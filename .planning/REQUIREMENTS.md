@@ -89,21 +89,21 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
-| FOUND-02 | Phase 1 | Pending |
-| CONN-01 | Phase 1 | Pending |
-| CONN-02 | Phase 1 | Pending |
-| COMP-01 | Phase 2 | Pending |
-| COMP-02 | Phase 2 | Pending |
-| COMP-03 | Phase 2 | Pending |
-| COMP-04 | Phase 2 | Pending |
-| SYS-01 | Phase 3 | Pending |
-| SYS-02 | Phase 3 | Pending |
-| SOLV-01 | Phase 3 | Pending |
-| SOLV-02 | Phase 3 | Pending |
-| VAL-01 | Phase 3 | Pending |
-| VAL-02 | Phase 3 | Pending |
-| VAL-03 | Phase 3 | Pending |
+| FOUND-01 | Phase 1 — Foundation | Pending |
+| FOUND-02 | Phase 1 — Foundation | Pending |
+| CONN-01 | Phase 1 — Foundation | Pending |
+| CONN-02 | Phase 1 — Foundation | Pending |
+| COMP-01 | Phase 2 — Components | Pending |
+| COMP-02 | Phase 2 — Components | Pending |
+| COMP-03 | Phase 2 — Components | Pending |
+| COMP-04 | Phase 2 — Components | Pending |
+| SYS-01 | Phase 3 — Integration and Validation | Pending |
+| SYS-02 | Phase 3 — Integration and Validation | Pending |
+| SOLV-01 | Phase 3 — Integration and Validation | Pending |
+| SOLV-02 | Phase 3 — Integration and Validation | Pending |
+| VAL-01 | Phase 3 — Integration and Validation | Pending |
+| VAL-02 | Phase 3 — Integration and Validation | Pending |
+| VAL-03 | Phase 3 — Integration and Validation | Pending |
 
 **Coverage:**
 - v1 requirements: 15 total
@@ -112,4 +112,4 @@
 
 ---
 *Requirements defined: 2026-03-12*
-*Last updated: 2026-03-12 after initial definition*
+*Last updated: 2026-03-12 after roadmap creation*
