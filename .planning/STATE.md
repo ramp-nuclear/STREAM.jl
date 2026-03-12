@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v0.1
 milestone_name: milestone
 current_phase: Phase 2 — Components
-current_plan: Plan 01 — Component Stubs and Test Scaffold (complete)
+current_plan: Plan 02 — Channel Implementation (complete)
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-03-12T01:25:47.511Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-03-12T01:31:36.817Z"
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 83
+  completed_plans: 6
+  percent: 100
 ---
 
 # STATE: STREAM.jl
@@ -33,18 +33,18 @@ progress:
 
 ## Current Position
 
-**Current phase:** Phase 2 — Components
-**Current plan:** Plan 02 — Channel Implementation (complete)
-**Status:** In progress
+**Current phase:** Phase 2 — Components (complete)
+**Current plan:** Plan 03 — Pump/Friction/Gravity Implementation (complete)
+**Status:** Phase 2 complete — ready for Phase 3
 
 **Progress:**
-[████████░░] 83%
+[██████████] 100%
 ```
 Phase 1: Foundation          [3/3 plans complete — Phase 1 DONE]
-Phase 2: Components          [2/3 plans complete — in progress]
+Phase 2: Components          [3/3 plans complete — Phase 2 DONE]
 Phase 3: Integration/Valid.  [ ] Not started
 
-Overall: 1/3 phases complete
+Overall: 2/3 phases complete
 
 ---
 
@@ -64,6 +64,7 @@ Overall: 1/3 phases complete
 | Phase 01-foundation P02 | 5 | 1 tasks | 1 files |
 | Phase 02-components P01 | 2min | 2 tasks | 3 files |
 | Phase 02-components P02 | 6 | 2 tasks | 2 files |
+| Phase 02-components P03 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Overall: 1/3 phases complete
 | Explicit `import STREAM: Channel` in test files | When STREAM exports Channel alongside Base, ambiguity must be resolved with explicit module import |
 | Rename kwarg D to Dh inside Channel function | Keyword arg `D` (Float64) shadows Differential(t) operator; explicit alias prevents Float64-callable MethodError |
 | mtkcompile(ch; fully_determined=false) for isolated component tests | Unconnected ports leave thermal.T and port_in.P unconstrained; fully_determined=false is the correct MTK approach for Phase 2 isolation testing |
+| [] as vars argument to System() for algebraic-only components | Pump and Gravity have no local state variables; empty vector avoids MTK variable tracking overhead |
+| A_grav parameter retained in Gravity even though unused in pressure equation | API consistency with future velocity observable; mirrors Friction's A_f pattern |
 
 ### Open Questions
 
@@ -103,9 +106,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-12T01:25:47.509Z
-**Stopped at:** Completed 02-02-PLAN.md
-**Next action:** Run PLAN 03 (Pump/Friction/Gravity) — Channel complete, use fully_determined=false pattern for all isolation tests.
+**Last session:** 2026-03-12T01:31:36.815Z
+**Stopped at:** Completed 02-03-PLAN.md
+**Next action:** Begin Phase 3 (Integration/Validation) — all four components ready: Channel, Pump, Friction, Gravity. Assemble closed forced-convection loop using compose() + connect() + mtkcompile().
 
 ---
 
