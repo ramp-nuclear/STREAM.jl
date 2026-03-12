@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.1
 milestone_name: milestone
-current_phase: Phase 3 — Integration and Validation (complete)
-current_plan: Plan 03 — Validation (complete)
+current_phase: Phase 4 — Tech Debt Cleanup (complete)
+current_plan: Plan 01 — v0.1 Audit Cleanup (complete)
 status: completed
-stopped_at: Phase 4 context gathered
-last_updated: "2026-03-12T20:48:19.728Z"
+stopped_at: Completed 04-tech-debt-cleanup-01-PLAN.md
+last_updated: "2026-03-12T21:11:54.172Z"
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
+  completed_phases: 4
+  total_plans: 11
+  completed_plans: 11
   percent: 100
 ---
 
@@ -33,9 +33,9 @@ progress:
 
 ## Current Position
 
-**Current phase:** Phase 3 — Integration and Validation (complete)
-**Current plan:** Plan 03 — Validation (complete)
-**Status:** Milestone complete
+**Current phase:** Phase 4 — Tech Debt Cleanup (complete)
+**Current plan:** Plan 01 — v0.1 Audit Cleanup (complete)
+**Status:** Phase 4 complete
 
 **Progress:**
 [██████████] 100%
@@ -43,8 +43,9 @@ progress:
 Phase 1: Foundation          [3/3 plans complete — Phase 1 DONE]
 Phase 2: Components          [4/4 plans complete — Phase 2 DONE]
 Phase 3: Integration/Valid.  [3/3 plans complete — Phase 3 DONE]
+Phase 4: Tech Debt Cleanup   [1/1 plans complete — Phase 4 DONE]
 
-Overall: 3/3 phases complete — MILESTONE v0.1 ACHIEVED
+Overall: 4/4 phases complete — v0.1 CODEBASE CLEAN
 
 ---
 
@@ -69,6 +70,7 @@ Overall: 3/3 phases complete — MILESTONE v0.1 ACHIEVED
 | Phase 03-integration-and-validation P01 | 68min | 2 tasks | 4 files |
 | Phase 03-integration-and-validation P02 | 18 | 1 tasks | 4 files |
 | Phase 03-integration-and-validation P03 | 15min | 2 tasks | 2 files |
+| Phase 04-tech-debt-cleanup P01 | 4min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -89,8 +91,8 @@ Overall: 3/3 phases complete — MILESTONE v0.1 ACHIEVED
 | Rename kwarg D to Dh inside Channel function | Keyword arg `D` (Float64) shadows Differential(t) operator; explicit alias prevents Float64-callable MethodError |
 | mtkcompile(ch; fully_determined=false) for isolated component tests | Unconnected ports leave thermal.T and port_in.P unconstrained; fully_determined=false is the correct MTK approach for Phase 2 isolation testing |
 | [] as vars argument to System() for algebraic-only components | Pump and Gravity have no local state variables; empty vector avoids MTK variable tracking overhead |
-| A_grav parameter retained in Gravity even though unused in pressure equation | API consistency with future velocity observable; mirrors Friction's A_f pattern |
-| Constructor kwargs renamed to match MTK parameter names (dP->dP_pump, A->A_grav) | Eliminates UndefKeywordError in consumer code; public API now identical to internal @parameters names |
+| Gravity BUG-01 fixed: @parameters H = H (single param, no A_grav) | MTK symbolic H shadows Julia Float64 kwarg in equation scope — param is now modifiable via setp post-compilation |
+| Channel/Friction param renames (L_ch→L, A_ch→A, L_f→L, A_f→A) | Equation bodies use Julia locals (safe); MTK symbolic paths now match Python STREAM convention |
 | TempBC component breaks circular instream() T dependency | MTK instream() resolves to connected stream T — in closed loop gives T=T_wall trivial equilibrium; TempBC injects fixed T_inlet as proper stream variable |
 | ch.thermal.T ~ T_wall only (no Q_flow constraint) | Setting both ThermalPort vars overspecifies; only T needs pinning — HTC equation determines Q_flow |
 | ch.port_in.T ~ T_inlet needed alongside TempBC | TempBC alone leaves residual circular T dependency; both constraints together give fully determined 12-equation system |
@@ -122,8 +124,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-12T20:48:19.723Z
-**Stopped at:** Phase 4 context gathered
+**Last session:** 2026-03-12T21:11:54.170Z
+**Stopped at:** Completed 04-tech-debt-cleanup-01-PLAN.md
 **Next action:** Milestone v0.1 complete. All 54 tests pass. Julia-STREAM validates within 1% of Python STREAM reference values.
 
 ---
