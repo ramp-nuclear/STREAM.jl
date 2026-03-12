@@ -81,9 +81,9 @@ function Channel(; name, n::Int, L, D, A)
     compose(System(eqs, t, all_vars, pars; name=name), port_in, port_out, thermal)
 end
 
-function Pump(; name, dP)
+function Pump(; name, dP_pump)
     pars = @parameters begin
-        dP_pump = dP
+        dP_pump = dP_pump
     end
     @named port_in  = FlowPort()
     @named port_out = FlowPort()
@@ -121,10 +121,10 @@ function Friction(; name, L, D, A)
     compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
 end
 
-function Gravity(; name, H, A)
+function Gravity(; name, H, A_grav)
     pars = @parameters begin
         H_grav = H
-        A_grav = A
+        A_grav = A_grav
     end
     @named port_in  = FlowPort()
     @named port_out = FlowPort()
