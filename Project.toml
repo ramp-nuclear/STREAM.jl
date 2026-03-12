@@ -1,0 +1,17 @@
+name = "STREAM"
+uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+authors = ["STREAM.jl Contributors"]
+version = "0.1.0"
+
+[deps]
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+
+[compat]
+DifferentialEquations = "7"
+ModelingToolkit = "11"
+Sundials = "5"
+Symbolics = "5, 6, 7"
+julia = "1.10"
