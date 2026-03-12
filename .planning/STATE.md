@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: Phase 2 — Components (complete)
 current_plan: Plan 04 — API Kwarg Rename (Pump/Gravity) (complete)
 status: planning
-stopped_at: Phase 3 context gathered
-last_updated: "2026-03-12T10:58:25.636Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-12T12:30:22.225Z"
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_plans: 10
+  completed_plans: 8
+  percent: 80
 ---
 
 # STATE: STREAM.jl
@@ -33,18 +33,18 @@ progress:
 
 ## Current Position
 
-**Current phase:** Phase 2 — Components (complete)
-**Current plan:** Plan 04 — API Kwarg Rename (Pump/Gravity) (complete)
-**Status:** Ready to plan
+**Current phase:** Phase 3 — Integration and Validation (in progress)
+**Current plan:** Plan 01 — Closed-Loop Assembly and Steady-State Solver (complete)
+**Status:** In progress
 
 **Progress:**
-[██████████] 100%
+[████████░░] 80%
 ```
 Phase 1: Foundation          [3/3 plans complete — Phase 1 DONE]
-Phase 2: Components          [3/3 plans complete — Phase 2 DONE]
-Phase 3: Integration/Valid.  [ ] Not started
+Phase 2: Components          [4/4 plans complete — Phase 2 DONE]
+Phase 3: Integration/Valid.  [1/3 plans complete — in progress]
 
-Overall: 2/3 phases complete
+Overall: 2.33/3 phases complete
 
 ---
 
@@ -66,6 +66,7 @@ Overall: 2/3 phases complete
 | Phase 02-components P02 | 6 | 2 tasks | 2 files |
 | Phase 02-components P03 | 3min | 2 tasks | 2 files |
 | Phase 02-components P04 | 3min | 2 tasks | 2 files |
+| Phase 03-integration-and-validation P01 | 68min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -88,11 +89,16 @@ Overall: 2/3 phases complete
 | [] as vars argument to System() for algebraic-only components | Pump and Gravity have no local state variables; empty vector avoids MTK variable tracking overhead |
 | A_grav parameter retained in Gravity even though unused in pressure equation | API consistency with future velocity observable; mirrors Friction's A_f pattern |
 | Constructor kwargs renamed to match MTK parameter names (dP->dP_pump, A->A_grav) | Eliminates UndefKeywordError in consumer code; public API now identical to internal @parameters names |
+| TempBC component breaks circular instream() T dependency | MTK instream() resolves to connected stream T — in closed loop gives T=T_wall trivial equilibrium; TempBC injects fixed T_inlet as proper stream variable |
+| ch.thermal.T ~ T_wall only (no Q_flow constraint) | Setting both ThermalPort vars overspecifies; only T needs pinning — HTC equation determines Q_flow |
+| ch.port_in.T ~ T_inlet needed alongside TempBC | TempBC alone leaves residual circular T dependency; both constraints together give fully determined 12-equation system |
+| KINSOL default globalization (no LineSearch) works with good initial guess | LineSearch finds trivial T=T_wall solution; default Newton with physics-based mdot_guess=0.490 kg/s converges to physical solution |
+| warn_initialize_determined=false for closed-loop SteadyStateProblem | MTK init system sees 22 eqs for 1 unknown (mdot) due to connector defaults; suppressing warning uses least-squares init correctly |
+| mtkcompile time ~12s for 12-equation closed loop | ANSWERED: Phase 3 benchmark; acceptable for interactive use, no assertion needed |
 
 ### Open Questions
 
-- MTK compile time on ~30-equation system — benchmark in Phase 3
-- Flow reversal: will ifelse() cause solver convergence issues? Fallback: tanh-smoothing
+- Flow reversal: will ifelse() cause solver convergence issues? Fallback: tanh-smoothing (still unanswered)
 
 ### Blockers
 
@@ -108,9 +114,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-12T10:58:25.633Z
-**Stopped at:** Phase 3 context gathered
-**Next action:** Begin Phase 3 (Integration/Validation) — all four components ready: Channel, Pump, Friction, Gravity. Assemble closed forced-convection loop using compose() + connect() + mtkcompile().
+**Last session:** 2026-03-12T12:28:00Z
+**Stopped at:** Completed 03-01-PLAN.md
+**Next action:** Plan 03-02 (transient solver) — build on build_loop() with ODEProblem + IDA(), implement solve_transient with Q_wall step change using PresetTimeCallback. Then 03-03 (Python STREAM reference generation and validation).
 
 ---
 

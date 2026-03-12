@@ -24,12 +24,12 @@
 
 ### System Assembly
 
-- [ ] **SYS-01**: Single closed loop (Pump → Friction → Channel → back to Pump) assembles, connects, and compiles with `mtkcompile` without errors
-- [ ] **SYS-02**: Clean user-facing API: construct components, connect them, set initial conditions, solve
+- [x] **SYS-01**: Single closed loop (Pump → Friction → Channel → back to Pump) assembles, connects, and compiles with `mtkcompile` without errors
+- [x] **SYS-02**: Clean user-facing API: construct components, connect them, set initial conditions, solve
 
 ### Solver Integration
 
-- [ ] **SOLV-01**: Steady-state solver: run closed loop to steady state, return named output variables (T per cell, mass flow, pressures)
+- [x] **SOLV-01**: Steady-state solver: run closed loop to steady state, return named output variables (T per cell, mass flow, pressures)
 - [ ] **SOLV-02**: Transient solver: simulate step change in channel power, return time-series solution
 
 ### Validation
@@ -97,9 +97,9 @@
 | COMP-02 | Phase 2 — Components | Complete |
 | COMP-03 | Phase 2 — Components | Complete |
 | COMP-04 | Phase 2 — Components | Complete |
-| SYS-01 | Phase 3 — Integration and Validation | Pending |
-| SYS-02 | Phase 3 — Integration and Validation | Pending |
-| SOLV-01 | Phase 3 — Integration and Validation | Pending |
+| SYS-01 | Phase 3 — Integration and Validation | Complete |
+| SYS-02 | Phase 3 — Integration and Validation | Complete |
+| SOLV-01 | Phase 3 — Integration and Validation | Complete |
 | SOLV-02 | Phase 3 — Integration and Validation | Pending |
 | VAL-01 | Phase 3 — Integration and Validation | Pending |
 | VAL-02 | Phase 3 — Integration and Validation | Pending |
