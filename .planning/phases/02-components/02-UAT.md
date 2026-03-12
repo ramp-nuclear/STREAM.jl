@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 02-components
 source: [02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md]
 started: 2026-03-12T01:45:00Z
@@ -93,32 +93,40 @@ skipped: 0
 
 ## Gaps
 
-- truth: "Channel(; name, n, L, D, A, mdot_0, cp_0) — initial mass flow and specific heat capacity configurable at construction"
+- truth: "Channel constructor kwarg names match PLAN documentation (mdot_0, cp_0 available or clearly absent by design)"
   status: failed
   reason: "User reported: MethodError: Channel only accepts (name, n, L, D, A) — mdot_0 and cp_0 are unsupported keyword arguments"
   severity: major
   test: 2
-  root_cause: ""
-  artifacts: []
+  root_cause: "Channel(; name, n, L, D, A) is the actual signature — mdot_0 and cp_0 were test authoring errors (never in the PLAN spec). Not a code bug; UAT test was wrong. No fix needed for Channel."
+  artifacts:
+    - path: "src/components.jl"
+      issue: "Channel signature line 15: (name, n, L, D, A) — correct as implemented"
   missing: []
   debug_session: ""
 
-- truth: "Pump(; name, dP_pump) — pressure rise parameter named dP_pump"
+- truth: "Pump constructor kwarg is named consistently with its MTK parameter (dP_pump at construction site)"
   status: failed
   reason: "User reported: UndefKeywordError: keyword argument `dP` not assigned — Pump uses `dP` not `dP_pump`"
   severity: major
   test: 4
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "Pump(; name, dP) uses `dP` as constructor kwarg but stores it as MTK parameter `dP_pump` internally (line 86). Constructor arg name `dP` is ambiguous — Phase 3 users assembling a loop need to know to pass `dP=` not `dP_pump=`. API inconsistency: internal MTK param name differs from constructor arg name."
+  artifacts:
+    - path: "src/components.jl"
+      issue: "line 84: function Pump(; name, dP) — kwarg is `dP`, but line 86 creates parameter `dP_pump = dP`"
+  missing:
+    - "Either rename constructor kwarg to `dP_pump` to match the MTK parameter, or document the discrepancy"
   debug_session: ""
 
-- truth: "Gravity(; name, H, A_grav) — cross-sectional area parameter named A_grav"
+- truth: "Gravity constructor kwarg is named consistently with its MTK parameter (A_grav at construction site)"
   status: failed
   reason: "User reported: UndefKeywordError: keyword argument `A` not assigned — Gravity uses `A` not `A_grav`"
   severity: major
   test: 6
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "Gravity(; name, H, A) uses `A` as constructor kwarg but stores it as MTK parameter `A_grav` internally (line 126-127). Same API inconsistency as Pump: constructor arg name differs from MTK param name. Also inconsistent with Friction which uses `A` → `A_f`, and Channel which uses `A` → `A_ch`."
+  artifacts:
+    - path: "src/components.jl"
+      issue: "line 124: function Gravity(; name, H, A) — kwarg is `A`, but line 127 creates parameter `A_grav = A`"
+  missing:
+    - "Standardize: either all constructors use descriptive kwarg names (dP_pump, A_grav) or all use short names (dP, A) — currently mixed"
   debug_session: ""
