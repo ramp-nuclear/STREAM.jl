@@ -31,8 +31,9 @@ end
     push!(op, ssys.fr.port_in.mdot => mdot_guess)
     push!(op, ssys.fr.Re => Re_guess)
 
+    # T_wall_final: raise wall temperature to increase heat input (step change)
     sol = STREAM.solve_transient(ssys, Q_sym, op, (0.0, 30.0);
-                                 Q_wall_final=2.0e4, t_step=10.0)
+                                 T_wall_final=393.15, t_step=10.0)
     @test length(sol.t) > 2
 end
 
@@ -51,7 +52,7 @@ end
     push!(op, ssys.fr.Re => Re_guess)
 
     sol = STREAM.solve_transient(ssys, Q_sym, op, (0.0, 30.0);
-                                 Q_wall_final=2.0e4, t_step=10.0)
+                                 T_wall_final=393.15, t_step=10.0)
     T_ts = sol[ssys.ch.T_out, :]
     @test !any(isnan, T_ts)
     @test !any(isinf, T_ts)

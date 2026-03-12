@@ -130,8 +130,101 @@ function solve_steady(ssys, op;
 end
 
 # ----------------------------------------------------------------
-# solve_transient  (stub -- implemented in plan 03-02)
+# build_loop_transient
+# Same topology as build_loop (Pump -> TempBC -> Friction -> Channel)
+# but with T_wall declared as a @parameters symbol so that
+# PresetTimeCallback + setp can modify it at runtime to simulate
+# a step change in wall heat input.
+#
+# Why T_wall rather than Q_wall as the modifiable parameter:
+#   Channel's energy balance uses h_tc[i] * (π*Dh) * dz * (thermal.T - T[i])
+#   — the driver is the wall temperature, not Q_flow directly. Q_flow is an
+#   observable (q_wall[i] ~ thermal.Q_flow / n) not in the energy balance.
+#   Stepping T_wall is equivalent to stepping the effective heat input.
+#
+# Returns (ssys, T_wall_sym) where T_wall_sym is the compiled parameter symbol.
+# Pass T_wall_sym as the second argument to solve_transient.
 # ----------------------------------------------------------------
-function solve_transient(ssys, op, tspan; Q_wall_final, t_step = 10.0)
-    error("solve_transient not yet implemented -- see plan 03-02")
+function build_loop_transient(;
+    n::Int   = 10,
+    L_ch     = 0.6,
+    D_ch     = 0.01,
+    A_ch     = 7.85e-5,
+    L_fr     = 0.3,
+    D_fr     = 0.01,
+    A_fr     = 7.85e-5,
+    dP_pump  = 3.0e4,
+    T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
+    T_wall_0 = 373.15,   # initial wall temperature (K); ~100°C
+)
+    @named pump = Pump(dP_pump = dP_pump)
+    @named fr   = Friction(L = L_fr, D = D_fr, A = A_fr)
+    @named ch   = Channel(n = n, L = L_ch, D = D_ch, A = A_ch)
+    @named bc   = _make_temp_bc(T_bc = T_inlet)   # temperature reset at pump outlet
+
+    # Declare T_wall as a modifiable parameter
+    ps = @parameters T_wall = T_wall_0
+
+    connections = [
+        connect(pump.port_out, bc.port_in),       # pump -> TempBC
+        connect(bc.port_out,   fr.port_in),        # TempBC -> friction
+        connect(fr.port_out,   ch.port_in),        # friction -> channel
+        connect(ch.port_out,   pump.port_in),      # channel -> pump (closed loop)
+        pump.port_in.P  ~ 1.0e5,                   # pressure gauge freedom fix
+        ch.thermal.T    ~ ps[1],                   # wall temperature (modifiable parameter)
+        ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
+    ]
+
+    @named sys = compose(
+        System(connections, t, [], ps; name = :sys),
+        pump, bc, fr, ch
+    )
+
+    t_compile = @elapsed ssys = mtkcompile(sys)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "build_loop_transient compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    return ssys, ps[1]
+end
+
+# ----------------------------------------------------------------
+# solve_transient
+# Simulates the closed loop with a step change in wall temperature
+# (which controls the effective wall heat input).
+#
+# ssys:         compiled system from build_loop_transient()
+# T_wall_sym:   parameter symbol from build_loop_transient() (second return value)
+# op:           Vector{Pair} — initial conditions for state variables
+#               (same structure as solve_steady op: ch.T[1..n], fr.port_in.mdot, fr.Re)
+# tspan:        (t_start, t_end) in seconds, e.g. (0.0, 60.0)
+# T_wall_final: new T_wall value (K) after the step change (e.g. 393.15 K for ~120°C)
+# t_step:       time of step change (s), default 10.0
+#
+# Returns ODESolution. Access time-series:
+#   sol[ssys.ch.T_out, :]      -- outlet T (K) at all time points
+#   sol.t                       -- time vector (s)
+# ----------------------------------------------------------------
+function solve_transient(ssys, T_wall_sym, op, tspan;
+                         T_wall_final,
+                         t_step = 10.0)
+    # MTK mtkcompile produces a mass-matrix ODE (implicit DAE form).
+    # IDA requires DAEProblem with explicit du0; CVODE_BDF cannot use mass matrices.
+    # Rodas5P is a stiff implicit Runge-Kutta solver that supports mass matrices
+    # and ODEProblem — the correct choice for MTK-generated DAE systems.
+    prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false)
+
+    # PresetTimeCallback: fires at t_step, sets T_wall to T_wall_final
+    # setp is in ModelingToolkit (not exported from public namespace)
+    T_wall_setter = ModelingToolkit.setp(ssys, T_wall_sym)
+    step_cb = PresetTimeCallback(
+        [t_step],
+        integrator -> T_wall_setter(integrator, T_wall_final)
+    )
+
+    # NoInit: skip MTK's automatic initialization (which fails for the rough
+    # guess op dict). The caller is responsible for providing a consistent-enough
+    # initial state (use steady_state_guess or a prior solve_steady solution).
+    sol = solve(prob, Rodas5P(); callback = step_cb, initializealg = SciMLBase.NoInit())
+    return sol
 end

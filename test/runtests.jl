@@ -200,4 +200,38 @@ end
     @test sol[ssys.fr.port_in.mdot] > 0     # positive mass flow
 end
 
+# ─────────────────────────────────────────────────────────────────
+# SOLV-02: solve_transient returns time-series with T_outlet rising
+# after T_wall step change
+# ─────────────────────────────────────────────────────────────────
+@testset "SOLV-02: build_loop_transient compiles" begin
+    ssys, T_wall_sym = build_loop_transient()
+    @test ssys isa ModelingToolkit.AbstractSystem
+    @test T_wall_sym isa Symbolics.Num   # T_wall parameter symbol returned
+end
+
+@testset "SOLV-02: solve_transient returns time-series" begin
+    n = 10
+    T_inlet = 313.15
+    Q_wall_0 = 1.0e4
+    mdot_guess = 0.490
+
+    ssys, T_wall_sym = build_loop_transient(T_inlet=T_inlet)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=Q_wall_0, mdot_guess=mdot_guess, n=n)
+    Re_guess = abs(mdot_guess) * 0.01 / (7.85e-5 * mu_water(T_inlet))
+
+    op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op, ssys.fr.port_in.mdot => mdot_guess)
+    push!(op, ssys.fr.Re => Re_guess)
+
+    # Step T_wall from 373.15 K (100°C) to 393.15 K (120°C) at t=10s
+    sol = solve_transient(ssys, T_wall_sym, op, (0.0, 30.0);
+                          T_wall_final=393.15, t_step=10.0)
+    @test sol.retcode == ReturnCode.Success
+    @test length(sol.t) > 2                            # multiple time points
+    T_ts = sol[ssys.ch.T_out, :]
+    @test !any(isnan, T_ts)                            # no NaN
+    @test T_ts[end] > T_ts[1]                          # T_outlet rises (VAL-02 qualitative)
+end
+
 end  # @testset "STREAM Phase 3 Tests"
