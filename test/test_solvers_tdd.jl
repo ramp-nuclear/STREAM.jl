@@ -1,7 +1,7 @@
 # test_solvers_tdd.jl -- TDD tests for src/solvers.jl (Phase 3, Plan 01)
-# RED phase: these tests should fail before solvers.jl is created
 
 using Test
+using ModelingToolkit
 using STREAM
 import STREAM: Channel, Pump, Friction  # resolve Base.Channel ambiguity
 
