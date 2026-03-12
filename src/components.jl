@@ -18,9 +18,9 @@ function Channel(; name, n::Int, L, D, A, g = 0.0)
     Dt = Differential(t)  # explicit Differential operator (avoids shadowing by D kwarg)
 
     pars = @parameters begin
-        L_ch  = L
+        L     = L
         D_h   = Dh
-        A_ch  = A
+        A     = A
         g_acc = g    # gravitational acceleration (m/s²); 0 for horizontal, 9.80665 for vertical
     end
 
@@ -100,9 +100,9 @@ end
 
 function Friction(; name, L, D, A)
     pars = @parameters begin
-        L_f = L
+        L   = L
         D_h = D
-        A_f = A
+        A   = A
     end
     vars = @variables begin
         Re(t)
@@ -123,11 +123,8 @@ function Friction(; name, L, D, A)
     compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
 end
 
-function Gravity(; name, H, A_grav)
-    pars = @parameters begin
-        H_grav = H
-        A_grav = A_grav
-    end
+function Gravity(; name, H)
+    pars = @parameters H = H
     @named port_in  = FlowPort()
     @named port_out = FlowPort()
     T_in = instream(port_in.T)

@@ -148,7 +148,7 @@ end
 end
 
 @testset "COMP-04: Gravity stub callable" begin
-    @named grav = Gravity(H=3.0, A_grav=7.85e-5)
+    @named grav = Gravity(H=3.0)
     @test grav isa ModelingToolkit.System
     @test_nowarn mtkcompile(grav; fully_determined=false)
 end
