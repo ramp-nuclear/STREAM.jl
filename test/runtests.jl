@@ -118,15 +118,20 @@ end  # @testset "STREAM Phase 1 Tests"
 @testset "STREAM Phase 2 Tests" begin
 
 @testset "COMP-01: Channel stub callable" begin
-    @test_throws ErrorException Channel(n=5, L=1.0, D=0.01, A=7.85e-5; name=:ch)
+    @named ch = Channel(n=5, L=1.0, D=0.01, A=7.85e-5)
+    @test ch isa ModelingToolkit.System
 end
 
 @testset "COMP-01: Channel equation count" begin
-    @test_skip "Requires implementation — Channel(n=5) should have exactly 5 energy balance ODEs"
+    @named ch = Channel(n=5, L=1.0, D=0.01, A=7.85e-5)
+    energy_eqs = filter(eq -> occursin("Differential", string(eq)), equations(ch))
+    @test length(energy_eqs) == 5
 end
 
 @testset "COMP-01: Channel mtkcompile" begin
-    @test_skip "Requires implementation — mtkcompile(Channel(n=5,...)) should succeed"
+    @named ch = Channel(n=5, L=1.0, D=0.01, A=7.85e-5)
+    # fully_determined=false required for isolated component with unconnected ports
+    @test_nowarn mtkcompile(ch; fully_determined=false)
 end
 
 @testset "COMP-02: Pump stub callable" begin
