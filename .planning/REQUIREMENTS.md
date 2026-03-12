@@ -12,8 +12,8 @@
 
 ### Connectors
 
-- [ ] **CONN-01**: `FlowPort` connector with pressure (across variable), mass flow (through/flow variable), and temperature variables
-- [ ] **CONN-02**: `ThermalPort` connector with temperature (across variable) and heat flow (through/flow variable)
+- [x] **CONN-01**: `FlowPort` connector with pressure (across variable), mass flow (through/flow variable), and temperature variables
+- [x] **CONN-02**: `ThermalPort` connector with temperature (across variable) and heat flow (through/flow variable)
 
 ### Components
 
@@ -91,8 +91,8 @@
 |-------------|-------|--------|
 | FOUND-01 | Phase 1 — Foundation | Complete |
 | FOUND-02 | Phase 1 — Foundation | Pending |
-| CONN-01 | Phase 1 — Foundation | Pending |
-| CONN-02 | Phase 1 — Foundation | Pending |
+| CONN-01 | Phase 1 — Foundation | Complete |
+| CONN-02 | Phase 1 — Foundation | Complete |
 | COMP-01 | Phase 2 — Components | Pending |
 | COMP-02 | Phase 2 — Components | Pending |
 | COMP-03 | Phase 2 — Components | Pending |
