@@ -135,15 +135,21 @@ end
 end
 
 @testset "COMP-02: Pump stub callable" begin
-    @test_throws ErrorException Pump(dP=1e4; name=:pump)
+    @named pump = Pump(dP=1e4)
+    @test pump isa ModelingToolkit.System
+    @test_nowarn mtkcompile(pump; fully_determined=false)
 end
 
 @testset "COMP-03: Friction stub callable" begin
-    @test_throws ErrorException Friction(L=1.0, D=0.01, A=7.85e-5; name=:fr)
+    @named fr = Friction(L=1.0, D=0.01, A=7.85e-5)
+    @test fr isa ModelingToolkit.System
+    @test_nowarn mtkcompile(fr; fully_determined=false)
 end
 
 @testset "COMP-04: Gravity stub callable" begin
-    @test_throws ErrorException Gravity(H=3.0, A=7.85e-5; name=:grav)
+    @named grav = Gravity(H=3.0, A=7.85e-5)
+    @test grav isa ModelingToolkit.System
+    @test_nowarn mtkcompile(grav; fully_determined=false)
 end
 
 end  # @testset "STREAM Phase 2 Tests"
