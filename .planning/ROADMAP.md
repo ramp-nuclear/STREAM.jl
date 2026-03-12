@@ -60,7 +60,12 @@ Plans:
   3. `solve_steady` returns T_outlet and mass flow that differ from Python STREAM reference values by less than 1% on identical inputs
   4. `solve_transient` with a step change in channel power returns a time-series where temperature evolution qualitatively matches Python STREAM (same direction, same timescale order of magnitude)
   5. `julia --project -e "using Pkg; Pkg.test()"` runs and passes all comparison tests against Python STREAM reference outputs automatically
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Closed-loop assembly, solve_steady, steady_state_guess (SYS-01, SYS-02, SOLV-01)
+- [ ] 03-02-PLAN.md — Transient solver with PresetTimeCallback step change (SOLV-02)
+- [ ] 03-03-PLAN.md — Python reference generation and Phase 3 test suite (VAL-01, VAL-02, VAL-03)
 
 ---
 
