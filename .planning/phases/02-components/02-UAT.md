@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: resolved
 phase: 02-components
 source: [02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md]
 started: 2026-03-12T01:45:00Z
-updated: 2026-03-12T02:10:00Z
+updated: 2026-03-12T04:15:00Z
 ---
 
 ## Current Test
@@ -94,7 +94,7 @@ skipped: 0
 ## Gaps
 
 - truth: "Channel constructor kwarg names match PLAN documentation (mdot_0, cp_0 available or clearly absent by design)"
-  status: failed
+  status: resolved
   reason: "User reported: MethodError: Channel only accepts (name, n, L, D, A) — mdot_0 and cp_0 are unsupported keyword arguments"
   severity: major
   test: 2
@@ -106,7 +106,7 @@ skipped: 0
   debug_session: ""
 
 - truth: "Pump constructor kwarg is named consistently with its MTK parameter (dP_pump at construction site)"
-  status: failed
+  status: resolved
   reason: "User reported: UndefKeywordError: keyword argument `dP` not assigned — Pump uses `dP` not `dP_pump`"
   severity: major
   test: 4
@@ -119,7 +119,7 @@ skipped: 0
   debug_session: ""
 
 - truth: "Gravity constructor kwarg is named consistently with its MTK parameter (A_grav at construction site)"
-  status: failed
+  status: resolved
   reason: "User reported: UndefKeywordError: keyword argument `A` not assigned — Gravity uses `A` not `A_grav`"
   severity: major
   test: 6
