@@ -8,7 +8,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Foundation** - Package scaffold, fluid properties, and connectors that all components depend on
+- [x] **Phase 1: Foundation** - Package scaffold, fluid properties, and connectors that all components depend on
 - [x] **Phase 2: Components** - All four thermal-hydraulic components with correct MTK equations (completed 2026-03-12)
 - [x] **Phase 3: Integration and Validation** - Closed loop assembly, solver API, and comparison against Python STREAM (completed 2026-03-12)
 
@@ -67,6 +67,38 @@ Plans:
 - [ ] 03-02-PLAN.md — Transient solver with PresetTimeCallback step change (SOLV-02)
 - [ ] 03-03-PLAN.md — Python reference generation and Phase 3 test suite (VAL-01, VAL-02, VAL-03)
 
+### Phase 4: Tech Debt Cleanup
+**Goal**: All known tech debt from the v0.1 audit is resolved — no dead parameters, no stale docstrings, no broken test files, naming convention aligned with Python STREAM
+**Depends on**: Phase 3
+**Requirements**: None (quality/cleanup — no new requirements)
+**Gap Closure**: Closes tech debt items from v0.1 audit
+**Success Criteria** (what must be TRUE):
+  1. `Gravity` component uses `H` as the MTK parameter in its pressure equation (BUG-01 fixed); `H_grav` and dead `A_grav` removed
+  2. Channel, Friction parameters renamed to drop `_ch`/`_f` suffixes: `L_ch→L`, `A_ch→A`, `L_f→L`, `A_f→A` (aligned with Python STREAM)
+  3. `solve_steady` docstring no longer references `ssys.fr.*`; example uses correct `ssys.ch.*` variables (BUG-02 fixed)
+  4. Stale TDD files removed: `test_transient_tdd.jl`, `test_solvers_tdd.jl` deleted; `test_comp_tdd.jl` unstaged deletion committed
+  5. `03-03-SUMMARY.md` `requirements-completed` frontmatter lists VAL-01, VAL-02, VAL-03
+  6. `Pkg.test()` still passes all 54 tests after all changes
+**Plans**: 1 plan
+
+Plans:
+- [ ] 04-01-PLAN.md — Fix BUG-01/BUG-02, rename parameters, clean stale files, fix SUMMARY frontmatter
+
+### Phase 5: Nyquist Validation
+**Goal**: All three v0.1 phases have formal validation records — the GSD system knows the code was verified, not just that tests pass
+**Depends on**: Phase 4
+**Requirements**: None (process/bookkeeping)
+**Gap Closure**: Closes Nyquist compliance gaps for phases 01, 02, 03
+**Success Criteria** (what must be TRUE):
+  1. Phase 01 has a completed Nyquist validation record
+  2. Phase 02 has a completed Nyquist validation record
+  3. Phase 03 has a completed Nyquist validation record
+  4. All three phases show `nyquist_compliant: true` in their metadata
+**Plans**: 1 plan
+
+Plans:
+- [ ] 05-01-PLAN.md — Run /gsd:validate-phase for phases 01, 02, 03
+
 ---
 
 ## Progress
@@ -76,8 +108,11 @@ Plans:
 | 1. Foundation | 3/3 | Done | 2026-03-12 |
 | 2. Components | 4/4 | Complete   | 2026-03-12 |
 | 3. Integration and Validation | 3/3 | Complete   | 2026-03-12 |
+| 4. Tech Debt Cleanup | 0/1 | Pending | — |
+| 5. Nyquist Validation | 0/1 | Pending | — |
 
 ---
 
 *Created: 2026-03-12*
 *Updated: 2026-03-12 — Phase 2 gap closure plan added (02-04)*
+*Updated: 2026-03-12 — Phases 4-5 added from v0.1 audit gap closure*
