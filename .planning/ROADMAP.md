@@ -42,7 +42,12 @@ Plans:
   3. `Friction(L=..., D=..., ...)` instantiates and its equation applies Darcy-Weisbach pressure drop with the Blasius friction factor
   4. `Gravity(H=..., ...)` instantiates and its equation applies the hydrostatic pressure term ρgh across its two FlowPorts
   5. Each component passes `mtkcompile` in isolation (no connection errors, no unresolved variables)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Test scaffold and component stubs (wave 0: enables parallel execution)
+- [ ] 02-02-PLAN.md — Channel implementation with array variables and Dittus-Boelter HTC (COMP-01)
+- [ ] 02-03-PLAN.md — Pump, Friction, Gravity algebraic component implementations (COMP-02, COMP-03, COMP-04)
 
 ### Phase 3: Integration and Validation
 **Goal**: A complete forced-convection loop runs, produces physically correct results, and those results match Python STREAM within tolerance
@@ -63,10 +68,10 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 1/3 | In Progress|  |
-| 2. Components | 0/? | Not started | - |
+| 2. Components | 0/3 | Not started | - |
 | 3. Integration and Validation | 0/? | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-12 — Phase 1 plans written*
+*Updated: 2026-03-12 — Phase 2 plans written*
