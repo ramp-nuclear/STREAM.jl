@@ -25,7 +25,12 @@
   2. `ρ_water(T)`, `cp_water(T)`, `μ_water(T)`, `k_water(T)` are callable symbolic functions; a short MTK model that uses them compiles without error
   3. `FlowPort` can be instantiated; it exposes pressure, mass flow, and temperature as symbolic variables with correct across/through semantics
   4. `ThermalPort` can be instantiated; it exposes temperature (across) and heat flow (through) as symbolic variables
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Package scaffold, source stubs, and complete test suite
+- [ ] 01-02-PLAN.md — Simantov fluid property implementations (FOUND-02)
+- [ ] 01-03-PLAN.md — Connector verification and finalization (CONN-01, CONN-02)
 
 ### Phase 2: Components
 **Goal**: Each thermal-hydraulic component is implemented as a standalone MTK component that can be instantiated and inspected in isolation
@@ -57,10 +62,11 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/? | Not started | - |
+| 1. Foundation | 0/3 | Planning done | - |
 | 2. Components | 0/? | Not started | - |
 | 3. Integration and Validation | 0/? | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
+*Updated: 2026-03-12 — Phase 1 plans written*
