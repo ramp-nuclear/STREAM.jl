@@ -135,7 +135,7 @@ end
 end
 
 @testset "COMP-02: Pump stub callable" begin
-    @named pump = Pump(dP=1e4)
+    @named pump = Pump(dP_pump=1e4)
     @test pump isa ModelingToolkit.System
     @test_nowarn mtkcompile(pump; fully_determined=false)
 end
@@ -147,7 +147,7 @@ end
 end
 
 @testset "COMP-04: Gravity stub callable" begin
-    @named grav = Gravity(H=3.0, A=7.85e-5)
+    @named grav = Gravity(H=3.0, A_grav=7.85e-5)
     @test grav isa ModelingToolkit.System
     @test_nowarn mtkcompile(grav; fully_determined=false)
 end
