@@ -1,6 +1,7 @@
 using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
+using DifferentialEquations: ReturnCode
 using STREAM
 import STREAM: Channel, Pump, Friction, Gravity  # resolve ambiguity with Base.Channel
 
@@ -153,3 +154,50 @@ end
 end
 
 end  # @testset "STREAM Phase 2 Tests"
+
+@testset "STREAM Phase 3 Tests" begin
+
+# ─────────────────────────────────────────────────────────────────
+# SYS-01: build_loop assembles and compiles without error
+# ─────────────────────────────────────────────────────────────────
+@testset "SYS-01: build_loop compiles closed loop" begin
+    ssys = build_loop()
+    @test ssys isa ModelingToolkit.AbstractSystem
+    # mtkcompile benchmark reported via @info (not asserted)
+end
+
+# ─────────────────────────────────────────────────────────────────
+# SYS-02: steady_state_guess returns physically correct profile
+# ─────────────────────────────────────────────────────────────────
+@testset "SYS-02: steady_state_guess monotonically increasing" begin
+    T = steady_state_guess(T_inlet=313.15, Q_wall=1e4, mdot_guess=0.1, n=10)
+    @test length(T) == 10
+    @test T[1] > 313.15       # first cell above inlet temperature
+    @test all(diff(T) .> 0)   # monotonically increasing
+end
+
+# ─────────────────────────────────────────────────────────────────
+# SOLV-01: solve_steady returns physical steady-state solution
+# ─────────────────────────────────────────────────────────────────
+@testset "SOLV-01: solve_steady returns physical solution" begin
+    n = 10
+    T_inlet = 313.15
+    Q_wall  = 1.0e4
+    mdot_guess = 0.490  # physics-based estimate for 30 kPa pump, 0.01m pipe
+
+    ssys = build_loop(T_inlet=T_inlet)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=Q_wall, mdot_guess=mdot_guess, n=n)
+    Re_guess = abs(mdot_guess) * 0.01 / (7.85e-5 * mu_water(T_inlet))
+
+    op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op, ssys.fr.port_in.mdot => mdot_guess)
+    push!(op, ssys.fr.Re => Re_guess)
+
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    @test sol[ssys.ch.T_out] > T_inlet      # outlet > inlet (fluid heated)
+    @test sol[ssys.ch.T_out] < 400.0        # physically reasonable (< 127°C)
+    @test sol[ssys.fr.port_in.mdot] > 0     # positive mass flow
+end
+
+end  # @testset "STREAM Phase 3 Tests"
