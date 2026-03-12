@@ -17,10 +17,10 @@
 
 ### Components
 
-- [ ] **COMP-01**: `Channel` — n-cell 1D finite-volume coolant, single-phase, Dittus-Boelter HTC, FlowPort in/out and ThermalPort for wall heat input
-- [ ] **COMP-02**: `Pump` — constant pressure rise, FlowPort in/out
-- [ ] **COMP-03**: `Friction` — Darcy-Weisbach pressure drop with Blasius friction factor, FlowPort in/out
-- [ ] **COMP-04**: `Gravity` — hydrostatic pressure term (ρgh), FlowPort in/out
+- [x] **COMP-01**: `Channel` — n-cell 1D finite-volume coolant, single-phase, Dittus-Boelter HTC, FlowPort in/out and ThermalPort for wall heat input
+- [x] **COMP-02**: `Pump` — constant pressure rise, FlowPort in/out
+- [x] **COMP-03**: `Friction` — Darcy-Weisbach pressure drop with Blasius friction factor, FlowPort in/out
+- [x] **COMP-04**: `Gravity` — hydrostatic pressure term (ρgh), FlowPort in/out
 
 ### System Assembly
 
@@ -93,10 +93,10 @@
 | FOUND-02 | Phase 1 — Foundation | Complete |
 | CONN-01 | Phase 1 — Foundation | Complete |
 | CONN-02 | Phase 1 — Foundation | Complete |
-| COMP-01 | Phase 2 — Components | Pending |
-| COMP-02 | Phase 2 — Components | Pending |
-| COMP-03 | Phase 2 — Components | Pending |
-| COMP-04 | Phase 2 — Components | Pending |
+| COMP-01 | Phase 2 — Components | Complete |
+| COMP-02 | Phase 2 — Components | Complete |
+| COMP-03 | Phase 2 — Components | Complete |
+| COMP-04 | Phase 2 — Components | Complete |
 | SYS-01 | Phase 3 — Integration and Validation | Pending |
 | SYS-02 | Phase 3 — Integration and Validation | Pending |
 | SOLV-01 | Phase 3 — Integration and Validation | Pending |
