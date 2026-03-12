@@ -1,42 +1,74 @@
 # Fluid property functions for light water (Simantov correlations)
-# Stub implementation — replaced by Plan 02
-# Temperature input: Kelvin. No range guards (ForwardDiff compatibility).
+# Source: Python STREAM light_water.py — coefficients ported verbatim
+# Temperature input: Kelvin. Converts internally. No range guards (ForwardDiff compatibility).
 
+# Internal helper — not exported
 _to_fahrenheit(T_C::Real) = 1.8 * T_C + 32.0
 
 """
     rho_water(T_K) -> kg/m³
-Saturated liquid water density (Simantov). T_K in Kelvin.
+
+Saturated liquid water density (Simantov correlation).
+T_K: temperature in Kelvin.
+
+Note: uses Fahrenheit internally — this is a quirk of the Simantov correlation.
 """
 function rho_water(T_K::Real)
-    return 0.0  # STUB — Plan 02 implements
+    T_C = T_K - 273.15
+    T_F = _to_fahrenheit(T_C)
+    A =  1004.789042
+    B =    -0.046283
+    C =    -7.9738e-4
+    return abs(A + B * T_F + C * T_F^2)
 end
 
 """
     cp_water(T_K) -> J/(kg·K)
-Specific heat of saturated liquid water (Simantov). T_K in Kelvin.
+
+Specific heat of saturated liquid water (Simantov correlation).
+T_K: temperature in Kelvin.
 """
 function cp_water(T_K::Real)
-    return 0.0  # STUB — Plan 02 implements
+    T_C = abs(T_K - 273.15)   # abs matches Python STREAM's np.abs(T)
+    A =  17.48908904
+    B =  -1.67507e-3
+    C =  -0.03189591
+    D =  -2.8748e-6
+    return sqrt((A + C * T_C) / (1 + B * T_C + D * T_C^2)) * 1000.0
 end
 
 """
     mu_water(T_K) -> Pa·s
-Dynamic viscosity of saturated liquid water (Simantov). T_K in Kelvin.
+
+Dynamic viscosity of saturated liquid water (Simantov correlation).
+T_K: temperature in Kelvin.
 """
 function mu_water(T_K::Real)
-    return 0.0  # STUB — Plan 02 implements
+    T_C = T_K - 273.15
+    A = -6.325203964
+    B =  8.705317e-3
+    C = -0.088832314
+    D = -9.657e-7
+    return exp((A + C * T_C) / (1 + B * T_C + D * T_C^2))
 end
 
 """
     k_water(T_K) -> W/(m·K)
-Thermal conductivity of saturated liquid water (Simantov). T_K in Kelvin.
+
+Thermal conductivity of saturated liquid water (Simantov correlation).
+T_K: temperature in Kelvin.
 """
 function k_water(T_K::Real)
-    return 0.0  # STUB — Plan 02 implements
+    T_C = T_K - 273.15
+    A =  0.5677829144
+    B =  1.8774171e-3
+    C = -8.1790e-6
+    D =  5.66294775e-9
+    return abs(A + B * T_C + C * T_C^2 + D * T_C^3)
 end
 
-# @register_symbolic must be at module top-level — placed here after definitions
+# @register_symbolic must be at module top-level (not inside any function or begin block).
+# These lines make the functions callable with symbolic MTK variables (Num type).
 @register_symbolic rho_water(T::Real)
 @register_symbolic cp_water(T::Real)
 @register_symbolic mu_water(T::Real)
