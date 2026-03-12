@@ -4,15 +4,15 @@ milestone: v0.1
 milestone_name: milestone
 current_phase: Phase 2 — Components
 current_plan: Plan 01 — Component Stubs and Test Scaffold (complete)
-status: in-progress
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-03-12T01:00:00Z"
+status: executing
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-03-12T01:25:47.511Z"
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
-  percent: 67
+  completed_plans: 5
+  percent: 83
 ---
 
 # STATE: STREAM.jl
@@ -34,14 +34,14 @@ progress:
 ## Current Position
 
 **Current phase:** Phase 2 — Components
-**Current plan:** Plan 01 — Component Stubs and Test Scaffold (complete)
+**Current plan:** Plan 02 — Channel Implementation (complete)
 **Status:** In progress
 
 **Progress:**
-[████████░░] 67%
+[████████░░] 83%
 ```
 Phase 1: Foundation          [3/3 plans complete — Phase 1 DONE]
-Phase 2: Components          [1/3 plans complete — in progress]
+Phase 2: Components          [2/3 plans complete — in progress]
 Phase 3: Integration/Valid.  [ ] Not started
 
 Overall: 1/3 phases complete
@@ -63,6 +63,7 @@ Overall: 1/3 phases complete
 | Phase 01-foundation P03 | 1min | 1 tasks | 0 files |
 | Phase 01-foundation P02 | 5 | 1 tasks | 1 files |
 | Phase 02-components P01 | 2min | 2 tasks | 3 files |
+| Phase 02-components P02 | 6 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Overall: 1/3 phases complete
 | Symbolics compat must include v7 | MTK v11 requires Symbolics v7, not just 5-6 |
 | `function Channel end` required to avoid Base.Channel conflict | Julia 1.12 requires explicit forward declaration to create new generic function with same name as Base type |
 | Explicit `import STREAM: Channel` in test files | When STREAM exports Channel alongside Base, ambiguity must be resolved with explicit module import |
+| Rename kwarg D to Dh inside Channel function | Keyword arg `D` (Float64) shadows Differential(t) operator; explicit alias prevents Float64-callable MethodError |
+| mtkcompile(ch; fully_determined=false) for isolated component tests | Unconnected ports leave thermal.T and port_in.P unconstrained; fully_determined=false is the correct MTK approach for Phase 2 isolation testing |
 
 ### Open Questions
 
@@ -100,9 +103,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-12T01:00:00Z
-**Stopped at:** Completed 02-01-PLAN.md — Component stubs and test scaffold
-**Next action:** Run PLAN 02 (Channel implementation) and PLAN 03 (Pump/Friction/Gravity) — both can run in parallel now that wave-0 harness is in place.
+**Last session:** 2026-03-12T01:25:47.509Z
+**Stopped at:** Completed 02-02-PLAN.md
+**Next action:** Run PLAN 03 (Pump/Friction/Gravity) — Channel complete, use fully_determined=false pattern for all isolation tests.
 
 ---
 
