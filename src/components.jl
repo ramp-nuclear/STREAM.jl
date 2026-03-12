@@ -12,15 +12,16 @@
 
 # Declare as new generic functions independent of Base
 function Channel end
-function Channel(; name, n::Int, L, D, A)
+function Channel(; name, n::Int, L, D, A, g = 0.0)
     # Rename plain-Julia D to Dh so it doesn't shadow Differential(t) operator
     Dh = D
     Dt = Differential(t)  # explicit Differential operator (avoids shadowing by D kwarg)
 
     pars = @parameters begin
-        L_ch = L
-        D_h  = Dh
-        A_ch = A
+        L_ch  = L
+        D_h   = Dh
+        A_ch  = A
+        g_acc = g    # gravitational acceleration (m/s²); 0 for horizontal, 9.80665 for vertical
     end
 
     vars = @variables begin
@@ -66,7 +67,8 @@ function Channel(; name, n::Int, L, D, A)
     f_ch    = 0.3164 * Re_mean^(-0.25)
     push!(eqs, T_out ~ T[n])
     push!(eqs, dP    ~ f_ch * (port_in.mdot * abs(port_in.mdot) /
-                                (2 * rho_water(T[i_mid]) * A^2)) * (L / Dh))
+                                (2 * rho_water(T[i_mid]) * A^2)) * (L / Dh)
+                      + rho_water(T[i_mid]) * g_acc * L)
 
     # Port wiring
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)

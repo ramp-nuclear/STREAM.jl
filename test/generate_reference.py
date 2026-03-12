@@ -2,232 +2,143 @@
 """
 generate_reference.py -- Python STREAM reference value generator
 
-Run this script ONCE to obtain reference values for Julia-STREAM VAL-01 tests:
+Run ONCE to obtain reference values for Julia-STREAM VAL-01 cross-validation:
   cd /home/itay/projects/Julia-STREAM/test && python generate_reference.py
 
-Requires Python STREAM to be installed and importable from ~/projects/STREAM.
+Requires Python STREAM at ~/projects/STREAM.
 
 UNIT CONVENTION:
-  Python STREAM uses CELSIUS for temperature inputs/outputs.
-  Julia-STREAM uses KELVIN.
-  This script converts all outputs to KELVIN before printing.
-  Verification: 313.15 K - 273.15 = 40.0 degC (inlet temperature).
+  Python STREAM: CELSIUS.  Julia-STREAM: KELVIN.
+  Outputs are converted to Kelvin before printing.
 
-PHYSICS MODEL:
-  This script uses the SAME fluid property correlations as Python STREAM
-  (Simantov correlations from stream.substances.light_water) combined with
-  the same physics that Julia-STREAM implements:
+PHYSICS / TOPOLOGY:
+  Pump → HeatExchanger(40°C) → ChannelAndContacts → back to Pump
 
-  Thermal model (Channel steady-state, first-order upwind):
-    mdot * cp(T[i]) * (T[i] - T[i-1]) = h_tc * pi*D_h*dz * (T_wall - T[i])
-  where:
-    h_tc = Dittus-Boelter HTC: Nu = 0.023 * Re^0.8 * Pr^0.4, h = Nu*k/D_h
-    T_wall = 373.15 K = 100 degC (Julia-STREAM build_loop default)
+  HeatExchanger pins inlet temperature to 40°C, equivalent to Julia-STREAM's TempBC.
+  ChannelAndContacts computes Dittus-Boelter HTC and Darcy-Weisbach friction internally.
+  Julia Channel also computes friction internally — no separate Friction component in either.
 
-  Hydraulic model (Darcy-Weisbach + Blasius):
-    dP = f_Blasius * L/D * mdot^2 / (2*rho*A^2)
-    f_Blasius = 0.316 * Re^{-0.25} (turbulent, Re > 2300)
-    Loop balance: dP_pump = |dP_ch| + |dP_fr|
-
-  NOTE: Python STREAM's stream.solvers requires scikits.odes (SUNDIALS).
-  This script bypasses that dependency and calls scipy.optimize.root directly
-  (the same solver used internally by stream.solvers.algebraic).
-  The fluid properties are loaded via a mock of scikits.odes.
+  Parameters matching Julia-STREAM build_loop() defaults:
+    - Pump: dP = 30 kPa
+    - Channel: n=10, L=0.6m, D=0.01m, A=7.85e-5 m²
+    - T_wall = 373.15 K = 100 C  (T_left = T_right = 100 C, symmetric circular pipe)
+    - T_inlet = 313.15 K = 40 C
+    - Horizontal loop: g=0 (Julia Channel.g_acc=0 default)
+    - Absolute pressure reference: 1e5 Pa
 """
 
 import sys
 import os
-import types
+from functools import partial
+import numpy as np
 
-# Add Python STREAM to path
 STREAM_PATH = os.path.expanduser("~/projects/STREAM")
 sys.path.insert(0, STREAM_PATH)
 
-# Mock scikits.odes to allow importing Python STREAM without SUNDIALS installed.
-# Only the algebraic (scipy-based) solver is needed; scikits is only needed for DAE.
-_scikits = types.ModuleType('scikits')
-_scikits_odes = types.ModuleType('scikits.odes')
-_scikits.odes = _scikits_odes
-_scikits_odes.dae = None
-sys.modules.setdefault('scikits', _scikits)
-sys.modules.setdefault('scikits.odes', _scikits_odes)
+# Unit conversion checks
+T_INLET_C = 40.0
+T_WALL_C  = 100.0
+T_INLET_K = T_INLET_C + 273.15
+T_WALL_K  = T_WALL_C  + 273.15
+assert abs(T_INLET_K - 313.15) < 1e-9
+assert abs(T_WALL_K  - 373.15) < 1e-9
 
-# Unit conversion check
-T_inlet_K = 313.15
-T_inlet_C = 40.0
-assert abs(T_inlet_K - 273.15 - T_inlet_C) < 1e-9, "Unit conversion sanity check failed"
+# Parameters matching Julia-STREAM build_loop() defaults
+N       = 10
+L_CH    = 0.6
+D_H     = 0.01
+DP_PUMP = 3.0e4
+P_ABS   = 1.0e5
 
-# Reference geometry (identical to Julia-STREAM test case)
-N_CELLS   = 10
-L_CH      = 0.6       # m
-D_H       = 0.01      # m
-A_CH      = 7.85e-5   # m^2
-L_FR      = 0.3       # m
-A_FR      = 7.85e-5   # m^2
-DP_PUMP   = 3.0e4     # Pa
-# Julia-STREAM build_loop() default: T_wall = 373.15 K = 100 degC
-T_WALL_C  = 373.15 - 273.15   # 100.0 degC
+from stream.calculations import Pump, HeatExchanger
+from stream.calculations.channel import ChannelAndContacts
+from stream.composition.cycle import FlowGraph, flow_edge
+from stream.pipe_geometry import EffectivePipe
+from stream.substances import light_water
+from stream.jacobians import ALG_jacobian
+from stream.physical_models.pressure_drop import pressure_diff
+
+pipe_ch = EffectivePipe.circular(length=L_CH, diameter=D_H)
+
+pump = Pump(pressure=DP_PUMP)
+
+# HeatExchanger pins coolant temperature to T_inlet at the pump outlet.
+# Equivalent to Julia-STREAM's TempBC component which resets fluid to T_inlet
+# before it enters the heated channel, breaking the circular thermal dependency.
+hx = HeatExchanger(outlet=T_INLET_C, name="HX")
+
+# ChannelAndContacts: computes Dittus-Boelter HTC self-consistently from flow.
+# Friction is already included internally via pressure_diff (Darcy-Weisbach).
+# g=0: Julia build_loop() Channel uses pure Darcy-Weisbach, no gravity term.
+# T_left=T_right=T_wall: symmetric heating matches Julia's single thermal.T port
+# (h_tc[i] * pi*D * dz * (T_wall - T[i])) on a circular pipe.
+channel = ChannelAndContacts(
+    z_boundaries=np.linspace(0, L_CH, N + 1),
+    fluid=light_water,
+    pipe=pipe_ch,
+    pressure_func=partial(pressure_diff, g=0),
+    name="Channel",
+)
+
+# FlowGraph: Pump+HX on forward edge, Channel on return edge.
+# reference_node pins absolute pressure at "A" (matches Julia: pump.port_in.P ~ 1e5).
+fg = FlowGraph(
+    flow_edge(("A", "B"), pump, hx),
+    flow_edge(("B", "A"), channel),
+    funcs={
+        channel: dict(
+            T_left=T_WALL_C,
+            T_right=T_WALL_C,
+            p_abs=P_ABS,
+        ),
+    },
+    reference_node=("A", P_ABS),
+    abs_pressure_comps=[channel],
+)
+
+agr = fg.aggregator
+K   = fg.kirchhoff
 
 try:
-    import numpy as np
-    from scipy import optimize as opt
-
-    # Import Python STREAM fluid properties (Simantov correlations, Celsius-based)
-    from stream.substances.light_water import light_water
-
-    def rho(T_C):
-        return light_water.density(T_C)
-
-    def cp_f(T_C):
-        return light_water.specific_heat(T_C)
-
-    def mu_f(T_C):
-        return light_water.viscosity(T_C)
-
-    def k_f(T_C):
-        return light_water.conductivity(T_C)
-
-    def dittus_boelter_h(T_C, mdot):
-        """Dittus-Boelter HTC using Python STREAM fluid properties.
-        Nu = 0.023 * Re^0.8 * Pr^0.4, h = Nu * k / D_h
-        Matches Julia-STREAM Channel component.
-        """
-        mu_v  = mu_f(T_C)
-        rho_v = rho(T_C)
-        cp_v  = cp_f(T_C)
-        k_v   = k_f(T_C)
-        Re    = abs(mdot) * D_H / (A_CH * mu_v)
-        Pr    = mu_v * cp_v / k_v
-        Nu    = 0.023 * Re**0.8 * Pr**0.4
-        return Nu * k_v / D_H
-
-    def blasius_f(Re):
-        """Blasius friction factor (matches Julia-STREAM Friction component)."""
-        if Re < 2300.0:
-            return 64.0 / max(Re, 1.0)   # Hagen-Poiseuille laminar
-        return 0.316 * Re**(-0.25)        # Blasius turbulent
-
-    def darcy_weisbach_dp(mdot, L, D, A, T_C):
-        """Darcy-Weisbach pressure drop (negative = loss).
-        dP = -f * L/D * mdot^2 / (2 * rho * A^2)
-        """
-        rho_v = rho(T_C)
-        mu_v  = mu_f(T_C)
-        Re    = abs(mdot) * D / (A * mu_v)
-        f     = blasius_f(Re)
-        return -f * L / D * mdot**2 / (2.0 * rho_v * A**2)
-
-    def steady_state_residuals(x):
-        """
-        State vector:
-          x[0]     = mdot (kg/s)
-          x[1:11]  = T[0..9] (Celsius, bulk temperature in each of N_CELLS cells)
-
-        Equations (N_CELLS + 1 total):
-          [0]   Pressure balance: DP_pump + dP_ch(mdot, T_avg) + dP_fr(mdot, T_inlet) = 0
-          [i+1] Energy balance cell i:
-                mdot * cp(T[i]) * (T[i] - T_in_i) - h_tc * pi*D_h*dz * (T_wall - T[i]) = 0
-        """
-        mdot = x[0]
-        T    = x[1:]
-
-        residuals = np.empty(N_CELLS + 1)
-
-        # Inlet temperature for each cell (first-order upwind)
-        T_in    = np.empty(N_CELLS)
-        T_in[0] = T_inlet_C
-        T_in[1:] = T[:-1]
-
-        dz = L_CH / N_CELLS
-
-        # Energy balance for each cell
-        for i in range(N_CELLS):
-            h_tc    = dittus_boelter_h(T[i], mdot)
-            q_wall  = h_tc * np.pi * D_H * dz * (T_WALL_C - T[i])
-            q_conv  = mdot * cp_f(T[i]) * (T[i] - T_in[i])
-            residuals[i + 1] = q_conv - q_wall
-
-        # Pressure balance (loop): pump + channel friction + friction component = 0
-        T_avg  = np.mean(T)
-        dP_ch  = darcy_weisbach_dp(mdot, L_CH, D_H, A_CH, T_avg)
-        dP_fr  = darcy_weisbach_dp(mdot, L_FR, D_H, A_FR, T_in[0])
-        residuals[0] = DP_PUMP + dP_ch + dP_fr
-
-        return residuals
-
-    # Physics-based initial guess (from Julia-STREAM Phase 3 Plan 01 result)
-    mdot_guess = 0.490   # kg/s
-    h_guess    = dittus_boelter_h(T_inlet_C, mdot_guess)
-    Q_rough    = h_guess * np.pi * D_H * L_CH * (T_WALL_C - T_inlet_C)
-    cp_in      = cp_f(T_inlet_C)
-    T_guess    = np.array([T_inlet_C + (i + 0.5) * Q_rough / (N_CELLS * mdot_guess * cp_in)
-                           for i in range(N_CELLS)])
-
-    x0 = np.empty(N_CELLS + 1)
-    x0[0]  = mdot_guess
-    x0[1:] = T_guess
-
-    result = opt.root(steady_state_residuals, x0, method='hybr',
-                      options={'xtol': 1e-10, 'maxfev': 50000})
-
-    if not result.success:
-        raise RuntimeError(f"Solver did not converge: {result.message}\n"
-                           f"Max residual: {np.max(np.abs(result.fun)):.3e}")
-
-    mdot_sol   = result.x[0]
-    T_sol_C    = result.x[1:]
-    T_outlet_C = T_sol_C[-1]
-    T_outlet_K = T_outlet_C + 273.15
-    mdot       = mdot_sol
-
-    # Sanity checks
-    assert T_outlet_K > T_inlet_K,  "T_outlet must be above T_inlet"
-    assert T_outlet_K < 450.0,      "T_outlet > 177 degC is physically unreasonable"
-    assert mdot > 1e-4,             "mdot must be positive and non-negligible"
-
-    print("=" * 60)
-    print("Python STREAM reference values (for hardcoding in runtests.jl)")
-    print("=" * 60)
-    print(f"T_outlet_kelvin = {T_outlet_K:.6f}")
-    print(f"mdot            = {mdot:.6f}")
-    print()
-    print("Hardcode in test/runtests.jl VAL-01 testset:")
-    print(f"  T_outlet_ref = {T_outlet_K:.4f}   # K  (Python STREAM: {T_outlet_C:.4f} degC)")
-    print(f"  mdot_ref     = {mdot:.6f}  # kg/s")
-    print()
-    print("Inputs used:")
-    print(f"  T_inlet = {T_inlet_C} degC = {T_inlet_K} K")
-    print(f"  T_wall  = {T_WALL_C} degC = {T_WALL_C + 273.15} K (Julia-STREAM build_loop default)")
-    print(f"  dP_pump = {DP_PUMP} Pa")
-    print(f"  n={N_CELLS}, L_ch={L_CH}m, D_h={D_H}m, A_ch={A_CH} m^2")
-    print()
-    print("Physical checks:")
-    Re_val  = abs(mdot) * D_H / (A_CH * mu_f(T_inlet_C))
-    h_out   = dittus_boelter_h(T_outlet_C, mdot)
-    T_avg   = np.mean(T_sol_C)
-    dP_ch   = darcy_weisbach_dp(mdot, L_CH, D_H, A_CH, T_avg)
-    dP_fr   = darcy_weisbach_dp(mdot, L_FR, D_H, A_FR, T_inlet_C)
-    print(f"  Re = {Re_val:.1f}")
-    print(f"  h_outlet = {h_out:.2f} W/m^2/K")
-    print(f"  dP_ch = {dP_ch:.1f} Pa  (channel friction)")
-    print(f"  dP_fr = {dP_fr:.1f} Pa  (friction component)")
-    print(f"  Pressure balance residual: {DP_PUMP + dP_ch + dP_fr:.3e} Pa")
-
-except ImportError as e:
-    print(f"ERROR: Could not import Python STREAM: {e}")
-    print(f"Expected path: {STREAM_PATH}")
-    print()
-    print("If Python STREAM is not available, use these placeholder values")
-    print("(replace after running this script with Python STREAM installed):")
-    print()
-    print("  T_outlet_ref = 0.0   # PLACEHOLDER -- run generate_reference.py")
-    print("  mdot_ref     = 0.0   # PLACEHOLDER -- run generate_reference.py")
-    sys.exit(1)
-
+    fg.check_gravity_mismatch()
 except Exception as e:
-    print(f"ERROR running script: {e}")
-    import traceback
-    traceback.print_exc()
-    print()
-    print("Key: the script must produce T_outlet in Kelvin and mdot in kg/s.")
-    raise
+    print(f"WARNING gravity check: {e}")
+
+# Initial guess
+mdot_guess = 0.5
+guess = fg.guess_steady_state(
+    mdots={pump: mdot_guess, hx: mdot_guess, channel: mdot_guess},
+    temperature=T_INLET_C,
+)
+# Augment with ChannelAndContacts thermal state (T_cool, h_left, h_right)
+guess[channel.name].update({
+    "T_cool":  np.linspace(T_INLET_C, T_INLET_C + 13, N),
+    "h_left":  1.5e4 * np.ones(N),
+    "h_right": 1.5e4 * np.ones(N),
+})
+
+guess_vec = agr.load(guess)
+sol_vec   = agr.solve_steady(guess_vec, jac=ALG_jacobian(agr))
+state     = agr.save(sol_vec)
+
+# Extract results
+T_outlet_C = state[channel.name]["T_cool"][-1]
+T_outlet_K = T_outlet_C + 273.15
+mdot       = abs(state[K.name][K.component_edge(pump)])
+
+assert T_outlet_K > T_INLET_K, f"T_outlet {T_outlet_K:.2f} K below inlet"
+assert T_outlet_K < 450.0,     f"T_outlet {T_outlet_K:.2f} K unreasonably high"
+assert mdot > 1e-4,            f"mdot {mdot:.4f} kg/s too small"
+
+print("=" * 60)
+print("Python STREAM reference values (hardcode in runtests.jl)")
+print("=" * 60)
+print(f"T_outlet_kelvin = {T_outlet_K:.6f}")
+print(f"mdot            = {mdot:.6f}")
+print()
+print(f"  T_outlet_ref = {T_outlet_K:.4f}   # K  (Python: {T_outlet_C:.4f} C)")
+print(f"  mdot_ref     = {mdot:.6f}  # kg/s")
+print()
+ch = state[channel.name]
+print(f"  Re (mean)  = {float(np.mean(ch.get('Re', [0]))):.0f}")
+print(f"  HTC (mean) = {float(np.mean(ch.get('h_left', [0]))):.1f} W/m2K")

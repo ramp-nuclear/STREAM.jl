@@ -48,8 +48,11 @@ end
 # ----------------------------------------------------------------
 # build_loop
 # Assembles the closed forced-convection loop:
-#   Pump -> TempBC -> Friction -> Channel -> back to Pump
+#   Pump -> TempBC -> Channel -> back to Pump
 # and compiles it with mtkcompile.
+#
+# Channel handles friction (Darcy-Weisbach Blasius) and gravity internally.
+# No separate Friction component — friction is part of Channel's dP equation.
 #
 # The TempBC component resets the fluid temperature to T_inlet at
 # the pump outlet. This is necessary because MTK stream semantics
@@ -66,7 +69,7 @@ end
 #   ch.port_in.T ~ T_inlet     additional T_inlet constraint (resolves remaining
 #                              circular temperature dependency in compiled system)
 #
-# Returns compiled ssys. Use ssys.ch.T[i], ssys.fr.port_in.mdot, etc.
+# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot, etc.
 # for symbolic indexing of results.
 # ----------------------------------------------------------------
 function build_loop(;
@@ -74,29 +77,24 @@ function build_loop(;
     L_ch     = 0.6,
     D_ch     = 0.01,
     A_ch     = 7.85e-5,
-    L_fr     = 0.3,
-    D_fr     = 0.01,
-    A_fr     = 7.85e-5,
     dP_pump  = 3.0e4,
     T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
     T_wall   = 373.15,   # wall temperature (K); ~100°C for forced convection
 )
     @named pump = Pump(dP_pump = dP_pump)
-    @named fr   = Friction(L = L_fr, D = D_fr, A = A_fr)
     @named ch   = Channel(n = n, L = L_ch, D = D_ch, A = A_ch)
     @named bc   = _make_temp_bc(T_bc = T_inlet)   # temperature reset at pump outlet
 
     connections = [
         connect(pump.port_out, bc.port_in),       # pump -> TempBC
-        connect(bc.port_out,   fr.port_in),        # TempBC -> friction
-        connect(fr.port_out,   ch.port_in),        # friction -> channel
+        connect(bc.port_out,   ch.port_in),        # TempBC -> channel
         connect(ch.port_out,   pump.port_in),      # channel -> pump (closed loop)
         pump.port_in.P  ~ 1.0e5,                  # pressure gauge freedom fix
         ch.thermal.T    ~ T_wall,                  # wall temperature pin (for HTC)
         ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
     ]
 
-    @named sys = compose(System(connections, t; name = :sys), pump, bc, fr, ch)
+    @named sys = compose(System(connections, t; name = :sys), pump, bc, ch)
 
     t_compile = @elapsed ssys = mtkcompile(sys)
     n_eq = length(equations(ssys))
@@ -118,8 +116,8 @@ end
 #       ssys.fr.Re => Re_guess for the algebraic variables.
 #
 # Returns SteadyStateSolution. Access results via symbolic indexing:
-#   sol[ssys.ch.T_out]           outlet temperature (K)
-#   sol[ssys.fr.port_in.mdot]    mass flow (kg/s)
+#   sol[ssys.ch.T_out]              outlet temperature (K)
+#   sol[ssys.ch.port_in.mdot]       mass flow (kg/s)
 # ----------------------------------------------------------------
 function solve_steady(ssys, op;
                       abstol = 1e-8,
@@ -131,7 +129,7 @@ end
 
 # ----------------------------------------------------------------
 # build_loop_transient
-# Same topology as build_loop (Pump -> TempBC -> Friction -> Channel)
+# Same topology as build_loop (Pump -> TempBC -> Channel)
 # but with T_wall declared as a @parameters symbol so that
 # PresetTimeCallback + setp can modify it at runtime to simulate
 # a step change in wall heat input.
@@ -150,15 +148,11 @@ function build_loop_transient(;
     L_ch     = 0.6,
     D_ch     = 0.01,
     A_ch     = 7.85e-5,
-    L_fr     = 0.3,
-    D_fr     = 0.01,
-    A_fr     = 7.85e-5,
     dP_pump  = 3.0e4,
     T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
     T_wall_0 = 373.15,   # initial wall temperature (K); ~100°C
 )
     @named pump = Pump(dP_pump = dP_pump)
-    @named fr   = Friction(L = L_fr, D = D_fr, A = A_fr)
     @named ch   = Channel(n = n, L = L_ch, D = D_ch, A = A_ch)
     @named bc   = _make_temp_bc(T_bc = T_inlet)   # temperature reset at pump outlet
 
@@ -167,8 +161,7 @@ function build_loop_transient(;
 
     connections = [
         connect(pump.port_out, bc.port_in),       # pump -> TempBC
-        connect(bc.port_out,   fr.port_in),        # TempBC -> friction
-        connect(fr.port_out,   ch.port_in),        # friction -> channel
+        connect(bc.port_out,   ch.port_in),        # TempBC -> channel
         connect(ch.port_out,   pump.port_in),      # channel -> pump (closed loop)
         pump.port_in.P  ~ 1.0e5,                   # pressure gauge freedom fix
         ch.thermal.T    ~ ps[1],                   # wall temperature (modifiable parameter)
@@ -177,7 +170,7 @@ function build_loop_transient(;
 
     @named sys = compose(
         System(connections, t, [], ps; name = :sys),
-        pump, bc, fr, ch
+        pump, bc, ch
     )
 
     t_compile = @elapsed ssys = mtkcompile(sys)
@@ -196,7 +189,7 @@ end
 # ssys:         compiled system from build_loop_transient()
 # T_wall_sym:   parameter symbol from build_loop_transient() (second return value)
 # op:           Vector{Pair} — initial conditions for state variables
-#               (same structure as solve_steady op: ch.T[1..n], fr.port_in.mdot, fr.Re)
+#               (same structure as solve_steady op: ch.T[1..n], ch.port_in.mdot)
 # tspan:        (t_start, t_end) in seconds, e.g. (0.0, 60.0)
 # T_wall_final: new T_wall value (K) after the step change (e.g. 393.15 K for ~120°C)
 # t_step:       time of step change (s), default 10.0

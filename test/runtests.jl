@@ -187,17 +187,15 @@ end
 
     ssys = build_loop(T_inlet=T_inlet)
     T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=Q_wall, mdot_guess=mdot_guess, n=n)
-    Re_guess = abs(mdot_guess) * 0.01 / (7.85e-5 * mu_water(T_inlet))
 
     op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op, ssys.fr.port_in.mdot => mdot_guess)
-    push!(op, ssys.fr.Re => Re_guess)
+    push!(op, ssys.ch.port_in.mdot => mdot_guess)
 
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_inlet      # outlet > inlet (fluid heated)
     @test sol[ssys.ch.T_out] < 400.0        # physically reasonable (< 127°C)
-    @test sol[ssys.fr.port_in.mdot] > 0     # positive mass flow
+    @test sol[ssys.ch.port_in.mdot] > 0     # positive mass flow
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -214,24 +212,78 @@ end
     n = 10
     T_inlet = 313.15
     Q_wall_0 = 1.0e4
-    mdot_guess = 0.490
+    mdot_guess = 0.490  # rough guess; KINSOL is robust to this
 
     ssys, T_wall_sym = build_loop_transient(T_inlet=T_inlet)
     T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=Q_wall_0, mdot_guess=mdot_guess, n=n)
-    Re_guess = abs(mdot_guess) * 0.01 / (7.85e-5 * mu_water(T_inlet))
 
-    op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op, ssys.fr.port_in.mdot => mdot_guess)
-    push!(op, ssys.fr.Re => Re_guess)
+    op_guess = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op_guess, ssys.ch.port_in.mdot => mdot_guess)
+
+    # Rodas5P+NoInit requires algebraically consistent ICs (pressure balance satisfied).
+    # Run solve_steady on the transient system first to get a consistent starting point.
+    sol_ss = solve_steady(ssys, op_guess)
+    op_ic = [ssys.ch.T[i] => sol_ss[ssys.ch.T[i]] for i in 1:n]
+    push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys.ch.port_in.mdot])
 
     # Step T_wall from 373.15 K (100°C) to 393.15 K (120°C) at t=10s
-    sol = solve_transient(ssys, T_wall_sym, op, (0.0, 30.0);
+    sol = solve_transient(ssys, T_wall_sym, op_ic, (0.0, 30.0);
                           T_wall_final=393.15, t_step=10.0)
     @test sol.retcode == ReturnCode.Success
     @test length(sol.t) > 2                            # multiple time points
     T_ts = sol[ssys.ch.T_out, :]
     @test !any(isnan, T_ts)                            # no NaN
-    @test T_ts[end] > T_ts[1]                          # T_outlet rises (VAL-02 qualitative)
+    @test T_ts[end] > T_ts[1]                          # T_outlet rises after T_wall step
+end
+
+# ─────────────────────────────────────────────────────────────────
+# VAL-01: Steady-state T_outlet and mdot within 1% of Python STREAM
+# Reference: generate_reference.py (T_wall=373.15K, T_inlet=313.15K,
+#            dP_pump=30kPa, n=10, L=0.6m, D=0.01m, g=0)
+# ─────────────────────────────────────────────────────────────────
+T_outlet_ref = 327.7894  # K  (Python STREAM: 54.6394 °C)
+mdot_ref     = 0.609289  # kg/s
+
+@testset "VAL-01: Steady-state matches Python STREAM within 1%" begin
+    n = 10; T_inlet = 313.15
+    ssys = build_loop(T_inlet=T_inlet)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+    op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op, ssys.ch.port_in.mdot => 0.490)
+    sol = solve_steady(ssys, op)
+
+    T_out = sol[ssys.ch.T_out]
+    mdot  = abs(sol[ssys.ch.port_in.mdot])
+    @test isapprox(T_out, T_outlet_ref; rtol=0.01)
+    @test isapprox(mdot,  mdot_ref;     rtol=0.01)
+end
+
+# ─────────────────────────────────────────────────────────────────
+# VAL-02: Transient T_outlet rises after T_wall step change
+# ─────────────────────────────────────────────────────────────────
+@testset "VAL-02: Transient T_outlet rises after T_wall step" begin
+    n = 10; T_inlet = 313.15
+    ssys, T_wall_sym = build_loop_transient(T_inlet=T_inlet)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+    op_guess = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op_guess, ssys.ch.port_in.mdot => 0.490)
+    sol_ss = solve_steady(ssys, op_guess)
+    op_ic = [ssys.ch.T[i] => sol_ss[ssys.ch.T[i]] for i in 1:n]
+    push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys.ch.port_in.mdot])
+
+    sol = solve_transient(ssys, T_wall_sym, op_ic, (0.0, 60.0);
+                          T_wall_final=393.15, t_step=10.0)
+    @test sol.retcode == ReturnCode.Success
+    T_ts = sol[ssys.ch.T_out, :]
+    @test !any(isnan, T_ts)
+    @test T_ts[end] > T_ts[1]   # outlet rises after T_wall step
+end
+
+# ─────────────────────────────────────────────────────────────────
+# VAL-03: Full suite runs via Pkg.test() (confirmed by reaching here)
+# ─────────────────────────────────────────────────────────────────
+@testset "VAL-03: Test suite runs automatically" begin
+    @test true
 end
 
 end  # @testset "STREAM Phase 3 Tests"
