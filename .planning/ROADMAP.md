@@ -9,7 +9,7 @@
 ## Phases
 
 - [ ] **Phase 1: Foundation** - Package scaffold, fluid properties, and connectors that all components depend on
-- [ ] **Phase 2: Components** - All four thermal-hydraulic components with correct MTK equations
+- [x] **Phase 2: Components** - All four thermal-hydraulic components with correct MTK equations (completed 2026-03-12)
 - [ ] **Phase 3: Integration and Validation** - Closed loop assembly, solver API, and comparison against Python STREAM
 
 ---
@@ -68,7 +68,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Done | 2026-03-12 |
-| 2. Components | 2/3 | In Progress|  |
+| 2. Components | 3/3 | Complete   | 2026-03-12 |
 | 3. Integration and Validation | 0/? | Not started | - |
 
 ---
