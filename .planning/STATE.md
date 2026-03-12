@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v0.1
 milestone_name: milestone
-current_phase: Phase 2 — Components (complete)
-current_plan: Plan 04 — API Kwarg Rename (Pump/Gravity) (complete)
-status: planning
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-03-12T12:30:22.225Z"
+current_phase: Phase 3 — Integration and Validation (in progress)
+current_plan: Plan 01 — Closed-Loop Assembly and Steady-State Solver (complete)
+status: executing
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-03-12T12:54:53.883Z"
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
-  percent: 80
+  completed_plans: 9
+  percent: 90
 ---
 
 # STATE: STREAM.jl
@@ -34,17 +34,17 @@ progress:
 ## Current Position
 
 **Current phase:** Phase 3 — Integration and Validation (in progress)
-**Current plan:** Plan 01 — Closed-Loop Assembly and Steady-State Solver (complete)
+**Current plan:** Plan 02 — Transient Solver (complete)
 **Status:** In progress
 
 **Progress:**
-[████████░░] 80%
+[█████████░] 90%
 ```
 Phase 1: Foundation          [3/3 plans complete — Phase 1 DONE]
 Phase 2: Components          [4/4 plans complete — Phase 2 DONE]
-Phase 3: Integration/Valid.  [1/3 plans complete — in progress]
+Phase 3: Integration/Valid.  [2/3 plans complete — in progress]
 
-Overall: 2.33/3 phases complete
+Overall: 2.67/3 phases complete
 
 ---
 
@@ -67,6 +67,7 @@ Overall: 2.33/3 phases complete
 | Phase 02-components P03 | 3min | 2 tasks | 2 files |
 | Phase 02-components P04 | 3min | 2 tasks | 2 files |
 | Phase 03-integration-and-validation P01 | 68min | 2 tasks | 4 files |
+| Phase 03-integration-and-validation P02 | 18 | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,9 @@ Overall: 2.33/3 phases complete
 | KINSOL default globalization (no LineSearch) works with good initial guess | LineSearch finds trivial T=T_wall solution; default Newton with physics-based mdot_guess=0.490 kg/s converges to physical solution |
 | warn_initialize_determined=false for closed-loop SteadyStateProblem | MTK init system sees 22 eqs for 1 unknown (mdot) due to connector defaults; suppressing warning uses least-squares init correctly |
 | mtkcompile time ~12s for 12-equation closed loop | ANSWERED: Phase 3 benchmark; acceptable for interactive use, no assertion needed |
+| T_wall stepped in transient (not Q_wall) | Channel energy balance uses thermal.T via HTC; Q_flow is only an observable — T_wall change is physically equivalent to Q_wall change |
+| Rodas5P for transient DAE simulation | IDA needs DAEProblem+du0; CVODE_BDF cannot use mass matrices; Rodas5P (stiff implicit RK) handles mass-matrix ODEProblem from mtkcompile |
+| SciMLBase.NoInit for transient initialization | MTK init sees 29 eqs for 1 unknown (overdetermined); NoInit bypasses and trusts physics-based initial guess |
 
 ### Open Questions
 
@@ -114,9 +118,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-12T12:28:00Z
-**Stopped at:** Completed 03-01-PLAN.md
-**Next action:** Plan 03-02 (transient solver) — build on build_loop() with ODEProblem + IDA(), implement solve_transient with Q_wall step change using PresetTimeCallback. Then 03-03 (Python STREAM reference generation and validation).
+**Last session:** 2026-03-12T12:54:53.881Z
+**Stopped at:** Completed 03-02-PLAN.md
+**Next action:** Plan 03-03 (validation) — generate Python STREAM reference values (T_outlet, mdot), compare Julia steady-state results within 1% tolerance, confirm transient T_outlet rises qualitatively.
 
 ---
 
