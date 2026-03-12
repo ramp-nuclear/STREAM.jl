@@ -38,16 +38,17 @@ Plans:
 **Requirements**: COMP-01, COMP-02, COMP-03, COMP-04
 **Success Criteria** (what must be TRUE):
   1. `Channel(n=5)` instantiates and its equations include n energy balance cells, Dittus-Boelter HTC, and FlowPort/ThermalPort connections
-  2. `Pump(dP=...)` instantiates and its equation imposes a constant pressure rise across its two FlowPorts
+  2. `Pump(dP_pump=...)` instantiates and its equation imposes a constant pressure rise across its two FlowPorts
   3. `Friction(L=..., D=..., ...)` instantiates and its equation applies Darcy-Weisbach pressure drop with the Blasius friction factor
-  4. `Gravity(H=..., ...)` instantiates and its equation applies the hydrostatic pressure term ρgh across its two FlowPorts
+  4. `Gravity(H=..., A_grav=...)` instantiates and its equation applies the hydrostatic pressure term ρgh across its two FlowPorts
   5. Each component passes `mtkcompile` in isolation (no connection errors, no unresolved variables)
-**Plans**: 3 plans
+**Plans**: 4 plans
 
 Plans:
 - [x] 02-01-PLAN.md — Test scaffold and component stubs (wave 0: enables parallel execution)
 - [ ] 02-02-PLAN.md — Channel implementation with array variables and Dittus-Boelter HTC (COMP-01)
 - [ ] 02-03-PLAN.md — Pump, Friction, Gravity algebraic component implementations (COMP-02, COMP-03, COMP-04)
+- [ ] 02-04-PLAN.md — Gap closure: rename Pump/Gravity constructor kwargs to match MTK parameter names (COMP-02, COMP-04)
 
 ### Phase 3: Integration and Validation
 **Goal**: A complete forced-convection loop runs, produces physically correct results, and those results match Python STREAM within tolerance
@@ -68,10 +69,10 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Done | 2026-03-12 |
-| 2. Components | 3/3 | Complete   | 2026-03-12 |
+| 2. Components | 3/4 | Gap closure pending | 2026-03-12 |
 | 3. Integration and Validation | 0/? | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-12 — Phase 2 plans written*
+*Updated: 2026-03-12 — Phase 2 gap closure plan added (02-04)*
