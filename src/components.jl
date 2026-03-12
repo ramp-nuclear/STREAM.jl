@@ -82,13 +82,58 @@ function Channel(; name, n::Int, L, D, A)
 end
 
 function Pump(; name, dP)
-    error("Pump not yet implemented")
+    pars = @parameters begin
+        dP_pump = dP
+    end
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+    eqs = Equation[
+        port_in.mdot + port_out.mdot ~ 0,
+        port_out.P - port_in.P ~ dP_pump,
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
+    ]
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 
 function Friction(; name, L, D, A)
-    error("Friction not yet implemented")
+    pars = @parameters begin
+        L_f = L
+        D_h = D
+        A_f = A
+    end
+    vars = @variables begin
+        Re(t)
+        f(t)
+    end
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+    T_in = instream(port_in.T)
+    eqs = Equation[
+        port_in.mdot + port_out.mdot ~ 0,
+        Re ~ abs(port_in.mdot) * D / (A * mu_water(T_in)),
+        f  ~ 0.3164 * Re^(-0.25),
+        port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) /
+                                       (2 * rho_water(T_in) * A^2)) * (L / D),
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
+    ]
+    compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
 end
 
 function Gravity(; name, H, A)
-    error("Gravity not yet implemented")
+    pars = @parameters begin
+        H_grav = H
+        A_grav = A
+    end
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+    T_in = instream(port_in.T)
+    eqs = Equation[
+        port_in.mdot + port_out.mdot ~ 0,
+        port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H,
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
+    ]
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
