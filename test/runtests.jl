@@ -2,6 +2,7 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
+import STREAM: Channel, Pump, Friction, Gravity  # resolve ambiguity with Base.Channel
 
 @testset "STREAM Phase 1 Tests" begin
 
@@ -113,3 +114,31 @@ end
 end
 
 end  # @testset "STREAM Phase 1 Tests"
+
+@testset "STREAM Phase 2 Tests" begin
+
+@testset "COMP-01: Channel stub callable" begin
+    @test_throws ErrorException Channel(n=5, L=1.0, D=0.01, A=7.85e-5; name=:ch)
+end
+
+@testset "COMP-01: Channel equation count" begin
+    @test_skip "Requires implementation — Channel(n=5) should have exactly 5 energy balance ODEs"
+end
+
+@testset "COMP-01: Channel mtkcompile" begin
+    @test_skip "Requires implementation — mtkcompile(Channel(n=5,...)) should succeed"
+end
+
+@testset "COMP-02: Pump stub callable" begin
+    @test_throws ErrorException Pump(dP=1e4; name=:pump)
+end
+
+@testset "COMP-03: Friction stub callable" begin
+    @test_throws ErrorException Friction(L=1.0, D=0.01, A=7.85e-5; name=:fr)
+end
+
+@testset "COMP-04: Gravity stub callable" begin
+    @test_throws ErrorException Gravity(H=3.0, A=7.85e-5; name=:grav)
+end
+
+end  # @testset "STREAM Phase 2 Tests"
