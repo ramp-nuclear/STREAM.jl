@@ -112,8 +112,7 @@ end
 # op:   Vector{Pair} of symbolic_var => initial_value
 #       Use symbols from ssys (compiled), e.g. ssys.ch.T[1] => 315.0
 #       Build the initial guess using steady_state_guess() for T cells.
-#       Also include ssys.fr.port_in.mdot => mdot_guess and
-#       ssys.fr.Re => Re_guess for the algebraic variables.
+#       Also include ssys.ch.port_in.mdot => mdot_guess for mass flow.
 #
 # Returns SteadyStateSolution. Access results via symbolic indexing:
 #   sol[ssys.ch.T_out]              outlet temperature (K)

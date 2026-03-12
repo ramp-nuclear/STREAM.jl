@@ -1,6 +1,7 @@
 ---
 phase: 03-integration-and-validation
 plan: "03"
+requirements-completed: [VAL-01, VAL-02, VAL-03]
 subsystem: validation
 tags: [julia, modelingtoolkit, validation, python-stream, reference-values, cross-validation]
 
