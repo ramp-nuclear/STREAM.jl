@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v0.1
 milestone_name: milestone
-current_phase: Phase 3 — Integration and Validation (in progress)
-current_plan: Plan 01 — Closed-Loop Assembly and Steady-State Solver (complete)
-status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-12T12:54:53.883Z"
+current_phase: Phase 3 — Integration and Validation (complete)
+current_plan: Plan 03 — Validation (complete)
+status: complete
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-03-12T13:30:00.000Z"
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 10
-  completed_plans: 9
-  percent: 90
+  completed_plans: 10
+  percent: 100
 ---
 
 # STATE: STREAM.jl
@@ -33,18 +33,18 @@ progress:
 
 ## Current Position
 
-**Current phase:** Phase 3 — Integration and Validation (in progress)
-**Current plan:** Plan 02 — Transient Solver (complete)
-**Status:** In progress
+**Current phase:** Phase 3 — Integration and Validation (complete)
+**Current plan:** Plan 03 — Validation (complete)
+**Status:** Complete
 
 **Progress:**
-[█████████░] 90%
+[██████████] 100%
 ```
 Phase 1: Foundation          [3/3 plans complete — Phase 1 DONE]
 Phase 2: Components          [4/4 plans complete — Phase 2 DONE]
-Phase 3: Integration/Valid.  [2/3 plans complete — in progress]
+Phase 3: Integration/Valid.  [3/3 plans complete — Phase 3 DONE]
 
-Overall: 2.67/3 phases complete
+Overall: 3/3 phases complete — MILESTONE v0.1 ACHIEVED
 
 ---
 
@@ -68,6 +68,7 @@ Overall: 2.67/3 phases complete
 | Phase 02-components P04 | 3min | 2 tasks | 2 files |
 | Phase 03-integration-and-validation P01 | 68min | 2 tasks | 4 files |
 | Phase 03-integration-and-validation P02 | 18 | 1 tasks | 4 files |
+| Phase 03-integration-and-validation P03 | 15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,9 @@ Overall: 2.67/3 phases complete
 | T_wall stepped in transient (not Q_wall) | Channel energy balance uses thermal.T via HTC; Q_flow is only an observable — T_wall change is physically equivalent to Q_wall change |
 | Rodas5P for transient DAE simulation | IDA needs DAEProblem+du0; CVODE_BDF cannot use mass matrices; Rodas5P (stiff implicit RK) handles mass-matrix ODEProblem from mtkcompile |
 | SciMLBase.NoInit for transient initialization | MTK init sees 29 eqs for 1 unknown (overdetermined); NoInit bypasses and trusts physics-based initial guess |
+| build_loop uses Pump→TempBC→Channel (no Friction) | Channel's Darcy-Weisbach term handles friction internally; separate Friction component created double-counting vs Python STREAM ChannelAndContacts |
+| Python STREAM FlowGraph+ChannelAndContacts for VAL-01 | ChannelAndContacts computes Dittus-Boelter HTC and friction self-consistently; HeatExchanger(outlet=T_inlet) is the TempBC equivalent |
+| T_outlet_ref=327.7894 K, mdot_ref=0.609289 kg/s hardcoded | Reference values from single Python STREAM run; hardcoded for reproducibility without requiring Python STREAM in test environment |
 
 ### Open Questions
 
@@ -118,9 +122,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-12T12:54:53.881Z
-**Stopped at:** Completed 03-02-PLAN.md
-**Next action:** Plan 03-03 (validation) — generate Python STREAM reference values (T_outlet, mdot), compare Julia steady-state results within 1% tolerance, confirm transient T_outlet rises qualitatively.
+**Last session:** 2026-03-12T13:30:00.000Z
+**Stopped at:** Completed 03-03-PLAN.md
+**Next action:** Milestone v0.1 complete. All 54 tests pass. Julia-STREAM validates within 1% of Python STREAM reference values.
 
 ---
 

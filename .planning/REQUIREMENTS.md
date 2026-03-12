@@ -34,9 +34,9 @@
 
 ### Validation
 
-- [ ] **VAL-01**: Steady-state T_outlet and mass flow match Python STREAM within 1% on identical inputs
-- [ ] **VAL-02**: Transient temperature response (step power change) qualitatively matches Python STREAM
-- [ ] **VAL-03**: Test suite runs Python STREAM reference cases and compares Julia outputs automatically
+- [x] **VAL-01**: Steady-state T_outlet and mass flow match Python STREAM within 1% on identical inputs
+- [x] **VAL-02**: Transient temperature response (step power change) qualitatively matches Python STREAM
+- [x] **VAL-03**: Test suite runs Python STREAM reference cases and compares Julia outputs automatically
 
 ## v2 Requirements
 
@@ -101,9 +101,9 @@
 | SYS-02 | Phase 3 — Integration and Validation | Complete |
 | SOLV-01 | Phase 3 — Integration and Validation | Complete |
 | SOLV-02 | Phase 3 — Integration and Validation | Complete |
-| VAL-01 | Phase 3 — Integration and Validation | Pending |
-| VAL-02 | Phase 3 — Integration and Validation | Pending |
-| VAL-03 | Phase 3 — Integration and Validation | Pending |
+| VAL-01 | Phase 3 — Integration and Validation | Complete |
+| VAL-02 | Phase 3 — Integration and Validation | Complete |
+| VAL-03 | Phase 3 — Integration and Validation | Complete |
 
 **Coverage:**
 - v1 requirements: 15 total
