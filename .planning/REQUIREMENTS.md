@@ -8,7 +8,7 @@
 ### Package Foundation
 
 - [x] **FOUND-01**: Julia package skeleton (Project.toml, src/, test/) with MTK, DifferentialEquations, Sundials as dependencies
-- [ ] **FOUND-02**: Light water fluid properties (ρ, cp, μ, k) as polynomial functions of T, registered via `@register_symbolic`, callable from any component without injection
+- [x] **FOUND-02**: Light water fluid properties (ρ, cp, μ, k) as polynomial functions of T, registered via `@register_symbolic`, callable from any component without injection
 
 ### Connectors
 
@@ -90,7 +90,7 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FOUND-01 | Phase 1 — Foundation | Complete |
-| FOUND-02 | Phase 1 — Foundation | Pending |
+| FOUND-02 | Phase 1 — Foundation | Complete |
 | CONN-01 | Phase 1 — Foundation | Complete |
 | CONN-02 | Phase 1 — Foundation | Complete |
 | COMP-01 | Phase 2 — Components | Pending |
