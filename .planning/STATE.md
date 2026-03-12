@@ -6,7 +6,7 @@ current_phase: Phase 5 — Nyquist Validation (complete)
 current_plan: Plan 01 — Nyquist Compliance Records (complete)
 status: completed
 stopped_at: Completed 05-nyquist-validation-01-PLAN.md
-last_updated: "2026-03-12T22:27:36.984Z"
+last_updated: "2026-03-12T22:29:50.846Z"
 progress:
   total_phases: 5
   completed_phases: 5
@@ -23,10 +23,10 @@ progress:
 
 ## Project Reference
 
-**Core value:** A working forced-convection loop in MTK that matches Python STREAM's steady-state and transient results, proving the Julia architecture is sound before any large-scale porting begins.
+See: .planning/PROJECT.md (updated 2026-03-13)
 
-**Milestone:** v0.1 — single forced-convection loop proof-of-concept
-
+**Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
+**Current focus:** Planning next milestone (v0.2)
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
@@ -35,7 +35,7 @@ progress:
 
 **Current phase:** Phase 5 — Nyquist Validation (complete)
 **Current plan:** Plan 01 — Nyquist Compliance Records (complete)
-**Status:** Milestone complete
+**Status:** v0.1 milestone complete
 
 **Progress:**
 [██████████] 100%
@@ -128,8 +128,8 @@ None.
 
 **Last session:** 2026-03-12T22:25:17.319Z
 **Stopped at:** Completed 05-nyquist-validation-01-PLAN.md
-**Next action:** v0.1 milestone Nyquist-complete. All 15 requirements covered. 54 tests pass. Run `/gsd:complete-milestone` or `/gsd:audit-milestone`.
+**Next action:** v0.1 milestone archived. Run `/gsd:new-milestone` to plan v0.2.
 
 ---
 
-*Last updated: 2026-03-12*
+*Last updated: 2026-03-13 — v0.1 milestone archived*
