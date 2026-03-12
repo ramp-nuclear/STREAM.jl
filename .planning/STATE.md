@@ -5,13 +5,13 @@ milestone_name: milestone
 current_phase: Phase 2 — Components (complete)
 current_plan: Plan 03 — Pump/Friction/Gravity Implementation (complete)
 status: planning
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-03-12T01:37:47.295Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-03-12T02:06:04.671Z"
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---
 
@@ -34,7 +34,7 @@ progress:
 ## Current Position
 
 **Current phase:** Phase 2 — Components (complete)
-**Current plan:** Plan 03 — Pump/Friction/Gravity Implementation (complete)
+**Current plan:** Plan 04 — API Kwarg Rename (Pump/Gravity) (complete)
 **Status:** Ready to plan
 
 **Progress:**
@@ -65,6 +65,7 @@ Overall: 2/3 phases complete
 | Phase 02-components P01 | 2min | 2 tasks | 3 files |
 | Phase 02-components P02 | 6 | 2 tasks | 2 files |
 | Phase 02-components P03 | 3min | 2 tasks | 2 files |
+| Phase 02-components P04 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,7 @@ Overall: 2/3 phases complete
 | mtkcompile(ch; fully_determined=false) for isolated component tests | Unconnected ports leave thermal.T and port_in.P unconstrained; fully_determined=false is the correct MTK approach for Phase 2 isolation testing |
 | [] as vars argument to System() for algebraic-only components | Pump and Gravity have no local state variables; empty vector avoids MTK variable tracking overhead |
 | A_grav parameter retained in Gravity even though unused in pressure equation | API consistency with future velocity observable; mirrors Friction's A_f pattern |
+| Constructor kwargs renamed to match MTK parameter names (dP->dP_pump, A->A_grav) | Eliminates UndefKeywordError in consumer code; public API now identical to internal @parameters names |
 
 ### Open Questions
 
@@ -106,8 +108,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-12T01:31:36.815Z
-**Stopped at:** Completed 02-03-PLAN.md
+**Last session:** 2026-03-12T02:06:04.669Z
+**Stopped at:** Completed 02-04-PLAN.md
 **Next action:** Begin Phase 3 (Integration/Validation) — all four components ready: Channel, Pump, Friction, Gravity. Assemble closed forced-convection loop using compose() + connect() + mtkcompile().
 
 ---
