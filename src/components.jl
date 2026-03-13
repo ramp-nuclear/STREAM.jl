@@ -168,3 +168,21 @@ function Inertia(; name, L_over_A)
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
+
+# HeatExchanger (COMP-02): temperature boundary condition as a public component.
+# Injects a fixed outlet temperature T_bc into the downstream stream, breaking
+# the circular thermal dependency in closed loops (where instream() would
+# otherwise resolve to the previous component's outlet T).
+# 4-equation structure: mass conservation, no pressure drop, T_bc outlet, adiabatic inlet.
+function HeatExchanger(; name, T_bc)
+    pars = @parameters T_bc = T_bc
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+    eqs = Equation[
+        port_in.mdot + port_out.mdot ~ 0,    # mass conservation
+        port_in.P   - port_out.P    ~ 0,     # no pressure drop
+        port_out.T  ~ T_bc,                   # inject fixed outlet temperature
+        port_in.T   ~ instream(port_out.T),   # backward stream (adiabatic)
+    ]
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+end

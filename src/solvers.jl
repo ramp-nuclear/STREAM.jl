@@ -24,28 +24,6 @@ function steady_state_guess(; T_inlet::Float64, Q_wall::Float64,
 end
 
 # ----------------------------------------------------------------
-# _make_temp_bc (internal helper)
-# Creates a temperature-reset boundary condition component.
-# Injects T_bc into the downstream stream so that instream() in
-# the connected Channel sees T_bc as the inlet temperature.
-# This is required because MTK stream semantics resolve instream()
-# to the connected port's T variable, which in a closed loop would
-# create a circular thermal dependency. The TempBC breaks the loop.
-# ----------------------------------------------------------------
-function _make_temp_bc(; name, T_bc)
-    pars = @parameters T_bc = T_bc
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,    # mass conservation
-        port_in.P   - port_out.P    ~ 0,     # no pressure drop
-        port_out.T  ~ T_bc,                   # inject T_bc into stream
-        port_in.T   ~ instream(port_out.T),   # backward stream (adiabatic)
-    ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
-end
-
-# ----------------------------------------------------------------
 # build_loop
 # Assembles the closed forced-convection loop:
 #   Pump -> TempBC -> Channel -> back to Pump
@@ -83,7 +61,7 @@ function build_loop(;
 )
     @named pump = Pump(dP_pump = dP_pump)
     @named ch   = Channel(n = n, L = L_ch, D = D_ch, A = A_ch)
-    @named bc   = _make_temp_bc(T_bc = T_inlet)   # temperature reset at pump outlet
+    @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
 
     connections = [
         connect(pump.port_out, bc.port_in),       # pump -> TempBC
@@ -165,7 +143,7 @@ function build_loop_vertical(;
 
     @named pump = Pump(dP_pump = dP_pump)
     @named ch   = Channel(n = n, L = L_ch, D = D_ch, A = A_ch, g = g_acc)
-    @named bc   = _make_temp_bc(T_bc = T_inlet)
+    @named bc   = HeatExchanger(T_bc = T_inlet)
     @named grav = Gravity(H = H)
 
     # Gravity wiring note:
@@ -223,7 +201,7 @@ function build_loop_transient(;
 )
     @named pump = Pump(dP_pump = dP_pump)
     @named ch   = Channel(n = n, L = L_ch, D = D_ch, A = A_ch)
-    @named bc   = _make_temp_bc(T_bc = T_inlet)   # temperature reset at pump outlet
+    @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
 
     # Declare T_wall as a modifiable parameter
     ps = @parameters T_wall = T_wall_0
