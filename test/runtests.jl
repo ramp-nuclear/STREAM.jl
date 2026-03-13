@@ -508,8 +508,9 @@ end
 end
 
 # ─────────────────────────────────────────────────────────────────
-# THERM-03: ChannelAndContacts one-sided matches ChannelHeatFlux within 0.1%
-# D_cac = 2 * D_chf so π*D_cac/2 = π*D_chf (equal heated perimeters, one-sided)
+# THERM-03: ChannelAndContacts two-sided matches ChannelHeatFlux within 0.1%
+# Both thermal_left and thermal_right connected to T_wall with D_cac = D_chf.
+# h_tc*(π*D/2)*dz*(T_wall-T)*2 = h_tc*(π*D)*dz*(T_wall-T) — exact CHF equivalence.
 # ─────────────────────────────────────────────────────────────────
 @testset "THERM-03: ChannelAndContacts two-sided matches ChannelHeatFlux within 0.1%" begin
     # Two-sided CAC (both left and right connected to same T_wall) with D=D_chf
