@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: Component & Network Expansion
 status: completed
-stopped_at: Completed 09-channelandcontacts-01-PLAN.md
-last_updated: "2026-03-13T18:50:27.822Z"
-last_activity: 2026-03-13 — Phase 8 plan 02 executed (COMP-02 HeatExchanger rename/export)
+stopped_at: Completed 09-channelandcontacts-02-PLAN.md
+last_updated: "2026-03-13T18:59:46.048Z"
+last_activity: 2026-03-13 — Phase 9 plan 02 executed (ChannelAndContacts + ChannelHeatFlux GREEN, v0.2 complete)
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 9 of 9 (ChannelAndContacts) — fourth v0.2 phase — IN PROGRESS
-Plan: 01 (complete — RED stubs)
-Status: Phase 9 plan 01 complete (THERM-01/02/03 RED stubs confirmed); ready for plan 02 (GREEN implementation)
-Last activity: 2026-03-13 — Phase 9 plan 01 executed (ChannelAndContacts + ChannelHeatFlux RED stubs)
+Phase: 9 of 9 (ChannelAndContacts) — fourth v0.2 phase — COMPLETE
+Plan: 02 (complete — GREEN implementation)
+Status: v0.2 milestone complete. All 10 requirements (GRAV-01/02, NET-01/02/03, COMP-01/02, THERM-01/02/03) satisfied.
+Last activity: 2026-03-13 — Phase 9 plan 02 executed (ChannelAndContacts + ChannelHeatFlux GREEN, 86 tests passing)
 
-Progress: [█████████░] 86% (Phase 9 plan 01 of 2 complete)
+Progress: [██████████] 100% (Phase 9 plan 02 of 2 complete — v0.2 done)
 
 ---
 
@@ -59,6 +59,7 @@ Progress: [█████████░] 86% (Phase 9 plan 01 of 2 complete)
 | Phase 08-inertia-and-heatexchanger P01 | 19 | 2 tasks | 3 files |
 | Phase 08-inertia-and-heatexchanger P02 | 4 | 1 tasks | 3 files |
 | Phase 09-channelandcontacts P01 | 8 | 2 tasks | 3 files |
+| Phase 09-channelandcontacts P02 | 7 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,16 @@ Progress: [█████████░] 86% (Phase 9 plan 01 of 2 complete)
 | THERM-03 uses build_loop as Channel reference + inline compose() for ChannelHeatFlux | No new build_ helper needed; inline wiring is the intended Pattern for ChannelHeatFlux usage |
 | build_loop signature confirmed to accept n, L_ch, D_ch, A_ch, dP_pump, T_inlet, T_wall | THERM-03 test can call build_loop directly without any workarounds |
 
+### Key Decisions (v0.2 Phase 9 Plan 02)
+
+| Decision | Rationale |
+|----------|-----------|
+| _channel_base_eqs accepts concrete g_acc=g (Float64) not MTK symbolic | dP is algebraic so concrete value works; avoids pars[4] indexing complexity |
+| q_wall[i] ~ thermal_ports[i].Q_flow (1:1 mapping, not /n) | Each ThermalPort covers exactly one cell — interface contract for HeatDiffusion v0.3 |
+| Q_wall_total observable sums all thermal_ports[i].Q_flow | Convenient total for diagnostics and downstream coupling |
+| ChannelHeatFlux q_wall[i] uses direct formula h_tc*pi*Dh*dz*(T_wall_p - T[i]) | No ThermalPorts in this variant; formula is algebraically equivalent |
+| v0.2 milestone complete — all 10 requirements (GRAV, NET, COMP, THERM) satisfied | ChannelAndContacts defines the per-cell interface for HeatDiffusion (v0.3) |
+
 ### Pending Todos
 
 None.
@@ -130,9 +141,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-13T18:50:27.819Z
-**Stopped at:** Completed 09-channelandcontacts-01-PLAN.md
-**Next action:** Phase 9 plan 01 (RED) complete. Continue with Phase 9 plan 02 (GREEN): implement ChannelAndContacts with n ThermalPort subsystems and per-cell energy balance; implement ChannelHeatFlux with T_wall parameter driving heat transfer matching Channel within 0.1%.
+**Last session:** 2026-03-13T18:59:46.045Z
+**Stopped at:** Completed 09-channelandcontacts-02-PLAN.md
+**Next action:** v0.2 milestone complete. All 10 requirements satisfied. Begin v0.3 planning: HeatDiffusion (2D fuel plate + ChannelAndContacts coupling). ChannelAndContacts.thermal1..thermalN is the ready interface.
 
 ---
 
