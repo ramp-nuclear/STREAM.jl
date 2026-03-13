@@ -25,7 +25,7 @@ Full phase details: `.planning/milestones/v0.1-ROADMAP.md`
 **Milestone Goal:** Validate multi-branch hydraulic networks, add gravity to vertical loops, add Inertia and HeatExchanger lumped components, and deliver ChannelAndContacts as the per-cell thermal interface for future fuel-plate coupling.
 
 - [x] **Phase 6: Gravity Validation** - Gravity term validated in a vertical closed loop with cancellation test (completed 2026-03-13)
-- [ ] **Phase 7: Network Architecture** - Resistor component and multi-branch Cube problem solved via MTK connect()
+- [x] **Phase 7: Network Architecture** - Resistor component and multi-branch Cube problem solved via MTK connect() (completed 2026-03-13)
 - [ ] **Phase 8: Inertia and HeatExchanger** - Inertia ODE component validated; HeatExchanger exposed as public API
 - [ ] **Phase 9: ChannelAndContacts** - Per-cell ThermalPort array component implemented and validated against Channel
 
@@ -88,7 +88,7 @@ Plans:
 | 4. Tech Debt Cleanup | v0.1 | 1/1 | Complete | 2026-03-12 |
 | 5. Nyquist Validation | v0.1 | 1/1 | Complete | 2026-03-12 |
 | 6. Gravity Validation | v0.2 | 1/1 | Complete | 2026-03-13 |
-| 7. Network Architecture | 1/2 | In Progress|  | - |
+| 7. Network Architecture | 2/2 | Complete   | 2026-03-13 | - |
 | 8. Inertia and HeatExchanger | v0.2 | 0/? | Not started | - |
 | 9. ChannelAndContacts | v0.2 | 0/? | Not started | - |
 

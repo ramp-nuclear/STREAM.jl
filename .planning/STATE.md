@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: Component & Network Expansion
 status: completed
-stopped_at: Completed 07-network-architecture-01-PLAN.md
-last_updated: "2026-03-13T14:43:04.291Z"
-last_activity: 2026-03-13 — Phase 6 plan 01 executed (GRAV-01, GRAV-02 validated)
+stopped_at: Completed 07-network-architecture-02-PLAN.md
+last_updated: "2026-03-13T14:49:03.310Z"
+last_activity: 2026-03-13 — Phase 7 plan 01 executed (NET-01 Resistor component)
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
-  percent: 100
+  completed_plans: 3
+  percent: 67
 ---
 
 # STATE: STREAM.jl
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 7 of 9 (Network Architecture) — second v0.2 phase — IN PROGRESS
-Plan: 01 (complete), 02 (pending)
-Status: Phase 7 plan 01 complete (NET-01 satisfied)
-Last activity: 2026-03-13 — Phase 7 plan 01 executed (NET-01 Resistor component)
+Phase: 7 of 9 (Network Architecture) — second v0.2 phase — COMPLETE
+Plan: 01 (complete), 02 (complete)
+Status: Phase 7 fully complete (NET-01, NET-02, NET-03 satisfied)
+Last activity: 2026-03-13 — Phase 7 plan 02 executed (NET-02/NET-03 Cube network)
 
-Progress: [███████░░░] 67% (Phase 7 plan 01 of 2 complete)
+Progress: [██████████] 100% (Phase 7 all plans complete)
 
 ---
 
@@ -55,6 +55,7 @@ Progress: [███████░░░] 67% (Phase 7 plan 01 of 2 complete)
 
 | Phase 06-gravity-validation P01 | 9 min | 2 tasks | 3 files |
 | Phase 07-network-architecture P01 | 5 min | 1 tasks | 3 files |
+| Phase 07 P02 | 3 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,9 @@ Progress: [███████░░░] 67% (Phase 7 plan 01 of 2 complete)
 |----------|-----------|
 | Resistor uses linear pressure drop without abs() | Bidirectional by design; positive mdot = flow in = pressure drop from in to out; matches Python STREAM semantics |
 | mtkcompile with fully_determined=false for isolated component tests | Allows testing individual components before wiring into a closed loop |
+| MTK variadic connect(a,b,c) is the junction — no Junction component needed | MTK generates Kirchhoff equations automatically; simpler topology |
+| Pressure anchor pump.port_in.P ~ 1.0e5 required for cube network | Body-diagonal Kirchhoff system leaves absolute pressure underdetermined |
+| Initial guess mdot_guess = mdot_analytical/3 sufficient for KINSOL | Source branch symmetry: each of 3 branches from corner 0 carries one-third |
 
 ### Pending Todos
 
@@ -101,9 +105,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-13T14:43:04.289Z
-**Stopped at:** Completed 07-network-architecture-01-PLAN.md
-**Next action:** Phase 7 plan 01 complete. Continue with plan 02 (Cube multi-branch network problem).
+**Last session:** 2026-03-13T14:49:03.307Z
+**Stopped at:** Completed 07-network-architecture-02-PLAN.md
+**Next action:** Phase 7 fully complete (NET-01/02/03 satisfied). Continue with Phase 8 (COMP-02 HeatExchanger) or Phase 9 (ChannelAndContacts).
 
 ---
 
