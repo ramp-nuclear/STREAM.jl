@@ -70,10 +70,11 @@ Plans:
   2. HeatDiffusion with pinned boundary temperatures (T_boundary < T_interior) solves at steady state with `sum(thermal_left[i].Q_flow) < 0` and `sum(thermal_right[i].Q_flow) < 0` (heat leaving the plate, correct Q_flow sign)
   3. `power_shape[1:nz, 1:nx]` (constructor parameter) and `power` (MTK parameter) together drive the correct volumetric heat source in the FD equations
   4. Leaving `thermal_right` unconnected and connecting only `thermal_left` produces a valid compiled system where all `thermal_right[i].Q_flow ~ 0` holds at steady state
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 11-01: TBD
+- [ ] 11-01-PLAN.md — Implement _diffusion_eqs helper and HeatDiffusion constructor; export from STREAM module (HDIFF-01, HDIFF-02, HDIFF-03, HDIFF-04)
+- [ ] 11-02-PLAN.md — Write Phase 11 test suite: instantiation/port smoke tests + steady-state behavioral test + adiabatic one-sided test (HDIFF-01 through HDIFF-05)
 
 ### Phase 12: MTR Validation
 **Goal**: Coupled HeatDiffusion + two ChannelAndContacts in MTR geometry (cladding+meat+cladding, two water channels) solves and matches Python STREAM reference outputs within 1%, including an asymmetric heating case that confirms left/right coupling direction is correct
@@ -104,10 +105,10 @@ Plans:
 | 8. Inertia and HeatExchanger | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 10. ChannelAndContacts Two-Sided Upgrade | 2/2 | Complete    | 2026-03-13 | - |
-| 11. HeatDiffusion Component | v0.3 | 0/? | Not started | - |
+| 11. HeatDiffusion Component | v0.3 | 0/2 | Not started | - |
 | 12. MTR Validation | v0.3 | 0/? | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-14 — Phase 10 plans created (2 plans, 2 waves)*
+*Updated: 2026-03-14 — Phase 11 plans created (2 plans, 2 waves)*
