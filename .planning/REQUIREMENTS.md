@@ -24,9 +24,9 @@
 
 ### Per-Cell Thermal Coupling
 
-- [ ] **THERM-01**: ChannelAndContacts component: n ThermalPorts (one per axial cell), per-cell wall temperature in energy balance: `h_tc[i] * (π*Dh) * dz * (thermal[i].T - T[i])`
-- [ ] **THERM-02**: Existing Channel (single ThermalPort) remains unchanged and all v0.1 tests continue to pass
-- [ ] **THERM-03**: ChannelAndContacts steady-state result matches Channel result when all n ThermalPorts are driven by the same uniform wall temperature (within 0.1%)
+- [x] **THERM-01**: ChannelAndContacts component: n ThermalPorts (one per axial cell), per-cell wall temperature in energy balance: `h_tc[i] * (π*Dh) * dz * (thermal[i].T - T[i])`
+- [x] **THERM-02**: Existing Channel (single ThermalPort) remains unchanged and all v0.1 tests continue to pass
+- [x] **THERM-03**: ChannelAndContacts steady-state result matches Channel result when all n ThermalPorts are driven by the same uniform wall temperature (within 0.1%)
 
 ## v3 Requirements (deferred)
 
@@ -61,9 +61,9 @@
 | NET-03 | Phase 7 | Complete |
 | COMP-01 | Phase 8 | Complete |
 | COMP-02 | Phase 8 | Complete |
-| THERM-01 | Phase 9 | Pending |
-| THERM-02 | Phase 9 | Pending |
-| THERM-03 | Phase 9 | Pending |
+| THERM-01 | Phase 9 | Complete |
+| THERM-02 | Phase 9 | Complete |
+| THERM-03 | Phase 9 | Complete |
 
 **Coverage:**
 - v0.2 requirements: 10 total

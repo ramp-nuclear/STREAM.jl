@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: Component & Network Expansion
 status: completed
-stopped_at: Phase 9 context gathered
-last_updated: "2026-03-13T18:20:28.553Z"
+stopped_at: Completed 09-channelandcontacts-01-PLAN.md
+last_updated: "2026-03-13T18:50:27.822Z"
 last_activity: 2026-03-13 — Phase 8 plan 02 executed (COMP-02 HeatExchanger rename/export)
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 8 of 9 (Inertia and HeatExchanger) — third v0.2 phase — COMPLETE
-Plan: 01 (complete), 02 (complete)
-Status: Phase 8 fully complete (COMP-01 Inertia + COMP-02 HeatExchanger satisfied)
-Last activity: 2026-03-13 — Phase 8 plan 02 executed (COMP-02 HeatExchanger rename/export)
+Phase: 9 of 9 (ChannelAndContacts) — fourth v0.2 phase — IN PROGRESS
+Plan: 01 (complete — RED stubs)
+Status: Phase 9 plan 01 complete (THERM-01/02/03 RED stubs confirmed); ready for plan 02 (GREEN implementation)
+Last activity: 2026-03-13 — Phase 9 plan 01 executed (ChannelAndContacts + ChannelHeatFlux RED stubs)
 
-Progress: [██████████] 100% (Phase 8 complete)
+Progress: [█████████░] 86% (Phase 9 plan 01 of 2 complete)
 
 ---
 
@@ -58,6 +58,7 @@ Progress: [██████████] 100% (Phase 8 complete)
 | Phase 07 P02 | 3 | 1 tasks | 3 files |
 | Phase 08-inertia-and-heatexchanger P01 | 19 | 2 tasks | 3 files |
 | Phase 08-inertia-and-heatexchanger P02 | 4 | 1 tasks | 3 files |
+| Phase 09-channelandcontacts P01 | 8 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,14 @@ Progress: [██████████] 100% (Phase 8 complete)
 | HeatExchanger is exact rename of _make_temp_bc — no behavior change | Component already correct; goal is public API exposure, not reimplementation |
 | Local variable `bc` unchanged in build_loop call sites | Connections reference bc.port_in/bc.port_out — only constructor name changes |
 
+### Key Decisions (v0.2 Phase 9 Plan 01)
+
+| Decision | Rationale |
+|----------|-----------|
+| RED stub: minimal FlowPort-only System sufficient for callable/mtkcompile pass | compose(System(eqs, t, [], []; name=name), port_in, port_out) passes structural tests while correctly failing behavioral assertions |
+| THERM-03 uses build_loop as Channel reference + inline compose() for ChannelHeatFlux | No new build_ helper needed; inline wiring is the intended Pattern for ChannelHeatFlux usage |
+| build_loop signature confirmed to accept n, L_ch, D_ch, A_ch, dP_pump, T_inlet, T_wall | THERM-03 test can call build_loop directly without any workarounds |
+
 ### Pending Todos
 
 None.
@@ -121,9 +130,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-13T18:20:28.549Z
-**Stopped at:** Phase 9 context gathered
-**Next action:** Phase 8 fully complete (COMP-01 Inertia + COMP-02 HeatExchanger satisfied). Continue with Phase 9 (ChannelAndContacts).
+**Last session:** 2026-03-13T18:50:27.819Z
+**Stopped at:** Completed 09-channelandcontacts-01-PLAN.md
+**Next action:** Phase 9 plan 01 (RED) complete. Continue with Phase 9 plan 02 (GREEN): implement ChannelAndContacts with n ThermalPort subsystems and per-cell energy balance; implement ChannelHeatFlux with T_wall parameter driving heat transfer matching Channel within 0.1%.
 
 ---
 
