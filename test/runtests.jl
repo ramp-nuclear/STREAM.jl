@@ -3,7 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using DifferentialEquations: ReturnCode
 using STREAM
-import STREAM: Channel, Pump, Friction, Gravity  # resolve ambiguity with Base.Channel
+import STREAM: Channel, Pump, Friction, Gravity, build_loop_vertical  # resolve ambiguity with Base.Channel
 
 @testset "STREAM Phase 1 Tests" begin
 
@@ -287,3 +287,58 @@ end
 end
 
 end  # @testset "STREAM Phase 3 Tests"
+
+@testset "STREAM Phase 6 Tests" begin
+
+# ─────────────────────────────────────────────────────────────────
+# GRAV-01: Vertical closed loop assembles, compiles, and solves
+# Topology: Pump -> TempBC -> Channel(g_acc=9.80665, L=0.6m) -> Gravity(H=0.6m) -> Pump
+# Channel carries g_acc for the upward leg; Gravity carries the return leg.
+# ─────────────────────────────────────────────────────────────────
+@testset "GRAV-01: vertical loop mtkcompiles" begin
+    ssys_v = build_loop_vertical()
+    @test ssys_v isa ModelingToolkit.AbstractSystem
+end
+
+@testset "GRAV-01: vertical loop solves" begin
+    n = 10; T_inlet = 313.15
+    ssys_v = build_loop_vertical(T_inlet=T_inlet)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+    op = [ssys_v.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op, ssys_v.ch.port_in.mdot => 0.490)
+    sol = solve_steady(ssys_v, op)
+    @test sol.retcode == ReturnCode.Success
+    @test sol[ssys_v.ch.port_in.mdot] > 0
+end
+
+# ─────────────────────────────────────────────────────────────────
+# GRAV-02: Gravity cancellation — equal up/down height gives same
+# steady-state mass flow as horizontal reference loop (within 1%)
+#
+# Physics: Channel dP includes +rho*g_acc*L (head loss going up).
+# Gravity component adds rho*9.80665*H to the return leg (head gain going down).
+# When H == L_ch == 0.6m, the two terms cancel; net gravity effect = 0.
+# The cancellation loop should therefore match the horizontal loop's mdot.
+# ─────────────────────────────────────────────────────────────────
+@testset "GRAV-02: gravity cancellation within 1% of horizontal" begin
+    n = 10; T_inlet = 313.15; L_ch = 0.6
+
+    # Horizontal reference (g_acc=0, no Gravity component)
+    ssys_h = build_loop(T_inlet=T_inlet)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+    op_h = [ssys_h.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op_h, ssys_h.ch.port_in.mdot => 0.490)
+    sol_h = solve_steady(ssys_h, op_h)
+    mdot_horiz = abs(sol_h[ssys_h.ch.port_in.mdot])
+
+    # Vertical cancellation loop (g_acc=9.80665, H_return=L_ch)
+    ssys_v = build_loop_vertical(T_inlet=T_inlet, L_ch=L_ch, H_return=L_ch)
+    op_v = [ssys_v.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op_v, ssys_v.ch.port_in.mdot => 0.490)
+    sol_v = solve_steady(ssys_v, op_v)
+    mdot_vert = abs(sol_v[ssys_v.ch.port_in.mdot])
+
+    @test isapprox(mdot_vert, mdot_horiz; rtol=0.01)
+end
+
+end  # @testset "STREAM Phase 6 Tests"

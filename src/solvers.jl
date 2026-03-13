@@ -168,11 +168,19 @@ function build_loop_vertical(;
     @named bc   = _make_temp_bc(T_bc = T_inlet)
     @named grav = Gravity(H = H)
 
+    # Gravity wiring note:
+    # Gravity equation: port_in.P - port_out.P ~ rho*g*H (port_in = high-P = bottom)
+    # For the RETURN leg (fluid descends from channel top back to pump bottom):
+    #   - channel outlet (top, low pressure) = grav.port_out (top)
+    #   - pump inlet (bottom, higher pressure) = grav.port_in (bottom)
+    # This gives: pump_inlet.P = channel_outlet.P + rho*g*H
+    # Loop balance: dP_pump = friction + rho*g*L_ch - rho*g*H
+    # Cancellation when H = L_ch: dP_pump = friction (gravity terms cancel).
     connections = [
         connect(pump.port_out, bc.port_in),       # pump -> TempBC
         connect(bc.port_out,   ch.port_in),        # TempBC -> channel (upward leg)
-        connect(ch.port_out,   grav.port_in),      # channel -> gravity return leg
-        connect(grav.port_out, pump.port_in),      # gravity -> pump (closed loop)
+        connect(ch.port_out,   grav.port_out),     # channel outlet (top) = grav port_out (top)
+        connect(grav.port_in,  pump.port_in),      # grav port_in (bottom) = pump inlet (bottom)
         pump.port_in.P  ~ 1.0e5,                  # pressure gauge freedom fix
         ch.thermal.T    ~ T_wall,                  # wall temperature pin (for HTC)
         ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
