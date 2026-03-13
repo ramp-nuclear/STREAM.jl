@@ -51,7 +51,10 @@ Plans:
   1. Resistor component exists: `dp ~ R * mdot` with a scalar resistance parameter, and a standalone test confirms it compiles and solves
   2. The Cube problem (12 Resistors, 8 nodes, 1 Pump) assembles using multi-port connect() calls and solves without error
   3. The Cube problem flow distribution matches the analytical equivalent resistance (5/6 R) within 1%
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 07-01-PLAN.md — Resistor component (NET-01): TDD implementation + export
+- [ ] 07-02-PLAN.md — build_cube utility + NET-02/NET-03 Cube validation
 
 ### Phase 8: Inertia and HeatExchanger
 **Goal**: Inertia ODE component and HeatExchanger public component are implemented and accessible
@@ -84,8 +87,8 @@ Plans:
 | 3. Integration and Validation | v0.1 | 3/3 | Complete | 2026-03-12 |
 | 4. Tech Debt Cleanup | v0.1 | 1/1 | Complete | 2026-03-12 |
 | 5. Nyquist Validation | v0.1 | 1/1 | Complete | 2026-03-12 |
-| 6. Gravity Validation | 1/1 | Complete   | 2026-03-13 | - |
-| 7. Network Architecture | v0.2 | 0/? | Not started | - |
+| 6. Gravity Validation | v0.2 | 1/1 | Complete | 2026-03-13 |
+| 7. Network Architecture | v0.2 | 0/2 | Not started | - |
 | 8. Inertia and HeatExchanger | v0.2 | 0/? | Not started | - |
 | 9. ChannelAndContacts | v0.2 | 0/? | Not started | - |
 
@@ -94,3 +97,4 @@ Plans:
 *Created: 2026-03-12*
 *Updated: 2026-03-13 — v0.2 roadmap added (phases 6-9)*
 *Updated: 2026-03-13 — Phase 6 plan written (06-01-PLAN.md)*
+*Updated: 2026-03-13 — Phase 7 plans written (07-01-PLAN.md, 07-02-PLAN.md)*
