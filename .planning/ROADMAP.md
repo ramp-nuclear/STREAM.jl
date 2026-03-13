@@ -39,7 +39,9 @@ Full phase details: `.planning/milestones/v0.1-ROADMAP.md`
   1. A vertical closed loop (Channel with g_acc=9.80665 + Gravity component on return leg of equal height) assembles, compiles with mtkcompile, and solves without error
   2. The gravity cancellation test passes: equal up/down height gives the same steady-state mass flow rate as the horizontal reference loop within 1%
   3. The test suite passes with the new gravity tests included (no regressions in v0.1 tests)
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 06-01-PLAN.md — add build_loop_vertical + GRAV-01/GRAV-02 tests
 
 ### Phase 7: Network Architecture
 **Goal**: Multi-branch hydraulic networks assemble and solve correctly via MTK connect() semantics
@@ -82,7 +84,7 @@ Full phase details: `.planning/milestones/v0.1-ROADMAP.md`
 | 3. Integration and Validation | v0.1 | 3/3 | Complete | 2026-03-12 |
 | 4. Tech Debt Cleanup | v0.1 | 1/1 | Complete | 2026-03-12 |
 | 5. Nyquist Validation | v0.1 | 1/1 | Complete | 2026-03-12 |
-| 6. Gravity Validation | v0.2 | 0/? | Not started | - |
+| 6. Gravity Validation | v0.2 | 0/1 | Not started | - |
 | 7. Network Architecture | v0.2 | 0/? | Not started | - |
 | 8. Inertia and HeatExchanger | v0.2 | 0/? | Not started | - |
 | 9. ChannelAndContacts | v0.2 | 0/? | Not started | - |
@@ -91,3 +93,4 @@ Full phase details: `.planning/milestones/v0.1-ROADMAP.md`
 
 *Created: 2026-03-12*
 *Updated: 2026-03-13 — v0.2 roadmap added (phases 6-9)*
+*Updated: 2026-03-13 — Phase 6 plan written (06-01-PLAN.md)*
