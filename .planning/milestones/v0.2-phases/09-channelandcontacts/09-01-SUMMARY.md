@@ -21,7 +21,7 @@ tech-stack:
   added: []
   patterns:
     - "TDD RED phase: stubs callable and mtkcompilable but fail at behavior assertions"
-    - "Per-cell ThermalPort design: ChannelAndContacts will use thermal1..thermalN subsystems instead of single thermal port"
+    - "Per-cell ThermalPort design: ChannelAndContacts uses thermal_left1..N and thermal_right1..N subsystems (Phase 10 rename from thermal1..thermalN — two-sided interface for HeatDiffusion)"
     - "T_wall-as-parameter pattern: ChannelHeatFlux encapsulates wall BC instead of external thermal.T constraint"
 
 key-files:
@@ -93,7 +93,7 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 - RED phase complete: both stubs are callable/mtkcompilable, correct tests fail at the right assertion points
-- Plan 02 (GREEN) must: add thermal1..thermalN ThermalPort subsystems to ChannelAndContacts with per-cell energy balance; implement ChannelHeatFlux with T_wall parameter driving actual heat transfer so steady-state T_out matches Channel within 0.1%
+- Plan 02 (GREEN) must: add thermal_left1..N and thermal_right1..N ThermalPort subsystems to ChannelAndContacts with dual-sided energy balance (Phase 10 — renamed from thermal1..thermalN for two-sided HeatDiffusion interface); implement ChannelHeatFlux with T_wall parameter driving actual heat transfer so steady-state T_out matches Channel within 0.1%
 - THERM-02 regression baseline confirmed: Channel is untouched, single :thermal subsystem still present
 
 ---
