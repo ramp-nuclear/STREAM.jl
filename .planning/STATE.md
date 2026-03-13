@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: HeatDiffusion
-status: planning
-stopped_at: v0.2 milestone archived — starting v0.3
+status: ready_to_plan
+stopped_at: v0.3 roadmap defined — phases 10-12 created
 last_updated: "2026-03-13"
-last_activity: 2026-03-13 — v0.2 milestone complete and archived; 86 tests passing; ready for v0.3
+last_activity: 2026-03-13 — v0.3 roadmap created; 14 requirements mapped to 3 phases
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -22,106 +22,58 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-13 after v0.2)
+See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Planning v0.3 — HeatDiffusion (2D fuel plate + ChannelAndContacts coupling)
+**Current focus:** Phase 10 — ChannelAndContacts Two-Sided Upgrade
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-13 — Milestone v0.3 started
+Phase: 10 of 12 (ChannelAndContacts Two-Sided Upgrade)
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-03-13 — v0.3 roadmap created; ready to plan Phase 10
 
-Progress: [██████████] 100% (Phase 9 plan 02 of 2 complete — v0.2 done)
+Progress: [░░░░░░░░░░] 0% (v0.3 not started)
 
 ---
 
 ## Performance Metrics
 
-| Metric | Value |
-|--------|-------|
-| v0.2 phases total | 4 |
-| v0.2 phases complete | 1 |
-| v0.2 requirements mapped | 10/10 |
-| v0.2 plans written | 1 |
-| v0.2 plans complete | 1 |
+**v0.2 velocity reference:** 7 plans; avg ~8 min/plan; total ~55 min execution
 
-**v0.1 velocity reference:** 12 plans completed; avg ~13 min/plan
+| Phase | Plans | Total Time | Avg/Plan |
+|-------|-------|------------|----------|
+| 06 Gravity | 1 | 9 min | 9 min |
+| 07 Network | 2 | 8 min | 4 min |
+| 08 Inertia+HX | 2 | 23 min | 12 min |
+| 09 Channel | 2 | 15 min | 8 min |
 
-| Phase 06-gravity-validation P01 | 9 min | 2 tasks | 3 files |
-| Phase 07-network-architecture P01 | 5 min | 1 tasks | 3 files |
-| Phase 07 P02 | 3 | 1 tasks | 3 files |
-| Phase 08-inertia-and-heatexchanger P01 | 19 | 2 tasks | 3 files |
-| Phase 08-inertia-and-heatexchanger P02 | 4 | 1 tasks | 3 files |
-| Phase 09-channelandcontacts P01 | 8 | 2 tasks | 3 files |
-| Phase 09-channelandcontacts P02 | 7 | 2 tasks | 1 files |
+**v0.3 (pending):**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 10 Channel Upgrade | TBD | - | - |
+| 11 HeatDiffusion | TBD | - | - |
+| 12 MTR Validation | TBD | - | - |
+
+*Updated after each plan completion*
+
+---
 
 ## Accumulated Context
 
-### Key Decisions (v0.1, carry-forward)
+### Key Decisions (carry-forward from v0.2)
 
 | Decision | Rationale |
 |----------|-----------|
-| MTK from day one | Avoid Python-style architecture; hit learning curve on 30 eq not 300 |
-| Gravity: g_acc in Channel + standalone Gravity component on return leg | Natural MTK approach; no special loop architecture needed |
+| q_wall[i] ~ thermal_ports[i].Q_flow 1:1 mapping | Each ThermalPort covers exactly one cell — interface contract for HeatDiffusion |
+| _channel_base_eqs accepts concrete g_acc (Float64) | dP is algebraic; avoids symbolic pars indexing |
+| MTK variadic connect() is the junction — no Junction component | Kirchhoff equations auto-generated |
 | build_loop is test/example utility, not primary API | MTK connect()/compose() is expressive enough |
-| Channel Darcy-Weisbach friction is inline (not wired component) | Reduces DAE complexity; confirmed no Friction in loop |
-| TempBC pattern for closed-loop T injection | Breaks circular instream() dependency |
-| mtkcompile ~12s for 12-eq loop | Acceptable for interactive use |
-
-### Key Decisions (v0.2 Phase 6)
-
-| Decision | Rationale |
-|----------|-----------|
-| Gravity port wiring reversed from flow direction | port_in.P > port_out.P means port_in is bottom (high-P); for descending return leg connect ch.port_out->grav.port_out and grav.port_in->pump.port_in |
-| 1% cancellation tolerance for GRAV-02 | Channel uses rho(T_mid), Gravity uses rho(T_in) — density evaluated at different temperatures, so machine-precision cancellation not achievable |
-
-### Key Decisions (v0.2 Phase 7)
-
-| Decision | Rationale |
-|----------|-----------|
-| Resistor uses linear pressure drop without abs() | Bidirectional by design; positive mdot = flow in = pressure drop from in to out; matches Python STREAM semantics |
-| mtkcompile with fully_determined=false for isolated component tests | Allows testing individual components before wiring into a closed loop |
-| MTK variadic connect(a,b,c) is the junction — no Junction component needed | MTK generates Kirchhoff equations automatically; simpler topology |
-| Pressure anchor pump.port_in.P ~ 1.0e5 required for cube network | Body-diagonal Kirchhoff system leaves absolute pressure underdetermined |
-| Initial guess mdot_guess = mdot_analytical/3 sufficient for KINSOL | Source branch symmetry: each of 3 branches from corner 0 carries one-third |
-
-### Key Decisions (v0.2 Phase 8 Plan 01)
-
-| Decision | Rationale |
-|----------|-----------|
-| Inertia uses vars=[] — MTK auto-promotes port_in.mdot as differential state | Explicit mdot state var would create overconstrained system; MTK infers state from Dt(port_in.mdot) appearance |
-| Pure pressure RL circuit: fully_determined=false + check_length=false + T ICs | T stream vars are free (no heat exchange); ODEProblem requires all unknowns have ICs even if T equations absent |
-
-### Key Decisions (v0.2 Phase 8 Plan 02)
-
-| Decision | Rationale |
-|----------|-----------|
-| HeatExchanger is exact rename of _make_temp_bc — no behavior change | Component already correct; goal is public API exposure, not reimplementation |
-| Local variable `bc` unchanged in build_loop call sites | Connections reference bc.port_in/bc.port_out — only constructor name changes |
-
-### Key Decisions (v0.2 Phase 9 Plan 01)
-
-| Decision | Rationale |
-|----------|-----------|
-| RED stub: minimal FlowPort-only System sufficient for callable/mtkcompile pass | compose(System(eqs, t, [], []; name=name), port_in, port_out) passes structural tests while correctly failing behavioral assertions |
-| THERM-03 uses build_loop as Channel reference + inline compose() for ChannelHeatFlux | No new build_ helper needed; inline wiring is the intended Pattern for ChannelHeatFlux usage |
-| build_loop signature confirmed to accept n, L_ch, D_ch, A_ch, dP_pump, T_inlet, T_wall | THERM-03 test can call build_loop directly without any workarounds |
-
-### Key Decisions (v0.2 Phase 9 Plan 02)
-
-| Decision | Rationale |
-|----------|-----------|
-| _channel_base_eqs accepts concrete g_acc=g (Float64) not MTK symbolic | dP is algebraic so concrete value works; avoids pars[4] indexing complexity |
-| q_wall[i] ~ thermal_ports[i].Q_flow (1:1 mapping, not /n) | Each ThermalPort covers exactly one cell — interface contract for HeatDiffusion v0.3 |
-| Q_wall_total observable sums all thermal_ports[i].Q_flow | Convenient total for diagnostics and downstream coupling |
-| ChannelHeatFlux q_wall[i] uses direct formula h_tc*pi*Dh*dz*(T_wall_p - T[i]) | No ThermalPorts in this variant; formula is algebraically equivalent |
-| v0.2 milestone complete — all 10 requirements (GRAV, NET, COMP, THERM) satisfied | ChannelAndContacts defines the per-cell interface for HeatDiffusion (v0.3) |
 
 ### Pending Todos
 
@@ -129,22 +81,18 @@ None.
 
 ### Blockers/Concerns
 
-- Flow reversal with ifelse() — convergence in multi-branch networks is untested (NET phases may surface issues)
-
-### Notes
-
-- COMP-02 (HeatExchanger public) is trivial: renames/exposes existing _make_temp_bc
-- NET-02/NET-03 (Cube problem) require NET-01 (Resistor) to exist first
-- ChannelAndContacts (Phase 9) defines the interface contract that HeatDiffusion (v0.3) will connect to
+- [Phase 12 prep]: `generate_reference.py` validation status is outstanding (flagged in memory). Confirm this script produces correct Python STREAM MTR reference outputs before Phase 12 planning begins.
+- [Phase 10 start]: MTK array port access syntax for `thermal_left[i]` must be confirmed with a smoke test early in Phase 10 before writing all tests against it (behavior may vary across MTK patch releases).
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-03-13T18:59:46.045Z
-**Stopped at:** Completed 09-channelandcontacts-02-PLAN.md
-**Next action:** v0.2 milestone complete. All 10 requirements satisfied. Begin v0.3 planning: HeatDiffusion (2D fuel plate + ChannelAndContacts coupling). ChannelAndContacts.thermal1..thermalN is the ready interface.
+**Last session:** 2026-03-13
+**Stopped at:** v0.3 roadmap created — phases 10-12 with 14 requirements mapped; ready to plan Phase 10
+**Next action:** Run `/gsd:plan-phase 10` to plan Phase 10 (ChannelAndContacts Two-Sided Upgrade)
+**Resume file:** None
 
 ---
 
-*Last updated: 2026-03-13 — v0.2 roadmap created*
+*Last updated: 2026-03-13 — v0.3 roadmap created*

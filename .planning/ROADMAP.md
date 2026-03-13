@@ -4,7 +4,7 @@
 
 - ✅ **v0.1 MVP** — Phases 1-5 (shipped 2026-03-13)
 - ✅ **v0.2 Component & Network Expansion** — Phases 6-9 (shipped 2026-03-13)
-- 📋 **v0.3 HeatDiffusion** — Phases 10+ (planned)
+- 🚧 **v0.3 HeatDiffusion** — Phases 10-12 (in progress)
 
 ## Phases
 
@@ -33,11 +33,63 @@ Full phase details: `.planning/milestones/v0.2-ROADMAP.md`
 
 </details>
 
-### 📋 v0.3 HeatDiffusion (Planned)
+### 🚧 v0.3 HeatDiffusion (In Progress)
 
-*Requirements and phases to be defined by `/gsd:new-milestone`*
+**Milestone Goal:** Implement a 2D finite-difference fuel plate (HeatDiffusion) and upgrade ChannelAndContacts to two-sided thermal coupling, validated against the Python STREAM MTR reference case.
+
+## Phase Summary
+
+- [ ] **Phase 10: ChannelAndContacts Two-Sided Upgrade** - Upgrade ChannelAndContacts to thermal_left/right ports, clear v0.2 tech debt, verify adiabatic default
+- [ ] **Phase 11: HeatDiffusion Component** - Implement 2D FD fuel plate with x-direction diffusion, two-sided ThermalPort arrays, and isolated unit tests
+- [ ] **Phase 12: MTR Validation** - Couple HeatDiffusion + two ChannelAndContacts in MTR geometry and validate against Python STREAM within 1%
+
+## Phase Details
+
+### Phase 10: ChannelAndContacts Two-Sided Upgrade
+**Goal**: ChannelAndContacts exposes stable two-sided thermal port API and v0.2 tech debt is cleared, establishing the interface contract that HeatDiffusion will be written against
+**Depends on**: Phase 9 (v0.2 ChannelAndContacts complete)
+**Requirements**: DEBT-01, DEBT-02, DEBT-03, CHAN-01, CHAN-02, CHAN-03
+**Success Criteria** (what must be TRUE):
+  1. `_channel_base_eqs` can be called without a `t_inlet` argument and all existing tests pass
+  2. ChannelAndContacts has `thermal_left[1:n]` and `thermal_right[1:n]` port arrays; old `thermal_ports` name is gone from the codebase
+  3. `q_wall[i]` in ChannelAndContacts is verified by test to equal `thermal_left[i].Q_flow + thermal_right[i].Q_flow`
+  4. A test with only one side connected confirms the unconnected side has Q_flow = 0 at steady state (adiabatic default explicit, not assumed)
+  5. The THERM-03 test directly asserts ChannelAndContacts behavioral output rather than relying on a proxy
+**Plans**: TBD
+
+Plans:
+- [ ] 10-01: TBD
+
+### Phase 11: HeatDiffusion Component
+**Goal**: HeatDiffusion is a working, unit-tested 2D finite-difference fuel plate component with x-direction diffusion and two-sided ThermalPort arrays, axis convention locked and validated in isolation
+**Depends on**: Phase 10
+**Requirements**: HDIFF-01, HDIFF-02, HDIFF-03, HDIFF-04, HDIFF-05
+**Success Criteria** (what must be TRUE):
+  1. User can instantiate `HeatDiffusion(nz=5, nx=3, ...)` and the resulting MTK system has state `T(t)[1:nz, 1:nx]` with rows=axial and cols=lateral (matching Python STREAM axis convention)
+  2. HeatDiffusion with pinned boundary temperatures (T_boundary < T_interior) solves at steady state with `sum(thermal_left[i].Q_flow) < 0` and `sum(thermal_right[i].Q_flow) < 0` (heat leaving the plate, correct Q_flow sign)
+  3. `power_shape[1:nz, 1:nx]` (constructor parameter) and `power` (MTK parameter) together drive the correct volumetric heat source in the FD equations
+  4. Leaving `thermal_right` unconnected and connecting only `thermal_left` produces a valid compiled system where all `thermal_right[i].Q_flow ~ 0` holds at steady state
+**Plans**: TBD
+
+Plans:
+- [ ] 11-01: TBD
+
+### Phase 12: MTR Validation
+**Goal**: Coupled HeatDiffusion + two ChannelAndContacts in MTR geometry (cladding+meat+cladding, two water channels) solves and matches Python STREAM reference outputs within 1%, including an asymmetric heating case that confirms left/right coupling direction is correct
+**Depends on**: Phase 11
+**Requirements**: VAL-01, VAL-02, VAL-03
+**Success Criteria** (what must be TRUE):
+  1. Steady-state T_outlet on both channels and T_plate (center and wall) match Python STREAM MTR reference within 1%
+  2. An asymmetric test (left channel 50 K hotter than right) produces a non-symmetric plate temperature profile consistent with Python STREAM — confirming the left/right coupling direction is not swapped
+  3. One-sided coupling (HeatDiffusion connected to one channel, other face adiabatic) solves correctly and is validated against Python STREAM one-sided reference
+**Plans**: TBD
+
+Plans:
+- [ ] 12-01: TBD
 
 ## Progress
+
+**Execution Order:** 10 → 11 → 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -50,8 +102,11 @@ Full phase details: `.planning/milestones/v0.2-ROADMAP.md`
 | 7. Network Architecture | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 8. Inertia and HeatExchanger | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
+| 10. ChannelAndContacts Two-Sided Upgrade | v0.3 | 0/? | Not started | - |
+| 11. HeatDiffusion Component | v0.3 | 0/? | Not started | - |
+| 12. MTR Validation | v0.3 | 0/? | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-13 — v0.2 archived, v0.3 planned*
+*Updated: 2026-03-13 — v0.3 roadmap defined (phases 10-12)*
