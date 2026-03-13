@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: Component & Network Expansion
 status: completed
-stopped_at: Phase 8 context gathered
-last_updated: "2026-03-13T15:20:22.900Z"
+stopped_at: Completed 08-01-PLAN.md (Inertia COMP-01)
+last_updated: "2026-03-13T16:21:56.023Z"
 last_activity: 2026-03-13 — Phase 7 plan 02 executed (NET-02/NET-03 Cube network)
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 7 of 9 (Network Architecture) — second v0.2 phase — COMPLETE
-Plan: 01 (complete), 02 (complete)
-Status: Phase 7 fully complete (NET-01, NET-02, NET-03 satisfied)
-Last activity: 2026-03-13 — Phase 7 plan 02 executed (NET-02/NET-03 Cube network)
+Phase: 8 of 9 (Inertia and HeatExchanger) — third v0.2 phase — IN PROGRESS
+Plan: 01 (complete), 02 (pending)
+Status: Plan 01 complete (COMP-01 Inertia satisfied); Plan 02 (HeatExchanger) next
+Last activity: 2026-03-13 — Phase 8 plan 01 executed (COMP-01 Inertia + RL-decay validation)
 
-Progress: [██████████] 100% (Phase 7 all plans complete)
+Progress: [████████░░] 80% (Phase 8 Plan 01 complete, Plan 02 pending)
 
 ---
 
@@ -56,6 +56,7 @@ Progress: [██████████] 100% (Phase 7 all plans complete)
 | Phase 06-gravity-validation P01 | 9 min | 2 tasks | 3 files |
 | Phase 07-network-architecture P01 | 5 min | 1 tasks | 3 files |
 | Phase 07 P02 | 3 | 1 tasks | 3 files |
+| Phase 08-inertia-and-heatexchanger P01 | 19 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,13 @@ Progress: [██████████] 100% (Phase 7 all plans complete)
 | Pressure anchor pump.port_in.P ~ 1.0e5 required for cube network | Body-diagonal Kirchhoff system leaves absolute pressure underdetermined |
 | Initial guess mdot_guess = mdot_analytical/3 sufficient for KINSOL | Source branch symmetry: each of 3 branches from corner 0 carries one-third |
 
+### Key Decisions (v0.2 Phase 8 Plan 01)
+
+| Decision | Rationale |
+|----------|-----------|
+| Inertia uses vars=[] — MTK auto-promotes port_in.mdot as differential state | Explicit mdot state var would create overconstrained system; MTK infers state from Dt(port_in.mdot) appearance |
+| Pure pressure RL circuit: fully_determined=false + check_length=false + T ICs | T stream vars are free (no heat exchange); ODEProblem requires all unknowns have ICs even if T equations absent |
+
 ### Pending Todos
 
 None.
@@ -105,8 +113,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-13T15:20:22.897Z
-**Stopped at:** Phase 8 context gathered
+**Last session:** 2026-03-13T16:21:56.021Z
+**Stopped at:** Completed 08-01-PLAN.md (Inertia COMP-01)
 **Next action:** Phase 7 fully complete (NET-01/02/03 satisfied). Continue with Phase 8 (COMP-02 HeatExchanger) or Phase 9 (ChannelAndContacts).
 
 ---
