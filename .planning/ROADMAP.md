@@ -55,10 +55,11 @@ Full phase details: `.planning/milestones/v0.2-ROADMAP.md`
   3. `q_wall[i]` in ChannelAndContacts is verified by test to equal `thermal_left[i].Q_flow + thermal_right[i].Q_flow`
   4. A test with only one side connected confirms the unconnected side has Q_flow = 0 at steady state (adiabatic default explicit, not assumed)
   5. The THERM-03 test directly asserts ChannelAndContacts behavioral output rather than relying on a proxy
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 10-01: TBD
+- [ ] 10-01-PLAN.md — Rewrite ChannelAndContacts (dual ports, two-sided energy balance), remove t_inlet from _channel_base_eqs, add ConstantTemperature, DEBT-03 doc fix
+- [ ] 10-02-PLAN.md — Update THERM-01 port assertions, rewrite THERM-03 as CAC-vs-CHF, add CHAN-03 adiabatic test
 
 ### Phase 11: HeatDiffusion Component
 **Goal**: HeatDiffusion is a working, unit-tested 2D finite-difference fuel plate component with x-direction diffusion and two-sided ThermalPort arrays, axis convention locked and validated in isolation
@@ -102,11 +103,11 @@ Plans:
 | 7. Network Architecture | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 8. Inertia and HeatExchanger | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
-| 10. ChannelAndContacts Two-Sided Upgrade | v0.3 | 0/? | Not started | - |
+| 10. ChannelAndContacts Two-Sided Upgrade | v0.3 | 0/2 | Planning complete | - |
 | 11. HeatDiffusion Component | v0.3 | 0/? | Not started | - |
 | 12. MTR Validation | v0.3 | 0/? | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-13 — v0.3 roadmap defined (phases 10-12)*
+*Updated: 2026-03-14 — Phase 10 plans created (2 plans, 2 waves)*
