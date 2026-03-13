@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.2
-milestone_name: Component & Network Expansion
-status: completed
-stopped_at: Completed 09-channelandcontacts-02-PLAN.md
-last_updated: "2026-03-13T19:03:40.391Z"
-last_activity: 2026-03-13 — Phase 9 plan 02 executed (ChannelAndContacts + ChannelHeatFlux GREEN, 86 tests passing)
+milestone: v0.3
+milestone_name: HeatDiffusion
+status: planning
+stopped_at: v0.2 milestone archived — starting v0.3
+last_updated: "2026-03-13"
+last_activity: 2026-03-13 — v0.2 milestone complete and archived; 86 tests passing; ready for v0.3
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # STATE: STREAM.jl
@@ -22,10 +22,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-13)
+See: .planning/PROJECT.md (updated 2026-03-13 after v0.2)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 7 — Network Architecture
+**Current focus:** Planning v0.3 — HeatDiffusion (2D fuel plate + ChannelAndContacts coupling)
 **Python STREAM reference:** ~/projects/STREAM
 
 ---

@@ -54,6 +54,50 @@
 
 ---
 
+## Milestone: v0.2 — Component & Network Expansion
+
+**Shipped:** 2026-03-13
+**Phases:** 4 (6-9) | **Plans:** 7
+
+### What Was Built
+- `build_loop_vertical`: vertical closed loop with Channel(g_acc) + Gravity(H) reversed-port wiring; hydrostatic cancellation test within 1%
+- `Resistor` component: linear hydraulic resistor (dP = R·ṁ) as building block for networks
+- `build_cube`: 12-Resistor cube network via MTK variadic connect(), KINSOL solve, 5/6·R analytical match
+- `Inertia` ODE component: L/A·D(ṁ) pressure drop; RL-decay transient match to 2.6×10⁻⁶ rtol
+- `HeatExchanger` public component: `_make_temp_bc` promoted to public API, all build_loop variants updated
+- `ChannelAndContacts` + `ChannelHeatFlux`: per-cell ThermalPort array via `_channel_base_eqs` shared helper; v0.3 interface ready
+
+### What Worked
+- TDD Red/Green approach continued to work cleanly — stubs + failing assertions gave clear targets
+- `_channel_base_eqs` shared-helper extraction emerged organically from the implementation; the shared-equations pattern should be the default for component variants
+- MTK variadic connect() proved sufficient for Kirchhoff junctions at cube scale (8 nodes, three 3-way + two 4-way junctions) — the "no Junction component" decision from v0.1 planning held up
+- All 4 phases executed in a single day (~7 hours total) — the v0.1 velocity transferred intact
+
+### What Was Inefficient
+- Gravity wiring ambiguity in the plan ("let MTK sort out signs") led to a Port-connection-direction bug in Phase 6 — the convention needed to be nailed down in the plan, not discovered at runtime
+- The `t_inlet` parameter in `_channel_base_eqs` is dead (both callers compute their own `T_inlet`) — a small code review gap that will need cleanup in v0.3
+- THERM-03 was validated via `ChannelHeatFlux` proxy rather than direct `ChannelAndContacts` pin — algebraically correct but leaves a gap; add direct test in v0.3
+- ODEProblem construction for pure pressure circuits (Inertia + Resistor loop) required two non-obvious flags (`fully_determined=false`, `check_length=false`) — the plan predicted one but not both
+
+### Patterns Established
+- **Reversed-port wiring for descending components**: For any component where `port_in.P > port_out.P` (high-pressure entry), connect the physically-bottom-end to port_in regardless of flow direction
+- **Multi-branch junction**: `connect(a, b, c, ...)` generates Kirchhoff automatically; always add a pressure anchor (`pump.port_in.P ~ 1.0e5`) to fix absolute pressure level
+- **Shared equation helper pattern**: Extract `_foo_base_eqs(eqs, ...; kwargs)` that mutates `eqs` in-place before variant-specific coupling loop
+- **ODE component with auto-promoted state**: Use `vars = []` and let MTK promote the `Dt(port_in.mdot)` variable; don't declare an explicit `mdot(t)` state
+
+### Key Lessons
+1. **Pin port wiring conventions explicitly in the plan** — "MTK will figure it out" is never safe for port direction; write out which end connects where
+2. **Pressure anchor is a mandatory fixture for multi-branch networks** — add it to every build_cube/build_network helper, not as an afterthought
+3. **Document dead parameters at creation time** — the `t_inlet` parameter in `_channel_base_eqs` was dead from day one; a one-line comment at creation would have avoided the audit note
+4. **Test both proxy and direct** — when THERM-03 was validated via proxy (algebraically equivalent), a follow-up direct test should have been written immediately
+
+### Cost Observations
+- Model mix: ~100% sonnet
+- Sessions: ~1 (single intensive session 2026-03-13)
+- Notable: 4 phases in 7 hours, 32 new tests — velocity roughly matched v0.1 per-plan pace (~5-10 min/plan vs 13 min/plan baseline)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -61,9 +105,11 @@
 | Milestone | Phases | Plans | Key Change |
 |-----------|--------|-------|------------|
 | v0.1 | 5 | 12 | First milestone — baseline established |
+| v0.2 | 4 | 7 | Smaller plans (avg 1.75/phase vs 2.4/phase); `_channel_base_eqs` shared helper pattern emerges |
 
 ### Cumulative Quality
 
 | Milestone | Tests | Requirements | Zero-Dep Additions |
 |-----------|-------|--------------|-------------------|
 | v0.1 | 54 | 15/15 | 0 |
+| v0.2 | 86 | 10/10 | 0 |
