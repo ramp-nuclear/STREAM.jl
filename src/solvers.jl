@@ -127,6 +127,68 @@ function solve_steady(ssys, op;
 end
 
 # ----------------------------------------------------------------
+# build_loop_vertical
+# Assembles a vertical closed loop that includes gravity effects:
+#   Pump -> TempBC -> Channel(g_acc=9.80665) -> Gravity(H) -> Pump
+#
+# The upward leg is modelled by Channel with g_acc set to the
+# gravitational acceleration (default 9.80665 m/s²). The Channel's
+# dP equation includes +rho*g_acc*L representing the hydrostatic
+# head loss as the fluid rises.
+#
+# The return (downward) leg is modelled by the standalone Gravity
+# component with height H (default = L_ch). Gravity's equation:
+#   port_in.P - port_out.P ~ rho * 9.80665 * H
+# represents the pressure gain as the fluid descends.
+#
+# Cancellation geometry (default): when H_return == L_ch and
+# g_acc == 9.80665, the upward head loss equals the downward head
+# gain, and the net gravity contribution to the loop pressure
+# balance is zero — matching the horizontal reference loop within
+# the accuracy of the density evaluation point (~1%).
+#
+# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot
+# for symbolic indexing (same pattern as build_loop).
+# ----------------------------------------------------------------
+function build_loop_vertical(;
+    n::Int   = 10,
+    L_ch     = 0.6,
+    D_ch     = 0.01,
+    A_ch     = 7.85e-5,
+    dP_pump  = 3.0e4,
+    T_inlet  = 313.15,    # coolant inlet temperature (K); 40°C
+    T_wall   = 373.15,    # wall temperature (K); ~100°C for forced convection
+    g_acc    = 9.80665,   # gravitational acceleration (m/s²)
+    H_return = nothing,   # height of return leg (m); defaults to L_ch for cancellation geometry
+)
+    H = isnothing(H_return) ? L_ch : H_return
+
+    @named pump = Pump(dP_pump = dP_pump)
+    @named ch   = Channel(n = n, L = L_ch, D = D_ch, A = A_ch, g = g_acc)
+    @named bc   = _make_temp_bc(T_bc = T_inlet)
+    @named grav = Gravity(H = H)
+
+    connections = [
+        connect(pump.port_out, bc.port_in),       # pump -> TempBC
+        connect(bc.port_out,   ch.port_in),        # TempBC -> channel (upward leg)
+        connect(ch.port_out,   grav.port_in),      # channel -> gravity return leg
+        connect(grav.port_out, pump.port_in),      # gravity -> pump (closed loop)
+        pump.port_in.P  ~ 1.0e5,                  # pressure gauge freedom fix
+        ch.thermal.T    ~ T_wall,                  # wall temperature pin (for HTC)
+        ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
+    ]
+
+    @named sys = compose(System(connections, t; name = :sys), pump, bc, ch, grav)
+
+    t_compile = @elapsed ssys = mtkcompile(sys)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "build_loop_vertical compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    return ssys
+end
+
+# ----------------------------------------------------------------
 # build_loop_transient
 # Same topology as build_loop (Pump -> TempBC -> Channel)
 # but with T_wall declared as a @parameters symbol so that
