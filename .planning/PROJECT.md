@@ -35,9 +35,12 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 ### Active
 
 - [ ] HeatDiffusion component: 2D (x-z) finite-difference fuel plate with T(t)[1:nx, 1:nz] indexed MTK variables
-- [ ] HeatDiffusion exposes thermal_left[1:n] and thermal_right[1:n] ThermalPort arrays for channel coupling
+- [ ] HeatDiffusion exposes thermal_left[1:nz] and thermal_right[1:nz] ThermalPort arrays for per-cell coupling
+- [ ] ChannelAndContacts upgraded: thermal_ports[1:n] replaced by thermal_left[1:n] + thermal_right[1:n]; q_wall[i] = left + right contributions
+- [ ] Unconnected ThermalPort sides default to adiabatic (Q_flow=0 from MTK acausal semantics — no explicit flag needed)
 - [ ] Coupled HeatDiffusion + ChannelAndContacts system solves and matches Python STREAM MTR reference case
 - [ ] Asymmetric left/right heating (two independent channels on either side of a plate) works without model changes
+- [ ] v0.2 tech debt: remove dead t_inlet parameter from _channel_base_eqs, add direct THERM-03 assertion, fix doc cosmetic in 09-01-SUMMARY.md
 
 ### Out of Scope
 
@@ -90,5 +93,15 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
 - **Scope gate**: v0.3 is exclusively HeatDiffusion (2D fuel plate + ChannelAndContacts coupling); PointKinetics and correlations are v0.4+
 
+## Current Milestone: v0.3 HeatDiffusion
+
+**Goal:** Implement the 2D finite-difference fuel plate (HeatDiffusion) and upgrade ChannelAndContacts to two-sided thermal coupling, validated against the Python STREAM MTR reference case.
+
+**Target features:**
+- HeatDiffusion: 2D (x-z) FD fuel plate with indexed MTK variables and two-sided ThermalPort arrays
+- ChannelAndContacts: upgraded to thermal_left + thermal_right (one or both sides, adiabatic default via MTK)
+- MTR reference case validation: coupled HeatDiffusion + ChannelAndContacts matches Python STREAM
+- v0.2 tech debt cleanup
+
 ---
-*Last updated: 2026-03-13 after v0.2 milestone completion*
+*Last updated: 2026-03-13 after v0.3 milestone start*

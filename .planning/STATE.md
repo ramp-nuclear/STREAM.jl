@@ -32,10 +32,10 @@ See: .planning/PROJECT.md (updated 2026-03-13 after v0.2)
 
 ## Current Position
 
-Phase: 9 of 9 (ChannelAndContacts) — fourth v0.2 phase — COMPLETE
-Plan: 02 (complete — GREEN implementation)
-Status: v0.2 milestone complete. All 10 requirements (GRAV-01/02, NET-01/02/03, COMP-01/02, THERM-01/02/03) satisfied.
-Last activity: 2026-03-13 — Phase 9 plan 02 executed (ChannelAndContacts + ChannelHeatFlux GREEN, 86 tests passing)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-13 — Milestone v0.3 started
 
 Progress: [██████████] 100% (Phase 9 plan 02 of 2 complete — v0.2 done)
 
