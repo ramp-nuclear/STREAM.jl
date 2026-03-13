@@ -77,7 +77,10 @@ Plans:
   1. ChannelAndContacts component exposes n ThermalPorts (one per axial cell) and its energy balance uses per-cell wall temperature: `h_tc[i] * (π*Dh) * dz * (thermal[i].T - T[i])`
   2. All v0.1 tests pass unchanged — existing Channel (single ThermalPort) is not modified
   3. ChannelAndContacts steady-state result matches Channel result within 0.1% when all n ThermalPorts are driven by the same uniform wall temperature
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 09-01-PLAN.md — test stubs (RED) + ChannelAndContacts/ChannelHeatFlux stubs + exports (THERM-01, THERM-02, THERM-03)
+- [ ] 09-02-PLAN.md — full implementation: _channel_base_eqs + ChannelAndContacts GREEN + ChannelHeatFlux GREEN (THERM-01, THERM-02, THERM-03)
 
 ## Progress
 
@@ -93,7 +96,7 @@ Plans:
 | 6. Gravity Validation | v0.2 | 1/1 | Complete | 2026-03-13 |
 | 7. Network Architecture | 2/2 | Complete   | 2026-03-13 | - |
 | 8. Inertia and HeatExchanger | 2/2 | Complete   | 2026-03-13 | - |
-| 9. ChannelAndContacts | v0.2 | 0/? | Not started | - |
+| 9. ChannelAndContacts | v0.2 | 0/2 | Not started | - |
 
 ---
 
@@ -102,3 +105,4 @@ Plans:
 *Updated: 2026-03-13 — Phase 6 plan written (06-01-PLAN.md)*
 *Updated: 2026-03-13 — Phase 7 plans written (07-01-PLAN.md, 07-02-PLAN.md)*
 *Updated: 2026-03-13 — Phase 8 plans written (08-01-PLAN.md, 08-02-PLAN.md)*
+*Updated: 2026-03-13 — Phase 9 plans written (09-01-PLAN.md, 09-02-PLAN.md)*
