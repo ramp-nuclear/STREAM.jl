@@ -20,7 +20,7 @@
 ### Lumped Components
 
 - [x] **COMP-01**: Inertia component: `dp ~ (L/A) * D(mdot)`, validated against Python STREAM Inertia on a transient test case
-- [ ] **COMP-02**: HeatExchanger component (public): fixed outlet temperature, no pressure drop — replaces internal `_make_temp_bc`; existing build_loop updated to use it
+- [x] **COMP-02**: HeatExchanger component (public): fixed outlet temperature, no pressure drop — replaces internal `_make_temp_bc`; existing build_loop updated to use it
 
 ### Per-Cell Thermal Coupling
 
@@ -60,7 +60,7 @@
 | NET-02 | Phase 7 | Complete |
 | NET-03 | Phase 7 | Complete |
 | COMP-01 | Phase 8 | Complete |
-| COMP-02 | Phase 8 | Pending |
+| COMP-02 | Phase 8 | Complete |
 | THERM-01 | Phase 9 | Pending |
 | THERM-02 | Phase 9 | Pending |
 | THERM-03 | Phase 9 | Pending |
