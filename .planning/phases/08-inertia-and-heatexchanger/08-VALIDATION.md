@@ -1,10 +1,11 @@
 ---
 phase: 8
 slug: inertia-and-heatexchanger
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-13
+audited: 2026-03-13
 ---
 
 # Phase 8 — Validation Strategy
@@ -38,11 +39,11 @@ created: 2026-03-13
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 8-01-01 | 01 | 0 | COMP-01, COMP-02 | stub | `julia --project -e 'include("test/runtests.jl")'` | ❌ W0 | ⬜ pending |
-| 8-02-01 | 02 | 1 | COMP-01 | unit | `julia --project -e 'include("test/runtests.jl")'` | ❌ W0 | ⬜ pending |
-| 8-02-02 | 02 | 1 | COMP-01 | integration | `julia --project -e 'include("test/runtests.jl")'` | ❌ W0 | ⬜ pending |
-| 8-03-01 | 03 | 1 | COMP-02 | unit | `julia --project -e 'include("test/runtests.jl")'` | ❌ W0 | ⬜ pending |
-| 8-03-02 | 03 | 1 | COMP-02 | regression | `julia --project -e 'include("test/runtests.jl")'` | ✅ existing | ⬜ pending |
+| 8-01-01 | 01 | 1 | COMP-01, COMP-02 | stub | `julia --project -e 'include("test/runtests.jl")'` | ✅ | ✅ green |
+| 8-02-01 | 01 | 1 | COMP-01 | unit | `julia --project -e 'include("test/runtests.jl")'` | ✅ | ✅ green |
+| 8-02-02 | 01 | 1 | COMP-01 | integration | `julia --project -e 'include("test/runtests.jl")'` | ✅ | ✅ green |
+| 8-03-01 | 02 | 1 | COMP-02 | unit | `julia --project -e 'include("test/runtests.jl")'` | ✅ | ✅ green |
+| 8-03-02 | 02 | 1 | COMP-02 | regression | `julia --project -e 'include("test/runtests.jl")'` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -50,7 +51,7 @@ created: 2026-03-13
 
 ## Wave 0 Requirements
 
-- [ ] `test/runtests.jl` Phase 8 testset — stubs for COMP-01 (Inertia callable, RL-decay) and COMP-02 (HeatExchanger callable, exported, build_loop regression)
+- [x] `test/runtests.jl` Phase 8 testset — COMP-01 (Inertia callable, mtkcompile, RL-decay) and COMP-02 (HeatExchanger callable, mtkcompile, export check, build_loop regression) — all green
 
 *Existing test infrastructure covers all prior requirements. Only new Phase 8 testset stubs needed.*
 
@@ -68,11 +69,19 @@ created: 2026-03-13
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-03-13 — all 75 tests pass (63 prior + 12 Phase 8 tests), zero regressions
+
+## Validation Audit 2026-03-13
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+| Pre-existing tests | 12 (COMP-01: Inertia ×3; COMP-02: HeatExchanger ×4 incl. regression) |
