@@ -54,22 +54,22 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GRAV-01 | — | Pending |
-| GRAV-02 | — | Pending |
-| NET-01 | — | Pending |
-| NET-02 | — | Pending |
-| NET-03 | — | Pending |
-| COMP-01 | — | Pending |
-| COMP-02 | — | Pending |
-| THERM-01 | — | Pending |
-| THERM-02 | — | Pending |
-| THERM-03 | — | Pending |
+| GRAV-01 | Phase 6 | Pending |
+| GRAV-02 | Phase 6 | Pending |
+| NET-01 | Phase 7 | Pending |
+| NET-02 | Phase 7 | Pending |
+| NET-03 | Phase 7 | Pending |
+| COMP-01 | Phase 8 | Pending |
+| COMP-02 | Phase 8 | Pending |
+| THERM-01 | Phase 9 | Pending |
+| THERM-02 | Phase 9 | Pending |
+| THERM-03 | Phase 9 | Pending |
 
 **Coverage:**
 - v0.2 requirements: 10 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 10 ⚠️
+- Mapped to phases: 10 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after initial definition*
+*Last updated: 2026-03-13 — traceability mapped to phases 6-9*
