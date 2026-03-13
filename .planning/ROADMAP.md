@@ -64,7 +64,10 @@ Plans:
   1. Inertia component implements `dp ~ (L/A) * D(mdot)` and a transient test matches the Python STREAM Inertia result within 1%
   2. HeatExchanger is an exported public component (not internal _make_temp_bc) with a fixed outlet temperature and no pressure drop
   3. build_loop uses HeatExchanger instead of the internal _make_temp_bc; existing v0.1 validation tests continue to pass
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 08-01-PLAN.md — Phase 8 test stubs + Inertia TDD implementation (COMP-01)
+- [ ] 08-02-PLAN.md — HeatExchanger refactor: move _make_temp_bc, update build_loop call sites, export (COMP-02)
 
 ### Phase 9: ChannelAndContacts
 **Goal**: Per-cell ThermalPort array component is implemented, tested, and backward-compatible with Channel
@@ -89,7 +92,7 @@ Plans:
 | 5. Nyquist Validation | v0.1 | 1/1 | Complete | 2026-03-12 |
 | 6. Gravity Validation | v0.2 | 1/1 | Complete | 2026-03-13 |
 | 7. Network Architecture | 2/2 | Complete   | 2026-03-13 | - |
-| 8. Inertia and HeatExchanger | v0.2 | 0/? | Not started | - |
+| 8. Inertia and HeatExchanger | v0.2 | 0/2 | Not started | - |
 | 9. ChannelAndContacts | v0.2 | 0/? | Not started | - |
 
 ---
@@ -98,3 +101,4 @@ Plans:
 *Updated: 2026-03-13 — v0.2 roadmap added (phases 6-9)*
 *Updated: 2026-03-13 — Phase 6 plan written (06-01-PLAN.md)*
 *Updated: 2026-03-13 — Phase 7 plans written (07-01-PLAN.md, 07-02-PLAN.md)*
+*Updated: 2026-03-13 — Phase 8 plans written (08-01-PLAN.md, 08-02-PLAN.md)*
