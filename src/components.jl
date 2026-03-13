@@ -186,3 +186,34 @@ function HeatExchanger(; name, T_bc)
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
+
+# ─── Phase 9 stubs (RED) ──────────────────────────────────────────────────────
+
+# ChannelAndContacts (THERM-01): per-cell ThermalPort array variant of Channel.
+# Stub: returns a minimal System so tests compile and fail at assertion level.
+function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+    eqs = Equation[
+        port_in.mdot + port_out.mdot ~ 0,
+        port_out.P - port_in.P       ~ 0,
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
+    ]
+    compose(System(eqs, t, [], []; name=name), port_in, port_out)
+end
+
+# ChannelHeatFlux (THERM-03): T_wall-as-parameter variant of Channel.
+# Stub: returns a minimal System with a T_wall_p parameter so tests compile.
+function ChannelHeatFlux(; name, n::Int, L, D, A, g = 0.0, T_wall)
+    pars = @parameters T_wall_p = T_wall
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+    eqs = Equation[
+        port_in.mdot + port_out.mdot ~ 0,
+        port_out.P - port_in.P       ~ 0,
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
+    ]
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+end
