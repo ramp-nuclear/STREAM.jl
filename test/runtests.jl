@@ -484,15 +484,15 @@ end
     @test_nowarn mtkcompile(ch; fully_determined=false)
 end
 
-@testset "THERM-01: ChannelAndContacts has thermal_left and thermal_right subsystems" begin
-    @named ch = ChannelAndContacts(n=2, L=1.0, D=0.01, A=7.85e-5)
+@testset "THERM-01: ChannelAndContacts has n ThermalPort subsystems" begin
+    @named ch = ChannelAndContacts(n=5, L=1.0, D=0.01, A=7.85e-5)
     subsys_names = Symbol.(ModelingToolkit.getname.(ModelingToolkit.get_systems(ch)))
-    # Phase 10: dual port arrays replace old thermal1..N
-    @test Symbol(:thermal_left1)  in subsys_names
-    @test Symbol(:thermal_left2)  in subsys_names
-    @test Symbol(:thermal_right1) in subsys_names
-    @test Symbol(:thermal_right2) in subsys_names
-    @test !(Symbol(:thermal1)     in subsys_names)   # old name must be gone
+    for i in 1:5
+        @test Symbol(:thermal_left, i)  in subsys_names
+        @test Symbol(:thermal_right, i) in subsys_names
+    end
+    # Old single-side names must be absent
+    @test !(Symbol(:thermal, 1) in subsys_names)
 end
 
 # ─────────────────────────────────────────────────────────────────
