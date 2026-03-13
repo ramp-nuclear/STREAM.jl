@@ -295,6 +295,10 @@ function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
                        + h_tc[i] * (π * Dh / 2) * dz * (thermal_right[i].T - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
+        # Port heat flow equations: Q_flow INTO channel from each wall face
+        # When unconnected (adiabatic), T_wall = T[i] => Q_flow = 0
+        push!(eqs, thermal_left[i].Q_flow  ~ h_tc[i] * (π * Dh / 2) * dz * (thermal_left[i].T  - T[i]))
+        push!(eqs, thermal_right[i].Q_flow ~ h_tc[i] * (π * Dh / 2) * dz * (thermal_right[i].T - T[i]))
         push!(eqs, q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow)
     end
 
