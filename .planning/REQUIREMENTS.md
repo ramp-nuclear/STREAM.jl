@@ -8,8 +8,8 @@
 
 ### Gravity & Vertical Loop
 
-- [ ] **GRAV-01**: Vertical closed loop (Channel with g_acc set to 9.80665 + Gravity component on return leg of equal height) assembles, compiles, and solves correctly
-- [ ] **GRAV-02**: Gravity cancellation test — equal height up/down gives the same steady-state flow as the horizontal reference loop within 1%
+- [x] **GRAV-01**: Vertical closed loop (Channel with g_acc set to 9.80665 + Gravity component on return leg of equal height) assembles, compiles, and solves correctly
+- [x] **GRAV-02**: Gravity cancellation test — equal height up/down gives the same steady-state flow as the horizontal reference loop within 1%
 
 ### Network Architecture
 
@@ -54,8 +54,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GRAV-01 | Phase 6 | Pending |
-| GRAV-02 | Phase 6 | Pending |
+| GRAV-01 | Phase 6 | Complete |
+| GRAV-02 | Phase 6 | Complete |
 | NET-01 | Phase 7 | Pending |
 | NET-02 | Phase 7 | Pending |
 | NET-03 | Phase 7 | Pending |

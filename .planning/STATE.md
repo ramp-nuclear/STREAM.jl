@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.2
 milestone_name: Component & Network Expansion
-current_phase: 6
-current_plan: —
-status: Ready to plan
-stopped_at: Roadmap created — ready to plan Phase 6
-last_updated: "2026-03-13"
+status: planning
+stopped_at: Completed 06-gravity-validation-01-PLAN.md
+last_updated: "2026-03-13T12:43:25.480Z"
+last_activity: 2026-03-13 — v0.2 roadmap created (phases 6-9)
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
   percent: 0
 ---
 
@@ -33,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 6 of 9 (Gravity Validation) — first v0.2 phase
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-13 — v0.2 roadmap created (phases 6-9)
+Phase: 6 of 9 (Gravity Validation) — first v0.2 phase — COMPLETE
+Plan: 01 (complete)
+Status: Phase 6 complete
+Last activity: 2026-03-13 — Phase 6 plan 01 executed (GRAV-01, GRAV-02 validated)
 
-Progress: [░░░░░░░░░░] 0% (v0.2)
+Progress: [██████████] 100% (Phase 6 complete)
 
 ---
 
@@ -47,14 +46,14 @@ Progress: [░░░░░░░░░░] 0% (v0.2)
 | Metric | Value |
 |--------|-------|
 | v0.2 phases total | 4 |
-| v0.2 phases complete | 0 |
+| v0.2 phases complete | 1 |
 | v0.2 requirements mapped | 10/10 |
-| v0.2 plans written | 0 |
-| v0.2 plans complete | 0 |
+| v0.2 plans written | 1 |
+| v0.2 plans complete | 1 |
 
 **v0.1 velocity reference:** 12 plans completed; avg ~13 min/plan
 
----
+| Phase 06-gravity-validation P01 | 9 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -68,6 +67,13 @@ Progress: [░░░░░░░░░░] 0% (v0.2)
 | Channel Darcy-Weisbach friction is inline (not wired component) | Reduces DAE complexity; confirmed no Friction in loop |
 | TempBC pattern for closed-loop T injection | Breaks circular instream() dependency |
 | mtkcompile ~12s for 12-eq loop | Acceptable for interactive use |
+
+### Key Decisions (v0.2 Phase 6)
+
+| Decision | Rationale |
+|----------|-----------|
+| Gravity port wiring reversed from flow direction | port_in.P > port_out.P means port_in is bottom (high-P); for descending return leg connect ch.port_out->grav.port_out and grav.port_in->pump.port_in |
+| 1% cancellation tolerance for GRAV-02 | Channel uses rho(T_mid), Gravity uses rho(T_in) — density evaluated at different temperatures, so machine-precision cancellation not achievable |
 
 ### Pending Todos
 
@@ -87,9 +93,9 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-13
-**Stopped at:** v0.2 roadmap written — phases 6-9 defined, 10/10 requirements mapped
-**Next action:** `/gsd:plan-phase 6` to plan Gravity Validation
+**Last session:** 2026-03-13T12:43:25.478Z
+**Stopped at:** Completed 06-gravity-validation-01-PLAN.md
+**Next action:** Phase 6 complete. Run `/gsd:plan-phase 7` for next v0.2 phase.
 
 ---
 
