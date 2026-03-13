@@ -271,6 +271,7 @@ function solve_transient(ssys, T_wall_sym, op, tspan;
                          T_wall_final,
                          t_step = 10.0)
     # MTK mtkcompile produces a mass-matrix ODE (implicit DAE form).
+
     # IDA requires DAEProblem with explicit du0; CVODE_BDF cannot use mass matrices.
     # Rodas5P is a stiff implicit Runge-Kutta solver that supports mass matrices
     # and ODEProblem — the correct choice for MTK-generated DAE systems.
@@ -289,4 +290,72 @@ function solve_transient(ssys, T_wall_sym, op, tspan;
     # initial state (use steady_state_guess or a prior solve_steady solution).
     sol = solve(prob, Rodas5P(); callback = step_cb, initializealg = SciMLBase.NoInit())
     return sol
+end
+
+# ----------------------------------------------------------------
+# build_cube
+# Assembles the Cube hydraulic network: 12 Resistors on the edges
+# of a cube, 1 Pump driving body-diagonal flow (corner 0 -> corner 7).
+#
+# Corner labeling (binary xyz bits):
+#   000=0, 001=1, 010=2, 011=3, 100=4, 101=5, 110=6, 111=7
+# 12 edges (one Resistor each): r01, r02, r04, r13, r15, r23, r26,
+#   r37, r45, r46, r57, r67
+# Each interior corner has exactly 3 Resistor ports — wired with a
+# 3-way connect() call. Source (corner 0) and sink (corner 7) are
+# 4-way (pump + 3 resistors each).
+#
+# MTK variadic connect() generates the Kirchhoff equations:
+#   Flow (mdot): sum = 0 at each junction
+#   Across (P):  equal at each junction
+#   Stream (T):  instream() mixture
+#
+# Analytical equivalent resistance (body diagonal): 5/6 * R
+# Expected total mdot: dP_pump * 6 / (5 * R)
+#
+# Returns compiled ssys.
+# ----------------------------------------------------------------
+function build_cube(; dP_pump=3.0e4, R=1.0e4)
+    @named pump = Pump(dP_pump=dP_pump)
+    # 12 edges of the cube (naming: r_ij where i < j are corner indices)
+    @named r01 = Resistor(R=R); @named r02 = Resistor(R=R); @named r04 = Resistor(R=R)
+    @named r13 = Resistor(R=R); @named r15 = Resistor(R=R)
+    @named r23 = Resistor(R=R); @named r26 = Resistor(R=R)
+    @named r37 = Resistor(R=R)
+    @named r45 = Resistor(R=R); @named r46 = Resistor(R=R)
+    @named r57 = Resistor(R=R)
+    @named r67 = Resistor(R=R)
+
+    connections = [
+        # Corner 0 (source): pump.port_out + 3 resistor inlets
+        connect(pump.port_out, r01.port_in, r02.port_in, r04.port_in),
+        # Corner 1: r01 out + r13 in + r15 in
+        connect(r01.port_out,  r13.port_in, r15.port_in),
+        # Corner 2: r02 out + r23 in + r26 in
+        connect(r02.port_out,  r23.port_in, r26.port_in),
+        # Corner 3: r13 out + r23 out + r37 in
+        connect(r13.port_out,  r23.port_out, r37.port_in),
+        # Corner 4: r04 out + r45 in + r46 in
+        connect(r04.port_out,  r45.port_in, r46.port_in),
+        # Corner 5: r15 out + r45 out + r57 in
+        connect(r15.port_out,  r45.port_out, r57.port_in),
+        # Corner 6: r26 out + r46 out + r67 in
+        connect(r26.port_out,  r46.port_out, r67.port_in),
+        # Corner 7 (sink): pump.port_in + 3 resistor outlets
+        connect(pump.port_in,  r37.port_out, r57.port_out, r67.port_out),
+        # Pressure gauge anchor (absolute level is underdetermined by Kirchhoff equations)
+        pump.port_in.P ~ 1.0e5,
+    ]
+
+    @named sys = compose(
+        System(connections, t; name=:sys),
+        pump, r01, r02, r04, r13, r15, r23, r26, r37, r45, r46, r57, r67
+    )
+
+    t_compile = @elapsed ssys = mtkcompile(sys)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "build_cube compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    return ssys
 end
