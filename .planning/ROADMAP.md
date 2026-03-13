@@ -103,7 +103,7 @@ Plans:
 | 7. Network Architecture | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 8. Inertia and HeatExchanger | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
-| 10. ChannelAndContacts Two-Sided Upgrade | v0.3 | 0/2 | Planning complete | - |
+| 10. ChannelAndContacts Two-Sided Upgrade | 1/2 | In Progress|  | - |
 | 11. HeatDiffusion Component | v0.3 | 0/? | Not started | - |
 | 12. MTR Validation | v0.3 | 0/? | Not started | - |
 

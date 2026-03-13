@@ -9,14 +9,14 @@ Requirements for the HeatDiffusion milestone. Each maps to roadmap phases.
 
 ### Tech Debt (DEBT)
 
-- [ ] **DEBT-01**: Developer can call `_channel_base_eqs` without a dead `t_inlet` parameter (parameter removed, all call sites updated)
+- [x] **DEBT-01**: Developer can call `_channel_base_eqs` without a dead `t_inlet` parameter (parameter removed, all call sites updated)
 - [ ] **DEBT-02**: THERM-03 test directly asserts ChannelAndContacts behavioral output rather than validating via a proxy
-- [ ] **DEBT-03**: `09-01-SUMMARY.md` cosmetic documentation issue is corrected
+- [x] **DEBT-03**: `09-01-SUMMARY.md` cosmetic documentation issue is corrected
 
 ### Channel Upgrade (CHAN)
 
-- [ ] **CHAN-01**: ChannelAndContacts exposes `thermal_left[1:n]` and `thermal_right[1:n]` ThermalPort arrays (replaces `thermal_ports[1:n]`)
-- [ ] **CHAN-02**: ChannelAndContacts `q_wall[i]` equals `thermal_left[i].Q_flow + thermal_right[i].Q_flow` (both sides contribute to cell energy balance)
+- [x] **CHAN-01**: ChannelAndContacts exposes `thermal_left[1:n]` and `thermal_right[1:n]` ThermalPort arrays (replaces `thermal_ports[1:n]`)
+- [x] **CHAN-02**: ChannelAndContacts `q_wall[i]` equals `thermal_left[i].Q_flow + thermal_right[i].Q_flow` (both sides contribute to cell energy balance)
 - [ ] **CHAN-03**: User can connect only one side of ChannelAndContacts and the unconnected side defaults to adiabatic (Q_flow=0 verified by explicit test)
 
 ### HeatDiffusion Component (HDIFF)
@@ -60,11 +60,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEBT-01 | Phase 10 | Pending |
+| DEBT-01 | Phase 10 | Complete |
 | DEBT-02 | Phase 10 | Pending |
-| DEBT-03 | Phase 10 | Pending |
-| CHAN-01 | Phase 10 | Pending |
-| CHAN-02 | Phase 10 | Pending |
+| DEBT-03 | Phase 10 | Complete |
+| CHAN-01 | Phase 10 | Complete |
+| CHAN-02 | Phase 10 | Complete |
 | CHAN-03 | Phase 10 | Pending |
 | HDIFF-01 | Phase 11 | Pending |
 | HDIFF-02 | Phase 11 | Pending |
