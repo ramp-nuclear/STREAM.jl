@@ -3,7 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using DifferentialEquations: ReturnCode
 using STREAM
-import STREAM: Channel, Pump, Friction, Gravity, build_loop_vertical  # resolve ambiguity with Base.Channel
+import STREAM: Channel, Pump, Friction, Gravity, Resistor, build_loop_vertical  # resolve ambiguity with Base.Channel
 
 @testset "STREAM Phase 1 Tests" begin
 
@@ -342,3 +342,20 @@ end
 end
 
 end  # @testset "STREAM Phase 6 Tests"
+
+@testset "STREAM Phase 7 Tests" begin
+
+# ─────────────────────────────────────────────────────────────────
+# NET-01: Resistor component — linear pressure drop dp ~ R * mdot
+# ─────────────────────────────────────────────────────────────────
+@testset "NET-01: Resistor stub callable" begin
+    @named r = Resistor(R=1.0e5)
+    @test r isa ModelingToolkit.System
+end
+
+@testset "NET-01: Resistor mtkcompile" begin
+    @named r = Resistor(R=1.0e5)
+    @test_nowarn mtkcompile(r; fully_determined=false)
+end
+
+end  # @testset "STREAM Phase 7 Tests"

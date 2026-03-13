@@ -11,7 +11,7 @@ include("solvers.jl")
 
 export rho_water, cp_water, mu_water, k_water
 export FlowPort, ThermalPort
-export Channel, Pump, Friction, Gravity
+export Channel, Pump, Friction, Gravity, Resistor
 export build_loop, build_loop_vertical, build_loop_transient, solve_steady, solve_transient, steady_state_guess
 
 end  # module STREAM

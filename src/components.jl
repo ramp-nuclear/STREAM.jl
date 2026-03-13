@@ -136,3 +136,16 @@ function Gravity(; name, H)
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
+
+function Resistor(; name, R)
+    pars = @parameters R = R
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+    eqs = Equation[
+        port_in.mdot + port_out.mdot ~ 0,
+        port_in.P - port_out.P ~ R * port_in.mdot,
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
+    ]
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+end
