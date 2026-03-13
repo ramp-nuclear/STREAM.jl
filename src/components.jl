@@ -204,7 +204,7 @@ end
 function _channel_base_eqs(eqs::Vector{Equation};
     n, T, Re, Nu, h_tc, v, T_out, dP,
     port_in, port_out,
-    Dh, A, L, g_acc, dz, t_inlet)
+    Dh, A, L, g_acc, dz)
 
     for i in 1:n
         push!(eqs, v[i]    ~ port_in.mdot / (rho_water(T[i]) * A))
@@ -230,21 +230,25 @@ function _channel_base_eqs(eqs::Vector{Equation};
     push!(eqs, port_in.T                    ~ instream(port_out.T))
 end
 
-# ChannelAndContacts (THERM-01): heated channel with n per-cell ThermalPorts.
-# Each thermal_ports[i] carries the wall temperature and heat flow for cell i.
+# ChannelAndContacts (THERM-01/CHAN-01/CHAN-02): heated channel with dual per-cell ThermalPort arrays.
+# Each thermal_left[i] and thermal_right[i] carry wall temperature and heat flow for cell i.
+# Two-sided heating models both fuel plate faces symmetrically (π*Dh/2 each side).
 # This is the interface that HeatDiffusion (v0.3) will connect to.
 #
 # Port layout:
-#   port_in, port_out  — FlowPorts (hydraulic)
-#   thermal1..thermalN — ThermalPorts (one per axial cell), via compose splat
+#   port_in, port_out        — FlowPorts (hydraulic)
+#   thermal_left1..N         — ThermalPorts (left wall face, one per axial cell)
+#   thermal_right1..N        — ThermalPorts (right wall face, one per axial cell)
 #
 # Energy balance (cell i):
-#   Dt(T[i]) ~ (mdot * cp * (T_up - T[i]) + h_tc[i] * π * Dh * dz * (thermal_ports[i].T - T[i]))
+#   Dt(T[i]) ~ (mdot * cp * (T_up - T[i])
+#               + h_tc[i] * (π * Dh / 2) * dz * (thermal_left[i].T  - T[i])
+#               + h_tc[i] * (π * Dh / 2) * dz * (thermal_right[i].T - T[i]))
 #              / (rho * cp * A * dz)
 #
 # Observables:
-#   q_wall[i]    — per-cell heat transfer rate (W); q_wall[i] ~ thermal_ports[i].Q_flow (1:1)
-#   Q_wall_total — total heat transfer rate (W); sum of all Q_flow
+#   q_wall[i]    — per-cell total heat transfer rate (W); q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow
+#   Q_wall_total — total heat transfer rate (W); sum over all cells
 function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
     Dh = D
     Dt = Differential(t)
@@ -270,8 +274,9 @@ function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
 
     @named port_in  = FlowPort()
     @named port_out = FlowPort()
-    # Per-cell ThermalPorts — named thermal1, thermal2, ..., thermalN
-    thermal_ports = [ThermalPort(name=Symbol(:thermal, i)) for i in 1:n]
+    # Dual per-cell ThermalPort arrays — Phase 10 two-sided interface
+    thermal_left  = [ThermalPort(name=Symbol(:thermal_left, i))  for i in 1:n]
+    thermal_right = [ThermalPort(name=Symbol(:thermal_right, i)) for i in 1:n]
 
     dz      = L / n
     eqs     = Equation[]
@@ -279,27 +284,27 @@ function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
 
     # Common equations: v, Re, Nu, h_tc, dP, T_out, port wiring
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
-                      port_in, port_out, Dh, A, L, g_acc=g, dz,
-                      t_inlet=T_inlet)
+                      port_in, port_out, Dh, A, L, g_acc=g, dz)
 
-    # Per-cell energy balance and thermal port coupling
+    # Per-cell energy balance: two-sided heating (π*Dh/2 per side)
     for i in 1:n
         T_up = (i == 1) ? T_inlet : T[i-1]
         push!(eqs,
             Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
-                       + h_tc[i] * (π * Dh) * dz * (thermal_ports[i].T - T[i]))
+                       + h_tc[i] * (π * Dh / 2) * dz * (thermal_left[i].T  - T[i])
+                       + h_tc[i] * (π * Dh / 2) * dz * (thermal_right[i].T - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
-        push!(eqs, q_wall[i] ~ thermal_ports[i].Q_flow)  # 1:1, not /n
+        push!(eqs, q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow)
     end
 
-    push!(eqs, Q_wall_total ~ sum(thermal_ports[i].Q_flow for i in 1:n))
+    push!(eqs, Q_wall_total ~ sum(q_wall[i] for i in 1:n))
 
     all_vars = [collect(T); collect(Re); collect(Nu); collect(h_tc);
                 collect(v); collect(q_wall); T_out; dP; Q_wall_total]
 
     compose(System(eqs, t, all_vars, pars; name=name),
-            port_in, port_out, thermal_ports...)  # splat array ports
+            port_in, port_out, thermal_left..., thermal_right...)
 end
 
 # ChannelHeatFlux (THERM-03): heated channel with T_wall as a scalar parameter.
@@ -344,8 +349,7 @@ function ChannelHeatFlux(; name, n::Int, L, D, A, g = 0.0, T_wall)
 
     # Common equations: v, Re, Nu, h_tc, dP, T_out, port wiring
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
-                      port_in, port_out, Dh, A, L, g_acc=g, dz,
-                      t_inlet=T_inlet)
+                      port_in, port_out, Dh, A, L, g_acc=g, dz)
 
     # Per-cell energy balance using T_wall_p parameter
     for i in 1:n
@@ -362,4 +366,13 @@ function ChannelHeatFlux(; name, n::Int, L, D, A, g = 0.0, T_wall)
                 collect(v); collect(q_wall); T_out; dP]
 
     compose(System(eqs, t, all_vars, pars; name=name), port_in, port_out)
+end
+
+# ConstantTemperature: pins a ThermalPort's temperature to a fixed parameter.
+# Used as a thermal boundary condition in tests and simple simulations.
+# MTK acausal semantics solve for Q_flow from the connected component's balance.
+function ConstantTemperature(; name, T)
+    pars = @parameters T_bc = T
+    @named thermal = ThermalPort()
+    compose(System([thermal.T ~ T_bc], t; name=name), thermal)
 end
