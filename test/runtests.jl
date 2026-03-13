@@ -3,7 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using DifferentialEquations  # ReturnCode, ODEProblem, Rodas5P, etc.
 using STREAM
-import STREAM: Channel, Pump, Friction, Gravity, Resistor, build_loop_vertical, Inertia, HeatExchanger  # resolve ambiguity with Base.Channel
+import STREAM: Channel, Pump, Friction, Gravity, Resistor, build_loop_vertical, Inertia, HeatExchanger, ChannelAndContacts, ChannelHeatFlux  # resolve ambiguity with Base.Channel
 const SciMLBase = DifferentialEquations.SciMLBase  # for NoInit() in RL-decay test
 
 @testset "STREAM Phase 1 Tests" begin
@@ -468,3 +468,78 @@ end
 end
 
 end  # @testset "STREAM Phase 8 Tests"
+
+@testset "STREAM Phase 9 Tests" begin
+
+# ─────────────────────────────────────────────────────────────────
+# THERM-01: ChannelAndContacts — n ThermalPorts, per-cell energy balance
+# ─────────────────────────────────────────────────────────────────
+@testset "THERM-01: ChannelAndContacts callable" begin
+    @named ch = ChannelAndContacts(n=5, L=1.0, D=0.01, A=7.85e-5)
+    @test ch isa ModelingToolkit.System
+end
+
+@testset "THERM-01: ChannelAndContacts mtkcompile" begin
+    @named ch = ChannelAndContacts(n=5, L=1.0, D=0.01, A=7.85e-5)
+    @test_nowarn mtkcompile(ch; fully_determined=false)
+end
+
+@testset "THERM-01: ChannelAndContacts has n ThermalPort subsystems" begin
+    @named ch = ChannelAndContacts(n=5, L=1.0, D=0.01, A=7.85e-5)
+    subsys_names = Symbol.(ModelingToolkit.getname.(ModelingToolkit.get_systems(ch)))
+    for i in 1:5
+        @test Symbol(:thermal, i) in subsys_names
+    end
+end
+
+# ─────────────────────────────────────────────────────────────────
+# THERM-02: Channel unchanged — all v0.1-v0.2 tests still pass
+# (implicit: reaching this point means prior testsets passed)
+# ─────────────────────────────────────────────────────────────────
+@testset "THERM-02: Channel unmodified (regression)" begin
+    @named ch = Channel(n=5, L=1.0, D=0.01, A=7.85e-5)
+    @test ch isa ModelingToolkit.System
+    subsys_names = Symbol.(ModelingToolkit.getname.(ModelingToolkit.get_systems(ch)))
+    @test :thermal in subsys_names   # single ThermalPort, unchanged
+    @test !(Symbol(:thermal, 1) in subsys_names)  # no per-cell array on Channel
+end
+
+# ─────────────────────────────────────────────────────────────────
+# THERM-03: ChannelHeatFlux steady-state matches Channel within 0.1%
+# Uses inline connect()/compose() — no build_loop helper
+# ─────────────────────────────────────────────────────────────────
+@testset "THERM-03: ChannelHeatFlux matches Channel within 0.1%" begin
+    n = 10; T_inlet = 313.15; T_wall = 373.15
+    L_ch = 0.6; D_ch = 0.01; A_ch = 7.85e-5; dP_pump = 3.0e4
+
+    # --- Channel reference (existing build_loop) ---
+    ssys_ch = build_loop(n=n, L_ch=L_ch, D_ch=D_ch, A_ch=A_ch,
+                         dP_pump=dP_pump, T_inlet=T_inlet, T_wall=T_wall)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+    op_ch = [ssys_ch.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op_ch, ssys_ch.ch.port_in.mdot => 0.490)
+    sol_ch = solve_steady(ssys_ch, op_ch)
+    T_out_ch = sol_ch[ssys_ch.ch.T_out]
+
+    # --- ChannelHeatFlux loop (inline wiring) ---
+    @named pump = Pump(dP_pump=dP_pump)
+    @named chf  = ChannelHeatFlux(n=n, L=L_ch, D=D_ch, A=A_ch, T_wall=T_wall)
+    @named bc   = HeatExchanger(T_bc=T_inlet)
+    connections = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out,   chf.port_in),
+        connect(chf.port_out,  pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        chf.port_in.T  ~ T_inlet,
+    ]
+    @named sys_chf = compose(System(connections, t; name=:sys_chf), pump, bc, chf)
+    ssys_chf = mtkcompile(sys_chf)
+    op_chf = [ssys_chf.chf.T[i] => T_guess[i] for i in 1:n]
+    push!(op_chf, ssys_chf.chf.port_in.mdot => 0.490)
+    sol_chf = solve_steady(ssys_chf, op_chf)
+    T_out_chf = sol_chf[ssys_chf.chf.T_out]
+
+    @test isapprox(T_out_chf, T_out_ch; rtol=1e-3)  # 0.1%
+end
+
+end  # @testset "STREAM Phase 9 Tests"
