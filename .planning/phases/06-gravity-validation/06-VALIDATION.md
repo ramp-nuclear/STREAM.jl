@@ -1,10 +1,11 @@
 ---
 phase: 6
 slug: gravity-validation
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-13
+audited: 2026-03-13
 ---
 
 # Phase 6 — Validation Strategy
@@ -38,8 +39,8 @@ created: 2026-03-13
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 06-01-01 | 01 | 1 | GRAV-01, GRAV-02 | unit | `julia --project -e "include(\"test/runtests.jl\")"` | ✅ | ⬜ pending |
-| 06-01-02 | 01 | 1 | GRAV-01, GRAV-02 | unit | `julia --project -e "include(\"test/runtests.jl\")"` | ✅ | ⬜ pending |
+| 06-01-01 | 01 | 1 | GRAV-01, GRAV-02 | unit | `julia --project -e "include(\"test/runtests.jl\")"` | ✅ | ✅ green |
+| 06-01-02 | 01 | 1 | GRAV-01, GRAV-02 | unit | `julia --project -e "include(\"test/runtests.jl\")"` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -59,11 +60,19 @@ created: 2026-03-13
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-03-13 — all 58 tests pass (54 existing + 4 Phase 6 GRAV tests), zero regressions
+
+## Validation Audit 2026-03-13
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+| Pre-existing tests | 4 (GRAV-01 ×2, GRAV-02 ×1, plus cancellation sub-test) |
