@@ -13,7 +13,7 @@
 
 ### Network Architecture
 
-- [ ] **NET-01**: Resistor component: linear pressure drop `dp ~ R * mdot`, where R is a scalar resistance parameter
+- [x] **NET-01**: Resistor component: linear pressure drop `dp ~ R * mdot`, where R is a scalar resistance parameter
 - [ ] **NET-02**: Cube problem (12 Resistors, 8 nodes, 1 Pump) assembled using multi-port `connect()` calls — no Junction component needed; MTK connection semantics handle flow conservation automatically
 - [ ] **NET-03**: Cube problem flow distribution matches analytical solution (equivalent resistance = 5/6 R) within 1%
 
@@ -56,7 +56,7 @@
 |-------------|-------|--------|
 | GRAV-01 | Phase 6 | Complete |
 | GRAV-02 | Phase 6 | Complete |
-| NET-01 | Phase 7 | Pending |
+| NET-01 | Phase 7 | Complete |
 | NET-02 | Phase 7 | Pending |
 | NET-03 | Phase 7 | Pending |
 | COMP-01 | Phase 8 | Pending |
