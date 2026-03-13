@@ -423,11 +423,17 @@ end
         L_comp.port_in.P ~ 1.0e5,   # pressure gauge anchor
     ]
     @named sys = compose(System(connections, t; name=:rl_sys), L_comp, R_comp)
-    ssys = mtkcompile(sys)
+    ssys = mtkcompile(sys; fully_determined=false)  # T eqs underdetermined (no heat exchange in RL circuit)
 
     # Initial condition: mdot = 1.0 kg/s
-    op = [ssys.L_comp.port_in.mdot => 1.0]
-    prob = ODEProblem(ssys, op, (0.0, 5000.0); warn_initialize_determined=false)
+    # T variables are free (no heat exchange in RL circuit); provide ICs for all unknowns
+    # check_length=false required because T unknowns are underdetermined (no T equations in pure RL circuit)
+    op = [
+        ssys.L_comp.port_in.mdot => 1.0,
+        ssys.L_comp.port_out.T   => 300.0,
+        ssys.L_comp.port_in.T    => 300.0,
+    ]
+    prob = ODEProblem(ssys, op, (0.0, 5000.0); warn_initialize_determined=false, check_length=false)
     sol  = solve(prob, Rodas5P(); initializealg=SciMLBase.NoInit())
 
     @test sol.retcode == ReturnCode.Success

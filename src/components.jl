@@ -149,3 +149,22 @@ function Resistor(; name, R)
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
+
+# Inertia (COMP-01): fluid inertia as ODE pressure-drop term
+# Equation: port_in.P - port_out.P ~ L_over_A * D(mdot)
+# L_over_A = L/A [m/m² = m⁻¹] — user pre-computes from geometry
+# No explicit mdot state variable needed — MTK auto-promotes port_in.mdot
+# as a differential state because it appears inside Dt(port_in.mdot).
+function Inertia(; name, L_over_A)
+    Dt   = Differential(t)           # same operator used in Channel energy balance
+    pars = @parameters L_over_A = L_over_A
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+    eqs = Equation[
+        port_in.mdot + port_out.mdot ~ 0,
+        port_in.P - port_out.P ~ L_over_A * Dt(port_in.mdot),   # ODE pressure eq
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
+    ]
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+end
