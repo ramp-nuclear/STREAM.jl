@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: HeatDiffusion
-status: planning
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-03-13T22:33:50.442Z"
-last_activity: 2026-03-13 — v0.3 roadmap created; ready to plan Phase 10
+status: executing
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-03-13T22:59:23.302Z"
+last_activity: 2026-03-13 — Phase 10 Plan 01 complete; ChannelAndContacts dual ports, ConstantTemperature added
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 # STATE: STREAM.jl
@@ -33,11 +33,11 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 ## Current Position
 
 Phase: 10 of 12 (ChannelAndContacts Two-Sided Upgrade)
-Plan: 01 COMPLETE
-Status: In progress (Plan 01 done)
-Last activity: 2026-03-13 — Phase 10 Plan 01 complete; ChannelAndContacts dual ports, ConstantTemperature added
+Plan: 02 COMPLETE — Phase 10 COMPLETE
+Status: Phase 10 done; ready for Phase 11 HeatDiffusion
+Last activity: 2026-03-13 — Phase 10 Plan 02 complete; THERM-01/03/CHAN-03 tests updated, 102 tests green
 
-Progress: [█████░░░░░] 50% (1/2 Phase 10 plans complete)
+Progress: [██████████] 100% (2/2 Phase 10 plans complete)
 
 ---
 
@@ -61,6 +61,7 @@ Progress: [█████░░░░░] 50% (1/2 Phase 10 plans complete)
 | 12 MTR Validation | TBD | - | - |
 
 *Updated after each plan completion*
+| Phase 10 P02 | 22 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,9 @@ Progress: [█████░░░░░] 50% (1/2 Phase 10 plans complete)
 | _channel_base_eqs accepts concrete g_acc (Float64) | dP is algebraic; avoids symbolic pars indexing |
 | MTK variadic connect() is the junction — no Junction component | Kirchhoff equations auto-generated |
 | build_loop is test/example utility, not primary API | MTK connect()/compose() is expressive enough |
+| THERM-03 uses two-sided CAC vs CHF (same D=0.01) | D_cac=2*D_chf fails 0.1% tolerance: h_tc depends on Dh via Re/Nu; same D ensures identical h_tc |
+| ChannelAndContacts requires explicit thermal.Q_flow equations | Acausal MTK: port Q_flow must be defined via h_tc*(pi*Dh/2)*dz*deltaT; missing eqs leave system underdetermined |
+| MTK port array access: getproperty(sys, Symbol(:thermal_left, i)) | sys.thermal_left[i] fails in connect(); named subsystem access is the correct pattern |
 
 ### Pending Todos
 
@@ -80,15 +84,16 @@ None.
 ### Blockers/Concerns
 
 - [Phase 12 prep]: `generate_reference.py` validation status is outstanding (flagged in memory). Confirm this script produces correct Python STREAM MTR reference outputs before Phase 12 planning begins.
-- [Phase 10 RESOLVED]: MTK array port access syntax for `thermal_left[i]` confirmed working — Phase 10 Plan 01 tests pass with dual port arrays.
+- [Phase 10 RESOLVED]: MTK array port access syntax: `getproperty(sys, Symbol(:thermal_left, i))` confirmed working; `sys.thermal_left[i]` fails in connect() calls.
+- [Phase 10 RESOLVED]: ChannelAndContacts port Q_flow equations required for proper acausal wiring — added in Plan 02.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-03-13T22:33:50.440Z
-**Stopped at:** Completed 10-01-PLAN.md
-**Next action:** Run `/gsd:plan-phase 10` to plan Phase 10 (ChannelAndContacts Two-Sided Upgrade)
+**Last session:** 2026-03-13T22:59:23.300Z
+**Stopped at:** Completed 10-02-PLAN.md
+**Next action:** Run `/gsd:plan-phase 11` to plan Phase 11 (HeatDiffusion)
 **Resume file:** None
 
 ---
