@@ -120,7 +120,7 @@ Plans:
 | 10. ChannelAndContacts Two-Sided Upgrade | v0.3 | 2/2 | Complete | 2026-03-13 |
 | 11. HeatDiffusion Component | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12. MTR Validation | 2/2 | Complete   | 2026-03-14 | 2026-03-14 |
-| 12.1. PipeGeometry Struct | 2/2 | Complete   | 2026-03-14 | - |
+| 12.1. PipeGeometry Struct | 2/2 | Complete    | 2026-03-14 | - |
 
 ---
 
