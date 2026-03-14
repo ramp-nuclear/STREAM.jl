@@ -50,7 +50,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - [ ] `wet_perimeter` field in PipeGeometry; Dh = 4A/wet_perimeter
 - [ ] `constant_Nusselt`, `laminar_friction`, `regime_dependent` correlation pluggables
 - [ ] `Pump(mdot0=...)` fixed-flow boundary condition mode
-- [ ] HeatDiffusion power_shape normalization assertion
+
 - [ ] `@observed` Re, Nu, h_tc, T_wall in ChannelAndContacts
 - [ ] `check_gravity_mismatch(sys)` helper
 - [ ] `port(sys, :thermal_left, i)` helper
@@ -113,7 +113,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 
 **Target features:**
 - Composition helpers: `symmetric_plate()`, `plate()`, `one_sided_connection()`, `compose_systems()`
-- Physics accuracy: `wet_perimeter` Dh fix, laminar correlations, fixed-flow Pump, power_shape assertion
+- Physics accuracy: `wet_perimeter` Dh fix, laminar correlations, fixed-flow Pump
 - Validation: transient HeatDiffusion, two-plate CAC, one-sided quantitative assertion
 - Developer QoL: `@observed` variables, `check_gravity_mismatch()`, `port()` helper
 

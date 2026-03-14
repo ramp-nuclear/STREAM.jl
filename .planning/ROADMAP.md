@@ -5,6 +5,7 @@
 - ✅ **v0.1 MVP** — Phases 1-5 (shipped 2026-03-13)
 - ✅ **v0.2 Component & Network Expansion** — Phases 6-9 (shipped 2026-03-13)
 - ✅ **v0.3 HeatDiffusion** — Phases 10-12.1 (shipped 2026-03-14)
+- 🚧 **v0.4 Composability & Physics** — Phases 13-16 (in progress)
 
 ## Phases
 
@@ -45,7 +46,63 @@ Full phase details: `.planning/milestones/v0.3-ROADMAP.md`
 
 </details>
 
+### 🚧 v0.4 Composability & Physics (In Progress)
+
+**Milestone Goal:** Make Julia STREAM ergonomic for real reactor assembly workflows and physically correct for the full MTR operating envelope (including laminar flow).
+
+- [ ] **Phase 13: Physics Foundation** — Dh fix, fixed-flow Pump
+- [ ] **Phase 14: Laminar Correlations** — Pluggable HTC/friction correlations with regime switching
+- [ ] **Phase 15: Composition Helpers & QoL** — symmetric_plate, plate, one_sided_connection, compose_systems, @observed, gravity check, port helper
+- [ ] **Phase 16: Validation** — Transient HeatDiffusion, two-plate CAC, one-sided quantitative assertion
+
+## Phase Details
+
+### Phase 13: Physics Foundation
+**Goal**: Physics computations are correct for rectangular MTR geometry; fixed-flow Pump available
+**Depends on**: Phase 12.1 (PipeGeometry struct exists)
+**Requirements**: PHY-01, PHY-05
+**Success Criteria** (what must be TRUE):
+  1. `PipeGeometry.rectangular(...)` computes `Dh = 4A / wet_perimeter` using all four walls; `wet_perimeter` is a readable field
+  2. `PipeGeometry.circular(D=...)` sets `wet_perimeter = π*D`; existing circular-geometry tests still pass
+  3. `Pump(mdot0=0.6)` assembles and solves a loop with fixed mass flow rate; `Pump(dp=1e5)` still works
+**Plans**: TBD
+
+### Phase 14: Laminar Correlations
+**Goal**: ChannelAndContacts supports pluggable HTC and friction correlations including laminar regime
+**Depends on**: Phase 13 (corrected Dh available; existing turbulent tests provide regression baseline)
+**Requirements**: PHY-02, PHY-03, PHY-04
+**Success Criteria** (what must be TRUE):
+  1. `constant_Nusselt(Nu=8.235)` can be passed as `htc_correlation` to ChannelAndContacts and produces the expected constant Nu in solution
+  2. `laminar_friction(Re)` returns `64/Re` (or rectangular correction) and can be passed as `friction_correlation` to ChannelAndContacts
+  3. `regime_dependent(; Re_transition=2300)` wraps any htc + friction pair and switches based on Re; a test exercises both branches
+  4. Existing Dittus-Boelter + Blasius path remains default and all prior MTR tests still pass
+**Plans**: TBD
+
+### Phase 15: Composition Helpers & QoL
+**Goal**: Users can assemble MTR subsystems in one call and inspect diagnostic variables from solutions
+**Depends on**: Phase 13 (corrected Dh), Phase 14 (correlation pluggables available for use inside helpers)
+**Requirements**: COMP-01, COMP-02, COMP-03, COMP-04, QOL-01, QOL-02, QOL-03
+**Success Criteria** (what must be TRUE):
+  1. `symmetric_plate(channel, fuel)` returns a solvable ODESystem; user can pass u0/p and get a solution without manual MTK wiring
+  2. `plate(ch_left, ch_right, fuel)` and `one_sided_connection(channel, fuel, side=:left)` each return solvable ODESystems
+  3. `compose_systems(sys_a, sys_b, connections)` merges two independently-built ODESystems into one solvable system
+  4. After solving a ChannelAndContacts system, `sol[sys.ch.Re, :]` returns a length-nz array of Reynolds numbers
+  5. `port(sys, :thermal_left, i)` returns the correct MTK subsystem; `check_gravity_mismatch(sys)` returns `:ok` on a balanced loop
+**Plans**: TBD
+
+### Phase 16: Validation
+**Goal**: HeatDiffusion transient behavior and all two-plate coupling configurations are quantitatively validated
+**Depends on**: Phase 15 (composition helpers available for use in validation assembly)
+**Requirements**: VAL-01, VAL-02, VAL-03
+**Success Criteria** (what must be TRUE):
+  1. A transient HeatDiffusion test compares T_plate_center(t) to the analytical 1D slab Fourier series solution and passes within tolerance
+  2. A system with two HeatDiffusion instances connected to one ChannelAndContacts (both thermal_left and thermal_right active) assembles and solves to a physically consistent steady state
+  3. The one-sided connection test has a quantitative T_plate_center assertion derived from analytical energy balance (T_center = T_wall + q*L/(2kA)); the test comment documents the Python STREAM discrepancy
+**Plans**: TBD
+
 ## Progress
+
+**Execution Order:** Phases execute in numeric order: 13 → 14 → 15 → 16
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -62,8 +119,12 @@ Full phase details: `.planning/milestones/v0.3-ROADMAP.md`
 | 11. HeatDiffusion Component | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12. MTR Validation | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12.1. PipeGeometry Struct | v0.3 | 2/2 | Complete | 2026-03-14 |
+| 13. Physics Foundation | v0.4 | 0/TBD | Not started | - |
+| 14. Laminar Correlations | v0.4 | 0/TBD | Not started | - |
+| 15. Composition Helpers & QoL | v0.4 | 0/TBD | Not started | - |
+| 16. Validation | v0.4 | 0/TBD | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-14 — v0.3 HeatDiffusion shipped*
+*Updated: 2026-03-14 — v0.4 Composability & Physics roadmap added (Phases 13-16)*

@@ -25,7 +25,6 @@
 - [ ] **PHY-03**: `laminar_friction(Re)` friction correlation available and pluggable into ChannelAndContacts
 - [ ] **PHY-04**: `regime_dependent(; Re_transition=2300)` wrapper that switches between laminar and turbulent correlations based on Re
 - [ ] **PHY-05**: `Pump(mdot0=...)` fixed-flow mode adds constraint `port_in.mdot ~ mdot0` instead of fixed-pressure equation
-- [ ] **PHY-06**: HeatDiffusion constructor asserts `abs(sum(power_shape) - 1.0) < 1e-6` with clear error message
 
 ### QoL
 
@@ -67,28 +66,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VAL-01 | — | Pending |
-| VAL-02 | — | Pending |
-| VAL-03 | — | Pending |
-| COMP-01 | — | Pending |
-| COMP-02 | — | Pending |
-| COMP-03 | — | Pending |
-| COMP-04 | — | Pending |
-| PHY-01 | — | Pending |
-| PHY-02 | — | Pending |
-| PHY-03 | — | Pending |
-| PHY-04 | — | Pending |
-| PHY-05 | — | Pending |
-| PHY-06 | — | Pending |
-| QOL-01 | — | Pending |
-| QOL-02 | — | Pending |
-| QOL-03 | — | Pending |
+| VAL-01 | Phase 16 | Pending |
+| VAL-02 | Phase 16 | Pending |
+| VAL-03 | Phase 16 | Pending |
+| COMP-01 | Phase 15 | Pending |
+| COMP-02 | Phase 15 | Pending |
+| COMP-03 | Phase 15 | Pending |
+| COMP-04 | Phase 15 | Pending |
+| PHY-01 | Phase 13 | Pending |
+| PHY-02 | Phase 14 | Pending |
+| PHY-03 | Phase 14 | Pending |
+| PHY-04 | Phase 14 | Pending |
+| PHY-05 | Phase 13 | Pending |
+| QOL-01 | Phase 15 | Pending |
+| QOL-02 | Phase 15 | Pending |
+| QOL-03 | Phase 15 | Pending |
 
 **Coverage:**
-- v0.4 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 ⚠️
+- v0.4 requirements: 15 total
+- Mapped to phases: 15
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-14*
-*Last updated: 2026-03-14 after initial definition*
+*Last updated: 2026-03-14 — traceability filled after roadmap creation (Phases 13-16)*
