@@ -1,0 +1,94 @@
+# Requirements: STREAM.jl
+
+**Defined:** 2026-03-14
+**Core Value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
+
+## v0.4 Requirements
+
+### Validation
+
+- [ ] **VAL-01**: User can validate HeatDiffusion transient behavior against analytical 1D slab diffusion solution (step-change in power, T_plate_center vs time within tolerance)
+- [ ] **VAL-02**: User can assemble and solve a system with two HeatDiffusion plates connected to one ChannelAndContacts (both thermal_left and thermal_right active simultaneously)
+- [ ] **VAL-03**: One-sided connection test has a quantitative T_plate_center assertion derived from analytical energy balance (not Python STREAM, which has a known bug here)
+
+### Composition
+
+- [ ] **COMP-01**: User can call `symmetric_plate(channel, fuel)` to get a pre-wired ODESystem (HeatDiffusion both sides connected to same ChannelAndContacts)
+- [ ] **COMP-02**: User can call `plate(ch_left, ch_right, fuel)` to get a pre-wired ODESystem (two independent channels on each side of one plate)
+- [ ] **COMP-03**: User can call `one_sided_connection(channel, fuel, side=:left)` to get a pre-wired single-side ODESystem
+- [ ] **COMP-04**: User can call `compose_systems(sys_a, sys_b, connections)` to merge two ODESystems with port connection list
+
+### Physics
+
+- [ ] **PHY-01**: PipeGeometry has `wet_perimeter` field; `Dh = 4A / wet_perimeter`; rectangular constructor computes `wet_perimeter = 2*(edge1 + edge2)`
+- [ ] **PHY-02**: `constant_Nusselt(Nu=8.235)` HTC correlation available and pluggable into ChannelAndContacts
+- [ ] **PHY-03**: `laminar_friction(Re)` friction correlation available and pluggable into ChannelAndContacts
+- [ ] **PHY-04**: `regime_dependent(; Re_transition=2300)` wrapper that switches between laminar and turbulent correlations based on Re
+- [ ] **PHY-05**: `Pump(mdot0=...)` fixed-flow mode adds constraint `port_in.mdot ~ mdot0` instead of fixed-pressure equation
+- [ ] **PHY-06**: HeatDiffusion constructor asserts `abs(sum(power_shape) - 1.0) < 1e-6` with clear error message
+
+### QoL
+
+- [ ] **QOL-01**: Re, Nu, h_tc, T_wall declared as `@observed` in ChannelAndContacts; accessible via `sol[sys.ch.Re, :]` after solve
+- [ ] **QOL-02**: `check_gravity_mismatch(sys)` function checks that gravity pressure terms sum to zero at zero flow
+- [ ] **QOL-03**: `port(sys, :thermal_left, i)` helper wraps `getproperty(sys, Symbol(:thermal_left, i))`
+
+## Future Requirements
+
+### Diffusion Modes
+
+- **DIFF-01**: HeatDiffusion supports xz-diffusion mode (axial + lateral) via `dz`/`kz` arguments
+- **DIFF-02**: HeatDiffusion supports r-diffusion / rz-diffusion (cylindrical geometry)
+
+### Multi-material
+
+- **MMАТ-01**: HeatDiffusion supports `materials[nz,nx]` matrix with harmonic mean k at interfaces
+
+### Extended Composition
+
+- **COMP-05**: `chain_fuels_channels()` / `rod()` for multi-rod assemblies (after compose_systems proven)
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Point kinetics | Architecture proven in v0.3; defer to v0.5 |
+| xz-diffusion / r-diffusion | No validation target defined yet |
+| Multi-material HeatDiffusion | Design agreed; defer until concrete case needed |
+| `channel_outputs()` helper | `@observed` makes `sol[sys.ch.Re, :]` work directly |
+| Heavy water / other fluids | Light water sufficient through v0.4 |
+| Subcooled boiling, natural convection | No validation target |
+| UQ / sensitivity analysis | Post-validation concern |
+| Decay heat | Needs point kinetics first |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| VAL-01 | — | Pending |
+| VAL-02 | — | Pending |
+| VAL-03 | — | Pending |
+| COMP-01 | — | Pending |
+| COMP-02 | — | Pending |
+| COMP-03 | — | Pending |
+| COMP-04 | — | Pending |
+| PHY-01 | — | Pending |
+| PHY-02 | — | Pending |
+| PHY-03 | — | Pending |
+| PHY-04 | — | Pending |
+| PHY-05 | — | Pending |
+| PHY-06 | — | Pending |
+| QOL-01 | — | Pending |
+| QOL-02 | — | Pending |
+| QOL-03 | — | Pending |
+
+**Coverage:**
+- v0.4 requirements: 16 total
+- Mapped to phases: 0
+- Unmapped: 16 ⚠️
+
+---
+*Requirements defined: 2026-03-14*
+*Last updated: 2026-03-14 after initial definition*
