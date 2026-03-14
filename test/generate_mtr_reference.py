@@ -222,14 +222,15 @@ power_cg_02 = CalculationGraph.from_decoupled(fuel_02, funcs={fuel_02: dict(powe
 agr_02 = fg_l_02.aggregator + fg_r_02.aggregator + plate_cg_02 + power_cg_02
 K_l_02 = fg_l_02.kirchhoff
 
-T_plate_02 = np.outer(np.ones(NZ), np.linspace(T_INLET_L_C + 5.0, T_INLET_R_ASYM_C + 5.0, NX))
+T_plate_avg_C = (T_INLET_L_C + T_INLET_R_ASYM_C) / 2  # 65°C — plate equilibrates between both channels
+T_plate_02 = np.full((NZ, NX), T_plate_avg_C + 2.0)  # 67°C uniform (right channel is hotter than plate)
 guess_02 = {
     **_hydraulic_guess(fg_l_02, pump_l_02, hx_l_02, ch_l_02, T_INLET_L_C),
     **_hydraulic_guess(fg_r_02, pump_r_02, hx_r_02, ch_r_02, T_INLET_R_ASYM_C),
     fuel_02.name: {
         "T": T_plate_02,
-        "T_wall_left":  np.full(NZ, T_INLET_L_C + 3.0),
-        "T_wall_right": np.full(NZ, T_INLET_R_ASYM_C + 3.0),
+        "T_wall_left":  np.full(NZ, T_plate_avg_C + 2.0),  # ~67°C
+        "T_wall_right": np.full(NZ, T_plate_avg_C + 2.0),  # ~67°C — right channel is hotter, flows heat into plate
     },
 }
 
