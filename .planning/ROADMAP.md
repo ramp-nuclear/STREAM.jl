@@ -74,12 +74,15 @@ Plans:
 **Goal**: ChannelAndContacts supports pluggable HTC and friction correlations including laminar regime
 **Depends on**: Phase 13 (corrected Dh available; existing turbulent tests provide regression baseline)
 **Requirements**: PHY-02, PHY-03, PHY-04
+**Plans**: 2 plans
+Plans:
+- [ ] 14-01-PLAN.md — Create src/correlations.jl (all six correlation functions/factories), extend PipeGeometry with width/depth, wire into STREAM module
+- [ ] 14-02-PLAN.md — Refactor _channel_base_eqs and Channel to accept correlation kwargs; add PHY-02/03/04 tests
 **Success Criteria** (what must be TRUE):
   1. `constant_Nusselt(Nu=8.235)` can be passed as `htc_correlation` to ChannelAndContacts and produces the expected constant Nu in solution
   2. `laminar_friction(Re)` returns `64/Re` (or rectangular correction) and can be passed as `friction_correlation` to ChannelAndContacts
   3. `regime_dependent(; Re_transition=2300)` wraps any htc + friction pair and switches based on Re; a test exercises both branches
   4. Existing Dittus-Boelter + Blasius path remains default and all prior MTR tests still pass
-**Plans**: TBD
 
 ### Phase 15: Composition Helpers & QoL
 **Goal**: Users can assemble MTR subsystems in one call and inspect diagnostic variables from solutions
@@ -122,12 +125,12 @@ Plans:
 | 11. HeatDiffusion Component | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12. MTR Validation | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12.1. PipeGeometry Struct | v0.3 | 2/2 | Complete | 2026-03-14 |
-| 13. Physics Foundation | 2/2 | Complete    | 2026-03-14 | - |
-| 14. Laminar Correlations | v0.4 | 0/TBD | Not started | - |
+| 13. Physics Foundation | v0.4 | 2/2 | Complete | 2026-03-14 |
+| 14. Laminar Correlations | v0.4 | 0/2 | Not started | - |
 | 15. Composition Helpers & QoL | v0.4 | 0/TBD | Not started | - |
 | 16. Validation | v0.4 | 0/TBD | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-14 — Phase 13 planned (2 plans: 13-01, 13-02)*
+*Updated: 2026-03-15 — Phase 14 planned (2 plans: 14-01, 14-02)*
