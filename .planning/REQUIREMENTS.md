@@ -24,7 +24,7 @@
 - [ ] **PHY-02**: `constant_Nusselt(Nu=8.235)` HTC correlation available and pluggable into ChannelAndContacts
 - [ ] **PHY-03**: `laminar_friction(Re)` friction correlation available and pluggable into ChannelAndContacts
 - [ ] **PHY-04**: `regime_dependent(; Re_transition=2300)` wrapper that switches between laminar and turbulent correlations based on Re
-- [ ] **PHY-05**: `Pump(mdot0=...)` fixed-flow mode adds constraint `port_in.mdot ~ mdot0` instead of fixed-pressure equation
+- [x] **PHY-05**: `Pump(mdot0=...)` fixed-flow mode adds constraint `port_in.mdot ~ mdot0` instead of fixed-pressure equation
 
 ### QoL
 
@@ -77,7 +77,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PHY-02 | Phase 14 | Pending |
 | PHY-03 | Phase 14 | Pending |
 | PHY-04 | Phase 14 | Pending |
-| PHY-05 | Phase 13 | Pending |
+| PHY-05 | Phase 13 | Complete |
 | QOL-01 | Phase 15 | Pending |
 | QOL-02 | Phase 15 | Pending |
 | QOL-03 | Phase 15 | Pending |
