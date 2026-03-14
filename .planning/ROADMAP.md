@@ -42,6 +42,7 @@ Full phase details: `.planning/milestones/v0.2-ROADMAP.md`
 - [x] **Phase 10: ChannelAndContacts Two-Sided Upgrade** - Upgrade ChannelAndContacts to thermal_left/right ports, clear v0.2 tech debt, verify adiabatic default (completed 2026-03-13)
 - [x] **Phase 11: HeatDiffusion Component** - Implement 2D FD fuel plate with x-direction diffusion, two-sided ThermalPort arrays, and isolated unit tests (completed 2026-03-14)
 - [x] **Phase 12: MTR Validation** - Couple HeatDiffusion + two ChannelAndContacts in MTR geometry and validate against Python STREAM within 1% (completed 2026-03-14)
+- [ ] **Phase 12.1: PipeGeometry Struct** - Introduce PipeGeometry struct, refactor channel constructors, restore quantitative VAL-01/02/03 assertions with correct rectangular MTR geometry (0/2 plans)
 
 ## Phase Details
 
@@ -90,9 +91,20 @@ Plans:
 - [ ] 12-01-PLAN.md — Write generate_mtr_reference.py (VAL-01/02/03 scenarios) + HDIFF-03 gap test; checkpoint to run Python script and obtain reference constants
 - [ ] 12-02-PLAN.md — Write VAL-01 (symmetric MTR), VAL-02 (asymmetric), VAL-03 (one-sided) Julia integration tests with hardcoded reference constants
 
+### Phase 12.1: PipeGeometry Struct (INSERTED)
+
+**Goal:** Introduce `PipeGeometry` struct with `L`, `Dh`, `A`, `heated_parts::NTuple{2,Float64}` and two keyword-argument outer constructors (`circular` via kwarg `D`, `rectangular` via kwarg `y`). Refactor `Channel`, `ChannelHeatFlux`, and `ChannelAndContacts` constructors to accept `PipeGeometry`. Update all call sites in tests and regenerate correct VAL-01/02/03 reference constants with proper rectangular MTR geometry, then add 1% quantitative assertions.
+**Requirements**: none (addresses physics correctness gap from Phase 12)
+**Depends on:** Phase 12
+**Plans:** 2 plans
+
+Plans:
+- [ ] 12.1-01-PLAN.md — Define PipeGeometry struct + refactor all three channel constructors + update all test call sites + update generate_mtr_reference.py
+- [ ] 12.1-02-PLAN.md — Run Python reference script (checkpoint), hardcode reference constants into VAL-01/02/03 with 1% assertions, update STATE.md stale entries
+
 ## Progress
 
-**Execution Order:** 10 → 11 → 12
+**Execution Order:** 10 → 11 → 12 → 12.1
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -105,11 +117,12 @@ Plans:
 | 7. Network Architecture | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 8. Inertia and HeatExchanger | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
-| 10. ChannelAndContacts Two-Sided Upgrade | 2/2 | Complete    | 2026-03-13 | - |
-| 11. HeatDiffusion Component | 2/2 | Complete    | 2026-03-14 | - |
-| 12. MTR Validation | 2/2 | Complete   | 2026-03-14 | - |
+| 10. ChannelAndContacts Two-Sided Upgrade | v0.3 | 2/2 | Complete | 2026-03-13 |
+| 11. HeatDiffusion Component | v0.3 | 2/2 | Complete | 2026-03-14 |
+| 12. MTR Validation | v0.3 | 2/2 | Complete | 2026-03-14 |
+| 12.1. PipeGeometry Struct | v0.3 | 0/2 | In Progress | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-14 — Phase 11 plans created (2 plans, 2 waves)*
+*Updated: 2026-03-14 — Phase 12.1 plans created (2 plans, 2 waves)*
