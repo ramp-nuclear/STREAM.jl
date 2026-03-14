@@ -42,7 +42,7 @@ Full phase details: `.planning/milestones/v0.2-ROADMAP.md`
 - [x] **Phase 10: ChannelAndContacts Two-Sided Upgrade** - Upgrade ChannelAndContacts to thermal_left/right ports, clear v0.2 tech debt, verify adiabatic default (completed 2026-03-13)
 - [x] **Phase 11: HeatDiffusion Component** - Implement 2D FD fuel plate with x-direction diffusion, two-sided ThermalPort arrays, and isolated unit tests (completed 2026-03-14)
 - [x] **Phase 12: MTR Validation** - Couple HeatDiffusion + two ChannelAndContacts in MTR geometry and validate against Python STREAM within 1% (completed 2026-03-14)
-- [ ] **Phase 12.1: PipeGeometry Struct** - Introduce PipeGeometry struct, refactor channel constructors, restore quantitative VAL-01/02/03 assertions with correct rectangular MTR geometry (0/2 plans)
+- [x] **Phase 12.1: PipeGeometry Struct** - Introduce PipeGeometry struct, refactor channel constructors, restore quantitative VAL-01/02/03 assertions with correct rectangular MTR geometry (0/2 plans) (completed 2026-03-14)
 
 ## Phase Details
 
@@ -96,7 +96,7 @@ Plans:
 **Goal:** Introduce `PipeGeometry` struct with `L`, `Dh`, `A`, `heated_parts::NTuple{2,Float64}` and two keyword-argument outer constructors (`circular` via kwarg `D`, `rectangular` via kwarg `y`). Refactor `Channel`, `ChannelHeatFlux`, and `ChannelAndContacts` constructors to accept `PipeGeometry`. Update all call sites in tests and regenerate correct VAL-01/02/03 reference constants with proper rectangular MTR geometry, then add 1% quantitative assertions.
 **Requirements**: none (addresses physics correctness gap from Phase 12)
 **Depends on:** Phase 12
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 12.1-01-PLAN.md — Define PipeGeometry struct + refactor all three channel constructors + update all test call sites + update generate_mtr_reference.py
@@ -119,8 +119,8 @@ Plans:
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 10. ChannelAndContacts Two-Sided Upgrade | v0.3 | 2/2 | Complete | 2026-03-13 |
 | 11. HeatDiffusion Component | v0.3 | 2/2 | Complete | 2026-03-14 |
-| 12. MTR Validation | v0.3 | 2/2 | Complete | 2026-03-14 |
-| 12.1. PipeGeometry Struct | 1/2 | In Progress|  | - |
+| 12. MTR Validation | 2/2 | Complete   | 2026-03-14 | 2026-03-14 |
+| 12.1. PipeGeometry Struct | 2/2 | Complete   | 2026-03-14 | - |
 
 ---
 
