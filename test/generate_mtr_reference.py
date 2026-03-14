@@ -76,11 +76,11 @@ z_bounds = np.linspace(0, LZ, NZ + 1)
 x_bounds = np.linspace(0, LX, NX + 1)
 pipe_ch = EffectivePipe(
     length=LZ,
-    heated_perimeter=np.pi * D_H,
-    wet_perimeter=np.pi * D_H,
-    area=np.pi * D_H**2 / 4,
-    heated_parts=(np.pi * D_H / 2, np.pi * D_H / 2),
-    width=D_H,
+    heated_perimeter=2 * Y_LEN,           # 2 * 0.07 = 0.14 m (rectangular)
+    wet_perimeter=np.pi * D_H,            # hydraulic perimeter unchanged
+    area=np.pi * D_H**2 / 4,             # flow area unchanged (= 7.85e-5 m²)
+    heated_parts=(Y_LEN, Y_LEN),          # 0.07 m per face
+    width=Y_LEN,                          # plate width (MTR convention)
 )
 
 
