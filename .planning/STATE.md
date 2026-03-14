@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.3
-milestone_name: HeatDiffusion
-status: completed
-stopped_at: Completed 12.1-pipegeometry-02-PLAN.md
-last_updated: "2026-03-14T13:56:53.289Z"
-last_activity: 2026-03-14 — Phase 12.1 Plan 02 complete; quantitative VAL assertions added; v0.3 milestone complete
+milestone: v0.4
+milestone_name: Composability & Physics
+status: in_progress
+stopped_at: ~
+last_updated: "2026-03-14"
+last_activity: 2026-03-14 — Milestone v0.4 started; defining requirements
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # STATE: STREAM.jl
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 
 ## Current Position
 
-Phase: 12.1 of 12.1 (PipeGeometry) — COMPLETE
-Plan: 02 COMPLETE — VAL-01/02/03 hardcoded Python STREAM reference constants + 1% isapprox assertions; 161 tests green
-Status: Phase 12.1 COMPLETE — PipeGeometry struct live; VAL-01/02/03 quantitative MTR validation restored
-Last activity: 2026-03-14 — Phase 12.1 Plan 02 complete; quantitative VAL assertions added; v0.3 milestone complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-14 — Milestone v0.4 started
 
-Progress: [██████████] 100% (8/8 plans complete)
+Progress: [░░░░░░░░░░] 0%
 
 ---
 

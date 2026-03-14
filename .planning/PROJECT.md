@@ -40,11 +40,20 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 
 ### Active
 
-- [ ] HeatDiffusion supports xz-diffusion mode (axial + lateral) via `_diffusion_eqs` helper with `dz`/`kz` arguments
-- [ ] HeatDiffusion supports r-diffusion mode (cylindrical geometry)
-- [ ] ChannelAndContacts supports a fuel plate on each side simultaneously (two plates, one channel)
-- [ ] `power` parameter on HeatDiffusion can be driven by a PointKinetics component at runtime
-- [ ] `symmetric_plate()` convenience function for common MTR geometry assembly
+- [ ] Transient HeatDiffusion validated against analytical 1D slab solution
+- [ ] Two HeatDiffusion instances connected to one ChannelAndContacts (thermal_left + thermal_right both active)
+- [ ] One-sided connection quantitative T_plate_center assertion (analytical energy balance)
+- [ ] `symmetric_plate(channel, fuel)` — pre-wired symmetric MTR subsystem
+- [ ] `plate(ch_left, ch_right, fuel)` — two-channel plate assembly
+- [ ] `one_sided_connection(channel, fuel, side=:left)` — single-side connection helper
+- [ ] `compose_systems(sys_a, sys_b, connections)` — composable subsystem assembly
+- [ ] `wet_perimeter` field in PipeGeometry; Dh = 4A/wet_perimeter
+- [ ] `constant_Nusselt`, `laminar_friction`, `regime_dependent` correlation pluggables
+- [ ] `Pump(mdot0=...)` fixed-flow boundary condition mode
+- [ ] HeatDiffusion power_shape normalization assertion
+- [ ] `@observed` Re, Nu, h_tc, T_wall in ChannelAndContacts
+- [ ] `check_gravity_mismatch(sys)` helper
+- [ ] `port(sys, :thermal_left, i)` helper
 
 ### Out of Scope
 
@@ -98,5 +107,15 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
 - **Scope gate**: v0.4 is point kinetics + additional correlations + composable subsystem assembly
 
+## Current Milestone: v0.4 Composability & Physics
+
+**Goal:** Make Julia STREAM ergonomic for real reactor assembly workflows and physically correct for the full MTR operating envelope (including laminar flow).
+
+**Target features:**
+- Composition helpers: `symmetric_plate()`, `plate()`, `one_sided_connection()`, `compose_systems()`
+- Physics accuracy: `wet_perimeter` Dh fix, laminar correlations, fixed-flow Pump, power_shape assertion
+- Validation: transient HeatDiffusion, two-plate CAC, one-sided quantitative assertion
+- Developer QoL: `@observed` variables, `check_gravity_mismatch()`, `port()` helper
+
 ---
-*Last updated: 2026-03-14 after v0.3 milestone*
+*Last updated: 2026-03-14 after v0.4 milestone start*
