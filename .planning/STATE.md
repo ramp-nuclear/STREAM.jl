@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: HeatDiffusion
-status: All VAL-01/02/03 MTR integration tests passing; 132 tests green
-stopped_at: Completed 12.1-pipegeometry-01-PLAN.md — PipeGeometry struct + all channel constructors migrated
-last_updated: "2026-03-14T10:43:48.116Z"
-last_activity: 2026-03-14 — Phase 12 Plan 02 complete; VAL-01/02/03 MTR tests + v0.3 complete
+status: All VAL-01/02/03 MTR integration tests green with 1% quantitative Python STREAM assertions; 161 tests green
+stopped_at: Completed 12.1-pipegeometry-02-PLAN.md — VAL-01/02/03 hardcoded reference constants + 1% isapprox assertions
+last_updated: "2026-03-14T11:00:00.000Z"
+last_activity: 2026-03-14 — Phase 12.1 Plan 02 complete; quantitative VAL assertions + Phase 12.1 COMPLETE
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 12.1 of 12.1 (PipeGeometry) — Plan 01 COMPLETE
-Plan: 01 COMPLETE — PipeGeometry struct + all channel constructors migrated; 161 tests green
-Status: PipeGeometry API live; VAL-01/02/03 now use rectangular MTR geometry; Plan 02 pending (quantitative VAL constants)
-Last activity: 2026-03-14 — Phase 12.1 Plan 01 complete; PipeGeometry struct + API migration
+Phase: 12.1 of 12.1 (PipeGeometry) — COMPLETE
+Plan: 02 COMPLETE — VAL-01/02/03 hardcoded Python STREAM reference constants + 1% isapprox assertions; 161 tests green
+Status: Phase 12.1 COMPLETE — PipeGeometry struct live; VAL-01/02/03 quantitative MTR validation restored
+Last activity: 2026-03-14 — Phase 12.1 Plan 02 complete; quantitative VAL assertions added; v0.3 milestone complete
 
-Progress: [█████████░] 88% (7/8 plans complete)
+Progress: [██████████] 100% (8/8 plans complete)
 
 ---
 
@@ -68,6 +68,7 @@ Progress: [█████████░] 88% (7/8 plans complete)
 | Phase 12-mtr-validation P01 | 35 | 3 tasks | 2 files |
 | Phase 12-mtr-validation P02 | 90 | 2 tasks | 4 files |
 | Phase 12.1-pipegeometry P01 | 16 | 2 tasks | 5 files |
+| Phase 12.1-pipegeometry P02 | 10 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -75,7 +76,7 @@ Progress: [█████████░] 88% (7/8 plans complete)
 
 | Decision | Rationale |
 |----------|-----------|
-| q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow | Two-sided heating: each side uses geometry.heated_parts[1]/[2]; for circular π*D/2 each — Phase 12.1 PipeGeometry |
+| q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow | Two-sided heating: each side uses geometry.heated_parts[i]; for circular: π*D/2 each; for rectangular MTR: y=0.07 m each — Phase 12.1 PipeGeometry contract |
 | _channel_base_eqs accepts concrete g_acc (Float64) | dP is algebraic; avoids symbolic pars indexing |
 | MTK variadic connect() is the junction — no Junction component | Kirchhoff equations auto-generated |
 | build_loop is test/example utility, not primary API | MTK connect()/compose() is expressive enough |
@@ -92,6 +93,7 @@ Progress: [█████████░] 88% (7/8 plans complete)
 | PipeGeometry kwarg dispatch: single outer constructor D=nothing/y=nothing sentinels | Julia cannot dispatch on kwarg names at precompile time; runtime branch is cleaner than named factory methods |
 | build_initializeprob=false mandatory for coupled HeatDiffusion+CAC | MTK init system corrupts u0 for coupled systems; bypass ensures KINSOL starts from user-provided guess |
 | MTR mdot initial guess: +0.600 kg/s (positive, Darcy-Weisbach at T≈315 K) | Negative guess (-0.490) causes 51 kPa pressure residual → KINSOL diverges to NaN |
+| VAL-03 T_plate_center quantitative assertion omitted | Python one_sided_connection gives 318.48 K (same as symmetric) — physically inconsistent; Julia gives 323.64 K (correct: one face active = hotter center); T_outlet and mdot assertions cover hydraulic validation |
 
 ### Roadmap Evolution
 
@@ -111,11 +113,11 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T10:43:48.114Z
-**Stopped at:** Completed 12.1-pipegeometry-01-PLAN.md — PipeGeometry struct + all channel constructors migrated
+**Last session:** 2026-03-14T11:00:00.000Z
+**Stopped at:** Completed 12.1-pipegeometry-02-PLAN.md — VAL-01/02/03 quantitative assertions + Phase 12.1 COMPLETE
 **Next action:** v0.3 milestone complete. Begin v0.4 planning (symmetric_plate() convenience function + composable subsystem assembly)
 **Resume file:** None
 
 ---
 
-*Last updated: 2026-03-14 — Phase 12.1 Plan 01 complete; PipeGeometry struct + all channel constructors migrated; 161 tests green*
+*Last updated: 2026-03-14 — Phase 12.1 Plan 02 complete; VAL-01/02/03 1% isapprox assertions against Python STREAM; 161 tests green*
