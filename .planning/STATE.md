@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: HeatDiffusion
 status: completed
-stopped_at: "Phase 12 Plan 01 complete — awaiting checkpoint: user run generate_mtr_reference.py"
-last_updated: "2026-03-14T02:41:17.645Z"
-last_activity: 2026-03-14 — Phase 11 Plan 02 complete; HDIFF test suite + CHAN-03 pre-existing fix
+stopped_at: Completed 12-mtr-validation-01-PLAN.md — reference constants obtained
+last_updated: "2026-03-14T02:53:57.201Z"
+last_activity: 2026-03-14 — Phase 12 Plan 01 complete; MTR reference script + HDIFF-03-gap test
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 6
   completed_plans: 5
-  percent: 100
+  percent: 83
 ---
 
 # STATE: STREAM.jl
@@ -65,6 +65,7 @@ Progress: [████████░░] 83% (5/6 plans complete)
 | Phase 11 P01 | 7 | 2 tasks | 2 files |
 | Phase 11 P02 | 21 | 2 tasks | 1 files |
 | Phase 12-mtr-validation P01 | 30 | 2 tasks | 2 files |
+| Phase 12-mtr-validation P01 | 35 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -101,10 +102,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T02:41:17.643Z
-**Stopped at:** Phase 12 Plan 01 complete — awaiting checkpoint: user run generate_mtr_reference.py
+**Last session:** 2026-03-14T02:53:57.199Z
+**Stopped at:** Completed 12-mtr-validation-01-PLAN.md — reference constants obtained
 **Next action:** User runs generate_mtr_reference.py → resume Plan 02 with reference constants
-**Resume file:** .planning/phases/12-mtr-validation/12-02-PLAN.md
+**Resume file:** None
 
 ---
 
