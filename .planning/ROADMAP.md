@@ -51,7 +51,7 @@ Full phase details: `.planning/milestones/v0.3-ROADMAP.md`
 **Milestone Goal:** Make Julia STREAM ergonomic for real reactor assembly workflows and physically correct for the full MTR operating envelope (including laminar flow).
 
 - [x] **Phase 13: Physics Foundation** — Dh fix, fixed-flow Pump (completed 2026-03-14)
-- [ ] **Phase 14: Laminar Correlations** — Pluggable HTC/friction correlations with regime switching
+- [x] **Phase 14: Laminar Correlations** — Pluggable HTC/friction correlations with regime switching (completed 2026-03-14)
 - [ ] **Phase 15: Composition Helpers & QoL** — symmetric_plate, plate, one_sided_connection, compose_systems, @observed, gravity check, port helper
 - [ ] **Phase 16: Validation** — Transient HeatDiffusion, two-plate CAC, one-sided quantitative assertion
 
@@ -126,7 +126,7 @@ Plans:
 | 12. MTR Validation | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12.1. PipeGeometry Struct | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 13. Physics Foundation | v0.4 | 2/2 | Complete | 2026-03-14 |
-| 14. Laminar Correlations | 1/2 | In Progress|  | - |
+| 14. Laminar Correlations | 2/2 | Complete   | 2026-03-14 | - |
 | 15. Composition Helpers & QoL | v0.4 | 0/TBD | Not started | - |
 | 16. Validation | v0.4 | 0/TBD | Not started | - |
 

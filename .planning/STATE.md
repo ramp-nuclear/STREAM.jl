@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-03-14T23:02:00.051Z"
-last_activity: 2026-03-14 — Phase 13 complete; Pump dual-mode (mdot0) added; VAL-01/02/03 constants regenerated for Dh≈2.495mm
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-03-15T09:35:00Z"
+last_activity: 2026-03-15 — Phase 14 Plan 02 complete; channel components accept pluggable correlations; PHY-02/03/04 integration tests pass
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 
 ## Current Position
 
-Phase: 14 of 16 (Laminar Correlations) — IN PROGRESS
-Plan: 01 of 02 complete
-Status: Phase 14 Plan 01 Done — Ready for Plan 02
-Last activity: 2026-03-15 — Phase 14 Plan 01 complete; correlations.jl created; PipeGeometry width/depth added
+Phase: 14 of 16 (Laminar Correlations) — COMPLETE
+Plan: 02 of 02 complete
+Status: Phase 14 Complete — Both plans done; correlations wired and tested
+Last activity: 2026-03-15 — Phase 14 Plan 02 complete; channel components accept pluggable correlations; PHY-02/03/04 integration tests pass
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ---
 
@@ -54,10 +54,9 @@ Progress: [████████░░] 75%
 | 13 Physics Foundation P01 | 1 | 11 min | 11 min |
 | 13 Physics Foundation P02 | 1 | 25 min | 25 min |
 | 14 Laminar Correlations P01 | 1 | 18 min | 18 min |
+| 14 Laminar Correlations P02 | 1 | 11 min | 11 min |
 
 *Updated after each plan completion*
-
----
 
 ## Accumulated Context
 
@@ -79,6 +78,8 @@ Progress: [████████░░] 75%
 | Old sentinel-kwargs PipeGeometry constructor deleted (no shim) | MethodError on old calls forces migration; factory functions are the only API |
 | Fixed-flow Pump (mdot0) has no pressure equation | Caller must anchor pressure; only 4 eqs: mass balance, mdot constraint, 2 T streams |
 | VAL-03 T_out assertion removed (Python one_sided_connection wrong) | Python distributes heat to both faces even for one-sided; Julia correct; energy balance is truth |
+| PHY-03 test pairs laminar_friction with constant_Nusselt (not dittus_boelter) | Keeps system well-conditioned at low Re where Dittus-Boelter extrapolates poorly |
+| Pr_i computed inline as symbolic expression cp*mu/k in channel components | NOT a new MTK variable — passed directly as closure argument to htc_correlation |
 
 ### Pending Todos
 
@@ -92,8 +93,8 @@ None at roadmap creation. PHY-01 (Dh fix) may require updating hardcoded referen
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T23:02:00.049Z
-**Stopped at:** Completed 14-01-PLAN.md
+**Last session:** 2026-03-14T23:17:53.774Z
+**Stopped at:** Completed 14-02-PLAN.md
 **Next action:** Execute Phase 14 (next v0.4 phase per ROADMAP.md)
 **Resume file:** None
 
