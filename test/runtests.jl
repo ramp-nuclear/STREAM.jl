@@ -830,9 +830,9 @@ end
 # Reference: generate_mtr_reference.py (Python STREAM)
 # ─────────────────────────────────────────────────────────────────
 @testset "VAL-01: Symmetric MTR — HeatDiffusion + two ChannelAndContacts" begin
-    # Physics-based validation. Python STREAM and Julia use incompatible plate-channel
-    # coupling areas (Fuel class: y*dz; ChannelAndContacts: π*Dh/2*dz — 4.46× mismatch),
-    # so quantitative Python reference comparison is not feasible. Validate physics instead:
+    # Quantitative validation against Python STREAM reference (generate_mtr_reference.py).
+    # Both use rectangular MTR geometry (y=0.07 m heated_parts) — 1% tolerance.
+    # Physics sanity checks also retained:
     #   - Both channels heat up (T_out > T_in = 313.15 K)
     #   - Symmetric: T_out_l == T_out_r within 0.1%
     #   - Plate center is hotter than fluid outlet
@@ -890,6 +890,18 @@ end
     mdot_l   = sol[ssys.cac_l.port_in.mdot]
     mdot_r   = sol[ssys.cac_r.port_in.mdot]
     T_center = sol[ssys.hd.T[nz÷2, (nx+1)÷2]]   # [5, 2] for nz=10, nx=3
+
+    # Reference constants from generate_mtr_reference.py (rectangular MTR geometry, y=0.07 m)
+    val01_T_outlet_l_ref = 315.1463   # K — left channel outlet temperature
+    val01_T_outlet_r_ref = 315.1463   # K — right channel outlet temperature
+    val01_mdot_l_ref     = 0.599315   # kg/s — left channel mass flow
+    val01_mdot_r_ref     = 0.599315   # kg/s — right channel mass flow
+    val01_T_plate_center = 318.4815   # K — plate center temperature (mid-axial, mid-lateral)
+    @test isapprox(T_out_l,  val01_T_outlet_l_ref; rtol=0.01)
+    @test isapprox(T_out_r,  val01_T_outlet_r_ref; rtol=0.01)
+    @test isapprox(mdot_l,   val01_mdot_l_ref;     rtol=0.01)
+    @test isapprox(mdot_r,   val01_mdot_r_ref;     rtol=0.01)
+    @test isapprox(T_center, val01_T_plate_center;  rtol=0.01)
 
     # Physics sanity checks
     @test T_out_l > T_in
@@ -958,6 +970,11 @@ end
 
     T_plate_left_col  = sol[ssys.hd.T[nz÷2, 1]]
     T_plate_right_col = sol[ssys.hd.T[nz÷2, nx]]
+    T_center_02       = sol[ssys.hd.T[nz÷2, (nx+1)÷2]]
+
+    # Reference constants from generate_mtr_reference.py (rectangular MTR geometry, y=0.07 m)
+    val02_T_plate_center = 344.3571   # K — plate center temperature (asymmetric: right channel 363.15 K)
+    @test isapprox(T_center_02, val02_T_plate_center; rtol=0.01)
 
     # Right column must be hotter than left column (right channel at 90°C drives right face hot)
     @test T_plate_right_col > T_plate_left_col
@@ -1014,6 +1031,16 @@ end
     T_out_l_03  = sol[ssys.cac_l.T_out]
     mdot_l_03   = sol[ssys.cac_l.port_in.mdot]
     T_center_03 = sol[ssys.hd.T[nz÷2, (nx+1)÷2]]
+
+    # Reference constants from generate_mtr_reference.py (rectangular MTR geometry, y=0.07 m)
+    val03_T_outlet_ref   = 315.1463   # K — left channel outlet temperature (one-sided, 10 kW)
+    val03_mdot_ref       = 0.599315   # kg/s — left channel mass flow
+    @test isapprox(T_out_l_03,  val03_T_outlet_ref;   rtol=0.01)
+    @test isapprox(mdot_l_03,   val03_mdot_ref;       rtol=0.01)
+    # NOTE: T_plate_center quantitative assertion omitted. Python one_sided_connection gives
+    # 318.48 K (same as symmetric VAL-01), which is physically inconsistent with one-sided cooling
+    # (Julia gives 323.64 K — hotter plate center, as expected when only one face is active).
+    # Plate center physics is validated by the T_center_03 > T_out_l_03 assertion below.
 
     @test T_out_l_03 > T_in
     @test mdot_l_03 > 0.0
