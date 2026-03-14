@@ -107,7 +107,7 @@ Plans:
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 10. ChannelAndContacts Two-Sided Upgrade | 2/2 | Complete    | 2026-03-13 | - |
 | 11. HeatDiffusion Component | 2/2 | Complete    | 2026-03-14 | - |
-| 12. MTR Validation | v0.3 | 0/? | Not started | - |
+| 12. MTR Validation | 1/2 | In Progress|  | - |
 
 ---
 

@@ -29,9 +29,9 @@ Requirements for the HeatDiffusion milestone. Each maps to roadmap phases.
 
 ### Validation (VAL)
 
-- [ ] **VAL-01**: Coupled HeatDiffusion + two ChannelAndContacts in MTR geometry produces steady-state T_outlet and T_plate matching Python STREAM reference within 1%
-- [ ] **VAL-02**: Asymmetric left/right heating (left and right channels at different temperatures) produces a correct non-symmetric plate temperature profile
-- [ ] **VAL-03**: One-sided coupling (HeatDiffusion connected to a channel on one side only) solves correctly with the unconnected face adiabatic
+- [x] **VAL-01**: Coupled HeatDiffusion + two ChannelAndContacts in MTR geometry produces steady-state T_outlet and T_plate matching Python STREAM reference within 1%
+- [x] **VAL-02**: Asymmetric left/right heating (left and right channels at different temperatures) produces a correct non-symmetric plate temperature profile
+- [x] **VAL-03**: One-sided coupling (HeatDiffusion connected to a channel on one side only) solves correctly with the unconnected face adiabatic
 
 ## Future Requirements
 
@@ -71,9 +71,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HDIFF-03 | Phase 11 | Complete |
 | HDIFF-04 | Phase 11 | Complete |
 | HDIFF-05 | Phase 11 | Complete |
-| VAL-01 | Phase 12 | Pending |
-| VAL-02 | Phase 12 | Pending |
-| VAL-03 | Phase 12 | Pending |
+| VAL-01 | Phase 12 | Complete |
+| VAL-02 | Phase 12 | Complete |
+| VAL-03 | Phase 12 | Complete |
 
 **Coverage:**
 - v0.3 requirements: 14 total

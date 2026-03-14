@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: HeatDiffusion
 status: completed
-stopped_at: Phase 12 context gathered
-last_updated: "2026-03-14T02:10:12.908Z"
+stopped_at: "Phase 12 Plan 01 complete — awaiting checkpoint: user run generate_mtr_reference.py"
+last_updated: "2026-03-14T02:41:17.645Z"
 last_activity: 2026-03-14 — Phase 11 Plan 02 complete; HDIFF test suite + CHAN-03 pre-existing fix
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 100
 ---
 
@@ -25,19 +25,19 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 11 — HeatDiffusion Component
+**Current focus:** Phase 12 — MTR Validation
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: 11 of 12 (HeatDiffusion Component)
-Plan: 02 COMPLETE (Phase 11 all plans done)
-Status: Phase 11 complete; HeatDiffusion implemented and fully tested (HDIFF-01 through HDIFF-05 all green)
-Last activity: 2026-03-14 — Phase 11 Plan 02 complete; HDIFF test suite + CHAN-03 pre-existing fix
+Phase: 12 of 12 (MTR Validation)
+Plan: 01 COMPLETE (Phase 12 Plan 01 done; awaiting checkpoint)
+Status: Phase 12 Plan 01 complete; generate_mtr_reference.py written, HDIFF-03-gap test passing
+Last activity: 2026-03-14 — Phase 12 Plan 01 complete; MTR reference script + HDIFF-03-gap test
 
-Progress: [██████████] 100% (4/4 Phase 11+ plans complete)
+Progress: [████████░░] 83% (5/6 plans complete)
 
 ---
 
@@ -64,6 +64,7 @@ Progress: [██████████] 100% (4/4 Phase 11+ plans complete)
 | Phase 10 P02 | 22 | 2 tasks | 2 files |
 | Phase 11 P01 | 7 | 2 tasks | 2 files |
 | Phase 11 P02 | 21 | 2 tasks | 1 files |
+| Phase 12-mtr-validation P01 | 30 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Progress: [██████████] 100% (4/4 Phase 11+ plans complete)
 | vec(collect(T)) flattens 2D MTK state for System() constructor | Required pattern for 2D array states in MTK; see RESEARCH.md Pitfall 2 |
 | HeatDiffusion Q_flow sign asymmetric: thermal_left.Q_flow > 0 (heat out left), thermal_right.Q_flow < 0 (heat out right) | Left eq: k*(T_plate - T_bc)/(dx/2); right eq: k*(T_bc - T_plate)/(dx/2) — asymmetry from half-cell scheme |
 | ChannelAndContacts one-sided solve needs Re/Nu/h_tc guesses + fully_determined=false | Without explicit algebraic var guesses, MTK initialization system hits cyclic dependency error |
+| plate() CalculationGraph has empty funcs; fuel power via CalculationGraph.from_decoupled | Python STREAM plate() / one_sided_connection() produce funcs-less CG; power must be injected separately |
+| HDIFF-03-gap test: power_shape [0.0,1.0,0.0] not [0.5,0.0,0.5] | Symmetric outer sources: Laplacian=0 forces T_center=T_outer; center-sourced shape correctly tests per-cell power_shape |
 
 ### Pending Todos
 
@@ -90,7 +93,7 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 12 prep]: `generate_reference.py` validation status is outstanding (flagged in memory). Confirm this script produces correct Python STREAM MTR reference outputs before Phase 12 planning begins.
+- [Phase 12 checkpoint]: `generate_mtr_reference.py` written; user must run it in Python STREAM env to obtain VAL-01/02/03 reference constants for Plan 02.
 - [Phase 10 RESOLVED]: MTK array port access syntax: `getproperty(sys, Symbol(:thermal_left, i))` confirmed working; `sys.thermal_left[i]` fails in connect() calls.
 - [Phase 10 RESOLVED]: ChannelAndContacts port Q_flow equations required for proper acausal wiring — added in Plan 02.
 
@@ -98,11 +101,11 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T02:10:12.905Z
-**Stopped at:** Phase 12 context gathered
-**Next action:** Proceed to Phase 12 MTR Validation planning
-**Resume file:** .planning/phases/12-mtr-validation/12-CONTEXT.md
+**Last session:** 2026-03-14T02:41:17.643Z
+**Stopped at:** Phase 12 Plan 01 complete — awaiting checkpoint: user run generate_mtr_reference.py
+**Next action:** User runs generate_mtr_reference.py → resume Plan 02 with reference constants
+**Resume file:** .planning/phases/12-mtr-validation/12-02-PLAN.md
 
 ---
 
-*Last updated: 2026-03-14 — Phase 11 Plan 02 complete; HeatDiffusion test suite all green*
+*Last updated: 2026-03-14 — Phase 12 Plan 01 complete; MTR reference script + HDIFF-03-gap test*
