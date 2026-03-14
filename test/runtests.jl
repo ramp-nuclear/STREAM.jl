@@ -154,18 +154,18 @@ end
 @testset "STREAM Phase 2 Tests" begin
 
 @testset "COMP-01: Channel stub callable" begin
-    @named ch = Channel(n=5, geometry=PipeGeometry(L=1.0, D=0.01))
+    @named ch = Channel(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     @test ch isa ModelingToolkit.System
 end
 
 @testset "COMP-01: Channel equation count" begin
-    @named ch = Channel(n=5, geometry=PipeGeometry(L=1.0, D=0.01))
+    @named ch = Channel(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     energy_eqs = filter(eq -> occursin("Differential", string(eq)), equations(ch))
     @test length(energy_eqs) == 5
 end
 
 @testset "COMP-01: Channel mtkcompile" begin
-    @named ch = Channel(n=5, geometry=PipeGeometry(L=1.0, D=0.01))
+    @named ch = Channel(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     # fully_determined=false required for isolated component with unconnected ports
     @test_nowarn mtkcompile(ch; fully_determined=false)
 end
@@ -509,17 +509,17 @@ end  # @testset "STREAM Phase 8 Tests"
 # THERM-01: ChannelAndContacts — n ThermalPorts, per-cell energy balance
 # ─────────────────────────────────────────────────────────────────
 @testset "THERM-01: ChannelAndContacts callable" begin
-    @named ch = ChannelAndContacts(n=5, geometry=PipeGeometry(L=1.0, D=0.01))
+    @named ch = ChannelAndContacts(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     @test ch isa ModelingToolkit.System
 end
 
 @testset "THERM-01: ChannelAndContacts mtkcompile" begin
-    @named ch = ChannelAndContacts(n=5, geometry=PipeGeometry(L=1.0, D=0.01))
+    @named ch = ChannelAndContacts(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     @test_nowarn mtkcompile(ch; fully_determined=false)
 end
 
 @testset "THERM-01: ChannelAndContacts has n ThermalPort subsystems" begin
-    @named ch = ChannelAndContacts(n=5, geometry=PipeGeometry(L=1.0, D=0.01))
+    @named ch = ChannelAndContacts(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     subsys_names = Symbol.(ModelingToolkit.getname.(ModelingToolkit.get_systems(ch)))
     for i in 1:5
         @test Symbol(:thermal_left, i)  in subsys_names
@@ -534,7 +534,7 @@ end
 # (implicit: reaching this point means prior testsets passed)
 # ─────────────────────────────────────────────────────────────────
 @testset "THERM-02: Channel unmodified (regression)" begin
-    @named ch = Channel(n=5, geometry=PipeGeometry(L=1.0, D=0.01))
+    @named ch = Channel(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     @test ch isa ModelingToolkit.System
     subsys_names = Symbol.(ModelingToolkit.getname.(ModelingToolkit.get_systems(ch)))
     @test :thermal in subsys_names   # single ThermalPort, unchanged
@@ -555,7 +555,7 @@ end
 
     # --- ChannelHeatFlux reference ---
     @named pump_chf = Pump(dP_pump=dP_pump)
-    @named chf = ChannelHeatFlux(n=n, geometry=PipeGeometry(L=L_ch, D=D_ch, A=A_ch), T_wall=T_wall)
+    @named chf = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
     @named bc_chf = HeatExchanger(T_bc=T_inlet)
     conns_chf = [
         connect(pump_chf.port_out, bc_chf.port_in),
@@ -574,7 +574,7 @@ end
 
     # --- ChannelAndContacts two-sided (both left and right connected to T_wall) ---
     @named pump_cac = Pump(dP_pump=dP_pump)
-    @named cac = ChannelAndContacts(n=n, geometry=PipeGeometry(L=L_ch, D=D_ch, A=A_ch))
+    @named cac = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
     @named bc_cac = HeatExchanger(T_bc=T_inlet)
     ct_l = [ConstantTemperature(name=Symbol(:ct_l, i), T=T_wall) for i in 1:n]
     ct_r = [ConstantTemperature(name=Symbol(:ct_r, i), T=T_wall) for i in 1:n]
@@ -606,7 +606,7 @@ end
     L_ch = 0.6; D_cac = 0.02; A_ch = 7.85e-5; dP_pump = 3.0e4
 
     @named pump2 = Pump(dP_pump=dP_pump)
-    @named cac2 = ChannelAndContacts(n=n, geometry=PipeGeometry(L=L_ch, D=D_cac, A=A_ch))
+    @named cac2 = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_cac))
     @named bc2 = HeatExchanger(T_bc=T_inlet)
     ct2 = [ConstantTemperature(name=Symbol(:ct2_, i), T=T_wall) for i in 1:n]
     conns2 = [
@@ -646,12 +646,12 @@ end  # @testset "STREAM Phase 9 Tests"
 # CHAN-01: ChannelAndContacts dual port arrays (DEBT-01 + CHAN-01/02)
 # ─────────────────────────────────────────────────────────────────
 @testset "CHAN-01: ChannelAndContacts callable with dual ports" begin
-    @named ch = ChannelAndContacts(n=2, geometry=PipeGeometry(L=1.0, D=0.01))
+    @named ch = ChannelAndContacts(n=2, geometry=PipeGeometry_circular(1.0, 0.01))
     @test ch isa ModelingToolkit.System
 end
 
 @testset "CHAN-01: ChannelAndContacts mtkcompile (bare, no connections)" begin
-    @named ch = ChannelAndContacts(n=2, geometry=PipeGeometry(L=1.0, D=0.01))
+    @named ch = ChannelAndContacts(n=2, geometry=PipeGeometry_circular(1.0, 0.01))
     @test_nowarn mtkcompile(ch; fully_determined=false)
 end
 
@@ -876,10 +876,10 @@ end
     T_in = 313.15
     @named pump_l = Pump(dP_pump=3.0e4)
     @named hx_l   = HeatExchanger(T_bc=T_in)
-    @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry(L=0.6, Dh=0.01, A=7.85e-5, y=0.07))
+    @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     @named pump_r = Pump(dP_pump=3.0e4)
     @named hx_r   = HeatExchanger(T_bc=T_in)
-    @named cac_r  = ChannelAndContacts(n=nz, geometry=PipeGeometry(L=0.6, Dh=0.01, A=7.85e-5, y=0.07))
+    @named cac_r  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
@@ -962,10 +962,10 @@ end
     T_in_l = 313.15; T_in_r = 363.15
     @named pump_l = Pump(dP_pump=3.0e4)
     @named hx_l   = HeatExchanger(T_bc=T_in_l)
-    @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry(L=0.6, Dh=0.01, A=7.85e-5, y=0.07))
+    @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     @named pump_r = Pump(dP_pump=3.0e4)
     @named hx_r   = HeatExchanger(T_bc=T_in_r)
-    @named cac_r  = ChannelAndContacts(n=nz, geometry=PipeGeometry(L=0.6, Dh=0.01, A=7.85e-5, y=0.07))
+    @named cac_r  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
@@ -1034,7 +1034,7 @@ end
     T_in = 313.15
     @named pump_l = Pump(dP_pump=3.0e4)
     @named hx_l   = HeatExchanger(T_bc=T_in)
-    @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry(L=0.6, Dh=0.01, A=7.85e-5, y=0.07))
+    @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
                                rho_s=2700.0, cp_s=900.0, k_s=200.0,

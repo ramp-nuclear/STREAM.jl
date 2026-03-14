@@ -60,7 +60,7 @@ function build_loop(;
     T_wall   = 373.15,   # wall temperature (K); ~100°C for forced convection
 )
     @named pump = Pump(dP_pump = dP_pump)
-    @named ch   = Channel(n = n, geometry = PipeGeometry(L = L_ch, D = D_ch, A = A_ch))
+    @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch))
     @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
 
     connections = [
@@ -145,7 +145,7 @@ function build_loop_vertical(;
     H = isnothing(H_return) ? L_ch : H_return
 
     @named pump = Pump(dP_pump = dP_pump)
-    @named ch   = Channel(n = n, geometry = PipeGeometry(L = L_ch, D = D_ch, A = A_ch), g = g_acc)
+    @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch), g = g_acc)
     @named bc   = HeatExchanger(T_bc = T_inlet)
     @named grav = Gravity(H = H)
 
@@ -203,7 +203,7 @@ function build_loop_transient(;
     T_wall_0 = 373.15,   # initial wall temperature (K); ~100°C
 )
     @named pump = Pump(dP_pump = dP_pump)
-    @named ch   = Channel(n = n, geometry = PipeGeometry(L = L_ch, D = D_ch, A = A_ch))
+    @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch))
     @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
 
     # Declare T_wall as a modifiable parameter
