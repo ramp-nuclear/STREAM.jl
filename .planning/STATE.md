@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
-stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-03-14T19:59:27.185Z"
+stopped_at: Phase 14 context gathered
+last_updated: "2026-03-14T22:06:40.266Z"
 last_activity: 2026-03-14 — Phase 13 complete; Pump dual-mode (mdot0) added; VAL-01/02/03 constants regenerated for Dh≈2.495mm
 progress:
   total_phases: 4
@@ -88,10 +88,10 @@ None at roadmap creation. PHY-01 (Dh fix) may require updating hardcoded referen
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T19:55:58.241Z
-**Stopped at:** Completed 13-02-PLAN.md
+**Last session:** 2026-03-14T22:06:40.263Z
+**Stopped at:** Phase 14 context gathered
 **Next action:** Execute Phase 14 (next v0.4 phase per ROADMAP.md)
-**Resume file:** None
+**Resume file:** .planning/phases/14-laminar-correlations/14-CONTEXT.md
 
 ---
 
