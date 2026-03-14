@@ -98,8 +98,11 @@ end
 # ----------------------------------------------------------------
 function solve_steady(ssys, op;
                       abstol = 1e-8,
-                      reltol = 1e-6)
-    prob = SteadyStateProblem(ssys, op; warn_initialize_determined=false)
+                      reltol = 1e-6,
+                      build_initializeprob = false)
+    prob = SteadyStateProblem(ssys, op;
+                              warn_initialize_determined=false,
+                              build_initializeprob=build_initializeprob)
     sol  = solve(prob, SSRootfind(KINSOL()); abstol = abstol, reltol = reltol)
     return sol
 end

@@ -1,6 +1,8 @@
 # Fluid property functions for light water (Simantov correlations)
 # Source: Python STREAM light_water.py — coefficients ported verbatim
-# Temperature input: Kelvin. Converts internally. No range guards (ForwardDiff compatibility).
+# Temperature input: Kelvin. Converts internally.
+# Note: cp_water guards the sqrt argument with max(0,…) so that KINSOL can evaluate
+# the residual at bad Newton iterates without throwing a DomainError; ForwardDiff-compatible.
 
 # Internal helper — not exported
 _to_fahrenheit(T_C::Real) = 1.8 * T_C + 32.0
@@ -34,7 +36,7 @@ function cp_water(T_K::Real)
     B =  -1.67507e-3
     C =  -0.03189591
     D =  -2.8748e-6
-    return sqrt((A + C * T_C) / (1 + B * T_C + D * T_C^2)) * 1000.0
+    return sqrt(max(0.0, (A + C * T_C) / (1 + B * T_C + D * T_C^2))) * 1000.0
 end
 
 """

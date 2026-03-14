@@ -387,8 +387,8 @@ end
 # Called by HeatDiffusion before assembling the MTK System.
 #
 # Appends (per axial cell i in 1:nz):
-#   thermal_left[i].Q_flow  — heat flux from plate left face to left channel (W)
-#   thermal_right[i].Q_flow — heat flux from plate right face to right channel (W)
+#   thermal_left[i].Q_flow  — heat flux INTO hd at left face (positive = into hd; negative for heated plate)
+#   thermal_right[i].Q_flow — heat flux INTO hd at right face (positive = into hd; negative for heated plate)
 # Appends (per cell [i,j] in 1:nz × 1:nx):
 #   Dt(T[i,j]) — temperature ODE with x-direction FD diffusion + volumetric source
 #
@@ -401,11 +401,15 @@ function _diffusion_eqs(eqs::Vector{Equation};
     nz, nx, k_s, rho_s, cp_s, dx, dz, y, power, power_shape, Dt)
 
     for i in 1:nz
-        # Left boundary Q_flow: heat conducted from plate left face to left channel (LOCKED)
+        # Left boundary Q_flow: heat flux INTO hd at left face (positive = into component).
+        # When plate is hotter than boundary: Q_flow_left < 0 (heat leaving plate).
+        # Formula: k * (T_bc - T_plate) / (dx/2), negative when T_plate > T_bc.
         push!(eqs, thermal_left[i].Q_flow ~
-            k_s * (y * dz) * (T[i, 1] - thermal_left[i].T) / (dx / 2))
+            k_s * (y * dz) * (thermal_left[i].T - T[i, 1]) / (dx / 2))
 
-        # Right boundary Q_flow: heat conducted from plate right face to right channel (LOCKED)
+        # Right boundary Q_flow: heat flux INTO hd at right face (positive = into component).
+        # When plate is hotter than boundary: Q_flow_right < 0 (heat leaving plate).
+        # Formula: k * (T_bc - T_plate) / (dx/2), negative when T_plate > T_bc.
         push!(eqs, thermal_right[i].Q_flow ~
             k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2))
     end
