@@ -16,46 +16,82 @@
 Geometry descriptor for a heated channel or pipe.
 
 Fields:
-- `L`  — channel length [m]
-- `Dh` — hydraulic diameter [m]; drives Re, Nu, h_tc, and Darcy-Weisbach dP
-- `A`  — flow cross-section area [m²]
-- `heated_parts` — heated perimeter per face [m]: (left_face, right_face)
+- `L`                — channel length [m]
+- `Dh`               — hydraulic diameter [m]: 4*area/wet_perimeter; drives Re, Nu, h_tc, Darcy-Weisbach dP
+- `A`                — flow cross-section area [m²]
+- `heated_perimeter` — total heated perimeter [m]: sum of both face contributions
+- `wet_perimeter`    — total wetted perimeter [m]: used to derive Dh
+- `heated_parts`     — heated perimeter per face [m]: (left_face, right_face)
 
-Constructors:
-- `PipeGeometry(; L, D, A=π*D^2/4)` — circular pipe (kwarg `D` selects this method)
-- `PipeGeometry(; L, Dh, A, y)` — rectangular MTR channel (kwarg `y` selects this method)
+Factory functions (preferred constructors):
+- `PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)` — rectangular channel
+- `PipeGeometry_circular(L, D)` — circular pipe
 
-For circular:    heated_parts = (π*D/2, π*D/2); total = π*D (same as old π*Dh)
-For rectangular: heated_parts = (y, y);          total = 2*y
+Do NOT call the inner positional constructor directly.
 """
 struct PipeGeometry
-    L            ::Float64                   # channel length [m]
-    Dh           ::Float64                   # hydraulic diameter [m]
-    A            ::Float64                   # flow cross-section area [m²]
-    heated_parts ::NTuple{2,Float64}         # heated perimeter per face [m]: (left, right)
+    L                ::Float64                   # channel length [m]
+    Dh               ::Float64                   # hydraulic diameter [m]: 4*area/wet_perimeter
+    A                ::Float64                   # flow cross-section area [m²]
+    heated_perimeter ::Float64                   # total heated perimeter [m]
+    wet_perimeter    ::Float64                   # total wetted perimeter [m]
+    heated_parts     ::NTuple{2,Float64}         # heated perimeter per face [m]: (left, right)
 end
 
-# Outer constructors use distinct required kwargs for dispatch-at-call-site safety.
-# Circular:    PipeGeometry(; L, D, A=π*D²/4) — kwarg `D` selects circular
-# Rectangular: PipeGeometry(; L, Dh, A, y)    — kwarg `y` selects rectangular
-#
-# Julia cannot dispatch on keyword argument *names*, so we use a single
-# method with `D = nothing` and `y = nothing` sentinels and branch at runtime.
-function PipeGeometry(; L, D = nothing, Dh = nothing, A = nothing, y = nothing)
-    if D !== nothing
-        # Circular pipe: D is diameter, A defaults to circular area
-        _D  = Float64(D)
-        _A  = A !== nothing ? Float64(A) : π * _D^2 / 4
-        PipeGeometry(Float64(L), _D, _A, (π * _D / 2, π * _D / 2))
-    elseif y !== nothing
-        # Rectangular MTR channel: Dh is hydraulic diameter, y is face width
-        _Dh = Float64(Dh)
-        _A  = Float64(A)
-        _y  = Float64(y)
-        PipeGeometry(Float64(L), _Dh, _A, (_y, _y))
+"""
+    PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
+
+Construct a `PipeGeometry` for a rectangular channel.
+
+- `L`            — channel length [m]
+- `edge1`        — first cross-section edge [m] (e.g. plate width)
+- `edge2`        — second cross-section edge [m] (e.g. channel gap)
+- `heated_edge`  — width of each heated face [m]
+- `one_sided`    — `:left`, `:right`, or `nothing` (default, both sides heated)
+
+Dh = 4*area/wet_perimeter where area = edge1*edge2 and wet_perimeter = 2*(edge1+edge2).
+"""
+function PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
+    _L    = Float64(L)
+    _e1   = Float64(edge1)
+    _e2   = Float64(edge2)
+    _he   = Float64(heated_edge)
+    area          = _e1 * _e2
+    wet_perimeter = 2.0 * (_e1 + _e2)
+    Dh            = 4.0 * area / wet_perimeter
+    if one_sided === nothing
+        heated_perimeter = 2.0 * _he
+        heated_parts     = (_he, _he)
+    elseif one_sided === :left
+        heated_perimeter = _he
+        heated_parts     = (_he, 0.0)
+    elseif one_sided === :right
+        heated_perimeter = _he
+        heated_parts     = (0.0, _he)
     else
-        error("PipeGeometry: provide either `D` (circular) or `Dh` + `A` + `y` (rectangular)")
+        error("one_sided must be :left, :right, or nothing; got $one_sided")
     end
+    PipeGeometry(_L, Dh, area, heated_perimeter, wet_perimeter, heated_parts)
+end
+
+"""
+    PipeGeometry_circular(L, D)
+
+Construct a `PipeGeometry` for a circular pipe.
+
+- `L` — channel length [m]
+- `D` — pipe diameter [m]
+
+Dh = D (exact for circular cross-section). heated_parts = (π*D/2, π*D/2) (symmetric split).
+"""
+function PipeGeometry_circular(L, D)
+    _L         = Float64(L)
+    _D         = Float64(D)
+    area       = π * _D^2 / 4
+    perimeter  = π * _D
+    heated_parts = (perimeter / 2, perimeter / 2)
+    # Dh = 4*(π*D²/4)/(π*D) = D — exact
+    PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts)
 end
 
 # Declare as new generic functions independent of Base
