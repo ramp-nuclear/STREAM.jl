@@ -21,10 +21,10 @@ Requirements for the HeatDiffusion milestone. Each maps to roadmap phases.
 
 ### HeatDiffusion Component (HDIFF)
 
-- [ ] **HDIFF-01**: User can instantiate a HeatDiffusion component with 2D MTK state `T(t)[1:nz, 1:nx]` (row=axial z, col=lateral x — matching Python STREAM axis convention)
-- [ ] **HDIFF-02**: HeatDiffusion computes x-direction (across-plate) heat diffusion via FD stencil using an internal `_diffusion_eqs` helper structured for future xz/r extension; top and bottom boundaries are adiabatic
-- [ ] **HDIFF-03**: HeatDiffusion accepts `power_shape[1:nz, 1:nx]` (normalized spatial distribution, constructor parameter) and `power` (total watts, MTK parameter) as the volumetric heat source
-- [ ] **HDIFF-04**: HeatDiffusion exposes `thermal_left[1:nz]` and `thermal_right[1:nz]` ThermalPort arrays for per-cell coupling to coolant channels
+- [x] **HDIFF-01**: User can instantiate a HeatDiffusion component with 2D MTK state `T(t)[1:nz, 1:nx]` (row=axial z, col=lateral x — matching Python STREAM axis convention)
+- [x] **HDIFF-02**: HeatDiffusion computes x-direction (across-plate) heat diffusion via FD stencil using an internal `_diffusion_eqs` helper structured for future xz/r extension; top and bottom boundaries are adiabatic
+- [x] **HDIFF-03**: HeatDiffusion accepts `power_shape[1:nz, 1:nx]` (normalized spatial distribution, constructor parameter) and `power` (total watts, MTK parameter) as the volumetric heat source
+- [x] **HDIFF-04**: HeatDiffusion exposes `thermal_left[1:nz]` and `thermal_right[1:nz]` ThermalPort arrays for per-cell coupling to coolant channels
 - [ ] **HDIFF-05**: User can leave one side of HeatDiffusion unconnected and it defaults to adiabatic (Q_flow=0 from MTK acausal semantics, verified by explicit test)
 
 ### Validation (VAL)
@@ -66,10 +66,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHAN-01 | Phase 10 | Complete |
 | CHAN-02 | Phase 10 | Complete |
 | CHAN-03 | Phase 10 | Complete |
-| HDIFF-01 | Phase 11 | Pending |
-| HDIFF-02 | Phase 11 | Pending |
-| HDIFF-03 | Phase 11 | Pending |
-| HDIFF-04 | Phase 11 | Pending |
+| HDIFF-01 | Phase 11 | Complete |
+| HDIFF-02 | Phase 11 | Complete |
+| HDIFF-03 | Phase 11 | Complete |
+| HDIFF-04 | Phase 11 | Complete |
 | HDIFF-05 | Phase 11 | Pending |
 | VAL-01 | Phase 12 | Pending |
 | VAL-02 | Phase 12 | Pending |

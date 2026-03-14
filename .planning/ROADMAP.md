@@ -105,7 +105,7 @@ Plans:
 | 8. Inertia and HeatExchanger | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 10. ChannelAndContacts Two-Sided Upgrade | 2/2 | Complete    | 2026-03-13 | - |
-| 11. HeatDiffusion Component | v0.3 | 0/2 | Not started | - |
+| 11. HeatDiffusion Component | 1/2 | In Progress|  | - |
 | 12. MTR Validation | v0.3 | 0/? | Not started | - |
 
 ---
