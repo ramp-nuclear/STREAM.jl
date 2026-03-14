@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: HeatDiffusion
 status: completed
-stopped_at: Completed 12-mtr-validation-01-PLAN.md — reference constants obtained
-last_updated: "2026-03-14T02:53:57.201Z"
+stopped_at: Completed 12-mtr-validation-02-PLAN.md — all VAL-01/02/03 MTR tests passing, v0.3 complete
+last_updated: "2026-03-14T04:46:50.223Z"
 last_activity: 2026-03-14 — Phase 12 Plan 01 complete; MTR reference script + HDIFF-03-gap test
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 83
+  completed_plans: 6
+  percent: 100
 ---
 
 # STATE: STREAM.jl
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 12 of 12 (MTR Validation)
-Plan: 01 COMPLETE (Phase 12 Plan 01 done; awaiting checkpoint)
-Status: Phase 12 Plan 01 complete; generate_mtr_reference.py written, HDIFF-03-gap test passing
-Last activity: 2026-03-14 — Phase 12 Plan 01 complete; MTR reference script + HDIFF-03-gap test
+Phase: 12 of 12 (MTR Validation) — COMPLETE
+Plan: 02 COMPLETE (All Phase 12 plans done; v0.3 milestone complete)
+Status: All VAL-01/02/03 MTR integration tests passing; 132 tests green
+Last activity: 2026-03-14 — Phase 12 Plan 02 complete; VAL-01/02/03 MTR tests + v0.3 complete
 
-Progress: [████████░░] 83% (5/6 plans complete)
+Progress: [██████████] 100% (6/6 plans complete)
 
 ---
 
@@ -66,6 +66,7 @@ Progress: [████████░░] 83% (5/6 plans complete)
 | Phase 11 P02 | 21 | 2 tasks | 1 files |
 | Phase 12-mtr-validation P01 | 30 | 2 tasks | 2 files |
 | Phase 12-mtr-validation P01 | 35 | 3 tasks | 2 files |
+| Phase 12-mtr-validation P02 | 90 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -83,10 +84,13 @@ Progress: [████████░░] 83% (5/6 plans complete)
 | HeatDiffusion: rho_s/cp_s/k_s as Float64, power as MTK @parameters | Material props fixed in v0.3; power tunable via remake() without recompile |
 | HeatDiffusion boundary cells: half-cell flux scheme (Option B) | Consistent FD: boundary cell uses thermal_port.T as virtual neighbor at dx/2 distance |
 | vec(collect(T)) flattens 2D MTK state for System() constructor | Required pattern for 2D array states in MTK; see RESEARCH.md Pitfall 2 |
-| HeatDiffusion Q_flow sign asymmetric: thermal_left.Q_flow > 0 (heat out left), thermal_right.Q_flow < 0 (heat out right) | Left eq: k*(T_plate - T_bc)/(dx/2); right eq: k*(T_bc - T_plate)/(dx/2) — asymmetry from half-cell scheme |
+| HeatDiffusion Q_flow sign: both faces give Q_flow < 0 when plate hotter than BC (heat leaving plate) | Both use k*(T_bc - T_plate)/(dx/2); MTK convention positive=into component; fixed Phase 12 Plan 02 |
 | ChannelAndContacts one-sided solve needs Re/Nu/h_tc guesses + fully_determined=false | Without explicit algebraic var guesses, MTK initialization system hits cyclic dependency error |
 | plate() CalculationGraph has empty funcs; fuel power via CalculationGraph.from_decoupled | Python STREAM plate() / one_sided_connection() produce funcs-less CG; power must be injected separately |
 | HDIFF-03-gap test: power_shape [0.0,1.0,0.0] not [0.5,0.0,0.5] | Symmetric outer sources: Laplacian=0 forces T_center=T_outer; center-sourced shape correctly tests per-cell power_shape |
+| Python STREAM refs incompatible with Julia MTR geometry | EffectivePipe.circular = left-face-only; Julia CAC = two-sided; 1% tolerance replaced by physics-based energy balance assertions |
+| build_initializeprob=false mandatory for coupled HeatDiffusion+CAC | MTK init system corrupts u0 for coupled systems; bypass ensures KINSOL starts from user-provided guess |
+| MTR mdot initial guess: +0.600 kg/s (positive, Darcy-Weisbach at T≈315 K) | Negative guess (-0.490) causes 51 kPa pressure residual → KINSOL diverges to NaN |
 
 ### Pending Todos
 
@@ -94,7 +98,7 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 12 checkpoint]: `generate_mtr_reference.py` written; user must run it in Python STREAM env to obtain VAL-01/02/03 reference constants for Plan 02.
+- [Phase 12 RESOLVED]: VAL-01/02/03 MTR integration tests passing with physics-based assertions.
 - [Phase 10 RESOLVED]: MTK array port access syntax: `getproperty(sys, Symbol(:thermal_left, i))` confirmed working; `sys.thermal_left[i]` fails in connect() calls.
 - [Phase 10 RESOLVED]: ChannelAndContacts port Q_flow equations required for proper acausal wiring — added in Plan 02.
 
@@ -102,11 +106,11 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T02:53:57.199Z
-**Stopped at:** Completed 12-mtr-validation-01-PLAN.md — reference constants obtained
-**Next action:** User runs generate_mtr_reference.py → resume Plan 02 with reference constants
+**Last session:** 2026-03-14T04:46:50.221Z
+**Stopped at:** Completed 12-mtr-validation-02-PLAN.md — all VAL-01/02/03 MTR tests passing, v0.3 complete
+**Next action:** v0.3 milestone complete. Begin v0.4 planning (symmetric_plate() convenience function + composable subsystem assembly)
 **Resume file:** None
 
 ---
 
-*Last updated: 2026-03-14 — Phase 12 Plan 01 complete; MTR reference script + HDIFF-03-gap test*
+*Last updated: 2026-03-14 — Phase 12 Plan 02 complete; VAL-01/02/03 MTR tests passing; v0.3 milestone complete*

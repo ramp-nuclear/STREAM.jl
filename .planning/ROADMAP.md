@@ -41,7 +41,7 @@ Full phase details: `.planning/milestones/v0.2-ROADMAP.md`
 
 - [x] **Phase 10: ChannelAndContacts Two-Sided Upgrade** - Upgrade ChannelAndContacts to thermal_left/right ports, clear v0.2 tech debt, verify adiabatic default (completed 2026-03-13)
 - [x] **Phase 11: HeatDiffusion Component** - Implement 2D FD fuel plate with x-direction diffusion, two-sided ThermalPort arrays, and isolated unit tests (completed 2026-03-14)
-- [ ] **Phase 12: MTR Validation** - Couple HeatDiffusion + two ChannelAndContacts in MTR geometry and validate against Python STREAM within 1%
+- [x] **Phase 12: MTR Validation** - Couple HeatDiffusion + two ChannelAndContacts in MTR geometry and validate against Python STREAM within 1% (completed 2026-03-14)
 
 ## Phase Details
 
@@ -107,7 +107,7 @@ Plans:
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 10. ChannelAndContacts Two-Sided Upgrade | 2/2 | Complete    | 2026-03-13 | - |
 | 11. HeatDiffusion Component | 2/2 | Complete    | 2026-03-14 | - |
-| 12. MTR Validation | 1/2 | In Progress|  | - |
+| 12. MTR Validation | 2/2 | Complete   | 2026-03-14 | - |
 
 ---
 
