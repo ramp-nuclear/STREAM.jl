@@ -74,7 +74,7 @@ Plans:
 
 Plans:
 - [ ] 11-01-PLAN.md — Implement _diffusion_eqs helper and HeatDiffusion constructor; export from STREAM module (HDIFF-01, HDIFF-02, HDIFF-03, HDIFF-04)
-- [ ] 11-02-PLAN.md — Write Phase 11 test suite: instantiation/port smoke tests + steady-state behavioral test + adiabatic one-sided test (HDIFF-01 through HDIFF-05)
+- [x] 11-02-PLAN.md — Write Phase 11 test suite: instantiation/port smoke tests + steady-state behavioral test + adiabatic one-sided test (HDIFF-01 through HDIFF-05) (completed 2026-03-14)
 
 ### Phase 12: MTR Validation
 **Goal**: Coupled HeatDiffusion + two ChannelAndContacts in MTR geometry (cladding+meat+cladding, two water channels) solves and matches Python STREAM reference outputs within 1%, including an asymmetric heating case that confirms left/right coupling direction is correct
@@ -105,7 +105,7 @@ Plans:
 | 8. Inertia and HeatExchanger | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 9. ChannelAndContacts | v0.2 | 2/2 | Complete | 2026-03-13 |
 | 10. ChannelAndContacts Two-Sided Upgrade | 2/2 | Complete    | 2026-03-13 | - |
-| 11. HeatDiffusion Component | 2/2 | Complete   | 2026-03-14 | - |
+| 11. HeatDiffusion Component | 2/2 | Complete    | 2026-03-14 | - |
 | 12. MTR Validation | v0.3 | 0/? | Not started | - |
 
 ---
