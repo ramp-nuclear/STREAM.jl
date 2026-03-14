@@ -830,10 +830,9 @@ end
 # Reference: generate_mtr_reference.py (Python STREAM)
 # ─────────────────────────────────────────────────────────────────
 @testset "VAL-01: Symmetric MTR — HeatDiffusion + two ChannelAndContacts" begin
-    # Physics-based validation: Julia uses symmetric two-sided heating (both faces active),
-    # while Python STREAM uses EffectivePipe.circular (only left face heats fluid).
-    # The models are geometrically different so Python reference values are NOT applicable.
-    # Instead, validate physical correctness:
+    # Physics-based validation. Python STREAM and Julia use incompatible plate-channel
+    # coupling areas (Fuel class: y*dz; ChannelAndContacts: π*Dh/2*dz — 4.46× mismatch),
+    # so quantitative Python reference comparison is not feasible. Validate physics instead:
     #   - Both channels heat up (T_out > T_in = 313.15 K)
     #   - Symmetric: T_out_l == T_out_r within 0.1%
     #   - Plate center is hotter than fluid outlet
@@ -892,15 +891,12 @@ end
     mdot_r   = sol[ssys.cac_r.port_in.mdot]
     T_center = sol[ssys.hd.T[nz÷2, (nx+1)÷2]]   # [5, 2] for nz=10, nx=3
 
-    # Both outlets must be above inlet (fluid is heated)
+    # Physics sanity checks
     @test T_out_l > T_in
     @test T_out_r > T_in
-    # Symmetry: symmetric geometry and BCs => equal outlet temperatures within 0.1%
     @test isapprox(T_out_l, T_out_r; rtol=0.001)
-    # Positive mass flow (forward direction)
     @test mdot_l > 0.0
     @test mdot_r > 0.0
-    # Plate center is hotter than the fluid outlet (heat source in plate)
     @test T_center > T_out_l
     # Energy balance: each channel receives 5 kW; T_rise = P/(mdot*cp)
     cp_approx = cp_water(T_in)
@@ -914,9 +910,7 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "VAL-02: Asymmetric MTR — right channel at 363.15 K inlet" begin
     # Asymmetric BCs: left inlet 313.15 K (40°C), right inlet 363.15 K (90°C).
-    # Physics validation: the right face of the plate must be hotter than the left face
-    # because the right channel is much hotter. Python reference value (342.69 K) is
-    # incompatible with Julia geometry (two-sided vs one-sided heating) — not used.
+    # Physics validation: right plate face hotter than left face (right channel dominates).
 
     nz = 10; nx = 3
     T_in_l = 313.15; T_in_r = 363.15
@@ -967,14 +961,10 @@ end
 
     # Right column must be hotter than left column (right channel at 90°C drives right face hot)
     @test T_plate_right_col > T_plate_left_col
-    # The asymmetry must be physically meaningful (both face temperatures differ)
-    @test T_plate_right_col != T_plate_left_col
     # Left outlet must be above left inlet (left channel at 40°C is heated by plate)
     @test sol[ssys.cac_l.T_out] > T_in_l
-    # Right outlet can be BELOW right inlet: right channel at 90°C may be cooled by the plate
-    # (plate center is typically below 90°C when left channel is at 40°C).
-    # Qualitative check: right outlet temperature must be physically reasonable
-    @test sol[ssys.cac_r.T_out] > T_in_l   # warmer than left inlet at minimum
+    # Right outlet warmer than left inlet at minimum
+    @test sol[ssys.cac_r.T_out] > T_in_l
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -983,13 +973,11 @@ end
 @testset "VAL-03: One-sided MTR — left channel only, thermal_right adiabatic" begin
     # One-sided geometry: only thermal_left[i] connected to cac_l; thermal_right[i] free (adiabatic).
     # All 10 kW deposited in the plate exits only through the left face.
-    # Python reference (T_out=314.05 K, mdot=0.598) reflects circular pipe (half-perimeter area);
-    # Julia uses π*D/2 per face — same area per face, but channel receives heat from left plate only.
     # Physics validation:
     #   - T_out_l > T_in (10 kW heats the single channel)
     #   - T_plate_center > T_out_l (plate is hotter than fluid)
     #   - thermal_right Q_flow == 0 (adiabatic right face)
-    #   - Energy balance: T_rise = 10 kW / (mdot * cp) ≈ 4 K at mdot≈0.6
+    #   - Energy balance: T_rise = 10 kW / (mdot * cp)
 
     nz = 10; nx = 3
     T_in = 313.15
@@ -1027,11 +1015,8 @@ end
     mdot_l_03   = sol[ssys.cac_l.port_in.mdot]
     T_center_03 = sol[ssys.hd.T[nz÷2, (nx+1)÷2]]
 
-    # Outlet must be above inlet (fluid is heated by 10 kW)
     @test T_out_l_03 > T_in
-    # Positive forward flow
     @test mdot_l_03 > 0.0
-    # Plate center is hotter than the fluid outlet
     @test T_center_03 > T_out_l_03
     # Energy balance: full 10 kW goes to one channel
     cp_approx = cp_water(T_in)

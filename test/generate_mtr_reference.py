@@ -74,7 +74,14 @@ assert abs(power_shape_np.sum() - 1.0) < 1e-9, f"power_shape sum = {power_shape_
 
 z_bounds = np.linspace(0, LZ, NZ + 1)
 x_bounds = np.linspace(0, LX, NX + 1)
-pipe_ch = EffectivePipe.circular(length=LZ, diameter=D_H)
+pipe_ch = EffectivePipe(
+    length=LZ,
+    heated_perimeter=np.pi * D_H,
+    wet_perimeter=np.pi * D_H,
+    area=np.pi * D_H**2 / 4,
+    heated_parts=(np.pi * D_H / 2, np.pi * D_H / 2),
+    width=D_H,
+)
 
 
 def _build_channel_and_loop(name_suffix: str, T_inlet_C: float):
@@ -215,10 +222,15 @@ power_cg_02 = CalculationGraph.from_decoupled(fuel_02, funcs={fuel_02: dict(powe
 agr_02 = fg_l_02.aggregator + fg_r_02.aggregator + plate_cg_02 + power_cg_02
 K_l_02 = fg_l_02.kirchhoff
 
+T_plate_02 = np.outer(np.ones(NZ), np.linspace(T_INLET_L_C + 5.0, T_INLET_R_ASYM_C + 5.0, NX))
 guess_02 = {
     **_hydraulic_guess(fg_l_02, pump_l_02, hx_l_02, ch_l_02, T_INLET_L_C),
     **_hydraulic_guess(fg_r_02, pump_r_02, hx_r_02, ch_r_02, T_INLET_R_ASYM_C),
-    **_fuel_guess(fuel_02, (T_INLET_L_C + T_INLET_R_ASYM_C) / 2),
+    fuel_02.name: {
+        "T": T_plate_02,
+        "T_wall_left":  np.full(NZ, T_INLET_L_C + 3.0),
+        "T_wall_right": np.full(NZ, T_INLET_R_ASYM_C + 3.0),
+    },
 }
 
 sol_vec_02, state_02 = _solve_scenario(agr_02, guess_02)
