@@ -84,10 +84,11 @@ Plans:
   1. Steady-state T_outlet on both channels and T_plate (center and wall) match Python STREAM MTR reference within 1%
   2. An asymmetric test (left channel 50 K hotter than right) produces a non-symmetric plate temperature profile consistent with Python STREAM — confirming the left/right coupling direction is not swapped
   3. One-sided coupling (HeatDiffusion connected to one channel, other face adiabatic) solves correctly and is validated against Python STREAM one-sided reference
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 12-01: TBD
+- [ ] 12-01-PLAN.md — Write generate_mtr_reference.py (VAL-01/02/03 scenarios) + HDIFF-03 gap test; checkpoint to run Python script and obtain reference constants
+- [ ] 12-02-PLAN.md — Write VAL-01 (symmetric MTR), VAL-02 (asymmetric), VAL-03 (one-sided) Julia integration tests with hardcoded reference constants
 
 ## Progress
 
