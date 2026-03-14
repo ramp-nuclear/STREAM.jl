@@ -3,7 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using DifferentialEquations  # ReturnCode, ODEProblem, Rodas5P, etc.
 using STREAM
-import STREAM: Channel, Pump, Friction, Gravity, Resistor, build_loop_vertical, Inertia, HeatExchanger, ChannelAndContacts, ChannelHeatFlux, ConstantTemperature  # resolve ambiguity with Base.Channel
+import STREAM: Channel, Pump, Friction, Gravity, Resistor, build_loop_vertical, Inertia, HeatExchanger, ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, HeatDiffusion  # resolve ambiguity with Base.Channel
 const SciMLBase = DifferentialEquations.SciMLBase  # for NoInit() in RL-decay test
 
 @testset "STREAM Phase 1 Tests" begin
@@ -584,10 +584,17 @@ end
         cac2.port_in.T ~ T_inlet,
     ]
     @named sys2 = compose(System(conns2, t; name=:sys2), pump2, bc2, cac2, ct2...)
-    ssys2 = mtkcompile(sys2)
+    ssys2 = mtkcompile(sys2; fully_determined=false)
     T_guess2 = steady_state_guess(T_inlet=T_inlet, Q_wall=5e3, mdot_guess=0.490, n=n)
     op2 = [ssys2.cac2.T[i] => T_guess2[i] for i in 1:n]
     push!(op2, ssys2.cac2.port_in.mdot => 0.490)
+    # Unconnected thermal_right ports have free T variables — provide initial guess
+    right_syms2 = [getproperty(ssys2.cac2, Symbol(:thermal_right, i)) for i in 1:n]
+    append!(op2, [right_syms2[i].T => T_wall for i in 1:n])
+    # Provide Re/Nu/h_tc guesses to break initialization cycle for algebraic variables
+    append!(op2, [ssys2.cac2.Re[i] => 3e5 for i in 1:n])
+    append!(op2, [ssys2.cac2.Nu[i] => 800.0 for i in 1:n])
+    append!(op2, [ssys2.cac2.h_tc[i] => 2.7e4 for i in 1:n])
     sol2 = solve_steady(ssys2, op2)
 
     # Verify all unconnected thermal_right ports have Q_flow == 0
@@ -625,3 +632,140 @@ end
 end
 
 end  # @testset "STREAM Phase 10 Tests"
+
+# NOTE: Phase 11 block is intentionally split across two tasks.
+# Task 1 adds HDIFF-01/04 (open block, no closing end yet).
+# Task 2 adds HDIFF-02/03/05 and closes the block.
+@testset "STREAM Phase 11 Tests" begin
+
+# ─────────────────────────────────────────────────────────────────
+# HDIFF-01: HeatDiffusion instantiation and 2D state variable
+# ─────────────────────────────────────────────────────────────────
+@testset "HDIFF-01: HeatDiffusion callable and returns MTK System" begin
+    ps = fill(1.0 / (5 * 3), 5, 3)
+    @named hd = HeatDiffusion(nz=5, nx=3, Lz=0.6, Lx=0.005, y=0.07,
+                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                               power_shape=ps)
+    @test hd isa ModelingToolkit.System
+end
+
+@testset "HDIFF-01: HeatDiffusion exported from STREAM" begin
+    @test isdefined(STREAM, :HeatDiffusion)
+end
+
+@testset "HDIFF-01: HeatDiffusion mtkcompile bare (no connections)" begin
+    ps = fill(1.0 / (3 * 2), 3, 2)
+    @named hd = HeatDiffusion(nz=3, nx=2, Lz=0.6, Lx=0.005, y=0.07,
+                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                               power_shape=ps)
+    @test_nowarn mtkcompile(hd; fully_determined=false)
+end
+
+@testset "HDIFF-01: HeatDiffusion state T[1:nz, 1:nx] present in unknowns" begin
+    nz, nx = 3, 2
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
+                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                               power_shape=ps)
+    unames = Symbol.(ModelingToolkit.getname.(unknowns(hd)))
+    @test :T in unames
+    # Count only plate temperature unknowns (excluding thermal port subsystem variables)
+    @test count(u -> ModelingToolkit.getname(u) == :T, unknowns(hd)) == nz * nx
+end
+
+# ─────────────────────────────────────────────────────────────────
+# HDIFF-04: ThermalPort arrays present as named subsystems
+# ─────────────────────────────────────────────────────────────────
+@testset "HDIFF-04: HeatDiffusion has thermal_left and thermal_right subsystems" begin
+    nz = 3
+    ps = fill(1.0 / (nz * 2), nz, 2)
+    @named hd = HeatDiffusion(nz=nz, nx=2, Lz=0.6, Lx=0.005, y=0.07,
+                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                               power_shape=ps)
+    sub_names = Symbol.(ModelingToolkit.getname.(ModelingToolkit.get_systems(hd)))
+    for i in 1:nz
+        @test Symbol(:thermal_left, i)  in sub_names
+        @test Symbol(:thermal_right, i) in sub_names
+    end
+end
+
+# ─────────────────────────────────────────────────────────────────
+# HDIFF-02/03: Steady-state behavioral test with pinned boundaries and uniform power
+# ─────────────────────────────────────────────────────────────────
+@testset "HDIFF-02/03: Steady-state plate T > T_boundary and Q_flow signs correct" begin
+    nz, nx = 3, 3
+    T_bc = 600.0
+    pwr  = 1e5
+    ps   = fill(1.0 / (nz * nx), nz, nx)
+
+    @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
+                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                               power_shape=ps, power=pwr)
+
+    ct_l = [ConstantTemperature(name=Symbol(:ct_l, i), T=T_bc) for i in 1:nz]
+    ct_r = [ConstantTemperature(name=Symbol(:ct_r, i), T=T_bc) for i in 1:nz]
+
+    conns = [
+        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i)))  for i in 1:nz]...,
+        [connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for i in 1:nz]...,
+    ]
+    @named sys = compose(System(conns, t; name=:sys), hd, ct_l..., ct_r...)
+    ssys = mtkcompile(sys)
+
+    # Initial guess: slightly above T_bc to break symmetry
+    op = [ssys.hd.T[i, j] => T_bc + 10.0 for i in 1:nz for j in 1:nx]
+    sol = solve_steady(ssys, op)
+
+    # All plate temperatures should be >= T_bc (heat source raises interior)
+    for i in 1:nz, j in 1:nx
+        @test sol[ssys.hd.T[i, j]] >= T_bc - 1e-6
+    end
+
+    # Q_flow sign check: left equation gives Q_flow = k*(T_plate - T_bc)/(dx/2) > 0 when plate is hotter
+    # Right equation gives Q_flow = k*(T_bc - T_plate)/(dx/2) < 0 when plate is hotter
+    # Energy balance: total power leaving through left face + right face = pwr
+    left_syms  = [getproperty(ssys.hd, Symbol(:thermal_left, i))  for i in 1:nz]
+    right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
+    Q_left_total  = sum(sol[left_syms[i].Q_flow]  for i in 1:nz)
+    Q_right_total = sum(sol[right_syms[i].Q_flow] for i in 1:nz)
+
+    # Left Q_flow > 0 (heat leaving plate to left channel — positive per half-cell scheme)
+    @test Q_left_total > 0.0
+
+    # Right Q_flow < 0 (heat leaving plate to right channel — negative per half-cell scheme)
+    @test Q_right_total < 0.0
+
+    # Energy balance check: |Q_left| + |Q_right| ≈ power (within 5% for FD approximation)
+    @test isapprox(abs(Q_left_total) + abs(Q_right_total), pwr; rtol=0.05)
+end
+
+# ─────────────────────────────────────────────────────────────────
+# HDIFF-05: One-sided connection — unconnected thermal_right is adiabatic
+# ─────────────────────────────────────────────────────────────────
+@testset "HDIFF-05: Unconnected thermal_right has Q_flow == 0 (adiabatic)" begin
+    nz, nx = 3, 3
+    T_bc = 600.0
+    pwr  = 5e4
+    ps   = fill(1.0 / (nz * nx), nz, nx)
+
+    @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
+                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                               power_shape=ps, power=pwr)
+
+    ct_l = [ConstantTemperature(name=Symbol(:ct5_l, i), T=T_bc) for i in 1:nz]
+    conns = [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i)))
+             for i in 1:nz]
+    @named sys = compose(System(conns, t; name=:sys), hd, ct_l...)
+    ssys = mtkcompile(sys; fully_determined=false)
+
+    op = [ssys.hd.T[i, j] => T_bc + 10.0 for i in 1:nz for j in 1:nx]
+    sol = solve_steady(ssys, op)
+
+    # Unconnected thermal_right ports must have Q_flow == 0
+    right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
+    for i in 1:nz
+        @test isapprox(sol[right_syms[i].Q_flow], 0.0; atol=1e-8)
+    end
+end
+
+end  # @testset "STREAM Phase 11 Tests"
