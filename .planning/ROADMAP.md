@@ -61,11 +61,14 @@ Full phase details: `.planning/milestones/v0.3-ROADMAP.md`
 **Goal**: Physics computations are correct for rectangular MTR geometry; fixed-flow Pump available
 **Depends on**: Phase 12.1 (PipeGeometry struct exists)
 **Requirements**: PHY-01, PHY-05
+**Plans**: 2 plans
+Plans:
+- [ ] 13-01-PLAN.md — Redesign PipeGeometry struct, add factory constructors, migrate all call sites
+- [ ] 13-02-PLAN.md — Add Pump(mdot0=...) dual-mode, regenerate MTR reference constants
 **Success Criteria** (what must be TRUE):
   1. `PipeGeometry.rectangular(...)` computes `Dh = 4A / wet_perimeter` using all four walls; `wet_perimeter` is a readable field
   2. `PipeGeometry.circular(D=...)` sets `wet_perimeter = π*D`; existing circular-geometry tests still pass
   3. `Pump(mdot0=0.6)` assembles and solves a loop with fixed mass flow rate; `Pump(dp=1e5)` still works
-**Plans**: TBD
 
 ### Phase 14: Laminar Correlations
 **Goal**: ChannelAndContacts supports pluggable HTC and friction correlations including laminar regime
@@ -119,7 +122,7 @@ Full phase details: `.planning/milestones/v0.3-ROADMAP.md`
 | 11. HeatDiffusion Component | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12. MTR Validation | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12.1. PipeGeometry Struct | v0.3 | 2/2 | Complete | 2026-03-14 |
-| 13. Physics Foundation | v0.4 | 0/TBD | Not started | - |
+| 13. Physics Foundation | v0.4 | 0/2 | Not started | - |
 | 14. Laminar Correlations | v0.4 | 0/TBD | Not started | - |
 | 15. Composition Helpers & QoL | v0.4 | 0/TBD | Not started | - |
 | 16. Validation | v0.4 | 0/TBD | Not started | - |
@@ -127,4 +130,4 @@ Full phase details: `.planning/milestones/v0.3-ROADMAP.md`
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-14 — v0.4 Composability & Physics roadmap added (Phases 13-16)*
+*Updated: 2026-03-14 — Phase 13 planned (2 plans: 13-01, 13-02)*
