@@ -769,3 +769,64 @@ end
 end
 
 end  # @testset "STREAM Phase 11 Tests"
+
+@testset "STREAM Phase 12 Tests" begin
+
+# ─────────────────────────────────────────────────────────────────
+# HDIFF-03 gap: Non-uniform power_shape — zero center cell is colder
+# power_shape = [0.5, 0.0, 0.5] (nx=3): outer cells get all the heat,
+# center cell has zero source and must be colder than neighbors at steady state.
+# ─────────────────────────────────────────────────────────────────
+@testset "HDIFF-03-gap: Non-uniform power_shape: center-only source cell is hottest" begin
+    # Rule-1 auto-fix: The originally planned [0.5, 0.0, 0.5] test is physically incorrect.
+    # With symmetric BCs and equal outer sources, the Laplacian=0 constraint forces
+    # T_center = (T_left + T_right)/2 = T_left at steady state — center is NOT colder.
+    # Correct test: put ALL power in center cell [0.0, 1.0, 0.0].
+    # At steady state T_center must be strictly hotter than both outer cells,
+    # which have zero source and sit adjacent to the cold boundary (T_bc).
+    # This verifies that power_shape is applied per-cell correctly.
+    nz, nx = 1, 3
+    T_bc = 600.0
+    pwr  = 1e4
+    # All power in center, zero in outer cells: sum = 1.0 (normalized)
+    ps = reshape([0.0, 1.0, 0.0], nz, nx)
+    @test isapprox(sum(ps), 1.0; atol=1e-12)
+
+    @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
+                               rho_s=2700.0, cp_s=900.0, k_s=200.0,
+                               power_shape=ps, power=pwr)
+
+    ct_l = [ConstantTemperature(name=Symbol(:ct12_l, i), T=T_bc) for i in 1:nz]
+    ct_r = [ConstantTemperature(name=Symbol(:ct12_r, i), T=T_bc) for i in 1:nz]
+
+    conns = [
+        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left,  i))) for i in 1:nz]...,
+        [connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for i in 1:nz]...,
+    ]
+    @named sys = compose(System(conns, t; name=:sys12gap), hd, ct_l..., ct_r...)
+    ssys = mtkcompile(sys)
+
+    op = [ssys.hd.T[i, j] => T_bc + 5.0 for i in 1:nz for j in 1:nx]
+    sol = solve_steady(ssys, op)
+
+    T_left   = sol[ssys.hd.T[1, 1]]
+    T_center = sol[ssys.hd.T[1, 2]]
+    T_right  = sol[ssys.hd.T[1, 3]]
+
+    # Center cell (sole source) must be hotter than the zero-source outer cells
+    @test T_center > T_left  + 0.01
+    @test T_center > T_right + 0.01
+    # Center cell must be above T_bc (it receives all the heat)
+    @test T_center > T_bc
+    # Outer cells (zero source, adjacent to cold BC) must also be above T_bc
+    # because they receive heat from the center via diffusion
+    @test T_left   > T_bc
+    @test T_right  > T_bc
+end
+
+# ─────────────────────────────────────────────────────────────────
+# VAL-01, VAL-02, VAL-03: MTR coupled integration tests
+# Added in Plan 02 after generate_mtr_reference.py constants are obtained.
+# ─────────────────────────────────────────────────────────────────
+
+end  # @testset "STREAM Phase 12 Tests"
