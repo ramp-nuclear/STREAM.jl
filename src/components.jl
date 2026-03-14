@@ -102,7 +102,9 @@ end
 
 # Declare as new generic functions independent of Base
 function Channel end
-function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0)
+function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
+                   htc_correlation      = dittus_boelter,
+                   friction_correlation = blasius_friction)
     Dh = geometry.Dh
     A  = geometry.A
     L  = geometry.L
@@ -147,15 +149,15 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0)
         push!(eqs, q_wall[i] ~ thermal.Q_flow / n)
         push!(eqs, v[i]      ~ port_in.mdot / (rho_water(T[i]) * A))
         push!(eqs, Re[i]     ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
-        push!(eqs, Nu[i]     ~ 0.023 * Re[i]^0.8 *
-                                (cp_water(T[i]) * mu_water(T[i]) / k_water(T[i]))^0.4)
+        Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
+        push!(eqs, Nu[i]     ~ htc_correlation(Re[i], Pr_i))
         push!(eqs, h_tc[i]  ~ Nu[i] * k_water(T[i]) / Dh)
     end
 
     # Scalar observables
     i_mid = max(1, n ÷ 2)   # middle cell for mean-property dP
     Re_mean = abs(port_in.mdot) * Dh / (A * mu_water(T[i_mid]))
-    f_ch    = 0.3164 * Re_mean^(-0.25)
+    f_ch    = friction_correlation(Re_mean)
     push!(eqs, T_out ~ T[n])
     push!(eqs, dP    ~ f_ch * (port_in.mdot * abs(port_in.mdot) /
                                 (2 * rho_water(T[i_mid]) * A^2)) * (L / Dh)
@@ -310,20 +312,22 @@ end
 function _channel_base_eqs(eqs::Vector{Equation};
     n, T, Re, Nu, h_tc, v, T_out, dP,
     port_in, port_out,
-    Dh, A, L, g_acc, dz)
+    Dh, A, L, g_acc, dz,
+    htc_correlation      = dittus_boelter,
+    friction_correlation = blasius_friction)
 
     for i in 1:n
         push!(eqs, v[i]    ~ port_in.mdot / (rho_water(T[i]) * A))
         push!(eqs, Re[i]   ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
-        push!(eqs, Nu[i]   ~ 0.023 * Re[i]^0.8 *
-                              (cp_water(T[i]) * mu_water(T[i]) / k_water(T[i]))^0.4)
+        Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
+        push!(eqs, Nu[i]   ~ htc_correlation(Re[i], Pr_i))
         push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
     end
 
     # Scalar: pressure drop and T_out
     i_mid   = max(1, n ÷ 2)
     Re_mean = abs(port_in.mdot) * Dh / (A * mu_water(T[i_mid]))
-    f_ch    = 0.3164 * Re_mean^(-0.25)
+    f_ch    = friction_correlation(Re_mean)
     push!(eqs, T_out ~ T[n])
     push!(eqs, dP    ~ f_ch * (port_in.mdot * abs(port_in.mdot) /
                                 (2 * rho_water(T[i_mid]) * A^2)) * (L / Dh)
@@ -355,7 +359,9 @@ end
 # Observables:
 #   q_wall[i]    — per-cell total heat transfer rate (W); q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow
 #   Q_wall_total — total heat transfer rate (W); sum over all cells
-function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0)
+function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
+                              htc_correlation      = dittus_boelter,
+                              friction_correlation = blasius_friction)
     Dh = geometry.Dh
     A  = geometry.A
     L  = geometry.L
@@ -392,7 +398,8 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0)
 
     # Common equations: v, Re, Nu, h_tc, dP, T_out, port wiring
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
-                      port_in, port_out, Dh, A, L, g_acc=g, dz)
+                      port_in, port_out, Dh, A, L, g_acc=g, dz,
+                      htc_correlation, friction_correlation)
 
     # Per-cell energy balance: two-sided heating (geometry.heated_parts[1]/[2] per face)
     for i in 1:n
@@ -429,7 +436,9 @@ end
 #
 # When T_wall is uniform, ChannelHeatFlux is algebraically equivalent to
 # Channel with thermal.T pinned to T_wall. THERM-03 validates this within 0.1%.
-function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall)
+function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall,
+                           htc_correlation      = dittus_boelter,
+                           friction_correlation = blasius_friction)
     Dh = geometry.Dh
     A  = geometry.A
     L  = geometry.L
@@ -463,7 +472,8 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
 
     # Common equations: v, Re, Nu, h_tc, dP, T_out, port wiring
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
-                      port_in, port_out, Dh, A, L, g_acc=g, dz)
+                      port_in, port_out, Dh, A, L, g_acc=g, dz,
+                      htc_correlation, friction_correlation)
 
     # Per-cell energy balance using T_wall_p parameter
     for i in 1:n
