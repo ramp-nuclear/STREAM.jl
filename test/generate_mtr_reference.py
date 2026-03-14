@@ -40,7 +40,9 @@ LZ, LX, Y_LEN = 0.6, 0.00127, 0.07
 POWER = 1e4
 DP_PUMP = 3.0e4
 P_ABS = 1.0e5
-D_H = 0.01
+# D_H = 0.01  # OLD: circular approximation (incorrect)
+# Correct MTR rectangular geometry: Dh = 4*area/wet_perimeter
+# area = 0.07 * 0.00127 = 8.89e-5 m², wet = 2*(0.07+0.00127) = 0.14254 m, Dh ≈ 0.002495 m
 
 T_INLET_L_C = 40.0       # VAL-01/02/03 left channel inlet (Celsius)
 T_INLET_R_C = 40.0       # VAL-01/03 right channel inlet (Celsius)
@@ -74,13 +76,14 @@ assert abs(power_shape_np.sum() - 1.0) < 1e-9, f"power_shape sum = {power_shape_
 
 z_bounds = np.linspace(0, LZ, NZ + 1)
 x_bounds = np.linspace(0, LX, NX + 1)
-pipe_ch = EffectivePipe(
+# Correct MTR rectangular channel geometry matching Julia PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+# edge1=0.07 m (plate width), edge2=0.00127 m (channel gap), heated_edge=0.07 m (both faces)
+# Dh = 4*(0.07*0.00127) / (2*(0.07+0.00127)) ≈ 0.002495 m
+pipe_ch = EffectivePipe.rectangular(
     length=LZ,
-    heated_perimeter=2 * Y_LEN,           # 2 * 0.07 = 0.14 m (rectangular)
-    wet_perimeter=np.pi * D_H,            # hydraulic perimeter unchanged
-    area=np.pi * D_H**2 / 4,             # flow area unchanged (= 7.85e-5 m²)
-    heated_parts=(Y_LEN, Y_LEN),          # 0.07 m per face
-    width=Y_LEN,                          # plate width (MTR convention)
+    edge1=Y_LEN,         # 0.07 m (plate width)
+    edge2=LX,            # 0.00127 m (channel gap)
+    heated_edge=Y_LEN,   # 0.07 m (plate width, both faces heated)
 )
 
 

@@ -947,14 +947,14 @@ end
     # Minimal op: only actual unknowns (plate T, fluid T, mdot).
     # Re/Nu/h_tc are observed (computed), T_out is observed — not unknowns; guesses ignored.
     # Correct mdot sign: port_in.mdot > 0 for fluid entering (forward flow).
-    # Magnitude ~0.600 kg/s from Darcy-Weisbach at D=0.01, dP=30 kPa, T≈315 K.
+    # Magnitude ~0.250 kg/s from Darcy-Weisbach at Dh≈2.495mm (rectangular), dP=30 kPa.
     T_w = 315.0
     op = vcat(
         [ssys.hd.T[i, j]          => T_w   for i in 1:nz for j in 1:nx],
         [ssys.cac_l.T[i]          => T_w   for i in 1:nz],
         [ssys.cac_r.T[i]          => T_w   for i in 1:nz],
-        [ssys.cac_l.port_in.mdot  => +0.600],
-        [ssys.cac_r.port_in.mdot  => +0.600],
+        [ssys.cac_l.port_in.mdot  => +0.250],
+        [ssys.cac_r.port_in.mdot  => +0.250],
     )
     sol = solve_steady(ssys, op)
 
@@ -967,11 +967,12 @@ end
     T_center = sol[ssys.hd.T[nz÷2, (nx+1)÷2]]   # [5, 2] for nz=10, nx=3
 
     # Reference constants from generate_mtr_reference.py (rectangular MTR geometry, y=0.07 m)
-    val01_T_outlet_l_ref = 315.1463   # K — left channel outlet temperature
-    val01_T_outlet_r_ref = 315.1463   # K — right channel outlet temperature
-    val01_mdot_l_ref     = 0.599315   # kg/s — left channel mass flow
-    val01_mdot_r_ref     = 0.599315   # kg/s — right channel mass flow
-    val01_T_plate_center = 318.4815   # K — plate center temperature (mid-axial, mid-lateral)
+    # Regenerated with EffectivePipe.rectangular(0.6, 0.07, 0.00127, 0.07); Dh ≈ 2.495 mm
+    val01_T_outlet_l_ref = 317.8871   # K — left channel outlet temperature
+    val01_T_outlet_r_ref = 317.8871   # K — right channel outlet temperature
+    val01_mdot_l_ref     = 0.252547   # kg/s — left channel mass flow
+    val01_mdot_r_ref     = 0.252547   # kg/s — right channel mass flow
+    val01_T_plate_center = 322.5997   # K — plate center temperature (mid-axial, mid-lateral)
     @test isapprox(T_out_l,  val01_T_outlet_l_ref; rtol=0.01)
     @test isapprox(T_out_r,  val01_T_outlet_r_ref; rtol=0.01)
     @test isapprox(mdot_l,   val01_mdot_l_ref;     rtol=0.01)
@@ -1031,13 +1032,14 @@ end
     ssys = mtkcompile(sys; fully_determined=false)
 
     # Asymmetric initial guess: right side at ~363 K, left at ~313 K
+    # mdot guess ~0.250 kg/s matches new Dh≈2.495mm rectangular geometry at dP=30 kPa
     op = vcat(
         [ssys.hd.T[i, j]          => 318.15 for i in 1:nz for j in 1:(nx-1)],
         [ssys.hd.T[i, nx]         => 368.15 for i in 1:nz],
         [ssys.cac_l.T[i]          => 318.15 for i in 1:nz],
         [ssys.cac_r.T[i]          => 368.15 for i in 1:nz],
-        [ssys.cac_l.port_in.mdot  => +0.600],
-        [ssys.cac_r.port_in.mdot  => +0.600],
+        [ssys.cac_l.port_in.mdot  => +0.250],
+        [ssys.cac_r.port_in.mdot  => +0.250],
     )
     sol = solve_steady(ssys, op)
 
@@ -1048,7 +1050,8 @@ end
     T_center_02       = sol[ssys.hd.T[nz÷2, (nx+1)÷2]]
 
     # Reference constants from generate_mtr_reference.py (rectangular MTR geometry, y=0.07 m)
-    val02_T_plate_center = 344.3571   # K — plate center temperature (asymmetric: right channel 363.15 K)
+    # Regenerated with EffectivePipe.rectangular(0.6, 0.07, 0.00127, 0.07); Dh ≈ 2.495 mm
+    val02_T_plate_center = 347.6125   # K — plate center temperature (asymmetric: right channel 363.15 K)
     @test isapprox(T_center_02, val02_T_plate_center; rtol=0.01)
 
     # Right column must be hotter than left column (right channel at 90°C drives right face hot)
@@ -1093,11 +1096,12 @@ end
     ssys = mtkcompile(sys; fully_determined=false)
 
     # Minimal op: plate T, fluid T, mdot (positive = forward flow)
+    # mdot guess ~0.250 kg/s matches new Dh≈2.495mm rectangular geometry at dP=30 kPa
     T_w = 317.0
     op = vcat(
         [ssys.hd.T[i, j]         => T_w   for i in 1:nz for j in 1:nx],
         [ssys.cac_l.T[i]         => T_w   for i in 1:nz],
-        [ssys.cac_l.port_in.mdot => +0.600],
+        [ssys.cac_l.port_in.mdot => +0.250],
     )
     sol = solve_steady(ssys, op)
 
@@ -1108,13 +1112,17 @@ end
     T_center_03 = sol[ssys.hd.T[nz÷2, (nx+1)÷2]]
 
     # Reference constants from generate_mtr_reference.py (rectangular MTR geometry, y=0.07 m)
-    val03_T_outlet_ref   = 315.1463   # K — left channel outlet temperature (one-sided, 10 kW)
-    val03_mdot_ref       = 0.599315   # kg/s — left channel mass flow
-    @test isapprox(T_out_l_03,  val03_T_outlet_ref;   rtol=0.01)
+    # Regenerated with EffectivePipe.rectangular(0.6, 0.07, 0.00127, 0.07); Dh ≈ 2.495 mm
+    # NOTE: Python one_sided_connection() distributes heat to BOTH plate faces (physically wrong
+    # for one-sided coupling). Julia correctly connects only thermal_left[i] to cac_l.
+    # As a result, Julia T_out (~322.6 K) differs from Python T_out (~317.9 K):
+    #   Julia energy balance: T_rise = 10kW / (mdot * cp) ≈ 9.4 K → T_out ≈ 322.6 K (correct)
+    #   Python one_sided: T_rise ≈ 4.7 K → T_out ≈ 317.9 K (wrong — only half heat exits via cac_l)
+    # Per STATE.md decision: use energy balance as truth; Python T_out assertion omitted.
+    val03_mdot_ref       = 0.252547   # kg/s — left channel mass flow (hydraulics correct in Python)
     @test isapprox(mdot_l_03,   val03_mdot_ref;       rtol=0.01)
     # NOTE: T_plate_center quantitative assertion omitted. Python one_sided_connection gives
-    # 318.48 K (same as symmetric VAL-01), which is physically inconsistent with one-sided cooling
-    # (Julia gives 323.64 K — hotter plate center, as expected when only one face is active).
+    # a physically inconsistent T_center; Julia gives correct (hotter) T_center for one-sided cooling.
     # Plate center physics is validated by the T_center_03 > T_out_l_03 assertion below.
 
     @test T_out_l_03 > T_in
