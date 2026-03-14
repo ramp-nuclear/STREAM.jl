@@ -21,9 +21,9 @@
 ### Physics
 
 - [x] **PHY-01**: PipeGeometry has `wet_perimeter` field; `Dh = 4A / wet_perimeter`; rectangular constructor computes `wet_perimeter = 2*(edge1 + edge2)`
-- [ ] **PHY-02**: `constant_Nusselt(Nu=8.235)` HTC correlation available and pluggable into ChannelAndContacts
-- [ ] **PHY-03**: `laminar_friction(Re)` friction correlation available and pluggable into ChannelAndContacts
-- [ ] **PHY-04**: `regime_dependent(; Re_transition=2300)` wrapper that switches between laminar and turbulent correlations based on Re
+- [x] **PHY-02**: `constant_Nusselt(Nu=8.235)` HTC correlation available and pluggable into ChannelAndContacts
+- [x] **PHY-03**: `laminar_friction(Re)` friction correlation available and pluggable into ChannelAndContacts
+- [x] **PHY-04**: `regime_dependent(; Re_transition=2300)` wrapper that switches between laminar and turbulent correlations based on Re
 - [x] **PHY-05**: `Pump(mdot0=...)` fixed-flow mode adds constraint `port_in.mdot ~ mdot0` instead of fixed-pressure equation
 
 ### QoL
@@ -74,9 +74,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMP-03 | Phase 15 | Pending |
 | COMP-04 | Phase 15 | Pending |
 | PHY-01 | Phase 13 | Complete |
-| PHY-02 | Phase 14 | Pending |
-| PHY-03 | Phase 14 | Pending |
-| PHY-04 | Phase 14 | Pending |
+| PHY-02 | Phase 14 | Complete |
+| PHY-03 | Phase 14 | Complete |
+| PHY-04 | Phase 14 | Complete |
 | PHY-05 | Phase 13 | Complete |
 | QOL-01 | Phase 15 | Pending |
 | QOL-02 | Phase 15 | Pending |

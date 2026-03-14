@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
-stopped_at: Phase 14 context gathered
-last_updated: "2026-03-14T22:06:40.266Z"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-03-14T23:02:00.051Z"
 last_activity: 2026-03-14 — Phase 13 complete; Pump dual-mode (mdot0) added; VAL-01/02/03 constants regenerated for Dh≈2.495mm
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 
 ## Current Position
 
-Phase: 13 of 16 (Physics Foundation) — COMPLETE
-Plan: 02 of 02 complete
-Status: Phase 13 Done — Ready for Phase 14
-Last activity: 2026-03-14 — Phase 13 complete; Pump dual-mode (mdot0) added; VAL-01/02/03 constants regenerated for Dh≈2.495mm
+Phase: 14 of 16 (Laminar Correlations) — IN PROGRESS
+Plan: 01 of 02 complete
+Status: Phase 14 Plan 01 Done — Ready for Plan 02
+Last activity: 2026-03-15 — Phase 14 Plan 01 complete; correlations.jl created; PipeGeometry width/depth added
 
-Progress: [██████████] 100%
+Progress: [████████░░] 75%
 
 ---
 
@@ -53,6 +53,7 @@ Progress: [██████████] 100%
 | 12.1 PipeGeometry | 2 | 26 min | 13 min |
 | 13 Physics Foundation P01 | 1 | 11 min | 11 min |
 | 13 Physics Foundation P02 | 1 | 25 min | 25 min |
+| 14 Laminar Correlations P01 | 1 | 18 min | 18 min |
 
 *Updated after each plan completion*
 
@@ -71,6 +72,9 @@ Progress: [██████████] 100%
 | HeatDiffusion Q_flow sign: both faces give Q_flow < 0 when plate hotter than BC | MTK convention positive=into component; fixed Phase 12 Plan 02 |
 | VAL-03 T_plate_center must use analytical reference, not Python STREAM | Python one_sided_connection gives 318.48 K (physically wrong); Julia gives 323.64 K (correct) |
 | regime_dependent switching must use ifelse() not a hard branch | Solver discontinuity risk; same pattern as flow reversal smoothing |
+| No @register_symbolic on correlation functions | Plain arithmetic; MTK traces symbolically (unlike spline fluid props which need opaque registration) |
+| laminar_friction aspect_ratio kwarg required (no default) | Callers must be explicit about geometry — prevents accidental rectangular K_R applied to circular case |
+| Re_transition converted to Float64 in regime_dependent | Avoids Int/Symbolics.Num type-promotion error at system build time |
 | PipeGeometry_rectangular: Dh = 4*area/wet_perimeter (~2.5 mm for MTR) | Old 10 mm circular approximation was incorrect; correct Dh shifts Re/HTC/VAL constants |
 | Old sentinel-kwargs PipeGeometry constructor deleted (no shim) | MethodError on old calls forces migration; factory functions are the only API |
 | Fixed-flow Pump (mdot0) has no pressure equation | Caller must anchor pressure; only 4 eqs: mass balance, mdot constraint, 2 T streams |
@@ -88,10 +92,10 @@ None at roadmap creation. PHY-01 (Dh fix) may require updating hardcoded referen
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T22:06:40.263Z
-**Stopped at:** Phase 14 context gathered
+**Last session:** 2026-03-14T23:02:00.049Z
+**Stopped at:** Completed 14-01-PLAN.md
 **Next action:** Execute Phase 14 (next v0.4 phase per ROADMAP.md)
-**Resume file:** .planning/phases/14-laminar-correlations/14-CONTEXT.md
+**Resume file:** None
 
 ---
 
