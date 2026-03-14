@@ -1141,3 +1141,76 @@ end
 end
 
 end  # @testset "STREAM Phase 12 Tests"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 14: Laminar Correlations
+# PHY-02: constant_Nusselt factory
+# PHY-03: rectangular_laminar_correction + laminar_friction factory
+# PHY-04: regime_dependent switching wrapper
+# ─────────────────────────────────────────────────────────────────────────────
+import STREAM: dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction,
+               rectangular_laminar_correction, regime_dependent
+
+@testset "PHY-02/03/04: Correlation Library" begin
+
+@testset "PHY-03: rectangular_laminar_correction reference values" begin
+    # Verified reference values from Python STREAM friction.py (2026-03-15)
+    @test isapprox(rectangular_laminar_correction(0.0),     0.66685; atol=1e-4)
+    @test isapprox(rectangular_laminar_correction(0.01814), 0.68544; atol=1e-4)
+    @test isapprox(rectangular_laminar_correction(0.5),     1.03639; atol=1e-4)
+    @test isapprox(rectangular_laminar_correction(1.0),     1.12462; atol=1e-4)
+end
+
+@testset "dittus_boelter standalone function" begin
+    # 0.023 * 8000^0.8 * 7^0.4
+    expected_Nu = 0.023 * 8000.0^0.8 * 7.0^0.4
+    @test isapprox(dittus_boelter(8000.0, 7.0), expected_Nu; rtol=1e-6)
+end
+
+@testset "blasius_friction standalone function" begin
+    # 0.3164 * 8000^(-0.25)
+    expected_f = 0.3164 * 8000.0^(-0.25)
+    @test isapprox(blasius_friction(8000.0), expected_f; rtol=1e-6)
+end
+
+@testset "PHY-02: constant_Nusselt factory" begin
+    # Default Nu = 8.235
+    htc_fn = constant_Nusselt()
+    @test htc_fn(300.0, 7.0) == 8.235
+    @test htc_fn(100.0, 3.0) == 8.235
+    # Custom Nu
+    htc_custom = constant_Nusselt(Nu=5.0)
+    @test htc_custom(300.0, 7.0) == 5.0
+end
+
+@testset "PHY-03: laminar_friction factory" begin
+    # MTR geometry: aspect_ratio = 0.00127/0.07 = 0.01814
+    f_fn = laminar_friction(aspect_ratio=0.01814)
+    k_R  = rectangular_laminar_correction(0.01814)
+    @test isapprox(f_fn(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
+    # Different Re
+    @test isapprox(f_fn(500.0), 64.0 / (500.0 * k_R); rtol=1e-6)
+end
+
+@testset "PHY-04: regime_dependent switching" begin
+    rd = regime_dependent(
+        htc_laminar        = constant_Nusselt(Nu=8.235),
+        htc_turbulent      = dittus_boelter,
+        friction_laminar   = laminar_friction(aspect_ratio=0.01814),
+        friction_turbulent = blasius_friction
+    )
+    # Named tuple must have :htc and :friction keys
+    @test haskey(NamedTuple(pairs(rd)), :htc)
+    @test haskey(NamedTuple(pairs(rd)), :friction)
+
+    # Laminar branch (Re=100 < 2300)
+    @test rd.htc(100.0, 7.0) == 8.235
+    k_R = rectangular_laminar_correction(0.01814)
+    @test isapprox(rd.friction(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
+
+    # Turbulent branch (Re=8000 > 2300)
+    @test isapprox(rd.htc(8000.0, 7.0), dittus_boelter(8000.0, 7.0); rtol=1e-6)
+    @test isapprox(rd.friction(8000.0), blasius_friction(8000.0);     rtol=1e-6)
+end
+
+end  # @testset "PHY-02/03/04: Correlation Library"
