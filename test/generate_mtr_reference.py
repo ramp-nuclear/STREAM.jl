@@ -53,7 +53,7 @@ T_INLET_R_ASYM_K = T_INLET_R_ASYM_C + 273.15
 assert abs(T_INLET_L_K - 313.15) < 1e-9
 assert abs(T_INLET_R_ASYM_K - 363.15) < 1e-9
 
-from stream.calculations import Pump, HeatExchanger
+from stream.calculations import Pump, HeatExchanger, Kirchhoff
 from stream.calculations.channel import ChannelAndContacts
 from stream.calculations.heat_diffusion import Fuel, Solid
 from stream.composition.cycle import FlowGraph, flow_edge
@@ -82,6 +82,8 @@ def _build_channel_and_loop(name_suffix: str, T_inlet_C: float):
 
     Returns (pump, hx, channel, FlowGraph).
     Note: fresh objects per scenario — Python STREAM components carry state.
+    Each Kirchhoff node receives a unique name (via k_constructor) so that
+    multiple FlowGraph aggregators can be combined without NonUniqueCalculationNameError.
     """
     pump = Pump(pressure=DP_PUMP, name=f"Pump_{name_suffix}")
     hx = HeatExchanger(outlet=T_inlet_C, name=f"HX_{name_suffix}")
@@ -102,6 +104,7 @@ def _build_channel_and_loop(name_suffix: str, T_inlet_C: float):
         },
         reference_node=("A", P_ABS),
         abs_pressure_comps=[channel],
+        k_constructor=partial(Kirchhoff, name=f"Kirchhoff_{name_suffix}"),
     )
     return pump, hx, channel, fg
 
@@ -118,24 +121,34 @@ def _build_fuel(name: str = "Fuel") -> Fuel:
     )
 
 
-def _initial_guess(channels, pumps, hxs, fuel, T_inlet_C: float, mdot_guess: float = 0.5):
-    """Assemble a combined initial state guess for a two-loop MTR system."""
-    state = {}
-    for ch in channels:
-        state[ch.name] = {
-            "T_cool":  np.linspace(T_inlet_C, T_inlet_C + 10, NZ),
-            "h_left":  1.5e4 * np.ones(NZ),
-            "h_right": 1.5e4 * np.ones(NZ),
-            "pressure": -DP_PUMP * np.ones(NZ),
-        }
-    for comp in [*pumps, *hxs]:
-        state[comp.name] = {"Tin": T_inlet_C, "pressure": DP_PUMP}
-    state[fuel.name] = {
-        "T": np.full((NZ, NX), T_inlet_C + 5.0),
-        "T_wall_left": np.full(NZ, T_inlet_C + 3.0),
-        "T_wall_right": np.full(NZ, T_inlet_C + 3.0),
-    }
+def _hydraulic_guess(fg, pump, hx, channel, T_inlet_C: float, mdot_guess: float = 0.5) -> dict:
+    """Build hydraulic initial guess for one loop using FlowGraph.guess_steady_state.
+
+    Returns a state dict covering Kirchhoff, pump, HX, and channel hydraulic state.
+    The channel thermal state (T_cool, h_left, h_right) is then augmented separately.
+    """
+    state = fg.guess_steady_state(
+        mdots={pump: mdot_guess, hx: mdot_guess, channel: mdot_guess},
+        temperature=T_inlet_C,
+    )
+    # Augment channel with thermal profile guess
+    state[channel.name].update({
+        "T_cool":  np.linspace(T_inlet_C, T_inlet_C + 10, NZ),
+        "h_left":  1.5e4 * np.ones(NZ),
+        "h_right": 1.5e4 * np.ones(NZ),
+    })
     return state
+
+
+def _fuel_guess(fuel, T_C: float) -> dict:
+    """Build fuel initial state guess."""
+    return {
+        fuel.name: {
+            "T": np.full((NZ, NX), T_C + 5.0),
+            "T_wall_left": np.full(NZ, T_C + 3.0),
+            "T_wall_right": np.full(NZ, T_C + 3.0),
+        }
+    }
 
 
 def _solve_scenario(agr, state_guess, jac=True):
@@ -158,14 +171,15 @@ fuel_01 = _build_fuel("Fuel_01")
 plate_cg_01 = plate(ch_l_01, ch_r_01, fuel_01)
 power_cg_01 = CalculationGraph.from_decoupled(fuel_01, funcs={fuel_01: dict(power=POWER)})
 
-full_cg_01 = fg_l_01.aggregator + fg_r_01.aggregator + plate_cg_01 + power_cg_01
-agr_01 = full_cg_01.to_aggregator()
+agr_01 = fg_l_01.aggregator + fg_r_01.aggregator + plate_cg_01 + power_cg_01
 K_l_01 = fg_l_01.kirchhoff
 K_r_01 = fg_r_01.kirchhoff
 
-guess_01 = _initial_guess(
-    [ch_l_01, ch_r_01], [pump_l_01, pump_r_01], [hx_l_01, hx_r_01], fuel_01, T_INLET_L_C
-)
+guess_01 = {
+    **_hydraulic_guess(fg_l_01, pump_l_01, hx_l_01, ch_l_01, T_INLET_L_C),
+    **_hydraulic_guess(fg_r_01, pump_r_01, hx_r_01, ch_r_01, T_INLET_R_C),
+    **_fuel_guess(fuel_01, T_INLET_L_C),
+}
 sol_vec_01, state_01 = _solve_scenario(agr_01, guess_01)
 
 T_outlet_l_K_sym = state_01[ch_l_01.name]["T_cool"][-1] + 273.15
@@ -198,19 +212,14 @@ fuel_02 = _build_fuel("Fuel_02")
 plate_cg_02 = plate(ch_l_02, ch_r_02, fuel_02)
 power_cg_02 = CalculationGraph.from_decoupled(fuel_02, funcs={fuel_02: dict(power=POWER)})
 
-full_cg_02 = fg_l_02.aggregator + fg_r_02.aggregator + plate_cg_02 + power_cg_02
-agr_02 = full_cg_02.to_aggregator()
+agr_02 = fg_l_02.aggregator + fg_r_02.aggregator + plate_cg_02 + power_cg_02
 K_l_02 = fg_l_02.kirchhoff
 
-guess_02 = _initial_guess(
-    [ch_l_02, ch_r_02], [pump_l_02, pump_r_02], [hx_l_02, hx_r_02], fuel_02,
-    T_INLET_L_C  # left-side reference for fuel guess
-)
-# Right side guess: use right channel inlet
-guess_02[ch_r_02.name]["T_cool"] = np.linspace(T_INLET_R_ASYM_C, T_INLET_R_ASYM_C + 10, NZ)
-guess_02[hx_r_02.name] = {"Tin": T_INLET_R_ASYM_C, "pressure": DP_PUMP}
-guess_02[pump_r_02.name] = {"Tin": T_INLET_R_ASYM_C, "pressure": DP_PUMP}
-guess_02[fuel_02.name]["T"] = np.full((NZ, NX), (T_INLET_L_C + T_INLET_R_ASYM_C) / 2 + 5.0)
+guess_02 = {
+    **_hydraulic_guess(fg_l_02, pump_l_02, hx_l_02, ch_l_02, T_INLET_L_C),
+    **_hydraulic_guess(fg_r_02, pump_r_02, hx_r_02, ch_r_02, T_INLET_R_ASYM_C),
+    **_fuel_guess(fuel_02, (T_INLET_L_C + T_INLET_R_ASYM_C) / 2),
+}
 
 sol_vec_02, state_02 = _solve_scenario(agr_02, guess_02)
 
@@ -235,23 +244,12 @@ fuel_03 = _build_fuel("Fuel_03")
 onesided_cg_03 = one_sided_connection(ch_l_03, fuel_03, fuel_side="left")
 power_cg_03 = CalculationGraph.from_decoupled(fuel_03, funcs={fuel_03: dict(power=POWER)})
 
-full_cg_03 = fg_l_03.aggregator + onesided_cg_03 + power_cg_03
-agr_03 = full_cg_03.to_aggregator()
+agr_03 = fg_l_03.aggregator + onesided_cg_03 + power_cg_03
 K_l_03 = fg_l_03.kirchhoff
 
-guess_03 = {}
-guess_03[ch_l_03.name] = {
-    "T_cool":  np.linspace(T_INLET_L_C, T_INLET_L_C + 15, NZ),
-    "h_left":  1.5e4 * np.ones(NZ),
-    "h_right": 1.5e4 * np.ones(NZ),
-    "pressure": -DP_PUMP * np.ones(NZ),
-}
-guess_03[pump_l_03.name] = {"Tin": T_INLET_L_C, "pressure": DP_PUMP}
-guess_03[hx_l_03.name] = {"Tin": T_INLET_L_C, "pressure": DP_PUMP}
-guess_03[fuel_03.name] = {
-    "T": np.full((NZ, NX), T_INLET_L_C + 5.0),
-    "T_wall_left": np.full(NZ, T_INLET_L_C + 3.0),
-    "T_wall_right": np.full(NZ, T_INLET_L_C + 3.0),
+guess_03 = {
+    **_hydraulic_guess(fg_l_03, pump_l_03, hx_l_03, ch_l_03, T_INLET_L_C, mdot_guess=0.5),
+    **_fuel_guess(fuel_03, T_INLET_L_C),
 }
 
 sol_vec_03, state_03 = _solve_scenario(agr_03, guess_03)
