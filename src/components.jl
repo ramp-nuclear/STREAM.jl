@@ -10,12 +10,61 @@
 # Note: `Channel` is declared as a new generic function here to avoid
 # conflict with Base.Channel (Julia's built-in concurrency channel type).
 
+"""
+    PipeGeometry
+
+Geometry descriptor for a heated channel or pipe.
+
+Fields:
+- `L`  — channel length [m]
+- `Dh` — hydraulic diameter [m]; drives Re, Nu, h_tc, and Darcy-Weisbach dP
+- `A`  — flow cross-section area [m²]
+- `heated_parts` — heated perimeter per face [m]: (left_face, right_face)
+
+Constructors:
+- `PipeGeometry(; L, D, A=π*D^2/4)` — circular pipe (kwarg `D` selects this method)
+- `PipeGeometry(; L, Dh, A, y)` — rectangular MTR channel (kwarg `y` selects this method)
+
+For circular:    heated_parts = (π*D/2, π*D/2); total = π*D (same as old π*Dh)
+For rectangular: heated_parts = (y, y);          total = 2*y
+"""
+struct PipeGeometry
+    L            ::Float64                   # channel length [m]
+    Dh           ::Float64                   # hydraulic diameter [m]
+    A            ::Float64                   # flow cross-section area [m²]
+    heated_parts ::NTuple{2,Float64}         # heated perimeter per face [m]: (left, right)
+end
+
+# Outer constructors use distinct required kwargs for dispatch-at-call-site safety.
+# Circular:    PipeGeometry(; L, D, A=π*D²/4) — kwarg `D` selects circular
+# Rectangular: PipeGeometry(; L, Dh, A, y)    — kwarg `y` selects rectangular
+#
+# Julia cannot dispatch on keyword argument *names*, so we use a single
+# method with `D = nothing` and `y = nothing` sentinels and branch at runtime.
+function PipeGeometry(; L, D = nothing, Dh = nothing, A = nothing, y = nothing)
+    if D !== nothing
+        # Circular pipe: D is diameter, A defaults to circular area
+        _D  = Float64(D)
+        _A  = A !== nothing ? Float64(A) : π * _D^2 / 4
+        PipeGeometry(Float64(L), _D, _A, (π * _D / 2, π * _D / 2))
+    elseif y !== nothing
+        # Rectangular MTR channel: Dh is hydraulic diameter, y is face width
+        _Dh = Float64(Dh)
+        _A  = Float64(A)
+        _y  = Float64(y)
+        PipeGeometry(Float64(L), _Dh, _A, (_y, _y))
+    else
+        error("PipeGeometry: provide either `D` (circular) or `Dh` + `A` + `y` (rectangular)")
+    end
+end
+
 # Declare as new generic functions independent of Base
 function Channel end
-function Channel(; name, n::Int, L, D, A, g = 0.0)
-    # Rename plain-Julia D to Dh so it doesn't shadow Differential(t) operator
-    Dh = D
-    Dt = Differential(t)  # explicit Differential operator (avoids shadowing by D kwarg)
+function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0)
+    Dh = geometry.Dh
+    A  = geometry.A
+    L  = geometry.L
+    Dt = Differential(t)  # explicit Differential operator
 
     pars = @parameters begin
         L     = L
@@ -49,7 +98,7 @@ function Channel(; name, n::Int, L, D, A, g = 0.0)
         # Energy balance (first-order upwind FV)
         push!(eqs,
             Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
-                       + h_tc[i] * (π * Dh) * dz * (thermal.T - T[i]))
+                       + h_tc[i] * sum(geometry.heated_parts) * dz * (thermal.T - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
         # Observables
@@ -232,7 +281,7 @@ end
 
 # ChannelAndContacts (THERM-01/CHAN-01/CHAN-02): heated channel with dual per-cell ThermalPort arrays.
 # Each thermal_left[i] and thermal_right[i] carry wall temperature and heat flow for cell i.
-# Two-sided heating models both fuel plate faces symmetrically (π*Dh/2 each side).
+# Two-sided heating models both fuel plate faces: geometry.heated_parts[1] (left), geometry.heated_parts[2] (right).
 # This is the interface that HeatDiffusion (v0.3) will connect to.
 #
 # Port layout:
@@ -242,15 +291,17 @@ end
 #
 # Energy balance (cell i):
 #   Dt(T[i]) ~ (mdot * cp * (T_up - T[i])
-#               + h_tc[i] * (π * Dh / 2) * dz * (thermal_left[i].T  - T[i])
-#               + h_tc[i] * (π * Dh / 2) * dz * (thermal_right[i].T - T[i]))
+#               + h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T  - T[i])
+#               + h_tc[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i]))
 #              / (rho * cp * A * dz)
 #
 # Observables:
 #   q_wall[i]    — per-cell total heat transfer rate (W); q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow
 #   Q_wall_total — total heat transfer rate (W); sum over all cells
-function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
-    Dh = D
+function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0)
+    Dh = geometry.Dh
+    A  = geometry.A
+    L  = geometry.L
     Dt = Differential(t)
 
     pars = @parameters begin
@@ -286,19 +337,19 @@ function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
                       port_in, port_out, Dh, A, L, g_acc=g, dz)
 
-    # Per-cell energy balance: two-sided heating (π*Dh/2 per side)
+    # Per-cell energy balance: two-sided heating (geometry.heated_parts[1]/[2] per face)
     for i in 1:n
         T_up = (i == 1) ? T_inlet : T[i-1]
         push!(eqs,
             Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
-                       + h_tc[i] * (π * Dh / 2) * dz * (thermal_left[i].T  - T[i])
-                       + h_tc[i] * (π * Dh / 2) * dz * (thermal_right[i].T - T[i]))
+                       + h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T  - T[i])
+                       + h_tc[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
         # Port heat flow equations: Q_flow INTO channel from each wall face
         # When unconnected (adiabatic), T_wall = T[i] => Q_flow = 0
-        push!(eqs, thermal_left[i].Q_flow  ~ h_tc[i] * (π * Dh / 2) * dz * (thermal_left[i].T  - T[i]))
-        push!(eqs, thermal_right[i].Q_flow ~ h_tc[i] * (π * Dh / 2) * dz * (thermal_right[i].T - T[i]))
+        push!(eqs, thermal_left[i].Q_flow  ~ h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T  - T[i]))
+        push!(eqs, thermal_right[i].Q_flow ~ h_tc[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i]))
         push!(eqs, q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow)
     end
 
@@ -321,8 +372,10 @@ end
 #
 # When T_wall is uniform, ChannelHeatFlux is algebraically equivalent to
 # Channel with thermal.T pinned to T_wall. THERM-03 validates this within 0.1%.
-function ChannelHeatFlux(; name, n::Int, L, D, A, g = 0.0, T_wall)
-    Dh = D
+function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall)
+    Dh = geometry.Dh
+    A  = geometry.A
+    L  = geometry.L
     Dt = Differential(t)
 
     pars = @parameters begin
@@ -360,10 +413,10 @@ function ChannelHeatFlux(; name, n::Int, L, D, A, g = 0.0, T_wall)
         T_up = (i == 1) ? T_inlet : T[i-1]
         push!(eqs,
             Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
-                       + h_tc[i] * (π * Dh) * dz * (T_wall_p - T[i]))
+                       + h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
-        push!(eqs, q_wall[i] ~ h_tc[i] * (π * Dh) * dz * (T_wall_p - T[i]))
+        push!(eqs, q_wall[i] ~ h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i]))
     end
 
     all_vars = [collect(T); collect(Re); collect(Nu); collect(h_tc);
