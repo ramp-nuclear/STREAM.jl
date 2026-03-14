@@ -25,7 +25,7 @@ Requirements for the HeatDiffusion milestone. Each maps to roadmap phases.
 - [x] **HDIFF-02**: HeatDiffusion computes x-direction (across-plate) heat diffusion via FD stencil using an internal `_diffusion_eqs` helper structured for future xz/r extension; top and bottom boundaries are adiabatic
 - [x] **HDIFF-03**: HeatDiffusion accepts `power_shape[1:nz, 1:nx]` (normalized spatial distribution, constructor parameter) and `power` (total watts, MTK parameter) as the volumetric heat source
 - [x] **HDIFF-04**: HeatDiffusion exposes `thermal_left[1:nz]` and `thermal_right[1:nz]` ThermalPort arrays for per-cell coupling to coolant channels
-- [ ] **HDIFF-05**: User can leave one side of HeatDiffusion unconnected and it defaults to adiabatic (Q_flow=0 from MTK acausal semantics, verified by explicit test)
+- [x] **HDIFF-05**: User can leave one side of HeatDiffusion unconnected and it defaults to adiabatic (Q_flow=0 from MTK acausal semantics, verified by explicit test)
 
 ### Validation (VAL)
 
@@ -70,7 +70,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HDIFF-02 | Phase 11 | Complete |
 | HDIFF-03 | Phase 11 | Complete |
 | HDIFF-04 | Phase 11 | Complete |
-| HDIFF-05 | Phase 11 | Pending |
+| HDIFF-05 | Phase 11 | Complete |
 | VAL-01 | Phase 12 | Pending |
 | VAL-02 | Phase 12 | Pending |
 | VAL-03 | Phase 12 | Pending |

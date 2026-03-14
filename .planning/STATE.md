@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: HeatDiffusion
-status: in-progress
-stopped_at: Phase 11 Plan 01 complete
-last_updated: "2026-03-14T00:15:28Z"
+status: verifying
+stopped_at: Completed 11-02-PLAN.md (HeatDiffusion test suite)
+last_updated: "2026-03-14T00:41:50.428Z"
 last_activity: 2026-03-14 — Phase 11 Plan 01 complete; HeatDiffusion + _diffusion_eqs implemented, bare mtkcompile verified
 progress:
   total_phases: 3
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 1
+  completed_phases: 2
+  total_plans: 4
+  completed_plans: 4
   percent: 33
 ---
 
@@ -33,11 +33,11 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 ## Current Position
 
 Phase: 11 of 12 (HeatDiffusion Component)
-Plan: 01 COMPLETE
-Status: Phase 11 Plan 01 done; HeatDiffusion component implemented and verified
-Last activity: 2026-03-14 — Phase 11 Plan 01 complete; HeatDiffusion + _diffusion_eqs implemented, bare mtkcompile verified
+Plan: 02 COMPLETE (Phase 11 all plans done)
+Status: Phase 11 complete; HeatDiffusion implemented and fully tested (HDIFF-01 through HDIFF-05 all green)
+Last activity: 2026-03-14 — Phase 11 Plan 02 complete; HDIFF test suite + CHAN-03 pre-existing fix
 
-Progress: [███░░░░░░░] 33% (1/3 Phase 11+ plans complete)
+Progress: [██████████] 100% (4/4 Phase 11+ plans complete)
 
 ---
 
@@ -63,6 +63,7 @@ Progress: [███░░░░░░░] 33% (1/3 Phase 11+ plans complete)
 *Updated after each plan completion*
 | Phase 10 P02 | 22 | 2 tasks | 2 files |
 | Phase 11 P01 | 7 | 2 tasks | 2 files |
+| Phase 11 P02 | 21 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Progress: [███░░░░░░░] 33% (1/3 Phase 11+ plans complete)
 | HeatDiffusion: rho_s/cp_s/k_s as Float64, power as MTK @parameters | Material props fixed in v0.3; power tunable via remake() without recompile |
 | HeatDiffusion boundary cells: half-cell flux scheme (Option B) | Consistent FD: boundary cell uses thermal_port.T as virtual neighbor at dx/2 distance |
 | vec(collect(T)) flattens 2D MTK state for System() constructor | Required pattern for 2D array states in MTK; see RESEARCH.md Pitfall 2 |
+| HeatDiffusion Q_flow sign asymmetric: thermal_left.Q_flow > 0 (heat out left), thermal_right.Q_flow < 0 (heat out right) | Left eq: k*(T_plate - T_bc)/(dx/2); right eq: k*(T_bc - T_plate)/(dx/2) — asymmetry from half-cell scheme |
+| ChannelAndContacts one-sided solve needs Re/Nu/h_tc guesses + fully_determined=false | Without explicit algebraic var guesses, MTK initialization system hits cyclic dependency error |
 
 ### Pending Todos
 
@@ -95,11 +98,11 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T00:15:28Z
-**Stopped at:** Completed 11-01-PLAN.md (HeatDiffusion component)
-**Next action:** Execute Phase 11 next plan or proceed to Phase 12 MTR Validation planning
-**Resume file:** .planning/phases/11-heatdiffusion-component/11-01-SUMMARY.md
+**Last session:** 2026-03-14T00:41:50.426Z
+**Stopped at:** Completed 11-02-PLAN.md (HeatDiffusion test suite)
+**Next action:** Proceed to Phase 12 MTR Validation planning
+**Resume file:** .planning/phases/11-heatdiffusion-component/11-02-SUMMARY.md
 
 ---
 
-*Last updated: 2026-03-14 — Phase 11 Plan 01 complete; HeatDiffusion implemented*
+*Last updated: 2026-03-14 — Phase 11 Plan 02 complete; HeatDiffusion test suite all green*
