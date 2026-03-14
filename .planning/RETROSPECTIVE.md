@@ -98,6 +98,49 @@
 
 ---
 
+## Milestone: v0.3 — HeatDiffusion
+
+**Shipped:** 2026-03-14
+**Phases:** 4 (10-12.1) | **Plans:** 8
+
+### What Was Built
+- ChannelAndContacts rewritten with dual `thermal_left[1:n]` / `thermal_right[1:n]` ThermalPort arrays; two-sided energy balance; adiabatic default verified by CHAN-03 test
+- v0.2 tech debt fully cleared: `_channel_base_eqs` t_inlet removed, THERM-03 direct assertion, DEBT-03 doc fix
+- `HeatDiffusion` component: 2D FD solid plate with `T(t)[1:nz, 1:nx]` MTK ODE state, `_diffusion_eqs` helper, power_shape + power source, dual ThermalPort arrays; 7-testset unit suite (HDIFF-01..05)
+- MTR fuel assembly integration tests: VAL-01 (symmetric), VAL-02 (asymmetric), VAL-03 (one-sided); all against Python STREAM reference
+- `PipeGeometry` struct with `circular(; D, ...)` and `rectangular(; y, ...)` constructors; Channel/ChannelHeatFlux/ChannelAndContacts refactored to accept it
+- Quantitative VAL-01/02/03 assertions at ≤1% rtol against hardcoded Python STREAM rectangular MTR reference constants
+
+### What Worked
+- Phase 12.1 insertion as a decimal phase was seamless — the geometry error was caught before archival and fixed without disrupting the broader plan structure
+- Hardcoding Python STREAM reference constants into Julia tests (rather than computing at test time) worked perfectly: stable, fast, zero Python dependency at CI time
+- KINSOL (KINSOL nonlinear solver) handled the coupled HeatDiffusion + ChannelAndContacts DAE without special tuning
+- MTK acausal semantics gave adiabatic defaults for free — HDIFF-05 / CHAN-03 required no explicit `Q_flow = 0` equations, just leaving a port unconnected
+
+### What Was Inefficient
+- Phase 12 produced physics-based (qualitative) VAL assertions first, then Phase 12.1 replaced them with quantitative 1% assertions — if PipeGeometry had been planned from the start, quantitative assertions would have been in Phase 12 directly
+- The 4.46× geometry error (circular `π·Dh/2` vs rectangular `2·y`) was not caught during planning — it only surfaced when comparing Julia vs Python reference values; a geometry cross-check step in Phase 12 planning would have avoided the inserted phase
+- VAL-02/03 Python reference script had convergence issues (NonUniqueCalculationNameError, initial guess) that required mid-plan fixes
+
+### Patterns Established
+- **Decimal phase for post-validation corrections**: When a geometry or physics error is found after the main validation phase, insert a decimal phase (12.1) to fix and re-validate — don't amend the completed phase plan
+- **PipeGeometry encapsulation**: All pipe geometry (L, Dh, A, heated_parts) belongs in a single struct; callers specify geometry explicitly rather than having it hardcoded in component constructors
+- **Rectangular heated perimeter = 2·y, not π·Dh/2**: MTR flat-plate geometry uses plate width as heated perimeter; document the distinction in any plan involving rectangular channels
+- **KINSOL initial guess sensitivity**: For coupled solid+fluid systems, using a physics-informed initial guess (e.g., T_plate_avg from energy balance) avoids convergence failures in asymmetric cases
+
+### Key Lessons
+1. **Cross-check geometry against Python STREAM before writing integration tests** — a five-minute dimensional check (circular vs rectangular perimeter) would have avoided an entire inserted phase
+2. **Plan quantitative validation targets from the start** — if the milestone goal says "within 1%", the plan should specify the geometry and reference constants up front, not discover them mid-phase
+3. **Decimal phase insertion works well for post-discovery corrections** — Phase 12.1 completed cleanly; the pattern is reusable for any mid-stream physics or API correction
+4. **MTK adiabatic default (unconnected port = Q_flow 0) must be tested explicitly** — it's not obvious from the framework docs; CHAN-03 and HDIFF-05 make it a regression target
+
+### Cost Observations
+- Model mix: ~100% sonnet (balanced profile throughout)
+- Sessions: ~2 (Phase 10 on 2026-03-13, Phases 11-12.1 on 2026-03-14)
+- Notable: Phase 12.1 (geometry fix + quantitative assertions) added ~1 hour but prevented shipping a 4.46× physics error in the milestone
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -106,6 +149,7 @@
 |-----------|--------|-------|------------|
 | v0.1 | 5 | 12 | First milestone — baseline established |
 | v0.2 | 4 | 7 | Smaller plans (avg 1.75/phase vs 2.4/phase); `_channel_base_eqs` shared helper pattern emerges |
+| v0.3 | 4 | 8 | Decimal phase insertion for post-validation correction; PipeGeometry encapsulation pattern; KINSOL for coupled solid+fluid DAE |
 
 ### Cumulative Quality
 
@@ -113,3 +157,4 @@
 |-----------|-------|--------------|-------------------|
 | v0.1 | 54 | 15/15 | 0 |
 | v0.2 | 86 | 10/10 | 0 |
+| v0.3 | 161 | 14/14 | 0 |

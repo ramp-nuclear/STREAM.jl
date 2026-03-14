@@ -1,5 +1,24 @@
 # Milestones
 
+## v0.3 HeatDiffusion (Shipped: 2026-03-14)
+
+**Phases:** 10-12.1 (4 phases, 8 plans)
+**Julia LOC:** ~1,003 src at completion
+**Tests:** 161 total at completion
+**Timeline:** 2026-03-13 → 2026-03-14 (~1.5 days)
+**Git range:** `feat(10-01)` → `feat(12.1-02)` (79 files changed, +9,345/-302 lines)
+
+**Key accomplishments:**
+- ChannelAndContacts rewritten with dual `thermal_left[1:n]` / `thermal_right[1:n]` ThermalPort arrays; adiabatic default verified by explicit test (CHAN-01/02/03 + DEBT-01/02/03)
+- HeatDiffusion implemented: 2D FD solid plate with `T(t)[nz,nx]` MTK ODE state, `_diffusion_eqs` helper, dual ThermalPort arrays, and power_shape/power source (HDIFF-01..05)
+- MTR fuel assembly validated: HeatDiffusion + 2× ChannelAndContacts solves with symmetric, asymmetric, and one-sided configurations (VAL-01/02/03)
+- PipeGeometry struct introduced with `circular` / `rectangular` outer constructors, fixing a 4.46× geometry error in the MTR reference case (Phase 12.1 inserted)
+- Quantitative VAL assertions: VAL-01/02/03 pass at ≤1% rtol against hardcoded Python STREAM rectangular MTR reference constants
+
+**Archive:** `.planning/milestones/v0.3-ROADMAP.md`
+
+---
+
 ## v0.2 Component & Network Expansion (Shipped: 2026-03-13)
 
 **Phases:** 6-9 (4 phases, 7 plans)

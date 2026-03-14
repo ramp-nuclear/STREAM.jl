@@ -4,7 +4,7 @@ milestone: v0.3
 milestone_name: HeatDiffusion
 status: completed
 stopped_at: Completed 12.1-pipegeometry-02-PLAN.md
-last_updated: "2026-03-14T12:30:50.474Z"
+last_updated: "2026-03-14T13:56:53.289Z"
 last_activity: 2026-03-14 — Phase 12.1 Plan 02 complete; quantitative VAL assertions added; v0.3 milestone complete
 progress:
   total_phases: 4
@@ -22,10 +22,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-13)
+See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 12 — MTR Validation
+**Current focus:** Planning next milestone (v0.4)
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
