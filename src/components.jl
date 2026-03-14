@@ -22,6 +22,8 @@ Fields:
 - `heated_perimeter` — total heated perimeter [m]: sum of both face contributions
 - `wet_perimeter`    — total wetted perimeter [m]: used to derive Dh
 - `heated_parts`     — heated perimeter per face [m]: (left_face, right_face)
+- `width`            — longer cross-section dimension [m]: max(edge1, edge2) for rect; D for circular
+- `depth`            — shorter cross-section dimension [m]: min(edge1, edge2) for rect; D for circular
 
 Factory functions (preferred constructors):
 - `PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)` — rectangular channel
@@ -36,6 +38,8 @@ struct PipeGeometry
     heated_perimeter ::Float64                   # total heated perimeter [m]
     wet_perimeter    ::Float64                   # total wetted perimeter [m]
     heated_parts     ::NTuple{2,Float64}         # heated perimeter per face [m]: (left, right)
+    width            ::Float64                   # longer cross-section dimension [m]: max(e1,e2) or D
+    depth            ::Float64                   # shorter cross-section dimension [m]: min(e1,e2) or D
 end
 
 """
@@ -71,7 +75,9 @@ function PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothin
     else
         error("one_sided must be :left, :right, or nothing; got $one_sided")
     end
-    PipeGeometry(_L, Dh, area, heated_perimeter, wet_perimeter, heated_parts)
+    _width = max(_e1, _e2)
+    _depth = min(_e1, _e2)
+    PipeGeometry(_L, Dh, area, heated_perimeter, wet_perimeter, heated_parts, _width, _depth)
 end
 
 """
@@ -91,7 +97,7 @@ function PipeGeometry_circular(L, D)
     perimeter  = π * _D
     heated_parts = (perimeter / 2, perimeter / 2)
     # Dh = 4*(π*D²/4)/(π*D) = D — exact
-    PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts)
+    PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts, _D, _D)
 end
 
 # Declare as new generic functions independent of Base
