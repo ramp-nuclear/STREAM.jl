@@ -126,7 +126,7 @@ Plans:
 | 12. MTR Validation | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12.1. PipeGeometry Struct | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 13. Physics Foundation | v0.4 | 2/2 | Complete | 2026-03-14 |
-| 14. Laminar Correlations | 2/2 | Complete   | 2026-03-14 | - |
+| 14. Laminar Correlations | 2/2 | Complete    | 2026-03-14 | - |
 | 15. Composition Helpers & QoL | v0.4 | 0/TBD | Not started | - |
 | 16. Validation | v0.4 | 0/TBD | Not started | - |
 

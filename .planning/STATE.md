@@ -4,7 +4,7 @@ milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
 stopped_at: Completed 14-02-PLAN.md
-last_updated: "2026-03-15T09:35:00Z"
+last_updated: "2026-03-14T23:21:36.673Z"
 last_activity: 2026-03-15 — Phase 14 Plan 02 complete; channel components accept pluggable correlations; PHY-02/03/04 integration tests pass
 progress:
   total_phases: 4
