@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.3
 milestone_name: HeatDiffusion
-status: completed
-stopped_at: Completed 12-mtr-validation-02-PLAN.md — all VAL-01/02/03 MTR tests passing, v0.3 complete
-last_updated: "2026-03-14T04:46:50.223Z"
-last_activity: 2026-03-14 — Phase 12 Plan 01 complete; MTR reference script + HDIFF-03-gap test
+status: All VAL-01/02/03 MTR integration tests passing; 132 tests green
+stopped_at: Completed 12.1-pipegeometry-01-PLAN.md — PipeGeometry struct + all channel constructors migrated
+last_updated: "2026-03-14T10:43:48.116Z"
+last_activity: 2026-03-14 — Phase 12 Plan 02 complete; VAL-01/02/03 MTR tests + v0.3 complete
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-13)
 
 ## Current Position
 
-Phase: 12 of 12 (MTR Validation) — COMPLETE
-Plan: 02 COMPLETE (All Phase 12 plans done; v0.3 milestone complete)
-Status: All VAL-01/02/03 MTR integration tests passing; 132 tests green
-Last activity: 2026-03-14 — Phase 12 Plan 02 complete; VAL-01/02/03 MTR tests + v0.3 complete
+Phase: 12.1 of 12.1 (PipeGeometry) — Plan 01 COMPLETE
+Plan: 01 COMPLETE — PipeGeometry struct + all channel constructors migrated; 161 tests green
+Status: PipeGeometry API live; VAL-01/02/03 now use rectangular MTR geometry; Plan 02 pending (quantitative VAL constants)
+Last activity: 2026-03-14 — Phase 12.1 Plan 01 complete; PipeGeometry struct + API migration
 
-Progress: [██████████] 100% (6/6 plans complete)
+Progress: [█████████░] 88% (7/8 plans complete)
 
 ---
 
@@ -67,6 +67,7 @@ Progress: [██████████] 100% (6/6 plans complete)
 | Phase 12-mtr-validation P01 | 30 | 2 tasks | 2 files |
 | Phase 12-mtr-validation P01 | 35 | 3 tasks | 2 files |
 | Phase 12-mtr-validation P02 | 90 | 2 tasks | 4 files |
+| Phase 12.1-pipegeometry P01 | 16 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -74,12 +75,12 @@ Progress: [██████████] 100% (6/6 plans complete)
 
 | Decision | Rationale |
 |----------|-----------|
-| q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow | Two-sided heating: each side uses pi*Dh/2; sum recovers pi*Dh — Phase 10 interface contract |
+| q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow | Two-sided heating: each side uses geometry.heated_parts[1]/[2]; for circular π*D/2 each — Phase 12.1 PipeGeometry |
 | _channel_base_eqs accepts concrete g_acc (Float64) | dP is algebraic; avoids symbolic pars indexing |
 | MTK variadic connect() is the junction — no Junction component | Kirchhoff equations auto-generated |
 | build_loop is test/example utility, not primary API | MTK connect()/compose() is expressive enough |
 | THERM-03 uses two-sided CAC vs CHF (same D=0.01) | D_cac=2*D_chf fails 0.1% tolerance: h_tc depends on Dh via Re/Nu; same D ensures identical h_tc |
-| ChannelAndContacts requires explicit thermal.Q_flow equations | Acausal MTK: port Q_flow must be defined via h_tc*(pi*Dh/2)*dz*deltaT; missing eqs leave system underdetermined |
+| ChannelAndContacts requires explicit thermal.Q_flow equations | Acausal MTK: port Q_flow must be defined via h_tc*geometry.heated_parts[i]*dz*deltaT; missing eqs leave system underdetermined |
 | MTK port array access: getproperty(sys, Symbol(:thermal_left, i)) | sys.thermal_left[i] fails in connect(); named subsystem access is the correct pattern |
 | HeatDiffusion: rho_s/cp_s/k_s as Float64, power as MTK @parameters | Material props fixed in v0.3; power tunable via remake() without recompile |
 | HeatDiffusion boundary cells: half-cell flux scheme (Option B) | Consistent FD: boundary cell uses thermal_port.T as virtual neighbor at dx/2 distance |
@@ -88,9 +89,13 @@ Progress: [██████████] 100% (6/6 plans complete)
 | ChannelAndContacts one-sided solve needs Re/Nu/h_tc guesses + fully_determined=false | Without explicit algebraic var guesses, MTK initialization system hits cyclic dependency error |
 | plate() CalculationGraph has empty funcs; fuel power via CalculationGraph.from_decoupled | Python STREAM plate() / one_sided_connection() produce funcs-less CG; power must be injected separately |
 | HDIFF-03-gap test: power_shape [0.0,1.0,0.0] not [0.5,0.0,0.5] | Symmetric outer sources: Laplacian=0 forces T_center=T_outer; center-sourced shape correctly tests per-cell power_shape |
-| Python STREAM refs incompatible with Julia MTR geometry | EffectivePipe.circular = left-face-only; Julia CAC = two-sided; 1% tolerance replaced by physics-based energy balance assertions |
+| PipeGeometry kwarg dispatch: single outer constructor D=nothing/y=nothing sentinels | Julia cannot dispatch on kwarg names at precompile time; runtime branch is cleaner than named factory methods |
 | build_initializeprob=false mandatory for coupled HeatDiffusion+CAC | MTK init system corrupts u0 for coupled systems; bypass ensures KINSOL starts from user-provided guess |
 | MTR mdot initial guess: +0.600 kg/s (positive, Darcy-Weisbach at T≈315 K) | Negative guess (-0.490) causes 51 kPa pressure residual → KINSOL diverges to NaN |
+
+### Roadmap Evolution
+
+- Phase 12.1 inserted after Phase 12: PipeGeometry Struct (URGENT) — Phase 10.5 was planned but never executed; Channel/ChannelHeatFlux/ChannelAndContacts all use hardcoded π*Dh/2 heated perimeter which is wrong for rectangular MTR geometry (4.46× error); VAL-01/02/03 reference constants must be regenerated after fix
 
 ### Pending Todos
 
@@ -106,11 +111,11 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T04:46:50.221Z
-**Stopped at:** Completed 12-mtr-validation-02-PLAN.md — all VAL-01/02/03 MTR tests passing, v0.3 complete
+**Last session:** 2026-03-14T10:43:48.114Z
+**Stopped at:** Completed 12.1-pipegeometry-01-PLAN.md — PipeGeometry struct + all channel constructors migrated
 **Next action:** v0.3 milestone complete. Begin v0.4 planning (symmetric_plate() convenience function + composable subsystem assembly)
 **Resume file:** None
 
 ---
 
-*Last updated: 2026-03-14 — Phase 12 Plan 02 complete; VAL-01/02/03 MTR tests passing; v0.3 milestone complete*
+*Last updated: 2026-03-14 — Phase 12.1 Plan 01 complete; PipeGeometry struct + all channel constructors migrated; 161 tests green*

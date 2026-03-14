@@ -96,7 +96,7 @@ Plans:
 **Goal:** Introduce `PipeGeometry` struct with `L`, `Dh`, `A`, `heated_parts::NTuple{2,Float64}` and two keyword-argument outer constructors (`circular` via kwarg `D`, `rectangular` via kwarg `y`). Refactor `Channel`, `ChannelHeatFlux`, and `ChannelAndContacts` constructors to accept `PipeGeometry`. Update all call sites in tests and regenerate correct VAL-01/02/03 reference constants with proper rectangular MTR geometry, then add 1% quantitative assertions.
 **Requirements**: none (addresses physics correctness gap from Phase 12)
 **Depends on:** Phase 12
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 12.1-01-PLAN.md — Define PipeGeometry struct + refactor all three channel constructors + update all test call sites + update generate_mtr_reference.py
@@ -120,7 +120,7 @@ Plans:
 | 10. ChannelAndContacts Two-Sided Upgrade | v0.3 | 2/2 | Complete | 2026-03-13 |
 | 11. HeatDiffusion Component | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12. MTR Validation | v0.3 | 2/2 | Complete | 2026-03-14 |
-| 12.1. PipeGeometry Struct | v0.3 | 0/2 | In Progress | - |
+| 12.1. PipeGeometry Struct | 1/2 | In Progress|  | - |
 
 ---
 
