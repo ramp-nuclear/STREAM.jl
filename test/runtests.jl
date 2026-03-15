@@ -1463,18 +1463,123 @@ end
     @test nameof(port(cac, :thermal_left, 3)) == nameof(getproperty(cac, Symbol(:thermal_left, 3)))
 end
 
+# Shared geometry for COMP tests (n=3 cells, small MTR-like channel)
+const geom_comp = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+const ps_comp   = ones(3, 3)  # uniform power shape, 3x3
+
+# Shared geometry for COMP tests (n=3 cells, small MTR-like channel)
+const geom_comp = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+const ps_comp   = ones(3, 3)  # uniform power shape, 3x3
+
 @testset "COMP-01: symmetric_plate — builds and solves" begin
-    @test false broken=true  # pending 15-02-PLAN.md implementation
+    @named cac  = ChannelAndContacts(n=3, geometry=geom_comp,
+                                      htc_correlation=constant_Nusselt(Nu=8.235),
+                                      friction_correlation=laminar_friction(aspect_ratio=0.0025/0.070))
+    @named fuel = HeatDiffusion(nz=3, nx=3, Lz=0.6, Lx=0.006, y=0.003,
+                                 rho_s=19300.0, cp_s=130.0, k_s=20.0,
+                                 power_shape=ps_comp, power=1e4)
+    plate_sys = symmetric_plate(cac, fuel; name=:plate)
+    # Add pump and HeatExchanger BCs for hydraulic closure
+    @named pump   = Pump(dP_pump=3.0e4)
+    @named hx_in  = HeatExchanger(T_bc=600.0)
+    outer_conns = [
+        connect(pump.port_out,          hx_in.port_in),
+        connect(hx_in.port_out,         plate_sys.cac.port_in),
+        connect(plate_sys.cac.port_out, pump.port_in),
+        pump.port_in.P         ~ 1.0e5,
+        plate_sys.cac.port_in.T ~ 600.0,
+    ]
+    @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, plate_sys)
+    ssys = mtkcompile(top)
+    @test length(ModelingToolkit.unknowns(ssys)) > 0
+    @test length(ModelingToolkit.equations(ssys)) > 0
 end
 
 @testset "COMP-02: plate — two-channel wiring" begin
-    @test false broken=true  # pending 15-02-PLAN.md implementation
+    @named ch_l = ChannelAndContacts(n=3, geometry=geom_comp,
+                                      htc_correlation=constant_Nusselt(Nu=8.235),
+                                      friction_correlation=laminar_friction(aspect_ratio=0.0025/0.070))
+    @named ch_r = ChannelAndContacts(n=3, geometry=geom_comp,
+                                      htc_correlation=constant_Nusselt(Nu=8.235),
+                                      friction_correlation=laminar_friction(aspect_ratio=0.0025/0.070))
+    @named fuel = HeatDiffusion(nz=3, nx=3, Lz=0.6, Lx=0.006, y=0.003,
+                                 rho_s=19300.0, cp_s=130.0, k_s=20.0,
+                                 power_shape=ps_comp, power=1e4)
+    plate_sys = plate(ch_l, ch_r, fuel; name=:plate)
+    @named pump_l = Pump(dP_pump=3.0e4)
+    @named hx_l   = HeatExchanger(T_bc=600.0)
+    @named pump_r = Pump(dP_pump=3.0e4)
+    @named hx_r   = HeatExchanger(T_bc=600.0)
+    outer_conns = [
+        connect(pump_l.port_out,           hx_l.port_in),
+        connect(hx_l.port_out,             plate_sys.ch_l.port_in),
+        connect(plate_sys.ch_l.port_out,   pump_l.port_in),
+        pump_l.port_in.P                 ~ 1.0e5,
+        plate_sys.ch_l.port_in.T        ~ 600.0,
+        connect(pump_r.port_out,           hx_r.port_in),
+        connect(hx_r.port_out,             plate_sys.ch_r.port_in),
+        connect(plate_sys.ch_r.port_out,   pump_r.port_in),
+        pump_r.port_in.P                 ~ 1.0e5,
+        plate_sys.ch_r.port_in.T        ~ 600.0,
+    ]
+    @named top = compose(System(outer_conns, t; name=:top), pump_l, hx_l, pump_r, hx_r, plate_sys)
+    ssys = mtkcompile(top)
+    @test length(ModelingToolkit.unknowns(ssys)) > 0
 end
 
 @testset "COMP-03: one_sided_connection — single face" begin
-    @test false broken=true  # pending 15-02-PLAN.md implementation
+    for test_side in [:left, :right]
+        @named ch   = ChannelAndContacts(n=3, geometry=geom_comp,
+                                          htc_correlation=constant_Nusselt(Nu=8.235),
+                                          friction_correlation=laminar_friction(aspect_ratio=0.0025/0.070))
+        @named fuel = HeatDiffusion(nz=3, nx=3, Lz=0.6, Lx=0.006, y=0.003,
+                                     rho_s=19300.0, cp_s=130.0, k_s=20.0,
+                                     power_shape=ps_comp, power=1e4)
+        osc_sys = one_sided_connection(ch, fuel; side=test_side, name=:osc)
+        @named pump  = Pump(dP_pump=3.0e4)
+        @named hx_in = HeatExchanger(T_bc=600.0)
+        outer_conns = [
+            connect(pump.port_out,         hx_in.port_in),
+            connect(hx_in.port_out,        osc_sys.ch.port_in),
+            connect(osc_sys.ch.port_out,   pump.port_in),
+            pump.port_in.P               ~ 1.0e5,
+            osc_sys.ch.port_in.T         ~ 600.0,
+        ]
+        @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, osc_sys)
+        ssys = mtkcompile(top)
+        @test length(ModelingToolkit.unknowns(ssys)) > 0
+    end
 end
 
 @testset "COMP-04: compose_systems — variadic wrapper" begin
-    @test false broken=true  # pending 15-02-PLAN.md implementation
+    # Build two symmetric_plate assemblies, connect hydraulically in series
+    @named cac1  = ChannelAndContacts(n=3, geometry=geom_comp,
+                                       htc_correlation=constant_Nusselt(Nu=8.235),
+                                       friction_correlation=laminar_friction(aspect_ratio=0.0025/0.070))
+    @named fuel1 = HeatDiffusion(nz=3, nx=3, Lz=0.6, Lx=0.006, y=0.003,
+                                  rho_s=19300.0, cp_s=130.0, k_s=20.0,
+                                  power_shape=ps_comp, power=1e4)
+    @named cac2  = ChannelAndContacts(n=3, geometry=geom_comp,
+                                       htc_correlation=constant_Nusselt(Nu=8.235),
+                                       friction_correlation=laminar_friction(aspect_ratio=0.0025/0.070))
+    @named fuel2 = HeatDiffusion(nz=3, nx=3, Lz=0.6, Lx=0.006, y=0.003,
+                                  rho_s=19300.0, cp_s=130.0, k_s=20.0,
+                                  power_shape=ps_comp, power=1e4)
+    p1 = symmetric_plate(cac1, fuel1; name=:plate1)
+    p2 = symmetric_plate(cac2, fuel2; name=:plate2)
+
+    # Series hydraulic connection: pump -> plate1 -> plate2 -> hx_in -> pump
+    @named pump  = Pump(dP_pump=3.0e4)
+    @named hx_in = HeatExchanger(T_bc=600.0)
+    cross_conns = Equation[
+        connect(pump.port_out,    hx_in.port_in),
+        connect(hx_in.port_out,  p1.cac1.port_in),
+        connect(p1.cac1.port_out, p2.cac2.port_in),
+        connect(p2.cac2.port_out, pump.port_in),
+        pump.port_in.P         ~ 1.0e5,
+        p1.cac1.port_in.T     ~ 600.0,
+    ]
+    reactor = compose_systems(p1, p2, pump, hx_in; connections=cross_conns, name=:reactor)
+    ssys = mtkcompile(reactor)
+    @test length(ModelingToolkit.unknowns(ssys)) > 0
 end
