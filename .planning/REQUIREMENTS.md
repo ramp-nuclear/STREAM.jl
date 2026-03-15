@@ -13,10 +13,10 @@
 
 ### Composition
 
-- [ ] **COMP-01**: User can call `symmetric_plate(channel, fuel)` to get a pre-wired ODESystem (HeatDiffusion both sides connected to same ChannelAndContacts)
-- [ ] **COMP-02**: User can call `plate(ch_left, ch_right, fuel)` to get a pre-wired ODESystem (two independent channels on each side of one plate)
-- [ ] **COMP-03**: User can call `one_sided_connection(channel, fuel, side=:left)` to get a pre-wired single-side ODESystem
-- [ ] **COMP-04**: User can call `compose_systems(sys_a, sys_b, connections)` to merge two ODESystems with port connection list
+- [x] **COMP-01**: User can call `symmetric_plate(channel, fuel)` to get a pre-wired ODESystem (HeatDiffusion both sides connected to same ChannelAndContacts)
+- [x] **COMP-02**: User can call `plate(ch_left, ch_right, fuel)` to get a pre-wired ODESystem (two independent channels on each side of one plate)
+- [x] **COMP-03**: User can call `one_sided_connection(channel, fuel, side=:left)` to get a pre-wired single-side ODESystem
+- [x] **COMP-04**: User can call `compose_systems(sys_a, sys_b, connections)` to merge two ODESystems with port connection list
 
 ### Physics
 
@@ -69,10 +69,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VAL-01 | Phase 16 | Pending |
 | VAL-02 | Phase 16 | Pending |
 | VAL-03 | Phase 16 | Pending |
-| COMP-01 | Phase 15 | Pending |
-| COMP-02 | Phase 15 | Pending |
-| COMP-03 | Phase 15 | Pending |
-| COMP-04 | Phase 15 | Pending |
+| COMP-01 | Phase 15 | Complete |
+| COMP-02 | Phase 15 | Complete |
+| COMP-03 | Phase 15 | Complete |
+| COMP-04 | Phase 15 | Complete |
 | PHY-01 | Phase 13 | Complete |
 | PHY-02 | Phase 14 | Complete |
 | PHY-03 | Phase 14 | Complete |

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
-stopped_at: "Completed 15-01-PLAN.md: QoL observed variables and helpers"
-last_updated: "2026-03-15T17:52:21.366Z"
-last_activity: 2026-03-15 — Phase 14 Plan 02 complete; channel components accept pluggable correlations; PHY-02/03/04 integration tests pass
+stopped_at: "Completed 15-02-PLAN.md: Composition helpers symmetric_plate, plate, one_sided_connection, compose_systems"
+last_updated: "2026-03-15T18:14:59.527Z"
+last_activity: 2026-03-15 — Phase 15 Plan 01 complete; ChannelAndContacts has @observed Re/Nu/velocity/Pe; port() and check_gravity_mismatch() added
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 100
+  completed_plans: 6
+  percent: 83
 ---
 
 # STATE: STREAM.jl
@@ -32,10 +32,10 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 
 ## Current Position
 
-Phase: 15 of 16 (Composition Helpers & QoL) — IN PROGRESS
-Plan: 01 of 02 complete
-Status: Phase 15 Plan 01 Complete — QoL observed variables and helpers shipped; Plan 02 pending
-Last activity: 2026-03-15 — Phase 15 Plan 01 complete; ChannelAndContacts has @observed Re/Nu/velocity/Pe; port() and check_gravity_mismatch() added
+Phase: 15 of 16 (Composition Helpers & QoL) — COMPLETE
+Plan: 02 of 02 complete
+Status: Phase 15 Complete — All COMP-01/02/03/04 and QOL-01/02/03 requirements satisfied
+Last activity: 2026-03-15 — Phase 15 Plan 02 complete; symmetric_plate, plate, one_sided_connection, compose_systems added; all COMP tests green
 
 Progress: [████████░░] 83%
 
@@ -58,6 +58,7 @@ Progress: [████████░░] 83%
 
 *Updated after each plan completion*
 | Phase 15-composition-helpers-qol P01 | 46 | 3 tasks | 4 files |
+| Phase 15-composition-helpers-qol P02 | 19 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Progress: [████████░░] 83%
 | h_tc equation inlined (no Nu MTK symbol) in observed_mode | Avoids MTK observed-chain resolution issue where observed references another observed |
 | check_gravity_mismatch inspects parameter defaults (H and g_acc) not symbolic | Sufficient for balanced loop detection; avoids complex symbolic substitution |
 | MTK getproperty returns equivalent but not identity-same objects | QOL-03 test uses nameof() equivalence instead of === identity |
+| COMP tests use HeatExchanger+Pump for hydraulic closure | ConstantTemperature is thermal-only (ThermalPort); cannot be used as FlowPort BC |
+| _infer_n counts thermal_left subsystems in uncompiled CAC | Safe n-inference without explicit parameter inspection; fails early if CAC already compiled |
+| compose_systems uses splatted positional systems... with connections as keyword | Avoids dispatch ambiguity between Vector{Equation} and ODESystem positional args |
 
 ### Pending Todos
 
@@ -98,8 +102,8 @@ None at roadmap creation. PHY-01 (Dh fix) may require updating hardcoded referen
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T17:52:21.364Z
-**Stopped at:** Completed 15-01-PLAN.md: QoL observed variables and helpers
+**Last session:** 2026-03-15T18:14:59.525Z
+**Stopped at:** Completed 15-02-PLAN.md: Composition helpers symmetric_plate, plate, one_sided_connection, compose_systems
 **Next action:** Execute Phase 14 (next v0.4 phase per ROADMAP.md)
 **Resume file:** None
 
