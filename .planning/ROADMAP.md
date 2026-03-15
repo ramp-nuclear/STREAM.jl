@@ -96,8 +96,8 @@ Plans:
   5. `port(sys, :thermal_left, i)` returns the correct MTK subsystem; `check_gravity_mismatch(sys)` returns `:ok` on a balanced loop
 **Plans**: 2 plans
 Plans:
-- [ ] 15-01-PLAN.md — Add @observed to ChannelAndContacts; add port() and check_gravity_mismatch() helpers
-- [ ] 15-02-PLAN.md — Create src/helpers.jl with symmetric_plate, plate, one_sided_connection, compose_systems
+- [ ] 15-01-PLAN.md — Wave 0 test stubs; refactor ChannelAndContacts @observed (Re/Nu/v/Pe + 10 vars); create src/helpers.jl with port() and check_gravity_mismatch()
+- [ ] 15-02-PLAN.md — Extend src/helpers.jl with symmetric_plate, plate, one_sided_connection, compose_systems; full COMP tests
 
 ### Phase 16: Validation
 **Goal**: HeatDiffusion transient behavior and all two-plate coupling configurations are quantitatively validated
@@ -136,4 +136,4 @@ Plans:
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-15 — Phase 15 planned (2 plans: 15-01, 15-02)*
+*Updated: 2026-03-15 — Phase 15 replanned (2 plans: 15-01 QOL+observed refactor, 15-02 composition helpers)*
