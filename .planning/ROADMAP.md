@@ -94,7 +94,10 @@ Plans:
   3. `compose_systems(sys_a, sys_b, connections)` merges two independently-built ODESystems into one solvable system
   4. After solving a ChannelAndContacts system, `sol[sys.ch.Re, :]` returns a length-nz array of Reynolds numbers
   5. `port(sys, :thermal_left, i)` returns the correct MTK subsystem; `check_gravity_mismatch(sys)` returns `:ok` on a balanced loop
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 15-01-PLAN.md — Add @observed to ChannelAndContacts; add port() and check_gravity_mismatch() helpers
+- [ ] 15-02-PLAN.md — Create src/helpers.jl with symmetric_plate, plate, one_sided_connection, compose_systems
 
 ### Phase 16: Validation
 **Goal**: HeatDiffusion transient behavior and all two-plate coupling configurations are quantitatively validated
@@ -126,11 +129,11 @@ Plans:
 | 12. MTR Validation | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 12.1. PipeGeometry Struct | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 13. Physics Foundation | v0.4 | 2/2 | Complete | 2026-03-14 |
-| 14. Laminar Correlations | 2/2 | Complete    | 2026-03-14 | - |
-| 15. Composition Helpers & QoL | v0.4 | 0/TBD | Not started | - |
+| 14. Laminar Correlations | v0.4 | 2/2 | Complete | 2026-03-14 |
+| 15. Composition Helpers & QoL | v0.4 | 0/2 | Not started | - |
 | 16. Validation | v0.4 | 0/TBD | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-15 — Phase 14 planned (2 plans: 14-01, 14-02)*
+*Updated: 2026-03-15 — Phase 15 planned (2 plans: 15-01, 15-02)*
