@@ -133,7 +133,7 @@ Plans:
 | 13. Physics Foundation | v0.4 | 2/2 | Complete | 2026-03-14 |
 | 14. Laminar Correlations | v0.4 | 2/2 | Complete | 2026-03-14 |
 | 15. Composition Helpers & QoL | v0.4 | 2/2 | Complete | 2026-03-15 |
-| 16. Validation | 1/1 | Complete   | 2026-03-15 | - |
+| 16. Validation | 1/1 | Complete    | 2026-03-15 | - |
 
 ---
 
