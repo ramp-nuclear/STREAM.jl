@@ -28,9 +28,9 @@
 
 ### QoL
 
-- [ ] **QOL-01**: Re, Nu, h_tc, T_wall declared as `@observed` in ChannelAndContacts; accessible via `sol[sys.ch.Re, :]` after solve
-- [ ] **QOL-02**: `check_gravity_mismatch(sys)` function checks that gravity pressure terms sum to zero at zero flow
-- [ ] **QOL-03**: `port(sys, :thermal_left, i)` helper wraps `getproperty(sys, Symbol(:thermal_left, i))`
+- [x] **QOL-01**: Re, Nu, h_tc, T_wall declared as `@observed` in ChannelAndContacts; accessible via `sol[sys.ch.Re, :]` after solve
+- [x] **QOL-02**: `check_gravity_mismatch(sys)` function checks that gravity pressure terms sum to zero at zero flow
+- [x] **QOL-03**: `port(sys, :thermal_left, i)` helper wraps `getproperty(sys, Symbol(:thermal_left, i))`
 
 ## Future Requirements
 
@@ -78,9 +78,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PHY-03 | Phase 14 | Complete |
 | PHY-04 | Phase 14 | Complete |
 | PHY-05 | Phase 13 | Complete |
-| QOL-01 | Phase 15 | Pending |
-| QOL-02 | Phase 15 | Pending |
-| QOL-03 | Phase 15 | Pending |
+| QOL-01 | Phase 15 | Complete |
+| QOL-02 | Phase 15 | Complete |
+| QOL-03 | Phase 15 | Complete |
 
 **Coverage:**
 - v0.4 requirements: 15 total

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
-stopped_at: Phase 15 context gathered
-last_updated: "2026-03-15T00:06:53.787Z"
+stopped_at: "Completed 15-01-PLAN.md: QoL observed variables and helpers"
+last_updated: "2026-03-15T17:52:21.366Z"
 last_activity: 2026-03-15 — Phase 14 Plan 02 complete; channel components accept pluggable correlations; PHY-02/03/04 integration tests pass
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 
 ## Current Position
 
-Phase: 14 of 16 (Laminar Correlations) — COMPLETE
-Plan: 02 of 02 complete
-Status: Phase 14 Complete — Both plans done; correlations wired and tested
-Last activity: 2026-03-15 — Phase 14 Plan 02 complete; channel components accept pluggable correlations; PHY-02/03/04 integration tests pass
+Phase: 15 of 16 (Composition Helpers & QoL) — IN PROGRESS
+Plan: 01 of 02 complete
+Status: Phase 15 Plan 01 Complete — QoL observed variables and helpers shipped; Plan 02 pending
+Last activity: 2026-03-15 — Phase 15 Plan 01 complete; ChannelAndContacts has @observed Re/Nu/velocity/Pe; port() and check_gravity_mismatch() added
 
-Progress: [██████████] 100%
+Progress: [████████░░] 83%
 
 ---
 
@@ -57,6 +57,7 @@ Progress: [██████████] 100%
 | 14 Laminar Correlations P02 | 1 | 11 min | 11 min |
 
 *Updated after each plan completion*
+| Phase 15-composition-helpers-qol P01 | 46 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,10 @@ Progress: [██████████] 100%
 | VAL-03 T_out assertion removed (Python one_sided_connection wrong) | Python distributes heat to both faces even for one-sided; Julia correct; energy balance is truth |
 | PHY-03 test pairs laminar_friction with constant_Nusselt (not dittus_boelter) | Keeps system well-conditioned at low Re where Dittus-Boelter extrapolates poorly |
 | Pr_i computed inline as symbolic expression cp*mu/k in channel components | NOT a new MTK variable — passed directly as closure argument to htc_correlation |
+| Re/Nu/v moved to @observed in ChannelAndContacts; h_tc stays unknown | Energy balance references h_tc directly; Re/Nu/v are diagnostic-only; solver unknown vector shrinks |
+| h_tc equation inlined (no Nu MTK symbol) in observed_mode | Avoids MTK observed-chain resolution issue where observed references another observed |
+| check_gravity_mismatch inspects parameter defaults (H and g_acc) not symbolic | Sufficient for balanced loop detection; avoids complex symbolic substitution |
+| MTK getproperty returns equivalent but not identity-same objects | QOL-03 test uses nameof() equivalence instead of === identity |
 
 ### Pending Todos
 
@@ -93,10 +98,10 @@ None at roadmap creation. PHY-01 (Dh fix) may require updating hardcoded referen
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T00:06:53.784Z
-**Stopped at:** Phase 15 context gathered
+**Last session:** 2026-03-15T17:52:21.364Z
+**Stopped at:** Completed 15-01-PLAN.md: QoL observed variables and helpers
 **Next action:** Execute Phase 14 (next v0.4 phase per ROADMAP.md)
-**Resume file:** .planning/phases/15-composition-helpers-qol/15-CONTEXT.md
+**Resume file:** None
 
 ---
 
