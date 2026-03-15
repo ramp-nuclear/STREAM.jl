@@ -130,7 +130,7 @@ Plans:
 | 12.1. PipeGeometry Struct | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 13. Physics Foundation | v0.4 | 2/2 | Complete | 2026-03-14 |
 | 14. Laminar Correlations | v0.4 | 2/2 | Complete | 2026-03-14 |
-| 15. Composition Helpers & QoL | 2/2 | Complete   | 2026-03-15 | - |
+| 15. Composition Helpers & QoL | 2/2 | Complete    | 2026-03-15 | - |
 | 16. Validation | v0.4 | 0/TBD | Not started | - |
 
 ---

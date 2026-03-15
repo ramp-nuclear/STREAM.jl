@@ -4,8 +4,8 @@ milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
 stopped_at: "Completed 15-02-PLAN.md: Composition helpers symmetric_plate, plate, one_sided_connection, compose_systems"
-last_updated: "2026-03-15T18:14:59.527Z"
-last_activity: 2026-03-15 — Phase 15 Plan 01 complete; ChannelAndContacts has @observed Re/Nu/velocity/Pe; port() and check_gravity_mismatch() added
+last_updated: "2026-03-15T18:31:53.076Z"
+last_activity: 2026-03-15 — Phase 15 Plan 02 complete; symmetric_plate, plate, one_sided_connection, compose_systems added; all COMP tests green
 progress:
   total_phases: 4
   completed_phases: 3
