@@ -1404,47 +1404,63 @@ import STREAM: check_gravity_mismatch, port
 @testset "QOL-01: @observed Re/Nu accessible via sol" begin
     # Tests that Re, Nu, velocity, Pe, h_tc_left, T_wall_left, q_wall_left
     # are accessible via MTK symbolic indexing after solve.
-    # Becomes green after Task 2 adds observed= to ChannelAndContacts.
-    @test_broken begin
-        geom = PipeGeometry_circular(D=0.01, L=0.6)
-        @named ch = ChannelAndContacts(n=3, geometry=geom)
-        @named pump = Pump(dP_pump=1e4)
-        @named bc = HeatExchanger(T_bc=600.0)
-        connections = [
-            connect(pump.port_out, ch.port_in),
-            connect(ch.port_out, bc.port_in),
-            connect(bc.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
-            ch.port_in.T   ~ 600.0,
-        ]
-        ct_l = [ConstantTemperature(name=Symbol(:ct_l_, i), T=620.0) for i in 1:3]
-        ct_r = [ConstantTemperature(name=Symbol(:ct_r_, i), T=620.0) for i in 1:3]
-        conns_thermal = vcat(connections,
-            [connect(ct_l[i].thermal, getproperty(ch, Symbol(:thermal_left,  i))) for i in 1:3],
-            [connect(ct_r[i].thermal, getproperty(ch, Symbol(:thermal_right, i))) for i in 1:3])
-        @named sys = compose(System(conns_thermal, t; name=:sys), pump, bc, ch, ct_l..., ct_r...)
-        ssys = mtkcompile(sys)
-        op = [ssys.ch.T[i] => 600.0 for i in 1:3]
-        push!(op, ssys.ch.port_in.mdot => 0.1)
-        sol = solve_steady(ssys, op)
-        sol[ssys.ch.Re[1], end] isa Real
-    end
+    # Uses same topology as PHY-04 turbulent integration test (known-working geometry).
+    n_qol = 3; T_inlet_qol = 313.15; T_wall_qol = 373.15
+    geom_qol = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    @named ch_qol = ChannelAndContacts(n=n_qol, geometry=geom_qol)
+    @named pump_qol = Pump(dP_pump=3.0e4)
+    @named bc_qol = HeatExchanger(T_bc=T_inlet_qol)
+    ct_l_qol = [ConstantTemperature(name=Symbol(:ct_l_qol_, i), T=T_wall_qol) for i in 1:n_qol]
+    ct_r_qol = [ConstantTemperature(name=Symbol(:ct_r_qol_, i), T=T_wall_qol) for i in 1:n_qol]
+    conns_qol = vcat(
+        [
+            connect(pump_qol.port_out, bc_qol.port_in),
+            connect(bc_qol.port_out,   ch_qol.port_in),
+            connect(ch_qol.port_out,   pump_qol.port_in),
+            pump_qol.port_in.P ~ 1.0e5,
+            ch_qol.port_in.T   ~ T_inlet_qol,
+        ],
+        [connect(ct_l_qol[i].thermal, getproperty(ch_qol, Symbol(:thermal_left,  i))) for i in 1:n_qol],
+        [connect(ct_r_qol[i].thermal, getproperty(ch_qol, Symbol(:thermal_right, i))) for i in 1:n_qol],
+    )
+    @named sys_qol = compose(System(conns_qol, t; name=:sys_qol),
+                              pump_qol, bc_qol, ch_qol, ct_l_qol..., ct_r_qol...)
+    ssys_qol = mtkcompile(sys_qol)
+    T_g_qol = steady_state_guess(T_inlet=T_inlet_qol, Q_wall=1e4, mdot_guess=0.250, n=n_qol)
+    op_qol = [ssys_qol.ch_qol.T[i] => T_g_qol[i] for i in 1:n_qol]
+    push!(op_qol, ssys_qol.ch_qol.port_in.mdot => 0.250)
+    sol_qol = solve_steady(ssys_qol, op_qol)
+    @test sol_qol.retcode == ReturnCode.Success
+    @test sol_qol[ssys_qol.ch_qol.Re[1]] isa Real
+    @test sol_qol[ssys_qol.ch_qol.Re[1]] > 0.0
+    @test sol_qol[ssys_qol.ch_qol.Nu[1]] isa Real
+    @test sol_qol[ssys_qol.ch_qol.Nu[1]] > 0.0
+    @test sol_qol[ssys_qol.ch_qol.velocity[1]] isa Real
+    @test sol_qol[ssys_qol.ch_qol.velocity[1]] > 0.0
+    @test sol_qol[ssys_qol.ch_qol.Pe[1]] > 0.0
+    @test sol_qol[ssys_qol.ch_qol.h_tc_left[1]] > 0.0
+    @test sol_qol[ssys_qol.ch_qol.h_tc_right[1]] > 0.0
+    @test sol_qol[ssys_qol.ch_qol.T_wall_left[1]] ≈ T_wall_qol atol=1.0
+    @test sol_qol[ssys_qol.ch_qol.q_wall_left[1]] isa Real
 end
 
 @testset "QOL-02: check_gravity_mismatch — balanced loop" begin
-    @test_broken begin
-        # build_loop_vertical has two Gravity components that balance
-        ssys = build_loop_vertical(n=3, dP_pump=5000.0, T_inlet=600.0)
-        check_gravity_mismatch(ssys) == :ok
-    end
+    # build_loop_vertical has a Gravity return component that balances the
+    # channel upward gravity term — returns :ok.
+    ssys = build_loop_vertical(n=3, dP_pump=5000.0, T_inlet=600.0)
+    @test check_gravity_mismatch(ssys) == :ok
 end
 
 @testset "QOL-03: port() helper" begin
-    @test_broken begin
-        geom = PipeGeometry_circular(D=0.01, L=0.6)
-        @named cac = ChannelAndContacts(n=3, geometry=geom)
-        port(cac, :thermal_left, 1) === getproperty(cac, :thermal_left1)
-    end
+    # port(sys, :thermal_left, i) wraps getproperty(sys, Symbol(face, i))
+    # Verify it returns the same object as direct getproperty access.
+    geom = PipeGeometry_circular(0.6, 0.01)  # L=0.6, D=0.01
+    @named cac = ChannelAndContacts(n=3, geometry=geom)
+    # port() and getproperty should return the same MTK subsystem (same name)
+    @test nameof(port(cac, :thermal_left, 1)) == nameof(getproperty(cac, :thermal_left1))
+    @test nameof(port(cac, :thermal_right, 2)) == nameof(getproperty(cac, :thermal_right2))
+    # port() constructs Symbol(:thermal_left, 3) = :thermal_left3 (checks concat logic)
+    @test nameof(port(cac, :thermal_left, 3)) == nameof(getproperty(cac, Symbol(:thermal_left, 3)))
 end
 
 @testset "COMP-01: symmetric_plate — builds and solves" begin
