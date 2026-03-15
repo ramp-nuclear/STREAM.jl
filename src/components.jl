@@ -309,19 +309,33 @@ end
 #   mass conservation, pressure drop, port_out.T, port_in.T
 #
 # Does NOT append energy balance equations — those differ per variant.
+#
+# Phase 15 note: When called from ChannelAndContacts, Re/Nu/v are NOT pushed
+# to eqs here (they become observed variables instead). h_tc is still an
+# unknown but with an inlined expression that does not reference Nu as MTK symbol.
+# The `observed_mode` flag controls this behavior.
 function _channel_base_eqs(eqs::Vector{Equation};
     n, T, Re, Nu, h_tc, v, T_out, dP,
     port_in, port_out,
     Dh, A, L, g_acc, dz,
     htc_correlation      = dittus_boelter,
-    friction_correlation = blasius_friction)
+    friction_correlation = blasius_friction,
+    observed_mode        = false)
 
     for i in 1:n
-        push!(eqs, v[i]    ~ port_in.mdot / (rho_water(T[i]) * A))
-        push!(eqs, Re[i]   ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
-        Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
-        push!(eqs, Nu[i]   ~ htc_correlation(Re[i], Pr_i))
-        push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
+        if observed_mode
+            # Re, Nu, v become observed variables (not solver unknowns).
+            # h_tc stays as unknown but uses inlined expression (avoids MTK observed-chain).
+            Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+            Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
+            push!(eqs, h_tc[i] ~ htc_correlation(Re_i, Pr_i) * k_water(T[i]) / Dh)
+        else
+            push!(eqs, v[i]    ~ port_in.mdot / (rho_water(T[i]) * A))
+            push!(eqs, Re[i]   ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
+            Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
+            push!(eqs, Nu[i]   ~ htc_correlation(Re[i], Pr_i))
+            push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
+        end
     end
 
     # Scalar: pressure drop and T_out
@@ -375,13 +389,21 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     end
 
     vars = @variables begin
-        (T(t))[1:n]      = fill(600.0, n)
-        (Re(t))[1:n]
-        (Nu(t))[1:n]
-        (h_tc(t))[1:n]
-        (v(t))[1:n]
-        (q_wall(t))[1:n]
-        T_out(t)         = 600.0
+        (T(t))[1:n]           = fill(600.0, n)
+        (Re(t))[1:n]          # observed — hydraulic Reynolds number
+        (Nu(t))[1:n]          # observed — Nusselt number
+        (h_tc(t))[1:n]        # unknown  — HTC (referenced in energy balance)
+        (v(t))[1:n]           # observed — alias for velocity
+        (velocity(t))[1:n]    # observed — fluid velocity [m/s]
+        (Pe(t))[1:n]          # observed — Peclet number
+        (h_tc_left(t))[1:n]   # observed — HTC at left wall face
+        (h_tc_right(t))[1:n]  # observed — HTC at right wall face
+        (T_wall_left(t))[1:n]  # observed — alias for thermal_left[i].T
+        (T_wall_right(t))[1:n] # observed — alias for thermal_right[i].T
+        (q_wall_left(t))[1:n]  # observed — Q_flow from left face
+        (q_wall_right(t))[1:n] # observed — Q_flow from right face
+        (q_wall(t))[1:n]      # unknown  — per-cell total heat (referenced in Q_wall_total)
+        T_out(t)              = 600.0
         dP(t)
         Q_wall_total(t)
     end
@@ -396,10 +418,12 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     eqs     = Equation[]
     T_inlet = instream(port_in.T)
 
-    # Common equations: v, Re, Nu, h_tc, dP, T_out, port wiring
+    # Common equations: h_tc (inlined, no Nu MTK symbol), dP, T_out, port wiring
+    # observed_mode=true: Re/Nu/v equations are NOT pushed to eqs here
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
                       port_in, port_out, Dh, A, L, g_acc=g, dz,
-                      htc_correlation, friction_correlation)
+                      htc_correlation, friction_correlation,
+                      observed_mode=true)
 
     # Per-cell energy balance: two-sided heating (geometry.heated_parts[1]/[2] per face)
     for i in 1:n
@@ -419,10 +443,29 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
 
     push!(eqs, Q_wall_total ~ sum(q_wall[i] for i in 1:n))
 
-    all_vars = [collect(T); collect(Re); collect(Nu); collect(h_tc);
-                collect(v); collect(q_wall); T_out; dP; Q_wall_total]
+    # Build observed equations: Re, Nu, v, velocity, Pe, h_tc_left/right, T_wall_left/right,
+    # q_wall_left/right — all expressed as Julia expressions of MTK unknowns.
+    obs = Equation[]
+    for i in 1:n
+        Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+        Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
+        push!(obs, Re[i]            ~ Re_i)
+        push!(obs, Nu[i]            ~ htc_correlation(Re_i, Pr_i))
+        push!(obs, v[i]             ~ port_in.mdot / (rho_water(T[i]) * A))
+        push!(obs, velocity[i]      ~ port_in.mdot / (rho_water(T[i]) * A))
+        push!(obs, Pe[i]            ~ Re_i * Pr_i)
+        push!(obs, h_tc_left[i]    ~ h_tc[i])
+        push!(obs, h_tc_right[i]   ~ h_tc[i])
+        push!(obs, T_wall_left[i]  ~ thermal_left[i].T)
+        push!(obs, T_wall_right[i] ~ thermal_right[i].T)
+        push!(obs, q_wall_left[i]  ~ thermal_left[i].Q_flow)
+        push!(obs, q_wall_right[i] ~ thermal_right[i].Q_flow)
+    end
 
-    compose(System(eqs, t, all_vars, pars; name=name),
+    # Re, Nu, v are now observed (not solver unknowns)
+    all_vars = [collect(T); collect(h_tc); collect(q_wall); T_out; dP; Q_wall_total]
+
+    compose(System(eqs, t, all_vars, pars; observed=obs, name=name),
             port_in, port_out, thermal_left..., thermal_right...)
 end
 
