@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
-stopped_at: Completed 14-02-PLAN.md
-last_updated: "2026-03-14T23:21:36.673Z"
+stopped_at: Phase 15 context gathered
+last_updated: "2026-03-15T00:06:53.787Z"
 last_activity: 2026-03-15 — Phase 14 Plan 02 complete; channel components accept pluggable correlations; PHY-02/03/04 integration tests pass
 progress:
   total_phases: 4
@@ -93,10 +93,10 @@ None at roadmap creation. PHY-01 (Dh fix) may require updating hardcoded referen
 
 ## Session Continuity
 
-**Last session:** 2026-03-14T23:17:53.774Z
-**Stopped at:** Completed 14-02-PLAN.md
+**Last session:** 2026-03-15T00:06:53.784Z
+**Stopped at:** Phase 15 context gathered
 **Next action:** Execute Phase 14 (next v0.4 phase per ROADMAP.md)
-**Resume file:** None
+**Resume file:** .planning/phases/15-composition-helpers-qol/15-CONTEXT.md
 
 ---
 
