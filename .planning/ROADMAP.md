@@ -107,7 +107,9 @@ Plans:
   1. A transient HeatDiffusion test compares T_plate_center(t) to the analytical 1D slab Fourier series solution and passes within tolerance
   2. A system with two HeatDiffusion instances connected to one ChannelAndContacts (both thermal_left and thermal_right active) assembles and solves to a physically consistent steady state
   3. The one-sided connection test has a quantitative T_plate_center assertion derived from analytical energy balance (T_center = T_wall + q*L/(2kA)); the test comment documents the Python STREAM discrepancy
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 16-01-PLAN.md — VAL-03 T_max inline assertion + VAL-01 transient Fourier testset + VAL-02 two-plate testset
 
 ## Progress
 
@@ -130,10 +132,10 @@ Plans:
 | 12.1. PipeGeometry Struct | v0.3 | 2/2 | Complete | 2026-03-14 |
 | 13. Physics Foundation | v0.4 | 2/2 | Complete | 2026-03-14 |
 | 14. Laminar Correlations | v0.4 | 2/2 | Complete | 2026-03-14 |
-| 15. Composition Helpers & QoL | 2/2 | Complete    | 2026-03-15 | - |
-| 16. Validation | v0.4 | 0/TBD | Not started | - |
+| 15. Composition Helpers & QoL | v0.4 | 2/2 | Complete | 2026-03-15 |
+| 16. Validation | v0.4 | 0/1 | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-15 — Phase 15 replanned (2 plans: 15-01 QOL+observed refactor, 15-02 composition helpers)*
+*Updated: 2026-03-15 — Phase 16 planned (1 plan: VAL-03 inline + VAL-01 transient + VAL-02 two-plate)*
