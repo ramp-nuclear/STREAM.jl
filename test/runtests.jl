@@ -1121,9 +1121,21 @@ end
     # Per STATE.md decision: use energy balance as truth; Python T_out assertion omitted.
     val03_mdot_ref       = 0.252547   # kg/s — left channel mass flow (hydraulics correct in Python)
     @test isapprox(mdot_l_03,   val03_mdot_ref;       rtol=0.01)
-    # NOTE: T_plate_center quantitative assertion omitted. Python one_sided_connection gives
-    # a physically inconsistent T_center; Julia gives correct (hotter) T_center for one-sided cooling.
-    # Plate center physics is validated by the T_center_03 > T_out_l_03 assertion below.
+    # VAL-03: T_max analytical assertion — adiabatic face is hottest point for one-sided cooling.
+    # For one-sided coupling (left face = T_wall, right face = adiabatic), uniform volumetric q,
+    # steady-state analytical solution: T_max = T_wall_avg + q_total * Lx / (2 * k_s * A)
+    # where A = y * Lz = 0.07 * 0.6 = 0.042 m² (plate face area).
+    # NOTE on Python STREAM discrepancy: Python one_sided_connection distributes heat to BOTH faces
+    # even for one-sided coupling, giving a physically incorrect (lower) T_center. Julia uses the
+    # correct one-sided formulation. T_max = T_wall_avg + q*Lx/(2*k_s*A) is the correct reference.
+    T_max_numerical = sol[ssys.hd.T[nz÷2, nx]]   # j=nx is adiabatic (right) face — hottest point
+    left_syms_v03 = [getproperty(ssys.cac_l, Symbol(:thermal_left, i)) for i in 1:nz]
+    T_wall_vals_v03 = [sol[left_syms_v03[i].T] for i in 1:nz]
+    T_wall_avg_v03 = sum(T_wall_vals_v03) / nz
+    A_v03 = 0.07 * 0.6              # y * Lz = 0.042 m²
+    T_max_analytical = T_wall_avg_v03 + 1e4 * 0.00127 / (2 * 200.0 * A_v03)
+    # Expected: ΔT ≈ 0.756 K above T_wall_avg (small but physically correct for high-k aluminum)
+    @test isapprox(T_max_numerical, T_max_analytical; rtol=0.01)
 
     @test T_out_l_03 > T_in
     @test mdot_l_03 > 0.0
@@ -1583,3 +1595,79 @@ end
     ssys = mtkcompile(reactor)
     @test length(ModelingToolkit.unknowns(ssys)) > 0
 end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 16: Validation
+# VAL-01: HeatDiffusion transient vs analytical 1D Fourier series
+# VAL-02: Two HeatDiffusion plates connected to one ChannelAndContacts
+# ─────────────────────────────────────────────────────────────────────────────
+@testset "Phase 16: Validation" begin
+
+# ─────────────────────────────────────────────────────────────────
+# VAL-01: HeatDiffusion transient — Fourier series validation
+# Pure plate (no fluid): both faces pinned at T_wall, power=0, uniform IC T0.
+# Plate relaxes toward T_wall via pure diffusion.
+# Assert T_center(t) matches analytical 1D Fourier series at 4 time points.
+# ─────────────────────────────────────────────────────────────────
+@testset "VAL-01: HeatDiffusion transient — Fourier series validation" begin
+    # MTR aluminum plate parameters — consistent with all existing VAL tests
+    nz_v01 = 10; nx_v01 = 5
+    k_s_v01  = 200.0;   rho_s_v01 = 2700.0;  cp_s_v01 = 900.0
+    Lx_v01   = 0.00127; Lz_v01    = 0.6;     y_v01    = 0.07
+    T_wall   = 300.0;   T0        = 400.0    # 100 K step-down for clear signal
+
+    # Diffusivity and thermal time constant
+    alpha_v01 = k_s_v01 / (rho_s_v01 * cp_s_v01)   # ≈ 8.23e-5 m²/s
+    tau_v01   = Lx_v01^2 / (π^2 * alpha_v01)        # ≈ 0.002 s
+
+    # Fourier series analytical reference (symmetric BCs, no power, center x=Lx/2):
+    # T(Lx/2, t) = T_wall + (4/π)(T0-T_wall) Σ_{k=0}^{N-1} [(-1)^k/(2k+1)] exp(-α((2k+1)π/Lx)²t)
+    function fourier_T_center(t_val)
+        result = T_wall
+        for k in 0:49
+            n = 2k + 1
+            result += (4/π) * (T0 - T_wall) * ((-1)^k / n) * exp(-alpha_v01 * (n*π/Lx_v01)^2 * t_val)
+        end
+        return result
+    end
+
+    # Build isolated plate with ConstantTemperature BCs on both faces, power=0
+    ps_v01 = fill(1.0 / (nz_v01 * nx_v01), nz_v01, nx_v01)
+    @named hd_v01 = HeatDiffusion(nz=nz_v01, nx=nx_v01, Lz=Lz_v01, Lx=Lx_v01, y=y_v01,
+                                   rho_s=rho_s_v01, cp_s=cp_s_v01, k_s=k_s_v01,
+                                   power_shape=ps_v01, power=0.0)
+    ct_l = [ConstantTemperature(name=Symbol(:ct_l_, i), T=T_wall) for i in 1:nz_v01]
+    ct_r = [ConstantTemperature(name=Symbol(:ct_r_, i), T=T_wall) for i in 1:nz_v01]
+    conns_v01 = [
+        [connect(ct_l[i].thermal, getproperty(hd_v01, Symbol(:thermal_left,  i))) for i in 1:nz_v01]...,
+        [connect(ct_r[i].thermal, getproperty(hd_v01, Symbol(:thermal_right, i))) for i in 1:nz_v01]...,
+    ]
+    @named sys_v01 = compose(System(conns_v01, t; name=:val01_sys), ct_l..., ct_r..., hd_v01)
+    ssys_v01 = mtkcompile(sys_v01; fully_determined=false)
+
+    # Uniform initial condition: all plate cells at T0
+    op_ic_v01 = [ssys_v01.hd_v01.T[i, j] => T0 for i in 1:nz_v01 for j in 1:nx_v01]
+
+    # Time span and assertion checkpoints (in seconds)
+    t_checkpoints = [0.5*tau_v01, tau_v01, 2*tau_v01, 5*tau_v01]
+    tspan_v01 = (0.0, 5.0*tau_v01 * 1.01)  # slight overshoot to include endpoint
+
+    prob_v01 = ODEProblem(ssys_v01, op_ic_v01, tspan_v01; warn_initialize_determined=false)
+    sol_v01 = solve(prob_v01, Rodas5P(); initializealg=SciMLBase.NoInit(),
+                    saveat=t_checkpoints)
+    @test sol_v01.retcode == ReturnCode.Success
+
+    # Assert T_center at each checkpoint vs Fourier series
+    T_center_sym = ssys_v01.hd_v01.T[nz_v01÷2, (nx_v01+1)÷2]
+    T_center_series = sol_v01[T_center_sym, :]
+    for (k, t_k) in enumerate(t_checkpoints)
+        T_num = T_center_series[k]
+        T_ref = fourier_T_center(t_k)
+        @test isapprox(T_num, T_ref; rtol=0.01)
+    end
+
+    # Solution must approach T_wall by 5τ
+    @test isapprox(T_center_series[end], T_wall; rtol=0.01)
+end
+
+end  # @testset "Phase 16: Validation"
