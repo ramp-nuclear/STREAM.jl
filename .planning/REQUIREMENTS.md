@@ -7,9 +7,9 @@
 
 ### Validation
 
-- [ ] **VAL-01**: User can validate HeatDiffusion transient behavior against analytical 1D slab diffusion solution (step-change in power, T_plate_center vs time within tolerance)
-- [ ] **VAL-02**: User can assemble and solve a system with two HeatDiffusion plates connected to one ChannelAndContacts (both thermal_left and thermal_right active simultaneously)
-- [ ] **VAL-03**: One-sided connection test has a quantitative T_plate_center assertion derived from analytical energy balance (not Python STREAM, which has a known bug here)
+- [x] **VAL-01**: User can validate HeatDiffusion transient behavior against analytical 1D slab diffusion solution (step-change in power, T_plate_center vs time within tolerance)
+- [x] **VAL-02**: User can assemble and solve a system with two HeatDiffusion plates connected to one ChannelAndContacts (both thermal_left and thermal_right active simultaneously)
+- [x] **VAL-03**: One-sided connection test has a quantitative T_plate_center assertion derived from analytical energy balance (not Python STREAM, which has a known bug here)
 
 ### Composition
 
@@ -66,9 +66,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VAL-01 | Phase 16 | Pending |
-| VAL-02 | Phase 16 | Pending |
-| VAL-03 | Phase 16 | Pending |
+| VAL-01 | Phase 16 | Complete |
+| VAL-02 | Phase 16 | Complete |
+| VAL-03 | Phase 16 | Complete |
 | COMP-01 | Phase 15 | Complete |
 | COMP-02 | Phase 15 | Complete |
 | COMP-03 | Phase 15 | Complete |

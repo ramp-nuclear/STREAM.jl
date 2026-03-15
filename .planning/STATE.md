@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
-stopped_at: Phase 16 context gathered
-last_updated: "2026-03-15T19:24:31.319Z"
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-03-15T20:07:04.824Z"
 last_activity: 2026-03-15 — Phase 15 Plan 02 complete; symmetric_plate, plate, one_sided_connection, compose_systems added; all COMP tests green
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 4
+  total_plans: 7
+  completed_plans: 7
   percent: 83
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 
 ## Current Position
 
-Phase: 15 of 16 (Composition Helpers & QoL) — COMPLETE
-Plan: 02 of 02 complete
-Status: Phase 15 Complete — All COMP-01/02/03/04 and QOL-01/02/03 requirements satisfied
-Last activity: 2026-03-15 — Phase 15 Plan 02 complete; symmetric_plate, plate, one_sided_connection, compose_systems added; all COMP tests green
+Phase: 16 of 16 (Validation) — COMPLETE
+Plan: 01 of 01 complete
+Status: Phase 16 Complete — All VAL-01/02/03 requirements satisfied; v0.4 milestone validation gap closed
+Last activity: 2026-03-15 — Phase 16 Plan 01 complete; VAL-01 Fourier transient, VAL-02 two-plate topology, VAL-03 T_max analytical assertion all green
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ---
 
@@ -59,6 +59,7 @@ Progress: [████████░░] 83%
 *Updated after each plan completion*
 | Phase 15-composition-helpers-qol P01 | 46 | 3 tasks | 4 files |
 | Phase 15-composition-helpers-qol P02 | 19 | 2 tasks | 3 files |
+| Phase 16-validation P01 | 7 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,9 @@ Progress: [████████░░] 83%
 | COMP tests use HeatExchanger+Pump for hydraulic closure | ConstantTemperature is thermal-only (ThermalPort); cannot be used as FlowPort BC |
 | _infer_n counts thermal_left subsystems in uncompiled CAC | Safe n-inference without explicit parameter inspection; fails early if CAC already compiled |
 | compose_systems uses splatted positional systems... with connections as keyword | Avoids dispatch ambiguity between Vector{Equation} and ODESystem positional args |
+| VAL-01 HeatDiffusion transient uses power=0.0 | Nonzero source invalidates Fourier formula; isolation confirms pure diffusion physics |
+| VAL-02 hd2 thermal_left connects to cac thermal_right | hd2 is on the right side of the channel; its left face (j=1) faces inward toward fluid |
+| T_max for one-sided adiabatic plate at j=nx (adiabatic face) | T_max = T_wall_avg + q*Lx/(2*k_s*A); adiabatic face is hottest for one-sided cooling |
 
 ### Pending Todos
 
@@ -102,10 +106,10 @@ None at roadmap creation. PHY-01 (Dh fix) may require updating hardcoded referen
 
 ## Session Continuity
 
-**Last session:** 2026-03-15T19:24:31.316Z
-**Stopped at:** Phase 16 context gathered
+**Last session:** 2026-03-15T20:07:04.822Z
+**Stopped at:** Completed 16-01-PLAN.md
 **Next action:** Execute Phase 14 (next v0.4 phase per ROADMAP.md)
-**Resume file:** .planning/phases/16-validation/16-CONTEXT.md
+**Resume file:** None
 
 ---
 

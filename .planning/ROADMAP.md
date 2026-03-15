@@ -53,7 +53,7 @@ Full phase details: `.planning/milestones/v0.3-ROADMAP.md`
 - [x] **Phase 13: Physics Foundation** — Dh fix, fixed-flow Pump (completed 2026-03-14)
 - [x] **Phase 14: Laminar Correlations** — Pluggable HTC/friction correlations with regime switching (completed 2026-03-14)
 - [x] **Phase 15: Composition Helpers & QoL** — symmetric_plate, plate, one_sided_connection, compose_systems, @observed, gravity check, port helper (completed 2026-03-15)
-- [ ] **Phase 16: Validation** — Transient HeatDiffusion, two-plate CAC, one-sided quantitative assertion
+- [x] **Phase 16: Validation** — Transient HeatDiffusion, two-plate CAC, one-sided quantitative assertion (completed 2026-03-15)
 
 ## Phase Details
 
@@ -133,7 +133,7 @@ Plans:
 | 13. Physics Foundation | v0.4 | 2/2 | Complete | 2026-03-14 |
 | 14. Laminar Correlations | v0.4 | 2/2 | Complete | 2026-03-14 |
 | 15. Composition Helpers & QoL | v0.4 | 2/2 | Complete | 2026-03-15 |
-| 16. Validation | v0.4 | 0/1 | Not started | - |
+| 16. Validation | 1/1 | Complete   | 2026-03-15 | - |
 
 ---
 
