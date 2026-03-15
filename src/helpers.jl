@@ -91,3 +91,106 @@ function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
 
     return :ok
 end
+
+# ================================================================
+# COMPOSITION HELPERS — COMP-01/02/03/04 (Phase 15 Plan 02)
+# ================================================================
+#
+# All helpers:
+# - Take PRE-BUILT component instances (not kwargs)
+# - Return a RAW ODESystem via compose() — caller calls mtkcompile()
+# - Do NOT validate n==nz — caller responsibility
+# - Use port() helper for all thermal port access in connect()
+# - build_initializeprob=false MUST be used when solving HeatDiffusion+CAC systems
+#
+# n-inference: count subsystems named "thermal_leftN" in first system arg.
+# If count returns 0, the cac/channel system structure is unexpected — check
+# that ChannelAndContacts was constructed (not mtkcompile'd before passing in).
+# Infer n from UNCOMPILED component instances only.
+
+function _infer_n(sys)
+    sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
+    n = count(s -> startswith(s, "thermal_left"), sub_names)
+    n == 0 && error("_infer_n: could not detect thermal port count in system $(ModelingToolkit.getname(sys)). Pass an uncompiled ChannelAndContacts instance.")
+    return n
+end
+
+# ----------------------------------------------------------------
+# symmetric_plate — COMP-01
+# Wires one HeatDiffusion fuel plate symmetrically to one ChannelAndContacts.
+# Both faces of the plate heat the same channel (symmetric heat load).
+#
+# Wiring (per CONTEXT.md):
+#   cac.thermal_right[i] <-> fuel.thermal_left[i]
+#   cac.thermal_left[i]  <-> fuel.thermal_right[i]
+#
+# cac.n must equal fuel.nz — caller ensures this.
+# Returns raw ODESystem. Add BCs (Pump, pressure anchor, inlet T) then mtkcompile().
+# ----------------------------------------------------------------
+function symmetric_plate(cac, fuel; name::Symbol)
+    n = _infer_n(cac)
+    connections = Equation[
+        [connect(port(cac, :thermal_right, i), port(fuel, :thermal_left,  i)) for i in 1:n]...,
+        [connect(port(cac, :thermal_left,  i), port(fuel, :thermal_right, i)) for i in 1:n]...,
+    ]
+    compose(System(connections, t; name=name), cac, fuel)
+end
+
+# ----------------------------------------------------------------
+# plate — COMP-02
+# Wires one HeatDiffusion plate between two independent channels.
+# Left channel's right face heats the plate's left face.
+# Right channel's left face heats the plate's right face.
+#
+# Wiring (per CONTEXT.md):
+#   ch_left.thermal_right[i]  <-> fuel.thermal_left[i]
+#   ch_right.thermal_left[i]  <-> fuel.thermal_right[i]
+#
+# ch_left.n == ch_right.n == fuel.nz — caller ensures this.
+# ----------------------------------------------------------------
+function plate(ch_left, ch_right, fuel; name::Symbol)
+    n = _infer_n(ch_left)
+    connections = Equation[
+        [connect(port(ch_left,  :thermal_right, i), port(fuel, :thermal_left,  i)) for i in 1:n]...,
+        [connect(port(ch_right, :thermal_left,  i), port(fuel, :thermal_right, i)) for i in 1:n]...,
+    ]
+    compose(System(connections, t; name=name), ch_left, ch_right, fuel)
+end
+
+# ----------------------------------------------------------------
+# one_sided_connection — COMP-03
+# Wires one HeatDiffusion plate to one channel on one face only.
+# The opposite fuel face remains unconnected (adiabatic by MTK default).
+#
+# Wiring (per CONTEXT.md):
+#   side=:left  => channel.thermal_left[i]  <-> fuel.thermal_right[i]
+#   side=:right => channel.thermal_right[i] <-> fuel.thermal_left[i]
+#
+# channel.n must equal fuel.nz — caller ensures this.
+# ----------------------------------------------------------------
+function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
+    side in (:left, :right) || error("one_sided_connection: side must be :left or :right, got :$side")
+    n = _infer_n(channel)
+    connections = if side == :left
+        Equation[[connect(port(channel, :thermal_left,  i), port(fuel, :thermal_right, i)) for i in 1:n]...]
+    else
+        Equation[[connect(port(channel, :thermal_right, i), port(fuel, :thermal_left,  i)) for i in 1:n]...]
+    end
+    compose(System(connections, t; name=name), channel, fuel)
+end
+
+# ----------------------------------------------------------------
+# compose_systems — COMP-04
+# Thin wrapper: merges two or more independently-built ODESystems with
+# explicit cross-connections (a Vector{Equation} of connect() calls).
+#
+# Primary use case: combining multiple symmetric_plate assemblies
+# with hydraulic series wiring between plates.
+#
+# Usage:
+#   conns = [connect(p1.cac.port_out, p2.cac.port_in), ...]
+#   top = compose_systems(p1, p2; connections=conns, name=:reactor)
+# ----------------------------------------------------------------
+function compose_systems(systems...; connections::Vector{<:Equation}, name::Symbol)
+    compose(System(connections, t; name=name), systems...)
+end
