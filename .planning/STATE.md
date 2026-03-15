@@ -4,7 +4,7 @@ milestone: v0.4
 milestone_name: Composability & Physics
 status: completed
 stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-03-15T20:09:45.493Z"
+last_updated: "2026-03-15T23:32:00.624Z"
 last_activity: 2026-03-15 — Phase 16 Plan 01 complete; VAL-01 Fourier transient, VAL-02 two-plate topology, VAL-03 T_max analytical assertion all green
 progress:
   total_phases: 4
@@ -22,10 +22,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-14)
+See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 13 — Physics Foundation
+**Current focus:** Planning next milestone (v0.5)
 **Python STREAM reference:** ~/projects/STREAM
 
 ---

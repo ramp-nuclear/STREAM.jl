@@ -1,5 +1,24 @@
 # Milestones
 
+## v0.4 Composability & Physics (Shipped: 2026-03-16)
+
+**Phases:** 13-16 (4 phases, 7 plans)
+**Julia LOC:** ~3,268 at completion
+**Timeline:** 2026-03-14 → 2026-03-16 (~2 days)
+**Git range:** `3788148` → `0298a38` (72 files changed, +8,029/-6,616 lines)
+
+**Key accomplishments:**
+- PipeGeometry redesigned with 6 fields and factory constructors; MTR hydraulic diameter corrected from 10 mm → 2.5 mm, fixing a 4× geometry error (PHY-01)
+- Pump extended with dual-mode dispatch (`Pump(mdot0=...)` for fixed-flow scenarios) (PHY-05)
+- Six pluggable HTC/friction correlation functions in `src/correlations.jl` with KAERI rectangular laminar correction and `regime_dependent` Re-switching (PHY-02/03/04)
+- ChannelAndContacts gains 10 MTK `@observed` variables (Re, Nu, velocity, Pe, wall T/q) + `port()`/`check_gravity_mismatch()` helpers (QOL-01/02/03)
+- Four MTK composition helpers (`symmetric_plate`, `plate`, `one_sided_connection`, `compose_systems`) collapse 10-20 line wiring loops into single calls (COMP-01/02/03/04)
+- Three quantitative VAL assertions: Fourier series transient, two-plate one-channel topology, T_max adiabatic-face formula (VAL-01/02/03)
+
+**Archive:** `.planning/milestones/v0.4-ROADMAP.md`
+
+---
+
 ## v0.3 HeatDiffusion (Shipped: 2026-03-14)
 
 **Phases:** 10-12.1 (4 phases, 8 plans)

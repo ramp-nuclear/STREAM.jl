@@ -141,6 +141,52 @@
 
 ---
 
+## Milestone: v0.4 — Composability & Physics
+
+**Shipped:** 2026-03-16
+**Phases:** 4 (13-16) | **Plans:** 7
+
+### What Was Built
+- PipeGeometry redesigned with 6 fields and `wet_perimeter`; Dh = 4A/wet_perimeter; MTR hydraulic diameter corrected from 10 mm → 2.5 mm; all ~20 call sites migrated to `PipeGeometry_rectangular` / `PipeGeometry_circular` factory functions
+- Pump dual-mode dispatch: `Pump(mdot0=...)` for fixed-flow, `Pump(dP_pump=...)` for fixed-pressure; PHY-05 loop integration test
+- Six pluggable correlation functions in `src/correlations.jl`: `constant_Nusselt`, `dittus_boelter`, `laminar_friction`, `blasius_friction`, `rectangular_laminar_correction` (KAERI K_R), `regime_dependent` with ifelse() Re-switching
+- ChannelAndContacts refactored to accept `htc_correlation` and `friction_correlation` closure kwargs; default unchanged
+- 10 MTK `@observed` variables in ChannelAndContacts: Re, Nu, velocity, Pe, h_tc_left/right, T_wall_left/right, q_wall_left/right
+- `src/helpers.jl` with `port()`, `check_gravity_mismatch()`, `symmetric_plate()`, `plate()`, `one_sided_connection()`, `compose_systems()`
+- Three quantitative VAL assertions: Fourier series transient (VAL-01, 4 checkpoints ≤1%), two-plate one-channel topology energy balance (VAL-02), T_max adiabatic formula (VAL-03, ≤1%)
+
+### What Worked
+- PipeGeometry factory functions (no sentinel-kwargs constructor) made the call sites cleaner than the old API
+- Correlation functions as plain Julia closures — no `@register_symbolic` needed; MTK traces arithmetic symbolically; clean API, no framework plumbing
+- `@observed` for Re/Nu/v/Pe worked cleanly: solver unknown vector shrinks, diagnostics still accessible via `sol[sys.ch.Re, :]`
+- Composition helpers infer `n` from CAC's uncompiled thermal_left subsystem count — callers don't need to pass `n` explicitly; ergonomic and safe
+- `regime_dependent` `ifelse()` pattern reused from flow-reversal smoothing — smooth switching, no solver discontinuity
+- VAL-03 using analytical energy balance instead of Python STREAM reference was the right call — caught a Python bug and produced a more rigorous assertion
+
+### What Was Inefficient
+- VAL-02/03 use raw `getproperty` wiring because the topology (2 plates → 1 channel; plate.thermal_left ↔ cac.thermal_left) is incompatible with `one_sided_connection` — the helpers were verified independently but couldn't be used in validation tests; a future helper covering these topologies would close this gap
+- The `build_initializeprob=false` requirement for coupled HeatDiffusion+CAC was discovered during execution rather than anticipated in the plan; it should be a first-class planning note for any HeatDiffusion integration test
+- PHY-05 channel thermal port pinning (`ch5.thermal.T ~ 350.0`) was unexpected — a planning note about unconnected ThermalPort unknowns would have prevented the mid-task discovery
+
+### Patterns Established
+- **Correlation closures**: All HTC and friction correlations are plain Julia functions returning `(Re, Pr, geom) -> value`; no MTK registration needed; pass as kwargs to channel components
+- **`@observed` for diagnostics**: Variables that feed equations (h_tc) stay as unknowns; variables that are derived outputs (Re, Nu) go to `@observed`; h_tc equation is inlined to avoid MTK observed-chain resolution issues
+- **Composition helpers infer n**: Any helper that wraps ChannelAndContacts should use `_infer_n(cac)` rather than require an explicit `n` argument
+- **No backward-compat shims**: When redesigning constructors, delete the old one; MethodError is the correct migration signal
+
+### Key Lessons
+1. **Plan call-site migration alongside struct redesign** — PipeGeometry_rectangular was planned, but the ~20 call sites in `src/solvers.jl` were missed in the initial plan migration map; the executor caught it, but the plan should have listed migration sites explicitly
+2. **VAL tests for coupled systems need `build_initializeprob=false`** — add this to the standard HeatDiffusion+CAC test template; it should never be discovered at execution time
+3. **Unconnected ThermalPort creates an extra unknown** — always pin any unconnected `thermal` port in test loops; add to test fixture checklist
+4. **Use analytical references when Python has known bugs** — VAL-03 demonstrates that deriving the assertion from first principles is both more rigorous and more portable than copying Python output
+
+### Cost Observations
+- Model mix: ~100% sonnet (balanced profile throughout)
+- Sessions: ~3 (Phase 13-14 on 2026-03-14, Phase 15 on 2026-03-15, Phase 16 + audit/tech debt on 2026-03-15/16)
+- Notable: Tech debt resolution from milestone audit (commit 5c4f9ad) added one focused session; 5 of 6 audit items resolved same-day, 1 accepted as architectural
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -150,6 +196,7 @@
 | v0.1 | 5 | 12 | First milestone — baseline established |
 | v0.2 | 4 | 7 | Smaller plans (avg 1.75/phase vs 2.4/phase); `_channel_base_eqs` shared helper pattern emerges |
 | v0.3 | 4 | 8 | Decimal phase insertion for post-validation correction; PipeGeometry encapsulation pattern; KINSOL for coupled solid+fluid DAE |
+| v0.4 | 4 | 7 | Pluggable correlations via plain closures; `@observed` pattern for diagnostics; composition helpers with n-inference |
 
 ### Cumulative Quality
 
@@ -158,3 +205,4 @@
 | v0.1 | 54 | 15/15 | 0 |
 | v0.2 | 86 | 10/10 | 0 |
 | v0.3 | 161 | 14/14 | 0 |
+| v0.4 | ~200+ | 15/15 | 0 |
