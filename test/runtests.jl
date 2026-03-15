@@ -126,6 +126,9 @@ end  # @testset "STREAM Phase 1 Tests"
     @test isapprox(geo.wet_perimeter, 2.0 * (0.07 + 0.00127); rtol=1e-4)
     # Dh = 4*area/wet_perimeter ≈ 0.002495 m
     @test isapprox(geo.Dh, 4.0 * (0.07 * 0.00127) / (2.0 * (0.07 + 0.00127)); rtol=1e-4)
+    # width = max(edge1, edge2) = 0.07; depth = min(edge1, edge2) = 0.00127
+    @test geo.width == 0.07
+    @test geo.depth == 0.00127
     # two-sided: heated_parts = (heated_edge, heated_edge)
     @test geo.heated_parts == (0.07, 0.07)
     # one_sided=:left
@@ -149,6 +152,9 @@ end
     @test isapprox(geo.heated_parts[2], π * 0.01 / 2; rtol=1e-10)
     # area = π*D²/4
     @test isapprox(geo.A, π * 0.01^2 / 4; rtol=1e-10)
+    # circular: width == depth == D
+    @test geo.width == 0.01
+    @test geo.depth == 0.01
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -356,9 +362,9 @@ end
 end
 
 # ─────────────────────────────────────────────────────────────────
-# VAL-03: Full suite runs via Pkg.test() (confirmed by reaching here)
+# COMPAT: Full suite runs via Pkg.test() (confirmed by reaching here)
 # ─────────────────────────────────────────────────────────────────
-@testset "VAL-03: Test suite runs automatically" begin
+@testset "COMPAT: Test suite runs automatically via Pkg.test()" begin
     @test true
 end
 
@@ -1463,6 +1469,25 @@ end
     @test check_gravity_mismatch(ssys) == :ok
 end
 
+@testset "QOL-02: check_gravity_mismatch — unbalanced loop :mismatch" begin
+    # Channel with g=9.81 (gravity active) but no Gravity return component.
+    # check_gravity_mismatch detects g_acc > 0 with no matching H parameter.
+    @named ch_gm   = Channel(n=1, geometry=PipeGeometry_circular(0.6, 0.01), g=9.81)
+    @named pump_gm = Pump(dP_pump=1000.0)
+    @named hx_gm   = HeatExchanger(T_bc=600.0)
+    conns_gm = [
+        connect(pump_gm.port_out, hx_gm.port_in),
+        connect(hx_gm.port_out,   ch_gm.port_in),
+        connect(ch_gm.port_out,   pump_gm.port_in),
+        pump_gm.port_in.P ~ 1.0e5,
+        ch_gm.port_in.T   ~ 600.0,
+        ch_gm.thermal.T   ~ 600.0,
+    ]
+    @named sys_gm = compose(System(conns_gm, t; name=:sys_gm), pump_gm, hx_gm, ch_gm)
+    ssys_gm = mtkcompile(sys_gm)
+    @test check_gravity_mismatch(ssys_gm) == :mismatch
+end
+
 @testset "QOL-03: port() helper" begin
     # port(sys, :thermal_left, i) wraps getproperty(sys, Symbol(face, i))
     # Verify it returns the same object as direct getproperty access.
@@ -1474,10 +1499,6 @@ end
     # port() constructs Symbol(:thermal_left, 3) = :thermal_left3 (checks concat logic)
     @test nameof(port(cac, :thermal_left, 3)) == nameof(getproperty(cac, Symbol(:thermal_left, 3)))
 end
-
-# Shared geometry for COMP tests (n=3 cells, small MTR-like channel)
-const geom_comp = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-const ps_comp   = ones(3, 3)  # uniform power shape, 3x3
 
 # Shared geometry for COMP tests (n=3 cells, small MTR-like channel)
 const geom_comp = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
@@ -1498,7 +1519,7 @@ const ps_comp   = ones(3, 3)  # uniform power shape, 3x3
         connect(pump.port_out,          hx_in.port_in),
         connect(hx_in.port_out,         plate_sys.cac.port_in),
         connect(plate_sys.cac.port_out, pump.port_in),
-        pump.port_in.P         ~ 1.0e5,
+        pump.port_in.P          ~ 1.0e5,
         plate_sys.cac.port_in.T ~ 600.0,
     ]
     @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, plate_sys)
@@ -1594,6 +1615,43 @@ end
     reactor = compose_systems(p1, p2, pump, hx_in; connections=cross_conns, name=:reactor)
     ssys = mtkcompile(reactor)
     @test length(ModelingToolkit.unknowns(ssys)) > 0
+end
+
+@testset "COMP: symmetric_plate — physics verification (energy balance)" begin
+    # Verify symmetric_plate produces physically correct output: T_out > T_in,
+    # full plate power matches channel energy gain within 5%.
+    # Uses default (Dittus-Boelter + Blasius) correlations for turbulent-regime convergence.
+    n_cp = 3; T_in_cp = 313.15
+    geom_cp = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    ps_cp   = fill(1.0 / (n_cp * n_cp), n_cp, n_cp)
+    @named cac_cp  = ChannelAndContacts(n=n_cp, geometry=geom_cp)
+    @named fuel_cp = HeatDiffusion(nz=n_cp, nx=n_cp, Lz=0.6, Lx=0.00127, y=0.07,
+                                    rho_s=19300.0, cp_s=130.0, k_s=20.0,
+                                    power_shape=ps_cp, power=1e4)
+    plate_cp = symmetric_plate(cac_cp, fuel_cp; name=:plate_cp)
+    @named pump_cp  = Pump(dP_pump=3.0e4)
+    @named hx_cp   = HeatExchanger(T_bc=T_in_cp)
+    outer_cp = [
+        connect(pump_cp.port_out,            hx_cp.port_in),
+        connect(hx_cp.port_out,              plate_cp.cac_cp.port_in),
+        connect(plate_cp.cac_cp.port_out,    pump_cp.port_in),
+        pump_cp.port_in.P                  ~ 1.0e5,
+        plate_cp.cac_cp.port_in.T          ~ T_in_cp,
+    ]
+    @named top_cp = compose(System(outer_cp, t; name=:top_cp), pump_cp, hx_cp, plate_cp)
+    ssys_cp = mtkcompile(top_cp)
+    T_g_cp = steady_state_guess(T_inlet=T_in_cp, Q_wall=1e4, mdot_guess=0.250, n=n_cp)
+    op_cp = vcat(
+        [ssys_cp.plate_cp.cac_cp.T[i]        => T_g_cp[i]       for i in 1:n_cp],
+        [ssys_cp.plate_cp.fuel_cp.T[i, j]    => T_g_cp[i] + 2.0 for i in 1:n_cp for j in 1:n_cp],
+        [ssys_cp.plate_cp.cac_cp.port_in.mdot => 0.250],
+    )
+    sol_cp = solve_steady(ssys_cp, op_cp)
+    @test sol_cp.retcode == ReturnCode.Success
+    @test sol_cp[ssys_cp.plate_cp.cac_cp.T_out] > T_in_cp
+    mdot_cp = sol_cp[ssys_cp.plate_cp.cac_cp.port_in.mdot]
+    @test isapprox(sol_cp[ssys_cp.plate_cp.cac_cp.T_out] - T_in_cp,
+                   1e4 / (mdot_cp * cp_water(T_in_cp)); rtol=0.05)
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
