@@ -111,3 +111,11 @@ None - no external service configuration required.
 ---
 *Phase: 14-laminar-correlations*
 *Completed: 2026-03-15*
+
+## Self-Check: PASSED
+
+- FOUND: /home/itay/projects/Julia-STREAM/.planning/phases/14-laminar-correlations/14-02-SUMMARY.md
+- FOUND: commit f1f84bc (feat(14-02): refactor channel components)
+- FOUND: commit 8ee2a65 (test(14-02): add PHY-02/03/04 integration tests)
+- FOUND: commit 2266b6c (docs(14-02): final metadata commit)
+- All 179 tests pass: `julia --project=. -e "include(\"test/runtests.jl\")"` — no failures
