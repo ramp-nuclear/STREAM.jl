@@ -1670,4 +1670,78 @@ end
     @test isapprox(T_center_series[end], T_wall; rtol=0.01)
 end
 
+# ─────────────────────────────────────────────────────────────────
+# VAL-02: Two HeatDiffusion plates connected to one ChannelAndContacts
+# Topology: thermal_left[i] → hd1 (plate 1); thermal_right[i] → hd2 (plate 2).
+# Both faces of the single CAC are simultaneously active.
+# This is the first test exercising the Phase 10 two-sided upgrade end-to-end.
+# ─────────────────────────────────────────────────────────────────
+@testset "VAL-02: Two-plate one-channel topology — both faces active" begin
+    nz_v02 = 10; nx_v02 = 3
+    T_in_v02 = 313.15
+    power_per_plate = 1e4   # W each → 20 kW total to one channel
+
+    @named pump_v02 = Pump(dP_pump=3.0e4)
+    @named hx_v02   = HeatExchanger(T_bc=T_in_v02)
+    @named cac_v02  = ChannelAndContacts(n=nz_v02,
+                          geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
+    ps_v02 = fill(1.0 / (nz_v02 * nx_v02), nz_v02, nx_v02)
+    @named hd1 = HeatDiffusion(nz=nz_v02, nx=nx_v02, Lz=0.6, Lx=0.00127, y=0.07,
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
+                                power_shape=ps_v02, power=power_per_plate)
+    @named hd2 = HeatDiffusion(nz=nz_v02, nx=nx_v02, Lz=0.6, Lx=0.00127, y=0.07,
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
+                                power_shape=ps_v02, power=power_per_plate)
+
+    conns_v02 = [
+        # Hydraulic loop
+        connect(pump_v02.port_out, hx_v02.port_in),
+        connect(hx_v02.port_out,   cac_v02.port_in),
+        connect(cac_v02.port_out,  pump_v02.port_in),
+        pump_v02.port_in.P       ~ 1.0e5,
+        cac_v02.port_in.T        ~ T_in_v02,
+        # hd1 left face → cac thermal_left (hd1 is on the left of the channel)
+        [connect(getproperty(hd1,     Symbol(:thermal_left,  i)),
+                 getproperty(cac_v02, Symbol(:thermal_left,  i))) for i in 1:nz_v02]...,
+        # hd2 left face → cac thermal_right (hd2 is on the right of the channel, facing inward)
+        [connect(getproperty(hd2,     Symbol(:thermal_left,  i)),
+                 getproperty(cac_v02, Symbol(:thermal_right, i))) for i in 1:nz_v02]...,
+    ]
+    @named sys_v02 = compose(System(conns_v02, t; name=:val02_sys), pump_v02, hx_v02, cac_v02, hd1, hd2)
+    ssys_v02 = mtkcompile(sys_v02; fully_determined=false)
+
+    # Initial guess: plate T slightly above T_in, mdot +0.250 (rectangular MTR at 30 kPa)
+    T_guess_v02 = T_in_v02 + 10.0
+    op_v02 = vcat(
+        [ssys_v02.hd1.T[i, j]          => T_guess_v02 for i in 1:nz_v02 for j in 1:nx_v02],
+        [ssys_v02.hd2.T[i, j]          => T_guess_v02 for i in 1:nz_v02 for j in 1:nx_v02],
+        [ssys_v02.cac_v02.T[i]          => T_guess_v02 for i in 1:nz_v02],
+        [ssys_v02.cac_v02.port_in.mdot  => +0.250],
+    )
+    sol_v02 = solve_steady(ssys_v02, op_v02)
+
+    # Assertion 1: solver converged
+    @test sol_v02.retcode == ReturnCode.Success
+
+    # Assertion 2: energy balance — both plates heat the single channel
+    mdot_v02 = sol_v02[ssys_v02.cac_v02.port_in.mdot]
+    cp_v02 = cp_water(T_in_v02)
+    T_rise_expected_v02 = (power_per_plate + power_per_plate) / (mdot_v02 * cp_v02)
+    @test isapprox(sol_v02[ssys_v02.cac_v02.T_out] - T_in_v02, T_rise_expected_v02; rtol=0.05)
+
+    # Assertion 3: each plate center hotter than fluid midpoint (plate has internal source)
+    mid = nz_v02 ÷ 2
+    lat = (nx_v02 + 1) ÷ 2
+    @test sol_v02[ssys_v02.hd1.T[mid, lat]] > sol_v02[ssys_v02.cac_v02.T[mid]]
+    @test sol_v02[ssys_v02.hd2.T[mid, lat]] > sol_v02[ssys_v02.cac_v02.T[mid]]
+
+    # Assertion 4: Q_flow < 0 on connected faces (heat flows FROM plate TO fluid, MTK convention)
+    # hd1: thermal_left[i] is connected → Q_flow < 0
+    # hd2: thermal_left[i] is connected → Q_flow < 0
+    for i in 1:nz_v02
+        @test sol_v02[getproperty(ssys_v02.hd1, Symbol(:thermal_left, i)).Q_flow] < 0.0
+        @test sol_v02[getproperty(ssys_v02.hd2, Symbol(:thermal_left, i)).Q_flow] < 0.0
+    end
+end
+
 end  # @testset "Phase 16: Validation"
