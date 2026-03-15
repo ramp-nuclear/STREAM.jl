@@ -1,10 +1,11 @@
 ---
 phase: 16
 slug: validation
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-15
+audited: 2026-03-15
 ---
 
 # Phase 16 — Validation Strategy
@@ -38,9 +39,9 @@ created: 2026-03-15
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 16-01-01 | 01 | 1 | VAL-03 | unit assertion | `julia --project test/runtests.jl` | ❌ W0 (inline edit) | ⬜ pending |
-| 16-01-02 | 01 | 1 | VAL-01 | integration | `julia --project test/runtests.jl` | ❌ W0 (new @testset) | ⬜ pending |
-| 16-02-01 | 02 | 2 | VAL-02 | integration | `julia --project test/runtests.jl` | ❌ W0 (new @testset) | ⬜ pending |
+| 16-01-01 | 01 | 1 | VAL-03 | unit assertion | `julia --project test/runtests.jl` | ✅ test/runtests.jl:1124 | ✅ green |
+| 16-01-02 | 01 | 1 | VAL-01 | integration | `julia --project test/runtests.jl` | ✅ test/runtests.jl:1612 | ✅ green |
+| 16-02-01 | 02 | 2 | VAL-02 | integration | `julia --project test/runtests.jl` | ✅ test/runtests.jl:1679 | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,11 +49,11 @@ created: 2026-03-15
 
 ## Wave 0 Requirements
 
-- [ ] `test/runtests.jl` — inline T_max assertion + NOTE comment update at lines 1124-1126 (within existing VAL-03 @testset)
-- [ ] `test/runtests.jl` — new `@testset "VAL-01: HeatDiffusion transient — Fourier series validation"` block after line 1585
-- [ ] `test/runtests.jl` — new `@testset "VAL-02: Two-plate one-channel topology — both faces active"` block after VAL-01
+- [x] `test/runtests.jl` — inline T_max assertion at line 1138 (within existing VAL-03 @testset)
+- [x] `test/runtests.jl` — `@testset "VAL-01: HeatDiffusion transient — Fourier series validation"` at line 1612
+- [x] `test/runtests.jl` — `@testset "VAL-02: Two-plate one-channel topology — both faces active"` at line 1679
 
-No new source files needed — all implementation is test assertions in the existing runtests.jl file.
+All 30 tests in `Phase 16: Validation` testset pass (confirmed 2026-03-15).
 
 ---
 
@@ -64,11 +65,21 @@ No new source files needed — all implementation is test assertions in the exis
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-03-15 — 30/30 tests green, 0 gaps
+
+---
+
+## Validation Audit 2026-03-15
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
