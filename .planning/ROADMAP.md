@@ -106,10 +106,11 @@ Plans:
   3. `?solve_steady`, `?solve_transient`, `?build_loop`, and related solver/example functions each return a complete docstring
   4. `?rho_water` (and `cp_water`, `mu_water`, `k_water`) return docstrings with `# Arguments` and `# Returns`
   5. CLAUDE.md contains a rationale sentence for each rule; `Project.toml` reads `version = "0.5.0"`; `ChannelHeatFlux` and `ConstantTemperature` are exported, tested, and documented
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 19-01: TBD
+- [ ] 19-01-PLAN.md — Add docstrings to all 28 exported functions (DOC-01, DOC-02, DOC-03, DOC-04)
+- [ ] 19-02-PLAN.md — Expand CLAUDE.md with rationale and MTK patterns; ChannelHeatFlux test; version bump (QOL-03, QOL-04, QOL-05)
 
 ## Progress
 
@@ -135,10 +136,10 @@ Plans:
 | 15. Composition Helpers & QoL | v0.4 | 2/2 | Complete | 2026-03-15 |
 | 16. Validation | v0.4 | 1/1 | Complete | 2026-03-15 |
 | 17. File Structure Reorganization | v0.5 | 2/2 | Complete | 2026-03-16 |
-| 18. Test Split and API Cleanup | 2/2 | Complete    | 2026-03-16 | - |
-| 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 0/TBD | Not started | - |
+| 18. Test Split and API Cleanup | v0.5 | 2/2 | Complete | 2026-03-16 |
+| 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 0/2 | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-16 — Phase 18 planned: 2 plans*
+*Updated: 2026-03-16 — Phase 19 planned: 2 plans*
