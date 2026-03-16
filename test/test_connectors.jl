@@ -1,9 +1,9 @@
 using Test
 using ModelingToolkit
 using Symbolics
-using ModelingToolkitBase
 using STREAM
 import STREAM: Channel  # resolve Base.Channel ambiguity
+const ModelingToolkitBase = ModelingToolkit.ModelingToolkitBase
 
 # ─────────────────────────────────────────────────────────────────
 # FOUND-01: Package loads (implicitly tested by reaching this line)
