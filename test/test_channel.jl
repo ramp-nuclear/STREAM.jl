@@ -246,3 +246,33 @@ end
     @test ct isa ModelingToolkit.System
     @test_nowarn mtkcompile(ct; fully_determined=false)
 end
+
+# ─────────────────────────────────────────────────────────────────
+# ChannelHeatFlux: standalone — builds, solves, produces heated output
+# Topology: Pump -> HeatExchanger(T_bc) -> ChannelHeatFlux(T_wall) -> Pump
+# Confirms: retcode Success, T_out > T_inlet (heat added)
+# ─────────────────────────────────────────────────────────────────
+@testset "ChannelHeatFlux: standalone" begin
+    n = 10; T_inlet = 313.15; T_wall = 373.15
+    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+
+    @named pump = Pump(dP_pump=dP_pump)
+    @named chf  = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
+    @named bc   = HeatExchanger(T_bc=T_inlet)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, chf.port_in),
+        connect(chf.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        chf.port_in.T  ~ T_inlet,
+    ]
+    @named sys = compose(System(conns, t; name=:sys), pump, bc, chf)
+    ssys = mtkcompile(sys)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+    op = [ssys.chf.T[i] => T_guess[i] for i in 1:n]
+    push!(op, ssys.chf.port_in.mdot => 0.490)
+    sol = solve_steady(ssys, op)
+
+    @test sol.retcode == ReturnCode.Success
+    @test sol[ssys.chf.T_out] > T_inlet   # outlet must be warmer than inlet
+end

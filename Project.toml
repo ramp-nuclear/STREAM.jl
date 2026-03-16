@@ -1,7 +1,7 @@
 name = "STREAM"
 uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 authors = ["STREAM.jl Contributors"]
-version = "0.1.0"
+version = "0.5.0"
 
 [deps]
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
