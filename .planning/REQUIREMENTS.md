@@ -82,33 +82,33 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SIGN-01 | — | Pending |
-| SIGN-02 | — | Pending |
-| SIGN-03 | — | Pending |
-| SIGN-04 | — | Pending |
-| FLUID-01 | — | Pending |
-| FLUID-02 | — | Pending |
-| FLUID-03 | — | Pending |
-| NATCONV-01 | — | Pending |
-| NATCONV-02 | — | Pending |
-| PUMP-01 | — | Pending |
-| PUMP-02 | — | Pending |
-| PUMP-03 | — | Pending |
-| FLAP-01 | — | Pending |
-| FLAP-02 | — | Pending |
-| FLAP-03 | — | Pending |
-| FLAP-04 | — | Pending |
-| FLAP-05 | — | Pending |
-| FLAP-06 | — | Pending |
-| SOLV-01 | — | Pending |
-| VAL-01 | — | Pending |
-| VAL-02 | — | Pending |
+| SIGN-01 | Phase 20 | Pending |
+| SIGN-02 | Phase 20 | Pending |
+| SIGN-03 | Phase 20 | Pending |
+| SIGN-04 | Phase 20 | Pending |
+| FLUID-01 | Phase 21 | Pending |
+| FLUID-02 | Phase 21 | Pending |
+| FLUID-03 | Phase 21 | Pending |
+| NATCONV-01 | Phase 21 | Pending |
+| NATCONV-02 | Phase 21 | Pending |
+| PUMP-01 | Phase 22 | Pending |
+| PUMP-02 | Phase 22 | Pending |
+| PUMP-03 | Phase 22 | Pending |
+| FLAP-01 | Phase 23 | Pending |
+| FLAP-02 | Phase 23 | Pending |
+| FLAP-03 | Phase 23 | Pending |
+| FLAP-04 | Phase 23 | Pending |
+| FLAP-05 | Phase 23 | Pending |
+| FLAP-06 | Phase 23 | Pending |
+| SOLV-01 | Phase 23 | Pending |
+| VAL-01 | Phase 24 | Pending |
+| VAL-02 | Phase 24 | Pending |
 
 **Coverage:**
 - v0.6 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21 (roadmap pending)
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 after initial definition*
+*Last updated: 2026-03-17 — traceability complete after roadmap creation*

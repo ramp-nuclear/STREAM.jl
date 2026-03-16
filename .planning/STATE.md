@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
-status: defining_requirements
-stopped_at: —
+status: roadmap_created
+stopped_at: Phase 20 ready to plan
 last_updated: "2026-03-17"
-last_activity: 2026-03-17 — Milestone v0.6 started
+last_activity: 2026-03-17 — v0.6 roadmap created (phases 20-24)
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 8
   completed_plans: 0
   percent: 0
 ---
@@ -22,71 +22,48 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-16)
+See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 19 (next) — v0.5 milestone complete after phase 18
+**Current focus:** Phase 20 — Sign Safety (v0.6 start)
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-17 — Milestone v0.6 started
+Phase: 20 of 24 (Sign Safety)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-03-17 — v0.6 roadmap created
 
-Progress: [████████░░] 83% (5 of 6 plans complete; phase 19 plan 01 summary pending)
+Progress: [░░░░░░░░░░] 0% (0 of 8 plans complete)
 
 ---
 
 ## Performance Metrics
 
-**v0.4 velocity reference:** 7 plans completed
+**v0.5 velocity reference:** 6 plans completed
 
 | Phase | Plans | Avg/Plan |
 |-------|-------|----------|
-| 13 Physics Foundation | 2 | ~18 min |
-| 14 Laminar Correlations | 2 | ~15 min |
-| 15 Composition Helpers & QoL | 2 | ~33 min |
-| 16 Validation | 1 | ~7 min |
-| 17 File Structure Reorganization P01 | 1 | ~23 min |
+| 17 File Structure Reorganization | 2 | ~24 min |
+| 18 Test Split and API Cleanup | 2 | ~9 min |
+| 19 Docstrings, CLAUDE.md, Final Polish | 2 | ~6 min |
 
 *Updated after each plan completion*
 
 ---
-| Phase 17 P02 | 25 | 2 tasks | 5 files |
-| Phase 18 P01 | 14 min | 2 tasks | 15 files |
-| Phase 18 P02 | 4 | 1 tasks | 3 files |
-| Phase 19-docstrings-claude-md-and-final-polish P02 | 4 | 2 tasks | 3 files |
-| Phase 19 P01 | 8 | 2 tasks | 10 files |
 
 ## Accumulated Context
 
-### Key Decisions (carry-forward for v0.5)
+### Key Decisions (carry-forward for v0.6)
 
-- [17-01]: misc.jl merges two non-adjacent sections from components.jl (Inertia/HeatExchanger + ConstantTemperature) in document order
-- [17-01]: _channel_base_eqs placed in channel.jl (not thermal_channel.jl); channel.jl included before thermal_channel.jl in STREAM.jl
-- [17-01]: VAL-01 Fourier series test is a pre-existing flaky failure, not caused by file structure changes — confirmed on prior commit
-- [v0.5]: Pure code quality milestone — zero new features, zero physics changes
-- [v0.5]: STR-02 done — components.jl split complete; include order audited, no forward-reference errors
-- [v0.4]: Composition helpers live in `src/helpers.jl` → moving to `src/composition/helpers.jl` in Phase 17
-- [v0.4]: Correlation functions live in `src/correlations.jl` → moving to `src/physical_models/correlations.jl` in Phase 17
-- [v0.4]: VAL-03 orphaned `@testset` placeholder exists in runtests.jl → remove in Phase 18 (QOL-02)
-- [v0.4]: `solve_transient` still uses positional args → convert to keyword-only in Phase 18 (QOL-01)
-- [17-02]: examples.jl has no using/export/include — all symbols accessed from module scope (STREAM.jl includes everything before examples.jl)
-- [17-02]: solvers.jl using statements left untouched per CONTEXT.md locked decision
-- [17-02]: STR-03, STR-04, STR-05 complete — canonical CLAUDE.md file layout is now fully in effect
-- [18-01]: ModelingToolkitBase accessed as ModelingToolkit.ModelingToolkitBase submodule (not standalone package in project env)
-- [18-01]: COMPAT test moved to test_examples.jl per CLAUDE.md layout; const SciMLBase moved into test_misc.jl and test_validation.jl
-- [18-01]: TEST-01 and QOL-02 complete — runtests.jl is now thin orchestrator; VAL-03 preserved in test_validation.jl
-- [18-02]: QOL-01 complete — solve_transient converted to keyword-only; all exported STREAM.jl functions now use keyword-only arguments
-- [19-02]: QOL-03: Why: rationale added as indented italic lines below each rule in CLAUDE.md; new MTK Patterns section documents 5 non-obvious conventions
-- [19-02]: QOL-04: Project.toml version bumped 0.1.0 -> 0.5.0 marking v0.5 Code Quality milestone complete
-- [19-02]: QOL-05: ChannelHeatFlux standalone testset added to test_channel.jl; ConstantTemperature confirmed exported and tested in CHAN-02
-- [19-01]: DOC-01 through DOC-04 complete — all 28 exported names have structured Julia docstrings with # Arguments and # Returns (# Ports for components)
-- [19-01]: Plan verify command had @doc macro semantics bug (evaluates expression at compile time, finds getfield docs); actual docstrings verified via Base.Docs.doc()
+- [v0.5]: solve_transient is now keyword-only — SOLV-01 must preserve this convention when adding `callbacks` kwarg
+- [v0.4]: ifelse() used for flow reversal and regime switching — SIGN-01..03 may need to audit all ifelse() sign usages
+- [v0.4]: Correlation functions are plain Julia closures (not @register_symbolic) — elenbaas_nusselt follows the same pattern
+- [v0.4]: Re/Nu/velocity/Pe are @observed (not unknowns) — SIGN-02 must ensure these stay @observed and sign-correct
+- [v0.3]: Flapper is a new component file — goes to src/components/ per CLAUDE.md layout
 
 ### Pending Todos
 
@@ -94,17 +71,18 @@ None.
 
 ### Blockers/Concerns
 
-- VAL-01 (Fourier series validation) is a pre-existing flaky numerical test — not introduced by 17-01.
+- VAL-01 (Fourier series validation) is a pre-existing flaky numerical test — not caused by v0.6 changes.
+- PUMP-01 requires @register_symbolic for a callable — implementation strategy (wrapping f(t) as symbolic) needs prototyping in plan.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-03-16T15:53:11.110Z
-**Stopped at:** Completed 19-01-PLAN.md
-**Next action:** `/gsd:plan-phase 17`
+**Last session:** 2026-03-17
+**Stopped at:** v0.6 roadmap created
+**Next action:** `/gsd:plan-phase 20`
 **Resume file:** None
 
 ---
 
-*Last updated: 2026-03-16 — Phase 19 plan 02 complete; CLAUDE.md rationale and MTK patterns added; ChannelHeatFlux tested; v0.5.0 tagged*
+*Last updated: 2026-03-17 — v0.6 roadmap created; 5 phases (20-24), 8 planned plans, 21 requirements mapped*
