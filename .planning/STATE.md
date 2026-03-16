@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Code Quality
 status: executing
-stopped_at: Phase 18 context gathered
-last_updated: "2026-03-16T12:16:51.604Z"
+stopped_at: Completed 18-01-PLAN.md
+last_updated: "2026-03-16T13:22:49.709Z"
 last_activity: 2026-03-16 — 17-02 complete; correlations/helpers moved to subdirs, examples.jl extracted from solvers.jl
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 100
 ---
 
@@ -25,19 +25,19 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 17 — File Structure Reorganization
+**Current focus:** Phase 18 — Test Split and API Cleanup
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: 17 of 19 in v0.5 (File Structure Reorganization)
-Plan: 2 of 2 in current phase (17-02 complete — phase 17 DONE)
+Phase: 18 of 19 in v0.5 (Test Split and API Cleanup)
+Plan: 1 of 2 in current phase (18-01 complete — test split done)
 Status: In Progress
-Last activity: 2026-03-16 — 17-02 complete; correlations/helpers moved to subdirs, examples.jl extracted from solvers.jl
+Last activity: 2026-03-16 — 18-01 complete; runtests.jl split into 13 self-contained test files
 
-Progress: [██████████] 100% (v0.5 phase 17 complete)
+Progress: [████████░░] 75% (v0.5 phase 18 plan 1 complete)
 
 ---
 
@@ -57,6 +57,7 @@ Progress: [██████████] 100% (v0.5 phase 17 complete)
 
 ---
 | Phase 17 P02 | 25 | 2 tasks | 5 files |
+| Phase 18 P01 | 14 min | 2 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Progress: [██████████] 100% (v0.5 phase 17 complete)
 - [17-02]: examples.jl has no using/export/include — all symbols accessed from module scope (STREAM.jl includes everything before examples.jl)
 - [17-02]: solvers.jl using statements left untouched per CONTEXT.md locked decision
 - [17-02]: STR-03, STR-04, STR-05 complete — canonical CLAUDE.md file layout is now fully in effect
+- [18-01]: ModelingToolkitBase accessed as ModelingToolkit.ModelingToolkitBase submodule (not standalone package in project env)
+- [18-01]: COMPAT test moved to test_examples.jl per CLAUDE.md layout; const SciMLBase moved into test_misc.jl and test_validation.jl
+- [18-01]: TEST-01 and QOL-02 complete — runtests.jl is now thin orchestrator; VAL-03 preserved in test_validation.jl
 
 ### Pending Todos
 
@@ -87,10 +91,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-16T12:16:51.601Z
-**Stopped at:** Phase 18 context gathered
+**Last session:** 2026-03-16T13:22:49.707Z
+**Stopped at:** Completed 18-01-PLAN.md
 **Next action:** `/gsd:plan-phase 17`
-**Resume file:** .planning/phases/18-test-split-and-api-cleanup/18-CONTEXT.md
+**Resume file:** None
 
 ---
 
