@@ -53,7 +53,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 
 ### Out of Scope
 
-- Point kinetics — thermal-hydraulic architecture now proven through v0.4; defer to v0.5
+- Point kinetics — thermal-hydraulic architecture now proven through v0.4; defer to v0.6+ (v0.5 is code quality)
 - Decay heat — irrelevant without neutronics
 - Uncertainty Quantification — post-validation concern
 - Python adapter (juliacall) — if Julia-STREAM is good, it should be used from Julia
@@ -77,6 +77,10 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - HeatDiffusion axis convention: rows=axial (z), cols=lateral (x) — matching Python STREAM
 - Correlation functions are plain Julia closures (not @register_symbolic) — MTK traces them symbolically
 - Composition helpers: `symmetric_plate`, `plate`, `one_sided_connection`, `compose_systems` in src/helpers.jl
+- **v0.5 is a pure code quality milestone** — no new features; goal is readability, file structure reorganization (see CLAUDE.md), docstrings, and test splitting. All deferred features go to v0.6+.
+- **v1.0 target** — first public release; ~85–100% of Python STREAM capabilities
+- **File structure standard** defined in CLAUDE.md (always loaded) — src/components/, src/physical_models/, src/composition/ subfolder layout
+- **Long-term fluid design** — AbstractFluid + multiple dispatch for v0.6+ multi-fluid support; keep @register_symbolic globals through v0.5
 
 ## Key Decisions
 
