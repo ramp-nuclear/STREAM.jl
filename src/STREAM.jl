@@ -16,6 +16,7 @@ include("components/thermal_channel.jl")
 include("components/heat_diffusion.jl")
 include("composition/helpers.jl")
 include("solvers.jl")
+include("examples.jl")
 
 export rho_water, cp_water, mu_water, k_water
 export FlowPort, ThermalPort

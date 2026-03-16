@@ -1,0 +1,253 @@
+# examples.jl — Example system builders for STREAM.jl
+# build_loop, build_loop_vertical, build_loop_transient, build_cube
+
+# ----------------------------------------------------------------
+# build_loop
+# Assembles the closed forced-convection loop:
+#   Pump -> TempBC -> Channel -> back to Pump
+# and compiles it with mtkcompile.
+#
+# Channel handles friction (Darcy-Weisbach Blasius) and gravity internally.
+# No separate Friction component — friction is part of Channel's dP equation.
+#
+# The TempBC component resets the fluid temperature to T_inlet at
+# the pump outlet. This is necessary because MTK stream semantics
+# resolve instream(ch.port_in.T) to the upstream connected port's T
+# (which would be T[n] in a fully closed loop, giving a trivial
+# degenerate steady state at T=T_wall). The TempBC forces the
+# "inlet temperature" seen by the Channel's first-cell energy
+# balance to be T_inlet, enabling physical non-trivial solutions.
+#
+# Boundary conditions:
+#   pump.port_in.P ~ 1.0e5     pressure gauge freedom fix (absolute anchor)
+#   ch.thermal.T ~ T_wall      wall temperature (K) -- required by Channel's
+#                              Dittus-Boelter HTC: h_tc[i]*(pi*Dh)*dz*(thermal.T - T[i])
+#   ch.port_in.T ~ T_inlet     additional T_inlet constraint (resolves remaining
+#                              circular temperature dependency in compiled system)
+#
+# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot, etc.
+# for symbolic indexing of results.
+# ----------------------------------------------------------------
+function build_loop(;
+    n::Int   = 10,
+    L_ch     = 0.6,
+    D_ch     = 0.01,
+    A_ch     = 7.85e-5,
+    dP_pump  = 3.0e4,
+    T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
+    T_wall   = 373.15,   # wall temperature (K); ~100°C for forced convection
+)
+    @named pump = Pump(dP_pump = dP_pump)
+    @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch))
+    @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
+
+    connections = [
+        connect(pump.port_out, bc.port_in),       # pump -> TempBC
+        connect(bc.port_out,   ch.port_in),        # TempBC -> channel
+        connect(ch.port_out,   pump.port_in),      # channel -> pump (closed loop)
+        pump.port_in.P  ~ 1.0e5,                  # pressure gauge freedom fix
+        ch.thermal.T    ~ T_wall,                  # wall temperature pin (for HTC)
+        ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
+    ]
+
+    @named sys = compose(System(connections, t; name = :sys), pump, bc, ch)
+
+    t_compile = @elapsed ssys = mtkcompile(sys)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "mtkcompile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    return ssys
+end
+
+# ----------------------------------------------------------------
+# build_loop_vertical
+# Assembles a vertical closed loop that includes gravity effects:
+#   Pump -> TempBC -> Channel(g_acc=9.80665) -> Gravity(H) -> Pump
+#
+# The upward leg is modelled by Channel with g_acc set to the
+# gravitational acceleration (default 9.80665 m/s²). The Channel's
+# dP equation includes +rho*g_acc*L representing the hydrostatic
+# head loss as the fluid rises.
+#
+# The return (downward) leg is modelled by the standalone Gravity
+# component with height H (default = L_ch). Gravity's equation:
+#   port_in.P - port_out.P ~ rho * 9.80665 * H
+# represents the pressure gain as the fluid descends.
+#
+# Cancellation geometry (default): when H_return == L_ch and
+# g_acc == 9.80665, the upward head loss equals the downward head
+# gain, and the net gravity contribution to the loop pressure
+# balance is zero — matching the horizontal reference loop within
+# the accuracy of the density evaluation point (~1%).
+#
+# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot
+# for symbolic indexing (same pattern as build_loop).
+# ----------------------------------------------------------------
+function build_loop_vertical(;
+    n::Int   = 10,
+    L_ch     = 0.6,
+    D_ch     = 0.01,
+    A_ch     = 7.85e-5,
+    dP_pump  = 3.0e4,
+    T_inlet  = 313.15,    # coolant inlet temperature (K); 40°C
+    T_wall   = 373.15,    # wall temperature (K); ~100°C for forced convection
+    g_acc    = 9.80665,   # gravitational acceleration (m/s²)
+    H_return = nothing,   # height of return leg (m); defaults to L_ch for cancellation geometry
+)
+    H = isnothing(H_return) ? L_ch : H_return
+
+    @named pump = Pump(dP_pump = dP_pump)
+    @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch), g = g_acc)
+    @named bc   = HeatExchanger(T_bc = T_inlet)
+    @named grav = Gravity(H = H)
+
+    # Gravity wiring note:
+    # Gravity equation: port_in.P - port_out.P ~ rho*g*H (port_in = high-P = bottom)
+    # For the RETURN leg (fluid descends from channel top back to pump bottom):
+    #   - channel outlet (top, low pressure) = grav.port_out (top)
+    #   - pump inlet (bottom, higher pressure) = grav.port_in (bottom)
+    # This gives: pump_inlet.P = channel_outlet.P + rho*g*H
+    # Loop balance: dP_pump = friction + rho*g*L_ch - rho*g*H
+    # Cancellation when H = L_ch: dP_pump = friction (gravity terms cancel).
+    connections = [
+        connect(pump.port_out, bc.port_in),       # pump -> TempBC
+        connect(bc.port_out,   ch.port_in),        # TempBC -> channel (upward leg)
+        connect(ch.port_out,   grav.port_out),     # channel outlet (top) = grav port_out (top)
+        connect(grav.port_in,  pump.port_in),      # grav port_in (bottom) = pump inlet (bottom)
+        pump.port_in.P  ~ 1.0e5,                  # pressure gauge freedom fix
+        ch.thermal.T    ~ T_wall,                  # wall temperature pin (for HTC)
+        ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
+    ]
+
+    @named sys = compose(System(connections, t; name = :sys), pump, bc, ch, grav)
+
+    t_compile = @elapsed ssys = mtkcompile(sys)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "build_loop_vertical compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    return ssys
+end
+
+# ----------------------------------------------------------------
+# build_loop_transient
+# Same topology as build_loop (Pump -> TempBC -> Channel)
+# but with T_wall declared as a @parameters symbol so that
+# PresetTimeCallback + setp can modify it at runtime to simulate
+# a step change in wall heat input.
+#
+# Why T_wall rather than Q_wall as the modifiable parameter:
+#   Channel's energy balance uses h_tc[i] * (π*Dh) * dz * (thermal.T - T[i])
+#   — the driver is the wall temperature, not Q_flow directly. Q_flow is an
+#   observable (q_wall[i] ~ thermal.Q_flow / n) not in the energy balance.
+#   Stepping T_wall is equivalent to stepping the effective heat input.
+#
+# Returns (ssys, T_wall_sym) where T_wall_sym is the compiled parameter symbol.
+# Pass T_wall_sym as the second argument to solve_transient.
+# ----------------------------------------------------------------
+function build_loop_transient(;
+    n::Int   = 10,
+    L_ch     = 0.6,
+    D_ch     = 0.01,
+    A_ch     = 7.85e-5,
+    dP_pump  = 3.0e4,
+    T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
+    T_wall_0 = 373.15,   # initial wall temperature (K); ~100°C
+)
+    @named pump = Pump(dP_pump = dP_pump)
+    @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch))
+    @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
+
+    # Declare T_wall as a modifiable parameter
+    ps = @parameters T_wall = T_wall_0
+
+    connections = [
+        connect(pump.port_out, bc.port_in),       # pump -> TempBC
+        connect(bc.port_out,   ch.port_in),        # TempBC -> channel
+        connect(ch.port_out,   pump.port_in),      # channel -> pump (closed loop)
+        pump.port_in.P  ~ 1.0e5,                   # pressure gauge freedom fix
+        ch.thermal.T    ~ ps[1],                   # wall temperature (modifiable parameter)
+        ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
+    ]
+
+    @named sys = compose(
+        System(connections, t, [], ps; name = :sys),
+        pump, bc, ch
+    )
+
+    t_compile = @elapsed ssys = mtkcompile(sys)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "build_loop_transient compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    return ssys, ps[1]
+end
+
+# ----------------------------------------------------------------
+# build_cube
+# Assembles the Cube hydraulic network: 12 Resistors on the edges
+# of a cube, 1 Pump driving body-diagonal flow (corner 0 -> corner 7).
+#
+# Corner labeling (binary xyz bits):
+#   000=0, 001=1, 010=2, 011=3, 100=4, 101=5, 110=6, 111=7
+# 12 edges (one Resistor each): r01, r02, r04, r13, r15, r23, r26,
+#   r37, r45, r46, r57, r67
+# Each interior corner has exactly 3 Resistor ports — wired with a
+# 3-way connect() call. Source (corner 0) and sink (corner 7) are
+# 4-way (pump + 3 resistors each).
+#
+# MTK variadic connect() generates the Kirchhoff equations:
+#   Flow (mdot): sum = 0 at each junction
+#   Across (P):  equal at each junction
+#   Stream (T):  instream() mixture
+#
+# Analytical equivalent resistance (body diagonal): 5/6 * R
+# Expected total mdot: dP_pump * 6 / (5 * R)
+#
+# Returns compiled ssys.
+# ----------------------------------------------------------------
+function build_cube(; dP_pump=3.0e4, R=1.0e4)
+    @named pump = Pump(dP_pump=dP_pump)
+    # 12 edges of the cube (naming: r_ij where i < j are corner indices)
+    @named r01 = Resistor(R=R); @named r02 = Resistor(R=R); @named r04 = Resistor(R=R)
+    @named r13 = Resistor(R=R); @named r15 = Resistor(R=R)
+    @named r23 = Resistor(R=R); @named r26 = Resistor(R=R)
+    @named r37 = Resistor(R=R)
+    @named r45 = Resistor(R=R); @named r46 = Resistor(R=R)
+    @named r57 = Resistor(R=R)
+    @named r67 = Resistor(R=R)
+
+    connections = [
+        # Corner 0 (source): pump.port_out + 3 resistor inlets
+        connect(pump.port_out, r01.port_in, r02.port_in, r04.port_in),
+        # Corner 1: r01 out + r13 in + r15 in
+        connect(r01.port_out,  r13.port_in, r15.port_in),
+        # Corner 2: r02 out + r23 in + r26 in
+        connect(r02.port_out,  r23.port_in, r26.port_in),
+        # Corner 3: r13 out + r23 out + r37 in
+        connect(r13.port_out,  r23.port_out, r37.port_in),
+        # Corner 4: r04 out + r45 in + r46 in
+        connect(r04.port_out,  r45.port_in, r46.port_in),
+        # Corner 5: r15 out + r45 out + r57 in
+        connect(r15.port_out,  r45.port_out, r57.port_in),
+        # Corner 6: r26 out + r46 out + r67 in
+        connect(r26.port_out,  r46.port_out, r67.port_in),
+        # Corner 7 (sink): pump.port_in + 3 resistor outlets
+        connect(pump.port_in,  r37.port_out, r57.port_out, r67.port_out),
+        # Pressure gauge anchor (absolute level is underdetermined by Kirchhoff equations)
+        pump.port_in.P ~ 1.0e5,
+    ]
+
+    @named sys = compose(
+        System(connections, t; name=:sys),
+        pump, r01, r02, r04, r13, r15, r23, r26, r37, r45, r46, r57, r67
+    )
+
+    t_compile = @elapsed ssys = mtkcompile(sys)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "build_cube compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    return ssys
+end
