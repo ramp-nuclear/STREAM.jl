@@ -1,0 +1,114 @@
+# Requirements: STREAM.jl
+
+**Defined:** 2026-03-17
+**Core Value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
+
+## v0.6 Requirements
+
+### Sign Safety
+
+- [ ] **SIGN-01**: Channel handles negative `mdot` — Re uses `abs(mdot)`, friction dP flips sign, temperature advection upwinds correctly
+- [ ] **SIGN-02**: ChannelAndContacts handles negative `mdot` — same guarantees as SIGN-01; all `@observed` variables (Re, Nu, velocity, Pe) remain physically meaningful
+- [ ] **SIGN-03**: ChannelHeatFlux handles negative `mdot`
+- [ ] **SIGN-04**: Test suite asserts correct reversed temperature profile (T decreases axially) and positive Re for a channel run with `mdot < 0`
+
+### Fluid Properties
+
+- [ ] **FLUID-01**: `beta_water(T)` — isobaric thermal expansion coefficient [1/K] for light water, `@register_symbolic`
+- [ ] **FLUID-02**: `Gr(beta, g, dT, L, nu)` — Grashof number utility (plain exported Julia function)
+- [ ] **FLUID-03**: `Ra(Gr_val, Pr_val)` — Rayleigh number utility (plain exported Julia function)
+
+### Natural Convection HTC
+
+- [ ] **NATCONV-01**: `elenbaas_nusselt(Ra, b, L)` — Elenbaas parallel-plate natural convection correlation, returns Nu; usable as pluggable HTC in Channel/ChannelAndContacts
+- [ ] **NATCONV-02**: `elenbaas_nusselt` validated against published Elenbaas table values or analytical limiting cases
+
+### Time-Varying Pump
+
+- [ ] **PUMP-01**: `Pump(dP_pump=f)` where `f` is a Julia callable `f(t) -> Float64`; function captured at construction via `@register_symbolic`, no change to `solve_transient` API
+- [ ] **PUMP-02**: Scalar `dP_pump` behavior and `mdot0` mode unchanged
+- [ ] **PUMP-03**: Test: pump pressure ramps from 1e5 to 0 over 100 s; mdot decays to zero; verified against analytical expectation
+
+### Flapper
+
+- [ ] **FLAP-01**: `Flapper` component — MTK ODESystem with FlowPorts, internal `ref_mdot(t)` variable (wired externally by user), parameters `dt`, `threshold`, `T_open` (init=Inf)
+- [ ] **FLAP-02**: Flapper uses C1 smooth ramp (`3*xi^2 - 2*xi^3` where `xi = clamp((t - T_open)/dt, 0, 1)`) to interpolate resistance from closed (high) to open (low)
+- [ ] **FLAP-03**: Flapper embeds MTK continuous event: when `ref_mdot - threshold` crosses zero from above, set `T_open = t`; no solver restart required
+- [ ] **FLAP-04**: User wires trigger via `flapper.ref_mdot ~ reference_component.port_in.mdot` as a plain algebraic equation during system composition
+- [ ] **FLAP-05**: Test: Flapper remains closed under positive ref_mdot — verifies near-zero leakage through Flapper path
+- [ ] **FLAP-06**: Test: Flapper opens when ref_mdot crosses threshold — verifies T_open is recorded and smooth ramp proceeds correctly
+
+### Solver Events
+
+- [ ] **SOLV-01**: `solve_transient` accepts optional `callbacks` keyword argument (DifferentialEquations.jl `CallbackSet`) for user-supplied events alongside MTK-native Flapper events
+
+### Validation
+
+- [ ] **VAL-01**: Loss-of-flow transient — forced-flow steady state, `dP_pump` ramps to 0, mdot crosses zero, Flapper opens, simulation continues to quasi-static natural circulation; asserts energy balance holds throughout
+- [ ] **VAL-02**: Natural circulation temperature rise matches analytical estimate using Elenbaas HTC within reasonable tolerance
+
+## Future Requirements
+
+### Priority 1 (v0.7+)
+
+- PointKinetics + PointKineticsWInput + ReactivityController
+- Decay heat (ANS14, ANS73, JAERI91)
+- Subcooled boiling HTC (Bergles-Rohsenow, McAdams, partial SCB blend)
+- CHF correlations (Sudo-Kaminaga, Mirshak, Fabrega)
+- Full threshold analysis suite (ONB, OFI, OSV, CHF, twall_limit)
+- HeatDiffusion xz_diffusion (2D Cartesian) + cylindrical geometries
+
+### Priority 2 (v0.8+)
+
+- LocalPressureDrop, Bend, Screen components
+- Fully-developed and developing laminar HTC suite
+- Marco-Han analytical rectangular duct Nu
+- Colebrook-White turbulent friction
+- Heavy water fluid + AbstractFluid multi-fluid abstraction
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Point kinetics | Separate milestone — 3+ components, state machine |
+| Decay heat | Requires neutronics |
+| CHF / boiling correlations | Safety Analysis milestone |
+| Heavy water / AbstractFluid | Multi-fluid milestone |
+| LocalPressureDrop, Bend, Screen | Local losses milestone |
+| Two-phase flow | Out of STREAM design scope |
+| Natural convection as full loop solver mode | Elenbaas added as HTC correlation only |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SIGN-01 | — | Pending |
+| SIGN-02 | — | Pending |
+| SIGN-03 | — | Pending |
+| SIGN-04 | — | Pending |
+| FLUID-01 | — | Pending |
+| FLUID-02 | — | Pending |
+| FLUID-03 | — | Pending |
+| NATCONV-01 | — | Pending |
+| NATCONV-02 | — | Pending |
+| PUMP-01 | — | Pending |
+| PUMP-02 | — | Pending |
+| PUMP-03 | — | Pending |
+| FLAP-01 | — | Pending |
+| FLAP-02 | — | Pending |
+| FLAP-03 | — | Pending |
+| FLAP-04 | — | Pending |
+| FLAP-05 | — | Pending |
+| FLAP-06 | — | Pending |
+| SOLV-01 | — | Pending |
+| VAL-01 | — | Pending |
+| VAL-02 | — | Pending |
+
+**Coverage:**
+- v0.6 requirements: 21 total
+- Mapped to phases: 0
+- Unmapped: 21 (roadmap pending)
+
+---
+*Requirements defined: 2026-03-17*
+*Last updated: 2026-03-17 after initial definition*
