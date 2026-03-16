@@ -6,6 +6,7 @@
 - ✅ **v0.2 Component & Network Expansion** — Phases 6-9 (shipped 2026-03-13)
 - ✅ **v0.3 HeatDiffusion** — Phases 10-12.1 (shipped 2026-03-14)
 - ✅ **v0.4 Composability & Physics** — Phases 13-16 (shipped 2026-03-16)
+- 🚧 **v0.5 Code Quality** — Phases 17-19 (in progress)
 
 ## Phases
 
@@ -58,9 +59,59 @@ Full phase details: `.planning/milestones/v0.4-ROADMAP.md`
 
 </details>
 
+### 🚧 v0.5 Code Quality (In Progress)
+
+**Milestone Goal:** Reorganize files to match the canonical CLAUDE.md layout, add docstrings to all exported names, split the monolithic test file, and fix minor code quality issues — no new features.
+
+## Phase Details
+
+### Phase 17: File Structure Reorganization
+**Goal**: The codebase on disk matches the canonical file layout defined in CLAUDE.md
+**Depends on**: Phase 16
+**Requirements**: STR-01, STR-02, STR-03, STR-04, STR-05
+**Success Criteria** (what must be TRUE):
+  1. `src/geometry.jl` exists as a standalone file; `components.jl` no longer contains `PipeGeometry`
+  2. `src/components/` contains six dedicated files (`channel.jl`, `pump.jl`, `resistors.jl`, `misc.jl`, `thermal_channel.jl`, `heat_diffusion.jl`); the old monolithic `components.jl` is gone
+  3. `src/physical_models/correlations.jl` exists; the old `src/correlations.jl` is gone
+  4. `src/composition/helpers.jl` exists; the old `src/helpers.jl` is gone
+  5. `src/examples.jl` contains `build_loop*`, `build_cube`, and `steady_state_guess`; `src/solvers.jl` contains only solver logic
+**Plans**: TBD
+
+Plans:
+- [ ] 17-01: TBD
+
+### Phase 18: Test Split and API Cleanup
+**Goal**: The test suite is a collection of focused per-file test modules; `solve_transient` has a keyword-only signature; the orphaned VAL-03 placeholder is gone
+**Depends on**: Phase 17
+**Requirements**: TEST-01, QOL-01, QOL-02
+**Success Criteria** (what must be TRUE):
+  1. `test/runtests.jl` contains only `@testset` wrappers and `include()` calls — no test logic
+  2. Thirteen `test_*.jl` files exist under `test/`, each matching one src file area per CLAUDE.md layout
+  3. `solve_transient(sys, prob; kwargs...)` rejects positional arguments for solver options at the call site
+  4. The orphaned `@testset "VAL-03"` block is absent from `runtests.jl` and from all `test_*.jl` files
+**Plans**: TBD
+
+Plans:
+- [ ] 18-01: TBD
+
+### Phase 19: Docstrings, CLAUDE.md, and Final Polish
+**Goal**: Every exported name has a Julia docstring; CLAUDE.md explains the rationale behind each rule; `ChannelHeatFlux`/`ConstantTemperature` are confirmed ship-ready; version is bumped to 0.5.0
+**Depends on**: Phase 18
+**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, QOL-03, QOL-04, QOL-05
+**Success Criteria** (what must be TRUE):
+  1. `?ComponentName` in the Julia REPL returns a docstring with `# Arguments` and `# Returns` for all 11 component constructors
+  2. `?helperName` returns a docstring with `# Arguments` and `# Returns` for all 6 composition and QoL helpers
+  3. `?solve_steady`, `?solve_transient`, `?build_loop`, and related solver/example functions each return a complete docstring
+  4. `?rho_water` (and `cp_water`, `mu_water`, `k_water`) return docstrings with `# Arguments` and `# Returns`
+  5. CLAUDE.md contains a rationale sentence for each rule; `Project.toml` reads `version = "0.5.0"`; `ChannelHeatFlux` and `ConstantTemperature` are exported, tested, and documented
+**Plans**: TBD
+
+Plans:
+- [ ] 19-01: TBD
+
 ## Progress
 
-**Execution Order:** Phases execute in numeric order: 13 → 14 → 15 → 16
+**Execution Order:** Phases execute in numeric order: 17 → 18 → 19
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -81,8 +132,11 @@ Full phase details: `.planning/milestones/v0.4-ROADMAP.md`
 | 14. Laminar Correlations | v0.4 | 2/2 | Complete | 2026-03-14 |
 | 15. Composition Helpers & QoL | v0.4 | 2/2 | Complete | 2026-03-15 |
 | 16. Validation | v0.4 | 1/1 | Complete | 2026-03-15 |
+| 17. File Structure Reorganization | v0.5 | 0/TBD | Not started | - |
+| 18. Test Split and API Cleanup | v0.5 | 0/TBD | Not started | - |
+| 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 0/TBD | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-15 — Phase 16 planned (1 plan: VAL-03 inline + VAL-01 transient + VAL-02 two-plate)*
+*Updated: 2026-03-16 — v0.5 phases 17-19 added*

@@ -52,27 +52,27 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STR-01 | — | Pending |
-| STR-02 | — | Pending |
-| STR-03 | — | Pending |
-| STR-04 | — | Pending |
-| STR-05 | — | Pending |
-| DOC-01 | — | Pending |
-| DOC-02 | — | Pending |
-| DOC-03 | — | Pending |
-| DOC-04 | — | Pending |
-| TEST-01 | — | Pending |
-| QOL-01 | — | Pending |
-| QOL-02 | — | Pending |
-| QOL-03 | — | Pending |
-| QOL-04 | — | Pending |
-| QOL-05 | — | Pending |
+| STR-01 | Phase 17 | Pending |
+| STR-02 | Phase 17 | Pending |
+| STR-03 | Phase 17 | Pending |
+| STR-04 | Phase 17 | Pending |
+| STR-05 | Phase 17 | Pending |
+| DOC-01 | Phase 19 | Pending |
+| DOC-02 | Phase 19 | Pending |
+| DOC-03 | Phase 19 | Pending |
+| DOC-04 | Phase 19 | Pending |
+| TEST-01 | Phase 18 | Pending |
+| QOL-01 | Phase 18 | Pending |
+| QOL-02 | Phase 18 | Pending |
+| QOL-03 | Phase 19 | Pending |
+| QOL-04 | Phase 19 | Pending |
+| QOL-05 | Phase 19 | Pending |
 
 **Coverage:**
 - v0.5 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15 ⚠️
+- Mapped to phases: 15
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-16*
-*Last updated: 2026-03-16 after initial definition*
+*Last updated: 2026-03-16 — traceability updated after roadmap creation (phases 17-19)*
