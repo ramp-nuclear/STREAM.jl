@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Code Quality
 status: planning
-stopped_at: Phase 17 context gathered
-last_updated: "2026-03-16T09:54:28.921Z"
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-03-16T10:31:56.584Z"
 last_activity: 2026-03-16 — v0.5 roadmap created; phases 17-19 defined
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -33,11 +33,11 @@ See: .planning/PROJECT.md (updated 2026-03-16)
 ## Current Position
 
 Phase: 17 of 19 in v0.5 (File Structure Reorganization)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-16 — v0.5 roadmap created; phases 17-19 defined
+Plan: 1 of 2 in current phase (17-01 complete)
+Status: In Progress
+Last activity: 2026-03-16 — 17-01 complete; split components.jl into 6 files, geometry.jl extracted
 
-Progress: [░░░░░░░░░░] 0% (v0.5 milestone)
+Progress: [█████░░░░░] 50% (v0.5 milestone)
 
 ---
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0% (v0.5 milestone)
 | 14 Laminar Correlations | 2 | ~15 min |
 | 15 Composition Helpers & QoL | 2 | ~33 min |
 | 16 Validation | 1 | ~7 min |
+| 17 File Structure Reorganization P01 | 1 | ~23 min |
 
 *Updated after each plan completion*
 
@@ -60,8 +61,11 @@ Progress: [░░░░░░░░░░] 0% (v0.5 milestone)
 
 ### Key Decisions (carry-forward for v0.5)
 
+- [17-01]: misc.jl merges two non-adjacent sections from components.jl (Inertia/HeatExchanger + ConstantTemperature) in document order
+- [17-01]: _channel_base_eqs placed in channel.jl (not thermal_channel.jl); channel.jl included before thermal_channel.jl in STREAM.jl
+- [17-01]: VAL-01 Fourier series test is a pre-existing flaky failure, not caused by file structure changes — confirmed on prior commit
 - [v0.5]: Pure code quality milestone — zero new features, zero physics changes
-- [v0.5]: STR-02 splits monolithic `components.jl` into 6 files — STREAM.jl include order must be audited to avoid forward-reference errors
+- [v0.5]: STR-02 done — components.jl split complete; include order audited, no forward-reference errors
 - [v0.4]: Composition helpers live in `src/helpers.jl` → moving to `src/composition/helpers.jl` in Phase 17
 - [v0.4]: Correlation functions live in `src/correlations.jl` → moving to `src/physical_models/correlations.jl` in Phase 17
 - [v0.4]: VAL-03 orphaned `@testset` placeholder exists in runtests.jl → remove in Phase 18 (QOL-02)
@@ -73,16 +77,16 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 17 (STR-02): splitting `components.jl` into 6 files requires careful include-order in `STREAM.jl` — components that reference shared helpers (e.g., `_channel_base_eqs`) must be included after the helper is defined.
+- VAL-01 (Fourier series validation) is a pre-existing flaky numerical test — not introduced by 17-01.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-03-16T09:54:28.919Z
-**Stopped at:** Phase 17 context gathered
+**Last session:** 2026-03-16T10:31:56.582Z
+**Stopped at:** Completed 17-01-PLAN.md
 **Next action:** `/gsd:plan-phase 17`
-**Resume file:** .planning/phases/17-file-structure-reorganization/17-CONTEXT.md
+**Resume file:** None
 
 ---
 

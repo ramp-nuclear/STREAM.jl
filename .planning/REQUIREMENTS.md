@@ -7,8 +7,8 @@
 
 ### Structure
 
-- [ ] **STR-01**: Codebase can load after `src/geometry.jl` is extracted from `components.jl` and `STREAM.jl` includes updated
-- [ ] **STR-02**: `components.jl` is split into 6 files under `src/components/` (`channel.jl`, `pump.jl`, `resistors.jl`, `misc.jl`, `thermal_channel.jl`, `heat_diffusion.jl`) and all tests still pass
+- [x] **STR-01**: Codebase can load after `src/geometry.jl` is extracted from `components.jl` and `STREAM.jl` includes updated
+- [x] **STR-02**: `components.jl` is split into 6 files under `src/components/` (`channel.jl`, `pump.jl`, `resistors.jl`, `misc.jl`, `thermal_channel.jl`, `heat_diffusion.jl`) and all tests still pass
 - [ ] **STR-03**: `correlations.jl` is moved to `src/physical_models/correlations.jl`
 - [ ] **STR-04**: `helpers.jl` is moved to `src/composition/helpers.jl`
 - [ ] **STR-05**: `build_loop*`/`build_cube`/`steady_state_guess` are extracted from `solvers.jl` into `src/examples.jl`
@@ -52,8 +52,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STR-01 | Phase 17 | Pending |
-| STR-02 | Phase 17 | Pending |
+| STR-01 | Phase 17 | Complete |
+| STR-02 | Phase 17 | Complete |
 | STR-03 | Phase 17 | Pending |
 | STR-04 | Phase 17 | Pending |
 | STR-05 | Phase 17 | Pending |
