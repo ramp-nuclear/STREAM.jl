@@ -15,10 +15,10 @@
 
 ### Docs
 
-- [ ] **DOC-01**: All 11 component constructors have Julia docstrings with `# Arguments` and `# Returns`
-- [ ] **DOC-02**: All 6 composition/QoL helpers have Julia docstrings with `# Arguments` and `# Returns`
-- [ ] **DOC-03**: All 7 solver/example functions have Julia docstrings with `# Arguments` and `# Returns`
-- [ ] **DOC-04**: `rho_water`, `cp_water`, `mu_water`, `k_water` docstrings completed with `# Arguments` and `# Returns`
+- [x] **DOC-01**: All 11 component constructors have Julia docstrings with `# Arguments` and `# Returns`
+- [x] **DOC-02**: All 6 composition/QoL helpers have Julia docstrings with `# Arguments` and `# Returns`
+- [x] **DOC-03**: All 7 solver/example functions have Julia docstrings with `# Arguments` and `# Returns`
+- [x] **DOC-04**: `rho_water`, `cp_water`, `mu_water`, `k_water` docstrings completed with `# Arguments` and `# Returns`
 
 ### Test
 
@@ -28,9 +28,9 @@
 
 - [x] **QOL-01**: `solve_transient` converted to keyword-only signature; all call sites updated
 - [x] **QOL-02**: Orphaned `@testset "VAL-03"` Phase 1 placeholder removed from `runtests.jl`
-- [ ] **QOL-03**: CLAUDE.md rewritten with rationale behind each rule and MTK-specific patterns
-- [ ] **QOL-04**: `Project.toml` version bumped to `0.5.0`
-- [ ] **QOL-05**: `ChannelHeatFlux` and `ConstantTemperature` audited — confirm exported, tested, and documented
+- [x] **QOL-03**: CLAUDE.md rewritten with rationale behind each rule and MTK-specific patterns
+- [x] **QOL-04**: `Project.toml` version bumped to `0.5.0`
+- [x] **QOL-05**: `ChannelHeatFlux` and `ConstantTemperature` audited — confirm exported, tested, and documented
 
 ## Future Requirements
 
@@ -57,16 +57,16 @@
 | STR-03 | Phase 17 | Complete |
 | STR-04 | Phase 17 | Complete |
 | STR-05 | Phase 17 | Complete |
-| DOC-01 | Phase 19 | Pending |
-| DOC-02 | Phase 19 | Pending |
-| DOC-03 | Phase 19 | Pending |
-| DOC-04 | Phase 19 | Pending |
+| DOC-01 | Phase 19 | Complete |
+| DOC-02 | Phase 19 | Complete |
+| DOC-03 | Phase 19 | Complete |
+| DOC-04 | Phase 19 | Complete |
 | TEST-01 | Phase 18 | Complete |
 | QOL-01 | Phase 18 | Complete |
 | QOL-02 | Phase 18 | Complete |
-| QOL-03 | Phase 19 | Pending |
-| QOL-04 | Phase 19 | Pending |
-| QOL-05 | Phase 19 | Pending |
+| QOL-03 | Phase 19 | Complete |
+| QOL-04 | Phase 19 | Complete |
+| QOL-05 | Phase 19 | Complete |
 
 **Coverage:**
 - v0.5 requirements: 15 total
