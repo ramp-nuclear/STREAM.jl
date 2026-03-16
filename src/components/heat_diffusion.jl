@@ -70,6 +70,31 @@ end
 # power: MTK @parameters (tunable via remake()), total watts into the plate.
 # power_shape[nz, nx]: user-supplied spatial distribution — NOT normalized internally.
 # Top/bottom boundaries are adiabatic by omission of z-diffusion equations.
+"""
+    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=600.0) -> ODESystem
+
+2D finite-difference heat diffusion plate with axial (`nz`) and lateral (`nx`) cells.
+
+# Arguments
+- `name`: system name (Symbol)
+- `nz`: number of axial cells (Int)
+- `nx`: number of lateral cells (Int)
+- `Lz`: axial length [m]
+- `Lx`: lateral thickness [m]
+- `y`: plate depth [m] (into-page dimension)
+- `rho_s`: solid density [kg/m^3]
+- `cp_s`: solid specific heat [J/(kg*K)]
+- `k_s`: thermal conductivity [W/(m*K)]
+- `power_shape`: axial-lateral power shape matrix of size `(nz, nx)` (not normalized internally)
+- `power`: total volumetric power into plate [W/m^3], default 1e6 (MTK parameter, tunable via `remake`)
+- `T0`: initial temperature [K], default 600.0
+
+# Ports
+- `thermal_left[1:nz]`, `thermal_right[1:nz]` -- `ThermalPort` arrays (no FlowPorts)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function HeatDiffusion(; name,
                          nz::Int, nx::Int,
                          Lz, Lx, y,

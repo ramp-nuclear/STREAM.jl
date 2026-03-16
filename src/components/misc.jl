@@ -5,6 +5,21 @@
 # L_over_A = L/A [m/m² = m⁻¹] — user pre-computes from geometry
 # No explicit mdot state variable needed — MTK auto-promotes port_in.mdot
 # as a differential state because it appears inside Dt(port_in.mdot).
+"""
+    Inertia(; name, L_over_A) -> ODESystem
+
+Fluid inertia element for transient simulations. Adds `L/A * d(mdot)/dt` to the momentum equation.
+
+# Arguments
+- `name`: system name (Symbol)
+- `L_over_A`: length-to-area ratio [1/m]
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function Inertia(; name, L_over_A)
     Dt   = Differential(t)           # same operator used in Channel energy balance
     pars = @parameters L_over_A = L_over_A
@@ -24,6 +39,21 @@ end
 # the circular thermal dependency in closed loops (where instream() would
 # otherwise resolve to the previous component's outlet T).
 # 4-equation structure: mass conservation, no pressure drop, T_bc outlet, adiabatic inlet.
+"""
+    HeatExchanger(; name, T_bc) -> ODESystem
+
+Ideal heat exchanger that resets fluid temperature to a fixed boundary condition.
+
+# Arguments
+- `name`: system name (Symbol)
+- `T_bc`: boundary condition temperature [K]
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function HeatExchanger(; name, T_bc)
     pars = @parameters T_bc = T_bc
     @named port_in  = FlowPort()
@@ -40,6 +70,21 @@ end
 # ConstantTemperature: pins a ThermalPort's temperature to a fixed parameter.
 # Used as a thermal boundary condition in tests and simple simulations.
 # MTK acausal semantics solve for Q_flow from the connected component's balance.
+"""
+    ConstantTemperature(; name, T) -> ODESystem
+
+Constant-temperature thermal boundary condition.
+
+# Arguments
+- `name`: system name (Symbol)
+- `T`: fixed surface temperature [K]
+
+# Ports
+- `thermal` -- `ThermalPort` (single port, used as a wall BC)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function ConstantTemperature(; name, T)
     pars = @parameters T_bc = T
     @named thermal = ThermalPort()

@@ -2,6 +2,27 @@
 
 # Declare as new generic functions independent of Base
 function Channel end
+
+"""
+    Channel(; name, n, geometry, g=0.0, htc_correlation=dittus_boelter, friction_correlation=blasius_friction) -> ODESystem
+
+Single-phase convective channel with `n` axial finite-volume cells.
+
+# Arguments
+- `name`: system name (Symbol)
+- `n`: number of axial cells (Int)
+- `geometry`: pipe geometry descriptor (PipeGeometry)
+- `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
+- `htc_correlation`: HTC function `(Re, Pr) -> Nu`, default `dittus_boelter`
+- `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `thermal` -- `ThermalPort` (single scalar wall temperature BC)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
                    htc_correlation      = dittus_boelter,
                    friction_correlation = blasius_friction)

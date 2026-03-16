@@ -1,5 +1,22 @@
 # resistors.jl — Friction, Gravity, Resistor components for STREAM.jl
 
+"""
+    Friction(; name, L, D, A) -> ODESystem
+
+Frictional pressure drop element using Darcy-Weisbach correlation.
+
+# Arguments
+- `name`: system name (Symbol)
+- `L`: pipe length [m]
+- `D`: hydraulic diameter [m]
+- `A`: flow area [m^2]
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function Friction(; name, L, D, A)
     pars = @parameters begin
         L   = L
@@ -25,6 +42,21 @@ function Friction(; name, L, D, A)
     compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
 end
 
+"""
+    Gravity(; name, H) -> ODESystem
+
+Hydrostatic pressure change for a vertical elevation change.
+
+# Arguments
+- `name`: system name (Symbol)
+- `H`: elevation change [m], positive = upward
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function Gravity(; name, H)
     pars = @parameters H = H
     @named port_in  = FlowPort()
@@ -39,6 +71,21 @@ function Gravity(; name, H)
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 
+"""
+    Resistor(; name, R) -> ODESystem
+
+Generic flow resistance with a fixed resistance coefficient.
+
+# Arguments
+- `name`: system name (Symbol)
+- `R`: resistance coefficient [Pa/(kg/s)]
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function Resistor(; name, R)
     pars = @parameters R = R
     @named port_in  = FlowPort()

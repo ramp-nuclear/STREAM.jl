@@ -1,5 +1,22 @@
 # pump.jl — Pump component for STREAM.jl
 
+"""
+    Pump(; name, dP_pump=nothing, mdot0=nothing) -> ODESystem
+
+Fixed-pressure-drop or fixed-mass-flow pump. Exactly one of `dP_pump` or `mdot0` must be
+provided; errors if both or neither kwarg is provided.
+
+# Arguments
+- `name`: system name (Symbol)
+- `dP_pump`: fixed pressure rise [Pa], or `nothing`
+- `mdot0`: fixed mass flow rate [kg/s], or `nothing`
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function Pump(; name, dP_pump=nothing, mdot0=nothing)
     if dP_pump !== nothing && mdot0 === nothing
         # Fixed-pressure mode: pressure rise is a parameter; mdot determined by loop resistance

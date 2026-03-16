@@ -19,6 +19,26 @@
 # Observables:
 #   q_wall[i]    — per-cell total heat transfer rate (W); q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow
 #   Q_wall_total — total heat transfer rate (W); sum over all cells
+"""
+    ChannelAndContacts(; name, n, geometry, g=0.0, htc_correlation=dittus_boelter, friction_correlation=blasius_friction) -> ODESystem
+
+Convective channel with per-cell thermal contact arrays on both sides for conjugate heat transfer.
+
+# Arguments
+- `name`: system name (Symbol)
+- `n`: number of axial cells (Int)
+- `geometry`: pipe geometry descriptor (PipeGeometry)
+- `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
+- `htc_correlation`: HTC function `(Re, Pr) -> Nu`, default `dittus_boelter`
+- `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `thermal_left[1:n]`, `thermal_right[1:n]` -- `ThermalPort` arrays (one per axial cell)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
                               htc_correlation      = dittus_boelter,
                               friction_correlation = blasius_friction)
@@ -125,6 +145,26 @@ end
 #
 # When T_wall is uniform, ChannelHeatFlux is algebraically equivalent to
 # Channel with thermal.T pinned to T_wall. THERM-03 validates this within 0.1%.
+"""
+    ChannelHeatFlux(; name, n, geometry, g=0.0, T_wall, htc_correlation=dittus_boelter, friction_correlation=blasius_friction) -> ODESystem
+
+Convective channel with a fixed wall temperature applied uniformly to all cells.
+
+# Arguments
+- `name`: system name (Symbol)
+- `n`: number of axial cells (Int)
+- `geometry`: pipe geometry descriptor (PipeGeometry)
+- `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
+- `T_wall`: wall temperature [K]
+- `htc_correlation`: HTC function `(Re, Pr) -> Nu`, default `dittus_boelter`
+- `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+
+# Returns
+Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+"""
 function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall,
                            htc_correlation      = dittus_boelter,
                            friction_correlation = blasius_friction)
