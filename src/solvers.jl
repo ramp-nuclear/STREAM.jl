@@ -65,9 +65,9 @@ end
 #   sol[ssys.ch.T_out, :]      -- outlet T (K) at all time points
 #   sol.t                       -- time vector (s)
 # ----------------------------------------------------------------
-function solve_transient(ssys, T_wall_sym, op, tspan;
-                         T_wall_final,
-                         t_step = 10.0)
+function solve_transient(; ssys, T_wall_sym, op, tspan,
+                           T_wall_final,
+                           t_step = 10.0)
     # MTK mtkcompile produces a mass-matrix ODE (implicit DAE form).
 
     # IDA requires DAEProblem with explicit du0; CVODE_BDF cannot use mass matrices.

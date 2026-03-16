@@ -42,7 +42,7 @@ end
     op_ic = [ssys.ch.T[i] => sol_ss[ssys.ch.T[i]] for i in 1:n]
     push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys.ch.port_in.mdot])
 
-    sol = solve_transient(ssys, T_wall_sym, op_ic, (0.0, 60.0);
+    sol = solve_transient(ssys=ssys, T_wall_sym=T_wall_sym, op=op_ic, tspan=(0.0, 60.0),
                           T_wall_final=393.15, t_step=10.0)
     @test sol.retcode == ReturnCode.Success
     T_ts = sol[ssys.ch.T_out, :]

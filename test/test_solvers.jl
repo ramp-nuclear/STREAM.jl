@@ -75,7 +75,7 @@ end
     push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys.ch.port_in.mdot])
 
     # Step T_wall from 373.15 K (100°C) to 393.15 K (120°C) at t=10s
-    sol = solve_transient(ssys, T_wall_sym, op_ic, (0.0, 30.0);
+    sol = solve_transient(ssys=ssys, T_wall_sym=T_wall_sym, op=op_ic, tspan=(0.0, 30.0),
                           T_wall_final=393.15, t_step=10.0)
     @test sol.retcode == ReturnCode.Success
     @test length(sol.t) > 2                            # multiple time points
