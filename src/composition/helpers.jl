@@ -12,6 +12,19 @@
 # Example:
 #   connect(port(cac, :thermal_left, 2), port(fuel, :thermal_right, 2))
 # ----------------------------------------------------------------
+"""
+    port(sys, face, i) -> SubsystemPort
+
+Access an indexed thermal port array element from a compiled subsystem.
+
+# Arguments
+- `sys`: MTK system instance
+- `face`: port array name (Symbol), e.g. `:thermal_left`
+- `i`: 1-based cell index (Int)
+
+# Returns
+The subsystem port object, suitable for use in `connect()` calls.
+"""
 port(sys, face::Symbol, i::Int) = getproperty(sys, Symbol(face, i))
 
 # ----------------------------------------------------------------
@@ -31,6 +44,18 @@ port(sys, face::Symbol, i::Int) = getproperty(sys, Symbol(face, i))
 # Parameter names in compiled systems have subsystem prefixes (e.g., ch₊g_acc,
 # grav₊H) — we match by the suffix after the last ₊ separator.
 # ----------------------------------------------------------------
+"""
+    check_gravity_mismatch(sys) -> Symbol
+
+Check whether gravity pressure contributions in a hydraulic loop are balanced.
+
+# Arguments
+- `sys`: compiled `AbstractSystem` to inspect
+
+# Returns
+`:ok` if balanced (or gravity disabled), `:mismatch` if channels have gravity but no
+return-leg `Gravity` component.
+"""
 function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
     # Collect all parameters from the system
     all_pars = try
@@ -127,6 +152,19 @@ end
 # cac.n must equal fuel.nz — caller ensures this.
 # Returns raw ODESystem. Add BCs (Pump, pressure anchor, inlet T) then mtkcompile().
 # ----------------------------------------------------------------
+"""
+    symmetric_plate(cac, fuel; name) -> ODESystem
+
+Wire one `HeatDiffusion` fuel plate symmetrically to one `ChannelAndContacts` channel.
+
+# Arguments
+- `cac`: uncompiled `ChannelAndContacts` instance
+- `fuel`: uncompiled `HeatDiffusion` instance (`nz` must equal `cac.n`)
+- `name`: system name (Symbol)
+
+# Returns
+Uncompiled `ODESystem` from `compose()`. Add boundary conditions, then `mtkcompile()`.
+"""
 function symmetric_plate(cac, fuel; name::Symbol)
     n = _infer_n(cac)
     connections = Equation[
@@ -148,6 +186,20 @@ end
 #
 # ch_left.n == ch_right.n == fuel.nz — caller ensures this.
 # ----------------------------------------------------------------
+"""
+    plate(ch_left, ch_right, fuel; name) -> ODESystem
+
+Wire a `HeatDiffusion` fuel plate between two `ChannelAndContacts` channels (left and right faces).
+
+# Arguments
+- `ch_left`: uncompiled `ChannelAndContacts` for left face
+- `ch_right`: uncompiled `ChannelAndContacts` for right face
+- `fuel`: uncompiled `HeatDiffusion` instance
+- `name`: system name (Symbol)
+
+# Returns
+Uncompiled `ODESystem` from `compose()`.
+"""
 function plate(ch_left, ch_right, fuel; name::Symbol)
     n = _infer_n(ch_left)
     connections = Equation[
@@ -168,6 +220,20 @@ end
 #
 # channel.n must equal fuel.nz — caller ensures this.
 # ----------------------------------------------------------------
+"""
+    one_sided_connection(channel, fuel; side=:left, name) -> ODESystem
+
+Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channel.
+
+# Arguments
+- `channel`: uncompiled `ChannelAndContacts` instance
+- `fuel`: uncompiled `HeatDiffusion` instance
+- `side`: `:left` or `:right`, which face of the fuel plate connects to the channel (default `:left`)
+- `name`: system name (Symbol)
+
+# Returns
+Uncompiled `ODESystem` from `compose()`.
+"""
 function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
     side in (:left, :right) || error("one_sided_connection: side must be :left or :right, got :$side")
     n = _infer_n(channel)
@@ -191,6 +257,19 @@ end
 #   conns = [connect(p1.cac.port_out, p2.cac.port_in), ...]
 #   top = compose_systems(p1, p2; connections=conns, name=:reactor)
 # ----------------------------------------------------------------
+"""
+    compose_systems(systems...; connections, name) -> ODESystem
+
+Compose multiple MTK systems with explicit connection equations into a single system.
+
+# Arguments
+- `systems`: positional varargs of uncompiled systems
+- `connections`: vector of connection equations (`Vector{<:Equation}`)
+- `name`: system name (Symbol)
+
+# Returns
+Uncompiled `ODESystem` ready for `mtkcompile()`.
+"""
 function compose_systems(systems...; connections::Vector{<:Equation}, name::Symbol)
     compose(System(connections, t; name=name), systems...)
 end

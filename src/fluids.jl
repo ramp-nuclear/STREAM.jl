@@ -14,6 +14,12 @@ Saturated liquid water density (Simantov correlation).
 T_K: temperature in Kelvin.
 
 Note: uses Fahrenheit internally — this is a quirk of the Simantov correlation.
+
+# Arguments
+- `T_K`: temperature [K]
+
+# Returns
+Density [kg/m^3] as `Float64`.
 """
 function rho_water(T_K::Real)
     T_C = T_K - 273.15
@@ -29,6 +35,12 @@ end
 
 Specific heat of saturated liquid water (Simantov correlation).
 T_K: temperature in Kelvin.
+
+# Arguments
+- `T_K`: temperature [K]
+
+# Returns
+Specific heat [J/(kg*K)] as `Float64`.
 """
 function cp_water(T_K::Real)
     T_C = abs(T_K - 273.15)   # abs matches Python STREAM's np.abs(T)
@@ -44,6 +56,12 @@ end
 
 Dynamic viscosity of saturated liquid water (Simantov correlation).
 T_K: temperature in Kelvin.
+
+# Arguments
+- `T_K`: temperature [K]
+
+# Returns
+Dynamic viscosity [Pa*s] as `Float64`.
 """
 function mu_water(T_K::Real)
     T_C = T_K - 273.15
@@ -59,6 +77,12 @@ end
 
 Thermal conductivity of saturated liquid water (Simantov correlation).
 T_K: temperature in Kelvin.
+
+# Arguments
+- `T_K`: temperature [K]
+
+# Returns
+Thermal conductivity [W/(m*K)] as `Float64`.
 """
 function k_water(T_K::Real)
     T_C = T_K - 273.15

@@ -28,6 +28,22 @@
 # Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot, etc.
 # for symbolic indexing of results.
 # ----------------------------------------------------------------
+"""
+    build_loop(; n=10, T_inlet=313.15, T_wall=373.15, L_ch=0.6, D_ch=0.01, dP_pump=3.0e4) -> ODESystem
+
+Build a simple steady-state horizontal flow loop (Pump + HeatExchanger + ChannelHeatFlux).
+
+# Arguments
+- `n`: number of axial cells (default 10)
+- `T_inlet`: inlet temperature [K] (default 313.15)
+- `T_wall`: wall temperature [K] (default 373.15)
+- `L_ch`: channel length [m] (default 0.6)
+- `D_ch`: channel diameter [m] (default 0.01)
+- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
+
+# Returns
+Compiled `ODESystem` (already passed through `mtkcompile`).
+"""
 function build_loop(;
     n::Int   = 10,
     L_ch     = 0.6,
@@ -84,6 +100,24 @@ end
 # Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot
 # for symbolic indexing (same pattern as build_loop).
 # ----------------------------------------------------------------
+"""
+    build_loop_vertical(; n=10, T_inlet=313.15, T_wall=373.15, L_ch=0.6, D_ch=0.01, dP_pump=3.0e4, H=0.6) -> ODESystem
+
+Build a vertical flow loop with gravity (Pump + HeatExchanger + Channel + Gravity).
+
+# Arguments
+- `n`: number of axial cells (default 10)
+- `T_inlet`: inlet temperature [K] (default 313.15)
+- `T_wall`: wall temperature [K] (default 373.15)
+- `L_ch`: channel length [m] (default 0.6)
+- `D_ch`: channel diameter [m] (default 0.01)
+- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
+- `g_acc`: gravitational acceleration [m/s^2] (default 9.80665)
+- `H_return`: height of return leg [m], defaults to `L_ch` for cancellation geometry
+
+# Returns
+Compiled `ODESystem`.
+"""
 function build_loop_vertical(;
     n::Int   = 10,
     L_ch     = 0.6,
@@ -146,6 +180,23 @@ end
 # Returns (ssys, T_wall_sym) where T_wall_sym is the compiled parameter symbol.
 # Pass T_wall_sym as the second argument to solve_transient.
 # ----------------------------------------------------------------
+"""
+    build_loop_transient(; n=10, T_inlet=313.15, T_wall_0=373.15, L_ch=0.6, D_ch=0.01, dP_pump=3.0e4) -> Tuple{ODESystem, Num}
+
+Build a transient-capable flow loop with a tunable wall temperature parameter.
+
+# Arguments
+- `n`: number of axial cells (default 10)
+- `T_inlet`: inlet temperature [K] (default 313.15)
+- `T_wall_0`: initial wall temperature [K] (default 373.15)
+- `L_ch`: channel length [m] (default 0.6)
+- `D_ch`: channel diameter [m] (default 0.01)
+- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
+
+# Returns
+Tuple `(ssys, T_wall_sym)` where `ssys` is the compiled system and `T_wall_sym` is the
+symbolic wall-temperature parameter for use with `solve_transient`.
+"""
 function build_loop_transient(;
     n::Int   = 10,
     L_ch     = 0.6,
@@ -207,6 +258,18 @@ end
 #
 # Returns compiled ssys.
 # ----------------------------------------------------------------
+"""
+    build_cube(; dP_pump=3.0e4, R=1.0e4) -> ODESystem
+
+Build a two-branch parallel network (cube topology) for network solver validation.
+
+# Arguments
+- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
+- `R`: branch resistance [Pa/(kg/s)] (default 1.0e4)
+
+# Returns
+Compiled `ODESystem`.
+"""
 function build_cube(; dP_pump=3.0e4, R=1.0e4)
     @named pump = Pump(dP_pump=dP_pump)
     # 12 edges of the cube (naming: r_ij where i < j are corner indices)

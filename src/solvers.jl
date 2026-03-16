@@ -17,6 +17,21 @@ using Sundials                 # KINSOL, IDA
 # T_inlet: K, Q_wall: W, mdot_guess: kg/s, n: number of cells
 # Returns T_cells::Vector{Float64} (Kelvin), length n.
 # ----------------------------------------------------------------
+"""
+    steady_state_guess(; T_inlet, Q_wall, mdot_guess, n) -> Vector{Float64}
+
+Generate a linear temperature guess for steady-state initialization.
+
+# Arguments
+- `T_inlet`: inlet temperature [K]
+- `Q_wall`: total wall heat input [W]
+- `mdot_guess`: estimated mass flow rate [kg/s]
+- `n`: number of axial cells (Int)
+
+# Returns
+Vector of length `n` with linearly interpolated temperatures from `T_inlet` to estimated
+`T_outlet` as `Float64`.
+"""
 function steady_state_guess(; T_inlet::Float64, Q_wall::Float64,
                                mdot_guess::Float64, n::Int)
     cp = cp_water(T_inlet)
@@ -37,6 +52,21 @@ end
 #   sol[ssys.ch.T_out]              outlet temperature (K)
 #   sol[ssys.ch.port_in.mdot]       mass flow (kg/s)
 # ----------------------------------------------------------------
+"""
+    solve_steady(ssys, op; solver=nothing, kwargs...) -> SciMLSolution
+
+Solve a compiled system to steady state using KINSOL (or a user-specified solver).
+
+# Arguments
+- `ssys`: compiled system from `mtkcompile`
+- `op`: operating point as `Vector{Pair}` of initial guesses
+- `abstol`: absolute tolerance (default 1e-8)
+- `reltol`: relative tolerance (default 1e-6)
+- `build_initializeprob`: passed to `SteadyStateProblem` (default `false`)
+
+# Returns
+`SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
+"""
 function solve_steady(ssys, op;
                       abstol = 1e-8,
                       reltol = 1e-6,
@@ -65,6 +95,22 @@ end
 #   sol[ssys.ch.T_out, :]      -- outlet T (K) at all time points
 #   sol.t                       -- time vector (s)
 # ----------------------------------------------------------------
+"""
+    solve_transient(; ssys, T_wall_sym, op, tspan, T_wall_final, t_step=10.0) -> SciMLSolution
+
+Solve a transient simulation with a step-change wall temperature callback.
+
+# Arguments
+- `ssys`: compiled system from `build_loop_transient`
+- `T_wall_sym`: symbolic parameter for wall temperature (second return value of `build_loop_transient`)
+- `op`: initial operating point as `Vector{Pair}`
+- `tspan`: time span tuple `(t_start, t_end)` [s]
+- `T_wall_final`: new wall temperature [K] after the step change
+- `t_step`: time of step change [s], default 10.0
+
+# Returns
+`SciMLBase.ODESolution`. Access time-dependent results via `sol[ssys.component.variable]`.
+"""
 function solve_transient(; ssys, T_wall_sym, op, tspan,
                            T_wall_final,
                            t_step = 10.0)
