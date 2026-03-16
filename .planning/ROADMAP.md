@@ -86,14 +86,15 @@ Plans:
 **Depends on**: Phase 17
 **Requirements**: TEST-01, QOL-01, QOL-02
 **Success Criteria** (what must be TRUE):
-  1. `test/runtests.jl` contains only `@testset` wrappers and `include()` calls — no test logic
+  1. `test/runtests.jl` contains only `include()` calls — no test logic, no using statements
   2. Thirteen `test_*.jl` files exist under `test/`, each matching one src file area per CLAUDE.md layout
-  3. `solve_transient(sys, prob; kwargs...)` rejects positional arguments for solver options at the call site
-  4. The orphaned `@testset "VAL-03"` block is absent from `runtests.jl` and from all `test_*.jl` files
-**Plans**: TBD
+  3. `solve_transient` uses keyword-only arguments; positional call sites fail with MethodError
+  4. VAL-03 has real content in `test_validation.jl` (not deleted, not a placeholder)
+**Plans**: 2 plans
 
 Plans:
-- [ ] 18-01: TBD
+- [ ] 18-01-PLAN.md — Split runtests.jl into 13 test_*.jl files; rewrite runtests.jl as thin orchestrator (TEST-01, QOL-02)
+- [ ] 18-02-PLAN.md — Convert solve_transient to keyword-only; update 2 call sites (QOL-01)
 
 ### Phase 19: Docstrings, CLAUDE.md, and Final Polish
 **Goal**: Every exported name has a Julia docstring; CLAUDE.md explains the rationale behind each rule; `ChannelHeatFlux`/`ConstantTemperature` are confirmed ship-ready; version is bumped to 0.5.0
@@ -133,11 +134,11 @@ Plans:
 | 14. Laminar Correlations | v0.4 | 2/2 | Complete | 2026-03-14 |
 | 15. Composition Helpers & QoL | v0.4 | 2/2 | Complete | 2026-03-15 |
 | 16. Validation | v0.4 | 1/1 | Complete | 2026-03-15 |
-| 17. File Structure Reorganization | 2/2 | Complete    | 2026-03-16 | - |
-| 18. Test Split and API Cleanup | v0.5 | 0/TBD | Not started | - |
+| 17. File Structure Reorganization | v0.5 | 2/2 | Complete | 2026-03-16 |
+| 18. Test Split and API Cleanup | v0.5 | 0/2 | Not started | - |
 | 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 0/TBD | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-16 — Phase 17 planned: 2 plans*
+*Updated: 2026-03-16 — Phase 18 planned: 2 plans*
