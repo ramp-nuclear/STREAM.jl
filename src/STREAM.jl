@@ -7,14 +7,14 @@ using Symbolics: @register_symbolic
 include("fluids.jl")
 include("connectors.jl")
 include("geometry.jl")
-include("correlations.jl")
+include("physical_models/correlations.jl")
 include("components/channel.jl")
 include("components/pump.jl")
 include("components/resistors.jl")
 include("components/misc.jl")
 include("components/thermal_channel.jl")
 include("components/heat_diffusion.jl")
-include("helpers.jl")
+include("composition/helpers.jl")
 include("solvers.jl")
 
 export rho_water, cp_water, mu_water, k_water
