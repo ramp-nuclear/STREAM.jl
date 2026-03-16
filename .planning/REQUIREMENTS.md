@@ -26,7 +26,7 @@
 
 ### QoL
 
-- [ ] **QOL-01**: `solve_transient` converted to keyword-only signature; all call sites updated
+- [x] **QOL-01**: `solve_transient` converted to keyword-only signature; all call sites updated
 - [x] **QOL-02**: Orphaned `@testset "VAL-03"` Phase 1 placeholder removed from `runtests.jl`
 - [ ] **QOL-03**: CLAUDE.md rewritten with rationale behind each rule and MTK-specific patterns
 - [ ] **QOL-04**: `Project.toml` version bumped to `0.5.0`
@@ -62,7 +62,7 @@
 | DOC-03 | Phase 19 | Pending |
 | DOC-04 | Phase 19 | Pending |
 | TEST-01 | Phase 18 | Complete |
-| QOL-01 | Phase 18 | Pending |
+| QOL-01 | Phase 18 | Complete |
 | QOL-02 | Phase 18 | Complete |
 | QOL-03 | Phase 19 | Pending |
 | QOL-04 | Phase 19 | Pending |

@@ -135,7 +135,7 @@ Plans:
 | 15. Composition Helpers & QoL | v0.4 | 2/2 | Complete | 2026-03-15 |
 | 16. Validation | v0.4 | 1/1 | Complete | 2026-03-15 |
 | 17. File Structure Reorganization | v0.5 | 2/2 | Complete | 2026-03-16 |
-| 18. Test Split and API Cleanup | 1/2 | In Progress|  | - |
+| 18. Test Split and API Cleanup | 2/2 | Complete   | 2026-03-16 | - |
 | 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 0/TBD | Not started | - |
 
 ---
