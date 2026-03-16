@@ -4,14 +4,14 @@ milestone: v0.5
 milestone_name: Code Quality
 status: executing
 stopped_at: Completed 17-02-PLAN.md
-last_updated: "2026-03-16T10:41:15.851Z"
-last_activity: 2026-03-16 — 17-01 complete; split components.jl into 6 files, geometry.jl extracted
+last_updated: "2026-03-16T10:45:01.898Z"
+last_activity: 2026-03-16 — 17-02 complete; correlations/helpers moved to subdirs, examples.jl extracted from solvers.jl
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 2
   completed_plans: 2
-  percent: 50
+  percent: 100
 ---
 
 # STATE: STREAM.jl
