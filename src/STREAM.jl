@@ -6,8 +6,14 @@ using Symbolics: @register_symbolic
 
 include("fluids.jl")
 include("connectors.jl")
+include("geometry.jl")
 include("correlations.jl")
-include("components.jl")
+include("components/channel.jl")
+include("components/pump.jl")
+include("components/resistors.jl")
+include("components/misc.jl")
+include("components/thermal_channel.jl")
+include("components/heat_diffusion.jl")
 include("helpers.jl")
 include("solvers.jl")
 
