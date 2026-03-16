@@ -4,22 +4,11 @@
 
 STREAM.jl is a Julia rewrite of the Python package STREAM (System Thermohydraulics for Reactor Evaluation, Analysis & Modeling) — a nuclear reactor thermal-hydraulics simulation code. It models heat evacuation in reactor systems through coupled differential-algebraic equations, using ModelingToolkit.jl (MTK) as the core symbolic modeling engine instead of the hand-rolled Aggregator+DAE approach used in Python STREAM.
 
-v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls.
+v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls. v0.5 reorganized the codebase to the canonical CLAUDE.md file layout, split the monolithic test file into 13 focused modules, added Julia docstrings to all 28 exported names, and expanded CLAUDE.md with rationale and MTK patterns.
 
 ## Core Value
 
 A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-
-## Current Milestone: v0.5 Code Quality
-
-**Goal:** Reorganize the codebase to match the canonical file structure, add docstrings to all exported names, split the monolithic test file, and fix minor code quality issues — no new features.
-
-**Target features:**
-- File structure reorganization (geometry.jl, components/, physical_models/, composition/, examples.jl)
-- Julia docstrings on all 24 exported functions lacking them
-- test/runtests.jl split into 13 dedicated test files
-- CLAUDE.md improved with rationale and MTK patterns
-- solve_transient keyword-only conversion + minor QoL fixes
 
 ## Requirements
 
@@ -57,22 +46,20 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - ✓ Transient HeatDiffusion validated against Fourier series analytical solution (≤1% rtol, 4 time checkpoints) — v0.4
 - ✓ Two-plate one-channel topology (both thermal_left + thermal_right active) solved and energy-balanced — v0.4
 - ✓ One-sided T_max assertion from analytical energy balance (VAL-03; Python bug documented) — v0.4
+- ✓ Source reorganized to canonical layout: `geometry.jl`, `src/components/` (6 files), `src/physical_models/`, `src/composition/`, `src/examples.jl` — v0.5
+- ✓ Monolithic `runtests.jl` split into 13 self-contained `test_*.jl` files matching CLAUDE.md layout — v0.5
+- ✓ `solve_transient` converted to keyword-only signature; all exported solvers now keyword-only — v0.5
+- ✓ All 28 exported names have structured Julia docstrings (`# Arguments`, `# Ports`, `# Returns`) — v0.5
+- ✓ CLAUDE.md rewritten with **Why:** rationale after every rule and MTK Patterns reference section — v0.5
+- ✓ `Project.toml` bumped to `0.5.0`; `ChannelHeatFlux` and `ConstantTemperature` confirmed exported, tested, documented — v0.5
 
 ### Active
 
-<!-- v0.5 Code Quality — building toward these -->
-
-- [ ] File structure reorganized to match CLAUDE.md canonical layout (geometry.jl, components/, physical_models/, composition/, examples.jl)
-- [ ] All exported names have Julia docstrings with # Arguments and # Returns
-- [ ] test/runtests.jl split into 13 dedicated test_*.jl files; runtests.jl becomes thin orchestrator
-- [ ] CLAUDE.md fleshed out with rationale and MTK-specific patterns
-- [ ] solve_transient converted to keyword-only signature
-- [ ] Orphaned VAL-03 placeholder testset removed
-- [ ] Project.toml bumped to v0.5.0
+<!-- v0.6+ — next milestone features go here -->
 
 ### Out of Scope
 
-- Point kinetics — thermal-hydraulic architecture now proven through v0.4; defer to v0.6+ (v0.5 is code quality)
+- Point kinetics — thermal-hydraulic architecture now proven through v0.5; defer to v0.6+
 - Decay heat — irrelevant without neutronics
 - Uncertainty Quantification — post-validation concern
 - Python adapter (juliacall) — if Julia-STREAM is good, it should be used from Julia
@@ -87,19 +74,19 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **v0.2 shipped** 2026-03-13 — 818 src LOC, 545 test LOC, 86 tests, 4 phases, 7 plans
 - **v0.3 shipped** 2026-03-14 — ~1,003 Julia LOC, 161 tests, 4 phases (10-12.1), 8 plans
 - **v0.4 shipped** 2026-03-16 — ~3,268 Julia LOC, 4 phases (13-16), 7 plans; 15 requirements complete
+- **v0.5 shipped** 2026-03-16 — ~3,750 Julia LOC (src + test), 3 phases (17-19), 6 plans; 15 requirements complete; canonical file layout, full docstrings, 13-file test suite
 - Python STREAM lives at ~/projects/STREAM and is the reference implementation for all validation
-- MTK architecture validated through four milestones: acausal connect() + mtkcompile + Sundials IDA replaces Aggregator pattern
+- MTK architecture validated through five milestones: acausal connect() + mtkcompile + Sundials IDA replaces Aggregator pattern
 - Friction is handled inside Channel (Darcy-Weisbach inline) — no separate Friction component in loop
 - Gravity: g_acc parameter in Channel + standalone Gravity on return leg (reversed-port convention)
 - Multi-branch networks use MTK variadic connect() for junctions — no Junction component needed
 - PipeGeometry struct encapsulates L, Dh, A, wet_perimeter, heated_parts; Dh = 4A/wet_perimeter
 - HeatDiffusion axis convention: rows=axial (z), cols=lateral (x) — matching Python STREAM
 - Correlation functions are plain Julia closures (not @register_symbolic) — MTK traces them symbolically
-- Composition helpers: `symmetric_plate`, `plate`, `one_sided_connection`, `compose_systems` in src/helpers.jl
-- **v0.5 is a pure code quality milestone** — no new features; goal is readability, file structure reorganization (see CLAUDE.md), docstrings, and test splitting. All deferred features go to v0.6+.
+- Composition helpers: `symmetric_plate`, `plate`, `one_sided_connection`, `compose_systems` in src/composition/helpers.jl
+- **File structure standard** fully in effect as of v0.5 — see CLAUDE.md for canonical layout
 - **v1.0 target** — first public release; ~85–100% of Python STREAM capabilities
-- **File structure standard** defined in CLAUDE.md (always loaded) — src/components/, src/physical_models/, src/composition/ subfolder layout
-- **Long-term fluid design** — AbstractFluid + multiple dispatch for v0.6+ multi-fluid support; keep @register_symbolic globals through v0.5
+- **Long-term fluid design** — AbstractFluid + multiple dispatch for v0.6+ multi-fluid support; keep @register_symbolic globals until then
 
 ## Key Decisions
 
@@ -126,6 +113,9 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 | Fixed-flow Pump has no pressure equation; caller anchors P | Mass flow constraint + pressure anchor is exactly determined | ✓ Good — PHY-05 pattern works; forced-flow scenarios now ergonomic |
 | VAL-03 T_out assertion removed; energy balance is truth | Python `one_sided_connection` distributes heat to both faces (bug); Julia correct | ✓ Good — Julia energy balance confirmed analytically |
 | Composition helpers infer `n` from CAC thermal_left subsystem count | Safe without explicit parameter inspection; fails early if CAC compiled | ✓ Good — ergonomic; no need to pass n explicitly to helpers |
+| Split test suite: one `test_*.jl` per source area | Each file has independent `using` blocks and runs in isolation; mirrors src/ layout | ✓ Good — TEST-01 confirmed; CLAUDE.md layout now fully mirrored |
+| CLAUDE.md includes **Why:** rationale for every rule | Rules without context get ignored or broken; rationale enables judgment at edge cases | ✓ Good — QOL-03 complete; MTK Patterns section added as reference |
+| `solve_transient` keyword-only aligns with project-wide convention | Consistent API: no function mixes positional and keyword arguments | ✓ Good — QOL-01 complete; MethodError guard now enforced |
 
 ## Constraints
 
@@ -135,4 +125,4 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
 
 ---
-*Last updated: 2026-03-16 after v0.5 milestone start*
+*Last updated: 2026-03-16 after v0.5 milestone*

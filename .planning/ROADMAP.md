@@ -6,7 +6,7 @@
 - ✅ **v0.2 Component & Network Expansion** — Phases 6-9 (shipped 2026-03-13)
 - ✅ **v0.3 HeatDiffusion** — Phases 10-12.1 (shipped 2026-03-14)
 - ✅ **v0.4 Composability & Physics** — Phases 13-16 (shipped 2026-03-16)
-- 🚧 **v0.5 Code Quality** — Phases 17-19 (in progress)
+- ✅ **v0.5 Code Quality** — Phases 17-19 (shipped 2026-03-16)
 
 ## Phases
 
@@ -59,58 +59,16 @@ Full phase details: `.planning/milestones/v0.4-ROADMAP.md`
 
 </details>
 
-### 🚧 v0.5 Code Quality (In Progress)
+<details>
+<summary>✅ v0.5 Code Quality (Phases 17-19) — SHIPPED 2026-03-16</summary>
 
-**Milestone Goal:** Reorganize files to match the canonical CLAUDE.md layout, add docstrings to all exported names, split the monolithic test file, and fix minor code quality issues — no new features.
+- [x] Phase 17: File Structure Reorganization (2/2 plans) — completed 2026-03-16
+- [x] Phase 18: Test Split and API Cleanup (2/2 plans) — completed 2026-03-16
+- [x] Phase 19: Docstrings, CLAUDE.md, and Final Polish (2/2 plans) — completed 2026-03-16
 
-## Phase Details
+Full phase details: `.planning/milestones/v0.5-ROADMAP.md`
 
-### Phase 17: File Structure Reorganization
-**Goal**: The codebase on disk matches the canonical file layout defined in CLAUDE.md
-**Depends on**: Phase 16
-**Requirements**: STR-01, STR-02, STR-03, STR-04, STR-05
-**Success Criteria** (what must be TRUE):
-  1. `src/geometry.jl` exists as a standalone file; `components.jl` no longer contains `PipeGeometry`
-  2. `src/components/` contains six dedicated files (`channel.jl`, `pump.jl`, `resistors.jl`, `misc.jl`, `thermal_channel.jl`, `heat_diffusion.jl`); the old monolithic `components.jl` is gone
-  3. `src/physical_models/correlations.jl` exists; the old `src/correlations.jl` is gone
-  4. `src/composition/helpers.jl` exists; the old `src/helpers.jl` is gone
-  5. `src/examples.jl` contains `build_loop*`, `build_cube`; `src/solvers.jl` contains only solver logic
-**Plans**: 2 plans
-
-Plans:
-- [ ] 17-01-PLAN.md — Extract geometry.jl and split components.jl into src/components/ (STR-01, STR-02)
-- [ ] 17-02-PLAN.md — Move correlations.jl, helpers.jl, extract examples.jl (STR-03, STR-04, STR-05)
-
-### Phase 18: Test Split and API Cleanup
-**Goal**: The test suite is a collection of focused per-file test modules; `solve_transient` has a keyword-only signature; the orphaned VAL-03 placeholder is gone
-**Depends on**: Phase 17
-**Requirements**: TEST-01, QOL-01, QOL-02
-**Success Criteria** (what must be TRUE):
-  1. `test/runtests.jl` contains only `include()` calls — no test logic, no using statements
-  2. Thirteen `test_*.jl` files exist under `test/`, each matching one src file area per CLAUDE.md layout
-  3. `solve_transient` uses keyword-only arguments; positional call sites fail with MethodError
-  4. VAL-03 has real content in `test_validation.jl` (not deleted, not a placeholder)
-**Plans**: 2 plans
-
-Plans:
-- [ ] 18-01-PLAN.md — Split runtests.jl into 13 test_*.jl files; rewrite runtests.jl as thin orchestrator (TEST-01, QOL-02)
-- [ ] 18-02-PLAN.md — Convert solve_transient to keyword-only; update 2 call sites (QOL-01)
-
-### Phase 19: Docstrings, CLAUDE.md, and Final Polish
-**Goal**: Every exported name has a Julia docstring; CLAUDE.md explains the rationale behind each rule; `ChannelHeatFlux`/`ConstantTemperature` are confirmed ship-ready; version is bumped to 0.5.0
-**Depends on**: Phase 18
-**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, QOL-03, QOL-04, QOL-05
-**Success Criteria** (what must be TRUE):
-  1. `?ComponentName` in the Julia REPL returns a docstring with `# Arguments` and `# Returns` for all 11 component constructors
-  2. `?helperName` returns a docstring with `# Arguments` and `# Returns` for all 6 composition and QoL helpers
-  3. `?solve_steady`, `?solve_transient`, `?build_loop`, and related solver/example functions each return a complete docstring
-  4. `?rho_water` (and `cp_water`, `mu_water`, `k_water`) return docstrings with `# Arguments` and `# Returns`
-  5. CLAUDE.md contains a rationale sentence for each rule; `Project.toml` reads `version = "0.5.0"`; `ChannelHeatFlux` and `ConstantTemperature` are exported, tested, and documented
-**Plans**: 2 plans
-
-Plans:
-- [ ] 19-01-PLAN.md — Add docstrings to all 28 exported functions (DOC-01, DOC-02, DOC-03, DOC-04)
-- [ ] 19-02-PLAN.md — Expand CLAUDE.md with rationale and MTK patterns; ChannelHeatFlux test; version bump (QOL-03, QOL-04, QOL-05)
+</details>
 
 ## Progress
 
@@ -137,9 +95,9 @@ Plans:
 | 16. Validation | v0.4 | 1/1 | Complete | 2026-03-15 |
 | 17. File Structure Reorganization | v0.5 | 2/2 | Complete | 2026-03-16 |
 | 18. Test Split and API Cleanup | v0.5 | 2/2 | Complete | 2026-03-16 |
-| 19. Docstrings, CLAUDE.md, and Final Polish | 2/2 | Complete    | 2026-03-16 | - |
+| 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 2/2 | Complete | 2026-03-16 |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-16 — Phase 19 planned: 2 plans*
+*Updated: 2026-03-16 — v0.5 shipped*

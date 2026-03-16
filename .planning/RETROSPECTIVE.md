@@ -187,6 +187,47 @@
 
 ---
 
+## Milestone: v0.5 — Code Quality
+
+**Shipped:** 2026-03-16
+**Phases:** 3 (17-19) | **Plans:** 6
+
+### What Was Built
+- Source reorganized into canonical layout: `geometry.jl`, `src/components/` (6 files), `src/physical_models/correlations.jl`, `src/composition/helpers.jl`, `src/examples.jl` — CLAUDE.md contract fully on disk
+- Monolithic `test/runtests.jl` exploded into 13 self-contained `test_*.jl` files; each imports its own deps and runs independently
+- `solve_transient` converted to keyword-only; project-wide keyword-only API convention now 100% complete
+- Structured Julia docstrings on all 28 exported names (`# Arguments`, `# Ports`, `# Returns`) — full REPL `?help` coverage
+- CLAUDE.md rewritten with **Why:** rationale after every rule + 5-pattern MTK Patterns section
+- `Project.toml` bumped to `0.5.0`
+
+### What Worked
+- Pure code quality milestone with no feature creep made execution fast and focused — all 6 plans completed in 1 day
+- Retroactive Nyquist audits (18, 19) caught missing SUMMARY frontmatter tracking quickly without blocking development
+- The `tech_debt` audit status (not `gaps_found`) allowed milestone completion with known minor doc gaps documented — right call
+- Phase 17 → 18 → 19 dependency chain was perfectly linear; no parallelization needed or beneficial
+
+### What Was Inefficient
+- The SUMMARY.md frontmatter for 18-01 and 18-02 was incomplete at phase completion — tracking IDs were not in the required fields; caught by retroactive Nyquist audit rather than live
+- FlowPort and ThermalPort docstrings were explicitly out of scope for DOC-01..04 but not called out during phase planning; created an audit gap (29 exported names documented, 2 skipped)
+- Milestones.md accomplishments field was blank from CLI (no `one_liner` fields in SUMMARY.md frontmatter) — required manual update
+
+### Patterns Established
+- Pure refactor milestones benefit from a strict "no new features" guard in the audit — audit status `tech_debt` (not `gaps_found`) is the right outcome for pure quality milestones
+- SUMMARY.md frontmatter `one_liner` field is required for CLI milestone archival to work — enforce this in phase wrap-up checklist
+- Retroactive Nyquist audits are fast and low-cost; running them after every phase catches tracking gaps before they accumulate
+
+### Key Lessons
+- Code quality milestones ship faster than feature milestones — 3 phases, 6 plans, 1 day is achievable when scope is clear and there are no blocked dependencies
+- "Why:" rationale in CLAUDE.md prevents future contributors (and AI agents) from accidentally reverting intentional design decisions
+- Test files that mirror source files one-to-one make test location predictable — worth the upfront reorganization cost
+
+### Cost Observations
+- Model mix: ~100% sonnet (balanced profile)
+- Sessions: 1 day (all 3 phases executed 2026-03-16)
+- Notable: Fastest milestone to date; pure reorganization + documentation with zero new DAE equations
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -197,6 +238,7 @@
 | v0.2 | 4 | 7 | Smaller plans (avg 1.75/phase vs 2.4/phase); `_channel_base_eqs` shared helper pattern emerges |
 | v0.3 | 4 | 8 | Decimal phase insertion for post-validation correction; PipeGeometry encapsulation pattern; KINSOL for coupled solid+fluid DAE |
 | v0.4 | 4 | 7 | Pluggable correlations via plain closures; `@observed` pattern for diagnostics; composition helpers with n-inference |
+| v0.5 | 3 | 6 | Pure code quality — canonical file layout, test split, full docstrings, CLAUDE.md rationale; no new features |
 
 ### Cumulative Quality
 
@@ -206,3 +248,4 @@
 | v0.2 | 86 | 10/10 | 0 |
 | v0.3 | 161 | 14/14 | 0 |
 | v0.4 | ~200+ | 15/15 | 0 |
+| v0.5 | ~200+ | 15/15 | 0 |

@@ -1,5 +1,24 @@
 # Milestones
 
+## v0.5 Code Quality (Shipped: 2026-03-16)
+
+**Phases:** 17-19 (3 phases, 6 plans)
+**Julia LOC:** ~3,750 (src + test) at completion
+**Timeline:** 2026-03-16 (1 day)
+**Git range:** `feat(17-01)` → `feat(19-02)` (49 files changed, +6,409/-2,780 lines)
+
+**Key accomplishments:**
+- Source reorganized into canonical layout: `geometry.jl`, `src/components/` (6 files), `src/physical_models/`, `src/composition/`, `src/examples.jl` — matches CLAUDE.md contract exactly (STR-01..05)
+- Monolithic `runtests.jl` split into 13 self-contained `test_*.jl` files; each file has its own `using` block and runs independently (TEST-01)
+- `solve_transient` converted to keyword-only signature, completing project-wide keyword-only API convention (QOL-01)
+- Structured Julia docstrings added to all 28 exported names (`# Arguments`, `# Ports`, `# Returns`) — full REPL `?help` coverage (DOC-01..04)
+- CLAUDE.md rewritten with **Why:** rationale after every rule and a 5-pattern MTK Patterns reference section for `@register_symbolic`, `ifelse()`, `vars=[]`, `@observed`, and `mtkcompile` (QOL-03)
+- `Project.toml` bumped to `0.5.0`; `ChannelHeatFlux` confirmed exported, tested, and documented (QOL-04/05)
+
+**Archive:** `.planning/milestones/v0.5-ROADMAP.md`
+
+---
+
 ## v0.4 Composability & Physics (Shipped: 2026-03-16)
 
 **Phases:** 13-16 (4 phases, 7 plans)
