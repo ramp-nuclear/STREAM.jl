@@ -1,10 +1,11 @@
 ---
 phase: 19
 slug: docstrings-claude-md-and-final-polish
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-16
+audited: 2026-03-16
 ---
 
 # Phase 19 — Validation Strategy
@@ -38,13 +39,13 @@ created: 2026-03-16
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 19-01-01 | 01 | 0 | QOL-05 | unit | `julia --project test/runtests.jl` | ❌ W0 | ⬜ pending |
-| 19-01-02 | 01 | 1 | DOC-01 | manual | `julia --project -e 'using STREAM; @doc Channel'` | N/A | ⬜ pending |
-| 19-01-03 | 01 | 1 | DOC-02 | manual | `julia --project -e 'using STREAM; @doc symmetric_plate'` | N/A | ⬜ pending |
-| 19-01-04 | 01 | 1 | DOC-03 | manual | `julia --project -e 'using STREAM; @doc solve_steady'` | N/A | ⬜ pending |
-| 19-01-05 | 01 | 1 | DOC-04 | manual | `julia --project -e 'using STREAM; @doc rho_water'` | N/A | ⬜ pending |
-| 19-01-06 | 01 | 2 | QOL-03 | manual | n/a | N/A | ⬜ pending |
-| 19-01-07 | 01 | 2 | QOL-04 | smoke | `julia --project -e 'import Pkg; Pkg.status()'` | ✅ | ⬜ pending |
+| 19-01-01 | 02 | 1 | QOL-05 | unit | `julia --project test/runtests.jl` | ✅ | ✅ green |
+| 19-01-02 | 01 | 1 | DOC-01 | automated | `julia --project -e 'using STREAM; for n in [:Channel,:Pump,:Friction,:Gravity,:Resistor,:Inertia,:HeatExchanger,:ConstantTemperature,:ChannelAndContacts,:ChannelHeatFlux,:HeatDiffusion]; d=string(Base.Docs.doc(getfield(STREAM,n))); @assert occursin("# Arguments",d); end; println("ok")'` | ✅ | ✅ green |
+| 19-01-03 | 01 | 1 | DOC-02 | automated | `julia --project -e 'using STREAM; for n in [:port,:check_gravity_mismatch,:symmetric_plate,:plate,:one_sided_connection,:compose_systems]; d=string(Base.Docs.doc(getfield(STREAM,n))); @assert occursin("# Arguments",d) && occursin("# Returns",d); end; println("ok")'` | ✅ | ✅ green |
+| 19-01-04 | 01 | 1 | DOC-03 | automated | `julia --project -e 'using STREAM; for n in [:steady_state_guess,:solve_steady,:solve_transient,:build_loop,:build_loop_vertical,:build_loop_transient,:build_cube]; d=string(Base.Docs.doc(getfield(STREAM,n))); @assert occursin("# Arguments",d) && occursin("# Returns",d); end; println("ok")'` | ✅ | ✅ green |
+| 19-01-05 | 01 | 1 | DOC-04 | automated | `julia --project -e 'using STREAM; for n in [:rho_water,:cp_water,:mu_water,:k_water]; d=string(Base.Docs.doc(getfield(STREAM,n))); @assert occursin("# Arguments",d) && occursin("# Returns",d); end; println("ok")'` | ✅ | ✅ green |
+| 19-01-06 | 02 | 1 | QOL-03 | manual | `grep -c "Why:" CLAUDE.md` (expect ≥5); `grep "## MTK Patterns" CLAUDE.md` | ✅ | ✅ green |
+| 19-01-07 | 02 | 1 | QOL-04 | smoke | `grep 'version = "0.5.0"' Project.toml` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -52,9 +53,7 @@ created: 2026-03-16
 
 ## Wave 0 Requirements
 
-- [ ] `test/test_channel.jl` — add `@testset "ChannelHeatFlux"` dedicated block (covers QOL-05)
-
-*(All other test infrastructure exists and is sufficient for this phase.)*
+- [x] `test/test_channel.jl` — `@testset "ChannelHeatFlux: standalone"` added (covers QOL-05)
 
 ---
 
@@ -72,11 +71,23 @@ created: 2026-03-16
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-03-16
+
+---
+
+## Validation Audit 2026-03-16
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+All 7 requirements verified green. DOC-01 through DOC-04 reclassified from manual to automated — `Base.Docs.doc()` confirms structured docstrings on all 28 exported names at load time.
