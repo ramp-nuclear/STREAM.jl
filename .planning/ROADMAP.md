@@ -74,11 +74,12 @@ Full phase details: `.planning/milestones/v0.4-ROADMAP.md`
   2. `src/components/` contains six dedicated files (`channel.jl`, `pump.jl`, `resistors.jl`, `misc.jl`, `thermal_channel.jl`, `heat_diffusion.jl`); the old monolithic `components.jl` is gone
   3. `src/physical_models/correlations.jl` exists; the old `src/correlations.jl` is gone
   4. `src/composition/helpers.jl` exists; the old `src/helpers.jl` is gone
-  5. `src/examples.jl` contains `build_loop*`, `build_cube`, and `steady_state_guess`; `src/solvers.jl` contains only solver logic
-**Plans**: TBD
+  5. `src/examples.jl` contains `build_loop*`, `build_cube`; `src/solvers.jl` contains only solver logic
+**Plans**: 2 plans
 
 Plans:
-- [ ] 17-01: TBD
+- [ ] 17-01-PLAN.md — Extract geometry.jl and split components.jl into src/components/ (STR-01, STR-02)
+- [ ] 17-02-PLAN.md — Move correlations.jl, helpers.jl, extract examples.jl (STR-03, STR-04, STR-05)
 
 ### Phase 18: Test Split and API Cleanup
 **Goal**: The test suite is a collection of focused per-file test modules; `solve_transient` has a keyword-only signature; the orphaned VAL-03 placeholder is gone
@@ -132,11 +133,11 @@ Plans:
 | 14. Laminar Correlations | v0.4 | 2/2 | Complete | 2026-03-14 |
 | 15. Composition Helpers & QoL | v0.4 | 2/2 | Complete | 2026-03-15 |
 | 16. Validation | v0.4 | 1/1 | Complete | 2026-03-15 |
-| 17. File Structure Reorganization | v0.5 | 0/TBD | Not started | - |
+| 17. File Structure Reorganization | v0.5 | 0/2 | Not started | - |
 | 18. Test Split and API Cleanup | v0.5 | 0/TBD | Not started | - |
 | 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 0/TBD | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-16 — v0.5 phases 17-19 added*
+*Updated: 2026-03-16 — Phase 17 planned: 2 plans*
