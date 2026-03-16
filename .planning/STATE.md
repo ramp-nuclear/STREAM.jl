@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.5
-milestone_name: Code Quality
-status: completed
-stopped_at: Completed 19-01-PLAN.md
-last_updated: "2026-03-16T16:14:28.217Z"
-last_activity: 2026-03-16 — 19-02 complete; CLAUDE.md expanded, ChannelHeatFlux tested, version 0.5.0
+milestone: v0.6
+milestone_name: Flow Reversal Systems
+status: defining_requirements
+stopped_at: —
+last_updated: "2026-03-17"
+last_activity: 2026-03-17 — Milestone v0.6 started
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 83
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # STATE: STREAM.jl
@@ -32,10 +32,10 @@ See: .planning/PROJECT.md (updated 2026-03-16)
 
 ## Current Position
 
-Phase: 19 of 19 in v0.5 (Docstrings, CLAUDE.md, Final Polish)
-Plan: 2 of 2 in current phase (19-02 complete — CLAUDE.md rationale, ChannelHeatFlux test, v0.5.0 bump)
-Status: Phase 19 plan 02 complete — v0.5 milestone all plans done
-Last activity: 2026-03-16 — 19-02 complete; CLAUDE.md expanded, ChannelHeatFlux tested, version 0.5.0
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-17 — Milestone v0.6 started
 
 Progress: [████████░░] 83% (5 of 6 plans complete; phase 19 plan 01 summary pending)
 

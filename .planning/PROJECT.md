@@ -55,7 +55,18 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 
 ### Active
 
-<!-- v0.6+ — next milestone features go here -->
+<!-- v0.6 Flow Reversal Systems -->
+
+- [ ] All existing components (Channel, ChannelAndContacts, ChannelHeatFlux) handle negative mass flow correctly (sign-safe audit and fixes)
+- [ ] `beta_water(T)` thermal expansion coefficient for light water added to fluids.jl
+- [ ] `Gr` and `Ra` dimensionless number utilities available
+- [ ] Elenbaas natural convection HTC correlation implemented and pluggable
+- [ ] `Pump(dP_pump=f(t))` accepts a Julia callable for time-varying pressure rise
+- [ ] `Flapper` component: smooth check valve with C1 ramp, MTK continuous event trigger, `ref_mdot` wiring
+- [ ] `ContinuousCallback` (event) support exposed in `solve_transient`
+- [ ] Loss-of-flow transient validated: forced flow → pump off → flow reversal → Flapper opens → natural circulation
+
+> **Gap analysis available:** `.planning/GAP-ANALYSIS.md` contains a full feature-by-feature comparison of Python STREAM vs Julia STREAM (compiled 2026-03-16, v0.5.0). Use this as the primary input when scoping v0.6+ milestones. ~80 items missing; Priority 1 (9 items) covers the non-negotiable core for real reactor simulations.
 
 ### Out of Scope
 
@@ -65,7 +76,8 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - Python adapter (juliacall) — if Julia-STREAM is good, it should be used from Julia
 - Heavy water, sodium, or any non-light-water fluid — light water sufficient
 - Wrapper struct for solver API (SteadySolution, TransientSolution) — ODESolution is sufficient
-- Subcooled boiling, natural convection — not needed for current validation targets
+- Subcooled boiling — not needed for current validation targets
+- Natural convection as a standalone loop mode (Elenbaas added in v0.6 as HTC correlation only, not a full natural-convection-loop solver)
 - `channel_outputs()` helper — `@observed` makes `sol[sys.ch.Re, :]` work directly
 
 ## Context
@@ -124,5 +136,16 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **Validation**: All results compared against Python STREAM on identical inputs. <1% steady-state; qualitative transient match
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
 
+## Current Milestone: v0.6 Flow Reversal Systems
+
+**Goal:** Enable loss-of-flow accident simulation — from forced flow through pump coastdown, flow reversal, Flapper opening, to established natural circulation.
+
+**Target features:**
+- Sign-safe components (all handle negative mass flow)
+- Elenbaas natural convection HTC + thermal expansion fluid property
+- Time-varying Pump pressure (`dP_pump` as callable)
+- Flapper component (smooth C1 trigger, MTK continuous event)
+- Loss-of-flow validation scenario
+
 ---
-*Last updated: 2026-03-16 after v0.5 milestone*
+*Last updated: 2026-03-17 after v0.6 milestone start*
