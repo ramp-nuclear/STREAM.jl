@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.4
-milestone_name: Composability & Physics
-status: completed
-stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-03-15T23:32:00.624Z"
-last_activity: 2026-03-15 — Phase 16 Plan 01 complete; VAL-01 Fourier transient, VAL-02 two-plate topology, VAL-03 T_max analytical assertion all green
+milestone: v0.5
+milestone_name: Code Quality
+status: defining requirements
+stopped_at: —
+last_updated: "2026-03-16T00:00:00.000Z"
+last_activity: 2026-03-16 — Milestone v0.5 started
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # STATE: STREAM.jl
@@ -25,19 +25,19 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Planning next milestone (v0.5)
+**Current focus:** v0.5 Code Quality milestone
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: 16 of 16 (Validation) — COMPLETE
-Plan: 01 of 01 complete
-Status: Phase 16 Complete — All VAL-01/02/03 requirements satisfied; v0.4 milestone validation gap closed
-Last activity: 2026-03-15 — Phase 16 Plan 01 complete; VAL-01 Fourier transient, VAL-02 two-plate topology, VAL-03 T_max analytical assertion all green
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-16 — Milestone v0.5 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ---
 

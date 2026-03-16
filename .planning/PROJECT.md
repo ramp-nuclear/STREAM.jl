@@ -10,6 +10,17 @@ v0.1 shipped a single forced-convection coolant loop validated against Python ST
 
 A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
 
+## Current Milestone: v0.5 Code Quality
+
+**Goal:** Reorganize the codebase to match the canonical file structure, add docstrings to all exported names, split the monolithic test file, and fix minor code quality issues — no new features.
+
+**Target features:**
+- File structure reorganization (geometry.jl, components/, physical_models/, composition/, examples.jl)
+- Julia docstrings on all 24 exported functions lacking them
+- test/runtests.jl split into 13 dedicated test files
+- CLAUDE.md improved with rationale and MTK patterns
+- solve_transient keyword-only conversion + minor QoL fixes
+
 ## Requirements
 
 ### Validated
@@ -49,7 +60,15 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 
 ### Active
 
-(Pending next milestone planning — no requirements defined yet)
+<!-- v0.5 Code Quality — building toward these -->
+
+- [ ] File structure reorganized to match CLAUDE.md canonical layout (geometry.jl, components/, physical_models/, composition/, examples.jl)
+- [ ] All exported names have Julia docstrings with # Arguments and # Returns
+- [ ] test/runtests.jl split into 13 dedicated test_*.jl files; runtests.jl becomes thin orchestrator
+- [ ] CLAUDE.md fleshed out with rationale and MTK-specific patterns
+- [ ] solve_transient converted to keyword-only signature
+- [ ] Orphaned VAL-03 placeholder testset removed
+- [ ] Project.toml bumped to v0.5.0
 
 ### Out of Scope
 
@@ -116,4 +135,4 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
 
 ---
-*Last updated: 2026-03-16 after v0.4 milestone*
+*Last updated: 2026-03-16 after v0.5 milestone start*
