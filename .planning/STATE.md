@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Code Quality
 status: executing
-stopped_at: Phase 19 context gathered
-last_updated: "2026-03-16T15:01:58.658Z"
-last_activity: 2026-03-16 — 18-02 complete; solve_transient converted to keyword-only signature
+stopped_at: Completed 19-02-PLAN.md
+last_updated: "2026-03-16T15:49:22.778Z"
+last_activity: 2026-03-16 — 19-02 complete; CLAUDE.md expanded with rationale and MTK patterns; version 0.5.0
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-16)
 
 ## Current Position
 
-Phase: 18 of 19 in v0.5 (Test Split and API Cleanup) — COMPLETE
-Plan: 2 of 2 in current phase (18-02 complete — solve_transient keyword-only API)
-Status: In Progress (Phase 19 next)
-Last activity: 2026-03-16 — 18-02 complete; solve_transient converted to keyword-only signature
+Phase: 19 of 19 in v0.5 (Docstrings, CLAUDE.md, Final Polish)
+Plan: 2 of 2 in current phase (19-02 complete — CLAUDE.md rationale, ChannelHeatFlux test, v0.5.0 bump)
+Status: Phase 19 plan 02 complete — v0.5 milestone all plans done
+Last activity: 2026-03-16 — 19-02 complete; CLAUDE.md expanded, ChannelHeatFlux tested, version 0.5.0
 
-Progress: [██████████] 100% (v0.5 phase 18 all plans complete)
+Progress: [████████░░] 83% (5 of 6 plans complete; phase 19 plan 01 summary pending)
 
 ---
 
@@ -59,6 +59,7 @@ Progress: [██████████] 100% (v0.5 phase 18 all plans complet
 | Phase 17 P02 | 25 | 2 tasks | 5 files |
 | Phase 18 P01 | 14 min | 2 tasks | 15 files |
 | Phase 18 P02 | 4 | 1 tasks | 3 files |
+| Phase 19-docstrings-claude-md-and-final-polish P02 | 4 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Progress: [██████████] 100% (v0.5 phase 18 all plans complet
 - [18-01]: COMPAT test moved to test_examples.jl per CLAUDE.md layout; const SciMLBase moved into test_misc.jl and test_validation.jl
 - [18-01]: TEST-01 and QOL-02 complete — runtests.jl is now thin orchestrator; VAL-03 preserved in test_validation.jl
 - [18-02]: QOL-01 complete — solve_transient converted to keyword-only; all exported STREAM.jl functions now use keyword-only arguments
+- [19-02]: QOL-03: Why: rationale added as indented italic lines below each rule in CLAUDE.md; new MTK Patterns section documents 5 non-obvious conventions
+- [19-02]: QOL-04: Project.toml version bumped 0.1.0 -> 0.5.0 marking v0.5 Code Quality milestone complete
+- [19-02]: QOL-05: ChannelHeatFlux standalone testset added to test_channel.jl; ConstantTemperature confirmed exported and tested in CHAN-02
 
 ### Pending Todos
 
@@ -93,11 +97,11 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-16T15:01:58.655Z
-**Stopped at:** Phase 19 context gathered
+**Last session:** 2026-03-16T15:49:22.776Z
+**Stopped at:** Completed 19-02-PLAN.md
 **Next action:** `/gsd:plan-phase 17`
-**Resume file:** .planning/phases/19-docstrings-claude-md-and-final-polish/19-CONTEXT.md
+**Resume file:** None
 
 ---
 
-*Last updated: 2026-03-16 — Phase 18 complete; canonical file layout + keyword-only API in effect; phase 19 remains*
+*Last updated: 2026-03-16 — Phase 19 plan 02 complete; CLAUDE.md rationale and MTK patterns added; ChannelHeatFlux tested; v0.5.0 tagged*
