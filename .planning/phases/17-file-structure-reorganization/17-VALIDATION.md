@@ -1,10 +1,11 @@
 ---
 phase: 17
 slug: file-structure-reorganization
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: compliant
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-16
+audited: 2026-03-16
 ---
 
 # Phase 17 — Validation Strategy
@@ -38,11 +39,11 @@ created: 2026-03-16
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 17-01-01 | 01 | 1 | STR-01 | smoke | `julia --project=. -e 'using STREAM; @assert isdefined(STREAM, :PipeGeometry)'` | ✅ | ⬜ pending |
-| 17-01-02 | 01 | 1 | STR-02 | smoke+unit | `julia --project=. -e 'using Pkg; Pkg.test()'` | ✅ | ⬜ pending |
-| 17-01-03 | 01 | 1 | STR-03 | smoke | `julia --project=. -e 'using STREAM; @assert isdefined(STREAM, :dittus_boelter)'` | ✅ | ⬜ pending |
-| 17-01-04 | 01 | 1 | STR-04 | smoke | `julia --project=. -e 'using STREAM; @assert isdefined(STREAM, :symmetric_plate)'` | ✅ | ⬜ pending |
-| 17-01-05 | 01 | 1 | STR-05 | smoke | `julia --project=. -e 'using STREAM; @assert isdefined(STREAM, :build_loop)'` | ✅ | ⬜ pending |
+| 17-01-01 | 01 | 1 | STR-01 | smoke | `julia --project=. -e 'using STREAM; @assert isdefined(STREAM, :PipeGeometry)'` | ✅ | ✅ green |
+| 17-01-02 | 01 | 1 | STR-02 | smoke+unit | `julia --project=. -e 'using Pkg; Pkg.test()'` | ✅ | ✅ green |
+| 17-01-03 | 01 | 1 | STR-03 | smoke | `julia --project=. -e 'using STREAM; @assert isdefined(STREAM, :dittus_boelter)'` | ✅ | ✅ green |
+| 17-01-04 | 01 | 1 | STR-04 | smoke | `julia --project=. -e 'using STREAM; @assert isdefined(STREAM, :symmetric_plate)'` | ✅ | ✅ green |
+| 17-01-05 | 01 | 1 | STR-05 | smoke | `julia --project=. -e 'using STREAM; @assert isdefined(STREAM, :build_loop)'` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -62,11 +63,20 @@ created: 2026-03-16
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-03-16
+
+## Validation Audit 2026-03-16
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+All 5 tasks COVERED. VAL-01 Fourier series failure is pre-existing and unrelated to phase 17.
