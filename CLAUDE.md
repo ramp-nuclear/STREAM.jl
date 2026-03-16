@@ -59,10 +59,39 @@ test/
 ## Component authoring conventions
 
 - All component constructor arguments are **keyword-only** (no positional args). Matches MTK convention everywhere.
+  *Why: Keyword-only prevents argument-order bugs and makes call sites self-documenting. MTK's own `@mtkmodel` macro generates keyword-only constructors.*
 - Factory functions (`PipeGeometry_rectangular`, `PipeGeometry_circular`) are also keyword-only.
+  *Why: Consistency with component constructors. Mixing positional and keyword styles across the API creates confusion.*
 - Internal helpers are prefixed with `_` and not exported.
+  *Why: Keeps the public API surface small and signals that these functions may change without notice. The `_` prefix is a Julia community convention.*
 - Every exported name has a docstring with at minimum: description, `# Arguments`, `# Returns`.
+  *Why: The REPL `?name` lookup is the primary discovery mechanism for Julia packages. Structured sections make docstrings scannable.*
 
 ## Exports
 
 All public exports are declared in `STREAM.jl`. Never add `export` statements inside component files.
+  *Why: A single export list in the module entry point makes the public API auditable at a glance. Scattered exports are easy to lose track of.*
+
+## MTK Patterns
+
+Non-obvious ModelingToolkit conventions used throughout the codebase.
+
+### `@register_symbolic` for fluid properties
+
+Plain Julia functions cannot accept MTK's `Num` type (symbolic variables). `@register_symbolic` wraps them as opaque nodes in the symbolic expression graph, allowing them to appear in MTK equations without being traced or differentiated symbolically by Symbolics.jl.
+
+### `ifelse()` for flow reversal and regime switching
+
+Julia's `if`/`else` on a symbolic `Num` expression would evaluate the branch condition at trace time (equation construction), collapsing to a single branch permanently. `ifelse()` emits a symbolic conditional node that the solver evaluates at each timestep, enabling correct flow-reversal and laminar/turbulent regime switching.
+
+### `vars=[]` for Inertia
+
+When `Dt(port_in.mdot)` appears in an equation, MTK automatically promotes `port_in.mdot` to a differential state variable. Explicitly listing it in `vars` would be redundant. Passing `vars=[]` makes clear that the component introduces no *additional* state variables beyond what MTK infers.
+
+### `@observed` vs plain unknowns
+
+`@observed` variables are computed post-solve from the solution trajectory -- they are not part of the DAE system. Use `@observed` for diagnostic quantities (e.g., `Re`, `Nu`, `htc`) that are never referenced on the RHS of another equation. If a variable appears in another equation, it must be a plain unknown so the solver can see it.
+
+### `mtkcompile` before solve
+
+MTK's symbolic IR requires structural analysis (index reduction from DAE to ODE), Jacobian sparsity detection, and code generation before a numerical solver can use it. Always call `mtkcompile(sys)` to produce a compiled system. Passing an uncompiled `System` to `solve` will error or produce wrong results.
