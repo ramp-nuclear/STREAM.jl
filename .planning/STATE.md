@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.5
 milestone_name: Code Quality
-status: planning
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-03-16T10:31:56.584Z"
-last_activity: 2026-03-16 — v0.5 roadmap created; phases 17-19 defined
+status: executing
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-03-16T10:41:15.851Z"
+last_activity: 2026-03-16 — 17-01 complete; split components.jl into 6 files, geometry.jl extracted
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 # STATE: STREAM.jl
@@ -33,11 +33,11 @@ See: .planning/PROJECT.md (updated 2026-03-16)
 ## Current Position
 
 Phase: 17 of 19 in v0.5 (File Structure Reorganization)
-Plan: 1 of 2 in current phase (17-01 complete)
+Plan: 2 of 2 in current phase (17-02 complete — phase 17 DONE)
 Status: In Progress
-Last activity: 2026-03-16 — 17-01 complete; split components.jl into 6 files, geometry.jl extracted
+Last activity: 2026-03-16 — 17-02 complete; correlations/helpers moved to subdirs, examples.jl extracted from solvers.jl
 
-Progress: [█████░░░░░] 50% (v0.5 milestone)
+Progress: [██████████] 100% (v0.5 phase 17 complete)
 
 ---
 
@@ -56,6 +56,7 @@ Progress: [█████░░░░░] 50% (v0.5 milestone)
 *Updated after each plan completion*
 
 ---
+| Phase 17 P02 | 25 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,9 @@ Progress: [█████░░░░░] 50% (v0.5 milestone)
 - [v0.4]: Correlation functions live in `src/correlations.jl` → moving to `src/physical_models/correlations.jl` in Phase 17
 - [v0.4]: VAL-03 orphaned `@testset` placeholder exists in runtests.jl → remove in Phase 18 (QOL-02)
 - [v0.4]: `solve_transient` still uses positional args → convert to keyword-only in Phase 18 (QOL-01)
+- [17-02]: examples.jl has no using/export/include — all symbols accessed from module scope (STREAM.jl includes everything before examples.jl)
+- [17-02]: solvers.jl using statements left untouched per CONTEXT.md locked decision
+- [17-02]: STR-03, STR-04, STR-05 complete — canonical CLAUDE.md file layout is now fully in effect
 
 ### Pending Todos
 
@@ -83,11 +87,11 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-16T10:31:56.582Z
-**Stopped at:** Completed 17-01-PLAN.md
+**Last session:** 2026-03-16T10:41:15.849Z
+**Stopped at:** Completed 17-02-PLAN.md
 **Next action:** `/gsd:plan-phase 17`
 **Resume file:** None
 
 ---
 
-*Last updated: 2026-03-16 — v0.5 roadmap created; 3 phases (17-19) covering 15 requirements*
+*Last updated: 2026-03-16 — Phase 17 complete; canonical file layout in effect; phases 18-19 remain*
