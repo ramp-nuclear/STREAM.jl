@@ -150,3 +150,55 @@ function regime_dependent(;
 
     return (htc = htc_fn, friction = friction_fn)
 end
+
+"""
+    elenbaas_nusselt(Ra, b, L) -> Nu
+
+Elenbaas natural convection correlation for parallel vertical plates.
+Formula: Nu = (1/24) * Ra * (b/L) * (1 - exp(-35 * L / (Ra * b)))^0.75
+
+Source: Elenbaas (1942), as implemented in Python STREAM `_Elenbaas`.
+
+# Arguments
+- `Ra`: Rayleigh number (based on gap width b)
+- `b`: gap between plates [m] (channel depth)
+- `L`: heated length [m]
+
+# Returns
+Nusselt number (dimensionless).
+"""
+elenbaas_nusselt(Ra, b, L) = (1/24) * Ra * (b / L) * (1 - exp(-35 * L / (Ra * b)))^0.75
+
+"""
+    elenbaas_htc(; b, L, Dh, g=9.81) -> (Re, Pr, T_bulk, T_wall) -> Nu
+
+Factory returning an HTC correlation for Elenbaas natural convection.
+Captures geometry and gravity at construction time. The returned closure
+computes beta, nu, Gr, and Ra from T_bulk and T_wall at each evaluation.
+
+Compatible with the 4-arg HTC interface `(Re, Pr, T_bulk, T_wall) -> Nu`.
+When T_wall = T_bulk (dT=0), returns Nu=0 (physically correct: no buoyancy
+driving force).
+
+Note: Re and Pr arguments are accepted for interface compatibility but
+are NOT used in the Elenbaas correlation (natural convection does not
+depend on forced-flow Reynolds number).
+
+# Arguments
+- `b`: gap between plates [m] (channel depth)
+- `L`: heated length [m]
+- `Dh`: hydraulic diameter [m] (used as characteristic length in Gr)
+- `g`: gravitational acceleration [m/s^2] (default 9.81)
+
+# Returns
+Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+"""
+function elenbaas_htc(; b, L, Dh, g = 9.81)
+    return (Re, Pr, T_bulk, T_wall) -> begin
+        beta   = beta_water(T_bulk)
+        nu     = mu_water(T_bulk) / rho_water(T_bulk)
+        Gr_val = Gr(beta, g, T_wall - T_bulk, Dh, nu)
+        Ra_val = Ra(Gr_val, Pr)
+        elenbaas_nusselt(Ra_val, b, L)
+    end
+end
