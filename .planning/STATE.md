@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: completed
-stopped_at: Phase 21 context gathered
-last_updated: "2026-03-17T17:23:15.444Z"
+stopped_at: Completed 21-01-PLAN.md
+last_updated: "2026-03-17T17:51:56.396Z"
 last_activity: 2026-03-17 — 20-02 sign safety tests and abs(mdot) energy balance fix complete
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 20 of 24 (Sign Safety)
-Plan: 02 complete (phase 20 complete)
-Status: Phase complete
-Last activity: 2026-03-17 — 20-02 sign safety tests and abs(mdot) energy balance fix complete
+Phase: 21 of 24 (Fluid Properties and Natural Convection)
+Plan: 01 complete (21-01 beta_water + dimensionless + 4-arg HTC interface)
+Status: In progress
+Last activity: 2026-03-17 — 21-01 beta_water, dimensionless.jl, 4-arg HTC interface complete
 
-Progress: [██████████] 100% (2 of 2 phase 20 plans complete)
+Progress: [████████░░] 75% (3 of 4 phase 21 plans complete -- ROADMAP shows 2 plans in phase 21)
 
 ---
 
@@ -56,6 +56,7 @@ Progress: [██████████] 100% (2 of 2 phase 20 plans complete)
 ---
 | Phase 20-sign-safety P01 | 2 | 2 tasks | 2 files |
 | Phase 20 P02 | 100 | 2 tasks | 4 files |
+| Phase 21 P01 | 27 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Progress: [██████████] 100% (2 of 2 phase 20 plans complete)
 - [v0.6 SIGN]: velocity[i] (unsigned speed) and v[i] (signed) are distinct observables in ChannelAndContacts
 - [v0.6 SIGN-02]: abs(port_in.mdot) in FV energy balance — T_up already selects correct direction; advective flux = |mdot|*cp*(T_up-T[i]); signed mdot gives wrong sign for reversed flow
 - [v0.6 SIGN-02]: Q_advect for reversed flow uses T_boundary_inlet (from port_in.T pin), NOT T[n] (already heated above T_inlet by wall)
+- [v0.6 FLUID]: Re, Pr, Nu, Pe NOT exported as standalone names — conflict with @variables in component functions; use STREAM.Re(...) for utility access
+- [v0.6 FLUID]: HTC closures accept (Re, Pr, T_bulk, T_wall); dittus_boelter/constant_Nusselt use args...; regime_dependent forwards 4 args explicitly
+- [v0.6 FLUID]: elenbaas_nusselt and elenbaas_htc pre-exported in STREAM.jl; Plan 02 only needs to implement the functions
 
 ### Pending Todos
 
@@ -85,10 +89,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-17T17:23:15.442Z
-**Stopped at:** Phase 21 context gathered
+**Last session:** 2026-03-17T17:51:56.394Z
+**Stopped at:** Completed 21-01-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
-**Resume file:** .planning/phases/21-fluid-properties-natural-convection/21-CONTEXT.md
+**Resume file:** None
 
 ---
 

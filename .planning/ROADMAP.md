@@ -181,7 +181,7 @@ Plans:
 | 18. Test Split and API Cleanup | v0.5 | 2/2 | Complete | 2026-03-16 |
 | 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 2/2 | Complete | 2026-03-16 |
 | 20. Sign Safety | 2/2 | Complete    | 2026-03-17 | - |
-| 21. Fluid Properties & Natural Convection | v0.6 | 0/2 | Not started | - |
+| 21. Fluid Properties & Natural Convection | 1/2 | In Progress|  | - |
 | 22. Time-Varying Pump | v0.6 | 0/1 | Not started | - |
 | 23. Flapper & Solver Events | v0.6 | 0/2 | Not started | - |
 | 24. Loss-of-Flow Validation | v0.6 | 0/1 | Not started | - |

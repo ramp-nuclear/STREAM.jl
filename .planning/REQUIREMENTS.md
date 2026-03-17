@@ -14,9 +14,9 @@
 
 ### Fluid Properties
 
-- [ ] **FLUID-01**: `beta_water(T)` — isobaric thermal expansion coefficient [1/K] for light water, `@register_symbolic`
-- [ ] **FLUID-02**: `Gr(beta, g, dT, L, nu)` — Grashof number utility (plain exported Julia function)
-- [ ] **FLUID-03**: `Ra(Gr_val, Pr_val)` — Rayleigh number utility (plain exported Julia function)
+- [x] **FLUID-01**: `beta_water(T)` — isobaric thermal expansion coefficient [1/K] for light water, `@register_symbolic`
+- [x] **FLUID-02**: `Gr(beta, g, dT, L, nu)` — Grashof number utility (plain exported Julia function)
+- [x] **FLUID-03**: `Ra(Gr_val, Pr_val)` — Rayleigh number utility (plain exported Julia function)
 
 ### Natural Convection HTC
 
@@ -86,9 +86,9 @@
 | SIGN-02 | Phase 20 | Complete |
 | SIGN-03 | Phase 20 | Complete |
 | SIGN-04 | Phase 20 | Complete |
-| FLUID-01 | Phase 21 | Pending |
-| FLUID-02 | Phase 21 | Pending |
-| FLUID-03 | Phase 21 | Pending |
+| FLUID-01 | Phase 21 | Complete |
+| FLUID-02 | Phase 21 | Complete |
+| FLUID-03 | Phase 21 | Complete |
 | NATCONV-01 | Phase 21 | Pending |
 | NATCONV-02 | Phase 21 | Pending |
 | PUMP-01 | Phase 22 | Pending |
