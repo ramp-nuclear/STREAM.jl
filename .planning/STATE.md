@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: planning
-stopped_at: Phase 20 context gathered
-last_updated: "2026-03-17T12:47:49.130Z"
+stopped_at: Completed 20-sign-safety-01-PLAN.md
+last_updated: "2026-03-17T13:07:14.568Z"
 last_activity: 2026-03-17 — v0.6 roadmap created
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -33,11 +33,11 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 20 of 24 (Sign Safety)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-03-17 — v0.6 roadmap created
+Plan: 01 complete, 02 next
+Status: In progress
+Last activity: 2026-03-17 — 20-01 channel sign-safety source fixes complete
 
-Progress: [░░░░░░░░░░] 0% (0 of 8 plans complete)
+Progress: [█████░░░░░] 50% (1 of 2 phase plans complete)
 
 ---
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0% (0 of 8 plans complete)
 *Updated after each plan completion*
 
 ---
+| Phase 20-sign-safety P01 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,9 @@ Progress: [░░░░░░░░░░] 0% (0 of 8 plans complete)
 - [v0.4]: Correlation functions are plain Julia closures (not @register_symbolic) — elenbaas_nusselt follows the same pattern
 - [v0.4]: Re/Nu/velocity/Pe are @observed (not unknowns) — SIGN-02 must ensure these stay @observed and sign-correct
 - [v0.3]: Flapper is a new component file — goes to src/components/ per CLAUDE.md layout
+- [v0.6 SIGN]: ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev) per-cell upwinding — T_inlet_fwd/rev declared before loop, selection inside loop
+- [v0.6 SIGN]: port_in.T ~ T[1] is correct MTK outflow equation (T[1] is outflow temp through port_in under reverse flow)
+- [v0.6 SIGN]: velocity[i] (unsigned speed) and v[i] (signed) are distinct observables in ChannelAndContacts
 
 ### Pending Todos
 
@@ -78,10 +82,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-17T12:47:49.128Z
-**Stopped at:** Phase 20 context gathered
+**Last session:** 2026-03-17T13:07:14.566Z
+**Stopped at:** Completed 20-sign-safety-01-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
-**Resume file:** .planning/phases/20-sign-safety/20-CONTEXT.md
+**Resume file:** None
 
 ---
 
