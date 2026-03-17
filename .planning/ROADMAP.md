@@ -80,6 +80,7 @@ Full phase details: `.planning/milestones/v0.5-ROADMAP.md`
 - [ ] **Phase 22: Time-Varying Pump** - Enable callable dP_pump for coastdown and ramp scenarios
 - [ ] **Phase 23: Flapper & Solver Events** - Implement Flapper check-valve component with MTK continuous event and expose callback API
 - [ ] **Phase 24: Loss-of-Flow Validation** - Validate full loss-of-flow transient end-to-end against analytical expectations
+- [ ] **Phase 25: Argument Structure Audit** - Sweep all public functions and constructors, replace keyword-only where positional + multiple dispatch is more idiomatic Julia
 
 ## Phase Details
 
@@ -154,9 +155,23 @@ Plans:
 Plans:
 - [ ] 24-01: Loss-of-flow transient validation scenario
 
+### Phase 25: Argument Structure Audit
+**Goal**: Sweep all exported functions and component constructors; replace keyword-only signatures with positional arguments + multiple dispatch wherever it improves clarity or enables type-based dispatch
+**Depends on**: Phase 24
+**Requirements**: (none — code quality / convention alignment)
+**Success Criteria** (what must be TRUE):
+  1. All functions where the argument type determines behavior (e.g., `Real` vs `Function`) use positional dispatch instead of runtime `isa` checks
+  2. Short utility functions and internal `_`-prefixed helpers use positional arguments where natural
+  3. Large multi-arg constructors where keyword-only prevents argument-order bugs remain keyword-only (no regression)
+  4. CLAUDE.md updated to reflect the new rule: positional + dispatch preferred when types differ; keyword-only when distinguishing between named concepts of the same type
+**Plans**: TBD
+
+Plans:
+- [ ] 25-01: Argument structure sweep and CLAUDE.md update
+
 ## Progress
 
-**Execution Order:** Phases execute in numeric order: 20 → 21 → 22 → 23 → 24
+**Execution Order:** Phases execute in numeric order: 20 → 21 → 22 → 23 → 24 → 25
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -185,8 +200,9 @@ Plans:
 | 22. Time-Varying Pump | v0.6 | 0/1 | Not started | - |
 | 23. Flapper & Solver Events | v0.6 | 0/2 | Not started | - |
 | 24. Loss-of-Flow Validation | v0.6 | 0/1 | Not started | - |
+| 25. Argument Structure Audit | v0.6 | 0/1 | Not started | - |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-17 — v0.6 roadmap added (phases 20-24)*
+*Updated: 2026-03-17 — Phase 25 added: argument structure audit (positional + dispatch rule)*
