@@ -64,8 +64,11 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         T_up_rev = (i == n) ? T_inlet_rev : T[i+1]
         T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
         # Energy balance (first-order upwind FV)
+        # abs(port_in.mdot) ensures correct sign under reversed flow (mdot < 0):
+        # the upwind temperature T_up is already selected for the correct direction,
+        # so the advective flux is always |mdot|*cp*(T_upstream - T[i]).
         push!(eqs,
-            Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
+            Dt(T[i]) ~ (abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i])
                        + h_tc[i] * sum(geometry.heated_parts) * dz * (thermal.T - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
@@ -91,7 +94,7 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
     push!(eqs, port_out.P - port_in.P ~ -dP)
     push!(eqs, port_out.T ~ T[n])
-    push!(eqs, port_in.T  ~ T[1])
+    push!(eqs, port_in.T  ~ instream(port_out.T))
 
     all_vars = [collect(T); collect(Re); collect(Nu);
                 collect(h_tc); collect(v); collect(q_wall);
@@ -156,5 +159,5 @@ function _channel_base_eqs(eqs::Vector{Equation};
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
     push!(eqs, port_out.P - port_in.P       ~ -dP)
     push!(eqs, port_out.T                   ~ T[n])
-    push!(eqs, port_in.T                    ~ T[1])
+    push!(eqs, port_in.T                    ~ instream(port_out.T))
 end

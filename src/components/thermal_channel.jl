@@ -98,7 +98,7 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         T_up_rev = (i == n) ? T_inlet_rev : T[i+1]
         T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
         push!(eqs,
-            Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
+            Dt(T[i]) ~ (abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i])
                        + h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T  - T[i])
                        + h_tc[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
@@ -214,7 +214,7 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
         T_up_rev = (i == n) ? T_inlet_rev : T[i+1]
         T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
         push!(eqs,
-            Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
+            Dt(T[i]) ~ (abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i])
                        + h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
