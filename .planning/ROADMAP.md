@@ -75,7 +75,7 @@ Full phase details: `.planning/milestones/v0.5-ROADMAP.md`
 
 **Milestone Goal:** Enable loss-of-flow accident simulation — from forced flow through pump coastdown, flow reversal, Flapper opening, to established natural circulation.
 
-- [ ] **Phase 20: Sign Safety** - Audit and fix all channel components to handle negative mass flow correctly
+- [x] **Phase 20: Sign Safety** - Audit and fix all channel components to handle negative mass flow correctly (completed 2026-03-17)
 - [ ] **Phase 21: Fluid Properties & Natural Convection** - Add thermal expansion coefficient, Gr/Ra utilities, and Elenbaas HTC correlation
 - [ ] **Phase 22: Time-Varying Pump** - Enable callable dP_pump for coastdown and ramp scenarios
 - [ ] **Phase 23: Flapper & Solver Events** - Implement Flapper check-valve component with MTK continuous event and expose callback API
@@ -180,7 +180,7 @@ Plans:
 | 17. File Structure Reorganization | v0.5 | 2/2 | Complete | 2026-03-16 |
 | 18. Test Split and API Cleanup | v0.5 | 2/2 | Complete | 2026-03-16 |
 | 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 2/2 | Complete | 2026-03-16 |
-| 20. Sign Safety | 1/2 | In Progress|  | - |
+| 20. Sign Safety | 2/2 | Complete   | 2026-03-17 | - |
 | 21. Fluid Properties & Natural Convection | v0.6 | 0/2 | Not started | - |
 | 22. Time-Varying Pump | v0.6 | 0/1 | Not started | - |
 | 23. Flapper & Solver Events | v0.6 | 0/2 | Not started | - |

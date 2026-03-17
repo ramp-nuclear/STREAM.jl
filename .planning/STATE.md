@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
-status: planning
-stopped_at: Completed 20-sign-safety-01-PLAN.md
-last_updated: "2026-03-17T13:07:14.568Z"
-last_activity: 2026-03-17 — v0.6 roadmap created
+status: executing
+stopped_at: Completed 20-sign-safety-02-PLAN.md
+last_updated: "2026-03-17T15:00:24.955Z"
+last_activity: 2026-03-17 — 20-01 channel sign-safety source fixes complete
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 # STATE: STREAM.jl
@@ -33,11 +33,11 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 20 of 24 (Sign Safety)
-Plan: 01 complete, 02 next
-Status: In progress
-Last activity: 2026-03-17 — 20-01 channel sign-safety source fixes complete
+Plan: 02 complete (phase 20 complete)
+Status: Phase complete
+Last activity: 2026-03-17 — 20-02 sign safety tests and abs(mdot) energy balance fix complete
 
-Progress: [█████░░░░░] 50% (1 of 2 phase plans complete)
+Progress: [██████████] 100% (2 of 2 phase 20 plans complete)
 
 ---
 
@@ -55,6 +55,7 @@ Progress: [█████░░░░░] 50% (1 of 2 phase plans complete)
 
 ---
 | Phase 20-sign-safety P01 | 2 | 2 tasks | 2 files |
+| Phase 20 P02 | 100 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,8 @@ Progress: [█████░░░░░] 50% (1 of 2 phase plans complete)
 - [v0.6 SIGN]: ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev) per-cell upwinding — T_inlet_fwd/rev declared before loop, selection inside loop
 - [v0.6 SIGN]: port_in.T ~ T[1] is correct MTK outflow equation (T[1] is outflow temp through port_in under reverse flow)
 - [v0.6 SIGN]: velocity[i] (unsigned speed) and v[i] (signed) are distinct observables in ChannelAndContacts
+- [v0.6 SIGN-02]: abs(port_in.mdot) in FV energy balance — T_up already selects correct direction; advective flux = |mdot|*cp*(T_up-T[i]); signed mdot gives wrong sign for reversed flow
+- [v0.6 SIGN-02]: Q_advect for reversed flow uses T_boundary_inlet (from port_in.T pin), NOT T[n] (already heated above T_inlet by wall)
 
 ### Pending Todos
 
@@ -82,8 +85,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-17T13:07:14.566Z
-**Stopped at:** Completed 20-sign-safety-01-PLAN.md
+**Last session:** 2026-03-17T15:00:24.951Z
+**Stopped at:** Completed 20-sign-safety-02-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
 **Resume file:** None
 

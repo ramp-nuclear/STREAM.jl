@@ -10,7 +10,7 @@
 - [x] **SIGN-01**: Channel handles negative `mdot` — Re uses `abs(mdot)`, friction dP flips sign, temperature advection upwinds correctly
 - [x] **SIGN-02**: ChannelAndContacts handles negative `mdot` — same guarantees as SIGN-01; all `@observed` variables (Re, Nu, velocity, Pe) remain physically meaningful
 - [x] **SIGN-03**: ChannelHeatFlux handles negative `mdot`
-- [ ] **SIGN-04**: Test suite asserts correct reversed temperature profile (T decreases axially) and positive Re for a channel run with `mdot < 0`
+- [x] **SIGN-04**: Test suite asserts correct reversed temperature profile (T decreases axially) and positive Re for a channel run with `mdot < 0`
 
 ### Fluid Properties
 
@@ -85,7 +85,7 @@
 | SIGN-01 | Phase 20 | Complete |
 | SIGN-02 | Phase 20 | Complete |
 | SIGN-03 | Phase 20 | Complete |
-| SIGN-04 | Phase 20 | Pending |
+| SIGN-04 | Phase 20 | Complete |
 | FLUID-01 | Phase 21 | Pending |
 | FLUID-02 | Phase 21 | Pending |
 | FLUID-03 | Phase 21 | Pending |
