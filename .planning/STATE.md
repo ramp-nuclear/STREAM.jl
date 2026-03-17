@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
-status: completed
-stopped_at: Completed 21-01-PLAN.md
-last_updated: "2026-03-17T17:51:56.396Z"
-last_activity: 2026-03-17 — 20-02 sign safety tests and abs(mdot) energy balance fix complete
+status: executing
+stopped_at: Completed 21-02-PLAN.md
+last_updated: "2026-03-17T18:04:09.805Z"
+last_activity: 2026-03-17 — 21-01 beta_water, dimensionless.jl, 4-arg HTC interface complete
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 100
+  completed_plans: 4
+  percent: 75
 ---
 
 # STATE: STREAM.jl
@@ -33,11 +33,11 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 ## Current Position
 
 Phase: 21 of 24 (Fluid Properties and Natural Convection)
-Plan: 01 complete (21-01 beta_water + dimensionless + 4-arg HTC interface)
-Status: In progress
-Last activity: 2026-03-17 — 21-01 beta_water, dimensionless.jl, 4-arg HTC interface complete
+Plan: 02 complete (21-02 elenbaas_nusselt, elenbaas_htc, NATCONV-01/02)
+Status: Phase 21 complete
+Last activity: 2026-03-17 — 21-02 elenbaas_nusselt, elenbaas_htc natural convection correlation complete
 
-Progress: [████████░░] 75% (3 of 4 phase 21 plans complete -- ROADMAP shows 2 plans in phase 21)
+Progress: [██████████] 100% (4 of 4 phase 21 plans complete)
 
 ---
 
@@ -57,6 +57,7 @@ Progress: [████████░░] 75% (3 of 4 phase 21 plans complete -
 | Phase 20-sign-safety P01 | 2 | 2 tasks | 2 files |
 | Phase 20 P02 | 100 | 2 tasks | 4 files |
 | Phase 21 P01 | 27 | 2 tasks | 7 files |
+| Phase 21 P02 | 10 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,7 @@ Progress: [████████░░] 75% (3 of 4 phase 21 plans complete -
 - [v0.6 FLUID]: Re, Pr, Nu, Pe NOT exported as standalone names — conflict with @variables in component functions; use STREAM.Re(...) for utility access
 - [v0.6 FLUID]: HTC closures accept (Re, Pr, T_bulk, T_wall); dittus_boelter/constant_Nusselt use args...; regime_dependent forwards 4 args explicitly
 - [v0.6 FLUID]: elenbaas_nusselt and elenbaas_htc pre-exported in STREAM.jl; Plan 02 only needs to implement the functions
+- [v0.6 NATCONV]: NATCONV-02 Gr/Ra tolerances use rtol=5e-4 — Julia Simantov coefficients match Python exactly but tabulated reference values differ by ~0.034%; standalone Nu test with pre-computed Ra validates formula to rtol=1e-6
 
 ### Pending Todos
 
@@ -89,8 +91,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-17T17:51:56.394Z
-**Stopped at:** Completed 21-01-PLAN.md
+**Last session:** 2026-03-17T18:04:09.802Z
+**Stopped at:** Completed 21-02-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
 **Resume file:** None
 
