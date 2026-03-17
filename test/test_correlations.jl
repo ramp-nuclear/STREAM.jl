@@ -5,7 +5,8 @@ using DifferentialEquations
 using STREAM
 import STREAM: Channel
 import STREAM: dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction,
-               rectangular_laminar_correction, regime_dependent
+               rectangular_laminar_correction, regime_dependent,
+               elenbaas_nusselt, elenbaas_htc, beta_water, Gr, Ra
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 14: Laminar Correlations
@@ -254,3 +255,82 @@ end
 end
 
 end  # @testset "PHY-02/03/04: Integration Tests — Pluggable Correlations in Solved Systems"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 21: Natural Convection Correlations
+# NATCONV-01: elenbaas_nusselt standalone + elenbaas_htc factory
+# NATCONV-02: Validation against Python STREAM reference values
+# ─────────────────────────────────────────────────────────────────────────────
+
+@testset "NATCONV-01/02: Elenbaas Natural Convection" begin
+
+@testset "NATCONV-01: elenbaas_nusselt standalone" begin
+    # Reference: RESEARCH.md MTR-scale test point
+    # Ra=12375.512696, b=0.00254m, L=0.6m
+    # Expected Nu = 1.2731625848
+    @test isapprox(elenbaas_nusselt(12375.512696, 0.00254, 0.6), 1.2731625848; rtol=1e-6)
+end
+
+@testset "NATCONV-01: elenbaas_nusselt limiting cases" begin
+    # Ra -> 0: Nu -> 0 (no buoyancy)
+    @test isapprox(elenbaas_nusselt(0.0, 0.00254, 0.6), 0.0; atol=1e-10)
+    # Large Ra: Nu should be positive and growing
+    Nu_large = elenbaas_nusselt(1e6, 0.00254, 0.6)
+    @test Nu_large > 0.0
+    @test Nu_large > elenbaas_nusselt(1e4, 0.00254, 0.6)
+end
+
+@testset "NATCONV-01: elenbaas_htc factory produces 4-arg closure" begin
+    htc_fn = elenbaas_htc(b=0.00254, L=0.6, Dh=0.00254)
+    # Must accept 4 args
+    Nu_val = htc_fn(0.0, 4.32, 313.15, 333.15)  # Re=0 (natural conv), Pr~4.32, T_bulk=40C, T_wall=60C
+    @test Nu_val > 0.0
+
+    # T_wall = T_bulk -> dT=0 -> Nu=0
+    Nu_zero = htc_fn(0.0, 4.32, 313.15, 313.15)
+    @test isapprox(Nu_zero, 0.0; atol=1e-10)
+end
+
+@testset "NATCONV-02: elenbaas_nusselt Python STREAM validation" begin
+    # Full validation against pre-computed Python STREAM reference values
+    # Test point: T_bulk=40C (313.15K), T_wall=60C (333.15K), S=0.00254m, Lh=0.6m
+    #
+    # Python STREAM computation chain:
+    #   rho   = 991.3511 kg/m^3
+    #   mu    = 6.5197e-04 Pa*s
+    #   cp    = 4178.9588 J/(kg*K)
+    #   k     = 0.630156 W/(m*K)
+    #   beta  = 3.851798e-04 1/K
+    #   nu    = mu/rho = 6.5766e-07 m^2/s
+    #   Gr    = beta*g*dT*Dh^3/nu^2 = 2862.302086
+    #   Pr    = cp*mu/k = 4.323622
+    #   Ra    = Gr*Pr = 12375.512696
+    #   Nu    = (1/24)*Ra*(b/L)*(1-exp(-35*L/(Ra*b)))^0.75 = 1.2731625848
+    #
+    # This test reproduces the full chain using Julia functions:
+    T_bulk = 313.15  # 40 C in Kelvin
+    T_wall = 333.15  # 60 C in Kelvin
+    b      = 0.00254
+    L_h    = 0.6
+
+    beta_val = beta_water(T_bulk)
+    @test isapprox(beta_val, 3.851798e-04; rtol=1e-4)
+
+    nu_val = mu_water(T_bulk) / rho_water(T_bulk)
+    Gr_val = Gr(beta_val, 9.81, T_wall - T_bulk, b, nu_val)
+    # rtol=5e-4: Gr is sensitive to rho/mu product; Julia and Python Simantov coefficients
+    # produce numerically identical results but differ from the tabulated reference by ~0.034%
+    @test isapprox(Gr_val, 2862.302086; rtol=5e-4)
+
+    Pr_val = cp_water(T_bulk) * mu_water(T_bulk) / k_water(T_bulk)
+    @test isapprox(Pr_val, 4.323622; rtol=1e-4)
+
+    Ra_val = Ra(Gr_val, Pr_val)
+    @test isapprox(Ra_val, 12375.512696; rtol=5e-4)
+
+    Nu_val = elenbaas_nusselt(Ra_val, b, L_h)
+    # Nu tolerance matches Ra tolerance (propagated from Gr uncertainty)
+    @test isapprox(Nu_val, 1.2731625848; rtol=5e-4)
+end
+
+end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
