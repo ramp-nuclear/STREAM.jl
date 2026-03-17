@@ -25,8 +25,8 @@
 
 ### Time-Varying Pump
 
-- [ ] **PUMP-01**: `Pump(dP_pump=f)` where `f` is a Julia callable `f(t) -> Float64`; function captured at construction via `@register_symbolic`, no change to `solve_transient` API
-- [ ] **PUMP-02**: Scalar `dP_pump` behavior and `mdot0` mode unchanged
+- [x] **PUMP-01**: `Pump(dP_pump=f)` where `f` is a Julia callable `f(t) -> Float64`; function captured at construction via `@register_symbolic`, no change to `solve_transient` API
+- [x] **PUMP-02**: Scalar `dP_pump` behavior and `mdot0` mode unchanged
 - [ ] **PUMP-03**: Test: pump pressure ramps from 1e5 to 0 over 100 s; mdot decays to zero; verified against analytical expectation
 
 ### Flapper
@@ -91,8 +91,8 @@
 | FLUID-03 | Phase 21 | Complete |
 | NATCONV-01 | Phase 21 | Complete |
 | NATCONV-02 | Phase 21 | Complete |
-| PUMP-01 | Phase 22 | Pending |
-| PUMP-02 | Phase 22 | Pending |
+| PUMP-01 | Phase 22 | Complete |
+| PUMP-02 | Phase 22 | Complete |
 | PUMP-03 | Phase 22 | Pending |
 | FLAP-01 | Phase 23 | Pending |
 | FLAP-02 | Phase 23 | Pending |

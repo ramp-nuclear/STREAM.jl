@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: completed
-stopped_at: Phase 22 context gathered
-last_updated: "2026-03-17T20:42:43.859Z"
+stopped_at: Completed 22-01-PLAN.md
+last_updated: "2026-03-17T23:58:43.623Z"
 last_activity: 2026-03-17 — 21-02 elenbaas_nusselt, elenbaas_htc natural convection correlation complete
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 100
 ---
 
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 21 of 24 (Fluid Properties and Natural Convection)
-Plan: 02 complete (21-02 elenbaas_nusselt, elenbaas_htc, NATCONV-01/02)
-Status: Phase 21 complete
-Last activity: 2026-03-17 — 21-02 elenbaas_nusselt, elenbaas_htc natural convection correlation complete
+Phase: 22 of 24 (Time-Varying Pump)
+Plan: 01 complete (22-01 callable Pump dispatch, solve_transient redesign, PUMP-01/02)
+Status: Phase 22 in progress (Plan 01 of 2 complete)
+Last activity: 2026-03-18 — 22-01 three-method Pump dispatch + positional solve_transient API
 
-Progress: [██████████] 100% (4 of 4 phase 21 plans complete)
+Progress: [████████░░] 83% (5 of 6 v0.6 plans complete)
 
 ---
 
@@ -58,6 +58,7 @@ Progress: [██████████] 100% (4 of 4 phase 21 plans complete)
 | Phase 20 P02 | 100 | 2 tasks | 4 files |
 | Phase 21 P01 | 27 | 2 tasks | 7 files |
 | Phase 21 P02 | 10 | 2 tasks | 2 files |
+| Phase 22-time-varying-pump P01 | 7 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,10 @@ Progress: [██████████] 100% (4 of 4 phase 21 plans complete)
 - [v0.6 FLUID]: HTC closures accept (Re, Pr, T_bulk, T_wall); dittus_boelter/constant_Nusselt use args...; regime_dependent forwards 4 args explicitly
 - [v0.6 FLUID]: elenbaas_nusselt and elenbaas_htc pre-exported in STREAM.jl; Plan 02 only needs to implement the functions
 - [v0.6 NATCONV]: NATCONV-02 Gr/Ra tolerances use rtol=5e-4 — Julia Simantov coefficients match Python exactly but tabulated reference values differ by ~0.034%; standalone Nu test with pre-computed Ra validates formula to rtol=1e-6
+- [v0.6 PUMP-01]: Pump callable dispatch uses @parameters (dP_pump_fn::FType)(..) — NOT @register_symbolic; caller passes ssys.pump.dP_pump_fn => f in op to ODEProblem
+- [v0.6 PUMP]: solve_transient positional: ssys, op, t (time array); tspan=(t[1],t[end]); callbacks=nothing pre-wired for Phase 23 Flapper
+- [v0.6 PUMP]: build_loop_transient returns ssys only; T_wall_fn callable wires ch.thermal.T ~ ps[1](t) via @parameters (T_wall_callable::FType)(..)
+- [v0.6 PUMP]: @named Pump(dP_pump) positional syntax — @named macro injects name=:pump; old Pump(dP_pump=x) keyword syntax removed; all test call sites need updating in Plan 02
 
 ### Pending Todos
 
@@ -85,16 +90,16 @@ None.
 ### Blockers/Concerns
 
 - VAL-01 (Fourier series validation) is a pre-existing flaky numerical test — not caused by v0.6 changes.
-- PUMP-01 requires @register_symbolic for a callable — implementation strategy (wrapping f(t) as symbolic) needs prototyping in plan.
+- All test files using Pump(dP_pump=X) keyword syntax will fail until Plan 02 updates them (test_channel.jl, test_composition.jl, test_correlations.jl, test_validation.jl, test_solvers.jl).
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-03-17T20:42:43.856Z
-**Stopped at:** Phase 22 context gathered
+**Last session:** 2026-03-17T23:58:43.621Z
+**Stopped at:** Completed 22-01-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
-**Resume file:** .planning/phases/22-time-varying-pump/22-CONTEXT.md
+**Resume file:** None
 
 ---
 
