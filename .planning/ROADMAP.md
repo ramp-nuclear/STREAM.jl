@@ -115,17 +115,18 @@ Plans:
 - [ ] 21-02-PLAN.md — Elenbaas correlation and validation tests
 
 ### Phase 22: Time-Varying Pump
-**Goal**: Pump accepts a Julia callable for time-varying pressure rise, enabling coastdown and ramp scenarios without API changes to solve_transient
+**Goal**: Pump accepts a Julia callable for time-varying pressure rise, enabling coastdown and ramp scenarios; solve_transient redesigned to clean positional API
 **Depends on**: Phase 20
 **Requirements**: PUMP-01, PUMP-02, PUMP-03
 **Success Criteria** (what must be TRUE):
   1. `Pump(dP_pump=f)` where `f` is a Julia callable `f(t) -> Float64` compiles and runs a transient without changes to `solve_transient`
   2. Existing `Pump(dP_pump=scalar)` and `Pump(mdot0=...)` modes produce results identical to v0.5 (no regression)
   3. A pump ramped from 1e5 to 0 Pa over 100 s produces mdot decay to zero that matches the analytical expectation within tolerance
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 22-01: Callable dP_pump dispatch and test
+- [ ] 22-01-PLAN.md — Pump callable dispatch, solve_transient redesign, build_loop_transient update
+- [ ] 22-02-PLAN.md — PUMP-01/02/03 tests, SOLV-02 and VAL-02 test rewrites
 
 ### Phase 23: Flapper & Solver Events
 **Goal**: Flapper check-valve component available with MTK continuous event triggering and solve_transient exposes user-supplied callbacks
@@ -197,7 +198,7 @@ Plans:
 | 19. Docstrings, CLAUDE.md, and Final Polish | v0.5 | 2/2 | Complete | 2026-03-16 |
 | 20. Sign Safety | 2/2 | Complete    | 2026-03-17 | - |
 | 21. Fluid Properties & Natural Convection | 2/2 | Complete    | 2026-03-17 | - |
-| 22. Time-Varying Pump | v0.6 | 0/1 | Not started | - |
+| 22. Time-Varying Pump | v0.6 | 0/2 | Not started | - |
 | 23. Flapper & Solver Events | v0.6 | 0/2 | Not started | - |
 | 24. Loss-of-Flow Validation | v0.6 | 0/1 | Not started | - |
 | 25. Argument Structure Audit | v0.6 | 0/1 | Not started | - |
@@ -205,4 +206,4 @@ Plans:
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-17 — Phase 25 added: argument structure audit (positional + dispatch rule)*
+*Updated: 2026-03-18 — Phase 22 plans finalized: 2 plans in 2 waves*
