@@ -107,11 +107,11 @@ Plans:
   2. `Gr(beta, g, dT, L, nu)` and `Ra(Gr_val, Pr_val)` return correct dimensionless numbers from plain Julia calls at known reference conditions
   3. `elenbaas_nusselt(Ra, b, L)` returns Nu values that match published Elenbaas table values or analytical limiting cases within stated tolerance
   4. `elenbaas_nusselt` is accepted as a pluggable HTC argument in Channel or ChannelAndContacts without code changes to those components
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 21-01: beta_water, Gr, Ra additions to fluids.jl and exports
-- [ ] 21-02: Elenbaas correlation implementation and validation
+- [ ] 21-01-PLAN.md — beta_water, dimensionless.jl, HTC 4-arg interface extension
+- [ ] 21-02-PLAN.md — Elenbaas correlation and validation tests
 
 ### Phase 22: Time-Varying Pump
 **Goal**: Pump accepts a Julia callable for time-varying pressure rise, enabling coastdown and ramp scenarios without API changes to solve_transient
