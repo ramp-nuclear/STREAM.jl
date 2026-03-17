@@ -87,10 +87,13 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
 
     # Common equations: h_tc (inlined, no Nu MTK symbol), dP, T_out, port wiring
     # observed_mode=true: Re/Nu/v equations are NOT pushed to eqs here
+    # Build T_wall_cells from thermal_left ports for HTC computation
+    _T_wall_cells = [thermal_left[i].T for i in 1:n]
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
                       port_in, port_out, Dh, A, L, g_acc=g, dz,
                       htc_correlation, friction_correlation,
-                      observed_mode=true)
+                      observed_mode=true,
+                      T_wall_cells=_T_wall_cells)
 
     # Per-cell energy balance: two-sided heating (geometry.heated_parts[1]/[2] per face)
     for i in 1:n
@@ -119,7 +122,7 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
         Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
         push!(obs, Re[i]            ~ Re_i)
-        push!(obs, Nu[i]            ~ htc_correlation(Re_i, Pr_i))
+        push!(obs, Nu[i]            ~ htc_correlation(Re_i, Pr_i, T[i], thermal_left[i].T))
         push!(obs, v[i]             ~ port_in.mdot / (rho_water(T[i]) * A))
         push!(obs, velocity[i]      ~ abs(port_in.mdot) / (rho_water(T[i]) * A))
         push!(obs, Pe[i]            ~ Re_i * Pr_i)

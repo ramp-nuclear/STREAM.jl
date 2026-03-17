@@ -66,14 +66,14 @@ end
     @test haskey(NamedTuple(pairs(rd)), :htc)
     @test haskey(NamedTuple(pairs(rd)), :friction)
 
-    # Laminar branch (Re=100 < 2300)
-    @test rd.htc(100.0, 7.0) == 8.235
+    # Laminar branch (Re=100 < 2300): 4-arg interface (Re, Pr, T_bulk, T_wall)
+    @test rd.htc(100.0, 7.0, 300.0, 320.0) == 8.235
     k_R = rectangular_laminar_correction(0.01814)
     @test isapprox(rd.friction(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
 
-    # Turbulent branch (Re=8000 > 2300)
-    @test isapprox(rd.htc(8000.0, 7.0), dittus_boelter(8000.0, 7.0); rtol=1e-6)
-    @test isapprox(rd.friction(8000.0), blasius_friction(8000.0);     rtol=1e-6)
+    # Turbulent branch (Re=8000 > 2300): 4-arg interface
+    @test isapprox(rd.htc(8000.0, 7.0, 300.0, 320.0), dittus_boelter(8000.0, 7.0); rtol=1e-6)
+    @test isapprox(rd.friction(8000.0), blasius_friction(8000.0);                   rtol=1e-6)
 end
 
 end  # @testset "PHY-02/03/04: Correlation Library"

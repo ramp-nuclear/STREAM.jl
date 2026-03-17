@@ -77,7 +77,7 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         push!(eqs, v[i]      ~ port_in.mdot / (rho_water(T[i]) * A))
         push!(eqs, Re[i]     ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
         Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
-        push!(eqs, Nu[i]     ~ htc_correlation(Re[i], Pr_i))
+        push!(eqs, Nu[i]     ~ htc_correlation(Re[i], Pr_i, T[i], T[i]))
         push!(eqs, h_tc[i]  ~ Nu[i] * k_water(T[i]) / Dh)
     end
 
@@ -128,7 +128,8 @@ function _channel_base_eqs(eqs::Vector{Equation};
     Dh, A, L, g_acc, dz,
     htc_correlation      = dittus_boelter,
     friction_correlation = blasius_friction,
-    observed_mode        = false)
+    observed_mode        = false,
+    T_wall_cells         = nothing)
 
     for i in 1:n
         if observed_mode
@@ -136,12 +137,13 @@ function _channel_base_eqs(eqs::Vector{Equation};
             # h_tc stays as unknown but uses inlined expression (avoids MTK observed-chain).
             Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
             Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
-            push!(eqs, h_tc[i] ~ htc_correlation(Re_i, Pr_i) * k_water(T[i]) / Dh)
+            T_w_i = T_wall_cells === nothing ? T[i] : T_wall_cells[i]
+            push!(eqs, h_tc[i] ~ htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T[i]) / Dh)
         else
             push!(eqs, v[i]    ~ port_in.mdot / (rho_water(T[i]) * A))
             push!(eqs, Re[i]   ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
             Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
-            push!(eqs, Nu[i]   ~ htc_correlation(Re[i], Pr_i))
+            push!(eqs, Nu[i]   ~ htc_correlation(Re[i], Pr_i, T[i], T[i]))
             push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
         end
     end

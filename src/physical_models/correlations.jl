@@ -9,16 +9,18 @@
 #   - No @register_symbolic on any function in this file — all are plain arithmetic.
 
 """
-    dittus_boelter(Re, Pr) -> Nu
+    dittus_boelter(Re, Pr, args...) -> Nu
 
 Dittus-Boelter heat transfer correlation for turbulent forced convection.
 Returns Nusselt number Nu = 0.023 * Re^0.8 * Pr^0.4.
 
-Valid for: Re > 10,000, 0.6 ≤ Pr ≤ 160, L/D > 10.
-Currently replaces the hardcoded Dittus-Boelter inline expression in channel components.
+The `args...` accepts and ignores extra arguments for backward compatibility with
+the 4-arg HTC interface `(Re, Pr, T_bulk, T_wall) -> Nu`.
+
+Valid for: Re > 10,000, 0.6 <= Pr <= 160, L/D > 10.
 MTK-compatible: plain arithmetic on symbolic Re/Pr traces correctly.
 """
-dittus_boelter(Re, Pr) = 0.023 * Re^0.8 * Pr^0.4
+dittus_boelter(Re, Pr, args...) = 0.023 * Re^0.8 * Pr^0.4
 
 """
     blasius_friction(Re) -> f_darcy
@@ -72,7 +74,7 @@ ChannelAndContacts(htc_correlation = htc_fn, ...)
 ```
 """
 function constant_Nusselt(; Nu = 8.235)
-    return (Re, Pr) -> Nu
+    return (Re, Pr, args...) -> Nu
 end
 
 """
@@ -116,8 +118,8 @@ when `Re` is a Symbolics.Num at system-build time.
 Returns:
 ```julia
 (
-    htc      = (Re, Pr) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr), htc_turbulent(Re, Pr)),
-    friction = (Re)     -> ifelse(Re < Re_tr, friction_laminar(Re), friction_turbulent(Re))
+    htc      = (Re, Pr, T_bulk, T_wall) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr, T_bulk, T_wall), htc_turbulent(Re, Pr, T_bulk, T_wall)),
+    friction = (Re)                     -> ifelse(Re < Re_tr, friction_laminar(Re), friction_turbulent(Re))
 )
 ```
 
@@ -143,8 +145,8 @@ function regime_dependent(;
     # Convert to Float64 immediately — avoids type-promotion issues with symbolic Re
     Re_tr = Float64(Re_transition)
 
-    htc_fn      = (Re, Pr) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr), htc_turbulent(Re, Pr))
-    friction_fn = (Re)     -> ifelse(Re < Re_tr, friction_laminar(Re), friction_turbulent(Re))
+    htc_fn      = (Re, Pr, T_bulk, T_wall) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr, T_bulk, T_wall), htc_turbulent(Re, Pr, T_bulk, T_wall))
+    friction_fn = (Re)                     -> ifelse(Re < Re_tr, friction_laminar(Re), friction_turbulent(Re))
 
     return (htc = htc_fn, friction = friction_fn)
 end
