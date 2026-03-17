@@ -92,7 +92,7 @@ Full phase details: `.planning/milestones/v0.5-ROADMAP.md`
   2. Re, Nu, velocity, and Pe @observed variables remain positive and physically meaningful under negative mdot in ChannelAndContacts
   3. ChannelHeatFlux produces correct energy balance under negative mdot
   4. The test suite explicitly asserts correct reversed temperature profile and positive Re for all three channel types run with mdot < 0
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 20-01: Sign-safe audit and fix for Channel, ChannelAndContacts, ChannelHeatFlux
