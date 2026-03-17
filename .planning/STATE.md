@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
-status: roadmap_created
-stopped_at: Phase 20 ready to plan
-last_updated: "2026-03-17"
-last_activity: 2026-03-17 — v0.6 roadmap created (phases 20-24)
+status: planning
+stopped_at: Phase 20 context gathered
+last_updated: "2026-03-17T12:47:49.130Z"
+last_activity: 2026-03-17 — v0.6 roadmap created
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 8
+  total_plans: 0
   completed_plans: 0
   percent: 0
 ---
@@ -78,10 +78,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-17
-**Stopped at:** v0.6 roadmap created
+**Last session:** 2026-03-17T12:47:49.128Z
+**Stopped at:** Phase 20 context gathered
 **Next action:** `/gsd:plan-phase 20`
-**Resume file:** None
+**Resume file:** .planning/phases/20-sign-safety/20-CONTEXT.md
 
 ---
 
