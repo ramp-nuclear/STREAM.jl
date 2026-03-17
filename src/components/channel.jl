@@ -56,10 +56,13 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     dz = L / n
 
     eqs = Equation[]
-    T_inlet = instream(port_in.T)
+    T_inlet_fwd = instream(port_in.T)
+    T_inlet_rev = instream(port_out.T)
 
     for i in 1:n
-        T_up = (i == 1) ? T_inlet : T[i-1]
+        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i-1]
+        T_up_rev = (i == n) ? T_inlet_rev : T[i+1]
+        T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
         # Energy balance (first-order upwind FV)
         push!(eqs,
             Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
@@ -88,7 +91,7 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
     push!(eqs, port_out.P - port_in.P ~ -dP)
     push!(eqs, port_out.T ~ T[n])
-    push!(eqs, port_in.T  ~ instream(port_out.T))
+    push!(eqs, port_in.T  ~ T[1])
 
     all_vars = [collect(T); collect(Re); collect(Nu);
                 collect(h_tc); collect(v); collect(q_wall);
@@ -153,5 +156,5 @@ function _channel_base_eqs(eqs::Vector{Equation};
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
     push!(eqs, port_out.P - port_in.P       ~ -dP)
     push!(eqs, port_out.T                   ~ T[n])
-    push!(eqs, port_in.T                    ~ instream(port_out.T))
+    push!(eqs, port_in.T                    ~ T[1])
 end
