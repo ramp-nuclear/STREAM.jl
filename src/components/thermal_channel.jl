@@ -80,9 +80,10 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     thermal_left  = [ThermalPort(name=Symbol(:thermal_left, i))  for i in 1:n]
     thermal_right = [ThermalPort(name=Symbol(:thermal_right, i)) for i in 1:n]
 
-    dz      = L / n
-    eqs     = Equation[]
-    T_inlet = instream(port_in.T)
+    dz          = L / n
+    eqs         = Equation[]
+    T_inlet_fwd = instream(port_in.T)
+    T_inlet_rev = instream(port_out.T)
 
     # Common equations: h_tc (inlined, no Nu MTK symbol), dP, T_out, port wiring
     # observed_mode=true: Re/Nu/v equations are NOT pushed to eqs here
@@ -93,7 +94,9 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
 
     # Per-cell energy balance: two-sided heating (geometry.heated_parts[1]/[2] per face)
     for i in 1:n
-        T_up = (i == 1) ? T_inlet : T[i-1]
+        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i-1]
+        T_up_rev = (i == n) ? T_inlet_rev : T[i+1]
+        T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
         push!(eqs,
             Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
                        + h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T  - T[i])
@@ -118,7 +121,7 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         push!(obs, Re[i]            ~ Re_i)
         push!(obs, Nu[i]            ~ htc_correlation(Re_i, Pr_i))
         push!(obs, v[i]             ~ port_in.mdot / (rho_water(T[i]) * A))
-        push!(obs, velocity[i]      ~ port_in.mdot / (rho_water(T[i]) * A))
+        push!(obs, velocity[i]      ~ abs(port_in.mdot) / (rho_water(T[i]) * A))
         push!(obs, Pe[i]            ~ Re_i * Pr_i)
         push!(obs, h_tc_left[i]    ~ h_tc[i])
         push!(obs, h_tc_right[i]   ~ h_tc[i])
@@ -195,9 +198,10 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
     @named port_in  = FlowPort()
     @named port_out = FlowPort()
 
-    dz      = L / n
-    eqs     = Equation[]
-    T_inlet = instream(port_in.T)
+    dz          = L / n
+    eqs         = Equation[]
+    T_inlet_fwd = instream(port_in.T)
+    T_inlet_rev = instream(port_out.T)
 
     # Common equations: v, Re, Nu, h_tc, dP, T_out, port wiring
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
@@ -206,7 +210,9 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
 
     # Per-cell energy balance using T_wall_p parameter
     for i in 1:n
-        T_up = (i == 1) ? T_inlet : T[i-1]
+        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i-1]
+        T_up_rev = (i == n) ? T_inlet_rev : T[i+1]
+        T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
         push!(eqs,
             Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
                        + h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i]))
