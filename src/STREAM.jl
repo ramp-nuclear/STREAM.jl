@@ -8,6 +8,7 @@ include("fluids.jl")
 include("connectors.jl")
 include("geometry.jl")
 include("physical_models/correlations.jl")
+include("physical_models/dimensionless.jl")
 include("components/channel.jl")
 include("components/pump.jl")
 include("components/resistors.jl")
@@ -18,10 +19,11 @@ include("composition/helpers.jl")
 include("solvers.jl")
 include("examples.jl")
 
-export rho_water, cp_water, mu_water, k_water
+export rho_water, cp_water, mu_water, k_water, beta_water
 export FlowPort, ThermalPort
 export Channel, Pump, Friction, Gravity, Resistor, Inertia, HeatExchanger, ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, HeatDiffusion, PipeGeometry, PipeGeometry_rectangular, PipeGeometry_circular
-export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction, rectangular_laminar_correction, regime_dependent
+export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction, rectangular_laminar_correction, regime_dependent, elenbaas_nusselt, elenbaas_htc
+export Gr, Ra, Re_vel, Pe
 export build_loop, build_loop_vertical, build_loop_transient, build_cube, solve_steady, solve_transient, steady_state_guess, check_gravity_mismatch, port
 export symmetric_plate, plate, one_sided_connection, compose_systems
 

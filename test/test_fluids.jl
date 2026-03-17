@@ -41,3 +41,36 @@ end
     result = rho_water(T_sym)
     @test result isa Symbolics.Num  # symbolic, not a Float64
 end
+
+# ─────────────────────────────────────────────────────────────────
+# FLUID-01: beta_water spot-checks (Simantov thermal expansion)
+# Reference values computed from Python STREAM light_water.py
+# ─────────────────────────────────────────────────────────────────
+@testset "FLUID-01: beta_water" begin
+    @test isapprox(beta_water(293.15), 2.7907882032e-04; rtol=1e-6)
+    @test isapprox(beta_water(323.15), 4.3910662994e-04; rtol=1e-6)
+    @test isapprox(beta_water(373.15), 7.2134423031e-04; rtol=1e-6)
+end
+
+@testset "FLUID-01: beta_water MTK symbolic" begin
+    @variables T_sym(t) = 300.0
+    result = beta_water(T_sym)
+    @test result isa Symbolics.Num
+end
+
+# ─────────────────────────────────────────────────────────────────
+# FLUID-02/03: Gr and Ra dimensionless number utilities
+# Reference: MTR-scale test point from RESEARCH.md
+# T_bulk=40C, T_wall=60C, S=0.00254m, Lh=0.6m
+# ─────────────────────────────────────────────────────────────────
+@testset "FLUID-02: Gr" begin
+    # Reference values from RESEARCH.md:
+    # beta=3.851798e-04, g=9.81, dT=20, L=0.00254, nu=6.5766e-07
+    # Gr = beta * g * dT * L^3 / nu^2 = 2863.260
+    @test isapprox(Gr(3.851798e-04, 9.81, 20.0, 0.00254, 6.5766e-07), 2863.260; rtol=1e-4)
+end
+
+@testset "FLUID-03: Ra" begin
+    # Ra = Gr * Pr = 2863.260 * 4.323622 = 12379.654
+    @test isapprox(Ra(2863.260, 4.323622), 12379.654; rtol=1e-4)
+end

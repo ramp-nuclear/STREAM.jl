@@ -93,9 +93,30 @@ function k_water(T_K::Real)
     return abs(A + B * T_C + C * T_C^2 + D * T_C^3)
 end
 
+"""
+    beta_water(T_K) -> 1/K
+
+Isobaric thermal expansion coefficient of saturated liquid water (Simantov correlation).
+Derived analytically from the Simantov density formula: beta = -(1/rho) * d(rho)/dT.
+
+# Arguments
+- `T_K`: temperature [K]
+
+# Returns
+Thermal expansion coefficient [1/K] as `Float64`.
+"""
+function beta_water(T_K::Real)
+    T_C = T_K - 273.15
+    T_F = _to_fahrenheit(T_C)
+    B = -0.046283
+    C = -7.9738e-4
+    return -1.8 * (B + 2 * C * T_F) / rho_water(T_K)
+end
+
 # @register_symbolic must be at module top-level (not inside any function or begin block).
 # These lines make the functions callable with symbolic MTK variables (Num type).
 @register_symbolic rho_water(T::Real)
 @register_symbolic cp_water(T::Real)
 @register_symbolic mu_water(T::Real)
 @register_symbolic k_water(T::Real)
+@register_symbolic beta_water(T::Real)
