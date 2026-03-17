@@ -53,7 +53,7 @@ function build_loop(;
     T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
     T_wall   = 373.15,   # wall temperature (K); ~100°C for forced convection
 )
-    @named pump = Pump(dP_pump = dP_pump)
+    @named pump = Pump(dP_pump)
     @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch))
     @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
 
@@ -131,7 +131,7 @@ function build_loop_vertical(;
 )
     H = isnothing(H_return) ? L_ch : H_return
 
-    @named pump = Pump(dP_pump = dP_pump)
+    @named pump = Pump(dP_pump)
     @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch), g = g_acc)
     @named bc   = HeatExchanger(T_bc = T_inlet)
     @named grav = Gravity(H = H)
@@ -164,38 +164,27 @@ function build_loop_vertical(;
     return ssys
 end
 
-# ----------------------------------------------------------------
-# build_loop_transient
-# Same topology as build_loop (Pump -> TempBC -> Channel)
-# but with T_wall declared as a @parameters symbol so that
-# PresetTimeCallback + setp can modify it at runtime to simulate
-# a step change in wall heat input.
-#
-# Why T_wall rather than Q_wall as the modifiable parameter:
-#   Channel's energy balance uses h_tc[i] * (π*Dh) * dz * (thermal.T - T[i])
-#   — the driver is the wall temperature, not Q_flow directly. Q_flow is an
-#   observable (q_wall[i] ~ thermal.Q_flow / n) not in the energy balance.
-#   Stepping T_wall is equivalent to stepping the effective heat input.
-#
-# Returns (ssys, T_wall_sym) where T_wall_sym is the compiled parameter symbol.
-# Pass T_wall_sym as the second argument to solve_transient.
-# ----------------------------------------------------------------
 """
-    build_loop_transient(; n=10, T_inlet=313.15, T_wall_0=373.15, L_ch=0.6, D_ch=0.01, dP_pump=3.0e4) -> Tuple{ODESystem, Num}
+    build_loop_transient(; n=10, T_inlet=313.15, T_wall_0=373.15, L_ch=0.6, D_ch=0.01, dP_pump=3.0e4, T_wall_fn=nothing) -> ODESystem
 
-Build a transient-capable flow loop with a tunable wall temperature parameter.
+Build a transient-capable flow loop. When `T_wall_fn` is provided (a callable `t -> K`),
+wall temperature is time-varying via an MTK callable parameter. When `T_wall_fn` is `nothing`,
+wall temperature is pinned to the scalar `T_wall_0`.
+
+When using a callable `T_wall_fn`, the caller must include the callable parameter in `op`:
+`ssys.sys.T_wall_callable => T_wall_fn` (where `ssys` is the compiled system).
 
 # Arguments
 - `n`: number of axial cells (default 10)
 - `T_inlet`: inlet temperature [K] (default 313.15)
-- `T_wall_0`: initial wall temperature [K] (default 373.15)
+- `T_wall_0`: wall temperature [K] (default 373.15); used when `T_wall_fn` is `nothing`
 - `L_ch`: channel length [m] (default 0.6)
 - `D_ch`: channel diameter [m] (default 0.01)
 - `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
+- `T_wall_fn`: optional callable `(t) -> K` for time-varying wall temperature
 
 # Returns
-Tuple `(ssys, T_wall_sym)` where `ssys` is the compiled system and `T_wall_sym` is the
-symbolic wall-temperature parameter for use with `solve_transient`.
+Compiled `ODESystem` (already passed through `mtkcompile`).
 """
 function build_loop_transient(;
     n::Int   = 10,
@@ -203,36 +192,47 @@ function build_loop_transient(;
     D_ch     = 0.01,
     A_ch     = 7.85e-5,
     dP_pump  = 3.0e4,
-    T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
-    T_wall_0 = 373.15,   # initial wall temperature (K); ~100°C
+    T_inlet  = 313.15,    # coolant inlet temperature (K); 40°C
+    T_wall_0 = 373.15,    # wall temperature (K); used when T_wall_fn is nothing
+    T_wall_fn = nothing,  # optional callable (t) -> K for time-varying wall temperature
 )
-    @named pump = Pump(dP_pump = dP_pump)
+    @named pump = Pump(dP_pump)
     @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch))
     @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
 
-    # Declare T_wall as a modifiable parameter
-    ps = @parameters T_wall = T_wall_0
-
-    connections = [
-        connect(pump.port_out, bc.port_in),       # pump -> TempBC
-        connect(bc.port_out,   ch.port_in),        # TempBC -> channel
-        connect(ch.port_out,   pump.port_in),      # channel -> pump (closed loop)
-        pump.port_in.P  ~ 1.0e5,                   # pressure gauge freedom fix
-        ch.thermal.T    ~ ps[1],                   # wall temperature (modifiable parameter)
-        ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
-    ]
-
-    @named sys = compose(
-        System(connections, t, [], ps; name = :sys),
-        pump, bc, ch
-    )
+    if T_wall_fn === nothing
+        # Scalar wall temperature — same as build_loop; no parameter declaration needed
+        connections = [
+            connect(pump.port_out, bc.port_in),
+            connect(bc.port_out,   ch.port_in),
+            connect(ch.port_out,   pump.port_in),
+            pump.port_in.P  ~ 1.0e5,
+            ch.thermal.T    ~ T_wall_0,
+            ch.port_in.T    ~ T_inlet,
+        ]
+        @named sys = compose(System(connections, t; name = :sys), pump, bc, ch)
+    else
+        # Callable wall temperature — uses MTK callable parameter
+        # Caller must include ssys.sys.T_wall_callable => T_wall_fn in op
+        FType = typeof(T_wall_fn)
+        ps = @parameters (T_wall_callable::FType)(..)
+        connections = [
+            connect(pump.port_out, bc.port_in),
+            connect(bc.port_out,   ch.port_in),
+            connect(ch.port_out,   pump.port_in),
+            pump.port_in.P  ~ 1.0e5,
+            ch.thermal.T    ~ ps[1](t),
+            ch.port_in.T    ~ T_inlet,
+        ]
+        @named sys = compose(System(connections, t, [], ps; name = :sys), pump, bc, ch)
+    end
 
     t_compile = @elapsed ssys = mtkcompile(sys)
     n_eq = length(equations(ssys))
     n_uk = length(unknowns(ssys))
     @info "build_loop_transient compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
 
-    return ssys, ps[1]
+    return ssys
 end
 
 # ----------------------------------------------------------------
@@ -271,7 +271,7 @@ Build a two-branch parallel network (cube topology) for network solver validatio
 Compiled `ODESystem`.
 """
 function build_cube(; dP_pump=3.0e4, R=1.0e4)
-    @named pump = Pump(dP_pump=dP_pump)
+    @named pump = Pump(dP_pump)
     # 12 edges of the cube (naming: r_ij where i < j are corner indices)
     @named r01 = Resistor(R=R); @named r02 = Resistor(R=R); @named r04 = Resistor(R=R)
     @named r13 = Resistor(R=R); @named r15 = Resistor(R=R)

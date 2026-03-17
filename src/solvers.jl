@@ -78,60 +78,41 @@ function solve_steady(ssys, op;
     return sol
 end
 
-# ----------------------------------------------------------------
-# solve_transient
-# Simulates the closed loop with a step change in wall temperature
-# (which controls the effective wall heat input).
-#
-# ssys:         compiled system from build_loop_transient()
-# T_wall_sym:   parameter symbol from build_loop_transient() (second return value)
-# op:           Vector{Pair} — initial conditions for state variables
-#               (same structure as solve_steady op: ch.T[1..n], ch.port_in.mdot)
-# tspan:        (t_start, t_end) in seconds, e.g. (0.0, 60.0)
-# T_wall_final: new T_wall value (K) after the step change (e.g. 393.15 K for ~120°C)
-# t_step:       time of step change (s), default 10.0
-#
-# Returns ODESolution. Access time-series:
-#   sol[ssys.ch.T_out, :]      -- outlet T (K) at all time points
-#   sol.t                       -- time vector (s)
-# ----------------------------------------------------------------
 """
-    solve_transient(; ssys, T_wall_sym, op, tspan, T_wall_final, t_step=10.0) -> SciMLSolution
+    solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...) -> SciMLSolution
 
-Solve a transient simulation with a step-change wall temperature callback.
+Solve a transient simulation over a time array.
 
 # Arguments
-- `ssys`: compiled system from `build_loop_transient`
-- `T_wall_sym`: symbolic parameter for wall temperature (second return value of `build_loop_transient`)
-- `op`: initial operating point as `Vector{Pair}`
-- `tspan`: time span tuple `(t_start, t_end)` [s]
-- `T_wall_final`: new wall temperature [K] after the step change
-- `t_step`: time of step change [s], default 10.0
+- `ssys`: compiled system from `mtkcompile`
+- `op`: operating point / initial conditions as `Vector{Pair}` (states and parameters,
+  including callable parameters such as `ssys.pump.dP_pump_fn => f`)
+- `t`: time array (e.g. `range(0, 100, length=1000)`); `tspan` derived as `(t[1], t[end])`
+- `solver`: ODE solver (default `Rodas5P()`)
+- `callbacks`: optional `CallbackSet` for user-supplied events (passed to DifferentialEquations
+  `solve`); pre-wired for Phase 23 Flapper support
+- `kwargs...`: additional keyword arguments forwarded to `solve`
 
 # Returns
-`SciMLBase.ODESolution`. Access time-dependent results via `sol[ssys.component.variable]`.
+`SciMLBase.ODESolution`. Access time-dependent results via `sol[ssys.component.variable, :]`.
 """
-function solve_transient(; ssys, T_wall_sym, op, tspan,
-                           T_wall_final,
-                           t_step = 10.0)
+function solve_transient(ssys, op, t;
+                         solver = Rodas5P(),
+                         callbacks = nothing,
+                         kwargs...)
     # MTK mtkcompile produces a mass-matrix ODE (implicit DAE form).
-
-    # IDA requires DAEProblem with explicit du0; CVODE_BDF cannot use mass matrices.
     # Rodas5P is a stiff implicit Runge-Kutta solver that supports mass matrices
     # and ODEProblem — the correct choice for MTK-generated DAE systems.
+    tspan = (Float64(t[1]), Float64(t[end]))
     prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false)
-
-    # PresetTimeCallback: fires at t_step, sets T_wall to T_wall_final
-    # setp is in ModelingToolkit (not exported from public namespace)
-    T_wall_setter = ModelingToolkit.setp(ssys, T_wall_sym)
-    step_cb = PresetTimeCallback(
-        [t_step],
-        integrator -> T_wall_setter(integrator, T_wall_final)
-    )
 
     # NoInit: skip MTK's automatic initialization (which fails for the rough
     # guess op dict). The caller is responsible for providing a consistent-enough
     # initial state (use steady_state_guess or a prior solve_steady solution).
-    sol = solve(prob, Rodas5P(); callback = step_cb, initializealg = SciMLBase.NoInit())
+    sol = solve(prob, solver;
+                saveat = t,
+                callback = callbacks,
+                initializealg = SciMLBase.NoInit(),
+                kwargs...)
     return sol
 end
