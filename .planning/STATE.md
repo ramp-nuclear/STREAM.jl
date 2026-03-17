@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: completed
-stopped_at: Completed 21-02-PLAN.md
-last_updated: "2026-03-17T18:45:52.714Z"
+stopped_at: Phase 22 context gathered
+last_updated: "2026-03-17T20:42:43.859Z"
 last_activity: 2026-03-17 — 21-02 elenbaas_nusselt, elenbaas_htc natural convection correlation complete
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 2
   total_plans: 4
   completed_plans: 4
@@ -91,10 +91,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-17T18:04:09.802Z
-**Stopped at:** Completed 21-02-PLAN.md
+**Last session:** 2026-03-17T20:42:43.856Z
+**Stopped at:** Phase 22 context gathered
 **Next action:** `/gsd:plan-phase 20`
-**Resume file:** None
+**Resume file:** .planning/phases/22-time-varying-pump/22-CONTEXT.md
 
 ---
 
