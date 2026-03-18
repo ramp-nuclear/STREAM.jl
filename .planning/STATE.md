@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
-status: completed
-stopped_at: Completed 22-01-PLAN.md
-last_updated: "2026-03-17T23:58:43.623Z"
-last_activity: 2026-03-17 — 21-02 elenbaas_nusselt, elenbaas_htc natural convection correlation complete
+status: executing
+stopped_at: Completed 22-02-PLAN.md
+last_updated: "2026-03-18T00:36:21.996Z"
+last_activity: 2026-03-18 — 22-01 three-method Pump dispatch + positional solve_transient API
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 100
+  completed_plans: 6
+  percent: 83
 ---
 
 # STATE: STREAM.jl
@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 22 of 24 (Time-Varying Pump)
-Plan: 01 complete (22-01 callable Pump dispatch, solve_transient redesign, PUMP-01/02)
-Status: Phase 22 in progress (Plan 01 of 2 complete)
-Last activity: 2026-03-18 — 22-01 three-method Pump dispatch + positional solve_transient API
+Phase: 22 of 24 (Time-Varying Pump) — COMPLETE
+Plan: 02 complete (22-02 test suite: PUMP-01/02/03, SOLV-02, VAL-02, all Pump call sites fixed)
+Status: Phase 22 complete; v0.6 plans 1-6 done
+Last activity: 2026-03-18 — 22-02 PUMP-01/02/03 tests + SOLV-02/VAL-02 API migration
 
-Progress: [████████░░] 83% (5 of 6 v0.6 plans complete)
+Progress: [██████████] 100% (6 of 6 v0.6 plans complete)
 
 ---
 
@@ -59,6 +59,7 @@ Progress: [████████░░] 83% (5 of 6 v0.6 plans complete)
 | Phase 21 P01 | 27 | 2 tasks | 7 files |
 | Phase 21 P02 | 10 | 2 tasks | 2 files |
 | Phase 22-time-varying-pump P01 | 7 | 2 tasks | 3 files |
+| Phase 22-time-varying-pump P02 | 32 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -81,7 +82,11 @@ Progress: [████████░░] 83% (5 of 6 v0.6 plans complete)
 - [v0.6 PUMP-01]: Pump callable dispatch uses @parameters (dP_pump_fn::FType)(..) — NOT @register_symbolic; caller passes ssys.pump.dP_pump_fn => f in op to ODEProblem
 - [v0.6 PUMP]: solve_transient positional: ssys, op, t (time array); tspan=(t[1],t[end]); callbacks=nothing pre-wired for Phase 23 Flapper
 - [v0.6 PUMP]: build_loop_transient returns ssys only; T_wall_fn callable wires ch.thermal.T ~ ps[1](t) via @parameters (T_wall_callable::FType)(..)
-- [v0.6 PUMP]: @named Pump(dP_pump) positional syntax — @named macro injects name=:pump; old Pump(dP_pump=x) keyword syntax removed; all test call sites need updating in Plan 02
+- [v0.6 PUMP]: @named Pump(dP_pump) positional syntax — @named macro injects name=:pump; old Pump(dP_pump=x) keyword syntax removed; all test call sites now updated (Plan 02)
+- [v0.6 PUMP-02]: Analytical PUMP-03 formula corrected: particular solution for tau*x'+x=dP0/R*(1-t/T_ramp) is x_p=(dP0/R)*(1+tau/T_ramp-t/T_ramp); plan spec had sign error
+- [v0.6 PUMP-02]: Two-system pattern for callable T_wall ICs: scalar build_loop_transient for solve_steady, callable build_loop_transient for solve_transient (SteadyStateProblem cannot handle time-dependent callables)
+- [v0.6 PUMP-02]: Pair{Any,Any} op vector required when mixing Float64 state ICs with callable parameter values; use last(parameters(ssys)) to get raw callable sym
+- [v0.6 PUMP-02]: Two thermal anchors needed in hydraulics-only closed loop (no HeatExchanger): single pump.port_in.T anchor leaves ine.port_out.T underdetermined
 
 ### Pending Todos
 
@@ -90,14 +95,13 @@ None.
 ### Blockers/Concerns
 
 - VAL-01 (Fourier series validation) is a pre-existing flaky numerical test — not caused by v0.6 changes.
-- All test files using Pump(dP_pump=X) keyword syntax will fail until Plan 02 updates them (test_channel.jl, test_composition.jl, test_correlations.jl, test_validation.jl, test_solvers.jl).
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-03-17T23:58:43.621Z
-**Stopped at:** Completed 22-01-PLAN.md
+**Last session:** 2026-03-18T00:36:21.994Z
+**Stopped at:** Completed 22-02-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
 **Resume file:** None
 
