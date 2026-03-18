@@ -23,7 +23,7 @@ end
 end
 
 @testset "COMP-02: Pump stub callable" begin
-    @named pump = Pump(dP_pump=1e4)
+    @named pump = Pump(1e4)
     @test pump isa ModelingToolkit.System
     @test_nowarn mtkcompile(pump; fully_determined=false)
 end
@@ -140,7 +140,7 @@ end
     L_ch = 0.6; D_ch = 0.01; A_ch = 7.85e-5; dP_pump = 3.0e4
 
     # --- ChannelHeatFlux reference ---
-    @named pump_chf = Pump(dP_pump=dP_pump)
+    @named pump_chf = Pump(dP_pump)
     @named chf = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
     @named bc_chf = HeatExchanger(T_bc=T_inlet)
     conns_chf = [
@@ -159,7 +159,7 @@ end
     T_out_chf = sol_chf[ssys_chf.chf.T_out]
 
     # --- ChannelAndContacts two-sided (both left and right connected to T_wall) ---
-    @named pump_cac = Pump(dP_pump=dP_pump)
+    @named pump_cac = Pump(dP_pump)
     @named cac = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
     @named bc_cac = HeatExchanger(T_bc=T_inlet)
     ct_l = [ConstantTemperature(name=Symbol(:ct_l, i), T=T_wall) for i in 1:n]
@@ -191,7 +191,7 @@ end
     n = 5; T_inlet = 313.15; T_wall = 373.15
     L_ch = 0.6; D_cac = 0.02; A_ch = 7.85e-5; dP_pump = 3.0e4
 
-    @named pump2 = Pump(dP_pump=dP_pump)
+    @named pump2 = Pump(dP_pump)
     @named cac2 = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_cac))
     @named bc2 = HeatExchanger(T_bc=T_inlet)
     ct2 = [ConstantTemperature(name=Symbol(:ct2_, i), T=T_wall) for i in 1:n]
@@ -256,7 +256,7 @@ end
     n = 10; T_inlet = 313.15; T_wall = 373.15
     L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
 
-    @named pump = Pump(dP_pump=dP_pump)
+    @named pump = Pump(dP_pump)
     @named chf  = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
     @named bc   = HeatExchanger(T_bc=T_inlet)
     conns = [

@@ -96,7 +96,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
     n = 3; T_inlet = 313.15; T_wall = 373.15; dP_pump = 3.0e4
     geom = PipeGeometry_circular(0.6, 0.01)
 
-    @named pump_phy02 = Pump(dP_pump=dP_pump)
+    @named pump_phy02 = Pump(dP_pump)
     @named cac_phy02  = ChannelAndContacts(n=n, geometry=geom,
                                            htc_correlation=constant_Nusselt(Nu=8.235))
     @named bc_phy02   = HeatExchanger(T_bc=T_inlet)
@@ -138,7 +138,7 @@ end
     geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     ar   = geom.depth / geom.width   # aspect_ratio for MTR geometry (~0.01814)
 
-    @named pump_phy03 = Pump(dP_pump=30.0)   # 30 Pa → Re << 2300 → laminar regime
+    @named pump_phy03 = Pump(30.0)   # 30 Pa → Re << 2300 → laminar regime
     @named cac_phy03  = ChannelAndContacts(n=n, geometry=geom,
                                            htc_correlation      = constant_Nusselt(Nu=8.235),
                                            friction_correlation = laminar_friction(aspect_ratio=ar))
@@ -186,7 +186,7 @@ end
     # Very low dP to force laminar regime
     dP_lam = 30.0   # ~30 Pa gives very low mdot -> Re << 2300
 
-    @named pump_lam = Pump(dP_pump=dP_lam)
+    @named pump_lam = Pump(dP_lam)
     @named cac_lam  = ChannelAndContacts(n=n, geometry=geom,
                                           htc_correlation      = rd.htc,
                                           friction_correlation = rd.friction)
@@ -226,7 +226,7 @@ end
     )
     dP_turb = 3.0e4   # standard MTR dP, gives Re >> 2300
 
-    @named pump_turb = Pump(dP_pump=dP_turb)
+    @named pump_turb = Pump(dP_turb)
     @named cac_turb  = ChannelAndContacts(n=n, geometry=geom,
                                            htc_correlation      = rd.htc,
                                            friction_correlation = rd.friction)

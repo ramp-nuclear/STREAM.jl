@@ -31,19 +31,32 @@ end
 
 # ─────────────────────────────────────────────────────────────────
 # VAL-02: Transient T_outlet rises after T_wall step change
+# (callable T_wall pattern — T_wall_fn wired at build time)
 # ─────────────────────────────────────────────────────────────────
 @testset "VAL-02: Transient T_outlet rises after T_wall step" begin
     n = 10; T_inlet = 313.15
-    ssys, T_wall_sym = build_loop_transient(T_inlet=T_inlet)
-    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
-    op_guess = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op_guess, ssys.ch.port_in.mdot => 0.490)
-    sol_ss = solve_steady(ssys, op_guess)
-    op_ic = [ssys.ch.T[i] => sol_ss[ssys.ch.T[i]] for i in 1:n]
-    push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys.ch.port_in.mdot])
 
-    sol = solve_transient(ssys=ssys, T_wall_sym=T_wall_sym, op=op_ic, tspan=(0.0, 60.0),
-                          T_wall_final=393.15, t_step=10.0)
+    # Step-change: T_wall from 373.15 to 393.15 at t=10s via callable
+    T_wall_0 = 373.15; T_wall_final = 393.15; t_step = 10.0
+    T_wall_step = t -> t < t_step ? T_wall_0 : T_wall_final
+
+    # Use a scalar-T_wall system for the steady-state solve (consistent ICs at T_wall_0),
+    # then switch to the callable system for the transient.
+    ssys_ss = build_loop_transient(T_inlet=T_inlet, T_wall_0=T_wall_0)
+    ssys    = build_loop_transient(T_inlet=T_inlet, T_wall_fn=T_wall_step)
+
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+    op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op_guess, ssys_ss.ch.port_in.mdot => 0.490)
+    sol_ss = solve_steady(ssys_ss, op_guess)
+    # Use Pair{Any,Any} so the callable parameter can be mixed with Float64 values
+    op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
+    push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys_ss.ch.port_in.mdot])
+    T_wall_sym = last(parameters(ssys))   # T_wall_callable is the last parameter
+    push!(op_ic, T_wall_sym => T_wall_step)
+
+    t_arr = range(0.0, 60.0, length=600)
+    sol = solve_transient(ssys, op_ic, t_arr)
     @test sol.retcode == ReturnCode.Success
     T_ts = sol[ssys.ch.T_out, :]
     @test !any(isnan, T_ts)
@@ -66,10 +79,10 @@ end
 
     nz = 10; nx = 3
     T_in = 313.15
-    @named pump_l = Pump(dP_pump=3.0e4)
+    @named pump_l = Pump(3.0e4)
     @named hx_l   = HeatExchanger(T_bc=T_in)
     @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
-    @named pump_r = Pump(dP_pump=3.0e4)
+    @named pump_r = Pump(3.0e4)
     @named hx_r   = HeatExchanger(T_bc=T_in)
     @named cac_r  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps = fill(1.0 / (nz * nx), nz, nx)
@@ -153,10 +166,10 @@ end
 
     nz = 10; nx = 3
     T_in_l = 313.15; T_in_r = 363.15
-    @named pump_l = Pump(dP_pump=3.0e4)
+    @named pump_l = Pump(3.0e4)
     @named hx_l   = HeatExchanger(T_bc=T_in_l)
     @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
-    @named pump_r = Pump(dP_pump=3.0e4)
+    @named pump_r = Pump(3.0e4)
     @named hx_r   = HeatExchanger(T_bc=T_in_r)
     @named cac_r  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps = fill(1.0 / (nz * nx), nz, nx)
@@ -227,7 +240,7 @@ end
 
     nz = 10; nx = 3
     T_in = 313.15
-    @named pump_l = Pump(dP_pump=3.0e4)
+    @named pump_l = Pump(3.0e4)
     @named hx_l   = HeatExchanger(T_bc=T_in)
     @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps = fill(1.0 / (nz * nx), nz, nx)
@@ -381,7 +394,7 @@ end
     T_in_v02 = 313.15
     power_per_plate = 1e4   # W each → 20 kW total to one channel
 
-    @named pump_v02 = Pump(dP_pump=3.0e4)
+    @named pump_v02 = Pump(3.0e4)
     @named hx_v02   = HeatExchanger(T_bc=T_in_v02)
     @named cac_v02  = ChannelAndContacts(n=nz_v02,
                           geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))

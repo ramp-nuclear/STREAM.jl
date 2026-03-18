@@ -48,38 +48,50 @@ end
 
 # ─────────────────────────────────────────────────────────────────
 # SOLV-02: solve_transient returns time-series with T_outlet rising
-# after T_wall step change
+# after T_wall step change (callable T_wall pattern)
 # ─────────────────────────────────────────────────────────────────
 @testset "SOLV-02: build_loop_transient compiles" begin
-    ssys, T_wall_sym = build_loop_transient()
+    ssys = build_loop_transient()
     @test ssys isa ModelingToolkit.AbstractSystem
-    @test T_wall_sym isa Symbolics.Num   # T_wall parameter symbol returned
+    # No longer returns a tuple — just ssys
 end
 
-@testset "SOLV-02: solve_transient returns time-series" begin
+@testset "SOLV-02: solve_transient returns time-series (callable T_wall step)" begin
     n = 10
     T_inlet = 313.15
     Q_wall_0 = 1.0e4
-    mdot_guess = 0.490  # rough guess; KINSOL is robust to this
+    mdot_guess = 0.490
 
-    ssys, T_wall_sym = build_loop_transient(T_inlet=T_inlet)
+    # Step-change: T_wall jumps from 373.15 to 393.15 at t=10s via callable
+    T_wall_0 = 373.15
+    T_wall_final = 393.15
+    t_step = 10.0
+    T_wall_step = t -> t < t_step ? T_wall_0 : T_wall_final
+
+    # Use a scalar-T_wall system for the steady-state solve (consistent ICs at T_wall_0)
+    # then switch to the callable system for the transient.
+    ssys_ss = build_loop_transient(T_inlet=T_inlet, T_wall_0=T_wall_0)
+    ssys    = build_loop_transient(T_inlet=T_inlet, T_wall_fn=T_wall_step)
+
     T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=Q_wall_0, mdot_guess=mdot_guess, n=n)
 
-    op_guess = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op_guess, ssys.ch.port_in.mdot => mdot_guess)
+    op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op_guess, ssys_ss.ch.port_in.mdot => mdot_guess)
 
-    # Rodas5P+NoInit requires algebraically consistent ICs (pressure balance satisfied).
-    # Run solve_steady on the transient system first to get a consistent starting point.
-    sol_ss = solve_steady(ssys, op_guess)
-    op_ic = [ssys.ch.T[i] => sol_ss[ssys.ch.T[i]] for i in 1:n]
-    push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys.ch.port_in.mdot])
+    # Solve steady state on the scalar system for consistent ICs
+    sol_ss = solve_steady(ssys_ss, op_guess)
+    # Use Pair{Any,Any} so the callable parameter can be mixed with Float64 values
+    op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
+    push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys_ss.ch.port_in.mdot])
+    # Include callable parameter in op for the transient system
+    T_wall_sym = last(parameters(ssys))   # T_wall_callable is the last parameter
+    push!(op_ic, T_wall_sym => T_wall_step)
 
-    # Step T_wall from 373.15 K (100°C) to 393.15 K (120°C) at t=10s
-    sol = solve_transient(ssys=ssys, T_wall_sym=T_wall_sym, op=op_ic, tspan=(0.0, 30.0),
-                          T_wall_final=393.15, t_step=10.0)
+    t_arr = range(0.0, 30.0, length=300)
+    sol = solve_transient(ssys, op_ic, t_arr)
     @test sol.retcode == ReturnCode.Success
-    @test length(sol.t) > 2                            # multiple time points
+    @test length(sol.t) > 2
     T_ts = sol[ssys.ch.T_out, :]
-    @test !any(isnan, T_ts)                            # no NaN
-    @test T_ts[end] > T_ts[1]                          # T_outlet rises after T_wall step
+    @test !any(isnan, T_ts)
+    @test T_ts[end] > T_ts[1]   # T_outlet rises after T_wall step
 end

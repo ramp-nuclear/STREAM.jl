@@ -22,7 +22,7 @@ import STREAM: dittus_boelter, blasius_friction, constant_Nusselt, laminar_frict
     n_qol = 3; T_inlet_qol = 313.15; T_wall_qol = 373.15
     geom_qol = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     @named ch_qol = ChannelAndContacts(n=n_qol, geometry=geom_qol)
-    @named pump_qol = Pump(dP_pump=3.0e4)
+    @named pump_qol = Pump(3.0e4)
     @named bc_qol = HeatExchanger(T_bc=T_inlet_qol)
     ct_l_qol = [ConstantTemperature(name=Symbol(:ct_l_qol_, i), T=T_wall_qol) for i in 1:n_qol]
     ct_r_qol = [ConstantTemperature(name=Symbol(:ct_r_qol_, i), T=T_wall_qol) for i in 1:n_qol]
@@ -69,7 +69,7 @@ end
     # Channel with g=9.81 (gravity active) but no Gravity return component.
     # check_gravity_mismatch detects g_acc > 0 with no matching H parameter.
     @named ch_gm   = Channel(n=1, geometry=PipeGeometry_circular(0.6, 0.01), g=9.81)
-    @named pump_gm = Pump(dP_pump=1000.0)
+    @named pump_gm = Pump(1000.0)
     @named hx_gm   = HeatExchanger(T_bc=600.0)
     conns_gm = [
         connect(pump_gm.port_out, hx_gm.port_in),
@@ -109,7 +109,7 @@ const ps_comp   = ones(3, 3)  # uniform power shape, 3x3
                                  power_shape=ps_comp, power=1e4)
     plate_sys = symmetric_plate(cac, fuel; name=:plate)
     # Add pump and HeatExchanger BCs for hydraulic closure
-    @named pump   = Pump(dP_pump=3.0e4)
+    @named pump   = Pump(3.0e4)
     @named hx_in  = HeatExchanger(T_bc=600.0)
     outer_conns = [
         connect(pump.port_out,          hx_in.port_in),
@@ -135,9 +135,9 @@ end
                                  rho_s=19300.0, cp_s=130.0, k_s=20.0,
                                  power_shape=ps_comp, power=1e4)
     plate_sys = plate(ch_l, ch_r, fuel; name=:plate)
-    @named pump_l = Pump(dP_pump=3.0e4)
+    @named pump_l = Pump(3.0e4)
     @named hx_l   = HeatExchanger(T_bc=600.0)
-    @named pump_r = Pump(dP_pump=3.0e4)
+    @named pump_r = Pump(3.0e4)
     @named hx_r   = HeatExchanger(T_bc=600.0)
     outer_conns = [
         connect(pump_l.port_out,           hx_l.port_in),
@@ -165,7 +165,7 @@ end
                                      rho_s=19300.0, cp_s=130.0, k_s=20.0,
                                      power_shape=ps_comp, power=1e4)
         osc_sys = one_sided_connection(ch, fuel; side=test_side, name=:osc)
-        @named pump  = Pump(dP_pump=3.0e4)
+        @named pump  = Pump(3.0e4)
         @named hx_in = HeatExchanger(T_bc=600.0)
         outer_conns = [
             connect(pump.port_out,         hx_in.port_in),
@@ -198,7 +198,7 @@ end
     p2 = symmetric_plate(cac2, fuel2; name=:plate2)
 
     # Series hydraulic connection: pump -> plate1 -> plate2 -> hx_in -> pump
-    @named pump  = Pump(dP_pump=3.0e4)
+    @named pump  = Pump(3.0e4)
     @named hx_in = HeatExchanger(T_bc=600.0)
     cross_conns = Equation[
         connect(pump.port_out,    hx_in.port_in),
@@ -225,7 +225,7 @@ end
                                     rho_s=19300.0, cp_s=130.0, k_s=20.0,
                                     power_shape=ps_cp, power=1e4)
     plate_cp = symmetric_plate(cac_cp, fuel_cp; name=:plate_cp)
-    @named pump_cp  = Pump(dP_pump=3.0e4)
+    @named pump_cp  = Pump(3.0e4)
     @named hx_cp   = HeatExchanger(T_bc=T_in_cp)
     outer_cp = [
         connect(pump_cp.port_out,            hx_cp.port_in),
