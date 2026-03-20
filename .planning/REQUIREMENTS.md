@@ -31,16 +31,16 @@
 
 ### Flapper
 
-- [ ] **FLAP-01**: `Flapper` component — MTK ODESystem with FlowPorts, internal `ref_mdot(t)` variable (wired externally by user), parameters `dt`, `threshold`, `T_open` (init=Inf)
-- [ ] **FLAP-02**: Flapper uses C1 smooth ramp (`3*xi^2 - 2*xi^3` where `xi = clamp((t - T_open)/dt, 0, 1)`) to interpolate resistance from closed (high) to open (low)
-- [ ] **FLAP-03**: Flapper embeds MTK continuous event: when `ref_mdot - threshold` crosses zero from above, set `T_open = t`; no solver restart required
-- [ ] **FLAP-04**: User wires trigger via `flapper.ref_mdot ~ reference_component.port_in.mdot` as a plain algebraic equation during system composition
+- [x] **FLAP-01**: `Flapper` component — MTK ODESystem with FlowPorts, internal `ref_mdot(t)` variable (wired externally by user), parameters `dt`, `threshold`, `T_open` (init=Inf)
+- [x] **FLAP-02**: Flapper uses C1 smooth ramp (`3*xi^2 - 2*xi^3` where `xi = clamp((t - T_open)/dt, 0, 1)`) to interpolate resistance from closed (high) to open (low)
+- [x] **FLAP-03**: Flapper embeds MTK continuous event: when `ref_mdot - threshold` crosses zero from above, set `T_open = t`; no solver restart required
+- [x] **FLAP-04**: User wires trigger via `flapper.ref_mdot ~ reference_component.port_in.mdot` as a plain algebraic equation during system composition
 - [ ] **FLAP-05**: Test: Flapper remains closed under positive ref_mdot — verifies near-zero leakage through Flapper path
 - [ ] **FLAP-06**: Test: Flapper opens when ref_mdot crosses threshold — verifies T_open is recorded and smooth ramp proceeds correctly
 
 ### Solver Events
 
-- [ ] **SOLV-01**: `solve_transient` accepts optional `callbacks` keyword argument (DifferentialEquations.jl `CallbackSet`) for user-supplied events alongside MTK-native Flapper events
+- [x] **SOLV-01**: `solve_transient` accepts optional `callbacks` keyword argument (DifferentialEquations.jl `CallbackSet`) for user-supplied events alongside MTK-native Flapper events
 
 ### Validation
 
@@ -94,13 +94,13 @@
 | PUMP-01 | Phase 22 | Complete |
 | PUMP-02 | Phase 22 | Complete |
 | PUMP-03 | Phase 22 | Complete |
-| FLAP-01 | Phase 23 | Pending |
-| FLAP-02 | Phase 23 | Pending |
-| FLAP-03 | Phase 23 | Pending |
-| FLAP-04 | Phase 23 | Pending |
+| FLAP-01 | Phase 23 | Complete |
+| FLAP-02 | Phase 23 | Complete |
+| FLAP-03 | Phase 23 | Complete |
+| FLAP-04 | Phase 23 | Complete |
 | FLAP-05 | Phase 23 | Pending |
 | FLAP-06 | Phase 23 | Pending |
-| SOLV-01 | Phase 23 | Pending |
+| SOLV-01 | Phase 23 | Complete |
 | VAL-01 | Phase 24 | Pending |
 | VAL-02 | Phase 24 | Pending |
 

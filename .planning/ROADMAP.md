@@ -140,7 +140,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 23-01-PLAN.md — Flapper component implementation (FLAP-01..04), module wiring, SOLV-01 scope
+- [x] 23-01-PLAN.md — Flapper component implementation (FLAP-01..04), module wiring, SOLV-01 scope
 - [ ] 23-02-PLAN.md — Flapper closed/open tests (FLAP-05, FLAP-06) and SOLV-01 smoke test
 
 ### Phase 24: Loss-of-Flow Validation
@@ -199,7 +199,7 @@ Plans:
 | 20. Sign Safety | 2/2 | Complete    | 2026-03-17 | - |
 | 21. Fluid Properties & Natural Convection | 2/2 | Complete    | 2026-03-17 | - |
 | 22. Time-Varying Pump | 2/2 | Complete    | 2026-03-18 | - |
-| 23. Flapper & Solver Events | v0.6 | 0/2 | Not started | - |
+| 23. Flapper & Solver Events | v0.6 | 1/2 | In Progress|  |
 | 24. Loss-of-Flow Validation | v0.6 | 0/1 | Not started | - |
 | 25. Argument Structure Audit | v0.6 | 0/1 | Not started | - |
 

@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
-status: completed
-stopped_at: Completed 22-02-PLAN.md
-last_updated: "2026-03-18T00:39:37.418Z"
-last_activity: 2026-03-18 — 22-02 PUMP-01/02/03 tests + SOLV-02/VAL-02 API migration
+status: unknown
+stopped_at: Completed 23-01-PLAN.md
+last_updated: "2026-03-20T18:35:21.358Z"
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 8
+  completed_plans: 7
 ---
 
 # STATE: STREAM.jl
@@ -25,21 +23,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 20 — Sign Safety (v0.6 start)
+**Current focus:** Phase 23 — flapper-solver-events
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: 22 of 24 (Time-Varying Pump) — COMPLETE
-Plan: 02 complete (22-02 test suite: PUMP-01/02/03, SOLV-02, VAL-02, all Pump call sites fixed)
-Status: Phase 22 complete; v0.6 plans 1-6 done
-Last activity: 2026-03-18 — 22-02 PUMP-01/02/03 tests + SOLV-02/VAL-02 API migration
-
-Progress: [██████████] 100% (6 of 6 v0.6 plans complete)
-
----
+Phase: 23 (flapper-solver-events) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -60,6 +52,7 @@ Progress: [██████████] 100% (6 of 6 v0.6 plans complete)
 | Phase 21 P02 | 10 | 2 tasks | 2 files |
 | Phase 22-time-varying-pump P01 | 7 | 2 tasks | 3 files |
 | Phase 22-time-varying-pump P02 | 32 | 2 tasks | 6 files |
+| Phase 23-flapper-solver-events P01 | 9 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -87,6 +80,9 @@ Progress: [██████████] 100% (6 of 6 v0.6 plans complete)
 - [v0.6 PUMP-02]: Two-system pattern for callable T_wall ICs: scalar build_loop_transient for solve_steady, callable build_loop_transient for solve_transient (SteadyStateProblem cannot handle time-dependent callables)
 - [v0.6 PUMP-02]: Pair{Any,Any} op vector required when mixing Float64 state ICs with callable parameter values; use last(parameters(ssys)) to get raw callable sym
 - [v0.6 PUMP-02]: Two thermal anchors needed in hydraulics-only closed loop (no HeatExchanger): single pump.port_in.T anchor leaves ine.port_out.T underdetermined
+- [v0.6 FLAP-01]: T_open initial value is 1e30 (not Inf) -- Inf causes Rodas5P instability; 1e30 sentinel keeps ramp at 0 before event fires
+- [v0.6 FLAP-03]: affect_neg=[T_open ~ t] fires on downward crossing (ref_mdot drops below threshold); affect=nothing ignores upward crossing
+- [v0.6 FLAP-04]: ref_mdot has no equation inside Flapper -- user must wire flapper.ref_mdot ~ component.port_in.mdot during composition
 
 ### Pending Todos
 
@@ -100,8 +96,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-18T00:36:21.994Z
-**Stopped at:** Completed 22-02-PLAN.md
+**Last session:** 2026-03-20T18:35:21.354Z
+**Stopped at:** Completed 23-01-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
 **Resume file:** None
 
