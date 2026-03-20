@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: unknown
-stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-03-20T18:35:21.358Z"
+stopped_at: Completed 23-02-PLAN.md
+last_updated: "2026-03-20T18:57:30.489Z"
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # STATE: STREAM.jl
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 23 (flapper-solver-events) — EXECUTING
+Phase: 23 (flapper-solver-events) — COMPLETE
 Plan: 2 of 2
 
 ## Performance Metrics
@@ -53,6 +53,7 @@ Plan: 2 of 2
 | Phase 22-time-varying-pump P01 | 7 | 2 tasks | 3 files |
 | Phase 22-time-varying-pump P02 | 32 | 2 tasks | 6 files |
 | Phase 23-flapper-solver-events P01 | 9 | 2 tasks | 4 files |
+| Phase 23 P02 | 21 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Plan: 2 of 2
 - [v0.6 FLAP-01]: T_open initial value is 1e30 (not Inf) -- Inf causes Rodas5P instability; 1e30 sentinel keeps ramp at 0 before event fires
 - [v0.6 FLAP-03]: affect_neg=[T_open ~ t] fires on downward crossing (ref_mdot drops below threshold); affect=nothing ignores upward crossing
 - [v0.6 FLAP-04]: ref_mdot has no equation inside Flapper -- user must wire flapper.ref_mdot ~ component.port_in.mdot during composition
+- [v0.6 FLAP-06]: Callable Pump(f(t)) cannot be used in same ODEProblem as Flapper (SymbolicContinuousCallback): MTK compile_equational_affect builds sub-ImplicitDiscreteProblem that cannot resolve callable parameter at build time; use Pump(0)+Inertia IC decay pattern for open-transition tests
+- [v0.6 FLAP-05]: Use threshold << expected steady-state mdot for closed-state tests (e.g. threshold=1e-6 vs mdot~1e-3); default threshold=0.01 > mdot through R_closed=1e8 Flapper, making test fragile
 
 ### Pending Todos
 
@@ -96,8 +99,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-20T18:35:21.354Z
-**Stopped at:** Completed 23-01-PLAN.md
+**Last session:** 2026-03-20T18:57:30.486Z
+**Stopped at:** Completed 23-02-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
 **Resume file:** None
 

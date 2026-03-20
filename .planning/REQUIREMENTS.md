@@ -35,8 +35,8 @@
 - [x] **FLAP-02**: Flapper uses C1 smooth ramp (`3*xi^2 - 2*xi^3` where `xi = clamp((t - T_open)/dt, 0, 1)`) to interpolate resistance from closed (high) to open (low)
 - [x] **FLAP-03**: Flapper embeds MTK continuous event: when `ref_mdot - threshold` crosses zero from above, set `T_open = t`; no solver restart required
 - [x] **FLAP-04**: User wires trigger via `flapper.ref_mdot ~ reference_component.port_in.mdot` as a plain algebraic equation during system composition
-- [ ] **FLAP-05**: Test: Flapper remains closed under positive ref_mdot — verifies near-zero leakage through Flapper path
-- [ ] **FLAP-06**: Test: Flapper opens when ref_mdot crosses threshold — verifies T_open is recorded and smooth ramp proceeds correctly
+- [x] **FLAP-05**: Test: Flapper remains closed under positive ref_mdot — verifies near-zero leakage through Flapper path
+- [x] **FLAP-06**: Test: Flapper opens when ref_mdot crosses threshold — verifies T_open is recorded and smooth ramp proceeds correctly
 
 ### Solver Events
 
@@ -98,8 +98,8 @@
 | FLAP-02 | Phase 23 | Complete |
 | FLAP-03 | Phase 23 | Complete |
 | FLAP-04 | Phase 23 | Complete |
-| FLAP-05 | Phase 23 | Pending |
-| FLAP-06 | Phase 23 | Pending |
+| FLAP-05 | Phase 23 | Complete |
+| FLAP-06 | Phase 23 | Complete |
 | SOLV-01 | Phase 23 | Complete |
 | VAL-01 | Phase 24 | Pending |
 | VAL-02 | Phase 24 | Pending |

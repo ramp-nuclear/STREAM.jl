@@ -78,7 +78,7 @@ Full phase details: `.planning/milestones/v0.5-ROADMAP.md`
 - [x] **Phase 20: Sign Safety** - Audit and fix all channel components to handle negative mass flow correctly (completed 2026-03-17)
 - [x] **Phase 21: Fluid Properties & Natural Convection** - Add thermal expansion coefficient, Gr/Ra utilities, and Elenbaas HTC correlation (completed 2026-03-17)
 - [x] **Phase 22: Time-Varying Pump** - Enable callable dP_pump for coastdown and ramp scenarios (completed 2026-03-18)
-- [ ] **Phase 23: Flapper & Solver Events** - Implement Flapper check-valve component with MTK continuous event and expose callback API
+- [x] **Phase 23: Flapper & Solver Events** - Implement Flapper check-valve component with MTK continuous event and expose callback API (completed 2026-03-20)
 - [ ] **Phase 24: Loss-of-Flow Validation** - Validate full loss-of-flow transient end-to-end against analytical expectations
 - [ ] **Phase 25: Argument Structure Audit** - Sweep all public functions and constructors, replace keyword-only where positional + multiple dispatch is more idiomatic Julia
 
@@ -141,7 +141,7 @@ Plans:
 
 Plans:
 - [x] 23-01-PLAN.md — Flapper component implementation (FLAP-01..04), module wiring, SOLV-01 scope
-- [ ] 23-02-PLAN.md — Flapper closed/open tests (FLAP-05, FLAP-06) and SOLV-01 smoke test
+- [x] 23-02-PLAN.md — Flapper closed/open tests (FLAP-05, FLAP-06) and SOLV-01 smoke test
 
 ### Phase 24: Loss-of-Flow Validation
 **Goal**: Full loss-of-flow transient validated end-to-end: forced flow, pump coastdown, flow reversal, Flapper opening, natural circulation
@@ -199,7 +199,7 @@ Plans:
 | 20. Sign Safety | 2/2 | Complete    | 2026-03-17 | - |
 | 21. Fluid Properties & Natural Convection | 2/2 | Complete    | 2026-03-17 | - |
 | 22. Time-Varying Pump | 2/2 | Complete    | 2026-03-18 | - |
-| 23. Flapper & Solver Events | v0.6 | 1/2 | In Progress|  |
+| 23. Flapper & Solver Events | v0.6 | 2/2 | Complete   | 2026-03-20 |
 | 24. Loss-of-Flow Validation | v0.6 | 0/1 | Not started | - |
 | 25. Argument Structure Audit | v0.6 | 0/1 | Not started | - |
 
