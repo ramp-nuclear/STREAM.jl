@@ -1,2 +1,153 @@
-# test_flapper.jl -- Flapper tests (FLAP-05, FLAP-06, SOLV-01)
-# Full tests are implemented in Phase 23 Plan 02.
+using Test
+using ModelingToolkit
+using ModelingToolkit: t_nounits as t
+using DifferentialEquations
+using STREAM
+
+# ─────────────────────────────────────────────────────────────────
+# Helper: build a minimal closed-loop Flapper system (scalar pump)
+#
+# Topology: Pump(dP_val) → Resistor(R=1e5) → Flapper → back to Pump
+# flapper.ref_mdot ~ pump.port_in.mdot
+# Two thermal anchors break circular instream in hydraulics-only loop.
+# ─────────────────────────────────────────────────────────────────
+function _build_flapper_scalar_loop(dP_val; flap_kwargs...)
+    @named pump    = Pump(dP_val)
+    @named res     = Resistor(R=1e5)
+    @named flapper = Flapper(; flap_kwargs...)
+
+    conns = [
+        connect(pump.port_out,    res.port_in),
+        connect(res.port_out,     flapper.port_in),
+        connect(flapper.port_out, pump.port_in),
+        flapper.ref_mdot ~ pump.port_in.mdot,
+        pump.port_in.P ~ 1e5,
+        pump.port_in.T ~ 313.15,
+        res.port_out.T ~ 313.15,
+    ]
+    @named sys = compose(System(conns, t; name=:flap_scalar_loop), pump, res, flapper)
+    return sys
+end
+
+# ─────────────────────────────────────────────────────────────────
+# FLAP-05: Flapper remains closed under positive ref_mdot
+#
+# A scalar pump with dP=1e5 Pa drives flow through Resistor(1e5) + Flapper.
+# Steady-state mdot ≈ 1e5 / (1e5 + 1e8) ≈ 1e-3 kg/s.
+# With threshold=1e-6 kg/s, this mdot stays well above threshold throughout
+# the 20 s transient, so the event never fires and T_open stays at 1e30.
+# ─────────────────────────────────────────────────────────────────
+@testset "FLAP-05: Flapper remains closed under positive ref_mdot" begin
+    sys = _build_flapper_scalar_loop(1e5; threshold=1e-6)
+    ssys = mtkcompile(sys; fully_determined=false)
+
+    op = Pair{Any,Any}[
+        ssys.flapper.T_open => 1e30,
+    ]
+
+    t_arr = range(0.0, 20.0; length=200)
+    sol = solve_transient(ssys, op, t_arr)
+
+    @test sol.retcode == ReturnCode.Success
+    # T_open must stay at 1e30 sentinel (event never fired — ref_mdot > threshold all run)
+    @test isapprox(sol[ssys.flapper.T_open, end], 1e30; rtol=1e-6)
+    # xi must remain 0 (no ramp triggered)
+    @test isapprox(sol[ssys.flapper.xi, end], 0.0; atol=1e-8)
+end
+
+# ─────────────────────────────────────────────────────────────────
+# FLAP-06: Flapper opens when ref_mdot crosses threshold
+#
+# Topology: Pump(0) → Inertia(L_over_A=5e5) → Resistor(1e5) → Flapper → Pump
+# With dP=0, the loop decays under inertia+resistance: tau = L/A / R = 5e5/1e5 = 5s
+# Initial condition: ine.port_in.mdot = 1.0 kg/s
+# ref_mdot wired to ine.port_in.mdot, threshold=1e-4 kg/s
+# mdot decays exponentially: mdot(t) ≈ mdot_0 * exp(-t / tau_eff)
+# The event fires when mdot drops below threshold.
+# T_open is recorded at the crossing time; after T_open + dt=3s, xi = 1.0.
+#
+# Note: callable Pump(f(t)) cannot be used here because MTK's callback
+# compilation in ODEProblem construction requires all parameter values
+# to be resolvable at build time, which breaks when a SymbolicContinuousCallback
+# is present in the same system. The Inertia+decay approach achieves the same
+# test objective without callable parameters.
+# ─────────────────────────────────────────────────────────────────
+@testset "FLAP-06: Flapper opens when ref_mdot crosses threshold" begin
+    threshold_val = 1e-4   # kg/s; well below the initial mdot of 1.0 kg/s
+    dt_ramp       = 3.0    # s; ramp duration
+    L_over_A      = 5e5   # m^{-1}; tau_eff = L_over_A / R_eff ≈ 5s
+
+    @named pump    = Pump(0.0)   # zero pressure: loop decays under inertia
+    @named ine     = Inertia(L_over_A=L_over_A)
+    @named res     = Resistor(R=1e5)
+    @named flapper = Flapper(; threshold=threshold_val, dt=dt_ramp, R_closed=1e8, R_open=100.0)
+
+    conns = [
+        connect(pump.port_out,    ine.port_in),
+        connect(ine.port_out,     res.port_in),
+        connect(res.port_out,     flapper.port_in),
+        connect(flapper.port_out, pump.port_in),
+        # wire ref_mdot to the inertia mdot (the loop flow rate)
+        flapper.ref_mdot ~ ine.port_in.mdot,
+        pump.port_in.P ~ 1e5,
+        pump.port_in.T ~ 313.15,
+        ine.port_out.T ~ 313.15,
+    ]
+    @named sys = compose(System(conns, t; name=:flap06_decay), pump, ine, res, flapper)
+    ssys = mtkcompile(sys; fully_determined=false)
+
+    mdot_0 = 1.0   # initial mdot (kg/s); well above threshold
+
+    op = Pair{Any,Any}[
+        ssys.ine.port_in.mdot => mdot_0,
+        ssys.flapper.T_open   => 1e30,
+    ]
+
+    t_arr = range(0.0, 100.0; length=1000)
+    sol = solve_transient(ssys, op, t_arr)
+
+    @test sol.retcode == ReturnCode.Success
+
+    T_open_val = sol[ssys.flapper.T_open, end]
+
+    # Event must have fired: T_open is no longer the 1e30 sentinel
+    @test T_open_val < 1e10
+
+    # Event must have fired at a positive time (not at t=0 where mdot was above threshold)
+    @test T_open_val > 0.0
+
+    # After T_open + dt_ramp, the ramp is complete: xi should reach 1.0
+    # t_end = 100s >> T_open + dt_ramp, so xi should be 1.0 at the final time
+    @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)
+
+    # At t_end, mdot should be near zero (decay complete; pump dP = 0)
+    @test abs(sol[ssys.ine.port_in.mdot, end]) < 1e-6 * mdot_0
+end
+
+# ─────────────────────────────────────────────────────────────────
+# SOLV-01: solve_transient passes user-supplied callbacks
+#
+# Reuse the scalar-pump Flapper loop from FLAP-05.
+# A ContinuousCallback fires at t=5s and sets fired[]=true.
+# Verifies that the callbacks kwarg is forwarded to the DiffEq solver.
+# ─────────────────────────────────────────────────────────────────
+@testset "SOLV-01: solve_transient passes user callbacks" begin
+    sys = _build_flapper_scalar_loop(1e5; threshold=1e-6)
+    ssys = mtkcompile(sys; fully_determined=false)
+
+    op = Pair{Any,Any}[
+        ssys.flapper.T_open => 1e30,
+    ]
+
+    fired = Ref(false)
+    user_cb = ContinuousCallback(
+        (u, t_val, integ) -> t_val - 5.0,
+        integ -> (fired[] = true)
+    )
+
+    t_arr = range(0.0, 20.0; length=200)
+    sol = solve_transient(ssys, op, t_arr; callbacks=CallbackSet(user_cb))
+
+    @test sol.retcode == ReturnCode.Success
+    @test fired[]
+end
