@@ -151,10 +151,10 @@ Plans:
   1. The simulation runs continuously from forced-flow steady state through pump-off, mdot sign reversal, Flapper opening, and into natural circulation without solver restart or crash
   2. Energy balance (Q_in = mdot * cp * dT) holds within stated tolerance at all simulated time checkpoints throughout the transient
   3. Natural circulation temperature rise matches the Elenbaas-based analytical estimate within a stated tolerance
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 24-01: Loss-of-flow transient validation scenario
+- [ ] 24-01-PLAN.md — build_loop_lof() helper and VAL-01/VAL-02 test suite
 
 ### Phase 25: Argument Structure Audit
 **Goal**: Sweep all exported functions and component constructors; replace keyword-only signatures with positional arguments + multiple dispatch wherever it improves clarity or enables type-based dispatch
@@ -206,4 +206,4 @@ Plans:
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-20 — Phase 23 plans finalized: 2 plans in 2 waves*
+*Updated: 2026-03-20 — Phase 24 plans finalized: 1 plan in 1 wave*
