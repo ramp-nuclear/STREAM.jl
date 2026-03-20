@@ -137,11 +137,11 @@ Plans:
   2. Flapper resistance stays near maximum when ref_mdot exceeds threshold — a test verifies near-zero leakage through the Flapper path under positive flow
   3. When ref_mdot crosses threshold from above, T_open is recorded without solver restart and the C1 smooth ramp correctly transitions resistance from closed to open
   4. `solve_transient` accepts a `callbacks` keyword argument and passes it through to the DifferentialEquations.jl solver alongside MTK-native events
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 23-01: Flapper component implementation (FLAP-01..04) and SOLV-01 callbacks keyword
-- [ ] 23-02: Flapper closed and open tests (FLAP-05, FLAP-06)
+- [ ] 23-01-PLAN.md — Flapper component implementation (FLAP-01..04), module wiring, SOLV-01 scope
+- [ ] 23-02-PLAN.md — Flapper closed/open tests (FLAP-05, FLAP-06) and SOLV-01 smoke test
 
 ### Phase 24: Loss-of-Flow Validation
 **Goal**: Full loss-of-flow transient validated end-to-end: forced flow, pump coastdown, flow reversal, Flapper opening, natural circulation
@@ -206,4 +206,4 @@ Plans:
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-18 — Phase 22 plans finalized: 2 plans in 2 waves*
+*Updated: 2026-03-20 — Phase 23 plans finalized: 2 plans in 2 waves*
