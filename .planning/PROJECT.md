@@ -144,7 +144,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - Sign-safe components (all handle negative mass flow)
 - Elenbaas natural convection HTC + thermal expansion fluid property
 - Time-varying Pump pressure (`dP_pump` as callable)
-- Flapper component (smooth C1 trigger, MTK continuous event)
+- Flapper component (smooth C1 trigger, MTK continuous event) — Validated in Phase 23: flapper-solver-events
 - Loss-of-flow validation scenario
 
 ---
