@@ -314,3 +314,75 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
 
     return ssys
 end
+
+"""
+    build_loop_lof(; n=10, L_ch=1.0, D_ch=0.01, T_wall=373.15, T_inlet=313.15,
+                    L_over_A=1.75e5, g_acc_ch=9.80665, threshold=0.01, dt_ramp=5.0) -> ODESystem
+
+Build a loss-of-flow validation loop using a series topology with a Flapper check valve.
+Used for end-to-end LOF transient validation (VAL-01, VAL-02).
+
+Topology (series):
+`Pump(0.0) -> Inertia -> HeatExchanger(T_inlet) -> ChannelHeatFlux(g=g_acc_ch) -> Flapper -> Pump`
+
+Physics: With `g_acc_ch > 0` (upward channel), gravity opposes forced flow. At t=0 the pump
+produces zero pressure rise; the Inertia carries the initial forced-flow momentum which decays
+as gravity and friction oppose the flow. When `ine.port_in.mdot` drops below `threshold` the
+Flapper opens (resistance drops from R_closed=1e8 to ~0), enabling reversed (downward) flow
+driven by buoyancy. The system then transitions to natural circulation.
+
+Initial conditions: set `ine.port_in.mdot` to the forced-flow steady-state value obtained
+from a separate `build_loop_vertical` call with the same geometry and a matching `dP_pump`.
+Use `Pair{Any,Any}` op vector and `initializealg=SciMLBase.NoInit()` via `solve_transient`.
+
+# Arguments
+- `n`: number of axial cells in ChannelHeatFlux (default 10)
+- `L_ch`: channel length [m] (default 1.0)
+- `D_ch`: channel hydraulic diameter [m] (default 0.01)
+- `T_wall`: channel wall temperature [K] (default 373.15)
+- `T_inlet`: inlet/HeatExchanger boundary temperature [K] (default 313.15)
+- `L_over_A`: Inertia length-to-area ratio [1/m] (default 1.75e5); controls coastdown time constant
+- `g_acc_ch`: gravitational acceleration in ChannelHeatFlux [m/s^2]; positive = upward flow, gravity opposes forced flow (default 9.80665)
+- `threshold`: Flapper trigger threshold [kg/s]; should be ~10% of steady-state mdot (default 0.01)
+- `dt_ramp`: Flapper opening ramp duration [s] (default 5.0)
+
+# Returns
+Compiled `ODESystem` (via `mtkcompile(sys; fully_determined=false)`).
+"""
+function build_loop_lof(;
+    n::Int    = 10,
+    L_ch      = 1.0,
+    D_ch      = 0.01,
+    T_wall    = 373.15,
+    T_inlet   = 313.15,
+    L_over_A  = 1.75e5,
+    g_acc_ch  = 9.80665,
+    threshold = 0.01,
+    dt_ramp   = 5.0,
+)
+    @named pump    = Pump(0.0)
+    @named ine     = Inertia(L_over_A=L_over_A)
+    @named bc      = HeatExchanger(T_bc=T_inlet)
+    @named ch      = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=g_acc_ch, T_wall=T_wall)
+    @named flapper = Flapper(threshold=threshold, dt=dt_ramp)
+
+    connections = [
+        connect(pump.port_out, ine.port_in),
+        connect(ine.port_out,  bc.port_in),
+        connect(bc.port_out,   ch.port_in),
+        connect(ch.port_out,   flapper.port_in),
+        connect(flapper.port_out, pump.port_in),
+        pump.port_in.P    ~ 1.0e5,
+        ch.port_in.T      ~ T_inlet,
+        flapper.ref_mdot  ~ ine.port_in.mdot,
+    ]
+
+    @named sys = compose(System(connections, t; name=:sys), pump, ine, bc, ch, flapper)
+
+    t_compile = @elapsed ssys = mtkcompile(sys; fully_determined=false)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "build_loop_lof compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    return ssys
+end
