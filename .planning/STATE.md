@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: unknown
-stopped_at: Completed 24.1-01-PLAN.md
-last_updated: "2026-03-21T13:35:08.292Z"
+stopped_at: Completed 24.1-02-PLAN.md
+last_updated: "2026-03-21T14:31:57.866Z"
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # STATE: STREAM.jl
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 24.1 (bypass-lof-topology) — EXECUTING
+Phase: 24.1 (bypass-lof-topology) — COMPLETE
 Plan: 2 of 2
 
 ## Performance Metrics
@@ -56,6 +56,7 @@ Plan: 2 of 2
 | Phase 23 P02 | 21 | 1 tasks | 1 files |
 | Phase 24-loss-of-flow P01 | 90 | 2 tasks | 4 files |
 | Phase 24.1 P01 | 12 | 2 tasks | 4 files |
+| Phase 24.1 P02 | 55 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,9 @@ Plan: 2 of 2
 - [v0.6 LOF]: Series topology for LOF: parallel bypass Gravity creates irresolvable pressure contradiction when H_bypass=H_ch; series avoids it; all energy balance assertions pass at 0.09% error
 - [v0.6 LOF]: LOF IC strategy: reference loop without Flapper/Inertia for KINSOL SS; D(T_open)=0 causes zero Jacobian if Flapper present in SteadyStateProblem
 - [v0.6 LOF]: LOF energy balance: max(T_cells)-T_inlet selects correct outlet in both forward flow (T[n]=top) and reversed flow (T[1]=bottom) without direction detection
+- [v0.6 LOF-02]: VAL-02 gravity-driven NC: series topology with HX temperature reset creates rho*g*L (~9700 Pa) NC driver, NOT buoyancy delta_rho*g*H (~40 Pa); use gravity-friction stability check (CV < 5%), not buoyancy analytical estimate
+- [v0.6 LOF-02]: Channel Dt term reverted: (L/A)*Dt(port_in.mdot) in _channel_base_eqs over-determines parallel 3-way junction systems (28 eq/27 unknowns); standalone Inertia component provides hydraulic inductance for series topology
+- [v0.6 LOF-02]: MTK parallel Channel limitation: any Channel with bidirectional instream() at a 3-way junction adds one extra Kirchhoff equation -> over-determined; use series topology or pure Resistor/Gravity for parallel paths
 
 ### Pending Todos
 
@@ -104,8 +108,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-21T13:35:08.288Z
-**Stopped at:** Completed 24.1-01-PLAN.md
+**Last session:** 2026-03-21T14:31:57.864Z
+**Stopped at:** Completed 24.1-02-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
 **Resume file:** None
 
