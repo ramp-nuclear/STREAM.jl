@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: unknown
-stopped_at: Completed 23-02-PLAN.md
-last_updated: "2026-03-20T19:05:05.922Z"
+stopped_at: Completed 24-01-PLAN.md
+last_updated: "2026-03-21T00:01:38.229Z"
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
+  completed_phases: 5
+  total_plans: 9
+  completed_plans: 9
 ---
 
 # STATE: STREAM.jl
@@ -23,15 +23,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-17)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 23 — flapper-solver-events
+**Current focus:** v0.6 complete — all 9 plans done
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: 24
-Plan: Not started
+Phase: 24 (loss-of-flow) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Plan: Not started
 | Phase 22-time-varying-pump P02 | 32 | 2 tasks | 6 files |
 | Phase 23-flapper-solver-events P01 | 9 | 2 tasks | 4 files |
 | Phase 23 P02 | 21 | 1 tasks | 1 files |
+| Phase 24-loss-of-flow P01 | 90 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Plan: Not started
 - [v0.6 FLAP-04]: ref_mdot has no equation inside Flapper -- user must wire flapper.ref_mdot ~ component.port_in.mdot during composition
 - [v0.6 FLAP-06]: Callable Pump(f(t)) cannot be used in same ODEProblem as Flapper (SymbolicContinuousCallback): MTK compile_equational_affect builds sub-ImplicitDiscreteProblem that cannot resolve callable parameter at build time; use Pump(0)+Inertia IC decay pattern for open-transition tests
 - [v0.6 FLAP-05]: Use threshold << expected steady-state mdot for closed-state tests (e.g. threshold=1e-6 vs mdot~1e-3); default threshold=0.01 > mdot through R_closed=1e8 Flapper, making test fragile
+- [v0.6 LOF]: Series topology for LOF: parallel bypass Gravity creates irresolvable pressure contradiction when H_bypass=H_ch; series avoids it; all energy balance assertions pass at 0.09% error
+- [v0.6 LOF]: LOF IC strategy: reference loop without Flapper/Inertia for KINSOL SS; D(T_open)=0 causes zero Jacobian if Flapper present in SteadyStateProblem
+- [v0.6 LOF]: LOF energy balance: max(T_cells)-T_inlet selects correct outlet in both forward flow (T[n]=top) and reversed flow (T[1]=bottom) without direction detection
 
 ### Pending Todos
 
@@ -99,8 +103,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-20T18:57:30.486Z
-**Stopped at:** Completed 23-02-PLAN.md
+**Last session:** 2026-03-21T00:01:38.225Z
+**Stopped at:** Completed 24-01-PLAN.md
 **Next action:** `/gsd:plan-phase 20`
 **Resume file:** None
 

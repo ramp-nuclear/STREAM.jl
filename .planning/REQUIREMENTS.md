@@ -44,8 +44,8 @@
 
 ### Validation
 
-- [ ] **VAL-01**: Loss-of-flow transient — forced-flow steady state, `dP_pump` ramps to 0, mdot crosses zero, Flapper opens, simulation continues to quasi-static natural circulation; asserts energy balance holds throughout
-- [ ] **VAL-02**: Natural circulation temperature rise matches analytical estimate using Elenbaas HTC within reasonable tolerance
+- [x] **VAL-01**: Loss-of-flow transient — forced-flow steady state, `dP_pump` ramps to 0, mdot crosses zero, Flapper opens, simulation continues to quasi-static natural circulation; asserts energy balance holds throughout
+- [x] **VAL-02**: Natural circulation temperature rise matches analytical estimate using Elenbaas HTC within reasonable tolerance
 
 ## Future Requirements
 
@@ -101,8 +101,8 @@
 | FLAP-05 | Phase 23 | Complete |
 | FLAP-06 | Phase 23 | Complete |
 | SOLV-01 | Phase 23 | Complete |
-| VAL-01 | Phase 24 | Pending |
-| VAL-02 | Phase 24 | Pending |
+| VAL-01 | Phase 24 | Complete |
+| VAL-02 | Phase 24 | Complete |
 
 **Coverage:**
 - v0.6 requirements: 21 total
