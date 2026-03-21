@@ -62,7 +62,7 @@ function HeatExchanger(; name, T_bc)
         port_in.mdot + port_out.mdot ~ 0,    # mass conservation
         port_in.P   - port_out.P    ~ 0,     # no pressure drop
         port_out.T  ~ T_bc,                   # inject fixed outlet temperature
-        port_in.T   ~ instream(port_out.T),   # backward stream (adiabatic)
+        port_in.T   ~ T_bc,                   # backward stream: also reset to T_bc
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end

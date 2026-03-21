@@ -88,13 +88,14 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     push!(eqs, T_out ~ T[n])
     push!(eqs, dP    ~ f_ch * (port_in.mdot * abs(port_in.mdot) /
                                 (2 * rho_water(T[i_mid]) * A^2)) * (L / Dh)
-                      + rho_water(T[i_mid]) * g_acc * L)
+                      + rho_water(T[i_mid]) * g_acc * L
+                      + (L / A) * Dt(port_in.mdot))
 
     # Port wiring
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
     push!(eqs, port_out.P - port_in.P ~ -dP)
     push!(eqs, port_out.T ~ T[n])
-    push!(eqs, port_in.T  ~ instream(port_out.T))
+    push!(eqs, port_in.T  ~ T[1])
 
     all_vars = [collect(T); collect(Re); collect(Nu);
                 collect(h_tc); collect(v); collect(q_wall);
@@ -153,13 +154,15 @@ function _channel_base_eqs(eqs::Vector{Equation};
     Re_mean = abs(port_in.mdot) * Dh / (A * mu_water(T[i_mid]))
     f_ch    = friction_correlation(Re_mean)
     push!(eqs, T_out ~ T[n])
+    Dt = Differential(t)
     push!(eqs, dP    ~ f_ch * (port_in.mdot * abs(port_in.mdot) /
                                 (2 * rho_water(T[i_mid]) * A^2)) * (L / Dh)
-                      + rho_water(T[i_mid]) * g_acc * L)
+                      + rho_water(T[i_mid]) * g_acc * L
+                      + (L / A) * Dt(port_in.mdot))
 
     # Port wiring (4 equations — identical across all channel variants)
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
     push!(eqs, port_out.P - port_in.P       ~ -dP)
     push!(eqs, port_out.T                   ~ T[n])
-    push!(eqs, port_in.T                    ~ instream(port_out.T))
+    push!(eqs, port_in.T                    ~ T[1])
 end

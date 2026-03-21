@@ -41,7 +41,6 @@ const T_guess_rev_sign = reverse(T_guess_fwd_sign)
         connect(bc.port_out,   ch.port_in),
         connect(ch.port_out,   pump.port_in),
         pump.port_in.P ~ 1.0e5,
-        ch.port_in.T   ~ T_inlet_sign,
         ch.thermal.T   ~ T_wall_sign,
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, ch)
@@ -87,7 +86,6 @@ end
         [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left,  i))) for i in 1:n_sign]...,
         [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n_sign]...,
         pump.port_in.P  ~ 1.0e5,
-        cac.port_in.T   ~ T_inlet_sign,
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys; fully_determined=false)
@@ -136,7 +134,6 @@ end
         connect(bc.port_out,   chf.port_in),
         connect(chf.port_out,  pump.port_in),
         pump.port_in.P ~ 1.0e5,
-        chf.port_in.T  ~ T_inlet_sign,
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, chf)
     ssys = mtkcompile(sys; fully_determined=false)

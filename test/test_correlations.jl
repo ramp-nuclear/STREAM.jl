@@ -109,7 +109,6 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         [connect(ct_l_phy02[i].thermal, getproperty(cac_phy02, Symbol(:thermal_left,  i))) for i in 1:n]...,
         [connect(ct_r_phy02[i].thermal, getproperty(cac_phy02, Symbol(:thermal_right, i))) for i in 1:n]...,
         pump_phy02.port_in.P ~ 1.0e5,
-        cac_phy02.port_in.T ~ T_inlet,
     ]
     @named sys_phy02 = compose(System(conns_phy02, t; name=:sys_phy02),
                                 pump_phy02, bc_phy02, cac_phy02, ct_l_phy02..., ct_r_phy02...)
@@ -152,7 +151,6 @@ end
         [connect(ct_l_phy03[i].thermal, getproperty(cac_phy03, Symbol(:thermal_left,  i))) for i in 1:n]...,
         [connect(ct_r_phy03[i].thermal, getproperty(cac_phy03, Symbol(:thermal_right, i))) for i in 1:n]...,
         pump_phy03.port_in.P ~ 1.0e5,
-        cac_phy03.port_in.T ~ T_inlet,
     ]
     @named sys_phy03 = compose(System(conns_phy03, t; name=:sys_phy03),
                                 pump_phy03, bc_phy03, cac_phy03, ct_l_phy03..., ct_r_phy03...)
@@ -200,7 +198,6 @@ end
         [connect(ct_l_lam[i].thermal, getproperty(cac_lam, Symbol(:thermal_left,  i))) for i in 1:n]...,
         [connect(ct_r_lam[i].thermal, getproperty(cac_lam, Symbol(:thermal_right, i))) for i in 1:n]...,
         pump_lam.port_in.P ~ 1.0e5,
-        cac_lam.port_in.T ~ T_inlet,
     ]
     @named sys_lam = compose(System(conns_lam, t; name=:sys_lam),
                               pump_lam, bc_lam, cac_lam, ct_l_lam..., ct_r_lam...)
@@ -240,7 +237,6 @@ end
         [connect(ct_l_turb[i].thermal, getproperty(cac_turb, Symbol(:thermal_left,  i))) for i in 1:n]...,
         [connect(ct_r_turb[i].thermal, getproperty(cac_turb, Symbol(:thermal_right, i))) for i in 1:n]...,
         pump_turb.port_in.P ~ 1.0e5,
-        cac_turb.port_in.T ~ T_inlet,
     ]
     @named sys_turb = compose(System(conns_turb, t; name=:sys_turb),
                                pump_turb, bc_turb, cac_turb, ct_l_turb..., ct_r_turb...)

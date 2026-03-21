@@ -32,7 +32,6 @@ import STREAM: dittus_boelter, blasius_friction, constant_Nusselt, laminar_frict
             connect(bc_qol.port_out,   ch_qol.port_in),
             connect(ch_qol.port_out,   pump_qol.port_in),
             pump_qol.port_in.P ~ 1.0e5,
-            ch_qol.port_in.T   ~ T_inlet_qol,
         ],
         [connect(ct_l_qol[i].thermal, getproperty(ch_qol, Symbol(:thermal_left,  i))) for i in 1:n_qol],
         [connect(ct_r_qol[i].thermal, getproperty(ch_qol, Symbol(:thermal_right, i))) for i in 1:n_qol],
@@ -76,7 +75,6 @@ end
         connect(hx_gm.port_out,   ch_gm.port_in),
         connect(ch_gm.port_out,   pump_gm.port_in),
         pump_gm.port_in.P ~ 1.0e5,
-        ch_gm.port_in.T   ~ 600.0,
         ch_gm.thermal.T   ~ 600.0,
     ]
     @named sys_gm = compose(System(conns_gm, t; name=:sys_gm), pump_gm, hx_gm, ch_gm)
@@ -116,7 +114,6 @@ const ps_comp   = ones(3, 3)  # uniform power shape, 3x3
         connect(hx_in.port_out,         plate_sys.cac.port_in),
         connect(plate_sys.cac.port_out, pump.port_in),
         pump.port_in.P          ~ 1.0e5,
-        plate_sys.cac.port_in.T ~ 600.0,
     ]
     @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, plate_sys)
     ssys = mtkcompile(top)
@@ -144,12 +141,10 @@ end
         connect(hx_l.port_out,             plate_sys.ch_l.port_in),
         connect(plate_sys.ch_l.port_out,   pump_l.port_in),
         pump_l.port_in.P                 ~ 1.0e5,
-        plate_sys.ch_l.port_in.T        ~ 600.0,
         connect(pump_r.port_out,           hx_r.port_in),
         connect(hx_r.port_out,             plate_sys.ch_r.port_in),
         connect(plate_sys.ch_r.port_out,   pump_r.port_in),
         pump_r.port_in.P                 ~ 1.0e5,
-        plate_sys.ch_r.port_in.T        ~ 600.0,
     ]
     @named top = compose(System(outer_conns, t; name=:top), pump_l, hx_l, pump_r, hx_r, plate_sys)
     ssys = mtkcompile(top)
@@ -172,7 +167,6 @@ end
             connect(hx_in.port_out,        osc_sys.ch.port_in),
             connect(osc_sys.ch.port_out,   pump.port_in),
             pump.port_in.P               ~ 1.0e5,
-            osc_sys.ch.port_in.T         ~ 600.0,
         ]
         @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, osc_sys)
         ssys = mtkcompile(top)
@@ -206,7 +200,6 @@ end
         connect(p1.cac1.port_out, p2.cac2.port_in),
         connect(p2.cac2.port_out, pump.port_in),
         pump.port_in.P         ~ 1.0e5,
-        p1.cac1.port_in.T     ~ 600.0,
     ]
     reactor = compose_systems(p1, p2, pump, hx_in; connections=cross_conns, name=:reactor)
     ssys = mtkcompile(reactor)
@@ -232,7 +225,6 @@ end
         connect(hx_cp.port_out,              plate_cp.cac_cp.port_in),
         connect(plate_cp.cac_cp.port_out,    pump_cp.port_in),
         pump_cp.port_in.P                  ~ 1.0e5,
-        plate_cp.cac_cp.port_in.T          ~ T_in_cp,
     ]
     @named top_cp = compose(System(outer_cp, t; name=:top_cp), pump_cp, hx_cp, plate_cp)
     ssys_cp = mtkcompile(top_cp)

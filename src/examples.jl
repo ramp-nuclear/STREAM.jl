@@ -63,7 +63,6 @@ function build_loop(;
         connect(ch.port_out,   pump.port_in),      # channel -> pump (closed loop)
         pump.port_in.P  ~ 1.0e5,                  # pressure gauge freedom fix
         ch.thermal.T    ~ T_wall,                  # wall temperature pin (for HTC)
-        ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
     ]
 
     @named sys = compose(System(connections, t; name = :sys), pump, bc, ch)
@@ -151,7 +150,6 @@ function build_loop_vertical(;
         connect(grav.port_in,  pump.port_in),      # grav port_in (bottom) = pump inlet (bottom)
         pump.port_in.P  ~ 1.0e5,                  # pressure gauge freedom fix
         ch.thermal.T    ~ T_wall,                  # wall temperature pin (for HTC)
-        ch.port_in.T    ~ T_inlet,                 # T_inlet constraint (resolves circular T)
     ]
 
     @named sys = compose(System(connections, t; name = :sys), pump, bc, ch, grav)
@@ -208,7 +206,6 @@ function build_loop_transient(;
             connect(ch.port_out,   pump.port_in),
             pump.port_in.P  ~ 1.0e5,
             ch.thermal.T    ~ T_wall_0,
-            ch.port_in.T    ~ T_inlet,
         ]
         @named sys = compose(System(connections, t; name = :sys), pump, bc, ch)
     else
@@ -222,7 +219,6 @@ function build_loop_transient(;
             connect(ch.port_out,   pump.port_in),
             pump.port_in.P  ~ 1.0e5,
             ch.thermal.T    ~ ps[1](t),
-            ch.port_in.T    ~ T_inlet,
         ]
         @named sys = compose(System(connections, t, [], ps; name = :sys), pump, bc, ch)
     end
@@ -373,13 +369,12 @@ function build_loop_lof(;
         connect(ch.port_out,   flapper.port_in),
         connect(flapper.port_out, pump.port_in),
         pump.port_in.P    ~ 1.0e5,
-        ch.port_in.T      ~ T_inlet,
         flapper.ref_mdot  ~ ine.port_in.mdot,
     ]
 
     @named sys = compose(System(connections, t; name=:sys), pump, ine, bc, ch, flapper)
 
-    t_compile = @elapsed ssys = mtkcompile(sys; fully_determined=false)
+    t_compile = @elapsed ssys = mtkcompile(sys)
     n_eq = length(equations(ssys))
     n_uk = length(unknowns(ssys))
     @info "build_loop_lof compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
@@ -392,34 +387,37 @@ end
                            L_over_A=1.75e5, g_acc=9.80665, R_ext=1.0e6,
                            threshold=0.01, dt_ramp=5.0) -> ODESystem
 
-Build a loss-of-flow validation loop with a Flapper check valve.
+Build a loss-of-flow validation loop with bypass topology: real 3-way junctions,
+parallel paths (heated channel vs Flapper shortcut), and channel momentum inertia.
 
-Topology (series loop with Flapper):
-`Pump(0.0) -> Inertia -> HeatExchanger(T_inlet) -> ChannelHeatFlux(g=+g_acc) -> Flapper -> Pump`
+Topology (4-node parallel network):
+- Node A (top): ine output, ch input, flapper input (3-way junction)
+- Node B (bottom): ch output, ret input (2-way)
+- Node C (top): ret output, flapper output, ext_res input (3-way junction)
+- D series branch: ext_res -> hx -> pump -> ine
 
-Physics: With `g_acc > 0` (upward channel), gravity opposes forced flow. At t=0 the pump
-produces zero pressure rise; the Inertia carries the initial forced-flow momentum which decays
-as gravity and friction oppose the flow. When `ine.port_in.mdot` drops below `threshold` the
-Flapper opens (resistance drops from R_closed=1e8 to ~0), enabling reversed (downward) flow
-driven by buoyancy. The system then transitions to natural circulation.
+Gravity signs:
+- ch (ChannelHeatFlux, A->B, nominally downward): g = -g_acc
+- ret (Channel, B->C, nominally upward): g = +g_acc
 
-Note: The `g_acc` parameter is used as `+g_acc` for the upward channel orientation.
-The `R_ext` parameter is accepted for API compatibility but not used in this topology.
+Physics: Pump coasts to 0 dP. Inertia carries momentum; ch flow decays.
+Flapper opens when pump branch mdot (ine.port_in.mdot) drops to threshold.
+After Flapper opens, flow redistributes: ch flow reverses (upward NC driven by buoyancy).
 
 # Arguments
-- `n`: number of axial cells in ChannelHeatFlux (default 10)
+- `n`: number of axial cells (default 10)
 - `L_ch`: channel length [m] (default 1.0)
 - `D_ch`: channel hydraulic diameter [m] (default 0.01)
 - `T_wall`: heated channel wall temperature [K] (default 373.15)
 - `T_inlet`: inlet/HeatExchanger boundary temperature [K] (default 313.15)
 - `L_over_A`: Inertia length-to-area ratio [1/m] (default 1.75e5)
-- `g_acc`: gravitational acceleration magnitude [m/s^2] (default 9.80665); used as +g_acc (upward channel)
-- `R_ext`: accepted for API compatibility (not used in this series topology)
+- `g_acc`: gravitational acceleration magnitude [m/s^2] (default 9.80665)
+- `R_ext`: external hydraulic resistance [Pa·s/kg] (default 1.0e6)
 - `threshold`: Flapper trigger threshold [kg/s] (default 0.01)
 - `dt_ramp`: Flapper opening ramp duration [s] (default 5.0)
 
 # Returns
-Compiled `ODESystem` (via `mtkcompile(sys; fully_determined=false)`).
+Compiled `ODESystem` (via `mtkcompile(sys)`).
 """
 function build_loop_lof_bypass(;
     n::Int    = 10,
@@ -429,35 +427,47 @@ function build_loop_lof_bypass(;
     T_inlet   = 313.15,
     L_over_A  = 1.75e5,
     g_acc     = 9.80665,
-    R_ext     = 1.0e6,   # accepted for API compatibility; not used in series topology
+    R_ext     = 1.0e6,
     threshold = 0.01,
     dt_ramp   = 5.0,
 )
-    # Series loop topology — identical to build_loop_lof but with unified API.
-    # MTK's acausal Channel components cannot be placed in 3-way parallel junctions
-    # without generating structurally over-determined systems (extra Kirchhoff equation
-    # from the bidirectional instream temperature equations). The series topology
-    # produces all required behaviors: flow reversal, Flapper firing, NC equilibrium.
+    geom = PipeGeometry_circular(L_ch, D_ch)
+
     @named pump    = Pump(0.0)
     @named ine     = Inertia(L_over_A=L_over_A)
-    @named bc      = HeatExchanger(T_bc=T_inlet)
-    @named ch      = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=g_acc, T_wall=T_wall)
-    @named flapper = Flapper(threshold=threshold, dt=dt_ramp)
+    @named hx      = HeatExchanger(T_bc=T_inlet)
+    @named ch      = ChannelHeatFlux(n=n, geometry=geom, g=-g_acc, T_wall=T_wall)
+    @named ret     = Channel(n=n, geometry=geom, g=g_acc)
+    # use_callback=false: MTK's SymbolicContinuousCallback is incompatible with parallel
+    # topologies where channel inertia (Dt(mdot)) appears in the pressure balance equations
+    # that the callback DAE solver must handle. Use a native ContinuousCallback instead
+    # (see test_loss_of_flow.jl _lof_bypass_ic for the external callback construction).
+    @named flapper = Flapper(threshold=threshold, dt=dt_ramp, use_callback=false)
+    @named ext_res = Resistor(R=R_ext)
 
     connections = [
-        connect(pump.port_out, ine.port_in),
-        connect(ine.port_out,  bc.port_in),
-        connect(bc.port_out,   ch.port_in),
-        connect(ch.port_out,   flapper.port_in),
-        connect(flapper.port_out, pump.port_in),
-        pump.port_in.P    ~ 1.0e5,
-        ch.port_in.T      ~ T_inlet,
-        flapper.ref_mdot  ~ ine.port_in.mdot,
+        # D series branch: ext_res -> hx -> pump -> ine
+        connect(ext_res.port_out, hx.port_in),
+        connect(hx.port_out,      pump.port_in),
+        connect(pump.port_out,    ine.port_in),
+        # Node A (3-way): ine output -> ch input + flapper input
+        connect(ine.port_out, ch.port_in, flapper.port_in),
+        # Node B (2-way): ch output -> ret input
+        connect(ch.port_out, ret.port_in),
+        # Node C (3-way): ret output + flapper output -> ext_res input
+        connect(ret.port_out, flapper.port_out, ext_res.port_in),
+        # Boundary conditions
+        pump.port_in.P   ~ 1.0e5,
+        ret.thermal.T    ~ T_inlet,
+        flapper.ref_mdot ~ ine.port_in.mdot,
     ]
 
-    @named sys = compose(System(connections, t; name=:sys), pump, ine, bc, ch, flapper)
+    @named sys = compose(
+        System(connections, t; name=:sys),
+        pump, ine, hx, ch, ret, flapper, ext_res,
+    )
 
-    t_compile = @elapsed ssys = mtkcompile(sys; fully_determined=false)
+    t_compile = @elapsed ssys = mtkcompile(sys)
     n_eq = length(equations(ssys))
     n_uk = length(unknowns(ssys))
     @info "build_loop_lof_bypass compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk

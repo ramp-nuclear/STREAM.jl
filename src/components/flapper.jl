@@ -3,7 +3,7 @@
 using ModelingToolkit: SymbolicContinuousCallback
 
 """
-    Flapper(; name, dt=5.0, threshold=0.01, R_closed=1e8, R_open=100.0) -> System
+    Flapper(; name, dt=5.0, threshold=0.01, R_closed=1e8, R_open=100.0, use_callback=true) -> System
 
 Flapper check-valve component with a continuous event trigger. When the wired reference
 mass flow `ref_mdot` drops below `threshold`, the event fires and latches `T_open` to the
@@ -22,12 +22,21 @@ flapper.ref_mdot ~ pump.port_in.mdot
 ```
 `mtkcompile` will error if this equation is omitted (under-determined system).
 
+When `use_callback=false`, the `SymbolicContinuousCallback` is omitted from the component.
+This is required for parallel (multi-path) topologies where channel momentum inertia terms
+`(L/A)*Dt(mdot)` appear in the pressure balance equations that MTK's callback DAE solver
+would need to handle — causing an `UnsolvableCallbackError`. In that case, supply an
+external `DifferentialEquations.ContinuousCallback` that directly sets `T_open` in the
+ODE state vector, and pass it via `solve_transient(...; callbacks=cb)`.
+
 # Arguments
 - `name`: system name (Symbol), injected by `@named` macro
 - `dt`: ramp duration [s]; time for resistance to transition from closed to open (default: 5.0)
 - `threshold`: mass flow threshold [kg/s]; event fires when `ref_mdot` drops below this value (default: 0.01)
 - `R_closed`: closed-state hydraulic resistance [Pa·s/kg]; high resistance keeps valve shut (default: 1e8)
 - `R_open`: open-state hydraulic resistance [Pa·s/kg]; low resistance after valve opens (default: 100.0)
+- `use_callback`: register MTK `SymbolicContinuousCallback` (default: `true`); set to `false`
+  for parallel topologies where channel inertia causes `UnsolvableCallbackError`
 
 # Ports
 - `port_in`: `FlowPort` — inlet (pressure, mass flow, temperature)
@@ -38,7 +47,8 @@ Uncompiled `System`. Call `mtkcompile(sys; fully_determined=false)` before solvi
 standalone Flapper (since `ref_mdot` is underdetermined alone), or compose it into a full
 system where `ref_mdot` is wired.
 """
-function Flapper(; name, dt = 5.0, threshold = 0.01, R_closed = 1e8, R_open = 100.0)
+function Flapper(; name, dt = 5.0, threshold = 0.01, R_closed = 1e8, R_open = 100.0,
+                   use_callback = true)
     pars = @parameters begin
         dt        = dt
         threshold = threshold
@@ -50,15 +60,6 @@ function Flapper(; name, dt = 5.0, threshold = 0.01, R_closed = 1e8, R_open = 10
 
     @named port_in  = FlowPort()
     @named port_out = FlowPort()
-
-    # Continuous event: fires when ref_mdot drops below threshold (downward crossing).
-    # affect = nothing  → ignore upward crossing (ref_mdot rises above threshold)
-    # affect_neg fires  → downward crossing (ref_mdot drops below threshold); latch T_open
-    cb = SymbolicContinuousCallback(
-        [ref_mdot - threshold ~ 0],
-        nothing;
-        affect_neg = [T_open ~ t]
-    )
 
     D = Differential(t)
 
@@ -72,5 +73,17 @@ function Flapper(; name, dt = 5.0, threshold = 0.01, R_closed = 1e8, R_open = 10
         # ref_mdot has no equation here -- user wires it during composition
     ]
 
-    compose(System(eqs, t, vars, pars; name = name, continuous_events = [cb]), port_in, port_out)
+    if use_callback
+        # Continuous event: fires when ref_mdot drops below threshold (downward crossing).
+        # affect = nothing  → ignore upward crossing (ref_mdot rises above threshold)
+        # affect_neg fires  → downward crossing (ref_mdot drops below threshold); latch T_open
+        cb = SymbolicContinuousCallback(
+            [ref_mdot - threshold ~ 0],
+            nothing;
+            affect_neg = [T_open ~ t]
+        )
+        compose(System(eqs, t, vars, pars; name = name, continuous_events = [cb]), port_in, port_out)
+    else
+        compose(System(eqs, t, vars, pars; name = name), port_in, port_out)
+    end
 end

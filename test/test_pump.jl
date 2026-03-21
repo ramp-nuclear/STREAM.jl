@@ -28,12 +28,12 @@ import STREAM: Pump, Channel
         connect(bc5.port_out,   ch5.port_in),
         connect(ch5.port_out,   pump5.port_in),
         pump5.port_in.P ~ 1e5,
-        ch5.port_in.T  ~ 313.15,
         ch5.thermal.T  ~ 350.0,   # pin wall temperature (adiabatic not needed; mdot0 drives flow)
     ]
     @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
     ssys5 = mtkcompile(sys5; fully_determined=false)
-    op5 = [ssys5.ch5.T[i] => 313.15 for i in 1:5]
+    op5 = Pair{Any,Any}[ssys5.ch5.port_in.mdot => 0.6]
+    append!(op5, [ssys5.ch5.T[i] => 313.15 for i in 1:5])
     sol5 = solve_steady(ssys5, op5)
     @test sol5.retcode == ReturnCode.Success
     @test isapprox(sol5[ssys5.pump5.port_in.mdot], 0.6; rtol=1e-4)
@@ -74,7 +74,6 @@ end
         connect(bc_r.port_out,   ch_r.port_in),
         connect(ch_r.port_out,   pump_r.port_in),
         pump_r.port_in.P ~ 1e5,
-        ch_r.port_in.T  ~ 313.15,
         ch_r.thermal.T  ~ 350.0,
     ]
     @named sys_r = compose(System(conns_r, t; name=:pump02_loop), pump_r, bc_r, ch_r)

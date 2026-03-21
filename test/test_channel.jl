@@ -13,7 +13,7 @@ end
 @testset "COMP-01: Channel equation count" begin
     @named ch = Channel(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     energy_eqs = filter(eq -> occursin("Differential", string(eq)), equations(ch))
-    @test length(energy_eqs) == 5  # 5 energy balance ODEs (one per cell)
+    @test length(energy_eqs) == 6  # 5 energy balance ODEs + 1 inertia dP equation
 end
 
 @testset "COMP-01: Channel mtkcompile" begin
@@ -148,7 +148,6 @@ end
         connect(bc_chf.port_out, chf.port_in),
         connect(chf.port_out, pump_chf.port_in),
         pump_chf.port_in.P ~ 1.0e5,
-        chf.port_in.T ~ T_inlet,
     ]
     @named sys_chf = compose(System(conns_chf, t; name=:sys_chf), pump_chf, bc_chf, chf)
     ssys_chf = mtkcompile(sys_chf)
@@ -171,7 +170,6 @@ end
         [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left,  i))) for i in 1:n]...,
         [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
         pump_cac.port_in.P ~ 1.0e5,
-        cac.port_in.T ~ T_inlet,
     ]
     @named sys_cac = compose(System(conns_cac, t; name=:sys_cac), pump_cac, bc_cac, cac, ct_l..., ct_r...)
     ssys_cac = mtkcompile(sys_cac)
@@ -201,7 +199,6 @@ end
         connect(cac2.port_out, pump2.port_in),
         [connect(ct2[i].thermal, getproperty(cac2, Symbol(:thermal_left, i))) for i in 1:n]...,
         pump2.port_in.P ~ 1.0e5,
-        cac2.port_in.T ~ T_inlet,
     ]
     @named sys2 = compose(System(conns2, t; name=:sys2), pump2, bc2, cac2, ct2...)
     ssys2 = mtkcompile(sys2; fully_determined=false)
@@ -264,7 +261,6 @@ end
         connect(bc.port_out, chf.port_in),
         connect(chf.port_out, pump.port_in),
         pump.port_in.P ~ 1.0e5,
-        chf.port_in.T  ~ T_inlet,
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, chf)
     ssys = mtkcompile(sys)
