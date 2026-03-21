@@ -200,7 +200,7 @@ Plans:
 | 21. Fluid Properties & Natural Convection | 2/2 | Complete    | 2026-03-17 | - |
 | 22. Time-Varying Pump | 2/2 | Complete    | 2026-03-18 | - |
 | 23. Flapper & Solver Events | v0.6 | 2/2 | Complete    | 2026-03-20 |
-| 24. Loss-of-Flow Validation | v0.6 | 1/1 | Complete   | 2026-03-21 |
+| 24. Loss-of-Flow Validation | v0.6 | 1/1 | Complete    | 2026-03-21 |
 | 25. Argument Structure Audit | v0.6 | 0/1 | Not started | - |
 
 ---

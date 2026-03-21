@@ -4,7 +4,7 @@ milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: unknown
 stopped_at: Completed 24-01-PLAN.md
-last_updated: "2026-03-21T00:01:38.229Z"
+last_updated: "2026-03-21T00:19:32.545Z"
 progress:
   total_phases: 6
   completed_phases: 5
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 24 (loss-of-flow) — EXECUTING
-Plan: 1 of 1
+Phase: 25
+Plan: Not started
 
 ## Performance Metrics
 
