@@ -386,3 +386,90 @@ function build_loop_lof(;
 
     return ssys
 end
+
+"""
+    build_loop_lof_bypass(; n=10, L_ch=1.0, D_ch=0.01, T_wall=373.15, T_inlet=313.15,
+                           L_over_A=1.75e5, g_acc=9.80665, R_ext=1.0e6,
+                           threshold=0.01, dt_ramp=5.0) -> ODESystem
+
+Build a loss-of-flow validation loop with bypass topology: real junctions, parallel paths
+(heated channel vs Flapper shortcut), and channel momentum inertia.
+
+Topology (4-node parallel network):
+- Node A (top): Pump+Inertia output, ChannelHeatFlux input, Flapper input
+- Node B (bottom): ChannelHeatFlux output, return Channel input
+- Node C (top): return Channel output, Flapper output, external Resistor input
+- Node D: external Resistor output, HeatExchanger, Pump input
+
+Parallel paths between A and C:
+- Long path (nominal): A -> ChannelHeatFlux (down) -> B -> Channel (up) -> C
+- Short path (bypass): A -> Flapper -> C
+
+# Arguments
+- `n`: number of axial cells in channels (default 10)
+- `L_ch`: channel length [m] (default 1.0)
+- `D_ch`: channel hydraulic diameter [m] (default 0.01)
+- `T_wall`: heated channel wall temperature [K] (default 373.15)
+- `T_inlet`: inlet/HeatExchanger boundary temperature [K] (default 313.15)
+- `L_over_A`: Inertia length-to-area ratio [1/m] (default 1.75e5)
+- `g_acc`: gravitational acceleration magnitude [m/s^2] (default 9.80665)
+- `R_ext`: external resistance [Pa*s/kg] (default 1.0e6)
+- `threshold`: Flapper trigger threshold [kg/s] (default 0.01)
+- `dt_ramp`: Flapper opening ramp duration [s] (default 5.0)
+
+# Returns
+Compiled `ODESystem` (via `mtkcompile`).
+"""
+function build_loop_lof_bypass(;
+    n::Int    = 10,
+    L_ch      = 1.0,
+    D_ch      = 0.01,
+    T_wall    = 373.15,
+    T_inlet   = 313.15,
+    L_over_A  = 1.75e5,
+    g_acc     = 9.80665,
+    R_ext     = 1.0e6,
+    threshold = 0.01,
+    dt_ramp   = 5.0,
+)
+    geom = PipeGeometry_circular(L_ch, D_ch)
+
+    # Components
+    @named pump    = Pump(0.0)
+    @named ine     = Inertia(L_over_A=L_over_A)
+    @named hx      = HeatExchanger(T_bc=T_inlet)
+    @named ch      = ChannelHeatFlux(n=n, geometry=geom, g=-g_acc, T_wall=T_wall)
+    @named ret     = Channel(n=n, geometry=geom, g=g_acc)
+    @named flapper = Flapper(threshold=threshold, dt=dt_ramp)
+    @named ext_res = Resistor(R=R_ext)
+
+    connections = [
+        # D -> A: pump branch (series)
+        connect(ext_res.port_out, hx.port_in),
+        connect(hx.port_out,     pump.port_in),
+        connect(pump.port_out,   ine.port_in),
+        # Node A: ine output -> ch input + flapper input (3-way junction)
+        connect(ine.port_out, ch.port_in, flapper.port_in),
+        # Node B: ch output -> ret input (2-way)
+        connect(ch.port_out, ret.port_in),
+        # Node C: ret output + flapper output -> ext_res input (3-way junction)
+        connect(ret.port_out, flapper.port_out, ext_res.port_in),
+        # Boundary conditions
+        pump.port_in.P    ~ 1.0e5,       # pressure gauge anchor
+        ch.port_in.T      ~ T_inlet,     # forced T inlet (breaks circular T)
+        ret.thermal.T     ~ T_inlet,     # unheated return pipe wall BC
+        flapper.ref_mdot  ~ ine.port_in.mdot,   # trigger wiring
+    ]
+
+    @named sys = compose(
+        System(connections, t; name=:sys),
+        pump, ine, hx, ch, ret, flapper, ext_res,
+    )
+
+    t_compile = @elapsed ssys = mtkcompile(sys; fully_determined=false)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "build_loop_lof_bypass compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    return ssys
+end
