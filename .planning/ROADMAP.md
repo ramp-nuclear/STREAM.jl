@@ -170,7 +170,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 24.1-01-PLAN.md — Channel momentum inertia + build_loop_lof_bypass topology
+- [x] 24.1-01-PLAN.md — Channel momentum inertia + build_loop_lof_bypass topology
 - [ ] 24.1-02-PLAN.md — Bypass LOF transient tests and NC validation
 
 ### Phase 25: Argument Structure Audit
@@ -218,7 +218,7 @@ Plans:
 | 22. Time-Varying Pump | 2/2 | Complete    | 2026-03-18 | - |
 | 23. Flapper & Solver Events | v0.6 | 2/2 | Complete    | 2026-03-20 |
 | 24. Loss-of-Flow Validation | v0.6 | 1/1 | Complete    | 2026-03-21 |
-| 24.1. Bypass LOF Topology | v0.6 | 0/2 | Not started | - |
+| 24.1. Bypass LOF Topology | v0.6 | 1/2 | In Progress|  |
 | 25. Argument Structure Audit | v0.6 | 0/1 | Not started | - |
 
 ---
