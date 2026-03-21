@@ -362,7 +362,7 @@ end
 
     prob_v01 = ODEProblem(ssys_v01, op_ic_v01, tspan_v01; warn_initialize_determined=false)
     sol_v01 = solve(prob_v01, Rodas5P(); initializealg=SciMLBase.NoInit(),
-                    saveat=t_checkpoints)
+                    reltol=1e-6, abstol=1e-8, saveat=t_checkpoints)
     @test sol_v01.retcode == ReturnCode.Success
 
     # Assert T_center at each checkpoint vs Fourier series
