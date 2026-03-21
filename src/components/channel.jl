@@ -88,7 +88,8 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     push!(eqs, T_out ~ T[n])
     push!(eqs, dP    ~ f_ch * (port_in.mdot * abs(port_in.mdot) /
                                 (2 * rho_water(T[i_mid]) * A^2)) * (L / Dh)
-                      + rho_water(T[i_mid]) * g_acc * L)
+                      + rho_water(T[i_mid]) * g_acc * L
+                      + (L / A) * Dt(port_in.mdot))
 
     # Port wiring
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
@@ -131,6 +132,8 @@ function _channel_base_eqs(eqs::Vector{Equation};
     observed_mode        = false,
     T_wall_cells         = nothing)
 
+    Dt = Differential(t)
+
     for i in 1:n
         if observed_mode
             # Re, Nu, v become observed variables (not solver unknowns).
@@ -155,7 +158,8 @@ function _channel_base_eqs(eqs::Vector{Equation};
     push!(eqs, T_out ~ T[n])
     push!(eqs, dP    ~ f_ch * (port_in.mdot * abs(port_in.mdot) /
                                 (2 * rho_water(T[i_mid]) * A^2)) * (L / Dh)
-                      + rho_water(T[i_mid]) * g_acc * L)
+                      + rho_water(T[i_mid]) * g_acc * L
+                      + (L / A) * Dt(port_in.mdot))
 
     # Port wiring (4 equations — identical across all channel variants)
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
