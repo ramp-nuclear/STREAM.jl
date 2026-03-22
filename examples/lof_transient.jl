@@ -39,6 +39,9 @@ using Plots
 using Statistics
 using Printf
 
+# mm unit for plot margins — sourced from Plots' internal dependency
+const mm = Plots.PlotMeasures.mm
+
 ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
 gr()
 
@@ -307,310 +310,484 @@ println("=" ^ 70)
 println()
 
 # =============================================================================
-# SECTION 7: Create output directory
-# =============================================================================
-
-outdir = "examples/output/lof_transient"
-mkpath(outdir)
-println("Output directory: $outdir")
-
-# Helper: build viridis-like color gradient for n lines
-function cell_colors(n)
-    [RGB(1-i/n, 0.3+0.4*(i/n), i/n) for i in 1:n]
-end
-
-# Helper: vertical event annotations using annotate! (avoids GR BoundsError
-# that occurs when mixing 2-element series with 3001-element series in same axes).
-# Draws a label at the top of the plot at the event time.
-function add_event_vlines!(p, fire_t, open_t, t_range; ymin=-1e12, ymax=1e12)
-    # Use annotate! with a vertical text marker at the event times.
-    # We also overlay a thin 3-element series (x=[t, t, t], y=[y1, 0.5*(y1+y2), y2])
-    # using enough points to avoid GR's padding check triggering on length mismatch.
-    # Simplest robust approach: construct a NaN-padded full-length series.
-    n_pts = length(t_range)
-    t_vec_full = collect(t_range)
-
-    function _vline_series(t_event, y_lo, y_hi)
-        # Build a series that is NaN everywhere except at the closest time index
-        # where it draws a 3-point spike: [y_lo, y_hi, NaN] pattern repeated.
-        # We find the closest 3 consecutive indices around t_event.
-        idx = argmin(abs.(t_vec_full .- t_event))
-        y_series = fill(NaN, n_pts)
-        # Place a 2-point up-down spike at idx
-        if idx > 1
-            y_series[idx-1] = y_lo
-        end
-        y_series[idx] = y_hi
-        return t_vec_full, y_series
-    end
-
-    if !isnan(fire_t) && fire_t >= t_range[1] && fire_t <= t_range[end]
-        # Use annotate! for the label
-        try
-            annotate!(p, fire_t, 0.0, Plots.text("fire", 7, :orange, :left))
-        catch
-        end
-    end
-    if !isnan(open_t) && open_t >= t_range[1] && open_t <= t_range[end]
-        try
-            annotate!(p, open_t, 0.0, Plots.text("open", 7, :red, :left))
-        catch
-        end
-    end
-end
-
-# =============================================================================
-# SECTION 8: Time-series plots
-# =============================================================================
-
-# -----------------------------------------------------------------------
-# Plot 1 — Mass flow rates
+# SECTION 7: Output directories and helpers
 #
-# Physical behavior to expect:
-#   - All mdot start at mdot_ss (positive = downward forced flow).
-#   - After pump trip: ine.mdot decays (Inertia coastdown).
-#   - ch.mdot follows ine.mdot initially (all flow through ch-ret with flapper closed).
-#   - At t_fire: flapper opens; flow redistributes between ch and flapper paths.
-#   - ch.mdot crosses zero and goes negative (upward NC flow).
-#   - ret.mdot also reverses (follows ch by mass conservation through Node B).
-#   - mdot_ine approaches zero (pump is off, ext_res path carries tiny flow).
-# -----------------------------------------------------------------------
-println("Generating Plot 1: Mass flow rates...")
-p1 = plot(t_vec, mdot_ch;
-    label="ch (heated, ChannelHeatFlux)",
+# Plots are organized into 4 sub-folders by time scale / purpose:
+#   01_overview/            — full 0-300s: orientation and big picture
+#   02_transition_0to60s/   — zoomed 0-60s: the critical action window
+#   03_nc_equilibrium/      — 200-300s: NC plateau, verify steady NC values
+#   04_spatial_profiles/    — spatial snapshots + 2D heatmap (cell × time)
+# =============================================================================
+
+outdir_base  = "examples/output/lof_transient"
+dir_overview = joinpath(outdir_base, "01_overview")
+dir_trans    = joinpath(outdir_base, "02_transition_0to60s")
+dir_nc       = joinpath(outdir_base, "03_nc_equilibrium")
+dir_spatial  = joinpath(outdir_base, "04_spatial_profiles")
+
+for d in [dir_overview, dir_trans, dir_nc, dir_spatial]
+    mkpath(d)
+end
+println("Output directories created under: $outdir_base/")
+println()
+
+# Color gradient for n cells: blue (cell 1, port_in side) → red (cell n, port_out side)
+colors_cells = range(colorant"navy", stop=colorant"firebrick", length=n)
+
+# Add vertical event lines to a plot for flapper fire / fully-open events.
+# tmin/tmax gate which lines are drawn (skip if outside the plot's x window).
+function add_events!(p;
+        tfire = flapper_fire_time,
+        topen = flapper_open_time,
+        tmin  = -Inf,
+        tmax  = Inf)
+    if !isnan(tfire) && tmin <= tfire <= tmax
+        vline!(p, [tfire];
+            color=:darkorange, lw=2, ls=:dash,
+            label="flapper fires ($(round(tfire; digits=2))s)")
+    end
+    if !isnan(topen) && tmin <= topen <= tmax
+        vline!(p, [topen];
+            color=:red, lw=1.5, ls=:dot,
+            label="fully open ($(round(topen; digits=2))s)")
+    end
+    return p
+end
+
+# Return indices of t_vec that fall in [t_lo, t_hi]
+wmask(t_lo, t_hi) = findall(x -> t_lo <= x <= t_hi, t_vec)
+
+# =============================================================================
+# SECTION 8: Overview plots (0–300s)
+#
+# Purpose: orient the reader. Everything important is compressed here, but
+# these plots confirm the big-picture sequence: forced flow → NC.
+# =============================================================================
+println("=== 01_overview (0–300s) ===")
+
+# --- 8a. Mass flows: 4-panel, each component on its own y-axis ---------------
+# Separate panels avoid the "everything hidden under ine spike" problem.
+# Physical: ine decays from mdot_ss → ~0; ch and ret reverse sign; flapper
+# path appears after valve opens and carries a fraction of the NC flow.
+println("  01_flow_all_components.png")
+
+p8a_ch = plot(t_vec, mdot_ch;
+    ylabel="ch [kg/s]", label="ch (heated)", lw=2, color=:royalblue,
+    title="LOF Bypass — Mass Flows (0-300s)")
+hline!(p8a_ch, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
+add_events!(p8a_ch)
+
+p8a_ret = plot(t_vec, mdot_ret;
+    ylabel="ret [kg/s]", label="ret (return)", lw=2, color=:forestgreen)
+hline!(p8a_ret, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
+add_events!(p8a_ret)
+
+p8a_ine = plot(t_vec, mdot_ine;
+    ylabel="ine [kg/s]", label="ine (pump branch)", lw=2, color=:gray)
+hline!(p8a_ine, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
+add_events!(p8a_ine)
+
+p8a_flap = plot(t_vec, mdot_flap;
+    xlabel="Time [s]", ylabel="flapper [kg/s]",
+    label="flapper path", lw=2, color=:purple, ls=:dash)
+hline!(p8a_flap, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
+add_events!(p8a_flap)
+
+pov_flow = plot(p8a_ch, p8a_ret, p8a_ine, p8a_flap;
+    layout=(4, 1), size=(1000, 900), dpi=150,
+    left_margin=8mm, right_margin=5mm, bottom_margin=3mm)
+savefig(pov_flow, joinpath(dir_overview, "01_flow_all_components.png"))
+
+# --- 8b. ch + ret on same axes (shows anti-symmetric reversal clearly) -------
+println("  02_flow_ch_ret.png")
+p8b = plot(t_vec, mdot_ch;
+    label="ch (heated)", lw=2.5, color=:royalblue,
     xlabel="Time [s]", ylabel="Mass flow [kg/s]",
-    title="LOF Bypass: Mass Flow Rates",
-    linewidth=2, color=:blue, size=(900, 600), dpi=150, legend=:topright)
-plot!(p1, t_vec, mdot_ret;  label="ret (return, Channel)", linewidth=2, color=:green)
-plot!(p1, t_vec, mdot_flap; label="flapper path",          linewidth=2, color=:purple, linestyle=:dash)
-plot!(p1, t_vec, mdot_ine;  label="ine (pump branch)",     linewidth=2, color=:gray)
-plot!(p1, t_vec, zeros(length(t_vec)); linestyle=:dot, color=:black, linewidth=1, label=nothing)  # zero reference
-add_event_vlines!(p1, flapper_fire_time, flapper_open_time, t_vec)
-savefig(p1, "$outdir/01_mass_flow_rates.png")
+    title="LOF Bypass: ch and ret Mass Flows (0-300s)\n(positive = port_in→port_out, negative = reversed)",
+    size=(1000, 500), dpi=150)
+plot!(p8b, t_vec, mdot_ret; label="ret (return)", lw=2.5, color=:forestgreen)
+hline!(p8b, [0.0]; color=:black, lw=1, ls=:dot, label="zero")
+add_events!(p8b)
+savefig(p8b, joinpath(dir_overview, "02_flow_ch_ret.png"))
 
-# -----------------------------------------------------------------------
-# Plot 2 — Channel (heated) cell temperatures over time
-#
-# Physical behavior:
-#   - At t=0: T_ch[i] = T_ss[i] (hot cells from SS, T_ss[n] ~highest).
-#   - After pump trip: forced flow stops; cells cool if mdot goes to zero temporarily,
-#     then reheat as NC reversed flow heats them from the bottom (cell 1) up.
-#   - At NC: T_ch[1] becomes highest (top of upward-flowing heated channel).
-#     In NC with reversed flow, cell 1 is the outlet of the heated channel.
-# -----------------------------------------------------------------------
-println("Generating Plot 2: Channel temperatures...")
-colors2 = range(colorant"blue", stop=colorant"red", length=n)
-p2 = plot(; xlabel="Time [s]", ylabel="Temperature [K]",
-    title="LOF Bypass: Heated Channel (ch) Cell Temperatures",
-    size=(900, 600), dpi=150, legend=:outerright)
+# --- 8c. ch cell temperatures overview (T[1]..T[n] all 300s) ----------------
+# Physical: At SS T[n] is hottest (outlet); at NC T[1] is hottest (reversed flow).
+println("  03_temperatures_ch.png")
+p8c = plot(; xlabel="Time [s]", ylabel="Temperature [K]",
+    title="LOF Bypass: Heated Channel (ch) Cell Temperatures — Overview (0-300s)\n(blue=cell 1, red=cell 10; reversed during NC)",
+    size=(1000, 600), dpi=150, legend=:right)
 for i in 1:n
-    plot!(p2, t_vec, T_ch[i]; label="T[$i]", linewidth=1.5, color=colors2[i])
+    plot!(p8c, t_vec, T_ch[i]; label="T[$i]", lw=1.5, color=colors_cells[i])
 end
-add_event_vlines!(p2, flapper_fire_time, flapper_open_time, t_vec)
-savefig(p2, "$outdir/02_channel_temperatures.png")
+add_events!(p8c)
+savefig(p8c, joinpath(dir_overview, "03_temperatures_ch.png"))
 
-# -----------------------------------------------------------------------
-# Plot 3 — Return channel (ret) cell temperatures over time
-#
-# Physical behavior:
-#   - ret is a Channel (not ChannelHeatFlux) with thermal BC pinned to T_inlet.
-#   - In NC: ret carries cold water (from HX at T_inlet) downward (B->C).
-#   - ret.T[i] stays near T_inlet throughout (effective heat removal by HX).
-# -----------------------------------------------------------------------
-println("Generating Plot 3: Return channel temperatures...")
-p3 = plot(; xlabel="Time [s]", ylabel="Temperature [K]",
-    title="LOF Bypass: Return Channel (ret) Cell Temperatures",
-    size=(900, 600), dpi=150, legend=:outerright)
-for i in 1:n
-    plot!(p3, t_vec, T_ret[i]; label="T[$i]", linewidth=1.5, color=colors2[i])
-end
-add_event_vlines!(p3, flapper_fire_time, flapper_open_time, t_vec)
-savefig(p3, "$outdir/03_return_temperatures.png")
-
-# -----------------------------------------------------------------------
-# Plot 4 — Heat flux per cell in heated channel
-#
-# Physical behavior:
-#   - q_wall[i] = h_tc[i] * heated_perimeter * dz * (T_wall - T[i])
-#   - At SS: all cells positive (T_wall > T[i]), more heat in cooler (early) cells.
-#   - During coastdown: mdot drops -> Re drops -> h_tc drops -> q_wall drops.
-#   - At NC: flow reversed; cell 1 (coolest in NC inlet) has highest q_wall again.
-# -----------------------------------------------------------------------
-println("Generating Plot 4: Heat flux per cell...")
-p4 = plot(; xlabel="Time [s]", ylabel="Heat flux [W]",
-    title="LOF Bypass: Heated Channel Wall Heat Flux per Cell",
-    size=(900, 600), dpi=150, legend=:outerright)
-for i in 1:n
-    plot!(p4, t_vec, q_wall_ch[i]; label="q[$i]", linewidth=1.5, color=colors2[i])
-end
-add_event_vlines!(p4, flapper_fire_time, flapper_open_time, t_vec)
-savefig(p4, "$outdir/04_heat_flux.png")
-
-# -----------------------------------------------------------------------
-# Plot 5 — Reynolds numbers per cell
-#
-# Physical behavior:
-#   - At SS: Re > 2300 (forced convection, turbulent).
-#   - During coastdown: Re drops as mdot decays.
-#   - At NC: Re << SS value (mdot_nc << mdot_ss -> laminar or low-turbulent regime).
-#   - All cells have the same Re (same mdot, same geometry — Re varies only via T[i]).
-# -----------------------------------------------------------------------
-println("Generating Plot 5: Reynolds numbers...")
-p5 = plot(; xlabel="Time [s]", ylabel="Reynolds number [-]",
-    title="LOF Bypass: Heated Channel Reynolds Number per Cell",
-    size=(900, 600), dpi=150, legend=:outerright)
-for i in 1:n
-    plot!(p5, t_vec, Re_ch[i]; label="Re[$i]", linewidth=1.5, color=colors2[i])
-end
-plot!(p5, t_vec, fill(2300.0, length(t_vec)); linestyle=:dash, color=:black, linewidth=1, label="Re=2300 (lam/turb)")
-add_event_vlines!(p5, flapper_fire_time, flapper_open_time, t_vec)
-savefig(p5, "$outdir/05_reynolds.png")
-
-# -----------------------------------------------------------------------
-# Plot 6 — Heat transfer coefficient (HTC) per cell
-#
-# Physical behavior:
-#   - HTC follows Re (Dittus-Boelter: Nu ~ Re^0.8 Pr^0.4 -> h_tc ~ Re^0.8).
-#   - Drops sharply during coastdown as Re decreases.
-#   - At NC: low Re -> low HTC, but significant heating still occurs due to
-#     long residence time (low mdot through long channel).
-# -----------------------------------------------------------------------
-println("Generating Plot 6: HTC...")
-p6 = plot(; xlabel="Time [s]", ylabel="HTC [W/(m^2·K)]",
-    title="LOF Bypass: Heated Channel HTC per Cell",
-    size=(900, 600), dpi=150, legend=:outerright)
-for i in 1:n
-    plot!(p6, t_vec, htc_ch[i]; label="h[$i]", linewidth=1.5, color=colors2[i])
-end
-add_event_vlines!(p6, flapper_fire_time, flapper_open_time, t_vec)
-savefig(p6, "$outdir/06_htc.png")
-
-# -----------------------------------------------------------------------
-# Plot 7 — Flapper state (xi and T_open)
-#
-# Physical behavior:
-#   - xi = clamp((t - T_open) / dt_ramp, 0, 1) — smooth cubic ramp from 0 to 1.
-#   - Before firing: T_open = 1e30 -> xi = 0 (valve fully closed).
-#   - After firing: T_open latched to t_fire -> xi ramps from 0 to 1 over dt_ramp.
-#   - T_open display clamped to [0, 300] for readability (sentinel 1e30 not shown).
-# -----------------------------------------------------------------------
-println("Generating Plot 7: Flapper state...")
-T_open_display = clamp.(T_open_arr, 0.0, 300.0)   # sentinel -> 300 (off-chart)
-p7a = plot(t_vec, xi_arr;
-    ylabel="xi (opening fraction)", title="Flapper Opening State",
-    linewidth=2, color=:purple, label="xi",
-    ylims=(-0.05, 1.1), size=(900, 300), dpi=150)
-add_event_vlines!(p7a, flapper_fire_time, flapper_open_time, t_vec)
-
-p7b = plot(t_vec, T_open_display;
-    xlabel="Time [s]", ylabel="T_open [s]",
-    title="Flapper T_open (latch time; 300 = sentinel/not fired)",
-    linewidth=2, color=:orange, label="T_open (clamped)",
-    size=(900, 300), dpi=150)
-
-p7 = plot(p7a, p7b; layout=(2,1), size=(900, 600), dpi=150)
-savefig(p7, "$outdir/07_flapper_state.png")
-
-# -----------------------------------------------------------------------
-# Plot 8 — Pressure drops
-#
-# Physical behavior:
-#   - At SS: dP_ch > 0 (friction + gravity head for downward flow).
-#   - During coastdown: dP decreases as mdot decreases.
-#   - At NC: dP_ch changes sign (buoyancy drives reversed flow).
-#   - dP_ret opposes NC flow (gravity opposes upward return).
-# -----------------------------------------------------------------------
-println("Generating Plot 8: Pressure drops...")
-p8 = plot(t_vec, dP_ch;
-    label="ch dP (heated)", xlabel="Time [s]", ylabel="Pressure drop [Pa]",
-    title="LOF Bypass: Channel Pressure Drops",
-    linewidth=2, color=:blue, size=(900, 600), dpi=150, legend=:topright)
-plot!(p8, t_vec, dP_ret; label="ret dP (return)", linewidth=2, color=:green)
-plot!(p8, t_vec, zeros(length(t_vec)); linestyle=:dot, color=:black, linewidth=1, label=nothing)
-add_event_vlines!(p8, flapper_fire_time, flapper_open_time, t_vec)
-savefig(p8, "$outdir/08_pressure_drops.png")
+# --- 8d. Flapper xi overview (confirms xi=0→1 transition) -------------------
+println("  04_flapper_xi.png")
+p8d = plot(t_vec, xi_arr;
+    xlabel="Time [s]", ylabel="ξ (opening fraction)",
+    title="Flapper Check Valve Opening State (0-300s)\n(ξ=0: closed, ξ=1: fully open)",
+    lw=2.5, color=:purple, label="ξ", ylims=(-0.05, 1.1),
+    size=(900, 400), dpi=150)
+add_events!(p8d)
+savefig(p8d, joinpath(dir_overview, "04_flapper_xi.png"))
 
 # =============================================================================
-# SECTION 9: Spatial profile snapshots
+# SECTION 9: Transition plots (0–60s) — the critical action window
 #
-# Three time slices: t=0 (SS), t~flapper_fire (transition), t=300s (NC).
-# Spatial axis = cell index 1..n (1 = port_in side under positive flow,
-#                                  but becomes "outlet" under reversed NC flow).
+# The flapper fires at ~t_fire (sub-second to a few seconds depending on L_over_A).
+# Flow reversal and NC onset all happen before t≈60s. These zoomed plots show
+# the details that are completely invisible in 0-300s views.
 # =============================================================================
+println()
+println("=== 02_transition_0to60s ===")
 
-# Pick snapshot indices
-idx_t0   = 1
-idx_fire = isnan(flapper_fire_time) ? div(length(t_vec), 2) :
-           argmin(abs.(t_vec .- flapper_fire_time))
-idx_end  = length(t_vec)
+t_trans_hi = 60.0
+idx_t  = wmask(0.0, t_trans_hi)
+tv_t   = t_vec[idx_t]
+mch_t  = mdot_ch[idx_t]
+mret_t = mdot_ret[idx_t]
+mine_t = mdot_ine[idx_t]
+mflap_t = mdot_flap[idx_t]
+xi_t   = xi_arr[idx_t]
+dPch_t = dP_ch[idx_t]
+dPret_t = dP_ret[idx_t]
+Tch_t   = [T_ch[i][idx_t]     for i in 1:n]
+Tret_t  = [T_ret[i][idx_t]    for i in 1:n]
+Re_t    = [Re_ch[i][idx_t]    for i in 1:n]
+htc_t   = [htc_ch[i][idx_t]   for i in 1:n]
+qw_t    = [q_wall_ch[i][idx_t] for i in 1:n]
 
-t_labels = [
-    "t=0s (SS)",
-    isnan(flapper_fire_time) ? "t=$(round(t_vec[idx_fire]; digits=1))s" :
-        "t=$(round(flapper_fire_time; digits=1))s (fire)",
-    "t=300s (NC)",
-]
-snap_indices = [idx_t0, idx_fire, idx_end]
-snap_colors  = [:blue, :orange, :red]
+# --- 9a. ch and ret flows — reversal with zero-crossing annotated ------------
+# This is the most important plot: shows ch going negative (NC reversed flow).
+println("  01_flow_ch_ret_zoom.png")
+p9a = plot(tv_t, mch_t;
+    label="ch (heated)", lw=2.5, color=:royalblue,
+    xlabel="Time [s]", ylabel="Mass flow [kg/s]",
+    title="LOF Bypass: ch and ret Flow — Transition 0–$(Int(t_trans_hi))s\n(ch crosses zero = flow reversal; negative = upward NC)",
+    size=(1000, 500), dpi=150)
+plot!(p9a, tv_t, mret_t; label="ret (return)", lw=2.5, color=:forestgreen)
+hline!(p9a, [0.0]; color=:black, lw=1, ls=:dot, label="zero")
 
+# Annotate ch zero-crossing
+if any(mch_t .< 0)
+    idx_cross = findfirst(mch_t .< 0)
+    if !isnothing(idx_cross)
+        t_cross = tv_t[idx_cross]
+        vline!(p9a, [t_cross];
+            color=:royalblue, lw=1.5, ls=:dashdot,
+            label="ch reverses ($(round(t_cross; digits=1))s)")
+    end
+end
+add_events!(p9a; tmin=0.0, tmax=t_trans_hi)
+savefig(p9a, joinpath(dir_trans, "01_flow_ch_ret_zoom.png"))
+
+# --- 9b. All 4 flows, 2-panel layout ----------------------------------------
+println("  02_flow_all_zoom.png")
+p9b_top = plot(tv_t, mch_t;
+    label="ch", lw=2, color=:royalblue,
+    ylabel="ch / ret [kg/s]",
+    title="LOF Bypass: All Flows — Transition 0–$(Int(t_trans_hi))s")
+plot!(p9b_top, tv_t, mret_t; label="ret", lw=2, color=:forestgreen)
+hline!(p9b_top, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
+add_events!(p9b_top; tmin=0.0, tmax=t_trans_hi)
+
+p9b_bot = plot(tv_t, mine_t;
+    label="ine (pump branch)", lw=2, color=:gray,
+    xlabel="Time [s]", ylabel="ine / flapper [kg/s]")
+plot!(p9b_bot, tv_t, mflap_t; label="flapper path", lw=2, color=:purple, ls=:dash)
+hline!(p9b_bot, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
+add_events!(p9b_bot; tmin=0.0, tmax=t_trans_hi)
+
+p9b = plot(p9b_top, p9b_bot;
+    layout=(2, 1), size=(1000, 700), dpi=150,
+    left_margin=8mm, right_margin=5mm)
+savefig(p9b, joinpath(dir_trans, "02_flow_all_zoom.png"))
+
+# --- 9c. Flapper xi zoomed on the opening event -----------------------------
+println("  03_flapper_xi_zoom.png")
+t_xi_hi = isnan(flapper_fire_time) ? 20.0 : min(flapper_fire_time + 15.0, t_trans_hi)
+idx_xi = wmask(0.0, t_xi_hi)
+p9c = plot(t_vec[idx_xi], xi_arr[idx_xi];
+    xlabel="Time [s]", ylabel="ξ (opening fraction)",
+    title="Flapper Opening Event — Zoomed (0–$(round(t_xi_hi; digits=1))s)\n(Hermite cubic ramp over dt_ramp=$(dt_ramp)s)",
+    lw=2.5, color=:purple, label="ξ",
+    ylims=(-0.05, 1.1), size=(900, 420), dpi=150)
+add_events!(p9c; tmin=0.0, tmax=t_xi_hi)
+savefig(p9c, joinpath(dir_trans, "03_flapper_xi_zoom.png"))
+
+# --- 9d. ch temperatures during transition ----------------------------------
+# Watch for the temperature dip (mdot → 0, heat accumulates) then
+# re-stratification in the reversed NC direction.
+println("  04_temperatures_ch_zoom.png")
+p9d = plot(; xlabel="Time [s]", ylabel="Temperature [K]",
+    title="LOF Bypass: Heated Channel (ch) Temperatures — Transition 0–$(Int(t_trans_hi))s\n(blue=cell 1 / inlet forward, red=cell 10 / outlet forward)",
+    size=(1000, 600), dpi=150, legend=:right)
+for i in 1:n
+    plot!(p9d, tv_t, Tch_t[i]; label="T[$i]", lw=1.5, color=colors_cells[i])
+end
+add_events!(p9d; tmin=0.0, tmax=t_trans_hi)
+savefig(p9d, joinpath(dir_trans, "04_temperatures_ch_zoom.png"))
+
+# --- 9e. Wall heat flux during transition ------------------------------------
+# Q_wall = h_tc * perimeter * dz * (T_wall - T[i]). Drops sharply with Re.
+# Small bump after flapper opens as flow re-establishes.
+println("  05_heat_flux_zoom.png")
+p9e = plot(; xlabel="Time [s]", ylabel="Heat flux per cell [W]",
+    title="LOF Bypass: Channel Wall Heat Flux — Transition 0–$(Int(t_trans_hi))s",
+    size=(1000, 600), dpi=150, legend=:right)
+for i in 1:n
+    plot!(p9e, tv_t, qw_t[i]; label="q[$i]", lw=1.5, color=colors_cells[i])
+end
+add_events!(p9e; tmin=0.0, tmax=t_trans_hi)
+savefig(p9e, joinpath(dir_trans, "05_heat_flux_zoom.png"))
+
+# --- 9f. Re and HTC on log scale — shows laminar/turbulent transition --------
+# Log scale reveals both the high-Re forced-flow regime and the low-Re NC regime.
+# Dittus-Boelter: Nu ~ Re^0.8 → HTC ~ Re^0.8 → ratio ~40-100x between regimes.
+println("  06_re_htc_log_zoom.png")
+# Use mid-channel cell (cell 5) as representative; all cells behave similarly.
+Re5_pos  = max.(Re_t[5],  1.0)   # floor at 1 to avoid log(0) issues
+htc5_pos = max.(htc_t[5], 1.0)
+
+p9f_re = plot(tv_t, Re5_pos;
+    ylabel="Re [-] (cell 5, log₁₀)", yscale=:log10,
+    title="LOF Bypass: Re and HTC Log Scale — Transition 0–$(Int(t_trans_hi))s\n(Dittus-Boelter regime: HTC ∝ Re^0.8; NC Re << SS Re)",
+    lw=2, color=:steelblue, label="Re (cell 5)", size=(1000, 700), dpi=150)
+hline!(p9f_re, [2300.0]; color=:black, lw=1, ls=:dash, label="Re=2300 (lam/turb)")
+add_events!(p9f_re; tmin=0.0, tmax=t_trans_hi)
+
+p9f_htc = plot(tv_t, htc5_pos;
+    xlabel="Time [s]", ylabel="HTC [W/m²K] (cell 5, log₁₀)", yscale=:log10,
+    lw=2, color=:firebrick, label="HTC (cell 5)")
+add_events!(p9f_htc; tmin=0.0, tmax=t_trans_hi)
+
+p9f = plot(p9f_re, p9f_htc;
+    layout=(2, 1), size=(1000, 700), dpi=150,
+    left_margin=12mm, right_margin=5mm)
+savefig(p9f, joinpath(dir_trans, "06_re_htc_log_zoom.png"))
+
+# --- 9g. Pressure drops during transition ------------------------------------
+# dP_ch sign reversal: positive under forced downward flow, negative at NC
+# (gravity head drives reversed upward flow). dP_ret is always positive (gravity
+# opposes the return upward leg). Together their sum drives the NC loop.
+println("  07_pressure_drops_zoom.png")
+p9g = plot(tv_t, dPch_t;
+    label="ch dP (heated channel)", lw=2, color=:royalblue,
+    xlabel="Time [s]", ylabel="Pressure drop [Pa]",
+    title="LOF Bypass: Channel Pressure Drops — Transition 0–$(Int(t_trans_hi))s\n(ch sign flips at NC; ch+ret buoyancy difference drives NC loop)",
+    size=(1000, 500), dpi=150)
+plot!(p9g, tv_t, dPret_t; label="ret dP (return channel)", lw=2, color=:forestgreen)
+hline!(p9g, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
+add_events!(p9g; tmin=0.0, tmax=t_trans_hi)
+savefig(p9g, joinpath(dir_trans, "07_pressure_drops_zoom.png"))
+
+# =============================================================================
+# SECTION 10: NC equilibrium plots (200–300s)
+#
+# Purpose: verify that NC has settled to a steady state. Flat lines confirm
+# equilibrium. Annotate with the mean NC mdot and temperature values.
+# =============================================================================
+println()
+println("=== 03_nc_equilibrium (200–300s) ===")
+
+t_nc_lo = 200.0
+idx_nc   = wmask(t_nc_lo, 300.0)
+tv_nc    = t_vec[idx_nc]
+mch_nc   = mdot_ch[idx_nc]
+mret_nc  = mdot_ret[idx_nc]
+mflap_nc = mdot_flap[idx_nc]
+mine_nc  = mdot_ine[idx_nc]
+Tch_nc   = [T_ch[i][idx_nc]      for i in 1:n]
+qw_nc    = [q_wall_ch[i][idx_nc] for i in 1:n]
+Re_nc    = [Re_ch[i][idx_nc]     for i in 1:n]
+htc_nc   = [htc_ch[i][idx_nc]    for i in 1:n]
+
+mdot_nc_mean = mean(abs.(mch_nc))
+
+# --- 10a. NC flow rates (all components) ------------------------------------
+# ch.mdot < 0 (upward NC), ret.mdot > 0 (downward return), ine ≈ 0, flapper > 0.
+println("  01_nc_flow.png")
+p10a = plot(tv_nc, mch_nc;
+    label="ch (heated, upward NC → negative)", lw=2.5, color=:royalblue,
+    xlabel="Time [s]", ylabel="Mass flow [kg/s]",
+    title="LOF Bypass: Natural Circulation Mass Flows (200–300s)\nNC |mdot| = $(round(mdot_nc_mean; digits=5)) kg/s  ($(round(100*mdot_nc_mean/mdot_ss; digits=1))% of SS)",
+    size=(1000, 500), dpi=150)
+plot!(p10a, tv_nc, mret_nc;  label="ret (return, downward NC → positive)", lw=2.5, color=:forestgreen)
+plot!(p10a, tv_nc, mflap_nc; label="flapper path",                         lw=1.5, color=:purple, ls=:dash)
+plot!(p10a, tv_nc, mine_nc;  label="ine (pump branch, ≈ 0)",               lw=1.5, color=:gray,   ls=:dot)
+hline!(p10a, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
+savefig(p10a, joinpath(dir_nc, "01_nc_flow.png"))
+
+# --- 10b. NC channel temperatures -- should be flat, T[1] hottest -----------
+# In reversed NC flow: cell 1 is the outlet (top of upward ch); hottest.
+# Cell n is the inlet (bottom, coolest fluid entering from ret/HX side).
+println("  02_nc_temperatures_ch.png")
+T_nc_max_mean = mean(Tch_nc[1])   # cell 1 = outlet in NC = hottest
+p10b = plot(; xlabel="Time [s]", ylabel="Temperature [K]",
+    title="LOF Bypass: Heated Channel Temperatures at NC Equilibrium (200–300s)\n(cell 1 = outlet under NC; T_max ≈ $(round(T_nc_max_mean - 273.15; digits=1)) °C)",
+    size=(1000, 600), dpi=150, legend=:right)
+for i in 1:n
+    plot!(p10b, tv_nc, Tch_nc[i]; label="T[$i]", lw=1.5, color=colors_cells[i])
+end
+savefig(p10b, joinpath(dir_nc, "02_nc_temperatures_ch.png"))
+
+# --- 10c. NC wall heat flux per cell -----------------------------------------
+# q_wall is small but nonzero at NC. Spatial variation shows which cells are
+# most active. In NC with reversed flow, cell 1 (coolest inlet-side) has highest q.
+println("  03_nc_heat_flux.png")
+p10c = plot(; xlabel="Time [s]", ylabel="Heat flux per cell [W]",
+    title="LOF Bypass: Channel Wall Heat Flux at NC Equilibrium (200–300s)",
+    size=(1000, 600), dpi=150, legend=:right)
+for i in 1:n
+    plot!(p10c, tv_nc, qw_nc[i]; label="q[$i]", lw=1.5, color=colors_cells[i])
+end
+savefig(p10c, joinpath(dir_nc, "03_nc_heat_flux.png"))
+
+# --- 10d. NC Reynolds and HTC (2-panel) --------------------------------------
+# Re should be well below 2300 (laminar NC). HTC is low but finite.
+println("  04_nc_re_htc.png")
+Re_nc_mid  = Re_nc[5]
+htc_nc_mid = htc_nc[5]
+Re_nc_mean = mean(Re_nc_mid)
+p10d_re = plot(tv_nc, Re_nc_mid;
+    ylabel="Re [-] (cell 5)",
+    title="LOF Bypass: Re and HTC at NC Equilibrium (200–300s)\nRe ≈ $(round(Int, Re_nc_mean))  ($(Re_nc_mean < 2300 ? "laminar" : "turbulent"))",
+    lw=2, color=:steelblue, label="Re (cell 5)")
+hline!(p10d_re, [2300.0]; color=:black, lw=1, ls=:dash, label="Re=2300")
+p10d_htc = plot(tv_nc, htc_nc_mid;
+    xlabel="Time [s]", ylabel="HTC [W/m²K] (cell 5)",
+    lw=2, color=:firebrick, label="HTC (cell 5)")
+p10d = plot(p10d_re, p10d_htc;
+    layout=(2, 1), size=(900, 700), dpi=150,
+    left_margin=8mm)
+savefig(p10d, joinpath(dir_nc, "04_nc_re_htc.png"))
+
+# =============================================================================
+# SECTION 11: Spatial profile snapshots
+#
+# Show how the temperature (and heat flux) profile along the channel evolves
+# from SS → coastdown → reversal → NC. Multiple time snapshots reveal:
+#   - Forward SS: T increases cell 1→n (inlet to outlet)
+#   - During reversal: flat or dip as mdot → 0
+#   - NC: T increases cell n→1 (reversed direction; cell 1 is now the outlet)
+# =============================================================================
+println()
+println("=== 04_spatial_profiles ===")
+
+# Snapshot times: spread across the entire transient
+snap_times_target = [0.0, 0.5, 2.0, 10.0, 30.0, 100.0, 200.0, 300.0]
+snap_times_target = filter(t -> t <= t_vec[end], snap_times_target)
+snap_idx = [argmin(abs.(t_vec .- tt)) for tt in snap_times_target]
+snap_t   = [t_vec[i] for i in snap_idx]
+n_snaps  = length(snap_idx)
+
+# Color: early times = cool blue, late times = warm red
+snap_colors_range = range(colorant"steelblue", stop=colorant"darkred", length=n_snaps)
 cell_axis = 1:n
 
-# -----------------------------------------------------------------------
-# Plot 9 — Temperature spatial profiles at three snapshots
-#
-# Physical: At SS, T increases monotonically from cell 1 to n (coolant heats up).
-#           At NC: T increases from n to 1 (reversed flow heats from bottom cell upward).
-# -----------------------------------------------------------------------
-println("Generating Plot 9: Temperature spatial profiles...")
-p9 = plot(; xlabel="Cell index", ylabel="Temperature [K]",
-    title="LOF Bypass: Temperature Profiles at Key Times",
-    size=(900, 600), dpi=150, legend=:topleft)
-for (k, idx) in enumerate(snap_indices)
+# --- 11a. ch Temperature spatial profiles ------------------------------------
+println("  01_temperature_ch_multitime.png")
+p11a = plot(; xlabel="Cell index (1=Node A, n=Node B)", ylabel="Temperature [K]",
+    title="LOF Bypass: ch Temperature Profile at Key Times\n(gradient inversion = NC flow reversal established)",
+    size=(1000, 650), dpi=150, legend=:outerright)
+for (k, idx) in enumerate(snap_idx)
     T_snap = [T_ch[i][idx] for i in 1:n]
-    plot!(p9, cell_axis, T_snap; label=t_labels[k], linewidth=2, color=snap_colors[k],
-          marker=:circle, markersize=4)
+    lbl = "t=$(round(snap_t[k]; digits=1))s"
+    plot!(p11a, cell_axis, T_snap;
+        label=lbl, lw=2, color=snap_colors_range[k],
+        marker=:circle, markersize=5)
 end
-savefig(p9, "$outdir/09_temperature_profiles.png")
+savefig(p11a, joinpath(dir_spatial, "01_temperature_ch_multitime.png"))
 
-# -----------------------------------------------------------------------
-# Plot 10 — Reynolds number spatial profiles at three snapshots
-#
-# Physical: At SS, Re is nearly uniform (same mdot, slight variation via T[i]).
-#           At NC: Re much lower (mdot_nc << mdot_ss).
-# -----------------------------------------------------------------------
-println("Generating Plot 10: Reynolds spatial profiles...")
-p10 = plot(; xlabel="Cell index", ylabel="Reynolds number [-]",
-    title="LOF Bypass: Reynolds Profiles at Key Times",
-    size=(900, 600), dpi=150, legend=:topright)
-for (k, idx) in enumerate(snap_indices)
-    Re_snap = [Re_ch[i][idx] for i in 1:n]
-    plot!(p10, cell_axis, Re_snap; label=t_labels[k], linewidth=2, color=snap_colors[k],
-          marker=:circle, markersize=4)
+# --- 11b. ret Temperature spatial profiles -----------------------------------
+println("  02_temperature_ret_multitime.png")
+p11b = plot(; xlabel="Cell index (1=Node B, n=Node C)", ylabel="Temperature [K]",
+    title="LOF Bypass: ret Temperature Profile at Key Times\n(ret stays near T_inlet=$(T_inlet-273.15)°C — HX removes heat)",
+    size=(1000, 650), dpi=150, legend=:outerright)
+for (k, idx) in enumerate(snap_idx)
+    T_snap = [T_ret[i][idx] for i in 1:n]
+    lbl = "t=$(round(snap_t[k]; digits=1))s"
+    plot!(p11b, cell_axis, T_snap;
+        label=lbl, lw=2, color=snap_colors_range[k],
+        marker=:circle, markersize=5)
 end
-plot!(p10, collect(cell_axis), fill(2300.0, n); linestyle=:dash, color=:black, linewidth=1, label="Re=2300")
-savefig(p10, "$outdir/10_reynolds_profiles.png")
+savefig(p11b, joinpath(dir_spatial, "02_temperature_ret_multitime.png"))
 
-# -----------------------------------------------------------------------
-# Plot 11 — HTC spatial profiles at three snapshots
-#
-# Physical: HTC tracks Re^0.8, so same trend as Re profiles.
-# -----------------------------------------------------------------------
-println("Generating Plot 11: HTC spatial profiles...")
-p11 = plot(; xlabel="Cell index", ylabel="HTC [W/(m^2·K)]",
-    title="LOF Bypass: HTC Profiles at Key Times",
-    size=(900, 600), dpi=150, legend=:topright)
-for (k, idx) in enumerate(snap_indices)
-    htc_snap = [htc_ch[i][idx] for i in 1:n]
-    plot!(p11, cell_axis, htc_snap; label=t_labels[k], linewidth=2, color=snap_colors[k],
-          marker=:circle, markersize=4)
+# --- 11c. ch Heat flux spatial profiles --------------------------------------
+println("  03_heat_flux_ch_multitime.png")
+p11c = plot(; xlabel="Cell index", ylabel="Heat flux per cell [W]",
+    title="LOF Bypass: ch Wall Heat Flux Profile at Key Times\n(q ∝ HTC × (T_wall - T_cell); drops sharply with Re at coastdown)",
+    size=(1000, 650), dpi=150, legend=:outerright)
+for (k, idx) in enumerate(snap_idx)
+    q_snap = [q_wall_ch[i][idx] for i in 1:n]
+    lbl = "t=$(round(snap_t[k]; digits=1))s"
+    plot!(p11c, cell_axis, q_snap;
+        label=lbl, lw=2, color=snap_colors_range[k],
+        marker=:circle, markersize=5)
 end
-savefig(p11, "$outdir/11_htc_profiles.png")
+savefig(p11c, joinpath(dir_spatial, "03_heat_flux_ch_multitime.png"))
 
+# --- 11d. 2D temperature heatmap (cell index × time) ------------------------
+# Best single plot for understanding the spatio-temporal temperature evolution.
+# Color encodes temperature; x=time, y=cell index.
+# Visually shows: SS gradient → gradient collapse → gradient inversion at NC.
+println("  04_temperature_heatmap_ch.png")
+
+# Subsample time to ~600 points for a clean, readable heatmap
+sub_step = max(1, div(length(t_vec), 600))
+idx_sub  = 1:sub_step:length(t_vec)
+t_sub    = t_vec[idx_sub]
+# Matrix: rows = cells (1..n), cols = time (subsampled); values in °C
+T_matrix = Float64[T_ch[i][j] - 273.15 for i in 1:n, j in idx_sub]
+
+p11d = heatmap(t_sub, 1:n, T_matrix;
+    xlabel="Time [s]",
+    ylabel="Cell index\n(1=Node A under forward flow)",
+    title="LOF Bypass: Heated Channel Temperature [°C] (cell × time)\n(gradient inversion shows NC reversal)",
+    c=:hot, colorbar_title=" T [°C]",
+    size=(1100, 500), dpi=150,
+    left_margin=5mm, right_margin=20mm, bottom_margin=5mm, top_margin=5mm)
+if !isnan(flapper_fire_time)
+    vline!(p11d, [flapper_fire_time];
+        color=:cyan, lw=2.5, ls=:dash,
+        label="flapper fires ($(round(flapper_fire_time; digits=2))s)")
+end
+savefig(p11d, joinpath(dir_spatial, "04_temperature_heatmap_ch.png"))
+
+# =============================================================================
+# SECTION 12: Final summary
+# =============================================================================
 println()
-println("All plots saved to: $outdir/")
-println("Files generated:")
-for f in sort(readdir(outdir))
-    println("  $outdir/$f")
-end
+println("=" ^ 70)
+println("ALL PLOTS SAVED")
+println("=" ^ 70)
+println()
+println("  01_overview/                        (0–300s, big picture)")
+println("    01_flow_all_components.png        4-panel: each mdot separately")
+println("    02_flow_ch_ret.png                ch vs ret reversal, full time")
+println("    03_temperatures_ch.png            all cell temps, full time")
+println("    04_flapper_xi.png                 flapper opening, full time")
+println()
+println("  02_transition_0to60s/               (key action window)")
+println("    01_flow_ch_ret_zoom.png           reversal + zero-crossing annotated")
+println("    02_flow_all_zoom.png              2-panel, all components")
+println("    03_flapper_xi_zoom.png            opening event, tight zoom")
+println("    04_temperatures_ch_zoom.png       cell temps during transition")
+println("    05_heat_flux_zoom.png             wall heat flux during transition")
+println("    06_re_htc_log_zoom.png            Re & HTC log scale (lam/turb)")
+println("    07_pressure_drops_zoom.png        dP sign flip at NC onset")
+println()
+println("  03_nc_equilibrium/                  (200–300s, NC plateau)")
+println("    01_nc_flow.png                    NC mdot values + flat lines")
+println("    02_nc_temperatures_ch.png         cell temps at NC equilibrium")
+println("    03_nc_heat_flux.png               wall heat flux at NC")
+println("    04_nc_re_htc.png                  Re & HTC at NC (laminar check)")
+println()
+println("  04_spatial_profiles/")
+println("    01_temperature_ch_multitime.png   ch T vs cell, 8 time snapshots")
+println("    02_temperature_ret_multitime.png  ret T vs cell, 8 time snapshots")
+println("    03_heat_flux_ch_multitime.png     q_wall vs cell, 8 snapshots")
+println("    04_temperature_heatmap_ch.png     2D: cell×time heatmap (best overview)")
 println()
 println("Done.")
