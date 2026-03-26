@@ -82,6 +82,7 @@ Full phase details: `.planning/milestones/v0.5-ROADMAP.md`
 - [x] **Phase 24: Loss-of-Flow Validation** - Validate full loss-of-flow transient end-to-end against analytical expectations (completed 2026-03-21)
 - [x] **Phase 24.1: Bypass LOF Topology** - Replace series-loop LOF model with real bypass topology (junctions, parallel paths, channel momentum inertia, natural circulation) (completed 2026-03-21)
 - [x] **Phase 25: Argument Structure Audit** - Sweep all public functions and constructors, replace keyword-only where positional + multiple dispatch is more idiomatic Julia (completed 2026-03-26)
+- [ ] **Phase 26: NC Regime HTC + LOF Cleanup** - Wire NC detection (Gr/Re²>1 → Elenbaas override) into regime_dependent, wire into build_loop_lof_bypass, validate NC temperature rise against Elenbaas, remove dead build_loop_lof, fix stale docs
 
 ## Phase Details
 
@@ -187,6 +188,24 @@ Plans:
 Plans:
 - [x] 25-01: Argument structure sweep and CLAUDE.md update
 
+### Phase 26: NC Regime HTC + LOF Cleanup
+**Goal**: Wire natural convection detection (Gr/Re²>1 criterion, matching Python STREAM) into `regime_dependent`; use it in `build_loop_lof_bypass` so the NC phase of a LOF transient uses Elenbaas HTC; validate NC temperature rise against Elenbaas prediction; remove dead `build_loop_lof`; fix all stale docs from v0.6 audit
+**Depends on**: Phase 25
+**Requirements**: VAL-02, NATCONV-01
+**Success Criteria** (what must be TRUE):
+  1. `regime_dependent` accepts optional `htc_natural`, `Dh`, `g` kwargs; when provided, wraps forced-conv HTC in `ifelse(Gr_val > Re^2, htc_natural(...), htc_forced)` — MTK-compatible via `ifelse`
+  2. `build_loop_lof_bypass` wires `regime_dependent` (with `elenbaas_htc` as NC override and laminar friction below Re_transition) for both `ch` and `ret`
+  3. VAL-02 test asserts that NC-phase temperature rise matches the Elenbaas-based analytical estimate within a stated tolerance (currently the test only validates mdot via gravity-friction balance)
+  4. `build_loop_lof` is removed from `src/examples.jl` and from exports in `STREAM.jl`
+  5. 3 channel docstrings updated to document the 4-arg `(Re, Pr, T_bulk, T_wall)->Nu` HTC interface
+  6. `24.1-VERIFICATION.md` rewritten to reflect actual HEAD state (SC1 channel inertia: PASS, SC2 parallel topology: PASS, VAL-02: PASS after this phase)
+  7. `build_loop_lof_bypass` docstring stale "R_ext not used" note removed
+**Plans**: 2 plans
+
+Plans:
+- [ ] 26-01: Extend regime_dependent with NC detection + wire into build_loop_lof_bypass
+- [ ] 26-02: VAL-02 temperature-rise test + remove build_loop_lof + stale doc fixes
+
 ## Progress
 
 **Execution Order:** Phases execute in numeric order: 20 → 21 → 22 → 23 → 24 → 24.1 → 25
@@ -220,6 +239,7 @@ Plans:
 | 24. Loss-of-Flow Validation | v0.6 | 1/1 | Complete    | 2026-03-21 |
 | 24.1. Bypass LOF Topology | v0.6 | 2/2 | Complete   | 2026-03-21 |
 | 25. Argument Structure Audit | v0.6 | 1/1 | Complete    | 2026-03-26 |
+| 26. NC Regime HTC + LOF Cleanup | v0.6 | 0/2 | Pending | - |
 
 ---
 

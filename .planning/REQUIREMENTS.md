@@ -20,7 +20,7 @@
 
 ### Natural Convection HTC
 
-- [x] **NATCONV-01**: `elenbaas_nusselt(Ra, b, L)` — Elenbaas parallel-plate natural convection correlation, returns Nu; usable as pluggable HTC in Channel/ChannelAndContacts
+- [ ] **NATCONV-01**: `elenbaas_nusselt(Ra, b, L)` — Elenbaas parallel-plate natural convection correlation, returns Nu; usable as pluggable HTC in Channel/ChannelAndContacts
 - [x] **NATCONV-02**: `elenbaas_nusselt` validated against published Elenbaas table values or analytical limiting cases
 
 ### Time-Varying Pump
@@ -45,7 +45,7 @@
 ### Validation
 
 - [x] **VAL-01**: Loss-of-flow transient — forced-flow steady state, `dP_pump` ramps to 0, mdot crosses zero, Flapper opens, simulation continues to quasi-static natural circulation; asserts energy balance holds throughout
-- [x] **VAL-02**: Natural circulation temperature rise matches analytical estimate using Elenbaas HTC within reasonable tolerance
+- [ ] **VAL-02**: Natural circulation temperature rise matches analytical estimate using Elenbaas HTC within reasonable tolerance
 
 ## Future Requirements
 
@@ -89,7 +89,7 @@
 | FLUID-01 | Phase 21 | Complete |
 | FLUID-02 | Phase 21 | Complete |
 | FLUID-03 | Phase 21 | Complete |
-| NATCONV-01 | Phase 21 | Complete |
+| NATCONV-01 | Phase 26 | Pending |
 | NATCONV-02 | Phase 21 | Complete |
 | PUMP-01 | Phase 22 | Complete |
 | PUMP-02 | Phase 22 | Complete |
@@ -102,13 +102,14 @@
 | FLAP-06 | Phase 23 | Complete |
 | SOLV-01 | Phase 23 | Complete |
 | VAL-01 | Phase 24 | Complete |
-| VAL-02 | Phase 24 | Complete |
+| VAL-02 | Phase 26 | Pending |
 
 **Coverage:**
 - v0.6 requirements: 21 total
 - Mapped to phases: 21
 - Unmapped: 0
+- Pending (gap closure): NATCONV-01, VAL-02 → Phase 26
 
 ---
 *Requirements defined: 2026-03-17*
-*Last updated: 2026-03-17 — traceability complete after roadmap creation*
+*Last updated: 2026-03-26 — Phase 26 gap closure: NATCONV-01, VAL-02 reset to Pending*
