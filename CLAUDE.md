@@ -58,10 +58,13 @@ test/
 
 ## Component authoring conventions
 
-- All component constructor arguments are **keyword-only** (no positional args). Matches MTK convention everywhere.
-  *Why: Keyword-only prevents argument-order bugs and makes call sites self-documenting. MTK's own `@mtkmodel` macro generates keyword-only constructors.*
-- Factory functions (`PipeGeometry_rectangular`, `PipeGeometry_circular`) are also keyword-only.
-  *Why: Consistency with component constructors. Mixing positional and keyword styles across the API creates confusion.*
+- **Positional arguments** when: (a) the argument type determines behavior, enabling multiple dispatch (e.g., `Pump(dP::Real; name)` vs `Pump(dP::Any; name)`); OR (b) the constructor/function has 1 or fewer physics parameters and its role is unambiguous from the function name (e.g., `Resistor(R; name)`, `Gravity(H; name)`, `HeatExchanger(T_bc; name)`).
+  *Why: Positional args with type annotations enable Julia's multiple dispatch and keep call sites concise when the meaning is obvious.*
+- **Keyword arguments** when: multiple arguments of the same type where labeling prevents order bugs (e.g., `Channel(; name, L, Dh, ...)` has many Float64 params); OR complex constructors with many parameters where self-documentation outweighs brevity.
+  *Why: Keyword-only prevents argument-order bugs for multi-parameter constructors where positional would be ambiguous.*
+- Factory functions (`PipeGeometry_rectangular`, `PipeGeometry_circular`) use positional arguments (established in v0.4).
+- The `name` kwarg is **always keyword-only** (provided by `@named` macro, never positional).
+  *Why: The `@named` macro injects `name=:varname` as a keyword argument. Making it positional would break `@named`.*
 - Internal helpers are prefixed with `_` and not exported.
   *Why: Keeps the public API surface small and signals that these functions may change without notice. The `_` prefix is a Julia community convention.*
 - Every exported name has a docstring with at minimum: description, `# Arguments`, `# Returns`.
