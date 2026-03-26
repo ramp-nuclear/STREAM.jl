@@ -81,7 +81,7 @@ Full phase details: `.planning/milestones/v0.5-ROADMAP.md`
 - [x] **Phase 23: Flapper & Solver Events** - Implement Flapper check-valve component with MTK continuous event and expose callback API (completed 2026-03-20)
 - [x] **Phase 24: Loss-of-Flow Validation** - Validate full loss-of-flow transient end-to-end against analytical expectations (completed 2026-03-21)
 - [x] **Phase 24.1: Bypass LOF Topology** - Replace series-loop LOF model with real bypass topology (junctions, parallel paths, channel momentum inertia, natural circulation) (completed 2026-03-21)
-- [ ] **Phase 25: Argument Structure Audit** - Sweep all public functions and constructors, replace keyword-only where positional + multiple dispatch is more idiomatic Julia
+- [x] **Phase 25: Argument Structure Audit** - Sweep all public functions and constructors, replace keyword-only where positional + multiple dispatch is more idiomatic Julia (completed 2026-03-26)
 
 ## Phase Details
 
@@ -185,7 +185,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 25-01: Argument structure sweep and CLAUDE.md update
+- [x] 25-01: Argument structure sweep and CLAUDE.md update
 
 ## Progress
 
@@ -219,7 +219,7 @@ Plans:
 | 23. Flapper & Solver Events | v0.6 | 2/2 | Complete    | 2026-03-20 |
 | 24. Loss-of-Flow Validation | v0.6 | 1/1 | Complete    | 2026-03-21 |
 | 24.1. Bypass LOF Topology | v0.6 | 2/2 | Complete   | 2026-03-21 |
-| 25. Argument Structure Audit | v0.6 | 0/1 | Not started | - |
+| 25. Argument Structure Audit | v0.6 | 1/1 | Complete   | 2026-03-26 |
 
 ---
 
