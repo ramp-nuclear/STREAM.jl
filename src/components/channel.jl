@@ -13,7 +13,7 @@ Single-phase convective channel with `n` axial finite-volume cells.
 - `n`: number of axial cells (Int)
 - `geometry`: pipe geometry descriptor (PipeGeometry)
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
-- `htc_correlation`: HTC function `(Re, Pr) -> Nu`, default `dittus_boelter`
+- `htc_correlation`: HTC function `(Re, Pr, T_bulk, T_wall) -> Nu`, default `dittus_boelter`
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
 
 # Ports
