@@ -20,7 +20,7 @@
 
 ### Natural Convection HTC
 
-- [ ] **NATCONV-01**: `elenbaas_nusselt(Ra, b, L)` — Elenbaas parallel-plate natural convection correlation, returns Nu; usable as pluggable HTC in Channel/ChannelAndContacts
+- [x] **NATCONV-01**: `elenbaas_nusselt(Ra, b, L)` — Elenbaas parallel-plate natural convection correlation, returns Nu; usable as pluggable HTC in Channel/ChannelAndContacts
 - [x] **NATCONV-02**: `elenbaas_nusselt` validated against published Elenbaas table values or analytical limiting cases
 
 ### Time-Varying Pump
@@ -89,7 +89,7 @@
 | FLUID-01 | Phase 21 | Complete |
 | FLUID-02 | Phase 21 | Complete |
 | FLUID-03 | Phase 21 | Complete |
-| NATCONV-01 | Phase 26 | Pending |
+| NATCONV-01 | Phase 26 | Complete |
 | NATCONV-02 | Phase 21 | Complete |
 | PUMP-01 | Phase 22 | Complete |
 | PUMP-02 | Phase 22 | Complete |

@@ -203,7 +203,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 26-01: Extend regime_dependent with NC detection + wire into build_loop_lof_bypass
+- [x] 26-01: Extend regime_dependent with NC detection + wire into build_loop_lof_bypass
 - [ ] 26-02: VAL-02 temperature-rise test + remove build_loop_lof + stale doc fixes
 
 ## Progress
@@ -239,7 +239,7 @@ Plans:
 | 24. Loss-of-Flow Validation | v0.6 | 1/1 | Complete    | 2026-03-21 |
 | 24.1. Bypass LOF Topology | v0.6 | 2/2 | Complete   | 2026-03-21 |
 | 25. Argument Structure Audit | v0.6 | 1/1 | Complete    | 2026-03-26 |
-| 26. NC Regime HTC + LOF Cleanup | v0.6 | 0/2 | Pending | - |
+| 26. NC Regime HTC + LOF Cleanup | v0.6 | 1/2 | In Progress|  |
 
 ---
 
