@@ -80,10 +80,10 @@ end
     nz = 10; nx = 3
     T_in = 313.15
     @named pump_l = Pump(3.0e4)
-    @named hx_l   = HeatExchanger(T_bc=T_in)
+    @named hx_l   = HeatExchanger(T_in)
     @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     @named pump_r = Pump(3.0e4)
-    @named hx_r   = HeatExchanger(T_bc=T_in)
+    @named hx_r   = HeatExchanger(T_in)
     @named cac_r  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
@@ -165,10 +165,10 @@ end
     nz = 10; nx = 3
     T_in_l = 313.15; T_in_r = 363.15
     @named pump_l = Pump(3.0e4)
-    @named hx_l   = HeatExchanger(T_bc=T_in_l)
+    @named hx_l   = HeatExchanger(T_in_l)
     @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     @named pump_r = Pump(3.0e4)
-    @named hx_r   = HeatExchanger(T_bc=T_in_r)
+    @named hx_r   = HeatExchanger(T_in_r)
     @named cac_r  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
@@ -237,7 +237,7 @@ end
     nz = 10; nx = 3
     T_in = 313.15
     @named pump_l = Pump(3.0e4)
-    @named hx_l   = HeatExchanger(T_bc=T_in)
+    @named hx_l   = HeatExchanger(T_in)
     @named cac_l  = ChannelAndContacts(n=nz, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
@@ -344,8 +344,8 @@ end
     @named hd_v01 = HeatDiffusion(nz=nz_v01, nx=nx_v01, Lz=Lz_v01, Lx=Lx_v01, y=y_v01,
                                    rho_s=rho_s_v01, cp_s=cp_s_v01, k_s=k_s_v01,
                                    power_shape=ps_v01, power=0.0)
-    ct_l = [ConstantTemperature(name=Symbol(:ct_l_, i), T=T_wall) for i in 1:nz_v01]
-    ct_r = [ConstantTemperature(name=Symbol(:ct_r_, i), T=T_wall) for i in 1:nz_v01]
+    ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:nz_v01]
+    ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:nz_v01]
     conns_v01 = [
         [connect(ct_l[i].thermal, getproperty(hd_v01, Symbol(:thermal_left,  i))) for i in 1:nz_v01]...,
         [connect(ct_r[i].thermal, getproperty(hd_v01, Symbol(:thermal_right, i))) for i in 1:nz_v01]...,
@@ -390,7 +390,7 @@ end
     power_per_plate = 1e4   # W each → 20 kW total to one channel
 
     @named pump_v02 = Pump(3.0e4)
-    @named hx_v02   = HeatExchanger(T_bc=T_in_v02)
+    @named hx_v02   = HeatExchanger(T_in_v02)
     @named cac_v02  = ChannelAndContacts(n=nz_v02,
                           geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
     ps_v02 = fill(1.0 / (nz_v02 * nx_v02), nz_v02, nx_v02)

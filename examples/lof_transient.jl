@@ -50,16 +50,16 @@ gr()
 # (Matches test/test_loss_of_flow.jl constants exactly)
 # =============================================================================
 
-const n          = 10          # axial cells in each channel
+const n          = 50          # axial cells in each channel
 const L_ch       = 1.0         # channel length [m]
 const D_ch       = 0.01        # hydraulic diameter [m]
 const T_wall     = 373.15      # heated channel wall temperature [K] (~100°C)
 const T_inlet    = 313.15      # inlet / HX boundary temperature [K] (~40°C)
 const g_acc      = 9.80665     # gravitational acceleration [m/s^2]
-const L_over_A   = 1.75e5      # Inertia L/A [1/m] — controls coastdown time constant
+const L_over_A   = 5e6         # Inertia L/A [1/m] — controls coastdown time constant
 const R_ext      = 1.0e6       # external bypass resistance [Pa·s/kg]
 const threshold  = 0.01        # Flapper trigger threshold [kg/s]
-const dt_ramp    = 5.0         # Flapper ramp duration [s]
+const dt_ramp    = 0.5         # Flapper ramp duration [s]
 const dP_ref     = 1.5e4       # reference pump dP for SS [Pa]
 
 println("=" ^ 70)
@@ -86,7 +86,7 @@ println()
 println("Building steady-state reference loop...")
 
 @named pump_ref = Pump(dP_ref)
-@named hx_ref   = HeatExchanger(T_bc=T_inlet)
+@named hx_ref   = HeatExchanger(T_inlet)
 @named ch_ref   = ChannelHeatFlux(n=n,
                       geometry = PipeGeometry_circular(L_ch, D_ch),
                       g        = -g_acc,

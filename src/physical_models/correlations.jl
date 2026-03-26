@@ -78,12 +78,12 @@ function constant_Nusselt(; Nu = 8.235)
 end
 
 """
-    laminar_friction(; aspect_ratio) -> (Re) -> f_darcy
+    laminar_friction(aspect_ratio::Real) -> (Re) -> f_darcy
 
 Factory returning a friction correlation for fully-developed laminar flow in a
 rectangular duct.
 
-`aspect_ratio` (REQUIRED kwarg) = `depth / width` where depth = min(edge1, edge2)
+`aspect_ratio` = `depth / width` where depth = min(edge1, edge2)
 and width = max(edge1, edge2). Precomputes the geometric correction factor
 `K_R = rectangular_laminar_correction(aspect_ratio)` at construction time.
 
@@ -95,11 +95,11 @@ For square (aspect_ratio=1.0): K_R ≈ 1.1246, giving f ≈ 56.9/Re (NOT 64/Re).
 Usage:
 ```julia
 geom = PipeGeometry_rectangular(L, e1, e2, he)
-f_fn = laminar_friction(aspect_ratio = geom.depth / geom.width)
+f_fn = laminar_friction(geom.depth / geom.width)
 ChannelAndContacts(friction_correlation = f_fn, ...)
 ```
 """
-function laminar_friction(; aspect_ratio::Real)
+function laminar_friction(aspect_ratio::Real)
     k_R = rectangular_laminar_correction(aspect_ratio)
     return (Re) -> 64.0 / (Re * k_R)
 end
@@ -128,7 +128,7 @@ Usage:
 rd = regime_dependent(
     htc_laminar        = constant_Nusselt(Nu=8.235),
     htc_turbulent      = dittus_boelter,
-    friction_laminar   = laminar_friction(aspect_ratio = geom.depth / geom.width),
+    friction_laminar   = laminar_friction(geom.depth / geom.width),
     friction_turbulent = blasius_friction,
     Re_transition      = 2300.0
 )

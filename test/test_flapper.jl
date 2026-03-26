@@ -7,13 +7,13 @@ using STREAM
 # ─────────────────────────────────────────────────────────────────
 # Helper: build a minimal closed-loop Flapper system (scalar pump)
 #
-# Topology: Pump(dP_val) → Resistor(R=1e5) → Flapper → back to Pump
+# Topology: Pump(dP_val) → Resistor(1e5) → Flapper → back to Pump
 # flapper.ref_mdot ~ pump.port_in.mdot
 # Two thermal anchors break circular instream in hydraulics-only loop.
 # ─────────────────────────────────────────────────────────────────
 function _build_flapper_scalar_loop(dP_val; flap_kwargs...)
     @named pump    = Pump(dP_val)
-    @named res     = Resistor(R=1e5)
+    @named res     = Resistor(1e5)
     @named flapper = Flapper(; flap_kwargs...)
 
     conns = [
@@ -78,8 +78,8 @@ end
     L_over_A      = 5e5   # m^{-1}; tau_eff = L_over_A / R_eff ≈ 5s
 
     @named pump    = Pump(0.0)   # zero pressure: loop decays under inertia
-    @named ine     = Inertia(L_over_A=L_over_A)
-    @named res     = Resistor(R=1e5)
+    @named ine     = Inertia(L_over_A)
+    @named res     = Resistor(1e5)
     @named flapper = Flapper(; threshold=threshold_val, dt=dt_ramp, R_closed=1e8, R_open=100.0)
 
     conns = [

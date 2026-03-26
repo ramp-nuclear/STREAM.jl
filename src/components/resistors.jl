@@ -43,13 +43,13 @@ function Friction(; name, L, D, A)
 end
 
 """
-    Gravity(; name, H) -> ODESystem
+    Gravity(H; name) -> ODESystem
 
 Hydrostatic pressure change for a vertical elevation change.
 
 # Arguments
-- `name`: system name (Symbol)
 - `H`: elevation change [m], positive = upward
+- `name`: system name (Symbol)
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
@@ -57,7 +57,7 @@ Hydrostatic pressure change for a vertical elevation change.
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function Gravity(; name, H)
+function Gravity(H; name)
     pars = @parameters H = H
     @named port_in  = FlowPort()
     @named port_out = FlowPort()
@@ -72,13 +72,13 @@ function Gravity(; name, H)
 end
 
 """
-    Resistor(; name, R) -> ODESystem
+    Resistor(R; name) -> ODESystem
 
 Generic flow resistance with a fixed resistance coefficient.
 
 # Arguments
-- `name`: system name (Symbol)
 - `R`: resistance coefficient [Pa/(kg/s)]
+- `name`: system name (Symbol)
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
@@ -86,7 +86,7 @@ Generic flow resistance with a fixed resistance coefficient.
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function Resistor(; name, R)
+function Resistor(R; name)
     pars = @parameters R = R
     @named port_in  = FlowPort()
     @named port_out = FlowPort()

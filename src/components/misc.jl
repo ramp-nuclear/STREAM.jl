@@ -6,13 +6,13 @@
 # No explicit mdot state variable needed — MTK auto-promotes port_in.mdot
 # as a differential state because it appears inside Dt(port_in.mdot).
 """
-    Inertia(; name, L_over_A) -> ODESystem
+    Inertia(L_over_A; name) -> ODESystem
 
 Fluid inertia element for transient simulations. Adds `L/A * d(mdot)/dt` to the momentum equation.
 
 # Arguments
-- `name`: system name (Symbol)
 - `L_over_A`: length-to-area ratio [1/m]
+- `name`: system name (Symbol)
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
@@ -20,7 +20,7 @@ Fluid inertia element for transient simulations. Adds `L/A * d(mdot)/dt` to the 
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function Inertia(; name, L_over_A)
+function Inertia(L_over_A; name)
     Dt   = Differential(t)           # same operator used in Channel energy balance
     pars = @parameters L_over_A = L_over_A
     @named port_in  = FlowPort()
@@ -40,13 +40,13 @@ end
 # otherwise resolve to the previous component's outlet T).
 # 4-equation structure: mass conservation, no pressure drop, T_bc outlet, adiabatic inlet.
 """
-    HeatExchanger(; name, T_bc) -> ODESystem
+    HeatExchanger(T_bc; name) -> ODESystem
 
 Ideal heat exchanger that resets fluid temperature to a fixed boundary condition.
 
 # Arguments
-- `name`: system name (Symbol)
 - `T_bc`: boundary condition temperature [K]
+- `name`: system name (Symbol)
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
@@ -54,7 +54,7 @@ Ideal heat exchanger that resets fluid temperature to a fixed boundary condition
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function HeatExchanger(; name, T_bc)
+function HeatExchanger(T_bc; name)
     pars = @parameters T_bc = T_bc
     @named port_in  = FlowPort()
     @named port_out = FlowPort()
@@ -71,13 +71,13 @@ end
 # Used as a thermal boundary condition in tests and simple simulations.
 # MTK acausal semantics solve for Q_flow from the connected component's balance.
 """
-    ConstantTemperature(; name, T) -> ODESystem
+    ConstantTemperature(T; name) -> ODESystem
 
 Constant-temperature thermal boundary condition.
 
 # Arguments
-- `name`: system name (Symbol)
 - `T`: fixed surface temperature [K]
+- `name`: system name (Symbol)
 
 # Ports
 - `thermal` -- `ThermalPort` (single port, used as a wall BC)
@@ -85,7 +85,7 @@ Constant-temperature thermal boundary condition.
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function ConstantTemperature(; name, T)
+function ConstantTemperature(T; name)
     pars = @parameters T_bc = T
     @named thermal = ThermalPort()
     compose(System([thermal.T ~ T_bc], t; name=name), thermal)

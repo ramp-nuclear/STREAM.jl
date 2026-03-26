@@ -35,7 +35,7 @@ const T_guess_rev_sign = reverse(T_guess_fwd_sign)
 @testset "SIGN-01/04: Channel reversed flow" begin
     @named pump = Pump(mdot0=mdot_neg)
     @named ch   = Channel(n=n_sign, geometry=geom_sign)
-    @named bc   = HeatExchanger(T_bc=T_inlet_sign)
+    @named bc   = HeatExchanger(T_inlet_sign)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out,   ch.port_in),
@@ -76,9 +76,9 @@ end
 @testset "SIGN-02/04: ChannelAndContacts reversed flow" begin
     @named pump = Pump(mdot0=mdot_neg)
     @named cac  = ChannelAndContacts(n=n_sign, geometry=geom_sign)
-    @named bc   = HeatExchanger(T_bc=T_inlet_sign)
-    ct_l = [ConstantTemperature(name=Symbol(:ct_l, i), T=T_wall_sign) for i in 1:n_sign]
-    ct_r = [ConstantTemperature(name=Symbol(:ct_r, i), T=T_wall_sign) for i in 1:n_sign]
+    @named bc   = HeatExchanger(T_inlet_sign)
+    ct_l = [ConstantTemperature(T_wall_sign; name=Symbol(:ct_l, i)) for i in 1:n_sign]
+    ct_r = [ConstantTemperature(T_wall_sign; name=Symbol(:ct_r, i)) for i in 1:n_sign]
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out,   cac.port_in),
@@ -128,7 +128,7 @@ end
 @testset "SIGN-03/04: ChannelHeatFlux reversed flow" begin
     @named pump = Pump(mdot0=mdot_neg)
     @named chf  = ChannelHeatFlux(n=n_sign, geometry=geom_sign, T_wall=T_wall_sign)
-    @named bc   = HeatExchanger(T_bc=T_inlet_sign)
+    @named bc   = HeatExchanger(T_inlet_sign)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out,   chf.port_in),

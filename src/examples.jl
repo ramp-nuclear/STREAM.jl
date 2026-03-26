@@ -55,7 +55,7 @@ function build_loop(;
 )
     @named pump = Pump(dP_pump)
     @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch))
-    @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
+    @named bc   = HeatExchanger(T_inlet)   # temperature reset at pump outlet
 
     connections = [
         connect(pump.port_out, bc.port_in),       # pump -> TempBC
@@ -132,8 +132,8 @@ function build_loop_vertical(;
 
     @named pump = Pump(dP_pump)
     @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch), g = g_acc)
-    @named bc   = HeatExchanger(T_bc = T_inlet)
-    @named grav = Gravity(H = H)
+    @named bc   = HeatExchanger(T_inlet)
+    @named grav = Gravity(H)
 
     # Gravity wiring note:
     # Gravity equation: port_in.P - port_out.P ~ rho*g*H (port_in = high-P = bottom)
@@ -196,7 +196,7 @@ function build_loop_transient(;
 )
     @named pump = Pump(dP_pump)
     @named ch   = Channel(n = n, geometry = PipeGeometry_circular(L_ch, D_ch))
-    @named bc   = HeatExchanger(T_bc = T_inlet)   # temperature reset at pump outlet
+    @named bc   = HeatExchanger(T_inlet)   # temperature reset at pump outlet
 
     if T_wall_fn === nothing
         # Scalar wall temperature — same as build_loop; no parameter declaration needed
@@ -269,13 +269,13 @@ Compiled `ODESystem`.
 function build_cube(; dP_pump=3.0e4, R=1.0e4)
     @named pump = Pump(dP_pump)
     # 12 edges of the cube (naming: r_ij where i < j are corner indices)
-    @named r01 = Resistor(R=R); @named r02 = Resistor(R=R); @named r04 = Resistor(R=R)
-    @named r13 = Resistor(R=R); @named r15 = Resistor(R=R)
-    @named r23 = Resistor(R=R); @named r26 = Resistor(R=R)
-    @named r37 = Resistor(R=R)
-    @named r45 = Resistor(R=R); @named r46 = Resistor(R=R)
-    @named r57 = Resistor(R=R)
-    @named r67 = Resistor(R=R)
+    @named r01 = Resistor(R); @named r02 = Resistor(R); @named r04 = Resistor(R)
+    @named r13 = Resistor(R); @named r15 = Resistor(R)
+    @named r23 = Resistor(R); @named r26 = Resistor(R)
+    @named r37 = Resistor(R)
+    @named r45 = Resistor(R); @named r46 = Resistor(R)
+    @named r57 = Resistor(R)
+    @named r67 = Resistor(R)
 
     connections = [
         # Corner 0 (source): pump.port_out + 3 resistor inlets
@@ -357,8 +357,8 @@ function build_loop_lof(;
     dt_ramp   = 5.0,
 )
     @named pump    = Pump(0.0)
-    @named ine     = Inertia(L_over_A=L_over_A)
-    @named bc      = HeatExchanger(T_bc=T_inlet)
+    @named ine     = Inertia(L_over_A)
+    @named bc      = HeatExchanger(T_inlet)
     @named ch      = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=g_acc_ch, T_wall=T_wall)
     @named flapper = Flapper(threshold=threshold, dt=dt_ramp)
 
@@ -434,8 +434,8 @@ function build_loop_lof_bypass(;
     geom = PipeGeometry_circular(L_ch, D_ch)
 
     @named pump    = Pump(0.0)
-    @named ine     = Inertia(L_over_A=L_over_A)
-    @named hx      = HeatExchanger(T_bc=T_inlet)
+    @named ine     = Inertia(L_over_A)
+    @named hx      = HeatExchanger(T_inlet)
     @named ch      = ChannelHeatFlux(n=n, geometry=geom, g=-g_acc, T_wall=T_wall)
     @named ret     = Channel(n=n, geometry=geom, g=g_acc)
     # use_callback=false: MTK's SymbolicContinuousCallback is incompatible with parallel
@@ -443,7 +443,7 @@ function build_loop_lof_bypass(;
     # that the callback DAE solver must handle. Use a native ContinuousCallback instead
     # (see test_loss_of_flow.jl _lof_bypass_ic for the external callback construction).
     @named flapper = Flapper(threshold=threshold, dt=dt_ramp, use_callback=false)
-    @named ext_res = Resistor(R=R_ext)
+    @named ext_res = Resistor(R_ext)
 
     connections = [
         # D series branch: ext_res -> hx -> pump -> ine

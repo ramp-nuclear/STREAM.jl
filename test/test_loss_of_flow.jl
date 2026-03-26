@@ -58,7 +58,7 @@ function _lof_bypass_ic(; n=BYPASS_N)
     # No Flapper, no Inertia -> KINSOL-friendly
     # ch_ref uses g=-BYPASS_G_ACC (same gravity orientation as bypass ch)
     @named pump_ref = Pump(BYPASS_DP_REF)
-    @named hx_ref   = HeatExchanger(T_bc=BYPASS_T_INLET)
+    @named hx_ref   = HeatExchanger(BYPASS_T_INLET)
     @named ch_ref   = ChannelHeatFlux(n=n,
                           geometry = PipeGeometry_circular(BYPASS_L_CH, BYPASS_D_CH),
                           g        = -BYPASS_G_ACC,

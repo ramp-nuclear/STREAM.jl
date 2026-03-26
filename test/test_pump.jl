@@ -21,7 +21,7 @@ import STREAM: Pump, Channel
     # HeatExchanger provides pressure closure (port_in.P - port_out.P ~ 0)
     # pump.port_in.P ~ 1e5 provides absolute pressure reference
     @named pump5  = Pump(mdot0=0.6)
-    @named bc5    = HeatExchanger(T_bc=313.15)
+    @named bc5    = HeatExchanger(313.15)
     @named ch5    = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns5 = [
         connect(pump5.port_out, bc5.port_in),
@@ -67,7 +67,7 @@ end
 
     # Integration: scalar pump in a loop (positional arg syntax)
     @named pump_r  = Pump(3.0e4)
-    @named bc_r    = HeatExchanger(T_bc=313.15)
+    @named bc_r    = HeatExchanger(313.15)
     @named ch_r    = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns_r = [
         connect(pump_r.port_out, bc_r.port_in),
@@ -112,8 +112,8 @@ end
     dP_fn = t -> dP0 * (1 - t / T_ramp)
 
     @named pump = Pump(dP_fn)
-    @named ine  = Inertia(L_over_A=L_over_A)
-    @named res  = Resistor(R=R_val)
+    @named ine  = Inertia(L_over_A)
+    @named res  = Resistor(R_val)
 
     # Closed loop: pump -> inertia -> resistor -> pump
     # Two thermal anchors needed: circular instream in a closed hydraulics-only loop

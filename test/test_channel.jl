@@ -35,7 +35,7 @@ end
 end
 
 @testset "COMP-04: Gravity stub callable" begin
-    @named grav = Gravity(H=3.0)
+    @named grav = Gravity(3.0)
     @test grav isa ModelingToolkit.System
     @test_nowarn mtkcompile(grav; fully_determined=false)
 end
@@ -142,7 +142,7 @@ end
     # --- ChannelHeatFlux reference ---
     @named pump_chf = Pump(dP_pump)
     @named chf = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
-    @named bc_chf = HeatExchanger(T_bc=T_inlet)
+    @named bc_chf = HeatExchanger(T_inlet)
     conns_chf = [
         connect(pump_chf.port_out, bc_chf.port_in),
         connect(bc_chf.port_out, chf.port_in),
@@ -160,9 +160,9 @@ end
     # --- ChannelAndContacts two-sided (both left and right connected to T_wall) ---
     @named pump_cac = Pump(dP_pump)
     @named cac = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
-    @named bc_cac = HeatExchanger(T_bc=T_inlet)
-    ct_l = [ConstantTemperature(name=Symbol(:ct_l, i), T=T_wall) for i in 1:n]
-    ct_r = [ConstantTemperature(name=Symbol(:ct_r, i), T=T_wall) for i in 1:n]
+    @named bc_cac = HeatExchanger(T_inlet)
+    ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l, i)) for i in 1:n]
+    ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r, i)) for i in 1:n]
     conns_cac = [
         connect(pump_cac.port_out, bc_cac.port_in),
         connect(bc_cac.port_out, cac.port_in),
@@ -191,8 +191,8 @@ end
 
     @named pump2 = Pump(dP_pump)
     @named cac2 = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_cac))
-    @named bc2 = HeatExchanger(T_bc=T_inlet)
-    ct2 = [ConstantTemperature(name=Symbol(:ct2_, i), T=T_wall) for i in 1:n]
+    @named bc2 = HeatExchanger(T_inlet)
+    ct2 = [ConstantTemperature(T_wall; name=Symbol(:ct2_, i)) for i in 1:n]
     conns2 = [
         connect(pump2.port_out, bc2.port_in),
         connect(bc2.port_out, cac2.port_in),
@@ -239,7 +239,7 @@ end
 end
 
 @testset "CHAN-02: ConstantTemperature callable and mtkcompiles" begin
-    @named ct = ConstantTemperature(T=373.15)
+    @named ct = ConstantTemperature(373.15)
     @test ct isa ModelingToolkit.System
     @test_nowarn mtkcompile(ct; fully_determined=false)
 end
@@ -255,7 +255,7 @@ end
 
     @named pump = Pump(dP_pump)
     @named chf  = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
-    @named bc   = HeatExchanger(T_bc=T_inlet)
+    @named bc   = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, chf.port_in),

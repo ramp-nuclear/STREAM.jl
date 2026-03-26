@@ -11,12 +11,12 @@ const SciMLBase = DifferentialEquations.SciMLBase
 # Equation: port_in.P - port_out.P ~ L_over_A * D(mdot)
 # ─────────────────────────────────────────────────────────────────
 @testset "COMP-01: Inertia stub callable" begin
-    @named L = Inertia(L_over_A=1e3)
+    @named L = Inertia(1e3)
     @test L isa ModelingToolkit.System
 end
 
 @testset "COMP-01: Inertia mtkcompile" begin
-    @named L = Inertia(L_over_A=1e3)
+    @named L = Inertia(1e3)
     @test_nowarn mtkcompile(L; fully_determined=false)
 end
 
@@ -27,8 +27,8 @@ end
     L_over_A  = 1e3
     tau       = L_over_A / R_val   # 1000 s
 
-    @named L_comp = Inertia(L_over_A=L_over_A)
-    @named R_comp = Resistor(R=R_val)
+    @named L_comp = Inertia(L_over_A)
+    @named R_comp = Resistor(R_val)
     connections = [
         connect(L_comp.port_out, R_comp.port_in),
         connect(R_comp.port_out, L_comp.port_in),
@@ -61,12 +61,12 @@ end
 # COMP-02: HeatExchanger stubs (RED — implemented in Plan 02)
 # ─────────────────────────────────────────────────────────────────
 @testset "COMP-02: HeatExchanger stub callable" begin
-    @named hx = HeatExchanger(T_bc=313.15)
+    @named hx = HeatExchanger(313.15)
     @test hx isa ModelingToolkit.System
 end
 
 @testset "COMP-02: HeatExchanger mtkcompile" begin
-    @named hx = HeatExchanger(T_bc=313.15)
+    @named hx = HeatExchanger(313.15)
     @test_nowarn mtkcompile(hx; fully_determined=false)
 end
 

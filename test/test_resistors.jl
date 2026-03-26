@@ -9,12 +9,12 @@ import STREAM: Resistor
 # NET-01: Resistor component — linear pressure drop dp ~ R * mdot
 # ─────────────────────────────────────────────────────────────────
 @testset "NET-01: Resistor stub callable" begin
-    @named r = Resistor(R=1.0e5)
+    @named r = Resistor(1.0e5)
     @test r isa ModelingToolkit.System
 end
 
 @testset "NET-01: Resistor mtkcompile" begin
-    @named r = Resistor(R=1.0e5)
+    @named r = Resistor(1.0e5)
     @test_nowarn mtkcompile(r; fully_determined=false)
 end
 

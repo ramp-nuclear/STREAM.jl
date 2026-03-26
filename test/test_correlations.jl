@@ -49,7 +49,7 @@ end
 
 @testset "PHY-03: laminar_friction factory" begin
     # MTR geometry: aspect_ratio = 0.00127/0.07 = 0.01814
-    f_fn = laminar_friction(aspect_ratio=0.01814)
+    f_fn = laminar_friction(0.01814)
     k_R  = rectangular_laminar_correction(0.01814)
     @test isapprox(f_fn(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
     # Different Re
@@ -60,7 +60,7 @@ end
     rd = regime_dependent(
         htc_laminar        = constant_Nusselt(Nu=8.235),
         htc_turbulent      = dittus_boelter,
-        friction_laminar   = laminar_friction(aspect_ratio=0.01814),
+        friction_laminar   = laminar_friction(0.01814),
         friction_turbulent = blasius_friction
     )
     # Named tuple must have :htc and :friction keys
@@ -99,9 +99,9 @@ end  # @testset "PHY-02/03/04: Correlation Library"
     @named pump_phy02 = Pump(dP_pump)
     @named cac_phy02  = ChannelAndContacts(n=n, geometry=geom,
                                            htc_correlation=constant_Nusselt(Nu=8.235))
-    @named bc_phy02   = HeatExchanger(T_bc=T_inlet)
-    ct_l_phy02 = [ConstantTemperature(name=Symbol(:ct_l_phy02_, i), T=T_wall) for i in 1:n]
-    ct_r_phy02 = [ConstantTemperature(name=Symbol(:ct_r_phy02_, i), T=T_wall) for i in 1:n]
+    @named bc_phy02   = HeatExchanger(T_inlet)
+    ct_l_phy02 = [ConstantTemperature(T_wall; name=Symbol(:ct_l_phy02_, i)) for i in 1:n]
+    ct_r_phy02 = [ConstantTemperature(T_wall; name=Symbol(:ct_r_phy02_, i)) for i in 1:n]
     conns_phy02 = [
         connect(pump_phy02.port_out, bc_phy02.port_in),
         connect(bc_phy02.port_out, cac_phy02.port_in),
@@ -125,7 +125,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
 end
 
 # ─────────────────────────────────────────────────────────────────
-# PHY-03: laminar_friction(aspect_ratio=0.01814) plugged into ChannelAndContacts
+# PHY-03: laminar_friction(0.01814) plugged into ChannelAndContacts
 # Solved system must return retcode==Success and dP > 0 (positive pressure drop).
 # ─────────────────────────────────────────────────────────────────
 @testset "PHY-03: laminar_friction integration — dP > 0 in solution" begin
@@ -140,10 +140,10 @@ end
     @named pump_phy03 = Pump(30.0)   # 30 Pa → Re << 2300 → laminar regime
     @named cac_phy03  = ChannelAndContacts(n=n, geometry=geom,
                                            htc_correlation      = constant_Nusselt(Nu=8.235),
-                                           friction_correlation = laminar_friction(aspect_ratio=ar))
-    @named bc_phy03   = HeatExchanger(T_bc=T_inlet)
-    ct_l_phy03 = [ConstantTemperature(name=Symbol(:ct_l_phy03_, i), T=T_wall) for i in 1:n]
-    ct_r_phy03 = [ConstantTemperature(name=Symbol(:ct_r_phy03_, i), T=T_wall) for i in 1:n]
+                                           friction_correlation = laminar_friction(ar))
+    @named bc_phy03   = HeatExchanger(T_inlet)
+    ct_l_phy03 = [ConstantTemperature(T_wall; name=Symbol(:ct_l_phy03_, i)) for i in 1:n]
+    ct_r_phy03 = [ConstantTemperature(T_wall; name=Symbol(:ct_r_phy03_, i)) for i in 1:n]
     conns_phy03 = [
         connect(pump_phy03.port_out, bc_phy03.port_in),
         connect(bc_phy03.port_out, cac_phy03.port_in),
@@ -177,7 +177,7 @@ end
     rd = regime_dependent(
         htc_laminar        = constant_Nusselt(Nu=8.235),
         htc_turbulent      = dittus_boelter,
-        friction_laminar   = laminar_friction(aspect_ratio = geom.depth / geom.width),
+        friction_laminar   = laminar_friction(geom.depth / geom.width),
         friction_turbulent = blasius_friction,
         Re_transition      = 2300.0
     )
@@ -188,9 +188,9 @@ end
     @named cac_lam  = ChannelAndContacts(n=n, geometry=geom,
                                           htc_correlation      = rd.htc,
                                           friction_correlation = rd.friction)
-    @named bc_lam   = HeatExchanger(T_bc=T_inlet)
-    ct_l_lam = [ConstantTemperature(name=Symbol(:ct_l_lam_, i), T=T_wall) for i in 1:n]
-    ct_r_lam = [ConstantTemperature(name=Symbol(:ct_r_lam_, i), T=T_wall) for i in 1:n]
+    @named bc_lam   = HeatExchanger(T_inlet)
+    ct_l_lam = [ConstantTemperature(T_wall; name=Symbol(:ct_l_lam_, i)) for i in 1:n]
+    ct_r_lam = [ConstantTemperature(T_wall; name=Symbol(:ct_r_lam_, i)) for i in 1:n]
     conns_lam = [
         connect(pump_lam.port_out, bc_lam.port_in),
         connect(bc_lam.port_out, cac_lam.port_in),
@@ -217,7 +217,7 @@ end
     rd = regime_dependent(
         htc_laminar        = constant_Nusselt(Nu=8.235),
         htc_turbulent      = dittus_boelter,
-        friction_laminar   = laminar_friction(aspect_ratio = geom.depth / geom.width),
+        friction_laminar   = laminar_friction(geom.depth / geom.width),
         friction_turbulent = blasius_friction,
         Re_transition      = 2300.0
     )
@@ -227,9 +227,9 @@ end
     @named cac_turb  = ChannelAndContacts(n=n, geometry=geom,
                                            htc_correlation      = rd.htc,
                                            friction_correlation = rd.friction)
-    @named bc_turb   = HeatExchanger(T_bc=T_inlet)
-    ct_l_turb = [ConstantTemperature(name=Symbol(:ct_l_turb_, i), T=T_wall) for i in 1:n]
-    ct_r_turb = [ConstantTemperature(name=Symbol(:ct_r_turb_, i), T=T_wall) for i in 1:n]
+    @named bc_turb   = HeatExchanger(T_inlet)
+    ct_l_turb = [ConstantTemperature(T_wall; name=Symbol(:ct_l_turb_, i)) for i in 1:n]
+    ct_r_turb = [ConstantTemperature(T_wall; name=Symbol(:ct_r_turb_, i)) for i in 1:n]
     conns_turb = [
         connect(pump_turb.port_out, bc_turb.port_in),
         connect(bc_turb.port_out, cac_turb.port_in),

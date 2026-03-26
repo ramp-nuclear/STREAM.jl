@@ -69,8 +69,8 @@ end
                                rho_s=19300.0, cp_s=116.0, k_s=174.0,
                                power_shape=ps, power=pwr)
 
-    ct_l = [ConstantTemperature(name=Symbol(:ct_l, i), T=T_bc) for i in 1:nz]
-    ct_r = [ConstantTemperature(name=Symbol(:ct_r, i), T=T_bc) for i in 1:nz]
+    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct_l, i)) for i in 1:nz]
+    ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct_r, i)) for i in 1:nz]
 
     conns = [
         [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i)))  for i in 1:nz]...,
@@ -119,7 +119,7 @@ end
                                rho_s=19300.0, cp_s=116.0, k_s=174.0,
                                power_shape=ps, power=pwr)
 
-    ct_l = [ConstantTemperature(name=Symbol(:ct5_l, i), T=T_bc) for i in 1:nz]
+    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct5_l, i)) for i in 1:nz]
     conns = [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i)))
              for i in 1:nz]
     @named sys = compose(System(conns, t; name=:sys), hd, ct_l...)
@@ -159,8 +159,8 @@ end
                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
                                power_shape=ps, power=pwr)
 
-    ct_l = [ConstantTemperature(name=Symbol(:ct12_l, i), T=T_bc) for i in 1:nz]
-    ct_r = [ConstantTemperature(name=Symbol(:ct12_r, i), T=T_bc) for i in 1:nz]
+    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct12_l, i)) for i in 1:nz]
+    ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct12_r, i)) for i in 1:nz]
 
     conns = [
         [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left,  i))) for i in 1:nz]...,
