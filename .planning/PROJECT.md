@@ -52,6 +52,8 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - ✓ All 28 exported names have structured Julia docstrings (`# Arguments`, `# Ports`, `# Returns`) — v0.5
 - ✓ CLAUDE.md rewritten with **Why:** rationale after every rule and MTK Patterns reference section — v0.5
 - ✓ `Project.toml` bumped to `0.5.0`; `ChannelHeatFlux` and `ConstantTemperature` confirmed exported, tested, documented — v0.5
+- ✓ `regime_dependent` extended with NC detection: Gr/Re² > 1 switches to `htc_natural`; `Gr_over_Re2[i]` observable added to `ChannelAndContacts` and `ChannelHeatFlux`; `build_loop_lof_bypass` wires Elenbaas NC HTC — v0.6 Phase 26 (Validated in Phase 26: NATCONV-01)
+- ✓ VAL-02 NC temperature-rise assertion added; dead `build_loop_lof` removed; HTC docstrings corrected; 24.1-VERIFICATION.md rewritten to 5/5 pass — v0.6 Phase 26 (Validated in Phase 26: VAL-02)
 
 ### Active
 
@@ -148,4 +150,4 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - Loss-of-flow validation scenario
 
 ---
-*Last updated: 2026-03-26 after Phase 25 complete — argument structure audit shipped (6 signatures converted to positional, CLAUDE.md two-tier convention rule codified)*
+*Last updated: 2026-03-26 2026-03-26 after Phase 25 complete — argument structure audit shipped (6 signatures converted to positional, CLAUDE.md two-tier convention rule codified)*
