@@ -82,7 +82,7 @@ Full phase details: `.planning/milestones/v0.5-ROADMAP.md`
 - [x] **Phase 24: Loss-of-Flow Validation** - Validate full loss-of-flow transient end-to-end against analytical expectations (completed 2026-03-21)
 - [x] **Phase 24.1: Bypass LOF Topology** - Replace series-loop LOF model with real bypass topology (junctions, parallel paths, channel momentum inertia, natural circulation) (completed 2026-03-21)
 - [x] **Phase 25: Argument Structure Audit** - Sweep all public functions and constructors, replace keyword-only where positional + multiple dispatch is more idiomatic Julia (completed 2026-03-26)
-- [ ] **Phase 26: NC Regime HTC + LOF Cleanup** - Wire NC detection (Gr/Re²>1 → Elenbaas override) into regime_dependent, wire into build_loop_lof_bypass, validate NC temperature rise against Elenbaas, remove dead build_loop_lof, fix stale docs
+- [x] **Phase 26: NC Regime HTC + LOF Cleanup** - Wire NC detection (Gr/Re²>1 → Elenbaas override) into regime_dependent, wire into build_loop_lof_bypass, validate NC temperature rise against Elenbaas, remove dead build_loop_lof, fix stale docs (completed 2026-03-26)
 
 ## Phase Details
 
@@ -204,7 +204,7 @@ Plans:
 
 Plans:
 - [x] 26-01: Extend regime_dependent with NC detection + wire into build_loop_lof_bypass
-- [ ] 26-02: VAL-02 temperature-rise test + remove build_loop_lof + stale doc fixes
+- [x] 26-02: VAL-02 temperature-rise test + remove build_loop_lof + stale doc fixes
 
 ## Progress
 
@@ -239,7 +239,7 @@ Plans:
 | 24. Loss-of-Flow Validation | v0.6 | 1/1 | Complete    | 2026-03-21 |
 | 24.1. Bypass LOF Topology | v0.6 | 2/2 | Complete   | 2026-03-21 |
 | 25. Argument Structure Audit | v0.6 | 1/1 | Complete    | 2026-03-26 |
-| 26. NC Regime HTC + LOF Cleanup | v0.6 | 1/2 | In Progress|  |
+| 26. NC Regime HTC + LOF Cleanup | v0.6 | 2/2 | Complete   | 2026-03-26 |
 
 ---
 
