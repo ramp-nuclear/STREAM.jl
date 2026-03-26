@@ -182,7 +182,7 @@ Plans:
   2. Short utility functions and internal `_`-prefixed helpers use positional arguments where natural
   3. Large multi-arg constructors where keyword-only prevents argument-order bugs remain keyword-only (no regression)
   4. CLAUDE.md updated to reflect the new rule: positional + dispatch preferred when types differ; keyword-only when distinguishing between named concepts of the same type
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 25-01: Argument structure sweep and CLAUDE.md update
