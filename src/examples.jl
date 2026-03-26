@@ -436,7 +436,19 @@ function build_loop_lof_bypass(;
     @named pump    = Pump(0.0)
     @named ine     = Inertia(L_over_A)
     @named hx      = HeatExchanger(T_inlet)
-    @named ch      = ChannelHeatFlux(n=n, geometry=geom, g=-g_acc, T_wall=T_wall)
+    # NC-enabled regime switching for heated channel (D-10)
+    rd_ch = regime_dependent(
+        htc_laminar        = constant_Nusselt(Nu=8.235),
+        htc_turbulent      = dittus_boelter,
+        friction_laminar   = laminar_friction(1.0),
+        friction_turbulent = blasius_friction,
+        htc_natural        = elenbaas_htc(b=D_ch, L=L_ch, Dh=D_ch, g=g_acc),
+        Dh                 = D_ch,
+        g                  = g_acc,
+    )
+    @named ch      = ChannelHeatFlux(n=n, geometry=geom, g=-g_acc, T_wall=T_wall,
+                                     htc_correlation      = rd_ch.htc,
+                                     friction_correlation = rd_ch.friction)
     @named ret     = Channel(n=n, geometry=geom, g=g_acc)
     # use_callback=false: MTK's SymbolicContinuousCallback is incompatible with parallel
     # topologies where channel inertia (Dt(mdot)) appears in the pressure balance equations

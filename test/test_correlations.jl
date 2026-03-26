@@ -330,3 +330,64 @@ end
 end
 
 end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 26: NC regime detection in regime_dependent
+# NATCONV-01: regime_dependent NC kwargs — branch selection, backward compat,
+#             ArgumentError on partial kwargs, @warn on Dh/g without htc_natural
+# ─────────────────────────────────────────────────────────────────────────────
+
+@testset "NATCONV-01: regime_dependent NC detection" begin
+    # Setup: laminar HTC returns 4.0, turbulent returns 100.0, NC returns 999.0
+    htc_lam  = (Re, Pr, T_b, T_w) -> 4.0
+    htc_turb = (Re, Pr, T_b, T_w) -> 100.0
+    htc_nc   = (Re, Pr, T_b, T_w) -> 999.0
+    f_lam    = (Re) -> 64.0 / Re
+    f_turb   = (Re) -> 0.316 * Re^(-0.25)
+
+    # Test 1: NC branch selected when Gr/Re^2 > 1
+    # Use low Re (high Gr/Re^2) and large dT to trigger NC
+    rd = regime_dependent(
+        htc_laminar=htc_lam, htc_turbulent=htc_turb,
+        friction_laminar=f_lam, friction_turbulent=f_turb,
+        htc_natural=htc_nc, Dh=0.01, g=9.81,
+    )
+    # At Re=10, Pr=7, T_bulk=313.15 (40C), T_wall=373.15 (100C):
+    # beta ~ 3.85e-4, nu ~ 6.6e-7, Gr = beta*g*60*0.01^3/nu^2 ~ 520
+    # Re^2 = 100. Gr/Re^2 ~ 5.2 > 1 => NC branch
+    @test rd.htc(10.0, 7.0, 313.15, 373.15) == 999.0
+
+    # Test 2: Forced-conv branch selected when Gr/Re^2 < 1
+    # At Re=5000 (turbulent, Re^2=25e6 >> Gr): forced turb branch
+    @test rd.htc(5000.0, 7.0, 313.15, 373.15) == 100.0
+
+    # Test 3: Laminar forced at low Re when Gr/Re^2 < 1 (small dT)
+    # T_wall ~ T_bulk => Gr ~ 0 => forced branch => laminar at Re=100
+    @test rd.htc(100.0, 7.0, 313.15, 313.20) == 4.0
+
+    # Test 4: Friction unchanged by NC kwargs
+    @test rd.friction(100.0) == 64.0 / 100.0     # laminar
+    @test rd.friction(5000.0) == 0.316 * 5000.0^(-0.25)  # turbulent
+
+    # Test 5: Backward compat — no NC kwargs => identical to existing regime_dependent
+    rd_no_nc = regime_dependent(
+        htc_laminar=htc_lam, htc_turbulent=htc_turb,
+        friction_laminar=f_lam, friction_turbulent=f_turb,
+    )
+    @test rd_no_nc.htc(100.0, 7.0, 313.15, 373.15) == 4.0   # laminar forced
+    @test rd_no_nc.htc(5000.0, 7.0, 313.15, 373.15) == 100.0 # turbulent forced
+
+    # Test 6: D-04 — htc_natural without g => ArgumentError
+    @test_throws ArgumentError regime_dependent(
+        htc_laminar=htc_lam, htc_turbulent=htc_turb,
+        friction_laminar=f_lam, friction_turbulent=f_turb,
+        htc_natural=htc_nc, Dh=0.01,  # g missing
+    )
+
+    # Test 7: D-03 — Dh and g without htc_natural => @warn
+    @test_logs (:warn, r"NC regime will not be detected") regime_dependent(
+        htc_laminar=htc_lam, htc_turbulent=htc_turb,
+        friction_laminar=f_lam, friction_turbulent=f_turb,
+        Dh=0.01, g=9.81,  # htc_natural missing
+    )
+end
