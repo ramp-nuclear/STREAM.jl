@@ -148,4 +148,4 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - Loss-of-flow validation scenario
 
 ---
-*Last updated: 2026-03-21 after Phase 24 complete — loss-of-flow transient validation shipped (VAL-01, VAL-02 passing, 16 tests)*
+*Last updated: 2026-03-26 after Phase 25 complete — argument structure audit shipped (6 signatures converted to positional, CLAUDE.md two-tier convention rule codified)*
