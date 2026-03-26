@@ -4,7 +4,7 @@ milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: unknown
 stopped_at: Completed 26-02-PLAN.md (plan 02 of 02 in phase 26)
-last_updated: "2026-03-26T22:37:41.050Z"
+last_updated: "2026-03-26T23:02:10.371Z"
 progress:
   total_phases: 8
   completed_phases: 8
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-03-17)
 
 ## Current Position
 
-Phase: 26 (nc-regime-htc-lof-cleanup) — EXECUTING
-Plan: 2 of 2
+Phase: 26
+Plan: Not started
 
 ## Performance Metrics
 
