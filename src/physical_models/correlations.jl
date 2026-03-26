@@ -106,7 +106,7 @@ end
 
 """
     regime_dependent(; htc_laminar, htc_turbulent, friction_laminar, friction_turbulent,
-                       Re_transition=2300) -> (htc=fn, friction=fn)
+                       Re_transition=2300, htc_natural=nothing, Dh=nothing, g=nothing) -> (htc=fn, friction=fn)
 
 Factory returning a named tuple of regime-switching HTC and friction correlations.
 Switches between laminar and turbulent correlations using `ifelse()` — MTK-compatible
@@ -114,6 +114,24 @@ smooth switching (established project pattern; same as flow reversal in Channel)
 
 `Re_transition` is converted to `Float64` immediately to avoid type-promotion issues
 when `Re` is a Symbolics.Num at system-build time.
+
+When `htc_natural`, `Dh`, and `g` are all provided, the returned `htc` closure additionally
+switches to the natural convection correlation when `Gr/Re^2 > 1` (Grashof-over-Reynolds-squared
+criterion, matching Python STREAM convention). In this mode, the HTC closure computes:
+- `Gr = beta * g * dT * Dh^3 / nu^2` from T_bulk and T_wall
+- If `Gr/Re^2 > 1`: return `htc_natural(Re, Pr, T_bulk, T_wall)` (natural convection)
+- Else: return forced-convection (laminar or turbulent based on Re vs Re_transition)
+
+# Arguments
+- `htc_laminar`: HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu` for laminar forced convection
+- `htc_turbulent`: HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu` for turbulent forced convection
+- `friction_laminar`: friction closure `(Re) -> f` for laminar regime
+- `friction_turbulent`: friction closure `(Re) -> f` for turbulent regime
+- `Re_transition`: Reynolds number transition threshold (default 2300)
+- `htc_natural`: optional NC HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu`; when provided
+  with `Dh` and `g`, enables NC regime switching via `Gr/Re^2 > 1`
+- `Dh`: hydraulic diameter [m] for Grashof computation (required when `htc_natural` is provided)
+- `g`: gravitational acceleration [m/s^2] for Grashof computation (required when `htc_natural` is provided)
 
 Returns:
 ```julia
@@ -133,6 +151,17 @@ rd = regime_dependent(
     Re_transition      = 2300.0
 )
 ChannelAndContacts(htc_correlation = rd.htc, friction_correlation = rd.friction, ...)
+
+# With NC detection:
+rd_nc = regime_dependent(
+    htc_laminar        = constant_Nusselt(Nu=8.235),
+    htc_turbulent      = dittus_boelter,
+    friction_laminar   = laminar_friction(geom.depth / geom.width),
+    friction_turbulent = blasius_friction,
+    htc_natural        = elenbaas_htc(b=D_ch, L=L_ch, Dh=D_ch, g=g_acc),
+    Dh                 = D_ch,
+    g                  = g_acc,
+)
 ```
 """
 function regime_dependent(;
@@ -140,13 +169,41 @@ function regime_dependent(;
     htc_turbulent,
     friction_laminar,
     friction_turbulent,
-    Re_transition = 2300)
+    Re_transition = 2300,
+    htc_natural   = nothing,
+    Dh            = nothing,
+    g             = nothing)
 
     # Convert to Float64 immediately — avoids type-promotion issues with symbolic Re
     Re_tr = Float64(Re_transition)
 
-    htc_fn      = (Re, Pr, T_bulk, T_wall) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr, T_bulk, T_wall), htc_turbulent(Re, Pr, T_bulk, T_wall))
-    friction_fn = (Re)                     -> ifelse(Re < Re_tr, friction_laminar(Re), friction_turbulent(Re))
+    # D-04: htc_natural requires both Dh and g
+    if !isnothing(htc_natural) && (isnothing(Dh) || isnothing(g))
+        throw(ArgumentError("regime_dependent: htc_natural provided but Dh or g is missing — all three (htc_natural, Dh, g) must be supplied together."))
+    end
+
+    # D-03: Dh or g without htc_natural is a likely miscall — warn
+    if isnothing(htc_natural) && (!isnothing(Dh) || !isnothing(g))
+        @warn "regime_dependent: Dh and g supplied but htc_natural not provided — NC regime will not be detected."
+    end
+
+    if !isnothing(htc_natural)
+        # NC-enabled path: switch on Gr/Re^2 > 1
+        Dh_val = Float64(Dh)
+        g_val  = Float64(g)
+        htc_forced_fn = (Re, Pr, T_bulk, T_wall) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr, T_bulk, T_wall), htc_turbulent(Re, Pr, T_bulk, T_wall))
+        htc_fn = (Re, Pr, T_bulk, T_wall) -> begin
+            beta_v = beta_water(T_bulk)
+            nu_v   = mu_water(T_bulk) / rho_water(T_bulk)
+            Gr_val = Gr(beta_v, g_val, T_wall - T_bulk, Dh_val, nu_v)
+            ifelse(Gr_val / Re^2 > 1, htc_natural(Re, Pr, T_bulk, T_wall), htc_forced_fn(Re, Pr, T_bulk, T_wall))
+        end
+    else
+        # Existing forced-convection-only path (backward compatible)
+        htc_fn = (Re, Pr, T_bulk, T_wall) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr, T_bulk, T_wall), htc_turbulent(Re, Pr, T_bulk, T_wall))
+    end
+
+    friction_fn = (Re) -> ifelse(Re < Re_tr, friction_laminar(Re), friction_turbulent(Re))
 
     return (htc = htc_fn, friction = friction_fn)
 end

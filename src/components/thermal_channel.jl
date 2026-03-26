@@ -68,6 +68,7 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         (T_wall_right(t))[1:n] # observed — alias for thermal_right[i].T
         (q_wall_left(t))[1:n]  # observed — Q_flow from left face
         (q_wall_right(t))[1:n] # observed — Q_flow from right face
+        (Gr_over_Re2(t))[1:n]  # observed — Gr/Re^2 NC criterion
         (q_wall(t))[1:n]      # unknown  — per-cell total heat (referenced in Q_wall_total)
         T_out(t)              = 600.0
         dP(t)
@@ -132,6 +133,9 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         push!(obs, T_wall_right[i] ~ thermal_right[i].T)
         push!(obs, q_wall_left[i]  ~ thermal_left[i].Q_flow)
         push!(obs, q_wall_right[i] ~ thermal_right[i].Q_flow)
+        nu_i = mu_water(T[i]) / rho_water(T[i])
+        Gr_i = Gr(beta_water(T[i]), g_acc, thermal_left[i].T - T[i], Dh, nu_i)
+        push!(obs, Gr_over_Re2[i] ~ Gr_i / Re_i^2)
     end
 
     # Re, Nu, v are now observed (not solver unknowns)
@@ -188,13 +192,14 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
     end
 
     vars = @variables begin
-        (T(t))[1:n]      = fill(600.0, n)
+        (T(t))[1:n]           = fill(600.0, n)
         (Re(t))[1:n]
         (Nu(t))[1:n]
         (h_tc(t))[1:n]
         (v(t))[1:n]
         (q_wall(t))[1:n]
-        T_out(t)         = 600.0
+        (Gr_over_Re2(t))[1:n]
+        T_out(t)              = 600.0
         dP(t)
     end
 
@@ -222,10 +227,12 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
         push!(eqs, q_wall[i] ~ h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i]))
+        nu_i = mu_water(T[i]) / rho_water(T[i])
+        push!(eqs, Gr_over_Re2[i] ~ Gr(beta_water(T[i]), g_acc, T_wall_p - T[i], Dh, nu_i) / Re[i]^2)
     end
 
     all_vars = [collect(T); collect(Re); collect(Nu); collect(h_tc);
-                collect(v); collect(q_wall); T_out; dP]
+                collect(v); collect(q_wall); collect(Gr_over_Re2); T_out; dP]
 
     compose(System(eqs, t, all_vars, pars; name=name), port_in, port_out)
 end
