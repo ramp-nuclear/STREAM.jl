@@ -1,10 +1,11 @@
 ---
 phase: 21
 slug: fluid-properties-natural-convection
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-17
+audited: 2026-03-27
 ---
 
 # Phase 21 — Validation Strategy
@@ -38,12 +39,12 @@ created: 2026-03-17
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 21-01-01 | 01 | 1 | FLUID-01 | unit | `julia --project -e 'include("test/test_fluids.jl")'` | ✅ exists | ⬜ pending |
-| 21-01-02 | 01 | 1 | FLUID-02, FLUID-03 | unit | `julia --project -e 'include("test/test_fluids.jl")'` | ✅ exists | ⬜ pending |
-| 21-01-03 | 01 | 1 | FLUID-01, FLUID-02, FLUID-03 | unit | `julia --project test/runtests.jl` | ✅ exists | ⬜ pending |
-| 21-02-01 | 02 | 2 | NATCONV-01 | unit | `julia --project -e 'include("test/test_correlations.jl")'` | ✅ exists | ⬜ pending |
-| 21-02-02 | 02 | 2 | NATCONV-02 | unit | `julia --project -e 'include("test/test_correlations.jl")'` | ✅ exists | ⬜ pending |
-| 21-02-03 | 02 | 2 | NATCONV-01 | integration | `julia --project test/runtests.jl` | ✅ exists | ⬜ pending |
+| 21-01-01 | 01 | 1 | FLUID-01 | unit | `julia --project -e 'include("test/test_fluids.jl")'` | ✅ exists | ✅ green |
+| 21-01-02 | 01 | 1 | FLUID-02, FLUID-03 | unit | `julia --project -e 'include("test/test_fluids.jl")'` | ✅ exists | ✅ green |
+| 21-01-03 | 01 | 1 | FLUID-01, FLUID-02, FLUID-03 | unit | `julia --project test/runtests.jl` | ✅ exists | ✅ green |
+| 21-02-01 | 02 | 2 | NATCONV-01 | unit | `julia --project -e 'include("test/test_correlations.jl")'` | ✅ exists | ✅ green |
+| 21-02-02 | 02 | 2 | NATCONV-02 | unit | `julia --project -e 'include("test/test_correlations.jl")'` | ✅ exists | ✅ green |
+| 21-02-03 | 02 | 2 | NATCONV-01 | integration | `julia --project test/runtests.jl` | ✅ exists | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -63,11 +64,21 @@ All phase behaviors have automated verification.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-03-27 — all 6 tasks green, 0 gaps
+
+---
+
+## Validation Audit 2026-03-27
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
