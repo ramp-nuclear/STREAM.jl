@@ -261,4 +261,22 @@ end
 
     # 30% tolerance: accounts for property variations and small ext_res bypass flow
     @test isapprox(mdot_nc, mdot_analytical; rtol=0.30)
+
+    # VAL-02 temperature rise: NC-phase dT through heated channel (ch) matches
+    # Elenbaas analytical estimate (D-14, D-15).
+    #
+    # In reversed NC flow, fluid enters ch at Node B (ret.T[1]) and exits at Node A (ch.T[1]).
+    # The actual inlet temperature to ch is ret.T[1], which is > BYPASS_T_INLET because the
+    # return channel cools the fluid but not fully back to T_inlet.
+    # We measure the actual temperature rise through ch: T_max_nc - T_inlet_nc.
+    T_inlet_nc = mean([sol[ssys.ret.T[1], idx] for idx in nc_indices])
+    T_bulk_nc  = (BYPASS_T_INLET + T_max_nc) / 2
+    htc_fn_nc  = elenbaas_htc(b=BYPASS_D_CH, L=BYPASS_L_CH, Dh=BYPASS_D_CH, g=BYPASS_G_ACC)
+    Pr_nc      = cp_water(T_bulk_nc) * mu_water(T_bulk_nc) / k_water(T_bulk_nc)
+    Nu_nc      = htc_fn_nc(0.0, Pr_nc, T_bulk_nc, BYPASS_T_WALL)
+    h_nc       = Nu_nc * k_water(T_bulk_nc) / BYPASS_D_CH
+    A_heated   = pi * BYPASS_D_CH * BYPASS_L_CH
+    DeltaT_analytical = (BYPASS_T_WALL - BYPASS_T_INLET) *
+                        (1 - exp(-h_nc * A_heated / (mdot_nc * cp_water(BYPASS_T_INLET))))
+    @test isapprox(T_max_nc - T_inlet_nc, DeltaT_analytical; rtol=0.30)
 end

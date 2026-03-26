@@ -212,9 +212,12 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
     T_inlet_rev = instream(port_out.T)
 
     # Common equations: v, Re, Nu, h_tc, dP, T_out, port wiring
+    # Pass T_wall_p as T_wall_cells so the htc_correlation receives the actual wall
+    # temperature (needed for NC regime detection in regime_dependent: Gr/Re²>1 check).
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
                       port_in, port_out, Dh, A, L, g_acc=g, dz,
-                      htc_correlation, friction_correlation)
+                      htc_correlation, friction_correlation,
+                      T_wall_cells = fill(T_wall_p, n))
 
     # Per-cell energy balance using T_wall_p parameter
     for i in 1:n
