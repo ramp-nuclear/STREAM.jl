@@ -219,7 +219,7 @@ Plans:
 | 23. Flapper & Solver Events | v0.6 | 2/2 | Complete    | 2026-03-20 |
 | 24. Loss-of-Flow Validation | v0.6 | 1/1 | Complete    | 2026-03-21 |
 | 24.1. Bypass LOF Topology | v0.6 | 2/2 | Complete   | 2026-03-21 |
-| 25. Argument Structure Audit | v0.6 | 1/1 | Complete   | 2026-03-26 |
+| 25. Argument Structure Audit | v0.6 | 1/1 | Complete    | 2026-03-26 |
 
 ---
 
