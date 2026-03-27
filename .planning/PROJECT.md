@@ -12,6 +12,17 @@ v0.1 shipped a single forced-convection coolant loop validated against Python ST
 
 See `.planning/MILESTONES.md` for full v0.7 details.
 
+## Current Milestone: v0.7 Safety Physics & Pressure Field
+
+**Goal:** Add per-cell absolute pressure to all channel components, implement subcooled boiling HTC with in-loop correction, deliver a post-process threshold analysis suite matching Python STREAM, and complete the laminar HTC and friction correlation libraries.
+
+**Target features:**
+- Pressure infrastructure: per-cell P[i], dP refactor, sat_temperature, T_sat/T_ONB observables
+- Subcooled boiling: McAdams, Bergles-Rohsenow, partial SCB, in-loop Option B correction
+- Threshold analysis: ONB, OFI, OSV, CHF (×3), twall_limit, threshold_analysis post-processor
+- HTC completions: Marco-Han Nusselt, developing/fully-developed laminar, maximal_htc
+- Friction completions: Colebrook-White, viscosity correction
+
 ## Core Value
 
 A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
@@ -82,7 +93,22 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 
 ### Active
 
-<!-- v0.7 requirements — now validated -->
+<!-- v0.7 requirements — Safety Physics & Pressure Field -->
+
+- [ ] Per-cell absolute pressure P[i] as observed variables in all channel variants
+- [ ] Refactor dP to exact per-cell sum (replaces i_mid lumped approximation)
+- [ ] sat_temperature(P) @register_symbolic fluid function
+- [ ] T_sat[i], T_ONB[i] as observed in ChannelAndContacts and ChannelHeatFlux
+- [ ] McAdams and Bergles-Rohsenow subcooled boiling heat flux correlations
+- [ ] partial_SCB_correction and regime_dependent_q_scb
+- [ ] In-loop SCB correction in ChannelAndContacts (Option B: ifelse on T_wall >= T_ONB)
+- [ ] Threshold analysis physics layer (T_ONB, q_OFI, q_OSV, q_CHF x3, twall_limit)
+- [ ] threshold_analysis(sol, ssys.ch; ...) post-process function
+- [ ] Marco_Han_Nusselt analytical rectangular duct correlation
+- [ ] developing_laminar_h_spl and fully_developed_laminar_h_spl
+- [ ] maximal_htc(...) elementwise-max correlation combinator
+- [ ] turbulent_friction(Re, epsilon) Colebrook-White
+- [ ] viscosity_correction(heat_wet_ratio, mu_ratio)
 
 > **Gap analysis available:** `.planning/GAP-ANALYSIS.md` contains a full feature-by-feature comparison of Python STREAM vs Julia STREAM (compiled 2026-03-16, v0.5.0). ~80 items missing; Priority 1 (9 items) covers the non-negotiable core for real reactor simulations.
 
@@ -169,4 +195,4 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
 
 ---
-*Last updated: 2026-04-01 after v0.7 milestone — Safety Physics & Pressure Field shipped: pressure field, momentum ODE, subcooled boiling, threshold analysis, HTC/friction completions.*
+*Last updated: 2026-03-27 after v0.7 milestone started — Safety Physics & Pressure Field (per-cell pressure, SCB, threshold analysis, HTC/friction completions)*

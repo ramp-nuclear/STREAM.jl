@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Safety Physics & Pressure Field
-status: complete
-stopped_at: v0.7 milestone complete — archived 2026-04-01
-last_updated: "2026-04-01T00:00:00.000Z"
+status: planning
+stopped_at: Defining requirements
+last_updated: "2026-03-27"
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 13
-  completed_plans: 13
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # STATE: STREAM.jl
@@ -30,7 +30,10 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 
 ## Current Position
 
-Milestone v0.7 complete. Starting v0.8 planning.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-27 — Milestone v0.7 started
 
 ## Performance Metrics
 
