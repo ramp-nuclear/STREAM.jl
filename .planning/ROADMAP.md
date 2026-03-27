@@ -108,9 +108,9 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
   2. `sol[ch.dP]` equals `sum(dp[i])` exactly (per-cell sum, not i_mid lump)
   3. `sat_temperature(P)` is callable from MTK equations and returns physically correct saturation temperature for typical reactor pressures (e.g. ~393 K at 2 bar)
   4. `sol[ch.T_sat[i], :]` and `sol[ch.T_ONB[i], :]` are accessible observables in ChannelAndContacts and ChannelHeatFlux
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
-- [ ] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
+- [x] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
 - [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
 
 ### Phase 28: Subcooled Boiling
@@ -187,7 +187,7 @@ Plans:
 | 24.1. Bypass LOF Topology | v0.6 | 2/2 | Complete | 2026-03-21 |
 | 25. Argument Structure Audit | v0.6 | 1/1 | Complete | 2026-03-26 |
 | 26. NC Regime HTC + LOF Cleanup | v0.6 | 2/2 | Complete | 2026-03-26 |
-| 27. Pressure Field | v0.7 | 0/2 | Planning | - |
+| 27. Pressure Field | v0.7 | 1/2 | In Progress|  |
 | 28. Subcooled Boiling | v0.7 | 0/? | Not started | - |
 | 29. Threshold Analysis | v0.7 | 0/? | Not started | - |
 | 30. HTC & Friction Completions | v0.7 | 0/? | Not started | - |
