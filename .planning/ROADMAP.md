@@ -108,7 +108,10 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
   2. `sol[ch.dP]` equals `sum(dp[i])` exactly (per-cell sum, not i_mid lump)
   3. `sat_temperature(P)` is callable from MTK equations and returns physically correct saturation temperature for typical reactor pressures (e.g. ~393 K at 2 bar)
   4. `sol[ch.T_sat[i], :]` and `sol[ch.T_ONB[i], :]` are accessible observables in ChannelAndContacts and ChannelHeatFlux
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
+- [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
 
 ### Phase 28: Subcooled Boiling
 **Goal**: Subcooled boiling heat flux correlations are available as standalone functions and ChannelAndContacts can optionally apply an in-loop SCB correction when wall temperature exceeds T_ONB
@@ -119,7 +122,10 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
   2. `regime_dependent_q_scb` selects the correct correlation branch (McAdams for turbulent, Bergles-Rohsenow for laminar) based on Re
   3. ChannelAndContacts with `scb_correction` kwarg solves without error; when `T_wall[i] < T_ONB[i]` the effective HTC matches the pure single-phase result exactly
   4. When `T_wall >> T_sat`, the effective HTC from the SCB-corrected ChannelAndContacts is measurably higher than the uncorrected single-phase HTC
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
+- [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
 
 ### Phase 29: Threshold Analysis
 **Goal**: The full Python STREAM threshold analysis suite is available as callable Julia functions (physics layer) and as a post-process runner that accepts an ODESolution and returns named safety margins per cell
@@ -130,7 +136,10 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
   2. `threshold_analysis(sol, ch; ...)` returns a NamedTuple with one field per threshold function provided by the caller
   3. `threshold_analysis` handles both steady-state and transient ODESolution without branching at the call site; steady returns one value per cell, transient returns a vector per cell
   4. Results for at least one CHF correlation match Python STREAM output within 5% on the canonical MTR geometry
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
+- [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
 
 ### Phase 30: HTC & Friction Completions
 **Goal**: The correlation library covers developing and fully-developed laminar rectangular-duct flow, a combinator for taking the elementwise maximum across correlations, Colebrook-White turbulent friction, and a viscosity correction factor
@@ -141,7 +150,10 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
   2. `fully_developed_laminar_h_spl` and `developing_laminar_h_spl` return pluggable 4-arg closures accepted by `regime_dependent` without modification
   3. `maximal_htc(corr1, corr2)` returns a closure that produces the elementwise max Nu when called; demonstrated with at least two correlations
   4. `turbulent_friction(Re, epsilon)` returns Darcy friction factor consistent with Moody chart values; smooth-pipe limit matches Blasius within 2% for Re in [4000, 1e5]
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
+- [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
 
 ## Progress
 
@@ -175,7 +187,7 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 | 24.1. Bypass LOF Topology | v0.6 | 2/2 | Complete | 2026-03-21 |
 | 25. Argument Structure Audit | v0.6 | 1/1 | Complete | 2026-03-26 |
 | 26. NC Regime HTC + LOF Cleanup | v0.6 | 2/2 | Complete | 2026-03-26 |
-| 27. Pressure Field | v0.7 | 0/? | Not started | - |
+| 27. Pressure Field | v0.7 | 0/2 | Planning | - |
 | 28. Subcooled Boiling | v0.7 | 0/? | Not started | - |
 | 29. Threshold Analysis | v0.7 | 0/? | Not started | - |
 | 30. HTC & Friction Completions | v0.7 | 0/? | Not started | - |
