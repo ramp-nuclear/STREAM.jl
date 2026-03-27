@@ -4,7 +4,7 @@
 
 STREAM.jl is a Julia rewrite of the Python package STREAM (System Thermohydraulics for Reactor Evaluation, Analysis & Modeling) — a nuclear reactor thermal-hydraulics simulation code. It models heat evacuation in reactor systems through coupled differential-algebraic equations, using ModelingToolkit.jl (MTK) as the core symbolic modeling engine instead of the hand-rolled Aggregator+DAE approach used in Python STREAM.
 
-v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls. v0.5 reorganized the codebase to the canonical CLAUDE.md file layout, split the monolithic test file into 13 focused modules, added Julia docstrings to all 28 exported names, and expanded CLAUDE.md with rationale and MTK patterns.
+v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls. v0.5 reorganized the codebase to the canonical CLAUDE.md file layout, split the monolithic test file into 13 focused modules, added Julia docstrings to all 28 exported names, and expanded CLAUDE.md with rationale and MTK patterns. v0.6 delivered flow reversal systems: sign-safe channel components with ifelse() upwinding, thermal expansion coefficient and Elenbaas natural convection HTC, time-varying Pump callable dispatch, Flapper check-valve with MTK continuous events, and a validated loss-of-flow transient with physically correct 4-node bypass topology covering forced flow, pump coastdown, flow reversal, Flapper opening, and established natural circulation.
 
 ## Core Value
 
@@ -52,23 +52,23 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - ✓ All 28 exported names have structured Julia docstrings (`# Arguments`, `# Ports`, `# Returns`) — v0.5
 - ✓ CLAUDE.md rewritten with **Why:** rationale after every rule and MTK Patterns reference section — v0.5
 - ✓ `Project.toml` bumped to `0.5.0`; `ChannelHeatFlux` and `ConstantTemperature` confirmed exported, tested, documented — v0.5
-- ✓ `regime_dependent` extended with NC detection: Gr/Re² > 1 switches to `htc_natural`; `Gr_over_Re2[i]` observable added to `ChannelAndContacts` and `ChannelHeatFlux`; `build_loop_lof_bypass` wires Elenbaas NC HTC — v0.6 Phase 26 (Validated in Phase 26: NATCONV-01)
-- ✓ VAL-02 NC temperature-rise assertion added; dead `build_loop_lof` removed; HTC docstrings corrected; 24.1-VERIFICATION.md rewritten to 5/5 pass — v0.6 Phase 26 (Validated in Phase 26: VAL-02)
+- ✓ `regime_dependent` extended with NC detection: Gr/Re² > 1 switches to `htc_natural`; `Gr_over_Re2[i]` observable added to `ChannelAndContacts` and `ChannelHeatFlux`; `build_loop_lof_bypass` wires Elenbaas NC HTC — v0.6
+- ✓ VAL-02 NC temperature-rise assertion passes; NC dT matches Elenbaas analytical estimate within 30% rtol (actual ratio 0.997) — v0.6
+- ✓ All channel types (Channel, ChannelAndContacts, ChannelHeatFlux) sign-safe: ifelse() upwinding selects upstream T by mdot sign; abs(mdot) in Re; port_in.T ~ T[1] stream equation corrected — v0.6
+- ✓ `beta_water(T)` thermal expansion coefficient, @register_symbolic, validated at 3 reference temperatures — v0.6
+- ✓ `Gr`, `Ra` dimensionless number utilities; 4-arg HTC interface (Re, Pr, T_bulk, T_wall) extended to all correlations and channel components — v0.6
+- ✓ `elenbaas_nusselt(Ra, b, L)` Elenbaas 1942 parallel-plate natural convection; `elenbaas_htc(; b, L, Dh, g)` factory returning pluggable 4-arg closure — v0.6
+- ✓ `Pump(dP_pump::Any; name)` callable dispatch via MTK `@parameters (dP_pump_fn::FType)(..)` pattern; `solve_transient` redesigned to positional API matching Python STREAM — v0.6
+- ✓ `Flapper` check-valve: C1 smooth ramp (Hermite cubic), MTK SymbolicContinuousCallback latch (T_open=1e30 sentinel, affect_neg fires on downward crossing), wired via plain algebraic equation — v0.6
+- ✓ `solve_transient` accepts optional `callbacks` keyword for user-supplied DifferentialEquations.jl events alongside MTK-native Flapper events — v0.6
+- ✓ Loss-of-flow transient validated end-to-end via `build_loop_lof_bypass`: 4-node bypass topology (real junctions, parallel channel/Flapper paths, standalone Inertia), energy balance <0.09% rtol, natural circulation established — v0.6
+- ✓ All public functions migrated from keyword-only to positional + multiple dispatch where argument types differ (6 signatures: Resistor, Gravity, Inertia, HeatExchanger, ConstantTemperature, laminar_friction) — v0.6
 
 ### Active
 
-<!-- v0.6 Flow Reversal Systems -->
+<!-- v0.7+ requirements — defined in next /gsd:new-milestone cycle -->
 
-- [ ] All existing components (Channel, ChannelAndContacts, ChannelHeatFlux) handle negative mass flow correctly (sign-safe audit and fixes)
-- [ ] `beta_water(T)` thermal expansion coefficient for light water added to fluids.jl
-- [ ] `Gr` and `Ra` dimensionless number utilities available
-- [ ] Elenbaas natural convection HTC correlation implemented and pluggable
-- [ ] `Pump(dP_pump=f(t))` accepts a Julia callable for time-varying pressure rise
-- [ ] `Flapper` component: smooth check valve with C1 ramp, MTK continuous event trigger, `ref_mdot` wiring
-- [ ] `ContinuousCallback` (event) support exposed in `solve_transient`
-- [ ] Loss-of-flow transient validated: forced flow → pump off → flow reversal → Flapper opens → natural circulation
-
-> **Gap analysis available:** `.planning/GAP-ANALYSIS.md` contains a full feature-by-feature comparison of Python STREAM vs Julia STREAM (compiled 2026-03-16, v0.5.0). Use this as the primary input when scoping v0.6+ milestones. ~80 items missing; Priority 1 (9 items) covers the non-negotiable core for real reactor simulations.
+> **Gap analysis available:** `.planning/GAP-ANALYSIS.md` contains a full feature-by-feature comparison of Python STREAM vs Julia STREAM (compiled 2026-03-16, v0.5.0). ~80 items missing; Priority 1 (9 items) covers the non-negotiable core for real reactor simulations.
 
 ### Out of Scope
 
@@ -89,6 +89,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **v0.3 shipped** 2026-03-14 — ~1,003 Julia LOC, 161 tests, 4 phases (10-12.1), 8 plans
 - **v0.4 shipped** 2026-03-16 — ~3,268 Julia LOC, 4 phases (13-16), 7 plans; 15 requirements complete
 - **v0.5 shipped** 2026-03-16 — ~3,750 Julia LOC (src + test), 3 phases (17-19), 6 plans; 15 requirements complete; canonical file layout, full docstrings, 13-file test suite
+- **v0.6 shipped** 2026-03-27 — 2,373 src LOC, 8 phases (20-26 incl. 24.1), 14 plans; 21 requirements complete; flow reversal, Flapper, Elenbaas NC, LOF transient validated
 - Python STREAM lives at ~/projects/STREAM and is the reference implementation for all validation
 - MTK architecture validated through five milestones: acausal connect() + mtkcompile + Sundials IDA replaces Aggregator pattern
 - Friction is handled inside Channel (Darcy-Weisbach inline) — no separate Friction component in loop
@@ -130,6 +131,12 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 | Split test suite: one `test_*.jl` per source area | Each file has independent `using` blocks and runs in isolation; mirrors src/ layout | ✓ Good — TEST-01 confirmed; CLAUDE.md layout now fully mirrored |
 | CLAUDE.md includes **Why:** rationale for every rule | Rules without context get ignored or broken; rationale enables judgment at edge cases | ✓ Good — QOL-03 complete; MTK Patterns section added as reference |
 | `solve_transient` keyword-only aligns with project-wide convention | Consistent API: no function mixes positional and keyword arguments | ✓ Good — QOL-01 complete; MethodError guard now enforced |
+| Series-loop LOF topology replaced by 4-node bypass | Series topology had no real junctions; couldn't model parallel channel/Flapper paths or correct gravity signs per branch | ✓ Good — bypass topology is physically correct; NC established at expected mdot magnitude |
+| Channel momentum inertia reverted from Channel component; standalone Inertia used | `(L/A)*Dt(port_in.mdot)` in Channel breaks parallel topologies (current-source conflict at junctions); standalone Inertia in series is exact and composable | ✓ Good — all 5 bypass LOF tests pass; Inertia component handles this correctly |
+| Flapper sentinel T_open=1e30 (not Inf) | MTK parameter Inf causes domain errors in arithmetic (t - Inf = -Inf → xi clamp → NaN); sentinel 1e30 keeps `t - T_open < 0` until event fires | ✓ Good — FLAP-05/06 pass cleanly; sentinel pattern is the right MTK idiom |
+| Pump callable via `@parameters (dP_pump_fn::FType)(..)` | Captured Julia closure as typed MTK parameter; alternative (@register_symbolic) would be opaque and not accept closures | ✓ Good — PUMP-01/02/03 all pass; callable captured correctly in symbolic graph |
+| NC detection in `regime_dependent` via `Gr/Re²>1` with `ifelse()` | Hard if-branch creates solver discontinuity; ifelse() emits symbolic conditional same as Re-regime switching | ✓ Good — NC temperature rise matches Elenbaas within 0.3% (ratio 0.997) |
+| `solve_transient` redesigned to positional API `(ssys, op, t; ...)` | Mirrors Python STREAM API; keyword-only was inconsistent since v0.6 broke the "all keyword" convention by adding callable Pump | ✓ Good — cleaner call sites; 23 Pump call sites migrated; no regressions |
 
 ## Constraints
 
@@ -138,16 +145,5 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **Validation**: All results compared against Python STREAM on identical inputs. <1% steady-state; qualitative transient match
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
 
-## Current Milestone: v0.6 Flow Reversal Systems
-
-**Goal:** Enable loss-of-flow accident simulation — from forced flow through pump coastdown, flow reversal, Flapper opening, to established natural circulation.
-
-**Target features:**
-- Sign-safe components (all handle negative mass flow)
-- Elenbaas natural convection HTC + thermal expansion fluid property
-- Time-varying Pump pressure (`dP_pump` as callable)
-- Flapper component (smooth C1 trigger, MTK continuous event) — Validated in Phase 23: flapper-solver-events
-- Loss-of-flow validation scenario
-
 ---
-*Last updated: 2026-03-26 2026-03-26 after Phase 25 complete — argument structure audit shipped (6 signatures converted to positional, CLAUDE.md two-tier convention rule codified)*
+*Last updated: 2026-03-27 after v0.6 milestone shipped — flow reversal systems complete (Flapper, Elenbaas NC HTC, bypass LOF topology, NC regime detection, argument structure audit)*

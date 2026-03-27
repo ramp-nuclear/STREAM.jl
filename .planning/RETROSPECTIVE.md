@@ -228,6 +228,51 @@
 
 ---
 
+## Milestone: v0.6 — Flow Reversal Systems
+
+**Shipped:** 2026-03-27
+**Phases:** 8 (20-26 incl. 24.1) | **Plans:** 14
+
+### What Was Built
+- Sign-safe channel energy loops: ifelse() upwinding selects upstream temperature by mdot sign; abs(mdot) in Re; port_in.T ~ T[1] stream equation corrected in all three channel variants
+- `beta_water(T)` thermal expansion coefficient (@register_symbolic), `Gr`/`Ra` dimensionless utilities, 4-arg HTC interface `(Re, Pr, T_bulk, T_wall)` extended to all correlations and channel call sites
+- `elenbaas_nusselt(Ra, b, L)` Elenbaas 1942 natural convection correlation + `elenbaas_htc(; b, L, Dh, g)` pluggable factory; validated against Python STREAM MTR reference
+- Three-method Pump dispatch: `Pump(dP_pump::Real)`, `Pump(mdot0::Real)`, `Pump(dP_pump::Any)` for callable; `solve_transient` redesigned to positional API `(ssys, op, t; ...)`
+- `Flapper` check-valve: Hermite cubic C1 ramp, MTK SymbolicContinuousCallback latch (T_open=1e30 sentinel, affect_neg fires on downward ref_mdot crossing), wired via plain algebraic equation
+- 4-node bypass LOF topology (`build_loop_lof_bypass`): real junctions, parallel heated channel / Flapper shortcut paths, standalone Inertia, gravity signs per branch
+- `regime_dependent` extended with NC detection: `ifelse(Gr/Re² > 1, htc_natural(...), htc_forced)` — MTK-compatible; `Gr_over_Re2[i]` observable added
+- LOF transient validated: energy balance 0.09% rtol, NC established, dT matches Elenbaas within 0.3% (ratio 0.997)
+- 6 public signatures migrated from keyword-only to positional + multiple dispatch; CLAUDE.md two-tier convention rule codified
+
+### What Worked
+- `Flapper` sentinel pattern (T_open=1e30) is robust — avoids domain errors from Inf arithmetic; generalizable to any "unlatched" state machine in MTK
+- Series-loop → bypass topology replacement was the right call; the physical reasoning (real junctions, parallel paths) made the NC result significantly more meaningful
+- NC detection via `ifelse(Gr/Re² > 1)` is a direct match to Python STREAM convention and needed no convergence tuning
+- Phase 26 (NC cleanup) added Elenbaas temperature-rise validation retroactively to an already-passing test — fast and additive, no rework
+
+### What Was Inefficient
+- Series-loop LOF topology was built in Phase 24, found insufficient, and replaced by Phase 24.1 — the physical bypass requirement should have been identified during planning
+- Channel momentum inertia `(L/A)*Dt(port_in.mdot)` was added in Phase 24.1-01 and reverted in Phase 24.1-02 after discovering it breaks parallel topologies — cost one plan of rework
+- Phase 22 VALIDATION.md left as Nyquist non-compliant (tech debt in audit) — should have been closed at phase completion
+
+### Patterns Established
+- **Bypass topology is the correct LOF model**: any loss-of-flow scenario needs parallel flow paths; a series loop can't capture the physics of Flapper opening a bypass route
+- **Callable MTK parameters**: `@parameters (fn::FType)(..)` is the idiomatic pattern for time-varying inputs; `@register_symbolic` is for pure functions, not closures
+- **Sentinel value for event latch**: T_open=1e30 > any physical time; arithmetic with sentinel is safe; direct Inf initialization is not safe in MTK parameter arithmetic
+- **Positional + dispatch when types differ**: `Pump(dP::Real)` vs `Pump(dP::Any)` — argument type encodes behavior; this is the correct Julia idiom; keyword-only only when distinguishing named concepts of same type
+
+### Key Lessons
+1. **Topology planning matters most**: the two physical planning mistakes (series LOF, channel inertia) cost 1.5 plans; next time, sketch the graph with node/edge count before committing to topology
+2. **VALIDATION.md must close at phase completion**, not retroactively — tech debt items in the audit show where this wasn't done
+3. **NC regime detection is a switchover, not a blend** — `ifelse(Gr/Re² > 1)` is a hard switch; blending is future work; get the switch right first, then worry about transition smoothness
+
+### Cost Observations
+- Model mix: ~100% sonnet (balanced profile)
+- Sessions: ~10 days (2026-03-17 → 2026-03-27), with gaps between phases
+- Notable: Largest milestone to date by phase count (8); most complex MTK patterns (continuous events, callable parameters, parallel topology)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -239,6 +284,7 @@
 | v0.3 | 4 | 8 | Decimal phase insertion for post-validation correction; PipeGeometry encapsulation pattern; KINSOL for coupled solid+fluid DAE |
 | v0.4 | 4 | 7 | Pluggable correlations via plain closures; `@observed` pattern for diagnostics; composition helpers with n-inference |
 | v0.5 | 3 | 6 | Pure code quality — canonical file layout, test split, full docstrings, CLAUDE.md rationale; no new features |
+| v0.6 | 8 | 14 | Flow reversal systems — MTK continuous events, callable parameters, bypass topology, NC regime detection |
 
 ### Cumulative Quality
 
@@ -249,3 +295,4 @@
 | v0.3 | 161 | 14/14 | 0 |
 | v0.4 | ~200+ | 15/15 | 0 |
 | v0.5 | ~200+ | 15/15 | 0 |
+| v0.6 | ~230+ | 21/21 | 0 |
