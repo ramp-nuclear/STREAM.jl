@@ -177,43 +177,45 @@ end
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VAL-01: energy balance at 5 checkpoints (rtol=5%)
+# VAL-01: energy balance — forced-flow instantaneous + NC time-averaged
 #
 # Energy balance: Q_wall = |mdot| * cp * |T_outlet - T_inlet_to_ch|
 #
-# Forward flow (mdot > 0): fluid enters ch via port_in from the HX chain.
-#   T_inlet_to_ch ≈ BYPASS_T_INLET (HX forces T_bc); T_outlet = T[n] (≈ T_max).
+# Forward flow (mdot > 0): T_inlet_to_ch = BYPASS_T_INLET (HX anchor); T_outlet = T[n].
+#   Checked instantaneously at t=0 (quasi-steady forced flow, 0.08% error expected).
 #
-# Backward flow / NC (mdot < 0): fluid enters ch via port_out from Node B (ret side).
-#   T_inlet_to_ch = ret.T[1] (what ret offers at port_in = Node B interface);
-#   T_outlet = T[1] (≈ T_max). This is exact at NC steady state: Q_wall ≈ 0.3%.
+# NC (mdot < 0): The bypass NC oscillates persistently (~50s period).
+#   Thermal storage means Q_wall ≠ mdot·cp·dT at any snapshot (∂T/∂t ≠ 0).
+#   The energy balance holds exactly *on average* over a full oscillation period.
+#   T_inlet_to_ch = ret.T[1] (fluid entering ch.port_out from Node B via ret);
+#   T_outlet_ch = T[1] (hot exit in reversed flow). Time-averaged over t=100–300s.
 # ─────────────────────────────────────────────────────────────────────────────
-@testset "VAL-01: energy balance at 5 checkpoints (rtol=5%)" begin
+@testset "VAL-01: energy balance (forced-flow instantaneous; NC time-averaged)" begin
     ssys, op, _, cb = _lof_bypass_ic()
 
     t_arr = range(0.0, 300.0; length=3001)
     sol   = solve_transient(ssys, op, t_arr; callbacks=cb)
 
-    n           = BYPASS_N
-    checkpoints = [1, 751, 1501, 2251, 3001]
+    n = BYPASS_N
 
-    for idx in checkpoints
-        mdot_v = abs(sol[ssys.ch.port_in.mdot, idx])
-        mdot_v < 1e-6 && continue
-        T_cells = [sol[ssys.ch.T[i], idx] for i in 1:n]
-        Q_wall  = abs(sum(sol[ssys.ch.q_wall[i], idx] for i in 1:n))
-        if sol[ssys.ch.port_in.mdot, idx] >= 0.0
-            # Forward flow: inlet = BYPASS_T_INLET (from HX chain), outlet = T[n]
-            T_inlet_ch = BYPASS_T_INLET
-            T_outlet_ch = T_cells[n]
-        else
-            # Backward flow (NC): inlet = ret.T[1] at Node B, outlet = T[1]
-            T_inlet_ch  = sol[ssys.ret.T[1], idx]
-            T_outlet_ch = T_cells[1]
-        end
-        Q_meas = mdot_v * cp_water(BYPASS_T_INLET) * abs(T_outlet_ch - T_inlet_ch)
-        @test isapprox(Q_meas, Q_wall; rtol=0.05)
+    # 1. Forced flow at t=0: instantaneous check (quasi-steady, 0.08% expected error)
+    mdot_0  = abs(sol[ssys.ch.port_in.mdot, 1])
+    Q_wall_0 = abs(sum(sol[ssys.ch.q_wall[i], 1] for i in 1:n))
+    Q_meas_0 = mdot_0 * cp_water(BYPASS_T_INLET) * abs(sol[ssys.ch.T[n], 1] - BYPASS_T_INLET)
+    @test isapprox(Q_meas_0, Q_wall_0; rtol=0.02)
+
+    # 2. NC regime: time-averaged over t=100–300s (indices 1001–3001).
+    #    Averaging over the oscillation period cancels thermal-storage transients.
+    nc_indices = 1001:3001
+    Q_wall_nc = [abs(sum(sol[ssys.ch.q_wall[i], idx] for i in 1:n)) for idx in nc_indices]
+    Q_meas_nc = Float64[]
+    for idx in nc_indices
+        mdot_v      = abs(sol[ssys.ch.port_in.mdot, idx])
+        T_inlet_ch  = sol[ssys.ret.T[1], idx]   # fluid entering ch from Node B via ret
+        T_outlet_ch = sol[ssys.ch.T[1], idx]    # hot exit in reversed (NC upward) flow
+        push!(Q_meas_nc, mdot_v * cp_water(BYPASS_T_INLET) * abs(T_outlet_ch - T_inlet_ch))
     end
+    @test isapprox(mean(Q_meas_nc), mean(Q_wall_nc); rtol=0.02)
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
