@@ -1,10 +1,11 @@
 ---
 phase: 26
 slug: nc-regime-htc-lof-cleanup
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: verified
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-26
+audited: 2026-03-27
 ---
 
 # Phase 26 — Validation Strategy
@@ -38,14 +39,14 @@ created: 2026-03-26
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 26-01-01 | 01 | 1 | NATCONV-01 | unit | `julia --project -e "include(\"test/test_correlations.jl\")"` | ✅ | ⬜ pending |
-| 26-01-02 | 01 | 1 | NATCONV-01 | unit | `julia --project -e "include(\"test/test_correlations.jl\")"` | ✅ | ⬜ pending |
-| 26-01-03 | 01 | 1 | NATCONV-01 | integration | `julia --project -e "include(\"test/test_channel.jl\")"` | ✅ | ⬜ pending |
-| 26-01-04 | 01 | 1 | NATCONV-01 | integration | `julia --project test/runtests.jl` | ✅ | ⬜ pending |
-| 26-02-01 | 02 | 2 | VAL-02 | integration | `julia --project -e "include(\"test/test_loss_of_flow.jl\")"` | ✅ | ⬜ pending |
-| 26-02-02 | 02 | 2 | VAL-02 | integration | `julia --project -e "include(\"test/test_loss_of_flow.jl\")"` | ✅ | ⬜ pending |
-| 26-02-03 | 02 | 2 | — | lint | `grep -n "build_loop_lof" src/examples.jl src/STREAM.jl` (expect 0 matches) | ✅ | ⬜ pending |
-| 26-02-04 | 02 | 2 | — | lint | `grep -n "Re, Pr)" src/components/channel.jl src/components/thermal_channel.jl` (expect 0 old-style docstring hits) | ✅ | ⬜ pending |
+| 26-01-01 | 01 | 1 | NATCONV-01 | unit | `julia --project -e "include(\"test/test_correlations.jl\")"` | ✅ | ✅ green |
+| 26-01-02 | 01 | 1 | NATCONV-01 | unit | `julia --project -e "include(\"test/test_correlations.jl\")"` | ✅ | ✅ green |
+| 26-01-03 | 01 | 1 | NATCONV-01 | integration | `julia --project -e "include(\"test/test_channel.jl\")"` | ✅ | ✅ green |
+| 26-01-04 | 01 | 1 | NATCONV-01 | integration | `julia --project test/runtests.jl` | ✅ | ✅ green |
+| 26-02-01 | 02 | 2 | VAL-02 | integration | `julia --project -e "include(\"test/test_loss_of_flow.jl\")"` | ✅ | ✅ green |
+| 26-02-02 | 02 | 2 | VAL-02 | integration | `julia --project -e "include(\"test/test_loss_of_flow.jl\")"` | ✅ | ✅ green |
+| 26-02-03 | 02 | 2 | — | lint | `grep -n "build_loop_lof" src/examples.jl src/STREAM.jl` (expect 0 matches) | ✅ | ✅ green |
+| 26-02-04 | 02 | 2 | — | lint | `grep -n "Re, Pr)" src/components/channel.jl src/components/thermal_channel.jl` (expect 0 old-style docstring hits) | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -69,11 +70,23 @@ Existing infrastructure covers all phase requirements.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 90s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 90s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-03-27
+
+---
+
+## Validation Audit 2026-03-27
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+All 8 tasks verified green. No missing tests. Phase is Nyquist-compliant.
