@@ -65,7 +65,7 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         (T(t))[1:n]           = fill(600.0, n)
         (Re(t))[1:n]          # observed -- hydraulic Reynolds number
         (Nu(t))[1:n]          # observed -- Nusselt number
-        (h_tc(t))[1:n] = fill(5000.0, n)  # unknown -- HTC; default guess for SCB solver convergence
+        (h_tc(t))[1:n]        # unknown  -- HTC (referenced in energy balance)
         (v(t))[1:n]           # observed -- alias for velocity
         (velocity(t))[1:n]    # observed -- fluid velocity [m/s]
         (Pe(t))[1:n]          # observed -- Peclet number
@@ -77,7 +77,7 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         (q_wall_right(t))[1:n] # observed -- Q_flow from right face
         (Gr_over_Re2(t))[1:n]  # observed -- Gr/Re^2 NC criterion
         (q_wall(t))[1:n]      # unknown  -- per-cell total heat (referenced in Q_wall_total)
-        (dp(t))[1:n]          = fill(100.0, n)  # unknown  -- per-cell pressure drop
+        (dp(t))[1:n]          # unknown  -- per-cell pressure drop
         (P(t))[1:n]           # observed -- per-cell absolute pressure
         (T_sat(t))[1:n]       # observed -- saturation temperature at P[i]
         (T_ONB(t))[1:n]       # observed -- onset of nucleate boiling temperature
@@ -178,15 +178,14 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         push!(obs, Gr_over_Re2[i] ~ Gr_i / Re_i^2)
         # Per-cell absolute pressure, T_sat, T_ONB (D-05, D-06, D-11, D-12)
         # CRITICAL: Use P_i expression (not P[i] symbol) to avoid observed-to-observed chain
-        # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
-        P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+        P_i = port_in.P - sum(dp[j] for j in 1:i)
         push!(obs, P[i] ~ P_i)
         push!(obs, T_sat[i] ~ sat_temperature(P_i))
         q_spl_i = q_wall[i] / (sum(geometry.heated_parts) * dz)
         push!(obs, T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_spl_i))
     end
-    # dP observed alias (D-04): total pressure drop including inertia
-    push!(obs, dP ~ port_in.P - port_out.P)
+    # dP observed alias (D-04)
+    push!(obs, dP ~ sum(dp[i] for i in 1:n))
 
     # Re, Nu, v are now observed (not solver unknowns)
     # dP, P[i], T_sat[i], T_ONB[i] are also observed
@@ -250,7 +249,7 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
         (v(t))[1:n]
         (q_wall(t))[1:n]
         (Gr_over_Re2(t))[1:n]
-        (dp(t))[1:n]          = fill(100.0, n)  # unknown -- per-cell pressure drop
+        (dp(t))[1:n]          # unknown -- per-cell pressure drop
         (P(t))[1:n]           # observed -- per-cell absolute pressure
         (T_sat(t))[1:n]       # observed -- saturation temperature at P[i]
         (T_ONB(t))[1:n]       # observed -- onset of nucleate boiling temperature
@@ -290,17 +289,15 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
     end
 
     # Observed equations: P[i], T_sat[i], T_ONB[i], dP (D-05, D-11, D-12)
-    # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
     obs = Equation[]
     for i in 1:n
-        P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+        P_i = port_in.P - sum(dp[j] for j in 1:i)
         push!(obs, P[i] ~ P_i)
         push!(obs, T_sat[i] ~ sat_temperature(P_i))
         q_spl_i = q_wall[i] / (sum(geometry.heated_parts) * dz)
         push!(obs, T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_spl_i))
     end
-    # dP observed: total pressure drop including inertia
-    push!(obs, dP ~ port_in.P - port_out.P)
+    push!(obs, dP ~ sum(dp[i] for i in 1:n))
 
     all_vars = [collect(T); collect(Re); collect(Nu); collect(h_tc);
                 collect(v); collect(q_wall); collect(Gr_over_Re2); collect(dp); T_out]
