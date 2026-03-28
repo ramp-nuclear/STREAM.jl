@@ -201,7 +201,7 @@ Plans:
 | 25. Argument Structure Audit | v0.6 | 1/1 | Complete | 2026-03-26 |
 | 26. NC Regime HTC + LOF Cleanup | v0.6 | 2/2 | Complete | 2026-03-26 |
 | 27. Pressure Field | v0.7 | 2/2 | Complete   | 2026-03-28 |
-| 27.1. Channel Momentum Inertia | v0.7 | 3/3 | Complete   | 2026-03-28 |
+| 27.1. Channel Momentum Inertia | v0.7 | 3/3 | Complete    | 2026-03-28 |
 | 28. Subcooled Boiling | v0.7 | 0/? | Not started | - |
 | 29. Threshold Analysis | v0.7 | 0/? | Not started | - |
 | 30. HTC & Friction Completions | v0.7 | 0/? | Not started | - |
