@@ -13,7 +13,7 @@ end
 @testset "COMP-01: Channel equation count" begin
     @named ch = Channel(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     energy_eqs = filter(eq -> occursin("Differential", string(eq)), equations(ch))
-    @test length(energy_eqs) == 5  # 5 energy balance ODEs (dp[i] has no Dt term)
+    @test length(energy_eqs) == 6  # 5 energy balance ODEs + 1 momentum ODE
 end
 
 @testset "COMP-01: Channel mtkcompile" begin

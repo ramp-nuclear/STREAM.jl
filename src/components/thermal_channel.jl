@@ -178,14 +178,15 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         push!(obs, Gr_over_Re2[i] ~ Gr_i / Re_i^2)
         # Per-cell absolute pressure, T_sat, T_ONB (D-05, D-06, D-11, D-12)
         # CRITICAL: Use P_i expression (not P[i] symbol) to avoid observed-to-observed chain
-        P_i = port_in.P - sum(dp[j] for j in 1:i)
+        # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
+        P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
         push!(obs, P[i] ~ P_i)
         push!(obs, T_sat[i] ~ sat_temperature(P_i))
         q_spl_i = q_wall[i] / (sum(geometry.heated_parts) * dz)
         push!(obs, T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_spl_i))
     end
-    # dP observed alias (D-04)
-    push!(obs, dP ~ sum(dp[i] for i in 1:n))
+    # dP observed alias (D-04): total pressure drop including inertia
+    push!(obs, dP ~ port_in.P - port_out.P)
 
     # Re, Nu, v are now observed (not solver unknowns)
     # dP, P[i], T_sat[i], T_ONB[i] are also observed
@@ -289,15 +290,17 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
     end
 
     # Observed equations: P[i], T_sat[i], T_ONB[i], dP (D-05, D-11, D-12)
+    # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
     obs = Equation[]
     for i in 1:n
-        P_i = port_in.P - sum(dp[j] for j in 1:i)
+        P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
         push!(obs, P[i] ~ P_i)
         push!(obs, T_sat[i] ~ sat_temperature(P_i))
         q_spl_i = q_wall[i] / (sum(geometry.heated_parts) * dz)
         push!(obs, T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_spl_i))
     end
-    push!(obs, dP ~ sum(dp[i] for i in 1:n))
+    # dP observed: total pressure drop including inertia
+    push!(obs, dP ~ port_in.P - port_out.P)
 
     all_vars = [collect(T); collect(Re); collect(Nu); collect(h_tc);
                 collect(v); collect(q_wall); collect(Gr_over_Re2); collect(dp); T_out]
