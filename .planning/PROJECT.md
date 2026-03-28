@@ -132,7 +132,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **v0.4 shipped** 2026-03-16 — ~3,268 Julia LOC, 4 phases (13-16), 7 plans; 15 requirements complete
 - **v0.5 shipped** 2026-03-16 — ~3,750 Julia LOC (src + test), 3 phases (17-19), 6 plans; 15 requirements complete; canonical file layout, full docstrings, 13-file test suite
 - **v0.6 shipped** 2026-03-27 — 2,373 src LOC, 8 phases (20-26 incl. 24.1), 14 plans; 21 requirements complete; flow reversal, Flapper, Elenbaas NC, LOF transient validated
-- **v0.7 shipped** 2026-04-01 — 7,715 Julia LOC (src + test), 7 phases (27, 27.1, 28, 29, 30, 31, 32), 13 plans; 34 requirements (33 complete + 1 deferred); full safety physics and pressure field suite: pressure observables, momentum ODE, SCB, threshold analysis, complete HTC/friction library
+- **v0.7 Phase 27.1 complete** 2026-03-28 — momentum ODE in all channel variants (Channel, ChannelAndContacts, ChannelHeatFlux); PRES-05..12 pass; requirements traceability closed (34 total reqs tracked)
 - Python STREAM lives at ~/projects/STREAM and is the reference implementation for all validation
 - MTK architecture validated through five milestones: acausal connect() + mtkcompile + Sundials IDA replaces Aggregator pattern
 - Friction is handled inside Channel (Darcy-Weisbach inline) — no separate Friction component in loop
@@ -195,4 +195,4 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
 
 ---
-*Last updated: 2026-03-27 after v0.7 milestone started — Safety Physics & Pressure Field (per-cell pressure, SCB, threshold analysis, HTC/friction completions)*
+*Last updated: 2026-03-28 after Phase 27.1 complete — Channel momentum ODE, PRES-05..12 verified, requirements traceability closed*
