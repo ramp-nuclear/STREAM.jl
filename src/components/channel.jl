@@ -45,7 +45,7 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         (h_tc(t))[1:n]
         (v(t))[1:n]
         (q_wall(t))[1:n]
-        (dp(t))[1:n]
+        (dp(t))[1:n]     = fill(100.0, n)
         (P(t))[1:n]
         T_out(t) = 600.0
         dP(t)
@@ -83,14 +83,14 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         push!(eqs, h_tc[i]  ~ Nu[i] * k_water(T[i]) / Dh)
     end
 
-    # Per-cell pressure drop (D-02): friction + gravity + inertia, each using dz = L/n
+    # Per-cell pressure drop (D-02): friction + gravity, each using dz = L/n
+    # Momentum inertia is handled by standalone Inertia component in loop, not inside Channel.
     for i in 1:n
         Re_i_val = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
         f_i = friction_correlation(Re_i_val)
         push!(eqs, dp[i] ~ f_i * (port_in.mdot * abs(port_in.mdot) /
                                     (2 * rho_water(T[i]) * A^2)) * (dz / Dh)
-                           + rho_water(T[i]) * g_acc * dz
-                           + (dz / A) * Dt(port_in.mdot))
+                           + rho_water(T[i]) * g_acc * dz)
     end
 
     push!(eqs, T_out ~ T[n])
@@ -174,8 +174,8 @@ function _channel_base_eqs(eqs::Vector{Equation};
         end
     end
 
-    # Per-cell pressure drop (D-02, D-14): friction + gravity + inertia per cell
-    Dt = Differential(t)
+    # Per-cell pressure drop (D-02, D-14): friction + gravity per cell
+    # Momentum inertia is handled by standalone Inertia component, not inside channel.
     for i in 1:n
         if observed_mode
             # In observed_mode, Re[i] is observed -- inline Re for friction (Pitfall 5)
@@ -186,8 +186,7 @@ function _channel_base_eqs(eqs::Vector{Equation};
         end
         push!(eqs, dp[i] ~ f_i * (port_in.mdot * abs(port_in.mdot) /
                                     (2 * rho_water(T[i]) * A^2)) * (dz / Dh)
-                           + rho_water(T[i]) * g_acc * dz
-                           + (dz / A) * Dt(port_in.mdot))
+                           + rho_water(T[i]) * g_acc * dz)
     end
 
     push!(eqs, T_out ~ T[n])
