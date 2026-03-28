@@ -77,7 +77,7 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         (q_wall_right(t))[1:n] # observed -- Q_flow from right face
         (Gr_over_Re2(t))[1:n]  # observed -- Gr/Re^2 NC criterion
         (q_wall(t))[1:n]      # unknown  -- per-cell total heat (referenced in Q_wall_total)
-        (dp(t))[1:n]          # unknown  -- per-cell pressure drop
+        (dp(t))[1:n]          = fill(100.0, n)  # unknown  -- per-cell pressure drop
         (P(t))[1:n]           # observed -- per-cell absolute pressure
         (T_sat(t))[1:n]       # observed -- saturation temperature at P[i]
         (T_ONB(t))[1:n]       # observed -- onset of nucleate boiling temperature
@@ -249,7 +249,7 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
         (v(t))[1:n]
         (q_wall(t))[1:n]
         (Gr_over_Re2(t))[1:n]
-        (dp(t))[1:n]          # unknown -- per-cell pressure drop
+        (dp(t))[1:n]          = fill(100.0, n)  # unknown -- per-cell pressure drop
         (P(t))[1:n]           # observed -- per-cell absolute pressure
         (T_sat(t))[1:n]       # observed -- saturation temperature at P[i]
         (T_ONB(t))[1:n]       # observed -- onset of nucleate boiling temperature
