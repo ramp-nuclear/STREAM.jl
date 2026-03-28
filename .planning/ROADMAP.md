@@ -92,7 +92,7 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 
 **Milestone Goal:** Add per-cell absolute pressure to all channel components, implement subcooled boiling HTC with in-loop correction, deliver a post-process threshold analysis suite matching Python STREAM, and complete the laminar HTC and friction correlation libraries.
 
-- [ ] **Phase 27: Pressure Field** - Per-cell dP refactor, absolute pressure observables, sat_temperature, and T_sat/T_ONB in channels
+- [x] **Phase 27: Pressure Field** - Per-cell dP refactor, absolute pressure observables, sat_temperature, and T_sat/T_ONB in channels (completed 2026-03-28)
 - [ ] **Phase 28: Subcooled Boiling** - McAdams and Bergles-Rohsenow SCB correlations plus in-loop ChannelAndContacts correction
 - [ ] **Phase 29: Threshold Analysis** - ONB/OFI/OSV/CHF physics functions and threshold_analysis post-processor
 - [ ] **Phase 30: HTC & Friction Completions** - Marco-Han laminar Nusselt, developing laminar, maximal_htc, Colebrook-White, viscosity correction
@@ -108,10 +108,10 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
   2. `sol[ch.dP]` equals `sum(dp[i])` exactly (per-cell sum, not i_mid lump)
   3. `sat_temperature(P)` is callable from MTK equations and returns physically correct saturation temperature for typical reactor pressures (e.g. ~393 K at 2 bar)
   4. `sol[ch.T_sat[i], :]` and `sol[ch.T_ONB[i], :]` are accessible observables in ChannelAndContacts and ChannelHeatFlux
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
-- [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
+- [x] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
 
 ### Phase 28: Subcooled Boiling
 **Goal**: Subcooled boiling heat flux correlations are available as standalone functions and ChannelAndContacts can optionally apply an in-loop SCB correction when wall temperature exceeds T_ONB
@@ -124,7 +124,7 @@ Plans:
   4. When `T_wall >> T_sat`, the effective HTC from the SCB-corrected ChannelAndContacts is measurably higher than the uncorrected single-phase HTC
 **Plans:** 2 plans
 Plans:
-- [ ] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
+- [x] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
 - [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
 
 ### Phase 29: Threshold Analysis
@@ -187,7 +187,7 @@ Plans:
 | 24.1. Bypass LOF Topology | v0.6 | 2/2 | Complete | 2026-03-21 |
 | 25. Argument Structure Audit | v0.6 | 1/1 | Complete | 2026-03-26 |
 | 26. NC Regime HTC + LOF Cleanup | v0.6 | 2/2 | Complete | 2026-03-26 |
-| 27. Pressure Field | v0.7 | 1/2 | In Progress|  |
+| 27. Pressure Field | v0.7 | 2/2 | Complete   | 2026-03-28 |
 | 28. Subcooled Boiling | v0.7 | 0/? | Not started | - |
 | 29. Threshold Analysis | v0.7 | 0/? | Not started | - |
 | 30. HTC & Friction Completions | v0.7 | 0/? | Not started | - |
