@@ -13,7 +13,7 @@ end
 @testset "COMP-01: Channel equation count" begin
     @named ch = Channel(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     energy_eqs = filter(eq -> occursin("Differential", string(eq)), equations(ch))
-    @test length(energy_eqs) == 10  # 5 energy balance ODEs + 5 per-cell dp[i] with Dt(mdot) inertia
+    @test length(energy_eqs) == 5  # 5 energy balance ODEs (dp[i] has no Dt term)
 end
 
 @testset "COMP-01: Channel mtkcompile" begin
@@ -212,9 +212,6 @@ end
     append!(op2, [ssys2.cac2.Re[i] => 3e5 for i in 1:n])
     append!(op2, [ssys2.cac2.Nu[i] => 800.0 for i in 1:n])
     append!(op2, [ssys2.cac2.h_tc[i] => 2.7e4 for i in 1:n])
-    # dp[i] includes Dt(mdot) -- provide derivative guess for initialization
-    Dt = Differential(t)
-    push!(op2, Dt(ssys2.cac2.port_in.mdot) => 0.0)
     sol2 = solve_steady(ssys2, op2)
 
     # Verify all unconnected thermal_right ports have Q_flow == 0
@@ -366,11 +363,11 @@ end
 # Pressure anchor required for meaningful P[i] -- see D-07
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-04: T_sat and T_ONB in ChannelAndContacts" begin
-    n = 5; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_cac = 0.02; dP_pump = 3.0e4
+    n = 10; T_inlet = 313.15; T_wall = 373.15
+    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
 
     @named pump = Pump(dP_pump)
-    @named cac  = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_cac))
+    @named cac  = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
     @named bc   = HeatExchanger(T_inlet)
     ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l, i)) for i in 1:n]
     ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r, i)) for i in 1:n]
@@ -385,12 +382,9 @@ end
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys)
-    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=5e3, mdot_guess=0.490, n=n)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
     op = [ssys.cac.T[i] => T_guess[i] for i in 1:n]
     push!(op, ssys.cac.port_in.mdot => 0.490)
-    # dp[i] includes Dt(mdot) inertia -- provide derivative guess for initialization
-    Dt = Differential(t)
-    push!(op, Dt(ssys.cac.port_in.mdot) => 0.0)
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
 
