@@ -119,10 +119,10 @@ Plans:
 **Goal:** Add momentum ODE to all channel variants so transient inertia physics is correct, dp[i] stays algebraic, P[i] observed includes the distributed inertia correction term, and dP = port_in.P - port_out.P
 **Requirements**: PRES-05, PRES-06, PRES-07, PRES-08, PRES-09, PRES-10, PRES-11, PRES-12, VAL-PRES-01
 **Depends on:** Phase 27
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 27.1-01-PLAN.md — Momentum ODE in Channel/_channel_base_eqs, updated P[i]/dP observed, thermal variant updates
+- [x] 27.1-01-PLAN.md — Momentum ODE in Channel/_channel_base_eqs, updated P[i]/dP observed, thermal variant updates
 - [ ] 27.1-02-PLAN.md — Transient inertia tests PRES-05..12, Inertia compatibility, VAL-PRES-01 placeholder
 
 ### Phase 28: Subcooled Boiling
@@ -200,7 +200,7 @@ Plans:
 | 25. Argument Structure Audit | v0.6 | 1/1 | Complete | 2026-03-26 |
 | 26. NC Regime HTC + LOF Cleanup | v0.6 | 2/2 | Complete | 2026-03-26 |
 | 27. Pressure Field | v0.7 | 2/2 | Complete   | 2026-03-28 |
-| 27.1. Channel Momentum Inertia | v0.7 | 0/2 | Not started | - |
+| 27.1. Channel Momentum Inertia | v0.7 | 1/2 | In Progress|  |
 | 28. Subcooled Boiling | v0.7 | 0/? | Not started | - |
 | 29. Threshold Analysis | v0.7 | 0/? | Not started | - |
 | 30. HTC & Friction Completions | v0.7 | 0/? | Not started | - |
