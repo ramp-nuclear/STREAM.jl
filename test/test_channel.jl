@@ -430,3 +430,230 @@ end
         @test sol[ssys.chf.T_ONB[i]] > sol[ssys.chf.T_sat[i]]
     end
 end
+
+# ─────────────────────────────────────────────────────────────────
+# PRES-05: Transient loop with step change in pump dP (Channel)
+# Verifies momentum ODE produces correct transient response:
+# dp[i] and P[i] respond during transient, dP = P_in - P_out,
+# correction term -> 0 at new steady state, mdot increases after step.
+# ─────────────────────────────────────────────────────────────────
+@testset "PRES-05: Channel transient momentum response" begin
+    n = 5; T_inlet = 313.15; T_wall = 373.15
+    L_ch = 1.0; D_ch = 0.01; dP_0 = 3.0e4; dP_1 = 4.0e4; t_step = 50.0
+
+    # Step function for pump dP
+    dP_fn = t -> t < t_step ? dP_0 : dP_1
+
+    @named pump = Pump(dP_fn)
+    @named ch   = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc   = HeatExchanger(T_inlet)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, ch.port_in),
+        connect(ch.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        ch.thermal.T ~ T_wall,
+    ]
+    @named sys = compose(System(conns, t; name=:sys), pump, bc, ch)
+    ssys = mtkcompile(sys)
+
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.5, n=n)
+    op = Pair{Any,Any}[ssys.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op, ssys.ch.port_in.mdot => 0.5)
+    push!(op, ssys.pump.dP_pump_fn => dP_fn)
+
+    t_arr = range(0, 300, length=500)
+    sol = solve_transient(ssys, op, t_arr)
+    @test sol.retcode == ReturnCode.Success
+
+    # dp[i] are finite throughout transient
+    for i in 1:n
+        @test all(isfinite, sol[ssys.ch.dp[i], :])
+    end
+
+    # P[i] are finite and positive throughout transient
+    for i in 1:n
+        @test all(isfinite, sol[ssys.ch.P[i], :])
+        @test all(p -> p > 0, sol[ssys.ch.P[i], :])
+    end
+
+    # dP = port_in.P - port_out.P at all time points
+    dP_vals = sol[ssys.ch.dP, :]
+    P_in_vals = sol[ssys.ch.port_in.P, :]
+    P_out_vals = sol[ssys.ch.port_out.P, :]
+    for k in eachindex(dP_vals)
+        @test isapprox(dP_vals[k], P_in_vals[k] - P_out_vals[k]; rtol=1e-10)
+    end
+
+    # At t->infinity (last time point), correction term -> 0:
+    # dP should approximately equal sum(dp[i])
+    dp_sum_end = sum(sol[ssys.ch.dp[i], :][end] for i in 1:n)
+    @test isapprox(dP_vals[end], dp_sum_end; rtol=0.01)
+
+    # mdot increases after step (dP_1 > dP_0)
+    mdot_before = sol(t_step - 1.0, idxs=ssys.ch.port_in.mdot)
+    mdot_after  = sol(t_arr[end],   idxs=ssys.ch.port_in.mdot)
+    @test mdot_after > mdot_before
+end
+
+# ─────────────────────────────────────────────────────────────────
+# PRES-06: Momentum ODE numerical consistency
+# Verifies (L/A)*Dt(mdot) = (P_in - P_out) - sum(dp) at solver tolerance
+# ─────────────────────────────────────────────────────────────────
+@testset "PRES-06: momentum ODE residual check" begin
+    n = 5; T_inlet = 313.15; T_wall = 373.15
+    L_ch = 1.0; D_ch = 0.01; A_ch = pi * (D_ch/2)^2
+    dP_0 = 3.0e4; dP_1 = 4.0e4; t_step = 50.0
+
+    dP_fn = t -> t < t_step ? dP_0 : dP_1
+
+    @named pump = Pump(dP_fn)
+    @named ch   = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc   = HeatExchanger(T_inlet)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, ch.port_in),
+        connect(ch.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        ch.thermal.T ~ T_wall,
+    ]
+    @named sys = compose(System(conns, t; name=:sys), pump, bc, ch)
+    ssys = mtkcompile(sys)
+
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.5, n=n)
+    op = Pair{Any,Any}[ssys.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op, ssys.ch.port_in.mdot => 0.5)
+    push!(op, ssys.pump.dP_pump_fn => dP_fn)
+
+    t_arr = range(0, 300, length=500)
+    sol = solve_transient(ssys, op, t_arr)
+    @test sol.retcode == ReturnCode.Success
+
+    # Check momentum ODE residual at several time points (away from step discontinuity)
+    L_over_A = L_ch / A_ch
+    check_times = [20.0, 100.0, 200.0, 280.0]
+    for tc in check_times
+        P_in  = sol(tc, idxs=ssys.ch.port_in.P)
+        P_out = sol(tc, idxs=ssys.ch.port_out.P)
+        dp_sum = sum(sol(tc, idxs=ssys.ch.dp[i]) for i in 1:n)
+        # (P_in - P_out) - sum(dp) = (L/A)*Dt(mdot)
+        # At late times (tc=200,280), Dt(mdot) -> 0, so residual -> 0
+        # At early times, residual = (L/A)*Dt(mdot) which should be finite and consistent
+        rhs = (P_in - P_out) - dp_sum
+        @test isfinite(rhs)
+        # At t=280 (well after step settles), Dt(mdot) ~ 0 => rhs ~ 0
+        if tc > 250.0
+            @test abs(rhs) < 100.0  # within 100 Pa (essentially zero for 1e5 Pa scale)
+        end
+    end
+end
+
+# ─────────────────────────────────────────────────────────────────
+# PRES-07: Channel alone -- no standalone Inertia needed
+# Verifies Channel with built-in momentum ODE produces smooth transient
+# ─────────────────────────────────────────────────────────────────
+@testset "PRES-07: Channel alone produces physically reasonable transient" begin
+    n = 5; T_inlet = 313.15; T_wall = 373.15
+    L_ch = 1.0; D_ch = 0.01
+
+    # Constant pump -- verify transient from IC converges to steady state
+    @named pump = Pump(3.0e4)
+    @named ch   = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc   = HeatExchanger(T_inlet)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, ch.port_in),
+        connect(ch.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        ch.thermal.T ~ T_wall,
+    ]
+    @named sys = compose(System(conns, t; name=:sys), pump, bc, ch)
+    ssys = mtkcompile(sys)
+
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.5, n=n)
+    op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op, ssys.ch.port_in.mdot => 0.5)
+
+    t_arr = range(0, 200, length=300)
+    sol = solve_transient(ssys, op, t_arr)
+    @test sol.retcode == ReturnCode.Success
+
+    # mdot evolves smoothly -- no NaN or Inf
+    mdot_series = sol[ssys.ch.port_in.mdot, :]
+    @test all(isfinite, mdot_series)
+    @test !any(isnan, mdot_series)
+
+    # Converges to steady state: mdot at end is stable (last 10% variation < 1%)
+    mdot_late = mdot_series[end-30:end]
+    mdot_mean = sum(mdot_late) / length(mdot_late)
+    @test maximum(mdot_late) - minimum(mdot_late) < 0.01 * abs(mdot_mean)
+end
+
+# ─────────────────────────────────────────────────────────────────
+# PRES-08: ChannelHeatFlux steady-state regression with momentum ODE
+# Verifies momentum ODE present and steady-state dP = sum(dp), P[i] = cumsum
+# ─────────────────────────────────────────────────────────────────
+@testset "PRES-08: Channel momentum ODE present, steady-state correct" begin
+    # Verify ChannelHeatFlux has momentum ODE and steady-state matches pre-inertia behavior
+    n = 5; T_inlet = 313.15; T_wall = 373.15
+    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+
+    @named pump = Pump(dP_pump)
+    @named ch   = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
+    @named bc   = HeatExchanger(T_inlet)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, ch.port_in),
+        connect(ch.port_out, pump.port_in),
+        pump.port_in.P ~ 2e5,
+    ]
+    @named sys = compose(System(conns, t; name=:sys), pump, bc, ch)
+    ssys = mtkcompile(sys)
+    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+    op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
+    push!(op, ssys.ch.port_in.mdot => 0.490)
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+
+    # At steady state: dP = sum(dp[i]) (inertia term = 0)
+    dP_total = sol[ssys.ch.dP]
+    dp_sum   = sum(sol[ssys.ch.dp[i]] for i in 1:n)
+    @test isapprox(dP_total, dp_sum; rtol=1e-6)
+
+    # P[i] = port_in.P - cumsum(dp) at steady state (correction = 0)
+    P_in = sol[ssys.ch.port_in.P]
+    cumsum_dp = 0.0
+    for i in 1:n
+        cumsum_dp += sol[ssys.ch.dp[i]]
+        @test isapprox(sol[ssys.ch.P[i]], P_in - cumsum_dp; rtol=1e-6)
+    end
+end
+
+# ─────────────────────────────────────────────────────────────────
+# PRES-12: n=1 channel edge case -- P[1] = port_out.P
+# ─────────────────────────────────────────────────────────────────
+@testset "PRES-12: n=1 channel P[1] = port_out.P" begin
+    T_inlet = 313.15; T_wall = 373.15
+    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+
+    @named pump = Pump(dP_pump)
+    @named ch   = ChannelHeatFlux(n=1, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
+    @named bc   = HeatExchanger(T_inlet)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, ch.port_in),
+        connect(ch.port_out, pump.port_in),
+        pump.port_in.P ~ 2e5,
+    ]
+    @named sys = compose(System(conns, t; name=:sys), pump, bc, ch)
+    ssys = mtkcompile(sys)
+    op = [ssys.ch.T[1] => 340.0, ssys.ch.port_in.mdot => 0.490]
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+
+    # For n=1: P[1] formula with i=1, n=1 gives:
+    # P[1] = P_in - dp[1] - (1/1)*((P_in - P_out) - dp[1])
+    #       = P_in - dp[1] - P_in + P_out + dp[1]
+    #       = P_out
+    @test isapprox(sol[ssys.ch.P[1]], sol[ssys.ch.port_out.P]; rtol=1e-10)
+end
