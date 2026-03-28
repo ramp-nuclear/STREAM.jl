@@ -84,7 +84,7 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     end
 
     # Per-cell pressure drop (D-02): friction + gravity, each using dz = L/n
-    # Momentum inertia is handled by standalone Inertia component in loop, not inside Channel.
+    # Momentum inertia is handled by the momentum ODE below; dp[i] is algebraic (friction + gravity only).
     for i in 1:n
         Re_i_val = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
         f_i = friction_correlation(Re_i_val)
@@ -97,17 +97,19 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
 
     # Port wiring
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
-    push!(eqs, port_out.P - port_in.P ~ -sum(dp[i] for i in 1:n))
+    push!(eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(dp[i] for i in 1:n))
     push!(eqs, port_out.T ~ T[n])
     push!(eqs, port_in.T  ~ T[1])
 
     # Observed equations: P[i] absolute pressure and dP alias (D-04, D-05, D-06)
+    # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
+    # At steady state Dt(mdot)=0, the correction term vanishes and P[i] = P_in - cumsum(dp[1:i]).
     obs = Equation[]
     for i in 1:n
-        P_i = port_in.P - sum(dp[j] for j in 1:i)
+        P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
         push!(obs, P[i] ~ P_i)
     end
-    push!(obs, dP ~ sum(dp[i] for i in 1:n))
+    push!(obs, dP ~ port_in.P - port_out.P)
 
     all_vars = [collect(T); collect(Re); collect(Nu);
                 collect(h_tc); collect(v); collect(q_wall);
@@ -126,11 +128,11 @@ end
 #   v[i], Re[i], Nu[i], h_tc[i]  (when observed_mode=false)
 #   h_tc[i] only                  (when observed_mode=true; Re/Nu/v become observed)
 # Appends (per-cell):
-#   dp[i] -- per-cell pressure drop (friction + gravity + inertia)
+#   dp[i] -- per-cell pressure drop (friction + gravity only)
 # Appends (scalar):
 #   T_out ~ T[n]
 # Appends (port wiring):
-#   mass conservation, pressure drop (sum of dp[i]), port_out.T, port_in.T
+#   mass conservation, momentum ODE (L/A)*Dt(mdot), port_out.T, port_in.T
 #
 # Does NOT append energy balance equations -- those differ per variant.
 # The dP observed alias is NOT pushed here -- each caller builds its own obs list.
@@ -175,7 +177,7 @@ function _channel_base_eqs(eqs::Vector{Equation};
     end
 
     # Per-cell pressure drop (D-02, D-14): friction + gravity per cell
-    # Momentum inertia is handled by standalone Inertia component, not inside channel.
+    # Momentum inertia is handled by the momentum ODE below; dp[i] is algebraic (friction + gravity only).
     for i in 1:n
         if observed_mode
             # In observed_mode, Re[i] is observed -- inline Re for friction (Pitfall 5)
@@ -192,8 +194,9 @@ function _channel_base_eqs(eqs::Vector{Equation};
     push!(eqs, T_out ~ T[n])
 
     # Port wiring (4 equations -- identical across all channel variants)
+    Dt = Differential(t)
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
-    push!(eqs, port_out.P - port_in.P       ~ -sum(dp[i] for i in 1:n))
+    push!(eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(dp[i] for i in 1:n))
     push!(eqs, port_out.T                   ~ T[n])
     push!(eqs, port_in.T                    ~ T[1])
 end
