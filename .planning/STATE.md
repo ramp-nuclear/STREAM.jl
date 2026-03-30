@@ -1,11 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.7
-milestone_name: Safety Physics & Pressure Field
-status: executing
-stopped_at: Phase 28 context gathered
-last_updated: "2026-03-29T15:08:44.144Z"
-last_activity: 2026-03-28
+milestone: v0.6
+milestone_name: Flow Reversal Systems
+status: unknown
+stopped_at: Completed 28-01-PLAN.md (plan 01 of 02 in phase 28)
+last_updated: "2026-03-30T20:38:09Z"
 progress:
   total_phases: 5
   completed_phases: 2
@@ -25,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 27.1 — channel-momentum-inertia
+**Current focus:** Phase 28 — subcooled-boiling
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
@@ -33,13 +32,7 @@ See: .planning/PROJECT.md (updated 2026-03-27)
 ## Current Position
 
 Phase: 28
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-03-28
-
-Progress: [░░░░░░░░░░] 0% (0/4 phases)
-
----
+Plan: 02 (next)
 
 ## Performance Metrics
 
@@ -55,15 +48,28 @@ Progress: [░░░░░░░░░░] 0% (0/4 phases)
 *Updated after each plan completion*
 
 ---
-| Phase 27 P01 | 6min | 2 tasks | 4 files |
-| Phase 27 P02 | 37min | 3 tasks | 3 files |
-| Phase 27.1 P01 | 878 | 2 tasks | 4 files |
-| Phase 27.1-channel-momentum-inertia P02 | 45 | 2 tasks | 1 files |
-| Phase 27.1-channel-momentum-inertia P03 | 99 | 2 tasks | 2 files |
+| Phase 20-sign-safety P01 | 2 | 2 tasks | 2 files |
+| Phase 20 P02 | 100 | 2 tasks | 4 files |
+| Phase 21 P01 | 27 | 2 tasks | 7 files |
+| Phase 21 P02 | 10 | 2 tasks | 2 files |
+| Phase 22-time-varying-pump P01 | 7 | 2 tasks | 3 files |
+| Phase 22-time-varying-pump P02 | 32 | 2 tasks | 6 files |
+| Phase 23-flapper-solver-events P01 | 9 | 2 tasks | 4 files |
+| Phase 23 P02 | 21 | 1 tasks | 1 files |
+| Phase 24-loss-of-flow P01 | 90 | 2 tasks | 4 files |
+| Phase 24.1 P01 | 12 | 2 tasks | 4 files |
+| Phase 24.1 P02 | 55 | 2 tasks | 4 files |
+| Phase 25 P01 | 15 | 2 tasks | 17 files |
+| Phase 26-nc-regime-htc-lof-cleanup P01 | 10 | 2 tasks | 4 files |
+| Phase 26 P02 | 60 | 2 tasks | 6 files |
+| Phase 28-subcooled-boiling P01 | 5 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
 ### Key Decisions (carry-forward for v0.7)
+
+- [v0.7 SCB-01]: max(dT, 0.0) inside ifelse() exponentiation prevents DomainError when dT < 0 (Julia ifelse evaluates both branches eagerly)
+- [v0.7 SCB-04]: regime_dependent_q_scb is a factory (not direct function) to capture pressure at construction time, matching scb_correction closure contract
 
 - [v0.6]: ifelse() for all conditional switching — use for T_wall >= T_ONB SCB switching (ISCB-01)
 - [v0.6]: @register_symbolic for opaque fluid functions — sat_temperature(P) follows same pattern as rho_water(T)
@@ -86,10 +92,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-29T15:08:44.134Z
-**Stopped at:** Phase 28 context gathered
-**Next action:** `/gsd:plan-phase 27`
-**Resume file:** .planning/phases/28-subcooled-boiling/28-CONTEXT.md
+**Last session:** 2026-03-30T20:38:09Z
+**Stopped at:** Completed 28-01-PLAN.md (plan 01 of 02 in phase 28)
+**Next action:** Execute 28-02-PLAN.md
+**Resume file:** None
 
 ---
 
