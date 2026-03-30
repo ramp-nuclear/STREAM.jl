@@ -12,17 +12,6 @@ v0.1 shipped a single forced-convection coolant loop validated against Python ST
 
 See `.planning/MILESTONES.md` for full v0.7 details.
 
-## Current Milestone: v0.7 Safety Physics & Pressure Field
-
-**Goal:** Add per-cell absolute pressure to all channel components, implement subcooled boiling HTC with in-loop correction, deliver a post-process threshold analysis suite matching Python STREAM, and complete the laminar HTC and friction correlation libraries.
-
-**Target features:**
-- Pressure infrastructure: per-cell P[i], dP refactor, sat_temperature, T_sat/T_ONB observables
-- Subcooled boiling: McAdams, Bergles-Rohsenow, partial SCB, in-loop Option B correction
-- Threshold analysis: ONB, OFI, OSV, CHF (×3), twall_limit, threshold_analysis post-processor
-- HTC completions: Marco-Han Nusselt, developing/fully-developed laminar, maximal_htc
-- Friction completions: Colebrook-White, viscosity correction
-
 ## Core Value
 
 A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
@@ -99,9 +88,9 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - [ ] Refactor dP to exact per-cell sum (replaces i_mid lumped approximation)
 - [ ] sat_temperature(P) @register_symbolic fluid function
 - [ ] T_sat[i], T_ONB[i] as observed in ChannelAndContacts and ChannelHeatFlux
-- [ ] McAdams and Bergles-Rohsenow subcooled boiling heat flux correlations
-- [ ] partial_SCB_correction and regime_dependent_q_scb
-- [ ] In-loop SCB correction in ChannelAndContacts (Option B: ifelse on T_wall >= T_ONB)
+- ✓ McAdams and Bergles-Rohsenow subcooled boiling heat flux correlations — v0.7 (Phase 28)
+- ✓ partial_SCB_correction and regime_dependent_q_scb — v0.7 (Phase 28)
+- ✓ In-loop SCB correction in ChannelAndContacts (Option B: ifelse on T_wall >= T_ONB) — v0.7 (Phase 28)
 - [ ] Threshold analysis physics layer (T_ONB, q_OFI, q_OSV, q_CHF x3, twall_limit)
 - [ ] threshold_analysis(sol, ssys.ch; ...) post-process function
 - [ ] Marco_Han_Nusselt analytical rectangular duct correlation
