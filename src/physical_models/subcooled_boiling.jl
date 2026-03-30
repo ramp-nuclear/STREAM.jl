@@ -29,7 +29,10 @@ Subcooled boiling heat flux `q` [W/m^2].
 """
 function McAdams_SCB_heat_flux(T_sat, T_wall)
     dT = T_wall - T_sat
-    return ifelse(dT > 0, 740.0 * dT^3.86, 0.0)
+    # Use max(dT, 0.0) inside exponentiation to avoid DomainError when dT < 0
+    # (ifelse evaluates both branches eagerly in plain Julia; negative^non-integer is complex)
+    dT_safe = max(dT, 0.0)
+    return ifelse(dT > 0, 740.0 * dT_safe^3.86, 0.0)
 end
 
 """
@@ -58,7 +61,10 @@ Subcooled boiling heat flux `q` [W/m^2].
 function Bergles_Rohsenow_SCB_heat_flux(T_wall, T_sat, pressure; h_fg=2257e3, sigma=0.059)
     dT = T_wall - T_sat
     p = pressure / 1e5  # Pa to bar
-    return ifelse(dT > 0, 1082.0 * p^1.156 * dT^(1.0 / (0.463 * p^0.0234)), 0.0)
+    # Use max(dT, 0.0) inside exponentiation to avoid DomainError when dT < 0
+    # (ifelse evaluates both branches eagerly in plain Julia; negative^non-integer is complex)
+    dT_safe = max(dT, 0.0)
+    return ifelse(dT > 0, 1082.0 * p^1.156 * dT_safe^(1.0 / (0.463 * p^0.0234)), 0.0)
 end
 
 """
