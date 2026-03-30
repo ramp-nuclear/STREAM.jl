@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.6
 milestone_name: Flow Reversal Systems
 status: unknown
-stopped_at: Completed 28-01-PLAN.md (plan 01 of 02 in phase 28)
-last_updated: "2026-03-30T20:38:09Z"
+stopped_at: Completed 28-02-PLAN.md (plan 02 of 02 in phase 28)
+last_updated: "2026-03-31T21:34:25Z"
 progress:
   total_phases: 5
   completed_phases: 2
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-03-27)
 
 ## Current Position
 
-Phase: 28
-Plan: 02 (next)
+Phase: 28 (completed)
+Plan: 02 of 02 (completed)
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Plan: 02 (next)
 | Phase 26-nc-regime-htc-lof-cleanup P01 | 10 | 2 tasks | 4 files |
 | Phase 26 P02 | 60 | 2 tasks | 6 files |
 | Phase 28-subcooled-boiling P01 | 5 | 2 tasks | 4 files |
+| Phase 28 P02 | 51 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,9 @@ Plan: 02 (next)
 
 - [v0.7 SCB-01]: max(dT, 0.0) inside ifelse() exponentiation prevents DomainError when dT < 0 (Julia ifelse evaluates both branches eagerly)
 - [v0.7 SCB-04]: regime_dependent_q_scb is a factory (not direct function) to capture pressure at construction time, matching scb_correction closure contract
+- [v0.7 ISCB-01]: skip_htc kwarg in _channel_base_eqs suppresses h_tc push so caller can provide custom equations (SCB correction)
+- [v0.7 ISCB-01]: SCB correction factors are 10-100x when T_wall >> T_ONB; KINSOL diverges, transient solver or continuation needed for full-loop SCB steady-state
+- [v0.7 ISCB-01]: h_tc default guess 5000.0 in ChannelAndContacts prevents MTK cyclic guesses initialization error
 
 - [v0.6]: ifelse() for all conditional switching — use for T_wall >= T_ONB SCB switching (ISCB-01)
 - [v0.6]: @register_symbolic for opaque fluid functions — sat_temperature(P) follows same pattern as rho_water(T)
@@ -85,16 +89,16 @@ None.
 
 ### Blockers/Concerns
 
-- VAL-01 (Fourier series validation) is a pre-existing flaky numerical test — not caused by v0.6 changes, not expected to affect v0.7.
-- Phase 28 depends on Phase 27 (T_ONB[i] observable needed for ISCB-01); Phase 30 is independent of Phase 28/29.
+- VAL-01 (Fourier series validation) is a pre-existing flaky numerical test — not caused by v0.6 changes.
+- NET-03 (Cube flow) is a pre-existing KINSOL convergence failure — not caused by v0.7 changes.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-03-30T20:38:09Z
-**Stopped at:** Completed 28-01-PLAN.md (plan 01 of 02 in phase 28)
-**Next action:** Execute 28-02-PLAN.md
+**Last session:** 2026-03-31T21:34:25Z
+**Stopped at:** Completed 28-02-PLAN.md (plan 02 of 02 in phase 28)
+**Next action:** Phase 28 complete; next milestone planning
 **Resume file:** None
 
 ---
