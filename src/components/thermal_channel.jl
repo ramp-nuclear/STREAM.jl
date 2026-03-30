@@ -121,10 +121,7 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
             # Inline P[i] expression (not the observed symbol) to avoid observed-to-observed chain
             P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
             T_sat_i = sat_temperature(P_i)
-            # max(q_spl, 0) guards _bergles_rohsenow_dT_ONB against DomainError:
-            # during solver iteration q_spl can temporarily go negative, and
-            # (negative)^(non-integer exponent) produces a DomainError.
-            q_spl_i = max(h_spl_i * (T_w_i - T[i]), 0.0)
+            q_spl_i = h_spl_i * (T_w_i - T[i])
 
             q_scb_i = scb_correction(T_w_i, T_sat_i, Re_i)
             T_ONB_i = T_sat_i + _bergles_rohsenow_dT_ONB(P_i, q_spl_i)
