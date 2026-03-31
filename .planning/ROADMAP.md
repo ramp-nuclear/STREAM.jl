@@ -248,7 +248,7 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 | 27. Pressure Field | v0.7 | 2/2 | Complete | 2026-03-28 |
 | 27.1. Channel Momentum & Inertia | v0.7 | 3/3 | Complete | 2026-03-29 |
 | 28. Subcooled Boiling | v0.7 | 2/2 | Complete | 2026-03-30 |
-| 29. Threshold Analysis | v0.7 | 2/2 | Complete   | 2026-03-31 |
+| 29. Threshold Analysis | v0.7 | 2/2 | Complete    | 2026-03-31 |
 | 30. HTC & Friction Completions | v0.7 | 0/? | Pending | — |
 | 31. Project Scaffold | v0.8 | 0/? | Not started | — |
 | 32. Canvas & Node Editor | v0.8 | 0/? | Not started | — |
