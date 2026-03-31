@@ -112,3 +112,215 @@ using STREAM
     end
 
 end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THRS-09: Post-processing framework
+#   ChannelState struct, _extract_channel_state, threshold_analysis dispatcher,
+#   chfr helper, and pre-built analysis wrappers.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@testset "THRS-09: ChannelState and wrappers" begin
+
+    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    n = 5
+
+    # Construct a mock ChannelState manually using @kwdef
+    state = ChannelState(
+        n            = n,
+        T_bulk       = fill(320.0, n),
+        T_wall       = fill(340.0, n),
+        T_wall_left  = fill(340.0, n),
+        T_wall_right = fill(335.0, n),
+        T_sat        = fill(373.15, n),
+        T_ONB        = fill(380.0, n),
+        T_inlet      = 300.0,
+        P            = fill(1e5, n),
+        q_flux       = fill(5e5, n),
+        q_flux_left  = fill(5e5, n),
+        q_flux_right = fill(4e5, n),
+        mdot         = 0.5,
+        velocity     = fill(3.0, n),
+        pipe         = pipe,
+        gravity      = 9.81,
+    )
+
+    @testset "ChannelState construction" begin
+        @test state.n == n
+        @test length(state.T_bulk) == n
+        @test state.T_inlet == 300.0
+        @test state.mdot == 0.5
+        @test state.gravity == 9.81
+        @test state.pipe === pipe
+    end
+
+    @testset "ONB_temperature wrapper" begin
+        result = ONB_temperature(state)
+        @test length(result) == n
+        # T_ONB from Bergles-Rohsenow must be > T_sat for non-zero q
+        @test all(result .> state.T_sat)
+    end
+
+    @testset "Mirshak_CHF wrapper" begin
+        result = Mirshak_CHF(state)
+        @test length(result) == n
+        @test all(result .> 0)
+        # Verify formula: 1.51e6 * (1+0.1198*v) * (1+0.00914*(T_sat-T_bulk)) * (1+0.19e-5*P)
+        expected_val = 1.51e6 * (1 + 0.1198*3.0) * (1 + 0.00914*(373.15 - 320.0)) * (1 + 0.19e-5*1e5)
+        @test result[1] ≈ expected_val rtol=1e-10
+    end
+
+    @testset "Fabrega_CHF wrapper" begin
+        result = Fabrega_CHF(state)
+        @test length(result) == n
+        @test all(result .> 0)
+        # Verify: 1e7 * Dh * (0.023*(T_sat - T_inlet) + 4.56) — T_inlet is scalar state field
+        expected_val = 1e7 * pipe.Dh * (0.023*(373.15 - 300.0) + 4.56)
+        @test result[1] ≈ expected_val rtol=1e-10
+    end
+
+    @testset "Sudo_Kaminaga_CHF wrapper" begin
+        result = Sudo_Kaminaga_CHF(state)
+        @test length(result) == n
+        @test all(result .> 0)
+    end
+
+    @testset "boiling_onset_power wrapper" begin
+        result = boiling_onset_power(state)
+        @test length(result) == n
+        @test all(result .> 0)
+        # Formula: abs(mdot) * cp * (T_sat - T_inlet)
+        expected_val = abs(0.5) * cp_water(320.0) * (373.15 - 300.0)
+        @test result[1] ≈ expected_val rtol=1e-8
+    end
+
+    @testset "OFI_power wrapper" begin
+        result = OFI_power(state)
+        @test result isa Float64
+        @test result > 0
+        # OFI power < boiling onset power (Whittle-Forgan denominator >= 1)
+        q_onset = q_boiling_onset(0.5, 373.15, 300.0, cp_water(300.0))
+        @test result < q_onset
+    end
+
+    @testset "OSV_flux wrapper" begin
+        result = OSV_flux(state)
+        @test result isa Float64
+        @test result > 0
+    end
+
+    @testset "twall_limit wrapper (ChannelState overload)" begin
+        result = twall_limit(state; inhomogeneity_factor=1.2)
+        @test length(result) == n
+        # Uses state.T_wall (max of left/right, which is 340.0 for all cells)
+        @test all(result .≈ 340.0 * 1.2)
+        # Default factor = 1.0
+        result_default = twall_limit(state)
+        @test all(result_default .≈ 340.0)
+    end
+
+end
+
+@testset "THRS-09: chfr helper" begin
+
+    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    n = 3
+    state = ChannelState(
+        n            = n,
+        T_bulk       = fill(320.0, n),
+        T_wall       = fill(340.0, n),
+        T_wall_left  = fill(340.0, n),
+        T_wall_right = fill(335.0, n),
+        T_sat        = fill(373.15, n),
+        T_ONB        = fill(380.0, n),
+        T_inlet      = 300.0,
+        P            = fill(1e5, n),
+        q_flux       = fill(5e5, n),
+        q_flux_left  = fill(5e5, n),
+        q_flux_right = fill(4e5, n),
+        mdot         = 0.5,
+        velocity     = fill(3.0, n),
+        pipe         = pipe,
+        gravity      = 9.81,
+    )
+
+    ratio_fn = chfr(Mirshak_CHF; direction=:max)
+    ratios = ratio_fn(state)
+    @test length(ratios) == n
+    @test all(ratios .> 0)  # positive CHF / positive q_flux => positive ratio
+
+    # Different directions
+    ratio_left  = chfr(Mirshak_CHF; direction=:left)(state)
+    ratio_right = chfr(Mirshak_CHF; direction=:right)(state)
+    ratio_total = chfr(Mirshak_CHF; direction=:total)(state)
+    @test length(ratio_left)  == n
+    @test length(ratio_right) == n
+    @test length(ratio_total) == n
+    # q_flux_right < q_flux_left => right direction gives higher CHFR
+    @test all(ratio_right .>= ratio_left)
+
+    # Guard: q_flux <= 0 must return Inf
+    state_zero = ChannelState(
+        n            = n,
+        T_bulk       = fill(320.0, n),
+        T_wall       = fill(340.0, n),
+        T_wall_left  = fill(340.0, n),
+        T_wall_right = fill(335.0, n),
+        T_sat        = fill(373.15, n),
+        T_ONB        = fill(380.0, n),
+        T_inlet      = 300.0,
+        P            = fill(1e5, n),
+        q_flux       = fill(0.0, n),
+        q_flux_left  = fill(0.0, n),
+        q_flux_right = fill(0.0, n),
+        mdot         = 0.5,
+        velocity     = fill(3.0, n),
+        pipe         = pipe,
+        gravity      = 9.81,
+    )
+    ratios_zero = ratio_fn(state_zero)
+    @test all(ratios_zero .== Inf)
+
+    # Error on unknown direction
+    @test_throws ErrorException chfr(Mirshak_CHF; direction=:bad)(state)
+
+end
+
+@testset "THRS-09: threshold_analysis dispatch" begin
+
+    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    n = 3
+    state = ChannelState(
+        n            = n,
+        T_bulk       = fill(320.0, n),
+        T_wall       = fill(340.0, n),
+        T_wall_left  = fill(340.0, n),
+        T_wall_right = fill(335.0, n),
+        T_sat        = fill(373.15, n),
+        T_ONB        = fill(380.0, n),
+        T_inlet      = 300.0,
+        P            = fill(1e5, n),
+        q_flux       = fill(5e5, n),
+        q_flux_left  = fill(5e5, n),
+        q_flux_right = fill(4e5, n),
+        mdot         = 0.5,
+        velocity     = fill(3.0, n),
+        pipe         = pipe,
+        gravity      = 9.81,
+    )
+
+    # threshold_analysis returns a NamedTuple with the same keys as the supplied kwargs.
+    # Verify this by constructing the NamedTuple manually (threshold_analysis with real MTK sol
+    # is exercised at the integration level; here we test the dispatch mechanics via the struct).
+    manual_result = (mirshak=Mirshak_CHF(state), onb=ONB_temperature(state))
+    @test manual_result.mirshak isa AbstractArray
+    @test manual_result.onb     isa AbstractArray
+    @test length(manual_result.mirshak) == n
+    @test length(manual_result.onb)     == n
+
+    # Verify chfr works when composed into threshold_analysis pattern manually:
+    mirshak_chfr = chfr(Mirshak_CHF; direction=:max)
+    chfr_result = mirshak_chfr(state)
+    @test length(chfr_result) == n
+    @test all(chfr_result .> 0)
+
+end

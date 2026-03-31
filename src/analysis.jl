@@ -326,7 +326,7 @@ Calls `q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, state.pipe, state.gravity)
 Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
 """
 function Sudo_Kaminaga_CHF(state::ChannelState)
-    return q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, state.pipe, state.gravity)
+    return q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, Ref(state.pipe), state.gravity)
 end
 
 """
@@ -360,7 +360,7 @@ Calls `q_CHF_fabrega.(state.T_inlet, state.T_sat, state.pipe)`.
 Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
 """
 function Fabrega_CHF(state::ChannelState)
-    return q_CHF_fabrega.(state.T_inlet, state.T_sat, state.pipe)
+    return q_CHF_fabrega.(state.T_inlet, state.T_sat, Ref(state.pipe))
 end
 
 """
