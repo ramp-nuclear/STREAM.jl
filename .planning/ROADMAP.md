@@ -94,7 +94,13 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 - [x] Phase 27: Pressure Field (2/2 plans) — completed 2026-03-28
 - [x] Phase 27.1: Channel Momentum & Inertia (3/3 plans) — completed 2026-03-29
 - [x] Phase 28: Subcooled Boiling (2/2 plans) — completed 2026-03-30
-- [ ] Phase 29: Threshold Analysis (0/? plans) — pending
+- [ ] Phase 29: Threshold Analysis (0/2 plans) — planned
+  **Goal:** Nuclear safety threshold correlations (ONB, OFI, OSV, CHF) + post-processing framework
+  **Plans:** 2 plans
+  **Requirements:** [THRS-01, THRS-02, THRS-03, THRS-04, THRS-05, THRS-06, THRS-07, THRS-08, THRS-09]
+  Plans:
+  - [ ] 29-01-PLAN.md — Physics functions (THRS-01..08): Bergles-Rohsenow T_ONB, boiling onset, OFI, OSV, CHF (Sudo-Kaminaga, Mirshak, Fabrega), twall_limit
+  - [ ] 29-02-PLAN.md — Post-processing framework (THRS-09): ChannelState, threshold_analysis, chfr, pre-built wrappers
 - [ ] Phase 30: HTC & Friction Completions (0/? plans) — pending
 
 </details>
@@ -134,10 +140,10 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 | 27. Pressure Field | v0.7 | 2/2 | Complete | 2026-03-28 |
 | 27.1. Channel Momentum & Inertia | v0.7 | 3/3 | Complete | 2026-03-29 |
 | 28. Subcooled Boiling | v0.7 | 2/2 | Complete | 2026-03-30 |
-| 29. Threshold Analysis | v0.7 | 0/? | Pending | — |
+| 29. Threshold Analysis | v0.7 | 0/2 | Planned | — |
 | 30. HTC & Friction Completions | v0.7 | 0/? | Pending | — |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-30 — Phase 28 complete; Phases 29-30 pending*
+*Updated: 2026-03-31 — Phase 29 planned (2 plans); Phase 30 pending*
