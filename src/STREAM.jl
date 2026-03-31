@@ -29,6 +29,7 @@ export Channel, Pump, Flapper, Friction, Gravity, Resistor, Inertia, HeatExchang
 export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction, rectangular_laminar_correction, regime_dependent, elenbaas_nusselt, elenbaas_htc
 export McAdams_SCB_heat_flux, Bergles_Rohsenow_SCB_heat_flux, partial_SCB_correction, regime_dependent_q_scb
 export Bergles_Rohsenow_T_ONB, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber, q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
+export ChannelState, threshold_analysis, chfr, ONB_temperature, boiling_onset_power, OFI_power, OSV_flux, Sudo_Kaminaga_CHF, Mirshak_CHF, Fabrega_CHF
 export Gr, Ra, Re_vel, Pe
 export build_loop, build_loop_vertical, build_loop_transient, build_cube, build_loop_lof_bypass, solve_steady, solve_transient, steady_state_guess, check_gravity_mismatch, port
 export symmetric_plate, plate, one_sided_connection, compose_systems

@@ -76,23 +76,8 @@ assembled into a matrix of shape `[n_cells, n_times]`.
 
 `q_flux_left[i] = q_wall_left[i] / (pipe.heated_parts[1] * dz)` per D-05.
 When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
-
-# Preconditions
-`channel_sys` must be a ChannelAndContacts system with fields T_wall_left[n], T_wall_right[n],
-T_sat[n], T_ONB[n], q_wall_left[n], q_wall_right[n]. Throws `ArgumentError` if called with
-a Channel or ChannelHeatFlux system (those lack T_wall_left, T_sat, T_ONB, etc.).
 """
 function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
-    # Precondition: channel_sys must be a ChannelAndContacts system (has T_wall_left, T_sat, etc.)
-    if !hasproperty(channel_sys, :T_wall_left)
-        throw(ArgumentError(
-            "_extract_channel_state requires a ChannelAndContacts system. " *
-            "The provided system does not have T_wall_left, T_wall_right, T_sat, T_ONB, " *
-            "q_wall_left, and q_wall_right fields. Pass a ChannelAndContacts subsystem, " *
-            "not a Channel or ChannelHeatFlux."
-        ))
-    end
-
     # Determine n from the length of the T array
     n = length(channel_sys.T)
 
@@ -341,7 +326,7 @@ Calls `q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, state.pipe, state.gravity)
 Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
 """
 function Sudo_Kaminaga_CHF(state::ChannelState)
-    return q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, Ref(state.pipe), state.gravity)
+    return q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, state.pipe, state.gravity)
 end
 
 """
@@ -375,7 +360,7 @@ Calls `q_CHF_fabrega.(state.T_inlet, state.T_sat, state.pipe)`.
 Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
 """
 function Fabrega_CHF(state::ChannelState)
-    return q_CHF_fabrega.(state.T_inlet, state.T_sat, Ref(state.pipe))
+    return q_CHF_fabrega.(state.T_inlet, state.T_sat, state.pipe)
 end
 
 """
