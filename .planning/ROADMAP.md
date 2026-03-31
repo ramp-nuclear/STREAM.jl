@@ -9,6 +9,7 @@
 - ✅ **v0.5 Code Quality** — Phases 17-19 (shipped 2026-03-16)
 - ✅ **v0.6 Flow Reversal Systems** — Phases 20-26 (shipped 2026-03-27)
 - 🔄 **v0.7 Safety Physics & Pressure Field** — Phases 27-30 (in progress)
+- 📋 **v0.8 STREAM Composer GUI** — Phases 31-38 (planned)
 
 ## Phases
 
@@ -105,6 +106,113 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 
 </details>
 
+### 📋 v0.8 STREAM Composer GUI (Phases 31-38) — PLANNED
+
+- [ ] **Phase 31: Project Scaffold** — Tauri 2 + React + ReactFlow skeleton; component metadata registry; dev environment verified
+- [ ] **Phase 32: Canvas & Node Editor** — Drag-from-toolbox, custom node components with FlowPort handles, edge drawing, zoom/pan/minimap, undo/redo
+- [ ] **Phase 33: Parameter Editing** — Sidebar form generation from component schema; PipeGeometry picker; Pump mode toggle; scalar validation; rename
+- [ ] **Phase 34: Code Generation** — Graph-to-Julia translator; BC editor; live code preview panel; export to .jl file
+- [ ] **Phase 35: Project Persistence** — Save/load .streamgui JSON; unsaved-changes guard; recent projects list
+- [ ] **Phase 36: UI Design Pass** — shadcn/ui integration throughout; three-panel layout; component icons/colors; design contract and visual audit gates
+- [ ] **Phase 37: Topology Validation** — Unconnected port warnings; missing pressure BC alert; missing driving element alert
+- [ ] **Phase 38: Thermal Composition** — ChannelAndContacts ThermalPort array visualization; HeatDiffusion connections; composition helper code generation
+
+## Phase Details
+
+### Phase 31: Project Scaffold
+**Goal**: Developer and user can launch the STREAM Composer desktop app; component metadata registry defines all STREAM.jl components
+**Depends on**: Nothing (first GUI phase; independent of v0.7)
+**Requirements**: SCAF-01, SCAF-02, SCAF-03, SCAF-04, SCAF-05
+**Success Criteria** (what must be TRUE):
+  1. `npm run tauri dev` starts the app in a browser/webview within 10 seconds
+  2. ReactFlow canvas renders at center of screen with no console errors
+  3. Component registry JSON contains at least the 9 core STREAM.jl components with correct port definitions
+  4. App bundles to a distributable installer on at least one platform
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 32: Canvas & Node Editor
+**Goal**: Users can visually build hydraulic system topologies by placing components and wiring them together
+**Depends on**: Phase 31
+**Requirements**: CANV-01, CANV-02, CANV-03, CANV-04, CANV-05, CANV-06, CANV-07
+**Success Criteria** (what must be TRUE):
+  1. User can drag Pump from toolbox; it appears as a node on canvas
+  2. User can connect Pump.port_out to Channel.port_in with a visible edge
+  3. User can delete a node and its connected edges are removed
+  4. Undo/redo reverses at least 10 sequential operations correctly
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 33: Parameter Editing
+**Goal**: Users can configure every component parameter through a sidebar form with validation and mode-specific fields
+**Depends on**: Phase 32
+**Requirements**: PARA-01, PARA-02, PARA-03, PARA-04, PARA-05, PARA-06
+**Success Criteria** (what must be TRUE):
+  1. Clicking a Channel node opens sidebar showing L, Dh, n, and PipeGeometry fields
+  2. Changing n from 5 to 10 is reflected immediately; no stale value remains
+  3. Pump sidebar shows dP_pump field in fixed-dP mode; toggling to fixed-mdot replaces it with mdot0
+  4. Entering letters in a numeric field shows a visible error, not a crash
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 34: Code Generation
+**Goal**: Users can view and export valid STREAM.jl Julia code generated from their canvas topology
+**Depends on**: Phase 33
+**Requirements**: CODE-01, CODE-02, CODE-03, CODE-04, CODE-05, CODE-06, CODE-07
+**Success Criteria** (what must be TRUE):
+  1. Canvas with Pump-HeatExchanger-Channel-Pump loop generates valid STREAM.jl code
+  2. Generated code compiles without errors when pasted into a Julia REPL with `using STREAM`
+  3. Pressing Export opens native file dialog; saved file contains the generated code
+  4. BC panel allows adding `pump.port_in.P ~ 1.0e5`; generated code includes it
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 35: Project Persistence
+**Goal**: Users can save, load, and resume their work across sessions without data loss
+**Depends on**: Phase 34
+**Requirements**: PERS-01, PERS-02, PERS-03, PERS-04
+**Success Criteria** (what must be TRUE):
+  1. Ctrl+S saves project; reloading the app and opening the file restores all nodes, edges, positions, and parameters exactly
+  2. Closing the app with unsaved changes shows a confirmation dialog
+  3. Recent Projects list shows last 5 files by name
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 36: UI Design Pass
+**Goal**: Every UI surface uses shadcn/ui design system with consistent visual language and quality-gated process
+**Depends on**: Phase 35
+**Requirements**: DSGN-01, DSGN-02, DSGN-03, DSGN-04, DSGN-05
+**Success Criteria** (what must be TRUE):
+  1. Every UI element uses shadcn/ui primitives (no raw `<button>` or `<input>` with inline styles)
+  2. UI-SPEC.md design contract was written and approved before Phase 36 coding began
+  3. UI-REVIEW.md audit was completed after Phase 36 coding; no BLOCK verdicts
+  4. Toolbox icons are distinct (not identical placeholder boxes)
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 37: Topology Validation
+**Goal**: Users receive immediate visual feedback when their system topology has structural problems
+**Depends on**: Phase 32
+**Requirements**: VALD-01, VALD-02, VALD-03
+**Success Criteria** (what must be TRUE):
+  1. A Channel with port_in unconnected shows a red/orange visual indicator on the canvas node
+  2. A complete loop with no Pump shows an alert banner "No driving element detected"
+  3. A complete loop missing a pressure anchor shows a separate alert banner
+  4. Alerts disappear when the condition is resolved
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 38: Thermal Composition
+**Goal**: Users can build and wire thermal fuel assembly topologies with array-port connections and smart code generation
+**Depends on**: Phase 34, Phase 32
+**Requirements**: THERM-01, THERM-02, THERM-03
+**Success Criteria** (what must be TRUE):
+  1. ChannelAndContacts(n=4) node shows 4 thermal_left and 4 thermal_right port handles
+  2. Connecting a HeatDiffusion left-side port to thermal_left[2] is possible and draws a typed edge
+  3. Symmetric_plate topology (HeatDiffusion between two ChannelAndContacts) generates `symmetric_plate(cac1, fuel)` call in output code
+**Plans**: TBD
+**UI hint**: yes
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -142,8 +250,16 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 | 28. Subcooled Boiling | v0.7 | 2/2 | Complete | 2026-03-30 |
 | 29. Threshold Analysis | v0.7 | 0/2 | Planned | — |
 | 30. HTC & Friction Completions | v0.7 | 0/? | Pending | — |
+| 31. Project Scaffold | v0.8 | 0/? | Not started | — |
+| 32. Canvas & Node Editor | v0.8 | 0/? | Not started | — |
+| 33. Parameter Editing | v0.8 | 0/? | Not started | — |
+| 34. Code Generation | v0.8 | 0/? | Not started | — |
+| 35. Project Persistence | v0.8 | 0/? | Not started | — |
+| 36. UI Design Pass | v0.8 | 0/? | Not started | — |
+| 37. Topology Validation | v0.8 | 0/? | Not started | — |
+| 38. Thermal Composition | v0.8 | 0/? | Not started | — |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-31 — Phase 29 planned (2 plans); Phase 30 pending*
+*Updated: 2026-03-31 — v0.8 STREAM Composer GUI phases 31-38 added (8 phases, 40 requirements)*

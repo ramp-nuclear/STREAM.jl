@@ -4,7 +4,7 @@ milestone: v0.1
 milestone_name: milestone
 status: unknown
 stopped_at: Phase 29 context gathered (discuss mode)
-last_updated: "2026-03-31T16:25:16.220Z"
+last_updated: "2026-03-31T18:00:00.000Z"
 progress:
   total_phases: 4
   completed_phases: 3
@@ -20,11 +20,15 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-27)
+See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
 **Current focus:** Phase 29 — threshold-analysis (next up)
 **Python STREAM reference:** ~/projects/STREAM
+
+**Roadmap summary:**
+- v0.7 (in progress): Phases 27-30 — Safety Physics & Pressure Field (3/4 phases complete)
+- v0.8 (planned): Phases 31-38 — STREAM Composer GUI (8 phases, 40 requirements, 0 started)
 
 ---
 
@@ -95,14 +99,14 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-31T16:25:16.215Z
-**Stopped at:** Phase 29 context gathered (discuss mode)
-**Next action:** Phase 28 complete; next milestone planning
+**Last session:** 2026-03-31T18:00:00.000Z
+**Stopped at:** v0.8 roadmap phases 31-38 added to ROADMAP.md
+**Next action:** Phase 29 threshold-analysis (v0.7) or start v0.8 Phase 31
 **Resume file:** .planning/phases/29-threshold-analysis/29-CONTEXT.md
 
 ---
 
-*Last updated: 2026-03-31 — Completed quick task 260331-q27: Audit and fix GSD planning artifacts*
+*Last updated: 2026-03-31 — v0.8 STREAM Composer GUI roadmap added (phases 31-38, 40 requirements)*
 
 ### Quick Tasks Completed
 
