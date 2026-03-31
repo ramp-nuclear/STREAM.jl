@@ -8,7 +8,7 @@
 - ✅ **v0.4 Composability & Physics** — Phases 13-16 (shipped 2026-03-16)
 - ✅ **v0.5 Code Quality** — Phases 17-19 (shipped 2026-03-16)
 - ✅ **v0.6 Flow Reversal Systems** — Phases 20-26 (shipped 2026-03-27)
-- 🚧 **v0.7 Safety Physics & Pressure Field** — Phases 27-30 (in progress)
+- 🔄 **v0.7 Safety Physics & Pressure Field** — Phases 27-30 (in progress)
 
 ## Phases
 
@@ -88,85 +88,16 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 
 </details>
 
-### v0.7 Safety Physics & Pressure Field (In Progress)
+<details>
+<summary>🔄 v0.7 Safety Physics & Pressure Field (Phases 27-30) — IN PROGRESS</summary>
 
-**Milestone Goal:** Add per-cell absolute pressure to all channel components, implement subcooled boiling HTC with in-loop correction, deliver a post-process threshold analysis suite matching Python STREAM, and complete the laminar HTC and friction correlation libraries.
+- [x] Phase 27: Pressure Field (2/2 plans) — completed 2026-03-28
+- [x] Phase 27.1: Channel Momentum & Inertia (3/3 plans) — completed 2026-03-29
+- [x] Phase 28: Subcooled Boiling (2/2 plans) — completed 2026-03-30
+- [ ] Phase 29: Threshold Analysis (0/? plans) — pending
+- [ ] Phase 30: HTC & Friction Completions (0/? plans) — pending
 
-- [x] **Phase 27: Pressure Field** - Per-cell dP refactor, absolute pressure observables, sat_temperature, and T_sat/T_ONB in channels (completed 2026-03-28)
-- [x] **Phase 27.1: Channel Momentum Inertia** (INSERTED) - Momentum ODE in all channel variants, P[i] inertia correction, transient validation (completed 2026-03-28)
-- [ ] **Phase 28: Subcooled Boiling** - McAdams and Bergles-Rohsenow SCB correlations plus in-loop ChannelAndContacts correction
-- [ ] **Phase 29: Threshold Analysis** - ONB/OFI/OSV/CHF physics functions and threshold_analysis post-processor
-- [ ] **Phase 30: HTC & Friction Completions** - Marco-Han laminar Nusselt, developing laminar, maximal_htc, Colebrook-White, viscosity correction
-
-## Phase Details
-
-### Phase 27: Pressure Field
-**Goal**: All channel variants expose per-cell absolute pressure and saturation-related observables so downstream safety calculations have the spatial pressure profile they require
-**Depends on**: Phase 26
-**Requirements**: PRES-01, PRES-02, PRES-03, PRES-04
-**Success Criteria** (what must be TRUE):
-  1. `sol[ch.P[i], :]` returns meaningful absolute pressure at each axial cell for Channel, ChannelAndContacts, and ChannelHeatFlux
-  2. `sol[ch.dP]` equals `sum(dp[i])` exactly (per-cell sum, not i_mid lump)
-  3. `sat_temperature(P)` is callable from MTK equations and returns physically correct saturation temperature for typical reactor pressures (e.g. ~393 K at 2 bar)
-  4. `sol[ch.T_sat[i], :]` and `sol[ch.T_ONB[i], :]` are accessible observables in ChannelAndContacts and ChannelHeatFlux
-**Plans:** 2/2 plans complete
-Plans:
-- [x] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
-- [x] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
-
-### Phase 27.1: channel-momentum-inertia (INSERTED)
-
-**Goal:** Add momentum ODE to all channel variants so transient inertia physics is correct, dp[i] stays algebraic, P[i] observed includes the distributed inertia correction term, and dP = port_in.P - port_out.P
-**Requirements**: PRES-05, PRES-06, PRES-07, PRES-08, PRES-09, PRES-10, PRES-11, PRES-12, VAL-PRES-01
-**Depends on:** Phase 27
-**Plans:** 3/3 plans complete
-
-Plans:
-- [x] 27.1-01-PLAN.md — Momentum ODE in Channel/_channel_base_eqs, updated P[i]/dP observed, thermal variant updates
-- [x] 27.1-02-PLAN.md — Transient inertia tests PRES-05..12, Inertia compatibility, VAL-PRES-01 placeholder
-- [x] 27.1-03-PLAN.md — Gap closure: PRES-05..12 and VAL-PRES-01 requirements traceability, PRES-11 scope correction
-
-### Phase 28: Subcooled Boiling
-**Goal**: Subcooled boiling heat flux correlations are available as standalone functions and ChannelAndContacts can optionally apply an in-loop SCB correction when wall temperature exceeds T_ONB
-**Depends on**: Phase 27
-**Requirements**: SCB-01, SCB-02, SCB-03, SCB-04, ISCB-01, ISCB-02
-**Success Criteria** (what must be TRUE):
-  1. `McAdams_SCB_heat_flux` and `Bergles_Rohsenow_SCB_heat_flux` return physically plausible values in unit tests with known inputs
-  2. `regime_dependent_q_scb` selects the correct correlation branch (McAdams for turbulent, Bergles-Rohsenow for laminar) based on Re
-  3. ChannelAndContacts with `scb_correction` kwarg solves without error; when `T_wall[i] < T_ONB[i]` the effective HTC matches the pure single-phase result exactly
-  4. When `T_wall >> T_sat`, the effective HTC from the SCB-corrected ChannelAndContacts is measurably higher than the uncorrected single-phase HTC
-**Plans:** 2 plans
-Plans:
-- [x] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
-- [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
-
-### Phase 29: Threshold Analysis
-**Goal**: The full Python STREAM threshold analysis suite is available as callable Julia functions (physics layer) and as a post-process runner that accepts an ODESolution and returns named safety margins per cell
-**Depends on**: Phase 27
-**Requirements**: THRS-01, THRS-02, THRS-03, THRS-04, THRS-05, THRS-06, THRS-07, THRS-08, THRS-09
-**Success Criteria** (what must be TRUE):
-  1. Each of the seven physics functions (T_ONB, q_boiling_onset, q_OFI, q_OSV, q_CHF x3, twall_limit) returns a scalar when called with representative MTR inputs
-  2. `threshold_analysis(sol, ch; ...)` returns a NamedTuple with one field per threshold function provided by the caller
-  3. `threshold_analysis` handles both steady-state and transient ODESolution without branching at the call site; steady returns one value per cell, transient returns a vector per cell
-  4. Results for at least one CHF correlation match Python STREAM output within 5% on the canonical MTR geometry
-**Plans:** 2 plans
-Plans:
-- [ ] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
-- [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
-
-### Phase 30: HTC & Friction Completions
-**Goal**: The correlation library covers developing and fully-developed laminar rectangular-duct flow, a combinator for taking the elementwise maximum across correlations, Colebrook-White turbulent friction, and a viscosity correction factor
-**Depends on**: Phase 28
-**Requirements**: HTC-01, HTC-02, HTC-03, HTC-04, FRIC-01, FRIC-02
-**Success Criteria** (what must be TRUE):
-  1. `Marco_Han_Nusselt(aspect_ratio)` returns tabulated Nu values within 1% of published data for standard aspect ratios (e.g. Nu=7.541 for square duct)
-  2. `fully_developed_laminar_h_spl` and `developing_laminar_h_spl` return pluggable 4-arg closures accepted by `regime_dependent` without modification
-  3. `maximal_htc(corr1, corr2)` returns a closure that produces the elementwise max Nu when called; demonstrated with at least two correlations
-  4. `turbulent_friction(Re, epsilon)` returns Darcy friction factor consistent with Moody chart values; smooth-pipe limit matches Blasius within 2% for Re in [4000, 1e5]
-**Plans:** 2 plans
-Plans:
-- [ ] 27-01-PLAN.md — sat_temperature + _bergles_rohsenow_dT_ONB functions and unit tests
-- [ ] 27-02-PLAN.md — Per-cell dp[i] refactor, P[i]/T_sat[i]/T_ONB[i] observables, integration tests
+</details>
 
 ## Progress
 
@@ -200,9 +131,13 @@ Plans:
 | 24.1. Bypass LOF Topology | v0.6 | 2/2 | Complete | 2026-03-21 |
 | 25. Argument Structure Audit | v0.6 | 1/1 | Complete | 2026-03-26 |
 | 26. NC Regime HTC + LOF Cleanup | v0.6 | 2/2 | Complete | 2026-03-26 |
-| 28. Subcooled Boiling | v0.7 | 2/2 | Complete    | 2026-03-30 |
+| 27. Pressure Field | v0.7 | 2/2 | Complete | 2026-03-28 |
+| 27.1. Channel Momentum & Inertia | v0.7 | 3/3 | Complete | 2026-03-29 |
+| 28. Subcooled Boiling | v0.7 | 2/2 | Complete | 2026-03-30 |
+| 29. Threshold Analysis | v0.7 | 0/? | Pending | — |
+| 30. HTC & Friction Completions | v0.7 | 0/? | Pending | — |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-30 — Phase 28 Plan 01 complete*
+*Updated: 2026-03-30 — Phase 28 complete; Phases 29-30 pending*

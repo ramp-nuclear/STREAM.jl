@@ -1,12 +1,12 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.1
-milestone_name: milestone
-status: unknown
-stopped_at: Completed 28-02-PLAN.md (plan 02 of 02 in phase 28)
+milestone: v0.7
+milestone_name: Safety Physics & Pressure Field
+status: in_progress
+stopped_at: Completed Phase 28 (subcooled-boiling); next is Phase 29 (threshold-analysis)
 last_updated: "2026-03-30T21:59:14.936Z"
 progress:
-  total_phases: 3
+  total_phases: 5
   completed_phases: 3
   total_plans: 7
   completed_plans: 7
@@ -23,15 +23,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 28 — subcooled-boiling
+**Current focus:** Phase 29 — threshold-analysis (next up)
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: 28
-Plan: Not started
+Phase: 29 (next — not yet started)
+Plan: N/A — Phase 29 not yet planned
 
 ## Performance Metrics
 
