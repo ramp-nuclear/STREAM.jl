@@ -102,4 +102,11 @@ None.
 
 ---
 
-*Last updated: 2026-03-27 — v0.7 roadmap created*
+*Last updated: 2026-03-31 — Completed quick task 260331-q27: Audit and fix GSD planning artifacts*
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260322-l7z | Create LOF transient example script with comprehensive plots and analysis | 2026-03-22 | 52f4e44 | [260322-l7z-create-lof-transient-example-script-with](./quick/260322-l7z-create-lof-transient-example-script-with/) |
+| 260331-q27 | Audit and fix GSD planning artifacts (PROJECT.md Phase 27/28 requirements, evolution log, footer) | 2026-03-31 | 435be6b | [260331-q27-audit-gsd-planning-artifacts-and-surface](./quick/260331-q27-audit-gsd-planning-artifacts-and-surface/) |
