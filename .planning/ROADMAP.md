@@ -124,9 +124,15 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 **Success Criteria** (what must be TRUE):
   1. `npm run tauri dev` starts the app in a browser/webview within 10 seconds
   2. ReactFlow canvas renders at center of screen with no console errors
-  3. Component registry JSON contains at least the 9 core STREAM.jl components with correct port definitions
+  3. Component registry JSON contains all 12 STREAM.jl components with correct port definitions
   4. App bundles to a distributable installer on at least one platform
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 33-01-PLAN.md — Tauri 2 scaffold with React, ReactFlow, Zustand, Vitest, shadcn, three-panel layout
+- [ ] 33-02-PLAN.md — Component metadata registry JSON (12 components) with TypeScript types and tests
+- [ ] 33-03-PLAN.md — Human-verify: desktop app launches with three-panel layout
+
 **UI hint**: yes
 
 ### Phase 34: Canvas & Node Editor
@@ -250,7 +256,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 | 30. HTC & Friction Completions | v0.7 | 2/2 | Complete | 2026-04-01 |
 | 31. Write Phase 27 Verification Document | v0.7 | 1/1 | Complete | 2026-04-01 |
 | 32. THRS-09 & Phase 30 Integration Hardening | v0.7 | 1/1 | Complete | 2026-04-01 |
-| 33. Project Scaffold | v0.8 | 0/? | Not started | — |
+| 33. Project Scaffold | v0.8 | 0/3 | Not started | — |
 | 34. Canvas & Node Editor | v0.8 | 0/? | Not started | — |
 | 35. Parameter Editing | v0.8 | 0/? | Not started | — |
 | 36. Code Generation | v0.8 | 0/? | Not started | — |
@@ -262,4 +268,4 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-01 — v0.7 complete; v0.8 STREAM Composer GUI phases renumbered 33-40 (continuing from Phase 32)*
+*Updated: 2026-04-01 — Phase 33 planned: 3 plans in 2 waves*
