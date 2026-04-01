@@ -4,18 +4,13 @@
 
 STREAM.jl is a Julia rewrite of the Python package STREAM (System Thermohydraulics for Reactor Evaluation, Analysis & Modeling) — a nuclear reactor thermal-hydraulics simulation code. It models heat evacuation in reactor systems through coupled differential-algebraic equations, using ModelingToolkit.jl (MTK) as the core symbolic modeling engine instead of the hand-rolled Aggregator+DAE approach used in Python STREAM.
 
-v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls. v0.5 reorganized the codebase to the canonical CLAUDE.md file layout, split the monolithic test file into 13 focused modules, added Julia docstrings to all 28 exported names, and expanded CLAUDE.md with rationale and MTK patterns. v0.6 delivered flow reversal systems: sign-safe channel components with ifelse() upwinding, thermal expansion coefficient and Elenbaas natural convection HTC, time-varying Pump callable dispatch, Flapper check-valve with MTK continuous events, and a validated loss-of-flow transient with physically correct 4-node bypass topology covering forced flow, pump coastdown, flow reversal, Flapper opening, and established natural circulation. v0.7 (in progress) added per-cell absolute pressure, sat_temperature, T_sat/T_ONB observables, and subcooled boiling: McAdams + Bergles-Rohsenow SCB correlations, partial_SCB_correction, regime_dependent_q_scb factory, and in-loop SCB correction as optional kwarg on ChannelAndContacts.
+v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls. v0.5 reorganized the codebase to the canonical CLAUDE.md file layout, split the monolithic test file into 13 focused modules, added Julia docstrings to all 28 exported names, and expanded CLAUDE.md with rationale and MTK patterns. v0.6 delivered flow reversal systems: sign-safe channel components with ifelse() upwinding, thermal expansion coefficient and Elenbaas natural convection HTC, time-varying Pump callable dispatch, Flapper check-valve with MTK continuous events, and a validated loss-of-flow transient with physically correct 4-node bypass topology covering forced flow, pump coastdown, flow reversal, Flapper opening, and established natural circulation. v0.7 delivered the full safety physics and pressure field suite: per-cell absolute pressure P[i]/dp[i], sat_temperature @register_symbolic, T_sat[i]/T_ONB[i] observables, distributed momentum ODE in all channel variants, subcooled boiling (McAdams + Bergles-Rohsenow + in-loop SCB correction), nuclear safety threshold analysis framework (8 physics functions + ChannelState + threshold_analysis dispatcher + chfr factory), and complete HTC/friction correlation library (Marco-Han, developing/fully-developed laminar factories, maximal_htc combinator, Colebrook-White turbulent friction, viscosity correction) with htc/ + friction/ subdirectory split.
 
-## Current Milestone: v0.7 Safety Physics & Pressure Field
+## Next Milestone: v0.8 (TBD)
 
-**Goal:** Add per-cell absolute pressure to all channel components, implement subcooled boiling HTC with in-loop correction, deliver a post-process threshold analysis suite matching Python STREAM, and complete the laminar HTC and friction correlation libraries.
+**Previous milestone:** v0.7 Safety Physics & Pressure Field — shipped 2026-04-01
 
-**Target features:**
-- Pressure infrastructure: per-cell P[i], dP refactor, sat_temperature, T_sat/T_ONB observables
-- Subcooled boiling: McAdams, Bergles-Rohsenow, partial SCB, in-loop Option B correction
-- Threshold analysis: ONB, OFI, OSV, CHF (×3), twall_limit, threshold_analysis post-processor
-- HTC completions: Marco-Han Nusselt, developing/fully-developed laminar, maximal_htc
-- Friction completions: Colebrook-White, viscosity correction
+See `.planning/MILESTONES.md` for full v0.7 details.
 
 ## Core Value
 
@@ -74,25 +69,20 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - ✓ `solve_transient` accepts optional `callbacks` keyword for user-supplied DifferentialEquations.jl events alongside MTK-native Flapper events — v0.6
 - ✓ Loss-of-flow transient validated end-to-end via `build_loop_lof_bypass`: 4-node bypass topology (real junctions, parallel channel/Flapper paths, standalone Inertia), energy balance <0.09% rtol, natural circulation established — v0.6
 - ✓ All public functions migrated from keyword-only to positional + multiple dispatch where argument types differ (6 signatures: Resistor, Gravity, Inertia, HeatExchanger, ConstantTemperature, laminar_friction) — v0.6
+- ✓ Per-cell absolute pressure P[i] as observed variables in all channel variants; dP refactored to exact per-cell sum — v0.7
+- ✓ sat_temperature(P) @register_symbolic fluid function (Simantov equation) — v0.7
+- ✓ T_sat[i], T_ONB[i] as @observed in ChannelAndContacts and ChannelHeatFlux — v0.7
+- ✓ Distributed momentum ODE (L/A)*Dt(mdot) in all three channel variants; P[i] with inertia correction; PRES-05..12 transient tests passing — v0.7
+- ✓ McAdams and Bergles-Rohsenow subcooled boiling heat flux correlations; partial_SCB_correction and regime_dependent_q_scb factory — v0.7
+- ✓ In-loop SCB correction in ChannelAndContacts (ifelse on T_wall >= T_ONB); backward compatible with skip_htc kwarg in _channel_base_eqs — v0.7
+- ✓ Nuclear safety threshold analysis: 8 physics functions (Bergles-Rohsenow T_ONB, q_OFI Whittle-Forgan, q_OSV Saha-Zuber, q_CHF Sudo-Kaminaga/Mirshak/Fabrega, twall_limit) — v0.7
+- ✓ ChannelState struct + threshold_analysis() dispatcher + chfr() factory + 8 pre-built analysis wrappers; _extract_channel_state with ArgumentError precondition guard — v0.7
+- ✓ Marco_Han_Nusselt rectangular duct laminar Nu; fully_developed_laminar_h_spl and developing_laminar_h_spl HTC factories; maximal_htc combinator — v0.7
+- ✓ turbulent_friction(Re, epsilon) Colebrook-White; viscosity_correction(heat_wet_ratio, mu_ratio); correlations.jl split into htc/ + friction/ subdirs — v0.7
 
 ### Active
 
-<!-- v0.7 requirements — Safety Physics & Pressure Field -->
-
-- ✓ Per-cell absolute pressure P[i] as observed variables in all channel variants — v0.7 (Phase 27)
-- ✓ Refactor dP to exact per-cell sum (replaces i_mid lumped approximation) — v0.7 (Phase 27)
-- ✓ sat_temperature(P) @register_symbolic fluid function — v0.7 (Phase 27)
-- ✓ T_sat[i], T_ONB[i] as observed in ChannelAndContacts and ChannelHeatFlux — v0.7 (Phase 27)
-- ✓ McAdams and Bergles-Rohsenow subcooled boiling heat flux correlations — v0.7 (Phase 28)
-- ✓ partial_SCB_correction and regime_dependent_q_scb — v0.7 (Phase 28)
-- ✓ In-loop SCB correction in ChannelAndContacts (Option B: ifelse on T_wall >= T_ONB) — v0.7 (Phase 28)
-- [ ] Threshold analysis physics layer (T_ONB, q_OFI, q_OSV, q_CHF x3, twall_limit)
-- [ ] threshold_analysis(sol, ssys.ch; ...) post-process function
-- [ ] Marco_Han_Nusselt analytical rectangular duct correlation
-- [ ] developing_laminar_h_spl and fully_developed_laminar_h_spl
-- [ ] maximal_htc(...) elementwise-max correlation combinator
-- [ ] turbulent_friction(Re, epsilon) Colebrook-White
-- [ ] viscosity_correction(heat_wet_ratio, mu_ratio)
+<!-- v0.7 requirements — now validated -->
 
 > **Gap analysis available:** `.planning/GAP-ANALYSIS.md` contains a full feature-by-feature comparison of Python STREAM vs Julia STREAM (compiled 2026-03-16, v0.5.0). ~80 items missing; Priority 1 (9 items) covers the non-negotiable core for real reactor simulations.
 
@@ -116,9 +106,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **v0.4 shipped** 2026-03-16 — ~3,268 Julia LOC, 4 phases (13-16), 7 plans; 15 requirements complete
 - **v0.5 shipped** 2026-03-16 — ~3,750 Julia LOC (src + test), 3 phases (17-19), 6 plans; 15 requirements complete; canonical file layout, full docstrings, 13-file test suite
 - **v0.6 shipped** 2026-03-27 — 2,373 src LOC, 8 phases (20-26 incl. 24.1), 14 plans; 21 requirements complete; flow reversal, Flapper, Elenbaas NC, LOF transient validated
-- **v0.7 Phase 27 complete** 2026-03-28 — per-cell P[i]/dp[i], sat_temperature @register_symbolic, T_sat[i]/T_ONB[i] observables; PRES-01..04 satisfied
-- **v0.7 Phase 27.1 complete** 2026-03-29 — momentum ODE in all channel variants (Channel, ChannelAndContacts, ChannelHeatFlux); PRES-05..12 pass; requirements traceability closed (34 total reqs tracked)
-- **v0.7 Phase 28 complete** 2026-03-30 — McAdams + Bergles-Rohsenow SCB correlations, partial_SCB_correction, regime_dependent_q_scb factory, in-loop SCB correction on ChannelAndContacts; SCB-01..04, ISCB-01..02 satisfied
+- **v0.7 shipped** 2026-04-01 — 7,715 Julia LOC (src + test), 7 phases (27, 27.1, 28, 29, 30, 31, 32), 13 plans; 34 requirements (33 complete + 1 deferred); full safety physics and pressure field suite: pressure observables, momentum ODE, SCB, threshold analysis, complete HTC/friction library
 - Python STREAM lives at ~/projects/STREAM and is the reference implementation for all validation
 - MTK architecture validated through five milestones: acausal connect() + mtkcompile + Sundials IDA replaces Aggregator pattern
 - Friction is handled inside Channel (Darcy-Weisbach inline) — no separate Friction component in loop
@@ -163,6 +151,12 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 | Series-loop LOF topology replaced by 4-node bypass | Series topology had no real junctions; couldn't model parallel channel/Flapper paths or correct gravity signs per branch | ✓ Good — bypass topology is physically correct; NC established at expected mdot magnitude |
 | Channel momentum inertia reverted from Channel component; standalone Inertia used | `(L/A)*Dt(port_in.mdot)` in Channel breaks parallel topologies (current-source conflict at junctions); standalone Inertia in series is exact and composable | ✓ Good — all 5 bypass LOF tests pass; Inertia component handles this correctly |
 | Channel carries distributed inertia `(L/A)*Dt(mdot)` via momentum ODE (Phase 27.1 reversal) | Pressure field implementation requires inertia in P[i] formula; series-only topologies (no parallel branches) are safe; Channel+Inertia in series compilation-only (two competing Dt(mdot) ODEs — physical over-specification) | ✓ Good — PRES-05..12 all pass; PRES-11 correctly scoped to compilation-only |
+| max(dT, 0.0) inside ifelse() for SCB exponentiation | Julia ifelse() evaluates both branches eagerly; negative dT causes DomainError in power law without the max guard | ✓ Good — SCB-01..04 pass; same pattern applies to all power-law correlations with ifelse() |
+| SCB in-loop correction via skip_htc kwarg + caller-provided h_tc equations | Cleanest extension point; doesn't modify _channel_base_eqs control flow; caller inserts the ifelse(T_wall>=T_ONB, h_scb, h_spl) equation | ✓ Good — ISCB-01/02 pass; backward compatible (scb_correction=nothing default) |
+| threshold_analysis takes sol + channel_sys; ChannelState is internal bridge | Post-process API mirrors Python STREAM; ChannelState bundles MTK solution extraction for clean function boundaries | ✓ Good — THRS-09 E2E test passes; chfr() factory provides ergonomic CHFR computation |
+| _extract_channel_state requires ChannelAndContacts (ArgumentError guard) | ChannelHeatFlux/Channel lack T_wall_left/right observables; hasproperty guard gives clear error instead of silent failure | ✓ Good — guard test passes; precondition documented in docstring |
+| _nusselt_coefficient_developing uses ifelse() (not if/else) | MTK traces through closures symbolically at mtkcompile time; if/else on Num throws TypeError at trace time | ✓ Good — Phase 30 smoke test passes; closures with ifelse() are MTK-compatible |
+| correlations.jl split into htc/ and friction/ subdirs when > 300 lines | CLAUDE.md threshold; prevents monolithic file; enables independent evolution of HTC and friction suites | ✓ Good — Phase 30-01 split done cleanly; STREAM.jl includes updated |
 | Flapper sentinel T_open=1e30 (not Inf) | MTK parameter Inf causes domain errors in arithmetic (t - Inf = -Inf → xi clamp → NaN); sentinel 1e30 keeps `t - T_open < 0` until event fires | ✓ Good — FLAP-05/06 pass cleanly; sentinel pattern is the right MTK idiom |
 | Pump callable via `@parameters (dP_pump_fn::FType)(..)` | Captured Julia closure as typed MTK parameter; alternative (@register_symbolic) would be opaque and not accept closures | ✓ Good — PUMP-01/02/03 all pass; callable captured correctly in symbolic graph |
 | NC detection in `regime_dependent` via `Gr/Re²>1` with `ifelse()` | Hard if-branch creates solver discontinuity; ifelse() emits symbolic conditional same as Re-regime switching | ✓ Good — NC temperature rise matches Elenbaas within 0.3% (ratio 0.997) |
@@ -175,4 +169,4 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
 
 ---
-*Last updated: 2026-04-01 after Phase 30 complete — HTC and friction correlation suite completed: Marco_Han_Nusselt (HTC-01), fully_developed_laminar_h_spl (HTC-02), developing_laminar_h_spl (HTC-03), maximal_htc (HTC-04), turbulent_friction (FRIC-01), viscosity_correction (FRIC-02). correlations.jl split into htc/ and friction/ subdirs.*
+*Last updated: 2026-04-01 after v0.7 milestone — Safety Physics & Pressure Field shipped: pressure field, momentum ODE, subcooled boiling, threshold analysis, HTC/friction completions.*

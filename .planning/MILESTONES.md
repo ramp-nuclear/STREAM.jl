@@ -1,5 +1,26 @@
 # Milestones
 
+## v0.7 Safety Physics & Pressure Field (Shipped: 2026-04-01)
+
+**Phases:** 27, 27.1, 28, 29, 30, 31, 32 (7 phases, 13 plans)
+**Julia LOC:** 7,715 (src + test) at completion
+**Timeline:** 2026-03-27 → 2026-04-01 (5 days)
+**Requirements:** 34 total (33 complete + 1 intentionally deferred: VAL-PRES-01)
+
+**Key accomplishments:**
+
+- Per-cell pressure field (dp[i], P[i]) across all three channel variants; dP refactored to exact sum; sat_temperature @register_symbolic; T_sat[i] and T_ONB[i] as @observed in ChannelAndContacts and ChannelHeatFlux (PRES-01..04)
+- Distributed momentum ODE (L/A)*Dt(mdot) in Channel, ChannelAndContacts, ChannelHeatFlux; P[i] with distributed inertia correction; all PRES-05..12 transient tests passing (PRES-05..12)
+- Subcooled boiling suite: McAdams + Bergles-Rohsenow SCB correlations, partial_SCB_correction, regime_dependent_q_scb factory, in-loop SCB correction for ChannelAndContacts via ifelse(T_wall >= T_ONB) (SCB-01..04, ISCB-01..02)
+- Nuclear safety threshold analysis: 8 physics functions (Bergles-Rohsenow T_ONB, q_OFI Whittle-Forgan, q_OSV Saha-Zuber, 3×CHF, twall_limit) + ChannelState struct + threshold_analysis() dispatcher + chfr() factory + 8 pre-built wrappers (THRS-01..09)
+- Complete HTC/friction correlation library: Marco_Han_Nusselt, fully_developed_laminar_h_spl, developing_laminar_h_spl, maximal_htc, turbulent_friction (Colebrook-White), viscosity_correction; correlations.jl split into htc/ + friction/ subdirs (HTC-01..04, FRIC-01..02)
+- Audit gap closure: 27-VERIFICATION.md written retroactively from VALIDATION.md evidence; _extract_channel_state ArgumentError guard + E2E solve→extract→analyze pipeline test; Phase 30 in-system smoke tests with ifelse() fix for MTK symbolic tracing
+
+**Known Gaps (intentional deferrals):**
+- VAL-PRES-01: Python STREAM pressure cross-validation (@test_skip placeholder) — requires Python reference data generation
+
+---
+
 ## v0.6 Flow Reversal Systems (Shipped: 2026-03-27)
 
 **Phases completed:** 8 phases, 14 plans, 23 tasks

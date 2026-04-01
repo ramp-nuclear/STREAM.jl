@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.7
 milestone_name: Safety Physics & Pressure Field
-status: unknown
-stopped_at: Completed 32-01-PLAN.md (plan 01 of 01 in phase 32)
-last_updated: "2026-04-01T11:56:24.751Z"
+status: complete
+stopped_at: v0.7 milestone complete — archived 2026-04-01
+last_updated: "2026-04-01T00:00:00.000Z"
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 4
-  completed_plans: 4
+  total_phases: 7
+  completed_phases: 7
+  total_plans: 13
+  completed_plans: 13
 ---
 
 # STATE: STREAM.jl
@@ -20,18 +20,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-31)
+See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 32 — THRS-09 & Phase 30 Integration Hardening
+**Current focus:** Planning next milestone (v0.8)
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: 32
-Plan: Not started
+Milestone v0.7 complete. Starting v0.8 planning.
 
 ## Performance Metrics
 
@@ -134,7 +133,7 @@ None.
 
 ---
 
-*Last updated: 2026-03-31 — Phase 29 threshold-analysis complete; Phase 30 next*
+*Last updated: 2026-04-01 — v0.7 milestone complete; archived to .planning/milestones/v0.7-ROADMAP.md*
 
 ### Quick Tasks Completed
 

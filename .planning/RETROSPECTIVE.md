@@ -273,6 +273,47 @@
 
 ---
 
+## Milestone: v0.7 — Safety Physics & Pressure Field
+
+**Shipped:** 2026-04-01
+**Phases:** 7 (27, 27.1, 28, 29, 30, 31, 32) | **Plans:** 13
+
+### What Was Built
+- Per-cell pressure field (dp[i], P[i]) in all three channel variants; sat_temperature @register_symbolic; T_sat[i]/T_ONB[i] observables (PRES-01..04)
+- Distributed momentum ODE (L/A)*Dt(mdot) in Channel, ChannelAndContacts, ChannelHeatFlux with P[i] inertia correction; 8 transient PRES-05..12 tests passing
+- Subcooled boiling suite: McAdams_SCB_heat_flux, Bergles_Rohsenow_SCB_heat_flux, partial_SCB_correction, regime_dependent_q_scb factory; in-loop SCB correction for ChannelAndContacts
+- Nuclear safety threshold analysis: 8 physics functions (T_ONB, OFI, OSV, CHF×3, twall_limit) + ChannelState struct + threshold_analysis dispatcher + chfr factory + 8 pre-built wrappers
+- Complete HTC/friction library: Marco_Han_Nusselt, fully_developed_laminar_h_spl, developing_laminar_h_spl, maximal_htc, turbulent_friction (Colebrook-White), viscosity_correction; correlations.jl split into htc/ + friction/ subdirs
+- Audit gap closure phases: 27-VERIFICATION.md retroactively written; _extract_channel_state ArgumentError guard; E2E solve→extract→analyze pipeline test; Phase 30 in-system smoke tests
+
+### What Worked
+- **Structured audit → gap-closure phases pattern**: running `/gsd:audit-milestone` before completion surfaced 3 real gaps; creating Phases 31+32 specifically to close them produced a cleaner milestone than ignoring the gaps
+- **Retroactive VERIFICATION.md from VALIDATION.md**: Phase 27's documentation gap was a 15-minute task (Phase 31); the audit correctly identified it as documentation-only, not implementation
+- **E2E test coverage as explicit phase goal**: Phase 32's goal was specifically an E2E test for the solve→extract→analyze pipeline — made the previously-untested bridge a first-class deliverable
+- **ifelse() discipline**: consistently applying the ifelse() pattern for all piecewise functions in MTK closures (max(dT,0), _nusselt_coefficient_developing) prevented symbolic tracing errors
+
+### What Was Inefficient
+- **Audit ran after Phase 30 was done**: ideally audit runs at Phase 29 completion; discovered the Phase 30 in-system test gap post-hoc; required an extra gap-closure phase
+- **VALIDATION.md nyquist_compliant: false** on 3 of 5 phases (27.1, 29, 30) — validation strategies weren't updated at phase completion; consistent pattern of tech debt appearing in audit
+- **Phase 29 THRS-09 mock-only tests**: threshold_analysis E2E was never written during Phase 29 itself; the integration checker caught it only in the audit; should be part of the acceptance criteria at Phase 29 plan time
+
+### Patterns Established
+- **Audit-before-complete as standard workflow**: `/gsd:audit-milestone` before `/gsd:complete-milestone` is now validated as producing better milestone quality
+- **Gap-closure phases (31, 32 pattern)**: small focused phases that address audit findings are more trackable than ad-hoc "fix during completion"
+- **ArgumentError guard for component-specific helpers**: `_extract_channel_state` guard (`hasproperty(:T_wall_left)`) is the right pattern for functions with structural preconditions — fail fast with a clear message
+
+### Key Lessons
+1. **Write VALIDATION.md nyquist_compliant: true at plan completion, not retroactively** — 3/5 phases left this as false; it's a 5-minute update that prevents audit findings
+2. **E2E tests should be in the plan's acceptance criteria**, not added as gap-closure — the THRS-09 E2E test was always needed; stating it as a requirement upfront avoids the audit round-trip
+3. **Correlations used only in standalone tests will fail in MTK** — any new correlation factory should have a one-line compile test in the plan (the `ifelse()` discovery in Phase 32 was preventable)
+
+### Cost Observations
+- Model mix: ~100% sonnet (quality profile)
+- Timeline: 5 days (2026-03-27 → 2026-04-01) across 7 phases
+- Notable: First milestone to use explicit audit-before-complete pattern; 2 gap-closure phases added post-audit; VAL-PRES-01 is the only intentionally deferred requirement across all 7 milestones
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -285,6 +326,7 @@
 | v0.4 | 4 | 7 | Pluggable correlations via plain closures; `@observed` pattern for diagnostics; composition helpers with n-inference |
 | v0.5 | 3 | 6 | Pure code quality — canonical file layout, test split, full docstrings, CLAUDE.md rationale; no new features |
 | v0.6 | 8 | 14 | Flow reversal systems — MTK continuous events, callable parameters, bypass topology, NC regime detection |
+| v0.7 | 7 | 13 | Safety physics suite — pressure field, SCB, threshold analysis, HTC/friction completions; audit-before-complete pattern validated |
 
 ### Cumulative Quality
 
@@ -296,3 +338,4 @@
 | v0.4 | ~200+ | 15/15 | 0 |
 | v0.5 | ~200+ | 15/15 | 0 |
 | v0.6 | ~230+ | 21/21 | 0 |
+| v0.7 | ~300+ | 33/34 | 1 (QuadGK) |
