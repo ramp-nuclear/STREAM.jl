@@ -12,6 +12,31 @@ v0.1 shipped a single forced-convection coolant loop validated against Python ST
 
 See `.planning/MILESTONES.md` for full v0.7 details.
 
+## Next Milestone: v0.8 STREAM Composer GUI
+
+**Goal:** Build a standalone desktop application that lets engineers visually compose STREAM.jl thermal-hydraulic systems by dragging and dropping components onto a canvas, connecting them via flow edges, and exporting valid Julia/MTK code as a .jl file — without any live Julia execution inside the GUI.
+
+**Target features:**
+- Tauri 2 + React + ReactFlow desktop app for Windows and Linux
+- Component toolbox: all 9 current STREAM.jl hydraulic components (Pump, Channel, ChannelHeatFlux, ChannelAndContacts, Resistor, Gravity, Friction, Inertia, HeatExchanger)
+- Visual FlowPort connections (drag edge from port_out handle → port_in handle)
+- Parameter editing sidebar: scalar values, PipeGeometry picker, Pump mode toggle, parameter validation
+- Code generator: graph → valid @named + connect() + compose() + mtkcompile() Julia code
+- Export to .jl file (user runs it manually in STREAM.jl — no execution inside GUI)
+- Project save/load in .streamgui JSON format
+- UI design quality via shadcn/ui + Tailwind CSS — every frontend phase preceded by gsd:ui-phase contract and followed by gsd:ui-review audit
+- Basic topology alerts: unconnected ports, missing pressure boundary condition, no driving element
+- Thermal composition: ChannelAndContacts with ThermalPort array visualization and HeatDiffusion node connections
+
+**Deferred to v0.9+ GUI milestone:**
+- Correlation closure editing (regime_dependent, etc.)
+- Multi-way junction nodes (3+ port connections)
+- Live Julia validation backend (Oxygen.jl)
+- Result plotting or simulation execution from GUI
+- Round-trip .jl file parsing (graph ← Julia code)
+
+**Research basis:** `.planning/research/gui-feasibility/RESEARCH.md` — full feasibility study conducted 2026-03-31 covering ecosystem survey, architecture options, graph-to-code translation, effort estimate, and Claude Code suitability (confidence: HIGH for architecture, MEDIUM for effort estimates).
+
 ## Core Value
 
 A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
@@ -178,12 +203,35 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 | Pump callable via `@parameters (dP_pump_fn::FType)(..)` | Captured Julia closure as typed MTK parameter; alternative (@register_symbolic) would be opaque and not accept closures | ✓ Good — PUMP-01/02/03 all pass; callable captured correctly in symbolic graph |
 | NC detection in `regime_dependent` via `Gr/Re²>1` with `ifelse()` | Hard if-branch creates solver discontinuity; ifelse() emits symbolic conditional same as Re-regime switching | ✓ Good — NC temperature rise matches Elenbaas within 0.3% (ratio 0.997) |
 | `solve_transient` redesigned to positional API `(ssys, op, t; ...)` | Mirrors Python STREAM API; keyword-only was inconsistent since v0.6 broke the "all keyword" convention by adding callable Pump | ✓ Good — cleaner call sites; 23 Pump call sites migrated; no regressions |
+| GUI milestones are periodic and independent; STREAM.jl advances on its own track | GUI is a code generator, not a live simulation environment. The coupling contract is the component metadata registry (JSON). Most STREAM.jl milestones don't touch the GUI. A new GUI milestone is triggered when (a) enough new components/API changes accumulate to justify a GUI sync, or (b) the GUI needs new composition capabilities. | — Pending (v0.8 is first GUI milestone) |
+| GUI generates .jl files only — no embedded Julia runtime in v0.8 | Julia TTFX is 10-30s for STREAM.jl, unacceptable for interactive GUI. File-only approach has zero runtime dependencies, produces inspectable/versionable artifacts, and eliminates entire IPC error class. Live validation (Oxygen.jl) deferred to v0.9+. | — Pending (v0.8) |
+| GUI built with Tauri 2 + React + ReactFlow, not Qt or Electron | Multiple Claude Code-built Tauri 2 apps already exist (proven territory). ReactFlow is the dominant node editor library (800K weekly downloads). Small bundle (<10MB), fast startup, cross-platform. Full rationale in .planning/research/gui-feasibility/RESEARCH.md. | — Pending (v0.8) |
+| GUI UI quality gated by gsd:ui-phase + gsd:ui-review per frontend phase | Claude Code builds 70-80% of GUI effectively; remaining 20-30% is visual polish requiring human eyes. Design contracts (UI-SPEC.md) written before coding; 6-pillar visual audits after. shadcn/ui prevents hand-rolled CSS anti-patterns. | — Pending (v0.8) |
+
 ## Constraints
 
 - **Tech stack**: Julia + ModelingToolkit.jl + DifferentialEquations.jl + Sundials.jl
 - **Fluid**: Light water only through v0.4; other fluids deferred
 - **Validation**: All results compared against Python STREAM on identical inputs. <1% steady-state; qualitative transient match
 - **Architecture**: No Python-style Aggregator pattern. MTK compose() + connect() + mtkcompile() replaces it
+- **GUI tech stack (v0.8+)**: Tauri 2 + React + ReactFlow + shadcn/ui. No Julia runtime inside GUI. Output is .jl files only.
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
-*Last updated: 2026-03-31 after Phase 29 complete — threshold analysis, ChannelState, CHFR wrappers delivered*
+*Last updated: 2026-03-31 after v0.8 milestone planned — STREAM Composer GUI; dual-track development model established*
