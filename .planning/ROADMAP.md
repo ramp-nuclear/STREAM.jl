@@ -107,7 +107,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 ### 🔄 v0.8 STREAM Composer GUI (Phases 33-40) — ACTIVE
 
 - [x] **Phase 33: Project Scaffold** — Tauri 2 + React + ReactFlow skeleton; component metadata registry; dev environment verified (completed 2026-04-01)
-- [ ] **Phase 34: Canvas & Node Editor** — Drag-from-toolbox, custom node components with FlowPort handles, edge drawing, zoom/pan/minimap, undo/redo
+- [x] **Phase 34: Canvas & Node Editor** — Drag-from-toolbox, custom node components with FlowPort handles, edge drawing, zoom/pan/minimap, undo/redo (completed 2026-04-01)
 - [ ] **Phase 35: Parameter Editing** — Sidebar form generation from component schema; PipeGeometry picker; Pump mode toggle; scalar validation; rename
 - [ ] **Phase 36: Code Generation** — Graph-to-Julia translator; BC editor; live code preview panel; export to .jl file
 - [ ] **Phase 37: Project Persistence** — Save/load .streamgui JSON; unsaved-changes guard; recent projects list
@@ -145,7 +145,7 @@ Plans:
   2. User can connect Pump.port_out to Channel.port_in with a visible edge
   3. User can delete a node and its connected edges are removed
   4. Undo/redo reverses at least 10 sequential operations correctly
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 34-01-PLAN.md — Install zundo, extend store with temporal + actions, create StreamNode and ToolboxItem components
@@ -264,7 +264,7 @@ Plans:
 | 31. Write Phase 27 Verification Document | v0.7 | 1/1 | Complete | 2026-04-01 |
 | 32. THRS-09 & Phase 30 Integration Hardening | v0.7 | 1/1 | Complete | 2026-04-01 |
 | 33. Project Scaffold | v0.8 | 2/4 | Complete    | 2026-04-01 |
-| 34. Canvas & Node Editor | v0.8 | 2/3 | In Progress|  |
+| 34. Canvas & Node Editor | v0.8 | 2/3 | Complete    | 2026-04-01 |
 | 35. Parameter Editing | v0.8 | 0/? | Not started | — |
 | 36. Code Generation | v0.8 | 0/? | Not started | — |
 | 37. Project Persistence | v0.8 | 0/? | Not started | — |
