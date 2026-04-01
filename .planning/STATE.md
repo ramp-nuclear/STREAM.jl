@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
-status: unknown
-stopped_at: Completed 29-02-PLAN.md
-last_updated: "2026-03-31T20:57:58.346Z"
+status: planning
+stopped_at: Milestone v0.8 started — 2026-04-01
+last_updated: "2026-04-01T00:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 0
@@ -20,23 +20,25 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-31)
+See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 29 — threshold-analysis
+**Current focus:** Milestone v0.8 — STREAM Composer GUI (not started)
 **Python STREAM reference:** ~/projects/STREAM
 
 **Roadmap summary:**
 
-- v0.7 (in progress): Phases 27-30 — Safety Physics & Pressure Field (3/4 phases complete)
-- v0.8 (planned): Phases 31-38 — STREAM Composer GUI (8 phases, 40 requirements, 0 started)
+- v0.7 (complete): Phases 27-32 — Safety Physics & Pressure Field (7 phases, 13 plans)
+- v0.8 (active): Phases 33-40 — STREAM Composer GUI (8 phases, 40 requirements, 0 started)
 
 ---
 
 ## Current Position
 
-Phase: 31
-Plan: Not started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-01 — Milestone v0.8 started
 
 ## Performance Metrics
 

@@ -6,23 +6,19 @@ STREAM.jl is a Julia rewrite of the Python package STREAM (System Thermohydrauli
 
 v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls. v0.5 reorganized the codebase to the canonical CLAUDE.md file layout, split the monolithic test file into 13 focused modules, added Julia docstrings to all 28 exported names, and expanded CLAUDE.md with rationale and MTK patterns. v0.6 delivered flow reversal systems: sign-safe channel components with ifelse() upwinding, thermal expansion coefficient and Elenbaas natural convection HTC, time-varying Pump callable dispatch, Flapper check-valve with MTK continuous events, and a validated loss-of-flow transient with physically correct 4-node bypass topology covering forced flow, pump coastdown, flow reversal, Flapper opening, and established natural circulation. v0.7 delivered the full safety physics and pressure field suite: per-cell absolute pressure P[i]/dp[i], sat_temperature @register_symbolic, T_sat[i]/T_ONB[i] observables, distributed momentum ODE in all channel variants, subcooled boiling (McAdams + Bergles-Rohsenow + in-loop SCB correction), nuclear safety threshold analysis framework (8 physics functions + ChannelState + threshold_analysis dispatcher + chfr factory), and complete HTC/friction correlation library (Marco-Han, developing/fully-developed laminar factories, maximal_htc combinator, Colebrook-White turbulent friction, viscosity correction) with htc/ + friction/ subdirectory split.
 
-## Next Milestone: v0.8 (TBD)
+## Current Milestone: v0.8 STREAM Composer GUI
 
-**Previous milestone:** v0.7 Safety Physics & Pressure Field — shipped 2026-04-01
-
-See `.planning/MILESTONES.md` for full v0.7 details.
-
-## Next Milestone: v0.8 STREAM Composer GUI
-
-**Goal:** Build a standalone desktop application that lets engineers visually compose STREAM.jl thermal-hydraulic systems by dragging and dropping components onto a canvas, connecting them via flow edges, and exporting valid Julia/MTK code as a .jl file — without any live Julia execution inside the GUI.
+**Goal:** Build a standalone desktop application (Tauri 2 + React + ReactFlow) that lets engineers visually compose STREAM.jl thermal-hydraulic systems by dragging and dropping components onto a canvas, connecting them via flow edges, and exporting valid Julia/MTK code as a .jl file — without any live Julia execution inside the GUI.
 
 **Target features:**
-- Tauri 2 + React + ReactFlow desktop app for Windows and Linux
-- Component toolbox: all 9 current STREAM.jl hydraulic components (Pump, Channel, ChannelHeatFlux, ChannelAndContacts, Resistor, Gravity, Friction, Inertia, HeatExchanger)
-- Visual FlowPort connections (drag edge from port_out handle → port_in handle)
-- Parameter editing sidebar: scalar values, PipeGeometry picker, Pump mode toggle, parameter validation
-- Code generator: graph → valid @named + connect() + compose() + mtkcompile() Julia code
-- Export to .jl file (user runs it manually in STREAM.jl — no execution inside GUI)
+- Project scaffold: Tauri 2 + React + ReactFlow desktop app for Windows and Linux; component metadata registry JSON for all 9 STREAM.jl hydraulic components
+- Canvas & node editor: drag components from toolbox, draw FlowPort edges, undo/redo, pan/zoom/minimap
+- Parameter editing: sidebar with scalar fields, PipeGeometry picker, Pump mode toggle, per-field validation
+- Code generation: live Julia code preview, export to .jl, correct @named + connect() + compose() output
+- Project persistence: save/load JSON, unsaved-changes guard, recent files list
+- UI design pass: shadcn/ui throughout, design contract + audit gates
+- Topology validation: unconnected port warnings, missing pressure-anchor/driving-element alerts
+- Thermal composition: ChannelAndContacts ThermalPort array port handles, HeatDiffusion wiring, symmetric_plate code-gen
 - Project save/load in .streamgui JSON format
 - UI design quality via shadcn/ui + Tailwind CSS — every frontend phase preceded by gsd:ui-phase contract and followed by gsd:ui-review audit
 - Basic topology alerts: unconnected ports, missing pressure boundary condition, no driving element
@@ -107,24 +103,16 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 
 ### Active
 
-<!-- v0.7 requirements — Safety Physics & Pressure Field -->
+<!-- v0.8 requirements — STREAM Composer GUI -->
 
-- ✓ Per-cell absolute pressure P[i] as observed variables in all channel variants — v0.7 (Phase 27)
-- ✓ Refactor dP to exact per-cell sum (replaces i_mid lumped approximation) — v0.7 (Phase 27)
-- ✓ sat_temperature(P) @register_symbolic fluid function — v0.7 (Phase 27)
-- ✓ T_sat[i], T_ONB[i] as observed in ChannelAndContacts and ChannelHeatFlux — v0.7 (Phase 27)
-- ✓ McAdams and Bergles-Rohsenow subcooled boiling heat flux correlations — v0.7 (Phase 28)
-- ✓ partial_SCB_correction and regime_dependent_q_scb — v0.7 (Phase 28)
-- ✓ In-loop SCB correction in ChannelAndContacts (Option B: ifelse on T_wall >= T_ONB) — v0.7 (Phase 28)
-- [ ] Threshold analysis physics layer (T_ONB, q_OFI, q_OSV, q_CHF x3, twall_limit)
-- [ ] threshold_analysis(sol, ssys.ch; ...) post-process function
-- [ ] Marco_Han_Nusselt analytical rectangular duct correlation
-- [ ] developing_laminar_h_spl and fully_developed_laminar_h_spl
-- [ ] maximal_htc(...) elementwise-max correlation combinator
-- [ ] turbulent_friction(Re, epsilon) Colebrook-White
-- [ ] viscosity_correction(heat_wet_ratio, mu_ratio)
-
-> **Gap analysis available:** `.planning/GAP-ANALYSIS.md` contains a full feature-by-feature comparison of Python STREAM vs Julia STREAM (compiled 2026-03-16, v0.5.0). ~80 items missing; Priority 1 (9 items) covers the non-negotiable core for real reactor simulations.
+- [ ] **SCAF-01..05**: Tauri 2 + React + ReactFlow desktop scaffold; component metadata registry JSON for all 9 STREAM.jl components
+- [ ] **CANV-01..07**: Canvas node editor — drag-drop components, FlowPort edges, undo/redo, pan/zoom
+- [ ] **PARA-01..06**: Parameter editing sidebar — scalar fields, PipeGeometry picker, Pump mode toggle, per-field validation
+- [ ] **CODE-01..07**: Code generator — live Julia preview, export to .jl, correct @named + connect() + compose() output, boundary conditions panel
+- [ ] **PERS-01..04**: Project persistence — save/load JSON, unsaved-changes guard, recent files
+- [ ] **DSGN-01..05**: UI design pass — shadcn/ui throughout, UI-SPEC design contract + UI-REVIEW audit
+- [ ] **VALD-01..03**: Topology validation — unconnected port warnings, missing pressure-anchor/driving-element alerts
+- [ ] **THERM-01..03**: Thermal composition — ChannelAndContacts ThermalPort array handles, HeatDiffusion wiring, symmetric_plate code-gen
 
 ### Out of Scope
 
@@ -146,9 +134,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **v0.4 shipped** 2026-03-16 — ~3,268 Julia LOC, 4 phases (13-16), 7 plans; 15 requirements complete
 - **v0.5 shipped** 2026-03-16 — ~3,750 Julia LOC (src + test), 3 phases (17-19), 6 plans; 15 requirements complete; canonical file layout, full docstrings, 13-file test suite
 - **v0.6 shipped** 2026-03-27 — 2,373 src LOC, 8 phases (20-26 incl. 24.1), 14 plans; 21 requirements complete; flow reversal, Flapper, Elenbaas NC, LOF transient validated
-- **v0.7 Phase 27 complete** 2026-03-28 — per-cell P[i]/dp[i], sat_temperature @register_symbolic, T_sat[i]/T_ONB[i] observables; PRES-01..04 satisfied
-- **v0.7 Phase 27.1 complete** 2026-03-29 — momentum ODE in all channel variants (Channel, ChannelAndContacts, ChannelHeatFlux); PRES-05..12 pass; requirements traceability closed (34 total reqs tracked)
-- **v0.7 Phase 28 complete** 2026-03-30 — McAdams + Bergles-Rohsenow SCB correlations, partial_SCB_correction, regime_dependent_q_scb factory, in-loop SCB correction on ChannelAndContacts; SCB-01..04, ISCB-01..02 satisfied
+- **v0.7 shipped** 2026-04-01 — 7,715 Julia LOC (src + test), 7 phases (27, 27.1, 28, 29, 30, 31, 32), 13 plans; full safety physics and pressure field suite: pressure observables, momentum ODE, SCB, threshold analysis, complete HTC/friction library
 - Python STREAM lives at ~/projects/STREAM and is the reference implementation for all validation
 - MTK architecture validated through five milestones: acausal connect() + mtkcompile + Sundials IDA replaces Aggregator pattern
 - Friction is handled inside Channel (Darcy-Weisbach inline) — no separate Friction component in loop
@@ -234,4 +220,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-31 after v0.8 milestone planned — STREAM Composer GUI; dual-track development model established*
+*Last updated: 2026-04-01 after v0.8 milestone started — STREAM Composer GUI; phases 33-40 (continuing from v0.7 Phase 32)*
