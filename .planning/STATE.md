@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
-status: Defining requirements
-stopped_at: Phase 33 context gathered
-last_updated: "2026-04-01T15:02:09.501Z"
-last_activity: 2026-04-01 — Milestone v0.8 started
+status: executing
+stopped_at: Completed 33-01-PLAN.md
+last_updated: "2026-04-01T20:22:47.198Z"
+last_activity: 2026-04-01
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 1
 ---
 
 # STATE: STREAM.jl
@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Milestone v0.8 — STREAM Composer GUI (not started)
+**Current focus:** Phase 33 — project-scaffold
 **Python STREAM reference:** ~/projects/STREAM
 
 **Roadmap summary:**
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-01 — Milestone v0.8 started
+Phase: 33 (project-scaffold) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-04-01
 
 ## Performance Metrics
 
@@ -73,8 +73,16 @@ Last activity: 2026-04-01 — Milestone v0.8 started
 | Phase 28 P02 | 51 | 2 tasks | 4 files |
 | Phase 29 P01 | 30 | 2 tasks | 6 files |
 | Phase 29-threshold-analysis P02 | 18 | 2 tasks | 3 files |
+| Phase 33 P01 | 7 | 2 tasks | 44 files |
 
 ## Accumulated Context
+
+### Key Decisions (v0.8 GUI)
+
+- [v0.8 SCAF-01]: Tailwind v4 + @tailwindcss/vite: npm create tauri-app installs Tailwind v4; shadcn init expects v3 config file. components.json and src/index.css created manually with v4 CSS variable design tokens (New York/Zinc style). Future `npx shadcn add [component]` works correctly with this setup.
+- [v0.8 SCAF-01]: vitest --passWithNoTests in test script: Vitest exits code 1 when no test files exist; flag added so CI passes before registry tests added in Plan 02.
+- [v0.8 SCAF-01]: tsconfig.json not tsconfig.app.json: Tauri react-ts template generates tsconfig.json + tsconfig.node.json; path aliases added to tsconfig.json directly.
+- [v0.8 SCAF-01]: Zustand + ReactFlow integration pattern: store owns nodes/edges arrays; onNodesChange/onEdgesChange use applyNodeChanges/applyEdgeChanges; CanvasPanel reads from store via useStore hook.
 
 ### Key Decisions (carry-forward for v0.7)
 
@@ -105,10 +113,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-01T15:02:09.498Z
-**Stopped at:** Phase 33 context gathered
+**Last session:** 2026-04-01T20:22:47.195Z
+**Stopped at:** Completed 33-01-PLAN.md
 **Next action:** Phase 29 threshold-analysis (v0.7) or start v0.8 Phase 31
-**Resume file:** .planning/phases/33-project-scaffold/33-CONTEXT.md
+**Resume file:** None
 
 ---
 

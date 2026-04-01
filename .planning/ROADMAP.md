@@ -126,10 +126,10 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
   2. ReactFlow canvas renders at center of screen with no console errors
   3. Component registry JSON contains all 12 STREAM.jl components with correct port definitions
   4. App bundles to a distributable installer on at least one platform
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
-- [ ] 33-01-PLAN.md — Tauri 2 scaffold with React, ReactFlow, Zustand, Vitest, shadcn, three-panel layout
+- [x] 33-01-PLAN.md — Tauri 2 scaffold with React, ReactFlow, Zustand, Vitest, shadcn, three-panel layout
 - [ ] 33-02-PLAN.md — Component metadata registry JSON (12 components) with TypeScript types and tests
 - [ ] 33-03-PLAN.md — Human-verify: desktop app launches with three-panel layout
 - [ ] 33-04-PLAN.md — Human-verify: Tauri build produces native installer (SCAF-02)
@@ -257,7 +257,7 @@ Plans:
 | 30. HTC & Friction Completions | v0.7 | 2/2 | Complete | 2026-04-01 |
 | 31. Write Phase 27 Verification Document | v0.7 | 1/1 | Complete | 2026-04-01 |
 | 32. THRS-09 & Phase 30 Integration Hardening | v0.7 | 1/1 | Complete | 2026-04-01 |
-| 33. Project Scaffold | v0.8 | 0/4 | Not started | — |
+| 33. Project Scaffold | v0.8 | 1/4 | In Progress|  |
 | 34. Canvas & Node Editor | v0.8 | 0/? | Not started | — |
 | 35. Parameter Editing | v0.8 | 0/? | Not started | — |
 | 36. Code Generation | v0.8 | 0/? | Not started | — |
