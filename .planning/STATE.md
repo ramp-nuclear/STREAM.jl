@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
 status: executing
-stopped_at: Completed 33-01-PLAN.md
-last_updated: "2026-04-01T20:22:47.198Z"
+stopped_at: Completed 33-02-PLAN.md
+last_updated: "2026-04-01T20:29:36.726Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # STATE: STREAM.jl
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 ## Current Position
 
 Phase: 33 (project-scaffold) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-01
 
@@ -74,6 +74,7 @@ Last activity: 2026-04-01
 | Phase 29 P01 | 30 | 2 tasks | 6 files |
 | Phase 29-threshold-analysis P02 | 18 | 2 tasks | 3 files |
 | Phase 33 P01 | 7 | 2 tasks | 44 files |
+| Phase 33 P02 | 4 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,9 @@ Last activity: 2026-04-01
 - [v0.8 SCAF-01]: vitest --passWithNoTests in test script: Vitest exits code 1 when no test files exist; flag added so CI passes before registry tests added in Plan 02.
 - [v0.8 SCAF-01]: tsconfig.json not tsconfig.app.json: Tauri react-ts template generates tsconfig.json + tsconfig.node.json; path aliases added to tsconfig.json directly.
 - [v0.8 SCAF-01]: Zustand + ReactFlow integration pattern: store owns nodes/edges arrays; onNodesChange/onEdgesChange use applyNodeChanges/applyEdgeChanges; CanvasPanel reads from store via useStore hook.
+- [v0.8 SCAF-02]: vitest default environment is node (not jsdom): jsdom has ESM incompatibility with html-encoding-sniffer on Node.js 18; React component tests in later phases should add @vitest-environment jsdom docblock per-file.
+- [v0.8 SCAF-02]: Registry Parameter interface has positional: boolean field for Phase 36 code generation to distinguish @named macro positional vs keyword arg syntax.
+- [v0.8 SCAF-02]: ChannelHeatFlux has no ThermalPort in the registry -- T_wall is a scalar Real parameter, not a port connection; _note field documents this in the JSON entry.
 
 ### Key Decisions (carry-forward for v0.7)
 
@@ -113,8 +117,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-01T20:22:47.195Z
-**Stopped at:** Completed 33-01-PLAN.md
+**Last session:** 2026-04-01T20:29:36.723Z
+**Stopped at:** Completed 33-02-PLAN.md
 **Next action:** Phase 29 threshold-analysis (v0.7) or start v0.8 Phase 31
 **Resume file:** None
 
