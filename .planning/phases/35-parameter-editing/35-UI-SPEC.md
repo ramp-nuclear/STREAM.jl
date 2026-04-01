@@ -63,7 +63,7 @@ Exceptions: none
 | Role | Size | Weight | Line Height | Usage in Phase 35 |
 |------|------|--------|-------------|--------------------|
 | Body | 14px | 400 (regular) | 1.5 | Parameter values in input fields, descriptions |
-| Label | 13px | 500 (medium) | 1.4 | Field labels ("L", "Dh", "n"), unit suffixes |
+| Label | 13px | 600 (semibold) | 1.4 | Field labels ("L", "Dh", "n"), unit suffixes |
 | Heading | 16px | 600 (semibold) | 1.3 | Sidebar title ("Properties"), section headings ("Parameters", "Geometry") |
 | Subheading | 14px | 600 (semibold) | 1.4 | Component type label below instance name |
 
@@ -87,6 +87,8 @@ Accent reserved for: active segment in PipeGeometry/Pump mode toggle, focused in
 ---
 
 ## Layout Contract
+
+Primary focal point (node selected): instance name field -- full-width input at sidebar top, immediately drawing attention to the component being edited.
 
 ### Sidebar Structure (top to bottom)
 
@@ -192,7 +194,7 @@ Added to registry as `options` field on Function-type parameters:
 
 ### Unit Display
 - Units rendered as suffix text inside the input container, right-aligned
-- Uses muted-foreground color at Label size (13px, weight 500)
+- Uses muted-foreground color at Label size (13px, weight 600)
 - Not interactive; purely informational
 
 ---
