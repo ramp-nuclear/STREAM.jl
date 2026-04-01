@@ -1,7 +1,7 @@
 ---
 phase: 34
 slug: canvas-node-editor
-status: draft
+status: approved
 shadcn_initialized: true
 preset: new-york/zinc
 created: 2026-04-02
