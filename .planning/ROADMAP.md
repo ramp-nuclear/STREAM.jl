@@ -109,6 +109,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 - [x] **Phase 33: Project Scaffold** — Tauri 2 + React + ReactFlow skeleton; component metadata registry; dev environment verified (completed 2026-04-01)
 - [x] **Phase 34: Canvas & Node Editor** — Drag-from-toolbox, custom node components with FlowPort handles, edge drawing, zoom/pan/minimap, undo/redo (completed 2026-04-01)
 - [ ] **Phase 35: Parameter Editing** — Sidebar form generation from component schema; PipeGeometry picker; Pump mode toggle; scalar validation; rename
+- [ ] **Phase 35.1: Correlation Picker** — Extend registry with factory sub-parameter schemas; sidebar dropdown for all HTC/friction correlations; factory correlations (regime_dependent, elenbaas_htc, maximal_htc) show nested sub-fields; capped at one level of nesting
 - [ ] **Phase 36: Code Generation** — Graph-to-Julia translator; BC editor; live code preview panel; export to .jl file
 - [ ] **Phase 37: Project Persistence** — Save/load .streamgui JSON; unsaved-changes guard; recent projects list
 - [ ] **Phase 38: UI Design Pass** — shadcn/ui integration throughout; three-panel layout; component icons/colors; design contract and visual audit gates
@@ -165,6 +166,32 @@ Plans:
   4. Entering letters in a numeric field shows a visible error, not a crash
 **Plans**: TBD
 **UI hint**: yes
+
+### Phase 35.1: Correlation Picker
+**Goal**: Users can select any available HTC or friction correlation from a dropdown, including factory correlations that require sub-parameters
+**Depends on**: Phase 35
+**Requirements**: (no PARA- requirement yet — emerged from Phase 35 discuss-phase)
+**Success Criteria** (what must be TRUE):
+  1. Channel sidebar shows a dropdown for htc_correlation with all available HTC correlations (dittus_boelter, constant_Nusselt, elenbaas_htc, regime_dependent, maximal_htc)
+  2. Selecting regime_dependent reveals sub-fields: htc_forced dropdown (simple closures only), htc_natural dropdown (simple closures only), threshold Float
+  3. Selecting elenbaas_htc reveals sub-fields: b, L, Dh (Real), g (Real, default 9.80665)
+  4. Selecting a simple closure (dittus_boelter, constant_Nusselt) shows no sub-fields
+  5. Code generation (Phase 36) emits correct nested factory call: `htc_correlation=regime_dependent(htc_forced=dittus_boelter, htc_natural=elenbaas_htc(b=0.003, L=0.6, Dh=0.0025))`
+**Plans**: TBD
+**UI hint**: yes
+
+**Design decisions captured during Phase 35 discuss-phase (2026-04-02):**
+- Phase 35 shows factory correlations grayed-out in the dropdown with tooltip "factory correlation editing coming soon" — not interactive
+- Phase 35.1 activates them by adding sub-parameter schemas to the registry and rendering nested form sections
+- **Registry schema extension needed**: add `options` field to Function-type parameters in `components.json`. Each option entry has: `id` (Julia function name), `label` (display name), `kind` ("simple" | "factory"), and for factory kind: `sub_parameters[]` array using the same Parameter schema as component parameters
+- **Recursion depth cap**: factory sub-dropdowns only offer simple closures (no further factories). This covers 99% of real use cases. `regime_dependent.htc_forced` and `regime_dependent.htc_natural` can be dittus_boelter/constant_Nusselt/elenbaas_htc but NOT another regime_dependent. `maximal_htc.htc1`/`htc2` same rule.
+- **Code gen contract**: Phase 36 must handle Function-type params specially — emit as bare Julia identifier for simple closures (`dittus_boelter`), emit as factory call for factories (`elenbaas_htc(b=0.003, L=0.6, Dh=0.0025, g=9.80665)`). Phase 35.1 stores factory selection + sub-param values in `parameters` map as a structured object, not a flat string.
+- **Known factory correlations and their sub-params**:
+  - `regime_dependent(htc_forced, htc_natural; threshold=1.0)` — htc_forced/htc_natural: closure selector (simple only); threshold: Real
+  - `elenbaas_htc(; b, L, Dh, g=9.80665)` — b: Real (channel gap, m); L: Real (channel length, m); Dh: Real (hydraulic diameter, m); g: Real (gravity, m/s², default 9.80665)
+  - `maximal_htc(htc1, htc2)` — htc1/htc2: closure selectors (simple only)
+- **Simple closures** (directly usable, no sub-params): `dittus_boelter`, `constant_Nusselt` (HTC); `blasius_friction`, `laminar_friction` (friction)
+- `marco_han_nusselt` — check if this is exported before adding to picker list
 
 ### Phase 36: Code Generation
 **Goal**: Users can view and export valid STREAM.jl Julia code generated from their canvas topology
@@ -266,6 +293,7 @@ Plans:
 | 33. Project Scaffold | v0.8 | 2/4 | Complete    | 2026-04-01 |
 | 34. Canvas & Node Editor | v0.8 | 2/3 | Complete    | 2026-04-01 |
 | 35. Parameter Editing | v0.8 | 0/? | Not started | — |
+| 35.1. Correlation Picker | v0.8 | 0/? | Not started | — |
 | 36. Code Generation | v0.8 | 0/? | Not started | — |
 | 37. Project Persistence | v0.8 | 0/? | Not started | — |
 | 38. UI Design Pass | v0.8 | 0/? | Not started | — |
@@ -275,4 +303,4 @@ Plans:
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-02 — Phase 34 planned: 3 plans in 3 waves (store+components, wiring+tests, human-verify)*
+*Updated: 2026-04-02 — Phase 35.1 added: Correlation Picker (factory correlation editing, grayed out in Phase 35, fully implemented in 35.1)*
