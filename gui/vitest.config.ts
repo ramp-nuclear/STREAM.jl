@@ -8,7 +8,7 @@ export default defineConfig({
     // phases) should add @vitest-environment jsdom docblock comment per-file.
     environment: "node",
     globals: true,
-    setupFiles: [],
+    setupFiles: ["./src/test-setup.ts"],
   },
   resolve: {
     alias: {
