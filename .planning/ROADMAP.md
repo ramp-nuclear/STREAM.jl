@@ -8,8 +8,8 @@
 - ✅ **v0.4 Composability & Physics** — Phases 13-16 (shipped 2026-03-16)
 - ✅ **v0.5 Code Quality** — Phases 17-19 (shipped 2026-03-16)
 - ✅ **v0.6 Flow Reversal Systems** — Phases 20-26 (shipped 2026-03-27)
-- 🔄 **v0.7 Safety Physics & Pressure Field** — Phases 27-30 (in progress)
-- 📋 **v0.8 STREAM Composer GUI** — Phases 31-38 (planned)
+- ✅ **v0.7 Safety Physics & Pressure Field** — Phases 27-32 (shipped 2026-04-01)
+- 🔄 **v0.8 STREAM Composer GUI** — Phases 33-40 (active)
 
 ## Phases
 
@@ -90,36 +90,34 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 </details>
 
 <details>
-<summary>🔄 v0.7 Safety Physics & Pressure Field (Phases 27-30) — IN PROGRESS</summary>
+<summary>✅ v0.7 Safety Physics & Pressure Field (Phases 27-32) — SHIPPED 2026-04-01</summary>
 
 - [x] Phase 27: Pressure Field (2/2 plans) — completed 2026-03-28
 - [x] Phase 27.1: Channel Momentum & Inertia (3/3 plans) — completed 2026-03-29
 - [x] Phase 28: Subcooled Boiling (2/2 plans) — completed 2026-03-30
-- [ ] Phase 29: Threshold Analysis (0/2 plans) — planned
-  **Goal:** Nuclear safety threshold correlations (ONB, OFI, OSV, CHF) + post-processing framework
-  **Plans:** 2 plans
-  **Requirements:** [THRS-01, THRS-02, THRS-03, THRS-04, THRS-05, THRS-06, THRS-07, THRS-08, THRS-09]
-  Plans:
-  - [x] 29-01-PLAN.md — Physics functions (THRS-01..08): Bergles-Rohsenow T_ONB, boiling onset, OFI, OSV, CHF (Sudo-Kaminaga, Mirshak, Fabrega), twall_limit
-  - [x] 29-02-PLAN.md — Post-processing framework (THRS-09): ChannelState, threshold_analysis, chfr, pre-built wrappers
-- [ ] Phase 30: HTC & Friction Completions (0/? plans) — pending
+- [x] Phase 29: Threshold Analysis (2/2 plans) — completed 2026-03-31
+- [x] Phase 30: HTC & Friction Completions (2/2 plans) — completed 2026-04-01
+- [x] Phase 31: Write Phase 27 Verification Document (1/1 plans) — completed 2026-04-01
+- [x] Phase 32: THRS-09 & Phase 30 Integration Hardening (1/1 plans) — completed 2026-04-01
+
+Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 
 </details>
 
-### 📋 v0.8 STREAM Composer GUI (Phases 31-38) — PLANNED
+### 🔄 v0.8 STREAM Composer GUI (Phases 33-40) — ACTIVE
 
-- [ ] **Phase 31: Project Scaffold** — Tauri 2 + React + ReactFlow skeleton; component metadata registry; dev environment verified
-- [ ] **Phase 32: Canvas & Node Editor** — Drag-from-toolbox, custom node components with FlowPort handles, edge drawing, zoom/pan/minimap, undo/redo
-- [ ] **Phase 33: Parameter Editing** — Sidebar form generation from component schema; PipeGeometry picker; Pump mode toggle; scalar validation; rename
-- [ ] **Phase 34: Code Generation** — Graph-to-Julia translator; BC editor; live code preview panel; export to .jl file
-- [ ] **Phase 35: Project Persistence** — Save/load .streamgui JSON; unsaved-changes guard; recent projects list
-- [ ] **Phase 36: UI Design Pass** — shadcn/ui integration throughout; three-panel layout; component icons/colors; design contract and visual audit gates
-- [ ] **Phase 37: Topology Validation** — Unconnected port warnings; missing pressure BC alert; missing driving element alert
-- [ ] **Phase 38: Thermal Composition** — ChannelAndContacts ThermalPort array visualization; HeatDiffusion connections; composition helper code generation
+- [ ] **Phase 33: Project Scaffold** — Tauri 2 + React + ReactFlow skeleton; component metadata registry; dev environment verified
+- [ ] **Phase 34: Canvas & Node Editor** — Drag-from-toolbox, custom node components with FlowPort handles, edge drawing, zoom/pan/minimap, undo/redo
+- [ ] **Phase 35: Parameter Editing** — Sidebar form generation from component schema; PipeGeometry picker; Pump mode toggle; scalar validation; rename
+- [ ] **Phase 36: Code Generation** — Graph-to-Julia translator; BC editor; live code preview panel; export to .jl file
+- [ ] **Phase 37: Project Persistence** — Save/load .streamgui JSON; unsaved-changes guard; recent projects list
+- [ ] **Phase 38: UI Design Pass** — shadcn/ui integration throughout; three-panel layout; component icons/colors; design contract and visual audit gates
+- [ ] **Phase 39: Topology Validation** — Unconnected port warnings; missing pressure BC alert; missing driving element alert
+- [ ] **Phase 40: Thermal Composition** — ChannelAndContacts ThermalPort array visualization; HeatDiffusion connections; composition helper code generation
 
 ## Phase Details
 
-### Phase 31: Project Scaffold
+### Phase 33: Project Scaffold
 **Goal**: Developer and user can launch the STREAM Composer desktop app; component metadata registry defines all STREAM.jl components
 **Depends on**: Nothing (first GUI phase; independent of v0.7)
 **Requirements**: SCAF-01, SCAF-02, SCAF-03, SCAF-04, SCAF-05
@@ -131,9 +129,9 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 32: Canvas & Node Editor
+### Phase 34: Canvas & Node Editor
 **Goal**: Users can visually build hydraulic system topologies by placing components and wiring them together
-**Depends on**: Phase 31
+**Depends on**: Phase 33
 **Requirements**: CANV-01, CANV-02, CANV-03, CANV-04, CANV-05, CANV-06, CANV-07
 **Success Criteria** (what must be TRUE):
   1. User can drag Pump from toolbox; it appears as a node on canvas
@@ -143,9 +141,9 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 33: Parameter Editing
+### Phase 35: Parameter Editing
 **Goal**: Users can configure every component parameter through a sidebar form with validation and mode-specific fields
-**Depends on**: Phase 32
+**Depends on**: Phase 34
 **Requirements**: PARA-01, PARA-02, PARA-03, PARA-04, PARA-05, PARA-06
 **Success Criteria** (what must be TRUE):
   1. Clicking a Channel node opens sidebar showing L, Dh, n, and PipeGeometry fields
@@ -155,9 +153,9 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 34: Code Generation
+### Phase 36: Code Generation
 **Goal**: Users can view and export valid STREAM.jl Julia code generated from their canvas topology
-**Depends on**: Phase 33
+**Depends on**: Phase 35
 **Requirements**: CODE-01, CODE-02, CODE-03, CODE-04, CODE-05, CODE-06, CODE-07
 **Success Criteria** (what must be TRUE):
   1. Canvas with Pump-HeatExchanger-Channel-Pump loop generates valid STREAM.jl code
@@ -167,9 +165,9 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 35: Project Persistence
+### Phase 37: Project Persistence
 **Goal**: Users can save, load, and resume their work across sessions without data loss
-**Depends on**: Phase 34
+**Depends on**: Phase 36
 **Requirements**: PERS-01, PERS-02, PERS-03, PERS-04
 **Success Criteria** (what must be TRUE):
   1. Ctrl+S saves project; reloading the app and opening the file restores all nodes, edges, positions, and parameters exactly
@@ -178,21 +176,21 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 36: UI Design Pass
+### Phase 38: UI Design Pass
 **Goal**: Every UI surface uses shadcn/ui design system with consistent visual language and quality-gated process
-**Depends on**: Phase 35
+**Depends on**: Phase 37
 **Requirements**: DSGN-01, DSGN-02, DSGN-03, DSGN-04, DSGN-05
 **Success Criteria** (what must be TRUE):
   1. Every UI element uses shadcn/ui primitives (no raw `<button>` or `<input>` with inline styles)
-  2. UI-SPEC.md design contract was written and approved before Phase 36 coding began
-  3. UI-REVIEW.md audit was completed after Phase 36 coding; no BLOCK verdicts
+  2. UI-SPEC.md design contract was written and approved before Phase 38 coding began
+  3. UI-REVIEW.md audit was completed after Phase 38 coding; no BLOCK verdicts
   4. Toolbox icons are distinct (not identical placeholder boxes)
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 37: Topology Validation
+### Phase 39: Topology Validation
 **Goal**: Users receive immediate visual feedback when their system topology has structural problems
-**Depends on**: Phase 32
+**Depends on**: Phase 34
 **Requirements**: VALD-01, VALD-02, VALD-03
 **Success Criteria** (what must be TRUE):
   1. A Channel with port_in unconnected shows a red/orange visual indicator on the canvas node
@@ -202,9 +200,9 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 38: Thermal Composition
+### Phase 40: Thermal Composition
 **Goal**: Users can build and wire thermal fuel assembly topologies with array-port connections and smart code generation
-**Depends on**: Phase 34, Phase 32
+**Depends on**: Phase 36, Phase 34
 **Requirements**: THERM-01, THERM-02, THERM-03
 **Success Criteria** (what must be TRUE):
   1. ChannelAndContacts(n=4) node shows 4 thermal_left and 4 thermal_right port handles
@@ -249,17 +247,19 @@ Full phase details: `.planning/milestones/v0.6-ROADMAP.md`
 | 27.1. Channel Momentum & Inertia | v0.7 | 3/3 | Complete | 2026-03-29 |
 | 28. Subcooled Boiling | v0.7 | 2/2 | Complete | 2026-03-30 |
 | 29. Threshold Analysis | v0.7 | 2/2 | Complete    | 2026-03-31 |
-| 30. HTC & Friction Completions | v0.7 | 0/? | Pending | — |
-| 31. Project Scaffold | v0.8 | 0/? | Not started | — |
-| 32. Canvas & Node Editor | v0.8 | 0/? | Not started | — |
-| 33. Parameter Editing | v0.8 | 0/? | Not started | — |
-| 34. Code Generation | v0.8 | 0/? | Not started | — |
-| 35. Project Persistence | v0.8 | 0/? | Not started | — |
-| 36. UI Design Pass | v0.8 | 0/? | Not started | — |
-| 37. Topology Validation | v0.8 | 0/? | Not started | — |
-| 38. Thermal Composition | v0.8 | 0/? | Not started | — |
+| 30. HTC & Friction Completions | v0.7 | 2/2 | Complete | 2026-04-01 |
+| 31. Write Phase 27 Verification Document | v0.7 | 1/1 | Complete | 2026-04-01 |
+| 32. THRS-09 & Phase 30 Integration Hardening | v0.7 | 1/1 | Complete | 2026-04-01 |
+| 33. Project Scaffold | v0.8 | 0/? | Not started | — |
+| 34. Canvas & Node Editor | v0.8 | 0/? | Not started | — |
+| 35. Parameter Editing | v0.8 | 0/? | Not started | — |
+| 36. Code Generation | v0.8 | 0/? | Not started | — |
+| 37. Project Persistence | v0.8 | 0/? | Not started | — |
+| 38. UI Design Pass | v0.8 | 0/? | Not started | — |
+| 39. Topology Validation | v0.8 | 0/? | Not started | — |
+| 40. Thermal Composition | v0.8 | 0/? | Not started | — |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-03-31 — v0.8 STREAM Composer GUI phases 31-38 added (8 phases, 40 requirements)*
+*Updated: 2026-04-01 — v0.7 complete; v0.8 STREAM Composer GUI phases renumbered 33-40 (continuing from Phase 32)*
