@@ -1,0 +1,586 @@
+{
+  "stream_version": "0.7.0",
+  "schema_version": "1.0",
+  "components": [
+    {
+      "id": "Channel",
+      "label": "Channel",
+      "category": "Hydraulic",
+      "description": "Single-phase convective channel with n axial finite-volume cells. Dittus-Boelter HTC, Darcy-Weisbach friction, optional gravity term.",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" },
+        { "name": "thermal", "type": "ThermalPort", "side": "top" }
+      ],
+      "parameters": [
+        {
+          "name": "n",
+          "type": "Int",
+          "description": "Number of axial finite-volume cells",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "geometry",
+          "type": "PipeGeometry",
+          "description": "Pipe geometry descriptor (use PipeGeometry_rectangular or PipeGeometry_circular)",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "g",
+          "type": "Real",
+          "unit": "m/s^2",
+          "default": 0.0,
+          "description": "Gravitational acceleration; 0.0 for horizontal, 9.80665 for vertical",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "htc_correlation",
+          "type": "Function",
+          "default": "dittus_boelter",
+          "description": "HTC correlation closure (Re, Pr, T_bulk, T_wall) -> Nu",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "friction_correlation",
+          "type": "Function",
+          "default": "blasius_friction",
+          "description": "Friction factor correlation closure (Re) -> f",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "Channel(; name, n, geometry, g=0.0, htc_correlation=dittus_boelter, friction_correlation=blasius_friction)",
+          "parameters": ["n", "geometry", "g", "htc_correlation", "friction_correlation"]
+        }
+      ]
+    },
+    {
+      "id": "ChannelAndContacts",
+      "label": "Channel And Contacts",
+      "category": "Hydraulic",
+      "description": "Convective channel with dual ThermalPort arrays for per-cell fuel plate coupling. thermal_left[1:n] and thermal_right[1:n] are independent ThermalPort arrays; unconnected side defaults adiabatic.",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" },
+        { "name": "thermal_left", "type": "ThermalPort", "side": "top", "array": true, "arrayParam": "n" },
+        { "name": "thermal_right", "type": "ThermalPort", "side": "bottom", "array": true, "arrayParam": "n" }
+      ],
+      "parameters": [
+        {
+          "name": "n",
+          "type": "Int",
+          "description": "Number of axial finite-volume cells",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "geometry",
+          "type": "PipeGeometry",
+          "description": "Pipe geometry descriptor (use PipeGeometry_rectangular or PipeGeometry_circular)",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "g",
+          "type": "Real",
+          "unit": "m/s^2",
+          "default": 0.0,
+          "description": "Gravitational acceleration; 0.0 for horizontal, 9.80665 for vertical",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "htc_correlation",
+          "type": "Function",
+          "default": "dittus_boelter",
+          "description": "HTC correlation closure (Re, Pr, T_bulk, T_wall) -> Nu",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "friction_correlation",
+          "type": "Function",
+          "default": "blasius_friction",
+          "description": "Friction factor correlation closure (Re) -> f",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "scb_correction",
+          "type": "Function",
+          "default": null,
+          "description": "Subcooled boiling correction closure; null disables SCB correction",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "ChannelAndContacts(; name, n, geometry, g=0.0, htc_correlation=dittus_boelter, friction_correlation=blasius_friction, scb_correction=nothing)",
+          "parameters": ["n", "geometry", "g", "htc_correlation", "friction_correlation", "scb_correction"]
+        }
+      ]
+    },
+    {
+      "id": "ChannelHeatFlux",
+      "label": "Channel Heat Flux",
+      "category": "Hydraulic",
+      "description": "Convective channel with scalar wall temperature BC. T_wall is a Real parameter (fixed scalar), not a ThermalPort connection. No ThermalPort ports.",
+      "_note": "T_wall is a scalar BC parameter (Real), not a ThermalPort connection",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "n",
+          "type": "Int",
+          "description": "Number of axial finite-volume cells",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "geometry",
+          "type": "PipeGeometry",
+          "description": "Pipe geometry descriptor (use PipeGeometry_rectangular or PipeGeometry_circular)",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "g",
+          "type": "Real",
+          "unit": "m/s^2",
+          "default": 0.0,
+          "description": "Gravitational acceleration; 0.0 for horizontal, 9.80665 for vertical",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "T_wall",
+          "type": "Real",
+          "unit": "K",
+          "description": "Fixed wall temperature scalar boundary condition",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "htc_correlation",
+          "type": "Function",
+          "default": "dittus_boelter",
+          "description": "HTC correlation closure (Re, Pr, T_bulk, T_wall) -> Nu",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "friction_correlation",
+          "type": "Function",
+          "default": "blasius_friction",
+          "description": "Friction factor correlation closure (Re) -> f",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "ChannelHeatFlux(; name, n, geometry, g=0.0, T_wall, htc_correlation=dittus_boelter, friction_correlation=blasius_friction)",
+          "parameters": ["n", "geometry", "g", "T_wall", "htc_correlation", "friction_correlation"]
+        }
+      ]
+    },
+    {
+      "id": "Pump",
+      "label": "Pump",
+      "category": "Hydraulic",
+      "description": "Fixed-pressure-drop or fixed-mass-flow pump. Supports two GUI-accessible modes: scalar fixed dP and fixed mass flow rate.",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "dP_pump",
+          "type": "Real",
+          "unit": "Pa",
+          "description": "Fixed pressure rise across the pump (used in fixed-dP mode)",
+          "required": true,
+          "positional": true
+        },
+        {
+          "name": "mdot0",
+          "type": "Real",
+          "unit": "kg/s",
+          "description": "Fixed mass flow rate (used in fixed-mdot mode)",
+          "required": true,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "fixed-dP",
+          "signature": "Pump(dP_pump::Real; name)",
+          "parameters": ["dP_pump"]
+        },
+        {
+          "mode": "fixed-mdot",
+          "signature": "Pump(; name, mdot0)",
+          "parameters": ["mdot0"]
+        }
+      ]
+    },
+    {
+      "id": "Flapper",
+      "label": "Flapper",
+      "category": "Hydraulic",
+      "description": "Check-valve with smooth opening ramp and MTK continuous event callback. Opens when reference mass flow drops below threshold (loss-of-flow scenarios).",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "dt",
+          "type": "Real",
+          "unit": "s",
+          "default": 5.0,
+          "description": "Opening ramp duration after trigger event",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "threshold",
+          "type": "Real",
+          "unit": "kg/s",
+          "default": 0.01,
+          "description": "Mass flow threshold below which the Flapper opens",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "R_closed",
+          "type": "Real",
+          "unit": "Pa*s/kg",
+          "default": 1e8,
+          "description": "Hydraulic resistance in closed state",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "R_open",
+          "type": "Real",
+          "unit": "Pa*s/kg",
+          "default": 100.0,
+          "description": "Hydraulic resistance in open state",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "use_callback",
+          "type": "Bool",
+          "default": true,
+          "description": "Enable MTK SymbolicContinuousCallback for Flapper latch event",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "Flapper(; name, dt=5.0, threshold=0.01, R_closed=1e8, R_open=100.0, use_callback=true)",
+          "parameters": ["dt", "threshold", "R_closed", "R_open", "use_callback"]
+        }
+      ]
+    },
+    {
+      "id": "Friction",
+      "label": "Friction",
+      "category": "Hydraulic",
+      "description": "Standalone Darcy-Weisbach friction pressure drop element. Used for piping segments outside of Channel components.",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "L",
+          "type": "Real",
+          "unit": "m",
+          "description": "Pipe length",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "D",
+          "type": "Real",
+          "unit": "m",
+          "description": "Hydraulic diameter",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "A",
+          "type": "Real",
+          "unit": "m^2",
+          "description": "Cross-sectional flow area",
+          "required": true,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "Friction(; name, L, D, A)",
+          "parameters": ["L", "D", "A"]
+        }
+      ]
+    },
+    {
+      "id": "Gravity",
+      "label": "Gravity",
+      "category": "Hydraulic",
+      "description": "Hydrostatic pressure head element. Use on the return leg of a vertical loop with reversed port convention (port_out at bottom, port_in at top).",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "H",
+          "type": "Real",
+          "unit": "m",
+          "description": "Vertical height of the segment [m]",
+          "required": true,
+          "positional": true
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "Gravity(H; name)",
+          "parameters": ["H"]
+        }
+      ]
+    },
+    {
+      "id": "Resistor",
+      "label": "Resistor",
+      "category": "Hydraulic",
+      "description": "Linear hydraulic resistor. Pressure drop proportional to mass flow: dP = R * mdot.",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "R",
+          "type": "Real",
+          "unit": "Pa/(kg/s)",
+          "description": "Hydraulic resistance",
+          "required": true,
+          "positional": true
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "Resistor(R; name)",
+          "parameters": ["R"]
+        }
+      ]
+    },
+    {
+      "id": "Inertia",
+      "label": "Inertia",
+      "category": "Hydraulic",
+      "description": "Concentrated fluid inertia element. Adds (L/A)*d(mdot)/dt to the momentum equation for transient simulations.",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "L_over_A",
+          "type": "Real",
+          "unit": "1/m",
+          "description": "Length-to-area ratio (L/A) for the fluid inertia term",
+          "required": true,
+          "positional": true
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "Inertia(L_over_A; name)",
+          "parameters": ["L_over_A"]
+        }
+      ]
+    },
+    {
+      "id": "HeatExchanger",
+      "label": "Heat Exchanger",
+      "category": "Hydraulic",
+      "description": "Ideal heat exchanger that resets fluid temperature to a fixed boundary condition. No pressure drop.",
+      "ports": [
+        { "name": "port_in", "type": "FlowPort", "side": "left" },
+        { "name": "port_out", "type": "FlowPort", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "T_bc",
+          "type": "Real",
+          "unit": "K",
+          "description": "Boundary condition temperature; fluid exits at this temperature",
+          "required": true,
+          "positional": true
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "HeatExchanger(T_bc; name)",
+          "parameters": ["T_bc"]
+        }
+      ]
+    },
+    {
+      "id": "ConstantTemperature",
+      "label": "Constant Temperature",
+      "category": "Thermal",
+      "description": "Constant-temperature thermal boundary condition. Pins a ThermalPort temperature to a fixed value. Used as a wall BC for ChannelAndContacts and HeatDiffusion.",
+      "ports": [
+        { "name": "thermal", "type": "ThermalPort", "side": "left" }
+      ],
+      "parameters": [
+        {
+          "name": "T",
+          "type": "Real",
+          "unit": "K",
+          "description": "Fixed surface temperature",
+          "required": true,
+          "positional": true
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "ConstantTemperature(T; name)",
+          "parameters": ["T"]
+        }
+      ]
+    },
+    {
+      "id": "HeatDiffusion",
+      "label": "Heat Diffusion",
+      "category": "Thermal",
+      "description": "2D finite-difference fuel plate. T(t)[1:nz, 1:nx] MTK state. Dual ThermalPort arrays thermal_left[1:nz] and thermal_right[1:nz] for coupling to ChannelAndContacts on both sides.",
+      "ports": [
+        { "name": "thermal_left", "type": "ThermalPort", "side": "left", "array": true, "arrayParam": "nz" },
+        { "name": "thermal_right", "type": "ThermalPort", "side": "right", "array": true, "arrayParam": "nz" }
+      ],
+      "parameters": [
+        {
+          "name": "nz",
+          "type": "Int",
+          "description": "Number of axial (z) finite-difference nodes",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "nx",
+          "type": "Int",
+          "description": "Number of lateral (x) finite-difference nodes",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "Lz",
+          "type": "Real",
+          "unit": "m",
+          "description": "Axial length of the fuel plate",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "Lx",
+          "type": "Real",
+          "unit": "m",
+          "description": "Lateral width of the fuel plate",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "y",
+          "type": "Real",
+          "unit": "m",
+          "description": "Plate thickness",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "rho_s",
+          "type": "Real",
+          "unit": "kg/m^3",
+          "description": "Solid density",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "cp_s",
+          "type": "Real",
+          "unit": "J/(kg*K)",
+          "description": "Solid specific heat capacity",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "k_s",
+          "type": "Real",
+          "unit": "W/(m*K)",
+          "description": "Solid thermal conductivity",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "power_shape",
+          "type": "Matrix",
+          "description": "Normalized power distribution matrix [nz x nx]; caller-specified, not validated",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "power",
+          "type": "Real",
+          "unit": "W/m^3",
+          "default": 1e6,
+          "description": "Volumetric heat generation rate",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "T0",
+          "type": "Real",
+          "unit": "K",
+          "default": 600.0,
+          "description": "Initial temperature for all nodes",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=600.0)",
+          "parameters": ["nz", "nx", "Lz", "Lx", "y", "rho_s", "cp_s", "k_s", "power_shape", "power", "T0"]
+        }
+      ]
+    }
+  ]
+}
