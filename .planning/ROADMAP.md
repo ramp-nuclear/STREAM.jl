@@ -145,11 +145,11 @@ Plans:
   2. User can connect Pump.port_out to Channel.port_in with a visible edge
   3. User can delete a node and its connected edges are removed
   4. Undo/redo reverses at least 10 sequential operations correctly
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [x] 34-01-PLAN.md — Install zundo, extend store with temporal + actions, create StreamNode and ToolboxItem components
-- [ ] 34-02-PLAN.md — Wire CanvasPanel and ToolboxPanel, create unit tests for store and StreamNode
+- [x] 34-02-PLAN.md — Wire CanvasPanel and ToolboxPanel, create unit tests for store and StreamNode
 - [ ] 34-03-PLAN.md — Human-verify: canvas drag-drop, edge drawing, delete, undo/redo
 
 **UI hint**: yes
@@ -264,7 +264,7 @@ Plans:
 | 31. Write Phase 27 Verification Document | v0.7 | 1/1 | Complete | 2026-04-01 |
 | 32. THRS-09 & Phase 30 Integration Hardening | v0.7 | 1/1 | Complete | 2026-04-01 |
 | 33. Project Scaffold | v0.8 | 2/4 | Complete    | 2026-04-01 |
-| 34. Canvas & Node Editor | v0.8 | 1/3 | In Progress|  |
+| 34. Canvas & Node Editor | v0.8 | 2/3 | In Progress|  |
 | 35. Parameter Editing | v0.8 | 0/? | Not started | — |
 | 36. Code Generation | v0.8 | 0/? | Not started | — |
 | 37. Project Persistence | v0.8 | 0/? | Not started | — |
