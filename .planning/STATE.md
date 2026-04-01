@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.8
-milestone_name: STREAM Composer GUI
+milestone: v0.7
+milestone_name: Safety Physics & Pressure Field
 status: unknown
-stopped_at: Completed 29-02-PLAN.md
+stopped_at: Phase 29 threshold-analysis complete
 last_updated: "2026-03-31T20:57:58.346Z"
 progress:
-  total_phases: 8
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 4
+  completed_phases: 3
+  total_plans: 9
+  completed_plans: 9
 ---
 
 # STATE: STREAM.jl
@@ -26,17 +26,12 @@ See: .planning/PROJECT.md (updated 2026-03-31)
 **Current focus:** Phase 29 — threshold-analysis
 **Python STREAM reference:** ~/projects/STREAM
 
-**Roadmap summary:**
-
-- v0.7 (in progress): Phases 27-30 — Safety Physics & Pressure Field (3/4 phases complete)
-- v0.8 (planned): Phases 31-38 — STREAM Composer GUI (8 phases, 40 requirements, 0 started)
-
 ---
 
 ## Current Position
 
-Phase: 31
-Plan: Not started
+Phase: 30 (next — not yet started)
+Plan: N/A
 
 ## Performance Metrics
 
@@ -102,14 +97,14 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-03-31T20:51:11.911Z
-**Stopped at:** Completed 29-02-PLAN.md
-**Next action:** Phase 29 threshold-analysis (v0.7) or start v0.8 Phase 31
+**Last session:** 2026-03-31T20:57:58.346Z
+**Stopped at:** Phase 29 threshold-analysis complete
+**Next action:** Phase 30 — HTC & Friction Completions
 **Resume file:** None
 
 ---
 
-*Last updated: 2026-03-31 — v0.8 STREAM Composer GUI roadmap added (phases 31-38, 40 requirements)*
+*Last updated: 2026-03-31 — Phase 29 threshold-analysis complete; Phase 30 next*
 
 ### Quick Tasks Completed
 
