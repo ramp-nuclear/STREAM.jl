@@ -1,12 +1,21 @@
 import { create } from "zustand";
+import { temporal } from "zundo";
 import {
   Node,
   Edge,
+  Connection,
   applyNodeChanges,
   applyEdgeChanges,
+  addEdge as rfAddEdge,
   NodeChange,
   EdgeChange,
 } from "@xyflow/react";
+
+export interface StreamNodeData {
+  componentId: string;
+  instanceName: string;
+  parameters: Record<string, unknown>;
+}
 
 interface AppState {
   nodes: Node[];
@@ -15,17 +24,72 @@ interface AppState {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   selectNode: (nodeId: string | null) => void;
+  addNode: (componentId: string, position: { x: number; y: number }) => void;
+  removeNode: (nodeId: string) => void;
+  addEdge: (connection: Connection) => void;
+  removeEdge: (edgeId: string) => void;
 }
 
-const useStore = create<AppState>((set, get) => ({
-  nodes: [],
-  edges: [],
-  selectedNodeId: null,
-  onNodesChange: (changes) =>
-    set({ nodes: applyNodeChanges(changes, get().nodes) }),
-  onEdgesChange: (changes) =>
-    set({ edges: applyEdgeChanges(changes, get().edges) }),
-  selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
-}));
+// Per-type instance counters for default naming (module-level, not tracked by zundo)
+const instanceCounters: Record<string, number> = {};
+
+function getNextInstanceName(componentId: string): string {
+  const count = (instanceCounters[componentId] ?? 0) + 1;
+  instanceCounters[componentId] = count;
+  return `${componentId.toLowerCase()}_${count}`;
+}
+
+const useStore = create<AppState>()(
+  temporal(
+    (set, get) => ({
+      nodes: [],
+      edges: [],
+      selectedNodeId: null,
+      onNodesChange: (changes) =>
+        set({ nodes: applyNodeChanges(changes, get().nodes) }),
+      onEdgesChange: (changes) =>
+        set({ edges: applyEdgeChanges(changes, get().edges) }),
+      selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
+      addNode: (componentId, position) => {
+        const id = crypto.randomUUID();
+        const newNode: Node = {
+          id,
+          type: "streamNode",
+          position,
+          data: {
+            componentId,
+            instanceName: getNextInstanceName(componentId),
+            parameters: {},
+          } satisfies StreamNodeData,
+        };
+        set({ nodes: [...get().nodes, newNode] });
+      },
+      removeNode: (nodeId) => {
+        const { nodes, edges } = get();
+        set({
+          nodes: nodes.filter((n) => n.id !== nodeId),
+          edges: edges.filter(
+            (e) => e.source !== nodeId && e.target !== nodeId,
+          ),
+          selectedNodeId: null,
+        });
+      },
+      addEdge: (connection) => {
+        set({ edges: rfAddEdge(connection, get().edges) });
+      },
+      removeEdge: (edgeId) => {
+        set({ edges: get().edges.filter((e) => e.id !== edgeId) });
+      },
+    }),
+    {
+      partialize: (state) => ({
+        nodes: state.nodes,
+        edges: state.edges,
+        selectedNodeId: state.selectedNodeId,
+      }),
+      limit: 50,
+    },
+  ),
+);
 
 export default useStore;
