@@ -1,207 +1,155 @@
 # Pitfalls Research
 
-**Domain:** 2D MTK finite-difference components + two-sided ThermalPort coupling in Julia-STREAM v0.3
-**Researched:** 2026-03-13
-**Confidence:** HIGH (based on direct reading of Python STREAM source, existing Julia MTK codebase, and MTK/Symbolics documentation patterns)
+**Domain:** Tauri 2 + React + ReactFlow desktop GUI with Julia code generation for STREAM.jl v0.8
+**Researched:** 2026-04-01
+**Confidence:** MEDIUM-HIGH (ReactFlow and Tauri 2 pitfalls verified via official docs and GitHub issues; code generation pitfalls derived from STREAM.jl source analysis; cross-platform pitfalls from documented bug reports)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Python Fuel T array is T[z, x] — Julia PROJECT.md says T[nx, nz]
+### Pitfall 1: ReactFlow Stale Closures in Custom Node Callbacks
 
 **What goes wrong:**
-The Python `Fuel` class stores temperatures as `T.reshape(self.shape)` where `self.shape = (m, n)`, `m = len(dz)` (axial cells), `n = len(dx)` (lateral/x cells). This means the Python array is indexed `T[z_index, x_index]` — row is axial, column is lateral.
-
-The current Julia PROJECT.md requirement says `T(t)[1:nx, 1:nz]` which is `T[x_index, z_index]` — the transpose. When comparing against Python STREAM, the axes must match exactly or a factor-of-`nz` vs `nx` indexing error will corrupt the validation comparison silently (temperatures extracted will be from wrong cells, but the solver will still converge).
+Custom node components capture stale references to `nodes` or `edges` arrays in event handlers. When a user edits a parameter in the sidebar, the callback reads an outdated snapshot of the graph state, causing silent data loss -- the user's edit appears to "revert" on the next render cycle, or worse, overwrites another node's data.
 
 **Why it happens:**
-The Julia convention was written without cross-checking the Python source. The naming `[1:nx, 1:nz]` is intuitive from a "plate cross-section" mental model but transposes the Python convention.
+React's closure semantics mean that any function created inside a render captures the state values at that render time. ReactFlow's `useNodesState` and `useEdgesState` hooks return new array references on every change, but callbacks memoized with `useCallback` without proper dependency arrays hold stale references. React 18's automatic batching makes this worse by collapsing multiple state updates into one render, so intermediate states are never seen.
 
 **How to avoid:**
-Decide on one canonical axis order before writing a single equation and document it explicitly. The safest choice is to match Python: `T[1:nz, 1:nx]` (row=axial z, col=lateral x) — this makes direct numerical comparison trivial. Whatever is chosen, add a comment at the top of the HeatDiffusion component stating the axis convention.
-
-When extracting `thermal_left[i]` and `thermal_right[i]` for axial cell `i`, the correct slice is `T[i, 1]` (leftmost x column of row i) and `T[i, end]` (rightmost x column of row i) under Python convention, or `T[1, i]` and `T[end, i]` under transposed convention.
+- Use Zustand as the state store (ReactFlow's official recommendation for non-trivial apps). Zustand's `useStore` with selectors avoids the stale closure problem because selectors subscribe to specific slices of state, not the whole array.
+- Never pass raw `nodes`/`edges` arrays as dependencies to `useCallback` -- use Zustand selectors or `useStoreApi` for imperative access inside callbacks.
+- For the parameter editing sidebar: read node data via `useStore(state => state.nodes.find(n => n.id === selectedId)?.data)` with a selector, not by closing over `nodes`.
 
 **Warning signs:**
-- Validation comparison shows temperature profiles that are rotated/transposed relative to Python STREAM output
-- `T_wall_left` matches Python's `T_wall_right` and vice versa
-- Center temperature is correct but axial profile is wrong (nx cells along what should be nz)
+- Parameter edits in the sidebar that "bounce back" to previous values.
+- `console.log` inside a callback showing old state while the UI shows new state.
+- Tests pass when actions are slow but fail when automated (timing-dependent).
 
 **Phase to address:**
-HeatDiffusion implementation phase (first phase of v0.3). Document the axis convention in the component header before writing the FD stencil loop.
+Phase 34 (Canvas & Node Editor) -- establish the Zustand store pattern before any custom node logic is written. Phase 35 (Parameter Editing) inherits this pattern.
 
 ---
 
-### Pitfall 2: Python Fuel indices() has an intentional left/right swap
+### Pitfall 2: ReactFlow Re-renders Cascade from Node/Edge Array Mutations
 
 **What goes wrong:**
-In `heat_diffusion.py`, the `indices()` method maps `"T_left"` to `self._vars["T_wall_right"]` and `"T_right"` to `self._vars["T_wall_left"]`. This is not a bug in Python STREAM — it is an intentional convention where the fuel's "left wall temperature" (what it exposes to the channel on its left) is computed from the fuel's right-side cladding variables. The swap exists because `indices()` returns what the fuel *provides* to its neighbors, not what it *receives*.
-
-If Julia's HeatDiffusion exposes `thermal_left[i].T` as the temperature on the left face of the plate, but Python STREAM's `T_wall_left` is the wall temperature sent to the right channel (due to the swap), the coupled validation will produce symmetric but physically mirrored results.
+Every custom node component re-renders whenever the `nodes` array reference changes -- including when a completely unrelated node moves. With 20+ nodes on canvas, dragging one node causes O(n) re-renders per frame, making the UI visibly janky. The parameter sidebar, if it depends on the `nodes` array, also re-renders on every drag, causing input fields to lose focus or lag.
 
 **Why it happens:**
-The Python coupling convention is subtle: in a `plate(ch_l, ch_r, fuel)` topology, the fuel receives `T_left` (coolant temp from left channel) and provides `T_wall_left` (plate surface temp back to left channel). But `Fuel.indices()` routes `T_left` → `T_wall_right` slice — meaning when the graph says "give channel_left the fuel's T_left variable," it actually pulls the right-side wall data. This convention is embedded in the composition helpers and may be reversed versus naive expectation.
+ReactFlow passes the `nodes` array to its internal renderer. If custom nodes are not wrapped in `React.memo`, React re-renders them all. Even with `React.memo`, if node data objects are recreated (new references) on each state update, the shallow comparison fails and every node re-renders anyway.
 
 **How to avoid:**
-Before writing the Julia coupling equations, generate a small Python STREAM MTR reference case (fuel sandwiched between two asymmetric channels) and print both `T_wall_left` and `T_wall_right`. Confirm which corresponds to which channel by setting only one channel to a high temperature. Use this as the ground truth for the Julia port convention.
+- Wrap ALL custom node components in `React.memo()` from day one. This is non-negotiable.
+- Wrap ALL custom edge components in `React.memo()` as well.
+- Store node data as stable references in Zustand. When updating a single node's parameter, mutate only that node's data slice using Zustand's `immer` middleware or manual spread, ensuring other nodes keep the same reference.
+- The parameter sidebar must subscribe to only the selected node's data, not the entire nodes array: `useStore(s => s.nodes.find(n => n.id === selectedId))`.
+- Memoize all props passed to `<ReactFlow>`: `nodeTypes`, `edgeTypes`, `defaultEdgeOptions`, callback functions.
 
 **Warning signs:**
-- Asymmetric heating test (left channel hotter than right) produces the correct magnitude but mirrored side (right channel shows the higher wall temperature)
-- Symmetric case validates correctly but asymmetric case does not
+- React DevTools Profiler shows all nodes re-rendering on single-node drag.
+- Input fields in the sidebar lose focus when typing.
+- Canvas becomes sluggish with 15+ nodes.
 
 **Phase to address:**
-HeatDiffusion + ChannelAndContacts coupling validation phase (the MTR reference case phase). Test asymmetric configuration explicitly, not just the symmetric case.
+Phase 34 (Canvas & Node Editor) -- define `nodeTypes` and `edgeTypes` outside the component or memoize them. Phase 35 (Parameter Editing) -- ensure sidebar uses precise selectors.
 
 ---
 
-### Pitfall 3: ThermalPort Q_flow sign convention silently reverses heat direction
+### Pitfall 3: Code Generation Emits Wrong Constructor Signatures
 
 **What goes wrong:**
-`ThermalPort` in connectors.jl declares `Q_flow` as `[connect = Flow]` with the comment "positive = into component." In MTK acausal semantics, this means when two ThermalPorts are connected, MTK generates the Kirchhoff-like equation: `portA.Q_flow + portB.Q_flow ~ 0`. So the component that receives heat has positive Q_flow, and the one that sends heat has negative Q_flow.
-
-HeatDiffusion generates heat (fuel plate is a source). When writing the energy balance equation for the left boundary cell, the heat leaving the plate into the channel must appear as negative Q_flow on the fuel's port and positive Q_flow on the channel's port. If both sides write `Q_flow ~ h * A * (T_wall - T_cool)` with the same sign, the heat will be double-counted or the direction will be wrong.
-
-The current ChannelAndContacts energy balance `h_tc[i] * (π * Dh) * dz * (thermal_ports[i].T - T[i])` is written from the channel's perspective: positive when wall is hotter than coolant. This already implies the channel receives heat (positive Q_flow into channel). HeatDiffusion must be consistent: the fuel's port Q_flow equation must be the negative of the channel's perspective, or left as an algebraic observable only (the MTK `connect()` equation already handles the balance).
+Generated Julia code uses keyword arguments where STREAM.jl expects positional arguments (or vice versa). Example: generating `Pump(dP_pump=30000.0)` instead of `Pump(30000.0)`, or `Channel(n=10, geometry=PipeGeometry_circular(0.6, 0.01))` missing the keyword syntax. The generated file runs but produces a `MethodError` at runtime, and the user blames the GUI.
 
 **Why it happens:**
-The channel energy balance uses `thermal_ports[i].T` as a temperature boundary — it reads the temperature from the port, not the heat flow. The Q_flow on the channel's port is an observable (`q_wall[i] ~ thermal_ports[i].Q_flow`) not a driver. HeatDiffusion will be the first component that actually drives Q_flow from the fuel side. Getting the driving direction wrong silently produces cooling where there should be heating.
+STREAM.jl has a mixed convention (documented in CLAUDE.md): single-physics-parameter components use positional args with dispatch (`Pump(dP::Real; name)`, `Resistor(R; name)`), while multi-parameter components use keyword-only (`Channel(; n, geometry, ...)`). Factory functions (`PipeGeometry_rectangular`, `PipeGeometry_circular`) use positional args. This is non-obvious and easy to get wrong in a code generator that treats all parameters uniformly.
 
 **How to avoid:**
-Follow the pattern already established: write the FD boundary equation as `Q_flow ~ -k_eff * A * (T_boundary - T_interior) / (dx/2)` from the fuel's perspective. The negative sign ensures that when the interior is cooler than the boundary (heat flowing out of the fuel), Q_flow on the fuel's port is negative (consistent with "positive = into fuel"). The channel's port then sees positive Q_flow from the `connect()` equation.
-
-As a sanity check: at steady state, `sum(thermal_left[i].Q_flow for i in 1:nz)` should be negative on the fuel side and the corresponding channel's `Q_wall_total` should be positive and equal in magnitude.
+- The component metadata registry JSON must encode constructor mode explicitly: `"argStyle": "positional"` vs `"argStyle": "keyword"` per parameter. This is already planned in SCAF-03.
+- The code generator must read this metadata and emit the correct syntax. Write a dedicated `formatConstructorCall(component, params)` function with unit tests for every component type.
+- Add a test suite that generates code for each of the 9 components and asserts the output matches a known-good `.jl` snippet character-by-character. This is cheap insurance.
+- For Pump's dual-mode dispatch: `Pump(30000.0)` for scalar dP vs `Pump(; mdot0=0.5)` for fixed flow. The registry must encode both modes.
 
 **Warning signs:**
-- Coupled system converges but the channel temperature decreases along the flow direction despite a hot fuel plate
-- `Q_wall_total` on the channel is negative (heat flowing from coolant to plate)
-- `abs(Q_flow)` is correct but sign is wrong
+- `MethodError: no method matching Pump(; dP_pump=30000.0)` when running generated code.
+- Subtle: code generates but produces wrong physics (e.g., wrong constructor overload selected).
 
 **Phase to address:**
-HeatDiffusion component implementation phase. Write a unit test before coupling: isolated HeatDiffusion with pinned boundary temperatures should have `sum(Q_flow)` negative at left and right thermal ports when the fuel interior is hotter than the boundary conditions.
+Phase 33 (Scaffold) -- registry must encode constructor signatures correctly. Phase 36 (Code Generation) -- unit tests for every component's generated output.
 
 ---
 
-### Pitfall 4: MTK 2D array variable `(T(t))[1:nz, 1:nx]` — mtkcompile performance and Jacobian density
+### Pitfall 4: Code Generation Produces Unconnected or Misordered Systems
 
 **What goes wrong:**
-MTK/Symbolics.jl supports array-valued time-dependent variables, and `(T(t))[1:nz, 1:nx]` is valid syntax. However, `mtkcompile` with a large 2D FD grid (e.g., 10x10 = 100 cells, each with a 5-point stencil) creates a symbolic system with O(nx*nz) ODE equations where each equation references at most 5 neighboring symbolic variables. The total system equation count becomes O(nx*nz + n_channel_cells), which can be hundreds of equations for a realistic MTR plate.
-
-Known Symbolics.jl behavior: structural_simplify (called by mtkcompile) performs tearing on all algebraic equations. With 100 differential temperature states and ~200 algebraic equations (HTC, Re, Nu, q_wall per cell), compile time can spike dramatically — potentially minutes instead of seconds.
+Generated code compiles but the MTK system is ill-posed: missing pressure anchor (system is underdetermined), missing `mtkcompile`, components listed in wrong order in `compose()`, or `connect()` calls reference nonexistent port names. The user gets a cryptic MTK/Sundials error instead of a helpful message.
 
 **Why it happens:**
-The v0.1/v0.2 systems had at most 10 cells per channel. A 10-axial x 5-lateral plate adds 50 FD nodes, each coupling to its neighbors symbolically. Symbolics.jl's tearing algorithm is O(n²) or worse on dense equation graphs. The FD stencil is sparse numerically but Symbolics.jl may not exploit that sparsity during compilation.
+The code generator translates a visual graph into text. Unlike a compiler, it has no type checker -- it emits strings. If the graph has disconnected subgraphs, or the user forgot a boundary condition, or an edge connects incompatible port types, the generator happily produces syntactically valid but semantically broken Julia code.
 
 **How to avoid:**
-Start development with the smallest possible grid (3x3 or 5x3) and measure `mtkcompile` time before scaling. If compile time exceeds 60 seconds for a 10x10 grid, switch to the `sparse=true` option in `mtkcompile` (available in MTK ≥ v9) or use `structural_simplify(sys; fully_determined=false)` to skip tearing for diagnostic purposes.
-
-Keep the channel-side algebraic variables (Re, Nu, h_tc per cell) inside `ChannelAndContacts` and do not expose them through ThermalPorts — this avoids expanding the coupled symbolic system with channel algebraics when compiling HeatDiffusion.
-
-For the MTR reference case validation, a 10z x 5x grid (50 FD nodes) is realistic. Profile `@time mtkcompile(...)` explicitly and document the result.
+- Implement topology validation (VALD-01/02/03) BEFORE the code generator is considered complete. The validation layer should catch:
+  - Unconnected mandatory ports (every FlowPort must have an edge).
+  - No pressure anchor in the system (at least one `pump.port_in.P ~ value`).
+  - No driving element (at least one Pump or Gravity).
+  - Disconnected subgraphs (all nodes must be reachable).
+- The code generator should emit components in a deterministic order (alphabetical by instance name, or topological). MTK does not care about declaration order, but deterministic output makes diffs meaningful and debugging easier.
+- Always emit `mtkcompile(sys)` -- never let the user accidentally skip it.
+- Emit comments in generated code: `# Boundary conditions`, `# Component instantiation`, `# Connections` -- makes it auditable.
 
 **Warning signs:**
-- `mtkcompile` takes more than 30 seconds for a small test system
-- `OutOfMemoryError` or LLVM crashes during `mtkcompile` on grid > 20x20
-- Julia process hangs with high CPU (Symbolics symbolic manipulation loop)
+- Generated code runs but Sundials throws `SingularException` or `LinearAlgebra.SingularException`.
+- MTK's `mtkcompile` reports "system is structurally singular" -- usually means missing equation (missing BC or missing connection).
 
 **Phase to address:**
-HeatDiffusion implementation phase. Benchmark with 3x3 grid first, then scale. Document the compile time in the phase VALIDATION.md.
+Phase 36 (Code Generation) for deterministic output. Phase 39 (Topology Validation) for pre-generation checks. Order matters: validation should ideally be built before or alongside code generation, not after.
 
 ---
 
-### Pitfall 5: ChannelAndContacts thermal_ports renaming breaks existing tests silently
+### Pitfall 5: Tauri 2 Capability/Permission Denials at Runtime
 
 **What goes wrong:**
-The existing ChannelAndContacts creates per-cell ThermalPorts named `thermal1`, `thermal2`, ..., `thermalN` via `Symbol(:thermal, i)`. When the component is upgraded to `thermal_left` and `thermal_right` arrays, every existing test that accesses `cac.thermal1` or `cac.thermal2` will fail with a "field not found" or "subsystem not found" error. More dangerously, tests that call `mtkcompile` and access port equations by string name (via `sys.thermal1.T`) will silently use a stale MTK system object if the test file caches the old compiled system.
+The app builds and runs in dev mode, but the production build silently fails when trying to open a file dialog, read a file, or write a `.jl` export. The user clicks "Save" and nothing happens. No error is shown because the Tauri IPC call is rejected by the ACL system and the frontend does not handle the rejection.
 
 **Why it happens:**
-MTK subsystems are accessed by name. Renaming `thermalN` to `thermal_left[i]` changes the internal name from `thermal1` to the array indexing syntax. Any test setup that pins wall temperature via `[cac.thermal1.T ~ 600.0]` must be rewritten to use the new array port name syntax.
+Tauri 2 replaced the v1 boolean allowlist with a fine-grained ACL system. Every plugin command (file dialog open, file system read, file system write) requires an explicit permission entry in `src-tauri/capabilities/*.json`. Developers test in dev mode where permissions may be more relaxed, or they add the permission for `open` but forget `save`, or they grant read but not write to the app data directory.
 
 **How to avoid:**
-Before the breaking change, audit every occurrence of `thermal_ports`, `thermal1`, `thermal2` in the test suite. Treat this as a rename refactor: update all call sites atomically in the same commit as the component change. Do not attempt to maintain backward compatibility by keeping both naming schemes — it will create an inconsistent port structure that confuses MTK's compose().
-
-Write a minimal smoke test for the new API before touching existing tests: `cac.thermal_left` and `cac.thermal_right` are accessible as named subsystem arrays.
+- Create a single `src-tauri/capabilities/default.json` capability file during scaffold (Phase 33) that grants all permissions the app will ever need: `dialog:allow-open`, `dialog:allow-save`, `fs:allow-read-text-file`, `fs:allow-write-text-file`, `fs:allow-exists`, plus scope to `$APPDATA` and user-selected paths.
+- Every Tauri IPC call in the frontend must have a `.catch()` handler that shows an error toast. Never fire-and-forget.
+- Test the production build (not just dev mode) on both Windows and Linux before any milestone is considered complete. Dev mode and production mode have different permission enforcement.
 
 **Warning signs:**
-- Tests that previously passed now throw `KeyError` or `UndefVarError` on port access
-- `mtkcompile` succeeds but `sol[cac.thermal1.T]` returns wrong values (using stale compiled system)
-- Test count drops by exactly the number of `thermal_ports` references (deletions rather than updates)
+- Console error: `"[plugin-name].command not allowed"` in the webview developer console.
+- File dialog opens but the subsequent read/write silently fails.
+- Works in `npm run tauri dev` but breaks in the installed AppImage/.exe.
 
 **Phase to address:**
-ChannelAndContacts upgrade phase. This should be done as an atomic change: modify the component and update all test call sites in one plan.
+Phase 33 (Scaffold) -- set up all capabilities. Phase 37 (Persistence) -- verify save/load works in production build.
 
 ---
 
-### Pitfall 6: Unconnected ThermalPort adiabatic assumption — Q_flow = 0 only if explicitly stated
+### Pitfall 6: Thermal Port Array Handles Break ReactFlow's Connection Model
 
 **What goes wrong:**
-The PROJECT.md requirement states "Unconnected ThermalPort sides default to adiabatic (Q_flow=0 from MTK acausal semantics — no explicit flag needed)." This is conditionally true: in MTK, an unconnected `[connect = Flow]` variable is treated as zero *if the system is closed* (i.e., the equation count matches the unknown count after mtkcompile). However, for a `thermal_left` or `thermal_right` array port that is declared but not connected in a `compose()` call, MTK may not automatically add Q_flow=0 — it depends on the MTK version and whether `structural_simplify` sees the port as a boundary or as an underdetermined equation.
-
-In Modelica semantics, unconnected flow variables have zero by default. MTK follows this for `[connect = Flow]` variables in fully closed systems. But if a user builds a test with only the fuel plate (no channel connected), the left and right port equations are underdetermined unless MTK's structural analysis generates the zero equation. This behavior has changed between MTK versions.
+ChannelAndContacts has `thermal_left[1:n]` and `thermal_right[1:n]` -- arrays of ports where `n` is a user-configurable parameter. Standard ReactFlow handles are static (defined at component registration time). When `n` changes, the number of handles on the node must change dynamically. If implemented naively, existing edges connected to `thermal_left[3]` become invalid when `n` is reduced to 2, causing React errors or orphaned edges in the graph state.
 
 **Why it happens:**
-MTK's handling of unconnected connectors was improved across versions. In older MTK versions (< v9), unconnected Flow variables were sometimes left as free variables rather than zeroed, causing "system is underdetermined" errors. In current MTK v9+, the behavior is correct for well-formed systems, but only when the port is included in `compose()` even if unconnected at the outer level.
+ReactFlow's handle system assumes handles are stable. Handle IDs are used as edge endpoints. When handles are added/removed dynamically, ReactFlow does not automatically clean up edges pointing to removed handles. The developer must manually prune invalid edges when `n` changes.
 
 **How to avoid:**
-Write an explicit test for adiabatic behavior: build a HeatDiffusion system with thermal_right connected to a channel and thermal_left left unconnected, then call `mtkcompile`. Verify that the solution sets `thermal_left[i].Q_flow ~ 0` for all i and that the temperature profile is one-sided. Do not assume this works without testing it.
-
-As a fallback, add explicit `~ 0` equations for unconnected ports in the component definition itself — but only as a last resort, since it conflicts with MTK's connector pattern.
-
-**Warning signs:**
-- `mtkcompile` throws "system is singular" or "not fully determined" when only one side is connected
-- One-sided heating test produces symmetrically heated plate (both sides see heat flow)
-- MTK warning about unset or over-constrained equations when a single-sided connection is tested
-
-**Phase to address:**
-HeatDiffusion + ChannelAndContacts coupling phase. Test one-sided connection explicitly before testing symmetric coupling.
-
----
-
-### Pitfall 7: FD stencil top/bottom boundary (adiabatic z-ends) creates an implicit Q=0 equation that must not conflict with the FD stencil
-
-**What goes wrong:**
-The HeatDiffusion plate has four boundaries: left/right (lateral x, connected to channels via ThermalPorts) and top/bottom (axial z-ends, adiabatic by default). The left/right boundaries are driven by ThermalPort connections. The top/bottom boundaries are purely adiabatic: no flux crosses the top or bottom of the plate.
-
-In the FD stencil, the top boundary condition is typically implemented as a ghost-cell or zero-flux Neumann BC: the flux at the top face equals zero, meaning `T[1, :]` (top row) sees no axial diffusion from above. If this is implemented as a separate equation `Q_top[j] ~ 0 for j in 1:nx`, it adds `nx` equations that must not duplicate or conflict with the FD stencil's top-row treatment.
-
-The risk: if the FD loop for the top row `i=1` already includes the axial flux term (which evaluates to zero only because `T_ghost = T[1, :]`), and an additional explicit `Q_top ~ 0` equation is added, the system is overconstrained.
-
-**Why it happens:**
-The Python `Fuel` handles this via the `T_walls.z = (top, bottom)` Walls dataclass where `top` and `bottom` are passed as optional external inputs. When not provided, `wall_or_default()` substitutes `T_last_cell.top = T[0, :]` (the actual cell temperature), which creates a Neumann BC by making the wall equal to the interior. This is elegant in Python but subtle to replicate in MTK.
-
-**How to avoid:**
-Implement the adiabatic top/bottom as a zero-flux Neumann BC by treating the ghost cell temperature as equal to the boundary cell: `T_ghost_top[j] = T[1, j]` for all j. This means the flux across the top face is `(T_ghost - T[1,j]) / dx_ghost = 0` — no additional equation needed, and the stencil is self-consistent. Do not create a separate `Q_top` port or equation.
+- When `n` changes on a ChannelAndContacts or HeatDiffusion node, run an edge cleanup pass that removes any edges connected to handles with index > new `n`.
+- Show a confirmation dialog if reducing `n` would disconnect existing thermal edges.
+- Use handle IDs that encode the port type and index: `thermal_left_0`, `thermal_left_1`, etc. Parse these IDs in the code generator to emit `port(cac, :thermal_left, 1)` calls.
+- Consider setting a minimum `n` (e.g., 1) and a maximum (e.g., 50) with validation to prevent degenerate cases.
 
 **Warning signs:**
-- `mtkcompile` reports overconstrained system when using a full 2D FD stencil
-- Solver diverges at the plate edges (top/bottom rows show unphysical temperatures)
-- Adding an explicit `Q_flow = 0` boundary term doubles the residual at top/bottom rows
+- React error: "Cannot find handle with id thermal_left_5" after reducing `n`.
+- Edges visually attached to a position where no handle exists.
+- Generated code references `port(cac, :thermal_left, 11)` when `n` is 10.
 
 **Phase to address:**
-HeatDiffusion FD stencil implementation phase.
-
----
-
-### Pitfall 8: Initial condition for 2D T array must be consistent with the coupled FD + channel system
-
-**What goes wrong:**
-The existing components (Channel, ChannelAndContacts) use `fill(600.0, n)` as the initial condition for cell temperatures. For HeatDiffusion, all `nx * nz` cells need initial conditions. If the initial guess is far from steady state (e.g., uniform 300 K for a plate that equilibrates to 700 K), Sundials IDA must integrate through a large transient before reaching steady state — or if used directly as a steady-state initial condition for an algebraic solve, it may fail to converge.
-
-More critically: the coupled system (HeatDiffusion + two ChannelAndContacts) has a larger algebraic structure than anything tested so far. The initial condition for the coupled system must be consistent: all differential states (T in fuel, T in both channels) must satisfy the algebraic constraints (HTC, Re, Nu equations in both channels). An inconsistent IC causes IDA's consistent IC initialization to fail or take excessive iterations.
-
-**Why it happens:**
-In v0.1/v0.2, the initial conditions were simple enough that MTK's default IC computation (via IDA's `calc_ic`) handled inconsistencies. With O(100) new differential states and coupled nonlinear algebraics, the IC problem is harder. Python STREAM addresses this with `symmetric_plate_steady_state()` which runs decoupled iterations before the full coupled solve.
-
-**How to avoid:**
-Use a decoupled warm-start strategy: first solve the channel alone (with `T_wall` pinned as a parameter), then solve the fuel alone (with channel T and HTC as fixed boundary conditions), then couple and iterate. This mirrors Python STREAM's `symmetric_plate_steady_state` helper. Document this as the recommended IC construction pattern for the coupled system.
-
-**Warning signs:**
-- IDA's `calc_ic` fails with "consistent IC not found" or throws `DimensionMismatch`
-- The steady-state solve converges to a physically wrong solution (uniform temperature, or very high temperatures)
-- Transient simulation shows a huge spike in the first few time steps before settling
-
-**Phase to address:**
-MTR reference case validation phase (the final validation phase). Document the IC construction strategy explicitly in the phase plan.
+Phase 40 (Thermal Composition) -- this is the phase that introduces dynamic port arrays. Must be designed carefully from the start.
 
 ---
 
@@ -209,87 +157,133 @@ MTR reference case validation phase (the final validation phase). Document the I
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Hardcode `T[1:nz, 1:nx]` axis order without comment | Saves one line of documentation | Anyone comparing to Python STREAM must re-derive the convention; breaks if the array is transposed during validation | Never — always document the axis convention explicitly |
-| Skip asymmetric coupling test, only test symmetric case | Faster validation | Left/right swap bugs (Pitfall 2) are undetectable; the symmetric case hides sign convention errors | Never for validation milestone |
-| Use `fully_determined=false` in mtkcompile to suppress errors during development | Faster iteration when system is structurally incomplete | Silently allows underdetermined systems to "compile"; solver will fail at runtime with cryptic errors | Acceptable during RED phase; remove before GREEN |
-| Use `fill(700.0, nz, nx)` as IC without warm-start | Simple, fast to write | IDA consistent IC computation may fail on coupled system; decoupled warm-start needed | Acceptable for unit tests of isolated HeatDiffusion; not for coupled system |
-| Keep `t_inlet` dead parameter in `_channel_base_eqs` | No action needed | Misleading signature; future callers may try to use it | Remove during v0.2 tech debt cleanup phase (already documented) |
-
----
+| Store all state in `useState` instead of Zustand | Faster initial development, fewer dependencies | Stale closures, re-render cascades, no undo/redo support | Never -- Zustand is required for ReactFlow apps with parameter editing |
+| Inline `nodeTypes`/`edgeTypes` inside JSX | Fewer files, "simpler" code | Causes full re-mount of all nodes on every parent render (React creates new component references) | Never -- define outside component or memoize with `useMemo` |
+| Generate code as string concatenation | Quick to implement | Impossible to test individual parts, brittle to whitespace, no AST validation | MVP only -- migrate to template functions with unit tests by Phase 36 |
+| Skip production build testing | Saves CI time | Permission/capability failures discovered by users, not developers | Never -- test production build on both platforms every phase |
+| Hardcode component metadata in TypeScript | No JSON parsing overhead | Cannot add components without recompilation, violates SCAF-04 | Never -- registry JSON is a core requirement |
+| Use `onNodesChange` for undo history | Captures every change "for free" | Captures drag micro-movements, history fills with noise, undo is unusable | Never -- use Zundo with selective recording (pause during drag, record on drop) |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| HeatDiffusion ↔ ChannelAndContacts via ThermalPort | Forgetting that MTK `connect()` generates `Q_flow_left + Q_flow_right ~ 0` — so one side must not also define Q_flow independently | Let the channel's energy balance use `thermal_left[i].T` as a temperature boundary; define `q_wall` as an observable (`q_wall[i] ~ thermal_left[i].Q_flow`), not a driver |
-| Python STREAM `Fuel.T` extract vs Julia `HeatDiffusion.T` | Python saves T as `T.reshape(self.shape)` — shape is `(nz, nx)`; Julia's MTK solution `sol[hd.T]` returns whatever shape was declared | Declare `(T(t))[1:nz, 1:nx]` to match Python, or explicitly transpose before numerical comparison |
-| Python `Fuel.indices()` left/right swap | Assuming `T_wall_left` in Python maps to the left side of the plate — it does not; indices() swaps it | Test with asymmetric temperatures before trusting the coupling direction |
-| ChannelAndContacts `thermal_left` array vs old `thermal1..thermalN` | MTK port access: `sys.thermal_left[1].T` vs old `sys.thermal1.T` — different syntax for array vs named ports | Confirm MTK's array port access syntax for your version before writing tests |
-| Sundials IDA tolerance on mixed-scale system | Default atol=1e-6 works for 300-700 K temperatures but may be too loose for small `dx` FD cells with steep gradients | Set atol per-variable: tighter on T (1e-4 is sufficient for 1% validation) and normal on algebraics |
-
----
+| shadcn/ui Popover inside ReactFlow node | Popover portals to `document.body`, z-index conflicts with ReactFlow's canvas layers; popover appears behind nodes or is unclickable | Set `container` prop on the Popover to portal within the ReactFlow wrapper div; add `pointer-events-auto` to interactive elements inside portaled components |
+| shadcn/ui Select inside ReactFlow custom node | Click on Select triggers ReactFlow's node selection/drag instead of opening the dropdown | Add `noDragHandle` class or `onPointerDown={(e) => e.stopPropagation()}` on interactive form elements inside custom nodes; use ReactFlow's `nodeDragThreshold` |
+| shadcn/ui Dialog for confirmation prompts | Dialog backdrop blocks ReactFlow canvas interaction after dialog closes if cleanup is incomplete | Use the `onOpenChange` callback to properly reset state; prefer shadcn AlertDialog for destructive confirmations (it handles focus trapping correctly) |
+| Tauri file dialog + ReactFlow state | User saves project, file dialog returns path, but by the time the save completes the ReactFlow state has changed (user kept editing during save) | Snapshot the graph state synchronously before opening the file dialog; write the snapshot, not the live state |
+| Zustand + ReactFlow `useReactFlow` hook | Trying to call `useReactFlow()` inside a Zustand action (outside React component tree) fails because hooks cannot be called outside components | Pass ReactFlow instance methods to Zustand via `useEffect` initialization, or use `useStoreApi` for imperative access from within actions |
+| ReactFlow minimap + custom node styling | Minimap renders simplified node shapes that ignore custom node CSS, making it look broken | Use ReactFlow's `MiniMap` `nodeColor` prop to set colors by node type; do not expect minimap to mirror custom node internals |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| `mtkcompile` symbolic explosion on large FD grid | Compilation takes >2 minutes; Julia OOM on 20x20 grid | Benchmark with 3x3 first; use `sparse=true` in mtkcompile if available | Grid > ~10x10 with full algebraic channel coupling |
-| Sundials IDA Jacobian density for O(100) state system | IDA takes >10 seconds per time step; progress bar stalls | Ensure MTK generates sparse Jacobian (default in MTK v9+); verify `jac_sparsity` is not dense | Any system with >50 states and dense coupling |
-| Re-compilation on every test run | Each test recreates the MTK system from scratch; `mtkcompile` dominates test time | Cache compiled system across tests using module-level `const` or `@testset` setup block | Test suite with >5 test cases using the same compiled system |
-| FD stencil with non-uniform grid spacing | Arithmetic mean of neighbor temperatures is wrong for non-uniform dx | Use harmonic mean of conductivities weighted by dx (as Python STREAM does) | Any plate with fuel+cladding layers of different thicknesses |
+| Subscribing sidebar to entire `nodes` array | Sidebar re-renders on every node drag (60fps of wasted renders); input fields lose focus | Use Zustand selector: `useStore(s => s.nodes.find(n => n.id === id)?.data)` | Noticeable with 10+ nodes |
+| Regenerating Julia code on every keystroke in parameter fields | Code preview panel flickers; browser tab becomes unresponsive with complex graphs | Debounce code generation (300ms); or generate only on blur/explicit refresh | Noticeable with 15+ components |
+| Storing full undo history without limits | Memory grows unbounded; after 30 min of editing, tab uses 500MB+ | Cap undo history at 50-100 entries; discard oldest on overflow | After ~200 undo steps |
+| ReactFlow `fitView` on every node addition | Canvas jumps around as user adds nodes, breaking spatial memory | Only `fitView` on initial load and explicit user action (button click); use `setCenter` for new node focus | Annoying from node 3 onward |
+| JSON serialization of large graph state for save | Save blocks the UI thread for 100ms+ with 50+ nodes and full parameter data | Use `structuredClone` + web worker for serialization; or serialize in Rust via Tauri command | 50+ nodes with complex params |
 
----
+## Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Writing user-supplied component names directly into generated Julia code without sanitization | Code injection: a name like `pump; rm -rf /` would execute when the `.jl` file is run | Validate names against Julia identifier regex `^[a-zA-Z_][a-zA-Z0-9_]*$`; reject anything else. CODE-07 covers this. |
+| Storing recent file paths in localStorage without sanitization | Path traversal in display; minor risk since paths come from OS dialog | Always display paths via `<span>` not `dangerouslySetInnerHTML`; truncate long paths |
+| Allowing arbitrary file extensions in export dialog | User accidentally overwrites a system file | Default to `.jl` extension; use Tauri dialog `filters` to restrict to `.jl` and `.streamgui` |
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| No visual feedback when code generation has errors | User exports a `.jl` file, runs it, gets a wall of Julia errors with no connection to what they did in the GUI | Show topology validation warnings as colored badges on nodes and a banner; make the export button disabled or orange when warnings exist |
+| Port handles too small to click | Users struggle to start edge connections, especially on high-DPI displays | Make handles at least 12x12px with an invisible 20x20px hit area; show a tooltip on hover identifying the port |
+| Undo undoes too much or too little | User expects undo to revert "add node" but it reverts 15 micro-position-changes from dragging | Use Zundo with selective recording: pause history during `onNodeDragStart`, resume on `onNodeDragStop`; record discrete actions (add, delete, parameter change) explicitly |
+| No indication of which node is selected | User clicks a node, opens sidebar, edits parameters, but is not sure which node they are editing | Highlight selected node with a visible border/glow; show node name prominently at top of sidebar |
+| Boundary condition panel is hidden or non-obvious | User creates a valid-looking graph but generated code is missing `pump.port_in.P ~ 1.0e5`, causing MTK to fail | Show a dedicated "Boundary Conditions" section in the sidebar or as a canvas overlay; pre-populate with the most common BC (pressure anchor) when a Pump is added |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Axis convention:** T array axis order is documented AND matches Python STREAM's `(nz, nx)` convention — verify by extracting T at a known asymmetric condition and comparing element-by-element with Python output
-- [ ] **Adiabatic unconnected ports:** One-sided connection test passes (HeatDiffusion with only thermal_left connected; thermal_right sees Q_flow ~ 0 at steady state)
-- [ ] **Q_flow sign consistency:** `sum(thermal_left[i].Q_flow) + sum(thermal_right[i].Q_flow)` equals total power deposited in plate at steady state (energy balance closure)
-- [ ] **ChannelAndContacts migration:** All existing THERM tests still pass after thermal_ports → thermal_left + thermal_right rename
-- [ ] **Asymmetric coupling:** Left channel at different temperature than right channel produces correctly asymmetric plate temperature profile (not mirrored)
-- [ ] **v0.2 tech debt:** `_channel_base_eqs` dead `t_inlet` parameter removed, THERM-03 direct assertion added, 09-01-SUMMARY.md cosmetic fix applied
-- [ ] **MTR reference case:** Coupled system steady-state T_outlet and T_wall_max match Python STREAM within 1% on identical inputs
-
----
+- [ ] **Code generation:** Often missing `using STREAM` import at top of generated file -- verify generated code is a complete runnable script, not just the system composition
+- [ ] **Code generation:** Often missing `using ModelingToolkit: t` -- the `t` independent variable must be imported or defined
+- [ ] **Boundary conditions:** Often missing pressure anchor `pump.port_in.P ~ 1.0e5` -- verify generated code always includes at least one pressure reference
+- [ ] **Save/load:** Often missing canvas viewport state (zoom, pan position) -- verify opening a saved project restores the exact visual layout
+- [ ] **Save/load:** Often missing the STREAM.jl version tag -- verify `.streamgui` files record which library version the project targets
+- [ ] **Undo/redo:** Often missing edge deletion from undo stack -- verify that deleting an edge can be undone, not just node operations
+- [ ] **Parameter editing:** Often missing validation for empty fields -- verify that clearing a required field shows an error, not silently sets the value to 0 or NaN
+- [ ] **Cross-platform:** Often missing high-DPI scaling test -- verify nodes, handles, and text are properly sized on 4K displays (Windows scaling 150%/200%)
+- [ ] **Production build:** Often missing the capability for `fs:allow-write-text-file` -- verify `.jl` export works in the installed app, not just dev mode
+- [ ] **Thermal composition:** Often missing edge cleanup when `n` changes -- verify reducing cell count removes orphaned thermal edges
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Axis convention mismatch discovered at validation | MEDIUM | Transpose the Julia T array extraction in the validation script; no component rewrite needed if the Julia array indexing is internally consistent |
-| Left/right swap error discovered after tests pass | MEDIUM | Swap the `thermal_left` ↔ `thermal_right` connection in the coupling equations; re-run all coupled tests |
-| Q_flow sign error causing reverse heat transfer | LOW | Add a negative sign to the boundary flux equation in HeatDiffusion; all other equations are unchanged |
-| mtkcompile timeout on large grid | HIGH | Reduce grid to 5x3 for validation, or restructure the FD equations to reduce algebraic coupling (e.g., compute FD fluxes as Julia functions rather than symbolic equations) |
-| Inconsistent IC causing IDA failure | MEDIUM | Implement the decoupled warm-start strategy: solve channel-only first, then fuel-only, then couple |
-| ChannelAndContacts port rename breaks tests | LOW | Bulk search-replace `thermal_ports\[i\]` → `thermal_left[i]` (or `thermal_right[i]`) with appropriate context |
-
----
+| Wrong constructor signatures in generated code | LOW | Fix the registry JSON entries and `formatConstructorCall`; add regression tests per component |
+| Stale closure bugs in sidebar | MEDIUM | Migrate from `useState` to Zustand store; refactor all callbacks to use selectors. Harder if deeply embedded. |
+| Re-render cascade (no `React.memo`) | LOW-MEDIUM | Add `React.memo` wrappers to all custom node/edge components; define `nodeTypes`/`edgeTypes` outside component. Mechanical fix. |
+| Missing Tauri capabilities in production | LOW | Add missing permissions to `capabilities/default.json`; rebuild. No code changes needed. |
+| Undo history full of drag noise | MEDIUM | Integrate Zundo properly with pause/resume around drag events; may need to clear existing history data format |
+| Thermal port array handle orphaning | MEDIUM | Add edge cleanup logic to `n`-change handler; migrate existing saved projects by running cleanup on load |
+| Code generation string concatenation spaghetti | HIGH | Rewrite code generator as structured template functions with AST-like intermediate representation; significant refactor if deferred too long |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Axis convention T[z,x] vs T[x,z] | Phase 1: HeatDiffusion component implementation | Extract T at asymmetric condition, compare element-by-element with Python `Fuel.save()` output |
-| Python left/right swap in indices() | Phase 3: MTR reference case validation | Asymmetric heating test: pin left channel 50K hotter than right; confirm left plate surface is hotter |
-| Q_flow sign convention | Phase 1: HeatDiffusion component implementation | Unit test: isolated plate with T_boundary < T_interior; verify `sum(Q_flow) < 0` on fuel ports |
-| mtkcompile performance on 2D FD | Phase 1: HeatDiffusion component implementation | Benchmark `@time mtkcompile(...)` on 3x3, 5x5, 10x10 grids; document in VALIDATION.md |
-| ChannelAndContacts port rename breaking change | Phase 2: ChannelAndContacts upgrade | All existing THERM tests pass after rename; zero new failures introduced |
-| Adiabatic unconnected ports | Phase 2: ChannelAndContacts upgrade + Phase 3 | One-sided connection test: `thermal_right` unconnected; verify Q_flow ~ 0 at right boundary |
-| FD top/bottom Neumann BC conflicts with stencil | Phase 1: HeatDiffusion component implementation | Verify axial temperature profile has zero gradient at top and bottom rows |
-| Inconsistent IC for coupled system | Phase 3: MTR reference case validation | Coupled steady-state solve converges from decoupled warm-start IC; no `calc_ic` failure |
+| Stale closures in custom nodes | Phase 34 (Canvas) | React DevTools Profiler shows no stale state in callbacks; parameter edit from sidebar persists correctly |
+| Re-render cascades | Phase 34 (Canvas) | Profiler shows only moved node re-renders during drag; sidebar does not re-render on unrelated node movement |
+| Wrong constructor signatures | Phase 33 (Scaffold, registry) + Phase 36 (Code Gen) | Unit test per component: generated snippet matches known-good Julia code |
+| Unconnected/misordered systems | Phase 36 (Code Gen) + Phase 39 (Validation) | Generate code for 3 reference topologies (simple loop, vertical loop with gravity, two-plate assembly); run through Julia and verify `mtkcompile` succeeds |
+| Tauri capability denials | Phase 33 (Scaffold) + Phase 37 (Persistence) | Production build smoke test: open file, save file, export `.jl` on both Windows and Linux |
+| shadcn/ui portal z-index conflicts | Phase 35 (Parameter Editing) | Manual test: open a Select dropdown inside a custom node; verify it renders above the canvas and is clickable |
+| Thermal port array handle orphaning | Phase 40 (Thermal Composition) | Automated test: create ChannelAndContacts with n=5, connect thermal edges, reduce n to 3, verify edges to indices 4-5 are removed |
+| Undo/redo noise from dragging | Phase 34 (Canvas, CANV-07) | Undo after drag-then-parameter-edit reverts the parameter edit (not the drag); undo after add-node removes the node |
+| Cross-platform path handling | Phase 37 (Persistence) | Save a project on Windows with a path containing spaces and backslashes; open on Linux; verify it loads without error |
+| Code injection via component names | Phase 36 (Code Gen, CODE-07) | Attempt to set component name to `pump; println("injected")`; verify it is rejected by the identifier validator |
+| Linux AppImage WebKitGTK dependency | Phase 33 (Scaffold, SCAF-02) | Build AppImage on Ubuntu 22.04; run on Ubuntu 22.04 and 24.04; verify webview loads |
 
----
+## Platform-Specific Pitfalls
+
+### Windows
+
+| Issue | Detail | Mitigation |
+|-------|--------|------------|
+| File dialog `defaultPath` ignores forward slashes | Tauri's dialog plugin on Windows requires backslash (`\`) separators in `defaultPath`; forward slashes cause the dialog to open in an unexpected directory | Use `path.sep` or Rust's `PathBuf` normalization; never hardcode `/` in paths sent to the dialog API |
+| WebView2 auto-updates | Microsoft Edge WebView2 updates independently of the app; a new WebView2 version could break CSS or JS behavior | Pin minimum WebView2 version in `tauri.conf.json` if needed; test with the latest Edge stable before releases |
+| High-DPI scaling (150%/200%) | Custom nodes, handles, and text may appear blurry or misaligned on scaled displays | Use CSS `rem` units and SVG for icons; test at 100%, 150%, and 200% scaling in Windows Display Settings |
+
+### Linux
+
+| Issue | Detail | Mitigation |
+|-------|--------|------------|
+| WebKitGTK version varies by distro | Ubuntu 22.04 ships WebKitGTK 2.36; Ubuntu 24.04 ships 2.44; CSS features and JS API support differ | Target WebKitGTK 2.36+ as minimum; avoid bleeding-edge CSS (e.g., CSS nesting, `:has()` selector) that requires newer WebKit |
+| AppImage glibc compatibility | AppImage built on Ubuntu 24.04 will not run on Ubuntu 22.04 due to glibc version mismatch | Build AppImage on the oldest supported distro (Ubuntu 22.04) using Docker or CI |
+| Missing `libwebkit2gtk-4.1-dev` on build machines | Tauri 2 requires `libwebkit2gtk-4.1-dev` (not 4.0); some CI images and older distros only have 4.0 | Document build prerequisites; use a Docker image with all Tauri Linux deps pre-installed |
+| AppImage missing `libwebkit2gtkinjectedbundle.so` | Known Tauri bug: the injected bundle `.so` is not included in AppImage, causing runtime warnings | Monitor tauri-apps/tauri#12463 for a fix; the warning is cosmetic for most use cases but may affect some WebKit features |
 
 ## Sources
 
-- Python STREAM `heat_diffusion.py` (direct source read): `Fuel.__init__`, `Fuel.calculate`, `Fuel.indices()` — confirms `self.shape = (m, n)` = `(nz, nx)`, and the intentional left/right swap in `indices()`
-- Python STREAM `SKILL.md` (stream-user): `Fuel` variables documentation, `plate()` / `symmetric_plate()` composition API, coupling direction convention
-- Python STREAM `tribal_knowledge.md`: tribal rule on `T_left / T_right` referring to x-direction boundaries
-- Julia `connectors.jl`: `ThermalPort` Q_flow sign declaration (`positive = into component`)
-- Julia `components.jl`: `ChannelAndContacts` implementation — existing `thermal_ports` naming, `q_wall[i] ~ thermal_ports[i].Q_flow` 1:1 mapping
-- Julia `PROJECT.md`: v0.3 requirements, current ChannelAndContacts interface contract
-- MTK documentation patterns (HIGH confidence from v0.1/v0.2 established patterns): `compose()` with array ports, `[connect = Flow]` Kirchhoff semantics, `mtkcompile` structural simplify behavior
+- [ReactFlow: State Management (official docs)](https://reactflow.dev/learn/advanced-use/state-management)
+- [ReactFlow: Performance (official docs)](https://reactflow.dev/learn/advanced-use/performance)
+- [ReactFlow: Common Errors](https://reactflow.dev/learn/troubleshooting/common-errors)
+- [ReactFlow: Connection Validation](https://reactflow.dev/examples/interaction/validation)
+- [ReactFlow: Undo/Redo Example](https://reactflow.dev/examples/interaction/undo-redo)
+- [Tauri 2: Inter-Process Communication](https://v2.tauri.app/concept/inter-process-communication/)
+- [Tauri 2: Capabilities](https://v2.tauri.app/security/capabilities/)
+- [Tauri 2: Dialog Plugin](https://v2.tauri.app/plugin/dialog/)
+- [Tauri 2: File System Plugin](https://v2.tauri.app/plugin/file-system/)
+- [tauri-apps/tauri#8074 -- defaultPath ignores forward slashes on Windows](https://github.com/tauri-apps/tauri/issues/8074)
+- [tauri-apps/tauri#12463 -- AppImage missing libwebkit2gtkinjectedbundle.so](https://github.com/tauri-apps/tauri/issues/12463)
+- [tauri-apps/tauri#14796 -- AppImage linuxdeploy failures](https://github.com/tauri-apps/tauri/issues/14796)
+- [tauri-apps/discussions#10026 -- Linux AppImage bundling with WebKitGTK](https://github.com/orgs/tauri-apps/discussions/10026)
+- [Radix UI primitives#1317 -- Z-index issues with Dialog.Portal + Popover](https://github.com/radix-ui/primitives/issues/1317)
+- [shadcn-ui/ui#1511 -- Popover not working in Modal Dialog](https://github.com/shadcn-ui/ui/issues/1511)
+- [Zundo -- Zustand undo/redo middleware](https://github.com/charkour/zundo)
+- [Synergy Codes -- ReactFlow State Management (ebook)](https://www.synergycodes.com/blog/state-management-in-react-flow)
+- [Medium -- Optimize React Flow Performance](https://medium.com/@lukasz.jazwa_32493/the-ultimate-guide-to-optimize-react-flow-project-performance-42f4297b2b7b)
 
 ---
-*Pitfalls research for: 2D MTK FD components + two-sided ThermalPort coupling (Julia-STREAM v0.3)*
-*Researched: 2026-03-13*
+*Pitfalls research for: STREAM Composer GUI (Tauri 2 + React + ReactFlow + Julia code generation)*
+*Researched: 2026-04-01*

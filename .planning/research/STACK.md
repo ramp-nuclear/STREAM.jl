@@ -1,12 +1,8 @@
 # Stack Research
 
-**Domain:** 2D finite-difference fuel plate (HeatDiffusion) + two-sided ChannelAndContacts coupling in Julia/MTK
-**Researched:** 2026-03-13
+**Domain:** Desktop GUI (Tauri 2 + React + ReactFlow node editor) for STREAM.jl visual composition
+**Researched:** 2026-04-01
 **Confidence:** HIGH
-
-## Summary
-
-No new packages are required for v0.3. The existing stack (ModelingToolkit v11, Symbolics v7, Sundials v5, DifferentialEquations v7) already supports everything HeatDiffusion needs. The 2D indexed variable pattern `(T(t))[1:nx, 1:nz]` is the same mechanism as the existing `(T(t))[1:n]` in Channel — same Symbolics.jl symbolic array infrastructure, same MTK scalarization. The two-sided ChannelAndContacts upgrade is a direct extension of the proven `thermal_ports[1:n]` splat pattern.
 
 ## Recommended Stack
 
@@ -14,171 +10,216 @@ No new packages are required for v0.3. The existing stack (ModelingToolkit v11, 
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| ModelingToolkit.jl | 11.15.0 (current), compat = "11" | Symbolic equation system, mtkcompile, compose(), connect() | Already validated for acausal thermal-hydraulic modeling; v11 handles symbolic arrays via Symbolics.jl 7 |
-| Symbolics.jl | 7.15.3 (current), compat = "5, 6, 7" | Symbolic array variable declaration `(T(t))[1:nx, 1:nz]` | Provides the 2D indexed variable syntax; `@variables (T(t))[1:nx, 1:nz]` is legal and works identically to 1D arrays |
-| Sundials.jl | 5.1.0 | IDA DAE solver backend | HeatDiffusion adds ODE states but does not change DAE structure; IDA continues to be the correct solver |
-| DifferentialEquations.jl | 7.17.0 | Solver dispatch, ODEProblem/DAEProblem construction | No change needed |
+| Tauri 2 | 2.10.x (`@tauri-apps/cli` 2.10.1, `tauri` crate 2.10.3) | Desktop shell: system webview, native file dialogs, OS integration | Proven Claude Code territory (Claudia, opcode). <10 MB bundle, <0.5s startup. Minimal Rust needed -- file I/O only for v0.8. Cross-platform Win/Linux via WebView2/WebKitGTK. |
+| React | 19.2.x (19.2.4 current) | UI framework | Industry standard. Required by ReactFlow. React 19 is stable since Dec 2024; 19.2.4 is latest patch (Jan 2026). |
+| @xyflow/react (React Flow 12) | 12.10.x (12.10.2 current) | Node-based canvas editor | 800K+ weekly npm downloads, 26K+ GitHub stars. Built-in zoom/pan/minimap/controls. Custom nodes with typed handles map directly to STREAM.jl FlowPort/ThermalPort. The `reactflow` package name is DEPRECATED -- use `@xyflow/react` (named imports, not default). |
+| Vite | 8.0.x (8.0.3 current) | Build tool, dev server, HMR | Vite 8 ships Rolldown (Rust bundler) for 10-30x faster builds. Official Tauri 2 template uses Vite. Sub-second HMR. |
+| TypeScript | 5.8.x | Type safety | Non-negotiable for a project with complex component metadata, graph state, and code generation. |
+| Tailwind CSS | 4.2.x (4.2.2 current) | Utility-first CSS | v4 has zero-config setup, automatic content detection, 5x faster builds. Required by shadcn/ui. No `tailwind.config.js` needed in v4 -- single CSS import line. |
+| shadcn/ui | CLI v4 (March 2026) | UI component library | Copy-paste components (not npm dependency). Uses Radix UI primitives (unified `radix-ui` package since Feb 2026). Prevents hand-rolled CSS. Every button, input, dropdown, dialog, tooltip comes pre-built and accessible. |
+
+### Tauri Plugins (Rust + npm pairs)
+
+| Plugin | npm Package | Cargo Crate | Purpose |
+|--------|-------------|-------------|---------|
+| Dialog | `@tauri-apps/plugin-dialog` ~2.6.0 | `tauri-plugin-dialog` | Native file open/save dialogs for .streamgui and .jl export |
+| Fs | `@tauri-apps/plugin-fs` | `tauri-plugin-fs` | Read/write project files (.streamgui JSON) |
+| Store | `@tauri-apps/plugin-store` | `tauri-plugin-store` | Persist recent files list, window state |
 
 ### Supporting Libraries
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| LinearAlgebra (stdlib) | Julia 1.10+ | `vec()` to flatten 2D symbolic arrays for `System()` state var list | Use `vec(collect(T))` to pass 2D symbolic array as flat 1D state list to `System(eqs, t, all_vars, pars; name=name)` |
-
-No new packages need to be added to Project.toml.
+| zustand | 5.0.x (5.0.12 current) | Global state management (graph state, undo/redo history, UI panels) | Use for all app state outside ReactFlow's internal state. zustand 5.x is required for React 19 compatibility. ReactFlow 12.6+ bundles zustand 5 internally. |
+| @tauri-apps/api | 2.x | Tauri JS API (invoke Rust commands, events) | File system access, window management, app lifecycle |
+| lucide-react | latest | Icons for toolbox component categories and node decorations | Use for all icons; consistent with shadcn/ui defaults |
+| clsx + tailwind-merge | latest | Conditional class merging | Installed automatically by shadcn/ui init (`cn()` utility) |
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| Julia 1.10+ (current: 1.12.5) | Language runtime | No change; `compat julia = "1.10"` remains correct |
+| Node.js 20 LTS or 22 LTS | JS runtime for dev/build | Tauri 2 requires Node 18+; use LTS for stability |
+| Rust stable (1.77.2+) | Tauri backend compilation | Tauri plugins require Rust 1.77.2+. Install via `rustup`. |
+| `@tauri-apps/cli` 2.10.x | Tauri CLI (`npm run tauri dev`, `npm run tauri build`) | Install as devDependency |
+| ESLint + Prettier | Linting and formatting | Standard React/TS config |
 
 ## Installation
 
-No changes to Project.toml. Existing dependencies cover all v0.3 needs.
+### Scaffold (one-time)
+
+```bash
+# Create Tauri 2 + React + TypeScript + Vite project
+npm create tauri-app@latest stream-composer -- --template react-ts
+
+cd stream-composer
+
+# Install React Flow (use @xyflow/react, NOT reactflow)
+npm install @xyflow/react
+
+# Install Tailwind CSS v4 (Vite plugin)
+npm install tailwindcss @tailwindcss/vite
+
+# Install zustand for state management
+npm install zustand
+
+# Install Tauri plugins (npm side)
+npm install @tauri-apps/plugin-dialog @tauri-apps/plugin-fs @tauri-apps/plugin-store
+
+# Initialize shadcn/ui
+npx shadcn@latest init
+
+# Add commonly needed shadcn/ui components
+npx shadcn@latest add button input label select tabs dialog tooltip scroll-area separator sheet
+```
+
+### Cargo.toml (src-tauri/Cargo.toml)
 
 ```toml
-# Project.toml remains unchanged:
-[deps]
-DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
-ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
-Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
-Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-
-[compat]
-DifferentialEquations = "7"
-ModelingToolkit = "11"
-Sundials = "5"
-Symbolics = "5, 6, 7"
-julia = "1.10"
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-store = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 ```
 
-## Integration Patterns for New Features
+### Dev dependencies (package.json)
 
-### 2D Array Variables in HeatDiffusion
-
-The syntax is identical to the 1D pattern already in Channel, extended to two dimensions:
-
-```julia
-# Existing 1D pattern (Channel, ChannelAndContacts):
-vars = @variables begin
-    (T(t))[1:n] = fill(600.0, n)
-end
-all_vars = [collect(T); ...]
-# Uses T[i] in equations
-
-# 2D extension for HeatDiffusion:
-vars = @variables begin
-    (T(t))[1:nx, 1:nz] = fill(700.0, nx, nz)
-end
-all_vars = [vec(collect(T)); ...]
-# Uses T[ix, iz] in equations
-```
-
-The critical difference: `collect(T)` on a 2D symbolic array returns a Matrix; `vec(collect(T))` flattens it to the 1D Vector that `System()` expects for state variables.
-
-### Equation Generation for FD Stencil
-
-Use nested `for` loops with `push!` — same pattern as Channel's energy balance loop, extended to 2D:
-
-```julia
-eqs = Equation[]
-for ix in 1:nx, iz in 1:nz
-    # interior: 5-point stencil
-    T_left  = (ix == 1)  ? T_bc_left  : T[ix-1, iz]
-    T_right = (ix == nx) ? T_bc_right : T[ix+1, iz]
-    T_down  = (iz == 1)  ? T_bc_bot   : T[ix, iz-1]
-    T_up    = (iz == nz) ? T_bc_top   : T[ix, iz+1]
-    push!(eqs, Dt(T[ix, iz]) ~ ...)
-end
-```
-
-This mirrors the tether simulation pattern from the Discourse community (confirmed working with MTK v11): iterate over indices, build boundary-aware stencil, push scalar equations.
-
-### Two-Sided ThermalPort Arrays
-
-This is a direct extension of the existing `thermal_ports[1:n]` splat pattern in ChannelAndContacts. Two independent port arrays instead of one:
-
-```julia
-# Existing single-sided (ChannelAndContacts v0.2):
-thermal_ports = [ThermalPort(name=Symbol(:thermal, i)) for i in 1:n]
-compose(System(...), port_in, port_out, thermal_ports...)
-
-# Two-sided extension (ChannelAndContacts v0.3):
-thermal_left  = [ThermalPort(name=Symbol(:thermal_left,  i)) for i in 1:n]
-thermal_right = [ThermalPort(name=Symbol(:thermal_right, i)) for i in 1:n]
-compose(System(...), port_in, port_out, thermal_left..., thermal_right...)
-```
-
-MTK's `connect()` and acausal semantics handle unconnected ports naturally — a ThermalPort not wired to anything will have `Q_flow = 0` by the flow conservation law, giving adiabatic behavior without any explicit flag.
-
-### Initial Conditions (Critical Pattern)
-
-For 2D array variables, use Dict syntax — not manually constructed u0 vectors. MTK state ordering can change between patch releases:
-
-```julia
-# Correct:
-u0 = Dict(hd.T => fill(700.0, nx, nz))
-
-# Wrong (order-sensitive, breaks silently):
-u0 = vec(collect(...))  # manually ordered
+```bash
+npm install -D @tauri-apps/cli typescript @types/react @types/react-dom eslint prettier
 ```
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| Manual `for ix, iz` loop + `push!` equations | MethodOfLines.jl for symbolic PDE discretization | Use MethodOfLines only if you need automatic PDE-to-ODE conversion from symbolic PDEs; for HeatDiffusion the FD stencil is hand-written and fixed — MethodOfLines adds complexity without benefit |
-| `vec(collect(T))` to flatten 2D for `System()` | `scalarize(T)` | `scalarize` works but produces a symbolic expression that may not behave identically to a concrete Vector in `System()`; `vec(collect(T))` is the pattern proven by Channel's 1D `collect(T)` |
-| `Dict(T => fill(...))` for u0/p0 | Manual u0 vector | Never use manual u0 — MTK state ordering changes between patch releases (confirmed in community discourse) |
-| Two separate `thermal_left[1:n]` + `thermal_right[1:n]` arrays | Single `thermal_ports[1:2n]` with even/odd convention | Separate named arrays are explicit and match how HeatDiffusion exposes ports; 2n single array would require index arithmetic to identify left vs right |
+| Tauri 2 | Electron | When you need Chrome DevTools protocol access, or when WebKitGTK rendering issues on Linux are a dealbreaker. Electron bundles Chromium (100+ MB) but guarantees identical rendering everywhere. |
+| @xyflow/react | Rete.js | When you need framework-agnostic (Vue/Svelte/Angular) support. Rete has typed ports but smaller ecosystem (26K weekly downloads vs 800K). |
+| @xyflow/react | Litegraph.js | When building ComfyUI-style Canvas2D pipelines. Not React-native; poor TypeScript support. |
+| zustand | Redux Toolkit | When the team already uses Redux. zustand is simpler (no actions/reducers boilerplate), and ReactFlow uses it internally, so sharing the dependency is natural. |
+| zustand | Jotai | When you prefer atomic state. zustand's single-store model is better for undo/redo (snapshot entire state). |
+| shadcn/ui | Radix UI directly | When you want full control over styling without any pre-built component patterns. shadcn/ui IS Radix under the hood but with sensible defaults. |
+| Vite 8 | Vite 6 | Only if Vite 8's Rolldown integration causes plugin compatibility issues (unlikely -- stable since March 2026). |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| MethodOfLines.jl | Adds a new heavy dependency for PDE discretization; HeatDiffusion's FD stencil is a fixed 5-point scheme that doesn't benefit from symbolic PDE machinery | Manual nested for-loop with push! equations |
-| Manual u0/p0 vector construction for 2D states | MTK state ordering is not guaranteed to be stable across patch releases; manual indexing silently produces wrong results | `Dict(component.T => fill(700.0, nx, nz))` syntax |
-| Adding MTK version constraint tighter than "11" | v11.15.0 → v11.16.0 transition shows active development but no breaking changes for array vars; tighter pin would prevent bugfix adoption | Keep `ModelingToolkit = "11"` in compat |
-| `@mtkmodel` / `@mtkbuild` macros | These are the newer declarative DSL for MTK; the project uses the functional `compose(System(...), ...)` API which is fully supported in v11 and matches the existing codebase style | Keep using `compose(System(...), ...)` functional API |
+| `reactflow` (old npm package) | Deprecated since React Flow 12. Named `@xyflow/react` now. Old package stuck at 11.11.4 (2+ years stale). | `@xyflow/react` |
+| zustand 4.x | Does not support React 19. Peer dependency conflict. | zustand 5.x |
+| Tailwind CSS 3.x | v4 is a complete rewrite with zero-config. v3 requires `tailwind.config.js` and PostCSS plugin. shadcn/ui CLI v4 targets Tailwind v4. | Tailwind CSS 4.x |
+| Material UI / Ant Design / Chakra UI | Heavy npm dependencies, opinionated styling that fights Tailwind, larger bundle. shadcn/ui gives you ownership of the code (copy-paste, not dependency). | shadcn/ui |
+| Redux | Unnecessary complexity for this app's state. Actions/reducers/middleware overkill. | zustand |
+| Tauri 1.x | EOL trajectory. Tauri 2 has been stable since Oct 2024 with active development (2.10.x). Plugin ecosystem is Tauri 2-only now. | Tauri 2.x |
+| `@tauri-apps/api` v1 | Incompatible with Tauri 2. The v2 API is a complete rewrite. | `@tauri-apps/api` v2 |
+| Monaco Editor (for v0.8) | Overkill for read-only code preview. A `<pre>` block with syntax highlighting (e.g., Prism.js or highlight.js) is sufficient. Monaco adds ~2 MB. Defer to v0.9+ if user code editing is needed. | `<pre>` + basic syntax highlighting |
 
-## Stack Patterns by Variant
+## Cross-Platform Notes (Windows + Linux)
 
-**For HeatDiffusion interior cells:**
-- Use `T[ix, iz]` direct indexing in push!-appended equations
-- Boundary conditions expressed inline (no separate BC system)
-- `Dt(T[ix, iz]) ~` left-hand side requires `Differential(t)` operator declared once at top of component function
+### WebView Differences
 
-**For ChannelAndContacts two-sided upgrade:**
-- Replace `thermal_ports[1:n]` with `thermal_left[1:n]` + `thermal_right[1:n]`
-- Energy balance: `h_tc[i] * (...) * (thermal_left[i].T - T[i]) + h_tc[i] * (...) * (thermal_right[i].T - T[i])`
-- `Q_wall_total ~ sum(thermal_left[i].Q_flow + thermal_right[i].Q_flow for i in 1:n)`
-- Splat both arrays into `compose()`
+| Platform | WebView Engine | Version | Notes |
+|----------|---------------|---------|-------|
+| Windows | WebView2 (Chromium-based) | Auto-updates with Edge | Reliable, consistent rendering. Pre-installed on Windows 10/11. |
+| Linux | WebKitGTK | Varies by distro | **Primary risk area.** Rendering may differ from Chromium. Font rendering, CSS flexbox edge cases, and animation timing can vary. |
 
-**For HeatDiffusion ThermalPort arrays (`thermal_left[1:nz]`, `thermal_right[1:nz]`):**
-- Same `[ThermalPort(name=Symbol(:thermal_left, i)) for i in 1:nz]` pattern
-- Boundary condition equations: `T[1, iz] ~ thermal_left[iz].T` (left wall tied to port temperature)
-- `Q_flow` equations derived from Fourier's law at the boundary cell
+### Mitigation Strategy
 
-## Version Compatibility
+1. **Test on both platforms early** (Phase 33 scaffold must run on both before proceeding).
+2. **Avoid bleeding-edge CSS** -- stick to Tailwind utilities which abstract browser differences.
+3. **shadcn/ui components are tested cross-browser** -- this is a major advantage over hand-rolled CSS.
+4. **ReactFlow handles its own canvas rendering** -- the node editor itself is well-tested cross-platform.
+5. **File paths**: Use Tauri's path APIs (not hardcoded `/` or `\`). `@tauri-apps/api/path` normalizes paths.
+
+### Linux Prerequisites
+
+```bash
+# Ubuntu/Debian
+sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
+  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+# Fedora
+sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget file \
+  libxdo-devel libappindicator-gtk3-devel librsvg2-devel
+```
+
+### Windows Prerequisites
+
+- WebView2 runtime (pre-installed on Windows 10 21H2+ and Windows 11)
+- Visual Studio Build Tools 2022 with C++ workload (for Rust compilation)
+- Rust via `rustup`
+
+## Version Compatibility Matrix
 
 | Package | Compatible With | Notes |
 |---------|-----------------|-------|
-| ModelingToolkit 11.15.0 | Symbolics 7.15.3 | Both installed; MTK v11 requires Symbolics v5+ (compat already covers this) |
-| Sundials 5.1.0 | DifferentialEquations 7.17.0 | No change; IDA solver path unchanged by HeatDiffusion |
-| Julia 1.12.5 | All packages above | Runtime version; compat lower-bounds at 1.10 which is fine |
+| @xyflow/react 12.6+ | React 19.x, zustand 5.x | React 19 support confirmed since 12.6.0 (zustand 5 peer dep) |
+| @xyflow/react 12.10.x | Vite 8.x | No known issues; standard ESM package |
+| shadcn/ui CLI v4 | Tailwind CSS 4.x, React 19.x | Feb 2026 update switched to unified `radix-ui` package |
+| Tailwind CSS 4.x | Vite 8.x | Uses `@tailwindcss/vite` plugin (not PostCSS) |
+| Tauri 2.10.x | Node 18+, Rust 1.77.2+ | npm + Cargo versions must stay in sync (same minor) |
+| `@tauri-apps/plugin-dialog` 2.6.x | Tauri 2.10.x | Plugin versions track Tauri 2.x major; minor versions may lag |
+| zustand 5.0.x | React 19.x | Full React 19 support; no peer dependency issues |
 
-MTK v11.16.0 is the current release as of 2026-03-13 (released 2025-03-12). The `compat = "11"` bound in Project.toml already allows it. No manual version pin update needed — `Pkg.update()` will pick it up if desired, but the project's patch-level stability has been fine on 11.15.0 through v0.1 and v0.2.
+## Project Structure (gui/ directory)
+
+```
+gui/
+  package.json
+  vite.config.ts
+  tsconfig.json
+  tsconfig.app.json
+  src/
+    App.tsx                    # Main layout (3-panel: toolbox | canvas | sidebar)
+    main.tsx                   # Entry point
+    components/
+      ui/                      # shadcn/ui components (auto-generated)
+      canvas/                  # ReactFlow canvas, custom nodes, edges
+      toolbox/                 # Component palette (drag source)
+      sidebar/                 # Parameter editing forms
+      codegen/                 # Code preview panel
+    registry/
+      components.json          # STREAM.jl component metadata
+    stores/
+      graph-store.ts           # zustand: nodes, edges, undo/redo
+      project-store.ts         # zustand: file path, dirty flag, recent files
+    lib/
+      codegen.ts               # Graph-to-Julia code generator
+      validation.ts            # Topology validation (unconnected ports, missing BC)
+      utils.ts                 # shadcn/ui cn() utility
+    styles/
+      globals.css              # Tailwind CSS v4 import + ReactFlow styles
+  src-tauri/
+    Cargo.toml
+    src/
+      main.rs                  # Tauri entry point, plugin registration
+      lib.rs                   # Tauri commands (if any custom Rust commands needed)
+    tauri.conf.json            # App config: window size, title, permissions
+    capabilities/
+      default.json             # Tauri 2 capability permissions for plugins
+```
 
 ## Sources
 
-- Existing codebase: `/home/itay/projects/Julia-STREAM/src/components.jl` — confirmed `(T(t))[1:n]` 1D symbolic array pattern + `collect(T)` flatten + for-loop `push!` already in production use (HIGH confidence)
-- [Symbolics.jl Arrays Documentation](https://symbolics.juliasymbolics.org/dev/manual/arrays/) — `@variables A[1:5, 1:3]` 2D array syntax; `scalarize()` and `collect()` semantics (HIGH confidence)
-- [MTK Language Documentation](https://docs.sciml.ai/ModelingToolkit/stable/basics/MTKLanguage/) — `(v_array(t))[1:N, 1:M]` syntax with `@structural_parameters` for sizing (HIGH confidence)
-- [Julia Discourse: 2D Arrays with ModelingToolkit](https://discourse.julialang.org/t/2d-arrays-with-modelingtoolkit/107448) — Community confirmation `@variables pos(t)[1:3, 1:segments+1]` works; `vcat`/`push!` loop patterns; Dict u0 requirement (MEDIUM confidence — community source, aligns with official docs)
-- [MTK GitHub Releases](https://github.com/SciML/ModelingToolkit.jl/releases) — v11.16.0 is latest as of 2026-03-13 (HIGH confidence)
-- Installed package manifest (`julia --project -e "import Pkg; ..."`) — exact versions 11.15.0 / 7.15.3 / 5.1.0 / 7.17.0 (HIGH confidence)
+- [Tauri 2 Official Docs](https://v2.tauri.app/) -- version 2.10.x, create-project guide, plugin docs (HIGH confidence)
+- [Tauri 2 Releases (GitHub)](https://github.com/tauri-apps/tauri/releases) -- crate version 2.10.3 confirmed (HIGH confidence)
+- [@tauri-apps/cli npm](https://www.npmjs.com/package/@tauri-apps/cli) -- v2.10.1 confirmed (HIGH confidence)
+- [@xyflow/react npm](https://www.npmjs.com/package/@xyflow/react) -- v12.10.2 confirmed (HIGH confidence)
+- [React Flow 12 Migration Guide](https://reactflow.dev/learn/troubleshooting/migrate-to-v12) -- package rename, named imports (HIGH confidence)
+- [React Flow + React 19 compatibility](https://x.com/xyflowdev/status/1877044785485087175) -- confirmed compatible since @xyflow/react 12.6.0 (HIGH confidence)
+- [React npm](https://www.npmjs.com/package/react) -- v19.2.4 confirmed (HIGH confidence)
+- [Vite 8 Announcement](https://vite.dev/blog/announcing-vite8) -- Rolldown integration, March 2026 (HIGH confidence)
+- [shadcn/ui Changelog](https://ui.shadcn.com/docs/changelog) -- CLI v4 March 2026, unified radix-ui Feb 2026 (HIGH confidence)
+- [shadcn/ui Vite Installation](https://ui.shadcn.com/docs/installation/vite) -- setup steps verified (HIGH confidence)
+- [Tailwind CSS npm](https://www.npmjs.com/package/tailwindcss) -- v4.2.2 confirmed (HIGH confidence)
+- [zustand npm](https://www.npmjs.com/package/zustand) -- v5.0.12, React 19 support (HIGH confidence)
+- [Tauri WebView Versions](https://v2.tauri.app/reference/webview-versions/) -- WebView2 vs WebKitGTK platform matrix (HIGH confidence)
+- [Tauri Cross-Platform Discussion](https://github.com/tauri-apps/tauri/discussions/12311) -- rendering differences Win vs Linux (MEDIUM confidence)
+- [@tauri-apps/plugin-dialog npm](https://www.npmjs.com/package/@tauri-apps/plugin-dialog) -- v2.6.0 confirmed (HIGH confidence)
+- [kitlib/tauri-app-template](https://github.com/kitlib/tauri-app-template) -- community template: Tauri v2 + React 19 + shadcn/ui (MEDIUM confidence)
 
 ---
-*Stack research for: HeatDiffusion (2D FD fuel plate) + two-sided ChannelAndContacts, Julia-STREAM v0.3*
-*Researched: 2026-03-13*
+*Stack research for: STREAM Composer GUI (v0.8) -- Tauri 2 + React + ReactFlow desktop node editor*
+*Researched: 2026-04-01*

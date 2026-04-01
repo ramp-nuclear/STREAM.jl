@@ -1,202 +1,233 @@
 # Project Research Summary
 
-**Project:** Julia-STREAM v0.3 — HeatDiffusion + Two-Sided ChannelAndContacts
-**Domain:** MTK-based 2D finite-difference fuel plate with acausal thermal-hydraulic coupling (MTR reactor geometry)
-**Researched:** 2026-03-13
+**Project:** STREAM Composer GUI (v0.8)
+**Domain:** Desktop node-based visual editor for STREAM.jl thermal-hydraulic system composition with Julia code generation
+**Researched:** 2026-04-01
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Julia-STREAM v0.3 is a symbolic simulation library milestone whose sole deliverable is a working, validated 2D fuel plate (HeatDiffusion) coupled to two coolant channels via an upgraded ChannelAndContacts component. The project is implemented using ModelingToolkit.jl v11 (acausal, equation-based modeling) on top of Sundials IDA (DAE solver). No new packages are required — the existing stack fully supports 2D indexed MTK variables via `(T(t))[1:nz, 1:nx]`, the same Symbolics.jl symbolic array infrastructure already proven in v0.2's Channel/ChannelAndContacts 1D patterns. The approach is to extend existing patterns incrementally: 2D array variables extend 1D, two-sided ThermalPort arrays extend the single-sided design, and the FD stencil follows the same push!-loop equation generation used throughout the codebase.
+STREAM Composer is a desktop GUI that lets engineers visually compose STREAM.jl thermal-hydraulic systems by dragging components onto a canvas, connecting ports, configuring parameters, and exporting runnable Julia code. The research consensus is clear: build this with Tauri 2 + React + @xyflow/react (ReactFlow 12), backed by a Zustand store and a JSON component metadata registry. This stack is mature, actively maintained, and has been proven in similar domain-specific node editors (ComfyUI pattern). The critical architectural insight is that the app is a pure code generator -- it never needs a Julia runtime, which eliminates TTFX issues and makes distribution trivial. This is the key differentiator versus all competing tools (JuliaHub Dyad, OMEdit, ModelingToolkitDesigner.jl), all of which require a live simulation backend.
 
-The recommended build order is: (1) clean up v0.2 tech debt and upgrade ChannelAndContacts to two-sided ports first — this stabilizes the interface contract before HeatDiffusion is written against it; (2) implement HeatDiffusion with x-direction diffusion only (matching Python STREAM's `x_diffusion` default), validate the component in isolation, then (3) couple the full MTR geometry (cladding+meat+cladding plate sandwiched between two water channels) and validate against Python STREAM reference outputs within 1%. Z-direction diffusion is a differentiator but not required for the reference case validation and should be deferred to after Phase 12 validation passes.
+The recommended approach is registry-driven: a single `components.json` file encodes every STREAM.jl component's ports, parameters, and constructor signatures. The GUI renders nodes generically from this registry, and the code generator reads it to emit correct Julia syntax. This means adding a new STREAM.jl component to the GUI requires only a JSON entry -- no TypeScript changes. The feature set for v0.8 is well-scoped: canvas editing, parameter sidebar, code generation, and project persistence form the MVP core; thermal port arrays and smart composition code-gen are v0.8 Phase 2 additions; Julia backend integration and round-trip parsing are explicitly deferred.
 
-The primary risks are not algorithmic but convention-based: Python STREAM's Fuel class stores T with axes `(nz, nx)` (row=axial, col=lateral), opposite to the intuitive Julia `[nx, nz]` naming in the original PROJECT.md. Additionally, Python's `Fuel.indices()` has an intentional left/right swap that will produce mirrored but otherwise-valid-looking results if not caught by an asymmetric test. A third risk is MTK's handling of unconnected ThermalPort Q_flow variables in partially-connected systems, which must be tested explicitly rather than assumed. All three risks are well-defined and preventable with targeted tests.
-
----
+The main risks are (1) ReactFlow stale closures and re-render cascades if Zustand is not adopted from day one, (2) incorrect constructor signatures in generated code if the registry does not encode positional-vs-keyword argument style explicitly for each component, and (3) Tauri 2 capability permission denials in production builds if file/dialog permissions are not configured during scaffold. All three are preventable at Phase 33 (scaffold) if the patterns are established before any feature work begins.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No Project.toml changes are needed. ModelingToolkit v11 + Symbolics v7 + Sundials v5 + DifferentialEquations v7 already cover all v0.3 requirements. The 2D array variable pattern `(T(t))[1:nz, 1:nx]` is native to Symbolics.jl and follows the same mechanics as the 1D `(T(t))[1:n]` already in production use. The critical implementation note is that `vec(collect(T))` (not just `collect(T)`) is required to flatten a 2D symbolic array into the 1D `Vector{Num}` that `System()` expects for `all_vars`. Initial conditions must use Dict syntax (`Dict(hd.T => fill(700.0, nz, nx))`) — never manually constructed vectors — because MTK state ordering is not stable across patch releases.
+The stack is fully pinned and ready to use. Tauri 2 (2.10.x) provides the native desktop shell with a sub-10 MB bundle and cross-platform file dialogs. React 19.2.x with @xyflow/react 12.10.x forms the canvas layer; ReactFlow 12 is a complete rewrite with React 19 and zustand 5 support. Vite 8 (Rolldown-based) provides fast builds and HMR. Tailwind CSS 4.x and shadcn/ui (CLI v4) supply UI components without heavy library dependencies. There are no version conflicts when using the recommended pinned versions.
 
 **Core technologies:**
-- ModelingToolkit.jl v11: symbolic equation system, mtkcompile, compose(), connect() — already validated for acausal thermal-hydraulic modeling
-- Symbolics.jl v7: 2D indexed variable declaration `(T(t))[1:nz, 1:nx]` — same infrastructure as existing 1D arrays
-- Sundials.jl v5 (IDA backend): DAE solver — HeatDiffusion adds ODE states but does not change DAE structure
-- LinearAlgebra (stdlib): `vec(collect(T))` to flatten 2D symbolic arrays for System() state var list
+- Tauri 2.10.x: Native desktop shell (file I/O, dialogs, packaging) -- proven small-bundle, cross-platform, minimal Rust required
+- @xyflow/react 12.10.x: Node-based canvas editor -- 800K weekly downloads, built-in pan/zoom/minimap, typed handle support for FlowPort/ThermalPort
+- React 19.2.x: UI framework -- required by ReactFlow 12; React 19 is stable since Dec 2024
+- zustand 5.0.x: Global state management -- required for React 19; ReactFlow uses it internally; enables undo/redo via Zundo
+- Vite 8.0.x: Build tool -- official Tauri template; Rolldown gives 10-30x faster builds
+- Tailwind CSS 4.2.x + shadcn/ui CLI v4: UI components -- zero-config setup; pre-built accessible components; owned code (not a runtime dependency)
+- TypeScript 5.8.x: Type safety -- non-negotiable for complex graph state and code generation
 
-See `.planning/research/STACK.md` for complete integration patterns and alternatives considered.
+**Critical version warnings:**
+- Use `@xyflow/react`, NOT the deprecated `reactflow` package (stuck at v11, 2+ years stale)
+- Use zustand 5.x, NOT 4.x (no React 19 support; peer dependency conflict)
+- Use Tailwind 4.x, NOT 3.x (shadcn/ui CLI v4 targets Tailwind 4; zero-config vs PostCSS required)
+- Use Tauri 2.x, NOT 1.x (EOL trajectory; plugin ecosystem is Tauri 2-only now)
 
 ### Expected Features
 
-The v0.3 feature set is precisely scoped: HeatDiffusion (2D FD fuel plate with two-sided ThermalPort arrays) + ChannelAndContacts upgrade (single-sided to two-sided thermal ports) + MTR reference case validation. Everything else is explicitly deferred.
+The feature set is precisely scoped by the REQUIREMENTS.md v0.8 section. Research confirms this scope is correct for an MVP that validates the GUI concept.
 
-**Must have (table stakes):**
-- `HeatDiffusion` component with `T(t)[1:nz, 1:nx]` 2D MTK state — core of v0.3, without this there is no fuel plate
-- x-direction diffusion (across plate thickness) — dominant heat path; without it plate is isothermal
-- `thermal_left[1:nz]` + `thermal_right[1:nz]` ThermalPort arrays on HeatDiffusion — interface contract to coolant channels
-- ChannelAndContacts upgraded from `thermal_ports[1:n]` to `thermal_left[1:n]` + `thermal_right[1:n]` — MTR requires two-sided coupling
-- Adiabatic default for unconnected ThermalPort (Q_flow=0 from MTK acausal semantics) — one-sided test cases must work
-- MTR reference case validation: HeatDiffusion + two ChannelAndContacts matches Python STREAM within 1%
+**Must have (table stakes -- v0.8 Phase 33-37):**
+- Drag-drop component creation from toolbox onto canvas
+- Pan, zoom, minimap on canvas (ReactFlow built-in)
+- Connect ports by dragging handle to handle
+- Delete nodes and edges
+- Click-to-select opens parameter sidebar with editable fields
+- PipeGeometry picker (circular vs rectangular with shape-specific fields)
+- Pump mode toggle (fixed-dP vs fixed-mdot dispatch)
+- Instance renaming with Julia identifier validation
+- Live code preview panel (debounced)
+- Export to `.jl` with correct `@named` + `connect()` + `compose()` + `mtkcompile()`
+- Boundary condition panel for pressure anchor + thermal pins
+- Save/load `.streamgui` JSON project files (Ctrl+S / Ctrl+O)
+- Unsaved changes guard
 
-**Should have (differentiators):**
-- MTK symbolic Jacobian for 2D PDE (automatic via mtkcompile; no extra user effort; dramatically improves IDA convergence)
-- Asymmetric left/right heating support (emerges automatically from two-port design; no extra equations)
-- Multi-layer material (cladding+meat) via per-cell `k[i,j]` and harmonic mean conductivity at cell faces
+**Should have (differentiators -- v0.8 Phase 38-40):**
+- Typed port validation (FlowPort vs ThermalPort -- reject cross-type connections at draw time)
+- Undo/redo (Zustand + Zundo middleware; selective recording)
+- Topology validation alerts (unconnected ports, missing pump/pressure anchor)
+- shadcn/ui design pass for polish
+- ThermalPort array handles on ChannelAndContacts (dynamic count based on `n`)
+- HeatDiffusion node wiring
+- Smart thermal code-gen (detects symmetric_plate / plate / one_sided_connection patterns)
+- Recent projects list
 
-**Defer (v0.4+):**
-- z-direction diffusion (xz_diffusion): differentiator but not required for the MTR reference case validation; add after Phase 12 passes
-- Point kinetics coupling — out of scope through v0.3
-- Additional HTC correlations (laminar, Marco-Han) — Dittus-Boelter is sufficient for MTR turbulent regime
-- Power shape profiling (cosine, non-uniform) — uniform q_gen is sufficient for reference case
-- Cylindrical/polar geometry, subcooled boiling, natural convection — no validation target
+**Defer (v0.9+):**
+- Embedded Julia runtime / live model validation -- Julia TTFX makes this impractical; conflates composer with IDE
+- Round-trip `.jl` parsing -- compiler-level difficulty, not worth the investment
+- Correlation closure editing in GUI -- combinatorial form space; too complex for v0.8
+- Multi-way junction nodes (T-junctions for Cube problem) -- defer until linear loops validated
+- Simulation execution from GUI -- conflates composer with IDE
+- Auto-layout (ElkJS) -- manual positioning sufficient; users often undo auto-layout
+- Dark mode -- ship light theme first; shadcn/ui supports it in a future pass
+- Native installers -- dev mode sufficient for the validation phase
 
-See `.planning/research/FEATURES.md` for full boundary condition details, discretization scheme, and validation patterns.
+**Key anti-features to avoid building:**
+- In-node parameter editing (too cluttered for components with 5-15 params; use sidebar)
+- Drag-from-filesystem to open project (use Ctrl+O menu pattern instead)
 
 ### Architecture Approach
 
-The architecture extends the existing acausal component pattern. HeatDiffusion is implemented as a new file (`src/heat_diffusion.jl`) following the same `compose(System(...), ports...)` structure as ChannelAndContacts. ChannelAndContacts is modified in-place (breaking change) to replace `thermal_ports[1:n]` with `thermal_left[1:n]` + `thermal_right[1:n]`. MTK's `connect()` handles the plate-channel coupling; no new connector types are needed. The file inclusion order in STREAM.jl must be: `fluids.jl → connectors.jl → components.jl → heat_diffusion.jl → solvers.jl`.
+The architecture follows a three-panel desktop layout (Toolbox | Canvas | Sidebar) with a clear separation between UI concerns and business logic. The component registry JSON is the coupling contract between STREAM.jl and the GUI -- a single source of truth that drives node rendering, form generation, and code templates. All mutable state lives in a Zustand store (not React component state), which avoids stale closures and enables undo/redo. Code generation is a pure function (`GraphState -> string`) with no side effects, making it fully unit-testable. The Tauri Rust backend is intentionally minimal (~100 lines) handling only file I/O and native dialogs.
 
 **Major components:**
-1. `HeatDiffusion` (new, `src/heat_diffusion.jl`) — 2D FD fuel plate; nx×nz state variables `T[i,j]`; exposes `thermal_left[1:nz]` and `thermal_right[1:nz]` ThermalPort arrays; no FlowPorts (solid component)
-2. `ChannelAndContacts` (modified, `src/components.jl`) — n-cell heated channel upgraded from single-sided to `thermal_left[1:n]` + `thermal_right[1:n]`; breaking change, clean rename with no backward compatibility
-3. `ThermalPort` / `FlowPort` (unchanged, `src/connectors.jl`) — acausal connectors; ThermalPort Q_flow sign: positive = into component
-4. Solver helpers (new `build_mtr_loop` in `src/solvers.jl`) — wires the MTR topology for the reference case validation
+1. Component Registry (`registry/components.json`) -- STREAM.jl API contract: ports, params, constructor signatures; drives all other components; no TypeScript changes needed to add new components
+2. Zustand Store (`store/`) -- single mutable state for nodes, edges, params, selection, undo history; includes Zundo temporal middleware (limit: 50 steps)
+3. ReactFlow Canvas (`components/canvas/`) -- visual graph with single generic StreamNode rendered from registry; typed FlowPort and ThermalPort array handles
+4. Parameter Sidebar (`components/sidebar/`) -- dynamic form generated from registry schema; includes PipeGeometryPicker and PumpModePicker
+5. Code Generator (`codegen/generator.ts`) -- pure function pipeline: imports -> component declarations -> connections -> BCs -> compose -> mtkcompile
+6. Validation Engine (`validation/topology.ts`) -- pure function on graph state: unconnected ports, missing driver, missing pressure anchor
+7. Tauri Shell (`src-tauri/`) -- Rust: native file dialogs, read/write .streamgui and .jl files, capabilities ACL (~100 LOC)
+8. Persistence Layer (`hooks/useProjectFile.ts`) -- save/load .streamgui JSON with viewport state; Tauri plugin-store for recent files
 
-**Key patterns:**
-- FD stencil: nested `for i in 1:nz, j in 1:nx` loop with explicit boundary handling (left/right/top/bottom as separate code blocks, not symbolic `ifelse`)
-- Material properties (`rho_s`, `cp_s`, `k_s`): plain Julia Float64 constructor arguments, not MTK parameters — no symbolic overhead for time-invariant solids
-- Two-sided energy balance in ChannelAndContacts: `Q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow`
-
-See `.planning/research/ARCHITECTURE.md` for data flow diagrams, interface contracts, and build order details.
+**Key architectural decisions:**
+- Registry-driven rendering: one `StreamNode.tsx` renders all STREAM.jl component types; no per-component TSX files
+- `gui/` directory at repo root (sibling to `src/`, not nested inside Julia codebase)
+- `codegen/` and `validation/` are pure TypeScript modules, separate from UI components; testable without rendering
+- ThermalPort handles use indexed IDs (`thermal_left_0`, `thermal_left_1`) to enable smart thermal code-gen pattern detection
 
 ### Critical Pitfalls
 
-1. **T array axis convention mismatch (T[z,x] vs T[x,z])** — Python STREAM's `Fuel` stores T with shape `(nz, nx)` (row=axial z, col=lateral x). The original Julia PROJECT.md wrote `T[1:nx, 1:nz]` which is transposed. Use `T[1:nz, 1:nx]` to match Python, and document the axis convention as the first line in `heat_diffusion.jl`. Validate by extracting T at a known asymmetric condition and comparing element-by-element.
+1. **ReactFlow stale closures in callbacks** -- Custom node callbacks capture stale `nodes` array snapshots, causing parameter edits to silently revert. Use Zustand selectors (`useStore(s => s.nodes.find(n => n.id === id)?.data)`) for all reads inside event handlers. Establish this pattern at Phase 34 before any sidebar logic is written.
 
-2. **Python `Fuel.indices()` intentional left/right swap** — `indices()` routes `"T_left"` to `T_wall_right` internals and vice versa. This is intentional (it returns what the fuel *provides* to neighbors, not what it *receives*). Test with an asymmetric channel configuration (left channel 50 K hotter than right) before trusting any coupling direction. The symmetric MTR case will pass even if the swap is wrong.
+2. **ReactFlow re-render cascades** -- Every custom node re-renders when the `nodes` array changes unless wrapped in `React.memo`. Define `nodeTypes`/`edgeTypes` outside the component (or `useMemo`) on day one. Symptom: sidebar input fields lose focus while typing; canvas janky with 15+ nodes.
 
-3. **ThermalPort Q_flow sign convention** — positive Q_flow = into component. HeatDiffusion is a heat source; at steady state, `sum(thermal_left[i].Q_flow)` on the fuel's ports must be negative (heat leaving the plate). Write a unit test for isolated HeatDiffusion before coupling: pinned boundary conditions with T_boundary < T_interior must yield `sum(Q_flow) < 0` on fuel ports.
+3. **Wrong constructor signatures in generated code** -- STREAM.jl uses positional args for single-physics components (`Pump(30000.0)`) and keyword args for multi-param components (`Channel(; n=10, geometry=...)`). The registry JSON must encode `argStyle: "positional" | "keyword"` per parameter. Add per-component unit tests for generated output at Phase 36.
 
-4. **Unconnected ThermalPort adiabatic assumption** — MTK's `Q_flow = 0` for unconnected Flow variables is version-dependent and must be tested explicitly, not assumed. Build a one-sided test (only `thermal_left` connected, `thermal_right` unconnected) and verify the solver compiles and `thermal_right[i].Q_flow ~ 0` holds at steady state.
+4. **Tauri 2 capability permission denials in production builds** -- Dev mode is more permissive than the installed app. All required permissions (`dialog:allow-open`, `dialog:allow-save`, `fs:allow-read-text-file`, `fs:allow-write-text-file`) must be in `src-tauri/capabilities/default.json` at Phase 33. Every Tauri IPC call must have a `.catch()` error handler. Test production builds on both platforms before completing Phase 37.
 
-5. **ChannelAndContacts port rename breaks existing tests** — The rename from `thermal1..thermalN` to `thermal_left[i]` must be done atomically: modify the component and update all test call sites in the same commit. Audit all occurrences of `thermal_ports`, `thermal1`, `thermal2` in the test suite before making the change.
-
-See `.planning/research/PITFALLS.md` for full pitfall descriptions, warning signs, recovery strategies, and the "Looks Done But Isn't" checklist.
-
----
+5. **Thermal port array handle orphaning** -- When `n` decreases on a ChannelAndContacts node, existing edges to removed handles become invalid React errors. Phase 40 must include an edge cleanup pass on `n` changes with a confirmation dialog if edges would be severed.
 
 ## Implications for Roadmap
 
-Based on combined research, the natural phase structure is a 4-phase sequence matching the dependency graph from ARCHITECTURE.md.
+Based on research, suggested phase structure (continues from current v0.7 milestone, starting at Phase 33):
 
-### Phase 10: v0.2 Tech Debt + ChannelAndContacts Two-Sided Upgrade
+### Phase 33: Scaffold + Component Registry
+**Rationale:** All downstream work depends on the scaffold and registry. The registry is the contract between STREAM.jl and the GUI -- it must encode correct constructor signatures before any UI is built. Tauri capabilities set here prevent production build failures in Phase 37.
+**Delivers:** Running Tauri 2 + React + ReactFlow dev environment on both Windows and Linux; complete `components.json` for all 9 STREAM.jl hydraulic components with argStyle encoding; Tauri capability permissions configured; `gui/` project structure established.
+**Addresses:** SCAF-01, SCAF-03, SCAF-04
+**Avoids:** Pitfall 3 (registry encodes argStyle from day one); Pitfall 5 (capabilities configured at scaffold, not after)
 
-**Rationale:** The ChannelAndContacts interface is the foundation everything else connects to. Getting the two-sided port contract right before HeatDiffusion is written means HeatDiffusion can be implemented against a stable API. Reversing this order means HeatDiffusion must be revised if the channel port design changes. The v0.2 tech debt items (dead `t_inlet` parameter, THERM-03 direct assertion, cosmetic doc fix) are independent and bundle cleanly into this phase.
+### Phase 34: Canvas Node Editor + State Architecture
+**Rationale:** Canvas is the core product feature. Must establish Zustand store pattern before any custom node logic -- retrofitting stale-closure fixes is a medium-cost refactor if deferred.
+**Delivers:** Drag-drop from toolbox; FlowPort connections with typed handle validation (`isValidConnection`); node/edge deletion; free repositioning; minimap/controls; Zustand store with Zundo undo/redo; React.memo on all custom nodes; nodeTypes/edgeTypes defined outside render.
+**Addresses:** CANV-01..07
+**Avoids:** Pitfall 1 (Zustand selectors from day one); Pitfall 2 (React.memo and stable nodeTypes from day one)
 
-**Delivers:** Upgraded ChannelAndContacts with `thermal_left[1:n]` + `thermal_right[1:n]`; cleared v0.2 debt; updated THERM tests; verified adiabatic default for unconnected ports.
+### Phase 35: Parameter Editing Sidebar
+**Rationale:** Canvas must exist before there is anything to edit. Dynamic form generation from registry schema keeps the sidebar extensible without code changes when STREAM.jl adds components.
+**Delivers:** Click-to-select opens sidebar; dynamic parameter fields from registry schema; PipeGeometry picker; Pump mode toggle; instance renaming with Julia identifier validation; per-field validation.
+**Addresses:** PARA-01..06
+**Avoids:** Pitfall 2 (sidebar uses precise Zustand selectors, not full nodes array); shadcn/ui Select inside custom node requires `stopPropagation`
 
-**Features addressed:** ChannelAndContacts two-sided upgrade (table stakes); adiabatic default for unconnected ThermalPort (table stakes).
+### Phase 36: Code Generation + Export
+**Rationale:** Code generation is the product's output contract. Must be correct before persistence (persistence saves the state the generator reads). Pure-function architecture enables exhaustive testing.
+**Delivers:** Pure-function code generator producing complete runnable Julia scripts; live code preview (debounced 300ms); export to `.jl` via Tauri save dialog; boundary condition panel; Julia identifier injection validation (CODE-07); unit tests per component verifying generated output.
+**Addresses:** CODE-01..07
+**Avoids:** Pitfall 3 (unit tests verify constructor signatures per component); Pitfall 4 (deterministic ordering, always emit mtkcompile, emit `using STREAM` + `using ModelingToolkit: t`)
 
-**Pitfalls to avoid:** Port rename breaking tests silently (Pitfall 5) — atomic commit; adiabatic unconnected port assumption (Pitfall 6) — explicit one-sided test.
+### Phase 37: Project Persistence
+**Rationale:** Users need to save work before the product is usable for real systems. Must come after code generation since `.streamgui` JSON serializes the same state the generator reads.
+**Delivers:** Save/load `.streamgui` JSON (Ctrl+S / Ctrl+O) with canvas viewport state; unsaved changes guard; recent projects list (Tauri plugin-store); `.streamgui` format versioning (`version` + `streamjl_version` fields).
+**Addresses:** PERS-01..04
+**Avoids:** Pitfall 5 (verify production build save/load on both Windows and Linux); cross-platform path handling (use Tauri path APIs, not hardcoded separators)
 
-### Phase 11: HeatDiffusion Component (x-diffusion, uniform plate)
+### Phase 38: Design Polish + Undo/Redo Solidification
+**Rationale:** After core editor works end-to-end, stabilize UX before adding complex thermal features. Polish is cheaper before thermal complexity is added.
+**Delivers:** shadcn/ui component pass across all panels; Zundo undo/redo refinement (pause during drag, resume on drop); handle hit-area sizing for high-DPI; selected node highlight; non-blocking topology alert banners foundation.
+**Addresses:** DSGN-01..04; CANV-07 solidification
+**Avoids:** Undo history noise from drag micro-movements; UX pitfalls (handle too small, no selection indication)
 
-**Rationale:** Implement HeatDiffusion with x-direction diffusion only, matching Python STREAM's `x_diffusion` default. This tests the 2D MTK array variable pattern, the FD stencil generation, and the ThermalPort array coupling in isolation before the complexity of z-diffusion and system coupling is added. The axis convention (Pitfall 1) and Q_flow sign convention (Pitfall 3) must be locked down here, not discovered during coupled validation.
+### Phase 39: Topology Validation
+**Rationale:** Validation catches the most common user errors before they waste time running Julia. Must come after BC panel exists (Phase 36) since validation checks for pressure anchor presence.
+**Delivers:** Non-blocking alert banners: unconnected mandatory ports; no pump/gravity driver; no pressure anchor BC; disconnected subgraph; export button highlighted when warnings exist; port-level visual warning badges.
+**Addresses:** VALD-01..03
+**Avoids:** Pitfall 4 (validation catches missing BCs before code generation is attempted)
 
-**Delivers:** `src/heat_diffusion.jl` with `T[1:nz, 1:nx]`, x-diffusion stencil, uniform power, `thermal_left/right` port arrays; HDIFF-01..04 tests; documented axis convention; benchmarked mtkcompile time on 3x3 and representative MTR grids.
-
-**Features addressed:** HeatDiffusion 2D MTK state (table stakes); x-direction diffusion (table stakes); ThermalPort arrays on HeatDiffusion (table stakes); MTK symbolic Jacobian (differentiator, free from mtkcompile).
-
-**Pitfalls to avoid:** Axis convention mismatch (Pitfall 1) — document before writing stencil; Q_flow sign error (Pitfall 3) — unit test with pinned BC; FD top/bottom Neumann BC conflict (Pitfall 7) — ghost-cell approach; mtkcompile performance (Pitfall 4) — benchmark early with small grid.
-
-### Phase 12: Coupled System + MTR Reference Case Validation
-
-**Rationale:** Wire HeatDiffusion between two ChannelAndContacts instances in the MTR geometry (cladding+meat+cladding, two water channels) and validate against Python STREAM reference outputs. This is the milestone exit criterion. The asymmetric coupling test (Pitfall 2, Python left/right swap) must be explicitly included — the symmetric case alone will not catch the swap.
-
-**Delivers:** `build_mtr_loop` helper in `solvers.jl`; VAL-03 validation test comparing T_outlet, T_wall_left, T_wall_right, T_center vs Python STREAM within 1%; asymmetric heating test.
-
-**Features addressed:** MTR reference case validation (table stakes); asymmetric left/right heating (differentiator); multi-layer material support (differentiator, needed for cladding+meat geometry).
-
-**Pitfalls to avoid:** Python left/right swap in indices() (Pitfall 2) — asymmetric test mandatory; inconsistent IC for coupled system (Pitfall 8) — decoupled warm-start strategy.
-
-### Phase 13: z-Direction Diffusion (Conditional)
-
-**Rationale:** Add axial (z-direction) diffusion to HeatDiffusion only if Phase 12 validation reveals a discrepancy attributable to axial conduction. Python STREAM uses `x_diffusion` as the default for flat MTR plates where axial conduction is negligible. This phase is conditional on Phase 12 results.
-
-**Delivers:** `xz_diffusion` mode in HeatDiffusion; re-validation showing axial contribution is within expected range.
-
-**Features addressed:** z-direction diffusion (differentiator; deferred from Phase 11).
-
-**Pitfalls to avoid:** Neumann BC stencil consistency (Pitfall 7) — same ghost-cell approach; mtkcompile performance at larger equation count (Pitfall 4).
+### Phase 40: Thermal Composition
+**Rationale:** Most complex feature -- depends on all foundation layers. Dynamic handle counts are a non-standard ReactFlow usage that requires careful design. Best isolated when confidence in foundation is high.
+**Delivers:** ThermalPort array handles on ChannelAndContacts (dynamic count from `n`; indexed handle IDs `thermal_left_0`, etc.); HeatDiffusion node wiring; smart thermal code-gen pattern recognition (symmetric_plate / plate / one_sided_connection); edge cleanup on `n` reduction with confirmation dialog.
+**Addresses:** THERM-01..03
+**Avoids:** Pitfall 6 (edge cleanup on n-change is required behavior, not optional)
 
 ### Phase Ordering Rationale
 
-- **Interface before implementation:** ChannelAndContacts (Phase 10) before HeatDiffusion (Phase 11) because HeatDiffusion is written against ChannelAndContacts's port contract. Writing HeatDiffusion first requires revisiting it when the channel interface changes.
-- **Isolation before coupling:** HeatDiffusion unit tests (Phase 11) before MTR coupling (Phase 12) because convention errors (axis order, Q_flow sign) discovered during isolated testing cost one equation change; discovered during coupled validation cost a full debug session on a coupled nonlinear system.
-- **x-only before xz:** Python STREAM's default is x-only; the MTR validation case does not require axial conduction; adding z-diffusion before validation passes adds risk to an unproven coupled system.
-- **Tech debt first:** Clearing dead parameters and cosmetic issues at the start prevents them from accumulating through v0.3 phases and cluttering validation diffs.
+- Registry before canvas: the registry JSON is the contract -- building custom nodes without it leads to hardcoded per-component components that violate SCAF-04 (extensibility via JSON only).
+- Zustand before custom nodes: stale closure bugs are a state management architecture problem. Retrofitting Zustand after building with useState is a medium-cost refactor.
+- Code generation before persistence: `.streamgui` serializes graph state; knowing what the generator needs from that state informs the save format. Avoids a save-format redesign.
+- Validation after BC panel (Phase 36): topology validation checks for pressure anchor BCs -- the BC panel must exist first.
+- Thermal last: depends on every foundation layer. High complexity with dynamic handle counts. Best isolated to the final phase when confidence in the foundation is high.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 12 (MTR Validation):** The Python STREAM reference outputs need to be generated via `generate_reference.py` (flagged in memory: `todo_comprehensive_review.md`). Confirm the reference generation script is working and produces the exact geometry + boundary conditions used in Julia-STREAM's test before this phase begins. Also requires confirming the exact Python `Fuel.indices()` left/right swap behavior with a concrete numerical test.
-- **Phase 13 (z-diffusion):** Conditional on Phase 12 results. If needed, requires reviewing Python STREAM's `xz_diffusion` stencil coefficients before implementation.
+- **Phase 40 (Thermal Composition):** ThermalPort array handles with dynamic counts are a non-standard ReactFlow usage. The edge cleanup logic and smart code-gen pattern recognition (symmetric_plate detection algorithm) need detailed design before implementation. Consider a targeted research step during Phase 40 planning focused on dynamic handle patterns.
+- **Phase 33 (Linux AppImage -- SCAF-02):** Known Tauri bug (tauri-apps/tauri#12463) with missing `libwebkit2gtkinjectedbundle.so` in AppImage. Monitor for fix status before committing to AppImage distribution in Phase 33.
 
-Phases with standard patterns (skip deeper research):
-- **Phase 10 (ChannelAndContacts upgrade):** Well-understood rename + energy balance extension of proven v0.2 pattern. Pitfalls are documented; no research needed.
-- **Phase 11 (HeatDiffusion skeleton):** MTK 2D array variable pattern is documented in STACK.md and ARCHITECTURE.md with concrete code. No research needed beyond the FD stencil details already captured in FEATURES.md.
-
----
+Phases with standard patterns (skip research-phase):
+- **Phase 34 (Canvas):** ReactFlow official docs have exhaustive examples for custom nodes, handle typing, and Zustand integration.
+- **Phase 35 (Parameter Sidebar):** Dynamic form generation from JSON schema is a standard React pattern; shadcn/ui provides all needed form primitives.
+- **Phase 36 (Code Generation):** Pure function with known input/output contract. STREAM.jl constructor signatures documented in CLAUDE.md.
+- **Phase 37 (Persistence):** Tauri plugin-dialog + plugin-fs are well-documented with examples.
+- **Phase 38 (Design Polish):** shadcn/ui components are copy-paste with documented customization; Zundo has documented drag-pause pattern.
+- **Phase 39 (Validation):** Graph topology analysis is standard algorithm work (connectivity, node classification).
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Verified via installed manifest + direct codebase inspection + official MTK/Symbolics docs. No new packages; 2D array variable syntax confirmed from multiple sources including community discourse. |
-| Features | HIGH | Sourced directly from Python STREAM source code (`heat_diffusion.py`, `channel.py`, `mtr_geometry.py`) and existing Julia-STREAM `components.jl`. Boundary condition details match Python implementation. |
-| Architecture | HIGH | Based on direct code inspection of existing codebase and Python STREAM. FD stencil patterns, port contracts, and component structure are all confirmed. Perimeter split in two-sided energy balance is MEDIUM (needs confirmation against Python STREAM MTR geometry during implementation). |
-| Pitfalls | HIGH | Axis convention mismatch and left/right swap confirmed from direct Python source read. Q_flow sign confirmed from connectors.jl. MTK unconnected port behavior confirmed from v0.1/v0.2 experience. |
+| Stack | HIGH | All version numbers verified against npm/GitHub registries. React 19 + ReactFlow 12 + zustand 5 compatibility confirmed. Tauri 2 stable since Oct 2024. No version conflicts. |
+| Features | HIGH | Requirements already defined in REQUIREMENTS.md v0.8; research validates scope and identifies correct deferrals. Feature dependencies mapped explicitly with clear rationale. |
+| Architecture | HIGH | Registry-driven pattern is established in ReactFlow community. Zustand + Zundo is ReactFlow's official recommendation. Pure-function code generator is standard. Three-panel layout is well-proven. |
+| Pitfalls | MEDIUM-HIGH | ReactFlow stale closure and re-render pitfalls verified via official docs and community posts. Tauri capability pitfalls from tracked GitHub issues. Code generation pitfalls from STREAM.jl source analysis. Platform-specific pitfalls from bug reports. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Exact perimeter geometry constants in two-sided ChannelAndContacts energy balance:** The hydraulic perimeter split (wall area per side for flat MTR channels) needs to be confirmed against Python STREAM's MTR geometry constants (`W * dz` per side). Address during Phase 10 implementation by cross-checking against `channel.py`'s `ChannelAndContacts` heat transfer area calculation.
-
-- **`generate_reference.py` validation status:** Memory notes an outstanding task to validate this script against Python STREAM outputs. This script provides the reference values for VAL-03. Confirm it is working before Phase 12 begins.
-
-- **MTK array port access syntax for `thermal_left[i]`:** The syntax for accessing array-indexed subsystem ports in MTK v11 (`sys.thermal_left[1].T` vs some other form) should be confirmed with a small smoke test early in Phase 10 before writing all tests against it.
-
-- **`mtkcompile` performance at MTR grid scale (nz=10, nx=3..5):** Research documents expected behavior but actual compile time for the coupled system (plate + two channels) should be benchmarked explicitly in Phase 11. Document in VALIDATION.md.
-
----
+- **WebKitGTK rendering on Linux:** Rendering differences between WebKitGTK versions (Ubuntu 22.04 vs 24.04) are documented but the specific impact on ReactFlow canvas rendering is not quantified. Mitigation: test on both distros early in Phase 33; avoid CSS features requiring WebKit 2.38+.
+- **AppImage bundling for Linux:** Tauri bug #12463 (missing injected bundle .so) is cosmetic for most uses but unresolved as of 2026-04-01. Monitor during Phase 33 SCAF-02; may require workaround or deferral of AppImage distribution.
+- **`.streamgui` format evolution:** The JSON format needs a migration strategy for when STREAM.jl components change (e.g., parameter renamed across Julia versions). Phase 37 should define a version field and basic migration path, but the full migration strategy is not yet designed.
+- **Pump dual-dispatch registry schema:** The registry must encode both `Pump(dP::Real)` (positional) and `Pump(; mdot0)` (keyword) modes as a single mode-switching entry. The exact JSON schema for this dual-dispatch entry needs to be specified during Phase 33 registry design.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-
-- `/home/itay/projects/Julia-STREAM/src/components.jl` — existing ChannelAndContacts 1D symbolic array pattern; ThermalPort splat into compose
-- `/home/itay/projects/Julia-STREAM/src/connectors.jl` — ThermalPort Q_flow sign declaration
-- `/home/itay/projects/STREAM/stream/calculations/heat_diffusion.py` — Python Fuel class; axis order `(nz, nx)`; `indices()` left/right swap; `x_diffusion` / `xz_diffusion`
-- `/home/itay/projects/STREAM/stream/calculations/channel.py` — Python ChannelAndContacts two-sided design
-- [Symbolics.jl Arrays Documentation](https://symbolics.juliasymbolics.org/dev/manual/arrays/) — `@variables A[1:5, 1:3]` 2D array syntax
-- [MTK Language Documentation](https://docs.sciml.ai/ModelingToolkit/stable/basics/MTKLanguage/) — `(v_array(t))[1:N, 1:M]` syntax
-- Julia-STREAM `.planning/PROJECT.md` — v0.3 scope and requirements
+- [Tauri 2 Official Docs](https://v2.tauri.app/) -- version 2.10.x, plugin docs, capabilities ACL
+- [@xyflow/react npm](https://www.npmjs.com/package/@xyflow/react) -- v12.10.2; React Flow 12 migration guide
+- [React Flow Official Docs](https://reactflow.dev/) -- custom nodes, state management, performance, connection validation, undo/redo
+- [React npm](https://www.npmjs.com/package/react) -- v19.2.4
+- [Vite 8 Announcement](https://vite.dev/blog/announcing-vite8) -- Rolldown integration, March 2026
+- [shadcn/ui Changelog](https://ui.shadcn.com/docs/changelog) -- CLI v4 March 2026; unified radix-ui Feb 2026
+- [zustand npm](https://www.npmjs.com/package/zustand) -- v5.0.12; React 19 support
+- [Tailwind CSS npm](https://www.npmjs.com/package/tailwindcss) -- v4.2.2; zero-config Vite plugin
+- STREAM.jl CLAUDE.md -- constructor conventions (positional vs keyword); component API
+- STREAM.jl `.planning/REQUIREMENTS.md` v0.8 section -- feature scope definition
 
 ### Secondary (MEDIUM confidence)
-
-- [Julia Discourse: 2D Arrays with ModelingToolkit](https://discourse.julialang.org/t/2d-arrays-with-modelingtoolkit/107448) — community confirmation of 2D indexed variable syntax; Dict u0 requirement
-- [SciML Discourse: MTK performance for large models](https://discourse.julialang.org/t/modelingtoolkit-jl-performance-for-large-models-with-similar-components/82442) — practical guidance on system size limits
-- Python STREAM `tribal_knowledge.md` — T_left / T_right x-direction convention
+- [ReactFlow: State Management Guide](https://reactflow.dev/learn/advanced-use/state-management) -- Zustand integration patterns, stale closure warnings
+- [ReactFlow: Performance Guide](https://reactflow.dev/learn/advanced-use/performance) -- React.memo requirements, selector patterns
+- [Zundo GitHub](https://github.com/charkour/zundo) -- Zustand undo/redo middleware; selective recording pattern
+- [tauri-apps/tauri#8074](https://github.com/tauri-apps/tauri/issues/8074) -- Windows defaultPath forward slash bug
+- [tauri-apps/tauri#12463](https://github.com/tauri-apps/tauri/issues/12463) -- Linux AppImage missing injected bundle .so
+- [shadcn-ui/ui#1511](https://github.com/shadcn-ui/ui/issues/1511) -- Popover z-index in ReactFlow nodes
+- STREAM.jl `.planning/research/gui-feasibility/RESEARCH.md` -- prior feasibility study
 
 ### Tertiary (LOW confidence)
-
-- MTK behavior for unconnected connector Q_flow = 0 across versions — inferred from Modelica semantics and v0.1/v0.2 experience; must be tested explicitly in Phase 10/11
+- [kitlib/tauri-app-template](https://github.com/kitlib/tauri-app-template) -- community Tauri v2 + React 19 + shadcn/ui template (validates stack compatibility)
+- [Synergy Codes -- ReactFlow State Management](https://www.synergycodes.com/blog/state-management-in-react-flow) -- community patterns for large graphs
 
 ---
-
-*Research completed: 2026-03-13*
+*Research completed: 2026-04-01*
 *Ready for roadmap: yes*
