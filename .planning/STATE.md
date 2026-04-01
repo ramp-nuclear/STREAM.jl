@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.6
-milestone_name: Flow Reversal Systems
+milestone: v0.7
+milestone_name: Safety Physics & Pressure Field
 status: unknown
-stopped_at: Completed 26-02-PLAN.md (plan 02 of 02 in phase 26)
-last_updated: "2026-03-27T00:37:58.624Z"
+stopped_at: Completed 32-01-PLAN.md (plan 01 of 01 in phase 32)
+last_updated: "2026-04-01T11:56:24.751Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 14
-  completed_plans: 14
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # STATE: STREAM.jl
@@ -20,17 +20,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-17)
+See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 26 — nc-regime-htc-lof-cleanup
+**Current focus:** Phase 32 — THRS-09 & Phase 30 Integration Hardening
 **Python STREAM reference:** ~/projects/STREAM
 
 ---
 
 ## Current Position
 
-Phase: 26
+Phase: 32
 Plan: Not started
 
 ## Performance Metrics
@@ -60,10 +60,25 @@ Plan: Not started
 | Phase 25 P01 | 15 | 2 tasks | 17 files |
 | Phase 26-nc-regime-htc-lof-cleanup P01 | 10 | 2 tasks | 4 files |
 | Phase 26 P02 | 60 | 2 tasks | 6 files |
+| Phase 28-subcooled-boiling P01 | 5 | 2 tasks | 4 files |
+| Phase 28 P02 | 51 | 2 tasks | 4 files |
+| Phase 29 P01 | 30 | 2 tasks | 6 files |
+| Phase 29-threshold-analysis P02 | 18 | 2 tasks | 3 files |
+| Phase 30 P02 | 534 | 2 tasks | 3 files |
+| Phase 31 P01 | 5 | 2 tasks | 2 files |
+| Phase 32 P01 | 13 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
-### Key Decisions (carry-forward for v0.6)
+### Key Decisions (carry-forward for v0.7)
+
+- [v0.7 SCB-01]: max(dT, 0.0) inside ifelse() exponentiation prevents DomainError when dT < 0 (Julia ifelse evaluates both branches eagerly)
+- [v0.7 SCB-04]: regime_dependent_q_scb is a factory (not direct function) to capture pressure at construction time, matching scb_correction closure contract
+- [v0.7 ISCB-01]: skip_htc kwarg in _channel_base_eqs suppresses h_tc push so caller can provide custom equations (SCB correction)
+- [v0.7 ISCB-01]: SCB correction factors are 10-100x when T_wall >> T_ONB; KINSOL diverges, transient solver or continuation needed for full-loop SCB steady-state
+- [v0.7 ISCB-01]: h_tc default guess 5000.0 in ChannelAndContacts prevents MTK cyclic guesses initialization error
+- [v0.7 THRS-09]: _nusselt_coefficient_developing must use ifelse() not if/else: MTK traces through closures symbolically; if/else on Num throws TypeError at trace time
+- [v0.7 THRS-09]: ArgumentError guard in _extract_channel_state uses hasproperty(:T_wall_left) — simplest structural check for ChannelAndContacts precondition
 
 - [v0.5]: solve_transient is now keyword-only — SOLV-01 must preserve this convention when adding `callbacks` kwarg
 - [v0.4]: ifelse() used for flow reversal and regime switching — SIGN-01..03 may need to audit all ifelse() sign usages
@@ -106,22 +121,24 @@ None.
 ### Blockers/Concerns
 
 - VAL-01 (Fourier series validation) is a pre-existing flaky numerical test — not caused by v0.6 changes.
+- NET-03 (Cube flow) is a pre-existing KINSOL convergence failure — not caused by v0.7 changes.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-03-26T22:37:41.047Z
-**Stopped at:** Completed 26-02-PLAN.md (plan 02 of 02 in phase 26)
-**Next action:** `/gsd:plan-phase 20`
+**Last session:** 2026-04-01T11:27:17.068Z
+**Stopped at:** Completed 32-01-PLAN.md (plan 01 of 01 in phase 32)
+**Next action:** Phase 30 — HTC & Friction Completions
 **Resume file:** None
 
 ---
 
-*Last updated: 2026-03-22 — Completed quick task 260322-l7z: Create LOF transient example script with comprehensive plots and analysis*
+*Last updated: 2026-03-31 — Phase 29 threshold-analysis complete; Phase 30 next*
 
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260322-l7z | Create LOF transient example script with comprehensive plots and analysis | 2026-03-22 | 52f4e44 | [260322-l7z-create-lof-transient-example-script-with](./quick/260322-l7z-create-lof-transient-example-script-with/) |
+| 260331-q27 | Audit and fix GSD planning artifacts (PROJECT.md Phase 27/28 requirements, evolution log, footer) | 2026-03-31 | 435be6b | [260331-q27-audit-gsd-planning-artifacts-and-surface](./quick/260331-q27-audit-gsd-planning-artifacts-and-surface/) |

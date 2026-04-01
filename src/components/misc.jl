@@ -8,7 +8,14 @@
 """
     Inertia(L_over_A; name) -> ODESystem
 
-Fluid inertia element for transient simulations. Adds `L/A * d(mdot)/dt` to the momentum equation.
+Concentrated fluid inertia element for transient simulations. Adds `L/A * d(mdot)/dt`
+to the momentum equation.
+
+Note: Channel, ChannelAndContacts, and ChannelHeatFlux now carry their own distributed
+inertia via a momentum ODE `(L/A)*Dt(mdot)`. Use standalone Inertia only for concentrated
+inertia effects (fittings, sudden area changes, valves, piping outside channels). When
+placed in series with a Channel, both momentum ODEs contribute additively through MTK
+network topology -- correct physics (distributed + concentrated).
 
 # Arguments
 - `L_over_A`: length-to-area ratio [1/m]

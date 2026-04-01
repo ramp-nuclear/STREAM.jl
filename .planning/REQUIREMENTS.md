@@ -1,0 +1,136 @@
+# Requirements: STREAM.jl
+
+**Defined:** 2026-03-27
+**Core Value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
+
+## v0.7 Requirements
+
+### Pressure Field
+
+- [x] **PRES-01**: Per-cell pressure drop dp[i] computed individually for each axial cell (replaces single i_mid lump in _channel_base_eqs); dP = sum(dp[i]) becomes the exact total
+- [x] **PRES-02**: Per-cell absolute pressure P[i] available as observed variables in Channel, ChannelAndContacts, and ChannelHeatFlux (P[i] ~ port_in.P - cumsum(dp[1:i]))
+- [x] **PRES-03**: sat_temperature(P) added as @register_symbolic function in fluids.jl (Simantov or Antoine equation for light water saturation temperature vs. pressure)
+- [x] **PRES-04**: T_sat[i] and T_ONB[i] available as observed variables in ChannelAndContacts and ChannelHeatFlux (T_ONB via Bergles-Rohsenow dT_ONB formula using P[i] and q_wall[i])
+- [x] **PRES-05**: Transient loop with step pump dP change: dp[i] and P[i] respond correctly during transient; dP = port_in.P - port_out.P captures total drop including inertia; at new steady state the (i/n) correction term approaches 0
+- [x] **PRES-06**: Momentum ODE numerical consistency: (L/A)*Dt(mdot) = (P_in - P_out) - sum(dp) residual within ODE solver tolerance throughout transient
+- [x] **PRES-07**: Channel alone (no standalone Inertia in loop) produces physically reasonable transient: mdot evolves smoothly from initial to final steady state, no NaN or Inf
+- [x] **PRES-08**: All three channel variants (Channel, ChannelAndContacts, ChannelHeatFlux) have momentum ODE present; steady-state dP = sum(dp[i]) and P[i] = port_in.P - cumsum(dp) (correction = 0 at Dt(mdot)=0)
+- [x] **PRES-09**: ChannelAndContacts (observed_mode=true path in _channel_base_eqs) transient solves without error; T_sat[i] and T_ONB[i] accessible during transient
+- [x] **PRES-10**: ChannelHeatFlux transient solves without error; T_sat[i] and T_ONB[i] accessible during transient
+- [x] **PRES-11**: Channel + standalone Inertia in series: mtkcompile succeeds (no over-constraint). Transient solve is NOT supported -- two competing Dt(mdot) ODEs for the same flow variable (distributed channel inertia + concentrated Inertia component) causes solver instability. This is a physical over-specification, not a bug.
+- [x] **PRES-12**: n=1 channel edge case: P[1] = port_out.P (formula reduces correctly for single cell)
+- [ ] **VAL-PRES-01**: Quantitative cross-validation of dp[i] and P[i] against Python STREAM pressure_diff with mdot2 != 0; dp[i] within 1%, P[i] within 0.1% relative to port_in.P scale. Deferred: requires Python reference data generation.
+
+### Subcooled Boiling Correlations
+
+- [x] **SCB-01**: McAdams_SCB_heat_flux(T_sat, T_wall) → W/m² implemented as standalone Julia function in src/physical_models/subcooled_boiling.jl
+- [x] **SCB-02**: Bergles_Rohsenow_SCB_heat_flux(T_wall, T_sat, pressure, ...) → W/m² implemented with surface tension / latent heat inputs
+- [x] **SCB-03**: partial_SCB_correction(q_spl, q_scb, q_scb_inc) → dimensionless factor; Bergles-Rohsenow smooth SPL↔SCB blend
+- [x] **SCB-04**: regime_dependent_q_scb(; pressure, Re_transition) factory → (T_wall, T_sat, Re) closure; selects McAdams (turbulent) or Bergles-Rohsenow (laminar) by Re
+
+### In-loop SCB in Channels
+
+- [x] **ISCB-01**: ChannelAndContacts accepts optional scb_correction kwarg (closure or nothing); when provided, h_tc[i] is replaced by ifelse(T_wall[i] >= T_ONB[i], h_spl[i] * partial_scb_factor, h_spl[i]) using the ifelse() MTK pattern
+- [x] **ISCB-02**: In-loop SCB correction validated: with T_wall >> T_sat the effective HTC increases relative to pure single-phase; with T_wall < T_ONB the result matches the base single-phase case exactly
+
+### Threshold Analysis — Physics Layer
+
+- [x] **THRS-01**: Bergles_Rohsenow_T_ONB(pressure, q_wall, T_sat) → temperature at onset of nucleate boiling [K]
+- [x] **THRS-02**: q_boiling_onset(mdot, T_sat, T_inlet, cp) → power at which bulk reaches saturation [W]
+- [x] **THRS-03**: q_OFI_whittle_forgan(mdot, T_sat, T_inlet, pipe) → onset of flow instability power [W/m²]
+- [x] **THRS-04**: q_OSV_saha_zuber(T_inlet, mdot, pipe, ...) → onset of significant void heat flux [W/m²]; self-consistent formulation (Saha-Zuber computed_bulk variant)
+- [x] **THRS-05**: q_CHF_sudo_kaminaga(T_bulk, mdot, pipe, gravity) → critical heat flux [W/m²]; Kaminaga 1998
+- [x] **THRS-06**: q_CHF_mirshak(T_bulk, T_sat, pressure, v) → CHF [W/m²]; valid for v > 1.5 m/s
+- [x] **THRS-07**: q_CHF_fabrega(T_inlet, T_sat, pipe) → CHF [W/m²]; valid for v < 0.5 m/s
+- [x] **THRS-08**: twall_limit(T_wall, inhomogeneity_factor) → effective wall temperature after inhomogeneity scaling
+
+### Threshold Analysis — Post-process Layer
+
+- [x] **THRS-09**: threshold_analysis(sol, channel_sys; kwargs...) → NamedTuple; extracts T[i], mdot, T_wall[i], P[i] from MTK solution and calls user-specified threshold functions; returns one named field per function; handles both steady-state and transient ODESolution uniformly (scalar per cell for steady; vector-over-time per cell for transient)
+
+### HTC Library Completions
+
+- [x] **HTC-01**: Marco_Han_Nusselt(aspect_ratio) → Nu for fully-developed laminar flow in rectangular duct with uniform wall temperature (4-sided heating)
+- [x] **HTC-02**: fully_developed_laminar_h_spl(; Dh, aspect_ratio) → correlation closure (Re, Pr, T_bulk, T_wall) -> Nu using Marco-Han
+- [x] **HTC-03**: developing_laminar_h_spl(; Dh, develop_length, aspect_ratio) → correlation closure; Shah & London interpolation for thermally developing flow
+- [x] **HTC-04**: maximal_htc(correlations...) → correlation closure that returns elementwise max Nu across all provided correlations at each call
+
+### Friction Library Completions
+
+- [x] **FRIC-01**: turbulent_friction(Re, epsilon=0) → Darcy friction factor via Colebrook-White approximation (RELAP/KAERI form); epsilon is relative roughness, defaults to smooth pipe
+- [x] **FRIC-02**: viscosity_correction(heat_wet_ratio, mu_ratio) → multiplicative correction factor for temperature-dependent viscosity in friction calculations
+
+## v2 Requirements (deferred)
+
+### Pressure Drop Components
+- **PDROP-01**: LocalPressureDrop component (K·mdot·|mdot|/2ρA²)
+- **PDROP-02**: Local pressure loss correlations: contraction_factor, expansion_factor, bend_factor (Idelchik)
+
+### Fuel Extensions
+- **FUEL-01**: HeatDiffusion axial BCs (T_top, T_bottom, h_top, h_bottom)
+- **FUEL-02**: HeatDiffusion gap conductance (x_contacts, z_contacts)
+- **FUEL-03**: HeatDiffusion xz_diffusion (full 2D Cartesian)
+- **FUEL-04**: HeatDiffusion r_diffusion / rz_diffusion (cylindrical)
+
+### Multi-fluid
+- **FLUID-01**: AbstractFluid protocol + heavy_water (D₂O)
+
+### Neutronics
+- **NK-01**: PointKinetics + ReactivityController
+- **NK-02**: Decay heat (ANS14/ANS73/JAERI91)
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Subcooled boiling two-phase drift-flux model | Out of scope — single-phase effective HTC only |
+| In-loop boiling in Channel / ChannelHeatFlux | Only ChannelAndContacts gets SCB correction (it has the ThermalPort needed to resolve T_wall[i]) |
+| Surface tension / latent heat as @register_symbolic | Only needed for Bergles-Rohsenow SCB; will pass as scalar constants for now |
+| Sequential quasi-static solver | Deferred — not blocking current use cases |
+| State serialization (YAML/DataFrame) | Deferred — ODESolution sufficient for now |
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| PRES-01 | Phase 27 | Complete |
+| PRES-02 | Phase 27 | Complete |
+| PRES-03 | Phase 27 | Complete |
+| PRES-04 | Phase 27 | Complete |
+| PRES-05 | Phase 27.1 | Complete |
+| PRES-06 | Phase 27.1 | Complete |
+| PRES-07 | Phase 27.1 | Complete |
+| PRES-08 | Phase 27.1 | Complete |
+| PRES-09 | Phase 27.1 | Complete |
+| PRES-10 | Phase 27.1 | Complete |
+| PRES-11 | Phase 27.1 | Complete |
+| PRES-12 | Phase 27.1 | Complete |
+| VAL-PRES-01 | Phase 27.1 | Deferred |
+| SCB-01 | Phase 28 | Complete |
+| SCB-02 | Phase 28 | Complete |
+| SCB-03 | Phase 28 | Complete |
+| SCB-04 | Phase 28 | Complete |
+| ISCB-01 | Phase 28 | Complete |
+| ISCB-02 | Phase 28 | Complete |
+| THRS-01 | Phase 29 | Complete |
+| THRS-02 | Phase 29 | Complete |
+| THRS-03 | Phase 29 | Complete |
+| THRS-04 | Phase 29 | Complete |
+| THRS-05 | Phase 29 | Complete |
+| THRS-06 | Phase 29 | Complete |
+| THRS-07 | Phase 29 | Complete |
+| THRS-08 | Phase 29 | Complete |
+| THRS-09 | Phase 32 | Complete |
+| HTC-01 | Phase 30 | Complete |
+| HTC-02 | Phase 30 | Complete |
+| HTC-03 | Phase 30 | Complete |
+| HTC-04 | Phase 30 | Complete |
+| FRIC-01 | Phase 30 | Complete |
+| FRIC-02 | Phase 30 | Complete |
+
+**Coverage:**
+- v0.7 requirements: 34 total (mapped: 34, unmapped: 0 ✓)
+
+---
+*Requirements defined: 2026-03-27*
+*Last updated: 2026-04-01 after Phase 31 verification (PRES-01..04 complete)*

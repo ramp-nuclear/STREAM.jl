@@ -6,7 +6,9 @@ using STREAM
 import STREAM: Channel
 import STREAM: dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction,
                rectangular_laminar_correction, regime_dependent,
-               elenbaas_nusselt, elenbaas_htc, beta_water, Gr, Ra
+               elenbaas_nusselt, elenbaas_htc, beta_water, Gr, Ra,
+               Marco_Han_Nusselt, turbulent_friction, viscosity_correction,
+               fully_developed_laminar_h_spl, developing_laminar_h_spl, maximal_htc
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 14: Laminar Correlations
@@ -391,3 +393,196 @@ end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
         Dh=0.01, g=9.81,  # htc_natural missing
     )
 end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 30: HTC & Friction Completions
+# HTC-01: Marco_Han_Nusselt
+# FRIC-01: turbulent_friction (Colebrook-White)
+# FRIC-02: viscosity_correction
+# ─────────────────────────────────────────────────────────────────────────────
+
+@testset "HTC-01: Marco_Han_Nusselt" begin
+    # Reference values from Python STREAM laminar.py doctest
+    @test Marco_Han_Nusselt(0.0) == 8.235
+    @test isapprox(Marco_Han_Nusselt(0.2), 5.991134842079999; rtol=1e-10)
+
+    # ar=0 to ar=0.5: Nu decreases (thin gap to moderate aspect ratio)
+    @test Marco_Han_Nusselt(0.0) > Marco_Han_Nusselt(0.5)
+
+    # ar=1.0 (square duct): positive Nu
+    @test Marco_Han_Nusselt(1.0) > 0.0
+end
+
+@testset "FRIC-01: turbulent_friction (Colebrook-White)" begin
+    # Reference values from Python STREAM friction.py doctest
+    @test isapprox(turbulent_friction(4e3),      0.039804935964641644; rtol=1e-10)
+    @test isapprox(turbulent_friction(4e3, 0.1), 0.10560870441248855;  rtol=1e-10)
+    @test isapprox(turbulent_friction(1e6),      0.011649393290640643; rtol=1e-10)
+
+    # D-08: Re <= 0 guard
+    @test turbulent_friction(5.0)  == 0.0
+    @test turbulent_friction(0.0)  == 0.0
+    @test turbulent_friction(-1.0) == 0.0
+
+    # Smooth pipe (epsilon=0): friction decreases with Re
+    @test turbulent_friction(4e3) > turbulent_friction(1e6)
+end
+
+@testset "FRIC-02: viscosity_correction" begin
+    # Reference values from Python STREAM friction.py doctest
+    @test viscosity_correction(1.0, 1.0) == 1.0
+    @test viscosity_correction(1.0, 0.0) == 0.0
+    @test isapprox(viscosity_correction(1.0, 2.0), 1.4948492486349383; rtol=1e-10)
+
+    # heat_wet_ratio = 0 => no correction regardless of mu_ratio
+    @test viscosity_correction(0.0, 5.0) == 1.0
+end
+
+@testset "HTC-02: fully_developed_laminar_h_spl" begin
+    # D-01: Uses _two_sided_heating_nusselt, NOT Marco_Han_Nusselt
+    # Reference: _two_sided_heating_nusselt(0.0) = 8.235
+    htc_fn = fully_developed_laminar_h_spl(Dh=0.005, aspect_ratio=0.0)
+    @test htc_fn(1000.0, 7.0, 313.0, 333.0) == 8.235
+
+    # At ar=0.2: _two_sided_heating_nusselt(0.2) != Marco_Han_Nusselt(0.2)
+    # two_sided: 8.235*(1 - 1.4122*0.2 + 2.3473*0.04 - 2.8983*0.008 + 2.0629*0.0016 - 0.6077*0.00032)
+    htc_fn_ar02 = fully_developed_laminar_h_spl(Dh=0.005, aspect_ratio=0.2)
+    nu_two_sided_02 = 8.235 * (1.0 - 1.4122*0.2 + 2.3473*0.2^2 - 2.8983*0.2^3 + 2.0629*0.2^4 - 0.6077*0.2^5)
+    @test isapprox(htc_fn_ar02(500.0, 5.0, 310.0, 350.0), nu_two_sided_02; rtol=1e-10)
+    # Confirm it differs from Marco_Han
+    @test htc_fn_ar02(500.0, 5.0, 310.0, 350.0) != Marco_Han_Nusselt(0.2)
+
+    # Closure ignores Re, Pr — same Nu for any inputs
+    @test htc_fn_ar02(100.0, 3.0, 300.0, 400.0) == htc_fn_ar02(5000.0, 10.0, 290.0, 380.0)
+
+    # ar=1.0 (square): _two_sided gives different value than Marco_Han
+    htc_sq = fully_developed_laminar_h_spl(Dh=0.01, aspect_ratio=1.0)
+    @test htc_sq(100.0, 7.0, 313.0, 333.0) > 0.0
+end
+
+@testset "HTC-03: developing_laminar_h_spl" begin
+    # At very high Re (large x_star), developing flow Nu should approach
+    # the fully-developed value _two_sided_heating_nusselt(ar)
+    ar = 0.2
+    htc_dev = developing_laminar_h_spl(Dh=0.005, develop_length=0.3, aspect_ratio=ar)
+    htc_fd  = fully_developed_laminar_h_spl(Dh=0.005, aspect_ratio=ar)
+
+    # At high Re, x_star is small -> developing Nu is LARGER than fully developed
+    Nu_dev_high_Re = htc_dev(2000.0, 7.0, 313.0, 333.0)
+    Nu_fd = htc_fd(2000.0, 7.0, 313.0, 333.0)
+    @test Nu_dev_high_Re > Nu_fd  # developing flow enhances heat transfer
+
+    # At very low Re (large x_star -> fully developed), should converge toward fd value
+    # Re=1 with develop_length=0.3 -> x_star is large -> _nusselt_coefficient_developing ~ 8.235
+    Nu_dev_low_Re = htc_dev(1.0, 7.0, 313.0, 333.0)
+    @test isapprox(Nu_dev_low_Re, Nu_fd; rtol=0.05)  # within 5% of fully developed
+
+    # Positive for all reasonable inputs
+    @test htc_dev(500.0, 5.0, 310.0, 350.0) > 0.0
+
+    # x_star correction factor test: changing aspect_ratio changes the result
+    htc_dev_ar05 = developing_laminar_h_spl(Dh=0.005, develop_length=0.3, aspect_ratio=0.5)
+    @test htc_dev(1000.0, 7.0, 313.0, 333.0) != htc_dev_ar05(1000.0, 7.0, 313.0, 333.0)
+end
+
+@testset "HTC-04: maximal_htc" begin
+    # max of two constant correlations
+    c5  = constant_Nusselt(Nu=5.0)
+    c10 = constant_Nusselt(Nu=10.0)
+    htc_max = maximal_htc(c5, c10)
+    @test htc_max(100.0, 7.0, 313.0, 333.0) == 10.0
+
+    # max of three correlations
+    c1 = constant_Nusselt(Nu=1.0)
+    htc_max3 = maximal_htc(c1, c5, c10)
+    @test htc_max3(100.0, 7.0, 313.0, 333.0) == 10.0
+
+    # Single correlation passthrough
+    htc_single = maximal_htc(c5)
+    @test htc_single(100.0, 7.0, 313.0, 333.0) == 5.0
+
+    # Works with non-constant correlations (dittus_boelter)
+    htc_mixed = maximal_htc(c5, dittus_boelter)
+    # At Re=100, Pr=7: dittus_boelter ~ 0.023 * 100^0.8 * 7^0.4 ~ 2.7 < 5
+    @test htc_mixed(100.0, 7.0, 313.0, 333.0) == 5.0
+    # At Re=10000, Pr=7: dittus_boelter ~ 0.023 * 10000^0.8 * 7^0.4 ~ 55.2 > 5
+    @test htc_mixed(10000.0, 7.0, 313.0, 333.0) > 5.0
+    @test isapprox(htc_mixed(10000.0, 7.0, 313.0, 333.0), dittus_boelter(10000.0, 7.0); rtol=1e-10)
+end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 30 in-system smoke tests
+# HTC-02/03: Phase 30 laminar HTC factories plugged into a real compiled Channel
+# Closes audit gap: fully_developed_laminar_h_spl and developing_laminar_h_spl
+# have never been passed as htc_correlation to a Channel and mtkcompiled.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@testset "HTC-02/03: Phase 30 laminar HTC factories in compiled Channel" begin
+
+@testset "HTC-02: fully_developed_laminar_h_spl compiles in Channel" begin
+    n = 5; T_inlet = 313.15; T_wall = 373.15; dP_pump = 30.0
+    geom = PipeGeometry_circular(0.6, 0.01)
+    htc_fn = fully_developed_laminar_h_spl(Dh=0.01, aspect_ratio=0.1)
+
+    @named pump_fd = Pump(dP_pump)
+    @named cac_fd  = ChannelAndContacts(n=n, geometry=geom,
+                                         htc_correlation=htc_fn,
+                                         friction_correlation=laminar_friction(0.1))
+    @named bc_fd   = HeatExchanger(T_inlet)
+    ct_l_fd = [ConstantTemperature(T_wall; name=Symbol(:ct_l_fd_, i)) for i in 1:n]
+    ct_r_fd = [ConstantTemperature(T_wall; name=Symbol(:ct_r_fd_, i)) for i in 1:n]
+    conns_fd = [
+        connect(pump_fd.port_out, bc_fd.port_in),
+        connect(bc_fd.port_out, cac_fd.port_in),
+        connect(cac_fd.port_out, pump_fd.port_in),
+        [connect(ct_l_fd[i].thermal, getproperty(cac_fd, Symbol(:thermal_left,  i))) for i in 1:n]...,
+        [connect(ct_r_fd[i].thermal, getproperty(cac_fd, Symbol(:thermal_right, i))) for i in 1:n]...,
+        pump_fd.port_in.P ~ 1.0e5,
+    ]
+    @named sys_fd = compose(System(conns_fd, t; name=:sys_fd),
+                             pump_fd, bc_fd, cac_fd, ct_l_fd..., ct_r_fd...)
+    # Critical assertion: mtkcompile must succeed without symbolic tracing error
+    ssys_fd = @test_nowarn mtkcompile(sys_fd)
+    @test ssys_fd !== nothing
+
+    # Solve to verify the system is also numerically tractable
+    op_fd = [ssys_fd.cac_fd.T[i] => T_inlet for i in 1:n]
+    push!(op_fd, ssys_fd.cac_fd.port_in.mdot => 1e-3)
+    sol_fd = solve_steady(ssys_fd, op_fd)
+    @test sol_fd.retcode == ReturnCode.Success
+end
+
+@testset "HTC-03: developing_laminar_h_spl compiles in Channel" begin
+    n = 5; T_inlet = 313.15; T_wall = 373.15; dP_pump = 30.0
+    geom = PipeGeometry_circular(0.6, 0.01)
+    htc_fn = developing_laminar_h_spl(Dh=0.01, develop_length=0.3, aspect_ratio=0.1)
+
+    @named pump_dev = Pump(dP_pump)
+    @named cac_dev  = ChannelAndContacts(n=n, geometry=geom,
+                                          htc_correlation=htc_fn,
+                                          friction_correlation=laminar_friction(0.1))
+    @named bc_dev   = HeatExchanger(T_inlet)
+    ct_l_dev = [ConstantTemperature(T_wall; name=Symbol(:ct_l_dev_, i)) for i in 1:n]
+    ct_r_dev = [ConstantTemperature(T_wall; name=Symbol(:ct_r_dev_, i)) for i in 1:n]
+    conns_dev = [
+        connect(pump_dev.port_out, bc_dev.port_in),
+        connect(bc_dev.port_out, cac_dev.port_in),
+        connect(cac_dev.port_out, pump_dev.port_in),
+        [connect(ct_l_dev[i].thermal, getproperty(cac_dev, Symbol(:thermal_left,  i))) for i in 1:n]...,
+        [connect(ct_r_dev[i].thermal, getproperty(cac_dev, Symbol(:thermal_right, i))) for i in 1:n]...,
+        pump_dev.port_in.P ~ 1.0e5,
+    ]
+    @named sys_dev = compose(System(conns_dev, t; name=:sys_dev),
+                              pump_dev, bc_dev, cac_dev, ct_l_dev..., ct_r_dev...)
+    # Critical assertion: mtkcompile must succeed without symbolic tracing error
+    ssys_dev = @test_nowarn mtkcompile(sys_dev)
+    @test ssys_dev !== nothing
+
+    # Solve to verify the system is also numerically tractable
+    op_dev = [ssys_dev.cac_dev.T[i] => T_inlet for i in 1:n]
+    push!(op_dev, ssys_dev.cac_dev.port_in.mdot => 1e-3)
+    sol_dev = solve_steady(ssys_dev, op_dev)
+    @test sol_dev.retcode == ReturnCode.Success
+end
+
+end  # @testset "HTC-02/03: Phase 30 laminar HTC factories in compiled Channel"
