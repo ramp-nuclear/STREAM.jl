@@ -113,6 +113,33 @@ function beta_water(T_K::Real)
     return -1.8 * (B + 2 * C * T_F) / rho_water(T_K)
 end
 
+"""
+    sat_temperature(P_Pa) -> K
+
+Saturation temperature of light water at absolute pressure P_Pa (Simantov correlation).
+Input: pressure in Pa. Output: temperature in Kelvin.
+
+Guard: uses abs(P_Pa) inside log to prevent DomainError at bad Newton iterates.
+
+Note: P[i] absolute pressure is only meaningful when a pressure anchor is set
+on a FlowPort in the loop (e.g., pump.port_in.P ~ 1e5).
+
+# Arguments
+- `P_Pa`: absolute pressure [Pa]
+
+# Returns
+Saturation temperature [K] as `Float64`.
+"""
+function sat_temperature(P_Pa::Real)
+    X = log(abs(P_Pa) * 1e-6)
+    A = 179.9600321
+    B = -0.1063030
+    C = 24.2278298
+    D = 2.951e-4
+    T_C = (A + C * X) / (1 + B * X + D * X^2)
+    return T_C + 273.15
+end
+
 # @register_symbolic must be at module top-level (not inside any function or begin block).
 # These lines make the functions callable with symbolic MTK variables (Num type).
 @register_symbolic rho_water(T::Real)
@@ -120,3 +147,4 @@ end
 @register_symbolic mu_water(T::Real)
 @register_symbolic k_water(T::Real)
 @register_symbolic beta_water(T::Real)
+@register_symbolic sat_temperature(P::Real)

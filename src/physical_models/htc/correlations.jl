@@ -1,11 +1,10 @@
-# correlations.jl — Pluggable HTC and friction correlation functions for STREAM.jl
+# htc/correlations.jl — Heat transfer coefficient correlation functions for STREAM.jl
 #
 # Design:
-#   - Standalone named functions (dittus_boelter, blasius_friction): plain Julia arithmetic,
-#     NOT @register_symbolic. MTK traces through these symbolically when Re/Pr are symbolic.
-#   - Factories (constant_Nusselt, laminar_friction, regime_dependent): return closures
+#   - Standalone named functions (dittus_boelter, elenbaas_nusselt, Marco_Han_Nusselt):
+#     plain Julia arithmetic, NOT @register_symbolic. MTK traces through these symbolically.
+#   - Factories (constant_Nusselt, regime_dependent, elenbaas_htc): return closures
 #     that capture construction-time scalars; inner function receives only symbolic Re/Pr.
-#   - rectangular_laminar_correction: scalar utility function, always returns Float64.
 #   - No @register_symbolic on any function in this file — all are plain arithmetic.
 
 """
@@ -21,41 +20,6 @@ Valid for: Re > 10,000, 0.6 <= Pr <= 160, L/D > 10.
 MTK-compatible: plain arithmetic on symbolic Re/Pr traces correctly.
 """
 dittus_boelter(Re, Pr, args...) = 0.023 * Re^0.8 * Pr^0.4
-
-"""
-    blasius_friction(Re) -> f_darcy
-
-Blasius friction factor correlation for turbulent smooth-pipe flow.
-Returns Darcy friction factor f = 0.3164 * Re^(-0.25).
-
-Valid for: 4,000 < Re < 100,000.
-MTK-compatible: plain arithmetic on symbolic Re traces correctly.
-"""
-blasius_friction(Re) = 0.3164 * Re^(-0.25)
-
-"""
-    rectangular_laminar_correction(aspect_ratio) -> K_R
-
-Scalar geometric correction factor K_R from the KAERI formula for fully-developed
-laminar flow in a rectangular duct.
-
-`aspect_ratio = depth / width`, must be in [0, 1]:
-- 0.0 (thin gap limit): K_R ≈ 0.66685
-- 0.01814 (MTR geometry: 0.00127/0.07): K_R ≈ 0.68544
-- 0.5: K_R ≈ 1.03639
-- 1.0 (square): K_R ≈ 1.12462
-
-Use: `f_darcy = 64 / (Re * K_R)` for rectangular laminar flow.
-
-Source: KAERI formula as used in TERMIC thermal-hydraulics code;
-matches Python STREAM friction.py `rectangular_laminar_correction`.
-"""
-function rectangular_laminar_correction(aspect_ratio::Real)
-    return (
-        0.88919 +
-        87.656 * ((1 + aspect_ratio * (sqrt(2) - 1)) / (4 * (1 + aspect_ratio)) - sqrt(2) / 8)^1.9
-    )^(-1)
-end
 
 """
     constant_Nusselt(; Nu=8.235) -> (Re, Pr) -> Nu
@@ -75,33 +39,6 @@ ChannelAndContacts(htc_correlation = htc_fn, ...)
 """
 function constant_Nusselt(; Nu = 8.235)
     return (Re, Pr, args...) -> Nu
-end
-
-"""
-    laminar_friction(aspect_ratio::Real) -> (Re) -> f_darcy
-
-Factory returning a friction correlation for fully-developed laminar flow in a
-rectangular duct.
-
-`aspect_ratio` = `depth / width` where depth = min(edge1, edge2)
-and width = max(edge1, edge2). Precomputes the geometric correction factor
-`K_R = rectangular_laminar_correction(aspect_ratio)` at construction time.
-
-Returns `(Re) -> 64.0 / (Re * K_R)`.
-
-For truly circular geometry (no correction), use a raw lambda `(Re) -> 64.0 / Re`.
-For square (aspect_ratio=1.0): K_R ≈ 1.1246, giving f ≈ 56.9/Re (NOT 64/Re).
-
-Usage:
-```julia
-geom = PipeGeometry_rectangular(L, e1, e2, he)
-f_fn = laminar_friction(geom.depth / geom.width)
-ChannelAndContacts(friction_correlation = f_fn, ...)
-```
-"""
-function laminar_friction(aspect_ratio::Real)
-    k_R = rectangular_laminar_correction(aspect_ratio)
-    return (Re) -> 64.0 / (Re * k_R)
 end
 
 """
@@ -258,4 +195,139 @@ function elenbaas_htc(; b, L, Dh, g = 9.81)
         Ra_val = Ra(Gr_val, Pr)
         elenbaas_nusselt(Ra_val, b, L)
     end
+end
+
+# _bergles_rohsenow_dT_ONB: Bergles-Rohsenow onset of nucleate boiling
+# temperature difference. Private helper for T_ONB[i] observables.
+# Phase 29 will elevate this to public Bergles_Rohsenow_T_ONB export.
+#
+# Source: Python STREAM temperatures.py lines 103-105
+# Formula: dT = 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
+# where p = P_Pa / 1e5 (pressure in bar)
+function _bergles_rohsenow_dT_ONB(P_Pa, q_spl)
+    p = P_Pa / 1e5
+    return 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
+end
+
+# Kakac Table 44 case 3 — 2-sided heating in rectangular duct.
+# Private helper used by HTC-02 and HTC-03 factories.
+# NOT the same as Marco_Han_Nusselt (which is 4-sided uniform heat flux).
+function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
+    return nu0 * (
+        1.0
+        - 1.4122 * aspect_ratio
+        + 2.3473 * aspect_ratio^2
+        - 2.8983 * aspect_ratio^3
+        + 2.0629 * aspect_ratio^4
+        - 0.6077 * aspect_ratio^5
+    )
+end
+
+# Shah & London equations 317-319 for parallel plates, thermally developing flow.
+# Piecewise approximation; errors vs Table 34: <0.2% for x<=6e-5, <0.6% for x<=2e-4,
+# <8% for 2e-4<x<=1e-3, <0.6% for x>1e-3.
+# Uses ifelse() (not if/else) so that MTK can trace through this function when x is
+# a symbolic Num expression (plain if/else evaluates the branch condition at trace time
+# and will throw a TypeError on symbolic arguments). See CLAUDE.md MTK Patterns.
+function _nusselt_coefficient_developing(x)
+    nu_low  = 1.49 * x^(-1/3)
+    nu_mid  = 1.49 * x^(-1/3) - 0.4
+    nu_high = 8.235 + 8.68 * exp(-164 * x) * (1e3 * x)^(-0.506)
+    return ifelse(x <= 2e-4, nu_low, ifelse(x <= 1e-3, nu_mid, nu_high))
+end
+
+"""
+    fully_developed_laminar_h_spl(; Dh, aspect_ratio) -> (Re, Pr, T_bulk, T_wall) -> Nu
+
+Factory returning an HTC correlation for fully-developed laminar flow in a
+rectangular duct with 2-sided heating. Uses `_two_sided_heating_nusselt` (Kakac
+Table 44 case 3) per D-01 -- NOT Marco-Han (which is 4-sided heating).
+
+Precomputes Nu at construction time; the returned closure ignores Re, Pr, T_bulk,
+T_wall (fully developed Nu is geometry-dependent only).
+
+# Arguments
+- `Dh`: hydraulic diameter [m] (accepted for interface consistency, not used in Nu calculation)
+- `aspect_ratio`: channel depth / channel width (0 to 1)
+
+# Returns
+Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+"""
+function fully_developed_laminar_h_spl(; Dh, aspect_ratio)
+    nu = _two_sided_heating_nusselt(aspect_ratio)
+    return (Re, Pr, args...) -> nu
+end
+
+"""
+    developing_laminar_h_spl(; Dh, develop_length, aspect_ratio) -> (Re, Pr, T_bulk, T_wall) -> Nu
+
+Factory returning an HTC correlation for thermally developing laminar flow in a
+rectangular duct with 2-sided heating. Uses Shah & London piecewise Nu coefficient
+with the aspect-ratio correction factor from Python STREAM (per D-03).
+
+The x_star formula includes a finite-width correction:
+`x_star = develop_length / Dh / Re / Pr / (6 - 5 * exp(-0.75 * aspect_ratio / 0.3257))`
+
+# Arguments
+- `Dh`: hydraulic diameter [m]
+- `develop_length`: distance from channel entrance [m]
+- `aspect_ratio`: channel depth / channel width (0 to 1)
+
+# Returns
+Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+"""
+function developing_laminar_h_spl(; Dh, develop_length, aspect_ratio)
+    correction = 6 - 5 * exp(-0.75 * aspect_ratio / 0.3257)
+    return (Re, Pr, args...) -> begin
+        x_star = develop_length / Dh / Re / Pr / correction
+        nudev = _nusselt_coefficient_developing(x_star)
+        _two_sided_heating_nusselt(aspect_ratio, nudev)
+    end
+end
+
+"""
+    maximal_htc(correlations...) -> (Re, Pr, T_bulk, T_wall) -> Nu
+
+Combinator returning an HTC correlation that evaluates all provided correlations
+and returns the maximum Nusselt number. Useful for selecting the dominant heat
+transfer mechanism (e.g., max of natural convection, developing laminar, turbulent).
+
+# Arguments
+- `correlations...`: one or more HTC closures `(Re, Pr, T_bulk, T_wall) -> Nu`
+
+# Returns
+Closure `(Re, Pr, T_bulk, T_wall) -> max(c1(...), c2(...), ...)`.
+"""
+function maximal_htc(correlations...)
+    return (Re, Pr, T_bulk, T_wall) -> begin
+        reduce(max, (c(Re, Pr, T_bulk, T_wall) for c in correlations))
+    end
+end
+
+"""
+    Marco_Han_Nusselt(aspect_ratio) -> Nu
+
+Marco and Han approximation for Nusselt number in fully-developed laminar flow
+through rectangular ducts with uniform wall temperature (4-sided heating).
+Kakac ch. 3 polynomial fit; reported error +/- 0.03%.
+
+`aspect_ratio = depth / width`, must be in [0, 1].
+
+# Arguments
+- `aspect_ratio`: channel depth / channel width (0 to 1)
+
+# Returns
+Nusselt number (dimensionless).
+
+Reference values: `Marco_Han_Nusselt(0.0) == 8.235`, `Marco_Han_Nusselt(0.2) == 5.991134842...`
+"""
+function Marco_Han_Nusselt(aspect_ratio)
+    return 8.235 * (
+        1.0
+        - 2.0421 * aspect_ratio
+        + 3.853 * aspect_ratio^2
+        - 2.4765 * aspect_ratio^3
+        + 1.0578 * aspect_ratio^4
+        - 0.1861 * aspect_ratio^5
+    )
 end

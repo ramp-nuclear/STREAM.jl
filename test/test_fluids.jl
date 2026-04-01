@@ -74,3 +74,34 @@ end
     # Ra = Gr * Pr = 2863.260 * 4.323622 = 12379.654
     @test isapprox(Ra(2863.260, 4.323622), 12379.654; rtol=1e-4)
 end
+
+# ─────────────────────────────────────────────────────────────────
+# PRES-03: sat_temperature spot-checks (Simantov saturation correlation)
+# Reference values from Python STREAM light_water.py docstring
+# ─────────────────────────────────────────────────────────────────
+@testset "PRES-03: sat_temperature" begin
+    @test isapprox(sat_temperature(1e5),     372.78; rtol=1e-4)   # 99.63 C
+    @test isapprox(sat_temperature(0.5e5),   354.43; rtol=1e-4)   # 81.28 C
+    @test isapprox(sat_temperature(2e5),     393.44; rtol=1e-4)   # 120.29 C
+    @test isapprox(sat_temperature(101325.0), 373.15; rtol=1e-3)  # 100.00 C (1 atm)
+end
+
+@testset "PRES-03: sat_temperature MTK symbolic" begin
+    @variables P_sym(t) = 1e5
+    result = sat_temperature(P_sym)
+    @test result isa Symbolics.Num
+end
+
+# ─────────────────────────────────────────────────────────────────
+# PRES-03: _bergles_rohsenow_dT_ONB spot-checks
+# Reference: Python STREAM temperatures.py docstring
+# Note: private helper, accessed via STREAM._bergles_rohsenow_dT_ONB
+# ─────────────────────────────────────────────────────────────────
+@testset "PRES-03: _bergles_rohsenow_dT_ONB" begin
+    # Zero heat flux -> zero superheat
+    @test STREAM._bergles_rohsenow_dT_ONB(1e10, 0.0) == 0.0
+    # Typical reactor conditions: positive dT
+    dT = STREAM._bergles_rohsenow_dT_ONB(1e5, 1e6)
+    @test dT > 0.0
+    @test isfinite(dT)
+end
