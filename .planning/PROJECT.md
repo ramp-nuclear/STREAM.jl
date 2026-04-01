@@ -8,6 +8,8 @@ v0.1 shipped a single forced-convection coolant loop validated against Python ST
 
 ## Current Milestone: v0.8 STREAM Composer GUI
 
+Phase 34 complete — Canvas and node editor implemented: toolbox drag-drop, custom StreamNode with registry-driven FlowPort handles, edge drawing with directionality validation, delete, undo/redo (Ctrl+Z/Ctrl+Shift+Z), 30 unit tests passing.
+
 **Goal:** Build a standalone desktop application (Tauri 2 + React + ReactFlow) that lets engineers visually compose STREAM.jl thermal-hydraulic systems by dragging and dropping components onto a canvas, connecting them via flow edges, and exporting valid Julia/MTK code as a .jl file — without any live Julia execution inside the GUI.
 
 **Target features:**
