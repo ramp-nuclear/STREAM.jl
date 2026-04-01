@@ -47,7 +47,7 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Major section breaks |
 | 3xl | 64px | Page-level spacing (unused in Phase 33) |
 
-Exceptions: Touch targets for toolbox items must be at minimum 36px height (desktop app, not mobile — 44px not required).
+Exceptions: Touch targets for toolbox items must be at minimum 32px height (desktop app, not mobile — 44px not required).
 
 ---
 
@@ -56,11 +56,11 @@ Exceptions: Touch targets for toolbox items must be at minimum 36px height (desk
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 14px | 400 (regular) | 1.5 |
-| Label | 12px | 500 (medium) | 1.4 |
+| Label | 12px | 400 (regular) | 1.4 |
 | Heading | 18px | 600 (semibold) | 1.2 |
 | Display | 24px | 600 (semibold) | 1.2 |
 
-**Rationale:** 14px body is standard for desktop tool UIs (VS Code, Figma, engineering tools). 12px labels for compact panel content. 3 weights declared (400, 500, 600) — medium weight used only for labels to differentiate from body text without resorting to bold.
+**Rationale:** 14px body is standard for desktop tool UIs (VS Code, Figma, engineering tools). 12px labels for compact panel content. 2 weights declared (400, 600). Labels are distinguished from body text by their smaller 12px size; a separate weight is not needed. Semibold (600) is reserved for headings and display text to establish visual hierarchy.
 
 ---
 
