@@ -4,7 +4,7 @@ milestone: v0.8
 milestone_name: STREAM Composer GUI
 status: verifying
 stopped_at: Completed 35.1-PLAN-4-tests-functionselect.md
-last_updated: "2026-04-02T10:59:35.364Z"
+last_updated: "2026-04-02T11:02:45.124Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 9
@@ -36,8 +36,8 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 
 ## Current Position
 
-Phase: 35.1 (correlation-picker) — EXECUTING
-Plan: 4 of 4
+Phase: 36
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-04-02
 
