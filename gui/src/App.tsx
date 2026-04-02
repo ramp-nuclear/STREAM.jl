@@ -45,42 +45,57 @@ function App() {
   }, []);
 
   // Keyboard shortcuts (global)
+  // kbLock prevents re-entrant execution: on Linux, GTK native dialogs leak
+  // keystrokes (e.g. Ctrl+N = new folder) into the WebView while open, which
+  // would trigger newProject() mid-save and clear the canvas.
+  const kbLock = useRef(false);
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
+      if (kbLock.current) return;
       // Ctrl+Shift+S or Cmd+Shift+S — Save As
       if ((e.ctrlKey || e.metaKey) && e.key === "s" && e.shiftKey) {
         e.preventDefault();
-        await useStore.getState().saveProjectAs();
+        kbLock.current = true;
+        try { await useStore.getState().saveProjectAs(); }
+        finally { kbLock.current = false; }
         return;
       }
       // Ctrl+S or Cmd+S — Save
       if ((e.ctrlKey || e.metaKey) && e.key === "s" && !e.shiftKey) {
         e.preventDefault();
-        await useStore.getState().saveProject();
+        kbLock.current = true;
+        try { await useStore.getState().saveProject(); }
+        finally { kbLock.current = false; }
         return;
       }
       // Ctrl+O or Cmd+O — Open
       if ((e.ctrlKey || e.metaKey) && e.key === "o") {
         e.preventDefault();
-        const { isDirty: dirty } = useStore.getState();
-        if (dirty) {
-          const action = await showUnsavedDialog();
-          if (action === "cancel") return;
-          if (action === "save") await useStore.getState().saveProject();
-        }
-        await useStore.getState().loadProject();
+        kbLock.current = true;
+        try {
+          const { isDirty: dirty } = useStore.getState();
+          if (dirty) {
+            const action = await showUnsavedDialog();
+            if (action === "cancel") return;
+            if (action === "save") await useStore.getState().saveProject();
+          }
+          await useStore.getState().loadProject();
+        } finally { kbLock.current = false; }
         return;
       }
       // Ctrl+N or Cmd+N — New
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
-        const { isDirty: dirty } = useStore.getState();
-        if (dirty) {
-          const action = await showUnsavedDialog();
-          if (action === "cancel") return;
-          if (action === "save") await useStore.getState().saveProject();
-        }
-        await useStore.getState().newProject();
+        kbLock.current = true;
+        try {
+          const { isDirty: dirty } = useStore.getState();
+          if (dirty) {
+            const action = await showUnsavedDialog();
+            if (action === "cancel") return;
+            if (action === "save") await useStore.getState().saveProject();
+          }
+          await useStore.getState().newProject();
+        } finally { kbLock.current = false; }
         return;
       }
     };
