@@ -2,10 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import useStore from "../useStore";
 import type { StreamNodeData } from "../useStore";
 
-// Reset store and temporal history before each test
+// Reset store and undo history before each test
 beforeEach(() => {
-  useStore.setState({ nodes: [], edges: [], selectedNodeId: null, bcs: [], isDirty: false });
-  useStore.temporal.getState().clear();
+  useStore.setState({ nodes: [], edges: [], selectedNodeId: null, bcs: [], isDirty: false, _undoPast: [], _undoFuture: [] });
 });
 
 describe("addNode", () => {
@@ -117,16 +116,16 @@ describe("undo/redo", () => {
     useStore.getState().addNode("Pump", { x: 0, y: 0 });
     expect(useStore.getState().nodes).toHaveLength(1);
 
-    useStore.temporal.getState().undo();
+    useStore.getState().undo();
     expect(useStore.getState().nodes).toHaveLength(0);
   });
 
   it("redo re-applies addNode", () => {
     useStore.getState().addNode("Pump", { x: 0, y: 0 });
-    useStore.temporal.getState().undo();
+    useStore.getState().undo();
     expect(useStore.getState().nodes).toHaveLength(0);
 
-    useStore.temporal.getState().redo();
+    useStore.getState().redo();
     expect(useStore.getState().nodes).toHaveLength(1);
   });
 
@@ -139,13 +138,13 @@ describe("undo/redo", () => {
 
     // Undo all 10
     for (let i = 0; i < 10; i++) {
-      useStore.temporal.getState().undo();
+      useStore.getState().undo();
     }
     expect(useStore.getState().nodes).toHaveLength(0);
 
     // Redo all 10
     for (let i = 0; i < 10; i++) {
-      useStore.temporal.getState().redo();
+      useStore.getState().redo();
     }
     expect(useStore.getState().nodes).toHaveLength(10);
   });
@@ -190,7 +189,7 @@ describe("updateNodeParams", () => {
     useStore.getState().addNode("Channel", { x: 0, y: 0 });
     const nodeId = useStore.getState().nodes[0].id;
     useStore.getState().updateNodeParams(nodeId, { parameters: { n: 10 } });
-    useStore.temporal.getState().undo();
+    useStore.getState().undo();
     const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
     expect(data.parameters.n).not.toBe(10);
   });

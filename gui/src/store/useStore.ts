@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { temporal } from "zundo";
 import {
   Node,
   Edge,
@@ -9,7 +8,6 @@ import {
   addEdge as rfAddEdge,
   NodeChange,
   EdgeChange,
-  NodePositionChange,
 } from "@xyflow/react";
 import { getComponent } from "../registry";
 import type { BCEntry } from "../lib/codeGenerator";
@@ -19,6 +17,13 @@ import {
   addToRecent,
   reconstructInstanceCounters,
 } from "../lib/projectIO";
+
+// Snapshot of undoable canvas content (not UI state like selection or panels).
+interface CanvasSnapshot {
+  nodes: Node[];
+  edges: Edge[];
+  bcs: BCEntry[];
+}
 
 export interface StreamNodeData {
   componentId: string;
@@ -41,6 +46,13 @@ interface AppState {
   isDirty: boolean;
   currentFilePath: string | null;
   recentFiles: string[];
+  // Undo/redo — explicit history stack, not auto-tracked middleware
+  _undoPast: CanvasSnapshot[];
+  _undoFuture: CanvasSnapshot[];
+  /** Push a snapshot of the current canvas state before a mutation. Call before set(). */
+  _pushSnapshot: () => void;
+  undo: () => void;
+  redo: () => void;
   // Canvas actions
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -113,324 +125,349 @@ async function saveRecentFiles(files: string[]): Promise<void> {
 // Store
 // ---------------------------------------------------------------------------
 
-const useStore = create<AppState>()(
-  temporal(
-    (set, get) => ({
+const useStore = create<AppState>()((set, get) => ({
+  nodes: [],
+  edges: [],
+  selectedNodeId: null,
+  bcs: [],
+  bottomPanelOpen: false,
+  toolboxCollapsed: false,
+  sidebarCollapsed: false,
+  // Persistence initial state
+  isDirty: false,
+  currentFilePath: null,
+  recentFiles: [],
+
+  // ---------------------------------------------------------------------------
+  // Undo / redo — explicit history stack
+  //
+  // Why not zundo (temporal middleware)? ReactFlow fires many "noise" change
+  // events (select, dimensions, intermediate drag positions) that caused
+  // spurious history entries and required multiple Ctrl+Z presses.
+  // Explicit push-before-mutation is simpler and fully predictable.
+  // ---------------------------------------------------------------------------
+
+  _undoPast: [],
+  _undoFuture: [],
+
+  _pushSnapshot: () => {
+    const { nodes, edges, bcs, _undoPast } = get();
+    set({
+      _undoPast: [..._undoPast, { nodes, edges, bcs }].slice(-50),
+      _undoFuture: [],
+    });
+  },
+
+  undo: () => {
+    const { nodes, edges, bcs, _undoPast, _undoFuture } = get();
+    if (_undoPast.length === 0) return;
+    const prev = _undoPast[_undoPast.length - 1];
+    set({
+      nodes: prev.nodes,
+      edges: prev.edges,
+      bcs: prev.bcs,
+      _undoPast: _undoPast.slice(0, -1),
+      _undoFuture: [{ nodes, edges, bcs }, ..._undoFuture].slice(0, 50),
+      isDirty: true,
+    });
+  },
+
+  redo: () => {
+    const { nodes, edges, bcs, _undoPast, _undoFuture } = get();
+    if (_undoFuture.length === 0) return;
+    const next = _undoFuture[0];
+    set({
+      nodes: next.nodes,
+      edges: next.edges,
+      bcs: next.bcs,
+      _undoPast: [..._undoPast, { nodes, edges, bcs }].slice(-50),
+      _undoFuture: _undoFuture.slice(1),
+      isDirty: true,
+    });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Canvas actions (content-mutating — set isDirty: true)
+  // ---------------------------------------------------------------------------
+
+  onNodesChange: (changes) => {
+    // Skip contentless events (selection highlight, layout measurement) — they
+    // are not content mutations and must not dirty the document or push history.
+    const isContentless = changes.every(
+      (c) => c.type === "select" || c.type === "dimensions",
+    );
+    if (isContentless) {
+      set({ nodes: applyNodeChanges(changes, get().nodes) });
+      return;
+    }
+
+    // Keyboard-delete (Delete/Backspace on selected node): snapshot before removal.
+    if (changes.some((c) => c.type === "remove")) {
+      get()._pushSnapshot();
+    }
+
+    set({ nodes: applyNodeChanges(changes, get().nodes), isDirty: true });
+  },
+
+  onEdgesChange: (changes) => {
+    const isContentless = changes.every((c) => c.type === "select");
+    if (isContentless) return;
+
+    // Keyboard-delete on selected edge: snapshot before removal.
+    if (changes.some((c) => c.type === "remove")) {
+      get()._pushSnapshot();
+    }
+
+    set({ edges: applyEdgeChanges(changes, get().edges), isDirty: true });
+  },
+
+  // selectNode is NOT content-mutating — do NOT set isDirty
+  selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
+
+  addNode: (componentId, position) => {
+    get()._pushSnapshot();
+    const id = crypto.randomUUID();
+    const component = getComponent(componentId);
+    const defaultParams: Record<string, unknown> = {};
+    if (component) {
+      for (const param of component.parameters) {
+        if (param.default !== undefined && param.default !== null) {
+          defaultParams[param.name] = param.default;
+        }
+      }
+    }
+    const defaultMode =
+      component?.constructorModes[0]?.mode ?? "default";
+    const newNode: Node = {
+      id,
+      type: "streamNode",
+      position,
+      data: {
+        componentId,
+        instanceName: getNextInstanceName(componentId),
+        parameters: defaultParams,
+        constructorMode: defaultMode,
+      } satisfies StreamNodeData,
+    };
+    set({ nodes: [...get().nodes, newNode], isDirty: true });
+  },
+
+  updateNodeParams: (nodeId, patch) => {
+    get()._pushSnapshot();
+    const { nodes } = get();
+    set({
+      nodes: nodes.map((n) => {
+        if (n.id !== nodeId) return n;
+        const data = n.data as unknown as StreamNodeData;
+        return {
+          ...n,
+          data: {
+            ...data,
+            ...(patch.instanceName !== undefined && {
+              instanceName: patch.instanceName,
+            }),
+            ...(patch.constructorMode !== undefined && {
+              constructorMode: patch.constructorMode,
+            }),
+            ...(patch.parameters !== undefined && {
+              parameters: { ...data.parameters, ...patch.parameters },
+            }),
+          },
+        };
+      }),
+      isDirty: true,
+    });
+  },
+
+  removeNode: (nodeId) => {
+    get()._pushSnapshot();
+    const { nodes, edges, bcs } = get();
+    set({
+      nodes: nodes.filter((n) => n.id !== nodeId),
+      edges: edges.filter(
+        (e) => e.source !== nodeId && e.target !== nodeId,
+      ),
+      bcs: bcs.filter((bc) => bc.nodeId !== nodeId),
+      selectedNodeId: null,
+      isDirty: true,
+    });
+  },
+
+  addEdge: (connection) => {
+    get()._pushSnapshot();
+    set({ edges: rfAddEdge(connection, get().edges), isDirty: true });
+  },
+
+  removeEdge: (edgeId) => {
+    get()._pushSnapshot();
+    set({ edges: get().edges.filter((e) => e.id !== edgeId), isDirty: true });
+  },
+
+  addBC: (bc) => {
+    get()._pushSnapshot();
+    set({ bcs: [...get().bcs, bc], isDirty: true });
+  },
+
+  removeBC: (index) => {
+    get()._pushSnapshot();
+    set({ bcs: get().bcs.filter((_, i) => i !== index), isDirty: true });
+  },
+
+  // toggleBottomPanel is NOT content-mutating — do NOT set isDirty
+  toggleBottomPanel: () => set({ bottomPanelOpen: !get().bottomPanelOpen }),
+
+  // Panel collapse is NOT content-mutating — do NOT set isDirty
+  setToolboxCollapsed: (collapsed) => set({ toolboxCollapsed: collapsed }),
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+
+  // ---------------------------------------------------------------------------
+  // setRecentFiles
+  // ---------------------------------------------------------------------------
+
+  setRecentFiles: (files) => set({ recentFiles: files }),
+
+  // ---------------------------------------------------------------------------
+  // saveProject (D-02)
+  // ---------------------------------------------------------------------------
+
+  saveProject: async () => {
+    const { currentFilePath } = get();
+    if (!currentFilePath) {
+      return get().saveProjectAs();
+    }
+    try {
+      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+      const json = serializeProject(get().nodes, get().edges, get().bcs);
+      await writeTextFile(currentFilePath, json);
+      const updated = addToRecent(get().recentFiles, currentFilePath);
+      set({ isDirty: false, recentFiles: updated });
+      await saveRecentFiles(updated);
+    } catch (err) {
+      console.error("[saveProject] write failed:", err);
+      try {
+        const { message } = await import("@tauri-apps/plugin-dialog");
+        await message(
+          "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again.",
+          { title: "Save Failed", kind: "error" },
+        );
+      } catch (dialogErr) {
+        console.error("[saveProject] error dialog failed:", dialogErr);
+      }
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // saveProjectAs (D-02)
+  // ---------------------------------------------------------------------------
+
+  saveProjectAs: async () => {
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const filePath = await save({
+        defaultPath: "project.streamgui",
+        filters: [
+          { name: "STREAM Composer Projects", extensions: ["streamgui"] },
+        ],
+      });
+      if (!filePath) return;
+
+      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+      const json = serializeProject(get().nodes, get().edges, get().bcs);
+      await writeTextFile(filePath, json);
+      const updated = addToRecent(get().recentFiles, filePath);
+      set({ isDirty: false, currentFilePath: filePath, recentFiles: updated });
+      await saveRecentFiles(updated);
+    } catch (err) {
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(
+        "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again.",
+        { title: "Save Failed", kind: "error" },
+      );
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // loadProject (D-02)
+  // ---------------------------------------------------------------------------
+
+  loadProject: async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const filePath = await open({
+        filters: [
+          { name: "STREAM Composer Projects", extensions: ["streamgui"] },
+        ],
+        multiple: false,
+      });
+      if (!filePath) return;
+      const path = Array.isArray(filePath) ? filePath[0] : filePath;
+      await get().loadProjectFromPath(path);
+    } catch (err) {
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(
+        "Couldn't open this project. The file may be missing, corrupted, or not a valid .streamgui file.",
+        { title: "Open Failed", kind: "error" },
+      );
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // loadProjectFromPath
+  // ---------------------------------------------------------------------------
+
+  loadProjectFromPath: async (filePath: string) => {
+    try {
+      const { readTextFile } = await import("@tauri-apps/plugin-fs");
+      const content = await readTextFile(filePath);
+      const project = deserializeProject(content);
+
+      const reconstructed = reconstructInstanceCounters(project.nodes);
+      clearInstanceCounters();
+      Object.assign(instanceCounters, reconstructed);
+
+      const updated = addToRecent(get().recentFiles, filePath);
+      set({
+        nodes: project.nodes,
+        edges: project.edges,
+        bcs: project.bcs,
+        currentFilePath: filePath,
+        isDirty: false,
+        selectedNodeId: null,
+        recentFiles: updated,
+        _undoPast: [],
+        _undoFuture: [],
+      });
+      await saveRecentFiles(updated);
+    } catch (err) {
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      await message(
+        "Couldn't open this project. The file may be missing, corrupted, or not a valid .streamgui file.",
+        { title: "Open Failed", kind: "error" },
+      );
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // newProject (D-11)
+  // ---------------------------------------------------------------------------
+
+  newProject: async () => {
+    clearInstanceCounters();
+    set({
       nodes: [],
       edges: [],
-      selectedNodeId: null,
       bcs: [],
+      currentFilePath: null,
+      isDirty: false,
+      selectedNodeId: null,
       bottomPanelOpen: false,
       toolboxCollapsed: false,
       sidebarCollapsed: false,
-      // Persistence initial state
-      isDirty: false,
-      currentFilePath: null,
-      recentFiles: [],
-
-      // ---------------------------------------------------------------------------
-      // Canvas actions (content-mutating — set isDirty: true)
-      // ---------------------------------------------------------------------------
-
-      onNodesChange: (changes) => {
-        const { pause, resume } = useStore.temporal.getState();
-
-        // Changes that carry no content (selection highlight, layout measurement).
-        // Never record these — they produce spurious history entries that force
-        // multiple Ctrl+Z presses to reach an actual structural change.
-        const isContentless = changes.every(
-          (c) => c.type === "select" || c.type === "dimensions",
-        );
-        if (isContentless) {
-          pause();
-          set({ nodes: applyNodeChanges(changes, get().nodes) });
-          resume();
-          return; // also skip isDirty — selection doesn't affect saves
-        }
-
-        // Position changes during drag: pause mid-drag, resume at drag-end
-        // so the entire drag is a single undo step.
-        const posChanges = changes.filter(
-          (c) => c.type === "position",
-        ) as NodePositionChange[];
-        if (posChanges.length > 0) {
-          const anyDragEnd = posChanges.some((c) => c.dragging === false);
-          const anyMidDrag = posChanges.some((c) => c.dragging === true);
-          if (anyDragEnd) {
-            resume();
-          } else if (anyMidDrag) {
-            pause();
-          }
-        }
-
-        set({ nodes: applyNodeChanges(changes, get().nodes), isDirty: true });
-      },
-
-      onEdgesChange: (changes) =>
-        set({ edges: applyEdgeChanges(changes, get().edges), isDirty: true }),
-
-      // selectNode is NOT content-mutating — do NOT set isDirty
-      selectNode: (nodeId) => set({ selectedNodeId: nodeId }),
-
-      addNode: (componentId, position) => {
-        const id = crypto.randomUUID();
-        const component = getComponent(componentId);
-        const defaultParams: Record<string, unknown> = {};
-        if (component) {
-          for (const param of component.parameters) {
-            if (param.default !== undefined && param.default !== null) {
-              defaultParams[param.name] = param.default;
-            }
-          }
-        }
-        const defaultMode =
-          component?.constructorModes[0]?.mode ?? "default";
-        const newNode: Node = {
-          id,
-          type: "streamNode",
-          position,
-          data: {
-            componentId,
-            instanceName: getNextInstanceName(componentId),
-            parameters: defaultParams,
-            constructorMode: defaultMode,
-          } satisfies StreamNodeData,
-        };
-        set({ nodes: [...get().nodes, newNode], isDirty: true });
-      },
-
-      updateNodeParams: (nodeId, patch) => {
-        const { nodes } = get();
-        set({
-          nodes: nodes.map((n) => {
-            if (n.id !== nodeId) return n;
-            const data = n.data as unknown as StreamNodeData;
-            return {
-              ...n,
-              data: {
-                ...data,
-                ...(patch.instanceName !== undefined && {
-                  instanceName: patch.instanceName,
-                }),
-                ...(patch.constructorMode !== undefined && {
-                  constructorMode: patch.constructorMode,
-                }),
-                ...(patch.parameters !== undefined && {
-                  parameters: { ...data.parameters, ...patch.parameters },
-                }),
-              },
-            };
-          }),
-          isDirty: true,
-        });
-      },
-
-      removeNode: (nodeId) => {
-        const { nodes, edges, bcs } = get();
-        set({
-          nodes: nodes.filter((n) => n.id !== nodeId),
-          edges: edges.filter(
-            (e) => e.source !== nodeId && e.target !== nodeId,
-          ),
-          bcs: bcs.filter((bc) => bc.nodeId !== nodeId),
-          selectedNodeId: null,
-          isDirty: true,
-        });
-      },
-
-      addEdge: (connection) => {
-        set({ edges: rfAddEdge(connection, get().edges), isDirty: true });
-      },
-
-      removeEdge: (edgeId) => {
-        set({
-          edges: get().edges.filter((e) => e.id !== edgeId),
-          isDirty: true,
-        });
-      },
-
-      addBC: (bc) => set({ bcs: [...get().bcs, bc], isDirty: true }),
-
-      removeBC: (index) =>
-        set({
-          bcs: get().bcs.filter((_, i) => i !== index),
-          isDirty: true,
-        }),
-
-      // toggleBottomPanel is NOT content-mutating — do NOT set isDirty
-      toggleBottomPanel: () =>
-        set({ bottomPanelOpen: !get().bottomPanelOpen }),
-
-      // Panel collapse is NOT content-mutating — do NOT set isDirty
-      setToolboxCollapsed: (collapsed) => set({ toolboxCollapsed: collapsed }),
-      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
-
-      // ---------------------------------------------------------------------------
-      // setRecentFiles
-      // ---------------------------------------------------------------------------
-
-      setRecentFiles: (files) => set({ recentFiles: files }),
-
-      // ---------------------------------------------------------------------------
-      // saveProject (D-02)
-      // ---------------------------------------------------------------------------
-
-      saveProject: async () => {
-        const { currentFilePath } = get();
-        if (!currentFilePath) {
-          return get().saveProjectAs();
-        }
-        try {
-          const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-          const json = serializeProject(get().nodes, get().edges, get().bcs);
-          await writeTextFile(currentFilePath, json);
-          const updated = addToRecent(get().recentFiles, currentFilePath);
-          set({ isDirty: false, recentFiles: updated });
-          await saveRecentFiles(updated);
-        } catch (err) {
-          console.error("[saveProject] write failed:", err);
-          try {
-            const { message } = await import("@tauri-apps/plugin-dialog");
-            await message(
-              "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again.",
-              { title: "Save Failed", kind: "error" },
-            );
-          } catch (dialogErr) {
-            console.error("[saveProject] error dialog failed:", dialogErr);
-          }
-        }
-      },
-
-      // ---------------------------------------------------------------------------
-      // saveProjectAs (D-02)
-      // ---------------------------------------------------------------------------
-
-      saveProjectAs: async () => {
-        try {
-          const { save } = await import("@tauri-apps/plugin-dialog");
-          const filePath = await save({
-            defaultPath: "project.streamgui",
-            filters: [
-              {
-                name: "STREAM Composer Projects",
-                extensions: ["streamgui"],
-              },
-            ],
-          });
-          if (!filePath) return; // User cancelled
-
-          const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-          const json = serializeProject(get().nodes, get().edges, get().bcs);
-          await writeTextFile(filePath, json);
-          const updated = addToRecent(get().recentFiles, filePath);
-          set({ isDirty: false, currentFilePath: filePath, recentFiles: updated });
-          await saveRecentFiles(updated);
-        } catch (err) {
-          const { message } = await import("@tauri-apps/plugin-dialog");
-          await message(
-            "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again.",
-            { title: "Save Failed", kind: "error" },
-          );
-        }
-      },
-
-      // ---------------------------------------------------------------------------
-      // loadProject (D-02)
-      // ---------------------------------------------------------------------------
-
-      loadProject: async () => {
-        try {
-          const { open } = await import("@tauri-apps/plugin-dialog");
-          const filePath = await open({
-            filters: [
-              {
-                name: "STREAM Composer Projects",
-                extensions: ["streamgui"],
-              },
-            ],
-            multiple: false,
-          });
-          if (!filePath) return; // User cancelled
-          const path = Array.isArray(filePath) ? filePath[0] : filePath;
-          await get().loadProjectFromPath(path);
-        } catch (err) {
-          const { message } = await import("@tauri-apps/plugin-dialog");
-          await message(
-            "Couldn't open this project. The file may be missing, corrupted, or not a valid .streamgui file.",
-            { title: "Open Failed", kind: "error" },
-          );
-        }
-      },
-
-      // ---------------------------------------------------------------------------
-      // loadProjectFromPath
-      // ---------------------------------------------------------------------------
-
-      loadProjectFromPath: async (filePath: string) => {
-        try {
-          const { readTextFile } = await import("@tauri-apps/plugin-fs");
-          const content = await readTextFile(filePath);
-          const project = deserializeProject(content);
-
-          // Reconstruct instanceCounters from the loaded node names (Pitfall 6)
-          const reconstructed = reconstructInstanceCounters(project.nodes);
-          clearInstanceCounters();
-          Object.assign(instanceCounters, reconstructed);
-
-          const updated = addToRecent(get().recentFiles, filePath);
-          set({
-            nodes: project.nodes,
-            edges: project.edges,
-            bcs: project.bcs,
-            currentFilePath: filePath,
-            isDirty: false,
-            selectedNodeId: null,
-            recentFiles: updated,
-          });
-          await saveRecentFiles(updated);
-        } catch (err) {
-          const { message } = await import("@tauri-apps/plugin-dialog");
-          await message(
-            "Couldn't open this project. The file may be missing, corrupted, or not a valid .streamgui file.",
-            { title: "Open Failed", kind: "error" },
-          );
-        }
-      },
-
-      // ---------------------------------------------------------------------------
-      // newProject (D-11)
-      // ---------------------------------------------------------------------------
-
-      newProject: async () => {
-        clearInstanceCounters();
-        set({
-          nodes: [],
-          edges: [],
-          bcs: [],
-          currentFilePath: null,
-          isDirty: false,
-          selectedNodeId: null,
-          bottomPanelOpen: false,
-          toolboxCollapsed: false,
-          sidebarCollapsed: false,
-        });
-        // Clear undo/redo history (temporal middleware)
-        useStore.temporal.getState().clear();
-      },
-    }),
-    {
-      // Only track content in undo history. selectedNodeId is UI state — including
-      // it caused every canvas click to create a history entry, requiring multiple
-      // Ctrl+Z presses to reach actual structural changes.
-      partialize: (state) => ({
-        nodes: state.nodes,
-        edges: state.edges,
-        bcs: state.bcs,
-      }),
-      limit: 50,
-    },
-  ),
-);
+      _undoPast: [],
+      _undoFuture: [],
+    });
+  },
+}));
 
 /**
  * Initialize recent files from disk on app startup.

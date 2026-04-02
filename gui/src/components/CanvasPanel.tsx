@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Controls,
@@ -27,6 +27,7 @@ export default function CanvasPanel() {
   const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge, selectNode } =
     useStore();
   const { screenToFlowPosition } = useReactFlow();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
@@ -40,9 +41,16 @@ export default function CanvasPanel() {
         y: event.clientY,
       });
       addNode(componentId, position);
+      // Restore keyboard focus to the canvas so Ctrl+Z works without a click.
+      containerRef.current?.focus();
     },
     [screenToFlowPosition, addNode],
   );
+
+  // Snapshot canvas state at drag start so the entire move is one undo step.
+  const onNodeDragStart = useCallback(() => {
+    useStore.getState()._pushSnapshot();
+  }, []);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -80,14 +88,14 @@ export default function CanvasPanel() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
-        useStore.temporal.getState().undo();
+        useStore.getState().undo();
       }
       if (
         (e.ctrlKey || e.metaKey) &&
         ((e.key === "z" && e.shiftKey) || e.key === "y")
       ) {
         e.preventDefault();
-        useStore.temporal.getState().redo();
+        useStore.getState().redo();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -95,7 +103,7 @@ export default function CanvasPanel() {
   }, []);
 
   return (
-    <div className="flex-1 h-full relative">
+    <div ref={containerRef} className="flex-1 h-full relative" tabIndex={-1}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -106,6 +114,7 @@ export default function CanvasPanel() {
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
+        onNodeDragStart={onNodeDragStart}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
