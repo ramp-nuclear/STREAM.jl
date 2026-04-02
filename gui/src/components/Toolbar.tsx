@@ -8,7 +8,11 @@ import { getComponent } from "../registry";
 import { generateCode } from "../lib/codeGenerator";
 import FileMenu from "./FileMenu";
 
-export default function Toolbar() {
+interface Props {
+  onUnsavedCheck: () => Promise<"save" | "discard" | "cancel">;
+}
+
+export default function Toolbar({ onUnsavedCheck }: Props) {
   const nodes = useStore((s) => s.nodes);
   const edges = useStore((s) => s.edges);
   const bcs = useStore((s) => s.bcs);
@@ -33,7 +37,7 @@ export default function Toolbar() {
   return (
     <div className="flex items-center justify-between h-9 px-2 bg-muted border-b">
       <div className="flex items-center gap-1">
-        <FileMenu />
+        <FileMenu onUnsavedCheck={onUnsavedCheck} />
         <Button
           variant={bottomPanelOpen ? "default" : "outline"}
           size="sm"

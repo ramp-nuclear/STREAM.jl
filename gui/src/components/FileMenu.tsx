@@ -1,5 +1,4 @@
 import { ChevronDown } from "lucide-react";
-import { message } from "@tauri-apps/plugin-dialog";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -9,23 +8,11 @@ import {
 } from "./ui/dropdown-menu";
 import useStore from "../store/useStore";
 
-export async function promptUnsavedChanges(): Promise<
-  "save" | "discard" | "cancel"
-> {
-  const result = await message(
-    "Your project has unsaved changes that will be lost.",
-    {
-      title: "Save changes?",
-      kind: "warning",
-      buttons: { yes: "Save", no: "Don't Save", cancel: "Cancel" },
-    },
-  );
-  if (result === "Save") return "save";
-  if (result === "Don't Save") return "discard";
-  return "cancel";
+interface Props {
+  onUnsavedCheck: () => Promise<"save" | "discard" | "cancel">;
 }
 
-export default function FileMenu() {
+export default function FileMenu({ onUnsavedCheck }: Props) {
   const isDirty = useStore((s) => s.isDirty);
   const saveProject = useStore((s) => s.saveProject);
   const saveProjectAs = useStore((s) => s.saveProjectAs);
@@ -34,7 +21,7 @@ export default function FileMenu() {
 
   async function handleNew() {
     if (isDirty) {
-      const action = await promptUnsavedChanges();
+      const action = await onUnsavedCheck();
       if (action === "cancel") return;
       if (action === "save") await saveProject();
     }
@@ -43,7 +30,7 @@ export default function FileMenu() {
 
   async function handleOpen() {
     if (isDirty) {
-      const action = await promptUnsavedChanges();
+      const action = await onUnsavedCheck();
       if (action === "cancel") return;
       if (action === "save") await saveProject();
     }
