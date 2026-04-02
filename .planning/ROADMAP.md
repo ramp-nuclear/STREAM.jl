@@ -198,6 +198,7 @@ Plans:
   - `maximal_htc(htc1, htc2)` — htc1/htc2: closure selectors (simple only)
 - **Simple closures** (directly usable, no sub-params): `dittus_boelter`, `constant_Nusselt` (HTC); `blasius_friction`, `laminar_friction` (friction)
 - `marco_han_nusselt` — check if this is exported before adding to picker list
+- **Open design question for discuss-phase**: How should `param.description` be surfaced in the sidebar? Options: (a) shadcn Tooltip on the label (hover), (b) secondary text below the label, (c) info icon next to the label. Decision must be made in 35.1 discuss-phase and applied consistently from 35.1 forward.
 
 ### Phase 36: Code Generation
 **Goal**: Users can view and export valid STREAM.jl Julia code generated from their canvas topology
