@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import useStore from "../useStore";
+import type { StreamNodeData } from "../useStore";
 
 // Reset store and temporal history before each test
 beforeEach(() => {
@@ -147,5 +148,74 @@ describe("undo/redo", () => {
       useStore.temporal.getState().redo();
     }
     expect(useStore.getState().nodes).toHaveLength(10);
+  });
+});
+
+describe("updateNodeParams", () => {
+  it("updates parameters for a node", () => {
+    useStore.getState().addNode("Channel", { x: 0, y: 0 });
+    const nodeId = useStore.getState().nodes[0].id;
+    useStore.getState().updateNodeParams(nodeId, { parameters: { n: 10 } });
+    const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
+    expect(data.parameters.n).toBe(10);
+  });
+
+  it("merges parameters without overwriting others", () => {
+    useStore.getState().addNode("Channel", { x: 0, y: 0 });
+    const nodeId = useStore.getState().nodes[0].id;
+    useStore.getState().updateNodeParams(nodeId, { parameters: { n: 10 } });
+    useStore.getState().updateNodeParams(nodeId, { parameters: { g: 9.81 } });
+    const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
+    expect(data.parameters.n).toBe(10);
+    expect(data.parameters.g).toBe(9.81);
+  });
+
+  it("updates instanceName", () => {
+    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+    const nodeId = useStore.getState().nodes[0].id;
+    useStore.getState().updateNodeParams(nodeId, { instanceName: "my_pump" });
+    const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
+    expect(data.instanceName).toBe("my_pump");
+  });
+
+  it("updates constructorMode", () => {
+    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+    const nodeId = useStore.getState().nodes[0].id;
+    useStore.getState().updateNodeParams(nodeId, { constructorMode: "fixed-mdot" });
+    const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
+    expect(data.constructorMode).toBe("fixed-mdot");
+  });
+
+  it("is covered by undo/redo", () => {
+    useStore.getState().addNode("Channel", { x: 0, y: 0 });
+    const nodeId = useStore.getState().nodes[0].id;
+    useStore.getState().updateNodeParams(nodeId, { parameters: { n: 10 } });
+    useStore.temporal.getState().undo();
+    const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
+    expect(data.parameters.n).not.toBe(10);
+  });
+});
+
+describe("addNode default population", () => {
+  it("populates default parameter values from registry", () => {
+    useStore.getState().addNode("Channel", { x: 0, y: 0 });
+    const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
+    // Channel has g default 0.0, htc_correlation default dittus_boelter, friction_correlation default blasius_friction
+    expect(data.parameters.g).toBe(0.0);
+    expect(data.parameters.htc_correlation).toBe("dittus_boelter");
+    expect(data.parameters.friction_correlation).toBe("blasius_friction");
+  });
+
+  it("sets constructorMode to first mode", () => {
+    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+    const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
+    expect(data.constructorMode).toBe("fixed-dP");
+  });
+
+  it("does not set defaults for required params with no default", () => {
+    useStore.getState().addNode("Channel", { x: 0, y: 0 });
+    const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
+    // n is required with no default
+    expect(data.parameters.n).toBeUndefined();
   });
 });
