@@ -6,6 +6,7 @@ import { Button } from "./ui/button";
 import useStore from "../store/useStore";
 import { getComponent } from "../registry";
 import { generateCode } from "../lib/codeGenerator";
+import FileMenu from "./FileMenu";
 
 export default function Toolbar() {
   const nodes = useStore((s) => s.nodes);
@@ -32,6 +33,7 @@ export default function Toolbar() {
   return (
     <div className="flex items-center justify-between h-9 px-2 bg-muted border-b">
       <div className="flex items-center gap-1">
+        <FileMenu />
         <Button
           variant={bottomPanelOpen ? "default" : "outline"}
           size="sm"

@@ -15,6 +15,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import useStore from "../store/useStore";
 import StreamNode from "./StreamNode";
+import WelcomeOverlay from "./WelcomeOverlay";
 
 const nodeTypes: NodeTypes = {
   streamNode: StreamNode,
@@ -94,7 +95,7 @@ export default function CanvasPanel() {
   }, []);
 
   return (
-    <div className="flex-1 h-full">
+    <div className="flex-1 h-full relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -116,6 +117,7 @@ export default function CanvasPanel() {
         <MiniMap />
         <Background variant={BackgroundVariant.Dots} />
       </ReactFlow>
+      <WelcomeOverlay />
     </div>
   );
 }
