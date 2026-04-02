@@ -51,28 +51,28 @@ function App() {
   const kbLock = useRef(false);
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && ["s","n","o"].includes(e.key.toLowerCase()))
+        console.log("[kb]", e.key, "shift=", e.shiftKey, "lock=", kbLock.current);
       if (kbLock.current) return;
-      // Ctrl+Shift+S or Cmd+Shift+S — Save As
-      if ((e.ctrlKey || e.metaKey) && e.key === "s" && e.shiftKey) {
-        e.preventDefault();
-        kbLock.current = true;
-        try { await useStore.getState().saveProjectAs(); }
-        finally { kbLock.current = false; }
-        return;
-      }
-      // Ctrl+S or Cmd+S — Save
-      if ((e.ctrlKey || e.metaKey) && e.key === "s" && !e.shiftKey) {
-        e.preventDefault();
-        kbLock.current = true;
-        try { await useStore.getState().saveProject(); }
-        finally { kbLock.current = false; }
-        return;
-      }
-      // Ctrl+O or Cmd+O — Open
-      if ((e.ctrlKey || e.metaKey) && e.key === "o") {
-        e.preventDefault();
-        kbLock.current = true;
-        try {
+      try {
+        // Ctrl+Shift+S — Save As
+        if ((e.ctrlKey || e.metaKey) && e.key === "s" && e.shiftKey) {
+          e.preventDefault();
+          kbLock.current = true;
+          await useStore.getState().saveProjectAs();
+          return;
+        }
+        // Ctrl+S — Save
+        if ((e.ctrlKey || e.metaKey) && e.key === "s" && !e.shiftKey) {
+          e.preventDefault();
+          kbLock.current = true;
+          await useStore.getState().saveProject();
+          return;
+        }
+        // Ctrl+O — Open
+        if ((e.ctrlKey || e.metaKey) && e.key === "o") {
+          e.preventDefault();
+          kbLock.current = true;
           const { isDirty: dirty } = useStore.getState();
           if (dirty) {
             const action = await showUnsavedDialog();
@@ -80,14 +80,12 @@ function App() {
             if (action === "save") await useStore.getState().saveProject();
           }
           await useStore.getState().loadProject();
-        } finally { kbLock.current = false; }
-        return;
-      }
-      // Ctrl+N or Cmd+N — New
-      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
-        e.preventDefault();
-        kbLock.current = true;
-        try {
+          return;
+        }
+        // Ctrl+N — New
+        if ((e.ctrlKey || e.metaKey) && e.key === "n") {
+          e.preventDefault();
+          kbLock.current = true;
           const { isDirty: dirty } = useStore.getState();
           if (dirty) {
             const action = await showUnsavedDialog();
@@ -95,8 +93,12 @@ function App() {
             if (action === "save") await useStore.getState().saveProject();
           }
           await useStore.getState().newProject();
-        } finally { kbLock.current = false; }
-        return;
+          return;
+        }
+      } catch (err) {
+        console.error("[handleKeyDown] unhandled error:", err);
+      } finally {
+        kbLock.current = false;
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -136,6 +138,7 @@ function App() {
     getCurrentWindow()
       .onCloseRequested(async (event) => {
         const { isDirty: dirty } = useStore.getState();
+        console.log("[onCloseRequested] fired, isDirty=", dirty, "kbLock=", kbLock.current);
         if (!dirty) return; // allow close
 
         event.preventDefault(); // must be synchronous before any await

@@ -246,11 +246,16 @@ const useStore = create<AppState>()(
           set({ isDirty: false, recentFiles: updated });
           await saveRecentFiles(updated);
         } catch (err) {
-          const { message } = await import("@tauri-apps/plugin-dialog");
-          await message(
-            "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again.",
-            { title: "Save Failed", kind: "error" },
-          );
+          console.error("[saveProject] write failed:", err);
+          try {
+            const { message } = await import("@tauri-apps/plugin-dialog");
+            await message(
+              "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again.",
+              { title: "Save Failed", kind: "error" },
+            );
+          } catch (dialogErr) {
+            console.error("[saveProject] error dialog failed:", dialogErr);
+          }
         }
       },
 
@@ -355,6 +360,7 @@ const useStore = create<AppState>()(
       // ---------------------------------------------------------------------------
 
       newProject: async () => {
+        console.trace("[useStore] newProject called");
         clearInstanceCounters();
         set({
           nodes: [],
