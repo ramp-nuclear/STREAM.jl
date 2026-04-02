@@ -41,8 +41,8 @@ export default function CanvasPanel() {
         y: event.clientY,
       });
       addNode(componentId, position);
-      // Restore keyboard focus to the canvas so Ctrl+Z works without a click.
-      containerRef.current?.focus();
+      // Defer focus past the browser's own drag-end focus bookkeeping.
+      setTimeout(() => containerRef.current?.focus(), 0);
     },
     [screenToFlowPosition, addNode],
   );
