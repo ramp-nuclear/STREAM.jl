@@ -6,15 +6,28 @@ import CanvasPanel from "./components/CanvasPanel";
 import SidebarPanel from "./components/SidebarPanel";
 import Toolbar from "./components/Toolbar";
 import BottomPanel from "./components/BottomPanel";
+import PanelCollapseButton from "./components/PanelCollapseButton";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
+import { TooltipProvider } from "./components/ui/tooltip";
 import useStore from "./store/useStore";
 import { initializeRecentFiles } from "./store/useStore";
+import { useResizable } from "./hooks/useResizable";
 
 type DialogCallback = (action: "save" | "discard" | "cancel") => void;
 
 function App() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const dialogCallbackRef = useRef<DialogCallback | null>(null);
+
+  // Panel collapse state
+  const toolboxCollapsed = useStore((s) => s.toolboxCollapsed);
+  const sidebarCollapsed = useStore((s) => s.sidebarCollapsed);
+  const setToolboxCollapsed = useStore((s) => s.setToolboxCollapsed);
+  const setSidebarCollapsed = useStore((s) => s.setSidebarCollapsed);
+
+  // Panel resize hooks
+  const toolboxResize = useResizable({ direction: "left", minWidth: 120, maxWidth: 360, defaultWidth: 240 });
+  const sidebarResize = useResizable({ direction: "right", minWidth: 200, maxWidth: 400, defaultWidth: 320 });
 
   // Returns a promise that resolves when the user picks an action.
   const showUnsavedDialog = useCallback(
@@ -165,23 +178,41 @@ function App() {
 
   return (
     <ReactFlowProvider>
-      <div className="flex flex-col h-screen w-screen overflow-hidden">
-        <div className="flex flex-1 min-h-0">
-          <ToolboxPanel />
-          <div className="flex flex-col flex-1">
-            <Toolbar onUnsavedCheck={showUnsavedDialog} />
-            <CanvasPanel />
+      <TooltipProvider>
+        <div className="flex flex-col h-screen w-screen overflow-hidden">
+          <div className="flex flex-1 min-h-0">
+            {!toolboxCollapsed && (
+              <ToolboxPanel width={toolboxResize.width} />
+            )}
+            <div className="flex items-center border-r">
+              {!toolboxCollapsed && (
+                <div className="w-2 h-full cursor-col-resize" onMouseDown={toolboxResize.onMouseDown} />
+              )}
+              <PanelCollapseButton side="left" collapsed={toolboxCollapsed} onToggle={() => setToolboxCollapsed(!toolboxCollapsed)} />
+            </div>
+            <div className="flex flex-col flex-1">
+              <Toolbar onUnsavedCheck={showUnsavedDialog} />
+              <CanvasPanel />
+            </div>
+            <div className="flex items-center border-l">
+              <PanelCollapseButton side="right" collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+              {!sidebarCollapsed && (
+                <div className="w-2 h-full cursor-col-resize" onMouseDown={sidebarResize.onMouseDown} />
+              )}
+            </div>
+            {!sidebarCollapsed && (
+              <SidebarPanel width={sidebarResize.width} />
+            )}
           </div>
-          <SidebarPanel />
+          <BottomPanel />
         </div>
-        <BottomPanel />
-      </div>
-      <UnsavedChangesDialog
-        open={dialogOpen}
-        onSave={handleDialogSave}
-        onDiscard={handleDialogDiscard}
-        onCancel={handleDialogCancel}
-      />
+        <UnsavedChangesDialog
+          open={dialogOpen}
+          onSave={handleDialogSave}
+          onDiscard={handleDialogDiscard}
+          onCancel={handleDialogCancel}
+        />
+      </TooltipProvider>
     </ReactFlowProvider>
   );
 }

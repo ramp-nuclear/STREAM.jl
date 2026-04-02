@@ -8,14 +8,18 @@ import InstanceNameField from "./InstanceNameField";
 import ParameterForm from "./ParameterForm";
 import ModeToggle from "./ModeToggle";
 
-export default function SidebarPanel() {
+interface SidebarPanelProps {
+  width: number;
+}
+
+export default function SidebarPanel({ width }: SidebarPanelProps) {
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const nodes = useStore((s) => s.nodes);
   const updateNodeParams = useStore((s) => s.updateNodeParams);
 
   if (selectedNodeId === null) {
     return (
-      <div className="w-80 h-full border-l">
+      <div className="h-full border-l shrink-0" style={{ width }}>
         <div className="p-[16px] pt-[32px]">
           <h2 className="text-[16px] font-semibold leading-[1.3]">
             Properties
@@ -41,7 +45,7 @@ export default function SidebarPanel() {
 
   if (!component) {
     return (
-      <div className="w-80 h-full border-l">
+      <div className="h-full border-l shrink-0" style={{ width }}>
         <div className="p-[16px] pt-[32px]">
           <h2 className="text-[16px] font-semibold leading-[1.3]">
             Properties
@@ -58,7 +62,7 @@ export default function SidebarPanel() {
     data.constructorMode ?? component.constructorModes[0]?.mode ?? "default";
 
   return (
-    <div className="w-80 h-full border-l">
+    <div className="h-full border-l shrink-0" style={{ width }}>
       <ScrollArea className="h-full">
         <div className="p-[16px] pt-[32px]" key={selectedNodeId}>
           <h2 className="text-[16px] font-semibold leading-[1.3]">
