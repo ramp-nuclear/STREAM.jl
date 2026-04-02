@@ -14,6 +14,7 @@
     "fs:allow-mkdir",
     "fs:scope-home-recursive",
     "core:window:allow-set-title",
-    "core:window:allow-close"
+    "core:window:allow-close",
+    "core:window:allow-destroy"
   ]
 }

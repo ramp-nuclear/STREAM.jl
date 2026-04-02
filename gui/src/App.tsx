@@ -118,12 +118,11 @@ function App() {
         const action = await showUnsavedDialog();
         if (action === "save") {
           await useStore.getState().saveProject();
-          await getCurrentWindow().close();
-        } else if (action === "discard") {
-          useStore.setState({ isDirty: false });
-          await getCurrentWindow().close();
         }
-        // "cancel" → do nothing
+        if (action !== "cancel") {
+          // destroy() bypasses CloseRequested — avoids re-triggering this guard
+          await getCurrentWindow().destroy();
+        }
       })
       .then((fn) => {
         if (!active) {
