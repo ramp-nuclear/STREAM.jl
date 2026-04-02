@@ -62,4 +62,34 @@ describe("StreamNode", () => {
     const handles = container.querySelectorAll(".react-flow__handle");
     expect(handles.length).toBe(2);
   });
+
+  it("renders with category border stripe for Hydraulic component", () => {
+    const { container } = renderStreamNode({
+      componentId: "Pump",
+      instanceName: "pump_1",
+      parameters: {},
+    });
+    const nodeDiv = container.firstElementChild?.firstElementChild;
+    expect(nodeDiv?.className).toContain("border-l-blue-500");
+  });
+
+  it("renders with category border stripe for Thermal component", () => {
+    const { container } = renderStreamNode({
+      componentId: "ConstantTemperature",
+      instanceName: "ct_1",
+      parameters: {},
+    });
+    const nodeDiv = container.firstElementChild?.firstElementChild;
+    expect(nodeDiv?.className).toContain("border-l-amber-500");
+  });
+
+  it("renders an SVG icon element", () => {
+    const { container } = renderStreamNode({
+      componentId: "Pump",
+      instanceName: "pump_1",
+      parameters: {},
+    });
+    const svg = container.querySelector("svg");
+    expect(svg).toBeTruthy();
+  });
 });
