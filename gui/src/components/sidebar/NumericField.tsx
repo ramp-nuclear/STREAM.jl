@@ -4,6 +4,13 @@ import { Label } from "@/components/ui/label";
 import { validateInt, validateReal } from "@/lib/validation";
 import type { Parameter } from "@/registry/types";
 import { cn } from "@/lib/utils";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface NumericFieldProps {
   param: Parameter;
@@ -30,8 +37,18 @@ export default function NumericField({ param, value, onChange }: NumericFieldPro
 
   return (
     <div className="flex flex-col gap-[8px]">
-      <Label className="text-[13px] font-semibold leading-[1.4]">
+      <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
         {param.name}
+        {param.description && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3 w-3 text-muted-foreground cursor-default" />
+              </TooltipTrigger>
+              <TooltipContent>{param.description}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </Label>
       <div className="relative">
         <Input
