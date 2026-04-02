@@ -419,12 +419,12 @@ const useStore = create<AppState>()(
       },
     }),
     {
-      // Exclude isDirty, currentFilePath, recentFiles from zundo partialize.
-      // isDirty is metadata; currentFilePath/recentFiles are session state, not undoable content.
+      // Only track content in undo history. selectedNodeId is UI state — including
+      // it caused every canvas click to create a history entry, requiring multiple
+      // Ctrl+Z presses to reach actual structural changes.
       partialize: (state) => ({
         nodes: state.nodes,
         edges: state.edges,
-        selectedNodeId: state.selectedNodeId,
         bcs: state.bcs,
       }),
       limit: 50,
