@@ -247,7 +247,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 38-01-PLAN.md — Icon map, category colors, StreamNode + ToolboxItem visual redesign
+- [x] 38-01-PLAN.md — Icon map, category colors, StreamNode + ToolboxItem visual redesign
 - [ ] 38-02-PLAN.md — Panel collapse/resize behavior, store additions, shadcn audit
 - [ ] 38-03-PLAN.md — Human-verify: visual verification of all DSGN requirements
 **UI hint**: yes
@@ -320,7 +320,7 @@ Plans:
 | 35.1. Correlation Picker | v0.8 | 0/? | Complete    | 2026-04-02 |
 | 36. Code Generation | v0.8 | 2/3 | Complete    | 2026-04-02 |
 | 37. Project Persistence | v0.8 | 3/3 | Complete    | 2026-04-02 |
-| 38. UI Design Pass | v0.8 | 0/? | Not started | — |
+| 38. UI Design Pass | v0.8 | 1/3 | In Progress|  |
 | 39. Topology Validation | v0.8 | 0/? | Not started | — |
 | 40. Thermal Composition | v0.8 | 0/? | Not started | — |
 
