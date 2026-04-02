@@ -8,16 +8,16 @@ interface BCRowProps {
 
 export default function BCRow({ expression, onDelete }: BCRowProps) {
   return (
-    <div className="flex items-center justify-between bg-muted rounded-md px-3 py-1.5">
-      <span className="font-mono text-sm">{expression}</span>
+    <div className="inline-flex items-center gap-1 bg-muted rounded-md pl-3 pr-1 py-1 max-w-full">
+      <span className="font-mono text-sm truncate">{expression}</span>
       <Button
         variant="ghost"
         size="icon"
-        className="h-6 w-6 hover:text-destructive"
+        className="h-5 w-5 shrink-0 hover:text-destructive"
         onClick={onDelete}
         aria-label="Remove boundary condition"
       >
-        <X className="h-4 w-4" />
+        <X className="h-3 w-3" />
       </Button>
     </div>
   );

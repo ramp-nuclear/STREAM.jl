@@ -33,9 +33,8 @@ export default function Toolbar() {
     <div className="flex items-center justify-between h-9 px-2 bg-muted border-b">
       <div className="flex items-center gap-1">
         <Button
-          variant={bottomPanelOpen ? "outline" : "ghost"}
+          variant={bottomPanelOpen ? "default" : "outline"}
           size="sm"
-          className={bottomPanelOpen ? "border-primary" : ""}
           onClick={toggleBottomPanel}
         >
           <Code2 className="h-4 w-4 mr-1" />

@@ -109,7 +109,7 @@ export default function BCPanel() {
           <p>Add a pressure anchor (e.g., pump.port_in.P ~ 1.0e5).</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
           {bcs.map((bc, index) => {
             const name = getInstanceName(bc.nodeId);
             if (!name) return null;

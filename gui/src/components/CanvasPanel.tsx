@@ -5,6 +5,7 @@ import {
   MiniMap,
   Background,
   BackgroundVariant,
+  ConnectionLineType,
   useReactFlow,
   type Connection,
   type Edge,
@@ -104,6 +105,8 @@ export default function CanvasPanel() {
         onPaneClick={onPaneClick}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
+        defaultEdgeOptions={{ type: "smoothstep" }}
+        connectionLineType={ConnectionLineType.SmoothStep}
         deleteKeyCode={["Delete", "Backspace"]}
         fitView
       >
