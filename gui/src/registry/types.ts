@@ -8,6 +8,12 @@ export interface Port {
   arrayParam?: string;
 }
 
+export interface FunctionOption {
+  value: string;
+  label: string;
+  kind: "simple" | "factory";
+}
+
 export interface Parameter {
   name: string;
   type: "Real" | "Int" | "Bool" | "PipeGeometry" | "Function" | "Matrix";
@@ -16,6 +22,7 @@ export interface Parameter {
   description: string;
   required: boolean;
   positional: boolean;
+  options?: FunctionOption[];
 }
 
 export interface ConstructorMode {

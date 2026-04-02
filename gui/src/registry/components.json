@@ -42,7 +42,14 @@
           "default": "dittus_boelter",
           "description": "HTC correlation closure (Re, Pr, T_bulk, T_wall) -> Nu",
           "required": false,
-          "positional": false
+          "positional": false,
+          "options": [
+            { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+            { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
+            { "value": "regime_dependent", "label": "Regime Dependent", "kind": "factory" },
+            { "value": "elenbaas_htc", "label": "Elenbaas", "kind": "factory" },
+            { "value": "maximal_htc", "label": "Maximal HTC", "kind": "factory" }
+          ]
         },
         {
           "name": "friction_correlation",
@@ -50,7 +57,11 @@
           "default": "blasius_friction",
           "description": "Friction factor correlation closure (Re) -> f",
           "required": false,
-          "positional": false
+          "positional": false,
+          "options": [
+            { "value": "blasius_friction", "label": "Blasius", "kind": "simple" },
+            { "value": "laminar_friction", "label": "Laminar", "kind": "simple" }
+          ]
         }
       ],
       "constructorModes": [
@@ -102,7 +113,14 @@
           "default": "dittus_boelter",
           "description": "HTC correlation closure (Re, Pr, T_bulk, T_wall) -> Nu",
           "required": false,
-          "positional": false
+          "positional": false,
+          "options": [
+            { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+            { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
+            { "value": "regime_dependent", "label": "Regime Dependent", "kind": "factory" },
+            { "value": "elenbaas_htc", "label": "Elenbaas", "kind": "factory" },
+            { "value": "maximal_htc", "label": "Maximal HTC", "kind": "factory" }
+          ]
         },
         {
           "name": "friction_correlation",
@@ -110,7 +128,11 @@
           "default": "blasius_friction",
           "description": "Friction factor correlation closure (Re) -> f",
           "required": false,
-          "positional": false
+          "positional": false,
+          "options": [
+            { "value": "blasius_friction", "label": "Blasius", "kind": "simple" },
+            { "value": "laminar_friction", "label": "Laminar", "kind": "simple" }
+          ]
         },
         {
           "name": "scb_correction",
@@ -177,7 +199,14 @@
           "default": "dittus_boelter",
           "description": "HTC correlation closure (Re, Pr, T_bulk, T_wall) -> Nu",
           "required": false,
-          "positional": false
+          "positional": false,
+          "options": [
+            { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+            { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
+            { "value": "regime_dependent", "label": "Regime Dependent", "kind": "factory" },
+            { "value": "elenbaas_htc", "label": "Elenbaas", "kind": "factory" },
+            { "value": "maximal_htc", "label": "Maximal HTC", "kind": "factory" }
+          ]
         },
         {
           "name": "friction_correlation",
@@ -185,7 +214,11 @@
           "default": "blasius_friction",
           "description": "Friction factor correlation closure (Re) -> f",
           "required": false,
-          "positional": false
+          "positional": false,
+          "options": [
+            { "value": "blasius_friction", "label": "Blasius", "kind": "simple" },
+            { "value": "laminar_friction", "label": "Laminar", "kind": "simple" }
+          ]
         }
       ],
       "constructorModes": [

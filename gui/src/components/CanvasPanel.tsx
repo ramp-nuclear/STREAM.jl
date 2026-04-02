@@ -8,6 +8,7 @@ import {
   useReactFlow,
   type Connection,
   type Edge,
+  type Node,
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -19,7 +20,7 @@ const nodeTypes: NodeTypes = {
 };
 
 export default function CanvasPanel() {
-  const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge } =
+  const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge, selectNode } =
     useStore();
   const { screenToFlowPosition } = useReactFlow();
 
@@ -50,6 +51,17 @@ export default function CanvasPanel() {
     },
     [addEdge],
   );
+
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      selectNode(node.id);
+    },
+    [selectNode],
+  );
+
+  const onPaneClick = useCallback(() => {
+    selectNode(null);
+  }, [selectNode]);
 
   const isValidConnection = useCallback((connection: Edge | Connection) => {
     return !!(
@@ -88,6 +100,8 @@ export default function CanvasPanel() {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         deleteKeyCode={["Delete", "Backspace"]}
