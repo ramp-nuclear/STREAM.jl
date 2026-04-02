@@ -10,16 +10,23 @@ import ModeToggle from "./ModeToggle";
 
 interface SidebarPanelProps {
   width: number;
+  onResizeMouseDown?: (e: React.MouseEvent) => void;
 }
 
-export default function SidebarPanel({ width }: SidebarPanelProps) {
+export default function SidebarPanel({ width, onResizeMouseDown }: SidebarPanelProps) {
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const nodes = useStore((s) => s.nodes);
   const updateNodeParams = useStore((s) => s.updateNodeParams);
 
   if (selectedNodeId === null) {
     return (
-      <div className="h-full border-l shrink-0" style={{ width }}>
+      <div className="relative h-full border-l shrink-0" style={{ width }}>
+        {onResizeMouseDown && (
+          <div
+            className="absolute left-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-border/50"
+            onMouseDown={onResizeMouseDown}
+          />
+        )}
         <div className="p-[16px] pt-[32px]">
           <h2 className="text-[16px] font-semibold leading-[1.3]">
             Properties
@@ -45,7 +52,13 @@ export default function SidebarPanel({ width }: SidebarPanelProps) {
 
   if (!component) {
     return (
-      <div className="h-full border-l shrink-0" style={{ width }}>
+      <div className="relative h-full border-l shrink-0" style={{ width }}>
+        {onResizeMouseDown && (
+          <div
+            className="absolute left-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-border/50"
+            onMouseDown={onResizeMouseDown}
+          />
+        )}
         <div className="p-[16px] pt-[32px]">
           <h2 className="text-[16px] font-semibold leading-[1.3]">
             Properties
@@ -62,7 +75,13 @@ export default function SidebarPanel({ width }: SidebarPanelProps) {
     data.constructorMode ?? component.constructorModes[0]?.mode ?? "default";
 
   return (
-    <div className="h-full border-l shrink-0" style={{ width }}>
+    <div className="relative h-full border-l shrink-0" style={{ width }}>
+      {onResizeMouseDown && (
+        <div
+          className="absolute left-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-border/50"
+          onMouseDown={onResizeMouseDown}
+        />
+      )}
       <ScrollArea className="h-full">
         <div className="p-[16px] pt-[32px]" key={selectedNodeId}>
           <h2 className="text-[16px] font-semibold leading-[1.3]">

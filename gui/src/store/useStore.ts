@@ -9,6 +9,7 @@ import {
   addEdge as rfAddEdge,
   NodeChange,
   EdgeChange,
+  NodePositionChange,
 } from "@xyflow/react";
 import { getComponent } from "../registry";
 import type { BCEntry } from "../lib/codeGenerator";
@@ -131,8 +132,24 @@ const useStore = create<AppState>()(
       // Canvas actions (content-mutating — set isDirty: true)
       // ---------------------------------------------------------------------------
 
-      onNodesChange: (changes) =>
-        set({ nodes: applyNodeChanges(changes, get().nodes), isDirty: true }),
+      onNodesChange: (changes) => {
+        // Suppress intermediate drag positions from undo history.
+        // Pause at drag start/mid; resume at drag end so only the
+        // final resting position is recorded as a single undo step.
+        const posChanges = changes.filter(
+          (c) => c.type === "position",
+        ) as NodePositionChange[];
+        if (posChanges.length > 0) {
+          const anyDragEnd = posChanges.some((c) => c.dragging === false);
+          const anyMidDrag = posChanges.some((c) => c.dragging === true);
+          if (anyDragEnd) {
+            useStore.temporal.getState().resume();
+          } else if (anyMidDrag) {
+            useStore.temporal.getState().pause();
+          }
+        }
+        set({ nodes: applyNodeChanges(changes, get().nodes), isDirty: true });
+      },
 
       onEdgesChange: (changes) =>
         set({ edges: applyEdgeChanges(changes, get().edges), isDirty: true }),

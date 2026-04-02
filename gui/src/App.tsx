@@ -182,12 +182,9 @@ function App() {
         <div className="flex flex-col h-screen w-screen overflow-hidden">
           <div className="flex flex-1 min-h-0">
             {!toolboxCollapsed && (
-              <ToolboxPanel width={toolboxResize.width} />
+              <ToolboxPanel width={toolboxResize.width} onResizeMouseDown={toolboxResize.onMouseDown} />
             )}
             <div className="flex items-center border-r">
-              {!toolboxCollapsed && (
-                <div className="w-2 h-full cursor-col-resize" onMouseDown={toolboxResize.onMouseDown} />
-              )}
               <PanelCollapseButton side="left" collapsed={toolboxCollapsed} onToggle={() => setToolboxCollapsed(!toolboxCollapsed)} />
             </div>
             <div className="flex flex-col flex-1">
@@ -196,12 +193,9 @@ function App() {
             </div>
             <div className="flex items-center border-l">
               <PanelCollapseButton side="right" collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-              {!sidebarCollapsed && (
-                <div className="w-2 h-full cursor-col-resize" onMouseDown={sidebarResize.onMouseDown} />
-              )}
             </div>
             {!sidebarCollapsed && (
-              <SidebarPanel width={sidebarResize.width} />
+              <SidebarPanel width={sidebarResize.width} onResizeMouseDown={sidebarResize.onMouseDown} />
             )}
           </div>
           <BottomPanel />
