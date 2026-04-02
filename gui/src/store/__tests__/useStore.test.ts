@@ -4,7 +4,7 @@ import type { StreamNodeData } from "../useStore";
 
 // Reset store and temporal history before each test
 beforeEach(() => {
-  useStore.setState({ nodes: [], edges: [], selectedNodeId: null });
+  useStore.setState({ nodes: [], edges: [], selectedNodeId: null, bcs: [], isDirty: false });
   useStore.temporal.getState().clear();
 });
 
@@ -217,5 +217,83 @@ describe("addNode default population", () => {
     const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
     // n is required with no default
     expect(data.parameters.n).toBeUndefined();
+  });
+});
+
+describe("isDirty tracking", () => {
+  it("isDirty starts false", () => {
+    expect(useStore.getState().isDirty).toBe(false);
+  });
+
+  it("addNode sets isDirty true", () => {
+    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  it("removeNode sets isDirty true", () => {
+    // Force isDirty to false first so we can verify the action sets it
+    useStore.setState({ isDirty: false });
+    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+    const nodeId = useStore.getState().nodes[0].id;
+    useStore.setState({ isDirty: false });
+    useStore.getState().removeNode(nodeId);
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  it("addEdge sets isDirty true", () => {
+    useStore.setState({ isDirty: false });
+    useStore.getState().addEdge({
+      source: "a",
+      target: "b",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
+    });
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  it("removeEdge sets isDirty true", () => {
+    useStore.getState().addEdge({
+      source: "a",
+      target: "b",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
+    });
+    const edgeId = useStore.getState().edges[0].id;
+    useStore.setState({ isDirty: false });
+    useStore.getState().removeEdge(edgeId);
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  it("updateNodeParams sets isDirty true", () => {
+    useStore.getState().addNode("Channel", { x: 0, y: 0 });
+    const nodeId = useStore.getState().nodes[0].id;
+    useStore.setState({ isDirty: false });
+    useStore.getState().updateNodeParams(nodeId, { parameters: { n: 5 } });
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  it("addBC sets isDirty true", () => {
+    useStore.setState({ isDirty: false });
+    useStore.getState().addBC({ nodeId: "n1", portField: "port_in.P", value: 1e5 });
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  it("removeBC sets isDirty true", () => {
+    useStore.getState().addBC({ nodeId: "n1", portField: "port_in.P", value: 1e5 });
+    useStore.setState({ isDirty: false });
+    useStore.getState().removeBC(0);
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  it("selectNode does NOT set isDirty true", () => {
+    useStore.setState({ isDirty: false });
+    useStore.getState().selectNode("some-node-id");
+    expect(useStore.getState().isDirty).toBe(false);
+  });
+
+  it("toggleBottomPanel does NOT set isDirty true", () => {
+    useStore.setState({ isDirty: false });
+    useStore.getState().toggleBottomPanel();
+    expect(useStore.getState().isDirty).toBe(false);
   });
 });
