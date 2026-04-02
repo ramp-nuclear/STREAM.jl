@@ -244,7 +244,12 @@ Plans:
   2. UI-SPEC.md design contract was written and approved before Phase 38 coding began
   3. UI-REVIEW.md audit was completed after Phase 38 coding; no BLOCK verdicts
   4. Toolbox icons are distinct (not identical placeholder boxes)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 38-01-PLAN.md — Icon map, category colors, StreamNode + ToolboxItem visual redesign
+- [ ] 38-02-PLAN.md — Panel collapse/resize behavior, store additions, shadcn audit
+- [ ] 38-03-PLAN.md — Human-verify: visual verification of all DSGN requirements
 **UI hint**: yes
 
 ### Phase 39: Topology Validation
@@ -322,4 +327,4 @@ Plans:
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-02 — Phase 37 plans created: 3 plans in 3 waves (data layer + UI + human verify)*
+*Updated: 2026-04-03 — Phase 38 plans created: 3 plans in 3 waves (icons+nodes, panels, human verify)*
