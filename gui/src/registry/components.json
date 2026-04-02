@@ -46,9 +46,106 @@
           "options": [
             { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
             { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
-            { "value": "regime_dependent", "label": "Regime Dependent", "kind": "factory" },
-            { "value": "elenbaas_htc", "label": "Elenbaas", "kind": "factory" },
-            { "value": "maximal_htc", "label": "Maximal HTC", "kind": "factory" }
+            {
+              "value": "regime_dependent",
+              "label": "Regime Dependent",
+              "kind": "factory",
+              "sub_parameters": [
+                {
+                  "name": "htc_forced",
+                  "type": "Function",
+                  "description": "HTC closure for forced convection regime",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
+                    {
+                      "value": "elenbaas_htc",
+                      "label": "Elenbaas",
+                      "kind": "factory",
+                      "sub_parameters": [
+                        { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
+                        { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
+                        { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
+                        { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "htc_natural",
+                  "type": "Function",
+                  "description": "HTC closure for natural convection regime",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
+                    {
+                      "value": "elenbaas_htc",
+                      "label": "Elenbaas",
+                      "kind": "factory",
+                      "sub_parameters": [
+                        { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
+                        { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
+                        { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
+                        { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "threshold",
+                  "type": "Real",
+                  "unit": "—",
+                  "default": 1.0,
+                  "description": "Gr/Re² threshold for NC detection",
+                  "required": false,
+                  "positional": false
+                }
+              ]
+            },
+            {
+              "value": "elenbaas_htc",
+              "label": "Elenbaas",
+              "kind": "factory",
+              "sub_parameters": [
+                { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
+                { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
+                { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
+                { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
+              ]
+            },
+            {
+              "value": "maximal_htc",
+              "label": "Maximal HTC",
+              "kind": "factory",
+              "sub_parameters": [
+                {
+                  "name": "htc1",
+                  "type": "Function",
+                  "description": "First HTC closure candidate",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" }
+                  ]
+                },
+                {
+                  "name": "htc2",
+                  "type": "Function",
+                  "description": "Second HTC closure candidate",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" }
+                  ]
+                }
+              ]
+            }
           ]
         },
         {
@@ -117,9 +214,106 @@
           "options": [
             { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
             { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
-            { "value": "regime_dependent", "label": "Regime Dependent", "kind": "factory" },
-            { "value": "elenbaas_htc", "label": "Elenbaas", "kind": "factory" },
-            { "value": "maximal_htc", "label": "Maximal HTC", "kind": "factory" }
+            {
+              "value": "regime_dependent",
+              "label": "Regime Dependent",
+              "kind": "factory",
+              "sub_parameters": [
+                {
+                  "name": "htc_forced",
+                  "type": "Function",
+                  "description": "HTC closure for forced convection regime",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
+                    {
+                      "value": "elenbaas_htc",
+                      "label": "Elenbaas",
+                      "kind": "factory",
+                      "sub_parameters": [
+                        { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
+                        { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
+                        { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
+                        { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "htc_natural",
+                  "type": "Function",
+                  "description": "HTC closure for natural convection regime",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
+                    {
+                      "value": "elenbaas_htc",
+                      "label": "Elenbaas",
+                      "kind": "factory",
+                      "sub_parameters": [
+                        { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
+                        { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
+                        { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
+                        { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "threshold",
+                  "type": "Real",
+                  "unit": "—",
+                  "default": 1.0,
+                  "description": "Gr/Re² threshold for NC detection",
+                  "required": false,
+                  "positional": false
+                }
+              ]
+            },
+            {
+              "value": "elenbaas_htc",
+              "label": "Elenbaas",
+              "kind": "factory",
+              "sub_parameters": [
+                { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
+                { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
+                { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
+                { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
+              ]
+            },
+            {
+              "value": "maximal_htc",
+              "label": "Maximal HTC",
+              "kind": "factory",
+              "sub_parameters": [
+                {
+                  "name": "htc1",
+                  "type": "Function",
+                  "description": "First HTC closure candidate",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" }
+                  ]
+                },
+                {
+                  "name": "htc2",
+                  "type": "Function",
+                  "description": "Second HTC closure candidate",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" }
+                  ]
+                }
+              ]
+            }
           ]
         },
         {
@@ -203,9 +397,106 @@
           "options": [
             { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
             { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
-            { "value": "regime_dependent", "label": "Regime Dependent", "kind": "factory" },
-            { "value": "elenbaas_htc", "label": "Elenbaas", "kind": "factory" },
-            { "value": "maximal_htc", "label": "Maximal HTC", "kind": "factory" }
+            {
+              "value": "regime_dependent",
+              "label": "Regime Dependent",
+              "kind": "factory",
+              "sub_parameters": [
+                {
+                  "name": "htc_forced",
+                  "type": "Function",
+                  "description": "HTC closure for forced convection regime",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
+                    {
+                      "value": "elenbaas_htc",
+                      "label": "Elenbaas",
+                      "kind": "factory",
+                      "sub_parameters": [
+                        { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
+                        { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
+                        { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
+                        { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "htc_natural",
+                  "type": "Function",
+                  "description": "HTC closure for natural convection regime",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
+                    {
+                      "value": "elenbaas_htc",
+                      "label": "Elenbaas",
+                      "kind": "factory",
+                      "sub_parameters": [
+                        { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
+                        { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
+                        { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
+                        { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "threshold",
+                  "type": "Real",
+                  "unit": "—",
+                  "default": 1.0,
+                  "description": "Gr/Re² threshold for NC detection",
+                  "required": false,
+                  "positional": false
+                }
+              ]
+            },
+            {
+              "value": "elenbaas_htc",
+              "label": "Elenbaas",
+              "kind": "factory",
+              "sub_parameters": [
+                { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
+                { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
+                { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
+                { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
+              ]
+            },
+            {
+              "value": "maximal_htc",
+              "label": "Maximal HTC",
+              "kind": "factory",
+              "sub_parameters": [
+                {
+                  "name": "htc1",
+                  "type": "Function",
+                  "description": "First HTC closure candidate",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" }
+                  ]
+                },
+                {
+                  "name": "htc2",
+                  "type": "Function",
+                  "description": "Second HTC closure candidate",
+                  "required": true,
+                  "positional": false,
+                  "options": [
+                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
+                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" }
+                  ]
+                }
+              ]
+            }
           ]
         },
         {
