@@ -164,7 +164,13 @@ Plans:
   2. Changing n from 5 to 10 is reflected immediately; no stale value remains
   3. Pump sidebar shows dP_pump field in fixed-dP mode; toggling to fixed-mdot replaces it with mdot0
   4. Entering letters in a numeric field shows a visible error, not a crash
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 35-01-PLAN.md — Extend registry schema, store (updateNodeParams, defaults), validation lib, canvas selection wiring, shadcn install
+- [ ] 35-02-PLAN.md — Build sidebar component tree (SidebarPanel, ParameterForm, NumericField, PipeGeometryPicker, FunctionSelect, ModeToggle)
+- [ ] 35-03-PLAN.md — Human-verify: parameter editing sidebar across all component types
+
 **UI hint**: yes
 
 ### Phase 35.1: Correlation Picker
