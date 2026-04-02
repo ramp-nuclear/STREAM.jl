@@ -2,8 +2,8 @@
 phase: 35
 slug: parameter-editing
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-02
 ---
 
@@ -38,24 +38,30 @@ created: 2026-04-02
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 35-01-01 | 01 | 1 | PARA-01 | unit | `cd gui && npx vitest run` | ❌ W0 | ⬜ pending |
-| 35-01-02 | 01 | 1 | PARA-02 | unit | `cd gui && npx vitest run` | ❌ W0 | ⬜ pending |
-| 35-02-01 | 02 | 1 | PARA-03 | unit | `cd gui && npx vitest run` | ❌ W0 | ⬜ pending |
-| 35-02-02 | 02 | 1 | PARA-04 | unit | `cd gui && npx vitest run` | ❌ W0 | ⬜ pending |
-| 35-03-01 | 03 | 2 | PARA-05 | unit | `cd gui && npx vitest run` | ❌ W0 | ⬜ pending |
-| 35-03-02 | 03 | 2 | PARA-06 | unit | `cd gui && npx vitest run` | ❌ W0 | ⬜ pending |
+| 35-01-01 | 01 | 1 | PARA-01,06 | unit | `cd gui && npx vitest run` | Yes (useStore.test.ts, validation.test.ts) | pending |
+| 35-01-02 | 01 | 1 | PARA-02,05 | unit | `cd gui && npx vitest run` | Yes (useStore.test.ts, validation.test.ts) | pending |
+| 35-02-01 | 02 | 2 | PARA-01..06 | unit | `cd gui && npx vitest run` | Yes (W0 Task 3 creates stubs) | pending |
+| 35-02-02 | 02 | 2 | PARA-03,04 | unit | `cd gui && npx vitest run` | Yes (W0 Task 3 creates stubs) | pending |
+| 35-02-03 | 02 | 2 | PARA-01..06 | unit | `cd gui && npx vitest run` | Yes (Wave 0 test stubs) | pending |
+| 35-03-01 | 03 | 3 | PARA-01..06 | human | Manual verification | N/A | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending / green / red / flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `gui/src/components/__tests__/ParameterSidebar.test.tsx` — stubs for PARA-01, PARA-02, PARA-03, PARA-04
-- [ ] `gui/src/components/__tests__/PumpSidebar.test.tsx` — stubs for PARA-05 (mode toggle)
-- [ ] `gui/src/store/__tests__/registry.test.ts` — stubs for PARA-06 (validation)
+Wave 0 test stubs are created by Plan 02, Task 3. All files below are created with at least one real render test plus it.todo() stubs for future coverage:
 
-*If vitest not yet installed in gui/, run `cd gui && npm install -D vitest @testing-library/react @testing-library/user-event`*
+- [x] `gui/src/components/sidebar/__tests__/SidebarPanel.test.tsx` — stubs for PARA-01 (selection, empty state)
+- [x] `gui/src/components/sidebar/__tests__/ParameterForm.test.tsx` — real render test for field dispatch + stubs for PARA-02 (blur-gating)
+- [x] `gui/src/components/sidebar/__tests__/ModeToggle.test.tsx` — real render test for mode buttons + stubs for PARA-03 (mode switching)
+- [x] `gui/src/components/sidebar/__tests__/PipeGeometryPicker.test.tsx` — real render test for geometry buttons + stubs for PARA-04 (field clearing)
+- [x] `gui/src/components/sidebar/__tests__/InstanceNameField.test.tsx` — real render test for input + stubs for PARA-05 (identifier validation)
+
+Additionally, Plan 01 Task 2 creates full-coverage tests for non-UI logic:
+- [x] `gui/src/lib/__tests__/validation.test.ts` — comprehensive validateInt/Real/PositiveReal/JuliaIdentifier tests
+- [x] `gui/src/store/__tests__/useStore.test.ts` — updateNodeParams and addNode default population tests
 
 ---
 
@@ -70,11 +76,11 @@ created: 2026-04-02
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 15s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 15s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved (revision pass)
