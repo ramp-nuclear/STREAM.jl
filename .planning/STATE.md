@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
 status: verifying
-stopped_at: Completed 35.1-PLAN-4-tests-functionselect.md
-last_updated: "2026-04-02T11:02:45.124Z"
+stopped_at: Phase 36 context gathered (discuss mode)
+last_updated: "2026-04-02T12:36:01.380Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 9
@@ -127,10 +127,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-02T10:59:35.362Z
-**Stopped at:** Completed 35.1-PLAN-4-tests-functionselect.md
+**Last session:** 2026-04-02T12:36:01.376Z
+**Stopped at:** Phase 36 context gathered (discuss mode)
 **Next action:** Phase 35-02 — sidebar UI
-**Resume file:** None
+**Resume file:** .planning/phases/36-code-generation/36-CONTEXT.md
 
 ---
 
