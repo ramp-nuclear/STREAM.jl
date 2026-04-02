@@ -69,8 +69,8 @@ describe("StreamNode", () => {
       instanceName: "pump_1",
       parameters: {},
     });
-    const nodeDiv = container.firstElementChild?.firstElementChild;
-    expect(nodeDiv?.className).toContain("border-l-blue-500");
+    const borderEl = container.querySelector(".border-l-blue-500");
+    expect(borderEl).toBeTruthy();
   });
 
   it("renders with category border stripe for Thermal component", () => {
@@ -79,8 +79,8 @@ describe("StreamNode", () => {
       instanceName: "ct_1",
       parameters: {},
     });
-    const nodeDiv = container.firstElementChild?.firstElementChild;
-    expect(nodeDiv?.className).toContain("border-l-amber-500");
+    const borderEl = container.querySelector(".border-l-amber-500");
+    expect(borderEl).toBeTruthy();
   });
 
   it("renders an SVG icon element", () => {
