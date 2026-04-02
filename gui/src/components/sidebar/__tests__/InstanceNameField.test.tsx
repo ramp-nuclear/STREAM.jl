@@ -10,6 +10,13 @@ describe("InstanceNameField", () => {
     expect(input).toBeTruthy();
   });
 
+  it("renders a 'Name' label with info icon", () => {
+    render(<InstanceNameField value="ch1" onChange={vi.fn()} />);
+    expect(screen.getByText("Name")).toBeTruthy();
+    const icons = document.querySelectorAll("svg");
+    expect(icons.length).toBeGreaterThan(0);
+  });
+
   it.todo("validates Julia identifier on blur");
   it.todo("shows error for invalid identifiers");
   it.todo("calls onChange only for valid values");
