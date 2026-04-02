@@ -48,12 +48,12 @@ Exceptions: none
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 14px | 400 (regular) | 1.5 |
-| Label | 12px | 500 (medium) | 1.4 |
+| Label | 12px | 600 (semibold) | 1.4 |
 | Heading | 20px | 600 (semibold) | 1.2 |
 
 Notes:
 - Body: dropdown menu item text, recent file names in welcome overlay
-- Label: keyboard shortcut hints in dropdown items (e.g., "Ctrl+S"), "No recent projects" secondary text
+- Label: keyboard shortcut hints in dropdown items (e.g., "Ctrl+S"), "No recent projects" secondary text. The 12px size at 600 weight creates sufficient visual contrast against 14px/400 body text.
 - Heading: welcome overlay title ("STREAM Composer")
 
 ---
@@ -93,8 +93,9 @@ Accent reserved for: File dropdown trigger active state, recent file list hover/
 | `@tauri-apps/plugin-dialog` `save()` | Save As file dialog |
 | `@tauri-apps/plugin-dialog` `open()` | Open file dialog |
 | `@tauri-apps/plugin-dialog` `ask()` | Unsaved changes confirmation (3-button: Save / Don't Save / Cancel) |
+| `@tauri-apps/plugin-dialog` `message()` | Error alerts for save/open failures |
 
-Rationale: The unsaved-changes guard (D-10, D-11) uses native OS dialogs via Tauri's plugin-dialog, not shadcn AlertDialog. This matches OS conventions for "save before close" patterns and avoids adding a component only used for one dialog.
+Rationale: The unsaved-changes guard (D-10, D-11) uses native OS dialogs via Tauri's plugin-dialog, not shadcn AlertDialog. This matches OS conventions for "save before close" patterns and avoids adding a component only used for one dialog. Error alerts also use native `message()` dialogs for consistency.
 
 ### Custom Components
 
@@ -125,6 +126,9 @@ Rationale: The unsaved-changes guard (D-10, D-11) uses native OS dialogs via Tau
 | Window title (clean, file open) | "{filename}.streamgui - STREAM Composer" |
 | Window title (dirty, no file) | "STREAM Composer*" |
 | Window title (dirty, file open) | "{filename}.streamgui* - STREAM Composer" |
+| Error: save failure | Title: "Save Failed" -- Body: "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again." -- Surface: Tauri `dialog.message()` with `kind: "error"` |
+| Error: open/load failure | Title: "Open Failed" -- Body: "Couldn't open this project. The file may be missing, corrupted, or not a valid .streamgui file." -- Surface: Tauri `dialog.message()` with `kind: "error"` |
+| Error: load parse failure | Title: "Open Failed" -- Body: "This file doesn't contain a valid STREAM Composer project." -- Surface: Tauri `dialog.message()` with `kind: "error"` |
 
 ---
 
@@ -165,6 +169,13 @@ Implementation: global `keydown` listener in `App.tsx` (per D-11 in CONTEXT.md d
 - Dialog: native Tauri `ask()` with title "Save changes?", message "Your project has unsaved changes that will be lost."
 - Three buttons: "Save" (saves then proceeds), "Don't Save" (proceeds without saving), "Cancel" (aborts action)
 - On window close: if Save chosen, save completes then `event.preventDefault()` is NOT called (window closes); if Cancel, `event.preventDefault()` keeps window open
+
+### Error Handling (file I/O)
+
+- All file I/O operations (`readTextFile`, `writeTextFile`, `open()`, `save()`) are wrapped in try/catch
+- On failure: display native Tauri `dialog.message()` with `kind: "error"`, using the error copy from the Copywriting Contract above
+- Save failure: user sees the error alert and can retry via Ctrl+S or File > Save. No data is lost (the in-memory state is unchanged).
+- Open/load failure: user sees the error alert and remains on their current project (or empty canvas). No state change occurs.
 
 ### Dirty State Indicator (D-08, D-09)
 
