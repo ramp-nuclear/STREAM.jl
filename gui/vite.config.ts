@@ -34,7 +34,9 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 4. ignore .streamgui project files — writing them triggers a full
+      //    page reload because Vite doesn't know how to HMR unknown file types
+      ignored: ["**/src-tauri/**", "**/*.streamgui"],
     },
   },
 }));
