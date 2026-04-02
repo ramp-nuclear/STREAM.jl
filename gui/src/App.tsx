@@ -93,15 +93,17 @@ function App() {
 
   // Window title sync
   useEffect(() => {
-    const win = getCurrentWindow();
     const filename = currentFilePath
       ? currentFilePath.split(/[/\\]/).pop()
       : null;
     const dirty = isDirty ? "*" : "";
     const title = filename
       ? `${filename}${dirty} - STREAM Composer`
-      : `STREAM Composer${dirty}`;
-    win.setTitle(title);
+      : `STREAM Composer`;
+    // document.title is the reliable path on Linux/WebKitGTK.
+    // setTitle() is the Tauri IPC path (works on macOS/Windows).
+    document.title = title;
+    getCurrentWindow().setTitle(title).catch(() => {});
   }, [isDirty, currentFilePath]);
 
   // Window close guard — fixed: track unlisten via ref to avoid async race in Strict Mode
