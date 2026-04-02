@@ -6,18 +6,30 @@ import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
+  MarkerType,
   useReactFlow,
   type Connection,
   type Edge,
+  type EdgeTypes,
   type Node,
   type NodeTypes,
 } from "@xyflow/react";
+import StreamEdge from "./StreamEdge";
 import "@xyflow/react/dist/style.css";
 import useStore from "../store/useStore";
 import StreamNode from "./StreamNode";
 
 const nodeTypes: NodeTypes = {
   streamNode: StreamNode,
+};
+
+const edgeTypes: EdgeTypes = {
+  stream: StreamEdge,
+};
+
+const defaultEdgeOptions = {
+  type: "stream",
+  markerEnd: { type: MarkerType.ArrowClosed },
 };
 
 export default function CanvasPanel() {
@@ -105,7 +117,8 @@ export default function CanvasPanel() {
         onPaneClick={onPaneClick}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
-        defaultEdgeOptions={{ type: "smoothstep" }}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={defaultEdgeOptions}
         connectionLineType={ConnectionLineType.SmoothStep}
         deleteKeyCode={["Delete", "Backspace"]}
         fitView

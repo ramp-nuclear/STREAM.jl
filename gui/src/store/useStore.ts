@@ -123,7 +123,7 @@ const useStore = create<AppState>()(
         });
       },
       addEdge: (connection) => {
-        set({ edges: rfAddEdge(connection, get().edges) });
+        set({ edges: rfAddEdge({ ...connection, type: "stream" }, get().edges) });
       },
       removeEdge: (edgeId) => {
         set({ edges: get().edges.filter((e) => e.id !== edgeId) });
