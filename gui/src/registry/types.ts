@@ -12,6 +12,14 @@ export interface FunctionOption {
   value: string;
   label: string;
   kind: "simple" | "factory";
+  sub_parameters?: Parameter[];  // only present when kind === "factory"
+}
+
+// Represents a selected factory correlation value with its configured sub-parameters
+export interface FactoryCorrelationValue {
+  kind: "factory";
+  value: string;
+  subParams: Record<string, unknown>;
 }
 
 export interface Parameter {
