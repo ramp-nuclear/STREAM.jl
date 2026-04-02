@@ -226,10 +226,10 @@ Plans:
   1. Ctrl+S saves project; reloading the app and opening the file restores all nodes, edges, positions, and parameters exactly
   2. Closing the app with unsaved changes shows a confirmation dialog
   3. Recent Projects list shows last 5 files by name
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
-- [ ] 37-01-PLAN.md — projectIO pure functions + store extensions (isDirty, file actions, recent files) + Tauri permissions
+- [x] 37-01-PLAN.md — projectIO pure functions + store extensions (isDirty, file actions, recent files) + Tauri permissions
 - [ ] 37-02-PLAN.md — FileMenu dropdown, WelcomeOverlay, keyboard shortcuts, window title sync, close guard
 - [ ] 37-03-PLAN.md — Human-verify: save/load round-trip, dirty indicator, recent projects, close guard
 
@@ -314,7 +314,7 @@ Plans:
 | 35. Parameter Editing | v0.8 | 3/3 | Complete   | 2026-04-02 |
 | 35.1. Correlation Picker | v0.8 | 0/? | Complete    | 2026-04-02 |
 | 36. Code Generation | v0.8 | 2/3 | Complete    | 2026-04-02 |
-| 37. Project Persistence | v0.8 | 0/3 | Not started | — |
+| 37. Project Persistence | v0.8 | 1/3 | In Progress|  |
 | 38. UI Design Pass | v0.8 | 0/? | Not started | — |
 | 39. Topology Validation | v0.8 | 0/? | Not started | — |
 | 40. Thermal Composition | v0.8 | 0/? | Not started | — |
