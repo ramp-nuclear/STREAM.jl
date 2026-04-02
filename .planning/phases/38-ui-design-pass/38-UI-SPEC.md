@@ -25,7 +25,7 @@ created: 2026-04-03
 
 Installed shadcn primitives: button, input, label, select, scroll-area, tabs, tooltip, badge, dropdown-menu, separator.
 
-Phase 38 may add: `dialog` (if needed for confirmation UX), `resizable` (for panel drag-resize). No other additions expected.
+Phase 38 may add: `dialog` (if needed for confirmation UX), `resizable` (if needed for panel drag-resize). No other additions expected.
 
 ---
 
@@ -43,7 +43,7 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Not used in this phase |
 | 3xl | 64px | Not used in this phase |
 
-Exceptions: Drag handle hit area is 6px wide (not a multiple of 4) for precise resize affordance. Touch target for collapse chevron button is 32x32px (8-point aligned).
+Exceptions: Touch target for collapse chevron button is 32x32px (8-point aligned). No other spacing exceptions in this phase.
 
 ---
 
@@ -167,7 +167,7 @@ Each panel (toolbox, sidebar) has two affordances:
    - Sidebar collapsed: chevron points left (expand). Expanded: chevron points right (collapse).
    - When collapsed: the chevron button remains visible at the edge as a 32px-wide strip.
 
-2. **Drag handle**: 6px-wide vertical strip on the inner edge of each panel. Cursor: `col-resize`. On mousedown + mousemove, resizes the panel between min and max width. The drag handle overlaps with or is adjacent to the chevron button area.
+2. **Drag handle**: 8px-wide vertical strip on the inner edge of each panel. Cursor: `col-resize`. On mousedown + mousemove, resizes the panel between min and max width. The drag handle overlaps with or is adjacent to the chevron button area.
 
 ### Zustand Store Additions (D-07)
 
@@ -262,6 +262,9 @@ No raw `<button>` or `<input>` elements found in current codebase. Phase 38 must
 - Topology validation indicators (Phase 39)
 - Dark mode (not in v0.8 requirements)
 - Component registry JSON changes (no registry modifications needed)
+
+### Implementation Notes
+- Drag handle visual width is an implementation detail of the resize affordance, not a design spacing token. The rendered handle strip should be 8px wide for comfortable grab targeting on the 8-point grid. The actual interactive hit area may extend slightly via padding/pseudo-elements at the implementor's discretion.
 
 ---
 
