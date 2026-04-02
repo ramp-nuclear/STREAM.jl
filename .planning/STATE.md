@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
-status: verifying
-stopped_at: Completed 36-01-PLAN.md (plan 01 of 03 in phase 36)
-last_updated: "2026-04-02T14:27:06.417Z"
-last_activity: 2026-04-02
+status: executing
+stopped_at: Phase 36 UI-SPEC approved
+last_updated: "2026-04-02T14:21:40.939Z"
+last_activity: 2026-04-02 -- Phase 36 execution started
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 13
-  completed_plans: 15
+  completed_plans: 14
 ---
 
 # STATE: STREAM.jl
@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 35.1 — correlation-picker
+**Current focus:** Phase 36 — code-generation
 **Python STREAM reference:** ~/projects/STREAM
 
 **Roadmap summary:**
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 
 ## Current Position
 
-Phase: 36
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-02
+Phase: 36 (code-generation) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 36
+Last activity: 2026-04-02 -- Phase 36 execution started
 
 ## Performance Metrics
 
@@ -83,7 +83,6 @@ Last activity: 2026-04-02
 | Phase 35.1 P2 | 5 | 2 tasks | 1 files |
 | Phase 35.1 P3 | 5 | 3 tasks | 3 files |
 | Phase 35.1 P4 | 3 | 3 tasks | 5 files |
-| Phase 36 P01 | 212 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -128,10 +127,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-02T14:27:06.415Z
-**Stopped at:** Completed 36-01-PLAN.md (plan 01 of 03 in phase 36)
+**Last session:** 2026-04-02T12:44:56.373Z
+**Stopped at:** Phase 36 UI-SPEC approved
 **Next action:** Phase 35-02 — sidebar UI
-**Resume file:** None
+**Resume file:** .planning/phases/36-code-generation/36-UI-SPEC.md
 
 ---
 
