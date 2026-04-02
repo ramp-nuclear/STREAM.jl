@@ -4,6 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { validatePositiveReal } from "@/lib/validation";
 import { cn } from "@/lib/utils";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type PipeGeometryValue =
   | { type: "circular"; L: number | ""; D: number | "" }
@@ -34,6 +41,7 @@ interface DimensionFieldProps {
   onChange: (value: string) => void;
   onBlur: () => void;
   error: string | null;
+  description?: string;
 }
 
 function DimensionField({
@@ -42,11 +50,22 @@ function DimensionField({
   onChange,
   onBlur,
   error,
+  description,
 }: DimensionFieldProps) {
   return (
     <div className="flex flex-col gap-[8px]">
-      <Label className="text-[13px] font-semibold leading-[1.4]">
+      <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
         {label}
+        {description && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3 w-3 text-muted-foreground cursor-default" />
+              </TooltipTrigger>
+              <TooltipContent>{description}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </Label>
       <div className="relative">
         <Input
@@ -147,14 +166,14 @@ export default function PipeGeometryPicker({
   }
 
   const circularFields = [
-    { label: "L", key: "L" },
-    { label: "D", key: "D" },
+    { label: "L", key: "L", description: "Channel length" },
+    { label: "D", key: "D", description: "Inner diameter" },
   ];
 
   const rectangularFields = [
-    { label: "L", key: "L" },
-    { label: "W", key: "W" },
-    { label: "H", key: "H" },
+    { label: "L", key: "L", description: "Channel length" },
+    { label: "W", key: "W", description: "Channel width" },
+    { label: "H", key: "H", description: "Channel height" },
   ];
 
   const fields = geoType === "circular" ? circularFields : rectangularFields;
@@ -189,6 +208,7 @@ export default function PipeGeometryPicker({
           }
           onBlur={() => handleFieldBlur(f.key)}
           error={errors[f.key] ?? null}
+          description={f.description}
         />
       ))}
     </div>
