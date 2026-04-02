@@ -13,9 +13,6 @@ import { initializeRecentFiles } from "./store/useStore";
 type DialogCallback = (action: "save" | "discard" | "cancel") => void;
 
 function App() {
-  const isDirty = useStore((s) => s.isDirty);
-  const currentFilePath = useStore((s) => s.currentFilePath);
-
   const [dialogOpen, setDialogOpen] = useState(false);
   const dialogCallbackRef = useRef<DialogCallback | null>(null);
 
@@ -91,20 +88,30 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showUnsavedDialog]);
 
-  // Window title sync
+  // Window title sync — subscribe outside React to bypass render batching.
+  // On Linux/WebKitGTK, setTitle() IPC doesn't update the GTK title bar reliably;
+  // we invoke the underlying command directly as a fallback.
   useEffect(() => {
-    const filename = currentFilePath
-      ? currentFilePath.split(/[/\\]/).pop()
-      : null;
-    const dirty = isDirty ? "*" : "";
-    const title = filename
-      ? `${filename}${dirty} - STREAM Composer`
-      : `STREAM Composer`;
-    // document.title is the reliable path on Linux/WebKitGTK.
-    // setTitle() is the Tauri IPC path (works on macOS/Windows).
-    document.title = title;
-    getCurrentWindow().setTitle(title).catch(() => {});
-  }, [isDirty, currentFilePath]);
+    function syncTitle(filePath: string | null, dirty: boolean) {
+      const filename = filePath ? filePath.split(/[/\\]/).pop() : null;
+      const marker = dirty ? "*" : "";
+      const title = filename
+        ? `${filename}${marker} - STREAM Composer`
+        : "STREAM Composer";
+      document.title = title;
+      getCurrentWindow().setTitle(title).catch(console.error);
+    }
+
+    // Run immediately with current state
+    const s = useStore.getState();
+    syncTitle(s.currentFilePath, s.isDirty);
+
+    // Subscribe to future changes outside React render cycle
+    const unsub = useStore.subscribe((state) => {
+      syncTitle(state.currentFilePath, state.isDirty);
+    });
+    return unsub;
+  }, []);
 
   // Window close guard — fixed: track unlisten via ref to avoid async race in Strict Mode
   const unlistenRef = useRef<(() => void) | null>(null);

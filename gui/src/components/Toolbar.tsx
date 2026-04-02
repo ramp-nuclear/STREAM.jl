@@ -18,6 +18,8 @@ export default function Toolbar({ onUnsavedCheck }: Props) {
   const bcs = useStore((s) => s.bcs);
   const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
   const toggleBottomPanel = useStore((s) => s.toggleBottomPanel);
+  const isDirty = useStore((s) => s.isDirty);
+  const currentFilePath = useStore((s) => s.currentFilePath);
 
   const code = useMemo(
     () => generateCode(nodes, edges, bcs, getComponent),
@@ -38,6 +40,11 @@ export default function Toolbar({ onUnsavedCheck }: Props) {
     <div className="flex items-center justify-between h-9 px-2 bg-muted border-b">
       <div className="flex items-center gap-1">
         <FileMenu onUnsavedCheck={onUnsavedCheck} />
+        {currentFilePath && (
+          <span className="text-xs text-muted-foreground ml-2">
+            {currentFilePath.split(/[/\\]/).pop()}{isDirty ? " *" : ""}
+          </span>
+        )}
         <Button
           variant={bottomPanelOpen ? "default" : "outline"}
           size="sm"
