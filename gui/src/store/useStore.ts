@@ -32,6 +32,10 @@ interface AppState {
   selectedNodeId: string | null;
   bcs: BCEntry[];
   bottomPanelOpen: boolean;
+  toolboxCollapsed: boolean;
+  sidebarCollapsed: boolean;
+  setToolboxCollapsed: (collapsed: boolean) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   // Persistence state
   isDirty: boolean;
   currentFilePath: string | null;
@@ -116,6 +120,8 @@ const useStore = create<AppState>()(
       selectedNodeId: null,
       bcs: [],
       bottomPanelOpen: false,
+      toolboxCollapsed: false,
+      sidebarCollapsed: false,
       // Persistence initial state
       isDirty: false,
       currentFilePath: null,
@@ -222,6 +228,10 @@ const useStore = create<AppState>()(
       // toggleBottomPanel is NOT content-mutating — do NOT set isDirty
       toggleBottomPanel: () =>
         set({ bottomPanelOpen: !get().bottomPanelOpen }),
+
+      // Panel collapse is NOT content-mutating — do NOT set isDirty
+      setToolboxCollapsed: (collapsed) => set({ toolboxCollapsed: collapsed }),
+      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
       // ---------------------------------------------------------------------------
       // setRecentFiles
@@ -369,6 +379,8 @@ const useStore = create<AppState>()(
           isDirty: false,
           selectedNodeId: null,
           bottomPanelOpen: false,
+          toolboxCollapsed: false,
+          sidebarCollapsed: false,
         });
         // Clear undo/redo history (temporal middleware)
         useStore.temporal.getState().clear();
