@@ -95,6 +95,8 @@ Last activity: 2026-04-02
 - [v0.8 SCAF-02]: vitest default environment is node (not jsdom): jsdom has ESM incompatibility with html-encoding-sniffer on Node.js 18; React component tests in later phases should add @vitest-environment jsdom docblock per-file.
 - [v0.8 SCAF-02]: Registry Parameter interface has positional: boolean field for Phase 36 code generation to distinguish @named macro positional vs keyword arg syntax.
 - [v0.8 SCAF-02]: ChannelHeatFlux has no ThermalPort in the registry -- T_wall is a scalar Real parameter, not a port connection; _note field documents this in the JSON entry.
+- [v0.8 35.1-4]: getByDisplayValue for inputMode=decimal inputs: NumericField uses inputMode not type=number so spinbutton ARIA role is not assigned; use getByDisplayValue on the default value string in tests.
+- [v0.8 35.1-4]: getAllByRole combobox[0] for factory sub-field context: selecting factory option renders second FunctionSelect so there are multiple comboboxes in DOM; index [0] is always the top-level trigger.
 
 ### Key Decisions (carry-forward for v0.7)
 
