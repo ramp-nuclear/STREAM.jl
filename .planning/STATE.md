@@ -5,7 +5,7 @@ milestone_name: STREAM Composer GUI
 status: executing
 stopped_at: Completed 35-01-PLAN.md (plan 01 of 03 in phase 35)
 last_updated: "2026-04-02T00:23:14.950Z"
-last_activity: 2026-04-01
+last_activity: 2026-04-02 -- Phase 35 execution started
 progress:
   total_phases: 9
   completed_phases: 2
@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 34 — canvas-node-editor
+**Current focus:** Phase 35 — parameter-editing
 **Python STREAM reference:** ~/projects/STREAM
 
 **Roadmap summary:**
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 
 ## Current Position
 
-Phase: 35
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-01
+Phase: 35 (parameter-editing) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 35
+Last activity: 2026-04-02 -- Phase 35 execution started
 
 ## Performance Metrics
 
@@ -122,7 +122,7 @@ None.
 
 **Last session:** 2026-04-02T00:23:14.947Z
 **Stopped at:** Completed 35-01-PLAN.md (plan 01 of 03 in phase 35)
-**Next action:** Phase 29 threshold-analysis (v0.7) or start v0.8 Phase 31
+**Next action:** Phase 35-02 — sidebar UI
 **Resume file:** None
 
 ---
