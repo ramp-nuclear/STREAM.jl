@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
 status: executing
-stopped_at: Completed 35.1-PLAN-1-types-and-registry.md
-last_updated: "2026-04-02T10:51:32.159Z"
+stopped_at: Completed 35.1-PLAN-2-FunctionSelect-factory-sub-fields.md
+last_updated: "2026-04-02T10:54:09.708Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 10
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # STATE: STREAM.jl
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 ## Current Position
 
 Phase: 35.1 (correlation-picker) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-02
 
@@ -80,6 +80,7 @@ Last activity: 2026-04-02
 | Phase 35 P01 | 284 | 2 tasks | 16 files |
 | Phase 35 P02 | 5 | 3 tasks | 14 files |
 | Phase 35.1 P1 | 8 | 2 tasks | 2 files |
+| Phase 35.1 P2 | 5 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -122,8 +123,8 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-02T10:51:32.156Z
-**Stopped at:** Completed 35.1-PLAN-1-types-and-registry.md
+**Last session:** 2026-04-02T10:54:09.703Z
+**Stopped at:** Completed 35.1-PLAN-2-FunctionSelect-factory-sub-fields.md
 **Next action:** Phase 35-02 — sidebar UI
 **Resume file:** None
 
