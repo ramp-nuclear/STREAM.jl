@@ -49,12 +49,16 @@ function getStreamPath(
 
   if (dy >= 0) {
     // Source above target → RIGHT-side C-shape.
-    // Path approaches target from the right, so stop short to keep arrowhead visible.
-    const endX = targetX + ARROW_CLEARANCE;
+    // Path approaches the LEFT handle of the target coming from the right,
+    // so the arrowhead body would extend rightward INTO the node.
+    // Stop the path ARROW_CLEARANCE px to the LEFT of the handle so the
+    // arrowhead body sits just outside the node border.
+    const endX = targetX - ARROW_CLEARANCE;
     return `M ${sourceX},${sourceY} C ${rightBound},${sourceY} ${rightBound},${targetY} ${endX},${targetY}`;
   } else {
     // Source below target → LEFT-side C-shape.
-    // Path approaches from the left; arrowhead body is outside the node naturally.
+    // Path approaches from the left; arrowhead tip at targetX, body extends
+    // leftward — outside the node. No adjustment needed.
     return `M ${sourceX},${sourceY} C ${leftBound},${sourceY} ${leftBound},${targetY} ${targetX},${targetY}`;
   }
 }
