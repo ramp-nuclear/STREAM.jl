@@ -40,11 +40,13 @@ export default function Toolbar({ onUnsavedCheck }: Props) {
     <div className="flex items-center justify-between h-9 px-2 bg-muted border-b">
       <div className="flex items-center gap-1">
         <FileMenu onUnsavedCheck={onUnsavedCheck} />
-        {currentFilePath && (
-          <span className="text-xs text-muted-foreground ml-2">
-            {currentFilePath.split(/[/\\]/).pop()}{isDirty ? " *" : ""}
-          </span>
-        )}
+        <span className="text-xs text-muted-foreground ml-2 select-none">
+          {currentFilePath
+            ? `${currentFilePath.split(/[/\\]/).pop()}${isDirty ? " *" : ""}`
+            : isDirty
+              ? "Untitled *"
+              : ""}
+        </span>
         <Button
           variant={bottomPanelOpen ? "default" : "outline"}
           size="sm"
