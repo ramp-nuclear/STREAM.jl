@@ -133,9 +133,23 @@ const useStore = create<AppState>()(
       // ---------------------------------------------------------------------------
 
       onNodesChange: (changes) => {
-        // Suppress intermediate drag positions from undo history.
-        // Pause at drag start/mid; resume at drag end so only the
-        // final resting position is recorded as a single undo step.
+        const { pause, resume } = useStore.temporal.getState();
+
+        // Changes that carry no content (selection highlight, layout measurement).
+        // Never record these — they produce spurious history entries that force
+        // multiple Ctrl+Z presses to reach an actual structural change.
+        const isContentless = changes.every(
+          (c) => c.type === "select" || c.type === "dimensions",
+        );
+        if (isContentless) {
+          pause();
+          set({ nodes: applyNodeChanges(changes, get().nodes) });
+          resume();
+          return; // also skip isDirty — selection doesn't affect saves
+        }
+
+        // Position changes during drag: pause mid-drag, resume at drag-end
+        // so the entire drag is a single undo step.
         const posChanges = changes.filter(
           (c) => c.type === "position",
         ) as NodePositionChange[];
@@ -143,11 +157,12 @@ const useStore = create<AppState>()(
           const anyDragEnd = posChanges.some((c) => c.dragging === false);
           const anyMidDrag = posChanges.some((c) => c.dragging === true);
           if (anyDragEnd) {
-            useStore.temporal.getState().resume();
+            resume();
           } else if (anyMidDrag) {
-            useStore.temporal.getState().pause();
+            pause();
           }
         }
+
         set({ nodes: applyNodeChanges(changes, get().nodes), isDirty: true });
       },
 
