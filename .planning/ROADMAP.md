@@ -110,7 +110,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 - [x] **Phase 34: Canvas & Node Editor** — Drag-from-toolbox, custom node components with FlowPort handles, edge drawing, zoom/pan/minimap, undo/redo (completed 2026-04-01)
 - [x] **Phase 35: Parameter Editing** — Sidebar form generation from component schema; PipeGeometry picker; Pump mode toggle; scalar validation; rename (completed 2026-04-02)
 - [x] **Phase 35.1: Correlation Picker** — Extend registry with factory sub-parameter schemas; sidebar dropdown for all HTC/friction correlations; factory correlations (regime_dependent, elenbaas_htc, maximal_htc) show nested sub-fields; capped at one level of nesting (completed 2026-04-02)
-- [ ] **Phase 36: Code Generation** — Graph-to-Julia translator; BC editor; live code preview panel; export to .jl file
+- [x] **Phase 36: Code Generation** — Graph-to-Julia translator; BC editor; live code preview panel; export to .jl file (completed 2026-04-02)
 - [ ] **Phase 37: Project Persistence** — Save/load .streamgui JSON; unsaved-changes guard; recent projects list
 - [ ] **Phase 38: UI Design Pass** — shadcn/ui integration throughout; three-panel layout; component icons/colors; design contract and visual audit gates
 - [ ] **Phase 39: Topology Validation** — Unconnected port warnings; missing pressure BC alert; missing driving element alert
@@ -209,7 +209,7 @@ Plans:
   2. Generated code compiles without errors when pasted into a Julia REPL with `using STREAM`
   3. Pressing Export opens native file dialog; saved file contains the generated code
   4. BC panel allows adding `pump.port_in.P ~ 1.0e5`; generated code includes it
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 36-01-PLAN.md — Pure code generator function with comprehensive unit tests (TDD)
@@ -307,7 +307,7 @@ Plans:
 | 34. Canvas & Node Editor | v0.8 | 2/3 | Complete    | 2026-04-01 |
 | 35. Parameter Editing | v0.8 | 3/3 | Complete   | 2026-04-02 |
 | 35.1. Correlation Picker | v0.8 | 0/? | Complete    | 2026-04-02 |
-| 36. Code Generation | v0.8 | 2/3 | In Progress|  |
+| 36. Code Generation | v0.8 | 2/3 | Complete    | 2026-04-02 |
 | 37. Project Persistence | v0.8 | 0/? | Not started | — |
 | 38. UI Design Pass | v0.8 | 0/? | Not started | — |
 | 39. Topology Validation | v0.8 | 0/? | Not started | — |
