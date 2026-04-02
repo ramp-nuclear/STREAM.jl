@@ -209,7 +209,13 @@ Plans:
   2. Generated code compiles without errors when pasted into a Julia REPL with `using STREAM`
   3. Pressing Export opens native file dialog; saved file contains the generated code
   4. BC panel allows adding `pump.port_in.P ~ 1.0e5`; generated code includes it
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 36-01-PLAN.md — Pure code generator function with comprehensive unit tests (TDD)
+- [ ] 36-02-PLAN.md — Store BC state, Tauri plugins, UI components (Toolbar, BottomPanel, CodePreview, BCPanel)
+- [ ] 36-03-PLAN.md — Human-verify: code preview, BC editing, export
+
 **UI hint**: yes
 
 ### Phase 37: Project Persistence
@@ -301,7 +307,7 @@ Plans:
 | 34. Canvas & Node Editor | v0.8 | 2/3 | Complete    | 2026-04-01 |
 | 35. Parameter Editing | v0.8 | 3/3 | Complete   | 2026-04-02 |
 | 35.1. Correlation Picker | v0.8 | 0/? | Complete    | 2026-04-02 |
-| 36. Code Generation | v0.8 | 0/? | Not started | — |
+| 36. Code Generation | v0.8 | 0/3 | Not started | — |
 | 37. Project Persistence | v0.8 | 0/? | Not started | — |
 | 38. UI Design Pass | v0.8 | 0/? | Not started | — |
 | 39. Topology Validation | v0.8 | 0/? | Not started | — |
@@ -310,4 +316,4 @@ Plans:
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-02 — Phase 35.1 added: Correlation Picker (factory correlation editing, grayed out in Phase 35, fully implemented in 35.1)*
+*Updated: 2026-04-02 — Phase 36 plans created: 3 plans in 3 waves (code generator + UI + human verify)*
