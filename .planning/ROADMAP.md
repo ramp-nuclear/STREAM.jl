@@ -108,7 +108,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 
 - [x] **Phase 33: Project Scaffold** — Tauri 2 + React + ReactFlow skeleton; component metadata registry; dev environment verified (completed 2026-04-01)
 - [x] **Phase 34: Canvas & Node Editor** — Drag-from-toolbox, custom node components with FlowPort handles, edge drawing, zoom/pan/minimap, undo/redo (completed 2026-04-01)
-- [ ] **Phase 35: Parameter Editing** — Sidebar form generation from component schema; PipeGeometry picker; Pump mode toggle; scalar validation; rename
+- [x] **Phase 35: Parameter Editing** — Sidebar form generation from component schema; PipeGeometry picker; Pump mode toggle; scalar validation; rename (completed 2026-04-02)
 - [ ] **Phase 35.1: Correlation Picker** — Extend registry with factory sub-parameter schemas; sidebar dropdown for all HTC/friction correlations; factory correlations (regime_dependent, elenbaas_htc, maximal_htc) show nested sub-fields; capped at one level of nesting
 - [ ] **Phase 36: Code Generation** — Graph-to-Julia translator; BC editor; live code preview panel; export to .jl file
 - [ ] **Phase 37: Project Persistence** — Save/load .streamgui JSON; unsaved-changes guard; recent projects list
@@ -298,7 +298,7 @@ Plans:
 | 32. THRS-09 & Phase 30 Integration Hardening | v0.7 | 1/1 | Complete | 2026-04-01 |
 | 33. Project Scaffold | v0.8 | 2/4 | Complete    | 2026-04-01 |
 | 34. Canvas & Node Editor | v0.8 | 2/3 | Complete    | 2026-04-01 |
-| 35. Parameter Editing | v0.8 | 2/3 | In Progress|  |
+| 35. Parameter Editing | v0.8 | 2/3 | Complete    | 2026-04-02 |
 | 35.1. Correlation Picker | v0.8 | 0/? | Not started | — |
 | 36. Code Generation | v0.8 | 0/? | Not started | — |
 | 37. Project Persistence | v0.8 | 0/? | Not started | — |
