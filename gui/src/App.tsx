@@ -51,8 +51,6 @@ function App() {
   const kbLock = useRef(false);
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && ["s","n","o"].includes(e.key.toLowerCase()))
-        console.log("[kb]", e.key, "shift=", e.shiftKey, "lock=", kbLock.current);
       if (kbLock.current) return;
       try {
         // Ctrl+Shift+S — Save As
@@ -138,7 +136,6 @@ function App() {
     getCurrentWindow()
       .onCloseRequested(async (event) => {
         const { isDirty: dirty } = useStore.getState();
-        console.log("[onCloseRequested] fired, isDirty=", dirty, "kbLock=", kbLock.current);
         if (!dirty) return; // allow close
 
         event.preventDefault(); // must be synchronous before any await

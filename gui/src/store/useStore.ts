@@ -360,7 +360,6 @@ const useStore = create<AppState>()(
       // ---------------------------------------------------------------------------
 
       newProject: async () => {
-        console.trace("[useStore] newProject called");
         clearInstanceCounters();
         set({
           nodes: [],
