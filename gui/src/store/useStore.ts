@@ -11,6 +11,7 @@ import {
   EdgeChange,
 } from "@xyflow/react";
 import { getComponent } from "../registry";
+import type { BCEntry } from "../lib/codeGenerator";
 
 export interface StreamNodeData {
   componentId: string;
@@ -23,6 +24,8 @@ interface AppState {
   nodes: Node[];
   edges: Edge[];
   selectedNodeId: string | null;
+  bcs: BCEntry[];
+  bottomPanelOpen: boolean;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   selectNode: (nodeId: string | null) => void;
@@ -31,6 +34,9 @@ interface AppState {
   addEdge: (connection: Connection) => void;
   removeEdge: (edgeId: string) => void;
   updateNodeParams: (nodeId: string, patch: Partial<StreamNodeData>) => void;
+  addBC: (bc: BCEntry) => void;
+  removeBC: (index: number) => void;
+  toggleBottomPanel: () => void;
 }
 
 // Per-type instance counters for default naming (module-level, not tracked by zundo)
@@ -48,6 +54,8 @@ const useStore = create<AppState>()(
       nodes: [],
       edges: [],
       selectedNodeId: null,
+      bcs: [],
+      bottomPanelOpen: false,
       onNodesChange: (changes) =>
         set({ nodes: applyNodeChanges(changes, get().nodes) }),
       onEdgesChange: (changes) =>
@@ -104,12 +112,13 @@ const useStore = create<AppState>()(
         });
       },
       removeNode: (nodeId) => {
-        const { nodes, edges } = get();
+        const { nodes, edges, bcs } = get();
         set({
           nodes: nodes.filter((n) => n.id !== nodeId),
           edges: edges.filter(
             (e) => e.source !== nodeId && e.target !== nodeId,
           ),
+          bcs: bcs.filter((bc) => bc.nodeId !== nodeId),
           selectedNodeId: null,
         });
       },
@@ -119,12 +128,18 @@ const useStore = create<AppState>()(
       removeEdge: (edgeId) => {
         set({ edges: get().edges.filter((e) => e.id !== edgeId) });
       },
+      addBC: (bc) => set({ bcs: [...get().bcs, bc] }),
+      removeBC: (index) =>
+        set({ bcs: get().bcs.filter((_, i) => i !== index) }),
+      toggleBottomPanel: () =>
+        set({ bottomPanelOpen: !get().bottomPanelOpen }),
     }),
     {
       partialize: (state) => ({
         nodes: state.nodes,
         edges: state.edges,
         selectedNodeId: state.selectedNodeId,
+        bcs: state.bcs,
       }),
       limit: 50,
     },
