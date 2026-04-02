@@ -167,7 +167,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 35-01-PLAN.md — Extend registry schema, store (updateNodeParams, defaults), validation lib, canvas selection wiring, shadcn install
+- [x] 35-01-PLAN.md — Extend registry schema, store (updateNodeParams, defaults), validation lib, canvas selection wiring, shadcn install
 - [ ] 35-02-PLAN.md — Build sidebar component tree (SidebarPanel, ParameterForm, NumericField, PipeGeometryPicker, FunctionSelect, ModeToggle)
 - [ ] 35-03-PLAN.md — Human-verify: parameter editing sidebar across all component types
 
@@ -298,7 +298,7 @@ Plans:
 | 32. THRS-09 & Phase 30 Integration Hardening | v0.7 | 1/1 | Complete | 2026-04-01 |
 | 33. Project Scaffold | v0.8 | 2/4 | Complete    | 2026-04-01 |
 | 34. Canvas & Node Editor | v0.8 | 2/3 | Complete    | 2026-04-01 |
-| 35. Parameter Editing | v0.8 | 0/? | Not started | — |
+| 35. Parameter Editing | v0.8 | 1/3 | In Progress|  |
 | 35.1. Correlation Picker | v0.8 | 0/? | Not started | — |
 | 36. Code Generation | v0.8 | 0/? | Not started | — |
 | 37. Project Persistence | v0.8 | 0/? | Not started | — |
