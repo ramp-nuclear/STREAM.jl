@@ -291,16 +291,20 @@ Plans:
 ### Phase 41: Layered Canvas
 **Goal**: Hydraulic and thermal canvas content live on separate toggleable layers so the canvas stays readable when both are present
 **Depends on**: Phase 40
-**Requirements**: TBD (discuss-phase required to define exact interaction model)
+**Requirements**: LAYR-01, LAYR-02, LAYR-03, LAYR-04, LAYR-05
 **Success Criteria** (what must be TRUE):
   1. A toolbar layer toggle lets the user switch between Hydraulic, Thermal, and Both views
   2. In Hydraulic view, thermal nodes/edges are visually subordinated (dimmed or hidden)
   3. In Thermal view, hydraulic nodes/edges are visually subordinated
   4. Components that belong to both layers (e.g. ChannelAndContacts) remain visible in both layer views
   5. Layer selection is persisted with the project in .streamgui
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 41-01-PLAN.md — Layer detection utility, store activeLayer state, projectIO v2 schema
+- [ ] 41-02-PLAN.md — Toolbar toggle, toolbox filtering, canvas dimming, handle dimming, Tab cycling
+
 **UI hint**: yes
-**Note**: Requires `/gsd:discuss-phase 41` before planning — the interaction model (toolbox filtering, dimming vs hiding, multi-layer component behavior) needs to be decided.
 
 ### Phase 42: Edge & Path Visual Overhaul
 **Goal**: Hydraulic and thermal edges look clean — correct arrowheads, sensible routing for parallel edges, no clipping artifacts
@@ -389,7 +393,7 @@ Plans:
 | 38. UI Design Pass | v0.8 | 3/3 | Complete | 2026-04-03 |
 | 39. Topology Validation | v0.8 | 3/3 | Complete | 2026-04-03 |
 | 40. Thermal Composition | v0.8 | 2/2 | Complete | 2026-04-03 |
-| 41. Layered Canvas | v0.8 | 0/? | Planned | — |
+| 41. Layered Canvas | v0.8 | 0/2 | Planned | — |
 | 42. Edge & Path Visual Overhaul | v0.8 | 0/? | Planned | — |
 | 43. UI Polish & Redesign | v0.8 | 0/? | Planned | — |
 | 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
@@ -397,4 +401,4 @@ Plans:
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-03 — Added Phases 41-44 (Layered Canvas, Edge Visual, UI Polish, Light/Dark Mode); fixed Progress table plan counts; promoted 999.1 backlog to Phase 44*
+*Updated: 2026-04-03 — Phase 41 planned (2 plans, LAYR-01..05 requirements defined)*
