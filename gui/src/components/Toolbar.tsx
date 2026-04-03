@@ -86,19 +86,19 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
         >
           <ToggleGroupItem
             value="Hydraulic"
-            className="data-[state=on]:bg-blue-500/25 data-[state=on]:text-blue-700 data-[state=on]:border-blue-400"
+            className="data-[state=on]:bg-blue-500/25 data-[state=on]:text-blue-700 data-[state=on]:border-blue-400 dark:data-[state=on]:text-blue-300"
           >
             Hydraulic
           </ToggleGroupItem>
           <ToggleGroupItem
             value="Both"
-            className="data-[state=on]:bg-slate-200 data-[state=on]:text-slate-700"
+            className="data-[state=on]:bg-slate-200 data-[state=on]:text-slate-700 dark:data-[state=on]:bg-slate-700 dark:data-[state=on]:text-slate-200"
           >
             Both
           </ToggleGroupItem>
           <ToggleGroupItem
             value="Thermal"
-            className="data-[state=on]:bg-amber-500/25 data-[state=on]:text-amber-700 data-[state=on]:border-amber-400"
+            className="data-[state=on]:bg-amber-500/25 data-[state=on]:text-amber-700 data-[state=on]:border-amber-400 dark:data-[state=on]:text-amber-300"
           >
             Thermal
           </ToggleGroupItem>

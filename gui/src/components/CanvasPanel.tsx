@@ -45,7 +45,7 @@ interface CanvasPanelProps {
   resolvedTheme?: "light" | "dark";
 }
 
-export default function CanvasPanel({ resolvedTheme: _resolvedTheme }: CanvasPanelProps = {}) {
+export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge, selectNode } =
     useStore();
   const activeLayer = useStore((s) => s.activeLayer);
@@ -189,6 +189,7 @@ export default function CanvasPanel({ resolvedTheme: _resolvedTheme }: CanvasPan
   return (
     <div ref={containerRef} className="flex-1 h-full relative focus:outline-none" tabIndex={-1}>
       <ReactFlow
+        colorMode={resolvedTheme === "dark" ? "dark" : "light"}
         nodes={enrichedNodes}
         edges={enrichedEdges}
         onNodesChange={onNodesChange}
@@ -209,7 +210,7 @@ export default function CanvasPanel({ resolvedTheme: _resolvedTheme }: CanvasPan
       >
         <Controls />
         <MiniMap />
-        <Background variant={BackgroundVariant.Dots} />
+        <Background variant={BackgroundVariant.Dots} color={resolvedTheme === "dark" ? "#555" : "#ccc"} />
       </ReactFlow>
       <WelcomeOverlay />
     </div>
