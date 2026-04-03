@@ -359,8 +359,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
-- [ ] 43-02-PLAN.md — Bottom panel drag-to-resize with store-backed height
+- [ ] 44-01-PLAN.md — Theme infrastructure: useTheme hook, ThemeMenu dropdown, FOUC prevention, App/Toolbar wiring
+- [ ] 44-02-PLAN.md — ReactFlow colorMode integration, layer toggle dark fixes, visual checkpoint
 **UI hint**: yes
 
 ## Progress
@@ -414,9 +414,9 @@ Plans:
 | 41. Layered Canvas | v0.8 | 2/2 | Complete    | 2026-04-03 |
 | 42. Edge & Path Visual Overhaul | v0.8 | 2/2 | Complete    | 2026-04-03 |
 | 43. UI Polish & Redesign | v0.8 | 2/2 | Complete    | 2026-04-03 |
-| 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
+| 44. Light/Dark Mode | v0.8 | 0/2 | Planned | — |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-04 — Phase 43 planned (2 plans, SC-1..SC-5 success criteria)*
+*Updated: 2026-04-04 — Phase 44 planned (2 plans, SC-1..SC-5 requirements)*
