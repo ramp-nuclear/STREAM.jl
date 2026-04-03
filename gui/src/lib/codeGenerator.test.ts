@@ -186,12 +186,75 @@ const resistorDef: ComponentDefinition = {
   ],
 };
 
+const cacDef: ComponentDefinition = {
+  id: "ChannelAndContacts",
+  label: "Channel And Contacts",
+  category: "Hydraulic",
+  description: "CAC",
+  ports: [
+    { name: "port_in", type: "FlowPort", side: "left" },
+    { name: "port_out", type: "FlowPort", side: "right" },
+    { name: "thermal_left", type: "ThermalPort", side: "top", array: true, arrayParam: "n" },
+    { name: "thermal_right", type: "ThermalPort", side: "bottom", array: true, arrayParam: "n" },
+  ],
+  parameters: [
+    { name: "n", type: "Int", description: "Cells", required: true, positional: false },
+    { name: "geometry", type: "PipeGeometry", description: "Geometry", required: true, positional: false },
+  ],
+  constructorModes: [
+    { mode: "default", signature: "ChannelAndContacts(; name, n, geometry)", parameters: ["n", "geometry"] },
+  ],
+};
+
+const hdDef: ComponentDefinition = {
+  id: "HeatDiffusion",
+  label: "Heat Diffusion",
+  category: "Thermal",
+  description: "HD",
+  ports: [
+    { name: "thermal_left", type: "ThermalPort", side: "left", array: true, arrayParam: "nz" },
+    { name: "thermal_right", type: "ThermalPort", side: "right", array: true, arrayParam: "nz" },
+  ],
+  parameters: [
+    { name: "nz", type: "Int", description: "Axial nodes", required: true, positional: false },
+    { name: "nx", type: "Int", description: "Radial nodes", required: true, positional: false },
+    { name: "Lz", type: "Real", unit: "m", description: "Axial length", required: true, positional: false },
+    { name: "Lx", type: "Real", unit: "m", description: "Radial thickness", required: true, positional: false },
+    { name: "y", type: "Real", unit: "m", description: "Half-gap", required: true, positional: false },
+    { name: "k", type: "Real", unit: "W/(m*K)", description: "Conductivity", required: true, positional: false },
+    { name: "rho_s", type: "Real", unit: "kg/m^3", description: "Density", required: true, positional: false },
+    { name: "cp_s", type: "Real", unit: "J/(kg*K)", description: "Specific heat", required: true, positional: false },
+  ],
+  constructorModes: [
+    { mode: "default", signature: "HeatDiffusion(; name, nz, nx, Lz, Lx, y, k, rho_s, cp_s)", parameters: ["nz", "nx", "Lz", "Lx", "y", "k", "rho_s", "cp_s"] },
+  ],
+};
+
+const ctDef: ComponentDefinition = {
+  id: "ConstantTemperature",
+  label: "Constant Temperature",
+  category: "Thermal",
+  description: "CT",
+  ports: [
+    { name: "thermal", type: "ThermalPort", side: "left" },
+  ],
+  parameters: [
+    { name: "T", type: "Real", unit: "K", description: "Temperature", required: true, positional: true },
+  ],
+  constructorModes: [
+    { mode: "default", signature: "ConstantTemperature(T; name)", parameters: ["T"] },
+  ],
+};
+
 const componentMap: Record<string, ComponentDefinition> = {
   Pump: pumpDef,
   Channel: channelDef,
   HeatExchanger: heatExDef,
   Gravity: gravityDef,
   Resistor: resistorDef,
+  ChannelAndContacts: cacDef,
+  HeatDiffusion: hdDef,
+  ConstantTemperature: ctDef,
 };
 
 function mockGetComponent(id: string): ComponentDefinition | undefined {
@@ -452,6 +515,177 @@ describe("generateCode", () => {
       const code = generateCode(nodes, [], [], mockGetComponent);
       // g=9.80665 is the default for elenbaas_htc, should be omitted
       expect(code).not.toMatch(/elenbaas_htc\([^)]*g=/);
+    });
+  });
+
+  // =========================================================================
+  // Thermal code generation (Phase 40 Plan 02)
+  // =========================================================================
+
+  describe("thermal code generation", () => {
+    // Shared HD params
+    const hdParams = { nz: 5, nx: 3, Lz: 0.6, Lx: 0.001, y: 0.0015, k: 15.0, rho_s: 6500.0, cp_s: 300.0 };
+    const cacParams = { n: 5, geometry: { type: "rectangular", L: 0.6, W: 0.066, H: 0.003 } };
+
+    it("no thermal edges -> unchanged Phase 36 ODESystem format", () => {
+      // Only flow edges, no thermal edges
+      const nodes = [
+        makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
+        makeNode("c", "ChannelAndContacts", "cac_1", cacParams),
+      ];
+      const edges = [makeEdge("e1", "p", "port_out", "c", "port_in")];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      expect(code).toContain("ODESystem(eqs, t;");
+      expect(code).not.toContain("compose_systems");
+      expect(code).not.toContain("symmetric_plate");
+    });
+
+    it("symmetric_plate -- one CAC wired both thermal sides to one HD", () => {
+      const nodes = [
+        makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
+        makeNode("c", "ChannelAndContacts", "cac_1", cacParams),
+        makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
+      ];
+      // CAC.thermal_right -> HD.thermal_left AND CAC.thermal_left -> HD.thermal_right
+      const edges = [
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
+        makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
+        makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
+      ];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      expect(code).toContain("symmetric_plate(cac_1, fuel_1)");
+      expect(code).toContain("@named assembly_1");
+      expect(code).not.toContain("ODESystem(eqs, t;");
+    });
+
+    it("plate -- two CACs each wired one side of one HD", () => {
+      const nodes = [
+        makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
+        makeNode("c1", "ChannelAndContacts", "cac_left", cacParams),
+        makeNode("c2", "ChannelAndContacts", "cac_right", cacParams),
+        makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
+      ];
+      // cac_left.thermal_right -> HD.thermal_left, cac_right.thermal_left -> HD.thermal_right
+      const edges = [
+        makeEdge("e1", "p", "port_out", "c1", "port_in"),
+        makeEdge("e2", "c1", "port_out", "c2", "port_in"),
+        makeEdge("e3", "c2", "port_out", "p", "port_in"),
+        makeEdge("t1", "c1", "thermal_right", "h", "thermal_left"),
+        makeEdge("t2", "c2", "thermal_left", "h", "thermal_right"),
+      ];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      expect(code).toContain("plate(cac_left, cac_right, fuel_1)");
+      expect(code).toContain("@named assembly_1");
+    });
+
+    it("one_sided_connection (left) -- CAC.thermal_left -> HD.thermal_right", () => {
+      const nodes = [
+        makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
+        makeNode("c", "ChannelAndContacts", "cac_1", cacParams),
+        makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
+      ];
+      const edges = [
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
+        makeEdge("t1", "c", "thermal_left", "h", "thermal_right"),
+      ];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      expect(code).toContain("one_sided_connection(cac_1, fuel_1; side=:left)");
+      expect(code).toContain("@named assembly_1");
+    });
+
+    it("one_sided_connection (right) -- CAC.thermal_right -> HD.thermal_left", () => {
+      const nodes = [
+        makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
+        makeNode("c", "ChannelAndContacts", "cac_1", cacParams),
+        makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
+      ];
+      const edges = [
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
+        makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
+      ];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      expect(code).toContain("one_sided_connection(cac_1, fuel_1; side=:right)");
+      expect(code).toContain("@named assembly_1");
+    });
+
+    it("unknown topology -> emits TODO comment", () => {
+      // Wire only one thermal port from HD to another HD (nonsensical)
+      const nodes = [
+        makeNode("h1", "HeatDiffusion", "fuel_1", hdParams),
+        makeNode("h2", "HeatDiffusion", "fuel_2", hdParams),
+      ];
+      const edges = [
+        makeEdge("t1", "h1", "thermal_right", "h2", "thermal_left"),
+      ];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      expect(code).toContain("# TODO: verify thermal wiring");
+    });
+
+    it("hydraulic connects use dotted assembly path when CAC is inside assembly", () => {
+      const nodes = [
+        makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
+        makeNode("c", "ChannelAndContacts", "cac_1", cacParams),
+        makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
+      ];
+      const edges = [
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
+        makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
+        makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
+      ];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      // CAC is consumed into assembly_1, so hydraulic connects must use assembly path
+      expect(code).toContain("assembly_1.cac_1.port_in");
+      expect(code).toContain("assembly_1.cac_1.port_out");
+    });
+
+    it("top-level system uses compose_systems() when thermal assemblies exist", () => {
+      const nodes = [
+        makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
+        makeNode("c", "ChannelAndContacts", "cac_1", cacParams),
+        makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
+      ];
+      const edges = [
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
+        makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
+        makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
+      ];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      expect(code).toContain("compose_systems(");
+      expect(code).not.toContain("ODESystem(eqs, t;");
+      expect(code).toContain("mtkcompile");
+    });
+
+    it("nz != n mismatch emits NOTE comment", () => {
+      const nodes = [
+        makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
+        makeNode("c", "ChannelAndContacts", "cac_1", { ...cacParams, n: 5 }),
+        makeNode("h", "HeatDiffusion", "fuel_1", { ...hdParams, nz: 10 }),
+      ];
+      const edges = [
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
+        makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
+      ];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      expect(code).toContain("# NOTE: HeatDiffusion nz");
+    });
+
+    it("ConstantTemperature wired to ThermalPort emits per-cell connect calls", () => {
+      const nodes = [
+        makeNode("c", "ChannelAndContacts", "cac_1", cacParams),
+        makeNode("ct", "ConstantTemperature", "ct_1", { T: 400.0 }),
+      ];
+      const edges = [
+        makeEdge("t1", "ct", "thermal", "c", "thermal_left"),
+      ];
+      const code = generateCode(nodes, edges, [], mockGetComponent);
+      // Should emit per-cell connect with port() helper
+      expect(code).toContain("port(");
     });
   });
 });
