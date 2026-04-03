@@ -222,4 +222,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 after Phase 35.1 (correlation-picker) complete — factory HTC correlation picker UI with sub-field rendering, FactoryCorrelationValue type, info icons across all sidebar fields*
+*Last updated: 2026-04-03 after Phase 38 (ui-design-pass) complete — component icons + category color borders (blue Hydraulic/amber Thermal), collapsible/resizable toolbox and sidebar panels, shadcn/ui audit, human-verified*
