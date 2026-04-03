@@ -88,7 +88,7 @@ Accent reserved for: No new accent usage. Category colors (blue-500, amber-500) 
 | Unconnected port line | "{instanceName}: {portName} unconnected" |
 | No pressure anchor line | "No pressure boundary condition" |
 | No driving element line | "No driving element (add a Pump or Gravity component)" |
-| Dialog dismiss button | "OK" |
+| Dialog dismiss button | "Back to Canvas" |
 | Dialog icon | `AlertTriangle` from lucide-react, 16px, `text-destructive` inline with title |
 
 ### Copywriting Notes
@@ -116,7 +116,7 @@ On success (no validation errors): proceed with export/save as normal.
 
 ### Post-Dialog Behavior (D-05, D-06)
 
-After the user clicks "OK" to dismiss the dialog:
+After the user clicks "Back to Canvas" to dismiss the dialog:
 1. `errorNodeIds` set in store is populated with IDs of nodes that have unconnected FlowPorts.
 2. Red rings appear on those nodes immediately.
 3. When the user connects a port (adds an edge), the store checks if both ports on the affected nodes are now connected. If so, removes the node ID from `errorNodeIds`. Ring disappears reactively.
