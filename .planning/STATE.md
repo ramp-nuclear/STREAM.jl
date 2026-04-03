@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
 status: executing
-stopped_at: Completed 41-01-PLAN.md (plan 01 of phase 41-layered-canvas)
-last_updated: "2026-04-03T18:16:26.236Z"
-last_activity: 2026-04-03
+stopped_at: Phase 41 UI-SPEC approved
+last_updated: "2026-04-03T18:10:53.086Z"
+last_activity: 2026-04-03 -- Phase 41 execution started
 progress:
   total_phases: 13
   completed_phases: 8
   total_plans: 26
-  completed_plans: 29
+  completed_plans: 28
 ---
 
 # STATE: STREAM.jl
@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 40 — thermal-composition
+**Current focus:** Phase 41 — layered-canvas
 **Python STREAM reference:** ~/projects/STREAM
 
 **Roadmap summary:**
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-03
+Phase: 41 (layered-canvas) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 41
+Last activity: 2026-04-03 -- Phase 41 execution started
 
 ## Performance Metrics
 
@@ -89,7 +89,6 @@ Last activity: 2026-04-03
 | Phase 38 P02 | 3 | 2 tasks | 6 files |
 | Phase 39-topology-validation P02 | 163 | 2 tasks | 5 files |
 | Phase 40 P02 | 209 | 1 tasks | 2 files |
-| Phase 41-layered-canvas P01 | 3 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -134,10 +133,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-03T18:16:26.233Z
-**Stopped at:** Completed 41-01-PLAN.md (plan 01 of phase 41-layered-canvas)
+**Last session:** 2026-04-03T17:46:38.430Z
+**Stopped at:** Phase 41 UI-SPEC approved
 **Next action:** Phase 38-02 — panel collapse/resize
-**Resume file:** None
+**Resume file:** .planning/phases/41-layered-canvas/41-UI-SPEC.md
 
 ---
 
