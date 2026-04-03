@@ -9,12 +9,17 @@ import { getComponent } from "../registry";
 import { generateCode } from "../lib/codeGenerator";
 import type { LayerView } from "../lib/layers";
 import FileMenu from "./FileMenu";
+import ThemeMenu from "./ThemeMenu";
+import type { Theme } from "../hooks/useTheme";
 
 interface Props {
   onUnsavedCheck: () => Promise<"save" | "discard" | "cancel">;
+  theme: Theme;
+  resolvedTheme: "light" | "dark";
+  setTheme: (t: Theme) => void;
 }
 
-export default function Toolbar({ onUnsavedCheck }: Props) {
+export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
   const nodes = useStore((s) => s.nodes);
   const edges = useStore((s) => s.edges);
   const bcs = useStore((s) => s.bcs);
@@ -100,8 +105,9 @@ export default function Toolbar({ onUnsavedCheck }: Props) {
         </ToggleGroup>
       </div>
 
-      {/* Right section: Export button */}
+      {/* Right section: ThemeMenu + Export button */}
       <div className="flex items-center gap-1">
+        <ThemeMenu theme={theme} setTheme={setTheme} />
         <Button
           variant="default"
           size="sm"

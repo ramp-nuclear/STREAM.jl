@@ -13,6 +13,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import useStore from "./store/useStore";
 import { initializeRecentFiles } from "./store/useStore";
 import { useResizable } from "./hooks/useResizable";
+import { useTheme } from "./hooks/useTheme";
 
 type DialogCallback = (action: "save" | "discard" | "cancel") => void;
 
@@ -29,6 +30,9 @@ function App() {
   // Panel resize hooks
   const toolboxResize = useResizable({ direction: "left", minWidth: 120, maxWidth: 360, defaultWidth: 240 });
   const sidebarResize = useResizable({ direction: "right", minWidth: 200, maxWidth: 400, defaultWidth: 320 });
+
+  // Theme
+  const { theme, resolvedTheme, setTheme } = useTheme();
 
   // Returns a promise that resolves when the user picks an action.
   const showUnsavedDialog = useCallback(
@@ -189,8 +193,8 @@ function App() {
               <PanelCollapseButton side="left" collapsed={toolboxCollapsed} onToggle={() => setToolboxCollapsed(!toolboxCollapsed)} />
             </div>
             <div className="flex flex-col flex-1">
-              <Toolbar onUnsavedCheck={showUnsavedDialog} />
-              <CanvasPanel />
+              <Toolbar onUnsavedCheck={showUnsavedDialog} theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} />
+              <CanvasPanel resolvedTheme={resolvedTheme} />
             </div>
             <div className="flex items-center border-l">
               <PanelCollapseButton side="right" collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />

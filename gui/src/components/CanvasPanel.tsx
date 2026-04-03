@@ -41,7 +41,11 @@ const edgeTypes: EdgeTypes = {
 
 const defaultEdgeOptions = { type: "smoothstep" };
 
-export default function CanvasPanel() {
+interface CanvasPanelProps {
+  resolvedTheme?: "light" | "dark";
+}
+
+export default function CanvasPanel({ resolvedTheme: _resolvedTheme }: CanvasPanelProps = {}) {
   const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge, selectNode } =
     useStore();
   const activeLayer = useStore((s) => s.activeLayer);
