@@ -378,21 +378,19 @@ describe("addEdge arrowheads and offset", () => {
     expect(edge.markerEnd).toBeUndefined();
   });
 
-  it("applies symmetric offset to bidirectional edge pairs", () => {
+  it("both edges in a bidirectional pair get hydraulicEdge type", () => {
     useStore.getState().addNode("Pump", { x: 0, y: 0 });
     useStore.getState().addNode("Channel", { x: 200, y: 0 });
     const { nodes } = useStore.getState();
     const pumpId = nodes[0].id;
     const channelId = nodes[1].id;
 
-    // Add A->B
     useStore.getState().addEdge({
       source: pumpId,
       target: channelId,
       sourceHandle: "port_out",
       targetHandle: "port_in",
     });
-    // Add B->A (reverse)
     useStore.getState().addEdge({
       source: channelId,
       target: pumpId,
@@ -402,44 +400,27 @@ describe("addEdge arrowheads and offset", () => {
 
     const edges = useStore.getState().edges;
     expect(edges).toHaveLength(2);
+    expect(edges[0].type).toBe("hydraulicEdge");
+    expect(edges[1].type).toBe("hydraulicEdge");
+  });
+});
 
-    const offsets = edges.map((e) => (e.data as Record<string, unknown>)?.parallelOffset);
-    // One should be +7, the other -7 (Y-shift in HydraulicEdge for visual separation)
-    expect(offsets).toContain(7);
-    expect(offsets).toContain(-7);
+describe("bottomPanelHeight", () => {
+  it("initial state has bottomPanelHeight === 240", () => {
+    expect(useStore.getState().bottomPanelHeight).toBe(240);
   });
 
-  it("removes offset from surviving edge when partner is deleted", () => {
-    useStore.getState().addNode("Pump", { x: 0, y: 0 });
-    useStore.getState().addNode("Channel", { x: 200, y: 0 });
-    const { nodes } = useStore.getState();
-    const pumpId = nodes[0].id;
-    const channelId = nodes[1].id;
+  it("setBottomPanelHeight(300) updates bottomPanelHeight to 300", () => {
+    useStore.getState().setBottomPanelHeight(300);
+    expect(useStore.getState().bottomPanelHeight).toBe(300);
+  });
 
-    // Create bidirectional pair
-    useStore.getState().addEdge({
-      source: pumpId,
-      target: channelId,
-      sourceHandle: "port_out",
-      targetHandle: "port_in",
-    });
-    useStore.getState().addEdge({
-      source: channelId,
-      target: pumpId,
-      sourceHandle: "port_out",
-      targetHandle: "port_in",
-    });
-
-    const edgesBefore = useStore.getState().edges;
-    expect(edgesBefore).toHaveLength(2);
-
-    // Remove one edge
-    useStore.getState().removeEdge(edgesBefore[0].id);
-
-    const edgesAfter = useStore.getState().edges;
-    expect(edgesAfter).toHaveLength(1);
-    // Surviving edge should have no parallelOffset (offset cleaned up)
-    expect((edgesAfter[0].data as Record<string, unknown>)?.parallelOffset).toBeUndefined();
+  it("setBottomPanelHeight persists across toggleBottomPanel close/reopen", () => {
+    useStore.getState().setBottomPanelHeight(300);
+    // Close and reopen panel
+    useStore.getState().toggleBottomPanel();
+    useStore.getState().toggleBottomPanel();
+    expect(useStore.getState().bottomPanelHeight).toBe(300);
   });
 });
 
