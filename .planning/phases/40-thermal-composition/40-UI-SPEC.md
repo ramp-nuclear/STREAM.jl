@@ -1,7 +1,8 @@
 ---
 phase: 40
 slug: thermal-composition
-status: draft
+status: approved
+reviewed_at: 2026-04-03
 shadcn_initialized: true
 preset: new-york/zinc
 created: 2026-04-03
