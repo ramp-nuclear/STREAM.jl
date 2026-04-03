@@ -8,7 +8,7 @@ v0.1 shipped a single forced-convection coolant loop validated against Python ST
 
 ## Current Milestone: v0.8 STREAM Composer GUI
 
-Phase 42 complete — Edge & Path Visual Overhaul: hydraulic edge arrowheads (MarkerType.ArrowClosed), bidirectional parallel offset routing (±10px), FlowPort handle polarity coloring (port_in blue-300/port_out blue-700), cursor crosshair CSS fix, reconstructInstanceCounters bug fix (componentId-based). 230 tests passing.
+Phase 43 complete — UI Polish & Redesign: ThermalPort handles 12×12px with 1.5px border, Info icon tooltips on parameter fields with descriptions (MatrixBadge + ParameterForm Bool), draggable bottom panel resize (120px–60vh clamp, Zustand-persisted height). 232 tests passing.
 
 **Goal:** Build a standalone desktop application (Tauri 2 + React + ReactFlow) that lets engineers visually compose STREAM.jl thermal-hydraulic systems by dragging and dropping components onto a canvas, connecting them via flow edges, and exporting valid Julia/MTK code as a .jl file — without any live Julia execution inside the GUI.
 
