@@ -8,7 +8,7 @@ v0.1 shipped a single forced-convection coolant loop validated against Python ST
 
 ## Current Milestone: v0.8 STREAM Composer GUI
 
-Phase 41 complete — Layered canvas system implemented: fluid/thermal/structural layer toggle in toolbar, node/edge dimming (opacity 0.2/0.15) for off-layer elements, per-handle dimming on dual-layer nodes (ChannelAndContacts), toolbox filtering by active layer, Tab key cycling, and activeLayer persistence in StreamProject v2 schema. 223 tests passing.
+Phase 42 complete — Edge & Path Visual Overhaul: hydraulic edge arrowheads (MarkerType.ArrowClosed), bidirectional parallel offset routing (±10px), FlowPort handle polarity coloring (port_in blue-300/port_out blue-700), cursor crosshair CSS fix, reconstructInstanceCounters bug fix (componentId-based). 230 tests passing.
 
 **Goal:** Build a standalone desktop application (Tauri 2 + React + ReactFlow) that lets engineers visually compose STREAM.jl thermal-hydraulic systems by dragging and dropping components onto a canvas, connecting them via flow edges, and exporting valid Julia/MTK code as a .jl file — without any live Julia execution inside the GUI.
 
@@ -222,4 +222,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after Phase 38 (ui-design-pass) complete — component icons + category color borders (blue Hydraulic/amber Thermal), collapsible/resizable toolbox and sidebar panels, shadcn/ui audit, human-verified*
+*Last updated: 2026-04-03 after Phase 42 (edge-path-visual-overhaul) complete — hydraulic arrowheads + parallel offset, handle polarity colors, cursor fix, counter reconstruction fix*
