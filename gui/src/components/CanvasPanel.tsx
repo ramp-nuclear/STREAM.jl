@@ -190,6 +190,7 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
     <div ref={containerRef} className="flex-1 h-full relative focus:outline-none" tabIndex={-1}>
       <ReactFlow
         colorMode={resolvedTheme === "dark" ? "dark" : "light"}
+        style={resolvedTheme === "dark" ? ({ "--xy-background-color": "#282c34" } as React.CSSProperties) : undefined}
         nodes={enrichedNodes}
         edges={enrichedEdges}
         onNodesChange={onNodesChange}
@@ -210,7 +211,7 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       >
         <Controls />
         <MiniMap />
-        <Background variant={BackgroundVariant.Dots} color={resolvedTheme === "dark" ? "#555" : "#ccc"} />
+        <Background variant={BackgroundVariant.Dots} color={resolvedTheme === "dark" ? "#4b5263" : "#ccc"} />
       </ReactFlow>
       <WelcomeOverlay />
     </div>
