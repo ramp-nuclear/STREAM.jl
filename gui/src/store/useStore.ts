@@ -11,6 +11,7 @@ import {
 } from "@xyflow/react";
 import { getComponent } from "../registry";
 import type { BCEntry } from "../lib/codeGenerator";
+import { validateTopology, type TopologyResult } from "../lib/validation";
 import {
   serializeProject,
   deserializeProject,
@@ -42,6 +43,11 @@ interface AppState {
   sidebarCollapsed: boolean;
   setToolboxCollapsed: (collapsed: boolean) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  // Topology validation (Phase 39)
+  errorNodeIds: Set<string>;
+  validationResult: TopologyResult | null;
+  validateAndGate: () => TopologyResult;
+  clearValidation: () => void;
   // Persistence state
   isDirty: boolean;
   currentFilePath: string | null;
@@ -133,6 +139,9 @@ const useStore = create<AppState>()((set, get) => ({
   bottomPanelOpen: false,
   toolboxCollapsed: false,
   sidebarCollapsed: false,
+  // Topology validation (Phase 39) initial state
+  errorNodeIds: new Set<string>(),
+  validationResult: null,
   // Persistence initial state
   isDirty: false,
   currentFilePath: null,
@@ -169,6 +178,8 @@ const useStore = create<AppState>()((set, get) => ({
       _undoPast: _undoPast.slice(0, -1),
       _undoFuture: [{ nodes, edges, bcs }, ..._undoFuture].slice(0, 50),
       isDirty: true,
+      errorNodeIds: new Set<string>(),
+      validationResult: null,
     });
   },
 
@@ -183,6 +194,8 @@ const useStore = create<AppState>()((set, get) => ({
       _undoPast: [..._undoPast, { nodes, edges, bcs }].slice(-50),
       _undoFuture: _undoFuture.slice(1),
       isDirty: true,
+      errorNodeIds: new Set<string>(),
+      validationResult: null,
     });
   },
 
@@ -295,7 +308,33 @@ const useStore = create<AppState>()((set, get) => ({
 
   addEdge: (connection) => {
     get()._pushSnapshot();
-    set({ edges: rfAddEdge(connection, get().edges), isDirty: true });
+    const newEdges = rfAddEdge(connection, get().edges);
+    const { errorNodeIds } = get();
+
+    if (errorNodeIds.size > 0) {
+      const updatedErrors = new Set(errorNodeIds);
+      for (const nodeId of [connection.source, connection.target]) {
+        if (!nodeId || !updatedErrors.has(nodeId)) continue;
+        const node = get().nodes.find((n) => n.id === nodeId);
+        if (!node) continue;
+        const data = node.data as { componentId: string };
+        const def = getComponent(data.componentId);
+        if (!def) continue;
+        const flowPorts = def.ports.filter((p) => p.type === "FlowPort");
+        const allConnected = flowPorts.every((port) => {
+          const isInput = port.name.includes("in");
+          return newEdges.some((e) =>
+            isInput
+              ? e.target === nodeId && e.targetHandle === port.name
+              : e.source === nodeId && e.sourceHandle === port.name,
+          );
+        });
+        if (allConnected) updatedErrors.delete(nodeId);
+      }
+      set({ edges: newEdges, isDirty: true, errorNodeIds: updatedErrors });
+    } else {
+      set({ edges: newEdges, isDirty: true });
+    }
   },
 
   removeEdge: (edgeId) => {
@@ -315,6 +354,22 @@ const useStore = create<AppState>()((set, get) => ({
 
   // toggleBottomPanel is NOT content-mutating — do NOT set isDirty
   toggleBottomPanel: () => set({ bottomPanelOpen: !get().bottomPanelOpen }),
+
+  // ---------------------------------------------------------------------------
+  // Topology validation (Phase 39)
+  // ---------------------------------------------------------------------------
+
+  validateAndGate: () => {
+    const { nodes, edges, bcs } = get();
+    const result = validateTopology(nodes, edges, bcs, getComponent);
+    const errorIds = new Set(result.nodeErrors.map((e) => e.nodeId));
+    set({ errorNodeIds: errorIds, validationResult: result });
+    return result;
+  },
+
+  clearValidation: () => {
+    set({ errorNodeIds: new Set<string>(), validationResult: null });
+  },
 
   // Panel collapse is NOT content-mutating — do NOT set isDirty
   setToolboxCollapsed: (collapsed) => set({ toolboxCollapsed: collapsed }),
@@ -436,6 +491,8 @@ const useStore = create<AppState>()((set, get) => ({
         recentFiles: updated,
         _undoPast: [],
         _undoFuture: [],
+        errorNodeIds: new Set<string>(),
+        validationResult: null,
       });
       await saveRecentFiles(updated);
     } catch (err) {
@@ -465,6 +522,8 @@ const useStore = create<AppState>()((set, get) => ({
       sidebarCollapsed: false,
       _undoPast: [],
       _undoFuture: [],
+      errorNodeIds: new Set<string>(),
+      validationResult: null,
     });
   },
 }));
