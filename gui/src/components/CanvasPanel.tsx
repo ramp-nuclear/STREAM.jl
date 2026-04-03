@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ReactFlow,
   Controls,
@@ -16,6 +16,7 @@ import "@xyflow/react/dist/style.css";
 import useStore from "../store/useStore";
 import type { StreamNodeData } from "../store/useStore";
 import { getComponent } from "../registry";
+import { isNodeDimmed, isEdgeDimmed } from "../lib/layers";
 import StreamNode from "./StreamNode";
 import WelcomeOverlay from "./WelcomeOverlay";
 
@@ -37,8 +38,47 @@ const defaultEdgeOptions = { type: "smoothstep" };
 export default function CanvasPanel() {
   const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge, selectNode } =
     useStore();
+  const activeLayer = useStore((s) => s.activeLayer);
+  const cycleLayer = useStore((s) => s.cycleLayer);
   const { screenToFlowPosition } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Enrich nodes with dimming styles based on active layer
+  const enrichedNodes = useMemo(() => {
+    if (activeLayer === "Both") return nodes;
+    return nodes.map(node => {
+      const nodeData = node.data as unknown as StreamNodeData;
+      const dimmed = isNodeDimmed(nodeData.componentId, activeLayer, getComponent);
+      if (!dimmed) return node;
+      return {
+        ...node,
+        style: {
+          ...node.style,
+          opacity: 0.2,
+          pointerEvents: "none" as const,
+          transition: "opacity 150ms ease",
+        },
+      };
+    });
+  }, [nodes, activeLayer]);
+
+  // Enrich edges with dimming styles based on active layer
+  const enrichedEdges = useMemo(() => {
+    if (activeLayer === "Both") return edges;
+    return edges.map(edge => {
+      const isThermalEdge = edge.style?.stroke === "#f59e0b";
+      const dimmed = isEdgeDimmed(isThermalEdge, activeLayer);
+      if (!dimmed) return edge;
+      return {
+        ...edge,
+        style: {
+          ...edge.style,
+          opacity: 0.15,
+          transition: "opacity 150ms ease",
+        },
+      };
+    });
+  }, [edges, activeLayer]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
@@ -77,6 +117,9 @@ export default function CanvasPanel() {
 
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
+      const nodeData = node.data as unknown as StreamNodeData;
+      const dimmed = isNodeDimmed(nodeData.componentId, useStore.getState().activeLayer, getComponent);
+      if (dimmed) return; // Don't select dimmed nodes
       selectNode(node.id);
     },
     [selectNode],
@@ -102,6 +145,23 @@ export default function CanvasPanel() {
     return true;
   }, []);
 
+  // Tab key cycles layers when canvas has focus (not inside form elements)
+  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== "Tab") return;
+    const target = e.target as HTMLElement;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    cycleLayer();
+  }, [cycleLayer]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
@@ -121,10 +181,10 @@ export default function CanvasPanel() {
   }, []);
 
   return (
-    <div ref={containerRef} className="flex-1 h-full relative" tabIndex={-1}>
+    <div ref={containerRef} className="flex-1 h-full relative" tabIndex={-1} onKeyDown={handleContainerKeyDown}>
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={enrichedNodes}
+        edges={enrichedEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

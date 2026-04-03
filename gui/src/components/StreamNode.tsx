@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { getComponent } from "../registry";
 import { getComponentIcon } from "@/registry/icons";
+import { getComponentLayers } from "../lib/layers";
+import type { LayerView } from "../lib/layers";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
 
@@ -24,6 +26,7 @@ const sideToPosition: Record<string, Position> = {
 export default function StreamNode({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as StreamNodeData;
   const hasError = useStore(useCallback((s: { errorNodeIds: Set<string> }) => s.errorNodeIds.has(id), [id]));
+  const activeLayer = useStore(useCallback((s: { activeLayer: LayerView }) => s.activeLayer, []));
   const component = getComponent(nodeData.componentId);
   if (!component) return null;
 
@@ -32,6 +35,12 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
 
   const flowPorts = component.ports.filter((p) => p.type === "FlowPort");
   const thermalPorts = component.ports.filter((p) => p.type === "ThermalPort");
+
+  // Handle dimming for dual-layer nodes (e.g. ChannelAndContacts)
+  const { hasFlow, hasThermal } = getComponentLayers(component);
+  const isDualLayer = hasFlow && hasThermal;
+  const dimFlowHandles = isDualLayer && activeLayer === "Thermal";
+  const dimThermalHandles = isDualLayer && activeLayer === "Hydraulic";
 
   return (
     <div
@@ -55,6 +64,7 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           type={port.name.includes("out") ? "source" : "target"}
           position={sideToPosition[port.side]}
           data={{ portType: port.type }}
+          style={dimFlowHandles ? { opacity: 0.2, pointerEvents: "none" as const } : undefined}
         />
       ))}
       {thermalPorts.map((port) => (
@@ -71,6 +81,7 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
             height: 10,
             borderRadius: 0,
             transform: "rotate(45deg)",
+            ...(dimThermalHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
           }}
         />
       ))}
