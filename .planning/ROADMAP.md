@@ -277,7 +277,11 @@ Plans:
   1. ChannelAndContacts(n=4) node shows 4 thermal_left and 4 thermal_right port handles
   2. Connecting a HeatDiffusion left-side port to thermal_left[2] is possible and draws a typed edge
   3. Symmetric_plate topology (HeatDiffusion between two ChannelAndContacts) generates `symmetric_plate(cac1, fuel)` call in output code
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 40-01-PLAN.md — ThermalPort handle rendering, connection enforcement, amber dashed edge styling
+- [ ] 40-02-PLAN.md — Thermal topology detection and composition helper code generation
 **UI hint**: yes
 
 ## Progress
@@ -327,12 +331,12 @@ Plans:
 | 37. Project Persistence | v0.8 | 3/3 | Complete    | 2026-04-02 |
 | 38. UI Design Pass | v0.8 | 2/3 | Complete    | 2026-04-03 |
 | 39. Topology Validation | v0.8 | 2/3 | Complete    | 2026-04-03 |
-| 40. Thermal Composition | v0.8 | 0/? | Not started | — |
+| 40. Thermal Composition | v0.8 | 0/2 | Not started | — |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-03 — Phase 38 plans created: 3 plans in 3 waves (icons+nodes, panels, human verify)*
+*Updated: 2026-04-03 — Phase 40 plans created: 2 plans in 2 waves (handles+enforcement, code gen)*
 
 ## Backlog
 
