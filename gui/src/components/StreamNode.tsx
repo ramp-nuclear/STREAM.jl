@@ -11,6 +11,9 @@ const CATEGORY_LEFT_BORDER_COLOR: Record<string, string> = {
   Thermal: "#f59e0b", // amber-500
 };
 
+const THERMAL_HANDLE_COLOR = "#f59e0b"; // amber-500
+const THERMAL_HANDLE_BORDER = "#d97706"; // amber-600
+
 const sideToPosition: Record<string, Position> = {
   left: Position.Left,
   right: Position.Right,
@@ -27,8 +30,8 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
   const Icon = getComponentIcon(nodeData.componentId);
   const accentColor = CATEGORY_LEFT_BORDER_COLOR[component.category];
 
-  // D-03: Only FlowPort handles in Phase 34 (ThermalPort deferred to Phase 40)
   const flowPorts = component.ports.filter((p) => p.type === "FlowPort");
+  const thermalPorts = component.ports.filter((p) => p.type === "ThermalPort");
 
   return (
     <div
@@ -51,6 +54,24 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           id={port.name}
           type={port.name.includes("out") ? "source" : "target"}
           position={sideToPosition[port.side]}
+          data={{ portType: port.type }}
+        />
+      ))}
+      {thermalPorts.map((port) => (
+        <Handle
+          key={port.name}
+          id={port.name}
+          type={port.side === "right" || port.side === "bottom" ? "source" : "target"}
+          position={sideToPosition[port.side]}
+          data={{ portType: port.type }}
+          style={{
+            background: THERMAL_HANDLE_COLOR,
+            border: `1px solid ${THERMAL_HANDLE_BORDER}`,
+            width: 10,
+            height: 10,
+            borderRadius: 0,
+            transform: "rotate(45deg)",
+          }}
         />
       ))}
     </div>

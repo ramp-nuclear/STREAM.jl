@@ -309,6 +309,26 @@ const useStore = create<AppState>()((set, get) => ({
   addEdge: (connection) => {
     get()._pushSnapshot();
     const newEdges = rfAddEdge(connection, get().edges);
+
+    // Apply thermal edge styling (per D-03, UI-SPEC): amber dashed for ThermalPort edges
+    const styledEdges = newEdges.map((e) => {
+      // Only style edges that don't already have a style (the newly added one)
+      if (e.style) return e;
+      // Check if this edge connects ThermalPorts
+      const srcNode = get().nodes.find((n) => n.id === e.source);
+      const tgtNode = get().nodes.find((n) => n.id === e.target);
+      if (!srcNode || !tgtNode) return e;
+      const srcComp = getComponent((srcNode.data as unknown as StreamNodeData).componentId);
+      const tgtComp = getComponent((tgtNode.data as unknown as StreamNodeData).componentId);
+      if (!srcComp || !tgtComp) return e;
+      const srcPort = srcComp.ports.find((p) => p.name === e.sourceHandle);
+      const tgtPort = tgtComp.ports.find((p) => p.name === e.targetHandle);
+      if (srcPort?.type === "ThermalPort" && tgtPort?.type === "ThermalPort") {
+        return { ...e, style: { stroke: "#f59e0b", strokeDasharray: "6 3" } };
+      }
+      return e;
+    });
+
     const { errorNodeIds } = get();
 
     if (errorNodeIds.size > 0) {
@@ -323,7 +343,7 @@ const useStore = create<AppState>()((set, get) => ({
         const flowPorts = def.ports.filter((p) => p.type === "FlowPort");
         const allConnected = flowPorts.every((port) => {
           const isInput = port.name.includes("in");
-          return newEdges.some((e) =>
+          return styledEdges.some((e) =>
             isInput
               ? e.target === nodeId && e.targetHandle === port.name
               : e.source === nodeId && e.sourceHandle === port.name,
@@ -331,9 +351,9 @@ const useStore = create<AppState>()((set, get) => ({
         });
         if (allConnected) updatedErrors.delete(nodeId);
       }
-      set({ edges: newEdges, isDirty: true, errorNodeIds: updatedErrors });
+      set({ edges: styledEdges, isDirty: true, errorNodeIds: updatedErrors });
     } else {
-      set({ edges: newEdges, isDirty: true });
+      set({ edges: styledEdges, isDirty: true });
     }
   },
 

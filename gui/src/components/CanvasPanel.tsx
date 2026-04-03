@@ -14,8 +14,19 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import useStore from "../store/useStore";
+import type { StreamNodeData } from "../store/useStore";
+import { getComponent } from "../registry";
 import StreamNode from "./StreamNode";
 import WelcomeOverlay from "./WelcomeOverlay";
+
+export function getPortType(nodeId: string, handleId: string): string | null {
+  const node = useStore.getState().nodes.find((n) => n.id === nodeId);
+  if (!node) return null;
+  const comp = getComponent((node.data as unknown as StreamNodeData).componentId);
+  if (!comp) return null;
+  const port = comp.ports.find((p) => p.name === handleId);
+  return port?.type ?? null;
+}
 
 const nodeTypes: NodeTypes = {
   streamNode: StreamNode,
@@ -76,12 +87,19 @@ export default function CanvasPanel() {
   }, [selectNode]);
 
   const isValidConnection = useCallback((connection: Edge | Connection) => {
-    return !!(
-      connection.source &&
-      connection.target &&
-      connection.sourceHandle &&
-      connection.targetHandle
-    );
+    if (
+      !connection.source ||
+      !connection.target ||
+      !connection.sourceHandle ||
+      !connection.targetHandle
+    ) {
+      return false;
+    }
+    // Port-type enforcement (per D-05): FlowPort-to-FlowPort only, ThermalPort-to-ThermalPort only
+    const sourceType = getPortType(connection.source, connection.sourceHandle);
+    const targetType = getPortType(connection.target, connection.targetHandle);
+    if (sourceType && targetType && sourceType !== targetType) return false;
+    return true;
   }, []);
 
   useEffect(() => {
