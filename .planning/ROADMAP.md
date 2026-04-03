@@ -328,3 +328,14 @@ Plans:
 
 *Created: 2026-03-12*
 *Updated: 2026-04-03 — Phase 38 plans created: 3 plans in 3 waves (icons+nodes, panels, human verify)*
+
+## Backlog
+
+### Phase 999.1: Light/Dark Mode Theme Switcher (BACKLOG)
+
+**Goal:** Allow users to switch between light and dark themes via a settings menu. All UI elements should look great and be properly colored in both modes.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
