@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
 status: executing
-stopped_at: Completed 40-01-PLAN.md (plan 01 of 02 in phase 40)
-last_updated: "2026-04-03T13:46:27.464Z"
-last_activity: 2026-04-03
+stopped_at: Phase 40 UI-SPEC approved
+last_updated: "2026-04-03T13:40:36.702Z"
+last_activity: 2026-04-03 -- Phase 40 execution started
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 24
-  completed_plans: 27
+  completed_plans: 26
 ---
 
 # STATE: STREAM.jl
@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 39 — topology-validation
+**Current focus:** Phase 40 — thermal-composition
 **Python STREAM reference:** ~/projects/STREAM
 
 **Roadmap summary:**
@@ -36,10 +36,10 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-03
+Phase: 40 (thermal-composition) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 40
+Last activity: 2026-04-03 -- Phase 40 execution started
 
 ## Performance Metrics
 
@@ -88,7 +88,6 @@ Last activity: 2026-04-03
 | Phase 37 P02 | 525623 | 2 tasks | 6 files |
 | Phase 38 P02 | 3 | 2 tasks | 6 files |
 | Phase 39-topology-validation P02 | 163 | 2 tasks | 5 files |
-| Phase 40-thermal-composition P01 | 144 | 1 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -133,10 +132,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-03T13:46:27.461Z
-**Stopped at:** Completed 40-01-PLAN.md (plan 01 of 02 in phase 40)
+**Last session:** 2026-04-03T13:22:41.426Z
+**Stopped at:** Phase 40 UI-SPEC approved
 **Next action:** Phase 38-02 — panel collapse/resize
-**Resume file:** None
+**Resume file:** .planning/phases/40-thermal-composition/40-UI-SPEC.md
 
 ---
 
