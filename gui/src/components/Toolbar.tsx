@@ -27,6 +27,9 @@ export default function Toolbar({ onUnsavedCheck }: Props) {
   );
 
   async function handleExport() {
+    const result = useStore.getState().validateAndGate();
+    if (!result.valid) return; // Dialog will show via validationResult state
+
     const filePath = await save({
       defaultPath: "system.jl",
       filters: [{ name: "Julia files", extensions: ["jl"] }],
