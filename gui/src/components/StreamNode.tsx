@@ -88,9 +88,9 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           data={{ portType: port.type }}
           style={{
             background: THERMAL_HANDLE_COLOR,
-            border: `1px solid ${THERMAL_HANDLE_BORDER}`,
-            width: 10,
-            height: 10,
+            border: `1.5px solid ${THERMAL_HANDLE_BORDER}`,
+            width: 12,
+            height: 12,
             borderRadius: 0,
             transform: "rotate(45deg)",
             ...(dimThermalHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
