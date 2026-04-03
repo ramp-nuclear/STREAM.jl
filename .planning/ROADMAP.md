@@ -115,7 +115,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 - [x] **Phase 38: UI Design Pass** — shadcn/ui integration throughout; three-panel layout; component icons/colors; design contract and visual audit gates (completed 2026-04-03)
 - [x] **Phase 39: Topology Validation** — Unconnected port warnings; missing pressure BC alert; missing driving element alert (completed 2026-04-03)
 - [x] **Phase 40: Thermal Composition** — ChannelAndContacts ThermalPort array visualization; HeatDiffusion connections; composition helper code generation (completed 2026-04-03)
-- [ ] **Phase 41: Layered Canvas** — Hydraulic and thermal content on separate toggleable layers; reduces visual clutter when both are present
+- [x] **Phase 41: Layered Canvas** — Hydraulic and thermal content on separate toggleable layers; reduces visual clutter when both are present (completed 2026-04-03)
 - [ ] **Phase 42: Edge & Path Visual Overhaul** — Correct arrowheads; clean loop routing; thermal edge clarity; cursor glitch fix; rename counter bug fix
 - [ ] **Phase 43: UI Polish & Redesign** — Professional polish pass: nodes, buttons, sidebar, spacing, field descriptions, resizable panels
 - [ ] **Phase 44: Light/Dark Mode** — Theme toggle in settings menu; all surfaces correct in both modes
@@ -302,7 +302,7 @@ Plans:
 
 Plans:
 - [x] 41-01-PLAN.md — Layer detection utility, store activeLayer state, projectIO v2 schema
-- [ ] 41-02-PLAN.md — Toolbar toggle, toolbox filtering, canvas dimming, handle dimming, Tab cycling
+- [x] 41-02-PLAN.md — Toolbar toggle, toolbox filtering, canvas dimming, handle dimming, Tab cycling
 
 **UI hint**: yes
 
@@ -393,7 +393,7 @@ Plans:
 | 38. UI Design Pass | v0.8 | 3/3 | Complete | 2026-04-03 |
 | 39. Topology Validation | v0.8 | 3/3 | Complete | 2026-04-03 |
 | 40. Thermal Composition | v0.8 | 2/2 | Complete | 2026-04-03 |
-| 41. Layered Canvas | v0.8 | 1/2 | In Progress|  |
+| 41. Layered Canvas | v0.8 | 2/2 | Complete   | 2026-04-03 |
 | 42. Edge & Path Visual Overhaul | v0.8 | 0/? | Planned | — |
 | 43. UI Polish & Redesign | v0.8 | 0/? | Planned | — |
 | 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
