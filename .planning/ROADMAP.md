@@ -187,7 +187,11 @@ Plans:
   3. Selecting elenbaas_htc reveals sub-fields: b, L, Dh (Real), g (Real, default 9.80665)
   4. Selecting a simple closure (dittus_boelter, constant_Nusselt) shows no sub-fields
   5. Code generation (Phase 36) emits correct nested factory call: `htc_correlation=regime_dependent(htc_forced=dittus_boelter, htc_natural=elenbaas_htc(b=0.003, L=0.6, Dh=0.0025))`
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
+- [ ] 43-02-PLAN.md — Bottom panel drag-to-resize with store-backed height
 **UI hint**: yes
 
 **Design decisions captured during Phase 35 discuss-phase (2026-04-02):**
@@ -328,27 +332,35 @@ Plans:
 ### Phase 43: UI Polish & Redesign
 **Goal**: Every surface of the GUI looks intentional and professional — clean spacing, consistent visual hierarchy, no rough edges
 **Depends on**: Phase 42
-**Requirements**: TBD
+**Requirements**: SC-1, SC-2, SC-3, SC-4, SC-5
 **Success Criteria** (what must be TRUE):
   1. All buttons have consistent sizing, padding, and hover states
   2. ThermalPort amber diamond handles are visually clean and proportional
   3. Sidebar shows a brief description for each parameter field (tooltip or inline text)
   4. Panel dividers are draggable (canvas↔sidebar, canvas↔bottom panel)
   5. A developer familiar with shadcn/ui would not immediately notice rough edges on casual inspection
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
+- [ ] 43-02-PLAN.md — Bottom panel drag-to-resize with store-backed height
 **UI hint**: yes
 
 ### Phase 44: Light/Dark Mode
 **Goal**: Users can toggle between light and dark themes via a settings menu; all surfaces look correct in both modes
 **Depends on**: Phase 43
-**Requirements**: TBD
+**Requirements**: SC-1, SC-2, SC-3, SC-4, SC-5
 **Success Criteria** (what must be TRUE):
   1. A settings button (gear icon) opens a settings panel or dropdown
   2. Light/Dark/System options are available; selection persists across sessions
   3. All shadcn/ui components display correctly in both themes
   4. ReactFlow canvas background and node colors adapt to the active theme
   5. Amber thermal edges and red error rings remain legible in both themes
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
+- [ ] 43-02-PLAN.md — Bottom panel drag-to-resize with store-backed height
 **UI hint**: yes
 
 ## Progress
@@ -401,10 +413,10 @@ Plans:
 | 40. Thermal Composition | v0.8 | 2/2 | Complete | 2026-04-03 |
 | 41. Layered Canvas | v0.8 | 2/2 | Complete    | 2026-04-03 |
 | 42. Edge & Path Visual Overhaul | v0.8 | 2/2 | Complete    | 2026-04-03 |
-| 43. UI Polish & Redesign | v0.8 | 0/? | Planned | — |
+| 43. UI Polish & Redesign | v0.8 | 0/2 | Planned | — |
 | 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-03 — Phase 42 planned (2 plans, EDGE-01..06 requirements defined)*
+*Updated: 2026-04-04 — Phase 43 planned (2 plans, SC-1..SC-5 success criteria)*
