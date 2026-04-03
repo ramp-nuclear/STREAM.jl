@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-03T21:28:27.071Z",
+  "phase": "42",
+  "phase_name": "edge-path-visual-overhaul",
+  "phase_dir": ".planning/phases/42-edge-path-visual-overhaul",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "42-01", "name": "Arrowheads + bidirectional parallel offset", "status": "done", "commit": "18faace"},
+    {"id": "42-02", "name": "FlowPort polarity colors + cursor fix + counter bug", "status": "done", "commit": "d62c4a1"},
+    {"id": "hotfix-1", "name": "port_in/port_out colors blue-400/red-400", "status": "done", "commit": "5263f99"},
+    {"id": "hotfix-2", "name": "Replace pathOptions.offset with HydraulicEdge custom component", "status": "done", "commit": "36017ad"},
+    {"id": "hotfix-3", "name": "Racetrack over/under cubic bezier routing for bidirectional pairs", "status": "done", "commit": "0a510c6"}
+  ],
+  "remaining_tasks": [
+    {"id": "uat-visual", "name": "User restarts dev server and visually verifies racetrack routing", "status": "not_started"},
+    {"id": "docs-update", "name": "Update SUMMARY/VERIFICATION to reflect hotfix routing changes", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {
+      "action": "Restart dev server and verify racetrack oval looks correct",
+      "context": "Final routing fix (racetrack bezier) was committed but not visually verified — ran out of context",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Racetrack over/under routing for bidirectional pairs",
+      "rationale": "pathOptions.offset is wrong API (step distance not lateral). Y-shift still overlaps for vertically-stacked nodes. Cubic bezier routing above/below both nodes avoids crossing entirely.",
+      "phase": "42"
+    },
+    {
+      "decision": "port_in = blue-400 (#60a5fa), port_out = red-400 (#f87171)",
+      "rationale": "User found original blue-300/blue-700 too similar. Red for outgoing, blue for incoming.",
+      "phase": "42"
+    },
+    {
+      "decision": "MARGIN = 60px for racetrack arc clearance",
+      "rationale": "~40px to clear nodeHeight/2 plus ~20px visual gap. May need tuning.",
+      "phase": "42"
+    }
+  ],
+  "uncommitted_files": [],
+  "next_action": "User restarts dev server, shares screenshot, verify racetrack oval. Then update SUMMARY/VERIFICATION docs.",
+  "context_notes": "Phase 42 was gsd-tools-complete but post-UAT revealed parallel edge routing bugs. Went through 3 iterations. Final approach (racetrack cubic bezier) is theoretically correct based on research into ReactFlow BiDirectionalEdge, Cytoscape.js, and hydraulic circuit diagram conventions. All 230 tests pass. Key file: gui/src/components/HydraulicEdge.tsx (MARGIN constant at line 8)."
+}
