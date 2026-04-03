@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { MarkerType } from "@xyflow/react";
 import useStore from "../useStore";
+import { enrichEdges } from "../useStore";
 import type { StreamNodeData } from "../useStore";
 
 // Reset store and undo history before each test
@@ -332,5 +334,144 @@ describe("activeLayer", () => {
     expect(useStore.getState().nodes).toHaveLength(0);
     // activeLayer should still be Thermal — undo does not touch it
     expect(useStore.getState().activeLayer).toBe("Thermal");
+  });
+});
+
+describe("addEdge arrowheads and offset", () => {
+  it("adds MarkerType.ArrowClosed markerEnd to hydraulic edges", () => {
+    // Add two Pump nodes (FlowPort connections)
+    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+    useStore.getState().addNode("Pump", { x: 200, y: 0 });
+    const { nodes } = useStore.getState();
+    const pumpA = nodes[0].id;
+    const pumpB = nodes[1].id;
+
+    useStore.getState().addEdge({
+      source: pumpA,
+      target: pumpB,
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
+    });
+
+    const edge = useStore.getState().edges[0];
+    expect(edge.markerEnd).toBeDefined();
+    expect((edge.markerEnd as { type: string }).type).toBe(MarkerType.ArrowClosed);
+  });
+
+  it("does not add markerEnd to thermal edges", () => {
+    // Add two ChannelAndContacts nodes (have ThermalPort connections)
+    useStore.getState().addNode("ChannelAndContacts", { x: 0, y: 0 });
+    useStore.getState().addNode("HeatDiffusion", { x: 200, y: 0 });
+    const { nodes } = useStore.getState();
+    const cacId = nodes[0].id;
+    const hdId = nodes[1].id;
+
+    useStore.getState().addEdge({
+      source: cacId,
+      target: hdId,
+      sourceHandle: "thermal_left",
+      targetHandle: "thermal_left",
+    });
+
+    const edge = useStore.getState().edges[0];
+    // Thermal edges should NOT have arrowheads
+    expect(edge.markerEnd).toBeUndefined();
+  });
+
+  it("applies symmetric offset to bidirectional edge pairs", () => {
+    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+    useStore.getState().addNode("Channel", { x: 200, y: 0 });
+    const { nodes } = useStore.getState();
+    const pumpId = nodes[0].id;
+    const channelId = nodes[1].id;
+
+    // Add A->B
+    useStore.getState().addEdge({
+      source: pumpId,
+      target: channelId,
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
+    });
+    // Add B->A (reverse)
+    useStore.getState().addEdge({
+      source: channelId,
+      target: pumpId,
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
+    });
+
+    const edges = useStore.getState().edges;
+    expect(edges).toHaveLength(2);
+
+    const offsets = edges.map((e) => (e as unknown as { pathOptions?: { offset: number } }).pathOptions?.offset);
+    // One should be +10, the other -10
+    expect(offsets).toContain(10);
+    expect(offsets).toContain(-10);
+  });
+
+  it("removes offset from surviving edge when partner is deleted", () => {
+    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+    useStore.getState().addNode("Channel", { x: 200, y: 0 });
+    const { nodes } = useStore.getState();
+    const pumpId = nodes[0].id;
+    const channelId = nodes[1].id;
+
+    // Create bidirectional pair
+    useStore.getState().addEdge({
+      source: pumpId,
+      target: channelId,
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
+    });
+    useStore.getState().addEdge({
+      source: channelId,
+      target: pumpId,
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
+    });
+
+    const edgesBefore = useStore.getState().edges;
+    expect(edgesBefore).toHaveLength(2);
+
+    // Remove one edge
+    useStore.getState().removeEdge(edgesBefore[0].id);
+
+    const edgesAfter = useStore.getState().edges;
+    expect(edgesAfter).toHaveLength(1);
+    // Surviving edge should have no pathOptions (offset cleaned up)
+    expect((edgesAfter[0] as unknown as { pathOptions?: unknown }).pathOptions).toBeUndefined();
+  });
+});
+
+describe("enrichEdges", () => {
+  it("is a pure function that enriches edges without store access", () => {
+    const nodes = [
+      {
+        id: "n1",
+        type: "streamNode",
+        position: { x: 0, y: 0 },
+        data: { componentId: "Pump", instanceName: "pump_1", parameters: {} },
+      },
+      {
+        id: "n2",
+        type: "streamNode",
+        position: { x: 100, y: 0 },
+        data: { componentId: "Channel", instanceName: "channel_1", parameters: {} },
+      },
+    ];
+    const edges = [
+      {
+        id: "e1",
+        source: "n1",
+        target: "n2",
+        sourceHandle: "port_out",
+        targetHandle: "port_in",
+      },
+    ];
+
+    const result = enrichEdges(edges, nodes);
+    expect(result).toHaveLength(1);
+    expect(result[0].markerEnd).toBeDefined();
+    expect((result[0].markerEnd as { type: string }).type).toBe(MarkerType.ArrowClosed);
   });
 });

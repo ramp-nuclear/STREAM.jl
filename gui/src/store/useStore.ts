@@ -8,6 +8,7 @@ import {
   addEdge as rfAddEdge,
   NodeChange,
   EdgeChange,
+  MarkerType,
 } from "@xyflow/react";
 import { getComponent } from "../registry";
 import type { BCEntry } from "../lib/codeGenerator";
@@ -133,6 +134,64 @@ async function saveRecentFiles(files: string[]): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Edge enrichment: arrowheads + parallel offset for bidirectional pairs
+// ---------------------------------------------------------------------------
+
+/**
+ * Enrich edges with hydraulic arrowheads and parallel offset for bidirectional pairs.
+ * Pure function — does NOT call get(). Used by addEdge and loadProjectFromPath.
+ */
+export function enrichEdges(edges: Edge[], nodes: Node[]): Edge[] {
+  // Step 1: Apply arrowheads (hydraulic) or strip them (thermal)
+  const arrowedEdges = edges.map((e) => {
+    // Determine port type by looking up source node's component port
+    const srcNode = nodes.find((n) => n.id === e.source);
+    if (!srcNode) return e;
+    const srcComp = getComponent((srcNode.data as unknown as StreamNodeData).componentId);
+    if (!srcComp) return e;
+    const srcPort = srcComp.ports.find((p) => p.name === e.sourceHandle);
+    if (srcPort?.type === "ThermalPort") {
+      // Thermal edge: no arrowhead, preserve existing thermal style
+      const { markerEnd, ...rest } = e as Edge & { markerEnd?: unknown };
+      return rest;
+    }
+    // Hydraulic edge: filled arrowhead
+    return {
+      ...e,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 16,
+        height: 16,
+        color: "#b1b1b7",
+      },
+    };
+  });
+
+  // Step 2: Detect bidirectional pairs and apply offset
+  // A bidirectional pair is two edges connecting the same two nodes in opposite directions,
+  // regardless of which specific handles they use.
+  return arrowedEdges.map((e) => {
+    const reverseEdge = arrowedEdges.find(
+      (other) =>
+        other.id !== e.id &&
+        other.source === e.target &&
+        other.target === e.source,
+    );
+    if (!reverseEdge) {
+      // No partner — strip any stale offset
+      if ((e as Edge & { pathOptions?: unknown }).pathOptions) {
+        const { pathOptions, ...rest } = e as Edge & { pathOptions?: unknown };
+        return rest as Edge;
+      }
+      return e;
+    }
+    // Stable ordering: lower array index gets positive offset
+    const isFirst = arrowedEdges.indexOf(e) < arrowedEdges.indexOf(reverseEdge);
+    return { ...e, pathOptions: { offset: isFirst ? 10 : -10 } };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -251,6 +310,36 @@ const useStore = create<AppState>()((set, get) => ({
       get()._pushSnapshot();
     }
 
+    // Offset cleanup: if removing an edge that has pathOptions.offset,
+    // clear offset from its surviving bidirectional partner
+    const removedIds = changes
+      .filter((c): c is EdgeChange & { type: "remove"; id: string } => c.type === "remove")
+      .map((c) => c.id);
+    if (removedIds.length > 0) {
+      const currentEdges = get().edges;
+      const removedEdges = currentEdges.filter((e) => removedIds.includes(e.id));
+      let cleanedEdges = currentEdges;
+      for (const removed of removedEdges) {
+        if (!(removed as Edge & { pathOptions?: { offset?: number } }).pathOptions?.offset) continue;
+        const partnerIdx = cleanedEdges.findIndex(
+          (e) =>
+            !removedIds.includes(e.id) &&
+            e.source === removed.target &&
+            e.target === removed.source,
+        );
+        if (partnerIdx !== -1) {
+          const { pathOptions, ...rest } = cleanedEdges[partnerIdx] as Edge & { pathOptions?: unknown };
+          cleanedEdges = [
+            ...cleanedEdges.slice(0, partnerIdx),
+            rest as Edge,
+            ...cleanedEdges.slice(partnerIdx + 1),
+          ];
+        }
+      }
+      set({ edges: applyEdgeChanges(changes, cleanedEdges), isDirty: true });
+      return;
+    }
+
     set({ edges: applyEdgeChanges(changes, get().edges), isDirty: true });
   },
 
@@ -349,6 +438,9 @@ const useStore = create<AppState>()((set, get) => ({
       return e;
     });
 
+    // Apply hydraulic arrowheads and parallel offset for bidirectional pairs
+    const finalEdges = enrichEdges(styledEdges, get().nodes);
+
     const { errorNodeIds } = get();
 
     if (errorNodeIds.size > 0) {
@@ -363,7 +455,7 @@ const useStore = create<AppState>()((set, get) => ({
         const flowPorts = def.ports.filter((p) => p.type === "FlowPort");
         const allConnected = flowPorts.every((port) => {
           const isInput = port.name.includes("in");
-          return styledEdges.some((e) =>
+          return finalEdges.some((e) =>
             isInput
               ? e.target === nodeId && e.targetHandle === port.name
               : e.source === nodeId && e.sourceHandle === port.name,
@@ -371,15 +463,31 @@ const useStore = create<AppState>()((set, get) => ({
         });
         if (allConnected) updatedErrors.delete(nodeId);
       }
-      set({ edges: styledEdges, isDirty: true, errorNodeIds: updatedErrors });
+      set({ edges: finalEdges, isDirty: true, errorNodeIds: updatedErrors });
     } else {
-      set({ edges: styledEdges, isDirty: true });
+      set({ edges: finalEdges, isDirty: true });
     }
   },
 
   removeEdge: (edgeId) => {
     get()._pushSnapshot();
-    set({ edges: get().edges.filter((e) => e.id !== edgeId), isDirty: true });
+    const currentEdges = get().edges;
+    const removed = currentEdges.find((e) => e.id === edgeId);
+    let edges = currentEdges.filter((e) => e.id !== edgeId);
+    // Clean up partner offset when removing one edge of a bidirectional pair
+    if (removed && (removed as Edge & { pathOptions?: { offset?: number } }).pathOptions?.offset) {
+      edges = edges.map((e) => {
+        if (
+          e.source === removed.target &&
+          e.target === removed.source
+        ) {
+          const { pathOptions, ...rest } = e as Edge & { pathOptions?: unknown };
+          return rest as Edge;
+        }
+        return e;
+      });
+    }
+    set({ edges, isDirty: true });
   },
 
   addBC: (bc) => {
@@ -528,10 +636,13 @@ const useStore = create<AppState>()((set, get) => ({
       clearInstanceCounters();
       Object.assign(instanceCounters, reconstructed);
 
+      // Re-enrich edges for arrowheads and parallel offset (handles pre-Phase-42 saves)
+      const enrichedProjectEdges = enrichEdges(project.edges, project.nodes);
+
       const updated = addToRecent(get().recentFiles, filePath);
       set({
         nodes: project.nodes,
-        edges: project.edges,
+        edges: enrichedProjectEdges,
         bcs: project.bcs,
         activeLayer: (project.activeLayer ?? "Both") as LayerView,
         currentFilePath: filePath,
