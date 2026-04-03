@@ -309,14 +309,20 @@ Plans:
 ### Phase 42: Edge & Path Visual Overhaul
 **Goal**: Hydraulic and thermal edges look clean — correct arrowheads, sensible routing for parallel edges, no clipping artifacts
 **Depends on**: Phase 41
-**Requirements**: TBD
+**Requirements**: EDGE-01, EDGE-02, EDGE-03, EDGE-04, EDGE-05, EDGE-06
 **Success Criteria** (what must be TRUE):
   1. Arrowheads are visible and correctly positioned at edge endpoints (not hidden behind node borders)
-  2. A Pump→Channel→Pump loop shows two distinct, non-overlapping edge routes
+  2. A Pump->Channel->Pump loop shows two distinct, non-overlapping edge routes
   3. Thermal (amber) edges route cleanly and are visually distinct from hydraulic edges
   4. Edge drag handles show correct cursor state (no cursor disappearance)
   5. Rename counter is correctly reconstructed on project load even for custom-named nodes
-**Plans**: TBD
+  6. FlowPort port_in and port_out handles display distinct polarity colors
+**Plans:** 2 plans
+
+Plans:
+- [ ] 42-01-PLAN.md — Edge arrowheads, parallel offset routing, offset cleanup, project load re-enrichment
+- [ ] 42-02-PLAN.md — FlowPort handle polarity colors, cursor CSS fix, rename counter bug fix
+
 **UI hint**: yes
 
 ### Phase 43: UI Polish & Redesign
@@ -394,11 +400,11 @@ Plans:
 | 39. Topology Validation | v0.8 | 3/3 | Complete | 2026-04-03 |
 | 40. Thermal Composition | v0.8 | 2/2 | Complete | 2026-04-03 |
 | 41. Layered Canvas | v0.8 | 2/2 | Complete    | 2026-04-03 |
-| 42. Edge & Path Visual Overhaul | v0.8 | 0/? | Planned | — |
+| 42. Edge & Path Visual Overhaul | v0.8 | 0/2 | Planned | — |
 | 43. UI Polish & Redesign | v0.8 | 0/? | Planned | — |
 | 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-03 — Phase 41 planned (2 plans, LAYR-01..05 requirements defined)*
+*Updated: 2026-04-03 — Phase 42 planned (2 plans, EDGE-01..06 requirements defined)*
