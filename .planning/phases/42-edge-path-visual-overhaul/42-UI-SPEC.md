@@ -38,12 +38,12 @@ Inherited from Phase 38 contract. No changes.
 | xs | 4px | Not used in this phase |
 | sm | 8px | FlowPort handle diameter (8px, existing ReactFlow default) |
 | md | 16px | Not used in this phase |
-| lg | 24px | Parallel edge lateral offset (20px -- see exception) |
+| lg | 24px | Not used in this phase |
 | xl | 32px | Not used in this phase |
 | 2xl | 48px | Not used in this phase |
 | 3xl | 64px | Not used in this phase |
 
-Exceptions: Parallel edge lateral offset is 20px (not a multiple of 4). This is a ReactFlow `pathOptions.offset` value tuned for visual clarity of parallel smoothstep edges at default zoom. At 16px the edges are too close; at 24px they are too far apart for typical node spacing. 20px is the pragmatic value.
+All spacing values are multiples of 4. No exceptions.
 
 ---
 
@@ -155,7 +155,7 @@ If a reverse edge exists, apply symmetric offset to BOTH edges in the pair:
 | Original (first added) | +10 |
 | Reverse (second added) | -10 |
 
-Symmetric +/-10px gives 20px total separation between parallel paths.
+Symmetric +/-10px gives 20px total separation between parallel paths. The 20px total separation is a ReactFlow `pathOptions.offset` rendering constant tuned for visual clarity of parallel smoothstep edges at default zoom -- it is not a layout spacing token.
 
 Implementation: When the reverse edge is detected, mutate the existing edge in the array to add `pathOptions: { offset: 10 }` and set the new edge to `pathOptions: { offset: -10 }`.
 
