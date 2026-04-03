@@ -9,7 +9,7 @@
 - ✅ **v0.5 Code Quality** — Phases 17-19 (shipped 2026-03-16)
 - ✅ **v0.6 Flow Reversal Systems** — Phases 20-26 (shipped 2026-03-27)
 - ✅ **v0.7 Safety Physics & Pressure Field** — Phases 27-32 (shipped 2026-04-01)
-- 🔄 **v0.8 STREAM Composer GUI** — Phases 33-40 (active)
+- 🔄 **v0.8 STREAM Composer GUI** — Phases 33-44 (active)
 
 ## Phases
 
@@ -104,7 +104,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 
 </details>
 
-### 🔄 v0.8 STREAM Composer GUI (Phases 33-40) — ACTIVE
+### 🔄 v0.8 STREAM Composer GUI (Phases 33-44) — ACTIVE
 
 - [x] **Phase 33: Project Scaffold** — Tauri 2 + React + ReactFlow skeleton; component metadata registry; dev environment verified (completed 2026-04-01)
 - [x] **Phase 34: Canvas & Node Editor** — Drag-from-toolbox, custom node components with FlowPort handles, edge drawing, zoom/pan/minimap, undo/redo (completed 2026-04-01)
@@ -115,6 +115,10 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 - [x] **Phase 38: UI Design Pass** — shadcn/ui integration throughout; three-panel layout; component icons/colors; design contract and visual audit gates (completed 2026-04-03)
 - [x] **Phase 39: Topology Validation** — Unconnected port warnings; missing pressure BC alert; missing driving element alert (completed 2026-04-03)
 - [x] **Phase 40: Thermal Composition** — ChannelAndContacts ThermalPort array visualization; HeatDiffusion connections; composition helper code generation (completed 2026-04-03)
+- [ ] **Phase 41: Layered Canvas** — Hydraulic and thermal content on separate toggleable layers; reduces visual clutter when both are present
+- [ ] **Phase 42: Edge & Path Visual Overhaul** — Correct arrowheads; clean loop routing; thermal edge clarity; cursor glitch fix; rename counter bug fix
+- [ ] **Phase 43: UI Polish & Redesign** — Professional polish pass: nodes, buttons, sidebar, spacing, field descriptions, resizable panels
+- [ ] **Phase 44: Light/Dark Mode** — Theme toggle in settings menu; all surfaces correct in both modes
 
 ## Phase Details
 
@@ -284,6 +288,59 @@ Plans:
 - [x] 40-02-PLAN.md — Thermal topology detection and composition helper code generation
 **UI hint**: yes
 
+### Phase 41: Layered Canvas
+**Goal**: Hydraulic and thermal canvas content live on separate toggleable layers so the canvas stays readable when both are present
+**Depends on**: Phase 40
+**Requirements**: TBD (discuss-phase required to define exact interaction model)
+**Success Criteria** (what must be TRUE):
+  1. A toolbar layer toggle lets the user switch between Hydraulic, Thermal, and Both views
+  2. In Hydraulic view, thermal nodes/edges are visually subordinated (dimmed or hidden)
+  3. In Thermal view, hydraulic nodes/edges are visually subordinated
+  4. Components that belong to both layers (e.g. ChannelAndContacts) remain visible in both layer views
+  5. Layer selection is persisted with the project in .streamgui
+**Plans**: TBD
+**UI hint**: yes
+**Note**: Requires `/gsd:discuss-phase 41` before planning — the interaction model (toolbox filtering, dimming vs hiding, multi-layer component behavior) needs to be decided.
+
+### Phase 42: Edge & Path Visual Overhaul
+**Goal**: Hydraulic and thermal edges look clean — correct arrowheads, sensible routing for parallel edges, no clipping artifacts
+**Depends on**: Phase 41
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. Arrowheads are visible and correctly positioned at edge endpoints (not hidden behind node borders)
+  2. A Pump→Channel→Pump loop shows two distinct, non-overlapping edge routes
+  3. Thermal (amber) edges route cleanly and are visually distinct from hydraulic edges
+  4. Edge drag handles show correct cursor state (no cursor disappearance)
+  5. Rename counter is correctly reconstructed on project load even for custom-named nodes
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 43: UI Polish & Redesign
+**Goal**: Every surface of the GUI looks intentional and professional — clean spacing, consistent visual hierarchy, no rough edges
+**Depends on**: Phase 42
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. All buttons have consistent sizing, padding, and hover states
+  2. ThermalPort amber diamond handles are visually clean and proportional
+  3. Sidebar shows a brief description for each parameter field (tooltip or inline text)
+  4. Panel dividers are draggable (canvas↔sidebar, canvas↔bottom panel)
+  5. A developer familiar with shadcn/ui would not immediately notice rough edges on casual inspection
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 44: Light/Dark Mode
+**Goal**: Users can toggle between light and dark themes via a settings menu; all surfaces look correct in both modes
+**Depends on**: Phase 43
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. A settings button (gear icon) opens a settings panel or dropdown
+  2. Light/Dark/System options are available; selection persists across sessions
+  3. All shadcn/ui components display correctly in both themes
+  4. ReactFlow canvas background and node colors adapt to the active theme
+  5. Amber thermal edges and red error rings remain legible in both themes
+**Plans**: TBD
+**UI hint**: yes
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -323,28 +380,21 @@ Plans:
 | 30. HTC & Friction Completions | v0.7 | 2/2 | Complete | 2026-04-01 |
 | 31. Write Phase 27 Verification Document | v0.7 | 1/1 | Complete | 2026-04-01 |
 | 32. THRS-09 & Phase 30 Integration Hardening | v0.7 | 1/1 | Complete | 2026-04-01 |
-| 33. Project Scaffold | v0.8 | 2/4 | Complete    | 2026-04-01 |
-| 34. Canvas & Node Editor | v0.8 | 2/3 | Complete    | 2026-04-01 |
-| 35. Parameter Editing | v0.8 | 3/3 | Complete   | 2026-04-02 |
-| 35.1. Correlation Picker | v0.8 | 0/? | Complete    | 2026-04-02 |
-| 36. Code Generation | v0.8 | 2/3 | Complete    | 2026-04-02 |
-| 37. Project Persistence | v0.8 | 3/3 | Complete    | 2026-04-02 |
-| 38. UI Design Pass | v0.8 | 2/3 | Complete    | 2026-04-03 |
-| 39. Topology Validation | v0.8 | 2/3 | Complete    | 2026-04-03 |
-| 40. Thermal Composition | v0.8 | 2/2 | Complete    | 2026-04-03 |
+| 33. Project Scaffold | v0.8 | 4/4 | Complete | 2026-04-01 |
+| 34. Canvas & Node Editor | v0.8 | 3/3 | Complete | 2026-04-01 |
+| 35. Parameter Editing | v0.8 | 3/3 | Complete | 2026-04-02 |
+| 35.1. Correlation Picker | v0.8 | 4/4 | Complete | 2026-04-02 |
+| 36. Code Generation | v0.8 | 3/3 | Complete | 2026-04-02 |
+| 37. Project Persistence | v0.8 | 3/3 | Complete | 2026-04-02 |
+| 38. UI Design Pass | v0.8 | 3/3 | Complete | 2026-04-03 |
+| 39. Topology Validation | v0.8 | 3/3 | Complete | 2026-04-03 |
+| 40. Thermal Composition | v0.8 | 2/2 | Complete | 2026-04-03 |
+| 41. Layered Canvas | v0.8 | 0/? | Planned | — |
+| 42. Edge & Path Visual Overhaul | v0.8 | 0/? | Planned | — |
+| 43. UI Polish & Redesign | v0.8 | 0/? | Planned | — |
+| 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-03 — Phase 40 plans created: 2 plans in 2 waves (handles+enforcement, code gen)*
-
-## Backlog
-
-### Phase 999.1: Light/Dark Mode Theme Switcher (BACKLOG)
-
-**Goal:** Allow users to switch between light and dark themes via a settings menu. All UI elements should look great and be properly colored in both modes.
-**Requirements:** TBD
-**Plans:** 2/2 plans complete
-
-Plans:
-- [ ] TBD (promote with /gsd:review-backlog when ready)
+*Updated: 2026-04-03 — Added Phases 41-44 (Layered Canvas, Edge Visual, UI Polish, Light/Dark Mode); fixed Progress table plan counts; promoted 999.1 backlog to Phase 44*
