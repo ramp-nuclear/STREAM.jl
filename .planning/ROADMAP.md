@@ -190,7 +190,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
+- [x] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
 - [ ] 43-02-PLAN.md — Bottom panel drag-to-resize with store-backed height
 **UI hint**: yes
 
@@ -339,7 +339,7 @@ Plans:
   3. Sidebar shows a brief description for each parameter field (tooltip or inline text)
   4. Panel dividers are draggable (canvas↔sidebar, canvas↔bottom panel)
   5. A developer familiar with shadcn/ui would not immediately notice rough edges on casual inspection
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
@@ -413,7 +413,7 @@ Plans:
 | 40. Thermal Composition | v0.8 | 2/2 | Complete | 2026-04-03 |
 | 41. Layered Canvas | v0.8 | 2/2 | Complete    | 2026-04-03 |
 | 42. Edge & Path Visual Overhaul | v0.8 | 2/2 | Complete    | 2026-04-03 |
-| 43. UI Polish & Redesign | v0.8 | 0/2 | Planned | — |
+| 43. UI Polish & Redesign | v0.8 | 1/2 | In Progress|  |
 | 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
 
 ---
