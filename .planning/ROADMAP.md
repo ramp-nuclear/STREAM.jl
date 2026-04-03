@@ -117,7 +117,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 - [x] **Phase 40: Thermal Composition** — ChannelAndContacts ThermalPort array visualization; HeatDiffusion connections; composition helper code generation (completed 2026-04-03)
 - [x] **Phase 41: Layered Canvas** — Hydraulic and thermal content on separate toggleable layers; reduces visual clutter when both are present (completed 2026-04-03)
 - [x] **Phase 42: Edge & Path Visual Overhaul** — Correct arrowheads; clean loop routing; thermal edge clarity; cursor glitch fix; rename counter bug fix (completed 2026-04-03)
-- [ ] **Phase 43: UI Polish & Redesign** — Professional polish pass: nodes, buttons, sidebar, spacing, field descriptions, resizable panels
+- [x] **Phase 43: UI Polish & Redesign** — Professional polish pass: nodes, buttons, sidebar, spacing, field descriptions, resizable panels (completed 2026-04-03)
 - [ ] **Phase 44: Light/Dark Mode** — Theme toggle in settings menu; all surfaces correct in both modes
 
 ## Phase Details
@@ -191,7 +191,7 @@ Plans:
 
 Plans:
 - [x] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
-- [ ] 43-02-PLAN.md — Bottom panel drag-to-resize with store-backed height
+- [x] 43-02-PLAN.md — Bottom panel drag-to-resize with store-backed height
 **UI hint**: yes
 
 **Design decisions captured during Phase 35 discuss-phase (2026-04-02):**
@@ -339,10 +339,10 @@ Plans:
   3. Sidebar shows a brief description for each parameter field (tooltip or inline text)
   4. Panel dividers are draggable (canvas↔sidebar, canvas↔bottom panel)
   5. A developer familiar with shadcn/ui would not immediately notice rough edges on casual inspection
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
+- [x] 43-01-PLAN.md — Thermal handle proportions, button audit, parameter field tooltips
 - [ ] 43-02-PLAN.md — Bottom panel drag-to-resize with store-backed height
 **UI hint**: yes
 
@@ -413,7 +413,7 @@ Plans:
 | 40. Thermal Composition | v0.8 | 2/2 | Complete | 2026-04-03 |
 | 41. Layered Canvas | v0.8 | 2/2 | Complete    | 2026-04-03 |
 | 42. Edge & Path Visual Overhaul | v0.8 | 2/2 | Complete    | 2026-04-03 |
-| 43. UI Polish & Redesign | v0.8 | 1/2 | In Progress|  |
+| 43. UI Polish & Redesign | v0.8 | 2/2 | Complete   | 2026-04-03 |
 | 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
 
 ---
