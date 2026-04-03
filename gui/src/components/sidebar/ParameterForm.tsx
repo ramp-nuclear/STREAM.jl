@@ -1,3 +1,4 @@
+import { Info } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import NumericField from "./NumericField";
 import PipeGeometryPicker from "./PipeGeometryPicker";
@@ -5,6 +6,7 @@ import FunctionSelect from "./FunctionSelect";
 import MatrixBadge from "./MatrixBadge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ComponentDefinition, Parameter } from "@/registry/types";
 
 interface ParameterFormProps {
@@ -55,8 +57,18 @@ export default function ParameterForm({
       case "Bool":
         return (
           <div key={param.name} className="flex flex-col gap-[8px]">
-            <Label className="text-[13px] font-semibold leading-[1.4]">
+            <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
               {param.name}
+              {param.description && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3 w-3 text-muted-foreground cursor-default" />
+                    </TooltipTrigger>
+                    <TooltipContent>{param.description}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </Label>
             <Button
               variant={values[param.name] ? "default" : "outline"}
