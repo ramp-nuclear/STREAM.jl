@@ -113,7 +113,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 - [x] **Phase 36: Code Generation** — Graph-to-Julia translator; BC editor; live code preview panel; export to .jl file (completed 2026-04-02)
 - [x] **Phase 37: Project Persistence** — Save/load .streamgui JSON; unsaved-changes guard; recent projects list (completed 2026-04-02)
 - [x] **Phase 38: UI Design Pass** — shadcn/ui integration throughout; three-panel layout; component icons/colors; design contract and visual audit gates (completed 2026-04-03)
-- [ ] **Phase 39: Topology Validation** — Unconnected port warnings; missing pressure BC alert; missing driving element alert
+- [x] **Phase 39: Topology Validation** — Unconnected port warnings; missing pressure BC alert; missing driving element alert (completed 2026-04-03)
 - [ ] **Phase 40: Thermal Composition** — ChannelAndContacts ThermalPort array visualization; HeatDiffusion connections; composition helper code generation
 
 ## Phase Details
@@ -326,7 +326,7 @@ Plans:
 | 36. Code Generation | v0.8 | 2/3 | Complete    | 2026-04-02 |
 | 37. Project Persistence | v0.8 | 3/3 | Complete    | 2026-04-02 |
 | 38. UI Design Pass | v0.8 | 2/3 | Complete    | 2026-04-03 |
-| 39. Topology Validation | v0.8 | 2/3 | In Progress|  |
+| 39. Topology Validation | v0.8 | 2/3 | Complete    | 2026-04-03 |
 | 40. Thermal Composition | v0.8 | 0/? | Not started | — |
 
 ---
@@ -340,7 +340,7 @@ Plans:
 
 **Goal:** Allow users to switch between light and dark themes via a settings menu. All UI elements should look great and be properly colored in both modes.
 **Requirements:** TBD
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
