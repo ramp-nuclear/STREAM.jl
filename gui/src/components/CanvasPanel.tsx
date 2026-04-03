@@ -177,7 +177,7 @@ export default function CanvasPanel() {
   }, []);
 
   return (
-    <div ref={containerRef} className="flex-1 h-full relative" tabIndex={-1}>
+    <div ref={containerRef} className="flex-1 h-full relative focus:outline-none" tabIndex={-1}>
       <ReactFlow
         nodes={enrichedNodes}
         edges={enrichedEdges}
