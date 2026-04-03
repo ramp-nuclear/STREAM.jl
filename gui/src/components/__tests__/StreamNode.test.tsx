@@ -92,4 +92,58 @@ describe("StreamNode", () => {
     const svg = container.querySelector("svg");
     expect(svg).toBeTruthy();
   });
+
+  it("ChannelAndContacts renders ThermalPort handles", () => {
+    const { container } = renderStreamNode({
+      componentId: "ChannelAndContacts",
+      instanceName: "cac_1",
+      parameters: {},
+    });
+    const handles = container.querySelectorAll(".react-flow__handle");
+    // 2 FlowPort (port_in, port_out) + 2 ThermalPort (thermal_left, thermal_right)
+    expect(handles.length).toBe(4);
+  });
+
+  it("HeatDiffusion renders ThermalPort handles only", () => {
+    const { container } = renderStreamNode({
+      componentId: "HeatDiffusion",
+      instanceName: "hd_1",
+      parameters: {},
+    });
+    const handles = container.querySelectorAll(".react-flow__handle");
+    // 2 ThermalPort handles (thermal_left, thermal_right), no FlowPorts
+    expect(handles.length).toBe(2);
+  });
+
+  it("ConstantTemperature renders single ThermalPort handle", () => {
+    const { container } = renderStreamNode({
+      componentId: "ConstantTemperature",
+      instanceName: "ct_1",
+      parameters: {},
+    });
+    const handles = container.querySelectorAll(".react-flow__handle");
+    expect(handles.length).toBe(1);
+  });
+
+  it("ThermalPort handles have amber background", () => {
+    const { container } = renderStreamNode({
+      componentId: "ConstantTemperature",
+      instanceName: "ct_1",
+      parameters: {},
+    });
+    const handle = container.querySelector(".react-flow__handle") as HTMLElement;
+    expect(handle).toBeTruthy();
+    expect(handle.style.background).toContain("#f59e0b");
+  });
+
+  it("ThermalPort handles have diamond rotation", () => {
+    const { container } = renderStreamNode({
+      componentId: "ConstantTemperature",
+      instanceName: "ct_1",
+      parameters: {},
+    });
+    const handle = container.querySelector(".react-flow__handle") as HTMLElement;
+    expect(handle).toBeTruthy();
+    expect(handle.style.transform).toContain("rotate(45deg)");
+  });
 });
