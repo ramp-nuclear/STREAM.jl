@@ -81,18 +81,19 @@ export default function Toolbar({ onUnsavedCheck }: Props) {
         >
           <ToggleGroupItem
             value="Hydraulic"
-            className={activeLayer === "Hydraulic" ? "bg-blue-500/15 text-blue-700 border-blue-300" : ""}
+            className="data-[state=on]:bg-blue-500/25 data-[state=on]:text-blue-700 data-[state=on]:border-blue-400"
           >
             Hydraulic
           </ToggleGroupItem>
           <ToggleGroupItem
             value="Both"
+            className="data-[state=on]:bg-slate-200 data-[state=on]:text-slate-700"
           >
             Both
           </ToggleGroupItem>
           <ToggleGroupItem
             value="Thermal"
-            className={activeLayer === "Thermal" ? "bg-amber-500/15 text-amber-700 border-amber-300" : ""}
+            className="data-[state=on]:bg-amber-500/25 data-[state=on]:text-amber-700 data-[state=on]:border-amber-400"
           >
             Thermal
           </ToggleGroupItem>

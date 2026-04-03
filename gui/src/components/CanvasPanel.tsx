@@ -39,7 +39,6 @@ export default function CanvasPanel() {
   const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge, selectNode } =
     useStore();
   const activeLayer = useStore((s) => s.activeLayer);
-  const cycleLayer = useStore((s) => s.cycleLayer);
   const { screenToFlowPosition } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -145,23 +144,6 @@ export default function CanvasPanel() {
     return true;
   }, []);
 
-  // Tab key cycles layers when canvas has focus (not inside form elements)
-  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key !== "Tab") return;
-    const target = e.target as HTMLElement;
-    if (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement ||
-      target.isContentEditable
-    ) {
-      return;
-    }
-    e.preventDefault();
-    e.stopPropagation();
-    cycleLayer();
-  }, [cycleLayer]);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
@@ -175,13 +157,27 @@ export default function CanvasPanel() {
         e.preventDefault();
         useStore.getState().redo();
       }
+      // Tab cycles layers globally; skip when a text input has focus
+      if (e.key === "Tab") {
+        const target = e.target as HTMLElement;
+        if (
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+        e.preventDefault();
+        useStore.getState().cycleLayer();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   return (
-    <div ref={containerRef} className="flex-1 h-full relative" tabIndex={-1} onKeyDown={handleContainerKeyDown}>
+    <div ref={containerRef} className="flex-1 h-full relative" tabIndex={-1}>
       <ReactFlow
         nodes={enrichedNodes}
         edges={enrichedEdges}
