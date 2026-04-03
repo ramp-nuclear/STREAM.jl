@@ -276,7 +276,7 @@ describe("reconstructInstanceCounters", () => {
     expect(result["channel"]).toBe(4);
   });
 
-  it("ignores nodes with non-matching instanceName patterns", () => {
+  it("ignores custom-renamed nodes that do not match componentId pattern", () => {
     const nodes: Node[] = [
       {
         id: "n1",
@@ -290,8 +290,54 @@ describe("reconstructInstanceCounters", () => {
       },
     ];
     const result = reconstructInstanceCounters(nodes);
-    // No numeric suffix found, counter should not be set (or default 0)
-    expect(result["my_custom_pump"]).toBeUndefined();
+    // "my_custom_pump" does not match ^pump_(\d+)$, so no counter for "pump"
+    expect(result["pump"]).toBeUndefined();
+  });
+
+  it("does not create spurious counter for custom names with trailing number", () => {
+    const nodes: Node[] = [
+      {
+        id: "n1",
+        type: "streamNode",
+        position: { x: 0, y: 0 },
+        data: {
+          componentId: "Pump",
+          instanceName: "my_custom_3",
+          parameters: {},
+        },
+      },
+    ];
+    const result = reconstructInstanceCounters(nodes);
+    // "my_custom_3" does not match ^pump_(\d+)$
+    expect(result["pump"]).toBeUndefined();
+    // Should not create a "my_custom" key either
+    expect(result["my_custom"]).toBeUndefined();
+  });
+
+  it("handles mix of default-named and custom-renamed nodes", () => {
+    const nodes: Node[] = [
+      {
+        id: "n1",
+        type: "streamNode",
+        position: { x: 0, y: 0 },
+        data: { componentId: "Pump", instanceName: "pump_2", parameters: {} },
+      },
+      {
+        id: "n2",
+        type: "streamNode",
+        position: { x: 0, y: 0 },
+        data: { componentId: "Pump", instanceName: "main_pump", parameters: {} },
+      },
+      {
+        id: "n3",
+        type: "streamNode",
+        position: { x: 0, y: 0 },
+        data: { componentId: "Channel", instanceName: "channel_5", parameters: {} },
+      },
+    ];
+    const result = reconstructInstanceCounters(nodes);
+    expect(result["pump"]).toBe(2);       // Only pump_2 counts, not main_pump
+    expect(result["channel"]).toBe(5);
   });
 });
 

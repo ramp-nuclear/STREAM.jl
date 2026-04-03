@@ -139,20 +139,19 @@ export function reconstructInstanceCounters(
   nodes: Node[],
 ): Record<string, number> {
   const counters: Record<string, number> = {};
-  const pattern = /^(.+)_(\d+)$/;
 
   for (const node of nodes) {
-    const data = node.data as { instanceName?: unknown };
-    if (typeof data?.instanceName !== "string") continue;
+    const data = node.data as { componentId?: string; instanceName?: unknown };
+    if (!data?.componentId || typeof data.instanceName !== "string") continue;
 
+    const key = data.componentId.toLowerCase();
+    const pattern = new RegExp(`^${key}_(\\d+)$`);
     const match = pattern.exec(data.instanceName);
     if (!match) continue;
 
-    const prefix = match[1]; // already lowercase (set by getNextInstanceName)
-    const num = parseInt(match[2], 10);
-
-    if (counters[prefix] === undefined || num > counters[prefix]) {
-      counters[prefix] = num;
+    const num = parseInt(match[1], 10);
+    if (counters[key] === undefined || num > counters[key]) {
+      counters[key] = num;
     }
   }
 

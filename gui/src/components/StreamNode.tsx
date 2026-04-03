@@ -13,6 +13,11 @@ const CATEGORY_LEFT_BORDER_COLOR: Record<string, string> = {
   Thermal: "#f59e0b", // amber-500
 };
 
+const FLOW_IN_BG = "#93c5fd";       // blue-300 (port_in)
+const FLOW_IN_BORDER = "#3b82f6";   // blue-500
+const FLOW_OUT_BG = "#1d4ed8";      // blue-700 (port_out)
+const FLOW_OUT_BORDER = "#1e40af";  // blue-800
+
 const THERMAL_HANDLE_COLOR = "#f59e0b"; // amber-500
 const THERMAL_HANDLE_BORDER = "#d97706"; // amber-600
 
@@ -57,16 +62,23 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
         {component.label}
       </div>
       <div className="font-semibold text-sm">{nodeData.instanceName}</div>
-      {flowPorts.map((port) => (
-        <Handle
-          key={port.name}
-          id={port.name}
-          type={port.name.includes("out") ? "source" : "target"}
-          position={sideToPosition[port.side]}
-          data={{ portType: port.type }}
-          style={dimFlowHandles ? { opacity: 0.2, pointerEvents: "none" as const } : undefined}
-        />
-      ))}
+      {flowPorts.map((port) => {
+        const isInPort = port.name.includes("in");
+        return (
+          <Handle
+            key={port.name}
+            id={port.name}
+            type={isInPort ? "target" : "source"}
+            position={sideToPosition[port.side]}
+            data={{ portType: port.type }}
+            style={{
+              background: isInPort ? FLOW_IN_BG : FLOW_OUT_BG,
+              border: `1.5px solid ${isInPort ? FLOW_IN_BORDER : FLOW_OUT_BORDER}`,
+              ...(dimFlowHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
+            }}
+          />
+        );
+      })}
       {thermalPorts.map((port) => (
         <Handle
           key={port.name}
