@@ -265,7 +265,7 @@ Plans:
 
 Plans:
 - [x] 39-01-PLAN.md — Validation logic (pure function + tests) and store integration
-- [ ] 39-02-PLAN.md — ValidationDialog component, StreamNode error ring, export/save gates
+- [x] 39-02-PLAN.md — ValidationDialog component, StreamNode error ring, export/save gates
 - [ ] 39-03-PLAN.md — Human-verify: topology validation visual and functional verification
 **UI hint**: yes
 
@@ -326,7 +326,7 @@ Plans:
 | 36. Code Generation | v0.8 | 2/3 | Complete    | 2026-04-02 |
 | 37. Project Persistence | v0.8 | 3/3 | Complete    | 2026-04-02 |
 | 38. UI Design Pass | v0.8 | 2/3 | Complete    | 2026-04-03 |
-| 39. Topology Validation | v0.8 | 1/3 | In Progress|  |
+| 39. Topology Validation | v0.8 | 2/3 | In Progress|  |
 | 40. Thermal Composition | v0.8 | 0/? | Not started | — |
 
 ---
@@ -340,7 +340,7 @@ Plans:
 
 **Goal:** Allow users to switch between light and dark themes via a settings menu. All UI elements should look great and be properly colored in both modes.
 **Requirements:** TBD
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
