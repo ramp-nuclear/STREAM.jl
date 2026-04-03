@@ -331,7 +331,7 @@ Plans:
 | 37. Project Persistence | v0.8 | 3/3 | Complete    | 2026-04-02 |
 | 38. UI Design Pass | v0.8 | 2/3 | Complete    | 2026-04-03 |
 | 39. Topology Validation | v0.8 | 2/3 | Complete    | 2026-04-03 |
-| 40. Thermal Composition | v0.8 | 2/2 | Complete   | 2026-04-03 |
+| 40. Thermal Composition | v0.8 | 2/2 | Complete    | 2026-04-03 |
 
 ---
 
