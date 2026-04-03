@@ -8,6 +8,7 @@ import Toolbar from "./components/Toolbar";
 import BottomPanel from "./components/BottomPanel";
 import PanelCollapseButton from "./components/PanelCollapseButton";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
+import ValidationDialog from "./components/ValidationDialog";
 import { TooltipProvider } from "./components/ui/tooltip";
 import useStore from "./store/useStore";
 import { initializeRecentFiles } from "./store/useStore";
@@ -206,6 +207,7 @@ function App() {
           onDiscard={handleDialogDiscard}
           onCancel={handleDialogCancel}
         />
+        <ValidationDialog />
       </TooltipProvider>
     </ReactFlowProvider>
   );

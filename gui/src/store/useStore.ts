@@ -386,6 +386,10 @@ const useStore = create<AppState>()((set, get) => ({
   // ---------------------------------------------------------------------------
 
   saveProject: async () => {
+    // Phase 39: validation gate (D-01, D-02)
+    const result = get().validateAndGate();
+    if (!result.valid) return;
+
     const { currentFilePath } = get();
     if (!currentFilePath) {
       return get().saveProjectAs();
@@ -416,6 +420,10 @@ const useStore = create<AppState>()((set, get) => ({
   // ---------------------------------------------------------------------------
 
   saveProjectAs: async () => {
+    // Phase 39: validation gate (D-01, D-02)
+    const result = get().validateAndGate();
+    if (!result.valid) return;
+
     try {
       const { save } = await import("@tauri-apps/plugin-dialog");
       const filePath = await save({
