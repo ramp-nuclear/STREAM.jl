@@ -118,7 +118,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 - [x] **Phase 41: Layered Canvas** — Hydraulic and thermal content on separate toggleable layers; reduces visual clutter when both are present (completed 2026-04-03)
 - [x] **Phase 42: Edge & Path Visual Overhaul** — Correct arrowheads; clean loop routing; thermal edge clarity; cursor glitch fix; rename counter bug fix (completed 2026-04-03)
 - [x] **Phase 43: UI Polish & Redesign** — Professional polish pass: nodes, buttons, sidebar, spacing, field descriptions, resizable panels (completed 2026-04-03)
-- [ ] **Phase 44: Light/Dark Mode** — Theme toggle in settings menu; all surfaces correct in both modes
+- [x] **Phase 44: Light/Dark Mode** — Theme toggle in settings menu; all surfaces correct in both modes (completed 2026-04-03)
 
 ## Phase Details
 
@@ -356,11 +356,11 @@ Plans:
   3. All shadcn/ui components display correctly in both themes
   4. ReactFlow canvas background and node colors adapt to the active theme
   5. Amber thermal edges and red error rings remain legible in both themes
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 44-01-PLAN.md — Theme infrastructure: useTheme hook, ThemeMenu dropdown, FOUC prevention, App/Toolbar wiring
-- [ ] 44-02-PLAN.md — ReactFlow colorMode integration, layer toggle dark fixes, visual checkpoint
+- [x] 44-02-PLAN.md — ReactFlow colorMode integration, layer toggle dark fixes, visual checkpoint
 **UI hint**: yes
 
 ## Progress
@@ -414,7 +414,7 @@ Plans:
 | 41. Layered Canvas | v0.8 | 2/2 | Complete    | 2026-04-03 |
 | 42. Edge & Path Visual Overhaul | v0.8 | 2/2 | Complete    | 2026-04-03 |
 | 43. UI Polish & Redesign | v0.8 | 2/2 | Complete    | 2026-04-03 |
-| 44. Light/Dark Mode | v0.8 | 1/2 | In Progress|  |
+| 44. Light/Dark Mode | v0.8 | 2/2 | Complete   | 2026-04-03 |
 
 ---
 
