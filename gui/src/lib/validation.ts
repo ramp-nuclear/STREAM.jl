@@ -41,3 +41,88 @@ export function validateJuliaIdentifier(value: string): StringValidationResult {
   }
   return { valid: true, value };
 }
+
+// ---------------------------------------------------------------------------
+// Topology validation (Phase 39)
+// ---------------------------------------------------------------------------
+
+import type { Node, Edge } from "@xyflow/react";
+import type { BCEntry } from "./codeGenerator";
+import type { ComponentDefinition } from "../registry/types";
+
+export interface NodeError {
+  nodeId: string;
+  instanceName: string;
+  portName: string;
+}
+
+export interface SystemError {
+  message: string;
+}
+
+export interface TopologyResult {
+  valid: boolean;
+  nodeErrors: NodeError[];
+  systemErrors: SystemError[];
+}
+
+/**
+ * Validate the topology of a STREAM.jl canvas graph.
+ *
+ * Checks:
+ * - VALD-01: Every FlowPort on every node must be connected by an edge.
+ * - VALD-02: At least one pressure boundary condition must exist.
+ * - VALD-03: At least one driving element (Pump or Gravity) must exist.
+ *
+ * Pure function — no side effects, no store dependency.
+ */
+export function validateTopology(
+  nodes: Node[],
+  edges: Edge[],
+  bcs: BCEntry[],
+  getComponentDef: (id: string) => ComponentDefinition | undefined,
+): TopologyResult {
+  const nodeErrors: NodeError[] = [];
+
+  for (const node of nodes) {
+    const data = node.data as { componentId: string; instanceName: string };
+    const def = getComponentDef(data.componentId);
+    if (!def) continue;
+    const flowPorts = def.ports.filter((p) => p.type === "FlowPort");
+    for (const port of flowPorts) {
+      const isInput = port.name.includes("in");
+      const connected = edges.some((e) =>
+        isInput
+          ? e.target === node.id && e.targetHandle === port.name
+          : e.source === node.id && e.sourceHandle === port.name,
+      );
+      if (!connected) {
+        nodeErrors.push({
+          nodeId: node.id,
+          instanceName: data.instanceName,
+          portName: port.name,
+        });
+      }
+    }
+  }
+
+  const systemErrors: SystemError[] = [];
+  if (bcs.length === 0) {
+    systemErrors.push({ message: "No pressure boundary condition" });
+  }
+  const hasDriving = nodes.some((n) => {
+    const cid = (n.data as { componentId: string }).componentId;
+    return cid === "Pump" || cid === "Gravity";
+  });
+  if (!hasDriving) {
+    systemErrors.push({
+      message: "No driving element (add a Pump or Gravity component)",
+    });
+  }
+
+  return {
+    valid: nodeErrors.length === 0 && systemErrors.length === 0,
+    nodeErrors,
+    systemErrors,
+  };
+}
