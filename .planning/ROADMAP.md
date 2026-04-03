@@ -114,7 +114,7 @@ Full phase details: `.planning/milestones/v0.7-ROADMAP.md`
 - [x] **Phase 37: Project Persistence** — Save/load .streamgui JSON; unsaved-changes guard; recent projects list (completed 2026-04-02)
 - [x] **Phase 38: UI Design Pass** — shadcn/ui integration throughout; three-panel layout; component icons/colors; design contract and visual audit gates (completed 2026-04-03)
 - [x] **Phase 39: Topology Validation** — Unconnected port warnings; missing pressure BC alert; missing driving element alert (completed 2026-04-03)
-- [ ] **Phase 40: Thermal Composition** — ChannelAndContacts ThermalPort array visualization; HeatDiffusion connections; composition helper code generation
+- [x] **Phase 40: Thermal Composition** — ChannelAndContacts ThermalPort array visualization; HeatDiffusion connections; composition helper code generation (completed 2026-04-03)
 
 ## Phase Details
 
@@ -281,7 +281,7 @@ Plans:
 
 Plans:
 - [x] 40-01-PLAN.md — ThermalPort handle rendering, connection enforcement, amber dashed edge styling
-- [ ] 40-02-PLAN.md — Thermal topology detection and composition helper code generation
+- [x] 40-02-PLAN.md — Thermal topology detection and composition helper code generation
 **UI hint**: yes
 
 ## Progress
@@ -331,7 +331,7 @@ Plans:
 | 37. Project Persistence | v0.8 | 3/3 | Complete    | 2026-04-02 |
 | 38. UI Design Pass | v0.8 | 2/3 | Complete    | 2026-04-03 |
 | 39. Topology Validation | v0.8 | 2/3 | Complete    | 2026-04-03 |
-| 40. Thermal Composition | v0.8 | 1/2 | In Progress|  |
+| 40. Thermal Composition | v0.8 | 2/2 | Complete   | 2026-04-03 |
 
 ---
 
@@ -344,7 +344,7 @@ Plans:
 
 **Goal:** Allow users to switch between light and dark themes via a settings menu. All UI elements should look great and be properly colored in both modes.
 **Requirements:** TBD
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
