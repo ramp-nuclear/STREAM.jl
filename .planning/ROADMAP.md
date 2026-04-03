@@ -393,7 +393,7 @@ Plans:
 | 38. UI Design Pass | v0.8 | 3/3 | Complete | 2026-04-03 |
 | 39. Topology Validation | v0.8 | 3/3 | Complete | 2026-04-03 |
 | 40. Thermal Composition | v0.8 | 2/2 | Complete | 2026-04-03 |
-| 41. Layered Canvas | v0.8 | 2/2 | Complete   | 2026-04-03 |
+| 41. Layered Canvas | v0.8 | 2/2 | Complete    | 2026-04-03 |
 | 42. Edge & Path Visual Overhaul | v0.8 | 0/? | Planned | — |
 | 43. UI Polish & Redesign | v0.8 | 0/? | Planned | — |
 | 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
