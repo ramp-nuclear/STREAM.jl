@@ -280,7 +280,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 40-01-PLAN.md — ThermalPort handle rendering, connection enforcement, amber dashed edge styling
+- [x] 40-01-PLAN.md — ThermalPort handle rendering, connection enforcement, amber dashed edge styling
 - [ ] 40-02-PLAN.md — Thermal topology detection and composition helper code generation
 **UI hint**: yes
 
@@ -331,7 +331,7 @@ Plans:
 | 37. Project Persistence | v0.8 | 3/3 | Complete    | 2026-04-02 |
 | 38. UI Design Pass | v0.8 | 2/3 | Complete    | 2026-04-03 |
 | 39. Topology Validation | v0.8 | 2/3 | Complete    | 2026-04-03 |
-| 40. Thermal Composition | v0.8 | 0/2 | Not started | — |
+| 40. Thermal Composition | v0.8 | 1/2 | In Progress|  |
 
 ---
 
@@ -344,7 +344,7 @@ Plans:
 
 **Goal:** Allow users to switch between light and dark themes via a settings menu. All UI elements should look great and be properly colored in both modes.
 **Requirements:** TBD
-**Plans:** 3/3 plans complete
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
