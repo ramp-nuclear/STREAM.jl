@@ -261,7 +261,12 @@ Plans:
   2. A complete loop with no Pump shows an alert banner "No driving element detected"
   3. A complete loop missing a pressure anchor shows a separate alert banner
   4. Alerts disappear when the condition is resolved
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 39-01-PLAN.md — Validation logic (pure function + tests) and store integration
+- [ ] 39-02-PLAN.md — ValidationDialog component, StreamNode error ring, export/save gates
+- [ ] 39-03-PLAN.md — Human-verify: topology validation visual and functional verification
 **UI hint**: yes
 
 ### Phase 40: Thermal Composition
@@ -321,7 +326,7 @@ Plans:
 | 36. Code Generation | v0.8 | 2/3 | Complete    | 2026-04-02 |
 | 37. Project Persistence | v0.8 | 3/3 | Complete    | 2026-04-02 |
 | 38. UI Design Pass | v0.8 | 2/3 | Complete    | 2026-04-03 |
-| 39. Topology Validation | v0.8 | 0/? | Not started | — |
+| 39. Topology Validation | v0.8 | 0/3 | Not started | — |
 | 40. Thermal Composition | v0.8 | 0/? | Not started | — |
 
 ---
