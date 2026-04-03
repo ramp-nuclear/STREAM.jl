@@ -11,6 +11,7 @@ import {
   type Edge,
   type Node,
   type NodeTypes,
+  type EdgeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import useStore from "../store/useStore";
@@ -18,6 +19,7 @@ import type { StreamNodeData } from "../store/useStore";
 import { getComponent } from "../registry";
 import { isNodeDimmed, isEdgeDimmed } from "../lib/layers";
 import StreamNode from "./StreamNode";
+import HydraulicEdge from "./HydraulicEdge";
 import WelcomeOverlay from "./WelcomeOverlay";
 
 export function getPortType(nodeId: string, handleId: string): string | null {
@@ -31,6 +33,10 @@ export function getPortType(nodeId: string, handleId: string): string | null {
 
 const nodeTypes: NodeTypes = {
   streamNode: StreamNode,
+};
+
+const edgeTypes: EdgeTypes = {
+  hydraulicEdge: HydraulicEdge,
 };
 
 const defaultEdgeOptions = { type: "smoothstep" };
@@ -191,6 +197,7 @@ export default function CanvasPanel() {
         onNodeDragStart={onNodeDragStart}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         connectionLineType={ConnectionLineType.SmoothStep}
         deleteKeyCode={["Delete", "Backspace"]}

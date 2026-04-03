@@ -140,24 +140,29 @@ async function saveRecentFiles(files: string[]): Promise<void> {
 /**
  * Enrich edges with hydraulic arrowheads and parallel offset for bidirectional pairs.
  * Pure function — does NOT call get(). Used by addEdge and loadProjectFromPath.
+ *
+ * Hydraulic edges use the custom "hydraulicEdge" type (HydraulicEdge component) which
+ * reads data.parallelOffset to shift sourceY/targetY, producing true parallel lines.
+ * ReactFlow's smoothstep pathOptions.offset controls step distance, not lateral position
+ * — it cannot separate overlapping bidirectional edges.
  */
 export function enrichEdges(edges: Edge[], nodes: Node[]): Edge[] {
-  // Step 1: Apply arrowheads (hydraulic) or strip them (thermal)
-  const arrowedEdges = edges.map((e) => {
-    // Determine port type by looking up source node's component port
+  // Step 1: Set hydraulicEdge type + arrowhead for hydraulic; strip arrowhead from thermal.
+  const typedEdges = edges.map((e) => {
     const srcNode = nodes.find((n) => n.id === e.source);
     if (!srcNode) return e;
     const srcComp = getComponent((srcNode.data as unknown as StreamNodeData).componentId);
     if (!srcComp) return e;
     const srcPort = srcComp.ports.find((p) => p.name === e.sourceHandle);
     if (srcPort?.type === "ThermalPort") {
-      // Thermal edge: no arrowhead, preserve existing thermal style
+      // Thermal edge: keep smoothstep, no arrowhead
       const { markerEnd, ...rest } = e as Edge & { markerEnd?: unknown };
       return rest;
     }
-    // Hydraulic edge: filled arrowhead
+    // Hydraulic edge: custom type + filled arrowhead
     return {
       ...e,
+      type: "hydraulicEdge",
       markerEnd: {
         type: MarkerType.ArrowClosed,
         width: 16,
@@ -167,27 +172,27 @@ export function enrichEdges(edges: Edge[], nodes: Node[]): Edge[] {
     };
   });
 
-  // Step 2: Detect bidirectional pairs and apply offset
-  // A bidirectional pair is two edges connecting the same two nodes in opposite directions,
-  // regardless of which specific handles they use.
-  return arrowedEdges.map((e) => {
-    const reverseEdge = arrowedEdges.find(
+  // Step 2: Detect bidirectional pairs and apply Y-offset via data.parallelOffset.
+  // HydraulicEdge shifts sourceY/targetY by this value to produce visually distinct paths.
+  return typedEdges.map((e) => {
+    const reverseEdge = typedEdges.find(
       (other) =>
         other.id !== e.id &&
         other.source === e.target &&
         other.target === e.source,
     );
     if (!reverseEdge) {
-      // No partner — strip any stale offset
-      if ((e as Edge & { pathOptions?: unknown }).pathOptions) {
-        const { pathOptions, ...rest } = e as Edge & { pathOptions?: unknown };
-        return rest as Edge;
+      // No partner — strip any stale parallelOffset
+      const eData = e.data as Record<string, unknown> | undefined;
+      if (eData?.parallelOffset !== undefined) {
+        const { parallelOffset: _, ...restData } = eData;
+        return { ...e, data: restData };
       }
       return e;
     }
-    // Stable ordering: lower array index gets positive offset
-    const isFirst = arrowedEdges.indexOf(e) < arrowedEdges.indexOf(reverseEdge);
-    return { ...e, pathOptions: { offset: isFirst ? 10 : -10 } };
+    // Stable ordering: lower array index gets positive offset (shifts edge down)
+    const isFirst = typedEdges.indexOf(e) < typedEdges.indexOf(reverseEdge);
+    return { ...e, data: { ...(e.data ?? {}), parallelOffset: isFirst ? 7 : -7 } };
   });
 }
 
@@ -310,8 +315,8 @@ const useStore = create<AppState>()((set, get) => ({
       get()._pushSnapshot();
     }
 
-    // Offset cleanup: if removing an edge that has pathOptions.offset,
-    // clear offset from its surviving bidirectional partner
+    // Offset cleanup: if removing an edge that has data.parallelOffset,
+    // clear parallelOffset from its surviving bidirectional partner
     const removedIds = changes
       .filter((c): c is EdgeChange & { type: "remove"; id: string } => c.type === "remove")
       .map((c) => c.id);
@@ -320,7 +325,7 @@ const useStore = create<AppState>()((set, get) => ({
       const removedEdges = currentEdges.filter((e) => removedIds.includes(e.id));
       let cleanedEdges = currentEdges;
       for (const removed of removedEdges) {
-        if (!(removed as Edge & { pathOptions?: { offset?: number } }).pathOptions?.offset) continue;
+        if ((removed.data as Record<string, unknown>)?.parallelOffset === undefined) continue;
         const partnerIdx = cleanedEdges.findIndex(
           (e) =>
             !removedIds.includes(e.id) &&
@@ -328,10 +333,11 @@ const useStore = create<AppState>()((set, get) => ({
             e.target === removed.source,
         );
         if (partnerIdx !== -1) {
-          const { pathOptions, ...rest } = cleanedEdges[partnerIdx] as Edge & { pathOptions?: unknown };
+          const partner = cleanedEdges[partnerIdx];
+          const { parallelOffset: _, ...restData } = partner.data as Record<string, unknown>;
           cleanedEdges = [
             ...cleanedEdges.slice(0, partnerIdx),
-            rest as Edge,
+            { ...partner, data: restData },
             ...cleanedEdges.slice(partnerIdx + 1),
           ];
         }
@@ -474,15 +480,12 @@ const useStore = create<AppState>()((set, get) => ({
     const currentEdges = get().edges;
     const removed = currentEdges.find((e) => e.id === edgeId);
     let edges = currentEdges.filter((e) => e.id !== edgeId);
-    // Clean up partner offset when removing one edge of a bidirectional pair
-    if (removed && (removed as Edge & { pathOptions?: { offset?: number } }).pathOptions?.offset) {
+    // Clean up partner parallelOffset when removing one edge of a bidirectional pair
+    if (removed && (removed.data as Record<string, unknown>)?.parallelOffset !== undefined) {
       edges = edges.map((e) => {
-        if (
-          e.source === removed.target &&
-          e.target === removed.source
-        ) {
-          const { pathOptions, ...rest } = e as Edge & { pathOptions?: unknown };
-          return rest as Edge;
+        if (e.source === removed.target && e.target === removed.source) {
+          const { parallelOffset: _, ...restData } = e.data as Record<string, unknown>;
+          return { ...e, data: restData };
         }
         return e;
       });

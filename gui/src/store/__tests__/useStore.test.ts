@@ -403,10 +403,10 @@ describe("addEdge arrowheads and offset", () => {
     const edges = useStore.getState().edges;
     expect(edges).toHaveLength(2);
 
-    const offsets = edges.map((e) => (e as unknown as { pathOptions?: { offset: number } }).pathOptions?.offset);
-    // One should be +10, the other -10
-    expect(offsets).toContain(10);
-    expect(offsets).toContain(-10);
+    const offsets = edges.map((e) => (e.data as Record<string, unknown>)?.parallelOffset);
+    // One should be +7, the other -7 (Y-shift in HydraulicEdge for visual separation)
+    expect(offsets).toContain(7);
+    expect(offsets).toContain(-7);
   });
 
   it("removes offset from surviving edge when partner is deleted", () => {
@@ -438,8 +438,8 @@ describe("addEdge arrowheads and offset", () => {
 
     const edgesAfter = useStore.getState().edges;
     expect(edgesAfter).toHaveLength(1);
-    // Surviving edge should have no pathOptions (offset cleaned up)
-    expect((edgesAfter[0] as unknown as { pathOptions?: unknown }).pathOptions).toBeUndefined();
+    // Surviving edge should have no parallelOffset (offset cleaned up)
+    expect((edgesAfter[0].data as Record<string, unknown>)?.parallelOffset).toBeUndefined();
   });
 });
 
