@@ -34,8 +34,11 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
     <div
       className={`border rounded-[var(--radius)] bg-card p-2 min-w-[140px] ${
         selected ? "ring-2 ring-[var(--ring)]" : ""
-      } ${hasError ? "outline outline-2 outline-destructive outline-offset-1" : ""}`}
-      style={accentColor ? { borderLeftWidth: "3px", borderLeftColor: accentColor } : undefined}
+      } ${hasError ? "outline outline-2 outline-offset-1" : ""}`}
+      style={{
+        ...(accentColor ? { borderLeftWidth: "3px", borderLeftColor: accentColor } : {}),
+        ...(hasError ? { outlineColor: "var(--destructive)" } : {}),
+      }}
     >
       <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
         <Icon className="w-3.5 h-3.5" />
