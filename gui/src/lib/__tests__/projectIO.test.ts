@@ -56,10 +56,10 @@ describe("serializeProject", () => {
     expect(() => JSON.parse(result)).not.toThrow();
   });
 
-  it("includes version 1", () => {
+  it("includes version 2", () => {
     const result = serializeProject(sampleNodes, sampleEdges, sampleBcs);
     const parsed = JSON.parse(result);
-    expect(parsed.version).toBe(1);
+    expect(parsed.version).toBe(2);
   });
 
   it("includes nodes array", () => {
@@ -100,7 +100,7 @@ describe("deserializeProject", () => {
   it("parses valid JSON and returns a StreamProject", () => {
     const json = serializeProject(sampleNodes, sampleEdges, sampleBcs);
     const project = deserializeProject(json);
-    expect(project.version).toBe(1);
+    expect(project.version).toBe(2);
     expect(project.nodes).toHaveLength(2);
     expect(project.edges).toHaveLength(1);
     expect(project.bcs).toHaveLength(1);
@@ -292,5 +292,55 @@ describe("reconstructInstanceCounters", () => {
     const result = reconstructInstanceCounters(nodes);
     // No numeric suffix found, counter should not be set (or default 0)
     expect(result["my_custom_pump"]).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StreamProject v2
+// ---------------------------------------------------------------------------
+
+describe("StreamProject v2", () => {
+  it("serializeProject writes version 2 with activeLayer", () => {
+    const result = serializeProject(sampleNodes, sampleEdges, sampleBcs, "Thermal");
+    const parsed = JSON.parse(result);
+    expect(parsed.version).toBe(2);
+    expect(parsed.activeLayer).toBe("Thermal");
+  });
+
+  it("serializeProject defaults activeLayer to Both", () => {
+    const result = serializeProject(sampleNodes, sampleEdges, sampleBcs);
+    const parsed = JSON.parse(result);
+    expect(parsed.version).toBe(2);
+    expect(parsed.activeLayer).toBe("Both");
+  });
+
+  it("deserializeProject handles v1 files (no activeLayer)", () => {
+    const v1Json = JSON.stringify({
+      version: 1,
+      nodes: [],
+      edges: [],
+      bcs: [],
+    });
+    const project = deserializeProject(v1Json);
+    expect(project.activeLayer).toBe("Both");
+    expect(project.version).toBe(2);
+  });
+
+  it("deserializeProject preserves v2 activeLayer", () => {
+    const v2Json = JSON.stringify({
+      version: 2,
+      nodes: [],
+      edges: [],
+      bcs: [],
+      activeLayer: "Thermal",
+    });
+    const project = deserializeProject(v2Json);
+    expect(project.activeLayer).toBe("Thermal");
+  });
+
+  it("round-trip preserves activeLayer", () => {
+    const json = serializeProject(sampleNodes, sampleEdges, sampleBcs, "Hydraulic");
+    const project = deserializeProject(json);
+    expect(project.activeLayer).toBe("Hydraulic");
   });
 });

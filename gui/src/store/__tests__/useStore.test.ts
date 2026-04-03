@@ -296,3 +296,41 @@ describe("isDirty tracking", () => {
     expect(useStore.getState().isDirty).toBe(false);
   });
 });
+
+describe("activeLayer", () => {
+  it("defaults to Both", () => {
+    expect(useStore.getState().activeLayer).toBe("Both");
+  });
+
+  it("setActiveLayer updates activeLayer", () => {
+    useStore.getState().setActiveLayer("Hydraulic");
+    expect(useStore.getState().activeLayer).toBe("Hydraulic");
+  });
+
+  it("setActiveLayer sets isDirty", () => {
+    useStore.setState({ isDirty: false });
+    useStore.getState().setActiveLayer("Thermal");
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  it("cycleLayer rotates Hydraulic->Both->Thermal->Hydraulic", () => {
+    useStore.getState().setActiveLayer("Hydraulic");
+    useStore.getState().cycleLayer();
+    expect(useStore.getState().activeLayer).toBe("Both");
+    useStore.getState().cycleLayer();
+    expect(useStore.getState().activeLayer).toBe("Thermal");
+    useStore.getState().cycleLayer();
+    expect(useStore.getState().activeLayer).toBe("Hydraulic");
+  });
+
+  it("activeLayer is NOT in CanvasSnapshot (undo stack)", () => {
+    // Change activeLayer, then perform undoable action, undo — activeLayer should be unchanged
+    useStore.getState().setActiveLayer("Thermal");
+    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+    expect(useStore.getState().nodes).toHaveLength(1);
+    useStore.getState().undo();
+    expect(useStore.getState().nodes).toHaveLength(0);
+    // activeLayer should still be Thermal — undo does not touch it
+    expect(useStore.getState().activeLayer).toBe("Thermal");
+  });
+});

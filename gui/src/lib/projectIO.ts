@@ -11,10 +11,11 @@ import type { BCEntry } from "./codeGenerator";
 // ---------------------------------------------------------------------------
 
 export interface StreamProject {
-  version: 1;
+  version: 1 | 2;
   nodes: Node[];
   edges: Edge[];
   bcs: BCEntry[];
+  activeLayer?: "Hydraulic" | "Both" | "Thermal";
 }
 
 // ---------------------------------------------------------------------------
@@ -30,18 +31,20 @@ export interface StreamProject {
  * - `bcs`   — Boundary condition entries
  *
  * # Returns
- * A pretty-printed JSON string with `{ version: 1, nodes, edges, bcs }`.
+ * A pretty-printed JSON string with `{ version: 2, nodes, edges, bcs, activeLayer }`.
  */
 export function serializeProject(
   nodes: Node[],
   edges: Edge[],
   bcs: BCEntry[],
+  activeLayer: "Hydraulic" | "Both" | "Thermal" = "Both",
 ): string {
   const project: StreamProject = {
-    version: 1,
+    version: 2,
     nodes,
     edges,
     bcs,
+    activeLayer,
   };
   return JSON.stringify(project, null, 2);
 }
@@ -78,6 +81,11 @@ export function deserializeProject(json: string): StreamProject {
   }
   if (!Array.isArray(parsed.bcs)) {
     throw new Error("Invalid .streamgui file");
+  }
+
+  // v1 -> v2 migration: default activeLayer to "Both"
+  if (parsed.version === 1 || !parsed.activeLayer) {
+    return { ...parsed, version: 2, activeLayer: "Both" } as unknown as StreamProject;
   }
 
   return parsed as unknown as StreamProject;

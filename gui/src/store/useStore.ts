@@ -18,6 +18,7 @@ import {
   addToRecent,
   reconstructInstanceCounters,
 } from "../lib/projectIO";
+import type { LayerView } from "../lib/layers";
 
 // Snapshot of undoable canvas content (not UI state like selection or panels).
 interface CanvasSnapshot {
@@ -48,6 +49,10 @@ interface AppState {
   validationResult: TopologyResult | null;
   validateAndGate: () => TopologyResult;
   clearValidation: () => void;
+  // Layer view state (persisted in .streamgui, but NOT in undo stack)
+  activeLayer: LayerView;
+  setActiveLayer: (layer: LayerView) => void;
+  cycleLayer: () => void;
   // Persistence state
   isDirty: boolean;
   currentFilePath: string | null;
@@ -142,6 +147,8 @@ const useStore = create<AppState>()((set, get) => ({
   // Topology validation (Phase 39) initial state
   errorNodeIds: new Set<string>(),
   validationResult: null,
+  // Layer view initial state
+  activeLayer: "Both" as LayerView,
   // Persistence initial state
   isDirty: false,
   currentFilePath: null,
@@ -197,6 +204,19 @@ const useStore = create<AppState>()((set, get) => ({
       errorNodeIds: new Set<string>(),
       validationResult: null,
     });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Layer view actions (persisted in .streamgui — set isDirty so saves capture)
+  // ---------------------------------------------------------------------------
+
+  setActiveLayer: (layer) => set({ activeLayer: layer, isDirty: true }),
+
+  cycleLayer: () => {
+    const order: LayerView[] = ["Hydraulic", "Both", "Thermal"];
+    const { activeLayer } = get();
+    const idx = order.indexOf(activeLayer);
+    set({ activeLayer: order[(idx + 1) % 3], isDirty: true });
   },
 
   // ---------------------------------------------------------------------------
@@ -416,7 +436,7 @@ const useStore = create<AppState>()((set, get) => ({
     }
     try {
       const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-      const json = serializeProject(get().nodes, get().edges, get().bcs);
+      const json = serializeProject(get().nodes, get().edges, get().bcs, get().activeLayer);
       await writeTextFile(currentFilePath, json);
       const updated = addToRecent(get().recentFiles, currentFilePath);
       set({ isDirty: false, recentFiles: updated });
@@ -455,7 +475,7 @@ const useStore = create<AppState>()((set, get) => ({
       if (!filePath) return;
 
       const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-      const json = serializeProject(get().nodes, get().edges, get().bcs);
+      const json = serializeProject(get().nodes, get().edges, get().bcs, get().activeLayer);
       await writeTextFile(filePath, json);
       const updated = addToRecent(get().recentFiles, filePath);
       set({ isDirty: false, currentFilePath: filePath, recentFiles: updated });
@@ -513,6 +533,7 @@ const useStore = create<AppState>()((set, get) => ({
         nodes: project.nodes,
         edges: project.edges,
         bcs: project.bcs,
+        activeLayer: (project.activeLayer ?? "Both") as LayerView,
         currentFilePath: filePath,
         isDirty: false,
         selectedNodeId: null,
@@ -542,6 +563,7 @@ const useStore = create<AppState>()((set, get) => ({
       nodes: [],
       edges: [],
       bcs: [],
+      activeLayer: "Both" as LayerView,
       currentFilePath: null,
       isDirty: false,
       selectedNodeId: null,
