@@ -317,10 +317,10 @@ Plans:
   4. Edge drag handles show correct cursor state (no cursor disappearance)
   5. Rename counter is correctly reconstructed on project load even for custom-named nodes
   6. FlowPort port_in and port_out handles display distinct polarity colors
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 42-01-PLAN.md — Edge arrowheads, parallel offset routing, offset cleanup, project load re-enrichment
+- [x] 42-01-PLAN.md — Edge arrowheads, parallel offset routing, offset cleanup, project load re-enrichment
 - [ ] 42-02-PLAN.md — FlowPort handle polarity colors, cursor CSS fix, rename counter bug fix
 
 **UI hint**: yes
@@ -400,7 +400,7 @@ Plans:
 | 39. Topology Validation | v0.8 | 3/3 | Complete | 2026-04-03 |
 | 40. Thermal Composition | v0.8 | 2/2 | Complete | 2026-04-03 |
 | 41. Layered Canvas | v0.8 | 2/2 | Complete    | 2026-04-03 |
-| 42. Edge & Path Visual Overhaul | v0.8 | 0/2 | Planned | — |
+| 42. Edge & Path Visual Overhaul | v0.8 | 1/2 | In Progress|  |
 | 43. UI Polish & Redesign | v0.8 | 0/? | Planned | — |
 | 44. Light/Dark Mode | v0.8 | 0/? | Planned | — |
 

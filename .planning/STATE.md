@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
 status: completed
-stopped_at: Phase 42 context gathered
-last_updated: "2026-04-03T19:31:56.770Z"
+stopped_at: Completed 42-01-PLAN.md (plan 01 of 02 in phase 42)
+last_updated: "2026-04-03T20:17:40Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 13
@@ -37,8 +37,8 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 ## Current Position
 
 Phase: 42
-Plan: Not started
-Status: Phase 41 complete
+Plan: 01 complete, 02 pending
+Status: Phase 42 plan 01 complete
 Last activity: 2026-04-03
 
 ## Performance Metrics
@@ -91,11 +91,13 @@ Last activity: 2026-04-03
 | Phase 40 P02 | 209 | 1 tasks | 2 files |
 | Phase 41-layered-canvas P01 | 3 | 2 tasks | 6 files |
 | Phase 41-layered-canvas P02 | 3 | 2 tasks | 6 files |
+| Phase 42-edge-path-visual-overhaul P01 | 197 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
 ### Key Decisions (v0.8 GUI)
 
+- [v0.8 EDGE-01]: Bidirectional pair detection matches on node IDs only (not handles) -- real loops use different port names (port_out->port_in) in each direction; enrichEdges is a pure exported function for testability
 - [v0.8 SCAF-01]: Tailwind v4 + @tailwindcss/vite: npm create tauri-app installs Tailwind v4; shadcn init expects v3 config file. components.json and src/index.css created manually with v4 CSS variable design tokens (New York/Zinc style). Future `npx shadcn add [component]` works correctly with this setup.
 - [v0.8 SCAF-01]: vitest --passWithNoTests in test script: Vitest exits code 1 when no test files exist; flag added so CI passes before registry tests added in Plan 02.
 - [v0.8 SCAF-01]: tsconfig.json not tsconfig.app.json: Tauri react-ts template generates tsconfig.json + tsconfig.node.json; path aliases added to tsconfig.json directly.
@@ -135,10 +137,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-03T19:31:56.763Z
-**Stopped at:** Phase 42 context gathered
-**Next action:** Phase 41 UAT or next phase
-**Resume file:** .planning/phases/42-edge-path-visual-overhaul/42-CONTEXT.md
+**Last session:** 2026-04-03T20:17:40Z
+**Stopped at:** Completed 42-01-PLAN.md (plan 01 of 02 in phase 42)
+**Next action:** Execute 42-02-PLAN.md
+**Resume file:** .planning/phases/42-edge-path-visual-overhaul/42-01-SUMMARY.md
 
 ---
 
