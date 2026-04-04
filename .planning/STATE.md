@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: STREAM Composer GUI
-status: verifying
-stopped_at: Completed 44-02-PLAN.md
-last_updated: "2026-04-04T09:36:02.622Z"
+status: complete
+stopped_at: v0.8 milestone complete — archived 2026-04-04
+last_updated: "2026-04-04T10:40:01.261Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 13
-  completed_phases: 12
+  completed_phases: 13
   total_plans: 32
-  completed_plans: 36
+  completed_plans: 32
 ---
 
 # STATE: STREAM.jl
@@ -21,10 +21,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-01)
+See: .planning/PROJECT.md (updated 2026-04-04)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 44 — light-dark-mode
+**Current focus:** Planning next milestone (v0.9)
 **Python STREAM reference:** ~/projects/STREAM
 
 **Roadmap summary:**

@@ -4,36 +4,13 @@
 
 STREAM.jl is a Julia rewrite of the Python package STREAM (System Thermohydraulics for Reactor Evaluation, Analysis & Modeling) — a nuclear reactor thermal-hydraulics simulation code. It models heat evacuation in reactor systems through coupled differential-algebraic equations, using ModelingToolkit.jl (MTK) as the core symbolic modeling engine instead of the hand-rolled Aggregator+DAE approach used in Python STREAM.
 
-v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls. v0.5 reorganized the codebase to the canonical CLAUDE.md file layout, split the monolithic test file into 13 focused modules, added Julia docstrings to all 28 exported names, and expanded CLAUDE.md with rationale and MTK patterns. v0.6 delivered flow reversal systems: sign-safe channel components with ifelse() upwinding, thermal expansion coefficient and Elenbaas natural convection HTC, time-varying Pump callable dispatch, Flapper check-valve with MTK continuous events, and a validated loss-of-flow transient with physically correct 4-node bypass topology covering forced flow, pump coastdown, flow reversal, Flapper opening, and established natural circulation. v0.7 delivered the full safety physics and pressure field suite: per-cell absolute pressure P[i]/dp[i], sat_temperature @register_symbolic, T_sat[i]/T_ONB[i] observables, distributed momentum ODE in all channel variants, subcooled boiling (McAdams + Bergles-Rohsenow + in-loop SCB correction), nuclear safety threshold analysis framework (8 physics functions + ChannelState + threshold_analysis dispatcher + chfr factory), and complete HTC/friction correlation library (Marco-Han, developing/fully-developed laminar factories, maximal_htc combinator, Colebrook-White turbulent friction, viscosity correction) with htc/ + friction/ subdirectory split.
+v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls. v0.5 reorganized the codebase to the canonical CLAUDE.md file layout, split the monolithic test file into 13 focused modules, added Julia docstrings to all 28 exported names, and expanded CLAUDE.md with rationale and MTK patterns. v0.6 delivered flow reversal systems: sign-safe channel components with ifelse() upwinding, thermal expansion coefficient and Elenbaas natural convection HTC, time-varying Pump callable dispatch, Flapper check-valve with MTK continuous events, and a validated loss-of-flow transient with physically correct 4-node bypass topology covering forced flow, pump coastdown, flow reversal, Flapper opening, and established natural circulation. v0.7 delivered the full safety physics and pressure field suite: per-cell absolute pressure P[i]/dp[i], sat_temperature @register_symbolic, T_sat[i]/T_ONB[i] observables, distributed momentum ODE in all channel variants, subcooled boiling (McAdams + Bergles-Rohsenow + in-loop SCB correction), nuclear safety threshold analysis framework (8 physics functions + ChannelState + threshold_analysis dispatcher + chfr factory), and complete HTC/friction correlation library (Marco-Han, developing/fully-developed laminar factories, maximal_htc combinator, Colebrook-White turbulent friction, viscosity correction) with htc/ + friction/ subdirectory split. v0.8 delivered the STREAM Composer GUI — a standalone Tauri 2 + React + ReactFlow desktop application (13 phases, 32 plans) with drag-drop topology building, parameter editing with factory correlation pickers, live Julia code generation, project save/load, topology validation, thermal composition code-gen, layered hydraulic/thermal canvas, and light/dark theme — all without a Julia runtime embedded in the GUI.
 
-## Current Milestone: v0.8 STREAM Composer GUI
+## Shipped: v0.8 STREAM Composer GUI (2026-04-04)
 
-Phase 43 complete — UI Polish & Redesign: ThermalPort handles 12×12px with 1.5px border, Info icon tooltips on parameter fields with descriptions (MatrixBadge + ParameterForm Bool), draggable bottom panel resize (120px–60vh clamp, Zustand-persisted height). 232 tests passing.
+**Delivered:** Standalone Tauri 2 + React + ReactFlow desktop app — drag-drop topology builder, parameter editing with factory correlation pickers, live Julia code generation, project save/load, topology validation, thermal composition code-gen, layered canvas, light/dark theme. No Julia runtime inside the GUI.
 
-**Goal:** Build a standalone desktop application (Tauri 2 + React + ReactFlow) that lets engineers visually compose STREAM.jl thermal-hydraulic systems by dragging and dropping components onto a canvas, connecting them via flow edges, and exporting valid Julia/MTK code as a .jl file — without any live Julia execution inside the GUI.
-
-**Target features:**
-- Project scaffold: Tauri 2 + React + ReactFlow desktop app for Windows and Linux; component metadata registry JSON for all 9 STREAM.jl hydraulic components
-- Canvas & node editor: drag components from toolbox, draw FlowPort edges, undo/redo, pan/zoom/minimap
-- Parameter editing: sidebar with scalar fields, PipeGeometry picker, Pump mode toggle, per-field validation
-- Code generation: live Julia code preview, export to .jl, correct @named + connect() + compose() output
-- Project persistence: save/load JSON, unsaved-changes guard, recent files list
-- UI design pass: shadcn/ui throughout, design contract + audit gates
-- Topology validation: unconnected port warnings, missing pressure-anchor/driving-element alerts
-- Thermal composition: ChannelAndContacts ThermalPort array port handles, HeatDiffusion wiring, symmetric_plate code-gen
-- Project save/load in .streamgui JSON format
-- UI design quality via shadcn/ui + Tailwind CSS — every frontend phase preceded by gsd:ui-phase contract and followed by gsd:ui-review audit
-- Basic topology alerts: unconnected ports, missing pressure boundary condition, no driving element
-- Thermal composition: ChannelAndContacts with ThermalPort array visualization and HeatDiffusion node connections
-
-**Deferred to v0.9+ GUI milestone:**
-- Correlation closure editing (regime_dependent, etc.)
-- Multi-way junction nodes (3+ port connections)
-- Live Julia validation backend (Oxygen.jl)
-- Result plotting or simulation execution from GUI
-- Round-trip .jl file parsing (graph ← Julia code)
-
-**Research basis:** `.planning/research/gui-feasibility/RESEARCH.md` — full feasibility study conducted 2026-03-31 covering ecosystem survey, architecture options, graph-to-code translation, effort estimate, and Claude Code suitability (confidence: HIGH for architecture, MEDIUM for effort estimates).
+**13 phases, 32 plans | 232 files changed, ~43k LOC TypeScript/React**
 
 ## Core Value
 
@@ -102,19 +79,22 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - ✓ ChannelState struct + threshold_analysis() dispatcher + chfr() factory + 8 pre-built analysis wrappers; _extract_channel_state with ArgumentError precondition guard — v0.7
 - ✓ Marco_Han_Nusselt rectangular duct laminar Nu; fully_developed_laminar_h_spl and developing_laminar_h_spl HTC factories; maximal_htc combinator — v0.7
 - ✓ turbulent_friction(Re, epsilon) Colebrook-White; viscosity_correction(heat_wet_ratio, mu_ratio); correlations.jl split into htc/ + friction/ subdirs — v0.7
+- ✓ **SCAF-01..04**: Tauri 2 + React + ReactFlow desktop scaffold; component metadata registry JSON for all 12 STREAM.jl components; three-panel layout; Vitest configured — v0.8
+- ✓ **CANV-01..07**: Drag-drop canvas with FlowPort edge wiring, connection type enforcement, Delete/Backspace deletion, Ctrl+Z undo/redo (10+ ops), pan/zoom/minimap; 30 tests — v0.8
+- ✓ **PARA-01..06**: Parameter editing sidebar — registry-driven form dispatching, on-blur scalar validation, PipeGeometry picker, Pump mode toggle, factory correlation pickers with nested sub-parameters — v0.8
+- ✓ **CODE-01..07**: Pure code generator: graph→valid STREAM.jl Julia code with positional/keyword arg handling, factory recursion, default elision; live preview panel; BC editor; Tauri file export — v0.8
+- ✓ **PERS-01..03**: Save/load .streamgui JSON, unsaved-changes guard, WelcomeOverlay with recent files list, keyboard shortcuts, close guard with dialog — v0.8 (PERS-04 partial: Open Recent in FileMenu deferred)
+- ✓ **DSGN-01..05**: shadcn/ui throughout, Lucide icon map, design contract (UI-SPEC.md) + visual audit (UI-REVIEW.md) gates per frontend phase — v0.8
+- ✓ **VALD-01..03**: validateTopology pure function (11 tests), destructive error rings on nodes, ValidationDialog, gated export/save — v0.8
+- ✓ **THERM-01..03**: Amber diamond ThermalPort handles, port-type connection enforcement, thermal composition detection (symmetric_plate/plate/one_sided_connection), compose_systems code-gen — v0.8
+- ✓ Layered canvas with hydraulic/thermal toggle (dimming, toolbox filtering, Tab cycling), StreamProject v2 schema — v0.8
+- ✓ Edge visual overhaul: arrowheads, parallel offset routing, FlowPort polarity colors (port_in/port_out), cursor fix, counter reconstruction fix — v0.8
+- ✓ UI polish: ThermalPort 12×12px handles, Info icon tooltips on all parameter fields, draggable bottom panel resize — v0.8
+- ✓ Light/dark/system theme toggle (ThemeMenu gear icon, localStorage persistence, FOUC prevention, ReactFlow colorMode integration, One Dark Pro palette) — v0.8
 
 ### Active
 
-<!-- v0.8 requirements — STREAM Composer GUI -->
-
-- [ ] **SCAF-01..05**: Tauri 2 + React + ReactFlow desktop scaffold; component metadata registry JSON for all 9 STREAM.jl components
-- [ ] **CANV-01..07**: Canvas node editor — drag-drop components, FlowPort edges, undo/redo, pan/zoom
-- [ ] **PARA-01..06**: Parameter editing sidebar — scalar fields, PipeGeometry picker, Pump mode toggle, per-field validation
-- [ ] **CODE-01..07**: Code generator — live Julia preview, export to .jl, correct @named + connect() + compose() output, boundary conditions panel
-- [ ] **PERS-01..04**: Project persistence — save/load JSON, unsaved-changes guard, recent files
-- [ ] **DSGN-01..05**: UI design pass — shadcn/ui throughout, UI-SPEC design contract + UI-REVIEW audit
-- [ ] **VALD-01..03**: Topology validation — unconnected port warnings, missing pressure-anchor/driving-element alerts
-- [ ] **THERM-01..03**: Thermal composition — ChannelAndContacts ThermalPort array handles, HeatDiffusion wiring, symmetric_plate code-gen
+<!-- v0.9 requirements will be defined in the next milestone planning session -->
 
 ### Out of Scope
 
@@ -137,6 +117,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **v0.5 shipped** 2026-03-16 — ~3,750 Julia LOC (src + test), 3 phases (17-19), 6 plans; 15 requirements complete; canonical file layout, full docstrings, 13-file test suite
 - **v0.6 shipped** 2026-03-27 — 2,373 src LOC, 8 phases (20-26 incl. 24.1), 14 plans; 21 requirements complete; flow reversal, Flapper, Elenbaas NC, LOF transient validated
 - **v0.7 shipped** 2026-04-01 — 7,715 Julia LOC (src + test), 7 phases (27, 27.1, 28, 29, 30, 31, 32), 13 plans; full safety physics and pressure field suite: pressure observables, momentum ODE, SCB, threshold analysis, complete HTC/friction library
+- **v0.8 shipped** 2026-04-04 — ~43k TypeScript/React LOC, 13 phases (33-44 incl. 35.1), 32 plans; STREAM Composer GUI: Tauri 2 desktop app with drag-drop topology, code generation, persistence, validation, thermal composition, layered canvas, dark mode
 - Python STREAM lives at ~/projects/STREAM and is the reference implementation for all validation
 - MTK architecture validated through five milestones: acausal connect() + mtkcompile + Sundials IDA replaces Aggregator pattern
 - Friction is handled inside Channel (Darcy-Weisbach inline) — no separate Friction component in loop
@@ -191,10 +172,12 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 | Pump callable via `@parameters (dP_pump_fn::FType)(..)` | Captured Julia closure as typed MTK parameter; alternative (@register_symbolic) would be opaque and not accept closures | ✓ Good — PUMP-01/02/03 all pass; callable captured correctly in symbolic graph |
 | NC detection in `regime_dependent` via `Gr/Re²>1` with `ifelse()` | Hard if-branch creates solver discontinuity; ifelse() emits symbolic conditional same as Re-regime switching | ✓ Good — NC temperature rise matches Elenbaas within 0.3% (ratio 0.997) |
 | `solve_transient` redesigned to positional API `(ssys, op, t; ...)` | Mirrors Python STREAM API; keyword-only was inconsistent since v0.6 broke the "all keyword" convention by adding callable Pump | ✓ Good — cleaner call sites; 23 Pump call sites migrated; no regressions |
-| GUI milestones are periodic and independent; STREAM.jl advances on its own track | GUI is a code generator, not a live simulation environment. The coupling contract is the component metadata registry (JSON). Most STREAM.jl milestones don't touch the GUI. A new GUI milestone is triggered when (a) enough new components/API changes accumulate to justify a GUI sync, or (b) the GUI needs new composition capabilities. | — Pending (v0.8 is first GUI milestone) |
-| GUI generates .jl files only — no embedded Julia runtime in v0.8 | Julia TTFX is 10-30s for STREAM.jl, unacceptable for interactive GUI. File-only approach has zero runtime dependencies, produces inspectable/versionable artifacts, and eliminates entire IPC error class. Live validation (Oxygen.jl) deferred to v0.9+. | — Pending (v0.8) |
-| GUI built with Tauri 2 + React + ReactFlow, not Qt or Electron | Multiple Claude Code-built Tauri 2 apps already exist (proven territory). ReactFlow is the dominant node editor library (800K weekly downloads). Small bundle (<10MB), fast startup, cross-platform. Full rationale in .planning/research/gui-feasibility/RESEARCH.md. | — Pending (v0.8) |
-| GUI UI quality gated by gsd:ui-phase + gsd:ui-review per frontend phase | Claude Code builds 70-80% of GUI effectively; remaining 20-30% is visual polish requiring human eyes. Design contracts (UI-SPEC.md) written before coding; 6-pillar visual audits after. shadcn/ui prevents hand-rolled CSS anti-patterns. | — Pending (v0.8) |
+| GUI milestones are periodic and independent; STREAM.jl advances on its own track | GUI is a code generator, not a live simulation environment. The coupling contract is the component metadata registry (JSON). Most STREAM.jl milestones don't touch the GUI. A new GUI milestone is triggered when (a) enough new components/API changes accumulate to justify a GUI sync, or (b) the GUI needs new composition capabilities. | ✓ Good — v0.8 first GUI milestone shipped; GUI tracks library without blocking it |
+| GUI generates .jl files only — no embedded Julia runtime in v0.8 | Julia TTFX is 10-30s for STREAM.jl, unacceptable for interactive GUI. File-only approach has zero runtime dependencies, produces inspectable/versionable artifacts, and eliminates entire IPC error class. Live validation (Oxygen.jl) deferred to v0.9+. | ✓ Good — code generation validated; .jl export works cleanly |
+| GUI built with Tauri 2 + React + ReactFlow, not Qt or Electron | Multiple Claude Code-built Tauri 2 apps already exist (proven territory). ReactFlow is the dominant node editor library (800K weekly downloads). Small bundle (<10MB), fast startup, cross-platform. Full rationale in .planning/research/gui-feasibility/RESEARCH.md. | ✓ Good — 13 phases built cleanly on this stack; no significant friction |
+| GUI UI quality gated by gsd:ui-phase + gsd:ui-review per frontend phase | Claude Code builds 70-80% of GUI effectively; remaining 20-30% is visual polish requiring human eyes. Design contracts (UI-SPEC.md) written before coding; 6-pillar visual audits after. shadcn/ui prevents hand-rolled CSS anti-patterns. | ✓ Good — design contracts caught issues early; shadcn/ui prevented CSS debt |
+| Layered canvas: hydraulic and thermal content on separate toggleable layers | Reduces visual clutter when both are present; simplifies routing logic per layer. StreamProject v2 schema with v1 backwards compat. | ✓ Good — Phase 41 delivered cleanly; Tab cycling ergonomic |
+| Factory correlations capped at one level of nesting | regime_dependent sub-dropdowns only offer simple closures (no recursive factories). Covers 99% of real use cases, avoids UI complexity. | ✓ Good — Phase 35.1 proven sufficient; no user-facing limitation hit |
 
 ## Constraints
 
@@ -222,4 +205,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after Phase 42 (edge-path-visual-overhaul) complete — hydraulic arrowheads + parallel offset, handle polarity colors, cursor fix, counter reconstruction fix*
+*Last updated: 2026-04-04 after v0.8 milestone (STREAM Composer GUI — Phases 33-44)*

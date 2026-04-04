@@ -314,6 +314,53 @@
 
 ---
 
+## Milestone: v0.8 — STREAM Composer GUI
+
+**Shipped:** 2026-04-04
+**Phases:** 13 (33-44, incl. 35.1) | **Plans:** 32
+
+### What Was Built
+- Tauri 2 + React + ReactFlow desktop app with three-panel layout, Zustand store, Tailwind v4, shadcn design tokens, Vitest; JSON component registry for all 12 STREAM.jl components with TypeScript types
+- Drag-drop canvas with FlowPort connection validation, undo/redo (10+ ops), pan/zoom/minimap, Hydraulic/Thermal toolbox categories
+- Parameter editing sidebar: registry-driven form dispatching, PipeGeometry picker, Pump mode toggle, factory correlation pickers (regime_dependent, elenbaas_htc, maximal_htc) with nested sub-parameter fields
+- Pure code generator: graph→valid STREAM.jl Julia with positional/keyword arg handling, factory recursion, default elision; live preview panel; Tauri file export
+- Project persistence: save/load .streamgui JSON, unsaved-changes guard, WelcomeOverlay with recent files, Ctrl+S/O/N shortcuts, close guard; 7 real-runtime bug fixes including WSLg title workaround and kbLock mutex
+- Topology validation: pure validateTopology (11 TDD tests), error rings on nodes, ValidationDialog, gated export/save
+- Thermal composition: amber diamond ThermalPort handles, connection type enforcement, symmetric_plate/plate/one_sided_connection detection, compose_systems code-gen
+- Layered canvas: Hydraulic/Thermal toggle with dimming, toolbox filtering, Tab cycling, StreamProject v2 schema
+- Edge visual overhaul: arrowheads, parallel offset routing, FlowPort polarity colors, cursor fix, counter reconstruction fix
+- UI polish: 12×12px ThermalPort handles, Info icon tooltips on all parameter fields, draggable bottom panel resize
+- Light/dark/system theme: ThemeMenu gear icon, localStorage persistence, FOUC prevention, ReactFlow colorMode integration, One Dark Pro palette
+
+### What Worked
+- **`gsd:ui-phase` + `gsd:ui-review` gates per frontend phase**: design contracts caught visual issues before they were baked in; shadcn/ui prevented hand-rolled CSS anti-patterns; every frontend phase had a clear visual acceptance contract
+- **Pure function extraction pattern**: generateCode(), validateTopology(), layer detection utilities, projectIO — all implemented as pure functions with comprehensive unit tests before UI wiring; made the UI code thin and the logic testable
+- **Registry-as-truth principle**: the component metadata JSON was the single source of truth for the sidebar, toolbox, and code generator; adding a new component or parameter only required updating the registry, not the UI code
+- **Decimal phase (35.1) for emergent scope**: correlation pickers emerged during Phase 35 discuss-phase; the 35.1 decimal insertion kept the numbering clean and the audit traceable
+- **Real-runtime verification** (Phases 33-03, 34-03, etc.): human-verify plans exposed multiple integration bugs that unit tests missed (WSLg title workaround, kbLock mutex, React close-guard dialog)
+
+### What Was Inefficient
+- **Several SUMMARY.md files had broken one_liner fields**: "Outcome:", "One-liner:", "[Rule 3 - Blocking]" artifacts appeared in the MILESTONES.md auto-generated accomplishments list; required manual cleanup — one_liner field should be validated at plan completion
+- **Phase 35 started before SCAF-02 (Windows installer) was resolved**: installer build requires Windows + Rust environment; was deferred without a clear plan for the constraint; still unresolved at v0.8 close
+- **FileMenu Open Recent gap (PERS-04)**: WelcomeOverlay disappears once a node is on canvas, making recent projects unreachable from FileMenu; a known gap since Phase 37 that wasn't addressed before v0.8 close
+
+### Patterns Established
+- **UI-phase → code → UI-review per frontend phase**: this 3-step gate is now the standard for any frontend phase; it catches visual issues before they compound
+- **Pure function TDD for UI logic**: all stateful UI behavior extracted to pure functions first (validateTopology, generateCode, layerDetection, projectIO) — this is the right default for any complex UI state
+- **Tech debt YAML in audit frontmatter**: the `tech_debt:` section in v0.8-MILESTONE-AUDIT.md provided a structured record of known deferrals that fed directly into the completion notes
+
+### Key Lessons
+1. **Verify SUMMARY.md one_liner at plan completion** — broken one_liners propagate to MILESTONES.md; the field should contain a clean sentence, not a plan-checker report fragment
+2. **Platform build constraints need a resolution plan, not just a deferral note** — SCAF-02 Windows installer has been deferred since Phase 33; by v0.9 GUI it should have a concrete resolution (CI job, cross-compile, or explicit out-of-scope)
+3. **WelcomeOverlay-only recent files is a UX dead end** — PERS-04's Open Recent should be in both WelcomeOverlay and FileMenu; the current design only works if the user hasn't started work
+
+### Cost Observations
+- Model mix: ~100% sonnet (quality profile)
+- Timeline: 3 days (2026-04-01 → 2026-04-04) across 13 phases, 32 plans
+- Notable: First entirely TypeScript/React milestone in a Julia-centric project; first use of ui-phase design contracts; tech debt audit status (not gaps_found) allowed completion without gap-closure phases
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -327,6 +374,7 @@
 | v0.5 | 3 | 6 | Pure code quality — canonical file layout, test split, full docstrings, CLAUDE.md rationale; no new features |
 | v0.6 | 8 | 14 | Flow reversal systems — MTK continuous events, callable parameters, bypass topology, NC regime detection |
 | v0.7 | 7 | 13 | Safety physics suite — pressure field, SCB, threshold analysis, HTC/friction completions; audit-before-complete pattern validated |
+| v0.8 | 13 | 32 | First GUI milestone — Tauri 2 + React + ReactFlow; ui-phase design contracts per frontend phase; pure function TDD for UI logic; registry-as-truth pattern |
 
 ### Cumulative Quality
 
@@ -339,3 +387,4 @@
 | v0.5 | ~200+ | 15/15 | 0 |
 | v0.6 | ~230+ | 21/21 | 0 |
 | v0.7 | ~300+ | 33/34 | 1 (QuadGK) |
+| v0.8 | ~300+ Julia + Vitest GUI | 40/40 | Tauri + React + ReactFlow stack (separate from Julia deps) |

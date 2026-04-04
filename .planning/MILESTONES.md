@@ -1,5 +1,29 @@
 # Milestones
 
+## v0.8 STREAM Composer GUI (Shipped: 2026-04-04)
+
+**Phases completed:** 13 phases, 32 plans, 47 tasks
+
+**Timeline:** 2026-04-01 → 2026-04-04 (3 days)
+**TypeScript/React LOC:** ~43,334 insertions across 232 files
+
+**Key accomplishments:**
+
+- Tauri 2 + React + ReactFlow desktop app scaffold with three-panel layout, Zustand store, Tailwind v4 + shadcn design tokens, Vitest configured; JSON registry of all 12 STREAM.jl components with TypeScript types and 14 validation tests
+- Drag-drop canvas: ReactFlow wired with FlowPort connection validation, Delete/Backspace node removal, Ctrl+Z undo/redo (10+ ops), Hydraulic/Thermal toolbox categories; 30 tests all passing
+- Parameter editing sidebar: registry-driven form dispatching, on-blur validation, PipeGeometry picker, Pump mode toggle, factory correlation pickers (regime_dependent, elenbaas_htc, maximal_htc) with nested sub-parameter fields
+- Pure code generator transforms canvas graph → valid STREAM.jl Julia code with positional/keyword arg handling, factory param recursion, and default elision; live preview panel + Tauri file save export
+- Project persistence: save/load .streamgui JSON, unsaved-changes guard, WelcomeOverlay with recent files, keyboard shortcuts (Ctrl+S/O/N/Shift+S), close guard with dialog; 7 real-runtime bug fixes including WSLg title workaround and kbLock mutex
+- UI suite: Lucide icon map, shadcn/ui throughout, topology validation (11 TDD tests, error rings, gated export), thermal composition code-gen (symmetric_plate/plate/one_sided_connection detection), layered canvas (Hydraulic/Thermal toggle with dimming), arrowhead + parallel edge routing + FlowPort polarity colors, light/dark/system theme toggle with FOUC prevention
+
+**Known Gaps (tech debt):**
+
+- FileMenu has no Open Recent submenu — recent projects only accessible via WelcomeOverlay (PERS-04 partial)
+- Windows .exe installer deferred — requires Windows + Rust build environment (SCAF-02 partial)
+- Dead prop: resolvedTheme in Toolbar Props not destructured in function body (Phase 44)
+
+---
+
 ## v0.7 Safety Physics & Pressure Field (Shipped: 2026-04-01)
 
 **Phases:** 27, 27.1, 28, 29, 30, 31, 32 (7 phases, 13 plans)
@@ -17,6 +41,7 @@
 - Audit gap closure: 27-VERIFICATION.md written retroactively from VALIDATION.md evidence; _extract_channel_state ArgumentError guard + E2E solve→extract→analyze pipeline test; Phase 30 in-system smoke tests with ifelse() fix for MTK symbolic tracing
 
 **Known Gaps (intentional deferrals):**
+
 - VAL-PRES-01: Python STREAM pressure cross-validation (@test_skip placeholder) — requires Python reference data generation
 
 ---
