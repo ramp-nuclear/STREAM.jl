@@ -10,6 +10,7 @@
 - ✅ **v0.6 Flow Reversal Systems** — Phases 20-26 (shipped 2026-03-27)
 - ✅ **v0.7 Safety Physics & Pressure Field** — Phases 27-32 (shipped 2026-04-01)
 - ✅ **v0.8 STREAM Composer GUI** — Phases 33-44 (shipped 2026-04-04)
+- 🚧 **v0.9 Point Kinetics & Reactor Control** — Phases 45+ (in progress)
 
 ## Phases
 
@@ -125,6 +126,23 @@ Full phase details: `.planning/milestones/v0.8-ROADMAP.md`
 
 </details>
 
+<details open>
+<summary>🚧 v0.9 Point Kinetics & Reactor Control (Phases 45+) — IN PROGRESS</summary>
+
+- [x] Phase 45: PointKinetics Bare Component & Steady-State ICs (2/2 plans) — completed 2026-04-04
+- [x] Phase 46: Callable Control Reactivity + ReactivityController (2/2 plans) — completed 2026-04-04
+- [x] Phase 47: Temperature Feedback for PointKinetics (2/2 plans) — completed 2026-04-05
+- [x] Phase 48: SCRAM Solver Integration (1/1 plans) — completed 2026-04-08
+  **Plans:** 1 plan
+  Plans:
+  - [x] 48-01-PLAN.md — Unified callback factory pattern: SCRAMCondition, scram_callback, flapper_callback; Flapper refactor; SCRAM-01/SCRAM-02 tests
+- [x] Phase 49: Full Loop Integration + Validation (2/2 plans) — completed 2026-04-09
+  Plans:
+  - [x] 49-01-PLAN.md — build_loop_pk example, full PK+loop integration tests
+  - [x] 49-02-PLAN.md — validation against Python STREAM reference results + SCRAM-in-loop test
+
+</details>
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -177,8 +195,12 @@ Full phase details: `.planning/milestones/v0.8-ROADMAP.md`
 | 42. Edge & Path Visual Overhaul | v0.8 | 2/2 | Complete | 2026-04-03 |
 | 43. UI Polish & Redesign | v0.8 | 2/2 | Complete | 2026-04-03 |
 | 44. Light/Dark Mode | v0.8 | 2/2 | Complete | 2026-04-03 |
+| 45. PointKinetics Bare Component & Steady-State ICs | v0.9 | 2/2 | Complete | 2026-04-04 |
+| 46. Callable Control Reactivity + ReactivityController | v0.9 | 2/2 | Complete | 2026-04-04 |
+| 47. Temperature Feedback for PointKinetics | v0.9 | 2/2 | Complete   | 2026-04-05 |
+| 48. SCRAM Solver Integration | v0.9 | 1/1 | Complete | 2026-04-08 |
 
 ---
 
 *Created: 2026-03-12*
-*Updated: 2026-04-04 — v0.8 milestone shipped (Phases 33-44, STREAM Composer GUI)*
+*Updated: 2026-04-08 — Phase 48 complete (1/1 plans); scram_callback signature fix committed*

@@ -5,16 +5,32 @@ using DifferentialEquations
 using STREAM
 
 # ─────────────────────────────────────────────────────────────────
+# FLAP-REF: Flapper constructor no longer accepts use_callback or threshold
+#
+# Phase 48 removed use_callback and threshold from the Flapper constructor.
+# Passing either kwarg must throw a MethodError (unknown keyword argument).
+# The callback is now external: flapper_callback(ssys, monitored_sym; threshold)
+# ─────────────────────────────────────────────────────────────────
+@testset "FLAP-REF: Flapper has no use_callback or threshold kwargs" begin
+    # Passing use_callback kwarg must raise MethodError
+    @test_throws Exception Flapper(; name=:flap_ref, use_callback=true)
+    # Passing threshold kwarg must raise MethodError
+    @test_throws Exception Flapper(; name=:flap_ref, threshold=0.01)
+    # Plain constructor (without those kwargs) must succeed
+    @test_nowarn Flapper(; name=:flap_plain)
+end
+
+# ─────────────────────────────────────────────────────────────────
 # Helper: build a minimal closed-loop Flapper system (scalar pump)
 #
 # Topology: Pump(dP_val) → Resistor(1e5) → Flapper → back to Pump
 # flapper.ref_mdot ~ pump.port_in.mdot
 # Two thermal anchors break circular instream in hydraulics-only loop.
 # ─────────────────────────────────────────────────────────────────
-function _build_flapper_scalar_loop(dP_val; flap_kwargs...)
+function _build_flapper_scalar_loop(dP_val)
     @named pump    = Pump(dP_val)
     @named res     = Resistor(1e5)
-    @named flapper = Flapper(; flap_kwargs...)
+    @named flapper = Flapper()
 
     conns = [
         connect(pump.port_out,    res.port_in),
@@ -33,12 +49,12 @@ end
 # FLAP-05: Flapper remains closed under positive ref_mdot
 #
 # A scalar pump with dP=1e5 Pa drives flow through Resistor(1e5) + Flapper.
-# Steady-state mdot ≈ 1e5 / (1e5 + 1e8) ≈ 1e-3 kg/s.
+# Steady-state mdot ~ 1e5 / (1e5 + 1e8) ~ 1e-3 kg/s.
 # With threshold=1e-6 kg/s, this mdot stays well above threshold throughout
 # the 20 s transient, so the event never fires and T_open stays at 1e30.
 # ─────────────────────────────────────────────────────────────────
 @testset "FLAP-05: Flapper remains closed under positive ref_mdot" begin
-    sys = _build_flapper_scalar_loop(1e5; threshold=1e-6)
+    sys = _build_flapper_scalar_loop(1e5)
     ssys = mtkcompile(sys; fully_determined=false)
 
     op = Pair{Any,Any}[
@@ -46,7 +62,7 @@ end
     ]
 
     t_arr = range(0.0, 20.0; length=200)
-    sol = solve_transient(ssys, op, t_arr)
+    sol = solve_transient(ssys, op, t_arr; callbacks=flapper_callback(ssys, ssys.pump.port_in.mdot; threshold=1e-6))
 
     @test sol.retcode == ReturnCode.Success
     # T_open must stay at 1e30 sentinel (event never fired — ref_mdot > threshold all run)
@@ -62,25 +78,19 @@ end
 # With dP=0, the loop decays under inertia+resistance: tau = L/A / R = 5e5/1e5 = 5s
 # Initial condition: ine.port_in.mdot = 1.0 kg/s
 # ref_mdot wired to ine.port_in.mdot, threshold=1e-4 kg/s
-# mdot decays exponentially: mdot(t) ≈ mdot_0 * exp(-t / tau_eff)
+# mdot decays exponentially: mdot(t) ~ mdot_0 * exp(-t / tau_eff)
 # The event fires when mdot drops below threshold.
 # T_open is recorded at the crossing time; after T_open + dt=3s, xi = 1.0.
-#
-# Note: callable Pump(f(t)) cannot be used here because MTK's callback
-# compilation in ODEProblem construction requires all parameter values
-# to be resolvable at build time, which breaks when a SymbolicContinuousCallback
-# is present in the same system. The Inertia+decay approach achieves the same
-# test objective without callable parameters.
 # ─────────────────────────────────────────────────────────────────
 @testset "FLAP-06: Flapper opens when ref_mdot crosses threshold" begin
     threshold_val = 1e-4   # kg/s; well below the initial mdot of 1.0 kg/s
     dt_ramp       = 3.0    # s; ramp duration
-    L_over_A      = 5e5   # m^{-1}; tau_eff = L_over_A / R_eff ≈ 5s
+    L_over_A      = 5e5   # m^{-1}; tau_eff = L_over_A / R_eff ~ 5s
 
     @named pump    = Pump(0.0)   # zero pressure: loop decays under inertia
     @named ine     = Inertia(L_over_A)
     @named res     = Resistor(1e5)
-    @named flapper = Flapper(; threshold=threshold_val, dt=dt_ramp, R_closed=1e8, R_open=100.0)
+    @named flapper = Flapper(; dt=dt_ramp, R_closed=1e8, R_open=100.0)
 
     conns = [
         connect(pump.port_out,    ine.port_in),
@@ -104,7 +114,7 @@ end
     ]
 
     t_arr = range(0.0, 100.0; length=1000)
-    sol = solve_transient(ssys, op, t_arr)
+    sol = solve_transient(ssys, op, t_arr; callbacks=flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=threshold_val))
 
     @test sol.retcode == ReturnCode.Success
 
@@ -132,7 +142,7 @@ end
 # Verifies that the callbacks kwarg is forwarded to the DiffEq solver.
 # ─────────────────────────────────────────────────────────────────
 @testset "SOLV-01: solve_transient passes user callbacks" begin
-    sys = _build_flapper_scalar_loop(1e5; threshold=1e-6)
+    sys = _build_flapper_scalar_loop(1e5)
     ssys = mtkcompile(sys; fully_determined=false)
 
     op = Pair{Any,Any}[

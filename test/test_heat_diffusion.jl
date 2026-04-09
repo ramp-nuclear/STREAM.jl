@@ -75,6 +75,7 @@ end
     conns = [
         [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i)))  for i in 1:nz]...,
         [connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for i in 1:nz]...,
+        hd.power ~ pwr,
     ]
     @named sys = compose(System(conns, t; name=:sys), hd, ct_l..., ct_r...)
     ssys = mtkcompile(sys)
@@ -120,8 +121,10 @@ end
                                power_shape=ps, power=pwr)
 
     ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct5_l, i)) for i in 1:nz]
-    conns = [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i)))
-             for i in 1:nz]
+    conns = vcat(
+        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for i in 1:nz],
+        [hd.power ~ pwr],
+    )
     @named sys = compose(System(conns, t; name=:sys), hd, ct_l...)
     ssys = mtkcompile(sys; fully_determined=false)
 
@@ -165,6 +168,7 @@ end
     conns = [
         [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left,  i))) for i in 1:nz]...,
         [connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for i in 1:nz]...,
+        hd.power ~ pwr,
     ]
     @named sys = compose(System(conns, t; name=:sys12gap), hd, ct_l..., ct_r...)
     ssys = mtkcompile(sys)

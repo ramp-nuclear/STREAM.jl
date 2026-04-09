@@ -164,6 +164,10 @@ Wire one `HeatDiffusion` fuel plate symmetrically to one `ChannelAndContacts` ch
 
 # Returns
 Uncompiled `ODESystem` from `compose()`. Add boundary conditions, then `mtkcompile()`.
+
+After calling this function, refer to sub-components exclusively via the returned system
+(e.g. `rods.cac`, `rods.fuel`). The original component variables hold unscoped symbolic
+names and should not be used in equations or connection dicts after composition.
 """
 function symmetric_plate(cac, fuel; name::Symbol)
     n = _infer_n(cac)
@@ -199,6 +203,10 @@ Wire a `HeatDiffusion` fuel plate between two `ChannelAndContacts` channels (lef
 
 # Returns
 Uncompiled `ODESystem` from `compose()`.
+
+After calling this function, refer to sub-components exclusively via the returned system
+(e.g. `rods.ch_left`, `rods.fuel`). The original component variables hold unscoped symbolic
+names and should not be used in equations or connection dicts after composition.
 """
 function plate(ch_left, ch_right, fuel; name::Symbol)
     n = _infer_n(ch_left)
@@ -233,6 +241,10 @@ Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channe
 
 # Returns
 Uncompiled `ODESystem` from `compose()`.
+
+After calling this function, refer to sub-components exclusively via the returned system
+(e.g. `osc.channel`, `osc.fuel`). The original component variables hold unscoped symbolic
+names and should not be used in equations or connection dicts after composition.
 """
 function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
     side in (:left, :right) || error("one_sided_connection: side must be :left or :right, got :$side")
@@ -272,4 +284,65 @@ Uncompiled `ODESystem` ready for `mtkcompile()`.
 """
 function compose_systems(systems...; connections::Vector{<:Equation}, name::Symbol)
     compose(System(connections, t; name=name), systems...)
+end
+
+# ----------------------------------------------------------------
+# connect_temperature_feedback — Phase 47 TF-04 (updated API)
+# Generates per-cell binding equations pk.T_source_<cname>[j] ~ comp.T[...]
+# for each component in the components list. Uses row-major flattening
+# for 2D T (HeatDiffusion): j_flat = (jz-1)*nx + jx.
+# See .planning/phases/47-temperature-feedback-point-kinetics/47-CONTEXT.md D-04.
+# ----------------------------------------------------------------
+"""
+    connect_temperature_feedback(pk, components) -> Vector{Equation}
+
+Generate binding equations that wire each component's existing `T` symbolic to the
+corresponding `pk.T_source_<name>` unknowns inside `PointKinetics`. Used together
+with `compose_systems` to close the neutronics<->thermal-hydraulics loop.
+
+# Arguments
+- `pk`: uncompiled `PointKinetics` system built with `temp_worth=...`
+- `components`: list of scoped component references whose temperatures feed into `pk`
+  (e.g. `[rods.cac]`, `[inter.ch_left, inter.ch_right]`). Pass scoped references
+  (post-composition), not original component variables. Alpha coefficients belong in
+  the `PointKinetics` constructor `temp_worth` dict — they are not needed here.
+
+# Returns
+`Vector{Equation}` -- one equation per cell, per component. Length equals the total
+number of cells across all components. For 1D channel T: `pk.T_source_<name>[j] ~ comp.T[j]`.
+For 2D HeatDiffusion T: `pk.T_source_<name>[(jz-1)*nx+jx] ~ comp.T[jz, jx]` (row-major).
+
+# Note
+Pass scoped references (post-composition), not original component variables. The
+original component variables hold unscoped symbolic names and should not be used in
+equations or connection dicts after composition.
+
+# Example (scoped — component wrapped inside symmetric_plate)
+```julia
+rods = symmetric_plate(cac, fuel; name=:rods)
+@named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => alpha))
+eqs = connect_temperature_feedback(pk, [rods.cac])
+# eqs has n equations binding pk.T_source_cac[j] ~ rods.cac.T[j]
+```
+"""
+function connect_temperature_feedback(pk, components)
+    eqs = Equation[]
+    for comp in components
+        cname = nameof(comp)
+        pk_T_source = getproperty(pk, Symbol(:T_source_, cname))
+        T_sym = getproperty(comp, :T)
+        if ndims(T_sym) == 1
+            n = length(T_sym)
+            for j in 1:n
+                push!(eqs, pk_T_source[j] ~ T_sym[j])
+            end
+        else
+            nz, nx = size(T_sym)
+            for jz in 1:nz, jx in 1:nx
+                j = (jz - 1) * nx + jx
+                push!(eqs, pk_T_source[j] ~ T_sym[jz, jx])
+            end
+        end
+    end
+    return eqs
 end
