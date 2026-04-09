@@ -98,3 +98,22 @@ When `Dt(port_in.mdot)` appears in an equation, MTK automatically promotes `port
 ### `mtkcompile` before solve
 
 MTK's symbolic IR requires structural analysis (index reduction from DAE to ODE), Jacobian sparsity detection, and code generation before a numerical solver can use it. Always call `mtkcompile(sys)` to produce a compiled system. Passing an uncompiled `System` to `solve` will error or produce wrong results.
+
+## Performance — Sysimage
+
+Julia startup + TTFX for ModelingToolkit/OrdinaryDiffEq/Symbolics is 60-120 seconds per fresh invocation. A prebuilt sysimage cuts this to ~5 seconds.
+
+**Build once** (5-15 min, rebuild when `Manifest.toml` changes):
+```bash
+./build_sysimage.sh
+```
+The shell script sets `--heap-size-hint=4G --threads=1` to prevent OOM freezes on WSL2.
+Do **not** run `julia --project=. build_sysimage.jl` directly — it will exhaust memory.
+
+**Always use the sysimage** when running tests or verification:
+```bash
+test -f stream.so && SYSIMG="--sysimage stream.so" || SYSIMG=""
+julia $SYSIMG --project=. test/runtests.jl
+```
+
+`stream.so` is git-ignored and platform-specific — each machine builds its own. The sysimage bakes deps, not STREAM source, so source edits are picked up without rebuilding.

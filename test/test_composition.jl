@@ -114,6 +114,7 @@ const ps_comp   = ones(3, 3)  # uniform power shape, 3x3
         connect(hx_in.port_out,         plate_sys.cac.port_in),
         connect(plate_sys.cac.port_out, pump.port_in),
         pump.port_in.P          ~ 1.0e5,
+        plate_sys.fuel.power    ~ 1e4,
     ]
     @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, plate_sys)
     ssys = mtkcompile(top)
@@ -145,6 +146,7 @@ end
         connect(hx_r.port_out,             plate_sys.ch_r.port_in),
         connect(plate_sys.ch_r.port_out,   pump_r.port_in),
         pump_r.port_in.P                 ~ 1.0e5,
+        plate_sys.fuel.power             ~ 1e4,
     ]
     @named top = compose(System(outer_conns, t; name=:top), pump_l, hx_l, pump_r, hx_r, plate_sys)
     ssys = mtkcompile(top)
@@ -167,6 +169,7 @@ end
             connect(hx_in.port_out,        osc_sys.ch.port_in),
             connect(osc_sys.ch.port_out,   pump.port_in),
             pump.port_in.P               ~ 1.0e5,
+            osc_sys.fuel.power           ~ 1e4,
         ]
         @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, osc_sys)
         ssys = mtkcompile(top)
@@ -200,6 +203,8 @@ end
         connect(p1.cac1.port_out, p2.cac2.port_in),
         connect(p2.cac2.port_out, pump.port_in),
         pump.port_in.P         ~ 1.0e5,
+        p1.fuel1.power         ~ 1e4,
+        p2.fuel2.power         ~ 1e4,
     ]
     reactor = compose_systems(p1, p2, pump, hx_in; connections=cross_conns, name=:reactor)
     ssys = mtkcompile(reactor)
@@ -225,6 +230,7 @@ end
         connect(hx_cp.port_out,              plate_cp.cac_cp.port_in),
         connect(plate_cp.cac_cp.port_out,    pump_cp.port_in),
         pump_cp.port_in.P                  ~ 1.0e5,
+        plate_cp.fuel_cp.power             ~ 1e4,
     ]
     @named top_cp = compose(System(outer_cp, t; name=:top_cp), pump_cp, hx_cp, plate_cp)
     ssys_cp = mtkcompile(top_cp)

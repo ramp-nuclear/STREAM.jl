@@ -86,7 +86,8 @@ end
 - `cp_s`: solid specific heat [J/(kg*K)]
 - `k_s`: thermal conductivity [W/(m*K)]
 - `power_shape`: axial-lateral power shape matrix of size `(nz, nx)` (not normalized internally)
-- `power`: total volumetric power into plate [W/m^3], default 1e6 (MTK parameter, tunable via `remake`)
+- `power`: total power into plate [W], MTK variable — must be constrained via a connection equation
+  (e.g. `fuel.power ~ 1e4` for standalone use, or `rods.fuel.power ~ pk.P * scale` for PK-coupled use)
 - `T0`: initial temperature [K], default 600.0
 
 # Ports
@@ -102,35 +103,37 @@ function HeatDiffusion(; name,
                          power_shape,
                          power  = 1e6,
                          T0     = 600.0)
+    power_init = power
     Dt = Differential(t)
     dx = Lx / nx
     dz = Lz / nz
 
-    pars = @parameters begin
-        power = power
-    end
-
     vars = @variables begin
         (T(t))[1:nz, 1:nx] = fill(T0, nz, nx)
+        power(t) = power_init
     end
 
     thermal_left  = [ThermalPort(name=Symbol(:thermal_left, i))  for i in 1:nz]
     thermal_right = [ThermalPort(name=Symbol(:thermal_right, i)) for i in 1:nz]
 
+    # Extract T and power symbolics from vars
+    T_var     = vars[1]
+    power_var = vars[2]
+
     eqs = Equation[]
     _diffusion_eqs(eqs;
-        T            = T,
+        T            = T_var,
         thermal_left  = thermal_left,
         thermal_right = thermal_right,
         nz = nz, nx = nx,
         k_s = k_s, rho_s = rho_s, cp_s = cp_s,
         dx = dx, dz = dz, y = y,
-        power        = only(pars),
+        power        = power_var,
         power_shape  = power_shape,
         Dt           = Dt)
 
-    all_vars = vec(collect(T))
+    all_vars = vcat(vec(collect(T_var)), [power_var])
 
-    compose(System(eqs, t, all_vars, pars; name=name),
+    compose(System(eqs, t, all_vars, []; name=name),
             thermal_left..., thermal_right...)
 end

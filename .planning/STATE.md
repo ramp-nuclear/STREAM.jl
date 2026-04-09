@@ -1,16 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.8
-milestone_name: STREAM Composer GUI
-status: complete
-stopped_at: v0.8 milestone complete — archived 2026-04-04
-last_updated: "2026-04-04T10:40:01.261Z"
-last_activity: 2026-04-04
+milestone: v0.9
+milestone_name: Point Kinetics & Reactor Control
+status: planning
+stopped_at: Phase 49 complete — all VAL-PK tests pass, REVIEW.md, VERIFICATION.md created
+last_updated: "2026-04-09T23:15:45.789Z"
+last_activity: 2026-04-10
 progress:
-  total_phases: 13
-  completed_phases: 13
-  total_plans: 32
-  completed_plans: 32
+  total_phases: 6
+  completed_phases: 5
+  total_plans: 8
+  completed_plans: 8
+  percent: 100
 ---
 
 # STATE: STREAM.jl
@@ -24,22 +25,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-04)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Planning next milestone (v0.9)
+**Current focus:** Phase 49 complete — ready for next phase (v0.9 milestone nearing completion)
 **Python STREAM reference:** ~/projects/STREAM
 
 **Roadmap summary:**
 
-- v0.7 (complete): Phases 27-32 — Safety Physics & Pressure Field (7 phases, 13 plans)
-- v0.8 (active): Phases 33-40 — STREAM Composer GUI (8 phases, 40 requirements, 0 started)
+- v0.8 (complete): Phases 33-44 — STREAM Composer GUI (shipped 2026-04-04)
+- v0.9 (active): Phases 45+ — Point Kinetics & Reactor Control
 
 ---
 
 ## Current Position
 
-Phase: 44 (light-dark-mode) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-04-04
+Phase: 49 (full-loop-integration-validation) — READY
+Plan: 0 of 2
+Status: Ready for Phase 49 planning/execution
+Last activity: 2026-04-10
 
 ## Performance Metrics
 
@@ -96,8 +97,25 @@ Last activity: 2026-04-04
 | Phase 43 P02 | 96 | 2 tasks | 4 files |
 | Phase 44-light-dark-mode P01 | 2 | 2 tasks | 6 files |
 | Phase 44-light-dark-mode P02 | 15 | 2 tasks | 3 files |
+| Phase 45-pointkinetics-bare-component P01 | - | 2 tasks | 2 files |
+| Phase 45-pointkinetics-bare-component P02 | - | 2 tasks | 1 files |
+| Phase 46-callable-control-reactivity P01 | 15 | 3 tasks | 2 files |
+| Phase 46-callable-control-reactivity P02 | 25 | 2 tasks | 1 files |
+| Phase 47 P02 | 35 | 2 tasks | 2 files |
 
 ## Accumulated Context
+
+### Key Decisions (v0.9 Point Kinetics)
+
+- [v0.9 PK-01]: Callable MTK parameter pattern: `FType=typeof(fn)` at construction; `@parameters (fn::FType)(..)` variadic; used in equations as `fn(t)`. Matches Pump(dP_pump::Any) precedent from Phase 22.
+- [v0.9 PK-02]: ReactivityController callable struct: `ctrl(t) = worth(ctrl, t)` allows passing ctrl directly as the MTK callable parameter without wrapper closure. FType = typeof(ctrl) captured at PointKinetics construction time.
+- [v0.9 PK-03]: Additive rho composition (D-01): `rho_val + rho_c_fn(t) - beta_sum` for power ODE; `reactivity ~ rho_val + rho_c_fn(t)` for observed. Extends cleanly to Phase 47 temperature feedback.
+- [v0.9 PK-04]: State-aware input reactivity signature: `(state, t_state, t) -> Float64` matches Python STREAM InputReactivity protocol. MTK callable parameter receives only `(t)` — RC forwards via worth(ctrl, t).
+- [v0.9 PK-05]: Prompt-jump test window: sample at `t_step + Lambda/delta_rho` (not plan's 0.01s). At Lambda=5.4e-5, delta_rho=0.002: window = 0.027s. Sampling at 0.028s gives 0.08% error vs expected formula.
+- [v0.9 PK-06]: op-dict uses `Pair{Any,Any}[]` for callable-parameter entries; `ssys.rho_c_fn => ctrl` binds the callable at solve time (D-10 from RESEARCH.md).
+- [v0.9 TF-01]: scoped_comps kwarg in connect_temperature_feedback: when cac is wrapped in symmetric_plate(cac, fuel; name=:rods), its T vars are re-scoped to rods+cac+T. Pass scoped_comps=Dict(cac=>rods.cac) so feedback equations bind to the correct symbolic while pk.T_source_cac name stays from original nameof(cac).
+- [v0.9 TF-02]: IC path after mtkcompile: compiled system IS the named system (ssys IS core). Variables are ssys.rods.cac.T, not ssys.core.rods.cac.T. Extra prefix causes KeyError.
+- [v0.9 TF-03]: TF-07 fixture uses power=0.0 in HeatDiffusion — fixed background power warms channel before step insertion, causing P_max==P0 failure. Zero power keeps feedback=0 at t=0 so step reactivity can drive P above P0.
 
 ### Key Decisions (v0.8 GUI)
 
@@ -120,13 +138,13 @@ Last activity: 2026-04-04
 - [v0.7 ISCB-01]: SCB correction factors are 10-100x when T_wall >> T_ONB; KINSOL diverges, transient solver or continuation needed for full-loop SCB steady-state
 - [v0.7 ISCB-01]: h_tc default guess 5000.0 in ChannelAndContacts prevents MTK cyclic guesses initialization error
 
-- [v0.6]: ifelse() for all conditional switching — use for T_wall >= T_ONB SCB switching (ISCB-01)
-- [v0.6]: @register_symbolic for opaque fluid functions — sat_temperature(P) follows same pattern as rho_water(T)
-- [v0.6]: Correlation functions are plain Julia closures — HTC-01..04, FRIC-01..02 follow same pattern
-- [v0.6]: @observed for diagnostic quantities not on RHS of other equations — P[i], T_sat[i], T_ONB[i] qualify
-- [v0.4]: Re/Nu/velocity/Pe are @observed (not unknowns) — pressure observables follow same rule
-- [v0.3]: New component files go in src/components/ — subcooled_boiling.jl goes in src/physical_models/
-- [v0.6 LOF]: pressure anchor pump.port_in.P ~ 1.0e5 required for multi-branch networks — P[i] absolute values depend on this anchor being present
+- [v0.6]: ifelse() for all conditional switching -- use for T_wall >= T_ONB SCB switching (ISCB-01)
+- [v0.6]: @register_symbolic for opaque fluid functions -- sat_temperature(P) follows same pattern as rho_water(T)
+- [v0.6]: Correlation functions are plain Julia closures -- HTC-01..04, FRIC-01..02 follow same pattern
+- [v0.6]: @observed for diagnostic quantities not on RHS of other equations -- P[i], T_sat[i], T_ONB[i] qualify
+- [v0.4]: Re/Nu/velocity/Pe are @observed (not unknowns) -- pressure observables follow same rule
+- [v0.3]: New component files go in src/components/ -- subcooled_boiling.jl goes in src/physical_models/
+- [v0.6 LOF]: pressure anchor pump.port_in.P ~ 1.0e5 required for multi-branch networks -- P[i] absolute values depend on this anchor being present
 
 ### Pending Todos
 
@@ -134,21 +152,21 @@ None.
 
 ### Blockers/Concerns
 
-- VAL-01 (Fourier series validation) is a pre-existing flaky numerical test — not caused by v0.6 changes.
-- NET-03 (Cube flow) is a pre-existing KINSOL convergence failure — not caused by v0.7 changes.
+- VAL-01 (Fourier series validation) is a pre-existing flaky numerical test -- not caused by v0.6 changes.
+- NET-03 (Cube flow) is a pre-existing KINSOL convergence failure -- not caused by v0.7 changes.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-04-03T23:48:26.992Z
-**Stopped at:** Completed 44-02-PLAN.md
-**Next action:** Verify phase 42
-**Resume file:** None
+**Last session:** 2026-04-09T00:00:00.000Z
+**Stopped at:** Phase 49 complete — all VAL-PK tests pass, REVIEW.md, VERIFICATION.md created
+**Next action:** Check remaining v0.9 phases (50+) or run /gsd-progress
+**Resume file:** .planning/phases/49-full-loop-integration-validation/49-VERIFICATION.md
 
 ---
 
-*Last updated: 2026-03-31 — v0.8 STREAM Composer GUI roadmap added (phases 31-38, 40 requirements)*
+*Last updated: 2026-04-04 -- Phase 46 complete (callable PointKinetics + ReactivityController, 1344 tests pass)*
 
 ### Quick Tasks Completed
 
@@ -156,3 +174,4 @@ None.
 |---|-------------|------|--------|-----------|
 | 260322-l7z | Create LOF transient example script with comprehensive plots and analysis | 2026-03-22 | 52f4e44 | [260322-l7z-create-lof-transient-example-script-with](./quick/260322-l7z-create-lof-transient-example-script-with/) |
 | 260331-q27 | Audit and fix GSD planning artifacts (PROJECT.md Phase 27/28 requirements, evolution log, footer) | 2026-03-31 | 435be6b | [260331-q27-audit-gsd-planning-artifacts-and-surface](./quick/260331-q27-audit-gsd-planning-artifacts-and-surface/) |
+| 260408-qv7 | Commit scram_callback signature fix (ssys first arg) and verify Phase 48->49 state | 2026-04-08 | 98a64ac | [260408-qv7-commit-scram-callback-signature-fix-and-](./quick/260408-qv7-commit-scram-callback-signature-fix-and-/) |

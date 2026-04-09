@@ -47,11 +47,10 @@ const BYPASS_DP_REF   = 1.5e4
 #   - Dt(ret.port_in.mdot) = 0.0 (index-reduced derivative state; zero at quasi-SS t=0)
 #   - flapper.T_open = 1e30 (sentinel: flapper not yet fired)
 #
-# Callback strategy (use_callback=false in Flapper):
-#   MTK's SymbolicContinuousCallback is incompatible with parallel topologies where
-#   channel inertia (Dt(mdot)) appears in the callback's pressure balance equations,
-#   causing UnsolvableCallbackError. Instead, we build a native DifferentialEquations
-#   ContinuousCallback that monitors ine.port_in.mdot and directly sets T_open in u.
+# Callback strategy:
+#   Flapper is a pure equation system (no internal SymbolicContinuousCallback).
+#   flapper_callback(ssys; threshold) returns an external ContinuousCallback that
+#   monitors flapper.ref_mdot and latches T_open when flow drops below threshold.
 # ─────────────────────────────────────────────────────────────────────────────
 function _lof_bypass_ic(; n=BYPASS_N)
     # Reference loop for SS: Pump -> HX -> ChannelHeatFlux -> Pump
@@ -82,7 +81,7 @@ function _lof_bypass_ic(; n=BYPASS_N)
     mdot_ss = ss_sol[ref_ssys.ch_ref.port_in.mdot]
     T_ss    = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
 
-    # Build bypass system (Flapper has use_callback=false)
+    # Build bypass system (Flapper is a pure equation system — callback is external)
     ssys = build_loop_lof_bypass(;
         n         = n,
         L_ch      = BYPASS_L_CH,
@@ -92,7 +91,6 @@ function _lof_bypass_ic(; n=BYPASS_N)
         L_over_A  = BYPASS_L_OVER_A,
         g_acc     = BYPASS_G_ACC,
         R_ext     = BYPASS_R_EXT,
-        threshold = BYPASS_THRESHOLD,
         dt_ramp   = BYPASS_DT_RAMP,
     )
 
@@ -110,17 +108,10 @@ function _lof_bypass_ic(; n=BYPASS_N)
         push!(op, ssys.ret.T[i] => BYPASS_T_INLET)
     end
 
-    # Build native callback: monitors ine.port_in.mdot crossing threshold (downward).
-    # When mdot drops below BYPASS_THRESHOLD, latch T_open = current solver time.
-    # This replaces MTK's SymbolicContinuousCallback which cannot handle the parallel
-    # topology's pressure balance equations that contain Dt(mdot) inertia terms.
-    i_T_open   = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
-    i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.port_in.mdot)
-    cb = ContinuousCallback(
-        (u, t, integrator) -> u[i_ine_mdot] - BYPASS_THRESHOLD,
-        nothing,                                         # ignore upward crossing
-        (integrator) -> (integrator.u[i_T_open] = integrator.t),  # downward: latch T_open
-    )
+    # flapper_callback formalizes the external ContinuousCallback pattern.
+    # Fires when flapper.ref_mdot (wired to ine.port_in.mdot in the loop) drops below
+    # BYPASS_THRESHOLD. On downward crossing, latches T_open = solver time.
+    cb = flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=BYPASS_THRESHOLD)
 
     return ssys, op, mdot_ss, cb
 end

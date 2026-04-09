@@ -314,7 +314,7 @@ end
 """
     build_loop_lof_bypass(; n=10, L_ch=1.0, D_ch=0.01, T_wall=373.15, T_inlet=313.15,
                            L_over_A=1.75e5, g_acc=9.80665, R_ext=1.0e6,
-                           threshold=0.01, dt_ramp=5.0) -> ODESystem
+                           dt_ramp=5.0) -> ODESystem
 
 Build a loss-of-flow validation loop with bypass topology: real 3-way junctions,
 parallel paths (heated channel vs Flapper shortcut), and channel momentum inertia.
@@ -330,7 +330,7 @@ Gravity signs:
 - ret (Channel, B->C, nominally upward): g = +g_acc
 
 Physics: Pump coasts to 0 dP. Inertia carries momentum; ch flow decays.
-Flapper opens when pump branch mdot (ine.port_in.mdot) drops to threshold.
+Flapper opens when pump branch mdot (ine.port_in.mdot) drops below the Flapper internal threshold.
 After Flapper opens, flow redistributes: ch flow reverses (upward NC driven by buoyancy).
 
 # Arguments
@@ -342,7 +342,6 @@ After Flapper opens, flow redistributes: ch flow reverses (upward NC driven by b
 - `L_over_A`: Inertia length-to-area ratio [1/m] (default 1.75e5)
 - `g_acc`: gravitational acceleration magnitude [m/s^2] (default 9.80665)
 - `R_ext`: external hydraulic resistance [Pa·s/kg] (default 1.0e6)
-- `threshold`: Flapper trigger threshold [kg/s] (default 0.01)
 - `dt_ramp`: Flapper opening ramp duration [s] (default 5.0)
 
 # Returns
@@ -357,7 +356,6 @@ function build_loop_lof_bypass(;
     L_over_A  = 1.75e5,
     g_acc     = 9.80665,
     R_ext     = 1.0e6,
-    threshold = 0.01,
     dt_ramp   = 5.0,
 )
     geom = PipeGeometry_circular(L_ch, D_ch)
@@ -379,11 +377,10 @@ function build_loop_lof_bypass(;
                                      htc_correlation      = rd_ch.htc,
                                      friction_correlation = rd_ch.friction)
     @named ret     = Channel(n=n, geometry=geom, g=g_acc)
-    # use_callback=false: MTK's SymbolicContinuousCallback is incompatible with parallel
-    # topologies where channel inertia (Dt(mdot)) appears in the pressure balance equations
-    # that the callback DAE solver must handle. Use a native ContinuousCallback instead
-    # (see test_loss_of_flow.jl _lof_bypass_ic for the external callback construction).
-    @named flapper = Flapper(threshold=threshold, dt=dt_ramp, use_callback=false)
+    # Flapper is a pure equation system — no internal SymbolicContinuousCallback.
+    # Use flapper_callback(ssys; threshold=...) to create an external ContinuousCallback
+    # and pass it to solve_transient(...; callbacks=cb).
+    @named flapper = Flapper(dt=dt_ramp)
     @named ext_res = Resistor(R_ext)
 
     connections = [
@@ -414,4 +411,151 @@ function build_loop_lof_bypass(;
     @info "build_loop_lof_bypass compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
 
     return ssys
+end
+
+"""
+    build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=293.15, dP_pump=3.0e4,
+                  P0=1.0, power_scale=1e4, temp_worth=nothing, ref_temp=nothing,
+                  rho_val=0.0) -> (ODESystem, Vector{Pair{Any,Any}})
+
+Build a full thermal-hydraulic loop coupled to a `PointKinetics` reactor model
+(pump + HeatExchanger + ChannelAndContacts + HeatDiffusion + PointKinetics).
+This is the primary integration-validation builder for Phase 49: it proves that
+PK+T-H coupling compiles, solves stably, responds to reactivity insertion with
+negative temperature feedback, and terminates correctly on SCRAM.
+
+Unlike other `build_loop_*` builders which return only a compiled `ODESystem`,
+`build_loop_pk` returns `(ssys, ic)` — the compiled system AND a ready-to-use
+initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
+`solve_transient`.
+
+# Arguments
+- `ctrl`: `ReactivityController` instance (or any callable `(t) -> Float64`)
+  providing time-varying control reactivity. Determines the concrete `FType`
+  captured in the MTK callable parameter at construction time.
+- `n::Int`: number of axial cells in `ChannelAndContacts` (default 7)
+- `nz::Int`: number of axial slices in `HeatDiffusion` (default 7)
+- `nx::Int`: number of lateral slices in `HeatDiffusion` (default 2)
+- `T_inlet`: coolant inlet temperature [K] (default 293.15)
+- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
+- `P0`: initial reactor power [dimensionless or W] passed to
+  `point_kinetics_steady_state(P0)` for IC generation (default 1.0)
+- `power_scale`: conversion factor from dimensionless PK power to physical
+  heat deposition [W]; `fuel.power = pk.P * power_scale` (default 1e4)
+- `temp_worth`: per-component temperature feedback weights, or `nothing` (default).
+  Accepts `Dict{Symbol,Any}` with keys `:cac` and/or `:fuel`, mapping to scalar,
+  1D vector (length `n` for `:cac`), or 2D matrix (shape `nz×nx` for `:fuel`)
+  reactivity coefficients. Keys are internally resolved to scoped component
+  references inside `symmetric_plate`. `nothing` = no temperature feedback.
+- `ref_temp`: per-component reference temperatures [K]. Same key structure as
+  `temp_worth`. `nothing` = use zero reference (full T contributes to feedback).
+- `rho_val`: constant base reactivity bias [-] (default 0.0 = critical)
+
+# Returns
+`(ssys, ic)` where:
+- `ssys`: compiled `ODESystem` (passed through `mtkcompile`)
+- `ic`: `Vector{Pair{Any,Any}}` initial conditions including PK state
+  (P, C_1..C_6, rho_c_fn), hydraulic IC (port_in.mdot), and thermal ICs
+  (cac.T[i] and fuel.T[i,j]). Pass directly to `solve_transient(ssys, ic, t)`.
+"""
+function build_loop_pk(ctrl;
+    n::Int      = 7,
+    nz::Int     = 7,
+    nx::Int     = 2,
+    T_inlet     = 293.15,
+    dP_pump     = 3.0e4,
+    P0          = 1.0,
+    power_scale = 1e4,
+    temp_worth  = nothing,
+    ref_temp    = nothing,
+    rho_val     = 0.0,
+)
+    # Stage 1: Component construction
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    ps = fill(1.0 / (nz * nx), nz, nx)  # uniform power shape, normalized
+    @named cac  = ChannelAndContacts(n=n, geometry=geom,
+                                      htc_correlation=constant_Nusselt(Nu=8.235),
+                                      friction_correlation=laminar_friction(0.0025/0.070))
+    @named fuel = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
+                                  rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                                  power_shape=ps)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+
+    # Stage 2: Resolve Symbol keys to scoped component refs for temp_worth/ref_temp.
+    # IMPORTANT: cache rods.cac and rods.fuel as local vars to guarantee the same
+    # object reference is used as the Dict key in both tw and rt. MTK System
+    # getproperty may create new objects on each call, causing Dict lookup failures
+    # when iterating temp_worth and calling get(ref_temp, comp, default).
+    rods_cac  = rods.cac
+    rods_fuel = rods.fuel
+
+    function _resolve_tw(d, rods_cac, rods_fuel)
+        isnothing(d) && return nothing
+        resolved = Dict{Any,Any}()
+        for (k, v) in d
+            comp = k == :cac  ? rods_cac  :
+                   k == :fuel ? rods_fuel :
+                   error("Unknown component key: $k (expected :cac or :fuel)")
+            resolved[comp] = v
+        end
+        return resolved
+    end
+
+    tw = _resolve_tw(temp_worth, rods_cac, rods_fuel)
+    rt = _resolve_tw(ref_temp, rods_cac, rods_fuel)
+
+    # Stage 3: PK construction with resolved (scoped) temp_worth / ref_temp
+    @named pk = PointKinetics(ctrl; rho_val=rho_val, temp_worth=tw, ref_temp=rt)
+
+    # Stage 4: Connections and compose
+    # Only wire connect_temperature_feedback for components that have entries in tw.
+    # The PK system only has T_source_<cname> unknowns for components listed in temp_worth.
+    # Passing a component not in temp_worth would cause "variable T_source_<X> does not exist".
+    # We match by component name (Symbol) rather than object identity since System equality
+    # is not guaranteed to be stable across composition boundaries.
+    fb_components = if isnothing(tw)
+        System[]
+    else
+        tw_names = Set(nameof(k) for k in keys(tw))
+        filter(c -> nameof(c) in tw_names, [rods_cac, rods_fuel])
+    end
+    fb_eqs    = isempty(fb_components) ? Equation[] : connect_temperature_feedback(pk, fb_components)
+    power_eqs = [rods_fuel.power ~ pk.P * power_scale]
+
+    @named pump = Pump(dP_pump)
+    @named bc   = HeatExchanger(T_inlet)
+
+    all_connections = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, rods_cac.port_in),
+        connect(rods_cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        fb_eqs...,
+        power_eqs...,
+    ]
+
+    full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
+
+    # Stage 5: Compile
+    t_compile = @elapsed ssys = mtkcompile(full)
+    n_eq = length(equations(ssys))
+    n_uk = length(unknowns(ssys))
+    @info "build_loop_pk compile time: $(round(t_compile; digits=2))s" n_equations=n_eq n_unknowns=n_uk
+
+    # Stage 6: Build IC dict
+    pk_ic = point_kinetics_steady_state(P0)
+    ic = Pair{Any,Any}[
+        ssys.pk.rho_c_fn => ctrl,
+        ssys.pk.P        => pk_ic.P,
+        ssys.pk.C_1      => pk_ic.C_k[1],
+        ssys.pk.C_2      => pk_ic.C_k[2],
+        ssys.pk.C_3      => pk_ic.C_k[3],
+        ssys.pk.C_4      => pk_ic.C_k[4],
+        ssys.pk.C_5      => pk_ic.C_k[5],
+        ssys.pk.C_6      => pk_ic.C_k[6],
+        ssys.rods.cac.port_in.mdot => 0.2,
+        [ssys.rods.cac.T[i]     => T_inlet for i in 1:n]...,
+        [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
+    ]
+    return (ssys, ic)
 end
