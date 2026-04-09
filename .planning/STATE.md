@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.9
-milestone_name: Point Kinetics & Reactor Control
+milestone: v1.0
+milestone_name: Open-Source Readiness
 status: planning
-stopped_at: Phase 49 complete — all VAL-PK tests pass, REVIEW.md, VERIFICATION.md created
-last_updated: "2026-04-09T23:24:01.592Z"
+stopped_at: Phase 50 context gathered (discuss mode)
+last_updated: "2026-04-09T23:55:39.433Z"
 last_activity: 2026-04-09
 progress:
-  total_phases: 6
-  completed_phases: 5
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # STATE: STREAM.jl
@@ -105,6 +104,10 @@ Last activity: 2026-04-09
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 50 added: Open-Source Readiness (README, repo metadata, file audit) — start of v1.0 milestone
+
 ### Key Decisions (v0.9 Point Kinetics)
 
 - [v0.9 PK-01]: Callable MTK parameter pattern: `FType=typeof(fn)` at construction; `@parameters (fn::FType)(..)` variadic; used in equations as `fn(t)`. Matches Pump(dP_pump::Any) precedent from Phase 22.
@@ -159,10 +162,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-09T00:00:00.000Z
-**Stopped at:** Phase 49 complete — all VAL-PK tests pass, REVIEW.md, VERIFICATION.md created
+**Last session:** 2026-04-09T23:55:39.431Z
+**Stopped at:** Phase 50 context gathered (discuss mode)
 **Next action:** Check remaining v0.9 phases (50+) or run /gsd-progress
-**Resume file:** .planning/phases/49-full-loop-integration-validation/49-VERIFICATION.md
+**Resume file:** .planning/phases/50-open-source-readiness/50-CONTEXT.md
 
 ---
 
