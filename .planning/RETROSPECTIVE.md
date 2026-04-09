@@ -361,6 +361,48 @@
 
 ---
 
+## Milestone: v0.9 — Point Kinetics & Reactor Control
+
+**Shipped:** 2026-04-10
+**Phases:** 5 (45-49) | **Plans:** 8
+
+### What Was Built
+- `PointKinetics` MTK component: 7-ODE DAE (power P + 6 delayed-neutron precursor groups C_k), U-235 6-group constants, `mtkcompile` confirmed; `point_kinetics_steady_state(P0)` analytical IC helper
+- `PointKinetics(rho_c_fn::Any; ...)` callable-mode constructor using MTK variadic callable parameter (`FType=typeof(fn)` + `@parameters (fn::FType)(..)`); additive rho composition `rho_val + rho_c_fn(t) - beta_sum`
+- `ReactivityController{S,F}` mutable struct: `input_reactivity` callable, `state_machine`, `state`, `t_state`, `log`, `abort_states`; `worth`/`change_state` methods; `ctrl(t) = worth(ctrl, t)` callable dispatch
+- Temperature feedback: `_flatten_weights` helper + callable constructor extension for Doppler/coolant α coefficients; `connect_temperature_feedback` composition helper with `scoped_comps` kwarg for symmetric_plate-wrapped regions; TF-07 multi-region validated
+- Unified callback factory pattern: `SCRAMCondition`, `scram_callback(ssys, ctrl, condition)`, `flapper_callback(ssys, flapper)`; Flapper refactored to new API; existing LOF and flapper tests updated
+- `build_loop_pk(ctrl; ...)` full-loop builder coupling PointKinetics to TH loop (pump, channel, HeatDiffusion, HeatExchanger); LOOP-01..04 integration tests (compilation, quiescent stability, power excursion, SCRAM); VAL-PK-01..03 quantitative validation vs Python STREAM (prompt-jump, beta-effective, reactivity insertion)
+
+### What Worked
+- **Callable MTK parameter pattern extended cleanly**: the `Pump(dP_pump::Any)` precedent from Phase 22 transferred directly to `PointKinetics(rho_c_fn::Any)`; no new patterns needed, just application
+- **Additive rho composition (D-01)** made temperature feedback in Phase 47 a natural extension — `+ alpha*(T-T0)` terms required no ODE restructuring
+- **connect_temperature_feedback as a pure composition helper** (returns `Vector{Equation}`) matched the `symmetric_plate` helper pattern exactly; the scoped_comps Dict kwarg solved the symbolic re-scoping problem cleanly
+- **Prompt-jump physics investigation** (Phase 46-02) replaced a plan-specified sample time of 0.01s with the physically correct `t_step + Λ/δρ ≈ 0.027s`; the deviation was caught and fixed during execution rather than slipping into a wrong test
+- **Phase 49 VAL-PK-01..03**: quantitative validation against Python STREAM confirmed the coupled PK+TH model is physically correct; the KINSOL NaN guard fix (guard `dT >= 0` in VAL-PK-02a/b) was a clean surgical fix
+
+### What Was Inefficient
+- **Phase 47 VERIFICATION.md was never created** — verification happened via UAT (47-UAT.md) but the standard VERIFICATION.md artifact was missing; noted as tech debt in audit; UAT-only verification is acceptable but non-standard
+- **47-02-SUMMARY.md Self-Check falsely claimed scoped_comps kwarg was added to connect_temperature_feedback** — the actual fix was passing scoped refs as Dict keys; summary accuracy gap caught in milestone audit
+- **Worktree merge commits required post-hoc squash before PR** — two `git merge` commits from worktree agents blocked GitHub FF merge; had to `git reset --soft main && git commit` + force-push after PR was already created; this should be caught pre-ship
+
+### Patterns Established
+- **Pre-ship merge-commit check**: always run `git log --merges main..HEAD` before `/gsd:ship`; if any exist, squash with `git reset --soft main && git commit` before pushing — the milestone is one logical unit, squashing is acceptable
+- **Callable MTK parameter pattern**: `FType=typeof(fn)` captured at construction + `@parameters (fn::FType)(..)` variadic — generalizes to any Julia callable that needs to be embedded in an MTK symbolic equation
+- **Prompt-jump test window**: sample `t_step + Λ/δρ` after reactivity step insertion; using a fixed 0.01s is wrong — the settling time scales with neutron generation time divided by reactivity insertion
+
+### Key Lessons
+1. **Check for merge commits before every `/gsd:ship`** — worktree agents produce merge commits silently; the pre-ship checklist must include `git log --merges main..HEAD` and squash if non-empty
+2. **VERIFICATION.md is required, not optional** — UAT alone is not equivalent; the VERIFICATION.md status field drives `/gsd:ship` preflight; Phase 47's missing file created ambiguity at ship time
+3. **MTK callable parameters are the right pattern for any "pluggable physics" scenario** — wherever Python STREAM uses a callable class/protocol, the Julia MTK equivalent is `@parameters (fn::FType)(..)` with FType captured at construction
+
+### Cost Observations
+- Model mix: ~100% sonnet (quality profile)
+- Timeline: 6 days (2026-04-04 → 2026-04-10) across 5 phases, 8 plans
+- Notable: First neutronics milestone; callable MTK parameter pattern reused from Phase 22 without modification; most complex composition helper (connect_temperature_feedback) required scoped_comps workaround for MTK symbolic re-scoping
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -375,6 +417,7 @@
 | v0.6 | 8 | 14 | Flow reversal systems — MTK continuous events, callable parameters, bypass topology, NC regime detection |
 | v0.7 | 7 | 13 | Safety physics suite — pressure field, SCB, threshold analysis, HTC/friction completions; audit-before-complete pattern validated |
 | v0.8 | 13 | 32 | First GUI milestone — Tauri 2 + React + ReactFlow; ui-phase design contracts per frontend phase; pure function TDD for UI logic; registry-as-truth pattern |
+| v0.9 | 5 | 8 | First neutronics milestone — callable MTK parameter pattern; additive rho composition; connect_temperature_feedback composition helper; SCRAM callback factory |
 
 ### Cumulative Quality
 
@@ -388,3 +431,4 @@
 | v0.6 | ~230+ | 21/21 | 0 |
 | v0.7 | ~300+ | 33/34 | 1 (QuadGK) |
 | v0.8 | ~300+ Julia + Vitest GUI | 40/40 | Tauri + React + ReactFlow stack (separate from Julia deps) |
+| v0.9 | ~400+ Julia | 24/24 | No new deps — callable MTK pattern uses existing MTK infrastructure |

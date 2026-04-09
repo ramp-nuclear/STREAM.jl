@@ -1,5 +1,22 @@
 # Milestones
 
+## v0.9 Point Kinetics & Reactor Control (Shipped: 2026-04-09)
+
+**Phases completed:** 6 phases, 8 plans, 13 tasks
+
+**Key accomplishments:**
+
+- 6-group point kinetics MTK component (7 ODEs) with U-235 defaults and analytical steady-state IC helper validated against precursor-only decay analytical solution
+- MTK callable-mode PointKinetics with additive rho composition + pure-Julia ReactivityController state-machine struct
+- RC-01 ReactivityController unit tests (8 sub-tests) and PK-03 callable PointKinetics integration tests (5 sub-tests) added to test/test_point_kinetics.jl with prompt-jump validated at t_step + 0.028s
+- New code location:
+- 1. [Rule 1 - Bug] Fixed symbolic scoping mismatch in connect_temperature_feedback
+- One-liner:
+- Task 1: `build_loop_pk` in `src/examples.jl`
+- Pre-existing VAL-01 MTR test failure:
+
+---
+
 ## v0.8 STREAM Composer GUI (Shipped: 2026-04-04)
 
 **Phases completed:** 13 phases, 32 plans, 47 tasks
