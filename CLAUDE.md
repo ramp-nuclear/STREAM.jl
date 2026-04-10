@@ -107,8 +107,10 @@ Julia startup + TTFX for ModelingToolkit/OrdinaryDiffEq/Symbolics is 60-120 seco
 ```bash
 ./build_sysimage.sh
 ```
-The shell script sets `--heap-size-hint=4G --threads=1` to prevent OOM freezes on WSL2.
+The shell script sets `--heap-size-hint` dynamically (75% of free RAM) and `--threads=1` to prevent OOM freezes on WSL2.
 Do **not** run `julia --project=. build_sysimage.jl` directly — it will exhaust memory.
+
+The sysimage bakes `STREAM`, `ModelingToolkit`, `Symbolics`, and `QuadGK`. `OrdinaryDiffEq` and `Sundials` are intentionally excluded — their LLVM IR is large enough to OOM-kill the linker even on 32 GB machines. The TTFX speedup from baking `mtkcompile` dispatch (MTK + Symbolics) is the main benefit; solver first-call overhead is much smaller.
 
 **Always use the sysimage** when running tests or verification:
 ```bash
