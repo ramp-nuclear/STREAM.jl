@@ -16,11 +16,14 @@
 using PackageCompiler
 
 @info "Building STREAM.jl sysimage → stream.so"
-@info "Packages: STREAM, ModelingToolkit, Symbolics, QuadGK"
-@info "Note: OrdinaryDiffEq and Sundials excluded — their LLVM IR is too large for WSL2 link step"
+@info "Packages: STREAM, QuadGK"
+@info "Note: ModelingToolkit/Symbolics/OrdinaryDiffEq/Sundials are excluded."
+@info "Their LLVM IR is too large for PackageCompiler's link step even on 32 GB machines."
+@info "MTK load time is handled by Julia's automatic pkgimage cache (~/.julia/compiled/)."
+@info "For fast mtkcompile: keep a persistent Julia REPL open with Revise.jl."
 
 create_sysimage(
-    ["STREAM", "ModelingToolkit", "Symbolics", "QuadGK"];
+    ["STREAM", "QuadGK"];
     sysimage_path = "stream.so",
     project = "."
 )

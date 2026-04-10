@@ -101,16 +101,20 @@ MTK's symbolic IR requires structural analysis (index reduction from DAE to ODE)
 
 ## Performance — Sysimage
 
-Julia startup + TTFX for ModelingToolkit/OrdinaryDiffEq/Symbolics is 60-120 seconds per fresh invocation. A prebuilt sysimage cuts this to ~5 seconds.
+**The recommended development workflow for fast iteration:**
 
-**Build once** (5-15 min, rebuild when `Manifest.toml` changes):
+1. Keep a persistent Julia REPL open — don't restart Julia between runs
+2. Use `Revise.jl` for code changes — edits are picked up automatically without restarting
+3. `mtkcompile` is slow only on the *first* call in a session (~10-30s); subsequent calls reuse compiled dispatch
+
+**Build once** (2-5 min, rebuild when `Manifest.toml` changes):
 ```bash
 ./build_sysimage.sh
 ```
 The shell script sets `--heap-size-hint` dynamically (75% of free RAM) and `--threads=1` to prevent OOM freezes on WSL2.
 Do **not** run `julia --project=. build_sysimage.jl` directly — it will exhaust memory.
 
-The sysimage bakes `STREAM`, `ModelingToolkit`, `Symbolics`, and `QuadGK`. `OrdinaryDiffEq` and `Sundials` are intentionally excluded — their LLVM IR is large enough to OOM-kill the linker even on 32 GB machines. The TTFX speedup from baking `mtkcompile` dispatch (MTK + Symbolics) is the main benefit; solver first-call overhead is much smaller.
+The sysimage bakes `STREAM` and `QuadGK` only. `ModelingToolkit`, `Symbolics`, `OrdinaryDiffEq`, and `Sundials` are intentionally excluded — their LLVM IR is large enough to OOM-kill the PackageCompiler linker even on 32 GB machines. MTK's `using` load time is handled by Julia's automatic pkgimage cache (`~/.julia/compiled/`), which is built on first use and reused across sessions.
 
 **Always use the sysimage** when running tests or verification:
 ```bash
