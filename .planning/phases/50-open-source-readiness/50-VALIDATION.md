@@ -43,9 +43,9 @@ created: 2026-04-10
 | 50-03-01 | 03 | 1 | D-13 (VAL-01 fix) | — | N/A | unit | `julia --project=. test/runtests.jl` | ✅ | ⬜ pending |
 | 50-03-02 | 03 | 1 | D-13 (NET-03 fix) | — | N/A | unit | `julia --project=. test/runtests.jl` | ✅ | ⬜ pending |
 | 50-04-01 | 04 | 2 | D-12 | — | N/A | manual | `test -f .github/workflows/ci.yml && cat .github/workflows/ci.yml` | ❌ W0 | ⬜ pending |
-| 50-05-01 | 05 | 2 | D-09 | — | N/A | manual | `test -f examples/simple_loop.jl && julia --project=. examples/simple_loop.jl` | ❌ W0 | ⬜ pending |
-| 50-05-02 | 05 | 2 | D-10 | — | N/A | manual | `test -f examples/mtr_assembly.jl && julia --project=. examples/mtr_assembly.jl` | ❌ W0 | ⬜ pending |
-| 50-06-01 | 06 | 3 | D-01..D-06 | — | N/A | manual | `test -f README.md && wc -l README.md` | ❌ W0 | ⬜ pending |
+| 50-03-01 | 03 | 1 | D-09 | — | N/A | manual | `test -f examples/simple_loop.jl && julia --project=. examples/simple_loop.jl` | ❌ W0 | ⬜ pending |
+| 50-03-02 | 03 | 1 | D-10 | — | N/A | manual | `test -f examples/mtr_assembly.jl && julia --project=. examples/mtr_assembly.jl` | ❌ W0 | ⬜ pending |
+| 50-04-01 | 04 | 1 | D-01..D-06 | — | N/A | manual | `test -f README.md && wc -l README.md` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

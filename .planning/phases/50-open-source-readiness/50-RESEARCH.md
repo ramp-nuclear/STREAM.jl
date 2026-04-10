@@ -445,27 +445,19 @@ None — existing test infrastructure covers all phase requirements. The fixes a
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `RobustMultiNewton` require explicit `using NonlinearSolve`?**
-   - What we know: `NonlinearSolve` is a transitive dep of `DifferentialEquations`.
-   - What's unclear: Whether it is re-exported and visible without explicit `using NonlinearSolve`.
-   - Recommendation: Add `using NonlinearSolve` to `test_resistors.jl` explicitly to be safe.
+   - **RESOLVED:** Plan 50-02 Task 1 adds `using NonlinearSolve` explicitly to `test_resistors.jl`. Safe regardless of re-export status.
 
 2. **Is `repo` a recognized Project.toml field?**
-   - What we know: pkgdocs.julialang.org does not list `repo` as a standard field. Pkg ignores unknown fields.
-   - What's unclear: Whether any tooling (e.g., JuliaHub, pkg registry) reads `repo`.
-   - Recommendation: Add it as D-18 specifies — it is harmless and serves as documentation.
+   - **RESOLVED:** Plan 50-01 adds it as D-18 specifies. Pkg ignores unknown fields; the entry is harmless documentation.
 
 3. **Will removing `NoInit` from VAL-01 break anything?**
-   - What we know: The plate-only system is a pure ODE (HeatDiffusion with ConstantTemperature). `NoInit` is documented as degrading first-step accuracy.
-   - What's unclear: Whether MTK's structural analysis for this specific system introduces algebraic constraints that require `NoInit`.
-   - Recommendation: Remove `NoInit`, run the test locally. If it fails initialization, re-add with a comment explaining why. The failing case (initialization attempt on an already-consistent IC) should just succeed.
+   - **RESOLVED:** Plan 50-02 Task 1 removes `NoInit` and tightens tolerances to `reltol=1e-8, abstol=1e-10`. The plate-only system is a pure ODE with no algebraic constraints — NoInit is unnecessary and harmful per DifferentialEquations.jl docs.
 
 4. **Do the example scripts need `Pkg.activate` calls?**
-   - What we know: `lof_transient.jl` does not have an activate call — it relies on `julia --project=.` from the repo root.
-   - What's unclear: Whether new examples need an explicit `using Pkg; Pkg.activate(@__DIR__, "..")` for users who run them from a different working directory.
-   - Recommendation: Follow `lof_transient.jl` convention — document "run from repo root with `julia --project=.`" in the header comment.
+   - **RESOLVED:** Plan 50-03 follows `lof_transient.jl` convention — no `Pkg.activate`, rely on `julia --project=.` from repo root, documented in script header.
 
 ---
 
