@@ -45,17 +45,23 @@ echo "Julia: $(julia --version)"
 echo "RAM available: $(free -h | awk '/^Mem:/{print $7}')"
 echo ""
 echo "Building stream.so — this takes 5-15 minutes."
-echo "Memory is capped at 4 GB; single-threaded to prevent WSL freeze."
+echo "Single-threaded to prevent WSL freeze."
 echo ""
 
-# --heap-size-hint=4G  → GC runs aggressively before 4 GB, preventing OOM
+# --heap-size-hint is set to 75% of free RAM so the GC has room to breathe
+# without capping on low-memory machines. On machines with <8 GB free the
+# old hard 4G cap caused excessive GC pressure; on machines with >10 GB it
+# was simply unnecessary.
+HEAP_MB=$(( FREE_MB * 3 / 4 ))
+HEAP_HINT="${HEAP_MB}M"
+
 # --threads=1          → no parallel compilation (PackageCompiler is single-
 #                        threaded internally but this prevents Julia startup
 #                        threads from adding pressure)
 # JULIA_NUM_THREADS=1  → belt-and-suspenders for any thread-pool code paths
 exec env JULIA_NUM_THREADS=1 \
     julia \
-        --heap-size-hint=4G \
+        --heap-size-hint="${HEAP_HINT}" \
         --threads=1 \
         --project=. \
         build_sysimage.jl
