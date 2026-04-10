@@ -1,6 +1,6 @@
 name = "STREAM"
 uuid = "49562357-9609-405b-b96f-716d2939d241"
-version = "0.9.0"
+version = "1.0.0"
 authors = ["Itay Benvenisti <itaybnv@github.com>"]
 repo = "https://github.com/itaybnv/STREAM.jl"
 

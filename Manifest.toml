@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "bc6e4b0ce3291d83ff030094744a98bcb6c4affe"
+project_hash = "d3718ce1778beaf6867371feb0171612dd1d0648"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f7304359109c768cf32dc5fa2d371565bb63b68a"
@@ -2235,8 +2235,8 @@ version = "0.1.0"
 [[deps.STREAM]]
 deps = ["DifferentialEquations", "ModelingToolkit", "OrdinaryDiffEq", "Plots", "QuadGK", "Sundials", "Symbolics"]
 path = "."
-uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-version = "0.6.0"
+uuid = "49562357-9609-405b-b96f-716d2939d241"
+version = "0.9.0"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLLogging", "SciMLOperators", "SciMLPublic", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]

@@ -403,6 +403,48 @@
 
 ---
 
+## Milestone: v1.0 — Open-Source Release
+
+**Shipped:** 2026-04-10
+**Phases:** 2 (50-51) | **Plans:** 7
+
+### What Was Built
+- MIT license, Project.toml with fresh UUID, PackageCompiler moved to [extras] only (not a transitive runtime dep)
+- GitHub Actions CI workflow: Julia stable + ubuntu-latest; RobustMultiNewton for NET-03; NoInit removed from VAL-01 ODE for reliable Fourier convergence at t=0.5·tau
+- Two example scripts: `examples/simple_loop.jl` (hello-world forced convection loop with plots) and `examples/mtr_assembly.jl` (MTR plate-fuel two-channel thermal assembly)
+- README.md: physics-first lead paragraph, component catalog table, install + usage examples, sysimage performance section
+- `test/Project.toml`: enables `julia --project=. test/runtests.jl` direct invocation without Pkg.test()
+- MTR assembly power equation fix: HeatDiffusion `power` is MTK `@variables` unknown (not a parameter); `rods.hd.power ~ POWER` governing equation required
+- `build_sysimage.sh`: mtkcompile warmup baked into precompile, 6 GB RAM pre-flight gate, dynamic heap-size-hint (75% free RAM), time_startup.jl TTFX baseline script
+- PackageCompiler+Julia1.12+WSL2 incompatibility fully investigated and documented: SIGTERM at ~7min on incremental LLVM link regardless of package list; persistent REPL + Revise.jl established as primary development workflow
+
+### What Worked
+- Phase 50 executed as a clean 5-plan wave: each plan had a single clear deliverable and no dependencies between Wave 1 plans (after 50-01 metadata)
+- The `test/Project.toml` solution for direct test invocation is simple and doesn't break CI or Pkg.test()
+- Physics-first README framing (reactor cooling loops and safety analysis before any mention of MTK) is the right orientation for a research library audience
+- Phase 51 root-cause investigation was thorough — confirming the OOM was in the base incremental link step (not package-specific IR) required 4 attempts with progressively reduced package lists; result is a confident, documented conclusion rather than a workaround
+
+### What Was Inefficient
+- The MTR assembly power equation bug (HeatDiffusion power as @variables unknown) was a pre-existing misunderstanding that should have been caught during Phase 50-03 example development; it surfaced only during Phase 50-05 gap closure UAT
+- Phase 51 goal (reliable sysimage) was not achievable on the current platform (Julia1.12+WSL2); the phase delivered documentation and best-effort build tooling, but the primary TTFX requirements (TTFX-04) were not met — the goal was too platform-dependent to be framed as a deliverable requirement
+
+### Patterns Established
+- **`test/Project.toml` for direct test invocation**: adding `[deps]` section with test-only packages enables `julia --project=. test/runtests.jl`; coexists with root `[extras]/[targets]` for CI
+- **PackageCompiler to `[extras]`**: avoids LLVM becoming a transitive runtime dep for end users; always put build-only tools in `[extras]` not `[deps]`
+- **Physics-first README structure**: lead with what the library *does* (reactor cooling loops, safety analysis) before mentioning MTK; target audience is domain scientists, not Julia library users
+
+### Key Lessons
+1. **Platform-dependent performance requirements need escape hatches in the plan** — TTFX-04 (sysimage on WSL2) should have been written as "if buildable" with a documented alternative (persistent REPL); framing it as a hard requirement led to a partial outcome
+2. **UAT before marking a phase complete catches integration gaps** — the Phase 50 UAT found the MTR power equation bug that example-only testing missed; don't skip UAT for "documentation phases"
+3. **Minimal CI is better than complex CI at first public release** — starting with stable-only, ubuntu-only keeps the matrix small and failures actionable; expand after usage patterns are established
+
+### Cost Observations
+- Model mix: ~100% sonnet (quality profile)
+- Timeline: 2026-04-10 (single day, ~16 hours of wall time across two phases)
+- Notable: Single-day release sprint from "all v0.9 work done" to "v1.0 public"; most of the time was Phase 51 sysimage investigation (4 build attempts); Phase 50 execution was fast (~30 min for 5 plans)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -418,6 +460,7 @@
 | v0.7 | 7 | 13 | Safety physics suite — pressure field, SCB, threshold analysis, HTC/friction completions; audit-before-complete pattern validated |
 | v0.8 | 13 | 32 | First GUI milestone — Tauri 2 + React + ReactFlow; ui-phase design contracts per frontend phase; pure function TDD for UI logic; registry-as-truth pattern |
 | v0.9 | 5 | 8 | First neutronics milestone — callable MTK parameter pattern; additive rho composition; connect_temperature_feedback composition helper; SCRAM callback factory |
+| v1.0 | 2 | 7 | Open-source release milestone — MIT license, CI, examples, README, test/Project.toml; sysimage WSL2 incompatibility documented; persistent REPL as primary workflow |
 
 ### Cumulative Quality
 
@@ -432,3 +475,4 @@
 | v0.7 | ~300+ | 33/34 | 1 (QuadGK) |
 | v0.8 | ~300+ Julia + Vitest GUI | 40/40 | Tauri + React + ReactFlow stack (separate from Julia deps) |
 | v0.9 | ~400+ Julia | 24/24 | No new deps — callable MTK pattern uses existing MTK infrastructure |
+| v1.0 | ~400+ Julia (unchanged) | N/A (release infra) | No new Julia deps — PackageCompiler to [extras]; GitHub Actions added |

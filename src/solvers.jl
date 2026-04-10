@@ -60,6 +60,8 @@ Solve a compiled system to steady state using KINSOL (or a user-specified solver
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
 - `op`: operating point as `Vector{Pair}` of initial guesses
+- `solver`: nonlinear solver to use (default `SSRootfind(KINSOL())`);
+  pass `SSRootfind(RobustMultiNewton())` for robustness on multi-branch networks
 - `abstol`: absolute tolerance (default 1e-8)
 - `reltol`: relative tolerance (default 1e-6)
 - `build_initializeprob`: passed to `SteadyStateProblem` (default `false`)
@@ -68,13 +70,15 @@ Solve a compiled system to steady state using KINSOL (or a user-specified solver
 `SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
 """
 function solve_steady(ssys, op;
+                      solver = nothing,
                       abstol = 1e-8,
                       reltol = 1e-6,
                       build_initializeprob = false)
     prob = SteadyStateProblem(ssys, op;
                               warn_initialize_determined=false,
                               build_initializeprob=build_initializeprob)
-    sol  = solve(prob, SSRootfind(KINSOL()); abstol = abstol, reltol = reltol)
+    _solver = isnothing(solver) ? SSRootfind(KINSOL()) : solver
+    sol  = solve(prob, _solver; abstol = abstol, reltol = reltol)
     return sol
 end
 

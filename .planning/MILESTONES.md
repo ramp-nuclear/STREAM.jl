@@ -1,5 +1,27 @@
 # Milestones
 
+## v1.0 Open-Source Release (Shipped: 2026-04-10)
+
+**Phases:** 50-51 (2 phases, 7 plans)
+**Julia LOC:** 4,301 src / 5,066 test at completion
+**Timeline:** 2026-04-10 (single-day release sprint)
+**Git range:** `26bc397` → `c837d37` (39 files changed, 4,792 insertions)
+
+**Key accomplishments:**
+
+- MIT license, correct Project.toml metadata (fresh RFC 4122 UUID, PackageCompiler moved to [extras] only — not a transitive runtime dep), Manifest.toml committed for reproducibility
+- GitHub Actions CI workflow (julia-actions/setup-julia@v2, stable only, ubuntu-latest); RobustMultiNewton solver for NET-03 Cube test; NoInit removed from VAL-01 ODE solves for reliable Fourier convergence
+- Two runnable example scripts: `examples/simple_loop.jl` (hello-world forced convection loop) and `examples/mtr_assembly.jl` (MTR plate-fuel two-channel thermal assembly)
+- README.md with physics-first documentation, component catalog table, and usage examples for public GitHub discovery
+- `test/Project.toml` enabling `julia --project=. test/runtests.jl` direct invocation; MTR assembly power equation fixed (HeatDiffusion power is MTK @variables unknown, not a parameter — `rods.hd.power ~ POWER` required)
+- mtkcompile warmup baked into sysimage precompile; pre-flight 6 GB RAM gate with dynamic heap-size-hint (75% free RAM) in `build_sysimage.sh`; TTFX timing baseline script
+- PackageCompiler+Julia1.12+WSL2 incompatibility documented (SIGTERM at ~7min on incremental LLVM link step regardless of package list); persistent REPL + Revise.jl established as primary development workflow
+
+**Known Gaps:**
+- Sysimage not buildable on Julia 1.12 + WSL2 (TTFX-04 requirement not met on this platform); build infrastructure retained for future Julia versions or non-WSL2 environments
+
+---
+
 ## v0.9 Point Kinetics & Reactor Control (Shipped: 2026-04-09)
 
 **Phases completed:** 6 phases, 8 plans, 13 tasks

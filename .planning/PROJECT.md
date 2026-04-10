@@ -6,11 +6,11 @@ STREAM.jl is a Julia rewrite of the Python package STREAM (System Thermohydrauli
 
 v0.1 shipped a single forced-convection coolant loop validated against Python STREAM within 1%. v0.2 extended the architecture to multi-branch networks, gravity in vertical loops, flow inertia, public HeatExchanger, and ChannelAndContacts as the per-cell thermal interface for fuel-plate coupling. v0.3 delivered HeatDiffusion — a 2D finite-difference fuel plate that couples to ChannelAndContacts on both sides — and validated the full MTR fuel assembly geometry against Python STREAM within 1%. v0.4 corrected MTR physics (hydraulic diameter 10 mm → 2.5 mm), added pluggable HTC/friction correlations with laminar regime support, and introduced MTK composition helpers that collapse 10-20 line manual wiring sequences into single calls. v0.5 reorganized the codebase to the canonical CLAUDE.md file layout, split the monolithic test file into 13 focused modules, added Julia docstrings to all 28 exported names, and expanded CLAUDE.md with rationale and MTK patterns. v0.6 delivered flow reversal systems: sign-safe channel components with ifelse() upwinding, thermal expansion coefficient and Elenbaas natural convection HTC, time-varying Pump callable dispatch, Flapper check-valve with MTK continuous events, and a validated loss-of-flow transient with physically correct 4-node bypass topology covering forced flow, pump coastdown, flow reversal, Flapper opening, and established natural circulation. v0.7 delivered the full safety physics and pressure field suite: per-cell absolute pressure P[i]/dp[i], sat_temperature @register_symbolic, T_sat[i]/T_ONB[i] observables, distributed momentum ODE in all channel variants, subcooled boiling (McAdams + Bergles-Rohsenow + in-loop SCB correction), nuclear safety threshold analysis framework (8 physics functions + ChannelState + threshold_analysis dispatcher + chfr factory), and complete HTC/friction correlation library (Marco-Han, developing/fully-developed laminar factories, maximal_htc combinator, Colebrook-White turbulent friction, viscosity correction) with htc/ + friction/ subdirectory split. v0.8 delivered the STREAM Composer GUI — a standalone Tauri 2 + React + ReactFlow desktop application (13 phases, 32 plans) with drag-drop topology building, parameter editing with factory correlation pickers, live Julia code generation, project save/load, topology validation, thermal composition code-gen, layered hydraulic/thermal canvas, and light/dark theme — all without a Julia runtime embedded in the GUI. v0.9 added the complete reactor dynamics stack: a 6-group point kinetics MTK component (7 ODEs, delayed-neutron precursors), ReactivityController state machine, temperature feedback composition helper (`connect_temperature_feedback`), unified SCRAM/flapper callback factories, and `build_loop_pk` coupling PointKinetics to the full TH loop — validated quantitatively against Python STREAM reference results (prompt-jump, beta-effective, reactivity insertion).
 
-## Shipped: v0.9 Point Kinetics & Reactor Control (2026-04-10)
+## Shipped: v1.0 Open-Source Release (2026-04-10)
 
-**Delivered:** 6-group PointKinetics MTK component (7 ODEs), ReactivityController state machine, temperature feedback via `connect_temperature_feedback`, unified SCRAM/flapper callback factories, `build_loop_pk` full-loop builder. Validated against Python STREAM: prompt-jump rtol<1%, VAL-PK-01..03 pass. 24/24 requirements satisfied.
+**Delivered:** MIT license, Project.toml metadata (fresh UUID, PackageCompiler to [extras]), GitHub Actions CI, two example scripts (`simple_loop.jl`, `mtr_assembly.jl`), README.md for public discovery, `test/Project.toml` for direct test invocation, mtkcompile warmup + pre-flight RAM gate in `build_sysimage.sh`, TTFX timing script. PackageCompiler+Julia1.12+WSL2 incompatibility documented; persistent REPL as primary workflow.
 
-**5 phases, 8 plans | ~1,200 Julia LOC added**
+**2 phases, 7 plans | 4,301 src LOC / 5,066 test LOC at release**
 
 ## Core Value
 
@@ -102,7 +102,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 
 ### Active
 
-<!-- v1.0 requirements will be defined in the next milestone planning session -->
+<!-- v1.1+ requirements will be defined in the next milestone planning session -->
 
 ### Out of Scope
 - Decay heat — irrelevant without neutronics
@@ -125,6 +125,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - **v0.7 shipped** 2026-04-01 — 7,715 Julia LOC (src + test), 7 phases (27, 27.1, 28, 29, 30, 31, 32), 13 plans; full safety physics and pressure field suite: pressure observables, momentum ODE, SCB, threshold analysis, complete HTC/friction library
 - **v0.8 shipped** 2026-04-04 — ~43k TypeScript/React LOC, 13 phases (33-44 incl. 35.1), 32 plans; STREAM Composer GUI: Tauri 2 desktop app with drag-drop topology, code generation, persistence, validation, thermal composition, layered canvas, dark mode
 - **v0.9 shipped** 2026-04-10 — ~1,200 Julia LOC added, 5 phases (45-49), 8 plans; Point Kinetics & Reactor Control: PointKinetics MTK component, ReactivityController state machine, temperature feedback, SCRAM callbacks, full-loop builder with Python STREAM validation
+- **v1.0 shipped** 2026-04-10 — 4,301 src LOC / 5,066 test LOC, 2 phases (50-51), 7 plans; Open-Source Release: MIT license, CI, example scripts, README, test/Project.toml, sysimage build tooling (WSL2 incompatibility documented)
 - Python STREAM lives at ~/projects/STREAM and is the reference implementation for all validation
 - MTK architecture validated through five milestones: acausal connect() + mtkcompile + Sundials IDA replaces Aggregator pattern
 - Friction is handled inside Channel (Darcy-Weisbach inline) — no separate Friction component in loop
@@ -191,6 +192,11 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 | `connect_temperature_feedback` scoped_comps kwarg | When cac is wrapped in symmetric_plate, T-vars are re-scoped; Dict(cac=>rods.cac) binds feedback equations to correct symbolic | ✓ Good — TF-07 multi-region test passes; scoping bug caught during Phase 47 |
 | Prompt-jump sample at `t_step + Λ/δρ` not `t_step + 0.01s` | Prompt-neutron transient takes ~Λ/δρ ≈ 0.027s to settle; sampling too early gives 14% error vs expected formula | ✓ Good — PK-03 passes at rtol=1e-2; physics comment documents the window |
 | `build_loop_pk` IC path after mtkcompile: vars are `ssys.rods.cac.T` not `ssys.core.rods.cac.T` | Compiled system IS the named system; extra prefix causes KeyError in op-dict | ✓ Good — LOOP-02..04 pass; documented in TF-02 decision |
+| PackageCompiler in [extras] only (not [deps]) | Prevents LLVM from becoming a transitive runtime dependency for users installing STREAM.jl | ✓ Good — clean install without PackageCompiler overhead |
+| CI targets Julia stable + ubuntu-latest only (no matrix) | Multi-version/multi-platform matrix adds complexity without value at this scale; stable is sufficient for a research library | ✓ Good — CI passes cleanly, no false failures from nightly |
+| `test/Project.toml` for direct test invocation | `julia --project=. test/runtests.jl` requires test deps discoverable from root project; separate test/Project.toml coexists with [extras]/[targets] in root | ✓ Good — direct invocation confirmed working |
+| HeatDiffusion `power` is an MTK @variables unknown, not a parameter | Constructor arg is initial guess only; governing equation `sys.hd.power ~ VALUE` must be provided by caller — matches MTK acausal semantics | ✓ Good — fixed silent over-specification bug in mtr_assembly.jl |
+| PackageCompiler+Julia1.12+WSL2: persistent REPL is primary workflow | Incremental sysimage link is killed by SIGTERM at ~7min regardless of package list; not fixable by reducing scope; build infrastructure retained for future Julia versions | ✓ Good — documented clearly in CLAUDE.md; REPL+Revise.jl provides equivalent ergonomics |
 
 ## Constraints
 
@@ -218,4 +224,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after v0.9 milestone (Point Kinetics & Reactor Control — Phases 45-49)*
+*Last updated: 2026-04-10 after v1.0 milestone (Open-Source Release — Phases 50-51)*
