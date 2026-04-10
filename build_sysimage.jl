@@ -22,7 +22,6 @@ using PackageCompiler
 create_sysimage(
     ["STREAM", "ModelingToolkit", "Symbolics", "QuadGK"];
     sysimage_path = "stream.so",
-    precompile_execution_file = "test/precompile_exec.jl",
     project = "."
 )
 
