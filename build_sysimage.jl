@@ -16,10 +16,11 @@
 using PackageCompiler
 
 @info "Building STREAM.jl sysimage → stream.so"
-@info "Packages: STREAM, ModelingToolkit, OrdinaryDiffEq, Symbolics, QuadGK, Sundials"
+@info "Packages: STREAM, ModelingToolkit, Symbolics, QuadGK"
+@info "Note: OrdinaryDiffEq and Sundials excluded — their LLVM IR is too large for WSL2 link step"
 
 create_sysimage(
-    ["STREAM", "ModelingToolkit", "OrdinaryDiffEq", "Symbolics", "QuadGK", "Sundials"];
+    ["STREAM", "ModelingToolkit", "Symbolics", "QuadGK"];
     sysimage_path = "stream.so",
     precompile_execution_file = "test/precompile_exec.jl",
     project = "."

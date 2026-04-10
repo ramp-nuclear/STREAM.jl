@@ -8,8 +8,6 @@
 using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using OrdinaryDiffEq
-using Sundials
 using Symbolics
 using QuadGK
 
