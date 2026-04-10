@@ -116,6 +116,11 @@ Do **not** run `julia --project=. build_sysimage.jl` directly — it will exhaus
 
 The sysimage bakes `STREAM` and `QuadGK` only. `ModelingToolkit`, `Symbolics`, `OrdinaryDiffEq`, and `Sundials` are intentionally excluded — their LLVM IR is large enough to OOM-kill the PackageCompiler linker even on 32 GB machines. MTK's `using` load time is handled by Julia's automatic pkgimage cache (`~/.julia/compiled/`), which is built on first use and reused across sessions.
 
+> **Note:** PackageCompiler's incremental link step crashes on Julia 1.12 + WSL2 regardless
+> of package list size. If `./build_sysimage.sh` is killed by signal 15 at ~7 min, the
+> sysimage cannot be built on this configuration. Use the persistent REPL workflow instead.
+> The build infrastructure remains in place for future Julia versions or non-WSL2 machines.
+
 **Always use the sysimage** when running tests or verification:
 ```bash
 test -f stream.so && SYSIMG="--sysimage stream.so" || SYSIMG=""
@@ -123,29 +128,6 @@ julia $SYSIMG --project=. test/runtests.jl
 ```
 
 `stream.so` is git-ignored and platform-specific — each machine builds its own. The sysimage bakes deps, not STREAM source, so source edits are picked up without rebuilding.
-
-**WSL2 memory requirements:**
-
-The build requires approximately 6 GB of free RAM during the PackageCompiler link step.
-If the build crashes silently (WSL2 terminal closes, no `stream.so` appears), the machine
-needs more RAM allocated.
-
-To check your Windows RAM (run in PowerShell):
-```powershell
-(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
-```
-
-Edit `%USERPROFILE%\.wslconfig` on Windows (create it if it doesn't exist):
-```ini
-[wsl2]
-memory=10GB   # ~65% of 16 GB physical RAM; adjust to your machine
-swap=4GB      # optional safety net
-```
-
-After editing, restart WSL: `wsl --shutdown`, then reopen the terminal.
-
-The build script now checks free RAM before starting and exits with an error if
-insufficient, so you won't waste 15 minutes on a build that will fail.
 
 **Measuring TTFX improvement:**
 ```bash
