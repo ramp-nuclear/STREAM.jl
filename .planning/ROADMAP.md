@@ -11,6 +11,7 @@
 - ✅ **v0.7 Safety Physics & Pressure Field** — Phases 27-32 (shipped 2026-04-01)
 - ✅ **v0.8 STREAM Composer GUI** — Phases 33-44 (shipped 2026-04-04)
 - ✅ **v0.9 Point Kinetics & Reactor Control** — Phases 45-49 (shipped 2026-04-10)
+- 🚧 **v1.0 Open-Source Readiness** — Phase 50+ (in progress)
 
 ## Phases
 
@@ -196,8 +197,25 @@ Full phase details: `.planning/milestones/v0.9-ROADMAP.md`
 | 47. Temperature Feedback for PointKinetics | v0.9 | 2/2 | Complete   | 2026-04-05 |
 | 48. SCRAM Solver Integration | v0.9 | 1/1 | Complete | 2026-04-08 |
 | 49. Full Loop Integration + Validation | v0.9 | 2/2 | Complete | 2026-04-09 |
+| 50. Open-Source Readiness | v1.0 | 0/4 | Planned | — |
+
+## v1.0 Open-Source Readiness
+
+### Phase 50: Open-Source Readiness
+
+**Goal:** Prepare STREAM.jl for public GitHub discovery: README, MIT LICENSE, GitHub Actions CI, two new example scripts, and Project.toml metadata cleanup
+**Requirements**: D-01..D-19 (see 50-CONTEXT.md)
+**Depends on:** Phase 49
+**Plans:** 4 plans
+
+Plans:
+- [ ] 50-01-PLAN.md — Project.toml metadata + MIT LICENSE
+- [ ] 50-02-PLAN.md — Fix failing tests (NET-03, VAL-01 Fourier) + GitHub Actions CI
+- [ ] 50-03-PLAN.md — Example scripts (simple_loop.jl, mtr_assembly.jl)
+- [ ] 50-04-PLAN.md — README.md (physics-first, component catalog, validation summary)
 
 ---
 
 *Created: 2026-03-12*
 *Updated: 2026-04-10 — v0.9 shipped (Point Kinetics & Reactor Control, Phases 45-49)*
+*Updated: 2026-04-10 — Phase 50 planned (4 plans, Wave 1 all-parallel)
