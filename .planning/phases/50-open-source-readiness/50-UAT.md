@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 50-open-source-readiness
 source: [50-01-SUMMARY.md, 50-02-SUMMARY.md, 50-03-SUMMARY.md, 50-04-SUMMARY.md]
 started: 2026-04-10T08:00:00Z
@@ -60,9 +60,12 @@ blocked: 0
   reason: "User reported: ERROR: Package NonlinearSolve not found in current path. NonlinearSolve is in [extras] not [deps] — unavailable outside Pkg.test(). CI passes but local direct invocation fails."
   severity: major
   test: 4
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "No test/Project.toml exists. The [extras]/[targets] mechanism in root Project.toml only activates via Pkg.test(). Direct invocation (julia --project=. test/runtests.jl) only sees [deps], so using NonlinearSolve in test_resistors.jl fails. Fix: create test/Project.toml declaring NonlinearSolve and Test as deps."
+  artifacts:
+    - path: "test/Project.toml"
+      issue: "missing — needs to be created with NonlinearSolve = 8913a72c-1f9b-4ce2-8d82-65094dcecaec and Test"
+  missing:
+    - "Create test/Project.toml with NonlinearSolve and Test deps"
   debug_session: ""
 
 - truth: "Running julia --project=. examples/mtr_assembly.jl completes without error"
@@ -70,7 +73,12 @@ blocked: 0
   reason: "User reported: ERROR: Equations (92), unknowns (93), and initial conditions (93) are of different lengths. System is under-determined — one equation is missing. Fails at solve_steady call in mtr_assembly.jl:117."
   severity: major
   test: 6
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "HeatDiffusion declares `power` as an MTK @variables unknown (not a parameter). The constructor arg only sets its initial value, not a governing equation. mtr_assembly.jl conns never includes `rods.hd.power ~ POWER`, leaving power unconstrained. Fix: add `rods.hd.power ~ POWER` to the conns array."
+  artifacts:
+    - path: "examples/mtr_assembly.jl"
+      issue: "conns array (lines 90-99) missing rods.hd.power ~ POWER equation"
+    - path: "src/components/heat_diffusion.jl"
+      issue: "power declared as @variables unknown at lines 111-114 — requires explicit governing equation at call site"
+  missing:
+    - "Add `rods.hd.power ~ POWER` to conns in examples/mtr_assembly.jl"
   debug_session: ""
