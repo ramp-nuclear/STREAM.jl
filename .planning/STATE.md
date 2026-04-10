@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.1
-milestone_name: milestone
+milestone: v1.0
+milestone_name: Open-Source Release
 status: executing
-stopped_at: Phase 49 complete — all VAL-PK tests pass, REVIEW.md, VERIFICATION.md created
-last_updated: "2026-04-10T09:02:58.810Z"
+stopped_at: Phase 51 context gathered
+last_updated: "2026-04-10T10:05:30.719Z"
 last_activity: 2026-04-10 -- Phase 50 execution started
 progress:
-  total_phases: 2
+  total_phases: 1
   completed_phases: 0
-  total_plans: 5
-  completed_plans: 4
-  percent: 80
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # STATE: STREAM.jl
@@ -105,6 +104,10 @@ Last activity: 2026-04-10 -- Phase 50 execution started
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 51 added: Julia Startup Performance & Reliable Sysimage — fix WSL2 sysimage build crashes, reduce TTFX for `using STREAM`, `mtkcompile`, and loop construction
+
 ### Key Decisions (v0.9 Point Kinetics)
 
 - [v0.9 PK-01]: Callable MTK parameter pattern: `FType=typeof(fn)` at construction; `@parameters (fn::FType)(..)` variadic; used in equations as `fn(t)`. Matches Pump(dP_pump::Any) precedent from Phase 22.
@@ -159,10 +162,10 @@ None.
 
 ## Session Continuity
 
-**Last session:** 2026-04-09T00:00:00.000Z
-**Stopped at:** Phase 49 complete — all VAL-PK tests pass, REVIEW.md, VERIFICATION.md created
+**Last session:** 2026-04-10T10:05:30.717Z
+**Stopped at:** Phase 51 context gathered
 **Next action:** Check remaining v0.9 phases (50+) or run /gsd-progress
-**Resume file:** .planning/phases/49-full-loop-integration-validation/49-VERIFICATION.md
+**Resume file:** .planning/phases/51-julia-startup-performance-reliable-sysimage/51-CONTEXT.md
 
 ---
 
