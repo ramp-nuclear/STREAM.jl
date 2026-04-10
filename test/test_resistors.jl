@@ -2,7 +2,6 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using DifferentialEquations
-using NonlinearSolve
 using STREAM
 import STREAM: Resistor
 
@@ -65,7 +64,7 @@ end
         ssys.r57.port_in.mdot  => mdot_full / 3.0,
         ssys.r67.port_in.mdot  => mdot_full / 3.0,
     ]
-    sol = solve_steady(ssys, op; solver=SSRootfind(RobustMultiNewton()))
+    sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
     mdot_numerical = abs(sol[ssys.pump.port_out.mdot])
