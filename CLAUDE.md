@@ -117,3 +117,35 @@ julia $SYSIMG --project=. test/runtests.jl
 ```
 
 `stream.so` is git-ignored and platform-specific — each machine builds its own. The sysimage bakes deps, not STREAM source, so source edits are picked up without rebuilding.
+
+**WSL2 memory requirements:**
+
+The build requires approximately 6 GB of free RAM during the PackageCompiler link step.
+If the build crashes silently (WSL2 terminal closes, no `stream.so` appears), the machine
+needs more RAM allocated.
+
+To check your Windows RAM (run in PowerShell):
+```powershell
+(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+```
+
+Edit `%USERPROFILE%\.wslconfig` on Windows (create it if it doesn't exist):
+```ini
+[wsl2]
+memory=10GB   # ~65% of 16 GB physical RAM; adjust to your machine
+swap=4GB      # optional safety net
+```
+
+After editing, restart WSL: `wsl --shutdown`, then reopen the terminal.
+
+The build script now checks free RAM before starting and exits with an error if
+insufficient, so you won't waste 15 minutes on a build that will fail.
+
+**Measuring TTFX improvement:**
+```bash
+# Baseline (no sysimage):
+julia --project=. time_startup.jl
+
+# With sysimage (after building):
+julia --sysimage stream.so --project=. time_startup.jl
+```

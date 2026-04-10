@@ -15,6 +15,31 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ── Pre-flight memory check ────────────────────────────────────────────────
+# PackageCompiler + MTK + Sundials require ~6 GB free during the link step.
+# Abort early rather than waste 15 minutes on a build that will OOM.
+FREE_MB=$(awk '/^MemAvailable:/{print int($2/1024)}' /proc/meminfo)
+THRESHOLD_MB=6144  # 6 GB — conservative for PackageCompiler link step
+
+if [ "$FREE_MB" -lt "$THRESHOLD_MB" ]; then
+    echo "ERROR: Insufficient free RAM for sysimage build."
+    echo "  Available: ${FREE_MB} MB"
+    echo "  Required:  ${THRESHOLD_MB} MB (6 GB)"
+    echo ""
+    echo "To increase WSL2 memory, edit %USERPROFILE%\\.wslconfig on Windows:"
+    echo ""
+    echo "  [wsl2]"
+    echo "  memory=10GB   # ~65% of 16 GB physical RAM"
+    echo "  swap=4GB      # optional safety net"
+    echo ""
+    echo "Check your Windows RAM first (run in PowerShell):"
+    echo "  (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB"
+    echo ""
+    echo "After editing .wslconfig, restart WSL: wsl --shutdown (then reopen terminal)"
+    exit 1
+fi
+echo "Pre-flight check: ${FREE_MB} MB free — OK (threshold: ${THRESHOLD_MB} MB)"
+
 echo "=== STREAM.jl sysimage builder ==="
 echo "Julia: $(julia --version)"
 echo "RAM available: $(free -h | awk '/^Mem:/{print $7}')"
