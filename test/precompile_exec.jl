@@ -22,7 +22,7 @@ using QuadGK
 
 @named pump = Pump(3.0e4)
 geo = PipeGeometry_circular(1.0, 0.01)
-@named ch = Channel(; n=2, geometry=geo)
+@named ch = STREAM.Channel(; n=2, geometry=geo)
 
 eqs = [
     connect(pump.port_out, ch.port_in),
