@@ -96,9 +96,10 @@ conns = [
     connect(hx_r.port_out, rods.cac_r.port_in),
     connect(rods.cac_r.port_out, pump_r.port_in),
     pump_r.port_in.P ~ 1.0e5,
+    rods.hd.power ~ POWER,
 ]
 @named sys = compose(System(conns, t; name=:mtr_example), pump_l, hx_l, pump_r, hx_r, rods)
-ssys = mtkcompile(sys; fully_determined=false)
+ssys = mtkcompile(sys)
 
 # =============================================================================
 # SECTION 3: Initial guess and solve
