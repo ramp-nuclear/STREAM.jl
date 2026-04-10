@@ -11,6 +11,7 @@
 - ✅ **v0.7 Safety Physics & Pressure Field** — Phases 27-32 (shipped 2026-04-01)
 - ✅ **v0.8 STREAM Composer GUI** — Phases 33-44 (shipped 2026-04-04)
 - ✅ **v0.9 Point Kinetics & Reactor Control** — Phases 45-49 (shipped 2026-04-10)
+- 🚧 **v1.0 Open-Source Release** — Phases 50-51 (active)
 
 ## Phases
 
@@ -139,6 +140,11 @@ Full phase details: `.planning/milestones/v0.9-ROADMAP.md`
 
 </details>
 
+**🚧 v1.0 Open-Source Release (Phases 50-51) — ACTIVE**
+
+- [x] Phase 50: Open-Source Readiness (5/5 plans) — completed 2026-04-10
+- [ ] Phase 51: Julia Startup Performance & Reliable Sysimage (2 plans)
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -196,6 +202,18 @@ Full phase details: `.planning/milestones/v0.9-ROADMAP.md`
 | 47. Temperature Feedback for PointKinetics | v0.9 | 2/2 | Complete   | 2026-04-05 |
 | 48. SCRAM Solver Integration | v0.9 | 1/1 | Complete | 2026-04-08 |
 | 49. Full Loop Integration + Validation | v0.9 | 2/2 | Complete | 2026-04-09 |
+| 50. Open-Source Readiness | v1.0 | 5/5 | Complete | 2026-04-10 |
+
+### Phase 51: Julia Startup Performance & Reliable Sysimage
+
+**Goal:** Fix the sysimage build process so it works reliably on WSL2 without crashing, and reduce Julia startup/TTFX time for `using STREAM`, `mtkcompile`, and loop construction.
+**Requirements**: TTFX-01, TTFX-02, TTFX-03, TTFX-04, TTFX-05, TTFX-06
+**Depends on:** Phase 50
+**Plans:** 2 plans
+
+Plans:
+- [ ] 51-01-PLAN.md — warmup code, pre-flight memory check, CLAUDE.md docs, timing script
+- [ ] 51-02-PLAN.md — sysimage build verification, TTFX measurement, test suite with sysimage
 
 ---
 
