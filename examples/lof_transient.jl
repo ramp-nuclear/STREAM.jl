@@ -34,7 +34,7 @@
 using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using DifferentialEquations
+using OrdinaryDiffEq, SteadyStateDiffEq
 using Plots
 using Statistics
 using Printf

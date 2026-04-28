@@ -507,7 +507,7 @@ function scram_callback(ssys, p_sym::Num, ctrl; terminate = true)
     # dPdt = 0.0 placeholder (SCRAMCondition ignores it; future: symbolic du access).
     affect! = function (integrator)
         change_state(ctrl, integrator.t, plimit + 1.0, 0.0)
-        terminate && DifferentialEquations.terminate!(integrator)
+        terminate && terminate!(integrator)
     end
 
     ContinuousCallback(condition, affect!)  # upward crossing only (P - plimit: neg -> pos)

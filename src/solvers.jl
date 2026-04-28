@@ -7,7 +7,7 @@
 
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using DifferentialEquations   # SSRootfind -- NOT in ModelingToolkit
+using OrdinaryDiffEq, SteadyStateDiffEq
 using Sundials                 # KINSOL, IDA
 
 # ----------------------------------------------------------------

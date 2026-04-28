@@ -21,7 +21,7 @@
 using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using DifferentialEquations
+using OrdinaryDiffEq, SteadyStateDiffEq
 using Plots
 ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
 gr()
