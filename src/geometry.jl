@@ -1,14 +1,5 @@
 # geometry.jl — PipeGeometry descriptor for STREAM.jl
 #
-# Design note (q_wall indirection):
-# Channel uses a single ThermalPort carrying total Q_wall (W), then splits
-# internally: q_wall[i] = thermal.Q_flow / n per cell. This indirection
-# exists so that a future refactor to per-cell ThermalPorts only changes
-# the port declaration and q_wall binding — the energy balance loop
-# D(T[i]) ~ ... is untouched.
-#
-# Note: `Channel` is declared as a new generic function here to avoid
-# conflict with Base.Channel (Julia's built-in concurrency channel type).
 
 """
     PipeGeometry
@@ -29,7 +20,6 @@ Factory functions (preferred constructors):
 - `PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)` — rectangular channel
 - `PipeGeometry_circular(L, D)` — circular pipe
 
-Do NOT call the inner positional constructor directly.
 """
 #! format: off
 struct PipeGeometry
@@ -92,14 +82,14 @@ Construct a `PipeGeometry` for a circular pipe.
 - `L` — channel length [m]
 - `D` — pipe diameter [m]
 
-Dh = D (exact for circular cross-section). heated_parts = (π*D/2, π*D/2) (symmetric split).
+Dh = D (exact for circular cross-section). 
+heated_parts = (perimeter, 0) because it is circular, not annular.
 """
 function PipeGeometry_circular(L, D)
-    _L = Float64(L)
-    _D = Float64(D)
-    area = π * _D^2 / 4
-    perimeter = π * _D
-    heated_parts = (perimeter / 2, perimeter / 2)
-    # Dh = 4*(π*D²/4)/(π*D) = D — exact
-    return PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts, _D, _D)
+    _L           = Float64(L)
+    _D           = Float64(D)
+    area         = π * _D^2 / 4
+    perimeter    = π * _D
+    heated_parts = (perimeter, 0.)
+    PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts, _D, _D)
 end

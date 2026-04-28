@@ -53,7 +53,7 @@ Pr(cp, mu, k) = cp * mu / k
 """
     Nu(h, Dh, k) -> Float64
 
-Nusselt number from heat transfer coefficient.
+Nusselt number.
 
 # Arguments
 - `h`: heat transfer coefficient [W/(m^2*K)]
@@ -80,25 +80,22 @@ Peclet number (dimensionless).
 Pe(Re_val, Pr_val) = Re_val * Pr_val
 
 """
-    Gr(beta, g, dT, L, nu) -> Float64
-
-Grashof number. Simplified form using kinematic viscosity:
-Gr = beta * g * dT * L^3 / nu^2
-
-Mathematically equivalent to Python STREAM's rho^2 * g * beta * dT * L^3 / mu^2
-(since nu = mu/rho).
+Grashof number.
 
 # Arguments
+- `rho`: density [kg/m³]
+- `mu`: viscosity [kg/(m°K)]
 - `beta`: thermal expansion coefficient [1/K]
+- `T_wall`: Wall temperature [°K]
+- `T`: Bulk temperature [°K]
+- `L`: characteristic length (aka hydraulic diameter) [m]
 - `g`: gravitational acceleration [m/s^2]
-- `dT`: temperature difference T_wall - T_bulk [K]
-- `L`: characteristic length [m]
-- `nu`: kinematic viscosity [m^2/s] (= mu/rho)
 
 # Returns
+Float64
 Grashof number (dimensionless).
 """
-Gr(beta, g, dT, L, nu) = beta * g * dT * L^3 / nu^2
+Gr(rho, mu, beta, T_wall, T, L, g) = rho^2 * beta * g * (T_wall-T) * L^3 / mu^2
 
 """
     Ra(Gr_val, Pr_val) -> Float64
