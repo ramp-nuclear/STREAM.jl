@@ -2,7 +2,7 @@ using Test
 using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using DifferentialEquations
+using OrdinaryDiffEq, SteadyStateDiffEq
 import STREAM: Channel, HeatDiffusion, ChannelAndContacts
 import ModelingToolkit: compose
 

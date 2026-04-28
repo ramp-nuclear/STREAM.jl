@@ -1,7 +1,7 @@
 using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using DifferentialEquations
+using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 import STREAM: Channel
 

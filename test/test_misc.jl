@@ -1,10 +1,9 @@
 using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using DifferentialEquations
+using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 import STREAM: Inertia, HeatExchanger
-const SciMLBase = DifferentialEquations.SciMLBase
 
 # ─────────────────────────────────────────────────────────────────
 # COMP-01: Inertia — ODE pressure-drop component

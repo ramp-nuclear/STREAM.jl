@@ -1,10 +1,9 @@
 using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using DifferentialEquations
+using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 import STREAM: Channel, HeatDiffusion, PipeGeometry_rectangular
-const SciMLBase = DifferentialEquations.SciMLBase
 
 # Free constants used by Phase 3 VAL tests
 T_outlet_ref = 327.7894  # K  (Python STREAM: 54.6394 °C)

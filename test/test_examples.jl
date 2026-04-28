@@ -1,7 +1,7 @@
 using Test
 using STREAM
 using ModelingToolkit
-using DifferentialEquations: ReturnCode
+using OrdinaryDiffEq: ReturnCode
 
 # ─────────────────────────────────────────────────────────────────
 # COMPAT: Full suite runs via Pkg.test() (confirmed by reaching here)
