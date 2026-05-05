@@ -147,8 +147,7 @@ ssys = build_loop_lof_bypass(;
     T_inlet   = T_inlet,
     L_over_A  = L_over_A,
     g_acc     = g_acc,
-    R_ext     = R_ext,
-    threshold = threshold,
+    R_ext=R_ext,
     dt_ramp   = dt_ramp,
 )
 #! format: on

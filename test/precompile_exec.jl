@@ -8,7 +8,6 @@
 using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using Symbolics
 using QuadGK
 
 # ── Warmup: minimal Pump + Channel system ────────────────────────────────────

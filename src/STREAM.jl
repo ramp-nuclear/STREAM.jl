@@ -2,7 +2,6 @@ module STREAM
 
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using Symbolics: @register_symbolic
 
 include("fluids.jl")
 include("connectors.jl")

@@ -62,8 +62,6 @@ run_check "using ModelingToolkit" \
     'using ModelingToolkit'
 run_check "using OrdinaryDiffEq" \
     'using OrdinaryDiffEq'
-run_check "using Symbolics" \
-    'using Symbolics'
 run_check "using Sundials" \
     'using Sundials'
 run_check "using STREAM (all packages together)" \

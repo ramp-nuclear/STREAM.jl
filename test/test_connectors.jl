@@ -1,6 +1,5 @@
 using Test
 using ModelingToolkit
-using Symbolics
 using STREAM
 import STREAM: Channel  # resolve Base.Channel ambiguity
 const ModelingToolkitBase = ModelingToolkit.ModelingToolkitBase
