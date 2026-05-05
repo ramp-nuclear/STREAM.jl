@@ -132,14 +132,30 @@ function regime_dependent(;
     if !isnothing(htc_natural)
         # NC-enabled path: switch on Gr/Re^2 > 1
         Dh_val = Float64(Dh)
-        g_val  = Float64(g)
-        htc_forced_fn = (Re, Pr, T_bulk, T_wall) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr, T_bulk, T_wall), htc_turbulent(Re, Pr, T_bulk, T_wall))
-        htc_fn = (Re, Pr, T_bulk, T_wall) -> begin
-            beta_v = beta_water(T_bulk)
-            nu_v   = mu_water(T_bulk) / rho_water(T_bulk)
-            Gr_val = Gr(rho_water(T_bulk), mu_water(T_bulk), beta_water(T_bulk), T_wall, T_bulk, Dh_val, g_val)
-            ifelse(Gr_val / Re^2 > 1, htc_natural(Re, Pr, T_bulk, T_wall), htc_forced_fn(Re, Pr, T_bulk, T_wall))
-        end
+        g_val = Float64(g)
+        htc_forced_fn =
+            (Re, Pr, T_bulk, T_wall) -> ifelse(
+                Re < Re_tr,
+                htc_laminar(Re, Pr, T_bulk, T_wall),
+                htc_turbulent(Re, Pr, T_bulk, T_wall),
+            )
+        htc_fn =
+            (Re, Pr, T_bulk, T_wall) -> begin
+                Gr_val = Gr(
+                    rho_water(T_bulk),
+                    mu_water(T_bulk),
+                    beta_water(T_bulk),
+                    T_wall,
+                    T_bulk,
+                    Dh_val,
+                    g_val,
+                )
+                ifelse(
+                    Gr_val / Re^2 > 1,
+                    htc_natural(Re, Pr, T_bulk, T_wall),
+                    htc_forced_fn(Re, Pr, T_bulk, T_wall),
+                )
+            end
     else
         # Existing forced-convection-only path (backward compatible)
         htc_fn =
@@ -199,7 +215,15 @@ Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 """
 function elenbaas_htc(; b, L, Dh, g=9.81)
     return (Re, Pr, T_bulk, T_wall) -> begin
-        Gr_val = Gr(rho_water(T_bulk), mu_water(T_bulk), beta_water(T_bulk), T_wall, T_bulk, Dh, g)
+        Gr_val = Gr(
+            rho_water(T_bulk),
+            mu_water(T_bulk),
+            beta_water(T_bulk),
+            T_wall,
+            T_bulk,
+            Dh,
+            g,
+        )
         Ra_val = Ra(Gr_val, Pr)
         elenbaas_nusselt(Ra_val, b, L)
     end

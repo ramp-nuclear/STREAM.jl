@@ -208,7 +208,15 @@ function ChannelAndContacts(;
         push!(obs, T_wall_right[i] ~ thermal_right[i].T)
         push!(obs, q_wall_left[i] ~ thermal_left[i].Q_flow)
         push!(obs, q_wall_right[i] ~ thermal_right[i].Q_flow)
-        Gr_i = Gr(rho_water(T[i]), mu_water(T[i]), beta_water(T[i]), thermal_left[i].T, T[i], Dh, g_acc)
+        Gr_i = Gr(
+            rho_water(T[i]),
+            mu_water(T[i]),
+            beta_water(T[i]),
+            thermal_left[i].T,
+            T[i],
+            Dh,
+            g_acc,
+        )
         push!(obs, Gr_over_Re2[i] ~ Gr_i / Re_i^2)
         # Per-cell absolute pressure, T_sat, T_ONB (D-05, D-06, D-11, D-12)
         # CRITICAL: Use P_i expression (not P[i] symbol) to avoid observed-to-observed chain
@@ -227,7 +235,12 @@ function ChannelAndContacts(;
     # Re, Nu, v are now observed (not solver unknowns)
     # dP, P[i], T_sat[i], T_ONB[i] are also observed
     all_vars = [
-        collect(T); collect(h_tc); collect(q_wall); collect(dp); T_out; Q_wall_total
+        collect(T);
+        collect(h_tc);
+        collect(q_wall);
+        collect(dp);
+        T_out;
+        Q_wall_total
     ]
 
     compose(
@@ -353,8 +366,12 @@ function ChannelHeatFlux(;
                 h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i])
             ) / (rho_water(T[i]) * cp_water(T[i]) * A * dz),
         )
-        push!(eqs, q_wall[i] ~ h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i]))
-        Gr_i = Gr(rho_water(T[i]), mu_water(T[i]), beta_water(T[i]), T_wall_p, T[i], Dh, g_acc)
+        push!(
+            eqs, q_wall[i] ~ h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i])
+        )
+        Gr_i = Gr(
+            rho_water(T[i]), mu_water(T[i]), beta_water(T[i]), T_wall_p, T[i], Dh, g_acc
+        )
         push!(eqs, Gr_over_Re2[i] ~ Gr_i / Re[i]^2)
     end
 

@@ -104,7 +104,7 @@ function HeatDiffusion(; name,
     thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:nz]
 
     T_var, power_var = vars
-    #format off
+    #! format: off
     eqs = _diffusion_eqs(;
         T             = T_var,
         thermal_left  = thermal_left,
@@ -121,7 +121,7 @@ function HeatDiffusion(; name,
         power_shape   = power_shape,
         Dt            = Dt)
 
-    #format on
+    #!format: on
     all_vars = vcat(vec(collect(T_var)), [power_var])
     compose(System(eqs, t, all_vars, []; name=name),
             thermal_left..., thermal_right...)

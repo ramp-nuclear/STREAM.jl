@@ -282,6 +282,6 @@ end
     A_heated = pi * BYPASS_D_CH * BYPASS_L_CH
     DeltaT_analytical =
         (BYPASS_T_WALL - BYPASS_T_INLET) *
-                        (1 - exp(-h_nc * A_heated / (mdot_nc * cp_water(BYPASS_T_INLET))))
+        (1 - exp(-h_nc * A_heated / (mdot_nc * cp_water(BYPASS_T_INLET))))
     @test isapprox(T_max_nc - T_inlet_nc, DeltaT_analytical; rtol=0.30)
 end

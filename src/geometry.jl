@@ -86,10 +86,12 @@ Dh = D (exact for circular cross-section).
 heated_parts = (perimeter, 0) because it is circular, not annular.
 """
 function PipeGeometry_circular(L, D)
+    #! format: off
     _L           = Float64(L)
     _D           = Float64(D)
     area         = π * _D^2 / 4
     perimeter    = π * _D
     heated_parts = (perimeter, 0.)
+    #! format: on
     PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts, _D, _D)
 end
