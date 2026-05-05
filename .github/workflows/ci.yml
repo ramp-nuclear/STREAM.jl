@@ -9,19 +9,37 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   code-style:
+    runs-on: ubuntu-latest
+    # Permissions needed for reviewdog/action-suggester to post comments
     permissions:
-      contents: write
+      contents: read
       checks: write
       issues: write
       pull-requests: write
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/cache@v3
+      - name: Julia stuff
+        shell: julia --color=yes {0}
+        run: |
+          import Pkg
+          Pkg.add("JuliaFormatter")
+          import JuliaFormatter
+          JuliaFormatter.format(".")
+      - name: Check for formatting errors
+        shell: bash
+        run: |
+          output=$(git diff --name-only)
+          if [ "$output" != "" ]; then
+              >&2 echo "Some files have not been formatted !!!"
+              echo "$output"
+              exit 1
+          fi
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+      - uses: reviewdog/action-suggester@v1
+        if: github.event_name == 'pull_request'
         with:
-          fetch-depth: 0
-      - name: Run Formatter & reviewdog
-        uses: julia-actions/julia-format@v4
-        with:
-          version: 2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tool_name: JuliaFormatter
+          fail_level: warning
+          github_token: ${{ secrets.GITHUB_TOKEN }}
