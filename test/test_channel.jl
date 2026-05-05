@@ -858,22 +858,16 @@ end
 
     # No NaN in mdot, P[i], dp[i]
     @test all(isfinite, sol[ssys.ch.port_in.mdot, :])
-    for i in 1:n
-        @test all(isfinite, sol[ssys.ch.P[i], :])
-        @test all(isfinite, sol[ssys.ch.dp[i], :])
-        @test all(isfinite, sol[ssys.ch.T_sat[i], :])
-        # T_ONB finite at final time (steady state); transient startup may have
-        # non-finite T_ONB due to Bergles-Rohsenow formula sensitivity to q_wall sign
-        @test isfinite(sol[ssys.ch.T_ONB[i], :][end])
-    end
+    @test all(isfinite, hcat(sol[ssys.ch.P, :]...))
+    @test all(isfinite, hcat(sol[ssys.ch.dp, :]...))
+    @test all(isfinite, hcat(sol[ssys.ch.T_sat, :]...))
+    @test all(isfinite, hcat(sol[ssys.ch.T_ONB, :]...))
 
     # dP = port_in.P - port_out.P
     dP_vals = sol[ssys.ch.dP, :]
     P_in_vals = sol[ssys.ch.port_in.P, :]
     P_out_vals = sol[ssys.ch.port_out.P, :]
-    for k in eachindex(dP_vals)
-        @test isapprox(dP_vals[k], P_in_vals[k] - P_out_vals[k]; rtol=1e-10)
-    end
+    @test isapprox(dP_vals, P_in_vals .- P_out_vals; rtol=1e-10)
 
     # mdot increases after step
     mdot_before = sol(t_step - 1.0, idxs=ssys.ch.port_in.mdot)
