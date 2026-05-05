@@ -39,7 +39,7 @@ function _diffusion_eqs(
         push!(
             eqs,
             thermal_left[i].Q_flow ~
-                k_s * (y * dz) * (thermal_left[i].T - T[i, 1]) / (dx / 2),
+            k_s * (y * dz) * (thermal_left[i].T - T[i, 1]) / (dx / 2),
         )
 
         # Right boundary Q_flow: heat flux INTO hd at right face (positive = into component).
@@ -48,7 +48,7 @@ function _diffusion_eqs(
         push!(
             eqs,
             thermal_right[i].Q_flow ~
-                k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2),
+            k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2),
         )
     end
 
@@ -64,10 +64,10 @@ function _diffusion_eqs(
                 push!(
                     eqs,
                     Dt(T[i, 1]) ~
-                        (
-                            k_s * (T[i, 2] - T[i, 1]) / dx -
-                            k_s * (T[i, 1] - thermal_left[i].T) / (dx / 2)
-                        ) / (rho_s * cp_s * dx) + q_vol,
+                    (
+                        k_s * (T[i, 2] - T[i, 1]) / dx -
+                        k_s * (T[i, 1] - thermal_left[i].T) / (dx / 2)
+                    ) / (rho_s * cp_s * dx) + q_vol,
                 )
             elseif j == nx
                 # Right boundary cell: right neighbor is virtual at thermal_right[i].T,
@@ -75,18 +75,18 @@ function _diffusion_eqs(
                 push!(
                     eqs,
                     Dt(T[i, nx]) ~
-                        (
-                            k_s * (thermal_right[i].T - T[i, nx]) / (dx / 2) -
-                            k_s * (T[i, nx] - T[i, nx - 1]) / dx
-                        ) / (rho_s * cp_s * dx) + q_vol,
+                    (
+                        k_s * (thermal_right[i].T - T[i, nx]) / (dx / 2) -
+                        k_s * (T[i, nx] - T[i, nx - 1]) / dx
+                    ) / (rho_s * cp_s * dx) + q_vol,
                 )
             else
                 # Interior cells: standard second-order FD stencil (LOCKED)
                 push!(
                     eqs,
                     Dt(T[i, j]) ~
-                        k_s * (T[i, j + 1] - 2 * T[i, j] + T[i, j - 1]) /
-                        (dx^2 * rho_s * cp_s) + q_vol,
+                    k_s * (T[i, j + 1] - 2 * T[i, j] + T[i, j - 1]) /
+                    (dx^2 * rho_s * cp_s) + q_vol,
                 )
             end
         end
