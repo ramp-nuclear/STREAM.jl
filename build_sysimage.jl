@@ -22,11 +22,7 @@ using PackageCompiler
 @info "MTK load time is handled by Julia's automatic pkgimage cache (~/.julia/compiled/)."
 @info "For fast mtkcompile: keep a persistent Julia REPL open with Revise.jl."
 
-create_sysimage(
-    ["STREAM", "QuadGK"];
-    sysimage_path = "stream.so",
-    project = "."
-)
+create_sysimage(["STREAM", "QuadGK"]; sysimage_path="stream.so", project=".")
 
 @info "Done! sysimage written to stream.so"
 @info "Run tests with: julia --sysimage stream.so --project=. test/runtests.jl"

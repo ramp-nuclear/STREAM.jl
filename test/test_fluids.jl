@@ -10,9 +10,9 @@ using STREAM
 # Tolerance: rtol=1e-6 (deterministic polynomial; any larger diff = unit error)
 # ─────────────────────────────────────────────────────────────────
 @testset "FOUND-02: rho_water" begin
-    @test isapprox(rho_water(300.0), 995.925708;  rtol=1e-5)
-    @test isapprox(rho_water(350.0), 973.771824;  rtol=1e-5)
-    @test isapprox(rho_water(400.0), 938.700383;  rtol=1e-5)
+    @test isapprox(rho_water(300.0), 995.925708; rtol=1e-5)
+    @test isapprox(rho_water(350.0), 973.771824; rtol=1e-5)
+    @test isapprox(rho_water(400.0), 938.700383; rtol=1e-5)
 end
 
 @testset "FOUND-02: cp_water" begin
@@ -80,9 +80,9 @@ end
 # Reference values from Python STREAM light_water.py docstring
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-03: sat_temperature" begin
-    @test isapprox(sat_temperature(1e5),     372.78; rtol=1e-4)   # 99.63 C
-    @test isapprox(sat_temperature(0.5e5),   354.43; rtol=1e-4)   # 81.28 C
-    @test isapprox(sat_temperature(2e5),     393.44; rtol=1e-4)   # 120.29 C
+    @test isapprox(sat_temperature(1e5), 372.78; rtol=1e-4)   # 99.63 C
+    @test isapprox(sat_temperature(0.5e5), 354.43; rtol=1e-4)   # 81.28 C
+    @test isapprox(sat_temperature(2e5), 393.44; rtol=1e-4)   # 120.29 C
     @test isapprox(sat_temperature(101325.0), 373.15; rtol=1e-3)  # 100.00 C (1 atm)
 end
 

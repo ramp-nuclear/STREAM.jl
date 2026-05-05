@@ -15,22 +15,41 @@
 # power_shape[i,j] is NOT normalised internally.
 #
 # v0.4 note: add dz, kz arguments here for axial (z) diffusion (DIFF-01).
-function _diffusion_eqs(eqs::Vector{Equation};
-    T, thermal_left, thermal_right,
-    nz, nx, k_s, rho_s, cp_s, dx, dz, y, power, power_shape, Dt)
-
+function _diffusion_eqs(
+    eqs::Vector{Equation};
+    T,
+    thermal_left,
+    thermal_right,
+    nz,
+    nx,
+    k_s,
+    rho_s,
+    cp_s,
+    dx,
+    dz,
+    y,
+    power,
+    power_shape,
+    Dt,
+)
     for i in 1:nz
         # Left boundary Q_flow: heat flux INTO hd at left face (positive = into component).
         # When plate is hotter than boundary: Q_flow_left < 0 (heat leaving plate).
         # Formula: k * (T_bc - T_plate) / (dx/2), negative when T_plate > T_bc.
-        push!(eqs, thermal_left[i].Q_flow ~
-            k_s * (y * dz) * (thermal_left[i].T - T[i, 1]) / (dx / 2))
+        push!(
+            eqs,
+            thermal_left[i].Q_flow ~
+                k_s * (y * dz) * (thermal_left[i].T - T[i, 1]) / (dx / 2),
+        )
 
         # Right boundary Q_flow: heat flux INTO hd at right face (positive = into component).
         # When plate is hotter than boundary: Q_flow_right < 0 (heat leaving plate).
         # Formula: k * (T_bc - T_plate) / (dx/2), negative when T_plate > T_bc.
-        push!(eqs, thermal_right[i].Q_flow ~
-            k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2))
+        push!(
+            eqs,
+            thermal_right[i].Q_flow ~
+                k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2),
+        )
     end
 
     for i in 1:nz
@@ -42,22 +61,33 @@ function _diffusion_eqs(eqs::Vector{Equation};
             if j == 1
                 # Left boundary cell: left neighbor is virtual at thermal_left[i].T,
                 # half a dx away from cell centre. Right flux over full dx.
-                push!(eqs, Dt(T[i, 1]) ~
-                    (k_s * (T[i, 2] - T[i, 1]) / dx
-                     - k_s * (T[i, 1] - thermal_left[i].T) / (dx / 2)) /
-                    (rho_s * cp_s * dx) + q_vol)
+                push!(
+                    eqs,
+                    Dt(T[i, 1]) ~
+                        (
+                            k_s * (T[i, 2] - T[i, 1]) / dx -
+                            k_s * (T[i, 1] - thermal_left[i].T) / (dx / 2)
+                        ) / (rho_s * cp_s * dx) + q_vol,
+                )
             elseif j == nx
                 # Right boundary cell: right neighbor is virtual at thermal_right[i].T,
                 # half a dx away from cell centre. Left flux over full dx.
-                push!(eqs, Dt(T[i, nx]) ~
-                    (k_s * (thermal_right[i].T - T[i, nx]) / (dx / 2)
-                     - k_s * (T[i, nx] - T[i, nx-1]) / dx) /
-                    (rho_s * cp_s * dx) + q_vol)
+                push!(
+                    eqs,
+                    Dt(T[i, nx]) ~
+                        (
+                            k_s * (thermal_right[i].T - T[i, nx]) / (dx / 2) -
+                            k_s * (T[i, nx] - T[i, nx - 1]) / dx
+                        ) / (rho_s * cp_s * dx) + q_vol,
+                )
             else
                 # Interior cells: standard second-order FD stencil (LOCKED)
-                push!(eqs, Dt(T[i, j]) ~
-                    k_s * (T[i, j+1] - 2*T[i, j] + T[i, j-1]) / (dx^2 * rho_s * cp_s)
-                    + q_vol)
+                push!(
+                    eqs,
+                    Dt(T[i, j]) ~
+                        k_s * (T[i, j + 1] - 2 * T[i, j] + T[i, j - 1]) /
+                        (dx^2 * rho_s * cp_s) + q_vol,
+                )
             end
         end
     end
@@ -96,6 +126,7 @@ end
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
+#! format: off
 function HeatDiffusion(; name,
                          nz::Int, nx::Int,
                          Lz, Lx, y,
@@ -103,6 +134,7 @@ function HeatDiffusion(; name,
                          power_shape,
                          power  = 1e6,
                          T0     = 600.0)
+#! format: on
     power_init = power
     Dt = Differential(t)
     dx = Lx / nx
@@ -113,27 +145,35 @@ function HeatDiffusion(; name,
         power(t) = power_init
     end
 
-    thermal_left  = [ThermalPort(name=Symbol(:thermal_left, i))  for i in 1:nz]
-    thermal_right = [ThermalPort(name=Symbol(:thermal_right, i)) for i in 1:nz]
+    thermal_left = [ThermalPort(; name=Symbol(:thermal_left, i)) for i in 1:nz]
+    thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:nz]
 
     # Extract T and power symbolics from vars
-    T_var     = vars[1]
+    T_var = vars[1]
     power_var = vars[2]
 
     eqs = Equation[]
-    _diffusion_eqs(eqs;
-        T            = T_var,
-        thermal_left  = thermal_left,
-        thermal_right = thermal_right,
-        nz = nz, nx = nx,
-        k_s = k_s, rho_s = rho_s, cp_s = cp_s,
-        dx = dx, dz = dz, y = y,
-        power        = power_var,
-        power_shape  = power_shape,
-        Dt           = Dt)
+    _diffusion_eqs(
+        eqs;
+        T=T_var,
+        thermal_left=thermal_left,
+        thermal_right=thermal_right,
+        nz=nz,
+        nx=nx,
+        k_s=k_s,
+        rho_s=rho_s,
+        cp_s=cp_s,
+        dx=dx,
+        dz=dz,
+        y=y,
+        power=power_var,
+        power_shape=power_shape,
+        Dt=Dt,
+    )
 
     all_vars = vcat(vec(collect(T_var)), [power_var])
 
-    compose(System(eqs, t, all_vars, []; name=name),
-            thermal_left..., thermal_right...)
+    return compose(
+        System(eqs, t, all_vars, []; name=name), thermal_left..., thermal_right...
+    )
 end

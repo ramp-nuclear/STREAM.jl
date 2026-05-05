@@ -28,18 +28,22 @@ using STREAM
         result2 = Bergles_Rohsenow_T_ONB(1e5, 1e5, 350.0)
         @test result2 == 350.0 + STREAM._bergles_rohsenow_dT_ONB(1e5, 1e5)
         # Higher wall flux → larger dT_ONB
-        @test Bergles_Rohsenow_T_ONB(1e5, 2e5, 373.15) > Bergles_Rohsenow_T_ONB(1e5, 1e5, 373.15)
+        @test Bergles_Rohsenow_T_ONB(1e5, 2e5, 373.15) >
+            Bergles_Rohsenow_T_ONB(1e5, 1e5, 373.15)
     end
 
     @testset "THRS-02: q_boiling_onset" begin
         # Formula: abs(mdot) * cp * (T_sat - T_inlet)
-        @test q_boiling_onset(0.5, 373.15, 300.0, 4180.0) ≈ 0.5 * 4180.0 * (373.15 - 300.0) rtol=1e-10
+        @test q_boiling_onset(0.5, 373.15, 300.0, 4180.0) ≈ 0.5 * 4180.0 * (373.15 - 300.0) rtol =
+            1e-10
         # abs(mdot): negative flow gives same result
-        @test q_boiling_onset(-0.5, 373.15, 300.0, 4180.0) ≈ q_boiling_onset(0.5, 373.15, 300.0, 4180.0)
+        @test q_boiling_onset(-0.5, 373.15, 300.0, 4180.0) ≈
+            q_boiling_onset(0.5, 373.15, 300.0, 4180.0)
         # T_sat == T_inlet → zero power needed
-        @test q_boiling_onset(0.5, 373.15, 373.15, 4180.0) ≈ 0.0 atol=1e-10
+        @test q_boiling_onset(0.5, 373.15, 373.15, 4180.0) ≈ 0.0 atol = 1e-10
         # Larger mdot → higher power
-        @test q_boiling_onset(1.0, 373.15, 300.0, 4180.0) > q_boiling_onset(0.5, 373.15, 300.0, 4180.0)
+        @test q_boiling_onset(1.0, 373.15, 300.0, 4180.0) >
+            q_boiling_onset(0.5, 373.15, 300.0, 4180.0)
     end
 
     @testset "THRS-03: q_OFI_whittle_forgan" begin
@@ -51,7 +55,7 @@ using STREAM
         q_onset = q_boiling_onset(0.5, 373.15, 300.0, cp_water(300.0))
         @test result < q_onset
         # abs(mdot): negative flow gives same result
-        @test q_OFI_whittle_forgan(-0.5, 373.15, 300.0, pipe) ≈ result rtol=1e-10
+        @test q_OFI_whittle_forgan(-0.5, 373.15, 300.0, pipe) ≈ result rtol = 1e-10
     end
 
     @testset "THRS-04: q_OSV_saha_zuber" begin
@@ -59,7 +63,9 @@ using STREAM
         @test result > 0  # positive flux
         @test result isa Float64
         # With explicit flux_shape (uniform vector)
-        result2 = q_OSV_saha_zuber(300.0, 0.5, pipe; flux_shape=ones(10), dz=0.06*ones(10))
+        result2 = q_OSV_saha_zuber(
+            300.0, 0.5, pipe; flux_shape=ones(10), dz=0.06 * ones(10)
+        )
         @test result2 > 0
         @test result2 isa Float64
     end
@@ -85,20 +91,23 @@ using STREAM
         T_bulk = 320.0
         T_sat = 373.15
         P = 1e5
-        expected = 1.51e6 * (1 + 0.1198*v) * (1 + 0.00914*(T_sat - T_bulk)) * (1 + 0.19e-5*P)
-        @test q_CHF_mirshak(T_bulk, T_sat, P, v) ≈ expected rtol=1e-10
+        expected =
+            1.51e6 * (1 + 0.1198 * v) * (1 + 0.00914 * (T_sat - T_bulk)) * (1 + 0.19e-5 * P)
+        @test q_CHF_mirshak(T_bulk, T_sat, P, v) ≈ expected rtol = 1e-10
         # Higher velocity → higher CHF
-        @test q_CHF_mirshak(320.0, 373.15, 1e5, 3.0) > q_CHF_mirshak(320.0, 373.15, 1e5, 2.0)
+        @test q_CHF_mirshak(320.0, 373.15, 1e5, 3.0) >
+            q_CHF_mirshak(320.0, 373.15, 1e5, 2.0)
         # Higher subcooling → higher CHF
-        @test q_CHF_mirshak(300.0, 373.15, 1e5, 2.0) > q_CHF_mirshak(320.0, 373.15, 1e5, 2.0)
+        @test q_CHF_mirshak(300.0, 373.15, 1e5, 2.0) >
+            q_CHF_mirshak(320.0, 373.15, 1e5, 2.0)
     end
 
     @testset "THRS-07: q_CHF_fabrega" begin
         # Formula: 1e7 * Dh * (0.023*(T_sat - T_inlet) + 4.56)
         T_inlet = 300.0
         T_sat = 373.15
-        expected = 1e7 * pipe.Dh * (0.023*(T_sat - T_inlet) + 4.56)
-        @test q_CHF_fabrega(T_inlet, T_sat, pipe) ≈ expected rtol=1e-10
+        expected = 1e7 * pipe.Dh * (0.023 * (T_sat - T_inlet) + 4.56)
+        @test q_CHF_fabrega(T_inlet, T_sat, pipe) ≈ expected rtol = 1e-10
         # Higher subcooling → higher CHF
         @test q_CHF_fabrega(280.0, 373.15, pipe) > q_CHF_fabrega(300.0, 373.15, pipe)
     end
@@ -110,7 +119,6 @@ using STREAM
         # Monotonicity
         @test twall_limit(400.0, 1.5) > twall_limit(400.0, 1.2)
     end
-
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -120,10 +128,10 @@ end
 # ─────────────────────────────────────────────────────────────────────────────
 
 @testset "THRS-09: ChannelState and wrappers" begin
-
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 5
 
+    #! format: off
     # Construct a mock ChannelState manually using @kwdef
     state = ChannelState(
         n            = n,
@@ -143,6 +151,7 @@ end
         pipe         = pipe,
         gravity      = 9.81,
     )
+    #! format: on
 
     @testset "ChannelState construction" begin
         @test state.n == n
@@ -165,8 +174,12 @@ end
         @test length(result) == n
         @test all(result .> 0)
         # Verify formula: 1.51e6 * (1+0.1198*v) * (1+0.00914*(T_sat-T_bulk)) * (1+0.19e-5*P)
-        expected_val = 1.51e6 * (1 + 0.1198*3.0) * (1 + 0.00914*(373.15 - 320.0)) * (1 + 0.19e-5*1e5)
-        @test result[1] ≈ expected_val rtol=1e-10
+        expected_val =
+            1.51e6 *
+            (1 + 0.1198 * 3.0) *
+            (1 + 0.00914 * (373.15 - 320.0)) *
+            (1 + 0.19e-5 * 1e5)
+        @test result[1] ≈ expected_val rtol = 1e-10
     end
 
     @testset "Fabrega_CHF wrapper" begin
@@ -174,8 +187,8 @@ end
         @test length(result) == n
         @test all(result .> 0)
         # Verify: 1e7 * Dh * (0.023*(T_sat - T_inlet) + 4.56) — T_inlet is scalar state field
-        expected_val = 1e7 * pipe.Dh * (0.023*(373.15 - 300.0) + 4.56)
-        @test result[1] ≈ expected_val rtol=1e-10
+        expected_val = 1e7 * pipe.Dh * (0.023 * (373.15 - 300.0) + 4.56)
+        @test result[1] ≈ expected_val rtol = 1e-10
     end
 
     @testset "Sudo_Kaminaga_CHF wrapper" begin
@@ -190,7 +203,7 @@ end
         @test all(result .> 0)
         # Formula: abs(mdot) * cp * (T_sat - T_inlet)
         expected_val = abs(0.5) * cp_water(320.0) * (373.15 - 300.0)
-        @test result[1] ≈ expected_val rtol=1e-8
+        @test result[1] ≈ expected_val rtol = 1e-8
     end
 
     @testset "OFI_power wrapper" begin
@@ -217,13 +230,12 @@ end
         result_default = twall_limit(state)
         @test all(result_default .≈ 340.0)
     end
-
 end
 
 @testset "THRS-09: chfr helper" begin
-
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 3
+    #! format: off
     state = ChannelState(
         n            = n,
         T_bulk       = fill(320.0, n),
@@ -242,6 +254,7 @@ end
         pipe         = pipe,
         gravity      = 9.81,
     )
+    #! format: on
 
     ratio_fn = chfr(Mirshak_CHF; direction=:max)
     ratios = ratio_fn(state)
@@ -249,15 +262,16 @@ end
     @test all(ratios .> 0)  # positive CHF / positive q_flux => positive ratio
 
     # Different directions
-    ratio_left  = chfr(Mirshak_CHF; direction=:left)(state)
+    ratio_left = chfr(Mirshak_CHF; direction=:left)(state)
     ratio_right = chfr(Mirshak_CHF; direction=:right)(state)
     ratio_total = chfr(Mirshak_CHF; direction=:total)(state)
-    @test length(ratio_left)  == n
+    @test length(ratio_left) == n
     @test length(ratio_right) == n
     @test length(ratio_total) == n
     # q_flux_right < q_flux_left => right direction gives higher CHFR
     @test all(ratio_right .>= ratio_left)
 
+    #! format: off
     # Guard: q_flux <= 0 must return Inf
     state_zero = ChannelState(
         n            = n,
@@ -277,18 +291,18 @@ end
         pipe         = pipe,
         gravity      = 9.81,
     )
+    #! format: on
     ratios_zero = ratio_fn(state_zero)
     @test all(ratios_zero .== Inf)
 
     # Error on unknown direction
     @test_throws ErrorException chfr(Mirshak_CHF; direction=:bad)(state)
-
 end
 
 @testset "THRS-09: threshold_analysis dispatch" begin
-
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 3
+    #! format: off
     state = ChannelState(
         n            = n,
         T_bulk       = fill(320.0, n),
@@ -307,20 +321,20 @@ end
         pipe         = pipe,
         gravity      = 9.81,
     )
+    #! format: on
 
     # threshold_analysis returns a NamedTuple with the same keys as the supplied kwargs.
     # Verify this by constructing the NamedTuple manually (threshold_analysis with real MTK sol
     # is exercised at the integration level; here we test the dispatch mechanics via the struct).
     manual_result = (mirshak=Mirshak_CHF(state), onb=ONB_temperature(state))
     @test manual_result.mirshak isa AbstractArray
-    @test manual_result.onb     isa AbstractArray
+    @test manual_result.onb isa AbstractArray
     @test length(manual_result.mirshak) == n
-    @test length(manual_result.onb)     == n
+    @test length(manual_result.onb) == n
 
     # Verify chfr works when composed into threshold_analysis pattern manually:
     mirshak_chfr = chfr(Mirshak_CHF; direction=:max)
     chfr_result = mirshak_chfr(state)
     @test length(chfr_result) == n
     @test all(chfr_result .> 0)
-
 end

@@ -45,24 +45,29 @@ Convective channel with per-cell thermal contact arrays on both sides for conjug
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
-                              htc_correlation      = dittus_boelter,
-                              friction_correlation = blasius_friction,
-                              scb_correction       = nothing)
+function ChannelAndContacts(;
+    name,
+    n::Int,
+    geometry::PipeGeometry,
+    g=0.0,
+    htc_correlation=dittus_boelter,
+    friction_correlation=blasius_friction,
+    scb_correction=nothing,
+)
     Dh = geometry.Dh
-    A  = geometry.A
-    L  = geometry.L
+    A = geometry.A
+    L = geometry.L
     Dt = Differential(t)
 
     pars = @parameters begin
-        L     = L
-        D_h   = Dh
-        A     = A
+        L = L
+        D_h = Dh
+        A = A
         g_acc = g
     end
 
     vars = @variables begin
-        (T(t))[1:n]           = fill(600.0, n)
+        (T(t))[1:n] = fill(600.0, n)
         (Re(t))[1:n]          # observed -- hydraulic Reynolds number
         (Nu(t))[1:n]          # observed -- Nusselt number
         (h_tc(t))[1:n] = fill(5000.0, n)  # unknown -- HTC; default guess for SCB solver convergence
@@ -77,23 +82,23 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         (q_wall_right(t))[1:n] # observed -- Q_flow from right face
         (Gr_over_Re2(t))[1:n]  # observed -- Gr/Re^2 NC criterion
         (q_wall(t))[1:n]      # unknown  -- per-cell total heat (referenced in Q_wall_total)
-        (dp(t))[1:n]          = fill(100.0, n)  # unknown  -- per-cell pressure drop
+        (dp(t))[1:n] = fill(100.0, n)  # unknown  -- per-cell pressure drop
         (P(t))[1:n]           # observed -- per-cell absolute pressure
         (T_sat(t))[1:n]       # observed -- saturation temperature at P[i]
         (T_ONB(t))[1:n]       # observed -- onset of nucleate boiling temperature
-        T_out(t)              = 600.0
+        T_out(t) = 600.0
         dP(t)                 # observed -- total pressure drop alias
         Q_wall_total(t)
     end
 
-    @named port_in  = FlowPort()
+    @named port_in = FlowPort()
     @named port_out = FlowPort()
     # Dual per-cell ThermalPort arrays -- Phase 10 two-sided interface
-    thermal_left  = [ThermalPort(name=Symbol(:thermal_left, i))  for i in 1:n]
-    thermal_right = [ThermalPort(name=Symbol(:thermal_right, i)) for i in 1:n]
+    thermal_left = [ThermalPort(; name=Symbol(:thermal_left, i)) for i in 1:n]
+    thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:n]
 
-    dz          = L / n
-    eqs         = Equation[]
+    dz = L / n
+    eqs = Equation[]
     T_inlet_fwd = instream(port_in.T)
     T_inlet_rev = instream(port_out.T)
 
@@ -101,12 +106,29 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     # observed_mode=true: Re/Nu/v equations are NOT pushed to eqs here
     # Build T_wall_cells from thermal_left ports for HTC computation
     _T_wall_cells = [thermal_left[i].T for i in 1:n]
-    _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dp,
-                      port_in, port_out, Dh, A, L, g_acc=g, dz,
-                      htc_correlation, friction_correlation,
-                      observed_mode=true,
-                      T_wall_cells=_T_wall_cells,
-                      skip_htc=(scb_correction !== nothing))
+    _channel_base_eqs(
+        eqs;
+        n,
+        T,
+        Re,
+        Nu,
+        h_tc,
+        v,
+        T_out,
+        dp,
+        port_in,
+        port_out,
+        Dh,
+        A,
+        L,
+        g_acc=g,
+        dz,
+        htc_correlation,
+        friction_correlation,
+        observed_mode=true,
+        T_wall_cells=_T_wall_cells,
+        skip_htc=(scb_correction !== nothing),
+    )
 
     # SCB-corrected h_tc[i] equations (ISCB-01): when scb_correction is provided,
     # h_tc[i] = ifelse(T_wall >= T_ONB, h_spl * partial_factor, h_spl).
@@ -119,7 +141,9 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
             h_spl_i = htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T[i]) / Dh
 
             # Inline P[i] expression (not the observed symbol) to avoid observed-to-observed chain
-            P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+            P_i =
+                port_in.P - sum(dp[j] for j in 1:i) -
+                (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
             T_sat_i = sat_temperature(P_i)
             # max(q_spl, 0) guards _bergles_rohsenow_dT_ONB against DomainError:
             # during solver iteration q_spl can temporarily go negative, and
@@ -137,19 +161,30 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
 
     # Per-cell energy balance: two-sided heating (geometry.heated_parts[1]/[2] per face)
     for i in 1:n
-        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i-1]
-        T_up_rev = (i == n) ? T_inlet_rev : T[i+1]
+        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i - 1]
+        T_up_rev = (i == n) ? T_inlet_rev : T[i + 1]
         T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
-        push!(eqs,
-            Dt(T[i]) ~ (abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i])
-                       + h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T  - T[i])
-                       + h_tc[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i]))
-                      / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
+        push!(
+            eqs,
+            Dt(T[i]) ~
+            (
+                abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i]) +
+                h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T - T[i]) +
+                h_tc[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i])
+            ) / (rho_water(T[i]) * cp_water(T[i]) * A * dz),
         )
         # Port heat flow equations: Q_flow INTO channel from each wall face
         # When unconnected (adiabatic), T_wall = T[i] => Q_flow = 0
-        push!(eqs, thermal_left[i].Q_flow  ~ h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T  - T[i]))
-        push!(eqs, thermal_right[i].Q_flow ~ h_tc[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i]))
+        push!(
+            eqs,
+            thermal_left[i].Q_flow ~
+            h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T - T[i]),
+        )
+        push!(
+            eqs,
+            thermal_right[i].Q_flow ~
+            h_tc[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i]),
+        )
         push!(eqs, q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow)
     end
 
@@ -162,16 +197,16 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     for i in 1:n
         Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
         Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
-        push!(obs, Re[i]            ~ Re_i)
-        push!(obs, Nu[i]            ~ htc_correlation(Re_i, Pr_i, T[i], thermal_left[i].T))
-        push!(obs, v[i]             ~ port_in.mdot / (rho_water(T[i]) * A))
-        push!(obs, velocity[i]      ~ abs(port_in.mdot) / (rho_water(T[i]) * A))
-        push!(obs, Pe[i]            ~ Re_i * Pr_i)
-        push!(obs, h_tc_left[i]    ~ h_tc[i])
-        push!(obs, h_tc_right[i]   ~ h_tc[i])
-        push!(obs, T_wall_left[i]  ~ thermal_left[i].T)
+        push!(obs, Re[i] ~ Re_i)
+        push!(obs, Nu[i] ~ htc_correlation(Re_i, Pr_i, T[i], thermal_left[i].T))
+        push!(obs, v[i] ~ port_in.mdot / (rho_water(T[i]) * A))
+        push!(obs, velocity[i] ~ abs(port_in.mdot) / (rho_water(T[i]) * A))
+        push!(obs, Pe[i] ~ Re_i * Pr_i)
+        push!(obs, h_tc_left[i] ~ h_tc[i])
+        push!(obs, h_tc_right[i] ~ h_tc[i])
+        push!(obs, T_wall_left[i] ~ thermal_left[i].T)
         push!(obs, T_wall_right[i] ~ thermal_right[i].T)
-        push!(obs, q_wall_left[i]  ~ thermal_left[i].Q_flow)
+        push!(obs, q_wall_left[i] ~ thermal_left[i].Q_flow)
         push!(obs, q_wall_right[i] ~ thermal_right[i].Q_flow)
         nu_i = mu_water(T[i]) / rho_water(T[i])
         Gr_i = Gr(beta_water(T[i]), g_acc, thermal_left[i].T - T[i], Dh, nu_i)
@@ -179,7 +214,9 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
         # Per-cell absolute pressure, T_sat, T_ONB (D-05, D-06, D-11, D-12)
         # CRITICAL: Use P_i expression (not P[i] symbol) to avoid observed-to-observed chain
         # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
-        P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+        P_i =
+            port_in.P - sum(dp[j] for j in 1:i) -
+            (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
         push!(obs, P[i] ~ P_i)
         push!(obs, T_sat[i] ~ sat_temperature(P_i))
         q_spl_i = q_wall[i] / (sum(geometry.heated_parts) * dz)
@@ -190,10 +227,17 @@ function ChannelAndContacts(; name, n::Int, geometry::PipeGeometry, g = 0.0,
 
     # Re, Nu, v are now observed (not solver unknowns)
     # dP, P[i], T_sat[i], T_ONB[i] are also observed
-    all_vars = [collect(T); collect(h_tc); collect(q_wall); collect(dp); T_out; Q_wall_total]
+    all_vars = [
+        collect(T); collect(h_tc); collect(q_wall); collect(dp); T_out; Q_wall_total
+    ]
 
-    compose(System(eqs, t, all_vars, pars; observed=obs, name=name),
-            port_in, port_out, thermal_left..., thermal_right...)
+    compose(
+        System(eqs, t, all_vars, pars; observed=obs, name=name),
+        port_in,
+        port_out,
+        thermal_left...,
+        thermal_right...,
+    )
 end
 
 # ChannelHeatFlux (THERM-03): heated channel with T_wall as a scalar parameter.
@@ -226,74 +270,108 @@ Convective channel with a fixed wall temperature applied uniformly to all cells.
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall,
-                           htc_correlation      = dittus_boelter,
-                           friction_correlation = blasius_friction)
+function ChannelHeatFlux(;
+    name,
+    n::Int,
+    geometry::PipeGeometry,
+    g=0.0,
+    T_wall,
+    htc_correlation=dittus_boelter,
+    friction_correlation=blasius_friction,
+)
     Dh = geometry.Dh
-    A  = geometry.A
-    L  = geometry.L
+    A = geometry.A
+    L = geometry.L
     Dt = Differential(t)
 
     pars = @parameters begin
-        L        = L
-        D_h      = Dh
-        A        = A
-        g_acc    = g
+        L = L
+        D_h = Dh
+        A = A
+        g_acc = g
         T_wall_p = T_wall   # scalar wall temperature parameter (K)
     end
 
     vars = @variables begin
-        (T(t))[1:n]           = fill(600.0, n)
+        (T(t))[1:n] = fill(600.0, n)
         (Re(t))[1:n]
         (Nu(t))[1:n]
         (h_tc(t))[1:n]
         (v(t))[1:n]
         (q_wall(t))[1:n]
         (Gr_over_Re2(t))[1:n]
-        (dp(t))[1:n]          = fill(100.0, n)  # unknown -- per-cell pressure drop
+        (dp(t))[1:n] = fill(100.0, n)  # unknown -- per-cell pressure drop
         (P(t))[1:n]           # observed -- per-cell absolute pressure
         (T_sat(t))[1:n]       # observed -- saturation temperature at P[i]
         (T_ONB(t))[1:n]       # observed -- onset of nucleate boiling temperature
-        T_out(t)              = 600.0
+        T_out(t) = 600.0
         dP(t)                 # observed -- total pressure drop alias
     end
 
-    @named port_in  = FlowPort()
+    @named port_in = FlowPort()
     @named port_out = FlowPort()
 
-    dz          = L / n
-    eqs         = Equation[]
+    dz = L / n
+    eqs = Equation[]
     T_inlet_fwd = instream(port_in.T)
     T_inlet_rev = instream(port_out.T)
 
     # Common equations: v, Re, Nu, h_tc, dp[i], T_out, port wiring
     # Pass T_wall_p as T_wall_cells so the htc_correlation receives the actual wall
     # temperature (needed for NC regime detection in regime_dependent: Gr/Re^2>1 check).
-    _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dp,
-                      port_in, port_out, Dh, A, L, g_acc=g, dz,
-                      htc_correlation, friction_correlation,
-                      T_wall_cells = fill(T_wall_p, n))
+    _channel_base_eqs(
+        eqs;
+        n,
+        T,
+        Re,
+        Nu,
+        h_tc,
+        v,
+        T_out,
+        dp,
+        port_in,
+        port_out,
+        Dh,
+        A,
+        L,
+        g_acc=g,
+        dz,
+        htc_correlation,
+        friction_correlation,
+        T_wall_cells=fill(T_wall_p, n),
+    )
 
     # Per-cell energy balance using T_wall_p parameter
     for i in 1:n
-        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i-1]
-        T_up_rev = (i == n) ? T_inlet_rev : T[i+1]
+        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i - 1]
+        T_up_rev = (i == n) ? T_inlet_rev : T[i + 1]
         T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
-        push!(eqs,
-            Dt(T[i]) ~ (abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i])
-                       + h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i]))
-                      / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
+        push!(
+            eqs,
+            Dt(T[i]) ~
+            (
+                abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i]) +
+                h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i])
+            ) / (rho_water(T[i]) * cp_water(T[i]) * A * dz),
         )
-        push!(eqs, q_wall[i] ~ h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i]))
+        push!(
+            eqs, q_wall[i] ~ h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i])
+        )
         nu_i = mu_water(T[i]) / rho_water(T[i])
-        push!(eqs, Gr_over_Re2[i] ~ Gr(beta_water(T[i]), g_acc, T_wall_p - T[i], Dh, nu_i) / Re[i]^2)
+        push!(
+            eqs,
+            Gr_over_Re2[i] ~
+            Gr(beta_water(T[i]), g_acc, T_wall_p - T[i], Dh, nu_i) / Re[i]^2,
+        )
     end
 
     # Observed equations: P[i], T_sat[i], T_ONB[i], dP (D-05, D-11, D-12)
     # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
     obs = Equation[]
     for i in 1:n
-        P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+        P_i =
+            port_in.P - sum(dp[j] for j in 1:i) -
+            (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
         push!(obs, P[i] ~ P_i)
         push!(obs, T_sat[i] ~ sat_temperature(P_i))
         q_spl_i = q_wall[i] / (sum(geometry.heated_parts) * dz)
@@ -302,8 +380,17 @@ function ChannelHeatFlux(; name, n::Int, geometry::PipeGeometry, g = 0.0, T_wall
     # dP observed: total pressure drop including inertia
     push!(obs, dP ~ port_in.P - port_out.P)
 
-    all_vars = [collect(T); collect(Re); collect(Nu); collect(h_tc);
-                collect(v); collect(q_wall); collect(Gr_over_Re2); collect(dp); T_out]
+    all_vars = [
+        collect(T);
+        collect(Re);
+        collect(Nu);
+        collect(h_tc);
+        collect(v);
+        collect(q_wall);
+        collect(Gr_over_Re2);
+        collect(dp);
+        T_out
+    ]
 
     compose(System(eqs, t, all_vars, pars; observed=obs, name=name), port_in, port_out)
 end

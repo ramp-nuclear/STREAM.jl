@@ -23,7 +23,9 @@ import STREAM: PipeGeometry_rectangular, PipeGeometry_circular
     geo_r = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07, one_sided=:right)
     @test geo_r.heated_parts == (0.0, 0.07)
     # invalid one_sided throws
-    @test_throws Exception PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07, one_sided=:bad_value)
+    @test_throws Exception PipeGeometry_rectangular(
+        0.6, 0.07, 0.00127, 0.07, one_sided=:bad_value
+    )
 end
 
 @testset "PHY-01: PipeGeometry_circular geometry" begin

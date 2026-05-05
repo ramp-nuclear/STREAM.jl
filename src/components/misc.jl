@@ -28,15 +28,15 @@ network topology -- correct physics (distributed + concentrated).
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
 function Inertia(L_over_A; name)
-    Dt   = Differential(t)           # same operator used in Channel energy balance
+    Dt = Differential(t)           # same operator used in Channel energy balance
     pars = @parameters L_over_A = L_over_A
-    @named port_in  = FlowPort()
+    @named port_in = FlowPort()
     @named port_out = FlowPort()
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
         port_in.P - port_out.P ~ L_over_A * Dt(port_in.mdot),   # ODE pressure eq
         port_out.T ~ instream(port_in.T),
-        port_in.T  ~ instream(port_out.T),
+        port_in.T ~ instream(port_out.T),
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
@@ -63,13 +63,13 @@ Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
 function HeatExchanger(T_bc; name)
     pars = @parameters T_bc = T_bc
-    @named port_in  = FlowPort()
+    @named port_in = FlowPort()
     @named port_out = FlowPort()
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,    # mass conservation
-        port_in.P   - port_out.P    ~ 0,     # no pressure drop
-        port_out.T  ~ T_bc,                   # inject fixed outlet temperature
-        port_in.T   ~ T_bc,                   # backward stream: also reset to T_bc
+        port_in.P - port_out.P ~ 0,     # no pressure drop
+        port_out.T ~ T_bc,                   # inject fixed outlet temperature
+        port_in.T ~ T_bc,                   # backward stream: also reset to T_bc
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end

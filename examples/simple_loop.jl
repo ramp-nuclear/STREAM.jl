@@ -30,27 +30,35 @@ gr()
 # SECTION 1: Parameters
 # =============================================================================
 
+#! format: off
 const N_CELLS   = 10        # axial discretization cells
 const T_INLET   = 313.15    # K (40°C) coolant inlet temperature
 const T_WALL    = 373.15    # K (~100°C) wall temperature
 const DP_PUMP   = 3.0e4     # Pa pump pressure rise
 const L_CHANNEL = 0.6       # m channel length
 const D_CHANNEL = 0.01      # m hydraulic diameter
+#! format: on
 
 # =============================================================================
 # SECTION 2: Build and compile
 # =============================================================================
 
 println("Building loop...")
-ssys = build_loop(n=N_CELLS, T_inlet=T_INLET, T_wall=T_WALL,
-                  L_ch=L_CHANNEL, D_ch=D_CHANNEL, dP_pump=DP_PUMP)
+ssys = build_loop(;
+    n=N_CELLS,
+    T_inlet=T_INLET,
+    T_wall=T_WALL,
+    L_ch=L_CHANNEL,
+    D_ch=D_CHANNEL,
+    dP_pump=DP_PUMP,
+)
 
 # =============================================================================
 # SECTION 3: Initial guess and solve
 # =============================================================================
 
 # Initial guess using steady_state_guess helper
-T_guess = steady_state_guess(T_inlet=T_INLET, Q_wall=1e4, mdot_guess=0.490, n=N_CELLS)
+T_guess = steady_state_guess(; T_inlet=T_INLET, Q_wall=1e4, mdot_guess=0.490, n=N_CELLS)
 op = [ssys.ch.T[i] => T_guess[i] for i in 1:N_CELLS]
 push!(op, ssys.ch.port_in.mdot => 0.490)
 
@@ -65,8 +73,8 @@ end
 # SECTION 4: Extract and print results
 # =============================================================================
 
-T_out  = sol[ssys.ch.T_out]
-mdot   = abs(sol[ssys.ch.port_in.mdot])
+T_out = sol[ssys.ch.T_out]
+mdot = abs(sol[ssys.ch.port_in.mdot])
 T_axial = [sol[ssys.ch.T[i]] for i in 1:N_CELLS]
 
 println("Steady-state results:")
@@ -78,15 +86,20 @@ println("  T_rise   = $(round(T_out - T_INLET, digits=2)) K")
 # SECTION 5: Plot axial temperature profile
 # =============================================================================
 
-z_positions = range(0.0, L_CHANNEL, length=N_CELLS)
-p = plot(z_positions, T_axial .- 273.15,
-         xlabel="Axial position [m]",
-         ylabel="Fluid temperature [°C]",
-         title="STREAM.jl — Simple Loop Steady State",
-         label="T_fluid",
-         linewidth=2, marker=:circle, markersize=4)
-hline!([T_WALL - 273.15], linestyle=:dash, label="T_wall", color=:red)
-hline!([T_INLET - 273.15], linestyle=:dot, label="T_inlet", color=:blue)
+z_positions = range(0.0, L_CHANNEL; length=N_CELLS)
+p = plot(
+    z_positions,
+    T_axial .- 273.15;
+    xlabel="Axial position [m]",
+    ylabel="Fluid temperature [°C]",
+    title="STREAM.jl — Simple Loop Steady State",
+    label="T_fluid",
+    linewidth=2,
+    marker=:circle,
+    markersize=4,
+)
+hline!([T_WALL - 273.15]; linestyle=:dash, label="T_wall", color=:red)
+hline!([T_INLET - 273.15]; linestyle=:dot, label="T_inlet", color=:blue)
 
 mkpath("examples/output")
 savefig(p, "examples/output/simple_loop_temperature.png")

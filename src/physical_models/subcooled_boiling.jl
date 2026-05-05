@@ -124,11 +124,13 @@ Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
 # Returns
 Closure `(T_wall, T_sat, Re) -> q_scb [W/m^2]`.
 """
-function regime_dependent_q_scb(; pressure=1e5, h_fg=2257e3, sigma=0.059, Re_transition=2300)
+function regime_dependent_q_scb(;
+    pressure=1e5, h_fg=2257e3, sigma=0.059, Re_transition=2300
+)
     Re_tr = Float64(Re_transition)
     return (T_wall, T_sat, Re) -> ifelse(
         Re >= Re_tr,
         McAdams_SCB_heat_flux(T_sat, T_wall),
-        Bergles_Rohsenow_SCB_heat_flux(T_wall, T_sat, pressure; h_fg=h_fg, sigma=sigma)
+        Bergles_Rohsenow_SCB_heat_flux(T_wall, T_sat, pressure; h_fg=h_fg, sigma=sigma),
     )
 end

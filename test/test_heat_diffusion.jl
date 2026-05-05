@@ -10,9 +10,17 @@ import STREAM: HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
 # ─────────────────────────────────────────────────────────────────
 @testset "HDIFF-01: HeatDiffusion callable and returns MTK System" begin
     ps = fill(1.0 / (5 * 3), 5, 3)
-    @named hd = HeatDiffusion(nz=5, nx=3, Lz=0.6, Lx=0.005, y=0.07,
-                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                               power_shape=ps)
+    @named hd = HeatDiffusion(
+        nz=5,
+        nx=3,
+        Lz=0.6,
+        Lx=0.005,
+        y=0.07,
+        rho_s=19300.0,
+        cp_s=116.0,
+        k_s=174.0,
+        power_shape=ps,
+    )
     @test hd isa ModelingToolkit.System
 end
 
@@ -22,18 +30,34 @@ end
 
 @testset "HDIFF-01: HeatDiffusion mtkcompile bare (no connections)" begin
     ps = fill(1.0 / (3 * 2), 3, 2)
-    @named hd = HeatDiffusion(nz=3, nx=2, Lz=0.6, Lx=0.005, y=0.07,
-                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                               power_shape=ps)
+    @named hd = HeatDiffusion(
+        nz=3,
+        nx=2,
+        Lz=0.6,
+        Lx=0.005,
+        y=0.07,
+        rho_s=19300.0,
+        cp_s=116.0,
+        k_s=174.0,
+        power_shape=ps,
+    )
     @test_nowarn mtkcompile(hd; fully_determined=false)
 end
 
 @testset "HDIFF-01: HeatDiffusion state T[1:nz, 1:nx] present in unknowns" begin
     nz, nx = 3, 2
     ps = fill(1.0 / (nz * nx), nz, nx)
-    @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
-                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                               power_shape=ps)
+    @named hd = HeatDiffusion(
+        nz=nz,
+        nx=nx,
+        Lz=0.6,
+        Lx=0.005,
+        y=0.07,
+        rho_s=19300.0,
+        cp_s=116.0,
+        k_s=174.0,
+        power_shape=ps,
+    )
     unames = Symbol.(ModelingToolkit.getname.(unknowns(hd)))
     @test :T in unames
     # Count only plate temperature unknowns (excluding thermal port subsystem variables)
@@ -46,12 +70,20 @@ end
 @testset "HDIFF-04: HeatDiffusion has thermal_left and thermal_right subsystems" begin
     nz = 3
     ps = fill(1.0 / (nz * 2), nz, 2)
-    @named hd = HeatDiffusion(nz=nz, nx=2, Lz=0.6, Lx=0.005, y=0.07,
-                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                               power_shape=ps)
+    @named hd = HeatDiffusion(
+        nz=nz,
+        nx=2,
+        Lz=0.6,
+        Lx=0.005,
+        y=0.07,
+        rho_s=19300.0,
+        cp_s=116.0,
+        k_s=174.0,
+        power_shape=ps,
+    )
     sub_names = Symbol.(ModelingToolkit.getname.(ModelingToolkit.get_systems(hd)))
     for i in 1:nz
-        @test Symbol(:thermal_left, i)  in sub_names
+        @test Symbol(:thermal_left, i) in sub_names
         @test Symbol(:thermal_right, i) in sub_names
     end
 end
@@ -62,19 +94,34 @@ end
 @testset "HDIFF-02/03: Steady-state plate T > T_boundary and Q_flow signs correct" begin
     nz, nx = 3, 3
     T_bc = 600.0
-    pwr  = 1e5
-    ps   = fill(1.0 / (nz * nx), nz, nx)
+    pwr = 1e5
+    ps = fill(1.0 / (nz * nx), nz, nx)
 
-    @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
-                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                               power_shape=ps, power=pwr)
+    @named hd = HeatDiffusion(
+        nz=nz,
+        nx=nx,
+        Lz=0.6,
+        Lx=0.005,
+        y=0.07,
+        rho_s=19300.0,
+        cp_s=116.0,
+        k_s=174.0,
+        power_shape=ps,
+        power=pwr,
+    )
 
     ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct_l, i)) for i in 1:nz]
     ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct_r, i)) for i in 1:nz]
 
     conns = [
-        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i)))  for i in 1:nz]...,
-        [connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for i in 1:nz]...,
+        [
+            connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for
+            i in 1:nz
+        ]...,
+        [
+            connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for
+            i in 1:nz
+        ]...,
         hd.power ~ pwr,
     ]
     @named sys = compose(System(conns, t; name=:sys), hd, ct_l..., ct_r...)
@@ -94,9 +141,9 @@ end
     # MTK convention: Q_flow > 0 means heat INTO the component (HeatDiffusion).
     # So heat leaving the hot plate gives Q_flow < 0 on BOTH faces.
     # Energy balance: |Q_left| + |Q_right| = pwr (total power dissipated).
-    left_syms  = [getproperty(ssys.hd, Symbol(:thermal_left, i))  for i in 1:nz]
+    left_syms = [getproperty(ssys.hd, Symbol(:thermal_left, i)) for i in 1:nz]
     right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
-    Q_left_total  = sum(sol[left_syms[i].Q_flow]  for i in 1:nz)
+    Q_left_total = sum(sol[left_syms[i].Q_flow] for i in 1:nz)
     Q_right_total = sum(sol[right_syms[i].Q_flow] for i in 1:nz)
 
     # Both Q_flow < 0: heat leaving the plate (symmetric, plate hotter than T_bc)
@@ -113,12 +160,21 @@ end
 @testset "HDIFF-05: Unconnected thermal_right has Q_flow == 0 (adiabatic)" begin
     nz, nx = 3, 3
     T_bc = 600.0
-    pwr  = 5e4
-    ps   = fill(1.0 / (nz * nx), nz, nx)
+    pwr = 5e4
+    ps = fill(1.0 / (nz * nx), nz, nx)
 
-    @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
-                               rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                               power_shape=ps, power=pwr)
+    @named hd = HeatDiffusion(
+        nz=nz,
+        nx=nx,
+        Lz=0.6,
+        Lx=0.005,
+        y=0.07,
+        rho_s=19300.0,
+        cp_s=116.0,
+        k_s=174.0,
+        power_shape=ps,
+        power=pwr,
+    )
 
     ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct5_l, i)) for i in 1:nz]
     conns = vcat(
@@ -153,21 +209,36 @@ end
     # This verifies that power_shape is applied per-cell correctly.
     nz, nx = 1, 3
     T_bc = 600.0
-    pwr  = 1e4
+    pwr = 1e4
     # All power in center, zero in outer cells: sum = 1.0 (normalized)
     ps = reshape([0.0, 1.0, 0.0], nz, nx)
     @test isapprox(sum(ps), 1.0; atol=1e-12)
 
-    @named hd = HeatDiffusion(nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
-                               rho_s=2700.0, cp_s=900.0, k_s=200.0,
-                               power_shape=ps, power=pwr)
+    @named hd = HeatDiffusion(
+        nz=nz,
+        nx=nx,
+        Lz=0.6,
+        Lx=0.005,
+        y=0.07,
+        rho_s=2700.0,
+        cp_s=900.0,
+        k_s=200.0,
+        power_shape=ps,
+        power=pwr,
+    )
 
     ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct12_l, i)) for i in 1:nz]
     ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct12_r, i)) for i in 1:nz]
 
     conns = [
-        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left,  i))) for i in 1:nz]...,
-        [connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for i in 1:nz]...,
+        [
+            connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for
+            i in 1:nz
+        ]...,
+        [
+            connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for
+            i in 1:nz
+        ]...,
         hd.power ~ pwr,
     ]
     @named sys = compose(System(conns, t; name=:sys12gap), hd, ct_l..., ct_r...)
@@ -176,17 +247,17 @@ end
     op = [ssys.hd.T[i, j] => T_bc + 5.0 for i in 1:nz for j in 1:nx]
     sol = solve_steady(ssys, op)
 
-    T_left   = sol[ssys.hd.T[1, 1]]
+    T_left = sol[ssys.hd.T[1, 1]]
     T_center = sol[ssys.hd.T[1, 2]]
-    T_right  = sol[ssys.hd.T[1, 3]]
+    T_right = sol[ssys.hd.T[1, 3]]
 
     # Center cell (sole source) must be hotter than the zero-source outer cells
-    @test T_center > T_left  + 0.01
+    @test T_center > T_left + 0.01
     @test T_center > T_right + 0.01
     # Center cell must be above T_bc (it receives all the heat)
     @test T_center > T_bc
     # Outer cells (zero source, adjacent to cold BC) must also be above T_bc
     # because they receive heat from the center via diffusion
-    @test T_left   > T_bc
-    @test T_right  > T_bc
+    @test T_left > T_bc
+    @test T_right > T_bc
 end

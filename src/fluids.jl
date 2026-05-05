@@ -24,9 +24,9 @@ Density [kg/m^3] as `Float64`.
 function rho_water(T_K::Real)
     T_C = T_K - 273.15
     T_F = _to_fahrenheit(T_C)
-    A =  1004.789042
-    B =    -0.046283
-    C =    -7.9738e-4
+    A = 1004.789042
+    B = -0.046283
+    C = -7.9738e-4
     return abs(A + B * T_F + C * T_F^2)
 end
 
@@ -44,10 +44,10 @@ Specific heat [J/(kg*K)] as `Float64`.
 """
 function cp_water(T_K::Real)
     T_C = abs(T_K - 273.15)   # abs matches Python STREAM's np.abs(T)
-    A =  17.48908904
-    B =  -1.67507e-3
-    C =  -0.03189591
-    D =  -2.8748e-6
+    A = 17.48908904
+    B = -1.67507e-3
+    C = -0.03189591
+    D = -2.8748e-6
     return sqrt(max(0.0, (A + C * T_C) / (1 + B * T_C + D * T_C^2))) * 1000.0
 end
 
@@ -66,7 +66,7 @@ Dynamic viscosity [Pa*s] as `Float64`.
 function mu_water(T_K::Real)
     T_C = T_K - 273.15
     A = -6.325203964
-    B =  8.705317e-3
+    B = 8.705317e-3
     C = -0.088832314
     D = -9.657e-7
     return exp((A + C * T_C) / (1 + B * T_C + D * T_C^2))
@@ -86,10 +86,10 @@ Thermal conductivity [W/(m*K)] as `Float64`.
 """
 function k_water(T_K::Real)
     T_C = T_K - 273.15
-    A =  0.5677829144
-    B =  1.8774171e-3
+    A = 0.5677829144
+    B = 1.8774171e-3
     C = -8.1790e-6
-    D =  5.66294775e-9
+    D = 5.66294775e-9
     return abs(A + B * T_C + C * T_C^2 + D * T_C^3)
 end
 

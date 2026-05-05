@@ -106,7 +106,7 @@ function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
     end
 
     # Gravity is active in channels (g_acc > 0) — check for Gravity return components
-    active_g  = any(v -> v > 0.0, g_vals)
+    active_g = any(v -> v > 0.0, g_vals)
     has_return = !isempty(h_vals) && any(v -> v > 0.0, h_vals)
 
     if active_g && !has_return
@@ -136,7 +136,9 @@ end
 function _infer_n(sys)
     sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
     n = count(s -> startswith(s, "thermal_left"), sub_names)
-    n == 0 && error("_infer_n: could not detect thermal port count in system $(ModelingToolkit.getname(sys)). Pass an uncompiled ChannelAndContacts instance.")
+    n == 0 && error(
+        "_infer_n: could not detect thermal port count in system $(ModelingToolkit.getname(sys)). Pass an uncompiled ChannelAndContacts instance.",
+    )
     return n
 end
 
@@ -172,8 +174,12 @@ names and should not be used in equations or connection dicts after composition.
 function symmetric_plate(cac, fuel; name::Symbol)
     n = _infer_n(cac)
     connections = Equation[
-        [connect(port(cac, :thermal_right, i), port(fuel, :thermal_left,  i)) for i in 1:n]...,
-        [connect(port(cac, :thermal_left,  i), port(fuel, :thermal_right, i)) for i in 1:n]...,
+        [
+            connect(port(cac, :thermal_right, i), port(fuel, :thermal_left, i)) for i in 1:n
+        ]...,
+        [
+            connect(port(cac, :thermal_left, i), port(fuel, :thermal_right, i)) for i in 1:n
+        ]...,
     ]
     compose(System(connections, t; name=name), cac, fuel)
 end
@@ -211,8 +217,14 @@ names and should not be used in equations or connection dicts after composition.
 function plate(ch_left, ch_right, fuel; name::Symbol)
     n = _infer_n(ch_left)
     connections = Equation[
-        [connect(port(ch_left,  :thermal_right, i), port(fuel, :thermal_left,  i)) for i in 1:n]...,
-        [connect(port(ch_right, :thermal_left,  i), port(fuel, :thermal_right, i)) for i in 1:n]...,
+        [
+            connect(port(ch_left, :thermal_right, i), port(fuel, :thermal_left, i)) for
+            i in 1:n
+        ]...,
+        [
+            connect(port(ch_right, :thermal_left, i), port(fuel, :thermal_right, i)) for
+            i in 1:n
+        ]...,
     ]
     compose(System(connections, t; name=name), ch_left, ch_right, fuel)
 end
@@ -247,12 +259,19 @@ After calling this function, refer to sub-components exclusively via the returne
 names and should not be used in equations or connection dicts after composition.
 """
 function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
-    side in (:left, :right) || error("one_sided_connection: side must be :left or :right, got :$side")
+    side in (:left, :right) ||
+        error("one_sided_connection: side must be :left or :right, got :$side")
     n = _infer_n(channel)
     connections = if side == :left
-        Equation[[connect(port(channel, :thermal_left,  i), port(fuel, :thermal_right, i)) for i in 1:n]...]
+        Equation[[
+            connect(port(channel, :thermal_left, i), port(fuel, :thermal_right, i)) for
+            i in 1:n
+        ]...]
     else
-        Equation[[connect(port(channel, :thermal_right, i), port(fuel, :thermal_left,  i)) for i in 1:n]...]
+        Equation[[
+            connect(port(channel, :thermal_right, i), port(fuel, :thermal_left, i)) for
+            i in 1:n
+        ]...]
     end
     compose(System(connections, t; name=name), channel, fuel)
 end

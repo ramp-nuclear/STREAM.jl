@@ -37,7 +37,7 @@ htc_fn = constant_Nusselt(Nu = 5.0)  # custom Nu
 ChannelAndContacts(htc_correlation = htc_fn, ...)
 ```
 """
-function constant_Nusselt(; Nu = 8.235)
+function constant_Nusselt(; Nu=8.235)
     return (Re, Pr, args...) -> Nu
 end
 
@@ -106,17 +106,22 @@ function regime_dependent(;
     htc_turbulent,
     friction_laminar,
     friction_turbulent,
-    Re_transition = 2300,
-    htc_natural   = nothing,
-    Dh            = nothing,
-    g             = nothing)
+    Re_transition=2300,
+    htc_natural=nothing,
+    Dh=nothing,
+    g=nothing,
+)
 
     # Convert to Float64 immediately — avoids type-promotion issues with symbolic Re
     Re_tr = Float64(Re_transition)
 
     # D-04: htc_natural requires both Dh and g
     if !isnothing(htc_natural) && (isnothing(Dh) || isnothing(g))
-        throw(ArgumentError("regime_dependent: htc_natural provided but Dh or g is missing — all three (htc_natural, Dh, g) must be supplied together."))
+        throw(
+            ArgumentError(
+                "regime_dependent: htc_natural provided but Dh or g is missing — all three (htc_natural, Dh, g) must be supplied together.",
+            ),
+        )
     end
 
     # D-03: Dh or g without htc_natural is a likely miscall — warn
@@ -127,22 +132,37 @@ function regime_dependent(;
     if !isnothing(htc_natural)
         # NC-enabled path: switch on Gr/Re^2 > 1
         Dh_val = Float64(Dh)
-        g_val  = Float64(g)
-        htc_forced_fn = (Re, Pr, T_bulk, T_wall) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr, T_bulk, T_wall), htc_turbulent(Re, Pr, T_bulk, T_wall))
-        htc_fn = (Re, Pr, T_bulk, T_wall) -> begin
-            beta_v = beta_water(T_bulk)
-            nu_v   = mu_water(T_bulk) / rho_water(T_bulk)
-            Gr_val = Gr(beta_v, g_val, T_wall - T_bulk, Dh_val, nu_v)
-            ifelse(Gr_val / Re^2 > 1, htc_natural(Re, Pr, T_bulk, T_wall), htc_forced_fn(Re, Pr, T_bulk, T_wall))
-        end
+        g_val = Float64(g)
+        htc_forced_fn =
+            (Re, Pr, T_bulk, T_wall) -> ifelse(
+                Re < Re_tr,
+                htc_laminar(Re, Pr, T_bulk, T_wall),
+                htc_turbulent(Re, Pr, T_bulk, T_wall),
+            )
+        htc_fn =
+            (Re, Pr, T_bulk, T_wall) -> begin
+                beta_v = beta_water(T_bulk)
+                nu_v = mu_water(T_bulk) / rho_water(T_bulk)
+                Gr_val = Gr(beta_v, g_val, T_wall - T_bulk, Dh_val, nu_v)
+                ifelse(
+                    Gr_val / Re^2 > 1,
+                    htc_natural(Re, Pr, T_bulk, T_wall),
+                    htc_forced_fn(Re, Pr, T_bulk, T_wall),
+                )
+            end
     else
         # Existing forced-convection-only path (backward compatible)
-        htc_fn = (Re, Pr, T_bulk, T_wall) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr, T_bulk, T_wall), htc_turbulent(Re, Pr, T_bulk, T_wall))
+        htc_fn =
+            (Re, Pr, T_bulk, T_wall) -> ifelse(
+                Re < Re_tr,
+                htc_laminar(Re, Pr, T_bulk, T_wall),
+                htc_turbulent(Re, Pr, T_bulk, T_wall),
+            )
     end
 
     friction_fn = (Re) -> ifelse(Re < Re_tr, friction_laminar(Re), friction_turbulent(Re))
 
-    return (htc = htc_fn, friction = friction_fn)
+    return (htc=htc_fn, friction=friction_fn)
 end
 
 """
@@ -187,10 +207,10 @@ depend on forced-flow Reynolds number).
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 """
-function elenbaas_htc(; b, L, Dh, g = 9.81)
+function elenbaas_htc(; b, L, Dh, g=9.81)
     return (Re, Pr, T_bulk, T_wall) -> begin
-        beta   = beta_water(T_bulk)
-        nu     = mu_water(T_bulk) / rho_water(T_bulk)
+        beta = beta_water(T_bulk)
+        nu = mu_water(T_bulk) / rho_water(T_bulk)
         Gr_val = Gr(beta, g, T_wall - T_bulk, Dh, nu)
         Ra_val = Ra(Gr_val, Pr)
         elenbaas_nusselt(Ra_val, b, L)
@@ -214,12 +234,8 @@ end
 # NOT the same as Marco_Han_Nusselt (which is 4-sided uniform heat flux).
 function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     return nu0 * (
-        1.0
-        - 1.4122 * aspect_ratio
-        + 2.3473 * aspect_ratio^2
-        - 2.8983 * aspect_ratio^3
-        + 2.0629 * aspect_ratio^4
-        - 0.6077 * aspect_ratio^5
+        1.0 - 1.4122 * aspect_ratio + 2.3473 * aspect_ratio^2 - 2.8983 * aspect_ratio^3 +
+        2.0629 * aspect_ratio^4 - 0.6077 * aspect_ratio^5
     )
 end
 
@@ -227,8 +243,8 @@ end
 # Uses ifelse() (not if/else) so that MTK can trace through this function when x is
 # a symbolic Num expression. See CLAUDE.md MTK Patterns.
 function _nusselt_coefficient_developing(x)
-    nu_low  = 1.49 * x^(-1/3)
-    nu_mid  = 1.49 * x^(-1/3) - 0.4
+    nu_low = 1.49 * x^(-1/3)
+    nu_mid = 1.49 * x^(-1/3) - 0.4
     nu_high = 8.235 + 8.68 * exp(-164 * x) * (1e3 * x)^(-0.506)
     return ifelse(x <= 2e-4, nu_low, ifelse(x <= 1e-3, nu_mid, nu_high))
 end
@@ -306,11 +322,7 @@ Nusselt number (dimensionless).
 """
 function Marco_Han_Nusselt(aspect_ratio)
     return 8.235 * (
-        1.0
-        - 2.0421 * aspect_ratio
-        + 3.853 * aspect_ratio^2
-        - 2.4765 * aspect_ratio^3
-        + 1.0578 * aspect_ratio^4
-        - 0.1861 * aspect_ratio^5
+        1.0 - 2.0421 * aspect_ratio + 3.853 * aspect_ratio^2 - 2.4765 * aspect_ratio^3 +
+        1.0578 * aspect_ratio^4 - 0.1861 * aspect_ratio^5
     )
 end

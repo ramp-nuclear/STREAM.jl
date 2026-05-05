@@ -136,19 +136,21 @@ Source: Python STREAM thresholds.py `Saha_Zuber_OSV_computed_bulk`.
 # Returns
 OSV heat flux `q_OSV` [W/m^2]. Returns the minimum (most conservative) value along the channel.
 """
-function q_OSV_saha_zuber(T_inlet, mdot, pipe; flux_shape=nothing, dz=nothing, flux_enworse=1.0)
+function q_OSV_saha_zuber(
+    T_inlet, mdot, pipe; flux_shape=nothing, dz=nothing, flux_enworse=1.0
+)
     # Coolant properties at inlet temperature
-    rho   = rho_water(T_inlet)
-    cp    = cp_water(T_inlet)
-    k     = k_water(T_inlet)
-    G     = abs(mdot) / pipe.A
-    u     = G / rho
+    rho = rho_water(T_inlet)
+    cp = cp_water(T_inlet)
+    k = k_water(T_inlet)
+    G = abs(mdot) / pipe.A
+    u = G / rho
     # Peclet number
-    pe    = rho * u * pipe.Dh * cp / k
+    pe = rho * u * pipe.Dh * cp / k
 
     # Saha-Zuber coefficient X
-    Nu_c  = 455.0
-    St_c  = 0.0065
+    Nu_c = 455.0
+    St_c = 0.0065
     if pe <= 7e4
         X = k / pipe.Dh * Nu_c
     else
@@ -163,19 +165,19 @@ function q_OSV_saha_zuber(T_inlet, mdot, pipe; flux_shape=nothing, dz=nothing, f
     if flux_shape === nothing
         # Uniform flux: cumsum(dz) / (1 * flux_enworse)
         dz_local = fill(pipe.L / n_cells, n_cells)
-        shape    = ones(n_cells)
+        shape = ones(n_cells)
     else
         dz_local = dz === nothing ? fill(pipe.L / n_cells, n_cells) : dz
-        shape    = Float64.(flux_shape)
+        shape = Float64.(flux_shape)
     end
 
     dT = T_sat_est - T_inlet
     Hp = pipe.heated_perimeter
     power_factor = Hp / (abs(mdot) * cp)
-    cumulative   = cumsum(shape .* dz_local)
+    cumulative = cumsum(shape .* dz_local)
     shape_factor = cumulative ./ (shape .* flux_enworse)
-    denominator  = 1.0 .+ X .* power_factor .* shape_factor
-    q_osv_cells  = X .* dT ./ denominator
+    denominator = 1.0 .+ X .* power_factor .* shape_factor
+    q_osv_cells = X .* dT ./ denominator
     # Return minimum (most conservative cell — first cell where void first onset)
     return minimum(q_osv_cells)
 end
@@ -211,18 +213,27 @@ Source: Python STREAM thresholds.py `Sudo_Kaminaga_CHF`.
 # Returns
 CHF heat flux `q_CHF` [W/m^2].
 """
-function q_CHF_sudo_kaminaga(T_bulk, mdot, pipe, gravity;
-                              rho_l=958.4, rho_v=0.598, hfg=2257e3,
-                              sigma=0.059, cp_sat=4217.0, T_sat=373.15)
+function q_CHF_sudo_kaminaga(
+    T_bulk,
+    mdot,
+    pipe,
+    gravity;
+    rho_l=958.4,
+    rho_v=0.598,
+    hfg=2257e3,
+    sigma=0.059,
+    cp_sat=4217.0,
+    T_sat=373.15,
+)
     g_abs = abs(gravity)
-    drho  = rho_l - rho_v
+    drho = rho_l - rho_v
     lamda = sqrt(sigma / drho / g_abs)
-    Aht   = sum(pipe.heated_parts) * pipe.L
+    Aht = sum(pipe.heated_parts) * pipe.L
     A_ratio = pipe.A / Aht
 
     G_star = mdot / pipe.A / sqrt(lamda * drho * rho_v * g_abs)
 
-    dT_inlet  = (cp_sat / hfg) * (T_sat - T_bulk)
+    dT_inlet = (cp_sat / hfg) * (T_sat - T_bulk)
     # Use T_sat as conservative outlet temperature (maximum subcooling consumed)
     dT_outlet = (cp_sat / hfg) * (T_sat - T_sat)  # 0.0 at saturated outlet
 
@@ -263,7 +274,10 @@ Source: Python STREAM thresholds.py `Mirshak_CHF`.
 CHF heat flux `q_CHF` [W/m^2].
 """
 function q_CHF_mirshak(T_bulk, T_sat, pressure, v)
-    return 1.51e6 * (1 + 0.1198 * v) * (1 + 0.00914 * (T_sat - T_bulk)) * (1 + 0.19e-5 * pressure)
+    return 1.51e6 *
+           (1 + 0.1198 * v) *
+           (1 + 0.00914 * (T_sat - T_bulk)) *
+           (1 + 0.19e-5 * pressure)
 end
 
 """

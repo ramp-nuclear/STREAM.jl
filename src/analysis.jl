@@ -44,6 +44,7 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
 - `pipe::Union{PipeGeometry, Nothing}` — channel geometry, or `nothing` if unavailable
 - `gravity::Float64`           — gravitational acceleration [m/s²]
 """
+#! format: off
 @kwdef struct ChannelState
     n             ::Int
     T_bulk        ::AbstractVector
@@ -62,6 +63,7 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
     pipe          ::Union{PipeGeometry, Nothing}
     gravity       ::Float64
 end
+#! format: on
 
 # ─── Private helper ─────────────────────────────────────────────────────────
 
@@ -88,34 +90,36 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         false
     end
 
+    #! format: off
     if is_transient
         # Transient: assemble [n_cells, n_times] matrices
-        T_bulk       = hcat([sol[channel_sys.T[i], :]       for i in 1:n]...)'
-        T_wall_left  = hcat([sol[channel_sys.T_wall_left[i], :]  for i in 1:n]...)'
+        T_bulk = hcat([sol[channel_sys.T[i], :] for i in 1:n]...)'
+        T_wall_left = hcat([sol[channel_sys.T_wall_left[i], :] for i in 1:n]...)'
         T_wall_right = hcat([sol[channel_sys.T_wall_right[i], :] for i in 1:n]...)'
-        T_sat_arr    = hcat([sol[channel_sys.T_sat[i], :]    for i in 1:n]...)'
-        T_ONB_arr    = hcat([sol[channel_sys.T_ONB[i], :]    for i in 1:n]...)'
-        P_arr        = hcat([sol[channel_sys.P[i], :]        for i in 1:n]...)'
-        vel_arr      = hcat([sol[channel_sys.velocity[i], :] for i in 1:n]...)'
-        qwl_arr      = hcat([sol[channel_sys.q_wall_left[i], :]  for i in 1:n]...)'
-        qwr_arr      = hcat([sol[channel_sys.q_wall_right[i], :] for i in 1:n]...)'
+        T_sat_arr = hcat([sol[channel_sys.T_sat[i], :] for i in 1:n]...)'
+        T_ONB_arr = hcat([sol[channel_sys.T_ONB[i], :] for i in 1:n]...)'
+        P_arr = hcat([sol[channel_sys.P[i], :] for i in 1:n]...)'
+        vel_arr = hcat([sol[channel_sys.velocity[i], :] for i in 1:n]...)'
+        qwl_arr = hcat([sol[channel_sys.q_wall_left[i], :] for i in 1:n]...)'
+        qwr_arr = hcat([sol[channel_sys.q_wall_right[i], :] for i in 1:n]...)'
         # Scalar fields: use first time point
-        T_inlet_val  = sol[channel_sys.port_in.T, 1]
-        mdot_val     = sol[channel_sys.port_in.mdot, 1]
+        T_inlet_val = sol[channel_sys.port_in.T, 1]
+        mdot_val = sol[channel_sys.port_in.mdot, 1]
     else
         # Steady state: scalar per cell
-        T_bulk       = [sol[channel_sys.T[i]]           for i in 1:n]
-        T_wall_left  = [sol[channel_sys.T_wall_left[i]]  for i in 1:n]
+        T_bulk = [sol[channel_sys.T[i]] for i in 1:n]
+        T_wall_left = [sol[channel_sys.T_wall_left[i]] for i in 1:n]
         T_wall_right = [sol[channel_sys.T_wall_right[i]] for i in 1:n]
-        T_sat_arr    = [sol[channel_sys.T_sat[i]]        for i in 1:n]
-        T_ONB_arr    = [sol[channel_sys.T_ONB[i]]        for i in 1:n]
-        P_arr        = [sol[channel_sys.P[i]]            for i in 1:n]
-        vel_arr      = [sol[channel_sys.velocity[i]]     for i in 1:n]
-        qwl_arr      = [sol[channel_sys.q_wall_left[i]]  for i in 1:n]
-        qwr_arr      = [sol[channel_sys.q_wall_right[i]] for i in 1:n]
-        T_inlet_val  = sol[channel_sys.port_in.T]
-        mdot_val     = sol[channel_sys.port_in.mdot]
+        T_sat_arr = [sol[channel_sys.T_sat[i]] for i in 1:n]
+        T_ONB_arr = [sol[channel_sys.T_ONB[i]] for i in 1:n]
+        P_arr = [sol[channel_sys.P[i]] for i in 1:n]
+        vel_arr = [sol[channel_sys.velocity[i]] for i in 1:n]
+        qwl_arr = [sol[channel_sys.q_wall_left[i]] for i in 1:n]
+        qwr_arr = [sol[channel_sys.q_wall_right[i]] for i in 1:n]
+        T_inlet_val = sol[channel_sys.port_in.T]
+        mdot_val = sol[channel_sys.port_in.mdot]
     end
+    #! format: on
 
     # Conservative wall temperature: max of left and right face
     T_wall = max.(T_wall_left, T_wall_right)
@@ -123,16 +127,17 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
     # q_flux conversion: q_wall [W] -> q_flux [W/m²] per D-05
     if pipe !== nothing
         dz = pipe.L / n
-        q_flux_left  = qwl_arr ./ (pipe.heated_parts[1] * dz)
+        q_flux_left = qwl_arr ./ (pipe.heated_parts[1] * dz)
         q_flux_right = qwr_arr ./ (pipe.heated_parts[2] * dz)
     else
-        q_flux_left  = zero(T_bulk)
+        q_flux_left = zero(T_bulk)
         q_flux_right = zero(T_bulk)
     end
 
     # Conservative q_flux: max of both faces
     q_flux = max.(q_flux_left, q_flux_right)
 
+    #! format: off
     return ChannelState(
         n            = n,
         T_bulk       = T_bulk,
@@ -151,6 +156,7 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         pipe         = pipe,
         gravity      = gravity,
     )
+    #! format: on
 end
 
 # ─── threshold_analysis dispatcher ──────────────────────────────────────────
@@ -187,8 +193,8 @@ result.onb           # Vector{Float64} of ONB temperatures per cell
 ```
 """
 function threshold_analysis(sol, channel_sys; pipe=nothing, gravity=9.81, kwargs...)
-    state  = _extract_channel_state(sol, channel_sys; pipe=pipe, gravity=gravity)
-    names  = keys(kwargs)
+    state = _extract_channel_state(sol, channel_sys; pipe=pipe, gravity=gravity)
+    names = keys(kwargs)
     values = [fn(state) for fn in Base.values(kwargs)]
     return NamedTuple{names}(Tuple(values))
 end
@@ -217,7 +223,7 @@ Closure `(state::ChannelState) -> Vector{Float64}` where each entry is `CHF[i] /
 with `q[i] <= 0 → Inf` (no boiling risk when wall is not being heated).
 """
 function chfr(chf_fn; direction=:max)
-    return function(state::ChannelState)
+    return function (state::ChannelState)
         q = if direction == :left
             state.q_flux_left
         elseif direction == :right
@@ -378,5 +384,6 @@ Calls `twall_limit.(state.T_wall, inhomogeneity_factor)`.
 # Returns
 Vector (or matrix for transient) of effective wall temperature limits [K] per cell.
 """
-twall_limit(state::ChannelState; inhomogeneity_factor=1.0) =
-    twall_limit.(state.T_wall, inhomogeneity_factor)
+function twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
+    return twall_limit.(state.T_wall, inhomogeneity_factor)
+end

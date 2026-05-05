@@ -42,13 +42,13 @@ Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 function Pump(dP_pump::Real; name)
     # Fixed-pressure mode: pressure rise is a constant parameter
     pars = @parameters dP_pump = dP_pump
-    @named port_in  = FlowPort()
+    @named port_in = FlowPort()
     @named port_out = FlowPort()
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
         port_out.P - port_in.P ~ dP_pump,
         port_out.T ~ instream(port_in.T),
-        port_in.T  ~ instream(port_out.T),
+        port_in.T ~ instream(port_out.T),
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
@@ -58,13 +58,13 @@ function Pump(dP_pump::Any; name)
     # FType must be concrete so MTK can generate the correct symbolic node.
     FType = typeof(dP_pump)
     pars = @parameters (dP_pump_fn::FType)(..)
-    @named port_in  = FlowPort()
+    @named port_in = FlowPort()
     @named port_out = FlowPort()
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
         port_out.P - port_in.P ~ dP_pump_fn(t),
         port_out.T ~ instream(port_in.T),
-        port_in.T  ~ instream(port_out.T),
+        port_in.T ~ instream(port_out.T),
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
@@ -72,13 +72,13 @@ end
 function Pump(; name, mdot0)
     # Fixed-flow mode: mass flow is a parameter; no pressure equation
     pars = @parameters mdot0 = mdot0
-    @named port_in  = FlowPort()
+    @named port_in = FlowPort()
     @named port_out = FlowPort()
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
         port_in.mdot ~ mdot0,
         port_out.T ~ instream(port_in.T),
-        port_in.T  ~ instream(port_out.T),
+        port_in.T ~ instream(port_out.T),
     ]
     compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end

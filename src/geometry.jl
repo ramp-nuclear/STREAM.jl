@@ -31,6 +31,7 @@ Factory functions (preferred constructors):
 
 Do NOT call the inner positional constructor directly.
 """
+#! format: off
 struct PipeGeometry
     L                ::Float64                   # channel length [m]
     Dh               ::Float64                   # hydraulic diameter [m]: 4*area/wet_perimeter
@@ -41,6 +42,7 @@ struct PipeGeometry
     width            ::Float64                   # longer cross-section dimension [m]: max(e1,e2) or D
     depth            ::Float64                   # shorter cross-section dimension [m]: min(e1,e2) or D
 end
+#! format: on
 
 """
     PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
@@ -56,28 +58,30 @@ Construct a `PipeGeometry` for a rectangular channel.
 Dh = 4*area/wet_perimeter where area = edge1*edge2 and wet_perimeter = 2*(edge1+edge2).
 """
 function PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
-    _L    = Float64(L)
-    _e1   = Float64(edge1)
-    _e2   = Float64(edge2)
-    _he   = Float64(heated_edge)
-    area          = _e1 * _e2
+    _L = Float64(L)
+    _e1 = Float64(edge1)
+    _e2 = Float64(edge2)
+    _he = Float64(heated_edge)
+    area = _e1 * _e2
     wet_perimeter = 2.0 * (_e1 + _e2)
-    Dh            = 4.0 * area / wet_perimeter
+    Dh = 4.0 * area / wet_perimeter
     if one_sided === nothing
         heated_perimeter = 2.0 * _he
-        heated_parts     = (_he, _he)
+        heated_parts = (_he, _he)
     elseif one_sided === :left
         heated_perimeter = _he
-        heated_parts     = (_he, 0.0)
+        heated_parts = (_he, 0.0)
     elseif one_sided === :right
         heated_perimeter = _he
-        heated_parts     = (0.0, _he)
+        heated_parts = (0.0, _he)
     else
         error("one_sided must be :left, :right, or nothing; got $one_sided")
     end
     _width = max(_e1, _e2)
     _depth = min(_e1, _e2)
-    PipeGeometry(_L, Dh, area, heated_perimeter, wet_perimeter, heated_parts, _width, _depth)
+    return PipeGeometry(
+        _L, Dh, area, heated_perimeter, wet_perimeter, heated_parts, _width, _depth
+    )
 end
 
 """
@@ -91,11 +95,11 @@ Construct a `PipeGeometry` for a circular pipe.
 Dh = D (exact for circular cross-section). heated_parts = (π*D/2, π*D/2) (symmetric split).
 """
 function PipeGeometry_circular(L, D)
-    _L         = Float64(L)
-    _D         = Float64(D)
-    area       = π * _D^2 / 4
-    perimeter  = π * _D
+    _L = Float64(L)
+    _D = Float64(D)
+    area = π * _D^2 / 4
+    perimeter = π * _D
     heated_parts = (perimeter / 2, perimeter / 2)
     # Dh = 4*(π*D²/4)/(π*D) = D — exact
-    PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts, _D, _D)
+    return PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts, _D, _D)
 end

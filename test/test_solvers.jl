@@ -30,7 +30,7 @@ end
 @testset "SOLV-01: solve_steady returns physical solution" begin
     n = 10
     T_inlet = 313.15
-    Q_wall  = 1.0e4
+    Q_wall = 1.0e4
     mdot_guess = 0.490  # physics-based estimate for 30 kPa pump, 0.01m pipe
 
     ssys = build_loop(T_inlet=T_inlet)
@@ -71,9 +71,11 @@ end
     # Use a scalar-T_wall system for the steady-state solve (consistent ICs at T_wall_0)
     # then switch to the callable system for the transient.
     ssys_ss = build_loop_transient(T_inlet=T_inlet, T_wall_0=T_wall_0)
-    ssys    = build_loop_transient(T_inlet=T_inlet, T_wall_fn=T_wall_step)
+    ssys = build_loop_transient(T_inlet=T_inlet, T_wall_fn=T_wall_step)
 
-    T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=Q_wall_0, mdot_guess=mdot_guess, n=n)
+    T_guess = steady_state_guess(
+        T_inlet=T_inlet, Q_wall=Q_wall_0, mdot_guess=mdot_guess, n=n
+    )
 
     op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
     push!(op_guess, ssys_ss.ch.port_in.mdot => mdot_guess)

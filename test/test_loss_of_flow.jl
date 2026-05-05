@@ -26,6 +26,7 @@ using STREAM
 #   After NC: flow reverses to upward, ch.port_in.mdot < 0.
 # ─────────────────────────────────────────────────────────────────────────────
 
+#! format: off
 const BYPASS_N        = 10
 const BYPASS_L_CH     = 1.0
 const BYPASS_D_CH     = 0.01
@@ -37,6 +38,7 @@ const BYPASS_R_EXT    = 1.0e6
 const BYPASS_THRESHOLD = 0.01
 const BYPASS_DT_RAMP  = 5.0
 const BYPASS_DP_REF   = 1.5e4
+#! format: on
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper: solve SS reference loop, build bypass system, return (ssys, op, mdot_ss, cb)
@@ -57,16 +59,18 @@ function _lof_bypass_ic(; n=BYPASS_N)
     # No Flapper, no Inertia -> KINSOL-friendly
     # ch_ref uses g=-BYPASS_G_ACC (same gravity orientation as bypass ch)
     @named pump_ref = Pump(BYPASS_DP_REF)
-    @named hx_ref   = HeatExchanger(BYPASS_T_INLET)
-    @named ch_ref   = ChannelHeatFlux(n=n,
-                          geometry = PipeGeometry_circular(BYPASS_L_CH, BYPASS_D_CH),
-                          g        = -BYPASS_G_ACC,
-                          T_wall   = BYPASS_T_WALL)
+    @named hx_ref = HeatExchanger(BYPASS_T_INLET)
+    @named ch_ref = ChannelHeatFlux(
+        n=n,
+        geometry=PipeGeometry_circular(BYPASS_L_CH, BYPASS_D_CH),
+        g=(-BYPASS_G_ACC),
+        T_wall=BYPASS_T_WALL,
+    )
 
     conns_ref = [
         connect(pump_ref.port_out, hx_ref.port_in),
-        connect(hx_ref.port_out,   ch_ref.port_in),
-        connect(ch_ref.port_out,   pump_ref.port_in),
+        connect(hx_ref.port_out, ch_ref.port_in),
+        connect(ch_ref.port_out, pump_ref.port_in),
         pump_ref.port_in.P ~ 1.0e5,
     ]
     @named ref_sys = compose(System(conns_ref, t; name=:ref), pump_ref, hx_ref, ch_ref)
@@ -74,32 +78,36 @@ function _lof_bypass_ic(; n=BYPASS_N)
 
     op_ref = Pair{Any,Any}[ref_ssys.ch_ref.port_in.mdot => 0.3]
     for i in 1:n
-        push!(op_ref, ref_ssys.ch_ref.T[i] => BYPASS_T_INLET + i * (BYPASS_T_WALL - BYPASS_T_INLET) / n)
+        push!(
+            op_ref,
+            ref_ssys.ch_ref.T[i] =>
+                BYPASS_T_INLET + i * (BYPASS_T_WALL - BYPASS_T_INLET) / n,
+        )
     end
     ss_sol = solve_steady(ref_ssys, op_ref)
 
     mdot_ss = ss_sol[ref_ssys.ch_ref.port_in.mdot]
-    T_ss    = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
+    T_ss = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
 
     # Build bypass system (Flapper is a pure equation system — callback is external)
     ssys = build_loop_lof_bypass(;
-        n         = n,
-        L_ch      = BYPASS_L_CH,
-        D_ch      = BYPASS_D_CH,
-        T_wall    = BYPASS_T_WALL,
-        T_inlet   = BYPASS_T_INLET,
-        L_over_A  = BYPASS_L_OVER_A,
-        g_acc     = BYPASS_G_ACC,
-        R_ext     = BYPASS_R_EXT,
-        dt_ramp   = BYPASS_DT_RAMP,
+        n=n,
+        L_ch=BYPASS_L_CH,
+        D_ch=BYPASS_D_CH,
+        T_wall=BYPASS_T_WALL,
+        T_inlet=BYPASS_T_INLET,
+        L_over_A=BYPASS_L_OVER_A,
+        g_acc=BYPASS_G_ACC,
+        R_ext=BYPASS_R_EXT,
+        dt_ramp=BYPASS_DT_RAMP,
     )
 
     Dt = Differential(t)
     op = Pair{Any,Any}[
-        ssys.ine.port_in.mdot        => mdot_ss,  # total loop flow
-        ssys.ret.port_in.mdot        => mdot_ss,  # all flow through ch-ret (flapper closed)
-        Dt(ssys.ret.port_in.mdot)    => 0.0,      # index-reduced derivative state
-        ssys.flapper.T_open          => 1.0e30,   # sentinel: not yet fired
+        ssys.ine.port_in.mdot => mdot_ss,  # total loop flow
+        ssys.ret.port_in.mdot => mdot_ss,  # all flow through ch-ret (flapper closed)
+        Dt(ssys.ret.port_in.mdot) => 0.0,      # index-reduced derivative state
+        ssys.flapper.T_open => 1.0e30,   # sentinel: not yet fired
     ]
     for i in 1:n
         push!(op, ssys.ch.T[i] => T_ss[i])
@@ -136,7 +144,7 @@ end
     ssys, op, _, cb = _lof_bypass_ic()
 
     t_arr = range(0.0, 300.0; length=3001)
-    sol   = solve_transient(ssys, op, t_arr; callbacks=cb)
+    sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
     @test sol.retcode == ReturnCode.Success
 
@@ -155,7 +163,7 @@ end
     ssys, op, _, cb = _lof_bypass_ic()
 
     t_arr = range(0.0, 300.0; length=3001)
-    sol   = solve_transient(ssys, op, t_arr; callbacks=cb)
+    sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
     mdot_ch_initial = sol[ssys.ch.port_in.mdot, 1]
     @test mdot_ch_initial > 0.0
@@ -185,14 +193,15 @@ end
     ssys, op, _, cb = _lof_bypass_ic()
 
     t_arr = range(0.0, 300.0; length=3001)
-    sol   = solve_transient(ssys, op, t_arr; callbacks=cb)
+    sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
     n = BYPASS_N
 
     # 1. Forced flow at t=0: instantaneous check (quasi-steady, 0.08% expected error)
-    mdot_0  = abs(sol[ssys.ch.port_in.mdot, 1])
+    mdot_0 = abs(sol[ssys.ch.port_in.mdot, 1])
     Q_wall_0 = abs(sum(sol[ssys.ch.q_wall[i], 1] for i in 1:n))
-    Q_meas_0 = mdot_0 * cp_water(BYPASS_T_INLET) * abs(sol[ssys.ch.T[n], 1] - BYPASS_T_INLET)
+    Q_meas_0 =
+        mdot_0 * cp_water(BYPASS_T_INLET) * abs(sol[ssys.ch.T[n], 1] - BYPASS_T_INLET)
     @test isapprox(Q_meas_0, Q_wall_0; rtol=0.02)
 
     # 2. NC regime: time-averaged over t=100–300s (indices 1001–3001).
@@ -201,8 +210,8 @@ end
     Q_wall_nc = [abs(sum(sol[ssys.ch.q_wall[i], idx] for i in 1:n)) for idx in nc_indices]
     Q_meas_nc = Float64[]
     for idx in nc_indices
-        mdot_v      = abs(sol[ssys.ch.port_in.mdot, idx])
-        T_inlet_ch  = sol[ssys.ret.T[1], idx]   # fluid entering ch from Node B via ret
+        mdot_v = abs(sol[ssys.ch.port_in.mdot, idx])
+        T_inlet_ch = sol[ssys.ret.T[1], idx]   # fluid entering ch from Node B via ret
         T_outlet_ch = sol[ssys.ch.T[1], idx]    # hot exit in reversed (NC upward) flow
         push!(Q_meas_nc, mdot_v * cp_water(BYPASS_T_INLET) * abs(T_outlet_ch - T_inlet_ch))
     end
@@ -227,30 +236,32 @@ end
     ssys, op, _, cb = _lof_bypass_ic()
 
     t_arr = range(0.0, 300.0; length=3001)
-    sol   = solve_transient(ssys, op, t_arr; callbacks=cb)
+    sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
-    n          = BYPASS_N
+    n = BYPASS_N
     nc_indices = 2701:3001
 
     mdot_nc_series = abs.(sol[ssys.ch.port_in.mdot, nc_indices])
-    mdot_nc        = mean(mdot_nc_series)
+    mdot_nc = mean(mdot_nc_series)
 
     T_max_nc = mean([maximum([sol[ssys.ch.T[i], idx] for i in 1:n]) for idx in nc_indices])
 
     geom = PipeGeometry_circular(BYPASS_L_CH, BYPASS_D_CH)
     A_xs = geom.A
-    Dh   = geom.Dh
+    Dh = geom.Dh
 
     T_hot_avg = (BYPASS_T_INLET + T_max_nc) / 2
-    rho_cold  = rho_water(BYPASS_T_INLET)
-    rho_hot   = rho_water(T_hot_avg)
+    rho_cold = rho_water(BYPASS_T_INLET)
+    rho_hot = rho_water(T_hot_avg)
     delta_rho = rho_cold - rho_hot
 
     Re_nc = mdot_nc * Dh / (A_xs * mu_water(T_hot_avg))
-    f_nc  = 0.316 * Re_nc^(-0.25)
+    f_nc = 0.316 * Re_nc^(-0.25)
     # Full loop (ch + ret, same geometry): 2x friction → factor of 2 cancels in sqrt
-    mdot_analytical = sqrt(delta_rho * BYPASS_G_ACC * BYPASS_L_CH *
-                           rho_hot * A_xs^2 * Dh / (f_nc * BYPASS_L_CH))
+    mdot_analytical = sqrt(
+        delta_rho * BYPASS_G_ACC * BYPASS_L_CH * rho_hot * A_xs^2 * Dh /
+        (f_nc * BYPASS_L_CH),
+    )
 
     # 30% tolerance: accounts for property variations and small ext_res bypass flow
     @test isapprox(mdot_nc, mdot_analytical; rtol=0.30)
@@ -263,13 +274,14 @@ end
     # return channel cools the fluid but not fully back to T_inlet.
     # We measure the actual temperature rise through ch: T_max_nc - T_inlet_nc.
     T_inlet_nc = mean([sol[ssys.ret.T[1], idx] for idx in nc_indices])
-    T_bulk_nc  = (BYPASS_T_INLET + T_max_nc) / 2
-    htc_fn_nc  = elenbaas_htc(b=BYPASS_D_CH, L=BYPASS_L_CH, Dh=BYPASS_D_CH, g=BYPASS_G_ACC)
-    Pr_nc      = cp_water(T_bulk_nc) * mu_water(T_bulk_nc) / k_water(T_bulk_nc)
-    Nu_nc      = htc_fn_nc(0.0, Pr_nc, T_bulk_nc, BYPASS_T_WALL)
-    h_nc       = Nu_nc * k_water(T_bulk_nc) / BYPASS_D_CH
-    A_heated   = pi * BYPASS_D_CH * BYPASS_L_CH
-    DeltaT_analytical = (BYPASS_T_WALL - BYPASS_T_INLET) *
+    T_bulk_nc = (BYPASS_T_INLET + T_max_nc) / 2
+    htc_fn_nc = elenbaas_htc(b=BYPASS_D_CH, L=BYPASS_L_CH, Dh=BYPASS_D_CH, g=BYPASS_G_ACC)
+    Pr_nc = cp_water(T_bulk_nc) * mu_water(T_bulk_nc) / k_water(T_bulk_nc)
+    Nu_nc = htc_fn_nc(0.0, Pr_nc, T_bulk_nc, BYPASS_T_WALL)
+    h_nc = Nu_nc * k_water(T_bulk_nc) / BYPASS_D_CH
+    A_heated = pi * BYPASS_D_CH * BYPASS_L_CH
+    DeltaT_analytical =
+        (BYPASS_T_WALL - BYPASS_T_INLET) *
                         (1 - exp(-h_nc * A_heated / (mdot_nc * cp_water(BYPASS_T_INLET))))
     @test isapprox(T_max_nc - T_inlet_nc, DeltaT_analytical; rtol=0.30)
 end

@@ -28,13 +28,13 @@ end
 # Two thermal anchors break circular instream in hydraulics-only loop.
 # ─────────────────────────────────────────────────────────────────
 function _build_flapper_scalar_loop(dP_val)
-    @named pump    = Pump(dP_val)
-    @named res     = Resistor(1e5)
+    @named pump = Pump(dP_val)
+    @named res = Resistor(1e5)
     @named flapper = Flapper()
 
     conns = [
-        connect(pump.port_out,    res.port_in),
-        connect(res.port_out,     flapper.port_in),
+        connect(pump.port_out, res.port_in),
+        connect(res.port_out, flapper.port_in),
         connect(flapper.port_out, pump.port_in),
         flapper.ref_mdot ~ pump.port_in.mdot,
         pump.port_in.P ~ 1e5,
@@ -57,12 +57,15 @@ end
     sys = _build_flapper_scalar_loop(1e5)
     ssys = mtkcompile(sys; fully_determined=false)
 
-    op = Pair{Any,Any}[
-        ssys.flapper.T_open => 1e30,
-    ]
+    op = Pair{Any,Any}[ssys.flapper.T_open => 1e30,]
 
     t_arr = range(0.0, 20.0; length=200)
-    sol = solve_transient(ssys, op, t_arr; callbacks=flapper_callback(ssys, ssys.pump.port_in.mdot; threshold=1e-6))
+    sol = solve_transient(
+        ssys,
+        op,
+        t_arr;
+        callbacks=flapper_callback(ssys, ssys.pump.port_in.mdot; threshold=1e-6),
+    )
 
     @test sol.retcode == ReturnCode.Success
     # T_open must stay at 1e30 sentinel (event never fired — ref_mdot > threshold all run)
@@ -84,18 +87,18 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "FLAP-06: Flapper opens when ref_mdot crosses threshold" begin
     threshold_val = 1e-4   # kg/s; well below the initial mdot of 1.0 kg/s
-    dt_ramp       = 3.0    # s; ramp duration
-    L_over_A      = 5e5   # m^{-1}; tau_eff = L_over_A / R_eff ~ 5s
+    dt_ramp = 3.0    # s; ramp duration
+    L_over_A = 5e5   # m^{-1}; tau_eff = L_over_A / R_eff ~ 5s
 
-    @named pump    = Pump(0.0)   # zero pressure: loop decays under inertia
-    @named ine     = Inertia(L_over_A)
-    @named res     = Resistor(1e5)
+    @named pump = Pump(0.0)   # zero pressure: loop decays under inertia
+    @named ine = Inertia(L_over_A)
+    @named res = Resistor(1e5)
     @named flapper = Flapper(; dt=dt_ramp, R_closed=1e8, R_open=100.0)
 
     conns = [
-        connect(pump.port_out,    ine.port_in),
-        connect(ine.port_out,     res.port_in),
-        connect(res.port_out,     flapper.port_in),
+        connect(pump.port_out, ine.port_in),
+        connect(ine.port_out, res.port_in),
+        connect(res.port_out, flapper.port_in),
         connect(flapper.port_out, pump.port_in),
         # wire ref_mdot to the inertia mdot (the loop flow rate)
         flapper.ref_mdot ~ ine.port_in.mdot,
@@ -108,13 +111,15 @@ end
 
     mdot_0 = 1.0   # initial mdot (kg/s); well above threshold
 
-    op = Pair{Any,Any}[
-        ssys.ine.port_in.mdot => mdot_0,
-        ssys.flapper.T_open   => 1e30,
-    ]
+    op = Pair{Any,Any}[ssys.ine.port_in.mdot => mdot_0, ssys.flapper.T_open => 1e30]
 
     t_arr = range(0.0, 100.0; length=1000)
-    sol = solve_transient(ssys, op, t_arr; callbacks=flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=threshold_val))
+    sol = solve_transient(
+        ssys,
+        op,
+        t_arr;
+        callbacks=flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=threshold_val),
+    )
 
     @test sol.retcode == ReturnCode.Success
 
@@ -145,14 +150,11 @@ end
     sys = _build_flapper_scalar_loop(1e5)
     ssys = mtkcompile(sys; fully_determined=false)
 
-    op = Pair{Any,Any}[
-        ssys.flapper.T_open => 1e30,
-    ]
+    op = Pair{Any,Any}[ssys.flapper.T_open => 1e30,]
 
     fired = Ref(false)
     user_cb = ContinuousCallback(
-        (u, t_val, integ) -> t_val - 5.0,
-        integ -> (fired[] = true)
+        (u, t_val, integ) -> t_val - 5.0, integ -> (fired[] = true)
     )
 
     t_arr = range(0.0, 20.0; length=200)

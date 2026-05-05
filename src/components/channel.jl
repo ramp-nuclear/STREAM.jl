@@ -23,37 +23,42 @@ Single-phase convective channel with `n` axial finite-volume cells.
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
-                   htc_correlation      = dittus_boelter,
-                   friction_correlation = blasius_friction)
+function Channel(;
+    name,
+    n::Int,
+    geometry::PipeGeometry,
+    g=0.0,
+    htc_correlation=dittus_boelter,
+    friction_correlation=blasius_friction,
+)
     Dh = geometry.Dh
-    A  = geometry.A
-    L  = geometry.L
+    A = geometry.A
+    L = geometry.L
     Dt = Differential(t)
 
     pars = @parameters begin
-        L     = L
-        D_h   = Dh
-        A     = A
+        L = L
+        D_h = Dh
+        A = A
         g_acc = g    # gravitational acceleration (m/s^2); 0 for horizontal, 9.80665 for vertical
     end
 
     vars = @variables begin
-        (T(t))[1:n]      = fill(600.0, n)
+        (T(t))[1:n] = fill(600.0, n)
         (Re(t))[1:n]
         (Nu(t))[1:n]
         (h_tc(t))[1:n]
         (v(t))[1:n]
         (q_wall(t))[1:n]
-        (dp(t))[1:n]     = fill(100.0, n)
+        (dp(t))[1:n] = fill(100.0, n)
         (P(t))[1:n]
         T_out(t) = 600.0
         dP(t)
     end
 
-    @named port_in  = FlowPort()
+    @named port_in = FlowPort()
     @named port_out = FlowPort()
-    @named thermal  = ThermalPort()
+    @named thermal = ThermalPort()
 
     dz = L / n
 
@@ -62,25 +67,28 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     T_inlet_rev = instream(port_out.T)
 
     for i in 1:n
-        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i-1]
-        T_up_rev = (i == n) ? T_inlet_rev : T[i+1]
+        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i - 1]
+        T_up_rev = (i == n) ? T_inlet_rev : T[i + 1]
         T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
         # Energy balance (first-order upwind FV)
         # abs(port_in.mdot) ensures correct sign under reversed flow (mdot < 0):
         # the upwind temperature T_up is already selected for the correct direction,
         # so the advective flux is always |mdot|*cp*(T_upstream - T[i]).
-        push!(eqs,
-            Dt(T[i]) ~ (abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i])
-                       + h_tc[i] * sum(geometry.heated_parts) * dz * (thermal.T - T[i]))
-                      / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
+        push!(
+            eqs,
+            Dt(T[i]) ~
+            (
+                abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i]) +
+                h_tc[i] * sum(geometry.heated_parts) * dz * (thermal.T - T[i])
+            ) / (rho_water(T[i]) * cp_water(T[i]) * A * dz),
         )
         # Observables
         push!(eqs, q_wall[i] ~ thermal.Q_flow / n)
-        push!(eqs, v[i]      ~ port_in.mdot / (rho_water(T[i]) * A))
-        push!(eqs, Re[i]     ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
+        push!(eqs, v[i] ~ port_in.mdot / (rho_water(T[i]) * A))
+        push!(eqs, Re[i] ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
         Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
-        push!(eqs, Nu[i]     ~ htc_correlation(Re[i], Pr_i, T[i], T[i]))
-        push!(eqs, h_tc[i]  ~ Nu[i] * k_water(T[i]) / Dh)
+        push!(eqs, Nu[i] ~ htc_correlation(Re[i], Pr_i, T[i], T[i]))
+        push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
     end
 
     # Per-cell pressure drop (D-02): friction + gravity, each using dz = L/n
@@ -88,34 +96,51 @@ function Channel(; name, n::Int, geometry::PipeGeometry, g = 0.0,
     for i in 1:n
         Re_i_val = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
         f_i = friction_correlation(Re_i_val)
-        push!(eqs, dp[i] ~ f_i * (port_in.mdot * abs(port_in.mdot) /
-                                    (2 * rho_water(T[i]) * A^2)) * (dz / Dh)
-                           + rho_water(T[i]) * g_acc * dz)
+        push!(
+            eqs,
+            dp[i] ~
+            f_i *
+            (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(T[i]) * A^2)) *
+            (dz / Dh) + rho_water(T[i]) * g_acc * dz,
+        )
     end
 
     push!(eqs, T_out ~ T[n])
 
     # Port wiring
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
-    push!(eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(dp[i] for i in 1:n))
+    push!(
+        eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(dp[i] for i in 1:n)
+    )
     push!(eqs, port_out.T ~ T[n])
-    push!(eqs, port_in.T  ~ T[1])
+    push!(eqs, port_in.T ~ T[1])
 
     # Observed equations: P[i] absolute pressure and dP alias (D-04, D-05, D-06)
     # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
     # At steady state Dt(mdot)=0, the correction term vanishes and P[i] = P_in - cumsum(dp[1:i]).
     obs = Equation[]
     for i in 1:n
-        P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+        P_i =
+            port_in.P - sum(dp[j] for j in 1:i) -
+            (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
         push!(obs, P[i] ~ P_i)
     end
     push!(obs, dP ~ port_in.P - port_out.P)
 
-    all_vars = [collect(T); collect(Re); collect(Nu);
-                collect(h_tc); collect(v); collect(q_wall);
-                collect(dp); T_out]
+    all_vars = [
+        collect(T);
+        collect(Re);
+        collect(Nu);
+        collect(h_tc);
+        collect(v);
+        collect(q_wall);
+        collect(dp);
+        T_out
+    ]
 
-    compose(System(eqs, t, all_vars, pars; observed=obs, name=name), port_in, port_out, thermal)
+    compose(
+        System(eqs, t, all_vars, pars; observed=obs, name=name), port_in, port_out, thermal
+    )
 end
 
 # --- Phase 9: shared base equations helper ---
@@ -144,16 +169,29 @@ end
 #
 # Phase 27 note: When observed_mode=true, per-cell friction uses inlined Re_i
 # expression (not Re[i] symbol) to avoid referencing an observed variable.
-function _channel_base_eqs(eqs::Vector{Equation};
-    n, T, Re, Nu, h_tc, v, T_out, dp,
-    port_in, port_out,
-    Dh, A, L, g_acc, dz,
-    htc_correlation      = dittus_boelter,
-    friction_correlation = blasius_friction,
-    observed_mode        = false,
-    T_wall_cells         = nothing,
-    skip_htc             = false)
-
+function _channel_base_eqs(
+    eqs::Vector{Equation};
+    n,
+    T,
+    Re,
+    Nu,
+    h_tc,
+    v,
+    T_out,
+    dp,
+    port_in,
+    port_out,
+    Dh,
+    A,
+    L,
+    g_acc,
+    dz,
+    htc_correlation=dittus_boelter,
+    friction_correlation=blasius_friction,
+    observed_mode=false,
+    T_wall_cells=nothing,
+    skip_htc=false,
+)
     for i in 1:n
         if observed_mode
             # Re, Nu, v become observed variables (not solver unknowns).
@@ -164,14 +202,17 @@ function _channel_base_eqs(eqs::Vector{Equation};
                 Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
                 Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
                 T_w_i = T_wall_cells === nothing ? T[i] : T_wall_cells[i]
-                push!(eqs, h_tc[i] ~ htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T[i]) / Dh)
+                push!(
+                    eqs,
+                    h_tc[i] ~ htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T[i]) / Dh,
+                )
             end
         else
-            push!(eqs, v[i]    ~ port_in.mdot / (rho_water(T[i]) * A))
-            push!(eqs, Re[i]   ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
+            push!(eqs, v[i] ~ port_in.mdot / (rho_water(T[i]) * A))
+            push!(eqs, Re[i] ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
             Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
             T_w_i = T_wall_cells === nothing ? T[i] : T_wall_cells[i]
-            push!(eqs, Nu[i]   ~ htc_correlation(Re[i], Pr_i, T[i], T_w_i))
+            push!(eqs, Nu[i] ~ htc_correlation(Re[i], Pr_i, T[i], T_w_i))
             push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
         end
     end
@@ -186,9 +227,13 @@ function _channel_base_eqs(eqs::Vector{Equation};
         else
             f_i = friction_correlation(Re[i])
         end
-        push!(eqs, dp[i] ~ f_i * (port_in.mdot * abs(port_in.mdot) /
-                                    (2 * rho_water(T[i]) * A^2)) * (dz / Dh)
-                           + rho_water(T[i]) * g_acc * dz)
+        push!(
+            eqs,
+            dp[i] ~
+            f_i *
+            (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(T[i]) * A^2)) *
+            (dz / Dh) + rho_water(T[i]) * g_acc * dz,
+        )
     end
 
     push!(eqs, T_out ~ T[n])
@@ -196,7 +241,9 @@ function _channel_base_eqs(eqs::Vector{Equation};
     # Port wiring (4 equations -- identical across all channel variants)
     Dt = Differential(t)
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
-    push!(eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(dp[i] for i in 1:n))
-    push!(eqs, port_out.T                   ~ T[n])
-    push!(eqs, port_in.T                    ~ T[1])
+    push!(
+        eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(dp[i] for i in 1:n)
+    )
+    push!(eqs, port_out.T ~ T[n])
+    push!(eqs, port_in.T ~ T[1])
 end

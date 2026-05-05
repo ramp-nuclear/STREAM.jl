@@ -18,7 +18,6 @@ end
     @test_nowarn mtkcompile(r; fully_determined=false)
 end
 
-
 # ─────────────────────────────────────────────────────────────────
 # NET-02: Cube problem — 12 Resistors + 1 Pump assembled via multi-port connect()
 # Topology: 8 corners (0-7 binary), 12 edges, pump drives corner 0 -> corner 7
@@ -34,8 +33,8 @@ end
 # Tolerance: 1% (consistent with GRAV-02 and VAL-01)
 # ─────────────────────────────────────────────────────────────────
 @testset "NET-03: Cube flow matches 5/6 R analytical within 1%" begin
-    R_val    = 1.0e4
-    dP_val   = 3.0e4
+    R_val = 1.0e4
+    dP_val = 3.0e4
     ssys = build_cube(dP_pump=dP_val, R=R_val)
 
     mdot_analytical = dP_val / (5.0/6.0 * R_val)
@@ -49,20 +48,20 @@ end
     op = [
         ssys.pump.port_out.mdot => mdot_full,
         # Three source edges from corner 0
-        ssys.r01.port_in.mdot  => mdot_full / 3.0,
-        ssys.r02.port_in.mdot  => mdot_full / 3.0,
-        ssys.r04.port_in.mdot  => mdot_full / 3.0,
+        ssys.r01.port_in.mdot => mdot_full / 3.0,
+        ssys.r02.port_in.mdot => mdot_full / 3.0,
+        ssys.r04.port_in.mdot => mdot_full / 3.0,
         # Internal edges (rough equal split)
-        ssys.r13.port_in.mdot  => mdot_full / 6.0,
-        ssys.r15.port_in.mdot  => mdot_full / 6.0,
-        ssys.r23.port_in.mdot  => mdot_full / 6.0,
-        ssys.r26.port_in.mdot  => mdot_full / 6.0,
-        ssys.r45.port_in.mdot  => mdot_full / 6.0,
-        ssys.r46.port_in.mdot  => mdot_full / 6.0,
+        ssys.r13.port_in.mdot => mdot_full / 6.0,
+        ssys.r15.port_in.mdot => mdot_full / 6.0,
+        ssys.r23.port_in.mdot => mdot_full / 6.0,
+        ssys.r26.port_in.mdot => mdot_full / 6.0,
+        ssys.r45.port_in.mdot => mdot_full / 6.0,
+        ssys.r46.port_in.mdot => mdot_full / 6.0,
         # Three sink edges to corner 7
-        ssys.r37.port_in.mdot  => mdot_full / 3.0,
-        ssys.r57.port_in.mdot  => mdot_full / 3.0,
-        ssys.r67.port_in.mdot  => mdot_full / 3.0,
+        ssys.r37.port_in.mdot => mdot_full / 3.0,
+        ssys.r57.port_in.mdot => mdot_full / 3.0,
+        ssys.r67.port_in.mdot => mdot_full / 3.0,
     ]
     sol = solve_steady(ssys, op)
 

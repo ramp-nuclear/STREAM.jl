@@ -32,8 +32,9 @@ Generate a linear temperature guess for steady-state initialization.
 Vector of length `n` with linearly interpolated temperatures from `T_inlet` to estimated
 `T_outlet` as `Float64`.
 """
-function steady_state_guess(; T_inlet::Float64, Q_wall::Float64,
-                               mdot_guess::Float64, n::Int)
+function steady_state_guess(;
+    T_inlet::Float64, Q_wall::Float64, mdot_guess::Float64, n::Int
+)
     cp = cp_water(T_inlet)
     return [T_inlet + i * Q_wall / (n * mdot_guess * cp) for i in 1:n]
 end
@@ -69,16 +70,17 @@ Solve a compiled system to steady state using KINSOL (or a user-specified solver
 # Returns
 `SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
 """
-function solve_steady(ssys, op;
-                      solver = nothing,
-                      abstol = 1e-8,
-                      reltol = 1e-6,
-                      build_initializeprob = false)
-    prob = SteadyStateProblem(ssys, op;
-                              warn_initialize_determined=false,
-                              build_initializeprob=build_initializeprob)
+function solve_steady(
+    ssys, op; solver=nothing, abstol=1e-8, reltol=1e-6, build_initializeprob=false
+)
+    prob = SteadyStateProblem(
+        ssys,
+        op;
+        warn_initialize_determined=false,
+        build_initializeprob=build_initializeprob,
+    )
     _solver = isnothing(solver) ? SSRootfind(KINSOL()) : solver
-    sol  = solve(prob, _solver; abstol = abstol, reltol = reltol)
+    sol = solve(prob, _solver; abstol=abstol, reltol=reltol)
     return sol
 end
 
@@ -100,10 +102,7 @@ Solve a transient simulation over a time array.
 # Returns
 `SciMLBase.ODESolution`. Access time-dependent results via `sol[ssys.component.variable, :]`.
 """
-function solve_transient(ssys, op, t;
-                         solver = Rodas5P(),
-                         callbacks = nothing,
-                         kwargs...)
+function solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...)
     # MTK mtkcompile produces a mass-matrix ODE (implicit DAE form).
     # Rodas5P is a stiff implicit Runge-Kutta solver that supports mass matrices
     # and ODEProblem — the correct choice for MTK-generated DAE systems.
@@ -113,10 +112,13 @@ function solve_transient(ssys, op, t;
     # NoInit: skip MTK's automatic initialization (which fails for the rough
     # guess op dict). The caller is responsible for providing a consistent-enough
     # initial state (use steady_state_guess or a prior solve_steady solution).
-    sol = solve(prob, solver;
-                saveat = t,
-                callback = callbacks,
-                initializealg = SciMLBase.NoInit(),
-                kwargs...)
+    sol = solve(
+        prob,
+        solver;
+        saveat=t,
+        callback=callbacks,
+        initializealg=SciMLBase.NoInit(),
+        kwargs...,
+    )
     return sol
 end

@@ -3,7 +3,8 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, build_loop_vertical
+import STREAM:
+    Channel, ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, build_loop_vertical
 
 @testset "COMP-01: Channel stub callable" begin
     @named ch = Channel(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
@@ -51,7 +52,8 @@ end
 end
 
 @testset "GRAV-01: vertical loop solves" begin
-    n = 10; T_inlet = 313.15
+    n = 10;
+    T_inlet = 313.15
     ssys_v = build_loop_vertical(T_inlet=T_inlet)
     T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
     op = [ssys_v.ch.T[i] => T_guess[i] for i in 1:n]
@@ -71,7 +73,9 @@ end
 # The cancellation loop should therefore match the horizontal loop's mdot.
 # ─────────────────────────────────────────────────────────────────
 @testset "GRAV-02: gravity cancellation within 1% of horizontal" begin
-    n = 10; T_inlet = 313.15; L_ch = 0.6
+    n = 10;
+    T_inlet = 313.15;
+    L_ch = 0.6
 
     # Horizontal reference (g_acc=0, no Gravity component)
     ssys_h = build_loop(T_inlet=T_inlet)
@@ -108,7 +112,7 @@ end
     @named ch = ChannelAndContacts(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     subsys_names = Symbol.(ModelingToolkit.getname.(ModelingToolkit.get_systems(ch)))
     for i in 1:5
-        @test Symbol(:thermal_left, i)  in subsys_names
+        @test Symbol(:thermal_left, i) in subsys_names
         @test Symbol(:thermal_right, i) in subsys_names
     end
     # Old single-side names must be absent
@@ -136,12 +140,19 @@ end
     # Two-sided CAC (both left and right connected to same T_wall) with D=D_chf
     # gives h_tc*(π*D/2)*dz*(T_wall-T)*2 = h_tc*(π*D)*dz*(T_wall-T) — identical to CHF.
     # Same D ensures identical h_tc. CHAN-03 separately validates the adiabatic right side.
-    n = 10; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_ch = 0.01; A_ch = 7.85e-5; dP_pump = 3.0e4
+    n = 10;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 0.6;
+    D_ch = 0.01;
+    A_ch = 7.85e-5;
+    dP_pump = 3.0e4
 
     # --- ChannelHeatFlux reference ---
     @named pump_chf = Pump(dP_pump)
-    @named chf = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
+    @named chf = ChannelHeatFlux(
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall
+    )
     @named bc_chf = HeatExchanger(T_inlet)
     conns_chf = [
         connect(pump_chf.port_out, bc_chf.port_in),
@@ -167,11 +178,19 @@ end
         connect(pump_cac.port_out, bc_cac.port_in),
         connect(bc_cac.port_out, cac.port_in),
         connect(cac.port_out, pump_cac.port_in),
-        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left,  i))) for i in 1:n]...,
-        [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
+        [
+            connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for
+            i in 1:n
+        ]...,
+        [
+            connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for
+            i in 1:n
+        ]...,
         pump_cac.port_in.P ~ 1.0e5,
     ]
-    @named sys_cac = compose(System(conns_cac, t; name=:sys_cac), pump_cac, bc_cac, cac, ct_l..., ct_r...)
+    @named sys_cac = compose(
+        System(conns_cac, t; name=:sys_cac), pump_cac, bc_cac, cac, ct_l..., ct_r...
+    )
     ssys_cac = mtkcompile(sys_cac)
     op_cac = [ssys_cac.cac.T[i] => T_guess[i] for i in 1:n]
     push!(op_cac, ssys_cac.cac.port_in.mdot => 0.490)
@@ -186,8 +205,13 @@ end
 # Uses same one-sided CAC geometry as THERM-03
 # ─────────────────────────────────────────────────────────────────
 @testset "CHAN-03: Unconnected thermal_right is adiabatic (Q_flow == 0)" begin
-    n = 5; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_cac = 0.02; A_ch = 7.85e-5; dP_pump = 3.0e4
+    n = 5;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 0.6;
+    D_cac = 0.02;
+    A_ch = 7.85e-5;
+    dP_pump = 3.0e4
 
     @named pump2 = Pump(dP_pump)
     @named cac2 = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_cac))
@@ -197,7 +221,10 @@ end
         connect(pump2.port_out, bc2.port_in),
         connect(bc2.port_out, cac2.port_in),
         connect(cac2.port_out, pump2.port_in),
-        [connect(ct2[i].thermal, getproperty(cac2, Symbol(:thermal_left, i))) for i in 1:n]...,
+        [
+            connect(ct2[i].thermal, getproperty(cac2, Symbol(:thermal_left, i))) for
+            i in 1:n
+        ]...,
         pump2.port_in.P ~ 1.0e5,
     ]
     @named sys2 = compose(System(conns2, t; name=:sys2), pump2, bc2, cac2, ct2...)
@@ -250,12 +277,18 @@ end
 # Confirms: retcode Success, T_out > T_inlet (heat added)
 # ─────────────────────────────────────────────────────────────────
 @testset "ChannelHeatFlux: standalone" begin
-    n = 10; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+    n = 10;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 0.6;
+    D_ch = 0.01;
+    dP_pump = 3.0e4
 
     @named pump = Pump(dP_pump)
-    @named chf  = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
-    @named bc   = HeatExchanger(T_inlet)
+    @named chf = ChannelHeatFlux(
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall
+    )
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, chf.port_in),
@@ -278,12 +311,18 @@ end
 # Pressure anchor required for meaningful P[i] -- see D-07
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-01: per-cell dp and dP consistency" begin
-    n = 10; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+    n = 10;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 0.6;
+    D_ch = 0.01;
+    dP_pump = 3.0e4
 
     @named pump = Pump(dP_pump)
-    @named chf  = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
-    @named bc   = HeatExchanger(T_inlet)
+    @named chf = ChannelHeatFlux(
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall
+    )
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, chf.port_in),
@@ -301,7 +340,7 @@ end
 
     # dP == sum(dp[i]) exactly
     dP_total = sol[ssys.chf.dP]
-    dp_sum   = sum(sol[ssys.chf.dp[i]] for i in 1:n)
+    dp_sum = sum(sol[ssys.chf.dp[i]] for i in 1:n)
     @test isapprox(dP_total, dp_sum; rtol=1e-10)
 
     # Each dp[i] must be finite and nonzero (loop has friction)
@@ -316,12 +355,18 @@ end
 # Pressure anchor required for meaningful P[i] -- see D-07
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-02: absolute pressure P[i]" begin
-    n = 10; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+    n = 10;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 0.6;
+    D_ch = 0.01;
+    dP_pump = 3.0e4
 
     @named pump = Pump(dP_pump)
-    @named chf  = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
-    @named bc   = HeatExchanger(T_inlet)
+    @named chf = ChannelHeatFlux(
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall
+    )
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, chf.port_in),
@@ -354,7 +399,7 @@ end
 
     # Monotonically decreasing (friction dominates in horizontal forced flow)
     for i in 2:n
-        @test sol[ssys.chf.P[i]] <= sol[ssys.chf.P[i-1]]
+        @test sol[ssys.chf.P[i]] <= sol[ssys.chf.P[i - 1]]
     end
 end
 
@@ -363,20 +408,30 @@ end
 # Pressure anchor required for meaningful P[i] -- see D-07
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-04: T_sat and T_ONB in ChannelAndContacts" begin
-    n = 10; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+    n = 10;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 0.6;
+    D_ch = 0.01;
+    dP_pump = 3.0e4
 
     @named pump = Pump(dP_pump)
-    @named cac  = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
-    @named bc   = HeatExchanger(T_inlet)
+    @named cac = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc = HeatExchanger(T_inlet)
     ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l, i)) for i in 1:n]
     ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r, i)) for i in 1:n]
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, cac.port_in),
         connect(cac.port_out, pump.port_in),
-        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left,  i))) for i in 1:n]...,
-        [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
+        [
+            connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for
+            i in 1:n
+        ]...,
+        [
+            connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for
+            i in 1:n
+        ]...,
         # Pressure anchor required for meaningful P[i] -- see D-07
         pump.port_in.P ~ 2e5,
     ]
@@ -403,12 +458,18 @@ end
 end
 
 @testset "PRES-04: T_sat and T_ONB in ChannelHeatFlux" begin
-    n = 10; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+    n = 10;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 0.6;
+    D_ch = 0.01;
+    dP_pump = 3.0e4
 
     @named pump = Pump(dP_pump)
-    @named chf  = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
-    @named bc   = HeatExchanger(T_inlet)
+    @named chf = ChannelHeatFlux(
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall
+    )
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, chf.port_in),
@@ -438,15 +499,21 @@ end
 # correction term -> 0 at new steady state, mdot increases after step.
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-05: Channel transient momentum response" begin
-    n = 5; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 1.0; D_ch = 0.01; dP_0 = 3.0e4; dP_1 = 4.0e4; t_step = 50.0
+    n = 5;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 1.0;
+    D_ch = 0.01;
+    dP_0 = 3.0e4;
+    dP_1 = 4.0e4;
+    t_step = 50.0
 
     # Step function for pump dP
     dP_fn = t -> t < t_step ? dP_0 : dP_1
 
     @named pump = Pump(dP_fn)
-    @named ch   = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
-    @named bc   = HeatExchanger(T_inlet)
+    @named ch = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, ch.port_in),
@@ -492,7 +559,7 @@ end
 
     # mdot increases after step (dP_1 > dP_0)
     mdot_before = sol(t_step - 1.0, idxs=ssys.ch.port_in.mdot)
-    mdot_after  = sol(t_arr[end],   idxs=ssys.ch.port_in.mdot)
+    mdot_after = sol(t_arr[end], idxs=ssys.ch.port_in.mdot)
     @test mdot_after > mdot_before
 end
 
@@ -501,15 +568,21 @@ end
 # Verifies (L/A)*Dt(mdot) = (P_in - P_out) - sum(dp) at solver tolerance
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-06: momentum ODE residual check" begin
-    n = 5; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 1.0; D_ch = 0.01; A_ch = pi * (D_ch/2)^2
-    dP_0 = 3.0e4; dP_1 = 4.0e4; t_step = 50.0
+    n = 5;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 1.0;
+    D_ch = 0.01;
+    A_ch = pi * (D_ch/2)^2
+    dP_0 = 3.0e4;
+    dP_1 = 4.0e4;
+    t_step = 50.0
 
     dP_fn = t -> t < t_step ? dP_0 : dP_1
 
     @named pump = Pump(dP_fn)
-    @named ch   = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
-    @named bc   = HeatExchanger(T_inlet)
+    @named ch = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, ch.port_in),
@@ -533,7 +606,7 @@ end
     L_over_A = L_ch / A_ch
     check_times = [20.0, 100.0, 200.0, 280.0]
     for tc in check_times
-        P_in  = sol(tc, idxs=ssys.ch.port_in.P)
+        P_in = sol(tc, idxs=ssys.ch.port_in.P)
         P_out = sol(tc, idxs=ssys.ch.port_out.P)
         dp_sum = sum(sol(tc, idxs=ssys.ch.dp[i]) for i in 1:n)
         # (P_in - P_out) - sum(dp) = (L/A)*Dt(mdot)
@@ -553,13 +626,16 @@ end
 # Verifies Channel with built-in momentum ODE produces smooth transient
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-07: Channel alone produces physically reasonable transient" begin
-    n = 5; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 1.0; D_ch = 0.01
+    n = 5;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 1.0;
+    D_ch = 0.01
 
     # Constant pump -- verify transient from IC converges to steady state
     @named pump = Pump(3.0e4)
-    @named ch   = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
-    @named bc   = HeatExchanger(T_inlet)
+    @named ch = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, ch.port_in),
@@ -584,7 +660,7 @@ end
     @test !any(isnan, mdot_series)
 
     # Converges to steady state: mdot at end is stable (last 10% variation < 1%)
-    mdot_late = mdot_series[end-30:end]
+    mdot_late = mdot_series[(end - 30):end]
     mdot_mean = sum(mdot_late) / length(mdot_late)
     @test maximum(mdot_late) - minimum(mdot_late) < 0.01 * abs(mdot_mean)
 end
@@ -595,12 +671,18 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-08: Channel momentum ODE present, steady-state correct" begin
     # Verify ChannelHeatFlux has momentum ODE and steady-state matches pre-inertia behavior
-    n = 5; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+    n = 5;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 0.6;
+    D_ch = 0.01;
+    dP_pump = 3.0e4
 
     @named pump = Pump(dP_pump)
-    @named ch   = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
-    @named bc   = HeatExchanger(T_inlet)
+    @named ch = ChannelHeatFlux(
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall
+    )
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, ch.port_in),
@@ -617,7 +699,7 @@ end
 
     # At steady state: dP = sum(dp[i]) (inertia term = 0)
     dP_total = sol[ssys.ch.dP]
-    dp_sum   = sum(sol[ssys.ch.dp[i]] for i in 1:n)
+    dp_sum = sum(sol[ssys.ch.dp[i]] for i in 1:n)
     @test isapprox(dP_total, dp_sum; rtol=1e-6)
 
     # P[i] = port_in.P - cumsum(dp) at steady state (correction = 0)
@@ -633,12 +715,17 @@ end
 # PRES-12: n=1 channel edge case -- P[1] = port_out.P
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-12: n=1 channel P[1] = port_out.P" begin
-    T_inlet = 313.15; T_wall = 373.15
-    L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 0.6;
+    D_ch = 0.01;
+    dP_pump = 3.0e4
 
     @named pump = Pump(dP_pump)
-    @named ch   = ChannelHeatFlux(n=1, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
-    @named bc   = HeatExchanger(T_inlet)
+    @named ch = ChannelHeatFlux(
+        n=1, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall
+    )
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, ch.port_in),
@@ -663,22 +750,34 @@ end
 # Verifies thermal variant with dual ThermalPort arrays solves transient
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-09: ChannelAndContacts transient with momentum ODE" begin
-    n = 5; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 1.0; D_ch = 0.01; dP_0 = 3.0e4; dP_1 = 4.0e4; t_step = 50.0
+    n = 5;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 1.0;
+    D_ch = 0.01;
+    dP_0 = 3.0e4;
+    dP_1 = 4.0e4;
+    t_step = 50.0
 
     dP_fn = t -> t < t_step ? dP_0 : dP_1
 
     @named pump = Pump(dP_fn)
-    @named cac  = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
-    @named bc   = HeatExchanger(T_inlet)
+    @named cac = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc = HeatExchanger(T_inlet)
     ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l, i)) for i in 1:n]
     ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r, i)) for i in 1:n]
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, cac.port_in),
         connect(cac.port_out, pump.port_in),
-        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left,  i))) for i in 1:n]...,
-        [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
+        [
+            connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for
+            i in 1:n
+        ]...,
+        [
+            connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for
+            i in 1:n
+        ]...,
         pump.port_in.P ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...)
@@ -723,14 +822,22 @@ end
 # PRES-10: ChannelHeatFlux transient with momentum ODE
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-10: ChannelHeatFlux transient with momentum ODE" begin
-    n = 5; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 1.0; D_ch = 0.01; dP_0 = 3.0e4; dP_1 = 4.0e4; t_step = 50.0
+    n = 5;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 1.0;
+    D_ch = 0.01;
+    dP_0 = 3.0e4;
+    dP_1 = 4.0e4;
+    t_step = 50.0
 
     dP_fn = t -> t < t_step ? dP_0 : dP_1
 
     @named pump = Pump(dP_fn)
-    @named ch   = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
-    @named bc   = HeatExchanger(T_inlet)
+    @named ch = ChannelHeatFlux(
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall
+    )
+    @named bc = HeatExchanger(T_inlet)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, ch.port_in),
@@ -770,7 +877,7 @@ end
 
     # mdot increases after step
     mdot_before = sol(t_step - 1.0, idxs=ssys.ch.port_in.mdot)
-    mdot_after  = sol(t_arr[end],   idxs=ssys.ch.port_in.mdot)
+    mdot_after = sol(t_arr[end], idxs=ssys.ch.port_in.mdot)
     @test mdot_after > mdot_before
 end
 
@@ -786,15 +893,19 @@ end
     # This test verifies:
     #   (a) mtkcompile succeeds (no compilation error)
     #   (b) Channel alone (without Inertia) solves correctly (the recommended pattern)
-    n = 5; T_inlet = 313.15; T_wall = 373.15
-    L_ch = 1.0; D_ch = 0.01; A_ch = pi * (D_ch/2)^2
+    n = 5;
+    T_inlet = 313.15;
+    T_wall = 373.15
+    L_ch = 1.0;
+    D_ch = 0.01;
+    A_ch = pi * (D_ch/2)^2
     L_over_A_extra = 5000.0
 
     # Verify Channel + Inertia mtkcompile succeeds
     @named pump = Pump(3.0e4)
-    @named ch   = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
-    @named bc   = HeatExchanger(T_inlet)
-    @named ine  = Inertia(L_over_A_extra)
+    @named ch = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc = HeatExchanger(T_inlet)
+    @named ine = Inertia(L_over_A_extra)
     conns = [
         connect(pump.port_out, bc.port_in),
         connect(bc.port_out, ch.port_in),
@@ -809,8 +920,8 @@ end
 
     # Channel-only loop (recommended pattern): solves correctly
     @named pump2 = Pump(3.0e4)
-    @named ch2   = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
-    @named bc2   = HeatExchanger(T_inlet)
+    @named ch2 = Channel(n=n, geometry=PipeGeometry_circular(L_ch, D_ch))
+    @named bc2 = HeatExchanger(T_inlet)
     conns2 = [
         connect(pump2.port_out, bc2.port_in),
         connect(bc2.port_out, ch2.port_in),
@@ -830,7 +941,7 @@ end
     @test all(isfinite, sol2[ssys2.ch2.port_in.mdot, :])
 
     # Channel alone converges to steady state
-    mdot_late = sol2[ssys2.ch2.port_in.mdot, :][end-30:end]
+    mdot_late = sol2[ssys2.ch2.port_in.mdot, :][(end - 30):end]
     mdot_mean = sum(mdot_late) / length(mdot_late)
     @test maximum(mdot_late) - minimum(mdot_late) < 0.01 * abs(mdot_mean)
 end

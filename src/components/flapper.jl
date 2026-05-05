@@ -39,16 +39,16 @@ Uncompiled `System`. Call `mtkcompile(sys; fully_determined=false)` before solvi
 standalone Flapper (since `ref_mdot` is underdetermined alone), or compose it into a full
 system where `ref_mdot` is wired.
 """
-function Flapper(; name, dt = 5.0, R_closed = 1e8, R_open = 100.0)
+function Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0)
     pars = @parameters begin
-        dt       = dt
+        dt = dt
         R_closed = R_closed
-        R_open   = R_open
+        R_open = R_open
     end
 
     vars = @variables T_open(t) = 1e30 xi(t) ref_mdot(t)
 
-    @named port_in  = FlowPort()
+    @named port_in = FlowPort()
     @named port_out = FlowPort()
 
     D = Differential(t)
@@ -57,13 +57,13 @@ function Flapper(; name, dt = 5.0, R_closed = 1e8, R_open = 100.0)
         port_in.mdot + port_out.mdot ~ 0,
         D(T_open) ~ 0,
         xi ~ clamp((t - T_open) / dt, 0.0, 1.0),
-        port_in.P - port_out.P ~ (R_closed + (R_open - R_closed) * (3 * xi^2 - 2 * xi^3)) * port_in.mdot,
+        port_in.P - port_out.P ~ (R_closed + (R_open - R_closed) * (3 * xi ^ 2 - 2 * xi ^ 3)) * port_in.mdot,
         port_out.T ~ instream(port_in.T),
-        port_in.T  ~ instream(port_out.T),
+        port_in.T ~ instream(port_out.T),
         # ref_mdot has no equation here — user wires it during composition
     ]
 
-    compose(System(eqs, t, vars, pars; name = name), port_in, port_out)
+    compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
 end
 
 """
@@ -106,8 +106,8 @@ cb2 = flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=1e-4)      # custo
 sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 ```
 """
-function flapper_callback(ssys, monitored_sym; threshold = 0.01)
-    T_open_idx    = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
+function flapper_callback(ssys, monitored_sym; threshold=0.01)
+    T_open_idx = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
     monitored_idx = ModelingToolkit.variable_index(ssys, monitored_sym)
 
     # Use u[idx] (the interpolated state passed to the condition) for state variables.
@@ -126,6 +126,6 @@ function flapper_callback(ssys, monitored_sym; threshold = 0.01)
     ContinuousCallback(
         condition,
         nothing,   # upward crossing: ignore (flow recovered — valve stays open)
-        affect!    # downward crossing: latch T_open = t_now
+        affect!,    # downward crossing: latch T_open = t_now
     )
 end

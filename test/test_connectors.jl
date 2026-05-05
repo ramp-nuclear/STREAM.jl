@@ -33,14 +33,18 @@ end
     @named fp = FlowPort()
     mdot_var = only(filter(v -> ModelingToolkit.getname(v) == :mdot, unknowns(fp)))
     # Use Symbolics.getmetadata to access the connect type from variable metadata
-    connect_type = Symbolics.getmetadata(mdot_var, ModelingToolkitBase.VariableConnectType, nothing)
+    connect_type = Symbolics.getmetadata(
+        mdot_var, ModelingToolkitBase.VariableConnectType, nothing
+    )
     @test connect_type == ModelingToolkit.Flow
 end
 
 @testset "CONN-01: T is a Stream variable" begin
     @named fp = FlowPort()
     T_var = only(filter(v -> ModelingToolkit.getname(v) == :T, unknowns(fp)))
-    connect_type = Symbolics.getmetadata(T_var, ModelingToolkitBase.VariableConnectType, nothing)
+    connect_type = Symbolics.getmetadata(
+        T_var, ModelingToolkitBase.VariableConnectType, nothing
+    )
     @test connect_type == ModelingToolkit.Stream
 end
 
@@ -62,7 +66,9 @@ end
 @testset "CONN-02: Q_flow is a Flow variable" begin
     @named tp = ThermalPort()
     q_var = only(filter(v -> ModelingToolkit.getname(v) == :Q_flow, unknowns(tp)))
-    connect_type = Symbolics.getmetadata(q_var, ModelingToolkitBase.VariableConnectType, nothing)
+    connect_type = Symbolics.getmetadata(
+        q_var, ModelingToolkitBase.VariableConnectType, nothing
+    )
     @test connect_type == ModelingToolkit.Flow
 end
 
@@ -70,6 +76,8 @@ end
     @named tp = ThermalPort()
     T_var = only(filter(v -> ModelingToolkit.getname(v) == :T, unknowns(tp)))
     # Across variables have no connect metadata — getmetadata returns nothing
-    connect_type = Symbolics.getmetadata(T_var, ModelingToolkitBase.VariableConnectType, nothing)
+    connect_type = Symbolics.getmetadata(
+        T_var, ModelingToolkitBase.VariableConnectType, nothing
+    )
     @test connect_type === nothing
 end

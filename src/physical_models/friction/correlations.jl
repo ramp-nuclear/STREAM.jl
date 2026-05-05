@@ -38,7 +38,8 @@ matches Python STREAM friction.py `rectangular_laminar_correction`.
 function rectangular_laminar_correction(aspect_ratio::Real)
     return (
         0.88919 +
-        87.656 * ((1 + aspect_ratio * (sqrt(2) - 1)) / (4 * (1 + aspect_ratio)) - sqrt(2) / 8)^1.9
+        87.656 *
+        ((1 + aspect_ratio * (sqrt(2) - 1)) / (4 * (1 + aspect_ratio)) - sqrt(2) / 8)^1.9
     )^(-1)
 end
 

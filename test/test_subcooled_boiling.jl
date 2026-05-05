@@ -3,9 +3,15 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-import STREAM: ChannelAndContacts, Pump, HeatExchanger, ConstantTemperature,
-               PipeGeometry_circular, solve_steady, steady_state_guess,
-               regime_dependent_q_scb
+import STREAM:
+    ChannelAndContacts,
+    Pump,
+    HeatExchanger,
+    ConstantTemperature,
+    PipeGeometry_circular,
+    solve_steady,
+    steady_state_guess,
+    regime_dependent_q_scb
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 28: Subcooled Boiling Correlations
@@ -16,7 +22,6 @@ import STREAM: ChannelAndContacts, Pump, HeatExchanger, ConstantTemperature,
 # ─────────────────────────────────────────────────────────────────────────────
 
 @testset "Subcooled Boiling Correlations" begin
-
     @testset "SCB-01: McAdams_SCB_heat_flux" begin
         T_sat = 373.15  # 100C at ~1 atm
         # Positive heat flux for T_wall > T_sat
@@ -44,7 +49,9 @@ import STREAM: ChannelAndContacts, Pump, HeatExchanger, ConstantTemperature,
         @test Bergles_Rohsenow_SCB_heat_flux(T_sat, T_sat, pressure) == 0.0
         @test Bergles_Rohsenow_SCB_heat_flux(T_sat - 5.0, T_sat, pressure) == 0.0
         # Accepts kwargs without error
-        q_kw = Bergles_Rohsenow_SCB_heat_flux(T_sat + 10.0, T_sat, pressure; h_fg=2257e3, sigma=0.059)
+        q_kw = Bergles_Rohsenow_SCB_heat_flux(
+            T_sat + 10.0, T_sat, pressure; h_fg=2257e3, sigma=0.059
+        )
         @test q_kw == q  # defaults match explicit values
         # Pressure sensitivity: different pressure gives different result
         q_2bar = Bergles_Rohsenow_SCB_heat_flux(T_sat + 10.0, T_sat, 2e5)
@@ -92,24 +99,35 @@ end
 #           SCB-corrected HTC == uncorrected when T_wall < T_ONB
 # ─────────────────────────────────────────────────────────────────────────────
 @testset "ISCB: In-loop SCB Correction" begin
-    n = 5; T_inlet = 313.15; L_ch = 0.6; D_ch = 0.01; dP_pump = 3.0e4
+    n = 5;
+    T_inlet = 313.15;
+    L_ch = 0.6;
+    D_ch = 0.01;
+    dP_pump = 3.0e4
 
     # Helper: build a minimal loop with ChannelAndContacts + Pump + HeatExchanger + ConstantTemperature BCs.
     # Returns (compiled_sys, solution). T_wall must be below T_ONB for KINSOL convergence
     # (SCB correction factors are 10-100x, which makes fully-boiling steady-state stiff for Newton).
     function _build_scb_loop(; scb_correction=nothing, T_wall_bc=373.15)
         @named pump = Pump(dP_pump)
-        @named cac  = ChannelAndContacts(n=n, geometry=PipeGeometry_circular(L_ch, D_ch),
-                                          scb_correction=scb_correction)
-        @named bc   = HeatExchanger(T_inlet)
+        @named cac = ChannelAndContacts(
+            n=n, geometry=PipeGeometry_circular(L_ch, D_ch), scb_correction=scb_correction
+        )
+        @named bc = HeatExchanger(T_inlet)
         ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l, i)) for i in 1:n]
         ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r, i)) for i in 1:n]
         conns = [
             connect(pump.port_out, bc.port_in),
             connect(bc.port_out, cac.port_in),
             connect(cac.port_out, pump.port_in),
-            [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left,  i))) for i in 1:n]...,
-            [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
+            [
+                connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for
+                i in 1:n
+            ]...,
+            [
+                connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for
+                i in 1:n
+            ]...,
             pump.port_in.P ~ 2e5,
         ]
         @named sys = compose(System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...)
@@ -125,8 +143,9 @@ end
     @testset "ISCB-01: SCB ChannelAndContacts compiles" begin
         # Verify mtkcompile succeeds with SCB correction — structural correctness
         scb_fn = regime_dependent_q_scb(pressure=2e5)
-        @named cac = ChannelAndContacts(n=3, geometry=PipeGeometry_circular(L_ch, D_ch),
-                                         scb_correction=scb_fn)
+        @named cac = ChannelAndContacts(
+            n=3, geometry=PipeGeometry_circular(L_ch, D_ch), scb_correction=scb_fn
+        )
         @test cac isa ModelingToolkit.System
         println("SCB ChannelAndContacts: OK")
     end
@@ -146,8 +165,12 @@ end
     @testset "ISCB-02: High T_wall -> enhanced HTC (numerical)" begin
         # Direct numerical evaluation: at T_wall >> T_sat, the SCB correction factor > 1
         # This validates the physics without requiring KINSOL convergence in the boiling regime.
-        T_bulk = 320.0; P = 2e5; T_wall = 420.0
-        mdot = 0.49; Dh = D_ch; Ac = pi/4 * Dh^2
+        T_bulk = 320.0;
+        P = 2e5;
+        T_wall = 420.0
+        mdot = 0.49;
+        Dh = D_ch;
+        Ac = pi/4 * Dh^2
         Re_val = abs(mdot) * Dh / (Ac * STREAM.mu_water(T_bulk))
         Pr_val = STREAM.cp_water(T_bulk) * STREAM.mu_water(T_bulk) / STREAM.k_water(T_bulk)
 
@@ -175,7 +198,7 @@ end
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=330.0)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=330.0)
 
-        htc_scb   = [sol_scb[ssys_scb.cac.h_tc[i]] for i in 1:n]
+        htc_scb = [sol_scb[ssys_scb.cac.h_tc[i]] for i in 1:n]
         htc_noscb = [sol_noscb[ssys_noscb.cac.h_tc[i]] for i in 1:n]
         # Should be identical (ifelse selects uncorrected branch)
         for i in 1:n

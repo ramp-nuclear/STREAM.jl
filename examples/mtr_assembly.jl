@@ -39,6 +39,7 @@ gr()
 # SECTION 1: Parameters
 # =============================================================================
 
+#! format: off
 const NZ        = 10        # axial cells
 const NX        = 3         # lateral cells in plate
 const T_INLET   = 313.15    # K (40 degC) coolant inlet temperature
@@ -52,6 +53,7 @@ const LX_PLATE  = 0.00127   # m plate thickness (gap between channels)
 const RHO_AL    = 2700.0    # kg/m^3
 const CP_AL     = 900.0     # J/(kg*K)
 const K_AL      = 200.0     # W/(m*K)
+#! format: on
 
 # =============================================================================
 # SECTION 2: Build and compile
@@ -66,13 +68,22 @@ geom = PipeGeometry_rectangular(L_PLATE, Y_PLATE, LX_PLATE, Y_PLATE)
 
 # Step 2: Fuel plate — uniform normalized power shape.
 ps = fill(1.0 / (NZ * NX), NZ, NX)
-@named hd = HeatDiffusion(nz=NZ, nx=NX, Lz=L_PLATE, Lx=LX_PLATE, y=Y_PLATE,
-                           rho_s=RHO_AL, cp_s=CP_AL, k_s=K_AL,
-                           power_shape=ps, power=POWER)
+@named hd = HeatDiffusion(;
+    nz=NZ,
+    nx=NX,
+    Lz=L_PLATE,
+    Lx=LX_PLATE,
+    y=Y_PLATE,
+    rho_s=RHO_AL,
+    cp_s=CP_AL,
+    k_s=K_AL,
+    power_shape=ps,
+    power=POWER,
+)
 
 # Step 3: Left and right coolant channels (ChannelAndContacts provides thermal ports).
-@named cac_l = ChannelAndContacts(n=NZ, geometry=geom)
-@named cac_r = ChannelAndContacts(n=NZ, geometry=geom)
+@named cac_l = ChannelAndContacts(; n=NZ, geometry=geom)
+@named cac_r = ChannelAndContacts(; n=NZ, geometry=geom)
 
 # Step 4: Thermal coupling via plate().
 # plate(ch_left, ch_right, fuel; name) wires:
@@ -83,9 +94,9 @@ ps = fill(1.0 / (NZ * NX), NZ, NX)
 
 # Step 5: Complete hydraulic loops (pump + heat exchanger for each channel).
 @named pump_l = Pump(DP_PUMP)
-@named hx_l   = HeatExchanger(T_INLET)
+@named hx_l = HeatExchanger(T_INLET)
 @named pump_r = Pump(DP_PUMP)
-@named hx_r   = HeatExchanger(T_INLET)
+@named hx_r = HeatExchanger(T_INLET)
 
 conns = [
     connect(pump_l.port_out, hx_l.port_in),
@@ -107,11 +118,11 @@ ssys = mtkcompile(sys)
 
 T_w = 315.0
 op = vcat(
-    [ssys.rods.hd.T[i, j]          => T_w   for i in 1:NZ for j in 1:NX],
-    [ssys.rods.cac_l.T[i]          => T_w   for i in 1:NZ],
-    [ssys.rods.cac_r.T[i]          => T_w   for i in 1:NZ],
-    [ssys.rods.cac_l.port_in.mdot  => +0.250],
-    [ssys.rods.cac_r.port_in.mdot  => +0.250],
+    [ssys.rods.hd.T[i, j] => T_w for i in 1:NZ for j in 1:NX],
+    [ssys.rods.cac_l.T[i] => T_w for i in 1:NZ],
+    [ssys.rods.cac_r.T[i] => T_w for i in 1:NZ],
+    [ssys.rods.cac_l.port_in.mdot => +0.250],
+    [ssys.rods.cac_r.port_in.mdot => +0.250],
 )
 
 println("Solving steady state...")
@@ -125,9 +136,9 @@ end
 # SECTION 4: Extract and print results
 # =============================================================================
 
-T_out_l  = sol[ssys.rods.cac_l.T_out]
-T_out_r  = sol[ssys.rods.cac_r.T_out]
-T_center = sol[ssys.rods.hd.T[NZ÷2, (NX+1)÷2]]
+T_out_l = sol[ssys.rods.cac_l.T_out]
+T_out_r = sol[ssys.rods.cac_r.T_out]
+T_center = sol[ssys.rods.hd.T[NZ ÷ 2, (NX + 1) ÷ 2]]
 
 println("Steady-state results:")
 println("  Left channel T_out  = $(round(T_out_l - 273.15, digits=2)) degC")
@@ -139,16 +150,22 @@ println("  T_plate_center > T_fluid: $(T_center > T_out_l)")
 # SECTION 5: Plot axial temperature profiles
 # =============================================================================
 
-T_plate_center_col = [sol[ssys.rods.hd.T[i, (NX+1)÷2]] for i in 1:NZ]
+T_plate_center_col = [sol[ssys.rods.hd.T[i, (NX + 1) ÷ 2]] for i in 1:NZ]
 T_fluid_l = [sol[ssys.rods.cac_l.T[i]] for i in 1:NZ]
 T_fluid_r = [sol[ssys.rods.cac_r.T[i]] for i in 1:NZ]
-z = range(0.0, L_PLATE, length=NZ)
+z = range(0.0, L_PLATE; length=NZ)
 
-p = plot(z, T_plate_center_col .- 273.15,
-         label="Plate center", linewidth=2, color=:red)
-plot!(p, z, T_fluid_l .- 273.15, label="Left channel", linewidth=2, color=:blue)
-plot!(p, z, T_fluid_r .- 273.15, label="Right channel", linewidth=2, color=:green,
-      linestyle=:dash)
+p = plot(z, T_plate_center_col .- 273.15; label="Plate center", linewidth=2, color=:red)
+plot!(p, z, T_fluid_l .- 273.15; label="Left channel", linewidth=2, color=:blue)
+plot!(
+    p,
+    z,
+    T_fluid_r .- 273.15;
+    label="Right channel",
+    linewidth=2,
+    color=:green,
+    linestyle=:dash,
+)
 xlabel!(p, "Axial position [m]")
 ylabel!(p, "Temperature [degC]")
 title!(p, "STREAM.jl — MTR Assembly Steady State")

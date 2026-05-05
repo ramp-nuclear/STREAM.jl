@@ -29,9 +29,13 @@ function _flatten_weights(raw, comp)
         if raw isa Real
             return (fill(Float64(raw), nz*nx), nz*nx)
         elseif raw isa AbstractMatrix && size(raw) == (nz, nx)
-            return ([Float64(raw[i,j]) for i in 1:nz for j in 1:nx], nz*nx)
+            return ([Float64(raw[i, j]) for i in 1:nz for j in 1:nx], nz*nx)
         else
-            throw(ArgumentError("weight for $(nameof(comp)) must be scalar or $(nz)x$(nx) matrix, got $(summary(raw))"))
+            throw(
+                ArgumentError(
+                    "weight for $(nameof(comp)) must be scalar or $(nz)x$(nx) matrix, got $(summary(raw))",
+                ),
+            )
         end
     else
         n = length(T_sym)
@@ -40,7 +44,11 @@ function _flatten_weights(raw, comp)
         elseif raw isa AbstractVector && length(raw) == n
             return (Float64.(raw), n)
         else
-            throw(ArgumentError("weight for $(nameof(comp)) must be scalar or length-$n vector, got $(summary(raw))"))
+            throw(
+                ArgumentError(
+                    "weight for $(nameof(comp)) must be scalar or length-$n vector, got $(summary(raw))",
+                ),
+            )
         end
     end
 end
@@ -67,11 +75,9 @@ initialized with the correct precursor concentrations from `point_kinetics_stead
 Uncompiled `System` with 7 state variables (P, C_1..C_6) and 3 observed variables
 (beta_total, dPdt, reactivity). Call `mtkcompile(sys)` before solving.
 """
-function PointKinetics(; name,
-                         rho = 0.0,
-                         Lambda = U235_LAMBDA,
-                         beta_k = U235_BETA_K,
-                         lambda_k = U235_LAMBDA_K)
+function PointKinetics(;
+    name, rho=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K
+)
     Dt = Differential(t)
 
     pars = @parameters begin
@@ -108,8 +114,13 @@ function PointKinetics(; name,
     beta_sum = beta_1 + beta_2 + beta_3 + beta_4 + beta_5 + beta_6
 
     # Precursor source terms: sum_k(lambda_k * C_k)
-    precursor_source = lambda_1*C_1 + lambda_2*C_2 + lambda_3*C_3 +
-                       lambda_4*C_4 + lambda_5*C_5 + lambda_6*C_6
+    precursor_source =
+        lambda_1*C_1 +
+        lambda_2*C_2 +
+        lambda_3*C_3 +
+        lambda_4*C_4 +
+        lambda_5*C_5 +
+        lambda_6*C_6
 
     eqs = Equation[
         Dt(P) ~ (rho_val - beta_sum) / Lambda_gen * P + precursor_source,
@@ -129,10 +140,29 @@ function PointKinetics(; name,
         reactivity ~ rho_val,
     ]
 
-    System(eqs, t, [P, C_1, C_2, C_3, C_4, C_5, C_6],
-           [rho_val, Lambda_gen, beta_1, beta_2, beta_3, beta_4, beta_5, beta_6,
-            lambda_1, lambda_2, lambda_3, lambda_4, lambda_5, lambda_6];
-           observed=obs, name=name)
+    System(
+        eqs,
+        t,
+        [P, C_1, C_2, C_3, C_4, C_5, C_6],
+        [
+            rho_val,
+            Lambda_gen,
+            beta_1,
+            beta_2,
+            beta_3,
+            beta_4,
+            beta_5,
+            beta_6,
+            lambda_1,
+            lambda_2,
+            lambda_3,
+            lambda_4,
+            lambda_5,
+            lambda_6,
+        ];
+        observed=obs,
+        name=name,
+    )
 end
 
 """
@@ -181,13 +211,16 @@ Call `mtkcompile(sys)` before solving.
 unknowns that MUST be bound by calling `connect_temperature_feedback` and wrapping in
 a composed System before `mtkcompile` (Phase 47 D-05).
 """
-function PointKinetics(rho_c_fn::Any; name,
-                         rho_val = 0.0,
-                         Lambda = U235_LAMBDA,
-                         beta_k = U235_BETA_K,
-                         lambda_k = U235_LAMBDA_K,
-                         temp_worth = nothing,
-                         ref_temp = nothing)
+function PointKinetics(
+    rho_c_fn::Any;
+    name,
+    rho_val=0.0,
+    Lambda=U235_LAMBDA,
+    beta_k=U235_BETA_K,
+    lambda_k=U235_LAMBDA_K,
+    temp_worth=nothing,
+    ref_temp=nothing,
+)
     Dt = Differential(t)
     FType = typeof(rho_c_fn)
     pars = @parameters begin
@@ -222,8 +255,13 @@ function PointKinetics(rho_c_fn::Any; name,
     end
 
     beta_sum = beta_1 + beta_2 + beta_3 + beta_4 + beta_5 + beta_6
-    precursor_source = lambda_1*C_1 + lambda_2*C_2 + lambda_3*C_3 +
-                       lambda_4*C_4 + lambda_5*C_5 + lambda_6*C_6
+    precursor_source =
+        lambda_1*C_1 +
+        lambda_2*C_2 +
+        lambda_3*C_3 +
+        lambda_4*C_4 +
+        lambda_5*C_5 +
+        lambda_6*C_6
 
     # Phase 47: build T_source unknowns + feedback_expr (D-01, D-02, D-03, D-07).
     # When temp_worth === nothing, feedback_expr stays as literal 0 and the equations
@@ -263,10 +301,30 @@ function PointKinetics(rho_c_fn::Any; name,
         reactivity ~ rho_val + rho_c_fn(t) + feedback_expr,
     ]
 
-    System(eqs, t, [P, C_1, C_2, C_3, C_4, C_5, C_6, T_source_vars...],
-           [rho_val, Lambda_gen, beta_1, beta_2, beta_3, beta_4, beta_5, beta_6,
-            lambda_1, lambda_2, lambda_3, lambda_4, lambda_5, lambda_6, rho_c_fn];
-           observed=obs, name=name)
+    System(
+        eqs,
+        t,
+        [P, C_1, C_2, C_3, C_4, C_5, C_6, T_source_vars...],
+        [
+            rho_val,
+            Lambda_gen,
+            beta_1,
+            beta_2,
+            beta_3,
+            beta_4,
+            beta_5,
+            beta_6,
+            lambda_1,
+            lambda_2,
+            lambda_3,
+            lambda_4,
+            lambda_5,
+            lambda_6,
+            rho_c_fn,
+        ];
+        observed=obs,
+        name=name,
+    )
 end
 
 """
@@ -287,10 +345,9 @@ At steady state with rho=0, dC_k/dt = 0 gives: C_k = beta_k / (lambda_k * Lambda
 # Returns
 NamedTuple `(P=P0, C_k=Vector{Float64})` where `C_k[i] = beta_k[i] / (lambda_k[i] * Lambda) * P0`.
 """
-function point_kinetics_steady_state(P0;
-                                      Lambda = U235_LAMBDA,
-                                      beta_k = U235_BETA_K,
-                                      lambda_k = U235_LAMBDA_K)
+function point_kinetics_steady_state(
+    P0; Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K
+)
     C_k = [beta_k[i] / (lambda_k[i] * Lambda) * P0 for i in 1:length(beta_k)]
     return (P=P0, C_k=C_k)
 end
@@ -317,12 +374,12 @@ Instances are callable: `ctrl(t)` returns `worth(ctrl, t)`. This lets users pass
 - `log::Vector{Tuple{S, Float64}}` : state transition history (state, entry-time) pairs
 - `abort_states::Set`   : states that signal downstream callbacks to stop integration
 """
-mutable struct ReactivityController{S, F}
+mutable struct ReactivityController{S,F}
     input_reactivity::F
     state_machine
     state::S
     t_state::Float64
-    log::Vector{Tuple{S, Float64}}
+    log::Vector{Tuple{S,Float64}}
     abort_states::Set
 end
 
@@ -346,19 +403,22 @@ Construct a `ReactivityController` with sensible defaults.
 A `ReactivityController{S,F}` where `S = typeof(initial_state)` and
 `F = typeof(input_reactivity)`. The `log` field starts with `[(initial_state, initial_time)]`.
 """
-function ReactivityController(input_reactivity=nothing;
-                              initial_state=:NORMAL,
-                              initial_time=0.0,
-                              state_machine=nothing,
-                              abort_states=nothing)
+function ReactivityController(
+    input_reactivity=nothing;
+    initial_state=:NORMAL,
+    initial_time=0.0,
+    state_machine=nothing,
+    abort_states=nothing,
+)
     ir = input_reactivity === nothing ? ((s, ts, t) -> 0.0) : input_reactivity
     sm = state_machine === nothing ? ((s, t, p, dp) -> s) : state_machine
     ab = abort_states === nothing ? Set() : abort_states
     S_t = typeof(initial_state)
     F_t = typeof(ir)
     t0 = Float64(initial_time)
-    ReactivityController{S_t, F_t}(ir, sm, initial_state, t0,
-                                   Tuple{S_t, Float64}[(initial_state, t0)], ab)
+    ReactivityController{S_t,F_t}(
+        ir, sm, initial_state, t0, Tuple{S_t,Float64}[(initial_state, t0)], ab
+    )
 end
 
 """
@@ -376,8 +436,9 @@ invoked by the MTK callable parameter when `ctrl` is passed to
 # Returns
 `Float64` control reactivity value [-].
 """
-worth(ctrl::ReactivityController, t_now) =
+function worth(ctrl::ReactivityController, t_now)
     ctrl.input_reactivity(ctrl.state, ctrl.t_state, t_now)
+end
 
 """
     change_state(ctrl::ReactivityController, t_now, power, dPdt) -> new_state
@@ -487,7 +548,7 @@ cb = scram_callback(ssys, ssys.pk.P, ctrl; terminate=false)
 sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 ```
 """
-function scram_callback(ssys, p_sym::Num, ctrl; terminate = true)
+function scram_callback(ssys, p_sym::Num, ctrl; terminate=true)
     plimit = ctrl.state_machine.power_limit                # read once from SCRAMCondition
 
     # Resolve p_idx eagerly at callback construction time (ssys is available here).
