@@ -10,7 +10,7 @@ concurrency:
 jobs:
   code-style:
     permissions:
-      contents: read
+      contents: write
       checks: write
       issues: write
       pull-requests: write
