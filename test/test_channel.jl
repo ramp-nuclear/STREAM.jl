@@ -344,10 +344,8 @@ end
     @test isapprox(dP_total, dp_sum; rtol=1e-10)
 
     # Each dp[i] must be finite and nonzero (loop has friction)
-    for i in 1:n
-        @test isfinite(sol[ssys.chf.dp[i]])
-        @test sol[ssys.chf.dp[i]] != 0.0
-    end
+    @test all(isfinite, sol[ssys.chf.dp])
+    @test all(sol[ssys.chf.dp] .!= 0.0)
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -384,23 +382,16 @@ end
     P_in = sol[ssys.chf.port_in.P]
 
     # P[i] = port_in.P - cumsum(dp[1:i])
-    cumsum_dp = 0.0
-    for i in 1:n
-        cumsum_dp += sol[ssys.chf.dp[i]]
-        P_expected = P_in - cumsum_dp
-        @test isapprox(sol[ssys.chf.P[i]], P_expected; rtol=1e-10)
-    end
+    cumsum_dp = cumsum(sol[ssys.chf.dp])
+    P_expected = P_in .- cumsum_dp
+    @test all(isapprox(sol[ssys.chf.P], P_expected; rtol=1e-10))
 
     # P[i] values are near the anchor pressure (2e5 Pa +/- total dP)
-    for i in 1:n
-        @test sol[ssys.chf.P[i]] > 0.0
-        @test abs(sol[ssys.chf.P[i]] - 2e5) < 1e5  # within 1 bar of anchor
-    end
+    @test all(sol[ssys.chf.P] .> 0.0)
+    @test all(abs.(sol[ssys.chf.P] .- 2e5) .< 1e5)  # within 1 bar of anchor
 
     # Monotonically decreasing (friction dominates in horizontal forced flow)
-    for i in 2:n
-        @test sol[ssys.chf.P[i]] <= sol[ssys.chf.P[i - 1]]
-    end
+    @test all(diff(sol[ssys.chf.P]) .<= 0.0)
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -445,16 +436,12 @@ end
 
     # T_sat[i] is approximately sat_temperature(2e5) ~= 393.44 K
     # (pressure varies slightly per cell, but should be in range 360-400 K)
-    for i in 1:n
-        @test isfinite(sol[ssys.cac.T_sat[i]])
-        @test 360.0 < sol[ssys.cac.T_sat[i]] < 420.0
-    end
+    @test all(isfinite, sol[ssys.cac.T_sat])
+    @test all(360.0 .< sol[ssys.cac.T_sat] .< 420.0)
 
     # T_ONB[i] > T_sat[i] for all cells (ONB temperature exceeds saturation)
-    for i in 1:n
-        @test isfinite(sol[ssys.cac.T_ONB[i]])
-        @test sol[ssys.cac.T_ONB[i]] > sol[ssys.cac.T_sat[i]]
-    end
+    @test all(isfinite, sol[ssys.cac.T_ONB])
+    @test all(sol[ssys.cac.T_ONB] .> sol[ssys.cac.T_sat])
 end
 
 @testset "PRES-04: T_sat and T_ONB in ChannelHeatFlux" begin
@@ -485,11 +472,9 @@ end
     @test sol.retcode == ReturnCode.Success
 
     # T_sat and T_ONB are accessible and finite
-    for i in 1:n
-        @test isfinite(sol[ssys.chf.T_sat[i]])
-        @test isfinite(sol[ssys.chf.T_ONB[i]])
-        @test sol[ssys.chf.T_ONB[i]] > sol[ssys.chf.T_sat[i]]
-    end
+    @test all(isfinite, sol[ssys.chf.T_sat])
+    @test all(isfinite, sol[ssys.chf.T_ONB])
+    @test all(sol[ssys.chf.T_ONB] .> sol[ssys.chf.T_sat])
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -533,24 +518,18 @@ end
     sol = solve_transient(ssys, op, t_arr)
     @test sol.retcode == ReturnCode.Success
 
-    # dp[i] are finite throughout transient
-    for i in 1:n
-        @test all(isfinite, sol[ssys.ch.dp[i], :])
-    end
+    @test all(isfinite, hcat(sol[ssys.ch.dp, :]...))
 
     # P[i] are finite and positive throughout transient
-    for i in 1:n
-        @test all(isfinite, sol[ssys.ch.P[i], :])
-        @test all(p -> p > 0, sol[ssys.ch.P[i], :])
-    end
+    _P = hcat(sol[ssys.ch.P, :]...)
+    @test all(isfinite, _P)
+    @test all(p -> p > 0, _P)
 
     # dP = port_in.P - port_out.P at all time points
     dP_vals = sol[ssys.ch.dP, :]
     P_in_vals = sol[ssys.ch.port_in.P, :]
     P_out_vals = sol[ssys.ch.port_out.P, :]
-    for k in eachindex(dP_vals)
-        @test isapprox(dP_vals[k], P_in_vals[k] - P_out_vals[k]; rtol=1e-10)
-    end
+    @test all(isapprox(dP_vals, P_in_vals - P_out_vals; rtol=1e-10))
 
     # At t->infinity (last time point), correction term -> 0:
     # dP should approximately equal sum(dp[i])
@@ -796,26 +775,21 @@ end
     sol = solve_transient(ssys, op, t_arr)
     @test sol.retcode == ReturnCode.Success
 
+    finite(x) = all(isfinite, hcat(sol[x, :]...))
     # No NaN in mdot, P[i], dp[i]
-    @test all(isfinite, sol[ssys.cac.port_in.mdot, :])
-    for i in 1:n
-        @test all(isfinite, sol[ssys.cac.P[i], :])
-        @test all(isfinite, sol[ssys.cac.dp[i], :])
-    end
+    @test finite(ssys.cac.port_in.mdot)
+    @test finite(ssys.cac.P)
+    @test finite(ssys.cac.dP)
 
     # dP = port_in.P - port_out.P at all time points
     dP_vals = sol[ssys.cac.dP, :]
     P_in_vals = sol[ssys.cac.port_in.P, :]
     P_out_vals = sol[ssys.cac.port_out.P, :]
-    for k in eachindex(dP_vals)
-        @test isapprox(dP_vals[k], P_in_vals[k] - P_out_vals[k]; rtol=1e-10)
-    end
+    @test all(isapprox(dP_vals, P_in_vals - P_out_vals; rtol=1e-10))
 
     # T_sat and T_ONB still accessible during transient
-    for i in 1:n
-        @test all(isfinite, sol[ssys.cac.T_sat[i], :])
-        @test all(isfinite, sol[ssys.cac.T_ONB[i], :])
-    end
+    @test finite(ssys.cac.T_sat)
+    @test finite(ssys.cac.T_ONB)
 end
 
 # ─────────────────────────────────────────────────────────────────
