@@ -6,6 +6,8 @@ using STREAM
 import STREAM:
     Channel, ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, build_loop_vertical
 
+zabs = 273.15
+
 @testset "COMP-01: Channel stub callable" begin
     @named ch = Channel(n=5, geometry=PipeGeometry_circular(1.0, 0.01))
     @test ch isa ModelingToolkit.System
@@ -74,7 +76,7 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "GRAV-02: gravity cancellation within 1% of horizontal" begin
     n = 10;
-    T_inlet = 313.15;
+    T_inlet = 40.0
     L_ch = 0.6
 
     # Horizontal reference (g_acc=0, no Gravity component)
@@ -141,8 +143,8 @@ end
     # gives h_tc*(π*D/2)*dz*(T_wall-T)*2 = h_tc*(π*D)*dz*(T_wall-T) — identical to CHF.
     # Same D ensures identical h_tc. CHAN-03 separately validates the adiabatic right side.
     n = 10;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 0.6;
     D_ch = 0.01;
     A_ch = 7.85e-5;
@@ -206,8 +208,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "CHAN-03: Unconnected thermal_right is adiabatic (Q_flow == 0)" begin
     n = 5;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 0.6;
     D_cac = 0.02;
     A_ch = 7.85e-5;
@@ -278,8 +280,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "ChannelHeatFlux: standalone" begin
     n = 10;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 0.6;
     D_ch = 0.01;
     dP_pump = 3.0e4
@@ -312,8 +314,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-01: per-cell dp and dP consistency" begin
     n = 10;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 0.6;
     D_ch = 0.01;
     dP_pump = 3.0e4
@@ -356,8 +358,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-02: absolute pressure P[i]" begin
     n = 10;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 0.6;
     D_ch = 0.01;
     dP_pump = 3.0e4
@@ -409,8 +411,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-04: T_sat and T_ONB in ChannelAndContacts" begin
     n = 10;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 0.6;
     D_ch = 0.01;
     dP_pump = 3.0e4
@@ -443,11 +445,11 @@ end
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
 
-    # T_sat[i] is approximately sat_temperature(2e5) ~= 393.44 K
+    # T_sat[i] is approximately Tsat(2e5) ~= 393.44 K
     # (pressure varies slightly per cell, but should be in range 360-400 K)
     for i in 1:n
         @test isfinite(sol[ssys.cac.T_sat[i]])
-        @test 360.0 < sol[ssys.cac.T_sat[i]] < 420.0
+        @test 360.0 - zabs < sol[ssys.cac.T_sat[i]] < 420.0 - zabs
     end
 
     # T_ONB[i] > T_sat[i] for all cells (ONB temperature exceeds saturation)
@@ -459,8 +461,8 @@ end
 
 @testset "PRES-04: T_sat and T_ONB in ChannelHeatFlux" begin
     n = 10;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 0.6;
     D_ch = 0.01;
     dP_pump = 3.0e4
@@ -500,8 +502,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-05: Channel transient momentum response" begin
     n = 5;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 1.0;
     D_ch = 0.01;
     dP_0 = 3.0e4;
@@ -569,8 +571,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-06: momentum ODE residual check" begin
     n = 5;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 1.0;
     D_ch = 0.01;
     A_ch = pi * (D_ch/2)^2
@@ -627,8 +629,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-07: Channel alone produces physically reasonable transient" begin
     n = 5;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 1.0;
     D_ch = 0.01
 
@@ -672,8 +674,8 @@ end
 @testset "PRES-08: Channel momentum ODE present, steady-state correct" begin
     # Verify ChannelHeatFlux has momentum ODE and steady-state matches pre-inertia behavior
     n = 5;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 0.6;
     D_ch = 0.01;
     dP_pump = 3.0e4
@@ -715,8 +717,8 @@ end
 # PRES-12: n=1 channel edge case -- P[1] = port_out.P
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-12: n=1 channel P[1] = port_out.P" begin
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 0.6;
     D_ch = 0.01;
     dP_pump = 3.0e4
@@ -751,8 +753,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-09: ChannelAndContacts transient with momentum ODE" begin
     n = 5;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 1.0;
     D_ch = 0.01;
     dP_0 = 3.0e4;
@@ -823,8 +825,8 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "PRES-10: ChannelHeatFlux transient with momentum ODE" begin
     n = 5;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 1.0;
     D_ch = 0.01;
     dP_0 = 3.0e4;
@@ -894,8 +896,8 @@ end
     #   (a) mtkcompile succeeds (no compilation error)
     #   (b) Channel alone (without Inertia) solves correctly (the recommended pattern)
     n = 5;
-    T_inlet = 313.15;
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     L_ch = 1.0;
     D_ch = 0.01;
     A_ch = pi * (D_ch/2)^2

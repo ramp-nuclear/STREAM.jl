@@ -101,10 +101,11 @@ Source: Python STREAM thresholds.py `Whittle_Forgan_OFI`.
 # Returns
 OFI limit power `Q_OFI` [W].
 """
-function q_OFI_whittle_forgan(mdot, T_sat, T_inlet, pipe)
+function q_OFI_whittle_forgan(mdot, T_sat, T_inlet, pipe; liquid=H2O)
     G = abs(mdot) / pipe.A
     G_cgs = G / 10  # SI to CGS conversion (G must be in CGS per Whittle-Forgan)
-    integral_cp, _ = quadgk(cp_water, T_inlet, T_sat)
+    c(T) = cₚ(liquid, T)
+    integral_cp, _ = quadgk(c, T_inlet, T_sat)
     return abs(mdot) * integral_cp / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
 end
 
@@ -137,12 +138,18 @@ Source: Python STREAM thresholds.py `Saha_Zuber_OSV_computed_bulk`.
 OSV heat flux `q_OSV` [W/m^2]. Returns the minimum (most conservative) value along the channel.
 """
 function q_OSV_saha_zuber(
-    T_inlet, mdot, pipe; flux_shape=nothing, dz=nothing, flux_enworse=1.0
+    T_inlet,
+    mdot,
+    pipe;
+    flux_shape=nothing,
+    dz=nothing,
+    flux_enworse=1.0,
+    liquid=H2O,
 )
     # Coolant properties at inlet temperature
-    rho = rho_water(T_inlet)
-    cp = cp_water(T_inlet)
-    k = k_water(T_inlet)
+    rho = ρ(liquid, T_inlet)
+    cp = cₚ(liquid, T_inlet)
+    k = k(liquid, T_inlet)
     G = abs(mdot) / pipe.A
     u = G / rho
     # Peclet number
@@ -158,7 +165,7 @@ function q_OSV_saha_zuber(
     end
 
     dT_sub = pipe.heated_perimeter  # placeholder; actual T_sat needed for full calc
-    T_sat_est = sat_temperature(1e5)  # use 1 atm default for self-consistent bulk
+    T_sat_est = Tsat(liquid, 1e5)  # use 1 atm default for self-consistent bulk
 
     # Handle uniform vs provided flux shape
     n_cells = flux_shape === nothing ? 10 : length(flux_shape)

@@ -52,7 +52,7 @@ using STREAM
         @test result > 0  # positive power
         @test result isa Float64
         # OFI power is less than boiling onset power (denominator >= 1)
-        q_onset = q_boiling_onset(0.5, 373.15, 300.0, cp_water(300.0))
+        q_onset = q_boiling_onset(0.5, 373.15, 300.0, cₚ(H2O, 300.0))
         @test result < q_onset
         # abs(mdot): negative flow gives same result
         @test q_OFI_whittle_forgan(-0.5, 373.15, 300.0, pipe) ≈ result rtol = 1e-10
@@ -202,7 +202,7 @@ end
         @test length(result) == n
         @test all(result .> 0)
         # Formula: abs(mdot) * cp * (T_sat - T_inlet)
-        expected_val = abs(0.5) * cp_water(320.0) * (373.15 - 300.0)
+        expected_val = abs(0.5) * cₚ(H2O, 320.0) * (373.15 - 300.0)
         @test result[1] ≈ expected_val rtol = 1e-8
     end
 
@@ -211,7 +211,7 @@ end
         @test result isa Float64
         @test result > 0
         # OFI power < boiling onset power (Whittle-Forgan denominator >= 1)
-        q_onset = q_boiling_onset(0.5, 373.15, 300.0, cp_water(300.0))
+        q_onset = q_boiling_onset(0.5, 373.15, 300.0, cₚ(H2O, 300.0))
         @test result < q_onset
     end
 

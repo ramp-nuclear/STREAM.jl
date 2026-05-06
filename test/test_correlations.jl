@@ -13,7 +13,6 @@ import STREAM:
     regime_dependent,
     elenbaas_nusselt,
     elenbaas_htc,
-    beta_water,
     Gr,
     Ra,
     Marco_Han_Nusselt,
@@ -396,21 +395,21 @@ end  # @testset "PHY-02/03/04: Integration Tests — Pluggable Correlations in S
         #   Nu    = (1/24)*Ra*(b/L)*(1-exp(-35*L/(Ra*b)))^0.75 = 1.2731625848
         #
         # This test reproduces the full chain using Julia functions:
-        T_bulk = 313.15  # 40 C in Kelvin
-        T_wall = 333.15  # 60 C in Kelvin
+        T_bulk = 40.0
+        T_wall = 60.0
         b = 0.00254
         L_h = 0.6
 
-        beta_val = beta_water(T_bulk)
-        @test isapprox(beta_val, 3.851798e-04; rtol=1e-4)
+        l = H2O(T_bulk)
+        @test isapprox(l.β, 3.851798e-04; rtol=1e-4)
 
-        nu_val = mu_water(T_bulk) / rho_water(T_bulk)
-        Gr_val = Gr(beta_val, 9.81, T_wall - T_bulk, b, nu_val)
+        ν = l.μ / l.ρ
+        Gr_val = Gr(l.β, 9.81, T_wall - T_bulk, b, ν)
         # rtol=5e-4: Gr is sensitive to rho/mu product; Julia and Python Simantov coefficients
         # produce numerically identical results but differ from the tabulated reference by ~0.034%
         @test isapprox(Gr_val, 2862.302086; rtol=5e-4)
 
-        Pr_val = cp_water(T_bulk) * mu_water(T_bulk) / k_water(T_bulk)
+        Pr_val = l.cₚ * l.μ / l.k
         @test isapprox(Pr_val, 4.323622; rtol=1e-4)
 
         Ra_val = Ra(Gr_val, Pr_val)

@@ -51,8 +51,8 @@ function build_loop(;
     D_ch     = 0.01,
     A_ch     = 7.85e-5,
     dP_pump  = 3.0e4,
-    T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
-    T_wall   = 373.15,   # wall temperature (K); ~100°C for forced convection
+    T_inlet  = 40.0,   # coolant inlet temperature; 40°C
+    T_wall   = 100.0,   # wall temperature; ~100°C for forced convection
 )
 #! format: on
     @named pump = Pump(dP_pump)
@@ -127,8 +127,8 @@ function build_loop_vertical(;
     D_ch     = 0.01,
     A_ch     = 7.85e-5,
     dP_pump  = 3.0e4,
-    T_inlet  = 313.15,    # coolant inlet temperature (K); 40°C
-    T_wall   = 373.15,    # wall temperature (K); ~100°C for forced convection
+    T_inlet  = 40.0,    # coolant inlet temperature; 40°C
+    T_wall   = 100.0,    # wall temperature; ~100°C for forced convection
     g_acc    = 9.80665,   # gravitational acceleration (m/s²)
     H_return = nothing,   # height of return leg (m); defaults to L_ch for cancellation geometry
 )

@@ -125,7 +125,7 @@ end
     # For reversed flow, T_boundary_inlet = T_inlet_sign (resolved via port_in.T pin),
     # NOT T_vals[n_sign] (which has already been partially heated by the wall).
     T_mean = (T_vals[1] + T_inlet_sign) / 2
-    Q_advect = abs(mdot_neg) * cp_water(T_mean) * (T_vals[1] - T_inlet_sign)
+    Q_advect = abs(mdot_neg) * cₚ(H2O, T_mean) * (T_vals[1] - T_inlet_sign)
     Q_wall_total = sol[ssys.cac.Q_wall_total]
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
@@ -167,7 +167,7 @@ end
     # Advective heat gain = |mdot| * cp * (T_outlet - T_boundary_inlet).
     # For reversed flow, T_boundary_inlet = T_inlet_sign (resolved via port_in.T pin).
     T_mean = (T_vals[1] + T_inlet_sign) / 2
-    Q_advect = abs(mdot_neg) * cp_water(T_mean) * (T_vals[1] - T_inlet_sign)
+    Q_advect = abs(mdot_neg) * cₚ(H2O, T_mean) * (T_vals[1] - T_inlet_sign)
     Q_wall_total = sum(sol[ssys.chf.q_wall[i]] for i in 1:n_sign)
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end

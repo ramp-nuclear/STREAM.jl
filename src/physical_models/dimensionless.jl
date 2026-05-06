@@ -50,6 +50,8 @@ Prandtl number (dimensionless).
 """
 Pr(cp, mu, k) = cp * mu / k
 
+Pr(l::AbstractLiquid, T) = cₚ(l, T) * μ(l, T) / k(l, T)
+
 """
     Nu(h, Dh, k) -> Float64
 

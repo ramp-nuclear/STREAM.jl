@@ -176,7 +176,7 @@ end
     @test mdot_r > 0.0
     @test T_center > T_out_l
     # Energy balance: each channel receives 5 kW; T_rise = P/(mdot*cp)
-    cp_approx = cp_water(T_in)
+    cp_approx = cₚ(H2O, T_in)
     T_rise_expected = 5000.0 / (mdot_l * cp_approx)
     @test isapprox(T_out_l - T_in, T_rise_expected; rtol=0.05)
 end
@@ -368,7 +368,7 @@ end
     @test mdot_l_03 > 0.0
     @test T_center_03 > T_out_l_03
     # Energy balance: full 10 kW goes to one channel
-    cp_approx = cp_water(T_in)
+    cp_approx = cₚ(H2O, T_in)
     T_rise_expected = 1e4 / (mdot_l_03 * cp_approx)
     @test isapprox(T_out_l_03 - T_in, T_rise_expected; rtol=0.05)
 
@@ -556,7 +556,7 @@ end
 
     # Assertion 2: energy balance — both plates heat the single channel
     mdot_v02 = sol_v02[ssys_v02.cac_v02.port_in.mdot]
-    cp_v02 = cp_water(T_in_v02)
+    cp_v02 = cₚ(H2O, T_in_v02)
     T_rise_expected_v02 = (power_per_plate + power_per_plate) / (mdot_v02 * cp_v02)
     @test isapprox(
         sol_v02[ssys_v02.cac_v02.T_out] - T_in_v02, T_rise_expected_v02; rtol=0.05

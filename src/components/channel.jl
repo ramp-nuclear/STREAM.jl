@@ -30,6 +30,7 @@ function Channel(;
     g=0.0,
     htc_correlation=dittus_boelter,
     friction_correlation=blasius_friction,
+    liquid=H2O,
 )
     Dh = geometry.Dh
     A = geometry.A
@@ -65,6 +66,10 @@ function Channel(;
     eqs = Equation[]
     T_inlet_fwd = instream(port_in.T)
     T_inlet_rev = instream(port_out.T)
+    r = ρ.(liquid, T[:])
+    c = cₚ.(liquid, T[:])
+    μ_ = μ.(liquid, T[:])
+    k_ = k.(liquid, T[:])
 
     for i in 1:n
         T_up_fwd = (i == 1) ? T_inlet_fwd : T[i - 1]
@@ -78,30 +83,30 @@ function Channel(;
             eqs,
             Dt(T[i]) ~
             (
-                abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i]) +
+                    abs(port_in.mdot) * c[i] * (T_up - T[i]) +
                 h_tc[i] * sum(geometry.heated_parts) * dz * (thermal.T - T[i])
-            ) / (rho_water(T[i]) * cp_water(T[i]) * A * dz),
+                ) / (r[i] * c[i] * A * dz),
         )
         # Observables
         push!(eqs, q_wall[i] ~ thermal.Q_flow / n)
-        push!(eqs, v[i] ~ port_in.mdot / (rho_water(T[i]) * A))
-        push!(eqs, Re[i] ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
-        Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
+        push!(eqs, v[i] ~ port_in.mdot / (r[i] * A))
+        push!(eqs, Re[i] ~ abs(port_in.mdot) * Dh / (A * μ_[i]))
+        Pr_i = c[i] * μ_[i] / k_[i]
         push!(eqs, Nu[i] ~ htc_correlation(Re[i], Pr_i, T[i], T[i]))
-        push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
+        push!(eqs, h_tc[i] ~ Nu[i] * k_[i] / Dh)
     end
 
     # Per-cell pressure drop (D-02): friction + gravity, each using dz = L/n
     # Momentum inertia is handled by the momentum ODE below; dp[i] is algebraic (friction + gravity only).
     for i in 1:n
-        Re_i_val = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+        Re_i_val = abs(port_in.mdot) * Dh / (A * μ_[i])
         f_i = friction_correlation(Re_i_val)
         push!(
             eqs,
             dp[i] ~
             f_i *
-            (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(T[i]) * A^2)) *
-            (dz / Dh) + rho_water(T[i]) * g_acc * dz,
+                (port_in.mdot * abs(port_in.mdot) / (2 * r[i] * A^2)) *
+                (dz / Dh) + μ_[i] * g_acc * dz,
         )
     end
 
@@ -191,7 +196,12 @@ function _channel_base_eqs(
     observed_mode=false,
     T_wall_cells=nothing,
     skip_htc=false,
+    liquid=H2O,
 )
+    r = ρ.(liquid, T[:])
+    c = cₚ.(liquid, T[:])
+    μ_ = μ.(liquid, T[:])
+    k_ = k.(liquid, T[:])
     for i in 1:n
         if observed_mode
             # Re, Nu, v become observed variables (not solver unknowns).
@@ -199,21 +209,21 @@ function _channel_base_eqs(
             # When skip_htc=true, h_tc[i] equations are NOT pushed here — caller provides them
             # (e.g. ChannelAndContacts with SCB correction pushes its own h_tc[i] equations).
             if !skip_htc
-                Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
-                Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
+                Re_i = abs(port_in.mdot) * Dh / (A * μ_[i])
+                Pr_i = c[i] * μ_[i] / k_[i]
                 T_w_i = T_wall_cells === nothing ? T[i] : T_wall_cells[i]
                 push!(
                     eqs,
-                    h_tc[i] ~ htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T[i]) / Dh,
+                    h_tc[i] ~ htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_[i] / Dh,
                 )
             end
         else
-            push!(eqs, v[i] ~ port_in.mdot / (rho_water(T[i]) * A))
-            push!(eqs, Re[i] ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
-            Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
+            push!(eqs, v[i] ~ port_in.mdot / (r[i] * A))
+            push!(eqs, Re[i] ~ abs(port_in.mdot) * Dh / (A * μ_[i]))
+            Pr_i = c[i] * μ_[i] / k_[i]
             T_w_i = T_wall_cells === nothing ? T[i] : T_wall_cells[i]
             push!(eqs, Nu[i] ~ htc_correlation(Re[i], Pr_i, T[i], T_w_i))
-            push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
+            push!(eqs, h_tc[i] ~ Nu[i] * k_[i] / Dh)
         end
     end
 
@@ -222,7 +232,7 @@ function _channel_base_eqs(
     for i in 1:n
         if observed_mode
             # In observed_mode, Re[i] is observed -- inline Re for friction (Pitfall 5)
-            Re_i_for_friction = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+            Re_i_for_friction = abs(port_in.mdot) * Dh / (A * μ_[i])
             f_i = friction_correlation(Re_i_for_friction)
         else
             f_i = friction_correlation(Re[i])
@@ -231,8 +241,8 @@ function _channel_base_eqs(
             eqs,
             dp[i] ~
             f_i *
-            (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(T[i]) * A^2)) *
-            (dz / Dh) + rho_water(T[i]) * g_acc * dz,
+                (port_in.mdot * abs(port_in.mdot) / (2 * r[i] * A^2)) *
+                (dz / Dh) + r[i] * g_acc * dz,
         )
     end
 

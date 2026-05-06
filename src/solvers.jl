@@ -33,9 +33,13 @@ Vector of length `n` with linearly interpolated temperatures from `T_inlet` to e
 `T_outlet` as `Float64`.
 """
 function steady_state_guess(;
-    T_inlet::Float64, Q_wall::Float64, mdot_guess::Float64, n::Int
+    T_inlet::Float64,
+    Q_wall::Float64,
+    mdot_guess::Float64,
+    n::Int,
+    liquid::AbstractLiquid=H2O,
 )
-    cp = cp_water(T_inlet)
+    cp = cₚ(liquid, T_inlet)
     return [T_inlet + i * Q_wall / (n * mdot_guess * cp) for i in 1:n]
 end
 

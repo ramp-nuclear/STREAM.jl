@@ -348,7 +348,7 @@ end
     mdot_cp = sol_cp[ssys_cp.plate_cp.cac_cp.port_in.mdot]
     @test isapprox(
         sol_cp[ssys_cp.plate_cp.cac_cp.T_out] - T_in_cp,
-        1e4 / (mdot_cp * cp_water(T_in_cp));
+        1e4 / (mdot_cp * cₚ(H2O, T_in_cp));
         rtol=0.05,
     )
 end

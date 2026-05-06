@@ -201,7 +201,7 @@ end
     mdot_0 = abs(sol[ssys.ch.port_in.mdot, 1])
     Q_wall_0 = abs(sum(sol[ssys.ch.q_wall[i], 1] for i in 1:n))
     Q_meas_0 =
-        mdot_0 * cp_water(BYPASS_T_INLET) * abs(sol[ssys.ch.T[n], 1] - BYPASS_T_INLET)
+        mdot_0 * cₚ(H2O, BYPASS_T_INLET) * abs(sol[ssys.ch.T[n], 1] - BYPASS_T_INLET)
     @test isapprox(Q_meas_0, Q_wall_0; rtol=0.02)
 
     # 2. NC regime: time-averaged over t=100–300s (indices 1001–3001).
@@ -213,7 +213,7 @@ end
         mdot_v = abs(sol[ssys.ch.port_in.mdot, idx])
         T_inlet_ch = sol[ssys.ret.T[1], idx]   # fluid entering ch from Node B via ret
         T_outlet_ch = sol[ssys.ch.T[1], idx]    # hot exit in reversed (NC upward) flow
-        push!(Q_meas_nc, mdot_v * cp_water(BYPASS_T_INLET) * abs(T_outlet_ch - T_inlet_ch))
+        push!(Q_meas_nc, mdot_v * cₚ(H2O, BYPASS_T_INLET) * abs(T_outlet_ch - T_inlet_ch))
     end
     @test isapprox(mean(Q_meas_nc), mean(Q_wall_nc); rtol=0.02)
 end
@@ -251,11 +251,11 @@ end
     Dh = geom.Dh
 
     T_hot_avg = (BYPASS_T_INLET + T_max_nc) / 2
-    rho_cold = rho_water(BYPASS_T_INLET)
-    rho_hot = rho_water(T_hot_avg)
+    rho_cold = ρ(H2O, BYPASS_T_INLET)
+    rho_hot = ρ(H2O, T_hot_avg)
     delta_rho = rho_cold - rho_hot
 
-    Re_nc = mdot_nc * Dh / (A_xs * mu_water(T_hot_avg))
+    Re_nc = mdot_nc * Dh / (A_xs * μ(H2O, T_hot_avg))
     f_nc = 0.316 * Re_nc^(-0.25)
     # Full loop (ch + ret, same geometry): 2x friction → factor of 2 cancels in sqrt
     mdot_analytical = sqrt(
@@ -276,12 +276,12 @@ end
     T_inlet_nc = mean([sol[ssys.ret.T[1], idx] for idx in nc_indices])
     T_bulk_nc = (BYPASS_T_INLET + T_max_nc) / 2
     htc_fn_nc = elenbaas_htc(b=BYPASS_D_CH, L=BYPASS_L_CH, Dh=BYPASS_D_CH, g=BYPASS_G_ACC)
-    Pr_nc = cp_water(T_bulk_nc) * mu_water(T_bulk_nc) / k_water(T_bulk_nc)
+    Pr_nc = Pr(T_bulk_nc)
     Nu_nc = htc_fn_nc(0.0, Pr_nc, T_bulk_nc, BYPASS_T_WALL)
-    h_nc = Nu_nc * k_water(T_bulk_nc) / BYPASS_D_CH
+    h_nc = Nu_nc * k(H2O, T_bulk_nc) / BYPASS_D_CH
     A_heated = pi * BYPASS_D_CH * BYPASS_L_CH
     DeltaT_analytical =
         (BYPASS_T_WALL - BYPASS_T_INLET) *
-                        (1 - exp(-h_nc * A_heated / (mdot_nc * cp_water(BYPASS_T_INLET))))
+        (1 - exp(-h_nc * A_heated / (mdot_nc * cₚ(H2O, BYPASS_T_INLET))))
     @test isapprox(T_max_nc - T_inlet_nc, DeltaT_analytical; rtol=0.30)
 end

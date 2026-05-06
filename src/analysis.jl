@@ -264,7 +264,7 @@ end
 
 Channel power at which the bulk coolant reaches saturation temperature per cell.
 
-Calls `q_boiling_onset.(state.mdot, state.T_sat, state.T_inlet, cp_water.(state.T_bulk))`.
+Calls `q_boiling_onset.(state.mdot, state.T_sat, state.T_inlet, cₚ.(state.T_bulk))`.
 
 # Arguments
 - `state`: extracted channel state
@@ -272,8 +272,10 @@ Calls `q_boiling_onset.(state.mdot, state.T_sat, state.T_inlet, cp_water.(state.
 # Returns
 Vector (or matrix for transient) of boiling onset power limits [W] per cell.
 """
-function boiling_onset_power(state::ChannelState)
-    return q_boiling_onset.(state.mdot, state.T_sat, state.T_inlet, cp_water.(state.T_bulk))
+function boiling_onset_power(state::ChannelState; liquid=H2O)
+    return q_boiling_onset.(
+        state.mdot, state.T_sat, state.T_inlet, cₚ.(liquid, state.T_bulk)
+    )
 end
 
 """

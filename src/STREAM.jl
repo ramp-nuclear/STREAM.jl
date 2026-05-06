@@ -3,7 +3,9 @@ module STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 
-include("fluids.jl")
+include("substances/liquid.jl")
+include("substances/light_water.jl")
+include("substances/heavy_water.jl")
 include("connectors.jl")
 include("geometry.jl")
 include("physical_models/htc/correlations.jl")
@@ -24,7 +26,7 @@ include("solvers.jl")
 include("analysis.jl")
 include("examples.jl")
 
-export rho_water, cp_water, mu_water, k_water, beta_water, sat_temperature
+export AbstractLiquid, Liquid, ρ, ρᵥ, cₚ, μ, Tsat, σ, hfg, k, β, H2O, D2O
 export FlowPort, ThermalPort
 export Channel,
     Pump,

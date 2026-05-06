@@ -17,7 +17,7 @@ Frictional pressure drop element using Darcy-Weisbach correlation.
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function Friction(; name, L, D, A)
+function Friction(; name, L, D, A, liquid=H2O)
     pars = @parameters begin
         L = L
         D_h = D
@@ -32,11 +32,11 @@ function Friction(; name, L, D, A)
     T_in = instream(port_in.T)
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
-        Re ~ abs(port_in.mdot) * D / (A * mu_water(T_in)),
+        Re ~ abs(port_in.mdot) * D / (A * μ(liquid, T_in)),
         f ~ 0.3164 * Re ^ (-0.25),
-        port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(
-            T_in
-        ) * A ^ 2)) * (L / D),
+        port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) / (2 * ρ(
+            liquid, T_in
+        ) * A^2)) * (L / D),
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]
@@ -58,14 +58,15 @@ Hydrostatic pressure change for a vertical elevation change.
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-function Gravity(H; name)
+function Gravity(H; name, liquid=H2O)
     pars = @parameters H = H
     @named port_in = FlowPort()
     @named port_out = FlowPort()
     T_in = instream(port_in.T)
+    r = ρ(liquid, T_in)
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H,
+        port_in.P - port_out.P ~ r * 9.80665 * H,
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]

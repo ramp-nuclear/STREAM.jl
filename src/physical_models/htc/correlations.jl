@@ -110,6 +110,7 @@ function regime_dependent(;
     htc_natural=nothing,
     Dh=nothing,
     g=nothing,
+    liquid=H2O,
 )
 
     # Convert to Float64 immediately — avoids type-promotion issues with symbolic Re
@@ -141,8 +142,8 @@ function regime_dependent(;
             )
         htc_fn =
             (Re, Pr, T_bulk, T_wall) -> begin
-                beta_v = beta_water(T_bulk)
-                nu_v = mu_water(T_bulk) / rho_water(T_bulk)
+                beta_v = β.(liquid, T_bulk)
+                nu_v = μ.(liquid, T_bulk) / ρ.(liquid, T_bulk)
                 Gr_val = Gr(beta_v, g_val, T_wall - T_bulk, Dh_val, nu_v)
                 ifelse(
                     Gr_val / Re^2 > 1,
@@ -207,11 +208,11 @@ depend on forced-flow Reynolds number).
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 """
-function elenbaas_htc(; b, L, Dh, g=9.81)
+function elenbaas_htc(; b, L, Dh, g=9.81, liquid=H2O)
     return (Re, Pr, T_bulk, T_wall) -> begin
-        beta = beta_water(T_bulk)
-        nu = mu_water(T_bulk) / rho_water(T_bulk)
-        Gr_val = Gr(beta, g, T_wall - T_bulk, Dh, nu)
+        beta = β.(liquid, T_bulk)
+        ν = μ.(liquid, T_bulk) ./ ρ.(liquid, T_bulk)
+        Gr_val = Gr(beta, g, T_wall - T_bulk, Dh, ν)
         Ra_val = Ra(Gr_val, Pr)
         elenbaas_nusselt(Ra_val, b, L)
     end

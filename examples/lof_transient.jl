@@ -282,7 +282,7 @@ nc_time = nc_time_found[]
 T_inlet_ch_final = sol[ssys.ret.T[1], end]
 T_outlet_ch_final = T_ch[1][end]  # T[1] = hottest in NC reversed flow
 Q_wall_final = abs(sum(q_wall_ch[i][end] for i in 1:n))
-Q_advect_final = mdot_nc * cp_water(T_inlet) * abs(T_outlet_ch_final - T_inlet_ch_final)
+Q_advect_final = mdot_nc * cₚ(H2O, T_inlet) * abs(T_outlet_ch_final - T_inlet_ch_final)
 energy_balance_ratio = (Q_advect_final > 1e-3) ? Q_wall_final / Q_advect_final : NaN
 
 println("="^70)

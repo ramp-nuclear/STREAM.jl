@@ -171,13 +171,13 @@ end
         mdot = 0.49;
         Dh = D_ch;
         Ac = pi/4 * Dh^2
-        Re_val = abs(mdot) * Dh / (Ac * STREAM.mu_water(T_bulk))
-        Pr_val = STREAM.cp_water(T_bulk) * STREAM.mu_water(T_bulk) / STREAM.k_water(T_bulk)
+        Re_val = abs(mdot) * Dh / (Ac * μ(H2O, T_bulk))
+        Pr_val = Pr(H2O, T_bulk)
 
-        h_spl = dittus_boelter(Re_val, Pr_val, T_bulk, T_wall) * STREAM.k_water(T_bulk) / Dh
+        h_spl = dittus_boelter(Re_val, Pr_val, T_bulk, T_wall) * k(H2O, T_bulk) / Dh
         q_spl = h_spl * (T_wall - T_bulk)
 
-        T_sat = sat_temperature(P)
+        T_sat = Tsat(H2O, P)
         import STREAM: _bergles_rohsenow_dT_ONB
         T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
 
