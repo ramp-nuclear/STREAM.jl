@@ -100,11 +100,11 @@ thermal_ports = [ThermalPort(name=Symbol(:thermal, i)) for i in 1:n]
 
 # Compose with splat:
 compose(System(eqs, t, all_vars, pars; name=name),
-        port_in, port_out, thermal_ports...)
+        inlet, outlet, thermal_ports...)
 ```
 
 **Confirmed outputs:**
-- `compose` accepts the splat: `compose(sys, port_in, port_out, thermal_ports...)`
+- `compose` accepts the splat: `compose(sys, inlet, outlet, thermal_ports...)`
 - `mtkcompile(sys; fully_determined=false)` succeeds
 - Per-element access: `thermal_ports[i].T` and `thermal_ports[i].Q_flow` are valid Symbolics.Num expressions
 
@@ -123,11 +123,11 @@ function _channel_base_eqs(;
     T,           # per-cell temperature vars (T(t))[1:n]
     Re, Nu, h_tc, v,         # per-cell observable vars
     T_out, dP,               # scalar observable vars
-    port_in, port_out,       # FlowPort connectors
+    inlet, outlet,       # FlowPort connectors
     Dh, A, L,                # geometry (already concrete floats or MTK pars)
     g_acc,                   # gravity par
     dz,                      # cell height = L/n
-    t_inlet,                 # instream(port_in.T)
+    t_inlet,                 # instream(inlet.T)
 )
 ```
 
@@ -142,7 +142,7 @@ The function appends equations for: velocity, Re, Nu, h_tc (per cell); pressure 
 ```julia
 # ChannelAndContacts energy balance (per cell i):
 push!(eqs,
-    Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
+    Dt(T[i]) ~ (inlet.mdot * cp_water(T[i]) * (T_up - T[i])
                + h_tc[i] * (π * Dh) * dz * (thermal_ports[i].T - T[i]))
               / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
 )
@@ -258,8 +258,8 @@ test/
 **How to avoid:** In the THERM-01 standalone test, add `[ch.thermal_ports[i].T ~ T_wall for i in 1:n]` to connections, or use `mtkcompile(sys; fully_determined=false)` for the stub test that only checks compilability.
 **Warning signs:** `mtkcompile` fails with over/under-determination error on ChannelAndContacts standalone.
 
-### Pitfall 4: ChannelHeatFlux skipping port_out.T wiring
-**What goes wrong:** Omitting `port_out.T ~ T[n]` from `ChannelHeatFlux` because it "doesn't have ThermalPorts."
+### Pitfall 4: ChannelHeatFlux skipping outlet.T wiring
+**What goes wrong:** Omitting `outlet.T ~ T[n]` from `ChannelHeatFlux` because it "doesn't have ThermalPorts."
 **Why it happens:** Superficially, ChannelHeatFlux looks simpler — but it still needs all FlowPort wiring equations identical to Channel.
 **How to avoid:** `_channel_base_eqs` includes port wiring; ChannelHeatFlux calls it and only adds the T_wall thermal coupling loop.
 
@@ -298,24 +298,24 @@ function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
         Q_wall_total(t)
     end
 
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet  = FlowPort()
+    @named outlet = FlowPort()
     # Per-cell ThermalPorts (verified pattern):
     thermal_ports = [ThermalPort(name=Symbol(:thermal, i)) for i in 1:n]
 
     dz = L / n
     eqs = Equation[]
-    T_inlet = instream(port_in.T)
+    T_inlet = instream(inlet.T)
 
     # _channel_base_eqs handles: v, Re, Nu, h_tc, dP, T_out, port wiring
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
-                      port_in, port_out, Dh, A, L, g_acc=pars[4], dz, t_inlet=T_inlet)
+                      inlet, outlet, Dh, A, L, g_acc=pars[4], dz, t_inlet=T_inlet)
 
     # ChannelAndContacts-specific: energy balance + per-cell thermal
     for i in 1:n
         T_up = (i == 1) ? T_inlet : T[i-1]
         push!(eqs,
-            Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
+            Dt(T[i]) ~ (inlet.mdot * cp_water(T[i]) * (T_up - T[i])
                        + h_tc[i] * (π * Dh) * dz * (thermal_ports[i].T - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
@@ -328,7 +328,7 @@ function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
                 collect(v); collect(q_wall); T_out; dP; Q_wall_total]
 
     compose(System(eqs, t, all_vars, pars; name=name),
-            port_in, port_out, thermal_ports...)  # splat array
+            inlet, outlet, thermal_ports...)  # splat array
 end
 ```
 
@@ -358,20 +358,20 @@ function ChannelHeatFlux(; name, n::Int, L, D, A, g = 0.0, T_wall)
         dP(t)
     end
 
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet  = FlowPort()
+    @named outlet = FlowPort()
 
     dz = L / n
     eqs = Equation[]
-    T_inlet = instream(port_in.T)
+    T_inlet = instream(inlet.T)
 
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
-                      port_in, port_out, Dh, A, L, g_acc=pars[4], dz, t_inlet=T_inlet)
+                      inlet, outlet, Dh, A, L, g_acc=pars[4], dz, t_inlet=T_inlet)
 
     for i in 1:n
         T_up = (i == 1) ? T_inlet : T[i-1]
         push!(eqs,
-            Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
+            Dt(T[i]) ~ (inlet.mdot * cp_water(T[i]) * (T_up - T[i])
                        + h_tc[i] * (π * Dh) * dz * (T_wall_p - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
@@ -381,7 +381,7 @@ function ChannelHeatFlux(; name, n::Int, L, D, A, g = 0.0, T_wall)
     all_vars = [collect(T); collect(Re); collect(Nu); collect(h_tc);
                 collect(v); collect(q_wall); T_out; dP]
 
-    compose(System(eqs, t, all_vars, pars; name=name), port_in, port_out)
+    compose(System(eqs, t, all_vars, pars; name=name), inlet, outlet)
 end
 ```
 
@@ -415,7 +415,7 @@ end
     ssys_ch = build_loop(; n, L_ch, D_ch, A_ch, dP_pump, T_inlet, T_wall)
     T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
     op_ch = [ssys_ch.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op_ch, ssys_ch.ch.port_in.mdot => 0.490)
+    push!(op_ch, ssys_ch.ch.inlet.mdot => 0.490)
     sol_ch = solve_steady(ssys_ch, op_ch)
     T_out_ch = sol_ch[ssys_ch.ch.T_out]
 
@@ -424,16 +424,16 @@ end
     @named chf  = ChannelHeatFlux(n=n, L=L_ch, D=D_ch, A=A_ch, T_wall=T_wall)
     @named bc   = HeatExchanger(T_bc=T_inlet)
     connections = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out,   chf.port_in),
-        connect(chf.port_out,  pump.port_in),
-        pump.port_in.P ~ 1.0e5,
-        chf.port_in.T  ~ T_inlet,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet,   chf.inlet),
+        connect(chf.outlet,  pump.inlet),
+        pump.inlet.P ~ 1.0e5,
+        chf.inlet.T  ~ T_inlet,
     ]
     @named sys_chf = compose(System(connections, t; name=:sys_chf), pump, bc, chf)
     ssys_chf = mtkcompile(sys_chf)
     op_chf = [ssys_chf.chf.T[i] => T_guess[i] for i in 1:n]
-    push!(op_chf, ssys_chf.chf.port_in.mdot => 0.490)
+    push!(op_chf, ssys_chf.chf.inlet.mdot => 0.490)
     sol_chf = solve_steady(ssys_chf, op_chf)
     T_out_chf = sol_chf[ssys_chf.chf.T_out]
 

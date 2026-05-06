@@ -10,7 +10,7 @@ import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, ConstantTemperature
 # reversed (negative) mass flow for all three channel variants.
 #
 # Physical setup: T_wall > T_inlet, mdot < 0
-# Flow direction: fluid enters at port_out (cell n), exits at port_in (cell 1)
+# Flow direction: fluid enters at outlet (cell n), exits at inlet (cell 1)
 # Expected temperature profile: T[1] > T[2] > ... > T[n]
 #   — cell 1 is the outlet (hottest), cell n is the inlet (cold, at T_inlet)
 # ─────────────────────────────────────────────────────────────────
@@ -39,16 +39,16 @@ const T_guess_rev_sign = reverse(T_guess_fwd_sign)
     @named ch = Channel(n=n_sign, geometry=geom_sign)
     @named bc = HeatExchanger(T_inlet_sign)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch.port_in),
-        connect(ch.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, ch.inlet),
+        connect(ch.outlet, pump.inlet),
+        pump.inlet.P ~ 1.0e5,
         ch.thermal.T ~ T_wall_sign,
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, ch)
     ssys = mtkcompile(sys; fully_determined=false)
     op = [ssys.ch.T[i] => T_guess_rev_sign[i] for i in 1:n_sign]
-    push!(op, ssys.ch.port_in.mdot => mdot_neg)
+    push!(op, ssys.ch.inlet.mdot => mdot_neg)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -82,9 +82,9 @@ end
     ct_l = [ConstantTemperature(T_wall_sign; name=Symbol(:ct_l, i)) for i in 1:n_sign]
     ct_r = [ConstantTemperature(T_wall_sign; name=Symbol(:ct_r, i)) for i in 1:n_sign]
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, cac.port_in),
-        connect(cac.port_out, pump.port_in),
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, cac.inlet),
+        connect(cac.outlet, pump.inlet),
         [
             connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for
             i in 1:n_sign
@@ -93,12 +93,12 @@ end
             connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for
             i in 1:n_sign
         ]...,
-        pump.port_in.P ~ 1.0e5,
+        pump.inlet.P ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys; fully_determined=false)
     op = [ssys.cac.T[i] => T_guess_rev_sign[i] for i in 1:n_sign]
-    push!(op, ssys.cac.port_in.mdot => mdot_neg)
+    push!(op, ssys.cac.inlet.mdot => mdot_neg)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -122,7 +122,7 @@ end
     # Energy balance within 1% rtol:
     # Q_wall_total is computed from ConstantTemperature connections (proper acausal balance).
     # Advective heat gain = |mdot| * cp * (T_outlet - T_boundary_inlet).
-    # For reversed flow, T_boundary_inlet = T_inlet_sign (resolved via port_in.T pin),
+    # For reversed flow, T_boundary_inlet = T_inlet_sign (resolved via inlet.T pin),
     # NOT T_vals[n_sign] (which has already been partially heated by the wall).
     T_mean = (T_vals[1] + T_inlet_sign) / 2
     Q_advect = abs(mdot_neg) * cp_water(T_mean) * (T_vals[1] - T_inlet_sign)
@@ -138,15 +138,15 @@ end
     @named chf = ChannelHeatFlux(n=n_sign, geometry=geom_sign, T_wall=T_wall_sign)
     @named bc = HeatExchanger(T_inlet_sign)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, chf.port_in),
-        connect(chf.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, chf.inlet),
+        connect(chf.outlet, pump.inlet),
+        pump.inlet.P ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, chf)
     ssys = mtkcompile(sys; fully_determined=false)
     op = [ssys.chf.T[i] => T_guess_rev_sign[i] for i in 1:n_sign]
-    push!(op, ssys.chf.port_in.mdot => mdot_neg)
+    push!(op, ssys.chf.inlet.mdot => mdot_neg)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -165,7 +165,7 @@ end
 
     # Energy balance: ChannelHeatFlux q_wall computed from h_tc*(T_wall-T[i]).
     # Advective heat gain = |mdot| * cp * (T_outlet - T_boundary_inlet).
-    # For reversed flow, T_boundary_inlet = T_inlet_sign (resolved via port_in.T pin).
+    # For reversed flow, T_boundary_inlet = T_inlet_sign (resolved via inlet.T pin).
     T_mean = (T_vals[1] + T_inlet_sign) / 2
     Q_advect = abs(mdot_neg) * cp_water(T_mean) * (T_vals[1] - T_inlet_sign)
     Q_wall_total = sum(sol[ssys.chf.q_wall[i]] for i in 1:n_sign)

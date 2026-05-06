@@ -175,7 +175,7 @@ end
 1. Add to `@variables` block: `(Gr_over_Re2(t))[1:n]  # observed — Gr/Re² NC criterion`
 2. Inside the per-cell obs loop, append:
 ```julia
-Re_i   = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+Re_i   = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
 nu_i   = mu_water(T[i]) / rho_water(T[i])
 Gr_i   = Gr(beta_water(T[i]), g_acc, thermal_left[i].T - T[i], Dh, nu_i)
 push!(obs, Gr_over_Re2[i] ~ Gr_i / Re_i^2)
@@ -315,7 +315,7 @@ A_heated  = π * BYPASS_D_CH * BYPASS_L_CH
 
 **What goes wrong:** Planner writes SC1 as PASS unconditionally without explaining the resolution: the Inertia component (standalone) provides hydraulic inductance, satisfying the physical intent of SC1 even though `_channel_base_eqs` has no `Dt(mdot)` term.
 
-**Why it happens:** The VERIFICATION.md says SC1 failed because "channel.jl has no Dt(port_in.mdot)." D-19 says rewrite to PASS, but the physical justification must be stated.
+**Why it happens:** The VERIFICATION.md says SC1 failed because "channel.jl has no Dt(inlet.mdot)." D-19 says rewrite to PASS, but the physical justification must be stated.
 
 **How to avoid:** Rewrite SC1 as PASS with note: "Channel momentum inertia is provided by the standalone `Inertia(L_over_A)` component in series with the loop (present in `build_loop_lof_bypass`); direct Dt term in Channel was reverted (commit a8dab81) due to MTK over-determination at parallel junctions. Inertia component achieves the same physics effect."
 
@@ -343,11 +343,11 @@ The returned closure already matches the 4-arg interface `(Re, Pr, T_bulk, T_wal
 ```julia
 obs = Equation[]
 for i in 1:n
-    Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+    Re_i = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
     Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
     push!(obs, Re[i]       ~ Re_i)
     push!(obs, Nu[i]       ~ htc_correlation(Re_i, Pr_i, T[i], thermal_left[i].T))
-    push!(obs, v[i]        ~ port_in.mdot / (rho_water(T[i]) * A))
+    push!(obs, v[i]        ~ inlet.mdot / (rho_water(T[i]) * A))
     # ... 8 more observed variables
 end
 ```

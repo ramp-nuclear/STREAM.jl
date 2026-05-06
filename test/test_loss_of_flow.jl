@@ -23,7 +23,7 @@ using STREAM
 #   Solve SS to get mdot_ss and T_ss[1:n]. Transfer to bypass system IC via NoInit.
 #
 # LOF-03: ch has g=-G_ACC (assists downward flow). Positive mdot = downward (A->B).
-#   After NC: flow reverses to upward, ch.port_in.mdot < 0.
+#   After NC: flow reverses to upward, ch.inlet.mdot < 0.
 # ─────────────────────────────────────────────────────────────────────────────
 
 #! format: off
@@ -44,9 +44,9 @@ const BYPASS_DP_REF   = 1.5e4
 # Helper: solve SS reference loop, build bypass system, return (ssys, op, mdot_ss, cb)
 #
 # IC strategy:
-#   - ine.port_in.mdot = mdot_ss (total loop flow)
-#   - ret.port_in.mdot = mdot_ss (all flow through ch-ret path; flapper closed at t=0)
-#   - Dt(ret.port_in.mdot) = 0.0 (index-reduced derivative state; zero at quasi-SS t=0)
+#   - ine.inlet.mdot = mdot_ss (total loop flow)
+#   - ret.inlet.mdot = mdot_ss (all flow through ch-ret path; flapper closed at t=0)
+#   - Dt(ret.inlet.mdot) = 0.0 (index-reduced derivative state; zero at quasi-SS t=0)
 #   - flapper.T_open = 1e30 (sentinel: flapper not yet fired)
 #
 # Callback strategy:
@@ -68,15 +68,15 @@ function _lof_bypass_ic(; n=BYPASS_N)
     )
 
     conns_ref = [
-        connect(pump_ref.port_out, hx_ref.port_in),
-        connect(hx_ref.port_out, ch_ref.port_in),
-        connect(ch_ref.port_out, pump_ref.port_in),
-        pump_ref.port_in.P ~ 1.0e5,
+        connect(pump_ref.outlet, hx_ref.inlet),
+        connect(hx_ref.outlet, ch_ref.inlet),
+        connect(ch_ref.outlet, pump_ref.inlet),
+        pump_ref.inlet.P ~ 1.0e5,
     ]
     @named ref_sys = compose(System(conns_ref, t; name=:ref), pump_ref, hx_ref, ch_ref)
     ref_ssys = mtkcompile(ref_sys)
 
-    op_ref = Pair{Any,Any}[ref_ssys.ch_ref.port_in.mdot => 0.3]
+    op_ref = Pair{Any,Any}[ref_ssys.ch_ref.inlet.mdot => 0.3]
     for i in 1:n
         push!(
             op_ref,
@@ -86,7 +86,7 @@ function _lof_bypass_ic(; n=BYPASS_N)
     end
     ss_sol = solve_steady(ref_ssys, op_ref)
 
-    mdot_ss = ss_sol[ref_ssys.ch_ref.port_in.mdot]
+    mdot_ss = ss_sol[ref_ssys.ch_ref.inlet.mdot]
     T_ss = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
 
     # Build bypass system (Flapper is a pure equation system — callback is external)
@@ -104,9 +104,9 @@ function _lof_bypass_ic(; n=BYPASS_N)
 
     Dt = Differential(t)
     op = Pair{Any,Any}[
-        ssys.ine.port_in.mdot => mdot_ss,  # total loop flow
-        ssys.ret.port_in.mdot => mdot_ss,  # all flow through ch-ret (flapper closed)
-        Dt(ssys.ret.port_in.mdot) => 0.0,      # index-reduced derivative state
+        ssys.ine.inlet.mdot => mdot_ss,  # total loop flow
+        ssys.ret.inlet.mdot => mdot_ss,  # all flow through ch-ret (flapper closed)
+        Dt(ssys.ret.inlet.mdot) => 0.0,      # index-reduced derivative state
         ssys.flapper.T_open => 1.0e30,   # sentinel: not yet fired
     ]
     for i in 1:n
@@ -117,9 +117,9 @@ function _lof_bypass_ic(; n=BYPASS_N)
     end
 
     # flapper_callback formalizes the external ContinuousCallback pattern.
-    # Fires when flapper.ref_mdot (wired to ine.port_in.mdot in the loop) drops below
+    # Fires when flapper.ref_mdot (wired to ine.inlet.mdot in the loop) drops below
     # BYPASS_THRESHOLD. On downward crossing, latches T_open = solver time.
-    cb = flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=BYPASS_THRESHOLD)
+    cb = flapper_callback(ssys, ssys.ine.inlet.mdot; threshold=BYPASS_THRESHOLD)
 
     return ssys, op, mdot_ss, cb
 end
@@ -155,7 +155,7 @@ end
 end
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LOF-03: channel flow reversal — ch.port_in.mdot crosses zero
+# LOF-03: channel flow reversal — ch.inlet.mdot crosses zero
 # ch has g=-G_ACC (assists downward flow). Positive mdot = downward (A->B).
 # After NC establishes, ch reverses to upward: mdot < 0.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,10 +165,10 @@ end
     t_arr = range(0.0, 300.0; length=3001)
     sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
-    mdot_ch_initial = sol[ssys.ch.port_in.mdot, 1]
+    mdot_ch_initial = sol[ssys.ch.inlet.mdot, 1]
     @test mdot_ch_initial > 0.0
 
-    mdot_ch_final = sol[ssys.ch.port_in.mdot, end]
+    mdot_ch_final = sol[ssys.ch.inlet.mdot, end]
     @test mdot_ch_final < 0.0
 
     mdot_nc = abs(mdot_ch_final)
@@ -186,7 +186,7 @@ end
 # NC (mdot < 0): The bypass NC oscillates persistently (~50s period).
 #   Thermal storage means Q_wall ≠ mdot·cp·dT at any snapshot (∂T/∂t ≠ 0).
 #   The energy balance holds exactly *on average* over a full oscillation period.
-#   T_inlet_to_ch = ret.T[1] (fluid entering ch.port_out from Node B via ret);
+#   T_inlet_to_ch = ret.T[1] (fluid entering ch.outlet from Node B via ret);
 #   T_outlet_ch = T[1] (hot exit in reversed flow). Time-averaged over t=100–300s.
 # ─────────────────────────────────────────────────────────────────────────────
 @testset "VAL-01: energy balance (forced-flow instantaneous; NC time-averaged)" begin
@@ -198,7 +198,7 @@ end
     n = BYPASS_N
 
     # 1. Forced flow at t=0: instantaneous check (quasi-steady, 0.08% expected error)
-    mdot_0 = abs(sol[ssys.ch.port_in.mdot, 1])
+    mdot_0 = abs(sol[ssys.ch.inlet.mdot, 1])
     Q_wall_0 = abs(sum(sol[ssys.ch.q_wall[i], 1] for i in 1:n))
     Q_meas_0 =
         mdot_0 * cp_water(BYPASS_T_INLET) * abs(sol[ssys.ch.T[n], 1] - BYPASS_T_INLET)
@@ -210,7 +210,7 @@ end
     Q_wall_nc = [abs(sum(sol[ssys.ch.q_wall[i], idx] for i in 1:n)) for idx in nc_indices]
     Q_meas_nc = Float64[]
     for idx in nc_indices
-        mdot_v = abs(sol[ssys.ch.port_in.mdot, idx])
+        mdot_v = abs(sol[ssys.ch.inlet.mdot, idx])
         T_inlet_ch = sol[ssys.ret.T[1], idx]   # fluid entering ch from Node B via ret
         T_outlet_ch = sol[ssys.ch.T[1], idx]    # hot exit in reversed (NC upward) flow
         push!(Q_meas_nc, mdot_v * cp_water(BYPASS_T_INLET) * abs(T_outlet_ch - T_inlet_ch))
@@ -241,7 +241,7 @@ end
     n = BYPASS_N
     nc_indices = 2701:3001
 
-    mdot_nc_series = abs.(sol[ssys.ch.port_in.mdot, nc_indices])
+    mdot_nc_series = abs.(sol[ssys.ch.inlet.mdot, nc_indices])
     mdot_nc = mean(mdot_nc_series)
 
     T_max_nc = mean([maximum([sol[ssys.ch.T[i], idx] for i in 1:n]) for idx in nc_indices])

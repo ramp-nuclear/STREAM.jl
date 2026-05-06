@@ -210,10 +210,10 @@ Julia's test runner allows duplicate `@testset` names; they run independently wi
 ### IN-03: Magic constant `0.2` for initial mdot IC in `build_loop_pk`
 
 **File:** `src/examples.jl:557`
-**Issue:** The initial condition for `rods.cac.port_in.mdot` is hardcoded to `0.2` kg/s:
+**Issue:** The initial condition for `rods.cac.inlet.mdot` is hardcoded to `0.2` kg/s:
 
 ```julia
-ssys.rods.cac.port_in.mdot => 0.2,
+ssys.rods.cac.inlet.mdot => 0.2,
 ```
 
 This value is appropriate for the default `PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)` at `dP_pump=3.0e4`, but it is not derived from physics — it is an empirical guess. If a caller passes a different `dP_pump` or geometry (via future extension), this guess may be far off and cause KINSOL/transient initialization to fail. A comment explaining the origin would reduce future maintenance risk.
@@ -221,7 +221,7 @@ This value is appropriate for the default `PipeGeometry_rectangular(0.6, 0.070, 
 **Fix:** Add an inline comment:
 
 ```julia
-ssys.rods.cac.port_in.mdot => 0.2,   # empirical mdot guess for default geom at dP=30 kPa
+ssys.rods.cac.inlet.mdot => 0.2,   # empirical mdot guess for default geom at dP=30 kPa
 ```
 
 ---

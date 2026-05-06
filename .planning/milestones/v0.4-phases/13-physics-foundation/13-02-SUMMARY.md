@@ -11,7 +11,7 @@ requires:
 
 provides:
   - Pump dual-mode dispatch: Pump(dP_pump=X) or Pump(mdot0=X), error if both/neither
-  - PHY-05 testsets: callable, mtkcompile, integration (sol[pump.port_in.mdot] ≈ 0.6), error cases
+  - PHY-05 testsets: callable, mtkcompile, integration (sol[pump.inlet.mdot] ≈ 0.6), error cases
   - generate_mtr_reference.py updated to EffectivePipe.rectangular with correct Dh
   - VAL-01/02/03 reference constants regenerated for rectangular Dh ≈ 2.495 mm
 
@@ -24,7 +24,7 @@ tech-stack:
   added: []
   patterns:
     - "Sentinel dispatch: dP_pump=nothing/mdot0=nothing kwargs in Pump constructor"
-    - "Fixed-flow Pump: port_in.mdot ~ mdot0 constraint, no pressure equation (caller anchors P)"
+    - "Fixed-flow Pump: inlet.mdot ~ mdot0 constraint, no pressure equation (caller anchors P)"
     - "VAL-03 T_out: use energy balance not Python one_sided_connection (known Python issue)"
 
 key-files:
@@ -37,7 +37,7 @@ key-files:
 
 key-decisions:
   - "Pump dual-mode via sentinel kwargs (dP_pump=nothing, mdot0=nothing): clean dispatch, single function"
-  - "Fixed-flow Pump has NO pressure equation: caller must provide pressure anchor (e.g. pump.port_in.P ~ 1e5)"
+  - "Fixed-flow Pump has NO pressure equation: caller must provide pressure anchor (e.g. pump.inlet.P ~ 1e5)"
   - "VAL-03 T_out assertion removed: Python one_sided_connection distributes heat to both faces (wrong); Julia correctly connects thermal_left only; energy balance is the truth"
   - "VAL-03 mdot assertion retained: Python hydraulics are correct (0.252547 kg/s, ~0.5% from Julia 0.2538)"
   - "Channel thermal port must be pinned (ch5.thermal.T ~ constant) in PHY-05 loop to avoid extra unknown"
@@ -63,7 +63,7 @@ requirements-completed:
 
 ## Accomplishments
 - Pump extended with sentinel dispatch: `Pump(mdot0=0.6)` creates fixed-flow mode (4 eqs: mass balance, mdot constraint, 2 T streams; NO pressure equation); `Pump(dP_pump=1e5)` unchanged
-- PHY-05 testsets added: callable check, mtkcompile, loop integration (sol[pump.port_in.mdot] ≈ 0.6 rtol=1e-4), error cases (both/neither args throw ErrorException)
+- PHY-05 testsets added: callable check, mtkcompile, loop integration (sol[pump.inlet.mdot] ≈ 0.6 rtol=1e-4), error cases (both/neither args throw ErrorException)
 - generate_mtr_reference.py updated: `EffectivePipe(...)` circular approximation replaced with `EffectivePipe.rectangular(length=0.6, edge1=0.07, edge2=0.00127, heated_edge=0.07)` giving Dh ≈ 2.495 mm
 - VAL-01: T_out 315.1463→317.8871 K, mdot 0.5993→0.2525 kg/s; VAL-02: T_plate_center 344.36→347.61 K; VAL-03: mdot updated, T_out assertion removed (Python one_sided_connection gives physically wrong T_out)
 - Full test suite: all tests pass (0 failures)
@@ -81,7 +81,7 @@ Each task was committed atomically:
 - `/home/itay/projects/Julia-STREAM/test/generate_mtr_reference.py` - EffectivePipe.rectangular replaces old circular approximation; D_H constant removed
 
 ## Decisions Made
-- **Fixed-flow Pump has no pressure equation**: Only 4 equations — mass balance, mdot constraint, and 2 T stream equations. Caller must anchor pressure via `pump.port_in.P ~ 1e5`. This matches Python STREAM's flow-forced pump pattern.
+- **Fixed-flow Pump has no pressure equation**: Only 4 equations — mass balance, mdot constraint, and 2 T stream equations. Caller must anchor pressure via `pump.inlet.P ~ 1e5`. This matches Python STREAM's flow-forced pump pattern.
 - **VAL-03 T_out assertion removed**: Python `one_sided_connection()` distributes 10 kW equally to both plate faces even when only one is connected, giving T_out ≈ 317.9 K (energy T_rise ≈ 4.75 K). Julia correctly connects only thermal_left, giving T_out ≈ 322.6 K (energy T_rise ≈ 9.4 K = 10 kW / (mdot*cp)). Energy balance confirms Julia is correct. This extends the STATE.md decision about VAL-03 T_plate_center.
 - **Channel thermal port must be pinned in PHY-05 loop**: `Channel` has a `thermal` ThermalPort; when unconnected, `thermal.T` becomes an unknown (6 unknowns vs 5 equations). Added `ch5.thermal.T ~ 350.0` to the connections to pin it and restore system determinacy.
 

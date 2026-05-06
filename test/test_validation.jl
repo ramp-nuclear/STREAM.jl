@@ -20,11 +20,11 @@ mdot_ref = 0.609289  # kg/s
     ssys = build_loop(; T_inlet=T_inlet)
     T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
     op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op, ssys.ch.port_in.mdot => 0.490)
+    push!(op, ssys.ch.inlet.mdot => 0.490)
     sol = solve_steady(ssys, op)
 
     T_out = sol[ssys.ch.T_out]
-    mdot = abs(sol[ssys.ch.port_in.mdot])
+    mdot = abs(sol[ssys.ch.inlet.mdot])
     @test isapprox(T_out, T_outlet_ref; rtol=0.01)
     @test isapprox(mdot, mdot_ref; rtol=0.01)
 end
@@ -50,11 +50,11 @@ end
 
     T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
     op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op_guess, ssys_ss.ch.port_in.mdot => 0.490)
+    push!(op_guess, ssys_ss.ch.inlet.mdot => 0.490)
     sol_ss = solve_steady(ssys_ss, op_guess)
     # Use Pair{Any,Any} so the callable parameter can be mixed with Float64 values
     op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
-    push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys_ss.ch.port_in.mdot])
+    push!(op_ic, ssys.ch.inlet.mdot => sol_ss[ssys_ss.ch.inlet.mdot])
     T_wall_sym = ssys.T_wall_callable   # stable named access, immune to parameter reordering
     push!(op_ic, T_wall_sym => T_wall_step)
 
@@ -107,14 +107,14 @@ end
         power=1e4,
     )
     conns = [
-        connect(pump_l.port_out, hx_l.port_in),
-        connect(hx_l.port_out, cac_l.port_in),
-        connect(cac_l.port_out, pump_l.port_in),
-        pump_l.port_in.P ~ 1.0e5,
-        connect(pump_r.port_out, hx_r.port_in),
-        connect(hx_r.port_out, cac_r.port_in),
-        connect(cac_r.port_out, pump_r.port_in),
-        pump_r.port_in.P ~ 1.0e5,
+            connect(pump_l.outlet, hx_l.inlet),
+            connect(hx_l.outlet, cac_l.inlet),
+            connect(cac_l.outlet, pump_l.inlet),
+            pump_l.inlet.P ~ 1.0e5,
+            connect(pump_r.outlet, hx_r.inlet),
+            connect(hx_r.outlet, cac_r.inlet),
+            connect(cac_r.outlet, pump_r.inlet),
+            pump_r.inlet.P ~ 1.0e5,
         [
             connect(
                 getproperty(hd, Symbol(:thermal_left, i)),
@@ -135,15 +135,15 @@ end
 
     # Minimal op: only actual unknowns (plate T, fluid T, mdot).
     # Re/Nu/h_tc are observed (computed), T_out is observed — not unknowns; guesses ignored.
-    # Correct mdot sign: port_in.mdot > 0 for fluid entering (forward flow).
+        # Correct mdot sign: inlet.mdot > 0 for fluid entering (forward flow).
     # Magnitude ~0.250 kg/s from Darcy-Weisbach at Dh≈2.495mm (rectangular), dP=30 kPa.
     T_w = 315.0
     op = vcat(
         [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
         [ssys.cac_l.T[i] => T_w for i in 1:nz],
         [ssys.cac_r.T[i] => T_w for i in 1:nz],
-        [ssys.cac_l.port_in.mdot => +0.250],
-        [ssys.cac_r.port_in.mdot => +0.250],
+            [ssys.cac_l.inlet.mdot => +0.250],
+            [ssys.cac_r.inlet.mdot => +0.250],
     )
     sol = solve_steady(ssys, op)
 
@@ -151,8 +151,8 @@ end
 
     T_out_l = sol[ssys.cac_l.T_out]
     T_out_r = sol[ssys.cac_r.T_out]
-    mdot_l = sol[ssys.cac_l.port_in.mdot]
-    mdot_r = sol[ssys.cac_r.port_in.mdot]
+        mdot_l = sol[ssys.cac_l.inlet.mdot]
+        mdot_r = sol[ssys.cac_r.inlet.mdot]
     T_center = sol[ssys.hd.T[nz ÷ 2, (nx + 1) ÷ 2]]   # [5, 2] for nz=10, nx=3
 
     # Reference constants from generate_mtr_reference.py (rectangular MTR geometry, y=0.07 m)
@@ -218,14 +218,14 @@ end
         power=1e4,
     )
     conns = [
-        connect(pump_l.port_out, hx_l.port_in),
-        connect(hx_l.port_out, cac_l.port_in),
-        connect(cac_l.port_out, pump_l.port_in),
-        pump_l.port_in.P ~ 1.0e5,
-        connect(pump_r.port_out, hx_r.port_in),
-        connect(hx_r.port_out, cac_r.port_in),
-        connect(cac_r.port_out, pump_r.port_in),
-        pump_r.port_in.P ~ 1.0e5,
+            connect(pump_l.outlet, hx_l.inlet),
+            connect(hx_l.outlet, cac_l.inlet),
+            connect(cac_l.outlet, pump_l.inlet),
+            pump_l.inlet.P ~ 1.0e5,
+            connect(pump_r.outlet, hx_r.inlet),
+            connect(hx_r.outlet, cac_r.inlet),
+            connect(cac_r.outlet, pump_r.inlet),
+            pump_r.inlet.P ~ 1.0e5,
         [
             connect(
                 getproperty(hd, Symbol(:thermal_left, i)),
@@ -251,8 +251,8 @@ end
         [ssys.hd.T[i, nx] => 368.15 for i in 1:nz],
         [ssys.cac_l.T[i] => 318.15 for i in 1:nz],
         [ssys.cac_r.T[i] => 368.15 for i in 1:nz],
-        [ssys.cac_l.port_in.mdot => +0.250],
-        [ssys.cac_r.port_in.mdot => +0.250],
+            [ssys.cac_l.inlet.mdot => +0.250],
+            [ssys.cac_r.inlet.mdot => +0.250],
     )
     sol = solve_steady(ssys, op)
 
@@ -310,10 +310,10 @@ end
         power=1e4,
     )
     conns = [
-        connect(pump_l.port_out, hx_l.port_in),
-        connect(hx_l.port_out, cac_l.port_in),
-        connect(cac_l.port_out, pump_l.port_in),
-        pump_l.port_in.P ~ 1.0e5,
+            connect(pump_l.outlet, hx_l.inlet),
+            connect(hx_l.outlet, cac_l.inlet),
+            connect(cac_l.outlet, pump_l.inlet),
+            pump_l.inlet.P ~ 1.0e5,
         [
             connect(
                 getproperty(hd, Symbol(:thermal_left, i)),
@@ -330,14 +330,14 @@ end
     op = vcat(
         [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
         [ssys.cac_l.T[i] => T_w for i in 1:nz],
-        [ssys.cac_l.port_in.mdot => +0.250],
+            [ssys.cac_l.inlet.mdot => +0.250],
     )
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
 
     T_out_l_03 = sol[ssys.cac_l.T_out]
-    mdot_l_03 = sol[ssys.cac_l.port_in.mdot]
+        mdot_l_03 = sol[ssys.cac_l.inlet.mdot]
     T_center_03 = sol[ssys.hd.T[nz ÷ 2, (nx + 1) ÷ 2]]
 
     # Reference constants from generate_mtr_reference.py (rectangular MTR geometry, y=0.07 m)
@@ -523,10 +523,10 @@ end
 
     conns_v02 = [
         # Hydraulic loop
-        connect(pump_v02.port_out, hx_v02.port_in),
-        connect(hx_v02.port_out, cac_v02.port_in),
-        connect(cac_v02.port_out, pump_v02.port_in),
-        pump_v02.port_in.P ~ 1.0e5,
+            connect(pump_v02.outlet, hx_v02.inlet),
+            connect(hx_v02.outlet, cac_v02.inlet),
+            connect(cac_v02.outlet, pump_v02.inlet),
+            pump_v02.inlet.P ~ 1.0e5,
         # hd1 left face → cac thermal_left (hd1 is on the left of the channel)
         [
             connect(
@@ -553,7 +553,7 @@ end
         [ssys_v02.hd1.T[i, j] => T_guess_v02 for i in 1:nz_v02 for j in 1:nx_v02],
         [ssys_v02.hd2.T[i, j] => T_guess_v02 for i in 1:nz_v02 for j in 1:nx_v02],
         [ssys_v02.cac_v02.T[i] => T_guess_v02 for i in 1:nz_v02],
-        [ssys_v02.cac_v02.port_in.mdot => +0.250],
+            [ssys_v02.cac_v02.inlet.mdot => +0.250],
     )
     sol_v02 = solve_steady(ssys_v02, op_v02)
 
@@ -561,7 +561,7 @@ end
     @test sol_v02.retcode == ReturnCode.Success
 
     # Assertion 2: energy balance — both plates heat the single channel
-    mdot_v02 = sol_v02[ssys_v02.cac_v02.port_in.mdot]
+        mdot_v02 = sol_v02[ssys_v02.cac_v02.inlet.mdot]
     cp_v02 = cp_water(T_in_v02)
     T_rise_expected_v02 = (power_per_plate + power_per_plate) / (mdot_v02 * cp_v02)
     @test isapprox(

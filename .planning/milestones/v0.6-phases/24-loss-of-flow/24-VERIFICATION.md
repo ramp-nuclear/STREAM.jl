@@ -46,7 +46,7 @@ re_verification: false
 | `test/test_loss_of_flow.jl` | `src/examples.jl` | `build_loop_lof()` call | VERIFIED | `_lof_ic()` helper at line 80 calls `build_loop_lof(...)` with explicit kwargs; called from all 6 testsets |
 | `test/test_loss_of_flow.jl` | `src/solvers.jl` | `solve_steady` then `solve_transient` | VERIFIED | `solve_steady` called at line 74 (in `_lof_ic`); `solve_transient` called at lines 121, 133, 154, 184, 210 (5 testsets) |
 | `src/examples.jl` | `src/components/thermal_channel.jl` | `ChannelHeatFlux` constructor | VERIFIED | Line 366: `@named ch = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=g_acc_ch, T_wall=T_wall)` |
-| `src/examples.jl` | `src/components/flapper.jl` | `Flapper` constructor and `ref_mdot` wiring | VERIFIED | Line 367: `@named flapper = Flapper(threshold=threshold, dt=dt_ramp)`; line 377: `flapper.ref_mdot ~ ine.port_in.mdot` |
+| `src/examples.jl` | `src/components/flapper.jl` | `Flapper` constructor and `ref_mdot` wiring | VERIFIED | Line 367: `@named flapper = Flapper(threshold=threshold, dt=dt_ramp)`; line 377: `flapper.ref_mdot ~ ine.inlet.mdot` |
 
 ---
 
@@ -83,7 +83,7 @@ Scan confirmed: no `TODO`, `FIXME`, `PLACEHOLDER`, or empty-return anti-patterns
 
 #### 1. Transient Physical Realism
 
-**Test:** Run `julia --project -e 'include("test/test_loss_of_flow.jl")'` and inspect the console output or attach a Plots.jl visualization of `sol[ssys.ine.port_in.mdot, :]` over time
+**Test:** Run `julia --project -e 'include("test/test_loss_of_flow.jl")'` and inspect the console output or attach a Plots.jl visualization of `sol[ssys.ine.inlet.mdot, :]` over time
 **Expected:** mdot starts positive (~0.1–0.5 kg/s), decays to near-zero within a few seconds (Flapper fires), reverses to a stable negative NC value (~0.2 kg/s) that holds for the remaining ~290 s
 **Why human:** The automated tests assert endpoint values and energy balance but do not verify the transient has the physically expected shape (smooth decay, clean reversal, stable NC plateau)
 

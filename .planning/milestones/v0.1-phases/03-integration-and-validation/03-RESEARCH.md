@@ -10,7 +10,7 @@
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
-- **Loop assembly**: Manual wiring — user calls `connect(pump.port_out, friction.port_in)`, etc., then `compose()` and `mtkcompile()`. No convenience constructor.
+- **Loop assembly**: Manual wiring — user calls `connect(pump.outlet, friction.inlet)`, etc., then `compose()` and `mtkcompile()`. No convenience constructor.
 - **Reference topology**: Pump → Friction → Channel → back to Pump (closed forced-convection loop)
 - **Solver return values**: Return raw MTK solution (`ODESolution` / steady-state solution) from both `solve_steady()` and `solve_transient()`. MTK symbolic indexing (`sol[sys.channel.T_out]`) is sufficient for v0.1.
 - **Steady-state solver**: `SteadyStateProblem` + `SSRootfind()` + KINSOL (Sundials)
@@ -32,7 +32,7 @@
 - Exact solver tolerances for SSRootfind/KINSOL (abstol, reltol)
 - How to express the time-varying Q_wall step in the transient problem (callback vs. time-dependent parameter)
 - Whether to put `solve_steady` / `solve_transient` as free functions in `STREAM` module or in a new `src/solvers.jl`
-- Absolute pressure reference constraint for the closed loop (MTK needs one pressure pinned to remove gauge degree of freedom — e.g., `pump.port_in.P = 1e5`)
+- Absolute pressure reference constraint for the closed loop (MTK needs one pressure pinned to remove gauge degree of freedom — e.g., `pump.inlet.P = 1e5`)
 
 ### Deferred Ideas (OUT OF SCOPE)
 - Thin solution wrapper (`SteadySolution` / `TransientSolution`) — deferred to v0.2
@@ -46,7 +46,7 @@
 
 | ID | Description | Research Support |
 |----|-------------|-----------------|
-| SYS-01 | Single closed loop (Pump → Friction → Channel → back to Pump) assembles, connects, and compiles with `mtkcompile` without errors | MTK `connect()` + `compose()` + `mtkcompile(sys; fully_determined=true)` pattern; pressure gauge-freedom fix via pinning `pump.port_in.P ~ 1e5` |
+| SYS-01 | Single closed loop (Pump → Friction → Channel → back to Pump) assembles, connects, and compiles with `mtkcompile` without errors | MTK `connect()` + `compose()` + `mtkcompile(sys; fully_determined=true)` pattern; pressure gauge-freedom fix via pinning `pump.inlet.P ~ 1e5` |
 | SYS-02 | Clean user-facing API: construct components, connect them, set initial conditions, solve | `solve_steady` / `solve_transient` free functions in `src/solvers.jl`; `steady_state_guess` utility; `SteadyStateProblem(ssys, op)` + `solve(prob, SSRootfind(KINSOL()))` |
 | SOLV-01 | Steady-state solver: run closed loop to steady state, return named output variables (T per cell, mass flow, pressures) | `SteadyStateProblem` + `SSRootfind(KINSOL())` from DifferentialEquations v7; caller gets raw `SteadyStateSolution` with symbolic indexing |
 | SOLV-02 | Transient solver: simulate step change in channel power, return time-series solution | `ODEProblem(ssys, op, tspan)` + `solve(prob, IDA())`; `PresetTimeCallback` to flip Q_wall parameter at t=10s via `setp` |
@@ -63,7 +63,7 @@ Phase 3 wires the four complete components (Pump, Friction, Channel, Gravity) in
 
 The key technical finding is that the steady-state solver stack is fully available in the installed packages: `DifferentialEquations v7.17.0` exports `SSRootfind` and `DynamicSS`; `Sundials v5.1.0` exports `KINSOL` and `IDA`; `ModelingToolkit v11.15.0` provides `SteadyStateProblem` and `ODEProblem` that both accept an `op` (operating point) dict as their combined u0+p argument. The MTK v11 preferred API for constructing problems from compiled systems uses `SteadyStateProblem(ssys, op)` where `op` is a `Vector{Pair}` or `Dict` containing initial conditions for state variables and parameter overrides.
 
-The most consequential open question is the **pressure gauge freedom**: a closed hydraulic loop has no absolute pressure reference, so the compiled MTK system will have a structural singularity unless one pressure is pinned as an additional algebraic constraint (`pump.port_in.P ~ 1e5`). This must be handled before `mtkcompile` succeeds with `fully_determined=true`. The `steady_state_guess` helper requires physics-based estimates of both temperature (linear rise) and mass flow (from 30 kPa drive vs. Blasius friction estimate).
+The most consequential open question is the **pressure gauge freedom**: a closed hydraulic loop has no absolute pressure reference, so the compiled MTK system will have a structural singularity unless one pressure is pinned as an additional algebraic constraint (`pump.inlet.P ~ 1e5`). This must be handled before `mtkcompile` succeeds with `fully_determined=true`. The `steady_state_guess` helper requires physics-based estimates of both temperature (linear rise) and mass flow (from 30 kPa drive vs. Blasius friction estimate).
 
 **Primary recommendation:** Implement in four sequential waves: (1) closed-loop assembly and `mtkcompile` smoke test, (2) `solve_steady` with `SSRootfind(KINSOL())` and initial guess helper, (3) `solve_transient` with `PresetTimeCallback` step change, (4) Python STREAM reference generation and tolerance comparison.
 
@@ -117,7 +117,7 @@ test/
 
 **When to use:** Assembling any complete closed hydraulic loop where all ports are connected (no dangling ports).
 
-**Critical issue — pressure gauge freedom:** A fully-connected closed loop has no absolute pressure reference. MTK will report a structural singularity (underdetermined system) without an explicit pressure pin. The fix is to add an equation `pump.port_in.P ~ 1.0e5` to the equation list before calling `compose()`.
+**Critical issue — pressure gauge freedom:** A fully-connected closed loop has no absolute pressure reference. MTK will report a structural singularity (underdetermined system) without an explicit pressure pin. The fix is to add an equation `pump.inlet.P ~ 1.0e5` to the equation list before calling `compose()`.
 
 ```julia
 # Source: MTK v11 connect()/compose() pattern established in Phase 2
@@ -131,10 +131,10 @@ test/
 #   ch.thermal.Q_flow ~ 1.0e4   (in the top-level compose equations)
 
 connections = [
-    connect(pump.port_out, fr.port_in),
-    connect(fr.port_out, ch.port_in),
-    connect(ch.port_out, pump.port_in),
-    pump.port_in.P ~ 1.0e5,    # pressure gauge freedom fix
+    connect(pump.outlet, fr.inlet),
+    connect(fr.outlet, ch.inlet),
+    connect(ch.outlet, pump.inlet),
+    pump.inlet.P ~ 1.0e5,    # pressure gauge freedom fix
     ch.thermal.Q_flow ~ 1.0e4, # wall heat input (10 kW)
 ]
 
@@ -157,14 +157,14 @@ op = [
     ch.T[1] => 313.15 + 5.0,   # initial guess: T slightly above inlet per cell
     ch.T[2] => 313.15 + 10.0,
     # ... (steady_state_guess generates this)
-    pump.port_in.P => 1.0e5,
+    pump.inlet.P => 1.0e5,
 ]
 prob = SteadyStateProblem(ssys, op)
 sol = solve(prob, SSRootfind(KINSOL()))
 
 # Access results via symbolic indexing
 T_outlet = sol[ch.T_out]
-mdot     = sol[pump.port_in.mdot]
+mdot     = sol[pump.inlet.mdot]
 ```
 
 ### Pattern 3: ODEProblem + IDA for Transient
@@ -237,7 +237,7 @@ end
 ### Pitfall 2: Pressure Gauge Freedom
 **What goes wrong:** `mtkcompile` reports the system is structurally singular or underdetermined.
 **Why it happens:** In a fully-closed loop, all pressures are defined relative to each other through pressure-drop equations. There is no absolute pressure anchor. MTK cannot determine the gauge level.
-**How to avoid:** Add one absolute pressure pin to the connection equations: `pump.port_in.P ~ 1.0e5`. This is analogous to Python STREAM's approach of fixing an absolute pressure in the aggregator.
+**How to avoid:** Add one absolute pressure pin to the connection equations: `pump.inlet.P ~ 1.0e5`. This is analogous to Python STREAM's approach of fixing an absolute pressure in the aggregator.
 **Warning signs:** "structural singularity" or "n_equations ≠ n_unknowns" in `mtkcompile` output.
 
 ### Pitfall 3: Temperature Scale Mismatch (Kelvin vs Celsius)
@@ -248,7 +248,7 @@ end
 
 ### Pitfall 4: ifelse() in Blasius Friction Causing Convergence Issues
 **What goes wrong:** `SSRootfind(KINSOL())` fails to converge or gives wrong steady-state mass flow.
-**Why it happens:** The Channel uses `abs(port_in.mdot)` in Re and friction factor — this has a non-smooth derivative at mdot=0. KINSOL uses Newton iteration with Jacobian — the non-differentiable point at mdot=0 can cause the Jacobian to be ill-conditioned near the initial guess.
+**Why it happens:** The Channel uses `abs(inlet.mdot)` in Re and friction factor — this has a non-smooth derivative at mdot=0. KINSOL uses Newton iteration with Jacobian — the non-differentiable point at mdot=0 can cause the Jacobian to be ill-conditioned near the initial guess.
 **How to avoid:** Provide a physics-based initial guess (from `steady_state_guess`) that puts mdot far from zero (e.g., 0.1 kg/s). With a sensible starting point, the solver stays in the smooth region.
 **Warning signs:** KINSOL reporting "maximum iterations exceeded" or convergence to mdot=0.
 
@@ -277,7 +277,7 @@ prob = SteadyStateProblem(ssys, [
     ssys.channel.T[1] => 315.0,
     ssys.channel.T[2] => 317.0,
     # ... all state variables need initial values
-    ssys.pump.port_in.P => 1.0e5,  # if P is a state/observable
+    ssys.pump.inlet.P => 1.0e5,  # if P is a state/observable
 ])
 sol = solve(prob, SSRootfind(KINSOL()))
 ```

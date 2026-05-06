@@ -20,7 +20,7 @@ tech-stack:
   added: []
   patterns:
     - "Resistor follows Pump/Friction/Gravity port pattern: two FlowPorts, mass balance, pressure equation, instream() for T"
-    - "Linear pressure drop: port_in.P - port_out.P ~ R * port_in.mdot (bidirectional, no abs() needed)"
+    - "Linear pressure drop: inlet.P - outlet.P ~ R * inlet.mdot (bidirectional, no abs() needed)"
 
 key-files:
   created: []
@@ -30,7 +30,7 @@ key-files:
     - test/runtests.jl
 
 key-decisions:
-  - "Linear resistor equation uses port_in.mdot (not abs(mdot)) — bidirectional by design, matching Python STREAM"
+  - "Linear resistor equation uses inlet.mdot (not abs(mdot)) — bidirectional by design, matching Python STREAM"
   - "mtkcompile with fully_determined=false is the isolation test pattern for individual components (consistent with Phase 2)"
 
 patterns-established:
@@ -81,7 +81,7 @@ _Note: TDD stub phase passes both tests because `fully_determined=false` allows 
 
 ## Decisions Made
 
-- Linear pressure drop uses `port_in.P - port_out.P ~ R * port_in.mdot` without `abs()` — bidirectional by design, matching Python STREAM's Resistor semantics. Positive mdot means flow into component (pressure drops from in to out).
+- Linear pressure drop uses `inlet.P - outlet.P ~ R * inlet.mdot` without `abs()` — bidirectional by design, matching Python STREAM's Resistor semantics. Positive mdot means flow into component (pressure drops from in to out).
 - mtkcompile with `fully_determined=false` is the right isolation test pattern for components with unconnected ports (consistent with Phase 2 approach for Pump/Friction/Gravity).
 
 ## Deviations from Plan

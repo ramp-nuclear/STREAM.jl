@@ -110,7 +110,7 @@ Existing exports available to Phase 48:
 Current state (to be modified in Phase 48):
 - Line 3: `using ModelingToolkit: SymbolicContinuousCallback` — REMOVE this import
 - Constructor has `use_callback=true`, `threshold` as `@parameters` — REMOVE both
-- Lines 76-88: conditional `if use_callback ... SymbolicContinuousCallback ... end` branch — REMOVE, always emit `compose(System(eqs, t, vars, pars; name=name), port_in, port_out)`
+- Lines 76-88: conditional `if use_callback ... SymbolicContinuousCallback ... end` branch — REMOVE, always emit `compose(System(eqs, t, vars, pars; name=name), inlet, outlet)`
 - `T_open`, `xi`, `ref_mdot`, `D(T_open) ~ 0`, resistance equation — ALL UNCHANGED
 
 **`src/solvers.jl`** [VERIFIED: lines 99-117]
@@ -128,7 +128,7 @@ The exact pattern Phase 48 formalizes is already proven in `test/test_loss_of_fl
 ```julia
 # LOF-02: established pattern that flapper_callback formalizes
 i_T_open   = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
-i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.port_in.mdot)
+i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.inlet.mdot)
 cb = ContinuousCallback(
     (u, t, integrator) -> u[i_ine_mdot] - BYPASS_THRESHOLD,
     nothing,                                         # ignore upward crossing
@@ -306,7 +306,7 @@ Result: Flapper is a pure equation system. Tests that previously passed `Flapper
 ```julia
 # Source: test/test_loss_of_flow.jl lines 117-123 [VERIFIED]
 i_T_open   = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
-i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.port_in.mdot)
+i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.inlet.mdot)
 cb = ContinuousCallback(
     (u, t, integrator) -> u[i_ine_mdot] - BYPASS_THRESHOLD,
     nothing,

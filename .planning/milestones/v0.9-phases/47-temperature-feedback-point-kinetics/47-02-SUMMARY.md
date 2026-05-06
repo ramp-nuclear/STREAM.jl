@@ -51,7 +51,7 @@ covering regression guard, end-to-end reactivity observable, and analytical powe
 - tspan used: (0.0, 2.0), 50 saveat points + tstops=[0.1]
 - Test wall-clock time: ~95 seconds (dominated by mtkcompile)
 - IC entries beyond PK states:
-  - `ssys7.rods7.cac7.port_in.mdot => 0.2`
+  - `ssys7.rods7.cac7.inlet.mdot => 0.2`
   - `ssys7.rods7.cac7.T[i] => 293.15` for i in 1:3
   - `ssys7.rods7.fuel7.T[i,j] => 293.15` for i in 1:3, j in 1:2
 - rho_trace[end] <= delta_rho: **yes** (rho[end] ≈ 4.96e-4 < 5e-4 = delta_rho)

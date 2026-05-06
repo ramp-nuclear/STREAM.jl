@@ -17,7 +17,7 @@ Human verification checkpoint for canvas and node editor. All 7 CANV requirement
 All requirements passed:
 - CANV-01: Canvas controls (zoom, pan, minimap, fit-to-view) ✓
 - CANV-02: Drag-from-toolbox with auto-naming (pump_1, pump_2, etc.) ✓
-- CANV-03: Edge drawing with directionality validation (port_out → port_in only) ✓
+- CANV-03: Edge drawing with directionality validation (outlet → inlet only) ✓
 - CANV-04: Delete nodes and edges via Delete/Backspace ✓
 - CANV-05: Node repositioning with edges following ✓
 - CANV-06: Node display with type + instance name + handles ✓

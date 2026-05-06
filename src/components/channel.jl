@@ -17,7 +17,7 @@ Single-phase convective channel with `n` axial finite-volume cells.
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 - `thermal` -- `ThermalPort` (single scalar wall temperature BC)
 
 # Returns
@@ -56,36 +56,36 @@ function Channel(;
         dP(t)
     end
 
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
     @named thermal = ThermalPort()
 
     dz = L / n
 
     eqs = Equation[]
-    T_inlet_fwd = instream(port_in.T)
-    T_inlet_rev = instream(port_out.T)
+    T_inlet_fwd = instream(inlet.T)
+    T_inlet_rev = instream(outlet.T)
 
     for i in 1:n
         T_up_fwd = (i == 1) ? T_inlet_fwd : T[i - 1]
         T_up_rev = (i == n) ? T_inlet_rev : T[i + 1]
-        T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
+        T_up = ifelse(inlet.mdot >= 0, T_up_fwd, T_up_rev)
         # Energy balance (first-order upwind FV)
-        # abs(port_in.mdot) ensures correct sign under reversed flow (mdot < 0):
+        # abs(inlet.mdot) ensures correct sign under reversed flow (mdot < 0):
         # the upwind temperature T_up is already selected for the correct direction,
         # so the advective flux is always |mdot|*cp*(T_upstream - T[i]).
         push!(
             eqs,
             Dt(T[i]) ~
             (
-                abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i]) +
+                    abs(inlet.mdot) * cp_water(T[i]) * (T_up - T[i]) +
                 h_tc[i] * sum(geometry.heated_parts) * dz * (thermal.T - T[i])
             ) / (rho_water(T[i]) * cp_water(T[i]) * A * dz),
         )
         # Observables
         push!(eqs, q_wall[i] ~ thermal.Q_flow / n)
-        push!(eqs, v[i] ~ port_in.mdot / (rho_water(T[i]) * A))
-        push!(eqs, Re[i] ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
+        push!(eqs, v[i] ~ inlet.mdot / (rho_water(T[i]) * A))
+        push!(eqs, Re[i] ~ abs(inlet.mdot) * Dh / (A * mu_water(T[i])))
         Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
         push!(eqs, Nu[i] ~ htc_correlation(Re[i], Pr_i, T[i], T[i]))
         push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
@@ -94,13 +94,13 @@ function Channel(;
     # Per-cell pressure drop (D-02): friction + gravity, each using dz = L/n
     # Momentum inertia is handled by the momentum ODE below; dp[i] is algebraic (friction + gravity only).
     for i in 1:n
-        Re_i_val = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+        Re_i_val = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
         f_i = friction_correlation(Re_i_val)
         push!(
             eqs,
             dp[i] ~
             f_i *
-            (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(T[i]) * A^2)) *
+                (inlet.mdot * abs(inlet.mdot) / (2 * rho_water(T[i]) * A^2)) *
             (dz / Dh) + rho_water(T[i]) * g_acc * dz,
         )
     end
@@ -108,12 +108,13 @@ function Channel(;
     push!(eqs, T_out ~ T[n])
 
     # Port wiring
-    push!(eqs, port_in.mdot + port_out.mdot ~ 0)
+    push!(eqs, inlet.mdot + outlet.mdot ~ 0)
     push!(
-        eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(dp[i] for i in 1:n)
+        eqs,
+        (L / A) * Dt(inlet.mdot) ~ (inlet.P - outlet.P) - sum(dp[i] for i in 1:n),
     )
-    push!(eqs, port_out.T ~ T[n])
-    push!(eqs, port_in.T ~ T[1])
+    push!(eqs, outlet.T ~ T[n])
+    push!(eqs, inlet.T ~ T[1])
 
     # Observed equations: P[i] absolute pressure and dP alias (D-04, D-05, D-06)
     # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
@@ -121,11 +122,11 @@ function Channel(;
     obs = Equation[]
     for i in 1:n
         P_i =
-            port_in.P - sum(dp[j] for j in 1:i) -
-            (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+            inlet.P - sum(dp[j] for j in 1:i) -
+            (i / n) * ((inlet.P - outlet.P) - sum(dp[j] for j in 1:n))
         push!(obs, P[i] ~ P_i)
     end
-    push!(obs, dP ~ port_in.P - port_out.P)
+    push!(obs, dP ~ inlet.P - outlet.P)
 
     all_vars = [
         collect(T);
@@ -139,7 +140,10 @@ function Channel(;
     ]
 
     compose(
-        System(eqs, t, all_vars, pars; observed=obs, name=name), port_in, port_out, thermal
+        System(eqs, t, all_vars, pars; observed=obs, name=name),
+        inlet,
+        outlet,
+        thermal,
     )
 end
 
@@ -157,7 +161,7 @@ end
 # Appends (scalar):
 #   T_out ~ T[n]
 # Appends (port wiring):
-#   mass conservation, momentum ODE (L/A)*Dt(mdot), port_out.T, port_in.T
+#   mass conservation, momentum ODE (L/A)*Dt(mdot), outlet.T, inlet.T
 #
 # Does NOT append energy balance equations -- those differ per variant.
 # The dP observed alias is NOT pushed here -- each caller builds its own obs list.
@@ -179,8 +183,8 @@ function _channel_base_eqs(
     v,
     T_out,
     dp,
-    port_in,
-    port_out,
+    inlet,
+    outlet,
     Dh,
     A,
     L,
@@ -199,7 +203,7 @@ function _channel_base_eqs(
             # When skip_htc=true, h_tc[i] equations are NOT pushed here — caller provides them
             # (e.g. ChannelAndContacts with SCB correction pushes its own h_tc[i] equations).
             if !skip_htc
-                Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+                Re_i = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
                 Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
                 T_w_i = T_wall_cells === nothing ? T[i] : T_wall_cells[i]
                 push!(
@@ -208,8 +212,8 @@ function _channel_base_eqs(
                 )
             end
         else
-            push!(eqs, v[i] ~ port_in.mdot / (rho_water(T[i]) * A))
-            push!(eqs, Re[i] ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
+            push!(eqs, v[i] ~ inlet.mdot / (rho_water(T[i]) * A))
+            push!(eqs, Re[i] ~ abs(inlet.mdot) * Dh / (A * mu_water(T[i])))
             Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
             T_w_i = T_wall_cells === nothing ? T[i] : T_wall_cells[i]
             push!(eqs, Nu[i] ~ htc_correlation(Re[i], Pr_i, T[i], T_w_i))
@@ -222,7 +226,7 @@ function _channel_base_eqs(
     for i in 1:n
         if observed_mode
             # In observed_mode, Re[i] is observed -- inline Re for friction (Pitfall 5)
-            Re_i_for_friction = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+            Re_i_for_friction = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
             f_i = friction_correlation(Re_i_for_friction)
         else
             f_i = friction_correlation(Re[i])
@@ -231,7 +235,7 @@ function _channel_base_eqs(
             eqs,
             dp[i] ~
             f_i *
-            (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(T[i]) * A^2)) *
+                (inlet.mdot * abs(inlet.mdot) / (2 * rho_water(T[i]) * A^2)) *
             (dz / Dh) + rho_water(T[i]) * g_acc * dz,
         )
     end
@@ -240,10 +244,11 @@ function _channel_base_eqs(
 
     # Port wiring (4 equations -- identical across all channel variants)
     Dt = Differential(t)
-    push!(eqs, port_in.mdot + port_out.mdot ~ 0)
+    push!(eqs, inlet.mdot + outlet.mdot ~ 0)
     push!(
-        eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(dp[i] for i in 1:n)
+        eqs,
+        (L / A) * Dt(inlet.mdot) ~ (inlet.P - outlet.P) - sum(dp[i] for i in 1:n),
     )
-    push!(eqs, port_out.T ~ T[n])
-    push!(eqs, port_in.T ~ T[1])
+    push!(eqs, outlet.T ~ T[n])
+    return push!(eqs, inlet.T ~ T[1])
 end

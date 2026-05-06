@@ -501,10 +501,10 @@ import ModelingToolkit: compose
 
         fb_eqs = connect_temperature_feedback(pk, [rods.cac])
         hydro_eqs = Equation[
-            connect(pump_tf6.port_out, hx_tf6.port_in),
-            connect(hx_tf6.port_out, rods.cac.port_in),
-            connect(rods.cac.port_out, pump_tf6.port_in),
-            pump_tf6.port_in.P ~ 1.0e5,
+            connect(pump_tf6.outlet, hx_tf6.inlet),
+            connect(hx_tf6.outlet, rods.cac.inlet),
+            connect(rods.cac.outlet, pump_tf6.inlet),
+            pump_tf6.inlet.P ~ 1.0e5,
             rods.fuel.power ~ 1e3,
         ]
         all_eqs = vcat(fb_eqs, hydro_eqs)
@@ -523,7 +523,7 @@ import ModelingToolkit: compose
             ssys.pk.C_5 => ic.C_k[5],
             ssys.pk.C_6 => ic.C_k[6],
             # Thermal-hydraulic ICs (ssys IS the core system — no extra .core prefix)
-            ssys.rods.cac.port_in.mdot => 0.2,
+            ssys.rods.cac.inlet.mdot => 0.2,
             [ssys.rods.cac.T[i] => T0 for i in 1:n]...,
             [ssys.rods.fuel.T[i, j] => T0 for i in 1:n for j in 1:2]...,
         ]
@@ -591,10 +591,10 @@ import ModelingToolkit: compose
 
         fb_eqs7 = connect_temperature_feedback(pk7, [rods7_cac7])
         hydro_eqs7 = Equation[
-            connect(pump_tf7.port_out, hx_tf7.port_in),
-            connect(hx_tf7.port_out, rods7.cac7.port_in),
-            connect(rods7.cac7.port_out, pump_tf7.port_in),
-            pump_tf7.port_in.P ~ 1.0e5,
+            connect(pump_tf7.outlet, hx_tf7.inlet),
+            connect(hx_tf7.outlet, rods7.cac7.inlet),
+            connect(rods7.cac7.outlet, pump_tf7.inlet),
+            pump_tf7.inlet.P ~ 1.0e5,
             rods7.fuel7.power ~ 0.0,
         ]
         all_eqs7 = vcat(fb_eqs7, hydro_eqs7)
@@ -616,7 +616,7 @@ import ModelingToolkit: compose
             ssys7.pk7.C_5 => ic7.C_k[5],
             ssys7.pk7.C_6 => ic7.C_k[6],
             # ssys7 IS the core7 system — no extra .core7 prefix
-            ssys7.rods7.cac7.port_in.mdot => 0.2,
+            ssys7.rods7.cac7.inlet.mdot => 0.2,
             [ssys7.rods7.cac7.T[i] => T0 for i in 1:n]...,
             [ssys7.rods7.fuel7.T[i, j] => T0 for i in 1:n for j in 1:2]...,
         ]

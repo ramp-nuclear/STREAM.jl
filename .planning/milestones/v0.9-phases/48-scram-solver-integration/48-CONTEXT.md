@@ -152,7 +152,7 @@ extensibility (e.g. `SCRAM_at_dPdt`, combined power+rate state machines).
    which is now external. No equation inside Flapper uses `threshold`.
 4. **Remove** the `if use_callback ... else ... end` branch — always emit:
    ```julia
-   compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
+   compose(System(eqs, t, vars, pars; name=name), inlet, outlet)
    ```
 5. Keep all other behavior: `T_open`, `xi`, `ref_mdot`, resistance equation, `Dt(T_open) ~ 0`.
 
@@ -266,7 +266,7 @@ LOF-02 (`test_loss_of_flow.jl:113`) already uses the exact external `ContinuousC
 pattern that Phase 48 formalizes for Flapper:
 ```julia
 i_T_open   = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
-i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.port_in.mdot)
+i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.inlet.mdot)
 cb = ContinuousCallback(
     (u, t, integrator) -> u[i_ine_mdot] - BYPASS_THRESHOLD,
     nothing,

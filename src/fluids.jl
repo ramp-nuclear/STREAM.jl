@@ -122,7 +122,7 @@ Input: pressure in Pa. Output: temperature in Kelvin.
 Guard: uses abs(P_Pa) inside log to prevent DomainError at bad Newton iterates.
 
 Note: P[i] absolute pressure is only meaningful when a pressure anchor is set
-on a FlowPort in the loop (e.g., pump.port_in.P ~ 1e5).
+on a FlowPort in the loop (e.g., pump.inlet.P ~ 1e5).
 
 # Arguments
 - `P_Pa`: absolute pressure [Pa]

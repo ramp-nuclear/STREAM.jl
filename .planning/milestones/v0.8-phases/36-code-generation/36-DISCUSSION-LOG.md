@@ -47,7 +47,7 @@
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| FlowPort.P only | port_in.P and port_out.P only; thermal BCs via ConstantTemperature (Phase 40) | ✓ |
+| FlowPort.P only | inlet.P and outlet.P only; thermal BCs via ConstantTemperature (Phase 40) | ✓ |
 | All port fields | FlowPort.P + FlowPort.mdot + ThermalPort.T + ThermalPort.Q_flow | |
 
 **User's choice:** FlowPort.P only

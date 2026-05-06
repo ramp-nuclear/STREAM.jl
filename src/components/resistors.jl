@@ -12,7 +12,7 @@ Frictional pressure drop element using Darcy-Weisbach correlation.
 - `A`: flow area [m^2]
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
@@ -27,20 +27,20 @@ function Friction(; name, L, D, A)
         Re(t)
         f(t)
     end
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    T_in = instream(port_in.T)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        Re ~ abs(port_in.mdot) * D / (A * mu_water(T_in)),
+        inlet.mdot + outlet.mdot ~ 0,
+        Re ~ abs(inlet.mdot) * D / (A * mu_water(T_in)),
         f ~ 0.3164 * Re ^ (-0.25),
-        port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(
+        inlet.P - outlet.P ~ f * (inlet.mdot * abs(inlet.mdot) / (2 * rho_water(
             T_in
         ) * A ^ 2)) * (L / D),
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
+        outlet.T ~ instream(inlet.T),
+        inlet.T ~ instream(outlet.T),
     ]
-    compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, vars, pars; name=name), inlet, outlet)
 end
 
 """
@@ -53,23 +53,23 @@ Hydrostatic pressure change for a vertical elevation change.
 - `name`: system name (Symbol)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
 function Gravity(H; name)
     pars = @parameters H = H
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    T_in = instream(port_in.T)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
+        inlet.mdot + outlet.mdot ~ 0,
+        inlet.P - outlet.P ~ rho_water(T_in) * 9.80665 * H,
+        outlet.T ~ instream(inlet.T),
+        inlet.T ~ instream(outlet.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), inlet, outlet)
 end
 
 """
@@ -82,20 +82,20 @@ Generic flow resistance with a fixed resistance coefficient.
 - `name`: system name (Symbol)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
 function Resistor(R; name)
     pars = @parameters R = R
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ R * port_in.mdot,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
+        inlet.mdot + outlet.mdot ~ 0,
+        inlet.P - outlet.P ~ R * inlet.mdot,
+        outlet.T ~ instream(inlet.T),
+        inlet.T ~ instream(outlet.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), inlet, outlet)
 end

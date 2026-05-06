@@ -60,7 +60,7 @@ ssys = build_loop(;
 # Initial guess using steady_state_guess helper
 T_guess = steady_state_guess(; T_inlet=T_INLET, Q_wall=1e4, mdot_guess=0.490, n=N_CELLS)
 op = [ssys.ch.T[i] => T_guess[i] for i in 1:N_CELLS]
-push!(op, ssys.ch.port_in.mdot => 0.490)
+push!(op, ssys.ch.inlet.mdot => 0.490)
 
 println("Solving steady state...")
 sol = solve_steady(ssys, op)
@@ -74,7 +74,7 @@ end
 # =============================================================================
 
 T_out = sol[ssys.ch.T_out]
-mdot = abs(sol[ssys.ch.port_in.mdot])
+mdot = abs(sol[ssys.ch.inlet.mdot])
 T_axial = [sol[ssys.ch.T[i]] for i in 1:N_CELLS]
 
 println("Steady-state results:")

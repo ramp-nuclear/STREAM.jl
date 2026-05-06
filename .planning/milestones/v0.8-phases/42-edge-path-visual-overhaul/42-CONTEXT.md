@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Fix edge rendering quality across the ReactFlow canvas: correct arrowheads on hydraulic edges, non-overlapping routing for parallel/loop edges, thermal edges already visually distinct (amber + dashed), cursor glitch fix on edge drag handles, rename counter reconstruction fix on project load, and FlowPort handle polarity coloring (port_in vs port_out distinct colors).
+Fix edge rendering quality across the ReactFlow canvas: correct arrowheads on hydraulic edges, non-overlapping routing for parallel/loop edges, thermal edges already visually distinct (amber + dashed), cursor glitch fix on edge drag handles, rename counter reconstruction fix on project load, and FlowPort handle polarity coloring (inlet vs outlet distinct colors).
 
 </domain>
 
@@ -25,7 +25,7 @@ Fix edge rendering quality across the ReactFlow canvas: correct arrowheads on hy
 - **D-05:** No changes to thermal edge style beyond what's already implemented (`stroke: "#f59e0b"`, `strokeDasharray: "6 3"`). Once routing is fixed and arrowheads are absent, thermal edges are sufficiently distinct from hydraulic edges.
 
 ### FlowPort Handle Polarity Coloring
-- **D-06:** `port_in` and `port_out` handles get **distinct colors** so connection direction is immediately visible. Claude picks the exact colors (must harmonize with the existing blue hydraulic category color and not clash with amber thermal handles).
+- **D-06:** `inlet` and `outlet` handles get **distinct colors** so connection direction is immediately visible. Claude picks the exact colors (must harmonize with the existing blue hydraulic category color and not clash with amber thermal handles).
 - **D-07:** Port direction (`"in"` vs `"out"`) is derived from the `direction` field in `gui/src/registry/components.json` port entries. The `StreamNode` handle renderer reads `port.direction` to apply the color. No registry schema changes — the field already exists (or is added if missing per the component definitions).
 
 ### Cursor Glitch Fix
@@ -36,7 +36,7 @@ Fix edge rendering quality across the ReactFlow canvas: correct arrowheads on hy
 
 ### Claude's Discretion
 - Exact arrowhead size and color (should be visible against the canvas background, not oversized)
-- Exact colors for port_in vs port_out handles (must harmonize with blue hydraulic category, not conflict with amber thermal)
+- Exact colors for inlet vs outlet handles (must harmonize with blue hydraulic category, not conflict with amber thermal)
 - Whether offset is applied symmetrically (+10px / -10px) or asymmetrically (0 / +20px)
 - CSS selector and property for cursor fix
 - Whether offset detection uses an O(n) edge scan or a Set for O(1) lookup
@@ -55,7 +55,7 @@ Fix edge rendering quality across the ReactFlow canvas: correct arrowheads on hy
 - `gui/src/components/CanvasPanel.tsx` — `defaultEdgeOptions`, `addEdge` callback, `isValidConnection`; arrowhead + offset logic goes here or in `addEdge` store action
 - `gui/src/store/useStore.ts` — `addEdge` action (lines ~331–376): edge styling applied here; markerEnd and offset should be added at this point; `instanceCounters` module-level object and `getNextInstanceName`
 - `gui/src/lib/projectIO.ts` — `reconstructInstanceCounters` function (~line 138); counter reconstruction bug fix goes here
-- `gui/src/components/StreamNode.tsx` — Handle renderer; polarity coloring (port_in vs port_out) applied here via `port.direction`
+- `gui/src/components/StreamNode.tsx` — Handle renderer; polarity coloring (inlet vs outlet) applied here via `port.direction`
 - `gui/src/registry/components.json` — Per-port `direction` field ("in"/"out") for all 9 component types; verify field exists for all FlowPort entries
 
 ### Prior phase context
@@ -88,7 +88,7 @@ Fix edge rendering quality across the ReactFlow canvas: correct arrowheads on hy
 <specifics>
 ## Specific Ideas
 
-- User confirmed: colored port handles (port_in vs port_out) are for visual clarity at connection time, NOT for free-form endpoint repositioning. Reconnectable edge endpoints are explicitly out of scope.
+- User confirmed: colored port handles (inlet vs outlet) are for visual clarity at connection time, NOT for free-form endpoint repositioning. Reconnectable edge endpoints are explicitly out of scope.
 
 </specifics>
 

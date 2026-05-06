@@ -22,10 +22,10 @@ geo = PipeGeometry_circular(1.0, 0.01)
 @named ch = STREAM.Channel(; n=2, geometry=geo)
 
 eqs = [
-    connect(pump.port_out, ch.port_in),
-    connect(ch.port_out, pump.port_in),
+    connect(pump.outlet, ch.inlet),
+    connect(ch.outlet, pump.inlet),
     ch.thermal.T ~ 373.15,
-    pump.port_in.P ~ 1.0e5,
+    pump.inlet.P ~ 1.0e5,
 ]
 @named sys = System(eqs, t, [], []; systems=[pump, ch])
 ssys = mtkcompile(sys)

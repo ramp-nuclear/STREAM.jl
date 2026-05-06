@@ -10,7 +10,7 @@ Phase 13 has two tightly scoped changes: (1) replace the sentinel-kwargs `PipeGe
 
 The Dh fix is a breaking geometry change. The current test code passes `Dh=0.01` (a 10 mm circular value) to all VAL-01/02/03 MTR scenarios. After the fix, the correct rectangular Dh for the MTR channel (edge1=0.07 m, edge2=0.00127 m) is ~2.495 mm — a factor of 4 smaller. This shifts Re, Nu, h_tc, and the resulting outlet temperatures and mass flows. All VAL-01/02/03 reference constants must be regenerated from Python STREAM using `EffectivePipe.rectangular(length=0.6, edge1=0.07, edge2=0.00127, heated_edge=0.07)` after the struct change is in place.
 
-The Pump change is purely additive. The existing `dP_pump` path is unchanged; the new `mdot0` path adds one MTK equation (`port_in.mdot ~ mdot0`), removes the pressure equation, and requires the test loop to supply a separate pressure anchor (e.g., an `HeatExchanger` or a pressure node).
+The Pump change is purely additive. The existing `dP_pump` path is unchanged; the new `mdot0` path adds one MTK equation (`inlet.mdot ~ mdot0`), removes the pressure equation, and requires the test loop to supply a separate pressure anchor (e.g., an `HeatExchanger` or a pressure node).
 
 **Primary recommendation:** Implement PipeGeometry redesign first (Plan 01), then Pump dual-mode + reference constant regeneration (Plan 02). The two are separable but regenerating reference constants requires the new struct to be in place.
 
@@ -50,9 +50,9 @@ The Pump change is purely additive. The existing `dP_pump` path is unchanged; th
 **Pump dual-mode**
 - `Pump(; name, dP_pump=nothing, mdot0=nothing)` — sentinel dispatch
 - Fixed-pressure mode (`dP_pump !== nothing`): existing behavior unchanged
-- Fixed-flow mode (`mdot0 !== nothing`): adds `port_in.mdot ~ mdot0`; does NOT add pressure equation — caller provides pressure anchor
+- Fixed-flow mode (`mdot0 !== nothing`): adds `inlet.mdot ~ mdot0`; does NOT add pressure equation — caller provides pressure anchor
 - Error if both or neither provided
-- Test: after solve, `sol[pump.port_in.mdot] ≈ mdot0` (rtol=1e-4)
+- Test: after solve, `sol[pump.inlet.mdot] ≈ mdot0` (rtol=1e-4)
 
 ### Claude's Discretion
 
@@ -75,7 +75,7 @@ The Pump change is purely additive. The existing `dP_pump` path is unchanged; th
 | ID | Description | Research Support |
 |----|-------------|-----------------|
 | PHY-01 | PipeGeometry has `wet_perimeter` field; `Dh = 4A / wet_perimeter`; rectangular constructor computes `wet_perimeter = 2*(edge1 + edge2)` | Fully specified in CONTEXT.md; Python `EffectivePipe.rectangular` is the reference implementation; exact field layout and constructor semantics are locked |
-| PHY-05 | `Pump(mdot0=...)` fixed-flow mode adds constraint `port_in.mdot ~ mdot0` instead of fixed-pressure equation | Additive change to existing `Pump`; sentinel-kwargs pattern already established in codebase; only one new MTK equation needed |
+| PHY-05 | `Pump(mdot0=...)` fixed-flow mode adds constraint `inlet.mdot ~ mdot0` instead of fixed-pressure equation | Additive change to existing `Pump`; sentinel-kwargs pattern already established in codebase; only one new MTK equation needed |
 </phase_requirements>
 
 ---
@@ -180,34 +180,34 @@ function Pump(; name, dP_pump=nothing, mdot0=nothing)
     if dP_pump !== nothing && mdot0 === nothing
         # existing fixed-pressure path — unchanged
         pars = @parameters dP_pump = dP_pump
-        @named port_in  = FlowPort()
-        @named port_out = FlowPort()
+        @named inlet  = FlowPort()
+        @named outlet = FlowPort()
         eqs = Equation[
-            port_in.mdot + port_out.mdot ~ 0,
-            port_out.P - port_in.P ~ dP_pump,
-            port_out.T ~ instream(port_in.T),
-            port_in.T  ~ instream(port_out.T),
+            inlet.mdot + outlet.mdot ~ 0,
+            outlet.P - inlet.P ~ dP_pump,
+            outlet.T ~ instream(inlet.T),
+            inlet.T  ~ instream(outlet.T),
         ]
-        compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+        compose(System(eqs, t, [], pars; name=name), inlet, outlet)
     elseif mdot0 !== nothing && dP_pump === nothing
         # new fixed-flow path
         pars = @parameters mdot0 = mdot0
-        @named port_in  = FlowPort()
-        @named port_out = FlowPort()
+        @named inlet  = FlowPort()
+        @named outlet = FlowPort()
         eqs = Equation[
-            port_in.mdot + port_out.mdot ~ 0,
-            port_in.mdot ~ mdot0,              # fixes mass flow; no pressure equation
-            port_out.T ~ instream(port_in.T),
-            port_in.T  ~ instream(port_out.T),
+            inlet.mdot + outlet.mdot ~ 0,
+            inlet.mdot ~ mdot0,              # fixes mass flow; no pressure equation
+            outlet.T ~ instream(inlet.T),
+            inlet.T  ~ instream(outlet.T),
         ]
-        compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+        compose(System(eqs, t, [], pars; name=name), inlet, outlet)
     else
         error("Pump: provide exactly one of `dP_pump` or `mdot0`")
     end
 end
 ```
 
-**Pressure anchor requirement:** The fixed-flow Pump provides no pressure reference. A loop using `Pump(mdot0=...)` needs an `HeatExchanger` (which has `port_in.P - port_out.P ~ 0`) or an explicit pressure node to close the system. The simplest test topology is: `Pump(mdot0=0.6)` → `HeatExchanger(T_bc=313.15)` → `Channel(...)` → (back to pump), where the HeatExchanger provides `P_out.P - port_in.P ~ 0` and the overall loop pressure is anchored by a reference `P_abs` parameter in the channel (matching the existing `solve_steady` pattern).
+**Pressure anchor requirement:** The fixed-flow Pump provides no pressure reference. A loop using `Pump(mdot0=...)` needs an `HeatExchanger` (which has `inlet.P - outlet.P ~ 0`) or an explicit pressure node to close the system. The simplest test topology is: `Pump(mdot0=0.6)` → `HeatExchanger(T_bc=313.15)` → `Channel(...)` → (back to pump), where the HeatExchanger provides `P_out.P - inlet.P ~ 0` and the overall loop pressure is anchored by a reference `P_abs` parameter in the channel (matching the existing `solve_steady` pattern).
 
 Actually, examining `build_loop` in `solvers.jl` will clarify what reference pressure anchor is needed. The key point: `Pump(dP_pump)` drives dP but the loop needs an absolute pressure reference elsewhere; same architecture applies to `Pump(mdot0)`.
 
@@ -277,9 +277,9 @@ Grep results show these `PipeGeometry(...)` call sites to migrate:
 
 **What goes wrong:** A loop with only `Pump(mdot0=...)` has no absolute pressure reference. MTK will fail to compile (singular system) or produce degenerate pressure values.
 
-**Why it happens:** The fixed-flow Pump provides `port_in.mdot ~ mdot0` but removes the `port_out.P - port_in.P ~ dP_pump` equation. There is now one fewer pressure constraint in the loop.
+**Why it happens:** The fixed-flow Pump provides `inlet.mdot ~ mdot0` but removes the `outlet.P - inlet.P ~ dP_pump` equation. There is now one fewer pressure constraint in the loop.
 
-**How to avoid:** Include an `HeatExchanger` (which has `port_in.P - port_out.P ~ 0`) in the test loop with `funcs={..., p_abs=1e5}` or equivalent. The `solve_steady` call should pass an absolute pressure condition via the `p_abs` parameter on the channel. This is the same pattern already used in all existing loop tests.
+**How to avoid:** Include an `HeatExchanger` (which has `inlet.P - outlet.P ~ 0`) in the test loop with `funcs={..., p_abs=1e5}` or equivalent. The `solve_steady` call should pass an absolute pressure condition via the `p_abs` parameter on the channel. This is the same pattern already used in all existing loop tests.
 
 ### Pitfall 5: `heated_parts` sum check
 
@@ -348,16 +348,16 @@ end
 @named bc   = HeatExchanger(T_bc=313.15)
 @named ch   = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
 conns = [
-    connect(pump.port_out, bc.port_in),
-    connect(bc.port_out,   ch.port_in),
-    connect(ch.port_out,   pump.port_in),
+    connect(pump.outlet, bc.inlet),
+    connect(bc.outlet,   ch.inlet),
+    connect(ch.outlet,   pump.inlet),
 ]
 @named sys = System(conns, t, systems=[pump, bc, ch])
 ssys = mtkcompile(sys)
 # solve_steady needs p_abs; mdot initial guess should be mdot0
 prob = ODEProblem(ssys, [ch.T => fill(313.15, 5)], (0.0, 1e6), [])
 sol  = solve(prob, ...)
-@test isapprox(sol[ssys.pump.port_in.mdot], 0.6; rtol=1e-4)
+@test isapprox(sol[ssys.pump.inlet.mdot], 0.6; rtol=1e-4)
 ```
 
 ---
@@ -413,7 +413,7 @@ sol  = solve(prob, ...)
 | PHY-01 | All existing COMP-01/THERM-01/THERM-02/CHAN-01 tests still pass after call site migration | regression | same | ✅ exists (migrate call sites only) |
 | PHY-01 | VAL-01/02/03 quantitative assertions pass with regenerated reference constants | integration | same | ✅ exists (update constants only) |
 | PHY-05 | `Pump(mdot0=0.6)` assembles and compiles | unit | same | ❌ Wave 0 — new testset |
-| PHY-05 | Loop with `Pump(mdot0=0.6)` solves; `sol[pump.port_in.mdot] ≈ 0.6` (rtol=1e-4) | integration | same | ❌ Wave 0 — new testset |
+| PHY-05 | Loop with `Pump(mdot0=0.6)` solves; `sol[pump.inlet.mdot] ≈ 0.6` (rtol=1e-4) | integration | same | ❌ Wave 0 — new testset |
 | PHY-05 | `Pump(dP_pump=1e5)` still works (regression) | regression | same | ✅ exists (unchanged) |
 | PHY-05 | `Pump(dP_pump=1e5, mdot0=0.6)` errors; `Pump()` errors | unit | same | ❌ Wave 0 — new testset |
 

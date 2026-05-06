@@ -197,11 +197,11 @@ tau = Lx^2 / (π^2 * alpha)     # ≈ 0.002 s for MTR aluminum
 # Source: derived from runtests.jl:1092-1093 wiring pattern
 conns = [
     # hydraulic loop
-    connect(pump.port_out, hx.port_in),
-    connect(hx.port_out, cac.port_in),
-    connect(cac.port_out, pump.port_in),
-    pump.port_in.P ~ 1.0e5,
-    cac.port_in.T  ~ T_in,
+    connect(pump.outlet, hx.inlet),
+    connect(hx.outlet, cac.inlet),
+    connect(cac.outlet, pump.inlet),
+    pump.inlet.P ~ 1.0e5,
+    cac.inlet.T  ~ T_in,
     # plate 1 → left face
     [connect(getproperty(hd1, Symbol(:thermal_left,  i)),
              getproperty(cac,  Symbol(:thermal_left,  i))) for i in 1:nz]...,
@@ -219,7 +219,7 @@ Note: hd2's `thermal_left[i]` connects to cac's `thermal_right[i]` — the plate
 
 ```julia
 # Source: derived from VAL-03 energy balance at runtests.jl:1133-1134
-mdot = sol[ssys.cac.port_in.mdot]
+mdot = sol[ssys.cac.inlet.mdot]
 cp_approx = cp_water(T_in)
 T_rise_expected = (P1 + P2) / (mdot * cp_approx)
 @test isapprox(sol[ssys.cac.T_out] - T_in, T_rise_expected; rtol=0.05)

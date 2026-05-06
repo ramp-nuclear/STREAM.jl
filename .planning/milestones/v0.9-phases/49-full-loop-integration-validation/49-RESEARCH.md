@@ -163,10 +163,10 @@ power_eqs    = [rods.fuel.power ~ pk.P * power_scale]
 @named bc    = HeatExchanger(T_inlet)
 
 all_connections = [
-    connect(pump.port_out, bc.port_in),
-    connect(bc.port_out, rods.cac.port_in),
-    connect(rods.cac.port_out, pump.port_in),
-    pump.port_in.P ~ 1.0e5,       # pressure anchor (required)
+    connect(pump.outlet, bc.inlet),
+    connect(bc.outlet, rods.cac.inlet),
+    connect(rods.cac.outlet, pump.inlet),
+    pump.inlet.P ~ 1.0e5,       # pressure anchor (required)
     fb_eqs...,
     power_eqs...,
 ]
@@ -189,7 +189,7 @@ op = Pair{Any,Any}[
     ssys.pk.P        => ic7.P,
     ssys.pk.C_1      => ic7.C_k[1],
     # ... C_2 through C_6 ...
-    ssys.rods.cac.port_in.mdot => 0.2,
+    ssys.rods.cac.inlet.mdot => 0.2,
     [ssys.rods.cac.T[i]     => T_inlet  for i in 1:n]...,
     [ssys.rods.fuel.T[i, j] => T_fuel_0 for i in 1:nz for j in 1:nx]...,
 ]
@@ -341,10 +341,10 @@ function build_loop_pk(ctrl;
     power_eqs = [rods.fuel.power ~ pk.P * power_scale]
 
     all_connections = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods.cac.port_in),
-        connect(rods.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, rods.cac.inlet),
+        connect(rods.cac.outlet, pump.inlet),
+        pump.inlet.P ~ 1.0e5,
         fb_eqs...,
         power_eqs...,
     ]
@@ -363,7 +363,7 @@ function build_loop_pk(ctrl;
         ssys.pk.C_4      => pk_ic.C_k[4],
         ssys.pk.C_5      => pk_ic.C_k[5],
         ssys.pk.C_6      => pk_ic.C_k[6],
-        ssys.rods.cac.port_in.mdot => 0.2,
+        ssys.rods.cac.inlet.mdot => 0.2,
         [ssys.rods.cac.T[i]     => T_inlet  for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => 600.0    for i in 1:nz for j in 1:nx]...,
     ]
@@ -509,7 +509,7 @@ This phase has no external API surfaces, authentication, or user-facing inputs. 
 |---|-------|---------|---------------|
 | A1 | VAL-PK-02a/b can be validated with `solve_steady` using large initial power | Common Pitfalls #4, Code Examples | If KINSOL fails to converge, fallback is long `solve_transient`; assertion on `sol[end]` |
 | A2 | `build_loop_pk` should accept `temp_worth` as a plain dict (component name → alpha) and resolve scoping internally | Architecture Patterns (build_loop_pk skeleton) | If the function signature differs in the plan, the IC scoping logic may be wrong |
-| A3 | `rods.cac.port_in.mdot => 0.2` is a reasonable initial mdot for the hydraulic ICs in the coupled system | Code Examples | Convergence failures if mdot IC is too far from the physical solution; might need tuning |
+| A3 | `rods.cac.inlet.mdot => 0.2` is a reasonable initial mdot for the hydraulic ICs in the coupled system | Code Examples | Convergence failures if mdot IC is too far from the physical solution; might need tuning |
 
 **Note on A3:** TF-06 and TF-07 use `0.2 kg/s` successfully for the channel-fuel assembly with `dP_pump=3.0e4`. Phase 49 uses the same geometry/pump, so this should transfer directly.
 

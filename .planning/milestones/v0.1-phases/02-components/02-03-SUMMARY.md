@@ -26,7 +26,7 @@ tech-stack:
   patterns:
     - "Algebraic-only MTK components pass [] as vars argument to System() when no local state"
     - "mtkcompile(comp; fully_determined=false) for all isolated component tests with unconnected ports"
-    - "instream(port_in.T) bound to local T_in variable before use in equations for clarity"
+    - "instream(inlet.T) bound to local T_in variable before use in equations for clarity"
     - "Re and f declared as @variables (not parameters) so they appear in observed() after mtkcompile"
 
 key-files:
@@ -94,7 +94,7 @@ _Note: TDD task has two commits (test RED then feat GREEN)_
 
 **1. [Rule 2 - Missing Critical] Added fully_determined=false to TDD test script**
 - **Found during:** Task 1 GREEN phase verification
-- **Issue:** mtkcompile on isolated components fails with ExtraVariablesSystemException (port_in.P unconstrained) — same issue as COMP-01 in PLAN 02
+- **Issue:** mtkcompile on isolated components fails with ExtraVariablesSystemException (inlet.P unconstrained) — same issue as COMP-01 in PLAN 02
 - **Fix:** Updated TDD test script to use `mtkcompile(comp; fully_determined=false)` for all three components
 - **Files modified:** test/test_comp_tdd.jl (temporary, removed after task completion)
 - **Verification:** All 6 TDD tests pass after fix

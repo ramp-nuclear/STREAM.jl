@@ -6,7 +6,7 @@
 # This is the interface that HeatDiffusion (v0.3) will connect to.
 #
 # Port layout:
-#   port_in, port_out        — FlowPorts (hydraulic)
+#   inlet, outlet        — FlowPorts (hydraulic)
 #   thermal_left1..N         — ThermalPorts (left wall face, one per axial cell)
 #   thermal_right1..N        — ThermalPorts (right wall face, one per axial cell)
 #
@@ -39,7 +39,7 @@ Convective channel with per-cell thermal contact arrays on both sides for conjug
   Bergles-Rohsenow partial boiling factor when T_wall[i] >= T_ONB[i]. Default `nothing` (pure single-phase).
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 - `thermal_left[1:n]`, `thermal_right[1:n]` -- `ThermalPort` arrays (one per axial cell)
 
 # Returns
@@ -91,16 +91,16 @@ function ChannelAndContacts(;
         Q_wall_total(t)
     end
 
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
     # Dual per-cell ThermalPort arrays -- Phase 10 two-sided interface
     thermal_left = [ThermalPort(; name=Symbol(:thermal_left, i)) for i in 1:n]
     thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:n]
 
     dz = L / n
     eqs = Equation[]
-    T_inlet_fwd = instream(port_in.T)
-    T_inlet_rev = instream(port_out.T)
+    T_inlet_fwd = instream(inlet.T)
+    T_inlet_rev = instream(outlet.T)
 
     # Common equations: h_tc (inlined, no Nu MTK symbol), dp[i], T_out, port wiring
     # observed_mode=true: Re/Nu/v equations are NOT pushed to eqs here
@@ -116,8 +116,8 @@ function ChannelAndContacts(;
         v,
         T_out,
         dp,
-        port_in,
-        port_out,
+        inlet,
+        outlet,
         Dh,
         A,
         L,
@@ -135,15 +135,15 @@ function ChannelAndContacts(;
     # All expressions are inlined (no observed-to-observed chains).
     if scb_correction !== nothing
         for i in 1:n
-            Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+            Re_i = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
             Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
             T_w_i = thermal_left[i].T
             h_spl_i = htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T[i]) / Dh
 
             # Inline P[i] expression (not the observed symbol) to avoid observed-to-observed chain
             P_i =
-                port_in.P - sum(dp[j] for j in 1:i) -
-                (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+                inlet.P - sum(dp[j] for j in 1:i) -
+                (i / n) * ((inlet.P - outlet.P) - sum(dp[j] for j in 1:n))
             T_sat_i = sat_temperature(P_i)
             # max(q_spl, 0) guards _bergles_rohsenow_dT_ONB against DomainError:
             # during solver iteration q_spl can temporarily go negative, and
@@ -163,12 +163,12 @@ function ChannelAndContacts(;
     for i in 1:n
         T_up_fwd = (i == 1) ? T_inlet_fwd : T[i - 1]
         T_up_rev = (i == n) ? T_inlet_rev : T[i + 1]
-        T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
+        T_up = ifelse(inlet.mdot >= 0, T_up_fwd, T_up_rev)
         push!(
             eqs,
             Dt(T[i]) ~
             (
-                abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i]) +
+                    abs(inlet.mdot) * cp_water(T[i]) * (T_up - T[i]) +
                 h_tc[i] * geometry.heated_parts[1] * dz * (thermal_left[i].T - T[i]) +
                 h_tc[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i])
             ) / (rho_water(T[i]) * cp_water(T[i]) * A * dz),
@@ -195,12 +195,12 @@ function ChannelAndContacts(;
     # All expressed as Julia expressions of MTK unknowns (no observed-to-observed chains).
     obs = Equation[]
     for i in 1:n
-        Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+        Re_i = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
         Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
         push!(obs, Re[i] ~ Re_i)
         push!(obs, Nu[i] ~ htc_correlation(Re_i, Pr_i, T[i], thermal_left[i].T))
-        push!(obs, v[i] ~ port_in.mdot / (rho_water(T[i]) * A))
-        push!(obs, velocity[i] ~ abs(port_in.mdot) / (rho_water(T[i]) * A))
+        push!(obs, v[i] ~ inlet.mdot / (rho_water(T[i]) * A))
+        push!(obs, velocity[i] ~ abs(inlet.mdot) / (rho_water(T[i]) * A))
         push!(obs, Pe[i] ~ Re_i * Pr_i)
         push!(obs, h_tc_left[i] ~ h_tc[i])
         push!(obs, h_tc_right[i] ~ h_tc[i])
@@ -215,15 +215,15 @@ function ChannelAndContacts(;
         # CRITICAL: Use P_i expression (not P[i] symbol) to avoid observed-to-observed chain
         # P[i] includes distributed inertia correction: (i/n) * ((P_in - P_out) - sum_all_dp)
         P_i =
-            port_in.P - sum(dp[j] for j in 1:i) -
-            (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+            inlet.P - sum(dp[j] for j in 1:i) -
+            (i / n) * ((inlet.P - outlet.P) - sum(dp[j] for j in 1:n))
         push!(obs, P[i] ~ P_i)
         push!(obs, T_sat[i] ~ sat_temperature(P_i))
         q_spl_i = q_wall[i] / (sum(geometry.heated_parts) * dz)
         push!(obs, T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_spl_i))
     end
     # dP observed alias (D-04): total pressure drop including inertia
-    push!(obs, dP ~ port_in.P - port_out.P)
+    push!(obs, dP ~ inlet.P - outlet.P)
 
     # Re, Nu, v are now observed (not solver unknowns)
     # dP, P[i], T_sat[i], T_ONB[i] are also observed
@@ -233,8 +233,8 @@ function ChannelAndContacts(;
 
     compose(
         System(eqs, t, all_vars, pars; observed=obs, name=name),
-        port_in,
-        port_out,
+        inlet,
+        outlet,
         thermal_left...,
         thermal_right...,
     )
@@ -265,7 +265,7 @@ Convective channel with a fixed wall temperature applied uniformly to all cells.
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
@@ -308,13 +308,13 @@ function ChannelHeatFlux(;
         dP(t)                 # observed -- total pressure drop alias
     end
 
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
 
     dz = L / n
     eqs = Equation[]
-    T_inlet_fwd = instream(port_in.T)
-    T_inlet_rev = instream(port_out.T)
+    T_inlet_fwd = instream(inlet.T)
+    T_inlet_rev = instream(outlet.T)
 
     # Common equations: v, Re, Nu, h_tc, dp[i], T_out, port wiring
     # Pass T_wall_p as T_wall_cells so the htc_correlation receives the actual wall
@@ -329,8 +329,8 @@ function ChannelHeatFlux(;
         v,
         T_out,
         dp,
-        port_in,
-        port_out,
+        inlet,
+        outlet,
         Dh,
         A,
         L,
@@ -345,12 +345,12 @@ function ChannelHeatFlux(;
     for i in 1:n
         T_up_fwd = (i == 1) ? T_inlet_fwd : T[i - 1]
         T_up_rev = (i == n) ? T_inlet_rev : T[i + 1]
-        T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
+        T_up = ifelse(inlet.mdot >= 0, T_up_fwd, T_up_rev)
         push!(
             eqs,
             Dt(T[i]) ~
             (
-                abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i]) +
+                    abs(inlet.mdot) * cp_water(T[i]) * (T_up - T[i]) +
                 h_tc[i] * sum(geometry.heated_parts) * dz * (T_wall_p - T[i])
             ) / (rho_water(T[i]) * cp_water(T[i]) * A * dz),
         )
@@ -370,15 +370,15 @@ function ChannelHeatFlux(;
     obs = Equation[]
     for i in 1:n
         P_i =
-            port_in.P - sum(dp[j] for j in 1:i) -
-            (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+            inlet.P - sum(dp[j] for j in 1:i) -
+            (i / n) * ((inlet.P - outlet.P) - sum(dp[j] for j in 1:n))
         push!(obs, P[i] ~ P_i)
         push!(obs, T_sat[i] ~ sat_temperature(P_i))
         q_spl_i = q_wall[i] / (sum(geometry.heated_parts) * dz)
         push!(obs, T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_spl_i))
     end
     # dP observed: total pressure drop including inertia
-    push!(obs, dP ~ port_in.P - port_out.P)
+    push!(obs, dP ~ inlet.P - outlet.P)
 
     all_vars = [
         collect(T);
@@ -392,5 +392,5 @@ function ChannelHeatFlux(;
         T_out
     ]
 
-    compose(System(eqs, t, all_vars, pars; observed=obs, name=name), port_in, port_out)
+    return compose(System(eqs, t, all_vars, pars; observed=obs, name=name), inlet, outlet)
 end

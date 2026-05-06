@@ -68,10 +68,10 @@ fb_eqs = connect_temperature_feedback(pk, [rods.cac, rods.fuel])
 power_coupling = [rods.fuel.power ~ pk.P * power_scale]
 
 connections = [
-    connect(pump.port_out, bc.port_in),
-    connect(bc.port_out, rods.cac.port_in),
-    connect(rods.cac.port_out, pump.port_in),
-    pump.port_in.P ~ 1.0e5,
+    connect(pump.outlet, bc.inlet),
+    connect(bc.outlet, rods.cac.inlet),
+    connect(rods.cac.outlet, pump.inlet),
+    pump.inlet.P ~ 1.0e5,
     ...
     fb_eqs...,
     power_coupling...,

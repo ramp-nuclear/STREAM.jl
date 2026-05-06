@@ -25,7 +25,7 @@
 - New arrays: `thermal_left = [ThermalPort(name=Symbol(:thermal_left, i)) for i in 1:n]` and `thermal_right = [ThermalPort(name=Symbol(:thermal_right, i)) for i in 1:n]`
 - MTK subsystem names: `thermal_left1, thermal_left2, ..., thermal_leftN` and `thermal_right1, ..., thermal_rightN`
 - `thermal_ports` (old name) removed completely from codebase — no alias, no backward compat shim
-- `compose(...)` call splats both arrays: `compose(sys, port_in, port_out, thermal_left..., thermal_right...)`
+- `compose(...)` call splats both arrays: `compose(sys, inlet, outlet, thermal_left..., thermal_right...)`
 
 **THERM-01 test update:**
 - Replace `Symbol(:thermal, i) in subsys_names` with `Symbol(:thermal_left, i)` and `Symbol(:thermal_right, i)` checks
@@ -40,7 +40,7 @@
 - This test also implicitly validates CHAN-03 (adiabatic default): `thermal_right[i].Q_flow == 0` at steady state
 
 **Tech debt cleanup:**
-- DEBT-01: Remove `t_inlet` parameter from `_channel_base_eqs` signature; `T_inlet = instream(port_in.T)` is computed at call site, not passed as argument; update all call sites
+- DEBT-01: Remove `t_inlet` parameter from `_channel_base_eqs` signature; `T_inlet = instream(inlet.T)` is computed at call site, not passed as argument; update all call sites
 - DEBT-02: THERM-03 now directly tests ChannelAndContacts (see above)
 - DEBT-03: Fix cosmetic doc issue in `09-01-SUMMARY.md`
 
@@ -122,7 +122,7 @@ MTK subsystem names produced: `thermal_left1, thermal_left2, ..., thermal_leftN`
 for i in 1:n
     T_up = (i == 1) ? T_inlet : T[i-1]
     push!(eqs,
-        Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
+        Dt(T[i]) ~ (inlet.mdot * cp_water(T[i]) * (T_up - T[i])
                    + h_tc[i] * (π * Dh / 2) * dz * (thermal_left[i].T  - T[i])
                    + h_tc[i] * (π * Dh / 2) * dz * (thermal_right[i].T - T[i]))
                   / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
@@ -139,7 +139,7 @@ Note: `π * Dh / 2` replaces the previous `π * Dh` because the total heated per
 ```julia
 # Source: CONTEXT.md locked decision
 compose(System(eqs, t, all_vars, pars; name=name),
-        port_in, port_out, thermal_left..., thermal_right...)
+        inlet, outlet, thermal_left..., thermal_right...)
 ```
 
 MTK accepts any number of positional subsystem arguments in compose(); splatting two separate arrays is equivalent to listing all ports individually.
@@ -150,7 +150,7 @@ Current signature (line 204-207 in components.jl):
 ```julia
 function _channel_base_eqs(eqs::Vector{Equation};
     n, T, Re, Nu, h_tc, v, T_out, dP,
-    port_in, port_out,
+    inlet, outlet,
     Dh, A, L, g_acc, dz, t_inlet)   # <-- t_inlet: dead parameter
 ```
 
@@ -160,7 +160,7 @@ New signature:
 ```julia
 function _channel_base_eqs(eqs::Vector{Equation};
     n, T, Re, Nu, h_tc, v, T_out, dP,
-    port_in, port_out,
+    inlet, outlet,
     Dh, A, L, g_acc, dz)
 ```
 
@@ -189,12 +189,12 @@ D_chf = 0.01; D_cac = 2 * D_chf   # equalize heated perimeters
 # Wire n ConstantTemperature sources to thermal_left[1:n]
 ct = [ConstantTemperature(name=Symbol(:ct, i), T=T_wall) for i in 1:n]
 connections = [
-    connect(pump.port_out, bc.port_in),
-    connect(bc.port_out,   cac.port_in),
-    connect(cac.port_out,  pump.port_in),
+    connect(pump.outlet, bc.inlet),
+    connect(bc.outlet,   cac.inlet),
+    connect(cac.outlet,  pump.inlet),
     [connect(ct[i].thermal, cac.thermal_left[i]) for i in 1:n]...,
-    pump.port_in.P ~ 1.0e5,
-    cac.port_in.T  ~ T_inlet,
+    pump.inlet.P ~ 1.0e5,
+    cac.inlet.T  ~ T_inlet,
 ]
 @named sys_cac = compose(System(connections, t; name=:sys_cac),
                           pump, bc, cac, ct...)
@@ -298,7 +298,7 @@ This can be embedded in the THERM-03 testset since the one-sided THERM-03 setup 
 
 **Why it happens:** compose() accepts subsystems positionally; order affects `get_systems()` output.
 
-**How to avoid:** Always use `port_in, port_out, thermal_left..., thermal_right...` ordering and write tests accordingly. Since tests check by name (not position), ordering does not affect correctness.
+**How to avoid:** Always use `inlet, outlet, thermal_left..., thermal_right...` ordering and write tests accordingly. Since tests check by name (not position), ordering does not affect correctness.
 
 ---
 
@@ -331,23 +331,23 @@ function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
         Q_wall_total(t)
     end
 
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet  = FlowPort()
+    @named outlet = FlowPort()
     thermal_left  = [ThermalPort(name=Symbol(:thermal_left, i))  for i in 1:n]
     thermal_right = [ThermalPort(name=Symbol(:thermal_right, i)) for i in 1:n]
 
     dz      = L / n
     eqs     = Equation[]
-    T_inlet = instream(port_in.T)
+    T_inlet = instream(inlet.T)
 
     # DEBT-01: no t_inlet argument
     _channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP,
-                      port_in, port_out, Dh, A, L, g_acc=g, dz)
+                      inlet, outlet, Dh, A, L, g_acc=g, dz)
 
     for i in 1:n
         T_up = (i == 1) ? T_inlet : T[i-1]
         push!(eqs,
-            Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
+            Dt(T[i]) ~ (inlet.mdot * cp_water(T[i]) * (T_up - T[i])
                        + h_tc[i] * (π * Dh / 2) * dz * (thermal_left[i].T  - T[i])
                        + h_tc[i] * (π * Dh / 2) * dz * (thermal_right[i].T - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
@@ -360,7 +360,7 @@ function ChannelAndContacts(; name, n::Int, L, D, A, g = 0.0)
                 collect(v); collect(q_wall); T_out; dP; Q_wall_total]
 
     compose(System(eqs, t, all_vars, pars; name=name),
-            port_in, port_out, thermal_left..., thermal_right...)
+            inlet, outlet, thermal_left..., thermal_right...)
 end
 ```
 
@@ -381,7 +381,7 @@ end
 # Source: DEBT-01, components.jl line 204
 function _channel_base_eqs(eqs::Vector{Equation};
     n, T, Re, Nu, h_tc, v, T_out, dP,
-    port_in, port_out,
+    inlet, outlet,
     Dh, A, L, g_acc, dz)
     # body unchanged — t_inlet was never used in the body
 ```

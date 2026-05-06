@@ -18,7 +18,7 @@ import { validateJuliaIdentifier } from "./validation";
 
 export interface BCEntry {
   nodeId: string;
-  portField: "port_in.P" | "port_out.P";
+  portField: "inlet.P" | "outlet.P";
   value: number;
 }
 
@@ -706,8 +706,8 @@ export function generateCode(
     const sourceData = nodeDataMap.get(edge.source)!;
     const targetData = nodeDataMap.get(edge.target)!;
 
-    const sourceHandle = edge.sourceHandle ?? "port_out";
-    const targetHandle = edge.targetHandle ?? "port_in";
+    const sourceHandle = edge.sourceHandle ?? "outlet";
+    const targetHandle = edge.targetHandle ?? "inlet";
 
     // Resolve instance path: if consumed by assembly, prefix with assembly name
     const sourcePath = resolveInstancePath(edge.source, sourceData, sourceHandle, nodeToAssembly);

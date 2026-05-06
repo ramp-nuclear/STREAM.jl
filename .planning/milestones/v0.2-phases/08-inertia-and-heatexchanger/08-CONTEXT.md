@@ -16,9 +16,9 @@ Add two lumped components: `Inertia` (ODE transient pressure-drop component) and
 ### Inertia parameter API
 - Combined single parameter: `Inertia(; name, L_over_A)` — user pre-computes L/A
 - Parameter named `L_over_A` internally (self-documenting, mirrors the formula)
-- Equation: `port_in.P - port_out.P ~ L_over_A * Differential(t)(port_in.mdot)`
-- No explicit `mdot` state variable — use `port_in.mdot` implicitly (consistent with Resistor/Gravity/Friction)
-- Temperature: passthrough (`port_out.T ~ instream(port_in.T)`, `port_in.T ~ instream(port_out.T)`)
+- Equation: `inlet.P - outlet.P ~ L_over_A * Differential(t)(inlet.mdot)`
+- No explicit `mdot` state variable — use `inlet.mdot` implicitly (consistent with Resistor/Gravity/Friction)
+- Temperature: passthrough (`outlet.T ~ instream(inlet.T)`, `inlet.T ~ instream(outlet.T)`)
 - No `KirchhoffWithDerivatives` equivalent needed — MTK handles ODE/DAE structure automatically
 
 ### Transient validation test (COMP-01)
@@ -31,7 +31,7 @@ Add two lumped components: `Inertia` (ODE transient pressure-drop component) and
 
 ### HeatExchanger (COMP-02)
 - Move `_make_temp_bc` from `solvers.jl` to `components.jl`, rename to `HeatExchanger`
-- Identical 4-equation structure: mass balance, no pressure drop, `port_out.T ~ T_bc`, `port_in.T ~ instream(port_out.T)`
+- Identical 4-equation structure: mass balance, no pressure drop, `outlet.T ~ T_bc`, `inlet.T ~ instream(outlet.T)`
 - Export `HeatExchanger` from `STREAM.jl`
 - Remove `_make_temp_bc` from `solvers.jl`; update all three `build_loop` variants (`build_loop`, `build_loop_vertical`, `build_loop_transient`) to call `HeatExchanger` directly
 - No pressure-drop parameter added — COMP-02 explicitly says no pressure drop
@@ -53,7 +53,7 @@ Add two lumped components: `Inertia` (ODE transient pressure-drop component) and
 - `build_loop`, `build_loop_vertical`, `build_loop_transient` in `solvers.jl`: all call `_make_temp_bc` and need to be updated to `HeatExchanger`
 
 ### Established Patterns
-- All components: `compose(System(eqs, t, vars, pars; name=name), port_in, port_out)`
+- All components: `compose(System(eqs, t, vars, pars; name=name), inlet, outlet)`
 - Differential operator: `Dt = Differential(t)` — already used in `Channel`'s energy balance
 - `mtkcompile(system, fully_determined=false)` for standalone component tests (established in Phase 7)
 - TDD: write failing test first, then implement
@@ -69,7 +69,7 @@ Add two lumped components: `Inertia` (ODE transient pressure-drop component) and
 <specifics>
 ## Specific Ideas
 
-- MTK makes Kirchhoff-with-derivatives trivial: `Differential(t)(port_in.mdot)` is a first-class symbolic expression — no manual derivative tracking needed (confirmed in discussion)
+- MTK makes Kirchhoff-with-derivatives trivial: `Differential(t)(inlet.mdot)` is a first-class symbolic expression — no manual derivative tracking needed (confirmed in discussion)
 - Python STREAM test reference: `test_inertia_through_RL_circuit_follows_analytic_solution` in `tests/test_general/test_integrations.py` lines 433-466
 
 </specifics>

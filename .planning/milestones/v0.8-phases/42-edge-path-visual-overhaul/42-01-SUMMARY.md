@@ -16,7 +16,7 @@ key_files:
     - gui/src/store/useStore.ts
     - gui/src/store/__tests__/useStore.test.ts
 decisions:
-  - "Bidirectional pair detection matches on node IDs only (not handles) -- real loops use different port names on each direction (port_out->port_in vs port_out->port_in)"
+  - "Bidirectional pair detection matches on node IDs only (not handles) -- real loops use different port names on each direction (outlet->inlet vs outlet->inlet)"
   - "enrichEdges is a pure exported function (not a store method) for testability and reuse in loadProjectFromPath"
   - "Thermal edges explicitly strip markerEnd to handle re-enrichment of saved projects that may have stale markers"
 metrics:
@@ -55,7 +55,7 @@ Hydraulic edges display filled ArrowClosed markers at target end; bidirectional 
 
 **1. [Rule 1 - Bug] Bidirectional pair detection used handle matching**
 - **Found during:** Task 1
-- **Issue:** Plan specified `other.sourceHandle === e.targetHandle && other.targetHandle === e.sourceHandle` for reverse detection. Real bidirectional pairs (e.g., Pump.port_out->Channel.port_in and Channel.port_out->Pump.port_in) have different handle names on each direction, so handle matching fails.
+- **Issue:** Plan specified `other.sourceHandle === e.targetHandle && other.targetHandle === e.sourceHandle` for reverse detection. Real bidirectional pairs (e.g., Pump.outlet->Channel.inlet and Channel.outlet->Pump.inlet) have different handle names on each direction, so handle matching fails.
 - **Fix:** Changed bidirectional detection to match on node IDs only (source/target swapped), ignoring handles. Applied same fix to offset cleanup in onEdgesChange and removeEdge.
 - **Files modified:** gui/src/store/useStore.ts
 - **Commit:** 6cfc46c

@@ -49,9 +49,9 @@ Make PipeGeometry self-computing (Dh derived from geometry, not caller-provided)
 
 - `Pump(; name, dP_pump=nothing, mdot0=nothing)` — single function, sentinel dispatch
 - Fixed-pressure mode (`dP_pump !== nothing`): existing behavior unchanged
-- Fixed-flow mode (`mdot0 !== nothing`): adds `port_in.mdot ~ mdot0` as the only constraint; does NOT add a pressure anchor — caller is responsible
+- Fixed-flow mode (`mdot0 !== nothing`): adds `inlet.mdot ~ mdot0` as the only constraint; does NOT add a pressure anchor — caller is responsible
 - Error if both or neither provided
-- Test assertion: after solving, `sol[pump.port_in.mdot] ≈ mdot0` (rtol=1e-4); loop must include a separate pressure anchor
+- Test assertion: after solving, `sol[pump.inlet.mdot] ≈ mdot0` (rtol=1e-4); loop must include a separate pressure anchor
 
 ### Claude's Discretion
 

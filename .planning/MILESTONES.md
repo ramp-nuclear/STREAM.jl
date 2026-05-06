@@ -91,8 +91,8 @@
 
 **Key accomplishments:**
 
-- ifelse() bidirectional upwinding and port_in.T ~ T[1] fix applied to all three channel variants (Channel, ChannelAndContacts, ChannelHeatFlux)
-- 1. [Rule 1 - Bug] Reverted incorrect port_in.T equation from Plan 20-01
+- ifelse() bidirectional upwinding and inlet.T ~ T[1] fix applied to all three channel variants (Channel, ChannelAndContacts, ChannelHeatFlux)
+- 1. [Rule 1 - Bug] Reverted incorrect inlet.T equation from Plan 20-01
 - beta_water with @register_symbolic, Gr/Ra/Re/Pe dimensionless utilities, and 4-arg HTC interface (Re, Pr, T_bulk, T_wall) extended across all correlation closures and channel components
 - Elenbaas 1942 parallel-plate natural convection correlation with pluggable 4-arg HTC factory, validated against Python STREAM MTR reference values
 - Three-method Pump dispatch with MTK callable parameter pattern, positional solve_transient API, and callable T_wall support in build_loop_transient

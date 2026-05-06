@@ -7,7 +7,7 @@ import STREAM: Inertia, HeatExchanger
 
 # ─────────────────────────────────────────────────────────────────
 # COMP-01: Inertia — ODE pressure-drop component
-# Equation: port_in.P - port_out.P ~ L_over_A * D(mdot)
+# Equation: inlet.P - outlet.P ~ L_over_A * D(mdot)
 # ─────────────────────────────────────────────────────────────────
 @testset "COMP-01: Inertia stub callable" begin
     @named L = Inertia(1e3)
@@ -29,9 +29,9 @@ end
     @named L_comp = Inertia(L_over_A)
     @named R_comp = Resistor(R_val)
     connections = [
-        connect(L_comp.port_out, R_comp.port_in),
-        connect(R_comp.port_out, L_comp.port_in),
-        L_comp.port_in.P ~ 1.0e5,   # pressure gauge anchor
+        connect(L_comp.outlet, R_comp.inlet),
+        connect(R_comp.outlet, L_comp.inlet),
+        L_comp.inlet.P ~ 1.0e5,   # pressure gauge anchor
     ]
     @named sys = compose(System(connections, t; name=:rl_sys), L_comp, R_comp)
     ssys = mtkcompile(sys; fully_determined=false)  # T eqs underdetermined (no heat exchange in RL circuit)
@@ -40,9 +40,9 @@ end
     # T variables are free (no heat exchange in RL circuit); provide ICs for all unknowns
     # check_length=false required because T unknowns are underdetermined (no T equations in pure RL circuit)
     op = [
-        ssys.L_comp.port_in.mdot => 1.0,
-        ssys.L_comp.port_out.T => 300.0,
-        ssys.L_comp.port_in.T => 300.0,
+        ssys.L_comp.inlet.mdot => 1.0,
+        ssys.L_comp.outlet.T => 300.0,
+        ssys.L_comp.inlet.T => 300.0,
     ]
     prob = ODEProblem(
         ssys, op, (0.0, 5000.0); warn_initialize_determined=false, check_length=false
@@ -52,7 +52,7 @@ end
     @test sol.retcode == ReturnCode.Success
     t_check = [0.0, 500.0, 1000.0, 2000.0, 5000.0]
     for tc in t_check
-        mdot_num = sol(tc, idxs=ssys.L_comp.port_in.mdot)
+        mdot_num = sol(tc; idxs=ssys.L_comp.inlet.mdot)
         mdot_ana = exp(-tc / tau)
         @test isapprox(mdot_num, mdot_ana; rtol=0.01)
     end

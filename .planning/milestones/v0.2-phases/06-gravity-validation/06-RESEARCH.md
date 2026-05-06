@@ -19,9 +19,9 @@
 
 ## Summary
 
-Both components required for this phase already exist and compile. The `Channel` component (in `src/components.jl`) has a `g_acc` parameter that contributes `rho_water(T[i_mid]) * g_acc * L` to the pressure drop equation. The standalone `Gravity` component computes `port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H`. Neither has ever been wired together into a complete solved loop — that is the sole work of Phase 6.
+Both components required for this phase already exist and compile. The `Channel` component (in `src/components.jl`) has a `g_acc` parameter that contributes `rho_water(T[i_mid]) * g_acc * L` to the pressure drop equation. The standalone `Gravity` component computes `inlet.P - outlet.P ~ rho_water(T_in) * 9.80665 * H`. Neither has ever been wired together into a complete solved loop — that is the sole work of Phase 6.
 
-The cancellation physics is sound: Channel's upward gravity head loss and Gravity's return-leg head gain are equal when `H = L_ch` and `g_acc = 9.80665`. A small density mismatch exists because Channel evaluates density at the midpoint cell temperature (`T[i_mid]`) while Gravity evaluates at the inlet temperature (`T_in` via `instream(port_in.T)`). At the reference operating conditions (~313–328 K), this difference is under 0.5% of the total density, well within the 1% cancellation tolerance.
+The cancellation physics is sound: Channel's upward gravity head loss and Gravity's return-leg head gain are equal when `H = L_ch` and `g_acc = 9.80665`. A small density mismatch exists because Channel evaluates density at the midpoint cell temperature (`T[i_mid]`) while Gravity evaluates at the inlet temperature (`T_in` via `instream(inlet.T)`). At the reference operating conditions (~313–328 K), this difference is under 0.5% of the total density, well within the 1% cancellation tolerance.
 
 The only new code required is `build_loop_vertical()` in `src/solvers.jl` (mirroring `build_loop` but adding the `Gravity` component in the return leg), the export of `build_loop_vertical` in `src/STREAM.jl`, and two test cases in `test/runtests.jl`. No existing code needs modification.
 
@@ -61,46 +61,46 @@ Pump -> TempBC -> Channel(g_acc=9.80665, L=L_ch) -> Gravity(H=L_ch) -> Pump (clo
 ```
 
 ### Pattern 1: MTK connect() for hydraulic loop
-**What:** Components are connected via `connect(a.port_out, b.port_in)`. MTK applies stream variable semantics: `mdot` (Flow) sums to zero at junctions; `T` (Stream) resolves via `instream()`.
+**What:** Components are connected via `connect(a.outlet, b.inlet)`. MTK applies stream variable semantics: `mdot` (Flow) sums to zero at junctions; `T` (Stream) resolves via `instream()`.
 **When to use:** Always — this is the MTK acausal approach used in all v0.1 components.
 
 ```julia
 # Source: src/solvers.jl build_loop()
 connections = [
-    connect(pump.port_out, bc.port_in),
-    connect(bc.port_out,   ch.port_in),
-    connect(ch.port_out,   pump.port_in),
-    pump.port_in.P ~ 1.0e5,          # pressure gauge freedom fix
+    connect(pump.outlet, bc.inlet),
+    connect(bc.outlet,   ch.inlet),
+    connect(ch.outlet,   pump.inlet),
+    pump.inlet.P ~ 1.0e5,          # pressure gauge freedom fix
     ch.thermal.T   ~ T_wall,
-    ch.port_in.T   ~ T_inlet,
+    ch.inlet.T   ~ T_inlet,
 ]
 @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
 ssys = mtkcompile(sys)
 ```
 
 ### Pattern 2: Gravity component wiring direction
-**What:** `Gravity`'s pressure equation is `port_in.P - port_out.P ~ rho * g * H`. With `H > 0`, `port_in.P > port_out.P`. Connect Gravity in the flow direction of the return leg (downstream of Channel, upstream of Pump). MTK handles the sign bookkeeping.
+**What:** `Gravity`'s pressure equation is `inlet.P - outlet.P ~ rho * g * H`. With `H > 0`, `inlet.P > outlet.P`. Connect Gravity in the flow direction of the return leg (downstream of Channel, upstream of Pump). MTK handles the sign bookkeeping.
 
 **Convention confirmed from src/components.jl:**
 ```julia
 function Gravity(; name, H)
-    # port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H
-    # H > 0: port_in is high-pressure (bottom of return column)
-    # Connect in flow direction: ch.port_out -> grav.port_in -> pump.port_in
+    # inlet.P - outlet.P ~ rho_water(T_in) * 9.80665 * H
+    # H > 0: inlet is high-pressure (bottom of return column)
+    # Connect in flow direction: ch.outlet -> grav.inlet -> pump.inlet
 ```
 
 **Physical sign analysis:**
 - Channel goes UP: `dP` includes `+rho * g_acc * L` (pressure drops going up — correct)
-- Return leg goes DOWN: Gravity provides `port_in.P - port_out.P = +rho * g * H > 0`
-  - With flow going `ch.port_out → grav.port_in → grav.port_out → pump.port_in`, the Gravity equation means `P_in > P_out`. For the downward return leg, fluid gains pressure going down — this is physically correct when `port_in` is the high end (top of return leg). Let MTK resolve absolute signs; the algebraic system is consistent.
+- Return leg goes DOWN: Gravity provides `inlet.P - outlet.P = +rho * g * H > 0`
+  - With flow going `ch.outlet → grav.inlet → grav.outlet → pump.inlet`, the Gravity equation means `P_in > P_out`. For the downward return leg, fluid gains pressure going down — this is physically correct when `inlet` is the high end (top of return leg). Let MTK resolve absolute signs; the algebraic system is consistent.
 
 ### Pattern 3: Pressure gauge freedom fix
-**What:** Always pin `pump.port_in.P ~ 1.0e5` to remove one degree of freedom from the absolute pressure level.
+**What:** Always pin `pump.inlet.P ~ 1.0e5` to remove one degree of freedom from the absolute pressure level.
 **When to use:** Every closed loop. Without it, mtkcompile reports an underdetermined system.
 
 ### Pattern 4: Temperature boundary condition
 **What:** `_make_temp_bc` breaks the circular `instream()` T dependency in closed loops.
-**When to use:** Every closed loop that uses `Channel` — the TempBC must be present and `ch.port_in.T ~ T_inlet` must be an explicit constraint.
+**When to use:** Every closed loop that uses `Channel` — the TempBC must be present and `ch.inlet.T ~ T_inlet` must be an explicit constraint.
 
 ### Anti-Patterns to Avoid
 - **Skipping the TempBC:** Without `_make_temp_bc`, the `instream()` in Channel's first cell creates a circular T dependency that mtkcompile cannot resolve.
@@ -113,7 +113,7 @@ function Gravity(; name, H)
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| Pressure gauge freedom | Manual absolute pressure assignment | `pump.port_in.P ~ 1.0e5` constraint (already in build_loop) | MTK needs exactly one absolute pressure anchor per loop |
+| Pressure gauge freedom | Manual absolute pressure assignment | `pump.inlet.P ~ 1.0e5` constraint (already in build_loop) | MTK needs exactly one absolute pressure anchor per loop |
 | Initial guess for T cells | Manual arithmetic | `steady_state_guess()` | Already available; produces monotonically increasing profile |
 | Nonlinear solve | Custom root-find | `solve_steady(ssys, op)` via KINSOL | Already proven in VAL-01 |
 | Gravity pressure term | Custom g*rho*h equation | `Gravity(; name, H)` component (already in src/components.jl) | Already registered, already compiles (COMP-04 test passes) |
@@ -123,15 +123,15 @@ function Gravity(; name, H)
 ## Common Pitfalls
 
 ### Pitfall 1: Density mismatch in cancellation test
-**What goes wrong:** The 1% cancellation tolerance is almost entirely consumed by the density evaluation inconsistency between Channel (uses `T[i_mid]`, the n/2-th cell temperature) and Gravity (uses `instream(port_in.T)`, the inlet temperature).
+**What goes wrong:** The 1% cancellation tolerance is almost entirely consumed by the density evaluation inconsistency between Channel (uses `T[i_mid]`, the n/2-th cell temperature) and Gravity (uses `instream(inlet.T)`, the inlet temperature).
 **Why it happens:** Channel's `dP` equation evaluates density at a single representative midpoint cell for simplicity. Gravity evaluates at the fluid entering the component (channel outlet temperature). In the reference case, T_inlet ≈ 313 K and T_outlet ≈ 328 K, giving a ~5°C difference and ~0.3% density difference — well within 1%.
 **How to avoid:** Use `rtol=0.01` for the cancellation assertion. Do not tighten to `rtol=0.001` without reconciling density evaluation points.
 **Warning signs:** If `isapprox` fails at 1% tolerance, check whether `T_wall` was accidentally set very high, causing a large T_inlet–T_outlet spread.
 
 ### Pitfall 2: Gravity component port connection direction confusion
-**What goes wrong:** Connecting `grav.port_out` to `ch.port_out` (upstream instead of downstream) produces a physically inverted loop where Gravity subtracts pressure twice instead of canceling Channel's term.
-**Why it happens:** The equation `port_in.P - port_out.P ~ rho*g*H` looks like it describes upward flow (fluid going from high-P to low-P). For a downward return leg, the physical intuition is reversed.
-**How to avoid:** Always connect Gravity in the natural flow direction: `connect(ch.port_out, grav.port_in)` and `connect(grav.port_out, pump.port_in)`. Trust MTK's sign bookkeeping.
+**What goes wrong:** Connecting `grav.outlet` to `ch.outlet` (upstream instead of downstream) produces a physically inverted loop where Gravity subtracts pressure twice instead of canceling Channel's term.
+**Why it happens:** The equation `inlet.P - outlet.P ~ rho*g*H` looks like it describes upward flow (fluid going from high-P to low-P). For a downward return leg, the physical intuition is reversed.
+**How to avoid:** Always connect Gravity in the natural flow direction: `connect(ch.outlet, grav.inlet)` and `connect(grav.outlet, pump.inlet)`. Trust MTK's sign bookkeeping.
 
 ### Pitfall 3: Missing export causing test import failure
 **What goes wrong:** Tests import `build_loop_vertical` via `import STREAM: Channel, Pump, Friction, Gravity, build_loop_vertical` — if the export is not added to `src/STREAM.jl`, the test file fails to compile.
@@ -139,7 +139,7 @@ function Gravity(; name, H)
 **How to avoid:** Add `build_loop_vertical` to the `export` line in `src/STREAM.jl` before running tests.
 
 ### Pitfall 4: mtkcompile fails on underdetermined system
-**What goes wrong:** If `pump.port_in.P ~ 1.0e5` is omitted, mtkcompile may report an underdetermined system (more unknowns than equations).
+**What goes wrong:** If `pump.inlet.P ~ 1.0e5` is omitted, mtkcompile may report an underdetermined system (more unknowns than equations).
 **Why it happens:** In a closed pressure loop, absolute pressure is a free variable. The constraint pins it.
 **How to avoid:** Copy the connection list from `build_loop` exactly; do not omit the pressure anchor.
 
@@ -168,13 +168,13 @@ function build_loop_vertical(;
     @named grav = Gravity(H=H)
 
     connections = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out,   ch.port_in),
-        connect(ch.port_out,   grav.port_in),
-        connect(grav.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet,   ch.inlet),
+        connect(ch.outlet,   grav.inlet),
+        connect(grav.outlet, pump.inlet),
+        pump.inlet.P ~ 1.0e5,
         ch.thermal.T   ~ T_wall,
-        ch.port_in.T   ~ T_inlet,
+        ch.inlet.T   ~ T_inlet,
     ]
 
     @named sys = compose(System(connections, t; name=:sys), pump, bc, ch, grav)
@@ -196,16 +196,16 @@ end
     # Horizontal reference
     ssys_h = build_loop(T_inlet=T_inlet, L_ch=L_ch)
     op_h = [ssys_h.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op_h, ssys_h.ch.port_in.mdot => 0.490)
+    push!(op_h, ssys_h.ch.inlet.mdot => 0.490)
     sol_h = solve_steady(ssys_h, op_h)
-    mdot_horiz = abs(sol_h[ssys_h.ch.port_in.mdot])
+    mdot_horiz = abs(sol_h[ssys_h.ch.inlet.mdot])
 
     # Vertical cancellation loop
     ssys_v = build_loop_vertical(T_inlet=T_inlet, L_ch=L_ch, H_return=L_ch)
     op_v = [ssys_v.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op_v, ssys_v.ch.port_in.mdot => 0.490)
+    push!(op_v, ssys_v.ch.inlet.mdot => 0.490)
     sol_v = solve_steady(ssys_v, op_v)
-    mdot_vert = abs(sol_v[ssys_v.ch.port_in.mdot])
+    mdot_vert = abs(sol_v[ssys_v.ch.inlet.mdot])
 
     @test isapprox(mdot_vert, mdot_horiz; rtol=0.01)
 end
@@ -227,7 +227,7 @@ end
 ## Open Questions
 
 1. **Gravity component port direction under flow reversal**
-   - What we know: Gravity uses `instream(port_in.T)` which is the MTK stream semantics for the dominant-flow temperature. Under forward flow (pump -> ch -> grav -> pump), this resolves to channel outlet temperature — correct.
+   - What we know: Gravity uses `instream(inlet.T)` which is the MTK stream semantics for the dominant-flow temperature. Under forward flow (pump -> ch -> grav -> pump), this resolves to channel outlet temperature — correct.
    - What's unclear: If flow were to reverse (e.g., pump failure scenario), `instream` would resolve differently. This is not tested in Phase 6 and is not a requirement here.
    - Recommendation: Leave as-is for Phase 6; note as future consideration for transient/multi-branch phases.
 
@@ -270,7 +270,7 @@ Phase 6 is a pure addition — zero modifications to existing components. The co
 
 | File | Relevant Content | Status |
 |------|-----------------|--------|
-| `src/components.jl` | `Channel(g=0.0)` with `g_acc` in `dP`; `Gravity(H)` with `port_in.P - port_out.P ~ rho*g*H` | Complete, no changes needed |
+| `src/components.jl` | `Channel(g=0.0)` with `g_acc` in `dP`; `Gravity(H)` with `inlet.P - outlet.P ~ rho*g*H` | Complete, no changes needed |
 | `src/connectors.jl` | `FlowPort`, `ThermalPort` | Complete, no changes needed |
 | `src/solvers.jl` | `build_loop`, `build_loop_transient`, `solve_steady`, `solve_transient`, `_make_temp_bc`, `steady_state_guess` | Add `build_loop_vertical` only |
 | `src/STREAM.jl` | Exports all above; already exports `Gravity` | Add `build_loop_vertical` to export line |
@@ -297,7 +297,7 @@ The Julia design mirrors this correctly: Channel includes gravity internally via
 ## Sources
 
 ### Primary (HIGH confidence)
-- `src/components.jl` — Channel dP equation (`rho_water(T[i_mid]) * g_acc * L`), Gravity equation (`port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H`), verified by direct reading
+- `src/components.jl` — Channel dP equation (`rho_water(T[i_mid]) * g_acc * L`), Gravity equation (`inlet.P - outlet.P ~ rho_water(T_in) * 9.80665 * H`), verified by direct reading
 - `src/solvers.jl` — `build_loop` wiring topology, `solve_steady` pattern, `_make_temp_bc` pattern; verified by direct reading
 - `test/runtests.jl` — 54 existing tests confirmed; COMP-04 confirms Gravity stub compiles; verified by direct reading
 - `src/STREAM.jl` — export list; verified by direct reading

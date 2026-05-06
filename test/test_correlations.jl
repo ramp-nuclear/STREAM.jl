@@ -126,9 +126,9 @@ end  # @testset "PHY-02/03/04: Correlation Library"
             ConstantTemperature(T_wall; name=Symbol(:ct_r_phy02_, i)) for i in 1:n
         ]
         conns_phy02 = [
-            connect(pump_phy02.port_out, bc_phy02.port_in),
-            connect(bc_phy02.port_out, cac_phy02.port_in),
-            connect(cac_phy02.port_out, pump_phy02.port_in),
+            connect(pump_phy02.outlet, bc_phy02.inlet),
+            connect(bc_phy02.outlet, cac_phy02.inlet),
+            connect(cac_phy02.outlet, pump_phy02.inlet),
             [
                 connect(
                     ct_l_phy02[i].thermal, getproperty(cac_phy02, Symbol(:thermal_left, i))
@@ -139,7 +139,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
                     ct_r_phy02[i].thermal, getproperty(cac_phy02, Symbol(:thermal_right, i))
                 ) for i in 1:n
             ]...,
-            pump_phy02.port_in.P ~ 1.0e5,
+            pump_phy02.inlet.P ~ 1.0e5,
         ]
         @named sys_phy02 = compose(
             System(conns_phy02, t; name=:sys_phy02),
@@ -152,7 +152,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         ssys_phy02 = mtkcompile(sys_phy02)
         T_g = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
         op_phy02 = [ssys_phy02.cac_phy02.T[i] => T_g[i] for i in 1:n]
-        push!(op_phy02, ssys_phy02.cac_phy02.port_in.mdot => 0.490)
+        push!(op_phy02, ssys_phy02.cac_phy02.inlet.mdot => 0.490)
         sol_phy02 = solve_steady(ssys_phy02, op_phy02)
 
         @test sol_phy02.retcode == ReturnCode.Success
@@ -191,9 +191,9 @@ end  # @testset "PHY-02/03/04: Correlation Library"
             ConstantTemperature(T_wall; name=Symbol(:ct_r_phy03_, i)) for i in 1:n
         ]
         conns_phy03 = [
-            connect(pump_phy03.port_out, bc_phy03.port_in),
-            connect(bc_phy03.port_out, cac_phy03.port_in),
-            connect(cac_phy03.port_out, pump_phy03.port_in),
+            connect(pump_phy03.outlet, bc_phy03.inlet),
+            connect(bc_phy03.outlet, cac_phy03.inlet),
+            connect(cac_phy03.outlet, pump_phy03.inlet),
             [
                 connect(
                     ct_l_phy03[i].thermal, getproperty(cac_phy03, Symbol(:thermal_left, i))
@@ -204,7 +204,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
                     ct_r_phy03[i].thermal, getproperty(cac_phy03, Symbol(:thermal_right, i))
                 ) for i in 1:n
             ]...,
-            pump_phy03.port_in.P ~ 1.0e5,
+            pump_phy03.inlet.P ~ 1.0e5,
         ]
         @named sys_phy03 = compose(
             System(conns_phy03, t; name=:sys_phy03),
@@ -217,7 +217,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         ssys_phy03 = mtkcompile(sys_phy03)
         # Initial guess: mdot≈8.8e-4 kg/s from laminar Hagen-Poiseuille estimate at 30 Pa
         op_phy03 = [ssys_phy03.cac_phy03.T[i] => T_inlet for i in 1:n]
-        push!(op_phy03, ssys_phy03.cac_phy03.port_in.mdot => 8.8e-4)
+        push!(op_phy03, ssys_phy03.cac_phy03.inlet.mdot => 8.8e-4)
         sol_phy03 = solve_steady(ssys_phy03, op_phy03)
 
         @test sol_phy03.retcode == ReturnCode.Success
@@ -254,9 +254,9 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         ct_l_lam = [ConstantTemperature(T_wall; name=Symbol(:ct_l_lam_, i)) for i in 1:n]
         ct_r_lam = [ConstantTemperature(T_wall; name=Symbol(:ct_r_lam_, i)) for i in 1:n]
         conns_lam = [
-            connect(pump_lam.port_out, bc_lam.port_in),
-            connect(bc_lam.port_out, cac_lam.port_in),
-            connect(cac_lam.port_out, pump_lam.port_in),
+            connect(pump_lam.outlet, bc_lam.inlet),
+            connect(bc_lam.outlet, cac_lam.inlet),
+            connect(cac_lam.outlet, pump_lam.inlet),
             [
                 connect(
                     ct_l_lam[i].thermal, getproperty(cac_lam, Symbol(:thermal_left, i))
@@ -267,7 +267,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
                     ct_r_lam[i].thermal, getproperty(cac_lam, Symbol(:thermal_right, i))
                 ) for i in 1:n
             ]...,
-            pump_lam.port_in.P ~ 1.0e5,
+            pump_lam.inlet.P ~ 1.0e5,
         ]
         @named sys_lam = compose(
             System(conns_lam, t; name=:sys_lam),
@@ -280,7 +280,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         ssys_lam = mtkcompile(sys_lam)
         # For laminar regime: very low mdot — initial guess near zero
         op_lam = [ssys_lam.cac_lam.T[i] => T_inlet for i in 1:n]
-        push!(op_lam, ssys_lam.cac_lam.port_in.mdot => 1e-4)
+        push!(op_lam, ssys_lam.cac_lam.inlet.mdot => 1e-4)
         sol_lam = solve_steady(ssys_lam, op_lam)
 
         @test sol_lam.retcode == ReturnCode.Success
@@ -309,9 +309,9 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         ct_l_turb = [ConstantTemperature(T_wall; name=Symbol(:ct_l_turb_, i)) for i in 1:n]
         ct_r_turb = [ConstantTemperature(T_wall; name=Symbol(:ct_r_turb_, i)) for i in 1:n]
         conns_turb = [
-            connect(pump_turb.port_out, bc_turb.port_in),
-            connect(bc_turb.port_out, cac_turb.port_in),
-            connect(cac_turb.port_out, pump_turb.port_in),
+            connect(pump_turb.outlet, bc_turb.inlet),
+            connect(bc_turb.outlet, cac_turb.inlet),
+            connect(cac_turb.outlet, pump_turb.inlet),
             [
                 connect(
                     ct_l_turb[i].thermal, getproperty(cac_turb, Symbol(:thermal_left, i))
@@ -322,7 +322,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
                     ct_r_turb[i].thermal, getproperty(cac_turb, Symbol(:thermal_right, i))
                 ) for i in 1:n
             ]...,
-            pump_turb.port_in.P ~ 1.0e5,
+            pump_turb.inlet.P ~ 1.0e5,
         ]
         @named sys_turb = compose(
             System(conns_turb, t; name=:sys_turb),
@@ -335,7 +335,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         ssys_turb = mtkcompile(sys_turb)
         T_g_turb = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.250, n=n)
         op_turb = [ssys_turb.cac_turb.T[i] => T_g_turb[i] for i in 1:n]
-        push!(op_turb, ssys_turb.cac_turb.port_in.mdot => 0.250)
+        push!(op_turb, ssys_turb.cac_turb.inlet.mdot => 0.250)
         sol_turb = solve_steady(ssys_turb, op_turb)
 
         @test sol_turb.retcode == ReturnCode.Success
@@ -642,9 +642,9 @@ end
         ct_l_fd = [ConstantTemperature(T_wall; name=Symbol(:ct_l_fd_, i)) for i in 1:n]
         ct_r_fd = [ConstantTemperature(T_wall; name=Symbol(:ct_r_fd_, i)) for i in 1:n]
         conns_fd = [
-            connect(pump_fd.port_out, bc_fd.port_in),
-            connect(bc_fd.port_out, cac_fd.port_in),
-            connect(cac_fd.port_out, pump_fd.port_in),
+            connect(pump_fd.outlet, bc_fd.inlet),
+            connect(bc_fd.outlet, cac_fd.inlet),
+            connect(cac_fd.outlet, pump_fd.inlet),
             [
                 connect(ct_l_fd[i].thermal, getproperty(cac_fd, Symbol(:thermal_left, i)))
                 for i in 1:n
@@ -653,7 +653,7 @@ end
                 connect(ct_r_fd[i].thermal, getproperty(cac_fd, Symbol(:thermal_right, i)))
                 for i in 1:n
             ]...,
-            pump_fd.port_in.P ~ 1.0e5,
+            pump_fd.inlet.P ~ 1.0e5,
         ]
         @named sys_fd = compose(
             System(conns_fd, t; name=:sys_fd),
@@ -669,7 +669,7 @@ end
 
         # Solve to verify the system is also numerically tractable
         op_fd = [ssys_fd.cac_fd.T[i] => T_inlet for i in 1:n]
-        push!(op_fd, ssys_fd.cac_fd.port_in.mdot => 1e-3)
+        push!(op_fd, ssys_fd.cac_fd.inlet.mdot => 1e-3)
         sol_fd = solve_steady(ssys_fd, op_fd)
         @test sol_fd.retcode == ReturnCode.Success
     end
@@ -693,9 +693,9 @@ end
         ct_l_dev = [ConstantTemperature(T_wall; name=Symbol(:ct_l_dev_, i)) for i in 1:n]
         ct_r_dev = [ConstantTemperature(T_wall; name=Symbol(:ct_r_dev_, i)) for i in 1:n]
         conns_dev = [
-            connect(pump_dev.port_out, bc_dev.port_in),
-            connect(bc_dev.port_out, cac_dev.port_in),
-            connect(cac_dev.port_out, pump_dev.port_in),
+            connect(pump_dev.outlet, bc_dev.inlet),
+            connect(bc_dev.outlet, cac_dev.inlet),
+            connect(cac_dev.outlet, pump_dev.inlet),
             [
                 connect(
                     ct_l_dev[i].thermal, getproperty(cac_dev, Symbol(:thermal_left, i))
@@ -706,7 +706,7 @@ end
                     ct_r_dev[i].thermal, getproperty(cac_dev, Symbol(:thermal_right, i))
                 ) for i in 1:n
             ]...,
-            pump_dev.port_in.P ~ 1.0e5,
+            pump_dev.inlet.P ~ 1.0e5,
         ]
         @named sys_dev = compose(
             System(conns_dev, t; name=:sys_dev),
@@ -722,7 +722,7 @@ end
 
         # Solve to verify the system is also numerically tractable
         op_dev = [ssys_dev.cac_dev.T[i] => T_inlet for i in 1:n]
-        push!(op_dev, ssys_dev.cac_dev.port_in.mdot => 1e-3)
+        push!(op_dev, ssys_dev.cac_dev.inlet.mdot => 1e-3)
         sol_dev = solve_steady(ssys_dev, op_dev)
         @test sol_dev.retcode == ReturnCode.Success
     end

@@ -37,13 +37,13 @@ end
     T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=Q_wall, mdot_guess=mdot_guess, n=n)
 
     op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op, ssys.ch.port_in.mdot => mdot_guess)
+    push!(op, ssys.ch.inlet.mdot => mdot_guess)
 
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_inlet      # outlet > inlet (fluid heated)
     @test sol[ssys.ch.T_out] < 400.0        # physically reasonable (< 127°C)
-    @test sol[ssys.ch.port_in.mdot] > 0     # positive mass flow
+    @test sol[ssys.ch.inlet.mdot] > 0     # positive mass flow
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -78,13 +78,13 @@ end
     )
 
     op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op_guess, ssys_ss.ch.port_in.mdot => mdot_guess)
+    push!(op_guess, ssys_ss.ch.inlet.mdot => mdot_guess)
 
     # Solve steady state on the scalar system for consistent ICs
     sol_ss = solve_steady(ssys_ss, op_guess)
     # Use Pair{Any,Any} so the callable parameter can be mixed with Float64 values
     op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
-    push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys_ss.ch.port_in.mdot])
+    push!(op_ic, ssys.ch.inlet.mdot => sol_ss[ssys_ss.ch.inlet.mdot])
     # Include callable parameter in op for the transient system
     T_wall_sym = last(parameters(ssys))   # T_wall_callable is the last parameter
     push!(op_ic, T_wall_sym => T_wall_step)

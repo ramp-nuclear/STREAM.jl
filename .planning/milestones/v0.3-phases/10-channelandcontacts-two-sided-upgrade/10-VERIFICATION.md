@@ -56,7 +56,7 @@ re_verification: false
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `ChannelAndContacts` | `_channel_base_eqs` | keyword call without `t_inlet` | WIRED | Line 286-287: `_channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP, port_in, port_out, Dh, A, L, g_acc=g, dz)` — no `t_inlet` kwarg |
+| `ChannelAndContacts` | `_channel_base_eqs` | keyword call without `t_inlet` | WIRED | Line 286-287: `_channel_base_eqs(eqs; n, T, Re, Nu, h_tc, v, T_out, dP, inlet, outlet, Dh, A, L, g_acc=g, dz)` — no `t_inlet` kwarg |
 | `ChannelAndContacts` | `thermal_left[i], thermal_right[i]` | energy balance equation | WIRED | Lines 293-302: energy balance uses both `thermal_left[i].T` and `thermal_right[i].T`; `q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow` |
 
 ### Plan 02 Key Links

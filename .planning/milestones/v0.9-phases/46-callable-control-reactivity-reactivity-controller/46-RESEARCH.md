@@ -158,7 +158,7 @@ function Pump(dP_pump::Any; name)
     FType = typeof(dP_pump)                           # capture concrete type at construction
     pars = @parameters (dP_pump_fn::FType)(..)        # variadic (..), NOT (t)
     # ... equations use dP_pump_fn(t) ...
-    port_out.P - port_in.P ~ dP_pump_fn(t)
+    outlet.P - inlet.P ~ dP_pump_fn(t)
 end
 
 # Caller passes the callable via op-dict:

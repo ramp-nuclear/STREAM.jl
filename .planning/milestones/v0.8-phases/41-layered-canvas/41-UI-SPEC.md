@@ -227,7 +227,7 @@ Edge dimming: `style={{ opacity: 0.15, transition: "opacity 150ms ease" }}`.
 
 ### Handle Dimming for Dual-Layer Nodes (D-08)
 
-In Thermal view, ChannelAndContacts is fully visible but its FlowPort handles (port_in, port_out) are dimmed and non-interactive. In Hydraulic view, its ThermalPort handles (thermal_left[], thermal_right[]) are dimmed and non-interactive.
+In Thermal view, ChannelAndContacts is fully visible but its FlowPort handles (inlet, outlet) are dimmed and non-interactive. In Hydraulic view, its ThermalPort handles (thermal_left[], thermal_right[]) are dimmed and non-interactive.
 
 Implementation: StreamNode handle rendering checks `activeLayer` from store. If the handle's port type does not match the active layer view, apply `opacity: 0.2; pointer-events: none` to that handle element. In Both view, all handles are active.
 

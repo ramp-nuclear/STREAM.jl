@@ -37,7 +37,7 @@ key-files:
 key-decisions:
   - "T_open initial value is 1e30 (not Inf) — Inf causes Rodas5P instability; 1e30 sentinel keeps ramp at 0 before event fires"
   - "affect_neg fires on downward crossing (ref_mdot drops below threshold); affect=nothing ignores upward crossing"
-  - "ref_mdot has no equation inside Flapper — user must wire flapper.ref_mdot ~ component.port_in.mdot during composition"
+  - "ref_mdot has no equation inside Flapper — user must wire flapper.ref_mdot ~ component.inlet.mdot during composition"
   - "clamp() works natively in MTK symbolic equations without @register_symbolic"
 
 patterns-established:

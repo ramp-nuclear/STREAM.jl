@@ -40,7 +40,7 @@ key-decisions:
   - "Analytical formula corrected: plan spec had sign error; correct solution is (dP0/R)*(1 + tau/T_ramp - t/T_ramp - (tau/T_ramp)*exp(-t/tau))"
   - "Callable T_wall ICs: use scalar build_loop_transient for solve_steady, then callable for solve_transient — SteadyStateProblem cannot handle time-dependent callable params"
   - "Pair{Any,Any} op vector: Julia type inference specializes [sym => float64, ...] as Vector{Pair{Num,Float64}}; push!(callable_pair) fails; use explicit Pair{Any,Any}"
-  - "Two thermal anchors in PUMP-03 loop (pump.port_in.T + ine.port_out.T): single anchor insufficient to resolve circular instream in pure hydraulics-only closed loop"
+  - "Two thermal anchors in PUMP-03 loop (pump.inlet.T + ine.outlet.T): single anchor insufficient to resolve circular instream in pure hydraulics-only closed loop"
   - "last(parameters(ssys)) to access T_wall_callable param symbol: ssys.T_wall_callable returns CallAndWrap{Num}, not Num; use raw sym from parameters(ssys)"
 
 patterns-established:
@@ -95,7 +95,7 @@ completed: 2026-03-18
 
 - **`Pair{Any,Any}` op vector:** Julia's type inference creates `Vector{Pair{Num,Float64}}` from `[sym => 1.0, ...]`. `push!(op, callable_sym => fn)` fails with type conversion error. Fix: explicitly type the vector as `Pair{Any,Any}[...]`.
 
-- **Two thermal anchors in PUMP-03:** In a pure hydraulics-only closed loop (Pump + Inertia + Resistor with no HeatExchanger), the MTK `instream()` equations are degenerate. A single `pump.port_in.T ~ 313.15` leaves `ine.port_out.T` undetermined (1 unknown, 0 equations). Adding `ine.port_out.T ~ 313.15` gives exactly 1 unknown (mdot), 1 equation — correct ODE structure.
+- **Two thermal anchors in PUMP-03:** In a pure hydraulics-only closed loop (Pump + Inertia + Resistor with no HeatExchanger), the MTK `instream()` equations are degenerate. A single `pump.inlet.T ~ 313.15` leaves `ine.outlet.T` undetermined (1 unknown, 0 equations). Adding `ine.outlet.T ~ 313.15` gives exactly 1 unknown (mdot), 1 equation — correct ODE structure.
 
 ## Deviations from Plan
 
@@ -111,8 +111,8 @@ completed: 2026-03-18
 
 **2. [Rule 3 - Blocking] Added second thermal anchor to PUMP-03 closed loop**
 - **Found during:** Task 1 (PUMP-03 mtkcompile)
-- **Issue:** `mtkcompile(sys)` raised `ExtraVariablesSystemException: 18 variables, 17 equations`. `ine.port_out.T` was underdetermined due to circular instream in hydraulics-only loop.
-- **Fix:** Added `ine.port_out.T ~ 313.15` to connections alongside existing `pump.port_in.T ~ 313.15`
+- **Issue:** `mtkcompile(sys)` raised `ExtraVariablesSystemException: 18 variables, 17 equations`. `ine.outlet.T` was underdetermined due to circular instream in hydraulics-only loop.
+- **Fix:** Added `ine.outlet.T ~ 313.15` to connections alongside existing `pump.inlet.T ~ 313.15`
 - **Files modified:** test/test_pump.jl
 - **Verification:** `mtkcompile(sys; fully_determined=false)` produces 1 unknown (mdot), 1 equation
 - **Committed in:** eb2d629 (Task 1 commit)

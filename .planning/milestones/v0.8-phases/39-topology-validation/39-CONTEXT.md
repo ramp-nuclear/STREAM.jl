@@ -91,7 +91,7 @@ This phase adds validation-triggered UI only. No new components, no new canvas i
 - Registry is imported via `getComponent(id)` and `getAllComponents()` from `gui/src/registry`
 - shadcn primitives used: Button, Input, Label, Select, ScrollArea, Tabs, Tooltip, Badge, DropdownMenu, Separator — AlertDialog is NOT yet installed
 - Node state (`selected`, `componentId`, `instanceName`) is in `node.data` as `StreamNodeData`
-- Edge `sourceHandle` / `targetHandle` contain the port name (e.g., `"port_in"`, `"port_out"`)
+- Edge `sourceHandle` / `targetHandle` contain the port name (e.g., `"inlet"`, `"outlet"`)
 
 ### Integration Points
 - `validateTopology()` called from export button handler (Toolbar) and save action (store's `saveProject`)

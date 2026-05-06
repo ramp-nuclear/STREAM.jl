@@ -58,7 +58,7 @@ describe("StreamNode", () => {
       instanceName: "pump_1",
       parameters: {},
     });
-    // Pump has port_in and port_out FlowPorts
+    // Pump has inlet and outlet FlowPorts
     const handles = container.querySelectorAll(".react-flow__handle");
     expect(handles.length).toBe(2);
   });
@@ -100,7 +100,7 @@ describe("StreamNode", () => {
       parameters: {},
     });
     const handles = container.querySelectorAll(".react-flow__handle");
-    // 2 FlowPort (port_in, port_out) + 2 ThermalPort (thermal_left, thermal_right)
+    // 2 FlowPort (inlet, outlet) + 2 ThermalPort (thermal_left, thermal_right)
     expect(handles.length).toBe(4);
   });
 

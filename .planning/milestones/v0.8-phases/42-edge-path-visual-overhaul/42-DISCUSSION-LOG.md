@@ -12,7 +12,7 @@
 - Arrowhead style — hydraulic edge markerEnd, thermal edge treatment
 - Parallel edge routing — how loop edges route without overlapping
 - Thermal edge treatment — visual sufficiency of amber + dashed
-- (User-added) Port polarity coloring — port_in vs port_out distinct colors
+- (User-added) Port polarity coloring — inlet vs outlet distinct colors
 
 ## Decisions Made
 
@@ -35,7 +35,7 @@
 ### Port Polarity Coloring
 | Question | Answer |
 |----------|--------|
-| Fold into Phase 42? | Yes — port_in and port_out handles get distinct colors |
+| Fold into Phase 42? | Yes — inlet and outlet handles get distinct colors |
 | Draggable edge endpoints (user idea) | Out of scope — just colored handles, no endpoint repositioning |
 
 ## Engineering Fixes (No User Input)

@@ -14,16 +14,16 @@ Add per-cell absolute pressure and saturation-related observables to all channel
 
 ### Per-cell pressure drop dp[i]
 
-- **D-01:** `dp(t)[1:n]` are MTK **unknowns** (not @observed) — they appear on the RHS of the port wiring equation `port_out.P - port_in.P ~ -sum(dp[i])`, so they must be solver variables.
-- **D-02:** Per-cell equation includes inertia split equally: `dp[i] ~ f[i]*(mdot*|mdot|/(2*rho[i]*A^2))*(dz/Dh) + rho[i]*g*dz + (dz/A)*Dt(port_in.mdot)`. Each cell gets `dz/A * Dt(mdot)`; summing over n cells gives `(L/A)*Dt(mdot)` exactly — matches current total and satisfies success criterion 2.
-- **D-03:** Port wiring equation changes from `port_out.P - port_in.P ~ -dP` to `port_out.P - port_in.P ~ -sum(dp[i] for i in 1:n)`. The `dP` variable is no longer a solver unknown.
+- **D-01:** `dp(t)[1:n]` are MTK **unknowns** (not @observed) — they appear on the RHS of the port wiring equation `outlet.P - inlet.P ~ -sum(dp[i])`, so they must be solver variables.
+- **D-02:** Per-cell equation includes inertia split equally: `dp[i] ~ f[i]*(mdot*|mdot|/(2*rho[i]*A^2))*(dz/Dh) + rho[i]*g*dz + (dz/A)*Dt(inlet.mdot)`. Each cell gets `dz/A * Dt(mdot)`; summing over n cells gives `(L/A)*Dt(mdot)` exactly — matches current total and satisfies success criterion 2.
+- **D-03:** Port wiring equation changes from `outlet.P - inlet.P ~ -dP` to `outlet.P - inlet.P ~ -sum(dp[i] for i in 1:n)`. The `dP` variable is no longer a solver unknown.
 - **D-04:** `dP(t)` becomes **@observed** alias: `dP ~ sum(dp[i] for i in 1:n)`. Preserves backward compatibility (`sol[ch.dP, :]` still works). Satisfies success criterion 2 exactly.
 
 ### Absolute pressure P[i]
 
 - **D-05:** `P(t)[1:n]` are **@observed** in Channel, ChannelAndContacts, and ChannelHeatFlux.
-- **D-06:** Formula uses a local Julia cumsum expression (not chained from the P[i] observed variable) to avoid observed-to-observed ordering issues: `P_i = port_in.P - sum(dp[j] for j in 1:i)` computed inside the loop, then `push!(obs, P[i] ~ P_i)`.
-- **D-07:** P[i] represents **absolute pressure** — physically meaningful only when a pressure anchor is set on a FlowPort in the loop (e.g., `pump.port_in.P ~ <some_value>` as initial condition). The anchor can be any absolute pressure value; 1e5 Pa is not special. Tests must set an anchor explicitly; this must be documented.
+- **D-06:** Formula uses a local Julia cumsum expression (not chained from the P[i] observed variable) to avoid observed-to-observed ordering issues: `P_i = inlet.P - sum(dp[j] for j in 1:i)` computed inside the loop, then `push!(obs, P[i] ~ P_i)`.
+- **D-07:** P[i] represents **absolute pressure** — physically meaningful only when a pressure anchor is set on a FlowPort in the loop (e.g., `pump.inlet.P ~ <some_value>` as initial condition). The anchor can be any absolute pressure value; 1e5 Pa is not special. Tests must set an anchor explicitly; this must be documented.
 
 ### sat_temperature function
 
@@ -35,7 +35,7 @@ Add per-cell absolute pressure and saturation-related observables to all channel
 - **D-10:** `T_sat(t)[1:n]` and `T_ONB(t)[1:n]` added as **@observed** in ChannelAndContacts and ChannelHeatFlux only. Channel gets dp[i] and P[i] but NOT T_sat/T_ONB (per PRES-04).
 - **D-11:** Both reference dp[j] unknowns directly via the same local `P_i` expression used for P[i] — no observed-to-observed chain:
   ```julia
-  P_i = port_in.P - sum(dp[j] for j in 1:i)
+  P_i = inlet.P - sum(dp[j] for j in 1:i)
   push!(obs, P[i]     ~ P_i)
   push!(obs, T_sat[i] ~ sat_temperature(P_i))
   push!(obs, T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_spl_i))
@@ -92,7 +92,7 @@ Add per-cell absolute pressure and saturation-related observables to all channel
 - `dz = L / n` for per-cell length — already used throughout
 
 ### Integration Points
-- `port_out.P - port_in.P ~ -sum(dp[i])` replaces current `port_out.P - port_in.P ~ -dP` in all three channel types (via `_channel_base_eqs`)
+- `outlet.P - inlet.P ~ -sum(dp[i])` replaces current `outlet.P - inlet.P ~ -dP` in all three channel types (via `_channel_base_eqs`)
 - `dP` variable removed from solver unknowns in all three channels; added to `obs` list instead
 - `dp(t)[1:n]` added to `all_vars` in Channel and ChannelHeatFlux; ChannelAndContacts uses separate `all_vars` list
 - `P(t)[1:n]`, `T_sat(t)[1:n]`, `T_ONB(t)[1:n]` added to `@variables` block and `obs` in relevant channels

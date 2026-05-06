@@ -62,7 +62,7 @@ human_verification:
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
 | src/solvers.jl | DifferentialEquations.SSRootfind + Sundials.KINSOL | `using DifferentialEquations, Sundials` at lines 10–11 | WIRED | `SSRootfind(KINSOL())` called at line 126 |
-| src/solvers.jl build_loop() | Channel via connect() | `connect(pump.port_out, bc.port_in)` etc. | WIRED | All three connect() calls present at lines 89–91; mtkcompile called at line 99 |
+| src/solvers.jl build_loop() | Channel via connect() | `connect(pump.outlet, bc.inlet)` etc. | WIRED | All three connect() calls present at lines 89–91; mtkcompile called at line 99 |
 | src/solvers.jl solve_transient() | DifferentialEquations.PresetTimeCallback + ModelingToolkit.setp | callback at line 213, setp at line 212 | WIRED | `PresetTimeCallback([t_step], integrator -> T_wall_setter(integrator, T_wall_final))` with explicit `ModelingToolkit.setp` |
 | src/solvers.jl solve_transient() | Rodas5P (replaces IDA stub) | `solve(prob, Rodas5P(); callback=step_cb, initializealg=SciMLBase.NoInit())` | WIRED | Line 221; IDA deviation documented in 03-02-SUMMARY |
 | test/runtests.jl VAL-01 tests | hardcoded reference values | `isapprox` with `rtol=0.01` | WIRED | Lines 257–258; `isapprox(T_out, T_outlet_ref; rtol=0.01)` and `isapprox(mdot, mdot_ref; rtol=0.01)` |
@@ -76,7 +76,7 @@ human_verification:
 |-------------|------------|-------------|--------|----------|
 | SYS-01 | 03-01 | Single closed loop assembles, connects, and compiles with mtkcompile | SATISFIED | `build_loop()` assembles Pump→TempBC→Channel (Friction internal to Channel); mtkcompile at solvers.jl:99; `@testset "SYS-01"` at runtests.jl:163. **Note:** SYS-01 requirement text says "Pump → Friction → Channel" but implementation correctly uses "Pump → TempBC → Channel" with Friction internal to Channel — this is a description drift, not a functional gap; the closed-loop compilation goal is satisfied. |
 | SYS-02 | 03-01 | Clean user-facing API: construct, connect, set ICs, solve | SATISFIED | `build_loop()` + `solve_steady()` + `steady_state_guess()` provide clean API; `@testset "SYS-02"` at runtests.jl:172 |
-| SOLV-01 | 03-01 | Steady-state solver returning named output variables | SATISFIED | `solve_steady` returns SteadyStateSolution with symbolic indexing `sol[ssys.ch.T_out]`, `sol[ssys.ch.port_in.mdot]`; SOLV-01 test at runtests.jl:182 |
+| SOLV-01 | 03-01 | Steady-state solver returning named output variables | SATISFIED | `solve_steady` returns SteadyStateSolution with symbolic indexing `sol[ssys.ch.T_out]`, `sol[ssys.ch.inlet.mdot]`; SOLV-01 test at runtests.jl:182 |
 | SOLV-02 | 03-02 | Transient solver: step change in channel power, return time-series | SATISFIED | `solve_transient` returns ODESolution; `sol.t` multi-point; `sol[ssys.ch.T_out, :]` time-series; SOLV-02 tests at runtests.jl:205–237 |
 | VAL-01 | 03-03 | T_outlet and mdot within 1% of Python STREAM on identical inputs | SATISFIED (code) | Reference values hardcoded from Python STREAM run; isapprox at rtol=0.01; SUMMARY claims pass |
 | VAL-02 | 03-03 | Transient temperature response qualitatively matches Python STREAM | SATISFIED | T_ts[end] > T_ts[1] after T_wall step; 03-02-SUMMARY reports T_outlet 318→331 K |
@@ -91,7 +91,7 @@ human_verification:
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
 | src/solvers.jl | 2–6 | `# Future refactor note (v0.2)` comment about wrapper structs | Info | Documents deferred refactor; not a blocker |
-| src/solvers.jl | 115–116 | Comment references `ssys.fr.Re` and `ssys.fr.port_in.mdot` which no longer exist (Friction removed from build_loop) | Warning | Stale comment in solve_steady docblock; no functional impact since actual runtests.jl uses `ssys.ch.port_in.mdot` correctly |
+| src/solvers.jl | 115–116 | Comment references `ssys.fr.Re` and `ssys.fr.inlet.mdot` which no longer exist (Friction removed from build_loop) | Warning | Stale comment in solve_steady docblock; no functional impact since actual runtests.jl uses `ssys.ch.inlet.mdot` correctly |
 
 No blocker anti-patterns found. The stale comment in solve_steady docs references Friction symbols that were removed from build_loop in plan 03-03, but the test code itself uses the correct symbols.
 

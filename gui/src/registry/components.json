@@ -8,8 +8,16 @@
       "category": "Hydraulic",
       "description": "Single-phase convective channel with n axial finite-volume cells. Dittus-Boelter HTC, Darcy-Weisbach friction, optional gravity term.",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" },
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        },
         { "name": "thermal", "type": "ThermalPort", "side": "top" }
       ],
       "parameters": [
@@ -175,8 +183,16 @@
       "category": "Hydraulic",
       "description": "Convective channel with dual ThermalPort arrays for per-cell fuel plate coupling. thermal_left[1:n] and thermal_right[1:n] are independent ThermalPort arrays; unconnected side defaults adiabatic.",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" },
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        },
         { "name": "thermal_left", "type": "ThermalPort", "side": "top", "array": true, "arrayParam": "n" },
         { "name": "thermal_right", "type": "ThermalPort", "side": "bottom", "array": true, "arrayParam": "n" }
       ],
@@ -352,8 +368,16 @@
       "description": "Convective channel with scalar wall temperature BC. T_wall is a Real parameter (fixed scalar), not a ThermalPort connection. No ThermalPort ports.",
       "_note": "T_wall is a scalar BC parameter (Real), not a ThermalPort connection",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        }
       ],
       "parameters": [
         {
@@ -526,8 +550,16 @@
       "category": "Hydraulic",
       "description": "Fixed-pressure-drop or fixed-mass-flow pump. Supports two GUI-accessible modes: scalar fixed dP and fixed mass flow rate.",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        }
       ],
       "parameters": [
         {
@@ -566,8 +598,16 @@
       "category": "Hydraulic",
       "description": "Check-valve with smooth opening ramp and MTK continuous event callback. Opens when reference mass flow drops below threshold (loss-of-flow scenarios).",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        }
       ],
       "parameters": [
         {
@@ -629,8 +669,16 @@
       "category": "Hydraulic",
       "description": "Standalone Darcy-Weisbach friction pressure drop element. Used for piping segments outside of Channel components.",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        }
       ],
       "parameters": [
         {
@@ -670,10 +718,18 @@
       "id": "Gravity",
       "label": "Gravity",
       "category": "Hydraulic",
-      "description": "Hydrostatic pressure head element. Use on the return leg of a vertical loop with reversed port convention (port_out at bottom, port_in at top).",
+      "description": "Hydrostatic pressure head element. Use on the return leg of a vertical loop with reversed port convention (outlet at bottom, inlet at top).",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        }
       ],
       "parameters": [
         {
@@ -699,8 +755,16 @@
       "category": "Hydraulic",
       "description": "Linear hydraulic resistor. Pressure drop proportional to mass flow: dP = R * mdot.",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        }
       ],
       "parameters": [
         {
@@ -726,8 +790,16 @@
       "category": "Hydraulic",
       "description": "Concentrated fluid inertia element. Adds (L/A)*d(mdot)/dt to the momentum equation for transient simulations.",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        }
       ],
       "parameters": [
         {
@@ -753,8 +825,16 @@
       "category": "Hydraulic",
       "description": "Ideal heat exchanger that resets fluid temperature to a fixed boundary condition. No pressure drop.",
       "ports": [
-        { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        {
+          "name": "inlet",
+          "type": "FlowPort",
+          "side": "left"
+        },
+        {
+          "name": "outlet",
+          "type": "FlowPort",
+          "side": "right"
+        }
       ],
       "parameters": [
         {

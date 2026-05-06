@@ -18,7 +18,7 @@
 - Reason: refactor to per-cell ports later changes only port topology and q_wall binding; energy balance loop is untouched
 
 **Channel temperature advection**
-- Use `instream(port_in.T)` for inlet temperature (cell 1's upstream boundary)
+- Use `instream(inlet.T)` for inlet temperature (cell 1's upstream boundary)
 - Cell-to-cell: `T_in[i] = T[i-1]` for cells 2..n (direct variable reference, first-order upwind)
 - Same first-order upwind finite-volume discretization as Python STREAM's `coolant_first_order_upwind_dTdt`
 
@@ -74,7 +74,7 @@
 
 Phase 2 implements four standalone MTK v11 components in `src/components.jl`. The technical domain is acausal component definition using MTK's `function` (or `@component`) pattern: declare parameters, declare symbolic variables, build an equation list, assemble subsystems (ports), and return `compose(System(...), subsystems)`.
 
-The most complex component is `Channel` with `n` cells: it requires array variables (`T(t)[1:n]`, `Re(t)[1:n]`, etc.), a for-loop over cells to generate energy balance ODEs, and use of `instream(port_in.T)` for the inlet boundary condition. All four fluid property functions (`rho_water`, `cp_water`, `mu_water`, `k_water`) are already `@register_symbolic` and callable directly from equation definitions.
+The most complex component is `Channel` with `n` cells: it requires array variables (`T(t)[1:n]`, `Re(t)[1:n]`, etc.), a for-loop over cells to generate energy balance ODEs, and use of `instream(inlet.T)` for the inlet boundary condition. All four fluid property functions (`rho_water`, `cp_water`, `mu_water`, `k_water`) are already `@register_symbolic` and callable directly from equation definitions.
 
 The key design risk is choosing between scalar-loop equation generation (explicit `for i in 1:n` producing `n` scalar equations) vs MTK array equations. Evidence from the installed MTK v11.15.0 test suite confirms that scalar-loop generation with `T(t)[1:n]` array variables and `D(T[i]) ~ ...` equations is the recommended, well-tested approach for variable-count systems like `Channel(n=5)`.
 
@@ -101,7 +101,7 @@ The key design risk is choosing between scalar-loop equation generation (explici
 |------------|-----------|----------|
 | Plain `function` | `@component` macro | `@component` adds GUI metadata only — functionally identical; plain `function` matches established connector pattern and avoids a macro that is not needed |
 | Scalar loop equations | MTK array equations (D(T) ~ f(T)) | Array equations introduce implicit scalarization concerns and are less debuggable for variable-n components; scalar loops produce exactly n explicit equations checkable in tests |
-| `instream(port_in.T)` | Direct `port_in.T` | Direct access is the outflow value; `instream` gives the mixture value flowing into the port — required for stream variables per MTK semantics |
+| `instream(inlet.T)` | Direct `inlet.T` | Direct access is the outflow value; `instream` gives the mixture value flowing into the port — required for stream variables per MTK semantics |
 
 **Installation:** No new packages needed — all dependencies are already declared in Project.toml.
 
@@ -125,9 +125,9 @@ test/
 **What:** All four components follow this skeleton:
 1. Declare `pars = @parameters ...` (geometry/physics constants)
 2. Declare `vars = @variables ...` (all symbolic state and observable variables)
-3. Instantiate subsystems (ports): `@named port_in = FlowPort(); ...`
+3. Instantiate subsystems (ports): `@named inlet = FlowPort(); ...`
 4. Build equation list: `eqs = Equation[...]`
-5. Return `compose(System(eqs, t, vars, pars; name=name), port_in, port_out, ...)`
+5. Return `compose(System(eqs, t, vars, pars; name=name), inlet, outlet, ...)`
 
 **When to use:** Every component in this phase. Consistent with the stream_connectors.jl test patterns and the existing connector pattern.
 
@@ -145,19 +145,19 @@ function Pump(; name, dP)
         T_in(t) = 600.0
         T_out(t) = 600.0
     end
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet  = FlowPort()
+    @named outlet = FlowPort()
 
     eqs = Equation[
         # Mass continuity
-        port_in.mdot + port_out.mdot ~ 0,
+        inlet.mdot + outlet.mdot ~ 0,
         # Pressure rise
-        port_out.P - port_in.P ~ dP,
+        outlet.P - inlet.P ~ dP,
         # Isenthalpic: stream temperature unchanged
-        port_out.T ~ instream(port_in.T),
-        port_in.T  ~ instream(port_out.T),
+        outlet.T ~ instream(inlet.T),
+        inlet.T  ~ instream(outlet.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    compose(System(eqs, t, [], pars; name=name), inlet, outlet)
 end
 ```
 
@@ -190,8 +190,8 @@ function Channel(; name, n, L, D, A)
         dP(t)    = 0.0                       # total pressure drop
     end
 
-    @named port_in    = FlowPort()
-    @named port_out   = FlowPort()
+    @named inlet    = FlowPort()
+    @named outlet   = FlowPort()
     @named thermal    = ThermalPort()
 
     dz = L / n  # cell length (scalar parameter arithmetic)
@@ -200,19 +200,19 @@ function Channel(; name, n, L, D, A)
     #   rho * cp * A * dz * D(T[i]) = mdot * cp * (T_in_i - T[i]) + h_tc[i] * Pi * dz * (T_wall - T[i])
     # where T_wall is from thermal port and Pi = pi * D (heated perimeter for circular channel)
     eqs = Equation[]
-    T_inlet = instream(port_in.T)
+    T_inlet = instream(inlet.T)
 
     for i in 1:n
         T_up = (i == 1) ? T_inlet : T[i-1]   # upwind cell temperature
         push!(eqs,
-            D(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i])
+            D(T[i]) ~ (inlet.mdot * cp_water(T[i]) * (T_up - T[i])
                        + h_tc[i] * (pi * D) * dz * (thermal.T - T[i]))
                       / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
         )
         # Observables
         push!(eqs, q_wall[i] ~ thermal.Q_flow / n)
-        push!(eqs, v[i]   ~ port_in.mdot / (rho_water(T[i]) * A))
-        push!(eqs, Re[i]  ~ abs(port_in.mdot) * D / (A * mu_water(T[i])))
+        push!(eqs, v[i]   ~ inlet.mdot / (rho_water(T[i]) * A))
+        push!(eqs, Re[i]  ~ abs(inlet.mdot) * D / (A * mu_water(T[i])))
         push!(eqs, Nu[i]  ~ 0.023 * Re[i]^0.8 * (cp_water(T[i]) * mu_water(T[i]) / k_water(T[i]))^0.4)
         push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / D)
     )
@@ -220,11 +220,11 @@ function Channel(; name, n, L, D, A)
     push!(eqs, T_out ~ T[n])
     push!(eqs, dP ~ ... )  # Darcy-Weisbach summed over cells (see Pitfalls)
     # Port connections
-    push!(eqs, port_in.mdot + port_out.mdot ~ 0)
-    push!(eqs, port_out.T ~ T[n])
-    push!(eqs, port_in.T  ~ instream(port_out.T))
+    push!(eqs, inlet.mdot + outlet.mdot ~ 0)
+    push!(eqs, outlet.T ~ T[n])
+    push!(eqs, inlet.T  ~ instream(outlet.T))
 
-    compose(System(eqs, t, [vars...], pars; name=name), port_in, port_out, thermal)
+    compose(System(eqs, t, [vars...], pars; name=name), inlet, outlet, thermal)
 end
 ```
 
@@ -244,19 +244,19 @@ function Friction(; name, L, D, A)
         Re(t)
         f(t)
     end
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet  = FlowPort()
+    @named outlet = FlowPort()
 
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        Re ~ abs(port_in.mdot) * D / (A * mu_water(instream(port_in.T))),
+        inlet.mdot + outlet.mdot ~ 0,
+        Re ~ abs(inlet.mdot) * D / (A * mu_water(instream(inlet.T))),
         f  ~ 0.3164 * Re^(-0.25),
-        port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) /
-                                       (2 * rho_water(instream(port_in.T)) * A^2)) * (L / D),
-        port_out.T ~ instream(port_in.T),
-        port_in.T  ~ instream(port_out.T),
+        inlet.P - outlet.P ~ f * (inlet.mdot * abs(inlet.mdot) /
+                                       (2 * rho_water(instream(inlet.T)) * A^2)) * (L / D),
+        outlet.T ~ instream(inlet.T),
+        inlet.T  ~ instream(outlet.T),
     ]
-    compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
+    compose(System(eqs, t, vars, pars; name=name), inlet, outlet)
 end
 ```
 
@@ -266,7 +266,7 @@ end
 - **Using DSL block `@variables` inside `@mtkmodel`:** MTK v11 uses `@mtkmodel` DSL (requires `SciCompDSL.jl`) or function-based API. This project uses function-based API — confirmed from connector implementations.
 - **Collecting all vars into System without array expansion:** When `@variables (T(t))[1:n] = ...` is declared, pass `[vars...;]` (splatted) to `System(...)` to ensure MTK sees scalar-indexed variables, not an array-of-arrays.
 - **Writing `D(T) ~ ...` as array equation:** For variable-n components, prefer scalar loop. Array equations work but make equation counting harder and are less compatible with structural analysis.
-- **Omitting `instream()` on stream port variables:** Accessing `port_in.T` directly gives the outflow value (what this component would send out on reversal), not the inlet mixture temperature. Always use `instream(port_in.T)` for physically meaningful inlet T.
+- **Omitting `instream()` on stream port variables:** Accessing `inlet.T` directly gives the outflow value (what this component would send out on reversal), not the inlet mixture temperature. Always use `instream(inlet.T)` for physically meaningful inlet T.
 
 ---
 
@@ -297,7 +297,7 @@ end
 
 ### Pitfall 2: `instream()` Used Outside Connection Context
 
-**What goes wrong:** Calling `instream(port_in.T)` in a component that is not yet connected causes `mtkcompile` to error with unresolved instream or malformed equation.
+**What goes wrong:** Calling `instream(inlet.T)` in a component that is not yet connected causes `mtkcompile` to error with unresolved instream or malformed equation.
 
 **Why it happens:** `instream` is a symbolic operator that MTK resolves during `expand_connections`. The component-in-isolation test calls `mtkcompile` directly on the unconnected component — MTK must handle unresolved stream variables.
 
@@ -337,11 +337,11 @@ end
 
 ### Pitfall 6: Port Stream Variable Direction for Channel
 
-**What goes wrong:** Incorrectly wiring `port_out.T ~ T[n]` (assigning the stream value) vs what MTK stream semantics actually require.
+**What goes wrong:** Incorrectly wiring `outlet.T ~ T[n]` (assigning the stream value) vs what MTK stream semantics actually require.
 
 **Why it happens:** Stream variables represent what a component *would* contribute to a mix if flow reversed. The correct pattern is:
-- `port_out.T ~ T[n]` — component sets its outflow stream value to the outlet temperature
-- `port_in.T ~ instream(port_out.T)` — component uses the actual inflow temperature (identity here, but needed structurally)
+- `outlet.T ~ T[n]` — component sets its outflow stream value to the outlet temperature
+- `inlet.T ~ instream(outlet.T)` — component uses the actual inflow temperature (identity here, but needed structurally)
 
 **How to avoid:** Follow the AdiabaticStraightPipe pattern in stream_connectors.jl: always set `port.T ~ <outflow_value>` and use `instream(other_port.T)` for inflow.
 
@@ -411,15 +411,15 @@ energy_eqs = filter(eq -> ..., equations(ch))  # filter for D(T[i]) ~ ... equati
 # Darcy-Weisbach: dp = f * (mdot * |mdot| / (2 * rho * A^2)) * (L / D)
 # In MTK equations:
 f  ~ 0.3164 * Re^(-0.25)
-port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) /
-                               (2 * rho_water(instream(port_in.T)) * A^2)) * (L / D)
+inlet.P - outlet.P ~ f * (inlet.mdot * abs(inlet.mdot) /
+                               (2 * rho_water(instream(inlet.T)) * A^2)) * (L / D)
 ```
 
 ### Gravity Component Equation (from Python STREAM pressure_drop/__init__.py)
 ```julia
 # Python reference: gravity_pressure(rho, dh, g=9.80665) = rho * g * dh
 # In MTK equations (positive pressure when flowing upward, conventional sign):
-port_in.P - port_out.P ~ rho_water(instream(port_in.T)) * 9.80665 * H
+inlet.P - outlet.P ~ rho_water(instream(inlet.T)) * 9.80665 * H
 ```
 
 ### Dittus-Boelter Correlation (from Python STREAM physical_models/heat_transfer_coefficient/turbulent.py)
@@ -433,7 +433,7 @@ h_tc[i] ~ Nu[i] * k_water(T[i]) / D
 ### Re from mdot (from Python STREAM physical_models/dimensionless.py, Re_mdot function)
 ```julia
 # Re_mdot = |mdot| * L / (A * mu)  — Python STREAM verbatim (L = hydraulic diameter here)
-Re[i] ~ abs(port_in.mdot) * D / (A * mu_water(T[i]))
+Re[i] ~ abs(inlet.mdot) * D / (A * mu_water(T[i]))
 ```
 
 ---
@@ -461,13 +461,13 @@ Re[i] ~ abs(port_in.mdot) * D / (A * mu_water(T[i]))
 
 2. **`abs()` in Blasius Re expression — ForwardDiff compatibility**
    - What we know: CONTEXT.md says "no range guards (ForwardDiff compatibility)" for fluid properties; `abs()` uses `ifelse` internally in symbolic context
-   - What's unclear: whether `abs(port_in.mdot)` in symbolic equations creates ForwardDiff issues at mdot=0
-   - Recommendation: Use `abs(port_in.mdot)` in Re expressions — MTK handles symbolic `abs` correctly with ForwardDiff via `IfElse.ifelse` under the hood; this is standard MTK practice.
+   - What's unclear: whether `abs(inlet.mdot)` in symbolic equations creates ForwardDiff issues at mdot=0
+   - Recommendation: Use `abs(inlet.mdot)` in Re expressions — MTK handles symbolic `abs` correctly with ForwardDiff via `IfElse.ifelse` under the hood; this is standard MTK practice.
 
 3. **Port mass flow equation for Channel: which port carries mdot**
-   - What we know: `mdot` positive = into port; Channel has `port_in.mdot > 0` (flow in) and `port_out.mdot < 0` (flow out)
-   - What's unclear: whether to use `port_in.mdot` or a local `mdot` variable in cell equations
-   - Recommendation: Use `port_in.mdot` directly in cell energy balance equations. Add continuity: `port_in.mdot + port_out.mdot ~ 0`. No need for a redundant local `mdot` variable.
+   - What we know: `mdot` positive = into port; Channel has `inlet.mdot > 0` (flow in) and `outlet.mdot < 0` (flow out)
+   - What's unclear: whether to use `inlet.mdot` or a local `mdot` variable in cell equations
+   - Recommendation: Use `inlet.mdot` directly in cell energy balance equations. Add continuity: `inlet.mdot + outlet.mdot ~ 0`. No need for a redundant local `mdot` variable.
 
 ---
 

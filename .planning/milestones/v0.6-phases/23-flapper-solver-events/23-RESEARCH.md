@@ -46,7 +46,7 @@ None — discussion stayed within phase scope.
 | FLAP-01 | `Flapper` component — MTK ODESystem with FlowPorts, internal `ref_mdot(t)` variable, parameters `dt`, `threshold`, `T_open` (init=Inf) | Verified: state var + FlowPorts pattern confirmed |
 | FLAP-02 | C1 smooth ramp (`3*xi^2 - 2*xi^3` where `xi = clamp((t - T_open)/dt, 0, 1)`) interpolates resistance | Verified: `clamp()` works natively in MTK symbolic eqs; anonymous fn not needed |
 | FLAP-03 | MTK continuous event: when `ref_mdot - threshold` crosses zero from above, set `T_open = t`; no solver restart | Verified: `affect_neg = [T_open ~ t]` fires on downward crossing; `affect = nothing` ignores upward |
-| FLAP-04 | User wires trigger via `flapper.ref_mdot ~ reference_component.port_in.mdot` as plain algebraic equation | Verified: `ref_mdot` declared with no equation in component — user provides it during composition |
+| FLAP-04 | User wires trigger via `flapper.ref_mdot ~ reference_component.inlet.mdot` as plain algebraic equation | Verified: `ref_mdot` declared with no equation in component — user provides it during composition |
 | FLAP-05 | Test: Flapper remains closed under positive ref_mdot — near-zero leakage | Research confirms R_closed=1e8 gives near-zero flow; test strategy clear |
 | FLAP-06 | Test: Flapper opens when ref_mdot crosses threshold — T_open recorded, smooth ramp proceeds | Verified: full event-trigger-ramp pattern works end-to-end in Julia tests |
 | SOLV-01 | `solve_transient` accepts optional `callbacks` keyword argument for user-supplied `CallbackSet` | Already implemented at `src/solvers.jl:99-118`; only a test is needed |
@@ -155,8 +155,8 @@ function Flapper(; name, dt = 5.0, threshold = 0.01, R_closed = 1e8, R_open = 10
     end
     vars = @variables T_open(t) = 1e30 xi(t) ref_mdot(t)
 
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet  = FlowPort()
+    @named outlet = FlowPort()
 
     cb = SymbolicContinuousCallback(
         [ref_mdot - threshold ~ 0],
@@ -165,20 +165,20 @@ function Flapper(; name, dt = 5.0, threshold = 0.01, R_closed = 1e8, R_open = 10
     )
 
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
+        inlet.mdot + outlet.mdot ~ 0,
         D(T_open) ~ 0,
         xi ~ clamp((t - T_open) / dt, 0.0, 1.0),
-        port_in.P - port_out.P ~ (R_closed + (R_open - R_closed) * (3*xi^2 - 2*xi^3)) * port_in.mdot,
-        port_out.T ~ instream(port_in.T),
-        port_in.T  ~ instream(port_out.T),
+        inlet.P - outlet.P ~ (R_closed + (R_open - R_closed) * (3*xi^2 - 2*xi^3)) * inlet.mdot,
+        outlet.T ~ instream(inlet.T),
+        inlet.T  ~ instream(outlet.T),
         # ref_mdot has no equation in this component -- user wires it during composition
     ]
 
-    compose(System(eqs, t, vars, pars; name=name, continuous_events=[cb]), port_in, port_out)
+    compose(System(eqs, t, vars, pars; name=name, continuous_events=[cb]), inlet, outlet)
 end
 ```
 
-**Note:** `ref_mdot` is declared in `vars` with no equation in the component. MTK will require exactly one equation for it during composition — the user provides `flapper.ref_mdot ~ some_component.port_in.mdot`.
+**Note:** `ref_mdot` is declared in `vars` with no equation in the component. MTK will require exactly one equation for it during composition — the user provides `flapper.ref_mdot ~ some_component.inlet.mdot`.
 
 ### Pattern 5: SOLV-01 Callback Smoke Test
 
@@ -248,7 +248,7 @@ end
 
 **Why it happens:** `ref_mdot` is declared in `vars` with no equation inside Flapper. MTK counts it as a free unknown requiring one equation. If the user forgets `flapper.ref_mdot ~ ...` during composition, the system is under-determined.
 
-**How to avoid:** The compose step MUST include `flapper.ref_mdot ~ reference_component.port_in.mdot`. Document this in the Flapper docstring.
+**How to avoid:** The compose step MUST include `flapper.ref_mdot ~ reference_component.inlet.mdot`. Document this in the Flapper docstring.
 
 **Warning signs:** `mtkcompile` error mentioning `ref_mdot` or structural analysis failure when Flapper is in the system.
 
@@ -297,7 +297,7 @@ eqs = [
     ...
     D(T_open) ~ 0,
     xi ~ clamp((t - T_open) / dt, 0.0, 1.0),
-    port_in.P - port_out.P ~ (R_closed + (R_open - R_closed) * (3*xi^2 - 2*xi^3)) * port_in.mdot,
+    inlet.P - outlet.P ~ (R_closed + (R_open - R_closed) * (3*xi^2 - 2*xi^3)) * inlet.mdot,
     ...
 ]
 ```
@@ -310,7 +310,7 @@ System(eqs, t, vars, pars; name=name, continuous_events=[cb])
 
 ### Compose Pattern (follows existing components)
 ```julia
-compose(System(eqs, t, vars, pars; name=name, continuous_events=[cb]), port_in, port_out)
+compose(System(eqs, t, vars, pars; name=name, continuous_events=[cb]), inlet, outlet)
 ```
 
 ### SOLV-01 Test — CallbackSet Passthrough (solve_transient already wired)

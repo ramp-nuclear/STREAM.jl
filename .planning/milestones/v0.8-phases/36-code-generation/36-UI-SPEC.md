@@ -167,14 +167,14 @@ New structure:
 |---------|-----------|-------|---------|
 | Component dropdown | shadcn Select | 140px | Populated from canvas node instanceNames. Placeholder: "Component" |
 | Dot separator | Static text "." | auto | `text-muted-foreground` |
-| Port.Field dropdown | shadcn Select | 120px | Options: `port_in.P`, `port_out.P` only. Placeholder: "Port" |
+| Port.Field dropdown | shadcn Select | 120px | Options: `inlet.P`, `outlet.P` only. Placeholder: "Port" |
 | Tilde separator | Static text "~" | auto | `text-muted-foreground`, `font-mono` |
 | Value input | shadcn Input | 120px | Numeric. Placeholder: "1.0e5" |
 | Add button | shadcn Button | auto | Label: "Add", variant: `outline`, size: `sm`. Disabled when any field is empty. |
 
 **BC entry row (existing entries):**
 ```
-pump_1.port_in.P ~ 1.0e5                                    [x]
+pump_1.inlet.P ~ 1.0e5                                    [x]
 ```
 
 | Element | Details |
@@ -187,7 +187,7 @@ pump_1.port_in.P ~ 1.0e5                                    [x]
 **Empty state (no BCs added):**
 ```
 No boundary conditions added.
-Add a pressure anchor (e.g., pump.port_in.P ~ 1.0e5).
+Add a pressure anchor (e.g., pump.inlet.P ~ 1.0e5).
 ```
 
 ### Code Preview (Code Tab)
@@ -227,7 +227,7 @@ Displayed as a single Julia comment line in the same monospace font and muted fo
 | Code toggle | "Code" (toolbar toggle button) |
 | Tab labels | "Code" / "BCs" |
 | Empty state (code, no nodes) | `# Add components to the canvas to generate Julia code.` |
-| Empty state (BCs, no entries) | Heading: "No boundary conditions added." Body: "Add a pressure anchor (e.g., pump.port_in.P ~ 1.0e5)." |
+| Empty state (BCs, no entries) | Heading: "No boundary conditions added." Body: "Add a pressure anchor (e.g., pump.inlet.P ~ 1.0e5)." |
 | BC add button | "Add" |
 | BC delete button | No label (icon-only X button, accessible via `aria-label="Remove boundary condition"`) |
 | BC component placeholder | "Component" |

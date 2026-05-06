@@ -81,7 +81,7 @@ channel = ChannelAndContacts(
 )
 
 # FlowGraph: Pump+HX on forward edge, Channel on return edge.
-# reference_node pins absolute pressure at "A" (matches Julia: pump.port_in.P ~ 1e5).
+# reference_node pins absolute pressure at "A" (matches Julia: pump.inlet.P ~ 1e5).
 fg = FlowGraph(
     flow_edge(("A", "B"), pump, hx),
     flow_edge(("B", "A"), channel),

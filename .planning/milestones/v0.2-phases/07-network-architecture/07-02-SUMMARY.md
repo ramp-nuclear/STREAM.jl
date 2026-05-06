@@ -24,7 +24,7 @@ tech-stack:
   added: []
   patterns:
     - "MTK variadic connect(a, b, c) generates Kirchhoff sum=0 at junctions — no explicit Junction component needed"
-    - "Pressure anchor pump.port_in.P ~ 1.0e5 required when Kirchhoff equations leave absolute pressure underdetermined"
+    - "Pressure anchor pump.inlet.P ~ 1.0e5 required when Kirchhoff equations leave absolute pressure underdetermined"
     - "Physics-based initial guess (mdot_guess = dP / R_eq / 3) avoids degenerate mdot=0 fixed point in KINSOL"
 
 key-files:
@@ -36,7 +36,7 @@ key-files:
 
 key-decisions:
   - "build_cube uses variadic connect() at each corner — no Junction component needed; MTK generates all Kirchhoff equations automatically"
-  - "Pressure anchor at pump.port_in is required — body-diagonal Kirchhoff system leaves absolute pressure as a free variable"
+  - "Pressure anchor at pump.inlet is required — body-diagonal Kirchhoff system leaves absolute pressure as a free variable"
   - "Initial guess of mdot_guess = mdot_analytical / 3 (one-third of total, matching source branch symmetry) sufficient for KINSOL convergence"
 
 patterns-established:
@@ -86,7 +86,7 @@ _Note: TDD tasks have two logical phases (RED failing test written first, then G
 
 ## Decisions Made
 - MTK's variadic `connect(a, b, c, d)` directly implements junctions — no Junction component needed; this is architecturally cleaner and generates correct Kirchhoff equations automatically
-- Pressure anchor `pump.port_in.P ~ 1.0e5` is essential: the cube Kirchhoff network determines pressure differences but leaves the absolute pressure level underdetermined; the anchor fixes this
+- Pressure anchor `pump.inlet.P ~ 1.0e5` is essential: the cube Kirchhoff network determines pressure differences but leaves the absolute pressure level underdetermined; the anchor fixes this
 - Initial guess `mdot_guess = mdot_analytical / 3` (each of the 3 source branches from corner 0 carries one-third) provided sufficient physics-based starting point for KINSOL convergence
 
 ## Deviations from Plan

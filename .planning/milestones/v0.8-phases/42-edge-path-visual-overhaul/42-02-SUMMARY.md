@@ -9,7 +9,7 @@ requires:
   - phase: 41-stream-composer-gui
     provides: StreamNode component, projectIO counter reconstruction
 provides:
-  - FlowPort handle polarity coloring (port_in blue-300, port_out blue-700)
+  - FlowPort handle polarity coloring (inlet blue-300, outlet blue-700)
   - CSS cursor fix for ReactFlow handles during edge drag
   - componentId-based reconstructInstanceCounters (bug fix)
 affects: [42-edge-path-visual-overhaul]
@@ -43,7 +43,7 @@ completed: 2026-04-03
 
 # Phase 42 Plan 02: Handle Polarity Coloring, Cursor Fix, Counter Bug Fix Summary
 
-**FlowPort handles colored by polarity (port_in light blue, port_out dark blue), cursor crosshair fix on handle drag, and componentId-based counter reconstruction eliminating custom-name inflation bug**
+**FlowPort handles colored by polarity (inlet light blue, outlet dark blue), cursor crosshair fix on handle drag, and componentId-based counter reconstruction eliminating custom-name inflation bug**
 
 ## Performance
 
@@ -54,7 +54,7 @@ completed: 2026-04-03
 - **Files modified:** 4
 
 ## Accomplishments
-- FlowPort port_in handles render with light blue (#93c5fd) background, port_out with dark blue (#1d4ed8)
+- FlowPort inlet handles render with light blue (#93c5fd) background, outlet with dark blue (#1d4ed8)
 - CSS cursor fix prevents cursor disappearance on ReactFlow handles during edge drag
 - reconstructInstanceCounters now uses componentId-based matching, preventing custom-renamed nodes from inflating counters
 

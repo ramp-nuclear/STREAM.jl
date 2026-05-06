@@ -99,14 +99,14 @@ ps = fill(1.0 / (NZ * NX), NZ, NX)
 @named hx_r = HeatExchanger(T_INLET)
 
 conns = [
-    connect(pump_l.port_out, hx_l.port_in),
-    connect(hx_l.port_out, rods.cac_l.port_in),
-    connect(rods.cac_l.port_out, pump_l.port_in),
-    pump_l.port_in.P ~ 1.0e5,
-    connect(pump_r.port_out, hx_r.port_in),
-    connect(hx_r.port_out, rods.cac_r.port_in),
-    connect(rods.cac_r.port_out, pump_r.port_in),
-    pump_r.port_in.P ~ 1.0e5,
+    connect(pump_l.outlet, hx_l.inlet),
+    connect(hx_l.outlet, rods.cac_l.inlet),
+    connect(rods.cac_l.outlet, pump_l.inlet),
+    pump_l.inlet.P ~ 1.0e5,
+    connect(pump_r.outlet, hx_r.inlet),
+    connect(hx_r.outlet, rods.cac_r.inlet),
+    connect(rods.cac_r.outlet, pump_r.inlet),
+    pump_r.inlet.P ~ 1.0e5,
     rods.hd.power ~ POWER,
 ]
 @named sys = compose(System(conns, t; name=:mtr_example), pump_l, hx_l, pump_r, hx_r, rods)
@@ -121,8 +121,8 @@ op = vcat(
     [ssys.rods.hd.T[i, j] => T_w for i in 1:NZ for j in 1:NX],
     [ssys.rods.cac_l.T[i] => T_w for i in 1:NZ],
     [ssys.rods.cac_r.T[i] => T_w for i in 1:NZ],
-    [ssys.rods.cac_l.port_in.mdot => +0.250],
-    [ssys.rods.cac_r.port_in.mdot => +0.250],
+    [ssys.rods.cac_l.inlet.mdot => +0.250],
+    [ssys.rods.cac_r.inlet.mdot => +0.250],
 )
 
 println("Solving steady state...")

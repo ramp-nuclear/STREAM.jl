@@ -82,7 +82,7 @@ Each task was committed atomically:
 ## Decisions Made
 
 - No behavior change to the component equations: `HeatExchanger` is an exact rename/move of `_make_temp_bc`
-- The local variable name `bc` retained in all build_loop functions since connections reference `bc.port_in` / `bc.port_out`
+- The local variable name `bc` retained in all build_loop functions since connections reference `bc.inlet` / `bc.outlet`
 
 ## Deviations from Plan
 

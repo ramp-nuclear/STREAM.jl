@@ -123,7 +123,7 @@ Last activity: 2026-04-10
 
 ### Key Decisions (v0.8 GUI)
 
-- [v0.8 EDGE-01]: Bidirectional pair detection matches on node IDs only (not handles) -- real loops use different port names (port_out->port_in) in each direction; enrichEdges is a pure exported function for testability
+- [v0.8 EDGE-01]: Bidirectional pair detection matches on node IDs only (not handles) -- real loops use different port names (outlet->inlet) in each direction; enrichEdges is a pure exported function for testability
 - [v0.8 SCAF-01]: Tailwind v4 + @tailwindcss/vite: npm create tauri-app installs Tailwind v4; shadcn init expects v3 config file. components.json and src/index.css created manually with v4 CSS variable design tokens (New York/Zinc style). Future `npx shadcn add [component]` works correctly with this setup.
 - [v0.8 SCAF-01]: vitest --passWithNoTests in test script: Vitest exits code 1 when no test files exist; flag added so CI passes before registry tests added in Plan 02.
 - [v0.8 SCAF-01]: tsconfig.json not tsconfig.app.json: Tauri react-ts template generates tsconfig.json + tsconfig.node.json; path aliases added to tsconfig.json directly.
@@ -148,7 +148,7 @@ Last activity: 2026-04-10
 - [v0.6]: @observed for diagnostic quantities not on RHS of other equations -- P[i], T_sat[i], T_ONB[i] qualify
 - [v0.4]: Re/Nu/velocity/Pe are @observed (not unknowns) -- pressure observables follow same rule
 - [v0.3]: New component files go in src/components/ -- subcooled_boiling.jl goes in src/physical_models/
-- [v0.6 LOF]: pressure anchor pump.port_in.P ~ 1.0e5 required for multi-branch networks -- P[i] absolute values depend on this anchor being present
+- [v0.6 LOF]: pressure anchor pump.inlet.P ~ 1.0e5 required for multi-branch networks -- P[i] absolute values depend on this anchor being present
 
 ### Pending Todos
 

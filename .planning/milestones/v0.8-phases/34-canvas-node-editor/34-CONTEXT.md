@@ -87,7 +87,7 @@ Users can visually build hydraulic system topologies by placing components from 
 ## Specific Ideas
 
 - Node card: type name as `text-xs text-muted-foreground`, instance name as `font-semibold text-sm` — functional, unstyled for Phase 38
-- Handle positioning: iterate `component.ports.filter(p => p.type === "FlowPort")`, map `side` → ReactFlow `Position` enum (left/right/top/bottom), use `source` type for port_out, `target` type for port_in
+- Handle positioning: iterate `component.ports.filter(p => p.type === "FlowPort")`, map `side` → ReactFlow `Position` enum (left/right/top/bottom), use `source` type for outlet, `target` type for inlet
 - zundo note: if the library has issues, fall back to manual `past[]`/`future[]` snapshot arrays — user was explicit about this as the escape hatch
 
 </specifics>
@@ -97,7 +97,7 @@ Users can visually build hydraulic system topologies by placing components from 
 
 - ThermalPort handle rendering — Phase 40
 - Component icons/colors — Phase 38 (UI design pass)
-- Edge labels showing `connect(a.port_out, b.port_in)` — could be added in Phase 36 (code gen) or Phase 38
+- Edge labels showing `connect(a.outlet, b.inlet)` — could be added in Phase 36 (code gen) or Phase 38
 - Multi-select with lasso tool — ReactFlow supports this out of the box; may come for free, but no explicit requirement
 
 </deferred>

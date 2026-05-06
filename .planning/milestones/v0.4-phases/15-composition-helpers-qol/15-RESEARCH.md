@@ -173,14 +173,14 @@ Note: In the existing tests, both channels connect via `:thermal_left` face (not
 
 **What:** Inspect composed ODESystem equations, identify those containing gravity terms, check if they sum to zero at zero flow.
 
-**Implementation approach:** The `dP` equation in `ChannelAndContacts` (line 10 in equation list) contains the gravity term `rho_water(T[i_mid]) * g_acc * L`. The `Gravity` component has `port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H`.
+**Implementation approach:** The `dP` equation in `ChannelAndContacts` (line 10 in equation list) contains the gravity term `rho_water(T[i_mid]) * g_acc * L`. The `Gravity` component has `inlet.P - outlet.P ~ rho_water(T_in) * 9.80665 * H`.
 
 The algorithm from CONTEXT (substitute mdot=0 and check pressure consistency) can be implemented as:
 
 ```julia
 function check_gravity_mismatch(sys::ModelingToolkit.System) -> Symbol
     # 1. Extract all equations from full system (ModelingToolkit.equations(sys))
-    # 2. Filter equations involving pressure (containing port_in.P, port_out.P, dP)
+    # 2. Filter equations involving pressure (containing inlet.P, outlet.P, dP)
     # 3. Substitute mdot=0 symbolically
     # 4. For each resulting pressure equation, evaluate the RHS at a reference T
     # 5. Check if the linear pressure system is consistent (gravity terms cancel)
@@ -312,7 +312,7 @@ compose(System(eqs, t, all_vars, pars; name=name), ...)
 all_vars = [collect(T); T_out; dP; Q_wall_total]
 # observed expressions use the already-baked-in eqs for Re, Nu, h_tc, v
 obs = [
-    Re[i] ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i]))  for i in 1:n ...,
+    Re[i] ~ abs(inlet.mdot) * Dh / (A * mu_water(T[i]))  for i in 1:n ...,
     Nu[i] ~ htc_correlation(Re[i], Pr_i)                    for i in 1:n ...,
     # ... etc.
 ]
@@ -357,7 +357,7 @@ Based on the CONTEXT.md decision table and the existing `_channel_base_eqs` code
 
 | Observed Variable | Expression | Notes |
 |------------------|------------|-------|
-| `Re[i]` | `abs(port_in.mdot) * Dh / (A * mu_water(T[i]))` | Already in `_channel_base_eqs` as eq — move to observed |
+| `Re[i]` | `abs(inlet.mdot) * Dh / (A * mu_water(T[i]))` | Already in `_channel_base_eqs` as eq — move to observed |
 | `Nu[i]` | `htc_correlation(Re[i], Pr_i)` where `Pr_i = cp_water(T[i])*mu_water(T[i])/k_water(T[i])` | Move from eqs |
 | `h_tc[i]` | `Nu[i] * k_water(T[i]) / Dh` | Currently `h_tc[i]` (single); split into left/right |
 | `h_tc_left[i]` | `Nu[i] * k_water(T[i]) / Dh * heated_parts[1]` | New split from h_tc |
@@ -365,7 +365,7 @@ Based on the CONTEXT.md decision table and the existing `_channel_base_eqs` code
 | `T_wall_left[i]` | `thermal_left[i].T` | Alias for wall temp |
 | `T_wall_right[i]` | `thermal_right[i].T` | Alias for wall temp |
 | `Pe[i]` | `Re[i] * cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])` | Re * Pr |
-| `velocity[i]` | `port_in.mdot / (rho_water(T[i]) * A)` | Same as `v[i]` — rename or alias |
+| `velocity[i]` | `inlet.mdot / (rho_water(T[i]) * A)` | Same as `v[i]` — rename or alias |
 | `q_wall_left[i]` | `thermal_left[i].Q_flow` | Already in energy balance eqs |
 | `q_wall_right[i]` | `thermal_right[i].Q_flow` | Already in energy balance eqs |
 

@@ -13,8 +13,8 @@
 - Format: one-line description + `# Arguments` (constructor kwargs only) + `# Ports` + `# Returns`
 - `# Arguments`: list only the kwargs the caller passes (e.g., `n`, `geometry`, `name`, `htc_func`). Omit MTK-internal metadata.
 - `# Ports`: list the connector ports each component exposes with their types.
-  - Standard flow components (Channel, Pump, Friction, Gravity, Resistor, Inertia, HeatExchanger, ChannelHeatFlux): `port_in`, `port_out` (FlowPort)
-  - ChannelAndContacts: `port_in`, `port_out` (FlowPort) + `thermal_left[1:n]`, `thermal_right[1:n]` (ThermalPort arrays)
+  - Standard flow components (Channel, Pump, Friction, Gravity, Resistor, Inertia, HeatExchanger, ChannelHeatFlux): `inlet`, `outlet` (FlowPort)
+  - ChannelAndContacts: `inlet`, `outlet` (FlowPort) + `thermal_left[1:n]`, `thermal_right[1:n]` (ThermalPort arrays)
   - HeatDiffusion: `thermal_left[1:n]`, `thermal_right[1:n]` (ThermalPort arrays, no FlowPorts)
   - ConstantTemperature: `thermal` (ThermalPort, single — it's a BC not a component)
 - `# Returns`: the ODESystem
@@ -40,7 +40,7 @@
 - Add a short **MTK Patterns** section covering non-obvious conventions:
   - Why `@register_symbolic` for fluid properties (not plain functions)
   - Why `ifelse()` for flow reversal (not if-branches: solver discontinuity)
-  - Why `vars=[]` for Inertia (MTK auto-promotes `Dt(port_in.mdot)`)
+  - Why `vars=[]` for Inertia (MTK auto-promotes `Dt(inlet.mdot)`)
   - When to use `@observed` vs plain unknowns (diagnostic-only vs equation-referenced)
   - Why `mtkcompile` is required before solve (symbolic reduction, Jacobian)
 - Keep CLAUDE.md focused: file structure + component conventions + MTK patterns. Not a tutorial.
@@ -98,16 +98,16 @@ The fluids docstrings (DOC-04) are the closest to complete — they use Julia's 
 
 | Component | File | Has Docstring | Has Inline Comments | Notes |
 |-----------|------|---------------|---------------------|-------|
-| Channel | `src/components/channel.jl` | No | Minimal | Ports: port_in, port_out (FlowPort); also has thermal (FlowPort — single scalar ThermalPort) |
+| Channel | `src/components/channel.jl` | No | Minimal | Ports: inlet, outlet (FlowPort); also has thermal (FlowPort — single scalar ThermalPort) |
 | Pump | `src/components/pump.jl` | No | No | Two modes: dP_pump OR mdot0 (mutually exclusive) |
-| Friction | `src/components/resistors.jl` | No | No | Ports: port_in, port_out (FlowPort) |
-| Gravity | `src/components/resistors.jl` | No | No | Ports: port_in, port_out (FlowPort) |
-| Resistor | `src/components/resistors.jl` | No | No | Ports: port_in, port_out (FlowPort) |
-| Inertia | `src/components/misc.jl` | No | Yes (good block) | Notable: `vars=[]`, MTK auto-promotes Dt(port_in.mdot) |
-| HeatExchanger | `src/components/misc.jl` | No | Yes (good block) | Ports: port_in, port_out (FlowPort) |
+| Friction | `src/components/resistors.jl` | No | No | Ports: inlet, outlet (FlowPort) |
+| Gravity | `src/components/resistors.jl` | No | No | Ports: inlet, outlet (FlowPort) |
+| Resistor | `src/components/resistors.jl` | No | No | Ports: inlet, outlet (FlowPort) |
+| Inertia | `src/components/misc.jl` | No | Yes (good block) | Notable: `vars=[]`, MTK auto-promotes Dt(inlet.mdot) |
+| HeatExchanger | `src/components/misc.jl` | No | Yes (good block) | Ports: inlet, outlet (FlowPort) |
 | ConstantTemperature | `src/components/misc.jl` | No | Yes (brief) | Port: thermal (ThermalPort, single) |
-| ChannelAndContacts | `src/components/thermal_channel.jl` | No | Yes (detailed header) | Ports: port_in, port_out (FlowPort) + thermal_left[1:n], thermal_right[1:n] |
-| ChannelHeatFlux | `src/components/thermal_channel.jl` | No | Yes (good block) | Ports: port_in, port_out only — no ThermalPorts |
+| ChannelAndContacts | `src/components/thermal_channel.jl` | No | Yes (detailed header) | Ports: inlet, outlet (FlowPort) + thermal_left[1:n], thermal_right[1:n] |
+| ChannelHeatFlux | `src/components/thermal_channel.jl` | No | Yes (good block) | Ports: inlet, outlet only — no ThermalPorts |
 | HeatDiffusion | `src/components/heat_diffusion.jl` | No | Yes (detailed header) | Ports: thermal_left[1:n], thermal_right[1:n] only |
 
 **Note on Channel's `thermal` port:** Channel has a single `thermal` FlowPort (not an array), used for a wall temperature BC. This is distinct from ChannelAndContacts which has per-cell arrays. The docstring must document this port accurately.
@@ -165,7 +165,7 @@ They are missing structured `# Arguments` and `# Returns` sections. The fix is t
 **Content to add for MTK Patterns section (from CONTEXT.md):**
 1. Why `@register_symbolic` for fluid properties — plain Julia functions can't accept MTK's `Num` type (symbolic variables); `@register_symbolic` wraps them to be opaque to Symbolics.jl's tracing, allowing them to appear in MTK equations without being differentiated symbolically.
 2. Why `ifelse()` for flow reversal (and regime switching) — Julia `if`/`else` on a symbolic expression would branch on the concrete value at trace time (always one branch, degenerate). `ifelse()` is the MTK/Symbolics.jl form of a ternary that emits a symbolic `ifelse` node, enabling smooth transitions and correct Jacobians.
-3. Why `vars=[]` for Inertia — MTK auto-promotes `port_in.mdot` to a state variable when it appears inside `Dt(port_in.mdot)`. Declaring it in `vars` would be redundant and confusing; leaving `vars=[]` lets MTK handle the promotion.
+3. Why `vars=[]` for Inertia — MTK auto-promotes `inlet.mdot` to a state variable when it appears inside `Dt(inlet.mdot)`. Declaring it in `vars` would be redundant and confusing; leaving `vars=[]` lets MTK handle the promotion.
 4. When to use `@observed` vs plain unknowns — `@observed` variables are computed post-solve (not part of the DAE); use for diagnostic quantities that are not referenced in any other equation. If a variable appears on the RHS of another equation, it must be a plain unknown.
 5. Why `mtkcompile` is required before solve — MTK's symbolic IR needs structural analysis, index reduction (DAE to ODE form), Jacobian sparsity computation, and code generation. Passing an uncompiled `System` to `solve` silently omits these and will either error or give wrong results.
 
@@ -259,17 +259,17 @@ Based on the existing THERM-03 pattern (test_channel.jl lines 143-159), the CHF 
     @named chf  = ChannelHeatFlux(n=n, geometry=PipeGeometry_circular(L_ch, D_ch), T_wall=T_wall)
     @named bc   = HeatExchanger(T_bc=T_inlet)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, chf.port_in),
-        connect(chf.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
-        chf.port_in.T  ~ T_inlet,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, chf.inlet),
+        connect(chf.outlet, pump.inlet),
+        pump.inlet.P ~ 1.0e5,
+        chf.inlet.T  ~ T_inlet,
     ]
     @named sys = compose(System(conns, t; name=:sys), pump, bc, chf)
     ssys = mtkcompile(sys)
     T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
     op = [ssys.chf.T[i] => T_guess[i] for i in 1:n]
-    push!(op, ssys.chf.port_in.mdot => 0.490)
+    push!(op, ssys.chf.inlet.mdot => 0.490)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -347,7 +347,7 @@ Single-phase convective channel with n axial finite-volume cells and one-sided w
 - `friction_correlation`: friction correlation function `(Re) -> f_darcy`; default `blasius_friction`
 
 # Ports
-- `port_in`, `port_out` — `FlowPort` (hydraulic: pressure, mass flow, temperature)
+- `inlet`, `outlet` — `FlowPort` (hydraulic: pressure, mass flow, temperature)
 - `thermal` — `ThermalPort` (wall temperature BC; `thermal.T` drives the energy balance)
 
 # Returns
@@ -418,7 +418,7 @@ Density [kg/m³] as `Float64`.
    - Recommendation: Yes, list `name` first with description "system name (Symbol)". All MTK components require it and callers always pass it.
 
 2. **`@vars=[]` note in Inertia docstring**
-   - What we know: Inertia uses `vars=[]` because MTK auto-promotes `port_in.mdot` as a state when it appears in `Dt(port_in.mdot)`. This is a non-obvious MTK pattern.
+   - What we know: Inertia uses `vars=[]` because MTK auto-promotes `inlet.mdot` as a state when it appears in `Dt(inlet.mdot)`. This is a non-obvious MTK pattern.
    - What's unclear: Should this implementation detail appear in the docstring or only in CLAUDE.md?
    - Recommendation: Keep it out of the docstring (CONTEXT.md: no observables/implementation notes). This belongs in the CLAUDE.md MTK Patterns section. The docstring should only document the interface.
 

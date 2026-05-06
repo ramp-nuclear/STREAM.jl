@@ -76,30 +76,30 @@ test/
 The Resistor follows the Pump/Gravity template: two FlowPorts, scalar parameter, no array
 variables, no ThermalPort.
 
-**Equation:** `port_in.P - port_out.P ~ R * port_in.mdot`
+**Equation:** `inlet.P - outlet.P ~ R * inlet.mdot`
 
-Note: `dp ~ R * mdot` where `dp = port_in.P - port_out.P`. Using `port_in.mdot` (positive =
+Note: `dp ~ R * mdot` where `dp = inlet.P - outlet.P`. Using `inlet.mdot` (positive =
 into component) means positive mdot drives positive pressure drop from in to out.
 
 **Temperature pass-through:** Same pattern as Pump and Gravity. The Resistor is isothermal —
 no heat addition. The stream T just passes through:
-- `port_out.T ~ instream(port_in.T)`
-- `port_in.T  ~ instream(port_out.T)`
+- `outlet.T ~ instream(inlet.T)`
+- `inlet.T  ~ instream(outlet.T)`
 
 **Example (directly mirrors existing components):**
 ```julia
 # Source: src/components.jl (Pump/Gravity pattern)
 function Resistor(; name, R)
     pars = @parameters R = R
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet  = FlowPort()
+    @named outlet = FlowPort()
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ R * port_in.mdot,
-        port_out.T ~ instream(port_in.T),
-        port_in.T  ~ instream(port_out.T),
+        inlet.mdot + outlet.mdot ~ 0,
+        inlet.P - outlet.P ~ R * inlet.mdot,
+        outlet.T ~ instream(inlet.T),
+        inlet.T  ~ instream(outlet.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    compose(System(eqs, t, [], pars; name=name), inlet, outlet)
 end
 ```
 
@@ -112,7 +112,7 @@ end
 function connect(sys1::AbstractSystem, sys2::AbstractSystem, syss::AbstractSystem...)
 ```
 
-When `connect(a.port_out, b.port_in, c.port_in)` is used:
+When `connect(a.outlet, b.inlet, c.inlet)` is used:
 - **Flow** (`mdot`, marked `[connect = Flow]`): sum = 0, i.e. `a.mdot + b.mdot + c.mdot = 0`
 - **Across** (`P`, no connect annotation): all equal, i.e. `a.P = b.P = c.P`
 - **Stream** (`T`, marked `[connect = Stream]`): `instream()` computes weighted mixture temperature
@@ -133,30 +133,30 @@ Edges (12 total, each is one Resistor):
   Along y: (0,2),(1,3),(4,6),(5,7)
   Along z: (0,1),(2,3),(4,5),(6,7)
 
-Flow direction: Pump port_out -> corner 0 (source node)
-                Pump port_in  <- corner 7 (sink node)
+Flow direction: Pump outlet -> corner 0 (source node)
+                Pump inlet  <- corner 7 (sink node)
 ```
 
 At each interior corner (1-6), exactly 3 Resistor ports meet. The connect() call joins them:
 
 ```julia
 # Corner 1 (connected to edges 0-1, 1-3, 1-5):
-connect(r01.port_out, r13.port_in, r15.port_in)
+connect(r01.outlet, r13.inlet, r15.inlet)
 ```
 
 Corner 0 (source) and corner 7 (sink) also connect to the pump:
 ```julia
 # Corner 0: pump outlet + 3 resistor inlets
-connect(pump.port_out, r01.port_in, r02.port_in, r04.port_in)
+connect(pump.outlet, r01.inlet, r02.inlet, r04.inlet)
 # Corner 7: pump inlet + 3 resistor outlets
-connect(pump.port_in,  r37.port_out, r57.port_out, r67.port_out)
+connect(pump.inlet,  r37.outlet, r57.outlet, r67.outlet)
 ```
 
 ### Pattern 4: Pressure Anchor
 
 The gauge freedom (one DOF for absolute pressure level) must be fixed with one constraint:
 ```julia
-pump.port_in.P ~ 1.0e5   # same pattern as build_loop
+pump.inlet.P ~ 1.0e5   # same pattern as build_loop
 ```
 
 ### Pattern 5: Temperature Constraint
@@ -169,7 +169,7 @@ However, there is a subtle issue: with Stream variables in a multi-branch isothe
 MTK may still require a temperature anchor. Check if `mtkcompile` raises a singularity or
 extra-equations error about temperature. If it does, add a single temperature pin:
 ```julia
-r_any.port_in.T ~ T_ambient   # e.g. 300.0 K
+r_any.inlet.T ~ T_ambient   # e.g. 300.0 K
 ```
 
 **Note from STATE.md:** "Flow reversal with ifelse() — convergence in multi-branch networks is
@@ -209,9 +209,9 @@ risks sign errors.
 
 ### Pitfall 1: Incorrect pressure drop sign convention
 **What goes wrong:** Solver gets negative mdot or solution doesn't converge.
-**Why it happens:** `port_in.P - port_out.P ~ R * mdot` with signed mdot — if flow reverses,
+**Why it happens:** `inlet.P - outlet.P ~ R * mdot` with signed mdot — if flow reverses,
 dP reverses too. This is physically correct for a linear resistor.
-**How to avoid:** Use `port_in.P - port_out.P ~ R * port_in.mdot` consistently. The Pump sets
+**How to avoid:** Use `inlet.P - outlet.P ~ R * inlet.mdot` consistently. The Pump sets
 the flow direction; the Resistor's linear equation handles both directions.
 **Warning signs:** `sol.retcode != ReturnCode.Success` or mdot ≈ 0 everywhere.
 
@@ -219,7 +219,7 @@ the flow direction; the Resistor's linear equation handles both directions.
 **What goes wrong:** `mtkcompile` raises "singular" or the solver returns NaN.
 **Why it happens:** Kirchhoff networks have one floating pressure DOF (only pressure differences
 are determined by flow equations). MTK cannot determine the absolute pressure level.
-**How to avoid:** Always add `pump.port_in.P ~ 1.0e5` (or equivalent) as a boundary condition.
+**How to avoid:** Always add `pump.inlet.P ~ 1.0e5` (or equivalent) as a boundary condition.
 **Warning signs:** `warn_initialize_determined` warning, or solver failure.
 
 ### Pitfall 3: Temperature DOF in isothermal network
@@ -228,7 +228,7 @@ fails with extra unknowns related to T stream variables.
 **Why it happens:** The stream T variables in FlowPort may introduce extra DOFs in an isothermal
 system where no component sets T.
 **How to avoid:** If `mtkcompile` fails on temperature variables, pin one temperature:
-`r01.port_in.T ~ 300.0`. For the standalone Resistor test, use
+`r01.inlet.T ~ 300.0`. For the standalone Resistor test, use
 `mtkcompile(; fully_determined=false)` (consistent with Phase 2 tests for Pump, Friction, Gravity).
 **Warning signs:** mtkcompile error mentioning T or stream variables; overdetermined system.
 
@@ -266,7 +266,7 @@ end
 ```julia
 # Source: ModelingToolkitBase/src/systems/connectors.jl line 25
 # connect() takes sys1, sys2, syss... (variadic)
-connect(node_a.port_out, node_b.port_in, node_c.port_in)
+connect(node_a.outlet, node_b.inlet, node_c.inlet)
 # => mdot_a_out + mdot_b_in + mdot_c_in = 0
 # => P_a_out = P_b_in = P_c_in
 ```
@@ -297,15 +297,15 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
     # Edges: (0,1),(0,2),(0,4),(1,3),(1,5),(2,3),(2,6),(3,7),(4,5),(4,6),(5,7),(6,7) = 12 OK
     @named r45 = Resistor(R=R)  # adds the missing edge (4,5)
     connections = [
-        connect(pump.port_out, r01.port_in, r02.port_in, r04.port_in),  # node 0: source
-        connect(r01.port_out,  r13.port_in, r15.port_in),               # node 1
-        connect(r02.port_out,  r23.port_in, r26.port_in),               # node 2
-        connect(r13.port_out,  r23.port_out, r37.port_in),              # node 3
-        connect(r04.port_out,  r45.port_in, r46.port_in),               # node 4
-        connect(r15.port_out,  r45.port_out, r57.port_in),              # node 5
-        connect(r26.port_out,  r46.port_out, r67.port_in),              # node 6
-        connect(pump.port_in,  r37.port_out, r57.port_out, r67.port_out), # node 7: sink
-        pump.port_in.P ~ 1.0e5,                                         # pressure anchor
+        connect(pump.outlet, r01.inlet, r02.inlet, r04.inlet),  # node 0: source
+        connect(r01.outlet,  r13.inlet, r15.inlet),               # node 1
+        connect(r02.outlet,  r23.inlet, r26.inlet),               # node 2
+        connect(r13.outlet,  r23.outlet, r37.inlet),              # node 3
+        connect(r04.outlet,  r45.inlet, r46.inlet),               # node 4
+        connect(r15.outlet,  r45.outlet, r57.inlet),              # node 5
+        connect(r26.outlet,  r46.outlet, r67.inlet),              # node 6
+        connect(pump.inlet,  r37.outlet, r57.outlet, r67.outlet), # node 7: sink
+        pump.inlet.P ~ 1.0e5,                                         # pressure anchor
     ]
     @named sys = compose(System(connections, t; name=:sys),
                          pump, r01, r02, r04, r13, r15, r23, r26, r37, r45, r46, r57, r67, r67)
@@ -323,7 +323,7 @@ dP_pump_val = 3.0e4
 mdot_analytical = dP_pump_val / (5/6 * R_val)   # = dP_pump * 6 / (5*R)
 
 # Check from solver:
-mdot_numerical = abs(sol[ssys.pump.port_out.mdot])
+mdot_numerical = abs(sol[ssys.pump.outlet.mdot])
 @test isapprox(mdot_numerical, mdot_analytical; rtol=0.01)
 ```
 
@@ -349,7 +349,7 @@ Axis  Edge   Corners  delta-bit
  Z    r67:   6 ↔ 7   bit-0
 ```
 
-Total: 12 edges. Corner 0 = source (pump.port_out), corner 7 = sink (pump.port_in).
+Total: 12 edges. Corner 0 = source (pump.outlet), corner 7 = sink (pump.inlet).
 
 Node connections at each corner (3 edges per corner):
 - Corner 0: r04, r02, r01 (pump source)
@@ -387,7 +387,7 @@ For verification in the Cube test:
 | Two-argument connect() chains | Single connect(a,b,c,...) call | MTK v9+ | Correct Kirchhoff generation |
 
 **Deprecated/outdated:**
-- Junction as explicit component: `connect(a, junction.port_in); connect(junction.port_out, b)` — this is the old Modelica 2.x approach. MTK and Modelica 3.x use multi-port connect() instead.
+- Junction as explicit component: `connect(a, junction.inlet); connect(junction.outlet, b)` — this is the old Modelica 2.x approach. MTK and Modelica 3.x use multi-port connect() instead.
 
 ---
 
@@ -396,7 +396,7 @@ For verification in the Cube test:
 1. **Temperature handling in isothermal Resistor network**
    - What we know: FlowPort has a Stream variable T; multi-branch connect() generates instream() mixture equations
    - What's unclear: Whether the Cube (isothermal) requires an explicit T anchor or if the stream equations are self-consistent
-   - Recommendation: Attempt mtkcompile without T anchor first. If it fails with temperature-related error, add `pump.port_in.T ~ 300.0` as a temperature anchor.
+   - Recommendation: Attempt mtkcompile without T anchor first. If it fails with temperature-related error, add `pump.inlet.T ~ 300.0` as a temperature anchor.
 
 2. **Initial guess sensitivity for Cube KINSOL solve**
    - What we know: Nonlinear networks can be sensitive to initial guess; linear R*mdot makes this less severe

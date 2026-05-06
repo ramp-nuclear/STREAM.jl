@@ -20,11 +20,11 @@ human_verification: []
 
 | #  | Truth                                                                                       | Status     | Evidence                                                                     |
 |----|---------------------------------------------------------------------------------------------|------------|------------------------------------------------------------------------------|
-| 1  | Channel energy balance uses ifelse() upwinding to select upstream T based on mdot sign      | VERIFIED   | channel.jl:65 `ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)`               |
+| 1  | Channel energy balance uses ifelse() upwinding to select upstream T based on mdot sign      | VERIFIED   | channel.jl:65 `ifelse(inlet.mdot >= 0, T_up_fwd, T_up_rev)`               |
 | 2  | ChannelAndContacts energy balance uses ifelse() upwinding                                   | VERIFIED   | thermal_channel.jl:99 same pattern                                           |
 | 3  | ChannelHeatFlux energy balance uses ifelse() upwinding                                      | VERIFIED   | thermal_channel.jl:215 same pattern                                          |
-| 4  | port_in.T is wired to T[1] in Channel and _channel_base_eqs                                 | PARTIAL    | Reverted to `instream(port_out.T)` — see note below; goal still achieved     |
-| 5  | velocity[i] observed variable uses abs(port_in.mdot) in ChannelAndContacts                 | VERIFIED   | thermal_channel.jl:124 `abs(port_in.mdot) / (rho_water(T[i]) * A)`          |
+| 4  | inlet.T is wired to T[1] in Channel and _channel_base_eqs                                 | PARTIAL    | Reverted to `instream(outlet.T)` — see note below; goal still achieved     |
+| 5  | velocity[i] observed variable uses abs(inlet.mdot) in ChannelAndContacts                 | VERIFIED   | thermal_channel.jl:124 `abs(inlet.mdot) / (rho_water(T[i]) * A)`          |
 | 6  | Channel produces reversed temperature profile (T[1] > T[n]) under negative mdot             | VERIFIED   | test_sign_safety.jl:59 `@test T_vals[1] > T_vals[n_sign]`; SUMMARY confirms |
 | 7  | ChannelAndContacts produces reversed temperature profile under negative mdot                 | VERIFIED   | test_sign_safety.jl:105 same assertion; energy balance rtol=0.01 passes      |
 | 8  | ChannelHeatFlux produces reversed temperature profile under negative mdot                   | VERIFIED   | test_sign_safety.jl:153 same assertion; energy balance rtol=0.01 passes      |
@@ -32,7 +32,7 @@ human_verification: []
 
 **Score:** 8/9 truths verified (truth 4 is partial — see note)
 
-**Note on truth 4 (port_in.T wiring):** Plan 20-01 changed `port_in.T ~ instream(port_out.T)` to `port_in.T ~ T[1]` in Channel constructor and `_channel_base_eqs`. Plan 20-02 discovered this caused `ExtraEquationsSystemException` in existing tests (over-constrains the system when callers pin `ch.port_in.T` externally). The revert to `port_in.T ~ instream(port_out.T)` is documented in 20-02-SUMMARY.md as an intentional bug fix. The overall phase goal — sign-safe channel behavior — is fully achieved through the ifelse() upwinding and abs(mdot) energy balance fixes. The port_in.T wiring is correct for the acausal MTK framework. This partial is informational, not a blocker.
+**Note on truth 4 (inlet.T wiring):** Plan 20-01 changed `inlet.T ~ instream(outlet.T)` to `inlet.T ~ T[1]` in Channel constructor and `_channel_base_eqs`. Plan 20-02 discovered this caused `ExtraEquationsSystemException` in existing tests (over-constrains the system when callers pin `ch.inlet.T` externally). The revert to `inlet.T ~ instream(outlet.T)` is documented in 20-02-SUMMARY.md as an intentional bug fix. The overall phase goal — sign-safe channel behavior — is fully achieved through the ifelse() upwinding and abs(mdot) energy balance fixes. The inlet.T wiring is correct for the acausal MTK framework. This partial is informational, not a blocker.
 
 ### Required Artifacts
 
@@ -47,7 +47,7 @@ human_verification: []
 
 | From                       | To                                     | Via                                            | Status   | Details                                                                    |
 |----------------------------|----------------------------------------|------------------------------------------------|----------|----------------------------------------------------------------------------|
-| `_channel_base_eqs`        | ChannelAndContacts, ChannelHeatFlux    | port_in.T wiring propagation                   | VERIFIED | Both call `_channel_base_eqs`; port_in.T ~ instream(port_out.T) at line 162 |
+| `_channel_base_eqs`        | ChannelAndContacts, ChannelHeatFlux    | inlet.T wiring propagation                   | VERIFIED | Both call `_channel_base_eqs`; inlet.T ~ instream(outlet.T) at line 162 |
 | `test_sign_safety.jl`      | `src/components/channel.jl`            | `Pump(mdot0=mdot_neg)` with Channel            | VERIFIED | test_sign_safety.jl:36 `Pump(mdot0=mdot_neg)` + Channel                   |
 | `test_sign_safety.jl`      | `src/components/thermal_channel.jl`    | ChannelAndContacts and ChannelHeatFlux usage   | VERIFIED | Lines 79 (ChannelAndContacts) and 132 (ChannelHeatFlux)                    |
 
@@ -80,7 +80,7 @@ None. All critical behaviors are verifiable from source:
 
 ### Gaps Summary
 
-No blocking gaps. The single partial truth (port_in.T wiring) reflects a deliberate, documented revert that preserved system correctness and is not a regression — existing tests continued to pass and the sign-safety tests pass with `fully_determined=false` and external port_in.T pinning. The phase goal is fully achieved.
+No blocking gaps. The single partial truth (inlet.T wiring) reflects a deliberate, documented revert that preserved system correctness and is not a regression — existing tests continued to pass and the sign-safety tests pass with `fully_determined=false` and external inlet.T pinning. The phase goal is fully achieved.
 
 ---
 

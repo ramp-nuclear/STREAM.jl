@@ -13,9 +13,9 @@ const CATEGORY_LEFT_BORDER_COLOR: Record<string, string> = {
   Thermal: "#f59e0b", // amber-500
 };
 
-const FLOW_IN_BG = "#60a5fa";       // blue-400 (port_in — incoming flow)
+const FLOW_IN_BG = "#60a5fa";       // blue-400 (inlet — incoming flow)
 const FLOW_IN_BORDER = "#1d4ed8";   // blue-700
-const FLOW_OUT_BG = "#f87171";      // red-400 (port_out — outgoing flow)
+const FLOW_OUT_BG = "#f87171";      // red-400 (outlet — outgoing flow)
 const FLOW_OUT_BORDER = "#b91c1c";  // red-700
 
 const THERMAL_HANDLE_COLOR = "#f59e0b"; // amber-500

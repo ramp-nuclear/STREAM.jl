@@ -122,7 +122,7 @@ Implementation sketch:
 if scb_correction !== nothing
     for i in 1:n
         # Compute h_spl[i] (the single-phase HTC from the correlation, same as current h_tc)
-        Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+        Re_i = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
         Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
         T_w_i = thermal_left[i].T
         h_spl_i = htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T[i]) / Dh
@@ -254,13 +254,13 @@ end
 if scb_correction !== nothing
     for i in 1:n
         # h_spl_i: single-phase HTC (what _channel_base_eqs computed)
-        Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+        Re_i = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
         Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
         T_w_i = thermal_left[i].T
         h_spl_i = htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T[i]) / Dh
 
         # Inline P[i] and T_ONB[i] expressions (avoid observed refs)
-        P_i = port_in.P - sum(dp[j] for j in 1:i) - (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+        P_i = inlet.P - sum(dp[j] for j in 1:i) - (i/n) * ((inlet.P - outlet.P) - sum(dp[j] for j in 1:n))
         T_sat_i = sat_temperature(P_i)
         q_spl_i = h_spl_i * (T_w_i - T[i])  # single-phase heat flux density [W/m^2]
 

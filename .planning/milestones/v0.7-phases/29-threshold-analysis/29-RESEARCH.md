@@ -133,7 +133,7 @@ end
 ```julia
 # Steady state: returns scalar or Vector{Float64}
 T_bulk_i = sol[channel_sys.T[i]]        # scalar for cell i
-mdot_val = sol[channel_sys.port_in.mdot] # scalar
+mdot_val = sol[channel_sys.inlet.mdot] # scalar
 
 # Transient: returns Vector{Float64} over time
 T_bulk_i_t = sol[channel_sys.T[i], :]    # vector over time for cell i
@@ -251,7 +251,7 @@ end
 n = length(...)  # determine from channel system
 T_bulk = [sol[channel_sys.T[i]] for i in 1:n]
 T_wall_left = [sol[channel_sys.T_wall_left[i]] for i in 1:n]
-mdot = sol[channel_sys.port_in.mdot]
+mdot = sol[channel_sys.inlet.mdot]
 # ... assemble into ChannelState
 ```
 

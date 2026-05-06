@@ -32,7 +32,7 @@ human_verification:
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Unconnected FlowPorts are detected and listed per node | VERIFIED | `validateTopology` iterates FlowPorts, tests "detects unconnected port_in/port_out" pass |
+| 1 | Unconnected FlowPorts are detected and listed per node | VERIFIED | `validateTopology` iterates FlowPorts, tests "detects unconnected inlet/outlet" pass |
 | 2 | Missing pressure BC detected when bcs array is empty | VERIFIED | VALD-02 branch in `validateTopology`; test "detects missing pressure boundary condition" passes |
 | 3 | Missing driving element detected when no Pump or Gravity exists | VERIFIED | VALD-03 branch in `validateTopology`; test "detects no driving element" passes |
 | 4 | All three checks pass silently when topology is valid | VERIFIED | Test "returns valid=true when all ports connected, has BCs, has Pump" passes |

@@ -10,9 +10,9 @@ dependency_graph:
 tech_stack:
   added: []
   patterns:
-    - abs(port_in.mdot) for sign-invariant advective energy flux in upwind FV
+    - abs(inlet.mdot) for sign-invariant advective energy flux in upwind FV
     - Reversed initial guess (reverse(T_fwd_guess)) for negative mdot solves
-    - Pump(mdot0=mdot_neg) + fully_determined=false + ch.port_in.T pin for reversed-flow topology
+    - Pump(mdot0=mdot_neg) + fully_determined=false + ch.inlet.T pin for reversed-flow topology
     - Q_advect = |mdot| * cp * (T_outlet - T_boundary_inlet) for reversed energy balance check
 key_files:
   created:
@@ -22,8 +22,8 @@ key_files:
     - src/components/thermal_channel.jl
     - test/runtests.jl
 decisions:
-  - "Use abs(port_in.mdot) in FV energy balance: upwind T_up already selects correct direction, so advective flux magnitude is always |mdot|*cp*(T_up - T[i]). Signed mdot gave wrong sign under reversed flow."
-  - "Energy balance check for reversed flow uses T_boundary_inlet (= T_inlet_sign from port_in.T pin), not T[n] (which has been partially heated by the wall)."
+  - "Use abs(inlet.mdot) in FV energy balance: upwind T_up already selects correct direction, so advective flux magnitude is always |mdot|*cp*(T_up - T[i]). Signed mdot gave wrong sign under reversed flow."
+  - "Energy balance check for reversed flow uses T_boundary_inlet (= T_inlet_sign from inlet.T pin), not T[n] (which has been partially heated by the wall)."
   - "Channel (ThermalPort) energy balance check uses simple plausibility checks (T[1] > T_inlet, T[n] < T_wall) since thermal.Q_flow is floating when only ch.thermal.T is externally pinned without ConstantTemperature."
 metrics:
   duration_minutes: ~100
@@ -49,25 +49,25 @@ Created `test/test_sign_safety.jl` with three testsets that drive `mdot = -0.490
 
 ### Auto-fixed Issues
 
-**1. [Rule 1 - Bug] Reverted incorrect port_in.T equation from Plan 20-01**
+**1. [Rule 1 - Bug] Reverted incorrect inlet.T equation from Plan 20-01**
 - **Found during:** Task 1 (initial debugging of reversed-flow test failures)
-- **Issue:** Plan 20-01 changed `port_in.T ~ instream(port_out.T)` to `port_in.T ~ T[1]` in both Channel and `_channel_base_eqs`. This caused `ExtraEquationsSystemException` in all existing tests that use `ch.port_in.T ~ T_inlet` as an external constraint (produces 6 equations for 5 unknowns).
-- **Fix:** Reverted to `port_in.T ~ instream(port_out.T)` in both locations. The ifelse() upwinding changes from Plan 20-01 were kept.
+- **Issue:** Plan 20-01 changed `inlet.T ~ instream(outlet.T)` to `inlet.T ~ T[1]` in both Channel and `_channel_base_eqs`. This caused `ExtraEquationsSystemException` in all existing tests that use `ch.inlet.T ~ T_inlet` as an external constraint (produces 6 equations for 5 unknowns).
+- **Fix:** Reverted to `inlet.T ~ instream(outlet.T)` in both locations. The ifelse() upwinding changes from Plan 20-01 were kept.
 - **Files modified:** `src/components/channel.jl` (line 94 and 159 in _channel_base_eqs)
 - **Commit:** c23c0b0 (Plan 20-01 commit, already in main)
 
-**2. [Rule 1 - Bug] abs(port_in.mdot) fix for FV energy balance sign**
+**2. [Rule 1 - Bug] abs(inlet.mdot) fix for FV energy balance sign**
 - **Found during:** Task 1 (sign safety tests were solving to unphysical branch)
-- **Issue:** The upwind FV energy balance used `port_in.mdot * cp * (T_up - T[i])`. With mdot < 0 and T_up > T[i] (warm fluid entering cold cell), this gave a NEGATIVE advective term — the wrong sign. Root cause: the upwind scheme selects T_up correctly (via ifelse), but the advective flux magnitude should always be positive when upstream is warmer. Using signed mdot inverts the direction.
+- **Issue:** The upwind FV energy balance used `inlet.mdot * cp * (T_up - T[i])`. With mdot < 0 and T_up > T[i] (warm fluid entering cold cell), this gave a NEGATIVE advective term — the wrong sign. Root cause: the upwind scheme selects T_up correctly (via ifelse), but the advective flux magnitude should always be positive when upstream is warmer. Using signed mdot inverts the direction.
 - **Derivation:** For reversed flow (mdot < 0), correct FV energy change = `|mdot|*cp*(T_upstream - T[i])`. Using `mdot*cp*(T_upstream - T[i])` with mdot < 0 gives the negative of the correct value.
-- **Fix:** Changed `port_in.mdot * cp_water(T[i]) * (T_up - T[i])` to `abs(port_in.mdot) * cp_water(T[i]) * (T_up - T[i])` in Channel, ChannelAndContacts, and ChannelHeatFlux energy balance equations. For forward flow (mdot > 0), abs() is a no-op.
+- **Fix:** Changed `inlet.mdot * cp_water(T[i]) * (T_up - T[i])` to `abs(inlet.mdot) * cp_water(T[i]) * (T_up - T[i])` in Channel, ChannelAndContacts, and ChannelHeatFlux energy balance equations. For forward flow (mdot > 0), abs() is a no-op.
 - **Files modified:** `src/components/channel.jl`, `src/components/thermal_channel.jl` (3 locations)
 - **Commit:** 32a101c
 
-**3. [Rule 3 - Blocking] Test topology for reversed flow requires fully_determined=false and port_in.T pin**
+**3. [Rule 3 - Blocking] Test topology for reversed flow requires fully_determined=false and inlet.T pin**
 - **Found during:** Task 1 (mtkcompile / SteadyStateProblem errors with Pump(mdot0))
-- **Issue:** `Pump(mdot0=mdot_neg)` without pressure equation leaves the system underdetermined unless `fully_determined=false`. Also, the stream temperature circularity (identical issue as forward flow) requires `ch.port_in.T ~ T_inlet_sign` to break the circular chain.
-- **Fix:** All three testsets use `mtkcompile(sys; fully_determined=false)` and include `ch.port_in.T ~ T_inlet_sign` in connections.
+- **Issue:** `Pump(mdot0=mdot_neg)` without pressure equation leaves the system underdetermined unless `fully_determined=false`. Also, the stream temperature circularity (identical issue as forward flow) requires `ch.inlet.T ~ T_inlet_sign` to break the circular chain.
+- **Fix:** All three testsets use `mtkcompile(sys; fully_determined=false)` and include `ch.inlet.T ~ T_inlet_sign` in connections.
 - **Files modified:** `test/test_sign_safety.jl`
 
 **4. [Rule 3 - Blocking] Initial guess must be reversed for negative mdot**
@@ -78,7 +78,7 @@ Created `test/test_sign_safety.jl` with three testsets that drive `mdot = -0.490
 
 **5. [Rule 1 - Bug] Energy balance formula must use T_boundary_inlet, not T[n]**
 - **Found during:** Task 1 (SIGN-02 energy balance assertion failing with 27% discrepancy)
-- **Issue:** Initial energy balance check used `|T[1] - T[n]|` as the temperature rise. But T[n] is the last cell, which is partially heated above T_inlet by the wall. The correct reference is `T_inlet_sign` (the boundary condition for the reversed-flow inlet at port_out).
+- **Issue:** Initial energy balance check used `|T[1] - T[n]|` as the temperature rise. But T[n] is the last cell, which is partially heated above T_inlet by the wall. The correct reference is `T_inlet_sign` (the boundary condition for the reversed-flow inlet at outlet).
 - **Fix:** `Q_advect = abs(mdot_neg) * cp_water(T_mean) * (T_vals[1] - T_inlet_sign)`. Verified: ratio Q_wall_total/Q_advect = 1.0001 (within 0.01%).
 - **Files modified:** `test/test_sign_safety.jl` (SIGN-02 and SIGN-03 testsets)
 

@@ -15,7 +15,7 @@ Fix all 6 tech debt items from the v0.1 audit: BUG-01 (Gravity MTK parameter unu
 
 ### BUG-01: Gravity component fix
 - Replace `H` (Julia kwarg Float64 baked into equation) with `H_grav` → rename to just `H` as the MTK `@parameters` symbol
-- The equation `port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H` should reference the MTK parameter `H`, not the Julia kwarg — so the parameter is modifiable post-compilation via `setp`
+- The equation `inlet.P - outlet.P ~ rho_water(T_in) * 9.80665 * H` should reference the MTK parameter `H`, not the Julia kwarg — so the parameter is modifiable post-compilation via `setp`
 - Remove `A_grav` entirely from both MTK `@parameters` and constructor kwargs — it was never used in any equation
 - New Gravity constructor signature: `Gravity(; name, H)` (just height)
 - No `D_h` shadowing concern for `H` — it's a plain Float64, not Differential
@@ -28,8 +28,8 @@ Fix all 6 tech debt items from the v0.1 audit: BUG-01 (Gravity MTK parameter unu
 - Verify no test in `runtests.jl` references old parameter names (`L_ch`, `A_ch`, `L_f`, `A_f`) directly
 
 ### BUG-02: solve_steady docstring fix
-- Remove lines referencing `ssys.fr.port_in.mdot => mdot_guess` and `ssys.fr.Re => Re_guess`
-- Replace with correct example using `ssys.ch.port_in.mdot => mdot_guess` (Friction was removed from `build_loop` in commit `2e5ed5c`)
+- Remove lines referencing `ssys.fr.inlet.mdot => mdot_guess` and `ssys.fr.Re => Re_guess`
+- Replace with correct example using `ssys.ch.inlet.mdot => mdot_guess` (Friction was removed from `build_loop` in commit `2e5ed5c`)
 - The `Re` algebraic variable no longer needs to be in `op` since it belongs to the removed Friction component
 
 ### Stale TDD file removal
@@ -55,7 +55,7 @@ Fix all 6 tech debt items from the v0.1 audit: BUG-01 (Gravity MTK parameter unu
 
 - BUG-01 root cause: `Gravity(; name, H, A_grav)` declares `@parameters H_grav = H`, `A_grav = A_grav` but the pressure equation was written as `... * H` (using the Julia kwarg Float64, not the MTK symbolic). Fix is literally one character: `H` → `H_grav` in the equation — then rename the MTK param to just `H` for cleaner API.
 - The `test_comp_tdd.jl` deletion is already in the git working tree (shown as ` D test/test_comp_tdd.jl` in git status) — just stage it.
-- After all parameter renames, `runtests.jl` uses symbolic indexing like `ssys.ch.T_out`, `ssys.ch.port_in.mdot` — verify none of these paths use the renamed parameters.
+- After all parameter renames, `runtests.jl` uses symbolic indexing like `ssys.ch.T_out`, `ssys.ch.inlet.mdot` — verify none of these paths use the renamed parameters.
 
 </specifics>
 
@@ -74,7 +74,7 @@ Fix all 6 tech debt items from the v0.1 audit: BUG-01 (Gravity MTK parameter unu
 - All changes must leave 54 tests green (`julia --project -e "using Pkg; Pkg.test()"`)
 
 ### Integration Points
-- `test/runtests.jl` uses: `ssys.ch.T[i]`, `ssys.ch.T_out`, `ssys.ch.port_in.mdot` — these paths don't use renamed params, should be unaffected
+- `test/runtests.jl` uses: `ssys.ch.T[i]`, `ssys.ch.T_out`, `ssys.ch.inlet.mdot` — these paths don't use renamed params, should be unaffected
 - Phase 2 isolation tests use `mtkcompile(Channel(...); fully_determined=false)` — column names in `observed(sys)` may shift but no test asserts on parameter names
 - No external downstream users of v0.1 API — breaking parameter rename is acceptable
 

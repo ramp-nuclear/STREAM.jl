@@ -10,7 +10,7 @@ requires:
     provides: finalized channel.jl and thermal_channel.jl source files
 provides:
   - ifelse() upwinding in Channel, ChannelAndContacts, and ChannelHeatFlux energy loops
-  - port_in.T ~ T[1] in Channel constructor and _channel_base_eqs
+  - inlet.T ~ T[1] in Channel constructor and _channel_base_eqs
   - unsigned velocity[i] observable in ChannelAndContacts
 affects: [20-sign-safety, 21-flapper-valve, test_sign_safety]
 
@@ -19,7 +19,7 @@ tech-stack:
   added: []
   patterns:
     - "Bidirectional upwind: T_inlet_fwd/T_inlet_rev declared before loop, ifelse(mdot>=0) per-cell"
-    - "port_in.T ~ T[1] as outflow equation (not instream(port_out.T))"
+    - "inlet.T ~ T[1] as outflow equation (not instream(outlet.T))"
 
 key-files:
   created: []
@@ -28,9 +28,9 @@ key-files:
     - src/components/thermal_channel.jl
 
 key-decisions:
-  - "ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev) — same MTK ifelse idiom already used in dP formula and regime_dependent"
-  - "port_in.T ~ T[1] replaces port_in.T ~ instream(port_out.T) — T[1] is the correct MTK outflow temperature for port_in"
-  - "_channel_base_eqs port_in.T fix propagates to ChannelAndContacts and ChannelHeatFlux automatically; Channel has its own copy and was fixed separately"
+  - "ifelse(inlet.mdot >= 0, T_up_fwd, T_up_rev) — same MTK ifelse idiom already used in dP formula and regime_dependent"
+  - "inlet.T ~ T[1] replaces inlet.T ~ instream(outlet.T) — T[1] is the correct MTK outflow temperature for inlet"
+  - "_channel_base_eqs inlet.T fix propagates to ChannelAndContacts and ChannelHeatFlux automatically; Channel has its own copy and was fixed separately"
   - "velocity[i] changed to abs(mdot)/(rho*A) (speed magnitude); v[i] stays signed as intended"
 
 patterns-established:
@@ -45,7 +45,7 @@ completed: 2026-03-17
 
 # Phase 20 Plan 01: Sign Safety — Source Fixes Summary
 
-**ifelse() bidirectional upwinding and port_in.T ~ T[1] fix applied to all three channel variants (Channel, ChannelAndContacts, ChannelHeatFlux)**
+**ifelse() bidirectional upwinding and inlet.T ~ T[1] fix applied to all three channel variants (Channel, ChannelAndContacts, ChannelHeatFlux)**
 
 ## Performance
 
@@ -57,7 +57,7 @@ completed: 2026-03-17
 
 ## Accomplishments
 - Fixed forward-only upwind formula in all three channel constructors — energy balance now selects upstream temperature based on mdot sign via ifelse()
-- Fixed port_in.T stream equation in Channel constructor and _channel_base_eqs — replaced wrong instream(port_out.T) with correct T[1]
+- Fixed inlet.T stream equation in Channel constructor and _channel_base_eqs — replaced wrong instream(outlet.T) with correct T[1]
 - Fixed velocity[i] observed variable in ChannelAndContacts to use abs(mdot) (unsigned speed magnitude)
 - Package loads clean after all changes (precompilation successful)
 
@@ -71,12 +71,12 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/components/channel.jl` - Renamed T_inlet to T_inlet_fwd, added T_inlet_rev; added ifelse() upwinding loop in Channel; fixed port_in.T in Channel constructor (line 94) and _channel_base_eqs (line 159)
+- `src/components/channel.jl` - Renamed T_inlet to T_inlet_fwd, added T_inlet_rev; added ifelse() upwinding loop in Channel; fixed inlet.T in Channel constructor (line 94) and _channel_base_eqs (line 159)
 - `src/components/thermal_channel.jl` - Added T_inlet_fwd/T_inlet_rev + ifelse() upwinding in ChannelAndContacts energy loop; same in ChannelHeatFlux energy loop; changed velocity[i] obs to abs(mdot)
 
 ## Decisions Made
-- Used ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev) per-cell — consistent with existing dP formula pattern `mdot * abs(mdot)` and regime_dependent correlation switcher; avoids tanh blend tuning parameters
-- port_in.T ~ T[1]: outflow from this component through port_in is at T[1] (first cell temperature); the old instream(port_out.T) equation was silent under forward flow (zero weight) but wrong under reverse flow
+- Used ifelse(inlet.mdot >= 0, T_up_fwd, T_up_rev) per-cell — consistent with existing dP formula pattern `mdot * abs(mdot)` and regime_dependent correlation switcher; avoids tanh blend tuning parameters
+- inlet.T ~ T[1]: outflow from this component through inlet is at T[1] (first cell temperature); the old instream(outlet.T) equation was silent under forward flow (zero weight) but wrong under reverse flow
 - No changes to _channel_base_eqs energy balance — it contains none; upwinding belongs in each constructor's own energy loop
 
 ## Deviations from Plan

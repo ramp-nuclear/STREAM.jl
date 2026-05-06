@@ -12,20 +12,20 @@
 #
 # The TempBC component resets the fluid temperature to T_inlet at
 # the pump outlet. This is necessary because MTK stream semantics
-# resolve instream(ch.port_in.T) to the upstream connected port's T
+# resolve instream(ch.inlet.T) to the upstream connected port's T
 # (which would be T[n] in a fully closed loop, giving a trivial
 # degenerate steady state at T=T_wall). The TempBC forces the
 # "inlet temperature" seen by the Channel's first-cell energy
 # balance to be T_inlet, enabling physical non-trivial solutions.
 #
 # Boundary conditions:
-#   pump.port_in.P ~ 1.0e5     pressure gauge freedom fix (absolute anchor)
+#   pump.inlet.P ~ 1.0e5     pressure gauge freedom fix (absolute anchor)
 #   ch.thermal.T ~ T_wall      wall temperature (K) -- required by Channel's
 #                              Dittus-Boelter HTC: h_tc[i]*(pi*Dh)*dz*(thermal.T - T[i])
-#   ch.port_in.T ~ T_inlet     additional T_inlet constraint (resolves remaining
+#   ch.inlet.T ~ T_inlet     additional T_inlet constraint (resolves remaining
 #                              circular temperature dependency in compiled system)
 #
-# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot, etc.
+# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.inlet.mdot, etc.
 # for symbolic indexing of results.
 # ----------------------------------------------------------------
 """
@@ -60,10 +60,10 @@ function build_loop(;
     @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
 
     connections = [
-        connect(pump.port_out, bc.port_in),       # pump -> TempBC
-        connect(bc.port_out, ch.port_in),        # TempBC -> channel
-        connect(ch.port_out, pump.port_in),      # channel -> pump (closed loop)
-        pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
+        connect(pump.outlet, bc.inlet),       # pump -> TempBC
+        connect(bc.outlet, ch.inlet),        # TempBC -> channel
+        connect(ch.outlet, pump.inlet),      # channel -> pump (closed loop)
+        pump.inlet.P ~ 1.0e5,                  # pressure gauge freedom fix
         ch.thermal.T ~ T_wall,                  # wall temperature pin (for HTC)
     ]
 
@@ -85,7 +85,7 @@ end
 #
 # The return (downward) leg is modelled by the standalone Gravity
 # component with height H (default = L_ch). Gravity's equation:
-#   port_in.P - port_out.P ~ rho * 9.80665 * H
+#   inlet.P - outlet.P ~ rho * 9.80665 * H
 # represents the pressure gain as the fluid descends.
 #
 # Cancellation geometry (default): when H_return == L_ch and
@@ -94,7 +94,7 @@ end
 # balance is zero — matching the horizontal reference loop within
 # the accuracy of the density evaluation point (~1%).
 #
-# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot
+# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.inlet.mdot
 # for symbolic indexing (same pattern as build_loop).
 # ----------------------------------------------------------------
 """
@@ -136,19 +136,19 @@ function build_loop_vertical(;
     @named grav = Gravity(H)
 
     # Gravity wiring note:
-    # Gravity equation: port_in.P - port_out.P ~ rho*g*H (port_in = high-P = bottom)
+    # Gravity equation: inlet.P - outlet.P ~ rho*g*H (inlet = high-P = bottom)
     # For the RETURN leg (fluid descends from channel top back to pump bottom):
-    #   - channel outlet (top, low pressure) = grav.port_out (top)
-    #   - pump inlet (bottom, higher pressure) = grav.port_in (bottom)
+    #   - channel outlet (top, low pressure) = grav.outlet (top)
+    #   - pump inlet (bottom, higher pressure) = grav.inlet (bottom)
     # This gives: pump_inlet.P = channel_outlet.P + rho*g*H
     # Loop balance: dP_pump = friction + rho*g*L_ch - rho*g*H
     # Cancellation when H = L_ch: dP_pump = friction (gravity terms cancel).
     connections = [
-        connect(pump.port_out, bc.port_in),       # pump -> TempBC
-        connect(bc.port_out, ch.port_in),        # TempBC -> channel (upward leg)
-        connect(ch.port_out, grav.port_out),     # channel outlet (top) = grav port_out (top)
-        connect(grav.port_in, pump.port_in),      # grav port_in (bottom) = pump inlet (bottom)
-        pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
+        connect(pump.outlet, bc.inlet),       # pump -> TempBC
+        connect(bc.outlet, ch.inlet),        # TempBC -> channel (upward leg)
+        connect(ch.outlet, grav.outlet),     # channel outlet (top) = grav outlet (top)
+        connect(grav.inlet, pump.inlet),      # grav inlet (bottom) = pump inlet (bottom)
+        pump.inlet.P ~ 1.0e5,                  # pressure gauge freedom fix
         ch.thermal.T ~ T_wall,                  # wall temperature pin (for HTC)
     ]
 
@@ -199,10 +199,10 @@ function build_loop_transient(;
     if T_wall_fn === nothing
         # Scalar wall temperature — same as build_loop; no parameter declaration needed
         connections = [
-            connect(pump.port_out, bc.port_in),
-            connect(bc.port_out, ch.port_in),
-            connect(ch.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
+            connect(pump.outlet, bc.inlet),
+            connect(bc.outlet, ch.inlet),
+            connect(ch.outlet, pump.inlet),
+            pump.inlet.P ~ 1.0e5,
             ch.thermal.T ~ T_wall_0,
         ]
         @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
@@ -212,10 +212,10 @@ function build_loop_transient(;
         FType = typeof(T_wall_fn)
         ps = @parameters (T_wall_callable::FType)(..)
         connections = [
-            connect(pump.port_out, bc.port_in),
-            connect(bc.port_out, ch.port_in),
-            connect(ch.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
+            connect(pump.outlet, bc.inlet),
+            connect(bc.outlet, ch.inlet),
+            connect(ch.outlet, pump.inlet),
+            pump.inlet.P ~ 1.0e5,
             ch.thermal.T ~ ps[1](t),
         ]
         @named sys = compose(System(connections, t, [], ps; name=:sys), pump, bc, ch)
@@ -277,24 +277,24 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
     @named r67 = Resistor(R)
 
     connections = [
-        # Corner 0 (source): pump.port_out + 3 resistor inlets
-        connect(pump.port_out, r01.port_in, r02.port_in, r04.port_in),
+        # Corner 0 (source): pump.outlet + 3 resistor inlets
+        connect(pump.outlet, r01.inlet, r02.inlet, r04.inlet),
         # Corner 1: r01 out + r13 in + r15 in
-        connect(r01.port_out, r13.port_in, r15.port_in),
+        connect(r01.outlet, r13.inlet, r15.inlet),
         # Corner 2: r02 out + r23 in + r26 in
-        connect(r02.port_out, r23.port_in, r26.port_in),
+        connect(r02.outlet, r23.inlet, r26.inlet),
         # Corner 3: r13 out + r23 out + r37 in
-        connect(r13.port_out, r23.port_out, r37.port_in),
+        connect(r13.outlet, r23.outlet, r37.inlet),
         # Corner 4: r04 out + r45 in + r46 in
-        connect(r04.port_out, r45.port_in, r46.port_in),
+        connect(r04.outlet, r45.inlet, r46.inlet),
         # Corner 5: r15 out + r45 out + r57 in
-        connect(r15.port_out, r45.port_out, r57.port_in),
+        connect(r15.outlet, r45.outlet, r57.inlet),
         # Corner 6: r26 out + r46 out + r67 in
-        connect(r26.port_out, r46.port_out, r67.port_in),
-        # Corner 7 (sink): pump.port_in + 3 resistor outlets
-        connect(pump.port_in, r37.port_out, r57.port_out, r67.port_out),
+        connect(r26.outlet, r46.outlet, r67.inlet),
+        # Corner 7 (sink): pump.inlet + 3 resistor outlets
+        connect(pump.inlet, r37.outlet, r57.outlet, r67.outlet),
         # Pressure gauge anchor (absolute level is underdetermined by Kirchhoff equations)
-        pump.port_in.P ~ 1.0e5,
+        pump.inlet.P ~ 1.0e5,
     ]
 
     @named sys = compose(
@@ -337,7 +337,7 @@ Gravity signs:
 - ret (Channel, B->C, nominally upward): g = +g_acc
 
 Physics: Pump coasts to 0 dP. Inertia carries momentum; ch flow decays.
-Flapper opens when pump branch mdot (ine.port_in.mdot) drops below the Flapper internal threshold.
+Flapper opens when pump branch mdot (ine.inlet.mdot) drops below the Flapper internal threshold.
 After Flapper opens, flow redistributes: ch flow reverses (upward NC driven by buoyancy).
 
 # Arguments
@@ -399,19 +399,19 @@ function build_loop_lof_bypass(;
 
     connections = [
         # D series branch: ext_res -> hx -> pump -> ine
-        connect(ext_res.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        connect(pump.port_out, ine.port_in),
+        connect(ext_res.outlet, hx.inlet),
+        connect(hx.outlet, pump.inlet),
+        connect(pump.outlet, ine.inlet),
         # Node A (3-way): ine output -> ch input + flapper input
-        connect(ine.port_out, ch.port_in, flapper.port_in),
+        connect(ine.outlet, ch.inlet, flapper.inlet),
         # Node B (2-way): ch output -> ret input
-        connect(ch.port_out, ret.port_in),
+        connect(ch.outlet, ret.inlet),
         # Node C (3-way): ret output + flapper output -> ext_res input
-        connect(ret.port_out, flapper.port_out, ext_res.port_in),
+        connect(ret.outlet, flapper.outlet, ext_res.inlet),
         # Boundary conditions
-        pump.port_in.P ~ 1.0e5,
+        pump.inlet.P ~ 1.0e5,
         ret.thermal.T ~ T_inlet,
-        flapper.ref_mdot ~ ine.port_in.mdot,
+        flapper.ref_mdot ~ ine.inlet.mdot,
     ]
 
     @named sys = compose(
@@ -464,7 +464,7 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 `(ssys, ic)` where:
 - `ssys`: compiled `ODESystem` (passed through `mtkcompile`)
 - `ic`: `Vector{Pair{Any,Any}}` initial conditions including PK state
-  (P, C_1..C_6, rho_c_fn), hydraulic IC (port_in.mdot), and thermal ICs
+  (P, C_1..C_6, rho_c_fn), hydraulic IC (inlet.mdot), and thermal ICs
   (cac.T[i] and fuel.T[i,j]). Pass directly to `solve_transient(ssys, ic, t)`.
 """
 #! format: off
@@ -556,10 +556,10 @@ function build_loop_pk(ctrl;
     @named bc = HeatExchanger(T_inlet)
 
     all_connections = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods_cac.port_in),
-        connect(rods_cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, rods_cac.inlet),
+        connect(rods_cac.outlet, pump.inlet),
+        pump.inlet.P ~ 1.0e5,
         fb_eqs...,
         power_eqs...,
     ]
@@ -580,7 +580,7 @@ function build_loop_pk(ctrl;
         ssys.pk.C_4 => pk_ic.C_k[4],
         ssys.pk.C_5 => pk_ic.C_k[5],
         ssys.pk.C_6 => pk_ic.C_k[6],
-        ssys.rods.cac.port_in.mdot => 0.2,
+        ssys.rods.cac.inlet.mdot => 0.2,
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]

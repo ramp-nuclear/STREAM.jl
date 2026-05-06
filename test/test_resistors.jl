@@ -42,30 +42,30 @@ end
     # Symmetric cube: 3 source branches from corner 0, 3 sink branches to corner 7
     # Body-diagonal paths: each of 3 "short" 1-resistor paths carries mdot/3
     # Each of 6 "long" 2-resistor paths carries mdot/6 (edge contribution)
-    # For initial guess: pump.port_out = full mdot; each direct branch ~ mdot/3
+    # For initial guess: pump.outlet = full mdot; each direct branch ~ mdot/3
     mdot_full = mdot_analytical
 
     op = [
-        ssys.pump.port_out.mdot => mdot_full,
+        ssys.pump.outlet.mdot => mdot_full,
         # Three source edges from corner 0
-        ssys.r01.port_in.mdot => mdot_full / 3.0,
-        ssys.r02.port_in.mdot => mdot_full / 3.0,
-        ssys.r04.port_in.mdot => mdot_full / 3.0,
+        ssys.r01.inlet.mdot => mdot_full / 3.0,
+        ssys.r02.inlet.mdot => mdot_full / 3.0,
+        ssys.r04.inlet.mdot => mdot_full / 3.0,
         # Internal edges (rough equal split)
-        ssys.r13.port_in.mdot => mdot_full / 6.0,
-        ssys.r15.port_in.mdot => mdot_full / 6.0,
-        ssys.r23.port_in.mdot => mdot_full / 6.0,
-        ssys.r26.port_in.mdot => mdot_full / 6.0,
-        ssys.r45.port_in.mdot => mdot_full / 6.0,
-        ssys.r46.port_in.mdot => mdot_full / 6.0,
+        ssys.r13.inlet.mdot => mdot_full / 6.0,
+        ssys.r15.inlet.mdot => mdot_full / 6.0,
+        ssys.r23.inlet.mdot => mdot_full / 6.0,
+        ssys.r26.inlet.mdot => mdot_full / 6.0,
+        ssys.r45.inlet.mdot => mdot_full / 6.0,
+        ssys.r46.inlet.mdot => mdot_full / 6.0,
         # Three sink edges to corner 7
-        ssys.r37.port_in.mdot => mdot_full / 3.0,
-        ssys.r57.port_in.mdot => mdot_full / 3.0,
-        ssys.r67.port_in.mdot => mdot_full / 3.0,
+        ssys.r37.inlet.mdot => mdot_full / 3.0,
+        ssys.r57.inlet.mdot => mdot_full / 3.0,
+        ssys.r67.inlet.mdot => mdot_full / 3.0,
     ]
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
-    mdot_numerical = abs(sol[ssys.pump.port_out.mdot])
+    mdot_numerical = abs(sol[ssys.pump.outlet.mdot])
     @test isapprox(mdot_numerical, mdot_analytical; rtol=0.01)
 end

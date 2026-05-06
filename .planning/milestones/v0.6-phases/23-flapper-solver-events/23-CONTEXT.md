@@ -39,7 +39,7 @@ Implement the `Flapper` check-valve component as an MTK ODESystem with a continu
 - Exact default values for `R_closed`, `R_open`, `dt`, `threshold` parameters
 - The precise MTK `continuous_events` API syntax (research must verify for the installed MTK version)
 - Whether `clamp` needs to be wrapped in `ifelse()` for symbolic compatibility or can be a registered function
-- How `ref_mdot` is declared (likely `@variables ref_mdot(t)` with no equation in the component — the user provides it externally via `flapper.ref_mdot ~ other.port_in.mdot`)
+- How `ref_mdot` is declared (likely `@variables ref_mdot(t)` with no equation in the component — the user provides it externally via `flapper.ref_mdot ~ other.inlet.mdot`)
 
 </decisions>
 
@@ -47,7 +47,7 @@ Implement the `Flapper` check-valve component as an MTK ODESystem with a continu
 ## Specific Ideas
 
 - The `clamp((t - T_open)/dt, 0, 1)` smooth ramp with `3*xi^2 - 2*xi^3` Hermite blend is explicitly specified in FLAP-02 — this is locked, not a discretion item.
-- User wires trigger via a plain algebraic equation: `flapper.ref_mdot ~ reference_component.port_in.mdot` during system composition (FLAP-04). No special API needed.
+- User wires trigger via a plain algebraic equation: `flapper.ref_mdot ~ reference_component.inlet.mdot` during system composition (FLAP-04). No special API needed.
 - The implementation must be tested "extensively" (user's words) — Plan 23-01 should include a standalone compile+event-trigger smoke test, and Plan 23-02 should have both a closed-state test and an open-transition test with numerical verification of the ramp shape.
 
 </specifics>
@@ -75,7 +75,7 @@ No external specs — requirements are fully captured in decisions above and REQ
 
 ### Reusable Assets
 - `FlowPort` connector (`src/connectors.jl`): Flapper needs two FlowPorts, identical to Pump/Resistor pattern
-- `Pump(dP_pump::Real)` (`src/components/pump.jl:42`): The scalar pressure-drop equation `port_out.P - port_in.P ~ dP_pump` is the base; Flapper replaces `dP_pump` with `R(t) * port_in.mdot`
+- `Pump(dP_pump::Real)` (`src/components/pump.jl:42`): The scalar pressure-drop equation `outlet.P - inlet.P ~ dP_pump` is the base; Flapper replaces `dP_pump` with `R(t) * inlet.mdot`
 - `solve_transient` (`src/solvers.jl:99`): callbacks kwarg already wired at line 114 (`callback = callbacks`)
 
 ### Established Patterns

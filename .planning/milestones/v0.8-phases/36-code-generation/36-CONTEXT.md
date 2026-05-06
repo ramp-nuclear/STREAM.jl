@@ -19,8 +19,8 @@ Users can view a live-updating read-only Julia code preview generated from their
 
 ### BC Panel Layout
 - **D-03:** The bottom panel has two tabs: **[Code] [BCs]**. The BCs tab shows the boundary conditions list + Add button. Same panel, same toggle — no extra screen real estate or separate widget needed.
-- **D-04:** BC entry uses a structured form: `[component dropdown ▾] . [port.field dropdown ▾] ~ [value input]` + `[Add]`. The component dropdown is populated from canvas nodes (instanceNames). The port.field dropdown is limited to **FlowPort.P only** (`port_in.P` and `port_out.P`). Thermal BCs come from ConstantTemperature canvas nodes (Phase 40), not from this panel.
-- **D-05:** BC entries are stored in the Zustand store as an array of `{ nodeId: string, portField: "port_in.P" | "port_out.P", value: number }`. Each entry renders as a row with the expression string and a delete `[x]` button.
+- **D-04:** BC entry uses a structured form: `[component dropdown ▾] . [port.field dropdown ▾] ~ [value input]` + `[Add]`. The component dropdown is populated from canvas nodes (instanceNames). The port.field dropdown is limited to **FlowPort.P only** (`inlet.P` and `outlet.P`). Thermal BCs come from ConstantTemperature canvas nodes (Phase 40), not from this panel.
+- **D-05:** BC entries are stored in the Zustand store as an array of `{ nodeId: string, portField: "inlet.P" | "outlet.P", value: number }`. Each entry renders as a row with the expression string and a delete `[x]` button.
 
 ### Generated Code Structure
 - **D-06:** Full runnable stub format:
@@ -34,8 +34,8 @@ Users can view a live-updating read-only Julia code preview generated from their
 
   # Connections
   eqs = [
-      connect(pump_1.port_out, ch_1.port_in),
-      pump_1.port_in.P ~ 1.0e5,
+      connect(pump_1.outlet, ch_1.inlet),
+      pump_1.inlet.P ~ 1.0e5,
   ]
 
   # System
@@ -83,7 +83,7 @@ Users can view a live-updating read-only Julia code preview generated from their
 - `gui/src/registry/types.ts` — `Parameter`, `ConstructorMode`, `ComponentDefinition` interfaces
 
 ### Canvas edge data (port names for connect() calls)
-- `gui/src/components/StreamNode.tsx` — Handle `id` = port name (e.g., `port_in`, `port_out`). ReactFlow `Edge.sourceHandle` and `Edge.targetHandle` carry these names.
+- `gui/src/components/StreamNode.tsx` — Handle `id` = port name (e.g., `inlet`, `outlet`). ReactFlow `Edge.sourceHandle` and `Edge.targetHandle` carry these names.
 - `gui/src/store/useStore.ts` — `edges` array: each edge has `source` (node id), `sourceHandle` (port name), `target` (node id), `targetHandle` (port name)
 
 ### STREAM.jl constructor API (source of truth for generated syntax)

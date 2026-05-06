@@ -37,7 +37,7 @@ key-files:
 
 key-decisions:
   - "_nusselt_coefficient_developing must use ifelse() not if/else: MTK traces through closures symbolically; if/else on Num throws TypeError at trace time (Rule 1 auto-fix)"
-  - "E2E test uses pump.port_in.P ~ 2e5 pressure anchor to get meaningful T_sat > 373K values"
+  - "E2E test uses pump.inlet.P ~ 2e5 pressure anchor to get meaningful T_sat > 373K values"
   - "ArgumentError guard uses hasproperty(:T_wall_left) — simplest structural check matching codebase patterns"
 
 patterns-established:
@@ -85,7 +85,7 @@ Each task was committed atomically:
 
 ## Decisions Made
 - `_nusselt_coefficient_developing` converted from `if/else` to `ifelse()`: the developing_laminar_h_spl closure passes `x_star` (a symbolic Num) to this function during MTK symbolic tracing; Julia's `if/else` evaluates the condition at trace time and throws TypeError on Num; `ifelse()` emits a symbolic conditional node that the solver evaluates numerically — same pattern used throughout the codebase for regime switching
-- E2E test uses `pump.port_in.P ~ 2e5` (2 atm) so T_sat values are above 393K (clearly above T_wall=373K in the loop)
+- E2E test uses `pump.inlet.P ~ 2e5` (2 atm) so T_sat values are above 393K (clearly above T_wall=373K in the loop)
 
 ## Deviations from Plan
 

@@ -86,7 +86,7 @@ completed: 2026-03-26
 
 ## Decisions Made
 
-- **VAL-02 temperature-rise uses T_inlet_nc = ret.T[1]:** In reversed NC flow, fluid enters ch from Node B (the junction between ch.port_out and ret.port_in). The actual inlet temperature is ret.T[1] (~326.78 K), not BYPASS_T_INLET (313.15 K). Using BYPASS_T_INLET gives a 55% error; using ret.T[1] gives 0.3% error.
+- **VAL-02 temperature-rise uses T_inlet_nc = ret.T[1]:** In reversed NC flow, fluid enters ch from Node B (the junction between ch.outlet and ret.inlet). The actual inlet temperature is ret.T[1] (~326.78 K), not BYPASS_T_INLET (313.15 K). Using BYPASS_T_INLET gives a 55% error; using ret.T[1] gives 0.3% error.
 
 - **24.1-VERIFICATION.md SC1 resolution:** The channel L/A*Dt(mdot) term is present in `_channel_base_eqs` (line 162 of channel.jl). The original gap report noted that the term was reverted (commit a8dab81), but the merge from main in this session showed the term was re-added in a subsequent commit. Both Channel and _channel_base_eqs now include the inertial term.
 

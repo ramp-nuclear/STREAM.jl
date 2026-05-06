@@ -44,7 +44,7 @@ re_verification: false
 | `src/components/pump.jl` | `function Pump(dP_pump::Real; name)` | VERIFIED | Line 42, exact match |
 | `src/components/pump.jl` | `function Pump(dP_pump::Any; name)` | VERIFIED | Line 56, exact match |
 | `src/components/pump.jl` | MTK callable `dP_pump_fn::FType` | VERIFIED | Line 60: `pars = @parameters (dP_pump_fn::FType)(..)` |
-| `src/components/pump.jl` | `dP_pump_fn(t)` in equation | VERIFIED | Line 65: `port_out.P - port_in.P ~ dP_pump_fn(t)` |
+| `src/components/pump.jl` | `dP_pump_fn(t)` in equation | VERIFIED | Line 65: `outlet.P - inlet.P ~ dP_pump_fn(t)` |
 | `src/solvers.jl` | `function solve_transient(ssys, op, t;` | VERIFIED | Line 99, exact match |
 | `src/solvers.jl` | `solver = Rodas5P()` default kwarg | VERIFIED | Line 100 |
 | `src/solvers.jl` | `callbacks = nothing` kwarg | VERIFIED | Line 101 |

@@ -182,31 +182,31 @@ end
 # In components.jl — _channel_base_eqs with correlation kwargs
 function _channel_base_eqs(eqs::Vector{Equation};
     n, T, Re, Nu, h_tc, v, T_out, dP,
-    port_in, port_out,
+    inlet, outlet,
     Dh, A, L, g_acc, dz,
     htc_correlation  = dittus_boelter,    # NEW
     friction_correlation = blasius_friction)  # NEW
 
     for i in 1:n
         Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])  # NEW: inline Pr
-        push!(eqs, v[i]    ~ port_in.mdot / (rho_water(T[i]) * A))
-        push!(eqs, Re[i]   ~ abs(port_in.mdot) * Dh / (A * mu_water(T[i])))
+        push!(eqs, v[i]    ~ inlet.mdot / (rho_water(T[i]) * A))
+        push!(eqs, Re[i]   ~ abs(inlet.mdot) * Dh / (A * mu_water(T[i])))
         push!(eqs, Nu[i]   ~ htc_correlation(Re[i], Pr_i))        # CHANGED
         push!(eqs, h_tc[i] ~ Nu[i] * k_water(T[i]) / Dh)
     end
 
     i_mid   = max(1, n ÷ 2)
-    Re_mean = abs(port_in.mdot) * Dh / (A * mu_water(T[i_mid]))
+    Re_mean = abs(inlet.mdot) * Dh / (A * mu_water(T[i_mid]))
     f_ch    = friction_correlation(Re_mean)                        # CHANGED
     push!(eqs, T_out ~ T[n])
-    push!(eqs, dP    ~ f_ch * (port_in.mdot * abs(port_in.mdot) /
+    push!(eqs, dP    ~ f_ch * (inlet.mdot * abs(inlet.mdot) /
                                 (2 * rho_water(T[i_mid]) * A^2)) * (L / Dh)
                       + rho_water(T[i_mid]) * g_acc * L)
 
-    push!(eqs, port_in.mdot + port_out.mdot ~ 0)
-    push!(eqs, port_out.P - port_in.P       ~ -dP)
-    push!(eqs, port_out.T                   ~ T[n])
-    push!(eqs, port_in.T                    ~ instream(port_out.T))
+    push!(eqs, inlet.mdot + outlet.mdot ~ 0)
+    push!(eqs, outlet.P - inlet.P       ~ -dP)
+    push!(eqs, outlet.T                   ~ T[n])
+    push!(eqs, inlet.T                    ~ instream(outlet.T))
 end
 ```
 

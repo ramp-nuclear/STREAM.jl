@@ -67,7 +67,7 @@ Requirements declared in PLANs: NET-01 (07-01-PLAN.md), NET-02 and NET-03 (07-02
 
 | Requirement | Source Plan | Description                                                                                       | Status    | Evidence                                                                                        |
 | ----------- | ----------- | ------------------------------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------- |
-| NET-01      | 07-01       | Resistor component: linear pressure drop `dp ~ R * mdot`, scalar resistance parameter            | SATISFIED | `port_in.P - port_out.P ~ R * port_in.mdot` in components.jl line 146; NET-01a + NET-01b tests pass |
+| NET-01      | 07-01       | Resistor component: linear pressure drop `dp ~ R * mdot`, scalar resistance parameter            | SATISFIED | `inlet.P - outlet.P ~ R * inlet.mdot` in components.jl line 146; NET-01a + NET-01b tests pass |
 | NET-02      | 07-02       | Cube problem (12 Resistors, 8 nodes, 1 Pump) assembled using multi-port connect() — no Junction  | SATISFIED | build_cube() in solvers.jl with 8 variadic connect() calls; NET-02 test at runtests.jl line 366 |
 | NET-03      | 07-02       | Cube flow distribution matches analytical solution (R_eq = 5/6 R) within 1%                      | SATISFIED | NET-03 test: `isapprox(mdot_numerical, dP/(5/6*R); rtol=0.01)`; commit 4771756 confirms 63/63 pass |
 

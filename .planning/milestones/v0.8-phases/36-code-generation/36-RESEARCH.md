@@ -19,8 +19,8 @@ The primary technical challenge is correct code emission for all parameter types
 - **D-01:** Bottom panel below the full-width canvas (spanning Toolbox + Canvas + Sidebar columns). Collapsible. IDE convention layout.
 - **D-02:** A "Code" button in a top toolbar / canvas header bar toggles the bottom panel open/closed. Export button also lives in this toolbar area.
 - **D-03:** The bottom panel has two tabs: [Code] [BCs]. The BCs tab shows the boundary conditions list + Add button. Same panel, same toggle.
-- **D-04:** BC entry uses a structured form: `[component dropdown] . [port.field dropdown] ~ [value input]` + `[Add]`. Component dropdown populated from canvas nodes (instanceNames). Port.field dropdown limited to FlowPort.P only (port_in.P and port_out.P). Thermal BCs come from ConstantTemperature canvas nodes (Phase 40).
-- **D-05:** BC entries stored in Zustand store as `{ nodeId: string, portField: "port_in.P" | "port_out.P", value: number }[]`. Each entry renders as a row with expression string and delete [x] button.
+- **D-04:** BC entry uses a structured form: `[component dropdown] . [port.field dropdown] ~ [value input]` + `[Add]`. Component dropdown populated from canvas nodes (instanceNames). Port.field dropdown limited to FlowPort.P only (inlet.P and outlet.P). Thermal BCs come from ConstantTemperature canvas nodes (Phase 40).
+- **D-05:** BC entries stored in Zustand store as `{ nodeId: string, portField: "inlet.P" | "outlet.P", value: number }[]`. Each entry renders as a row with expression string and delete [x] button.
 - **D-06:** Full runnable stub format with `using ModelingToolkit, STREAM`, `@named` declarations, `eqs` array with `connect()` + BCs, `@named sys = ODESystem(eqs, t; systems=[...])`, `mtkcompile`, commented solve stub.
 - **D-07:** Uses `ODESystem(eqs, t; systems=[...])` idiom, not `compose(System(...), ...)`.
 - **D-08:** `@named` declarations use correct positional vs keyword convention from CLAUDE.md. Registry `positional` field drives this -- no hardcoding.
@@ -215,7 +215,7 @@ New:
 
 interface BCEntry {
   nodeId: string;
-  portField: "port_in.P" | "port_out.P";
+  portField: "inlet.P" | "outlet.P";
   value: number;
 }
 

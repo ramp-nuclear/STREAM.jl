@@ -102,7 +102,7 @@ The original plan used `g_acc_ch = -9.80665` (gravity assists downward forced fl
 **1. [Rule 1 - Bug] Replaced parallel topology with series topology**
 - **Found during:** Task 1 (build_loop_lof implementation)
 - **Issue:** Parallel bypass Gravity topology caused `retcode: Unstable` at t=0; pressure equations algebraically inconsistent when both channel and bypass have gravity terms of equal magnitude
-- **Fix:** Series topology: `Pump(0) -> Inertia -> HX -> ChannelHeatFlux(g=+9.8) -> Flapper -> Pump`; removes bypass Gravity entirely; adds `ch.port_in.T ~ T_inlet` anchor (valid in series, not over-determined)
+- **Fix:** Series topology: `Pump(0) -> Inertia -> HX -> ChannelHeatFlux(g=+9.8) -> Flapper -> Pump`; removes bypass Gravity entirely; adds `ch.inlet.T ~ T_inlet` anchor (valid in series, not over-determined)
 - **Files modified:** src/examples.jl
 - **Verification:** 12eq/12uk, retcode=Success, energy balance 0.09%
 - **Committed in:** 2ee5da7

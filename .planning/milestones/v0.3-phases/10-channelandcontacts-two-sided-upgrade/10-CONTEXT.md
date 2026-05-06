@@ -30,7 +30,7 @@ New capabilities (HeatDiffusion itself, MTR validation, PipeGeometry refactor) a
 - New arrays: `thermal_left = [ThermalPort(name=Symbol(:thermal_left, i)) for i in 1:n]` and `thermal_right = [ThermalPort(name=Symbol(:thermal_right, i)) for i in 1:n]`
 - MTK subsystem names: `thermal_left1, thermal_left2, ..., thermal_leftN` and `thermal_right1, ..., thermal_rightN`
 - `thermal_ports` (old name) removed completely from codebase — no alias, no backward compat shim
-- `compose(...)` call splats both arrays: `compose(sys, port_in, port_out, thermal_left..., thermal_right...)`
+- `compose(...)` call splats both arrays: `compose(sys, inlet, outlet, thermal_left..., thermal_right...)`
 
 ### THERM-01 test update
 - Replace `Symbol(:thermal, i) in subsys_names` with `Symbol(:thermal_left, i)` and `Symbol(:thermal_right, i)` checks
@@ -45,7 +45,7 @@ New capabilities (HeatDiffusion itself, MTR validation, PipeGeometry refactor) a
 - This test also implicitly validates CHAN-03 (adiabatic default): `thermal_right[i].Q_flow == 0` at steady state
 
 ### Tech debt cleanup
-- DEBT-01: Remove `t_inlet` parameter from `_channel_base_eqs` signature; `T_inlet = instream(port_in.T)` is computed at call site, not passed as argument; update all call sites
+- DEBT-01: Remove `t_inlet` parameter from `_channel_base_eqs` signature; `T_inlet = instream(inlet.T)` is computed at call site, not passed as argument; update all call sites
 - DEBT-02: THERM-03 now directly tests ChannelAndContacts (see above)
 - DEBT-03: Fix cosmetic doc issue in `09-01-SUMMARY.md`
 
@@ -75,7 +75,7 @@ New capabilities (HeatDiffusion itself, MTR validation, PipeGeometry refactor) a
 
 ### Established Patterns
 - Port array creation: `[ThermalPort(name=Symbol(:thermal, i)) for i in 1:n]` — same pattern, new names
-- `compose(..., port_in, port_out, ports...)`: splat syntax supports both arrays by splatting each separately
+- `compose(..., inlet, outlet, ports...)`: splat syntax supports both arrays by splatting each separately
 - `mtkcompile(sys; fully_determined=false)`: already used in THERM-01 — ChannelAndContacts under-determined until thermal ports are connected
 
 ### Integration Points

@@ -39,11 +39,11 @@ ssys = build_loop(
 )
 
 # Steady-state initial guess and solve
-op  = [ssys.ch.port_in.mdot => 0.490]
+op  = [ssys.ch.inlet.mdot => 0.490]
 sol = solve_steady(ssys, op)
 
 println("T_outlet = ", round(sol[ssys.ch.T_out] - 273.15, digits=2), " C")
-println("mdot     = ", round(abs(sol[ssys.ch.port_in.mdot]), digits=4), " kg/s")
+println("mdot     = ", round(abs(sol[ssys.ch.inlet.mdot]), digits=4), " kg/s")
 # T_outlet ~= 54.6 C  (validated against Python STREAM)
 ```
 
