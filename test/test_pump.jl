@@ -18,25 +18,25 @@ import STREAM: Pump, Channel
     @test_nowarn mtkcompile(pump; fully_determined=false)
 
     # Test: Integration — Pump(mdot0=0.6) in a loop: Pump → HeatExchanger → Channel → back
-    # HeatExchanger provides pressure closure (inlet.P - outlet.P ~ 0)
-    # pump.inlet.P ~ 1e5 provides absolute pressure reference
+    # HeatExchanger provides pressure closure (port_in.P - port_out.P ~ 0)
+    # pump.port_in.P ~ 1e5 provides absolute pressure reference
     @named pump5 = Pump(mdot0=0.6)
     @named bc5 = HeatExchanger(313.15)
     @named ch5 = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns5 = [
-        connect(pump5.outlet, bc5.inlet),
-        connect(bc5.outlet, ch5.inlet),
-        connect(ch5.outlet, pump5.inlet),
-        pump5.inlet.P ~ 1e5,
+        connect(pump5.port_out, bc5.port_in),
+        connect(bc5.port_out, ch5.port_in),
+        connect(ch5.port_out, pump5.port_in),
+        pump5.port_in.P ~ 1e5,
         ch5.thermal.T ~ 350.0,   # pin wall temperature (adiabatic not needed; mdot0 drives flow)
     ]
     @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
     ssys5 = mtkcompile(sys5; fully_determined=false)
-    op5 = Pair{Any,Any}[ssys5.ch5.inlet.mdot => 0.6]
+    op5 = Pair{Any,Any}[ssys5.ch5.port_in.mdot => 0.6]
     append!(op5, [ssys5.ch5.T[i] => 313.15 for i in 1:5])
     sol5 = solve_steady(ssys5, op5)
     @test sol5.retcode == ReturnCode.Success
-    @test isapprox(sol5[ssys5.pump5.inlet.mdot], 0.6; rtol=1e-4)
+    @test isapprox(sol5[ssys5.pump5.port_in.mdot], 0.6; rtol=1e-4)
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -70,19 +70,19 @@ end
     @named bc_r = HeatExchanger(313.15)
     @named ch_r = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns_r = [
-        connect(pump_r.outlet, bc_r.inlet),
-        connect(bc_r.outlet, ch_r.inlet),
-        connect(ch_r.outlet, pump_r.inlet),
-        pump_r.inlet.P ~ 1e5,
+        connect(pump_r.port_out, bc_r.port_in),
+        connect(bc_r.port_out, ch_r.port_in),
+        connect(ch_r.port_out, pump_r.port_in),
+        pump_r.port_in.P ~ 1e5,
         ch_r.thermal.T ~ 350.0,
     ]
     @named sys_r = compose(System(conns_r, t; name=:pump02_loop), pump_r, bc_r, ch_r)
     ssys_r = mtkcompile(sys_r; fully_determined=false)
     op_r = [ssys_r.ch_r.T[i] => 313.15 for i in 1:5]
-    push!(op_r, ssys_r.ch_r.inlet.mdot => 0.490)
+    push!(op_r, ssys_r.ch_r.port_in.mdot => 0.490)
     sol_r = solve_steady(ssys_r, op_r)
     @test sol_r.retcode == ReturnCode.Success
-    @test sol_r[ssys_r.ch_r.inlet.mdot] > 0   # positive flow
+    @test sol_r[ssys_r.ch_r.port_in.mdot] > 0   # positive flow
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -119,19 +119,19 @@ end
     # Two thermal anchors needed: circular instream in a closed hydraulics-only loop
     # (no HeatExchanger) is degenerate; pinning pump inlet + inertia outlet breaks it.
     conns = [
-        connect(pump.outlet, ine.inlet),
-        connect(ine.outlet, res.inlet),
-        connect(res.outlet, pump.inlet),
-        pump.inlet.P ~ 1e5,       # pressure anchor
-        pump.inlet.T ~ 313.15,    # thermal anchor 1
-        ine.outlet.T ~ 313.15,    # thermal anchor 2 (breaks circular instream)
+        connect(pump.port_out, ine.port_in),
+        connect(ine.port_out, res.port_in),
+        connect(res.port_out, pump.port_in),
+        pump.port_in.P ~ 1e5,       # pressure anchor
+        pump.port_in.T ~ 313.15,    # thermal anchor 1
+        ine.port_out.T ~ 313.15,    # thermal anchor 2 (breaks circular instream)
     ]
     @named sys = compose(System(conns, t; name=:pump03), pump, ine, res)
     ssys = mtkcompile(sys; fully_determined=false)
 
     mdot_0 = dP0 / R_val   # 1.0 kg/s at steady state
 
-    op = [ssys.ine.inlet.mdot => mdot_0, ssys.pump.dP_pump_fn => dP_fn]
+    op = [ssys.ine.port_in.mdot => mdot_0, ssys.pump.dP_pump_fn => dP_fn]
 
     t_arr = range(0.0, T_ramp, length=1000)
     sol = solve_transient(ssys, op, t_arr)
@@ -151,12 +151,12 @@ end
     end
 
     mdot_end_analytical = mdot_analytical(T_ramp)
-    mdot_end_numerical = sol[ssys.ine.inlet.mdot, end]
+    mdot_end_numerical = sol[ssys.ine.port_in.mdot, end]
 
     @test isapprox(mdot_end_numerical, mdot_end_analytical; rtol=0.01)
 
     # Sanity: mdot at t=0 should be near mdot_0
-    @test isapprox(sol[ssys.ine.inlet.mdot, 1], mdot_0; rtol=0.01)
+    @test isapprox(sol[ssys.ine.port_in.mdot, 1], mdot_0; rtol=0.01)
 
     # Sanity: mdot near zero at T_ramp (|mdot| < 10% of initial)
     @test abs(mdot_end_numerical) < 0.1 * mdot_0
@@ -165,6 +165,6 @@ end
     idx_mid = length(t_arr) ÷ 2
     t_mid = t_arr[idx_mid]
     mdot_mid_analytical = mdot_analytical(t_mid)
-    mdot_mid_numerical = sol[ssys.ine.inlet.mdot, idx_mid]
+    mdot_mid_numerical = sol[ssys.ine.port_in.mdot, idx_mid]
     @test isapprox(mdot_mid_numerical, mdot_mid_analytical; rtol=0.01)
 end

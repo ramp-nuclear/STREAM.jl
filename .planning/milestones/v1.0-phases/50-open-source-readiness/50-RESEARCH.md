@@ -225,9 +225,9 @@ THE SOFTWARE.
 
 **What the test does:** Assembles a 12-resistor cube network, solves steady state with `solve_steady` (which calls `SSRootfind(KINSOL())`), and checks that total mdot matches the analytical 5/6 R result.
 
-**Root cause:** The initial guess `op = [ssys.pump.outlet.mdot => mdot_guess]` provides only one variable guess for a system with 12 resistors (12+ flow variables). KINSOL receives an under-specified initial point. For pure hydraulic networks (no thermal coupling), the Jacobian condition number is poorer than coupled thermal-hydraulic loops — KINSOL's line-search Newton can wander.
+**Root cause:** The initial guess `op = [ssys.pump.port_out.mdot => mdot_guess]` provides only one variable guess for a system with 12 resistors (12+ flow variables). KINSOL receives an under-specified initial point. For pure hydraulic networks (no thermal coupling), the Jacobian condition number is poorer than coupled thermal-hydraulic loops — KINSOL's line-search Newton can wander.
 
-**Confirmed from codebase:** `solve_steady` calls `SSRootfind(KINSOL())` unconditionally. The test's `op` only sets `ssys.pump.outlet.mdot`. The cube's body-diagonal symmetry means there are three equivalent 1-resistor paths and six 2-resistor paths; without symmetric initialization, KINSOL may not find the symmetric solution.
+**Confirmed from codebase:** `solve_steady` calls `SSRootfind(KINSOL())` unconditionally. The test's `op` only sets `ssys.pump.port_out.mdot`. The cube's body-diagonal symmetry means there are three equivalent 1-resistor paths and six 2-resistor paths; without symmetric initialization, KINSOL may not find the symmetric solution.
 
 **Fix options (in order of preference):**
 
@@ -347,10 +347,10 @@ jobs:
 mdot_analytical = dP_val / (5.0/6.0 * R_val)
 mdot_per_branch = mdot_analytical / 3.0
 op = [
-    ssys.pump.outlet.mdot => mdot_analytical,
-    ssys.r01.inlet.mdot  => mdot_per_branch,
-    ssys.r02.inlet.mdot  => mdot_per_branch,
-    ssys.r04.inlet.mdot  => mdot_per_branch,
+    ssys.pump.port_out.mdot => mdot_analytical,
+    ssys.r01.port_in.mdot  => mdot_per_branch,
+    ssys.r02.port_in.mdot  => mdot_per_branch,
+    ssys.r04.port_in.mdot  => mdot_per_branch,
     # ... remaining resistors
 ]
 # Use RobustMultiNewton as fallback solver

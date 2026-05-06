@@ -29,7 +29,7 @@ human_verification:
 | 2 | A_grav and H_grav removed from Gravity @parameters and constructor signature entirely | VERIFIED | Line 126: `function Gravity(; name, H)` — no A_grav kwarg. No occurrence of `H_grav` or `A_grav` anywhere in components.jl (grep confirmed CLEAN) |
 | 3 | Channel @parameters use L and A (not L_ch and A_ch) | VERIFIED | `src/components.jl` lines 21-24: `L = L`, `D_h = Dh`, `A = A`, `g_acc = g`. No `L_ch` or `A_ch` present (grep confirmed CLEAN) |
 | 4 | Friction @parameters use L and A (not L_f and A_f) | VERIFIED | `src/components.jl` lines 102-105: `L = L`, `D_h = D`, `A = A`. No `L_f` or `A_f` present (grep confirmed CLEAN) |
-| 5 | solve_steady docstring contains no reference to ssys.fr.* or ssys.fr.Re | VERIFIED | `src/solvers.jl` lines 111-115: docstring reads `ssys.ch.inlet.mdot => mdot_guess for mass flow`. No `fr.` occurrence (grep confirmed CLEAN) |
+| 5 | solve_steady docstring contains no reference to ssys.fr.* or ssys.fr.Re | VERIFIED | `src/solvers.jl` lines 111-115: docstring reads `ssys.ch.port_in.mdot => mdot_guess for mass flow`. No `fr.` occurrence (grep confirmed CLEAN) |
 | 6 | test/test_transient_tdd.jl and test/test_solvers_tdd.jl deleted from repo | VERIFIED | `ls test/` returns only `generate_reference.py` and `runtests.jl`. Both files absent. Commit 1c9b1a6 staged and committed their deletion. |
 | 7 | Staged deletion of test/test_comp_tdd.jl committed | VERIFIED | `git status --short` shows no `D test/test_comp_tdd.jl` — deletion was committed (working tree clean). File absent from `ls test/`. |
 | 8 | 03-03-SUMMARY.md frontmatter requirements-completed field lists VAL-01, VAL-02, VAL-03 | VERIFIED | `.planning/phases/03-integration-and-validation/03-03-SUMMARY.md` line 4: `requirements-completed: [VAL-01, VAL-02, VAL-03]` |
@@ -45,7 +45,7 @@ human_verification:
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
 | `src/components.jl` | Fixed Gravity, Channel, Friction components | VERIFIED | Gravity: `@parameters H = H`, no A_grav/H_grav; Channel: `L = L`, `A = A`; Friction: `L = L`, `A = A` |
-| `src/solvers.jl` | Corrected solve_steady docstring | VERIFIED | Lines 111-115 contain `ssys.ch.inlet.mdot` only — no `fr.*` reference |
+| `src/solvers.jl` | Corrected solve_steady docstring | VERIFIED | Lines 111-115 contain `ssys.ch.port_in.mdot` only — no `fr.*` reference |
 | `.planning/phases/03-integration-and-validation/03-03-SUMMARY.md` | Structured requirements-completed field with VAL-01, VAL-02, VAL-03 | VERIFIED | Line 4: `requirements-completed: [VAL-01, VAL-02, VAL-03]` |
 | `test/runtests.jl` | COMP-04 test calls Gravity(H=3.0) without A_grav kwarg | VERIFIED | Line 151: `@named grav = Gravity(H=3.0)` — no A_grav kwarg |
 | `test/test_transient_tdd.jl` | Deleted | VERIFIED | File does not exist; `ls test/` confirms only runtests.jl and generate_reference.py remain |
@@ -71,7 +71,7 @@ Phase 4 PLAN frontmatter declares `requirements: []` — this is a quality/clean
 | Item | Source | Description | Status |
 |------|--------|-------------|--------|
 | BUG-01 | MILESTONE-AUDIT tech_debt | Gravity H_grav MTK param unused in equation | RESOLVED — `@parameters H = H` now in scope for equation |
-| BUG-02 | MILESTONE-AUDIT tech_debt | solve_steady docstring ssys.fr.* stale references | RESOLVED — replaced with `ssys.ch.inlet.mdot` |
+| BUG-02 | MILESTONE-AUDIT tech_debt | solve_steady docstring ssys.fr.* stale references | RESOLVED — replaced with `ssys.ch.port_in.mdot` |
 | BUG-03/4 | MILESTONE-AUDIT tech_debt | Stale TDD test files not in Pkg.test() scope | RESOLVED — all three files deleted and committed |
 | VAL-01/02/03 frontmatter | MILESTONE-AUDIT tech_debt | Missing requirements-completed field in 03-03-SUMMARY.md | RESOLVED — field present at line 4 |
 
@@ -104,7 +104,7 @@ No gaps. All 9 must-have truths are satisfied by static inspection of the actual
 The phase goal — "resolve all v0.1 tech debt items so the codebase is clean for milestone close" — is achieved:
 
 - BUG-01 (Gravity MTK param shadowed by Julia kwarg): Fixed. `@parameters H = H` declares the MTK symbolic, equation now references it.
-- BUG-02 (stale docstring): Fixed. `ssys.fr.*` replaced with `ssys.ch.inlet.mdot`.
+- BUG-02 (stale docstring): Fixed. `ssys.fr.*` replaced with `ssys.ch.port_in.mdot`.
 - Parameter naming inconsistencies (L_ch/A_ch, L_f/A_f): Resolved. Both Channel and Friction now use bare `L` and `A` as MTK param names, matching Python STREAM convention.
 - Orphaned TDD test files (test_comp_tdd.jl, test_transient_tdd.jl, test_solvers_tdd.jl): Deleted and committed. test/ directory contains only active files.
 - 03-03-SUMMARY.md frontmatter gap (VAL-01/02/03 missing from structured field): Resolved. Field present.

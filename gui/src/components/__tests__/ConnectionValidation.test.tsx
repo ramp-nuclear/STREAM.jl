@@ -24,7 +24,7 @@ describe("getPortType", () => {
 
   it("returns FlowPort for a FlowPort handle", () => {
     useStore.setState({ nodes: [makeNode("n1", "Pump")] });
-    expect(getPortType("n1", "inlet")).toBe("FlowPort");
+    expect(getPortType("n1", "port_in")).toBe("FlowPort");
   });
 
   it("returns ThermalPort for a ThermalPort handle", () => {
@@ -33,7 +33,7 @@ describe("getPortType", () => {
   });
 
   it("returns null for unknown nodeId", () => {
-    expect(getPortType("nonexistent", "inlet")).toBeNull();
+    expect(getPortType("nonexistent", "port_in")).toBeNull();
   });
 });
 
@@ -46,7 +46,7 @@ describe("isValidConnection logic", () => {
     useStore.setState({
       nodes: [makeNode("n1", "Pump"), makeNode("n2", "HeatDiffusion")],
     });
-    const srcType = getPortType("n1", "outlet");
+    const srcType = getPortType("n1", "port_out");
     const tgtType = getPortType("n2", "thermal_left");
     // Cross-type should be blocked
     expect(srcType).toBe("FlowPort");
@@ -72,8 +72,8 @@ describe("isValidConnection logic", () => {
     useStore.setState({
       nodes: [makeNode("n1", "Pump"), makeNode("n2", "Channel")],
     });
-    const srcType = getPortType("n1", "outlet");
-    const tgtType = getPortType("n2", "inlet");
+    const srcType = getPortType("n1", "port_out");
+    const tgtType = getPortType("n2", "port_in");
     expect(srcType).toBe("FlowPort");
     expect(tgtType).toBe("FlowPort");
     expect(srcType === tgtType).toBe(true);
@@ -117,8 +117,8 @@ describe("addEdge thermal styling", () => {
     useStore.getState().addEdge({
       source: "n1",
       target: "n2",
-      sourceHandle: "outlet",
-      targetHandle: "inlet",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
     });
     const edges = useStore.getState().edges;
     expect(edges.length).toBe(1);

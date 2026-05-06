@@ -24,7 +24,7 @@ validation scenario — those are Phases 23–24.
 - `Pump(; name, mdot0)` — fixed-flow (keyword-only; mdot0 vs dP_pump is a concept distinction, not a type distinction — no dispatch possible, stays keyword)
 - Three methods total, clean Julia multiple dispatch for the scalar vs callable case
 - **No validation of the callable at construction time** — trust the caller (consistent with `power_shape` and all other user-supplied values). Errors surface at solve time with a clear MTK message.
-- The callable is registered via `@register_symbolic` so it becomes an opaque symbolic node in MTK equations: `outlet.P - inlet.P ~ dP_pump(t)`
+- The callable is registered via `@register_symbolic` so it becomes an opaque symbolic node in MTK equations: `port_out.P - port_in.P ~ dP_pump(t)`
 
 ### PUMP-03 test system
 - Loop topology: **Pump + Inertia + Resistor** (simplest system with mdot dynamics)
@@ -100,7 +100,7 @@ No external specs — requirements fully captured in decisions above.
 ## Existing Code Insights
 
 ### Reusable Assets
-- `Inertia` component (`src/components/misc.jl`): `(L/A)*Dt(inlet.mdot)` — provides mdot dynamics for PUMP-03 test
+- `Inertia` component (`src/components/misc.jl`): `(L/A)*Dt(port_in.mdot)` — provides mdot dynamics for PUMP-03 test
 - `Resistor` component (`src/components/resistors.jl`): `dP = R*mdot` — provides hydraulic resistance for PUMP-03 test
 - `@register_symbolic` pattern (`src/fluids.jl`): module-level registration of opaque functions — same mechanism needed for callable dP_pump
 - `solve_steady` signature (`src/solvers.jl:70`): `solve_steady(ssys, op; kwargs...)` — the positional pattern `solve_transient` should mirror

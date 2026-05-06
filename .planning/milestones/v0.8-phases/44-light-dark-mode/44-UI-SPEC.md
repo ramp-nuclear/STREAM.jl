@@ -91,8 +91,8 @@ These hardcoded hex values remain identical in both themes. They were chosen for
 
 | Element | Color | Light BG Contrast | Dark BG Contrast |
 |---------|-------|-------------------|------------------|
-| FlowPort outlet handle | #60a5fa (blue-400) | PASS | PASS |
-| FlowPort inlet handle | #94a3b8 (slate-400) | PASS | PASS |
+| FlowPort port_out handle | #60a5fa (blue-400) | PASS | PASS |
+| FlowPort port_in handle | #94a3b8 (slate-400) | PASS | PASS |
 | Thermal edge stroke | #f59e0b (amber-500) | PASS | PASS |
 | Error ring | `var(--destructive)` | PASS (theme-adaptive) | PASS (theme-adaptive) |
 

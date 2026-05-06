@@ -73,7 +73,7 @@ Implement `ChannelAndContacts` (n per-cell ThermalPorts for HeatDiffusion coupli
 - `HeatExchanger` in `src/components.jl`: available for wiring in any tests that need it, but THERM-03 uses `ChannelHeatFlux` instead
 
 ### Established Patterns
-- All components: `compose(System(eqs, t, vars, pars; name=name), inlet, outlet, ...ports...)`
+- All components: `compose(System(eqs, t, vars, pars; name=name), port_in, port_out, ...ports...)`
 - `mtkcompile(sys; fully_determined=false)` for standalone tests (established Phase 7)
 - TDD: RED stubs first, then GREEN implementation
 - Per-cell array variables: `(T(t))[1:n]` syntax already used in `Channel`

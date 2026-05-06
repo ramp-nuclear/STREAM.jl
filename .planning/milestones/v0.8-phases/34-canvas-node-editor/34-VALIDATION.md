@@ -64,7 +64,7 @@ created: 2026-04-02
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
 | Drag-and-drop node placement | CANV-01 | jsdom cannot simulate real drag events | Launch Tauri app, drag Pump from toolbox to canvas, verify node appears |
-| Edge drawing via handle click-drag | CANV-02 | ReactFlow edge creation requires pointer events | Launch Tauri app, drag from outlet handle to inlet handle, verify edge appears |
+| Edge drawing via handle click-drag | CANV-02 | ReactFlow edge creation requires pointer events | Launch Tauri app, drag from port_out handle to port_in handle, verify edge appears |
 | Canvas pan/zoom feel | CANV-05 | UX quality not automatable | Launch Tauri app, scroll to zoom, drag background to pan |
 
 ---

@@ -29,7 +29,7 @@ Plan 02 truths (requirements PRES-01, PRES-02, PRES-04):
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
 | 4 | dP == sum(dp[i]) for all channel variants (Channel, ChannelAndContacts, ChannelHeatFlux) | VERIFIED | 22 assertions in test_channel.jl PRES-01 testset |
-| 5 | P[i] forms a monotonically decreasing absolute pressure profile from inlet.P | VERIFIED | 40 assertions in test_channel.jl PRES-02 testset |
+| 5 | P[i] forms a monotonically decreasing absolute pressure profile from port_in.P | VERIFIED | 40 assertions in test_channel.jl PRES-02 testset |
 | 6 | T_sat[i] accessible and physically reasonable in thermal channels (ChannelAndContacts, ChannelHeatFlux) | VERIFIED | 72 assertions in test_channel.jl PRES-04 testset |
 | 7 | T_ONB[i] > T_sat[i] for all cells under nonzero wall heat flux | VERIFIED | included in 72 PRES-04 assertions |
 
@@ -55,8 +55,8 @@ Plan 02 truths (requirements PRES-01, PRES-02, PRES-04):
 | `src/fluids.jl` | `src/STREAM.jl` | export statement | WIRED | sat_temperature in fluid export line |
 | `src/components/thermal_channel.jl` | `src/fluids.jl` | sat_temperature(P_i) call in observed equations | WIRED | T_sat[i] ~ sat_temperature(P_i) |
 | `src/components/thermal_channel.jl` | `src/physical_models/correlations.jl` | _bergles_rohsenow_dT_ONB(P_i, q_spl_i) call | WIRED | T_ONB[i] ~ T_sat[i] + _bergles_rohsenow_dT_ONB(...) |
-| `src/components/channel.jl` | port wiring | dP ~ inlet.P - outlet.P | WIRED | sum(dp[i]) identity enforced via exact per-cell equations |
-| dp[i] unknown | P[i] observed | cumsum expression P_i = inlet.P - sum(dp[1:i]) | WIRED | P_i local variable used to avoid observed-to-observed chain |
+| `src/components/channel.jl` | port wiring | dP ~ port_in.P - port_out.P | WIRED | sum(dp[i]) identity enforced via exact per-cell equations |
+| dp[i] unknown | P[i] observed | cumsum expression P_i = port_in.P - sum(dp[1:i]) | WIRED | P_i local variable used to avoid observed-to-observed chain |
 
 ### Requirements Coverage
 

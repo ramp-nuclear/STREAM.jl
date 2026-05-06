@@ -72,7 +72,7 @@ None -- discussion stayed within phase scope.
 channel.jl line 89-92:
   dP ~ f_ch * (mdot * |mdot| / (2*rho[i_mid]*A^2)) * (L/Dh)
      + rho[i_mid] * g_acc * L
-     + (L/A) * Dt(inlet.mdot)
+     + (L/A) * Dt(port_in.mdot)
 
 _channel_base_eqs line 159-162:
   identical formula using i_mid = max(1, n / 2)
@@ -82,9 +82,9 @@ _channel_base_eqs line 159-162:
 ```julia
 # In _channel_base_eqs, for each cell i in 1:n:
 push!(eqs, dp[i] ~ friction_correlation(Re_i) *
-    (inlet.mdot * abs(inlet.mdot) / (2 * rho_water(T[i]) * A^2)) * (dz / Dh)
+    (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(T[i]) * A^2)) * (dz / Dh)
     + rho_water(T[i]) * g_acc * dz
-    + (dz / A) * Dt(inlet.mdot))
+    + (dz / A) * Dt(port_in.mdot))
 ```
 
 Key change: `L` replaced by `dz = L/n` in each term. Friction is evaluated per-cell using local T[i] instead of T[i_mid]. Inertia term `(dz/A)*Dt(mdot)` sums to `(L/A)*Dt(mdot)` over n cells.
@@ -94,13 +94,13 @@ Currently, friction uses `Re_mean` at `i_mid`. The new per-cell approach needs p
 
 **Channel and ChannelHeatFlux (observed_mode=false):** Re[i] is already a solver unknown, so `friction_correlation(Re[i])` works directly inside _channel_base_eqs.
 
-**ChannelAndContacts (observed_mode=true):** Re[i] is observed (not unknown). Must compute `Re_i` as an inlined expression (same as current h_tc inlining pattern on line 139 of channel.jl): `Re_i = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))`.
+**ChannelAndContacts (observed_mode=true):** Re[i] is observed (not unknown). Must compute `Re_i` as an inlined expression (same as current h_tc inlining pattern on line 139 of channel.jl): `Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))`.
 
 ### P[i] Observed Pattern
 ```julia
 obs = Equation[]
 for i in 1:n
-    P_i = inlet.P - sum(dp[j] for j in 1:i)
+    P_i = port_in.P - sum(dp[j] for j in 1:i)
     push!(obs, P[i] ~ P_i)
 end
 ```
@@ -159,7 +159,7 @@ Note: This is NOT @register_symbolic. It will be called inline in observed equat
 ### Pitfall 1: Observed-to-Observed Chain
 **What goes wrong:** If T_sat[i] references P[i] (an observed), MTK may fail to resolve the evaluation order or silently produce NaN.
 **Why it happens:** MTK observeds are computed post-solve; referencing one observed from another creates an ordering dependency that may not be satisfied.
-**How to avoid:** D-06/D-11 mandate using `P_i = inlet.P - sum(dp[j] for j in 1:i)` (the same expression, not the P[i] symbol) in T_sat and T_ONB equations.
+**How to avoid:** D-06/D-11 mandate using `P_i = port_in.P - sum(dp[j] for j in 1:i)` (the same expression, not the P[i] symbol) in T_sat and T_ONB equations.
 **Warning signs:** NaN in T_sat values while P[i] values are correct.
 
 ### Pitfall 2: dP Must Leave all_vars (Unknown List)
@@ -236,7 +236,7 @@ end
 # From ChannelAndContacts (thermal_channel.jl line 121-139):
 obs = Equation[]
 for i in 1:n
-    Re_i = abs(inlet.mdot) * Dh / (A * mu_water(T[i]))
+    Re_i = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
     push!(obs, Re[i] ~ Re_i)
     # ... more observed equations
 end

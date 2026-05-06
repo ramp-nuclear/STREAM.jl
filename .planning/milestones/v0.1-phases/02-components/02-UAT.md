@@ -47,7 +47,7 @@ expected: |
   p = Pump(name=:p, dP_pump=1000.0)
   eqs = equations(p)
   ```
-  Instantiates without error. One equation sets `outlet.P - inlet.P ~ dP_pump` (or equivalent). `mtkcompile(p; fully_determined=false)` completes without error.
+  Instantiates without error. One equation sets `port_out.P - port_in.P ~ dP_pump` (or equivalent). `mtkcompile(p; fully_determined=false)` completes without error.
 result: issue
 reported: "UndefKeywordError: keyword argument `dP` not assigned — Pump uses `dP` not `dP_pump`"
 severity: major

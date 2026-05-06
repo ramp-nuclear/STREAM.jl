@@ -37,12 +37,12 @@ Correlations for HTC (Marco-Han, developing laminar, maximal_htc) and friction
   T_wall_right::AbstractVector   # right face wall temperature [K]
   T_sat::AbstractVector          # T_sat[i] [K] (from @observed)
   T_ONB::AbstractVector          # T_ONB[i] [K] (from @observed)
-  T_inlet::Float64               # inlet.T [K]
+  T_inlet::Float64               # port_in.T [K]
   P::AbstractVector              # P[i] [Pa]
   q_flux::AbstractVector         # max(q_flux_left, q_flux_right) [W/m²] — conservative default
   q_flux_left::AbstractVector    # left face heat flux [W/m²]
   q_flux_right::AbstractVector   # right face heat flux [W/m²]
-  mdot::Float64                  # inlet.mdot [kg/s]
+  mdot::Float64                  # port_in.mdot [kg/s]
   velocity::AbstractVector       # velocity[i] [m/s] (absolute)
   pipe::Union{PipeGeometry, Nothing}
   gravity::Float64
@@ -96,7 +96,7 @@ Correlations for HTC (Marco-Han, developing laminar, maximal_htc) and friction
 ### Existing infrastructure to reuse/extend
 - `src/physical_models/correlations.jl` — `_bergles_rohsenow_dT_ONB` private helper (THRS-01 calls this); `regime_dependent` factory pattern
 - `src/physical_models/subcooled_boiling.jl` — file structure pattern to follow for `threshold_analysis.jl`
-- `src/components/thermal_channel.jl` — @observed variables available in ChannelAndContacts solution: `T_sat[i]`, `T_ONB[i]`, `P[i]`, `T_wall_left[i]`, `T_wall_right[i]`, `q_wall_left[i]`, `q_wall_right[i]`, `velocity[i]`; port variables `inlet.T`, `inlet.mdot`; state var `T[i]`
+- `src/components/thermal_channel.jl` — @observed variables available in ChannelAndContacts solution: `T_sat[i]`, `T_ONB[i]`, `P[i]`, `T_wall_left[i]`, `T_wall_right[i]`, `q_wall_left[i]`, `q_wall_right[i]`, `velocity[i]`; port variables `port_in.T`, `port_in.mdot`; state var `T[i]`
 - `src/solvers.jl` — `solve_steady` / `solve_transient` return types; how to query solution via `sol[ssys.comp.var]`
 - `src/geometry.jl` — `PipeGeometry` fields: `L`, `Dh`, `A`, `heated_perimeter`, `wet_perimeter`, `heated_parts` (NTuple{2,Float64}), `width`, `depth`
 
@@ -118,7 +118,7 @@ Correlations for HTC (Marco-Han, developing laminar, maximal_htc) and friction
 - `_bergles_rohsenow_dT_ONB(P_Pa, q_spl)` in `src/physical_models/correlations.jl` — THRS-01 calls this directly; don't duplicate logic
 - `rho_water`, `cp_water`, `mu_water`, `k_water`, `sat_temperature` — global fluid property functions; `boiling_onset_power` wrapper needs `cp_water(T_bulk)` from these
 - `regime_dependent_q_scb` (Phase 28) — THRS-04 (OSV Saha-Zuber) may reference `Re_transition` pattern; OSV is self-consistent so needs its own implementation
-- Query pattern from tests: `sol[ssys.cac.T_sat[i]]`, `sol[ssys.cac.T_wall_left[i]]`, `sol[ssys.cac.inlet.mdot]`, `sol[ssys.cac.velocity[i]]`, `sol[ssys.cac.P[i]]`
+- Query pattern from tests: `sol[ssys.cac.T_sat[i]]`, `sol[ssys.cac.T_wall_left[i]]`, `sol[ssys.cac.port_in.mdot]`, `sol[ssys.cac.velocity[i]]`, `sol[ssys.cac.P[i]]`
 
 ### Established Patterns
 - Correlation functions are **plain Julia closures**, not `@register_symbolic`

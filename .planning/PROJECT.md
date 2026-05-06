@@ -60,7 +60,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - ✓ `Project.toml` bumped to `0.5.0`; `ChannelHeatFlux` and `ConstantTemperature` confirmed exported, tested, documented — v0.5
 - ✓ `regime_dependent` extended with NC detection: Gr/Re² > 1 switches to `htc_natural`; `Gr_over_Re2[i]` observable added to `ChannelAndContacts` and `ChannelHeatFlux`; `build_loop_lof_bypass` wires Elenbaas NC HTC — v0.6
 - ✓ VAL-02 NC temperature-rise assertion passes; NC dT matches Elenbaas analytical estimate within 30% rtol (actual ratio 0.997) — v0.6
-- ✓ All channel types (Channel, ChannelAndContacts, ChannelHeatFlux) sign-safe: ifelse() upwinding selects upstream T by mdot sign; abs(mdot) in Re; inlet.T ~ T[1] stream equation corrected — v0.6
+- ✓ All channel types (Channel, ChannelAndContacts, ChannelHeatFlux) sign-safe: ifelse() upwinding selects upstream T by mdot sign; abs(mdot) in Re; port_in.T ~ T[1] stream equation corrected — v0.6
 - ✓ `beta_water(T)` thermal expansion coefficient, @register_symbolic, validated at 3 reference temperatures — v0.6
 - ✓ `Gr`, `Ra` dimensionless number utilities; 4-arg HTC interface (Re, Pr, T_bulk, T_wall) extended to all correlations and channel components — v0.6
 - ✓ `elenbaas_nusselt(Ra, b, L)` Elenbaas 1942 parallel-plate natural convection; `elenbaas_htc(; b, L, Dh, g)` factory returning pluggable 4-arg closure — v0.6
@@ -88,7 +88,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - ✓ **VALD-01..03**: validateTopology pure function (11 tests), destructive error rings on nodes, ValidationDialog, gated export/save — v0.8
 - ✓ **THERM-01..03**: Amber diamond ThermalPort handles, port-type connection enforcement, thermal composition detection (symmetric_plate/plate/one_sided_connection), compose_systems code-gen — v0.8
 - ✓ Layered canvas with hydraulic/thermal toggle (dimming, toolbox filtering, Tab cycling), StreamProject v2 schema — v0.8
-- ✓ Edge visual overhaul: arrowheads, parallel offset routing, FlowPort polarity colors (inlet/outlet), cursor fix, counter reconstruction fix — v0.8
+- ✓ Edge visual overhaul: arrowheads, parallel offset routing, FlowPort polarity colors (port_in/port_out), cursor fix, counter reconstruction fix — v0.8
 - ✓ UI polish: ThermalPort 12×12px handles, Info icon tooltips on all parameter fields, draggable bottom panel resize — v0.8
 - ✓ Light/dark/system theme toggle (ThemeMenu gear icon, localStorage persistence, FOUC prevention, ReactFlow colorMode integration, One Dark Pro palette) — v0.8
 
@@ -152,8 +152,8 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 | build_loop is a test example, not the primary API | MTK connect()/compose() is expressive enough; no FlowGraph wrapper needed | ✓ Good — users use connect()/compose() directly |
 | No Python adapter in early milestones | Avoid complexity that muddies architectural validation | — Pending |
 | MTK variadic connect(a,b,c) is the junction — no Junction component needed | MTK generates Kirchhoff equations automatically; simpler topology | ✓ Good — Cube (12 Resistors, 8 nodes) proved it works at scale |
-| Pressure anchor pump.inlet.P ~ 1.0e5 in multi-branch networks | Kirchhoff system leaves absolute pressure underdetermined without it | ✓ Good — required for any multi-branch network |
-| Inertia uses vars=[] — MTK auto-promotes inlet.mdot as differential state | Explicit mdot state var would create overconstrained system | ✓ Good — MTK infers state from Dt(inlet.mdot) correctly |
+| Pressure anchor pump.port_in.P ~ 1.0e5 in multi-branch networks | Kirchhoff system leaves absolute pressure underdetermined without it | ✓ Good — required for any multi-branch network |
+| Inertia uses vars=[] — MTK auto-promotes port_in.mdot as differential state | Explicit mdot state var would create overconstrained system | ✓ Good — MTK infers state from Dt(port_in.mdot) correctly |
 | ChannelAndContacts thermal_left[1:n] + thermal_right[1:n] dual ports | Each side is an independent ThermalPort array; unconnected side defaults adiabatic via MTK | ✓ Good — HeatDiffusion connects symmetrically to both sides |
 | PipeGeometry struct with heated_parts::NTuple{2,Float64} | Rectangular MTR geometry uses `2·y` heated perimeter, not `π·Dh/2`; struct makes this explicit | ✓ Good — fixed 4.46× error; geometry is now caller-specified not hardcoded |
 | Hardcode Python STREAM reference constants in Julia tests | Avoids test-time Python dependency; constants stable once geometry is locked | ✓ Good — VAL-01/02/03 are pure Julia tests with 1% rtol assertions |
@@ -168,7 +168,7 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 | CLAUDE.md includes **Why:** rationale for every rule | Rules without context get ignored or broken; rationale enables judgment at edge cases | ✓ Good — QOL-03 complete; MTK Patterns section added as reference |
 | `solve_transient` keyword-only aligns with project-wide convention | Consistent API: no function mixes positional and keyword arguments | ✓ Good — QOL-01 complete; MethodError guard now enforced |
 | Series-loop LOF topology replaced by 4-node bypass | Series topology had no real junctions; couldn't model parallel channel/Flapper paths or correct gravity signs per branch | ✓ Good — bypass topology is physically correct; NC established at expected mdot magnitude |
-| Channel momentum inertia reverted from Channel component; standalone Inertia used | `(L/A)*Dt(inlet.mdot)` in Channel breaks parallel topologies (current-source conflict at junctions); standalone Inertia in series is exact and composable | ✓ Good — all 5 bypass LOF tests pass; Inertia component handles this correctly |
+| Channel momentum inertia reverted from Channel component; standalone Inertia used | `(L/A)*Dt(port_in.mdot)` in Channel breaks parallel topologies (current-source conflict at junctions); standalone Inertia in series is exact and composable | ✓ Good — all 5 bypass LOF tests pass; Inertia component handles this correctly |
 | Channel carries distributed inertia `(L/A)*Dt(mdot)` via momentum ODE (Phase 27.1 reversal) | Pressure field implementation requires inertia in P[i] formula; series-only topologies (no parallel branches) are safe; Channel+Inertia in series compilation-only (two competing Dt(mdot) ODEs — physical over-specification) | ✓ Good — PRES-05..12 all pass; PRES-11 correctly scoped to compilation-only |
 | max(dT, 0.0) inside ifelse() for SCB exponentiation | Julia ifelse() evaluates both branches eagerly; negative dT causes DomainError in power law without the max guard | ✓ Good — SCB-01..04 pass; same pattern applies to all power-law correlations with ifelse() |
 | SCB in-loop correction via skip_htc kwarg + caller-provided h_tc equations | Cleanest extension point; doesn't modify _channel_base_eqs control flow; caller inserts the ifelse(T_wall>=T_ONB, h_scb, h_spl) equation | ✓ Good — ISCB-01/02 pass; backward compatible (scb_correction=nothing default) |

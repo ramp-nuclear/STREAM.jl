@@ -90,7 +90,7 @@ The code generator translates a visual graph into text. Unlike a compiler, it ha
 **How to avoid:**
 - Implement topology validation (VALD-01/02/03) BEFORE the code generator is considered complete. The validation layer should catch:
   - Unconnected mandatory ports (every FlowPort must have an edge).
-  - No pressure anchor in the system (at least one `pump.inlet.P ~ value`).
+  - No pressure anchor in the system (at least one `pump.port_in.P ~ value`).
   - No driving element (at least one Pump or Gravity).
   - Disconnected subgraphs (all nodes must be reachable).
 - The code generator should emit components in a deterministic order (alphabetical by instance name, or topological). MTK does not care about declaration order, but deterministic output makes diffs meaningful and debugging easier.
@@ -201,13 +201,13 @@ Phase 40 (Thermal Composition) -- this is the phase that introduces dynamic port
 | Port handles too small to click | Users struggle to start edge connections, especially on high-DPI displays | Make handles at least 12x12px with an invisible 20x20px hit area; show a tooltip on hover identifying the port |
 | Undo undoes too much or too little | User expects undo to revert "add node" but it reverts 15 micro-position-changes from dragging | Use Zundo with selective recording: pause history during `onNodeDragStart`, resume on `onNodeDragStop`; record discrete actions (add, delete, parameter change) explicitly |
 | No indication of which node is selected | User clicks a node, opens sidebar, edits parameters, but is not sure which node they are editing | Highlight selected node with a visible border/glow; show node name prominently at top of sidebar |
-| Boundary condition panel is hidden or non-obvious | User creates a valid-looking graph but generated code is missing `pump.inlet.P ~ 1.0e5`, causing MTK to fail | Show a dedicated "Boundary Conditions" section in the sidebar or as a canvas overlay; pre-populate with the most common BC (pressure anchor) when a Pump is added |
+| Boundary condition panel is hidden or non-obvious | User creates a valid-looking graph but generated code is missing `pump.port_in.P ~ 1.0e5`, causing MTK to fail | Show a dedicated "Boundary Conditions" section in the sidebar or as a canvas overlay; pre-populate with the most common BC (pressure anchor) when a Pump is added |
 
 ## "Looks Done But Isn't" Checklist
 
 - [ ] **Code generation:** Often missing `using STREAM` import at top of generated file -- verify generated code is a complete runnable script, not just the system composition
 - [ ] **Code generation:** Often missing `using ModelingToolkit: t` -- the `t` independent variable must be imported or defined
-- [ ] **Boundary conditions:** Often missing pressure anchor `pump.inlet.P ~ 1.0e5` -- verify generated code always includes at least one pressure reference
+- [ ] **Boundary conditions:** Often missing pressure anchor `pump.port_in.P ~ 1.0e5` -- verify generated code always includes at least one pressure reference
 - [ ] **Save/load:** Often missing canvas viewport state (zoom, pan position) -- verify opening a saved project restores the exact visual layout
 - [ ] **Save/load:** Often missing the STREAM.jl version tag -- verify `.streamgui` files record which library version the project targets
 - [ ] **Undo/redo:** Often missing edge deletion from undo stack -- verify that deleting an edge can be undone, not just node operations

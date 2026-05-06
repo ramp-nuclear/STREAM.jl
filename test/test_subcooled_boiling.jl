@@ -117,9 +117,9 @@ end
         ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l, i)) for i in 1:n]
         ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r, i)) for i in 1:n]
         conns = [
-            connect(pump.outlet, bc.inlet),
-            connect(bc.outlet, cac.inlet),
-            connect(cac.outlet, pump.inlet),
+            connect(pump.port_out, bc.port_in),
+            connect(bc.port_out, cac.port_in),
+            connect(cac.port_out, pump.port_in),
             [
                 connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for
                 i in 1:n
@@ -128,14 +128,14 @@ end
                 connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for
                 i in 1:n
             ]...,
-            pump.inlet.P ~ 2e5,
+            pump.port_in.P ~ 2e5,
         ]
         @named sys = compose(System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...)
         ssys = mtkcompile(sys)
         Q_guess = max(1e4, 1e3 * (T_wall_bc - T_inlet))
         T_guess = steady_state_guess(T_inlet=T_inlet, Q_wall=Q_guess, mdot_guess=0.490, n=n)
         op = [ssys.cac.T[i] => T_guess[i] for i in 1:n]
-        push!(op, ssys.cac.inlet.mdot => 0.490)
+        push!(op, ssys.cac.port_in.mdot => 0.490)
         sol = solve_steady(ssys, op)
         return ssys, sol
     end

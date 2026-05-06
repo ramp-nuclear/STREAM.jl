@@ -66,9 +66,9 @@ Phase 24 is a pure test/integration phase — no new MTK components are needed. 
 
 The primary technical challenge is correctly wiring the two-branch parallel topology so that MTK's acausal connect() generates the right Kirchhoff equations at the junction nodes. The second challenge is extracting a consistent initial condition from `solve_steady` for a system that already contains the Flapper (with `T_open=1e30`) and the Inertia, so that `solve_transient` can start without triggering `NoInit` failures.
 
-The energy balance assertions are straightforward: extract `ch.inlet.mdot`, `ch.T[1]`, and `ch.T[n]` (or `ch.T_out`) at sampled timepoints. The sign convention (D-05, CONTEXT specifics) must be handled carefully: during forced-flow `T_out < T_in` (outlet is the bottom = axially downstream for downward flow); after reversal `T_out > T_in`. The assertion should use `|mdot| * cp * |T_out - T_in|` throughout.
+The energy balance assertions are straightforward: extract `ch.port_in.mdot`, `ch.T[1]`, and `ch.T[n]` (or `ch.T_out`) at sampled timepoints. The sign convention (D-05, CONTEXT specifics) must be handled carefully: during forced-flow `T_out < T_in` (outlet is the bottom = axially downstream for downward flow); after reversal `T_out > T_in`. The assertion should use `|mdot| * cp * |T_out - T_in|` throughout.
 
-**Primary recommendation:** Build `build_loop_lof()` following the exact `build_loop_vertical` pattern for gravity wiring, extend it with a second branch using variadic `connect()` at the junction nodes (matching the `build_cube` pattern), and wire Flapper's `ref_mdot` to the Inertia's `inlet.mdot` as established in FLAP-06.
+**Primary recommendation:** Build `build_loop_lof()` following the exact `build_loop_vertical` pattern for gravity wiring, extend it with a second branch using variadic `connect()` at the junction nodes (matching the `build_cube` pattern), and wire Flapper's `ref_mdot` to the Inertia's `port_in.mdot` as established in FLAP-06.
 
 ---
 
@@ -126,10 +126,10 @@ In MTK acausal modeling, junction nodes are created implicitly by `connect()` wi
 
 ```julia
 # junction_top: pump inlet / flapper inlet share the same pressure node
-connect(ch.outlet, flapper.inlet, pump.inlet)    # bottom junction
+connect(ch.port_out, flapper.port_in, pump.port_in)    # bottom junction
 
 # junction_bot: bc outlet / flapper outlet / channel inlet
-connect(bc.outlet, flapper.outlet, ch.inlet)     # top junction (after HeatExchanger)
+connect(bc.port_out, flapper.port_out, ch.port_in)     # top junction (after HeatExchanger)
 ```
 
 No `Junction` component is needed — variadic `connect()` handles it (same as `build_cube`).
@@ -137,9 +137,9 @@ No `Junction` component is needed — variadic `connect()` handles it (same as `
 **Important gravity sign convention:**
 
 - `ChannelHeatFlux` uses `g_acc` parameter for the channel's own gravity term.
-  - Forced flow is **downward**: fluid descends through the channel, so the channel's pressure equation represents a pressure gain for the downward-flowing fluid. In `Channel._channel_base_eqs`: `dP_ch ~ friction_dP + rho*g_acc*L`. For downward flow with gravity, set `g_acc = +9.80665` if inlet is at top or `g_acc = -9.80665` if "downward means inlet is high-pressure (top)". **Verify against `build_loop_vertical` where Channel has `g=g_acc` and fluid goes upward.**
+  - Forced flow is **downward**: fluid descends through the channel, so the channel's pressure equation represents a pressure gain for the downward-flowing fluid. In `Channel._channel_base_eqs`: `dP_ch ~ friction_dP + rho*g_acc*L`. For downward flow with gravity, set `g_acc = +9.80665` if port_in is at top or `g_acc = -9.80665` if "downward means port_in is high-pressure (top)". **Verify against `build_loop_vertical` where Channel has `g=g_acc` and fluid goes upward.**
 
-- `Gravity` component: `inlet.P - outlet.P ~ rho * 9.80665 * H`. `inlet` = high-pressure = bottom end. For the bypass path (upward natural circulation), the Gravity component represents the hydrostatic head of the return leg.
+- `Gravity` component: `port_in.P - port_out.P ~ rho * 9.80665 * H`. `port_in` = high-pressure = bottom end. For the bypass path (upward natural circulation), the Gravity component represents the hydrostatic head of the return leg.
 
 ### IC Extraction Pattern (D-09)
 
@@ -152,16 +152,16 @@ ssys = build_loop_lof(...)   # returns mtkcompile'd system
 # Step 2: Steady-state solve — KINSOL ignores continuous events
 op_ss = Pair{Any,Any}[
     ssys.ch.T[i] => T_guess[i] for i in 1:n...,
-    ssys.ch.inlet.mdot => mdot_guess,
+    ssys.ch.port_in.mdot => mdot_guess,
     ssys.flapper.T_open  => 1e30,
 ]
 sol_ss = solve_steady(ssys, op_ss)
-mdot_ss = sol_ss[ssys.ine.inlet.mdot]  # forced-flow mdot from IC
+mdot_ss = sol_ss[ssys.ine.port_in.mdot]  # forced-flow mdot from IC
 
 # Step 3: Build op for transient with Inertia IC = steady-state mdot
 op = Pair{Any,Any}[
     ssys.ch.T[i] => sol_ss[ssys.ch.T[i]] for i in 1:n...,
-    ssys.ine.inlet.mdot => mdot_ss,    # Inertia state = forced-flow mdot
+    ssys.ine.port_in.mdot => mdot_ss,    # Inertia state = forced-flow mdot
     ssys.flapper.T_open   => 1e30,       # Flapper starts closed
     # Set threshold from mdot_ss after solve_steady
 ]
@@ -174,7 +174,7 @@ threshold_val = 0.1 * abs(mdot_ss)
 
 ```julia
 # At each checkpoint index i_t:
-mdot_t  = sol[ssys.ine.inlet.mdot, i_t]   # or ssys.ch.inlet.mdot
+mdot_t  = sol[ssys.ine.port_in.mdot, i_t]   # or ssys.ch.port_in.mdot
 T_in_t  = sol[ssys.ch.T[1], i_t]            # first cell (axially upstream depends on direction)
 T_out_t = sol[ssys.ch.T_out, i_t]
 cp_t    = cp_water((T_in_t + T_out_t) / 2)
@@ -186,22 +186,22 @@ Q_wall_total = sum(sol[ssys.ch.q_wall[i], i_t] for i in 1:n)
 @test isapprox(Q_meas, Q_wall_total; rtol=0.05)   # VAL-01: 5% tolerance
 ```
 
-**Sign handling (CONTEXT specifics):** During downward forced-flow, `T_out < T_in` (outlet = bottom = axially last cell, cooler entry at top). Use `|T_out - T_in|` throughout. The `T_out` observable in `ChannelHeatFlux` is always the axial outlet cell temperature, which changes meaning across flow reversal. Alternatively use `|ch.T[n] - ch.T[1]|` with the knowledge that cell 1 is near `inlet` and cell n is near `outlet`.
+**Sign handling (CONTEXT specifics):** During downward forced-flow, `T_out < T_in` (outlet = bottom = axially last cell, cooler entry at top). Use `|T_out - T_in|` throughout. The `T_out` observable in `ChannelHeatFlux` is always the axial outlet cell temperature, which changes meaning across flow reversal. Alternatively use `|ch.T[n] - ch.T[1]|` with the knowledge that cell 1 is near `port_in` and cell n is near `port_out`.
 
 ### Topology Wiring: Temperature Anchors
 
 Closed loops with multiple thermal paths need temperature anchors to break circular instream() dependencies:
 
 - `HeatExchanger(T_bc=T_inlet)` at the pump outlet resets the inlet temperature (same as `build_loop_vertical`).
-- One `ch.inlet.T ~ T_inlet` constraint (as in `build_loop_vertical`) resolves remaining circular dependency.
+- One `ch.port_in.T ~ T_inlet` constraint (as in `build_loop_vertical`) resolves remaining circular dependency.
 - The bypass path (Flapper → Gravity) carries stream temperature via `instream()` — no separate anchor needed there since the Flapper and Gravity both pass temperature through.
 
 ### Anti-Patterns to Avoid
 
 - **Callable Pump in same system as Flapper:** MTK's `compile_equational_affect` cannot resolve callable parameters at ODEProblem build time when a `SymbolicContinuousCallback` is present. Always use `Pump(0.0)` scalar with `Inertia` for the coastdown.
 - **Inf as T_open IC:** Causes Rodas5P instability. Use `1e30` sentinel throughout.
-- **Missing pressure anchor:** Multi-branch network has underdetermined pressure level without `pump.inlet.P ~ 1.0e5`.
-- **Single thermal anchor in closed loop:** Phase 22 experience showed two temperature anchors are needed; include both `HeatExchanger` and the `ch.inlet.T ~ T_inlet` constraint.
+- **Missing pressure anchor:** Multi-branch network has underdetermined pressure level without `pump.port_in.P ~ 1.0e5`.
+- **Single thermal anchor in closed loop:** Phase 22 experience showed two temperature anchors are needed; include both `HeatExchanger` and the `ch.port_in.T ~ T_inlet` constraint.
 - **`Pair{Symbol,Float64}` instead of `Pair{Any,Any}`:** Mixing `Float64` state ICs (T cells, mdot) with the `1e30` sentinel and callable parameters requires `Pair{Any,Any}` op vector.
 
 ---
@@ -231,11 +231,11 @@ Closed loops with multiple thermal paths need temperature anchors to break circu
 
 ### Pitfall 2: Inconsistent Inertia State vs. Steady-State IC
 
-**What goes wrong:** The steady-state solve for a loop with Inertia gives a consistent (mdot, T) state, but the Inertia's internal state variable is `inlet.mdot` — a port variable, not a named state. If the op vector does not include `ssys.ine.inlet.mdot => mdot_ss`, the transient starts from mdot=0 (default IC) and the coastdown is wrong.
+**What goes wrong:** The steady-state solve for a loop with Inertia gives a consistent (mdot, T) state, but the Inertia's internal state variable is `port_in.mdot` — a port variable, not a named state. If the op vector does not include `ssys.ine.port_in.mdot => mdot_ss`, the transient starts from mdot=0 (default IC) and the coastdown is wrong.
 
-**Why it happens:** `Inertia` uses `Dt(inlet.mdot)` making `inlet.mdot` a differential state. MTK promotes this automatically but it needs an initial value in op.
+**Why it happens:** `Inertia` uses `Dt(port_in.mdot)` making `port_in.mdot` a differential state. MTK promotes this automatically but it needs an initial value in op.
 
-**How to avoid:** Always set `ssys.ine.inlet.mdot => sol_ss[ssys.ine.inlet.mdot]` in the transient op, using the value from `solve_steady`.
+**How to avoid:** Always set `ssys.ine.port_in.mdot => sol_ss[ssys.ine.port_in.mdot]` in the transient op, using the value from `solve_steady`.
 
 **Warning signs:** `mdot` starts near zero at t=0 and the Flapper fires immediately (before any coastdown).
 
@@ -263,7 +263,7 @@ Closed loops with multiple thermal paths need temperature anchors to break circu
 
 **What goes wrong:** KINSOL diverges or returns wrong mdot distribution for the two-branch topology because the initial guess does not provide flow through the bypass branch.
 
-**Why it happens:** With `T_open=1e30`, the Flapper acts as `R_closed=1e8` resistance. All flow is in Branch 1. The KINSOL initial guess for `flapper.inlet.mdot` needs to be near zero (small leakage through 1e8 Ohm) rather than the full forced-flow mdot.
+**Why it happens:** With `T_open=1e30`, the Flapper acts as `R_closed=1e8` resistance. All flow is in Branch 1. The KINSOL initial guess for `flapper.port_in.mdot` needs to be near zero (small leakage through 1e8 Ohm) rather than the full forced-flow mdot.
 
 **How to avoid:** Set Flapper port mdot initial guesses to 0.0 (or a tiny positive value). Set Inertia + Channel mdot guess to the expected forced-flow value (~0.08 kg/s).
 
@@ -305,30 +305,30 @@ function build_loop_lof(;
 
     connections = [
         # Branch 1: Pump → Inertia → Channel → (bottom junction)
-        connect(pump.outlet, ine.inlet),
-        connect(ine.outlet,  bc.inlet),        # temperature reset
-        connect(bc.outlet,   ch.inlet),         # ch.inlet = top (downward flow)
+        connect(pump.port_out, ine.port_in),
+        connect(ine.port_out,  bc.port_in),        # temperature reset
+        connect(bc.port_out,   ch.port_in),         # ch.port_in = top (downward flow)
 
         # Branch 2: Flapper → Gravity (bypass)
-        connect(flapper.outlet, grav_nc.inlet), # Gravity inlet = bottom (high-P)
+        connect(flapper.port_out, grav_nc.port_in), # Gravity port_in = bottom (high-P)
 
-        # Junction: bottom node (ch.outlet, grav_nc.outlet, pump.inlet)
-        connect(ch.outlet, grav_nc.outlet, pump.inlet),
+        # Junction: bottom node (ch.port_out, grav_nc.port_out, pump.port_in)
+        connect(ch.port_out, grav_nc.port_out, pump.port_in),
 
-        # Junction: top node (ch.inlet side... through bc already connected)
-        # Flapper inlet connects to the same node as bc.outlet / ch.inlet
-        # Need: flapper.inlet connects to the top junction
-        # Wired separately to avoid double-connecting ch.inlet
-        connect(flapper.inlet, bc.outlet),   # NOTE: bc.outlet already connected to ch.inlet
+        # Junction: top node (ch.port_in side... through bc already connected)
+        # Flapper port_in connects to the same node as bc.port_out / ch.port_in
+        # Need: flapper.port_in connects to the top junction
+        # Wired separately to avoid double-connecting ch.port_in
+        connect(flapper.port_in, bc.port_out),   # NOTE: bc.port_out already connected to ch.port_in
         # Actually bc has only two ports — use a top junction:
-        # connect(bc.outlet, ch.inlet, flapper.inlet)  -- 3-way at top
+        # connect(bc.port_out, ch.port_in, flapper.port_in)  -- 3-way at top
 
         # Boundary conditions
-        pump.inlet.P        ~ 1.0e5,           # pressure anchor
-        ch.inlet.T          ~ T_inlet,          # T anchor (circular dependency fix)
+        pump.port_in.P        ~ 1.0e5,           # pressure anchor
+        ch.port_in.T          ~ T_inlet,          # T anchor (circular dependency fix)
 
         # Flapper trigger: wired to Inertia mdot (forced-flow branch flow)
-        flapper.ref_mdot ~ ine.inlet.mdot,
+        flapper.ref_mdot ~ ine.port_in.mdot,
     ]
     # ...
 end
@@ -336,15 +336,15 @@ end
 
 **Critical topology clarification:** The 3-way connect at the top junction must be:
 ```julia
-connect(bc.outlet, ch.inlet, flapper.inlet)
+connect(bc.port_out, ch.port_in, flapper.port_in)
 ```
 and the bottom 3-way:
 ```julia
-connect(ch.outlet, grav_nc.outlet, pump.inlet)
+connect(ch.port_out, grav_nc.port_out, pump.port_in)
 ```
 The `grav_ff` (forced-flow return) may not be needed if the `ChannelHeatFlux` `g_acc` parameter already includes the channel's own gravity contribution. The downward channel already has `rho*g_acc*L` in its `dP` equation. The Gravity component in the forced-flow branch would represent the return pipe's hydrostatic gain, which for a simple closed-loop cancels with the channel's gravity term when `H_return == L_ch`. For the LOF scenario, if Branch 1 is the **only** gravity element in the forced-flow path, the `Gravity(H=H_ch)` at the bottom of Branch 1 may or may not be needed depending on whether `g_acc` in `ChannelHeatFlux` already accounts for the full loop head.
 
-**Recommended simplified Branch 1:** `Pump(0.0) → Inertia → HeatExchanger → ChannelHeatFlux(g_acc = +9.80665, downward)`. The channel's positive `g_acc` with downward flow (inlet at top) gives a pressure gain that helps the pump — then no separate Gravity in Branch 1 is required. Branch 2 (bypass) has `Flapper → Gravity(H=H_bypass)` where Gravity represents the buoyancy driving force in the natural-circulation path.
+**Recommended simplified Branch 1:** `Pump(0.0) → Inertia → HeatExchanger → ChannelHeatFlux(g_acc = +9.80665, downward)`. The channel's positive `g_acc` with downward flow (port_in at top) gives a pressure gain that helps the pump — then no separate Gravity in Branch 1 is required. Branch 2 (bypass) has `Flapper → Gravity(H=H_bypass)` where Gravity represents the buoyancy driving force in the natural-circulation path.
 
 ### IC Extraction (Verified: FLAP-06 pattern)
 
@@ -353,16 +353,16 @@ The `grav_ff` (forced-flow return) may not be needed if the `ChannelHeatFlux` `g
 
 op_ss = Pair{Any,Any}[
     ssys.ch.T[i] => T_guess[i] for i in 1:n...,
-    ssys.ch.inlet.mdot => mdot_guess,
-    ssys.ine.inlet.mdot => mdot_guess,
+    ssys.ch.port_in.mdot => mdot_guess,
+    ssys.ine.port_in.mdot => mdot_guess,
     ssys.flapper.T_open => 1e30,
 ]
 sol_ss = solve_steady(ssys, op_ss)
-mdot_ss = sol_ss[ssys.ine.inlet.mdot]
+mdot_ss = sol_ss[ssys.ine.port_in.mdot]
 
 op = Pair{Any,Any}[
     ssys.ch.T[i] => sol_ss[ssys.ch.T[i]] for i in 1:n...,
-    ssys.ine.inlet.mdot => mdot_ss,
+    ssys.ine.port_in.mdot => mdot_ss,
     ssys.flapper.T_open => 1e30,
     ssys.flapper.threshold => 0.1 * abs(mdot_ss),  # override threshold from SS solve
 ]
@@ -378,8 +378,8 @@ t_end = t_arr[end]
 
 for frac in checkpoints
     i_t = searchsortedfirst(t_arr, frac * t_end)
-    mdot_t = sol[ssys.ine.inlet.mdot, i_t]
-    T_in_t = sol[ssys.ch.T[1], i_t]    # cell 1 ~ near inlet
+    mdot_t = sol[ssys.ine.port_in.mdot, i_t]
+    T_in_t = sol[ssys.ch.T[1], i_t]    # cell 1 ~ near port_in
     T_out_t = sol[ssys.ch.T_out, i_t]
     cp_t = cp_water((T_in_t + T_out_t) / 2)
     Q_meas = abs(mdot_t) * cp_t * abs(T_out_t - T_in_t)
@@ -443,18 +443,18 @@ end
 
 1. **Gravity sign in ChannelHeatFlux for downward forced flow**
    - What we know: `build_loop_vertical` uses `g=g_acc` (positive 9.80665) for upward flow. The `_channel_base_eqs` adds `rho * g_acc * L` to the pressure drop.
-   - What's unclear: For forced flow **downward** (inlet at top, outlet at bottom), is `g_acc` positive or negative? Positive `g_acc` with downward flow means the channel provides a pressure gain (helping the pump), which is physically correct. Need to verify against `_channel_base_eqs` sign convention to confirm `g_acc = +9.80665` for downward channel.
+   - What's unclear: For forced flow **downward** (port_in at top, port_out at bottom), is `g_acc` positive or negative? Positive `g_acc` with downward flow means the channel provides a pressure gain (helping the pump), which is physically correct. Need to verify against `_channel_base_eqs` sign convention to confirm `g_acc = +9.80665` for downward channel.
    - Recommendation: Read `src/components/channel.jl` `_channel_base_eqs` and verify the sign before writing the plan. The test should assert that at t=0, `sol[ssys.ch.dP] ≈ expected_dP` with correct sign.
 
 2. **Bypass Gravity port orientation for natural circulation**
-   - What we know: `Gravity`: `inlet.P - outlet.P ~ rho * g * H`. `inlet` = high-pressure = bottom end.
-   - What's unclear: In the natural-circulation bypass, the fluid rises. The Gravity component should provide a pressure gain for rising fluid. When wired as `connect(flapper.outlet, grav_nc.inlet)`, the Flapper is above (high-P) and Gravity's `outlet` is at the bottom — but this means fluid flows from Flapper (top) downward through Gravity, which is opposite to what NC requires.
-   - Recommendation: The bypass Gravity should be wired with `inlet` at the bottom (same junction as `ch.outlet` and `pump.inlet`). The NC path is: bottom junction → Gravity (upward: inlet at bottom, outlet at top) → Flapper → top junction → Channel (downward). Check topology carefully in the plan.
+   - What we know: `Gravity`: `port_in.P - port_out.P ~ rho * g * H`. `port_in` = high-pressure = bottom end.
+   - What's unclear: In the natural-circulation bypass, the fluid rises. The Gravity component should provide a pressure gain for rising fluid. When wired as `connect(flapper.port_out, grav_nc.port_in)`, the Flapper is above (high-P) and Gravity's `port_out` is at the bottom — but this means fluid flows from Flapper (top) downward through Gravity, which is opposite to what NC requires.
+   - Recommendation: The bypass Gravity should be wired with `port_in` at the bottom (same junction as `ch.port_out` and `pump.port_in`). The NC path is: bottom junction → Gravity (upward: port_in at bottom, port_out at top) → Flapper → top junction → Channel (downward). Check topology carefully in the plan.
 
 3. **Temperature anchor in two-branch topology**
-   - What we know: `build_loop_vertical` uses `HeatExchanger` + `ch.inlet.T ~ T_inlet`. The bypass path (Flapper → Gravity) carries temperature by `instream()` passthrough.
+   - What we know: `build_loop_vertical` uses `HeatExchanger` + `ch.port_in.T ~ T_inlet`. The bypass path (Flapper → Gravity) carries temperature by `instream()` passthrough.
    - What's unclear: With two parallel branches sharing a top junction, the instream temperature at the junction may have a weighted mixture formula. During NC, the bypass carries hot fluid backward — does the T anchor conflict?
-   - Recommendation: Keep the `HeatExchanger` + `ch.inlet.T ~ T_inlet` pattern from `build_loop_vertical`. The `HeatExchanger` should be in Branch 1 between `pump.outlet` and `ch.inlet` (or the top junction). If the T anchor causes issues during NC (reversed flow), the `HeatExchanger.T_bc` may need to remain as an inlet reset that becomes less constraining. Flag for implementation if solver fails on T anchor during NC.
+   - Recommendation: Keep the `HeatExchanger` + `ch.port_in.T ~ T_inlet` pattern from `build_loop_vertical`. The `HeatExchanger` should be in Branch 1 between `pump.port_out` and `ch.port_in` (or the top junction). If the T anchor causes issues during NC (reversed flow), the `HeatExchanger.T_bc` may need to remain as an inlet reset that becomes less constraining. Flag for implementation if solver fails on T anchor during NC.
 
 ---
 
@@ -465,7 +465,7 @@ end
 - `src/examples.jl` — `build_loop_vertical`, `build_cube`: reference for gravity wiring and multi-branch `connect()` pattern
 - `src/components/flapper.jl` — Flapper implementation, T_open sentinel, SymbolicContinuousCallback wiring
 - `src/components/misc.jl` — Inertia: `L_over_A * Dt(mdot)` equation; HeatExchanger: T_bc injection
-- `src/components/resistors.jl` — Gravity: `inlet.P - outlet.P ~ rho*g*H`; inlet = high-P = bottom
+- `src/components/resistors.jl` — Gravity: `port_in.P - port_out.P ~ rho*g*H`; port_in = high-P = bottom
 - `src/components/thermal_channel.jl` — ChannelHeatFlux: `T_wall_p` parameter, `q_wall[i]` observables, `g_acc` sign
 - `test/test_flapper.jl` FLAP-06 — canonical Pump(0.0)+Inertia IC coastdown and solve_steady IC extraction pattern
 - `test/test_validation.jl` VAL-02 — `Pair{Any,Any}` op, solve_steady → solve_transient IC handoff

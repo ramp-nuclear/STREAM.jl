@@ -15,7 +15,7 @@
 - `Pump(dP_pump::Any; name)` — callable fixed-pressure (new, positional dispatch; `Any` not `Function`)
 - `Pump(; name, mdot0)` — fixed-flow (keyword-only, stays)
 - Three methods total; no validation of callable at construction time
-- The callable is registered as a symbolic node: `outlet.P - inlet.P ~ dP_pump(t)`
+- The callable is registered as a symbolic node: `port_out.P - port_in.P ~ dP_pump(t)`
 - PUMP-03 test system: Pump + Inertia + Resistor loop
 - PUMP-03 ramp: `dP(t) = dP0 * (1 - t/T_ramp)`, `dP0 = 1e5 Pa`, `T_ramp = 100 s`
 - PUMP-03 validation: 1% rtol at `t = T_ramp`, check `mdot ≈ 0`
@@ -59,7 +59,7 @@ The key insight is that `@register_symbolic` is a **module-level macro** that ca
 
 The `solve_transient` redesign follows directly from the new positional API: `ssys, op, t` (time array) maps directly to Python STREAM's `agr.solve(y0=..., time=...)`. The old `PresetTimeCallback` + `setp` mechanism is eliminated by replacing it with a callable `T_wall_fn` wired at construction time.
 
-**Primary recommendation:** Use `@parameters (dP_pump_fn::typeof(f))(..)` in the callable `Pump` method, store the callable as a typed MTK parameter, wire `outlet.P - inlet.P ~ dP_pump_fn(t)` in equations, and pass `dP_pump_fn => f` in the initial conditions to `ODEProblem`.
+**Primary recommendation:** Use `@parameters (dP_pump_fn::typeof(f))(..)` in the callable `Pump` method, store the callable as a typed MTK parameter, wire `port_out.P - port_in.P ~ dP_pump_fn(t)` in equations, and pass `dP_pump_fn => f` in the initial conditions to `ODEProblem`.
 
 ---
 
@@ -99,15 +99,15 @@ function Pump(dP_pump::Any; name)
     FType = typeof(dP_pump)
     # Declare dP_pump_fn as a callable parameter of known type
     pars = @parameters (dP_pump_fn::FType)(..)
-    @named inlet  = FlowPort()
-    @named outlet = FlowPort()
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
     eqs = Equation[
-        inlet.mdot + outlet.mdot ~ 0,
-        outlet.P - inlet.P ~ dP_pump_fn(t),   # callable in equation
-        outlet.T ~ instream(inlet.T),
-        inlet.T  ~ instream(outlet.T),
+        port_in.mdot + port_out.mdot ~ 0,
+        port_out.P - port_in.P ~ dP_pump_fn(t),   # callable in equation
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
     ]
-    sys = compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+    sys = compose(System(eqs, t, [], pars; name=name), port_in, port_out)
     # Return (system, default_value) so caller can wire dP_pump_fn => dP_pump in op
     # Actually: MTK callable params need the value passed at problem construction,
     # not in the System constructor. The system carries the symbolic parameter.
@@ -227,7 +227,7 @@ Choose parameters such that `T_ramp ≈ 5*tau` so the system is clearly transien
 
 This gives a clearly decaying response. At `t = 100 s`, `mdot` should be near zero.
 
-Verification: `isapprox(sol[ssys.pump.inlet.mdot, end], mdot_analytical(T_ramp); rtol=0.01)`.
+Verification: `isapprox(sol[ssys.pump.port_in.mdot, end], mdot_analytical(T_ramp); rtol=0.01)`.
 
 ### Anti-Patterns to Avoid
 
@@ -297,15 +297,15 @@ Verification: `isapprox(sol[ssys.pump.inlet.mdot, end], mdot_analytical(T_ramp);
 function Pump(dP_pump::Any; name)
     FType = typeof(dP_pump)
     pars = @parameters (dP_pump_fn::FType)(..)
-    @named inlet  = FlowPort()
-    @named outlet = FlowPort()
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
     eqs = Equation[
-        inlet.mdot + outlet.mdot ~ 0,
-        outlet.P - inlet.P ~ dP_pump_fn(t),
-        outlet.T ~ instream(inlet.T),
-        inlet.T  ~ instream(outlet.T),
+        port_in.mdot + port_out.mdot ~ 0,
+        port_out.P - port_in.P ~ dP_pump_fn(t),
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 ```
 
@@ -375,12 +375,12 @@ end
     @named res  = Resistor(R=R)
 
     # Minimal closed loop: pump -> inertia -> resistor -> pump
-    # Pressure anchor: pump.inlet.P ~ 1e5
+    # Pressure anchor: pump.port_in.P ~ 1e5
     conns = [
-        connect(pump.outlet, ine.inlet),
-        connect(ine.outlet, res.inlet),
-        connect(res.outlet, pump.inlet),
-        pump.inlet.P ~ 1e5,
+        connect(pump.port_out, ine.port_in),
+        connect(ine.port_out, res.port_in),
+        connect(res.port_out, pump.port_in),
+        pump.port_in.P ~ 1e5,
     ]
     @named sys = compose(System(conns, t; name=:pump03), pump, ine, res)
     ssys = mtkcompile(sys)
@@ -389,7 +389,7 @@ end
 
     # Initial op: mdot at t=0 steady state, callable parameter
     op = [
-        ssys.ine.inlet.mdot  => mdot_0,
+        ssys.ine.port_in.mdot  => mdot_0,
         ssys.pump.dP_pump_fn   => dP_fn,   # callable parameter
     ]
 
@@ -401,7 +401,7 @@ end
     # Analytical mdot at t = T_ramp
     tau = L_over_A / R
     mdot_analytical = mdot_analytical_ramp(dP0, R, tau, T_ramp, mdot_0, T_ramp)
-    mdot_numerical  = sol[ssys.ine.inlet.mdot, end]
+    mdot_numerical  = sol[ssys.ine.port_in.mdot, end]
     @test isapprox(mdot_numerical, mdot_analytical; rtol=0.01)
     @test abs(mdot_numerical) < 0.1 * mdot_0   # near zero (< 10% of initial)
 end
@@ -453,14 +453,14 @@ end
    - Recommendation: Return `ssys` always. Document that when `T_wall_fn` is provided, the caller must include `ssys.sys.T_wall_callable => T_wall_fn` in their `op`. The planner should confirm parameter naming convention for the callable T_wall sym.
 
 2. **PUMP-03 initial mdot state vs callable parameter in `op`**
-   - What we know: `Inertia` introduces `inlet.mdot` as a differential state. The callable `dP_pump_fn` is a parameter. Both must appear in `op` passed to `ODEProblem`.
+   - What we know: `Inertia` introduces `port_in.mdot` as a differential state. The callable `dP_pump_fn` is a parameter. Both must appear in `op` passed to `ODEProblem`.
    - What's unclear: Whether `op` for `ODEProblem` accepts both state ICs and parameter values in the same `Vector{Pair}`, or if parameters require a separate `p` argument.
    - Recommendation: MTK's `ODEProblem` accepts both states and parameters in the `op` dict (it separates them internally). The existing pattern in `solve_transient` already passes all ICs as a single `op` vector. Callable parameters follow the same pattern.
 
 3. **Temperature equations in PUMP-03 test loop**
-   - What we know: The Pump+Inertia+Resistor test loop has no thermal boundary conditions (no `ch.inlet.T` pin, no wall temperature). Temperature is carried through `instream()`.
+   - What we know: The Pump+Inertia+Resistor test loop has no thermal boundary conditions (no `ch.port_in.T` pin, no wall temperature). Temperature is carried through `instream()`.
    - What's unclear: Whether the temperature equations in Pump/Inertia/Resistor form a solvable subsystem without additional thermal BCs in a closed loop.
-   - Recommendation: The three components all use `outlet.T ~ instream(inlet.T)` and `inlet.T ~ instream(outlet.T)`. In a closed loop, this circular `instream` dependency is degenerate but should be solvable at constant T (all temperatures equal). This is the expected behavior for a test focused on hydraulics only. Add `pump.inlet.T ~ 313.15` as a thermal anchor if the system is under-determined — consistent with existing loop tests. Planner should verify with `mtkcompile(sys; fully_determined=false)` check.
+   - Recommendation: The three components all use `port_out.T ~ instream(port_in.T)` and `port_in.T ~ instream(port_out.T)`. In a closed loop, this circular `instream` dependency is degenerate but should be solvable at constant T (all temperatures equal). This is the expected behavior for a test focused on hydraulics only. Add `pump.port_in.T ~ 313.15` as a thermal anchor if the system is under-determined — consistent with existing loop tests. Planner should verify with `mtkcompile(sys; fully_determined=false)` check.
 
 ---
 

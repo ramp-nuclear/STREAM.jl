@@ -27,8 +27,8 @@ function makeComp(
 }
 
 const hydraulicOnly = makeComp([
-  { name: "inlet", type: "FlowPort", side: "left" },
-  { name: "outlet", type: "FlowPort", side: "right" },
+  { name: "port_in", type: "FlowPort", side: "left" },
+  { name: "port_out", type: "FlowPort", side: "right" },
 ]);
 
 const thermalOnly = makeComp([
@@ -37,8 +37,8 @@ const thermalOnly = makeComp([
 ]);
 
 const dualLayer = makeComp([
-  { name: "inlet", type: "FlowPort", side: "left" },
-  { name: "outlet", type: "FlowPort", side: "right" },
+  { name: "port_in", type: "FlowPort", side: "left" },
+  { name: "port_out", type: "FlowPort", side: "right" },
   { name: "thermal_left", type: "ThermalPort", side: "left" },
   { name: "thermal_right", type: "ThermalPort", side: "right" },
 ]);

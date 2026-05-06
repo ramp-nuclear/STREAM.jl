@@ -143,17 +143,17 @@ ps = fill(1.0 / (nz * nx), nz, nx)
 
 conns = [
     # Left loop
-    connect(pump_l.outlet, hx_l.inlet),
-    connect(hx_l.outlet, cac_l.inlet),
-    connect(cac_l.outlet, pump_l.inlet),
-    pump_l.inlet.P ~ 1.0e5,
-    cac_l.inlet.T ~ 313.15,
+    connect(pump_l.port_out, hx_l.port_in),
+    connect(hx_l.port_out, cac_l.port_in),
+    connect(cac_l.port_out, pump_l.port_in),
+    pump_l.port_in.P ~ 1.0e5,
+    cac_l.port_in.T ~ 313.15,
     # Right loop
-    connect(pump_r.outlet, hx_r.inlet),
-    connect(hx_r.outlet, cac_r.inlet),
-    connect(cac_r.outlet, pump_r.inlet),
-    pump_r.inlet.P ~ 1.0e5,
-    cac_r.inlet.T ~ 313.15,   # 363.15 for VAL-02
+    connect(pump_r.port_out, hx_r.port_in),
+    connect(hx_r.port_out, cac_r.port_in),
+    connect(cac_r.port_out, pump_r.port_in),
+    pump_r.port_in.P ~ 1.0e5,
+    cac_r.port_in.T ~ 313.15,   # 363.15 for VAL-02
     # Plate-channel coupling
     [connect(getproperty(hd, Symbol(:thermal_left,  i)),
              getproperty(cac_l, Symbol(:thermal_left, i))) for i in 1:nz]...,
@@ -238,7 +238,7 @@ The exact API to feed power and solve for all three scenarios is documented in `
 From Phase 11 experience (HDIFF-02/03 test and CHAN-03 one-sided):
 
 - Channel T cells: `steady_state_guess(T_inlet, Q_wall, mdot_guess, n)` — Q_wall per channel is ~5 kW (half of 10 kW)
-- Channel `inlet.mdot`: ~0.490 kg/s (same as all prior tests)
+- Channel `port_in.mdot`: ~0.490 kg/s (same as all prior tests)
 - Channel `Re[i]`, `Nu[i]`, `h_tc[i]`: need explicit guesses for `fully_determined=false` solve
   - Re ~ 3e5, Nu ~ 800, h_tc ~ 2.7e4 (from CHAN-03 experience)
 - HeatDiffusion `T[i,j]`: `T_inlet + 5.0` (slightly above coolant inlet)
@@ -248,7 +248,7 @@ From Phase 11 experience (HDIFF-02/03 test and CHAN-03 one-sided):
 
 - **Connecting `cac_r.thermal_right[i]` instead of `cac_r.thermal_left[i]`**: The right channel sees the plate on its LEFT side (thermal_left). Connecting thermal_right would reverse the coupling direction — VAL-02 exists precisely to catch this swap.
 - **Using `sys.thermal_left[i]` syntax in connect()**: Fails for array-indexed ports in MTK. Must use `getproperty(sys, Symbol(:thermal_left, i))`.
-- **Forgetting `inlet.T ~ T_inlet` constraints**: The two-sided CAC system in THERM-03 used `cac.inlet.T ~ T_inlet`. Without this, the circular stream temperature can prevent convergence.
+- **Forgetting `port_in.T ~ T_inlet` constraints**: The two-sided CAC system in THERM-03 used `cac.port_in.T ~ T_inlet`. Without this, the circular stream temperature can prevent convergence.
 - **Skipping Re/Nu/h_tc guesses in one-sided (VAL-03) solve**: CHAN-03 showed that `fully_determined=false` + one unconnected side requires explicit algebraic var guesses to break the MTK initialization cycle.
 - **Running `mtkcompile(sys)` (fully_determined=true) without checking**: The two-loop system may be determined with both sides connected; one-sided (VAL-03) almost certainly requires `fully_determined=false`.
 
@@ -277,8 +277,8 @@ From Phase 11 experience (HDIFF-02/03 test and CHAN-03 one-sided):
 ### Pitfall 2: Pressure Anchor for Two Independent Loops
 
 **What goes wrong:** Forgetting to anchor absolute pressure for the second loop.
-**Why it happens:** The existing single-loop tests only need one `pump.inlet.P ~ 1.0e5`. The two-loop system has two independent pressure references.
-**How to avoid:** Add `pump_l.inlet.P ~ 1.0e5` AND `pump_r.inlet.P ~ 1.0e5`.
+**Why it happens:** The existing single-loop tests only need one `pump.port_in.P ~ 1.0e5`. The two-loop system has two independent pressure references.
+**How to avoid:** Add `pump_l.port_in.P ~ 1.0e5` AND `pump_r.port_in.P ~ 1.0e5`.
 
 ### Pitfall 3: `fully_determined` for the Coupled System
 

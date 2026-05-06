@@ -39,10 +39,10 @@ import STREAM:
     ]
     conns_qol = vcat(
         [
-            connect(pump_qol.outlet, bc_qol.inlet),
-            connect(bc_qol.outlet, ch_qol.inlet),
-            connect(ch_qol.outlet, pump_qol.inlet),
-            pump_qol.inlet.P ~ 1.0e5,
+            connect(pump_qol.port_out, bc_qol.port_in),
+            connect(bc_qol.port_out, ch_qol.port_in),
+            connect(ch_qol.port_out, pump_qol.port_in),
+            pump_qol.port_in.P ~ 1.0e5,
         ],
         [
             connect(ct_l_qol[i].thermal, getproperty(ch_qol, Symbol(:thermal_left, i))) for
@@ -64,7 +64,7 @@ import STREAM:
     ssys_qol = mtkcompile(sys_qol)
     T_g_qol = steady_state_guess(T_inlet=T_inlet_qol, Q_wall=1e4, mdot_guess=0.250, n=n_qol)
     op_qol = [ssys_qol.ch_qol.T[i] => T_g_qol[i] for i in 1:n_qol]
-    push!(op_qol, ssys_qol.ch_qol.inlet.mdot => 0.250)
+    push!(op_qol, ssys_qol.ch_qol.port_in.mdot => 0.250)
     sol_qol = solve_steady(ssys_qol, op_qol)
     @test sol_qol.retcode == ReturnCode.Success
     @test sol_qol[ssys_qol.ch_qol.Re[1]] isa Real
@@ -94,10 +94,10 @@ end
     @named pump_gm = Pump(1000.0)
     @named hx_gm = HeatExchanger(600.0)
     conns_gm = [
-        connect(pump_gm.outlet, hx_gm.inlet),
-        connect(hx_gm.outlet, ch_gm.inlet),
-        connect(ch_gm.outlet, pump_gm.inlet),
-        pump_gm.inlet.P ~ 1.0e5,
+        connect(pump_gm.port_out, hx_gm.port_in),
+        connect(hx_gm.port_out, ch_gm.port_in),
+        connect(ch_gm.port_out, pump_gm.port_in),
+        pump_gm.port_in.P ~ 1.0e5,
         ch_gm.thermal.T ~ 600.0,
     ]
     @named sys_gm = compose(System(conns_gm, t; name=:sys_gm), pump_gm, hx_gm, ch_gm)
@@ -146,10 +146,10 @@ const ps_comp = ones(3, 3)  # uniform power shape, 3x3
     @named pump = Pump(3.0e4)
     @named hx_in = HeatExchanger(600.0)
     outer_conns = [
-        connect(pump.outlet, hx_in.inlet),
-        connect(hx_in.outlet, plate_sys.cac.inlet),
-        connect(plate_sys.cac.outlet, pump.inlet),
-        pump.inlet.P ~ 1.0e5,
+        connect(pump.port_out, hx_in.port_in),
+        connect(hx_in.port_out, plate_sys.cac.port_in),
+        connect(plate_sys.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
         plate_sys.fuel.power ~ 1e4,
     ]
     @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, plate_sys)
@@ -189,14 +189,14 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(600.0)
     outer_conns = [
-        connect(pump_l.outlet, hx_l.inlet),
-        connect(hx_l.outlet, plate_sys.ch_l.inlet),
-        connect(plate_sys.ch_l.outlet, pump_l.inlet),
-        pump_l.inlet.P ~ 1.0e5,
-        connect(pump_r.outlet, hx_r.inlet),
-        connect(hx_r.outlet, plate_sys.ch_r.inlet),
-        connect(plate_sys.ch_r.outlet, pump_r.inlet),
-        pump_r.inlet.P ~ 1.0e5,
+        connect(pump_l.port_out, hx_l.port_in),
+        connect(hx_l.port_out, plate_sys.ch_l.port_in),
+        connect(plate_sys.ch_l.port_out, pump_l.port_in),
+        pump_l.port_in.P ~ 1.0e5,
+        connect(pump_r.port_out, hx_r.port_in),
+        connect(hx_r.port_out, plate_sys.ch_r.port_in),
+        connect(plate_sys.ch_r.port_out, pump_r.port_in),
+        pump_r.port_in.P ~ 1.0e5,
         plate_sys.fuel.power ~ 1e4,
     ]
     @named top = compose(
@@ -230,10 +230,10 @@ end
         @named pump = Pump(3.0e4)
         @named hx_in = HeatExchanger(600.0)
         outer_conns = [
-            connect(pump.outlet, hx_in.inlet),
-            connect(hx_in.outlet, osc_sys.ch.inlet),
-            connect(osc_sys.ch.outlet, pump.inlet),
-            pump.inlet.P ~ 1.0e5,
+            connect(pump.port_out, hx_in.port_in),
+            connect(hx_in.port_out, osc_sys.ch.port_in),
+            connect(osc_sys.ch.port_out, pump.port_in),
+            pump.port_in.P ~ 1.0e5,
             osc_sys.fuel.power ~ 1e4,
         ]
         @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, osc_sys)
@@ -287,11 +287,11 @@ end
     @named pump = Pump(3.0e4)
     @named hx_in = HeatExchanger(600.0)
     cross_conns = Equation[
-        connect(pump.outlet, hx_in.inlet),
-        connect(hx_in.outlet, p1.cac1.inlet),
-        connect(p1.cac1.outlet, p2.cac2.inlet),
-        connect(p2.cac2.outlet, pump.inlet),
-        pump.inlet.P ~ 1.0e5,
+        connect(pump.port_out, hx_in.port_in),
+        connect(hx_in.port_out, p1.cac1.port_in),
+        connect(p1.cac1.port_out, p2.cac2.port_in),
+        connect(p2.cac2.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
         p1.fuel1.power ~ 1e4,
         p2.fuel2.power ~ 1e4,
     ]
@@ -325,10 +325,10 @@ end
     @named pump_cp = Pump(3.0e4)
     @named hx_cp = HeatExchanger(T_in_cp)
     outer_cp = [
-        connect(pump_cp.outlet, hx_cp.inlet),
-        connect(hx_cp.outlet, plate_cp.cac_cp.inlet),
-        connect(plate_cp.cac_cp.outlet, pump_cp.inlet),
-        pump_cp.inlet.P ~ 1.0e5,
+        connect(pump_cp.port_out, hx_cp.port_in),
+        connect(hx_cp.port_out, plate_cp.cac_cp.port_in),
+        connect(plate_cp.cac_cp.port_out, pump_cp.port_in),
+        pump_cp.port_in.P ~ 1.0e5,
         plate_cp.fuel_cp.power ~ 1e4,
     ]
     @named top_cp = compose(System(outer_cp, t; name=:top_cp), pump_cp, hx_cp, plate_cp)
@@ -340,12 +340,12 @@ end
             ssys_cp.plate_cp.fuel_cp.T[i, j] => T_g_cp[i] + 2.0 for i in 1:n_cp for
             j in 1:n_cp
         ],
-        [ssys_cp.plate_cp.cac_cp.inlet.mdot => 0.250],
+        [ssys_cp.plate_cp.cac_cp.port_in.mdot => 0.250],
     )
     sol_cp = solve_steady(ssys_cp, op_cp)
     @test sol_cp.retcode == ReturnCode.Success
     @test sol_cp[ssys_cp.plate_cp.cac_cp.T_out] > T_in_cp
-    mdot_cp = sol_cp[ssys_cp.plate_cp.cac_cp.inlet.mdot]
+    mdot_cp = sol_cp[ssys_cp.plate_cp.cac_cp.port_in.mdot]
     @test isapprox(
         sol_cp[ssys_cp.plate_cp.cac_cp.T_out] - T_in_cp,
         1e4 / (mdot_cp * cp_water(T_in_cp));

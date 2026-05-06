@@ -31,7 +31,7 @@
 
 **User's choice:** Helper calls with pattern detection.
 
-**Notes:** When thermal wiring is present, the code gen switches from `ODESystem(eqs, t; systems=[...])` to `compose_systems(assembly; connections=eqs, name=:sys)`. Hydraulic connects that reference CAC nodes use the `assembly.cac_1.inlet` path. Fallback to raw connects with `# TODO` comment when pattern is ambiguous.
+**Notes:** When thermal wiring is present, the code gen switches from `ODESystem(eqs, t; systems=[...])` to `compose_systems(assembly; connections=eqs, name=:sys)`. Hydraulic connects that reference CAC nodes use the `assembly.cac_1.port_in` path. Fallback to raw connects with `# TODO` comment when pattern is ambiguous.
 
 ---
 

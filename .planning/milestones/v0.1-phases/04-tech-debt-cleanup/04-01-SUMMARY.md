@@ -64,7 +64,7 @@ completed: 2026-03-12
 ## Accomplishments
 
 - Fixed BUG-01: Gravity component now declares `@parameters H = H` so the pressure equation `rho_water(T_in) * 9.80665 * H` references the MTK symbolic parameter (modifiable via `setp` post-compilation), not the captured Julia Float64 kwarg
-- Fixed BUG-02: Removed stale `ssys.fr.inlet.mdot` and `ssys.fr.Re` references from `solve_steady` docstring (Friction removed from build_loop in phase 3, commit 2e5ed5c)
+- Fixed BUG-02: Removed stale `ssys.fr.port_in.mdot` and `ssys.fr.Re` references from `solve_steady` docstring (Friction removed from build_loop in phase 3, commit 2e5ed5c)
 - Renamed Channel `@parameters` `L_ch` → `L`, `A_ch` → `A` and Friction `@parameters` `L_f` → `L`, `A_f` → `A` to align MTK symbolic paths with Python STREAM convention
 - Deleted three dead TDD scaffolding files (`test_comp_tdd.jl`, `test_transient_tdd.jl`, `test_solvers_tdd.jl`) that referenced the removed Friction component and were not included in `runtests.jl`
 - Added `requirements-completed: [VAL-01, VAL-02, VAL-03]` to 03-03-SUMMARY.md frontmatter for GSD tooling
@@ -81,7 +81,7 @@ Each task was committed atomically:
 ## Files Created/Modified
 
 - `/home/itay/projects/Julia-STREAM/src/components.jl` — Gravity: `A_grav` kwarg removed, `H_grav` → `@parameters H = H`; Channel: `L_ch` → `L`, `A_ch` → `A`; Friction: `L_f` → `L`, `A_f` → `A`
-- `/home/itay/projects/Julia-STREAM/src/solvers.jl` — `solve_steady` docstring: replaced `ssys.fr.inlet.mdot` and `ssys.fr.Re` lines with `ssys.ch.inlet.mdot` reference
+- `/home/itay/projects/Julia-STREAM/src/solvers.jl` — `solve_steady` docstring: replaced `ssys.fr.port_in.mdot` and `ssys.fr.Re` lines with `ssys.ch.port_in.mdot` reference
 - `/home/itay/projects/Julia-STREAM/test/runtests.jl` — COMP-04 test: `Gravity(H=3.0, A_grav=7.85e-5)` → `Gravity(H=3.0)`
 - `/home/itay/projects/Julia-STREAM/.planning/phases/03-integration-and-validation/03-03-SUMMARY.md` — Added `requirements-completed: [VAL-01, VAL-02, VAL-03]`
 - **Deleted:** `test/test_comp_tdd.jl`, `test/test_transient_tdd.jl`, `test/test_solvers_tdd.jl`

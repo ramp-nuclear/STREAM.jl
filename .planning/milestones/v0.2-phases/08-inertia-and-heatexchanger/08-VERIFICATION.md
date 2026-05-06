@@ -42,7 +42,7 @@ re_verification: false
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/components.jl` | Inertia function with Differential(t)(inlet.mdot) ODE pattern | VERIFIED | Lines 153-170; `Dt = Differential(t)`, `L_over_A * Dt(inlet.mdot)` in equation, `vars = []` — MTK auto-promotes |
+| `src/components.jl` | Inertia function with Differential(t)(port_in.mdot) ODE pattern | VERIFIED | Lines 153-170; `Dt = Differential(t)`, `L_over_A * Dt(port_in.mdot)` in equation, `vars = []` — MTK auto-promotes |
 | `src/STREAM.jl` | Inertia in export list | VERIFIED | Line 14: `export ... Inertia, HeatExchanger` |
 | `test/runtests.jl` | Phase 8 testset with COMP-01 and COMP-02 stubs | VERIFIED | Lines 395-470: `@testset "STREAM Phase 8 Tests"` with all 7 sub-testsets |
 

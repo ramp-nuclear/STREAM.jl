@@ -12,9 +12,9 @@
 **Inertia parameter API**
 - Combined single parameter: `Inertia(; name, L_over_A)` — user pre-computes L/A
 - Parameter named `L_over_A` internally (self-documenting, mirrors the formula)
-- Equation: `inlet.P - outlet.P ~ L_over_A * Differential(t)(inlet.mdot)`
-- No explicit `mdot` state variable — use `inlet.mdot` implicitly (consistent with Resistor/Gravity/Friction)
-- Temperature: passthrough (`outlet.T ~ instream(inlet.T)`, `inlet.T ~ instream(outlet.T)`)
+- Equation: `port_in.P - port_out.P ~ L_over_A * Differential(t)(port_in.mdot)`
+- No explicit `mdot` state variable — use `port_in.mdot` implicitly (consistent with Resistor/Gravity/Friction)
+- Temperature: passthrough (`port_out.T ~ instream(port_in.T)`, `port_in.T ~ instream(port_out.T)`)
 - No `KirchhoffWithDerivatives` equivalent needed — MTK handles ODE/DAE structure automatically
 
 **Transient validation test (COMP-01)**
@@ -27,7 +27,7 @@
 
 **HeatExchanger (COMP-02)**
 - Move `_make_temp_bc` from `solvers.jl` to `components.jl`, rename to `HeatExchanger`
-- Identical 4-equation structure: mass balance, no pressure drop, `outlet.T ~ T_bc`, `inlet.T ~ instream(outlet.T)`
+- Identical 4-equation structure: mass balance, no pressure drop, `port_out.T ~ T_bc`, `port_in.T ~ instream(port_out.T)`
 - Export `HeatExchanger` from `STREAM.jl`
 - Remove `_make_temp_bc` from `solvers.jl`; update all three `build_loop` variants (`build_loop`, `build_loop_vertical`, `build_loop_transient`) to call `HeatExchanger` directly
 - No pressure-drop parameter added — COMP-02 explicitly says no pressure drop
@@ -55,7 +55,7 @@ None — discussion stayed within phase scope.
 
 ## Summary
 
-Phase 8 adds two lumped components that are almost entirely pre-solved by the existing codebase. The `Inertia` component follows the exact same compose-pattern as `Resistor`, `Gravity`, and `Friction`, differing only in using `Differential(t)(inlet.mdot)` on the right-hand side of the pressure equation. MTK treats this as a first-class ODE term; no special solver scaffolding is required beyond the already-established `Rodas5P` stiff solver path used by `solve_transient`.
+Phase 8 adds two lumped components that are almost entirely pre-solved by the existing codebase. The `Inertia` component follows the exact same compose-pattern as `Resistor`, `Gravity`, and `Friction`, differing only in using `Differential(t)(port_in.mdot)` on the right-hand side of the pressure equation. MTK treats this as a first-class ODE term; no special solver scaffolding is required beyond the already-established `Rodas5P` stiff solver path used by `solve_transient`.
 
 `HeatExchanger` is a pure rename-and-move: `_make_temp_bc` in `solvers.jl` lines 35-46 already contains the complete 4-equation structure. The task is to relocate it to `components.jl`, export it from `STREAM.jl`, and update the three `build_loop` variants (lines 86, 168, 226 of `solvers.jl`) to call `HeatExchanger` instead of the private helper.
 
@@ -94,21 +94,21 @@ Follow the `Resistor` pattern verbatim, with one equation substitution:
 function Inertia(; name, L_over_A)
     Dt  = Differential(t)           # same operator used in Channel energy balance
     pars = @parameters L_over_A = L_over_A
-    @named inlet  = FlowPort()
-    @named outlet = FlowPort()
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
     eqs = Equation[
-        inlet.mdot + outlet.mdot ~ 0,
-        inlet.P - outlet.P ~ L_over_A * Dt(inlet.mdot),  # ODE pressure eq
-        outlet.T ~ instream(inlet.T),
-        inlet.T  ~ instream(outlet.T),
+        port_in.mdot + port_out.mdot ~ 0,
+        port_in.P - port_out.P ~ L_over_A * Dt(port_in.mdot),  # ODE pressure eq
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 ```
 
 Key differences from `Resistor`:
 - Uses `Dt = Differential(t)` (already used in `Channel`; no new syntax)
-- The vars list is empty `[]` — `inlet.mdot` is the state, MTK promotes it automatically
+- The vars list is empty `[]` — `port_in.mdot` is the state, MTK promotes it automatically
 - No `abs()` needed — inertia is directional (sign of `Dt(mdot)` follows sign convention)
 
 ### HeatExchanger Component Structure
@@ -119,15 +119,15 @@ Direct copy of `_make_temp_bc` with renamed parameter:
 # Source: src/solvers.jl lines 35-46 (_make_temp_bc — move and rename)
 function HeatExchanger(; name, T_bc)
     pars = @parameters T_bc = T_bc
-    @named inlet  = FlowPort()
-    @named outlet = FlowPort()
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
     eqs = Equation[
-        inlet.mdot + outlet.mdot ~ 0,
-        inlet.P   - outlet.P    ~ 0,
-        outlet.T  ~ T_bc,
-        inlet.T   ~ instream(outlet.T),
+        port_in.mdot + port_out.mdot ~ 0,
+        port_in.P   - port_out.P    ~ 0,
+        port_out.T  ~ T_bc,
+        port_in.T   ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 ```
 
@@ -152,15 +152,15 @@ Follows the established `solve_transient` scaffolding pattern:
 @named L = Inertia(L_over_A = 1e3)
 @named R = Resistor(R = 1.0)
 connections = [
-    connect(L.outlet, R.inlet),
-    connect(R.outlet, L.inlet),
-    L.inlet.P ~ 1.0e5,           # pressure gauge anchor
+    connect(L.port_out, R.port_in),
+    connect(R.port_out, L.port_in),
+    L.port_in.P ~ 1.0e5,           # pressure gauge anchor
 ]
 @named sys = compose(System(connections, t; name=:sys), L, R)
 ssys = mtkcompile(sys)
 
 # Initial condition: mdot(0) = 1.0
-op = [ssys.L.inlet.mdot => 1.0]
+op = [ssys.L.port_in.mdot => 1.0]
 prob = ODEProblem(ssys, op, (0.0, 5000.0); warn_initialize_determined=false)
 sol = solve(prob, Rodas5P(); initializealg=SciMLBase.NoInit())
 
@@ -189,10 +189,10 @@ test/
 
 ### Anti-Patterns to Avoid
 
-- **Adding an explicit mdot state variable to Inertia:** MTK promotes `inlet.mdot` to a state automatically because it appears inside `Differential(t)`. Adding a redundant `mdot(t)` variable with an extra equality equation creates an over-determined system.
+- **Adding an explicit mdot state variable to Inertia:** MTK promotes `port_in.mdot` to a state automatically because it appears inside `Differential(t)`. Adding a redundant `mdot(t)` variable with an extra equality equation creates an over-determined system.
 - **Using `IDA` or `CVODE_BDF` for the RL-decay test:** These require `DAEProblem` with explicit `du0` or cannot handle mass matrices. `Rodas5P` is the correct stiff implicit Runge-Kutta solver for MTK-generated mass-matrix ODEs (established in `solve_transient`).
-- **Forgetting the pressure anchor in the RL-decay test:** As in the cube network (NET-02/03), a closed hydraulic loop has an underdetermined absolute pressure. Pin `L.inlet.P ~ 1.0e5` (or any port).
-- **Renaming the `bc` variable in build_loop functions:** All three `build_loop` variants use `@named bc = _make_temp_bc(...)`. The connections list references `bc.inlet`, `bc.outlet`. Changing the variable name would break the connection wiring. Only replace the constructor call.
+- **Forgetting the pressure anchor in the RL-decay test:** As in the cube network (NET-02/03), a closed hydraulic loop has an underdetermined absolute pressure. Pin `L.port_in.P ~ 1.0e5` (or any port).
+- **Renaming the `bc` variable in build_loop functions:** All three `build_loop` variants use `@named bc = _make_temp_bc(...)`. The connections list references `bc.port_in`, `bc.port_out`. Changing the variable name would break the connection wiring. Only replace the constructor call.
 
 ---
 
@@ -200,7 +200,7 @@ test/
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| ODE promotion of `inlet.mdot` | Manual state variable + equality eq | `Differential(t)(inlet.mdot)` directly in pressure eq | MTK promotes automatically; extra equation causes over-determination |
+| ODE promotion of `port_in.mdot` | Manual state variable + equality eq | `Differential(t)(port_in.mdot)` directly in pressure eq | MTK promotes automatically; extra equation causes over-determination |
 | Stiff ODE solver for mass-matrix system | Custom integrator | `Rodas5P()` | Rodas5P is the project-established solver for MTK-generated DAE/ODE systems |
 | Exponential decay verification | Custom tolerance logic | `isapprox(val, ref; rtol=0.01)` | Consistent with GRAV-02, NET-03, VAL-01 verification pattern |
 
@@ -217,7 +217,7 @@ test/
 ### Pitfall 2: Initial condition inconsistency with `NoInit`
 **What goes wrong:** `solve` throws an error about inconsistent initial conditions or returns `NaN`.
 **Why it happens:** `Rodas5P` with `NoInit` skips MTK's automatic initialization. The pressure variables in the RL loop must satisfy the loop balance at `t=0`. If `mdot(0) = 1.0` is given but pressures are left at default, the algebraic equations may not be satisfied.
-**How to avoid:** The pressure anchor `L.inlet.P ~ 1.0e5` removes the gauge freedom. MTK's algebraic constraints then determine all pressure values from the `mdot(0) = 1.0` IC. Alternatively, include `op` entries for pressure if needed, or use `SciMLBase.BrownFullBasicInit()` (slower but auto-consistent).
+**How to avoid:** The pressure anchor `L.port_in.P ~ 1.0e5` removes the gauge freedom. MTK's algebraic constraints then determine all pressure values from the `mdot(0) = 1.0` IC. Alternatively, include `op` entries for pressure if needed, or use `SciMLBase.BrownFullBasicInit()` (slower but auto-consistent).
 **Warning signs:** `sol.retcode != ReturnCode.Success` or `NaN` in `sol.t[2:]`.
 
 ### Pitfall 3: Missing export for `Inertia` or `HeatExchanger`
@@ -240,10 +240,10 @@ test/
 ```julia
 # Source: src/components.jl Channel energy balance (line 51)
 Dt = Differential(t)
-Dt(T[i]) ~ (inlet.mdot * cp_water(T[i]) * (T_up - T[i]) + ...) / (...)
+Dt(T[i]) ~ (port_in.mdot * cp_water(T[i]) * (T_up - T[i]) + ...) / (...)
 ```
 
-The same operator applied to `inlet.mdot` works identically. MTK recognises it as the state derivative and promotes `inlet.mdot` to a differential variable.
+The same operator applied to `port_in.mdot` works identically. MTK recognises it as the state derivative and promotes `port_in.mdot` to a differential variable.
 
 ### Rodas5P + NoInit for mass-matrix ODE (established pattern)
 ```julia
@@ -259,7 +259,7 @@ sol = solve(prob, Rodas5P(); initializealg = SciMLBase.NoInit())
 ### compose pattern (established for all components)
 ```julia
 # Source: src/components.jl Resistor (line 150)
-compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 ```
 
 Inertia uses identical structure with empty vars list `[]`.
@@ -279,14 +279,14 @@ Inertia uses identical structure with empty vars list `[]`.
 ## Open Questions
 
 1. **Pressure anchor for RL-decay loop with `NoInit`**
-   - What we know: The closed Inertia+Resistor loop has one gauge freedom (absolute pressure). The anchor `L.inlet.P ~ 1.0e5` resolves it.
+   - What we know: The closed Inertia+Resistor loop has one gauge freedom (absolute pressure). The anchor `L.port_in.P ~ 1.0e5` resolves it.
    - What's unclear: Whether `NoInit` will propagate the pressure values correctly from a single-port anchor when only `mdot(0)` is specified as IC.
    - Recommendation: Test with `SciMLBase.NoInit()` first. If pressure initialization fails, fall back to `SciMLBase.BrownFullBasicInit()` (slower but handles algebraic constraints automatically). Document the working approach in test comments.
 
 2. **`mdot` symbolic indexing in RL-decay solution**
-   - What we know: In the loop topology `ssys.L.inlet.mdot` is the primary state variable (or `ssys.R.inlet.mdot` — they are equal by mass conservation and Kirchhoff).
+   - What we know: In the loop topology `ssys.L.port_in.mdot` is the primary state variable (or `ssys.R.port_in.mdot` — they are equal by mass conservation and Kirchhoff).
    - What's unclear: After `mtkcompile`, which symbolic index MTK retains for the mdot state.
-   - Recommendation: Use `sol[ssys.L.inlet.mdot, :]` as the primary accessor. If not available post-compile, check `unknowns(ssys)` to find the retained symbol name. Add a comment in the test.
+   - Recommendation: Use `sol[ssys.L.port_in.mdot, :]` as the primary accessor. If not available post-compile, check `unknowns(ssys)` to find the retained symbol name. Add a comment in the test.
 
 ---
 
@@ -333,7 +333,7 @@ Inertia uses identical structure with empty vars list `[]`.
 - `.planning/phases/08-inertia-and-heatexchanger/08-CONTEXT.md` (read directly) — locked decisions
 
 ### Secondary (MEDIUM confidence)
-- `/home/itay/projects/STREAM/stream/calculations/ideal/inertia.py` — Python STREAM Inertia: `dp = -L * d(mdot)/dt` (sign matches Julia convention with `inlet.P - outlet.P ~ L_over_A * Dt(mdot)`)
+- `/home/itay/projects/STREAM/stream/calculations/ideal/inertia.py` — Python STREAM Inertia: `dp = -L * d(mdot)/dt` (sign matches Julia convention with `port_in.P - port_out.P ~ L_over_A * Dt(mdot)`)
 - `/home/itay/projects/STREAM/tests/test_general/test_integrations.py` lines 433-466 — Python canonical RL-circuit test: `mdot ~ exp(-(r/inertia)*t)` at rtol=1e-4; Julia uses rtol=0.01 per project convention
 
 ### Tertiary (LOW confidence)

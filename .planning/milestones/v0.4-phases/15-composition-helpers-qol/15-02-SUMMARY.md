@@ -28,7 +28,7 @@ tech-stack:
     - "_infer_n: count subsystems whose name starts with 'thermal_left' — safe n-inference from uncompiled CAC"
     - "Composition helpers return raw ODESystem via compose() — caller always calls mtkcompile()"
     - "COMP test pattern: HeatExchanger+Pump for hydraulic closure; ConstantTemperature is thermal-only"
-    - "Series hydraulic wiring: pump -> hx_in -> plate.cac.inlet -> ... -> pump.inlet.P ~ 1e5"
+    - "Series hydraulic wiring: pump -> hx_in -> plate.cac.port_in -> ... -> pump.port_in.P ~ 1e5"
 
 key-files:
   created: []
@@ -110,7 +110,7 @@ Each task was committed atomically:
 **2. [Rule 1 - Bug] Plan template used ConstantTemperature as a hydraulic boundary condition**
 - **Found during:** Task 2 (reviewing test template against component API)
 - **Issue:** `ConstantTemperature` only has a `thermal` ThermalPort — connecting it as `bc_T.port` in a FlowPort loop would fail. The plan template assumed it had a `port` (FlowPort).
-- **Fix:** Replaced `ConstantTemperature` BCs with `HeatExchanger(T_bc=600.0)` for hydraulic closure, matching VAL-01/02/03 test patterns. Added `pump.inlet.P ~ 1.0e5` and `cac.inlet.T ~ 600.0` constraints.
+- **Fix:** Replaced `ConstantTemperature` BCs with `HeatExchanger(T_bc=600.0)` for hydraulic closure, matching VAL-01/02/03 test patterns. Added `pump.port_in.P ~ 1.0e5` and `cac.port_in.T ~ 600.0` constraints.
 - **Files modified:** test/runtests.jl
 - **Verification:** All COMP tests mtkcompile successfully (structural check passes)
 - **Committed in:** 986c238

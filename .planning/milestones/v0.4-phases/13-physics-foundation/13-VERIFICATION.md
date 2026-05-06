@@ -19,7 +19,7 @@ score: 8/8 must-haves verified
 | Requirement | Phase | Plan | Description | Status | Evidence |
 |-------------|-------|------|-------------|--------|----------|
 | PHY-01 | 13 | 13-01 | PipeGeometry has `wet_perimeter` field; `Dh = 4A / wet_perimeter`; rectangular constructor computes correct wet_perimeter | SATISFIED | `src/components.jl` lines 32-95: 6-field struct + factory functions; `test/runtests.jl` lines 120-152: 10 assertions pass |
-| PHY-05 | 13 | 13-02 | `Pump(mdot0=...)` fixed-flow mode adds constraint `inlet.mdot ~ mdot0` instead of fixed-pressure equation | SATISFIED | `src/components.jl` lines 184-195: mdot0 branch with `inlet.mdot ~ mdot0`; `test/runtests.jl` lines 157-193: PHY-05 testsets present |
+| PHY-05 | 13 | 13-02 | `Pump(mdot0=...)` fixed-flow mode adds constraint `port_in.mdot ~ mdot0` instead of fixed-pressure equation | SATISFIED | `src/components.jl` lines 184-195: mdot0 branch with `port_in.mdot ~ mdot0`; `test/runtests.jl` lines 157-193: PHY-05 testsets present |
 
 Both requirements are marked `[x]` complete in `.planning/REQUIREMENTS.md` (lines 23 and 27).
 
@@ -36,7 +36,7 @@ Both requirements are marked `[x]` complete in `.planning/REQUIREMENTS.md` (line
 | 3 | wet_perimeter is a readable field on PipeGeometry | VERIFIED | `src/components.jl` line 37: `wet_perimeter ::Float64`; tests read it directly at lines 126, 146 |
 | 4 | All COMP-01, THERM-01, THERM-02, CHAN-01 circular-geometry tests still compile and pass (all call sites migrated) | VERIFIED | No old `PipeGeometry(;...)` calls remain in `test/runtests.jl` or `src/solvers.jl`; all circular sites use `PipeGeometry_circular(...)` |
 | 5 | Old PipeGeometry(; L, D=...) and PipeGeometry(; L, Dh=...) constructors are gone | VERIFIED | No sentinel-kwargs constructor exists in `src/components.jl`; only inner positional constructor present (lines 32-39) |
-| 6 | Pump(mdot0=0.6) assembles and compiles; loop solves with sol[pump.inlet.mdot] ≈ 0.6 | VERIFIED | `src/components.jl` lines 184-195; `test/runtests.jl` lines 157-186 with rtol=1e-4 assertion |
+| 6 | Pump(mdot0=0.6) assembles and compiles; loop solves with sol[pump.port_in.mdot] ≈ 0.6 | VERIFIED | `src/components.jl` lines 184-195; `test/runtests.jl` lines 157-186 with rtol=1e-4 assertion |
 | 7 | Pump() and Pump(dP_pump=1e5, mdot0=0.6) throw ErrorException | VERIFIED | `src/components.jl` line 197: error branch; `test/runtests.jl` lines 188-193: `@test_throws ErrorException` for both cases |
 | 8 | VAL-01/02/03 pass with regenerated reference constants at correct rectangular Dh ≈ 2.495 mm | VERIFIED | `test/runtests.jl` lines 971-980, 1054-1055, 1122-1123: updated constants (T_out 317.8871 K, mdot 0.252547 kg/s, T_plate_center 347.6125 K); commits 0a7853a |
 
@@ -57,7 +57,7 @@ Both requirements are marked `[x]` complete in `.planning/REQUIREMENTS.md` (line
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/components.jl` | Pump with sentinel dispatch: dP_pump or mdot0 | VERIFIED | Lines 171-199: dual-mode sentinel dispatch with `mdot0` in `@parameters` and `inlet.mdot ~ mdot0` equation |
+| `src/components.jl` | Pump with sentinel dispatch: dP_pump or mdot0 | VERIFIED | Lines 171-199: dual-mode sentinel dispatch with `mdot0` in `@parameters` and `port_in.mdot ~ mdot0` equation |
 | `test/runtests.jl` | PHY-05 testsets + updated VAL constants | VERIFIED | Lines 157-193: PHY-05 testsets; lines 971-980, 1054-1055, 1122-1123: updated VAL constants |
 | `test/generate_mtr_reference.py` | Updated script using EffectivePipe.rectangular | VERIFIED | Line 82: `EffectivePipe.rectangular(length=LZ, edge1=Y_LEN, edge2=LX, heated_edge=Y_LEN)` |
 
@@ -76,7 +76,7 @@ Both requirements are marked `[x]` complete in `.planning/REQUIREMENTS.md` (line
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `Pump(mdot0=...)` | MTK equations | `inlet.mdot ~ mdot0` equation | VERIFIED | `src/components.jl` line 191: `inlet.mdot ~ mdot0` present in the mdot0 branch |
+| `Pump(mdot0=...)` | MTK equations | `port_in.mdot ~ mdot0` equation | VERIFIED | `src/components.jl` line 191: `port_in.mdot ~ mdot0` present in the mdot0 branch |
 | `generate_mtr_reference.py` | `test/runtests.jl` VAL constants | Python STREAM output to hardcoded Julia rtol=1% assertions | VERIFIED | Script uses rectangular geometry; `runtests.jl` has new constants: T_out 317.8871 K, mdot 0.252547 kg/s |
 
 ---
@@ -119,7 +119,7 @@ Phase 13 achieves its goal. Both requirements (PHY-01 and PHY-05) are completely
 
 - **PHY-01:** The 6-field `PipeGeometry` struct is present and correct. `Dh = 4*area/wet_perimeter` is computed by both factory functions. The old sentinel-kwargs constructor is gone. All ~20 call sites in `test/runtests.jl` and 3 sites in `src/solvers.jl` are migrated. PHY-01 testsets with 10 assertions exist and are substantive.
 
-- **PHY-05:** `Pump` has dual-mode sentinel dispatch. The `mdot0` branch correctly uses `inlet.mdot ~ mdot0` with no pressure equation. Error cases are tested. The integration test verifies the loop solves with the correct mass flow at rtol=1e-4.
+- **PHY-05:** `Pump` has dual-mode sentinel dispatch. The `mdot0` branch correctly uses `port_in.mdot ~ mdot0` with no pressure equation. Error cases are tested. The integration test verifies the loop solves with the correct mass flow at rtol=1e-4.
 
 - **VAL recovery:** `generate_mtr_reference.py` uses `EffectivePipe.rectangular` with correct MTR geometry (Dh ≈ 2.495 mm). VAL-01/02/03 constants are updated in `runtests.jl` and all pass at rtol=1%.
 

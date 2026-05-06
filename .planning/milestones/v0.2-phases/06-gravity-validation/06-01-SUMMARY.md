@@ -21,7 +21,7 @@ affects:
 tech-stack:
   added: []
   patterns:
-    - Gravity wiring: connect ch.outlet->grav.outlet, grav.inlet->pump.inlet for return-leg descending flow
+    - Gravity wiring: connect ch.port_out->grav.port_out, grav.port_in->pump.port_in for return-leg descending flow
     - Gravity cancellation: Channel g_acc=9.80665 + Gravity H=L_ch gives net-zero gravity effect
 
 key-files:
@@ -32,7 +32,7 @@ key-files:
     - test/runtests.jl
 
 key-decisions:
-  - "Gravity wiring must be reversed from flow direction: grav.inlet at bottom (pump inlet), grav.outlet at top (channel outlet) — not in flow order — because inlet.P > outlet.P in Gravity equation means inlet is the high-pressure bottom end"
+  - "Gravity wiring must be reversed from flow direction: grav.port_in at bottom (pump inlet), grav.port_out at top (channel outlet) — not in flow order — because port_in.P > port_out.P in Gravity equation means port_in is the high-pressure bottom end"
   - "Cancellation tolerance 1% (rtol=0.01) accounts for density evaluation at different temperatures (Channel uses T[i_mid], Gravity uses T_in)"
 
 patterns-established:
@@ -84,7 +84,7 @@ _Note: Task 2 includes the Rule 1 auto-fix for the Gravity wiring bug discovered
 
 ## Decisions Made
 
-- **Gravity port wiring convention**: Gravity's equation is `inlet.P - outlet.P ~ rho*g*H`, so `inlet` is the high-pressure bottom end. For the return leg (fluid descends from channel top to pump inlet), the correct wiring is `ch.outlet -> grav.outlet` (top, low pressure) and `grav.inlet -> pump.inlet` (bottom, high pressure) — reverse of the naive flow-direction wiring. Loop balance becomes `dP_pump = friction + rho*g*L_ch - rho*g*H`, giving cancellation at H = L_ch.
+- **Gravity port wiring convention**: Gravity's equation is `port_in.P - port_out.P ~ rho*g*H`, so `port_in` is the high-pressure bottom end. For the return leg (fluid descends from channel top to pump inlet), the correct wiring is `ch.port_out -> grav.port_out` (top, low pressure) and `grav.port_in -> pump.port_in` (bottom, high pressure) — reverse of the naive flow-direction wiring. Loop balance becomes `dP_pump = friction + rho*g*L_ch - rho*g*H`, giving cancellation at H = L_ch.
 
 - **1% cancellation tolerance**: The Channel dP uses `rho_water(T[i_mid])` (midpoint temperature) while Gravity uses `rho_water(T_in)` (inlet temperature). These differ slightly, so exact machine-precision cancellation is not expected. The 1% rtol is physically justified and the test passes comfortably.
 
@@ -95,9 +95,9 @@ _Note: Task 2 includes the Rule 1 auto-fix for the Gravity wiring bug discovered
 **1. [Rule 1 - Bug] Reversed Gravity port wiring for correct physics**
 
 - **Found during:** Task 2 (GRAV-02 test execution)
-- **Issue:** Initial implementation wired Gravity in naive flow direction (`ch.outlet -> grav.inlet`, `grav.outlet -> pump.inlet`). This caused Gravity to ADD pressure loss (same direction as Channel), giving mdot_vertical = 0.459 vs mdot_horizontal = 0.607 (24% difference) instead of cancellation.
-- **Root cause:** Gravity equation `inlet.P - outlet.P ~ rho*g*H` means inlet is the HIGH-pressure bottom. Wiring in flow direction for the descending return leg puts the low-pressure top at inlet, making Gravity act as an additional sink.
-- **Fix:** Reversed connection: `connect(ch.outlet, grav.outlet)` and `connect(grav.inlet, pump.inlet)`. Loop balance: `dP_pump = friction + rho*g*L_ch - rho*g*H`, cancelling at H = L_ch.
+- **Issue:** Initial implementation wired Gravity in naive flow direction (`ch.port_out -> grav.port_in`, `grav.port_out -> pump.port_in`). This caused Gravity to ADD pressure loss (same direction as Channel), giving mdot_vertical = 0.459 vs mdot_horizontal = 0.607 (24% difference) instead of cancellation.
+- **Root cause:** Gravity equation `port_in.P - port_out.P ~ rho*g*H` means port_in is the HIGH-pressure bottom. Wiring in flow direction for the descending return leg puts the low-pressure top at port_in, making Gravity act as an additional sink.
+- **Fix:** Reversed connection: `connect(ch.port_out, grav.port_out)` and `connect(grav.port_in, pump.port_in)`. Loop balance: `dP_pump = friction + rho*g*L_ch - rho*g*H`, cancelling at H = L_ch.
 - **Files modified:** src/solvers.jl
 - **Verification:** GRAV-02 passes with mdot cancellation well within 1% rtol
 - **Committed in:** 8c48067 (Task 2 commit)

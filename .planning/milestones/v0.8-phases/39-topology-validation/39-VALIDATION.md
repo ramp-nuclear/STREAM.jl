@@ -56,7 +56,7 @@ created: 2026-04-03
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Red ring appears on unconnected node in canvas | VALD-01 | Visual CSS verification | Open canvas, add a Channel without connecting inlet, verify red ring visible |
+| Red ring appears on unconnected node in canvas | VALD-01 | Visual CSS verification | Open canvas, add a Channel without connecting port_in, verify red ring visible |
 | AlertDialog appears on export with validation errors | VALD-02, VALD-03 | React dialog rendering | Attempt export with incomplete topology, verify dialog shows grouped error list |
 | Alerts disappear when condition resolved | VALD-01–03 | Reactive clearing | Fix unconnected port, verify ring disappears; fix system errors, verify dialog no longer shows on export |
 

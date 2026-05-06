@@ -34,7 +34,7 @@ All required libraries are already installed (`@xyflow/react@12.10.2`, `zustand@
 ### Deferred Ideas (OUT OF SCOPE)
 - ThermalPort handle rendering -- Phase 40
 - Component icons/colors -- Phase 38 (UI design pass)
-- Edge labels showing `connect(a.outlet, b.inlet)` -- Phase 36 or 38
+- Edge labels showing `connect(a.port_out, b.port_in)` -- Phase 36 or 38
 - Multi-select with lasso tool -- may come free from ReactFlow
 </user_constraints>
 
@@ -218,7 +218,7 @@ const onDragOver = useCallback((event: React.DragEvent) => {
 ```typescript
 // Source: https://reactflow.dev/examples/interaction/validation
 const isValidConnection = useCallback((connection: Connection) => {
-  // sourceHandle and targetHandle carry the port name (e.g., "outlet", "inlet")
+  // sourceHandle and targetHandle carry the port name (e.g., "port_out", "port_in")
   // Handle type already enforces source->target (source handles are "source", target handles are "target")
   // Additional validation: both handles must exist
   return !!(connection.source && connection.target && connection.sourceHandle && connection.targetHandle);
@@ -270,7 +270,7 @@ const isValidConnection = useCallback((connection: Connection) => {
 ### Pitfall 2: Missing Handle IDs for Multi-Handle Nodes
 **What goes wrong:** ReactFlow cannot distinguish between multiple handles on the same node, causing edges to snap to the wrong port.
 **Why it happens:** Default Handle behavior assumes one source and one target per node.
-**How to avoid:** Every `<Handle>` must have a unique `id` prop matching the port name from the registry (e.g., `id="inlet"`, `id="outlet"`).
+**How to avoid:** Every `<Handle>` must have a unique `id` prop matching the port name from the registry (e.g., `id="port_in"`, `id="port_out"`).
 **Warning signs:** Edges connecting to wrong handles; `sourceHandle`/`targetHandle` undefined in connection callbacks.
 
 ### Pitfall 3: useReactFlow Hook Outside ReactFlowProvider

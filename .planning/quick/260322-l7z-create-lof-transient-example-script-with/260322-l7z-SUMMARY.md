@@ -100,7 +100,7 @@ Results are physically correct:
 
 **4. [Rule 1 - Bug] GR backend BoundsError: `sol[sym, :]` length mismatch with `t_arr`**
 - **Found during:** Task 1 plot generation
-- **Issue:** `ContinuousCallback` inserts 2 extra time points at the callback event, so `sol[ssys.ch.inlet.mdot, :]` returns 3003 elements while `collect(t_arr)` has 3001 elements. GR `gr_draw_segments` tries to access `x[1:3003]` on a 3001-element vector.
+- **Issue:** `ContinuousCallback` inserts 2 extra time points at the callback event, so `sol[ssys.ch.port_in.mdot, :]` returns 3003 elements while `collect(t_arr)` has 3001 elements. GR `gr_draw_segments` tries to access `x[1:3003]` on a 3001-element vector.
 - **Fix:** Changed `t_vec = collect(t_arr)` to `t_vec = sol.t` throughout; all extracted data arrays now share the same length.
 - **Files modified:** examples/lof_transient.jl
 

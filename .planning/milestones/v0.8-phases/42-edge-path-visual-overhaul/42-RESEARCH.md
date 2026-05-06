@@ -21,14 +21,14 @@ The technical surface is well-understood. ReactFlow v12.10.2 (`@xyflow/react`) c
 - D-03: Keep smoothstep edge type; for bidirectional edge pairs, auto-detect and apply lateral offset (~20px) via pathOptions.offset
 - D-04: Offset detection at addEdge time -- check if reverse edge already exists (same source/target handles swapped)
 - D-05: No changes to thermal edge style beyond existing implementation
-- D-06: inlet and outlet handles get distinct colors (blue-300 for in, blue-700 for out per UI-SPEC)
+- D-06: port_in and port_out handles get distinct colors (blue-300 for in, blue-700 for out per UI-SPEC)
 - D-07: Port direction derived from port.name (includes "in"/"out"); no registry schema changes
 - D-08: Cursor glitch is CSS/pointer-events bug -- fix via CSS targeting .react-flow__handle
 - D-09: reconstructInstanceCounters fix: use data.componentId.toLowerCase() as key, match ^<componentId_lower>_(\d+)$ pattern only
 
 ### Claude's Discretion
 - Exact arrowhead size and color (UI-SPEC specifies 16x16, #b1b1b7)
-- Exact colors for inlet vs outlet (UI-SPEC specifies blue-300/#93c5fd and blue-700/#1d4ed8)
+- Exact colors for port_in vs port_out (UI-SPEC specifies blue-300/#93c5fd and blue-700/#1d4ed8)
 - Symmetric vs asymmetric offset (UI-SPEC specifies symmetric +10/-10)
 - CSS selector and property for cursor fix
 - O(n) edge scan vs Set for offset detection
@@ -58,7 +58,7 @@ None -- all decisions are locked.
 ### File Touch Map
 ```
 gui/src/store/useStore.ts          # addEdge: markerEnd + offset; onEdgesChange: offset cleanup; loadProjectFromPath: re-enrichment
-gui/src/components/StreamNode.tsx   # Handle polarity colors (inlet blue-300, outlet blue-700)
+gui/src/components/StreamNode.tsx   # Handle polarity colors (port_in blue-300, port_out blue-700)
 gui/src/lib/projectIO.ts           # reconstructInstanceCounters: componentId-based regex
 gui/src/lib/__tests__/projectIO.test.ts  # Updated tests for counter fix
 gui/src/index.css                  # Cursor fix CSS rule

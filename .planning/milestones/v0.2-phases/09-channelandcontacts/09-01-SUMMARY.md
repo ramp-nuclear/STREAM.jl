@@ -38,7 +38,7 @@ key-decisions:
   - "ChannelHeatFlux stub is passthrough (no heat transfer) — THERM-03 steady-state comparison will error/fail correctly"
 
 patterns-established:
-  - "RED stub pattern: compose(System(minimal_eqs, t, [], []; name=name), inlet, outlet) is sufficient for callable + mtkcompile tests to pass"
+  - "RED stub pattern: compose(System(minimal_eqs, t, [], []; name=name), port_in, port_out) is sufficient for callable + mtkcompile tests to pass"
 
 requirements-completed: [THERM-01, THERM-02, THERM-03]
 
@@ -78,7 +78,7 @@ Each task was committed atomically:
 
 ## Decisions Made
 - THERM-03 test uses `build_loop` as Channel reference (matches existing pattern) and inline `compose()` for ChannelHeatFlux loop — no new `build_` helper is needed and would be premature
-- Stub design uses `compose(System(eqs, t, [], []; name=name), inlet, outlet)` — minimal FlowPort-only system sufficient to pass "callable" and "mtkcompile" tests while failing "has n ThermalPort subsystems"
+- Stub design uses `compose(System(eqs, t, [], []; name=name), port_in, port_out)` — minimal FlowPort-only system sufficient to pass "callable" and "mtkcompile" tests while failing "has n ThermalPort subsystems"
 - `build_loop` signature confirmed to accept `n, L_ch, D_ch, A_ch, dP_pump, T_inlet, T_wall` kwargs — THERM-03 test uses these directly without modification
 
 ## Deviations from Plan

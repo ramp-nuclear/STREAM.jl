@@ -242,19 +242,19 @@ Complete component API extracted from STREAM.jl source code for the registry JSO
 
 ### 1. Channel (keyword-only)
 - **Signature:** `Channel(; name, n, geometry, g=0.0, htc_correlation=dittus_boelter, friction_correlation=blasius_friction)`
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right), thermal (ThermalPort, top -- single scalar)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right), thermal (ThermalPort, top -- single scalar)
 - **Category:** Hydraulic
 - **Parameters:** n (Int, required), geometry (PipeGeometry, required), g (Real, m/s^2, default 0.0), htc_correlation (Function, default dittus_boelter), friction_correlation (Function, default blasius_friction)
 
 ### 2. ChannelAndContacts (keyword-only)
 - **Signature:** `ChannelAndContacts(; name, n, geometry, g=0.0, htc_correlation=dittus_boelter, friction_correlation=blasius_friction, scb_correction=nothing)`
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right), thermal_left[1:n] (ThermalPort array, top), thermal_right[1:n] (ThermalPort array, bottom)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right), thermal_left[1:n] (ThermalPort array, top), thermal_right[1:n] (ThermalPort array, bottom)
 - **Category:** Hydraulic
 - **Parameters:** n (Int, required), geometry (PipeGeometry, required), g (Real, m/s^2, default 0.0), htc_correlation (Function, default dittus_boelter), friction_correlation (Function, default blasius_friction), scb_correction (Function, default nothing)
 
 ### 3. ChannelHeatFlux (keyword-only)
 - **Signature:** `ChannelHeatFlux(; name, n, geometry, g=0.0, T_wall, htc_correlation=dittus_boelter, friction_correlation=blasius_friction)`
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right)
 - **Category:** Hydraulic
 - **Parameters:** n (Int, required), geometry (PipeGeometry, required), g (Real, m/s^2, default 0.0), T_wall (Real, K, required), htc_correlation (Function, default dittus_boelter), friction_correlation (Function, default blasius_friction)
 
@@ -262,43 +262,43 @@ Complete component API extracted from STREAM.jl source code for the registry JSO
 - **Mode 1 Signature:** `Pump(dP_pump::Real; name)` -- fixed scalar dP
 - **Mode 2 Signature:** `Pump(dP_pump::Any; name)` -- callable dP(t)
 - **Mode 3 Signature:** `Pump(; name, mdot0)` -- fixed mass flow
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right)
 - **Category:** Hydraulic
 - **Parameters (mode 1):** dP_pump (Real, Pa, required); **(mode 3):** mdot0 (Real, kg/s, required)
 
 ### 5. Flapper (keyword-only)
 - **Signature:** `Flapper(; name, dt=5.0, threshold=0.01, R_closed=1e8, R_open=100.0, use_callback=true)`
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right)
 - **Category:** Hydraulic
 - **Parameters:** dt (Real, s, default 5.0), threshold (Real, kg/s, default 0.01), R_closed (Real, Pa*s/kg, default 1e8), R_open (Real, Pa*s/kg, default 100.0), use_callback (Bool, default true)
 
 ### 6. Friction (keyword-only)
 - **Signature:** `Friction(; name, L, D, A)`
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right)
 - **Category:** Hydraulic
 - **Parameters:** L (Real, m, required), D (Real, m, required), A (Real, m^2, required)
 
 ### 7. Gravity (positional)
 - **Signature:** `Gravity(H; name)`
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right)
 - **Category:** Hydraulic
 - **Parameters:** H (Real, m, required)
 
 ### 8. Resistor (positional)
 - **Signature:** `Resistor(R; name)`
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right)
 - **Category:** Hydraulic
 - **Parameters:** R (Real, Pa/(kg/s), required)
 
 ### 9. Inertia (positional)
 - **Signature:** `Inertia(L_over_A; name)`
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right)
 - **Category:** Hydraulic
 - **Parameters:** L_over_A (Real, 1/m, required)
 
 ### 10. HeatExchanger (positional)
 - **Signature:** `HeatExchanger(T_bc; name)`
-- **Ports:** inlet (FlowPort, left), outlet (FlowPort, right)
+- **Ports:** port_in (FlowPort, left), port_out (FlowPort, right)
 - **Category:** Hydraulic
 - **Parameters:** T_bc (Real, K, required)
 

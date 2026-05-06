@@ -23,7 +23,7 @@ All three changes touch existing files with well-established patterns: `StreamNo
 - D-05: isValidConnection enforces port type matching. FlowPort-to-FlowPort only, ThermalPort-to-ThermalPort only. Cross-type connections blocked at draw time.
 - D-06: Port type derived from registry type field. Handle data carries portType: "FlowPort" | "ThermalPort" so isValidConnection can compare without registry lookup.
 - D-07: Code generator detects thermal wiring topology from edges array and emits correct helper: symmetric_plate, plate, one_sided_connection. Detection rules based on which ThermalPort handles of which component types are connected.
-- D-08: Thermal assembly helper is emitted as @named declaration; hydraulic FlowPort connects reference assembly.cac.inlet path. compose_systems wraps the assembly with hydraulic connections.
+- D-08: Thermal assembly helper is emitted as @named declaration; hydraulic FlowPort connects reference assembly.cac.port_in path. compose_systems wraps the assembly with hydraulic connections.
 - D-09: No thermal edges = Phase 36 format (ODESystem). Helper format only when thermal topology detected.
 - D-10: Unrecognized thermal wiring emits raw connect(port(...)) calls with # TODO comment.
 - D-11: No new VALD rules for ThermalPorts. Unconnected ThermalPorts are valid (adiabatic default).
@@ -129,7 +129,7 @@ const isValidConnection = useCallback((connection: Edge | Connection) => {
 
 **Two approaches:**
 1. **Registry lookup (simpler):** Import `getComponent` from registry. Look up source/target node componentId from store, find the port definition, check its `type` field. Requires store access from the callback.
-2. **Handle ID encoding (D-06 preferred):** Encode portType into the handle ID itself (e.g., `FlowPort:inlet`, `ThermalPort:thermal_left`). Then `isValidConnection` splits the handle ID to extract type. However, this changes handle IDs throughout the codebase and breaks edge sourceHandle/targetHandle references.
+2. **Handle ID encoding (D-06 preferred):** Encode portType into the handle ID itself (e.g., `FlowPort:port_in`, `ThermalPort:thermal_left`). Then `isValidConnection` splits the handle ID to extract type. However, this changes handle IDs throughout the codebase and breaks edge sourceHandle/targetHandle references.
 
 **Recommended approach:** Use store access. The `isValidConnection` callback already lives in CanvasPanel which imports `useStore`. Add a helper that takes a nodeId + handleId and returns the port type by looking up the node's componentId in the store and then the port definition in the registry.
 
@@ -172,7 +172,7 @@ if (sourceType && targetType && sourceType !== targetType) return false;
    @named assembly_1 = symmetric_plate(cac_1, fuel_1)
    ```
 
-5. Hydraulic `connect()` calls that reference a CAC inside an assembly use dotted path: `assembly_1.cac_1.inlet`
+5. Hydraulic `connect()` calls that reference a CAC inside an assembly use dotted path: `assembly_1.cac_1.port_in`
 
 6. Top-level system uses `compose_systems(assembly_1; connections=eqs, name=:sys)` instead of `ODESystem(eqs, t; systems=[...])`.
 
@@ -197,7 +197,7 @@ interface ThermalAssembly {
 
 ### Anti-Patterns to Avoid
 - **Per-cell handles:** D-01 explicitly locks single handle per side. Do NOT render n handles.
-- **Modifying handle IDs:** Do not encode portType into handle IDs. Keep existing `inlet`, `outlet`, `thermal_left`, `thermal_right` names. These are used by codeGenerator and stored in .streamgui files.
+- **Modifying handle IDs:** Do not encode portType into handle IDs. Keep existing `port_in`, `port_out`, `thermal_left`, `thermal_right` names. These are used by codeGenerator and stored in .streamgui files.
 - **Touching validation.ts VALD checks:** D-11/D-12 explicitly exclude ThermalPorts from topology validation. Do not modify `validateTopology`.
 
 ## Don't Hand-Roll
@@ -212,7 +212,7 @@ interface ThermalAssembly {
 
 ### Pitfall 1: Handle Position Overlap
 **What goes wrong:** Two ThermalPort handles on the same side (e.g., thermal_left on top, thermal_right on bottom) overlap with FlowPort handles if the FlowPort is also on that side.
-**Why it happens:** ChannelAndContacts has inlet on left, outlet on right (FlowPort), thermal_left on top, thermal_right on bottom (ThermalPort). No overlap. HeatDiffusion has thermal_left on left, thermal_right on right -- no FlowPorts, no overlap. ConstantTemperature has thermal on left -- no FlowPorts, no overlap.
+**Why it happens:** ChannelAndContacts has port_in on left, port_out on right (FlowPort), thermal_left on top, thermal_right on bottom (ThermalPort). No overlap. HeatDiffusion has thermal_left on left, thermal_right on right -- no FlowPorts, no overlap. ConstantTemperature has thermal on left -- no FlowPorts, no overlap.
 **How to avoid:** The registry side assignments in D-02 were specifically chosen to avoid overlap. Verify registry entries match D-02 before implementation.
 **Warning signs:** Handles visually stacking on top of each other.
 
@@ -331,9 +331,9 @@ using ModelingToolkit: t_nounits as t
 @named pump_1 = Pump(30000.0)
 
 eqs = [
-    connect(pump_1.outlet, assembly_1.cac_1.inlet),
-    connect(assembly_1.cac_1.outlet, pump_1.inlet),
-    pump_1.inlet.P ~ 1.0e5,
+    connect(pump_1.port_out, assembly_1.cac_1.port_in),
+    connect(assembly_1.cac_1.port_out, pump_1.port_in),
+    pump_1.port_in.P ~ 1.0e5,
 ]
 @named sys = compose_systems(assembly_1, pump_1; connections=eqs, name=:sys)
 ssys = mtkcompile(sys)

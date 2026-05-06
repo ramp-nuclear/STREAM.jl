@@ -302,8 +302,8 @@ Node { type: "Channel", name: "ch1", params: { n: 10 }, geometry: { type: "circu
 For each edge, emit a `connect()` call. The source/target handles map directly to STREAM.jl port names:
 
 ```
-Edge { source: "pump1", sourceHandle: "outlet", target: "ch1", targetHandle: "inlet" }
-  -->  connect(pump1.outlet, ch1.inlet)
+Edge { source: "pump1", sourceHandle: "port_out", target: "ch1", targetHandle: "port_in" }
+  -->  connect(pump1.port_out, ch1.port_in)
 ```
 
 For thermal connections (Phase 40), detect topology patterns and emit composition helper calls instead of raw connect():
@@ -320,9 +320,9 @@ Emit the BC equations, compose() call, and mtkcompile():
 
 ```julia
 connections = [
-    connect(pump1.outlet, ch1.inlet),
+    connect(pump1.port_out, ch1.port_in),
     # ... more connections
-    pump1.inlet.P ~ 1.0e5,          # pressure anchor
+    pump1.port_in.P ~ 1.0e5,          # pressure anchor
 ]
 @named sys = compose(System(connections, t), pump1, ch1)
 ssys = mtkcompile(sys)
@@ -366,13 +366,13 @@ The `.streamgui` file is the complete serializable graph state:
     {
       "id": "edge-1",
       "source": "node-1",
-      "sourceHandle": "outlet",
+      "sourceHandle": "port_out",
       "target": "node-2",
-      "targetHandle": "inlet"
+      "targetHandle": "port_in"
     }
   ],
   "boundaryConditions": [
-    { "type": "pressure_anchor", "nodeId": "node-1", "port": "inlet", "value": 100000.0 }
+    { "type": "pressure_anchor", "nodeId": "node-1", "port": "port_in", "value": 100000.0 }
   ]
 }
 ```
@@ -474,8 +474,8 @@ interface GeometryField {
   "category": "Hydraulic",
   "description": "Fixed-pressure or fixed-flow driving element",
   "ports": {
-    "inlet":  { "portType": "FlowPort", "direction": "in",  "side": "left" },
-    "outlet": { "portType": "FlowPort", "direction": "out", "side": "right" }
+    "port_in":  { "portType": "FlowPort", "direction": "in",  "side": "left" },
+    "port_out": { "portType": "FlowPort", "direction": "out", "side": "right" }
   },
   "parameters": [
     { "name": "dP_pump", "type": "number", "unit": "Pa", "default": 30000,
@@ -504,8 +504,8 @@ interface GeometryField {
   "category": "Hydraulic",
   "description": "Single-phase convective channel with n axial cells",
   "ports": {
-    "inlet":  { "portType": "FlowPort", "direction": "in",  "side": "left" },
-    "outlet": { "portType": "FlowPort", "direction": "out", "side": "right" },
+    "port_in":  { "portType": "FlowPort", "direction": "in",  "side": "left" },
+    "port_out": { "portType": "FlowPort", "direction": "out", "side": "right" },
     "thermal":  { "portType": "ThermalPort", "direction": "in", "side": "top" }
   },
   "parameters": [
@@ -544,8 +544,8 @@ interface GeometryField {
   "category": "Thermal",
   "description": "Channel with per-cell ThermalPort arrays for fuel plate coupling",
   "ports": {
-    "inlet":  { "portType": "FlowPort", "direction": "in",  "side": "left" },
-    "outlet": { "portType": "FlowPort", "direction": "out", "side": "right" },
+    "port_in":  { "portType": "FlowPort", "direction": "in",  "side": "left" },
+    "port_out": { "portType": "FlowPort", "direction": "out", "side": "right" },
     "thermal_left":  { "portType": "ThermalPort", "direction": "in", "side": "top",
                        "isArray": true, "arrayParam": "n" },
     "thermal_right": { "portType": "ThermalPort", "direction": "in", "side": "bottom",

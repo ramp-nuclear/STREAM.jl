@@ -355,7 +355,7 @@ No missing dependencies.
 - `gui/src/store/useStore.ts` -- Zustand store structure, undo/redo pattern, addEdge action
 - `gui/src/components/StreamNode.tsx` -- Current ring implementation (`ring-2 ring-[var(--ring)]`)
 - `gui/src/components/Toolbar.tsx` -- Export button handler location
-- `gui/src/registry/components.json` -- All 12 components, port definitions (verified: all hydraulic components have exactly inlet + outlet; 2 thermal-only components have zero FlowPorts)
+- `gui/src/registry/components.json` -- All 12 components, port definitions (verified: all hydraulic components have exactly port_in + port_out; 2 thermal-only components have zero FlowPorts)
 - `gui/src/lib/validation.ts` -- Existing field validation file (will add topology validation here)
 - `.planning/phases/39-topology-validation/39-UI-SPEC.md` -- UI design contract
 - `.planning/phases/39-topology-validation/39-CONTEXT.md` -- User decisions D-01 through D-12

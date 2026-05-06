@@ -146,7 +146,7 @@ None for Phase 34. Node cards are hand-built with Tailwind classes (`border roun
 
 ```
 +---------------------------+
-|  [o] inlet     outlet [o]  <- FlowPort handles (8px diameter circles)
+|  [o] port_in     port_out [o]  <- FlowPort handles (8px diameter circles)
 |                               |
 |  Channel                      |  <- type label: text-xs text-muted-foreground
 |  channel_1                    |  <- instance name: font-semibold text-sm

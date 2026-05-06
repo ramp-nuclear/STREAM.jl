@@ -36,13 +36,13 @@ const sampleEdges: Edge[] = [
     id: "edge-1",
     source: "node-1",
     target: "node-2",
-    sourceHandle: "outlet",
-    targetHandle: "inlet",
+    sourceHandle: "port_out",
+    targetHandle: "port_in",
   },
 ];
 
 const sampleBcs: BCEntry[] = [
-  { nodeId: "node-1", portField: "inlet.P", value: 1e5 },
+  { nodeId: "node-1", portField: "port_in.P", value: 1e5 },
 ];
 
 // ---------------------------------------------------------------------------

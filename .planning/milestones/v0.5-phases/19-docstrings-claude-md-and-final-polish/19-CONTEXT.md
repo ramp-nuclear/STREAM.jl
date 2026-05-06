@@ -17,8 +17,8 @@ Add Julia docstrings to all exported names (11 components, 6 composition helpers
 - Format: one-line description + `# Arguments` (constructor kwargs only) + `# Ports` + `# Returns`
 - `# Arguments`: list only the kwargs the caller passes (e.g., `n`, `geometry`, `name`, `htc_func`). Omit MTK-internal metadata.
 - `# Ports`: list the connector ports each component exposes with their types.
-  - Standard flow components (Channel, Pump, Friction, Gravity, Resistor, Inertia, HeatExchanger, ChannelHeatFlux): `inlet`, `outlet` (FlowPort)
-  - ChannelAndContacts: `inlet`, `outlet` (FlowPort) + `thermal_left[1:n]`, `thermal_right[1:n]` (ThermalPort arrays)
+  - Standard flow components (Channel, Pump, Friction, Gravity, Resistor, Inertia, HeatExchanger, ChannelHeatFlux): `port_in`, `port_out` (FlowPort)
+  - ChannelAndContacts: `port_in`, `port_out` (FlowPort) + `thermal_left[1:n]`, `thermal_right[1:n]` (ThermalPort arrays)
   - HeatDiffusion: `thermal_left[1:n]`, `thermal_right[1:n]` (ThermalPort arrays, no FlowPorts)
   - ConstantTemperature: `thermal` (ThermalPort, single — it's a BC not a component)
 - `# Returns`: the ODESystem
@@ -44,7 +44,7 @@ Add Julia docstrings to all exported names (11 components, 6 composition helpers
 - Add a short **MTK Patterns** section covering non-obvious conventions:
   - Why `@register_symbolic` for fluid properties (not plain functions)
   - Why `ifelse()` for flow reversal (not if-branches: solver discontinuity)
-  - Why `vars=[]` for Inertia (MTK auto-promotes `Dt(inlet.mdot)`)
+  - Why `vars=[]` for Inertia (MTK auto-promotes `Dt(port_in.mdot)`)
   - When to use `@observed` vs plain unknowns (diagnostic-only vs equation-referenced)
   - Why `mtkcompile` is required before solve (symbolic reduction, Jacobian)
 - Keep CLAUDE.md focused: file structure + component conventions + MTK patterns. Not a tutorial.

@@ -26,7 +26,7 @@ tech-stack:
     - "Isolated component mtkcompile: use fully_determined=false for components with unconnected ports"
     - "Array variable splatting: collect(T) before passing to System() avoids Symbolics.Arr dimension error"
     - "n as plain Julia Int in component signature — not @parameters (would break for-loop iteration)"
-    - "instream(inlet.T) for inlet temperature; T[i-1] for upwind cells 2..n"
+    - "instream(port_in.T) for inlet temperature; T[i-1] for upwind cells 2..n"
 
 key-files:
   created: []
@@ -36,7 +36,7 @@ key-files:
 
 key-decisions:
   - "Rename kwarg D to Dh inside Channel function body to prevent Float64 shadowing Differential(t) operator D"
-  - "Use mtkcompile(ch; fully_determined=false) for isolated component test — unconnected thermal/pressure ports leave thermal.T and inlet.P unconstrained, making plain mtkcompile() fail with ExtraVariablesSystemException"
+  - "Use mtkcompile(ch; fully_determined=false) for isolated component test — unconnected thermal/pressure ports leave thermal.T and port_in.P unconstrained, making plain mtkcompile() fail with ExtraVariablesSystemException"
   - "Middle cell T[n/2] used as mean temperature proxy for Darcy-Weisbach dP (single scalar observable)"
 
 patterns-established:
@@ -81,7 +81,7 @@ Each task was committed atomically:
 
 ## Decisions Made
 - Renamed keyword argument `D` to `Dh` locally inside Channel function body — `D` as a keyword parameter (Float64) would shadow the `Differential(t)` operator also conventionally named `D`, causing "objects of type Float64 are not callable" error
-- Used `mtkcompile(ch; fully_determined=false)` for the isolation test — unconnected ports leave `thermal.T` and `inlet.P` unconstrained, so plain `mtkcompile(ch)` throws `ExtraVariablesSystemException` (29 vars vs 27 equations). The `fully_determined=false` keyword tells MTK to proceed despite underdetermined subsets, appropriate for component-in-isolation testing
+- Used `mtkcompile(ch; fully_determined=false)` for the isolation test — unconnected ports leave `thermal.T` and `port_in.P` unconstrained, so plain `mtkcompile(ch)` throws `ExtraVariablesSystemException` (29 vars vs 27 equations). The `fully_determined=false` keyword tells MTK to proceed despite underdetermined subsets, appropriate for component-in-isolation testing
 - Used middle cell `T[n÷2]` as mean temperature proxy for single-scalar Darcy-Weisbach dP calculation
 
 ## Deviations from Plan
@@ -98,7 +98,7 @@ Each task was committed atomically:
 
 **2. [Rule 1 - Bug] mtkcompile fails on isolated Channel with ExtraVariablesSystemException**
 - **Found during:** Task 1 verification (mtkcompile check)
-- **Issue:** The plan specified `mtkcompile(ch)` should complete without error. However, an isolated Channel with unconnected `thermal` port and `inlet` has no equations for `thermal.T` and `inlet.P` (both are across/pressure variables that require external connections to be constrained). MTK raises `ExtraVariablesSystemException: 29 vars vs 27 equations`.
+- **Issue:** The plan specified `mtkcompile(ch)` should complete without error. However, an isolated Channel with unconnected `thermal` port and `port_in` has no equations for `thermal.T` and `port_in.P` (both are across/pressure variables that require external connections to be constrained). MTK raises `ExtraVariablesSystemException: 29 vars vs 27 equations`.
 - **Fix:** Updated the mtkcompile test to `mtkcompile(ch; fully_determined=false)`, which instructs MTK to proceed despite underdetermined subsets. This is the correct approach for isolated component testing in Phase 2 — the system will be fully determined when connected in Phase 3.
 - **Files modified:** test/runtests.jl
 - **Verification:** `mtkcompile(ch; fully_determined=false)` succeeds, returns compiled system with 38 observed variables including dP and T_out

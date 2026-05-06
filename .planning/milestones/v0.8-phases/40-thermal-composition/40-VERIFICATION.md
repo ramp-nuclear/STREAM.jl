@@ -112,14 +112,14 @@ No TODOs, placeholders, empty returns, or hardcoded stubs found in any phase 40 
 
 #### 2. Cross-Type Connection Rejection in Browser
 
-**Test:** Try to draw an edge from a Pump's outlet (circle handle) to a HeatDiffusion's thermal_left (diamond handle) in the live canvas.
+**Test:** Try to draw an edge from a Pump's port_out (circle handle) to a HeatDiffusion's thermal_left (diamond handle) in the live canvas.
 **Expected:** Edge snaps back / cannot be dropped. No connection is created.
 **Why human:** ReactFlow's isValidConnection behavior during live drag-and-drop requires browser interaction.
 
 #### 3. Generated Code Export End-to-End
 
 **Test:** Wire a Pump -> ChannelAndContacts -> (both thermal sides) -> HeatDiffusion, then copy the generated code from the Export panel.
-**Expected:** Output contains `@named assembly_1 = symmetric_plate(...)` and `@named sys = compose_systems(assembly_1, pump_1; connections=eqs, name=:sys)`. Hydraulic connect uses `assembly_1.cac_1.inlet` dotted path.
+**Expected:** Output contains `@named assembly_1 = symmetric_plate(...)` and `@named sys = compose_systems(assembly_1, pump_1; connections=eqs, name=:sys)`. Hydraulic connect uses `assembly_1.cac_1.port_in` dotted path.
 **Why human:** Requires the full GUI to be running with the Export panel visible.
 
 ---

@@ -60,7 +60,7 @@ audited: 2026-03-27
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Solver continuity across flow reversal | VAL-01 | Requires visual inspection of mdot(t) trajectory | Plot `sol[ssys.ine.inlet.mdot, :]` and verify sign changes smoothly without NaN/Inf |
+| Solver continuity across flow reversal | VAL-01 | Requires visual inspection of mdot(t) trajectory | Plot `sol[ssys.ine.port_in.mdot, :]` and verify sign changes smoothly without NaN/Inf |
 | Flapper opens at expected time | VAL-01 | Event timing depends on IC tuning | Check `sol` callback log or plot mdot_bypass vs t |
 
 ---

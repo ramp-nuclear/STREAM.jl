@@ -285,7 +285,7 @@ end
 # with hydraulic series wiring between plates.
 #
 # Usage:
-#   conns = [connect(p1.cac.outlet, p2.cac.inlet), ...]
+#   conns = [connect(p1.cac.port_out, p2.cac.port_in), ...]
 #   top = compose_systems(p1, p2; connections=conns, name=:reactor)
 # ----------------------------------------------------------------
 """

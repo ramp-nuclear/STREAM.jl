@@ -67,8 +67,8 @@ describe("removeNode", () => {
     useStore.getState().addEdge({
       source: pumpId,
       target: channelId,
-      sourceHandle: "outlet",
-      targetHandle: "inlet",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
     });
     expect(useStore.getState().edges).toHaveLength(1);
 
@@ -94,8 +94,8 @@ describe("addEdge / removeEdge", () => {
     useStore.getState().addEdge({
       source: "a",
       target: "b",
-      sourceHandle: "outlet",
-      targetHandle: "inlet",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
     });
     expect(useStore.getState().edges).toHaveLength(1);
   });
@@ -104,8 +104,8 @@ describe("addEdge / removeEdge", () => {
     useStore.getState().addEdge({
       source: "a",
       target: "b",
-      sourceHandle: "outlet",
-      targetHandle: "inlet",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
     });
     const edgeId = useStore.getState().edges[0].id;
     useStore.getState().removeEdge(edgeId);
@@ -246,8 +246,8 @@ describe("isDirty tracking", () => {
     useStore.getState().addEdge({
       source: "a",
       target: "b",
-      sourceHandle: "outlet",
-      targetHandle: "inlet",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
     });
     expect(useStore.getState().isDirty).toBe(true);
   });
@@ -256,8 +256,8 @@ describe("isDirty tracking", () => {
     useStore.getState().addEdge({
       source: "a",
       target: "b",
-      sourceHandle: "outlet",
-      targetHandle: "inlet",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
     });
     const edgeId = useStore.getState().edges[0].id;
     useStore.setState({ isDirty: false });
@@ -275,12 +275,12 @@ describe("isDirty tracking", () => {
 
   it("addBC sets isDirty true", () => {
     useStore.setState({ isDirty: false });
-    useStore.getState().addBC({ nodeId: "n1", portField: "inlet.P", value: 1e5 });
+    useStore.getState().addBC({ nodeId: "n1", portField: "port_in.P", value: 1e5 });
     expect(useStore.getState().isDirty).toBe(true);
   });
 
   it("removeBC sets isDirty true", () => {
-    useStore.getState().addBC({ nodeId: "n1", portField: "inlet.P", value: 1e5 });
+    useStore.getState().addBC({ nodeId: "n1", portField: "port_in.P", value: 1e5 });
     useStore.setState({ isDirty: false });
     useStore.getState().removeBC(0);
     expect(useStore.getState().isDirty).toBe(true);
@@ -349,8 +349,8 @@ describe("addEdge arrowheads and offset", () => {
     useStore.getState().addEdge({
       source: pumpA,
       target: pumpB,
-      sourceHandle: "outlet",
-      targetHandle: "inlet",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
     });
 
     const edge = useStore.getState().edges[0];
@@ -388,14 +388,14 @@ describe("addEdge arrowheads and offset", () => {
     useStore.getState().addEdge({
       source: pumpId,
       target: channelId,
-      sourceHandle: "outlet",
-      targetHandle: "inlet",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
     });
     useStore.getState().addEdge({
       source: channelId,
       target: pumpId,
-      sourceHandle: "outlet",
-      targetHandle: "inlet",
+      sourceHandle: "port_out",
+      targetHandle: "port_in",
     });
 
     const edges = useStore.getState().edges;
@@ -445,8 +445,8 @@ describe("enrichEdges", () => {
         id: "e1",
         source: "n1",
         target: "n2",
-        sourceHandle: "outlet",
-        targetHandle: "inlet",
+        sourceHandle: "port_out",
+        targetHandle: "port_in",
       },
     ];
 

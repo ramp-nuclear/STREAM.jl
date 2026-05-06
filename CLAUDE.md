@@ -89,7 +89,7 @@ Julia's `if`/`else` on a symbolic `Num` expression would evaluate the branch con
 
 ### `vars=[]` for Inertia
 
-When `Dt(inlet.mdot)` appears in an equation, MTK automatically promotes `inlet.mdot` to a differential state variable. Explicitly listing it in `vars` would be redundant. Passing `vars=[]` makes clear that the component introduces no *additional* state variables beyond what MTK infers.
+When `Dt(port_in.mdot)` appears in an equation, MTK automatically promotes `port_in.mdot` to a differential state variable. Explicitly listing it in `vars` would be redundant. Passing `vars=[]` makes clear that the component introduces no *additional* state variables beyond what MTK infers.
 
 ### `@observed` vs plain unknowns
 

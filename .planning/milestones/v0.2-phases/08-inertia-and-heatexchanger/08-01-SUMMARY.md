@@ -21,7 +21,7 @@ affects:
 tech-stack:
   added: []
   patterns:
-    - "Inertia ODE component: Differential(t)(inlet.mdot) as implicit state promoted by MTK"
+    - "Inertia ODE component: Differential(t)(port_in.mdot) as implicit state promoted by MTK"
     - "fully_determined=false + check_length=false pattern for underdetermined T variables in pure pressure circuits"
     - "RL-decay transient validation: Inertia + Resistor loop, IC mdot=1 kg/s, analytical mdot(t)=exp(-t/tau)"
 
@@ -33,13 +33,13 @@ key-files:
     - test/runtests.jl
 
 key-decisions:
-  - "Inertia uses empty vars=[] — MTK auto-promotes inlet.mdot as differential state via Dt(inlet.mdot)"
+  - "Inertia uses empty vars=[] — MTK auto-promotes port_in.mdot as differential state via Dt(port_in.mdot)"
   - "RL-decay test requires fully_determined=false (T stream vars underdetermined in pure pressure circuit)"
   - "ODEProblem requires check_length=false + explicit T ICs because T unknowns have no equations in RL circuit"
   - "T ICs set to 300.0 K (arbitrary, no heat exchange) alongside mdot=1.0 kg/s IC"
 
 patterns-established:
-  - "ODE component pattern: Dt = Differential(t); eqs include Dt(inlet.mdot) term; vars=[]; MTK auto-promotes"
+  - "ODE component pattern: Dt = Differential(t); eqs include Dt(port_in.mdot) term; vars=[]; MTK auto-promotes"
   - "Pure pressure circuit test: mtkcompile with fully_determined=false; ODEProblem with check_length=false"
 
 requirements-completed: [COMP-01]
@@ -62,7 +62,7 @@ completed: 2026-03-13
 - **Files modified:** 3
 
 ## Accomplishments
-- Inertia component implemented in src/components.jl following the Resistor pattern, substituting the algebraic pressure drop equation with the ODE `inlet.P - outlet.P ~ L_over_A * Dt(inlet.mdot)`
+- Inertia component implemented in src/components.jl following the Resistor pattern, substituting the algebraic pressure drop equation with the ODE `port_in.P - port_out.P ~ L_over_A * Dt(port_in.mdot)`
 - Inertia exported from STREAM module
 - RL-decay transient validation passes: mdot(t) matches exp(-t/tau) within 2.6e-6 rtol at all 5 time points (t = 0, 500, 1000, 2000, 5000 s)
 - Phase 8 testset written with COMP-01 (green) and COMP-02 stubs (red, for Plan 02)
@@ -82,7 +82,7 @@ _Note: TDD plan — test commit followed by implementation commit_
 - `test/runtests.jl` — Updated imports (DifferentialEquations unqualified, Inertia + HeatExchanger added); added Phase 8 testset
 
 ## Decisions Made
-- Inertia uses `vars = []` (empty) — MTK auto-promotes `inlet.mdot` as a differential state variable because it appears inside `Dt(inlet.mdot)`; adding an explicit `mdot(t)` state would overconstrain the system
+- Inertia uses `vars = []` (empty) — MTK auto-promotes `port_in.mdot` as a differential state variable because it appears inside `Dt(port_in.mdot)`; adding an explicit `mdot(t)` state would overconstrain the system
 - Temperature passthrough equations identical to Resistor/Gravity pattern (no heat exchange semantics)
 
 ## Deviations from Plan
@@ -94,13 +94,13 @@ _Note: TDD plan — test commit followed by implementation commit_
 - **Issue:** Plan wrote `ssys = mtkcompile(sys)` without `fully_determined=false`. The RL circuit (Inertia + Resistor, no heat exchange) has T stream variables that are underdetermined — `mtkcompile` raises `ExtraVariablesSystemException` (12 variables, 10 equations)
 - **Fix:** Changed to `mtkcompile(sys; fully_determined=false)` to allow the underdetermined T variables
 - **Files modified:** test/runtests.jl
-- **Verification:** mtkcompile succeeds; 3 unknowns retained: `L_comp.inlet.mdot`, `L_comp.outlet.T`, `L_comp.inlet.T`
+- **Verification:** mtkcompile succeeds; 3 unknowns retained: `L_comp.port_in.mdot`, `L_comp.port_out.T`, `L_comp.port_in.T`
 - **Committed in:** 6b996df
 
 **2. [Rule 1 - Bug] Fixed ODEProblem construction: added T ICs and check_length=false**
 - **Found during:** Task 2 (Implement Inertia component)
-- **Issue:** Plan wrote `op = [ssys.L_comp.inlet.mdot => 1.0]` with no T ICs. After mtkcompile with `fully_determined=false`, the system has 3 unknowns (mdot + 2 T vars) but only 1 equation. `ODEProblem` raises `ArgumentError: Equations (1), unknowns (3), and initial conditions (3) are of different lengths` even when all 3 ICs provided — requires `check_length=false`
-- **Fix:** Added T ICs (`L_comp.outlet.T => 300.0`, `L_comp.inlet.T => 300.0`) and `check_length=false` keyword to `ODEProblem` constructor
+- **Issue:** Plan wrote `op = [ssys.L_comp.port_in.mdot => 1.0]` with no T ICs. After mtkcompile with `fully_determined=false`, the system has 3 unknowns (mdot + 2 T vars) but only 1 equation. `ODEProblem` raises `ArgumentError: Equations (1), unknowns (3), and initial conditions (3) are of different lengths` even when all 3 ICs provided — requires `check_length=false`
+- **Fix:** Added T ICs (`L_comp.port_out.T => 300.0`, `L_comp.port_in.T => 300.0`) and `check_length=false` keyword to `ODEProblem` constructor
 - **Files modified:** test/runtests.jl
 - **Verification:** ODEProblem constructs successfully; Rodas5P integrates to ReturnCode.Success; RL-decay matches analytical within 2.6e-6 rtol
 - **Committed in:** 6b996df (same commit as fix 1)

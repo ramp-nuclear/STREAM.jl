@@ -13,7 +13,7 @@
 
 **BUG-01: Gravity component fix**
 - Replace `H` (Julia kwarg Float64 baked into equation) with `H_grav` → rename to just `H` as the MTK `@parameters` symbol
-- The equation `inlet.P - outlet.P ~ rho_water(T_in) * 9.80665 * H` should reference the MTK parameter `H`, not the Julia kwarg — so the parameter is modifiable post-compilation via `setp`
+- The equation `port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H` should reference the MTK parameter `H`, not the Julia kwarg — so the parameter is modifiable post-compilation via `setp`
 - Remove `A_grav` entirely from both MTK `@parameters` and constructor kwargs — it was never used in any equation
 - New Gravity constructor signature: `Gravity(; name, H)` (just height)
 - No `D_h` shadowing concern for `H` — it's a plain Float64, not Differential
@@ -26,8 +26,8 @@
 - Verify no test in `runtests.jl` references old parameter names (`L_ch`, `A_ch`, `L_f`, `A_f`) directly
 
 **BUG-02: solve_steady docstring fix**
-- Remove lines referencing `ssys.fr.inlet.mdot => mdot_guess` and `ssys.fr.Re => Re_guess`
-- Replace with correct example using `ssys.ch.inlet.mdot => mdot_guess` (Friction was removed from `build_loop` in commit `2e5ed5c`)
+- Remove lines referencing `ssys.fr.port_in.mdot => mdot_guess` and `ssys.fr.Re => Re_guess`
+- Replace with correct example using `ssys.ch.port_in.mdot => mdot_guess` (Friction was removed from `build_loop` in commit `2e5ed5c`)
 - The `Re` algebraic variable no longer needs to be in `op` since it belongs to the removed Friction component
 
 **Stale TDD file removal**
@@ -76,10 +76,10 @@ function Gravity(; name, H, A_grav)
     ...
     eqs = Equation[
         ...
-        inlet.P - outlet.P ~ rho_water(T_in) * 9.80665 * H,   # BUG: Julia kwarg, not MTK param
+        port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H,   # BUG: Julia kwarg, not MTK param
         ...
     ]
-    compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 ```
 
@@ -122,7 +122,7 @@ pars = @parameters begin
 end
 ```
 
-**Downstream cascade in Channel:** The MTK parameter names `L_ch` and `A_ch` appear only in the `@parameters` declaration — they are NOT referenced by name in the equation body. The Channel equations use the constructor kwarg variables `L`, `A`, `Dh` directly (Julia variables in scope). The equation on line 66: `Re_mean = abs(inlet.mdot) * Dh / (A * mu_water(T[i_mid]))` uses `Dh` and `A` as Julia Float64 locals. The MTK parameter names are only visible for post-compilation symbolic access (e.g., `ssys.ch.L_ch`). Renaming them does NOT affect equation correctness.
+**Downstream cascade in Channel:** The MTK parameter names `L_ch` and `A_ch` appear only in the `@parameters` declaration — they are NOT referenced by name in the equation body. The Channel equations use the constructor kwarg variables `L`, `A`, `Dh` directly (Julia variables in scope). The equation on line 66: `Re_mean = abs(port_in.mdot) * Dh / (A * mu_water(T[i_mid]))` uses `Dh` and `A` as Julia Float64 locals. The MTK parameter names are only visible for post-compilation symbolic access (e.g., `ssys.ch.L_ch`). Renaming them does NOT affect equation correctness.
 
 **Test impact:** No test in `runtests.jl` references `ssys.ch.L_ch`, `ssys.ch.A_ch`. Safe.
 
@@ -154,13 +154,13 @@ end
 
 **Current lines 114-116:**
 ```
-#       Also include ssys.fr.inlet.mdot => mdot_guess and
+#       Also include ssys.fr.port_in.mdot => mdot_guess and
 #       ssys.fr.Re => Re_guess for the algebraic variables.
 ```
 
 **Required replacement:**
 ```
-#       Also include ssys.ch.inlet.mdot => mdot_guess
+#       Also include ssys.ch.port_in.mdot => mdot_guess
 #       for the mass flow algebraic variable.
 ```
 
@@ -290,16 +290,16 @@ function Gravity(; name, H)                  # A_grav removed
     pars = @parameters begin
         H = H                                # MTK param named H (was H_grav)
     end
-    @named inlet  = FlowPort()
-    @named outlet = FlowPort()
-    T_in = instream(inlet.T)
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+    T_in = instream(port_in.T)
     eqs = Equation[
-        inlet.mdot + outlet.mdot ~ 0,
-        inlet.P - outlet.P ~ rho_water(T_in) * 9.80665 * H,  # H is now MTK symbolic
-        outlet.T ~ instream(inlet.T),
-        inlet.T  ~ instream(outlet.T),
+        port_in.mdot + port_out.mdot ~ 0,
+        port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H,  # H is now MTK symbolic
+        port_out.T ~ instream(port_in.T),
+        port_in.T  ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 ```
 
@@ -330,12 +330,12 @@ end
 # op:   Vector{Pair} of symbolic_var => initial_value
 #       Use symbols from ssys (compiled), e.g. ssys.ch.T[1] => 315.0
 #       Build the initial guess using steady_state_guess() for T cells.
-#       Also include ssys.ch.inlet.mdot => mdot_guess
+#       Also include ssys.ch.port_in.mdot => mdot_guess
 #       for the mass flow algebraic variable.
 #
 # Returns SteadyStateSolution. Access results via symbolic indexing:
 #   sol[ssys.ch.T_out]              outlet temperature (K)
-#   sol[ssys.ch.inlet.mdot]       mass flow (kg/s)
+#   sol[ssys.ch.port_in.mdot]       mass flow (kg/s)
 ```
 
 ### Updated COMP-04 test

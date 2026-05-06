@@ -29,7 +29,7 @@
 #     ~20-30s   mdot (ine) drops below threshold (0.01 kg/s). Flapper fires.
 #     +dt_ramp  Flapper fully open (5s ramp). Resistance drops from 1e8 to 100 Pa.s/kg.
 #     ~60-120s  Buoyancy drives reversed upward flow through heated ch. NC establishes.
-#     ~270-300s NC equilibrium: ch.inlet.mdot < 0 (upward), ret.inlet.mdot > 0 (downward).
+#     ~270-300s NC equilibrium: ch.port_in.mdot < 0 (upward), ret.port_in.mdot > 0 (downward).
 
 using STREAM
 using ModelingToolkit
@@ -94,22 +94,22 @@ println("Building steady-state reference loop...")
 )
 
 conns_ref = [
-    connect(pump_ref.outlet, hx_ref.inlet),
-    connect(hx_ref.outlet, ch_ref.inlet),
-    connect(ch_ref.outlet, pump_ref.inlet),
-    pump_ref.inlet.P ~ 1.0e5,
+    connect(pump_ref.port_out, hx_ref.port_in),
+    connect(hx_ref.port_out, ch_ref.port_in),
+    connect(ch_ref.port_out, pump_ref.port_in),
+    pump_ref.port_in.P ~ 1.0e5,
 ]
 @named ref_sys = compose(System(conns_ref, t; name=:ref), pump_ref, hx_ref, ch_ref)
 ref_ssys = mtkcompile(ref_sys)
 
 # Initial guess for SS: linear temperature ramp from T_inlet to T_wall
-op_ref = Pair{Any,Any}[ref_ssys.ch_ref.inlet.mdot => 0.3]
+op_ref = Pair{Any,Any}[ref_ssys.ch_ref.port_in.mdot => 0.3]
 for i in 1:n
     push!(op_ref, ref_ssys.ch_ref.T[i] => T_inlet + i * (T_wall - T_inlet) / n)
 end
 
 ss_sol = solve_steady(ref_ssys, op_ref)
-mdot_ss = ss_sol[ref_ssys.ch_ref.inlet.mdot]
+mdot_ss = ss_sol[ref_ssys.ch_ref.port_in.mdot]
 T_ss = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
 
 println("Steady-state solved:")
@@ -122,9 +122,9 @@ println()
 # SECTION 3: Build bypass system and set initial conditions
 #
 # IC strategy (matches _lof_bypass_ic in test/test_loss_of_flow.jl):
-#   - ine.inlet.mdot = mdot_ss  (total loop flow; Inertia carries this momentum)
-#   - ret.inlet.mdot = mdot_ss  (all flow through ch-ret path; flapper closed at t=0)
-#   - Dt(ret.inlet.mdot) = 0.0  (index-reduced derivative state; zero at quasi-SS)
+#   - ine.port_in.mdot = mdot_ss  (total loop flow; Inertia carries this momentum)
+#   - ret.port_in.mdot = mdot_ss  (all flow through ch-ret path; flapper closed at t=0)
+#   - Dt(ret.port_in.mdot) = 0.0  (index-reduced derivative state; zero at quasi-SS)
 #   - flapper.T_open = 1e30       (sentinel: valve not yet fired; ramp = 0 for all t << 1e30)
 #   - ch.T[i] = T_ss[i]           (channel cells initialized from SS reference)
 #   - ret.T[i] = T_inlet          (return channel starts cold)
@@ -132,7 +132,7 @@ println()
 # Callback strategy:
 #   MTK SymbolicContinuousCallback is incompatible with parallel topologies where
 #   channel inertia (Dt(mdot)) appears in the callback's pressure balance equations.
-#   Instead: native DifferentialEquations ContinuousCallback monitors ine.inlet.mdot,
+#   Instead: native DifferentialEquations ContinuousCallback monitors ine.port_in.mdot,
 #   and directly sets T_open in the ODE state vector when mdot drops below threshold.
 # =============================================================================
 
@@ -154,9 +154,9 @@ ssys = build_loop_lof_bypass(;
 
 Dt = Differential(t)
 op = Pair{Any,Any}[
-    ssys.ine.inlet.mdot => mdot_ss,  # Inertia carries forced-flow momentum
-    ssys.ret.inlet.mdot => mdot_ss,  # return channel flow (flapper closed at t=0)
-    Dt(ssys.ret.inlet.mdot) => 0.0,      # index-reduced state; zero at quasi-SS
+    ssys.ine.port_in.mdot => mdot_ss,  # Inertia carries forced-flow momentum
+    ssys.ret.port_in.mdot => mdot_ss,  # return channel flow (flapper closed at t=0)
+    Dt(ssys.ret.port_in.mdot) => 0.0,      # index-reduced state; zero at quasi-SS
     ssys.flapper.T_open => 1.0e30,   # sentinel: flapper has not fired yet
 ]
 for i in 1:n
@@ -171,7 +171,7 @@ end
 #   affect_neg: downward crossing -> latch T_open = current solver time
 #   nothing: ignore upward crossing
 i_T_open = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
-i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.inlet.mdot)
+i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.port_in.mdot)
 
 cb = ContinuousCallback(
     (u, t_cb, integrator) -> u[i_ine_mdot] - threshold,
@@ -219,10 +219,10 @@ println()
 t_vec = sol.t  # actual solver time points (may include callback-inserted extras)
 
 # Mass flow rates
-mdot_ch = sol[ssys.ch.inlet.mdot, :]
-mdot_ret = sol[ssys.ret.inlet.mdot, :]
-mdot_flap = sol[ssys.flapper.inlet.mdot, :]
-mdot_ine = sol[ssys.ine.inlet.mdot, :]
+mdot_ch = sol[ssys.ch.port_in.mdot, :]
+mdot_ret = sol[ssys.ret.port_in.mdot, :]
+mdot_flap = sol[ssys.flapper.port_in.mdot, :]
+mdot_ine = sol[ssys.ine.port_in.mdot, :]
 
 # Cell temperatures
 T_ch = [sol[ssys.ch.T[i], :] for i in 1:n]   # T_ch[i][time_idx]
@@ -336,7 +336,7 @@ end
 println("Output directories created under: $outdir_base/")
 println()
 
-# Color gradient for n cells: blue (cell 1, inlet side) → red (cell n, outlet side)
+# Color gradient for n cells: blue (cell 1, port_in side) → red (cell n, port_out side)
 colors_cells = range(colorant"navy"; stop=colorant"firebrick", length=n)
 
 # Add vertical event lines to a plot for flapper fire / fully-open events.
@@ -445,7 +445,7 @@ p8b = plot(
     color=:royalblue,
     xlabel="Time [s]",
     ylabel="Mass flow [kg/s]",
-    title="LOF Bypass: ch and ret Mass Flows (0-300s)\n(positive = inlet→outlet, negative = reversed)",
+    title="LOF Bypass: ch and ret Mass Flows (0-300s)\n(positive = port_in→port_out, negative = reversed)",
     size=(1000, 500),
     dpi=150,
 )

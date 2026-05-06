@@ -17,7 +17,7 @@ practical `t` values, keeping the valve closed before the event fires.
 `ref_mdot` has **no equation inside the component**. The user must wire it externally
 during system composition:
 ```julia
-flapper.ref_mdot ~ pump.inlet.mdot
+flapper.ref_mdot ~ pump.port_in.mdot
 ```
 `mtkcompile` will error if this equation is omitted (under-determined system).
 
@@ -31,8 +31,8 @@ resulting `ContinuousCallback` to `solve_transient(...; callbacks=cb)`.
 - `R_open`: open-state hydraulic resistance [Pa*s/kg] (default: 100.0)
 
 # Ports
-- `inlet`: `FlowPort` — inlet (pressure, mass flow, temperature)
-- `outlet`: `FlowPort` — outlet (pressure, mass flow, temperature)
+- `port_in`: `FlowPort` — inlet (pressure, mass flow, temperature)
+- `port_out`: `FlowPort` — outlet (pressure, mass flow, temperature)
 
 # Returns
 Uncompiled `System`. Call `mtkcompile(sys; fully_determined=false)` before solving a
@@ -48,22 +48,22 @@ function Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0)
 
     vars = @variables T_open(t) = 1e30 xi(t) ref_mdot(t)
 
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
+    @named port_in = FlowPort()
+    @named port_out = FlowPort()
 
     D = Differential(t)
 
     eqs = Equation[
-        inlet.mdot + outlet.mdot ~ 0,
+        port_in.mdot + port_out.mdot ~ 0,
         D(T_open) ~ 0,
         xi ~ clamp((t - T_open) / dt, 0.0, 1.0),
-        inlet.P - outlet.P ~ (R_closed + (R_open - R_closed) * (3 * xi^2 - 2 * xi^3)) * inlet.mdot,
-        outlet.T ~ instream(inlet.T),
-        inlet.T ~ instream(outlet.T),
+        port_in.P - port_out.P ~ (R_closed + (R_open - R_closed) * (3 * xi ^ 2 - 2 * xi ^ 3)) * port_in.mdot,
+        port_out.T ~ instream(port_in.T),
+        port_in.T ~ instream(port_out.T),
         # ref_mdot has no equation here — user wires it during composition
     ]
 
-    return compose(System(eqs, t, vars, pars; name=name), inlet, outlet)
+    compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
 end
 
 """
@@ -89,7 +89,7 @@ open once the event fires.
 # Arguments
 - `ssys`: compiled MTK system from `mtkcompile`. Must contain a Flapper subsystem
   accessible as `ssys.flapper`.
-- `monitored_sym`: symbolic state variable to monitor (e.g. `ssys.ine.inlet.mdot`).
+- `monitored_sym`: symbolic state variable to monitor (e.g. `ssys.ine.port_in.mdot`).
   Must be a state variable (present in the ODE state vector). If algebraic (e.g. wired
   to a pump port without inertia), `variable_index` returns `nothing` and the callback
   falls back to `integrator[sym]` — acceptable for purely quasi-static loops where the
@@ -101,8 +101,8 @@ open once the event fires.
 
 # Example
 ```julia
-cb  = flapper_callback(ssys, ssys.ine.inlet.mdot)                      # default threshold
-cb2 = flapper_callback(ssys, ssys.ine.inlet.mdot; threshold=1e-4)      # custom threshold
+cb  = flapper_callback(ssys, ssys.ine.port_in.mdot)                      # default threshold
+cb2 = flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=1e-4)      # custom threshold
 sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 ```
 """

@@ -72,7 +72,7 @@ completed: 2026-03-20
 
 ## Decisions Made
 
-- **Callable pump incompatible with MTK callback compilation:** When a `SymbolicContinuousCallback` is present in the system, `ODEProblem` construction compiles the `affect_neg` effect as a sub-`ImplicitDiscreteProblem`, which requires all parameter values at build time. The callable pump parameter `dP_pump_fn` is not resolvable during this sub-problem construction even when provided in the `op` dict — MTK can't find it before the ODEProblem is fully built. The workaround is `Pump(0.0)` + `Inertia` + initial condition `ine.inlet.mdot = 1.0`, letting the natural RL decay drive mdot below threshold.
+- **Callable pump incompatible with MTK callback compilation:** When a `SymbolicContinuousCallback` is present in the system, `ODEProblem` construction compiles the `affect_neg` effect as a sub-`ImplicitDiscreteProblem`, which requires all parameter values at build time. The callable pump parameter `dP_pump_fn` is not resolvable during this sub-problem construction even when provided in the `op` dict — MTK can't find it before the ODEProblem is fully built. The workaround is `Pump(0.0)` + `Inertia` + initial condition `ine.port_in.mdot = 1.0`, letting the natural RL decay drive mdot below threshold.
 
 - **threshold=1e-6 for FLAP-05:** With default `threshold=0.01` kg/s and `Pump(1e5)+Resistor(1e5)+Flapper(R_closed=1e8)`, the steady-state mdot is ~1e-3 kg/s (below the default threshold). The test depends on the fact that the continuous event only fires on a downward crossing — if the system starts at mdot=0 and rises to a value already below threshold, no crossing occurs. This is fragile. Using `threshold=1e-6` eliminates ambiguity: mdot is always well above threshold and T_open definitively stays at 1e30.
 

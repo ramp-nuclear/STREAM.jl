@@ -80,10 +80,10 @@
 - ODEProblem construction for pure pressure circuits (Inertia + Resistor loop) required two non-obvious flags (`fully_determined=false`, `check_length=false`) — the plan predicted one but not both
 
 ### Patterns Established
-- **Reversed-port wiring for descending components**: For any component where `inlet.P > outlet.P` (high-pressure entry), connect the physically-bottom-end to inlet regardless of flow direction
-- **Multi-branch junction**: `connect(a, b, c, ...)` generates Kirchhoff automatically; always add a pressure anchor (`pump.inlet.P ~ 1.0e5`) to fix absolute pressure level
+- **Reversed-port wiring for descending components**: For any component where `port_in.P > port_out.P` (high-pressure entry), connect the physically-bottom-end to port_in regardless of flow direction
+- **Multi-branch junction**: `connect(a, b, c, ...)` generates Kirchhoff automatically; always add a pressure anchor (`pump.port_in.P ~ 1.0e5`) to fix absolute pressure level
 - **Shared equation helper pattern**: Extract `_foo_base_eqs(eqs, ...; kwargs)` that mutates `eqs` in-place before variant-specific coupling loop
-- **ODE component with auto-promoted state**: Use `vars = []` and let MTK promote the `Dt(inlet.mdot)` variable; don't declare an explicit `mdot(t)` state
+- **ODE component with auto-promoted state**: Use `vars = []` and let MTK promote the `Dt(port_in.mdot)` variable; don't declare an explicit `mdot(t)` state
 
 ### Key Lessons
 1. **Pin port wiring conventions explicitly in the plan** — "MTK will figure it out" is never safe for port direction; write out which end connects where
@@ -234,7 +234,7 @@
 **Phases:** 8 (20-26 incl. 24.1) | **Plans:** 14
 
 ### What Was Built
-- Sign-safe channel energy loops: ifelse() upwinding selects upstream temperature by mdot sign; abs(mdot) in Re; inlet.T ~ T[1] stream equation corrected in all three channel variants
+- Sign-safe channel energy loops: ifelse() upwinding selects upstream temperature by mdot sign; abs(mdot) in Re; port_in.T ~ T[1] stream equation corrected in all three channel variants
 - `beta_water(T)` thermal expansion coefficient (@register_symbolic), `Gr`/`Ra` dimensionless utilities, 4-arg HTC interface `(Re, Pr, T_bulk, T_wall)` extended to all correlations and channel call sites
 - `elenbaas_nusselt(Ra, b, L)` Elenbaas 1942 natural convection correlation + `elenbaas_htc(; b, L, Dh, g)` pluggable factory; validated against Python STREAM MTR reference
 - Three-method Pump dispatch: `Pump(dP_pump::Real)`, `Pump(mdot0::Real)`, `Pump(dP_pump::Any)` for callable; `solve_transient` redesigned to positional API `(ssys, op, t; ...)`
@@ -252,7 +252,7 @@
 
 ### What Was Inefficient
 - Series-loop LOF topology was built in Phase 24, found insufficient, and replaced by Phase 24.1 — the physical bypass requirement should have been identified during planning
-- Channel momentum inertia `(L/A)*Dt(inlet.mdot)` was added in Phase 24.1-01 and reverted in Phase 24.1-02 after discovering it breaks parallel topologies — cost one plan of rework
+- Channel momentum inertia `(L/A)*Dt(port_in.mdot)` was added in Phase 24.1-01 and reverted in Phase 24.1-02 after discovering it breaks parallel topologies — cost one plan of rework
 - Phase 22 VALIDATION.md left as Nyquist non-compliant (tech debt in audit) — should have been closed at phase completion
 
 ### Patterns Established

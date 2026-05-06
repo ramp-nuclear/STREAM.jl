@@ -20,7 +20,7 @@ Implement four standalone MTK components (Channel, Pump, Friction, Gravity) that
 - **Reason for indirection:** When a heated plate with z/x-axis heat generation is added later, the refactor changes only port topology (1 port → n ports, `q_wall[i] = thermal_ports[i].Q_flow`). The energy balance equations are untouched.
 
 ### Channel temperature advection
-- Use `inStream(inlet.T)` for the inlet temperature (cell 1's upstream boundary)
+- Use `inStream(port_in.T)` for the inlet temperature (cell 1's upstream boundary)
 - Cell-to-cell: `T_in[i] = T[i-1]` for cells 2..n (direct variable reference, first-order upwind)
 - Same first-order upwind finite-volume discretization as Python STREAM's `coolant_first_order_upwind_dTdt`
 - MTK computes the Jacobian symbolically; physics and discretization scheme are identical to Python STREAM

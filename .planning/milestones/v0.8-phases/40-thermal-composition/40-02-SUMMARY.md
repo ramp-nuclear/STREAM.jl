@@ -61,7 +61,7 @@ completed: 2026-04-03
 
 - `detectThermalTopology` function classifies canvas thermal edges into symmetric_plate, plate, one_sided_connection, or unknown assembly types
 - Code generator emits correct STREAM.jl composition helper calls matching `src/composition/helpers.jl` signatures
-- Hydraulic `connect()` calls use dotted assembly paths (`assembly_1.cac_1.inlet`) when CAC is consumed by a thermal assembly
+- Hydraulic `connect()` calls use dotted assembly paths (`assembly_1.cac_1.port_in`) when CAC is consumed by a thermal assembly
 - `compose_systems()` replaces `ODESystem()` as the top-level system builder when thermal assemblies exist
 - nz/n parameter mismatch emits `# NOTE` warning comment
 - Unknown thermal topologies emit `# TODO: verify thermal wiring` fallback comment

@@ -35,7 +35,7 @@ re_verification: false
 | Artifact            | Expected                                                          | Status     | Details                                                                   |
 |---------------------|-------------------------------------------------------------------|------------|---------------------------------------------------------------------------|
 | `src/components.jl` | `_channel_base_eqs` helper                                        | VERIFIED   | Lines 204-231; contains required per-cell v/Re/Nu/h_tc, dP, port wiring  |
-| `src/components.jl` | ChannelAndContacts with `thermal_ports...` splat in compose()     | VERIFIED   | Line 302: `compose(..., inlet, outlet, thermal_ports...)`             |
+| `src/components.jl` | ChannelAndContacts with `thermal_ports...` splat in compose()     | VERIFIED   | Line 302: `compose(..., port_in, port_out, thermal_ports...)`             |
 | `src/components.jl` | `Q_wall_total` observable in ChannelAndContacts                   | VERIFIED   | Lines 268, 296, 299                                                       |
 | `src/STREAM.jl`     | ChannelAndContacts, ChannelHeatFlux exported                      | VERIFIED   | Line 14: full export line confirmed                                       |
 | `test/runtests.jl`  | Phase 9 testset with THERM-01, THERM-02, THERM-03 sub-testsets   | VERIFIED   | Lines 472-545: all 5 sub-testsets present                                 |

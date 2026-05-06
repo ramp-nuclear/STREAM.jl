@@ -42,13 +42,13 @@ key-files:
 key-decisions:
   - "TempBC helper component breaks circular instream() T dependency in closed loop — not a structural change to existing components"
   - "ch.thermal.T ~ T_wall only (no Q_flow constraint) — setting both ThermalPort vars overspecifies"
-  - "ch.inlet.T ~ T_inlet additional constraint resolves residual circular T dependency after TempBC"
+  - "ch.port_in.T ~ T_inlet additional constraint resolves residual circular T dependency after TempBC"
   - "KINSOL default (no LineSearch) with physics-based mdot guess (~0.490 kg/s) converges reliably"
   - "warn_initialize_determined=false suppresses MTK overdetermined init warning (22 eqs for 1 unknown)"
-  - "solve_steady op dict requires all compiled unknowns: ch.T[1..n] + fr.inlet.mdot + fr.Re"
+  - "solve_steady op dict requires all compiled unknowns: ch.T[1..n] + fr.port_in.mdot + fr.Re"
 
 patterns-established:
-  - "TempBC pattern: create inline FlowPort component that sets outlet.T ~ T_bc to inject T_inlet into stream"
+  - "TempBC pattern: create inline FlowPort component that sets port_out.T ~ T_bc to inject T_inlet into stream"
   - "Physics-based mdot estimate for initial guess: ~0.490 kg/s for 30 kPa pump, D=0.01m, L=0.9m total"
   - "Re initial guess = mdot * D / (A * mu_water(T_inlet)) matches definition, gives Re residual = 0 at u0"
 
@@ -92,11 +92,11 @@ completed: 2026-03-12
 
 ## Decisions Made
 
-1. **TempBC component for T_inlet injection**: MTK's `instream()` function resolves to the connected port's stream T variable, which in a fully closed loop gives `fr.outlet.T = ch.T[n]` — creating a circular thermal dependency and a trivial T=T_wall equilibrium. Fix: a TempBC component in the loop (`Pump → TempBC → Friction → Channel`) sets `outlet.T ~ T_inlet` as a stream variable, correctly injecting T_inlet into the channel's first-cell energy balance.
+1. **TempBC component for T_inlet injection**: MTK's `instream()` function resolves to the connected port's stream T variable, which in a fully closed loop gives `fr.port_out.T = ch.T[n]` — creating a circular thermal dependency and a trivial T=T_wall equilibrium. Fix: a TempBC component in the loop (`Pump → TempBC → Friction → Channel`) sets `port_out.T ~ T_inlet` as a stream variable, correctly injecting T_inlet into the channel's first-cell energy balance.
 
 2. **Only ch.thermal.T ~ T_wall (no Q_flow)**: Setting both ThermalPort variables (`ch.thermal.T ~ T_wall` AND `ch.thermal.Q_flow ~ Q_wall`) overspecifies the ThermalPort (Q_flow is a Flow variable with sum-to-zero semantics). Correct approach: pin only `ch.thermal.T ~ T_wall`, letting Q_flow be determined by HTC × area × ΔT.
 
-3. **ch.inlet.T ~ T_inlet additional constraint**: Even with TempBC, the closed-loop stream variable resolution leaves a residual underdetermined T variable. Adding `ch.inlet.T ~ T_inlet` in the connections resolves this without conflict.
+3. **ch.port_in.T ~ T_inlet additional constraint**: Even with TempBC, the closed-loop stream variable resolution leaves a residual underdetermined T variable. Adding `ch.port_in.T ~ T_inlet` in the connections resolves this without conflict.
 
 4. **warn_initialize_determined=false**: The MTK initialization system sees ~22 equations for 1 algebraic unknown (mdot) because all connector default initial values become initialization equations. Suppressing the warning and letting MTK use least-squares initialization works correctly.
 
@@ -109,7 +109,7 @@ completed: 2026-03-12
 **1. [Rule 1 - Bug] Fixed circular instream() thermal dependency requiring TempBC component**
 - **Found during:** Task 1 (build_loop implementation)
 - **Issue:** The plan specified `ch.thermal.Q_flow ~ Q_wall` and `ch.thermal.T ~ T_wall` as both connection constraints, which overspecifies the ThermalPort. Additionally, the `instream()` semantics in the Channel's energy balance resolve inlet temperature to `ch.T[n]` in a closed loop, creating a trivial T=T_wall equilibrium as the only steady-state solution.
-- **Fix:** (a) Use only `ch.thermal.T ~ T_wall` (drop Q_flow constraint); (b) Add TempBC inline component that injects T_inlet as a proper stream variable; (c) Add `ch.inlet.T ~ T_inlet` to resolve residual T circular dependency.
+- **Fix:** (a) Use only `ch.thermal.T ~ T_wall` (drop Q_flow constraint); (b) Add TempBC inline component that injects T_inlet as a proper stream variable; (c) Add `ch.port_in.T ~ T_inlet` to resolve residual T circular dependency.
 - **Files modified:** src/solvers.jl
 - **Verification:** build_loop() compiles (12 eq, 12 unknowns), solve_steady returns T_outlet=326.1 K (physically reasonable), residuals at solution < 1e-8
 - **Committed in:** `4443798` (Task 1 commit)

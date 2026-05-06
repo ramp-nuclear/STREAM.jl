@@ -24,7 +24,7 @@ tech-stack:
   added: []
   patterns:
     - "_channel_base_eqs helper: shared equation mutation function for channel variants"
-    - "compose(sys, inlet, outlet, thermal_ports...) splat for per-cell ThermalPort arrays"
+    - "compose(sys, port_in, port_out, thermal_ports...) splat for per-cell ThermalPort arrays"
     - "g_acc=g concrete Float64 in _channel_base_eqs call (avoids pars indexing complexity)"
 
 key-files:

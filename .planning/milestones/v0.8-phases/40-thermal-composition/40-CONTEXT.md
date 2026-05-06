@@ -43,13 +43,13 @@ Phase 41 (next sequential phase) will add the layered canvas (hydraulic/thermal 
 
   # Full system
   eqs = [
-      connect(pump_1.outlet, assembly.cac_1.inlet),
-      pump_1.inlet.P ~ 1.0e5,
+      connect(pump_1.port_out, assembly.cac_1.port_in),
+      pump_1.port_in.P ~ 1.0e5,
   ]
   @named sys = compose_systems(assembly; connections=eqs, name=:sys)
   ssys = mtkcompile(sys)
   ```
-  Hydraulic FlowPort `connect()` calls that reference the CAC (which is now a subsystem of `assembly`) use the `assembly.cac_1.inlet` path.
+  Hydraulic FlowPort `connect()` calls that reference the CAC (which is now a subsystem of `assembly`) use the `assembly.cac_1.port_in` path.
 - **D-09:** If no thermal edges exist in the canvas, the code generator falls back to the Phase 36 format: `ODESystem(eqs, t; systems=[...])`. The helper-based format is only emitted when thermal topology is detected.
 - **D-10:** If the thermal wiring doesn't match any known helper pattern (partial/ambiguous connections), emit raw `connect(port(...))` calls with a `# TODO: verify thermal wiring` comment, and do NOT emit a helper call.
 

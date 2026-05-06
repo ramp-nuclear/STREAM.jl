@@ -173,7 +173,7 @@ When thermal edges exist on the canvas, the code preview shows:
 
 1. A `# Thermal assembly (auto-detected: {pattern})` comment before each helper call
 2. `@named assembly_N = {helper}(args...)` declaration
-3. Hydraulic `connect()` calls using dotted assembly paths: `assembly_1.cac_1.inlet`
+3. Hydraulic `connect()` calls using dotted assembly paths: `assembly_1.cac_1.port_in`
 4. `compose_systems(assembly_1, ...; connections=eqs, name=:sys)` instead of `ODESystem`
 
 When no thermal edges exist, the code preview is unchanged from Phase 36 format.

@@ -47,7 +47,7 @@ human_verification:
 | `gui/src/components/Toolbar.tsx` | Code toggle + Export buttons (min 20 lines) | VERIFIED | 57 lines; Code2, Download icons, save(), writeTextFile |
 | `gui/src/components/BottomPanel.tsx` | Collapsible panel with Code/BCs tabs (min 30 lines) | VERIFIED | 31 lines; Tabs with code and bcs TabsTrigger |
 | `gui/src/components/CodePreview.tsx` | Read-only code display (min 15 lines) | VERIFIED | 24 lines; useMemo calling generateCode, font-mono text-[13px] |
-| `gui/src/components/BCPanel.tsx` | BC add form + BC list (min 40 lines) | VERIFIED | 128 lines; addBC/removeBC; inlet.P and outlet.P options |
+| `gui/src/components/BCPanel.tsx` | BC add form + BC list (min 40 lines) | VERIFIED | 128 lines; addBC/removeBC; port_in.P and port_out.P options |
 | `gui/src/components/BCRow.tsx` | Single BC row with delete (min 10 lines) | VERIFIED | 24 lines; aria-label="Remove boundary condition" |
 
 ---
@@ -83,8 +83,8 @@ human_verification:
 | Pump fixed-dP emits positional `Pump(30000.0)` | vitest unit test | Matched exactly | PASS |
 | Pump fixed-mdot emits keyword-only `Pump(; mdot0=0.5)` | vitest unit test | Matched exactly | PASS |
 | Channel defaults omitted from output | vitest unit test | Only n= and geometry= emitted | PASS |
-| connect() uses sourceHandle/targetHandle | vitest unit test | `connect(pump_1.outlet, ch_1.inlet)` | PASS |
-| BC emitted as equation | vitest unit test | `pump_1.inlet.P ~ 100000.0` | PASS |
+| connect() uses sourceHandle/targetHandle | vitest unit test | `connect(pump_1.port_out, ch_1.port_in)` | PASS |
+| BC emitted as equation | vitest unit test | `pump_1.port_in.P ~ 100000.0` | PASS |
 | Invalid identifier warns | vitest unit test | Warning comment prepended | PASS |
 | All 22 unit tests pass | `npx vitest run src/lib/codeGenerator.test.ts` | 22 passed | PASS |
 | Full test suite unbroken | `npx vitest run` | 99 passed, 0 failed | PASS |
@@ -123,7 +123,7 @@ No blockers found. No TODO/FIXME/placeholder comments. No empty implementations 
 
 ### 1. End-to-End Code Generation Feature
 
-**Test:** Run `cd gui && npm run tauri dev`. With an empty canvas: click Code button, verify bottom panel opens with placeholder text, verify Export is disabled. Add a Pump and Channel, connect them, verify code preview updates. Switch to BCs tab, add `pump_1.inlet.P ~ 1.0e5`, verify BC appears in Code tab. Click Export, choose a save path, verify the .jl file matches the preview.
+**Test:** Run `cd gui && npm run tauri dev`. With an empty canvas: click Code button, verify bottom panel opens with placeholder text, verify Export is disabled. Add a Pump and Channel, connect them, verify code preview updates. Switch to BCs tab, add `pump_1.port_in.P ~ 1.0e5`, verify BC appears in Code tab. Click Export, choose a save path, verify the .jl file matches the preview.
 
 **Expected:** All 7 UAT test scenarios from Plan 03 pass (documented as passing in 36-03-SUMMARY.md after the export bug fix).
 

@@ -32,7 +32,7 @@ key-decisions:
 
 patterns-established:
   - "dp[i] = friction + gravity only (no inertia); inertia handled by standalone Inertia component"
-  - "P[i] observed via cumulative sum of dp symbols: inlet.P - sum(dp[j] for j in 1:i)"
+  - "P[i] observed via cumulative sum of dp symbols: port_in.P - sum(dp[j] for j in 1:i)"
 
 requirements-completed: [PRES-01, PRES-02, PRES-04]
 
@@ -73,7 +73,7 @@ Each task was committed atomically:
 - `test/test_channel.jl` - PRES-01 (dP==sum(dp)), PRES-02 (P[i] monotonic), PRES-04 (T_sat/T_ONB)
 
 ## Decisions Made
-- Removed Dt(inlet.mdot) inertia term from per-cell dp[i] equations. With n per-cell equations each containing Dt(mdot), mtkcompile promoted the derivative to a free state variable in observed_mode (ChannelAndContacts), producing all-NaN solutions. Since the project already decided standalone Inertia handles momentum, this is consistent.
+- Removed Dt(port_in.mdot) inertia term from per-cell dp[i] equations. With n per-cell equations each containing Dt(mdot), mtkcompile promoted the derivative to a free state variable in observed_mode (ChannelAndContacts), producing all-NaN solutions. Since the project already decided standalone Inertia handles momentum, this is consistent.
 - Kept dp[i] as solver unknown (in all_vars, with equations in eqs) rather than observed. When dp[i] was observed in ChannelAndContacts, mtkcompile could not resolve the observed-to-observed chain involving dp and P[i].
 
 ## Deviations from Plan
@@ -82,8 +82,8 @@ Each task was committed atomically:
 
 **1. [Rule 1 - Bug] Removed Dt(mdot) from per-cell dp[i] equations**
 - **Found during:** Task 1/2 (dp[i] refactor)
-- **Issue:** Per-cell dp[i] with Dt(inlet.mdot) caused mtkcompile to promote the derivative as a free state variable when dp[i] was torn (algebraically eliminated). This produced NaN for all state variables in ChannelAndContacts.
-- **Fix:** Removed `(dz/A)*Dt(inlet.mdot)` from dp[i] equations in Channel, _channel_base_eqs. Momentum inertia is handled by standalone Inertia component (consistent with project decision).
+- **Issue:** Per-cell dp[i] with Dt(port_in.mdot) caused mtkcompile to promote the derivative as a free state variable when dp[i] was torn (algebraically eliminated). This produced NaN for all state variables in ChannelAndContacts.
+- **Fix:** Removed `(dz/A)*Dt(port_in.mdot)` from dp[i] equations in Channel, _channel_base_eqs. Momentum inertia is handled by standalone Inertia component (consistent with project decision).
 - **Files modified:** src/components/channel.jl
 - **Verification:** All channel tests pass; ChannelAndContacts produces finite dp/P/T_sat/T_ONB values
 - **Committed in:** 4c56220

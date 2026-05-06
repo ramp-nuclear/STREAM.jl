@@ -34,12 +34,12 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
 - `T_wall_right::AbstractVector` — right face wall temperature per cell [K]
 - `T_sat::AbstractVector`      — saturation temperature per cell [K]
 - `T_ONB::AbstractVector`      — onset of nucleate boiling temperature per cell [K]
-- `T_inlet::Float64`           — inlet temperature from `inlet.T` [K]
+- `T_inlet::Float64`           — inlet temperature from `port_in.T` [K]
 - `P::AbstractVector`          — absolute pressure per cell [Pa]
 - `q_flux::AbstractVector`     — conservative heat flux: `max(q_flux_left, q_flux_right)` per cell [W/m²]
 - `q_flux_left::AbstractVector`  — left face heat flux per cell [W/m²]
 - `q_flux_right::AbstractVector` — right face heat flux per cell [W/m²]
-- `mdot::Float64`              — mass flow rate from `inlet.mdot` [kg/s]
+- `mdot::Float64`              — mass flow rate from `port_in.mdot` [kg/s]
 - `velocity::AbstractVector`   — absolute fluid velocity per cell [m/s]
 - `pipe::Union{PipeGeometry, Nothing}` — channel geometry, or `nothing` if unavailable
 - `gravity::Float64`           — gravitational acceleration [m/s²]
@@ -103,8 +103,8 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         qwl_arr = hcat([sol[channel_sys.q_wall_left[i], :] for i in 1:n]...)'
         qwr_arr = hcat([sol[channel_sys.q_wall_right[i], :] for i in 1:n]...)'
         # Scalar fields: use first time point
-        T_inlet_val = sol[channel_sys.inlet.T, 1]
-        mdot_val = sol[channel_sys.inlet.mdot, 1]
+        T_inlet_val = sol[channel_sys.port_in.T, 1]
+        mdot_val = sol[channel_sys.port_in.mdot, 1]
     else
         # Steady state: scalar per cell
         T_bulk = [sol[channel_sys.T[i]] for i in 1:n]
@@ -116,8 +116,8 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         vel_arr = [sol[channel_sys.velocity[i]] for i in 1:n]
         qwl_arr = [sol[channel_sys.q_wall_left[i]] for i in 1:n]
         qwr_arr = [sol[channel_sys.q_wall_right[i]] for i in 1:n]
-        T_inlet_val = sol[channel_sys.inlet.T]
-        mdot_val = sol[channel_sys.inlet.mdot]
+        T_inlet_val = sol[channel_sys.port_in.T]
+        mdot_val = sol[channel_sys.port_in.mdot]
     end
     #! format: on
 

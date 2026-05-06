@@ -61,7 +61,7 @@ quasi-steady regime (VAL-02).
 
 - The topology has two parallel branches sharing inlet and outlet nodes — use `connect()` for the junction points exactly as the Cube network does, no Junction component needed.
 - The Flapper bypass `Gravity` component models the return height of the natural circulation path. When the Flapper opens, buoyancy (density difference between hot and ambient) drives flow through this path and reverses flow through the Channel.
-- For the energy balance assertion: extract `sol[ssys.ch.inlet.mdot, i]`, `sol[ssys.ch.T_out, i]`, `sol[ssys.ch.T_in, i]` at each checkpoint. Compute `Q_meas = mdot * cp_water(T_in) * (T_out - T_in)`. Assert `|Q_meas - Q_wall| / Q_wall < 0.05`.
+- For the energy balance assertion: extract `sol[ssys.ch.port_in.mdot, i]`, `sol[ssys.ch.T_out, i]`, `sol[ssys.ch.T_in, i]` at each checkpoint. Compute `Q_meas = mdot * cp_water(T_in) * (T_out - T_in)`. Assert `|Q_meas - Q_wall| / Q_wall < 0.05`.
 - During the downward forced-flow phase `T_out < T_in` (outlet is axially downstream = bottom, cooler entry at top). After reversal, `T_out > T_in`. The energy balance sign should be taken as `|mdot| * cp * |T_out - T_in|` to stay positive throughout.
 
 </specifics>
@@ -79,7 +79,7 @@ No external specs — requirements are fully captured in decisions above and REQ
 - `src/examples.jl` §build_loop_vertical — reference for gravity wiring pattern (Channel g_acc + Gravity on return); `build_loop_lof()` goes in this same file
 - `test/test_flapper.jl` §FLAP-06 — canonical pattern for Pump(0.0)+Inertia IC coastdown and solve_steady IC extraction with Flapper present
 - `src/components/misc.jl` — Inertia, HeatExchanger components
-- `src/components/resistors.jl` — Gravity component; port orientation convention (inlet at bottom, outlet at top)
+- `src/components/resistors.jl` — Gravity component; port orientation convention (port_in at bottom, port_out at top)
 
 ### MTK event compatibility note
 - Phase 23 CONTEXT.md §SOLV-01 and FLAP-06 note: callable Pump parameters are incompatible with SymbolicContinuousCallback in the same ODEProblem. Pump(0.0) scalar is the required pattern when Flapper is present.
@@ -90,17 +90,17 @@ No external specs — requirements are fully captured in decisions above and REQ
 ## Existing Code Insights
 
 ### Reusable Assets
-- `Flapper` (`src/components/flapper.jl`): Drop-in component; wire `flapper.ref_mdot ~ inertia.inlet.mdot` during composition
-- `Inertia` (`src/components/misc.jl`): `L_over_A` parameter; `D(inlet.mdot)` gives coastdown dynamics
+- `Flapper` (`src/components/flapper.jl`): Drop-in component; wire `flapper.ref_mdot ~ inertia.port_in.mdot` during composition
+- `Inertia` (`src/components/misc.jl`): `L_over_A` parameter; `D(port_in.mdot)` gives coastdown dynamics
 - `ChannelHeatFlux` (`src/components/thermal_channel.jl`): `Q_wall` parameter, `g_acc` parameter for vertical orientation; sign of `g_acc` controls upward vs downward pressure head
-- `Gravity` (`src/components/resistors.jl`): `H` parameter; `inlet.P - outlet.P ~ rho*g*H`; inlet = high-pressure (bottom) end
+- `Gravity` (`src/components/resistors.jl`): `H` parameter; `port_in.P - port_out.P ~ rho*g*H`; port_in = high-pressure (bottom) end
 - `HeatExchanger` (`src/components/misc.jl`): temperature BC reset at pump outlet (same role as in `build_loop_vertical`)
 - `solve_steady` (`src/solvers.jl`): KINSOL-based; safe to use on system with Flapper (events ignored)
 - `solve_transient` (`src/solvers.jl`): `callbacks` kwarg pre-wired; `initializealg=NoInit()` handles Flapper IC
 
 ### Established Patterns
 - `build_loop_vertical` (`src/examples.jl`): canonical gravity wiring reference; `build_loop_lof()` extends this with a second branch
-- Pressure anchor: `pump.inlet.P ~ 1e5` — required in any multi-branch network
+- Pressure anchor: `pump.port_in.P ~ 1e5` — required in any multi-branch network
 - Temperature anchor for hydraulics-only closed loops: two `T` pins needed (from Phase 22 experience with RL-decay loops)
 - `Pair{Any,Any}` op vector when mixing Float64 state ICs — required when Inertia IC is set alongside T-field ICs
 

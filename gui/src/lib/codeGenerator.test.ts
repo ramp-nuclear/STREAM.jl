@@ -15,8 +15,8 @@ const pumpDef: ComponentDefinition = {
   category: "Hydraulic",
   description: "Pump",
   ports: [
-    { name: "inlet", type: "FlowPort", side: "left" },
-    { name: "outlet", type: "FlowPort", side: "right" },
+    { name: "port_in", type: "FlowPort", side: "left" },
+    { name: "port_out", type: "FlowPort", side: "right" },
   ],
   parameters: [
     {
@@ -116,8 +116,8 @@ const channelDef: ComponentDefinition = {
   category: "Hydraulic",
   description: "Channel",
   ports: [
-    { name: "inlet", type: "FlowPort", side: "left" },
-    { name: "outlet", type: "FlowPort", side: "right" },
+    { name: "port_in", type: "FlowPort", side: "left" },
+    { name: "port_out", type: "FlowPort", side: "right" },
     { name: "thermal", type: "ThermalPort", side: "top" },
   ],
   parameters: [
@@ -141,8 +141,8 @@ const heatExDef: ComponentDefinition = {
   category: "Hydraulic",
   description: "HeatExchanger",
   ports: [
-    { name: "inlet", type: "FlowPort", side: "left" },
-    { name: "outlet", type: "FlowPort", side: "right" },
+    { name: "port_in", type: "FlowPort", side: "left" },
+    { name: "port_out", type: "FlowPort", side: "right" },
   ],
   parameters: [
     { name: "T_bc", type: "Real", unit: "K", description: "BC temp", required: true, positional: true },
@@ -158,8 +158,8 @@ const gravityDef: ComponentDefinition = {
   category: "Hydraulic",
   description: "Gravity",
   ports: [
-    { name: "inlet", type: "FlowPort", side: "left" },
-    { name: "outlet", type: "FlowPort", side: "right" },
+    { name: "port_in", type: "FlowPort", side: "left" },
+    { name: "port_out", type: "FlowPort", side: "right" },
   ],
   parameters: [
     { name: "H", type: "Real", unit: "m", description: "Height", required: true, positional: true },
@@ -175,8 +175,8 @@ const resistorDef: ComponentDefinition = {
   category: "Hydraulic",
   description: "Resistor",
   ports: [
-    { name: "inlet", type: "FlowPort", side: "left" },
-    { name: "outlet", type: "FlowPort", side: "right" },
+    { name: "port_in", type: "FlowPort", side: "left" },
+    { name: "port_out", type: "FlowPort", side: "right" },
   ],
   parameters: [
     { name: "R", type: "Real", unit: "Pa/(kg/s)", description: "Resistance", required: true, positional: true },
@@ -192,8 +192,8 @@ const cacDef: ComponentDefinition = {
   category: "Hydraulic",
   description: "CAC",
   ports: [
-    { name: "inlet", type: "FlowPort", side: "left" },
-    { name: "outlet", type: "FlowPort", side: "right" },
+    { name: "port_in", type: "FlowPort", side: "left" },
+    { name: "port_out", type: "FlowPort", side: "right" },
     { name: "thermal_left", type: "ThermalPort", side: "top", array: true, arrayParam: "n" },
     { name: "thermal_right", type: "ThermalPort", side: "bottom", array: true, arrayParam: "n" },
   ],
@@ -421,23 +421,23 @@ describe("generateCode", () => {
         makeNode("a", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
         makeNode("b", "Channel", "ch_1", { n: 5, geometry: { type: "rectangular", L: 0.5, W: 0.01, H: 0.003 } }),
       ];
-      const edges = [makeEdge("e1", "a", "outlet", "b", "inlet")];
+      const edges = [makeEdge("e1", "a", "port_out", "b", "port_in")];
       const code = generateCode(nodes, edges, [], mockGetComponent);
-      expect(code).toContain("connect(pump_1.outlet, ch_1.inlet)");
+      expect(code).toContain("connect(pump_1.port_out, ch_1.port_in)");
     });
   });
 
   describe("boundary conditions", () => {
     it("emits BC as equation", () => {
       const nodes = [makeNode("abc", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP")];
-      const bcs: BCEntry[] = [{ nodeId: "abc", portField: "inlet.P", value: 100000 }];
+      const bcs: BCEntry[] = [{ nodeId: "abc", portField: "port_in.P", value: 100000 }];
       const code = generateCode(nodes, [], bcs, mockGetComponent);
-      expect(code).toMatch(/pump_1\.inlet\.P\s*~\s*1(\.0)?e5|100000\.0/);
+      expect(code).toMatch(/pump_1\.port_in\.P\s*~\s*1(\.0)?e5|100000\.0/);
     });
 
     it("skips BC for deleted node", () => {
       const nodes = [makeNode("abc", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP")];
-      const bcs: BCEntry[] = [{ nodeId: "deleted_id", portField: "inlet.P", value: 100000 }];
+      const bcs: BCEntry[] = [{ nodeId: "deleted_id", portField: "port_in.P", value: 100000 }];
       const code = generateCode(nodes, [], bcs, mockGetComponent);
       // Should not contain a BC line for deleted_id
       expect(code).not.toContain("deleted_id");
@@ -459,7 +459,7 @@ describe("generateCode", () => {
         makeNode("a", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
         makeNode("b", "Channel", "ch_1", { n: 5, geometry: { type: "rectangular", L: 0.5, W: 0.01, H: 0.003 } }),
       ];
-      const edges = [makeEdge("e1", "a", "outlet", "b", "inlet")];
+      const edges = [makeEdge("e1", "a", "port_out", "b", "port_in")];
       const code = generateCode(nodes, edges, [], mockGetComponent);
 
       expect(code).toContain("using ModelingToolkit, STREAM");
@@ -533,7 +533,7 @@ describe("generateCode", () => {
         makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
         makeNode("c", "ChannelAndContacts", "cac_1", cacParams),
       ];
-      const edges = [makeEdge("e1", "p", "outlet", "c", "inlet")];
+      const edges = [makeEdge("e1", "p", "port_out", "c", "port_in")];
       const code = generateCode(nodes, edges, [], mockGetComponent);
       expect(code).toContain("ODESystem(eqs, t;");
       expect(code).not.toContain("compose_systems");
@@ -548,8 +548,8 @@ describe("generateCode", () => {
       ];
       // CAC.thermal_right -> HD.thermal_left AND CAC.thermal_left -> HD.thermal_right
       const edges = [
-        makeEdge("e1", "p", "outlet", "c", "inlet"),
-        makeEdge("e2", "c", "outlet", "p", "inlet"),
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
       ];
@@ -568,9 +568,9 @@ describe("generateCode", () => {
       ];
       // cac_left.thermal_right -> HD.thermal_left, cac_right.thermal_left -> HD.thermal_right
       const edges = [
-        makeEdge("e1", "p", "outlet", "c1", "inlet"),
-        makeEdge("e2", "c1", "outlet", "c2", "inlet"),
-        makeEdge("e3", "c2", "outlet", "p", "inlet"),
+        makeEdge("e1", "p", "port_out", "c1", "port_in"),
+        makeEdge("e2", "c1", "port_out", "c2", "port_in"),
+        makeEdge("e3", "c2", "port_out", "p", "port_in"),
         makeEdge("t1", "c1", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c2", "thermal_left", "h", "thermal_right"),
       ];
@@ -586,8 +586,8 @@ describe("generateCode", () => {
         makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
       ];
       const edges = [
-        makeEdge("e1", "p", "outlet", "c", "inlet"),
-        makeEdge("e2", "c", "outlet", "p", "inlet"),
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
         makeEdge("t1", "c", "thermal_left", "h", "thermal_right"),
       ];
       const code = generateCode(nodes, edges, [], mockGetComponent);
@@ -602,8 +602,8 @@ describe("generateCode", () => {
         makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
       ];
       const edges = [
-        makeEdge("e1", "p", "outlet", "c", "inlet"),
-        makeEdge("e2", "c", "outlet", "p", "inlet"),
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
       ];
       const code = generateCode(nodes, edges, [], mockGetComponent);
@@ -631,15 +631,15 @@ describe("generateCode", () => {
         makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
       ];
       const edges = [
-        makeEdge("e1", "p", "outlet", "c", "inlet"),
-        makeEdge("e2", "c", "outlet", "p", "inlet"),
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
       ];
       const code = generateCode(nodes, edges, [], mockGetComponent);
       // CAC is consumed into assembly_1, so hydraulic connects must use assembly path
-      expect(code).toContain("assembly_1.cac_1.inlet");
-      expect(code).toContain("assembly_1.cac_1.outlet");
+      expect(code).toContain("assembly_1.cac_1.port_in");
+      expect(code).toContain("assembly_1.cac_1.port_out");
     });
 
     it("top-level system uses compose_systems() when thermal assemblies exist", () => {
@@ -649,8 +649,8 @@ describe("generateCode", () => {
         makeNode("h", "HeatDiffusion", "fuel_1", hdParams),
       ];
       const edges = [
-        makeEdge("e1", "p", "outlet", "c", "inlet"),
-        makeEdge("e2", "c", "outlet", "p", "inlet"),
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
+        makeEdge("e2", "c", "port_out", "p", "port_in"),
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
       ];
@@ -667,7 +667,7 @@ describe("generateCode", () => {
         makeNode("h", "HeatDiffusion", "fuel_1", { ...hdParams, nz: 10 }),
       ];
       const edges = [
-        makeEdge("e1", "p", "outlet", "c", "inlet"),
+        makeEdge("e1", "p", "port_out", "c", "port_in"),
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
       ];

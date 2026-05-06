@@ -22,8 +22,8 @@ tech-stack:
   added: []
   patterns:
     - "Coupled HeatDiffusion+ChannelAndContacts: build_initializeprob=false required to bypass MTK initialization system corruption"
-    - "Minimal op dict for KINSOL: only actual unknowns (plate T, fluid T, cac.inlet.mdot); Re/Nu/h_tc/T_out are observed variables — guesses silently ignored"
-    - "Correct mdot sign: inlet.mdot > 0 for forward flow; negative initial guess causes KINSOL divergence"
+    - "Minimal op dict for KINSOL: only actual unknowns (plate T, fluid T, cac.port_in.mdot); Re/Nu/h_tc/T_out are observed variables — guesses silently ignored"
+    - "Correct mdot sign: port_in.mdot > 0 for forward flow; negative initial guess causes KINSOL divergence"
     - "Darcy-Weisbach estimate: mdot ≈ 0.600 kg/s for D=0.01, dP=30 kPa, T≈315 K"
     - "Physics-based MTR assertions: energy balance T_rise = P/(mdot*cp) replaces Python reference values (incompatible geometry)"
 
@@ -172,7 +172,7 @@ Instead of Python reference 1% tolerance, each test validates:
 
 ## Key Technical Discoveries
 
-1. **mdot sign convention confirmed:** `inlet.mdot > 0` for forward flow. Initial guess of `-0.490` causes KINSOL to diverge (pressure residual jumps to 51 kPa). Correct guess is `+0.600`.
+1. **mdot sign convention confirmed:** `port_in.mdot > 0` for forward flow. Initial guess of `-0.490` causes KINSOL to diverge (pressure residual jumps to 51 kPa). Correct guess is `+0.600`.
 
 2. **Observed vs unknown variables:** After mtkcompile, `Re[i]`, `Nu[i]`, `h_tc[i]`, `T_out` are observed (computed from unknowns). Including them in op dict is silently ignored but wastes setup time.
 

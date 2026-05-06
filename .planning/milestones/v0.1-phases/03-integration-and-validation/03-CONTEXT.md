@@ -14,12 +14,12 @@ Wire the four built components (Pump, Friction, Channel, Gravity) into a closed 
 ## Implementation Decisions
 
 ### Loop assembly API (SYS-01, SYS-02)
-- **Manual wiring** — user calls `connect(pump.outlet, friction.inlet)`, etc., then `compose()` and `mtkcompile()`. No convenience constructor (would hide the MTK structure this project is trying to validate)
+- **Manual wiring** — user calls `connect(pump.port_out, friction.port_in)`, etc., then `compose()` and `mtkcompile()`. No convenience constructor (would hide the MTK structure this project is trying to validate)
 - The closed loop (Pump → Friction → Channel → back to Pump) is the reference topology
 
 ### Solver return values (SOLV-01, SOLV-02)
 - **Return raw MTK solution** (`ODESolution` / steady-state solution) from both `solve_steady()` and `solve_transient()`
-- MTK solutions already support symbolic indexing: `sol[sys.channel.T_out]`, `sol[sys.pump.inlet.P]` — this is sufficient for v0.1
+- MTK solutions already support symbolic indexing: `sol[sys.channel.T_out]`, `sol[sys.pump.port_in.P]` — this is sufficient for v0.1
 - **Deferred:** a thin `SteadySolution(sol, sys)` / `TransientSolution(sol, sys)` wrapper that adds named property accessors (like Python STREAM's `Solution` object) — the right design will be clearer once the raw solution is in use. Document the idea in a code comment so it's not lost.
 
 ### Steady-state solver strategy (SOLV-01)
@@ -61,7 +61,7 @@ Wire the four built components (Pump, Friction, Channel, Gravity) into a closed 
 - Exact solver tolerances for SSRootfind/KINSOL (abstol, reltol)
 - How to express the time-varying Q_wall step in the transient problem (callback vs. time-dependent parameter)
 - Whether to put `solve_steady` / `solve_transient` as free functions in `STREAM` module or in a new `src/solvers.jl`
-- Absolute pressure reference constraint for the closed loop (MTK needs one pressure pinned to remove the gauge degree of freedom — e.g., `pump.inlet.P = 1e5`)
+- Absolute pressure reference constraint for the closed loop (MTK needs one pressure pinned to remove the gauge degree of freedom — e.g., `pump.port_in.P = 1e5`)
 
 </decisions>
 
@@ -78,7 +78,7 @@ Wire the four built components (Pump, Friction, Channel, Gravity) into a closed 
 ## Existing Code Insights
 
 ### Reusable Assets
-- `Pump(; name, dP_pump)` — FlowPort in/out, sets `outlet.P - inlet.P ~ dP_pump`. Ready to use.
+- `Pump(; name, dP_pump)` — FlowPort in/out, sets `port_out.P - port_in.P ~ dP_pump`. Ready to use.
 - `Friction(; name, L, D, A)` — Darcy-Weisbach with Blasius. Ready to use.
 - `Channel(; name, n, L, D, A)` — n-cell FV with Dittus-Boelter. Has `T_out` and `dP` observables. Ready to use.
 - `Gravity(; name, H, A_grav)` — hydrostatic dP. Ready to use (include if loop has vertical section).
@@ -86,8 +86,8 @@ Wire the four built components (Pump, Friction, Channel, Gravity) into a closed 
 - Phase 2 tests already use: `n=5, L=1.0, D=0.01, A=7.85e-5` — Phase 3 reference case uses same D and A (n=10, L=0.6 for channel).
 
 ### Established Patterns
-- `compose(System(...), inlet, outlet)` — how components are constructed (Phase 2 pattern)
-- `connect(a.outlet, b.inlet)` — MTK acausal connection syntax
+- `compose(System(...), port_in, port_out)` — how components are constructed (Phase 2 pattern)
+- `connect(a.port_out, b.port_in)` — MTK acausal connection syntax
 - `mtkcompile(sys; fully_determined=false)` for isolated components; Phase 3 full loop should compile with `fully_determined=true` (once pressure gauge freedom is fixed)
 - Temperature in Kelvin everywhere; no range guards on fluid properties
 - `import STREAM: Channel` needed in test files to resolve Base.Channel ambiguity (Phase 2 pattern)

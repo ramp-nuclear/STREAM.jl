@@ -41,10 +41,10 @@ score: 3/3 must-haves verified
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `Channel.dP equation` | `Gravity.inlet.P - outlet.P` | `connect()` wiring in `build_loop_vertical` | VERIFIED | `src/solvers.jl` line 182: `connect(ch.outlet, grav.outlet)` and line 183: `connect(grav.inlet, pump.inlet)` — reversed wiring for correct descending-return-leg physics |
+| `Channel.dP equation` | `Gravity.port_in.P - port_out.P` | `connect()` wiring in `build_loop_vertical` | VERIFIED | `src/solvers.jl` line 182: `connect(ch.port_out, grav.port_out)` and line 183: `connect(grav.port_in, pump.port_in)` — reversed wiring for correct descending-return-leg physics |
 | `build_loop_vertical` | `solve_steady` | `mtkcompile` output passed to `SteadyStateProblem` | VERIFIED | `test/runtests.jl` lines 308-311: `sol = solve_steady(ssys_v, op)` directly follows `ssys_v = build_loop_vertical(...)` |
 
-**Wiring note:** The key wiring uses the physically correct reversed-port pattern (`ch.outlet -> grav.outlet`; `grav.inlet -> pump.inlet`) discovered and fixed during TDD. The PLAN's suggested naive flow-direction wiring was superseded by the corrected implementation. The PLAN `pattern` field anticipated `connect(ch.outlet, grav.inlet)` (naive), but the actual code uses the reversed convention — this is the physically correct fix, not a deviation.
+**Wiring note:** The key wiring uses the physically correct reversed-port pattern (`ch.port_out -> grav.port_out`; `grav.port_in -> pump.port_in`) discovered and fixed during TDD. The PLAN's suggested naive flow-direction wiring was superseded by the corrected implementation. The PLAN `pattern` field anticipated `connect(ch.port_out, grav.port_in)` (naive), but the actual code uses the reversed convention — this is the physically correct fix, not a deviation.
 
 ---
 

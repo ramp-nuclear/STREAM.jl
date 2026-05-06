@@ -1,10 +1,10 @@
 # misc.jl — Inertia, HeatExchanger, ConstantTemperature components for STREAM.jl
 
 # Inertia (COMP-01): fluid inertia as ODE pressure-drop term
-# Equation: inlet.P - outlet.P ~ L_over_A * D(mdot)
+# Equation: port_in.P - port_out.P ~ L_over_A * D(mdot)
 # L_over_A = L/A [m/m² = m⁻¹] — user pre-computes from geometry
-# No explicit mdot state variable needed — MTK auto-promotes inlet.mdot
-# as a differential state because it appears inside Dt(inlet.mdot).
+# No explicit mdot state variable needed — MTK auto-promotes port_in.mdot
+# as a differential state because it appears inside Dt(port_in.mdot).
 """
     Inertia(L_over_A; name) -> ODESystem
 
@@ -22,7 +22,7 @@ network topology -- correct physics (distributed + concentrated).
 - `name`: system name (Symbol)
 
 # Ports
-- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
@@ -30,15 +30,15 @@ Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 function Inertia(L_over_A; name)
     Dt = Differential(t)           # same operator used in Channel energy balance
     pars = @parameters L_over_A = L_over_A
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
+    @named port_in = FlowPort()
+    @named port_out = FlowPort()
     eqs = Equation[
-        inlet.mdot + outlet.mdot ~ 0,
-        inlet.P - outlet.P ~ L_over_A * Dt(inlet.mdot),   # ODE pressure eq
-        outlet.T ~ instream(inlet.T),
-        inlet.T ~ instream(outlet.T),
+        port_in.mdot + port_out.mdot ~ 0,
+        port_in.P - port_out.P ~ L_over_A * Dt(port_in.mdot),   # ODE pressure eq
+        port_out.T ~ instream(port_in.T),
+        port_in.T ~ instream(port_out.T),
     ]
-    return compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 
 # HeatExchanger (COMP-02): temperature boundary condition as a public component.
@@ -56,22 +56,22 @@ Ideal heat exchanger that resets fluid temperature to a fixed boundary condition
 - `name`: system name (Symbol)
 
 # Ports
-- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
 function HeatExchanger(T_bc; name)
     pars = @parameters T_bc = T_bc
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
+    @named port_in = FlowPort()
+    @named port_out = FlowPort()
     eqs = Equation[
-        inlet.mdot + outlet.mdot ~ 0,    # mass conservation
-        inlet.P - outlet.P ~ 0,     # no pressure drop
-        outlet.T ~ T_bc,                   # inject fixed outlet temperature
-        inlet.T ~ T_bc,                   # backward stream: also reset to T_bc
+        port_in.mdot + port_out.mdot ~ 0,    # mass conservation
+        port_in.P - port_out.P ~ 0,     # no pressure drop
+        port_out.T ~ T_bc,                   # inject fixed outlet temperature
+        port_in.T ~ T_bc,                   # backward stream: also reset to T_bc
     ]
-    return compose(System(eqs, t, [], pars; name=name), inlet, outlet)
+    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 
 # ConstantTemperature: pins a ThermalPort's temperature to a fixed parameter.

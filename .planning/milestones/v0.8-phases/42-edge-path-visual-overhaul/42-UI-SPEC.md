@@ -88,8 +88,8 @@ Port handles must convey direction at a glance. Colors chosen to harmonize with 
 
 | Handle | Background | Border | Rationale |
 |--------|-----------|--------|-----------|
-| inlet (target) | `#93c5fd` (blue-300) | `#3b82f6` (blue-500) | Lighter blue = "receiving" / inflow |
-| outlet (source) | `#1d4ed8` (blue-700) | `#1e40af` (blue-800) | Darker blue = "driving" / outflow |
+| port_in (target) | `#93c5fd` (blue-300) | `#3b82f6` (blue-500) | Lighter blue = "receiving" / inflow |
+| port_out (source) | `#1d4ed8` (blue-700) | `#1e40af` (blue-800) | Darker blue = "driving" / outflow |
 | ThermalPort | `#f59e0b` (amber-500) | `#d97706` (amber-600) | Unchanged from existing |
 
 These colors use the blue family (matching the Hydraulic category accent) at different lightness levels. The light/dark distinction maps to an intuitive "in = open/light, out = filled/dark" metaphor. Both remain clearly distinct from the amber thermal handles.
@@ -172,11 +172,11 @@ When an edge is removed via `removeEdge` or `onEdgesChange`, check if its partne
 Port direction is inferred from the port name, consistent with the existing pattern in StreamNode.tsx:
 
 ```typescript
-const isInPort = port.name.includes("in");  // inlet -> target
-const isOutPort = port.name.includes("out"); // outlet -> source
+const isInPort = port.name.includes("in");  // port_in -> target
+const isOutPort = port.name.includes("out"); // port_out -> source
 ```
 
-No registry schema changes needed. The existing `port.name` convention (`inlet`, `outlet`) is the source of truth.
+No registry schema changes needed. The existing `port.name` convention (`port_in`, `port_out`) is the source of truth.
 
 ### Handle Style Application
 

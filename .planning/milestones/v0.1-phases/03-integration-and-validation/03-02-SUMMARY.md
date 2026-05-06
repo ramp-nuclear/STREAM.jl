@@ -105,7 +105,7 @@ completed: 2026-03-12
 **1. [Rule 1 - Bug] IDA solver incompatible with MTK's ODEProblem mass-matrix form**
 - **Found during:** Task 1 (solve_transient implementation)
 - **Issue:** Research doc and plan specified `ODEProblem + IDA()`. IDA requires `DAEProblem` with explicit `du0`; when given an `ODEProblem` it errors: "Problem types compatible with the chosen solver: SciMLBase.DAEProblem"
-- **Fix attempt 1:** Switched to `DAEProblem(ssys, op, tspan)` — errors: "Initial condition underdefined. Some are missing: fr₊inlet₊mdotˍt(t), fr₊Reˍt(t)"
+- **Fix attempt 1:** Switched to `DAEProblem(ssys, op, tspan)` — errors: "Initial condition underdefined. Some are missing: fr₊port_in₊mdotˍt(t), fr₊Reˍt(t)"
 - **Fix attempt 2:** Switched to `CVODE_BDF()` with `ODEProblem` — errors: "This solver is not able to use mass matrices"
 - **Fix attempt 3 (final):** Switched to `Rodas5P()` — supports mass-matrix ODEProblems natively. Confirmed working.
 - **Files modified:** src/solvers.jl

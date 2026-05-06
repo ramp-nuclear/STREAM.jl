@@ -31,7 +31,7 @@ export default function BCPanel() {
 
     addBC({
       nodeId: selectedNodeId,
-      portField: selectedPort as "inlet.P" | "outlet.P",
+      portField: selectedPort as "port_in.P" | "port_out.P",
       value: result.value,
     });
 
@@ -74,8 +74,8 @@ export default function BCPanel() {
             <SelectValue placeholder="Port" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="inlet.P">inlet.P</SelectItem>
-            <SelectItem value="outlet.P">outlet.P</SelectItem>
+            <SelectItem value="port_in.P">port_in.P</SelectItem>
+            <SelectItem value="port_out.P">port_out.P</SelectItem>
           </SelectContent>
         </Select>
 
@@ -106,7 +106,7 @@ export default function BCPanel() {
       {bcs.length === 0 ? (
         <div className="text-muted-foreground text-sm space-y-1">
           <p className="font-medium">No boundary conditions added.</p>
-          <p>Add a pressure anchor (e.g., pump.inlet.P ~ 1.0e5).</p>
+          <p>Add a pressure anchor (e.g., pump.port_in.P ~ 1.0e5).</p>
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">

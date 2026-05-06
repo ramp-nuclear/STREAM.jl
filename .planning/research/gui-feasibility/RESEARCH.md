@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Building a visual drag-and-drop GUI for composing STREAM.jl thermal-hydraulic systems is **feasible and moderately complex**. The core technical challenge -- translating a visual graph into valid Julia/MTK code -- is actually the *easiest* part, because STREAM.jl's component API is remarkably uniform: every component has `inlet`/`outlet` FlowPorts, some have ThermalPort arrays, and composition is a flat list of `connect()` calls plus boundary conditions. The harder parts are (1) getting a polished node-based editor working cross-platform and (2) handling the parameter editing UX for components with complex kwargs (correlation closures, PipeGeometry, etc.).
+Building a visual drag-and-drop GUI for composing STREAM.jl thermal-hydraulic systems is **feasible and moderately complex**. The core technical challenge -- translating a visual graph into valid Julia/MTK code -- is actually the *easiest* part, because STREAM.jl's component API is remarkably uniform: every component has `port_in`/`port_out` FlowPorts, some have ThermalPort arrays, and composition is a flat list of `connect()` calls plus boundary conditions. The harder parts are (1) getting a polished node-based editor working cross-platform and (2) handling the parameter editing UX for components with complex kwargs (correlation closures, PipeGeometry, etc.).
 
 The recommended path is a **Tauri 2 + React + ReactFlow** desktop app that generates `.jl` files as output. Julia runs as a separate process (not embedded). The GUI is a code generator, not a live simulation environment. This approach minimizes coupling, avoids the Julia startup time problem entirely, and produces artifacts (`.jl` files) that users can inspect, version-control, and modify by hand.
 
@@ -154,7 +154,7 @@ If live validation is later desired, Oxygen.jl (lightweight Flask-like Julia HTT
 
 STREAM.jl's component API has exceptional uniformity:
 
-1. **Every component** has `inlet` and `outlet` (FlowPort)
+1. **Every component** has `port_in` and `port_out` (FlowPort)
 2. **Thermal components** additionally have `thermal_left[1:n]` and `thermal_right[1:n]` (ThermalPort arrays)
 3. **Composition** is always: create named components, then `connect()` ports, then `compose()` + `mtkcompile()`
 4. The `build_loop` example is 15 lines of actual logic
@@ -180,15 +180,15 @@ Output: Valid Julia code
 ```julia
 # For each edge in graph:
 connections = [
-    connect(pump.outlet, bc.inlet),
-    connect(bc.outlet, ch.inlet),
-    connect(ch.outlet, pump.inlet),
+    connect(pump.port_out, bc.port_in),
+    connect(bc.port_out, ch.port_in),
+    connect(ch.port_out, pump.port_in),
 ]
 ```
 
 **Step 3: Boundary conditions** (user-specified in properties panel)
 ```julia
-push!(connections, pump.inlet.P ~ 1.0e5)
+push!(connections, pump.port_in.P ~ 1.0e5)
 push!(connections, ch.thermal.T ~ 373.15)
 ```
 
@@ -208,8 +208,8 @@ Each STREAM.jl component needs a JSON descriptor for the GUI:
   "label": "Pump",
   "category": "Hydraulic",
   "ports": {
-    "inlet":  { "type": "FlowPort", "side": "left" },
-    "outlet": { "type": "FlowPort", "side": "right" }
+    "port_in":  { "type": "FlowPort", "side": "left" },
+    "port_out": { "type": "FlowPort", "side": "right" }
   },
   "parameters": [
     { "name": "dP_pump", "type": "Real", "unit": "Pa", "default": 30000,
@@ -226,20 +226,20 @@ Each STREAM.jl component needs a JSON descriptor for the GUI:
 
 | Challenge | Difficulty | Notes |
 |-----------|-----------|-------|
-| **Simple FlowPort connections** | EASY | Direct 1:1 mapping: edge -> `connect(a.outlet, b.inlet)` |
-| **Multi-way junctions** | MEDIUM | Cube example: `connect(pump.outlet, r01.inlet, r02.inlet, r04.inlet)`. GUI needs junction nodes. |
+| **Simple FlowPort connections** | EASY | Direct 1:1 mapping: edge -> `connect(a.port_out, b.port_in)` |
+| **Multi-way junctions** | MEDIUM | Cube example: `connect(pump.port_out, r01.port_in, r02.port_in, r04.port_in)`. GUI needs junction nodes. |
 | **ThermalPort arrays** | MEDIUM | `port(cac, :thermal_left, i)` for i in 1:n. GUI needs to show port arrays, or use composition helpers. |
 | **Composition helpers** | MEDIUM | `symmetric_plate(cac, fuel)` wraps multiple connects. GUI could emit helper calls instead of raw connects. |
 | **Correlation closures** | HARD | `htc_correlation=dittus_boelter` or `regime_dependent(...)`. Need dropdown + nested parameter forms. |
 | **Callable parameters** | HARD | `Pump(t -> 30000*(1-t/10))`. Would need a code editor widget or predefined profiles. |
-| **Boundary conditions** | MEDIUM | `pump.inlet.P ~ 1.0e5`. Need a "boundary conditions" panel. Not obvious from graph topology alone. |
+| **Boundary conditions** | MEDIUM | `pump.port_in.P ~ 1.0e5`. Need a "boundary conditions" panel. Not obvious from graph topology alone. |
 | **PipeGeometry** | EASY-MEDIUM | `PipeGeometry_circular(L, D)` or `PipeGeometry_rectangular(...)`. Dropdown + fields. |
 
 ### 3.5 Scope Reduction for MVP
 
 **MVP scope (FlowPort-only, no thermal):**
 - Components: Pump, Resistor, Gravity, Friction, Inertia, HeatExchanger, Channel, ChannelHeatFlux
-- Ports: FlowPort only (inlet, outlet)
+- Ports: FlowPort only (port_in, port_out)
 - Parameters: Scalar values only (no closures, no callables)
 - Connections: Direct 1:1 (no multi-way junctions)
 - Output: `.jl` file with `build_*`-style code
