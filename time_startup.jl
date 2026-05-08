@@ -14,7 +14,6 @@ using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq
-using Sundials
 
 t_load = time() - t0
 println("using STREAM (load): $(round(t_load, digits=1)) s")
