@@ -69,12 +69,7 @@ function build_loop(;
 
     @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "mtkcompile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
-        n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -159,12 +154,7 @@ function build_loop_vertical(;
 
     @named sys = compose(System(connections, t; name=:sys), pump, bc, ch, grav)
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_vertical compile time: $(round(t_compile; digits=2))s" n_equations =
-        n_eq n_unknowns = n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -231,12 +221,7 @@ function build_loop_transient(;
         @named sys = compose(System(connections, t, [], ps; name=:sys), pump, bc, ch)
     end
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_transient compile time: $(round(t_compile; digits=2))s" n_equations =
-        n_eq n_unknowns = n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -329,12 +314,7 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
         r67,
     )
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_cube compile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
-        n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -438,12 +418,7 @@ function build_loop_lof_bypass(;
         System(connections, t; name=:sys), pump, ine, hx, ch, ret, flapper, ext_res
     )
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_lof_bypass compile time: $(round(t_compile; digits=2))s" n_equations =
-        n_eq n_unknowns = n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -592,11 +567,7 @@ function build_loop_pk(ctrl;
     full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
 
     # Stage 5: Compile
-    t_compile = @elapsed ssys = mtkcompile(full)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_pk compile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
-        n_uk
+    ssys = mtkcompile(full)
 
     # Stage 6: Build IC dict
     pk_ic = point_kinetics_steady_state(P0)

@@ -51,17 +51,13 @@ import ModelingToolkit: compose
         sol = solve_transient(ssys, op, t_span)
 
         # Analytical power: P(t) = P0 + sum_k C_k0[k] * (1 - exp(-lambda_k[k] * t))
-        for (j, tj) in enumerate(t_span)
-            P_analytical = P0 + sum(C_k0[k] * (1 - exp(-lambda_k[k] * tj)) for k in 1:6)
-            @test isapprox(sol[ssys.P, j], P_analytical, rtol=1e-3, atol=1e-6)
-        end
+        P_analytical =
+            P0 .+ sum(C_k0[k] .* (1 .- exp.(-lambda_k[k] .* t_span)) for k in 1:6)
+        @test isapprox(sol[ssys.P, :], P_analytical, rtol=1e-3, atol=1e-6)
 
         # Also verify individual precursor decay: C_k(t) = C_k0 * exp(-lambda_k * t)
-        for (j, tj) in enumerate(t_span)
-            @test isapprox(
-                sol[ssys.C_1, j], C_k0[1] * exp(-lambda_k[1] * tj), rtol=1e-3, atol=1e-6
-            )
-        end
+        C_k_analytical = C_k0[1] .* exp.(-lambda_k[1] .* t_span)
+        @test isapprox(sol[ssys.C_1, :], C_k_analytical, rtol=1e-3, atol=1e-6)
     end
 
     @testset "PK-01c: zero ICs yield trivial P=0 solution" begin
@@ -210,9 +206,7 @@ import ModelingToolkit: compose
         t_arr_b = range(0.0, 2.0, length=100)
         sol_b = solve_transient(ssys_b, op_b, t_arr_b)
         # At criticality with correct ICs, P stays within 1% of P0
-        for j in 1:length(t_arr_b)
-            @test isapprox(sol_b[ssys_b.P, j], P0; rtol=1e-2)
-        end
+        @test isapprox(sol_b[ssys_b.P, :], fill(P0, 100); rtol=1e-2)
 
         # PK-03c: step insertion prompt-jump validation
         # delta_rho = 0.002 << beta=0.006502 (sub-prompt-critical, delta_rho < beta/3)
@@ -273,9 +267,7 @@ import ModelingToolkit: compose
         @test P_traj[end] > P0  # positive ramp -> super-critical -> P grows above P0
         # Monotonicity from t=0.1s onward (skip initial KINSOL startup)
         idx_start = findfirst(tv -> tv >= 0.1, t_arr_d)
-        for j in (idx_start + 1):length(t_arr_d)
-            @test P_traj[j] >= P_traj[j - 1] - 1e-3 * P0  # allow tiny solver noise
-        end
+        @test all(diff(P_traj[idx_start:end]) .>= (1e-3 * P0)) # allow tiny solver noise
 
         # PK-03e: plain closure and ReactivityController wrapping same fn give same result
         plain_fn = t -> (t >= t_step) * delta_rho
@@ -580,8 +572,8 @@ import ModelingToolkit: compose
         # instead of Tref, producing massive spurious negative feedback at startup.
         rods7_cac7 = rods7.cac7
 
-        t_step = 0.1           # reactivity insertion time [s]
-        delta_rho = 0.0005        # step reactivity (well below beta_total=0.006502)
+        t_step = 0.01           # reactivity insertion time [s]
+        delta_rho = 0.001        # step reactivity (well below beta_total=0.006502)
         alpha_strong = -0.01      # strong negative alpha [dk/k per K] -- stabilizing
         Tref = 293.15
 

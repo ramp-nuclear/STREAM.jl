@@ -147,7 +147,6 @@ end
             n=3, geometry=PipeGeometry_circular(L_ch, D_ch), scb_correction=scb_fn
         )
         @test cac isa ModelingToolkit.System
-        println("SCB ChannelAndContacts: OK")
     end
 
     @testset "ISCB-01: SCB ChannelAndContacts solves (sub-ONB)" begin

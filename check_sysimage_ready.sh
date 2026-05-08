@@ -62,10 +62,8 @@ run_check "using ModelingToolkit" \
     'using ModelingToolkit'
 run_check "using OrdinaryDiffEq" \
     'using OrdinaryDiffEq'
-run_check "using Sundials" \
-    'using Sundials'
 run_check "using STREAM (all packages together)" \
-    'using STREAM, ModelingToolkit, OrdinaryDiffEq, Sundials, Symbolics, QuadGK'
+    'using STREAM, ModelingToolkit, OrdinaryDiffEq, QuadGK'
 echo ""
 
 # ── Check 4: PackageCompiler can build a tiny sysimage ───────────────────────
