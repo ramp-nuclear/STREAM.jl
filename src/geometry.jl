@@ -79,7 +79,7 @@ function PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothin
     end
     _width = max(_e1, _e2)
     _depth = min(_e1, _e2)
-    return PipeGeometry(
+    PipeGeometry(
         _L, Dh, area, heated_perimeter, wet_perimeter, heated_parts, _width, _depth
     )
 end

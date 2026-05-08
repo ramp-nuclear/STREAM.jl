@@ -228,7 +228,12 @@ function ChannelAndContacts(;
     # Re, Nu, v are now observed (not solver unknowns)
     # dP, P[i], T_sat[i], T_ONB[i] are also observed
     all_vars = [
-        collect(T); collect(h_tc); collect(q_wall); collect(dp); T_out; Q_wall_total
+        collect(T);
+        collect(h_tc);
+        collect(q_wall);
+        collect(dp);
+        T_out;
+        Q_wall_total
     ]
 
     compose(
