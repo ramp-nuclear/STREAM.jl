@@ -8,7 +8,6 @@
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-using Sundials                 # KINSOL, IDA
 
 # ----------------------------------------------------------------
 # steady_state_guess
@@ -43,20 +42,6 @@ function steady_state_guess(;
     return [T_inlet + i * Q_wall / (n * mdot_guess * cp) for i in 1:n]
 end
 
-# ----------------------------------------------------------------
-# solve_steady
-# Solves the compiled loop system for steady state using KINSOL.
-#
-# ssys: compiled system from build_loop()
-# op:   Vector{Pair} of symbolic_var => initial_value
-#       Use symbols from ssys (compiled), e.g. ssys.ch.T[1] => 315.0
-#       Build the initial guess using steady_state_guess() for T cells.
-#       Also include ssys.ch.port_in.mdot => mdot_guess for mass flow.
-#
-# Returns SteadyStateSolution. Access results via symbolic indexing:
-#   sol[ssys.ch.T_out]              outlet temperature (K)
-#   sol[ssys.ch.port_in.mdot]       mass flow (kg/s)
-# ----------------------------------------------------------------
 """
     solve_steady(ssys, op; solver=nothing, kwargs...) -> SciMLSolution
 
@@ -65,8 +50,7 @@ Solve a compiled system to steady state using KINSOL (or a user-specified solver
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
 - `op`: operating point as `Vector{Pair}` of initial guesses
-- `solver`: nonlinear solver to use (default `SSRootfind(KINSOL())`);
-  pass `SSRootfind(RobustMultiNewton())` for robustness on multi-branch networks
+- `solver`: nonlinear solver to use
 - `abstol`: absolute tolerance (default 1e-8)
 - `reltol`: relative tolerance (default 1e-6)
 - `build_initializeprob`: passed to `SteadyStateProblem` (default `false`)
@@ -83,8 +67,7 @@ function solve_steady(
         warn_initialize_determined=false,
         build_initializeprob=build_initializeprob,
     )
-    _solver = isnothing(solver) ? SSRootfind(KINSOL()) : solver
-    sol = solve(prob, _solver; abstol=abstol, reltol=reltol)
+    sol = solve(prob, solver; abstol=abstol, reltol=reltol)
     return sol
 end
 
