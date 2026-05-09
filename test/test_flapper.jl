@@ -55,7 +55,7 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "FLAP-05: Flapper remains closed under positive ref_mdot" begin
     sys = _build_flapper_scalar_loop(1e5)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys; fully_determined=false)  # legitimate-structural: Flapper state(t) is set by ContinuousCallback, not an MTK equation
 
     op = Pair{Any,Any}[ssys.flapper.T_open => 1e30,]
 
@@ -107,7 +107,7 @@ end
         ine.port_out.T ~ 313.15,
     ]
     @named sys = compose(System(conns, t; name=:flap06_decay), pump, ine, res, flapper)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys; fully_determined=false)  # legitimate-structural: Flapper state(t) set by callback (see flapper.jl:38)
 
     mdot_0 = 1.0   # initial mdot (kg/s); well above threshold
 
@@ -148,7 +148,7 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "SOLV-01: solve_transient passes user callbacks" begin
     sys = _build_flapper_scalar_loop(1e5)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys; fully_determined=false)  # legitimate-structural: Flapper state(t) set by callback (see flapper.jl:38)
 
     op = Pair{Any,Any}[ssys.flapper.T_open => 1e30,]
 

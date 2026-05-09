@@ -22,9 +22,22 @@ using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-using Plots
-ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
-gr()
+
+# Plots is intentionally NOT in Project.toml — project-level decision (see
+# .planning/phases/55-composition-helpers-examples-test-suite/deferred-items.md).
+# Guard `using Plots` so the simulation portion of this script runs on a stock
+# checkout; the plot block (Section 5) is skipped when Plots is unavailable or
+# when PHASE55_SMOKE_NOPLOT=1 is set. Install Plots manually with
+# `Pkg.add("Plots")` to enable the plot save.
+const PLOTS_AVAILABLE = (get(ENV, "PHASE55_SMOKE_NOPLOT", "") != "1") &&
+                        (Base.find_package("Plots") !== nothing)
+if PLOTS_AVAILABLE
+    @eval using Plots
+    ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
+    Plots.gr()
+else
+    @info "Plots.jl unavailable — Section 5 plot save will be skipped (run `Pkg.add(\"Plots\")` to enable)"
+end
 
 # =============================================================================
 # SECTION 1: Parameters
@@ -34,6 +47,7 @@ gr()
 const N_CELLS   = 10        # axial discretization cells
 const T_INLET   = 313.15    # K (40°C) coolant inlet temperature
 const T_WALL    = 373.15    # K (~100°C) wall temperature
+const H_WALL    = 5000.0    # W/(m²K) convective HTC on the heated face
 const DP_PUMP   = 3.0e4     # Pa pump pressure rise
 const L_CHANNEL = 0.6       # m channel length
 const D_CHANNEL = 0.01      # m hydraulic diameter
@@ -48,6 +62,7 @@ ssys = build_loop(;
     n=N_CELLS,
     T_inlet=T_INLET,
     T_wall=T_WALL,
+    h_wall=H_WALL,
     L_ch=L_CHANNEL,
     D_ch=D_CHANNEL,
     dP_pump=DP_PUMP,
@@ -83,24 +98,28 @@ println("  mdot     = $(round(mdot, digits=4)) kg/s")
 println("  T_rise   = $(round(T_out - T_INLET, digits=2)) K")
 
 # =============================================================================
-# SECTION 5: Plot axial temperature profile
+# SECTION 5: Plot axial temperature profile (skipped when Plots unavailable)
 # =============================================================================
 
-z_positions = range(0.0, L_CHANNEL; length=N_CELLS)
-p = plot(
-    z_positions,
-    T_axial .- 273.15;
-    xlabel="Axial position [m]",
-    ylabel="Fluid temperature [°C]",
-    title="STREAM.jl — Simple Loop Steady State",
-    label="T_fluid",
-    linewidth=2,
-    marker=:circle,
-    markersize=4,
-)
-hline!([T_WALL - 273.15]; linestyle=:dash, label="T_wall", color=:red)
-hline!([T_INLET - 273.15]; linestyle=:dot, label="T_inlet", color=:blue)
+if PLOTS_AVAILABLE
+    z_positions = range(0.0, L_CHANNEL; length=N_CELLS)
+    p = plot(
+        z_positions,
+        T_axial .- 273.15;
+        xlabel="Axial position [m]",
+        ylabel="Fluid temperature [°C]",
+        title="STREAM.jl — Simple Loop Steady State",
+        label="T_fluid",
+        linewidth=2,
+        marker=:circle,
+        markersize=4,
+    )
+    hline!([T_WALL - 273.15]; linestyle=:dash, label="T_wall", color=:red)
+    hline!([T_INLET - 273.15]; linestyle=:dot, label="T_inlet", color=:blue)
 
-mkpath("examples/output")
-savefig(p, "examples/output/simple_loop_temperature.png")
-println("Plot saved to examples/output/simple_loop_temperature.png")
+    mkpath("examples/output")
+    savefig(p, "examples/output/simple_loop_temperature.png")
+    println("Plot saved to examples/output/simple_loop_temperature.png")
+else
+    println("Section 5 (plotting) skipped: Plots.jl unavailable.")
+end

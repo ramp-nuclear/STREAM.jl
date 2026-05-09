@@ -1,12 +1,11 @@
-# time_startup.jl — TTFX benchmark for STREAM.jl
+# time_startup.jl — TTFX cold-start measurement for STREAM.jl
 #
-# Usage (baseline, no sysimage):
+# Usage:
 #   julia --project=. time_startup.jl
 #
-# Usage (with sysimage):
-#   julia --sysimage stream.so --project=. time_startup.jl
-#
-# Run both and compare: the sysimage should reduce total time from ~90s to ~5s.
+# Reports load time for `using STREAM` plus first `mtkcompile`. Use this to
+# quantify cold-start cost. The fast dev loop (bin/jl + daemon) avoids paying
+# this on every invocation — see CLAUDE.md §Performance for setup.
 
 t0 = time()
 

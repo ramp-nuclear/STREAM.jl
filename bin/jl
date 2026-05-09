@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# bin/jl — STREAM.jl daemon-required Julia runner with auto-recovery.
+#
+# Submits a Julia script to the running DaemonMode server (default port 3000).
+# If the daemon is not running, automatically calls bin/jl-up to start it,
+# then retries the submission. If bin/jl-up itself fails (e.g. the port is
+# held by a foreign process), exits 3 with the full error chain.
+#
+# Usage:
+#   bin/jl test/runtests.jl
+#   bin/jl test/runtests.jl arg1 arg2
+#
+# Manual control:
+#   bin/jl-up             # start (or check) the daemon
+#   tmux attach -t stream-jl   # live monitor (detach: Ctrl-B then D)
+#
+# Exit codes (from bin/jl-client.jl):
+#   0 → script ran without throwing
+#   1 → script threw
+#   2 → usage error
+#   3 → daemon not reachable AND auto-start failed
+#   4 → daemon closed connection mid-run
+#
+# Why auto-recover rather than just exit 3?
+# - Friction: starting the daemon is a one-line task users (and GSD) shouldn't
+#   have to do manually before every fresh-session call.
+# - Single ownership: recovery routes through bin/jl-up, the same blessed
+#   entry point a human would use. The daemon still lives in tmux session
+#   stream-jl, so `tmux attach -t stream-jl` keeps working as a live monitor.
+# - Visibility: auto-start announces itself on stderr; nothing is hidden.
+# - Failure stays loud: a daemon that the kernel/foreign-process won't let
+#   us start (port bind conflict) bubbles up the same exit 3 as before.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$SCRIPT_DIR"
+
+# stdout is always streamed (long test runs need live output). stderr from
+# attempt 1 is captured so we can suppress the daemon-down error message
+# when we're about to recover, and replay it otherwise.
+err_file="$(mktemp -t bin-jl-stderr.XXXXXX)"
+trap 'rm -f "$err_file"' EXIT
+
+julia --startup-file=no --project=. bin/jl-client.jl "$@" 2>"$err_file"
+ec=$?
+
+if [ "$ec" -eq 3 ]; then
+    echo "[bin/jl] daemon not reachable — auto-starting via bin/jl-up..." >&2
+    if ! bin/jl-up >&2; then
+        echo "[bin/jl] auto-start failed. Original client error:" >&2
+        cat "$err_file" >&2
+        exit 3
+    fi
+    # Successful auto-start. Retry with full streaming (no capture).
+    rm -f "$err_file"
+    trap - EXIT
+    exec julia --startup-file=no --project=. bin/jl-client.jl "$@"
+fi
+
+# attempt 1 finished with a non-recoverable code (0/1/2/4); replay its stderr.
+cat "$err_file" >&2
+exit "$ec"

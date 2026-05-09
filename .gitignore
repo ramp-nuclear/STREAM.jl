@@ -2,11 +2,6 @@
 .vscode/
 examples/output/
 
-# Julia sysimage (platform-specific, rebuilt locally with: julia --project=. build_sysimage.jl)
-stream.so
-*.dylib
-*.dll
-
 # Node / GUI
 node_modules/
 gui/export_examples/

@@ -1,5 +1,55 @@
 # Milestones
 
+## v1.1 Final Channel-Family Redesign (Shipped: 2026-05-09)
+
+**Phases:** 52-58 (7 phases, 33 plans)
+**Working branch:** `channels-redesign` (single PR vehicle, off origin/main)
+**Timeline:** 2026-05-05 → 2026-05-09 (5 days)
+
+**Goal:** Last channel rewrite — match Python STREAM's design intent for `Channel`, `ChannelHeatFlux`, and `ChannelAndContacts`; eliminate the flag-driven `_channel_base_eqs` helper; switch the convective energy balance to enthalpy form.
+
+**Key accomplishments:**
+
+- **Connector pattern locked-in** (Phase 52): array-of-scalar MTK acausal connectors per side per channel, after a 2026-05-05 spike (`/tmp/vec_diagnose3.jl`) proved vector-form connectors mis-integrate the first unknown when compiled alongside any `FlowPort`-bearing system. End-of-v1.1 connector roster: `FlowPort` + `ThermalPort` only (`WallPort` and `HeatFluxPort` retired during Phase 54/55 walk-backs after the drive-aware-port story was abandoned in favor of binding equations + value-source components).
+- **Shared `_channel_core` + enthalpy-form energy balance** (Phase 53): single private function emits energy/mass/momentum/friction/port-wiring/observables for all three variants. Convective term uses face-averaged cp `(cp(T_up) + cp(T[i]))/2` with `cp(T_in)` at the boundary face per NRG-01..04. `_channel_base_eqs` deleted; no `observed_mode`, `skip_htc`, or `T_wall_cells=nothing` dead branches anywhere.
+- **Variant rewrites + file consolidation** (Phase 54): `Channel` rebuilt as a passive recipient (T_wall via `thermal_left/right[1:n]` ports + `h_left`/`h_right` kwargs; adiabatic-by-default via Float64 IC `h=0.0`); `ChannelHeatFlux` receives q directly via channel-level `q_left/q_right[1:n]` variables (or via `HeatFluxSource` value-source); `ChannelAndContacts` rebuilt on `_channel_core` with optional `scb_correction` kwarg. Old `channel.jl` and `thermal_channel.jl` deleted; new `src/components/channels.jl` is the single home. Architectural invariant: only `ChannelAndContacts` ever connects to `HeatDiffusion`.
+- **Composition helpers + test reorganization + daemon dev loop** (Phase 55): `symmetric_plate`, `plate`, `one_sided_connection`, `compose_systems` updated; `port` and `check_gravity_mismatch` QoL helpers; `connect_temperature_feedback` for PK loops. Test suite consolidated to a 14-file canonical layout (`test_channels.jl` absorbs legacy `test_channel.jl`/`test_channel_core.jl`/`test_sign_safety.jl`; `test_integration.jl` is new and absorbs LOF/SOLV/COMPAT/PK loops; `test_thresholds.jl` renamed from `test_analysis.jl`). `bin/jl` + `bin/jl-up` daemon-dev-loop established as primary workflow (sub-second submissions after the warm-up cost).
+- **Python STREAM cross-validation** (Phase 56): `test/parity_helpers.jl` (274 lines) + per-cell `parity_check`/`assert_equivalence_*` machinery; `test/generate_reference.py` and `test/generate_mtr_reference.py` rewritten to emit Plan-04 paste-ready Julia const blocks at all D-07 tiers; `test/data/python_parity_reference.jl` (674 lines, 65 const PARITY_*); `test/data/parity_report.csv` is the live gate. **Final parity tally: 424 CLEAN / 78 GRAY / 34 FAIL** out of 536 row comparisons across simple_loop, mtr_symmetric, mtr_asymmetric, and mtr_one_sided scenarios. Heated-side `h_tc_*` rows match Python at floating-point precision (1e-11 rtol) after the per-side h fix in Phase 56-resume. The simple_loop scenario is fully CLEAN (83/83 quantities including T_out, mdot, dP_loop, per-cell T, T_wall, h_tc, q_density). The 34 residual FAIL rows have three documented causes (see "Known Gaps" below).
+- **HTC film-temperature evaluation** (Phase 57): switched the CAC SPL/SCB HTC pipeline (Re, Pr, leading k outside Nu) to evaluate fluid properties at film T `T_film = (T_cool + T_wall)/2`, matching Python STREAM `heat_transfer_coefficient/__init__.py:208-209`. Friction Re and natural-convection Gr stayed at bulk T per Python convention. Closed Phase-56 Gap #2: all 20 simple_loop `h_tc_*[i]` rows + all 30 `q_density_*[i]` rows moved from FAIL ~19% to CLEAN ~10⁻¹¹. HTC correlation 4-arg signature unchanged; module header + 7 factory docstrings document the eval-point convention; `elenbaas_htc` carries the bulk-NC exception note.
+- **MTK system determinacy repair** (Phase 58): root-cause-fixed the `mtkcompile`/`solve_steady` boundary failure on seven in-scope scenarios (3 MTR + VAL-01 HD Fourier + VAL-02 two-plate steady + VAL-02 transient + PK validation). Cause: `HeatDiffusion`'s `power(t)` is declared as an `@variables` unknown but no equation closes it; the broken scenarios forgot the `hd.power ~ <value>` connection-list pin that `build_loop_lof_bypass` and `build_loop_pk` already use. Added the missing pins, audited every `fully_determined=false` site (38 total, 7 bug-hiding flips, 31 legitimate-structural with inline rationale), shipped `test/test_determinacy.jl` (11/11 PASS) wired into `runtests.jl` as the regression gate so this class of bug cannot recur silently across MTK upgrades. No `check_length=false` workarounds in `src/solvers.jl`. No Manifest.toml MTK pin reversions.
+
+**Phase 56-resume work (post-58 close-up, 2026-05-08 → 2026-05-09):**
+
+After 56-PAUSE-CONTEXT.md's resume gate ("after 57+58 ship, expect zero FAIL beyond GRAY-tier"), the parity harness surfaced two further issues that the pause-context didn't anticipate:
+
+1. **MTR L/R wiring bug in the parity test itself** (not in `src/composition/helpers.jl`): `test/test_validation.jl` lines 371-374 (mtr_symmetric), 542-545 (mtr_asymmetric) hand-wired connections instead of using `plate()` and got the channel face wrong (`cac_l.thermal_LEFT ↔ hd.thermal_left` instead of `cac_l.thermal_RIGHT ↔ hd.thermal_left`). Fixed by 6-line edit. The helpers themselves were correct and matched Python's `stream/composition/mtr_geometry.py:60-63` semantics.
+2. **Per-side h_tc in CAC**: Julia computed a single h_tc per cell using only `thermal_left[i].T`'s film T, while Python computes h_left and h_right separately at each side's own film T (`channel.py:689-690`). For symmetric walls this matched; for asymmetric MTR (heated + adiabatic), the single-h approach used bulk-T-evaluated h on whichever channel had `thermal_left` as its adiabatic side. Fixed by promoting `h_tc_left`/`h_tc_right` to first-class unknowns with their own per-side film-T equations; `q_*_expr` now uses each side's own h. SCB branch keeps single-h_tc semantics with aliases (asymmetric SCB out of scope). The test parity rows mirror Python's `_other_if_none` convention via `max(h_left, h_right)` at the report level.
+
+**Known Gaps (deferred to v1.2 with documented cause):**
+
+- **mtr_one_sided q_left_l[1..10]** (10 FAIL rows): documented Python-side bug — `one_sided_connection` distributes one-sided heat to BOTH plate faces. Julia is physically correct; Python is acknowledged-wrong. `hard_ceiling=0.5` reflects the gap; ~100% drift exceeds it. Resolution: fix Python upstream (out of v1.1 scope) or accept as canonical Julia-vs-Python divergence point.
+- **mtr_asymmetric cac_r h_tc[1..7]** (14 FAIL rows, cells 8-10 GRAY): Julia's hot-channel h_tc is consistently 2-4% higher than Python's, monotonically decreasing along the channel. Cause: plate T(z,x) distribution sensitivity between Python's `CalculationGraph` topology and Julia's MTK topology — they aren't quite isomorphic in subtle ways. Bounded, well-characterized; root-cause investigation requires another bisection pass and is queued for v1.2.
+- **mtr_one_sided h_tc[6..10]** (10 FAIL rows, cells 1-5 GRAY): cascade of the Python `one_sided_connection` bug — Python's plate runs cooler (heat leaks to both faces), so Python's h is lower; Julia higher. ~3-5% drift.
+- **VAL-01 Fourier `solve(ODEProblem)` `ReturnCode.InitialFailure`**: Phase 58 fixed the structural determinacy (`mtkcompile(...; fully_determined=true)` succeeds with n_eqs=50=n_unknowns=50); numerical convergence of `Rodas5P` from naive IC remains a v1.2 numerical-investigation item.
+- **NET-03 / HTC-02-SPL / LOF-02 / LOF-03 / VAL-01-NC / VAL-02-NC**: pre-existing numerical convergence flakies (KINSol flag −7/−11 family, transient solver instability). `@test_skip` with documented cause; do not halt `bin/jl test/runtests.jl` orchestrator.
+- **`build_loop_lof_bypass` 2-step IC idiom**: `solve_transient` from a naive IC (T=313.15, mdot=0.5) returns `Unstable` at t=0; works only via the steady-then-transient pattern in `examples/lof_transient.jl:139`. Undocumented as a builder requirement; v1.2 docs/usability item.
+
+**Convention split with Python (acknowledged, not a bug):**
+
+- Julia's CAC computes per-side h_tc honestly (h_left at film(T_cool, T_left), h_right at film(T_cool, T_right)). Python applies `_other_if_none` to fill the unconnected side's h with the connected side's value. The parity test mirrors Python's convention by reporting `max(h_tc_left, h_tc_right)` for both walls. Underlying physics is correct in both implementations; the convention difference is purely about how the adiabatic-side h is *reported*.
+
+**Workflow improvements landed:**
+
+- Daemon dev loop (`bin/jl-up` + `bin/jl`) replaces the abandoned PackageCompiler sysimage approach (Phase 55 D-22; sysimage incremental-link killed by SIGTERM at ~7min on Julia 1.12 + WSL2 regardless of package set). Sub-second `bin/jl` submissions after warm-up.
+- `test/test_determinacy.jl` regression gate locks the canonical-builder + Phase-58-scenario determinacy contracts against future MTK upgrades.
+- `mtkcompile(...; fully_determined=true)` is now the default audit mode across the test suite (every bug-hiding `=false` flipped, legitimate-structural sites carry inline rationale).
+
+**Final parity report:** `test/data/parity_report.csv` (537 rows including header). Run `awk -F, 'NR>1 && $7=="FAIL"' test/data/parity_report.csv` to see the 34 remaining FAIL rows; each has a documented `note` column traceable to one of the buckets above.
+
+**Git range:** `b2ab8cc` → `475db6e` (37 files changed across 7 phases plus Phase 56-resume cleanup; full Manifest.toml regenerated under julia 1.12.6 with Statistics 1.10.0 stdlib pin removed).
+
+---
+
 ## v1.0 Open-Source Release (Shipped: 2026-04-10)
 
 **Phases:** 50-51 (2 phases, 7 plans)

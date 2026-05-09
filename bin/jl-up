@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# bin/jl-up — idempotent starter for the STREAM.jl Julia daemon.
+#
+# - If the daemon is already running on $STREAM_DAEMON_PORT (default 3000)
+#   inside tmux session "stream-jl": prints how to attach and exits 0.
+# - If tmux session "stream-jl" exists but the daemon is not listening:
+#   refuses to clobber it; tells you how to inspect or kill it.
+# - If port $STREAM_DAEMON_PORT is in use by some other process: refuses.
+# - Otherwise: launches the daemon in a detached tmux session and waits
+#   for the "listening on" line in /tmp/stream-jl-daemon.log.
+#
+# Why a script and not auto-spawn-from-bin/jl?
+# - The daemon needs to live in tmux so `tmux attach -t stream-jl` works
+#   as a live monitor.
+# - Auto-spawn from a per-call client makes ownership/lifecycle ambiguous
+#   (orphans, double-starts, races). One blessed entry point keeps the
+#   model simple: bin/jl-up to start, bin/jl to submit work.
+#
+# Usage:
+#   bin/jl-up                    # start (or report) on port 3000
+#   STREAM_DAEMON_PORT=4000 bin/jl-up
+
+set -uo pipefail
+
+PORT="${STREAM_DAEMON_PORT:-3000}"
+SESSION="${STREAM_DAEMON_SESSION:-stream-jl}"
+LOG="/tmp/stream-jl-daemon.log"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$SCRIPT_DIR"
+
+port_in_use() { ss -tln 2>/dev/null | grep -q ":$PORT "; }
+session_exists() { tmux has-session -t "$SESSION" 2>/dev/null; }
+
+# ── Already-up cases ─────────────────────────────────────────────────────
+if port_in_use; then
+    if session_exists; then
+        echo "daemon already running on port $PORT (tmux session: $SESSION)"
+        echo
+        echo "  attach (monitor): tmux attach -t $SESSION   (detach with Ctrl-B then D)"
+        echo "  submit work:      bin/jl <script.jl>"
+        exit 0
+    fi
+    echo "ERROR: port $PORT is in use, but tmux session '$SESSION' does not exist." >&2
+    echo "Some other process is bound to this port. Investigate before starting." >&2
+    echo "  ss -tlnp | grep ':$PORT '" >&2
+    exit 1
+fi
+
+if session_exists; then
+    echo "ERROR: tmux session '$SESSION' exists but the daemon is not listening on port $PORT." >&2
+    echo "Likely the daemon crashed or is still loading." >&2
+    echo
+    echo "  inspect: tmux attach -t $SESSION" >&2
+    echo "  kill:    tmux kill-session -t $SESSION  (then re-run bin/jl-up)" >&2
+    exit 1
+fi
+
+# ── Fresh start ──────────────────────────────────────────────────────────
+echo "starting daemon (tmux session: $SESSION, port: $PORT)..."
+: > "$LOG"   # truncate so the readiness grep below sees only the new run
+tmux new-session -d -s "$SESSION" -x 200 -y 50 \
+    "julia --project=. bin/jl-daemon.jl $PORT 2>&1 | tee \"$LOG\""
+
+DEADLINE=$(( $(date +%s) + 60 ))
+while ! grep -q "listening on 127.0.0.1:$PORT" "$LOG" 2>/dev/null; do
+    if [ "$(date +%s)" -gt "$DEADLINE" ]; then
+        echo "TIMEOUT waiting 60s for daemon readiness." >&2
+        echo "Check the tmux pane for errors:  tmux attach -t $SESSION" >&2
+        echo "Or read the log:                  tail -50 $LOG" >&2
+        exit 1
+    fi
+    sleep 0.5
+done
+
+elapsed=$(( $(date +%s) - (DEADLINE - 60) ))
+echo "daemon ready in ~${elapsed}s on port $PORT"
+echo
+echo "  attach (monitor): tmux attach -t $SESSION   (detach with Ctrl-B then D)"
+echo "  submit work:      bin/jl <script.jl>"

@@ -15,7 +15,7 @@ import STREAM: Pump, Channel
 
     # Test: Pump(mdot0=0.6) mtkcompiles without error (bare, no connections)
     # fully_determined=false: isolated ports make system under-determined
-    @test_nowarn mtkcompile(pump; fully_determined=false)
+    @test_nowarn mtkcompile(pump; fully_determined=false)  # isolated component: unconnected ports
 
     # Test: Integration — Pump(mdot0=0.6) in a loop: Pump → HeatExchanger → Channel → back
     # HeatExchanger provides pressure closure (port_in.P - port_out.P ~ 0)
@@ -28,10 +28,12 @@ import STREAM: Pump, Channel
         connect(bc5.port_out, ch5.port_in),
         connect(ch5.port_out, pump5.port_in),
         pump5.port_in.P ~ 1e5,
-        ch5.thermal.T ~ 350.0,   # pin wall temperature (adiabatic not needed; mdot0 drives flow)
+        # No wall-T binding needed: default h_left=h_right=0.0 makes Channel fully
+        # adiabatic; T_wall_left/right stay free unknowns and drop out of the energy
+        # balance. mdot0 drives flow (Phase 55 D-01: Channel.thermal port retired).
     ]
     @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
-    ssys5 = mtkcompile(sys5; fully_determined=false)
+    ssys5 = mtkcompile(sys5; fully_determined=false)  # isolated network: no pressure anchor on rate-equation test
     op5 = Pair{Any,Any}[ssys5.ch5.port_in.mdot => 0.6]
     append!(op5, [ssys5.ch5.T[i] => 313.15 for i in 1:5])
     sol5 = solve_steady(ssys5, op5)
@@ -63,7 +65,7 @@ end
     # Verify scalar dispatch still works with positional signature
     @named pump_s = Pump(1e5)
     @test pump_s isa ModelingToolkit.System
-    @test_nowarn mtkcompile(pump_s; fully_determined=false)
+    @test_nowarn mtkcompile(pump_s; fully_determined=false)  # isolated component: unconnected ports
 
     # Integration: scalar pump in a loop (positional arg syntax)
     @named pump_r = Pump(3.0e4)
@@ -74,10 +76,11 @@ end
         connect(bc_r.port_out, ch_r.port_in),
         connect(ch_r.port_out, pump_r.port_in),
         pump_r.port_in.P ~ 1e5,
-        ch_r.thermal.T ~ 350.0,
+        # Adiabatic default (h_left=h_right=0.0): no wall-T binding needed
+        # (Phase 55 D-01: Channel.thermal port retired).
     ]
     @named sys_r = compose(System(conns_r, t; name=:pump02_loop), pump_r, bc_r, ch_r)
-    ssys_r = mtkcompile(sys_r; fully_determined=false)
+    ssys_r = mtkcompile(sys_r; fully_determined=false)  # isolated network: no pressure anchor (pump+resistor flipped sign)
     op_r = [ssys_r.ch_r.T[i] => 313.15 for i in 1:5]
     push!(op_r, ssys_r.ch_r.port_in.mdot => 0.490)
     sol_r = solve_steady(ssys_r, op_r)
@@ -93,7 +96,7 @@ end
     @named pump_c = Pump(dP_fn)
     @test pump_c isa ModelingToolkit.System
     # Verify callable method was selected (not scalar)
-    @test_nowarn mtkcompile(pump_c; fully_determined=false)
+    @test_nowarn mtkcompile(pump_c; fully_determined=false)  # isolated component: callable pump in isolation
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -127,7 +130,7 @@ end
         ine.port_out.T ~ 313.15,    # thermal anchor 2 (breaks circular instream)
     ]
     @named sys = compose(System(conns, t; name=:pump03), pump, ine, res)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys; fully_determined=false)  # isolated network: no pressure anchor on pump+resistor test
 
     mdot_0 = dP0 / R_val   # 1.0 kg/s at steady state
 

@@ -1,8 +1,15 @@
+# test/test_connectors.jl — Phase 55 D-06 trim.
+# Connector unit tests: FlowPort + ThermalPort — the v1.1 connector roster.
+# (Phase 52's heat-flux connector type and its accompanying inline test stubs
+# were retired in Phase 55 D-06; CHF no longer uses any per-cell port. See
+# .planning/phases/55-composition-helpers-examples-test-suite/55-CONTEXT.md.)
+
 using Test
 using ModelingToolkit
 using STREAM
 import STREAM: Channel  # resolve Base.Channel ambiguity
 const ModelingToolkitBase = ModelingToolkit.ModelingToolkitBase
+using ModelingToolkit: t_nounits as t
 
 # ─────────────────────────────────────────────────────────────────
 # FOUND-01: Package loads (implicitly tested by reaching this line)
@@ -16,7 +23,6 @@ end
 # ─────────────────────────────────────────────────────────────────
 @testset "CONN-01: FlowPort instantiation" begin
     @named fp = FlowPort()
-    # Variable names exposed
     var_names = Symbol.(ModelingToolkit.getname.(unknowns(fp)))
     @test :P in var_names
     @test :mdot in var_names
@@ -31,7 +37,6 @@ end
 @testset "CONN-01: mdot is a Flow variable" begin
     @named fp = FlowPort()
     mdot_var = only(filter(v -> ModelingToolkit.getname(v) == :mdot, unknowns(fp)))
-    # Use Symbolics.getmetadata to access the connect type from variable metadata
     connect_type = Symbolics.getmetadata(
         mdot_var, ModelingToolkitBase.VariableConnectType, nothing
     )
@@ -48,7 +53,8 @@ end
 end
 
 # ─────────────────────────────────────────────────────────────────
-# CONN-02: ThermalPort — variable names and MTK metadata
+# CONN-02 (ThermalPort): legacy v0.x scope. Phase 52's heat-flux
+# connector also lived in this section but was retired in Phase 55 D-06.
 # ─────────────────────────────────────────────────────────────────
 @testset "CONN-02: ThermalPort instantiation" begin
     @named tp = ThermalPort()
@@ -74,7 +80,6 @@ end
 @testset "CONN-02: T is an across variable (no connect metadata)" begin
     @named tp = ThermalPort()
     T_var = only(filter(v -> ModelingToolkit.getname(v) == :T, unknowns(tp)))
-    # Across variables have no connect metadata — getmetadata returns nothing
     connect_type = Symbolics.getmetadata(
         T_var, ModelingToolkitBase.VariableConnectType, nothing
     )

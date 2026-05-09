@@ -35,9 +35,12 @@ resulting `ContinuousCallback` to `solve_transient(...; callbacks=cb)`.
 - `port_out`: `FlowPort` — outlet (pressure, mass flow, temperature)
 
 # Returns
-Uncompiled `System`. Call `mtkcompile(sys; fully_determined=false)` before solving a
-standalone Flapper (since `ref_mdot` is underdetermined alone), or compose it into a full
-system where `ref_mdot` is wired.
+Uncompiled `System`. The Flapper's `T_open(t)` state is set by an external
+`ContinuousCallback` (see `flapper_callback`), not by an MTK equation, so the system
+is intentionally structurally underdetermined. Additionally, `ref_mdot` has no
+in-component equation and must be wired by the caller. Call
+`mtkcompile(sys; fully_determined=false)` before solving a standalone Flapper, or
+compose it into a full system where `ref_mdot` is wired.
 """
 function Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0)
     pars = @parameters begin
