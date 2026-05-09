@@ -6,24 +6,6 @@ using DelimitedFiles
 using STREAM
 import STREAM: Channel, HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
 
-# ─────────────────────────────────────────────────────────────────────
-# Phase 56 parity harness — wired in 2026-05-08 per D-13 + D-14 (single-file)
-#
-# The 5 Python-parity testsets in this file are REPLACED (per D-13) with the
-# parity_check pipeline. The 3 KEPT testsets (VAL-02 transient T_wall step,
-# HD Fourier, two-plate one-channel, PK validation) are unchanged below.
-#
-# Pipeline shape (RESEARCH.md Pattern 3):
-#   (1) include parity_helpers.jl + python_parity_reference.jl
-#   (2) Initialize parity_report.csv (truncate at file load)
-#   (3) Run @testset "parity_helpers self-tests" — 12 sanity checks (RESEARCH.md "Test the Tester")
-#   (4) For each parity scenario:
-#       - assert_equivalence_* (5 pre-parity guards, D-10) — abort testset on fail
-#       - build + solve scenario
-#       - iterate ALL D-07 tiers via parity_check → ParityRow vector
-#       - print_drift_table(rows) + append_csv(PARITY_CSV, rows)
-#       - @test r.tier != TIER_FAIL for each row (D-03 — GRAY rows reported, not failed)
-# ─────────────────────────────────────────────────────────────────────
 
 include(joinpath(@__DIR__, "parity_helpers.jl"))
 include(joinpath(@__DIR__, "data", "python_parity_reference.jl"))
@@ -124,16 +106,6 @@ __init_parity_csv()  # called once at file load
     @test threw
 end
 
-# ─────────────────────────────────────────────────────────────────────
-# Phase 56 parity wrapper: ensures all 4 parity testsets run even if some
-# emit FAIL-tier rows (BLOCKER #3 — ALL scenarios must contribute to CSV).
-# A bare top-level @testset re-raises on first failure, halting subsequent
-# testsets. Wrapping the 4 sibling testsets inside an outer @testset lets
-# each complete regardless of sibling failures. The outer block is wrapped
-# in try/catch so the FAIL-tier verdict at end-of-outer-testset (per D-12 +
-# WARNING #10 reconciliation — Plan 5 close allows h_tc FAIL surfacing
-# honestly) does NOT halt subsequent KEPT testsets.
-# ─────────────────────────────────────────────────────────────────────
 try
 @testset "Phase 56 parity harness" begin
 
@@ -1018,11 +990,6 @@ end
                 getproperty(cac_v02, Symbol(:thermal_right, i)),
             ) for i in 1:nz_v02
         ]...,
-        # Phase 58-04: pin hd.power(t) for each HD instance to close the structural
-        # under-determinacy (Δ=−2 with two HDs). Without these pins, MTK cannot bind
-        # the symbolic `power(t)` variable declared in `HeatDiffusion`. See
-        # .planning/phases/58-mtk-system-determinacy-repair/scratch/diag_table.md
-        # Scenario E (live: 91/93 → 91/91 with both pins).
         hd1.power ~ power_per_plate,
         hd2.power ~ power_per_plate,
     ]
