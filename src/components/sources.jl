@@ -1,29 +1,5 @@
 # sources.jl — WallTemperature and HeatFluxSource value-source components for STREAM.jl
 #
-# Phase 55 D-04 deliverables. Both are portless "value source" subsystems —
-# their job is to expose a vector of plain output variables that other
-# systems (typically Channel.T_wall_left[i] / ChannelHeatFlux.q_left[i])
-# can bind to via either:
-#
-#   # Style 1 — direct binding eqns at compose time (args.funcs idiom):
-#   connections = [..., [ch.T_wall_left[i] ~ T_wall_value for i in 1:n]...]
-#
-#   # Style 2 — value-source component:
-#   @named wt = WallTemperature(; n=n, T_wall=T_wall_value)
-#   connections = [..., [ch.T_wall_left[i] ~ wt.T_wall_out[i] for i in 1:n]...]
-#
-# The two styles produce identical post-mtkcompile systems; Style 2 is
-# preferred for GUI / boxes-and-wires use cases (each "value source" is a
-# named subsystem in the compose tree).
-#
-# Difference from src/components/misc.jl:ConstantTemperature: ConstantTemperature
-# is FlowPort-side (single scalar T tied to a stream connector); WallTemperature /
-# HeatFluxSource are portless (a vector of plain @variables — no connector).
-
-# Three-branch construction pattern shared by both components, mirroring
-# Channel.h_left/h_right resolution at src/components/channels.jl (Phase 54
-# D-02) and PointKinetics rho_c_fn pattern at src/components/point_kinetics.jl:225,241
-# (RESEARCH.md §1 — verified MTK callable-parameter pattern).
 
 """
     WallTemperature(; name, n, T_wall) -> ODESystem
@@ -74,9 +50,6 @@ function WallTemperature(; name, n::Int, T_wall::Union{Real, AbstractVector{<:Re
         FType = typeof(T_wall)
         pT = @parameters (T_wall_fn::FType)(..)
         eqs = Equation[T_wall_out[i] ~ pT[1](t) for i in 1:n]
-        # `extra_pars` shape — Vector{Any} because callable-parameter @parameters
-        # returns Vector{Symbolics.CallAndWrap{Num}}, not Vector{Num} (Pitfall in
-        # RESEARCH.md §6: don't try Vector{Num} for the merged pars list — method error).
         pars = Any[collect(pT)...]
         return System(eqs, t, [collect(T_wall_out)...], pars; name=name)
     end

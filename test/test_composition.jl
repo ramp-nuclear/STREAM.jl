@@ -1,12 +1,4 @@
 # test/test_composition.jl — Phase 55 D-18 rewrite.
-# Composition helpers + CAC↔HD compose-correctness across topologies and shapes.
-# Mirrors Python STREAM's test_composition/test_subsystems.py rule: verify wiring
-# is correct (eqn count balanced, mtkcompile succeeds, brief solve produces a
-# meaningful steady state) — NOT physics-vs-analytic (that's test_integration.jl).
-#
-# Architectural invariant (locked, see feedback_channel_hd_connection_rule.md):
-# HeatDiffusion connects ONLY to ChannelAndContacts. Channel and
-# ChannelHeatFlux are NEVER composed with HeatDiffusion in this file.
 
 using Test
 using ModelingToolkit
@@ -183,17 +175,6 @@ end
     @test sol.retcode == ReturnCode.Success
 end
 
-# NOTE on `nx=1` (Deviation 1, see SUMMARY): the plan template originally asked
-# for an `nx=1` smallest-asymmetric testset. HeatDiffusion's lateral-FD stencil
-# (`src/components/heat_diffusion.jl:_diffusion_eqs`) hard-references `T[i,2]`
-# in the `j==1` left-boundary branch and `T[i,nx-1]` in the `j==nx` right-
-# boundary branch — `nx=1` triggers `BoundsError` because both branches fire on
-# the same single cell with no interior. Fixing this requires an additional
-# `if nx == 1` single-cell stencil branch in HeatDiffusion, which is OUT OF
-# PHASE-55 SCOPE (Phase 55 D-08 line: "src/components/heat_diffusion.jl ...
-# UNCHANGED in Phase 55"). Substituting `nx=1` with `nx=4` (a wider plate than
-# the default `nx=2`, asymmetric vs the n=4 channel cell count and the other
-# `nx=2`/`nx=3` testsets) preserves the spirit of the asymmetric-shape matrix.
 @testset "symmetric_plate — asymmetric nx=4 (wide plate, nx > n)" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=4)
     rods = symmetric_plate(cac, fuel; name=:rods)
@@ -286,9 +267,6 @@ end
 # ───────────────────────────────────────────────────────────
 @testset "one_sided_connection — side=:left compiles cleanly" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    # `one_sided_connection` calls `compose(...)` which preserves each
-    # subsystem's `@named` binding — the channel arg keeps its name `:cac`,
-    # not the parameter symbol `:channel`.
     osc = one_sided_connection(cac, fuel; side=:left, name=:osc_l)
     @test osc isa ModelingToolkit.AbstractSystem
     @named pump = Pump(3.0e4)

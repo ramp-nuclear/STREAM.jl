@@ -1,18 +1,4 @@
 # test/test_determinacy.jl
-# Phase 58 — guards against the under-determinacy regression family
-# documented in .planning/phases/56-python-stream-cross-validation/deferred-items.md §D-1.
-#
-# Asserts, for every canonical builder and every Phase-58 scenario topology:
-#   (1) length(equations(ssys)) == length(unknowns(ssys))
-#   (2) mtkcompile(sys; fully_determined=true) succeeds (does not throw)
-# (2) is the stronger contract; (1) is the cheap pre-check that names WHICH Δ
-# is wrong before the harder strict-compile attempt.
-#
-# At plan-end of Phase 58-01, the canonical-builders testset is GREEN; the
-# Phase-58 scenarios testset is RED (5 failures) by design — each scenario
-# helper deliberately omits the `hd.power ~ value` pin so subsequent fix
-# plans (58-02..04) can flip the corresponding row from RED to GREEN by
-# adding the pin in BOTH the helper here AND in test_validation.jl.
 
 using Test
 using ModelingToolkit
@@ -54,13 +40,6 @@ function assert_determined_compiled(label::String, ssys)
     return ssys
 end
 
-# ─────────────────────────────────────────────────────────────
-# Phase-58 scenario builder helpers (private). Each helper mirrors the
-# topology in test/test_validation.jl WITHOUT the `hd.power ~ value` pin,
-# so the helper produces the broken-state system. Plans 58-02..04 will add
-# the pin in BOTH the helper here AND test_validation.jl when they fix
-# the corresponding scenario.
-# ─────────────────────────────────────────────────────────────
 
 function _build_mtr_sym()
     nz = 10; nx = 3

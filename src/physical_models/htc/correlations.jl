@@ -6,13 +6,6 @@
 #   - Factories (constant_Nusselt, regime_dependent, elenbaas_htc): return closures
 #     that capture construction-time scalars; inner function receives only symbolic Re/Pr.
 #   - No @register_symbolic on any function in this file — all are plain arithmetic.
-#   - Eval-point convention (Phase 57 D-04): callers should pass `Re` and `Pr` evaluated at the
-#     FILM temperature `T_film = (T_bulk + T_wall)/2`, matching Python STREAM's
-#     `coolant_funcs.to_properties(T_film, pressure)` convention. The `T_bulk` slot in
-#     the 4-arg signature `(Re, Pr, T_bulk, T_wall) -> Nu` is reserved for the rare
-#     correlation that needs bulk T internally (e.g. `elenbaas_htc`'s natural-convection
-#     β, ν evaluations stay at bulk by Python convention). The Channel core in
-#     `src/components/channels.jl` does the film-T evaluation at the call site.
 
 """
     dittus_boelter(Re, Pr, args...) -> Nu

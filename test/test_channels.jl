@@ -1,22 +1,5 @@
 # test/test_channels.jl — Phase 55 TEST-01 unified channel-family unit tests.
 #
-# D-17 deliverable. Built fresh under the new architecture — not a port of
-# legacy test_channel.jl. Absorbs test_channel_core.jl (G1-G4 enthalpy-form
-# physics) and test_sign_safety.jl (flow-reversal sign tests) per the
-# Python STREAM rule "shared core tested with the variants that share it"
-# (RESEARCH.md §4 + Python ~/projects/STREAM/tests/test_calculations/test_channel.py).
-#
-# Architectural invariant (locked, see feedback_channel_hd_connection_rule.md):
-# HeatDiffusion connects ONLY to ChannelAndContacts. Channel and ChannelHeatFlux
-# NEVER wire to HeatDiffusion — they consume external T_wall / q values via
-# binding eqns (Style 1) or value-source components WallTemperature /
-# HeatFluxSource (Style 2). Phase 55 D-01 / D-03 dropped their per-cell ports.
-#
-# Spike #1 outcome (55-WAVE0-SPIKE-RESULTS.md): HYPOTHESIS=A — Channel/CHF with
-# default kwargs `mtkcompile`s in isolation under `fully_determined=false`,
-# leaving `T_wall_left[i]` / `T_wall_right[i]` (resp. `q_left[i]` / `q_right[i]`)
-# as free unknowns. Closed-loop tests still bind them defensively (the binding
-# is decorative under H=A, required under H=B).
 
 using Test
 using ModelingToolkit
@@ -95,12 +78,6 @@ end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Section 2: Adiabatic-by-default (D-17 second bullet)
-# Closed Pump → bc → Channel → Pump loop. With h_*=0.0 (default), the q_*_expr
-# collapses to zero regardless of T_wall_* values. We bind T_wall_*[i] ~ T_INLET
-# defensively (decorative under H=A, required under H=B).
-# ─────────────────────────────────────────────────────────────────
 @testset "Channel adiabatic-by-default — closed loop, h_*=0.0" begin
     n = N_DEFAULT
     @named pump = Pump(DP_PUMP)
@@ -150,11 +127,6 @@ end
     @test isapprox(sol[ssys.chf.T_out, end], T_INLET; rtol=1e-3)
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Section 3: Heated Style 1 — direct binding eqns (D-17 third bullet)
-# `[ch.T_wall_left[i] ~ T_WALL]` per cell drives the heated face.
-# Right side adiabatic via h_right=0.0; q_wall_right[i] ≈ 0.
-# ─────────────────────────────────────────────────────────────────
 @testset "Channel heated Style 1 — binding eqns drive T_wall_left, h_right=0 adiabatic right" begin
     n = N_DEFAULT
     @named pump = Pump(DP_PUMP)
@@ -224,11 +196,6 @@ end
     end
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Section 4: Heated Style 2 — value-source components (D-17 fourth bullet)
-# `WallTemperature` / `HeatFluxSource` produce the same numerics as Style 1.
-# Asserts equivalence to Style 1 within rtol=1e-6.
-# ─────────────────────────────────────────────────────────────────
 @testset "Channel heated Style 2 — WallTemperature source, equivalence to Style 1" begin
     n = N_DEFAULT
     # Style 1 baseline (binding eqn).
@@ -334,10 +301,6 @@ end
     @test isapprox(sol[ssys.chf.port_in.mdot, end], mdot_s1; rtol=1e-6)
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Section 5: h_left value-shape coverage (D-17 fifth bullet)
-# Real / Vector / Function shapes for `h_left`.
-# ─────────────────────────────────────────────────────────────────
 @testset "Channel h_left::Real (broadcast)" begin
     n = N_DEFAULT
     @named pump = Pump(DP_PUMP)
@@ -737,20 +700,6 @@ end
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Section 9: _channel_core enthalpy-form physics G1-G4 (D-17 ninth bullet)
-# Absorbed from test_channel_core.jl. Tests the SHARED CORE via direct
-# ChannelHeatFlux instantiations (with q_left binding to a captured / prescribed
-# per-cell flux profile). This replaces the old `_StubChannelCore` harness —
-# the post-Wave-1 ChannelHeatFlux IS the canonical CHF wrapper around
-# `_channel_core`, and binding `chf.q_left[i] ~ q_value[i]` reproduces what
-# the stub used to do via `q_left_vals=q_value`.
-# Canonical rtols preserved: G1 rtol=1e-6, G2 rtol=1e-9, G3 rtol=1e-12 (1e-9 fallback).
-# ─────────────────────────────────────────────────────────────────
-
-# Stage-1 baseline reference (captured 2026-05-06 on Julia 1.12.6 — see
-# test_channel_core.jl:48-72 for provenance). Driven by 1 K wall superheat,
-# CHF-style internal h_tc on a pump-loop.
 const STAGE1_GEOMETRY_L = 0.6
 const STAGE1_GEOMETRY_D = 0.01
 const STAGE1_N          = 10
@@ -771,16 +720,6 @@ const STAGE2_Q0          = 12_300.0
 const STAGE2_MDOT        = 0.49
 
 @testset "G1: Stage-1 constant-cp limit baseline (rtol=1e-6)" begin
-    # In the small-dT regime (~0.2 K total, ~0.02 K/cell), cp(T) is essentially
-    # constant. The face-averaged enthalpy form must degenerate to the
-    # constant-cp form. We compare:
-    #   - "v1.0" reference: a CAC + ConstantTemperature loop (h_tc internally
-    #      computed via dittus_boelter). This produces the canonical Stage-1
-    #      profile — a 1 K wall superheat ⇒ ~0.2 K total fluid heating.
-    #   - "core" replication: a ChannelHeatFlux loop driven with the per-cell
-    #      q profile captured from the v1.0 solve, bound via chf.q_left[i].
-    # The CHF wrapper of `_channel_core` must reproduce the same T profile to
-    # rtol=1e-6 since the regime is constant-cp.
     L = STAGE1_GEOMETRY_L
     D = STAGE1_GEOMETRY_D
     n = STAGE1_N
@@ -812,9 +751,6 @@ const STAGE2_MDOT        = 0.49
         T_out_v1 = sol_v1[ssys_v1.cac_v1.T_out]
         mdot_v1  = sol_v1[ssys_v1.cac_v1.port_in.mdot]
         T_v1     = [sol_v1[ssys_v1.cac_v1.T[i]] for i in 1:n]
-        # Per-cell q_wall_left profile (W) — what CHF must be driven with.
-        # CAC's q_wall_left is the absolute heat power per cell; CHF's q_left
-        # is the flux density [W/m^2]. Convert: q_left_density = Q / (heated * dz).
         dz = L / n
         q_density = Float64[
             sol_v1[ssys_v1.cac_v1.q_wall_left[i]] / (geom.heated_parts[1] * dz)
@@ -853,9 +789,6 @@ const STAGE2_MDOT        = 0.49
 end
 
 @testset "G2: Stage-2 Python pair_mean_1d parity (rtol=1e-9)" begin
-    # In the realistic-dT regime (~30 K), cp(T) varies by ~3% across cells. The
-    # face-averaged cp form must match Python STREAM's pair_mean_1d formula to
-    # rtol=1e-9. Driven by Pump(; mdot0) (fixed-flow) for parity with Python.
     L = STAGE2_GEOMETRY_L
     D = STAGE2_GEOMETRY_D
     n = STAGE2_N
@@ -893,9 +826,6 @@ end
 end
 
 @testset "G3: Single-cell forward/reverse mirror (rtol=1e-12, fallback 1e-9)" begin
-    # n=1 mirror identity: forward and reverse heating of the SAME cell with the
-    # SAME prescribed flux produce the SAME dT (energy added is direction-agnostic
-    # for a single cell). Catches asymmetric ifelse(mdot >= 0, ...) handling.
     n = 1
     geom = PipeGeometry_circular(0.1, 0.01)
     Q = 1000.0  # W per cell
@@ -950,9 +880,6 @@ end
 end
 
 @testset "Multi-cell mirror (G3 extended — spatial T(z) reflection, rtol=1e-12 / 1e-9 fallback)" begin
-    # n>1: forward and reverse mdot of equal magnitude reflect the spatial T(z)
-    # profile: T_rev[i] == T_fwd[n+1-i]. Catches off-by-one and ifelse boundary
-    # asymmetries undetectable at n=1.
     n = 3
     geom = PipeGeometry_circular(0.3, 0.01)
     Q = 800.0
@@ -1060,13 +987,6 @@ end
     end
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Section 10 (bonus per D-17): CAC ↔ CHF cross-equivalence smoke
-# CAC with constant-Nusselt + ConstantTemperature(T_wall) vs
-# CHF with HeatFluxSource(q_value) where q_value = h_tc × (T_wall − T_inlet).
-# Smoke-level — match within rtol=1e-3 (CAC's h_tc varies cell-to-cell with
-# Re/T, so this is a spirit-check, not a numerics-check).
-# ─────────────────────────────────────────────────────────────────
 @testset "CAC ↔ CHF cross-equivalence (smoke)" begin
     n = N_DEFAULT
     geom = PipeGeometry_circular(L_DEFAULT, D_DEFAULT)

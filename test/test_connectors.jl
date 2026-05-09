@@ -1,8 +1,5 @@
 # test/test_connectors.jl — Phase 55 D-06 trim.
 # Connector unit tests: FlowPort + ThermalPort — the v1.1 connector roster.
-# (Phase 52's heat-flux connector type and its accompanying inline test stubs
-# were retired in Phase 55 D-06; CHF no longer uses any per-cell port. See
-# .planning/phases/55-composition-helpers-examples-test-suite/55-CONTEXT.md.)
 
 using Test
 using ModelingToolkit

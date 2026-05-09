@@ -13,17 +13,6 @@
 #   test_subcooled_boiling.jl (ISCB-01..02 full-loop CAC + SCB; SCB-01..04 stay in test_thresholds.jl)
 #   test_point_kinetics.jl    (TF-06, TF-07 — full PK loop integration RELOCATED HERE)
 #
-# Architectural invariant (locked, see feedback_channel_hd_connection_rule.md):
-# HeatDiffusion connects ONLY to ChannelAndContacts. Tests in this file must not
-# violate that rule.
-#
-# Spike B awareness (Phase 55 Wave 0 outcome `spike_lof_winner: "B"`):
-# `build_loop_lof_bypass` heated leg = CAC + HeatDiffusion plate via
-# `one_sided_connection(ch, fuel; side=:left, name=:heated)`. Access path is
-# `ssys.heated.ch.*` / `ssys.heated.fuel.*`. Power input is `power_W` kwarg
-# (default 1.0e3 W) pinned via `heated.fuel.power ~ power_W`. Energy balance
-# checks must use Q_input = power_W (or sum of q_wall over the heated channel),
-# NOT a wall-T-to-bulk delta from a non-existent `T_wall` constant.
 
 using Test
 using ModelingToolkit
@@ -37,15 +26,8 @@ import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger
     HeatDiffusion, solve_steady, solve_transient, steady_state_guess,
     regime_dependent_q_scb, _bergles_rohsenow_dT_ONB
 
-# ───────────────────────────────────────────────────────────
-# §1 Builders smokes (D-19 first bullet)
-# Migrated from test_examples.jl (PK builder reach-only) and test_solvers.jl
-# (SYS-01, SYS-02). All six builders compile + solve a brief transient or
-# steady-state to verify the builder's output is structurally sane.
-# ───────────────────────────────────────────────────────────
 @testset "Builders smokes" begin
     @testset "SYS-01: build_loop compiles closed loop" begin
-        # Migrated from test_solvers.jl SYS-01 (lines 11-15).
         ssys = build_loop()
         @test ssys isa ModelingToolkit.AbstractSystem
         # mtkcompile benchmark reported via @info (not asserted)

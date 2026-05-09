@@ -18,14 +18,6 @@
 # "inlet temperature" seen by the Channel's first-cell energy
 # balance to be T_inlet, enabling physical non-trivial solutions.
 #
-# Phase 55 D-09 / D-10: Channel uses external-input variables.
-# `h_left=h_wall` kwarg supplies the convective HTC; per-cell
-# `[ch.T_wall_left[i] ~ T_wall for i in 1:n]` binding eqns close
-# the wall-temperature input (args.funcs idiom — D-05 Style 1).
-# `h_right=0.0` (default) leaves the right face adiabatic — the
-# right-face binding is decorative since the q-expression is zero
-# regardless.
-#
 # Boundary conditions:
 #   pump.port_in.P ~ 1.0e5                pressure gauge freedom fix (absolute anchor)
 #   ch.T_wall_left[i]  ~ T_wall   ∀ i      left-face wall temperature pin

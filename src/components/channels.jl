@@ -1,39 +1,11 @@
 # channels.jl — Channel, ChannelHeatFlux, ChannelAndContacts variants
 # and shared `_channel_core` for STREAM.jl.
 #
-# Phase 54 (v1.1) consolidated channel-family file. Holds:
-#   - the `function Channel end` Base-disambiguation declaration
-#     (Base.Channel{T} is Julia stdlib's task-communication channel; STREAM.Channel
-#     is unrelated). Without this declaration, `function Channel(; name, n, ...)` below
-#     would attempt to add a method to `Base.Channel`, which fails at module load.
-#   - the private helper `_channel_core` (single source of truth for the channel
-#     family's energy balance / friction / momentum / port wiring / observables;
-#     introduced in Phase 53).
-#   - the three public variants `Channel`, `ChannelHeatFlux`, and `ChannelAndContacts`.
-#     CHF and CAC are added in plans 54-02 / 54-03; this file ships only
-#     `Channel` for now (Phase 54-01).
-#
-# `_channel_core` is private (underscore-prefixed; not exported in src/STREAM.jl).
 
 # Declare Channel as a new generic function independent of Base.Channel{T}
 # (Base.Channel is Julia stdlib's task-communication channel; STREAM.Channel is unrelated)
 function Channel end
 
-# === Phase 53: shared `_channel_core` =====================================
-#
-# `_channel_core` is the single source of truth for the STREAM channel-family
-# physics: energy balance (enthalpy form, face-averaged cp), per-cell friction
-# (algebraic dp[i]), mass conservation, momentum ODE, port wiring, and observables
-# (Re, Pe, v, P, T_sat, T_ONB, q_wall, q_wall_left, q_wall_right, T_out, dP).
-#
-# Phase 54 will migrate Channel, ChannelAndContacts, and ChannelHeatFlux onto
-# `_channel_core`; until then those variants carry inlined per-variant equation
-# blocks (constant-cp form) instead of calling a shared helper.
-#
-# Returns a NamedTuple `(; eqs, obs)` (D-01) — variants splice
-# `eqs = [variant_eqs; core.eqs]` and `obs = [core.obs; variant_obs]` before
-# building the System. Variants declare ALL `@variables` (unknowns AND
-# observables core references); core builds equations referencing those symbols.
 
 """
     _channel_core(; n, T, dp, port_in, port_out, geometry, g_acc,
@@ -61,25 +33,19 @@ those symbols.
 - `g_acc::Real`                                     : gravitational acceleration [m/s^2]
 - `friction_correlation`                            : friction closure `(Re) -> f`
 - `q_left_expr`, `q_right_expr`                     : length-n `Vector{Num}`, per-cell heat flow inputs (W) — variant builds these
-- `Re, Pe, v, P, T_sat, T_ONB, q_wall, q_wall_left, q_wall_right` : variant-declared observable LHS symbols (D-10)
+- `Re, Pe, v, P, T_sat, T_ONB, q_wall, q_wall_left, q_wall_right` : variant-declared observable LHS symbols
 - `T_out, dP`                                       : variant-declared scalar observable LHS symbols
 
 # Returns
 NamedTuple `(; eqs::Vector{Equation}, obs::Vector{Equation})` — the variant
 splices these into its own equation lists before building the `System`.
 
-# Energy balance per cell (enthalpy form, face-averaged cp; D-06)
+# Energy balance per cell (enthalpy form, face-averaged cp)
 
     cp_face = (cp_water(T_up) + cp_water(T[i])) / 2
     Dt(T[i]) ~ (|mdot|*cp_face*(T_up - T[i]) + q_left_expr[i] + q_right_expr[i])
               / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
 
-Numerator uses face-averaged cp (NRG-01); boundary face of cell 1 forward and
-cell n reverse uses the SAME averaging with `T_up = instream(port_in.T)` /
-`instream(port_out.T)` (NRG-02). Denominator retains local `cp_water(T[i])` —
-the two cp values do NOT cancel (NRG-03). Single `ifelse(mdot >= 0, ...)`
-selects upstream T; cp inherits the selection because `cp_water` is
-`@register_symbolic` and deterministic (NRG-04).
 """
 function _channel_core(;
     n::Int,
@@ -180,33 +146,6 @@ function _channel_core(;
     return (; eqs, obs)
 end
 
-# === Phase 55 D-01 / D-02: external-input-variable Channel ================
-#
-# Phase 55 walks back the per-cell ThermalPort arrays Phase 54 shipped:
-# the new Channel has NO `thermal_left[1:n]` / `thermal_right[1:n]` ports.
-# In their place, channel-level external-input variables `T_wall_left[1:n]`
-# and `T_wall_right[1:n]` are declared on the System with no internal
-# equation. The user closes them either by direct binding eqns at compose
-# time (`[ch.T_wall_left[i] ~ value for i in 1:n]...`, args.funcs idiom — D-05
-# Style 1) or by wiring a `WallTemperature` source component
-# (D-04 / src/components/sources.jl, D-05 Style 2).
-#
-# Why drop the ports: the Phase 54 design emitted `port.Q_flow ~ q_left_expr[i]`
-# per cell; combined with MTK's Flow rule that auto-zeros Q_flow on dangling
-# ports, this over-determined the system whenever a user added a binding
-# eq on port.T (Phase 54 Deviation 1). The architectural rule
-# (`feedback_channel_hd_connection_rule.md`) — only ChannelAndContacts
-# connects to HeatDiffusion — means Channel and ChannelHeatFlux never
-# needed Flow-based ports. Removing them eliminates the over-determination
-# root cause; the q-expression construction proceeds against the plain
-# T_wall_left[i] @variables instead.
-#
-# Adiabatic by default: `h_left=h_right=0.0` (default) makes both
-# `q_*_expr[i]` zero regardless of T_wall_*[i], so the energy balance does
-# not heat the fluid. Whether T_wall_*[i] is a free unknown after
-# `mtkcompile(...; fully_determined=false)` (Hypothesis A) or is collapsed
-# by structural simplification (Hypothesis A_PARTIAL) is recorded in
-# 55-WAVE0-SPIKE-RESULTS.md and reflected in test_channels.jl assertions.
 
 """
     Channel(; name, n, geometry, g=0.0, h_left=0.0, h_right=0.0,
@@ -314,12 +253,6 @@ function Channel(;
 
     pars = Any[pars_base...; extra_pars...]
 
-    # ----------------------------------------------------------------
-    # Variables — variant declares ALL @variables that _channel_core references
-    # by symbol (Phase 53 D-10). T, dp are unknowns; the rest are observable LHS.
-    # NEW IN PHASE 55 (D-01): T_wall_left[1:n] and T_wall_right[1:n] are plain
-    # external-input variables — no equation, no default, user closes them.
-    # ----------------------------------------------------------------
     vars = @variables begin
         (T(t))[1:n] = fill(600.0, n)
         (dp(t))[1:n] = fill(100.0, n)
@@ -343,16 +276,6 @@ function Channel(;
 
     dz = L / n
 
-    # ----------------------------------------------------------------
-    # D-02 q-expression construction (per cell) — NO PORT-Q_FLOW EQUATION.
-    # The q expression now reads T_wall_left[i] / T_wall_right[i] directly
-    # (the channel-level @variable), not thermal_*[i].T (the deleted port var).
-    # No `port.Q_flow ~ q_*_expr` closure — there is no port to close.
-    #
-    # Adiabatic-by-default: h_left=h_right=0.0 ⇒ q_*_expr[i] = 0 ⇒ T[i] is
-    # not heated regardless of what T_wall_*[i] is set to (or whether it's
-    # bound at all).
-    # ----------------------------------------------------------------
     q_left_expr  = Vector{Num}(undef, n)
     q_right_expr = Vector{Num}(undef, n)
     for i in 1:n
@@ -360,9 +283,6 @@ function Channel(;
         q_right_expr[i] = hR_per_cell[i] * geometry.heated_parts[2] * dz * (T_wall_right[i] - T[i])
     end
 
-    # ----------------------------------------------------------------
-    # Hand off to _channel_core (Phase 53 D-01 / D-03 — UNCHANGED).
-    # ----------------------------------------------------------------
     core = _channel_core(;
         n, T, dp, port_in, port_out, geometry,
         g_acc=g, friction_correlation,
@@ -390,25 +310,6 @@ function Channel(;
     )
 end
 
-# === Phase 55 D-03: external-input-variable ChannelHeatFlux ================
-#
-# Phase 55 walks back the per-cell heat-flux ports Phase 54 shipped:
-# the new ChannelHeatFlux has NO `thermal_left[1:n]` / `thermal_right[1:n]`
-# ports. In their place, channel-level external-input variables `q_left[1:n]`
-# and `q_right[1:n]` (heat flux density [W/m^2]) are declared on the System
-# with no internal equation. The user closes them either by direct binding
-# eqns at compose time (`[chf.q_left[i] ~ value for i in 1:n]...`, args.funcs
-# idiom — D-05 Style 1) or by wiring a `HeatFluxSource` value-source
-# component (D-04 / src/components/sources.jl, D-05 Style 2).
-#
-# The Phase 52 heat-flux connector type was retired in Phase 55 D-06 — see
-# plan 55-04 for the connectors.jl + STREAM.jl exports + test_connectors.jl edits.
-#
-# Zero-flux by default: unbound `q_left[i] / q_right[i]` (or set to 0.0)
-# makes `q_*_expr[i] = 0` regardless of T[i]. Whether the unbound case
-# survives `mtkcompile(...; fully_determined=false)` follows the same
-# Hypothesis A / A_PARTIAL / B answer Spike #1 produced for Channel's
-# T_wall_*[i] vars.
 
 """
     ChannelHeatFlux(; name, n, geometry, g=0.0,
@@ -497,12 +398,6 @@ function ChannelHeatFlux(;
 
     dz = L / n
 
-    # ----------------------------------------------------------------
-    # D-03 q-expression construction (per cell) — NO PORT-Q_FLOW EQUATION.
-    # q expression reads q_left[i] / q_right[i] directly (channel-level @variable
-    # of physical units W/m^2). No `port.Q_flow ~ q_left_expr` closure — there
-    # is no port to close. Zero-flux when q_*[i] is bound to 0 (or default-unbound).
-    # ----------------------------------------------------------------
     q_left_expr  = Vector{Num}(undef, n)
     q_right_expr = Vector{Num}(undef, n)
     for i in 1:n
@@ -537,18 +432,6 @@ function ChannelHeatFlux(;
     )
 end
 
-# === Phase 54 D-08 / D-09: ChannelAndContacts (carry-forward, ThermalPort) ==
-#
-# ChannelAndContacts retains the legacy CONN-03 connector shape: per-cell
-# `ThermalPort` arrays per side. CAC is the ONLY variant that connects to
-# `HeatDiffusion` (locked architectural rule, see
-# `feedback_channel_hd_connection_rule.md`). h is computed INTERNALLY via the
-# `htc_correlation` kwarg (single-phase path) plus an optional `scb_correction`
-# closure that augments h_tc[i] by the Bergles-Rohsenow partial-boiling factor
-# when T_wall[i] >= T_ONB[i]. Both branches migrate verbatim from the legacy
-# CAC body in `thermal_channel.jl` (lines 105-165 of the pre-Phase-54-03 file).
-# Surrounding scaffolding (energy balance, friction, port wiring, observables)
-# is delegated to `_channel_core` per Phase 53 D-01..D-14.
 
 """
     ChannelAndContacts(; name, n, geometry, g=0.0,
@@ -641,55 +524,9 @@ function ChannelAndContacts(;
 
     dz = L / n
 
-    # ----------------------------------------------------------------
-    # h_tc[i] equation — single-phase OR correlation + SCB.
-    # MIGRATED VERBATIM from legacy CAC (thermal_channel.jl lines 111-117 single-phase
-    # branch and 141-164 SCB branch). Only the surrounding scaffolding changes.
-    # All expressions are inlined (no observed-to-observed chains; ISCB-01 + Pitfall 7).
-    # ----------------------------------------------------------------
     variant_eqs = Equation[]
-    # ----------------------------------------------------------------
-    # Phase 57 D-01/D-02/D-03: HTC fluid-property eval point.
-    # ----------------------------------------------------------------
-    # The HTC pipeline (Re, Pr, leading k outside Nu) evaluates fluid
-    # properties at the FILM temperature T_film = (T_cool + T_wall) / 2,
-    # matching Python STREAM's
-    #   T_film = film(T_cool, T_wall)
-    #   cool   = coolant_funcs.to_properties(T_film, pressure)
-    # in heat_transfer_coefficient/__init__.py:208-209.
-    #
-    # Friction Re (channels.jl:139 inside _channel_core) and the
-    # natural-convection Gr inside regime_dependent / elenbaas_htc /
-    # variant_obs Gr_over_Re2[i] (channels.jl:742-743) intentionally
-    # STAY at bulk T — that matches Python STREAM's convention for
-    # those quantities (friction is a bulk-flow phenomenon; NC driving
-    # force is a bulk-vs-wall ΔT phenomenon evaluated at bulk).
-    # Do NOT "fix" those to film T; they are correct as-is.
-    #
-    # The shared `_channel_core`'s diagnostic Re[i]/Pr[i]/Pe[i] observables
-    # (line 147) ALSO stay at bulk in this phase — `_channel_core` is
-    # consumed by Channel, ChannelHeatFlux, and CAC, and only CAC has a
-    # wall T in scope. Switching the core would require adding a wall-T
-    # kwarg (touches Channel/CHF too) or branching inside the core; both
-    # worse than the current arrangement where the CAC-specific film-T
-    # diagnostic lives in variant_obs Nu[i] (lines 733-744 below) where
-    # thermal_left[i].T is already in scope.
-    # ----------------------------------------------------------------
     if scb_correction === nothing
         for i in 1:n
-            # Phase 56-resume fix (per-side h): compute h_left using thermal_left[i].T's
-            # film, h_right using thermal_right[i].T's film. Matches Python's
-            #   h_left  = h_wall(T_wall=T_left,  T_cool, ...)
-            #   h_right = h_wall(T_wall=T_right, T_cool, ...)
-            # at stream/calculations/channel.py:689-690. Earlier attempts using a
-            # single h_tc with max() or ifelse() over the two wall T's destabilized
-            # KINSol's Jacobian at the symmetric kink (segfault and NaN convergence).
-            # Per-side h is smooth in each path, matches Python's per-side semantics,
-            # and produces honest CLEAN/GRAY parity for both heated and adiabatic
-            # sides (adiabatic side: T_w ≈ T[i] → T_film ≈ T[i] → h ≈ h_at_bulk;
-            # q on that side is h * (T_w−T[i]) ≈ 0 anyway so physics is unaffected).
-            # For symmetric scenarios (both walls equal): h_left == h_right (simple_loop unaffected).
-            # See .planning/phases/56-python-stream-cross-validation/56-MTR-CONVENTION-RESEARCH.md.
             T_left_w   = thermal_left[i].T
             T_film_l   = (T[i] + T_left_w) / 2
             Re_l       = abs(port_in.mdot) * Dh / (A * mu_water(T_film_l))
@@ -702,9 +539,6 @@ function ChannelAndContacts(;
             Pr_r       = cp_water(T_film_r) * mu_water(T_film_r) / k_water(T_film_r)
             push!(variant_eqs, h_tc_right[i] ~ htc_correlation(Re_r, Pr_r, T[i], T_right_w) * k_water(T_film_r) / Dh)
 
-            # h_tc[i] retained for backward compat — average of the two sides.
-            # (Used by no internal physics now; q_*_expr uses h_tc_left/h_tc_right directly.)
-            push!(variant_eqs, h_tc[i] ~ (h_tc_left[i] + h_tc_right[i]) / 2)
         end
     else
         for i in 1:n
@@ -742,42 +576,15 @@ function ChannelAndContacts(;
         end
     end
 
-    # ----------------------------------------------------------------
-    # D-09 q-expression construction (per cell). Uses h_tc[i] (the unknown) — core
-    # consumes the symbol by reference. Channel-side Q_flow eqns close ThermalPort.
-    # When the wall port dangles (no HD connection on that face), MTK's Flow rule
-    # auto-zeros Q_flow ⇒ either thermal_*[i].T = T[i] (adiabatic) or h_tc=0 (which
-    # cannot happen since h_tc has its own equation) — so unconnected sides settle
-    # to the equilibrium where q_*_expr[i] = 0 ⇒ T_wall[i] = T[i]. Adiabatic ✓.
-    # ----------------------------------------------------------------
     q_left_expr  = Vector{Num}(undef, n)
     q_right_expr = Vector{Num}(undef, n)
     for i in 1:n
-        # Phase 56-resume per-side h: q on each side uses its own side's h.
-        # In SCB branch h_tc_left[i] == h_tc_right[i] == h_tc[i] (symmetric SCB).
         q_left_expr[i]  = h_tc_left[i]  * geometry.heated_parts[1] * dz * (thermal_left[i].T  - T[i])
         q_right_expr[i] = h_tc_right[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i])
         push!(variant_eqs, thermal_left[i].Q_flow  ~ q_left_expr[i])
         push!(variant_eqs, thermal_right[i].Q_flow ~ q_right_expr[i])
     end
 
-    # ----------------------------------------------------------------
-    # Q_wall_total — Phase 53 D-14 — CAC-side scalar diagnostic.
-    #
-    # Phase 54-05 fix: pushed to variant_obs (was variant_eqs in Wave 3) and
-    # expressed directly in q_*_expr to avoid an observed-to-equation chain.
-    # The legacy CAC kept `q_wall[i] ~ thermal_left[i].Q_flow + thermal_right[i].Q_flow`
-    # in `eqs` (q_wall as unknown), so `Q_wall_total ~ sum(q_wall[i])` in eqs was
-    # consistent. The new core lifts q_wall[i] into `obs` (matching Channel/CHF),
-    # so referencing it from a regular eq created a per-cell shortfall that broke
-    # CAC↔HD `mtkcompile` in Phase 54-03 (regression). Direct expression in q_*_expr
-    # preserves the semantics (q_wall[i] = q_left_expr[i] + q_right_expr[i]) without
-    # the chain.
-    # ----------------------------------------------------------------
-
-    # ----------------------------------------------------------------
-    # Hand off to _channel_core (Phase 53 D-01 / D-03).
-    # ----------------------------------------------------------------
     core = _channel_core(;
         n, T, dp, port_in, port_out, geometry,
         g_acc=g, friction_correlation,
@@ -787,41 +594,21 @@ function ChannelAndContacts(;
         T_out, dP,
     )
 
-    # ----------------------------------------------------------------
-    # Variant-internal observables (Phase 53 D-09):
-    # Nu[i] (correlation output, not in core), h_tc_left/right (aliases of h_tc),
-    # T_wall_left/right (aliases of thermal_*[i].T), Gr_over_Re2 (NC criterion;
-    # references variant-specific T_w − T[i] which core doesn't see),
-    # velocity (legacy alias). All inlined so no observed-to-observed chains.
-    # ----------------------------------------------------------------
     variant_obs = Equation[]
     for i in 1:n
-        # Phase 57 D-01/D-02/B3 + Phase 56-resume: Nu[i] reports the same
-        # htc_correlation output that h_tc[i] consumes (SPL branch above), so its
-        # Re/Pr/wall-T must use the same eval-point convention. The "wall" is
-        # max(left, right) — picks the heated side in asymmetric scenarios; equal
-        # to either side in symmetric / both-pinned scenarios (simple_loop).
         T_w_obs_i    = thermal_left[i].T
         T_film_obs_i = (T[i] + T_w_obs_i) / 2
         Re_i_film    = abs(port_in.mdot) * Dh / (A * mu_water(T_film_obs_i))
         Pr_i_film    = cp_water(T_film_obs_i) * mu_water(T_film_obs_i) / k_water(T_film_obs_i)
         push!(variant_obs, Nu[i] ~ htc_correlation(Re_i_film, Pr_i_film, T[i], T_w_obs_i))
-        # Phase 56-resume per-side h: h_tc_left[i] and h_tc_right[i] are now
-        # unknowns with their own equations in variant_eqs (SPL: per-side film T;
-        # SCB: aliased to h_tc[i]). No observable aliases here.
         push!(variant_obs, T_wall_left[i]  ~ thermal_left[i].T)
         push!(variant_obs, T_wall_right[i] ~ thermal_right[i].T)
         push!(variant_obs, velocity[i] ~ abs(port_in.mdot) / (rho_water(T[i]) * A))
-        # D-03 invariant: NC criterion `Gr_over_Re2[i]` stays fully bulk-T
-        # (numerator AND denominator). Use a separate bulk Re here so the
-        # film-T `Re_i_film` above does not leak into the NC observable.
         Re_i_bulk = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
         nu_i = mu_water(T[i]) / rho_water(T[i])
         Gr_i = Gr(beta_water(T[i]), g_acc, thermal_left[i].T - T[i], Dh, nu_i)
         push!(variant_obs, Gr_over_Re2[i] ~ Gr_i / Re_i_bulk^2)
     end
-    # Q_wall_total — direct sum over q_*_expr to avoid observed-to-equation chain
-    # (Phase 54-05 fix; see comment block above before the q-expression loop).
     push!(variant_obs, Q_wall_total ~ sum(q_left_expr[i] + q_right_expr[i] for i in 1:n))
 
     eqs = [variant_eqs; core.eqs]
