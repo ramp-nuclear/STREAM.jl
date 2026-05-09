@@ -28,9 +28,6 @@ import STREAM: Pump, Channel
         connect(bc5.port_out, ch5.port_in),
         connect(ch5.port_out, pump5.port_in),
         pump5.port_in.P ~ 1e5,
-        # No wall-T binding needed: default h_left=h_right=0.0 makes Channel fully
-        # adiabatic; T_wall_left/right stay free unknowns and drop out of the energy
-        # balance. mdot0 drives flow (Phase 55 D-01: Channel.thermal port retired).
     ]
     @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
     ssys5 = mtkcompile(sys5; fully_determined=false)  # isolated network: no pressure anchor on rate-equation test

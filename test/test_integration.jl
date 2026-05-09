@@ -55,7 +55,6 @@ import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger
     end
 
     @testset "build_loop_vertical compiles + briefly solves" begin
-        # Smoke: vertical loop (gravity assist + return cancellation).
         ssys = build_loop_vertical()
         ic = Pair{Any,Any}[
             [ssys.ch.T[i] => 313.15 for i in 1:10]...,
@@ -67,8 +66,6 @@ import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger
     end
 
     @testset "build_loop_transient compiles + briefly solves" begin
-        # Smoke: scalar T_wall_0 path (no callable). Validates the non-callable
-        # branch of the migrated build_loop_transient.
         ssys = build_loop_transient()
         ic = Pair{Any,Any}[
             [ssys.ch.T[i] => 313.15 for i in 1:10]...,
@@ -79,9 +76,6 @@ import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger
     end
 
     @testset "build_cube compiles + briefly solves" begin
-        # Smoke: cube hydraulic network. Pure Resistor+Pump, no Channel.
-        # Pre-existing flakey on KINSOL convergence (NET-03) — tolerated per
-        # CONTEXT.md D-22 close-gate rule. We assert compile only.
         ssys = build_cube()
         @test ssys isa ModelingToolkit.AbstractSystem
         @test length(equations(ssys)) > 0
@@ -97,8 +91,6 @@ import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger
     end
 
     @testset "build_loop_pk compiles + briefly solves" begin
-        # Smoke: PK builder with trivial reactivity controller. Brief 0.0..0.1
-        # solve confirms compile + IC dict are wired correctly.
         ctrl = ReactivityController()
         ssys, ic = build_loop_pk(ctrl)
         @test length(equations(ssys)) > 0
@@ -108,14 +100,8 @@ import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger
     end
 end
 
-# ───────────────────────────────────────────────────────────
-# §2 Solver wrappers (D-19 second bullet — migrated from test_solvers.jl)
-# SOLV-01 + SOLV-02. SYS-01/02 lived in §1 above to keep all builder-smoke
-# style tests together.
-# ───────────────────────────────────────────────────────────
 @testset "Solver wrappers (SOLV-01, SOLV-02)" begin
     @testset "SOLV-01: solve_steady returns physical solution" begin
-        # Migrated from test_solvers.jl SOLV-01 (lines 30-47).
         n = 10
         T_inlet = 313.15
         Q_wall = 1.0e4
@@ -184,28 +170,6 @@ end
     end
 end
 
-# ───────────────────────────────────────────────────────────
-# §3 Loss-of-flow transient (D-19 third bullet)
-#
-# Migrated from test_loss_of_flow.jl — Spike B heated leg (CAC + HeatDiffusion
-# plate via `one_sided_connection(ch, fuel; side=:left, name=:heated)`).
-# Access paths are `heated.ch.*` and `heated.fuel.*` (the @named symbols are
-# preserved by `compose`).
-#
-# Reference loop (provides SS IC for the bypass system) uses CAC + per-cell
-# `ConstantTemperature` boundaries — matches Spike B's heated channel
-# component type for IC consistency. The legacy `ChannelHeatFlux(T_wall=...)`
-# form was dropped in Phase 55 D-03 (CHF no longer accepts T_wall).
-#
-# VAL-01 energy balance redesign per 55-09 SUMMARY's deferred work:
-# Spike B drives the heated leg via `heated.fuel.power ~ power_W` (1 kW
-# default). The relevant input flux is power_W; Q_wall_total = sum over cells
-# of q_wall is the channel-side measured heat (negative sign in CAC's
-# convention because heat flows fuel → coolant). The forced-flow check
-# compares |sum(q_wall)| against power_W; the NC time-averaged check matches
-# the legacy spirit (mdot · cp · dT) but uses `heated.ch.q_wall[i]` as the
-# channel-side measurement.
-# ───────────────────────────────────────────────────────────
 @testset "Loss-of-flow transient" begin
     # Baseline constants (preserved verbatim from test_loss_of_flow.jl
     # lines 30-41 where applicable; new constants added for Spike B).
@@ -226,19 +190,6 @@ end
     BYPASS_FUEL_LX   = 0.005
     #! format: on
 
-    # ─────────────────────────────────────────────────────────────────────
-    # Helper: build a Spike-B-aware reference loop, solve to SS, build the
-    # bypass system with Spike-B builder kwargs, return (ssys, op, mdot_ss, cb).
-    #
-    # IC strategy:
-    #   - heated.ch.port_in.mdot = mdot_ss (total loop flow at t=0, flapper closed)
-    #   - heated.ch.T[i] = T_ss[i] (from reference loop)
-    #   - heated.fuel.T[i, j] = T_ss[i] broadcast over plate width (rough but
-    #     adequate IC; the plate equilibrates fast under power_W = 1 kW)
-    #   - ret.T[i] = T_inlet (cold leg seeded at inlet temp)
-    #   - ret.port_in.mdot = mdot_ss; Dt(ret.port_in.mdot) = 0.0 (quasi-SS)
-    #   - flapper.T_open = 1e30 sentinel (not yet fired)
-    # ─────────────────────────────────────────────────────────────────────
     function _lof_bypass_ic(; n=BYPASS_N)
         # Reference loop: Pump(DP_REF) -> HX(T_inlet) -> CAC(g=-G_ACC, h_tc) -> Pump
         # Per-cell ConstantTemperature(T_wall_eff) sources wire to CAC's

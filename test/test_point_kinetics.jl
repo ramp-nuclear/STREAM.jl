@@ -466,11 +466,6 @@ import ModelingToolkit: compose
         end
     end  # TF-05
 
-    # NOTE: TF-06 ("reactivity observable includes feedback") and TF-07
-    # ("strong negative feedback bounds power") were full-loop integration
-    # tests; relocated to test/test_integration.jl §"Point-kinetics +
-    # thermal-feedback loops" by Phase 55 plan 55-10 (D-19). The component-
-    # unit testsets PK-01..03, RC-01, TF-01..05, SCRAM-01..02 stay here.
 
     # ─────────────────────────────────────────────────────────────────
     # SCRAM-01: SCRAMCondition struct construction and callable semantics
