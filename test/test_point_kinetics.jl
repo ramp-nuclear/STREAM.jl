@@ -51,13 +51,17 @@ import ModelingToolkit: compose
         sol = solve_transient(ssys, op, t_span)
 
         # Analytical power: P(t) = P0 + sum_k C_k0[k] * (1 - exp(-lambda_k[k] * t))
-        P_analytical =
-            P0 .+ sum(C_k0[k] .* (1 .- exp.(-lambda_k[k] .* t_span)) for k in 1:6)
-        @test isapprox(sol[ssys.P, :], P_analytical, rtol=1e-3, atol=1e-6)
+        for (j, tj) in enumerate(t_span)
+            P_analytical = P0 + sum(C_k0[k] * (1 - exp(-lambda_k[k] * tj)) for k in 1:6)
+            @test isapprox(sol[ssys.P, j], P_analytical, rtol=1e-3, atol=1e-6)
+        end
 
         # Also verify individual precursor decay: C_k(t) = C_k0 * exp(-lambda_k * t)
-        C_k_analytical = C_k0[1] .* exp.(-lambda_k[1] .* t_span)
-        @test isapprox(sol[ssys.C_1, :], C_k_analytical, rtol=1e-3, atol=1e-6)
+        for (j, tj) in enumerate(t_span)
+            @test isapprox(
+                sol[ssys.C_1, j], C_k0[1] * exp(-lambda_k[1] * tj), rtol=1e-3, atol=1e-6
+            )
+        end
     end
 
     @testset "PK-01c: zero ICs yield trivial P=0 solution" begin
@@ -206,7 +210,9 @@ import ModelingToolkit: compose
         t_arr_b = range(0.0, 2.0, length=100)
         sol_b = solve_transient(ssys_b, op_b, t_arr_b)
         # At criticality with correct ICs, P stays within 1% of P0
-        @test isapprox(sol_b[ssys_b.P, :], fill(P0, 100); rtol=1e-2)
+        for j in 1:length(t_arr_b)
+            @test isapprox(sol_b[ssys_b.P, j], P0; rtol=1e-2)
+        end
 
         # PK-03c: step insertion prompt-jump validation
         # delta_rho = 0.002 << beta=0.006502 (sub-prompt-critical, delta_rho < beta/3)
@@ -267,7 +273,9 @@ import ModelingToolkit: compose
         @test P_traj[end] > P0  # positive ramp -> super-critical -> P grows above P0
         # Monotonicity from t=0.1s onward (skip initial KINSOL startup)
         idx_start = findfirst(tv -> tv >= 0.1, t_arr_d)
-        @test all(diff(P_traj[idx_start:end]) .>= (1e-3 * P0)) # allow tiny solver noise
+        for j in (idx_start + 1):length(t_arr_d)
+            @test P_traj[j] >= P_traj[j - 1] - 1e-3 * P0  # allow tiny solver noise
+        end
 
         # PK-03e: plain closure and ReactivityController wrapping same fn give same result
         plain_fn = t -> (t >= t_step) * delta_rho
@@ -444,10 +452,11 @@ import ModelingToolkit: compose
         # D-05: Channel, ChannelAndContacts, ChannelHeatFlux, HeatDiffusion must NOT
         # reference PointKinetics-specific markers from Phase 47. The contract is that
         # temperature feedback is read from their EXISTING T symbolic via getproperty.
+        # File-list updated for Phase 55 file-consolidation reality (channel.jl +
+        # thermal_channel.jl were merged into the unified channels.jl in Phase 54).
         proj_root = pkgdir(STREAM)
         for relpath in (
-            "src/components/channel.jl",
-            "src/components/thermal_channel.jl",
+            "src/components/channels.jl",
             "src/components/heat_diffusion.jl",
         )
             src = read(joinpath(proj_root, relpath), String)
@@ -457,190 +466,11 @@ import ModelingToolkit: compose
         end
     end  # TF-05
 
-    @testset "TF-06: reactivity observable includes feedback" begin
-        # Build a ChannelAndContacts + HeatDiffusion via symmetric_plate, wire a
-        # PointKinetics with temp_worth on the channel, solve a short transient,
-        # and verify sol[pk.reactivity, :] is a finite vector.
-        n = 3
-        geom_tf = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-        ps_tf = fill(1.0 / (n * 2), n, 2)  # nz=3, nx=2 uniform power shape
-        @named cac = ChannelAndContacts(
-            n=n,
-            geometry=geom_tf,
-            htc_correlation=constant_Nusselt(Nu=8.235),
-            friction_correlation=laminar_friction(0.0025/0.070),
-        )
-        @named fuel = HeatDiffusion(
-            nz=n,
-            nx=2,
-            Lz=0.6,
-            Lx=0.005,
-            y=0.07,
-            rho_s=19300.0,
-            cp_s=116.0,
-            k_s=174.0,
-            power_shape=ps_tf,
-        )
-
-        rods = symmetric_plate(cac, fuel; name=:rods)
-
-        alpha_ch = fill(-1e-4, n)
-        Tref_ch = fill(293.15, n)
-
-        ctrl_tf6 = ReactivityController()  # returns 0.0 always (default :NORMAL state)
-        @named pk = PointKinetics(
-            ctrl_tf6;
-            rho_val=0.0,
-            temp_worth=Dict(rods.cac => alpha_ch),
-            ref_temp=Dict(rods.cac => Tref_ch),
-        )
-
-        # Hydraulic BCs
-        @named pump_tf6 = Pump(3.0e4)
-        @named hx_tf6 = HeatExchanger(293.15)
-
-        fb_eqs = connect_temperature_feedback(pk, [rods.cac])
-        hydro_eqs = Equation[
-            connect(pump_tf6.port_out, hx_tf6.port_in),
-            connect(hx_tf6.port_out, rods.cac.port_in),
-            connect(rods.cac.port_out, pump_tf6.port_in),
-            pump_tf6.port_in.P ~ 1.0e5,
-            rods.fuel.power ~ 1e3,
-        ]
-        all_eqs = vcat(fb_eqs, hydro_eqs)
-        full = compose_systems(rods, pk, pump_tf6, hx_tf6; connections=all_eqs, name=:core)
-        ssys = mtkcompile(full)
-
-        T0 = 293.15
-        ic = point_kinetics_steady_state(1.0)
-        op = Pair{Any,Any}[
-            ssys.pk.rho_c_fn => ctrl_tf6,
-            ssys.pk.P => ic.P,
-            ssys.pk.C_1 => ic.C_k[1],
-            ssys.pk.C_2 => ic.C_k[2],
-            ssys.pk.C_3 => ic.C_k[3],
-            ssys.pk.C_4 => ic.C_k[4],
-            ssys.pk.C_5 => ic.C_k[5],
-            ssys.pk.C_6 => ic.C_k[6],
-            # Thermal-hydraulic ICs (ssys IS the core system — no extra .core prefix)
-            ssys.rods.cac.port_in.mdot => 0.2,
-            [ssys.rods.cac.T[i] => T0 for i in 1:n]...,
-            [ssys.rods.fuel.T[i, j] => T0 for i in 1:n for j in 1:2]...,
-        ]
-
-        t_arr = range(0.0, 1.0, length=20)
-        sol = solve_transient(ssys, op, t_arr)
-
-        rho_trace = sol[ssys.pk.reactivity]
-        @test rho_trace isa AbstractVector
-        @test length(rho_trace) > 1
-        @test all(isfinite, rho_trace)
-    end  # TF-06
-
-    @testset "TF-07: strong negative feedback bounds power (analytical)" begin
-        # Mirror Python STREAM test_integrations.py:352-428 (fuel/coolant feedback).
-        # Setup: inject a positive step reactivity via rho_c_fn; attach strong negative
-        # temperature feedback on the channel. Expect:
-        #   (1) power rises initially after the step (prompt jump),
-        #   (2) power peaks at some finite value,
-        #   (3) power does NOT diverge -- max(P) / P0 is bounded,
-        #   (4) reactivity at late time is reduced by feedback < delta_rho.
-        n = 3
-        geom_tf7 = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-        ps_tf7 = fill(1.0 / (n * 2), n, 2)  # nz=3, nx=2 uniform power shape
-        @named cac7 = ChannelAndContacts(
-            n=n,
-            geometry=geom_tf7,
-            htc_correlation=constant_Nusselt(Nu=8.235),
-            friction_correlation=laminar_friction(0.0025/0.070),
-        )
-        @named fuel7 = HeatDiffusion(
-            nz=n,
-            nx=2,
-            Lz=0.6,
-            Lx=0.005,
-            y=0.07,
-            rho_s=19300.0,
-            cp_s=116.0,
-            k_s=174.0,
-            power_shape=ps_tf7,
-        )
-
-        rods7 = symmetric_plate(cac7, fuel7; name=:rods7)
-        # Cache scoped reference — MTK getproperty may return new objects per call;
-        # Dict key identity mismatch causes ref_temp lookup to fall back to 0.0
-        # instead of Tref, producing massive spurious negative feedback at startup.
-        rods7_cac7 = rods7.cac7
-
-        t_step = 0.01           # reactivity insertion time [s]
-        delta_rho = 0.001        # step reactivity (well below beta_total=0.006502)
-        alpha_strong = -0.01      # strong negative alpha [dk/k per K] -- stabilizing
-        Tref = 293.15
-
-        step_ctrl = t -> (t >= t_step ? delta_rho : 0.0)
-
-        @named pk7 = PointKinetics(
-            step_ctrl;
-            rho_val=0.0,
-            temp_worth=Dict(rods7_cac7 => fill(alpha_strong, n)),
-            ref_temp=Dict(rods7_cac7 => fill(Tref, n)),
-        )
-
-        @named pump_tf7 = Pump(3.0e4)
-        @named hx_tf7 = HeatExchanger(293.15)
-
-        fb_eqs7 = connect_temperature_feedback(pk7, [rods7_cac7])
-        hydro_eqs7 = Equation[
-            connect(pump_tf7.port_out, hx_tf7.port_in),
-            connect(hx_tf7.port_out, rods7.cac7.port_in),
-            connect(rods7.cac7.port_out, pump_tf7.port_in),
-            pump_tf7.port_in.P ~ 1.0e5,
-            rods7.fuel7.power ~ 0.0,
-        ]
-        all_eqs7 = vcat(fb_eqs7, hydro_eqs7)
-        full7 = compose_systems(
-            rods7, pk7, pump_tf7, hx_tf7; connections=all_eqs7, name=:core7
-        )
-        ssys7 = mtkcompile(full7)
-
-        P0 = 1.0
-        T0 = 293.15
-        ic7 = point_kinetics_steady_state(P0)
-        op7 = Pair{Any,Any}[
-            ssys7.pk7.rho_c_fn => step_ctrl,
-            ssys7.pk7.P => ic7.P,
-            ssys7.pk7.C_1 => ic7.C_k[1],
-            ssys7.pk7.C_2 => ic7.C_k[2],
-            ssys7.pk7.C_3 => ic7.C_k[3],
-            ssys7.pk7.C_4 => ic7.C_k[4],
-            ssys7.pk7.C_5 => ic7.C_k[5],
-            ssys7.pk7.C_6 => ic7.C_k[6],
-            # ssys7 IS the core7 system — no extra .core7 prefix
-            ssys7.rods7.cac7.port_in.mdot => 0.2,
-            [ssys7.rods7.cac7.T[i] => T0 for i in 1:n]...,
-            [ssys7.rods7.fuel7.T[i, j] => T0 for i in 1:n for j in 1:2]...,
-        ]
-
-        # Include a saveat point just after the step to capture the prompt-jump peak.
-        # tstops forces the solver to step at t_step, but saveat controls what's saved.
-        t_arr7 = sort(vcat(collect(range(0.0, 2.0, length=50)), t_step + 1e-3))
-        sol7 = solve_transient(ssys7, op7, t_arr7; tstops=[t_step])
-        @test sol7.retcode == ReturnCode.Success
-
-        P_trace = sol7[ssys7.pk7.P]
-        P_max = maximum(P_trace)
-
-        # (1) Power rises after step insertion
-        @test P_max > P0
-        # (2) Power is bounded -- no divergence (divergence would be >>100x P0)
-        @test P_max < 100 * P0
-        # (3) All power values are finite
-        @test all(isfinite, P_trace)
-
-        # (4) Late-time reactivity: strong alpha cancels most of delta_rho
-        rho_trace7 = sol7[ssys7.pk7.reactivity]
-        @test rho_trace7[end] <= delta_rho
-    end  # TF-07
+    # NOTE: TF-06 ("reactivity observable includes feedback") and TF-07
+    # ("strong negative feedback bounds power") were full-loop integration
+    # tests; relocated to test/test_integration.jl §"Point-kinetics +
+    # thermal-feedback loops" by Phase 55 plan 55-10 (D-19). The component-
+    # unit testsets PK-01..03, RC-01, TF-01..05, SCRAM-01..02 stay here.
 
     # ─────────────────────────────────────────────────────────────────
     # SCRAM-01: SCRAMCondition struct construction and callable semantics

@@ -12,6 +12,24 @@ v0.1 shipped a single forced-convection coolant loop validated against Python ST
 
 **2 phases, 7 plans | 4,301 src LOC / 5,066 test LOC at release**
 
+## Current Milestone: v1.1 Final Channel-Family Redesign
+
+**Goal:** Rewrite the three Channel components (`Channel`, `ChannelHeatFlux`, `ChannelAndContacts`) so the design matches Python STREAM's intent and never needs touching again — single shared core, no flag-driven helpers, correct enthalpy-form energy balance.
+
+**Target features:**
+- New connector type(s) carrying `(T_wall, h)` for `Channel` and `q` for `ChannelHeatFlux`; per-cell, per-side, adiabatic-when-unconnected
+- Single private `_channel_core` (energy balance, mass cons, momentum, friction, port wiring, observables) as the only source of truth — eliminates `_channel_base_eqs`, `observed_mode`, `skip_htc`, dead `T_wall_cells=nothing` default
+- `Channel` becomes a passive recipient (external T_wall + h → q = h·(T_wall − T)); `ChannelHeatFlux` receives q directly per-cell per-side; `ChannelAndContacts` retains correlation-driven h with optional SCB
+- Convective enthalpy-form energy balance: face-averaged cp at cell faces with cp(T_in) at the boundary face; local cp(T[i]) in the heat-capacity denominator
+- Examples (`build_loop`, `build_loop_vertical`, `build_loop_transient`, `build_cube`), composition helpers (`symmetric_plate`, `plate`, `one_sided_connection`), and `test_channel.jl` updated for the new API
+- Cross-validation against Python STREAM passes within existing tolerances after the enthalpy-form switch
+
+**Constraints:**
+- This is the last channel rewrite — no flag accretion permitted
+- All work delivered on dedicated branch `channels-redesign` as a single PR
+- Per-cell water property handling already correct (`@register_symbolic` evaluated at local T[i]); only the convective scheme changes
+- Honor CLAUDE.md conventions (file layout, authoring rules, MTK patterns, single export list)
+
 ## Core Value
 
 A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
@@ -100,9 +118,19 @@ A Julia MTK-based thermal-hydraulics library that matches Python STREAM results,
 - ✓ `SCRAMCondition`, `scram_callback`, `flapper_callback` unified callback factory pattern — v0.9
 - ✓ `build_loop_pk` full PK+TH loop builder; LOOP-01..04 integration tests; VAL-PK-01..03 quantitative validation vs Python STREAM — v0.9
 
+- ✓ **CONN-01..04**: WallPort `(T_wall, h)` + HeatFluxPort `q_flux` connectors; per-cell, per-side, adiabatic when unconnected; instream smokes pass for both — v1.1 (Phase 52)
+- ✓ **CORE-01**: Private `_channel_core(...; q_left_expr, q_right_expr)` helper in src/components/channel.jl — single source of truth for energy balance, mass conservation, momentum ODE, friction, port wiring, and observables — v1.1 (Phase 53)
+- ✓ **CORE-02..05**: `_channel_base_eqs` deleted; `observed_mode` / `skip_htc` / `T_wall_cells=nothing` flag knobs eliminated; G4 branch-coverage matrix exercises every code path inside `_channel_core` — v1.1 (Phase 53)
+- ✓ **NRG-01..04**: Enthalpy-form energy balance in `_channel_core` (face-averaged cp `(cp(T_up) + cp(T[i]))/2` numerator; local `cp(T[i])` denominator; single `ifelse(mdot ≥ 0)` selects upstream T and propagates to cp deterministically); G1 (Stage-1 baseline rtol=1e-6), G2 (Python pair_mean_1d parity rtol=1e-9), G3/G3b (forward/reverse mirror rtol=1e-12) all green — v1.1 (Phase 53). Public variants (Channel/CAC/CHF) still carry inlined constant-cp form; migration is Phase 54.
+
 ### Active
 
-<!-- v1.1+ requirements will be defined in the next milestone planning session -->
+<!-- v1.1: Final Channel-Family Redesign — full requirement list lives in REQUIREMENTS.md -->
+
+- [ ] `Channel` rewritten as passive recipient consuming WallPort `(T_wall, h)`; `ChannelHeatFlux` receives `q_flux` directly per-cell per-side; `ChannelAndContacts` simplified onto shared `_channel_core` with optional SCB (VAR-*)
+- [ ] Variants migrated to call `_channel_core` (replacing inlined constant-cp blocks); enthalpy-form energy balance reaches the public API (VAR-*)
+- [ ] `src/components/channel.jl` and `src/components/thermal_channel.jl` consolidated into `src/components/channels.jl`; STREAM.jl include + CLAUDE.md File Structure Standard updated (VAR-*)
+- [ ] Examples, composition helpers, and tests updated for the new API; cross-validation vs Python STREAM passes (TEST-*)
 
 ### Out of Scope
 - Decay heat — irrelevant without neutronics
@@ -224,4 +252,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after v1.0 milestone (Open-Source Release — Phases 50-51)*
+*Last updated: 2026-05-08 — Phase 58 complete (MTK system determinacy repair: `hd.power ~ <value>` pins on the 5 broken scenarios, full `fully_determined=false` audit, `test/test_determinacy.jl` regression gate 11/11 PASS). v1.1 milestone phases 52–58 all complete.*

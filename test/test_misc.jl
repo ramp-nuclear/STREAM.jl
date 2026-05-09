@@ -3,7 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-import STREAM: Inertia, HeatExchanger
+import STREAM: Inertia, HeatExchanger, WallTemperature, HeatFluxSource
 
 # ─────────────────────────────────────────────────────────────────
 # COMP-01: Inertia — ODE pressure-drop component
@@ -16,7 +16,7 @@ end
 
 @testset "COMP-01: Inertia mtkcompile" begin
     @named L = Inertia(1e3)
-    @test_nowarn mtkcompile(L; fully_determined=false)
+    @test_nowarn mtkcompile(L; fully_determined=false)  # isolated component: dangling ports
 end
 
 @testset "COMP-01: RL-decay transient matches exp(-(R/L_over_A)*t) within 1%" begin
@@ -34,7 +34,7 @@ end
         L_comp.port_in.P ~ 1.0e5,   # pressure gauge anchor
     ]
     @named sys = compose(System(connections, t; name=:rl_sys), L_comp, R_comp)
-    ssys = mtkcompile(sys; fully_determined=false)  # T eqs underdetermined (no heat exchange in RL circuit)
+    ssys = mtkcompile(sys; fully_determined=false)  # legitimate-structural: pure RL circuit, no T equations exist by design
 
     # Initial condition: mdot = 1.0 kg/s
     # T variables are free (no heat exchange in RL circuit); provide ICs for all unknowns
@@ -68,7 +68,7 @@ end
 
 @testset "COMP-02: HeatExchanger mtkcompile" begin
     @named hx = HeatExchanger(313.15)
-    @test_nowarn mtkcompile(hx; fully_determined=false)
+    @test_nowarn mtkcompile(hx; fully_determined=false)  # isolated component: HX is value-source, no port closure needed
 end
 
 @testset "COMP-02: HeatExchanger exported from STREAM" begin
@@ -77,5 +77,104 @@ end
 
 @testset "COMP-02: build_loop compiles after HeatExchanger rename (regression)" begin
     ssys = build_loop()
+    @test ssys isa ModelingToolkit.AbstractSystem
+end
+
+# ─────────────────────────────────────────────────────────────────
+# WallTemperature (Phase 55 D-04, src/components/sources.jl)
+# ─────────────────────────────────────────────────────────────────
+@testset "WallTemperature: Real (broadcast) instantiation" begin
+    n = 4
+    @named wt = WallTemperature(; n=n, T_wall=350.0)
+    @test wt isa ModelingToolkit.System
+    # Output: T_wall_out(t)[1:n] — 4 unknowns
+    var_names = string.(unknowns(wt))
+    twl_count = count(s -> occursin("T_wall_out", s), var_names)
+    @test twl_count == n
+    # Equation count: n equations of the form T_wall_out[i] ~ T_wall_const
+    eqs = equations(wt)
+    @test length(eqs) == n
+end
+
+@testset "WallTemperature: Vector instantiation + per-cell binding" begin
+    n = 4
+    profile = collect(range(300.0, 400.0, length=n))
+    @named wt = WallTemperature(; n=n, T_wall=profile)
+    @test wt isa ModelingToolkit.System
+    # n equations of the form T_wall_out[i] ~ profile[i]
+    eqs = equations(wt)
+    @test length(eqs) == n
+end
+
+@testset "WallTemperature: Vector length mismatch errors" begin
+    n = 4
+    @test_throws ErrorException WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:3.0))
+    @test_throws ErrorException WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:5.0))
+end
+
+@testset "WallTemperature: Function (callable parameter) instantiation" begin
+    n = 4
+    fn = (t) -> 350.0 + 10.0 * sin(t)
+    @named wt = WallTemperature(; n=n, T_wall=fn)
+    @test wt isa ModelingToolkit.System
+    # n equations of the form T_wall_out[i] ~ T_wall_fn(t)
+    eqs = equations(wt)
+    @test length(eqs) == n
+    # Parameter T_wall_fn(t) is present
+    par_strs = string.(parameters(wt))
+    @test any(s -> occursin("T_wall_fn", s), par_strs)
+end
+
+@testset "WallTemperature: mtkcompile in isolation succeeds (Real branch)" begin
+    n = 4
+    @named wt = WallTemperature(; n=n, T_wall=350.0)
+    ssys = mtkcompile(wt; fully_determined=false)  # isolated component: value-source, only RHS-driven port equations
+    @test ssys isa ModelingToolkit.AbstractSystem
+end
+
+# ─────────────────────────────────────────────────────────────────
+# HeatFluxSource (Phase 55 D-04, src/components/sources.jl)
+# ─────────────────────────────────────────────────────────────────
+@testset "HeatFluxSource: Real (broadcast) instantiation" begin
+    n = 4
+    @named hfs = HeatFluxSource(; n=n, q=1.0e5)
+    @test hfs isa ModelingToolkit.System
+    var_names = string.(unknowns(hfs))
+    q_count = count(s -> occursin("q_out", s), var_names)
+    @test q_count == n
+    eqs = equations(hfs)
+    @test length(eqs) == n
+end
+
+@testset "HeatFluxSource: Vector instantiation + per-cell binding" begin
+    n = 4
+    profile = collect(range(1.0e4, 1.0e5, length=n))
+    @named hfs = HeatFluxSource(; n=n, q=profile)
+    @test hfs isa ModelingToolkit.System
+    eqs = equations(hfs)
+    @test length(eqs) == n
+end
+
+@testset "HeatFluxSource: Vector length mismatch errors" begin
+    n = 4
+    @test_throws ErrorException HeatFluxSource(; name=:bad, n=n, q=collect(1.0:3.0))
+    @test_throws ErrorException HeatFluxSource(; name=:bad, n=n, q=collect(1.0:5.0))
+end
+
+@testset "HeatFluxSource: Function (callable parameter) instantiation" begin
+    n = 4
+    fn = (t) -> 1.0e5 * (1.0 + 0.1 * cos(t))
+    @named hfs = HeatFluxSource(; n=n, q=fn)
+    @test hfs isa ModelingToolkit.System
+    eqs = equations(hfs)
+    @test length(eqs) == n
+    par_strs = string.(parameters(hfs))
+    @test any(s -> occursin("q_fn", s), par_strs)
+end
+
+@testset "HeatFluxSource: mtkcompile in isolation succeeds (Real branch)" begin
+    n = 4
+    @named hfs = HeatFluxSource(; n=n, q=1.0e5)
+    ssys = mtkcompile(hfs; fully_determined=false)  # isolated component: value-source, only RHS-driven port equations
     @test ssys isa ModelingToolkit.AbstractSystem
 end

@@ -15,7 +15,7 @@ end
 
 @testset "NET-01: Resistor mtkcompile" begin
     @named r = Resistor(1.0e5)
-    @test_nowarn mtkcompile(r; fully_determined=false)
+    @test_nowarn mtkcompile(r; fully_determined=false)  # isolated component: pure resistance, no anchor
 end
 
 # ─────────────────────────────────────────────────────────────────

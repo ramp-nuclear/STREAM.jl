@@ -35,15 +35,27 @@ using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-using Plots
 using Statistics
 using Printf
 
-# mm unit for plot margins — sourced from Plots' internal dependency
-const mm = Plots.PlotMeasures.mm
-
-ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
-gr()
+# Phase 55 structured-smoke guard: when PHASE55_SMOKE_NOPLOT=1, skip the
+# plot-save block at the bottom of this script AND skip `using Plots` entirely.
+# The smoke verify (plan 55-09 Task 3) sets the env var, runs this script, then
+# greps for the sentinel log line below to prove the script reached this point
+# without crashing. Plots is a heavy dep that is intentionally NOT in the
+# project's Project.toml (deferred-items.md "pre-existing Plots dependency
+# gap"); gating it makes the simulation portion of this script runnable on a
+# stock checkout while plotting still works for the user with Plots installed.
+const PHASE55_SMOKE_NOPLOT = (get(ENV, "PHASE55_SMOKE_NOPLOT", "") == "1")
+if PHASE55_SMOKE_NOPLOT
+    @info "PHASE55 SMOKE: PHASE55_SMOKE_NOPLOT=1 detected — `using Plots` and plot save will be skipped"
+else
+    @eval using Plots
+    # mm unit for plot margins — sourced from Plots' internal dependency
+    @eval const mm = Plots.PlotMeasures.mm
+    ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
+    Plots.gr()
+end
 
 # =============================================================================
 # SECTION 1: Parameters
@@ -75,29 +87,45 @@ println("  threshold = $threshold kg/s,  dt_ramp = $dt_ramp s")
 println()
 
 # =============================================================================
-# SECTION 2: Steady-state reference loop
+# SECTION 2: Steady-state reference loop  (Phase 55 Spike B migration)
 #
 # Purpose: Obtain mdot_ss and T_ss[1:n] for the bypass system's initial conditions.
-# Reference loop: Pump(dP_ref) -> HeatExchanger(T_inlet) -> ChannelHeatFlux(g=-g_acc)
-# No Flapper, no Inertia — KINSOL-friendly (avoids D(T_open)=0 zero-Jacobian issue).
+# Reference loop: Pump(dP_ref) -> HeatExchanger(T_inlet) -> Channel(g=-g_acc, h_left=h_wall)
+#                 closed loop. No Flapper, no Inertia — KINSOL-friendly steady solve.
+#
+# Phase 55 D-01/D-09: the new external-input `Channel` replaces the legacy
+# `ChannelHeatFlux` constructor (which took T_wall as a kwarg). Wall temperature
+# is closed via per-cell `~`-binding `[ch_ref.T_wall_left[i] ~ T_wall for i in 1:n]`
+# (D-05 Style 1 args.funcs idiom). `h_left=h_wall` supplies the convective HTC;
+# right face adiabatic (`h_right=0.0` default).
 #
 # Physical: at t=0- the system is at forced-flow SS with pump providing dP_ref.
 # ch flows downward (positive mdot), heated from T_inlet to ~T_max_ss.
 # =============================================================================
 
+const h_wall = 5000.0   # convective HTC [W/(m^2·K)] for the SS reference loop
+
 println("Building steady-state reference loop...")
 
 @named pump_ref = Pump(dP_ref)
-@named hx_ref = HeatExchanger(T_inlet)
-@named ch_ref = ChannelHeatFlux(;
-    n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=(-g_acc), T_wall=T_wall
+@named hx_ref   = HeatExchanger(T_inlet)
+# Explicit `STREAM.Channel` qualifier — `Channel` is ambiguous between
+# `Base.Channel{T}` (Julia stdlib's task-communication channel) and
+# `STREAM.Channel` when both `using STREAM` and `using ModelingToolkit` are
+# active. Mirrors the resolution in examples/spike_phase55_lof_topology.jl.
+@named ch_ref   = STREAM.Channel(;
+    n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=(-g_acc),
+    h_left=h_wall, h_right=0.0,
 )
 
-conns_ref = [
+conns_ref = Equation[
     connect(pump_ref.port_out, hx_ref.port_in),
     connect(hx_ref.port_out, ch_ref.port_in),
     connect(ch_ref.port_out, pump_ref.port_in),
     pump_ref.port_in.P ~ 1.0e5,
+    # Phase 55 D-01: external-input wall-T variables on the channel itself.
+    [ch_ref.T_wall_left[i]  ~ T_wall  for i in 1:n]...,
+    [ch_ref.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
 ]
 @named ref_sys = compose(System(conns_ref, t; name=:ref), pump_ref, hx_ref, ch_ref)
 ref_ssys = mtkcompile(ref_sys)
@@ -121,13 +149,21 @@ println()
 # =============================================================================
 # SECTION 3: Build bypass system and set initial conditions
 #
-# IC strategy (matches _lof_bypass_ic in test/test_loss_of_flow.jl):
-#   - ine.port_in.mdot = mdot_ss  (total loop flow; Inertia carries this momentum)
-#   - ret.port_in.mdot = mdot_ss  (all flow through ch-ret path; flapper closed at t=0)
-#   - Dt(ret.port_in.mdot) = 0.0  (index-reduced derivative state; zero at quasi-SS)
-#   - flapper.T_open = 1e30       (sentinel: valve not yet fired; ramp = 0 for all t << 1e30)
-#   - ch.T[i] = T_ss[i]           (channel cells initialized from SS reference)
-#   - ret.T[i] = T_inlet          (return channel starts cold)
+# Phase 55 Spike B topology (`spike_lof_winner: "B"`): heated leg uses
+# ChannelAndContacts + HeatDiffusion plate via one_sided_connection. The plate
+# is wrapped under `heated`; sub-system access is `heated.ch.*` and
+# `heated.fuel.*` (NOT `heated.channel.*`).
+#
+# IC strategy (matches _lof_bypass_ic in test/test_loss_of_flow.jl, adapted to
+# Spike B's variable shape):
+#   - ine.port_in.mdot = mdot_ss      (total loop flow; Inertia carries this momentum)
+#   - ret.port_in.mdot = mdot_ss      (all flow through ch-ret path; flapper closed at t=0)
+#   - Dt(ret.port_in.mdot) = 0.0      (index-reduced state; zero at quasi-SS)
+#   - flapper.T_open = 1e30           (sentinel: valve not yet fired)
+#   - heated.ch.T[i] = T_ss[i]        (heated-channel cells from SS reference)
+#   - heated.fuel.T[i,j] = T_ss[i]    (fuel-plate cells seeded from coolant T;
+#                                      power_W slowly heats them up to NC equilibrium)
+#   - ret.T[i] = T_inlet              (return channel starts cold)
 #
 # Callback strategy:
 #   MTK SymbolicContinuousCallback is incompatible with parallel topologies where
@@ -138,16 +174,20 @@ println()
 
 println("Building bypass LOF system...")
 
+const power_W = 1.0e3   # total fuel-plate power [W] (Spike B baseline; produces NC ~ 4 g/s)
+const fuel_nx = 2       # lateral cells in HeatDiffusion plate
+
 #! format: off
 ssys = build_loop_lof_bypass(;
     n         = n,
     L_ch      = L_ch,
     D_ch      = D_ch,
-    T_wall    = T_wall,
     T_inlet   = T_inlet,
+    power_W   = power_W,
+    fuel_nx   = fuel_nx,
     L_over_A  = L_over_A,
     g_acc     = g_acc,
-    R_ext=R_ext,
+    R_ext     = R_ext,
     dt_ramp   = dt_ramp,
 )
 #! format: on
@@ -156,14 +196,19 @@ Dt = Differential(t)
 op = Pair{Any,Any}[
     ssys.ine.port_in.mdot => mdot_ss,  # Inertia carries forced-flow momentum
     ssys.ret.port_in.mdot => mdot_ss,  # return channel flow (flapper closed at t=0)
-    Dt(ssys.ret.port_in.mdot) => 0.0,      # index-reduced state; zero at quasi-SS
-    ssys.flapper.T_open => 1.0e30,   # sentinel: flapper has not fired yet
+    Dt(ssys.ret.port_in.mdot) => 0.0,  # index-reduced state; zero at quasi-SS
+    ssys.flapper.T_open => 1.0e30,     # sentinel: flapper has not fired yet
 ]
 for i in 1:n
-    push!(op, ssys.ch.T[i] => T_ss[i])     # heated channel cells from SS reference
+    push!(op, ssys.heated.ch.T[i] => T_ss[i])      # heated-channel cells from SS reference
 end
 for i in 1:n
-    push!(op, ssys.ret.T[i] => T_inlet)    # return channel starts cold
+    for j in 1:fuel_nx
+        push!(op, ssys.heated.fuel.T[i, j] => T_ss[i])  # fuel-plate cells seeded from coolant
+    end
+end
+for i in 1:n
+    push!(op, ssys.ret.T[i] => T_inlet)            # return channel starts cold
 end
 
 # Native ContinuousCallback:
@@ -218,27 +263,31 @@ println()
 
 t_vec = sol.t  # actual solver time points (may include callback-inserted extras)
 
-# Mass flow rates
-mdot_ch = sol[ssys.ch.port_in.mdot, :]
+# Mass flow rates  (Spike B: heated channel is ssys.heated.ch.*)
+mdot_ch = sol[ssys.heated.ch.port_in.mdot, :]
 mdot_ret = sol[ssys.ret.port_in.mdot, :]
 mdot_flap = sol[ssys.flapper.port_in.mdot, :]
 mdot_ine = sol[ssys.ine.port_in.mdot, :]
 
 # Cell temperatures
-T_ch = [sol[ssys.ch.T[i], :] for i in 1:n]   # T_ch[i][time_idx]
+T_ch = [sol[ssys.heated.ch.T[i], :] for i in 1:n]   # T_ch[i][time_idx]
 T_ret = [sol[ssys.ret.T[i], :] for i in 1:n]
 
 # Heat flux, Reynolds, HTC in heated channel
-q_wall_ch = [sol[ssys.ch.q_wall[i], :] for i in 1:n]
-Re_ch = [sol[ssys.ch.Re[i], :] for i in 1:n]
-htc_ch = [sol[ssys.ch.h_tc[i], :] for i in 1:n]
+# ChannelAndContacts exposes q_wall_left[i] / q_wall_right[i] (per-face). Under
+# one_sided_connection(:left), only the left face exchanges heat with the fuel
+# plate; the right face dangles (Q_flow=0 by Flow rule). q_wall[i] = q_left+q_right
+# is also available on the core.
+q_wall_ch = [sol[ssys.heated.ch.q_wall_left[i], :] for i in 1:n]
+Re_ch = [sol[ssys.heated.ch.Re[i], :] for i in 1:n]
+htc_ch = [sol[ssys.heated.ch.h_tc[i], :] for i in 1:n]
 
 # Flapper state
 xi_arr = sol[ssys.flapper.xi, :]
 T_open_arr = sol[ssys.flapper.T_open, :]
 
 # Pressure drops
-dP_ch = sol[ssys.ch.dP, :]
+dP_ch = sol[ssys.heated.ch.dP, :]
 dP_ret = sol[ssys.ret.dP, :]
 
 # =============================================================================
@@ -321,7 +370,18 @@ println()
 #   02_transition_0to60s/   — zoomed 0-60s: the critical action window
 #   03_nc_equilibrium/      — 200-300s: NC plateau, verify steady NC values
 #   04_spatial_profiles/    — spatial snapshots + 2D heatmap (cell × time)
+#
+# Phase 55 structured-smoke guard: skip the entire plot-save block when
+# PHASE55_SMOKE_NOPLOT=1. The simulation work above (Sections 1-6) has already
+# run; the smoke just needs to confirm the solver completed without entering
+# the plot-rendering codepath (which depends on a plot backend that may not
+# be available in headless / worktree contexts).
 # =============================================================================
+if get(ENV, "PHASE55_SMOKE_NOPLOT", "") == "1"
+    println("="^70)
+    println("PHASE55 SMOKE: skipping plot-save block (PHASE55_SMOKE_NOPLOT=1)")
+    println("="^70)
+else
 #! format: off
 outdir_base  = "examples/output/lof_transient"
 dir_overview = joinpath(outdir_base, "01_overview")
@@ -337,7 +397,15 @@ println("Output directories created under: $outdir_base/")
 println()
 
 # Color gradient for n cells: blue (cell 1, port_in side) → red (cell n, port_out side)
-colors_cells = range(colorant"navy"; stop=colorant"firebrick", length=n)
+# Phase 55: replaced `colorant"..."` string-macro calls with runtime `parse(Colorant, "...")`
+# so the macro doesn't need to be in scope at parse time. This lets the structured smoke
+# (PHASE55_SMOKE_NOPLOT=1) skip `using Plots` entirely without crashing the parser on
+# macros from un-loaded packages.
+colors_cells = range(
+    parse(Plots.Colors.Colorant, "navy");
+    stop=parse(Plots.Colors.Colorant, "firebrick"),
+    length=n,
+)
 
 # Add vertical event lines to a plot for flapper fire / fully-open events.
 # tmin/tmax gate which lines are drawn (skip if outside the plot's x window).
@@ -848,7 +916,11 @@ snap_t = [t_vec[i] for i in snap_idx]
 n_snaps = length(snap_idx)
 
 # Color: early times = cool blue, late times = warm red
-snap_colors_range = range(colorant"steelblue"; stop=colorant"darkred", length=n_snaps)
+snap_colors_range = range(
+    parse(Plots.Colors.Colorant, "steelblue");
+    stop=parse(Plots.Colors.Colorant, "darkred"),
+    length=n_snaps,
+)
 cell_axis = 1:n
 
 # --- 11a. ch Temperature spatial profiles ------------------------------------
@@ -1006,3 +1078,5 @@ println("    03_heat_flux_ch_multitime.png     q_wall vs cell, 8 snapshots")
 println("    04_temperature_heatmap_ch.png     2D: cell×time heatmap (best overview)")
 println()
 println("Done.")
+
+end  # PHASE55_SMOKE_NOPLOT guard

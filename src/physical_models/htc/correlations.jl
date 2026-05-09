@@ -6,6 +6,13 @@
 #   - Factories (constant_Nusselt, regime_dependent, elenbaas_htc): return closures
 #     that capture construction-time scalars; inner function receives only symbolic Re/Pr.
 #   - No @register_symbolic on any function in this file — all are plain arithmetic.
+#   - Eval-point convention (Phase 57 D-04): callers should pass `Re` and `Pr` evaluated at the
+#     FILM temperature `T_film = (T_bulk + T_wall)/2`, matching Python STREAM's
+#     `coolant_funcs.to_properties(T_film, pressure)` convention. The `T_bulk` slot in
+#     the 4-arg signature `(Re, Pr, T_bulk, T_wall) -> Nu` is reserved for the rare
+#     correlation that needs bulk T internally (e.g. `elenbaas_htc`'s natural-convection
+#     β, ν evaluations stay at bulk by Python convention). The Channel core in
+#     `src/components/channels.jl` does the film-T evaluation at the call site.
 
 """
     dittus_boelter(Re, Pr, args...) -> Nu
@@ -18,6 +25,8 @@ the 4-arg HTC interface `(Re, Pr, T_bulk, T_wall) -> Nu`.
 
 Valid for: Re > 10,000, 0.6 <= Pr <= 160, L/D > 10.
 MTK-compatible: plain arithmetic on symbolic Re/Pr traces correctly.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 dittus_boelter(Re, Pr, args...) = 0.023 * Re^0.8 * Pr^0.4
 
@@ -36,6 +45,8 @@ htc_fn = constant_Nusselt()          # Nu = 8.235
 htc_fn = constant_Nusselt(Nu = 5.0)  # custom Nu
 ChannelAndContacts(htc_correlation = htc_fn, ...)
 ```
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function constant_Nusselt(; Nu=8.235)
     return (Re, Pr, args...) -> Nu
@@ -100,6 +111,8 @@ rd_nc = regime_dependent(
     g                  = g_acc,
 )
 ```
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function regime_dependent(;
     htc_laminar,
@@ -212,6 +225,9 @@ depend on forced-flow Reynolds number).
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
+NC exception: this closure evaluates `beta_water`, `mu_water`, `rho_water` INTERNALLY at `T_bulk` (NOT at film) — natural-convection driving force is a bulk-vs-wall ΔT phenomenon and Python STREAM evaluates β, ν at bulk for Gr.
 """
 function elenbaas_htc(; b, L, Dh, g=9.81)
     return (Re, Pr, T_bulk, T_wall) -> begin
@@ -273,6 +289,8 @@ rectangular duct with 2-sided heating.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function fully_developed_laminar_h_spl(; Dh, aspect_ratio)
     nu = _two_sided_heating_nusselt(aspect_ratio)
@@ -292,6 +310,8 @@ rectangular duct with 2-sided heating.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function developing_laminar_h_spl(; Dh, develop_length, aspect_ratio)
     correction = 6 - 5 * exp(-0.75 * aspect_ratio / 0.3257)
@@ -313,6 +333,8 @@ and returns the maximum Nusselt number.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> max(c1(...), c2(...), ...)`.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function maximal_htc(correlations...)
     return (Re, Pr, T_bulk, T_wall) -> begin
@@ -331,6 +353,8 @@ through rectangular ducts with uniform wall temperature (4-sided heating).
 
 # Returns
 Nusselt number (dimensionless).
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function Marco_Han_Nusselt(aspect_ratio)
     return 8.235 * (

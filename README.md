@@ -82,10 +82,6 @@ Pkg.develop(path="/path/to/STREAM.jl")
 # julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-### Performance (Optional Sysimage)
-
-A precompilation sysimage (`build_sysimage.sh`) is included to reduce Julia startup time from ~90 seconds to ~5 seconds. **The sysimage is an optional performance optimization and is currently unreliable on some platforms (notably WSL2).** STREAM.jl runs correctly without it — use `julia --project=.` directly.
-
 ## Examples
 
 - `examples/simple_loop.jl` — Minimal forced-convection loop: build, solve, plot T_out

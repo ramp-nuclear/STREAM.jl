@@ -1,354 +1,398 @@
+# test/test_composition.jl — Phase 55 D-18 rewrite.
+# Composition helpers + CAC↔HD compose-correctness across topologies and shapes.
+# Mirrors Python STREAM's test_composition/test_subsystems.py rule: verify wiring
+# is correct (eqn count balanced, mtkcompile succeeds, brief solve produces a
+# meaningful steady state) — NOT physics-vs-analytic (that's test_integration.jl).
+#
+# Architectural invariant (locked, see feedback_channel_hd_connection_rule.md):
+# HeatDiffusion connects ONLY to ChannelAndContacts. Channel and
+# ChannelHeatFlux are NEVER composed with HeatDiffusion in this file.
+
 using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
-using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-import STREAM: Channel
-import STREAM:
-    dittus_boelter,
-    blasius_friction,
-    constant_Nusselt,
-    laminar_friction,
-    rectangular_laminar_correction,
-    regime_dependent
+import STREAM: Channel, _infer_n
+using OrdinaryDiffEq: ReturnCode
 
-# ─────────────────────────────────────────────────────────────────
-# Phase 15: Composition Helpers & QoL
-# QOL-01: @observed Re/Nu/velocity/Pe accessible via sol
-# QOL-02: check_gravity_mismatch — balanced loop returns :ok
-# QOL-03: port() helper — indexed port access
-# COMP-01/02/03/04: composition helpers (pending 15-02-PLAN.md)
-# ─────────────────────────────────────────────────────────────────
-
-@testset "QOL-01: @observed Re/Nu accessible via sol" begin
-    # Tests that Re, Nu, velocity, Pe, h_tc_left, T_wall_left, q_wall_left
-    # are accessible via MTK symbolic indexing after solve.
-    # Uses same topology as PHY-04 turbulent integration test (known-working geometry).
-    n_qol = 3;
-    T_inlet_qol = 313.15;
-    T_wall_qol = 373.15
-    geom_qol = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
-    @named ch_qol = ChannelAndContacts(n=n_qol, geometry=geom_qol)
-    @named pump_qol = Pump(3.0e4)
-    @named bc_qol = HeatExchanger(T_inlet_qol)
-    ct_l_qol = [
-        ConstantTemperature(T_wall_qol; name=Symbol(:ct_l_qol_, i)) for i in 1:n_qol
-    ]
-    ct_r_qol = [
-        ConstantTemperature(T_wall_qol; name=Symbol(:ct_r_qol_, i)) for i in 1:n_qol
-    ]
-    conns_qol = vcat(
-        [
-            connect(pump_qol.port_out, bc_qol.port_in),
-            connect(bc_qol.port_out, ch_qol.port_in),
-            connect(ch_qol.port_out, pump_qol.port_in),
-            pump_qol.port_in.P ~ 1.0e5,
-        ],
-        [
-            connect(ct_l_qol[i].thermal, getproperty(ch_qol, Symbol(:thermal_left, i))) for
-            i in 1:n_qol
-        ],
-        [
-            connect(ct_r_qol[i].thermal, getproperty(ch_qol, Symbol(:thermal_right, i))) for
-            i in 1:n_qol
-        ],
-    )
-    @named sys_qol = compose(
-        System(conns_qol, t; name=:sys_qol),
-        pump_qol,
-        bc_qol,
-        ch_qol,
-        ct_l_qol...,
-        ct_r_qol...,
-    )
-    ssys_qol = mtkcompile(sys_qol)
-    T_g_qol = steady_state_guess(T_inlet=T_inlet_qol, Q_wall=1e4, mdot_guess=0.250, n=n_qol)
-    op_qol = [ssys_qol.ch_qol.T[i] => T_g_qol[i] for i in 1:n_qol]
-    push!(op_qol, ssys_qol.ch_qol.port_in.mdot => 0.250)
-    sol_qol = solve_steady(ssys_qol, op_qol)
-    @test sol_qol.retcode == ReturnCode.Success
-    @test sol_qol[ssys_qol.ch_qol.Re[1]] isa Real
-    @test sol_qol[ssys_qol.ch_qol.Re[1]] > 0.0
-    @test sol_qol[ssys_qol.ch_qol.Nu[1]] isa Real
-    @test sol_qol[ssys_qol.ch_qol.Nu[1]] > 0.0
-    @test sol_qol[ssys_qol.ch_qol.velocity[1]] isa Real
-    @test sol_qol[ssys_qol.ch_qol.velocity[1]] > 0.0
-    @test sol_qol[ssys_qol.ch_qol.Pe[1]] > 0.0
-    @test sol_qol[ssys_qol.ch_qol.h_tc_left[1]] > 0.0
-    @test sol_qol[ssys_qol.ch_qol.h_tc_right[1]] > 0.0
-    @test sol_qol[ssys_qol.ch_qol.T_wall_left[1]] ≈ T_wall_qol atol=1.0
-    @test sol_qol[ssys_qol.ch_qol.q_wall_left[1]] isa Real
+# ───────────────────────────────────────────────────────────
+# Test fixtures — local helpers that build canonical CAC + HD pairs.
+# Mirrors Python STREAM's MTR_fuel_and_channel(z_N, fuel_N, clad_N) function
+# in tests/test_composition/conftest.py.
+# ───────────────────────────────────────────────────────────
+function _mtr_pair(; n=4, nz=4, nx=2)
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named cac = ChannelAndContacts(; n=n, geometry=geom,
+                                    htc_correlation=constant_Nusselt(; Nu=8.235),
+                                    friction_correlation=laminar_friction(0.0025 / 0.070))
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005,
+                                 y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                                 power_shape=ps)
+    return cac, fuel
 end
 
-@testset "QOL-02: check_gravity_mismatch — balanced loop" begin
-    # build_loop_vertical has a Gravity return component that balances the
-    # channel upward gravity term — returns :ok.
-    ssys = build_loop_vertical(n=3, dP_pump=5000.0, T_inlet=600.0)
+# ───────────────────────────────────────────────────────────
+# Section 1: port helper (D-18 first bullet)
+# ───────────────────────────────────────────────────────────
+@testset "port helper — indexed thermal port access on uncompiled CAC" begin
+    cac, _ = _mtr_pair()
+    p1 = port(cac, :thermal_left, 1)
+    @test p1 isa ModelingToolkit.AbstractSystem
+    # MTK's getname on a child subsystem returns a parent-qualified Symbol like
+    # `:cac₊thermal_left1` after composition. Compare against the equivalent
+    # getproperty access (which is exactly what `port` wraps) to assert the
+    # helper reaches the same port object as the canonical access pattern.
+    @test ModelingToolkit.getname(p1) == ModelingToolkit.getname(getproperty(cac, :thermal_left1))
+    p2 = port(cac, :thermal_right, 2)
+    @test ModelingToolkit.getname(p2) == ModelingToolkit.getname(getproperty(cac, :thermal_right2))
+    # Sanity: the local (last segment) name matches the requested face+i pattern.
+    name_str_1 = string(ModelingToolkit.getname(p1))
+    @test endswith(name_str_1, "thermal_left1")
+    name_str_2 = string(ModelingToolkit.getname(p2))
+    @test endswith(name_str_2, "thermal_right2")
+end
+
+# ───────────────────────────────────────────────────────────
+# Section 2: check_gravity_mismatch (D-18 second bullet)
+# Existing G_M tests carry forward — these don't touch Channel architecture.
+# ───────────────────────────────────────────────────────────
+@testset "check_gravity_mismatch — :ok when no gravity" begin
+    geom = PipeGeometry_circular(0.6, 0.01)
+    @named ch = ChannelAndContacts(; n=4, geometry=geom)  # default g=0.0
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    # CAC's per-cell thermal ports are Flow-based ThermalPort subsystems —
+    # pinning `port.T` directly over-determines via the dangling Flow rule
+    # (auto-zeros Q_flow). Drive them via ConstantTemperature `connect()`s
+    # (the canonical CAC wall-T pattern; see test_channels.jl SIGN-02 testset).
+    ct_l = [ConstantTemperature(313.15; name=Symbol(:ct_l_ok_, i)) for i in 1:4]
+    ct_r = [ConstantTemperature(313.15; name=Symbol(:ct_r_ok_, i)) for i in 1:4]
+    connections = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, ch.port_in),
+        connect(ch.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        [connect(ct_l[i].thermal, port(ch, :thermal_left, i)) for i in 1:4]...,
+        [connect(ct_r[i].thermal, port(ch, :thermal_right, i)) for i in 1:4]...,
+    ]
+    @named sys = compose(System(connections, t; name=:gravok), pump, bc, ch, ct_l..., ct_r...)
+    ssys = mtkcompile(sys)
     @test check_gravity_mismatch(ssys) == :ok
 end
 
-@testset "QOL-02: check_gravity_mismatch — unbalanced loop :mismatch" begin
-    # Channel with g=9.81 (gravity active) but no Gravity return component.
-    # check_gravity_mismatch detects g_acc > 0 with no matching H parameter.
-    @named ch_gm = Channel(n=1, geometry=PipeGeometry_circular(0.6, 0.01), g=9.81)
-    @named pump_gm = Pump(1000.0)
-    @named hx_gm = HeatExchanger(600.0)
-    conns_gm = [
-        connect(pump_gm.port_out, hx_gm.port_in),
-        connect(hx_gm.port_out, ch_gm.port_in),
-        connect(ch_gm.port_out, pump_gm.port_in),
-        pump_gm.port_in.P ~ 1.0e5,
-        ch_gm.thermal.T ~ 600.0,
-    ]
-    @named sys_gm = compose(System(conns_gm, t; name=:sys_gm), pump_gm, hx_gm, ch_gm)
-    ssys_gm = mtkcompile(sys_gm)
-    @test check_gravity_mismatch(ssys_gm) == :mismatch
-end
-
-@testset "QOL-03: port() helper" begin
-    # port(sys, :thermal_left, i) wraps getproperty(sys, Symbol(face, i))
-    # Verify it returns the same object as direct getproperty access.
-    geom = PipeGeometry_circular(0.6, 0.01)  # L=0.6, D=0.01
-    @named cac = ChannelAndContacts(n=3, geometry=geom)
-    # port() and getproperty should return the same MTK subsystem (same name)
-    @test nameof(port(cac, :thermal_left, 1)) == nameof(getproperty(cac, :thermal_left1))
-    @test nameof(port(cac, :thermal_right, 2)) == nameof(getproperty(cac, :thermal_right2))
-    # port() constructs Symbol(:thermal_left, 3) = :thermal_left3 (checks concat logic)
-    @test nameof(port(cac, :thermal_left, 3)) ==
-        nameof(getproperty(cac, Symbol(:thermal_left, 3)))
-end
-
-# Shared geometry for COMP tests (n=3 cells, small MTR-like channel)
-const geom_comp = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-const ps_comp = ones(3, 3)  # uniform power shape, 3x3
-
-@testset "COMP-01: symmetric_plate — builds and solves" begin
-    @named cac = ChannelAndContacts(
-        n=3,
-        geometry=geom_comp,
-        htc_correlation=constant_Nusselt(Nu=8.235),
-        friction_correlation=laminar_friction(0.0025/0.070),
-    )
-    @named fuel = HeatDiffusion(
-        nz=3,
-        nx=3,
-        Lz=0.6,
-        Lx=0.006,
-        y=0.003,
-        rho_s=19300.0,
-        cp_s=130.0,
-        k_s=20.0,
-        power_shape=ps_comp,
-        power=1e4,
-    )
-    plate_sys = symmetric_plate(cac, fuel; name=:plate)
-    # Add pump and HeatExchanger BCs for hydraulic closure
+@testset "check_gravity_mismatch — :mismatch when CAC has g but no Gravity component" begin
+    geom = PipeGeometry_circular(0.6, 0.01)
+    @named ch = ChannelAndContacts(; n=4, geometry=geom, g=9.80665)
     @named pump = Pump(3.0e4)
-    @named hx_in = HeatExchanger(600.0)
-    outer_conns = [
-        connect(pump.port_out, hx_in.port_in),
-        connect(hx_in.port_out, plate_sys.cac.port_in),
-        connect(plate_sys.cac.port_out, pump.port_in),
+    @named bc = HeatExchanger(313.15)
+    ct_l = [ConstantTemperature(313.15; name=Symbol(:ct_l_bad_, i)) for i in 1:4]
+    ct_r = [ConstantTemperature(313.15; name=Symbol(:ct_r_bad_, i)) for i in 1:4]
+    connections = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, ch.port_in),
+        connect(ch.port_out, pump.port_in),
         pump.port_in.P ~ 1.0e5,
-        plate_sys.fuel.power ~ 1e4,
+        [connect(ct_l[i].thermal, port(ch, :thermal_left, i)) for i in 1:4]...,
+        [connect(ct_r[i].thermal, port(ch, :thermal_right, i)) for i in 1:4]...,
     ]
-    @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, plate_sys)
-    ssys = mtkcompile(top)
-    @test length(ModelingToolkit.unknowns(ssys)) > 0
-    @test length(ModelingToolkit.equations(ssys)) > 0
+    @named sys = compose(System(connections, t; name=:gravbad), pump, bc, ch, ct_l..., ct_r...)
+    ssys = mtkcompile(sys)
+    @test check_gravity_mismatch(ssys) == :mismatch
 end
 
-@testset "COMP-02: plate — two-channel wiring" begin
-    @named ch_l = ChannelAndContacts(
-        n=3,
-        geometry=geom_comp,
-        htc_correlation=constant_Nusselt(Nu=8.235),
-        friction_correlation=laminar_friction(0.0025/0.070),
-    )
-    @named ch_r = ChannelAndContacts(
-        n=3,
-        geometry=geom_comp,
-        htc_correlation=constant_Nusselt(Nu=8.235),
-        friction_correlation=laminar_friction(0.0025/0.070),
-    )
-    @named fuel = HeatDiffusion(
-        nz=3,
-        nx=3,
-        Lz=0.6,
-        Lx=0.006,
-        y=0.003,
-        rho_s=19300.0,
-        cp_s=130.0,
-        k_s=20.0,
-        power_shape=ps_comp,
-        power=1e4,
-    )
-    plate_sys = plate(ch_l, ch_r, fuel; name=:plate)
+# ───────────────────────────────────────────────────────────
+# Section 3: _infer_n (D-18 third bullet)
+# Works on CAC (ThermalPort arrays kept); errors on the new Channel/CHF.
+# ───────────────────────────────────────────────────────────
+@testset "_infer_n: counts thermal_left* on CAC (n=4)" begin
+    cac, _ = _mtr_pair(; n=4)
+    @test _infer_n(cac) == 4
+end
+
+@testset "_infer_n: counts thermal_left* on CAC (n=10)" begin
+    cac10, _ = _mtr_pair(; n=10)
+    @test _infer_n(cac10) == 10
+end
+
+@testset "_infer_n: errors on Channel (no thermal port arrays under new design)" begin
+    @named ch = Channel(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
+    @test_throws ErrorException _infer_n(ch)
+end
+
+@testset "_infer_n: errors on ChannelHeatFlux (no thermal port arrays under new design)" begin
+    @named chf = ChannelHeatFlux(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
+    @test_throws ErrorException _infer_n(chf)
+end
+
+# ───────────────────────────────────────────────────────────
+# Section 4: symmetric_plate compose-correctness (D-18 fourth bullet)
+# Multiple shapes; both faces wired correctly; no mtkcompile errors.
+# Verify-block requires: at least 2 distinct shape testsets (n=4 + n=10)
+# AND at least 2 asymmetric-shape testsets (nx=1, nx=3).
+# ───────────────────────────────────────────────────────────
+@testset "symmetric_plate(cac, fuel) — n=4, nz=4, nx=2 compiles cleanly" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+    @test rods isa ModelingToolkit.AbstractSystem
+    # Add the missing power binding + a pump loop to make it solvable
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, rods.cac.port_in),
+        connect(rods.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        rods.fuel.power ~ 1.0e3,
+    ]
+    full = compose_systems(rods, pump, bc; connections=conns, name=:full)
+    ssys = mtkcompile(full)
+    @test ssys isa ModelingToolkit.AbstractSystem
+    # Solve briefly to verify composition produces meaningful steady state
+    ic = Pair{Any,Any}[
+        [ssys.rods.cac.T[i] => 313.15 for i in 1:4]...,
+        [ssys.rods.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:2]...,
+        ssys.rods.cac.port_in.mdot => 0.2,
+    ]
+    sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
+    @test sol.retcode == ReturnCode.Success
+end
+
+@testset "symmetric_plate — n=10, nz=10, nx=2 compiles cleanly" begin
+    cac, fuel = _mtr_pair(; n=10, nz=10, nx=2)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+    @test rods isa ModelingToolkit.AbstractSystem
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, rods.cac.port_in),
+        connect(rods.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        rods.fuel.power ~ 1.0e3,
+    ]
+    full = compose_systems(rods, pump, bc; connections=conns, name=:full10)
+    ssys = mtkcompile(full)
+    @test ssys isa ModelingToolkit.AbstractSystem
+    ic = Pair{Any,Any}[
+        [ssys.rods.cac.T[i] => 313.15 for i in 1:10]...,
+        [ssys.rods.fuel.T[i, j] => 313.15 for i in 1:10 for j in 1:2]...,
+        ssys.rods.cac.port_in.mdot => 0.2,
+    ]
+    sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
+    @test sol.retcode == ReturnCode.Success
+end
+
+# NOTE on `nx=1` (Deviation 1, see SUMMARY): the plan template originally asked
+# for an `nx=1` smallest-asymmetric testset. HeatDiffusion's lateral-FD stencil
+# (`src/components/heat_diffusion.jl:_diffusion_eqs`) hard-references `T[i,2]`
+# in the `j==1` left-boundary branch and `T[i,nx-1]` in the `j==nx` right-
+# boundary branch — `nx=1` triggers `BoundsError` because both branches fire on
+# the same single cell with no interior. Fixing this requires an additional
+# `if nx == 1` single-cell stencil branch in HeatDiffusion, which is OUT OF
+# PHASE-55 SCOPE (Phase 55 D-08 line: "src/components/heat_diffusion.jl ...
+# UNCHANGED in Phase 55"). Substituting `nx=1` with `nx=4` (a wider plate than
+# the default `nx=2`, asymmetric vs the n=4 channel cell count and the other
+# `nx=2`/`nx=3` testsets) preserves the spirit of the asymmetric-shape matrix.
+@testset "symmetric_plate — asymmetric nx=4 (wide plate, nx > n)" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=4)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+    @test rods isa ModelingToolkit.AbstractSystem
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, rods.cac.port_in),
+        connect(rods.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        rods.fuel.power ~ 1.0e3,
+    ]
+    full = compose_systems(rods, pump, bc; connections=conns, name=:fullx4)
+    ssys = mtkcompile(full)
+    @test ssys isa ModelingToolkit.AbstractSystem
+    ic = Pair{Any,Any}[
+        [ssys.rods.cac.T[i] => 313.15 for i in 1:4]...,
+        [ssys.rods.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:4]...,
+        ssys.rods.cac.port_in.mdot => 0.2,
+    ]
+    sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
+    @test sol.retcode == ReturnCode.Success
+end
+
+@testset "symmetric_plate — asymmetric nx=3 (non-square plate)" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=3)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+    @test rods isa ModelingToolkit.AbstractSystem
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, rods.cac.port_in),
+        connect(rods.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        rods.fuel.power ~ 1.0e3,
+    ]
+    full = compose_systems(rods, pump, bc; connections=conns, name=:fullx3)
+    ssys = mtkcompile(full)
+    @test ssys isa ModelingToolkit.AbstractSystem
+    ic = Pair{Any,Any}[
+        [ssys.rods.cac.T[i] => 313.15 for i in 1:4]...,
+        [ssys.rods.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:3]...,
+        ssys.rods.cac.port_in.mdot => 0.2,
+    ]
+    sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
+    @test sol.retcode == ReturnCode.Success
+end
+
+# ───────────────────────────────────────────────────────────
+# Section 5: plate (dual-CAC + HD) compose-correctness (D-18 fifth bullet)
+# Verify-block requires: at least 1 testset with name starting with "plate(".
+# ───────────────────────────────────────────────────────────
+@testset "plate(ch_left, ch_right, fuel) — both faces wired correctly" begin
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    @named ch_left = ChannelAndContacts(; n=4, geometry=geom)
+    @named ch_right = ChannelAndContacts(; n=4, geometry=geom)
+    ps = fill(1.0 / 8, 4, 2)
+    @named fuel = HeatDiffusion(; nz=4, nx=2, Lz=0.6, Lx=0.005,
+                                 y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                                 power_shape=ps)
+    pl = plate(ch_left, ch_right, fuel; name=:pl)
+    @test pl isa ModelingToolkit.AbstractSystem
+    # Power binding + minimal closure (skip pump loop — compose-correctness only)
     @named pump_l = Pump(3.0e4)
-    @named hx_l = HeatExchanger(600.0)
+    @named bc_l = HeatExchanger(313.15)
     @named pump_r = Pump(3.0e4)
-    @named hx_r = HeatExchanger(600.0)
-    outer_conns = [
-        connect(pump_l.port_out, hx_l.port_in),
-        connect(hx_l.port_out, plate_sys.ch_l.port_in),
-        connect(plate_sys.ch_l.port_out, pump_l.port_in),
+    @named bc_r = HeatExchanger(313.15)
+    conns = [
+        connect(pump_l.port_out, bc_l.port_in),
+        connect(bc_l.port_out, pl.ch_left.port_in),
+        connect(pl.ch_left.port_out, pump_l.port_in),
         pump_l.port_in.P ~ 1.0e5,
-        connect(pump_r.port_out, hx_r.port_in),
-        connect(hx_r.port_out, plate_sys.ch_r.port_in),
-        connect(plate_sys.ch_r.port_out, pump_r.port_in),
+        connect(pump_r.port_out, bc_r.port_in),
+        connect(bc_r.port_out, pl.ch_right.port_in),
+        connect(pl.ch_right.port_out, pump_r.port_in),
         pump_r.port_in.P ~ 1.0e5,
-        plate_sys.fuel.power ~ 1e4,
+        pl.fuel.power ~ 1.0e3,
     ]
-    @named top = compose(
-        System(outer_conns, t; name=:top), pump_l, hx_l, pump_r, hx_r, plate_sys
-    )
-    ssys = mtkcompile(top)
-    @test length(ModelingToolkit.unknowns(ssys)) > 0
+    full = compose_systems(pl, pump_l, bc_l, pump_r, bc_r; connections=conns, name=:dualcac)
+    ssys = mtkcompile(full)
+    @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-@testset "COMP-03: one_sided_connection — single face" begin
-    for test_side in [:left, :right]
-        @named ch = ChannelAndContacts(
-            n=3,
-            geometry=geom_comp,
-            htc_correlation=constant_Nusselt(Nu=8.235),
-            friction_correlation=laminar_friction(0.0025/0.070),
-        )
-        @named fuel = HeatDiffusion(
-            nz=3,
-            nx=3,
-            Lz=0.6,
-            Lx=0.006,
-            y=0.003,
-            rho_s=19300.0,
-            cp_s=130.0,
-            k_s=20.0,
-            power_shape=ps_comp,
-            power=1e4,
-        )
-        osc_sys = one_sided_connection(ch, fuel; side=test_side, name=:osc)
-        @named pump = Pump(3.0e4)
-        @named hx_in = HeatExchanger(600.0)
-        outer_conns = [
-            connect(pump.port_out, hx_in.port_in),
-            connect(hx_in.port_out, osc_sys.ch.port_in),
-            connect(osc_sys.ch.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
-            osc_sys.fuel.power ~ 1e4,
-        ]
-        @named top = compose(System(outer_conns, t; name=:top), pump, hx_in, osc_sys)
-        ssys = mtkcompile(top)
-        @test length(ModelingToolkit.unknowns(ssys)) > 0
-    end
-end
-
-@testset "COMP-04: compose_systems — variadic wrapper" begin
-    # Build two symmetric_plate assemblies, connect hydraulically in series
-    @named cac1 = ChannelAndContacts(
-        n=3,
-        geometry=geom_comp,
-        htc_correlation=constant_Nusselt(Nu=8.235),
-        friction_correlation=laminar_friction(0.0025/0.070),
-    )
-    @named fuel1 = HeatDiffusion(
-        nz=3,
-        nx=3,
-        Lz=0.6,
-        Lx=0.006,
-        y=0.003,
-        rho_s=19300.0,
-        cp_s=130.0,
-        k_s=20.0,
-        power_shape=ps_comp,
-        power=1e4,
-    )
-    @named cac2 = ChannelAndContacts(
-        n=3,
-        geometry=geom_comp,
-        htc_correlation=constant_Nusselt(Nu=8.235),
-        friction_correlation=laminar_friction(0.0025/0.070),
-    )
-    @named fuel2 = HeatDiffusion(
-        nz=3,
-        nx=3,
-        Lz=0.6,
-        Lx=0.006,
-        y=0.003,
-        rho_s=19300.0,
-        cp_s=130.0,
-        k_s=20.0,
-        power_shape=ps_comp,
-        power=1e4,
-    )
-    p1 = symmetric_plate(cac1, fuel1; name=:plate1)
-    p2 = symmetric_plate(cac2, fuel2; name=:plate2)
-
-    # Series hydraulic connection: pump -> plate1 -> plate2 -> hx_in -> pump
+# ───────────────────────────────────────────────────────────
+# Section 6: one_sided_connection (D-18 sixth bullet)
+# Verify-block requires: at least 2 "@testset \"one_sided_connection" testsets
+# (one per side variant).
+# ───────────────────────────────────────────────────────────
+@testset "one_sided_connection — side=:left compiles cleanly" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    # `one_sided_connection` calls `compose(...)` which preserves each
+    # subsystem's `@named` binding — the channel arg keeps its name `:cac`,
+    # not the parameter symbol `:channel`.
+    osc = one_sided_connection(cac, fuel; side=:left, name=:osc_l)
+    @test osc isa ModelingToolkit.AbstractSystem
     @named pump = Pump(3.0e4)
-    @named hx_in = HeatExchanger(600.0)
-    cross_conns = Equation[
-        connect(pump.port_out, hx_in.port_in),
-        connect(hx_in.port_out, p1.cac1.port_in),
-        connect(p1.cac1.port_out, p2.cac2.port_in),
-        connect(p2.cac2.port_out, pump.port_in),
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, osc.cac.port_in),
+        connect(osc.cac.port_out, pump.port_in),
         pump.port_in.P ~ 1.0e5,
-        p1.fuel1.power ~ 1e4,
-        p2.fuel2.power ~ 1e4,
+        osc.fuel.power ~ 1.0e3,
     ]
-    reactor = compose_systems(p1, p2, pump, hx_in; connections=cross_conns, name=:reactor)
-    ssys = mtkcompile(reactor)
-    @test length(ModelingToolkit.unknowns(ssys)) > 0
+    full = compose_systems(osc, pump, bc; connections=conns, name=:osc_full_l)
+    ssys = mtkcompile(full)
+    @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-@testset "COMP: symmetric_plate — physics verification (energy balance)" begin
-    # Verify symmetric_plate produces physically correct output: T_out > T_in,
-    # full plate power matches channel energy gain within 5%.
-    # Uses default (Dittus-Boelter + Blasius) correlations for turbulent-regime convergence.
-    n_cp = 3;
-    T_in_cp = 313.15
-    geom_cp = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
-    ps_cp = fill(1.0 / (n_cp * n_cp), n_cp, n_cp)
-    @named cac_cp = ChannelAndContacts(n=n_cp, geometry=geom_cp)
-    @named fuel_cp = HeatDiffusion(
-        nz=n_cp,
-        nx=n_cp,
-        Lz=0.6,
-        Lx=0.00127,
-        y=0.07,
-        rho_s=19300.0,
-        cp_s=130.0,
-        k_s=20.0,
-        power_shape=ps_cp,
-        power=1e4,
-    )
-    plate_cp = symmetric_plate(cac_cp, fuel_cp; name=:plate_cp)
-    @named pump_cp = Pump(3.0e4)
-    @named hx_cp = HeatExchanger(T_in_cp)
-    outer_cp = [
-        connect(pump_cp.port_out, hx_cp.port_in),
-        connect(hx_cp.port_out, plate_cp.cac_cp.port_in),
-        connect(plate_cp.cac_cp.port_out, pump_cp.port_in),
-        pump_cp.port_in.P ~ 1.0e5,
-        plate_cp.fuel_cp.power ~ 1e4,
+@testset "one_sided_connection — side=:right compiles cleanly" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    osc = one_sided_connection(cac, fuel; side=:right, name=:osc_r)
+    @test osc isa ModelingToolkit.AbstractSystem
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, osc.cac.port_in),
+        connect(osc.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        osc.fuel.power ~ 1.0e3,
     ]
-    @named top_cp = compose(System(outer_cp, t; name=:top_cp), pump_cp, hx_cp, plate_cp)
-    ssys_cp = mtkcompile(top_cp)
-    T_g_cp = steady_state_guess(T_inlet=T_in_cp, Q_wall=1e4, mdot_guess=0.250, n=n_cp)
-    op_cp = vcat(
-        [ssys_cp.plate_cp.cac_cp.T[i] => T_g_cp[i] for i in 1:n_cp],
-        [
-            ssys_cp.plate_cp.fuel_cp.T[i, j] => T_g_cp[i] + 2.0 for i in 1:n_cp for
-            j in 1:n_cp
-        ],
-        [ssys_cp.plate_cp.cac_cp.port_in.mdot => 0.250],
-    )
-    sol_cp = solve_steady(ssys_cp, op_cp)
-    @test sol_cp.retcode == ReturnCode.Success
-    @test sol_cp[ssys_cp.plate_cp.cac_cp.T_out] > T_in_cp
-    mdot_cp = sol_cp[ssys_cp.plate_cp.cac_cp.port_in.mdot]
-    @test isapprox(
-        sol_cp[ssys_cp.plate_cp.cac_cp.T_out] - T_in_cp,
-        1e4 / (mdot_cp * cp_water(T_in_cp));
-        rtol=0.05,
-    )
+    full = compose_systems(osc, pump, bc; connections=conns, name=:osc_full_r)
+    ssys = mtkcompile(full)
+    @test ssys isa ModelingToolkit.AbstractSystem
+end
+
+@testset "one_sided_connection — invalid side errors" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    @test_throws ErrorException one_sided_connection(cac, fuel; side=:bogus, name=:bad)
+end
+
+# ───────────────────────────────────────────────────────────
+# Section 7: compose_systems cross-plate wiring (D-18 seventh bullet)
+# Stitch two symmetric_plate assemblies via hydraulic-series connect equations.
+# ───────────────────────────────────────────────────────────
+@testset "compose_systems — two plates in series" begin
+    cac1, fuel1 = _mtr_pair(; n=4, nz=4, nx=2)
+    cac2, fuel2 = _mtr_pair(; n=4, nz=4, nx=2)
+    p1 = symmetric_plate(cac1, fuel1; name=:p1)
+    p2 = symmetric_plate(cac2, fuel2; name=:p2)
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, p1.cac.port_in),
+        connect(p1.cac.port_out, p2.cac.port_in),
+        connect(p2.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        p1.fuel.power ~ 1.0e3,
+        p2.fuel.power ~ 1.0e3,
+    ]
+    full = compose_systems(p1, p2, pump, bc; connections=conns, name=:two_plates)
+    ssys = mtkcompile(full)
+    @test ssys isa ModelingToolkit.AbstractSystem
+    ic = Pair{Any,Any}[
+        [ssys.p1.cac.T[i] => 313.15 for i in 1:4]...,
+        [ssys.p1.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:2]...,
+        [ssys.p2.cac.T[i] => 313.15 for i in 1:4]...,
+        [ssys.p2.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:2]...,
+        ssys.p1.cac.port_in.mdot => 0.2,
+    ]
+    sol = solve_transient(ssys, ic, range(0.0, 0.2, length=5))
+    @test sol.retcode == ReturnCode.Success
+end
+
+# ───────────────────────────────────────────────────────────
+# Section 8: connect_temperature_feedback (D-18 eighth bullet)
+# TF-04 equation-counting tests from Phase 47.
+# ───────────────────────────────────────────────────────────
+@testset "connect_temperature_feedback — 1D (CAC) emits n equations" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+    rho_c_fn(t) = 0.0
+    rods_cac = rods.cac
+    @named pk = PointKinetics(rho_c_fn; temp_worth=Dict(rods_cac => 1.0e-4))
+    eqs = connect_temperature_feedback(pk, [rods_cac])
+    @test length(eqs) == 4    # n=4 cells
+end
+
+@testset "connect_temperature_feedback — 2D (HeatDiffusion) emits nz*nx equations row-major" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+    rho_c_fn(t) = 0.0
+    rods_fuel = rods.fuel
+    @named pk = PointKinetics(rho_c_fn; temp_worth=Dict(rods_fuel => 1.0e-4))
+    eqs = connect_temperature_feedback(pk, [rods_fuel])
+    @test length(eqs) == 4 * 2  # nz=4, nx=2
+end
+
+@testset "connect_temperature_feedback — multiple components sum" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+    rho_c_fn(t) = 0.0
+    rods_cac = rods.cac
+    rods_fuel = rods.fuel
+    @named pk = PointKinetics(rho_c_fn; temp_worth=Dict(rods_cac => 1.0e-4, rods_fuel => 1.0e-4))
+    eqs = connect_temperature_feedback(pk, [rods_cac, rods_fuel])
+    @test length(eqs) == 4 + 4 * 2  # 4 cells + 4*2 grid
 end

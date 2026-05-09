@@ -31,9 +31,22 @@ using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-using Plots
-ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
-gr()
+
+# Plots is intentionally NOT in Project.toml — project-level decision (see
+# .planning/phases/55-composition-helpers-examples-test-suite/deferred-items.md).
+# Guard `using Plots` so the simulation portion of this script runs on a stock
+# checkout; the plot block (Section 5) is skipped when Plots is unavailable or
+# when PHASE55_SMOKE_NOPLOT=1 is set. Install Plots manually with
+# `Pkg.add("Plots")` to enable the plot save.
+const PLOTS_AVAILABLE = (get(ENV, "PHASE55_SMOKE_NOPLOT", "") != "1") &&
+                        (Base.find_package("Plots") !== nothing)
+if PLOTS_AVAILABLE
+    @eval using Plots
+    ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
+    Plots.gr()
+else
+    @info "Plots.jl unavailable — Section 5 plot save will be skipped (run `Pkg.add(\"Plots\")` to enable)"
+end
 
 # =============================================================================
 # SECTION 1: Parameters
@@ -147,29 +160,33 @@ println("  Plate center T      = $(round(T_center - 273.15, digits=2)) degC")
 println("  T_plate_center > T_fluid: $(T_center > T_out_l)")
 
 # =============================================================================
-# SECTION 5: Plot axial temperature profiles
+# SECTION 5: Plot axial temperature profiles (skipped when Plots unavailable)
 # =============================================================================
 
-T_plate_center_col = [sol[ssys.rods.hd.T[i, (NX + 1) ÷ 2]] for i in 1:NZ]
-T_fluid_l = [sol[ssys.rods.cac_l.T[i]] for i in 1:NZ]
-T_fluid_r = [sol[ssys.rods.cac_r.T[i]] for i in 1:NZ]
-z = range(0.0, L_PLATE; length=NZ)
+if PLOTS_AVAILABLE
+    T_plate_center_col = [sol[ssys.rods.hd.T[i, (NX + 1) ÷ 2]] for i in 1:NZ]
+    T_fluid_l = [sol[ssys.rods.cac_l.T[i]] for i in 1:NZ]
+    T_fluid_r = [sol[ssys.rods.cac_r.T[i]] for i in 1:NZ]
+    z = range(0.0, L_PLATE; length=NZ)
 
-p = plot(z, T_plate_center_col .- 273.15; label="Plate center", linewidth=2, color=:red)
-plot!(p, z, T_fluid_l .- 273.15; label="Left channel", linewidth=2, color=:blue)
-plot!(
-    p,
-    z,
-    T_fluid_r .- 273.15;
-    label="Right channel",
-    linewidth=2,
-    color=:green,
-    linestyle=:dash,
-)
-xlabel!(p, "Axial position [m]")
-ylabel!(p, "Temperature [degC]")
-title!(p, "STREAM.jl — MTR Assembly Steady State")
+    p = plot(z, T_plate_center_col .- 273.15; label="Plate center", linewidth=2, color=:red)
+    plot!(p, z, T_fluid_l .- 273.15; label="Left channel", linewidth=2, color=:blue)
+    plot!(
+        p,
+        z,
+        T_fluid_r .- 273.15;
+        label="Right channel",
+        linewidth=2,
+        color=:green,
+        linestyle=:dash,
+    )
+    xlabel!(p, "Axial position [m]")
+    ylabel!(p, "Temperature [degC]")
+    title!(p, "STREAM.jl — MTR Assembly Steady State")
 
-mkpath("examples/output")
-savefig(p, "examples/output/mtr_assembly_temperature.png")
-println("Plot saved to examples/output/mtr_assembly_temperature.png")
+    mkpath("examples/output")
+    savefig(p, "examples/output/mtr_assembly_temperature.png")
+    println("Plot saved to examples/output/mtr_assembly_temperature.png")
+else
+    println("Section 5 (plotting) skipped: Plots.jl unavailable.")
+end

@@ -41,7 +41,7 @@ end
         k_s=174.0,
         power_shape=ps,
     )
-    @test_nowarn mtkcompile(hd; fully_determined=false)
+    @test_nowarn mtkcompile(hd; fully_determined=false)  # isolated component: dangling thermal ports + unset power(t) by design
 end
 
 @testset "HDIFF-01: HeatDiffusion state T[1:nz, 1:nx] present in unknowns" begin
@@ -182,7 +182,7 @@ end
         [hd.power ~ pwr],
     )
     @named sys = compose(System(conns, t; name=:sys), hd, ct_l...)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys; fully_determined=true)
 
     op = [ssys.hd.T[i, j] => T_bc + 10.0 for i in 1:nz for j in 1:nx]
     sol = solve_steady(ssys, op)
