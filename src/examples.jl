@@ -435,13 +435,12 @@ function build_loop_lof_bypass(;
     geom = PipeGeometry_circular(L_ch, D_ch)
 
     # NC-enabled regime switching for heated channel (D-10)
-    rd_ch = regime_dependent(;
+    rd_ch = regime_dependent(geom;
         htc_laminar=constant_Nusselt(; Nu=8.235),
         htc_turbulent=dittus_boelter,
-        friction_laminar=laminar_friction(1.0),
+        friction_laminar=laminar_friction(geom),
         friction_turbulent=blasius_friction,
-        htc_natural=elenbaas_htc(; b=D_ch, L=L_ch, Dh=D_ch, g=g_acc),
-        Dh=D_ch,
+        htc_natural=elenbaas_htc(geom; g=g_acc),
         g=g_acc,
     )
 
@@ -578,7 +577,7 @@ function build_loop_pk(ctrl;
         n=n,
         geometry=geom,
         htc_correlation=constant_Nusselt(; Nu=8.235),
-        friction_correlation=laminar_friction(0.0025 / 0.070),
+        friction_correlation=laminar_friction(geom),
     )
     @named fuel = HeatDiffusion(;
         nz=nz,
