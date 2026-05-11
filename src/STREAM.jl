@@ -24,6 +24,10 @@ include("solvers.jl")
 include("analysis.jl")
 include("examples.jl")
 
+# Type alias for closure-arg clarity at call sites (documentation value, not enforcement).
+# Per Phase 59 D-00 / gui-redesign design-decisions §3.1.
+const HTCCorrelation = Function
+
 export rho_water, cp_water, mu_water, k_water, beta_water, sat_temperature
 export FlowPort, ThermalPort
 export Channel,
@@ -56,7 +60,8 @@ export dittus_boelter,
     viscosity_correction,
     fully_developed_laminar_h_spl,
     developing_laminar_h_spl,
-    maximal_htc
+    maximal_htc,
+    HTCCorrelation
 export McAdams_SCB_heat_flux,
     Bergles_Rohsenow_SCB_heat_flux, partial_SCB_correction, regime_dependent_q_scb
 export Bergles_Rohsenow_T_ONB,
