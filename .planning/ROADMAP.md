@@ -64,9 +64,9 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.12.
 **Depends on:** Phase 59.
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
-- [ ] 60-01-PLAN.md (Wave 1) — Implement `fuel_assembly` helper in `src/composition/helpers.jl` with four-variant dispatch + ArgumentError validation; export from `src/STREAM.jl`.
+- [x] 60-01-PLAN.md (Wave 1) — Implement `fuel_assembly` helper in `src/composition/helpers.jl` with four-variant dispatch + ArgumentError validation; export from `src/STREAM.jl`.
 - [ ] 60-02-PLAN.md (Wave 2, depends on 60-01) — Variant parity tests (4 testsets at rtol=1e-10) + ArgumentError tests in `test/test_composition.jl`; emit Phase 61 handoff note `.planning/notes/fuel-assembly-api.md` per D-07.
 
 ### Phase 61: Registry audit + rewrite for v1.1
@@ -204,7 +204,7 @@ contract document drafted in parallel throughout.
 | Phase | Plans Complete | Status      | Completed |
 |-------|----------------|-------------|-----------|
 | 59. Correlation `geom`-first refactor                | 4/4 | Complete    | 2026-05-11 |
-| 60. `fuel_assembly` composition helper               | 0/2 | Planned | — |
+| 60. `fuel_assembly` composition helper               | 1/2 | In Progress|  |
 | 61. Registry audit + rewrite for v1.1                | 0/TBD | Planned | — |
 | 62. Resources panel architecture                     | 0/TBD | Planned | — |
 | 63. BCs tab + value-source components in GUI         | 0/TBD | Planned | — |
