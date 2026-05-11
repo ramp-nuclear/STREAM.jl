@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: Ready to discuss
+status: executing
 stopped_at: Phase 60 context gathered
-last_updated: "2026-05-11T19:51:10.469Z"
-last_activity: 2026-05-11 — Phase 59 execution complete; ROADMAP and SUMMARY artifacts committed.
+last_updated: "2026-05-11T20:21:44.548Z"
+last_activity: 2026-05-11 -- Phase 60 execution started
 progress:
   total_phases: 14
   completed_phases: 1
-  total_plans: 4
+  total_plans: 6
   completed_plans: 4
-  percent: 100
+  percent: 67
 ---
 
 # STATE: STREAM.jl
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** v1.2 GUI Redesign — Phase 59 (correlation geom-first refactor) shipped; Phase 60 (`fuel_assembly` composition helper) next.
+**Current focus:** Phase 60 — fuel-assembly-composition-helper
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -57,10 +57,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 60 (`fuel_assembly` composition helper)
-Plan: Not started — no CONTEXT.md yet
-Status: Ready to discuss
-Last activity: 2026-05-11 — Phase 59 execution complete; ROADMAP and SUMMARY artifacts committed.
+Phase: 60 (fuel-assembly-composition-helper) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 60
+Last activity: 2026-05-11 -- Phase 60 execution started
 Next: `/gsd:discuss-phase 60` (recommended) — or `/gsd:plan-phase 60` to skip discuss.
 
 ---
