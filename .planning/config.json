@@ -11,7 +11,7 @@
     "auto_advance": false,
     "nyquist_validation": true,
     "code_review": true,
-    "code_review_depth": "standard",
+    "code_review_depth": "deep",
     "tdd_mode": false,
     "use_worktrees": true,
     "_auto_chain_active": false
