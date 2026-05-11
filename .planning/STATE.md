@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: "**Goal:** Bring `gui/src/registry/components.json` into alignment with v1.1 source. Stream version bump to `1.1.0`. Add 4 missing components. Rewrite Channel/CHF entries"
+milestone: v1.2
+milestone_name: "GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration"
 status: ready_to_plan
-stopped_at: Phase 59 context gathered
-last_updated: "2026-05-11T16:50:52.482Z"
-last_activity: 2026-05-11 -- Phase 59 execution started
+stopped_at: Phase 59 execution complete
+last_updated: "2026-05-11T21:10:00.000Z"
+last_activity: 2026-05-11 -- Phase 59 execution complete (correlation geom-first refactor shipped)
 progress:
-  total_phases: 7
-  completed_phases: 8
-  total_plans: 34
-  completed_plans: 34
-  percent: 114
+  total_phases: 14
+  completed_phases: 1
+  total_plans: 4
+  completed_plans: 4
+  percent: 7
 ---
 
 # STATE: STREAM.jl
@@ -25,31 +25,43 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 59 — correlation-geom-first-refactor
+**Current focus:** v1.2 GUI Redesign — Phase 59 (correlation geom-first refactor) shipped; Phase 60 (`fuel_assembly` composition helper) next.
 **Python STREAM reference:** ~/projects/STREAM
-**Working branch:** `channels-redesign` (off origin/main, single PR at end)
+**Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
 **Roadmap summary:**
 
 - v0.8 (shipped): Phases 33-44 — STREAM Composer GUI
 - v0.9 (shipped): Phases 45-49 — Point Kinetics & Reactor Control
 - v1.0 (shipped): Phases 50-51 — Open-Source Release
-- v1.1 (active): Phases 52-56 — Final Channel-Family Redesign
+- v1.1 (shipped to `gui-redesign`; PR #15 → `main` open): Phases 52-58 — Final Channel-Family Redesign + cross-validation + HTC film-temperature + MTK determinacy repair
   - Phase 52: Channel Connectors (CONN-01..04)
   - Phase 53: Shared `_channel_core` + Enthalpy-Form Energy Balance (CORE-01..05, NRG-01..04)
   - Phase 54: Variant Rewrites & File Consolidation (VAR-01..04)
-  - Phase 55: Composition Helpers, Examples & Test Suite (TEST-01, TEST-02, TEST-03, TEST-05)
+  - Phase 55: Composition Helpers, Examples & Test Suite
   - Phase 56: Python STREAM Cross-Validation (TEST-04)
+  - Phase 57: HTC film-temperature evaluation
+  - Phase 58: MTK system determinacy repair
+- v1.2 (active): Phases 59-72 — GUI Redesign (canonical decisions: `.planning/notes/gui-redesign-design-decisions.md`)
+  - Phase 59: Correlation `geom`-first refactor ✓ shipped 2026-05-11
+  - Phase 60: `fuel_assembly` composition helper (next)
+  - Phase 61: Registry audit + rewrite for v1.1 source
+  - Phase 62: Resources panel architecture
+  - Phase 63: BCs tab + value-source components in GUI
+  - Phase 64: Connection routing
+  - Phase 65: Interaction model overhaul
+  - Phase 66: Code preview rework
+  - Phases 67-72: see ROADMAP.md
 
 ---
 
 ## Current Position
 
-Phase: 998.1
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-11
-Next: `/gsd:audit-milestone v1.1` → `/gsd:complete-milestone v1.1` → `/gsd:ship`
+Phase: 60 (`fuel_assembly` composition helper)
+Plan: Not started — no CONTEXT.md yet
+Status: Ready to discuss
+Last activity: 2026-05-11 — Phase 59 execution complete; ROADMAP and SUMMARY artifacts committed.
+Next: `/gsd:discuss-phase 60` (recommended) — or `/gsd:plan-phase 60` to skip discuss.
 
 ---
 
@@ -61,6 +73,8 @@ Next: `/gsd:audit-milestone v1.1` → `/gsd:complete-milestone v1.1` → `/gsd:s
 - v1.1 phasing: 5 phases (52-56), coarse granularity, sequenced as connectors → shared core + energy balance → variants + file consolidation → composition/tests → cross-validation
 - Phase 57 added: HTC film-temperature evaluation
 - Phase 58 added: MTK system determinacy repair
+- v1.2 milestone (2026-05-11): GUI Redesign — Phases 59-72. Phase 59 is a `src/` cleanup prerequisite (correlation factories take `geom::PipeGeometry` first), Phase 60 adds the `fuel_assembly` composition helper, Phase 61 rewrites the GUI component registry, then Phases 62-72 ship the actual GUI redesign (resources panel, BCs tab, connection routing, interaction model, code preview, etc.). Canonical decisions live in `.planning/notes/gui-redesign-design-decisions.md`.
+- Phase 59 (2026-05-11): Correlation `geom`-first refactor shipped. All HTC + friction factories take `geom::PipeGeometry` positionally; `const HTCCorrelation = Function` exported. Python parity gate held (424 CLEAN / 34 FAIL / 78 GRAY, zero verdict flips). Phase 61 handoff doc at `.planning/notes/correlation-geom-first-api.md`.
 
 ### Key Decisions (carry-forward)
 
@@ -111,21 +125,20 @@ Next: `/gsd:audit-milestone v1.1` → `/gsd:complete-milestone v1.1` → `/gsd:s
 
 ## Session Continuity
 
-**Last session:** 2026-05-11T16:27:18.427Z
-**Stopped at:** Phase 59 context gathered
-**Next action:** `/gsd-plan-phase 52` to decompose Phase 52 (Channel Connectors) into executable plans
-**Resume file:** .planning/phases/59-correlation-geom-first-refactor/59-CONTEXT.md
-**Branch:** `channels-redesign`
-**Stash:** stash@{0} = "WIP before channels-redesign milestone: deps + snap research notes"
+**Last session:** 2026-05-11T21:10:00.000Z
+**Stopped at:** Phase 59 execution complete (4/4 plans, VERIFICATION passed 6/6)
+**Next action:** `/gsd:discuss-phase 60` to gather context for the `fuel_assembly` composition helper
+**Resume file:** .planning/ROADMAP.md (Phase 60 entry, line ~32 + line ~61)
+**Branch:** `gui-redesign`
+**Stash:** none
 
-**Phase 52 decisions locked (from 52-CONTEXT.md):**
+**Phase 59 outcomes (carry-forward into Phase 60 and Phase 61):**
 
-- WallPort (T_wall, h, Q_flow [Flow]) and HeatFluxPort (q_flux, Q_flow [Flow]) — scalar connectors, used as arrays per side
-- Adiabatic default: IC `h=0` / `q_flux=0` alone — no `ifelse` guard in channel equations
-- Q_flow [W] positive=into-channel, matches existing ThermalPort convention
-- Tests: inline `_StubRecipient` / `_StubWallDriver` / `_StubFluxDriver` in `test_connectors.jl`
-- Smoke test: tiny pump→stub→pump loop with brief solve, asserts no MTK stream-connection warnings
+- All correlation factories (`laminar_friction`, `elenbaas_htc`, `fully_developed_laminar_h_spl`, `developing_laminar_h_spl`, `regime_dependent`) take `geom::PipeGeometry` positionally. Old kwarg-only forms physically deleted (clean break per D-01). `const HTCCorrelation = Function` exported from `STREAM.jl` (declared BEFORE includes that reference it — see `f4a0042` fix).
+- Repo-wide closure check: zero non-geom call sites remain in `src/` or `test/`.
+- Python parity preserved exactly: 424 CLEAN / 34 FAIL / 78 GRAY (same as pre-refactor baseline; zero verdict flips).
+- API surface and remaining deferred items documented in `.planning/notes/correlation-geom-first-api.md` for Phase 61 to consume when rewriting the GUI registry.
 
 ---
 
-*Last updated: 2026-05-05 — Phase 52 context gathered*
+*Last updated: 2026-05-11 — Phase 59 execution complete*
