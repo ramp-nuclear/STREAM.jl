@@ -3,6 +3,11 @@ module STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 
+# Type alias for closure-arg clarity at call sites (documentation value, not enforcement).
+# Per Phase 59 D-00 / gui-redesign design-decisions §3.1.
+# Declared before includes so physical_models/htc/correlations.jl can reference it at parse time.
+const HTCCorrelation = Function
+
 include("fluids.jl")
 include("connectors.jl")
 include("geometry.jl")
@@ -23,10 +28,6 @@ include("composition/helpers.jl")
 include("solvers.jl")
 include("analysis.jl")
 include("examples.jl")
-
-# Type alias for closure-arg clarity at call sites (documentation value, not enforcement).
-# Per Phase 59 D-00 / gui-redesign design-decisions §3.1.
-const HTCCorrelation = Function
 
 export rho_water, cp_water, mu_water, k_water, beta_water, sat_temperature
 export FlowPort, ThermalPort
