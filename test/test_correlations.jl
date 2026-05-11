@@ -54,18 +54,22 @@ import STREAM:
     end
 
     @testset "PHY-03: laminar_friction factory" begin
-        # MTR geometry: aspect_ratio = 0.00127/0.07 = 0.01814
-        f_fn = laminar_friction(0.01814)
+        # MTR-like rectangular geometry constructed so depth/width == 0.01814 exactly.
+        # width = 0.07, depth = 0.07 * 0.01814 = 0.0012698  →  aspect_ratio = 0.01814.
+        geom = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
+        f_fn = laminar_friction(geom)
         k_R = rectangular_laminar_correction(0.01814)
         @test isapprox(f_fn(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
         @test isapprox(f_fn(500.0), 64.0 / (500.0 * k_R); rtol=1e-6)
     end
 
     @testset "PHY-04: regime_dependent switching" begin
+        # MTR-like rectangular geometry: depth/width == 0.01814 (k_R ≈ 0.68544).
+        geom = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
         rd = regime_dependent(
             htc_laminar=constant_Nusselt(Nu=8.235),
             htc_turbulent=dittus_boelter,
-            friction_laminar=laminar_friction(0.01814),
+            friction_laminar=laminar_friction(geom),
             friction_turbulent=blasius_friction,
         )
         # Named tuple must have :htc and :friction keys
@@ -143,14 +147,13 @@ end
         T_inlet = 313.15;
         T_wall = 373.15
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
-        ar = geom.depth / geom.width   # aspect_ratio for MTR geometry (~0.01814)
 
         @named pump_phy03 = Pump(30.0)
         @named cac_phy03 = ChannelAndContacts(
             n=n,
             geometry=geom,
             htc_correlation=constant_Nusselt(Nu=8.235),
-            friction_correlation=laminar_friction(ar),
+            friction_correlation=laminar_friction(geom),
         )
         @named bc_phy03 = HeatExchanger(T_inlet)
         ct_l_phy03 = [
@@ -202,7 +205,7 @@ end
         rd = regime_dependent(
             htc_laminar=constant_Nusselt(Nu=8.235),
             htc_turbulent=dittus_boelter,
-            friction_laminar=laminar_friction(geom.depth / geom.width),
+            friction_laminar=laminar_friction(geom),
             friction_turbulent=blasius_friction,
             Re_transition=2300.0,
         )
@@ -256,7 +259,7 @@ end
         rd = regime_dependent(
             htc_laminar=constant_Nusselt(Nu=8.235),
             htc_turbulent=dittus_boelter,
-            friction_laminar=laminar_friction(geom.depth / geom.width),
+            friction_laminar=laminar_friction(geom),
             friction_turbulent=blasius_friction,
             Re_transition=2300.0,
         )
