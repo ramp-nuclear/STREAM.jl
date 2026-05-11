@@ -204,7 +204,7 @@ contract document drafted in parallel throughout.
 | Phase | Plans Complete | Status      | Completed |
 |-------|----------------|-------------|-----------|
 | 59. Correlation `geom`-first refactor                | 4/4 | Complete    | 2026-05-11 |
-| 60. `fuel_assembly` composition helper               | 2/2 | Complete   | 2026-05-11 |
+| 60. `fuel_assembly` composition helper               | 2/2 | Complete    | 2026-05-11 |
 | 61. Registry audit + rewrite for v1.1                | 0/TBD | Planned | — |
 | 62. Resources panel architecture                     | 0/TBD | Planned | — |
 | 63. BCs tab + value-source components in GUI         | 0/TBD | Planned | — |
