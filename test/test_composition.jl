@@ -374,3 +374,483 @@ end
     eqs = connect_temperature_feedback(pk, [rods_cac, rods_fuel])
     @test length(eqs) == 4 + 4 * 2  # 4 cells + 4*2 grid
 end
+
+# ───────────────────────────────────────────────────────────
+# Section 9: fuel_assembly — Phase 60 (v1.2 §3.12)
+#
+# Locks the four-variant CAC↔Plate alternation helper added by plan 60-01.
+# D-06 gate: helper-built system must match hand-rolled connect() chain
+# pointwise at rtol=1e-10 after solve_steady. ArgumentError paths confirmed
+# for the four caller-input mistakes. Smoke confirms helper returns an
+# uncompiled ODESystem (no premature mtkcompile).
+#
+# Locked k per D-06: k=2 for variants 1/2/3, k=3 for variant 4.
+# build_initializeprob=false is mandatory for HD+CAC (per 60-CONTEXT).
+# ───────────────────────────────────────────────────────────
+
+# Helper: build a fresh (CAC, HD) pair under a caller-supplied name prefix.
+# Inline `@named` is required — MTK's `@named` macro expands at parse time
+# and needs a bare LHS identifier; string-interpolated symbols won't parse.
+# This helper splices the prefix into Symbol() at runtime instead, which
+# works because we call `ChannelAndContacts(; name=...)` directly (no @named).
+function _fa_cac(prefix::Symbol; n=4)
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    ChannelAndContacts(; name=prefix, n=n, geometry=geom,
+                       htc_correlation=constant_Nusselt(; Nu=8.235),
+                       friction_correlation=laminar_friction(geom))
+end
+
+function _fa_hd(prefix::Symbol; nz=4, nx=2)
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    HeatDiffusion(; name=prefix, nz=nz, nx=nx, Lz=0.6, Lx=0.005,
+                   y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
+                   power_shape=ps)
+end
+
+# Hand-rolled per-pair wiring — mirrors `_pair_connections` in src/composition/helpers.jl
+# (spatial-absolute L/R convention: left-of-pair uses thermal_right, right-of-pair uses
+# thermal_left). Used to build the reference systems for the four parity testsets.
+function _fa_pair_eqs(lsys, rsys, n::Int)
+    return [connect(port(lsys, :thermal_right, i), port(rsys, :thermal_left, i)) for i in 1:n]
+end
+
+# Time-derivative shortcut for solve_steady IC guesses on per-CAC momentum states
+# (see the deviation note in each variant testset for why these are needed).
+const _fa_Dt = Differential(t)
+
+# ─── Variant 1 — channel-bookended (k=2 plates, k+1=3 channels) parity ───
+@testset "fuel_assembly variant 1 (channel-bookended, k=2) parity" begin
+    n, nz, nx = 4, 4, 2
+    # Helper-built path
+    c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n); c3h = _fa_cac(:c3; n=n)
+    p1h = _fa_hd(:p1; nz=nz, nx=nx); p2h = _fa_hd(:p2; nz=nz, nx=nx)
+    asm_helper = fuel_assembly([c1h, c2h, c3h], [p1h, p2h]; name=:asm_helper)
+    @test asm_helper isa ModelingToolkit.AbstractSystem
+
+    @named pump_h = Pump(3.0e4)
+    @named bc_h = HeatExchanger(313.15)
+    conns_h = [
+        connect(pump_h.port_out, bc_h.port_in),
+        connect(bc_h.port_out, asm_helper.c1.port_in),
+        connect(asm_helper.c1.port_out, asm_helper.c2.port_in),
+        connect(asm_helper.c2.port_out, asm_helper.c3.port_in),
+        connect(asm_helper.c3.port_out, pump_h.port_in),
+        pump_h.port_in.P ~ 1.0e5,
+        asm_helper.p1.power ~ 1.0e3,
+        asm_helper.p2.power ~ 1.0e3,
+    ]
+    full_helper = compose_systems(asm_helper, pump_h, bc_h; connections=conns_h, name=:full_helper_v1)
+    ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
+
+    # Hand-rolled path — same components, explicit per-pair thermal wiring.
+    c1d = _fa_cac(:c1; n=n); c2d = _fa_cac(:c2; n=n); c3d = _fa_cac(:c3; n=n)
+    p1d = _fa_hd(:p1; nz=nz, nx=nx); p2d = _fa_hd(:p2; nz=nz, nx=nx)
+    therm_eqs = Equation[
+        _fa_pair_eqs(c1d, p1d, n)...,
+        _fa_pair_eqs(p1d, c2d, n)...,
+        _fa_pair_eqs(c2d, p2d, n)...,
+        _fa_pair_eqs(p2d, c3d, n)...,
+    ]
+    asm_hand = compose(System(therm_eqs, t; name=:asm_hand), c1d, c2d, c3d, p1d, p2d)
+
+    @named pump_d = Pump(3.0e4)
+    @named bc_d = HeatExchanger(313.15)
+    conns_d = [
+        connect(pump_d.port_out, bc_d.port_in),
+        connect(bc_d.port_out, asm_hand.c1.port_in),
+        connect(asm_hand.c1.port_out, asm_hand.c2.port_in),
+        connect(asm_hand.c2.port_out, asm_hand.c3.port_in),
+        connect(asm_hand.c3.port_out, pump_d.port_in),
+        pump_d.port_in.P ~ 1.0e5,
+        asm_hand.p1.power ~ 1.0e3,
+        asm_hand.p2.power ~ 1.0e3,
+    ]
+    full_hand = compose_systems(asm_hand, pump_d, bc_d; connections=conns_d, name=:full_hand_v1)
+    ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
+
+    # NOTE (D-06 deviation, applies to all four parity testsets): the plan
+    # specifies bare `solve_steady` on the parity gate, but each CAC's
+    # `(L/A)*Dt(port_in.mdot)` momentum ODE introduces one differential state,
+    # and `mtkcompile`'s structural reduction non-deterministically picks
+    # which CAC's `mdotˍt(t)` survives as the master state. The choice
+    # differs between helper-built and hand-rolled compilations (confirmed:
+    # helper retains c3, hand-rolled retains c2 for variant 1), so a bare
+    # `solve_steady` IC vector raises "Initial condition underdefined".
+    # Fix per the precedent in test_integration.jl line 262: pass explicit
+    # `Dt(...)=>0.0` guesses for every per-CAC `port_in.mdot` — extras are
+    # silently ignored, the surviving derivative state gets its IC. With
+    # this, solve_steady reaches true steady state at machine precision and
+    # the D-06 `rtol=1e-10` parity gate matches identically.
+    ic_helper = Pair{Any,Any}[
+        [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.c3.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        ssys_helper.asm_helper.c1.port_in.mdot => 0.2,
+        ssys_helper.asm_helper.c2.port_in.mdot => 0.2,
+        ssys_helper.asm_helper.c3.port_in.mdot => 0.2,
+        _fa_Dt(ssys_helper.asm_helper.c1.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c2.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c3.port_in.mdot) => 0.0,
+    ]
+    ic_hand = Pair{Any,Any}[
+        [ssys_hand.asm_hand.c1.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.c2.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.c3.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        ssys_hand.asm_hand.c1.port_in.mdot => 0.2,
+        ssys_hand.asm_hand.c2.port_in.mdot => 0.2,
+        ssys_hand.asm_hand.c3.port_in.mdot => 0.2,
+        _fa_Dt(ssys_hand.asm_hand.c1.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c2.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c3.port_in.mdot) => 0.0,
+    ]
+    sol_helper = solve_steady(ssys_helper, ic_helper)
+    sol_hand = solve_steady(ssys_hand, ic_hand)
+    @test sol_helper.retcode == ReturnCode.Success
+    @test sol_hand.retcode == ReturnCode.Success
+
+    # Parity by symbolic-accessor read-back: identical physical states across both
+    # systems (compiler unknown-vector ordering may differ between asm_helper and
+    # asm_hand — read by symbol to avoid relying on order stability).
+    vals_helper = Float64[]
+    vals_hand = Float64[]
+    for cname in (:c1, :c2, :c3), i in 1:n
+        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, cname), :T)[i]])
+        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, cname), :T)[i]])
+    end
+    for pname in (:p1, :p2), i in 1:nz, j in 1:nx
+        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, pname), :T)[i, j]])
+        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, pname), :T)[i, j]])
+    end
+    @test isapprox(vals_helper, vals_hand; rtol=1e-10)
+end
+
+# ─── Variant 2 — plate-bookended (k=1 channel, k+1=2 plates) parity ───
+# Per D-06 the locked k=2 means the smaller variants get k≥1 channels. Variant 2
+# uses k=2 channels + k+1=3 plates so 'k' matches the variant-1 cell count.
+@testset "fuel_assembly variant 2 (plate-bookended, k=2) parity" begin
+    n, nz, nx = 4, 4, 2
+    c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n)
+    p1h = _fa_hd(:p1; nz=nz, nx=nx); p2h = _fa_hd(:p2; nz=nz, nx=nx); p3h = _fa_hd(:p3; nz=nz, nx=nx)
+    asm_helper = fuel_assembly([c1h, c2h], [p1h, p2h, p3h]; name=:asm_helper)
+    @test asm_helper isa ModelingToolkit.AbstractSystem
+
+    @named pump_h = Pump(3.0e4)
+    @named bc_h = HeatExchanger(313.15)
+    conns_h = [
+        connect(pump_h.port_out, bc_h.port_in),
+        connect(bc_h.port_out, asm_helper.c1.port_in),
+        connect(asm_helper.c1.port_out, asm_helper.c2.port_in),
+        connect(asm_helper.c2.port_out, pump_h.port_in),
+        pump_h.port_in.P ~ 1.0e5,
+        asm_helper.p1.power ~ 1.0e3,
+        asm_helper.p2.power ~ 1.0e3,
+        asm_helper.p3.power ~ 1.0e3,
+    ]
+    full_helper = compose_systems(asm_helper, pump_h, bc_h; connections=conns_h, name=:full_helper_v2)
+    ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
+
+    c1d = _fa_cac(:c1; n=n); c2d = _fa_cac(:c2; n=n)
+    p1d = _fa_hd(:p1; nz=nz, nx=nx); p2d = _fa_hd(:p2; nz=nz, nx=nx); p3d = _fa_hd(:p3; nz=nz, nx=nx)
+    therm_eqs = Equation[
+        _fa_pair_eqs(p1d, c1d, n)...,
+        _fa_pair_eqs(c1d, p2d, n)...,
+        _fa_pair_eqs(p2d, c2d, n)...,
+        _fa_pair_eqs(c2d, p3d, n)...,
+    ]
+    asm_hand = compose(System(therm_eqs, t; name=:asm_hand), c1d, c2d, p1d, p2d, p3d)
+
+    @named pump_d = Pump(3.0e4)
+    @named bc_d = HeatExchanger(313.15)
+    conns_d = [
+        connect(pump_d.port_out, bc_d.port_in),
+        connect(bc_d.port_out, asm_hand.c1.port_in),
+        connect(asm_hand.c1.port_out, asm_hand.c2.port_in),
+        connect(asm_hand.c2.port_out, pump_d.port_in),
+        pump_d.port_in.P ~ 1.0e5,
+        asm_hand.p1.power ~ 1.0e3,
+        asm_hand.p2.power ~ 1.0e3,
+        asm_hand.p3.power ~ 1.0e3,
+    ]
+    full_hand = compose_systems(asm_hand, pump_d, bc_d; connections=conns_d, name=:full_hand_v2)
+    ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
+
+    # (See D-06 deviation note in variant 1 testset for the Dt(...) IC pattern.)
+    ic_helper = Pair{Any,Any}[
+        [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p3.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        ssys_helper.asm_helper.c1.port_in.mdot => 0.2,
+        ssys_helper.asm_helper.c2.port_in.mdot => 0.2,
+        _fa_Dt(ssys_helper.asm_helper.c1.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c2.port_in.mdot) => 0.0,
+    ]
+    ic_hand = Pair{Any,Any}[
+        [ssys_hand.asm_hand.c1.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.c2.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p3.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        ssys_hand.asm_hand.c1.port_in.mdot => 0.2,
+        ssys_hand.asm_hand.c2.port_in.mdot => 0.2,
+        _fa_Dt(ssys_hand.asm_hand.c1.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c2.port_in.mdot) => 0.0,
+    ]
+    sol_helper = solve_steady(ssys_helper, ic_helper)
+    sol_hand = solve_steady(ssys_hand, ic_hand)
+    @test sol_helper.retcode == ReturnCode.Success
+    @test sol_hand.retcode == ReturnCode.Success
+
+    vals_helper = Float64[]; vals_hand = Float64[]
+    for cname in (:c1, :c2), i in 1:n
+        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, cname), :T)[i]])
+        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, cname), :T)[i]])
+    end
+    for pname in (:p1, :p2, :p3), i in 1:nz, j in 1:nx
+        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, pname), :T)[i, j]])
+        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, pname), :T)[i, j]])
+    end
+    @test isapprox(vals_helper, vals_hand; rtol=1e-10)
+end
+
+# ─── Variant 3 — mixed (k=2 of each), start=:channel parity ───
+@testset "fuel_assembly variant 3 (mixed, k=2, start=:channel) parity" begin
+    n, nz, nx = 4, 4, 2
+    c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n)
+    p1h = _fa_hd(:p1; nz=nz, nx=nx); p2h = _fa_hd(:p2; nz=nz, nx=nx)
+    asm_helper = fuel_assembly([c1h, c2h], [p1h, p2h]; bookend=:mixed, start=:channel, name=:asm_helper)
+    @test asm_helper isa ModelingToolkit.AbstractSystem
+
+    @named pump_h = Pump(3.0e4)
+    @named bc_h = HeatExchanger(313.15)
+    conns_h = [
+        connect(pump_h.port_out, bc_h.port_in),
+        connect(bc_h.port_out, asm_helper.c1.port_in),
+        connect(asm_helper.c1.port_out, asm_helper.c2.port_in),
+        connect(asm_helper.c2.port_out, pump_h.port_in),
+        pump_h.port_in.P ~ 1.0e5,
+        asm_helper.p1.power ~ 1.0e3,
+        asm_helper.p2.power ~ 1.0e3,
+    ]
+    full_helper = compose_systems(asm_helper, pump_h, bc_h; connections=conns_h, name=:full_helper_v3)
+    ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
+
+    # Hand-rolled — sequence c1, p1, c2, p2 (start=:channel, mixed, open)
+    c1d = _fa_cac(:c1; n=n); c2d = _fa_cac(:c2; n=n)
+    p1d = _fa_hd(:p1; nz=nz, nx=nx); p2d = _fa_hd(:p2; nz=nz, nx=nx)
+    therm_eqs = Equation[
+        _fa_pair_eqs(c1d, p1d, n)...,
+        _fa_pair_eqs(p1d, c2d, n)...,
+        _fa_pair_eqs(c2d, p2d, n)...,
+    ]
+    asm_hand = compose(System(therm_eqs, t; name=:asm_hand), c1d, c2d, p1d, p2d)
+
+    @named pump_d = Pump(3.0e4)
+    @named bc_d = HeatExchanger(313.15)
+    conns_d = [
+        connect(pump_d.port_out, bc_d.port_in),
+        connect(bc_d.port_out, asm_hand.c1.port_in),
+        connect(asm_hand.c1.port_out, asm_hand.c2.port_in),
+        connect(asm_hand.c2.port_out, pump_d.port_in),
+        pump_d.port_in.P ~ 1.0e5,
+        asm_hand.p1.power ~ 1.0e3,
+        asm_hand.p2.power ~ 1.0e3,
+    ]
+    full_hand = compose_systems(asm_hand, pump_d, bc_d; connections=conns_d, name=:full_hand_v3)
+    ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
+
+    # (See D-06 deviation note in variant 1 testset for the Dt(...) IC pattern.)
+    ic_helper = Pair{Any,Any}[
+        [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        ssys_helper.asm_helper.c1.port_in.mdot => 0.2,
+        ssys_helper.asm_helper.c2.port_in.mdot => 0.2,
+        _fa_Dt(ssys_helper.asm_helper.c1.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c2.port_in.mdot) => 0.0,
+    ]
+    ic_hand = Pair{Any,Any}[
+        [ssys_hand.asm_hand.c1.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.c2.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        ssys_hand.asm_hand.c1.port_in.mdot => 0.2,
+        ssys_hand.asm_hand.c2.port_in.mdot => 0.2,
+        _fa_Dt(ssys_hand.asm_hand.c1.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c2.port_in.mdot) => 0.0,
+    ]
+    sol_helper = solve_steady(ssys_helper, ic_helper)
+    sol_hand = solve_steady(ssys_hand, ic_hand)
+    @test sol_helper.retcode == ReturnCode.Success
+    @test sol_hand.retcode == ReturnCode.Success
+
+    vals_helper = Float64[]; vals_hand = Float64[]
+    for cname in (:c1, :c2), i in 1:n
+        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, cname), :T)[i]])
+        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, cname), :T)[i]])
+    end
+    for pname in (:p1, :p2), i in 1:nz, j in 1:nx
+        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, pname), :T)[i, j]])
+        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, pname), :T)[i, j]])
+    end
+    @test isapprox(vals_helper, vals_hand; rtol=1e-10)
+end
+
+# ─── Variant 4 — closed annular (k=3 of each, ring) parity ───
+@testset "fuel_assembly variant 4 (closed annular, k=3) parity" begin
+    n, nz, nx = 4, 4, 2
+    c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n); c3h = _fa_cac(:c3; n=n)
+    p1h = _fa_hd(:p1; nz=nz, nx=nx); p2h = _fa_hd(:p2; nz=nz, nx=nx); p3h = _fa_hd(:p3; nz=nz, nx=nx)
+    asm_helper = fuel_assembly([c1h, c2h, c3h], [p1h, p2h, p3h]; closed=true, name=:asm_helper)
+    @test asm_helper isa ModelingToolkit.AbstractSystem
+
+    @named pump_h = Pump(3.0e4)
+    @named bc_h = HeatExchanger(313.15)
+    conns_h = [
+        connect(pump_h.port_out, bc_h.port_in),
+        connect(bc_h.port_out, asm_helper.c1.port_in),
+        connect(asm_helper.c1.port_out, asm_helper.c2.port_in),
+        connect(asm_helper.c2.port_out, asm_helper.c3.port_in),
+        connect(asm_helper.c3.port_out, pump_h.port_in),
+        pump_h.port_in.P ~ 1.0e5,
+        asm_helper.p1.power ~ 1.0e3,
+        asm_helper.p2.power ~ 1.0e3,
+        asm_helper.p3.power ~ 1.0e3,
+    ]
+    full_helper = compose_systems(asm_helper, pump_h, bc_h; connections=conns_h, name=:full_helper_v4)
+    ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
+
+    # Hand-rolled — sequence c1, p1, c2, p2, c3, p3 + wrap (p3 -> c1)
+    # Per closed-ring default in helpers.jl: when start===nothing && closed=true,
+    # the helper sets start=:channel and produces seq = (:c,c1),(:p,p1),(:c,c2),(:p,p2),(:c,c3),(:p,p3),
+    # then wraps so pair_range includes (seq[end], seq[1]) → (p3, c1).
+    c1d = _fa_cac(:c1; n=n); c2d = _fa_cac(:c2; n=n); c3d = _fa_cac(:c3; n=n)
+    p1d = _fa_hd(:p1; nz=nz, nx=nx); p2d = _fa_hd(:p2; nz=nz, nx=nx); p3d = _fa_hd(:p3; nz=nz, nx=nx)
+    therm_eqs = Equation[
+        _fa_pair_eqs(c1d, p1d, n)...,
+        _fa_pair_eqs(p1d, c2d, n)...,
+        _fa_pair_eqs(c2d, p2d, n)...,
+        _fa_pair_eqs(p2d, c3d, n)...,
+        _fa_pair_eqs(c3d, p3d, n)...,
+        _fa_pair_eqs(p3d, c1d, n)...,  # wrap pair
+    ]
+    asm_hand = compose(System(therm_eqs, t; name=:asm_hand), c1d, c2d, c3d, p1d, p2d, p3d)
+
+    @named pump_d = Pump(3.0e4)
+    @named bc_d = HeatExchanger(313.15)
+    conns_d = [
+        connect(pump_d.port_out, bc_d.port_in),
+        connect(bc_d.port_out, asm_hand.c1.port_in),
+        connect(asm_hand.c1.port_out, asm_hand.c2.port_in),
+        connect(asm_hand.c2.port_out, asm_hand.c3.port_in),
+        connect(asm_hand.c3.port_out, pump_d.port_in),
+        pump_d.port_in.P ~ 1.0e5,
+        asm_hand.p1.power ~ 1.0e3,
+        asm_hand.p2.power ~ 1.0e3,
+        asm_hand.p3.power ~ 1.0e3,
+    ]
+    full_hand = compose_systems(asm_hand, pump_d, bc_d; connections=conns_d, name=:full_hand_v4)
+    ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
+
+    # (See D-06 deviation note in variant 1 testset for the Dt(...) IC pattern.)
+    ic_helper = Pair{Any,Any}[
+        [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.c3.T[i] => 313.15 for i in 1:n]...,
+        [ssys_helper.asm_helper.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p3.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        ssys_helper.asm_helper.c1.port_in.mdot => 0.2,
+        ssys_helper.asm_helper.c2.port_in.mdot => 0.2,
+        ssys_helper.asm_helper.c3.port_in.mdot => 0.2,
+        _fa_Dt(ssys_helper.asm_helper.c1.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c2.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c3.port_in.mdot) => 0.0,
+    ]
+    ic_hand = Pair{Any,Any}[
+        [ssys_hand.asm_hand.c1.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.c2.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.c3.T[i] => 313.15 for i in 1:n]...,
+        [ssys_hand.asm_hand.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p3.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
+        ssys_hand.asm_hand.c1.port_in.mdot => 0.2,
+        ssys_hand.asm_hand.c2.port_in.mdot => 0.2,
+        ssys_hand.asm_hand.c3.port_in.mdot => 0.2,
+        _fa_Dt(ssys_hand.asm_hand.c1.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c2.port_in.mdot) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c3.port_in.mdot) => 0.0,
+    ]
+    sol_helper = solve_steady(ssys_helper, ic_helper)
+    sol_hand = solve_steady(ssys_hand, ic_hand)
+    @test sol_helper.retcode == ReturnCode.Success
+    @test sol_hand.retcode == ReturnCode.Success
+
+    vals_helper = Float64[]; vals_hand = Float64[]
+    for cname in (:c1, :c2, :c3), i in 1:n
+        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, cname), :T)[i]])
+        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, cname), :T)[i]])
+    end
+    for pname in (:p1, :p2, :p3), i in 1:nz, j in 1:nx
+        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, pname), :T)[i, j]])
+        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, pname), :T)[i, j]])
+    end
+    @test isapprox(vals_helper, vals_hand; rtol=1e-10)
+end
+
+# ─── ArgumentError paths (D-06) ───
+
+@testset "fuel_assembly — ArgumentError on bookend-vs-length conflict" begin
+    # 3 CACs + 2 HDs → auto would infer :channel; explicit bookend=:plate contradicts.
+    c1 = _fa_cac(:c1); c2 = _fa_cac(:c2); c3 = _fa_cac(:c3)
+    p1 = _fa_hd(:p1); p2 = _fa_hd(:p2)
+    @test_throws ArgumentError fuel_assembly([c1, c2, c3], [p1, p2]; bookend=:plate, name=:bad)
+end
+
+@testset "fuel_assembly — ArgumentError on bookend=:mixed without start" begin
+    # 2 CACs + 2 HDs equal lengths → :mixed bookend valid; missing start required.
+    c1 = _fa_cac(:c1); c2 = _fa_cac(:c2)
+    p1 = _fa_hd(:p1); p2 = _fa_hd(:p2)
+    @test_throws ArgumentError fuel_assembly([c1, c2], [p1, p2]; bookend=:mixed, name=:bad)
+end
+
+@testset "fuel_assembly — ArgumentError on start with non-mixed bookend" begin
+    # 3 CACs + 2 HDs → infers :channel; passing start=:channel is the contradiction
+    # (start kwarg is only meaningful for :mixed bookend).
+    c1 = _fa_cac(:c1); c2 = _fa_cac(:c2); c3 = _fa_cac(:c3)
+    p1 = _fa_hd(:p1); p2 = _fa_hd(:p2)
+    @test_throws ArgumentError fuel_assembly([c1, c2, c3], [p1, p2]; start=:channel, name=:bad)
+end
+
+@testset "fuel_assembly — ArgumentError on closed=true with unequal lengths" begin
+    # 3 CACs + 2 HDs (unequal) + closed=true is incoherent — a ring requires equal counts.
+    c1 = _fa_cac(:c1); c2 = _fa_cac(:c2); c3 = _fa_cac(:c3)
+    p1 = _fa_hd(:p1); p2 = _fa_hd(:p2)
+    @test_throws ArgumentError fuel_assembly([c1, c2, c3], [p1, p2]; closed=true, name=:bad)
+end
+
+# ─── Smoke: helper returns an uncompiled ODESystem (no premature mtkcompile) ───
+@testset "fuel_assembly — uncompiled ODESystem smoke" begin
+    # Build the cheapest variant-3 mixed k=2 instance and confirm the helper
+    # returned an UNCOMPILED system (caller is responsible for adding BCs
+    # then calling mtkcompile — see helper docstring). A bare `mtkcompile`
+    # on the raw assembly is intentionally NOT attempted: without a pump
+    # loop + power binding the system has more unknowns than equations and
+    # mtkcompile fails consistency. The smoke is "did the helper return a
+    # System, not numeric output?" — that is the D-06 last bullet.
+    c1 = _fa_cac(:c1); c2 = _fa_cac(:c2)
+    p1 = _fa_hd(:p1); p2 = _fa_hd(:p2)
+    asm = fuel_assembly([c1, c2], [p1, p2]; bookend=:mixed, start=:channel, name=:asm_smoke)
+    @test asm isa ModelingToolkit.AbstractSystem
+    # Confirm uncompiled by inspecting structure: an uncompiled assembly
+    # has the original 5 child subsystems exposed (c1, c2, p1, p2 + the
+    # connection-only System produced by compose); a compiled system would
+    # have flattened those into a single equation set.
+    @test length(ModelingToolkit.get_systems(asm)) == 4  # c1, c2, p1, p2
+end
