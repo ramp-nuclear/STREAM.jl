@@ -767,7 +767,7 @@ end
             n=n,
             geometry=geom_tf,
             htc_correlation=constant_Nusselt(Nu=8.235),
-            friction_correlation=laminar_friction(0.0025/0.070),
+            friction_correlation=laminar_friction(geom_tf),
         )
         @named fuel = HeatDiffusion(
             nz=n,
@@ -851,7 +851,7 @@ end
             n=n,
             geometry=geom_tf7,
             htc_correlation=constant_Nusselt(Nu=8.235),
-            friction_correlation=laminar_friction(0.0025/0.070),
+            friction_correlation=laminar_friction(geom_tf7),
         )
         @named fuel7 = HeatDiffusion(
             nz=n,
