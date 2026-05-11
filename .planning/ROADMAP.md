@@ -29,7 +29,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 ## Phases
 
 - [x] **Phase 59: Correlation `geom`-first refactor** — `src/physical_models/`; every factory that needs geometry takes `geom::PipeGeometry` first; no more `Dh`/`L`/`depth`/`width` plumbed independently. `const HTCCorrelation = Function` alias. Tests + Python parity re-run. (completed 2026-05-11)
-- [ ] **Phase 60: `fuel_assembly` composition helper** — new helper in `src/composition/helpers.jl` covering 4 variants of alternating CAC↔Plate chains (channel-bookended, plate-bookended, mixed, closed annular). Tests + code-gen detection update.
+- [x] **Phase 60: `fuel_assembly` composition helper** — new helper in `src/composition/helpers.jl` covering 4 variants of alternating CAC↔Plate chains (channel-bookended, plate-bookended, mixed, closed annular). Tests + code-gen detection update. (completed 2026-05-11)
 - [ ] **Phase 61: Registry audit + rewrite for v1.1** — `gui/src/registry/components.json` rewritten against v1.1 source. Add `WallTemperature`, `HeatFluxSource`, `PointKinetics`, `ReactivityController`. Collapse correlation sub-param trees per geom-first. Add `scope` field per parameter (constructor_kwarg vs external_input) for Properties-tab vs BCs-tab split. Bump `stream_version` to `1.1.0`.
 - [ ] **Phase 62: Resources panel architecture** — Navigator restructure to `Project → Model Options + Resources + Components`. Foreign-key UUID references. Save format (`.scp`). Reference picker UX. Sources toolbox category.
 - [ ] **Phase 63: BCs tab + value-source components in GUI** — Properties tab vs BCs tab separation. Five BC modes (value / profile / function / mark-in-code / driven-by-source-block). `WallTemperature` and `HeatFluxSource` toolbox entries. Dashed BC edge style. Bidirectional sync between BCs tab and canvas connections.
@@ -64,10 +64,10 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.12.
 **Depends on:** Phase 59.
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 - [x] 60-01-PLAN.md (Wave 1) — Implement `fuel_assembly` helper in `src/composition/helpers.jl` with four-variant dispatch + ArgumentError validation; export from `src/STREAM.jl`.
-- [ ] 60-02-PLAN.md (Wave 2, depends on 60-01) — Variant parity tests (4 testsets at rtol=1e-10) + ArgumentError tests in `test/test_composition.jl`; emit Phase 61 handoff note `.planning/notes/fuel-assembly-api.md` per D-07.
+- [x] 60-02-PLAN.md (Wave 2, depends on 60-01) — Variant parity tests (4 testsets at rtol=1e-10) + ArgumentError tests in `test/test_composition.jl`; emit Phase 61 handoff note `.planning/notes/fuel-assembly-api.md` per D-07.
 
 ### Phase 61: Registry audit + rewrite for v1.1
 
@@ -204,7 +204,7 @@ contract document drafted in parallel throughout.
 | Phase | Plans Complete | Status      | Completed |
 |-------|----------------|-------------|-----------|
 | 59. Correlation `geom`-first refactor                | 4/4 | Complete    | 2026-05-11 |
-| 60. `fuel_assembly` composition helper               | 1/2 | In Progress|  |
+| 60. `fuel_assembly` composition helper               | 2/2 | Complete   | 2026-05-11 |
 | 61. Registry audit + rewrite for v1.1                | 0/TBD | Planned | — |
 | 62. Resources panel architecture                     | 0/TBD | Planned | — |
 | 63. BCs tab + value-source components in GUI         | 0/TBD | Planned | — |
