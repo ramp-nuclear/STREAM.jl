@@ -95,7 +95,7 @@ export build_loop,
     steady_state_guess,
     check_gravity_mismatch,
     port
-export symmetric_plate, plate, one_sided_connection, compose_systems
+export symmetric_plate, plate, one_sided_connection, compose_systems, fuel_assembly
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController, worth, change_state
 export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback
