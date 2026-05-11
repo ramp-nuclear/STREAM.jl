@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: executing
+status: ready_to_plan
 stopped_at: Phase 60 context gathered
 last_updated: "2026-05-11T20:21:44.548Z"
 last_activity: 2026-05-11 -- Phase 60 execution started
 progress:
   total_phases: 14
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
   completed_plans: 4
-  percent: 67
+  percent: 14
 ---
 
 # STATE: STREAM.jl
@@ -57,10 +57,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 60 (fuel-assembly-composition-helper) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 60
-Last activity: 2026-05-11 -- Phase 60 execution started
+Phase: 61
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-11
 Next: `/gsd:discuss-phase 60` (recommended) — or `/gsd:plan-phase 60` to skip discuss.
 
 ---
