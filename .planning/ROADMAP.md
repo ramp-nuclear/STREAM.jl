@@ -28,7 +28,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 ## Phases
 
-- [ ] **Phase 59: Correlation `geom`-first refactor** — `src/physical_models/`; every factory that needs geometry takes `geom::PipeGeometry` first; no more `Dh`/`L`/`depth`/`width` plumbed independently. `const HTCCorrelation = Function` alias. Tests + Python parity re-run.
+- [x] **Phase 59: Correlation `geom`-first refactor** — `src/physical_models/`; every factory that needs geometry takes `geom::PipeGeometry` first; no more `Dh`/`L`/`depth`/`width` plumbed independently. `const HTCCorrelation = Function` alias. Tests + Python parity re-run. (completed 2026-05-11)
 - [ ] **Phase 60: `fuel_assembly` composition helper** — new helper in `src/composition/helpers.jl` covering 4 variants of alternating CAC↔Plate chains (channel-bookended, plate-bookended, mixed, closed annular). Tests + code-gen detection update.
 - [ ] **Phase 61: Registry audit + rewrite for v1.1** — `gui/src/registry/components.json` rewritten against v1.1 source. Add `WallTemperature`, `HeatFluxSource`, `PointKinetics`, `ReactivityController`. Collapse correlation sub-param trees per geom-first. Add `scope` field per parameter (constructor_kwarg vs external_input) for Properties-tab vs BCs-tab split. Bump `stream_version` to `1.1.0`.
 - [ ] **Phase 62: Resources panel architecture** — Navigator restructure to `Project → Model Options + Resources + Components`. Foreign-key UUID references. Save format (`.scp`). Reference picker UX. Sources toolbox category.
@@ -51,12 +51,12 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.1.
 **Depends on:** v1.1 channels-redesign merged (prerequisite above).
-**Plans:** 4 plans across 4 waves (post plan-checker fix: Plan 02 was demoted from Wave 1 to Wave 2 to resolve a shared-file race on `test/test_correlations.jl` PHY-04 unit testset between Plans 01 and 02; Plans 03/04 each shift one wave later as a consequence).
+**Plans:** 4/4 plans complete
 
-- [ ] 59-01-PLAN.md (Wave 1) — Refactor `laminar_friction` to `(geom::PipeGeometry)`; add `const HTCCorrelation = Function` alias + export; update PHY-03 tests.
-- [ ] 59-02-PLAN.md (Wave 2, depends on 59-01) — Refactor `elenbaas_htc`, `fully_developed_laminar_h_spl`, `developing_laminar_h_spl`, `regime_dependent` to `geom`-first signatures; collapse `regime_dependent` group validation to `(htc_natural, g)`; update HTC + NATCONV + PHY-04 tests.
-- [ ] 59-03-PLAN.md (Wave 3, depends on 59-01 + 59-02) — Sweep `src/examples.jl` (lines 438, 441, 443, 581), `test/test_composition.jl`, and `test/test_integration.jl` (TF-06 line 770, TF-07 line 854) call sites; run integrated test gate including `test/test_validation.jl` Python parity (load-bearing semantic-drift assertion against the pre-refactor parity_report.csv baseline).
-- [ ] 59-04-PLAN.md (Wave 4, depends on 59-03) — Emit `.planning/notes/correlation-geom-first-api.md` Phase 61 handoff doc per D-05.
+- [x] 59-01-PLAN.md (Wave 1) — Refactor `laminar_friction` to `(geom::PipeGeometry)`; add `const HTCCorrelation = Function` alias + export; update PHY-03 tests.
+- [x] 59-02-PLAN.md (Wave 2, depends on 59-01) — Refactor `elenbaas_htc`, `fully_developed_laminar_h_spl`, `developing_laminar_h_spl`, `regime_dependent` to `geom`-first signatures; collapse `regime_dependent` group validation to `(htc_natural, g)`; update HTC + NATCONV + PHY-04 tests.
+- [x] 59-03-PLAN.md (Wave 3, depends on 59-01 + 59-02) — Sweep `src/examples.jl` (lines 438, 441, 443, 581), `test/test_composition.jl`, and `test/test_integration.jl` (TF-06 line 770, TF-07 line 854) call sites; run integrated test gate including `test/test_validation.jl` Python parity (load-bearing semantic-drift assertion against the pre-refactor parity_report.csv baseline).
+- [x] 59-04-PLAN.md (Wave 4, depends on 59-03) — Emit `.planning/notes/correlation-geom-first-api.md` Phase 61 handoff doc per D-05.
 
 ### Phase 60: `fuel_assembly` composition helper
 
@@ -200,7 +200,7 @@ contract document drafted in parallel throughout.
 
 | Phase | Plans Complete | Status      | Completed |
 |-------|----------------|-------------|-----------|
-| 59. Correlation `geom`-first refactor                | 0/4   | Planned | — |
+| 59. Correlation `geom`-first refactor                | 4/4 | Complete    | 2026-05-11 |
 | 60. `fuel_assembly` composition helper               | 0/TBD | Planned | — |
 | 61. Registry audit + rewrite for v1.1                | 0/TBD | Planned | — |
 | 62. Resources panel architecture                     | 0/TBD | Planned | — |
