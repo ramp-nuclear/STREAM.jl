@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: "**Goal:** Bring `gui/src/registry/components.json` into alignment with v1.1 source. Stream version bump to `1.1.0`. Add 4 missing components. Rewrite Channel/CHF entries"
-status: executing
+status: ready_to_plan
 stopped_at: Phase 59 context gathered
-last_updated: "2026-05-11T16:47:18.241Z"
-last_activity: 2026-05-11 -- Phase 59 planning complete
+last_updated: "2026-05-11T16:50:52.482Z"
+last_activity: 2026-05-11 -- Phase 59 execution started
 progress:
   total_phases: 7
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 34
   completed_plans: 34
-  percent: 100
+  percent: 114
 ---
 
 # STATE: STREAM.jl
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** v1.1 close-up — all 7 phases complete (52-58 + Phase 56-resume), running /gsd:audit-milestone before /gsd:complete-milestone + /gsd:ship
+**Current focus:** Phase 59 — correlation-geom-first-refactor
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `channels-redesign` (off origin/main, single PR at end)
 
@@ -45,10 +45,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 56 (closed) — Plan 56-06 SUMMARY committed
-Plan: All v1.1 plans complete (34/34)
-Status: Ready to execute
-Last activity: 2026-05-11 -- Phase 59 planning complete
+Phase: 998.1
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-11
 Next: `/gsd:audit-milestone v1.1` → `/gsd:complete-milestone v1.1` → `/gsd:ship`
 
 ---
