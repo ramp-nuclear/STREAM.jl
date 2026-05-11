@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: milestone
-status: shipped
-stopped_at: "v1.1 milestone shipped — phases archived to .planning/archive/v1.1/; rebase + squash to single FF-mergeable commit on origin/main complete; ready for PR"
-last_updated: "2026-05-09T03:00:00.000Z"
-last_activity: 2026-05-09 -- v1.1 closed: rebased onto origin/main (adopted main's Sundials-free solver, dropped Sundials, added Statistics, regenerated Manifest, un-skipped NET-03 + HTC-02 SPL); WR-01 docstring fix applied; phases 52-58 archived to .planning/archive/v1.1/phases/
+milestone_name: "**Goal:** Bring `gui/src/registry/components.json` into alignment with v1.1 source. Stream version bump to `1.1.0`. Add 4 missing components. Rewrite Channel/CHF entries"
+status: Ready for milestone audit + close
+stopped_at: Phase 59 context gathered
+last_updated: "2026-05-11T16:27:18.445Z"
+last_activity: 2026-05-09 (parity 424 CLEAN / 78 GRAY / 34 FAIL, all FAILs documented)
 progress:
   total_phases: 7
   completed_phases: 7
@@ -111,10 +111,10 @@ Next: `/gsd:audit-milestone v1.1` → `/gsd:complete-milestone v1.1` → `/gsd:s
 
 ## Session Continuity
 
-**Last session:** 2026-05-08T15:26:43.716Z
-**Stopped at:** Phase 58 context gathered
+**Last session:** 2026-05-11T16:27:18.427Z
+**Stopped at:** Phase 59 context gathered
 **Next action:** `/gsd-plan-phase 52` to decompose Phase 52 (Channel Connectors) into executable plans
-**Resume file:** .planning/phases/58-mtk-system-determinacy-repair/58-CONTEXT.md
+**Resume file:** .planning/phases/59-correlation-geom-first-refactor/59-CONTEXT.md
 **Branch:** `channels-redesign`
 **Stash:** stash@{0} = "WIP before channels-redesign milestone: deps + snap research notes"
 
