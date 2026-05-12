@@ -80,6 +80,14 @@ export interface PowerShapeResource {
   params: {
     amplitude?: number;
     path?: string;
+    /** Set true when load-time file-existence check fails for file_loaded
+     * power shape; consumed by SidebarPanel to render the "Locate file..."
+     * banner (INV-10 / D-24). Persisted-on-disk flag is implementation-
+     * incidental: it is set only at load time and re-cleared on relocate. */
+    path_missing?: boolean;
+    /** The absolute path that was checked and not found — used by the
+     * banner copy. Stored alongside path_missing; cleared on relocate. */
+    absolute_path_attempted?: string;
   };
 }
 
@@ -147,7 +155,7 @@ interface AppState {
   validationResult: TopologyResult | null;
   validateAndGate: () => TopologyResult;
   clearValidation: () => void;
-  // Layer view state (persisted in .streamgui, but NOT in undo stack)
+  // Layer view state (persisted in .scp layout block, NOT in undo stack)
   activeLayer: LayerView;
   setActiveLayer: (layer: LayerView) => void;
   cycleLayer: () => void;
@@ -208,6 +216,12 @@ interface AppState {
     kind: "geometry" | "powerShape" | "fluid",
   ) => void;
   clearSelection: () => void;
+  // ----- Phase 62: INV-10 file-not-found UX for file_loaded PowerShapes -----
+  // Populated on loadProjectFromPath when a file_loaded Power Shape's CSV
+  // path resolves but does not exist on disk. Cleared on newProject /
+  // loadProject start / successful relocate.
+  missingFilePowerShapes: Array<{ uuid: string; name: string; pathTried: string }>;
+  relocatePowerShapeFile: (uuid: string) => Promise<void>;
   // File I/O actions
   saveProject: () => Promise<void>;
   saveProjectAs: () => Promise<void>;
@@ -296,6 +310,14 @@ function deriveSelectionKind(
 
 const RECENT_FILE_NAME = "recent.json";
 
+// ---------------------------------------------------------------------------
+// Phase 62: project file extension (.scp) — single source of truth
+// ---------------------------------------------------------------------------
+// Per RESEARCH "Anti-Patterns", extracting the extension to a constant
+// prevents the next renamer from missing a Tauri filter site.
+const PROJECT_FILE_EXTENSION = "scp";
+const PROJECT_FILE_LABEL = "STREAM Composer Projects";
+
 async function loadRecentFiles(): Promise<string[]> {
   try {
     // Dynamic imports to avoid breaking vitest (Tauri APIs unavailable in node env)
@@ -322,6 +344,83 @@ async function saveRecentFiles(files: string[]): Promise<void> {
   } catch {
     // Silent failure — don't block user if recent.json write fails
   }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 62: absolute-path detection (cross-platform)
+// ---------------------------------------------------------------------------
+function isAbsolutePath(p: string): boolean {
+  // Unix absolute -> leading '/'.  Windows absolute -> 'C:\' / 'C:/' style.
+  return p.startsWith("/") || /^[A-Za-z]:[\\/]/.test(p);
+}
+
+// Compute a relative path from `fromDir` to `toAbs`. The Tauri 2 `path` plugin
+// does NOT expose `relative()`, so we do it manually here. Both inputs MUST be
+// absolute; mixing styles (Windows / POSIX) is not supported — the function
+// normalizes both to POSIX-style forward slashes before walking the segments.
+//
+// Returns a forward-slash-joined relative path. Falls back to `toAbs` if the
+// two paths have no common root (e.g., different Windows drives).
+function computeRelativePath(fromDir: string, toAbs: string): string {
+  const norm = (s: string) => s.replace(/\\/g, "/").replace(/\/+$/, "");
+  const fromParts = norm(fromDir).split("/").filter((p) => p.length > 0);
+  const toParts = norm(toAbs).split("/").filter((p) => p.length > 0);
+
+  // Detect Windows-drive divergence (e.g., C:\ vs D:\) — no relative path exists.
+  if (
+    /^[A-Za-z]:$/.test(fromParts[0] ?? "") &&
+    /^[A-Za-z]:$/.test(toParts[0] ?? "") &&
+    fromParts[0].toLowerCase() !== toParts[0].toLowerCase()
+  ) {
+    return toAbs;
+  }
+
+  let i = 0;
+  while (
+    i < fromParts.length &&
+    i < toParts.length &&
+    fromParts[i] === toParts[i]
+  ) {
+    i++;
+  }
+  const ups = new Array(fromParts.length - i).fill("..");
+  const downs = toParts.slice(i);
+  const segments = [...ups, ...downs];
+  return segments.length === 0 ? "." : segments.join("/");
+}
+
+// Build a snapshot of powerShapes with file_loaded paths converted from
+// absolute -> relative-to-(.scp dirname). Pure: returns a new Record; does
+// NOT mutate input. Used at save time per D-24 + RESEARCH Pitfall 5.
+async function relativizePowerShapePaths(
+  powerShapes: Record<string, PowerShapeResource>,
+  scpFilePath: string,
+): Promise<Record<string, PowerShapeResource>> {
+  const out: Record<string, PowerShapeResource> = {};
+  // Lazy-import the Tauri path API so the vitest node env doesn't trip.
+  const pathApi = await import("@tauri-apps/api/path");
+  const scpDir = await pathApi.dirname(scpFilePath);
+  for (const [uuid, ps] of Object.entries(powerShapes)) {
+    if (ps.kind !== "file_loaded" || !ps.params.path) {
+      out[uuid] = ps;
+      continue;
+    }
+    const p = ps.params.path;
+    if (!isAbsolutePath(p)) {
+      out[uuid] = ps;
+      continue;
+    }
+    try {
+      // Tauri 2's path plugin does not expose relative(); compute manually.
+      // If the two paths share no common root (e.g., different Windows drives),
+      // computeRelativePath returns the absolute form unchanged.
+      const rel = computeRelativePath(scpDir, p);
+      out[uuid] = { ...ps, params: { ...ps.params, path: rel } };
+    } catch {
+      out[uuid] = ps;
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -436,6 +535,11 @@ const useStore = create<AppState>()((set, get) => ({
   selectionKind: "none",
 
   // ---------------------------------------------------------------------------
+  // Phase 62: INV-10 missing-file PowerShapes (file-not-found UX)
+  // ---------------------------------------------------------------------------
+  missingFilePowerShapes: [],
+
+  // ---------------------------------------------------------------------------
   // Undo / redo — explicit history stack
   //
   // Why not zundo (temporal middleware)? ReactFlow fires many "noise" change
@@ -503,7 +607,7 @@ const useStore = create<AppState>()((set, get) => ({
   },
 
   // ---------------------------------------------------------------------------
-  // Layer view actions (persisted in .streamgui — set isDirty so saves capture)
+  // Layer view actions (persisted in .scp layout block — set isDirty so saves capture)
   // ---------------------------------------------------------------------------
 
   setActiveLayer: (layer) => set({ activeLayer: layer, isDirty: true }),
@@ -991,9 +1095,29 @@ const useStore = create<AppState>()((set, get) => ({
     }
     try {
       const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-      const json = serializeProject(get().nodes, get().edges, get().bcs, get().activeLayer);
+      // Phase 62: absolute->relative path conversion for file_loaded
+      // PowerShapes (D-24 + RESEARCH Pitfall 5). Transient copy — does NOT
+      // mutate in-memory state.
+      const state = get();
+      const relPowerShapes = await relativizePowerShapePaths(
+        state.resources.powerShapes,
+        currentFilePath,
+      );
+      const json = serializeProject({
+        nodes: state.nodes,
+        edges: state.edges,
+        bcs: state.bcs,
+        resources: {
+          geometries: state.resources.geometries,
+          powerShapes: relPowerShapes,
+          fluids: state.resources.fluids,
+        },
+        modelOptions: state.modelOptions,
+        activeLeftTab: state.activeLeftTab,
+        activeLayer: state.activeLayer,
+      });
       await writeTextFile(currentFilePath, json);
-      const updated = addToRecent(get().recentFiles, currentFilePath);
+      const updated = addToRecent(state.recentFiles, currentFilePath);
       set({ isDirty: false, recentFiles: updated });
       await saveRecentFiles(updated);
     } catch (err) {
@@ -1022,20 +1146,41 @@ const useStore = create<AppState>()((set, get) => ({
     try {
       const { save } = await import("@tauri-apps/plugin-dialog");
       const filePath = await save({
-        defaultPath: "project.streamgui",
+        defaultPath: `project.${PROJECT_FILE_EXTENSION}`,
         filters: [
-          { name: "STREAM Composer Projects", extensions: ["streamgui"] },
+          { name: PROJECT_FILE_LABEL, extensions: [PROJECT_FILE_EXTENSION] },
         ],
       });
       if (!filePath) return;
 
       const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-      const json = serializeProject(get().nodes, get().edges, get().bcs, get().activeLayer);
+      // Phase 62: absolute->relative path conversion for file_loaded
+      // PowerShapes (D-24 + RESEARCH Pitfall 5). Transient copy — does NOT
+      // mutate in-memory state.
+      const state = get();
+      const relPowerShapes = await relativizePowerShapePaths(
+        state.resources.powerShapes,
+        filePath,
+      );
+      const json = serializeProject({
+        nodes: state.nodes,
+        edges: state.edges,
+        bcs: state.bcs,
+        resources: {
+          geometries: state.resources.geometries,
+          powerShapes: relPowerShapes,
+          fluids: state.resources.fluids,
+        },
+        modelOptions: state.modelOptions,
+        activeLeftTab: state.activeLeftTab,
+        activeLayer: state.activeLayer,
+      });
       await writeTextFile(filePath, json);
-      const updated = addToRecent(get().recentFiles, filePath);
+      const updated = addToRecent(state.recentFiles, filePath);
       set({ isDirty: false, currentFilePath: filePath, recentFiles: updated });
       await saveRecentFiles(updated);
     } catch (err) {
+      console.error("[saveProjectAs] write failed:", err);
       const { message } = await import("@tauri-apps/plugin-dialog");
       await message(
         "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again.",
@@ -1053,17 +1198,20 @@ const useStore = create<AppState>()((set, get) => ({
       const { open } = await import("@tauri-apps/plugin-dialog");
       const filePath = await open({
         filters: [
-          { name: "STREAM Composer Projects", extensions: ["streamgui"] },
+          { name: PROJECT_FILE_LABEL, extensions: [PROJECT_FILE_EXTENSION] },
         ],
         multiple: false,
       });
       if (!filePath) return;
       const path = Array.isArray(filePath) ? filePath[0] : filePath;
+      // Clear any stale missing-file alerts before the new load populates fresh ones.
+      set({ missingFilePowerShapes: [] });
       await get().loadProjectFromPath(path);
     } catch (err) {
+      console.error("[loadProject] open failed:", err);
       const { message } = await import("@tauri-apps/plugin-dialog");
       await message(
-        "Couldn't open this project. The file may be missing, corrupted, or not a valid .streamgui file.",
+        "Couldn't open this project. The file may be missing, corrupted, or not a valid .scp file.",
         { title: "Open Failed", kind: "error" },
       );
     }
@@ -1079,19 +1227,92 @@ const useStore = create<AppState>()((set, get) => ({
       const content = await readTextFile(filePath);
       const project = deserializeProject(content);
 
-      const reconstructed = reconstructInstanceCounters(project.nodes);
+      const reconstructed = reconstructInstanceCounters(project.components);
       clearInstanceCounters();
       Object.assign(instanceCounters, reconstructed);
 
       // Re-enrich edges for arrowheads and parallel offset (handles pre-Phase-42 saves)
-      const enrichedProjectEdges = enrichEdges(project.edges, project.nodes);
+      const enrichedProjectEdges = enrichEdges(
+        project.connections,
+        project.components,
+      );
+
+      // Phase 62: convert disk-format arrays back to Records keyed by uuid.
+      // Re-inject the unset PowerShape sentinel (D-26) and the light_water
+      // Fluid placeholder — both live in-memory only.
+      const geometriesRecord: Record<string, GeometryResource> = {};
+      for (const g of project.resources.geometries) geometriesRecord[g.uuid] = g;
+
+      const powerShapesRecord: Record<string, PowerShapeResource> = {
+        [SENTINEL_UNSET_POWER_SHAPE]: {
+          uuid: SENTINEL_UNSET_POWER_SHAPE,
+          name: SENTINEL_POWER_SHAPE_NAME,
+          kind: "unset",
+          params: {},
+        },
+      };
+      for (const ps of project.resources.power_shapes) {
+        // Defensive: refuse to clobber the sentinel if a malformed file
+        // re-introduced it.
+        if (ps.uuid === SENTINEL_UNSET_POWER_SHAPE) continue;
+        powerShapesRecord[ps.uuid] = ps;
+      }
+
+      const fluidsRecord: Record<string, FluidResource> = {
+        [SENTINEL_LIGHT_WATER_FLUID]: {
+          uuid: SENTINEL_LIGHT_WATER_FLUID,
+          name: "light_water",
+        },
+      };
+      for (const f of project.resources.fluids) {
+        if (f.uuid === SENTINEL_LIGHT_WATER_FLUID) continue;
+        fluidsRecord[f.uuid] = f;
+      }
+
+      // Phase 62 INV-10: file-existence check for file_loaded PowerShapes.
+      // Resolve relative paths against dirname(filePath); set path_missing
+      // and populate missingFilePowerShapes for the load-time surface.
+      const pathApi = await import("@tauri-apps/api/path");
+      const fsApi = await import("@tauri-apps/plugin-fs");
+      const scpDir = await pathApi.dirname(filePath);
+      const missing: Array<{ uuid: string; name: string; pathTried: string }> = [];
+      for (const ps of Object.values(powerShapesRecord)) {
+        if (ps.kind !== "file_loaded" || !ps.params.path) continue;
+        let absPath: string;
+        if (isAbsolutePath(ps.params.path)) {
+          absPath = ps.params.path;
+        } else {
+          try {
+            absPath = await pathApi.join(scpDir, ps.params.path);
+          } catch {
+            absPath = ps.params.path;
+          }
+        }
+        let exists = false;
+        try {
+          exists = await fsApi.exists(absPath);
+        } catch {
+          exists = false;
+        }
+        if (!exists) {
+          powerShapesRecord[ps.uuid] = {
+            ...ps,
+            params: {
+              ...ps.params,
+              path_missing: true,
+              absolute_path_attempted: absPath,
+            },
+          };
+          missing.push({ uuid: ps.uuid, name: ps.name, pathTried: absPath });
+        }
+      }
 
       const updated = addToRecent(get().recentFiles, filePath);
       set({
-        nodes: project.nodes,
+        nodes: project.components,
         edges: enrichedProjectEdges,
         bcs: project.bcs,
-        activeLayer: (project.activeLayer ?? "Both") as LayerView,
+        activeLayer: (project.layout.active_layer ?? "Both") as LayerView,
         currentFilePath: filePath,
         isDirty: false,
         selectedNodeId: null,
@@ -1100,17 +1321,45 @@ const useStore = create<AppState>()((set, get) => ({
         _undoFuture: [],
         errorNodeIds: new Set<string>(),
         validationResult: null,
-        // Phase 62: clear selection on load (resources are loaded by 62-04;
-        // for now just reset the selection discriminator).
+        // Phase 62: resources + modelOptions + activeLeftTab restored from .scp
+        resources: {
+          geometries: geometriesRecord,
+          powerShapes: powerShapesRecord,
+          fluids: fluidsRecord,
+        },
+        modelOptions: project.model_options,
+        activeLeftTab: project.layout.active_left_tab,
+        // Selection discriminator reset
         selectedResourceId: null,
         selectedResourceKind: null,
         selectionKind: "none",
+        // INV-10 surface: populate missing-file PowerShape list (cleared if empty)
+        missingFilePowerShapes: missing,
       });
       await saveRecentFiles(updated);
+
+      // INV-10 user-visible error surface: if any file_loaded PowerShape
+      // failed the existence check, show a single non-blocking notification
+      // pointing the user at the Resources tab to relocate them.
+      if (missing.length > 0) {
+        try {
+          const { message } = await import("@tauri-apps/plugin-dialog");
+          await message(
+            missing.length === 1
+              ? `1 power shape file could not be found: File not found: ${missing[0].pathTried}. Open the Resources tab to relocate it.`
+              : `${missing.length} power shape file(s) could not be found. Open the Resources tab to relocate them.`,
+            { title: "Missing Power Shape file", kind: "warning" },
+          );
+        } catch {
+          // Dialog plugin unavailable (e.g., tests) — the inline banner in
+          // the PowerShape editor still surfaces the path_missing flag.
+        }
+      }
     } catch (err) {
+      console.error("[loadProjectFromPath] open failed:", err);
       const { message } = await import("@tauri-apps/plugin-dialog");
       await message(
-        "Couldn't open this project. The file may be missing, corrupted, or not a valid .streamgui file.",
+        "Couldn't open this project. The file may be missing, corrupted, or not a valid .scp file.",
         { title: "Open Failed", kind: "error" },
       );
     }
@@ -1166,6 +1415,73 @@ const useStore = create<AppState>()((set, get) => ({
       selectedResourceId: null,
       selectedResourceKind: null,
       selectionKind: "none",
+      missingFilePowerShapes: [],
+    });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 62 INV-10: relocatePowerShapeFile — user-driven "Locate file…"
+  // Opens a Tauri CSV file picker. On a valid pick, converts the chosen
+  // absolute path to relative-to-.scp (D-24), updates the resource, clears
+  // path_missing, drops the resource from missingFilePowerShapes.
+  // ---------------------------------------------------------------------------
+  relocatePowerShapeFile: async (uuid: string) => {
+    const ps = get().resources.powerShapes[uuid];
+    if (!ps || ps.kind !== "file_loaded") return;
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const picked = await open({
+      filters: [{ name: "CSV (Power Shape)", extensions: ["csv"] }],
+      multiple: false,
+    });
+    if (!picked) return; // user cancelled
+    const newAbs = Array.isArray(picked) ? picked[0] : picked;
+    if (!newAbs) return;
+
+    // Defensive: re-check existence on the chosen path.
+    const fsApi = await import("@tauri-apps/plugin-fs");
+    let stillMissing = false;
+    try {
+      stillMissing = !(await fsApi.exists(String(newAbs)));
+    } catch {
+      stillMissing = true;
+    }
+
+    // Convert absolute -> relative-to-.scp per D-24.
+    const currentFilePath = get().currentFilePath;
+    let storedPath: string = String(newAbs);
+    if (currentFilePath) {
+      try {
+        const pathApi = await import("@tauri-apps/api/path");
+        const dir = await pathApi.dirname(currentFilePath);
+        storedPath = computeRelativePath(dir, String(newAbs));
+      } catch {
+        // Fall back to the absolute path if relativization fails.
+        storedPath = String(newAbs);
+      }
+    }
+
+    get()._pushSnapshot();
+    const state = get();
+    const updatedPs: PowerShapeResource = {
+      ...ps,
+      params: {
+        ...ps.params,
+        path: storedPath,
+        path_missing: stillMissing ? true : undefined,
+        absolute_path_attempted: stillMissing ? String(newAbs) : undefined,
+      },
+    };
+    set({
+      resources: {
+        ...state.resources,
+        powerShapes: { ...state.resources.powerShapes, [uuid]: updatedPs },
+      },
+      missingFilePowerShapes: stillMissing
+        ? state.missingFilePowerShapes.map((m) =>
+            m.uuid === uuid ? { ...m, pathTried: String(newAbs) } : m,
+          )
+        : state.missingFilePowerShapes.filter((m) => m.uuid !== uuid),
+      isDirty: true,
     });
   },
 }));

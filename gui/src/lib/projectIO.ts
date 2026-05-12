@@ -1,51 +1,139 @@
-// projectIO.ts -- Pure serialization/deserialization and recent-files logic.
+// projectIO.ts — Pure serialization / deserialization for the .scp v2.0 schema.
 //
-// Zero side-effects in this module. All file system I/O is handled in useStore.ts.
-// These functions are pure and fully testable in a vitest node environment.
+// Phase 62 hard-cutover: legacy numeric-version (v1/v2) form is rejected
+// outright (D-28). There is NO migration shim. The deserialize side throws
+// cleanly on any non-"2.0" format_version (INV-07 / INV-08).
+//
+// Zero side-effects in this module. All file system I/O is handled in
+// useStore.ts (which is responsible for absolute->relative path conversion of
+// file_loaded Power Shape paths per D-24 / RESEARCH Pitfall 5). projectIO is
+// fully testable in a vitest node environment.
 
 import type { Node, Edge } from "@xyflow/react";
 import type { BCEntry } from "./codeGenerator";
+import type { LayerView } from "./layers";
+import {
+  SENTINEL_UNSET_POWER_SHAPE,
+  type GeometryResource,
+  type PowerShapeResource,
+  type FluidResource,
+  type ModelOptionsSliceState,
+  type ActiveLeftTab,
+} from "../store/useStore";
+
+// Re-export the sentinel constant so consumers of projectIO can filter without
+// dual-importing from the store.
+export { SENTINEL_UNSET_POWER_SHAPE };
 
 // ---------------------------------------------------------------------------
-// Types
+// Format constant
+// ---------------------------------------------------------------------------
+
+/**
+ * Single source of truth for the .scp format version.
+ *
+ * Per D-27, the on-disk schema is `format_version: "2.0"`. Hard-cutover from
+ * the legacy numeric-version form (pre-v2.0) (D-28); no migration.
+ */
+export const PROJECT_FORMAT_VERSION = "2.0" as const;
+
+// ---------------------------------------------------------------------------
+// Types — the v2.0 schema (D-27, D-29)
 // ---------------------------------------------------------------------------
 
 export interface StreamProject {
-  version: 1 | 2;
-  nodes: Node[];
-  edges: Edge[];
+  format_version: typeof PROJECT_FORMAT_VERSION;
+  model_options: ModelOptionsSliceState;
+  resources: {
+    geometries: GeometryResource[];
+    power_shapes: PowerShapeResource[]; // sentinel NOT included
+    fluids: FluidResource[]; // light_water NOT included
+  };
+  components: Node[]; // ReactFlow Node[] — same in-memory shape as pre-Phase-62
+  connections: Edge[]; // renamed from "edges" per CONTEXT.md storage shape
   bcs: BCEntry[];
-  activeLayer?: "Hydraulic" | "Both" | "Thermal";
+  layout: {
+    active_left_tab: ActiveLeftTab; // D-08 / D-29
+    active_layer: LayerView; // moved from top-level (was StreamProject.activeLayer)
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Default factories (used by deserializeProject empty-state tolerance — Pitfall 3)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_FLUID = "water";
+const DEFAULT_G = 9.80665;
+
+function defaultModelOptions(): ModelOptionsSliceState {
+  return {
+    name: "",
+    description: "",
+    default_fluid: DEFAULT_FLUID,
+    g_default: DEFAULT_G,
+    solver: { abstol: 1e-8, reltol: 1e-6, dtmax: null },
+  };
+}
+
+function defaultLayout(): StreamProject["layout"] {
+  return { active_left_tab: "Components", active_layer: "Both" };
 }
 
 // ---------------------------------------------------------------------------
 // serializeProject
 // ---------------------------------------------------------------------------
 
+export interface SerializeProjectArgs {
+  nodes: Node[];
+  edges: Edge[];
+  bcs: BCEntry[];
+  resources: {
+    geometries: Record<string, GeometryResource>;
+    powerShapes: Record<string, PowerShapeResource>;
+    fluids: Record<string, FluidResource>;
+  };
+  modelOptions: ModelOptionsSliceState;
+  activeLeftTab: ActiveLeftTab;
+  activeLayer: LayerView;
+}
+
 /**
- * Serialize canvas state to a JSON string for writing to a `.streamgui` file.
+ * Serialize the in-memory state to a JSON string for writing to a `.scp` file.
+ *
+ * Conversions:
+ *  - resources.geometries / .powerShapes / .fluids: Record<uuid, T> -> T[]
+ *  - SENTINEL_UNSET_POWER_SHAPE is filtered out (D-26 — sentinel is in-memory only)
+ *  - light_water Fluid placeholder is filtered out (re-injected at load time)
+ *  - activeLeftTab + activeLayer are nested under `layout` (D-29)
  *
  * # Arguments
- * - `nodes` — ReactFlow node array
- * - `edges` — ReactFlow edge array
- * - `bcs`   — Boundary condition entries
+ * - `args` — single args object; see {@link SerializeProjectArgs}
  *
  * # Returns
- * A pretty-printed JSON string with `{ version: 2, nodes, edges, bcs, activeLayer }`.
+ * Pretty-printed JSON matching the v2.0 schema.
  */
-export function serializeProject(
-  nodes: Node[],
-  edges: Edge[],
-  bcs: BCEntry[],
-  activeLayer: "Hydraulic" | "Both" | "Thermal" = "Both",
-): string {
+export function serializeProject(args: SerializeProjectArgs): string {
+  const geometries = Object.values(args.resources.geometries);
+  const power_shapes = Object.values(args.resources.powerShapes).filter(
+    (p) => p.uuid !== SENTINEL_UNSET_POWER_SHAPE,
+  );
+  const fluids = Object.values(args.resources.fluids).filter(
+    (f) => f.name !== "light_water",
+  );
+
   const project: StreamProject = {
-    version: 2,
-    nodes,
-    edges,
-    bcs,
-    activeLayer,
+    format_version: PROJECT_FORMAT_VERSION,
+    model_options: args.modelOptions,
+    resources: { geometries, power_shapes, fluids },
+    components: args.nodes,
+    connections: args.edges,
+    bcs: args.bcs,
+    layout: {
+      active_left_tab: args.activeLeftTab,
+      active_layer: args.activeLayer,
+    },
   };
+
   return JSON.stringify(project, null, 2);
 }
 
@@ -54,45 +142,73 @@ export function serializeProject(
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a `.streamgui` JSON string back into a StreamProject object.
+ * Parse a `.scp` JSON string back into a {@link StreamProject}.
  *
- * # Arguments
- * - `json` — Raw text content of a `.streamgui` file
- *
- * # Returns
- * A `StreamProject` object with validated fields.
+ * Behaviour:
+ *  - Strict on `format_version`: anything other than the literal string "2.0"
+ *    throws. Legacy numeric-version form throws (D-28).
+ *  - Empty-state tolerant: missing top-level fields default gracefully so a
+ *    minimal `{"format_version":"2.0"}` parses to a fully-populated empty
+ *    project (RESEARCH Pitfall 3).
+ *  - No defensive try/catch around individual fields — the function either
+ *    succeeds or throws. The consumer wraps in try/catch and surfaces the
+ *    user-facing dialog.
  *
  * # Throws
- * `Error("Invalid .streamgui file")` if required fields are missing or of the
- * wrong type. Also re-throws `SyntaxError` from `JSON.parse` on malformed JSON.
+ *  - `SyntaxError` if `json` is not valid JSON (from `JSON.parse`)
+ *  - `Error` with a message containing "format_version" if version is missing
+ *    or not the literal "2.0"
  */
 export function deserializeProject(json: string): StreamProject {
   // Let JSON.parse throw SyntaxError on malformed input — don't swallow it.
   const parsed = JSON.parse(json) as Record<string, unknown>;
 
-  if (typeof parsed.version !== "number") {
-    throw new Error("Invalid .streamgui file");
-  }
-  if (!Array.isArray(parsed.nodes)) {
-    throw new Error("Invalid .streamgui file");
-  }
-  if (!Array.isArray(parsed.edges)) {
-    throw new Error("Invalid .streamgui file");
-  }
-  if (!Array.isArray(parsed.bcs)) {
-    throw new Error("Invalid .streamgui file");
+  // Strict format_version check (INV-07, INV-08, D-28). Hard-cutover guard:
+  // any missing / wrong / numeric version is a rejection — no migration.
+  if (parsed.format_version !== PROJECT_FORMAT_VERSION) {
+    const got =
+      parsed.format_version === undefined
+        ? "missing format_version"
+        : "got '" + String(parsed.format_version) + "'";
+    throw new Error("Invalid .scp file: expected format_version '" + PROJECT_FORMAT_VERSION + "', " + got);
   }
 
-  // v1 -> v2 migration: default activeLayer to "Both"
-  if (parsed.version === 1 || !parsed.activeLayer) {
-    return { ...parsed, version: 2, activeLayer: "Both" } as unknown as StreamProject;
-  }
+  // Empty-state tolerance — every top-level field is optional once
+  // format_version has validated.
+  const rawResources = (parsed.resources as Record<string, unknown>) ?? {};
+  const geometries = (rawResources.geometries as GeometryResource[]) ?? [];
+  const power_shapes =
+    (rawResources.power_shapes as PowerShapeResource[]) ?? [];
+  const fluids = (rawResources.fluids as FluidResource[]) ?? [];
 
-  return parsed as unknown as StreamProject;
+  const rawLayout = (parsed.layout as Record<string, unknown>) ?? {};
+  const layout: StreamProject["layout"] = {
+    active_left_tab:
+      (rawLayout.active_left_tab as ActiveLeftTab) ?? defaultLayout().active_left_tab,
+    active_layer:
+      (rawLayout.active_layer as LayerView) ?? defaultLayout().active_layer,
+  };
+
+  const model_options =
+    (parsed.model_options as ModelOptionsSliceState) ?? defaultModelOptions();
+
+  const components = (parsed.components as Node[]) ?? [];
+  const connections = (parsed.connections as Edge[]) ?? [];
+  const bcs = (parsed.bcs as BCEntry[]) ?? [];
+
+  return {
+    format_version: PROJECT_FORMAT_VERSION,
+    model_options,
+    resources: { geometries, power_shapes, fluids },
+    components,
+    connections,
+    bcs,
+    layout,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// addToRecent
+// addToRecent (unchanged from pre-Phase-62)
 // ---------------------------------------------------------------------------
 
 /**
@@ -116,7 +232,7 @@ export function addToRecent(files: string[], newPath: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// reconstructInstanceCounters
+// reconstructInstanceCounters (unchanged from pre-Phase-62)
 // ---------------------------------------------------------------------------
 
 /**
