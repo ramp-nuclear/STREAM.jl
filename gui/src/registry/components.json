@@ -1028,6 +1028,201 @@
           "parameters": ["nz", "nx", "Lz", "Lx", "y", "rho_s", "cp_s", "k_s", "power_shape", "power", "T0"]
         }
       ]
+    },
+    {
+      "id": "WallTemperature",
+      "label": "Wall Temperature",
+      "category": "Sources",
+      "description": "Value-source block. Drives external T_wall_left/T_wall_right BCs on a Channel via a dashed BCPort edge. Per-cell wall temperature; n must match the consumer Channel's n.",
+      "ports": [
+        { "name": "T_wall_out", "type": "BCPort", "array_size": "n", "default_axis": "horizontal", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "n",
+          "type": "Int",
+          "description": "Number of cells; must match consumer Channel.n",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "T_wall",
+          "type_union": ["Real", "Vector", "Function"],
+          "input_modes": ["scalar", "vector", "callable"],
+          "unit": "K",
+          "description": "Per-cell wall-temperature value, vector, or callable T_wall(t)",
+          "required": true,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "WallTemperature(; name, n, T_wall)",
+          "parameters": ["n", "T_wall"]
+        }
+      ]
+    },
+    {
+      "id": "HeatFluxSource",
+      "label": "Heat Flux Source",
+      "category": "Sources",
+      "description": "Value-source block. Drives external q_left/q_right BCs on a ChannelHeatFlux via a dashed BCPort edge. Per-cell heat flux.",
+      "ports": [
+        { "name": "q_out", "type": "BCPort", "array_size": "n", "default_axis": "horizontal", "side": "right" }
+      ],
+      "parameters": [
+        {
+          "name": "n",
+          "type": "Int",
+          "description": "Number of cells; must match consumer ChannelHeatFlux.n",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "q",
+          "type_union": ["Real", "Vector", "Function"],
+          "input_modes": ["scalar", "vector", "callable"],
+          "unit": "W/m^2",
+          "description": "Per-cell heat flux value, vector, or callable q(t)",
+          "required": true,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "HeatFluxSource(; name, n, q)",
+          "parameters": ["n", "q"]
+        }
+      ]
+    },
+    {
+      "id": "PointKinetics",
+      "label": "Point Kinetics",
+      "category": "Reactor Physics",
+      "description": "Lumped-parameter reactor power dynamics. Accepts scalar rho, callable rho(t), or a ReactivityController Resource reference.",
+      "ports": [],
+      "parameters": [
+        {
+          "name": "rho",
+          "type_union": ["Real", "Function", "ReactivityController"],
+          "input_modes": ["scalar", "callable", "controller"],
+          "default": 0.0,
+          "description": "Reactivity input (Δρ); scalar value, time-callable, or Resource reference",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "Lambda",
+          "type": "Real",
+          "unit": "s",
+          "default": "U235_LAMBDA",
+          "description": "Prompt neutron generation time (default: U-235)",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "beta_k",
+          "type": "Vector",
+          "default": "U235_BETA_K",
+          "description": "Delayed neutron precursor fractions (default: U-235 6-group)",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "lambda_k",
+          "type": "Vector",
+          "unit": "1/s",
+          "default": "U235_LAMBDA_K",
+          "description": "Precursor decay constants (default: U-235)",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "temp_worth",
+          "type_union": ["Mark"],
+          "visible_when": "rho.input_mode in ['callable','controller']",
+          "description": "Mark-in-code: temperature feedback dict (per-component reactivity coefficients). Per CONTEXT D-12 — Dict keys are MTK Systems and cannot be selected in JSON; user fills the Dict literal in the generated .jl file.",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "ref_temp",
+          "type_union": ["Mark"],
+          "visible_when": "rho.input_mode in ['callable','controller']",
+          "description": "Mark-in-code: reference-temperature dict (per-component reference temperatures, same key structure as temp_worth).",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "scalar",
+          "signature": "PointKinetics(; name, rho, Lambda, beta_k, lambda_k)",
+          "parameters": ["rho", "Lambda", "beta_k", "lambda_k"]
+        },
+        {
+          "mode": "callable",
+          "signature": "PointKinetics(rho_c_fn; name, rho_val, Lambda, beta_k, lambda_k, temp_worth, ref_temp)",
+          "parameters": ["rho", "Lambda", "beta_k", "lambda_k", "temp_worth", "ref_temp"]
+        }
+      ]
+    },
+    {
+      "id": "ReactivityController",
+      "label": "Reactivity Controller",
+      "category": "Resources",
+      "resource_kind": "reactivity_controller",
+      "description": "Resource (not a canvas component). Encapsulates input-reactivity function + state machine + abort states. Lives in the navigator under Resources → Reactivity Controllers (navigator tree is Phase 62). Referenced from PointKinetics.rho when input_mode == 'controller'.",
+      "ports": [],
+      "parameters": [
+        {
+          "name": "input_reactivity",
+          "type_union": ["Mark"],
+          "description": "Mark-in-code: callable (state, t_state, t) → Δρ; user fills the closure in the generated .jl.",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "state_machine",
+          "type_union": ["Mark"],
+          "description": "Mark-in-code: callable (state, t, power, dPdt) → new_state.",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "abort_states",
+          "type_union": ["Mark"],
+          "description": "Mark-in-code: Set{Symbol} of states that signal abort.",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "initial_state",
+          "type": "Symbol",
+          "default": ":NORMAL",
+          "description": "Initial state symbol (free-text input; codegen wraps with `:` prefix).",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "initial_time",
+          "type": "Real",
+          "unit": "s",
+          "default": 0.0,
+          "description": "Initial time for the state machine.",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "ReactivityController(input_reactivity; initial_state=:NORMAL, initial_time=0.0, state_machine=nothing, abort_states=nothing)",
+          "parameters": ["input_reactivity", "state_machine", "abort_states", "initial_state", "initial_time"]
+        }
+      ]
     }
   ]
 }
