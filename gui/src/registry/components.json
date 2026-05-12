@@ -6,11 +6,10 @@
       "id": "Channel",
       "label": "Channel",
       "category": "Hydraulic",
-      "description": "Single-phase convective channel with n axial finite-volume cells. Dittus-Boelter HTC, Darcy-Weisbach friction, optional gravity term.",
+      "description": "Single-phase convective channel with n axial finite-volume cells. v1.1: per-cell h_left/h_right Properties-tab kwargs (Real | Vector | Function) drive the convective coefficient on each face; T_wall_left[1:n] / T_wall_right[1:n] external-input BCs declare wall temperatures via the BCs tab (Value/Profile/Function/Mark, or a Source dashed-edge from a WallTemperature block). No thermal MTK port.",
       "ports": [
         { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" },
-        { "name": "thermal", "type": "ThermalPort", "side": "top" }
+        { "name": "port_out", "type": "FlowPort", "side": "right" }
       ],
       "parameters": [
         {
@@ -37,116 +36,24 @@
           "positional": false
         },
         {
-          "name": "htc_correlation",
-          "type": "Function",
-          "default": "dittus_boelter",
-          "description": "HTC correlation closure (Re, Pr, T_bulk, T_wall) -> Nu",
+          "name": "h_left",
+          "type_union": ["Real", "Vector", "Function"],
+          "input_modes": ["scalar", "vector", "callable"],
+          "unit": "W/(m^2 K)",
+          "default": 0.0,
+          "description": "Per-cell convective HTC on the left face; scalar broadcasts to n cells, vector length must equal n, callable evaluated as h_left_fn(t)",
           "required": false,
-          "positional": false,
-          "options": [
-            { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
-            { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
-            {
-              "value": "regime_dependent",
-              "label": "Regime Dependent",
-              "kind": "factory",
-              "sub_parameters": [
-                {
-                  "name": "htc_forced",
-                  "type": "Function",
-                  "description": "HTC closure for forced convection regime",
-                  "required": true,
-                  "positional": false,
-                  "options": [
-                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
-                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
-                    {
-                      "value": "elenbaas_htc",
-                      "label": "Elenbaas",
-                      "kind": "factory",
-                      "sub_parameters": [
-                        { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
-                        { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
-                        { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
-                        { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "name": "htc_natural",
-                  "type": "Function",
-                  "description": "HTC closure for natural convection regime",
-                  "required": true,
-                  "positional": false,
-                  "options": [
-                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
-                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" },
-                    {
-                      "value": "elenbaas_htc",
-                      "label": "Elenbaas",
-                      "kind": "factory",
-                      "sub_parameters": [
-                        { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
-                        { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
-                        { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
-                        { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "name": "threshold",
-                  "type": "Real",
-                  "unit": "—",
-                  "default": 1.0,
-                  "description": "Gr/Re² threshold for NC detection",
-                  "required": false,
-                  "positional": false
-                }
-              ]
-            },
-            {
-              "value": "elenbaas_htc",
-              "label": "Elenbaas",
-              "kind": "factory",
-              "sub_parameters": [
-                { "name": "b", "type": "Real", "unit": "m", "description": "Channel gap width", "required": true, "positional": false },
-                { "name": "L", "type": "Real", "unit": "m", "description": "Channel length", "required": true, "positional": false },
-                { "name": "Dh", "type": "Real", "unit": "m", "description": "Hydraulic diameter", "required": true, "positional": false },
-                { "name": "g", "type": "Real", "unit": "m/s^2", "default": 9.80665, "description": "Gravitational acceleration", "required": false, "positional": false }
-              ]
-            },
-            {
-              "value": "maximal_htc",
-              "label": "Maximal HTC",
-              "kind": "factory",
-              "sub_parameters": [
-                {
-                  "name": "htc1",
-                  "type": "Function",
-                  "description": "First HTC closure candidate",
-                  "required": true,
-                  "positional": false,
-                  "options": [
-                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
-                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" }
-                  ]
-                },
-                {
-                  "name": "htc2",
-                  "type": "Function",
-                  "description": "Second HTC closure candidate",
-                  "required": true,
-                  "positional": false,
-                  "options": [
-                    { "value": "dittus_boelter", "label": "Dittus-Boelter", "kind": "simple" },
-                    { "value": "constant_Nusselt", "label": "Constant Nusselt", "kind": "simple" }
-                  ]
-                }
-              ]
-            }
-          ]
+          "positional": false
+        },
+        {
+          "name": "h_right",
+          "type_union": ["Real", "Vector", "Function"],
+          "input_modes": ["scalar", "vector", "callable"],
+          "unit": "W/(m^2 K)",
+          "default": 0.0,
+          "description": "Per-cell convective HTC on the right face; scalar broadcasts to n cells, vector length must equal n, callable evaluated as h_right_fn(t)",
+          "required": false,
+          "positional": false
         },
         {
           "name": "friction_correlation",
@@ -156,16 +63,44 @@
           "required": false,
           "positional": false,
           "options": [
-            { "value": "blasius_friction", "label": "Blasius", "kind": "simple" },
-            { "value": "laminar_friction", "label": "Laminar", "kind": "simple" }
+            { "value": "blasius_friction", "label": "Blasius", "kind": "stateless" },
+            {
+              "value": "turbulent_friction",
+              "label": "Turbulent (Colebrook-White)",
+              "kind": "stateless",
+              "sub_parameters": [
+                { "name": "epsilon", "type": "Real", "unit": "m", "default": 0.0, "description": "Pipe surface roughness", "required": false, "positional": false }
+              ]
+            },
+            { "value": "laminar_friction", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
           ]
+        }
+      ],
+      "external_inputs": [
+        {
+          "name": "T_wall_left",
+          "shape": "[1:n]",
+          "unit": "K",
+          "description": "Per-cell left-wall temperature BC",
+          "bc_modes": ["Value", "Profile", "Function", "Mark", "Source"],
+          "source_component": "WallTemperature",
+          "source_port": "T_wall_out"
+        },
+        {
+          "name": "T_wall_right",
+          "shape": "[1:n]",
+          "unit": "K",
+          "description": "Per-cell right-wall temperature BC",
+          "bc_modes": ["Value", "Profile", "Function", "Mark", "Source"],
+          "source_component": "WallTemperature",
+          "source_port": "T_wall_out"
         }
       ],
       "constructorModes": [
         {
           "mode": "default",
-          "signature": "Channel(; name, n, geometry, g=0.0, htc_correlation=dittus_boelter, friction_correlation=blasius_friction)",
-          "parameters": ["n", "geometry", "g", "htc_correlation", "friction_correlation"]
+          "signature": "Channel(; n, geometry, g=0.0, h_left=0.0, h_right=0.0, friction_correlation=blasius_friction)",
+          "parameters": ["n", "geometry", "g", "h_left", "h_right", "friction_correlation"]
         }
       ]
     },
