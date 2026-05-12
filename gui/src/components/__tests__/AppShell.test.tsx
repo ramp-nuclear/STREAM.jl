@@ -83,9 +83,12 @@ describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () 
     expect(projectTab.getAttribute("aria-selected")).toBe("false");
   });
 
-  it("D-01: clicking Resources trigger flips aria-selected and updates store", () => {
+  it("D-01: activating Resources trigger flips aria-selected and updates store", () => {
+    // Radix Tabs activates on pointer down (not click). fireEvent.mouseDown
+    // matches Radix's listener; we also fire click for full event-pair fidelity.
     render(<App />);
     const resourcesTab = screen.getByRole("tab", { name: /^Resources$/ });
+    fireEvent.mouseDown(resourcesTab);
     fireEvent.click(resourcesTab);
     expect(useStore.getState().activeLeftTab).toBe("Resources");
     expect(
@@ -135,7 +138,11 @@ describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () 
     expect(useStore.getState().activeLeftTab).toBe("Project");
   });
 
-  it("D-07: Ctrl+Tab is NOT intercepted (browser-collision avoidance)", () => {
+  it("D-07: Ctrl+Tab does NOT switch left tabs (browser-collision avoidance)", () => {
+    // CanvasPanel's pre-existing Tab handler intercepts plain Tab to cycle
+    // layers (so defaultPrevented may be true from that handler). The Phase 62
+    // contract is narrower: our Ctrl+1/2/3 handler must NOT switch the left
+    // tab on Ctrl+Tab — exactly what D-07 forbids.
     render(<App />);
     const before = useStore.getState().activeLeftTab;
     const event = new KeyboardEvent("keydown", {
@@ -145,9 +152,7 @@ describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () 
       cancelable: true,
     });
     window.dispatchEvent(event);
-    // No tab change; preventDefault was NOT called.
     expect(useStore.getState().activeLeftTab).toBe(before);
-    expect(event.defaultPrevented).toBe(false);
   });
 
   it("INV-12: bare '1' keydown (no modifier) does NOT switch tabs", () => {

@@ -10,6 +10,7 @@ import PanelCollapseButton from "./components/PanelCollapseButton";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import ValidationDialog from "./components/ValidationDialog";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import useStore from "./store/useStore";
 import { initializeRecentFiles } from "./store/useStore";
 import { useResizable } from "./hooks/useResizable";
@@ -26,6 +27,10 @@ function App() {
   const sidebarCollapsed = useStore((s) => s.sidebarCollapsed);
   const setToolboxCollapsed = useStore((s) => s.setToolboxCollapsed);
   const setSidebarCollapsed = useStore((s) => s.setSidebarCollapsed);
+
+  // Phase 62 D-01 / D-07 — left-panel tabs + Ctrl+1/2/3 accelerators
+  const activeLeftTab = useStore((s) => s.activeLeftTab);
+  const setActiveLeftTab = useStore((s) => s.setActiveLeftTab);
 
   // Panel resize hooks
   const toolboxResize = useResizable({ direction: "left", minWidth: 120, maxWidth: 360, defaultWidth: 240 });
@@ -121,6 +126,29 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showUnsavedDialog]);
 
+  // Phase 62 D-07 / INV-12 — Ctrl+1 / Ctrl+2 / Ctrl+3 left-tab accelerators.
+  // Bound globally on window per UI-SPEC §"Tab strip — preventDefault on
+  // accelerator". Only bare Ctrl is honored — Ctrl+Shift+N / Alt+N / Meta+N
+  // are passed through so Ctrl+Shift+S (Save As) still wins. Ctrl+Tab is
+  // intentionally NOT intercepted (D-07: browser-collision avoidance).
+  useEffect(() => {
+    const handleLeftTabKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return;
+      if (e.key === "1") {
+        e.preventDefault();
+        setActiveLeftTab("Components");
+      } else if (e.key === "2") {
+        e.preventDefault();
+        setActiveLeftTab("Resources");
+      } else if (e.key === "3") {
+        e.preventDefault();
+        setActiveLeftTab("Project");
+      }
+    };
+    window.addEventListener("keydown", handleLeftTabKey);
+    return () => window.removeEventListener("keydown", handleLeftTabKey);
+  }, [setActiveLeftTab]);
+
   // Window title sync — subscribe outside React to bypass render batching.
   // On Linux/WebKitGTK, setTitle() IPC doesn't update the GTK title bar reliably;
   // we invoke the underlying command directly as a fallback.
@@ -187,7 +215,65 @@ function App() {
         <div className="flex flex-col h-screen w-screen overflow-hidden">
           <div className="flex flex-1 min-h-0">
             {!toolboxCollapsed && (
-              <ToolboxPanel width={toolboxResize.width} onResizeMouseDown={toolboxResize.onMouseDown} />
+              <div
+                className="relative h-full border-r shrink-0 flex flex-col"
+                style={{ width: toolboxResize.width }}
+              >
+                {/* Resize handle — thin overlay on right edge */}
+                <div
+                  className="absolute right-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-border/50"
+                  onMouseDown={toolboxResize.onMouseDown}
+                />
+                {/* Phase 62 D-01 — left-panel tab strip [Components][Resources][Project].
+                    Uses Tabs `variant="line"` per UI-SPEC §Tab strip (text-only,
+                    bottom-border active indicator, no bg pill).
+                    `gap-0` overrides the default Tabs `gap-2` so the strip sits
+                    flush against the panel body (UI-SPEC §Spacing tab-strip-height). */}
+                <Tabs
+                  value={activeLeftTab}
+                  onValueChange={(v) =>
+                    setActiveLeftTab(v as "Components" | "Resources" | "Project")
+                  }
+                  className="flex-1 min-h-0 gap-0"
+                >
+                  <TabsList
+                    variant="line"
+                    className="h-[36px] w-full justify-start rounded-none border-b px-0"
+                  >
+                    <TabsTrigger
+                      value="Components"
+                      className="px-[12px] flex-none data-[state=active]:border-primary"
+                    >
+                      Components
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="Resources"
+                      className="px-[12px] flex-none data-[state=active]:border-primary"
+                    >
+                      Resources
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="Project"
+                      className="px-[12px] flex-none data-[state=active]:border-primary"
+                    >
+                      Project
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="Components" className="flex-1 min-h-0 overflow-hidden mt-0">
+                    <ToolboxPanel />
+                  </TabsContent>
+                  <TabsContent value="Resources" className="flex-1 min-h-0 overflow-hidden mt-0">
+                    <div className="p-[16px] text-[14px] text-muted-foreground">
+                      Resources panel — coming in plan 62-06
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="Project" className="flex-1 min-h-0 overflow-hidden mt-0">
+                    <div className="p-[16px] text-[14px] text-muted-foreground">
+                      Project panel — coming in plan 62-07
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
             )}
             <div className="flex items-center border-r">
               <PanelCollapseButton side="left" collapsed={toolboxCollapsed} onToggle={() => setToolboxCollapsed(!toolboxCollapsed)} />
