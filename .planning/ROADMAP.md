@@ -88,11 +88,11 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.2.
 **Depends on:** Phase 61 (registry must support resource-ref shape).
-**Plans:** 11 plans
+**Plans:** 3/11 plans executed
 
-- [ ] 62-01-PLAN.md — Julia src/utilities.jl with rebin_extensive + cosine_power_shape; test/test_utilities.jl (Wave 1)
-- [ ] 62-02-PLAN.md — Zustand Resources + ModelOptions + activeLeftTab + selection-kind slices; sentinel UUID baked into initial state (Wave 1)
-- [ ] 62-03-PLAN.md — shadcn popover.tsx + context-menu.tsx shims; Pitfall 1 click-outside-disabled smoke test (Wave 1)
+- [x] 62-01-PLAN.md — Julia src/utilities.jl with rebin_extensive + cosine_power_shape; test/test_utilities.jl (Wave 1)
+- [x] 62-02-PLAN.md — Zustand Resources + ModelOptions + activeLeftTab + selection-kind slices; sentinel UUID baked into initial state (Wave 1)
+- [x] 62-03-PLAN.md — shadcn popover.tsx + context-menu.tsx shims; Pitfall 1 click-outside-disabled smoke test (Wave 1)
 - [ ] 62-04-PLAN.md — projectIO.ts rewrite for .scp v2.0; hard cutover from .streamgui; delete 5 stale export examples (Wave 2)
 - [ ] 62-05-PLAN.md — App.tsx Tabs shell + Ctrl+1/2/3 keyboard; SOURCES category header in ToolboxPanel (Wave 2)
 - [ ] 62-06-PLAN.md — Resources tab body: hand-rolled tree + group headers + search + inline-rename + context-menu (Wave 2)
@@ -223,7 +223,7 @@ contract document drafted in parallel throughout.
 | 59. Correlation `geom`-first refactor                | 4/4 | Complete    | 2026-05-11 |
 | 60. `fuel_assembly` composition helper               | 2/2 | Complete    | 2026-05-11 |
 | 61. Registry audit + rewrite for v1.1                | 5/5 | Complete   | 2026-05-12 |
-| 62. Resources panel architecture                     | 0/TBD | Planned | — |
+| 62. Resources panel architecture                     | 3/11 | In Progress|  |
 | 63. BCs tab + value-source components in GUI         | 0/TBD | Planned | — |
 | 64. Connection routing                               | 0/TBD | Planned | — |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
