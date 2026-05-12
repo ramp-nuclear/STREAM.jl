@@ -276,58 +276,58 @@ export default function ResourceRow({
 
   return (
     <>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <Popover open={usagesOpen} onOpenChange={setUsagesOpen}>
+      <Popover open={usagesOpen} onOpenChange={setUsagesOpen}>
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
             <PopoverAnchor asChild>{baseRow}</PopoverAnchor>
-            {usagesOpen && (
-              <PopoverContent
-                align="start"
-                side="right"
-                sideOffset={4}
-                className="w-[240px] p-0"
-              >
-                <div className="px-[12px] py-[8px] text-xs font-semibold border-b">
-                  Used by {usages.length} component(s)
-                </div>
-                <ScrollArea className="max-h-[200px]">
-                  <ul className="p-[4px]">
-                    {usages.length === 0 && (
-                      <li className="text-[12px] italic text-muted-foreground px-[8px] py-[4px]">
-                        No usages.
-                      </li>
-                    )}
-                    {usages.map((n) => {
-                      const data = n.data as unknown as StreamNodeData;
-                      const label = data?.instanceName ?? n.id;
-                      return (
-                        <li
-                          key={n.id}
-                          className="text-[12px] px-[8px] py-[4px] hover:bg-muted cursor-pointer rounded-sm"
-                          onClick={() => {
-                            useStore.getState().selectNode(n.id);
-                            setUsagesOpen(false);
-                          }}
-                        >
-                          {label}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </ScrollArea>
-              </PopoverContent>
-            )}
-          </Popover>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onSelect={startRename}>Rename</ContextMenuItem>
-          <ContextMenuItem onSelect={handleDuplicate}>Duplicate</ContextMenuItem>
-          <ContextMenuItem variant="destructive" onSelect={handleDelete}>
-            Delete
-          </ContextMenuItem>
-          <ContextMenuItem onSelect={handleShowUsages}>Show usages</ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onSelect={startRename}>Rename</ContextMenuItem>
+            <ContextMenuItem onSelect={handleDuplicate}>Duplicate</ContextMenuItem>
+            <ContextMenuItem variant="destructive" onSelect={handleDelete}>
+              Delete
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={handleShowUsages}>Show usages</ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+        {usagesOpen && (
+          <PopoverContent
+            align="start"
+            side="right"
+            sideOffset={4}
+            className="w-[240px] p-0"
+          >
+            <div className="px-[12px] py-[8px] text-xs font-semibold border-b">
+              Used by {usages.length} component(s)
+            </div>
+            <ScrollArea className="max-h-[200px]">
+              <ul className="p-[4px]">
+                {usages.length === 0 && (
+                  <li className="text-[12px] italic text-muted-foreground px-[8px] py-[4px]">
+                    No usages.
+                  </li>
+                )}
+                {usages.map((n) => {
+                  const data = n.data as unknown as StreamNodeData;
+                  const label = data?.instanceName ?? n.id;
+                  return (
+                    <li
+                      key={n.id}
+                      className="text-[12px] px-[8px] py-[4px] hover:bg-muted cursor-pointer rounded-sm"
+                      onClick={() => {
+                        useStore.getState().selectNode(n.id);
+                        setUsagesOpen(false);
+                      }}
+                    >
+                      {label}
+                    </li>
+                  );
+                })}
+              </ul>
+            </ScrollArea>
+          </PopoverContent>
+        )}
+      </Popover>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
