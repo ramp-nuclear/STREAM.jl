@@ -69,7 +69,7 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
             key={port.name}
             id={port.name}
             type={isInPort ? "target" : "source"}
-            position={sideToPosition[port.side]}
+            position={sideToPosition[port.side!]}
             data={{ portType: port.type }}
             style={{
               background: isInPort ? FLOW_IN_BG : FLOW_OUT_BG,
@@ -84,7 +84,7 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           key={port.name}
           id={port.name}
           type={port.side === "right" || port.side === "bottom" ? "source" : "target"}
-          position={sideToPosition[port.side]}
+          position={sideToPosition[port.side!]}
           data={{ portType: port.type }}
           style={{
             background: THERMAL_HANDLE_COLOR,
