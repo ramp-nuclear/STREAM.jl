@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: executing
-stopped_at: Phase 61 context gathered
-last_updated: "2026-05-12T18:54:11.161Z"
-last_activity: 2026-05-12 -- Phase 61 execution started
+status: in_progress
+stopped_at: Phase 61 complete
+last_updated: "2026-05-12T19:51:44.688Z"
+last_activity: 2026-05-12 -- Phase 61 marked complete
 progress:
   total_phases: 14
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 11
-  completed_plans: 6
-  percent: 55
+  completed_plans: 11
+  percent: 21
 ---
 
 # STATE: STREAM.jl
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 61 — registry-audit-rewrite-for-v1-1
+**Current focus:** Phase 62 — Resources panel architecture (Phase 61 shipped 2026-05-12 — data layer + 16-component registry; GUI rendering of new categories owned by Phases 62/63/68 per ROADMAP)
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -44,9 +44,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
   - Phase 58: MTK system determinacy repair
 - v1.2 (active): Phases 59-72 — GUI Redesign (canonical decisions: `.planning/notes/gui-redesign-design-decisions.md`)
   - Phase 59: Correlation `geom`-first refactor ✓ shipped 2026-05-11
-  - Phase 60: `fuel_assembly` composition helper (next)
-  - Phase 61: Registry audit + rewrite for v1.1 source
-  - Phase 62: Resources panel architecture
+  - Phase 60: `fuel_assembly` composition helper ✓ shipped 2026-05-11
+  - Phase 61: Registry audit + rewrite for v1.1 source ✓ shipped 2026-05-12
+  - Phase 62: Resources panel architecture (next)
   - Phase 63: BCs tab + value-source components in GUI
   - Phase 64: Connection routing
   - Phase 65: Interaction model overhaul
@@ -57,11 +57,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 61 (registry-audit-rewrite-for-v1-1) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 61
-Last activity: 2026-05-12 -- Phase 61 execution started
-Next: `/gsd:discuss-phase 60` (recommended) — or `/gsd:plan-phase 60` to skip discuss.
+Phase: 61 — COMPLETE (5/5 plans, 239 tests passing, 0 new tsc errors above the 7-error deferred-items.md baseline)
+Status: Phase 61 complete; ready for Phase 62
+Last activity: 2026-05-12 -- Phase 61 marked complete
+Next: `/gsd:discuss-phase 62` (recommended) — or `/gsd:plan-phase 62` to skip discuss.
 
 ---
 
@@ -75,6 +74,7 @@ Next: `/gsd:discuss-phase 60` (recommended) — or `/gsd:plan-phase 60` to skip 
 - Phase 58 added: MTK system determinacy repair
 - v1.2 milestone (2026-05-11): GUI Redesign — Phases 59-72. Phase 59 is a `src/` cleanup prerequisite (correlation factories take `geom::PipeGeometry` first), Phase 60 adds the `fuel_assembly` composition helper, Phase 61 rewrites the GUI component registry, then Phases 62-72 ship the actual GUI redesign (resources panel, BCs tab, connection routing, interaction model, code preview, etc.). Canonical decisions live in `.planning/notes/gui-redesign-design-decisions.md`.
 - Phase 59 (2026-05-11): Correlation `geom`-first refactor shipped. All HTC + friction factories take `geom::PipeGeometry` positionally; `const HTCCorrelation = Function` exported. Python parity gate held (424 CLEAN / 34 FAIL / 78 GRAY, zero verdict flips). Phase 61 handoff doc at `.planning/notes/correlation-geom-first-api.md`.
+- Phase 61 (2026-05-12): Registry audit + rewrite shipped — `gui/src/registry/components.json` now has 16 components (Channel/CHF/CAC/HD rewritten for v1.1; new: WallTemperature, HeatFluxSource, PointKinetics, ReactivityController). Envelope stream_version 1.1.0 / schema_version 2.0. 239 tests pass (was 232; +7 cross-validation tests for FK / array_size / pair_with resolution). `npm run build` baseline 7 pre-existing tsc errors (documented in `.planning/phases/61-.../deferred-items.md` — Phase 71 owns reconciliation). Phase 61 deliberately did NOT touch GUI rendering (`ToolboxPanel.tsx`, `StreamNode.tsx`, `ParameterForm.tsx`); the new categories (Sources / Reactor Physics / Resources) are invisible in the running app and Channel's new params don't render until Phase 62 (Resources panel + Sources toolbox category), Phase 63 (Properties vs BCs tab split + value-source UI), and Phase 68 (four-layer taxonomy) land. Plan 61-05 Task 3's smoke-test wording was over-eager — it described UI visibility that a data-only refactor cannot deliver; treat that as a planner-template lesson, not a Phase 61 gap.
 
 ### Key Decisions (carry-forward)
 
