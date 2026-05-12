@@ -20,16 +20,21 @@ const EXPECTED_COMPONENT_IDS = [
   "HeatExchanger",
   "ConstantTemperature",
   "HeatDiffusion",
+  // v1.1 Phase 61 Plan 03 additions:
+  "WallTemperature",
+  "HeatFluxSource",
+  "PointKinetics",
+  "ReactivityController",
 ];
 
 describe("COMPONENT_ICONS", () => {
-  it("has entries for all 12 component IDs", () => {
+  it("has entries for all 16 v1.1 component IDs", () => {
     const keys = Object.keys(COMPONENT_ICONS);
     expect(keys.sort()).toEqual([...EXPECTED_COMPONENT_IDS].sort());
   });
 
-  it("has exactly 12 entries", () => {
-    expect(Object.keys(COMPONENT_ICONS)).toHaveLength(12);
+  it("has exactly 16 entries", () => {
+    expect(Object.keys(COMPONENT_ICONS)).toHaveLength(16);
   });
 });
 
