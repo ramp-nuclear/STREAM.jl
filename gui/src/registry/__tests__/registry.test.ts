@@ -35,8 +35,19 @@ describe('Component Registry', () => {
     for (const comp of getAllComponents()) {
       for (const port of comp.ports) {
         expect(port.name, `${comp.id} port missing name`).toBeTruthy();
-        expect(port.type, `${comp.id} port missing type`).toMatch(/^(FlowPort|ThermalPort)$/);
-        expect(port.side, `${comp.id} port missing side`).toMatch(/^(left|right|top|bottom)$/);
+        // v1.1 (D-14): PortType union admits BCPort in addition to FlowPort/ThermalPort.
+        expect(port.type, `${comp.id} port missing type`).toMatch(/^(FlowPort|ThermalPort|BCPort)$/);
+        // v1.1 (D-16): `side` is optional on array-shaped logical ports that autoflip
+        // via `default_axis`. Non-autoflip ports still set it explicitly.
+        if (port.side !== undefined) {
+          expect(port.side, `${comp.id} port has invalid side`).toMatch(/^(left|right|top|bottom)$/);
+        } else {
+          // An array-shaped port without `side` must declare default_axis to drive autoflip.
+          expect(
+            port.default_axis,
+            `${comp.id}.${port.name} has no side but also no default_axis`,
+          ).toMatch(/^(horizontal|vertical)$/);
+        }
       }
     }
   });
@@ -79,17 +90,20 @@ describe('Component Registry', () => {
     expect(modeNames).toContain('fixed-mdot');
   });
 
-  it('ChannelAndContacts has ThermalPort array ports (D-04)', () => {
+  it('ChannelAndContacts has ThermalPort array ports (v1.1 D-16/D-17/D-20)', () => {
     const cac = getComponent('ChannelAndContacts');
     expect(cac).toBeDefined();
     const thermalLeft = cac!.ports.find(p => p.name === 'thermal_left');
     const thermalRight = cac!.ports.find(p => p.name === 'thermal_right');
     expect(thermalLeft).toBeDefined();
-    expect(thermalLeft!.array).toBe(true);
-    expect(thermalLeft!.arrayParam).toBe('n');
+    // v1.1: legacy `array: true` / `arrayParam: "n"` replaced by `array_size: "n"`.
+    expect(thermalLeft!.array_size).toBe('n');
+    expect(thermalLeft!.default_axis).toBe('vertical');
+    expect(thermalLeft!.pair_with).toBe('thermal_right');
     expect(thermalRight).toBeDefined();
-    expect(thermalRight!.array).toBe(true);
-    expect(thermalRight!.arrayParam).toBe('n');
+    expect(thermalRight!.array_size).toBe('n');
+    expect(thermalRight!.default_axis).toBe('vertical');
+    expect(thermalRight!.pair_with).toBe('thermal_left');
   });
 
   it('HeatDiffusion has ThermalPort array ports (D-04)', () => {
