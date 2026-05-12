@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: planning
+status: executing
 stopped_at: Phase 61 context gathered
-last_updated: "2026-05-12T18:25:33.851Z"
-last_activity: 2026-05-11
+last_updated: "2026-05-12T18:54:11.161Z"
+last_activity: 2026-05-12 -- Phase 61 execution started
 progress:
   total_phases: 14
   completed_phases: 2
-  total_plans: 6
+  total_plans: 11
   completed_plans: 6
-  percent: 100
+  percent: 55
 ---
 
 # STATE: STREAM.jl
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 60 — fuel-assembly-composition-helper
+**Current focus:** Phase 61 — registry-audit-rewrite-for-v1-1
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -57,10 +57,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 61
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-11
+Phase: 61 (registry-audit-rewrite-for-v1-1) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 61
+Last activity: 2026-05-12 -- Phase 61 execution started
 Next: `/gsd:discuss-phase 60` (recommended) — or `/gsd:plan-phase 60` to skip discuss.
 
 ---

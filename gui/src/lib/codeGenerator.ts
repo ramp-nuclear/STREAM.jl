@@ -297,7 +297,7 @@ interface ThermalAssembly {
 function getPortTypeFromDef(
   comp: ComponentDefinition | undefined,
   handleName: string,
-): "FlowPort" | "ThermalPort" | undefined {
+): "FlowPort" | "ThermalPort" | "BCPort" | undefined {
   if (!comp) return undefined;
   const port = comp.ports.find((p) => p.name === handleName);
   return port?.type;

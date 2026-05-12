@@ -9,12 +9,12 @@ describe('Component Registry', () => {
   it('has stream_version field (SCAF-05)', () => {
     expect(registry.stream_version).toBeDefined();
     expect(typeof registry.stream_version).toBe('string');
-    expect(registry.stream_version).toBe('0.7.0');
+    expect(registry.stream_version).toBe('1.1.0');
   });
 
   it('has schema_version field', () => {
     expect(registry.schema_version).toBeDefined();
-    expect(registry.schema_version).toBe('1.0');
+    expect(registry.schema_version).toBe('2.0');
   });
 
   it('every component has required fields (SCAF-03)', () => {
