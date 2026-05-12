@@ -1,6 +1,6 @@
 // projectIO.ts — Pure serialization / deserialization for the .scp v2.0 schema.
 //
-// Phase 62 hard-cutover: v1/v2 `.streamgui` numeric-version form is rejected
+// Phase 62 hard-cutover: legacy numeric-version (v1/v2) form is rejected
 // outright (D-28). There is NO migration shim. The deserialize side throws
 // cleanly on any non-"2.0" format_version (INV-07 / INV-08).
 //
@@ -33,7 +33,7 @@ export { SENTINEL_UNSET_POWER_SHAPE };
  * Single source of truth for the .scp format version.
  *
  * Per D-27, the on-disk schema is `format_version: "2.0"`. Hard-cutover from
- * the legacy `.streamgui` numeric-version form (D-28); no migration.
+ * the legacy numeric-version form (pre-v2.0) (D-28); no migration.
  */
 export const PROJECT_FORMAT_VERSION = "2.0" as const;
 

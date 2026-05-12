@@ -5,7 +5,7 @@
 // Covers invariants:
 //   INV-06 — round-trip preserves resources / components / connections / model_options
 //   INV-07 — `unset` Power Shape persists across save/load via the sentinel
-//   INV-08 — strict format_version: "2.0"; legacy .streamgui rejected, no migration
+//   INV-08 — strict format_version: "2.0"; legacy numeric-version form rejected, no migration
 //   INV-09 — file_loaded Power Shape stores a path string verbatim across round-trip
 //   INV-11 — layout.active_left_tab round-trips; defaults to "Components" if missing
 //   INV-13 — round-trip on a richly-populated project is structurally stable
