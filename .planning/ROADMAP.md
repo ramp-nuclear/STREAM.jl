@@ -30,7 +30,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 - [x] **Phase 59: Correlation `geom`-first refactor** — `src/physical_models/`; every factory that needs geometry takes `geom::PipeGeometry` first; no more `Dh`/`L`/`depth`/`width` plumbed independently. `const HTCCorrelation = Function` alias. Tests + Python parity re-run. (completed 2026-05-11)
 - [x] **Phase 60: `fuel_assembly` composition helper** — new helper in `src/composition/helpers.jl` covering 4 variants of alternating CAC↔Plate chains (channel-bookended, plate-bookended, mixed, closed annular). Tests + code-gen detection update. (completed 2026-05-11)
-- [ ] **Phase 61: Registry audit + rewrite for v1.1** — `gui/src/registry/components.json` rewritten against v1.1 source. Add `WallTemperature`, `HeatFluxSource`, `PointKinetics`, `ReactivityController`. Collapse correlation sub-param trees per geom-first. Add `scope` field per parameter (constructor_kwarg vs external_input) for Properties-tab vs BCs-tab split. Bump `stream_version` to `1.1.0`.
+- [x] **Phase 61: Registry audit + rewrite for v1.1** — `gui/src/registry/components.json` rewritten against v1.1 source. Add `WallTemperature`, `HeatFluxSource`, `PointKinetics`, `ReactivityController`. Collapse correlation sub-param trees per geom-first. Add `scope` field per parameter (constructor_kwarg vs external_input) for Properties-tab vs BCs-tab split. Bump `stream_version` to `1.1.0`. (completed 2026-05-12)
 - [ ] **Phase 62: Resources panel architecture** — Navigator restructure to `Project → Model Options + Resources + Components`. Foreign-key UUID references. Save format (`.scp`). Reference picker UX. Sources toolbox category.
 - [ ] **Phase 63: BCs tab + value-source components in GUI** — Properties tab vs BCs tab separation. Five BC modes (value / profile / function / mark-in-code / driven-by-source-block). `WallTemperature` and `HeatFluxSource` toolbox entries. Dashed BC edge style. Bidirectional sync between BCs tab and canvas connections.
 - [ ] **Phase 64: Connection routing** — Per-port autoflip for FlowPorts with asymmetric same-side placement. Independent axis-flip for thermal-pair ports on CAC/HD. Anti-parallel offset for bidirectional pairs as polish hook.
@@ -75,12 +75,12 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.2, Section 3.10, plus the audit methodology captured in the conversation lineage.
 **Depends on:** Phase 60 (so the registry can reflect helper additions).
-**Plans:** 5 plans
-- [ ] 61-01-PLAN.md (Wave 1) — Schema + types reshape: bump versions, extend types.ts with v1.1 vocabulary (external_inputs, type_union, BCPort, etc.)
-- [ ] 61-02-PLAN.md (Wave 2, depends on 61-01) — Channel-family + HD rewrite (Channel, CHF, CAC, HD entries)
-- [ ] 61-03-PLAN.md (Wave 3, depends on 61-02) — Add WallTemperature, HeatFluxSource, PointKinetics, ReactivityController + register icons
-- [ ] 61-04-PLAN.md (Wave 4, depends on 61-03) — Re-audit unchanged components (Pump, Flapper, etc.) + global legacy port-key sweep
-- [ ] 61-05-PLAN.md (Wave 5, depends on 61-04) — Update tests + reconcile downstream consumers + human-verified GUI smoke (HAS CHECKPOINT)
+**Plans:** 5/5 plans complete
+- [x] 61-01-PLAN.md (Wave 1) — Schema + types reshape: bump versions, extend types.ts with v1.1 vocabulary (external_inputs, type_union, BCPort, etc.)
+- [x] 61-02-PLAN.md (Wave 2, depends on 61-01) — Channel-family + HD rewrite (Channel, CHF, CAC, HD entries)
+- [x] 61-03-PLAN.md (Wave 3, depends on 61-02) — Add WallTemperature, HeatFluxSource, PointKinetics, ReactivityController + register icons
+- [x] 61-04-PLAN.md (Wave 4, depends on 61-03) — Re-audit unchanged components (Pump, Flapper, etc.) + global legacy port-key sweep
+- [x] 61-05-PLAN.md (Wave 5, depends on 61-04) — Update tests + reconcile downstream consumers + human-verified GUI smoke (HAS CHECKPOINT)
 
 ### Phase 62: Resources panel architecture
 
@@ -210,7 +210,7 @@ contract document drafted in parallel throughout.
 |-------|----------------|-------------|-----------|
 | 59. Correlation `geom`-first refactor                | 4/4 | Complete    | 2026-05-11 |
 | 60. `fuel_assembly` composition helper               | 2/2 | Complete    | 2026-05-11 |
-| 61. Registry audit + rewrite for v1.1                | 0/5 | Planned | — |
+| 61. Registry audit + rewrite for v1.1                | 5/5 | Complete   | 2026-05-12 |
 | 62. Resources panel architecture                     | 0/TBD | Planned | — |
 | 63. BCs tab + value-source components in GUI         | 0/TBD | Planned | — |
 | 64. Connection routing                               | 0/TBD | Planned | — |
