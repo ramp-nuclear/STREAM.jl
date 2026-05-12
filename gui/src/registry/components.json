@@ -703,15 +703,6 @@
           "positional": false
         },
         {
-          "name": "threshold",
-          "type": "Real",
-          "unit": "kg/s",
-          "default": 0.01,
-          "description": "Mass flow threshold below which the Flapper opens",
-          "required": false,
-          "positional": false
-        },
-        {
           "name": "R_closed",
           "type": "Real",
           "unit": "Pa*s/kg",
@@ -728,21 +719,13 @@
           "description": "Hydraulic resistance in open state",
           "required": false,
           "positional": false
-        },
-        {
-          "name": "use_callback",
-          "type": "Bool",
-          "default": true,
-          "description": "Enable MTK SymbolicContinuousCallback for Flapper latch event",
-          "required": false,
-          "positional": false
         }
       ],
       "constructorModes": [
         {
           "mode": "default",
-          "signature": "Flapper(; name, dt=5.0, threshold=0.01, R_closed=1e8, R_open=100.0, use_callback=true)",
-          "parameters": ["dt", "threshold", "R_closed", "R_open", "use_callback"]
+          "signature": "Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0)",
+          "parameters": ["dt", "R_closed", "R_open"]
         }
       ]
     },
