@@ -169,12 +169,25 @@ function formatParamValue(param: Parameter, value: unknown): string {
 /**
  * Emit a single component @named declaration line.
  * Returns one or two lines (warning comment + @named).
+ *
+ * TODO: Phase 66 — wire external_inputs[] into MTK equations.
+ * v1.1 Channel and ChannelHeatFlux carry an `external_inputs[]` array (T_wall_left /
+ * T_wall_right for Channel; q_left / q_right for ChannelHeatFlux) that this codegen
+ * currently ignores. The full BC-to-MTK wiring path (bc_modes "Value" / "Profile" /
+ * "Function" / "Mark" / "Source", plus the Source-mode dashed-edge resolution to a
+ * WallTemperature or HeatFluxSource block on the canvas) is owned by Phase 66. For
+ * Phase 61, the registry only locks in the shape — the emitted Julia for these
+ * components is the constructor call without any BC wiring.
  */
 function emitComponentDeclaration(
   nodeData: StreamNodeData,
   component: ComponentDefinition,
 ): string {
   const lines: string[] = [];
+
+  // TODO: Phase 66 — when the active component has external_inputs[], emit a per-BC
+  // `# TODO: bind <name>` placeholder block before the @named line. For now the
+  // shape is locked in the registry but not yet honored by the generator.
 
   // Identifier validation warning
   const idResult = validateJuliaIdentifier(nodeData.instanceName);
