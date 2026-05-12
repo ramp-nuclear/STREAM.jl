@@ -84,6 +84,7 @@ export default function ResourcesTreePanel() {
               label="Geometries"
               addAriaLabel="Add geometry"
               onAdd={handleAddGeometry}
+              resourceKind="geometry"
             />
             <ul role="group" className="mt-[2px]">
               {geometries.length === 0 ? (
@@ -112,6 +113,7 @@ export default function ResourcesTreePanel() {
               label="Power Shapes"
               addAriaLabel="Add power shape"
               onAdd={handleAddPowerShape}
+              resourceKind="powerShape"
             />
             <ul role="group" className="mt-[2px]">
               {powerShapes.length === 0 ? (
