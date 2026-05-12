@@ -730,15 +730,19 @@ export function generateCode(
     const sourcePort = sourceComp?.ports.find((p) => p.name === sourceHandle);
     const targetPort = targetComp?.ports.find((p) => p.name === targetHandle);
 
-    if (sourcePort?.array || targetPort?.array) {
+    // v1.1 (D-16): array-shaped logical ports now declare `array_size: "<param>"` instead
+    // of the legacy `array: true` + `arrayParam: "<param>"` pair. Recognise either form.
+    const sourceIsArray = sourcePort?.array === true || typeof sourcePort?.array_size === "string";
+    const targetIsArray = targetPort?.array === true || typeof targetPort?.array_size === "string";
+    if (sourceIsArray || targetIsArray) {
       // Emit per-cell connect with port() helper
-      const arrayPort = sourcePort?.array ? sourcePort : targetPort!;
-      const singlePort = sourcePort?.array ? targetPort! : sourcePort!;
-      const arraySide = sourcePort?.array ? sourceData : targetData;
-      const singleSide = sourcePort?.array ? targetData : sourceData;
-      const arrayHandle = sourcePort?.array ? sourceHandle : targetHandle;
-      const singleHandle = sourcePort?.array ? targetHandle : sourceHandle;
-      const nParam = arrayPort.arrayParam ?? "n";
+      const arrayPort = sourceIsArray ? sourcePort! : targetPort!;
+      const singlePort = sourceIsArray ? targetPort! : sourcePort!;
+      const arraySide = sourceIsArray ? sourceData : targetData;
+      const singleSide = sourceIsArray ? targetData : sourceData;
+      const arrayHandle = sourceIsArray ? sourceHandle : targetHandle;
+      const singleHandle = sourceIsArray ? targetHandle : sourceHandle;
+      const nParam = arrayPort.array_size ?? arrayPort.arrayParam ?? "n";
       const nVal = arraySide.parameters[nParam] ?? "n";
 
       lines.push(`    # ConstantTemperature per-cell connections`);
