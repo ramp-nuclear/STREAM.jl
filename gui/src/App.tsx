@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ToolboxPanel from "./components/ToolboxPanel";
+import ResourcesTreePanel from "./components/resources/ResourcesTreePanel";
 import CanvasPanel from "./components/CanvasPanel";
 import SidebarPanel from "./components/SidebarPanel";
 import Toolbar from "./components/Toolbar";
@@ -263,9 +264,7 @@ function App() {
                     <ToolboxPanel />
                   </TabsContent>
                   <TabsContent value="Resources" className="flex-1 min-h-0 overflow-hidden mt-0">
-                    <div className="p-[16px] text-[14px] text-muted-foreground">
-                      Resources panel — coming in plan 62-06
-                    </div>
+                    <ResourcesTreePanel />
                   </TabsContent>
                   <TabsContent value="Project" className="flex-1 min-h-0 overflow-hidden mt-0">
                     <div className="p-[16px] text-[14px] text-muted-foreground">
