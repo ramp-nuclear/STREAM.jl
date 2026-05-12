@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import NumericField from "./NumericField";
-import PipeGeometryPicker from "./PipeGeometryPicker";
+import ResourceReferencePicker from "./ResourceReferencePicker";
 import FunctionSelect from "./FunctionSelect";
 import MatrixBadge from "./MatrixBadge";
 import { Button } from "@/components/ui/button";
@@ -80,11 +80,24 @@ export default function ParameterForm({
           </div>
         );
       case "PipeGeometry":
+        // Phase 62 Plan 62-08 Task 2 — Assumption A1 reinterpretation.
+        // The registry still tags this param as `type: "PipeGeometry"` (per
+        // components.json lines 24, 128, 583) for `Channel.geometry`,
+        // `ChannelHeatFlux.geometry`, and `ChannelAndContacts.geometry`.
+        // Phase 62 keeps the tag string as-is and the consumer reinterprets
+        // it as a Resource-FK marker (Geometry resource). The `value` stored
+        // under `parameters.geometry` is now a UUID string, not the inline
+        // {type: "circular"|"rectangular", ...} object.
         return (
-          <PipeGeometryPicker
+          <ResourceReferencePicker
             key={param.name}
-            value={values[param.name]}
-            onChange={(v) => onParamChange(param.name, v)}
+            resourceKind="geometry"
+            value={
+              typeof values[param.name] === "string"
+                ? (values[param.name] as string)
+                : null
+            }
+            onChange={(uuid) => onParamChange(param.name, uuid)}
           />
         );
       case "Function":
@@ -97,6 +110,26 @@ export default function ParameterForm({
           />
         );
       case "Matrix":
+        // Phase 62 Plan 62-08 Task 2 — Assumption A1 reinterpretation.
+        // The registry tags `HeatDiffusion.power_shape` as `type: "Matrix"`
+        // (components.json line 983). Phase 62 reinterprets the
+        // Matrix-typed `power_shape` param as a Resource-FK marker
+        // (Power Shape resource). Defensive: future Matrix-typed params
+        // that are NOT `power_shape` fall back to MatrixBadge.
+        if (param.name === "power_shape") {
+          return (
+            <ResourceReferencePicker
+              key={param.name}
+              resourceKind="powerShape"
+              value={
+                typeof values[param.name] === "string"
+                  ? (values[param.name] as string)
+                  : null
+              }
+              onChange={(uuid) => onParamChange(param.name, uuid)}
+            />
+          );
+        }
         return <MatrixBadge key={param.name} param={param} />;
       default:
         return null;
@@ -114,7 +147,17 @@ export default function ParameterForm({
     sections.push({ heading: "Correlations", params: functionParams });
   }
   if (matrixParams.length > 0) {
-    sections.push({ heading: "Advanced", params: matrixParams });
+    // Phase 62: Matrix-typed `power_shape` is now a Resource-FK picker, not
+    // a placeholder badge. Use "Power Shape" as the section heading when the
+    // only matrix param is `power_shape` (current registry shape per
+    // components.json line 982). If a future plan adds a non-Resource Matrix
+    // param, the heading falls back to "Advanced".
+    const onlyPowerShape =
+      matrixParams.length === 1 && matrixParams[0].name === "power_shape";
+    sections.push({
+      heading: onlyPowerShape ? "Power Shape" : "Advanced",
+      params: matrixParams,
+    });
   }
 
   return (

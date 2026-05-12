@@ -47,7 +47,9 @@ describe("ParameterForm", () => {
     expect(screen.getByText("g")).toBeTruthy();
   });
 
-  it.todo("renders PipeGeometryPicker for PipeGeometry-type params");
+  it.todo(
+    "renders ResourceReferencePicker (resourceKind=geometry) for PipeGeometry-type params (62-08)",
+  );
   it("renders FunctionSelect for Function-type params", () => {
     const channelWithCorrelation: ComponentDefinition = {
       ...mockChannel,
