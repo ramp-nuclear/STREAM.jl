@@ -75,11 +75,11 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.2, Section 3.10, plus the audit methodology captured in the conversation lineage.
 **Depends on:** Phase 60 (so the registry can reflect helper additions).
-**Plans:** 3/5 plans executed
+**Plans:** 4/5 plans executed
 - [x] 61-01-PLAN.md (Wave 1) — Schema + types reshape: bump versions, extend types.ts with v1.1 vocabulary (external_inputs, type_union, BCPort, etc.)
 - [x] 61-02-PLAN.md (Wave 2, depends on 61-01) — Channel-family + HD rewrite (Channel, CHF, CAC, HD entries)
 - [x] 61-03-PLAN.md (Wave 3, depends on 61-02) — Add WallTemperature, HeatFluxSource, PointKinetics, ReactivityController + register icons
-- [ ] 61-04-PLAN.md (Wave 4, depends on 61-03) — Re-audit unchanged components (Pump, Flapper, etc.) + global legacy port-key sweep
+- [x] 61-04-PLAN.md (Wave 4, depends on 61-03) — Re-audit unchanged components (Pump, Flapper, etc.) + global legacy port-key sweep
 - [ ] 61-05-PLAN.md (Wave 5, depends on 61-04) — Update tests + reconcile downstream consumers + human-verified GUI smoke (HAS CHECKPOINT)
 
 ### Phase 62: Resources panel architecture
@@ -210,7 +210,7 @@ contract document drafted in parallel throughout.
 |-------|----------------|-------------|-----------|
 | 59. Correlation `geom`-first refactor                | 4/4 | Complete    | 2026-05-11 |
 | 60. `fuel_assembly` composition helper               | 2/2 | Complete    | 2026-05-11 |
-| 61. Registry audit + rewrite for v1.1                | 3/5 | In Progress|  |
+| 61. Registry audit + rewrite for v1.1                | 4/5 | In Progress|  |
 | 62. Resources panel architecture                     | 0/TBD | Planned | — |
 | 63. BCs tab + value-source components in GUI         | 0/TBD | Planned | — |
 | 64. Connection routing                               | 0/TBD | Planned | — |
