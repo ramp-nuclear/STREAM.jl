@@ -2,6 +2,17 @@
 //
 // Zero React dependencies. Transforms nodes, edges, and boundary conditions
 // into valid Julia code that uses ModelingToolkit and STREAM.jl.
+//
+// Phase 62 (D-21, D-22, D-25, D-26 — INV-CG-01..04):
+// - Resource declarations (Geometries + Power Shapes) are emitted at the top of
+//   the generated script BEFORE the first @named component constructor.
+// - Component constructors reference resources by their declared variable name
+//   via _ref UUID lookups (never inline values).
+// - Four Power Shape forms emit per kind: uniform / z_cosine / file_loaded /
+//   unset (sentinel). The file_loaded form uses rebin_extensive(readdlm(...))
+//   from STREAM.jl + DelimitedFiles (conditionally imported).
+// - Pitfall 4: resource names that collide with default component instance
+//   names get a WARNING comment (full validation framework owns Phase 71).
 
 import type { Node, Edge } from "@xyflow/react";
 import type {
@@ -11,6 +22,14 @@ import type {
   FactoryCorrelationValue,
 } from "../registry/types";
 import { validateJuliaIdentifier } from "./validation";
+
+// SENTINEL_UNSET_POWER_SHAPE is duplicated here as a literal (rather than
+// imported from useStore.ts) because the store module pulls in zustand and
+// React-Flow types that we deliberately keep out of this pure-codegen module
+// per the "zero React dependencies" rule above. The value MUST match
+// useStore.ts SENTINEL_UNSET_POWER_SHAPE — both sides assert this string
+// shape in their respective tests.
+const SENTINEL_UNSET_POWER_SHAPE_UUID = "00000000-0000-0000-0000-000000000000";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -28,6 +47,33 @@ interface StreamNodeData {
   instanceName: string;
   parameters: Record<string, unknown>;
   constructorMode?: string;
+}
+
+// Phase 62 Resource shapes (local mirror; avoid importing useStore).
+// MUST match the shapes declared in gui/src/store/useStore.ts.
+export interface CodegenGeometryResource {
+  uuid: string;
+  name: string;
+  kind: "rectangular" | "circular";
+  params: { L: number; W?: number; H?: number; D?: number };
+}
+
+export interface CodegenPowerShapeResource {
+  uuid: string;
+  name: string;
+  kind: "uniform" | "z_cosine" | "file_loaded" | "unset";
+  params: { amplitude?: number; path?: string };
+}
+
+export interface CodegenFluidResource {
+  uuid: string;
+  name: string;
+}
+
+export interface CodegenResources {
+  geometries: Record<string, CodegenGeometryResource>;
+  powerShapes: Record<string, CodegenPowerShapeResource>;
+  fluids: Record<string, CodegenFluidResource>;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,9 +190,30 @@ function formatFunctionParam(
 }
 
 /**
- * Format a parameter value based on its type definition.
+ * Resource-FK resolver result. Used by emitComponentDeclaration for
+ * PipeGeometry / Matrix(power_shape) params per Phase 62 INV-CG-02.
  */
-function formatParamValue(param: Parameter, value: unknown): string {
+interface ResolvedRef {
+  /** Emitted Julia expression for the param value (e.g., `geom_mtr` or `missing`). */
+  expr: string;
+  /** Optional warning comment line to emit BEFORE the @named declaration. */
+  warning?: string;
+}
+
+/**
+ * Format a parameter value based on its type definition.
+ *
+ * Phase 62 (INV-CG-02): if `resolveRef` is provided and the param is a
+ * Resource-FK type (PipeGeometry or Matrix-named-power_shape), the value
+ * is treated as a UUID string and resolved to the resource's declared
+ * variable name. Inline pre-Phase-62 geometry-object values still flow
+ * through formatPipeGeometry as a defensive fallback.
+ */
+function formatParamValue(
+  param: Parameter,
+  value: unknown,
+  resolveRef?: (param: Parameter, value: unknown) => ResolvedRef | undefined,
+): string {
   switch (param.type) {
     case "Real":
       return formatReal(value as number);
@@ -154,13 +221,24 @@ function formatParamValue(param: Parameter, value: unknown): string {
       return formatInt(value as number);
     case "Bool":
       return String(value);
-    case "PipeGeometry":
+    case "PipeGeometry": {
+      if (resolveRef) {
+        const ref = resolveRef(param, value);
+        if (ref) return ref.expr;
+      }
+      // Defensive fallback for pre-Phase-62 inline values.
       return formatPipeGeometry(value);
+    }
     case "Function":
       return formatFunctionParam(value, param.options);
-    case "Matrix":
+    case "Matrix": {
+      if (resolveRef) {
+        const ref = resolveRef(param, value);
+        if (ref) return ref.expr;
+      }
       // Matrix params are complex; emit as-is for now
       return String(value);
+    }
     default:
       return String(value);
   }
@@ -182,6 +260,7 @@ function formatParamValue(param: Parameter, value: unknown): string {
 function emitComponentDeclaration(
   nodeData: StreamNodeData,
   component: ComponentDefinition,
+  resolveRef?: (param: Parameter, value: unknown) => ResolvedRef | undefined,
 ): string {
   const lines: string[] = [];
 
@@ -213,7 +292,18 @@ function emitComponentDeclaration(
     const paramDef = component.parameters.find((p) => p.name === paramName);
     if (!paramDef) continue;
 
-    const value = nodeData.parameters[paramName];
+    // Phase 62: Resource-FK params live under `<name>_ref` in node.data.parameters
+    // (e.g. `geometry_ref`, `power_shape_ref`). Plain inline params stay under
+    // `<name>` (e.g., `n`, `nz`). Look up FK first, fall back to the plain key.
+    const isResourceFK =
+      paramDef.type === "PipeGeometry" ||
+      (paramDef.type === "Matrix" && paramDef.name === "power_shape");
+    const refKey = `${paramName}_ref`;
+    const value = isResourceFK
+      ? (nodeData.parameters[refKey] !== undefined
+          ? nodeData.parameters[refKey]
+          : nodeData.parameters[paramName])
+      : nodeData.parameters[paramName];
 
     // Skip if value matches default (default elision)
     if (paramDef.default !== undefined && paramDef.default !== null) {
@@ -226,7 +316,17 @@ function emitComponentDeclaration(
     // Required param with no value -- still emit (will produce invalid code, but user sees it)
     if (value === undefined) continue;
 
-    const formatted = formatParamValue(paramDef, value);
+    // Resource-FK warning emission BEFORE the @named line (Pitfall 4 + missing ref)
+    let formatted: string;
+    if (resolveRef && isResourceFK) {
+      const ref = resolveRef(paramDef, value);
+      if (ref?.warning) {
+        lines.push(ref.warning);
+      }
+      formatted = ref ? ref.expr : formatParamValue(paramDef, value, resolveRef);
+    } else {
+      formatted = formatParamValue(paramDef, value, resolveRef);
+    }
 
     if (paramDef.positional) {
       positionalParts.push(formatted);
@@ -325,7 +425,7 @@ function getPortTypeFromDef(
  * @returns Array of ThermalAssembly descriptors
  */
 export function detectThermalTopology(
-  nodes: Node[],
+  _nodes: Node[],
   edges: Edge[],
   nodeDataMap: Map<string, StreamNodeData>,
   getComponent: (id: string) => ComponentDefinition | undefined,
@@ -561,6 +661,10 @@ function resolveInstancePath(
  * @param edges - React Flow edges (connections)
  * @param bcs - Boundary condition entries
  * @param getComponent - Registry lookup function
+ * @param resources - Phase 62 Resources slice (geometries / power shapes / fluids).
+ *   When provided, FK-typed params (PipeGeometry, Matrix-named-power_shape) emit
+ *   resource-variable references instead of inline values, and a Resources block
+ *   is emitted at the top before the first @named declaration (INV-CG-01).
  * @returns Julia code string
  */
 export function generateCode(
@@ -568,6 +672,7 @@ export function generateCode(
   edges: Edge[],
   bcs: BCEntry[],
   getComponent: (id: string) => ComponentDefinition | undefined,
+  resources?: CodegenResources,
 ): string {
   // Empty canvas
   if (nodes.length === 0) {
@@ -576,9 +681,27 @@ export function generateCode(
 
   const lines: string[] = [];
 
+  // --- Smoke header comment ---
+  lines.push(
+    "# =============================================================================",
+  );
+  lines.push("# Generated by STREAM Composer");
+  lines.push(
+    "# =============================================================================",
+  );
+
   // --- Header ---
   lines.push("using ModelingToolkit, STREAM");
   lines.push("using ModelingToolkit: t_nounits as t");
+
+  // Phase 62: conditional DelimitedFiles import (only when a file_loaded power
+  // shape is present — keeps the generated script free of unused-package warnings).
+  const hasFileLoadedShape =
+    resources != null &&
+    Object.values(resources.powerShapes).some((p) => p.kind === "file_loaded");
+  if (hasFileLoadedShape) {
+    lines.push("using DelimitedFiles  # for file_loaded power shapes");
+  }
   lines.push("");
 
   // --- Build nodeDataMap ---
@@ -589,6 +712,158 @@ export function generateCode(
     const data = node.data as unknown as StreamNodeData;
     nodeDataMap.set(node.id, data);
     instanceNames.push(data.instanceName);
+  }
+
+  // --- Phase 62: Resources block (INV-CG-01..04) ---
+  // The variable names declared here are referenced from component constructors
+  // via the resolveRef closure below. Per RESEARCH Pitfall 4 (Conservative
+  // option), resource names colliding with default component instance names
+  // get a WARNING comment, but the codegen still emits them.
+  //
+  // Per-consumer Power Shape variable naming (RESEARCH Open Question Q2 — pick
+  // "separate statement per HD consumer"): each HeatDiffusion that references
+  // a Power Shape gets its own assignment line keyed by the HD instance name,
+  // so different (nz, nx) consumers don't trample each other.
+  //
+  // psVarFor: Map<HD nodeId, emitted variable name> — built during the
+  // Resources block emission, consumed inside resolveRef.
+  const psVarFor = new Map<string, string>();
+  const geomNameByUuid = new Map<string, string>();
+
+  // Detect resource-name collisions with default component instance names.
+  // Default instance names follow `<componentId.toLowerCase()>_<n>` (see
+  // useStore.getNextInstanceName). For each node, record both the actual
+  // declared instance name and the default-shape — both forms can collide.
+  const componentInstanceNames = new Set<string>();
+  for (const node of nodes) {
+    const data = node.data as unknown as StreamNodeData;
+    componentInstanceNames.add(data.instanceName);
+  }
+
+  if (resources) {
+    const geometries = Object.values(resources.geometries);
+    const powerShapes = Object.values(resources.powerShapes);
+
+    // Need at least one resource line OR HD consumer to render the header.
+    const hdNodes = nodes.filter((n) => {
+      const data = n.data as unknown as StreamNodeData;
+      return data.componentId === "HeatDiffusion";
+    });
+
+    if (geometries.length > 0 || hdNodes.length > 0) {
+      lines.push(
+        "# ---------------------------------------------------------------------------",
+      );
+      lines.push("# Resources");
+      lines.push(
+        "# ---------------------------------------------------------------------------",
+      );
+    }
+
+    // --- Geometries ---
+    for (const g of geometries) {
+      geomNameByUuid.set(g.uuid, g.name);
+      // Pitfall 4: collision warning
+      if (componentInstanceNames.has(g.name)) {
+        lines.push(
+          `# WARNING: Resource name "${g.name}" collides with component instance name "${g.name}" — generated code will not compile; rename the Resource.`,
+        );
+      }
+      if (g.kind === "rectangular") {
+        const L = g.params.L;
+        const W = g.params.W ?? 0;
+        const H = g.params.H ?? 0;
+        lines.push(
+          `${g.name} = PipeGeometry_rectangular(${formatReal(L)}, ${formatReal(W)}, ${formatReal(H)})`,
+        );
+      } else if (g.kind === "circular") {
+        const L = g.params.L;
+        const D = g.params.D ?? 0;
+        lines.push(
+          `${g.name} = PipeGeometry_circular(${formatReal(L)}, ${formatReal(D)})`,
+        );
+      }
+    }
+
+    // --- Power Shapes — per-consumer emission ---
+    for (const node of hdNodes) {
+      const data = node.data as unknown as StreamNodeData;
+      const hdName = data.instanceName;
+      const psRefRaw =
+        data.parameters["power_shape_ref"] ?? data.parameters["power_shape"];
+      const psRef = typeof psRefRaw === "string" ? psRefRaw : undefined;
+      const nzRaw = data.parameters["nz"];
+      const nxRaw = data.parameters["nx"];
+      const nz = typeof nzRaw === "number" ? formatInt(nzRaw) : "nz";
+      const nx = typeof nxRaw === "number" ? formatInt(nxRaw) : "nx";
+
+      // No ref at all -> emit a missing-ref warning + skip the variable
+      if (psRef === undefined) {
+        lines.push(`# WARNING: power_shape_ref missing on ${hdName}`);
+        continue;
+      }
+
+      // Sentinel "unset" -> the verbatim unset emit form per D-26
+      if (psRef === SENTINEL_UNSET_POWER_SHAPE_UUID) {
+        const varName = `power_shape_unset_for_${hdName}`;
+        psVarFor.set(node.id, varName);
+        lines.push(
+          `${varName} = ones(${nz}, ${nx})  # TODO: fill in your power shape`,
+        );
+        continue;
+      }
+
+      const psResource = powerShapes.find((p) => p.uuid === psRef);
+      if (!psResource) {
+        lines.push(`# WARNING: power_shape_ref missing on ${hdName}`);
+        continue;
+      }
+
+      // Skip emission for any reference to the unset sentinel that slipped
+      // through the kind-based check (defensive).
+      if (psResource.kind === "unset") {
+        const varName = `power_shape_unset_for_${hdName}`;
+        psVarFor.set(node.id, varName);
+        lines.push(
+          `${varName} = ones(${nz}, ${nx})  # TODO: fill in your power shape`,
+        );
+        continue;
+      }
+
+      const varName = `power_shape_${psResource.name}_for_${hdName}`;
+      psVarFor.set(node.id, varName);
+
+      // Pitfall 4: collision with component instance names
+      if (componentInstanceNames.has(psResource.name)) {
+        lines.push(
+          `# WARNING: Resource name "${psResource.name}" collides with component instance name "${psResource.name}" — generated code will not compile; rename the Resource.`,
+        );
+      }
+
+      switch (psResource.kind) {
+        case "uniform":
+          lines.push(`${varName} = ones(${nz}, ${nx})`);
+          break;
+        case "z_cosine": {
+          const amp = psResource.params.amplitude ?? 1.0;
+          lines.push(
+            `${varName} = cosine_power_shape(${nz}, ${nx}; amplitude=${formatReal(amp)})`,
+          );
+          break;
+        }
+        case "file_loaded": {
+          const path = psResource.params.path ?? "TODO_set_path.csv";
+          lines.push(
+            `${varName} = rebin_extensive(readdlm(joinpath(@__DIR__, ${JSON.stringify(path)}), ','), (${nz}, ${nx}))`,
+          );
+          break;
+        }
+      }
+    }
+
+    if (geometries.length > 0 || hdNodes.length > 0) {
+      lines.push("");
+    }
   }
 
   // --- Detect thermal topology ---
@@ -621,7 +896,38 @@ export function generateCode(
       lines.push(`# Unknown component: ${data.componentId}`);
       continue;
     }
-    lines.push(emitComponentDeclaration(data, component));
+
+    // resolveRef closure: maps Resource-FK params to the variable name declared
+    // in the Resources block. Returns undefined if `resources` was not passed
+    // (legacy 4-arg call path keeps inline emission).
+    const resolveRef = resources
+      ? (param: Parameter, value: unknown): ResolvedRef | undefined => {
+          if (param.type === "PipeGeometry") {
+            if (typeof value !== "string") return undefined;
+            const name = geomNameByUuid.get(value);
+            if (!name) {
+              return {
+                expr: "missing",
+                warning: `# WARNING: geometry_ref missing on ${data.instanceName}`,
+              };
+            }
+            return { expr: name };
+          }
+          if (param.type === "Matrix" && param.name === "power_shape") {
+            const varName = psVarFor.get(node.id);
+            if (!varName) {
+              return {
+                expr: "missing",
+                warning: `# WARNING: power_shape_ref missing on ${data.instanceName}`,
+              };
+            }
+            return { expr: varName };
+          }
+          return undefined;
+        }
+      : undefined;
+
+    lines.push(emitComponentDeclaration(data, component, resolveRef));
   }
 
   lines.push("");
@@ -750,7 +1056,6 @@ export function generateCode(
     if (sourceIsArray || targetIsArray) {
       // Emit per-cell connect with port() helper
       const arrayPort = sourceIsArray ? sourcePort! : targetPort!;
-      const singlePort = sourceIsArray ? targetPort! : sourcePort!;
       const arraySide = sourceIsArray ? sourceData : targetData;
       const singleSide = sourceIsArray ? targetData : sourceData;
       const arrayHandle = sourceIsArray ? sourceHandle : targetHandle;
