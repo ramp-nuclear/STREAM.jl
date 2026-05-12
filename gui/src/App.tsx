@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ToolboxPanel from "./components/ToolboxPanel";
 import ResourcesTreePanel from "./components/resources/ResourcesTreePanel";
+import ModelOptionsPanel from "./components/project/ModelOptionsPanel";
 import CanvasPanel from "./components/CanvasPanel";
 import SidebarPanel from "./components/SidebarPanel";
 import Toolbar from "./components/Toolbar";
@@ -267,9 +268,7 @@ function App() {
                     <ResourcesTreePanel />
                   </TabsContent>
                   <TabsContent value="Project" className="flex-1 min-h-0 overflow-hidden mt-0">
-                    <div className="p-[16px] text-[14px] text-muted-foreground">
-                      Project panel — coming in plan 62-07
-                    </div>
+                    <ModelOptionsPanel />
                   </TabsContent>
                 </Tabs>
               </div>
