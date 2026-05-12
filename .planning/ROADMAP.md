@@ -88,7 +88,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.2.
 **Depends on:** Phase 61 (registry must support resource-ref shape).
-**Plans:** 8/11 plans executed
+**Plans:** 9/11 plans executed
 
 - [x] 62-01-PLAN.md — Julia src/utilities.jl with rebin_extensive + cosine_power_shape; test/test_utilities.jl (Wave 1)
 - [x] 62-02-PLAN.md — Zustand Resources + ModelOptions + activeLeftTab + selection-kind slices; sentinel UUID baked into initial state (Wave 1)
@@ -97,7 +97,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] 62-05-PLAN.md — App.tsx Tabs shell + Ctrl+1/2/3 keyboard; SOURCES category header in ToolboxPanel (Wave 2)
 - [x] 62-06-PLAN.md — Resources tab body: hand-rolled tree + group headers + search + inline-rename + context-menu (Wave 2)
 - [x] 62-07-PLAN.md — Project tab body: Model Options form (name, description, fluid, g, solver defaults) (Wave 2)
-- [ ] 62-08-PLAN.md — Resource editors + ResourceReferencePicker + anchored Popover (non-dismiss-on-outside + Pitfall 1 focus return) (Wave 2)
+- [x] 62-08-PLAN.md — Resource editors + ResourceReferencePicker + anchored Popover (non-dismiss-on-outside + Pitfall 1 focus return) (Wave 2)
 - [ ] 62-09-PLAN.md — SidebarPanel selection-kind router; header text per kind; Esc cascade tail (Wave 3)
 - [x] 62-10-PLAN.md — codeGenerator.ts rewrite: Resources block at top + four PowerShape kinds + Pitfall 4 warnings (Wave 3)
 - [ ] 62-11-PLAN.md — Fresh simple_loop.scp fixture + INV-CG-05 smoke test + human-verify checkpoint (Wave 3, has checkpoint)
@@ -223,7 +223,7 @@ contract document drafted in parallel throughout.
 | 59. Correlation `geom`-first refactor                | 4/4 | Complete    | 2026-05-11 |
 | 60. `fuel_assembly` composition helper               | 2/2 | Complete    | 2026-05-11 |
 | 61. Registry audit + rewrite for v1.1                | 5/5 | Complete   | 2026-05-12 |
-| 62. Resources panel architecture                     | 8/11 | In Progress|  |
+| 62. Resources panel architecture                     | 9/11 | In Progress|  |
 | 63. BCs tab + value-source components in GUI         | 0/TBD | Planned | — |
 | 64. Connection routing                               | 0/TBD | Planned | — |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
