@@ -8,10 +8,11 @@ export default function CodePreview() {
   const nodes = useStore((s) => s.nodes);
   const edges = useStore((s) => s.edges);
   const bcs = useStore((s) => s.bcs);
+  const resources = useStore((s) => s.resources);
 
   const code = useMemo(
-    () => generateCode(nodes, edges, bcs, getComponent),
-    [nodes, edges, bcs],
+    () => generateCode(nodes, edges, bcs, getComponent, resources),
+    [nodes, edges, bcs, resources],
   );
 
   return (
