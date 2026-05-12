@@ -106,17 +106,21 @@ describe('Component Registry', () => {
     expect(thermalRight!.pair_with).toBe('thermal_left');
   });
 
-  it('HeatDiffusion has ThermalPort array ports (D-04)', () => {
+  it('HeatDiffusion has ThermalPort array ports (v1.1 D-16/D-17/D-21)', () => {
     const hd = getComponent('HeatDiffusion');
     expect(hd).toBeDefined();
     const thermalLeft = hd!.ports.find(p => p.name === 'thermal_left');
     const thermalRight = hd!.ports.find(p => p.name === 'thermal_right');
     expect(thermalLeft).toBeDefined();
-    expect(thermalLeft!.array).toBe(true);
-    expect(thermalLeft!.arrayParam).toBe('nz');
+    // v1.1: legacy `array: true` / `arrayParam: "nz"` replaced by `array_size: "nz"`.
+    // HD uses `nz` (not `n`) and `default_axis: "horizontal"` (per D-21, distinct from CAC's vertical).
+    expect(thermalLeft!.array_size).toBe('nz');
+    expect(thermalLeft!.default_axis).toBe('horizontal');
+    expect(thermalLeft!.pair_with).toBe('thermal_right');
     expect(thermalRight).toBeDefined();
-    expect(thermalRight!.array).toBe(true);
-    expect(thermalRight!.arrayParam).toBe('nz');
+    expect(thermalRight!.array_size).toBe('nz');
+    expect(thermalRight!.default_axis).toBe('horizontal');
+    expect(thermalRight!.pair_with).toBe('thermal_left');
   });
 
   it('ChannelHeatFlux has no ThermalPort and declares q_left/q_right external_inputs (v1.1 D-03/D-19)', () => {

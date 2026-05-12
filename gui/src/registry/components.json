@@ -929,8 +929,8 @@
       "category": "Thermal",
       "description": "2D finite-difference fuel plate. T(t)[1:nz, 1:nx] MTK state. Dual ThermalPort arrays thermal_left[1:nz] and thermal_right[1:nz] for coupling to ChannelAndContacts on both sides.",
       "ports": [
-        { "name": "thermal_left", "type": "ThermalPort", "side": "left", "array": true, "arrayParam": "nz" },
-        { "name": "thermal_right", "type": "ThermalPort", "side": "right", "array": true, "arrayParam": "nz" }
+        { "name": "thermal_left", "type": "ThermalPort", "array_size": "nz", "default_axis": "horizontal", "pair_with": "thermal_right" },
+        { "name": "thermal_right", "type": "ThermalPort", "array_size": "nz", "default_axis": "horizontal", "pair_with": "thermal_left" }
       ],
       "parameters": [
         {
