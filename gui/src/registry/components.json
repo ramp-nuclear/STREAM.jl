@@ -1096,6 +1096,133 @@
           "parameters": ["n", "q"]
         }
       ]
+    },
+    {
+      "id": "PointKinetics",
+      "label": "Point Kinetics",
+      "category": "Reactor Physics",
+      "description": "Lumped-parameter reactor power dynamics. Accepts scalar rho, callable rho(t), or a ReactivityController Resource reference.",
+      "ports": [],
+      "parameters": [
+        {
+          "name": "rho",
+          "type_union": ["Real", "Function", "ReactivityController"],
+          "input_modes": ["scalar", "callable", "controller"],
+          "default": 0.0,
+          "description": "Reactivity input (Δρ); scalar value, time-callable, or Resource reference",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "Lambda",
+          "type": "Real",
+          "unit": "s",
+          "default": "U235_LAMBDA",
+          "description": "Prompt neutron generation time (default: U-235)",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "beta_k",
+          "type": "Vector",
+          "default": "U235_BETA_K",
+          "description": "Delayed neutron precursor fractions (default: U-235 6-group)",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "lambda_k",
+          "type": "Vector",
+          "unit": "1/s",
+          "default": "U235_LAMBDA_K",
+          "description": "Precursor decay constants (default: U-235)",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "temp_worth",
+          "type_union": ["Mark"],
+          "visible_when": "rho.input_mode in ['callable','controller']",
+          "description": "Mark-in-code: temperature feedback dict (per-component reactivity coefficients). Per CONTEXT D-12 — Dict keys are MTK Systems and cannot be selected in JSON; user fills the Dict literal in the generated .jl file.",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "ref_temp",
+          "type_union": ["Mark"],
+          "visible_when": "rho.input_mode in ['callable','controller']",
+          "description": "Mark-in-code: reference-temperature dict (per-component reference temperatures, same key structure as temp_worth).",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "scalar",
+          "signature": "PointKinetics(; name, rho, Lambda, beta_k, lambda_k)",
+          "parameters": ["rho", "Lambda", "beta_k", "lambda_k"]
+        },
+        {
+          "mode": "callable",
+          "signature": "PointKinetics(rho_c_fn; name, rho_val, Lambda, beta_k, lambda_k, temp_worth, ref_temp)",
+          "parameters": ["rho", "Lambda", "beta_k", "lambda_k", "temp_worth", "ref_temp"]
+        }
+      ]
+    },
+    {
+      "id": "ReactivityController",
+      "label": "Reactivity Controller",
+      "category": "Resources",
+      "resource_kind": "reactivity_controller",
+      "description": "Resource (not a canvas component). Encapsulates input-reactivity function + state machine + abort states. Lives in the navigator under Resources → Reactivity Controllers (navigator tree is Phase 62). Referenced from PointKinetics.rho when input_mode == 'controller'.",
+      "ports": [],
+      "parameters": [
+        {
+          "name": "input_reactivity",
+          "type_union": ["Mark"],
+          "description": "Mark-in-code: callable (state, t_state, t) → Δρ; user fills the closure in the generated .jl.",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "state_machine",
+          "type_union": ["Mark"],
+          "description": "Mark-in-code: callable (state, t, power, dPdt) → new_state.",
+          "required": true,
+          "positional": false
+        },
+        {
+          "name": "abort_states",
+          "type_union": ["Mark"],
+          "description": "Mark-in-code: Set{Symbol} of states that signal abort.",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "initial_state",
+          "type": "Symbol",
+          "default": ":NORMAL",
+          "description": "Initial state symbol (free-text input; codegen wraps with `:` prefix).",
+          "required": false,
+          "positional": false
+        },
+        {
+          "name": "initial_time",
+          "type": "Real",
+          "unit": "s",
+          "default": 0.0,
+          "description": "Initial time for the state machine.",
+          "required": false,
+          "positional": false
+        }
+      ],
+      "constructorModes": [
+        {
+          "mode": "default",
+          "signature": "ReactivityController(input_reactivity; initial_state=:NORMAL, initial_time=0.0, state_machine=nothing, abort_states=nothing)",
+          "parameters": ["input_reactivity", "state_machine", "abort_states", "initial_state", "initial_time"]
+        }
+      ]
     }
   ]
 }
