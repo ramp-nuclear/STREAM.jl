@@ -88,7 +88,19 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.2.
 **Depends on:** Phase 61 (registry must support resource-ref shape).
-**Plans:** TBD via `/gsd:plan-phase`.
+**Plans:** 11 plans
+
+- [ ] 62-01-PLAN.md — Julia src/utilities.jl with rebin_extensive + cosine_power_shape; test/test_utilities.jl (Wave 1)
+- [ ] 62-02-PLAN.md — Zustand Resources + ModelOptions + activeLeftTab + selection-kind slices; sentinel UUID baked into initial state (Wave 1)
+- [ ] 62-03-PLAN.md — shadcn popover.tsx + context-menu.tsx shims; Pitfall 1 click-outside-disabled smoke test (Wave 1)
+- [ ] 62-04-PLAN.md — projectIO.ts rewrite for .scp v2.0; hard cutover from .streamgui; delete 5 stale export examples (Wave 2)
+- [ ] 62-05-PLAN.md — App.tsx Tabs shell + Ctrl+1/2/3 keyboard; SOURCES category header in ToolboxPanel (Wave 2)
+- [ ] 62-06-PLAN.md — Resources tab body: hand-rolled tree + group headers + search + inline-rename + context-menu (Wave 2)
+- [ ] 62-07-PLAN.md — Project tab body: Model Options form (name, description, fluid, g, solver defaults) (Wave 2)
+- [ ] 62-08-PLAN.md — Resource editors + ResourceReferencePicker + anchored Popover (non-dismiss-on-outside + Pitfall 1 focus return) (Wave 2)
+- [ ] 62-09-PLAN.md — SidebarPanel selection-kind router; header text per kind; Esc cascade tail (Wave 3)
+- [ ] 62-10-PLAN.md — codeGenerator.ts rewrite: Resources block at top + four PowerShape kinds + Pitfall 4 warnings (Wave 3)
+- [ ] 62-11-PLAN.md — Fresh simple_loop.scp fixture + INV-CG-05 smoke test + human-verify checkpoint (Wave 3, has checkpoint)
 
 ### Phase 63: BCs tab + value-source components in GUI
 
