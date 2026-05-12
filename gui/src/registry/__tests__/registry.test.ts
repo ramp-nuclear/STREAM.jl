@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { registry, getAllComponents, getComponent, getComponentsByCategory } from '../index';
 
 describe('Component Registry', () => {
-  it('loads all 14 v1.1 STREAM.jl components (SCAF-03, D-02; Plan 03 Task 1 adds Sources)', () => {
-    expect(getAllComponents()).toHaveLength(14);
+  it('loads all 16 v1.1 STREAM.jl components (SCAF-03, D-02; Plan 03 adds Sources/Reactor Physics/Resources)', () => {
+    expect(getAllComponents()).toHaveLength(16);
   });
 
   it('has stream_version field (SCAF-05)', () => {
@@ -24,7 +24,14 @@ describe('Component Registry', () => {
       expect(comp.category, `${comp.id} missing category`).toBeTruthy();
       expect(comp.description, `${comp.id} missing description`).toBeTruthy();
       expect(comp.ports, `${comp.id} missing ports`).toBeDefined();
-      expect(comp.ports.length, `${comp.id} has no ports`).toBeGreaterThan(0);
+      // v1.1 (D-12, D-13): non-canvas categories (Reactor Physics, Resources) legally
+      // carry an empty ports array — PointKinetics is connected via codegen-side
+      // connect_temperature_feedback, and ReactivityController is a Resource with no
+      // canvas presence at all.
+      const isNonCanvas = comp.category === 'Reactor Physics' || comp.category === 'Resources';
+      if (!isNonCanvas) {
+        expect(comp.ports.length, `${comp.id} has no ports`).toBeGreaterThan(0);
+      }
       expect(comp.parameters, `${comp.id} missing parameters`).toBeDefined();
       expect(comp.constructorModes, `${comp.id} missing constructorModes`).toBeDefined();
       expect(comp.constructorModes.length, `${comp.id} has no constructorModes`).toBeGreaterThan(0);
