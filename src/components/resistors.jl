@@ -30,13 +30,13 @@ function Friction(; name, L, D, A, liquid=H2O)
     @named port_in = FlowPort()
     @named port_out = FlowPort()
     T_in = instream(port_in.T)
+    rho = ρ(liquid, T_in)
+    dp = f * (port_in.mdot * abs(port_in.mdot) / (2rho * A^2)) * (L / D)
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
         Re ~ abs(port_in.mdot) * D / (A * μ(liquid, T_in)),
         f ~ 0.3164 * Re ^ (-0.25),
-        port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) / (2 * ρ(
-            liquid, T_in
-        ) * A^2)) * (L / D),
+        port_in.P - port_out.P ~ dp,
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]

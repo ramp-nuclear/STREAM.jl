@@ -2,6 +2,12 @@
     HeavyWater
 
 Type representing saturated heavy water (D₂O) correlations.
+
+References
+----------
+A. Crabtree and M. Siman-Tov,
+"Thermophysical Properties of Saturated Light and Heavy Water 
+for Advanced Neutron Source Applications", ORNL/TM-12322, 1993.
 """
 struct HeavyWater <: AbstractLiquid end
 
@@ -14,6 +20,7 @@ function density(::HeavyWater, T)
     C = -8.42e-4
     return A + B*TF + C*TF^2
 end
+density(H::HeavyWater, T, p) = density(H, T)
 
 function thermal_expansion(::HeavyWater, T)
     B = -0.077855
@@ -21,6 +28,7 @@ function thermal_expansion(::HeavyWater, T)
     TF = 1.8*T + 32
     return -1.8 * (B + 2C*TF) / density(D2O, T)
 end
+thermal_expansion(H::HeavyWater, T, p) = thermal_expansion(H, T)
 
 function specific_heat(::HeavyWater, T)
     Tl = (1.8*T + 491.67) * 1e-4
@@ -30,6 +38,7 @@ function specific_heat(::HeavyWater, T)
     D = 13555.737878
     return 1000 * (A + B*Tl + C*Tl^2 + D*Tl^3)
 end
+specific_heat(H::HeavyWater, T, p) = specific_heat(H, T)
 
 function viscosity(::HeavyWater, T)
     TF = 1.8*T + 32
@@ -39,6 +48,7 @@ function viscosity(::HeavyWater, T)
     D = 0.4111103409
     return A + B*TF + C/TF + D/(TF^2)
 end
+viscosity(H::HeavyWater, T, p) = viscosity(H, T)
 
 function conductivity(::HeavyWater, T)
     Tl = (1.8*T + 491.67) * 1e-4
@@ -48,6 +58,8 @@ function conductivity(::HeavyWater, T)
     D = 924.0219962
     return A + B*Tl + C*Tl^2 + D*Tl^3
 end
+conductivity(H::HeavyWater, T, p) = conductivity(H, T)
+
 
 function sat_temperature(::HeavyWater, P)
     X = log(abs(P) * 1e-6)
@@ -57,6 +69,8 @@ function sat_temperature(::HeavyWater, P)
     D = 1.708386e-3
     return exp(A + B*X + C*X^2 + D*X^3)
 end
+sat_temperature(H::HeavyWater, T, p) = sat_temperature(H, p)
+
 
 function surface_tension(::HeavyWater, T)
     X = abs(373.99 - T) / 647.15
@@ -65,6 +79,7 @@ function surface_tension(::HeavyWater, T)
     C = -6.60709649e-1
     return A * X^B * (1 + C*X)
 end
+surface_tension(H::HeavyWater, T, p) = surface_tension(H, T)
 
 function vapor_density(::HeavyWater, T)
     A = -5.456208705
@@ -74,6 +89,7 @@ function vapor_density(::HeavyWater, T)
     E = -1.1136e-4
     return exp((A + C*T + E*T^2) / (1 + B*T + D*T^2))
 end
+vapor_density(H::HeavyWater, T, p) = vapor_density(H, T)
 
 function latent_heat(::HeavyWater, T)
     X = abs(371.49 - T)
@@ -82,3 +98,5 @@ function latent_heat(::HeavyWater, T)
     C = -11.009078
     return sqrt(A + B*X + C*X^2) * 1000
 end
+latent_heat(H::HeavyWater, T, p) = latent_heat(H, T)
+

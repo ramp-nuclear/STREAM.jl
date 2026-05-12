@@ -27,6 +27,7 @@ include("analysis.jl")
 include("examples.jl")
 
 export AbstractLiquid, Liquid, ρ, ρᵥ, cₚ, μ, Tsat, σ, hfg, k, β, H2O, D2O
+export LightWater, HeavyWater
 export FlowPort, ThermalPort
 export Channel,
     Pump,
