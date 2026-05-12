@@ -57,6 +57,17 @@ export default function ToolboxPanel() {
           </div>
         </>
       )}
+
+      {/* Phase 62 D-30 — SOURCES category header. Always rendered (no
+          conditional `length > 0` gate); Phase 63 lands the value-source
+          drag entries with the BCs wiring. Phase 62 ships the header
+          alone — no rows, no tooltip, no drag handlers. The header uses
+          the same Tailwind treatment as the Hydraulic / Thermal headers
+          above (UI-SPEC §"Sources toolbox category header" +
+          §Copywriting). */}
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 mt-4">
+        Sources
+      </div>
     </div>
   );
 }
