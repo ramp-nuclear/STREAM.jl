@@ -45,7 +45,12 @@ describe('Component Registry', () => {
     for (const comp of getAllComponents()) {
       for (const param of comp.parameters) {
         expect(param.name, `${comp.id} param missing name`).toBeTruthy();
-        expect(param.type, `${comp.id}.${param.name} missing type`).toBeTruthy();
+        // v1.1 (D-10): polymorphic kwargs carry `type_union` in place of `type`.
+        // A parameter must declare one or the other.
+        expect(
+          param.type || param.type_union,
+          `${comp.id}.${param.name} missing type or type_union`,
+        ).toBeTruthy();
         expect(param.description, `${comp.id}.${param.name} missing description`).toBeTruthy();
         expect(typeof param.required, `${comp.id}.${param.name} missing required`).toBe('boolean');
         expect(typeof param.positional, `${comp.id}.${param.name} missing positional`).toBe('boolean');

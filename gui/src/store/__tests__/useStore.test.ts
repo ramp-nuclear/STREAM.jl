@@ -201,9 +201,11 @@ describe("addNode default population", () => {
   it("populates default parameter values from registry", () => {
     useStore.getState().addNode("Channel", { x: 0, y: 0 });
     const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
-    // Channel has g default 0.0, htc_correlation default dittus_boelter, friction_correlation default blasius_friction
+    // v1.1: Channel has g default 0.0, h_left/h_right default 0.0, friction_correlation default blasius_friction.
+    // htc_correlation is no longer a Channel parameter (D-18) — only ChannelAndContacts keeps it.
     expect(data.parameters.g).toBe(0.0);
-    expect(data.parameters.htc_correlation).toBe("dittus_boelter");
+    expect(data.parameters.h_left).toBe(0.0);
+    expect(data.parameters.h_right).toBe(0.0);
     expect(data.parameters.friction_correlation).toBe("blasius_friction");
   });
 
