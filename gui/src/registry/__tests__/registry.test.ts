@@ -105,14 +105,21 @@ describe('Component Registry', () => {
     expect(thermalRight!.arrayParam).toBe('nz');
   });
 
-  it('ChannelHeatFlux has no ThermalPort (T_wall is scalar BC)', () => {
+  it('ChannelHeatFlux has no ThermalPort and declares q_left/q_right external_inputs (v1.1 D-03/D-19)', () => {
     const chf = getComponent('ChannelHeatFlux');
     expect(chf).toBeDefined();
     const thermalPorts = chf!.ports.filter(p => p.type === 'ThermalPort');
     expect(thermalPorts).toHaveLength(0);
+    // v1.1: T_wall scalar parameter dropped; per-cell q_left/q_right external_inputs replace it.
     const tWall = chf!.parameters.find(p => p.name === 'T_wall');
-    expect(tWall).toBeDefined();
-    expect(tWall!.type).toBe('Real');
+    expect(tWall).toBeUndefined();
+    const externalInputs = chf!.external_inputs ?? [];
+    expect(externalInputs.map(e => e.name)).toEqual(['q_left', 'q_right']);
+    for (const ei of externalInputs) {
+      expect(ei.source_component).toBe('HeatFluxSource');
+      expect(ei.source_port).toBe('q_out');
+      expect(ei.unit).toBe('W/m^2');
+    }
   });
 
   it('ConstantTemperature is Thermal category (D-03)', () => {
