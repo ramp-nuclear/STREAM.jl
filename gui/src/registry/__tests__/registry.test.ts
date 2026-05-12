@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { registry, getAllComponents, getComponent, getComponentsByCategory } from '../index';
 
 describe('Component Registry', () => {
-  it('loads all 12 STREAM.jl components (SCAF-03, D-02)', () => {
-    expect(getAllComponents()).toHaveLength(12);
+  it('loads all 14 v1.1 STREAM.jl components (SCAF-03, D-02; Plan 03 Task 1 adds Sources)', () => {
+    expect(getAllComponents()).toHaveLength(14);
   });
 
   it('has stream_version field (SCAF-05)', () => {
