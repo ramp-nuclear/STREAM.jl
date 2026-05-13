@@ -5,7 +5,6 @@ import NumericField from "./NumericField";
 import ResourceReferencePicker from "./ResourceReferencePicker";
 import FunctionSelect from "./FunctionSelect";
 import MatrixBadge from "./MatrixBadge";
-import SegmentedButtonGroup from "./SegmentedButtonGroup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,67 +12,30 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { validateReal } from "@/lib/validation";
 import type { ComponentDefinition, Parameter } from "@/registry/types";
 
-// Plan 63.1-11 — D-10 type_union + input_modes contract.
+// Plan 63.1-11 — D-10 type_union + input_modes contract (scalar-only GUI).
 //
-// A type_union Parameter has no `param.type`; instead it carries a
-// `type_union[]` of allowed value shapes and a paired `input_modes[]`. The
-// stored value's runtime type is the discriminator:
-//   typeof value === "number"      → scalar mode
-//   Array.isArray(value)           → vector mode
-//   typeof value === "string"      → callable mode
-//   undefined                      → first input_mode (typically "scalar")
+// A type_union Parameter has no `param.type`; it carries a `type_union[]`
+// of allowed value shapes and a paired `input_modes[]`. Although the contract
+// supports scalar / vector / callable, the GUI ONLY exposes scalar editing —
+// per project-feedback (heavy-dev, 2026-05-14):
 //
-// The mode itself is NOT stored separately. Switching modes is purely visual
-// until the user edits — switching scalar→vector→scalar without editing
-// preserves the original number (no implicit write).
-type TypeUnionMode = "scalar" | "vector" | "callable" | "controller";
-
-function inferMode(
-  value: unknown,
-  inputModes: ReadonlyArray<string> | undefined
-): TypeUnionMode {
-  if (typeof value === "number") return "scalar";
-  if (Array.isArray(value)) return "vector";
-  if (typeof value === "string" && value.length > 0) return "callable";
-  const first = inputModes?.[0];
-  if (first === "vector" || first === "callable" || first === "controller") {
-    return first;
-  }
-  return "scalar";
-}
-
+//   Vector and callable values belong in the generated Julia script. Per-cell
+//   editors in a sidebar are unusable at realistic n (20+), and signature
+//   pickers add UI surface for negligible benefit. Users editing those shapes
+//   do so in the script.
+//
+// Rendering behaviour: always a scalar `<Input>` + small hint line. If the
+// stored value is non-scalar (array or string), the input shows the param
+// default; the first scalar edit cleanly overwrites the prior shape. No
+// migration / no per-cell editor anywhere.
 interface TypeUnionFieldProps {
   param: Parameter;
   value: unknown;
-  n: unknown;
   onChange: (value: unknown) => void;
 }
 
-function TypeUnionField({ param, value, n, onChange }: TypeUnionFieldProps) {
-  const inputModes = (param.input_modes ?? ["scalar"]) as ReadonlyArray<TypeUnionMode>;
-  // Mode state is initialized from the existing value, then re-synced when the
-  // upstream value transitions to a shape that mismatches the current mode
-  // (e.g. parent re-keyed). Local visual switches do not trigger writes.
-  const [activeMode, setActiveMode] = useState<TypeUnionMode>(() =>
-    inferMode(value, inputModes)
-  );
-  useEffect(() => {
-    const inferred = inferMode(value, inputModes);
-    // Only force-sync when the inferred mode disagrees with current state AND
-    // the incoming value is a concrete shape (number/array/non-empty string).
-    if (
-      inferred !== activeMode &&
-      (typeof value === "number" ||
-        Array.isArray(value) ||
-        (typeof value === "string" && value.length > 0))
-    ) {
-      setActiveMode(inferred);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
-
-  const cellCount = typeof n === "number" && n >= 1 ? Math.floor(n) : 1;
-
+function TypeUnionField({ param, value, onChange }: TypeUnionFieldProps) {
+  const initialDisplay = typeof value === "number" ? value : param.default;
   return (
     <div className="flex flex-col gap-[6px] min-w-0">
       <Label className="text-[12px] font-medium leading-[1.4] flex items-center gap-1 min-w-0">
@@ -89,45 +51,14 @@ function TypeUnionField({ param, value, n, onChange }: TypeUnionFieldProps) {
           </TooltipProvider>
         )}
       </Label>
-      <SegmentedButtonGroup<TypeUnionMode>
-        options={inputModes.map((m) => ({ value: m, label: m }))}
-        active={activeMode}
-        onChange={setActiveMode}
-        size="sm"
+      <ScalarInput
+        value={initialDisplay}
+        unit={param.unit}
+        onChange={(v) => onChange(v)}
       />
-      {activeMode === "scalar" && (
-        <ScalarInput
-          value={typeof value === "number" ? value : param.default}
-          unit={param.unit}
-          onChange={(v) => onChange(v)}
-        />
-      )}
-      {activeMode === "vector" && (
-        <VectorEditor
-          n={cellCount}
-          value={value}
-          fallback={
-            typeof param.default === "number" ? param.default : 0
-          }
-          unit={param.unit}
-          onChange={(arr) => onChange(arr)}
-        />
-      )}
-      {activeMode === "callable" && (
-        <SegmentedButtonGroup<"fn(t)" | "fn(t, i)">
-          options={[
-            { value: "fn(t)", label: "fn(t)" },
-            { value: "fn(t, i)", label: "fn(t, i)" },
-          ]}
-          active={
-            value === "fn(t)" || value === "fn(t, i)"
-              ? (value as "fn(t)" | "fn(t, i)")
-              : "fn(t)"
-          }
-          onChange={(sig) => onChange(sig)}
-          size="sm"
-        />
-      )}
+      <p className="text-[11px] text-muted-foreground leading-[1.3]">
+        Vector or function values — edit in the generated Julia.
+      </p>
     </div>
   );
 }
@@ -139,20 +70,29 @@ interface ScalarInputProps {
 }
 
 function ScalarInput({ value, unit, onChange }: ScalarInputProps) {
-  const [localValue, setLocalValue] = useState(String(value ?? ""));
+  const [localValue, setLocalValue] = useState(
+    typeof value === "number" ? String(value) : ""
+  );
   const [error, setError] = useState<string | null>(null);
 
   // Re-sync local string when the upstream numeric value changes (parent
   // re-keys or sibling edits cascade). String-compare prevents thrashing while
-  // the user is mid-edit.
+  // the user is mid-edit. Non-scalar stored values render as an empty input —
+  // the first edit overwrites them with a number (per project-feedback).
   useEffect(() => {
     if (typeof value === "number" && String(value) !== localValue) {
       setLocalValue(String(value));
+    } else if (value === undefined || value === null) {
+      // leave whatever the user has typed
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   function handleBlur() {
+    if (localValue.trim() === "") {
+      setError(null);
+      return;
+    }
     const result = validateReal(localValue);
     if (result.valid) {
       setError(null);
@@ -181,70 +121,6 @@ function ScalarInput({ value, unit, onChange }: ScalarInputProps) {
         )}
       </div>
       {error && <p className="text-destructive text-xs">{error}</p>}
-    </div>
-  );
-}
-
-interface VectorEditorProps {
-  n: number;
-  value: unknown;
-  fallback: number;
-  unit?: string;
-  onChange: (arr: number[]) => void;
-}
-
-function VectorEditor({ n, value, fallback, unit, onChange }: VectorEditorProps) {
-  const initial: number[] = Array.isArray(value)
-    ? (value as unknown[]).slice(0, n).map((v) => (typeof v === "number" ? v : fallback))
-    : Array(n).fill(fallback);
-  while (initial.length < n) initial.push(fallback);
-  const [cells, setCells] = useState<string[]>(initial.map((v) => String(v)));
-
-  // Re-sync local cell strings when n changes upstream.
-  useEffect(() => {
-    setCells((prev) => {
-      const next = [...prev];
-      while (next.length < n) next.push(String(fallback));
-      return next.slice(0, n);
-    });
-  }, [n, fallback]);
-
-  function commit(idx: number, raw: string) {
-    const updated = [...cells];
-    updated[idx] = raw;
-    setCells(updated);
-    const parsed = updated.map((s) => {
-      const r = validateReal(s);
-      return r.valid ? r.value : fallback;
-    });
-    onChange(parsed);
-  }
-
-  return (
-    <div className="flex flex-col gap-[4px]">
-      {cells.map((cell, i) => (
-        <div key={i} className="flex items-center gap-[8px]">
-          <Label className="text-[12px] w-[40px] text-muted-foreground">[{i + 1}]</Label>
-          <div className="relative flex-1">
-            <Input
-              value={cell}
-              onChange={(e) => {
-                const updated = [...cells];
-                updated[i] = e.target.value;
-                setCells(updated);
-              }}
-              onBlur={(e) => commit(i, e.target.value)}
-              inputMode="decimal"
-              className={unit ? "pr-12" : undefined}
-            />
-            {unit && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[13px] font-semibold pointer-events-none">
-                {unit}
-              </span>
-            )}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -298,7 +174,6 @@ export default function ParameterForm({
           key={param.name}
           param={param}
           value={values[param.name]}
-          n={values["n"]}
           onChange={(v) => onParamChange(param.name, v)}
         />
       );
