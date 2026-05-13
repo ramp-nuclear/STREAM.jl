@@ -108,11 +108,13 @@ function formatPipeGeometry(value: unknown): string {
     return `PipeGeometry_circular(${formatReal(L as number)}, ${formatReal(D as number)})`;
   }
   if (geo.type === "rectangular") {
+    // PipeGeometry_rectangular(L, edge1, edge2, heated_edge) — see Resources-block
+    // emission above for the L/W/H → 4-arg mapping rationale.
     const L = geo.L;
     const W = geo.W;
     const H = geo.H;
     if (L == null || W == null || H == null) return "# TODO: set geometry dimensions";
-    return `PipeGeometry_rectangular(${formatReal(L as number)}, ${formatReal(W as number)}, ${formatReal(H as number)})`;
+    return `PipeGeometry_rectangular(${formatReal(L as number)}, ${formatReal(W as number)}, ${formatReal(H as number)}, ${formatReal(W as number)})`;
   }
   return "# TODO: set geometry dimensions";
 }
@@ -770,11 +772,19 @@ export function generateCode(
         );
       }
       if (g.kind === "rectangular") {
+        // Julia signature is PipeGeometry_rectangular(L, edge1, edge2, heated_edge)
+        // (src/geometry.jl line 60). The GUI's L/W/H map as: L=length,
+        // W=edge1 (plate-width cross-section), H=edge2 (channel-gap cross-section),
+        // heated_edge=W (the plate's heated face equals the plate width). This
+        // matches the MTR plate-fuel convention used throughout STREAM.jl examples
+        // (src/examples.jl build_cube). INV-CG-05 (62-11) surfaced the missing
+        // fourth argument — the Resources-block emit previously dropped it,
+        // producing a MethodError at script runtime.
         const L = g.params.L;
         const W = g.params.W ?? 0;
         const H = g.params.H ?? 0;
         lines.push(
-          `${g.name} = PipeGeometry_rectangular(${formatReal(L)}, ${formatReal(W)}, ${formatReal(H)})`,
+          `${g.name} = PipeGeometry_rectangular(${formatReal(L)}, ${formatReal(W)}, ${formatReal(H)}, ${formatReal(W)})`,
         );
       } else if (g.kind === "circular") {
         const L = g.params.L;

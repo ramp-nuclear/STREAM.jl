@@ -314,7 +314,7 @@ describe("generateCode", () => {
         friction_correlation: "blasius_friction",
       })];
       const code = generateCode(nodes, [], [], mockGetComponent);
-      expect(code).toContain("@named ch_1 = Channel(; n=5, geometry=PipeGeometry_rectangular(0.5, 0.01, 0.003))");
+      expect(code).toContain("@named ch_1 = Channel(; n=5, geometry=PipeGeometry_rectangular(0.5, 0.01, 0.003, 0.01))");
       // defaults should be omitted
       expect(code).not.toContain("g=");
       expect(code).not.toContain("htc_correlation=");
