@@ -315,4 +315,30 @@ describe("BCsTabForm", () => {
     const wtN = (wtNode!.data as StreamNodeData).parameters?.n;
     expect(wtN).toBe(12);
   });
+
+  // Plan 63.1-13 (GAP-MINOR-SOURCE-GATE): the Source SelectItem must be
+  // disabled when no Sources-category nodes exist on the canvas.
+  it("Source SelectItem is disabled when no nodes with category='Sources' exist (GAP-MINOR-SOURCE-GATE)", () => {
+    // beforeEach seeds only a Channel — no WT/HFS on the canvas.
+    renderForm();
+    // Open the BC mode Select (the first combobox is the BC mode picker).
+    const combos = screen.getAllByRole("combobox");
+    fireEvent.click(combos[0]);
+    // Radix Select renders SelectItems with role="option". Source must be
+    // present but aria-disabled.
+    const sourceOption = screen.getByRole("option", { name: /^source$/i });
+    expect(sourceOption.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("Source SelectItem is ENABLED when at least one Sources-category node exists (GAP-MINOR-SOURCE-GATE)", () => {
+    const wt = makeWTNode("wt1", 10);
+    useStore.setState({
+      nodes: [makeChannelNode("ch1", 10), wt],
+    });
+    renderForm();
+    const combos = screen.getAllByRole("combobox");
+    fireEvent.click(combos[0]);
+    const sourceOption = screen.getByRole("option", { name: /^source$/i });
+    expect(sourceOption.getAttribute("aria-disabled")).not.toBe("true");
+  });
 });
