@@ -1037,7 +1037,34 @@ const useStore = create<AppState>()((set, get) => ({
         );
         const srcPort = srcComp?.ports.find((p) => p.name === connection.sourceHandle);
         if (srcPort?.type === "BCPort") {
-          set({ edges: finalEdges, isDirty: true });
+          // CR-01 (D-20): materialize bcMode on canvas-drag — without this
+          // the visible BC edge has no backing bcMode entry, so codegen and
+          // any re-render diverge from the canvas. Mirrors setBCMode's
+          // symmetric-mirror rule (default ON): when the dropped target is
+          // `${base}_left` the sibling `${base}_right` key is also seeded.
+          if (connection.targetHandle) {
+            const key = bcModeKey(connection.target, connection.targetHandle);
+            const baseField = stripSideSuffix(connection.targetHandle);
+            const symKey = `${connection.target}::${baseField}`;
+            const symmetric = get().bcSymmetric[symKey] ?? true;
+            const siblingName = symmetric
+              ? siblingExternalInputName(connection.targetHandle)
+              : null;
+            const entry: BCModeEntry = {
+              mode: "source",
+              sourceNodeId: connection.source,
+            };
+            const nextBCMode: Record<string, BCModeEntry> = {
+              ...get().bcMode,
+              [key]: entry,
+            };
+            if (siblingName) {
+              nextBCMode[bcModeKey(connection.target, siblingName)] = entry;
+            }
+            set({ edges: finalEdges, isDirty: true, bcMode: nextBCMode });
+          } else {
+            set({ edges: finalEdges, isDirty: true });
+          }
           return;
         }
       }
