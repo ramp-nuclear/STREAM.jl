@@ -108,41 +108,47 @@ function renderForm() {
 // ---------------------------------------------------------------------------
 
 describe("BCsTabForm", () => {
-  it("renders one symmetric toggle + one BCModePicker group for a paired field set (default symmetric ON) (D-05)", () => {
+  it("renders one symmetric toggle + one BC mode dropdown for a paired field set (default symmetric ON) (D-05, D-11)", () => {
     renderForm();
-    expect(screen.getByText("Symmetric (L = R)")).toBeTruthy();
-    // Symmetric ON: only one Value pill is visible (single picker for the pair).
-    const valueButtons = screen.getAllByRole("button", { name: "Value" });
-    expect(valueButtons.length).toBe(1);
-    // The picker label is the base field (no _left/_right suffix).
-    const baseLabels = screen.getAllByText("T_wall");
-    // T_wall appears as the section heading AND inside the picker label.
-    expect(baseLabels.length).toBeGreaterThanOrEqual(1);
+    // Phase 63.1 D-12: SegmentedButtonGroup with explicit Symmetric/Asymmetric labels.
+    expect(screen.getByRole("button", { name: "Symmetric" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Asymmetric" })).toBeTruthy();
+    // Phase 63.1 D-11: single inline Select dropdown (combobox role) for the pair.
+    const combos = screen.getAllByRole("combobox");
+    expect(combos.length).toBe(1);
+    // The required-unset placeholder is shown on the trigger.
+    expect(screen.getByText("Select BC mode...")).toBeTruthy();
+    // The required-unset destructive hint is rendered (D-09 carry-over).
+    expect(screen.getByText("BC required — select a mode")).toBeTruthy();
+    // The section heading (base field name) appears.
+    expect(screen.getAllByText("T_wall").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("expands to two stacked BCModePicker groups when symmetric toggle is OFF (D-05)", () => {
+  it("expands to two stacked BC mode dropdowns when symmetric toggle is OFF (D-05, D-11, D-12)", () => {
     renderForm();
-    // Toggle the switch OFF.
-    const sw = screen.getByRole("switch");
-    fireEvent.click(sw);
-    // Now both sides should render their own picker — two "Value" buttons.
-    const valueButtons = screen.getAllByRole("button", { name: "Value" });
-    expect(valueButtons.length).toBe(2);
-    // The two sibling labels should both appear.
+    // Phase 63.1 D-12: click the "Asymmetric" segmented button to break symmetric mirroring.
+    fireEvent.click(screen.getByRole("button", { name: "Asymmetric" }));
+    // Now both sides should render their own Select trigger — two combobox roles.
+    const combos = screen.getAllByRole("combobox");
+    expect(combos.length).toBe(2);
+    // Both sibling labels appear as section headings.
     expect(screen.getByText("T_wall_left[1:n]")).toBeTruthy();
     expect(screen.getByText("T_wall_right[1:n]")).toBeTruthy();
   });
 
-  it("calls setBCMode on the primary field when mode is changed in symmetric-ON mode (D-04, D-05)", () => {
+  it("renders the entry's current mode label on the Select trigger when entry is set (D-11)", () => {
+    useStore.setState({
+      bcMode: {
+        [bcModeKey("ch1", "T_wall_left")]: { mode: "value", value: 0 },
+        [bcModeKey("ch1", "T_wall_right")]: { mode: "value", value: 0 },
+      },
+    });
     renderForm();
-    // Click "Value" — symmetric ON, so the store's setBCMode mirror also
-    // writes the sibling.
-    fireEvent.click(screen.getByRole("button", { name: "Value" }));
-    const state = useStore.getState();
-    expect(state.bcMode[bcModeKey("ch1", "T_wall_left")]).toBeDefined();
-    expect(state.bcMode[bcModeKey("ch1", "T_wall_left")]?.mode).toBe("value");
-    // Sibling mirrored by the store (CD-05 symmetric ON behavior).
-    expect(state.bcMode[bcModeKey("ch1", "T_wall_right")]?.mode).toBe("value");
+    // The combobox trigger displays the selected mode label.
+    const combo = screen.getByRole("combobox");
+    expect(combo.textContent).toContain("Value");
+    // Required-unset hint is no longer shown.
+    expect(screen.queryByText("BC required — select a mode")).toBeNull();
   });
 
   it("renders NumericField below the picker when mode is Value", () => {
@@ -255,9 +261,11 @@ describe("BCsTabForm", () => {
       },
     });
     renderForm();
-    // Radix Select renders a combobox role on its trigger.
+    // Radix Select renders a combobox role on its trigger. In Phase 63.1 D-11
+    // the BC mode picker is also a combobox, so we expect at least 2:
+    // (1) the BC mode dropdown, (2) the source-node picker.
     const combos = screen.getAllByRole("combobox");
-    expect(combos.length).toBeGreaterThanOrEqual(1);
+    expect(combos.length).toBeGreaterThanOrEqual(2);
   });
 
   it("clicking '+ New WallTemperature' calls addNode and setBCMode (D-20)", () => {
