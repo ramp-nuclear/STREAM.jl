@@ -44,6 +44,20 @@ function makeChannelNode(id: string, n: number, x = 200, y = 100): Node {
   };
 }
 
+function makeCHFNode(id: string, n: number, x = 200, y = 100): Node {
+  return {
+    id,
+    type: "streamNode",
+    position: { x, y },
+    data: {
+      componentId: "ChannelHeatFlux",
+      instanceName: id,
+      parameters: { n },
+      constructorMode: "default",
+    },
+  };
+}
+
 describe("promoteToSharedSource (D-07 / D-08)", () => {
   it("spawns a WallTemperature node sized to consumer's n, positions it relatively, writes bcMode, and materializes the BC edge", () => {
     useStore.setState({ nodes: [makeChannelNode("ch1", 4, 200, 100)] });
@@ -79,5 +93,45 @@ describe("promoteToSharedSource (D-07 / D-08)", () => {
         e.type === "bcEdge",
     );
     expect(edge).toBeDefined();
+  });
+
+  // Plan 63.1-13 (GAP-RC-3): promoteToSharedSource seeds T_wall = 300 (WT) /
+  // q = 0 (HFS) alongside n so the spawned source's canvas label is muted-
+  // gray, never destructive-red "(unset)".
+  it("seeds T_wall = 300 on the spawned WallTemperature (GAP-RC-3)", () => {
+    useStore.setState({ nodes: [makeChannelNode("ch1", 4, 200, 100)] });
+    useStore.getState().promoteToSharedSource("ch1", "T_wall_left");
+    const newWT = useStore
+      .getState()
+      .nodes.find(
+        (n) =>
+          (n.data as unknown as { componentId: string }).componentId ===
+          "WallTemperature",
+      );
+    expect(newWT).toBeDefined();
+    const params = (
+      newWT!.data as unknown as { parameters: Record<string, unknown> }
+    ).parameters;
+    expect(params.T_wall).toBe(300);
+    // n is still seeded.
+    expect(params.n).toBe(4);
+  });
+
+  it("seeds q = 0 on the spawned HeatFluxSource (GAP-RC-3)", () => {
+    useStore.setState({ nodes: [makeCHFNode("chf1", 4, 200, 100)] });
+    useStore.getState().promoteToSharedSource("chf1", "q_left");
+    const newHFS = useStore
+      .getState()
+      .nodes.find(
+        (n) =>
+          (n.data as unknown as { componentId: string }).componentId ===
+          "HeatFluxSource",
+      );
+    expect(newHFS).toBeDefined();
+    const params = (
+      newHFS!.data as unknown as { parameters: Record<string, unknown> }
+    ).parameters;
+    expect(params.q).toBe(0);
+    expect(params.n).toBe(4);
   });
 });
