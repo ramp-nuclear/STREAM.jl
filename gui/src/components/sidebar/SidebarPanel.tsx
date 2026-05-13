@@ -282,7 +282,7 @@ export default function SidebarPanel({ width, onResizeMouseDown }: SidebarPanelP
   }
 
   return (
-    <div className="relative h-full border-l shrink-0" style={{ width }}>
+    <div className="relative h-full border-l shrink-0 overflow-hidden" style={{ width }}>
       {onResizeMouseDown && (
         <div
           className="absolute left-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-border/50"
@@ -290,7 +290,7 @@ export default function SidebarPanel({ width, onResizeMouseDown }: SidebarPanelP
         />
       )}
       <ScrollArea className="h-full">
-        <div className="p-[16px] pt-[32px]">
+        <div className="p-[16px] pt-[32px] min-w-0">
           <h2 className="text-[16px] font-semibold leading-[1.3]">
             {headerText}
           </h2>

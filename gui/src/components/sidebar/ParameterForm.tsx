@@ -161,9 +161,9 @@ export default function ParameterForm({
   }
 
   return (
-    <div className="flex flex-col gap-[24px]">
+    <div className="flex flex-col gap-[24px] min-w-0">
       {sections.map((section, idx) => (
-        <div key={section.heading}>
+        <div key={section.heading} className="min-w-0">
           {idx > 0 && <Separator className="mb-[24px]" />}
           <h3 className="text-[16px] font-semibold leading-[1.3] mb-[16px]">
             {section.heading}
