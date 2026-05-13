@@ -22,6 +22,7 @@ import type {
   FactoryCorrelationValue,
 } from "../registry/types";
 import { validateJuliaIdentifier } from "./validation";
+import { bcModeKey, type BCModeEntry } from "@/lib/bcMode";
 
 // SENTINEL_UNSET_POWER_SHAPE is duplicated here as a literal (rather than
 // imported from useStore.ts) because the store module pulls in zustand and
@@ -74,6 +75,14 @@ export interface CodegenResources {
   geometries: Record<string, CodegenGeometryResource>;
   powerShapes: Record<string, CodegenPowerShapeResource>;
   fluids: Record<string, CodegenFluidResource>;
+}
+
+// Phase 63 BC state passed into generateCode. Mirrors the useStore BC slices
+// (bcMode / bcSymmetric) without importing the store — keeps the pure-codegen
+// purity rule intact.
+export interface CodegenBCsState {
+  bcMode: Record<string, BCModeEntry>;
+  bcSymmetric: Record<string, boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -675,6 +684,7 @@ export function generateCode(
   bcs: BCEntry[],
   getComponent: (id: string) => ComponentDefinition | undefined,
   resources?: CodegenResources,
+  bcsState?: CodegenBCsState,
 ): string {
   // Empty canvas
   if (nodes.length === 0) {
@@ -696,13 +706,20 @@ export function generateCode(
   lines.push("using ModelingToolkit, STREAM");
   lines.push("using ModelingToolkit: t_nounits as t");
 
-  // Phase 62: conditional DelimitedFiles import (only when a file_loaded power
-  // shape is present — keeps the generated script free of unused-package warnings).
+  // Phase 62 / 63: conditional DelimitedFiles import. Fires when any
+  // file_loaded power shape is present (Phase 62) OR any Profile-file BC mode
+  // entry exists (Phase 63 D-07 — readdlm() call in the emitted rebin_intensive
+  // line). Keeps the generated script free of unused-package warnings.
   const hasFileLoadedShape =
     resources != null &&
     Object.values(resources.powerShapes).some((p) => p.kind === "file_loaded");
-  if (hasFileLoadedShape) {
-    lines.push("using DelimitedFiles  # for file_loaded power shapes");
+  const hasFileBCMode =
+    bcsState != null &&
+    Object.values(bcsState.bcMode).some(
+      (e) => e.mode === "profile" && e.preset === "file",
+    );
+  if (hasFileLoadedShape || hasFileBCMode) {
+    lines.push("using DelimitedFiles  # for file_loaded power shapes / file BC profiles");
   }
   lines.push("");
 
@@ -1027,6 +1044,130 @@ export function generateCode(
     }
   }
 
+  // --- Phase 63: BC pre-eqs emission (profile-vars + function stubs) ---
+  // For each consumer node with at least one Profile-cosine / Profile-file /
+  // Function BC mode entry, emit the profile-var assignment or function stub
+  // BEFORE the `eqs = [` block. Binding equations are emitted INSIDE the eqs
+  // block (below) per CONTEXT D-06..D-09 + CD-01..CD-02.
+  //
+  // bcEmitPlan: per (nodeId, externalInputName) record of the resolved entry
+  // and what to emit. Built once here so the pre-eqs and in-eqs passes share
+  // the same view. Walks consumer nodes in registry order and partitions by
+  // (left, right) for symmetric-expansion handling (D-05).
+  interface BCEmitItem {
+    consumerNode: Node;
+    consumerData: StreamNodeData;
+    externalInputName: string;
+    entry: BCModeEntry | undefined;
+    nValue: string | number;
+    // Variable / function name used by the binding equation. Stable per
+    // (instanceName, externalInputName) — collisions are extremely unlikely
+    // because Julia identifiers + instanceNames are validated.
+    profileVarName?: string;
+    functionStubName?: string;
+    // For symmetric ON, the L emission writes a flag so the R sibling is
+    // skipped (the L for-comprehension covers both sides via the sibling
+    // binding equation appended).
+    isSymmetricLeftPrimary?: boolean;
+    siblingExternalInputName?: string;
+  }
+  const bcEmitPlan: BCEmitItem[] = [];
+  if (bcsState !== undefined) {
+    for (const node of nodes) {
+      const data = nodeDataMap.get(node.id);
+      if (!data) continue;
+      const comp = getComponent(data.componentId);
+      if (!comp?.external_inputs) continue;
+      for (const ext of comp.external_inputs) {
+        const key = bcModeKey(node.id, ext.name);
+        const entry = bcsState.bcMode[key];
+        // baseField for symmetric handling (T_wall_left → T_wall).
+        const isLeft = ext.name.endsWith("_left");
+        const isRight = ext.name.endsWith("_right");
+        const baseField = isLeft
+          ? ext.name.slice(0, -"_left".length)
+          : isRight
+            ? ext.name.slice(0, -"_right".length)
+            : ext.name;
+        const symKey = `${node.id}::${baseField}`;
+        const symmetric = bcsState.bcSymmetric[symKey] ?? true;
+        // If symmetric ON and this is the RIGHT sibling AND the LEFT sibling
+        // has an entry, skip — the LEFT emission will write both sides.
+        let isSymmetricLeftPrimary = false;
+        let siblingExt: string | undefined;
+        if (symmetric && isRight) {
+          const leftKey = bcModeKey(node.id, `${baseField}_left`);
+          if (bcsState.bcMode[leftKey] !== undefined) {
+            continue; // skip — left emission covers both
+          }
+        }
+        if (symmetric && isLeft) {
+          const rightKey = bcModeKey(node.id, `${baseField}_right`);
+          if (bcsState.bcMode[rightKey] !== undefined || entry !== undefined) {
+            isSymmetricLeftPrimary = true;
+            siblingExt = `${baseField}_right`;
+          }
+        }
+        const nRaw = data.parameters["n"];
+        const nValue: string | number = typeof nRaw === "number" ? nRaw : "n";
+        const item: BCEmitItem = {
+          consumerNode: node,
+          consumerData: data,
+          externalInputName: ext.name,
+          entry,
+          nValue,
+          isSymmetricLeftPrimary,
+          siblingExternalInputName: siblingExt,
+        };
+        if (entry?.mode === "profile") {
+          item.profileVarName = `${data.instanceName}_${ext.name}_profile`;
+        }
+        if (entry?.mode === "function") {
+          item.functionStubName = entry.functionName;
+        }
+        bcEmitPlan.push(item);
+      }
+    }
+  }
+
+  // Pre-eqs pass: emit profile-vars and function stubs.
+  let bcHeaderEmitted = false;
+  const ensureBCHeader = () => {
+    if (bcHeaderEmitted) return;
+    lines.push("# ---------------------------------------------------------------------------");
+    lines.push("# Boundary conditions (Phase 63)");
+    lines.push("# ---------------------------------------------------------------------------");
+    bcHeaderEmitted = true;
+  };
+  for (const item of bcEmitPlan) {
+    const entry = item.entry;
+    if (entry === undefined) continue;
+    if (entry.mode === "profile" && entry.preset === "cosine") {
+      ensureBCHeader();
+      const amp = entry.amplitude;
+      const pf = entry.peakingFactor;
+      lines.push(
+        `${item.profileVarName} = cosine_T_wall_profile(${item.nValue}; amplitude=${formatReal(amp)}, peaking_factor=${formatReal(pf)})`,
+      );
+    } else if (entry.mode === "profile" && entry.preset === "file") {
+      ensureBCHeader();
+      const path = entry.path;
+      lines.push(
+        `${item.profileVarName} = rebin_intensive(readdlm(joinpath(@__DIR__, ${JSON.stringify(path)}), ','), ${item.nValue})`,
+      );
+    }
+  }
+  for (const item of bcEmitPlan) {
+    const entry = item.entry;
+    if (entry?.mode !== "function") continue;
+    ensureBCHeader();
+    const argList = entry.signature === "fn(t, i)" ? "t, i" : "t";
+    lines.push(
+      `${entry.functionName}(${argList}) = 0.0  # TODO: define your time-varying boundary condition`,
+    );
+  }
+  if (bcHeaderEmitted) lines.push("");
+
   // --- Equations section ---
   lines.push("eqs = [");
 
@@ -1096,6 +1237,103 @@ export function generateCode(
     lines.push(
       `    ${prefix}${data.instanceName}.${bc.portField} ~ ${formatReal(bc.value)},`,
     );
+  }
+
+  // --- Phase 63: BC binding equations (D-06..D-09, CD-01, CD-02) ---
+  // Per-mode binding emission. The bcEmitPlan was built before `eqs = [`.
+  // For each plan item:
+  //   - undefined entry → emit TODO comment only (no equation; D-09 required-unset)
+  //   - mode: "value"     → scalar binding for-comprehension
+  //   - mode: "profile"   → binding against profile-var declared pre-eqs
+  //   - mode: "function"  → binding against function stub declared pre-eqs
+  //   - mode: "mark"      → TODO comment only (same shape as undefined; user
+  //                          intent differs but codegen output is the same)
+  //   - mode: "source"    → binding against source-node array variable
+  //
+  // Symmetric expansion (D-05): when an item is `isSymmetricLeftPrimary`, the
+  // L emission writes a SECOND binding line for the sibling R side (the R
+  // sibling itself was filtered out in the plan-building pass).
+  let bcEqHeaderEmitted = false;
+  const emitBCEqHeaderIfNeeded = (instanceName: string) => {
+    if (bcEqHeaderEmitted) return;
+    lines.push(`    # BCs for ${instanceName}:`);
+    bcEqHeaderEmitted = true;
+  };
+  for (const item of bcEmitPlan) {
+    const { consumerData, externalInputName, entry, nValue, isSymmetricLeftPrimary, siblingExternalInputName } = item;
+    const targets: string[] = [externalInputName];
+    if (isSymmetricLeftPrimary && siblingExternalInputName) {
+      targets.push(siblingExternalInputName);
+    }
+
+    if (entry === undefined || entry.mode === "mark") {
+      // D-09 / CD-01: emit TODO comment per (consumer.externalInputName), no equation.
+      for (const tgt of targets) {
+        lines.push(
+          `    # TODO: set ${consumerData.instanceName}.${tgt}[i] here`,
+        );
+      }
+      continue;
+    }
+
+    if (entry.mode === "value") {
+      emitBCEqHeaderIfNeeded(consumerData.instanceName);
+      for (const tgt of targets) {
+        lines.push(
+          `    [${consumerData.instanceName}.${tgt}[i] ~ ${formatReal(entry.value)} for i in 1:${nValue}]...,`,
+        );
+      }
+      continue;
+    }
+
+    if (entry.mode === "profile") {
+      emitBCEqHeaderIfNeeded(consumerData.instanceName);
+      const profVar = item.profileVarName!;
+      for (const tgt of targets) {
+        lines.push(
+          `    [${consumerData.instanceName}.${tgt}[i] ~ ${profVar}[i] for i in 1:${nValue}]...,`,
+        );
+      }
+      continue;
+    }
+
+    if (entry.mode === "function") {
+      emitBCEqHeaderIfNeeded(consumerData.instanceName);
+      const fnName = entry.functionName;
+      const argList = entry.signature === "fn(t, i)" ? "t, i" : "t";
+      for (const tgt of targets) {
+        lines.push(
+          `    [${consumerData.instanceName}.${tgt}[i] ~ ${fnName}(${argList}) for i in 1:${nValue}]...,`,
+        );
+      }
+      continue;
+    }
+
+    if (entry.mode === "source") {
+      // Resolve the source-node instanceName + its BCPort name from the registry.
+      const sourceData = nodeDataMap.get(entry.sourceNodeId);
+      if (!sourceData) {
+        lines.push(
+          `    # WARNING: BC source node ${entry.sourceNodeId} not found for ${consumerData.instanceName}.${externalInputName}`,
+        );
+        continue;
+      }
+      const sourceComp = getComponent(sourceData.componentId);
+      const sourcePort = sourceComp?.ports.find((p) => p.type === "BCPort");
+      if (!sourcePort) {
+        lines.push(
+          `    # WARNING: source node ${sourceData.instanceName} has no BCPort`,
+        );
+        continue;
+      }
+      emitBCEqHeaderIfNeeded(consumerData.instanceName);
+      for (const tgt of targets) {
+        lines.push(
+          `    [${consumerData.instanceName}.${tgt}[i] ~ ${sourceData.instanceName}.${sourcePort.name}[i] for i in 1:${nValue}]...,`,
+        );
+      }
+      continue;
+    }
   }
 
   lines.push("]");
