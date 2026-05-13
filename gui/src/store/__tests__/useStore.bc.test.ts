@@ -260,12 +260,10 @@ describe("bcMode slice — n-mismatch soft warning (D-22)", () => {
   it("addEdge → BCPort source-type makes selectNodeErrors flag the canvas-drag path (D-22 via selector)", () => {
     // Seed nodes with mismatched n, then call addEdge DIRECTLY (NOT via
     // setBCMode). The store no longer writes per-event tags (D-15 removed
-    // _checkBCNMismatch); the canvas-drag path now relies on Plan 05's
-    // addEdge→bcMode mirroring + selectNodeErrors. Until Plan 05 lands, this
-    // test documents the contract by asserting on the selector applied to
-    // bcMode (which Plan 05 must materialize). For now the canvas-drag path
-    // creates an edge but no bcMode entry, so the selector reports no errors —
-    // the same as before from the selector's POV.
+    // _checkBCNMismatch); the canvas-drag path now relies on Plan 63.1-10
+    // CR-01's addEdge → bcMode mirroring + selectNodeErrors. Once the bcMode
+    // entry is written on canvas-drag, the selector reports 'bc-n-mismatch'
+    // on both sides.
     const ch = makeChannelNode("ch1", 12);
     const wt = makeWallTemperatureNode("wt1", 10);
     useStore.setState({ nodes: [ch, wt] });
@@ -277,11 +275,11 @@ describe("bcMode slice — n-mismatch soft warning (D-22)", () => {
     });
     // Edge is materialized (enrichEdges assigns type='bcEdge').
     expect(useStore.getState().edges.find((e) => e.type === "bcEdge")).toBeDefined();
-    // Selector contract: with no bcMode entry yet (Plan 05 owns mirroring),
-    // selectNodeErrors returns []. Once Plan 05 writes the bcMode entry on
-    // canvas-drag, this assertion flips to ['bc-n-mismatch'] for both sides.
-    expect(errorsFor("wt1")).toEqual([]);
-    expect(errorsFor("ch1")).toEqual([]);
+    // CR-01 (Plan 63.1-10): addEdge now writes the bcMode entry, so the
+    // selector reports 'bc-n-mismatch' on both consumer and source sides
+    // when n disagrees (ch.n=12, wt.n=10).
+    expect(errorsFor("wt1")).toEqual(["bc-n-mismatch"]);
+    expect(errorsFor("ch1")).toEqual(["bc-n-mismatch"]);
   });
 });
 
