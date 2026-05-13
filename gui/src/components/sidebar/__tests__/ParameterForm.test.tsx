@@ -129,13 +129,15 @@ describe("ParameterForm", () => {
 // ---------------------------------------------------------------------------
 // Plan 63.1-11 — RC-1: type_union parameters must render in Properties.
 //
-// These tests anchor against the LIVE registry (getComponent) so the contract
+// Per project-feedback (heavy-dev, 2026-05-14), the GUI exposes ONLY a scalar
+// editor for type_union params. Vector and callable values belong in the
+// generated Julia script — per-cell editors in a sidebar are unusable at
+// realistic n. These tests anchor against the LIVE registry so the contract
 // under test is the same Parameter shape ParameterForm consumes in production
-// (D-10 type_union + input_modes). They are deliberately RED on the current
-// renderField (no `case` for `type_union`).
+// (D-10 type_union + input_modes).
 // ---------------------------------------------------------------------------
-describe("ParameterForm — type_union parameters (RC-1)", () => {
-  it("renders T_wall mode picker and scalar input when WallTemperature is selected", () => {
+describe("ParameterForm — type_union parameters (RC-1, scalar-only)", () => {
+  it("renders T_wall as a scalar input when WallTemperature is selected", () => {
     const wt = getComponent("WallTemperature");
     expect(wt).toBeTruthy();
     const onParamChange = vi.fn();
@@ -147,24 +149,24 @@ describe("ParameterForm — type_union parameters (RC-1)", () => {
         onParamChange={onParamChange}
       />
     );
-    // Field label
     expect(screen.getByText("T_wall")).toBeTruthy();
-    // Mode picker — scalar / vector / callable segmented control
-    expect(screen.getByRole("button", { name: /^scalar$/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^vector$/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^callable$/i })).toBeTruthy();
-    // Scalar editor — NumericField textbox is reachable via the visible unit
-    // suffix "K"; assert at least one numeric Input rendered in the form.
+    // No mode picker — scalar / vector / callable buttons must NOT exist.
+    expect(screen.queryByRole("button", { name: /^scalar$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^vector$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^callable$/i })).toBeNull();
+    // Script-only hint is present.
+    expect(
+      screen.getByText(/edit in the generated julia/i)
+    ).toBeTruthy();
+    // Typing 300 + blur writes through onParamChange("T_wall", 300).
     const inputs = document.querySelectorAll("input");
-    expect(inputs.length).toBeGreaterThan(0);
-    // Typing a value and blurring writes through onParamChange("T_wall", 300).
     const scalarInput = inputs[inputs.length - 1] as HTMLInputElement;
     fireEvent.change(scalarInput, { target: { value: "300" } });
     fireEvent.blur(scalarInput);
     expect(onParamChange).toHaveBeenCalledWith("T_wall", 300);
   });
 
-  it("renders q editor when HeatFluxSource is selected (parity with T_wall)", () => {
+  it("renders q as a scalar input when HeatFluxSource is selected", () => {
     const hfs = getComponent("HeatFluxSource");
     expect(hfs).toBeTruthy();
     render(
@@ -176,10 +178,11 @@ describe("ParameterForm — type_union parameters (RC-1)", () => {
       />
     );
     expect(screen.getByText("q")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^scalar$/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^scalar$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^vector$/i })).toBeNull();
   });
 
-  it("renders h_left and h_right editors when Channel is selected", () => {
+  it("renders h_left and h_right scalar inputs when Channel is selected", () => {
     const ch = getComponent("Channel");
     expect(ch).toBeTruthy();
     // Channel.geometry uses ResourceReferencePicker which renders <Tooltip>
@@ -197,72 +200,14 @@ describe("ParameterForm — type_union parameters (RC-1)", () => {
     );
     expect(screen.getByText("h_left")).toBeTruthy();
     expect(screen.getByText("h_right")).toBeTruthy();
-    // Each type_union param renders its own mode picker → at least 2 scalar buttons.
-    const scalarButtons = screen.getAllByRole("button", { name: /^scalar$/i });
-    expect(scalarButtons.length).toBeGreaterThanOrEqual(2);
+    // No vector / callable controls anywhere.
+    expect(screen.queryByRole("button", { name: /^vector$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^callable$/i })).toBeNull();
   });
 
-  it("switches to vector mode and emits an array on edit", () => {
-    const wt = getComponent("WallTemperature");
-    const onParamChange = vi.fn();
-    render(
-      <ParameterForm
-        component={wt!}
-        activeMode="default"
-        values={{ n: 3 }}
-        onParamChange={onParamChange}
-      />
-    );
-    // Click the "vector" mode segment.
-    fireEvent.click(screen.getByRole("button", { name: /^vector$/i }));
-    // Three numeric cells render in the vector editor.
-    const inputs = Array.from(
-      document.querySelectorAll("input")
-    ) as HTMLInputElement[];
-    // The vector editor exposes exactly n cells (n=3 here). Other inputs in the
-    // form (n itself) are also present, so we filter by the cell-row pattern:
-    // assert at least 3 numeric inputs are present.
-    expect(inputs.length).toBeGreaterThanOrEqual(3);
-    // Edit cell index 1 to 350 and blur — onChange should fire with an
-    // array whose index 1 === 350.
-    // Vector cells are the last 3 inputs in document order.
-    const cell1 = inputs[inputs.length - 2];
-    fireEvent.change(cell1, { target: { value: "350" } });
-    fireEvent.blur(cell1);
-    expect(onParamChange).toHaveBeenCalled();
-    const lastCall = onParamChange.mock.calls.find(
-      (c) => c[0] === "T_wall" && Array.isArray(c[1])
-    );
-    expect(lastCall).toBeTruthy();
-    expect((lastCall![1] as number[]).length).toBe(3);
-    expect((lastCall![1] as number[])[1]).toBe(350);
-  });
-
-  it("switches to callable mode and emits a string signature", () => {
-    const wt = getComponent("WallTemperature");
-    const onParamChange = vi.fn();
-    render(
-      <ParameterForm
-        component={wt!}
-        activeMode="default"
-        values={{ n: 4 }}
-        onParamChange={onParamChange}
-      />
-    );
-    fireEvent.click(screen.getByRole("button", { name: /^callable$/i }));
-    // Signature picker exposes fn(t) and fn(t, i) segmented options.
-    const fnT = screen.getByRole("button", { name: /^fn\(t\)$/i });
-    const fnTi = screen.getByRole("button", { name: /^fn\(t, i\)$/i });
-    expect(fnT).toBeTruthy();
-    expect(fnTi).toBeTruthy();
-    fireEvent.click(fnTi);
-    expect(onParamChange).toHaveBeenCalledWith("T_wall", "fn(t, i)");
-  });
-
-  it("infers the active mode from an existing value", () => {
+  it("displays an existing scalar value in the input", () => {
     const wt = getComponent("WallTemperature")!;
-    // Mount #1 — scalar value → scalar input shows "350".
-    const r1 = render(
+    render(
       <ParameterForm
         component={wt}
         activeMode="default"
@@ -270,36 +215,36 @@ describe("ParameterForm — type_union parameters (RC-1)", () => {
         onParamChange={vi.fn()}
       />
     );
-    const scalarInput = Array.from(
+    const filled = Array.from(
       document.querySelectorAll("input")
     ).find((el) => (el as HTMLInputElement).value === "350");
-    expect(scalarInput).toBeTruthy();
-    r1.unmount();
+    expect(filled).toBeTruthy();
+  });
 
-    // Mount #2 — vector value → cells render with the stored array.
-    const r2 = render(
-      <ParameterForm
-        component={wt}
-        activeMode="default"
-        values={{ n: 4, T_wall: [300, 310, 320, 330] }}
-        onParamChange={vi.fn()}
-      />
-    );
-    const cell = Array.from(
-      document.querySelectorAll("input")
-    ).find((el) => (el as HTMLInputElement).value === "310");
-    expect(cell).toBeTruthy();
-    r2.unmount();
-
-    // Mount #3 — callable value → fn(t) segmented option present.
+  it("overwrites a stored non-scalar value with the typed scalar on edit", () => {
+    const wt = getComponent("WallTemperature")!;
+    const onParamChange = vi.fn();
+    // Stored value is an array — heavy-dev project file with a pre-existing
+    // vector value. UI must show an empty scalar input (per "always overwrite"
+    // contract) and the first edit must write a scalar number, not an array.
     render(
       <ParameterForm
         component={wt}
         activeMode="default"
-        values={{ n: 4, T_wall: "fn(t)" }}
-        onParamChange={vi.fn()}
+        values={{ n: 3, T_wall: [300, 310, 320] }}
+        onParamChange={onParamChange}
       />
     );
-    expect(screen.getByRole("button", { name: /^fn\(t\)$/i })).toBeTruthy();
+    // No per-cell editor exists — no input should carry "310".
+    const arrayCell = Array.from(
+      document.querySelectorAll("input")
+    ).find((el) => (el as HTMLInputElement).value === "310");
+    expect(arrayCell).toBeFalsy();
+    // Edit + blur the scalar input → emits a number.
+    const inputs = document.querySelectorAll("input");
+    const scalarInput = inputs[inputs.length - 1] as HTMLInputElement;
+    fireEvent.change(scalarInput, { target: { value: "295" } });
+    fireEvent.blur(scalarInput);
+    expect(onParamChange).toHaveBeenCalledWith("T_wall", 295);
   });
 });
