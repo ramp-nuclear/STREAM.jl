@@ -215,7 +215,7 @@ export default function ResourceRow({
   // text, weight 600 when selected. Fluid placeholder gets text-muted and
   // no hover bg shift.
   const rowClass = cn(
-    "h-[28px] px-[8px] text-[13px] flex items-center cursor-pointer select-none",
+    "h-[28px] px-[8px] text-[13px] flex items-center cursor-pointer select-none min-w-0 overflow-hidden",
     isFluidPlaceholder
       ? "text-muted-foreground cursor-default"
       : "hover:bg-muted",

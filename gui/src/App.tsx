@@ -218,7 +218,7 @@ function App() {
           <div className="flex flex-1 min-h-0">
             {!toolboxCollapsed && (
               <div
-                className="relative h-full border-r shrink-0 flex flex-col"
+                className="relative h-full border-r shrink-0 flex flex-col overflow-hidden"
                 style={{ width: toolboxResize.width }}
               >
                 {/* Resize handle — thin overlay on right edge */}
