@@ -8,11 +8,11 @@ import CanvasPanel from "./components/CanvasPanel";
 import SidebarPanel from "./components/SidebarPanel";
 import Toolbar from "./components/Toolbar";
 import BottomPanel from "./components/BottomPanel";
-import PanelCollapseButton from "./components/PanelCollapseButton";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import ValidationDialog from "./components/ValidationDialog";
 import { TooltipProvider } from "./components/ui/tooltip";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { ResponsiveTabsList } from "./components/ResponsiveTabsList";
 import useStore from "./store/useStore";
 import { initializeRecentFiles } from "./store/useStore";
 import { useResizable } from "./hooks/useResizable";
@@ -221,16 +221,22 @@ function App() {
                 className="relative h-full border-r shrink-0 flex flex-col overflow-hidden"
                 style={{ width: toolboxResize.width }}
               >
-                {/* Resize handle — thin overlay on right edge */}
+                {/* VS Code-style sash on inner edge: 4px hit area, transparent at
+                    rest, subtle hover tint, double-click to collapse. The panel's
+                    `border-r` is the 1px visible line; this overlay is the hit/drag
+                    surface. */}
                 <div
-                  className="absolute right-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-border/50"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize left panel"
+                  className="absolute right-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-primary/40 active:bg-primary/60 transition-colors"
                   onMouseDown={toolboxResize.onMouseDown}
+                  onDoubleClick={() => setToolboxCollapsed(true)}
                 />
                 {/* Phase 62 D-01 — left-panel tab strip [Components][Resources][Project].
-                    Uses Tabs `variant="line"` per UI-SPEC §Tab strip (text-only,
-                    bottom-border active indicator, no bg pill).
-                    `gap-0` overrides the default Tabs `gap-2` so the strip sits
-                    flush against the panel body (UI-SPEC §Spacing tab-strip-height). */}
+                    ResponsiveTabsList collapses overflowing tabs into a "..." menu
+                    when the panel is too narrow. UI-SPEC §Tab strip: text-only,
+                    bottom-border active indicator, no bg pill. */}
                 <Tabs
                   value={activeLeftTab}
                   onValueChange={(v) =>
@@ -238,29 +244,17 @@ function App() {
                   }
                   className="flex-1 min-h-0 gap-0"
                 >
-                  <TabsList
-                    variant="line"
-                    className="h-[36px] w-full justify-start rounded-none border-b px-0"
-                  >
-                    <TabsTrigger
-                      value="Components"
-                      className="px-[12px] flex-none data-[state=active]:border-primary"
-                    >
-                      Components
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="Resources"
-                      className="px-[12px] flex-none data-[state=active]:border-primary"
-                    >
-                      Resources
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="Project"
-                      className="px-[12px] flex-none data-[state=active]:border-primary"
-                    >
-                      Project
-                    </TabsTrigger>
-                  </TabsList>
+                  <ResponsiveTabsList
+                    tabs={[
+                      { value: "Components", label: "Components" },
+                      { value: "Resources", label: "Resources" },
+                      { value: "Project", label: "Project" },
+                    ]}
+                    value={activeLeftTab}
+                    onValueChange={(v) =>
+                      setActiveLeftTab(v as "Components" | "Resources" | "Project")
+                    }
+                  />
                   <TabsContent value="Components" className="flex-1 min-h-0 overflow-hidden mt-0">
                     <ToolboxPanel />
                   </TabsContent>
@@ -273,18 +267,37 @@ function App() {
                 </Tabs>
               </div>
             )}
-            <div className="flex items-center border-r">
-              <PanelCollapseButton side="left" collapsed={toolboxCollapsed} onToggle={() => setToolboxCollapsed(!toolboxCollapsed)} />
-            </div>
-            <div className="flex flex-col flex-1">
+            {/* Collapsed-edge re-expand affordance for the left panel. Renders only
+                when the panel is hidden: a 4px clickable strip flush with the canvas
+                edge. Cursor + tooltip do the discovery work. */}
+            {toolboxCollapsed && (
+              <button
+                type="button"
+                aria-label="Expand left panel"
+                title="Expand left panel"
+                className="h-full w-1 shrink-0 border-r cursor-pointer hover:bg-primary/40 transition-colors"
+                onClick={() => setToolboxCollapsed(false)}
+              />
+            )}
+            <div className="flex flex-col flex-1 min-w-0">
               <Toolbar onUnsavedCheck={showUnsavedDialog} theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} />
               <CanvasPanel resolvedTheme={resolvedTheme} />
             </div>
-            <div className="flex items-center border-l">
-              <PanelCollapseButton side="right" collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-            </div>
+            {sidebarCollapsed && (
+              <button
+                type="button"
+                aria-label="Expand right panel"
+                title="Expand right panel"
+                className="h-full w-1 shrink-0 border-l cursor-pointer hover:bg-primary/40 transition-colors"
+                onClick={() => setSidebarCollapsed(false)}
+              />
+            )}
             {!sidebarCollapsed && (
-              <SidebarPanel width={sidebarResize.width} onResizeMouseDown={sidebarResize.onMouseDown} />
+              <SidebarPanel
+                width={sidebarResize.width}
+                onResizeMouseDown={sidebarResize.onMouseDown}
+                onCollapse={() => setSidebarCollapsed(true)}
+              />
             )}
           </div>
           <BottomPanel />

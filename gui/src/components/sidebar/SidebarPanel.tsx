@@ -53,9 +53,10 @@ import PowerShapeResourceEditor from "./PowerShapeResourceEditor";
 interface SidebarPanelProps {
   width: number;
   onResizeMouseDown?: (e: React.MouseEvent) => void;
+  onCollapse?: () => void;
 }
 
-export default function SidebarPanel({ width, onResizeMouseDown }: SidebarPanelProps) {
+export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: SidebarPanelProps) {
   const selectionKind = useStore((s) => s.selectionKind);
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const selectedResourceId = useStore((s) => s.selectedResourceId);
@@ -285,13 +286,17 @@ export default function SidebarPanel({ width, onResizeMouseDown }: SidebarPanelP
     <div className="relative h-full border-l shrink-0 overflow-hidden" style={{ width }}>
       {onResizeMouseDown && (
         <div
-          className="absolute left-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-border/50"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize right panel"
+          className="absolute left-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-primary/40 active:bg-primary/60 transition-colors"
           onMouseDown={onResizeMouseDown}
+          onDoubleClick={onCollapse}
         />
       )}
       <ScrollArea className="h-full">
-        <div className="p-[16px] pt-[32px] min-w-0">
-          <h2 className="text-[16px] font-semibold leading-[1.3]">
+        <div className="p-[10px] pt-[10px] min-w-0">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground leading-[1.3] mb-[8px]">
             {headerText}
           </h2>
           {renderBody()}

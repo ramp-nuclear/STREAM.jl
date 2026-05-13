@@ -120,7 +120,7 @@ export default function ResourceReferencePicker({
     // line. Combined with `basis-full sm:basis-0` on the Select wrapper this
     // pins the wrap branch under the sidebar's real width range and keeps
     // both buttons fully visible. See VERIFICATION.md Critical Gap #1.
-    <div className="flex flex-wrap items-center gap-[8px]">
+    <div className="flex flex-wrap items-center gap-[6px] min-w-0">
       <div className="flex-1 min-w-0 basis-full sm:basis-0">
         <Select
           value={value ?? ""}
