@@ -97,7 +97,7 @@ export build_loop,
     check_gravity_mismatch,
     port
 export symmetric_plate, plate, one_sided_connection, compose_systems, fuel_assembly
-export rebin_extensive, cosine_power_shape
+export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController, worth, change_state
 export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback
