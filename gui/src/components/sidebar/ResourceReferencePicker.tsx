@@ -86,9 +86,19 @@ export default function ResourceReferencePicker({
 
   const hasNoResources = isGeometry && userResources.length === 0;
 
-  // Edit… disabled when picker has no selection OR is on the unset sentinel.
-  const isEditDisabled =
-    value == null || value === "" || value === SENTINEL_UNSET_POWER_SHAPE;
+  // Edit… disabled when:
+  //   - picker has no selection (null / empty / power-shape sentinel), OR
+  //   - value is a dangling reference (UUID points to a resource that no
+  //     longer exists, typically because the user deleted it from the
+  //     Resources tree). The Select trigger already falls back to the
+  //     placeholder UI in that case; the Edit button must follow suit or
+  //     clicking it routes the user to a non-existent resource.
+  const valueResolvesToResource =
+    value != null &&
+    value !== "" &&
+    value !== SENTINEL_UNSET_POWER_SHAPE &&
+    userResources.some((r) => r.uuid === value);
+  const isEditDisabled = !valueResolvesToResource;
 
   function handleEdit() {
     if (isEditDisabled || value == null) return;
