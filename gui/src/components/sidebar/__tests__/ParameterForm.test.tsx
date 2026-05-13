@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import ParameterForm from "../ParameterForm";
 import type { ComponentDefinition } from "../../../registry/types";
 import { getComponent } from "../../../registry";
+import { TooltipProvider } from "../../ui/tooltip";
 
 const mockChannel: ComponentDefinition = {
   id: "Channel",
@@ -181,13 +182,18 @@ describe("ParameterForm — type_union parameters (RC-1)", () => {
   it("renders h_left and h_right editors when Channel is selected", () => {
     const ch = getComponent("Channel");
     expect(ch).toBeTruthy();
+    // Channel.geometry uses ResourceReferencePicker which renders <Tooltip>
+    // without its own TooltipProvider — production wraps the whole App in one
+    // (App.tsx:217). Mirror that here so the picker mounts cleanly.
     render(
-      <ParameterForm
-        component={ch!}
-        activeMode="default"
-        values={{ n: 1, geometry: "uuid-stub" }}
-        onParamChange={vi.fn()}
-      />
+      <TooltipProvider>
+        <ParameterForm
+          component={ch!}
+          activeMode="default"
+          values={{ n: 1, geometry: "uuid-stub" }}
+          onParamChange={vi.fn()}
+        />
+      </TooltipProvider>
     );
     expect(screen.getByText("h_left")).toBeTruthy();
     expect(screen.getByText("h_right")).toBeTruthy();
@@ -255,7 +261,8 @@ describe("ParameterForm — type_union parameters (RC-1)", () => {
 
   it("infers the active mode from an existing value", () => {
     const wt = getComponent("WallTemperature")!;
-    const { rerender, unmount } = render(
+    // Mount #1 — scalar value → scalar input shows "350".
+    const r1 = render(
       <ParameterForm
         component={wt}
         activeMode="default"
@@ -263,17 +270,14 @@ describe("ParameterForm — type_union parameters (RC-1)", () => {
         onParamChange={vi.fn()}
       />
     );
-    // scalar mode active when value is a number — the scalar button carries the
-    // shadcn "default" variant, but a more robust selector is to assert that
-    // the scalar NumericField input currently holds "350".
     const scalarInput = Array.from(
       document.querySelectorAll("input")
     ).find((el) => (el as HTMLInputElement).value === "350");
     expect(scalarInput).toBeTruthy();
+    r1.unmount();
 
-    // Re-mount with vector value → vector mode active, 4 cells render.
-    unmount();
-    rerender(
+    // Mount #2 — vector value → cells render with the stored array.
+    const r2 = render(
       <ParameterForm
         component={wt}
         activeMode="default"
@@ -281,16 +285,14 @@ describe("ParameterForm — type_union parameters (RC-1)", () => {
         onParamChange={vi.fn()}
       />
     );
-    // Look for "310" as a value in some input — proves vector cells rendered
-    // with the stored array.
     const cell = Array.from(
       document.querySelectorAll("input")
     ).find((el) => (el as HTMLInputElement).value === "310");
     expect(cell).toBeTruthy();
+    r2.unmount();
 
-    // Re-mount with callable value → callable picker showing the chosen sig.
-    unmount();
-    rerender(
+    // Mount #3 — callable value → fn(t) segmented option present.
+    render(
       <ParameterForm
         component={wt}
         activeMode="default"
