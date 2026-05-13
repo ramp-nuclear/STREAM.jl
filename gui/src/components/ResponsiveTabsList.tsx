@@ -138,15 +138,19 @@ export function ResponsiveTabsList({
       // variant=line `after` bottom-bar indicator is force-suppressed.
       return cn(
         "flex-none size-[32px] p-0 rounded-md border-0",
-        // All icons stay at full foreground color (no dim). Hover and active
-        // both apply a subtle bg-accent fill — active is the persistent form
-        // of the hover state. !-prefixed so the shadcn TabsTrigger base
-        // rules (data-[state=active]:bg-background, dark:text-muted-
-        // foreground, etc.) do not win the cascade.
-        "!text-foreground dark:!text-foreground",
+        // Let shadcn TabsTrigger base own the icon-color cascade:
+        //   default: text-foreground/60   (light) / muted-foreground (dark) — slightly dim
+        //   hover:   text-foreground                                          — brightens
+        //   active:  text-foreground                                          — stays bright
+        // The icon-color difference between inactive and active is the
+        // active-state indicator. Hover bg-accent appears on top of any state,
+        // including the already-active tab. Active-state bg from the base is
+        // overridden to transparent so the active tab does not carry a
+        // permanent fill — only an icon-brightness shift.
         "!bg-transparent",
         "hover:!bg-accent",
-        "data-[state=active]:!bg-accent dark:data-[state=active]:!bg-accent",
+        "data-[state=active]:!bg-transparent dark:data-[state=active]:!bg-transparent",
+        "data-[state=active]:hover:!bg-accent",
         "data-[state=active]:after:!opacity-0",
       );
     }
