@@ -229,7 +229,7 @@ contract document drafted in parallel throughout.
 | 60. `fuel_assembly` composition helper               | 2/2 | Complete    | 2026-05-11 |
 | 61. Registry audit + rewrite for v1.1                | 5/5 | Complete   | 2026-05-12 |
 | 62. Resources panel architecture                     | 10/11 | In Progress|  |
-| 63. BCs tab + value-source components in GUI         | 4/4 | Complete   | 2026-05-13 |
+| 63. BCs tab + value-source components in GUI         | 4/4 | Complete    | 2026-05-13 |
 | 64. Connection routing                               | 0/TBD | Planned | — |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |
