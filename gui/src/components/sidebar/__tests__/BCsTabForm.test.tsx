@@ -231,7 +231,7 @@ describe("BCsTabForm", () => {
     // entry?.mode !== "source", so the Promote button must render.
     renderForm();
     expect(
-      screen.getByRole("button", { name: /↗ Promote to shared source/ }),
+      screen.getByRole("button", { name: /Promote to shared source/ }),
     ).toBeTruthy();
   });
 
@@ -250,7 +250,7 @@ describe("BCsTabForm", () => {
     });
     renderForm();
     expect(
-      screen.queryByRole("button", { name: /↗ Promote to shared source/ }),
+      screen.queryByRole("button", { name: /Promote to shared source/ }),
     ).toBeNull();
   });
 
@@ -281,7 +281,7 @@ describe("BCsTabForm", () => {
     // bcMode left undefined → Promote button visible. Click it.
     renderForm();
     fireEvent.click(
-      screen.getByRole("button", { name: /↗ Promote to shared source/ }),
+      screen.getByRole("button", { name: /Promote to shared source/ }),
     );
     const state = useStore.getState();
     // Two nodes: original Channel + newly-spawned WallTemperature.
@@ -305,7 +305,7 @@ describe("BCsTabForm", () => {
     });
     renderForm();
     fireEvent.click(
-      screen.getByRole("button", { name: /↗ Promote to shared source/ }),
+      screen.getByRole("button", { name: /Promote to shared source/ }),
     );
     const state = useStore.getState();
     const wtNode = state.nodes.find(
@@ -340,5 +340,24 @@ describe("BCsTabForm", () => {
     fireEvent.click(combos[0]);
     const sourceOption = screen.getByRole("option", { name: /^source$/i });
     expect(sourceOption.getAttribute("aria-disabled")).not.toBe("true");
+  });
+
+  // Plan 63.1-13 (GAP-COSMETIC-PROMOTE): Promote button is icon-only with
+  // aria-label="Promote to shared source" + a hover tooltip carrying the
+  // same string. No visible text content.
+  it("Promote button is icon-only with accessible label and no visible text (GAP-COSMETIC-PROMOTE)", () => {
+    renderForm();
+    const button = screen.getByRole("button", {
+      name: "Promote to shared source",
+    });
+    // Icon-only: visible text inside the button is empty (the SVG glyph is
+    // not text). Whitespace tolerated.
+    expect(button.textContent?.trim() ?? "").toBe("");
+    // The legacy "↗" character must be gone from the button content.
+    expect(button.textContent ?? "").not.toContain("↗");
+    // Button contains an SVG child (the lucide MoveUpRight glyph).
+    expect(button.querySelector("svg")).toBeTruthy();
+    // aria-label carries the accessible name.
+    expect(button.getAttribute("aria-label")).toBe("Promote to shared source");
   });
 });
