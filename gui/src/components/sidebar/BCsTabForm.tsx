@@ -4,9 +4,11 @@
 // per `external_inputs` pair (paired by the `_left`/`_right` suffix convention
 // — registry does NOT declare `pair_with` on external_inputs per 63-B
 // SUMMARY note), with:
-//   • Symmetric (L = R) toggle (default ON per CD-05) collapsing/expanding
-//     paired fields (D-05).
-//   • One BCModePicker per visible group (D-04).
+//   • Symmetric / Asymmetric SegmentedButtonGroup (default Symmetric per
+//     CD-05) collapsing/expanding paired fields (D-05; Phase 63.1 D-12
+//     replaced the old "Symmetric (L = R)" custom switch).
+//   • One inline shadcn Select per visible group as the BC mode picker
+//     (Phase 63.1 D-11 replaced the legacy 5-pill BC mode picker).
 //   • A per-mode editor body dispatched by the entry's `mode` discriminator.
 //
 // Critically, the form holds ZERO local state for BC values. Every mutation
@@ -44,7 +46,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import NumericField from "./NumericField";
-import BCModePicker from "./BCModePicker";
 import SegmentedButtonGroup from "./SegmentedButtonGroup";
 import useStore, { type StreamNodeData } from "@/store/useStore";
 import {
@@ -273,12 +274,24 @@ function GroupBlock({
       </h3>
 
       {isPaired && (
-        <SymmetricToggle
-          checked={isSymmetric}
-          onCheckedChange={(v) =>
-            setBCSymmetric(nodeId, group.baseField, v)
-          }
-        />
+        // Phase 63.1 D-12: labeled SegmentedButtonGroup replaces the legacy
+        // "Symmetric (L = R)" custom switch. The boolean store value is
+        // preserved at the boundary — `"sym" → true`, `"asym" → false`.
+        // Copy lock-in (UI-SPEC §"Copy lock-in"): the full words
+        // "Symmetric" / "Asymmetric" are load-bearing; never shorten.
+        <div className="mb-[8px]">
+          <SegmentedButtonGroup
+            options={[
+              { value: "sym", label: "Symmetric" },
+              { value: "asym", label: "Asymmetric" },
+            ]}
+            active={isSymmetric ? "sym" : "asym"}
+            onChange={(v) =>
+              setBCSymmetric(nodeId, group.baseField, v === "sym")
+            }
+            size="sm"
+          />
+        </div>
       )}
 
       {!isPaired || isSymmetric ? (
@@ -331,44 +344,6 @@ function GroupBlock({
 }
 
 // ---------------------------------------------------------------------------
-// SymmetricToggle — minimal switch-style button (no shadcn Switch primitive)
-// ---------------------------------------------------------------------------
-
-interface SymmetricToggleProps {
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-}
-
-function SymmetricToggle({ checked, onCheckedChange }: SymmetricToggleProps) {
-  return (
-    <div className="flex items-center gap-[8px] mb-[8px]">
-      <Label className="text-[13px] font-medium leading-[1.4]">
-        Symmetric (L = R)
-      </Label>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onCheckedChange(!checked)}
-        className={
-          checked
-            ? "h-5 w-9 rounded-full bg-primary relative transition-colors"
-            : "h-5 w-9 rounded-full bg-muted relative transition-colors"
-        }
-      >
-        <span
-          className={
-            checked
-              ? "absolute top-[2px] left-[18px] h-4 w-4 rounded-full bg-background transition-all"
-              : "absolute top-[2px] left-[2px] h-4 w-4 rounded-full bg-background transition-all"
-          }
-        />
-      </button>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // FieldRow — picker + per-mode editor
 // ---------------------------------------------------------------------------
 
@@ -395,13 +370,38 @@ function FieldRow({
   onEntryUpdate,
   nodes,
 }: FieldRowProps) {
+  // Phase 63.1 D-11: inline shadcn Select replaces the legacy 5-pill BC mode
+  // picker. The 5-mode dropdown takes the full row width so the per-mode
+  // value editor below gets the same width. When `entry === undefined` the
+  // trigger shows the placeholder and a destructive hint is rendered below
+  // (D-09 carry-over, verbatim from the legacy copy).
   return (
     <div className="flex flex-col gap-[8px]">
-      <BCModePicker
-        label={displayLabel}
-        active={entry?.mode}
-        onChange={onModeChange}
-      />
+      <Label className="text-[13px] font-semibold leading-[1.4]">
+        {displayLabel}
+      </Label>
+      <div className="flex flex-col gap-[6px]">
+        <Select
+          value={entry?.mode ?? ""}
+          onValueChange={(m) => onModeChange(m as BCMode)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select BC mode..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="value">Value</SelectItem>
+            <SelectItem value="profile">Profile</SelectItem>
+            <SelectItem value="function">Function</SelectItem>
+            <SelectItem value="mark">Mark</SelectItem>
+            <SelectItem value="source">Source</SelectItem>
+          </SelectContent>
+        </Select>
+        {entry === undefined && (
+          <p className="text-xs text-destructive/80 mt-[6px]">
+            BC required — select a mode
+          </p>
+        )}
+      </div>
       <ModeEditorBody
         entry={entry}
         component={component}

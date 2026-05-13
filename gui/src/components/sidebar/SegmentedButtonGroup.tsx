@@ -1,18 +1,17 @@
 // SegmentedButtonGroup.tsx — Phase 63 Plan 63-C Task 01.
 //
 // Generic segmented-button primitive extracted verbatim from ModeToggle's
-// internal layout (ModeToggle.tsx:28-46 — the horizontal-row JSX). Two
-// consumers:
+// internal layout (ModeToggle.tsx:28-46 — the horizontal-row JSX). Consumers:
 //   1. ModeToggle (Pump fixed-dP / fixed-mdot picker; pre-existing).
-//   2. BCModePicker (5-pill BC mode picker; Phase 63-C Task 02).
-//   3. BCsTabForm sub-pickers (Profile-preset, Function-signature; Task 03).
+//   2. BCsTabForm sub-pickers — Profile-preset, Function-signature, and the
+//      Phase 63.1 D-12 Symmetric/Asymmetric segmented control (the legacy
+//      5-pill BC mode picker was retired in Phase 63.1 Plan 07 in favor of
+//      an inline shadcn Select).
 //
 // Generic over `T extends string` so each consumer can keep its discriminated
 // union type without lossy stringification. When `active === undefined`, NO
 // button receives the `variant="default"` highlight — every pill renders as
-// `outline`. This is the D-09 required-unset visual for the BCs tab; it's a
-// free side-effect of the `variant={opt.value === active ? "default" : "outline"}`
-// expression evaluating false for every opt when active is undefined.
+// `outline`.
 
 import { Button } from "@/components/ui/button";
 
