@@ -7,6 +7,7 @@ import type { LayerView } from "../lib/layers";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
 import { getPortType } from "./CanvasPanel";
+import { selectNodeErrors, type NodeErrorsInput } from "@/lib/selectors/nodeErrors";
 
 // Inline colors: immune to Tailwind JIT scanning gaps and * { border-color } cascade.
 const CATEGORY_LEFT_BORDER_COLOR: Record<string, string> = {
@@ -77,14 +78,16 @@ const SOURCE_LABEL_FIELD: Record<string, string> = {
 export default function StreamNode({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as StreamNodeData;
   const hasError = useStore(useCallback((s: { errorNodeIds: Set<string> }) => s.errorNodeIds.has(id), [id]));
-  // Phase 63 D-22 — BC-specific error tag surface (sibling to the legacy
-  // Phase-39 `errorNodeIds: Set<string>`; both contribute to the red-ring).
+  // Phase 63 D-22 / 63.1 D-15 — BC-specific error tag surface (sibling to the
+  // legacy Phase-39 `errorNodeIds: Set<string>`; both contribute to the red-ring).
   // Select a primitive (boolean) — not a fresh array — to keep zustand's
   // shallow equality stable and avoid the maximum-update-depth re-render loop.
+  // Phase 63.1 D-15: ring state now derives from selectNodeErrors (pure
+  // function of nodes + edges + bcMode + bcSymmetric + anchors); there is no
+  // stored errorTagsByNodeId slice anymore.
   const hasBCError = useStore(
     useCallback(
-      (s: { errorTagsByNodeId: Record<string, string[]> }) =>
-        (s.errorTagsByNodeId[id]?.length ?? 0) > 0,
+      (s) => selectNodeErrors(s as unknown as NodeErrorsInput, id).length > 0,
       [id],
     ),
   );
