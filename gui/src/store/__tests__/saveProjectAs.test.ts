@@ -133,6 +133,13 @@ function resetStore(name: string = "") {
     activeLayer: "Both",
     errorNodeIds: new Set<string>(),
     validationResult: null,
+    // Stub the validation gate to always pass. The real validateTopology
+    // requires a non-empty graph with a pressure BC and a driving element
+    // (Pump/Gravity); an empty-canvas state would short-circuit
+    // saveProjectAs before the dialog opens, and we want to test the
+    // dialog-arg plumbing, not the gate. Plan 62-14 vitest_mock_pattern
+    // approach (b).
+    validateAndGate: () => ({ valid: true, nodeErrors: [], systemErrors: [] }),
     modelOptions: {
       name,
       description: "",
@@ -215,10 +222,13 @@ describe("saveProjectAs Tauri dialog defaultPath", () => {
     expect(saveMock.mock.calls[0][0].defaultPath).toBe("myproj.scp");
 
     // writeTextFile was called with the path the user picked + valid JSON.
-    expect(writeTextFileMock).toHaveBeenCalledTimes(1);
-    const [pathArg, payloadArg] = writeTextFileMock.mock.calls[0];
-    expect(pathArg).toBe("/tmp/myproj.scp");
-    const parsed = JSON.parse(payloadArg as string);
+    // (saveRecentFiles also writes a recent.json — accept either ordering;
+    // find the call whose first arg is the .scp path we picked.)
+    const scpCall = writeTextFileMock.mock.calls.find(
+      (call) => call[0] === "/tmp/myproj.scp",
+    );
+    expect(scpCall).toBeDefined();
+    const parsed = JSON.parse(scpCall![1] as string);
     expect(parsed.format_version).toBe("2.0");
 
     // Existing post-save semantics preserved.
