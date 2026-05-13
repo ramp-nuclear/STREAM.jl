@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, type LucideIcon } from "lucide-react";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
@@ -7,12 +7,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export interface ResponsiveTab {
   value: string;
+  /** Accessible name. Used as the tooltip text and the dropdown-menu label. */
   label: string;
+  /** Optional icon. When provided, the strip shows an icon-only trigger with
+   *  `label` as the accessible name + tooltip, VS Code Activity Bar style. */
+  icon?: LucideIcon;
 }
 
 interface ResponsiveTabsListProps {
@@ -26,19 +35,19 @@ interface ResponsiveTabsListProps {
 /**
  * VS Code-style responsive tabs strip.
  *
- * Renders TabsTriggers for tabs that fit the available width; overflowing
- * tabs are accessible through a "..." dropdown at the right edge. The active
+ * Each tab renders as either:
+ *   - Text (when `icon` is not provided)
+ *   - Icon-only with tooltip + sr-only label (when `icon` is provided)
+ *
+ * Tabs that don't fit fall into a "..." dropdown at the right edge. The
+ * dropdown only renders when at least one tab actually overflows. The active
  * tab is pinned visible — if it would have overflowed, it's swapped in for
  * the last fitting tab.
  *
- * The "..." button only renders when at least one tab actually overflows.
- * When all tabs fit, the strip looks identical to a vanilla TabsList.
- *
  * Implementation: tab widths are measured from a separate off-screen layer
- * that always contains all tabs at their natural width. The visible strip's
- * `hidden` flags do not affect measurement, so the visible count can recover
- * upward when the container is widened again. Falls back to rendering every
- * tab when ResizeObserver is unavailable or the container width measures 0
+ * that always contains all tabs at natural width, so visibility state in the
+ * visible row cannot poison subsequent measurements. Falls back to rendering
+ * every tab when ResizeObserver is unavailable or the container width is 0
  * (the test/jsdom path), keeping `getByRole("tab", { name: ... })` green.
  */
 export function ResponsiveTabsList({
@@ -61,16 +70,13 @@ export function ResponsiveTabsList({
     }
     const widths = measureRefs.current.map((r) => (r ? r.offsetWidth : 0));
     if (widths.length !== tabs.length || widths.some((w) => w === 0)) {
-      // Measurement layer not laid out yet; defer.
       return;
     }
     const totalWidth = widths.reduce((sum, w) => sum + w, 0);
-    // Happy path: all tabs fit without an overflow button.
     if (totalWidth <= containerWidth) {
       setVisibleCount(tabs.length);
       return;
     }
-    // Reserve for the "..." button and count tabs greedily from the start.
     const availableWidth = containerWidth - overflowButtonWidth;
     let used = 0;
     let count = 0;
@@ -94,14 +100,11 @@ export function ResponsiveTabsList({
     return () => ro.disconnect();
   }, [recompute]);
 
-  // Re-measure when label text changes (rare; covers i18n / dynamic labels).
   useLayoutEffect(() => {
     recompute();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs.map((t) => t.label).join("|")]);
 
-  // Pin the active tab visible — if it would overflow, swap it for the last
-  // fitting tab.
   const activeIndex = tabs.findIndex((t) => t.value === value);
   const visibleIndices = new Set<number>();
   for (let i = 0; i < visibleCount; i++) visibleIndices.add(i);
@@ -112,21 +115,42 @@ export function ResponsiveTabsList({
 
   const hiddenTabs = tabs.filter((_, i) => !visibleIndices.has(i));
 
-  // Tailwind class string applied to both the off-screen measurement buttons
-  // and the visible TabsTriggers so their content widths match exactly. The
-  // measurement layer uses bare `<span>` elements, so it does not include
-  // Radix Trigger base classes — empirically the px-[10px] + text-[12px]
-  // padding dominates the natural width.
-  const triggerClass = "px-[10px] text-[12px] flex-none data-[state=active]:border-primary";
+  // Trigger style. Icon tabs render as 28×28 squares with hover outline; text
+  // tabs render with horizontal padding. Both keep variant="line"'s
+  // bottom-border active indicator from the TabsList parent.
+  function triggerContent(tab: ResponsiveTab) {
+    if (tab.icon) {
+      const Icon = tab.icon;
+      return (
+        <>
+          <Icon className="size-4" aria-hidden="true" />
+          <span className="sr-only">{tab.label}</span>
+        </>
+      );
+    }
+    return tab.label;
+  }
+
+  function triggerClassFor(tab: ResponsiveTab) {
+    if (tab.icon) {
+      // Icon-only trigger: square, transparent at rest, outline on hover, no
+      // border at active state (the variant=line bottom-border handles active).
+      return cn(
+        "flex-none size-[28px] p-0",
+        "text-muted-foreground hover:text-foreground",
+        "rounded-none border border-transparent hover:border-border",
+        "data-[state=active]:text-foreground data-[state=active]:border-transparent",
+      );
+    }
+    return "px-[10px] text-[12px] flex-none data-[state=active]:border-primary";
+  }
 
   return (
     <div
       ref={containerRef}
       className="relative flex items-center w-full h-[28px] border-b overflow-hidden"
     >
-      {/* Off-screen measurement layer. Rendered absolutely outside the
-          viewport but kept in the layout flow at zero height so its
-          children get real offsetWidth values. */}
+      {/* Off-screen measurement layer — all tabs at natural width, never hidden. */}
       <div
         aria-hidden="true"
         className="absolute top-0 left-0 -translate-y-[200%] flex items-center pointer-events-none"
@@ -141,27 +165,37 @@ export function ResponsiveTabsList({
             tabIndex={-1}
             className={cn(
               "inline-flex h-[28px] items-center justify-center whitespace-nowrap font-medium",
-              triggerClass,
+              triggerClassFor(tab),
             )}
           >
-            {tab.label}
+            {triggerContent(tab)}
           </button>
         ))}
       </div>
 
       <TabsList
         variant="line"
-        className="h-full justify-start rounded-none border-0 px-0 min-w-0"
+        className="h-full justify-start rounded-none border-0 px-0 min-w-0 gap-0"
       >
-        {tabs.map((tab, i) => (
-          <TabsTrigger
-            key={tab.value}
-            value={tab.value}
-            className={cn(triggerClass, !visibleIndices.has(i) && "hidden")}
-          >
-            {tab.label}
-          </TabsTrigger>
-        ))}
+        {tabs.map((tab, i) => {
+          const triggerEl = (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              aria-label={tab.icon ? tab.label : undefined}
+              className={cn(triggerClassFor(tab), !visibleIndices.has(i) && "hidden")}
+            >
+              {triggerContent(tab)}
+            </TabsTrigger>
+          );
+          if (!tab.icon) return triggerEl;
+          return (
+            <Tooltip key={tab.value}>
+              <TooltipTrigger asChild>{triggerEl}</TooltipTrigger>
+              <TooltipContent side="bottom">{tab.label}</TooltipContent>
+            </Tooltip>
+          );
+        })}
       </TabsList>
       {hiddenTabs.length > 0 && (
         <DropdownMenu>
@@ -176,14 +210,18 @@ export function ResponsiveTabsList({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {hiddenTabs.map((t) => (
-              <DropdownMenuItem
-                key={t.value}
-                onSelect={() => onValueChange(t.value)}
-              >
-                {t.label}
-              </DropdownMenuItem>
-            ))}
+            {hiddenTabs.map((t) => {
+              const Icon = t.icon;
+              return (
+                <DropdownMenuItem
+                  key={t.value}
+                  onSelect={() => onValueChange(t.value)}
+                >
+                  {Icon && <Icon className="size-4 mr-2" aria-hidden="true" />}
+                  {t.label}
+                </DropdownMenuItem>
+              );
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       )}

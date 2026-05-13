@@ -13,6 +13,7 @@ import ValidationDialog from "./components/ValidationDialog";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList } from "./components/ResponsiveTabsList";
+import { Boxes, Library, Settings2 } from "lucide-react";
 import useStore from "./store/useStore";
 import { initializeRecentFiles } from "./store/useStore";
 import { useResizable } from "./hooks/useResizable";
@@ -246,9 +247,9 @@ function App() {
                 >
                   <ResponsiveTabsList
                     tabs={[
-                      { value: "Components", label: "Components" },
-                      { value: "Resources", label: "Resources" },
-                      { value: "Project", label: "Project" },
+                      { value: "Components", label: "Components", icon: Boxes },
+                      { value: "Resources", label: "Resources", icon: Library },
+                      { value: "Project", label: "Project", icon: Settings2 },
                     ]}
                     value={activeLeftTab}
                     onValueChange={(v) =>
