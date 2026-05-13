@@ -133,14 +133,14 @@ export function ResponsiveTabsList({
 
   function triggerClassFor(tab: ResponsiveTab) {
     if (tab.icon) {
-      // Icon-only trigger: square, no static outline, 2px outline appears on
-      // hover (border) and active (primary). No bottom-bar indicator — the
-      // variant=line `after` pseudo is forced to 0 opacity in icon mode.
+      // Icon-only trigger: square, no border at any state. Active/hover are
+      // communicated by icon color + a subtle background tint. The
+      // variant=line `after` bottom-bar indicator is force-suppressed.
       return cn(
-        "flex-none size-[32px] p-0 rounded-md",
-        "text-muted-foreground hover:text-foreground",
-        "border-2 border-transparent hover:border-border",
-        "data-[state=active]:text-foreground data-[state=active]:border-primary",
+        "flex-none size-[32px] p-0 rounded-md border-0",
+        "text-muted-foreground bg-transparent",
+        "hover:text-foreground hover:bg-accent",
+        "data-[state=active]:text-foreground data-[state=active]:bg-secondary",
         "data-[state=active]:after:!opacity-0",
       );
     }
