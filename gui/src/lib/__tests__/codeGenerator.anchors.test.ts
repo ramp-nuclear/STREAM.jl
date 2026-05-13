@@ -1,4 +1,5 @@
-// codeGenerator.anchors.test.ts — Phase 63.1 Plan 01 (Wave-0 RED).
+// codeGenerator.anchors.test.ts — Phase 63.1 Plan 01 (Wave-0 RED) flipped
+// GREEN by Plan 04 (Wave 3) — codegen contract change is now live.
 //
 // Covers the new anchors emit contract (D-05):
 //   - For each `anchors[nodeId]` entry, emit the line
@@ -7,11 +8,6 @@
 //   - When the consumer node is wrapped in a thermal assembly, the path is
 //     prefixed: `${assemblyName}.${instanceName}.${portField} ~ ...`.
 //   - When `anchors` is empty, no anchor binding line is emitted.
-//
-// The new `generateCode` signature accepts an anchors-aware state object as
-// its third positional arg (replacing the legacy `bcs: BCEntry[]`). This
-// is the RED — the current signature still expects `bcs: BCEntry[]`.
-// @ts-nocheck — codeGenerator anchors-emit lands in Wave 3 / Plan 07.
 
 import { describe, it, expect } from "vitest";
 import type { Node } from "@xyflow/react";
@@ -67,8 +63,8 @@ describe("codeGenerator anchors emit (D-05)", () => {
       undefined,
       { bcMode: {}, bcSymmetric: {} },
     );
-    // formatReal(1e5) emits "1.0e5"
-    expect(code).toContain("pump1.port_in.P ~ 1.0e5");
+    // formatReal(1e5) emits "100000.0" (String(1e5) === "100000" → append ".0")
+    expect(code).toContain("pump1.port_in.P ~ 100000.0");
   });
 
   it("emits assembly-prefixed path when the consumer is inside a thermal assembly", () => {
@@ -87,8 +83,9 @@ describe("codeGenerator anchors emit (D-05)", () => {
     );
     // When assembly resolution is active, the binding line includes the
     // assembly prefix. The exact prefix is implementation-defined but must
-    // resolve to `${assemblyName}.pump2.port_out.P ~ 2.0e5`.
-    expect(code).toMatch(/(assembly_\d+\.)?pump2\.port_out\.P ~ 2\.0e5/);
+    // resolve to `${assemblyName}.pump2.port_out.P ~ 200000.0`. (For a
+    // standalone Pump with no thermal-assembly wrapper, the prefix is empty.)
+    expect(code).toMatch(/(assembly_\d+\.)?pump2\.port_out\.P ~ 200000\.0/);
   });
 
   it("emits no anchor lines when anchors is empty", () => {

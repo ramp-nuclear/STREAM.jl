@@ -23,6 +23,7 @@ import type {
 } from "../registry/types";
 import { validateJuliaIdentifier } from "./validation";
 import { bcModeKey, type BCModeEntry } from "@/lib/bcMode";
+import type { CodegenAnchorsState } from "@/lib/anchors";
 
 // SENTINEL_UNSET_POWER_SHAPE is duplicated here as a literal (rather than
 // imported from useStore.ts) because the store module pulls in zustand and
@@ -36,11 +37,12 @@ const SENTINEL_UNSET_POWER_SHAPE_UUID = "00000000-0000-0000-0000-000000000000";
 // Public types
 // ---------------------------------------------------------------------------
 
-export interface BCEntry {
-  nodeId: string;
-  portField: "port_in.P" | "port_out.P";
-  value: number;
-}
+// Phase 63.1 Plan 04: the legacy boundary-conditions entry interface has been
+// retired. Pressure anchors are now carried via the per-node
+// `anchors: Record<nodeId, AnchorEntry>` shape declared in
+// `gui/src/lib/anchors.ts` (D-02 sentinel-by-absence). The codegen entry point
+// accepts an anchors-state object and iterates `Object.entries(state.anchors)`
+// (see emission loop below).
 
 // Re-export StreamNodeData shape inline (avoid importing zustand store)
 interface StreamNodeData {
@@ -670,7 +672,9 @@ function resolveInstancePath(
  *
  * @param nodes - React Flow nodes (insertion order)
  * @param edges - React Flow edges (connections)
- * @param bcs - Boundary condition entries
+ * @param anchorsState - Pressure anchors slice (Phase 63.1 D-02 + D-05). The
+ *   `anchors` Record carries at-most-one `AnchorEntry` per node. Each entry
+ *   emits a single Julia binding line `${instance}.${portField} ~ ${value}`.
  * @param getComponent - Registry lookup function
  * @param resources - Phase 62 Resources slice (geometries / power shapes / fluids).
  *   When provided, FK-typed params (PipeGeometry, Matrix-named-power_shape) emit
@@ -681,7 +685,7 @@ function resolveInstancePath(
 export function generateCode(
   nodes: Node[],
   edges: Edge[],
-  bcs: BCEntry[],
+  anchorsState: CodegenAnchorsState,
   getComponent: (id: string) => ComponentDefinition | undefined,
   resources?: CodegenResources,
   bcsState?: CodegenBCsState,
@@ -1225,17 +1229,17 @@ export function generateCode(
     }
   }
 
-  // Boundary conditions
-  for (const bc of bcs) {
-    const data = nodeDataMap.get(bc.nodeId);
+  // Pressure anchors (D-05)
+  for (const [nodeId, entry] of Object.entries(anchorsState.anchors)) {
+    const data = nodeDataMap.get(nodeId);
     if (!data) continue;
 
-    // Resolve BC path with assembly prefix if needed
-    const asm = nodeToAssembly.get(bc.nodeId);
+    // Resolve anchor path with assembly prefix if needed
+    const asm = nodeToAssembly.get(nodeId);
     const prefix = asm ? `${asm.assemblyName}.` : "";
 
     lines.push(
-      `    ${prefix}${data.instanceName}.${bc.portField} ~ ${formatReal(bc.value)},`,
+      `    ${prefix}${data.instanceName}.${entry.portField} ~ ${formatReal(entry.value)},`,
     );
   }
 

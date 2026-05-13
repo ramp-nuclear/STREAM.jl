@@ -12,10 +12,10 @@ import { describe, it, expect } from "vitest";
 import type { Node } from "@xyflow/react";
 import { generateCode } from "../codeGenerator";
 import type {
-  BCEntry,
   CodegenBCsState,
   CodegenResources,
 } from "../codeGenerator";
+import type { CodegenAnchorsState } from "../anchors";
 import type { ComponentDefinition } from "../../registry/types";
 import type { BCModeEntry } from "../bcMode";
 import { bcModeKey } from "../bcMode";
@@ -127,7 +127,7 @@ function emptyResources(): CodegenResources {
   return { geometries: {}, powerShapes: {}, fluids: {} };
 }
 
-const NO_BCS: BCEntry[] = [];
+const NO_ANCHORS: CodegenAnchorsState = { anchors: {} };
 
 function bcs(
   entries: Record<string, BCModeEntry>,
@@ -146,7 +146,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs(
@@ -162,7 +162,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs(
@@ -190,7 +190,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs(
@@ -217,7 +217,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs(
@@ -239,7 +239,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs(
@@ -266,7 +266,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs(
@@ -293,7 +293,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs(
@@ -314,7 +314,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs({}, { "ch1::T_wall": false }),
@@ -332,7 +332,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs({
@@ -348,7 +348,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs(
@@ -368,7 +368,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const code = generateCode(
       [ch, wt],
       [],
-      NO_BCS,
+      NO_ANCHORS,
       mockGetComponent,
       emptyResources(),
       bcs(
