@@ -24,6 +24,9 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
   const edges = useStore((s) => s.edges);
   const bcs = useStore((s) => s.bcs);
   const resources = useStore((s) => s.resources);
+  // Phase 63: BC slices feed into the per-mode codegen emission.
+  const bcMode = useStore((s) => s.bcMode);
+  const bcSymmetric = useStore((s) => s.bcSymmetric);
   const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
   const toggleBottomPanel = useStore((s) => s.toggleBottomPanel);
   const isDirty = useStore((s) => s.isDirty);
@@ -32,8 +35,12 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
   const setActiveLayer = useStore((s) => s.setActiveLayer);
 
   const code = useMemo(
-    () => generateCode(nodes, edges, bcs, getComponent, resources),
-    [nodes, edges, bcs, resources],
+    () =>
+      generateCode(nodes, edges, bcs, getComponent, resources, {
+        bcMode,
+        bcSymmetric,
+      }),
+    [nodes, edges, bcs, resources, bcMode, bcSymmetric],
   );
 
   async function handleExport() {

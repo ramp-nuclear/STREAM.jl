@@ -9,10 +9,17 @@ export default function CodePreview() {
   const edges = useStore((s) => s.edges);
   const bcs = useStore((s) => s.bcs);
   const resources = useStore((s) => s.resources);
+  // Phase 63: BC slices feed into the per-mode codegen emission.
+  const bcMode = useStore((s) => s.bcMode);
+  const bcSymmetric = useStore((s) => s.bcSymmetric);
 
   const code = useMemo(
-    () => generateCode(nodes, edges, bcs, getComponent, resources),
-    [nodes, edges, bcs, resources],
+    () =>
+      generateCode(nodes, edges, bcs, getComponent, resources, {
+        bcMode,
+        bcSymmetric,
+      }),
+    [nodes, edges, bcs, resources, bcMode, bcSymmetric],
   );
 
   return (
