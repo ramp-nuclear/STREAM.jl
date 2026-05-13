@@ -14,7 +14,7 @@
 // content is attached.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ResourcesTreePanel from "../ResourcesTreePanel";
 import useStore, {
@@ -352,5 +352,204 @@ describe("ResourcesTreePanel — context menu (D-03)", () => {
     fireEvent.click(cancel);
 
     expect(useStore.getState().resources.geometries[uuid]).toBeDefined();
+  });
+});
+
+// Phase 62-13 gap closure (VERIFICATION.md Critical Gap #2):
+// usage detection must match BOTH the registry-name key (`geometry`,
+// `power_shape` — what ParameterForm writes live) AND the `_ref`-suffixed
+// legacy key (what fixtures + .scp files use). The existing test above
+// covers the legacy `geometry_ref` path; these cases pin the live path
+// + sum-across-forms, default Cancel focus, and destructive variant.
+describe("ResourcesTreePanel — 62-13 dual-key usage detection", () => {
+  it("Live path: AlertDialog fires when usage stored under registry-name key (geometry)", async () => {
+    const uuid = useStore.getState().addGeometry({
+      name: "g_live",
+      kind: "rectangular",
+      params: { L: 1.0, W: 0.1, H: 0.05 },
+    });
+    useStore.setState({
+      nodes: [
+        {
+          id: "node-live-1",
+          type: "streamNode",
+          position: { x: 0, y: 0 },
+          data: {
+            componentId: "Channel",
+            instanceName: "channel_live",
+            parameters: { geometry: uuid },
+            constructorMode: "default",
+          },
+        },
+      ],
+    });
+
+    renderTree();
+    const row = screen.getByText("g_live").closest('li[role="treeitem"]');
+    fireEvent.contextMenu(row!);
+
+    const del = await screen.findByRole("menuitem", { name: /^Delete$/i });
+    fireEvent.click(del);
+
+    const desc = await screen.findByText(
+      /Delete geometry g_live\? It is used by 1 component\(s\)\./,
+    );
+    expect(desc).toBeTruthy();
+
+    const cancel = await screen.findByRole("button", { name: /^Cancel$/i });
+    fireEvent.click(cancel);
+
+    expect(useStore.getState().resources.geometries[uuid]).toBeDefined();
+  });
+
+  it("Live path: AlertDialog fires for power shape stored under power_shape key", async () => {
+    const uuid = useStore.getState().addPowerShape({
+      name: "ps_live",
+      kind: "z_cosine",
+      params: { amplitude: 1.0 },
+    });
+    useStore.setState({
+      nodes: [
+        {
+          id: "node-live-2",
+          type: "streamNode",
+          position: { x: 0, y: 0 },
+          data: {
+            componentId: "HeatDiffusion",
+            instanceName: "hd_live",
+            parameters: { power_shape: uuid },
+            constructorMode: "default",
+          },
+        },
+      ],
+    });
+
+    renderTree();
+    const row = screen.getByText("ps_live").closest('li[role="treeitem"]');
+    fireEvent.contextMenu(row!);
+
+    const del = await screen.findByRole("menuitem", { name: /^Delete$/i });
+    fireEvent.click(del);
+
+    const desc = await screen.findByText(
+      /Delete power shape ps_live\? It is used by 1 component\(s\)\./,
+    );
+    expect(desc).toBeTruthy();
+  });
+
+  it("Mixed keys: usage count sums across both forms", async () => {
+    const uuid = useStore.getState().addGeometry({
+      name: "g_mix",
+      kind: "rectangular",
+      params: { L: 1.0, W: 0.1, H: 0.05 },
+    });
+    useStore.setState({
+      nodes: [
+        {
+          id: "node-mix-1",
+          type: "streamNode",
+          position: { x: 0, y: 0 },
+          data: {
+            componentId: "Channel",
+            instanceName: "channel_live",
+            parameters: { geometry: uuid },
+            constructorMode: "default",
+          },
+        },
+        {
+          id: "node-mix-2",
+          type: "streamNode",
+          position: { x: 0, y: 50 },
+          data: {
+            componentId: "Channel",
+            instanceName: "channel_legacy",
+            parameters: { geometry_ref: uuid },
+            constructorMode: "default",
+          },
+        },
+      ],
+    });
+
+    renderTree();
+    const row = screen.getByText("g_mix").closest('li[role="treeitem"]');
+    fireEvent.contextMenu(row!);
+
+    const del = await screen.findByRole("menuitem", { name: /^Delete$/i });
+    fireEvent.click(del);
+
+    const desc = await screen.findByText(/used by 2 component\(s\)/);
+    expect(desc).toBeTruthy();
+  });
+
+  it("Cancel is focused by default after dialog opens (Radix first-focusable)", async () => {
+    const uuid = useStore.getState().addGeometry({
+      name: "g_focus",
+      kind: "rectangular",
+      params: { L: 1.0, W: 0.1, H: 0.05 },
+    });
+    useStore.setState({
+      nodes: [
+        {
+          id: "node-focus-1",
+          type: "streamNode",
+          position: { x: 0, y: 0 },
+          data: {
+            componentId: "Channel",
+            instanceName: "channel_focus",
+            parameters: { geometry: uuid },
+            constructorMode: "default",
+          },
+        },
+      ],
+    });
+
+    renderTree();
+    const row = screen.getByText("g_focus").closest('li[role="treeitem"]');
+    fireEvent.contextMenu(row!);
+    const del = await screen.findByRole("menuitem", { name: /^Delete$/i });
+    fireEvent.click(del);
+
+    await screen.findByRole("button", { name: /^Cancel$/i });
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toBe("Cancel"),
+    );
+  });
+
+  it("Delete anyway button uses destructive variant", async () => {
+    const uuid = useStore.getState().addGeometry({
+      name: "g_destructive",
+      kind: "rectangular",
+      params: { L: 1.0, W: 0.1, H: 0.05 },
+    });
+    useStore.setState({
+      nodes: [
+        {
+          id: "node-destr-1",
+          type: "streamNode",
+          position: { x: 0, y: 0 },
+          data: {
+            componentId: "Channel",
+            instanceName: "channel_destr",
+            parameters: { geometry: uuid },
+            constructorMode: "default",
+          },
+        },
+      ],
+    });
+
+    renderTree();
+    const row = screen.getByText("g_destructive").closest('li[role="treeitem"]');
+    fireEvent.contextMenu(row!);
+    const del = await screen.findByRole("menuitem", { name: /^Delete$/i });
+    fireEvent.click(del);
+
+    const deleteAnyway = await screen.findByRole("button", {
+      name: /^Delete anyway$/i,
+    });
+    const variantAttr = deleteAnyway.getAttribute("data-variant");
+    const classAttr = deleteAnyway.getAttribute("class") ?? "";
+    expect(
+      variantAttr === "destructive" || /destructive/.test(classAttr),
+    ).toBe(true);
   });
 });
