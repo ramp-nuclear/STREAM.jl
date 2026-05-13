@@ -390,6 +390,45 @@ function ChannelHeatFlux(;
 end
 
 
+function _nu_film(T_film::Real, mdot::Real, Dh::Real, A::Real, nu_f::Function)
+    Re = abs(mdot) * Dh / (A * mu_water(T_film))
+    Pr = cp_water(T_film) * mu_water(T_film) / k_water(T_film)
+    return nu_f(Re, Pr)
+end
+
+function _nu_film(T_w::Real, T::Real, mdot::Real, Dh::Real, A::Real, nu_f::Function)
+    T_film   = (T_w + T) / 2
+    nupartial(Re, Pr) = nu_f(Re, Pr, T_w, T)
+    return _nu_film(T_film, mdot, Dh, A, nupartial)
+end
+
+function _h_spl(T_w::Real, T::Real, mdot::Real, Dh::Real, A::Real, nu_f::Function)
+    T_film   = (T_w + T) / 2
+    return _nu_film(T_film, mdot, Dh, A, nu_f) * k_water(T_film) / Dh
+end
+
+
+function _h_eq_nocor(Tw::Real, T::Real, mdot::Real, Dh::Real, A::Real, htc, nu_f::Function)
+    return htc ~ _h_spl(Tw, T, mdot, Dh, A, nu_f)
+end
+
+
+function _h_eq_scb_cor(T_w::Real, T::Real, cumdp::Real, dp::Real, htc, mdot::Real, 
+                       P_in::Real, Dh::Real, A::Real, nu_f::Function, scb_f::Function)
+    h_spl = _h_spl(T_w, T, mdot, Dh, A, nu_f)
+    q_spl = max(h_spl * (T_w - T), 0.0)
+    P = P_in - cumdp + dp/2
+    T_sat = sat_temperature(P)
+    Re = abs(mdot) * Dh / (A * mu_water(T))
+    q_scb  = scb_f(T_w, T_sat, Re)
+    T_ONB  = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
+    q_scb_inc  = scb_f(T_ONB, T_sat, Re)
+    factor     = partial_SCB_correction(q_spl, q_scb, q_scb_inc)
+
+    return htc ~ ifelse(T_w >= T_ONB, h_spl * factor, h_spl)
+end
+
+
 """
     ChannelAndContacts(; name, n, geometry, g=0.0,
                        htc_correlation=dittus_boelter,
@@ -450,65 +489,30 @@ function ChannelAndContacts(;
         Q_wall_total(t)
     end
 
-    variant_eqs = Equation[]
     if scb_correction === nothing
-        for i in 1:n
-            T_left_w   = thermal_left[i].T
-            T_film_l   = (vars.T[i] + T_left_w) / 2
-            Re_l       = abs(port_in.mdot) * Dh / (A * mu_water(T_film_l))
-            Pr_l       = cp_water(T_film_l) * mu_water(T_film_l) / k_water(T_film_l)
-            push!(variant_eqs, h_tc_left[i]  ~ htc_correlation(Re_l, Pr_l, vars.T[i], T_left_w) * k_water(T_film_l) / Dh)
-
-            T_right_w  = thermal_right[i].T
-            T_film_r   = (vars.T[i] + T_right_w) / 2
-            Re_r       = abs(port_in.mdot) * Dh / (A * mu_water(T_film_r))
-            Pr_r       = cp_water(T_film_r) * mu_water(T_film_r) / k_water(T_film_r)
-            push!(variant_eqs, h_tc_right[i] ~ htc_correlation(Re_r, Pr_r, vars.T[i], T_right_w) * k_water(T_film_r) / Dh)
-
-        end
+        variant_eqs = [
+            [_h_eq_nocor(thermal_left[i].T,  vars.T[i], port_in.mdot, Dh, A, h_tc_left[i], htc_correlation) 
+             for i in 1:n]...;
+            [_h_eq_nocor(thermal_right[i].T, vars.T[i], port_in.mdot, Dh, A, h_tc_right[i], htc_correlation) 
+             for i in 1:n]...
+        ]
     else
-        for i in 1:n
-            T_w_left_i   = thermal_left[i].T
-            T_w_right_i  = thermal_right[i].T
-            T_film_left_i  = (vars.T[i] + T_w_left_i) / 2
-            T_film_right_i = (vars.T[i] + T_w_right_i) / 2
-
-            Re_left_i     = abs(port_in.mdot) * Dh / (A * mu_water(T_film_left_i))
-            Pr_left_i     = cp_water(T_film_left_i) * mu_water(T_film_left_i) / k_water(T_film_left_i)
-            h_spl_left_i  = htc_correlation(Re_left_i, Pr_left_i, vars.T[i], T_w_left_i) * k_water(T_film_left_i) / Dh
-            Re_right_i    = abs(port_in.mdot) * Dh / (A * mu_water(T_film_right_i))
-            Pr_right_i    = cp_water(T_film_right_i) * mu_water(T_film_right_i) / k_water(T_film_right_i)
-            h_spl_right_i = htc_correlation(Re_right_i, Pr_right_i, vars.T[i], T_w_right_i) * k_water(T_film_right_i) / Dh
-
-            q_spl_left_i = max(h_spl_left_i * (T_w_left_i - vars.T[i]), 0.0)
-            q_spl_right_i = max(h_spl_right_i * (T_w_right_i - vars.T[i]), 0.0)
-
-            # Inline P[i] (NOT the P[i] symbol to avoid an observed-to-observed chain)
-            P_i = port_in.P - sum(vars.dp[j] for j in 1:i) + vars.dp[i]/2
-            T_sat_i = sat_temperature(P_i)
-            Re_i_bulk = abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i]))
-            q_scb_left_i  = scb_correction(T_w_left_i, T_sat_i, Re_i_bulk)
-            q_scb_right_i = scb_correction(T_w_right_i, T_sat_i, Re_i_bulk)
-            T_ONB_left_i  = T_sat_i + _bergles_rohsenow_dT_ONB(P_i, q_spl_left_i)
-            T_ONB_right_i = T_sat_i + _bergles_rohsenow_dT_ONB(P_i, q_spl_right_i)
-            q_scb_inc_left_i  = scb_correction(T_ONB_left_i, T_sat_i, Re_i_bulk)
-            q_scb_inc_right_i = scb_correction(T_ONB_right_i, T_sat_i, Re_i_bulk)
-            factor_left_i     = partial_SCB_correction(q_spl_left_i, q_scb_left_i, q_scb_inc_left_i)
-            factor_right_i    = partial_SCB_correction(q_spl_right_i, q_scb_right_i, q_scb_inc_right_i)
-
-            push!(variant_eqs, h_tc_left[i]  ~ ifelse(T_w_left_i >= T_ONB_left_i, h_spl_left_i * factor_left_i, h_spl_left_i))
-            push!(variant_eqs, h_tc_right[i] ~ ifelse(T_w_right_i >= T_ONB_right_i, h_spl_right_i * factor_right_i, h_spl_right_i))
-        end
+        variant_eqs = [
+            [_h_eq_scb_cor(thermal_left[i].T,  vars.T[i], sum([vars.dp[j] for j in 1:i]), 
+                           vars.dp[i], h_tc_left[i],  port_in.mdot, port_in.P, Dh, A, htc_correlation, scb_correction) 
+                           for i in 1:n]...;
+            [_h_eq_scb_cor(thermal_right[i].T, vars.T[i], sum([vars.dp[j] for j in 1:i]), 
+                           vars.dp[i], h_tc_right[i], port_in.mdot, port_in.P, Dh, A, htc_correlation, scb_correction) 
+                           for i in 1:n]...;
+        ]
     end
 
-    q_left_expr  = Vector{Num}(undef, n)
-    q_right_expr = Vector{Num}(undef, n)
-    for i in 1:n
-        q_left_expr[i]  = h_tc_left[i]  * geometry.heated_parts[1] * dz * (thermal_left[i].T  - vars.T[i])
-        q_right_expr[i] = h_tc_right[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - vars.T[i])
-        push!(variant_eqs, thermal_left[i].Q_flow  ~ q_left_expr[i])
-        push!(variant_eqs, thermal_right[i].Q_flow ~ q_right_expr[i])
-    end
+    q_left_expr =  [h_tc_left[i]  * geometry.heated_parts[1] * dz * (thermal_left[i].T   - vars.T[i]) for i in 1:n]
+    q_right_expr = [h_tc_right[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T  - vars.T[i]) for i in 1:n]
+    variant_eqs = [variant_eqs...; 
+                   [thermal_left[i].Q_flow  ~ q_left_expr[i]  for i in 1:n]...;
+                   [thermal_right[i].Q_flow ~ q_right_expr[i] for i in 1:n]...;
+                   ]
 
     core = _channel_core(;
         n=n, 
@@ -520,30 +524,21 @@ function ChannelAndContacts(;
         vars=vars,
     )
 
-    variant_obs = Equation[]
-    for i in 1:n
-        T_w_obs_left_i    = thermal_left[i].T
-        T_film_obs_left_i = (vars.T[i] + T_w_obs_left_i) / 2
-        Re_film_left_i    = abs(port_in.mdot) * Dh / (A * mu_water(T_film_obs_left_i))
-        Pr_film_left_i    = cp_water(T_film_obs_left_i) * mu_water(T_film_obs_left_i) / k_water(T_film_obs_left_i)
-        push!(variant_obs, Nu_left[i] ~ htc_correlation(Re_film_left_i, Pr_film_left_i, vars.T[i], T_w_obs_left_i))
-
-        T_w_obs_right_i    = thermal_right[i].T
-        T_film_obs_right_i = (vars.T[i] + T_w_obs_right_i) / 2
-        Re_film_right_i    = abs(port_in.mdot) * Dh / (A * mu_water(T_film_obs_right_i))
-        Pr_film_right_i    = cp_water(T_film_obs_right_i) * mu_water(T_film_obs_right_i) / k_water(T_film_obs_right_i)
-        push!(variant_obs, Nu_right[i] ~ htc_correlation(Re_film_right_i, Pr_film_right_i, vars.T[i], T_w_obs_right_i))
-
-        push!(variant_obs, vars.T_wall_left[i]  ~ thermal_left[i].T)
-        push!(variant_obs, vars.T_wall_right[i] ~ thermal_right[i].T)
-        push!(variant_obs, velocity[i] ~ abs(vars.v[i]))
-        Re_i_bulk = abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i]))
-        Gr_left_i  = Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_left[i].T , vars.T[i], Dh, g)
-        Gr_right_i = Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_right[i].T, vars.T[i], Dh, g)
-        push!(variant_obs, Gr_over_Re2_left[i] ~ Gr_left_i / Re_i_bulk^2)
-        push!(variant_obs, Gr_over_Re2_right[i] ~ Gr_right_i / Re_i_bulk^2)
-    end
-    push!(variant_obs, Q_wall_total ~ sum(q_left_expr[i] + q_right_expr[i] for i in 1:n))
+    Re_bulk = [abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i])) for i in 1:n]
+    Gr_left  = [Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_left[i].T ,  vars.T[i], Dh, g) for i in 1:n]
+    Gr_right = [Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_right[i].T , vars.T[i], Dh, g) for i in 1:n]
+    variant_obs = [
+        [Nu_left[i]  ~ _nu_film(thermal_left[i].T,  vars.T[i], port_in.mdot, Dh, A, htc_correlation) 
+         for i in 1:n]...;
+        [Nu_right[i] ~ _nu_film(thermal_right[i].T, vars.T[i], port_in.mdot, Dh, A, htc_correlation) 
+         for i in 1:n]...;
+        [vars.T_wall_left[i] ~ thermal_left[i].T for i in 1:n]...;
+        [vars.T_wall_right[i] ~ thermal_right[i].T for i in 1:n]...;
+        [velocity[i] ~ abs(vars.v[i]) for i in 1:n]...;
+        [Gr_over_Re2_left[i]  ~ Gr_left[i]  / Re_bulk[i]^2 for i in 1:n]...;
+        [Gr_over_Re2_right[i] ~ Gr_right[i] / Re_bulk[i]^2 for i in 1:n]...;
+        Q_wall_total ~ sum(q_left_expr[i] + q_right_expr[i] for i in 1:n);
+    ]
 
     eqs = [core.eqs...; variant_eqs...]
     obs = [core.obs...; variant_obs...]
