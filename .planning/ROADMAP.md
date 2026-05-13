@@ -115,6 +115,16 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] 63-C-PLAN.md (Wave 2, depends on 63-B) — BCs tab UI: `SidebarPanel.tsx` Tabs wrapper, new `BCsTabForm.tsx` + `BCModePicker.tsx` + extracted `SegmentedButtonGroup.tsx` primitive; `+ New <SourceKind>` inline-button flow.
 - [x] 63-D-PLAN.md (Wave 2, parallel to 63-C, depends on 63-B) — Canvas BC edge: `BCEdge.tsx` dashed + click-to-cycle chip; `StreamNode.tsx` BCPort hollow-square handle + source-label + drop overlay + red-ring; `CanvasPanel.tsx` edgeTypes + isValidConnection BCPort allow-list; `ToolboxPanel.tsx` Sources populated.
 
+### Phase 63.1: BC architecture rework — unified BCs tab (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 63
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 63.1 to break down)
+
 ### Phase 64: Connection routing
 
 **Goal:** Solve the connection-arrow ugliness verified in the example_*.png screenshots. Per-port autoflip moves each FlowPort handle to the side facing its connected neighbor. Asymmetric same-side placement disambiguates when both ports of a component end up on the same edge. Thermal-port-pair axis-flip for CAC/HD (left/right or top/bottom). Optional polish hook for anti-parallel offset of bidirectional pairs.

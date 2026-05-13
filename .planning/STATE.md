@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: ready_to_plan
+status: planning
 stopped_at: Phase 63 context gathered
-last_updated: "2026-05-13T13:31:48.917Z"
+last_updated: "2026-05-13T15:37:14.000Z"
 last_activity: 2026-05-13
 progress:
-  total_phases: 14
+  total_phases: 15
   completed_phases: 5
-  total_plans: 26
-  completed_plans: 26
-  percent: 36
+  total_plans: 30
+  completed_plans: 30
+  percent: 100
 ---
 
 # STATE: STREAM.jl
@@ -76,6 +76,7 @@ Next: `/gsd:discuss-phase 62` (recommended) — or `/gsd:plan-phase 62` to skip 
 - v1.2 milestone (2026-05-11): GUI Redesign — Phases 59-72. Phase 59 is a `src/` cleanup prerequisite (correlation factories take `geom::PipeGeometry` first), Phase 60 adds the `fuel_assembly` composition helper, Phase 61 rewrites the GUI component registry, then Phases 62-72 ship the actual GUI redesign (resources panel, BCs tab, connection routing, interaction model, code preview, etc.). Canonical decisions live in `.planning/notes/gui-redesign-design-decisions.md`.
 - Phase 59 (2026-05-11): Correlation `geom`-first refactor shipped. All HTC + friction factories take `geom::PipeGeometry` positionally; `const HTCCorrelation = Function` exported. Python parity gate held (424 CLEAN / 34 FAIL / 78 GRAY, zero verdict flips). Phase 61 handoff doc at `.planning/notes/correlation-geom-first-api.md`.
 - Phase 61 (2026-05-12): Registry audit + rewrite shipped — `gui/src/registry/components.json` now has 16 components (Channel/CHF/CAC/HD rewritten for v1.1; new: WallTemperature, HeatFluxSource, PointKinetics, ReactivityController). Envelope stream_version 1.1.0 / schema_version 2.0. 239 tests pass (was 232; +7 cross-validation tests for FK / array_size / pair_with resolution). `npm run build` baseline 7 pre-existing tsc errors (documented in `.planning/phases/61-.../deferred-items.md` — Phase 71 owns reconciliation). Phase 61 deliberately did NOT touch GUI rendering (`ToolboxPanel.tsx`, `StreamNode.tsx`, `ParameterForm.tsx`); the new categories (Sources / Reactor Physics / Resources) are invisible in the running app and Channel's new params don't render until Phase 62 (Resources panel + Sources toolbox category), Phase 63 (Properties vs BCs tab split + value-source UI), and Phase 68 (four-layer taxonomy) land. Plan 61-05 Task 3's smoke-test wording was over-eager — it described UI visibility that a data-only refactor cannot deliver; treat that as a planner-template lesson, not a Phase 61 gap.
+- Phase 63.1 inserted after Phase 63: BC architecture rework — unified BCs tab (URGENT)
 
 ### Key Decisions (carry-forward)
 
