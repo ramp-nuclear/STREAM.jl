@@ -31,7 +31,7 @@ function resetStore() {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — fill in code)",
+          name: "(leave unset — set in code)",
           kind: "unset",
           params: {},
         },
@@ -146,7 +146,7 @@ describe("GeometryResourceEditor", () => {
   });
 
   describe("Julia identifier validation (verbatim UI-SPEC copy)", () => {
-    it("shows 'Use ASCII letters, digits, and underscores; must not start with a digit.' for 3channel", () => {
+    it("shows 'Letters, digits, underscores. Cannot start with a digit.' for 3channel", () => {
       const onSubmit = vi.fn();
       renderEditor({ mode: "create", onSubmit });
 
@@ -154,9 +154,10 @@ describe("GeometryResourceEditor", () => {
       fireEvent.change(nameInput, { target: { value: "3channel" } });
       fireEvent.click(screen.getByText("Create"));
 
+      // 62-15 rewrite per VERIFICATION Gap #4 — engineering-voice copy.
       expect(
         screen.getByText(
-          "Use ASCII letters, digits, and underscores; must not start with a digit.",
+          "Letters, digits, underscores. Cannot start with a digit.",
         ),
       ).toBeTruthy();
       expect(onSubmit).not.toHaveBeenCalled();
@@ -172,7 +173,7 @@ describe("GeometryResourceEditor", () => {
 
       expect(
         screen.getByText(
-          "Use ASCII letters, digits, and underscores; must not start with a digit.",
+          "Letters, digits, underscores. Cannot start with a digit.",
         ),
       ).toBeTruthy();
       expect(onSubmit).not.toHaveBeenCalled();

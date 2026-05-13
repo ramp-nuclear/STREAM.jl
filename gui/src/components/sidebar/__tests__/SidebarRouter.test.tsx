@@ -40,7 +40,7 @@ function resetStore() {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — fill in code)",
+          name: "(leave unset — set in code)",
           kind: "unset",
           params: {},
         },
@@ -170,17 +170,19 @@ describe("SidebarPanel — D-05 body branching by selection kind", () => {
   it("D-05: no-selection body — Resources tab active shows variant copy", () => {
     useStore.getState().setActiveLeftTab("Resources");
     renderPanel();
+    // 62-15 (VERIFICATION Gap #4) — was "Select a resource on the left to edit it."
     expect(
-      screen.getByText("Select a resource on the left to edit it."),
+      screen.getByText("Select a resource to edit it."),
     ).toBeTruthy();
   });
 
   it("D-05: no-selection body — Components tab active shows standard copy", () => {
     useStore.getState().setActiveLeftTab("Components");
     renderPanel();
+    // 62-15 (VERIFICATION Gap #4) — was "Select a component on the canvas to view its properties."
     expect(
       screen.getByText(
-        "Select a component on the canvas to view its properties.",
+        "Select a component to view its properties.",
       ),
     ).toBeTruthy();
   });
