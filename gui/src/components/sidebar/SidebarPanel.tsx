@@ -49,6 +49,7 @@ import InstanceNameField from "./InstanceNameField";
 import ParameterForm from "./ParameterForm";
 import ModeToggle from "./ModeToggle";
 import BCsTabForm from "./BCsTabForm";
+import AnchorsSection from "./AnchorsSection";
 import GeometryResourceEditor from "./GeometryResourceEditor";
 import PowerShapeResourceEditor from "./PowerShapeResourceEditor";
 
@@ -149,7 +150,17 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
       }
       const activeMode =
         data.constructorMode ?? component.constructorModes[0]?.mode ?? "default";
-      const hasBCs = (component.external_inputs?.length ?? 0) > 0;
+      // Phase 63.1 D-04 / D-09: broaden the BCs tab visibility gate. Pre-63.1
+      // the BCs tab was visible only when a component had external_inputs
+      // (Channel, ChannelHeatFlux, ChannelAndContacts). Now a component with
+      // a FlowPort can also carry a pressure anchor, so the tab must render
+      // for those too (Pump, Resistor, Gravity, etc.). The Anchors section
+      // inside the BCs body is itself gated on hasFlowPort (D-04); the
+      // External Inputs section is gated on hasExternalInputs.
+      const hasFlowPort = component.ports.some((p) => p.type === "FlowPort");
+      const hasExternalInputs =
+        (component.external_inputs?.length ?? 0) > 0;
+      const hasBCs = hasFlowPort || hasExternalInputs;
       // The outer <div key={selectedNodeId}> remount discipline (preserved
       // below) handles D-03: switching selection remounts the whole subtree,
       // so the <Tabs> local state defaults back to "properties" automatically.
@@ -173,6 +184,8 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
               activeMode={activeMode}
               data={data}
               selectedNodeId={selectedNodeId}
+              hasFlowPort={hasFlowPort}
+              hasExternalInputs={hasExternalInputs}
               onParamChange={(name, value) =>
                 updateNodeParams(selectedNodeId, {
                   parameters: { [name]: value },
@@ -349,6 +362,10 @@ interface ComponentTabsProps {
   activeMode: string;
   data: StreamNodeData;
   selectedNodeId: string;
+  /** Phase 63.1 D-04: gates the Anchors section inside the BCs tab body. */
+  hasFlowPort: boolean;
+  /** Phase 63.1 D-09: gates the External Inputs section + separator inside the BCs tab body. */
+  hasExternalInputs: boolean;
   onParamChange: (name: string, value: unknown) => void;
   onModeChange: (mode: string) => void;
 }
@@ -358,6 +375,8 @@ function ComponentTabs({
   activeMode,
   data,
   selectedNodeId,
+  hasFlowPort,
+  hasExternalInputs,
   onParamChange,
   onModeChange,
 }: ComponentTabsProps) {
@@ -391,7 +410,33 @@ function ComponentTabs({
         />
       </TabsContent>
       <TabsContent value="bcs">
-        <BCsTabForm component={component} nodeId={selectedNodeId} />
+        {/* Phase 63.1 D-09: two-section BCs tab body — Anchors above External
+            Inputs. Each section is independently gated. The defensive empty
+            branch (UI-SPEC §"BCs-Tab Layout" gating rules) covers the
+            theoretically-unreachable case where the host gate let this body
+            render with neither section eligible. */}
+        {hasFlowPort && (
+          <>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground leading-[1.3] mb-[8px]">
+              Anchors
+            </h3>
+            <AnchorsSection nodeId={selectedNodeId} component={component} />
+            {hasExternalInputs && <Separator className="my-[16px]" />}
+          </>
+        )}
+        {hasExternalInputs && (
+          <>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground leading-[1.3] mb-[8px]">
+              External Inputs
+            </h3>
+            <BCsTabForm component={component} nodeId={selectedNodeId} />
+          </>
+        )}
+        {!hasFlowPort && !hasExternalInputs && (
+          <p className="text-xs text-muted-foreground">
+            This component has no boundary conditions.
+          </p>
+        )}
       </TabsContent>
     </Tabs>
   );
