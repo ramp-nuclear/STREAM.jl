@@ -11,7 +11,6 @@ import {
   MarkerType,
 } from "@xyflow/react";
 import { getComponent } from "../registry";
-import type { BCEntry } from "../lib/codeGenerator";
 import { validateTopology, type TopologyResult } from "../lib/validation";
 import {
   bcModeKey,
@@ -1545,17 +1544,11 @@ const useStore = create<AppState>()((set, get) => ({
 
   validateAndGate: () => {
     const { nodes, edges, anchors } = get();
-    // Phase 63.1 D-02 transitional: validation.ts still types its 3rd arg as
-    // BCEntry[] (Plan 04 retires the signature). Materialize a synthetic
-    // BCEntry[] from the anchors Record so the validateTopology "no pressure
-    // boundary condition" check continues to work without changing
-    // validation.ts in this plan.
-    const bcsAdapter: BCEntry[] = Object.entries(anchors).map(([nodeId, entry]) => ({
-      nodeId,
-      portField: entry.portField,
-      value: entry.value,
-    }));
-    const result = validateTopology(nodes, edges, bcsAdapter, getComponent);
+    // 63.1-04: anchors slice replaces the legacy boundary-conditions array
+    // for the export gate. validateTopology now takes the anchors Record
+    // directly and checks `Object.keys(anchors).length === 0` to surface the
+    // "No pressure boundary condition" SystemError.
+    const result = validateTopology(nodes, edges, anchors, getComponent);
     const errorIds = new Set(result.nodeErrors.map((e) => e.nodeId));
     set({ errorNodeIds: errorIds, validationResult: result });
     return result;

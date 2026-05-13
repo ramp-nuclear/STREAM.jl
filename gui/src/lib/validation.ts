@@ -47,7 +47,7 @@ export function validateJuliaIdentifier(value: string): StringValidationResult {
 // ---------------------------------------------------------------------------
 
 import type { Node, Edge } from "@xyflow/react";
-import type { BCEntry } from "./codeGenerator";
+import type { AnchorEntry } from "./anchors";
 import type { ComponentDefinition } from "../registry/types";
 
 export interface NodeError {
@@ -79,7 +79,7 @@ export interface TopologyResult {
 export function validateTopology(
   nodes: Node[],
   edges: Edge[],
-  bcs: BCEntry[],
+  anchors: Record<string, AnchorEntry>,
   getComponentDef: (id: string) => ComponentDefinition | undefined,
 ): TopologyResult {
   const nodeErrors: NodeError[] = [];
@@ -107,7 +107,7 @@ export function validateTopology(
   }
 
   const systemErrors: SystemError[] = [];
-  if (bcs.length === 0) {
+  if (Object.keys(anchors).length === 0) {
     systemErrors.push({ message: "No pressure boundary condition" });
   }
   const hasDriving = nodes.some((n) => {
