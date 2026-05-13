@@ -8,7 +8,20 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import useStore from "../../store/useStore";
 import { isAllowedBCConnection } from "../../lib/bcMode";
+import {
+  selectNodeErrors,
+  type NodeErrorsInput,
+} from "../../lib/selectors/nodeErrors";
 import type { Node } from "@xyflow/react";
+
+// Phase 63.1 D-15: errorTagsByNodeId removed; assert via selectNodeErrors.
+function errorsFor(nodeId: string): string[] {
+  const s = useStore.getState() as unknown as NodeErrorsInput & { anchors?: Record<string, never> };
+  return selectNodeErrors(
+    { ...s, anchors: s.anchors ?? {} } as NodeErrorsInput,
+    nodeId,
+  );
+}
 
 function makeNode(id: string, componentId: string, n = 10): Node {
   return {
@@ -55,13 +68,13 @@ describe("isAllowedBCConnection (D-21)", () => {
 
 describe("Store path — BC edge materialization", () => {
   beforeEach(() => {
+    // Phase 63.1 D-15: errorTagsByNodeId removed.
     useStore.setState({
       nodes: [],
       edges: [],
       bcs: [],
       bcMode: {},
       bcSymmetric: {},
-      errorTagsByNodeId: {},
       errorNodeIds: new Set<string>(),
       _undoPast: [],
       _undoFuture: [],
@@ -83,7 +96,7 @@ describe("Store path — BC edge materialization", () => {
     expect(bcEdge?.target).toBe("ch1");
   });
 
-  it("creating an n-mismatched WT→Channel BC edge flags both endpoints in errorTagsByNodeId (D-22)", () => {
+  it("creating an n-mismatched WT→Channel BC edge surfaces bc-n-mismatch via selectNodeErrors (D-22, D-15)", () => {
     useStore.setState({
       nodes: [makeNode("wt1", "WallTemperature", 10), makeNode("ch1", "Channel", 12)],
     });
@@ -91,12 +104,12 @@ describe("Store path — BC edge materialization", () => {
       mode: "source",
       sourceNodeId: "wt1",
     });
-    const tags = useStore.getState().errorTagsByNodeId;
-    expect(tags["wt1"]).toContain("bc-n-mismatch");
-    expect(tags["ch1"]).toContain("bc-n-mismatch");
+    // Phase 63.1 D-15: derived from bcMode + nodes, not from a stored slice.
+    expect(errorsFor("wt1")).toContain("bc-n-mismatch");
+    expect(errorsFor("ch1")).toContain("bc-n-mismatch");
   });
 
-  it("creating a matched WT→Channel BC edge does NOT add an n-mismatch tag (D-22)", () => {
+  it("creating a matched WT→Channel BC edge — selectNodeErrors returns [] for both (D-22, D-15)", () => {
     useStore.setState({
       nodes: [makeNode("wt1", "WallTemperature", 10), makeNode("ch1", "Channel", 10)],
     });
@@ -104,14 +117,17 @@ describe("Store path — BC edge materialization", () => {
       mode: "source",
       sourceNodeId: "wt1",
     });
-    const tags = useStore.getState().errorTagsByNodeId;
-    expect(tags["wt1"]).toBeUndefined();
-    expect(tags["ch1"]).toBeUndefined();
+    expect(errorsFor("wt1")).toEqual([]);
+    expect(errorsFor("ch1")).toEqual([]);
   });
 
-  it("canvas-drag path (addEdge) also runs _checkBCNMismatch — Blocker-2 gate (D-22)", () => {
-    // Simulate the user dragging a BCPort connection on the canvas (the
-    // entry point that bypasses setBCMode and goes through addEdge).
+  it("canvas-drag path (addEdge) — selectNodeErrors contract (D-22, D-15)", () => {
+    // Phase 63.1 D-15: the canvas-drag path no longer writes per-event tags
+    // (_checkBCNMismatch removed). selectNodeErrors derives ring state from
+    // bcMode; Plan 05 will land the addEdge→bcMode mirroring that makes the
+    // canvas-drag path equivalent to setBCMode for selector purposes.
+    // Until Plan 05, addEdge creates the edge but no bcMode entry — so the
+    // selector returns [] for both. The edge is still materialized.
     useStore.setState({
       nodes: [makeNode("wt2", "WallTemperature", 10), makeNode("ch2", "Channel", 12)],
     });
@@ -121,8 +137,8 @@ describe("Store path — BC edge materialization", () => {
       sourceHandle: "T_wall_out",
       targetHandle: "T_wall_left",
     });
-    const tags = useStore.getState().errorTagsByNodeId;
-    expect(tags["wt2"]).toContain("bc-n-mismatch");
-    expect(tags["ch2"]).toContain("bc-n-mismatch");
+    expect(useStore.getState().edges.find((e) => e.type === "bcEdge")).toBeDefined();
+    expect(errorsFor("wt2")).toEqual([]);
+    expect(errorsFor("ch2")).toEqual([]);
   });
 });

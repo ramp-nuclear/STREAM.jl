@@ -37,9 +37,13 @@ function renderStreamNode(data: {
 
 beforeEach(() => {
   // Reset the BC-relevant slices so error-ring tests start clean.
+  // Phase 63.1 D-15: errorTagsByNodeId removed; ring state now derives from
+  // selectNodeErrors over nodes + bcMode.
   useStore.setState({
     errorNodeIds: new Set<string>(),
-    errorTagsByNodeId: {},
+    nodes: [],
+    bcMode: {},
+    bcSymmetric: {},
   });
 });
 
@@ -287,10 +291,41 @@ describe("StreamNode — Phase 63 source-block label (D-19)", () => {
 // Phase 63 D-22: errorTagsByNodeId-driven red-ring outline
 // ---------------------------------------------------------------------------
 
-describe("StreamNode — Phase 63 BC error red-ring (D-22)", () => {
-  it("applies red-ring outline when errorTagsByNodeId contains a tag (D-22)", () => {
+describe("StreamNode — Phase 63 BC error red-ring (D-22 via selectNodeErrors, D-15)", () => {
+  it("applies red-ring outline when selectNodeErrors detects bc-n-mismatch (D-22)", () => {
+    // Phase 63.1 D-15: ring state is derived from nodes + bcMode by
+    // selectNodeErrors. Set up a source-mode binding from a Channel consumer
+    // (n=12) to a WallTemperature source (n=10) — the selector returns
+    // ['bc-n-mismatch'] for both endpoints, driving the red-ring.
     useStore.setState({
-      errorTagsByNodeId: { "wt_red": ["bc-n-mismatch"] },
+      nodes: [
+        {
+          id: "wt_red",
+          type: "streamNode",
+          position: { x: 0, y: 0 },
+          data: {
+            componentId: "WallTemperature",
+            instanceName: "wt_1",
+            parameters: { n: 10, T_wall: 320 },
+          },
+        },
+        {
+          id: "ch_red",
+          type: "streamNode",
+          position: { x: 0, y: 0 },
+          data: {
+            componentId: "Channel",
+            instanceName: "ch_1",
+            parameters: { n: 12 },
+          },
+        },
+      ],
+      bcMode: {
+        "ch_red::T_wall_left": {
+          mode: "source",
+          sourceNodeId: "wt_red",
+        },
+      },
     });
     const { container } = renderStreamNode(
       { componentId: "WallTemperature", instanceName: "wt_1", parameters: { n: 10, T_wall: 320 } },
@@ -300,9 +335,10 @@ describe("StreamNode — Phase 63 BC error red-ring (D-22)", () => {
     expect(nodeEl.className).toMatch(/ring-destructive/);
   });
 
-  it("does NOT apply red-ring when errorTagsByNodeId is empty for that node", () => {
+  it("does NOT apply red-ring when selectNodeErrors returns [] for that node", () => {
     useStore.setState({
-      errorTagsByNodeId: {},
+      nodes: [],
+      bcMode: {},
       errorNodeIds: new Set<string>(),
     });
     const { container } = renderStreamNode(
