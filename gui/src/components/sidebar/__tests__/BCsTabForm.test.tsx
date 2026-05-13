@@ -226,7 +226,16 @@ describe("BCsTabForm", () => {
     expect(screen.queryByText("amplitude")).toBeNull();
   });
 
-  it("Source mode with NO existing source nodes shows '+ New WallTemperature' inline button (D-20)", () => {
+  it("Promote-to-shared-source button renders next to the Mode Select when entry.mode !== 'source' and source_component is defined (Phase 63.1 D-07)", () => {
+    // Default beforeEach leaves bcMode empty → entry === undefined →
+    // entry?.mode !== "source", so the Promote button must render.
+    renderForm();
+    expect(
+      screen.getByRole("button", { name: /↗ Promote to shared source/ }),
+    ).toBeTruthy();
+  });
+
+  it("Promote-to-shared-source button is HIDDEN when entry.mode === 'source' (Phase 63.1 D-07 visibility rule)", () => {
     useStore.setState({
       bcMode: {
         [bcModeKey("ch1", "T_wall_left")]: {
@@ -241,8 +250,8 @@ describe("BCsTabForm", () => {
     });
     renderForm();
     expect(
-      screen.getByRole("button", { name: /\+ New WallTemperature/ }),
-    ).toBeTruthy();
+      screen.queryByRole("button", { name: /↗ Promote to shared source/ }),
+    ).toBeNull();
   });
 
   it("Source mode with existing source nodes shows a Select dropdown listing them (D-20)", () => {
@@ -268,22 +277,11 @@ describe("BCsTabForm", () => {
     expect(combos.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("clicking '+ New WallTemperature' calls addNode and setBCMode (D-20)", () => {
-    useStore.setState({
-      bcMode: {
-        [bcModeKey("ch1", "T_wall_left")]: {
-          mode: "source",
-          sourceNodeId: "",
-        },
-        [bcModeKey("ch1", "T_wall_right")]: {
-          mode: "source",
-          sourceNodeId: "",
-        },
-      },
-    });
+  it("clicking the Promote button spawns a WallTemperature node and flips the entry to source mode (Phase 63.1 D-07 / D-08)", () => {
+    // bcMode left undefined → Promote button visible. Click it.
     renderForm();
     fireEvent.click(
-      screen.getByRole("button", { name: /\+ New WallTemperature/ }),
+      screen.getByRole("button", { name: /↗ Promote to shared source/ }),
     );
     const state = useStore.getState();
     // Two nodes: original Channel + newly-spawned WallTemperature.
@@ -300,24 +298,14 @@ describe("BCsTabForm", () => {
     }
   });
 
-  it("clicking '+ New WallTemperature' seeds the new WT's n from the consumer Channel (D-20 — n defaults to consumer Channel's n)", () => {
+  it("clicking Promote seeds the new WallTemperature's n from the consumer Channel (Phase 63.1 D-07 / D-08 — n defaults to consumer's n)", () => {
     // Channel n = 12 fixture.
     useStore.setState({
       nodes: [makeChannelNode("ch1", 12)],
-      bcMode: {
-        [bcModeKey("ch1", "T_wall_left")]: {
-          mode: "source",
-          sourceNodeId: "",
-        },
-        [bcModeKey("ch1", "T_wall_right")]: {
-          mode: "source",
-          sourceNodeId: "",
-        },
-      },
     });
     renderForm();
     fireEvent.click(
-      screen.getByRole("button", { name: /\+ New WallTemperature/ }),
+      screen.getByRole("button", { name: /↗ Promote to shared source/ }),
     );
     const state = useStore.getState();
     const wtNode = state.nodes.find(
