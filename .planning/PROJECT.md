@@ -252,4 +252,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-08 — Phase 58 complete (MTK system determinacy repair: `hd.power ~ <value>` pins on the 5 broken scenarios, full `fully_determined=false` audit, `test/test_determinacy.jl` regression gate 11/11 PASS). v1.1 milestone phases 52–58 all complete.*
+*Last updated: 2026-05-13 — Phase 63 complete (BCs tab + value-source components in GUI: 5 BC modes with codegen, dashed BCEdge with mid-edge L+R/L/R cycle chip, BCPort hollow-square handle, WT/HFS toolbox draggables, Julia `rebin_intensive` + `cosine_T_wall_profile` helpers, 525 vitest pass / 11 Julia testsets green). Pending follow-up phase: BC-only architecture rework + drop-overlay/click-vs-drag/n-mismatch-ring lifecycle fixes (CR-01..03 from 63-REVIEW.md).*
