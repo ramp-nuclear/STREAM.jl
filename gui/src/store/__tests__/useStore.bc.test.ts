@@ -37,7 +37,9 @@ beforeEach(() => {
     nodes: [],
     edges: [],
     selectedNodeId: null,
-    bcs: [],
+    // Phase 63.1 D-02: legacy boundary-conditions slice removed; reset the
+    // new per-node anchors Record instead.
+    anchors: {},
     isDirty: false,
     _undoPast: [],
     _undoFuture: [],

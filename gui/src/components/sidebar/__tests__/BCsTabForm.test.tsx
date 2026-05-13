@@ -89,7 +89,7 @@ beforeEach(() => {
     nodes: [makeChannelNode("ch1", 10)],
     edges: [],
     selectedNodeId: "ch1",
-    bcs: [],
+    anchors: {},
     isDirty: false,
     _undoPast: [],
     _undoFuture: [],

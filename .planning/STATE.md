@@ -4,14 +4,14 @@ milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
 status: executing
 stopped_at: Phase 63.1 UI-SPEC approved
-last_updated: "2026-05-13T19:30:53.046Z"
+last_updated: "2026-05-13T19:42:52.801Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 15
   completed_phases: 5
   total_plans: 40
-  completed_plans: 31
-  percent: 78
+  completed_plans: 32
+  percent: 80
 ---
 
 # STATE: STREAM.jl
@@ -58,7 +58,7 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 ## Current Position
 
 Phase: 63.1 (bc-architecture-rework-unified-bcs-tab) — EXECUTING
-Plan: 2 of 10
+Plan: 3 of 10
 Status: Ready to execute
 Last activity: 2026-05-13
 Next: `/gsd:discuss-phase 62` (recommended) — or `/gsd:plan-phase 62` to skip discuss.

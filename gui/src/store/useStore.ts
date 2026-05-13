@@ -19,6 +19,7 @@ import {
   type BCModeEntry,
   type BCEdgeData,
 } from "@/lib/bcMode";
+import type { AnchorEntry } from "@/lib/anchors";
 import {
   serializeProject,
   deserializeProject,
@@ -134,10 +135,12 @@ export type ActiveLeftTab = "Components" | "Resources" | "Project";
 // Phase 63.1 D-15: `errorTagsByNodeId` removed from the undoable slice set;
 // ring/error state is now derived on demand by selectNodeErrors (no stored
 // derived state, so no snapshot field is needed).
+// Phase 63.1 D-02 / D-03: legacy boundary-conditions slice removed; the new
+// per-node pressure anchor Record (`anchors`) replaces it as the undoable slice.
 interface CanvasSnapshot {
   nodes: Node[];
   edges: Edge[];
-  bcs: BCEntry[];
+  anchors: Record<string, AnchorEntry>;
   resources: ResourcesSliceState;
   modelOptions: ModelOptionsSliceState;
   bcMode: Record<string, BCModeEntry>;
@@ -155,7 +158,10 @@ interface AppState {
   nodes: Node[];
   edges: Edge[];
   selectedNodeId: string | null;
-  bcs: BCEntry[];
+  // Phase 63.1 D-02: per-node pressure anchor Record (replaces legacy
+  // boundary-conditions slice). `anchors[nodeId] === undefined` is the
+  // canonical "no anchor on that component" sentinel (D-02 at-most-one).
+  anchors: Record<string, AnchorEntry>;
   bottomPanelOpen: boolean;
   bottomPanelHeight: number;
   setBottomPanelHeight: (height: number) => void;
@@ -192,8 +198,13 @@ interface AppState {
   addEdge: (connection: Connection) => void;
   removeEdge: (edgeId: string) => void;
   updateNodeParams: (nodeId: string, patch: Partial<StreamNodeData>) => void;
-  addBC: (bc: BCEntry) => void;
-  removeBC: (index: number) => void;
+  // Phase 63.1 D-02: anchors slice actions.
+  // setAnchor writes anchors[nodeId] = entry under snapshot-before-mutate
+  // discipline; calling twice on the same nodeId overwrites (at-most-one).
+  // clearAnchor deletes the entry via immutable spread+delete (Pattern B).
+  // Replaces the legacy boundary-conditions slice actions.
+  setAnchor: (nodeId: string, entry: AnchorEntry) => void;
+  clearAnchor: (nodeId: string) => void;
   toggleBottomPanel: () => void;
   // ----- Phase 62: Resources slice -----
   resources: ResourcesSliceState;
@@ -619,7 +630,8 @@ const useStore = create<AppState>()((set, get) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
-  bcs: [],
+  // Phase 63.1 D-02: anchors Record (replaces legacy boundary-conditions array).
+  anchors: {},
   bottomPanelOpen: false,
   bottomPanelHeight: 240,
   setBottomPanelHeight: (height) => set({ bottomPanelHeight: height }),
@@ -718,7 +730,7 @@ const useStore = create<AppState>()((set, get) => ({
     const {
       nodes,
       edges,
-      bcs,
+      anchors,
       resources,
       modelOptions,
       bcMode,
@@ -731,7 +743,7 @@ const useStore = create<AppState>()((set, get) => ({
         {
           nodes,
           edges,
-          bcs,
+          anchors,
           resources,
           modelOptions,
           bcMode,
@@ -746,7 +758,7 @@ const useStore = create<AppState>()((set, get) => ({
     const {
       nodes,
       edges,
-      bcs,
+      anchors,
       resources,
       modelOptions,
       bcMode,
@@ -759,7 +771,7 @@ const useStore = create<AppState>()((set, get) => ({
     set({
       nodes: prev.nodes,
       edges: prev.edges,
-      bcs: prev.bcs,
+      anchors: prev.anchors,
       resources: prev.resources,
       modelOptions: prev.modelOptions,
       bcMode: prev.bcMode,
@@ -769,7 +781,7 @@ const useStore = create<AppState>()((set, get) => ({
         {
           nodes,
           edges,
-          bcs,
+          anchors,
           resources,
           modelOptions,
           bcMode,
@@ -787,7 +799,7 @@ const useStore = create<AppState>()((set, get) => ({
     const {
       nodes,
       edges,
-      bcs,
+      anchors,
       resources,
       modelOptions,
       bcMode,
@@ -800,7 +812,7 @@ const useStore = create<AppState>()((set, get) => ({
     set({
       nodes: next.nodes,
       edges: next.edges,
-      bcs: next.bcs,
+      anchors: next.anchors,
       resources: next.resources,
       modelOptions: next.modelOptions,
       bcMode: next.bcMode,
@@ -810,7 +822,7 @@ const useStore = create<AppState>()((set, get) => ({
         {
           nodes,
           edges,
-          bcs,
+          anchors,
           resources,
           modelOptions,
           bcMode,
@@ -955,14 +967,20 @@ const useStore = create<AppState>()((set, get) => ({
 
   removeNode: (nodeId) => {
     get()._pushSnapshot();
-    const { nodes, edges, bcs, selectedNodeId, selectedResourceId } = get();
+    const { nodes, edges, anchors, selectedNodeId, selectedResourceId } = get();
     const clearedSelectedNode = selectedNodeId === nodeId ? null : selectedNodeId;
+    // Phase 63.1 D-02: purge any pressure anchor on the deleted node so the
+    // anchors Record never carries orphan entries (mirrors clearAnchor's
+    // immutable spread+delete idiom — Pattern B). Replaces the legacy
+    // boundary-conditions filter that previously lived at this site.
+    const nextAnchors: Record<string, AnchorEntry> = { ...anchors };
+    delete nextAnchors[nodeId];
     set({
       nodes: nodes.filter((n) => n.id !== nodeId),
       edges: edges.filter(
         (e) => e.source !== nodeId && e.target !== nodeId,
       ),
-      bcs: bcs.filter((bc) => bc.nodeId !== nodeId),
+      anchors: nextAnchors,
       selectedNodeId: null,
       selectionKind: deriveSelectionKind(clearedSelectedNode, selectedResourceId),
       isDirty: true,
@@ -1047,14 +1065,23 @@ const useStore = create<AppState>()((set, get) => ({
     set({ edges, isDirty: true });
   },
 
-  addBC: (bc) => {
+  // Phase 63.1 D-02 / D-03: anchors slice actions (replace the legacy
+  // boundary-conditions slice actions, which are physically removed).
+  // Snapshot-before-mutate discipline (Pattern A); at-most-one per nodeId so
+  // setAnchor on an existing key overwrites without dedup logic.
+  setAnchor: (nodeId, entry) => {
     get()._pushSnapshot();
-    set({ bcs: [...get().bcs, bc], isDirty: true });
+    set({
+      anchors: { ...get().anchors, [nodeId]: entry },
+      isDirty: true,
+    });
   },
 
-  removeBC: (index) => {
+  clearAnchor: (nodeId) => {
     get()._pushSnapshot();
-    set({ bcs: get().bcs.filter((_, i) => i !== index), isDirty: true });
+    const next = { ...get().anchors };
+    delete next[nodeId];
+    set({ anchors: next, isDirty: true });
   },
 
   // ---------------------------------------------------------------------------
@@ -1517,8 +1544,18 @@ const useStore = create<AppState>()((set, get) => ({
   // ---------------------------------------------------------------------------
 
   validateAndGate: () => {
-    const { nodes, edges, bcs } = get();
-    const result = validateTopology(nodes, edges, bcs, getComponent);
+    const { nodes, edges, anchors } = get();
+    // Phase 63.1 D-02 transitional: validation.ts still types its 3rd arg as
+    // BCEntry[] (Plan 04 retires the signature). Materialize a synthetic
+    // BCEntry[] from the anchors Record so the validateTopology "no pressure
+    // boundary condition" check continues to work without changing
+    // validation.ts in this plan.
+    const bcsAdapter: BCEntry[] = Object.entries(anchors).map(([nodeId, entry]) => ({
+      nodeId,
+      portField: entry.portField,
+      value: entry.value,
+    }));
+    const result = validateTopology(nodes, edges, bcsAdapter, getComponent);
     const errorIds = new Set(result.nodeErrors.map((e) => e.nodeId));
     set({ errorNodeIds: errorIds, validationResult: result });
     return result;
@@ -1564,7 +1601,7 @@ const useStore = create<AppState>()((set, get) => ({
       const json = serializeProject({
         nodes: state.nodes,
         edges: state.edges,
-        bcs: state.bcs,
+        anchors: state.anchors,
         resources: {
           geometries: state.resources.geometries,
           powerShapes: relPowerShapes,
@@ -1626,7 +1663,7 @@ const useStore = create<AppState>()((set, get) => ({
       const json = serializeProject({
         nodes: state.nodes,
         edges: state.edges,
-        bcs: state.bcs,
+        anchors: state.anchors,
         resources: {
           geometries: state.resources.geometries,
           powerShapes: relPowerShapes,
@@ -1772,7 +1809,10 @@ const useStore = create<AppState>()((set, get) => ({
       set({
         nodes: project.components,
         edges: enrichedProjectEdges,
-        bcs: project.bcs,
+        // Phase 63.1 D-02 / D-14: anchors Record replaces legacy
+        // boundary-conditions array on load. No legacy fallback per D-14 —
+        // old .streamgui files lose their anchor data (accepted breakage).
+        anchors: project.anchors,
         activeLayer: (project.layout.active_layer ?? "Both") as LayerView,
         currentFilePath: filePath,
         isDirty: false,
@@ -1842,7 +1882,8 @@ const useStore = create<AppState>()((set, get) => ({
     set({
       nodes: [],
       edges: [],
-      bcs: [],
+      // Phase 63.1 D-02: reset anchors Record on newProject.
+      anchors: {},
       activeLayer: "Both" as LayerView,
       currentFilePath: null,
       isDirty: false,

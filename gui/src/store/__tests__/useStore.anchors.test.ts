@@ -74,4 +74,19 @@ describe("anchors slice (D-02)", () => {
     useStore.getState().setAnchor("n1", { portField: "port_in.P", value: 1e5 });
     expect(useStore.getState()._undoPast.length).toBe(1);
   });
+
+  it("removeNode purges anchors[nodeId] (cleanup migrates from legacy bcs.filter)", () => {
+    // Plan 03 acceptance: the legacy bcs cleanup at the previous line
+    // `bcs: bcs.filter((bc) => bc.nodeId !== nodeId)` in removeNode migrates
+    // to an immutable spread+delete on the anchors Record. Without this,
+    // anchor entries accumulate as orphan data on every node delete.
+    useStore.setState({ nodes: [makePumpNode("n1")] });
+    useStore.getState().setAnchor("n1", { portField: "port_in.P", value: 1.5 });
+    expect(useStore.getState().anchors["n1"]).toEqual({
+      portField: "port_in.P",
+      value: 1.5,
+    });
+    useStore.getState().removeNode("n1");
+    expect(useStore.getState().anchors["n1"]).toBeUndefined();
+  });
 });

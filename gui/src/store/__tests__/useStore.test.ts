@@ -6,7 +6,9 @@ import type { StreamNodeData } from "../useStore";
 
 // Reset store and undo history before each test
 beforeEach(() => {
-  useStore.setState({ nodes: [], edges: [], selectedNodeId: null, bcs: [], isDirty: false, _undoPast: [], _undoFuture: [] });
+  // Phase 63.1: legacy boundary-conditions slice removed; reset the new
+  // anchors Record (D-02) instead.
+  useStore.setState({ nodes: [], edges: [], selectedNodeId: null, anchors: {}, isDirty: false, _undoPast: [], _undoFuture: [] });
 });
 
 describe("addNode", () => {
@@ -275,16 +277,18 @@ describe("isDirty tracking", () => {
     expect(useStore.getState().isDirty).toBe(true);
   });
 
-  it("addBC sets isDirty true", () => {
+  it("setAnchor sets isDirty true", () => {
+    // Phase 63.1 D-02: setAnchor replaces legacy addBC.
     useStore.setState({ isDirty: false });
-    useStore.getState().addBC({ nodeId: "n1", portField: "port_in.P", value: 1e5 });
+    useStore.getState().setAnchor("n1", { portField: "port_in.P", value: 1e5 });
     expect(useStore.getState().isDirty).toBe(true);
   });
 
-  it("removeBC sets isDirty true", () => {
-    useStore.getState().addBC({ nodeId: "n1", portField: "port_in.P", value: 1e5 });
+  it("clearAnchor sets isDirty true", () => {
+    // Phase 63.1 D-02: clearAnchor replaces legacy removeBC.
+    useStore.getState().setAnchor("n1", { portField: "port_in.P", value: 1e5 });
     useStore.setState({ isDirty: false });
-    useStore.getState().removeBC(0);
+    useStore.getState().clearAnchor("n1");
     expect(useStore.getState().isDirty).toBe(true);
   });
 
