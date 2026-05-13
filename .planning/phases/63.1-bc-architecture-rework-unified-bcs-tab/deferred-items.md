@@ -31,3 +31,42 @@ explicitly accepted as deferred.
 
 Verified pre-existing — same set appears with `git stash` applied. Out of scope
 for Plan 10. Resolution: a tsc cleanup sweep at the end of Phase 63.1.
+
+---
+
+## From Plan 11 (Wave 6 — RC-1 type_union renderer)
+
+### Out-of-scope discoveries during human-verify smoke
+
+1. **WT.T_wall / HFS.q Properties do not mirror BCsTabForm mode options.**
+   - Observed: Channel BCs tab on `T_wall_left` exposes `value | profile |
+     function | mark | source`. WT.T_wall in Properties now exposes only Value
+     (scalar input, per the scalar-only refactor in `5125f89`).
+   - User feedback (2026-05-14): "you can promote anything to WT, so [the
+     options] should be the same" — minus `mark`/`source` which don't apply on
+     the source itself. Same applies to HFS.q vs CHF.q_left BC mode picker.
+   - Scope: requires extending `nodeData.parameters[T_wall|q]` from `number`
+     to a `BCModeEntry`-like discriminated union (value/profile/function),
+     reusing `BCsTabForm`'s `ProfileModeEditor` + `FunctionModeEditor` in
+     `ParameterForm.tsx`, and updating codegen + `StreamNode.sourceLabelLine`
+     to render the discriminated union.
+   - Resolution: **new Plan 63.1-14** (BC-mode parity between BCsTabForm and
+     ParameterForm). To be authored next.
+   - Memory: see `feedback_wt_hfs_properties_match_bc_modes.md`.
+
+2. **Channel BCs tab visual layout fit issues.**
+   - Observed during smoke: "Some stuff doesn't fit properly" in the Channel
+     BCs tab layout. Not a behavior regression — purely visual fit /
+     responsiveness.
+   - Scope: GUI design phase (Phase 65 or later v1.2 cosmetics phase).
+   - Resolution: deferred to design phase per user (2026-05-14). No plan
+     allocated in Phase 63.1.
+
+3. **Promoted WT/HFS spawns with value param unset.**
+   - Observed: clicking "Promote to shared source" on Channel.T_wall_left
+     spawns a WallTemperature node with `n` seeded but `T_wall` undefined —
+     canvas label reads destructive-red `T_wall = (unset)`.
+   - This is the existing `GAP-RC-3` already targeted by Plan 13 frontmatter
+     `requirements: [..., GAP-RC-3]`. NOT a new gap — already in the queue.
+   - Resolution: Plan 13 executes the value-param seed in
+     `promoteToSharedSource`. Memory: `feedback_promote_carry_relevant_params.md`.
