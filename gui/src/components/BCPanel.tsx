@@ -1,3 +1,9 @@
+// Phase 63.1 D-02 / D-03 transitional shim:
+// The legacy bottom-panel BCPanel form is preserved but rewired to the new
+// per-node `anchors` Record (replacing the deprecated boundary-conditions
+// slice). Plan 05 deletes this file (and BCRow.tsx) outright when the
+// unified BCs sidebar tab takes over rendering responsibilities. Until
+// then, this file keeps the bottom-panel "BCs" tab compiling.
 import { useState } from "react";
 import {
   Select,
@@ -14,9 +20,9 @@ import BCRow from "./BCRow";
 
 export default function BCPanel() {
   const nodes = useStore((s) => s.nodes);
-  const bcs = useStore((s) => s.bcs);
-  const addBC = useStore((s) => s.addBC);
-  const removeBC = useStore((s) => s.removeBC);
+  const anchors = useStore((s) => s.anchors);
+  const setAnchor = useStore((s) => s.setAnchor);
+  const clearAnchor = useStore((s) => s.clearAnchor);
 
   const [selectedNodeId, setSelectedNodeId] = useState("");
   const [selectedPort, setSelectedPort] = useState("");
@@ -29,8 +35,8 @@ export default function BCPanel() {
     const result = validateReal(valueStr);
     if (!result.valid) return;
 
-    addBC({
-      nodeId: selectedNodeId,
+    // D-02 at-most-one-per-node — setAnchor overwrites any prior entry.
+    setAnchor(selectedNodeId, {
       portField: selectedPort as "port_in.P" | "port_out.P",
       value: result.value,
     });
@@ -46,6 +52,8 @@ export default function BCPanel() {
     if (!node) return undefined;
     return (node.data as unknown as StreamNodeData).instanceName;
   }
+
+  const anchorEntries = Object.entries(anchors);
 
   return (
     <div className="p-4 space-y-4 h-full overflow-y-auto">
@@ -102,22 +110,22 @@ export default function BCPanel() {
         </Button>
       </div>
 
-      {/* BC list */}
-      {bcs.length === 0 ? (
+      {/* Anchor list (per-node, D-02 at-most-one) */}
+      {anchorEntries.length === 0 ? (
         <div className="text-muted-foreground text-sm space-y-1">
-          <p className="font-medium">No boundary conditions added.</p>
+          <p className="font-medium">No pressure anchors set.</p>
           <p>Add a pressure anchor (e.g., pump.port_in.P ~ 1.0e5).</p>
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {bcs.map((bc, index) => {
-            const name = getInstanceName(bc.nodeId);
+          {anchorEntries.map(([nodeId, entry]) => {
+            const name = getInstanceName(nodeId);
             if (!name) return null;
             return (
               <BCRow
-                key={`${bc.nodeId}-${bc.portField}-${index}`}
-                expression={`${name}.${bc.portField} ~ ${bc.value}`}
-                onDelete={() => removeBC(index)}
+                key={`${nodeId}-${entry.portField}`}
+                expression={`${name}.${entry.portField} ~ ${entry.value}`}
+                onDelete={() => clearAnchor(nodeId)}
               />
             );
           })}

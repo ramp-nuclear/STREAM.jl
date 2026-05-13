@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import useStore from "../store/useStore";
 import { getComponent } from "../registry";
-import { generateCode } from "../lib/codeGenerator";
+import { generateCode, type BCEntry } from "../lib/codeGenerator";
 import type { LayerView } from "../lib/layers";
 import FileMenu from "./FileMenu";
 import ThemeMenu from "./ThemeMenu";
@@ -22,7 +22,10 @@ interface Props {
 export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
   const nodes = useStore((s) => s.nodes);
   const edges = useStore((s) => s.edges);
-  const bcs = useStore((s) => s.bcs);
+  // Phase 63.1 D-02: subscribe to the new anchors slice; generateCode still
+  // accepts the legacy BCEntry[] (Plan 04 retires the signature), so we
+  // synthesize an adapter array from the per-node Record.
+  const anchors = useStore((s) => s.anchors);
   const resources = useStore((s) => s.resources);
   // Phase 63: BC slices feed into the per-mode codegen emission.
   const bcMode = useStore((s) => s.bcMode);
@@ -35,12 +38,20 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
   const setActiveLayer = useStore((s) => s.setActiveLayer);
 
   const code = useMemo(
-    () =>
-      generateCode(nodes, edges, bcs, getComponent, resources, {
+    () => {
+      const bcsAdapter: BCEntry[] = Object.entries(anchors).map(
+        ([nodeId, entry]) => ({
+          nodeId,
+          portField: entry.portField,
+          value: entry.value,
+        }),
+      );
+      return generateCode(nodes, edges, bcsAdapter, getComponent, resources, {
         bcMode,
         bcSymmetric,
-      }),
-    [nodes, edges, bcs, resources, bcMode, bcSymmetric],
+      });
+    },
+    [nodes, edges, anchors, resources, bcMode, bcSymmetric],
   );
 
   async function handleExport() {

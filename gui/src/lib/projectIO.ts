@@ -10,7 +10,7 @@
 // fully testable in a vitest node environment.
 
 import type { Node, Edge } from "@xyflow/react";
-import type { BCEntry } from "./codeGenerator";
+import type { AnchorEntry } from "./anchors";
 import type { LayerView } from "./layers";
 import {
   SENTINEL_UNSET_POWER_SHAPE,
@@ -51,7 +51,10 @@ export interface StreamProject {
   };
   components: Node[]; // ReactFlow Node[] — same in-memory shape as pre-Phase-62
   connections: Edge[]; // renamed from "edges" per CONTEXT.md storage shape
-  bcs: BCEntry[];
+  // Phase 63.1 D-02 / D-14: pressure-anchor Record keyed by nodeId (replaces
+  // the legacy boundary-conditions Array). No legacy fallback on load — old
+  // .streamgui files lose their anchor data on deserialize (accepted breakage).
+  anchors: Record<string, AnchorEntry>;
   layout: {
     active_left_tab: ActiveLeftTab; // D-08 / D-29
     active_layer: LayerView; // moved from top-level (was StreamProject.activeLayer)
@@ -86,7 +89,10 @@ function defaultLayout(): StreamProject["layout"] {
 export interface SerializeProjectArgs {
   nodes: Node[];
   edges: Edge[];
-  bcs: BCEntry[];
+  // Phase 63.1 D-02: pressure-anchor Record (replaces legacy
+  // boundary-conditions Array). Keys are nodeIds (stable UUIDs); written
+  // verbatim to disk (no Array conversion).
+  anchors: Record<string, AnchorEntry>;
   resources: {
     geometries: Record<string, GeometryResource>;
     powerShapes: Record<string, PowerShapeResource>;
@@ -127,7 +133,9 @@ export function serializeProject(args: SerializeProjectArgs): string {
     resources: { geometries, power_shapes, fluids },
     components: args.nodes,
     connections: args.edges,
-    bcs: args.bcs,
+    // Phase 63.1 D-02: write the anchors Record verbatim — keys are nodeIds,
+    // values are AnchorEntry; no Array conversion (Record on disk).
+    anchors: args.anchors,
     layout: {
       active_left_tab: args.activeLeftTab,
       active_layer: args.activeLayer,
@@ -194,7 +202,12 @@ export function deserializeProject(json: string): StreamProject {
 
   const components = (parsed.components as Node[]) ?? [];
   const connections = (parsed.connections as Edge[]) ?? [];
-  const bcs = (parsed.bcs as BCEntry[]) ?? [];
+  // Phase 63.1 D-14: no legacy boundary-conditions fallback. Old .streamgui
+  // files lose their anchor data on load — accepted breakage (per
+  // CLAUDE.md "no back-compat during heavy dev"). When both the legacy
+  // field and `anchors` are present in the JSON, `anchors` wins and the
+  // legacy field is silently dropped.
+  const anchors = (parsed.anchors as Record<string, AnchorEntry>) ?? {};
 
   return {
     format_version: PROJECT_FORMAT_VERSION,
@@ -202,7 +215,7 @@ export function deserializeProject(json: string): StreamProject {
     resources: { geometries, power_shapes, fluids },
     components,
     connections,
-    bcs,
+    anchors,
     layout,
   };
 }

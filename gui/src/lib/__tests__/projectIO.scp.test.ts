@@ -28,7 +28,7 @@ import type {
   FluidResource,
   ModelOptionsSliceState,
 } from "../../store/useStore";
-import type { BCEntry } from "../codeGenerator";
+import type { AnchorEntry } from "../anchors";
 
 // ---------------------------------------------------------------------------
 // Fixture
@@ -164,15 +164,17 @@ function makeEdges(): Edge[] {
   ];
 }
 
-function makeBcs(): BCEntry[] {
-  return [{ nodeId: "node-3", portField: "port_in.P", value: 1e5 }];
+// Phase 63.1 D-02: anchors Record keyed by nodeId replaces the legacy
+// boundary-conditions Array.
+function makeAnchors(): Record<string, AnchorEntry> {
+  return { "node-3": { portField: "port_in.P", value: 1e5 } };
 }
 
 function makeSerializeArgs() {
   return {
     nodes: makeNodes(),
     edges: makeEdges(),
-    bcs: makeBcs(),
+    anchors: makeAnchors(),
     resources: {
       geometries: makeGeometries(),
       powerShapes: makePowerShapes(),
@@ -294,10 +296,14 @@ describe("deserializeProject — round-trip (INV-06, INV-13)", () => {
       ),
     ).toBeUndefined();
 
-    // components / connections / bcs
+    // components / connections / anchors (D-02 round-trip)
     expect(project.components).toHaveLength(4);
     expect(project.connections).toHaveLength(2);
-    expect(project.bcs).toHaveLength(1);
+    expect(Object.keys(project.anchors)).toHaveLength(1);
+    expect(project.anchors["node-3"]).toEqual({
+      portField: "port_in.P",
+      value: 1e5,
+    });
 
     // model_options
     expect(project.model_options.g_default).toBe(9.80665);
@@ -341,11 +347,11 @@ describe("deserializeProject — strict format_version (INV-07, INV-08, D-28)", 
   });
 
   it("rejects legacy v2 numeric form { version: 2, nodes: [...] } (INV-08, D-28)", () => {
+    // Phase 63.1 acceptance: legacy boundary-conditions field omitted here —
+    // the format_version check throws before any payload field is parsed,
+    // so the historical legacy fields are not load-bearing.
     const legacy = JSON.stringify({
       version: 2,
-      nodes: [],
-      edges: [],
-      bcs: [],
       activeLayer: "Both",
     });
     expect(() => deserializeProject(legacy)).toThrow(/format_version/i);
@@ -354,9 +360,6 @@ describe("deserializeProject — strict format_version (INV-07, INV-08, D-28)", 
   it("rejects legacy v1 numeric form (INV-08, D-28)", () => {
     const legacy = JSON.stringify({
       version: 1,
-      nodes: [],
-      edges: [],
-      bcs: [],
     });
     expect(() => deserializeProject(legacy)).toThrow(/format_version/i);
   });
@@ -386,7 +389,8 @@ describe("deserializeProject — empty-state tolerance", () => {
     expect(project.resources.fluids).toEqual([]);
     expect(project.components).toEqual([]);
     expect(project.connections).toEqual([]);
-    expect(project.bcs).toEqual([]);
+    // Phase 63.1 D-02: anchors defaults to empty Record (not Array).
+    expect(project.anchors).toEqual({});
     expect(project.layout.active_left_tab).toBe("Components");
     expect(project.layout.active_layer).toBe("Both");
     expect(project.model_options).toBeDefined();
