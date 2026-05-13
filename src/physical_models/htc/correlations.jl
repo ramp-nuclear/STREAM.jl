@@ -117,11 +117,8 @@ function regime_dependent(;
     Dh=nothing,
     g=nothing,
 )
-
-    # Convert to Float64 immediately — avoids type-promotion issues with symbolic Re
     Re_tr = Float64(Re_transition)
 
-    # D-04: htc_natural requires both Dh and g
     if !isnothing(htc_natural) && (isnothing(Dh) || isnothing(g))
         throw(
             ArgumentError(
@@ -130,13 +127,11 @@ function regime_dependent(;
         )
     end
 
-    # D-03: Dh or g without htc_natural is a likely miscall — warn
     if isnothing(htc_natural) && (!isnothing(Dh) || !isnothing(g))
         @warn "regime_dependent: Dh and g supplied but htc_natural not provided — NC regime will not be detected."
     end
 
     if !isnothing(htc_natural)
-        # NC-enabled path: switch on Gr/Re^2 > 1
         Dh_val = Float64(Dh)
         g_val = Float64(g)
         htc_forced_fn =
@@ -163,7 +158,6 @@ function regime_dependent(;
                 )
             end
     else
-        # Existing forced-convection-only path (backward compatible)
         htc_fn =
             (Re, Pr, T_bulk, T_wall) -> ifelse(
                 Re < Re_tr,
@@ -193,7 +187,7 @@ Source: Elenbaas (1942), as implemented in Python STREAM `_Elenbaas`.
 # Returns
 Nusselt number (dimensionless).
 """
-elenbaas_nusselt(Ra, b, L) = (1/24) * Ra * (b / L) * (1 - exp(-35 * L / (Ra * b)))^0.75
+elenbaas_nusselt(Ra, b, L) = (1 / 24) * Ra * (b / L) * (1 - exp(-35 * L / (Ra * b)))^0.75
 
 """
     elenbaas_htc(; b, L, Dh, g=9.81) -> (Re, Pr, T_bulk, T_wall) -> Nu
@@ -238,21 +232,11 @@ function elenbaas_htc(; b, L, Dh, g=9.81)
     end
 end
 
-# _bergles_rohsenow_dT_ONB: Bergles-Rohsenow onset of nucleate boiling
-# temperature difference. Private helper for T_ONB[i] observables.
-# Phase 29 will elevate this to public Bergles_Rohsenow_T_ONB export.
-#
-# Source: Python STREAM temperatures.py lines 103-105
-# Formula: dT = 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
-# where p = P_Pa / 1e5 (pressure in bar)
 function _bergles_rohsenow_dT_ONB(P_Pa, q_spl)
     p = P_Pa / 1e5
     return 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
 end
 
-# Kakac Table 44 case 3 — 2-sided heating in rectangular duct.
-# Private helper used by HTC-02 and HTC-03 factories.
-# NOT the same as Marco_Han_Nusselt (which is 4-sided uniform heat flux).
 function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     return nu0 * (
         1.0 - 1.4122 * aspect_ratio + 2.3473 * aspect_ratio^2 - 2.8983 * aspect_ratio^3 +
@@ -260,12 +244,9 @@ function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     )
 end
 
-# Shah & London equations 317-319 for parallel plates, thermally developing flow.
-# Uses ifelse() (not if/else) so that MTK can trace through this function when x is
-# a symbolic Num expression. See CLAUDE.md MTK Patterns.
 function _nusselt_coefficient_developing(x)
-    nu_low = 1.49 * x^(-1/3)
-    nu_mid = 1.49 * x^(-1/3) - 0.4
+    nu_low = 1.49 * x^(-1 / 3)
+    nu_mid = 1.49 * x^(-1 / 3) - 0.4
     nu_high = 8.235 + 8.68 * exp(-164 * x) * (1e3 * x)^(-0.506)
     return ifelse(x <= 2e-4, nu_low, ifelse(x <= 1e-3, nu_mid, nu_high))
 end

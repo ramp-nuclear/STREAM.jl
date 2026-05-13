@@ -30,7 +30,9 @@ equations.
 connections = [..., [ch.T_wall_left[i] ~ wt.T_wall_out[i] for i in 1:10]...]
 ```
 """
-function WallTemperature(; name, n::Int, T_wall::Union{Real, AbstractVector{<:Real}, Function})
+function WallTemperature(;
+    name, n::Int, T_wall::Union{Real,AbstractVector{<:Real},Function}
+)
     @variables (T_wall_out(t))[1:n]
 
     if T_wall isa Real
@@ -82,7 +84,7 @@ subsystems and no Flow / Stream variables.
 connections = [..., [chf.q_left[i] ~ hfs.q_out[i] for i in 1:10]...]
 ```
 """
-function HeatFluxSource(; name, n::Int, q::Union{Real, AbstractVector{<:Real}, Function})
+function HeatFluxSource(; name, n::Int, q::Union{Real,AbstractVector{<:Real},Function})
     @variables (q_out(t))[1:n]
 
     if q isa Real
@@ -91,8 +93,7 @@ function HeatFluxSource(; name, n::Int, q::Union{Real, AbstractVector{<:Real}, F
         return System(eqs, t, [collect(q_out)...], pars; name=name)
 
     elseif q isa AbstractVector
-        length(q) == n ||
-            error("HeatFluxSource: q vector length $(length(q)) ≠ n=$n")
+        length(q) == n || error("HeatFluxSource: q vector length $(length(q)) ≠ n=$n")
         eqs = Equation[q_out[i] ~ q[i] for i in 1:n]
         return System(eqs, t, [collect(q_out)...], Num[]; name=name)
 

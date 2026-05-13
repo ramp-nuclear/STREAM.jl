@@ -1,8 +1,6 @@
 # Fluid property functions for light water (Siman Tov correlations)
 # Source: Moshe Siman Tov et al.
 # Temperature input: Kelvin. Converts internally.
-# Note: cp_water guards the sqrt argument with max(0,…) so that KINSOL can evaluate
-# the residual at bad Newton iterates without throwing a DomainError; ForwardDiff-compatible.
 
 # Internal helper — not exported
 _to_fahrenheit(T_C::Real) = 1.8 * T_C + 32.0

@@ -8,9 +8,6 @@
 #   dP/dt   = (rho - beta) / Lambda * P + sum_k(lambda_k * C_k)
 #   dC_k/dt = -lambda_k * C_k + beta_k / Lambda * P    for k = 1..6
 #
-# Phase 45: bare component with constant rho. No temperature feedback, no ports.
-# Phase 46 extends with callable rho(t) and ReactivityController struct.
-# Phase 47 adds temperature feedback.
 
 # U-235 6-group delayed neutron data (same as Python STREAM reference)
 const U235_LAMBDA = 5.4e-5  # neutron generation time [s]
@@ -18,18 +15,14 @@ const U235_LAMBDA_K = [55.72, 22.72, 6.22, 2.3, 0.618, 0.23]  # precursor decay 
 const U235_BETA_K = [0.000215, 0.001424, 0.001274, 0.002568, 0.000748, 0.000273]  # delayed neutron fractions [-]
 # beta_total = sum(U235_BETA_K) = 0.006502
 
-# _flatten_weights(raw, comp) -> (Vector{Float64}, Int)
-# Flattens a scalar or array weight into a row-major vector matching the component's
-# T symbolic array shape. Used for temp_worth and ref_temp in Phase 47.
-# Row-major is D-03: for HeatDiffusion 2D, j_flat = (jz-1)*nx + jx.
 function _flatten_weights(raw, comp)
     T_sym = getproperty(comp, :T)
     if ndims(T_sym) == 2
         nz, nx = size(T_sym)
         if raw isa Real
-            return (fill(Float64(raw), nz*nx), nz*nx)
+            return (fill(Float64(raw), nz * nx), nz * nx)
         elseif raw isa AbstractMatrix && size(raw) == (nz, nx)
-            return ([Float64(raw[i, j]) for i in 1:nz for j in 1:nx], nz*nx)
+            return ([Float64(raw[i, j]) for i in 1:nz for j in 1:nx], nz * nx)
         else
             throw(
                 ArgumentError(
@@ -115,12 +108,12 @@ function PointKinetics(;
 
     # Precursor source terms: sum_k(lambda_k * C_k)
     precursor_source =
-        lambda_1*C_1 +
-        lambda_2*C_2 +
-        lambda_3*C_3 +
-        lambda_4*C_4 +
-        lambda_5*C_5 +
-        lambda_6*C_6
+        lambda_1 * C_1 +
+        lambda_2 * C_2 +
+        lambda_3 * C_3 +
+        lambda_4 * C_4 +
+        lambda_5 * C_5 +
+        lambda_6 * C_6
 
     eqs = Equation[
         Dt(P) ~ (rho_val - beta_sum) / Lambda_gen * P + precursor_source,
@@ -140,7 +133,7 @@ function PointKinetics(;
         reactivity ~ rho_val,
     ]
 
-    System(
+    return System(
         eqs,
         t,
         [P, C_1, C_2, C_3, C_4, C_5, C_6],
@@ -255,17 +248,15 @@ function PointKinetics(
     end
 
     beta_sum = beta_1 + beta_2 + beta_3 + beta_4 + beta_5 + beta_6
-    precursor_source =
-        lambda_1*C_1 +
-        lambda_2*C_2 +
-        lambda_3*C_3 +
-        lambda_4*C_4 +
-        lambda_5*C_5 +
-        lambda_6*C_6
+    precursor_source = (
+        lambda_1 * C_1 +
+        lambda_2 * C_2 +
+        lambda_3 * C_3 +
+        lambda_4 * C_4 +
+        lambda_5 * C_5 +
+        lambda_6 * C_6
+    )
 
-    # Phase 47: build T_source unknowns + feedback_expr (D-01, D-02, D-03, D-07).
-    # When temp_worth === nothing, feedback_expr stays as literal 0 and the equations
-    # reduce exactly to Phase 46 behavior.
     T_source_vars = Num[]
     feedback_expr = 0
     if temp_worth !== nothing
@@ -301,7 +292,7 @@ function PointKinetics(
         reactivity ~ rho_val + rho_c_fn(t) + feedback_expr,
     ]
 
-    System(
+    return System(
         eqs,
         t,
         [P, C_1, C_2, C_3, C_4, C_5, C_6, T_source_vars...],
@@ -416,7 +407,7 @@ function ReactivityController(
     S_t = typeof(initial_state)
     F_t = typeof(ir)
     t0 = Float64(initial_time)
-    ReactivityController{S_t,F_t}(
+    return ReactivityController{S_t,F_t}(
         ir, sm, initial_state, t0, Tuple{S_t,Float64}[(initial_state, t0)], ab
     )
 end
@@ -437,7 +428,7 @@ invoked by the MTK callable parameter when `ctrl` is passed to
 `Float64` control reactivity value [-].
 """
 function worth(ctrl::ReactivityController, t_now)
-    ctrl.input_reactivity(ctrl.state, ctrl.t_state, t_now)
+    return ctrl.input_reactivity(ctrl.state, ctrl.t_state, t_now)
 end
 
 """
@@ -468,13 +459,7 @@ function change_state(ctrl::ReactivityController, t_now, power, dPdt)
     return new_state
 end
 
-# D-09: make ReactivityController callable so users can pass it directly as the
-# MTK callable parameter (FType = typeof(ctrl)), avoiding a wrapper closure.
 (ctrl::ReactivityController)(t_now) = worth(ctrl, t_now)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SCRAM support — Phase 48
-# ─────────────────────────────────────────────────────────────────────────────
 
 """
     SCRAMCondition
@@ -505,9 +490,6 @@ exceeds `power_limit`.
 `SCRAMCondition` instance.
 """
 SCRAM_at_power(power_limit) = SCRAMCondition(Float64(power_limit))
-
-# State-machine callable protocol: (state, t, P, dPdt) -> new_state.
-# dPdt is accepted for future extensibility (e.g. SCRAM_at_dPdt) but ignored here.
 (s::SCRAMCondition)(state, t, P, dPdt) = P > s.power_limit ? :SCRAM : state
 
 """
@@ -549,27 +531,14 @@ sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 ```
 """
 function scram_callback(ssys, p_sym::Num, ctrl; terminate=true)
-    plimit = ctrl.state_machine.power_limit                # read once from SCRAMCondition
-
-    # Resolve p_idx eagerly at callback construction time (ssys is available here).
-    # The condition MUST use u[p_idx] (the interpolated u arg), NOT integrator[p_sym].
-    # integrator[sym] reads integrator.u (last accepted step). DiffEq calls condition
-    # with (uprev, t_prev, integrator) and (u_curr, t_curr, integrator) for sign-change
-    # detection: both use the same integrator.u → same sign → crossing never detected.
-    # u[p_idx] correctly reads the step-boundary state passed as the first argument.
+    plimit = ctrl.state_machine.power_limit
     p_idx = ModelingToolkit.variable_index(ssys, p_sym)
 
     condition = (u, t, integrator) -> u[p_idx] - plimit
-
-    # Affect: fires at upward zero-crossing (P rises above plimit).
-    # At the exact crossing, integrator[p_sym] ≈ plimit, but SCRAMCondition uses
-    # strict P > plimit. Pass plimit + 1.0 to guarantee the transition — the callback
-    # fires only on upward crossing so we know P has exceeded the limit.
-    # dPdt = 0.0 placeholder (SCRAMCondition ignores it; future: symbolic du access).
     affect! = function (integrator)
         change_state(ctrl, integrator.t, plimit + 1.0, 0.0)
-        terminate && terminate!(integrator)
+        return terminate && terminate!(integrator)
     end
 
-    ContinuousCallback(condition, affect!)  # upward crossing only (P - plimit: neg -> pos)
+    return ContinuousCallback(condition, affect!)  # upward crossing only (P - plimit: neg -> pos)
 end

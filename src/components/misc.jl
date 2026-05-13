@@ -1,10 +1,5 @@
 # misc.jl — Inertia, HeatExchanger, ConstantTemperature components for STREAM.jl
 
-# Inertia (COMP-01): fluid inertia as ODE pressure-drop term
-# Equation: port_in.P - port_out.P ~ L_over_A * D(mdot)
-# L_over_A = L/A [m/m² = m⁻¹] — user pre-computes from geometry
-# No explicit mdot state variable needed — MTK auto-promotes port_in.mdot
-# as a differential state because it appears inside Dt(port_in.mdot).
 """
     Inertia(L_over_A; name) -> ODESystem
 
@@ -38,14 +33,9 @@ function Inertia(L_over_A; name)
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 
-# HeatExchanger (COMP-02): temperature boundary condition as a public component.
-# Injects a fixed outlet temperature T_bc into the downstream stream, breaking
-# the circular thermal dependency in closed loops (where instream() would
-# otherwise resolve to the previous component's outlet T).
-# 4-equation structure: mass conservation, no pressure drop, T_bc outlet, adiabatic inlet.
 """
     HeatExchanger(T_bc; name) -> ODESystem
 
@@ -66,17 +56,14 @@ function HeatExchanger(T_bc; name)
     @named port_in = FlowPort()
     @named port_out = FlowPort()
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,    # mass conservation
-        port_in.P - port_out.P ~ 0,     # no pressure drop
-        port_out.T ~ T_bc,                   # inject fixed outlet temperature
-        port_in.T ~ T_bc,                   # backward stream: also reset to T_bc
+        port_in.mdot + port_out.mdot ~ 0,
+        port_in.P - port_out.P ~ 0,
+        port_out.T ~ T_bc,
+        port_in.T ~ T_bc,
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 
-# ConstantTemperature: pins a ThermalPort's temperature to a fixed parameter.
-# Used as a thermal boundary condition in tests and simple simulations.
-# MTK acausal semantics solve for Q_flow from the connected component's balance.
 """
     ConstantTemperature(T; name) -> ODESystem
 
@@ -95,5 +82,5 @@ Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 function ConstantTemperature(T; name)
     pars = @parameters T_bc = T
     @named thermal = ThermalPort()
-    compose(System([thermal.T ~ T_bc], t; name=name), thermal)
+    return compose(System([thermal.T ~ T_bc], t; name=name), thermal)
 end

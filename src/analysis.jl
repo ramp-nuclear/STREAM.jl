@@ -159,8 +159,6 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
     #! format: on
 end
 
-# ─── threshold_analysis dispatcher ──────────────────────────────────────────
-
 """
     threshold_analysis(sol, channel_sys; pipe=nothing, gravity=9.81, kwargs...) -> NamedTuple
 
@@ -198,8 +196,6 @@ function threshold_analysis(sol, channel_sys; pipe=nothing, gravity=9.81, kwargs
     values = [fn(state) for fn in Base.values(kwargs)]
     return NamedTuple{names}(Tuple(values))
 end
-
-# ─── chfr factory ────────────────────────────────────────────────────────────
 
 """
     chfr(chf_fn; direction=:max) -> Function
@@ -239,8 +235,6 @@ function chfr(chf_fn; direction=:max)
         return [q_i > 0 ? c_i / q_i : Inf for (c_i, q_i) in zip(chf_vals, q)]
     end
 end
-
-# ─── Pre-built analysis wrappers ─────────────────────────────────────────────
 
 """
     ONB_temperature(state::ChannelState) -> AbstractArray
@@ -293,7 +287,6 @@ Calls `q_OFI_whittle_forgan(state.mdot, state.T_sat[1], state.T_inlet, state.pip
 OFI power limit [W] for the channel.
 """
 function OFI_power(state::ChannelState)
-    # Use the first cell's T_sat as representative (conservative: inlet condition)
     T_sat_rep = state.T_sat isa AbstractMatrix ? state.T_sat[1, 1] : state.T_sat[1]
     return q_OFI_whittle_forgan(state.mdot, T_sat_rep, state.T_inlet, state.pipe)
 end

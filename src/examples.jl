@@ -1,31 +1,6 @@
 # examples.jl — Example system builders for STREAM.jl
 # build_loop, build_loop_vertical, build_loop_transient, build_cube
 
-# ----------------------------------------------------------------
-# build_loop
-# Assembles the closed forced-convection loop:
-#   Pump -> TempBC -> Channel -> back to Pump
-# and compiles it with mtkcompile.
-#
-# Channel handles friction (Darcy-Weisbach Blasius) and gravity internally.
-# No separate Friction component — friction is part of Channel's dP equation.
-#
-# The TempBC component resets the fluid temperature to T_inlet at
-# the pump outlet. This is necessary because MTK stream semantics
-# resolve instream(ch.port_in.T) to the upstream connected port's T
-# (which would be T[n] in a fully closed loop, giving a trivial
-# degenerate steady state at T=T_wall). The TempBC forces the
-# "inlet temperature" seen by the Channel's first-cell energy
-# balance to be T_inlet, enabling physical non-trivial solutions.
-#
-# Boundary conditions:
-#   pump.port_in.P ~ 1.0e5                pressure gauge freedom fix (absolute anchor)
-#   ch.T_wall_left[i]  ~ T_wall   ∀ i      left-face wall temperature pin
-#   ch.T_wall_right[i] ~ T_inlet  ∀ i      right-face decoration (h_right=0 ⇒ q=0)
-#
-# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot, etc.
-# for symbolic indexing of results.
-# ----------------------------------------------------------------
 """
     build_loop(; n=10, T_inlet=313.15, T_wall=373.15, h_wall=5000.0,
                  L_ch=0.6, D_ch=0.01, dP_pump=3.0e4) -> ODESystem
@@ -57,8 +32,9 @@ function build_loop(;
 )
 #! format: on
     @named pump = Pump(dP_pump)
-    @named ch = Channel(; n=n, geometry=PipeGeometry_circular(L_ch, D_ch),
-                          h_left=h_wall, h_right=0.0)
+    @named ch = Channel(;
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), h_left=h_wall, h_right=0.0
+    )
     @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
 
     connections = Equation[
@@ -67,7 +43,7 @@ function build_loop(;
         connect(ch.port_out, pump.port_in),      # channel -> pump (closed loop)
         pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
         # Per-cell binding eqns (Phase 55 D-10 Style 1 — args.funcs idiom)
-        [ch.T_wall_left[i]  ~ T_wall  for i in 1:n]...,
+        [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
     ]
 
@@ -82,30 +58,6 @@ function build_loop(;
     return ssys
 end
 
-# ----------------------------------------------------------------
-# build_loop_vertical
-# Assembles a vertical closed loop that includes gravity effects:
-#   Pump -> TempBC -> Channel(g_acc=9.80665) -> Gravity(H) -> Pump
-#
-# The upward leg is modelled by Channel with g_acc set to the
-# gravitational acceleration (default 9.80665 m/s²). The Channel's
-# dP equation includes +rho*g_acc*L representing the hydrostatic
-# head loss as the fluid rises.
-#
-# The return (downward) leg is modelled by the standalone Gravity
-# component with height H (default = L_ch). Gravity's equation:
-#   port_in.P - port_out.P ~ rho * 9.80665 * H
-# represents the pressure gain as the fluid descends.
-#
-# Cancellation geometry (default): when H_return == L_ch and
-# g_acc == 9.80665, the upward head loss equals the downward head
-# gain, and the net gravity contribution to the loop pressure
-# balance is zero — matching the horizontal reference loop within
-# the accuracy of the density evaluation point (~1%).
-#
-# Returns compiled ssys. Use ssys.ch.T[i], ssys.ch.port_in.mdot
-# for symbolic indexing (same pattern as build_loop).
-# ----------------------------------------------------------------
 """
     build_loop_vertical(; n=10, T_inlet=313.15, T_wall=373.15, h_wall=5000.0,
                          L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
@@ -144,19 +96,12 @@ function build_loop_vertical(;
     H = isnothing(H_return) ? L_ch : H_return
 
     @named pump = Pump(dP_pump)
-    @named ch = Channel(; n=n, geometry=PipeGeometry_circular(L_ch, D_ch),
-                          g=g_acc, h_left=h_wall, h_right=0.0)
+    @named ch = Channel(;
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=g_acc, h_left=h_wall, h_right=0.0
+    )
     @named bc = HeatExchanger(T_inlet)
     @named grav = Gravity(H)
 
-    # Gravity wiring note:
-    # Gravity equation: port_in.P - port_out.P ~ rho*g*H (port_in = high-P = bottom)
-    # For the RETURN leg (fluid descends from channel top back to pump bottom):
-    #   - channel outlet (top, low pressure) = grav.port_out (top)
-    #   - pump inlet (bottom, higher pressure) = grav.port_in (bottom)
-    # This gives: pump_inlet.P = channel_outlet.P + rho*g*H
-    # Loop balance: dP_pump = friction + rho*g*L_ch - rho*g*H
-    # Cancellation when H = L_ch: dP_pump = friction (gravity terms cancel).
     connections = Equation[
         connect(pump.port_out, bc.port_in),       # pump -> TempBC
         connect(bc.port_out, ch.port_in),        # TempBC -> channel (upward leg)
@@ -164,7 +109,7 @@ function build_loop_vertical(;
         connect(grav.port_in, pump.port_in),      # grav port_in (bottom) = pump inlet (bottom)
         pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
         # Per-cell binding eqns (Phase 55 D-10 Style 1 — args.funcs idiom)
-        [ch.T_wall_left[i]  ~ T_wall  for i in 1:n]...,
+        [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
     ]
 
@@ -220,8 +165,9 @@ function build_loop_transient(;
 )
 #! format: on
     @named pump = Pump(dP_pump)
-    @named ch = Channel(; n=n, geometry=PipeGeometry_circular(L_ch, D_ch),
-                          h_left=h_wall, h_right=0.0)
+    @named ch = Channel(;
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), h_left=h_wall, h_right=0.0
+    )
     @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
 
     if T_wall_fn === nothing
@@ -232,8 +178,8 @@ function build_loop_transient(;
             connect(bc.port_out, ch.port_in),
             connect(ch.port_out, pump.port_in),
             pump.port_in.P ~ 1.0e5,
-            [ch.T_wall_left[i]  ~ T_wall_0 for i in 1:n]...,
-            [ch.T_wall_right[i] ~ T_inlet  for i in 1:n]...,  # decorative; h_right=0
+            [ch.T_wall_left[i] ~ T_wall_0 for i in 1:n]...,
+            [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
         ]
         @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
     else
@@ -248,8 +194,8 @@ function build_loop_transient(;
             connect(ch.port_out, pump.port_in),
             pump.port_in.P ~ 1.0e5,
             # Style 1 binding with builder-level callable: same `ps[1](t)` value broadcast per cell.
-            [ch.T_wall_left[i]  ~ ps[1](t) for i in 1:n]...,
-            [ch.T_wall_right[i] ~ T_inlet  for i in 1:n]...,  # decorative; h_right=0
+            [ch.T_wall_left[i] ~ ps[1](t) for i in 1:n]...,
+            [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
         ]
         @named sys = compose(System(connections, t, [], ps; name=:sys), pump, bc, ch)
     end
@@ -263,29 +209,6 @@ function build_loop_transient(;
     return ssys
 end
 
-# ----------------------------------------------------------------
-# build_cube
-# Assembles the Cube hydraulic network: 12 Resistors on the edges
-# of a cube, 1 Pump driving body-diagonal flow (corner 0 -> corner 7).
-#
-# Corner labeling (binary xyz bits):
-#   000=0, 001=1, 010=2, 011=3, 100=4, 101=5, 110=6, 111=7
-# 12 edges (one Resistor each): r01, r02, r04, r13, r15, r23, r26,
-#   r37, r45, r46, r57, r67
-# Each interior corner has exactly 3 Resistor ports — wired with a
-# 3-way connect() call. Source (corner 0) and sink (corner 7) are
-# 4-way (pump + 3 resistors each).
-#
-# MTK variadic connect() generates the Kirchhoff equations:
-#   Flow (mdot): sum = 0 at each junction
-#   Across (P):  equal at each junction
-#   Stream (T):  instream() mixture
-#
-# Analytical equivalent resistance (body diagonal): 5/6 * R
-# Expected total mdot: dP_pump * 6 / (5 * R)
-#
-# Returns compiled ssys.
-# ----------------------------------------------------------------
 """
     build_cube(; dP_pump=3.0e4, R=1.0e4) -> ODESystem
 
@@ -300,7 +223,6 @@ Compiled `ODESystem`.
 """
 function build_cube(; dP_pump=3.0e4, R=1.0e4)
     @named pump = Pump(dP_pump)
-    # 12 edges of the cube (naming: r_ij where i < j are corner indices)
     @named r01 = Resistor(R)
     @named r02 = Resistor(R)
     @named r04 = Resistor(R)
@@ -434,7 +356,6 @@ function build_loop_lof_bypass(;
 #! format: on
     geom = PipeGeometry_circular(L_ch, D_ch)
 
-    # NC-enabled regime switching for heated channel (D-10)
     rd_ch = regime_dependent(;
         htc_laminar=constant_Nusselt(; Nu=8.235),
         htc_turbulent=dittus_boelter,
@@ -445,31 +366,32 @@ function build_loop_lof_bypass(;
         g=g_acc,
     )
 
-    @named pump    = Pump(0.0)
-    @named ine     = Inertia(L_over_A)
-    @named hx      = HeatExchanger(T_inlet)
-    @named ch      = ChannelAndContacts(;
-        n=n, geometry=geom, g=(-g_acc),
+    @named pump = Pump(0.0)
+    @named ine = Inertia(L_over_A)
+    @named hx = HeatExchanger(T_inlet)
+    @named ch = ChannelAndContacts(;
+        n=n,
+        geometry=geom,
+        g=(-g_acc),
         htc_correlation=rd_ch.htc,
         friction_correlation=rd_ch.friction,
     )
-    @named ret     = Channel(; n=n, geometry=geom, g=g_acc)
-    # Flapper is a pure equation system — no internal SymbolicContinuousCallback.
-    # Use flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=...) to create an
-    # external ContinuousCallback and pass it to solve_transient(...; callbacks=cb).
+    @named ret = Channel(; n=n, geometry=geom, g=g_acc)
     @named flapper = Flapper(; dt=dt_ramp)
     @named ext_res = Resistor(R_ext)
 
-    # HeatDiffusion plate — 5 mandatory kwargs (RESEARCH.md §6 Pitfalls).
-    # power_shape sums to 1.0 so heated.fuel.power == total power into plate.
     ps = fill(1.0 / (n * fuel_nx), n, fuel_nx)
     @named fuel = HeatDiffusion(;
-        nz=n, nx=fuel_nx, Lz=L_ch, Lx=fuel_Lx,
-        y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
+        nz=n,
+        nx=fuel_nx,
+        Lz=L_ch,
+        Lx=fuel_Lx,
+        y=0.07,
+        rho_s=19300.0,
+        cp_s=116.0,
+        k_s=174.0,
         power_shape=ps,
     )
-    # one_sided_connection wires ch.thermal_left[i] <-> fuel.thermal_right[i] for i in 1:n.
-    # Sub-systems retain their @named symbols inside `heated`: heated.ch and heated.fuel.
     heated = one_sided_connection(ch, fuel; side=:left, name=:heated)
 
     connections = Equation[
@@ -486,21 +408,13 @@ function build_loop_lof_bypass(;
         # Boundary conditions
         pump.port_in.P ~ 1.0e5,
         flapper.ref_mdot ~ ine.port_in.mdot,
-        # Heated leg: pin total fuel-plate power. Spike B power_shape sums to 1, so
-        # heated.fuel.power equals the total W into the plate.
         heated.fuel.power ~ power_W,
-        # Return leg: ret uses the new external-input Channel (Phase 55 D-01).
-        # h_left=h_right=0 (defaults) make the q-expression zero regardless of T_wall_*;
-        # the per-cell T_wall_*[i] @variables still need binding eqns to keep MTK
-        # fully determined. Decorative under H=A but kept for symmetry with the rest
-        # of the migrated builders.
-        [ret.T_wall_left[i]  ~ T_inlet for i in 1:n]...,
+        [ret.T_wall_left[i] ~ T_inlet for i in 1:n]...,
         [ret.T_wall_right[i] ~ T_inlet for i in 1:n]...,
     ]
 
     @named sys = compose_systems(
-        heated, pump, ine, hx, ret, flapper, ext_res;
-        connections=connections, name=:sys,
+        heated, pump, ine, hx, ret, flapper, ext_res; connections=connections, name=:sys
     )
 
     t_compile = @elapsed ssys = mtkcompile(sys)
@@ -571,7 +485,6 @@ function build_loop_pk(ctrl;
     rho_val     = 0.0,
 )
 #! format: on
-    # Stage 1: Component construction
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ps = fill(1.0 / (nz * nx), nz, nx)  # uniform power shape, normalized
     @named cac = ChannelAndContacts(;
@@ -592,12 +505,6 @@ function build_loop_pk(ctrl;
         power_shape=ps,
     )
     rods = symmetric_plate(cac, fuel; name=:rods)
-
-    # Stage 2: Resolve Symbol keys to scoped component refs for temp_worth/ref_temp.
-    # IMPORTANT: cache rods.cac and rods.fuel as local vars to guarantee the same
-    # object reference is used as the Dict key in both tw and rt. MTK System
-    # getproperty may create new objects on each call, causing Dict lookup failures
-    # when iterating temp_worth and calling get(ref_temp, comp, default).
     rods_cac = rods.cac
     rods_fuel = rods.fuel
 
@@ -620,15 +527,8 @@ function build_loop_pk(ctrl;
     tw = _resolve_tw(temp_worth, rods_cac, rods_fuel)
     rt = _resolve_tw(ref_temp, rods_cac, rods_fuel)
 
-    # Stage 3: PK construction with resolved (scoped) temp_worth / ref_temp
     @named pk = PointKinetics(ctrl; rho_val=rho_val, temp_worth=tw, ref_temp=rt)
 
-    # Stage 4: Connections and compose
-    # Only wire connect_temperature_feedback for components that have entries in tw.
-    # The PK system only has T_source_<cname> unknowns for components listed in temp_worth.
-    # Passing a component not in temp_worth would cause "variable T_source_<X> does not exist".
-    # We match by component name (Symbol) rather than object identity since System equality
-    # is not guaranteed to be stable across composition boundaries.
     fb_components = if isnothing(tw)
         System[]
     else
@@ -655,15 +555,12 @@ function build_loop_pk(ctrl;
     ]
 
     full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
-
-    # Stage 5: Compile
     t_compile = @elapsed ssys = mtkcompile(full)
     n_eq = length(equations(ssys))
     n_uk = length(unknowns(ssys))
     @info "build_loop_pk compile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
         n_uk
 
-    # Stage 6: Build IC dict
     pk_ic = point_kinetics_steady_state(P0)
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,

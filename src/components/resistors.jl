@@ -33,14 +33,14 @@ function Friction(; name, L, D, A)
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
         Re ~ abs(port_in.mdot) * D / (A * mu_water(T_in)),
-        f ~ 0.3164 * Re ^ (-0.25),
+        f ~ 0.3164 * Re^(-0.25),
         port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(
             T_in
-        ) * A ^ 2)) * (L / D),
+        ) * A^2)) * (L / D),
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
 end
 
 """
@@ -69,7 +69,7 @@ function Gravity(H; name)
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 
 """
@@ -97,5 +97,5 @@ function Resistor(R; name)
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end

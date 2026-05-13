@@ -1,21 +1,10 @@
 # solvers.jl -- Solver API for STREAM.jl
 #
-# Future refactor note (v0.2): consider SteadySolution(sol, sys) and
-# TransientSolution(sol, sys) wrapper structs that expose named properties
-# like sol.T_outlet, sol.mdot instead of MTK symbolic indexing
-# sol[sys.ch.T_out]. Deferred until v0.1 usage patterns are clear.
 
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 
-# ----------------------------------------------------------------
-# steady_state_guess
-# Physics-based initial guess for the steady-state solver.
-# Based on Python STREAM's symmetric_plate_steady_state pattern.
-# T_inlet: K, Q_wall: W, mdot_guess: kg/s, n: number of cells
-# Returns T_cells::Vector{Float64} (Kelvin), length n.
-# ----------------------------------------------------------------
 """
     steady_state_guess(; T_inlet, Q_wall, mdot_guess, n) -> Vector{Float64}
 
@@ -86,15 +75,8 @@ Solve a transient simulation over a time array.
 `SciMLBase.ODESolution`. Access time-dependent results via `sol[ssys.component.variable, :]`.
 """
 function solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...)
-    # MTK mtkcompile produces a mass-matrix ODE (implicit DAE form).
-    # Rodas5P is a stiff implicit Runge-Kutta solver that supports mass matrices
-    # and ODEProblem — the correct choice for MTK-generated DAE systems.
     tspan = (Float64(t[1]), Float64(t[end]))
     prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false)
-
-    # NoInit: skip MTK's automatic initialization (which fails for the rough
-    # guess op dict). The caller is responsible for providing a consistent-enough
-    # initial state (use steady_state_guess or a prior solve_steady solution).
     sol = solve(
         prob,
         solver;
