@@ -578,83 +578,105 @@ function siblingExternalInputName(externalInputName: string): string | null {
 // (gui/src/lib/selectors/nodeErrors.ts).
 
 // ---------------------------------------------------------------------------
-// _reconcileEdgesForBCMode — pure edges reconciliation for ONE consumer side
+// _reconcileBCEdgesForBaseField — pure edge reconciliation for a consumer pair
 //
-// Plan 63.1-10 (CR-02 / CR-03): extracted from setBCMode's inline
-// edge-materialization block so setBCMode and setBCSymmetric share the
-// add/remove logic instead of duplicating it.
+// Plan 63.1-12 amend (2026-05-14): the previous per-side helper
+// (_reconcileEdgesForBCMode) used `externalInputName` as the bcEdge
+// `targetHandle`, which produced two latent bugs:
+//   1) When the consumer is bound on T_wall_right but not T_wall_left, the
+//      edge was created with targetHandle="T_wall_right" — but the registry
+//      only declares ONE BCPort handle per consumer pair (T_wall_left on the
+//      bottom edge). ReactFlow then dropped the edge silently.
+//   2) In asymmetric mode, changing the left side to a non-source mode
+//      removed the edge even though the right side was still source-bound.
 //
-// Semantics — operates on ONE (consumerNodeId, externalInputName) pair only.
-// Sibling reconciliation is the caller's responsibility (loop or second call).
-//   • prev="source", new="source" same sourceNodeId → no-op (idempotent)
-//   • prev="source", new="source" different source → swap the bcEdge
-//   • prev="source", new is anything else (or undefined) → remove the bcEdge
-//   • prev=undefined / non-source, new="source" → add a new bcEdge
-//   • prev=undefined / non-source, new=undefined / non-source → no-op
-//
-// `symmetric` is reserved for future use (caller currently passes false at
-// every call-site; siblings are handled by issuing a second call).
+// New contract:
+//   • One bcEdge per (sourceNode, consumer, baseField). targetHandle is
+//     ALWAYS the consumer's actual BCPort handle name (e.g. "T_wall_left").
+//   • The edge exists iff AT LEAST ONE of the sibling bcMode entries
+//     ({base}_left / {base}_right) is in source mode pointing to that
+//     sourceNode.
+//   • BCEdge.tsx derives the L/R/L+R side tag from bcMode at render time;
+//     the edge data is otherwise opaque.
 //
 // Pure: returns a new edges array; does NOT call set() or _pushSnapshot.
 // ---------------------------------------------------------------------------
-function _reconcileEdgesForBCMode(
+function _reconcileBCEdgesForBaseField(
   edges: Edge[],
   nodes: Node[],
   consumerNodeId: string,
-  externalInputName: string,
-  prevEntry: BCModeEntry | undefined,
-  newEntry: BCModeEntry | undefined,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _symmetric: boolean,
+  baseField: string,
+  nextBCMode: Record<string, BCModeEntry>,
 ): Edge[] {
-  let nextEdges = edges;
+  const consumerNode = nodes.find((n) => n.id === consumerNodeId);
+  if (!consumerNode) return edges;
+  const consumerComp = getComponent(
+    (consumerNode.data as unknown as StreamNodeData).componentId,
+  );
+  if (!consumerComp) return edges;
+  // Consumer's actual BCPort handle for this pair — registered as
+  // `${baseField}_left` on the bottom edge (e.g. T_wall_left on Channel).
+  const bcPortHandle = consumerComp.ports.find(
+    (p) =>
+      p.type === "BCPort" &&
+      (p.name === `${baseField}_left` || p.name === baseField),
+  );
+  if (!bcPortHandle) return edges;
+  const targetHandleName = bcPortHandle.name;
 
-  // Remove any prior source-mode edge bound to this (consumer, handle).
-  // This covers prev="source" → non-source/undefined transitions AND the
-  // source-A → source-B swap (the add step below re-emits a fresh edge).
-  if (prevEntry?.mode === "source") {
-    nextEdges = nextEdges.filter(
-      (e) =>
-        !(
-          e.type === "bcEdge" &&
-          e.target === consumerNodeId &&
-          e.targetHandle === externalInputName
-        ),
-    );
+  const leftEntry = nextBCMode[bcModeKey(consumerNodeId, `${baseField}_left`)];
+  const rightEntry = nextBCMode[bcModeKey(consumerNodeId, `${baseField}_right`)];
+  const boundSources = new Set<string>();
+  if (leftEntry?.mode === "source" && leftEntry.sourceNodeId) {
+    boundSources.add(leftEntry.sourceNodeId);
+  }
+  if (rightEntry?.mode === "source" && rightEntry.sourceNodeId) {
+    boundSources.add(rightEntry.sourceNodeId);
   }
 
-  // If the new entry is source-mode, materialize the BC edge (idempotent).
-  if (newEntry?.mode === "source") {
-    const sourceNode = nodes.find((n) => n.id === newEntry.sourceNodeId);
-    if (!sourceNode) return nextEdges;
+  // Drop any existing bcEdge for this consumer + targetHandle whose source
+  // is no longer bound by any side.
+  let nextEdges = edges.filter(
+    (e) =>
+      !(
+        e.type === "bcEdge" &&
+        e.target === consumerNodeId &&
+        e.targetHandle === targetHandleName &&
+        !boundSources.has(e.source)
+      ),
+  );
+
+  // Materialize one bcEdge per bound source (idempotent).
+  for (const sourceId of boundSources) {
+    const dup = nextEdges.some(
+      (e) =>
+        e.type === "bcEdge" &&
+        e.source === sourceId &&
+        e.target === consumerNodeId &&
+        e.targetHandle === targetHandleName,
+    );
+    if (dup) continue;
+    const sourceNode = nodes.find((n) => n.id === sourceId);
+    if (!sourceNode) continue;
     const sourceComp = getComponent(
       (sourceNode.data as unknown as StreamNodeData).componentId,
     );
     const sourcePort = sourceComp?.ports.find((p) => p.type === "BCPort");
-    if (!sourcePort) return nextEdges;
-    const dup = nextEdges.some(
-      (e) =>
-        e.type === "bcEdge" &&
-        e.source === newEntry.sourceNodeId &&
-        e.sourceHandle === sourcePort.name &&
-        e.target === consumerNodeId &&
-        e.targetHandle === externalInputName,
-    );
-    if (dup) return nextEdges;
-    const edgeId = `bce-${newEntry.sourceNodeId}-${consumerNodeId}-${externalInputName}-${crypto.randomUUID().slice(0, 8)}`;
+    if (!sourcePort) continue;
+    const edgeId = `bce-${sourceId}-${consumerNodeId}-${baseField}-${crypto.randomUUID().slice(0, 8)}`;
     const bcData: BCEdgeData = {
       componentId: consumerNodeId,
-      externalInputName,
+      externalInputName: targetHandleName,
       targetSide: "both",
     };
     nextEdges = [
       ...nextEdges,
       {
         id: edgeId,
-        source: newEntry.sourceNodeId,
+        source: sourceId,
         sourceHandle: sourcePort.name,
         target: consumerNodeId,
-        targetHandle: externalInputName,
+        targetHandle: targetHandleName,
         type: "bcEdge",
         data: bcData as unknown as Record<string, unknown>,
       } as Edge,
@@ -1255,29 +1277,20 @@ const useStore = create<AppState>()((set, get) => ({
       nextBCMode[siblingKey] = entry;
     }
 
-    // Compute new edges via the shared helper. One call per side (primary +
-    // sibling when symmetric). Plan 63.1-10: extracted helper, no inline
-    // edge-materialization here anymore.
-    let nextEdges = _reconcileEdgesForBCMode(
+    // Plan 63.1-12 amend: reconcile edges per (consumer, baseField) ONCE
+    // using the consumer's BCPort handle (not the per-side externalInputName).
+    // This keeps the edge alive whenever ANY sibling is source-bound and
+    // routes it to the consumer's actual ReactFlow handle.
+    // (`previous` is intentionally unread now — the new helper reads the full
+    // post-mutation bcMode and reconciles strictly by current binding state.)
+    void previous;
+    const nextEdges = _reconcileBCEdgesForBaseField(
       state.edges,
       state.nodes,
       componentId,
-      externalInputName,
-      previous,
-      entry,
-      false,
+      baseField,
+      nextBCMode,
     );
-    if (siblingKey && siblingName) {
-      nextEdges = _reconcileEdgesForBCMode(
-        nextEdges,
-        state.nodes,
-        componentId,
-        siblingName,
-        state.bcMode[siblingKey],
-        entry,
-        false,
-      );
-    }
 
     set({ bcMode: nextBCMode, edges: nextEdges, isDirty: true });
     // Phase 63.1 D-15: no _checkBCNMismatch call — selectNodeErrors recomputes
@@ -1388,47 +1401,34 @@ const useStore = create<AppState>()((set, get) => ({
     let nextEdges = state.edges;
 
     if (symmetric) {
-      // Plan 63.1-10: setBCSymmetric(true) now reconciles BOTH the bcMode map
-      // AND the BC edges on the right side. Two edge-holes are covered:
-      //   CR-02 (D-21): leftEntry undefined + rightEntry defined → delete
-      //                 rightKey AND remove the dangling right-side BC edge.
+      // Plan 63.1-10 + 63.1-12 amend: when symmetric flips ON, reconcile the
+      // pair so both sibling bcMode entries agree, then run a single
+      // per-baseField edge reconciliation.
+      //   CR-02 (D-21): leftEntry undefined + rightEntry defined → collapse
+      //                 to "neither set".
       //   CR-03 (D-21): leftEntry defined + leftEntry !== rightEntry → mirror
-      //                 left → right AND add/remove the right-side BC edge to
-      //                 match the new mode.
+      //                 left → right.
       const leftKey = bcModeKey(nodeId, `${baseField}_left`);
       const rightKey = bcModeKey(nodeId, `${baseField}_right`);
       const leftEntry = state.bcMode[leftKey];
       const rightEntry = state.bcMode[rightKey];
-      const rightInputName = `${baseField}_right`;
 
       if (leftEntry === undefined && rightEntry !== undefined) {
-        // CR-02 (D-21): collapse the pair to "neither set".
         const nbm = { ...state.bcMode };
         delete nbm[rightKey];
         nextBCMode = nbm;
-        nextEdges = _reconcileEdgesForBCMode(
-          nextEdges,
-          state.nodes,
-          nodeId,
-          rightInputName,
-          rightEntry,
-          undefined,
-          false,
-        );
       } else if (leftEntry !== undefined && leftEntry !== rightEntry) {
-        // CR-03 (D-21): mirror left → right AND reconcile the right BC edge.
         nextBCMode = { ...state.bcMode, [rightKey]: leftEntry };
-        nextEdges = _reconcileEdgesForBCMode(
-          nextEdges,
-          state.nodes,
-          nodeId,
-          rightInputName,
-          rightEntry,
-          leftEntry,
-          false,
-        );
       }
     }
+
+    nextEdges = _reconcileBCEdgesForBaseField(
+      nextEdges,
+      state.nodes,
+      nodeId,
+      baseField,
+      nextBCMode,
+    );
 
     set({
       bcMode: nextBCMode,
