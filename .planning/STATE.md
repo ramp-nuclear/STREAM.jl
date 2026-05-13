@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
 status: executing
 stopped_at: Phase 63.1 UI-SPEC approved
-last_updated: "2026-05-13T19:06:32.375Z"
-last_activity: 2026-05-13 -- Phase 63.1 planning complete
+last_updated: "2026-05-13T19:24:31.971Z"
+last_activity: 2026-05-13 -- Phase 63.1 execution started
 progress:
   total_phases: 15
   completed_phases: 5
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 62 — resources-panel-architecture
+**Current focus:** Phase 63.1 — bc-architecture-rework-unified-bcs-tab
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -57,10 +57,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 64
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-13 -- Phase 63.1 planning complete
+Phase: 63.1 (bc-architecture-rework-unified-bcs-tab) — EXECUTING
+Plan: 1 of 10
+Status: Executing Phase 63.1
+Last activity: 2026-05-13 -- Phase 63.1 execution started
 Next: `/gsd:discuss-phase 62` (recommended) — or `/gsd:plan-phase 62` to skip discuss.
 
 ---
