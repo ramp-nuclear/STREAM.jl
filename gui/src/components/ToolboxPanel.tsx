@@ -21,32 +21,30 @@ export default function ToolboxPanel() {
   );
 
   return (
-    <div className="h-full p-4 overflow-y-auto">
-      <h2 className="text-lg font-semibold mb-4">Components</h2>
-
-        {visibleHydraulic.length > 0 && (
-          <>
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 mt-4">
-              Hydraulic
-            </div>
-            <div className="space-y-0.5">
-              {visibleHydraulic.map((comp) => (
-                <ToolboxItem
-                  key={comp.id}
-                  componentId={comp.id}
-                  label={comp.label}
-                />
-              ))}
-            </div>
-          </>
-        )}
+    <div className="h-full p-2 overflow-y-auto min-w-0">
+      {visibleHydraulic.length > 0 && (
+        <>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-2 mb-1 mt-2">
+            Hydraulic
+          </div>
+          <div className="space-y-px">
+            {visibleHydraulic.map((comp) => (
+              <ToolboxItem
+                key={comp.id}
+                componentId={comp.id}
+                label={comp.label}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       {visibleThermal.length > 0 && (
         <>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 mt-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-2 mb-1 mt-3">
             Thermal
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-px">
             {visibleThermal.map((comp) => (
               <ToolboxItem
                 key={comp.id}
@@ -61,11 +59,8 @@ export default function ToolboxPanel() {
       {/* Phase 62 D-30 — SOURCES category header. Always rendered (no
           conditional `length > 0` gate); Phase 63 lands the value-source
           drag entries with the BCs wiring. Phase 62 ships the header
-          alone — no rows, no tooltip, no drag handlers. The header uses
-          the same Tailwind treatment as the Hydraulic / Thermal headers
-          above (UI-SPEC §"Sources toolbox category header" +
-          §Copywriting). */}
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 mt-4">
+          alone — no rows, no tooltip, no drag handlers. */}
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-2 mb-1 mt-3">
         Sources
       </div>
     </div>

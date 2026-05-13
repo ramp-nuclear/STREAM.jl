@@ -121,11 +121,14 @@ export default function ResourceGroupHeader({
   }
 
   return (
-    <div className="flex items-center justify-between pl-[8px] pr-[4px] mt-[8px]">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="flex items-center justify-between gap-1 pl-[8px] pr-[4px] mt-[8px] min-w-0">
+      <div
+        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate min-w-0"
+        title={label}
+      >
         {label}
       </div>
-      {rightAffordance}
+      <div className="shrink-0">{rightAffordance}</div>
     </div>
   );
 }

@@ -36,8 +36,8 @@ export default function NumericField({ param, value, onChange }: NumericFieldPro
   }
 
   return (
-    <div className="flex flex-col gap-[8px]">
-      <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
+    <div className="flex flex-col gap-[4px] min-w-0">
+      <Label className="text-[12px] font-medium leading-[1.4] flex items-center gap-1 min-w-0">
         {param.name}
         {param.description && (
           <TooltipProvider>
