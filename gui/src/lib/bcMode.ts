@@ -110,17 +110,14 @@ export function isAllowedBCConnection(
 }
 
 // ---------------------------------------------------------------------------
-// cycleBCEdgeTargetSide — pure helper (D-11)
+// cycleBCEdgeTargetSide — RETIRED (Plan 63.1-12 amend, 2026-05-14)
 // ---------------------------------------------------------------------------
 //
-// Cycle order: both → left → right → both. Re-exported under the same name
-// from the store as an action on a specific edge id; this pure helper is the
-// underlying cycle function.
-
-export function cycleBCEdgeTargetSide(
-  current: "left" | "right" | "both",
-): "left" | "right" | "both" {
-  if (current === "both") return "left";
-  if (current === "left") return "right";
-  return "both";
-}
+// The interactive L → R → L+R cycle was deleted. Cycling only updated
+// edge.data.targetSide without touching bcMode, which produced silent state
+// drift between the canvas tag and the BCs tab. BCEdge.tsx now derives the
+// side tag as a pure function of bcMode (the single source of truth). The
+// BCs tab is the only surface for manipulating BC mode + symmetry.
+//
+// `BCEdgeData.targetSide` is retained on the type for .scp round-tripping
+// but is no longer read by the renderer.

@@ -14,7 +14,6 @@ import { getComponent } from "../registry";
 import { validateTopology, type TopologyResult } from "../lib/validation";
 import {
   bcModeKey,
-  cycleBCEdgeTargetSide as cycleBCEdgeTargetSidePure,
   type BCModeEntry,
   type BCEdgeData,
 } from "@/lib/bcMode";
@@ -265,7 +264,6 @@ interface AppState {
   ) => void;
   clearBCMode: (componentId: string, externalInputName: string) => void;
   setBCSymmetric: (nodeId: string, baseField: string, symmetric: boolean) => void;
-  cycleBCEdgeTargetSide: (edgeId: string) => void;
   /** Phase 63.1 D-07 / D-08: hoist "Promote to shared source" from the
    *  BCsTabForm UI into the store. Spawns the corresponding value-source
    *  node (WallTemperature / HeatFluxSource) at (consumer.x - 160,
@@ -1440,22 +1438,9 @@ const useStore = create<AppState>()((set, get) => ({
     });
   },
 
-  cycleBCEdgeTargetSide: (edgeId) => {
-    get()._pushSnapshot();
-    const state = get();
-    const nextEdges = state.edges.map((e) => {
-      if (e.id !== edgeId) return e;
-      if (e.type !== "bcEdge") return e;
-      const data = (e.data as BCEdgeData | undefined) ?? {
-        componentId: e.target,
-        externalInputName: e.targetHandle ?? "",
-        targetSide: "both" as const,
-      };
-      const nextSide = cycleBCEdgeTargetSidePure(data.targetSide);
-      return { ...e, data: { ...data, targetSide: nextSide } } as Edge;
-    });
-    set({ edges: nextEdges, isDirty: true });
-  },
+  // cycleBCEdgeTargetSide retired in Plan 63.1-12 amend (2026-05-14).
+  // BCEdge side tag is now a pure derived render from bcMode; BCs tab is
+  // the single source of truth for BC state.
 
   _revertBCModeForEdge: (edge) => {
     if (edge.type !== "bcEdge") return;

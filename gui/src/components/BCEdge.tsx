@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -6,21 +6,33 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 import useStore from "../store/useStore";
-import type { BCEdgeData } from "../lib/bcMode";
+import { bcModeKey, type BCEdgeData } from "../lib/bcMode";
+
+// stripSideSuffix is a private helper in useStore.ts; re-implement the same
+// trivial rule here to avoid exporting store-internal helpers.
+function stripSideSuffix(name: string): string {
+  if (name.endsWith("_left")) return name.slice(0, -"_left".length);
+  if (name.endsWith("_right")) return name.slice(0, -"_right".length);
+  return name;
+}
 
 /**
- * Custom BC edge — Phase 63.
+ * Custom BC edge — Phase 63 / amended Plan 63.1-12.
  *
  * Dashed muted-foreground stroke (D-12, no arrowhead) carrying a mid-edge
- * inline chip ("L+R" / "L" / "R") that cycles `targetSide` on click via the
- * store action `cycleBCEdgeTargetSide` (D-11).
+ * read-only side tag ("L+R" / "L" / "R"). The tag is DERIVED at render time
+ * from the canonical `bcMode` slice — the BCs tab is the single source of
+ * truth for BC state. The legacy click-to-cycle interaction (D-11) was
+ * removed (2026-05-14): cycling the chip only updated `edge.data.targetSide`
+ * without touching `bcMode`, which produced silent state drift between the
+ * canvas tag and the BCs tab.
  *
  * Visual idiom is fixed — we do NOT consume the inbound `style` / `markerEnd`
- * EdgeProps (unlike `HydraulicEdge`), because the BC visual style must remain
- * uniform across all BC edges regardless of any enrichEdges styling.
+ * EdgeProps (unlike `HydraulicEdge`).
  */
 function BCEdge({
   id,
+  source,
   sourceX,
   sourceY,
   targetX,
@@ -39,11 +51,36 @@ function BCEdge({
   });
 
   const edgeData = data as BCEdgeData | undefined;
-  const targetSide = edgeData?.targetSide ?? "both";
-  const chipLabel =
-    targetSide === "both" ? "L+R" : targetSide === "left" ? "L" : "R";
 
-  const cycle = useStore((state) => state.cycleBCEdgeTargetSide);
+  // Read both sibling bcMode entries and check whether each points to this
+  // edge's source. The label collapses to "L+R" when both bind, "L" / "R"
+  // when only one does. Use a primitive-returning selector to keep zustand's
+  // shallow equality stable across re-renders.
+  const sideTag = useStore(
+    useCallback(
+      (
+        s: {
+          bcMode: Record<string, { mode: string; sourceNodeId?: string }>;
+        },
+      ): "L+R" | "L" | "R" | "" => {
+        if (!edgeData) return "L+R";
+        const baseField = stripSideSuffix(edgeData.externalInputName);
+        const leftKey = bcModeKey(edgeData.componentId, `${baseField}_left`);
+        const rightKey = bcModeKey(edgeData.componentId, `${baseField}_right`);
+        const leftEntry = s.bcMode[leftKey];
+        const rightEntry = s.bcMode[rightKey];
+        const leftMatch =
+          leftEntry?.mode === "source" && leftEntry.sourceNodeId === source;
+        const rightMatch =
+          rightEntry?.mode === "source" && rightEntry.sourceNodeId === source;
+        if (leftMatch && rightMatch) return "L+R";
+        if (leftMatch) return "L";
+        if (rightMatch) return "R";
+        return "";
+      },
+      [edgeData, source],
+    ),
+  );
 
   return (
     <>
@@ -56,23 +93,19 @@ function BCEdge({
           strokeDasharray: "6 3",
         }}
       />
-      <EdgeLabelRenderer>
-        <div
-          className="nopan absolute"
-          style={{
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            pointerEvents: "all",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => cycle(id)}
-            className="rounded border bg-background px-[6px] py-[2px] text-xs text-muted-foreground hover:bg-accent"
+      {sideTag && (
+        <EdgeLabelRenderer>
+          <span
+            className="nopan absolute rounded border bg-background px-[6px] py-[2px] text-xs text-muted-foreground"
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              pointerEvents: "none",
+            }}
           >
-            {chipLabel}
-          </button>
-        </div>
-      </EdgeLabelRenderer>
+            {sideTag}
+          </span>
+        </EdgeLabelRenderer>
+      )}
     </>
   );
 }
