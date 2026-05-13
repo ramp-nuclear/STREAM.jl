@@ -138,9 +138,13 @@ export function ResponsiveTabsList({
       // variant=line `after` bottom-bar indicator is force-suppressed.
       return cn(
         "flex-none size-[32px] p-0 rounded-md border-0",
-        "text-muted-foreground/50 bg-transparent",
-        "hover:text-foreground",
-        "data-[state=active]:text-foreground",
+        // !-prefixed to win against shadcn TabsTrigger base color/bg rules.
+        // Inactive icons render at 40% muted-foreground (dim), hover/active
+        // both jump to full foreground. No bg in any state.
+        "!text-muted-foreground/40 dark:!text-muted-foreground/40",
+        "hover:!text-foreground dark:hover:!text-foreground",
+        "data-[state=active]:!text-foreground dark:data-[state=active]:!text-foreground",
+        "!bg-transparent data-[state=active]:!bg-transparent dark:data-[state=active]:!bg-transparent",
         "data-[state=active]:after:!opacity-0",
       );
     }
