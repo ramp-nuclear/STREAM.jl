@@ -7,13 +7,15 @@
 //
 // • Dropdown lists resources of the matching kind in creation order.
 // • For Power Shape, the dropdown also renders the sentinel
-//   `(leave unset — fill in code)` as the fixed top entry, followed by
+//   `(leave unset — set in code)` as the fixed top entry, followed by
 //   a `<SelectSeparator />`, then the user's named Power Shapes
-//   (D-26 + UI-SPEC §"Power Shape picker — extra fixed top entry").
+//   (D-26 + UI-SPEC §"Power Shape picker — extra fixed top entry";
+//   sentinel copy updated in 62-15 per VERIFICATION.md Gap #4).
 // • Empty-state copy (no resources of this kind yet) is rendered as the
-//   `<SelectValue>` placeholder — single line, italic, truncate. Verbatim
-//   UI-SPEC: `No geometries yet — click + New… or open the Resources tab.`
-//   / `No power shapes yet — click + New… or open the Resources tab.`
+//   `<SelectValue>` placeholder — single line, italic, truncate. Copy
+//   rewritten in 62-15 to engineering-tool voice (VERIFICATION.md Gap #4):
+//   `No geometries. Use + New or the Resources tab.`
+//   / `No power shapes. Use + New or the Resources tab.`
 // • `+ New…` mounts `ResourceCreationButton` which hosts the popover with
 //   the contract enforced by `ResourceCreationPopoverContent` (D-15, D-16,
 //   Esc-cascade-stop, Pitfall 1 focus return). On Create, the new UUID is
@@ -22,8 +24,8 @@
 //   row, right Properties panel re-renders as the resource editor (the
 //   right-panel router is wired in 62-09). The button is disabled when
 //   the picker has no current selection OR is on the unset sentinel
-//   (UI-SPEC §"Edit… disabled rules" + verbatim disabled-tooltip
-//   `Select a resource to edit it.`).
+//   (UI-SPEC §"Edit… disabled rules" + disabled-tooltip
+//   `Pick a resource first.` — rewritten in 62-15 per VERIFICATION.md Gap #4).
 
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -64,8 +66,8 @@ export default function ResourceReferencePicker({
   // Per-kind data + verbatim copy (UI-SPEC §"Reference picker" empty-state copy).
   const isGeometry = resourceKind === "geometry";
   const emptyCopy = isGeometry
-    ? "No geometries yet — click + New… or open the Resources tab."
-    : "No power shapes yet — click + New… or open the Resources tab.";
+    ? "No geometries. Use + New or the Resources tab."
+    : "No power shapes. Use + New or the Resources tab.";
 
   // Build the list of selectable resources. For power shapes, prepend the
   // sentinel as the fixed top entry per D-26, then a separator, then user
@@ -151,7 +153,7 @@ export default function ResourceReferencePicker({
               <>
                 <SelectItem value={SENTINEL_UNSET_POWER_SHAPE}>
                   <span className="italic text-muted-foreground">
-                    (leave unset — fill in code)
+                    (leave unset — set in code)
                   </span>
                 </SelectItem>
                 {userResources.length > 0 && <SelectSeparator />}
@@ -184,7 +186,7 @@ export default function ResourceReferencePicker({
               </Button>
             </span>
           </TooltipTrigger>
-          <TooltipContent>Select a resource to edit it.</TooltipContent>
+          <TooltipContent>Pick a resource first.</TooltipContent>
         </Tooltip>
       ) : (
         <Button

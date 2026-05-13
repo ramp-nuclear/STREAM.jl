@@ -128,7 +128,7 @@ export default function GeometryResourceEditor({
   function validateName(): string | null {
     if (!JULIA_IDENT_RE.test(name)) {
       // Verbatim UI-SPEC copy.
-      return "Use ASCII letters, digits, and underscores; must not start with a digit.";
+      return "Letters, digits, underscores. Cannot start with a digit.";
     }
     if (existingNames.has(name)) {
       // Verbatim UI-SPEC copy.

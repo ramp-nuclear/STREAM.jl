@@ -147,7 +147,7 @@ export default function PowerShapeResourceEditor({
 
   function validateName(): string | null {
     if (!JULIA_IDENT_RE.test(name)) {
-      return "Use ASCII letters, digits, and underscores; must not start with a digit.";
+      return "Letters, digits, underscores. Cannot start with a digit.";
     }
     if (existingNames.has(name)) {
       return `A power shape named ${name} already exists.`;
@@ -221,13 +221,13 @@ export default function PowerShapeResourceEditor({
     } else if (kind === "z_cosine") {
       const amp = Number(amplitude.trim());
       if (!Number.isFinite(amp)) {
-        setDimError("Amplitude must be a finite number.");
+        setDimError("Amplitude must be finite.");
         return;
       }
       params.amplitude = amp;
     } else if (kind === "file_loaded") {
       if (!path) {
-        setDimError("Please pick a CSV file via Browse.");
+        setDimError("Pick a CSV file via Browse.");
         return;
       }
       params.path = path;

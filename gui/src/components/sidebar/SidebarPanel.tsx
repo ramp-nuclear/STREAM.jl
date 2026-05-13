@@ -12,11 +12,10 @@
 //       - fluid      → read-only light_water placeholder (D-03;
 //         RESEARCH Open Question 3 recommendation copy).
 //   • "none" / "project" → no-selection body:
-//       - Resources tab active → variant copy "Select a resource on the
-//         left to edit it."  (UI-SPEC §"Right Properties panel —
-//         no-selection body")
-//       - Otherwise → standard "Select a component on the canvas to view
-//         its properties."
+//       - Resources tab active → variant copy "Select a resource to edit it."
+//         (UI-SPEC §"Right Properties panel — no-selection body";
+//         rewritten in 62-15 per VERIFICATION.md Gap #4)
+//       - Otherwise → standard "Select a component to view its properties."
 //
 // Header text (D-06, UI-SPEC §"Right Properties panel — header text"):
 //   • component → "Properties"
@@ -268,8 +267,8 @@ export default function SidebarPanel({ width, onResizeMouseDown }: SidebarPanelP
     // variant copy.
     const variantCopy =
       activeLeftTab === "Resources"
-        ? "Select a resource on the left to edit it."
-        : "Select a component on the canvas to view its properties.";
+        ? "Select a resource to edit it."
+        : "Select a component to view its properties.";
     return (
       <div className="mt-[32px]">
         <p className="text-[14px] font-semibold text-muted-foreground">

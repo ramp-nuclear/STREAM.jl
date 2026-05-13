@@ -52,7 +52,7 @@ beforeEach(() => {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — fill in code)",
+          name: "(leave unset — set in code)",
           kind: "unset",
           params: {},
         },
@@ -123,9 +123,10 @@ describe("ResourcesTreePanel — Fluids placeholder row", () => {
 describe("ResourcesTreePanel — D-26 sentinel filter", () => {
   it("D-26: the unset PowerShape sentinel is NOT rendered as a row in Power Shapes", () => {
     renderTree();
-    // The sentinel's name is "(leave unset — fill in code)" — it must not
+    // The sentinel's name is "(leave unset — set in code)" — it must not
     // appear in the tree body (it only lives in the field-level picker).
-    expect(screen.queryByText("(leave unset — fill in code)")).toBeNull();
+    // (62-15 rewrite per VERIFICATION Gap #4.)
+    expect(screen.queryByText("(leave unset — set in code)")).toBeNull();
     // No <li> in the tree carries the sentinel UUID.
     const sentinelLi = document.querySelector(
       `li[data-resource-uuid="${SENTINEL_UNSET_POWER_SHAPE}"]`,
@@ -341,9 +342,10 @@ describe("ResourcesTreePanel — context menu (D-03)", () => {
     fireEvent.click(del);
 
     // AlertDialog content rendered (portal). The description carries the
-    // verbatim copy "Delete geometry g_used? It is used by 1 component(s)."
+    // verbatim copy "Delete geometry g_used? Used by 1 component(s)."
+    // (62-15 rewrite per VERIFICATION Gap #4 — "It is" filler dropped.)
     const desc = await screen.findByText(
-      /Delete geometry g_used\? It is used by 1 component\(s\)\./,
+      /Delete geometry g_used\? Used by 1 component\(s\)\./,
     );
     expect(desc).toBeTruthy();
 
@@ -392,7 +394,7 @@ describe("ResourcesTreePanel — 62-13 dual-key usage detection", () => {
     fireEvent.click(del);
 
     const desc = await screen.findByText(
-      /Delete geometry g_live\? It is used by 1 component\(s\)\./,
+      /Delete geometry g_live\? Used by 1 component\(s\)\./,
     );
     expect(desc).toBeTruthy();
 
@@ -432,7 +434,7 @@ describe("ResourcesTreePanel — 62-13 dual-key usage detection", () => {
     fireEvent.click(del);
 
     const desc = await screen.findByText(
-      /Delete power shape ps_live\? It is used by 1 component\(s\)\./,
+      /Delete power shape ps_live\? Used by 1 component\(s\)\./,
     );
     expect(desc).toBeTruthy();
   });
@@ -477,7 +479,8 @@ describe("ResourcesTreePanel — 62-13 dual-key usage detection", () => {
     const del = await screen.findByRole("menuitem", { name: /^Delete$/i });
     fireEvent.click(del);
 
-    const desc = await screen.findByText(/used by 2 component\(s\)/);
+    // 62-15: AlertDialog description starts with capital "Used by …".
+    const desc = await screen.findByText(/Used by 2 component\(s\)/);
     expect(desc).toBeTruthy();
   });
 
@@ -551,5 +554,40 @@ describe("ResourcesTreePanel — 62-13 dual-key usage detection", () => {
     expect(
       variantAttr === "destructive" || /destructive/.test(classAttr),
     ).toBe(true);
+  });
+});
+
+// 62-15 (VERIFICATION Gap #4): Fluids `+` disabled tooltip rewritten to
+// engineering-voice copy. The tooltip is passed as a prop string to
+// ResourceGroupHeader; we render the panel and assert the new copy
+// appears once the user hovers/focuses the disabled trigger.
+describe("ResourcesTreePanel — Fluids disabled-tooltip copy (62-15)", () => {
+  it("renders 'Multiple fluids not yet supported.' on the disabled Fluids + button", async () => {
+    renderTree();
+    const fluidAdd = screen.getByRole("button", { name: /Add fluid/i });
+    // Disabled buttons cannot receive focus directly in most browsers;
+    // Radix wraps them in a span/span trigger. Find the closest tooltip
+    // trigger ancestor and focus it.
+    const trigger = fluidAdd.closest("[data-slot='tooltip-trigger']") as
+      | HTMLElement
+      | null;
+    // If wrapped, focus the wrapper; otherwise the prop string is still
+    // greppable in the rendered DOM via a Radix-aria attribute.
+    if (trigger) {
+      fireEvent.focus(trigger);
+      await waitFor(() => {
+        const hits = screen.queryAllByText("Multiple fluids not yet supported.");
+        expect(hits.length).toBeGreaterThan(0);
+      });
+    } else {
+      // Fallback: the tooltip string is conveyed via aria-label or title
+      // on the disabled button. Either is acceptable.
+      const labelMatch =
+        fluidAdd.getAttribute("title") === "Multiple fluids not yet supported." ||
+        fluidAdd.getAttribute("aria-label")?.includes(
+          "Multiple fluids not yet supported.",
+        );
+      expect(labelMatch).toBe(true);
+    }
   });
 });

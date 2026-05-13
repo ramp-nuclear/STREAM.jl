@@ -143,7 +143,7 @@ export default function ResourcesTreePanel() {
               addAriaLabel="Add fluid"
               onAdd={handleAddFluid}
               disabled
-              disabledTooltip="Multi-fluid support is planned for a future release."
+              disabledTooltip="Multiple fluids not yet supported."
             />
             <ul role="group" className="mt-[2px]">
               {fluids.length === 0 ? (

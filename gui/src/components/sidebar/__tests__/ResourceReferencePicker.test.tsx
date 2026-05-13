@@ -34,7 +34,7 @@ function resetStore() {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — fill in code)",
+          name: "(leave unset — set in code)",
           kind: "unset",
           params: {},
         },
@@ -87,22 +87,40 @@ describe("ResourceReferencePicker", () => {
       renderPicker({ resourceKind: "geometry" });
       expect(
         screen.getByText(
-          "No geometries yet — click + New… or open the Resources tab.",
+          "No geometries. Use + New or the Resources tab.",
         ),
       ).toBeTruthy();
     });
+
+    // 62-15 (VERIFICATION Gap #4): pin the power-shape empty-state copy.
+    // The power-shape picker carries the sentinel as the fixed top entry,
+    // so the empty-state copy renders inside the SelectValue placeholder
+    // (the dropdown still has the sentinel as a selectable option).
+    it("D-20 / INV-15: power-shape picker carries the engineering-voice empty-state placeholder text in the component source", () => {
+      // The placeholder string is rendered by the SelectValue placeholder
+      // even when a sentinel item exists. Render the power-shape picker
+      // and assert the new copy is in the DOM (as the placeholder span).
+      renderPicker({ resourceKind: "powerShape" });
+      // happy-dom renders the SelectValue placeholder span inside the
+      // trigger; the new copy must appear at least once.
+      const hits = screen.queryAllByText(
+        "No power shapes. Use + New or the Resources tab.",
+      );
+      expect(hits.length).toBeGreaterThanOrEqual(1);
+    });
   });
 
-  describe("D-26: Power Shape sentinel — `(leave unset — fill in code)` is the fixed top entry", () => {
+  describe("D-26: Power Shape sentinel — `(leave unset — set in code)` is the fixed top entry", () => {
     it("D-26: Power Shape picker dropdown includes the sentinel item", async () => {
       renderPicker({ resourceKind: "powerShape" });
       // Open the Select menu by clicking the trigger.
       fireEvent.click(screen.getByRole("combobox"));
       await flushTimers();
 
-      // The sentinel option renders the verbatim copy "(leave unset — fill
-      // in code)" — it must be present.
-      expect(screen.getByText("(leave unset — fill in code)")).toBeTruthy();
+      // The sentinel option renders the verbatim copy "(leave unset — set
+      // in code)" — it must be present (62-15 rewrite per VERIFICATION Gap #4;
+      // supersedes the original D-26 "(leave unset — fill in code)" form).
+      expect(screen.getByText("(leave unset — set in code)")).toBeTruthy();
     });
   });
 
@@ -265,7 +283,7 @@ describe("ResourceReferencePicker", () => {
       expect(editButton.disabled).toBe(true);
     });
 
-    it("Edit… disabled tooltip shows the verbatim copy 'Select a resource to edit it.'", async () => {
+    it("Edit… disabled tooltip shows the verbatim copy 'Pick a resource first.'", async () => {
       renderPicker({ value: null });
       // Radix Tooltip portals its content lazily — it is NOT in the DOM
       // until the trigger is hovered/focused. Focus the wrapper span (the
@@ -281,9 +299,10 @@ describe("ResourceReferencePicker", () => {
       // Radix Tooltip renders BOTH the visual tooltip content AND a
       // visually-hidden `role="tooltip"` for assistive tech, so the
       // verbatim copy appears twice — we use getAllByText to assert at
-      // least one occurrence.
+      // least one occurrence. Copy rewritten in 62-15 per VERIFICATION
+      // Gap #4 (was: "Select a resource to edit it.").
       await waitFor(() => {
-        const hits = screen.getAllByText("Select a resource to edit it.");
+        const hits = screen.getAllByText("Pick a resource first.");
         expect(hits.length).toBeGreaterThan(0);
       });
     });
