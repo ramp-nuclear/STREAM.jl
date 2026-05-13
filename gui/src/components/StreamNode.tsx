@@ -1,5 +1,6 @@
 import type * as React from "react";
 import { useCallback } from "react";
+import { Anchor } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { getComponent } from "../registry";
 import { getComponentIcon } from "@/registry/icons";
@@ -102,20 +103,21 @@ type FlowPortLike = {
 
 function anchorIndicatorStyleFor(side: string | undefined): React.CSSProperties {
   // The FlowPort `<Handle>` is a 12-px circle that ReactFlow centers on the
-  // node edge at the requested `Position`. We place a 6-px dot just outside
-  // the handle, tangent to its edge. The exact offsets below mirror the
-  // UI-SPEC §"Canvas Anchor Indicator — Position" recommendation.
+  // node edge at the requested `Position`. We place the 12-px lucide Anchor
+  // icon just outside the handle, tangent to its edge. Plan 63.1-13 widened
+  // the indicator from a 6-px dot to a 12-px SVG glyph; offsets bumped from
+  // (-10, -3) to (-16, -6) accordingly.
   switch (side) {
     case "left":
-      return { position: "absolute", left: -10, top: -3 };
+      return { position: "absolute", left: -16, top: -6 };
     case "right":
-      return { position: "absolute", right: -10, top: -3 };
+      return { position: "absolute", right: -16, top: -6 };
     case "top":
-      return { position: "absolute", left: -3, top: -10 };
+      return { position: "absolute", left: -6, top: -16 };
     case "bottom":
-      return { position: "absolute", left: -3, bottom: -10 };
+      return { position: "absolute", left: -6, bottom: -16 };
     default:
-      return { position: "absolute", left: -10, top: -3 };
+      return { position: "absolute", left: -16, top: -6 };
   }
 }
 
@@ -154,10 +156,10 @@ function FlowPortHandle({
         }}
       />
       {hasAnchor && (
-        <div
+        <Anchor
           data-testid="anchor-indicator"
           aria-label="Pressure anchor"
-          className={`w-1.5 h-1.5 rounded-full bg-foreground ${
+          className={`w-3 h-3 text-foreground ${
             dimFlowHandles ? "opacity-20" : ""
           }`}
           style={anchorIndicatorStyleFor(port.side)}
