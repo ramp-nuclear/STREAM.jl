@@ -31,10 +31,11 @@ import ResourceCreationButton from "@/components/sidebar/ResourceCreationButton"
 // placeholder row" (multi-fluid support deferred to v0.6+).
 //
 // The canonical disabled-tooltip copy for the Fluids `+` button is:
-//   "Multi-fluid support is planned for a future release."
-// (verbatim per UI-SPEC §"Fluids placeholder row"). The caller passes it via
-// `disabledTooltip`; this comment exists so the literal is greppable in this
-// file as the central locus of the tooltip behavior.
+//   "Multiple fluids not yet supported."
+// (rewritten in 62-15 per VERIFICATION.md Gap #4; supersedes the original
+// UI-SPEC phrase that read as future-tense roadmap copy). The caller passes
+// it via `disabledTooltip`; this comment exists so the literal is greppable
+// in this file as the central locus of the tooltip behavior.
 
 export interface ResourceGroupHeaderProps {
   /** Visible label (lowercased; Tailwind `uppercase` does the visual styling). */
