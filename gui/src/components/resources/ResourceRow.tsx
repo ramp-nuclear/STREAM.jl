@@ -47,6 +47,20 @@ import useStore, {
 
 export type ResourceKind = "geometry" | "powerShape" | "fluid";
 
+// Phase 62-13: detect both the registry param name (live ParameterForm path)
+// and the _ref-suffixed legacy key (codeGenerator fallback, .scp fixtures).
+// ParameterForm.tsx writes UUIDs under `param.name` ("geometry" / "power_shape"),
+// while legacy fixtures and existing .scp files store them under
+// "geometry_ref" / "power_shape_ref". codeGenerator.ts:803 already does this
+// dual-key fallback (`power_shape_ref ?? power_shape`); the usage scan here
+// now mirrors that discipline so the AlertDialog fires in the live app, not
+// just under the legacy fixture key.
+const PARAM_KEY_BY_KIND: Record<ResourceKind, readonly string[]> = {
+  geometry: ["geometry", "geometry_ref"],
+  powerShape: ["power_shape", "power_shape_ref"],
+  fluid: [],
+};
+
 export interface ResourceRowProps {
   resource: GeometryResource | PowerShapeResource | FluidResource;
   kind: ResourceKind;
@@ -73,22 +87,20 @@ export default function ResourceRow({
   const [usagesOpen, setUsagesOpen] = useState(false);
 
   // Compute usage count and list (only for non-fluid kinds — fluids have no
-  // usage tracking in Phase 62).
-  const refKey = useMemo(() => {
-    if (kind === "geometry") return "geometry_ref";
-    if (kind === "powerShape") return "power_shape_ref";
-    return null;
-  }, [kind]);
-
+  // usage tracking in Phase 62). Phase 62-13: scan BOTH the registry param
+  // key (live ParameterForm path) AND the _ref-suffixed legacy key — see
+  // PARAM_KEY_BY_KIND above and codeGenerator.ts:803 for the precedent.
   const nodes = useStore((s) => s.nodes);
   const usages = useMemo(() => {
-    if (!refKey) return [];
+    const paramKeys = PARAM_KEY_BY_KIND[kind];
+    if (paramKeys.length === 0) return [];
     return nodes.filter((n) => {
       const data = n.data as unknown as StreamNodeData;
       const params = data?.parameters as Record<string, unknown> | undefined;
-      return params?.[refKey] === resource.uuid;
+      if (!params) return false;
+      return paramKeys.some((k) => params[k] === resource.uuid);
     });
-  }, [nodes, refKey, resource.uuid]);
+  }, [nodes, kind, resource.uuid]);
 
   // Keep renameValue in sync if the underlying resource name changes
   // (e.g., another action renamed it while this row was not in rename mode).
