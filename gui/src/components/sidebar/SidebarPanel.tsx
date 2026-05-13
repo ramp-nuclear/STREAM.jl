@@ -35,7 +35,7 @@
 //     The `e.defaultPrevented` guard here is belt-and-braces: if any
 //     higher-precedence handler called preventDefault, we skip the tail.
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import useStore, {
   SENTINEL_UNSET_POWER_SHAPE,
   type StreamNodeData,
@@ -44,9 +44,11 @@ import { getComponent } from "@/registry";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InstanceNameField from "./InstanceNameField";
 import ParameterForm from "./ParameterForm";
 import ModeToggle from "./ModeToggle";
+import BCsTabForm from "./BCsTabForm";
 import GeometryResourceEditor from "./GeometryResourceEditor";
 import PowerShapeResourceEditor from "./PowerShapeResourceEditor";
 
@@ -147,6 +149,10 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
       }
       const activeMode =
         data.constructorMode ?? component.constructorModes[0]?.mode ?? "default";
+      const hasBCs = (component.external_inputs?.length ?? 0) > 0;
+      // The outer <div key={selectedNodeId}> remount discipline (preserved
+      // below) handles D-03: switching selection remounts the whole subtree,
+      // so the <Tabs> local state defaults back to "properties" automatically.
       return (
         <div key={selectedNodeId}>
           <div className="mt-[24px] flex flex-col gap-[8px]">
@@ -161,29 +167,47 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
 
           <Separator className="my-[24px]" />
 
-          {component.constructorModes.length > 1 && (
+          {hasBCs ? (
+            <ComponentTabs
+              component={component}
+              activeMode={activeMode}
+              data={data}
+              selectedNodeId={selectedNodeId}
+              onParamChange={(name, value) =>
+                updateNodeParams(selectedNodeId, {
+                  parameters: { [name]: value },
+                })
+              }
+              onModeChange={(mode) =>
+                updateNodeParams(selectedNodeId, { constructorMode: mode })
+              }
+            />
+          ) : (
             <>
-              <ModeToggle
-                modes={component.constructorModes}
+              {component.constructorModes.length > 1 && (
+                <>
+                  <ModeToggle
+                    modes={component.constructorModes}
+                    activeMode={activeMode}
+                    onChange={(mode) =>
+                      updateNodeParams(selectedNodeId, { constructorMode: mode })
+                    }
+                  />
+                  <Separator className="my-[24px]" />
+                </>
+              )}
+              <ParameterForm
+                component={component}
                 activeMode={activeMode}
-                onChange={(mode) =>
-                  updateNodeParams(selectedNodeId, { constructorMode: mode })
+                values={data.parameters}
+                onParamChange={(name, value) =>
+                  updateNodeParams(selectedNodeId, {
+                    parameters: { [name]: value },
+                  })
                 }
               />
-              <Separator className="my-[24px]" />
             </>
           )}
-
-          <ParameterForm
-            component={component}
-            activeMode={activeMode}
-            values={data.parameters}
-            onParamChange={(name, value) =>
-              updateNodeParams(selectedNodeId, {
-                parameters: { [name]: value },
-              })
-            }
-          />
         </div>
       );
     }
@@ -303,5 +327,72 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
         </div>
       </ScrollArea>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ComponentTabs — Phase 63 Plan 63-C Task 04 helper
+// ---------------------------------------------------------------------------
+//
+// Wraps the existing component-branch Properties pane (ModeToggle if
+// multi-mode + ParameterForm) under a <Tabs> strip alongside the new BCs
+// tab (BCsTabForm). Used only when the selected component has
+// external_inputs.length > 0 (D-02 visibility gate).
+//
+// The activeTab local state defaults to "properties" — D-03 reset-on-
+// selection-change is delivered for free because the outer <div
+// key={selectedNodeId}> in renderBody remounts this subtree when the
+// selected node changes.
+
+interface ComponentTabsProps {
+  component: ReturnType<typeof getComponent>;
+  activeMode: string;
+  data: StreamNodeData;
+  selectedNodeId: string;
+  onParamChange: (name: string, value: unknown) => void;
+  onModeChange: (mode: string) => void;
+}
+
+function ComponentTabs({
+  component,
+  activeMode,
+  data,
+  selectedNodeId,
+  onParamChange,
+  onModeChange,
+}: ComponentTabsProps) {
+  const [activeTab, setActiveTab] = useState<"properties" | "bcs">("properties");
+  if (!component) return null;
+  return (
+    <Tabs
+      value={activeTab}
+      onValueChange={(v) => setActiveTab(v as "properties" | "bcs")}
+    >
+      <TabsList className="mb-[16px]">
+        <TabsTrigger value="properties">Properties</TabsTrigger>
+        <TabsTrigger value="bcs">BCs</TabsTrigger>
+      </TabsList>
+      <TabsContent value="properties">
+        {component.constructorModes.length > 1 && (
+          <>
+            <ModeToggle
+              modes={component.constructorModes}
+              activeMode={activeMode}
+              onChange={onModeChange}
+            />
+            <Separator className="my-[24px]" />
+          </>
+        )}
+        <ParameterForm
+          component={component}
+          activeMode={activeMode}
+          values={data.parameters}
+          onParamChange={onParamChange}
+        />
+      </TabsContent>
+      <TabsContent value="bcs">
+        <BCsTabForm component={component} nodeId={selectedNodeId} />
+      </TabsContent>
+    </Tabs>
   );
 }
