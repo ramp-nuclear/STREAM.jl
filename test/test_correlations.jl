@@ -404,8 +404,7 @@ end  # @testset "PHY-02/03/04: Integration Tests — Pluggable Correlations in S
         beta_val = beta_water(T_bulk)
         @test isapprox(beta_val, 3.851798e-04; rtol=1e-4)
 
-        nu_val = mu_water(T_bulk) / rho_water(T_bulk)
-        Gr_val = Gr(beta_val, 9.81, T_wall - T_bulk, b, nu_val)
+        Gr_val = Gr(rho_water(T_bulk), mu_water(T_bulk), beta_val, T_wall, T_bulk, b, 9.81)
         # rtol=5e-4: Gr is sensitive to rho/mu product; Julia and Python Simantov coefficients
         # produce numerically identical results but differ from the tabulated reference by ~0.034%
         @test isapprox(Gr_val, 2862.302086; rtol=5e-4)

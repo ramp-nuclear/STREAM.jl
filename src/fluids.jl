@@ -1,5 +1,5 @@
-# Fluid property functions for light water (Simantov correlations)
-# Source: Python STREAM light_water.py — coefficients ported verbatim
+# Fluid property functions for light water (Siman Tov correlations)
+# Source: Moshe Siman Tov et al.
 # Temperature input: Kelvin. Converts internally.
 # Note: cp_water guards the sqrt argument with max(0,…) so that KINSOL can evaluate
 # the residual at bad Newton iterates without throwing a DomainError; ForwardDiff-compatible.

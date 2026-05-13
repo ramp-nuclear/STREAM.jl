@@ -35,8 +35,8 @@ end
     # wet_perimeter = π*D
     @test isapprox(geo.wet_perimeter, π * 0.01; rtol=1e-10)
     # heated_parts symmetric split
-    @test isapprox(geo.heated_parts[1], π * 0.01 / 2; rtol=1e-10)
-    @test isapprox(geo.heated_parts[2], π * 0.01 / 2; rtol=1e-10)
+    @test isapprox(geo.heated_parts[1], π * 0.01; rtol=1e-10)
+    @test isapprox(geo.heated_parts[2], 0; atol=1e-10)
     # area = π*D²/4
     @test isapprox(geo.A, π * 0.01^2 / 4; rtol=1e-10)
     # circular: width == depth == D

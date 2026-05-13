@@ -141,9 +141,15 @@ function regime_dependent(;
             )
         htc_fn =
             (Re, Pr, T_bulk, T_wall) -> begin
-                beta_v = beta_water(T_bulk)
-                nu_v = mu_water(T_bulk) / rho_water(T_bulk)
-                Gr_val = Gr(beta_v, g_val, T_wall - T_bulk, Dh_val, nu_v)
+                Gr_val = Gr(
+                    rho_water(T_bulk),
+                    mu_water(T_bulk),
+                    beta_water(T_bulk),
+                    T_wall,
+                    T_bulk,
+                    Dh_val,
+                    g_val,
+                )
                 ifelse(
                     Gr_val / Re^2 > 1,
                     htc_natural(Re, Pr, T_bulk, T_wall),
@@ -209,9 +215,15 @@ Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 """
 function elenbaas_htc(; b, L, Dh, g=9.81)
     return (Re, Pr, T_bulk, T_wall) -> begin
-        beta = beta_water(T_bulk)
-        nu = mu_water(T_bulk) / rho_water(T_bulk)
-        Gr_val = Gr(beta, g, T_wall - T_bulk, Dh, nu)
+        Gr_val = Gr(
+            rho_water(T_bulk),
+            mu_water(T_bulk),
+            beta_water(T_bulk),
+            T_wall,
+            T_bulk,
+            Dh,
+            g,
+        )
         Ra_val = Ra(Gr_val, Pr)
         elenbaas_nusselt(Ra_val, b, L)
     end
