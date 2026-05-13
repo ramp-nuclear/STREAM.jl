@@ -3,13 +3,6 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-
-# ─────────────────────────────────────────────────────────────────
-# FLAP-REF: Flapper constructor no longer accepts use_callback or threshold
-#
-# Phase 48 removed use_callback and threshold from the Flapper constructor.
-# Passing either kwarg must throw a MethodError (unknown keyword argument).
-# The callback is now external: flapper_callback(ssys, monitored_sym; threshold)
 # ─────────────────────────────────────────────────────────────────
 @testset "FLAP-REF: Flapper has no use_callback or threshold kwargs" begin
     # Passing use_callback kwarg must raise MethodError
@@ -20,13 +13,6 @@ using STREAM
     @test_nowarn Flapper(; name=:flap_plain)
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Helper: build a minimal closed-loop Flapper system (scalar pump)
-#
-# Topology: Pump(dP_val) → Resistor(1e5) → Flapper → back to Pump
-# flapper.ref_mdot ~ pump.port_in.mdot
-# Two thermal anchors break circular instream in hydraulics-only loop.
-# ─────────────────────────────────────────────────────────────────
 function _build_flapper_scalar_loop(dP_val)
     @named pump = Pump(dP_val)
     @named res = Resistor(1e5)
@@ -45,14 +31,6 @@ function _build_flapper_scalar_loop(dP_val)
     return sys
 end
 
-# ─────────────────────────────────────────────────────────────────
-# FLAP-05: Flapper remains closed under positive ref_mdot
-#
-# A scalar pump with dP=1e5 Pa drives flow through Resistor(1e5) + Flapper.
-# Steady-state mdot ~ 1e5 / (1e5 + 1e8) ~ 1e-3 kg/s.
-# With threshold=1e-6 kg/s, this mdot stays well above threshold throughout
-# the 20 s transient, so the event never fires and T_open stays at 1e30.
-# ─────────────────────────────────────────────────────────────────
 @testset "FLAP-05: Flapper remains closed under positive ref_mdot" begin
     sys = _build_flapper_scalar_loop(1e5)
     ssys = mtkcompile(sys; fully_determined=false)  # legitimate-structural: Flapper state(t) is set by ContinuousCallback, not an MTK equation
@@ -139,13 +117,6 @@ end
     @test abs(sol[ssys.ine.port_in.mdot, end]) < 1e-6 * mdot_0
 end
 
-# ─────────────────────────────────────────────────────────────────
-# SOLV-01: solve_transient passes user-supplied callbacks
-#
-# Reuse the scalar-pump Flapper loop from FLAP-05.
-# A ContinuousCallback fires at t=5s and sets fired[]=true.
-# Verifies that the callbacks kwarg is forwarded to the DiffEq solver.
-# ─────────────────────────────────────────────────────────────────
 @testset "SOLV-01: solve_transient passes user callbacks" begin
     sys = _build_flapper_scalar_loop(1e5)
     ssys = mtkcompile(sys; fully_determined=false)  # legitimate-structural: Flapper state(t) set by callback (see flapper.jl:38)

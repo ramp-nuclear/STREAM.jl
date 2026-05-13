@@ -22,11 +22,6 @@ function __init_parity_csv()
 end
 __init_parity_csv()  # called once at file load
 
-# ─────────────────────────────────────────────────────────────────────
-# Harness self-tests — RESEARCH.md "Test the Tester"
-# 12 sanity checks for parity_check / append_csv / equivalence asserts.
-# Run BEFORE any parity testset so a regression in the harness fails fast.
-# ─────────────────────────────────────────────────────────────────────
 @testset "parity_helpers self-tests" begin
     # Self-test 1: identity → CLEAN, rtol=0
     r = parity_check("st", "q", 100.0, 100.0)
@@ -60,8 +55,6 @@ __init_parity_csv()  # called once at file load
     append_csv(tmp_csv, rows_test; truncate=true)
     @test isfile(tmp_csv)
     @test filesize(tmp_csv) > 100
-    # Read back via DelimitedFiles and check the 6th column (rtol) against original.
-    # CSV format is %.6e (~6 sig figs), so use rtol-based isapprox not absolute atol.
     readback = readdlm(tmp_csv, ',', skipstart=1)
     @test size(readback, 1) == 3
     for (i, original) in enumerate(rows_test)
@@ -140,9 +133,6 @@ try
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
     geom_simple = PipeGeometry_circular(0.6, 0.01)
-    # Use Julia's split (πD/2, πD/2) — pairwise guard from Plan 01. Python's
-    # (πD, 0) yields the SAME total perimeter πD; q_density is partition-invariant
-    # so the per-side comparison further down works on either split.
     assert_equivalence_geometry(geom_simple,
         0.01,                    # Dh
         π * 0.01^2 / 4,          # A
@@ -151,16 +141,12 @@ try
         rtol=1e-12)
     assert_equivalence_anchors()
 
-    # ── Step 2: build INLINE CAC + HX + Pump scenario (Pitfall 1) ──
     n = 10
     T_inlet = 313.15
     T_wall = 373.15
     @named pump = Pump(3.0e4)
     @named hx = HeatExchanger(T_inlet)
     @named cac = ChannelAndContacts(; n=n, geometry=geom_simple)
-    # Drive both wall sides at T_wall via ConstantTemperature + connect()
-    # (canonical pattern, mirrors HD Fourier testset). Python equivalent:
-    # funcs={T_left=100°C, T_right=100°C}.
     ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:n]
     ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:n]
     conns = vcat(
@@ -175,7 +161,6 @@ try
                           pump, hx, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys; fully_determined=true)
 
-    # IC guess
     T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.5, n=n)
     op = vcat(
         [ssys.cac.T[i] => T_guess[i] for i in 1:n],
@@ -183,14 +168,10 @@ try
     )
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
-    # Pitfall 5: KINSOL "Success" with NaN — guard before parity_check
     @test all(isfinite, [sol[ssys.cac.T[i]] for i in 1:n])
     @test isfinite(sol[ssys.cac.port_in.mdot])
-
-    # ── Step 3: iterate D-07 tiers ──
     rows = ParityRow[]
 
-    # Tier (a) scalars
     push!(rows, parity_check("simple_loop", "T_out",
                              sol[ssys.cac.T_out], PARITY_SIMPLE_T_OUT))
     push!(rows, parity_check("simple_loop", "mdot",
@@ -198,24 +179,16 @@ try
     push!(rows, parity_check("simple_loop", "dP_loop",
                              sol[ssys.cac.dP], PARITY_SIMPLE_DP))
 
-    # Tier (b) per-cell coolant T[i]
     for i in 1:n
         push!(rows, parity_check("simple_loop", "T[$i]",
                                  sol[ssys.cac.T[i]], PARITY_SIMPLE_T_CELLS[i]))
     end
 
-    # Tier (c) per-cell wall observables (CAC-only)
-    # GAP #1 NOTE: Python's q_density is partition-invariant — same W/m^2 on
-    # both sides regardless of (πD, 0) vs (πD/2, πD/2) split. Julia density:
-    # q_wall_left[i] / (heated_parts[1] * dz). Both produce identical W/m^2.
-    # Total q_density (left+right) is also reported for completeness.
     dz = 0.6 / n
     heated_l = geom_simple.heated_parts[1]   # πD/2
     heated_r = geom_simple.heated_parts[2]   # πD/2
     full_perim = heated_l + heated_r          # πD
     for i in 1:n
-        # T_wall_left[i] is input-driven (we pinned it via ConstantTemperature
-        # at T_wall=373.15) — should be CLEAN.
         push!(rows, parity_check("simple_loop", "T_wall_left[$i]",
                                  sol[getproperty(ssys.cac, Symbol(:thermal_left, i)).T],
                                  PARITY_SIMPLE_T_WALL_LEFT[i]))
@@ -230,18 +203,12 @@ try
                                  sol[ssys.cac.h_tc_right[i]],
                                  PARITY_SIMPLE_H_TC_RIGHT[i];
                                  note="Gap #2 candidate (HTC film-T vs bulk-T)"))
-        # Per-side density (heated part * dz). Julia and Python both partition-
-        # invariant at the density level.
         push!(rows, parity_check("simple_loop", "q_density_left[$i]",
                                  sol[ssys.cac.q_wall_left[i]] / (heated_l * dz),
                                  PARITY_SIMPLE_Q_DENSITY_LEFT[i]))
         push!(rows, parity_check("simple_loop", "q_density_right[$i]",
                                  sol[ssys.cac.q_wall_right[i]] / (heated_r * dz),
                                  PARITY_SIMPLE_Q_DENSITY_RIGHT[i]))
-        # GAP #1 mitigation row: total q_density = (q_left+q_right) / (full_perim * dz)
-        # vs (PARITY_LEFT[i] + PARITY_RIGHT[i]) / 2  (Python emits the same density on both
-        # sides, so the average reproduces the per-side density). For Gap #1 cancellation
-        # at the total-W level, sum Julia W vs sum Python (W/m^2) * full_perim * dz.
         q_total_julia = (sol[ssys.cac.q_wall_left[i]] + sol[ssys.cac.q_wall_right[i]]) /
                         (full_perim * dz)
         q_total_python = (PARITY_SIMPLE_Q_DENSITY_LEFT[i] + PARITY_SIMPLE_Q_DENSITY_RIGHT[i]) / 2
@@ -250,32 +217,23 @@ try
                                  note="Gap #1 mitigated: total q (left+right) cancels partition difference"))
     end
 
-    # ── Step 4: emit reports (D-08) ──
     print_drift_table(rows)
     append_csv(PARITY_CSV, rows; truncate=false)
 
-    # ── Step 5: HARD-FAIL @test only (D-03) — GRAY rows reported, not failed ──
     for r in rows
         @test r.tier != TIER_FAIL
     end
 end
 
-# ─────────────────────────────────────────────────────────────────
-# VAL-02: Transient T_outlet rises after T_wall step change
-# (callable T_wall pattern — T_wall_fn wired at build time)
-# ─────────────────────────────────────────────────────────────────
 @testset "VAL-02: Transient T_outlet rises after T_wall step" begin
     n = 10
     T_inlet = 313.15
 
-    # Step-change: T_wall from 373.15 to 393.15 at t=10s via callable
     T_wall_0 = 373.15
     T_wall_final = 393.15
     t_step = 10.0
     T_wall_step = t -> t < t_step ? T_wall_0 : T_wall_final
 
-    # Use a scalar-T_wall system for the steady-state solve (consistent ICs at T_wall_0),
-    # then switch to the callable system for the transient.
     ssys_ss = build_loop_transient(; T_inlet=T_inlet, T_wall_0=T_wall_0)
     ssys = build_loop_transient(; T_inlet=T_inlet, T_wall_fn=T_wall_step)
 
@@ -283,7 +241,6 @@ end
     op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
     push!(op_guess, ssys_ss.ch.port_in.mdot => 0.490)
     sol_ss = solve_steady(ssys_ss, op_guess)
-    # Use Pair{Any,Any} so the callable parameter can be mixed with Float64 values
     op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
     push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys_ss.ch.port_in.mdot])
     T_wall_sym = ssys.T_wall_callable   # stable named access, immune to parameter reordering
@@ -294,16 +251,10 @@ end
     @test sol.retcode == ReturnCode.Success
     T_ts = sol[ssys.ch.T_out, :]
     @test !any(isnan, T_ts)
-    @test T_ts[end] > T_ts[1]   # outlet rises after T_wall step
+    @test T_ts[end] > T_ts[1] 
 end
 
-# ─────────────────────────────────────────────────────────────────
-# VAL-01: Symmetric MTR — HeatDiffusion + two ChannelAndContacts
-# Both channels at 313.15 K inlet, 10 kW, nz=10, nx=3, D=0.01 m
-# Reference: generate_mtr_reference.py (Python STREAM)
-# ─────────────────────────────────────────────────────────────────
 @testset "Python parity: MTR symmetric" begin
-    # ── Step 1: equivalence guard ──
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
@@ -313,7 +264,7 @@ end
         PARITY_MTR_GEOM_AREA,
         PARITY_MTR_GEOM_WETPERIM,
         PARITY_MTR_GEOM_HEATED;
-        rtol=1e-9)  # PARITY_MTR_GEOM_DH pasted at %.10e (~10 sig figs) — 1e-12 too tight
+        rtol=1e-9)
     assert_equivalence_anchors()
 
     nz = 10
@@ -340,9 +291,6 @@ end
         connect(hx_r.port_out, cac_r.port_in),
         connect(cac_r.port_out, pump_r.port_in),
         pump_r.port_in.P ~ 1.0e5,
-        # MTR convention (matches Python stream.composition.mtr_geometry.plate):
-        # channel_L's RIGHT wall touches plate's LEFT face; channel_R's LEFT wall touches plate's RIGHT face.
-        # See .planning/phases/56-python-stream-cross-validation/56-MTR-CONVENTION-RESEARCH.md.
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
         [connect(getproperty(hd, Symbol(:thermal_right, i)),
@@ -362,10 +310,6 @@ end
         [ssys.cac_l.port_in.mdot => +0.250],
         [ssys.cac_r.port_in.mdot => +0.250],
     )
-    # Pre-existing MTK API issue (off-by-one eqs/unknowns) may prevent solve_steady
-    # on this MTR topology — out-of-scope for Plan 56-05 (deferred; see deferred-items.md).
-    # On failure: emit a sentinel row so parity_report.csv still contains an
-    # mtr_symmetric row per BLOCKER #3 (ALL 4 scenarios contribute to CSV).
     rows = ParityRow[]
     sol = try
         s = solve_steady(ssys, op)
@@ -385,8 +329,6 @@ end
         append_csv(PARITY_CSV, rows; truncate=false)
     else
 
-    # ── Step 3: iterate D-07 tiers (a)+(b)+(c)+(d) ──
-    # Tier (a) scalars
     push!(rows, parity_check("mtr_symmetric", "T_out_l",
                              sol[ssys.cac_l.T_out], PARITY_MTR_SYM_T_OUT_L))
     push!(rows, parity_check("mtr_symmetric", "T_out_r",
@@ -398,16 +340,12 @@ end
     push!(rows, parity_check("mtr_symmetric", "dP_loop",
                              sol[ssys.cac_l.dP], PARITY_MTR_SYM_DP))
 
-    # Tier (b) per-cell coolant — both channels
     for i in 1:nz
         push!(rows, parity_check("mtr_symmetric", "T_l[$i]",
                                  sol[ssys.cac_l.T[i]], PARITY_MTR_SYM_T_CELLS_L[i]))
         push!(rows, parity_check("mtr_symmetric", "T_r[$i]",
                                  sol[ssys.cac_r.T[i]], PARITY_MTR_SYM_T_CELLS_R[i]))
     end
-
-    # Tier (c) per-cell wall (CAC-only) — both channels, both sides
-    # No Gap #1 here — MTR rectangular heated_parts=(0.07, 0.07) IDENTICAL to Python.
     dz = 0.6 / nz
     heated_part = geom_mtr.heated_parts[1]   # 0.07 m
     for i in 1:nz
@@ -418,10 +356,6 @@ end
         push!(rows, parity_check("mtr_symmetric", "T_wall_right_l[$i]",
                                  sol[getproperty(ssys.cac_l, Symbol(:thermal_right, i)).T],
                                  PARITY_MTR_SYM_T_WALL_RIGHT_L[i]))
-        # Phase 56-resume: Julia computes per-side h honestly; Python emits same
-        # value on both walls via _other_if_none (channel.py:691, fills the None
-        # adiabatic-side h with the connected side's). Apply Python's convention
-        # at the test level: report the heated-side max for both parity rows.
         h_eff_cac_l = max(sol[ssys.cac_l.h_tc_left[i]], sol[ssys.cac_l.h_tc_right[i]])
         push!(rows, parity_check("mtr_symmetric", "h_tc_left_l[$i]",
                                  h_eff_cac_l,
@@ -461,22 +395,19 @@ end
                                  PARITY_MTR_SYM_Q_RIGHT_R[i]))
     end
 
-    # Tier (d) plate T(z,x)
     for z in 1:nz, x in 1:nx
         push!(rows, parity_check("mtr_symmetric", "T_plate[$(z)_$(x)]",
                                  sol[ssys.hd.T[z, x]],
                                  PARITY_MTR_SYM_T_PLATE[z, x]))
     end
 
-    # ── Step 4: emit ──
     print_drift_table(rows)
     append_csv(PARITY_CSV, rows; truncate=false)
 
-    # ── Step 5: HARD-FAIL @test ──
     for r in rows
         @test r.tier != TIER_FAIL
     end
-    end  # if sol === nothing ... else
+    end
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -484,7 +415,6 @@ end
 # Right side of plate must be hotter than left side.
 # ─────────────────────────────────────────────────────────────────
 @testset "Python parity: MTR asymmetric" begin
-    # ── Step 1: equivalence guard ──
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
@@ -492,7 +422,7 @@ end
     assert_equivalence_geometry(geom_mtr,
         PARITY_MTR_GEOM_DH, PARITY_MTR_GEOM_AREA,
         PARITY_MTR_GEOM_WETPERIM, PARITY_MTR_GEOM_HEATED;
-        rtol=1e-9)  # PARITY_MTR_GEOM_DH pasted at %.10e (~10 sig figs) — 1e-12 too tight
+        rtol=1e-9) 
     assert_equivalence_anchors()
 
     nz = 10
@@ -520,7 +450,6 @@ end
         connect(hx_r.port_out, cac_r.port_in),
         connect(cac_r.port_out, pump_r.port_in),
         pump_r.port_in.P ~ 1.0e5,
-        # MTR convention (see VAL-01 above): channel_L right ↔ plate left, channel_R left ↔ plate right.
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
         [connect(getproperty(hd, Symbol(:thermal_right, i)),
@@ -532,7 +461,6 @@ end
     )
     ssys = mtkcompile(sys; fully_determined=true)
 
-    # Asymmetric initial guess: right side at ~363 K, left at ~313 K
     op = vcat(
         [ssys.hd.T[i, j] => 318.15 for i in 1:nz for j in 1:(nx - 1)],
         [ssys.hd.T[i, nx] => 368.15 for i in 1:nz],
@@ -559,8 +487,6 @@ end
         append_csv(PARITY_CSV, rows; truncate=false)
     else
 
-    # ── Step 3: iterate D-07 tiers ──
-    # Tier (a)
     push!(rows, parity_check("mtr_asymmetric", "T_out_l",
                              sol[ssys.cac_l.T_out], PARITY_MTR_ASYM_T_OUT_L))
     push!(rows, parity_check("mtr_asymmetric", "T_out_r",
@@ -572,7 +498,6 @@ end
     push!(rows, parity_check("mtr_asymmetric", "dP_loop",
                              sol[ssys.cac_l.dP], PARITY_MTR_ASYM_DP))
 
-    # Tier (b)
     for i in 1:nz
         push!(rows, parity_check("mtr_asymmetric", "T_l[$i]",
                                  sol[ssys.cac_l.T[i]], PARITY_MTR_ASYM_T_CELLS_L[i]))
@@ -580,7 +505,6 @@ end
                                  sol[ssys.cac_r.T[i]], PARITY_MTR_ASYM_T_CELLS_R[i]))
     end
 
-    # Tier (c)
     dz = 0.6 / nz
     heated_part = geom_mtr.heated_parts[1]
     for i in 1:nz
@@ -591,7 +515,6 @@ end
         push!(rows, parity_check("mtr_asymmetric", "T_wall_right_l[$i]",
                                  sol[getproperty(ssys.cac_l, Symbol(:thermal_right, i)).T],
                                  PARITY_MTR_ASYM_T_WALL_RIGHT_L[i]))
-        # Phase 56-resume: per-side max mirrors Python _other_if_none (see mtr_symmetric).
         h_eff_cac_l = max(sol[ssys.cac_l.h_tc_left[i]], sol[ssys.cac_l.h_tc_right[i]])
         push!(rows, parity_check("mtr_asymmetric", "h_tc_left_l[$i]",
                                  h_eff_cac_l,
@@ -607,7 +530,6 @@ end
         push!(rows, parity_check("mtr_asymmetric", "q_right_l[$i]",
                                  sol[ssys.cac_l.q_wall_right[i]] / (heated_part * dz),
                                  PARITY_MTR_ASYM_Q_RIGHT_L[i]))
-        # Right channel
         push!(rows, parity_check("mtr_asymmetric", "T_wall_left_r[$i]",
                                  sol[getproperty(ssys.cac_r, Symbol(:thermal_left, i)).T],
                                  PARITY_MTR_ASYM_T_WALL_LEFT_R[i]))
@@ -631,37 +553,27 @@ end
                                  PARITY_MTR_ASYM_Q_RIGHT_R[i]))
     end
 
-    # Tier (d)
     for z in 1:nz, x in 1:nx
         push!(rows, parity_check("mtr_asymmetric", "T_plate[$(z)_$(x)]",
                                  sol[ssys.hd.T[z, x]],
                                  PARITY_MTR_ASYM_T_PLATE[z, x]))
     end
 
-    # ── Step 4: emit ──
     print_drift_table(rows)
     append_csv(PARITY_CSV, rows; truncate=false)
 
-    # ── Step 5: HARD-FAIL @test ──
     for r in rows
         @test r.tier != TIER_FAIL
     end
-    end  # if sol === nothing ... else
 end
 
-# ─────────────────────────────────────────────────────────────────
-# VAL-03: One-sided MTR — only left channel coupled; thermal_right adiabatic
-# ─────────────────────────────────────────────────────────────────
 @testset "Python parity: MTR one-sided" begin
     # KNOWN GAP (D-11): Python one_sided_connection distributes heat to BOTH plate
     # faces (Python bug). Julia correctly couples only the left face. Plate-T tier (d)
     # is widened to hard_ceiling=0.20 with KNOWN GAP note; T_out_l widened to 0.05.
     # The analytical T_max check (preserved from VAL-03) is the actual correctness gate.
     #
-    # Adiabatic right face emits T_wall = T_cool, q_density = 0 in the reference (per
-    # 56-04-SUMMARY adiabatic-side convention) — Julia produces the same at CLEAN tier.
-
-    # ── Step 1: equivalence guard ──
+    # Adiabatic right face emits T_wall = T_cool, q_density = 0 in the reference
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
@@ -689,13 +601,6 @@ end
         connect(hx_l.port_out, cac_l.port_in),
         connect(cac_l.port_out, pump_l.port_in),
         pump_l.port_in.P ~ 1.0e5,
-        # MTR one-sided convention: channel_L's LEFT wall is coupled to plate's LEFT face.
-        # This DIFFERS from plate() (which uses channel_L's RIGHT wall) because Python's
-        # one_sided_connection(fuel_side="left") follows a different convention than plate():
-        # it wires the channel's INTERNAL twall_left to the fuel (see Python
-        # stream/composition/mtr_geometry.py:198 and test/generate_mtr_reference.py:446-455).
-        # Channel_L's RIGHT wall is adiabatic. Plate's RIGHT face is unconnected
-        # => adiabatic by MTK default.
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_left, i))) for i in 1:nz]...,
         hd.power ~ 1e4,
@@ -727,8 +632,6 @@ end
         append_csv(PARITY_CSV, rows; truncate=false)
     else
 
-    # ── Step 3: iterate D-07 tiers — with widened ceilings on KNOWN GAP rows ──
-    # Tier (a) — T_out_l widened (Python bug; T_rise underestimated)
     push!(rows, parity_check("mtr_one_sided", "T_out_l",
                              sol[ssys.cac_l.T_out], PARITY_MTR_ONESIDED_T_OUT_L;
                              hard_ceiling=0.05,
@@ -738,7 +641,6 @@ end
     push!(rows, parity_check("mtr_one_sided", "dP_loop",
                              sol[ssys.cac_l.dP], PARITY_MTR_ONESIDED_DP))
 
-    # Tier (b)
     for i in 1:nz
         push!(rows, parity_check("mtr_one_sided", "T_l[$i]",
                                  sol[ssys.cac_l.T[i]], PARITY_MTR_ONESIDED_T_CELLS_L[i];
@@ -746,24 +648,17 @@ end
                                  note="KNOWN GAP — Python both-faces distribution"))
     end
 
-    # Tier (c)
     dz = 0.6 / nz
     heated_part = geom_mtr.heated_parts[1]
     for i in 1:nz
-        # Left side — connected
         push!(rows, parity_check("mtr_one_sided", "T_wall_left_l[$i]",
                                  sol[getproperty(ssys.cac_l, Symbol(:thermal_left, i)).T],
                                  PARITY_MTR_ONESIDED_T_WALL_LEFT_L[i];
                                  hard_ceiling=0.05,
                                  note="KNOWN GAP — Python both-faces distribution"))
-        # Right side — adiabatic; reference emits T_wall=T_cool, q=0
         push!(rows, parity_check("mtr_one_sided", "T_wall_right_l[$i]",
                                  sol[getproperty(ssys.cac_l, Symbol(:thermal_right, i)).T],
                                  PARITY_MTR_ONESIDED_T_WALL_RIGHT_L[i]))
-        # Phase 56-resume: per-side max mirrors Python _other_if_none (see mtr_symmetric).
-        # mtr_one_sided also has a known Python-side bug: distributes one-sided heat to
-        # BOTH plate faces, so Julia's plate runs slightly hotter → h slightly higher.
-        # hard_ceiling=0.05 already accommodates this documented gap.
         h_eff_cac_l = max(sol[ssys.cac_l.h_tc_left[i]], sol[ssys.cac_l.h_tc_right[i]])
         push!(rows, parity_check("mtr_one_sided", "h_tc_left_l[$i]",
                                  h_eff_cac_l,
@@ -785,7 +680,6 @@ end
                                  PARITY_MTR_ONESIDED_Q_RIGHT_L[i]))
     end
 
-    # Tier (d) plate cells — widened to 20% (KNOWN GAP — analytical T_max is the truth)
     for z in 1:nz, x in 1:nx
         push!(rows, parity_check("mtr_one_sided", "T_plate[$(z)_$(x)]",
                                  sol[ssys.hd.T[z, x]],
@@ -794,17 +688,12 @@ end
                                  note="KNOWN GAP — Python both-faces; T_max asserted analytically"))
     end
 
-    # ── Step 4: emit ──
     print_drift_table(rows)
     append_csv(PARITY_CSV, rows; truncate=false)
-
-    # ── Step 5: HARD-FAIL @test ──
     for r in rows
         @test r.tier != TIER_FAIL
     end
 
-    # Analytical T_max correctness gate (preserved from VAL-03 — the actual truth check
-    # since Python plate-T values are gap-known)
     T_max_numerical = sol[ssys.hd.T[nz ÷ 2, nx]]
     left_syms = [getproperty(ssys.cac_l, Symbol(:thermal_left, i)) for i in 1:nz]
     T_wall_vals = [sol[left_syms[i].T] for i in 1:nz]
@@ -813,34 +702,19 @@ end
     T_max_analytical = T_wall_avg + 1e4 * 0.00127 / (2 * 200.0 * A_plate)
     @test isapprox(T_max_numerical, T_max_analytical; rtol=0.01)
 
-    # Adiabatic right face Q_flow ≈ 0 (preserved physics check)
     right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
     for i in 1:nz
         @test isapprox(sol[right_syms[i].Q_flow], 0.0; atol=1e-6)
     end
-    end  # if sol === nothing ... else
-end
+    end
 
-end  # @testset "Phase 56 parity harness"
+end
 catch e
-    # FAIL-tier verdict at end-of-outer-testset per D-12 + WARNING #10 — surfaced,
-    # not silenced. Print error summary and continue so KEPT testsets still run
-    # and parity_report.csv covers ALL 4 scenarios (BLOCKER #3).
     @warn "Phase 56 parity harness reported FAIL-tier rows; see drift tables and parity_report.csv" exception=(e, catch_backtrace())
 end
 
-# KEPT testsets wrapped so pre-existing MTK API issues (deferred-items.md D-1)
-# do not halt include() before all KEPT testsets execute.
 try
-
-# ─────────────────────────────────────────────────────────────────
-# VAL-01: HeatDiffusion transient — Fourier series validation
-# Pure plate (no fluid): both faces pinned at T_wall, power=0, uniform IC T0.
-# Plate relaxes toward T_wall via pure diffusion.
-# Assert T_center(t) matches analytical 1D Fourier series at 4 time points.
-# ─────────────────────────────────────────────────────────────────
 @testset "VAL-01: HeatDiffusion transient — Fourier series validation" begin
-    # MTR aluminum plate parameters — consistent with all existing VAL tests
     nz_v01 = 10
     nx_v01 = 5
     k_s_v01 = 200.0
@@ -852,12 +726,9 @@ try
     T_wall = 300.0
     T0 = 400.0    # 100 K step-down for clear signal
 
-    # Diffusivity and thermal time constant
     alpha_v01 = k_s_v01 / (rho_s_v01 * cp_s_v01)   # ≈ 8.23e-5 m²/s
     tau_v01 = Lx_v01^2 / (π^2 * alpha_v01)        # ≈ 0.002 s
 
-    # Fourier series analytical reference (symmetric BCs, no power, center x=Lx/2):
-    # T(Lx/2, t) = T_wall + (4/π)(T0-T_wall) Σ_{k=0}^{N-1} [(-1)^k/(2k+1)] exp(-α((2k+1)π/Lx)²t)
     function fourier_T_center(t_val)
         result = T_wall
         for k in 0:49
@@ -871,7 +742,6 @@ try
         return result
     end
 
-    # Build isolated plate with ConstantTemperature BCs on both faces, power=0
     ps_v01 = fill(1.0 / (nz_v01 * nx_v01), nz_v01, nx_v01)
     @named hd_v01 = HeatDiffusion(;
         nz=nz_v01,
@@ -903,18 +773,14 @@ try
     )
     ssys_v01 = mtkcompile(sys_v01; fully_determined=true)
 
-    # Uniform initial condition: all plate cells at T0
     op_ic_v01 = [ssys_v01.hd_v01.T[i, j] => T0 for i in 1:nz_v01 for j in 1:nx_v01]
 
-    # Time span and assertion checkpoints (in seconds)
     t_checkpoints = [0.5 * tau_v01, tau_v01, 2 * tau_v01, 5 * tau_v01]
-    tspan_v01 = (0.0, 5.0 * tau_v01 * 1.01)  # slight overshoot to include endpoint
-
+    tspan_v01 = (0.0, 5.0 * tau_v01 * 1.01)  
     prob_v01 = ODEProblem(ssys_v01, op_ic_v01, tspan_v01; warn_initialize_determined=false)
     sol_v01 = solve(prob_v01, Rodas5P(); reltol=1e-8, abstol=1e-10, saveat=t_checkpoints)
     @test sol_v01.retcode == ReturnCode.Success
 
-    # Assert T_center at each checkpoint vs Fourier series
     T_center_sym = ssys_v01.hd_v01.T[nz_v01 ÷ 2, (nx_v01 + 1) ÷ 2]
     T_center_series = sol_v01[T_center_sym, :]
     for (k, t_k) in enumerate(t_checkpoints)
@@ -923,16 +789,9 @@ try
         @test isapprox(T_num, T_ref; rtol=0.01)
     end
 
-    # Solution must approach T_wall by 5τ
     @test isapprox(T_center_series[end], T_wall; rtol=0.01)
 end
 
-# ─────────────────────────────────────────────────────────────────
-# VAL-02: Two HeatDiffusion plates connected to one ChannelAndContacts
-# Topology: thermal_left[i] → hd1 (plate 1); thermal_right[i] → hd2 (plate 2).
-# Both faces of the single CAC are simultaneously active.
-# This is the first test exercising the Phase 10 two-sided upgrade end-to-end.
-# ─────────────────────────────────────────────────────────────────
 @testset "VAL-02: Two-plate one-channel topology — both faces active" begin
     nz_v02 = 10
     nx_v02 = 3
@@ -1034,14 +893,6 @@ end
     end
 end
 
-# ─────────────────────────────────────────────────────────────────
-# PointKinetics validation tests (VAL-PK-01 through VAL-PK-03)
-# Cross-validates against Python STREAM test_integrations.py lines 201-428.
-# These tests prove the PK+T-H coupling produces physically correct results:
-#   VAL-PK-01: linear temperature rise along channel at steady state
-#   VAL-PK-02a/b: negative fuel/coolant feedback suppresses power to near zero
-#   VAL-PK-03: reactivity observable is accessible and near zero at steady state
-# ─────────────────────────────────────────────────────────────────
 @testset "PointKinetics validation" begin
     @testset "VAL-PK-01: steady-state coolant temperature rises linearly" begin
         # Mirror Python STREAM test_integrations.py lines 201-267

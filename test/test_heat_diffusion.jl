@@ -5,9 +5,6 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 import STREAM: HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
 
-# ─────────────────────────────────────────────────────────────────
-# HDIFF-01: HeatDiffusion instantiation and 2D state variable
-# ─────────────────────────────────────────────────────────────────
 @testset "HDIFF-01: HeatDiffusion callable and returns MTK System" begin
     ps = fill(1.0 / (5 * 3), 5, 3)
     @named hd = HeatDiffusion(
@@ -64,9 +61,6 @@ end
     @test count(u -> ModelingToolkit.getname(u) == :T, unknowns(hd)) == nz * nx
 end
 
-# ─────────────────────────────────────────────────────────────────
-# HDIFF-04: ThermalPort arrays present as named subsystems
-# ─────────────────────────────────────────────────────────────────
 @testset "HDIFF-04: HeatDiffusion has thermal_left and thermal_right subsystems" begin
     nz = 3
     ps = fill(1.0 / (nz * 2), nz, 2)
@@ -88,9 +82,6 @@ end
     end
 end
 
-# ─────────────────────────────────────────────────────────────────
-# HDIFF-02/03: Steady-state behavioral test with pinned boundaries and uniform power
-# ─────────────────────────────────────────────────────────────────
 @testset "HDIFF-02/03: Steady-state plate T > T_boundary and Q_flow signs correct" begin
     nz, nx = 3, 3
     T_bc = 600.0
@@ -136,11 +127,6 @@ end
         @test sol[ssys.hd.T[i, j]] >= T_bc - 1e-6
     end
 
-    # Q_flow sign check: both left and right use k*(T_bc - T_plate)/(dx/2).
-    # When plate is hotter than T_bc: Q_flow < 0 (heat leaving plate = negative into component).
-    # MTK convention: Q_flow > 0 means heat INTO the component (HeatDiffusion).
-    # So heat leaving the hot plate gives Q_flow < 0 on BOTH faces.
-    # Energy balance: |Q_left| + |Q_right| = pwr (total power dissipated).
     left_syms = [getproperty(ssys.hd, Symbol(:thermal_left, i)) for i in 1:nz]
     right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
     Q_left_total = sum(sol[left_syms[i].Q_flow] for i in 1:nz)
@@ -154,9 +140,6 @@ end
     @test isapprox(abs(Q_left_total) + abs(Q_right_total), pwr; rtol=0.05)
 end
 
-# ─────────────────────────────────────────────────────────────────
-# HDIFF-05: One-sided connection — unconnected thermal_right is adiabatic
-# ─────────────────────────────────────────────────────────────────
 @testset "HDIFF-05: Unconnected thermal_right has Q_flow == 0 (adiabatic)" begin
     nz, nx = 3, 3
     T_bc = 600.0
@@ -194,23 +177,10 @@ end
     end
 end
 
-# ─────────────────────────────────────────────────────────────────
-# HDIFF-03 gap: Non-uniform power_shape — zero center cell is colder
-# power_shape = [0.5, 0.0, 0.5] (nx=3): outer cells get all the heat,
-# center cell has zero source and must be colder than neighbors at steady state.
-# ─────────────────────────────────────────────────────────────────
 @testset "HDIFF-03-gap: Non-uniform power_shape: center-only source cell is hottest" begin
-    # Rule-1 auto-fix: The originally planned [0.5, 0.0, 0.5] test is physically incorrect.
-    # With symmetric BCs and equal outer sources, the Laplacian=0 constraint forces
-    # T_center = (T_left + T_right)/2 = T_left at steady state — center is NOT colder.
-    # Correct test: put ALL power in center cell [0.0, 1.0, 0.0].
-    # At steady state T_center must be strictly hotter than both outer cells,
-    # which have zero source and sit adjacent to the cold boundary (T_bc).
-    # This verifies that power_shape is applied per-cell correctly.
     nz, nx = 1, 3
     T_bc = 600.0
     pwr = 1e4
-    # All power in center, zero in outer cells: sum = 1.0 (normalized)
     ps = reshape([0.0, 1.0, 0.0], nz, nx)
     @test isapprox(sum(ps), 1.0; atol=1e-12)
 
@@ -251,13 +221,9 @@ end
     T_center = sol[ssys.hd.T[1, 2]]
     T_right = sol[ssys.hd.T[1, 3]]
 
-    # Center cell (sole source) must be hotter than the zero-source outer cells
     @test T_center > T_left + 0.01
     @test T_center > T_right + 0.01
-    # Center cell must be above T_bc (it receives all the heat)
     @test T_center > T_bc
-    # Outer cells (zero source, adjacent to cold BC) must also be above T_bc
-    # because they receive heat from the center via diffusion
     @test T_left > T_bc
     @test T_right > T_bc
 end

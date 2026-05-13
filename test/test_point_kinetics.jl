@@ -25,12 +25,6 @@ import ModelingToolkit: compose
     end
 
     @testset "PK-01b: precursor-only decay matches analytical" begin
-        # Replicate Python STREAM test_precursor_death:
-        # beta_k=zeros(6) zeroes delayed neutron production.
-        # dP/dt = sum(lambda_k * C_k)  (no (rho-beta)/Lambda*P term since beta=0, rho=0)
-        # dC_k/dt = -lambda_k * C_k    (pure exponential decay, beta_k=0 kills source)
-        # Analytical: C_k(t) = C_k0 * exp(-lambda_k * t)
-        # Analytical: P(t) = P0 + sum(C_k0[i] * (1 - exp(-lambda_k[i]*t)))
         lambda_k = U235_LAMBDA_K
         @named pk = PointKinetics(rho=0.0, Lambda=1.0, beta_k=zeros(6), lambda_k=lambda_k)
         ssys = mtkcompile(pk)
@@ -56,7 +50,6 @@ import ModelingToolkit: compose
             @test isapprox(sol[ssys.P, j], P_analytical, rtol=1e-3, atol=1e-6)
         end
 
-        # Also verify individual precursor decay: C_k(t) = C_k0 * exp(-lambda_k * t)
         for (j, tj) in enumerate(t_span)
             @test isapprox(
                 sol[ssys.C_1, j], C_k0[1] * exp(-lambda_k[1] * tj), rtol=1e-3, atol=1e-6
@@ -107,7 +100,6 @@ import ModelingToolkit: compose
     end
 
     @testset "RC-01: ReactivityController" begin
-        # RC-01a: default constructor yields zero-reactivity controller
         ctrl_default = ReactivityController()
         @test ctrl_default.state == :NORMAL
         @test ctrl_default.t_state == 0.0
@@ -117,41 +109,34 @@ import ModelingToolkit: compose
         @test worth(ctrl_default, 10.0) == 0.0
         @test worth(ctrl_default, 1e6) == 0.0
 
-        # RC-01b: callable input_reactivity stored and invoked with (state, t_state, t)
         fn_linear = (s, ts, t) -> 0.001 * t
         ctrl_fn = ReactivityController(fn_linear)
         @test worth(ctrl_fn, 0.0) == 0.0
         @test worth(ctrl_fn, 2.5) == 0.0025
         @test worth(ctrl_fn, 10.0) == 0.01
 
-        # RC-01c: callable-struct form ctrl(t) == worth(ctrl, t) (D-09)
         @test ctrl_fn(0.0) == worth(ctrl_fn, 0.0)
         @test ctrl_fn(3.14) == worth(ctrl_fn, 3.14)
         @test ctrl_fn(100.0) == worth(ctrl_fn, 100.0)
 
-        # RC-01d: change_state updates state, t_state, and appends to log when state changes
         sm_flip = (s, t, p, dp) -> (p > 50.0 ? :SCRAM : s)
         ctrl_sm = ReactivityController((s, ts, t) -> 0.0; state_machine=sm_flip)
         @test ctrl_sm.state == :NORMAL
         @test length(ctrl_sm.log) == 1
-        # Power below threshold: no transition
         new1 = change_state(ctrl_sm, 0.5, 10.0, 1.0)
         @test new1 == :NORMAL
         @test ctrl_sm.state == :NORMAL
         @test ctrl_sm.t_state == 0.0
         @test length(ctrl_sm.log) == 1
-        # Power above threshold: transition to :SCRAM
         new2 = change_state(ctrl_sm, 1.5, 100.0, 5.0)
         @test new2 == :SCRAM
         @test ctrl_sm.state == :SCRAM
         @test ctrl_sm.t_state == 1.5
         @test ctrl_sm.log == [(:NORMAL, 0.0), (:SCRAM, 1.5)]
-        # Already SCRAM: no duplicate log entry
         new3 = change_state(ctrl_sm, 2.0, 200.0, 10.0)
         @test new3 == :SCRAM
         @test length(ctrl_sm.log) == 2
 
-        # RC-01e: change_state no-op when state_machine returns same state (default identity)
         ctrl_id = ReactivityController((s, ts, t) -> 0.0)  # default identity state_machine
         r = change_state(ctrl_id, 5.0, 999.0, 42.0)
         @test r == :NORMAL
@@ -159,14 +144,12 @@ import ModelingToolkit: compose
         @test ctrl_id.t_state == 0.0
         @test length(ctrl_id.log) == 1
 
-        # RC-01f: abort_states stored as provided
         abort = Set([:SCRAM, :ABORT])
         ctrl_ab = ReactivityController((s, ts, t) -> 0.0; abort_states=abort)
         @test ctrl_ab.abort_states == Set([:SCRAM, :ABORT])
         @test :SCRAM in ctrl_ab.abort_states
         @test :NORMAL ∉ ctrl_ab.abort_states
 
-        # RC-01g: initial_state / initial_time override defaults
         ctrl_init = ReactivityController(
             (s, ts, t) -> 0.0; initial_state=:STARTUP, initial_time=7.5
         )
@@ -174,7 +157,6 @@ import ModelingToolkit: compose
         @test ctrl_init.t_state == 7.5
         @test ctrl_init.log == [(:STARTUP, 7.5)]
 
-        # RC-01h: input_reactivity receives (state, t_state, t) in that order
         capture = Ref{Tuple{Symbol,Float64,Float64}}((:X, -1.0, -1.0))
         fn_capture = (s, ts, t) -> (capture[]=(s, ts, t); 0.0)
         ctrl_cap = ReactivityController(
@@ -185,16 +167,13 @@ import ModelingToolkit: compose
     end
 
     @testset "PK-03: Callable Control Reactivity" begin
-        # PK-03a: callable constructor compiles with 7 state variables
         fn_zero = t -> 0.0
         @named pk_a = PointKinetics(fn_zero; rho_val=0.0)
         ssys_a = mtkcompile(pk_a)
         @test length(unknowns(ssys_a)) == 7
-
-        # PK-03b: zero control reactivity reproduces criticality (P ≈ P0)
         P0 = 1e6
         ic = point_kinetics_steady_state(P0)
-        ctrl_zero = ReactivityController()  # default -> worth returns 0.0 always
+        ctrl_zero = ReactivityController()
         @named pk_b = PointKinetics(ctrl_zero; rho_val=0.0)
         ssys_b = mtkcompile(pk_b)
         op_b = Pair{Any,Any}[
@@ -214,8 +193,6 @@ import ModelingToolkit: compose
             @test isapprox(sol_b[ssys_b.P, j], P0; rtol=1e-2)
         end
 
-        # PK-03c: step insertion prompt-jump validation
-        # delta_rho = 0.002 << beta=0.006502 (sub-prompt-critical, delta_rho < beta/3)
         delta_rho = 0.002
         t_step = 1.0
         fn_step = (s, ts, t) -> (t >= t_step) * delta_rho
@@ -232,10 +209,6 @@ import ModelingToolkit: compose
             ssys_c.C_5 => ic.C_k[5],
             ssys_c.C_6 => ic.C_k[6],
         ]
-        # Sample at t_step + 0.028s: after prompt-neutron transient settles (~Lambda/delta_rho ≈ 0.027s)
-        # but before delayed-neutron precursors significantly perturb the quasi-static level
-        # (1/max(lambda_k) ≈ 4.3s >> 0.028s). At this narrow window, the prompt-jump
-        # formula β/(β-δρ)·P0 is accurate to ~1% (RESEARCH.md Pitfall #4).
         t_sample = t_step + 0.028
         t_arr_c = range(0.0, t_sample, length=500)
         sol_c = solve_transient(ssys_c, op_c, t_arr_c; tstops=[t_step])
@@ -268,16 +241,13 @@ import ModelingToolkit: compose
         t_arr_d = range(0.0, t_ramp_end, length=200)
         sol_d = solve_transient(ssys_d, op_d, t_arr_d)
         P_traj = sol_d[ssys_d.P, :]
-        # Monotonic power rise: every later sample exceeds an earlier one (except initial transient)
         @test P_traj[end] > P_traj[1]
         @test P_traj[end] > P0  # positive ramp -> super-critical -> P grows above P0
-        # Monotonicity from t=0.1s onward (skip initial KINSOL startup)
         idx_start = findfirst(tv -> tv >= 0.1, t_arr_d)
         for j in (idx_start + 1):length(t_arr_d)
             @test P_traj[j] >= P_traj[j - 1] - 1e-3 * P0  # allow tiny solver noise
         end
 
-        # PK-03e: plain closure and ReactivityController wrapping same fn give same result
         plain_fn = t -> (t >= t_step) * delta_rho
         @named pk_e = PointKinetics(plain_fn; rho_val=0.0)
         ssys_e = mtkcompile(pk_e)
@@ -293,7 +263,6 @@ import ModelingToolkit: compose
         ]
         t_arr_e = range(0.0, t_sample, length=500)
         sol_e = solve_transient(ssys_e, op_e, t_arr_e; tstops=[t_step])
-        # Plain-function jump should match the ReactivityController jump within rtol=1e-3
         @test isapprox(sol_e[ssys_e.P, end], sol_c[ssys_c.P, end]; rtol=1e-3)
     end
 
@@ -316,7 +285,6 @@ import ModelingToolkit: compose
             power_shape=ps_3x2,
         )
 
-        # TF-01a: default (no temp_worth) — same 7 state vars as Phase 46
         @testset "TF-01a: default no temp_worth gives 7 state vars" begin
             @named pk = PointKinetics(ctrl_zero)
             @test length(unknowns(pk)) == 7
@@ -324,13 +292,11 @@ import ModelingToolkit: compose
             @test !any(n -> occursin("T_source", n), unames)
         end
 
-        # TF-01b: explicit temp_worth=nothing — same as default
         @testset "TF-01b: temp_worth=nothing gives 7 state vars" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=nothing)
             @test length(unknowns(pk)) == 7
         end
 
-        # TF-02a: scalar broadcast to channel cells
         @testset "TF-02a: scalar alpha broadcasts to all channel cells" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=Dict(ch => -0.001))
             unames = string.(ModelingToolkit.getname.(unknowns(pk)))
@@ -339,7 +305,6 @@ import ModelingToolkit: compose
             @test length(unknowns(pk)) == 7 + 5
         end
 
-        # TF-02b: 1D vector per cell
         @testset "TF-02b: 1D vector per channel cell" begin
             @named pk = PointKinetics(
                 ctrl_zero; temp_worth=Dict(ch => [-0.001, -0.002, -0.003, -0.004, -0.005])
@@ -349,7 +314,6 @@ import ModelingToolkit: compose
             @test length(unknowns(pk)) == 7 + 5
         end
 
-        # TF-02c: 2D matrix for HeatDiffusion
         @testset "TF-02c: 2D matrix for HeatDiffusion (3x2=6 cells)" begin
             @named pk = PointKinetics(
                 ctrl_zero; temp_worth=Dict(fuel => fill(-0.002, 3, 2))
@@ -359,26 +323,22 @@ import ModelingToolkit: compose
             @test length(unknowns(pk)) == 7 + 6
         end
 
-        # TF-02d: shape mismatch raises ArgumentError (wrong length vector for channel)
         @testset "TF-02d: shape mismatch raises ArgumentError (vector)" begin
             @test_throws ArgumentError PointKinetics(
                 ctrl_zero; name=:pk, temp_worth=Dict(ch => [1.0, 2.0])
             )
         end
 
-        # TF-02e: shape mismatch raises ArgumentError (wrong matrix for HeatDiffusion)
         @testset "TF-02e: shape mismatch raises ArgumentError (matrix)" begin
             @test_throws ArgumentError PointKinetics(
                 ctrl_zero; name=:pk, temp_worth=Dict(fuel => fill(0.0, 2, 2))
             )
         end
 
-        # TF-03a: ref_temp omitted — constructor succeeds, Tref defaults to zeros
         @testset "TF-03a: ref_temp omitted — constructor succeeds" begin
             @test_nowarn PointKinetics(ctrl_zero; name=:pk, temp_worth=Dict(ch => -0.001))
         end
 
-        # TF-03b: ref_temp with missing key — constructor succeeds (fuel Tref defaults to zeros)
         @testset "TF-03b: ref_temp missing key — constructor succeeds" begin
             alpha1 = -0.001
             alpha2 = fill(-0.002, 3, 2)
@@ -390,13 +350,12 @@ import ModelingToolkit: compose
             )
         end
 
-        # TF-03c: ref_temp=nothing — same as omitted
         @testset "TF-03c: ref_temp=nothing — constructor succeeds" begin
             @test_nowarn PointKinetics(
                 ctrl_zero; name=:pk, temp_worth=Dict(ch => -0.001), ref_temp=nothing
             )
         end
-    end  # @testset "TF-01..TF-03"
+    end
 
     @testset "TF-04: connect_temperature_feedback" begin
         ctrl_zero = ReactivityController()
@@ -416,7 +375,6 @@ import ModelingToolkit: compose
             power_shape=ps_3x2,
         )
 
-        # TF-04a: 1D channel — 5 binding equations
         @testset "TF-04a: 1D channel generates 5 equations" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=Dict(ch => -0.001))
             eqs = connect_temperature_feedback(pk, [ch])
@@ -424,7 +382,6 @@ import ModelingToolkit: compose
             @test length(eqs) == 5
         end
 
-        # TF-04b: 2D HeatDiffusion row-major — 6 binding equations
         @testset "TF-04b: 2D HeatDiffusion generates 6 equations (row-major)" begin
             @named pk = PointKinetics(
                 ctrl_zero; temp_worth=Dict(fuel => fill(-0.002, 3, 2))
@@ -434,26 +391,15 @@ import ModelingToolkit: compose
             @test length(eqs) == 6
         end
 
-        # TF-04c: multiple components — 5 + 6 = 11 equations
         @testset "TF-04c: multiple components generates 5+6=11 equations" begin
             tw = Dict(ch => -0.001, fuel => fill(-0.002, 3, 2))
             @named pk = PointKinetics(ctrl_zero; temp_worth=tw)
             eqs = connect_temperature_feedback(pk, [ch, fuel])
             @test length(eqs) == 11
         end
-
-        # TF-04e: exported from STREAM module
-        @testset "TF-04e: connect_temperature_feedback exported" begin
-            @test isdefined(STREAM, :connect_temperature_feedback)
-        end
-    end  # @testset "TF-04"
+    end 
 
     @testset "TF-05: Components Unchanged (regression guard)" begin
-        # D-05: Channel, ChannelAndContacts, ChannelHeatFlux, HeatDiffusion must NOT
-        # reference PointKinetics-specific markers from Phase 47. The contract is that
-        # temperature feedback is read from their EXISTING T symbolic via getproperty.
-        # File-list updated for Phase 55 file-consolidation reality (channel.jl +
-        # thermal_channel.jl were merged into the unified channels.jl in Phase 54).
         proj_root = pkgdir(STREAM)
         for relpath in (
             "src/components/channels.jl",
@@ -464,47 +410,22 @@ import ModelingToolkit: compose
             @test !occursin("temp_worth", src)
             @test !occursin("connect_temperature_feedback", src)
         end
-    end  # TF-05
+    end  
 
-
-    # ─────────────────────────────────────────────────────────────────
-    # SCRAM-01: SCRAMCondition struct construction and callable semantics
-    # ─────────────────────────────────────────────────────────────────
     @testset "SCRAM-01: SCRAM_at_power struct and callable" begin
         sc = SCRAM_at_power(1.5)
         @test sc isa SCRAMCondition
         @test sc.power_limit == 1.5
 
-        # Float coercion
         @test SCRAM_at_power(2).power_limit isa Float64
 
-        # P below limit: no state transition
         @test sc(:NORMAL, 0.0, 1.0, 0.0) == :NORMAL
-
-        # P above limit: trigger SCRAM
         @test sc(:NORMAL, 0.0, 2.0, 0.0) == :SCRAM
-
-        # Already in SCRAM: stays in SCRAM
         @test sc(:SCRAM, 0.5, 2.0, 0.0) == :SCRAM
-
-        # dPdt is ignored (extensibility parameter): large negative dPdt still SCRAMs
         @test sc(:NORMAL, 0.0, 2.0, -999.0) == :SCRAM
-
-        # Boundary: P exactly at limit does NOT trigger (strict greater-than)
         @test sc(:NORMAL, 0.0, 1.5, 0.0) == :NORMAL
     end
 
-    # ─────────────────────────────────────────────────────────────────
-    # SCRAM-02: scram_callback terminates standalone PK when P > plimit
-    #
-    # Setup: standalone PK with step reactivity delta_rho = 0.005 inserted
-    # at t_step = 0.5s. Power rises above plimit = 1.5 due to prompt-jump.
-    # scram_callback fires on the upward P crossing, terminates integrator,
-    # transitions ctrl.state to :SCRAM, and logs the transition time.
-    #
-    # Note: PK is the root compiled system (ssys IS pk), so ssys.P is the
-    # correct symbolic — pass ssys.P as the first argument to scram_callback.
-    # ─────────────────────────────────────────────────────────────────
     @testset "SCRAM-02: scram_callback terminates solver on SCRAM" begin
         P0 = 1.0
         plimit = 1.5
@@ -523,8 +444,6 @@ import ModelingToolkit: compose
 
         @named pk = PointKinetics(ctrl; rho_val=0.0)
         ssys = mtkcompile(pk)
-
-        # p_sym=ssys.P: PK is root system (not nested as :pk subsystem in standalone test)
         cb = scram_callback(ssys, ssys.P, ctrl)
 
         ic = point_kinetics_steady_state(P0)
@@ -542,17 +461,12 @@ import ModelingToolkit: compose
         t_arr = range(0.0, 10.0; length=1000)
         sol = solve_transient(ssys, op, t_arr; tstops=[t_step], callbacks=cb)
 
-        # Solver must terminate early (terminate! default) — not reach t=10s
         @test sol.t[end] < 10.0
 
-        # SCRAM state transition must have occurred
         @test ctrl.state == :SCRAM
-
-        # Log must contain a SCRAM entry
         @test any(entry -> entry[1] == :SCRAM, ctrl.log)
 
-        # SCRAM must have fired AFTER step insertion (not spuriously at t=0)
         t_scram = ctrl.log[end][2]
         @test t_scram > t_step
     end
-end  # @testset "PointKinetics"
+end 

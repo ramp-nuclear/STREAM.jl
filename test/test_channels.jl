@@ -8,9 +8,6 @@ using STREAM
 import STREAM: Channel  # disambiguate from Base.Channel
 using OrdinaryDiffEq: ReturnCode
 
-# ───────────────────────────────────────────────────────────
-# Common test constants
-# ───────────────────────────────────────────────────────────
 const N_DEFAULT      = 4
 const L_DEFAULT      = 0.6
 const D_DEFAULT      = 0.01
@@ -185,7 +182,6 @@ end
 @testset "ChannelHeatFlux with HeatFluxSource connection the same as direct equations" begin
     n = N_DEFAULT
     geom = PipeGeometry_circular(L_DEFAULT, D_DEFAULT)
-    # Style 1 baseline.
     @named pump_s1 = Pump(DP_PUMP)
     @named bc_s1 = HeatExchanger(T_INLET)
     @named chf_s1 = ChannelHeatFlux(; n=n, geometry=geom)
@@ -206,7 +202,6 @@ end
     sol_s1 = solve_steady(ssys_s1, ic_s1)
     @test sol_s1.retcode == ReturnCode.Success
 
-    # Style 2 — HeatFluxSource value-source component.
     @named pump = Pump(DP_PUMP)
     @named bc = HeatExchanger(T_INLET)
     @named chf = ChannelHeatFlux(; n=n, geometry=geom)

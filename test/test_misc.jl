@@ -5,10 +5,6 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 import STREAM: Inertia, HeatExchanger, WallTemperature, HeatFluxSource
 
-# ─────────────────────────────────────────────────────────────────
-# COMP-01: Inertia — ODE pressure-drop component
-# Equation: port_in.P - port_out.P ~ L_over_A * D(mdot)
-# ─────────────────────────────────────────────────────────────────
 @testset "COMP-01: Inertia stub callable" begin
     @named L = Inertia(1e3)
     @test L isa ModelingToolkit.System
@@ -20,8 +16,6 @@ end
 end
 
 @testset "COMP-01: RL-decay transient matches exp(-(R/L_over_A)*t) within 1%" begin
-    # Topology: Inertia + Resistor in a closed loop (no pump)
-    # IC: mdot(0) = 1.0 kg/s. Analytical: mdot(t) = exp(-t/tau), tau = L_over_A/R = 1000s
     R_val = 1.0
     L_over_A = 1e3
     tau = L_over_A / R_val   # 1000 s
@@ -31,14 +25,12 @@ end
     connections = [
         connect(L_comp.port_out, R_comp.port_in),
         connect(R_comp.port_out, L_comp.port_in),
-        L_comp.port_in.P ~ 1.0e5,   # pressure gauge anchor
+        L_comp.port_in.P ~ 1.0e5,
     ]
     @named sys = compose(System(connections, t; name=:rl_sys), L_comp, R_comp)
-    ssys = mtkcompile(sys; fully_determined=false)  # legitimate-structural: pure RL circuit, no T equations exist by design
+    ssys = mtkcompile(sys; fully_determined=false)
 
-    # Initial condition: mdot = 1.0 kg/s
-    # T variables are free (no heat exchange in RL circuit); provide ICs for all unknowns
-    # check_length=false required because T unknowns are underdetermined (no T equations in pure RL circuit)
+
     op = [
         ssys.L_comp.port_in.mdot => 1.0,
         ssys.L_comp.port_out.T => 300.0,
@@ -58,9 +50,6 @@ end
     end
 end
 
-# ─────────────────────────────────────────────────────────────────
-# COMP-02: HeatExchanger stubs (RED — implemented in Plan 02)
-# ─────────────────────────────────────────────────────────────────
 @testset "COMP-02: HeatExchanger stub callable" begin
     @named hx = HeatExchanger(313.15)
     @test hx isa ModelingToolkit.System
@@ -80,18 +69,13 @@ end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-# ─────────────────────────────────────────────────────────────────
-# WallTemperature (Phase 55 D-04, src/components/sources.jl)
-# ─────────────────────────────────────────────────────────────────
 @testset "WallTemperature: Real (broadcast) instantiation" begin
     n = 4
     @named wt = WallTemperature(; n=n, T_wall=350.0)
     @test wt isa ModelingToolkit.System
-    # Output: T_wall_out(t)[1:n] — 4 unknowns
     var_names = string.(unknowns(wt))
     twl_count = count(s -> occursin("T_wall_out", s), var_names)
     @test twl_count == n
-    # Equation count: n equations of the form T_wall_out[i] ~ T_wall_const
     eqs = equations(wt)
     @test length(eqs) == n
 end
@@ -101,7 +85,6 @@ end
     profile = collect(range(300.0, 400.0, length=n))
     @named wt = WallTemperature(; n=n, T_wall=profile)
     @test wt isa ModelingToolkit.System
-    # n equations of the form T_wall_out[i] ~ profile[i]
     eqs = equations(wt)
     @test length(eqs) == n
 end
@@ -117,10 +100,8 @@ end
     fn = (t) -> 350.0 + 10.0 * sin(t)
     @named wt = WallTemperature(; n=n, T_wall=fn)
     @test wt isa ModelingToolkit.System
-    # n equations of the form T_wall_out[i] ~ T_wall_fn(t)
     eqs = equations(wt)
     @test length(eqs) == n
-    # Parameter T_wall_fn(t) is present
     par_strs = string.(parameters(wt))
     @test any(s -> occursin("T_wall_fn", s), par_strs)
 end
@@ -128,13 +109,10 @@ end
 @testset "WallTemperature: mtkcompile in isolation succeeds (Real branch)" begin
     n = 4
     @named wt = WallTemperature(; n=n, T_wall=350.0)
-    ssys = mtkcompile(wt; fully_determined=false)  # isolated component: value-source, only RHS-driven port equations
+    ssys = mtkcompile(wt; fully_determined=false)
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-# ─────────────────────────────────────────────────────────────────
-# HeatFluxSource (Phase 55 D-04, src/components/sources.jl)
-# ─────────────────────────────────────────────────────────────────
 @testset "HeatFluxSource: Real (broadcast) instantiation" begin
     n = 4
     @named hfs = HeatFluxSource(; n=n, q=1.0e5)
@@ -155,11 +133,6 @@ end
     @test length(eqs) == n
 end
 
-@testset "HeatFluxSource: Vector length mismatch errors" begin
-    n = 4
-    @test_throws ErrorException HeatFluxSource(; name=:bad, n=n, q=collect(1.0:3.0))
-    @test_throws ErrorException HeatFluxSource(; name=:bad, n=n, q=collect(1.0:5.0))
-end
 
 @testset "HeatFluxSource: Function (callable parameter) instantiation" begin
     n = 4

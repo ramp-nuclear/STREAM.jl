@@ -3,11 +3,6 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
 
-# ─────────────────────────────────────────────────────────────────
-# FOUND-02: Fluid property spot-checks (Simantov correlations)
-# Reference values computed from Python STREAM light_water.py
-# Tolerance: rtol=1e-6 (deterministic polynomial; any larger diff = unit error)
-# ─────────────────────────────────────────────────────────────────
 @testset "FOUND-02: rho_water" begin
     @test isapprox(rho_water(300.0), 995.925708; rtol=1e-5)
     @test isapprox(rho_water(350.0), 973.771824; rtol=1e-5)
@@ -33,18 +28,11 @@ end
 end
 
 @testset "FOUND-02: MTK smoke test — rho_water symbolic" begin
-    # Verify @register_symbolic is correctly placed at module top-level:
-    # calling rho_water on a symbolic variable should return a symbolic expression (Num),
-    # not a concrete Float64.
     @variables T_sym(t) = 300.0
     result = rho_water(T_sym)
     @test result isa Symbolics.Num  # symbolic, not a Float64
 end
 
-# ─────────────────────────────────────────────────────────────────
-# FLUID-01: beta_water spot-checks (Simantov thermal expansion)
-# Reference values computed from Python STREAM light_water.py
-# ─────────────────────────────────────────────────────────────────
 @testset "FLUID-01: beta_water" begin
     @test isapprox(beta_water(293.15), 2.7907882032e-04; rtol=1e-6)
     @test isapprox(beta_water(323.15), 4.3910662994e-04; rtol=1e-6)
@@ -62,10 +50,6 @@ end
     @test isapprox(Ra(2863.260, 4.323622), 12379.654; rtol=1e-4)
 end
 
-# ─────────────────────────────────────────────────────────────────
-# PRES-03: sat_temperature spot-checks (Simantov saturation correlation)
-# Reference values from Python STREAM light_water.py docstring
-# ─────────────────────────────────────────────────────────────────
 @testset "PRES-03: sat_temperature" begin
     @test isapprox(sat_temperature(1e5), 372.78; rtol=1e-4)   # 99.63 C
     @test isapprox(sat_temperature(0.5e5), 354.43; rtol=1e-4)   # 81.28 C
@@ -79,11 +63,6 @@ end
     @test result isa Symbolics.Num
 end
 
-# ─────────────────────────────────────────────────────────────────
-# PRES-03: _bergles_rohsenow_dT_ONB spot-checks
-# Reference: Python STREAM temperatures.py docstring
-# Note: private helper, accessed via STREAM._bergles_rohsenow_dT_ONB
-# ─────────────────────────────────────────────────────────────────
 @testset "PRES-03: _bergles_rohsenow_dT_ONB" begin
     # Zero heat flux -> zero superheat
     @test STREAM._bergles_rohsenow_dT_ONB(1e10, 0.0) == 0.0
