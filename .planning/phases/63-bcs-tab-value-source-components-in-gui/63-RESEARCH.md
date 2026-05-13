@@ -774,7 +774,8 @@ export default function BCsTabForm({ component, nodeId }: BCsTabFormProps) {
       {pairs.map(({ base, left, right }) => {
         const symKey = `${nodeId}::${base}`;
         // Default ON per D-05 — undefined means symmetric.
-        const symmetric = bcSymmetric[nodeId]?.[base] ?? true;
+        // Canonical shape: Record<string, boolean> keyed by `${nodeId}::${baseField}` — matches the flat-key idiom used elsewhere in the store (see 63-B-PLAN.md / 63-C-PLAN.md). The nested-object form would diverge from the plans.
+        const symmetric = bcSymmetric[`${nodeId}::${base}`] ?? true;
 
         return (
           <div key={base} className="flex flex-col gap-[8px]">
@@ -917,26 +918,26 @@ function emitBCBindings(
 
 **A4 update for the planner:** Use the registry FK. `external_input.source_component === "WallTemperature"` is the canonical lookup. The Source-mode dropdown is `nodes.filter(n => n.data.componentId === ext.source_component)`. This eliminates a hardcoded mapping.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Symmetric-toggle persistence shape (CD-05).**
    - What we know: Phase 62 stores per-node parameters under `node.data.parameters: Record<string, unknown>`. .scp round-trips this transparently (simple_loop.scp `data.parameters`).
    - What's unclear: Whether symmetric is a per-base-field or per-component-instance concept.
-   - **Recommendation: per-(node, base-field), stored as `node.data.bcSymmetric: Record<"T_wall" | "q", boolean>`.** Simpler shape, fits the existing .scp `data` blob shape, no schema bump. Persistent (survives reload). Confirmed CD-05's "per-component-persistent is the natural default."
+   - **Recommendation (RESOLVED): per-(node, base-field), stored as `node.data.bcSymmetric: Record<"T_wall" | "q", boolean>`.** Simpler shape, fits the existing .scp `data` blob shape, no schema bump. Persistent (survives reload). Confirmed CD-05's "per-component-persistent is the natural default."
 
 2. **Should the +New popover anchor on the BCs-tab dropdown trigger, or on the BCs-tab field row?**
    - What we know: Phase 62 anchors popovers on the trigger button.
-   - **Recommendation: anchor on the dropdown trigger button**, matching Phase 62 idiom exactly. Click → popover opens beside the dropdown → user types name + `n` → submits → block appears on canvas (positioned ~120px left of consumer, same y) → dropdown auto-selects new block → popover closes → edge gets created.
+   - **Recommendation (RESOLVED): anchor on the dropdown trigger button**, matching Phase 62 idiom exactly. Click → popover opens beside the dropdown → user types name + `n` → submits → block appears on canvas (positioned ~120px left of consumer, same y) → dropdown auto-selects new block → popover closes → edge gets created.
 
 3. **Function-mode default function body shape.**
    - What we know: D-08 says emit `# TODO: define your time-varying boundary condition`.
    - What's unclear: What's the actual placeholder body? `T_wall_left_fn(t) = 320.0` (concrete) vs `T_wall_left_fn(t) = ...` (literal Julia "ellipsis" which won't parse).
-   - **Recommendation: emit a numerical placeholder so the script *runs* without edit but produces obviously-wrong physics.** E.g., `T_wall_left_fn(t) = 320.0  # TODO: define your time-varying boundary condition`. The TODO marker carries the user instruction; the literal `320.0` keeps the script compilable so `mtkcompile` doesn't blow up before the user notices the TODO.
+   - **Recommendation (RESOLVED): emit a numerical placeholder so the script *runs* without edit but produces obviously-wrong physics.** E.g., `T_wall_left_fn(t) = 320.0  # TODO: define your time-varying boundary condition`. The TODO marker carries the user instruction; the literal `320.0` keeps the script compilable so `mtkcompile` doesn't blow up before the user notices the TODO.
 
 4. **BCs-tab body for required-unset vs Mark mode — visually distinguishable?**
    - What we know: D-09 says required-unset shows `BC required — select a mode` in muted-destructive. Mark mode has no editor.
    - What's unclear: How does the user tell them apart?
-   - **Recommendation: required-unset = no pill active + red hint text. Mark = "Mark" pill active + small grey "No editor — code-gen emits a TODO comment" body text.** The active-pill state distinguishes them visually at a glance.
+   - **Recommendation (RESOLVED): required-unset = no pill active + red hint text. Mark = "Mark" pill active + small grey "No editor — code-gen emits a TODO comment" body text.** The active-pill state distinguishes them visually at a glance.
 
 ## Environment Availability
 

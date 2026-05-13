@@ -119,7 +119,7 @@ Do not add `export` statements inside `src/utilities.jl` — exports live in `ST
 - `rebin_intensive([1.0, 2.0, 3.0, 4.0], 4)` returns `[1.0, 2.0, 3.0, 4.0]` (identity).
 - `rebin_intensive(rand(7), 13)` and downsampling back: area-weighted mean preserved to `rtol=1e-12`.
 - 2D form: `rebin_intensive(rand(3, 5), (9, 15))` preserves the global area-weighted mean to `rtol=1e-12`.
-- Cross-check identity (D-15): for non-uniform cell widths `dx_src = 1/n_in`, `dx_tgt = 1/n_out`, `rebin_intensive(x, n_out) ≈ rebin_extensive(x, n_out) ./ (dx_src / dx_tgt)` — i.e., `rebin_intensive` is `rebin_extensive` divided by the source-to-target width ratio. (Exact formulation: `rebin_intensive(x, n_out) .* (n_out) ≈ rebin_extensive(x, n_out) .* n_in` when `sum(x .* dx_src)` is conserved by extensive; planner finalizes exact assertion in test task.)
+- Cross-check identity (D-15): `rebin_intensive(v, M) .* N ≈ rebin_extensive(v, M) .* M` (rtol=1e-12), where `N = length(v)` is `n_in` and `M` is `n_out`. Derivation: ones(N) sanity case — LHS = N·ones(M), RHS = N·ones(M). The wrong form (multipliers swapped) would give M·ones(M) ≠ N·ones(M) unless M=N.
 - `cosine_T_wall_profile(10; amplitude=1.0, peaking_factor=1.0)` returns a length-10 vector with cosine-shape values centered at 1.0.
   </behavior>
   <verify>
@@ -155,7 +155,7 @@ Extend the file (append-only):
    - `INT-02: rebin_intensive area-weighted mean conservation for non-uniform inputs` — for `v = rand(N)`, assert `sum(rebin_intensive(v, M)) / M ≈ sum(v) / N` to `rtol=1e-12` across the same 5 reshape regimes.
    - `INT-03: rebin_intensive identity fast-path` — `v = [1.0, 2.0, 3.0, 4.0]`; assert `rebin_intensive(v, 4) == v` (byte-exact, not isapprox).
    - `INT-04: rebin_intensive 2D area-weighted mean conservation` — for `M = rand(nz, nx)`, assert `sum(rebin_intensive(M, (nz_out, nx_out))) / (nz_out * nx_out) ≈ sum(M) / (nz * nx)` to `rtol=1e-12` for `(3,5)→(9,15)`, `(9,15)→(3,5)`, `(7,7)→(13,11)`.
-   - `INT-05: rebin_intensive ↔ rebin_extensive cross-check (D-15)` — for `v = rand(N)`, assert `rebin_intensive(v, M) .* M ≈ rebin_extensive(v, M) .* N` to `rtol=1e-12` (this is the mean-conservation ↔ sum-conservation duality, derived in 63-PATTERNS shared-pattern section and CONTEXT D-15).
+   - `INT-05: rebin_intensive ↔ rebin_extensive cross-check (D-15)` — for `v = rand(N)`, assert `rebin_intensive(v, M) .* N ≈ rebin_extensive(v, M) .* M` to `rtol=1e-12` (where `N = length(v)` is `n_in` and `M` is `n_out`). Sanity check: with `v = ones(N)`, LHS = N·ones(M), RHS = N·ones(M) ✓. The mirror form `.* M ≈ .* N` would only hold when `M==N`; this is the mean-conservation ↔ sum-conservation duality, derived in 63-PATTERNS shared-pattern section and CONTEXT D-15.
    - `CT-01: cosine_T_wall_profile shape and amplitude` — assert `cosine_T_wall_profile(10; amplitude=1.0)` returns length 10; the vector is mirror-symmetric around its center; values are all ≥ 0; `cosine_T_wall_profile(10; amplitude=2.0, peaking_factor=1.0)` peak ≈ 2× the peak of `cosine_T_wall_profile(10; amplitude=1.0)`.
 
 3. Do NOT modify CONS-01..04 testsets. Do NOT modify any pre-existing `cosine_power_shape` testsets.

@@ -333,9 +333,11 @@ Body structure (mirror ParameterForm sections layout):
      - Filter `nodes` for those whose registry `componentId === externalInputMeta.source_component` (e.g., `"WallTemperature"` for `T_wall_*`).
      - If `filteredNodes.length > 0`: render `<Select value={entry.sourceNodeId} onValueChange={(id) => onUpdate({mode:"source", sourceNodeId: id})}>` with `<SelectItem>` per source node (label = node instanceName).
      - If `filteredNodes.length === 0`: render an inline button `<Button variant="outline" size="sm" onClick={handleNewSource}>+ New {sourceComponentLabel}</Button>` where `handleNewSource`:
-        * calls `addNode(sourceComponentId, {x: <consumer.x - 120>, y: consumer.y})` (sourceComponentId resolved from external input's `source_component` field; consumer position read from `nodes.find(n => n.id === nodeId).position`).
-        * gets the new node's id from the addNode return value (or read latest node from store).
-        * calls `setBCMode(nodeId, externalInputName, {mode:"source", sourceNodeId: newId})`.
+        * Read the consumer's `n` from the selected node: `const consumerNode = nodes.find(n => n.id === nodeId); const consumerN = (consumerNode?.data as StreamNodeData | undefined)?.parameters?.n ?? 1;`
+        * Calls `addNode(sourceComponentId, {x: consumerNode.position.x - 120, y: consumerNode.position.y})` (sourceComponentId resolved from external input's `source_component` field).
+        * Gets the new node's id from the `addNode` return value (or read latest node from store).
+        * **Seed `n` on the newly-created source-block from the consumer** (D-20 explicit: "n defaults to the consumer Channel's n; mode = required-unset"). Call `useStore.getState().updateNodeParams(newId, { parameters: { n: consumerN } })` — this is the parameter-mutation action exposed by `useStore` (verified by reading `useStore.ts` lines 181 / 755-779 in `<read_first>`; `addNode` itself uses registry-default `n=1`, so without this seed a brand-new WT spawned via `+ New` from a Channel(n=12) would be immediately n-mismatched). Run this BEFORE the subsequent `setBCMode` call so the source edge that `setBCMode` creates does NOT trip `_checkBCNMismatch` on first creation.
+        * Calls `setBCMode(nodeId, externalInputName, {mode:"source", sourceNodeId: newId})`.
      - `defaultEntryFor("source")` returns `{mode:"source", sourceNodeId: ""}` if no sources; else first available source's id.
 
 6. Critical: ALL state mutations go through 63-B store actions. The form holds NO local state for BC entries — every keystroke calls `setBCMode` with the new partial entry.
@@ -357,6 +359,7 @@ Tests:
 - `it("Source mode with NO existing source nodes shows '+ New WallTemperature' inline button (D-20)")` — assert button text matches `/\+ New WallTemperature/`.
 - `it("Source mode with existing source nodes shows a Select dropdown listing them (D-20)")` — seed `nodes` with a WT node; assert `screen.getByRole('combobox')` or appropriate select query reflects the WT node.
 - `it("clicking '+ New WallTemperature' calls addNode and setBCMode (D-20)")` — mock or use real store; assert post-click, `useStore.getState().nodes.length === 2` (consumer + new WT) AND `useStore.getState().bcMode["ch1::T_wall_left"]?.mode === "source"`.
+- `it("clicking '+ New WallTemperature' seeds the new WT's n from the consumer Channel (D-20 — n defaults to consumer Channel's n)")` — fixture: Channel node with `parameters.n = 12`. After clicking `+ New WallTemperature`, find the newly-spawned WT node via `useStore.getState().nodes.find(n => (n.data as StreamNodeData).componentId === "WallTemperature")` and assert its `data.parameters.n === 12`. This proves no n-mismatch fires on the brand-new source-block.
   </action>
   <verify>
     <automated>cd gui && npx vitest run src/components/sidebar/__tests__/BCsTabForm.test.tsx</automated>
@@ -370,6 +373,8 @@ Tests:
     - `grep -E 'addNode' gui/src/components/sidebar/BCsTabForm.tsx` returns at least 1 line
     - `grep -E 'pair_with' gui/src/components/sidebar/BCsTabForm.tsx` returns at least 1 line (grouping logic)
     - `gui/src/components/sidebar/__tests__/BCsTabForm.test.tsx` exists with at least 10 `it(...)` blocks: `grep -c '^\s*it(' gui/src/components/sidebar/__tests__/BCsTabForm.test.tsx` returns at least 10
+    - `grep -E 'updateNodeParams' gui/src/components/sidebar/BCsTabForm.tsx` returns at least 1 line (the n-seed call from `handleNewSource` per D-20)
+    - BCsTabForm test file contains a case asserting: after clicking `+ New WallTemperature` from a Channel with `n=12`, the newly created WT node's `parameters.n` equals 12 (read via `useStore.getState().nodes.find(n => n.data.componentId === 'WallTemperature').data.parameters.n === 12`). This proves D-20's n-default-from-consumer wiring.
     - `cd gui && npx vitest run src/components/sidebar/__tests__/BCsTabForm.test.tsx` exits 0
     - `cd gui && npx tsc --noEmit 2>&1 | grep -E 'BCsTabForm\.tsx'` returns 0 lines
   </acceptance_criteria>
