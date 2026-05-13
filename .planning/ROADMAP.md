@@ -32,7 +32,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] **Phase 60: `fuel_assembly` composition helper** — new helper in `src/composition/helpers.jl` covering 4 variants of alternating CAC↔Plate chains (channel-bookended, plate-bookended, mixed, closed annular). Tests + code-gen detection update. (completed 2026-05-11)
 - [x] **Phase 61: Registry audit + rewrite for v1.1** — `gui/src/registry/components.json` rewritten against v1.1 source. Add `WallTemperature`, `HeatFluxSource`, `PointKinetics`, `ReactivityController`. Collapse correlation sub-param trees per geom-first. Add `scope` field per parameter (constructor_kwarg vs external_input) for Properties-tab vs BCs-tab split. Bump `stream_version` to `1.1.0`. (completed 2026-05-12)
 - [ ] **Phase 62: Resources panel architecture** — Navigator restructure to `Project → Model Options + Resources + Components`. Foreign-key UUID references. Save format (`.scp`). Reference picker UX. Sources toolbox category.
-- [ ] **Phase 63: BCs tab + value-source components in GUI** — Properties tab vs BCs tab separation. Five BC modes (value / profile / function / mark-in-code / driven-by-source-block). `WallTemperature` and `HeatFluxSource` toolbox entries. Dashed BC edge style. Bidirectional sync between BCs tab and canvas connections.
+- [x] **Phase 63: BCs tab + value-source components in GUI** — Properties tab vs BCs tab separation. Five BC modes (value / profile / function / mark-in-code / driven-by-source-block). `WallTemperature` and `HeatFluxSource` toolbox entries. Dashed BC edge style. Bidirectional sync between BCs tab and canvas connections. (completed 2026-05-13)
 - [ ] **Phase 64: Connection routing** — Per-port autoflip for FlowPorts with asymmetric same-side placement. Independent axis-flip for thermal-pair ports on CAC/HD. Anti-parallel offset for bidirectional pairs as polish hook.
 - [ ] **Phase 65: Interaction model overhaul** — Left-marquee selection, right-click drag pan, right-click no-drag context menu. Edge deletion (Del/Backspace + right-click). Copy/Cut/Paste/Duplicate (Ctrl+C/X/V/D) with smart-parse-and-increment naming. Reset-to-empty rule for property fields. Snap-to-grid toggle. AutoRecover sidecar snapshot mechanism.
 - [ ] **Phase 66: Code preview rework** — Structured `CodeSection[]` output replacing flat string code-gen. Section blocks (Imports / Resources / Components / Composition / Main). Bidirectional traceability (code-hover → canvas-highlight; canvas-select → explicit code-jump). Click-to-pin sections. Copy + Export buttons in code panel toolbar. Hand-rolled formatting rules.
@@ -108,12 +108,12 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.10, Section 3.11.
 **Depends on:** Phase 62.
-**Plans:** 2/4 plans executed
+**Plans:** 4/4 plans complete
 
 - [x] 63-A-PLAN.md (Wave 1) — Julia `rebin_intensive` (1D + 2D) + `cosine_T_wall_profile` thin alias in `src/utilities.jl`; tests in `test/test_utilities.jl`; exports in `STREAM.jl`.
 - [x] 63-B-PLAN.md (Wave 1, parallel to 63-A) — Zustand `bcMode` slice + `bcSymmetric` + `errorNodeIds`; `gui/src/lib/bcMode.ts` shared types + `isAllowedBCConnection`; `codeGenerator.ts` 5-mode emit + symmetric expansion; vitest coverage.
-- [ ] 63-C-PLAN.md (Wave 2, depends on 63-B) — BCs tab UI: `SidebarPanel.tsx` Tabs wrapper, new `BCsTabForm.tsx` + `BCModePicker.tsx` + extracted `SegmentedButtonGroup.tsx` primitive; `+ New <SourceKind>` inline-button flow.
-- [ ] 63-D-PLAN.md (Wave 2, parallel to 63-C, depends on 63-B) — Canvas BC edge: `BCEdge.tsx` dashed + click-to-cycle chip; `StreamNode.tsx` BCPort hollow-square handle + source-label + drop overlay + red-ring; `CanvasPanel.tsx` edgeTypes + isValidConnection BCPort allow-list; `ToolboxPanel.tsx` Sources populated.
+- [x] 63-C-PLAN.md (Wave 2, depends on 63-B) — BCs tab UI: `SidebarPanel.tsx` Tabs wrapper, new `BCsTabForm.tsx` + `BCModePicker.tsx` + extracted `SegmentedButtonGroup.tsx` primitive; `+ New <SourceKind>` inline-button flow.
+- [x] 63-D-PLAN.md (Wave 2, parallel to 63-C, depends on 63-B) — Canvas BC edge: `BCEdge.tsx` dashed + click-to-cycle chip; `StreamNode.tsx` BCPort hollow-square handle + source-label + drop overlay + red-ring; `CanvasPanel.tsx` edgeTypes + isValidConnection BCPort allow-list; `ToolboxPanel.tsx` Sources populated.
 
 ### Phase 64: Connection routing
 
@@ -229,7 +229,7 @@ contract document drafted in parallel throughout.
 | 60. `fuel_assembly` composition helper               | 2/2 | Complete    | 2026-05-11 |
 | 61. Registry audit + rewrite for v1.1                | 5/5 | Complete   | 2026-05-12 |
 | 62. Resources panel architecture                     | 10/11 | In Progress|  |
-| 63. BCs tab + value-source components in GUI         | 2/4 | In Progress|  |
+| 63. BCs tab + value-source components in GUI         | 4/4 | Complete   | 2026-05-13 |
 | 64. Connection routing                               | 0/TBD | Planned | — |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |
