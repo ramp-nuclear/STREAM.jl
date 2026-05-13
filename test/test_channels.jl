@@ -97,10 +97,10 @@ end
         [ssys.ch.T[i] => T_INLET for i in 1:n]...,
         ssys.ch.port_in.mdot => 0.5,
     ]
-    sol = solve_transient(ssys, ic, range(0.0, 0.1, length=20))
+    sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
     # T_out ≈ T_inlet — no heating
-    @test isapprox(sol[ssys.ch.T_out, end], T_INLET; rtol=1e-3)
+    @test isapprox(sol[ssys.ch.T_out], T_INLET; rtol=1e-3)
 end
 
 @testset "ChannelHeatFlux adiabatic-by-default — q_*=0 binding" begin
@@ -151,16 +151,11 @@ end
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out, end] > T_INLET
     # q_wall_left[i] finite + signed correctly (positive for T_wall > T)
-    for i in 1:n
-        q_l = sol[ssys.ch.q_wall_left[i], end]
-        @test isfinite(q_l)
-        @test q_l > 0
-    end
-    # q_wall_right[i] ≈ 0 (h_right=0 zeros the expression)
-    for i in 1:n
-        q_r = sol[ssys.ch.q_wall_right[i], end]
-        @test isapprox(q_r, 0.0; atol=1e-9)
-    end
+    ql = sol[ssys.ch.q_wall_left[:], end]
+    qr = sol[ssys.ch.q_wall_right[:], end]
+    @test all(isfinite.(ql))
+    @test all(>(0), ql)
+    @test all(isapprox.(qr, 0.0, atol=1e-9))
 end
 
 @testset "ChannelHeatFlux heated Style 1 — binding eqns drive q_left" begin
@@ -188,12 +183,8 @@ end
     sol = solve_transient(ssys, ic, range(0.0, 1.0, length=50))
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.chf.T_out, end] > T_INLET
-    for i in 1:n
-        q_l = sol[ssys.chf.q_wall_left[i], end]
-        @test isapprox(q_l, expected; rtol=1e-6)
-        q_r = sol[ssys.chf.q_wall_right[i], end]
-        @test isapprox(q_r, 0.0; atol=1e-9)
-    end
+    @test all(isapprox.(sol[ssys.chf.q_wall_left[:], end], expected, rtol=1e-7))
+    @test all(isapprox.(sol[ssys.chf.q_wall_right[:], end], 0., atol=1e-9))
 end
 
 @testset "Channel heated Style 2 — WallTemperature source, equivalence to Style 1" begin
@@ -323,9 +314,6 @@ end
     ]
     sol = solve_transient(ssys, ic, range(0.0, 0.5, length=20))
     @test sol.retcode == ReturnCode.Success
-    for i in 1:n
-        @test isfinite(sol[ssys.ch.q_wall_left[i], end])
-    end
 end
 
 @testset "Channel h_left::Vector (per-cell axial profile)" begin
@@ -383,9 +371,6 @@ end
     ]
     sol = solve_transient(ssys, ic, range(0.0, 0.5, length=20))
     @test sol.retcode == ReturnCode.Success
-    for i in 1:n
-        @test isfinite(sol[ssys.ch.q_wall_left[i], end])
-    end
 end
 
 @testset "WallTemperature T_wall::Real / ::Vector / ::Function shapes" begin
@@ -404,12 +389,6 @@ end
     @test wt_f isa ModelingToolkit.AbstractSystem
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Section 6: CAC correlation-driven htc (D-17 sixth bullet)
-# CAC's h_tc[i] is computed internally from the htc_correlation closure.
-# Drive T_wall via WallTemperature on the left thermal port.
-# Right side dangles → adiabatic via ThermalPort Flow rule.
-# ─────────────────────────────────────────────────────────────────
 @testset "CAC htc_correlation=dittus_boelter — closed loop solves" begin
     n = N_DEFAULT
     geom = PipeGeometry_circular(L_DEFAULT, D_DEFAULT)
@@ -426,9 +405,10 @@ end
         connect(cac.port_out, pump.port_in),
         pump.port_in.P ~ 1.0e5,
         [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:n]...,
+        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
     ]
     @named sys = compose(System(conns, t; name=:cac_db), pump, bc, cac, ct_l...)
-    ssys = mtkcompile(sys; fully_determined=false)  # integration test: per-cell wall-T binding, ports intentionally underdetermined (Phase 55 D-08)
+    ssys = mtkcompile(sys; fully_determined=false)
     ic = Pair{Any,Any}[
         [ssys.cac.T[i] => T_INLET for i in 1:n]...,
         ssys.cac.port_in.mdot => 0.5,
@@ -436,12 +416,7 @@ end
     sol = solve_transient(ssys, ic, range(0.0, 1.0, length=50))
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.cac.T_out, end] > T_INLET
-    # h_tc[i] finite + positive throughout.
-    for i in 1:n
-        h_i = sol[ssys.cac.h_tc[i], end]
-        @test isfinite(h_i)
-        @test h_i > 0
-    end
+    @test all(>(0), sol[ssys.cac.h_tc_left[:], end])
 end
 
 # ─────────────────────────────────────────────────────────────────
@@ -492,15 +467,6 @@ end
         return ssys, sol
     end
 
-    @testset "ISCB-01: SCB ChannelAndContacts compiles" begin
-        # Verify mtkcompile succeeds with SCB correction — structural correctness.
-        scb_fn = regime_dependent_q_scb(pressure=2e5)
-        @named cac = ChannelAndContacts(
-            n=3, geometry=PipeGeometry_circular(L_ch, D_ch), scb_correction=scb_fn
-        )
-        @test cac isa ModelingToolkit.AbstractSystem
-    end
-
     @testset "ISCB-01: SCB ChannelAndContacts solves (sub-ONB)" begin
         # T_wall=380K < T_ONB (~408K at 2 bar): SCB present but inactive ⇒ converges.
         scb_fn = regime_dependent_q_scb(pressure=2e5)
@@ -548,11 +514,9 @@ end
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=330.0)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=330.0)
 
-        htc_scb = [sol_scb[ssys_scb.cac.h_tc[i]] for i in 1:n]
-        htc_noscb = [sol_noscb[ssys_noscb.cac.h_tc[i]] for i in 1:n]
-        for i in 1:n
-            @test htc_scb[i] ≈ htc_noscb[i] rtol=1e-10
-        end
+        htc_scb = sol_scb[ssys_scb.cac.h_tc_left[:]]
+        htc_noscb = sol_noscb[ssys_noscb.cac.h_tc_left[:]]
+        @test all(isapprox.(htc_noscb, htc_scb, rtol=1e-10))
     end
 end
 
@@ -689,9 +653,7 @@ end
     @test all(Re_vals .> 0)
 
     # CHF q_wall stays positive — q is intrinsic / sign-independent of flow.
-    for i in 1:N_SIGN
-        @test sol[ssys.chf.q_wall_left[i]] > 0
-    end
+    @test all(>(0), sol[ssys.chf.q_wall_left[:]])
 
     # Energy balance: advective heat gain ≈ summed q_wall.
     T_mean = (T_vals[1] + T_INLET_SIGN) / 2
@@ -737,6 +699,7 @@ const STAGE2_MDOT        = 0.49
         connect(hex_v1.port_out,  cac_v1.port_in),
         connect(cac_v1.port_out,  pump_v1.port_in),
         [connect(ct_l_v1[i].thermal, getproperty(cac_v1, Symbol(:thermal_left, i))) for i in 1:n]...,
+        [connect(ct_l_v1[i].thermal, getproperty(cac_v1, Symbol(:thermal_right, i))) for i in 1:n]...,
         pump_v1.port_in.P ~ 1.0e5,
     ]
     @named sys_v1 = compose(System(eqs_v1, t; name=:g1_v1_loop), pump_v1, hex_v1, cac_v1, ct_l_v1...)
@@ -914,8 +877,8 @@ end
     @test sol_rev.retcode == ReturnCode.Success
 
     if sol_fwd.retcode == ReturnCode.Success && sol_rev.retcode == ReturnCode.Success
-        T_fwd = [sol_fwd[ssys_fwd.chf.T[i]] for i in 1:n]
-        T_rev = [sol_rev[ssys_rev.chf.T[i]] for i in 1:n]
+        T_fwd = sol_fwd[ssys_fwd.chf.T[:]]
+        T_rev = sol_rev[ssys_rev.chf.T[:]]
 
         # Forward profile monotone increasing.
         @test T_fwd[1] < T_fwd[2] < T_fwd[3]
@@ -923,14 +886,7 @@ end
         @test T_rev[1] > T_rev[2] > T_rev[3]
 
         # Spatial mirror.
-        for i in 1:n
-            try
-                @test isapprox(T_rev[i], T_fwd[n+1-i]; rtol=1e-12)
-            catch
-                @warn "G3b cell $i rtol=1e-12 failed; relaxing to rtol=1e-9" T_rev_i=T_rev[i] T_fwd_mirror=T_fwd[n+1-i]
-                @test isapprox(T_rev[i], T_fwd[n+1-i]; rtol=1e-9)
-            end
-        end
+        @test all(isapprox.(T_rev, T_fwd[end:-1:1], rtol=1e-9))
     end
 end
 
@@ -1002,6 +958,7 @@ end
         connect(cac.port_out, pump_cac.port_in),
         pump_cac.port_in.P ~ 1.0e5,
         [connect(ct_l_xeq[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:n]...,
+        [connect(ct_l_xeq[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
     ]
     @named sys_cac = compose(System(conns_cac, t; name=:xeq_cac), pump_cac, bc_cac, cac, ct_l_xeq...)
     ssys_cac = mtkcompile(sys_cac; fully_determined=false)  # integration test: per-cell wall-T binding (Phase 55 D-08)

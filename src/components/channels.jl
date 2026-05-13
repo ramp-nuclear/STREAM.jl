@@ -7,6 +7,25 @@
 function Channel end
 
 
+struct NamedVars
+    T
+    dp
+    T_wall_left
+    T_wall_right
+    Re
+    Pe
+    v
+    P
+    T_sat
+    T_ONB
+    q_wall
+    q_wall_left
+    q_wall_right
+    T_out
+    dP
+end
+
+
 """
     _channel_core(; n, T, dp, port_in, port_out, geometry, g_acc,
                   friction_correlation=blasius_friction,
@@ -49,18 +68,13 @@ splices these into its own equation lists before building the `System`.
 """
 function _channel_core(;
     n::Int,
-    T,
-    dp,
     port_in,
     port_out,
     geometry::PipeGeometry,
     g_acc::Real,
     friction_correlation=blasius_friction,
-    q_left_expr,
-    q_right_expr,
-    Re, Pe, v, P, T_sat, T_ONB,
-    q_wall, q_wall_left, q_wall_right,
-    T_out, dP,
+    q_left_expr, q_right_expr,
+    vars::NamedVars
 )
     Dh = geometry.Dh
     A  = geometry.A
@@ -75,75 +89,100 @@ function _channel_core(;
     T_inlet_rev = instream(port_out.T)
 
     for i in 1:n
-        # Flow-reversal upwind selection — single ifelse (D-07, NRG-04).
-        # The (i == 1)/(i == n) ternaries collapse at trace time (Julia ?:),
-        # so cell 1 forward / cell n reverse correctly use the boundary face.
-        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i - 1]
-        T_up_rev = (i == n) ? T_inlet_rev : T[i + 1]
+        T_up_fwd = (i == 1) ? T_inlet_fwd : vars.T[i - 1]
+        T_up_rev = (i == n) ? T_inlet_rev : vars.T[i + 1]
         T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
 
-        # Face-averaged cp — boundary face uses same averaging as interior (D-05).
-        # Both branches of T_up run through cp_water; @register_symbolic ensures
-        # cp_water is opaque to Symbolics and faithfully transports the ifelse
-        # selection at runtime (D-07, NRG-04). NO second ifelse for cp.
-        cp_face = (cp_water(T_up) + cp_water(T[i])) / 2     # NRG-01, NRG-02
+        cp_face = (cp_water(T_up) + cp_water(vars.T[i])) / 2
 
-        # Energy balance — enthalpy form (D-06).
-        # Numerator: cp_face (face-averaged); denominator: cp_water(T[i]) (local).
-        # The two cp values do NOT cancel (NRG-03) — they coincide only in the
-        # constant-cp limit (T_up == T[i]).
+        # Energy balance — enthalpy form
         push!(eqs,
-            Dt(T[i]) ~ (
-                abs(port_in.mdot) * cp_face * (T_up - T[i])
+            Dt(vars.T[i]) ~ (
+                abs(port_in.mdot) * cp_face * (T_up - vars.T[i])
               + q_left_expr[i]
               + q_right_expr[i]
-            ) / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
+            ) / (rho_water(vars.T[i]) * cp_water(vars.T[i]) * A * dz)
         )
 
-        # Per-cell friction dp[i] — algebraic (Pitfall 5: inline Re for friction
-        # because Re[i] is observed, not unknown, in the new core).
-        Re_i_for_friction = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
+        # Using Reynolds directly and not the variable because it may only be observable
+        Re_i_for_friction = abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i]))
         f_i = friction_correlation(Re_i_for_friction)
         push!(eqs,
-            dp[i] ~ f_i * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(T[i]) * A^2)) * (dz / Dh)
-                  + rho_water(T[i]) * g_acc * dz
+            vars.dp[i] ~ f_i * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(vars.T[i]) * A^2)) * (dz / Dh)
+                  + rho_water(vars.T[i]) * g_acc * dz
         )
 
-        # q-agnostic observables (D-08).
-        Pr_i = cp_water(T[i]) * mu_water(T[i]) / k_water(T[i])
-        push!(obs, Re[i] ~ Re_i_for_friction)         # reuse the inlined Re_i (NOT Re[i] symbol)
-        push!(obs, Pe[i] ~ Re_i_for_friction * Pr_i)  # Re*Pr (Peclet)
-        push!(obs, v[i]  ~ port_in.mdot / (rho_water(T[i]) * A))  # canonical form (CAC line 202)
+        Pr_i = cp_water(vars.T[i]) * mu_water(vars.T[i]) / k_water(vars.T[i])
+        push!(obs, vars.Re[i] ~ Re_i_for_friction)
+        push!(obs, vars.Pe[i] ~ Re_i_for_friction * Pr_i)
+        push!(obs, vars.v[i]  ~ port_in.mdot / (rho_water(vars.T[i]) * A))
 
-        # Per-cell absolute pressure (distributed inertia correction; CAC pattern).
-        # P_i is a Julia local expression (NOT the P[i] symbol) to avoid an
-        # observed-to-observed chain when used inside T_sat[i] / T_ONB[i] (Pitfall 7).
-        P_i = port_in.P - sum(dp[j] for j in 1:i) -
-              (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
-        push!(obs, P[i]    ~ P_i)
-        push!(obs, T_sat[i] ~ sat_temperature(P_i))
+        P_i = port_in.P - sum(vars.dp[j] for j in 1:i) -
+              (i/n) * ((port_in.P - port_out.P) - sum(vars.dp[j] for j in 1:n))
+        push!(obs, vars.P[i]     ~ P_i)
+        push!(obs, vars.T_sat[i] ~ sat_temperature(P_i))
 
-        # q-derived observables (D-08).
-        # T_ONB[i] inlines q-density from q_left_expr/q_right_expr (Julia locals)
-        # rather than referencing the q_wall[i] observable symbol — avoids
-        # observed-to-observed chain (Pitfall 7).
         q_density_i = (q_left_expr[i] + q_right_expr[i]) / (sum(geometry.heated_parts) * dz)
-        push!(obs, T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_density_i))
+        push!(obs, vars.T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_density_i))
 
-        push!(obs, q_wall_left[i]  ~ q_left_expr[i])
-        push!(obs, q_wall_right[i] ~ q_right_expr[i])
-        push!(obs, q_wall[i]       ~ q_left_expr[i] + q_right_expr[i])
+        push!(obs, vars.q_wall_left[i]  ~ q_left_expr[i])
+        push!(obs, vars.q_wall_right[i] ~ q_right_expr[i])
+        push!(obs, vars.q_wall[i]       ~ q_left_expr[i] + q_right_expr[i])
     end
 
-    # Scalar equations — port wiring (identical across all variants; PATTERNS.md lines 104-115)
-    push!(eqs, T_out ~ T[n])
+    push!(obs, vars.T_out ~ ifelse(port_in.mdot >=0, vars.T[n], vars.T[1]))
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
-    push!(eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(dp[i] for i in 1:n))
-    push!(eqs, port_out.T ~ T[n])
-    push!(eqs, port_in.T  ~ T[1])
-    push!(obs, dP ~ port_in.P - port_out.P)
+    push!(eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(vars.dp[i] for i in 1:n))
+    push!(eqs, port_out.T ~ vars.T[n])
+    push!(eqs, port_in.T  ~ vars.T[1])
+    push!(obs, vars.dP ~ port_in.P - port_out.P)
 
     return (; eqs, obs)
+end
+
+
+function _setup(geometry, g, n)
+    pars = @parameters begin
+        L = geometry.L
+        D_h = geometry.Dh
+        A = geometry.A
+        g_acc = g
+    end
+
+    vars = @variables begin
+        (T(t))[1:n]
+        (dp(t))[1:n]
+        (T_wall_left(t))[1:n]
+        (T_wall_right(t))[1:n]
+        (Re(t))[1:n]
+        (Pe(t))[1:n]
+        (v(t))[1:n]
+        (P(t))[1:n]
+        (T_sat(t))[1:n]
+        (T_ONB(t))[1:n]
+        (q_wall(t))[1:n]
+        (q_wall_left(t))[1:n]
+        (q_wall_right(t))[1:n]
+        T_out(t)
+        dP(t)
+    end
+
+    @named port_in  = FlowPort()
+    @named port_out = FlowPort()
+
+    return pars, NamedVars(vars...), port_in, port_out
+
+end
+
+function _vcollect(vars::NamedVars)
+    [
+        collect(vars.T); collect(vars.dp);
+        collect(vars.T_wall_left); collect(vars.T_wall_right);
+        collect(vars.Re); collect(vars.Pe); collect(vars.v);
+        collect(vars.P); collect(vars.T_sat); collect(vars.T_ONB);
+        collect(vars.q_wall); collect(vars.q_wall_left); collect(vars.q_wall_right);
+        vars.T_out; vars.dP
+    ]
 end
 
 
@@ -151,12 +190,10 @@ end
     Channel(; name, n, geometry, g=0.0, h_left=0.0, h_right=0.0,
             friction_correlation=blasius_friction) -> ODESystem
 
-Single-phase convective channel with `n` axial finite-volume cells. External-input
-recipient: per-cell wall temperature arrives via channel-level `@variables`
-`T_wall_left(t)[1:n]` / `T_wall_right(t)[1:n]` (no port — these are plain
-unknowns the user closes via binding eqns or a `WallTemperature` source).
-`h_left` / `h_right` are constructor kwargs (each `Real | AbstractVector |
-Function`, default `0.0`). Adiabatic when `h_*=0.0` (default).
+Single-phase convective channel with `n` axial finite-volume cells. 
+`Heat flux is defined by external temperature (required closure post process) and 
+`prescribed heat transfer coefficient.
+A `WallTemperature` source can be used as a closure, for example.
 
 # Arguments
 - `name`: system name (Symbol)
@@ -205,22 +242,7 @@ function Channel(;
     h_right::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
     friction_correlation=blasius_friction,
 )
-    Dh = geometry.Dh
-    A  = geometry.A
-    L  = geometry.L
-    Dt = Differential(t)
-
-    # ----------------------------------------------------------------
-    # Base parameters: geometry + gravity. h_left/h_right resolution is
-    # unchanged from Phase 54 D-02 — only the q-expression *consumer*
-    # changed (T_wall_left[i] @variable in place of thermal_left[i].T port var).
-    # ----------------------------------------------------------------
-    pars_base = @parameters begin
-        L = L
-        D_h = Dh
-        A = A
-        g_acc = g
-    end
+    pars_base, varstruct, port_in, port_out = _setup(geometry, g, n)
 
     extra_pars = Any[]
     if h_left isa Real
@@ -253,56 +275,29 @@ function Channel(;
 
     pars = Any[pars_base...; extra_pars...]
 
-    vars = @variables begin
-        (T(t))[1:n] = fill(600.0, n)
-        (dp(t))[1:n] = fill(100.0, n)
-        (T_wall_left(t))[1:n]
-        (T_wall_right(t))[1:n]
-        (Re(t))[1:n]
-        (Pe(t))[1:n]
-        (v(t))[1:n]
-        (P(t))[1:n]
-        (T_sat(t))[1:n]
-        (T_ONB(t))[1:n]
-        (q_wall(t))[1:n]
-        (q_wall_left(t))[1:n]
-        (q_wall_right(t))[1:n]
-        T_out(t) = 600.0
-        dP(t)
-    end
-
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
-
-    dz = L / n
+    dz = geometry.L / n
 
     q_left_expr  = Vector{Num}(undef, n)
     q_right_expr = Vector{Num}(undef, n)
     for i in 1:n
-        q_left_expr[i]  = hL_per_cell[i] * geometry.heated_parts[1] * dz * (T_wall_left[i]  - T[i])
-        q_right_expr[i] = hR_per_cell[i] * geometry.heated_parts[2] * dz * (T_wall_right[i] - T[i])
+        q_left_expr[i]  = hL_per_cell[i] * geometry.heated_parts[1] * dz * (varstruct.T_wall_left[i]  - varstruct.T[i])
+        q_right_expr[i] = hR_per_cell[i] * geometry.heated_parts[2] * dz * (varstruct.T_wall_right[i] - varstruct.T[i])
     end
 
     core = _channel_core(;
-        n, T, dp, port_in, port_out, geometry,
-        g_acc=g, friction_correlation,
-        q_left_expr, q_right_expr,
-        Re, Pe, v, P, T_sat, T_ONB,
-        q_wall, q_wall_left, q_wall_right,
-        T_out, dP,
+        n=n, 
+        port_in=port_in, 
+        port_out=port_out, 
+        geometry=geometry,
+        g_acc=g, friction_correlation=friction_correlation,
+        q_left_expr=q_left_expr, q_right_expr=q_right_expr,
+        vars=varstruct,
     )
 
     eqs = core.eqs        # NO variant_eqs — there is no port-Q_flow closure
     obs = core.obs
 
-    all_vars = [
-        collect(T); collect(dp);
-        collect(T_wall_left); collect(T_wall_right);
-        collect(Re); collect(Pe); collect(v);
-        collect(P); collect(T_sat); collect(T_ONB);
-        collect(q_wall); collect(q_wall_left); collect(q_wall_right);
-        T_out; dP
-    ]
+    all_vars = _vcollect(varstruct)
 
     compose(
         System(eqs, t, all_vars, pars; observed=obs, name=name),
@@ -315,10 +310,8 @@ end
     ChannelHeatFlux(; name, n, geometry, g=0.0,
                     friction_correlation=blasius_friction) -> ODESystem
 
-Single-phase convective channel with `n` axial finite-volume cells. External-input
-recipient of prescribed heat flux: per-cell flux density [W/m^2] arrives via
-channel-level `@variables` `q_left(t)[1:n]` / `q_right(t)[1:n]` (no port — these
-are plain unknowns the user closes via binding eqns or a `HeatFluxSource` source).
+Single-phase convective channel with `n` axial finite-volume cells.
+Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource` source).
 
 # Arguments
 - `name`: system name (Symbol)
@@ -361,42 +354,13 @@ function ChannelHeatFlux(;
     g=0.0,
     friction_correlation=blasius_friction,
 )
-    Dh = geometry.Dh
-    A  = geometry.A
-    L  = geometry.L
-    Dt = Differential(t)
+    pars, varstruct, port_in, port_out = _setup(geometry, g, n)
+    dz = geometry.L / n
 
-    pars = @parameters begin
-        L = L
-        D_h = Dh
-        A = A
-        g_acc = g
-    end
-
-    # NEW IN PHASE 55 (D-03): q_left[1:n] and q_right[1:n] are plain external-input
-    # variables — no equation, no default, user closes them.
-    vars = @variables begin
-        (T(t))[1:n] = fill(600.0, n)
-        (dp(t))[1:n] = fill(100.0, n)
+    exvars = @variables begin
         (q_left(t))[1:n]
         (q_right(t))[1:n]
-        (Re(t))[1:n]
-        (Pe(t))[1:n]
-        (v(t))[1:n]
-        (P(t))[1:n]
-        (T_sat(t))[1:n]
-        (T_ONB(t))[1:n]
-        (q_wall(t))[1:n]
-        (q_wall_left(t))[1:n]
-        (q_wall_right(t))[1:n]
-        T_out(t) = 600.0
-        dP(t)
     end
-
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
-
-    dz = L / n
 
     q_left_expr  = Vector{Num}(undef, n)
     q_right_expr = Vector{Num}(undef, n)
@@ -406,25 +370,18 @@ function ChannelHeatFlux(;
     end
 
     core = _channel_core(;
-        n, T, dp, port_in, port_out, geometry,
-        g_acc=g, friction_correlation,
-        q_left_expr, q_right_expr,
-        Re, Pe, v, P, T_sat, T_ONB,
-        q_wall, q_wall_left, q_wall_right,
-        T_out, dP,
+        n=n, 
+        port_in=port_in, 
+        port_out=port_out, 
+        geometry=geometry,
+        g_acc=g, friction_correlation=friction_correlation,
+        q_left_expr=q_left_expr, q_right_expr=q_right_expr,
+        vars=varstruct,
     )
 
-    eqs = core.eqs        # NO variant_eqs — there is no port-Q_flow closure
+    eqs = core.eqs
     obs = core.obs
-
-    all_vars = [
-        collect(T); collect(dp);
-        collect(q_left); collect(q_right);
-        collect(Re); collect(Pe); collect(v);
-        collect(P); collect(T_sat); collect(T_ONB);
-        collect(q_wall); collect(q_wall_left); collect(q_wall_right);
-        T_out; dP
-    ]
+    all_vars = [_vcollect(varstruct); [collect(v) for v in exvars]...]
 
     compose(
         System(eqs, t, all_vars, pars; observed=obs, name=name),
@@ -441,9 +398,9 @@ end
 
 Convective channel with per-cell `ThermalPort` arrays on both sides for conjugate heat
 transfer (the variant that connects to `HeatDiffusion`). Internal HTC correlation
-(single-phase or correlation+SCB-enhanced) drives per-cell `h_tc[i]`; q is computed
-inside the variant as `h_tc[i] * heated_parts * dz * (T_wall - T[i])` and fed into
-`_channel_core` for the energy balance and the rest of the channel physics.
+(single-phase or correlation+SCB-enhanced) drives per-cell `h_tc[i]`; 
+Heat flux is computed as `h_tc[i] * heated_parts * dz * (T_wall - T[i])` 
+The wall temperature is connected through thermal port arrays.
 
 # Arguments
 - `name`: system name (Symbol)
@@ -473,156 +430,127 @@ function ChannelAndContacts(;
     friction_correlation=blasius_friction,
     scb_correction=nothing,
 )
-    Dh = geometry.Dh
-    A  = geometry.A
-    L  = geometry.L
-    Dt = Differential(t)
-
-    pars = @parameters begin
-        L = L
-        D_h = Dh
-        A = A
-        g_acc = g
-    end
-
-    # ----------------------------------------------------------------
-    # Variables — variant declares ALL @variables that _channel_core references
-    # by symbol (Phase 53 D-10), PLUS variant-specific observables (Phase 53 D-09):
-    # h_tc[i] (UNKNOWN — needed for SCB convergence per ISCB-01), Nu, h_tc_left/right,
-    # T_wall_left/right, Gr_over_Re2, velocity, Q_wall_total.
-    # h_tc default IC 5000.0 (ISCB-01: prevents MTK cyclic guesses init error in SCB).
-    # ----------------------------------------------------------------
-    vars = @variables begin
-        (T(t))[1:n] = fill(600.0, n)
-        (dp(t))[1:n] = fill(100.0, n)
-        (h_tc(t))[1:n] = fill(5000.0, n)
-        (Re(t))[1:n]
-        (Pe(t))[1:n]
-        (v(t))[1:n]
-        (P(t))[1:n]
-        (T_sat(t))[1:n]
-        (T_ONB(t))[1:n]
-        (q_wall(t))[1:n]
-        (q_wall_left(t))[1:n]
-        (q_wall_right(t))[1:n]
-        (Nu(t))[1:n]
-        (h_tc_left(t))[1:n] = fill(5000.0, n)   # Phase 56-resume per-side h: break MTK cyclic-guess (mirrors h_tc default)
-        (h_tc_right(t))[1:n] = fill(5000.0, n)  # Phase 56-resume per-side h: same
-        (T_wall_left(t))[1:n]
-        (T_wall_right(t))[1:n]
-        (Gr_over_Re2(t))[1:n]
-        (velocity(t))[1:n]
-        T_out(t) = 600.0
-        dP(t)
-        Q_wall_total(t)
-    end
-
-    @named port_in  = FlowPort()
-    @named port_out = FlowPort()
+    
+    pars, vars, port_in, port_out = _setup(geometry, g, n)
     thermal_left  = [ThermalPort(; name=Symbol(:thermal_left,  i)) for i in 1:n]
     thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:n]
 
+    Dh = geometry.Dh
+    A  = geometry.A
+    L  = geometry.L
     dz = L / n
+    exvars = @variables begin
+        (h_tc_left(t))[1:n]
+        (h_tc_right(t))[1:n]
+        (Nu_left(t))[1:n]
+        (Nu_right(t))[1:n]
+        (velocity(t))[1:n]
+        (Gr_over_Re2_left(t))[1:n]
+        (Gr_over_Re2_right(t))[1:n]
+        Q_wall_total(t)
+    end
 
     variant_eqs = Equation[]
     if scb_correction === nothing
         for i in 1:n
             T_left_w   = thermal_left[i].T
-            T_film_l   = (T[i] + T_left_w) / 2
+            T_film_l   = (vars.T[i] + T_left_w) / 2
             Re_l       = abs(port_in.mdot) * Dh / (A * mu_water(T_film_l))
             Pr_l       = cp_water(T_film_l) * mu_water(T_film_l) / k_water(T_film_l)
-            push!(variant_eqs, h_tc_left[i]  ~ htc_correlation(Re_l, Pr_l, T[i], T_left_w) * k_water(T_film_l) / Dh)
+            push!(variant_eqs, h_tc_left[i]  ~ htc_correlation(Re_l, Pr_l, vars.T[i], T_left_w) * k_water(T_film_l) / Dh)
 
             T_right_w  = thermal_right[i].T
-            T_film_r   = (T[i] + T_right_w) / 2
+            T_film_r   = (vars.T[i] + T_right_w) / 2
             Re_r       = abs(port_in.mdot) * Dh / (A * mu_water(T_film_r))
             Pr_r       = cp_water(T_film_r) * mu_water(T_film_r) / k_water(T_film_r)
-            push!(variant_eqs, h_tc_right[i] ~ htc_correlation(Re_r, Pr_r, T[i], T_right_w) * k_water(T_film_r) / Dh)
+            push!(variant_eqs, h_tc_right[i] ~ htc_correlation(Re_r, Pr_r, vars.T[i], T_right_w) * k_water(T_film_r) / Dh)
 
         end
     else
         for i in 1:n
-            # Phase 56-resume: SCB branch keeps single-h_tc semantics. SCB tests
-            # pin both walls to the same T (symmetric); asymmetric SCB is out of
-            # v1.1 scope. h_tc_left[i] / h_tc_right[i] alias h_tc[i] here so the
-            # variable structure stays uniform across the SCB / non-SCB paths.
-            T_w_i    = thermal_left[i].T
-            T_film_i = (T[i] + T_w_i) / 2
-            Re_i     = abs(port_in.mdot) * Dh / (A * mu_water(T_film_i))
-            Pr_i     = cp_water(T_film_i) * mu_water(T_film_i) / k_water(T_film_i)
-            h_spl_i  = htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T_film_i) / Dh
+            T_w_left_i   = thermal_left[i].T
+            T_w_right_i  = thermal_right[i].T
+            T_film_left_i  = (vars.T[i] + T_w_left_i) / 2
+            T_film_right_i = (vars.T[i] + T_w_right_i) / 2
 
-            # Inline P[i] (NOT the P[i] symbol) — Pitfall 7 (avoid observed-to-observed chain)
-            P_i = port_in.P - sum(dp[j] for j in 1:i) -
-                  (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+            Re_left_i     = abs(port_in.mdot) * Dh / (A * mu_water(T_film_left_i))
+            Pr_left_i     = cp_water(T_film_left_i) * mu_water(T_film_left_i) / k_water(T_film_left_i)
+            h_spl_left_i  = htc_correlation(Re_left_i, Pr_left_i, vars.T[i], T_w_left_i) * k_water(T_film_left_i) / Dh
+            Re_right_i    = abs(port_in.mdot) * Dh / (A * mu_water(T_film_right_i))
+            Pr_right_i    = cp_water(T_film_right_i) * mu_water(T_film_right_i) / k_water(T_film_right_i)
+            h_spl_right_i = htc_correlation(Re_right_i, Pr_right_i, vars.T[i], T_w_right_i) * k_water(T_film_right_i) / Dh
+
+            q_spl_left_i = max(h_spl_left_i * (T_w_left_i - vars.T[i]), 0.0)
+            q_spl_right_i = max(h_spl_right_i * (T_w_right_i - vars.T[i]), 0.0)
+
+            # Inline P[i] (NOT the P[i] symbol to avoid an observed-to-observed chain)
+            P_i = port_in.P - sum(vars.dp[j] for j in 1:i) + vars.dp[i]/2
             T_sat_i = sat_temperature(P_i)
-            # max(q_spl, 0) guards _bergles_rohsenow_dT_ONB against DomainError
-            # (SCB-01 / v0.7 retrospective).
-            q_spl_i = max(h_spl_i * (T_w_i - T[i]), 0.0)
+            Re_i_bulk = abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i]))
+            q_scb_left_i  = scb_correction(T_w_left_i, T_sat_i, Re_i_bulk)
+            q_scb_right_i = scb_correction(T_w_right_i, T_sat_i, Re_i_bulk)
+            T_ONB_left_i  = T_sat_i + _bergles_rohsenow_dT_ONB(P_i, q_spl_left_i)
+            T_ONB_right_i = T_sat_i + _bergles_rohsenow_dT_ONB(P_i, q_spl_right_i)
+            q_scb_inc_left_i  = scb_correction(T_ONB_left_i, T_sat_i, Re_i_bulk)
+            q_scb_inc_right_i = scb_correction(T_ONB_right_i, T_sat_i, Re_i_bulk)
+            factor_left_i     = partial_SCB_correction(q_spl_left_i, q_scb_left_i, q_scb_inc_left_i)
+            factor_right_i    = partial_SCB_correction(q_spl_right_i, q_scb_right_i, q_scb_inc_right_i)
 
-            # D-03 invariant: scb_correction's Re argument stays at bulk T
-            # (separate from the film-T Re_i feeding htc_correlation above).
-            # Pre-Phase-57 this was bulk; the SCB closure uses Re only as a
-            # regime/laminar gate, which is a bulk-flow phenomenon.
-            Re_i_bulk = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
-            q_scb_i     = scb_correction(T_w_i, T_sat_i, Re_i_bulk)
-            T_ONB_i     = T_sat_i + _bergles_rohsenow_dT_ONB(P_i, q_spl_i)
-            q_scb_inc_i = scb_correction(T_ONB_i, T_sat_i, Re_i_bulk)
-            factor_i    = partial_SCB_correction(q_spl_i, q_scb_i, q_scb_inc_i)
-
-            push!(variant_eqs, h_tc[i] ~ ifelse(T_w_i >= T_ONB_i, h_spl_i * factor_i, h_spl_i))
-            push!(variant_eqs, h_tc_left[i]  ~ h_tc[i])
-            push!(variant_eqs, h_tc_right[i] ~ h_tc[i])
+            push!(variant_eqs, h_tc_left[i]  ~ ifelse(T_w_left_i >= T_ONB_left_i, h_spl_left_i * factor_left_i, h_spl_left_i))
+            push!(variant_eqs, h_tc_right[i] ~ ifelse(T_w_right_i >= T_ONB_right_i, h_spl_right_i * factor_right_i, h_spl_right_i))
         end
     end
 
     q_left_expr  = Vector{Num}(undef, n)
     q_right_expr = Vector{Num}(undef, n)
     for i in 1:n
-        q_left_expr[i]  = h_tc_left[i]  * geometry.heated_parts[1] * dz * (thermal_left[i].T  - T[i])
-        q_right_expr[i] = h_tc_right[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - T[i])
+        q_left_expr[i]  = h_tc_left[i]  * geometry.heated_parts[1] * dz * (thermal_left[i].T  - vars.T[i])
+        q_right_expr[i] = h_tc_right[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T - vars.T[i])
         push!(variant_eqs, thermal_left[i].Q_flow  ~ q_left_expr[i])
         push!(variant_eqs, thermal_right[i].Q_flow ~ q_right_expr[i])
     end
 
     core = _channel_core(;
-        n, T, dp, port_in, port_out, geometry,
-        g_acc=g, friction_correlation,
-        q_left_expr, q_right_expr,
-        Re, Pe, v, P, T_sat, T_ONB,
-        q_wall, q_wall_left, q_wall_right,
-        T_out, dP,
+        n=n, 
+        port_in=port_in, 
+        port_out=port_out, 
+        geometry=geometry,
+        g_acc=g, friction_correlation=friction_correlation,
+        q_left_expr=q_left_expr, q_right_expr=q_right_expr,
+        vars=vars,
     )
 
     variant_obs = Equation[]
     for i in 1:n
-        T_w_obs_i    = thermal_left[i].T
-        T_film_obs_i = (T[i] + T_w_obs_i) / 2
-        Re_i_film    = abs(port_in.mdot) * Dh / (A * mu_water(T_film_obs_i))
-        Pr_i_film    = cp_water(T_film_obs_i) * mu_water(T_film_obs_i) / k_water(T_film_obs_i)
-        push!(variant_obs, Nu[i] ~ htc_correlation(Re_i_film, Pr_i_film, T[i], T_w_obs_i))
-        push!(variant_obs, T_wall_left[i]  ~ thermal_left[i].T)
-        push!(variant_obs, T_wall_right[i] ~ thermal_right[i].T)
-        push!(variant_obs, velocity[i] ~ abs(port_in.mdot) / (rho_water(T[i]) * A))
-        Re_i_bulk = abs(port_in.mdot) * Dh / (A * mu_water(T[i]))
-        nu_i = mu_water(T[i]) / rho_water(T[i])
-        Gr_i = Gr(beta_water(T[i]), g_acc, thermal_left[i].T - T[i], Dh, nu_i)
-        push!(variant_obs, Gr_over_Re2[i] ~ Gr_i / Re_i_bulk^2)
+        T_w_obs_left_i    = thermal_left[i].T
+        T_film_obs_left_i = (vars.T[i] + T_w_obs_left_i) / 2
+        Re_film_left_i    = abs(port_in.mdot) * Dh / (A * mu_water(T_film_obs_left_i))
+        Pr_film_left_i    = cp_water(T_film_obs_left_i) * mu_water(T_film_obs_left_i) / k_water(T_film_obs_left_i)
+        push!(variant_obs, Nu_left[i] ~ htc_correlation(Re_film_left_i, Pr_film_left_i, vars.T[i], T_w_obs_left_i))
+
+        T_w_obs_right_i    = thermal_right[i].T
+        T_film_obs_right_i = (vars.T[i] + T_w_obs_right_i) / 2
+        Re_film_right_i    = abs(port_in.mdot) * Dh / (A * mu_water(T_film_obs_right_i))
+        Pr_film_right_i    = cp_water(T_film_obs_right_i) * mu_water(T_film_obs_right_i) / k_water(T_film_obs_right_i)
+        push!(variant_obs, Nu_right[i] ~ htc_correlation(Re_film_right_i, Pr_film_right_i, vars.T[i], T_w_obs_right_i))
+
+        push!(variant_obs, vars.T_wall_left[i]  ~ thermal_left[i].T)
+        push!(variant_obs, vars.T_wall_right[i] ~ thermal_right[i].T)
+        push!(variant_obs, velocity[i] ~ abs(vars.v[i]))
+        Re_i_bulk = abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i]))
+        Gr_left_i  = Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_left[i].T , vars.T[i], Dh, g)
+        Gr_right_i = Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_right[i].T, vars.T[i], Dh, g)
+        push!(variant_obs, Gr_over_Re2_left[i] ~ Gr_left_i / Re_i_bulk^2)
+        push!(variant_obs, Gr_over_Re2_right[i] ~ Gr_right_i / Re_i_bulk^2)
     end
     push!(variant_obs, Q_wall_total ~ sum(q_left_expr[i] + q_right_expr[i] for i in 1:n))
 
-    eqs = [variant_eqs; core.eqs]
-    obs = [core.obs; variant_obs]
+    eqs = [core.eqs...; variant_eqs...]
+    obs = [core.obs...; variant_obs...]
 
     all_vars = [
-        collect(T); collect(dp); collect(h_tc);
-        collect(Re); collect(Pe); collect(v);
-        collect(P); collect(T_sat); collect(T_ONB);
-        collect(q_wall); collect(q_wall_left); collect(q_wall_right);
-        collect(Nu); collect(h_tc_left); collect(h_tc_right);
-        collect(T_wall_left); collect(T_wall_right);
-        collect(Gr_over_Re2); collect(velocity);
-        T_out; dP; Q_wall_total
+        _vcollect(vars)...;
+        [collect(v) for v in exvars]...
     ]
 
     compose(
