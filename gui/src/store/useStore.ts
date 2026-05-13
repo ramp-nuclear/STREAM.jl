@@ -266,6 +266,19 @@ interface AppState {
   clearBCMode: (componentId: string, externalInputName: string) => void;
   setBCSymmetric: (nodeId: string, baseField: string, symmetric: boolean) => void;
   cycleBCEdgeTargetSide: (edgeId: string) => void;
+  /** Phase 63.1 D-07 / D-08: hoist "Promote to shared source" from the
+   *  BCsTabForm UI into the store. Spawns the corresponding value-source
+   *  node (WallTemperature / HeatFluxSource) at (consumer.x - 160,
+   *  consumer.y - 40) per RESEARCH §A6, seeds `n` from the consumer so the
+   *  brand-new pair is not flagged by the n-mismatch selector, then calls
+   *  setBCMode with mode="source" + sourceNodeId — which materializes the
+   *  dashed BC edge via the existing setBCMode edge-add branch. No-op when
+   *  the consumer node is missing OR the registry's external_inputs entry
+   *  has no `source_component`. */
+  promoteToSharedSource: (
+    consumerNodeId: string,
+    externalInputName: string,
+  ) => void;
   /** Internal: invoked by onEdgesChange when a `type === "bcEdge"` edge is
    *  removed. Reverts the matching bcMode entry to undefined (required-unset).
    *  Phase 63.1 D-15: tag-clearing logic removed (selectNodeErrors auto-clears
@@ -1225,6 +1238,60 @@ const useStore = create<AppState>()((set, get) => ({
       bcMode: nextBCMode,
       edges: nextEdges,
       isDirty: true,
+    });
+  },
+
+  // Phase 63.1 D-07 / D-08: promote inline external-input binding to a shared
+  // canvas value-source node. Hoisted verbatim from BCsTabForm.handleNewSource
+  // (Plan 63-C) so the operation is a single store action. Snapshot discipline
+  // follows Pattern A — the action itself does not push a snapshot at the top:
+  // both `addNode` and `setBCMode` push their own. That yields two undo steps
+  // for one Promote click, which behaves correctly (Ctrl+Z first reverts the
+  // BC-mode dispatch, a second Ctrl+Z reverts the spawn + n-seed). Plan notes
+  // a future refactor may suppress the inner snapshots — out of scope here.
+  promoteToSharedSource: (consumerNodeId, externalInputName) => {
+    const state = get();
+    const consumer = state.nodes.find((n) => n.id === consumerNodeId);
+    if (!consumer) return;
+    const consumerData = consumer.data as unknown as StreamNodeData;
+    const consumerComp = getComponent(consumerData.componentId);
+    const sourceCompId = consumerComp?.external_inputs?.find(
+      (e) => e.name === externalInputName,
+    )?.source_component;
+    if (!sourceCompId) return;
+
+    // Spawn the value-source node. addNode currently returns void (RESEARCH
+    // A2); identify the freshly-added node by diffing pre/post id sets — the
+    // proven shape from the hoisted BCsTabForm.handleNewSource. RESEARCH §A6
+    // pins the spawn offset to (-160, -40) so the new node clears the
+    // consumer's bounding box without colliding with the legacy `+ New`
+    // button's `-120, 0` slot (now removed in Task 2).
+    const beforeIds = new Set(state.nodes.map((n) => n.id));
+    get().addNode(sourceCompId, {
+      x: consumer.position.x - 160,
+      y: consumer.position.y - 40,
+    });
+    const afterNodes = get().nodes;
+    const newNode = afterNodes.find((n) => !beforeIds.has(n.id));
+    if (!newNode) return;
+
+    // Seed n on the new source-block from the consumer FIRST so the subsequent
+    // setBCMode (which materializes the BC edge) does NOT flag the brand-new
+    // pair as mismatched (D-20 explicit; selectNodeErrors derives the
+    // bc-n-mismatch tag from `nodes + bcMode`).
+    const consumerN =
+      (consumerData.parameters?.n as number | undefined) ?? 1;
+    get().updateNodeParams(newNode.id, {
+      parameters: { n: consumerN },
+    });
+
+    // setBCMode internally materializes the dashed BC edge via its
+    // edge-materialization branch (useStore.ts §setBCMode L1144-1186). It
+    // also honors the symmetric-mirror discipline — if `bcSymmetric` is ON,
+    // the sibling external input gets the same source-mode entry + edge.
+    get().setBCMode(consumerNodeId, externalInputName, {
+      mode: "source",
+      sourceNodeId: newNode.id,
     });
   },
 
