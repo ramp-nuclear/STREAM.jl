@@ -80,9 +80,12 @@ describe("SidebarPanel — BCs tab strip (Phase 63)", () => {
     expect(screen.getByRole("tab", { name: /BCs/i })).toBeTruthy();
   });
 
-  it("does NOT render the tab strip when selected component has no external_inputs (D-02)", () => {
-    // Pump has no external_inputs in v1.1 registry.
-    useStore.getState().addNode("Pump", { x: 0, y: 0 });
+  it("does NOT render the tab strip when selected component has neither FlowPort nor external_inputs (Phase 63.1 D-04 — broadened gate)", () => {
+    // Phase 63.1 Plan 06 broadened hasBCs from `external_inputs.length > 0`
+    // to `hasFlowPort || hasExternalInputs`. To still cover the negative
+    // case we need a component that has NEITHER. WallTemperature is a
+    // value-source: only a BCPort, no FlowPort, no external_inputs.
+    useStore.getState().addNode("WallTemperature", { x: 0, y: 0 });
     const nodeId = useStore.getState().nodes[0].id;
     useStore.getState().selectNode(nodeId);
     renderPanel();
