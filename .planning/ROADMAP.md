@@ -108,10 +108,10 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.10, Section 3.11.
 **Depends on:** Phase 62.
-**Plans:** 4 plans
+**Plans:** 2/4 plans executed
 
-- [ ] 63-A-PLAN.md (Wave 1) — Julia `rebin_intensive` (1D + 2D) + `cosine_T_wall_profile` thin alias in `src/utilities.jl`; tests in `test/test_utilities.jl`; exports in `STREAM.jl`.
-- [ ] 63-B-PLAN.md (Wave 1, parallel to 63-A) — Zustand `bcMode` slice + `bcSymmetric` + `errorNodeIds`; `gui/src/lib/bcMode.ts` shared types + `isAllowedBCConnection`; `codeGenerator.ts` 5-mode emit + symmetric expansion; vitest coverage.
+- [x] 63-A-PLAN.md (Wave 1) — Julia `rebin_intensive` (1D + 2D) + `cosine_T_wall_profile` thin alias in `src/utilities.jl`; tests in `test/test_utilities.jl`; exports in `STREAM.jl`.
+- [x] 63-B-PLAN.md (Wave 1, parallel to 63-A) — Zustand `bcMode` slice + `bcSymmetric` + `errorNodeIds`; `gui/src/lib/bcMode.ts` shared types + `isAllowedBCConnection`; `codeGenerator.ts` 5-mode emit + symmetric expansion; vitest coverage.
 - [ ] 63-C-PLAN.md (Wave 2, depends on 63-B) — BCs tab UI: `SidebarPanel.tsx` Tabs wrapper, new `BCsTabForm.tsx` + `BCModePicker.tsx` + extracted `SegmentedButtonGroup.tsx` primitive; `+ New <SourceKind>` inline-button flow.
 - [ ] 63-D-PLAN.md (Wave 2, parallel to 63-C, depends on 63-B) — Canvas BC edge: `BCEdge.tsx` dashed + click-to-cycle chip; `StreamNode.tsx` BCPort hollow-square handle + source-label + drop overlay + red-ring; `CanvasPanel.tsx` edgeTypes + isValidConnection BCPort allow-list; `ToolboxPanel.tsx` Sources populated.
 
@@ -229,7 +229,7 @@ contract document drafted in parallel throughout.
 | 60. `fuel_assembly` composition helper               | 2/2 | Complete    | 2026-05-11 |
 | 61. Registry audit + rewrite for v1.1                | 5/5 | Complete   | 2026-05-12 |
 | 62. Resources panel architecture                     | 10/11 | In Progress|  |
-| 63. BCs tab + value-source components in GUI         | 0/4 | Planned | — |
+| 63. BCs tab + value-source components in GUI         | 2/4 | In Progress|  |
 | 64. Connection routing                               | 0/TBD | Planned | — |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |
