@@ -45,6 +45,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MoveUpRight } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import NumericField from "./NumericField";
 import SegmentedButtonGroup from "./SegmentedButtonGroup";
 import { getComponent } from "@/registry";
@@ -427,18 +434,26 @@ function FieldRow({
           )}
         </div>
         {showPromote && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-shrink-0"
-            onClick={() =>
-              useStore
-                .getState()
-                .promoteToSharedSource(nodeId, externalInput.name)
-            }
-          >
-            ↗ Promote to shared source
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Promote to shared source"
+                  className="flex-shrink-0"
+                  onClick={() =>
+                    useStore
+                      .getState()
+                      .promoteToSharedSource(nodeId, externalInput.name)
+                  }
+                >
+                  <MoveUpRight className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Promote to shared source</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
       <ModeEditorBody
