@@ -2,13 +2,13 @@ import { useMemo } from "react";
 import { ScrollArea } from "./ui/scroll-area";
 import useStore from "../store/useStore";
 import { getComponent } from "../registry";
-import { generateCode, type BCEntry } from "../lib/codeGenerator";
+import { generateCode } from "../lib/codeGenerator";
 
 export default function CodePreview() {
   const nodes = useStore((s) => s.nodes);
   const edges = useStore((s) => s.edges);
-  // Phase 63.1 D-02: subscribe to anchors; synthesize BCEntry[] adapter
-  // until Plan 04 retires the legacy generateCode signature.
+  // Phase 63.1 Plan 04: anchors slice is passed directly to generateCode as
+  // `{ anchors }` (Record-shape signature; no BCEntry[] adapter).
   const anchors = useStore((s) => s.anchors);
   const resources = useStore((s) => s.resources);
   // Phase 63: BC slices feed into the per-mode codegen emission.
@@ -16,19 +16,11 @@ export default function CodePreview() {
   const bcSymmetric = useStore((s) => s.bcSymmetric);
 
   const code = useMemo(
-    () => {
-      const bcsAdapter: BCEntry[] = Object.entries(anchors).map(
-        ([nodeId, entry]) => ({
-          nodeId,
-          portField: entry.portField,
-          value: entry.value,
-        }),
-      );
-      return generateCode(nodes, edges, bcsAdapter, getComponent, resources, {
+    () =>
+      generateCode(nodes, edges, { anchors }, getComponent, resources, {
         bcMode,
         bcSymmetric,
-      });
-    },
+      }),
     [nodes, edges, anchors, resources, bcMode, bcSymmetric],
   );
 

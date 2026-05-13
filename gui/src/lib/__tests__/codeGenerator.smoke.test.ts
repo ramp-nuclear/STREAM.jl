@@ -33,25 +33,11 @@ import { tmpdir } from "node:os";
 import { deserializeProject, SENTINEL_UNSET_POWER_SHAPE } from "../projectIO";
 import { generateCode } from "../codeGenerator";
 import type {
-  BCEntry,
   CodegenResources,
   CodegenGeometryResource,
   CodegenPowerShapeResource,
 } from "../codeGenerator";
 import { getComponent } from "../../registry";
-
-// Phase 63.1 D-02 adapter: the .scp v2.0+63.1 schema stores per-node anchors
-// as a Record; the legacy generateCode signature still wants BCEntry[]
-// (Plan 04 retires it). Convert at the call site here.
-function anchorsAsBcs(
-  anchors: Record<string, { portField: "port_in.P" | "port_out.P"; value: number }>,
-): BCEntry[] {
-  return Object.entries(anchors).map(([nodeId, entry]) => ({
-    nodeId,
-    portField: entry.portField,
-    value: entry.value,
-  }));
-}
 
 // `gui/src/lib/__tests__/codeGenerator.smoke.test.ts` -> repo root is three
 // `..` (lib -> src -> gui) plus one more to escape `gui` itself.
@@ -127,7 +113,7 @@ describe("Phase 62 INV-CG-05: simple_loop.scp end-to-end smoke", () => {
     const code = generateCode(
       project.components,
       project.connections,
-      anchorsAsBcs(project.anchors),
+      { anchors: project.anchors },
       getComponent,
       resources,
     );
@@ -167,7 +153,7 @@ describe("Phase 62 INV-CG-05: simple_loop.scp end-to-end smoke", () => {
       const code = generateCode(
         project.components,
         project.connections,
-        anchorsAsBcs(project.anchors),
+        { anchors: project.anchors },
         getComponent,
         resources,
       );
