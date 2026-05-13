@@ -17,10 +17,7 @@ import { cn } from "@/lib/utils";
 
 export interface ResponsiveTab {
   value: string;
-  /** Accessible name. Used as the tooltip text and the dropdown-menu label. */
   label: string;
-  /** Optional icon. When provided, the strip shows an icon-only trigger with
-   *  `label` as the accessible name + tooltip, VS Code Activity Bar style. */
   icon?: LucideIcon;
 }
 
@@ -28,29 +25,85 @@ interface ResponsiveTabsListProps {
   tabs: ResponsiveTab[];
   value: string;
   onValueChange: (value: string) => void;
-  /** Pixel width to reserve for the overflow "..." button. */
+  /** Pixel width to reserve for the overflow "..." button (text mode only). */
   overflowButtonWidth?: number;
 }
 
 /**
  * VS Code-style responsive tabs strip.
  *
- * Each tab renders as either:
- *   - Text (when `icon` is not provided)
- *   - Icon-only with tooltip + sr-only label (when `icon` is provided)
+ * Two render paths:
  *
- * Tabs that don't fit fall into a "..." dropdown at the right edge. The
- * dropdown only renders when at least one tab actually overflows. The active
- * tab is pinned visible — if it would have overflowed, it's swapped in for
- * the last fitting tab.
+ *   - **Icon-only mode** (every tab has an `icon`): custom `<button role="tab">`
+ *     elements with state driven by the parent `<Tabs value>` prop. Bypasses
+ *     shadcn TabsTrigger entirely so we own the color cascade — no fight with
+ *     `data-[state=active]:text-foreground` and friends. Three 32×32 icons
+ *     always fit the 120px minimum panel width, so no overflow needed.
  *
- * Implementation: tab widths are measured from a separate off-screen layer
- * that always contains all tabs at natural width, so visibility state in the
- * visible row cannot poison subsequent measurements. Falls back to rendering
- * every tab when ResizeObserver is unavailable or the container width is 0
- * (the test/jsdom path), keeping `getByRole("tab", { name: ... })` green.
+ *   - **Text mode** (any tab without an `icon`): falls through to the original
+ *     TabsList + TabsTrigger path with ResizeObserver-based overflow into a
+ *     "..." DropdownMenu. Kept for legacy text-tab callers.
+ *
+ * In icon mode the wrapping `<Tabs>` in the parent still tracks `value`, and
+ * `<TabsContent value="...">` still switches based on it — only the trigger
+ * row is custom. `role="tab"` + `aria-selected` + `aria-label` keep
+ * accessible-name lookups (`getByRole("tab", { name: ... })`) passing.
  */
-export function ResponsiveTabsList({
+export function ResponsiveTabsList(props: ResponsiveTabsListProps) {
+  const { tabs } = props;
+  const iconOnly = tabs.length > 0 && tabs.every((t) => t.icon != null);
+  if (iconOnly) return <IconTabsList {...props} />;
+  return <TextTabsList {...props} />;
+}
+
+// =========================================================================
+// Icon-only mode — custom buttons, no shadcn TabsTrigger
+// =========================================================================
+
+function IconTabsList({
+  tabs,
+  value,
+  onValueChange,
+}: ResponsiveTabsListProps) {
+  return (
+    <div className="flex items-center gap-1 px-1 h-[40px]" role="tablist">
+      {tabs.map((tab) => {
+        const Icon = tab.icon!;
+        const isActive = tab.value === value;
+        return (
+          <Tooltip key={tab.value}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-label={tab.label}
+                onClick={() => onValueChange(tab.value)}
+                className={cn(
+                  "flex items-center justify-center size-[32px] rounded-md transition-colors cursor-pointer",
+                  "hover:bg-accent",
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="size-5" aria-hidden="true" />
+                <span className="sr-only">{tab.label}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{tab.label}</TooltipContent>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+}
+
+// =========================================================================
+// Text mode — shadcn TabsList with overflow detection (legacy path)
+// =========================================================================
+
+function TextTabsList({
   tabs,
   value,
   onValueChange,
@@ -69,9 +122,7 @@ export function ResponsiveTabsList({
       return;
     }
     const widths = measureRefs.current.map((r) => (r ? r.offsetWidth : 0));
-    if (widths.length !== tabs.length || widths.some((w) => w === 0)) {
-      return;
-    }
+    if (widths.length !== tabs.length || widths.some((w) => w === 0)) return;
     const totalWidth = widths.reduce((sum, w) => sum + w, 0);
     if (totalWidth <= containerWidth) {
       setVisibleCount(tabs.length);
@@ -112,60 +163,14 @@ export function ResponsiveTabsList({
     visibleIndices.delete(visibleCount - 1);
     visibleIndices.add(activeIndex);
   }
-
   const hiddenTabs = tabs.filter((_, i) => !visibleIndices.has(i));
-
-  // Trigger style. Icon tabs render as 28×28 squares with hover outline; text
-  // tabs render with horizontal padding. Both keep variant="line"'s
-  // bottom-border active indicator from the TabsList parent.
-  function triggerContent(tab: ResponsiveTab) {
-    if (tab.icon) {
-      const Icon = tab.icon;
-      return (
-        <>
-          <Icon className="size-5" aria-hidden="true" />
-          <span className="sr-only">{tab.label}</span>
-        </>
-      );
-    }
-    return tab.label;
-  }
-
-  function triggerClassFor(tab: ResponsiveTab) {
-    if (tab.icon) {
-      // Icon-only trigger: square, no border at any state. Active/hover are
-      // communicated by icon color + a subtle background tint. The
-      // variant=line `after` bottom-bar indicator is force-suppressed.
-      return cn(
-        "flex-none size-[32px] p-0 rounded-md border-0",
-        // Color cascade designed to win against the shadcn TabsTrigger base
-        // unambiguously by using a different color *token* (not just an
-        // opacity step) for the active state:
-        //   default: text-muted-foreground   (gray, clearly dim)
-        //   hover:   text-foreground         (brightens — same as the active end-state would feel like)
-        //   active:  text-primary            (theme accent color — unmistakable)
-        //   active+hover: text-primary + bg-accent
-        // All marked !-important so they beat the base data-[state=active]:
-        // text-foreground rule.
-        "!text-muted-foreground dark:!text-muted-foreground",
-        "hover:!text-foreground dark:hover:!text-foreground",
-        "data-[state=active]:!text-primary dark:data-[state=active]:!text-primary",
-        "!bg-transparent",
-        "hover:!bg-accent",
-        "data-[state=active]:!bg-transparent dark:data-[state=active]:!bg-transparent",
-        "data-[state=active]:hover:!bg-accent",
-        "data-[state=active]:after:!opacity-0",
-      );
-    }
-    return "px-[10px] text-[12px] flex-none data-[state=active]:border-primary";
-  }
+  const triggerClass = "px-[10px] text-[12px] flex-none data-[state=active]:border-primary";
 
   return (
     <div
       ref={containerRef}
-      className="relative flex items-center w-full h-[40px] overflow-hidden"
+      className="relative flex items-center w-full h-[28px] border-b overflow-hidden"
     >
-      {/* Off-screen measurement layer — all tabs at natural width, never hidden. */}
       <div
         aria-hidden="true"
         className="absolute top-0 left-0 -translate-y-[200%] flex items-center pointer-events-none"
@@ -180,10 +185,10 @@ export function ResponsiveTabsList({
             tabIndex={-1}
             className={cn(
               "inline-flex items-center justify-center whitespace-nowrap font-medium",
-              triggerClassFor(tab),
+              triggerClass,
             )}
           >
-            {triggerContent(tab)}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -192,25 +197,15 @@ export function ResponsiveTabsList({
         variant="line"
         className="h-full justify-start rounded-none border-0 px-1 min-w-0 gap-2"
       >
-        {tabs.map((tab, i) => {
-          const triggerEl = (
-            <TabsTrigger
-              key={tab.value}
-              value={tab.value}
-              aria-label={tab.icon ? tab.label : undefined}
-              className={cn(triggerClassFor(tab), !visibleIndices.has(i) && "hidden")}
-            >
-              {triggerContent(tab)}
-            </TabsTrigger>
-          );
-          if (!tab.icon) return triggerEl;
-          return (
-            <Tooltip key={tab.value}>
-              <TooltipTrigger asChild>{triggerEl}</TooltipTrigger>
-              <TooltipContent side="bottom">{tab.label}</TooltipContent>
-            </Tooltip>
-          );
-        })}
+        {tabs.map((tab, i) => (
+          <TabsTrigger
+            key={tab.value}
+            value={tab.value}
+            className={cn(triggerClass, !visibleIndices.has(i) && "hidden")}
+          >
+            {tab.label}
+          </TabsTrigger>
+        ))}
       </TabsList>
       {hiddenTabs.length > 0 && (
         <DropdownMenu>
@@ -225,18 +220,14 @@ export function ResponsiveTabsList({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {hiddenTabs.map((t) => {
-              const Icon = t.icon;
-              return (
-                <DropdownMenuItem
-                  key={t.value}
-                  onSelect={() => onValueChange(t.value)}
-                >
-                  {Icon && <Icon className="size-4 mr-2" aria-hidden="true" />}
-                  {t.label}
-                </DropdownMenuItem>
-              );
-            })}
+            {hiddenTabs.map((t) => (
+              <DropdownMenuItem
+                key={t.value}
+                onSelect={() => onValueChange(t.value)}
+              >
+                {t.label}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
