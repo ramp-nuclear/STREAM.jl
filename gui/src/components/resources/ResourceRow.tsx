@@ -348,7 +348,7 @@ export default function ResourceRow({
               Delete {kindLabel(kind)} {resource.name}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {`Delete ${kindLabel(kind)} ${resource.name}? It is used by ${usages.length} component(s).`}
+              {`Delete ${kindLabel(kind)} ${resource.name}? Used by ${usages.length} component(s).`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -286,7 +286,7 @@ export default function ModelOptionsPanel() {
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              Multi-fluid support is planned for a future release.
+              Multiple fluids not yet supported.
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

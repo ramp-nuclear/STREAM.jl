@@ -55,7 +55,7 @@ const DEFAULT_SOLVER = {
 // entry". Contains a U+2014 em-dash; this is user-facing UI copy, NOT a Julia
 // identifier, so the Unicode exception in CLAUDE.md / feedback_ascii_variable_names
 // (Julia identifiers only) does not apply.
-const SENTINEL_POWER_SHAPE_NAME = "(leave unset — fill in code)";
+const SENTINEL_POWER_SHAPE_NAME = "(leave unset — set in code)";
 
 // Julia identifier regex used to validate user-supplied Resource names (per 62
 // UI-SPEC popover validation messages; matches §3.5 instance-name rules).
@@ -1184,7 +1184,7 @@ const useStore = create<AppState>()((set, get) => ({
       try {
         const { message } = await import("@tauri-apps/plugin-dialog");
         await message(
-          "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again.",
+          "Save failed. Check the file is writable and there is disk space.",
           { title: "Save Failed", kind: "error" },
         );
       } catch (dialogErr) {
@@ -1245,7 +1245,7 @@ const useStore = create<AppState>()((set, get) => ({
       console.error("[saveProjectAs] write failed:", err);
       const { message } = await import("@tauri-apps/plugin-dialog");
       await message(
-        "Couldn't save project. Check that the file isn't read-only and there is enough disk space, then try again.",
+        "Save failed. Check the file is writable and there is disk space.",
         { title: "Save Failed", kind: "error" },
       );
     }
@@ -1273,7 +1273,7 @@ const useStore = create<AppState>()((set, get) => ({
       console.error("[loadProject] open failed:", err);
       const { message } = await import("@tauri-apps/plugin-dialog");
       await message(
-        "Couldn't open this project. The file may be missing, corrupted, or not a valid .scp file.",
+        "Open failed. The file may be missing, corrupted, or not a valid .scp file.",
         { title: "Open Failed", kind: "error" },
       );
     }
@@ -1408,9 +1408,9 @@ const useStore = create<AppState>()((set, get) => ({
           const { message } = await import("@tauri-apps/plugin-dialog");
           await message(
             missing.length === 1
-              ? `1 power shape file could not be found: File not found: ${missing[0].pathTried}. Open the Resources tab to relocate it.`
-              : `${missing.length} power shape file(s) could not be found. Open the Resources tab to relocate them.`,
-            { title: "Missing Power Shape file", kind: "warning" },
+              ? `1 power-shape file not found: ${missing[0].pathTried}. Open the Resources tab to relocate.`
+              : `${missing.length} power-shape file(s) not found. Open the Resources tab to relocate.`,
+            { title: "Missing power-shape file", kind: "warning" },
           );
         } catch {
           // Dialog plugin unavailable (e.g., tests) — the inline banner in
@@ -1421,7 +1421,7 @@ const useStore = create<AppState>()((set, get) => ({
       console.error("[loadProjectFromPath] open failed:", err);
       const { message } = await import("@tauri-apps/plugin-dialog");
       await message(
-        "Couldn't open this project. The file may be missing, corrupted, or not a valid .scp file.",
+        "Open failed. The file may be missing, corrupted, or not a valid .scp file.",
         { title: "Open Failed", kind: "error" },
       );
     }
