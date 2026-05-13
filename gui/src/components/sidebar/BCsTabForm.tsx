@@ -21,17 +21,17 @@
 // setBCMode action's first argument is the consumer node id despite the
 // historical name; we follow that contract verbatim.
 //
-// `+ New <SourceKind>` flow (D-20): when the Source-mode dropdown is empty,
-// inline a button that:
-//   1. Spawns a new value-source block via addNode(srcCompId, position) at
-//      consumer.x - 120 (RESEARCH §"Pattern: + New inline").
-//   2. Seeds n on the new block from the consumer Channel's n so the very
-//      first source edge cannot trip _checkBCNMismatch (D-20 explicit).
-//   3. Calls setBCMode with the new source-block id (which the action then
-//      uses to materialize the BC edge AND auto-mirrors to the sibling if
-//      symmetric ON).
-// `addNode` returns void, so the new id is read back from the post-addNode
-// state by diffing nodes (last added is the newest by store-append order).
+// Promote-to-shared-source flow (Phase 63.1 D-07 / D-08, supersedes the
+// legacy "new source" outline button removed in Plan 08): a ghost Button
+// rendered inline next to the Mode Select on every External-Inputs row
+// whose externalInput.source_component is defined AND whose current entry
+// is not already in `source` mode. Click dispatches the new store action
+// `promoteToSharedSource(nodeId, externalInputName)` which spawns the
+// value-source node at (consumer.x - 160, consumer.y - 40) per RESEARCH
+// §A6, seeds the new node's `n` from the consumer Channel, and calls
+// setBCMode (which materializes the dashed BC edge AND auto-mirrors to
+// the sibling if symmetric ON). One click does what previously took
+// "switch dropdown to Source → click + New".
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -375,31 +375,59 @@ function FieldRow({
   // value editor below gets the same width. When `entry === undefined` the
   // trigger shows the placeholder and a destructive hint is rendered below
   // (D-09 carry-over, verbatim from the legacy copy).
+  //
+  // Phase 63.1 D-07 / D-08: the Promote-to-shared-source ghost button
+  // sits inline at the end of the Mode-Select row (same flex container,
+  // `flex-shrink-0` so it does not push the Select narrower; if the row
+  // becomes narrower than ~240px it wraps below). Visibility rules per
+  // UI-SPEC §"Promote-to-Shared-Source Button — Visibility rules":
+  //   1. externalInput.source_component is defined (registry has a paired
+  //      value-source — `WallTemperature` / `HeatFluxSource`).
+  //   2. entry?.mode !== "source" — the input is not already promoted.
+  // When hidden, no placeholder: the dropdown occupies the full row.
+  const showPromote =
+    !!externalInput.source_component && entry?.mode !== "source";
   return (
     <div className="flex flex-col gap-[8px]">
       <Label className="text-[13px] font-semibold leading-[1.4]">
         {displayLabel}
       </Label>
-      <div className="flex flex-col gap-[6px]">
-        <Select
-          value={entry?.mode ?? ""}
-          onValueChange={(m) => onModeChange(m as BCMode)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select BC mode..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="value">Value</SelectItem>
-            <SelectItem value="profile">Profile</SelectItem>
-            <SelectItem value="function">Function</SelectItem>
-            <SelectItem value="mark">Mark</SelectItem>
-            <SelectItem value="source">Source</SelectItem>
-          </SelectContent>
-        </Select>
-        {entry === undefined && (
-          <p className="text-xs text-destructive/80 mt-[6px]">
-            BC required — select a mode
-          </p>
+      <div className="flex items-center gap-[8px]">
+        <div className="flex flex-col gap-[6px] flex-1 min-w-0">
+          <Select
+            value={entry?.mode ?? ""}
+            onValueChange={(m) => onModeChange(m as BCMode)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select BC mode..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="value">Value</SelectItem>
+              <SelectItem value="profile">Profile</SelectItem>
+              <SelectItem value="function">Function</SelectItem>
+              <SelectItem value="mark">Mark</SelectItem>
+              <SelectItem value="source">Source</SelectItem>
+            </SelectContent>
+          </Select>
+          {entry === undefined && (
+            <p className="text-xs text-destructive/80 mt-[6px]">
+              BC required — select a mode
+            </p>
+          )}
+        </div>
+        {showPromote && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex-shrink-0"
+            onClick={() =>
+              useStore
+                .getState()
+                .promoteToSharedSource(nodeId, externalInput.name)
+            }
+          >
+            ↗ Promote to shared source
+          </Button>
         )}
       </div>
       <ModeEditorBody
@@ -643,7 +671,8 @@ function FunctionModeEditor({
 }
 
 // ---------------------------------------------------------------------------
-// Source mode editor + + New <SourceKind> flow
+// Source mode editor — picks an existing canvas source node. Spawn-a-new-one
+// path now lives in `promoteToSharedSource` (FieldRow ghost button), not here.
 // ---------------------------------------------------------------------------
 
 type SourceEntry = Extract<BCModeEntry, { mode: "source" }>;
@@ -663,52 +692,24 @@ function SourceModeEditor({
   onUpdate: (e: BCModeEntry) => void;
   nodes: ReturnType<typeof useStore.getState>["nodes"];
 }) {
+  // Phase 63.1 D-07 / D-08: the legacy "new source" outline button that
+  // lived here has been removed. The Promote-to-shared-source ghost
+  // button (rendered next to the Mode Select in FieldRow) supersedes it:
+  // the user no longer has to first switch the dropdown to `Source` and
+  // then click the legacy spawn button; one Promote click does both. Reaching the empty
+  // source-mode state via mode-dropdown is now the rare path. When it
+  // happens (e.g. the user selects `Source` then deletes the canvas
+  // source node), the source-list `Select` simply renders empty — the
+  // user can either pick a different mode from the dropdown or click
+  // Promote (which is visible again as soon as entry.mode !== "source").
   const sourceCompId = externalInput.source_component;
   const matching = nodes.filter(
     (n) =>
       (n.data as unknown as StreamNodeData | undefined)?.componentId ===
       sourceCompId,
   );
-
-  function handleNewSource() {
-    // Read fresh state — avoid stale closure on `nodes` prop.
-    const state = useStore.getState();
-    const consumerNode = state.nodes.find((n) => n.id === nodeId);
-    if (!consumerNode) return;
-    const consumerN =
-      ((consumerNode.data as unknown as StreamNodeData).parameters?.n as
-        | number
-        | undefined) ?? 1;
-
-    const beforeIds = new Set(state.nodes.map((n) => n.id));
-    state.addNode(sourceCompId, {
-      x: consumerNode.position.x - 120,
-      y: consumerNode.position.y,
-    });
-    // Identify the freshly-added node by diffing pre/post id sets.
-    const afterNodes = useStore.getState().nodes;
-    const newNode = afterNodes.find((n) => !beforeIds.has(n.id));
-    if (!newNode) return;
-
-    // Seed n on the new source-block from the consumer FIRST so the subsequent
-    // setBCMode (which materializes the BC edge AND fires _checkBCNMismatch)
-    // does NOT flag the brand-new pair as mismatched (D-20 explicit).
-    useStore.getState().updateNodeParams(newNode.id, {
-      parameters: { n: consumerN },
-    });
-    useStore.getState().setBCMode(nodeId, fieldName, {
-      mode: "source",
-      sourceNodeId: newNode.id,
-    });
-  }
-
-  if (matching.length === 0) {
-    return (
-      <Button variant="outline" size="sm" onClick={handleNewSource}>
-        + New {sourceCompId}
-      </Button>
-    );
-  }
+  void nodeId;
+  void fieldName;
 
   return (
     <Select
