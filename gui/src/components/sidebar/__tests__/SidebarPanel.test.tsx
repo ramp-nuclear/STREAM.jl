@@ -105,8 +105,11 @@ describe("SidebarPanel — BCs tab strip (Phase 63)", () => {
     const bcsTrigger = screen.getByRole("tab", { name: /BCs/i });
     fireEvent.mouseDown(bcsTrigger);
     fireEvent.click(bcsTrigger);
-    // BCs panel content visible — assert a BCsTabForm artefact ("Symmetric (L = R)").
-    expect(screen.getByText("Symmetric (L = R)")).toBeTruthy();
+    // BCs panel content visible — assert a BCsTabForm artefact. Phase 63.1
+    // D-12 replaced the legacy "Symmetric (L = R)" label with a labeled
+    // SegmentedButtonGroup whose left pill is rendered as a button named
+    // "Symmetric" (verbatim copy lock-in per UI-SPEC §"Copy lock-in").
+    expect(screen.getByRole("button", { name: "Symmetric" })).toBeTruthy();
 
     // Change selection — outer `<div key={selectedNodeId}>` remounts the
     // subtree, resetting local tab state.
@@ -149,6 +152,8 @@ describe("SidebarPanel — BCs tab strip (Phase 63)", () => {
     const bcsTrigger = screen.getByRole("tab", { name: /BCs/i });
     fireEvent.mouseDown(bcsTrigger);
     fireEvent.click(bcsTrigger);
-    expect(screen.getByText("Symmetric (L = R)")).toBeTruthy();
+    // Phase 63.1 D-12: SegmentedButtonGroup with explicit "Symmetric" label
+    // replaces the legacy "Symmetric (L = R)" custom switch.
+    expect(screen.getByRole("button", { name: "Symmetric" })).toBeTruthy();
   });
 });

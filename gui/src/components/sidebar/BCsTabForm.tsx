@@ -274,12 +274,24 @@ function GroupBlock({
       </h3>
 
       {isPaired && (
-        <SymmetricToggle
-          checked={isSymmetric}
-          onCheckedChange={(v) =>
-            setBCSymmetric(nodeId, group.baseField, v)
-          }
-        />
+        // Phase 63.1 D-12: labeled SegmentedButtonGroup replaces the legacy
+        // "Symmetric (L = R)" custom switch. The boolean store value is
+        // preserved at the boundary — `"sym" → true`, `"asym" → false`.
+        // Copy lock-in (UI-SPEC §"Copy lock-in"): the full words
+        // "Symmetric" / "Asymmetric" are load-bearing; never shorten.
+        <div className="mb-[8px]">
+          <SegmentedButtonGroup
+            options={[
+              { value: "sym", label: "Symmetric" },
+              { value: "asym", label: "Asymmetric" },
+            ]}
+            active={isSymmetric ? "sym" : "asym"}
+            onChange={(v) =>
+              setBCSymmetric(nodeId, group.baseField, v === "sym")
+            }
+            size="sm"
+          />
+        </div>
       )}
 
       {!isPaired || isSymmetric ? (
@@ -328,44 +340,6 @@ function GroupBlock({
         </div>
       )}
     </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// SymmetricToggle — minimal switch-style button (no shadcn Switch primitive)
-// ---------------------------------------------------------------------------
-
-interface SymmetricToggleProps {
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-}
-
-function SymmetricToggle({ checked, onCheckedChange }: SymmetricToggleProps) {
-  return (
-    <div className="flex items-center gap-[8px] mb-[8px]">
-      <Label className="text-[13px] font-medium leading-[1.4]">
-        Symmetric (L = R)
-      </Label>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onCheckedChange(!checked)}
-        className={
-          checked
-            ? "h-5 w-9 rounded-full bg-primary relative transition-colors"
-            : "h-5 w-9 rounded-full bg-muted relative transition-colors"
-        }
-      >
-        <span
-          className={
-            checked
-              ? "absolute top-[2px] left-[18px] h-4 w-4 rounded-full bg-background transition-all"
-              : "absolute top-[2px] left-[2px] h-4 w-4 rounded-full bg-background transition-all"
-          }
-        />
-      </button>
-    </div>
   );
 }
 
