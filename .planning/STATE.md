@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
 status: executing
-stopped_at: Phase 63.1 UI-SPEC approved
-last_updated: "2026-05-13T19:42:52.801Z"
-last_activity: 2026-05-13
+stopped_at: Phase 63.1 complete (10/10 plans, verifier PASS)
+last_updated: "2026-05-13T20:55:52.554Z"
+last_activity: 2026-05-13 -- Phase 63.1 complete
 progress:
   total_phases: 15
-  completed_phases: 5
-  total_plans: 40
-  completed_plans: 32
+  completed_phases: 6
+  total_plans: 50
+  completed_plans: 40
   percent: 80
 ---
 
@@ -57,11 +57,11 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 63.1 (bc-architecture-rework-unified-bcs-tab) — EXECUTING
-Plan: 3 of 10
-Status: Ready to execute
-Last activity: 2026-05-13
-Next: `/gsd:discuss-phase 62` (recommended) — or `/gsd:plan-phase 62` to skip discuss.
+Phase: 63.1 — COMPLETE (verifier PASS, 23/23 D-* decisions)
+Plan: 10 of 10
+Status: Phase 63.1 complete; one deferred test (SidebarPanel.anchors.test.tsx) logged in deferred-items.md
+Last activity: 2026-05-13 -- Phase 63.1 complete (verifier passed)
+Next: `/gsd:discuss-phase 62` — resources panel architecture (the next pending v1.2 phase).
 
 ---
 
