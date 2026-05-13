@@ -61,7 +61,7 @@ function resetStore() {
   useStore.setState({
     nodes: [],
     edges: [],
-    bcs: [],
+    anchors: {},
     selectedNodeId: null,
     selectedResourceId: null,
     selectedResourceKind: null,
@@ -211,7 +211,7 @@ describe("Missing power-shape dialog copy (62-15 — VERIFICATION Gap #4)", () =
       format_version: "2.0",
       components: [],
       connections: [],
-      bcs: [],
+      anchors: {},
       resources: {
         geometries: [],
         power_shapes: [
@@ -257,7 +257,7 @@ describe("Missing power-shape dialog copy (62-15 — VERIFICATION Gap #4)", () =
       format_version: "2.0",
       components: [],
       connections: [],
-      bcs: [],
+      anchors: {},
       resources: {
         geometries: [],
         power_shapes: [

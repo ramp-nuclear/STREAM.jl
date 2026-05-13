@@ -17,7 +17,7 @@ beforeEach(() => {
   useStore.setState({
     nodes: [],
     edges: [],
-    bcs: [],
+    anchors: {},
     selectedNodeId: null,
     selectedResourceId: null,
     selectedResourceKind: null,

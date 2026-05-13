@@ -72,7 +72,7 @@ describe("Store path — BC edge materialization", () => {
     useStore.setState({
       nodes: [],
       edges: [],
-      bcs: [],
+      anchors: {},
       bcMode: {},
       bcSymmetric: {},
       errorNodeIds: new Set<string>(),
