@@ -953,6 +953,24 @@ const useStore = create<AppState>()((set, get) => ({
   // ---------------------------------------------------------------------------
 
   onNodesChange: (changes) => {
+    // D-22: sync selectedNodeId from ReactFlow select events (fixes click-vs-drag
+    // stale Properties). Runs BEFORE the isContentless early-return so a pure
+    // select batch (which IS contentless from a dirty-doc perspective) still
+    // updates the selection. selectNode is a no-op when the id already matches.
+    for (const c of changes) {
+      if (c.type !== "select") continue;
+      if (c.selected) {
+        if (get().selectedNodeId !== c.id) {
+          get().selectNode(c.id);
+        }
+      } else {
+        // selected:false → clear if this is the currently-selected node.
+        if (get().selectedNodeId === c.id) {
+          get().selectNode(null);
+        }
+      }
+    }
+
     // Skip contentless events (selection highlight, layout measurement) — they
     // are not content mutations and must not dirty the document or push history.
     const isContentless = changes.every(

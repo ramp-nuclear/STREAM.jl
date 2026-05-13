@@ -124,10 +124,10 @@ describe("Store path — BC edge materialization", () => {
   it("canvas-drag path (addEdge) — selectNodeErrors contract (D-22, D-15)", () => {
     // Phase 63.1 D-15: the canvas-drag path no longer writes per-event tags
     // (_checkBCNMismatch removed). selectNodeErrors derives ring state from
-    // bcMode; Plan 05 will land the addEdge→bcMode mirroring that makes the
-    // canvas-drag path equivalent to setBCMode for selector purposes.
-    // Until Plan 05, addEdge creates the edge but no bcMode entry — so the
-    // selector returns [] for both. The edge is still materialized.
+    // bcMode; Plan 63.1-10 CR-01 landed the addEdge → bcMode mirroring that
+    // makes the canvas-drag path equivalent to setBCMode for selector purposes.
+    // With ch2.n=12 and wt2.n=10, selectNodeErrors now returns
+    // ['bc-n-mismatch'] on both sides — matching the setBCMode path above.
     useStore.setState({
       nodes: [makeNode("wt2", "WallTemperature", 10), makeNode("ch2", "Channel", 12)],
     });
@@ -138,7 +138,7 @@ describe("Store path — BC edge materialization", () => {
       targetHandle: "T_wall_left",
     });
     expect(useStore.getState().edges.find((e) => e.type === "bcEdge")).toBeDefined();
-    expect(errorsFor("wt2")).toEqual([]);
-    expect(errorsFor("ch2")).toEqual([]);
+    expect(errorsFor("wt2")).toContain("bc-n-mismatch");
+    expect(errorsFor("ch2")).toContain("bc-n-mismatch");
   });
 });
