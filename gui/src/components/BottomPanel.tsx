@@ -2,7 +2,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import useStore from "../store/useStore";
 import { useBottomPanelResize } from "../hooks/useBottomPanelResize";
 import CodePreview from "./CodePreview";
-import BCPanel from "./BCPanel";
 
 export default function BottomPanel() {
   const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
@@ -23,15 +22,9 @@ export default function BottomPanel() {
           <TabsTrigger value="code" className="text-[13px] font-medium">
             Code
           </TabsTrigger>
-          <TabsTrigger value="bcs" className="text-[13px] font-medium">
-            BCs
-          </TabsTrigger>
         </TabsList>
         <TabsContent value="code" className="flex-1 min-h-0">
           <CodePreview />
-        </TabsContent>
-        <TabsContent value="bcs" className="flex-1 min-h-0">
-          <BCPanel />
         </TabsContent>
       </Tabs>
     </div>
