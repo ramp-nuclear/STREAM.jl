@@ -6,10 +6,11 @@
       "id": "Channel",
       "label": "Channel",
       "category": "Hydraulic",
-      "description": "Single-phase convective channel with n axial finite-volume cells. v1.1: per-cell h_left/h_right Properties-tab kwargs (Real | Vector | Function) drive the convective coefficient on each face; T_wall_left[1:n] / T_wall_right[1:n] external-input BCs declare wall temperatures via the BCs tab (Value/Profile/Function/Mark, or a Source dashed-edge from a WallTemperature block). No thermal MTK port.",
+      "description": "Single-phase convective channel with n axial finite-volume cells. v1.1: per-cell h_left/h_right Properties-tab kwargs (Real | Vector | Function) drive the convective coefficient on each face; T_wall_left[1:n] / T_wall_right[1:n] external-input BCs declare wall temperatures via the BCs tab (Value/Profile/Function/Mark, or a Source dashed-edge from a WallTemperature block). A BCPort target handle (`T_wall_left`) on the bottom edge accepts dashed BC edges from a WallTemperature node; the right-side T_wall_right BC mirrors automatically when bcSymmetric is ON (default).",
       "ports": [
         { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        { "name": "port_out", "type": "FlowPort", "side": "right" },
+        { "name": "T_wall_left", "type": "BCPort", "array_size": "n", "side": "bottom" }
       ],
       "parameters": [
         {
@@ -565,10 +566,11 @@
       "id": "ChannelHeatFlux",
       "label": "Channel (Heat Flux BC)",
       "category": "Hydraulic",
-      "description": "Single-phase convective channel with imposed per-cell wall heat flux. v1.1: q_left[1:n] / q_right[1:n] external-input flux BCs (W/m^2) declared via the BCs tab (Value/Profile/Function/Mark, or a Source dashed-edge from a HeatFluxSource block). No thermal MTK port and no h_left/h_right — flux is imposed directly.",
+      "description": "Single-phase convective channel with imposed per-cell wall heat flux. v1.1: q_left[1:n] / q_right[1:n] external-input flux BCs (W/m^2) declared via the BCs tab (Value/Profile/Function/Mark, or a Source dashed-edge from a HeatFluxSource block). No thermal MTK port and no h_left/h_right — flux is imposed directly. A BCPort target handle (`q_left`) on the bottom edge accepts dashed BC edges from a HeatFluxSource node; the right-side q_right BC mirrors automatically when bcSymmetric is ON (default).",
       "ports": [
         { "name": "port_in", "type": "FlowPort", "side": "left" },
-        { "name": "port_out", "type": "FlowPort", "side": "right" }
+        { "name": "port_out", "type": "FlowPort", "side": "right" },
+        { "name": "q_left", "type": "BCPort", "array_size": "n", "side": "bottom" }
       ],
       "parameters": [
         {
