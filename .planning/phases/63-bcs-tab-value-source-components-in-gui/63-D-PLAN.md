@@ -437,7 +437,16 @@ A. Edit `gui/src/components/CanvasPanel.tsx`:
    }
    ```
 
-4. Do NOT mutate any store state inside `isValidConnection` (Pitfall 7). The store's `addEdge` action (triggered AFTER `isValidConnection` returns true) is the right place for the n-mismatch flagging (already handled by 63-B's `setBCMode`/`_onBCEdgeAdded` paths; for direct drag-to-connect, the connection callback path is `onConnect → addEdge → enrichEdges → store also runs n-mismatch check`). Verify the call chain: locate `onConnect` in CanvasPanel and confirm it ultimately calls a store action that runs `_checkBCNMismatch` for BC edges. If 63-B did not wire the n-check into `addEdge` proper, file a deferred-item note in this plan's SUMMARY for follow-up (planner judges if a minor extension is needed; default action: add a 1-line call to `_checkBCNMismatch` from `addEdge` for any new bcEdge created via `onConnect`).
+4. Do NOT mutate any store state inside `isValidConnection` (Pitfall 7). The store's `addEdge` action (triggered AFTER `isValidConnection` returns true) is the right place for the n-mismatch flagging — Plan 63-B Task 02 step 9 wires `_checkBCNMismatch` directly into `addEdge` so the canvas-drag entry point (`onConnect → addEdge → enrichEdges`) populates `errorNodeIds` synchronously for any newly-created `bcEdge`.
+
+   **This task makes NO modification to `useStore.ts`.** Instead, verify the wiring is in place by reading `useStore.ts` and confirming `_checkBCNMismatch` is called from BOTH `setBCMode` (the BCs-tab path) AND `addEdge` (the canvas-drag path). The verification is mechanical:
+
+   ```
+   grep -c '_checkBCNMismatch' gui/src/store/useStore.ts   # must be at least 3 (declaration + setBCMode + addEdge)
+   awk '/addEdge: \(connection\) =>/,/^  \}/' gui/src/store/useStore.ts | grep -c '_checkBCNMismatch'   # must be at least 1
+   ```
+
+   If either grep fails, FAIL this task and request re-execution of Plan 63-B (the wiring belongs in `useStore.ts`, which is owned by 63-B per `files_modified`; adding it from 63-D would create a file-collision risk and violate the same-wave file-ownership rule). Do NOT patch `useStore.ts` from 63-D under any circumstance.
 
 B. Create `gui/src/components/__tests__/CanvasPanel.bc.test.tsx` (do NOT clobber `ConnectionValidation.test.tsx`):
 
@@ -467,6 +476,9 @@ The 7 isAllowedBCConnection tests are PURE — no React, no jsdom needed. The in
     - `grep -E 'bcEdge: BCEdge' gui/src/components/CanvasPanel.tsx` returns 1 line
     - `grep -E 'isAllowedBCConnection' gui/src/components/CanvasPanel.tsx` returns at least 1 line
     - `grep -E 'sourceType === "BCPort"' gui/src/components/CanvasPanel.tsx` returns 1 line
+    - `grep -c '_checkBCNMismatch' gui/src/store/useStore.ts` returns at least 3 (read-only verification — 63-B owns this file; this assertion confirms the canvas-drag → store n-check wiring is in place per Blocker-2 from plan-checker review)
+    - `awk '/addEdge: \(connection\) =>/,/^  \}/' gui/src/store/useStore.ts | grep -c '_checkBCNMismatch'` returns at least 1 (the n-check call lives INSIDE `addEdge`'s body, not outside it)
+    - The integration test in `CanvasPanel.bc.test.tsx` named `creating an n-mismatched WT→Channel BC edge flags both endpoints in errorNodeIds` exercises this wiring end-to-end via the store
     - `cd gui && npx vitest run src/components/__tests__/CanvasPanel.bc.test.tsx` exits 0 (7+ tests green)
     - `cd gui && npx vitest run src/components/__tests__/ConnectionValidation.test.tsx` exits 0 (pre-existing FlowPort/ThermalPort enforcement still works)
     - `cd gui && npx tsc --noEmit 2>&1 | grep -E 'CanvasPanel\.tsx'` returns 0 lines

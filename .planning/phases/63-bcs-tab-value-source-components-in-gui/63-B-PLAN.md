@@ -273,7 +273,9 @@ Surgically extend `useStore.ts`. All store actions follow the existing pattern: 
    - In the existing `srcPort?.type === "ThermalPort"` branch, also handle `srcPort?.type === "BCPort"`: strip `markerEnd`, set `type: "bcEdge"`, set `data` to existing `e.data` if it already has `componentId/externalInputName/targetSide`, else initialize:
      `{ componentId: e.target, externalInputName: e.targetHandle ?? "", targetSide: (e.data as BCEdgeData | undefined)?.targetSide ?? "both" }`.
 
-9. No GUI-side import of `gui/src/components/...` allowed in `useStore.ts` (store stays UI-agnostic per Phase 62 discipline). All edge-creation work is plain `Edge[]` mutation.
+9. Extend the existing `addEdge` action at line 798 (the canvas-drag entry point — `onConnect` ultimately calls this). After the new edge is appended to `state.edges` and `enrichEdges(styledEdges, get().nodes)` returns the enriched list (line 822), inspect each newly-created edge: if its source-port type resolves to `BCPort` (look it up via the same registry lookup `enrichEdges` uses — `getComponent(srcNode.data.componentId).ports.find(p => p.name === e.sourceHandle)?.type === "BCPort"`), synchronously call `_checkBCNMismatch(connection.source, connection.target)` to populate `errorNodeIds`. The check runs AFTER `enrichEdges` so the edge already has `type: "bcEdge"`; it MUST run BEFORE the final `set({...})` so the store update is atomic (edge addition + n-mismatch flagging land in the same render tick). This wires D-22 for the primary canvas-drag user path (BCs-tab → store path is already covered by `setBCMode` from step 6a). Read `useStore.ts` lines 798-822 before editing to confirm `addEdge` is the exact entry-point name (or `onConnect` if the file uses that name) — cite PATTERNS.md "Edge enrichment by source-port type" (useStore.ts:493-520 enrichEdges) in your implementation.
+
+10. No GUI-side import of `gui/src/components/...` allowed in `useStore.ts` (store stays UI-agnostic per Phase 62 discipline). All edge-creation work is plain `Edge[]` mutation.
 
 Critical: do NOT remove any pre-existing action, slice, or test-affecting export. Phase 63-B is purely additive at the store level.
   </action>
@@ -282,6 +284,7 @@ Critical: do NOT remove any pre-existing action, slice, or test-affecting export
 - Setting `setBCMode("ch1", "T_wall_left", {mode: "source", sourceNodeId: "wt1"})` adds a BC edge `{source:"wt1", sourceHandle:"T_wall_out", target:"ch1", targetHandle:"T_wall_left", type:"bcEdge", data:{...,targetSide:"both"}}` to `edges[]`.
 - Removing that edge via `onEdgesChange([{type:"remove", id:<id>}])` clears the `bcMode` entry (and the symmetric sibling if applicable) and clears the `bc-n-mismatch` tag.
 - Setting `setBCMode` with `sourceNodeId` whose `n` differs from consumer's `n` adds tag `"bc-n-mismatch"` to BOTH `errorNodeIds[sourceNodeId]` and `errorNodeIds[consumerNodeId]`.
+- Creating a BC edge via the canvas-drag path (calling `addEdge({source:'wt1', sourceHandle:'T_wall_out', target:'ch1', targetHandle:'T_wall_left'})` directly — i.e., NOT through `setBCMode`) likewise adds the `bc-n-mismatch` tag to both endpoints when `n` differs. This is the D-22 wiring for the primary user path.
 - `setBCSymmetric("ch1", "T_wall", true)` after differing left/right entries copies left to right (left wins).
 - `cycleBCEdgeTargetSide(edgeId)` walks `both → left → right → both`.
 - Undo after `setBCMode` restores all three slices (`bcMode`, `bcSymmetric`, `errorNodeIds`) AND `edges` to pre-mutation state.
@@ -299,6 +302,8 @@ Critical: do NOT remove any pre-existing action, slice, or test-affecting export
     - `grep -c 'cycleBCEdgeTargetSide' gui/src/store/useStore.ts` returns at least 2
     - `grep -c '_revertBCModeForEdge' gui/src/store/useStore.ts` returns at least 2
     - `grep -E 'type: "bcEdge"' gui/src/store/useStore.ts` returns at least 1 line (inside enrichEdges)
+    - `grep -c '_checkBCNMismatch' gui/src/store/useStore.ts` returns at least 3 (interface/declaration + call inside setBCMode + call inside addEdge — wires D-22 for BOTH the BCs-tab path AND the canvas-drag path)
+    - `awk '/addEdge: \(connection\) =>/,/^  \}/' gui/src/store/useStore.ts | grep -c '_checkBCNMismatch'` returns at least 1 (the canvas-drag wiring lives INSIDE the `addEdge` action body, not elsewhere)
     - `grep -E 'from "@/lib/bcMode"' gui/src/store/useStore.ts` returns 1 line
     - `cd gui && npx tsc --noEmit` exits 0 (whole project compiles — exceptions: the 7 pre-existing tsc errors documented in `.planning/phases/61-.../deferred-items.md` may still appear; this task must not ADD any new tsc error in `useStore.ts` itself; verify by `cd gui && npx tsc --noEmit 2>&1 | grep useStore.ts` returns 0 lines)
     - `cd gui && npx vitest run src/store/__tests__/useStore.test.ts` exits 0 (pre-existing tests still green)
@@ -356,6 +361,7 @@ Test groups:
    - `it("creates edge AND flags both nodes when source.n !== consumer.n")`
    - `it("does NOT flag when source.n === consumer.n")`
    - `it("clears bc-n-mismatch tag when the BC edge is removed")`
+   - `it("addEdge → BCPort source-type triggers n-mismatch check on canvas-drag path (D-22)")` — seed store with WT node (n=10) and Channel node (n=12); call `useStore.getState().addEdge({source:'wt1', sourceHandle:'T_wall_out', target:'ch1', targetHandle:'__bcDrop__', ...})` directly (NOT via `setBCMode`); assert `useStore.getState().errorNodeIds['wt1']` and `useStore.getState().errorNodeIds['ch1']` both contain `'bc-n-mismatch'`. This proves the canvas-drag user path fires the n-check, not just the BCs-tab path.
 
 4. `describe("bcMode slice — clearBCMode (D-09 required-unset)")`:
    - `it("removes the key entirely; lookup returns undefined")`
@@ -381,6 +387,7 @@ Snapshot integration test: after `setBCMode`, calling `useStore.getState().undo(
     - `grep -c '^describe(' gui/src/store/__tests__/useStore.bc.test.ts` returns at least 6
     - `grep -c '^\s*it(' gui/src/store/__tests__/useStore.bc.test.ts` returns at least 15
     - `cd gui && npx vitest run src/store/__tests__/useStore.bc.test.ts` exits 0
+    - `cd gui && npx vitest run src/store/__tests__/useStore.bc.test.ts -t 'BCPort source-type triggers n-mismatch'` exits 0 (the canvas-drag-path n-mismatch test exists and passes — gates Blocker-2's D-22 wiring for the addEdge entry point)
     - Vitest output reports zero failures and zero skipped tests
   </acceptance_criteria>
   <done>BC slice fully covered by vitest; sets the contract that 63-C and 63-D consume.</done>
