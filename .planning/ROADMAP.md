@@ -123,16 +123,16 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 **Plans:** 10 plans
 
 Plans:
-- [ ] 63.1-01-PLAN.md (Wave 0) — Test scaffolding: nine RED test files covering selectNodeErrors, anchors slice, codegen anchors, projectIO schema, CR-01, CR-02/CR-03, click-vs-drag, promoteToSharedSource, StreamNode anchor indicator.
-- [ ] 63.1-02-PLAN.md (Wave 1, depends on 01) — selectNodeErrors pure selector + delete errorTagsByNodeId slice + _checkBCNMismatch action; StreamNode migrated; useStore.bc.test.ts rewritten.
-- [ ] 63.1-03-PLAN.md (Wave 2, depends on 02) — anchors slice (Record<nodeId, AnchorEntry>) + setAnchor/clearAnchor + projectIO schema swap; delete bcs/addBC/removeBC.
-- [ ] 63.1-04-PLAN.md (Wave 3, depends on 03) — codeGenerator signature swap + anchors emission + validateTopology Object.keys check + Toolbar/CodePreview call-sites.
-- [ ] 63.1-05-PLAN.md (Wave 3, depends on 03, parallel to 04) — Delete BCPanel.tsx, BCRow.tsx; remove BCs tab from BottomPanel.tsx.
-- [ ] 63.1-06-PLAN.md (Wave 4, depends on 03/04/05) — AnchorsSection.tsx + SidebarPanel.tsx ComponentTabs BCs body (Anchors + External Inputs two-section layout).
-- [ ] 63.1-07-PLAN.md (Wave 4, depends on 03/05, parallel to 06) — BCsTabForm.tsx: inline shadcn Select dropdown replaces BCModePicker; SegmentedButtonGroup replaces SymmetricToggle; delete BCModePicker.tsx.
-- [ ] 63.1-08-PLAN.md (Wave 5, depends on 06/07) — promoteToSharedSource store action + ↗ Promote to shared source ghost button in BCsTabForm; remove legacy + New ${sourceCompId} button.
-- [ ] 63.1-09-PLAN.md (Wave 5, depends on 03, parallel to 08) — ToolboxPanel.tsx Sources block deleted (D-06); StreamNode.tsx anchor indicator (D-13).
-- [ ] 63.1-10-PLAN.md (Wave 6, depends on 08) — CR-01 addEdge BCPort fix; CR-02/CR-03 setBCSymmetric fix + _reconcileEdgesForBCMode helper; click-vs-drag onNodesChange.select sync; D-23 verified.
+- [x] 63.1-01-PLAN.md (Wave 0) — Test scaffolding: nine RED test files covering selectNodeErrors, anchors slice, codegen anchors, projectIO schema, CR-01, CR-02/CR-03, click-vs-drag, promoteToSharedSource, StreamNode anchor indicator.
+- [x] 63.1-02-PLAN.md (Wave 1, depends on 01) — selectNodeErrors pure selector + delete errorTagsByNodeId slice + _checkBCNMismatch action; StreamNode migrated; useStore.bc.test.ts rewritten.
+- [x] 63.1-03-PLAN.md (Wave 2, depends on 02) — anchors slice (Record<nodeId, AnchorEntry>) + setAnchor/clearAnchor + projectIO schema swap; delete bcs/addBC/removeBC.
+- [x] 63.1-04-PLAN.md (Wave 3, depends on 03) — codeGenerator signature swap + anchors emission + validateTopology Object.keys check + Toolbar/CodePreview call-sites.
+- [x] 63.1-05-PLAN.md (Wave 3, depends on 03, parallel to 04) — Delete BCPanel.tsx, BCRow.tsx; remove BCs tab from BottomPanel.tsx.
+- [x] 63.1-06-PLAN.md (Wave 4, depends on 03/04/05) — AnchorsSection.tsx + SidebarPanel.tsx ComponentTabs BCs body (Anchors + External Inputs two-section layout).
+- [x] 63.1-07-PLAN.md (Wave 4, depends on 03/05, parallel to 06) — BCsTabForm.tsx: inline shadcn Select dropdown replaces BCModePicker; SegmentedButtonGroup replaces SymmetricToggle; delete BCModePicker.tsx.
+- [x] 63.1-08-PLAN.md (Wave 5, depends on 06/07) — promoteToSharedSource store action + ↗ Promote to shared source ghost button in BCsTabForm; remove legacy + New ${sourceCompId} button.
+- [x] 63.1-09-PLAN.md (Wave 5, depends on 03, parallel to 08) — ToolboxPanel.tsx Sources block deleted (D-06); StreamNode.tsx anchor indicator (D-13).
+- [x] 63.1-10-PLAN.md (Wave 6, depends on 08) — CR-01 addEdge BCPort fix; CR-02/CR-03 setBCSymmetric fix + _reconcileEdgesForBCMode helper; click-vs-drag onNodesChange.select sync; D-23 verified.
 
 
 ### Phase 64: Connection routing
@@ -250,6 +250,7 @@ contract document drafted in parallel throughout.
 | 61. Registry audit + rewrite for v1.1                | 5/5 | Complete   | 2026-05-12 |
 | 62. Resources panel architecture                     | 10/11 | In Progress|  |
 | 63. BCs tab + value-source components in GUI         | 4/4 | Complete    | 2026-05-13 |
+| 63.1. BC architecture rework — unified BCs tab       | 10/10 | Complete  | 2026-05-13 |
 | 64. Connection routing                               | 0/TBD | Planned | — |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |
