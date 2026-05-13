@@ -123,7 +123,7 @@ export function ResponsiveTabsList({
       const Icon = tab.icon;
       return (
         <>
-          <Icon className="size-4" aria-hidden="true" />
+          <Icon className="size-5" aria-hidden="true" />
           <span className="sr-only">{tab.label}</span>
         </>
       );
@@ -133,13 +133,15 @@ export function ResponsiveTabsList({
 
   function triggerClassFor(tab: ResponsiveTab) {
     if (tab.icon) {
-      // Icon-only trigger: square, transparent at rest, outline on hover, no
-      // border at active state (the variant=line bottom-border handles active).
+      // Icon-only trigger: square, no static outline, 2px outline appears on
+      // hover (border) and active (primary). No bottom-bar indicator — the
+      // variant=line `after` pseudo is forced to 0 opacity in icon mode.
       return cn(
-        "flex-none size-[28px] p-0",
+        "flex-none size-[32px] p-0 rounded-md",
         "text-muted-foreground hover:text-foreground",
-        "rounded-none border border-transparent hover:border-border",
-        "data-[state=active]:text-foreground data-[state=active]:border-transparent",
+        "border-2 border-transparent hover:border-border",
+        "data-[state=active]:text-foreground data-[state=active]:border-primary",
+        "data-[state=active]:after:!opacity-0",
       );
     }
     return "px-[10px] text-[12px] flex-none data-[state=active]:border-primary";
@@ -148,7 +150,7 @@ export function ResponsiveTabsList({
   return (
     <div
       ref={containerRef}
-      className="relative flex items-center w-full h-[28px] border-b overflow-hidden"
+      className="relative flex items-center w-full h-[40px] overflow-hidden"
     >
       {/* Off-screen measurement layer — all tabs at natural width, never hidden. */}
       <div
@@ -164,7 +166,7 @@ export function ResponsiveTabsList({
             type="button"
             tabIndex={-1}
             className={cn(
-              "inline-flex h-[28px] items-center justify-center whitespace-nowrap font-medium",
+              "inline-flex items-center justify-center whitespace-nowrap font-medium",
               triggerClassFor(tab),
             )}
           >
@@ -175,7 +177,7 @@ export function ResponsiveTabsList({
 
       <TabsList
         variant="line"
-        className="h-full justify-start rounded-none border-0 px-0 min-w-0 gap-0"
+        className="h-full justify-start rounded-none border-0 px-1 min-w-0 gap-2"
       >
         {tabs.map((tab, i) => {
           const triggerEl = (
