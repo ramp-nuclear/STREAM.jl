@@ -37,7 +37,7 @@ function resetStore() {
     activeLeftTab: "Components",
     bcMode: {},
     bcSymmetric: {},
-    errorTagsByNodeId: {},
+    // Phase 63.1 D-15: errorTagsByNodeId slice removed.
     resources: {
       geometries: {},
       powerShapes: {

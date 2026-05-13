@@ -129,8 +129,11 @@ export type ActiveLeftTab = "Components" | "Resources" | "Project";
 // Snapshot of undoable canvas + resources content (not UI state like selection,
 // active tab, or panels). Phase 62 extension: `resources` and `modelOptions` are
 // undoable; `activeLeftTab` is NOT (mirrors `selectedNodeId` / `activeLayer`).
-// Phase 63 extension: `bcMode`, `bcSymmetric`, `errorTagsByNodeId` are undoable
-// — every BC slice mutation (setBCMode, clearBCMode, etc.) pushes a snapshot.
+// Phase 63 extension: `bcMode`, `bcSymmetric` are undoable — every BC slice
+// mutation (setBCMode, clearBCMode, etc.) pushes a snapshot.
+// Phase 63.1 D-15: `errorTagsByNodeId` removed from the undoable slice set;
+// ring/error state is now derived on demand by selectNodeErrors (no stored
+// derived state, so no snapshot field is needed).
 interface CanvasSnapshot {
   nodes: Node[];
   edges: Edge[];
@@ -139,7 +142,6 @@ interface CanvasSnapshot {
   modelOptions: ModelOptionsSliceState;
   bcMode: Record<string, BCModeEntry>;
   bcSymmetric: Record<string, boolean>;
-  errorTagsByNodeId: Record<string, string[]>;
 }
 
 export interface StreamNodeData {
@@ -240,13 +242,11 @@ interface AppState {
   // Composite key `${nodeId}::${baseField}` (e.g., "ch1::T_wall") → symmetric ON/OFF.
   // Default ON per CD-05 (persisted per-component-instance).
   bcSymmetric: Record<string, boolean>;
-  // Phase 63 BC-specific error tags (e.g., "bc-n-mismatch"). Sibling of the
-  // existing Phase-39 `errorNodeIds: Set<string>` slice (which is owned by
-  // validateAndGate and has different shape semantics). Phase 71 will unify
-  // the two surfaces — Phase 63 ships the minimal Record<nodeId, string[]>
-  // form for the n-mismatch soft-warning surface (D-22). Consumed by 63-D's
-  // StreamNode renderer to drive red-ring rendering for BC-related errors.
-  errorTagsByNodeId: Record<string, string[]>;
+  // Phase 63.1 D-15: errorTagsByNodeId slice + _checkBCNMismatch action removed.
+  // Ring/error state now derives from selectNodeErrors
+  // (gui/src/lib/selectors/nodeErrors.ts). Phase 71 will continue extending
+  // the selector library — additional validators follow the same pure
+  // (state, nodeId) -> string[] shape (D-19 foundation).
   // BC actions
   setBCMode: (
     componentId: string,
@@ -257,15 +257,11 @@ interface AppState {
   setBCSymmetric: (nodeId: string, baseField: string, symmetric: boolean) => void;
   cycleBCEdgeTargetSide: (edgeId: string) => void;
   /** Internal: invoked by onEdgesChange when a `type === "bcEdge"` edge is
-   *  removed. Reverts the matching bcMode entry to undefined (required-unset)
-   *  and clears the `bc-n-mismatch` tag. NEVER pushes a snapshot — the outer
+   *  removed. Reverts the matching bcMode entry to undefined (required-unset).
+   *  Phase 63.1 D-15: tag-clearing logic removed (selectNodeErrors auto-clears
+   *  the ring on the next render). NEVER pushes a snapshot — the outer
    *  onEdgesChange does. */
   _revertBCModeForEdge: (edge: Edge) => void;
-  /** Internal: n-mismatch detection for BC connections. Reads both nodes' `n`
-   *  from `data.parameters.n`; if mismatched, adds the `bc-n-mismatch` tag to
-   *  both nodeIds' errorTagsByNodeId entries; otherwise clears that tag from
-   *  both. Idempotent. */
-  _checkBCNMismatch: (sourceNodeId: string, targetNodeId: string) => void;
   // File I/O actions
   saveProject: () => Promise<void>;
   saveProjectAs: () => Promise<void>;
@@ -556,39 +552,9 @@ function siblingExternalInputName(externalInputName: string): string | null {
   return null;
 }
 
-/** Mutate the given map: add `tag` to the array for `nodeId` (no duplicates).
- *  Creates the array if absent. */
-function addTagInPlace(
-  map: Record<string, string[]>,
-  nodeId: string,
-  tag: string,
-): void {
-  const existing = map[nodeId];
-  if (existing === undefined) {
-    map[nodeId] = [tag];
-    return;
-  }
-  if (!existing.includes(tag)) {
-    map[nodeId] = [...existing, tag];
-  }
-}
-
-/** Mutate the given map: remove `tag` from the array for `nodeId`. If the
- *  resulting array is empty, delete the key. No-op if absent. */
-function removeTagInPlace(
-  map: Record<string, string[]>,
-  nodeId: string,
-  tag: string,
-): void {
-  const existing = map[nodeId];
-  if (existing === undefined) return;
-  const filtered = existing.filter((t) => t !== tag);
-  if (filtered.length === 0) {
-    delete map[nodeId];
-  } else {
-    map[nodeId] = filtered;
-  }
-}
+// Phase 63.1 D-15: addTagInPlace / removeTagInPlace helpers removed alongside
+// errorTagsByNodeId slice — ring state now derives from selectNodeErrors
+// (gui/src/lib/selectors/nodeErrors.ts).
 
 // ---------------------------------------------------------------------------
 // Edge enrichment: arrowheads for hydraulic edges
@@ -734,7 +700,7 @@ const useStore = create<AppState>()((set, get) => ({
   // know which keys will exist until the user creates the consumer node.
   bcMode: {},
   bcSymmetric: {},
-  errorTagsByNodeId: {},
+  // Phase 63.1 D-15: errorTagsByNodeId initial state removed (slice deleted).
 
   // ---------------------------------------------------------------------------
   // Undo / redo — explicit history stack
@@ -757,7 +723,6 @@ const useStore = create<AppState>()((set, get) => ({
       modelOptions,
       bcMode,
       bcSymmetric,
-      errorTagsByNodeId,
       _undoPast,
     } = get();
     set({
@@ -771,7 +736,6 @@ const useStore = create<AppState>()((set, get) => ({
           modelOptions,
           bcMode,
           bcSymmetric,
-          errorTagsByNodeId,
         },
       ].slice(-50),
       _undoFuture: [],
@@ -787,7 +751,6 @@ const useStore = create<AppState>()((set, get) => ({
       modelOptions,
       bcMode,
       bcSymmetric,
-      errorTagsByNodeId,
       _undoPast,
       _undoFuture,
     } = get();
@@ -801,7 +764,6 @@ const useStore = create<AppState>()((set, get) => ({
       modelOptions: prev.modelOptions,
       bcMode: prev.bcMode,
       bcSymmetric: prev.bcSymmetric,
-      errorTagsByNodeId: prev.errorTagsByNodeId,
       _undoPast: _undoPast.slice(0, -1),
       _undoFuture: [
         {
@@ -812,7 +774,6 @@ const useStore = create<AppState>()((set, get) => ({
           modelOptions,
           bcMode,
           bcSymmetric,
-          errorTagsByNodeId,
         },
         ..._undoFuture,
       ].slice(0, 50),
@@ -831,7 +792,6 @@ const useStore = create<AppState>()((set, get) => ({
       modelOptions,
       bcMode,
       bcSymmetric,
-      errorTagsByNodeId,
       _undoPast,
       _undoFuture,
     } = get();
@@ -845,7 +805,6 @@ const useStore = create<AppState>()((set, get) => ({
       modelOptions: next.modelOptions,
       bcMode: next.bcMode,
       bcSymmetric: next.bcSymmetric,
-      errorTagsByNodeId: next.errorTagsByNodeId,
       _undoPast: [
         ..._undoPast,
         {
@@ -856,7 +815,6 @@ const useStore = create<AppState>()((set, get) => ({
           modelOptions,
           bcMode,
           bcSymmetric,
-          errorTagsByNodeId,
         },
       ].slice(-50),
       _undoFuture: _undoFuture.slice(1),
@@ -1037,13 +995,10 @@ const useStore = create<AppState>()((set, get) => ({
     // Apply hydraulic arrowheads and parallel offset for bidirectional pairs
     const finalEdges = enrichEdges(styledEdges, get().nodes);
 
-    // Phase 63 D-22 soft-warning n-mismatch detection on the canvas-drag path.
-    // enrichEdges has just assigned `type: "bcEdge"` for BCPort sources, so we
-    // can detect this case by checking the source port type via the registry.
-    // The check runs BEFORE the final set({...}) so the edge addition + the
-    // n-mismatch flagging land in the same render tick (atomic update).
-    // (The BCs-tab path is covered separately by setBCMode below — both user
-    // paths converge through _checkBCNMismatch.)
+    // Phase 63 D-22 / 63.1 D-15 — canvas-drag BCPort branch. enrichEdges has
+    // just assigned `type: "bcEdge"` for BCPort sources. Ring/error state for
+    // any n-mismatch is now derived by selectNodeErrors on next render — no
+    // per-event mutation needed here (D-15 selector-derived validator).
     if (connection.source && connection.target) {
       const srcNode = get().nodes.find((n) => n.id === connection.source);
       if (srcNode) {
@@ -1052,10 +1007,7 @@ const useStore = create<AppState>()((set, get) => ({
         );
         const srcPort = srcComp?.ports.find((p) => p.name === connection.sourceHandle);
         if (srcPort?.type === "BCPort") {
-          // Set edges first so _checkBCNMismatch reads the post-add edge set
-          // for any side-effect logic; then run the check.
           set({ edges: finalEdges, isDirty: true });
-          get()._checkBCNMismatch(connection.source, connection.target);
           return;
         }
       }
@@ -1208,12 +1160,8 @@ const useStore = create<AppState>()((set, get) => ({
     }
 
     set({ bcMode: nextBCMode, edges: nextEdges, isDirty: true });
-
-    // After updating edges + bcMode, run the n-mismatch check for any current
-    // source-mode entry on the key(s).
-    if (entry.mode === "source") {
-      get()._checkBCNMismatch(entry.sourceNodeId, componentId);
-    }
+    // Phase 63.1 D-15: no _checkBCNMismatch call — selectNodeErrors recomputes
+    // the bc-n-mismatch tag from nodes + bcMode on next render.
   },
 
   clearBCMode: (componentId, externalInputName) => {
@@ -1225,16 +1173,6 @@ const useStore = create<AppState>()((set, get) => ({
     const symmetric = state.bcSymmetric[symKey] ?? true;
     const siblingName = symmetric ? siblingExternalInputName(externalInputName) : null;
     const siblingKey = siblingName ? bcModeKey(componentId, siblingName) : null;
-
-    // Track any prior source-mode entry so we can remove its BC edge AND clear
-    // the bc-n-mismatch tag on the source node afterwards.
-    const priorSourceNodeIds = new Set<string>();
-    const prior = state.bcMode[key];
-    if (prior?.mode === "source") priorSourceNodeIds.add(prior.sourceNodeId);
-    if (siblingKey) {
-      const priorSib = state.bcMode[siblingKey];
-      if (priorSib?.mode === "source") priorSourceNodeIds.add(priorSib.sourceNodeId);
-    }
 
     // Remove the bcMode entry (and sibling).
     const nextBCMode: Record<string, BCModeEntry> = { ...state.bcMode };
@@ -1253,29 +1191,13 @@ const useStore = create<AppState>()((set, get) => ({
         ),
     );
 
-    // Clear bc-n-mismatch tag on consumer node (no remaining source link from
-    // this consumer to anything) and on each previously-linked source node.
-    const nextTags: Record<string, string[]> = { ...state.errorTagsByNodeId };
-    const consumerStillHasSource = Object.entries(nextBCMode).some(
-      ([k, v]) => k.startsWith(`${componentId}::`) && v.mode === "source",
-    );
-    if (!consumerStillHasSource) {
-      removeTagInPlace(nextTags, componentId, "bc-n-mismatch");
-    }
-    for (const sourceNodeId of priorSourceNodeIds) {
-      // If the source node has no other BC edges remaining, clear its tag.
-      const stillLinked = nextEdges.some(
-        (e) => e.type === "bcEdge" && e.source === sourceNodeId,
-      );
-      if (!stillLinked) {
-        removeTagInPlace(nextTags, sourceNodeId, "bc-n-mismatch");
-      }
-    }
+    // Phase 63.1 D-15: bc-n-mismatch tag-clearing logic removed — selectNodeErrors
+    // re-derives the tag set from `bcMode` on the next render, so once the
+    // source-mode entry is gone the tag stops appearing.
 
     set({
       bcMode: nextBCMode,
       edges: nextEdges,
-      errorTagsByNodeId: nextTags,
       isDirty: true,
     });
   },
@@ -1336,52 +1258,10 @@ const useStore = create<AppState>()((set, get) => ({
     delete nextBCMode[key];
     if (siblingKey) delete nextBCMode[siblingKey];
 
-    // Clear bc-n-mismatch tag on consumer (if no remaining source-mode bcMode
-    // entry for this consumer) and on the source endpoint (if any).
-    const nextTags: Record<string, string[]> = { ...state.errorTagsByNodeId };
-    const consumerStillHasSource = Object.entries(nextBCMode).some(
-      ([k, v]) => k.startsWith(`${componentId}::`) && v.mode === "source",
-    );
-    if (!consumerStillHasSource) {
-      removeTagInPlace(nextTags, componentId, "bc-n-mismatch");
-    }
-    // Source endpoint: check edge.source — if no other bcEdge originates there
-    // in the current edges (the edge being removed will be filtered by the
-    // outer applyEdgeChanges), clear its tag too. We approximate by checking
-    // current edges minus this one.
-    const sourceNodeId = edge.source;
-    const otherSourceEdges = state.edges.some(
-      (e) =>
-        e.id !== edge.id && e.type === "bcEdge" && e.source === sourceNodeId,
-    );
-    if (!otherSourceEdges) {
-      removeTagInPlace(nextTags, sourceNodeId, "bc-n-mismatch");
-    }
+    // Phase 63.1 D-15: tag-clearing logic removed — selectNodeErrors
+    // re-derives bc-n-mismatch from `bcMode` on next render.
 
-    set({ bcMode: nextBCMode, errorTagsByNodeId: nextTags });
-  },
-
-  _checkBCNMismatch: (sourceNodeId, targetNodeId) => {
-    const state = get();
-    const srcNode = state.nodes.find((n) => n.id === sourceNodeId);
-    const tgtNode = state.nodes.find((n) => n.id === targetNodeId);
-    if (!srcNode || !tgtNode) return;
-    const srcN = (srcNode.data as unknown as StreamNodeData).parameters?.["n"];
-    const tgtN = (tgtNode.data as unknown as StreamNodeData).parameters?.["n"];
-    const nextTags: Record<string, string[]> = { ...state.errorTagsByNodeId };
-    const TAG = "bc-n-mismatch";
-    if (
-      typeof srcN === "number" &&
-      typeof tgtN === "number" &&
-      srcN !== tgtN
-    ) {
-      addTagInPlace(nextTags, sourceNodeId, TAG);
-      addTagInPlace(nextTags, targetNodeId, TAG);
-    } else {
-      removeTagInPlace(nextTags, sourceNodeId, TAG);
-      removeTagInPlace(nextTags, targetNodeId, TAG);
-    }
-    set({ errorTagsByNodeId: nextTags });
+    set({ bcMode: nextBCMode });
   },
 
   // ---------------------------------------------------------------------------
@@ -1920,9 +1800,9 @@ const useStore = create<AppState>()((set, get) => ({
         // bcMode / bcSymmetric is out of scope for 63-B (Phase 66 owns scp
         // schema evolution). Reset to empty so a freshly-loaded project
         // doesn't carry stale BC state from the previous session.
+        // Phase 63.1 D-15: errorTagsByNodeId removed.
         bcMode: {},
         bcSymmetric: {},
-        errorTagsByNodeId: {},
       });
       await saveRecentFiles(updated);
 
@@ -2005,9 +1885,9 @@ const useStore = create<AppState>()((set, get) => ({
       selectionKind: "none",
       missingFilePowerShapes: [],
       // Phase 63: reset BC slices on newProject.
+      // Phase 63.1 D-15: errorTagsByNodeId removed.
       bcMode: {},
       bcSymmetric: {},
-      errorTagsByNodeId: {},
     });
   },
 

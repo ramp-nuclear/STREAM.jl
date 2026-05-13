@@ -95,7 +95,7 @@ beforeEach(() => {
     _undoFuture: [],
     bcMode: {},
     bcSymmetric: {},
-    errorTagsByNodeId: {},
+    // Phase 63.1 D-15: errorTagsByNodeId slice removed.
   });
 });
 

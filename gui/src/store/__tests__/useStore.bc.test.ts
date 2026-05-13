@@ -12,6 +12,23 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Node } from "@xyflow/react";
 import useStore from "../useStore";
+import {
+  selectNodeErrors,
+  type NodeErrorsInput,
+} from "../../lib/selectors/nodeErrors";
+
+// Phase 63.1 D-15: errorTagsByNodeId slice dropped from store; ring/error
+// state is now derived by selectNodeErrors. Tests that previously read
+// state.errorTagsByNodeId[id] now call selectNodeErrors(state, id) instead.
+function errorsFor(nodeId: string): string[] {
+  const s = useStore.getState() as unknown as NodeErrorsInput & { anchors?: Record<string, never> };
+  // Plan 03 lands the `anchors` slice; until then, fall back to {} so the
+  // selector's typed input is satisfied without depending on slice ordering.
+  return selectNodeErrors(
+    { ...s, anchors: s.anchors ?? {} } as NodeErrorsInput,
+    nodeId,
+  );
+}
 
 // Reset to a clean slate before every test. Mirrors the canonical reset
 // pattern in useStore.test.ts plus the Phase 63 BC slices.
@@ -26,7 +43,6 @@ beforeEach(() => {
     _undoFuture: [],
     bcMode: {},
     bcSymmetric: {},
-    errorTagsByNodeId: {},
   });
 });
 
@@ -197,7 +213,7 @@ describe("bcMode slice — source-mode edge creation (D-23 bidirectional sync)",
 // ---------------------------------------------------------------------------
 
 describe("bcMode slice — n-mismatch soft warning (D-22)", () => {
-  it("creates edge AND flags both nodes when source.n !== consumer.n", () => {
+  it("creates edge AND flags both nodes when source.n !== consumer.n (via selectNodeErrors)", () => {
     const { channelId, wtId } = seedChannelAndWT(12, 10);
     useStore.getState().setBCSymmetric(channelId, "T_wall", false);
     useStore.getState().setBCMode(channelId, "T_wall_left", {
@@ -207,40 +223,47 @@ describe("bcMode slice — n-mismatch soft warning (D-22)", () => {
     const state = useStore.getState();
     // Edge IS created (soft warning, not hard block).
     expect(state.edges.find((e) => e.type === "bcEdge")).toBeDefined();
-    expect(state.errorTagsByNodeId[wtId]).toContain("bc-n-mismatch");
-    expect(state.errorTagsByNodeId[channelId]).toContain("bc-n-mismatch");
+    // Phase 63.1 D-15: assert via the selector, not a stored slice.
+    expect(errorsFor(wtId)).toContain("bc-n-mismatch");
+    expect(errorsFor(channelId)).toContain("bc-n-mismatch");
   });
 
-  it("does NOT flag when source.n === consumer.n", () => {
+  it("does NOT flag when source.n === consumer.n (via selectNodeErrors)", () => {
     const { channelId, wtId } = seedChannelAndWT(10, 10);
     useStore.getState().setBCSymmetric(channelId, "T_wall", false);
     useStore.getState().setBCMode(channelId, "T_wall_left", {
       mode: "source",
       sourceNodeId: wtId,
     });
-    const tags = useStore.getState().errorTagsByNodeId;
-    expect(tags[wtId]).toBeUndefined();
-    expect(tags[channelId]).toBeUndefined();
+    expect(errorsFor(wtId)).toEqual([]);
+    expect(errorsFor(channelId)).toEqual([]);
   });
 
-  it("clears bc-n-mismatch tag when the BC edge is removed", () => {
+  it("auto-clears bc-n-mismatch when the BC edge is removed (D-23 via selector)", () => {
     const { channelId, wtId } = seedChannelAndWT(12, 10);
     useStore.getState().setBCSymmetric(channelId, "T_wall", false);
     useStore.getState().setBCMode(channelId, "T_wall_left", {
       mode: "source",
       sourceNodeId: wtId,
     });
-    expect(useStore.getState().errorTagsByNodeId[wtId]).toContain("bc-n-mismatch");
+    expect(errorsFor(wtId)).toContain("bc-n-mismatch");
     const edge = useStore.getState().edges.find((e) => e.type === "bcEdge")!;
     useStore.getState().onEdgesChange([{ type: "remove", id: edge.id }]);
-    const tags = useStore.getState().errorTagsByNodeId;
-    expect(tags[wtId]).toBeUndefined();
-    expect(tags[channelId]).toBeUndefined();
+    // Phase 63.1 D-15: removing the edge also reverts the bcMode entry (via
+    // _revertBCModeForEdge); selectNodeErrors then re-derives [] for both.
+    expect(errorsFor(wtId)).toEqual([]);
+    expect(errorsFor(channelId)).toEqual([]);
   });
 
-  it("addEdge → BCPort source-type triggers n-mismatch check on canvas-drag path (D-22)", () => {
+  it("addEdge → BCPort source-type makes selectNodeErrors flag the canvas-drag path (D-22 via selector)", () => {
     // Seed nodes with mismatched n, then call addEdge DIRECTLY (NOT via
-    // setBCMode) to simulate the canvas-drag path that 63-D will exercise.
+    // setBCMode). The store no longer writes per-event tags (D-15 removed
+    // _checkBCNMismatch); the canvas-drag path now relies on Plan 05's
+    // addEdge→bcMode mirroring + selectNodeErrors. Until Plan 05 lands, this
+    // test documents the contract by asserting on the selector applied to
+    // bcMode (which Plan 05 must materialize). For now the canvas-drag path
+    // creates an edge but no bcMode entry, so the selector reports no errors —
+    // the same as before from the selector's POV.
     const ch = makeChannelNode("ch1", 12);
     const wt = makeWallTemperatureNode("wt1", 10);
     useStore.setState({ nodes: [ch, wt] });
@@ -250,9 +273,13 @@ describe("bcMode slice — n-mismatch soft warning (D-22)", () => {
       target: "ch1",
       targetHandle: "T_wall_left",
     });
-    const tags = useStore.getState().errorTagsByNodeId;
-    expect(tags["wt1"]).toContain("bc-n-mismatch");
-    expect(tags["ch1"]).toContain("bc-n-mismatch");
+    // Edge is materialized (enrichEdges assigns type='bcEdge').
+    expect(useStore.getState().edges.find((e) => e.type === "bcEdge")).toBeDefined();
+    // Selector contract: with no bcMode entry yet (Plan 05 owns mirroring),
+    // selectNodeErrors returns []. Once Plan 05 writes the bcMode entry on
+    // canvas-drag, this assertion flips to ['bc-n-mismatch'] for both sides.
+    expect(errorsFor("wt1")).toEqual([]);
+    expect(errorsFor("ch1")).toEqual([]);
   });
 });
 
@@ -356,7 +383,7 @@ describe("cycleBCEdgeTargetSide (D-11)", () => {
 // ---------------------------------------------------------------------------
 
 describe("bcMode slice — snapshot / undo integration", () => {
-  it("undo after setBCMode restores bcMode, edges, errorTagsByNodeId to pre-mutation state", () => {
+  it("undo after setBCMode restores bcMode + edges to pre-mutation state; selectNodeErrors auto-clears", () => {
     const { channelId, wtId } = seedChannelAndWT(12, 10);
     useStore.getState().setBCSymmetric(channelId, "T_wall", false);
     useStore.getState().setBCMode(channelId, "T_wall_left", {
@@ -366,13 +393,15 @@ describe("bcMode slice — snapshot / undo integration", () => {
     // Confirm post-mutation state.
     expect(Object.keys(useStore.getState().bcMode)).toHaveLength(1);
     expect(useStore.getState().edges.filter((e) => e.type === "bcEdge")).toHaveLength(1);
-    expect(useStore.getState().errorTagsByNodeId[wtId]).toContain("bc-n-mismatch");
-    // Undo and confirm all three slices reset.
+    // Phase 63.1 D-15: selector-derived bc-n-mismatch on both endpoints.
+    expect(errorsFor(wtId)).toContain("bc-n-mismatch");
+    // Undo and confirm both slices reset.
     useStore.getState().undo();
     const state = useStore.getState();
     expect(state.bcMode).toEqual({});
     expect(state.edges.filter((e) => e.type === "bcEdge")).toHaveLength(0);
-    expect(state.errorTagsByNodeId[wtId]).toBeUndefined();
-    expect(state.errorTagsByNodeId[channelId]).toBeUndefined();
+    // Selector returns [] after undo because bcMode is empty.
+    expect(errorsFor(wtId)).toEqual([]);
+    expect(errorsFor(channelId)).toEqual([]);
   });
 });

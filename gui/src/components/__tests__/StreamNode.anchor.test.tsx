@@ -60,7 +60,7 @@ beforeEach(() => {
     bcSymmetric: {},
     anchors: {},
     errorNodeIds: new Set<string>(),
-    errorTagsByNodeId: {},
+    // Phase 63.1 D-15: errorTagsByNodeId slice removed.
   });
 });
 
