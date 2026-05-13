@@ -50,7 +50,7 @@ function resetStore() {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — fill in code)",
+          name: "(leave unset — set in code)",
           kind: "unset",
           params: {},
         },
@@ -185,6 +185,44 @@ describe("PowerShapeResourceEditor", () => {
         initialParams: { amplitude: 1.5 },
       });
       expect(screen.getByText("Edit Power Shape")).toBeTruthy();
+    });
+  });
+
+  // 62-15 (VERIFICATION Gap #4): pin the rewritten engineering-voice copy
+  // for identifier validation, amplitude error, and missing-CSV error.
+  describe("62-15 engineering-voice validation copy", () => {
+    it("shows 'Letters, digits, underscores. Cannot start with a digit.' for an invalid name", () => {
+      const onSubmit = vi.fn();
+      renderEditor({ mode: "create", onSubmit });
+      const nameInput = screen.getByDisplayValue("power_shape_1");
+      fireEvent.change(nameInput, { target: { value: "3bad" } });
+      fireEvent.click(screen.getByText("Create"));
+      expect(
+        screen.getByText(
+          "Letters, digits, underscores. Cannot start with a digit.",
+        ),
+      ).toBeTruthy();
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("shows 'Amplitude must be finite.' on a NaN amplitude", () => {
+      const onSubmit = vi.fn();
+      renderEditor({ mode: "create", initialKind: "z_cosine", onSubmit });
+      // Replace the 1.0 default with garbage.
+      const ampInput = screen.getByDisplayValue("1.0");
+      fireEvent.change(ampInput, { target: { value: "not-a-number" } });
+      fireEvent.click(screen.getByText("Create"));
+      expect(screen.getByText("Amplitude must be finite.")).toBeTruthy();
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("shows 'Pick a CSV file via Browse.' when file_loaded path is empty on submit", () => {
+      const onSubmit = vi.fn();
+      renderEditor({ mode: "create", initialKind: "file_loaded", onSubmit });
+      // Do NOT click Browse; click Create directly with empty path.
+      fireEvent.click(screen.getByText("Create"));
+      expect(screen.getByText("Pick a CSV file via Browse.")).toBeTruthy();
+      expect(onSubmit).not.toHaveBeenCalled();
     });
   });
 });
