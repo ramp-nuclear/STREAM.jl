@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { useCallback } from "react";
 import { Handle, Position, useConnection, type NodeProps } from "@xyflow/react";
 import { getComponent } from "../registry";
@@ -74,6 +75,98 @@ const SOURCE_LABEL_FIELD: Record<string, string> = {
   WallTemperature: "T_wall",
   HeatFluxSource: "q",
 };
+
+// ---------------------------------------------------------------------------
+// FlowPort handle + anchor indicator (Phase 63.1 D-13)
+// ---------------------------------------------------------------------------
+//
+// The anchor indicator is a small filled circle next to whichever FlowPort
+// handle is the anchored one for this node (i.e. `anchors[id].portField`
+// matches the handle's expected portField — `port_in.P` for an input handle,
+// `port_out.P` for an output handle). UI-SPEC §"Canvas Anchor Indicator"
+// fixes shape / size / color / positioning.
+//
+// The render is extracted into a sub-component so each handle can call
+// `useStore` directly. Calling `useStore` inside `flowPorts.map(...)` would
+// violate React's rules-of-hooks (hooks-in-loops). The same pattern is used
+// elsewhere in the project (per-row sub-components in ResourceRow.tsx, etc.).
+//
+// The hasAnchor selector returns a *primitive boolean*, not a fresh object —
+// this keeps zustand's shallow equality stable and avoids the max-update-
+// depth re-render loop (Pitfall 1, same rationale as `hasBCError` above).
+
+type FlowPortLike = {
+  name: string;
+  type: string;
+  side?: string;
+};
+
+function anchorIndicatorStyleFor(side: string | undefined): React.CSSProperties {
+  // The FlowPort `<Handle>` is a 12-px circle that ReactFlow centers on the
+  // node edge at the requested `Position`. We place a 6-px dot just outside
+  // the handle, tangent to its edge. The exact offsets below mirror the
+  // UI-SPEC §"Canvas Anchor Indicator — Position" recommendation.
+  switch (side) {
+    case "left":
+      return { position: "absolute", left: -10, top: -3 };
+    case "right":
+      return { position: "absolute", right: -10, top: -3 };
+    case "top":
+      return { position: "absolute", left: -3, top: -10 };
+    case "bottom":
+      return { position: "absolute", left: -3, bottom: -10 };
+    default:
+      return { position: "absolute", left: -10, top: -3 };
+  }
+}
+
+function FlowPortHandle({
+  nodeId,
+  port,
+  dimFlowHandles,
+}: {
+  nodeId: string;
+  port: FlowPortLike;
+  dimFlowHandles: boolean;
+}) {
+  const isInPort = port.name.includes("in");
+  const portFieldKey = isInPort ? "port_in.P" : "port_out.P";
+  // Pitfall 1 — return a primitive boolean, never a fresh object/array, so
+  // zustand's shallow equality keeps re-renders bounded.
+  const hasAnchor = useStore(
+    useCallback(
+      (s: { anchors: Record<string, { portField: string } | undefined> }) =>
+        s.anchors[nodeId]?.portField === portFieldKey,
+      [nodeId, portFieldKey],
+    ),
+  );
+
+  return (
+    <>
+      <Handle
+        id={port.name}
+        type={isInPort ? "target" : "source"}
+        position={sideToPosition[port.side!]}
+        data={{ portType: port.type }}
+        style={{
+          background: isInPort ? FLOW_IN_BG : FLOW_OUT_BG,
+          border: `1.5px solid ${isInPort ? FLOW_IN_BORDER : FLOW_OUT_BORDER}`,
+          ...(dimFlowHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
+        }}
+      />
+      {hasAnchor && (
+        <div
+          data-testid="anchor-indicator"
+          aria-label="Pressure anchor"
+          className={`w-1.5 h-1.5 rounded-full bg-foreground ${
+            dimFlowHandles ? "opacity-20" : ""
+          }`}
+          style={anchorIndicatorStyleFor(port.side)}
+        />
+      )}
+    </>
+  );
+}
 
 export default function StreamNode({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as StreamNodeData;
@@ -180,23 +273,14 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           {sourceLabel.text}
         </div>
       )}
-      {flowPorts.map((port) => {
-        const isInPort = port.name.includes("in");
-        return (
-          <Handle
-            key={port.name}
-            id={port.name}
-            type={isInPort ? "target" : "source"}
-            position={sideToPosition[port.side!]}
-            data={{ portType: port.type }}
-            style={{
-              background: isInPort ? FLOW_IN_BG : FLOW_OUT_BG,
-              border: `1.5px solid ${isInPort ? FLOW_IN_BORDER : FLOW_OUT_BORDER}`,
-              ...(dimFlowHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
-            }}
-          />
-        );
-      })}
+      {flowPorts.map((port) => (
+        <FlowPortHandle
+          key={port.name}
+          nodeId={id}
+          port={port}
+          dimFlowHandles={dimFlowHandles}
+        />
+      ))}
       {thermalPorts.map((port) => (
         <Handle
           key={port.name}
