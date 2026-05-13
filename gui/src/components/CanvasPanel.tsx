@@ -20,7 +20,9 @@ import { getComponent } from "../registry";
 import { isNodeDimmed, isEdgeDimmed } from "../lib/layers";
 import StreamNode from "./StreamNode";
 import HydraulicEdge from "./HydraulicEdge";
+import BCEdge from "./BCEdge";
 import WelcomeOverlay from "./WelcomeOverlay";
+import { isAllowedBCConnection } from "@/lib/bcMode";
 
 export function getPortType(nodeId: string, handleId: string): string | null {
   const node = useStore.getState().nodes.find((n) => n.id === nodeId);
@@ -37,6 +39,7 @@ const nodeTypes: NodeTypes = {
 
 const edgeTypes: EdgeTypes = {
   hydraulicEdge: HydraulicEdge,
+  bcEdge: BCEdge,
 };
 
 const defaultEdgeOptions = { type: "smoothstep" };
@@ -151,6 +154,17 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
     const sourceType = getPortType(connection.source, connection.sourceHandle);
     const targetType = getPortType(connection.target, connection.targetHandle);
     if (sourceType && targetType && sourceType !== targetType) return false;
+    // Phase 63 D-21 — BCPort allow-list. Pure read-only registry check (no
+    // store mutation here per RESEARCH Pitfall 7; n-mismatch flagging lives
+    // in `useStore.addEdge` / `setBCMode`).
+    if (sourceType === "BCPort") {
+      const srcNode = useStore.getState().nodes.find((n) => n.id === connection.source);
+      const tgtNode = useStore.getState().nodes.find((n) => n.id === connection.target);
+      if (!srcNode || !tgtNode) return false;
+      const srcCompId = (srcNode.data as unknown as StreamNodeData).componentId;
+      const tgtCompId = (tgtNode.data as unknown as StreamNodeData).componentId;
+      return isAllowedBCConnection(srcCompId, tgtCompId);
+    }
     return true;
   }, []);
 
