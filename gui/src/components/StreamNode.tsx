@@ -1,13 +1,12 @@
 import type * as React from "react";
 import { useCallback } from "react";
-import { Handle, Position, useConnection, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { getComponent } from "../registry";
 import { getComponentIcon } from "@/registry/icons";
 import { getComponentLayers } from "../lib/layers";
 import type { LayerView } from "../lib/layers";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
-import { getPortType } from "./CanvasPanel";
 import { selectNodeErrors, type NodeErrorsInput } from "@/lib/selectors/nodeErrors";
 
 // Inline colors: immune to Tailwind JIT scanning gaps and * { border-color } cascade.
@@ -185,7 +184,6 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
     ),
   );
   const activeLayer = useStore(useCallback((s: { activeLayer: LayerView }) => s.activeLayer, []));
-  const connection = useConnection();
   const component = getComponent(nodeData.componentId);
   if (!component) return null;
 
@@ -205,26 +203,6 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
   // Combined error surface — legacy Phase-39 + BC tag list. The red-ring
   // outline lights up when EITHER source has a flag for this node.
   const hasAnyError = hasError || hasBCError;
-
-  // -------------------------------------------------------------------------
-  // Whole-body BC drop overlay (D-10, CD-03)
-  // -------------------------------------------------------------------------
-  // Activate the dashed-outline overlay ONLY when:
-  //   (a) a connection is in-flight,
-  //   (b) the in-flight drag's source port is a BCPort, and
-  //   (c) the target node has external_inputs (i.e. is a consumer).
-  // The overlay is purely visual (`pointer-events-none`) — ReactFlow's own
-  // handle hit-testing performs the actual drop. Per CD-03 we use the
-  // built-in `useConnection` hook rather than hand-rolled mouse listeners.
-  const isConsumerNode = (component.external_inputs?.length ?? 0) > 0;
-  const dropActive =
-    !!connection &&
-    connection.inProgress === true &&
-    !!connection.fromNode &&
-    !!connection.fromHandle?.id &&
-    getPortType(connection.fromNode.id, connection.fromHandle.id) === "BCPort" &&
-    isConsumerNode &&
-    connection.fromNode.id !== id; // don't self-drop
 
   // -------------------------------------------------------------------------
   // Source-block label (D-19)
@@ -250,16 +228,6 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
         ...(hasAnyError ? { outlineColor: "var(--destructive)" } : {}),
       }}
     >
-      {dropActive && (
-        <div
-          className="absolute inset-0 rounded border-2 border-dashed pointer-events-none"
-          style={{ borderColor: "var(--muted-foreground)" }}
-        >
-          <div className="absolute -top-[20px] left-1/2 -translate-x-1/2 rounded bg-background px-[6px] py-[2px] text-xs text-muted-foreground border">
-            Connect BC
-          </div>
-        </div>
-      )}
       <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
         <Icon className="w-3.5 h-3.5" />
         {component.label}
@@ -299,22 +267,30 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           }}
         />
       ))}
-      {bcPorts.map((port) => (
-        <Handle
-          key={port.name}
-          id={port.name}
-          type="source"
-          position={sideToPosition[port.side ?? "right"]}
-          data={{ portType: port.type }}
-          style={{
-            background: "transparent",
-            border: `1.5px solid var(--muted-foreground)`,
-            width: 10,
-            height: 10,
-            borderRadius: 0,
-          }}
-        />
-      ))}
+      {bcPorts.map((port) => {
+        // Plan 63.1-12 RC-2: BCPort is now used on both Sources (source-side,
+        // e.g. WT.T_wall_out) AND Hydraulic consumers (target-side, e.g.
+        // Channel.T_wall_left on the bottom edge). The dispatch keys off the
+        // component category — see registry.test.ts "BCPort allowed on
+        // Sources OR Hydraulic" invariant.
+        const isBCSource = component.category === "Sources";
+        return (
+          <Handle
+            key={port.name}
+            id={port.name}
+            type={isBCSource ? "source" : "target"}
+            position={sideToPosition[port.side ?? "right"]}
+            data={{ portType: port.type }}
+            style={{
+              background: "transparent",
+              border: `1.5px solid var(--muted-foreground)`,
+              width: 10,
+              height: 10,
+              borderRadius: 0,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
