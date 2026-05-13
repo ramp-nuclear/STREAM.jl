@@ -203,19 +203,73 @@ describe("StreamNode — Phase 63 BCPort handle (D-18)", () => {
     expect(handle.style.borderRadius).toBe("0px");
   });
 
-  it("does NOT render BCPort handle on a Channel (Channel has no BCPort port)", () => {
+  // Plan 63.1-12 RC-2: Channel + ChannelHeatFlux now declare a BCPort TARGET
+  // handle on the bottom edge (T_wall_left / q_left). The pre-Plan-12 negative
+  // test ("Channel has no BCPort port") is intentionally retired here under
+  // Rule 3 auto-fix; the new contract is enforced by registry.test.ts (BCPort
+  // allowed on Sources OR Hydraulic) and the positive tests below.
+  it("renders BCPort target handle on a Channel (RC-2, bottom edge)", () => {
     const { container } = renderStreamNode({
       componentId: "Channel",
       instanceName: "ch_1",
-      parameters: {},
+      parameters: { n: 4 },
     });
-    // Channel has FlowPort port_in/port_out only; no BCPort handles allowed.
-    const handles = container.querySelectorAll(".react-flow__handle");
-    handles.forEach((h) => {
-      const el = h as HTMLElement;
-      // BCPort would have transparent background — verify none do.
-      expect(el.style.background).not.toBe("transparent");
+    const handles = Array.from(
+      container.querySelectorAll(".react-flow__handle"),
+    ) as HTMLElement[];
+    // The T_wall_left BCPort handle has data-handleid="T_wall_left".
+    const tWallTarget = handles.find(
+      (h) => h.getAttribute("data-handleid") === "T_wall_left",
+    );
+    expect(tWallTarget).toBeDefined();
+    expect(tWallTarget!.getAttribute("data-handlepos")).toBe("bottom");
+    // type='target' on a consumer; ReactFlow encodes type on the className.
+    expect(tWallTarget!.className).toContain("target");
+    // Same hollow-square visual as the source-side BCPort.
+    expect(tWallTarget!.style.background).toBe("transparent");
+    expect(tWallTarget!.style.borderRadius).toBe("0px");
+  });
+
+  it("renders BCPort target handle on a ChannelHeatFlux (RC-2, bottom edge)", () => {
+    const { container } = renderStreamNode({
+      componentId: "ChannelHeatFlux",
+      instanceName: "chf_1",
+      parameters: { n: 4 },
     });
+    const handles = Array.from(
+      container.querySelectorAll(".react-flow__handle"),
+    ) as HTMLElement[];
+    const qTarget = handles.find(
+      (h) => h.getAttribute("data-handleid") === "q_left",
+    );
+    expect(qTarget).toBeDefined();
+    expect(qTarget!.getAttribute("data-handlepos")).toBe("bottom");
+    expect(qTarget!.className).toContain("target");
+  });
+
+  it("renders BCPort handle as source on WallTemperature (category=Sources)", () => {
+    const { container } = renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: { n: 10, T_wall: 320 },
+    });
+    const handles = Array.from(
+      container.querySelectorAll(".react-flow__handle"),
+    ) as HTMLElement[];
+    const tOut = handles.find(
+      (h) => h.getAttribute("data-handleid") === "T_wall_out",
+    );
+    expect(tOut).toBeDefined();
+    expect(tOut!.className).toContain("source");
+  });
+
+  it("does NOT render the legacy 'Connect BC' decoy overlay (Plan 12 cleanup)", () => {
+    const { container } = renderStreamNode({
+      componentId: "Channel",
+      instanceName: "ch_1",
+      parameters: { n: 4 },
+    });
+    expect(container.textContent ?? "").not.toContain("Connect BC");
   });
 });
 
