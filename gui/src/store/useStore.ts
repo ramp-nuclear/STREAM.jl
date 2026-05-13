@@ -14,6 +14,12 @@ import { getComponent } from "../registry";
 import type { BCEntry } from "../lib/codeGenerator";
 import { validateTopology, type TopologyResult } from "../lib/validation";
 import {
+  bcModeKey,
+  cycleBCEdgeTargetSide as cycleBCEdgeTargetSidePure,
+  type BCModeEntry,
+  type BCEdgeData,
+} from "@/lib/bcMode";
+import {
   serializeProject,
   deserializeProject,
   addToRecent,
@@ -123,12 +129,17 @@ export type ActiveLeftTab = "Components" | "Resources" | "Project";
 // Snapshot of undoable canvas + resources content (not UI state like selection,
 // active tab, or panels). Phase 62 extension: `resources` and `modelOptions` are
 // undoable; `activeLeftTab` is NOT (mirrors `selectedNodeId` / `activeLayer`).
+// Phase 63 extension: `bcMode`, `bcSymmetric`, `errorTagsByNodeId` are undoable
+// — every BC slice mutation (setBCMode, clearBCMode, etc.) pushes a snapshot.
 interface CanvasSnapshot {
   nodes: Node[];
   edges: Edge[];
   bcs: BCEntry[];
   resources: ResourcesSliceState;
   modelOptions: ModelOptionsSliceState;
+  bcMode: Record<string, BCModeEntry>;
+  bcSymmetric: Record<string, boolean>;
+  errorTagsByNodeId: Record<string, string[]>;
 }
 
 export interface StreamNodeData {
@@ -222,6 +233,39 @@ interface AppState {
   // loadProject start / successful relocate.
   missingFilePowerShapes: Array<{ uuid: string; name: string; pathTried: string }>;
   relocatePowerShapeFile: (uuid: string) => Promise<void>;
+  // ----- Phase 63: BCs-tab slice (D-23 single source-of-truth) -----
+  // Composite key bcModeKey(componentId, externalInputName) → entry. Absence of
+  // a key = required-unset (D-09 sentinel-by-absence, no `{mode: "unset"}`).
+  bcMode: Record<string, BCModeEntry>;
+  // Composite key `${nodeId}::${baseField}` (e.g., "ch1::T_wall") → symmetric ON/OFF.
+  // Default ON per CD-05 (persisted per-component-instance).
+  bcSymmetric: Record<string, boolean>;
+  // Phase 63 BC-specific error tags (e.g., "bc-n-mismatch"). Sibling of the
+  // existing Phase-39 `errorNodeIds: Set<string>` slice (which is owned by
+  // validateAndGate and has different shape semantics). Phase 71 will unify
+  // the two surfaces — Phase 63 ships the minimal Record<nodeId, string[]>
+  // form for the n-mismatch soft-warning surface (D-22). Consumed by 63-D's
+  // StreamNode renderer to drive red-ring rendering for BC-related errors.
+  errorTagsByNodeId: Record<string, string[]>;
+  // BC actions
+  setBCMode: (
+    componentId: string,
+    externalInputName: string,
+    entry: BCModeEntry,
+  ) => void;
+  clearBCMode: (componentId: string, externalInputName: string) => void;
+  setBCSymmetric: (nodeId: string, baseField: string, symmetric: boolean) => void;
+  cycleBCEdgeTargetSide: (edgeId: string) => void;
+  /** Internal: invoked by onEdgesChange when a `type === "bcEdge"` edge is
+   *  removed. Reverts the matching bcMode entry to undefined (required-unset)
+   *  and clears the `bc-n-mismatch` tag. NEVER pushes a snapshot — the outer
+   *  onEdgesChange does. */
+  _revertBCModeForEdge: (edge: Edge) => void;
+  /** Internal: n-mismatch detection for BC connections. Reads both nodes' `n`
+   *  from `data.parameters.n`; if mismatched, adds the `bc-n-mismatch` tag to
+   *  both nodeIds' errorTagsByNodeId entries; otherwise clears that tag from
+   *  both. Idempotent. */
+  _checkBCNMismatch: (sourceNodeId: string, targetNodeId: string) => void;
   // File I/O actions
   saveProject: () => Promise<void>;
   saveProjectAs: () => Promise<void>;
@@ -483,6 +527,70 @@ async function relativizePowerShapePaths(
 }
 
 // ---------------------------------------------------------------------------
+// Phase 63 BC slice helpers (private, module-level)
+// ---------------------------------------------------------------------------
+
+/** Strip a trailing `_left` / `_right` suffix from an external_input name to
+ *  get the base field. e.g. `T_wall_left` → `T_wall`, `q_right` → `q`. If the
+ *  name has no `_left`/`_right` suffix, returns it unchanged (defensive). */
+function stripSideSuffix(externalInputName: string): string {
+  if (externalInputName.endsWith("_left")) {
+    return externalInputName.slice(0, -"_left".length);
+  }
+  if (externalInputName.endsWith("_right")) {
+    return externalInputName.slice(0, -"_right".length);
+  }
+  return externalInputName;
+}
+
+/** Return the paired sibling name (`T_wall_left` ↔ `T_wall_right`) by swapping
+ *  the `_left`/`_right` suffix. Returns `null` if the name has no such suffix
+ *  (e.g., a single-handed BC with no sibling — codegen tolerates this). */
+function siblingExternalInputName(externalInputName: string): string | null {
+  if (externalInputName.endsWith("_left")) {
+    return externalInputName.slice(0, -"_left".length) + "_right";
+  }
+  if (externalInputName.endsWith("_right")) {
+    return externalInputName.slice(0, -"_right".length) + "_left";
+  }
+  return null;
+}
+
+/** Mutate the given map: add `tag` to the array for `nodeId` (no duplicates).
+ *  Creates the array if absent. */
+function addTagInPlace(
+  map: Record<string, string[]>,
+  nodeId: string,
+  tag: string,
+): void {
+  const existing = map[nodeId];
+  if (existing === undefined) {
+    map[nodeId] = [tag];
+    return;
+  }
+  if (!existing.includes(tag)) {
+    map[nodeId] = [...existing, tag];
+  }
+}
+
+/** Mutate the given map: remove `tag` from the array for `nodeId`. If the
+ *  resulting array is empty, delete the key. No-op if absent. */
+function removeTagInPlace(
+  map: Record<string, string[]>,
+  nodeId: string,
+  tag: string,
+): void {
+  const existing = map[nodeId];
+  if (existing === undefined) return;
+  const filtered = existing.filter((t) => t !== tag);
+  if (filtered.length === 0) {
+    delete map[nodeId];
+  } else {
+    map[nodeId] = filtered;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Edge enrichment: arrowheads for hydraulic edges
 // ---------------------------------------------------------------------------
 
@@ -491,7 +599,8 @@ async function relativizePowerShapePaths(
  * Pure function — does NOT call get(). Used by addEdge and loadProjectFromPath.
  */
 export function enrichEdges(edges: Edge[], nodes: Node[]): Edge[] {
-  // Step 1: Set hydraulicEdge type + arrowhead for hydraulic; strip arrowhead from thermal.
+  // Step 1: Set hydraulicEdge type + arrowhead for hydraulic; strip arrowhead from thermal;
+  // assign bcEdge type + BCEdgeData payload for BCPort.
   const typedEdges = edges.map((e) => {
     const srcNode = nodes.find((n) => n.id === e.source);
     if (!srcNode) return e;
@@ -502,6 +611,23 @@ export function enrichEdges(edges: Edge[], nodes: Node[]): Edge[] {
       // Thermal edge: keep smoothstep, no arrowhead
       const { markerEnd, ...rest } = e as Edge & { markerEnd?: unknown };
       return rest;
+    }
+    if (srcPort?.type === "BCPort") {
+      // Phase 63 BC edge: strip markerEnd, set type "bcEdge", attach BCEdgeData.
+      // Preserve any existing data.targetSide (round-trip through .scp load /
+      // edge-cycle action); default `both` per D-11.
+      const existingData = e.data as BCEdgeData | undefined;
+      const { markerEnd, ...rest } = e as Edge & { markerEnd?: unknown };
+      const bcData: BCEdgeData = {
+        componentId: e.target,
+        externalInputName: e.targetHandle ?? "",
+        targetSide: existingData?.targetSide ?? "both",
+      };
+      return {
+        ...rest,
+        type: "bcEdge",
+        data: bcData as unknown as Record<string, unknown>,
+      } as Edge;
     }
     // Hydraulic edge: custom type + filled arrowhead
     return {
@@ -599,6 +725,18 @@ const useStore = create<AppState>()((set, get) => ({
   missingFilePowerShapes: [],
 
   // ---------------------------------------------------------------------------
+  // Phase 63: BCs-tab slice initial state (D-23)
+  // ---------------------------------------------------------------------------
+  // All three slices start empty. `bcMode[key] === undefined` is the canonical
+  // required-unset sentinel (D-09 sentinel-by-absence). `bcSymmetric` default
+  // ON is encoded by the *consumer* defaulting `(state.bcSymmetric[key] ?? true)`
+  // — we do not pre-populate per-(node, baseField) entries because we don't
+  // know which keys will exist until the user creates the consumer node.
+  bcMode: {},
+  bcSymmetric: {},
+  errorTagsByNodeId: {},
+
+  // ---------------------------------------------------------------------------
   // Undo / redo — explicit history stack
   //
   // Why not zundo (temporal middleware)? ReactFlow fires many "noise" change
@@ -611,19 +749,48 @@ const useStore = create<AppState>()((set, get) => ({
   _undoFuture: [],
 
   _pushSnapshot: () => {
-    const { nodes, edges, bcs, resources, modelOptions, _undoPast } = get();
+    const {
+      nodes,
+      edges,
+      bcs,
+      resources,
+      modelOptions,
+      bcMode,
+      bcSymmetric,
+      errorTagsByNodeId,
+      _undoPast,
+    } = get();
     set({
       _undoPast: [
         ..._undoPast,
-        { nodes, edges, bcs, resources, modelOptions },
+        {
+          nodes,
+          edges,
+          bcs,
+          resources,
+          modelOptions,
+          bcMode,
+          bcSymmetric,
+          errorTagsByNodeId,
+        },
       ].slice(-50),
       _undoFuture: [],
     });
   },
 
   undo: () => {
-    const { nodes, edges, bcs, resources, modelOptions, _undoPast, _undoFuture } =
-      get();
+    const {
+      nodes,
+      edges,
+      bcs,
+      resources,
+      modelOptions,
+      bcMode,
+      bcSymmetric,
+      errorTagsByNodeId,
+      _undoPast,
+      _undoFuture,
+    } = get();
     if (_undoPast.length === 0) return;
     const prev = _undoPast[_undoPast.length - 1];
     set({
@@ -632,9 +799,21 @@ const useStore = create<AppState>()((set, get) => ({
       bcs: prev.bcs,
       resources: prev.resources,
       modelOptions: prev.modelOptions,
+      bcMode: prev.bcMode,
+      bcSymmetric: prev.bcSymmetric,
+      errorTagsByNodeId: prev.errorTagsByNodeId,
       _undoPast: _undoPast.slice(0, -1),
       _undoFuture: [
-        { nodes, edges, bcs, resources, modelOptions },
+        {
+          nodes,
+          edges,
+          bcs,
+          resources,
+          modelOptions,
+          bcMode,
+          bcSymmetric,
+          errorTagsByNodeId,
+        },
         ..._undoFuture,
       ].slice(0, 50),
       isDirty: true,
@@ -644,8 +823,18 @@ const useStore = create<AppState>()((set, get) => ({
   },
 
   redo: () => {
-    const { nodes, edges, bcs, resources, modelOptions, _undoPast, _undoFuture } =
-      get();
+    const {
+      nodes,
+      edges,
+      bcs,
+      resources,
+      modelOptions,
+      bcMode,
+      bcSymmetric,
+      errorTagsByNodeId,
+      _undoPast,
+      _undoFuture,
+    } = get();
     if (_undoFuture.length === 0) return;
     const next = _undoFuture[0];
     set({
@@ -654,9 +843,21 @@ const useStore = create<AppState>()((set, get) => ({
       bcs: next.bcs,
       resources: next.resources,
       modelOptions: next.modelOptions,
+      bcMode: next.bcMode,
+      bcSymmetric: next.bcSymmetric,
+      errorTagsByNodeId: next.errorTagsByNodeId,
       _undoPast: [
         ..._undoPast,
-        { nodes, edges, bcs, resources, modelOptions },
+        {
+          nodes,
+          edges,
+          bcs,
+          resources,
+          modelOptions,
+          bcMode,
+          bcSymmetric,
+          errorTagsByNodeId,
+        },
       ].slice(-50),
       _undoFuture: _undoFuture.slice(1),
       isDirty: true,
@@ -708,6 +909,21 @@ const useStore = create<AppState>()((set, get) => ({
     // Keyboard-delete on selected edge: snapshot before removal.
     if (changes.some((c) => c.type === "remove")) {
       get()._pushSnapshot();
+    }
+
+    // Phase 63 D-23 bidirectional sync: when a `type === "bcEdge"` edge is
+    // removed (via keyboard delete or programmatically), revert the matching
+    // bcMode entry to undefined (required-unset) and clear bc-n-mismatch tags.
+    // Must run BEFORE applyEdgeChanges so we can read the about-to-be-removed
+    // edge from the current edges list.
+    const currentEdges = get().edges;
+    for (const c of changes) {
+      if (c.type !== "remove") continue;
+      const removedEdge = currentEdges.find((e) => e.id === c.id);
+      if (!removedEdge) continue;
+      if (removedEdge.type === "bcEdge") {
+        get()._revertBCModeForEdge(removedEdge);
+      }
     }
 
     set({ edges: applyEdgeChanges(changes, get().edges), isDirty: true });
@@ -821,6 +1037,30 @@ const useStore = create<AppState>()((set, get) => ({
     // Apply hydraulic arrowheads and parallel offset for bidirectional pairs
     const finalEdges = enrichEdges(styledEdges, get().nodes);
 
+    // Phase 63 D-22 soft-warning n-mismatch detection on the canvas-drag path.
+    // enrichEdges has just assigned `type: "bcEdge"` for BCPort sources, so we
+    // can detect this case by checking the source port type via the registry.
+    // The check runs BEFORE the final set({...}) so the edge addition + the
+    // n-mismatch flagging land in the same render tick (atomic update).
+    // (The BCs-tab path is covered separately by setBCMode below — both user
+    // paths converge through _checkBCNMismatch.)
+    if (connection.source && connection.target) {
+      const srcNode = get().nodes.find((n) => n.id === connection.source);
+      if (srcNode) {
+        const srcComp = getComponent(
+          (srcNode.data as unknown as StreamNodeData).componentId,
+        );
+        const srcPort = srcComp?.ports.find((p) => p.name === connection.sourceHandle);
+        if (srcPort?.type === "BCPort") {
+          // Set edges first so _checkBCNMismatch reads the post-add edge set
+          // for any side-effect logic; then run the check.
+          set({ edges: finalEdges, isDirty: true });
+          get()._checkBCNMismatch(connection.source, connection.target);
+          return;
+        }
+      }
+    }
+
     const { errorNodeIds } = get();
 
     if (errorNodeIds.size > 0) {
@@ -863,6 +1103,285 @@ const useStore = create<AppState>()((set, get) => ({
   removeBC: (index) => {
     get()._pushSnapshot();
     set({ bcs: get().bcs.filter((_, i) => i !== index), isDirty: true });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 63: BCs-tab slice actions (D-23 bidirectional sync)
+  //
+  // Every BC mutation MUST call _pushSnapshot() BEFORE set(...) — mirrors the
+  // Phase 62 Resources slice discipline. `_revertBCModeForEdge` is the lone
+  // exception (called from onEdgesChange which already pushed a snapshot).
+  // ---------------------------------------------------------------------------
+
+  setBCMode: (componentId, externalInputName, entry) => {
+    get()._pushSnapshot();
+    const state = get();
+    const key = bcModeKey(componentId, externalInputName);
+    const baseField = stripSideSuffix(externalInputName);
+    // Default symmetric ON (CD-05). Consumer reads `bcSymmetric[symKey] ?? true`.
+    const symKey = `${componentId}::${baseField}`;
+    const symmetric = state.bcSymmetric[symKey] ?? true;
+    const siblingName = symmetric ? siblingExternalInputName(externalInputName) : null;
+    const siblingKey = siblingName ? bcModeKey(componentId, siblingName) : null;
+
+    // Compute new bcMode map.
+    const previous = state.bcMode[key];
+    const nextBCMode: Record<string, BCModeEntry> = {
+      ...state.bcMode,
+      [key]: entry,
+    };
+    if (siblingKey) {
+      nextBCMode[siblingKey] = entry;
+    }
+
+    // Compute new edges map: add/replace source-mode BC edge, or remove stale
+    // edge when transitioning away from source mode.
+    let nextEdges = state.edges;
+
+    // Remove any prior source-mode edge for this (componentId, externalInputName)
+    // (and sibling, if symmetric). This handles: source→non-source transitions,
+    // source-A→source-B replacements (no duplicate), and the symmetric mirror.
+    const removeStaleSourceEdge = (targetHandle: string) => {
+      nextEdges = nextEdges.filter(
+        (e) =>
+          !(
+            e.type === "bcEdge" &&
+            e.target === componentId &&
+            e.targetHandle === targetHandle
+          ),
+      );
+    };
+    if (previous?.mode === "source") {
+      removeStaleSourceEdge(externalInputName);
+    }
+    if (
+      siblingKey &&
+      state.bcMode[siblingKey]?.mode === "source" &&
+      siblingName
+    ) {
+      removeStaleSourceEdge(siblingName);
+    }
+
+    // If new entry is source mode, materialize the BC edge(s).
+    if (entry.mode === "source") {
+      const sourceNode = state.nodes.find((n) => n.id === entry.sourceNodeId);
+      if (sourceNode) {
+        const sourceComp = getComponent(
+          (sourceNode.data as unknown as StreamNodeData).componentId,
+        );
+        const sourcePort = sourceComp?.ports.find((p) => p.type === "BCPort");
+        if (sourcePort) {
+          const sides: string[] = [externalInputName];
+          if (siblingName) sides.push(siblingName);
+          for (const tgtHandle of sides) {
+            // Idempotency: skip if an identical edge already exists.
+            const dup = nextEdges.some(
+              (e) =>
+                e.type === "bcEdge" &&
+                e.source === entry.sourceNodeId &&
+                e.sourceHandle === sourcePort.name &&
+                e.target === componentId &&
+                e.targetHandle === tgtHandle,
+            );
+            if (dup) continue;
+            const edgeId = `bce-${entry.sourceNodeId}-${componentId}-${tgtHandle}-${crypto.randomUUID().slice(0, 8)}`;
+            const bcData: BCEdgeData = {
+              componentId,
+              externalInputName: tgtHandle,
+              targetSide: "both",
+            };
+            nextEdges = [
+              ...nextEdges,
+              {
+                id: edgeId,
+                source: entry.sourceNodeId,
+                sourceHandle: sourcePort.name,
+                target: componentId,
+                targetHandle: tgtHandle,
+                type: "bcEdge",
+                data: bcData as unknown as Record<string, unknown>,
+              } as Edge,
+            ];
+          }
+        }
+      }
+    }
+
+    set({ bcMode: nextBCMode, edges: nextEdges, isDirty: true });
+
+    // After updating edges + bcMode, run the n-mismatch check for any current
+    // source-mode entry on the key(s).
+    if (entry.mode === "source") {
+      get()._checkBCNMismatch(entry.sourceNodeId, componentId);
+    }
+  },
+
+  clearBCMode: (componentId, externalInputName) => {
+    get()._pushSnapshot();
+    const state = get();
+    const key = bcModeKey(componentId, externalInputName);
+    const baseField = stripSideSuffix(externalInputName);
+    const symKey = `${componentId}::${baseField}`;
+    const symmetric = state.bcSymmetric[symKey] ?? true;
+    const siblingName = symmetric ? siblingExternalInputName(externalInputName) : null;
+    const siblingKey = siblingName ? bcModeKey(componentId, siblingName) : null;
+
+    // Track any prior source-mode entry so we can remove its BC edge AND clear
+    // the bc-n-mismatch tag on the source node afterwards.
+    const priorSourceNodeIds = new Set<string>();
+    const prior = state.bcMode[key];
+    if (prior?.mode === "source") priorSourceNodeIds.add(prior.sourceNodeId);
+    if (siblingKey) {
+      const priorSib = state.bcMode[siblingKey];
+      if (priorSib?.mode === "source") priorSourceNodeIds.add(priorSib.sourceNodeId);
+    }
+
+    // Remove the bcMode entry (and sibling).
+    const nextBCMode: Record<string, BCModeEntry> = { ...state.bcMode };
+    delete nextBCMode[key];
+    if (siblingKey) delete nextBCMode[siblingKey];
+
+    // Remove any BC edge whose target matches this consumer + handle(s).
+    const handlesToRemove = new Set<string>([externalInputName]);
+    if (siblingName) handlesToRemove.add(siblingName);
+    const nextEdges = state.edges.filter(
+      (e) =>
+        !(
+          e.type === "bcEdge" &&
+          e.target === componentId &&
+          handlesToRemove.has(e.targetHandle ?? "")
+        ),
+    );
+
+    // Clear bc-n-mismatch tag on consumer node (no remaining source link from
+    // this consumer to anything) and on each previously-linked source node.
+    const nextTags: Record<string, string[]> = { ...state.errorTagsByNodeId };
+    const consumerStillHasSource = Object.entries(nextBCMode).some(
+      ([k, v]) => k.startsWith(`${componentId}::`) && v.mode === "source",
+    );
+    if (!consumerStillHasSource) {
+      removeTagInPlace(nextTags, componentId, "bc-n-mismatch");
+    }
+    for (const sourceNodeId of priorSourceNodeIds) {
+      // If the source node has no other BC edges remaining, clear its tag.
+      const stillLinked = nextEdges.some(
+        (e) => e.type === "bcEdge" && e.source === sourceNodeId,
+      );
+      if (!stillLinked) {
+        removeTagInPlace(nextTags, sourceNodeId, "bc-n-mismatch");
+      }
+    }
+
+    set({
+      bcMode: nextBCMode,
+      edges: nextEdges,
+      errorTagsByNodeId: nextTags,
+      isDirty: true,
+    });
+  },
+
+  setBCSymmetric: (nodeId, baseField, symmetric) => {
+    get()._pushSnapshot();
+    const state = get();
+    const symKey = `${nodeId}::${baseField}`;
+    const nextBCSymmetric: Record<string, boolean> = {
+      ...state.bcSymmetric,
+      [symKey]: symmetric,
+    };
+    let nextBCMode = state.bcMode;
+    if (symmetric) {
+      // Left-wins: if turning ON and left/right entries differ, copy left to right.
+      const leftKey = bcModeKey(nodeId, `${baseField}_left`);
+      const rightKey = bcModeKey(nodeId, `${baseField}_right`);
+      const leftEntry = state.bcMode[leftKey];
+      const rightEntry = state.bcMode[rightKey];
+      if (leftEntry !== undefined && leftEntry !== rightEntry) {
+        nextBCMode = { ...state.bcMode, [rightKey]: leftEntry };
+      }
+    }
+    set({ bcMode: nextBCMode, bcSymmetric: nextBCSymmetric, isDirty: true });
+  },
+
+  cycleBCEdgeTargetSide: (edgeId) => {
+    get()._pushSnapshot();
+    const state = get();
+    const nextEdges = state.edges.map((e) => {
+      if (e.id !== edgeId) return e;
+      if (e.type !== "bcEdge") return e;
+      const data = (e.data as BCEdgeData | undefined) ?? {
+        componentId: e.target,
+        externalInputName: e.targetHandle ?? "",
+        targetSide: "both" as const,
+      };
+      const nextSide = cycleBCEdgeTargetSidePure(data.targetSide);
+      return { ...e, data: { ...data, targetSide: nextSide } } as Edge;
+    });
+    set({ edges: nextEdges, isDirty: true });
+  },
+
+  _revertBCModeForEdge: (edge) => {
+    if (edge.type !== "bcEdge") return;
+    const state = get();
+    const data = edge.data as BCEdgeData | undefined;
+    if (!data) return;
+    const { componentId, externalInputName } = data;
+    const key = bcModeKey(componentId, externalInputName);
+    const baseField = stripSideSuffix(externalInputName);
+    const symKey = `${componentId}::${baseField}`;
+    const symmetric = state.bcSymmetric[symKey] ?? true;
+    const siblingName = symmetric ? siblingExternalInputName(externalInputName) : null;
+    const siblingKey = siblingName ? bcModeKey(componentId, siblingName) : null;
+
+    const nextBCMode: Record<string, BCModeEntry> = { ...state.bcMode };
+    delete nextBCMode[key];
+    if (siblingKey) delete nextBCMode[siblingKey];
+
+    // Clear bc-n-mismatch tag on consumer (if no remaining source-mode bcMode
+    // entry for this consumer) and on the source endpoint (if any).
+    const nextTags: Record<string, string[]> = { ...state.errorTagsByNodeId };
+    const consumerStillHasSource = Object.entries(nextBCMode).some(
+      ([k, v]) => k.startsWith(`${componentId}::`) && v.mode === "source",
+    );
+    if (!consumerStillHasSource) {
+      removeTagInPlace(nextTags, componentId, "bc-n-mismatch");
+    }
+    // Source endpoint: check edge.source — if no other bcEdge originates there
+    // in the current edges (the edge being removed will be filtered by the
+    // outer applyEdgeChanges), clear its tag too. We approximate by checking
+    // current edges minus this one.
+    const sourceNodeId = edge.source;
+    const otherSourceEdges = state.edges.some(
+      (e) =>
+        e.id !== edge.id && e.type === "bcEdge" && e.source === sourceNodeId,
+    );
+    if (!otherSourceEdges) {
+      removeTagInPlace(nextTags, sourceNodeId, "bc-n-mismatch");
+    }
+
+    set({ bcMode: nextBCMode, errorTagsByNodeId: nextTags });
+  },
+
+  _checkBCNMismatch: (sourceNodeId, targetNodeId) => {
+    const state = get();
+    const srcNode = state.nodes.find((n) => n.id === sourceNodeId);
+    const tgtNode = state.nodes.find((n) => n.id === targetNodeId);
+    if (!srcNode || !tgtNode) return;
+    const srcN = (srcNode.data as unknown as StreamNodeData).parameters?.["n"];
+    const tgtN = (tgtNode.data as unknown as StreamNodeData).parameters?.["n"];
+    const nextTags: Record<string, string[]> = { ...state.errorTagsByNodeId };
+    const TAG = "bc-n-mismatch";
+    if (
+      typeof srcN === "number" &&
+      typeof tgtN === "number" &&
+      srcN !== tgtN
+    ) {
+      addTagInPlace(nextTags, sourceNodeId, TAG);
+      addTagInPlace(nextTags, targetNodeId, TAG);
+    } else {
+      removeTagInPlace(nextTags, sourceNodeId, TAG);
+      removeTagInPlace(nextTags, targetNodeId, TAG);
+    }
+    set({ errorTagsByNodeId: nextTags });
   },
 
   // ---------------------------------------------------------------------------
@@ -1397,6 +1916,13 @@ const useStore = create<AppState>()((set, get) => ({
         selectionKind: "none",
         // INV-10 surface: populate missing-file PowerShape list (cleared if empty)
         missingFilePowerShapes: missing,
+        // Phase 63: reset BC slices on project load — .scp persistence for
+        // bcMode / bcSymmetric is out of scope for 63-B (Phase 66 owns scp
+        // schema evolution). Reset to empty so a freshly-loaded project
+        // doesn't carry stale BC state from the previous session.
+        bcMode: {},
+        bcSymmetric: {},
+        errorTagsByNodeId: {},
       });
       await saveRecentFiles(updated);
 
@@ -1478,6 +2004,10 @@ const useStore = create<AppState>()((set, get) => ({
       selectedResourceKind: null,
       selectionKind: "none",
       missingFilePowerShapes: [],
+      // Phase 63: reset BC slices on newProject.
+      bcMode: {},
+      bcSymmetric: {},
+      errorTagsByNodeId: {},
     });
   },
 
