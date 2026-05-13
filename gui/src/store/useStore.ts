@@ -1373,10 +1373,23 @@ const useStore = create<AppState>()((set, get) => ({
     // setBCMode (which materializes the BC edge) does NOT flag the brand-new
     // pair as mismatched (D-20 explicit; selectNodeErrors derives the
     // bc-n-mismatch tag from `nodes + bcMode`).
+    //
+    // GAP-RC-3 (Plan 63.1-13): also seed the type_union scalar value parameter
+    // with a physically benign neutral default so the freshly-spawned source's
+    // canvas label reads as muted-gray ("T_wall = 300 K") rather than
+    // destructive-red "(unset)" before any user input. The user can immediately
+    // override via the Properties panel (Plan 11 RC-1 closure).
+    //   T_wall = 300.0 K — room temperature, clearly a placeholder.
+    //   q     = 0.0 W/m² — natural "no-source" default for HFS.
+    const SOURCE_DEFAULT_SEED: Record<string, Record<string, number>> = {
+      WallTemperature: { T_wall: 300.0 },
+      HeatFluxSource: { q: 0.0 },
+    };
+    const valueSeed = SOURCE_DEFAULT_SEED[sourceCompId] ?? {};
     const consumerN =
       (consumerData.parameters?.n as number | undefined) ?? 1;
     get().updateNodeParams(newNode.id, {
-      parameters: { n: consumerN },
+      parameters: { n: consumerN, ...valueSeed },
     });
 
     // setBCMode internally materializes the dashed BC edge via its
