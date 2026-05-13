@@ -140,7 +140,7 @@ export function ResponsiveTabsList({
         "flex-none size-[32px] p-0 rounded-md border-0",
         "text-muted-foreground bg-transparent",
         "hover:text-foreground",
-        "data-[state=active]:text-foreground",
+        "data-[state=active]:text-foreground data-[state=active]:ring-2 data-[state=active]:ring-primary",
         "data-[state=active]:after:!opacity-0",
       );
     }
