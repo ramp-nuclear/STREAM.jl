@@ -4,4 +4,7 @@ examples/output/
 
 # Node / GUI
 node_modules/
-gui/export_examples/
+# Phase 62 ships fresh .scp example fixtures under gui/export_examples/ (see
+# 62-11 plan); previously this whole directory was ignored because it held
+# stale developer dumps. Version-control the directory now; runtime artifacts
+# can be ignored individually as they appear.

@@ -519,7 +519,8 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         }),
       ];
       const code = generateCode(nodes, [], NO_BCS, mockGetComponent);
-      expect(code).toContain("PipeGeometry_rectangular(0.5, 0.01, 0.003)");
+      // 4-arg form: L, edge1=W, edge2=H, heated_edge=W (62-11 INV-CG-05 fix)
+      expect(code).toContain("PipeGeometry_rectangular(0.5, 0.01, 0.003, 0.01)");
     });
   });
 });
