@@ -318,6 +318,65 @@ const RECENT_FILE_NAME = "recent.json";
 const PROJECT_FILE_EXTENSION = "scp";
 const PROJECT_FILE_LABEL = "STREAM Composer Projects";
 
+// Pre-Phase-62-14 hardcoded default; still the fallback when modelOptions.name
+// is empty / whitespace / fully sanitized away. Kept as a named constant so a
+// future renamer can grep one source of truth.
+const FALLBACK_SAVE_AS_FILENAME = `project.${PROJECT_FILE_EXTENSION}` as const;
+
+// Regex for OS-illegal filename characters. Reserved on Windows, problematic
+// on POSIX, OR ASCII control range (\x00-\x1f). Stripped at sanitization
+// step 2 of computeSaveAsDefaultFilename.
+//
+// eslint-disable-next-line no-control-regex
+const ILLEGAL_FILENAME_CHARS_RE = /[\\/:*?"<>|\x00-\x1f]/g;
+
+/**
+ * Derive the default filename passed to the Tauri save() dialog for
+ * File → Save As. Sanitizes OS-illegal characters and appends `.scp`
+ * exactly once. Empty / whitespace-only / fully-sanitized-empty names
+ * fall back to `project.scp` (the pre-Phase-62-14 hardcode).
+ *
+ * Sanitization order:
+ *   1. Trim leading/trailing whitespace.
+ *   2. Strip OS-illegal chars: `/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`,
+ *      and ASCII control characters (\x00-\x1f).
+ *   3. Collapse runs of internal whitespace to a single space.
+ *   4. Trim again (step 2 can leave whitespace adjacent to stripped chars).
+ *   5. Empty result → fall back to `project.scp`.
+ *   6. Result already ends with `.scp` (case-insensitive) → return as-is
+ *      (preserves original case; do NOT double-append).
+ *   7. Otherwise → append `.scp`.
+ *
+ * Does NOT lowercase, enforce Julia-identifier rules, or strip filename-legal
+ * unicode — `modelOptions.name` is a free-form project label per Plan 62-07.
+ *
+ * Phase 62-14 — closes VERIFICATION.md Critical Gap #3.
+ *
+ * Exported for unit testing only; not part of the store's public API.
+ *
+ * @param name Raw `modelOptions.name` from the Model Options form.
+ * @returns A filename string suitable for the Tauri save() dialog's
+ *          `defaultPath` argument. Always non-empty and always ends in `.scp`
+ *          (case-insensitive).
+ */
+export function computeSaveAsDefaultFilename(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return FALLBACK_SAVE_AS_FILENAME;
+
+  const stripped = trimmed
+    .replace(ILLEGAL_FILENAME_CHARS_RE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (stripped.length === 0) return FALLBACK_SAVE_AS_FILENAME;
+
+  const ext = `.${PROJECT_FILE_EXTENSION}`;
+  if (stripped.toLowerCase().endsWith(ext.toLowerCase())) {
+    return stripped;
+  }
+  return `${stripped}${ext}`;
+}
+
 async function loadRecentFiles(): Promise<string[]> {
   try {
     // Dynamic imports to avoid breaking vitest (Tauri APIs unavailable in node env)
@@ -1145,8 +1204,11 @@ const useStore = create<AppState>()((set, get) => ({
 
     try {
       const { save } = await import("@tauri-apps/plugin-dialog");
+      // Phase 62-14 (Critical Gap #3): derive defaultPath from the current
+      // modelOptions.name (read lazily via get() so a name edit between
+      // action start and dialog open is reflected).
       const filePath = await save({
-        defaultPath: `project.${PROJECT_FILE_EXTENSION}`,
+        defaultPath: computeSaveAsDefaultFilename(get().modelOptions.name),
         filters: [
           { name: PROJECT_FILE_LABEL, extensions: [PROJECT_FILE_EXTENSION] },
         ],
