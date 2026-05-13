@@ -264,14 +264,22 @@ describe('Component Registry', () => {
     }
   });
 
-  it('BCPort is only used by Sources category components (D-14/D-15)', () => {
+  it('BCPort is used by Sources (source-side) and Hydraulic (target-side) only (D-14/D-15, Plan 63.1-12 RC-2)', () => {
+    // Phase 61 invariant ("Sources only") was widened in Plan 63.1-12: Channel
+    // and ChannelHeatFlux (category "Hydraulic") declare BCPort target handles
+    // (e.g. T_wall_left, q_left) so ReactFlow can bind a dashed BC edge dropped
+    // from a WallTemperature/HeatFluxSource source handle. StreamNode picks
+    // source-vs-target at render time via `component.category === "Sources"`.
+    // BCPort is still invalid on Reactor Physics, Resources, and any future
+    // non-{Sources,Hydraulic} category.
+    const allowedCategories = new Set(['Sources', 'Hydraulic']);
     for (const comp of getAllComponents()) {
       const bcPorts = comp.ports.filter(p => p.type === 'BCPort');
       if (bcPorts.length > 0) {
         expect(
-          comp.category,
-          `${comp.id} has BCPort(s) but category is "${comp.category}" — BCPort is reserved for Sources-category value-source blocks`,
-        ).toBe('Sources');
+          allowedCategories.has(comp.category),
+          `${comp.id} has BCPort(s) but category is "${comp.category}" — BCPort is allowed only on Sources (source-side) or Hydraulic (target-side) per Plan 63.1-12.`,
+        ).toBe(true);
       }
     }
   });
