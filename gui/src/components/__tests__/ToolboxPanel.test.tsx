@@ -86,11 +86,48 @@ describe("ToolboxPanel — SOURCES header (D-30)", () => {
     expect(pos & 4).toBeTruthy();
   });
 
-  it("D-30: no WallTemperature or HeatFluxSource rows are rendered in Phase 62", () => {
+  it("D-24: WallTemperature and HeatFluxSource rows ARE rendered in Phase 63", () => {
+    // Phase 63 D-24 populates the Sources category (Phase 62 only shipped
+    // the header). The registry labels are "Wall Temperature" and
+    // "Heat Flux Source" — match those via getByText to gate the rendering.
     render(<ToolboxPanel />);
-    // Phase 63 lands the drag entries; Phase 62 ships the header only.
-    expect(screen.queryByText(/WallTemperature/i)).toBeNull();
-    expect(screen.queryByText(/HeatFluxSource/i)).toBeNull();
+    expect(screen.getByText(/Wall Temperature/i)).toBeTruthy();
+    expect(screen.getByText(/Heat Flux Source/i)).toBeTruthy();
+  });
+
+  it("D-24: WallTemperature renders as a draggable ToolboxItem", () => {
+    render(<ToolboxPanel />);
+    const row = screen.getByText(/Wall Temperature/i);
+    // ToolboxItem wraps the label in a <div draggable> with the
+    // `application/streamcomponent` data on dragStart. We assert that the
+    // ancestor element is draggable.
+    let el: HTMLElement | null = row;
+    while (el && el.getAttribute("draggable") !== "true") {
+      el = el.parentElement;
+    }
+    expect(el).toBeTruthy();
+    expect(el?.getAttribute("draggable")).toBe("true");
+  });
+
+  it("D-24: HeatFluxSource renders as a draggable ToolboxItem", () => {
+    render(<ToolboxPanel />);
+    const row = screen.getByText(/Heat Flux Source/i);
+    let el: HTMLElement | null = row;
+    while (el && el.getAttribute("draggable") !== "true") {
+      el = el.parentElement;
+    }
+    expect(el).toBeTruthy();
+    expect(el?.getAttribute("draggable")).toBe("true");
+  });
+
+  it("D-24: Sources rows render AFTER the Sources header in DOM order", () => {
+    render(<ToolboxPanel />);
+    const header = screen.getByText(/^Sources$/i);
+    const wt = screen.getByText(/Wall Temperature/i);
+    const pos = header.compareDocumentPosition(wt);
+    // Node.DOCUMENT_POSITION_FOLLOWING = 4
+    // eslint-disable-next-line no-bitwise
+    expect(pos & 4).toBeTruthy();
   });
 
   it("D-30: SOURCES header is not interactive (no aria-describedby / tooltip)", () => {
