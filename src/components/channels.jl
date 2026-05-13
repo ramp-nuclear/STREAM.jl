@@ -117,8 +117,7 @@ function _channel_core(;
         push!(obs, vars.Pe[i] ~ Re_i_for_friction * Pr_i)
         push!(obs, vars.v[i]  ~ port_in.mdot / (rho_water(vars.T[i]) * A))
 
-        P_i = port_in.P - sum(vars.dp[j] for j in 1:i) -
-              (i/n) * ((port_in.P - port_out.P) - sum(vars.dp[j] for j in 1:n))
+        P_i = port_in.P - sum(vars.dp[j] for j in 1:i) + vars.dp[i] / 2
         push!(obs, vars.P[i]     ~ P_i)
         push!(obs, vars.T_sat[i] ~ sat_temperature(P_i))
 
