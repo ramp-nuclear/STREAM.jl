@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/select";
 import NumericField from "./NumericField";
 import SegmentedButtonGroup from "./SegmentedButtonGroup";
+import { getComponent } from "@/registry";
 import useStore, { type StreamNodeData } from "@/store/useStore";
 import {
   bcModeKey,
@@ -387,6 +388,14 @@ function FieldRow({
   // When hidden, no placeholder: the dropdown occupies the full row.
   const showPromote =
     !!externalInput.source_component && entry?.mode !== "source";
+  // Plan 63.1-13 (GAP-MINOR-SOURCE-GATE): "Source" mode is only meaningful
+  // when at least one Sources-category node already exists on the canvas.
+  // Gate it via aria-disabled on the SelectItem.
+  const hasAnySourceNode = nodes.some((n) => {
+    const compId = (n.data as unknown as StreamNodeData | undefined)
+      ?.componentId;
+    return compId ? getComponent(compId)?.category === "Sources" : false;
+  });
   return (
     <div className="flex flex-col gap-[8px]">
       <Label className="text-[13px] font-semibold leading-[1.4]">
@@ -406,7 +415,9 @@ function FieldRow({
               <SelectItem value="profile">Profile</SelectItem>
               <SelectItem value="function">Function</SelectItem>
               <SelectItem value="mark">Mark</SelectItem>
-              <SelectItem value="source">Source</SelectItem>
+              <SelectItem value="source" disabled={!hasAnySourceNode}>
+                Source
+              </SelectItem>
             </SelectContent>
           </Select>
           {entry === undefined && (
