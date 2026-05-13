@@ -352,31 +352,14 @@ describe("bcSymmetric slice (CD-05)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Group 6 — cycleBCEdgeTargetSide (D-11)
+// Group 6 — cycleBCEdgeTargetSide (D-11) RETIRED in Plan 63.1-12 amend.
 // ---------------------------------------------------------------------------
-
-describe("cycleBCEdgeTargetSide (D-11)", () => {
-  it("walks both → left → right → both on successive calls", () => {
-    const { channelId, wtId } = seedChannelAndWT(10, 10);
-    useStore.getState().setBCSymmetric(channelId, "T_wall", false);
-    useStore.getState().setBCMode(channelId, "T_wall_left", {
-      mode: "source",
-      sourceNodeId: wtId,
-    });
-    const edgeId = useStore.getState().edges.find((e) => e.type === "bcEdge")!.id;
-    const readSide = () => {
-      const e = useStore.getState().edges.find((ed) => ed.id === edgeId)!;
-      return (e.data as { targetSide: string }).targetSide;
-    };
-    expect(readSide()).toBe("both");
-    useStore.getState().cycleBCEdgeTargetSide(edgeId);
-    expect(readSide()).toBe("left");
-    useStore.getState().cycleBCEdgeTargetSide(edgeId);
-    expect(readSide()).toBe("right");
-    useStore.getState().cycleBCEdgeTargetSide(edgeId);
-    expect(readSide()).toBe("both");
-  });
-});
+//
+// The interactive L → R → L+R cycle was deleted (2026-05-14). Cycling only
+// updated edge.data.targetSide without touching bcMode, which produced silent
+// state drift between the canvas tag and the BCs tab. BCEdge.tsx now derives
+// the side tag purely from bcMode; the BCs tab is the single source of truth.
+// Coverage moved to BCEdge.test.tsx ("side tag derived from bcMode" group).
 
 // ---------------------------------------------------------------------------
 // Group 7 — snapshot integration (undo restores all three slices + edges)
