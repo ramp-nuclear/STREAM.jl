@@ -119,7 +119,7 @@ describe("validateTopology", () => {
   it("detects unconnected port_in on a node", () => {
     const nodes = [makeNode("n1", "Channel", "ch_1")];
     const edges: Edge[] = [];
-    const bcs = [{ nodeId: "n1", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n1: { portField: "port_in.P" as const, value: 1e5 } };
     // Add a Pump so VALD-03 doesn't fire
     nodes.push(makeNode("n2", "Pump", "pump_1"));
 
@@ -136,7 +136,7 @@ describe("validateTopology", () => {
     ];
     // Connect port_in but not port_out
     const edges = [makeEdge("n2", "port_out", "n1", "port_in")];
-    const bcs = [{ nodeId: "n1", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n1: { portField: "port_in.P" as const, value: 1e5 } };
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
@@ -154,7 +154,7 @@ describe("validateTopology", () => {
       makeEdge("n2", "port_out", "n1", "port_in"),
       makeEdge("n1", "port_out", "n2", "port_in"),
     ];
-    const bcs = [{ nodeId: "n1", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n1: { portField: "port_in.P" as const, value: 1e5 } };
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
@@ -167,7 +167,7 @@ describe("validateTopology", () => {
   it("detects missing pressure boundary condition when bcs is empty", () => {
     const nodes = [makeNode("n1", "Pump", "pump_1")];
     const edges: Edge[] = [];
-    const bcs: { nodeId: string; portField: "port_in.P" | "port_out.P"; value: number }[] = [];
+    const bcs: Record<string, { portField: "port_in.P" | "port_out.P"; value: number }> = {};
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
@@ -179,7 +179,7 @@ describe("validateTopology", () => {
   it("produces no pressure error when bcs is non-empty", () => {
     const nodes = [makeNode("n1", "Pump", "pump_1")];
     const edges: Edge[] = [];
-    const bcs = [{ nodeId: "n1", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n1: { portField: "port_in.P" as const, value: 1e5 } };
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
@@ -193,7 +193,7 @@ describe("validateTopology", () => {
   it("detects no driving element when no Pump or Gravity exists", () => {
     const nodes = [makeNode("n1", "Channel", "ch_1")];
     const edges: Edge[] = [];
-    const bcs = [{ nodeId: "n1", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n1: { portField: "port_in.P" as const, value: 1e5 } };
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
@@ -208,7 +208,7 @@ describe("validateTopology", () => {
       makeNode("n2", "Pump", "pump_1"),
     ];
     const edges: Edge[] = [];
-    const bcs = [{ nodeId: "n1", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n1: { portField: "port_in.P" as const, value: 1e5 } };
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
@@ -223,7 +223,7 @@ describe("validateTopology", () => {
       makeNode("n2", "Gravity", "gravity_1"),
     ];
     const edges: Edge[] = [];
-    const bcs = [{ nodeId: "n1", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n1: { portField: "port_in.P" as const, value: 1e5 } };
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
@@ -240,7 +240,7 @@ describe("validateTopology", () => {
       makeNode("n2", "Pump", "pump_1"),
     ];
     const edges: Edge[] = [];
-    const bcs = [{ nodeId: "n2", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n2: { portField: "port_in.P" as const, value: 1e5 } };
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
@@ -254,7 +254,7 @@ describe("validateTopology", () => {
       makeNode("n2", "Pump", "pump_1"),
     ];
     const edges: Edge[] = [];
-    const bcs = [{ nodeId: "n2", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n2: { portField: "port_in.P" as const, value: 1e5 } };
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
@@ -273,7 +273,7 @@ describe("validateTopology", () => {
       makeEdge("n2", "port_out", "n1", "port_in"),
       makeEdge("n1", "port_out", "n2", "port_in"),
     ];
-    const bcs = [{ nodeId: "n1", portField: "port_in.P" as const, value: 1e5 }];
+    const bcs = { n1: { portField: "port_in.P" as const, value: 1e5 } };
 
     const result = validateTopology(nodes, edges, bcs, mockGetComponent);
 
