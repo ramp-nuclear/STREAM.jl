@@ -289,6 +289,116 @@ describe("ResourceReferencePicker", () => {
     });
   });
 
+  // 62-12: width-overflow gap-closure tests. happy-dom does not implement
+  // real CSS flex layout, so we cannot measure runtime clipping. The
+  // testable contract is (a) all three controls render and have an
+  // `offsetParent` and (b) the className discipline that prevents the
+  // overflow at narrow widths is in place: `flex-wrap` on the outer
+  // container, `shrink-0` on the side buttons, and `min-w-0` + a
+  // `flex-1`/`basis` recipe on the Select wrapper. See
+  // .planning/phases/62-resources-panel-architecture/62-VERIFICATION.md
+  // Critical Gap #1 and 62-12-PLAN.md <chosen_strategy>.
+  describe("62-12 layout: row contents survive a 280px container width", () => {
+    it("Test A: all three controls render with non-null offsetParent at 280px width", () => {
+      // Seed exactly one geometry so the Select has a real selectable
+      // entry — the "no resources" empty state takes a different render
+      // branch.
+      const uuid = useStore.getState().addGeometry({
+        name: "g1",
+        kind: "rectangular",
+        params: { L: 0.6, W: 0.07, H: 0.0025 },
+      });
+
+      render(
+        <TooltipProvider>
+          <div style={{ width: 280 }} data-testid="picker-host">
+            <ResourceReferencePicker
+              resourceKind="geometry"
+              value={uuid}
+              onChange={vi.fn()}
+            />
+          </div>
+        </TooltipProvider>,
+      );
+
+      const trigger = screen.getByRole("combobox");
+      const newBtn = screen.getByText("+ New…").closest("button")!;
+      const editBtn = screen.getByText("Edit…").closest("button")!;
+
+      // Presence + attached to layout tree. happy-dom's `offsetParent` is a
+      // best-effort proxy for "rendered into a positioned ancestor" — null
+      // means the element is detached or display:none.
+      expect(trigger.offsetParent).not.toBeNull();
+      expect(newBtn.offsetParent).not.toBeNull();
+      expect(editBtn.offsetParent).not.toBeNull();
+
+      // The outer flex container must carry `flex-wrap` so the row can break
+      // when its intrinsic width exceeds the sidebar inner width.
+      const outer = trigger.closest('[class*="flex-wrap"]');
+      expect(outer).not.toBeNull();
+      expect((outer as HTMLElement).className).toMatch(/flex-wrap/);
+    });
+
+    it("Test B: side buttons carry shrink-0 (intrinsic-width pin)", () => {
+      // Enabled-Edit branch: provide a value so Edit… is not in the disabled
+      // tooltip-wrapped state.
+      const uuid = useStore.getState().addGeometry({
+        name: "g1",
+        kind: "rectangular",
+        params: { L: 0.6, W: 0.07, H: 0.0025 },
+      });
+      const { unmount } = render(
+        <TooltipProvider>
+          <ResourceReferencePicker
+            resourceKind="geometry"
+            value={uuid}
+            onChange={vi.fn()}
+          />
+        </TooltipProvider>,
+      );
+
+      const newBtnEnabled = screen
+        .getByText("+ New…")
+        .closest("button") as HTMLElement;
+      const editBtnEnabled = screen
+        .getByText("Edit…")
+        .closest("button") as HTMLElement;
+      expect(newBtnEnabled.className).toMatch(/(shrink-0|flex-shrink-0)/);
+      expect(editBtnEnabled.className).toMatch(/(shrink-0|flex-shrink-0)/);
+
+      unmount();
+
+      // Disabled-Edit branch: value=null routes through the Tooltip wrapper
+      // <span tabIndex={0}> which is the flex item; assert shrink-0 lives
+      // on the span, not on the inner disabled <Button>.
+      render(
+        <TooltipProvider>
+          <ResourceReferencePicker
+            resourceKind="geometry"
+            value={null}
+            onChange={vi.fn()}
+          />
+        </TooltipProvider>,
+      );
+      const wrapperSpan = screen
+        .getByText("Edit…")
+        .closest("[data-slot='tooltip-trigger']") as HTMLElement;
+      expect(wrapperSpan).not.toBeNull();
+      expect(wrapperSpan.className).toMatch(/(shrink-0|flex-shrink-0)/);
+    });
+
+    it("Test C: Select wrapper keeps min-w-0 and flex-1/basis for wrap-row growth", () => {
+      renderPicker();
+      const trigger = screen.getByRole("combobox");
+      // The Select trigger's nearest <div> parent is the wrapper that owns
+      // the flex/basis discipline.
+      const wrapper = trigger.parentElement as HTMLElement;
+      expect(wrapper).not.toBeNull();
+      expect(wrapper.className).toMatch(/min-w-0/);
+      expect(wrapper.className).toMatch(/(flex-1|basis)/);
+    });
+  });
+
   // Cleanup any stray document listeners between tests (defensive against
   // leakage from the Esc-cascade test).
   afterEach(() => {

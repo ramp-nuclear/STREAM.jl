@@ -103,15 +103,23 @@ export default function ResourceReferencePicker({
 
   // Trigger button for the `+ New…` mount inside ResourceCreationButton.
   // We use a real `<Button>` with `variant="outline" size="sm"` per UI-SPEC.
+  // `shrink-0` keeps the button at its intrinsic width when the row wraps —
+  // see plan 62-12 (close VERIFICATION.md Critical Gap #1).
   const newButtonTrigger = (
-    <Button variant="outline" size="sm">
+    <Button variant="outline" size="sm" className="shrink-0">
       + New…
     </Button>
   );
 
   return (
-    <div className="flex items-center gap-[8px]">
-      <div className="flex-1 min-w-0">
+    // 62-12: `flex-wrap` lets the row break onto a second visual row when the
+    // sidebar inner width (≈280-300px at the App.tsx default of 320px, ≈180px
+    // at the 200px min) cannot fit Select + `+ New…` + `Edit…` in a single
+    // line. Combined with `basis-full sm:basis-0` on the Select wrapper this
+    // pins the wrap branch under the sidebar's real width range and keeps
+    // both buttons fully visible. See VERIFICATION.md Critical Gap #1.
+    <div className="flex flex-wrap items-center gap-[8px]">
+      <div className="flex-1 min-w-0 basis-full sm:basis-0">
         <Select
           value={value ?? ""}
           onValueChange={handleSelectChange}
@@ -167,7 +175,10 @@ export default function ResourceReferencePicker({
       {isEditDisabled ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span tabIndex={0} className="inline-flex">
+            {/* 62-12: `shrink-0` on the span wrapper keeps the disabled-Edit
+                button at intrinsic width when the row wraps. The wrapper
+                <span> is the flex item, not the inner <Button>. */}
+            <span tabIndex={0} className="inline-flex shrink-0">
               <Button variant="outline" size="sm" disabled>
                 Edit…
               </Button>
@@ -176,7 +187,12 @@ export default function ResourceReferencePicker({
           <TooltipContent>Select a resource to edit it.</TooltipContent>
         </Tooltip>
       ) : (
-        <Button variant="outline" size="sm" onClick={handleEdit}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={handleEdit}
+        >
           Edit…
         </Button>
       )}
