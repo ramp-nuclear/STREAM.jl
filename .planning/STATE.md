@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: executing
+status: ready_to_plan
 stopped_at: Phase 63 context gathered
 last_updated: "2026-05-13T13:31:48.917Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 14
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 26
   completed_plans: 26
-  percent: 100
+  percent: 36
 ---
 
 # STATE: STREAM.jl
@@ -57,9 +57,9 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 62 (resources-panel-architecture) — EXECUTING
-Plan: 1 of 11
-Status: Executing Phase 62
+Phase: 64
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-05-13
 Next: `/gsd:discuss-phase 62` (recommended) — or `/gsd:plan-phase 62` to skip discuss.
 
