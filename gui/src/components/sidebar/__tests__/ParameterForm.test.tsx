@@ -138,33 +138,38 @@ describe("ParameterForm", () => {
 // (D-10 type_union + input_modes).
 // ---------------------------------------------------------------------------
 describe("ParameterForm — type_union parameters (RC-1, scalar-only)", () => {
-  it("renders T_wall as a scalar input when WallTemperature is selected", () => {
+  it("renders T_wall as a mode-aware field when WallTemperature is selected (Plan 14 update)", () => {
+    // Plan 14 (GAP-RC-4): WallTemperature is Sources-category, so T_wall now
+    // renders a Mode dropdown (Value/Profile/Function) instead of scalar-only.
+    // The old "edit in generated Julia" hint is gone for Sources-category params.
     const wt = getComponent("WallTemperature");
     expect(wt).toBeTruthy();
     const onParamChange = vi.fn();
     render(
-      <ParameterForm
-        component={wt!}
-        activeMode="default"
-        values={{ n: 4 }}
-        onParamChange={onParamChange}
-      />
+      <TooltipProvider>
+        <ParameterForm
+          component={wt!}
+          activeMode="default"
+          values={{ n: 4 }}
+          onParamChange={onParamChange}
+        />
+      </TooltipProvider>
     );
     expect(screen.getByText("T_wall")).toBeTruthy();
-    // No mode picker — scalar / vector / callable buttons must NOT exist.
+    // No scalar/vector/callable mode-picker buttons (those are the old pill pattern).
     expect(screen.queryByRole("button", { name: /^scalar$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^vector$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^callable$/i })).toBeNull();
-    // Script-only hint is present.
-    expect(
-      screen.getByText(/edit in the generated julia/i)
-    ).toBeTruthy();
-    // Typing 300 + blur writes through onParamChange("T_wall", 300).
+    // Plan 14: Mode dropdown (combobox) IS present for Sources-category.
+    expect(screen.getByRole("combobox")).toBeTruthy();
+    // Plan 14: "edit in generated Julia" hint is NOT present for Sources-category.
+    expect(screen.queryByText(/edit in the generated julia/i)).toBeNull();
+    // Typing 300 + blur dispatches a SourceValueEntry (not a bare number).
     const inputs = document.querySelectorAll("input");
     const scalarInput = inputs[inputs.length - 1] as HTMLInputElement;
     fireEvent.change(scalarInput, { target: { value: "300" } });
     fireEvent.blur(scalarInput);
-    expect(onParamChange).toHaveBeenCalledWith("T_wall", 300);
+    expect(onParamChange).toHaveBeenCalledWith("T_wall", { mode: "value", value: 300 });
   });
 
   it("renders q as a scalar input when HeatFluxSource is selected", () => {
@@ -222,31 +227,33 @@ describe("ParameterForm — type_union parameters (RC-1, scalar-only)", () => {
     expect(filled).toBeTruthy();
   });
 
-  it("overwrites a stored non-scalar value with the typed scalar on edit", () => {
+  it("overwrites a stored non-scalar value with the typed scalar on edit (Plan 14: SourceValueEntry)", () => {
     const wt = getComponent("WallTemperature")!;
     const onParamChange = vi.fn();
     // Stored value is an array — heavy-dev project file with a pre-existing
     // vector value. UI must show an empty scalar input (per "always overwrite"
-    // contract) and the first edit must write a scalar number, not an array.
+    // contract) and the first edit must write a SourceValueEntry, not an array.
     render(
-      <ParameterForm
-        component={wt}
-        activeMode="default"
-        values={{ n: 3, T_wall: [300, 310, 320] }}
-        onParamChange={onParamChange}
-      />
+      <TooltipProvider>
+        <ParameterForm
+          component={wt}
+          activeMode="default"
+          values={{ n: 3, T_wall: [300, 310, 320] }}
+          onParamChange={onParamChange}
+        />
+      </TooltipProvider>
     );
     // No per-cell editor exists — no input should carry "310".
     const arrayCell = Array.from(
       document.querySelectorAll("input")
     ).find((el) => (el as HTMLInputElement).value === "310");
     expect(arrayCell).toBeFalsy();
-    // Edit + blur the scalar input → emits a number.
+    // Edit + blur the scalar input → emits a SourceValueEntry (Plan 14).
     const inputs = document.querySelectorAll("input");
     const scalarInput = inputs[inputs.length - 1] as HTMLInputElement;
     fireEvent.change(scalarInput, { target: { value: "295" } });
     fireEvent.blur(scalarInput);
-    expect(onParamChange).toHaveBeenCalledWith("T_wall", 295);
+    expect(onParamChange).toHaveBeenCalledWith("T_wall", { mode: "value", value: 295 });
   });
 });
 
@@ -317,12 +324,16 @@ describe("ParameterForm — type_union mode dropdown (Plan 14, GAP-RC-4)", () =>
         />
       </TooltipProvider>
     );
-    // No combobox (Mode dropdown) should appear for Channel.h_left/h_right.
-    expect(screen.queryByRole("combobox")).toBeNull();
-    // Plan 11 scalar-only hint preserved.
+    // Channel default mode has: geometry (ResourceReferencePicker = 1 combobox)
+    // + friction_correlation (FunctionSelect = 1 combobox) = 2 comboboxes total.
+    // No Mode dropdown must be added by TypeUnionField for h_left/h_right (Channel
+    // is Hydraulic-category, not Sources). So combobox count must stay at 2.
+    const comboboxes = screen.getAllByRole("combobox");
+    expect(comboboxes).toHaveLength(2); // geometry picker + friction_correlation; no Mode dropdown
+    // Plan 11 scalar-only hint preserved for h_left / h_right.
     expect(
-      screen.getByText(/edit in the generated julia/i)
-    ).toBeTruthy();
+      screen.getAllByText(/edit in the generated julia/i).length
+    ).toBeGreaterThan(0);
   });
 
   it("switching Mode from Value to Profile dispatches a profile-cosine SourceValueEntry", () => {

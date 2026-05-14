@@ -8,34 +8,99 @@ import MatrixBadge from "./MatrixBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { validateReal } from "@/lib/validation";
+import {
+  isSourceValueEntry,
+  defaultSourceValueEntry,
+  type SourceValueEntry,
+} from "@/lib/sourceValueEntry";
+import { ProfileModeEditor, FunctionModeEditor } from "./modeEditors";
 import type { ComponentDefinition, Parameter } from "@/registry/types";
 
-// Plan 63.1-11 — D-10 type_union + input_modes contract (scalar-only GUI).
+// Plan 63.1-11 — D-10 type_union + input_modes contract (scalar-only GUI for
+// non-Sources params; mode-aware for Sources-category params per Plan 14).
 //
 // A type_union Parameter has no `param.type`; it carries a `type_union[]`
-// of allowed value shapes and a paired `input_modes[]`. Although the contract
-// supports scalar / vector / callable, the GUI ONLY exposes scalar editing —
-// per project-feedback (heavy-dev, 2026-05-14):
-//
-//   Vector and callable values belong in the generated Julia script. Per-cell
-//   editors in a sidebar are unusable at realistic n (20+), and signature
-//   pickers add UI surface for negligible benefit. Users editing those shapes
-//   do so in the script.
-//
-// Rendering behaviour: always a scalar `<Input>` + small hint line. If the
-// stored value is non-scalar (array or string), the input shows the param
-// default; the first scalar edit cleanly overwrites the prior shape. No
-// migration / no per-cell editor anywhere.
+// of allowed value shapes and a paired `input_modes[]`. For Hydraulic-category
+// components (Channel.h_left/h_right), the GUI ONLY exposes scalar editing —
+// per project-feedback (heavy-dev, 2026-05-14). For Sources-category components
+// (WallTemperature.T_wall, HeatFluxSource.q), the GUI exposes a 3-mode dropdown
+// (Value / Profile / Function) — per Plan 14, GAP-RC-4.
+
 interface TypeUnionFieldProps {
   param: Parameter;
   value: unknown;
+  isSourceValueParam: boolean;
   onChange: (value: unknown) => void;
 }
 
-function TypeUnionField({ param, value, onChange }: TypeUnionFieldProps) {
-  const initialDisplay = typeof value === "number" ? value : param.default;
+function TypeUnionField({ param, value, isSourceValueParam, onChange }: TypeUnionFieldProps) {
+  // For Sources-category params: derive the SourceValueEntry from the stored value.
+  // Bare-number legacy values are treated as value-mode for display; the first
+  // edit dispatches a SourceValueEntry (always-overwrite per Plan 11 Decision #2).
+  const entry: SourceValueEntry | undefined = isSourceValueEntry(value)
+    ? value
+    : isSourceValueParam && typeof value === "number"
+    ? defaultSourceValueEntry(value)
+    : undefined;
+
+  function handleModeChange(newMode: "value" | "profile" | "function") {
+    if (newMode === "value") {
+      const numericDefault =
+        typeof param.default === "number"
+          ? param.default
+          : entry?.mode === "value"
+          ? entry.value
+          : 300.0;
+      onChange({ mode: "value", value: numericDefault });
+    } else if (newMode === "profile") {
+      onChange({ mode: "profile", preset: "cosine", amplitude: 1.0, peakingFactor: 1.0 });
+    } else {
+      onChange({ mode: "function", signature: "fn(t)", functionName: "" });
+    }
+  }
+
+  if (!isSourceValueParam) {
+    // Scalar-only path for non-Sources params (Channel.h_left/h_right).
+    const initialDisplay = typeof value === "number" ? value : param.default;
+    return (
+      <div className="flex flex-col gap-[6px] min-w-0">
+        <Label className="text-[12px] font-medium leading-[1.4] flex items-center gap-1 min-w-0">
+          {param.name}
+          {param.description && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground cursor-default" />
+                </TooltipTrigger>
+                <TooltipContent>{param.description}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </Label>
+        <ScalarInput
+          value={initialDisplay}
+          unit={param.unit}
+          onChange={(v) => onChange(v)}
+        />
+        <p className="text-[11px] text-muted-foreground leading-[1.3]">
+          Vector or function values — edit in the generated Julia.
+        </p>
+      </div>
+    );
+  }
+
+  // Mode-aware path for Sources-category params (WT.T_wall, HFS.q).
+  const currentMode = entry?.mode ?? "value";
+
   return (
     <div className="flex flex-col gap-[6px] min-w-0">
       <Label className="text-[12px] font-medium leading-[1.4] flex items-center gap-1 min-w-0">
@@ -51,14 +116,37 @@ function TypeUnionField({ param, value, onChange }: TypeUnionFieldProps) {
           </TooltipProvider>
         )}
       </Label>
-      <ScalarInput
-        value={initialDisplay}
-        unit={param.unit}
-        onChange={(v) => onChange(v)}
-      />
-      <p className="text-[11px] text-muted-foreground leading-[1.3]">
-        Vector or function values — edit in the generated Julia.
-      </p>
+      <Select
+        value={currentMode}
+        onValueChange={(m) => handleModeChange(m as "value" | "profile" | "function")}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Select mode..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="value">Value</SelectItem>
+          <SelectItem value="profile">Profile</SelectItem>
+          <SelectItem value="function">Function</SelectItem>
+        </SelectContent>
+      </Select>
+      {/* Editor body dispatch based on current mode */}
+      {currentMode === "value" || entry === undefined ? (
+        <ScalarInput
+          value={entry?.mode === "value" ? entry.value : (typeof value === "number" ? value : undefined)}
+          unit={param.unit}
+          onChange={(v) => onChange({ mode: "value", value: v })}
+        />
+      ) : entry.mode === "profile" ? (
+        <ProfileModeEditor
+          entry={entry as Extract<SourceValueEntry, { mode: "profile" }>}
+          onUpdate={(e) => onChange(e)}
+        />
+      ) : entry.mode === "function" ? (
+        <FunctionModeEditor
+          entry={entry as Extract<SourceValueEntry, { mode: "function" }>}
+          onUpdate={(e) => onChange(e)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -174,6 +262,7 @@ export default function ParameterForm({
           key={param.name}
           param={param}
           value={values[param.name]}
+          isSourceValueParam={component.category === "Sources"}
           onChange={(v) => onParamChange(param.name, v)}
         />
       );
