@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: executing
-stopped_at: Phase 63.1 UI-SPEC approved
-last_updated: "2026-05-14T08:29:52.132Z"
-last_activity: 2026-05-14 -- Phase 63.1 execution started
+status: idle
+stopped_at: Phase 63.1 complete (14/14 plans + 7/7 UAT gaps closed)
+last_updated: "2026-05-14T12:15:00Z"
+last_activity: 2026-05-14 -- Phase 63.1 paperwork tidy-up (UAT/VERIFICATION/ROADMAP/STATE)
 progress:
   total_phases: 15
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 44
-  completed_plans: 43
-  percent: 98
+  completed_plans: 44
+  percent: 100
 ---
 
 # STATE: STREAM.jl
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 63.1 — bc-architecture-rework-unified-bcs-tab
+**Current focus:** Between phases — Phase 63.1 closed 2026-05-14; Phase 64 (Connection routing) is the next pending v1.2 phase.
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -46,9 +46,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
   - Phase 59: Correlation `geom`-first refactor ✓ shipped 2026-05-11
   - Phase 60: `fuel_assembly` composition helper ✓ shipped 2026-05-11
   - Phase 61: Registry audit + rewrite for v1.1 source ✓ shipped 2026-05-12
-  - Phase 62: Resources panel architecture (next)
-  - Phase 63: BCs tab + value-source components in GUI
-  - Phase 64: Connection routing
+  - Phase 62: Resources panel architecture ✓ shipped 2026-05-13 (15/15 plans, 18/18 UAT gaps closed)
+  - Phase 63: BCs tab + value-source components in GUI ✓ shipped 2026-05-13
+  - Phase 63.1: BC architecture rework — unified BCs tab ✓ shipped 2026-05-14 (14/14 plans, 7/7 UAT gaps closed via Plans 11–14)
+  - Phase 64: Connection routing (next)
   - Phase 65: Interaction model overhaul
   - Phase 66: Code preview rework
   - Phases 67-72: see ROADMAP.md
@@ -57,11 +58,15 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 63.1 (bc-architecture-rework-unified-bcs-tab) — EXECUTING
-Plan: 1 of 14
-Status: Executing Phase 63.1
-Last activity: 2026-05-14 -- Phase 63.1 execution started
-Next: either `/gsd:plan-phase 63.1-14` to author the BC-mode parity follow-up, or `/gsd:discuss-phase 62` for the resources panel architecture (the next pending v1.2 phase).
+Phase: 63.1 (bc-architecture-rework-unified-bcs-tab) — COMPLETE
+Plan: 14 of 14
+Status: Phase 63.1 shipped — all 14 plans + 7/7 UAT gaps closed; ready to advance
+Last activity: 2026-05-14 -- Phase 63.1 paperwork tidy-up (UAT status flip, VERIFICATION addendum, ROADMAP Phase 62 + 63.1-14 corrections, STATE refresh)
+Next: `/gsd:discuss-phase 64` (Connection routing — per-port autoflip + asymmetric same-side placement + thermal-pair axis-flip). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far.
+
+Outstanding non-blocking items (NOT 64's job):
+- 11 pre-existing tsc errors + 1 pre-existing vitest failure (`SidebarPanel.anchors.test.tsx "Symmetric (L = R)"`) — Phase 71 owns reconciliation per Phase 61's deferred-items.
+- Channel BCs tab visual layout fit issues — explicitly deferred (2026-05-14) to Phase 65 (interaction model overhaul / v1.2 cosmetics phase).
 
 ---
 
@@ -127,10 +132,10 @@ Next: either `/gsd:plan-phase 63.1-14` to author the BC-mode parity follow-up, o
 
 ## Session Continuity
 
-**Last session:** 2026-05-13T16:20:35.387Z
-**Stopped at:** Phase 63.1 UI-SPEC approved
-**Next action:** `/gsd:discuss-phase 60` to gather context for the `fuel_assembly` composition helper
-**Resume file:** .planning/phases/63.1-bc-architecture-rework-unified-bcs-tab/63.1-UI-SPEC.md
+**Last session:** 2026-05-14T12:15:00Z
+**Stopped at:** Phase 63.1 complete — paperwork tidied (UAT resolved, VERIFICATION addendum, ROADMAP corrected for Phase 62 + 63.1-14)
+**Next action:** `/gsd:discuss-phase 64` (Connection routing) — or `/gsd:ship` to open a milestone PR first
+**Resume file:** .planning/ROADMAP.md (§Phase 64)
 **Branch:** `gui-redesign`
 **Stash:** none
 
@@ -143,4 +148,4 @@ Next: either `/gsd:plan-phase 63.1-14` to author the BC-mode parity follow-up, o
 
 ---
 
-*Last updated: 2026-05-11 — Phase 59 execution complete*
+*Last updated: 2026-05-14 — Phase 63.1 complete; paperwork tidied; ready for Phase 64*
