@@ -33,7 +33,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] **Phase 61: Registry audit + rewrite for v1.1** — `gui/src/registry/components.json` rewritten against v1.1 source. Add `WallTemperature`, `HeatFluxSource`, `PointKinetics`, `ReactivityController`. Collapse correlation sub-param trees per geom-first. Add `scope` field per parameter (constructor_kwarg vs external_input) for Properties-tab vs BCs-tab split. Bump `stream_version` to `1.1.0`. (completed 2026-05-12)
 - [x] **Phase 62: Resources panel architecture** — Navigator restructure to `Project → Model Options + Resources + Components`. Foreign-key UUID references. Save format (`.scp`). Reference picker UX. Sources toolbox category. (completed 2026-05-13)
 - [x] **Phase 63: BCs tab + value-source components in GUI** — Properties tab vs BCs tab separation. Five BC modes (value / profile / function / mark-in-code / driven-by-source-block). `WallTemperature` and `HeatFluxSource` toolbox entries. Dashed BC edge style. Bidirectional sync between BCs tab and canvas connections. (completed 2026-05-13)
-- [ ] **Phase 64: Connection routing** — Per-port autoflip for FlowPorts with asymmetric same-side placement. Independent axis-flip for thermal-pair ports on CAC/HD. Anti-parallel offset for bidirectional pairs as polish hook.
+- [x] **Phase 64: Connection routing** — Per-port autoflip for FlowPorts with asymmetric same-side placement. Independent axis-flip for thermal-pair ports on CAC/HD. Anti-parallel offset for bidirectional pairs as polish hook. (completed 2026-05-14)
 - [ ] **Phase 65: Interaction model overhaul** — Left-marquee selection, right-click drag pan, right-click no-drag context menu. Edge deletion (Del/Backspace + right-click). Copy/Cut/Paste/Duplicate (Ctrl+C/X/V/D) with smart-parse-and-increment naming. Reset-to-empty rule for property fields. Snap-to-grid toggle. AutoRecover sidecar snapshot mechanism.
 - [ ] **Phase 66: Code preview rework** — Structured `CodeSection[]` output replacing flat string code-gen. Section blocks (Imports / Resources / Components / Composition / Main). Bidirectional traceability (code-hover → canvas-highlight; canvas-select → explicit code-jump). Click-to-pin sections. Copy + Export buttons in code panel toolbar. Hand-rolled formatting rules.
 - [ ] **Phase 67: Custom titlebar** — Tauri `decorations: false` + custom HTML titlebar. Integrated File/Edit/View/Help menubar, app icon, project name, dirty dot (left); min/max/close buttons (right). Cross-platform consistency.
@@ -149,7 +149,7 @@ Plans:
 
 **Design-decisions reference:** Section 3.3, Section 3.4.
 **Depends on:** Phase 62.
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 **Wave 1**
@@ -158,7 +158,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 64-03-streamnode-autoflip-integration-PLAN.md (Wave 2, depends on 01) — Wire autoflip into FlowPortHandle + new ThermalPortHandle in StreamNode.tsx; D-09/D-10 inline-style 25%/75%; useUpdateNodeInternals on side flip; closes Pitfall 6 latent CAC thermal undefined-side bug; human smoke checkpoint.
-- [ ] 64-04-topology-hint-validation-PLAN.md (Wave 2, depends on 01; sequenced after 03 on StreamNode.tsx) — selectTopologyHints pure selector in gui/src/lib/selectors/topologyHints.ts mirroring nodeErrors.ts; non-blocking yellow chip in StreamNode for D-15 axis-collision.
+- [x] 64-04-topology-hint-validation-PLAN.md (Wave 2, depends on 01; sequenced after 03 on StreamNode.tsx) — selectTopologyHints pure selector in gui/src/lib/selectors/topologyHints.ts mirroring nodeErrors.ts; non-blocking yellow chip in StreamNode for D-15 axis-collision.
 
 ### Phase 65: Interaction model overhaul
 
@@ -268,7 +268,7 @@ contract document drafted in parallel throughout.
 | 62. Resources panel architecture                     | 15/15 | Complete    | 2026-05-13 |
 | 63. BCs tab + value-source components in GUI         | 4/4 | Complete    | 2026-05-13 |
 | 63.1. BC architecture rework — unified BCs tab       | 14/14 | Complete   | 2026-05-14 |
-| 64. Connection routing                               | 3/4 | In Progress|  |
+| 64. Connection routing                               | 4/4 | Complete   | 2026-05-14 |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |
 | 67. Custom titlebar                                  | 0/TBD | Planned | — |
