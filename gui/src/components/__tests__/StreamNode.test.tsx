@@ -342,6 +342,73 @@ describe("StreamNode — Phase 63 source-block label (D-19)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Plan 63.1-14 GAP-RC-4: sourceLabelLine reads SourceValueEntry shapes
+// ---------------------------------------------------------------------------
+
+describe("StreamNode — Plan 14 sourceLabelLine SourceValueEntry (GAP-RC-4)", () => {
+  it("renders 'T_wall = 300 K' for value-mode SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: { n: 4, T_wall: { mode: "value", value: 300 } },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/T_wall\s*=\s*300/);
+    expect(label.textContent).toContain("K");
+  });
+
+  it("renders 'T_wall = profile (cosine)' for profile-cosine SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: {
+        n: 4,
+        T_wall: { mode: "profile", preset: "cosine", amplitude: 1.0, peakingFactor: 1.0 },
+      },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/T_wall\s*=\s*profile.*cosine/i);
+  });
+
+  it("renders 'T_wall = profile (file)' for profile-file SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: {
+        n: 4,
+        T_wall: { mode: "profile", preset: "file", path: "/data/twall.csv" },
+      },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/T_wall\s*=\s*profile.*file/i);
+  });
+
+  it("renders 'T_wall = fn(t)' for function SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: {
+        n: 4,
+        T_wall: { mode: "function", signature: "fn(t)", functionName: "my_fn" },
+      },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toBe("T_wall = fn(t)");
+  });
+
+  it("renders 'q = 1e5 W/m^2' for value-mode HFS SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "HeatFluxSource",
+      instanceName: "hfs_1",
+      parameters: { n: 4, q: { mode: "value", value: 100000 } },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/q\s*=\s*100000/);
+    expect(label.textContent).toContain("W/m^2");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Phase 63 D-22: errorTagsByNodeId-driven red-ring outline
 // ---------------------------------------------------------------------------
 
