@@ -111,4 +111,34 @@ describe("StreamNode anchor indicator (D-13)", () => {
     renderStreamNode("n1");
     expect(screen.queryByTestId("anchor-indicator")).toBeNull();
   });
+
+  // GAP-COSMETIC-ANCHOR (Plan 63.1-13): the indicator is a lucide Anchor SVG,
+  // not a filled-circle <div>. testID + aria-label must remain so the existing
+  // accessibility hooks survive the visual swap.
+  it("renders the anchor indicator as an SVG glyph (lucide Anchor icon)", () => {
+    useStore.setState({
+      nodes: [
+        {
+          id: "n1",
+          type: "streamNode",
+          position: { x: 0, y: 0 },
+          data: {
+            componentId: "Pump",
+            instanceName: "pump1",
+            parameters: {},
+            constructorMode: "default",
+          },
+        },
+      ],
+      anchors: { n1: { portField: "port_in.P", value: 1e5 } },
+    });
+    renderStreamNode("n1");
+    const indicator = screen.getByTestId("anchor-indicator");
+    // lucide-react icons render as <svg> elements. tagName is uppercase in HTML
+    // doms; lowercase in XHTML/SVG. Compare case-insensitively.
+    expect(indicator.tagName.toLowerCase()).toBe("svg");
+    // The SVG must NOT carry the legacy `rounded-full bg-foreground` div style.
+    expect(indicator.className.toString()).not.toContain("rounded-full");
+    expect(indicator.className.toString()).not.toContain("bg-foreground");
+  });
 });
