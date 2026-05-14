@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
 status: executing
-stopped_at: Phase 65 context gathered
-last_updated: "2026-05-14T12:57:12.190Z"
-last_activity: 2026-05-14 -- Phase 65 planning complete
+stopped_at: Phase 65 complete — 8/8 plans shipped, manual UAT deferred for 6 visual surfaces
+last_updated: "2026-05-14T15:45:00.000Z"
+last_activity: 2026-05-14 -- Phase 65 execution complete (8/8 plans)
 progress:
   total_phases: 15
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 56
-  completed_plans: 48
-  percent: 86
+  completed_plans: 56
+  percent: 53
 ---
 
 # STATE: STREAM.jl
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 64 — connection-routing
+**Current focus:** Phase 66 — code-preview-rework (Phase 65 just shipped 2026-05-14)
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -49,25 +49,34 @@ See: .planning/PROJECT.md (updated 2026-05-05)
   - Phase 62: Resources panel architecture ✓ shipped 2026-05-13 (15/15 plans, 18/18 UAT gaps closed)
   - Phase 63: BCs tab + value-source components in GUI ✓ shipped 2026-05-13
   - Phase 63.1: BC architecture rework — unified BCs tab ✓ shipped 2026-05-14 (14/14 plans, 7/7 UAT gaps closed via Plans 11–14)
-  - Phase 64: Connection routing (next)
-  - Phase 65: Interaction model overhaul
-  - Phase 66: Code preview rework
+  - Phase 64: Connection routing ✓ shipped 2026-05-14
+  - Phase 65: Interaction model overhaul ✓ shipped 2026-05-14 (8/8 plans; manual UAT deferred for 6 interactive surfaces — see VERIFICATION.md)
+  - Phase 66: Code preview rework (next)
   - Phases 67-72: see ROADMAP.md
 
 ---
 
 ## Current Position
 
-Phase: 65
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-14 -- Phase 65 planning complete
-Next: `/gsd:discuss-phase 64` (Connection routing — per-port autoflip + asymmetric same-side placement + thermal-pair axis-flip). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far.
+Phase: 65 — COMPLETE
+Plan: 8 of 8 shipped
+Status: Phase 65 complete (verification PASS, 8/8 deliverables; see VERIFICATION.md)
+Last activity: 2026-05-14 -- Phase 65 execution complete
+Next: `/gsd:discuss-phase 66` (Code preview rework). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far (covers Phases 59 → 65). User performs visual UAT on the 6 deferred Phase 65 surfaces before merge.
 
-Outstanding non-blocking items (NOT 64's job):
+Phase 65 deferred manual UAT (require running Tauri build):
+
+1. Canvas interaction matrix (left-marquee / right-drag pan / right-click menu with 5px/250ms threshold) — 65-03 Task 3
+2. Clipboard `navigator.clipboard` round-trip + Ctrl+D fixed-offset stacking — 65-04 Task 4
+3. Node/Edge/Canvas context menus + Rename inline-edit focus — 65-05 Task 4
+4. Snap-to-grid visual drag/drop behavior + per-project persistence round-trip — 65-06 Task 4
+5. AutoRecover crash simulation (`kill -9` while sidecar exists) → blocking restore modal on relaunch — 65-08 Task 3
+6. Untitled-project recovery flow → Save As required (D-04) — 65-08 Task 3
+
+Outstanding non-blocking items (NOT 66's job):
 
 - 11 pre-existing tsc errors + 1 pre-existing vitest failure (`SidebarPanel.anchors.test.tsx "Symmetric (L = R)"`) — Phase 71 owns reconciliation per Phase 61's deferred-items.
-- Channel BCs tab visual layout fit issues — explicitly deferred (2026-05-14) to Phase 65 (interaction model overhaul / v1.2 cosmetics phase).
+- Channel BCs tab visual layout fit issues — explicitly deferred to Phase 72 (v1.2 cosmetics / design system audit). Originally tagged for Phase 65 but Phase 65 scope was interaction model + AutoRecover, not BC visual layout.
 
 ---
 
@@ -133,12 +142,26 @@ Outstanding non-blocking items (NOT 64's job):
 
 ## Session Continuity
 
-**Last session:** 2026-05-14T12:13:07.640Z
-**Stopped at:** Phase 65 context gathered
-**Next action:** `/gsd:discuss-phase 64` (Connection routing) — or `/gsd:ship` to open a milestone PR first
-**Resume file:** .planning/phases/65-interaction-model-overhaul/65-CONTEXT.md
+**Last session:** 2026-05-14T15:45:00.000Z
+**Stopped at:** Phase 65 execution complete (8/8 plans, verification PASS)
+**Next action:** `/gsd:discuss-phase 66` (Code preview rework) — or `/gsd:ship` to open a milestone PR first and run UAT on the 6 deferred Phase 65 surfaces
+**Resume file:** .planning/phases/65-interaction-model-overhaul/VERIFICATION.md
 **Branch:** `gui-redesign`
 **Stash:** none
+
+**Phase 65 outcomes (carry-forward):**
+
+- Lowest-free `nextInstanceName` is canonical in `useStore.ts:328`; module-level `instanceCounters` is gone (Plan 65-01).
+- Clipboard payload contract: OS-clipboard JSON via `navigator.clipboard.writeText`; lowest-free renaming on paste; internal edges only (Plan 65-04, `gui/src/lib/clipboard.ts`).
+- Canvas interaction model now drawio-style: left-marquee, right-drag pan with 5px/250ms long-pan suppression (`gui/src/hooks/useRightClickContextMenu.ts`); 3 shadcn-based context menus (`gui/src/components/canvasMenus/`).
+- Snap-to-grid: 16px fixed grid via ReactFlow built-ins, canvas-overlay toggle button, persisted per-project in `.scp` `layout.snap_to_grid`.
+- AutoRecover: 2s debounced sidecar writer to `appDataDir/STREAM-Composer/autorecover/`; PID-alive lockfile crash detection; blocking Radix Dialog restore modal; bit-identical-to-Save payload via `projectIO.serialize`.
+
+**Process anomalies (no code impact, lessons for future phases):**
+
+- Plan 65-02 executor had a cwd-drift bug — committed directly to `gui-redesign` instead of its worktree branch. Code is correct but worktree isolation was bypassed.
+- Plan 65-07 worktree forked off an ancient commit (66dc2bf, pre-v1.1). Recovered via cherry-pick onto current HEAD; useStore.ts conflict resolved manually (dropped dead `clearInstanceCounters`, fixed outdated `serializeProject` signature).
+- Plan 65-08's render gate broke 3 AppShell tests; fixed by mocking `lib/autoRecover` and converting to `findByRole` (commit 46b07b0).
 
 **Phase 59 outcomes (carry-forward into Phase 60 and Phase 61):**
 
@@ -149,4 +172,4 @@ Outstanding non-blocking items (NOT 64's job):
 
 ---
 
-*Last updated: 2026-05-14 — Phase 63.1 complete; paperwork tidied; ready for Phase 64*
+*Last updated: 2026-05-14 — Phase 65 complete (8/8 plans, verification PASS); ready for Phase 66*
