@@ -1,9 +1,13 @@
 // NodeContextMenu.tsx — stateless context menu content for canvas nodes (Phase 65 Plan 05)
 // Rendered inside a Popover wrapper in CanvasPanel.tsx; dispatches store actions directly.
+//
+// Architecture note (W10): ContextMenuItem requires Radix MenuContentContext which is
+// unavailable inside a Popover. We use PopoverMenuItem / PopoverMenuSeparator from
+// context-menu.tsx — styled identically but context-free (plain HTML + Tailwind).
 
 import {
-  ContextMenuItem,
-  ContextMenuSeparator,
+  PopoverMenuItem,
+  PopoverMenuSeparator,
 } from "@/components/ui/context-menu";
 import useStore from "@/store/useStore";
 
@@ -48,17 +52,17 @@ export default function NodeContextMenu({ nodeId, onClose }: NodeContextMenuProp
   }
 
   return (
-    <>
-      <ContextMenuItem onSelect={handleRename}>Rename</ContextMenuItem>
-      <ContextMenuItem onSelect={handleDuplicate}>Duplicate</ContextMenuItem>
-      <ContextMenuItem onSelect={handleShowCode}>
+    <div role="menu" data-slot="node-context-menu">
+      <PopoverMenuItem onSelect={handleRename}>Rename</PopoverMenuItem>
+      <PopoverMenuItem onSelect={handleDuplicate}>Duplicate</PopoverMenuItem>
+      <PopoverMenuItem onSelect={handleShowCode}>
         Show generated Julia code
-      </ContextMenuItem>
+      </PopoverMenuItem>
       {/* Phase 71: render Show errors item when validation state exists for nodeId */}
-      <ContextMenuSeparator />
-      <ContextMenuItem variant="destructive" onSelect={handleDelete}>
+      <PopoverMenuSeparator />
+      <PopoverMenuItem variant="destructive" onSelect={handleDelete}>
         Delete
-      </ContextMenuItem>
-    </>
+      </PopoverMenuItem>
+    </div>
   );
 }
