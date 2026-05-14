@@ -2,8 +2,8 @@
 phase: 64-connection-routing
 plan: 04
 type: execute
-wave: 2
-depends_on: [01]
+wave: 3
+depends_on: ["64-01", "64-03"]
 files_modified:
   - gui/src/lib/selectors/topologyHints.ts
   - gui/src/lib/selectors/__tests__/topologyHints.test.ts
