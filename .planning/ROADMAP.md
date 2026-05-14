@@ -31,7 +31,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] **Phase 59: Correlation `geom`-first refactor** — `src/physical_models/`; every factory that needs geometry takes `geom::PipeGeometry` first; no more `Dh`/`L`/`depth`/`width` plumbed independently. `const HTCCorrelation = Function` alias. Tests + Python parity re-run. (completed 2026-05-11)
 - [x] **Phase 60: `fuel_assembly` composition helper** — new helper in `src/composition/helpers.jl` covering 4 variants of alternating CAC↔Plate chains (channel-bookended, plate-bookended, mixed, closed annular). Tests + code-gen detection update. (completed 2026-05-11)
 - [x] **Phase 61: Registry audit + rewrite for v1.1** — `gui/src/registry/components.json` rewritten against v1.1 source. Add `WallTemperature`, `HeatFluxSource`, `PointKinetics`, `ReactivityController`. Collapse correlation sub-param trees per geom-first. Add `scope` field per parameter (constructor_kwarg vs external_input) for Properties-tab vs BCs-tab split. Bump `stream_version` to `1.1.0`. (completed 2026-05-12)
-- [ ] **Phase 62: Resources panel architecture** — Navigator restructure to `Project → Model Options + Resources + Components`. Foreign-key UUID references. Save format (`.scp`). Reference picker UX. Sources toolbox category.
+- [x] **Phase 62: Resources panel architecture** — Navigator restructure to `Project → Model Options + Resources + Components`. Foreign-key UUID references. Save format (`.scp`). Reference picker UX. Sources toolbox category. (completed 2026-05-13)
 - [x] **Phase 63: BCs tab + value-source components in GUI** — Properties tab vs BCs tab separation. Five BC modes (value / profile / function / mark-in-code / driven-by-source-block). `WallTemperature` and `HeatFluxSource` toolbox entries. Dashed BC edge style. Bidirectional sync between BCs tab and canvas connections. (completed 2026-05-13)
 - [ ] **Phase 64: Connection routing** — Per-port autoflip for FlowPorts with asymmetric same-side placement. Independent axis-flip for thermal-pair ports on CAC/HD. Anti-parallel offset for bidirectional pairs as polish hook.
 - [ ] **Phase 65: Interaction model overhaul** — Left-marquee selection, right-click drag pan, right-click no-drag context menu. Edge deletion (Del/Backspace + right-click). Copy/Cut/Paste/Duplicate (Ctrl+C/X/V/D) with smart-parse-and-increment naming. Reset-to-empty rule for property fields. Snap-to-grid toggle. AutoRecover sidecar snapshot mechanism.
@@ -88,7 +88,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 
 **Design-decisions reference:** Section 3.2.
 **Depends on:** Phase 61 (registry must support resource-ref shape).
-**Plans:** 10/11 plans executed
+**Plans:** 15/15 plans complete
 
 - [x] 62-01-PLAN.md — Julia src/utilities.jl with rebin_extensive + cosine_power_shape; test/test_utilities.jl (Wave 1)
 - [x] 62-02-PLAN.md — Zustand Resources + ModelOptions + activeLeftTab + selection-kind slices; sentinel UUID baked into initial state (Wave 1)
@@ -100,7 +100,11 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] 62-08-PLAN.md — Resource editors + ResourceReferencePicker + anchored Popover (non-dismiss-on-outside + Pitfall 1 focus return) (Wave 2)
 - [x] 62-09-PLAN.md — SidebarPanel selection-kind router; header text per kind; Esc cascade tail (Wave 3)
 - [x] 62-10-PLAN.md — codeGenerator.ts rewrite: Resources block at top + four PowerShape kinds + Pitfall 4 warnings (Wave 3)
-- [ ] 62-11-PLAN.md — Fresh simple_loop.scp fixture + INV-CG-05 smoke test + human-verify checkpoint (Wave 3, has checkpoint)
+- [x] 62-11-PLAN.md — Fresh simple_loop.scp fixture + INV-CG-05 smoke test + human-verify checkpoint (Wave 3, has checkpoint)
+- [x] 62-12-PLAN.md (Wave 4, gap closure) — ResourceReferencePicker narrow-row wrap fix (flex-wrap + min-w-0 + shrink-0 + basis-full) closes UAT Gap 1.
+- [x] 62-13-PLAN.md (Wave 4, gap closure) — ResourceRow usage-detection scans both `parameters[name]` and `parameters[name+'_ref']` via PARAM_KEY_BY_KIND; delete AlertDialog now lists live + legacy usage. Closes UAT Gap 2.
+- [x] 62-14-PLAN.md (Wave 4, gap closure) — `useStore.saveProjectAs` derives default filename from `modelOptions.name` via `computeSaveAsDefaultFilename`; `FALLBACK_SAVE_AS_FILENAME` when name empty. Closes UAT Gap 3.
+- [x] 62-15-PLAN.md (Wave 5, copy audit) — Cross-cutting engineering-tool voice rewrite: 19 OLD-string instances removed; new copy ("Save failed" / "Open failed" / "(leave unset — set in code)" sentinel / "Used by N component(s)." in AlertDialog) verified. Closes UAT Gap 4.
 
 ### Phase 63: BCs tab + value-source components in GUI
 
@@ -136,6 +140,7 @@ Plans:
 - [x] 63.1-11-PLAN.md (Wave 7, gap closure, depends on 07/08) — RC-1: ParameterForm type_union branch + tests; unblocks WT.T_wall / HFS.q / Channel.h_left editability (closes UAT GAP-RC-1, GAP-RC-3 primary path).
 - [x] 63.1-12-PLAN.md (Wave 7, gap closure, depends on 10) — RC-2: add BCPort target handles to Channel + ChannelHeatFlux registry; StreamNode source-vs-target dispatch; delete decoy whole-body overlay (closes UAT GAP-RC-2 / test 6 blocked-by-prior-phase).
 - [x] 63.1-13-PLAN.md (Wave 8, gap closure, depends on 09/11) — Cosmetic + minor sweep: anchor glyph swap (lucide Anchor), Source SelectItem disabled gate, Promote button icon-only restyle, promoteToSharedSource default-seed (T_wall=300 / q=0) (closes UAT GAP-COSMETIC-ANCHOR, GAP-MINOR-SOURCE-GATE, GAP-COSMETIC-PROMOTE, GAP-RC-3 default-seed sweetener).
+- [x] 63.1-14-PLAN.md (Wave 8, gap closure, depends on 11/13) — BC-mode parity for WT.T_wall / HFS.q: new `sourceValueEntry.ts` 4-arm discriminated union (value / cosine-profile / file-profile / function); shared `modeEditors.tsx` extracted from BCsTabForm; ParameterForm TypeUnionField gains 3-option Mode dropdown (Value/Profile/Function) for Sources-category params; codeGenerator `sourceEmitPlan` emits profile-var assignments + function stubs; StreamNode `sourceLabelLine` dispatches per-mode; promoteToSharedSource seeds `defaultSourceValueEntry(300.0|0.0)` (closes UAT GAP-RC-4).
 
 
 ### Phase 64: Connection routing
@@ -251,7 +256,7 @@ contract document drafted in parallel throughout.
 | 59. Correlation `geom`-first refactor                | 4/4 | Complete    | 2026-05-11 |
 | 60. `fuel_assembly` composition helper               | 2/2 | Complete    | 2026-05-11 |
 | 61. Registry audit + rewrite for v1.1                | 5/5 | Complete   | 2026-05-12 |
-| 62. Resources panel architecture                     | 10/11 | In Progress|  |
+| 62. Resources panel architecture                     | 15/15 | Complete    | 2026-05-13 |
 | 63. BCs tab + value-source components in GUI         | 4/4 | Complete    | 2026-05-13 |
 | 63.1. BC architecture rework — unified BCs tab       | 14/14 | Complete   | 2026-05-14 |
 | 64. Connection routing                               | 0/TBD | Planned | — |
