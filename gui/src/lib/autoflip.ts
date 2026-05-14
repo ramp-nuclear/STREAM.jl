@@ -328,29 +328,3 @@ export function detectAxisCollision(
   return flowHoriz === thermalHoriz;
 }
 
-// ---------------------------------------------------------------------------
-// findAntiParallelSibling
-// ---------------------------------------------------------------------------
-
-/**
- * D-08 / D-17: find an anti-parallel sibling edge for a given hydraulic edge.
- *
- * Sibling rule: another edge whose `(source, target)` is the swap of this
- * edge's `(source, target)` AND whose `type === "hydraulicEdge"` (same-type
- * filter per D-17 — bcEdges and inline-styled thermal edges do NOT count).
- *
- * Returns `undefined` when no such sibling exists.
- */
-export function findAntiParallelSibling(
-  edge: Edge,
-  edges: Edge[],
-): Edge | undefined {
-  if (edge.type !== "hydraulicEdge") return undefined;
-  return edges.find(
-    (e) =>
-      e.id !== edge.id &&
-      e.type === "hydraulicEdge" &&
-      e.source === edge.target &&
-      e.target === edge.source,
-  );
-}

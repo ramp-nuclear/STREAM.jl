@@ -17,7 +17,6 @@ import {
   resolveFlowPortAssignment,
   resolveThermalPairSides,
   detectAxisCollision,
-  findAntiParallelSibling,
 } from "../autoflip";
 
 // ---------------------------------------------------------------------------
@@ -497,43 +496,3 @@ describe("detectAxisCollision", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// findAntiParallelSibling
-// ---------------------------------------------------------------------------
-
-describe("findAntiParallelSibling", () => {
-  it("D-08: A→B and B→A both hydraulicEdge -> returns the sibling", () => {
-    const a = makeEdge("e1", "A", "B", "port_out", "port_in", "hydraulicEdge");
-    const b = makeEdge("e2", "B", "A", "port_out", "port_in", "hydraulicEdge");
-    const sibling = findAntiParallelSibling(a, [a, b]);
-    expect(sibling?.id).toBe("e2");
-  });
-
-  it("D-17: A→B hydraulicEdge and B→A bcEdge -> no sibling (same-type-only)", () => {
-    const a = makeEdge("e1", "A", "B", "port_out", "port_in", "hydraulicEdge");
-    const b = makeEdge(
-      "e2",
-      "B",
-      "A",
-      "T_wall_out",
-      "T_wall_left",
-      "bcEdge",
-    );
-    expect(findAntiParallelSibling(a, [a, b])).toBeUndefined();
-  });
-
-  it("D-17: A→B hydraulicEdge and an unrelated thermal-styled edge between same nodes -> undefined", () => {
-    const a = makeEdge("e1", "A", "B", "port_out", "port_in", "hydraulicEdge");
-    // Thermal edges in the codebase don't carry type='hydraulicEdge'; they
-    // are styled inline via stroke color. Use a generic non-hydraulic type.
-    const thermal = makeEdge(
-      "e2",
-      "B",
-      "A",
-      "thermal_left",
-      "thermal_right",
-      "default",
-    );
-    expect(findAntiParallelSibling(a, [a, thermal])).toBeUndefined();
-  });
-});
