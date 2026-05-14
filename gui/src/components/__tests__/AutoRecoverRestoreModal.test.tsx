@@ -11,7 +11,7 @@
 //
 // Store action tests are in a separate file: autoRecover.actions.test.ts
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import AutoRecoverRestoreModal from "../AutoRecoverRestoreModal";
 import type { RestoreCandidate } from "../AutoRecoverRestoreModal";
