@@ -23,6 +23,7 @@ import type {
 } from "../registry/types";
 import { validateJuliaIdentifier } from "./validation";
 import { bcModeKey, type BCModeEntry } from "@/lib/bcMode";
+import { isSourceValueEntry, type SourceValueEntry } from "@/lib/sourceValueEntry";
 import type { CodegenAnchorsState } from "@/lib/anchors";
 
 // SENTINEL_UNSET_POWER_SHAPE is duplicated here as a literal (rather than
@@ -226,7 +227,29 @@ function formatParamValue(
   param: Parameter,
   value: unknown,
   resolveRef?: (param: Parameter, value: unknown) => ResolvedRef | undefined,
+  emitContext?: { instanceName: string },
 ): string {
+  // SourceValueEntry-shaped value: dispatch on entry.mode BEFORE the type switch.
+  // This covers WallTemperature.T_wall and HeatFluxSource.q (Sources-category params
+  // with type_union). Plan 63.1-14 GAP-RC-4.
+  if (isSourceValueEntry(value)) {
+    if (value.mode === "value") return formatReal(value.value);
+    if (value.mode === "profile") {
+      // profile-var name follows the same convention as bcEmitPlan profileVarName:
+      //   `${instanceName}_${paramName}_profile`
+      const inst = emitContext?.instanceName ?? "_";
+      return `${inst}_${param.name}_profile`;
+    }
+    if (value.mode === "function") {
+      return value.functionName || "<UNSET_FUNCTION>";
+    }
+  }
+  // Bare-number legacy fallback for type_union params (pre-Plan-14 .streamgui files
+  // that stored a plain number for T_wall / q). Emit as a Julia Real literal so we
+  // don't fall through to String(value) which would omit the ".0" suffix.
+  if (param.type_union !== undefined && typeof value === "number") {
+    return formatReal(value);
+  }
   switch (param.type) {
     case "Real":
       return formatReal(value as number);
@@ -331,14 +354,15 @@ function emitComponentDeclaration(
 
     // Resource-FK warning emission BEFORE the @named line (Pitfall 4 + missing ref)
     let formatted: string;
+    const emitCtx = { instanceName: nodeData.instanceName };
     if (resolveRef && isResourceFK) {
       const ref = resolveRef(paramDef, value);
       if (ref?.warning) {
         lines.push(ref.warning);
       }
-      formatted = ref ? ref.expr : formatParamValue(paramDef, value, resolveRef);
+      formatted = ref ? ref.expr : formatParamValue(paramDef, value, resolveRef, emitCtx);
     } else {
-      formatted = formatParamValue(paramDef, value, resolveRef);
+      formatted = formatParamValue(paramDef, value, resolveRef, emitCtx);
     }
 
     if (paramDef.positional) {
@@ -1170,6 +1194,53 @@ export function generateCode(
       `${entry.functionName}(${argList}) = 0.0  # TODO: define your time-varying boundary condition`,
     );
   }
+  // sourceEmitPlan: emit pre-eqs lines for Sources-category nodes whose
+  // type_union param holds a SourceValueEntry in profile or function mode.
+  // Plan 63.1-14 GAP-RC-4. Placed immediately after bcEmitPlan so both sets
+  // of profile-vars/stubs land in the same BC header section.
+  interface SourceEmitItem {
+    instanceName: string;
+    paramName: string;
+    entry: SourceValueEntry;
+    profileVarName?: string;
+    nValue: string | number;
+  }
+  const sourceEmitPlan: SourceEmitItem[] = [];
+  for (const node of nodes) {
+    const data = nodeDataMap.get(node.id);
+    if (!data) continue;
+    const comp = getComponent(data.componentId);
+    if (comp?.category !== "Sources") continue;
+    const valueParam = comp.parameters.find((p) => p.type_union !== undefined);
+    if (!valueParam) continue;
+    const v = data.parameters[valueParam.name];
+    if (!isSourceValueEntry(v)) continue;
+    if (v.mode === "value") continue;  // value mode emits inline at @named time
+    const nRaw = data.parameters["n"];
+    const nValue: string | number = typeof nRaw === "number" ? nRaw : "n";
+    const item: SourceEmitItem = { instanceName: data.instanceName, paramName: valueParam.name, entry: v, nValue };
+    if (v.mode === "profile") item.profileVarName = `${data.instanceName}_${valueParam.name}_profile`;
+    sourceEmitPlan.push(item);
+  }
+  for (const item of sourceEmitPlan) {
+    const e = item.entry;
+    if (e.mode !== "profile") continue;
+    ensureBCHeader();
+    if (e.preset === "cosine") {
+      // cosine_T_wall_profile is dimension-agnostic; reused for q here (Plan 14)
+      lines.push(`${item.profileVarName} = cosine_T_wall_profile(${item.nValue}; amplitude=${formatReal(e.amplitude)}, peaking_factor=${formatReal(e.peakingFactor)})`);
+    } else if (e.preset === "file") {
+      lines.push(`${item.profileVarName} = rebin_intensive(readdlm(joinpath(@__DIR__, ${JSON.stringify(e.path)}), ','), ${item.nValue})`);
+    }
+  }
+  for (const item of sourceEmitPlan) {
+    const e = item.entry;
+    if (e.mode !== "function") continue;
+    ensureBCHeader();
+    const argList = e.signature === "fn(t, i)" ? "t, i" : "t";
+    lines.push(`${e.functionName}(${argList}) = 0.0  # TODO: define your time-varying source value`);
+  }
+
   if (bcHeaderEmitted) lines.push("");
 
   // --- Equations section ---
