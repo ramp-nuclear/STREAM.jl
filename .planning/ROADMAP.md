@@ -149,12 +149,12 @@ Plans:
 
 **Design-decisions reference:** Section 3.3, Section 3.4.
 **Depends on:** Phase 62.
-**Plans:** 4 plans
+**Plans:** 2/4 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 64-01-autoflip-pure-module-PLAN.md (Wave 1) — Pure autoflip module: resolveFlowPortSide / resolveAsymmetricOffset / resolveThermalPairSides / detectAxisCollision / findAntiParallelSibling in gui/src/lib/autoflip.ts; vitest coverage of D-08..D-18.
-- [ ] 64-02-anti-parallel-bow-PLAN.md (Wave 1) — HydraulicEdge.tsx ±8px perpendicular bow for bidirectional hydraulic pairs (D-06/D-07/D-08/D-17 same-type-only filter); uses useStore.getState() (no hook subscription) to avoid render-storm.
+- [x] 64-01-autoflip-pure-module-PLAN.md (Wave 1) — Pure autoflip module: resolveFlowPortSide / resolveAsymmetricOffset / resolveThermalPairSides / detectAxisCollision / findAntiParallelSibling in gui/src/lib/autoflip.ts; vitest coverage of D-08..D-18.
+- [x] 64-02-anti-parallel-bow-PLAN.md (Wave 1) — HydraulicEdge.tsx ±8px perpendicular bow for bidirectional hydraulic pairs (D-06/D-07/D-08/D-17 same-type-only filter); uses useStore.getState() (no hook subscription) to avoid render-storm.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 64-03-streamnode-autoflip-integration-PLAN.md (Wave 2, depends on 01) — Wire autoflip into FlowPortHandle + new ThermalPortHandle in StreamNode.tsx; D-09/D-10 inline-style 25%/75%; useUpdateNodeInternals on side flip; closes Pitfall 6 latent CAC thermal undefined-side bug; human smoke checkpoint.
@@ -268,7 +268,7 @@ contract document drafted in parallel throughout.
 | 62. Resources panel architecture                     | 15/15 | Complete    | 2026-05-13 |
 | 63. BCs tab + value-source components in GUI         | 4/4 | Complete    | 2026-05-13 |
 | 63.1. BC architecture rework — unified BCs tab       | 14/14 | Complete   | 2026-05-14 |
-| 64. Connection routing                               | 0/4 | Planned | — |
+| 64. Connection routing                               | 2/4 | In Progress|  |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |
 | 67. Custom titlebar                                  | 0/TBD | Planned | — |
