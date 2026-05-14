@@ -23,7 +23,6 @@ import {
   serializeProject,
   deserializeProject,
   addToRecent,
-  reconstructInstanceCounters,
 } from "../lib/projectIO";
 import type { LayerView } from "../lib/layers";
 
@@ -293,26 +292,32 @@ interface AppState {
   setRecentFiles: (files: string[]) => void;
 }
 
-// Per-type instance counters for default naming (module-level, not tracked by zundo)
-const instanceCounters: Record<string, number> = {};
-
-function getNextInstanceName(componentId: string): string {
-  const count = (instanceCounters[componentId.toLowerCase()] ?? 0) + 1;
-  instanceCounters[componentId.toLowerCase()] = count;
-  return `${componentId.toLowerCase()}_${count}`;
-}
-
-function clearInstanceCounters(): void {
-  Object.keys(instanceCounters).forEach((k) => delete instanceCounters[k]);
+// ---------------------------------------------------------------------------
+// Phase 65 D-17/D-18: Toolbox-drop instance name helper — lowest-free positive
+// integer suffix, recomputed from current store state on every request.
+// Mirrors nextResourceName (Phase 62) — same algorithm, same contract.
+// ASCII-only by construction (per CLAUDE.md / feedback_ascii_variable_names).
+// ---------------------------------------------------------------------------
+export function nextInstanceName(
+  componentId: string,
+  existingInstanceNames: Set<string>,
+): string {
+  const lowerCaseId = componentId.toLowerCase();
+  const prefix = `${lowerCaseId}_`;
+  for (let i = 1; i < 10_000; i++) {
+    const candidate = `${prefix}${i}`;
+    if (!existingInstanceNames.has(candidate)) return candidate;
+  }
+  throw new Error(`nextInstanceName: exhausted candidates for ${componentId}`);
 }
 
 // ---------------------------------------------------------------------------
 // Phase 62: Resource name helper — lowest-free-positive-integer per kind (D-19)
 // ---------------------------------------------------------------------------
 //
-// Mirrors `getNextInstanceName` algorithmic shape, but uses *lowest free* rather
-// than *next after highest* so that after deleting `geometry_2` and re-creating,
-// the new resource lands at `geometry_2` (matches user mental model — D-19).
+// Uses *lowest free* rather than *next after highest* so that after deleting
+// `geometry_2` and re-creating, the new resource lands at `geometry_2`
+// (matches user mental model — D-19).
 // ASCII-only by construction (per CLAUDE.md / feedback_ascii_variable_names).
 export function nextResourceName(
   kind: "geometry" | "powerShape",
@@ -1062,13 +1067,16 @@ const useStore = create<AppState>()((set, get) => ({
     }
     const defaultMode =
       component?.constructorModes[0]?.mode ?? "default";
+    const existing = new Set(
+      get().nodes.map((n) => (n.data as unknown as StreamNodeData).instanceName),
+    );
     const newNode: Node = {
       id,
       type: "streamNode",
       position,
       data: {
         componentId,
-        instanceName: getNextInstanceName(componentId),
+        instanceName: nextInstanceName(componentId, existing),
         parameters: defaultParams,
         constructorMode: defaultMode,
       } satisfies StreamNodeData,
@@ -1909,10 +1917,6 @@ const useStore = create<AppState>()((set, get) => ({
       const content = await readTextFile(filePath);
       const project = deserializeProject(content);
 
-      const reconstructed = reconstructInstanceCounters(project.components);
-      clearInstanceCounters();
-      Object.assign(instanceCounters, reconstructed);
-
       // Re-enrich edges for arrowheads and parallel offset (handles pre-Phase-42 saves)
       const enrichedProjectEdges = enrichEdges(
         project.connections,
@@ -2062,7 +2066,6 @@ const useStore = create<AppState>()((set, get) => ({
   // ---------------------------------------------------------------------------
 
   newProject: async () => {
-    clearInstanceCounters();
     set({
       nodes: [],
       edges: [],
