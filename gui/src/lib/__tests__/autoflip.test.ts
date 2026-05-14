@@ -14,7 +14,7 @@ import type { Node, Edge } from "@xyflow/react";
 import type { ComponentDefinition, Port } from "../../registry/types";
 import {
   resolveFlowPortSide,
-  resolveAsymmetricOffset,
+  resolveFlowPortAssignment,
   resolveThermalPairSides,
   detectAxisCollision,
   findAntiParallelSibling,
@@ -229,129 +229,94 @@ describe("resolveFlowPortSide", () => {
 });
 
 // ---------------------------------------------------------------------------
-// resolveAsymmetricOffset
+// resolveFlowPortAssignment — "one port per side" rule
 // ---------------------------------------------------------------------------
 
-describe("resolveAsymmetricOffset", () => {
+describe("resolveFlowPortAssignment", () => {
   const getComp = makeGetComponent({ Pump: pumpComponent() });
 
-  it("D-09: both ports of a Pump resolve to the same side -> 25%/75% offsets", () => {
-    // Pump with both neighbors to the right -> both ports flip to 'right'.
-    // 'right' is a vertical-axis edge -> offset is along `top`.
+  it("no collision: opposite-side neighbors keep their preferred sides", () => {
+    const nodes = [
+      makeNode("p1", 0, 0, "Pump"),
+      makeNode("p2", -200, 0, "Pump"), // p1.port_in ← p2 on the left
+      makeNode("p3", 200, 0, "Pump"), // p1.port_out → p3 on the right
+    ];
+    const edges = [
+      makeEdge("e1", "p2", "p1", "port_out", "port_in"),
+      makeEdge("e2", "p1", "p3", "port_out", "port_in"),
+    ];
+    expect(resolveFlowPortAssignment(nodes, edges, "p1", getComp)).toEqual({
+      port_in: "left",
+      port_out: "right",
+    });
+  });
+
+  it("collision: both neighbors on the right — port_in keeps 'right', port_out displaces to orthogonal axis", () => {
+    // Both pumps neighbor p1 from the right half-plane: e1 brings p2 to the
+    // upper-right (dy < 0 for the neighbor → top is the orthogonal pick), and
+    // e2 sends p1.port_out to p3 in the lower-right (dy > 0 → bottom).
+    // port_in is declared first in the Pump registry, so it claims its
+    // preferred side ('right') first; port_out's 2nd-best is 'bottom'.
     const nodes = [
       makeNode("p1", 0, 0, "Pump"),
       makeNode("p2", 300, -50, "Pump"),
       makeNode("p3", 300, 50, "Pump"),
     ];
     const edges = [
-      makeEdge("e1", "p2", "p1", "port_out", "port_in"), // p1.port_in ← p2 (to the upper-right)
-      makeEdge("e2", "p1", "p3", "port_out", "port_in"), // p1.port_out → p3 (to the lower-right)
+      makeEdge("e1", "p2", "p1", "port_out", "port_in"),
+      makeEdge("e2", "p1", "p3", "port_out", "port_in"),
     ];
-    // Both target the right half-plane; both should resolve to 'right'.
-    const inOffset = resolveAsymmetricOffset(
-      nodes,
-      edges,
-      "p1",
-      "right",
-      "port_in",
-      "left",
-      getComp,
-    );
-    const outOffset = resolveAsymmetricOffset(
-      nodes,
-      edges,
-      "p1",
-      "right",
-      "port_out",
-      "right",
-      getComp,
-    );
-    expect(inOffset).toEqual({ top: "25%" });
-    expect(outOffset).toEqual({ top: "75%" });
+    expect(resolveFlowPortAssignment(nodes, edges, "p1", getComp)).toEqual({
+      port_in: "right",
+      port_out: "bottom",
+    });
   });
 
-  it("D-10: both ports share 'bottom' -> offsets keyed on `left` with 25%/75%", () => {
-    // 'bottom' is a horizontal-axis edge -> offset is along `left`.
+  it("collision: both neighbors directly to the right — port_out's 2nd-best falls back to vertical axis", () => {
+    // Both neighbors at exactly dy=0 → vertical scores tie at 0. Stable sort
+    // (right, bottom, top, left in initial declaration order) preserves
+    // 'bottom' ahead of 'top' on tie, so port_out lands on 'bottom'.
     const nodes = [
       makeNode("p1", 0, 0, "Pump"),
-      makeNode("p2", -50, 300, "Pump"),
-      makeNode("p3", 50, 300, "Pump"),
+      makeNode("p2", 300, 0, "Pump"),
+      makeNode("p3", 400, 0, "Pump"),
     ];
     const edges = [
       makeEdge("e1", "p2", "p1", "port_out", "port_in"),
       makeEdge("e2", "p1", "p3", "port_out", "port_in"),
     ];
-    const inOffset = resolveAsymmetricOffset(
-      nodes,
-      edges,
-      "p1",
-      "bottom",
-      "port_in",
-      "left",
-      getComp,
-    );
-    const outOffset = resolveAsymmetricOffset(
-      nodes,
-      edges,
-      "p1",
-      "bottom",
-      "port_out",
-      "right",
-      getComp,
-    );
-    expect(inOffset).toEqual({ left: "25%" });
-    expect(outOffset).toEqual({ left: "75%" });
+    expect(resolveFlowPortAssignment(nodes, edges, "p1", getComp)).toEqual({
+      port_in: "right",
+      port_out: "bottom",
+    });
   });
 
-  it("D-09 negative: when ports resolve to different sides, returns undefined", () => {
-    // Standard pump: port_in flips to 'left' (default), port_out to 'right'.
+  it("connected port outranks unconnected sibling on contested side", () => {
+    // Only port_in is wired; port_out has no edge. port_in's neighbor is on
+    // the right → port_in wants 'right' (which happens to be port_out's
+    // registry default). port_out yields and lands on its 2nd-best fallback.
     const nodes = [
       makeNode("p1", 0, 0, "Pump"),
-      makeNode("p2", -200, 0, "Pump"),
-      makeNode("p3", 200, 0, "Pump"),
+      makeNode("p2", 200, 0, "Pump"),
     ];
-    const edges = [
-      makeEdge("e1", "p2", "p1", "port_out", "port_in"),
-      makeEdge("e2", "p1", "p3", "port_out", "port_in"),
-    ];
-    const inOffset = resolveAsymmetricOffset(
-      nodes,
-      edges,
-      "p1",
-      "left",
-      "port_in",
-      "left",
-      getComp,
-    );
-    const outOffset = resolveAsymmetricOffset(
-      nodes,
-      edges,
-      "p1",
-      "right",
-      "port_out",
-      "right",
-      getComp,
-    );
-    expect(inOffset).toBeUndefined();
-    expect(outOffset).toBeUndefined();
+    const edges = [makeEdge("e1", "p2", "p1", "port_out", "port_in")];
+    const out = resolveFlowPortAssignment(nodes, edges, "p1", getComp);
+    expect(out.port_in).toBe("right");
+    expect(out.port_out).not.toBe("right"); // displaced — unconnected loses
   });
 
-  it("D-12: never applies to thermal pairs (no FlowPort sibling -> undefined)", () => {
-    // HeatDiffusion has only thermal ports — passing a thermal port name yields
-    // no FlowPort sibling, so the function returns undefined.
+  it("zero FlowPorts (HeatDiffusion-only component): returns empty assignment", () => {
     const hdGetComp = makeGetComponent({ HeatDiffusion: hdComponent() });
     const nodes = [makeNode("h1", 0, 0, "HeatDiffusion")];
     const edges: Edge[] = [];
-    const offset = resolveAsymmetricOffset(
-      nodes,
-      edges,
-      "h1",
-      "left",
-      "thermal_left",
-      "left",
-      hdGetComp,
+    expect(resolveFlowPortAssignment(nodes, edges, "h1", hdGetComp)).toEqual(
+      {},
     );
-    expect(offset).toBeUndefined();
+  });
+
+  it("missing node or component: returns empty assignment", () => {
+    const nodes = [makeNode("p1", 0, 0, "Pump")];
+    expect(resolveFlowPortAssignment(nodes, [], "nope", getComp)).toEqual({});
   });
 });
 

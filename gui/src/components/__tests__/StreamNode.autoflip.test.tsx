@@ -203,9 +203,10 @@ afterEach(() => {
 
 // ---------------------------------------------------------------------------
 // §3.3 Example 1 — bidirectional X-cross between two pumps placed left/right.
-// Both pumps' ports should flip to the side facing the neighbor. With both
-// FlowPorts of pump1 on the right side, D-09/D-10 places port_in at top:25%
-// and port_out at top:75%.
+// Both edges terminate at the same neighbor (p2 on the right). Under the
+// one-port-per-side rule, port_in (declared first) claims its preferred side
+// 'right'; port_out displaces to its 2nd-best 'bottom' (orthogonal axis,
+// stable-sort tie-break with dy = 0).
 // ---------------------------------------------------------------------------
 
 describe("StreamNode autoflip — FlowPort §3.3 Example 1 X-cross", () => {
@@ -219,15 +220,7 @@ describe("StreamNode autoflip — FlowPort §3.3 Example 1 X-cross", () => {
     );
   }
 
-  it("D-13/D-16: pump1.port_out flips to spatial right (neighbor to the right)", () => {
-    primeXCross();
-    const { container } = renderStreamNode("p1", "Pump", "pump1");
-    const handle = getHandle(container, "port_out");
-    expect(handle).toBeTruthy();
-    expect(handle!.className).toContain("react-flow__handle-right");
-  });
-
-  it("D-13/D-16: pump1.port_in flips to spatial right (its connection comes from pump2 on the right)", () => {
+  it("port_in (declared first) claims 'right' on collision", () => {
     primeXCross();
     const { container } = renderStreamNode("p1", "Pump", "pump1");
     const handle = getHandle(container, "port_in");
@@ -235,19 +228,27 @@ describe("StreamNode autoflip — FlowPort §3.3 Example 1 X-cross", () => {
     expect(handle!.className).toContain("react-flow__handle-right");
   });
 
-  it("D-09/D-10: same-side collision places port_in at top:25%, port_out at top:75% (reading direction)", () => {
+  it("port_out displaces to 'bottom' (one-port-per-side rule)", () => {
+    primeXCross();
+    const { container } = renderStreamNode("p1", "Pump", "pump1");
+    const handle = getHandle(container, "port_out");
+    expect(handle).toBeTruthy();
+    expect(handle!.className).toContain("react-flow__handle-bottom");
+  });
+
+  it("no asymmetric same-side offsets — handles carry no `top:25%` or `top:75%` overrides", () => {
     primeXCross();
     const { container } = renderStreamNode("p1", "Pump", "pump1");
     const portIn = getHandle(container, "port_in")!;
     const portOut = getHandle(container, "port_out")!;
-    // Pitfall 8: for left/right side, percentage axis is `top` (D-10).
-    expect(portIn.style.top).toBe("25%");
-    expect(portOut.style.top).toBe("75%");
+    expect(portIn.style.top).toBe("");
+    expect(portIn.style.left).toBe("");
+    expect(portOut.style.top).toBe("");
+    expect(portOut.style.left).toBe("");
   });
 
-  it("D-04 anchor co-location: anchor follows the autoflipped side (right → style.right === -16)", () => {
+  it("D-04 anchor co-location: anchor follows port_in's resolved side (right → style.right === -16px)", () => {
     primeXCross();
-    // Add anchor on pump1.port_in.P so the indicator renders.
     useStore.setState({
       anchors: { p1: { portField: "port_in.P", value: 1e5 } },
     });
@@ -256,8 +257,6 @@ describe("StreamNode autoflip — FlowPort §3.3 Example 1 X-cross", () => {
       '[data-testid="anchor-indicator"]',
     ) as HTMLElement | null;
     expect(indicator).toBeTruthy();
-    // anchorIndicatorStyleFor("right") returns { right: -16, top: -6 }.
-    // Inline `right: -16` serializes to `-16px` in CSSOM.
     expect(indicator!.style.right).toBe("-16px");
   });
 });

@@ -22,14 +22,11 @@ import type { ComponentDefinition } from "../registry/types";
 
 export type Side = "left" | "right" | "top" | "bottom";
 
-/**
- * Inline-style offset payload for ReactFlow `<Handle>` `style.left` / `style.top`.
- * The choice of key (`left` vs `top`) depends on the resolved side: when the
- * handle sits on top/bottom (horizontal edge), the percentage axis is `left`;
- * when it sits on left/right (vertical edge), the percentage axis is `top`.
- * See Pitfall 8 in 64-RESEARCH.md.
- */
-export type OffsetStyle = { left?: string; top?: string };
+const ALL_SIDES: readonly Side[] = ["left", "right", "top", "bottom"];
+
+function sidesExcept(s: Side): Side[] {
+  return ALL_SIDES.filter((x) => x !== s);
+}
 
 // ---------------------------------------------------------------------------
 // nodeCenter (internal)
@@ -105,62 +102,95 @@ export function resolveFlowPortSide(
 }
 
 // ---------------------------------------------------------------------------
-// resolveAsymmetricOffset
+// resolveFlowPortAssignment
 // ---------------------------------------------------------------------------
 
 /**
- * When both FlowPorts of a component resolve to the same side, return the
- * inline-style offset payload that positions the ports at 25% (port_in) /
- * 75% (port_out) along that side, per D-09 / D-10.
+ * Per-component FlowPort side assignment with the "one port per side" rule.
  *
- * Reading-direction rule (D-10):
- * - top/bottom side: percentage axis is `left` (in → left, out → right).
- * - left/right side: percentage axis is `top`  (in → top,  out → bottom).
+ * Each FlowPort scores all four sides by signed projection of its (dx, dy)
+ * neighbor-vector onto the side's outward normal; the dominant axis wins.
+ * Ports are then assigned greedily in registry declaration order — connected
+ * ports first, unconnected last — and a port whose preferred side is already
+ * taken falls back to its next-best ranked side.
  *
- * Returns `undefined` when:
- * - the node is not found or has no component definition,
- * - the component has no other FlowPort sibling (e.g., thermal-only or single-port),
- * - the sibling FlowPort resolves to a different side (D-09 only fires on same-side
- *   collision).
+ * Result: every FlowPort lands on a different side of the component (left,
+ * right, top, or bottom). For the common 2-FlowPort case, port_in keeps its
+ * dominant-axis vote and port_out displaces to its orthogonal-axis preference
+ * when they collide.
  */
-export function resolveAsymmetricOffset(
+export function resolveFlowPortAssignment(
   nodes: Node[],
   edges: Edge[],
   nodeId: string,
-  side: Side,
-  portName: string,
-  defaultSide: Side,
   getComponent: (id: string) => ComponentDefinition | undefined,
-): OffsetStyle | undefined {
+): Record<string, Side> {
+  const out: Record<string, Side> = {};
   const me = nodes.find((n) => n.id === nodeId);
-  if (!me) return undefined;
+  if (!me) return out;
   const componentId = (me.data as { componentId?: string } | undefined)?.componentId;
-  if (!componentId) return undefined;
+  if (!componentId) return out;
   const comp = getComponent(componentId);
-  if (!comp) return undefined;
-
+  if (!comp) return out;
   const flowPorts = comp.ports.filter((p) => p.type === "FlowPort");
-  const sibling = flowPorts.find((p) => p.name !== portName);
-  if (!sibling) return undefined; // No sibling FlowPort → asymmetric offset has no peer.
+  if (flowPorts.length === 0) return out;
 
-  const siblingSide = resolveFlowPortSide(
-    nodes,
-    edges,
-    nodeId,
-    sibling.name,
-    (sibling.side as Side | undefined) ?? defaultSide,
-    getComponent,
-  );
-  if (siblingSide !== side) return undefined; // D-09 only fires on same-side collision.
+  const meC = nodeCenter(me);
 
-  // Both ports on same side: apply 25% (in) / 75% (out) per D-10.
-  const isInPort = portName.includes("in");
-  const pct = isInPort ? "25%" : "75%";
+  type Ranked = { name: string; order: Side[]; connected: boolean };
+  const ranked: Ranked[] = flowPorts.map((p) => {
+    const isInPort = p.name.includes("in");
+    const myEdge = edges.find((e) =>
+      isInPort
+        ? e.target === nodeId && e.targetHandle === p.name
+        : e.source === nodeId && e.sourceHandle === p.name,
+    );
+    const defaultSide = (p.side as Side | undefined) ?? "left";
+    if (!myEdge) {
+      return {
+        name: p.name,
+        order: [defaultSide, ...sidesExcept(defaultSide)],
+        connected: false,
+      };
+    }
+    const neighborId = isInPort ? myEdge.source : myEdge.target;
+    const them = nodes.find((n) => n.id === neighborId);
+    if (!them) {
+      return {
+        name: p.name,
+        order: [defaultSide, ...sidesExcept(defaultSide)],
+        connected: false,
+      };
+    }
+    const tc = nodeCenter(them);
+    const dx = tc.x - meC.x;
+    const dy = tc.y - meC.y;
+    // Project onto each side's outward normal. Initial declaration order
+    // (right, left, bottom, top) gives D-13 horizontal-preferring tie-breaking
+    // via stable sort.
+    const scores: { side: Side; score: number }[] = [
+      { side: "right", score: dx },
+      { side: "left", score: -dx },
+      { side: "bottom", score: dy },
+      { side: "top", score: -dy },
+    ];
+    scores.sort((a, b) => b.score - a.score);
+    return { name: p.name, order: scores.map((s) => s.side), connected: true };
+  });
 
-  // Pitfall 8: top/bottom side → percentage axis is `left`; left/right side →
-  // percentage axis is `top`.
-  if (side === "top" || side === "bottom") return { left: pct };
-  return { top: pct };
+  // Connected ports outrank unconnected for any contested side. Among ports of
+  // equal connection status, registry declaration order wins — port_in is
+  // declared before port_out in every 2-FlowPort component today.
+  const ordered = ranked
+    .slice()
+    .sort((a, b) => Number(b.connected) - Number(a.connected));
+  const taken = new Set<Side>();
+  for (const r of ordered) {
+    const pick = r.order.find((s) => !taken.has(s)) ?? r.order[0];
+    out[r.name] = pick;
+    taken.add(pick);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
