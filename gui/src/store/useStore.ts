@@ -25,6 +25,20 @@ import {
   addToRecent,
 } from "../lib/projectIO";
 import type { LayerView } from "../lib/layers";
+import {
+  type ClipboardPayload,
+  CLIPBOARD_FORMAT_TAG,
+  CLIPBOARD_VERSION,
+  isClipboardPayload,
+  smartParseAndIncrement,
+} from "@/lib/clipboard";
+
+// ---------------------------------------------------------------------------
+// Phase 65 Plan 04: paste-offset counter (B4 lock).
+// Reset on copySelection — purely for visual paste offset stacking, NOT identity.
+// Independent of duplicateSelection which uses a fixed +20.
+// ---------------------------------------------------------------------------
+let pasteOffsetIndex = 0;
 
 // ---------------------------------------------------------------------------
 // Phase 62 Resources / ModelOptions / Tabs / Selection — types and constants
@@ -290,6 +304,11 @@ interface AppState {
   loadProjectFromPath: (path: string) => Promise<void>;
   newProject: () => Promise<void>;
   setRecentFiles: (files: string[]) => void;
+  // Phase 65 Plan 04: Clipboard actions (D-15, D-16, D-19)
+  copySelection: () => Promise<void>;
+  cutSelection: () => Promise<void>;
+  pasteFromClipboard: () => Promise<void>;
+  duplicateSelection: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -1768,6 +1787,253 @@ const useStore = create<AppState>()((set, get) => ({
   setRecentFiles: (files) => set({ recentFiles: files }),
 
   // ---------------------------------------------------------------------------
+  // Phase 65 Plan 04: Clipboard actions (D-15, D-16, D-19)
+  // ---------------------------------------------------------------------------
+
+  // Internal helper — builds ClipboardPayload from current selection WITHOUT
+  // pushing a snapshot or touching the OS clipboard. Used by both copySelection
+  // and cutSelection so cut takes exactly ONE snapshot (Rule 6).
+  // (Not exposed on the State interface; accessed only from within this closure.)
+
+  copySelection: async () => {
+    const { nodes, edges } = get();
+    const selected = nodes.filter((n) => n.selected);
+    if (selected.length === 0) return;
+
+    const selectedIds = new Set(selected.map((n) => n.id));
+    // D-19: internal edges only — both endpoints must be in the selection.
+    const internalEdges = edges.filter(
+      (e) => selectedIds.has(e.source) && selectedIds.has(e.target),
+    );
+
+    const payload: ClipboardPayload = {
+      __format: CLIPBOARD_FORMAT_TAG,
+      version: CLIPBOARD_VERSION,
+      nodes: selected,
+      edges: internalEdges,
+    };
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload));
+    } catch {
+      // Tauri webview may not have clipboard permission in some test envs — no-op.
+    }
+
+    // B4 lock: reset paste-offset sequence whenever the clipboard is refreshed.
+    pasteOffsetIndex = 0;
+  },
+
+  cutSelection: async () => {
+    const { nodes, edges, anchors, selectedNodeId, selectedResourceId } = get();
+    const selected = nodes.filter((n) => n.selected);
+    if (selected.length === 0) return;
+
+    const selectedIds = new Set(selected.map((n) => n.id));
+
+    // Build payload (same logic as copySelection, inline to avoid a second
+    // _pushSnapshot — Rule 6: cut takes exactly ONE snapshot).
+    const internalEdges = edges.filter(
+      (e) => selectedIds.has(e.source) && selectedIds.has(e.target),
+    );
+    const payload: ClipboardPayload = {
+      __format: CLIPBOARD_FORMAT_TAG,
+      version: CLIPBOARD_VERSION,
+      nodes: selected,
+      edges: internalEdges,
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload));
+    } catch {
+      // clipboard not available — no-op
+    }
+    pasteOffsetIndex = 0;
+
+    // Single snapshot for the entire cut operation.
+    get()._pushSnapshot();
+
+    // Remove selected nodes, their incident edges, and their anchors.
+    const nextAnchors = { ...anchors };
+    for (const id of selectedIds) {
+      delete nextAnchors[id];
+    }
+    const clearedSelectedNode = selectedNodeId && selectedIds.has(selectedNodeId) ? null : selectedNodeId;
+
+    set({
+      nodes: nodes.filter((n) => !selectedIds.has(n.id)),
+      edges: edges.filter(
+        (e) => !selectedIds.has(e.source) && !selectedIds.has(e.target),
+      ),
+      anchors: nextAnchors,
+      selectedNodeId: clearedSelectedNode,
+      selectionKind: deriveSelectionKind(clearedSelectedNode, selectedResourceId),
+      isDirty: true,
+    });
+  },
+
+  pasteFromClipboard: async () => {
+    let raw: string;
+    try {
+      raw = await navigator.clipboard.readText();
+    } catch {
+      return; // clipboard not available
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return; // malformed JSON — silent no-op (T-65-04)
+    }
+
+    if (!isClipboardPayload(parsed)) return; // wrong shape — silent no-op
+
+    // Snapshot pushed AFTER the guard check so malformed input cannot
+    // partially mutate state (T-65-04).
+    get()._pushSnapshot();
+
+    // B4 lock: each successive paste lands at original + N*20.
+    pasteOffsetIndex += 1;
+    const dx = pasteOffsetIndex * 20;
+    const dy = pasteOffsetIndex * 20;
+
+    // Build old-id → new-id map and mint new nodes.
+    const oldToNew = new Map<string, string>();
+    const existingNames = new Set(
+      get().nodes.map(
+        (n) => (n.data as unknown as StreamNodeData).instanceName,
+      ),
+    );
+
+    const newNodes: Node[] = parsed.nodes.map((srcNode) => {
+      const newId = crypto.randomUUID();
+      oldToNew.set(srcNode.id, newId);
+
+      const srcData = srcNode.data as unknown as StreamNodeData;
+      const newName = smartParseAndIncrement(srcData.instanceName, existingNames);
+      existingNames.add(newName); // keep the running set stable across the batch
+
+      return {
+        ...srcNode,
+        id: newId,
+        position: {
+          x: srcNode.position.x + dx,
+          y: srcNode.position.y + dy,
+        },
+        selected: true,
+        data: {
+          ...srcData,
+          instanceName: newName,
+          // componentId, parameters (incl. resource UUIDs), constructorMode preserved verbatim (D-19)
+        } as unknown as Record<string, unknown>,
+      };
+    });
+
+    // Remap edges; drop any edge whose source or target didn't make it into
+    // the id map (defensive against malformed payload — D-19 receive side).
+    const newEdges: Edge[] = parsed.edges.flatMap((srcEdge) => {
+      const newSource = oldToNew.get(srcEdge.source);
+      const newTarget = oldToNew.get(srcEdge.target);
+      if (!newSource || !newTarget) return []; // silently drop
+      return [
+        {
+          ...srcEdge,
+          id: crypto.randomUUID(),
+          source: newSource,
+          target: newTarget,
+        },
+      ];
+    });
+
+    // Deselect all existing nodes/edges; select only the fresh pastes.
+    const existingNodes = get().nodes.map((n) =>
+      n.selected ? { ...n, selected: false } : n,
+    );
+    const existingEdges = get().edges.map((e) =>
+      e.selected ? { ...e, selected: false } : e,
+    );
+
+    set({
+      nodes: [...existingNodes, ...newNodes],
+      edges: [...existingEdges, ...newEdges],
+      isDirty: true,
+    });
+  },
+
+  duplicateSelection: () => {
+    const { nodes, edges } = get();
+    const selected = nodes.filter((n) => n.selected);
+    if (selected.length === 0) return;
+
+    const selectedIds = new Set(selected.map((n) => n.id));
+    const internalEdges = edges.filter(
+      (e) => selectedIds.has(e.source) && selectedIds.has(e.target),
+    );
+
+    get()._pushSnapshot();
+
+    // D-16: fixed +20px offset on EVERY call — does NOT accumulate (B4 lock).
+    // Intentionally independent from the paste-offset counter used by pasteFromClipboard.
+    const dx = 20;
+    const dy = 20;
+
+    const oldToNew = new Map<string, string>();
+    const existingNames = new Set(
+      nodes.map((n) => (n.data as unknown as StreamNodeData).instanceName),
+    );
+
+    const newNodes: Node[] = selected.map((srcNode) => {
+      const newId = crypto.randomUUID();
+      oldToNew.set(srcNode.id, newId);
+
+      const srcData = srcNode.data as unknown as StreamNodeData;
+      const newName = smartParseAndIncrement(srcData.instanceName, existingNames);
+      existingNames.add(newName);
+
+      return {
+        ...srcNode,
+        id: newId,
+        position: {
+          x: srcNode.position.x + dx,
+          y: srcNode.position.y + dy,
+        },
+        selected: true,
+        data: {
+          ...srcData,
+          instanceName: newName,
+        } as unknown as Record<string, unknown>,
+      };
+    });
+
+    const newEdges: Edge[] = internalEdges.flatMap((srcEdge) => {
+      const newSource = oldToNew.get(srcEdge.source);
+      const newTarget = oldToNew.get(srcEdge.target);
+      if (!newSource || !newTarget) return [];
+      return [
+        {
+          ...srcEdge,
+          id: crypto.randomUUID(),
+          source: newSource,
+          target: newTarget,
+        },
+      ];
+    });
+
+    // Deselect originals; select duplicates.
+    const updatedNodes = nodes.map((n) =>
+      n.selected ? { ...n, selected: false } : n,
+    );
+    const updatedEdges = edges.map((e) =>
+      e.selected ? { ...e, selected: false } : e,
+    );
+
+    set({
+      nodes: [...updatedNodes, ...newNodes],
+      edges: [...updatedEdges, ...newEdges],
+      isDirty: true,
+    });
+  },
+
+  // ---------------------------------------------------------------------------
   // saveProject (D-02)
   // ---------------------------------------------------------------------------
 
@@ -2193,6 +2459,15 @@ const useStore = create<AppState>()((set, get) => ({
 export async function initializeRecentFiles(): Promise<void> {
   const files = await loadRecentFiles();
   useStore.setState({ recentFiles: files });
+}
+
+/**
+ * Reset the paste-offset counter to 0.
+ * Exposed for test isolation only — production code resets via copySelection.
+ * @internal
+ */
+export function _resetPasteOffsetIndexForTesting(): void {
+  pasteOffsetIndex = 0;
 }
 
 export default useStore;

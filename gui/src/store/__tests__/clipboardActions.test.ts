@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Node, Edge } from "@xyflow/react";
-import useStore from "../useStore";
+import useStore, { _resetPasteOffsetIndexForTesting } from "../useStore";
 import type { StreamNodeData } from "../useStore";
 import {
   CLIPBOARD_FORMAT_TAG,
@@ -86,6 +86,9 @@ beforeEach(() => {
     _undoPast: [],
     _undoFuture: [],
   });
+  // Reset the module-level paste-offset counter between tests so offset
+  // assertions don't leak across test cases.
+  _resetPasteOffsetIndexForTesting();
   clipboardText = "";
   writeTextMock.mockClear();
   readTextMock.mockClear();
@@ -144,24 +147,26 @@ describe("copySelection", () => {
     expect(payload.edges).toHaveLength(0);
   });
 
-  it("resets pasteOffsetIndex to 0", async () => {
-    // Perform two pastes to advance the offset index, then copy again and paste.
-    // The post-copy paste should land at +20 (index=1), not +60 (index=3).
+  it("resets pasteOffsetIndex to 0 on copy so next paste lands at +20 from copied pos", async () => {
+    // Advance the index by doing two pastes, then verify that a fresh copy+paste
+    // resets the sequence: the paste after re-copy lands at +20 from the newly
+    // copied position (not at +60 from some accumulated state).
     const node = makeNode("n1", "pump_1", "Pump", 100, 200, true);
     useStore.setState({ nodes: [node] });
 
-    await useStore.getState().copySelection();
-    await useStore.getState().pasteFromClipboard(); // index becomes 1 → offset +20
-    await useStore.getState().pasteFromClipboard(); // index becomes 2 → offset +40
+    await useStore.getState().copySelection(); // clipboard = n1 @ (100,200); index reset to 0
+    await useStore.getState().pasteFromClipboard(); // index=1 → pastes @ (120,220); pasted node now selected
+    await useStore.getState().pasteFromClipboard(); // index=2 → pastes @ (140,240); pasted node now selected
 
-    // Now copy again (resets index to 0)
+    // Copy the currently-selected node (at 140,240) → index resets to 0.
     await useStore.getState().copySelection();
-    await useStore.getState().pasteFromClipboard(); // index should be 1 again → +20
+    // Paste once → index=1 → should land at (140+20, 240+20) = (160,260), NOT (140+60=200).
+    await useStore.getState().pasteFromClipboard();
 
     const allNodes = useStore.getState().nodes;
-    // The last pasted node should be at original (100) + 1*20 = 120
     const lastPasted = allNodes[allNodes.length - 1];
-    expect(lastPasted.position.x).toBe(100 + 20); // +20, not +60
+    // Key assertion: offset is exactly +20 (index=1 after reset), not +60 (index=3 without reset).
+    expect(lastPasted.position.x).toBe(140 + 20); // 160, not 200
   });
 });
 
