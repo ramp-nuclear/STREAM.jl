@@ -9,6 +9,7 @@ import type { LayerView } from "../lib/layers";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
 import { selectNodeErrors, type NodeErrorsInput } from "@/lib/selectors/nodeErrors";
+import { isSourceValueEntry } from "@/lib/sourceValueEntry";
 
 // Inline colors: immune to Tailwind JIT scanning gaps and * { border-color } cascade.
 const CATEGORY_LEFT_BORDER_COLOR: Record<string, string> = {
@@ -54,6 +55,22 @@ function sourceLabelLine(
 ): { text: string; muted: boolean } {
   const value = parameters?.[fieldName];
   const n = parameters?.["n"];
+
+  // Plan 63.1-14 (GAP-RC-4): SourceValueEntry-shaped values dispatch first.
+  if (isSourceValueEntry(value)) {
+    if (value.mode === "value") {
+      const unitSuffix = unit ? ` ${unit}` : "";
+      return { text: `${fieldName} = ${value.value}${unitSuffix}`, muted: false };
+    }
+    if (value.mode === "profile") {
+      const presetLabel = value.preset === "file" ? "file" : "cosine";
+      return { text: `${fieldName} = profile (${presetLabel})`, muted: false };
+    }
+    if (value.mode === "function") {
+      return { text: `${fieldName} = fn(t)`, muted: false };
+    }
+  }
+
   if (value === undefined || value === null || value === "") {
     return { text: `${fieldName} = (unset)`, muted: true };
   }
