@@ -34,7 +34,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] **Phase 62: Resources panel architecture** — Navigator restructure to `Project → Model Options + Resources + Components`. Foreign-key UUID references. Save format (`.scp`). Reference picker UX. Sources toolbox category. (completed 2026-05-13)
 - [x] **Phase 63: BCs tab + value-source components in GUI** — Properties tab vs BCs tab separation. Five BC modes (value / profile / function / mark-in-code / driven-by-source-block). `WallTemperature` and `HeatFluxSource` toolbox entries. Dashed BC edge style. Bidirectional sync between BCs tab and canvas connections. (completed 2026-05-13)
 - [x] **Phase 64: Connection routing** — Per-port autoflip for FlowPorts with asymmetric same-side placement. Independent axis-flip for thermal-pair ports on CAC/HD. Anti-parallel offset for bidirectional pairs as polish hook. (completed 2026-05-14)
-- [ ] **Phase 65: Interaction model overhaul** — Left-marquee selection, right-click drag pan, right-click no-drag context menu. Edge deletion (Del/Backspace + right-click). Copy/Cut/Paste/Duplicate (Ctrl+C/X/V/D) with smart-parse-and-increment naming. Reset-to-empty rule for property fields. Snap-to-grid toggle. AutoRecover sidecar snapshot mechanism.
+- [x] **Phase 65: Interaction model overhaul** ✓ shipped 2026-05-14 — Left-marquee selection, right-click drag pan, right-click no-drag context menu. Edge deletion (Del/Backspace + right-click). Copy/Cut/Paste/Duplicate (Ctrl+C/X/V/D) with smart-parse-and-increment naming. Reset-to-empty rule for property fields. Snap-to-grid toggle. AutoRecover sidecar snapshot mechanism.
 - [ ] **Phase 66: Code preview rework** — Structured `CodeSection[]` output replacing flat string code-gen. Section blocks (Imports / Resources / Components / Composition / Main). Bidirectional traceability (code-hover → canvas-highlight; canvas-select → explicit code-jump). Click-to-pin sections. Copy + Export buttons in code panel toolbar. Hand-rolled formatting rules.
 - [ ] **Phase 67: Custom titlebar** — Tauri `decorations: false` + custom HTML titlebar. Integrated File/Edit/View/Help menubar, app icon, project name, dirty dot (left); min/max/close buttons (right). Cross-platform consistency.
 - [ ] **Phase 68: Layers system overhaul** — Four-layer taxonomy (Hydraulic / Thermal / Sources / Reactor Physics). Independent checkbox toggles. Floating Layers chip top-right of canvas with layer-state color indicators. Hide-vs-dim setting. Off-layer locked (non-interactive). Non-clunky layer-aware connect tool.
@@ -170,24 +170,24 @@ Plans:
 
 Plans:
 **Wave 1**
-- [ ] 65-01-PLAN.md — Naming retrofit: lowest-free nextInstanceName + delete instanceCounters (D-17, D-18).
-- [ ] 65-02-PLAN.md — Reset-to-empty unified field reset across Properties / BCs / type_union editors.
-- [ ] 65-03-PLAN.md — Canvas interaction props (panOnDrag=[2], selectionOnDrag, Esc-clears, edge-delete-via-Del) + useRightClickContextMenu 5px/250ms disambiguation (D-12).
+- [x] 65-01-PLAN.md — Naming retrofit: lowest-free nextInstanceName + delete instanceCounters (D-17, D-18).
+- [x] 65-02-PLAN.md — Reset-to-empty unified field reset across Properties / BCs / type_union editors.
+- [x] 65-03-PLAN.md — Canvas interaction props (panOnDrag=[2], selectionOnDrag, Esc-clears, edge-delete-via-Del) + useRightClickContextMenu 5px/250ms disambiguation (D-12).
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 65-04-PLAN.md — Clipboard core + Ctrl+C/X/V/D keyboard wiring + smart-parse-and-increment (D-15, D-16, D-19).
+- [x] 65-04-PLAN.md — Clipboard core + Ctrl+C/X/V/D keyboard wiring + smart-parse-and-increment (D-15, D-16, D-19).
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 65-05-PLAN.md — Node / Edge / Canvas context menus via shadcn ContextMenu + Popover (D-11, D-14); Auto-Layout grayed-out; "Show errors" hidden until Phase 71.
+- [x] 65-05-PLAN.md — Node / Edge / Canvas context menus via shadcn ContextMenu + Popover (D-11, D-14); Auto-Layout grayed-out; "Show errors" hidden until Phase 71.
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 65-06-PLAN.md — Snap-to-grid overlay button + ReactFlow snapToGrid/snapGrid + .scp layout.snap_to_grid persistence (D-07..D-10).
+- [x] 65-06-PLAN.md — Snap-to-grid overlay button + ReactFlow snapToGrid/snapGrid + .scp layout.snap_to_grid persistence (D-07..D-10).
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 65-07-PLAN.md — AutoRecover I/O substrate: sidecar writer + lockfile + crash detection + Tauri PID commands (D-01..D-06).
+- [x] 65-07-PLAN.md — AutoRecover I/O substrate: sidecar writer + lockfile + crash detection + Tauri PID commands (D-01..D-06).
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 65-08-PLAN.md — AutoRecover restore modal + App.tsx mount/unmount integration (D-03, D-04).
+- [x] 65-08-PLAN.md — AutoRecover restore modal + App.tsx mount/unmount integration (D-03, D-04).
 
 ### Phase 66: Code preview rework
 
