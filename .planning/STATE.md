@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: idle
-stopped_at: Phase 63.1 complete (14/14 plans + 7/7 UAT gaps closed)
-last_updated: "2026-05-14T12:15:00Z"
-last_activity: 2026-05-14 -- Phase 63.1 paperwork tidy-up (UAT/VERIFICATION/ROADMAP/STATE)
+status: Phase 63.1 shipped — all 14 plans + 7/7 UAT gaps closed; ready to advance
+stopped_at: Phase 64 context gathered
+last_updated: "2026-05-14T10:06:20.579Z"
+last_activity: 2026-05-14 -- Phase 63.1 paperwork tidy-up (UAT status flip, VERIFICATION addendum, ROADMAP Phase 62 + 63.1-14 corrections, STATE refresh)
 progress:
   total_phases: 15
   completed_phases: 6
@@ -65,6 +65,7 @@ Last activity: 2026-05-14 -- Phase 63.1 paperwork tidy-up (UAT status flip, VERI
 Next: `/gsd:discuss-phase 64` (Connection routing — per-port autoflip + asymmetric same-side placement + thermal-pair axis-flip). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far.
 
 Outstanding non-blocking items (NOT 64's job):
+
 - 11 pre-existing tsc errors + 1 pre-existing vitest failure (`SidebarPanel.anchors.test.tsx "Symmetric (L = R)"`) — Phase 71 owns reconciliation per Phase 61's deferred-items.
 - Channel BCs tab visual layout fit issues — explicitly deferred (2026-05-14) to Phase 65 (interaction model overhaul / v1.2 cosmetics phase).
 
@@ -132,10 +133,10 @@ Outstanding non-blocking items (NOT 64's job):
 
 ## Session Continuity
 
-**Last session:** 2026-05-14T12:15:00Z
-**Stopped at:** Phase 63.1 complete — paperwork tidied (UAT resolved, VERIFICATION addendum, ROADMAP corrected for Phase 62 + 63.1-14)
+**Last session:** 2026-05-14T10:06:20.569Z
+**Stopped at:** Phase 64 context gathered
 **Next action:** `/gsd:discuss-phase 64` (Connection routing) — or `/gsd:ship` to open a milestone PR first
-**Resume file:** .planning/ROADMAP.md (§Phase 64)
+**Resume file:** .planning/phases/64-connection-routing/64-CONTEXT.md
 **Branch:** `gui-redesign`
 **Stash:** none
 
