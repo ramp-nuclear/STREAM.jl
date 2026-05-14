@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: Phase 63.1 shipped — all 14 plans + 7/7 UAT gaps closed; ready to advance
+status: executing
 stopped_at: Phase 64 context gathered
-last_updated: "2026-05-14T10:06:20.579Z"
-last_activity: 2026-05-14 -- Phase 63.1 paperwork tidy-up (UAT status flip, VERIFICATION addendum, ROADMAP Phase 62 + 63.1-14 corrections, STATE refresh)
+last_updated: "2026-05-14T10:30:28.734Z"
+last_activity: 2026-05-14 -- Phase 64 planning complete
 progress:
   total_phases: 15
   completed_phases: 6
-  total_plans: 44
+  total_plans: 48
   completed_plans: 44
-  percent: 100
+  percent: 92
 ---
 
 # STATE: STREAM.jl
@@ -60,8 +60,8 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 Phase: 63.1 (bc-architecture-rework-unified-bcs-tab) — COMPLETE
 Plan: 14 of 14
-Status: Phase 63.1 shipped — all 14 plans + 7/7 UAT gaps closed; ready to advance
-Last activity: 2026-05-14 -- Phase 63.1 paperwork tidy-up (UAT status flip, VERIFICATION addendum, ROADMAP Phase 62 + 63.1-14 corrections, STATE refresh)
+Status: Ready to execute
+Last activity: 2026-05-14 -- Phase 64 planning complete
 Next: `/gsd:discuss-phase 64` (Connection routing — per-port autoflip + asymmetric same-side placement + thermal-pair axis-flip). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far.
 
 Outstanding non-blocking items (NOT 64's job):
