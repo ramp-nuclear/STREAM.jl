@@ -17,6 +17,23 @@ vi.mock("@tauri-apps/api/window", () => ({
   }),
 }));
 
+// Phase 65 Plan 08: App now has an AutoRecover render-gate that shows a boot
+// splash until detectCrashOnLaunch resolves. Mock the autoRecover module to
+// resolve synchronously to a clean launch so the workspace renders.
+vi.mock("../../lib/autoRecover", () => ({
+  detectCrashOnLaunch: vi
+    .fn()
+    .mockResolvedValue({ crashed: false, sidecars: [], staleLockfile: null }),
+  createDebouncedSidecarWriter: vi.fn().mockReturnValue({
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    flush: vi.fn(),
+  }),
+  getSidecarBasename: vi.fn().mockReturnValue("test.scp.autosave"),
+  writeLockfile: vi.fn().mockResolvedValue(undefined),
+  clearLockfile: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import App from "../../App";
 import useStore, {
@@ -64,18 +81,20 @@ afterEach(() => {
 });
 
 describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () => {
-  it("D-01: renders three tab triggers labeled Components / Resources / Project", () => {
+  it("D-01: renders three tab triggers labeled Components / Resources / Project", async () => {
     render(<App />);
+    // Phase 65 Plan 08: App now waits on detectCrashOnLaunch before rendering
+    // the workspace, so query asynchronously.
     expect(
-      screen.getByRole("tab", { name: /^Components$/ }),
+      await screen.findByRole("tab", { name: /^Components$/ }),
     ).toBeTruthy();
     expect(screen.getByRole("tab", { name: /^Resources$/ })).toBeTruthy();
     expect(screen.getByRole("tab", { name: /^Project$/ })).toBeTruthy();
   });
 
-  it("D-01: Components is the default active tab on cold start", () => {
+  it("D-01: Components is the default active tab on cold start", async () => {
     render(<App />);
-    const componentsTab = screen.getByRole("tab", { name: /^Components$/ });
+    const componentsTab = await screen.findByRole("tab", { name: /^Components$/ });
     expect(componentsTab.getAttribute("aria-selected")).toBe("true");
     const resourcesTab = screen.getByRole("tab", { name: /^Resources$/ });
     expect(resourcesTab.getAttribute("aria-selected")).toBe("false");
@@ -83,11 +102,11 @@ describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () 
     expect(projectTab.getAttribute("aria-selected")).toBe("false");
   });
 
-  it("D-01: activating Resources trigger flips aria-selected and updates store", () => {
+  it("D-01: activating Resources trigger flips aria-selected and updates store", async () => {
     // Radix Tabs activates on pointer down (not click). fireEvent.mouseDown
     // matches Radix's listener; we also fire click for full event-pair fidelity.
     render(<App />);
-    const resourcesTab = screen.getByRole("tab", { name: /^Resources$/ });
+    const resourcesTab = await screen.findByRole("tab", { name: /^Resources$/ });
     fireEvent.mouseDown(resourcesTab);
     fireEvent.click(resourcesTab);
     expect(useStore.getState().activeLeftTab).toBe("Resources");
