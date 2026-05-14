@@ -779,7 +779,7 @@ export function generateCode(
 
   // Detect resource-name collisions with default component instance names.
   // Default instance names follow `<componentId.toLowerCase()>_<n>` (see
-  // useStore.getNextInstanceName). For each node, record both the actual
+  // useStore.nextInstanceName). For each node, record both the actual
   // declared instance name and the default-shape — both forms can collide.
   const componentInstanceNames = new Set<string>();
   for (const node of nodes) {
