@@ -3,7 +3,7 @@ phase: 64-connection-routing
 plan: 03
 type: execute
 wave: 2
-depends_on: [01]
+depends_on: ["64-01"]
 files_modified:
   - gui/src/components/StreamNode.tsx
   - gui/src/components/__tests__/StreamNode.autoflip.test.tsx
