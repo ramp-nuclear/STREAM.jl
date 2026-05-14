@@ -544,7 +544,16 @@ function ValueModeEditor({
     default: value,
   };
   return (
-    <NumericField param={param} value={value} onChange={onChange} />
+    <NumericField
+      param={param}
+      value={value}
+      onChange={(v) => {
+        // NumericField.onChange is (number | undefined); ValueModeEditor's
+        // param.default is always set to `value` so undefined is never
+        // returned in practice. Guard for type safety.
+        if (v !== undefined) onChange(v);
+      }}
+    />
   );
 }
 
