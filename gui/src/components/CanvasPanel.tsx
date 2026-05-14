@@ -6,6 +6,7 @@ import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
+  SelectionMode,
   useReactFlow,
   type Connection,
   type Edge,
@@ -23,6 +24,7 @@ import HydraulicEdge from "./HydraulicEdge";
 import BCEdge from "./BCEdge";
 import WelcomeOverlay from "./WelcomeOverlay";
 import { isAllowedBCConnection } from "@/lib/bcMode";
+import { useRightClickContextMenu } from "@/hooks/useRightClickContextMenu";
 
 export function getPortType(nodeId: string, handleId: string): string | null {
   const node = useStore.getState().nodes.find((n) => n.id === nodeId);
@@ -52,8 +54,15 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge, selectNode } =
     useStore();
   const activeLayer = useStore((s) => s.activeLayer);
-  const { screenToFlowPosition } = useReactFlow();
+  // B3 guard: useReactFlow is called ONCE at the component top level — never
+  // inside callbacks or useEffect. setNodes/setEdges are stable identities per
+  // @xyflow/react v12 docs.
+  const { screenToFlowPosition, setNodes, setEdges } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Phase 65 Plan 03: right-click pan-vs-context-menu disambiguation (D-12).
+  // rcMenu.state is consumed by Plan 05 — no menu UI is rendered here.
+  const rcMenu = useRightClickContextMenu();
 
   // Enrich nodes with dimming styles based on active layer
   const enrichedNodes = useMemo(() => {
@@ -195,10 +204,27 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         e.preventDefault();
         useStore.getState().cycleLayer();
       }
+      // Esc clears selection (nodes AND edges); skip when a text input has focus
+      if (e.key === "Escape") {
+        const target = e.target as HTMLElement;
+        if (
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+        useStore.getState().selectNode(null);
+        // setNodes/setEdges from useReactFlow are stable identities — safe to omit from deps
+        setNodes((ns) => ns.map((n) => (n.selected ? { ...n, selected: false } : n)));
+        setEdges((es) => es.map((edge) => (edge.selected ? { ...edge, selected: false } : edge)));
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // setNodes/setEdges from useReactFlow are stable identities — safe to omit from deps
 
   return (
     <div ref={containerRef} className="flex-1 h-full relative focus:outline-none" tabIndex={-1}>
@@ -212,15 +238,21 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onEdgeContextMenu={rcMenu.onEdgeContextMenu}
         onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
+        onNodeContextMenu={rcMenu.onNodeContextMenu}
         onNodeDragStart={onNodeDragStart}
+        onPaneClick={onPaneClick}
+        onPaneContextMenu={rcMenu.onPaneContextMenu}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         connectionLineType={ConnectionLineType.SmoothStep}
-        deleteKeyCode={["Delete", "Backspace"]}
+        panOnDrag={[2]}
+        selectionOnDrag
+        selectionMode={SelectionMode.Partial}
+        deleteKeyCode={["Delete", "Backspace"]} // Del/Backspace deletes nodes AND edges via ReactFlow built-in — closes v0.8 user-list item #2
         fitView
       >
         <Controls />
