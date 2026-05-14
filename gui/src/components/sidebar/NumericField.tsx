@@ -15,7 +15,7 @@ import {
 interface NumericFieldProps {
   param: Parameter;
   value: unknown;
-  onChange: (value: number) => void;
+  onChange: (value: number | undefined) => void;
 }
 
 export default function NumericField({ param, value, onChange }: NumericFieldProps) {
@@ -25,6 +25,27 @@ export default function NumericField({ param, value, onChange }: NumericFieldPro
   const [error, setError] = useState<string | null>(null);
 
   function handleBlur() {
+    const trimmed = localValue.trim();
+
+    // Three-branch blank-on-blur rule (§3.5 reset-to-empty, Plan 65-02):
+    if (trimmed === "") {
+      if (param.default != null) {
+        // Branch 1: registry default exists — restore it.
+        const defaultVal = param.default as number;
+        setError(null);
+        setLocalValue(String(defaultVal));
+        onChange(defaultVal);
+      } else if (param.required) {
+        // Branch 2: required, no default — surface error.
+        setError("required");
+      } else {
+        // Branch 3: optional, no default — omit from code-gen.
+        setError(null);
+        onChange(undefined);
+      }
+      return;
+    }
+
     const result =
       param.type === "Int" ? validateInt(localValue) : validateReal(localValue);
     if (result.valid) {
