@@ -120,7 +120,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 **Goal:** Rework BC architecture from Phase 63 — unified BCs tab as single per-component surface for Anchors + External Inputs (D-09), hide Sources canvas nodes (D-06), dropdown mode picker (D-11), segmented Sym/Asym (D-12), new anchors Record slice replacing legacy bcs[] (D-02/D-03), selector-derived validation replacing errorTagsByNodeId (D-15..D-19/D-23), canvas anchor indicator (D-13), Promote-to-shared-source flow (D-07/D-08), plus CR-01/CR-02/CR-03 + click-vs-drag bug fixes (D-20/D-21/D-22).
 **Requirements**: D-01..D-23 (no global REQ-IDs; coverage tracked via CONTEXT.md decisions)
 **Depends on:** Phase 63
-**Plans:** 10 plans + 3 gap-closure plans (UAT follow-up)
+**Plans:** 14/14 plans complete
 
 Plans:
 - [x] 63.1-01-PLAN.md (Wave 0) — Test scaffolding: nine RED test files covering selectNodeErrors, anchors slice, codegen anchors, projectIO schema, CR-01, CR-02/CR-03, click-vs-drag, promoteToSharedSource, StreamNode anchor indicator.
@@ -133,9 +133,9 @@ Plans:
 - [x] 63.1-08-PLAN.md (Wave 5, depends on 06/07) — promoteToSharedSource store action + ↗ Promote to shared source ghost button in BCsTabForm; remove legacy + New ${sourceCompId} button.
 - [x] 63.1-09-PLAN.md (Wave 5, depends on 03, parallel to 08) — ToolboxPanel.tsx Sources block deleted (D-06); StreamNode.tsx anchor indicator (D-13).
 - [x] 63.1-10-PLAN.md (Wave 6, depends on 08) — CR-01 addEdge BCPort fix; CR-02/CR-03 setBCSymmetric fix + _reconcileEdgesForBCMode helper; click-vs-drag onNodesChange.select sync; D-23 verified.
-- [ ] 63.1-11-PLAN.md (Wave 7, gap closure, depends on 07/08) — RC-1: ParameterForm type_union branch + tests; unblocks WT.T_wall / HFS.q / Channel.h_left editability (closes UAT GAP-RC-1, GAP-RC-3 primary path).
-- [ ] 63.1-12-PLAN.md (Wave 7, gap closure, depends on 10) — RC-2: add BCPort target handles to Channel + ChannelHeatFlux registry; StreamNode source-vs-target dispatch; delete decoy whole-body overlay (closes UAT GAP-RC-2 / test 6 blocked-by-prior-phase).
-- [ ] 63.1-13-PLAN.md (Wave 8, gap closure, depends on 09/11) — Cosmetic + minor sweep: anchor glyph swap (lucide Anchor), Source SelectItem disabled gate, Promote button icon-only restyle, promoteToSharedSource default-seed (T_wall=300 / q=0) (closes UAT GAP-COSMETIC-ANCHOR, GAP-MINOR-SOURCE-GATE, GAP-COSMETIC-PROMOTE, GAP-RC-3 default-seed sweetener).
+- [x] 63.1-11-PLAN.md (Wave 7, gap closure, depends on 07/08) — RC-1: ParameterForm type_union branch + tests; unblocks WT.T_wall / HFS.q / Channel.h_left editability (closes UAT GAP-RC-1, GAP-RC-3 primary path).
+- [x] 63.1-12-PLAN.md (Wave 7, gap closure, depends on 10) — RC-2: add BCPort target handles to Channel + ChannelHeatFlux registry; StreamNode source-vs-target dispatch; delete decoy whole-body overlay (closes UAT GAP-RC-2 / test 6 blocked-by-prior-phase).
+- [x] 63.1-13-PLAN.md (Wave 8, gap closure, depends on 09/11) — Cosmetic + minor sweep: anchor glyph swap (lucide Anchor), Source SelectItem disabled gate, Promote button icon-only restyle, promoteToSharedSource default-seed (T_wall=300 / q=0) (closes UAT GAP-COSMETIC-ANCHOR, GAP-MINOR-SOURCE-GATE, GAP-COSMETIC-PROMOTE, GAP-RC-3 default-seed sweetener).
 
 
 ### Phase 64: Connection routing
@@ -253,7 +253,7 @@ contract document drafted in parallel throughout.
 | 61. Registry audit + rewrite for v1.1                | 5/5 | Complete   | 2026-05-12 |
 | 62. Resources panel architecture                     | 10/11 | In Progress|  |
 | 63. BCs tab + value-source components in GUI         | 4/4 | Complete    | 2026-05-13 |
-| 63.1. BC architecture rework — unified BCs tab       | 10/13 | Gap closure planned | 2026-05-14 |
+| 63.1. BC architecture rework — unified BCs tab       | 14/14 | Complete   | 2026-05-14 |
 | 64. Connection routing                               | 0/TBD | Planned | — |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |

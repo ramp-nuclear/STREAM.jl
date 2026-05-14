@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
 status: executing
 stopped_at: Phase 63.1 UI-SPEC approved
-last_updated: "2026-05-14T00:25:16.416Z"
-last_activity: 2026-05-14 -- Phase 63.1 planning complete
+last_updated: "2026-05-14T08:29:52.132Z"
+last_activity: 2026-05-14 -- Phase 63.1 execution started
 progress:
   total_phases: 15
   completed_phases: 5
@@ -57,10 +57,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 63.1 — gap-closure execution COMPLETE (Plans 11, 12, 13 landed)
-Plan: 13 of 13 (3 gap-closure plans on top of the original 10)
-Status: Ready to execute
-Last activity: 2026-05-14 -- Phase 63.1 planning complete
+Phase: 63.1 (bc-architecture-rework-unified-bcs-tab) — EXECUTING
+Plan: 1 of 14
+Status: Executing Phase 63.1
+Last activity: 2026-05-14 -- Phase 63.1 execution started
 Next: either `/gsd:plan-phase 63.1-14` to author the BC-mode parity follow-up, or `/gsd:discuss-phase 62` for the resources panel architecture (the next pending v1.2 phase).
 
 ---
