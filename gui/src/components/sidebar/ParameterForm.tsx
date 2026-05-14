@@ -89,6 +89,8 @@ function TypeUnionField({ param, value, isSourceValueParam, onChange }: TypeUnio
         <ScalarInput
           value={initialDisplay}
           unit={param.unit}
+          paramDefault={typeof param.default === "number" ? param.default : undefined}
+          paramRequired={param.required ?? false}
           onChange={(v) => onChange(v)}
         />
         <p className="text-[11px] text-muted-foreground leading-[1.3]">
@@ -134,7 +136,9 @@ function TypeUnionField({ param, value, isSourceValueParam, onChange }: TypeUnio
         <ScalarInput
           value={entry?.mode === "value" ? entry.value : (typeof value === "number" ? value : undefined)}
           unit={param.unit}
-          onChange={(v) => onChange({ mode: "value", value: v })}
+          paramDefault={typeof param.default === "number" ? param.default : undefined}
+          paramRequired={param.required ?? false}
+          onChange={(v) => onChange({ mode: "value", value: v as number })}
         />
       ) : entry.mode === "profile" ? (
         <ProfileModeEditor
@@ -154,10 +158,12 @@ function TypeUnionField({ param, value, isSourceValueParam, onChange }: TypeUnio
 interface ScalarInputProps {
   value: unknown;
   unit?: string;
-  onChange: (value: number) => void;
+  paramDefault?: number;
+  paramRequired?: boolean;
+  onChange: (value: number | undefined) => void;
 }
 
-function ScalarInput({ value, unit, onChange }: ScalarInputProps) {
+function ScalarInput({ value, unit, paramDefault, paramRequired, onChange }: ScalarInputProps) {
   const [localValue, setLocalValue] = useState(
     typeof value === "number" ? String(value) : ""
   );
@@ -177,10 +183,26 @@ function ScalarInput({ value, unit, onChange }: ScalarInputProps) {
   }, [value]);
 
   function handleBlur() {
-    if (localValue.trim() === "") {
-      setError(null);
+    const trimmed = localValue.trim();
+
+    // Three-branch blank-on-blur rule (§3.5 reset-to-empty, Plan 65-02):
+    if (trimmed === "") {
+      if (paramDefault != null) {
+        // Branch 1: registry default exists — restore it.
+        setError(null);
+        setLocalValue(String(paramDefault));
+        onChange(paramDefault);
+      } else if (paramRequired) {
+        // Branch 2: required, no default — surface error.
+        setError("required");
+      } else {
+        // Branch 3: optional, no default — omit from code-gen.
+        setError(null);
+        onChange(undefined);
+      }
       return;
     }
+
     const result = validateReal(localValue);
     if (result.valid) {
       setError(null);
