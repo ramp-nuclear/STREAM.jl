@@ -1,7 +1,14 @@
 import type * as React from "react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Anchor } from "lucide-react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import {
+  Handle,
+  Position,
+  useUpdateNodeInternals,
+  type Edge,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
 import { getComponent } from "../registry";
 import { getComponentIcon } from "@/registry/icons";
 import { getComponentLayers } from "../lib/layers";
@@ -10,6 +17,13 @@ import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
 import { selectNodeErrors, type NodeErrorsInput } from "@/lib/selectors/nodeErrors";
 import { isSourceValueEntry } from "@/lib/sourceValueEntry";
+import {
+  resolveFlowPortSide,
+  resolveAsymmetricOffset,
+  resolveThermalPairSides,
+  type Side,
+  type OffsetStyle,
+} from "@/lib/autoflip";
 
 // Inline colors: immune to Tailwind JIT scanning gaps and * { border-color } cascade.
 const CATEGORY_LEFT_BORDER_COLOR: Record<string, string> = {
@@ -118,6 +132,39 @@ type FlowPortLike = {
   side?: string;
 };
 
+type ThermalPortLike = {
+  name: string;
+  type: string;
+  side?: string;
+  default_axis?: "horizontal" | "vertical";
+  pair_with?: string;
+};
+
+// ---------------------------------------------------------------------------
+// Offset-string parsing (Pitfall 3 guard)
+// ---------------------------------------------------------------------------
+//
+// `resolveAsymmetricOffset` returns a fresh `OffsetStyle` object — returning
+// that directly from a `useStore` selector would cause an infinite re-render
+// loop because each call produces a new reference (Pitfall 3 / RESEARCH.md).
+// We encode the offset as a primitive string ("left:25%", "top:75%", or "")
+// from inside the selector and parse it back to an `OffsetStyle` in the
+// component body. The selector cache stays stable across renders.
+function offsetToString(offset: OffsetStyle | undefined): string {
+  if (!offset) return "";
+  if (offset.left !== undefined) return `left:${offset.left}`;
+  if (offset.top !== undefined) return `top:${offset.top}`;
+  return "";
+}
+
+function parseOffsetString(s: string): OffsetStyle | undefined {
+  if (!s) return undefined;
+  const [axis, value] = s.split(":");
+  if (axis === "left") return { left: value };
+  if (axis === "top") return { top: value };
+  return undefined;
+}
+
 function anchorIndicatorStyleFor(side: string | undefined): React.CSSProperties {
   // The FlowPort `<Handle>` is a 12-px circle that ReactFlow centers on the
   // node edge at the requested `Position`. We place the 12-px lucide Anchor
@@ -159,16 +206,69 @@ function FlowPortHandle({
     ),
   );
 
+  // Phase 64 D-01/D-02 — live side derivation from (nodes, edges). Returns a
+  // primitive string so zustand's shallow equality stays stable (Pitfall 3).
+  const defaultSide = (port.side as Side | undefined) ?? "left";
+  const resolvedSide = useStore(
+    useCallback(
+      (s: { nodes: Node[]; edges: Edge[] }) =>
+        resolveFlowPortSide(
+          s.nodes,
+          s.edges,
+          nodeId,
+          port.name,
+          defaultSide,
+          getComponent,
+        ),
+      [nodeId, port.name, defaultSide],
+    ),
+  );
+
+  // D-09/D-10 asymmetric same-side placement — encoded as a primitive string
+  // ("left:25%" / "top:75%" / "") inside the selector, parsed to OffsetStyle
+  // in the component body (Pitfall 3: never return a fresh object/array from
+  // a selector).
+  const offsetString = useStore(
+    useCallback(
+      (s: { nodes: Node[]; edges: Edge[] }) =>
+        offsetToString(
+          resolveAsymmetricOffset(
+            s.nodes,
+            s.edges,
+            nodeId,
+            resolvedSide,
+            port.name,
+            defaultSide,
+            getComponent,
+          ),
+        ),
+      [nodeId, port.name, resolvedSide, defaultSide],
+    ),
+  );
+  const offsetStyle = parseOffsetString(offsetString);
+
+  // Pattern 2 / Pitfall 1 — re-measure handle DOM whenever the resolved side
+  // flips. Multiple sibling sub-components may each fire updateNodeInternals
+  // on the same node id; ReactFlow handles redundant calls idempotently.
+  // Pitfall 2 note: if rapid drag exposes a sticky-edge race, switch to the
+  // deferred form `setTimeout(() => updateNodeInternals(nodeId), 0)`; not
+  // applied initially per the plan.
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(nodeId);
+  }, [nodeId, resolvedSide, updateNodeInternals]);
+
   return (
     <>
       <Handle
         id={port.name}
         type={isInPort ? "target" : "source"}
-        position={sideToPosition[port.side!]}
+        position={sideToPosition[resolvedSide]}
         data={{ portType: port.type }}
         style={{
           background: isInPort ? FLOW_IN_BG : FLOW_OUT_BG,
           border: `1.5px solid ${isInPort ? FLOW_IN_BORDER : FLOW_OUT_BORDER}`,
+          ...(offsetStyle ?? {}),
           ...(dimFlowHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
         }}
       />
@@ -179,10 +279,82 @@ function FlowPortHandle({
           className={`w-3 h-3 text-foreground ${
             dimFlowHandles ? "opacity-20" : ""
           }`}
-          style={anchorIndicatorStyleFor(port.side)}
+          // D-04 anchor co-location — anchor follows the resolved side, not
+          // the registry default, so handle + anchor never visually decouple.
+          style={anchorIndicatorStyleFor(resolvedSide)}
         />
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ThermalPortHandle — pair-thermal sub-component (Phase 64 D-12 / D-18).
+// ---------------------------------------------------------------------------
+//
+// Used for thermal ports carrying `pair_with` (CAC + HD today). The pair stays
+// on opposing faces; the suffix is definitive (`_left` → spatial left or top,
+// `_right` → spatial right or bottom); only the axis flips based on neighbor
+// placement. Single-port thermal handles (e.g. ConstantTemperature.thermal)
+// stay in the inline `.map(...)` path with the registry-default `side` —
+// they have no `pair_with` to swing.
+function ThermalPortHandle({
+  nodeId,
+  port,
+  dimThermalHandles,
+}: {
+  nodeId: string;
+  port: ThermalPortLike;
+  dimThermalHandles: boolean;
+}) {
+  const pairWith = port.pair_with!;
+  const defaultAxis = port.default_axis ?? "horizontal";
+
+  // Pitfall 3: pull just the primitive `thisSide` out of the selector body so
+  // the returned value is a string, not a fresh object.
+  const resolvedSide: Side = useStore(
+    useCallback(
+      (s: { nodes: Node[]; edges: Edge[] }) =>
+        resolveThermalPairSides(
+          s.nodes,
+          s.edges,
+          nodeId,
+          port.name,
+          pairWith,
+          defaultAxis,
+          getComponent,
+        ).thisSide,
+      [nodeId, port.name, pairWith, defaultAxis],
+    ),
+  );
+
+  // Pattern 2 / Pitfall 1 — re-measure when the side flips.
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(nodeId);
+  }, [nodeId, resolvedSide, updateNodeInternals]);
+
+  // The source/target heuristic now reads from the resolved side rather than
+  // the registry's static `port.side` — handle source/target identity flips
+  // alongside autoflip so edges connect to the correct end.
+  const isSourceHandle = resolvedSide === "right" || resolvedSide === "bottom";
+
+  return (
+    <Handle
+      id={port.name}
+      type={isSourceHandle ? "source" : "target"}
+      position={sideToPosition[resolvedSide]}
+      data={{ portType: port.type }}
+      style={{
+        background: THERMAL_HANDLE_COLOR,
+        border: `1.5px solid ${THERMAL_HANDLE_BORDER}`,
+        width: 12,
+        height: 12,
+        borderRadius: 0,
+        transform: "rotate(45deg)",
+        ...(dimThermalHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
+      }}
+    />
   );
 }
 
@@ -268,24 +440,43 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           dimFlowHandles={dimFlowHandles}
         />
       ))}
-      {thermalPorts.map((port) => (
-        <Handle
-          key={port.name}
-          id={port.name}
-          type={port.side === "right" || port.side === "bottom" ? "source" : "target"}
-          position={sideToPosition[port.side!]}
-          data={{ portType: port.type }}
-          style={{
-            background: THERMAL_HANDLE_COLOR,
-            border: `1.5px solid ${THERMAL_HANDLE_BORDER}`,
-            width: 12,
-            height: 12,
-            borderRadius: 0,
-            transform: "rotate(45deg)",
-            ...(dimThermalHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
-          }}
-        />
-      ))}
+      {thermalPorts.map((port) => {
+        // Phase 64 Pitfall 6 fix: pair-thermal ports (CAC + HD — they carry
+        // `pair_with` and have no static `side`) route through
+        // `ThermalPortHandle`, which resolves a defined side via D-18
+        // suffix-locked axis-flip. Single-port thermal entries (e.g.
+        // ConstantTemperature.thermal) keep the registry-default `side` —
+        // they have no pair to swing.
+        if (port.pair_with) {
+          return (
+            <ThermalPortHandle
+              key={port.name}
+              nodeId={id}
+              port={port as ThermalPortLike}
+              dimThermalHandles={dimThermalHandles}
+            />
+          );
+        }
+        const singleSide = (port.side ?? "left") as Side;
+        return (
+          <Handle
+            key={port.name}
+            id={port.name}
+            type={singleSide === "right" || singleSide === "bottom" ? "source" : "target"}
+            position={sideToPosition[singleSide]}
+            data={{ portType: port.type }}
+            style={{
+              background: THERMAL_HANDLE_COLOR,
+              border: `1.5px solid ${THERMAL_HANDLE_BORDER}`,
+              width: 12,
+              height: 12,
+              borderRadius: 0,
+              transform: "rotate(45deg)",
+              ...(dimThermalHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
+            }}
+          />
+        );
+      })}
       {bcPorts.map((port) => {
         // Plan 63.1-12 RC-2: BCPort is now used on both Sources (source-side,
         // e.g. WT.T_wall_out) AND Hydraulic consumers (target-side, e.g.
