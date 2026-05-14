@@ -18,6 +18,7 @@ import {
   type BCEdgeData,
 } from "@/lib/bcMode";
 import type { AnchorEntry } from "@/lib/anchors";
+import { defaultSourceValueEntry } from "@/lib/sourceValueEntry";
 import {
   serializeProject,
   deserializeProject,
@@ -1381,9 +1382,11 @@ const useStore = create<AppState>()((set, get) => ({
     // override via the Properties panel (Plan 11 RC-1 closure).
     //   T_wall = 300.0 K — room temperature, clearly a placeholder.
     //   q     = 0.0 W/m² — natural "no-source" default for HFS.
-    const SOURCE_DEFAULT_SEED: Record<string, Record<string, number>> = {
-      WallTemperature: { T_wall: 300.0 },
-      HeatFluxSource: { q: 0.0 },
+    // Plan 63.1-14 (GAP-RC-4): seed as SourceValueEntry { mode:"value", value:N }
+    // so the spawned source stores the new entry shape from first write.
+    const SOURCE_DEFAULT_SEED: Record<string, Record<string, unknown>> = {
+      WallTemperature: { T_wall: defaultSourceValueEntry(300.0) },
+      HeatFluxSource: { q: defaultSourceValueEntry(0.0) },
     };
     const valueSeed = SOURCE_DEFAULT_SEED[sourceCompId] ?? {};
     const consumerN =
