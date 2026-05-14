@@ -190,6 +190,57 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         e.preventDefault();
         useStore.getState().redo();
       }
+      // Phase 65 Plan 04: clipboard shortcuts (D-15, D-16). Skipped when text input has focus (above).
+      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
+        const target = e.target as HTMLElement;
+        if (
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target.isContentEditable
+        ) {
+          // fall through to browser-native copy
+        } else {
+          e.preventDefault();
+          void useStore.getState().copySelection();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "x") {
+        const target = e.target as HTMLElement;
+        if (
+          !(target instanceof HTMLInputElement) &&
+          !(target instanceof HTMLTextAreaElement) &&
+          !(target instanceof HTMLSelectElement) &&
+          !target.isContentEditable
+        ) {
+          e.preventDefault();
+          void useStore.getState().cutSelection();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+        const target = e.target as HTMLElement;
+        if (
+          !(target instanceof HTMLInputElement) &&
+          !(target instanceof HTMLTextAreaElement) &&
+          !(target instanceof HTMLSelectElement) &&
+          !target.isContentEditable
+        ) {
+          e.preventDefault();
+          void useStore.getState().pasteFromClipboard();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "d") {
+        const target = e.target as HTMLElement;
+        if (
+          !(target instanceof HTMLInputElement) &&
+          !(target instanceof HTMLTextAreaElement) &&
+          !(target instanceof HTMLSelectElement) &&
+          !target.isContentEditable
+        ) {
+          e.preventDefault();
+          useStore.getState().duplicateSelection();
+        }
+      }
       // Tab cycles layers globally; skip when a text input has focus
       if (e.key === "Tab") {
         const target = e.target as HTMLElement;
