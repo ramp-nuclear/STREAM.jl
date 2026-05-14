@@ -314,6 +314,9 @@ interface AppState {
   cutSelection: () => Promise<void>;
   pasteFromClipboard: () => Promise<void>;
   duplicateSelection: () => void;
+  // Phase 65 Plan 08: AutoRecover restore actions (D-03/D-04)
+  recoverFromSidecar: (basename: string) => Promise<void>;
+  discardAllSidecars: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -2488,6 +2491,126 @@ const useStore = create<AppState>()((set, get) => ({
         : state.missingFilePowerShapes.filter((m) => m.uuid !== uuid),
       isDirty: true,
     });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 65 Plan 08: AutoRecover restore actions (D-03/D-04)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Hydrate the store from a sidecar file after a crash is detected on launch.
+   *
+   * On success: populates nodes/edges/anchors/resources/modelOptions/layout from the
+   * sidecar; sets isDirty=true and currentFilePath=null (D-04: recovered state is
+   * in-memory unsaved — user must Save As to persist to a named file).
+   * On failure (null sidecar, malformed JSON): clears the sidecar to prevent a
+   * repeated boot-loop failure; store state is left unchanged.
+   *
+   * # Arguments
+   * - `basename` — sidecar basename (e.g. "foo.scp.autosave")
+   */
+  recoverFromSidecar: async (basename: string) => {
+    const { readSidecar, clearSidecar, clearLockfile } = await import(
+      "../lib/autoRecover"
+    );
+
+    const text = await readSidecar(basename);
+    if (text === null) {
+      // Sidecar missing or unreadable — clean up and bail out silently
+      await clearSidecar(basename);
+      await clearLockfile();
+      return;
+    }
+
+    let project;
+    try {
+      project = deserializeProject(text);
+    } catch {
+      // Malformed / incompatible sidecar — remove it to prevent boot-loop
+      await clearSidecar(basename);
+      await clearLockfile();
+      return;
+    }
+
+    // Re-enrich edges (handles pre-Phase-42 saves)
+    const enrichedEdges = enrichEdges(project.connections, project.components);
+
+    // Phase 62: re-inject sentinel resources (same pattern as loadProjectFromPath)
+    const geometriesRecord: Record<string, GeometryResource> = {};
+    for (const g of project.resources.geometries) geometriesRecord[g.uuid] = g;
+
+    const powerShapesRecord: Record<string, PowerShapeResource> = {
+      [SENTINEL_UNSET_POWER_SHAPE]: {
+        uuid: SENTINEL_UNSET_POWER_SHAPE,
+        name: "(leave unset — set in code)",
+        kind: "unset",
+        params: {},
+      },
+    };
+    for (const ps of project.resources.power_shapes) {
+      if (ps.uuid === SENTINEL_UNSET_POWER_SHAPE) continue;
+      powerShapesRecord[ps.uuid] = ps;
+    }
+
+    const fluidsRecord: Record<string, FluidResource> = {
+      [SENTINEL_LIGHT_WATER_FLUID]: {
+        uuid: SENTINEL_LIGHT_WATER_FLUID,
+        name: "light_water",
+      },
+    };
+    for (const f of project.resources.fluids) {
+      if (f.uuid === SENTINEL_LIGHT_WATER_FLUID) continue;
+      fluidsRecord[f.uuid] = f;
+    }
+
+    set({
+      nodes: project.components,
+      edges: enrichedEdges,
+      anchors: project.anchors,
+      activeLayer: (project.layout.active_layer ?? "Both") as LayerView,
+      snapToGrid: project.layout.snap_to_grid ?? false,
+      // D-04: recovered state is always in-memory unsaved; user must Save As
+      currentFilePath: null,
+      isDirty: true,
+      selectedNodeId: null,
+      _undoPast: [],
+      _undoFuture: [],
+      errorNodeIds: new Set<string>(),
+      validationResult: null,
+      resources: {
+        geometries: geometriesRecord,
+        powerShapes: powerShapesRecord,
+        fluids: fluidsRecord,
+      },
+      modelOptions: project.model_options,
+      activeLeftTab: project.layout.active_left_tab,
+      selectedResourceId: null,
+      selectedResourceKind: null,
+      selectionKind: "none",
+      missingFilePowerShapes: [],
+      bcMode: {},
+      bcSymmetric: {},
+    });
+
+    // Clear the sidecar and lockfile after successful hydration
+    await clearSidecar(basename);
+    await clearLockfile();
+  },
+
+  /**
+   * Discard all sidecar files and the lockfile.
+   *
+   * Called when the user clicks "Discard" on the restore modal. Clears every
+   * autosave sidecar (not just the one shown in the modal) and removes the
+   * stale lockfile so the next launch starts clean.
+   */
+  discardAllSidecars: async () => {
+    const { enumerateSidecars, clearSidecar, clearLockfile } = await import(
+      "../lib/autoRecover"
+    );
+    const basenames = await enumerateSidecars();
+    await Promise.all(basenames.map((b) => clearSidecar(b)));
+    await clearLockfile();
   },
 }));
 

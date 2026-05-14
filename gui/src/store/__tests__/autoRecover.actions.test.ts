@@ -11,14 +11,14 @@ import useStore from "../useStore";
 // Mock @/lib/autoRecover for store action tests
 // ---------------------------------------------------------------------------
 
-const mockReadSidecar = vi.fn<[string], Promise<string | null>>();
-const mockClearSidecar = vi.fn<[string], Promise<void>>();
-const mockClearLockfile = vi.fn<[], Promise<void>>();
-const mockEnumerateSidecars = vi.fn<[], Promise<string[]>>();
+const mockReadSidecar = vi.fn<(basename: string) => Promise<string | null>>();
+const mockClearSidecar = vi.fn<(basename: string) => Promise<void>>();
+const mockClearLockfile = vi.fn<() => Promise<void>>();
+const mockEnumerateSidecars = vi.fn<() => Promise<string[]>>();
 
 vi.mock("@/lib/autoRecover", () => ({
-  readSidecar: (...args: [string]) => mockReadSidecar(...args),
-  clearSidecar: (...args: [string]) => mockClearSidecar(...args),
+  readSidecar: (basename: string) => mockReadSidecar(basename),
+  clearSidecar: (basename: string) => mockClearSidecar(basename),
   clearLockfile: () => mockClearLockfile(),
   enumerateSidecars: () => mockEnumerateSidecars(),
   // Re-export any other needed exports with pass-through behavior
