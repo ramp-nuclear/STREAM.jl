@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
 status: executing
-stopped_at: Phase 63.1 complete (10/10 plans, verifier PASS)
-last_updated: "2026-05-13T20:55:52.554Z"
-last_activity: 2026-05-13 -- Phase 63.1 complete
+stopped_at: Phase 63.1 gap-closure complete (13/13 plans; 4 UAT gaps closed end-to-end)
+last_updated: "2026-05-14T03:00:00.000Z"
+last_activity: 2026-05-14 -- Phase 63.1 Plans 11/12/13 landed (RC-1, RC-2, RC-3, cosmetics)
 progress:
   total_phases: 15
   completed_phases: 6
-  total_plans: 50
-  completed_plans: 40
-  percent: 80
+  total_plans: 53
+  completed_plans: 43
+  percent: 81
 ---
 
 # STATE: STREAM.jl
@@ -57,11 +57,11 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 63.1 — COMPLETE (verifier PASS, 23/23 D-* decisions)
-Plan: 10 of 10
-Status: Phase 63.1 complete; one deferred test (SidebarPanel.anchors.test.tsx) logged in deferred-items.md
-Last activity: 2026-05-13 -- Phase 63.1 complete (verifier passed)
-Next: `/gsd:discuss-phase 62` — resources panel architecture (the next pending v1.2 phase).
+Phase: 63.1 — gap-closure execution COMPLETE (Plans 11, 12, 13 landed)
+Plan: 13 of 13 (3 gap-closure plans on top of the original 10)
+Status: 4 UAT gaps closed end-to-end (RC-1, RC-2, RC-3, cosmetics). Plan 14 (BC-mode parity Value/Profile/Function on WT.T_wall / HFS.q) authored as deferred follow-up; not yet planned. One deferred test (SidebarPanel.anchors.test.tsx) remains per deferred-items.md.
+Last activity: 2026-05-14 -- Phase 63.1 Plans 11/12/13 shipped via /gsd:execute-phase 63.1 --gaps-only
+Next: either `/gsd:plan-phase 63.1-14` to author the BC-mode parity follow-up, or `/gsd:discuss-phase 62` for the resources panel architecture (the next pending v1.2 phase).
 
 ---
 
