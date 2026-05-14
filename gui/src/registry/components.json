@@ -1035,7 +1035,7 @@
           "type_union": ["Real", "Vector", "Function"],
           "input_modes": ["scalar", "vector", "callable"],
           "unit": "K",
-          "description": "Per-cell wall-temperature value, vector, or callable T_wall(t)",
+          "description": "Per-cell wall-temperature; mode-aware editor (Value / Profile / Function) in Properties tab",
           "required": true,
           "positional": false
         }
@@ -1069,7 +1069,7 @@
           "type_union": ["Real", "Vector", "Function"],
           "input_modes": ["scalar", "vector", "callable"],
           "unit": "W/m^2",
-          "description": "Per-cell heat flux value, vector, or callable q(t)",
+          "description": "Per-cell heat flux; mode-aware editor (Value / Profile / Function) in Properties tab",
           "required": true,
           "positional": false
         }

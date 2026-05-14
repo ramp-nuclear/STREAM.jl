@@ -95,10 +95,10 @@ describe("promoteToSharedSource (D-07 / D-08)", () => {
     expect(edge).toBeDefined();
   });
 
-  // Plan 63.1-13 (GAP-RC-3): promoteToSharedSource seeds T_wall = 300 (WT) /
-  // q = 0 (HFS) alongside n so the spawned source's canvas label is muted-
-  // gray, never destructive-red "(unset)".
-  it("seeds T_wall = 300 on the spawned WallTemperature (GAP-RC-3)", () => {
+  // Plan 63.1-13 (GAP-RC-3) updated by Plan 63.1-14 (GAP-RC-4):
+  // promoteToSharedSource seeds T_wall / q as SourceValueEntry { mode:"value", value:N }
+  // (not bare numbers) so the spawned source stores the new shape from first write.
+  it("seeds T_wall as SourceValueEntry { mode:'value', value:300 } on the spawned WallTemperature (GAP-RC-3, Plan 14)", () => {
     useStore.setState({ nodes: [makeChannelNode("ch1", 4, 200, 100)] });
     useStore.getState().promoteToSharedSource("ch1", "T_wall_left");
     const newWT = useStore
@@ -112,12 +112,12 @@ describe("promoteToSharedSource (D-07 / D-08)", () => {
     const params = (
       newWT!.data as unknown as { parameters: Record<string, unknown> }
     ).parameters;
-    expect(params.T_wall).toBe(300);
+    expect(params.T_wall).toEqual({ mode: "value", value: 300 });
     // n is still seeded.
     expect(params.n).toBe(4);
   });
 
-  it("seeds q = 0 on the spawned HeatFluxSource (GAP-RC-3)", () => {
+  it("seeds q as SourceValueEntry { mode:'value', value:0 } on the spawned HeatFluxSource (GAP-RC-3, Plan 14)", () => {
     useStore.setState({ nodes: [makeCHFNode("chf1", 4, 200, 100)] });
     useStore.getState().promoteToSharedSource("chf1", "q_left");
     const newHFS = useStore
@@ -131,7 +131,7 @@ describe("promoteToSharedSource (D-07 / D-08)", () => {
     const params = (
       newHFS!.data as unknown as { parameters: Record<string, unknown> }
     ).parameters;
-    expect(params.q).toBe(0);
+    expect(params.q).toEqual({ mode: "value", value: 0 });
     expect(params.n).toBe(4);
   });
 });
