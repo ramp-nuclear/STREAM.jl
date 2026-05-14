@@ -1,13 +1,15 @@
 // AddComponentSubmenu.tsx — submenu for "Add Component" in the canvas context menu (Phase 65 Plan 05)
 // Groups registry components by category (alphabetical) and drops a new instance at
 // the flow-coordinate position passed from CanvasPanel.
+//
+// Architecture note (W10): uses PopoverMenuItem / PopoverMenuSub* (context-free).
 
 import { useMemo } from "react";
 import {
-  ContextMenuItem,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
+  PopoverMenuItem,
+  PopoverMenuSub,
+  PopoverMenuSubContent,
+  PopoverMenuSubTrigger,
 } from "@/components/ui/context-menu";
 import { getAllComponents } from "@/registry";
 import useStore from "@/store/useStore";
@@ -41,11 +43,11 @@ export default function AddComponentSubmenu({
   return (
     <>
       {grouped.map(({ category, components }) => (
-        <ContextMenuSub key={category}>
-          <ContextMenuSubTrigger>{category}</ContextMenuSubTrigger>
-          <ContextMenuSubContent>
+        <PopoverMenuSub key={category}>
+          <PopoverMenuSubTrigger>{category}</PopoverMenuSubTrigger>
+          <PopoverMenuSubContent>
             {components.map((comp) => (
-              <ContextMenuItem
+              <PopoverMenuItem
                 key={comp.id}
                 onSelect={() => {
                   useStore.getState().addNode(comp.id, flowPosition);
@@ -53,10 +55,10 @@ export default function AddComponentSubmenu({
                 }}
               >
                 {comp.label}
-              </ContextMenuItem>
+              </PopoverMenuItem>
             ))}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
+          </PopoverMenuSubContent>
+        </PopoverMenuSub>
       ))}
     </>
   );
