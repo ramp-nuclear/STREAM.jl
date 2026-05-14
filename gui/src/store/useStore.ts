@@ -197,6 +197,8 @@ interface AppState {
   isDirty: boolean;
   currentFilePath: string | null;
   recentFiles: string[];
+  // AutoRecover: stable UUID for untitled projects (D-04)
+  untitledProjectUuid: string;
   // Undo/redo — explicit history stack, not auto-tracked middleware
   _undoPast: CanvasSnapshot[];
   _undoFuture: CanvasSnapshot[];
@@ -795,6 +797,7 @@ const useStore = create<AppState>()((set, get) => ({
   isDirty: false,
   currentFilePath: null,
   recentFiles: [],
+  untitledProjectUuid: crypto.randomUUID(),
 
   // ---------------------------------------------------------------------------
   // Phase 62: Resources slice (D-09, D-10, D-11, D-26)
@@ -2082,6 +2085,9 @@ const useStore = create<AppState>()((set, get) => ({
       const updated = addToRecent(state.recentFiles, currentFilePath);
       set({ isDirty: false, recentFiles: updated });
       await saveRecentFiles(updated);
+      // Clear sidecar after successful save — the on-disk file is now authoritative
+      const { clearSidecar, getSidecarBasename } = await import("../lib/autoRecover");
+      await clearSidecar(getSidecarBasename(currentFilePath, get().untitledProjectUuid));
     } catch (err) {
       console.error("[saveProject] write failed:", err);
       try {
@@ -2142,9 +2148,16 @@ const useStore = create<AppState>()((set, get) => ({
         snapToGrid: state.snapToGrid,
       });
       await writeTextFile(filePath, json);
-      const updated = addToRecent(state.recentFiles, filePath);
+      // Capture uuid + previous file path before set() clears untitled state
+      // (consumed below by clearSidecar — Plan 65-07 D-02/D-06)
+      const prevUuid = get().untitledProjectUuid;
+      const prevFilePath = get().currentFilePath;
+      const updated = addToRecent(get().recentFiles, filePath);
       set({ isDirty: false, currentFilePath: filePath, recentFiles: updated });
       await saveRecentFiles(updated);
+      // Clear sidecar after successful save — the on-disk file is now authoritative
+      const { clearSidecar, getSidecarBasename } = await import("../lib/autoRecover");
+      await clearSidecar(getSidecarBasename(prevFilePath, prevUuid));
     } catch (err) {
       console.error("[saveProjectAs] write failed:", err);
       const { message } = await import("@tauri-apps/plugin-dialog");
@@ -2344,6 +2357,14 @@ const useStore = create<AppState>()((set, get) => ({
   // ---------------------------------------------------------------------------
 
   newProject: async () => {
+    // Clear the prior project's sidecar before resetting state (best-effort).
+    // Plan 65-07 D-02/D-06. `clearInstanceCounters()` removed — Plan 65-01
+    // deleted that module-level counter in favor of lowest-free naming.
+    const { clearSidecar, getSidecarBasename } = await import("../lib/autoRecover");
+    const prevFilePath = get().currentFilePath;
+    const prevUuid = get().untitledProjectUuid;
+    await clearSidecar(getSidecarBasename(prevFilePath, prevUuid));
+
     set({
       nodes: [],
       edges: [],
@@ -2396,6 +2417,10 @@ const useStore = create<AppState>()((set, get) => ({
       // Phase 63.1 D-15: errorTagsByNodeId removed.
       bcMode: {},
       bcSymmetric: {},
+      // Plan 65-07 D-04: regenerate uuid so the new untitled project gets a
+      // fresh sidecar filename (prevents sidecar collision with the previous
+      // untitled project).
+      untitledProjectUuid: crypto.randomUUID(),
     });
   },
 
@@ -2482,6 +2507,82 @@ export async function initializeRecentFiles(): Promise<void> {
  */
 export function _resetPasteOffsetIndexForTesting(): void {
   pasteOffsetIndex = 0;
+}
+
+/**
+ * Initialize the AutoRecover substrate (Plan 65-07 D-01/D-02/D-06).
+ *
+ * Call this from App.tsx on mount (alongside initializeRecentFiles).
+ * Returns a teardown function to call on app unmount (clears lockfile + unsubscribes).
+ *
+ * Wires:
+ * - A debounced isDirty subscription that calls writeSidecar ~2s after each edit
+ * - Writes the running.lock file (PID + timestamp) for crash detection on next launch
+ *
+ * Plan 65-08 calls teardown from App.tsx's unmount / beforeunload hook.
+ */
+export async function initAutoRecover(): Promise<{ teardown: () => Promise<void> }> {
+  const {
+    createDebouncedSidecarWriter,
+    getSidecarBasename,
+    writeLockfile,
+    clearLockfile,
+  } = await import("../lib/autoRecover");
+
+  // Get the current process PID via Tauri command
+  let pid = 0;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    pid = await invoke<number>("get_pid");
+  } catch {
+    // Non-Tauri environment (tests, dev preview without IPC) — use 0 as sentinel
+  }
+
+  // Build the debounced writer.
+  // serialize() is called at write time (not schedule time) so it captures the
+  // latest state at the moment the debounce fires. D-06: bit-identical to Save.
+  const writer = createDebouncedSidecarWriter(
+    2000,
+    () => {
+      const state = useStore.getState();
+      return serializeProject({
+        nodes: state.nodes,
+        edges: state.edges,
+        anchors: state.anchors,
+        resources: state.resources,
+        modelOptions: state.modelOptions,
+        activeLeftTab: state.activeLeftTab,
+        activeLayer: state.activeLayer,
+        snapToGrid: state.snapToGrid,
+      });
+    },
+    () => {
+      const state = useStore.getState();
+      return getSidecarBasename(state.currentFilePath, state.untitledProjectUuid);
+    },
+  );
+
+  // Subscribe to isDirty changes.
+  // Fire on every state change: if dirty → schedule (debounce resets on each call);
+  // if not dirty → cancel (save just happened, no sidecar write needed).
+  const unsubscribe = useStore.subscribe((state) => {
+    if (state.isDirty) {
+      writer.schedule();
+    } else {
+      writer.cancel();
+    }
+  });
+
+  // Write the running.lock file (crash detection D-02)
+  await writeLockfile(pid);
+
+  async function teardown(): Promise<void> {
+    unsubscribe();
+    writer.cancel();
+    await clearLockfile();
+  }
+
+  return { teardown };
 }
 
 export default useStore;
