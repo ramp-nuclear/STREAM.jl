@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
 status: executing
 stopped_at: Phase 64 context gathered
-last_updated: "2026-05-14T10:30:28.734Z"
-last_activity: 2026-05-14 -- Phase 64 planning complete
+last_updated: "2026-05-14T10:36:22.234Z"
+last_activity: 2026-05-14 -- Phase 64 execution started
 progress:
   total_phases: 15
   completed_phases: 6
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Between phases — Phase 63.1 closed 2026-05-14; Phase 64 (Connection routing) is the next pending v1.2 phase.
+**Current focus:** Phase 64 — connection-routing
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -58,10 +58,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 63.1 (bc-architecture-rework-unified-bcs-tab) — COMPLETE
-Plan: 14 of 14
-Status: Ready to execute
-Last activity: 2026-05-14 -- Phase 64 planning complete
+Phase: 64 (connection-routing) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 64
+Last activity: 2026-05-14 -- Phase 64 execution started
 Next: `/gsd:discuss-phase 64` (Connection routing — per-port autoflip + asymmetric same-side placement + thermal-pair axis-flip). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far.
 
 Outstanding non-blocking items (NOT 64's job):
