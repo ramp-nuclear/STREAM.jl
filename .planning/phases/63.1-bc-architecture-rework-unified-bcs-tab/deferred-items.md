@@ -38,7 +38,7 @@ for Plan 10. Resolution: a tsc cleanup sweep at the end of Phase 63.1.
 
 ### Out-of-scope discoveries during human-verify smoke
 
-1. **WT.T_wall / HFS.q Properties do not mirror BCsTabForm mode options.**
+1. **[CLOSED by Plan 63.1-14] WT.T_wall / HFS.q Properties do not mirror BCsTabForm mode options.**
    - Observed: Channel BCs tab on `T_wall_left` exposes `value | profile |
      function | mark | source`. WT.T_wall in Properties now exposes only Value
      (scalar input, per the scalar-only refactor in `5125f89`).
@@ -50,8 +50,10 @@ for Plan 10. Resolution: a tsc cleanup sweep at the end of Phase 63.1.
      reusing `BCsTabForm`'s `ProfileModeEditor` + `FunctionModeEditor` in
      `ParameterForm.tsx`, and updating codegen + `StreamNode.sourceLabelLine`
      to render the discriminated union.
-   - Resolution: **new Plan 63.1-14** (BC-mode parity between BCsTabForm and
-     ParameterForm). To be authored next.
+   - Resolution: **Plan 63.1-14** shipped — SourceValueEntry discriminated
+     union, TypeUnionField mode dropdown (3 options), modeEditors.tsx extract,
+     codegen sourceEmitPlan, sourceLabelLine dispatch, promoteToSharedSource
+     seed updated. GAP-RC-4 CLOSED.
    - Memory: see `feedback_wt_hfs_properties_match_bc_modes.md`.
 
 2. **Channel BCs tab visual layout fit issues.**
