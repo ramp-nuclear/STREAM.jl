@@ -5,6 +5,7 @@ import ParameterForm from "../ParameterForm";
 import type { ComponentDefinition } from "../../../registry/types";
 import { getComponent } from "../../../registry";
 import { TooltipProvider } from "../../ui/tooltip";
+import { isSourceValueEntry } from "../../../lib/sourceValueEntry";
 
 const mockChannel: ComponentDefinition = {
   id: "Channel",
@@ -246,5 +247,196 @@ describe("ParameterForm — type_union parameters (RC-1, scalar-only)", () => {
     fireEvent.change(scalarInput, { target: { value: "295" } });
     fireEvent.blur(scalarInput);
     expect(onParamChange).toHaveBeenCalledWith("T_wall", 295);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 14, GAP-RC-4: Mode dropdown for Sources-category type_union params.
+//
+// These tests anchor against the LIVE registry for WallTemperature / HFS /
+// Channel. They are RED until Task 3 (GREEN) extends TypeUnionField with the
+// 3-option Mode dropdown gated on component.category === "Sources".
+// ---------------------------------------------------------------------------
+describe("ParameterForm — type_union mode dropdown (Plan 14, GAP-RC-4)", () => {
+  it("WallTemperature renders the Mode dropdown with exactly Value/Profile/Function options", () => {
+    const wt = getComponent("WallTemperature")!;
+    render(
+      <TooltipProvider>
+        <ParameterForm
+          component={wt}
+          activeMode="default"
+          values={{ n: 4, T_wall: { mode: "value", value: 300 } }}
+          onParamChange={vi.fn()}
+        />
+      </TooltipProvider>
+    );
+    // The shadcn SelectTrigger renders as role="combobox".
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).toBeTruthy();
+    // Open the dropdown.
+    fireEvent.click(combobox);
+    expect(screen.getByRole("option", { name: "Value" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Profile" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Function" })).toBeTruthy();
+    // Mark and Source must NOT be present.
+    expect(screen.queryByRole("option", { name: "Mark" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "Source" })).toBeNull();
+  });
+
+  it("HeatFluxSource renders the Mode dropdown above the q editor", () => {
+    const hfs = getComponent("HeatFluxSource")!;
+    render(
+      <TooltipProvider>
+        <ParameterForm
+          component={hfs}
+          activeMode="default"
+          values={{ n: 4, q: { mode: "value", value: 0 } }}
+          onParamChange={vi.fn()}
+        />
+      </TooltipProvider>
+    );
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).toBeTruthy();
+    fireEvent.click(combobox);
+    expect(screen.getByRole("option", { name: "Value" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Profile" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Function" })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: "Mark" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "Source" })).toBeNull();
+  });
+
+  it("Channel does NOT render a Mode dropdown for h_left/h_right (regression guard)", () => {
+    const ch = getComponent("Channel")!;
+    render(
+      <TooltipProvider>
+        <ParameterForm
+          component={ch}
+          activeMode="default"
+          values={{ n: 1, geometry: "uuid-stub" }}
+          onParamChange={vi.fn()}
+        />
+      </TooltipProvider>
+    );
+    // No combobox (Mode dropdown) should appear for Channel.h_left/h_right.
+    expect(screen.queryByRole("combobox")).toBeNull();
+    // Plan 11 scalar-only hint preserved.
+    expect(
+      screen.getByText(/edit in the generated julia/i)
+    ).toBeTruthy();
+  });
+
+  it("switching Mode from Value to Profile dispatches a profile-cosine SourceValueEntry", () => {
+    const wt = getComponent("WallTemperature")!;
+    const onParamChange = vi.fn();
+    const { rerender } = render(
+      <TooltipProvider>
+        <ParameterForm
+          component={wt}
+          activeMode="default"
+          values={{ n: 4, T_wall: { mode: "value", value: 300 } }}
+          onParamChange={onParamChange}
+        />
+      </TooltipProvider>
+    );
+    // Open the Mode dropdown and pick Profile.
+    const combobox = screen.getByRole("combobox");
+    fireEvent.click(combobox);
+    fireEvent.click(screen.getByRole("option", { name: "Profile" }));
+    // Verify the dispatched value is a profile-cosine SourceValueEntry.
+    expect(onParamChange).toHaveBeenCalledWith(
+      "T_wall",
+      { mode: "profile", preset: "cosine", amplitude: 1.0, peakingFactor: 1.0 }
+    );
+    // Re-render with the new value; the ProfileModeEditor (Cosine/File seg control) should appear.
+    rerender(
+      <TooltipProvider>
+        <ParameterForm
+          component={wt}
+          activeMode="default"
+          values={{ n: 4, T_wall: { mode: "profile", preset: "cosine", amplitude: 1.0, peakingFactor: 1.0 } }}
+          onParamChange={onParamChange}
+        />
+      </TooltipProvider>
+    );
+    expect(screen.getByText("Cosine")).toBeTruthy();
+  });
+
+  it("switching Mode from Value to Function dispatches a function SourceValueEntry", () => {
+    const wt = getComponent("WallTemperature")!;
+    const onParamChange = vi.fn();
+    const { rerender } = render(
+      <TooltipProvider>
+        <ParameterForm
+          component={wt}
+          activeMode="default"
+          values={{ n: 4, T_wall: { mode: "value", value: 300 } }}
+          onParamChange={onParamChange}
+        />
+      </TooltipProvider>
+    );
+    const combobox = screen.getByRole("combobox");
+    fireEvent.click(combobox);
+    fireEvent.click(screen.getByRole("option", { name: "Function" }));
+    expect(onParamChange).toHaveBeenCalledWith(
+      "T_wall",
+      { mode: "function", signature: "fn(t)", functionName: "" }
+    );
+    rerender(
+      <TooltipProvider>
+        <ParameterForm
+          component={wt}
+          activeMode="default"
+          values={{ n: 4, T_wall: { mode: "function", signature: "fn(t)", functionName: "" } }}
+          onParamChange={onParamChange}
+        />
+      </TooltipProvider>
+    );
+    // FunctionModeEditor body shows fn(t) / fn(t, i) segmented control.
+    expect(screen.getByText("fn(t)")).toBeTruthy();
+  });
+
+  it("bare-number legacy T_wall renders as Value mode with the numeric value", () => {
+    const wt = getComponent("WallTemperature")!;
+    render(
+      <TooltipProvider>
+        <ParameterForm
+          component={wt}
+          activeMode="default"
+          values={{ n: 4, T_wall: 300 }}
+          onParamChange={vi.fn()}
+        />
+      </TooltipProvider>
+    );
+    // Mode dropdown should show "Value" (or its default).
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).toBeTruthy();
+    // The scalar input should display "300".
+    const input = Array.from(document.querySelectorAll("input")).find(
+      (el) => el.value === "300"
+    );
+    expect(input).toBeTruthy();
+  });
+
+  it("editing scalar value in Value mode dispatches SourceValueEntry (not bare number)", () => {
+    const wt = getComponent("WallTemperature")!;
+    const onParamChange = vi.fn();
+    render(
+      <TooltipProvider>
+        <ParameterForm
+          component={wt}
+          activeMode="default"
+          values={{ n: 4, T_wall: { mode: "value", value: 300 } }}
+          onParamChange={onParamChange}
+        />
+      </TooltipProvider>
+    );
+    const inputs = document.querySelectorAll("input");
+    const scalarInput = inputs[inputs.length - 1] as HTMLInputElement;
+    fireEvent.change(scalarInput, { target: { value: "350" } });
+    fireEvent.blur(scalarInput);
+    const lastCall = onParamChange.mock.calls[onParamChange.mock.calls.length - 1];
+    expect(lastCall[0]).toBe("T_wall");
+    expect(isSourceValueEntry(lastCall[1])).toBe(true);
+    expect(lastCall[1]).toEqual({ mode: "value", value: 350 });
   });
 });
