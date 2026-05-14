@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: planning
+status: executing
 stopped_at: Phase 65 context gathered
-last_updated: "2026-05-14T12:13:07.654Z"
-last_activity: 2026-05-14
+last_updated: "2026-05-14T12:57:12.190Z"
+last_activity: 2026-05-14 -- Phase 65 planning complete
 progress:
   total_phases: 15
   completed_phases: 7
-  total_plans: 48
+  total_plans: 56
   completed_plans: 48
-  percent: 100
+  percent: 86
 ---
 
 # STATE: STREAM.jl
@@ -60,8 +60,8 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 Phase: 65
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-14
+Status: Ready to execute
+Last activity: 2026-05-14 -- Phase 65 planning complete
 Next: `/gsd:discuss-phase 64` (Connection routing — per-port autoflip + asymmetric same-side placement + thermal-pair axis-flip). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far.
 
 Outstanding non-blocking items (NOT 64's job):

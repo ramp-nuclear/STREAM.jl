@@ -166,7 +166,28 @@ Plans:
 
 **Design-decisions reference:** Section 3.5.
 **Depends on:** —.
-**Plans:** TBD via `/gsd:plan-phase`.
+**Plans:** 8 plans.
+
+Plans:
+**Wave 1**
+- [ ] 65-01-PLAN.md — Naming retrofit: lowest-free nextInstanceName + delete instanceCounters (D-17, D-18).
+- [ ] 65-02-PLAN.md — Reset-to-empty unified field reset across Properties / BCs / type_union editors.
+- [ ] 65-03-PLAN.md — Canvas interaction props (panOnDrag=[2], selectionOnDrag, Esc-clears, edge-delete-via-Del) + useRightClickContextMenu 5px/250ms disambiguation (D-12).
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 65-04-PLAN.md — Clipboard core + Ctrl+C/X/V/D keyboard wiring + smart-parse-and-increment (D-15, D-16, D-19).
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 65-05-PLAN.md — Node / Edge / Canvas context menus via shadcn ContextMenu + Popover (D-11, D-14); Auto-Layout grayed-out; "Show errors" hidden until Phase 71.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 65-06-PLAN.md — Snap-to-grid overlay button + ReactFlow snapToGrid/snapGrid + .scp layout.snap_to_grid persistence (D-07..D-10).
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 65-07-PLAN.md — AutoRecover I/O substrate: sidecar writer + lockfile + crash detection + Tauri PID commands (D-01..D-06).
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 65-08-PLAN.md — AutoRecover restore modal + App.tsx mount/unmount integration (D-03, D-04).
 
 ### Phase 66: Code preview rework
 
@@ -269,7 +290,7 @@ contract document drafted in parallel throughout.
 | 63. BCs tab + value-source components in GUI         | 4/4 | Complete    | 2026-05-13 |
 | 63.1. BC architecture rework — unified BCs tab       | 14/14 | Complete   | 2026-05-14 |
 | 64. Connection routing                               | 4/4 | Complete    | 2026-05-14 |
-| 65. Interaction model overhaul                       | 0/TBD | Planned | — |
+| 65. Interaction model overhaul                       | 0/8 | Planned | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |
 | 67. Custom titlebar                                  | 0/TBD | Planned | — |
 | 68. Layers system overhaul                           | 0/TBD | Planned | — |
