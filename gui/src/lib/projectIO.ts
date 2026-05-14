@@ -58,6 +58,7 @@ export interface StreamProject {
   layout: {
     active_left_tab: ActiveLeftTab; // D-08 / D-29
     active_layer: LayerView; // moved from top-level (was StreamProject.activeLayer)
+    snap_to_grid: boolean; // Phase 65 D-10 — persisted per-project, default false
   };
 }
 
@@ -79,7 +80,7 @@ function defaultModelOptions(): ModelOptionsSliceState {
 }
 
 function defaultLayout(): StreamProject["layout"] {
-  return { active_left_tab: "Components", active_layer: "Both" };
+  return { active_left_tab: "Components", active_layer: "Both", snap_to_grid: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +102,7 @@ export interface SerializeProjectArgs {
   modelOptions: ModelOptionsSliceState;
   activeLeftTab: ActiveLeftTab;
   activeLayer: LayerView;
+  snapToGrid: boolean; // Phase 65 D-10
 }
 
 /**
@@ -139,6 +141,7 @@ export function serializeProject(args: SerializeProjectArgs): string {
     layout: {
       active_left_tab: args.activeLeftTab,
       active_layer: args.activeLayer,
+      snap_to_grid: args.snapToGrid,
     },
   };
 
@@ -195,6 +198,8 @@ export function deserializeProject(json: string): StreamProject {
       (rawLayout.active_left_tab as ActiveLeftTab) ?? defaultLayout().active_left_tab,
     active_layer:
       (rawLayout.active_layer as LayerView) ?? defaultLayout().active_layer,
+    // Phase 65 D-10: empty-state tolerance — missing field defaults to false (RESEARCH Pitfall 3)
+    snap_to_grid: (rawLayout.snap_to_grid as boolean) ?? false,
   };
 
   const model_options =
