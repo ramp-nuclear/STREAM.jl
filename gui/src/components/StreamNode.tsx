@@ -16,6 +16,10 @@ import type { LayerView } from "../lib/layers";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
 import { selectNodeErrors, type NodeErrorsInput } from "@/lib/selectors/nodeErrors";
+import {
+  selectTopologyHints,
+  type TopologyHintsInput,
+} from "@/lib/selectors/topologyHints";
 import { isSourceValueEntry } from "@/lib/sourceValueEntry";
 import {
   resolveFlowPortSide,
@@ -374,6 +378,21 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       [id],
     ),
   );
+  // Phase 64 Plan 04 D-15 — non-blocking topology-hint surface. Returns a
+  // primitive boolean (Pitfall 3: never return a fresh array from a Zustand
+  // selector). NOT mixed into `hasAnyError` — the chip and the red-ring
+  // outline are independent surfaces. The hint is a warning, not an error.
+  const hasTopologyHint = useStore(
+    useCallback(
+      (s) =>
+        selectTopologyHints(
+          s as unknown as TopologyHintsInput,
+          id,
+          getComponent,
+        ).length > 0,
+      [id],
+    ),
+  );
   const activeLayer = useStore(useCallback((s: { activeLayer: LayerView }) => s.activeLayer, []));
   const component = getComponent(nodeData.componentId);
   if (!component) return null;
@@ -430,6 +449,16 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           data-testid="source-block-label"
         >
           {sourceLabel.text}
+        </div>
+      )}
+      {hasTopologyHint && (
+        <div
+          data-testid="topology-hint-chip"
+          role="status"
+          aria-label="Topology hint"
+          className="absolute right-1 bottom-1 text-[10px] rounded border bg-amber-100 text-amber-900 px-1 py-0.5"
+        >
+          Hydraulic and thermal neighbors on same axis — consider repositioning.
         </div>
       )}
       {flowPorts.map((port) => (
