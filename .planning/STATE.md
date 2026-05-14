@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: ready_to_plan
-stopped_at: Phase 64 context gathered
-last_updated: "2026-05-14T10:36:22.234Z"
-last_activity: 2026-05-14 -- Phase 64 execution started
+status: planning
+stopped_at: Phase 65 context gathered
+last_updated: "2026-05-14T12:13:07.654Z"
+last_activity: 2026-05-14
 progress:
   total_phases: 15
   completed_phases: 7
   total_plans: 48
-  completed_plans: 44
-  percent: 47
+  completed_plans: 48
+  percent: 100
 ---
 
 # STATE: STREAM.jl
@@ -133,10 +133,10 @@ Outstanding non-blocking items (NOT 64's job):
 
 ## Session Continuity
 
-**Last session:** 2026-05-14T10:06:20.569Z
-**Stopped at:** Phase 64 context gathered
+**Last session:** 2026-05-14T12:13:07.640Z
+**Stopped at:** Phase 65 context gathered
 **Next action:** `/gsd:discuss-phase 64` (Connection routing) — or `/gsd:ship` to open a milestone PR first
-**Resume file:** .planning/phases/64-connection-routing/64-CONTEXT.md
+**Resume file:** .planning/phases/65-interaction-model-overhaul/65-CONTEXT.md
 **Branch:** `gui-redesign`
 **Stash:** none
 
