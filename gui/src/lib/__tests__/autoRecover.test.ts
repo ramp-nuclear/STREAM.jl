@@ -10,14 +10,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Mock Tauri APIs — must come BEFORE any import of the module under test.
 // ---------------------------------------------------------------------------
 
-const mockWriteTextFile = vi.fn<[string, string], Promise<void>>().mockResolvedValue(undefined);
-const mockReadTextFile = vi.fn<[string], Promise<string>>().mockResolvedValue("");
-const mockRemove = vi.fn<[string], Promise<void>>().mockResolvedValue(undefined);
-const mockMkdir = vi.fn<[string, { recursive: boolean }], Promise<void>>().mockResolvedValue(undefined);
-const mockReadDir = vi.fn<[string], Promise<{ name: string; isDirectory: boolean }[]>>().mockResolvedValue([]);
-const mockAppDataDir = vi.fn<[], Promise<string>>().mockResolvedValue("/mock/appdata");
-const mockJoin = vi.fn<string[], Promise<string>>().mockImplementation((...parts: string[]) => Promise.resolve(parts.join("/")));
-const mockInvoke = vi.fn<[string, { pid: number }], Promise<boolean>>().mockResolvedValue(true);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockWriteTextFile = vi.fn<any>().mockResolvedValue(undefined);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockReadTextFile = vi.fn<any>().mockResolvedValue("");
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockRemove = vi.fn<any>().mockResolvedValue(undefined);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockMkdir = vi.fn<any>().mockResolvedValue(undefined);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockReadDir = vi.fn<any>().mockResolvedValue([]);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockAppDataDir = vi.fn<any>().mockResolvedValue("/mock/appdata");
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockJoin = vi.fn<any>().mockImplementation((...parts: unknown[]) => Promise.resolve((parts as string[]).join("/")));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockInvoke = vi.fn<any>().mockResolvedValue(true);
 
 vi.mock("@tauri-apps/plugin-fs", () => ({
   writeTextFile: mockWriteTextFile,
@@ -39,19 +47,21 @@ vi.mock("@tauri-apps/api/core", () => ({
 // Now import the module under test
 import {
   getSidecarBasename,
-  getSidecarPath,
-  getLockfilePath,
-  writeSidecar,
-  readSidecar,
-  clearSidecar,
-  enumerateSidecars,
-  writeLockfile,
-  readLockfile,
-  clearLockfile,
   parseLockfileContent,
-  isPidAlive,
   detectCrashOnLaunch,
   createDebouncedSidecarWriter,
+  // The following are imported to verify they exist as named exports (acceptance criterion)
+  // but are not exercised directly in tests that run in node env without full Tauri IPC
+  getSidecarPath as _getSidecarPath,
+  getLockfilePath as _getLockfilePath,
+  writeSidecar as _writeSidecar,
+  readSidecar as _readSidecar,
+  clearSidecar as _clearSidecar,
+  enumerateSidecars as _enumerateSidecars,
+  writeLockfile as _writeLockfile,
+  readLockfile as _readLockfile,
+  clearLockfile as _clearLockfile,
+  isPidAlive as _isPidAlive,
 } from "../autoRecover";
 
 // ---------------------------------------------------------------------------
@@ -62,7 +72,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Default: appDataDir returns a sensible path; join concatenates with "/"
   mockAppDataDir.mockResolvedValue("/mock/appdata");
-  mockJoin.mockImplementation((...parts: string[]) => Promise.resolve(parts.join("/")));
+  mockJoin.mockImplementation((...parts: unknown[]) => Promise.resolve((parts as string[]).join("/")));
 });
 
 // ---------------------------------------------------------------------------
