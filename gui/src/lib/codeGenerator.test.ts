@@ -3,6 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { generateCode } from "./codeGenerator";
 import type { CodegenAnchorsState } from "./anchors";
+import { getComponent } from "../registry";
 import type { ComponentDefinition, Parameter, FunctionOption } from "../registry/types";
 import type { Node, Edge } from "@xyflow/react";
 
@@ -701,5 +702,121 @@ describe("generateCode", () => {
       // Should emit per-cell connect with port() helper
       expect(code).toContain("port(");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 63.1-14 (GAP-RC-4) — SourceValueEntry emission for WT.T_wall / HFS.q
+//
+// These tests use the LIVE registry (WallTemperature / HeatFluxSource) and
+// confirm that generateCode emits the right Julia for each value mode.
+// They are RED until Task 4 extends formatParamValue + adds sourceEmitPlan.
+// ---------------------------------------------------------------------------
+describe("codeGenerator — SourceValueEntry emission (Plan 14, GAP-RC-4)", () => {
+  it("WallTemperature in value mode emits T_wall=<scalar>", () => {
+    const wtComp = getComponent("WallTemperature")!;
+    const node = makeNode("wt1", "WallTemperature", "wt1", {
+      n: 4,
+      T_wall: { mode: "value", value: 300 },
+    });
+    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+      id === "WallTemperature" ? wtComp : undefined
+    );
+    expect(code).toContain("WallTemperature(");
+    expect(code).toContain("T_wall=300.0");
+    expect(code).not.toContain("[object Object]");
+  });
+
+  it("WallTemperature in profile-cosine mode emits profile-var line above @named", () => {
+    const wtComp = getComponent("WallTemperature")!;
+    const node = makeNode("wt1", "WallTemperature", "wt1", {
+      n: 4,
+      T_wall: { mode: "profile", preset: "cosine", amplitude: 1.0, peakingFactor: 1.5 },
+    });
+    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+      id === "WallTemperature" ? wtComp : undefined
+    );
+    expect(code).toContain("wt1_T_wall_profile = cosine_T_wall_profile(4; amplitude=1.0, peaking_factor=1.5)");
+    expect(code).toContain("T_wall=wt1_T_wall_profile");
+  });
+
+  it("WallTemperature in profile-file mode emits rebin_intensive line", () => {
+    const wtComp = getComponent("WallTemperature")!;
+    const node = makeNode("wt1", "WallTemperature", "wt1", {
+      n: 4,
+      T_wall: { mode: "profile", preset: "file", path: "wall.csv" },
+    });
+    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+      id === "WallTemperature" ? wtComp : undefined
+    );
+    expect(code).toContain('wt1_T_wall_profile = rebin_intensive(readdlm(joinpath(@__DIR__, "wall.csv"), \',\'), 4)');
+    expect(code).toContain("T_wall=wt1_T_wall_profile");
+  });
+
+  it("WallTemperature in function mode (fn(t)) emits stub above @named", () => {
+    const wtComp = getComponent("WallTemperature")!;
+    const node = makeNode("wt1", "WallTemperature", "wt1", {
+      n: 4,
+      T_wall: { mode: "function", signature: "fn(t)", functionName: "my_T_wall" },
+    });
+    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+      id === "WallTemperature" ? wtComp : undefined
+    );
+    expect(code).toContain("my_T_wall(t) = 0.0");
+    expect(code).toContain("T_wall=my_T_wall");
+  });
+
+  it("WallTemperature in function mode (fn(t, i)) emits stub with t, i arglist", () => {
+    const wtComp = getComponent("WallTemperature")!;
+    const node = makeNode("wt1", "WallTemperature", "wt1", {
+      n: 4,
+      T_wall: { mode: "function", signature: "fn(t, i)", functionName: "my_T_wall" },
+    });
+    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+      id === "WallTemperature" ? wtComp : undefined
+    );
+    expect(code).toContain("my_T_wall(t, i) = 0.0");
+    expect(code).toContain("T_wall=my_T_wall");
+  });
+
+  it("HeatFluxSource in value mode emits q=<scalar>", () => {
+    const hfsComp = getComponent("HeatFluxSource")!;
+    const node = makeNode("hfs1", "HeatFluxSource", "hfs1", {
+      n: 4,
+      q: { mode: "value", value: 50000 },
+    });
+    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+      id === "HeatFluxSource" ? hfsComp : undefined
+    );
+    expect(code).toContain("HeatFluxSource(");
+    expect(code).toContain("q=50000.0");
+    expect(code).not.toContain("[object Object]");
+  });
+
+  it("HeatFluxSource in profile-cosine mode reuses cosine_T_wall_profile helper", () => {
+    const hfsComp = getComponent("HeatFluxSource")!;
+    const node = makeNode("hfs1", "HeatFluxSource", "hfs1", {
+      n: 4,
+      q: { mode: "profile", preset: "cosine", amplitude: 1e6, peakingFactor: 1.2 },
+    });
+    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+      id === "HeatFluxSource" ? hfsComp : undefined
+    );
+    // cosine_T_wall_profile is dimension-agnostic; reused for q (Plan 14 design decision (a))
+    expect(code).toContain("hfs1_q_profile = cosine_T_wall_profile(4; amplitude=1000000.0, peaking_factor=1.2)");
+    expect(code).toContain("q=hfs1_q_profile");
+  });
+
+  it("bare-number legacy T_wall still emits a numeric literal (back-compat tolerance)", () => {
+    const wtComp = getComponent("WallTemperature")!;
+    const node = makeNode("wt_legacy", "WallTemperature", "wt_legacy", {
+      n: 4,
+      T_wall: 300,  // bare number (pre-Plan-14 .streamgui shape)
+    });
+    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+      id === "WallTemperature" ? wtComp : undefined
+    );
+    expect(code).toContain("T_wall=300.0");
+    expect(code).not.toContain("[object Object]");
   });
 });
