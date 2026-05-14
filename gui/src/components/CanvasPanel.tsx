@@ -29,6 +29,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import NodeContextMenu from "./canvasMenus/NodeContextMenu";
 import EdgeContextMenu from "./canvasMenus/EdgeContextMenu";
 import CanvasContextMenu from "./canvasMenus/CanvasContextMenu";
+import SnapToGridButton from "./canvasMenus/SnapToGridButton";
 
 export function getPortType(nodeId: string, handleId: string): string | null {
   const node = useStore.getState().nodes.find((n) => n.id === nodeId);
@@ -58,6 +59,8 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge, selectNode } =
     useStore();
   const activeLayer = useStore((s) => s.activeLayer);
+  // Phase 65 D-09: snap-to-grid state read from store
+  const snapEnabled = useStore((s) => s.snapToGrid);
   // B3 guard: useReactFlow is called ONCE at the component top level — never
   // inside callbacks or useEffect. setNodes/setEdges are stable identities per
   // @xyflow/react v12 docs.
@@ -317,12 +320,19 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         selectionOnDrag
         selectionMode={SelectionMode.Partial}
         deleteKeyCode={["Delete", "Backspace"]} // Del/Backspace deletes nodes AND edges via ReactFlow built-in — closes v0.8 user-list item #2
+        // Phase 65 D-08/D-09: 16px fixed grid snapping via ReactFlow built-in props
+        snapToGrid={snapEnabled}
+        snapGrid={[16, 16]}
         fitView
       >
         <Controls />
         <MiniMap />
         <Background variant={BackgroundVariant.Dots} color={resolvedTheme === "dark" ? "#4b5263" : "#ccc"} />
       </ReactFlow>
+      {/* Phase 65 D-07: snap-to-grid overlay button — top-right canvas corner (W9 lock: no Panel import) */}
+      <div className="absolute top-2 right-2 z-10">
+        <SnapToGridButton />
+      </div>
       <WelcomeOverlay />
       {/* Phase 65 Plan 05 — context menus via Popover (W10 lock / D-11).
           PopoverAnchor is a 1×1 invisible fixed element at the right-click coords;

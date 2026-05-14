@@ -183,6 +183,7 @@ function makeSerializeArgs() {
     modelOptions: makeModelOptions(),
     activeLeftTab: "Resources" as const,
     activeLayer: "Both" as const,
+    snapToGrid: false, // Phase 65 D-10
   };
 }
 

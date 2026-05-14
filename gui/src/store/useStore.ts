@@ -190,6 +190,9 @@ interface AppState {
   activeLayer: LayerView;
   setActiveLayer: (layer: LayerView) => void;
   cycleLayer: () => void;
+  // Snap-to-grid (Phase 65 D-10 — persisted in .scp layout block)
+  snapToGrid: boolean;
+  setSnapToGrid: (v: boolean) => void;
   // Persistence state
   isDirty: boolean;
   currentFilePath: string | null;
@@ -786,6 +789,8 @@ const useStore = create<AppState>()((set, get) => ({
   validationResult: null,
   // Layer view initial state
   activeLayer: "Both" as LayerView,
+  // Snap-to-grid initial state (Phase 65 D-10 — OFF by default)
+  snapToGrid: false,
   // Persistence initial state
   isDirty: false,
   currentFilePath: null,
@@ -992,6 +997,9 @@ const useStore = create<AppState>()((set, get) => ({
     const idx = order.indexOf(activeLayer);
     set({ activeLayer: order[(idx + 1) % 3], isDirty: true });
   },
+
+  // Phase 65 D-10: snap-to-grid toggle — persisted in .scp layout block
+  setSnapToGrid: (v) => set({ snapToGrid: v, isDirty: true }),
 
   // ---------------------------------------------------------------------------
   // Canvas actions (content-mutating — set isDirty: true)
@@ -2068,6 +2076,7 @@ const useStore = create<AppState>()((set, get) => ({
         modelOptions: state.modelOptions,
         activeLeftTab: state.activeLeftTab,
         activeLayer: state.activeLayer,
+        snapToGrid: state.snapToGrid,
       });
       await writeTextFile(currentFilePath, json);
       const updated = addToRecent(state.recentFiles, currentFilePath);
@@ -2130,6 +2139,7 @@ const useStore = create<AppState>()((set, get) => ({
         modelOptions: state.modelOptions,
         activeLeftTab: state.activeLeftTab,
         activeLayer: state.activeLayer,
+        snapToGrid: state.snapToGrid,
       });
       await writeTextFile(filePath, json);
       const updated = addToRecent(state.recentFiles, filePath);
@@ -2268,6 +2278,8 @@ const useStore = create<AppState>()((set, get) => ({
         // old .streamgui files lose their anchor data (accepted breakage).
         anchors: project.anchors,
         activeLayer: (project.layout.active_layer ?? "Both") as LayerView,
+        // Phase 65 D-10: restore snap-to-grid from .scp layout block (default false)
+        snapToGrid: project.layout.snap_to_grid ?? false,
         currentFilePath: filePath,
         isDirty: false,
         selectedNodeId: null,
@@ -2338,6 +2350,8 @@ const useStore = create<AppState>()((set, get) => ({
       // Phase 63.1 D-02: reset anchors Record on newProject.
       anchors: {},
       activeLayer: "Both" as LayerView,
+      // Phase 65 D-10: snap-to-grid defaults to OFF on new projects
+      snapToGrid: false,
       currentFilePath: null,
       isDirty: false,
       selectedNodeId: null,
