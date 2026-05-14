@@ -16,17 +16,11 @@ import type { LayerView } from "../lib/layers";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
 import { selectNodeErrors, type NodeErrorsInput } from "@/lib/selectors/nodeErrors";
-import {
-  selectTopologyHints,
-  type TopologyHintsInput,
-} from "@/lib/selectors/topologyHints";
 import { isSourceValueEntry } from "@/lib/sourceValueEntry";
 import {
-  resolveFlowPortSide,
-  resolveAsymmetricOffset,
+  resolveFlowPortAssignment,
   resolveThermalPairSides,
   type Side,
-  type OffsetStyle,
 } from "@/lib/autoflip";
 
 // Inline colors: immune to Tailwind JIT scanning gaps and * { border-color } cascade.
@@ -144,31 +138,6 @@ type ThermalPortLike = {
   pair_with?: string;
 };
 
-// ---------------------------------------------------------------------------
-// Offset-string parsing (Pitfall 3 guard)
-// ---------------------------------------------------------------------------
-//
-// `resolveAsymmetricOffset` returns a fresh `OffsetStyle` object — returning
-// that directly from a `useStore` selector would cause an infinite re-render
-// loop because each call produces a new reference (Pitfall 3 / RESEARCH.md).
-// We encode the offset as a primitive string ("left:25%", "top:75%", or "")
-// from inside the selector and parse it back to an `OffsetStyle` in the
-// component body. The selector cache stays stable across renders.
-function offsetToString(offset: OffsetStyle | undefined): string {
-  if (!offset) return "";
-  if (offset.left !== undefined) return `left:${offset.left}`;
-  if (offset.top !== undefined) return `top:${offset.top}`;
-  return "";
-}
-
-function parseOffsetString(s: string): OffsetStyle | undefined {
-  if (!s) return undefined;
-  const [axis, value] = s.split(":");
-  if (axis === "left") return { left: value };
-  if (axis === "top") return { top: value };
-  return undefined;
-}
-
 function anchorIndicatorStyleFor(side: string | undefined): React.CSSProperties {
   // The FlowPort `<Handle>` is a 12-px circle that ReactFlow centers on the
   // node edge at the requested `Position`. We place the 12-px lucide Anchor
@@ -210,46 +179,20 @@ function FlowPortHandle({
     ),
   );
 
-  // Phase 64 D-01/D-02 — live side derivation from (nodes, edges). Returns a
+  // Phase 64 — live side derivation under the "one port per side" rule. Each
+  // FlowPort scores its 4-side preference by neighbor projection; siblings
+  // displace each other so two ports never collide. Selector returns a
   // primitive string so zustand's shallow equality stays stable (Pitfall 3).
   const defaultSide = (port.side as Side | undefined) ?? "left";
   const resolvedSide = useStore(
     useCallback(
       (s: { nodes: Node[]; edges: Edge[] }) =>
-        resolveFlowPortSide(
-          s.nodes,
-          s.edges,
-          nodeId,
-          port.name,
-          defaultSide,
-          getComponent,
-        ),
+        (resolveFlowPortAssignment(s.nodes, s.edges, nodeId, getComponent)[
+          port.name
+        ] ?? defaultSide) as Side,
       [nodeId, port.name, defaultSide],
     ),
   );
-
-  // D-09/D-10 asymmetric same-side placement — encoded as a primitive string
-  // ("left:25%" / "top:75%" / "") inside the selector, parsed to OffsetStyle
-  // in the component body (Pitfall 3: never return a fresh object/array from
-  // a selector).
-  const offsetString = useStore(
-    useCallback(
-      (s: { nodes: Node[]; edges: Edge[] }) =>
-        offsetToString(
-          resolveAsymmetricOffset(
-            s.nodes,
-            s.edges,
-            nodeId,
-            resolvedSide,
-            port.name,
-            defaultSide,
-            getComponent,
-          ),
-        ),
-      [nodeId, port.name, resolvedSide, defaultSide],
-    ),
-  );
-  const offsetStyle = parseOffsetString(offsetString);
 
   // Pattern 2 / Pitfall 1 — re-measure handle DOM whenever the resolved side
   // flips. Multiple sibling sub-components may each fire updateNodeInternals
@@ -272,7 +215,6 @@ function FlowPortHandle({
         style={{
           background: isInPort ? FLOW_IN_BG : FLOW_OUT_BG,
           border: `1.5px solid ${isInPort ? FLOW_IN_BORDER : FLOW_OUT_BORDER}`,
-          ...(offsetStyle ?? {}),
           ...(dimFlowHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
         }}
       />
@@ -378,21 +320,6 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       [id],
     ),
   );
-  // Phase 64 Plan 04 D-15 — non-blocking topology-hint surface. Returns a
-  // primitive boolean (Pitfall 3: never return a fresh array from a Zustand
-  // selector). NOT mixed into `hasAnyError` — the chip and the red-ring
-  // outline are independent surfaces. The hint is a warning, not an error.
-  const hasTopologyHint = useStore(
-    useCallback(
-      (s) =>
-        selectTopologyHints(
-          s as unknown as TopologyHintsInput,
-          id,
-          getComponent,
-        ).length > 0,
-      [id],
-    ),
-  );
   const activeLayer = useStore(useCallback((s: { activeLayer: LayerView }) => s.activeLayer, []));
   const component = getComponent(nodeData.componentId);
   if (!component) return null;
@@ -449,16 +376,6 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           data-testid="source-block-label"
         >
           {sourceLabel.text}
-        </div>
-      )}
-      {hasTopologyHint && (
-        <div
-          data-testid="topology-hint-chip"
-          role="status"
-          aria-label="Topology hint"
-          className="absolute right-1 bottom-1 text-[10px] rounded border bg-amber-100 text-amber-900 px-1 py-0.5"
-        >
-          Hydraulic and thermal neighbors on same axis — consider repositioning.
         </div>
       )}
       {flowPorts.map((port) => (
