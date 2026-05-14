@@ -10,12 +10,17 @@ import Toolbar from "./components/Toolbar";
 import BottomPanel from "./components/BottomPanel";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import ValidationDialog from "./components/ValidationDialog";
+import AutoRecoverRestoreModal, {
+  type RestoreCandidate,
+} from "./components/AutoRecoverRestoreModal";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList } from "./components/ResponsiveTabsList";
 import { Boxes, Library, Settings2 } from "lucide-react";
 import useStore from "./store/useStore";
-import { initializeRecentFiles } from "./store/useStore";
+import { initializeRecentFiles, initAutoRecover } from "./store/useStore";
+import { detectCrashOnLaunch } from "./lib/autoRecover";
+import type { LockfileContent } from "./lib/autoRecover";
 import { useResizable } from "./hooks/useResizable";
 import { useTheme } from "./hooks/useTheme";
 
@@ -63,6 +68,115 @@ function App() {
   function handleDialogCancel() {
     setDialogOpen(false);
     dialogCallbackRef.current?.("cancel");
+  }
+
+  // ---------------------------------------------------------------------------
+  // Phase 65 Plan 08: AutoRecover crash-detection + restore modal (D-03/D-04)
+  // ---------------------------------------------------------------------------
+
+  // null  = crash check not yet run (show boot splash)
+  // []    = crash check done, no crash → normal workspace
+  // [...] = crash detected → show blocking restore modal
+  const [restoreCandidates, setRestoreCandidates] = useState<
+    RestoreCandidate[] | null
+  >(null);
+  const teardownRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Helper: derive a RestoreCandidate from a basename + stale lockfile
+  function buildRestoreCandidate(
+    basename: string,
+    staleLockfile: LockfileContent | null,
+  ): RestoreCandidate {
+    const isUntitled = basename.startsWith("untitled-");
+    const displayName = isUntitled
+      ? "Unsaved project"
+      : basename.replace(/\.scp\.autosave$/, "");
+    const modifiedAt = staleLockfile?.startedAt ?? new Date().toISOString();
+    return { basename, displayName, modifiedAt };
+  }
+
+  useEffect(() => {
+    let canceled = false;
+    (async () => {
+      // Get current PID via Tauri IPC
+      let pid = 0;
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        pid = await invoke<number>("get_pid");
+      } catch {
+        // Non-Tauri env (e.g. browser preview) — treat as no crash
+      }
+
+      const result = await detectCrashOnLaunch(pid);
+      if (canceled) return;
+
+      if (result.crashed) {
+        // Crash detected — show modal before workspace loads.
+        // DEFER initAutoRecover until user resolves the modal (D-02: don't
+        // clobber the stale lockfile while we're still inspecting it).
+        const candidates = result.sidecars.map((basename) =>
+          buildRestoreCandidate(basename, result.staleLockfile),
+        );
+        setRestoreCandidates(candidates);
+      } else {
+        // Clean launch — start the autoRecover writer + lockfile immediately.
+        setRestoreCandidates([]);
+        try {
+          const { teardown } = await initAutoRecover();
+          if (!canceled) {
+            teardownRef.current = teardown;
+          } else {
+            // Effect cleaned up before init returned — tear down immediately
+            await teardown();
+          }
+        } catch (err) {
+          console.error("[AutoRecover] initAutoRecover on clean launch failed:", err);
+        }
+      }
+    })();
+
+    return () => {
+      canceled = true;
+      if (teardownRef.current) {
+        void teardownRef.current();
+        teardownRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Modal resolution handlers (try/finally: initAutoRecover always runs even on
+  // error, and modal always closes — user has committed to a choice)
+  async function handleRecover(basename: string) {
+    try {
+      await useStore.getState().recoverFromSidecar(basename);
+    } catch (err) {
+      console.error("[AutoRecover] Recover failed:", err);
+    } finally {
+      try {
+        const { teardown } = await initAutoRecover();
+        teardownRef.current = teardown;
+      } catch (err) {
+        console.error("[AutoRecover] initAutoRecover after Recover failed:", err);
+      }
+      setRestoreCandidates([]);
+    }
+  }
+
+  async function handleDiscard() {
+    try {
+      await useStore.getState().discardAllSidecars();
+    } catch (err) {
+      console.error("[AutoRecover] Discard failed:", err);
+    } finally {
+      try {
+        const { teardown } = await initAutoRecover();
+        teardownRef.current = teardown;
+      } catch (err) {
+        console.error("[AutoRecover] initAutoRecover after Discard failed:", err);
+      }
+      setRestoreCandidates([]);
+    }
   }
 
   // Initialize recent files on mount
@@ -211,6 +325,26 @@ function App() {
       unlistenRef.current = null;
     };
   }, [showUnsavedDialog]);
+
+  // ---------------------------------------------------------------------------
+  // Phase 65 Plan 08: Render gate — AutoRecover modal or boot splash (D-03)
+  // ---------------------------------------------------------------------------
+
+  // While crash check hasn't completed: show a minimal boot splash.
+  if (restoreCandidates === null) {
+    return <div className="h-screen w-screen bg-background" />;
+  }
+
+  // Crash detected: show blocking modal BEFORE the canvas mounts (D-03).
+  if (restoreCandidates.length > 0) {
+    return (
+      <AutoRecoverRestoreModal
+        candidates={restoreCandidates}
+        onRecover={handleRecover}
+        onDiscard={handleDiscard}
+      />
+    );
+  }
 
   return (
     <ReactFlowProvider>
