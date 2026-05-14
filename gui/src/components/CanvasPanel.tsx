@@ -25,6 +25,10 @@ import BCEdge from "./BCEdge";
 import WelcomeOverlay from "./WelcomeOverlay";
 import { isAllowedBCConnection } from "@/lib/bcMode";
 import { useRightClickContextMenu } from "@/hooks/useRightClickContextMenu";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import NodeContextMenu from "./canvasMenus/NodeContextMenu";
+import EdgeContextMenu from "./canvasMenus/EdgeContextMenu";
+import CanvasContextMenu from "./canvasMenus/CanvasContextMenu";
 
 export function getPortType(nodeId: string, handleId: string): string | null {
   const node = useStore.getState().nodes.find((n) => n.id === nodeId);
@@ -277,6 +281,15 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // setNodes/setEdges from useReactFlow are stable identities — safe to omit from deps
 
+  // Phase 65 Plan 05: convert rcMenu screen coords to flow coords for pane menus.
+  // D-11: we use Popover as the host (NOT a controlled ContextMenu.Root) because
+  // Radix ContextMenu.Root does not support a controlled `open` at arbitrary screen coords.
+  // ContextMenuItem / ContextMenuSub* items are used inside PopoverContent for visual parity.
+  const flowPosition =
+    rcMenu.state.kind === "pane"
+      ? screenToFlowPosition({ x: rcMenu.state.screenX, y: rcMenu.state.screenY })
+      : null;
+
   return (
     <div ref={containerRef} className="flex-1 h-full relative focus:outline-none" tabIndex={-1}>
       <ReactFlow
@@ -311,6 +324,43 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         <Background variant={BackgroundVariant.Dots} color={resolvedTheme === "dark" ? "#4b5263" : "#ccc"} />
       </ReactFlow>
       <WelcomeOverlay />
+      {/* Phase 65 Plan 05 — context menus via Popover (W10 lock / D-11).
+          PopoverAnchor is a 1×1 invisible fixed element at the right-click coords;
+          Radix Floating UI anchors PopoverContent to it via side/align. */}
+      <Popover
+        open={rcMenu.state.kind !== null}
+        onOpenChange={(open) => { if (!open) rcMenu.close(); }}
+      >
+        <PopoverAnchor
+          style={{
+            position: "fixed",
+            left: rcMenu.state.screenX,
+            top: rcMenu.state.screenY,
+            width: 1,
+            height: 1,
+            pointerEvents: "none",
+          }}
+          aria-hidden
+        />
+        <PopoverContent
+          align="start"
+          side="bottom"
+          sideOffset={0}
+          className="p-1 w-auto min-w-[8rem]"
+          onEscapeKeyDown={() => rcMenu.close()}
+          onPointerDownOutside={() => rcMenu.close()}
+        >
+          {rcMenu.state.kind === "node" && (
+            <NodeContextMenu nodeId={rcMenu.state.targetId!} onClose={rcMenu.close} />
+          )}
+          {rcMenu.state.kind === "edge" && (
+            <EdgeContextMenu edgeId={rcMenu.state.targetId!} onClose={rcMenu.close} />
+          )}
+          {rcMenu.state.kind === "pane" && flowPosition && (
+            <CanvasContextMenu flowPosition={flowPosition} onClose={rcMenu.close} />
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
