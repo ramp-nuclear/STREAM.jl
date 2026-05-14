@@ -268,7 +268,7 @@ contract document drafted in parallel throughout.
 | 62. Resources panel architecture                     | 15/15 | Complete    | 2026-05-13 |
 | 63. BCs tab + value-source components in GUI         | 4/4 | Complete    | 2026-05-13 |
 | 63.1. BC architecture rework — unified BCs tab       | 14/14 | Complete   | 2026-05-14 |
-| 64. Connection routing                               | 4/4 | Complete   | 2026-05-14 |
+| 64. Connection routing                               | 4/4 | Complete    | 2026-05-14 |
 | 65. Interaction model overhaul                       | 0/TBD | Planned | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |
 | 67. Custom titlebar                                  | 0/TBD | Planned | — |
