@@ -59,6 +59,10 @@ Solve the connection-arrow ugliness verified in `example_*.png` screenshots by i
 - Validation chip wiring details (which Zustand store slice surfaces the topology hint) — follow Phase 63.1 BC-error precedent.
 - Test surface: unit tests for the geometric rules + a small set of representative ReactFlow layouts covering the §3.3 examples (Example 1 X-cross, Examples 3-4 vertical stack, Example 2 long return, the CAC crowded-edge case).
 
+### Planning Clarifications (locked 2026-05-14 during /gsd:plan-phase 64)
+- **D-17:** Anti-parallel bow detection is **same-type-only**. A hydraulic edge `(A→B)` only pairs with another hydraulic edge `(B→A)` for the ±8px bow; a thermal edge between the same two nodes does NOT count as the sibling. Cross-type pairs render straight. Refines D-08.
+- **D-18:** Thermal-pair port-name suffix is **definitive**: `thermal_left` always renders on the spatial left side when `axis=horizontal` and on the spatial top side when `axis=vertical`. `thermal_right` mirrors it. Only the axis flips between horizontal/vertical based on neighbor placement; the per-name side assignment is fixed. Refines D-12 / §3.4.
+
 </decisions>
 
 <canonical_refs>
