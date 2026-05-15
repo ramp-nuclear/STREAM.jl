@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 import {
   Node,
   Edge,
@@ -781,7 +782,7 @@ export function enrichEdges(edges: Edge[], nodes: Node[]): Edge[] {
 // Store
 // ---------------------------------------------------------------------------
 
-const useStore = create<AppState>()((set, get) => ({
+const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
@@ -2619,7 +2620,7 @@ const useStore = create<AppState>()((set, get) => ({
     await Promise.all(basenames.map((b) => clearSidecar(b)));
     await clearLockfile();
   },
-}));
+})));
 
 /**
  * Initialize recent files from disk on app startup.
