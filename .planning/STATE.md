@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
 status: executing
-stopped_at: Phase 65 complete — 8/8 plans shipped, manual UAT deferred for 6 visual surfaces
-last_updated: "2026-05-14T15:45:00.000Z"
-last_activity: 2026-05-14 -- Phase 65 execution complete (8/8 plans)
+stopped_at: Phase 65 complete — 14/14 plans shipped (8 original + 6 gap closure from UAT 2026-05-15); manual UAT still deferred for visual/interactive surfaces
+last_updated: "2026-05-15T00:00:00.000Z"
+last_activity: 2026-05-15 -- Phase 65 gap-closure execution complete (Plans 09-14)
 progress:
   total_phases: 15
   completed_phases: 8
-  total_plans: 56
-  completed_plans: 56
+  total_plans: 62
+  completed_plans: 62
   percent: 53
 ---
 
@@ -50,7 +50,7 @@ See: .planning/PROJECT.md (updated 2026-05-05)
   - Phase 63: BCs tab + value-source components in GUI ✓ shipped 2026-05-13
   - Phase 63.1: BC architecture rework — unified BCs tab ✓ shipped 2026-05-14 (14/14 plans, 7/7 UAT gaps closed via Plans 11–14)
   - Phase 64: Connection routing ✓ shipped 2026-05-14
-  - Phase 65: Interaction model overhaul ✓ shipped 2026-05-14 (8/8 plans; manual UAT deferred for 6 interactive surfaces — see VERIFICATION.md)
+  - Phase 65: Interaction model overhaul ✓ shipped 2026-05-14, gap closure 2026-05-15 (14/14 plans = 8 original + 6 gap-closure 09–14 from UAT 2026-05-15; manual UAT still pending for live-shell surfaces — see VERIFICATION.md and individual SUMMARYs)
   - Phase 66: Code preview rework (next)
   - Phases 67-72: see ROADMAP.md
 
@@ -58,11 +58,11 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 65 — COMPLETE
-Plan: 8 of 8 shipped
-Status: Phase 65 complete (verification PASS, 8/8 deliverables; see VERIFICATION.md)
-Last activity: 2026-05-14 -- Phase 65 execution complete
-Next: `/gsd:discuss-phase 66` (Code preview rework). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far (covers Phases 59 → 65). User performs visual UAT on the 6 deferred Phase 65 surfaces before merge.
+Phase: 65 — COMPLETE (incl. gap closure)
+Plan: 14 of 14 shipped (8 original + 6 gap closure 09–14)
+Status: Phase 65 complete (verification PASS for original 8/8; gap closure 09–14 shipped 2026-05-15 — re-verify via `/gsd:verify-work 65` once user runs deferred manual UAT)
+Last activity: 2026-05-15 -- Phase 65 gap-closure execution complete (Plans 09–14, six parallel worktree merges to `gui-redesign`)
+Next: `/gsd:verify-work 65` to re-run UAT against the gap-closure surfaces, then `/gsd:discuss-phase 66` (Code preview rework). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far (covers Phases 59 → 65).
 
 Phase 65 deferred manual UAT (require running Tauri build):
 
