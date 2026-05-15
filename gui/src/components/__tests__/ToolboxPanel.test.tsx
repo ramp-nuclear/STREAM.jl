@@ -1,13 +1,10 @@
 // @vitest-environment happy-dom
 //
-// Phase 63.1 D-06 — the Sources category block has been removed from the
-// default toolbox. Registry entries for WallTemperature / HeatFluxSource
-// remain in components.json so `promoteToSharedSource` (Plan 08) can spawn
-// them programmatically, but the user no longer drags them from the toolbox.
-//
-// This file's previous Phase 62 / 63 contract (the SOURCES header and the
-// WallTemperature / HeatFluxSource drag rows) is superseded by D-06; the
-// tests below now lock in the *absence* of those affordances.
+// Phase 63.1 D-06 removed the Sources category block. Phase 65 UAT 2026-05-15
+// reverted that — Sources are re-surfaced as direct drag affordances because
+// the workflow needed them. This file's contract has been flipped accordingly:
+// the SOURCES header and the WallTemperature / HeatFluxSource drag rows are
+// now expected to RENDER.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import ToolboxPanel from "../ToolboxPanel";
@@ -17,8 +14,6 @@ import useStore, {
 } from "../../store/useStore";
 
 beforeEach(() => {
-  // Cold-start store state per 62-02 (activeLayer affects which Hydraulic /
-  // Thermal items appear; default layer keeps both visible).
   useStore.setState({
     nodes: [],
     edges: [],
@@ -56,23 +51,23 @@ afterEach(() => {
   cleanup();
 });
 
-describe("ToolboxPanel — Sources category hidden by default (D-06)", () => {
-  it("D-06: does NOT render the SOURCES group header in the Components tab body", () => {
+describe("ToolboxPanel — Sources category re-surfaced (Phase 65 UAT revert of 63.1 D-06)", () => {
+  it("renders the SOURCES group header in the Components tab body", () => {
     render(<ToolboxPanel />);
-    expect(screen.queryByText(/^Sources$/i)).toBeNull();
+    expect(screen.getByText(/^Sources$/i)).toBeTruthy();
   });
 
-  it("D-06: does NOT render a WallTemperature drag row in the toolbox", () => {
+  it("renders a WallTemperature drag row in the toolbox", () => {
     render(<ToolboxPanel />);
-    expect(screen.queryByText(/Wall Temperature/i)).toBeNull();
+    expect(screen.getByText(/Wall Temperature/i)).toBeTruthy();
   });
 
-  it("D-06: does NOT render a HeatFluxSource drag row in the toolbox", () => {
+  it("renders a HeatFluxSource drag row in the toolbox", () => {
     render(<ToolboxPanel />);
-    expect(screen.queryByText(/Heat Flux Source/i)).toBeNull();
+    expect(screen.getByText(/Heat Flux Source/i)).toBeTruthy();
   });
 
-  it("D-06: continues to render the HYDRAULIC and THERMAL category headers", () => {
+  it("continues to render the HYDRAULIC and THERMAL category headers", () => {
     render(<ToolboxPanel />);
     expect(screen.getByText(/^Hydraulic$/i)).toBeTruthy();
     expect(screen.getByText(/^Thermal$/i)).toBeTruthy();

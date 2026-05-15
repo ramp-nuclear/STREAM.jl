@@ -1,11 +1,19 @@
 // CanvasContextMenu.tsx — stateless context menu content for the empty canvas pane (Phase 65 Plan 05)
 // Rendered inside a Popover wrapper in CanvasPanel.tsx.
 //
-// Architecture note (Phase 65 Plan 11): Add Component is now hosted inside a Radix
-// DropdownMenu (defaultOpen=true) so its per-category submenus (DropdownMenuSub*) get
-// Floating-UI viewport-collision-aware placement. Paste / Auto-Layout / Separator
-// remain plain PopoverMenuItem / PopoverMenuSeparator (leaves of the Popover host).
+// Architecture note (Phase 65 Plan 11): Add Component is hosted inside a Radix
+// DropdownMenu so its per-category submenus (DropdownMenuSub*) get Floating-UI
+// viewport-collision-aware placement. Paste / Auto-Layout / Separator remain
+// plain PopoverMenuItem / PopoverMenuSeparator (leaves of the Popover host).
+//
+// Phase 65 Plan 11 iteration (UAT 2026-05-15): the DropdownMenu is now
+// hover-driven, not `defaultOpen={true}`. The previous always-open behavior
+// showed the categories panel before the user hovered Add Component, which
+// looked like the item was permanently "selected". A 150ms grace timer
+// bridges the gap when the pointer travels from the trigger to the portalled
+// content.
 
+import { useEffect, useRef, useState } from "react";
 import { ChevronRightIcon } from "lucide-react";
 import {
   PopoverMenuItem,
@@ -14,7 +22,6 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuPortal,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import useStore from "@/store/useStore";
@@ -29,9 +36,26 @@ export default function CanvasContextMenu({
   flowPosition,
   onClose,
 }: CanvasContextMenuProps) {
+  const [submenuOpen, setSubmenuOpen] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
+
+  function cancelClose() {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }
+
+  function scheduleClose() {
+    cancelClose();
+    closeTimerRef.current = window.setTimeout(() => {
+      setSubmenuOpen(false);
+    }, 150);
+  }
+
+  useEffect(() => cancelClose, []);
+
   function handlePaste() {
-    // Phase 65 v1.2: paste lands at the offset Plan 04 computes, NOT at the right-click
-    // position. Revisit if user feedback demands click-anchored paste.
     void useStore.getState().pasteFromClipboard();
     onClose();
   }
@@ -41,16 +65,15 @@ export default function CanvasContextMenu({
       <PopoverMenuItem onSelect={handlePaste}>Paste</PopoverMenuItem>
       <PopoverMenuItem disabled>Auto-Layout (future)</PopoverMenuItem>
       <PopoverMenuSeparator />
-      <DropdownMenu
-        defaultOpen={true}
-        onOpenChange={(open) => {
-          if (!open) onClose();
-        }}
-      >
+      <DropdownMenu open={submenuOpen} onOpenChange={setSubmenuOpen}>
         <DropdownMenuTrigger asChild>
           <div
             role="menuitem"
             tabIndex={0}
+            onMouseEnter={() => { cancelClose(); setSubmenuOpen(true); }}
+            onMouseLeave={scheduleClose}
+            onFocus={() => { cancelClose(); setSubmenuOpen(true); }}
+            onClick={() => { cancelClose(); setSubmenuOpen(true); }}
             data-slot="popover-menu-item"
             className="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
           >
@@ -58,11 +81,15 @@ export default function CanvasContextMenu({
             <ChevronRightIcon className="ml-auto size-4" />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuPortal>
-          <DropdownMenuContent side="right" align="start" sideOffset={4}>
-            <AddComponentSubmenu flowPosition={flowPosition} onClose={onClose} />
-          </DropdownMenuContent>
-        </DropdownMenuPortal>
+        <DropdownMenuContent
+          side="right"
+          align="start"
+          sideOffset={4}
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+        >
+          <AddComponentSubmenu flowPosition={flowPosition} onClose={onClose} />
+        </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );

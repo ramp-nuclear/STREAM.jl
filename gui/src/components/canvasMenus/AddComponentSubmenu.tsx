@@ -46,7 +46,7 @@ export default function AddComponentSubmenu({
         <DropdownMenuSub key={category}>
           <DropdownMenuSubTrigger>{category}</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
-            <DropdownMenuSubContent>
+            <DropdownMenuSubContent sideOffset={2} alignOffset={-4}>
               {components.map((comp) => (
                 <DropdownMenuItem
                   key={comp.id}
