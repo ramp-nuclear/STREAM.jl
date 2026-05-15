@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ReactFlow,
-  Controls,
   MiniMap,
   Background,
   BackgroundVariant,
@@ -30,6 +29,10 @@ import NodeContextMenu from "./canvasMenus/NodeContextMenu";
 import EdgeContextMenu from "./canvasMenus/EdgeContextMenu";
 import CanvasContextMenu from "./canvasMenus/CanvasContextMenu";
 import SnapToGridButton from "./canvasMenus/SnapToGridButton";
+import ZoomInButton from "./canvasMenus/ZoomInButton";
+import ZoomOutButton from "./canvasMenus/ZoomOutButton";
+import FitViewButton from "./canvasMenus/FitViewButton";
+import InteractiveLockButton from "./canvasMenus/InteractiveLockButton";
 
 export function getPortType(nodeId: string, handleId: string): string | null {
   const node = useStore.getState().nodes.find((n) => n.id === nodeId);
@@ -61,6 +64,8 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   const activeLayer = useStore((s) => s.activeLayer);
   // Phase 65 D-09: snap-to-grid state read from store
   const snapEnabled = useStore((s) => s.snapToGrid);
+  // Phase 65 Plan 13: interactive lock — when true, all interactions disabled.
+  const interactiveLocked = useStore((s) => s.interactiveLocked);
   // B3 guard: useReactFlow is called ONCE at the component top level — never
   // inside callbacks or useEffect. setNodes/setEdges are stable identities per
   // @xyflow/react v12 docs.
@@ -316,7 +321,13 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         connectionLineType={ConnectionLineType.SmoothStep}
-        panOnDrag={[2]}
+        // Phase 65 Plan 13: interactiveLocked drives interaction props. When true,
+        // node drag / connect / select are disabled and panOnDrag is fully off
+        // (selection-on-drag remains but elementsSelectable=false makes it a no-op).
+        nodesDraggable={!interactiveLocked}
+        nodesConnectable={!interactiveLocked}
+        elementsSelectable={!interactiveLocked}
+        panOnDrag={interactiveLocked ? false : [2]}
         selectionOnDrag
         selectionMode={SelectionMode.Partial}
         deleteKeyCode={["Delete", "Backspace"]} // Del/Backspace deletes nodes AND edges via ReactFlow built-in — closes v0.8 user-list item #2
@@ -325,12 +336,15 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         snapGrid={[16, 16]}
         fitView
       >
-        <Controls />
         <MiniMap />
         <Background variant={BackgroundVariant.Dots} color={resolvedTheme === "dark" ? "#4b5263" : "#ccc"} />
       </ReactFlow>
-      {/* Phase 65 D-07: snap-to-grid overlay button — top-right canvas corner (W9 lock: no Panel import) */}
-      <div className="absolute top-2 right-2 z-10">
+      {/* Phase 65 Plan 13: top-right overlay — Zoom/Fit/Lock replace ReactFlow built-in Controls panel; SnapToGridButton from Plan 06. */}
+      <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+        <ZoomInButton />
+        <ZoomOutButton />
+        <FitViewButton />
+        <InteractiveLockButton />
         <SnapToGridButton />
       </div>
       <WelcomeOverlay />
