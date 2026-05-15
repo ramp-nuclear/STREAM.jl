@@ -1,5 +1,5 @@
 ---
-status: partial
+status: diagnosed
 phase: 65-interaction-model-overhaul
 source: [65-01-SUMMARY.md, 65-02-SUMMARY.md, 65-03-SUMMARY.md, 65-04-SUMMARY.md, 65-05-SUMMARY.md, 65-06-SUMMARY.md, 65-07-SUMMARY.md, 65-08-SUMMARY.md]
 started: 2026-05-15T11:13:01Z
@@ -144,76 +144,152 @@ blocked: 3
   reason: "Filesystem inspection: ~/.config/com.stream.composer does not exist; ~/.local/share/com.stream.composer contains only webview cache/storage — no autorecover/ subdir, no *.autosave, no *.lock files anywhere on disk. Writer produces nothing at runtime."
   severity: blocker
   test: 16
+  root_cause: "gui/src-tauri/capabilities/default.json grants only fs:scope-home-recursive (a READ scope for $HOME). It does NOT grant fs:scope-appdata-recursive or fs:allow-appdata-write-recursive. AutoRecover writes to $APPDATA (Linux: ~/.local/share/com.stream.composer/STREAM-Composer/autorecover/) — every tauri-plugin-fs call (mkdir, writeTextFile, readTextFile, readDir, remove) is rejected by the v2 ACL. The 7 silent `try { ... } catch { }` blocks in autoRecover.ts swallow the rejections. saveProject works because the dialog `save()` picker grants an implicit one-shot scope to the chosen file."
   artifacts:
+    - path: "gui/src-tauri/capabilities/default.json"
+      issue: "Missing: fs:scope-appdata-recursive, fs:allow-appdata-write-recursive, fs:allow-remove, fs:allow-read-dir. Existing fs:scope-home-recursive is the wrong base (and read-only)."
     - path: "gui/src/lib/autoRecover.ts"
-      issue: "Sidecar/lockfile writers never produce files on disk — likely silent Tauri-IPC failure"
-    - path: "gui/src-tauri/tauri.conf.json"
-      issue: "Suspected: withGlobalTauri or fs/path plugin permissions missing — Tauri v2 JS bridge not reaching webview"
-    - path: "gui/src/store/useStore.ts"
-      issue: "initAutoRecover subscribe may be wired but the writer's dynamic-import resolution fails silently"
+      issue: "7 silent try/catch blocks at lines 121, 137, 150, 170, 197, 213, 228 hide ACL rejections in devtools."
   missing:
-    - "Verification that @tauri-apps/plugin-fs / @tauri-apps/api/path are listed in tauri.conf.json capabilities/permissions"
-    - "Try/catch logging inside autoRecover.ts writer functions — current silent failure hides the root cause"
+    - "Add fs:scope-appdata-recursive + fs:allow-appdata-write-recursive + fs:allow-remove + fs:allow-read-dir to gui/src-tauri/capabilities/default.json"
+    - "Add a structured fs:scope entry binding $APPDATA/STREAM-Composer/autorecover/* (defense-in-depth)"
+    - "Replace the 7 silent catch blocks with `catch (err) { if (import.meta.env.DEV) console.warn('[autoRecover] <op> failed:', err); }`"
+    - "Fix smoke-test guidance — replace window.__TAURI__.core.invoke(...) with `(await import('@tauri-apps/api/core')).invoke(...)`; window.__TAURI__ is correctly not exposed (v2 default) and ES module imports bypass it."
+  debug_session: .planning/debug/autorecover-bridge.md
 
 - truth: "After force-killing the Tauri shell with unsaved edits and relaunching, the AutoRecoverRestoreModal appears blocking the workspace"
   status: failed
-  reason: "User simulated crash (added nodes, kill -9 target/debug/gui, relaunched) — no modal appeared, workspace loaded clean. Additionally `window.__TAURI__.core` is undefined in devtools (Tauri global not exposed)."
+  reason: "User simulated crash (added nodes, kill -9 target/debug/gui, relaunched) — no modal appeared, workspace loaded clean. Additionally `window.__TAURI__.core` is undefined in devtools."
   severity: blocker
   test: 17
+  root_cause: "Same root cause as Test 16 gap — capabilities/default.json missing appdata scope. With no sidecar files written, detectCrashOnLaunch's `enumerateSidecars` returns empty and App.tsx renders the clean workspace path. Tauri JS bridge, plugin registration, and is_pid_alive command are all correctly wired — fixing the capability ACL unblocks everything downstream."
   artifacts:
     - path: "gui/src/App.tsx"
-      issue: "Render gate / mount effect calls detectCrashOnLaunch but downstream Tauri IPC may be failing"
+      issue: "Render gate behaves correctly given no sidecars; no change needed — will work once capabilities are fixed."
     - path: "gui/src-tauri/src/lib.rs"
-      issue: "get_pid / is_pid_alive commands not reachable from JS (window.__TAURI__.core undefined)"
+      issue: "tauri_plugin_fs::init() and is_pid_alive/get_pid handlers correctly registered — no change needed."
   missing:
-    - "Likely the Tauri v2 JS bridge (window.__TAURI__) is gated; verify tauri.conf.json app.withGlobalTauri or migrate calls to use @tauri-apps/api/core import directly with proper capability config"
+    - "No code changes specific to Test 17 — fix is the same capabilities/default.json change as Test 16."
+    - "After fix: re-run UAT 16 → expect ~/.local/share/com.stream.composer/STREAM-Composer/autorecover/untitled-<uuid>.scp.autosave; then UAT 17 → kill -9 target/debug/gui → relaunch → modal appears."
+  debug_session: .planning/debug/autorecover-bridge.md
 
 - truth: "Canvas chrome shows only one set of overlay controls — ReactFlow's built-in bottom-left Controls (zoom/fit/lock) are hidden, leaving only the new top-right canvas overlay buttons"
   status: failed
   reason: "User reported: The canvas comes with buttons at the bottom-left (size, focus, and a lock) — there are now two places for these buttons. User wants the bottom-left buttons hidden."
   severity: cosmetic
   test: 14
-  artifacts: []
-  missing: []
-  note: "Likely <Controls /> from @xyflow/react in CanvasPanel.tsx — either remove it or render Controls without the built-in buttons we duplicate."
+  root_cause: "<Controls /> rendered unconditionally at gui/src/components/CanvasPanel.tsx:328 (imported on line 4). The top-right overlay div at lines 333-335 contains only <SnapToGridButton /> — no zoom/fit/lock counterparts exist. Removing Controls outright would lose those four functions; recommended path is to add top-right counterparts first using @xyflow/react v12's useReactFlow() helpers (zoomIn, zoomOut, fitView) plus a lock toggle backed by a new useStore boolean."
+  artifacts:
+    - path: "gui/src/components/CanvasPanel.tsx:328"
+      issue: "<Controls /> rendered unconditionally — needs to be removed."
+    - path: "gui/src/components/CanvasPanel.tsx:4"
+      issue: "Unused `Controls` import after removal."
+    - path: "gui/src/components/CanvasPanel.tsx:333-335"
+      issue: "Top-right overlay div needs new ZoomInButton / ZoomOutButton / FitViewButton / InteractiveLockButton siblings to SnapToGridButton."
+  missing:
+    - "Add 3-4 small icon buttons (Lucide ZoomIn/ZoomOut/Maximize/Lock) in the top-right overlay, mirroring SnapToGridButton.tsx structure"
+    - "Wire to useReactFlow().zoomIn(), zoomOut(), fitView() for the first three"
+    - "Add `interactiveLocked: boolean` + setInteractiveLocked action to useStore.ts; bind to ReactFlow nodesDraggable / nodesConnectable / elementsSelectable / panOnDrag props"
+    - "Delete <Controls /> at CanvasPanel.tsx:328 and the unused import on line 4"
+  debug_session: .planning/debug/reactflow-controls-dedup.md
 
 - truth: "Per-category submenus inside the Canvas → Add Component menu render fully on screen (not clipped or positioned offscreen)"
   status: failed
   reason: "User reported: Add components opens a submenu, but each item there doesn't show the submenu. Its placement is bugged — only a tiny edge of it is visible."
   severity: major
   test: 13
-  artifacts: []
-  missing: []
-  note: "Likely a Radix Popover / shadcn PopoverMenuSubContent positioning/portal/collisionBoundary issue — see gui/src/components/canvasMenus/AddComponentSubmenu.tsx and gui/src/components/ui/context-menu.tsx PopoverMenuSub* primitives added in Plan 05 (D-11 + W10 workaround)."
+  root_cause: "PopoverMenuSubContent in gui/src/components/ui/context-menu.tsx:243-265 (added by Plan 05 W10 workaround) is a hand-rolled absolutely-positioned <div> with hardcoded `absolute left-full top-0 z-50`. No viewport-collision detection / Floating UI / flip middleware. When the parent Add Component menu lives in the right portion of the viewport, the `left-full` projection pushes the level-2 submenu past the right edge, clipping it. The top-level Popover works because it uses Radix PopoverContent with Floating-UI auto-flip; the W10 workaround removed that for nested levels and never restored it."
+  artifacts:
+    - path: "gui/src/components/ui/context-menu.tsx:243-265"
+      issue: "PopoverMenuSubContent uses hardcoded `absolute left-full top-0` with no collision response — broken primitive."
+    - path: "gui/src/components/ui/context-menu.tsx:188-241"
+      issue: "PopoverMenuSub / PopoverMenuSubTrigger surround the broken primitive — need to participate in the fix."
+    - path: "gui/src/components/canvasMenus/AddComponentSubmenu.tsx:45-61"
+      issue: "Consumer — should not need changes if primitive is fixed cleanly."
+    - path: "gui/src/components/canvasMenus/CanvasContextMenu.tsx:38-43"
+      issue: "Same submenu primitive used for level-1 Add Component nesting — benefits from same fix."
+  missing:
+    - "PREFERRED: swap to Radix DropdownMenu.Sub / DropdownMenu.SubTrigger / DropdownMenu.SubContent — they ship viewport-collision via Floating UI, plus keyboard navigation and focus management. Mount with a dummy hidden DropdownMenu.Trigger inside PopoverContent."
+    - "ALTERNATIVE: patch PopoverMenuSub primitives with @floating-ui/react — useFloating with `flip()` + `shift()` middleware, FloatingPortal for content, refs.setReference on trigger."
+    - "Delete old hand-rolled PopoverMenuSub* primitives once unused"
+    - "Verify by right-clicking near right edge of canvas — submenu must flip to left and remain fully visible"
+  debug_session: .planning/debug/addcomponent-submenu-placement.md
 
 - truth: "Esc inside a focused text input does NOT change selection (properties panel and canvas stay aligned with the previously selected node)"
   status: failed
   reason: "User reported: While typing in a text input, Esc makes the properties window go back to 'nothing selected' but the canvas still shows the outline around what was selected — properties panel and canvas selection are out of sync."
   severity: major
   test: 7
-  artifacts: []
-  missing: []
+  root_cause: "Esc handling is split across two listeners on two state sources. (A) zustand selectedNodeId/selectionKind drives SidebarPanel. (B) ReactFlow nodes[].selected drives the canvas per-node `ring-2 ring-[var(--ring)]` outline. SidebarPanel.tsx:80-95 has a DOCUMENT keydown listener with NO input-focus guard — calls clearSelection() on Esc, clearing (A) only. CanvasPanel.tsx:266-280 correctly skips when input has focus, leaving (B) untouched. clearSelection() at useStore.ts:1762-1768 doesn't touch nodes[].selected, and D-22's ReactFlow→zustand sync is one-way. Net: properties panel deselects, canvas outline persists."
+  artifacts:
+    - path: "gui/src/components/sidebar/SidebarPanel.tsx:80-95"
+      issue: "Document keydown listener clears zustand selection on Esc with NO input-focus guard — proximate source of the desync."
+    - path: "gui/src/store/useStore.ts:1762-1768"
+      issue: "clearSelection() only mutates zustand selection slice; never touches nodes[].selected."
+    - path: "gui/src/components/CanvasPanel.tsx:266-280"
+      issue: "Correct handler with input-focus guard; clears BOTH state sources. Reference implementation."
+    - path: "gui/src/components/StreamNode.tsx:361"
+      issue: "Canvas per-node ring outline reads ReactFlow's `selected` prop, not zustand."
+  missing:
+    - "PREFERRED: add the same input-focus guard from CanvasPanel.tsx:266-275 to SidebarPanel.tsx:80-95 (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | isContentEditable early-return)"
+    - "Restores the documented invariant: Esc inside text input does not change selection at all"
+    - "OPTIONAL HARDENING (follow-up): update useStore.clearSelection() to also clear nodes[].selected via setNodes, so any future programmatic caller doesn't drift the two sources"
+  debug_session: .planning/debug/esc-selection-desync.md
 
 - truth: "Marquee selection rectangle border is styled to fit the GUI (not the default ReactFlow dotted line)"
   status: failed
   reason: "User reported: The border of the selection area is dotted and looks ugly. Wants a custom design — fill is fine, but the border should be a full line a little brighter than the fill."
   severity: cosmetic
   test: 4
-  artifacts: []
-  missing: []
+  root_cause: "Default @xyflow/react@12.10.2 stylesheet imported at gui/src/components/CanvasPanel.tsx:17 ships --xy-selection-border-default: 1px dotted rgba(0,89,220,0.8). Project has zero CSS overrides for .react-flow__selection. Phase 65 Plan 03 enabled selectionOnDrag + SelectionMode.Partial without adding accompanying CSS — defaults surfaced."
+  artifacts:
+    - path: "gui/src/index.css"
+      issue: "Missing custom override for .react-flow__selection (target file for the fix)."
+    - path: "gui/src/components/CanvasPanel.tsx:17"
+      issue: "Default stylesheet import — context only, not edited."
+  missing:
+    - "Append to gui/src/index.css after the existing .react-flow__handle block:"
+    - "  .react-flow__selection { background: color-mix(in oklch, var(--primary) 12%, transparent); border: 1px solid color-mix(in oklch, var(--primary) 55%, transparent); border-radius: 2px; }"
+    - "Uses existing --primary design token so it auto-adapts to light/dark via .dark class"
+  debug_session: .planning/debug/marquee-visual-style.md
 
 - truth: "After releasing marquee selection, no bounding box wraps the selected nodes — selection state is conveyed only by the per-node highlight"
   status: failed
   reason: "User reported: Once you release selection, a bounding box of what is selected appears. I don't like it. Prefers (a) no box at all, just keep the stuff that is selected marked."
   severity: cosmetic
   test: 4
-  artifacts: []
-  missing: []
+  root_cause: "@xyflow/react v12 internal <NodesSelection> renders .react-flow__nodesselection-rect whenever 2+ nodes are selected; no v12 prop disables it. Project has no override."
+  artifacts:
+    - path: "gui/src/index.css"
+      issue: "Missing display:none override for .react-flow__nodesselection-rect."
+  missing:
+    - "Append to gui/src/index.css:"
+    - "  .react-flow__nodesselection-rect { display: none; }"
+    - "Parent .react-flow__nodesselection has pointer-events:none — hiding the child rect does not affect dragging or selection state."
+  debug_session: .planning/debug/marquee-visual-style.md
 
 - truth: "Right-click drag (pan) and node drag feel smooth — not visibly FPS-capped or chopped"
   status: failed
-  reason: "User reported: Dragging with right click is not smooth (not something new). It may be FPS locked or something like that, because it feels chopped to drag around and drag stuff around. Maybe the performance of the entire GUI is capped in some way?"
+  reason: "User reported: Dragging with right click is not smooth (not something new). It may be FPS locked or something like that, because it feels chopped to drag around and drag stuff around."
   severity: minor
   test: 4
-  artifacts: []
-  missing: []
+  root_cause: "Two superimposed effects. (a) Environmental floor: right-click pan is pure CSS-transform with NO React state touch, yet it still chops — implicating WebKitGTK/WSLg compositing path on Linux 6.6 WSL2. No fix inside the app for this layer. (b) App-layer amplifier on top of (a) for NODE drag: zustand created without subscribeWithSelector middleware at useStore.ts:781 → every set() wakes every subscribe callback. App.tsx:288 title-sync subscribe calls getCurrentWindow().setTitle() on every store change including per-pixel drag sets — a Tauri IPC per pixel. useStore.ts:2691 autoRecover subscribe runs clearTimeout/setTimeout per pixel. StreamNode.tsx:174-194 per-port selectors run O(N+E) autoflip scans per node per set."
+  artifacts:
+    - path: "gui/src/App.tsx:272-292"
+      issue: "Unconditional title-sync subscribe calls Tauri IPC setTitle on every store change — single biggest in-app contributor."
+    - path: "gui/src/store/useStore.ts:781"
+      issue: "create() missing subscribeWithSelector middleware — every subscribe fires on every set."
+    - path: "gui/src/store/useStore.ts:1014-1048"
+      issue: "onNodesChange writes isDirty:true on every drag pixel — flips per-pixel debounce timers everywhere."
+    - path: "gui/src/store/useStore.ts:2691"
+      issue: "AutoRecover subscribe — per-pixel clearTimeout/setTimeout churn."
+    - path: "gui/src/components/StreamNode.tsx:174-206, 261-281"
+      issue: "Per-port autoflip selectors run O(N×P×(N+E)) scans per set()."
+  missing:
+    - "TRIVIAL: gate App.tsx:288 title-sync — only call setTitle when {currentFilePath, isDirty} actually changes (closure-tracked or via subscribeWithSelector)"
+    - "TRIVIAL: gate autoRecover subscribe — schedule on isDirty rising edge only"
+    - "TRIVIAL: install subscribeWithSelector middleware on the zustand store (useStore.ts:781)"
+    - "MEDIUM: memoize autoflip per-port selectors so the O(N+E) scan runs once per node-set change, not per port per set"
+    - "MEDIUM: consider flipping isDirty at onNodeDragStop instead of per pixel"
+    - "ENVIRONMENTAL (recommend retest, not code): test on native Linux or built Windows .exe (WebView2 — materially faster than WebKitGTK, not subject to WSLg)"
+  debug_session: .planning/debug/gui-drag-perf.md
