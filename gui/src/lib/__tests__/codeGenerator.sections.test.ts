@@ -248,26 +248,29 @@ function symmetricPlateFixture(): {
     cp_s: 300.0,
     power_shape_ref: "ps-1",
   });
-  // CAC.thermal_left[i] <-> HD.thermal_left[i]  (CAC left side of HD)
-  // CAC.thermal_right[i] <-> HD.thermal_right[i] (CAC right side of HD)
-  // n=5 thermal handles each. Build edges for all five indices on both sides.
-  const edges: Edge[] = [];
-  for (let i = 0; i < 5; i++) {
-    edges.push({
-      id: `e_left_${i}`,
+  // Symmetric_plate topology: CAC.thermal_right -> HD.thermal_left AND
+  // CAC.thermal_left -> HD.thermal_right. The thermal ports are array-shaped
+  // (per `array_size: "n"`), but the codegen detector keys on base port names
+  // — matches the convention used throughout codeGenerator.test.ts and the
+  // Phase 40 topology detector (D-07..D-10). Plan 02 Rule 1: corrected from
+  // the per-cell `thermal_left__${i}` shape that didn't match codegen's exact-
+  // name port lookup.
+  const edges: Edge[] = [
+    {
+      id: "e_t_left",
       source: "cac-uuid",
       target: "hd-uuid",
-      sourceHandle: `thermal_left__${i}`,
-      targetHandle: `thermal_left__${i}`,
-    });
-    edges.push({
-      id: `e_right_${i}`,
+      sourceHandle: "thermal_right",
+      targetHandle: "thermal_left",
+    },
+    {
+      id: "e_t_right",
       source: "cac-uuid",
       target: "hd-uuid",
-      sourceHandle: `thermal_right__${i}`,
-      targetHandle: `thermal_right__${i}`,
-    });
-  }
+      sourceHandle: "thermal_left",
+      targetHandle: "thermal_right",
+    },
+  ];
   return { nodes: [cac, hd], edges, cacId: "cac-uuid", hdId: "hd-uuid" };
 }
 
