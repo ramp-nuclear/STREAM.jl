@@ -101,6 +101,7 @@ function App() {
       // Get current PID via Tauri IPC
       let pid = 0;
       try {
+        // v2 IPC: use ES-module import, not window.__TAURI__ (which is intentionally undefined). See autoRecover.ts header for the long-form rationale.
         const { invoke } = await import("@tauri-apps/api/core");
         pid = await invoke<number>("get_pid");
       } catch {
