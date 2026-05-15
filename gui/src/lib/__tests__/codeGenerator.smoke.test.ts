@@ -31,13 +31,20 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
 import { deserializeProject, SENTINEL_UNSET_POWER_SHAPE } from "../projectIO";
-import { generateCode } from "../codeGenerator";
+// Phase 66 Plan 02 adapter wrap: generateCode now returns CodeSection[].
+// `gen(...)` serializes back to Julia text for the smoke gate, which spawns
+// `julia --project=. <tmp>.jl` and verifies the script loads + mtkcompiles.
+import { generateCode, serializeSections } from "../codeGenerator";
 import type {
   CodegenResources,
   CodegenGeometryResource,
   CodegenPowerShapeResource,
 } from "../codeGenerator";
 import { getComponent } from "../../registry";
+
+function gen(...args: Parameters<typeof generateCode>): string {
+  return serializeSections(generateCode(...args));
+}
 
 // `gui/src/lib/__tests__/codeGenerator.smoke.test.ts` -> repo root is three
 // `..` (lib -> src -> gui) plus one more to escape `gui` itself.
@@ -110,7 +117,7 @@ describe("Phase 62 INV-CG-05: simple_loop.scp end-to-end smoke", () => {
     const project = deserializeProject(json);
     const resources = toCodegenResources(project);
 
-    const code = generateCode(
+    const code = gen(
       project.components,
       project.connections,
       { anchors: project.anchors },
@@ -118,8 +125,9 @@ describe("Phase 62 INV-CG-05: simple_loop.scp end-to-end smoke", () => {
       resources,
     );
 
-    // INV-CG-01: # Resources block precedes the first @named line
-    const resIdx = code.indexOf("# Resources");
+    // INV-CG-01: # === Resources === section precedes the first @named line
+    // (Phase 66 D-12: canonical section header replaces ad-hoc `# Resources`).
+    const resIdx = code.indexOf("# === Resources ===");
     const namedIdx = code.indexOf("@named");
     expect(resIdx).toBeGreaterThanOrEqual(0);
     expect(namedIdx).toBeGreaterThanOrEqual(0);
@@ -150,7 +158,7 @@ describe("Phase 62 INV-CG-05: simple_loop.scp end-to-end smoke", () => {
       const project = deserializeProject(json);
       const resources = toCodegenResources(project);
 
-      const code = generateCode(
+      const code = gen(
         project.components,
         project.connections,
         { anchors: project.anchors },
