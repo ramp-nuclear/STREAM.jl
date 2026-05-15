@@ -1,3 +1,4 @@
+// dropdown-menu.tsx — shadcn-style shim around @radix-ui/react-dropdown-menu (Phase 65 Plan 11). Used for nested submenus with viewport-collision-aware placement (replaces hand-rolled PopoverMenuSub*).
 import * as React from "react"
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
