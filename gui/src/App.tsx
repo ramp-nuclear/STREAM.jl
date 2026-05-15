@@ -23,10 +23,18 @@ import { detectCrashOnLaunch } from "./lib/autoRecover";
 import type { LockfileContent } from "./lib/autoRecover";
 import { useResizable } from "./hooks/useResizable";
 import { useTheme } from "./hooks/useTheme";
+import { useShowCodeFor } from "./hooks/useShowCodeFor";
 
 type DialogCallback = (action: "save" | "discard" | "cancel") => void;
 
 function App() {
+  // Phase 66 Plan 03: install the window-level `stream:show-code-for` listener
+  // at app root so it survives BottomPanel mount/unmount cycles (CodePreview
+  // is short-circuited when the bottom panel is closed — Pitfall 2). Writes
+  // detail.nodeIds → useStore.pendingShowCodeFor; CodePreview consumes on
+  // next render (Plan 04 wires the consumer).
+  useShowCodeFor();
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const dialogCallbackRef = useRef<DialogCallback | null>(null);
 
@@ -266,6 +274,30 @@ function App() {
     window.addEventListener("keydown", handleLeftTabKey);
     return () => window.removeEventListener("keydown", handleLeftTabKey);
   }, [setActiveLeftTab]);
+
+  // Phase 66 Plan 03: Esc clears pinned code-panel sub-blocks.
+  // Coexists with the CanvasPanel.tsx Esc handler and the SidebarPanel.tsx
+  // Esc handler (Phase 65 Plan 10): all three are global on window keydown,
+  // none call stopPropagation, and each clears its own slice idempotently.
+  // Input-focus guard is the SAME predicate as CanvasPanel.tsx:276-289 — when
+  // the user is editing text, Esc should not clear pins.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      useStore.getState().clearPinnedSourceIds();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // Window title sync — subscribe outside React to bypass render batching.
   // On Linux/WebKitGTK, setTitle() IPC doesn't update the GTK title bar reliably;
