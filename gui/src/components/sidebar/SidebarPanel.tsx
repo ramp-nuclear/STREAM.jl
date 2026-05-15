@@ -76,6 +76,15 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
   // Items 1-3 (popover-close, rename-cancel, context-menu-close) are owned
   // by their respective layers and stop propagation before reaching this
   // listener — see file header for details.
+  //
+  // Phase 65 Plan 10: input-focus guard mirrors CanvasPanel.tsx:266-275 — Esc
+  // inside a text input is a no-op so the zustand selection slice and
+  // ReactFlow's per-node `selected` flag stay in lockstep (UAT Test 7
+  // desync fix). Without this guard, pressing Esc while typing in the
+  // InstanceNameField (or any other sidebar input) cleared the zustand
+  // selection while CanvasPanel's matching guard left the per-node
+  // `selected` flag set — Properties panel went blank while the canvas
+  // kept the selection outline.
   // ---------------------------------------------------------------------
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -84,6 +93,19 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
       // call preventDefault on Esc; this is belt-and-braces.
       if (e.defaultPrevented) return;
       if (e.key !== "Escape") return;
+      // Input-focus guard (Phase 65 Plan 10) — mirrors CanvasPanel.tsx:266-275.
+      // Esc in a text input is the browser default (which is "no-op for
+      // single-line, restore for textarea/contentEditable") and must not
+      // touch selection state.
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target !== null && target.isContentEditable)
+      ) {
+        return;
+      }
       // Read fresh state inside the handler — the closure was created
       // once on mount and cannot stale-close over selectionKind.
       if (useStore.getState().selectionKind !== "none") {
