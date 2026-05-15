@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import useStore from "../store/useStore";
 import { getComponent } from "../registry";
-import { generateCode } from "../lib/codeGenerator";
+import { generateCode, serializeSections } from "../lib/codeGenerator";
 import type { LayerView } from "../lib/layers";
 import FileMenu from "./FileMenu";
 import ThemeMenu from "./ThemeMenu";
@@ -37,12 +37,21 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
   const activeLayer = useStore((s) => s.activeLayer);
   const setActiveLayer = useStore((s) => s.setActiveLayer);
 
+  // TEMP — Phase 66 Plan 03 takes over this consumer.
+  // Plan 02 changed generateCode's return to CodeSection[]; we wrap with
+  // serializeSections so the existing `writeTextFile(filePath, code)` path
+  // keeps exporting a Julia string (now with D-12 `# === <Section> ===`
+  // section headers). Plan 03 extracts handleExport into a shared
+  // `gui/src/lib/exportCode.ts` util so this Toolbar.tsx call site and the
+  // BottomPanel Export button drive the same path.
   const code = useMemo(
     () =>
-      generateCode(nodes, edges, { anchors }, getComponent, resources, {
-        bcMode,
-        bcSymmetric,
-      }),
+      serializeSections(
+        generateCode(nodes, edges, { anchors }, getComponent, resources, {
+          bcMode,
+          bcSymmetric,
+        }),
+      ),
     [nodes, edges, anchors, resources, bcMode, bcSymmetric],
   );
 

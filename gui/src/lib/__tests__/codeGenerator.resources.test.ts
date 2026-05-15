@@ -12,11 +12,17 @@
 // by 62-10 (the new 5th argument to generateCode).
 
 import { describe, it, expect } from "vitest";
-import { generateCode } from "../codeGenerator";
+// Phase 66 Plan 02 adapter wrap: generateCode now returns CodeSection[];
+// `gen(...)` serializes back to the Julia string the assertions read.
+import { generateCode, serializeSections } from "../codeGenerator";
 import type { CodegenResources } from "../codeGenerator";
 import type { CodegenAnchorsState } from "../anchors";
 import type { ComponentDefinition } from "../../registry/types";
 import type { Node } from "@xyflow/react";
+
+function gen(...args: Parameters<typeof generateCode>): string {
+  return serializeSections(generateCode(...args));
+}
 
 // MUST match useStore.ts SENTINEL_UNSET_POWER_SHAPE (asserted by the codegen
 // itself; the constant is duplicated to keep this test file dependency-free
@@ -237,7 +243,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         n: 5,
         geometry_ref: geomUuid,
       })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
 
       const geomIdx = code.indexOf("PipeGeometry_rectangular");
       const namedIdx = code.indexOf("@named");
@@ -246,7 +252,9 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
       expect(geomIdx).toBeLessThan(namedIdx);
     });
 
-    it("emits a # Resources comment header above the resource lines", () => {
+    it("emits a # === Resources === section header above the resource lines (D-12)", () => {
+      // Phase 66 Plan 02 / D-12: ad-hoc dashed-block header replaced by the
+      // canonical `# === <Section Name> ===` form.
       const resources: CodegenResources = {
         ...emptyResources(),
         geometries: {
@@ -259,8 +267,8 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         },
       };
       const nodes = [makeChannel("g1")];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
-      expect(code).toContain("# Resources");
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      expect(code).toContain("# === Resources ===");
     });
   });
 
@@ -279,7 +287,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         },
       };
       const nodes = [makeChannel(geomUuid)];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       expect(code).toContain("geometry=geom_main");
       // The Channel constructor MUST NOT inline the PipeGeometry. The
       // PipeGeometry_rectangular call appears once — only in the Resources
@@ -305,7 +313,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         },
       };
       const nodes = [makeHD(psUuid, 10, 5)];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       // Verbatim form — modulo whitespace inside the call signature.
       expect(code).toContain(
         `rebin_extensive(readdlm(joinpath(@__DIR__, "shapes/mtr.csv"), ','), (10, 5))`,
@@ -329,7 +337,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         },
       };
       const nodes = [makeHD(SENTINEL_UNSET_POWER_SHAPE, 10, 5)];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       expect(code).toContain(
         "ones(10, 5)  # TODO: fill in your power shape",
       );
@@ -351,7 +359,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         },
       };
       const nodes = [makeHD(psUuid, 10, 5)];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       // The uniform line must NOT carry the TODO comment.
       const flatLine = code
         .split("\n")
@@ -377,7 +385,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         },
       };
       const nodes = [makeHD(psUuid, 10, 5)];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       expect(code).toContain("cosine_power_shape(10, 5; amplitude=2.0)");
     });
   });
@@ -397,7 +405,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         },
       };
       const nodes = [makeHD(psUuid, 8, 4)];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       const occurrences = (code.match(/using DelimitedFiles/g) ?? []).length;
       expect(occurrences).toBe(1);
     });
@@ -416,7 +424,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         },
       };
       const nodes = [makeHD(psUuid, 8, 4)];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       expect(code).not.toContain("using DelimitedFiles");
     });
   });
@@ -425,7 +433,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
     it("Channel with geometry_ref pointing at an unknown UUID -> WARNING + geometry=missing", () => {
       const resources: CodegenResources = emptyResources();
       const nodes = [makeChannel("ghost-uuid")];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       expect(code).toContain("# WARNING: geometry_ref missing");
       expect(code).toContain("geometry=missing");
     });
@@ -450,7 +458,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         makeNode("p", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
         makeChannel(geomUuid, "ch_1"),
       ];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       // Match the WARNING — either the verbatim phrase or any "collides" hint
       // (RESEARCH leaves the exact wording flexible).
       expect(code).toMatch(
@@ -477,7 +485,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         makeHD(psUuid, 10, 5, "hd_1", "hd-node-1"),
         makeHD(psUuid, 10, 5, "hd_2", "hd-node-2"),
       ];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       expect(code).toContain("power_shape_axial_cos_for_hd_1 = cosine_power_shape");
       expect(code).toContain("power_shape_axial_cos_for_hd_2 = cosine_power_shape");
       // Each HD constructor references its own variable.
@@ -501,7 +509,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
         },
       };
       const nodes = [makeChannel(geomUuid)];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent, resources);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent, resources);
       expect(code).toContain("tube_a = PipeGeometry_circular(0.6, 0.01)");
       expect(code).toContain("geometry=tube_a");
     });
@@ -519,7 +527,7 @@ describe("generateCode — resources block (Phase 62 INV-CG-01..04)", () => {
           geometry: { type: "rectangular", L: 0.5, W: 0.01, H: 0.003 },
         }),
       ];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       // 4-arg form: L, edge1=W, edge2=H, heated_edge=W (62-11 INV-CG-05 fix)
       expect(code).toContain("PipeGeometry_rectangular(0.5, 0.01, 0.003, 0.01)");
     });
