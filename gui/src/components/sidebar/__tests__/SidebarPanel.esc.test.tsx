@@ -76,23 +76,27 @@ function seedSelectedNode() {
 }
 
 /**
- * Dispatch a real Escape KeyboardEvent on document. When `focusTarget` is
- * provided, focus it first so `e.target` resolves to that element.
+ * Dispatch a real bubbling Escape KeyboardEvent. To mirror real-browser
+ * behavior where keydown originates at the focused element and bubbles up
+ * to the document, we dispatch from `focusTarget` (after focusing it).
+ * When `focusTarget` is null, we blur and dispatch from `document.body`,
+ * which still bubbles up to document but with no input-like target.
  */
 function dispatchEscOn(focusTarget: HTMLElement | null) {
+  const origin: EventTarget =
+    focusTarget ?? ((): EventTarget => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      return document.body;
+    })();
   if (focusTarget) {
     focusTarget.focus();
-  } else {
-    (document.activeElement as HTMLElement | null)?.blur();
   }
   const event = new KeyboardEvent("keydown", {
     key: "Escape",
     bubbles: true,
     cancelable: true,
   });
-  // happy-dom dispatches the event from document; the focused element is
-  // the natural target for keydown — that mirrors real-browser behavior.
-  document.dispatchEvent(event);
+  origin.dispatchEvent(event);
 }
 
 beforeEach(() => {
