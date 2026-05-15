@@ -166,7 +166,7 @@ Plans:
 
 **Design-decisions reference:** Section 3.5.
 **Depends on:** —.
-**Plans:** 8 plans.
+**Plans:** 14 plans (8 original + 6 gap closure from UAT 2026-05-15).
 
 Plans:
 **Wave 1**
@@ -188,6 +188,14 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [x] 65-08-PLAN.md — AutoRecover restore modal + App.tsx mount/unmount integration (D-03, D-04).
+
+**Wave 7** *(gap closure — UAT 2026-05-15; runs after Phase 65 ship)*
+- [ ] 65-09-autorecover-capability-fix-PLAN.md (gap closure) — BLOCKER: grant Tauri v2 fs ACL appdata scope (4 new permissions in capabilities/default.json) + DEV-mode logging on 8 autoRecover silent-catch blocks. Closes UAT Tests 16+17 (sidecar writer + crash modal). Has manual UAT checkpoint.
+- [ ] 65-10-esc-input-focus-guard-PLAN.md (gap closure) — Major: SidebarPanel.tsx Esc keydown handler gains input-focus guard mirroring CanvasPanel.tsx — restores zustand ↔ ReactFlow selection lockstep when Esc fires inside a text input. Closes UAT Test 7.
+- [ ] 65-11-addcomponent-submenu-radix-PLAN.md (gap closure) — Major: swap hand-rolled PopoverMenuSub* (W10 workaround from Plan 05) for Radix DropdownMenu.Sub with built-in Floating UI viewport-collision flip; new `gui/src/components/ui/dropdown-menu.tsx` shadcn shim. Closes UAT Test 13 (submenus offscreen at right edge).
+- [ ] 65-12-marquee-css-PLAN.md (gap closure) — Cosmetic: two CSS rule blocks appended to `gui/src/index.css` — solid border on `.react-flow__selection` (color-mix oklch), `display: none` on `.react-flow__nodesselection-rect`. Closes UAT Test 4 marquee dotted border + bounding-box gaps.
+- [ ] 65-13-canvas-controls-dedup-PLAN.md (gap closure) — Cosmetic: add 4 top-right overlay buttons (ZoomIn/ZoomOut/FitView/InteractiveLock mirroring SnapToGridButton.tsx pattern) + new session-only `interactiveLocked` useStore field driving nodesDraggable/nodesConnectable/elementsSelectable/panOnDrag; delete ReactFlow built-in `<Controls />`. Closes UAT Test 14.
+- [ ] 65-14-perf-trivial-gates-PLAN.md (gap closure, Wave 8 — depends on 65-13 for useStore.ts) — Minor (trivial dimension only): install `subscribeWithSelector` middleware on useStore; gate App.tsx title-sync subscribe so Tauri setTitle IPC fires only on {currentFilePath, isDirty} change; gate autoRecover subscribe to fire only on isDirty edge transitions. DEFERRED to future perf phase: autoflip memoization, isDirty-at-drag-stop, WSL2/WebKitGTK env retest. Partial closure of UAT Test 4 perf complaint.
 
 ### Phase 66: Code preview rework
 
@@ -290,7 +298,7 @@ contract document drafted in parallel throughout.
 | 63. BCs tab + value-source components in GUI         | 4/4 | Complete    | 2026-05-13 |
 | 63.1. BC architecture rework — unified BCs tab       | 14/14 | Complete   | 2026-05-14 |
 | 64. Connection routing                               | 4/4 | Complete    | 2026-05-14 |
-| 65. Interaction model overhaul                       | 0/8 | Planned | — |
+| 65. Interaction model overhaul                       | 8/14 | Gap closure in flight | — |
 | 66. Code preview rework                              | 0/TBD | Planned | — |
 | 67. Custom titlebar                                  | 0/TBD | Planned | — |
 | 68. Layers system overhaul                           | 0/TBD | Planned | — |
