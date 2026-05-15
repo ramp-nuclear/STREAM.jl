@@ -119,11 +119,17 @@ export function ContextMenuContent({
 }
 
 /**
- * PopoverMenuItem / PopoverMenuSeparator / PopoverMenuSub* — Radix-context-free
- * menu item primitives styled identically to ContextMenuItem / ContextMenuSeparator /
- * ContextMenuSub*. Use these inside a Popover (Phase 65 Plan 05 canvas context menus)
- * where a ContextMenu.Root ancestor is absent and we cannot use ContextMenuPrimitive.Item
- * (which requires MenuContentContext). Pure HTML + Tailwind — no Radix Item wrapper.
+ * PopoverMenuItem / PopoverMenuSeparator — Radix-context-free menu item primitives
+ * styled identically to ContextMenuItem / ContextMenuSeparator. Use these inside a
+ * Popover (Phase 65 Plan 05 canvas context menus) where a ContextMenu.Root ancestor
+ * is absent and we cannot use ContextMenuPrimitive.Item (which requires
+ * MenuContentContext). Pure HTML + Tailwind — no Radix Item wrapper.
+ *
+ * Phase 65 Plan 11: PopoverMenuSub / PopoverMenuSubTrigger / PopoverMenuSubContent /
+ * PopoverMenuSubContext were removed — they hand-rolled `absolute left-full top-0`
+ * positioning with no Floating UI, which clipped submenus offscreen near the right
+ * edge of the viewport. Submenus now use Radix DropdownMenu.Sub primitives from
+ * `@/components/ui/dropdown-menu` (viewport-collision-aware via Floating UI flip()).
  */
 
 export function PopoverMenuItem({
@@ -183,85 +189,6 @@ export function PopoverMenuSeparator({
       {...props}
     />
   )
-}
-
-export function PopoverMenuSub({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [open, setOpen] = React.useState(false);
-  // Clone children to inject open/setOpen via context
-  return (
-    <PopoverMenuSubContext.Provider value={{ open, setOpen }}>
-      <div data-slot="popover-menu-sub" className="relative">
-        {children}
-      </div>
-    </PopoverMenuSubContext.Provider>
-  );
-}
-
-const PopoverMenuSubContext = React.createContext<{
-  open: boolean;
-  setOpen: (v: boolean) => void;
-}>({ open: false, setOpen: () => {} });
-
-export function PopoverMenuSubTrigger({
-  className,
-  children,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
-  const { setOpen } = React.useContext(PopoverMenuSubContext);
-  return (
-    <div
-      role="menuitem"
-      aria-haspopup="menu"
-      data-slot="popover-menu-sub-trigger"
-      tabIndex={0}
-      className={cn(
-        "flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none",
-        "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-        className
-      )}
-      onClick={() => setOpen(true)}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight") {
-          e.preventDefault();
-          setOpen(true);
-        }
-      }}
-      {...props}
-    >
-      {children}
-      <ChevronRightIcon className="ml-auto size-4" />
-    </div>
-  );
-}
-
-export function PopoverMenuSubContent({
-  className,
-  children,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
-  const { open, setOpen } = React.useContext(PopoverMenuSubContext);
-  if (!open) return null;
-  return (
-    <div
-      role="menu"
-      data-slot="popover-menu-sub-content"
-      className={cn(
-        "absolute left-full top-0 z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg",
-        className
-      )}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      {...props}
-    >
-      {children}
-    </div>
-  );
 }
 
 export function ContextMenuItem({
