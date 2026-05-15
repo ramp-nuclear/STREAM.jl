@@ -130,3 +130,23 @@ body {
 .react-flow__handle:hover {
   cursor: crosshair;
 }
+
+/* Phase 65 Plan 12 — marquee selection rectangle (in-drag).
+   Replaces default `1px dotted rgba(0,89,220,0.8)` with a solid border in the
+   primary design token, slightly brighter than the fill. Auto-adapts to light/dark
+   via the .dark class on :root (color-mix consumes the resolved --primary value). */
+.react-flow__selection {
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--primary) 55%, transparent);
+  border-radius: 2px;
+}
+
+/* Phase 65 Plan 12 — hide the post-selection NodesSelection bounding box.
+   @xyflow/react v12 always renders this overlay when 2+ nodes are selected; no
+   prop disables it. Selection state is conveyed by per-node .selected highlight
+   on StreamNode (StreamNode.tsx:361 — ring-2 ring-[var(--ring)]). Parent
+   .react-flow__nodesselection already has pointer-events: none, so hiding the
+   child rect does not affect dragging or selection state. */
+.react-flow__nodesselection-rect {
+  display: none;
+}
