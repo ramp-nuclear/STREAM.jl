@@ -1,9 +1,10 @@
 // EdgeContextMenu.tsx — stateless context menu content for canvas edges (Phase 65 Plan 05)
-// Rendered inside a Popover wrapper in CanvasPanel.tsx; dispatches store actions directly.
+// Rendered inside a DropdownMenu wrapper in CanvasPanel.tsx; dispatches store actions directly.
 //
-// Architecture note (W10): uses PopoverMenuItem (context-free) instead of ContextMenuItem.
+// Phase 65 Plan 11 iteration (UAT 2026-05-15): uses DropdownMenuItem (a Radix Menu primitive)
+// so it participates in the outer DropdownMenu's roving-tabindex keyboard nav.
 
-import { PopoverMenuItem } from "@/components/ui/context-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import useStore from "@/store/useStore";
 
 interface EdgeContextMenuProps {
@@ -19,9 +20,9 @@ export default function EdgeContextMenu({ edgeId, onClose }: EdgeContextMenuProp
 
   return (
     <div role="menu" data-slot="edge-context-menu">
-      <PopoverMenuItem variant="destructive" onSelect={handleDelete}>
+      <DropdownMenuItem variant="destructive" onSelect={handleDelete}>
         Delete
-      </PopoverMenuItem>
+      </DropdownMenuItem>
       {/* Phase 71: render Show errors item when validation state exists for edgeId */}
     </div>
   );
