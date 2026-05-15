@@ -193,6 +193,9 @@ interface AppState {
   // Snap-to-grid (Phase 65 D-10 — persisted in .scp layout block)
   snapToGrid: boolean;
   setSnapToGrid: (v: boolean) => void;
+  // Phase 65 Plan 13: viewport interaction lock (session-only, NOT persisted in .scp).
+  interactiveLocked: boolean;
+  setInteractiveLocked: (v: boolean) => void;
   // Persistence state
   isDirty: boolean;
   currentFilePath: string | null;
@@ -796,6 +799,7 @@ const useStore = create<AppState>()((set, get) => ({
   activeLayer: "Both" as LayerView,
   // Snap-to-grid initial state (Phase 65 D-10 — OFF by default)
   snapToGrid: false,
+  interactiveLocked: false,
   // Persistence initial state
   isDirty: false,
   currentFilePath: null,
@@ -1006,6 +1010,9 @@ const useStore = create<AppState>()((set, get) => ({
 
   // Phase 65 D-10: snap-to-grid toggle — persisted in .scp layout block
   setSnapToGrid: (v) => set({ snapToGrid: v, isDirty: true }),
+
+  // Phase 65 Plan 13: do NOT set isDirty — session preference, not project state.
+  setInteractiveLocked: (v) => set({ interactiveLocked: v }),
 
   // ---------------------------------------------------------------------------
   // Canvas actions (content-mutating — set isDirty: true)
