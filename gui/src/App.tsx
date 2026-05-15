@@ -285,10 +285,15 @@ function App() {
     const s = useStore.getState();
     syncTitle(s.currentFilePath, s.isDirty);
 
-    // Subscribe to future changes outside React render cycle
-    const unsub = useStore.subscribe((state) => {
-      syncTitle(state.currentFilePath, state.isDirty);
-    });
+    // Phase 65 Plan 14: selector-gated — setTitle IPC fires only on filePath/dirty change.
+    const unsub = useStore.subscribe(
+      (state) => ({ filePath: state.currentFilePath, dirty: state.isDirty }),
+      ({ filePath, dirty }) => syncTitle(filePath, dirty),
+      {
+        equalityFn: (a, b) =>
+          a.filePath === b.filePath && a.dirty === b.dirty,
+      },
+    );
     return unsub;
   }, []);
 
