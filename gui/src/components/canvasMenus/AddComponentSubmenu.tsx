@@ -1,16 +1,16 @@
-// AddComponentSubmenu.tsx — submenu for "Add Component" in the canvas context menu (Phase 65 Plan 05)
+// AddComponentSubmenu.tsx — Phase 65 Plan 11: uses Radix DropdownMenu.Sub for viewport-collision-aware placement (was PopoverMenuSub* with hardcoded left-full positioning).
+//
 // Groups registry components by category (alphabetical) and drops a new instance at
 // the flow-coordinate position passed from CanvasPanel.
-//
-// Architecture note (W10): uses PopoverMenuItem / PopoverMenuSub* (context-free).
 
 import { useMemo } from "react";
 import {
-  PopoverMenuItem,
-  PopoverMenuSub,
-  PopoverMenuSubContent,
-  PopoverMenuSubTrigger,
-} from "@/components/ui/context-menu";
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getAllComponents } from "@/registry";
 import useStore from "@/store/useStore";
 
@@ -43,22 +43,25 @@ export default function AddComponentSubmenu({
   return (
     <>
       {grouped.map(({ category, components }) => (
-        <PopoverMenuSub key={category}>
-          <PopoverMenuSubTrigger>{category}</PopoverMenuSubTrigger>
-          <PopoverMenuSubContent>
-            {components.map((comp) => (
-              <PopoverMenuItem
-                key={comp.id}
-                onSelect={() => {
-                  useStore.getState().addNode(comp.id, flowPosition);
-                  onClose();
-                }}
-              >
-                {comp.label}
-              </PopoverMenuItem>
-            ))}
-          </PopoverMenuSubContent>
-        </PopoverMenuSub>
+        <DropdownMenuSub key={category}>
+          <DropdownMenuSubTrigger>{category}</DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent>
+              {components.map((comp) => (
+                <DropdownMenuItem
+                  key={comp.id}
+                  onSelect={(e) => {
+                    e.preventDefault?.();
+                    useStore.getState().addNode(comp.id, flowPosition);
+                    onClose();
+                  }}
+                >
+                  {comp.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
       ))}
     </>
   );

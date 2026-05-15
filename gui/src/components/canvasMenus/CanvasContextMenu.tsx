@@ -1,16 +1,22 @@
 // CanvasContextMenu.tsx — stateless context menu content for the empty canvas pane (Phase 65 Plan 05)
 // Rendered inside a Popover wrapper in CanvasPanel.tsx.
 //
-// Architecture note (W10): uses PopoverMenuItem / PopoverMenuSub* (context-free) instead of
-// ContextMenuItem / ContextMenuSub* — styled identically but no Radix Root context required.
+// Architecture note (Phase 65 Plan 11): Add Component is now hosted inside a Radix
+// DropdownMenu (defaultOpen=true) so its per-category submenus (DropdownMenuSub*) get
+// Floating-UI viewport-collision-aware placement. Paste / Auto-Layout / Separator
+// remain plain PopoverMenuItem / PopoverMenuSeparator (leaves of the Popover host).
 
+import { ChevronRightIcon } from "lucide-react";
 import {
   PopoverMenuItem,
   PopoverMenuSeparator,
-  PopoverMenuSub,
-  PopoverMenuSubContent,
-  PopoverMenuSubTrigger,
 } from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuPortal,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import useStore from "@/store/useStore";
 import AddComponentSubmenu from "./AddComponentSubmenu";
 
@@ -35,12 +41,29 @@ export default function CanvasContextMenu({
       <PopoverMenuItem onSelect={handlePaste}>Paste</PopoverMenuItem>
       <PopoverMenuItem disabled>Auto-Layout (future)</PopoverMenuItem>
       <PopoverMenuSeparator />
-      <PopoverMenuSub>
-        <PopoverMenuSubTrigger>Add Component</PopoverMenuSubTrigger>
-        <PopoverMenuSubContent>
-          <AddComponentSubmenu flowPosition={flowPosition} onClose={onClose} />
-        </PopoverMenuSubContent>
-      </PopoverMenuSub>
+      <DropdownMenu
+        defaultOpen={true}
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+      >
+        <DropdownMenuTrigger asChild>
+          <div
+            role="menuitem"
+            tabIndex={0}
+            data-slot="popover-menu-item"
+            className="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
+          >
+            Add Component
+            <ChevronRightIcon className="ml-auto size-4" />
+          </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuPortal>
+          <DropdownMenuContent side="right" align="start" sideOffset={4}>
+            <AddComponentSubmenu flowPosition={flowPosition} onClose={onClose} />
+          </DropdownMenuContent>
+        </DropdownMenuPortal>
+      </DropdownMenu>
     </div>
   );
 }
