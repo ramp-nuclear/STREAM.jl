@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { ScrollArea } from "./ui/scroll-area";
 import useStore from "../store/useStore";
 import { getComponent } from "../registry";
-import { generateCode } from "../lib/codeGenerator";
+import { generateCode, serializeSections } from "../lib/codeGenerator";
 
 export default function CodePreview() {
   const nodes = useStore((s) => s.nodes);
@@ -15,12 +15,20 @@ export default function CodePreview() {
   const bcMode = useStore((s) => s.bcMode);
   const bcSymmetric = useStore((s) => s.bcSymmetric);
 
+  // TEMP — Phase 66 Plan 04 takes over this consumer.
+  // Plan 02 changed generateCode's return to CodeSection[]; we wrap with
+  // serializeSections so the existing <pre><code> string render path keeps
+  // working (modulo the D-12 `# === <Section> ===` section headers).
+  // Plan 04 replaces this useMemo + <pre> with a section-by-section sub-block
+  // renderer that wires up hover/click/show-code-for traceability.
   const code = useMemo(
     () =>
-      generateCode(nodes, edges, { anchors }, getComponent, resources, {
-        bcMode,
-        bcSymmetric,
-      }),
+      serializeSections(
+        generateCode(nodes, edges, { anchors }, getComponent, resources, {
+          bcMode,
+          bcSymmetric,
+        }),
+      ),
     [nodes, edges, anchors, resources, bcMode, bcSymmetric],
   );
 
