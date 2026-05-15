@@ -373,6 +373,8 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
           className="p-1 w-auto min-w-[8rem]"
           onEscapeKeyDown={() => rcMenu.close()}
           onPointerDownOutside={() => rcMenu.close()}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
           {rcMenu.state.kind === "node" && (
             <NodeContextMenu nodeId={rcMenu.state.targetId!} onClose={rcMenu.close} />

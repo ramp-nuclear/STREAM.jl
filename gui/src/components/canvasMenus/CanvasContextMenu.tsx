@@ -72,10 +72,15 @@ export default function CanvasContextMenu({
             tabIndex={0}
             onMouseEnter={() => { cancelClose(); setSubmenuOpen(true); }}
             onMouseLeave={scheduleClose}
-            onFocus={() => { cancelClose(); setSubmenuOpen(true); }}
             onClick={() => { cancelClose(); setSubmenuOpen(true); }}
             data-slot="popover-menu-item"
-            className="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
+            // No `onFocus={open}` here — Radix Popover/Dropdown close routines shuffle
+            // focus during teardown, which would re-fire onFocus and re-open the submenu
+            // ("closes for a second and reopens" bug, UAT 2026-05-15). Keyboard users
+            // can open via Enter/Space/ArrowRight — Radix DropdownMenuTrigger handles
+            // those natively. `focus-visible:` (not `focus:`) so programmatic focus
+            // during open/close transitions doesn't draw a persistent highlight.
+            className="relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
           >
             Add Component
             <ChevronRightIcon className="ml-auto size-4" />
