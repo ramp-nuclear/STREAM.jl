@@ -42,9 +42,15 @@ export function useRightClickContextMenu(): {
 
   // Helper: returns true iff the last gesture qualifies as a quick-short right-click
   // (not a pan). Reads gestureRef directly so it always sees the latest value.
+  //
+  // First-interaction fallback (UAT 2026-05-15): return TRUE when gestureRef is
+  // null. The previous "null → false" rule caused the very first right-click on
+  // the canvas to silently no-op when ReactFlow's pane mousedown handler swallowed
+  // the bubble phase. A right-click with no prior mousedown is, by definition,
+  // not a pan gesture — so treating it as quick-short is safe.
   const isQuickShortGesture = useCallback((): boolean => {
     const g = gestureRef.current;
-    if (!g) return false;
+    if (!g) return true;
     const manhattan = Math.abs(g.upX - g.downX) + Math.abs(g.upY - g.downY);
     const elapsed = g.upT - g.downT;
     return manhattan <= MANHATTAN_THRESHOLD_PX && elapsed <= TIME_THRESHOLD_MS;
@@ -90,13 +96,17 @@ export function useRightClickContextMenu(): {
       }
     };
 
-    window.addEventListener("mousedown", handleMouseDown);
-    window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("contextmenu", handleContextMenu, true); // capture phase
+    // Capture phase for ALL three. ReactFlow's pane handler can stopPropagation
+    // on right-button mousedown during pan handling; using bubble phase meant the
+    // very first right-click after page load could miss the listener (gestureRef
+    // stayed null). Capture phase runs before any descendant can stop the event.
+    window.addEventListener("mousedown", handleMouseDown, true);
+    window.addEventListener("mouseup", handleMouseUp, true);
+    window.addEventListener("contextmenu", handleContextMenu, true);
 
     return () => {
-      window.removeEventListener("mousedown", handleMouseDown);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mousedown", handleMouseDown, true);
+      window.removeEventListener("mouseup", handleMouseUp, true);
       window.removeEventListener("contextmenu", handleContextMenu, true);
     };
   }, [isQuickShortGesture]);

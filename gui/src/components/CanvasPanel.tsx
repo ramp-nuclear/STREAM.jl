@@ -24,7 +24,11 @@ import BCEdge from "./BCEdge";
 import WelcomeOverlay from "./WelcomeOverlay";
 import { isAllowedBCConnection } from "@/lib/bcMode";
 import { useRightClickContextMenu } from "@/hooks/useRightClickContextMenu";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+} from "@/components/ui/dropdown-menu";
 import NodeContextMenu from "./canvasMenus/NodeContextMenu";
 import EdgeContextMenu from "./canvasMenus/EdgeContextMenu";
 import CanvasContextMenu from "./canvasMenus/CanvasContextMenu";
@@ -351,30 +355,49 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       {/* Phase 65 Plan 05 — context menus via Popover (W10 lock / D-11).
           PopoverAnchor is a 1×1 invisible fixed element at the right-click coords;
           Radix Floating UI anchors PopoverContent to it via side/align. */}
-      <Popover
+      {/*
+        Canvas right-click menu (Phase 65 Plan 11 iteration, UAT 2026-05-15).
+        Outer wrapper is a Radix DropdownMenu (was Popover). DropdownMenu hosts
+        Radix Menu primitives — DropdownMenuItem and DropdownMenuSub — which give
+        Add Component native safe-polygon hover handling. The previous Popover +
+        nested DropdownMenu hybrid had to hand-roll hover-to-open with timers,
+        which produced flicker.
+
+        Virtual anchor: a 1x1 fixed-positioned, pointer-events:none div wrapped
+        in DropdownMenuTrigger gives Floating-UI a real DOM element to anchor
+        against at (screenX, screenY) without intercepting clicks.
+      */}
+      <DropdownMenu
         open={rcMenu.state.kind !== null}
         onOpenChange={(open) => { if (!open) rcMenu.close(); }}
       >
-        <PopoverAnchor
-          style={{
-            position: "fixed",
-            left: rcMenu.state.screenX,
-            top: rcMenu.state.screenY,
-            width: 1,
-            height: 1,
-            pointerEvents: "none",
-          }}
-          aria-hidden
-        />
-        <PopoverContent
+        <DropdownMenuTrigger asChild>
+          <div
+            style={{
+              position: "fixed",
+              left: rcMenu.state.screenX,
+              top: rcMenu.state.screenY,
+              width: 1,
+              height: 1,
+              pointerEvents: "none",
+            }}
+            aria-hidden
+            tabIndex={-1}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
           align="start"
           side="bottom"
           sideOffset={0}
           className="p-1 w-auto min-w-[8rem]"
           onEscapeKeyDown={() => rcMenu.close()}
           onPointerDownOutside={() => rcMenu.close()}
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e: Event) => e.preventDefault()}
+          /* Radix DropdownMenu does NOT expose onOpenAutoFocus — Menu requires
+             the first item to be focused so keyboard nav can start. We rely on
+             :focus-visible (not :focus) styling on DropdownMenuItem so a
+             programmatic auto-focus from a mouse-triggered open does not draw
+             a persistent visual highlight. */
         >
           {rcMenu.state.kind === "node" && (
             <NodeContextMenu nodeId={rcMenu.state.targetId!} onClose={rcMenu.close} />
@@ -385,8 +408,8 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
           {rcMenu.state.kind === "pane" && flowPosition && (
             <CanvasContextMenu flowPosition={flowPosition} onClose={rcMenu.close} />
           )}
-        </PopoverContent>
-      </Popover>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
