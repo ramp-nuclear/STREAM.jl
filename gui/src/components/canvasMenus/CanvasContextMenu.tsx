@@ -42,7 +42,7 @@ export default function CanvasContextMenu({
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>Add Component</DropdownMenuSubTrigger>
         <DropdownMenuPortal>
-          <DropdownMenuSubContent sideOffset={2}>
+          <DropdownMenuSubContent>
             <AddComponentSubmenu flowPosition={flowPosition} onClose={onClose} />
           </DropdownMenuSubContent>
         </DropdownMenuPortal>
