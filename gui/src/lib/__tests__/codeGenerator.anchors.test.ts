@@ -11,8 +11,14 @@
 
 import { describe, it, expect } from "vitest";
 import type { Node } from "@xyflow/react";
-import { generateCode } from "../codeGenerator";
+// Phase 66 Plan 02 adapter wrap: generateCode now returns CodeSection[];
+// `gen(...)` serializes back to the existing Julia string form.
+import { generateCode, serializeSections } from "../codeGenerator";
 import type { ComponentDefinition } from "../../registry/types";
+
+function gen(...args: Parameters<typeof generateCode>): string {
+  return serializeSections(generateCode(...args));
+}
 
 const pumpDef: ComponentDefinition = {
   id: "Pump",
@@ -53,7 +59,7 @@ function makePump(id: string, instanceName: string): Node {
 
 describe("codeGenerator anchors emit (D-05)", () => {
   it("emits `${instanceName}.${portField} ~ ${value}` for each anchors entry", () => {
-    const code = generateCode(
+    const code = gen(
       [makePump("n1", "pump1")],
       [],
       {
@@ -71,7 +77,7 @@ describe("codeGenerator anchors emit (D-05)", () => {
     // The node carries an assembly tag; codegen path resolver prefixes with
     // the assembly's auto-generated name (e.g. assembly_1).
     const node = makePump("n2", "pump2");
-    const code = generateCode(
+    const code = gen(
       [node],
       [],
       {
@@ -89,7 +95,7 @@ describe("codeGenerator anchors emit (D-05)", () => {
   });
 
   it("emits no anchor lines when anchors is empty", () => {
-    const code = generateCode(
+    const code = gen(
       [makePump("n1", "pump1")],
       [],
       { anchors: {} },

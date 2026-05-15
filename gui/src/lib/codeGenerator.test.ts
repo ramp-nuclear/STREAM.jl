@@ -1,11 +1,25 @@
 // codeGenerator.test.ts -- Unit tests for STREAM.jl code generation from canvas state
 
 import { describe, it, expect } from "vitest";
-import { generateCode } from "./codeGenerator";
+// Phase 66 Plan 02: generateCode now returns CodeSection[]. The
+// `generateCode` import below is kept for type usage; every runtime call goes
+// through the `gen` helper which wraps with `serializeSections` so the
+// existing string-equality / `toContain` assertions keep their semantics.
+import { generateCode, serializeSections } from "./codeGenerator";
 import type { CodegenAnchorsState } from "./anchors";
 import { getComponent } from "../registry";
 import type { ComponentDefinition, Parameter, FunctionOption } from "../registry/types";
 import type { Node, Edge } from "@xyflow/react";
+
+/**
+ * One-line adapter wrap (CONTEXT canonical-refs §"Code touchpoints"): every
+ * `generateCode(...)` call site in this file flows through `gen(...)` which
+ * returns the assembled Julia string. Argument list is byte-equivalent to
+ * the existing 4/5/6-arg signatures.
+ */
+function gen(...args: Parameters<typeof generateCode>): string {
+  return serializeSections(generateCode(...args));
+}
 
 // Phase 63.1 Plan 04: helper to wrap an anchors Record into the third-arg
 // shape expected by generateCode (no more BCEntry[] adapter).
@@ -302,21 +316,24 @@ function makeEdge(id: string, source: string, sourceHandle: string, target: stri
 describe("generateCode", () => {
   describe("empty state", () => {
     it("returns comment for empty canvas", () => {
-      const result = generateCode([], [], NO_ANCHORS, mockGetComponent);
-      expect(result).toBe("# Add components to the canvas to generate Julia code.");
+      // Phase 66 Plan 02: empty-canvas output is now wrapped by serializeSections
+      // into a single-sub-block `# === Imports ===` section. The placeholder
+      // comment remains present (substring assertion).
+      const result = gen([], [], NO_ANCHORS, mockGetComponent);
+      expect(result).toContain("# Add components to the canvas to generate Julia code.");
     });
   });
 
   describe("component declarations", () => {
     it("emits Pump fixed-dP with positional arg", () => {
       const nodes = [makeNode("a", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP")];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("@named pump_1 = Pump(30000.0)");
     });
 
     it("emits Pump fixed-mdot with keyword-only (semicolon)", () => {
       const nodes = [makeNode("a", "Pump", "pump_1", { mdot0: 0.5 }, "fixed-mdot")];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("@named pump_1 = Pump(; mdot0=0.5)");
     });
 
@@ -328,7 +345,7 @@ describe("generateCode", () => {
         htc_correlation: "dittus_boelter",
         friction_correlation: "blasius_friction",
       })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("@named ch_1 = Channel(; n=5, geometry=PipeGeometry_rectangular(0.5, 0.01, 0.003, 0.01))");
       // defaults should be omitted
       expect(code).not.toContain("g=");
@@ -344,7 +361,7 @@ describe("generateCode", () => {
         htc_correlation: "constant_Nusselt",
         friction_correlation: "blasius_friction",
       })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("htc_correlation=constant_Nusselt");
     });
 
@@ -354,7 +371,7 @@ describe("generateCode", () => {
         geometry: { type: "rectangular", L: 0.5, W: 0.01, H: 0.003 },
         htc_correlation: { kind: "factory", value: "elenbaas_htc", subParams: { b: 0.003, L: 0.6, Dh: 0.0025, g: 9.80665 } },
       })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       // g=9.80665 is default for elenbaas_htc, should be omitted
       expect(code).toContain("htc_correlation=elenbaas_htc(b=0.003, L=0.6, Dh=0.0025)");
     });
@@ -373,26 +390,26 @@ describe("generateCode", () => {
           },
         },
       })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       // threshold=1.0 is default, should be omitted
       expect(code).toContain("htc_correlation=regime_dependent(htc_forced=dittus_boelter, htc_natural=elenbaas_htc(b=0.003, L=0.6, Dh=0.0025))");
     });
 
     it("emits HeatExchanger with positional arg", () => {
       const nodes = [makeNode("a", "HeatExchanger", "hx_1", { T_bc: 300 })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("@named hx_1 = HeatExchanger(300.0)");
     });
 
     it("emits Gravity with positional arg", () => {
       const nodes = [makeNode("a", "Gravity", "grav_1", { H: 0.5 })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("@named grav_1 = Gravity(0.5)");
     });
 
     it("emits Resistor with positional arg", () => {
       const nodes = [makeNode("a", "Resistor", "res_1", { R: 1000 })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("@named res_1 = Resistor(1000.0)");
     });
 
@@ -401,7 +418,7 @@ describe("generateCode", () => {
         n: 5,
         geometry: { type: "circular", L: 0.5, D: 0.01 },
       })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("geometry=PipeGeometry_circular(0.5, 0.01)");
     });
   });
@@ -412,20 +429,20 @@ describe("generateCode", () => {
         n: 5,
         geometry: { type: "rectangular", L: 0.5, W: 0.01, H: 0.003 },
       })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("n=5,");
       expect(code).not.toContain("n=5.0");
     });
 
     it("formats integer Real with .0", () => {
       const nodes = [makeNode("a", "Pump", "pump_1", { dP_pump: 100 }, "fixed-dP")];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("Pump(100.0)");
     });
 
     it("formats Real with existing decimal as-is", () => {
       const nodes = [makeNode("a", "Pump", "pump_1", { dP_pump: 0.5 }, "fixed-dP")];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("Pump(0.5)");
     });
   });
@@ -437,7 +454,7 @@ describe("generateCode", () => {
         makeNode("b", "Channel", "ch_1", { n: 5, geometry: { type: "rectangular", L: 0.5, W: 0.01, H: 0.003 } }),
       ];
       const edges = [makeEdge("e1", "a", "port_out", "b", "port_in")];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       expect(code).toContain("connect(pump_1.port_out, ch_1.port_in)");
     });
   });
@@ -446,14 +463,14 @@ describe("generateCode", () => {
     it("emits BC as equation", () => {
       const nodes = [makeNode("abc", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP")];
       const a = anchors({ nodeId: "abc", portField: "port_in.P", value: 100000 });
-      const code = generateCode(nodes, [], a, mockGetComponent);
+      const code = gen(nodes, [], a, mockGetComponent);
       expect(code).toMatch(/pump_1\.port_in\.P\s*~\s*1(\.0)?e5|100000\.0/);
     });
 
     it("skips BC for deleted node", () => {
       const nodes = [makeNode("abc", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP")];
       const a = anchors({ nodeId: "deleted_id", portField: "port_in.P", value: 100000 });
-      const code = generateCode(nodes, [], a, mockGetComponent);
+      const code = gen(nodes, [], a, mockGetComponent);
       // Should not contain a BC line for deleted_id
       expect(code).not.toContain("deleted_id");
     });
@@ -462,7 +479,7 @@ describe("generateCode", () => {
   describe("identifier validation", () => {
     it("warns for invalid instanceName", () => {
       const nodes = [makeNode("a", "Pump", "my pump", { dP_pump: 30000 }, "fixed-dP")];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain('# WARNING: Invalid identifier "my pump" -- rename before exporting');
       expect(code).toContain("@named my pump = Pump(30000.0)");
     });
@@ -475,7 +492,7 @@ describe("generateCode", () => {
         makeNode("b", "Channel", "ch_1", { n: 5, geometry: { type: "rectangular", L: 0.5, W: 0.01, H: 0.003 } }),
       ];
       const edges = [makeEdge("e1", "a", "port_out", "b", "port_in")];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
 
       expect(code).toContain("using ModelingToolkit, STREAM");
       expect(code).toContain("@named");
@@ -490,7 +507,7 @@ describe("generateCode", () => {
         makeNode("a", "Pump", "pump_1", { dP_pump: 30000 }, "fixed-dP"),
         makeNode("b", "Channel", "ch_1", { n: 5, geometry: { type: "rectangular", L: 0.5, W: 0.01, H: 0.003 } }),
       ];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("systems=[pump_1, ch_1]");
     });
   });
@@ -509,7 +526,7 @@ describe("generateCode", () => {
           },
         },
       })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       expect(code).toContain("htc_forced=dittus_boelter");
       expect(code).toContain("htc_natural=constant_Nusselt");
       // Should NOT have quotes around function names
@@ -527,7 +544,7 @@ describe("generateCode", () => {
           subParams: { b: 0.003, L: 0.6, Dh: 0.0025, g: 9.80665 },
         },
       })];
-      const code = generateCode(nodes, [], NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, [], NO_ANCHORS, mockGetComponent);
       // g=9.80665 is the default for elenbaas_htc, should be omitted
       expect(code).not.toMatch(/elenbaas_htc\([^)]*g=/);
     });
@@ -549,7 +566,7 @@ describe("generateCode", () => {
         makeNode("c", "ChannelAndContacts", "cac_1", cacParams),
       ];
       const edges = [makeEdge("e1", "p", "port_out", "c", "port_in")];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       expect(code).toContain("ODESystem(eqs, t;");
       expect(code).not.toContain("compose_systems");
       expect(code).not.toContain("symmetric_plate");
@@ -568,7 +585,7 @@ describe("generateCode", () => {
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
       ];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       expect(code).toContain("symmetric_plate(cac_1, fuel_1)");
       expect(code).toContain("@named assembly_1");
       expect(code).not.toContain("ODESystem(eqs, t;");
@@ -589,7 +606,7 @@ describe("generateCode", () => {
         makeEdge("t1", "c1", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c2", "thermal_left", "h", "thermal_right"),
       ];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       expect(code).toContain("plate(cac_left, cac_right, fuel_1)");
       expect(code).toContain("@named assembly_1");
     });
@@ -605,7 +622,7 @@ describe("generateCode", () => {
         makeEdge("e2", "c", "port_out", "p", "port_in"),
         makeEdge("t1", "c", "thermal_left", "h", "thermal_right"),
       ];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       expect(code).toContain("one_sided_connection(cac_1, fuel_1; side=:left)");
       expect(code).toContain("@named assembly_1");
     });
@@ -621,7 +638,7 @@ describe("generateCode", () => {
         makeEdge("e2", "c", "port_out", "p", "port_in"),
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
       ];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       expect(code).toContain("one_sided_connection(cac_1, fuel_1; side=:right)");
       expect(code).toContain("@named assembly_1");
     });
@@ -635,7 +652,7 @@ describe("generateCode", () => {
       const edges = [
         makeEdge("t1", "h1", "thermal_right", "h2", "thermal_left"),
       ];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       expect(code).toContain("# TODO: verify thermal wiring");
     });
 
@@ -651,7 +668,7 @@ describe("generateCode", () => {
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
       ];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       // CAC is consumed into assembly_1, so hydraulic connects must use assembly path
       expect(code).toContain("assembly_1.cac_1.port_in");
       expect(code).toContain("assembly_1.cac_1.port_out");
@@ -669,7 +686,7 @@ describe("generateCode", () => {
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
       ];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       expect(code).toContain("compose_systems(");
       expect(code).not.toContain("ODESystem(eqs, t;");
       expect(code).toContain("mtkcompile");
@@ -686,7 +703,7 @@ describe("generateCode", () => {
         makeEdge("t1", "c", "thermal_right", "h", "thermal_left"),
         makeEdge("t2", "c", "thermal_left", "h", "thermal_right"),
       ];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       expect(code).toContain("# NOTE: HeatDiffusion nz");
     });
 
@@ -698,7 +715,7 @@ describe("generateCode", () => {
       const edges = [
         makeEdge("t1", "ct", "thermal", "c", "thermal_left"),
       ];
-      const code = generateCode(nodes, edges, NO_ANCHORS, mockGetComponent);
+      const code = gen(nodes, edges, NO_ANCHORS, mockGetComponent);
       // Should emit per-cell connect with port() helper
       expect(code).toContain("port(");
     });
@@ -719,7 +736,7 @@ describe("codeGenerator — SourceValueEntry emission (Plan 14, GAP-RC-4)", () =
       n: 4,
       T_wall: { mode: "value", value: 300 },
     });
-    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+    const code = gen([node], [], NO_ANCHORS, (id) =>
       id === "WallTemperature" ? wtComp : undefined
     );
     expect(code).toContain("WallTemperature(");
@@ -733,7 +750,7 @@ describe("codeGenerator — SourceValueEntry emission (Plan 14, GAP-RC-4)", () =
       n: 4,
       T_wall: { mode: "profile", preset: "cosine", amplitude: 1.0, peakingFactor: 1.5 },
     });
-    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+    const code = gen([node], [], NO_ANCHORS, (id) =>
       id === "WallTemperature" ? wtComp : undefined
     );
     expect(code).toContain("wt1_T_wall_profile = cosine_T_wall_profile(4; amplitude=1.0, peaking_factor=1.5)");
@@ -746,7 +763,7 @@ describe("codeGenerator — SourceValueEntry emission (Plan 14, GAP-RC-4)", () =
       n: 4,
       T_wall: { mode: "profile", preset: "file", path: "wall.csv" },
     });
-    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+    const code = gen([node], [], NO_ANCHORS, (id) =>
       id === "WallTemperature" ? wtComp : undefined
     );
     expect(code).toContain('wt1_T_wall_profile = rebin_intensive(readdlm(joinpath(@__DIR__, "wall.csv"), \',\'), 4)');
@@ -759,7 +776,7 @@ describe("codeGenerator — SourceValueEntry emission (Plan 14, GAP-RC-4)", () =
       n: 4,
       T_wall: { mode: "function", signature: "fn(t)", functionName: "my_T_wall" },
     });
-    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+    const code = gen([node], [], NO_ANCHORS, (id) =>
       id === "WallTemperature" ? wtComp : undefined
     );
     expect(code).toContain("my_T_wall(t) = 0.0");
@@ -772,7 +789,7 @@ describe("codeGenerator — SourceValueEntry emission (Plan 14, GAP-RC-4)", () =
       n: 4,
       T_wall: { mode: "function", signature: "fn(t, i)", functionName: "my_T_wall" },
     });
-    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+    const code = gen([node], [], NO_ANCHORS, (id) =>
       id === "WallTemperature" ? wtComp : undefined
     );
     expect(code).toContain("my_T_wall(t, i) = 0.0");
@@ -785,7 +802,7 @@ describe("codeGenerator — SourceValueEntry emission (Plan 14, GAP-RC-4)", () =
       n: 4,
       q: { mode: "value", value: 50000 },
     });
-    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+    const code = gen([node], [], NO_ANCHORS, (id) =>
       id === "HeatFluxSource" ? hfsComp : undefined
     );
     expect(code).toContain("HeatFluxSource(");
@@ -799,7 +816,7 @@ describe("codeGenerator — SourceValueEntry emission (Plan 14, GAP-RC-4)", () =
       n: 4,
       q: { mode: "profile", preset: "cosine", amplitude: 1e6, peakingFactor: 1.2 },
     });
-    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+    const code = gen([node], [], NO_ANCHORS, (id) =>
       id === "HeatFluxSource" ? hfsComp : undefined
     );
     // cosine_T_wall_profile is dimension-agnostic; reused for q (Plan 14 design decision (a))
@@ -813,7 +830,7 @@ describe("codeGenerator — SourceValueEntry emission (Plan 14, GAP-RC-4)", () =
       n: 4,
       T_wall: 300,  // bare number (pre-Plan-14 .streamgui shape)
     });
-    const code = generateCode([node], [], NO_ANCHORS, (id) =>
+    const code = gen([node], [], NO_ANCHORS, (id) =>
       id === "WallTemperature" ? wtComp : undefined
     );
     expect(code).toContain("T_wall=300.0");

@@ -10,7 +10,10 @@
 
 import { describe, it, expect } from "vitest";
 import type { Node } from "@xyflow/react";
-import { generateCode } from "../codeGenerator";
+// Phase 66 Plan 02 adapter wrap: serializeSections wraps the new CodeSection[]
+// return so the existing `toContain` / `not.toContain` assertions on the
+// emitted Julia string keep their semantics.
+import { generateCode, serializeSections } from "../codeGenerator";
 import type {
   CodegenBCsState,
   CodegenResources,
@@ -19,6 +22,10 @@ import type { CodegenAnchorsState } from "../anchors";
 import type { ComponentDefinition } from "../../registry/types";
 import type { BCModeEntry } from "../bcMode";
 import { bcModeKey } from "../bcMode";
+
+function gen(...args: Parameters<typeof generateCode>): string {
+  return serializeSections(generateCode(...args));
+}
 
 // ---------------------------------------------------------------------------
 // Mock component registry — minimal Channel + WallTemperature + ChannelHeatFlux
@@ -143,7 +150,7 @@ function bcs(
 describe("codeGenerator BC emit (Phase 63-B-04)", () => {
   it("emits scalar binding for Value mode (D-06)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -159,7 +166,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
 
   it("emits cosine_T_wall_profile call + binding for Profile-cosine mode (D-06, CD-02)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -187,7 +194,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
 
   it("emits rebin_intensive call + binding for Profile-file mode (D-07)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -214,7 +221,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
 
   it("includes 'using DelimitedFiles' import when any BC is Profile-file (D-07)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -236,7 +243,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
 
   it("emits function stub + binding for Function mode fn(t) (D-08)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -263,7 +270,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
 
   it("emits function stub + binding for Function mode fn(t, i) (D-08)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -290,7 +297,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
 
   it("emits only a TODO comment (no equation) for Mark mode (D-09, CD-01)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -311,7 +318,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
     // Pass an empty bcMode map — both T_wall_left and T_wall_right entries
     // are absent (required-unset sentinel via absence).
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -329,7 +336,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
     // symmetric defaults ON (consumer reads `bcSymmetric[key] ?? true`). Provide
     // ONLY the left entry; the codegen should emit BOTH sides.
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -345,7 +352,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
 
   it("with symmetric OFF, only the side with an entry emits its binding", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
-    const code = generateCode(
+    const code = gen(
       [ch],
       [],
       NO_ANCHORS,
@@ -365,7 +372,7 @@ describe("codeGenerator BC emit (Phase 63-B-04)", () => {
   it("emits binding against source-node array variable for Source mode (D-23)", () => {
     const ch = makeChannel("ch1", "ch_1", 10);
     const wt = makeWT("wt1", "wt_1", 10);
-    const code = generateCode(
+    const code = gen(
       [ch, wt],
       [],
       NO_ANCHORS,
