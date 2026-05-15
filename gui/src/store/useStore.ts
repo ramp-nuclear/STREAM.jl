@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 import {
   Node,
   Edge,
@@ -781,7 +782,7 @@ export function enrichEdges(edges: Edge[], nodes: Node[]): Edge[] {
 // Store
 // ---------------------------------------------------------------------------
 
-const useStore = create<AppState>()((set, get) => ({
+const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
@@ -2619,7 +2620,7 @@ const useStore = create<AppState>()((set, get) => ({
     await Promise.all(basenames.map((b) => clearSidecar(b)));
     await clearLockfile();
   },
-}));
+})));
 
 /**
  * Initialize recent files from disk on app startup.
@@ -2693,15 +2694,18 @@ export async function initAutoRecover(): Promise<{ teardown: () => Promise<void>
   );
 
   // Subscribe to isDirty changes.
-  // Fire on every state change: if dirty → schedule (debounce resets on each call);
-  // if not dirty → cancel (save just happened, no sidecar write needed).
-  const unsubscribe = useStore.subscribe((state) => {
-    if (state.isDirty) {
-      writer.schedule();
-    } else {
-      writer.cancel();
-    }
-  });
+  // Phase 65 Plan 14: selector-gated — schedule/cancel fire only on isDirty transitions.
+  // Semantic shift from Plan 07 ("rapid edits reset the timer") to "2s after first edit
+  // in the dirty session". Both satisfy the AutoRecover goal of "save within ~2s of
+  // user activity" — the new semantics is a stricter, simpler guarantee. Source:
+  // .planning/debug/gui-drag-perf.md (per-pixel mousemove no longer reschedules timer).
+  const unsubscribe = useStore.subscribe(
+    (state) => state.isDirty,
+    (isDirty) => {
+      if (isDirty) writer.schedule();
+      else writer.cancel();
+    },
+  );
 
   // Write the running.lock file (crash detection D-02)
   await writeLockfile(pid);
