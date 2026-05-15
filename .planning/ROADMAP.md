@@ -203,7 +203,12 @@ Plans:
 
 **Design-decisions reference:** Section 3.11 (code-gen impact), plus the code-tab rework discussion captured in the conversation lineage.
 **Depends on:** Phase 62 (resources are part of generated sections).
-**Plans:** TBD via `/gsd:plan-phase`.
+**Plans:** 5 plans
+- [ ] 66-01-red-tests-structured-codegen-PLAN.md — Wave 0: RED tests for CodeSection[] + serializeSections + CodePreview UI behavior (5 new vitest files; all RED to lock the contract before implementation)
+- [ ] 66-02-codegenerator-structured-output-PLAN.md — Wave 1: refactor codeGenerator.ts to return CodeSection[]; add serializeSections; migrate 5 existing codegen test files via one-line adapter + D-12 header updates; TEMP-wrap CodePreview/Toolbar to preserve runtime
+- [ ] 66-03-store-slices-hooks-exportcode-PLAN.md — Wave 2: hoveredSourceIds/pinnedSourceIds/pendingShowCodeFor Zustand slices; useShowCodeFor hook; global Esc handler in App.tsx; exportCode.ts shared util; Toolbar migration to use the util
+- [ ] 66-04-codepreview-ui-rewrite-PLAN.md — Wave 3: CodePreview.tsx full rewrite (section-by-section, hover/click/scroll/flash); BottomPanel.tsx Copy + Export buttons in TabsList; flips Plan 01 RED CodePreview tests to GREEN
+- [ ] 66-05-streamnode-hover-ring-PLAN.md — Wave 4: StreamNode.tsx subscribes to hoveredSourceIds/pinnedSourceIds; index.css placeholder ring CSS; Phase 72 handoff doc; manual UAT checkpoint (end-to-end bidirectional traceability)
 
 ### Phase 67: Custom titlebar
 
