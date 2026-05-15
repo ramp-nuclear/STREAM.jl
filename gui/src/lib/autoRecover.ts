@@ -118,8 +118,11 @@ export async function writeSidecar(basename: string, content: string): Promise<v
     await mkdir(dir, { recursive: true });
     const path = await getSidecarPath(basename);
     await writeTextFile(path, content);
-  } catch {
-    // Silent failure — autorecover is best-effort; don't interrupt user
+  } catch (err) {
+    // Silent failure to caller; logged under DEV.
+    if (import.meta.env.DEV) {
+      console.warn("[autoRecover] writeSidecar failed:", err);
+    }
   }
 }
 
@@ -134,7 +137,11 @@ export async function readSidecar(basename: string): Promise<string | null> {
     const { readTextFile } = await import("@tauri-apps/plugin-fs");
     const path = await getSidecarPath(basename);
     return await readTextFile(path);
-  } catch {
+  } catch (err) {
+    // Silent failure to caller; logged under DEV.
+    if (import.meta.env.DEV) {
+      console.warn("[autoRecover] readSidecar failed:", err);
+    }
     return null;
   }
 }
@@ -147,8 +154,11 @@ export async function clearSidecar(basename: string): Promise<void> {
     const { remove } = await import("@tauri-apps/plugin-fs");
     const path = await getSidecarPath(basename);
     await remove(path);
-  } catch {
-    // Silent failure
+  } catch (err) {
+    // Silent failure to caller; logged under DEV.
+    if (import.meta.env.DEV) {
+      console.warn("[autoRecover] clearSidecar failed:", err);
+    }
   }
 }
 
@@ -167,7 +177,11 @@ export async function enumerateSidecars(): Promise<string[]> {
     return entries
       .filter((e) => !e.isDirectory && e.name != null && e.name.endsWith(AUTOSAVE_SUFFIX))
       .map((e) => e.name as string);
-  } catch {
+  } catch (err) {
+    // Silent failure to caller; logged under DEV.
+    if (import.meta.env.DEV) {
+      console.warn("[autoRecover] enumerateSidecars failed:", err);
+    }
     return [];
   }
 }
@@ -194,8 +208,11 @@ export async function writeLockfile(pid: number): Promise<void> {
     await mkdir(dir, { recursive: true });
     const path = await getLockfilePath();
     await writeTextFile(path, `${pid}\n${new Date().toISOString()}`);
-  } catch {
-    // Silent failure
+  } catch (err) {
+    // Silent failure to caller; logged under DEV.
+    if (import.meta.env.DEV) {
+      console.warn("[autoRecover] writeLockfile failed:", err);
+    }
   }
 }
 
@@ -211,7 +228,11 @@ export async function readLockfile(): Promise<LockfileContent | null> {
     const path = await getLockfilePath();
     const content = await readTextFile(path);
     return parseLockfileContent(content);
-  } catch {
+  } catch (err) {
+    // Silent failure to caller; logged under DEV.
+    if (import.meta.env.DEV) {
+      console.warn("[autoRecover] readLockfile failed:", err);
+    }
     return null;
   }
 }
@@ -225,8 +246,11 @@ export async function clearLockfile(): Promise<void> {
     const { remove } = await import("@tauri-apps/plugin-fs");
     const path = await getLockfilePath();
     await remove(path);
-  } catch {
-    // Silent failure
+  } catch (err) {
+    // Silent failure to caller; logged under DEV.
+    if (import.meta.env.DEV) {
+      console.warn("[autoRecover] clearLockfile failed:", err);
+    }
   }
 }
 
@@ -287,10 +311,30 @@ export interface CrashDetectionResult {
  * `true` if the process is alive, `false` otherwise (including on IPC error).
  */
 export async function isPidAlive(pid: number): Promise<boolean> {
+  /*
+   * Tauri v2 IPC invocation note (read this before debugging IPC failures):
+   *
+   * Use `(await import('@tauri-apps/api/core')).invoke(...)` — NOT
+   * `window.__TAURI__.core.invoke(...)`. The latter is a Tauri v1 idiom; in v2,
+   * `window.__TAURI__` is intentionally undefined by default because
+   * `app.withGlobalTauri` is unset in `gui/src-tauri/tauri.conf.json` (the v2
+   * default). ES-module imports of `@tauri-apps/api/*` and `@tauri-apps/plugin-*`
+   * go through the v2 IPC bridge (postMessage / IPC handlers) which is ALWAYS on
+   * regardless of `withGlobalTauri`.
+   *
+   * If you see `Cannot read properties of undefined (reading 'invoke')` in devtools
+   * from `window.__TAURI__.core.invoke(...)`, that is expected — switch your
+   * smoke-test snippet to the dynamic import form. See
+   * .planning/debug/autorecover-bridge.md "Resolution" for the full diagnosis.
+   */
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     return await invoke<boolean>("is_pid_alive", { pid });
-  } catch {
+  } catch (err) {
+    // Silent failure to caller; logged under DEV.
+    if (import.meta.env.DEV) {
+      console.warn("[autoRecover] isPidAlive failed:", err);
+    }
     return false;
   }
 }
