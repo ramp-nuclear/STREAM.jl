@@ -2,12 +2,12 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ToolboxPanel from "./components/ToolboxPanel";
+import LayersPanel from "./components/LayersPanel";
 import ResourcesTreePanel from "./components/resources/ResourcesTreePanel";
 import ModelOptionsPanel from "./components/project/ModelOptionsPanel";
 import CanvasPanel from "./components/CanvasPanel";
 import SidebarPanel from "./components/SidebarPanel";
 import CustomTitlebar from "./components/CustomTitlebar";
-import SecondaryToolbar from "./components/SecondaryToolbar";
 import BottomPanel from "./components/BottomPanel";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import ValidationDialog from "./components/ValidationDialog";
@@ -243,6 +243,24 @@ function App() {
           await useStore.getState().newProject();
           return;
         }
+        // Ctrl+` (backtick) — Toggle bottom code panel (Phase 68 D-13).
+        // Skip when the user is editing text so a literal backtick still types
+        // into inputs / textareas / contentEditable surfaces (same guard
+        // pattern as the Esc clear-pins handler below).
+        if ((e.ctrlKey || e.metaKey) && e.key === "`") {
+          const target = e.target as HTMLElement | null;
+          if (
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            target instanceof HTMLSelectElement ||
+            (target && target.isContentEditable)
+          ) {
+            return;
+          }
+          e.preventDefault();
+          useStore.getState().toggleBottomPanel();
+          return;
+        }
       } catch (err) {
         console.error("[handleKeyDown] unhandled error:", err);
       } finally {
@@ -394,7 +412,6 @@ function App() {
             theme={theme}
             setTheme={setTheme}
           />
-          <SecondaryToolbar />
           <div className="flex flex-1 min-h-0">
             {!toolboxCollapsed && (
               <div
@@ -445,6 +462,11 @@ function App() {
                     <ModelOptionsPanel />
                   </TabsContent>
                 </Tabs>
+                {/* Phase 68 — LayersPanel docked at the bottom of the left
+                    sidebar. Always visible while sidebar is open, regardless
+                    of active tab. Replaces the canvas-overlay LayersChip
+                    deleted after UAT 2026-05-17. */}
+                <LayersPanel />
               </div>
             )}
             {/* Collapsed-edge re-expand affordance for the left panel. Renders only

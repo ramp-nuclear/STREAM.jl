@@ -5,6 +5,10 @@
 // the workflow needed them. This file's contract has been flipped accordingly:
 // the SOURCES header and the WallTemperature / HeatFluxSource drag rows are
 // now expected to RENDER.
+//
+// Phase 68 Plan 03 — D-11 contract: ToolboxPanel does NOT filter components
+// by `activeLayers` state. Whatever the per-layer toggles are, every
+// registry-listed draggable component appears in its category section.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import ToolboxPanel from "../ToolboxPanel";
@@ -26,7 +30,13 @@ beforeEach(() => {
     _undoPast: [],
     _undoFuture: [],
     activeLeftTab: "Components",
-    activeLayer: "Both",
+    activeLayers: {
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    },
+    hideOffLayer: false,
     resources: {
       geometries: {},
       powerShapes: {
@@ -71,5 +81,60 @@ describe("ToolboxPanel — Sources category re-surfaced (Phase 65 UAT revert of 
     render(<ToolboxPanel />);
     expect(screen.getByText(/^Hydraulic$/i)).toBeTruthy();
     expect(screen.getByText(/^Thermal$/i)).toBeTruthy();
+  });
+});
+
+describe("ToolboxPanel — layer filter (Phase 68 D-11): toolbox does NOT filter by layer", () => {
+  it("renders Hydraulic components when Hydraulic layer is OFF", () => {
+    useStore.setState({
+      activeLayers: {
+        Hydraulic: false,
+        Thermal: true,
+        Sources: true,
+        ReactorPhysics: true,
+      },
+      hideOffLayer: false,
+    });
+    render(<ToolboxPanel />);
+    // HYDRAULIC header + at least one Hydraulic component still rendered
+    expect(screen.getByText(/^Hydraulic$/i)).toBeTruthy();
+    // Channel (hydraulic) — the canonical hydraulic primitive
+    expect(screen.getByText(/^Channel$/i)).toBeTruthy();
+  });
+
+  it("renders Thermal components when Thermal layer is OFF", () => {
+    useStore.setState({
+      activeLayers: {
+        Hydraulic: true,
+        Thermal: false,
+        Sources: true,
+        ReactorPhysics: true,
+      },
+      hideOffLayer: false,
+    });
+    render(<ToolboxPanel />);
+    expect(screen.getByText(/^Thermal$/i)).toBeTruthy();
+    // ConstantTemperature / HeatDiffusion are the thermal primitives — at
+    // least one must render. (Exact label depends on registry label field.)
+    expect(screen.getByText(/Constant Temperature/i)).toBeTruthy();
+  });
+
+  it("renders every category when ALL layers are OFF", () => {
+    useStore.setState({
+      activeLayers: {
+        Hydraulic: false,
+        Thermal: false,
+        Sources: false,
+        ReactorPhysics: false,
+      },
+      hideOffLayer: false,
+    });
+    render(<ToolboxPanel />);
+    expect(screen.getByText(/^Hydraulic$/i)).toBeTruthy();
+    expect(screen.getByText(/^Thermal$/i)).toBeTruthy();
+    expect(screen.getByText(/^Sources$/i)).toBeTruthy();
+    expect(screen.getByText(/^Channel$/i)).toBeTruthy();
+    expect(screen.getByText(/Constant Temperature/i)).toBeTruthy();
+    expect(screen.getByText(/Wall Temperature/i)).toBeTruthy();
   });
 });

@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import useStore from "../store/useStore";
 import FileMenu from "./FileMenu";
@@ -52,6 +53,63 @@ export default function CustomTitlebar({
   const isDirty = useStore((s) => s.isDirty);
   const currentFilePath = useStore((s) => s.currentFilePath);
 
+  // Controlled Menubar state — used to auto-close the active menu when the
+  // cursor leaves both the menubar triggers AND the open submenu content
+  // (Phase 68 UAT 2026-05-17). Default Radix behavior keeps the menu open
+  // until clicked-outside or Escape; the user expects mouse-leave to close.
+  //
+  // Grace-period close: while a menu is open we watch global mousemove. If
+  // the cursor is inside the menubar root OR inside any portaled element
+  // with role="menu" (Radix renders submenu content with that role), any
+  // pending close timer is cancelled. If the cursor leaves both safe zones,
+  // a 200ms close timer is scheduled. The delay covers the unavoidable
+  // 1-2px transition between the trigger and the menu content as the user
+  // moves between them — without it the cursor briefly registers as
+  // "outside" mid-transit and the menu closes prematurely.
+  //
+  // The trigger's lingering highlight after close is fixed in `ui/menubar.tsx`
+  // by removing `focus:bg-accent` from MenubarTrigger's base classes —
+  // data-[state=open] is now the only highlight trigger. No blur juggling
+  // needed here.
+  const [openMenu, setOpenMenu] = useState<string>("");
+  const menubarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+
+    let closeTimer: number | null = null;
+
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (!target) return;
+      const insideMenubar = menubarRef.current?.contains(target);
+      const insideMenu = !!target.closest('[role="menu"]');
+      if (insideMenubar || insideMenu) {
+        if (closeTimer != null) {
+          window.clearTimeout(closeTimer);
+          closeTimer = null;
+        }
+      } else if (closeTimer == null) {
+        closeTimer = window.setTimeout(() => {
+          closeTimer = null;
+          setOpenMenu("");
+        }, 200);
+      }
+    };
+
+    // Small initial delay so the synthetic mousemove from the click that
+    // opened the menu doesn't get evaluated before the content has mounted.
+    const initTimer = window.setTimeout(() => {
+      document.addEventListener("mousemove", handler);
+    }, 50);
+
+    return () => {
+      window.clearTimeout(initTimer);
+      if (closeTimer != null) window.clearTimeout(closeTimer);
+      document.removeEventListener("mousemove", handler);
+    };
+  }, [openMenu]);
+
   // D-06 — project name display
   let projectName = "";
   if (currentFilePath) {
@@ -71,13 +129,22 @@ export default function CustomTitlebar({
       {/* Single <Menubar> parent coordinates click-once switching between
           sibling menus (Office / VSCode / IntelliJ pattern — UAT round 2 #5).
           Override shadcn's default border / bg / padding so the menubar
-          is transparent and inherits the chrome bg from the titlebar. */}
-      <Menubar className="border-0 bg-transparent shadow-none p-0 h-full rounded-none gap-0">
-        <FileMenu onUnsavedCheck={onUnsavedCheck} />
-        <EditMenu />
-        <ViewMenu theme={theme} setTheme={setTheme} />
-        <HelpMenu />
-      </Menubar>
+          is transparent and inherits the chrome bg from the titlebar.
+          Phase 68 UAT 2026-05-17 — controlled via openMenu state so the
+          mousemove effect above can clear the active menu when the cursor
+          leaves both the triggers and any portaled submenu content. */}
+      <div ref={menubarRef} className="h-full">
+        <Menubar
+          value={openMenu}
+          onValueChange={setOpenMenu}
+          className="border-0 bg-transparent shadow-none p-0 h-full rounded-none gap-0"
+        >
+          <FileMenu onUnsavedCheck={onUnsavedCheck} />
+          <EditMenu />
+          <ViewMenu theme={theme} setTheme={setTheme} />
+          <HelpMenu />
+        </Menubar>
+      </div>
       {/* D-26: drag region MUST be a sibling (not a wrapper) — wrapping the
           menu cluster inside data-tauri-drag-region breaks Radix click
           handlers (Tauri #9901). */}
