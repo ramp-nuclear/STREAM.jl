@@ -320,6 +320,17 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       [id],
     ),
   );
+  // Phase 66 — code-panel ↔ canvas bidirectional traceability (D-05, D-09, D-11).
+  // Per-node primitive-boolean selectors mirror the `hasAnchor` / `hasBCError`
+  // shape above. Re-render fanout: toggling one ID only re-renders the
+  // affected StreamNode(s), not all N nodes — zustand sees the boolean flip
+  // for `n1` only and skips the other subscribers (Research Pattern 9).
+  const isCodeHovered = useStore(
+    useCallback((s: { hoveredSourceIds: Set<string> }) => s.hoveredSourceIds.has(id), [id]),
+  );
+  const isCodePinned = useStore(
+    useCallback((s: { pinnedSourceIds: Set<string> }) => s.pinnedSourceIds.has(id), [id]),
+  );
   const activeLayer = useStore(useCallback((s: { activeLayer: LayerView }) => s.activeLayer, []));
   const component = getComponent(nodeData.componentId);
   if (!component) return null;
@@ -359,7 +370,9 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
     <div
       className={`relative border rounded-[var(--radius)] bg-card p-2 min-w-[140px] ${
         selected ? "ring-2 ring-[var(--ring)]" : ""
-      } ${hasAnyError ? "outline outline-2 outline-offset-1 ring-2 ring-destructive" : ""}`}
+      } ${hasAnyError ? "outline outline-2 outline-offset-1 ring-2 ring-destructive" : ""} ${
+        isCodeHovered ? "stream-node--code-hover" : ""
+      } ${isCodePinned ? "stream-node--code-pinned" : ""}`}
       style={{
         ...(accentColor ? { borderLeftWidth: "3px", borderLeftColor: accentColor } : {}),
         ...(hasAnyError ? { outlineColor: "var(--destructive)" } : {}),

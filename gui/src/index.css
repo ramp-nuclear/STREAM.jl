@@ -150,3 +150,26 @@ body {
 .react-flow__nodesselection-rect {
   display: none;
 }
+
+/* Phase 66 — code-panel hover/pin ring on canvas nodes.
+   Lit up by StreamNode subscriptions to useStore.hoveredSourceIds /
+   pinnedSourceIds (per-node primitive-boolean selectors). Visual styling is
+   intentionally a placeholder — Phase 72 owns final tuning (color, animation,
+   stroke); see .planning/notes/phase-66-hover-ring-tuning.md.
+
+   `outline` not `border`: outline does NOT contribute to box dimensions, so
+   Phase 64's autoflip handle-position math (which reads node geometry) stays
+   correct. `outline-offset: 2px` keeps the new ring visually distinct from
+   ReactFlow's box-shadow-based selection ring.
+
+   Both classes can coexist (sub-block-hovered + previously-pinned node) —
+   the cascade resolves to a single outline; the pinned color wins by source
+   order, which is the intended distinction for now. */
+.stream-node--code-hover {
+  outline: 2px solid var(--stream-code-hover-ring-color, #38bdf8);  /* sky-400 placeholder */
+  outline-offset: 2px;
+}
+.stream-node--code-pinned {
+  outline: 2px solid var(--stream-code-pinned-ring-color, #0ea5e9);  /* sky-500 — slightly heavier */
+  outline-offset: 2px;
+}
