@@ -91,6 +91,21 @@ Replace the OS window chrome with a custom HTML titlebar: `decorations: false` i
 - **D-16:** **Secondary strip contents** (left to right): Layer toggle (existing ToggleGroup, same classes) | Code preview toggle button | Export button. ThemeMenu is removed from here.
 - **D-17:** The secondary strip is **full-width** (`w-full`), positioned immediately below the titlebar in the main `flex flex-col` root. It is NOT scoped to the center column.
 
+### Post-research decisions (added 2026-05-16 after RESEARCH.md)
+
+- **D-18:** **WSLg edge-resize contingency — defer.** Ship `decorations: false` as-is. If manual UAT on WSLg shows broken edge-resize (Tauri #8519/#6609), file a follow-up; do NOT pre-emptively add a CSS resize-gutter or `decorations: true` escape hatch to Phase 67. Window can still be resized via the maximize toggle in the meantime.
+- **D-19:** **Edit menu items always fire — no input-focus guard.** Menu items unconditionally call store actions (`undo`, `redo`, `cut`, `copy`, `pasteFromClipboard`, `duplicateSelection` — verify exact names against `useStore.ts`). The Phase 65 keyboard listeners in `CanvasPanel.tsx:209-307` retain their input-focus guard for accidental keypresses; the menu path is explicit user intent and the menu can't be open while an input has focus. Document this asymmetry as an inline comment in the new Edit menu component.
+- **D-20:** **About dialog GitHub URL:** `https://github.com/ramp-nuclear/STREAM.jl` (visible link in the About dialog; opens in default browser via Tauri shell open or plain `<a target="_blank">`).
+- **D-21:** **Theme list centralized.** Export `THEMES = ['light', 'dark', 'system'] as const` (or equivalent) from `gui/src/hooks/useTheme.ts` (or wherever `setTheme` lives). The View → Theme submenu maps over `THEMES`. Adding a 4th theme later (Phase 72) is a one-line array push. Do NOT hardcode three explicit `DropdownMenuRadioItem` elements.
+
+### Research-derived corrections (locked)
+
+- **D-22:** Correct store action name is **`pasteFromClipboard`**, NOT `pasteClipboard` (research found UI-SPEC §"Edit menu" has the wrong name; `useStore.ts:341, 1964` is authoritative). The Edit menu wiring must use `pasteFromClipboard`. The planner should grep `useStore.ts` for the exact names of `cut`, `copy`, `duplicateSelection`, `undo`, `redo` before locking the wiring.
+- **D-23:** **`@tauri-apps/plugin-os` is NOT yet installed.** Plan must include three install steps: (a) `npm install @tauri-apps/plugin-os` in `gui/`, (b) add `tauri-plugin-os = "2"` to `gui/src-tauri/Cargo.toml`, (c) register `tauri_plugin_os::init()` in `gui/src-tauri/src/lib.rs`. Plus capability permissions in `gui/src-tauri/capabilities/default.json`: `core:window:allow-minimize`, `core:window:allow-toggle-maximize`, `core:window:allow-start-dragging`, `core:window:allow-is-maximized`, `os:default`. Missing any one fails silently as a no-op IPC rejection.
+- **D-24:** **shadcn `dialog` component is NOT yet installed.** Plan must include `npx shadcn add dialog` (run in `gui/`) before the About dialog component is written.
+- **D-25:** **App icon must be copied to `gui/public/`.** `src-tauri/icons/32x32.png` is unreachable from Vite; copy to `gui/public/32x32.png` so `<img src="/32x32.png">` resolves. This is a build-time asset copy, not a Tauri convertFileSrc call.
+- **D-26:** **`data-tauri-drag-region` is a sibling, not a wrapper.** Render it as a separate `<div data-tauri-drag-region className="flex-1 h-full" onDoubleClick={...} />` between the menu cluster and the window controls, NOT as a parent of them. Click bubbling through the drag region into menu buttons is a known Tauri bug (#9901, #9725).
+
 ### Claude's Discretion
 
 - Exact component file names and locations (e.g., `gui/src/components/CustomTitlebar.tsx`, `gui/src/components/SecondaryToolbar.tsx`)
