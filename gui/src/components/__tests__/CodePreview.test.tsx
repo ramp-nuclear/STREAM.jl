@@ -86,6 +86,14 @@ function seedStore() {
     },
     bcMode: {},
     bcSymmetric: {},
+    // Plan 04 fix: reset hover/pin/pending slices so tests are isolated.
+    // Zustand setState merges, so without these the previous test's writes
+    // (e.g. test "clicking a sub-block adds its sourceIds to pinnedSourceIds"
+    // leaves pump-uuid in pinnedSourceIds) leak into the next test and break
+    // the D-10 additive-pin assertions.
+    hoveredSourceIds: new Set<string>(),
+    pinnedSourceIds: new Set<string>(),
+    pendingShowCodeFor: null,
   });
 }
 
