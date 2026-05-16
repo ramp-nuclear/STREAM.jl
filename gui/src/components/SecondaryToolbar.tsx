@@ -52,7 +52,7 @@ export default function SecondaryToolbar() {
   }
 
   return (
-    <div className="flex items-center justify-between h-8 px-2 bg-muted border-b w-full">
+    <div className="flex items-center justify-between h-8 px-2 bg-chrome border-b w-full">
       {/* Left cluster: Layer toggle */}
       <div className="flex items-center gap-1.5">
         <Layers className="h-3.5 w-3.5 text-muted-foreground" />
