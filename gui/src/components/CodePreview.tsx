@@ -212,16 +212,24 @@ const CodeSubBlockView = memo(
             : undefined
         }
         className={[
-          "whitespace-pre overflow-x-auto rounded-md transition-colors duration-150",
-          "px-3 py-1.5 border-l-2",
-          interactive ? "cursor-pointer" : "cursor-text opacity-80",
+          // select-text re-enables selection inside this pre (the panel root
+          // is select-none so visual selection bands don't bleed across
+          // section headers and inter-block gaps; see CodePreview body).
+          "whitespace-pre overflow-x-auto transition-colors duration-150 select-text",
+          // Interactive sub-blocks get the box affordance (rounded bg, left
+          // border, hover tint). Non-interactive scaffolding lines (`eqs = [`,
+          // `]`, Imports header, Main) render as plain code so the panel
+          // doesn't look like every line is its own clickable cell.
+          interactive
+            ? "px-3 py-1.5 rounded-md border-l-2 cursor-pointer"
+            : "px-3 cursor-text",
           flashed
             ? "bg-amber-500/30 border-amber-400 ring-1 ring-amber-400/70"
             : pinned
               ? "bg-sky-500/[0.14] border-sky-400 ring-1 ring-sky-400/40"
               : interactive
                 ? "border-transparent hover:bg-sky-500/[0.09] hover:border-sky-400/60"
-                : "border-transparent",
+                : "",
         ].join(" ")}
       >
         <code>
@@ -450,8 +458,13 @@ export default function CodePreview() {
 
   return (
     <ScrollArea className="h-full bg-[#0d1117]">
+      {/* select-none on the root suppresses the browser's visual selection
+          band on inter-block gaps, section header rows, and padding. Each
+          <pre> sub-block re-enables select-text on itself, so drag-selecting
+          across code blocks copies only the code text (no section labels,
+          no gap whitespace). */}
       <div
-        className="p-4 font-mono text-[13px] leading-[1.55] text-zinc-200"
+        className="p-4 font-mono text-[13px] leading-[1.55] text-zinc-200 select-none"
         onClick={handlePanelBodyClick}
       >
         {sections.length === 0 ? (
