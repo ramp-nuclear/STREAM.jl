@@ -44,11 +44,27 @@ export default function WindowControls() {
     }
   }, []);
 
-  // Snap-layout overlay hover bridge — Windows only. Mirrors the App.tsx
-  // listener-cleanup pattern (S5): `active` flag + ref to survive Strict
-  // Mode's double-effect-invocation without leaking listeners.
+  // Fire-and-forget Tauri IPC (Pattern S4 — `void` prefix matches App.tsx style).
+  const w = getCurrentWindow();
+  const onMin = () => void w.minimize();
+  const onMax = () => void w.toggleMaximize();
+  const onClose = () => void w.close();
+
+  // Snap-layout overlay bridge — Windows only. Three Tauri events from the
+  // native overlay HWND (src-tauri/src/snap_layout.rs):
+  //   hover-enter / hover-leave → toggle visual hover-state on the React
+  //     Maximize button so it looks responsive even though the OS overlay
+  //     ate the browser :hover.
+  //   click → call onMax(). Clicks on the overlay are routed by Windows as
+  //     non-client clicks to the OVERLAY HWND (because HTMAXBUTTON), not
+  //     the parent webview — so the React onClick handler on the Maximize
+  //     button never fires from a real click. The overlay emits this event
+  //     and we treat it as the click.
+  // Mirrors the App.tsx listener-cleanup pattern (S5): `active` flag + ref
+  // to survive Strict Mode double-invocation without leaking listeners.
   const unlistenEnterRef = useRef<(() => void) | null>(null);
   const unlistenLeaveRef = useRef<(() => void) | null>(null);
+  const unlistenClickRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (plat !== "windows") return;
     let active = true;
@@ -65,23 +81,26 @@ export default function WindowControls() {
         if (!active) fn();
         else unlistenLeaveRef.current = fn;
       })
-      .catch(() => {
-        // Non-Tauri env — no listener to attach
-      });
+      .catch(() => {});
+    listen("snap-layout://click", () => onMax())
+      .then((fn) => {
+        if (!active) fn();
+        else unlistenClickRef.current = fn;
+      })
+      .catch(() => {});
     return () => {
       active = false;
       unlistenEnterRef.current?.();
       unlistenLeaveRef.current?.();
+      unlistenClickRef.current?.();
       unlistenEnterRef.current = null;
       unlistenLeaveRef.current = null;
+      unlistenClickRef.current = null;
     };
+    // onMax is a stable inline closure capturing the singleton window — safe
+    // to omit from deps; including it would re-subscribe every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plat]);
-
-  // Fire-and-forget Tauri IPC (Pattern S4 — `void` prefix matches App.tsx style).
-  const w = getCurrentWindow();
-  const onMin = () => void w.minimize();
-  const onMax = () => void w.toggleMaximize();
-  const onClose = () => void w.close();
 
   if (plat === "macos") {
     return (
