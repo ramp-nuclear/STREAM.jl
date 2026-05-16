@@ -35,8 +35,8 @@ use windows_sys::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWi
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, RegisterClassExW, SetWindowPos,
     CS_HREDRAW, CS_VREDRAW, HTMAXBUTTON, HWND_TOP, SWP_ASYNCWINDOWPOS, SWP_SHOWWINDOW, WM_CLOSE,
-    WM_DPICHANGED, WM_NCHITTEST, WM_NCLBUTTONUP, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_SIZE,
-    WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_VISIBLE,
+    WM_DPICHANGED, WM_NCHITTEST, WM_NCLBUTTONDOWN, WM_NCLBUTTONUP, WM_NCMOUSELEAVE,
+    WM_NCMOUSEMOVE, WM_SIZE, WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_VISIBLE,
 };
 
 const CLASS_NAME: &[u16] = &[
@@ -261,14 +261,21 @@ unsafe extern "system" fn overlay_proc(
                 emit(EVT_HOVER_LEAVE);
             }
         }
-        // Clicks on the overlay arrive as WM_NCLBUTTONUP because the
+        // Clicks on the overlay arrive as non-client clicks because the
         // WM_NCHITTEST return value (HTMAXBUTTON) put the entire overlay
-        // area into the non-client space. The overlay's DefWindowProcW
-        // would react to this by trying to system-maximize itself — a
-        // child window — which is a no-op. Emit our event and return 0
-        // (consumed); React's onClick handler on the Maximize button
-        // listens and calls getCurrentWindow().toggleMaximize() on the
-        // parent webview.
+        // area into NC space. Two reasons both messages need handling:
+        //   - We must CONSUME WM_NCLBUTTONDOWN (return 0). Letting it fall
+        //     through to DefWindowProc on a child HWND can drop the UP
+        //     event entirely — DefWindowProc's standard system-button
+        //     tracking logic assumes a top-level window with a caption,
+        //     not a child, and behaves inconsistently. Without WM_NCLBUTTONUP
+        //     ever firing, the click silently fails — which is the bug
+        //     UAT round 4 surfaced on the icon center.
+        //   - On WM_NCLBUTTONUP, emit the Tauri event so React's
+        //     WindowControls calls getCurrentWindow().toggleMaximize().
+        WM_NCLBUTTONDOWN => {
+            return 0;
+        }
         WM_NCLBUTTONUP => {
             if let Some(emit) = EMITTER.get() {
                 emit(EVT_CLICK);
