@@ -32,6 +32,7 @@
 
 import {
   Fragment,
+  memo,
   useEffect,
   useMemo,
   useRef,
@@ -68,8 +69,10 @@ const TOKEN_CLASS: Record<TokKind, string> = {
   type: "text-sky-300",
   num: "text-orange-300",
 };
-function tokenize(line: string): { kind: TokKind; text: string }[] {
-  const out: { kind: TokKind; text: string }[] = [];
+type Token = { kind: TokKind; text: string };
+
+function tokenizeRaw(line: string): Token[] {
+  const out: Token[] = [];
   let i = 0;
   const n = line.length;
   let buf = "";
@@ -136,6 +139,136 @@ function tokenize(line: string): { kind: TokKind; text: string }[] {
   return out;
 }
 
+// Module-level cache: most generated lines (boilerplate `using …`, comment
+// dividers, repeated `connect(...)` shapes) recur across renders. A Map
+// lookup short-circuits the per-character regex walk and — more importantly —
+// returns the SAME Token[] reference, which keeps downstream React subtree
+// reconciliation cheap. Cap size to avoid leaks if the user pastes huge code.
+const tokenizeCache = new Map<string, readonly Token[]>();
+const TOKENIZE_CACHE_LIMIT = 4000;
+function tokenize(line: string): readonly Token[] {
+  const hit = tokenizeCache.get(line);
+  if (hit) return hit;
+  const fresh = tokenizeRaw(line);
+  if (tokenizeCache.size >= TOKENIZE_CACHE_LIMIT) tokenizeCache.clear();
+  tokenizeCache.set(line, fresh);
+  return fresh;
+}
+
+// Build a stable id for a sub-block (module-level so it doesn't allocate
+// on every render).
+function makeSubBlockId(sectionName: string, i: number): string {
+  return `code-sb-${sectionName.toLowerCase()}-${i}`;
+}
+
+// One sub-block, memoized — only re-renders when its own content / state
+// changes. Without this, every ReactFlow node-drag tick re-creates every
+// sub-block's hundreds of token <span>s and React reconciles the whole tree.
+interface CodeSubBlockProps {
+  id: string;
+  lines: readonly string[];
+  sourceIds: readonly string[];
+  flashed: boolean;
+  pinned: boolean;
+  interactive: boolean;
+  onHover: (sourceIds: readonly string[]) => void;
+  onLeave: () => void;
+  onPick: (sourceIds: readonly string[]) => void;
+  setRef: (el: HTMLElement | null) => void;
+}
+const CodeSubBlockView = memo(
+  function CodeSubBlockView(props: CodeSubBlockProps) {
+    const {
+      id,
+      lines,
+      sourceIds,
+      flashed,
+      pinned,
+      interactive,
+      onHover,
+      onLeave,
+      onPick,
+      setRef,
+    } = props;
+    return (
+      <pre
+        id={id}
+        ref={setRef}
+        data-sub-block=""
+        data-source-ids={sourceIds.join(",")}
+        data-flash={flashed ? "true" : undefined}
+        data-pinned={pinned ? "true" : undefined}
+        data-interactive={interactive ? "true" : undefined}
+        onMouseEnter={
+          interactive ? () => onHover(sourceIds) : undefined
+        }
+        onMouseLeave={interactive ? onLeave : undefined}
+        onClick={
+          interactive
+            ? (e) => {
+                e.stopPropagation();
+                onPick(sourceIds);
+              }
+            : undefined
+        }
+        className={[
+          "whitespace-pre overflow-x-auto rounded-md transition-colors duration-150",
+          "px-3 py-1.5 border-l-2",
+          interactive ? "cursor-pointer" : "cursor-text opacity-80",
+          flashed
+            ? "bg-amber-500/30 border-amber-400 ring-1 ring-amber-400/70"
+            : pinned
+              ? "bg-sky-500/[0.14] border-sky-400 ring-1 ring-sky-400/40"
+              : interactive
+                ? "border-transparent hover:bg-sky-500/[0.09] hover:border-sky-400/60"
+                : "border-transparent",
+        ].join(" ")}
+      >
+        <code>
+          {lines.map((line, li) => {
+            const toks = tokenize(line);
+            return (
+              <Fragment key={li}>
+                {toks.map((tok, ti) =>
+                  tok.kind === "plain" ? (
+                    <Fragment key={ti}>{tok.text}</Fragment>
+                  ) : (
+                    <span key={ti} className={TOKEN_CLASS[tok.kind]}>
+                      {tok.text}
+                    </span>
+                  ),
+                )}
+                {li < lines.length - 1 ? "\n" : ""}
+              </Fragment>
+            );
+          })}
+        </code>
+      </pre>
+    );
+  },
+  (prev, next) => {
+    // Content equality — skip re-render when nothing the user can see has
+    // changed. Reference of `lines` and `sourceIds` is fresh every codegen
+    // run, so we MUST compare by content, not by reference.
+    if (prev.id !== next.id) return false;
+    if (prev.flashed !== next.flashed) return false;
+    if (prev.pinned !== next.pinned) return false;
+    if (prev.interactive !== next.interactive) return false;
+    if (prev.lines.length !== next.lines.length) return false;
+    for (let i = 0; i < prev.lines.length; i++) {
+      if (prev.lines[i] !== next.lines[i]) return false;
+    }
+    if (prev.sourceIds.length !== next.sourceIds.length) return false;
+    for (let i = 0; i < prev.sourceIds.length; i++) {
+      if (prev.sourceIds[i] !== next.sourceIds[i]) return false;
+    }
+    // Handler refs (onHover/onLeave/onPick/setRef) are intentionally
+    // excluded — the parent passes useCallback-stable references, so they
+    // never change in practice.
+    return true;
+  },
+);
+
 export default function CodePreview() {
   // Listen for stream:show-code-for at this level too, so the consumer effect
   // below sees `pendingShowCodeFor` even when CodePreview is mounted without
@@ -143,36 +276,76 @@ export default function CodePreview() {
   // call setPendingShowCodeFor with the same ids — idempotent.
   useShowCodeFor();
 
-  const nodes = useStore((s) => s.nodes);
-  const edges = useStore((s) => s.edges);
-  const anchors = useStore((s) => s.anchors);
-  const resources = useStore((s) => s.resources);
-  const bcMode = useStore((s) => s.bcMode);
-  const bcSymmetric = useStore((s) => s.bcSymmetric);
+  // PERF — subscribe to a STRING fingerprint of codegen-relevant state, not
+  // to the live nodes/edges arrays. ReactFlow replaces the `nodes` array on
+  // EVERY position update (60 Hz during drag); a direct subscription
+  // re-renders CodePreview, re-runs generateCode, re-tokenizes every line and
+  // re-creates hundreds of token <span>s per tick — that was the lag source.
+  // Positions never affect generated code, so excluding them from the
+  // fingerprint makes drag a no-op for the panel. The selector still runs on
+  // every store update, but it's a few hundred microseconds of string-build
+  // per tick, vs ms of React reconciliation. The fingerprint key gates a
+  // useMemo that grabs the latest data via getState() — no closure capture,
+  // no stale-data risk.
+  const codegenKey = useStore(
+    useCallback((s: ReturnType<typeof useStore.getState>) => {
+      let nodesKey = "";
+      for (const n of s.nodes) {
+        nodesKey += n.id + "|" + (n.type ?? "") + "|" + JSON.stringify(n.data) + ";";
+      }
+      let edgesKey = "";
+      for (const e of s.edges) {
+        edgesKey +=
+          e.id +
+          "|" +
+          e.source +
+          "|" +
+          e.target +
+          "|" +
+          (e.sourceHandle ?? "") +
+          "|" +
+          (e.targetHandle ?? "") +
+          ";";
+      }
+      return (
+        nodesKey +
+        "#" +
+        edgesKey +
+        "#" +
+        JSON.stringify(s.anchors) +
+        "#" +
+        JSON.stringify(s.resources) +
+        "#" +
+        s.bcMode +
+        "#" +
+        JSON.stringify(s.bcSymmetric)
+      );
+    }, []),
+  );
   const pendingShowCodeFor = useStore((s) => s.pendingShowCodeFor);
   // Subscribe to pinnedSourceIds so the code panel itself shows pinned state
   // (canvas already shows the ring via StreamNode subscription — this is the
   // matching code-side affordance for bidirectional visual link).
   const pinnedSourceIds = useStore((s) => s.pinnedSourceIds);
 
-  const sections = useMemo<CodeSection[]>(
-    () =>
-      generateCode(nodes, edges, { anchors }, getComponent, resources, {
-        bcMode,
-        bcSymmetric,
-      }),
-    [nodes, edges, anchors, resources, bcMode, bcSymmetric],
-  );
+  const sections = useMemo<CodeSection[]>(() => {
+    const s = useStore.getState();
+    return generateCode(
+      s.nodes,
+      s.edges,
+      { anchors: s.anchors },
+      getComponent,
+      s.resources,
+      { bcMode: s.bcMode, bcSymmetric: s.bcSymmetric },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codegenKey]);
 
   // Ref map keyed by stable sub-block id, for scrollIntoView lookup.
   const subBlockRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   // Flash state: set of ids (multi-node payload can flash multiple sub-blocks).
   const [flashedIds, setFlashedIds] = useState<Set<string>>(new Set());
-
-  // Build a stable id for a sub-block.
-  const subBlockId = (section: CodeSection, i: number): string =>
-    `code-sb-${section.name.toLowerCase()}-${i}`;
 
   // 1.5s flash auto-clear. Reset whenever the flashed set changes to a
   // non-empty value; a single shared timer is fine because all flashes are
@@ -197,7 +370,7 @@ export default function CodePreview() {
       for (let i = 0; i < section.subBlocks.length; i++) {
         const sub = section.subBlocks[i];
         if (sub.sourceIds.some((sid) => targetIds.includes(sid))) {
-          matched.push({ id: subBlockId(section, i), sub });
+          matched.push({ id: makeSubBlockId(section.name, i), sub });
         }
       }
     }
@@ -225,18 +398,23 @@ export default function CodePreview() {
     useStore.getState().consumePendingShowCodeFor();
   }, [pendingShowCodeFor, sections]);
 
-  // Sub-block event handlers.
-  const handleSubBlockMouseEnter = useCallback((sourceIds: string[]) => {
-    useStore.getState().setHoveredSourceIds(sourceIds);
-  }, []);
-
-  const handleSubBlockMouseLeave = useCallback(() => {
+  // Sub-block event handlers — useCallback-stable so the memoized SubBlockView
+  // skips re-render via reference equality.
+  const handleSubBlockHover = useCallback(
+    (sourceIds: readonly string[]) => {
+      useStore.getState().setHoveredSourceIds(sourceIds as string[]);
+    },
+    [],
+  );
+  const handleSubBlockLeave = useCallback(() => {
     useStore.getState().clearHoveredSourceIds();
   }, []);
-
-  const handleSubBlockClick = useCallback((sourceIds: string[]) => {
-    useStore.getState().togglePinnedForSubBlock(sourceIds);
-  }, []);
+  const handleSubBlockPick = useCallback(
+    (sourceIds: readonly string[]) => {
+      useStore.getState().togglePinnedForSubBlock(sourceIds as string[]);
+    },
+    [],
+  );
 
   // Empty-space click on the panel body clears pinned source ids. The handler
   // attaches to the panel-body wrapper and uses `e.target === e.currentTarget`
@@ -250,10 +428,25 @@ export default function CodePreview() {
     [],
   );
 
-  const setSubBlockRef = (id: string) => (el: HTMLElement | null) => {
-    if (el) subBlockRefs.current.set(id, el);
-    else subBlockRefs.current.delete(id);
-  };
+  // Ref-setter factory — memoized PER id so the function identity is stable
+  // across renders (matches the SubBlockView memo equality contract).
+  const setSubBlockRefForId = useRef(
+    new Map<string, (el: HTMLElement | null) => void>(),
+  );
+  const getSubBlockRefSetter = useCallback(
+    (id: string) => {
+      let fn = setSubBlockRefForId.current.get(id);
+      if (!fn) {
+        fn = (el: HTMLElement | null) => {
+          if (el) subBlockRefs.current.set(id, el);
+          else subBlockRefs.current.delete(id);
+        };
+        setSubBlockRefForId.current.set(id, fn);
+      }
+      return fn;
+    },
+    [],
+  );
 
   return (
     <ScrollArea className="h-full bg-[#0d1117]">
@@ -281,84 +474,30 @@ export default function CodePreview() {
               </h4>
               <div className="flex flex-col gap-1.5">
                 {section.subBlocks.map((sub, i) => {
-                  const id = subBlockId(section, i);
+                  const id = makeSubBlockId(section.name, i);
                   const flashed = flashedIds.has(id);
                   // Sub-blocks with no sourceIds (Imports header, Composition
                   // scaffolding `eqs = [` / `]`, Main `@named sys = ...` block)
                   // have no canvas counterpart — hovering/clicking them has no
-                  // useful effect. Mark them non-interactive so the panel
-                  // reads as: "interactive lines have hover affordance;
-                  // scaffolding lines don't."
+                  // useful effect. Mark them non-interactive.
                   const interactive = sub.sourceIds.length > 0;
                   const pinned =
                     interactive &&
                     sub.sourceIds.some((sid) => pinnedSourceIds.has(sid));
                   return (
-                    <pre
+                    <CodeSubBlockView
                       key={id}
                       id={id}
-                      ref={setSubBlockRef(id)}
-                      data-sub-block=""
-                      data-source-ids={sub.sourceIds.join(",")}
-                      data-flash={flashed ? "true" : undefined}
-                      data-pinned={pinned ? "true" : undefined}
-                      data-interactive={interactive ? "true" : undefined}
-                      onMouseEnter={
-                        interactive
-                          ? () => handleSubBlockMouseEnter(sub.sourceIds)
-                          : undefined
-                      }
-                      onMouseLeave={
-                        interactive ? handleSubBlockMouseLeave : undefined
-                      }
-                      onClick={
-                        interactive
-                          ? (e) => {
-                              // Prevent bubbling to panel-body so the
-                              // empty-space clear-pins handler doesn't fire
-                              // after this toggle.
-                              e.stopPropagation();
-                              handleSubBlockClick(sub.sourceIds);
-                            }
-                          : undefined
-                      }
-                      className={[
-                        "whitespace-pre overflow-x-auto rounded-md transition-colors duration-150",
-                        "px-3 py-1.5 border-l-2",
-                        interactive
-                          ? "cursor-pointer"
-                          : "cursor-text opacity-80",
-                        flashed
-                          ? "bg-amber-500/30 border-amber-400 ring-1 ring-amber-400/70"
-                          : pinned
-                            ? "bg-sky-500/[0.14] border-sky-400 ring-1 ring-sky-400/40"
-                            : interactive
-                              ? "border-transparent hover:bg-sky-500/[0.09] hover:border-sky-400/60"
-                              : "border-transparent",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      <code>
-                        {sub.lines.map((line, li) => (
-                          <Fragment key={li}>
-                            {tokenize(line).map((tok, ti) =>
-                              tok.kind === "plain" ? (
-                                <Fragment key={ti}>{tok.text}</Fragment>
-                              ) : (
-                                <span
-                                  key={ti}
-                                  className={TOKEN_CLASS[tok.kind]}
-                                >
-                                  {tok.text}
-                                </span>
-                              ),
-                            )}
-                            {li < sub.lines.length - 1 ? "\n" : ""}
-                          </Fragment>
-                        ))}
-                      </code>
-                    </pre>
+                      lines={sub.lines}
+                      sourceIds={sub.sourceIds}
+                      flashed={flashed}
+                      pinned={pinned}
+                      interactive={interactive}
+                      onHover={handleSubBlockHover}
+                      onLeave={handleSubBlockLeave}
+                      onPick={handleSubBlockPick}
+                      setRef={getSubBlockRefSetter(id)}
+                    />
                   );
                 })}
               </div>

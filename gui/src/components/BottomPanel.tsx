@@ -14,15 +14,16 @@ export default function BottomPanel() {
   const bottomPanelHeight = useStore((s) => s.bottomPanelHeight);
   const { onMouseDown } = useBottomPanelResize();
 
-  // Read-only store subs for the right-side Copy/Export action buttons.
-  // (See Toolbar.tsx for the parallel call pattern — Phase 66 D-18 keeps
-  // BOTH the Toolbar Export and this BottomPanel Copy/Export alive.)
-  const nodes = useStore((s) => s.nodes);
-  const edges = useStore((s) => s.edges);
-  const anchors = useStore((s) => s.anchors);
-  const resources = useStore((s) => s.resources);
-  const bcMode = useStore((s) => s.bcMode);
-  const bcSymmetric = useStore((s) => s.bcSymmetric);
+  // PERF — only subscribe to the things this component actually reads in its
+  // render output. The Copy/Export click handlers read live state via
+  // useStore.getState() at click time (a tick-old reference is fine).
+  // Previously this component subscribed to the full `nodes` array (etc.),
+  // which re-rendered the BottomPanel on every ReactFlow drag tick and was
+  // an unrelated contributor to the code-tab lag.
+  // We DO need a boolean for the disabled state on Copy/Export, so we
+  // subscribe to a derived primitive instead of the array — re-renders fire
+  // only when the canvas crosses the empty/non-empty boundary.
+  const hasNodes = useStore((s) => s.nodes.length > 0);
 
   // 1.5s confirmation state for the Copy button (Research Pattern 8).
   const [copied, setCopied] = useState(false);
@@ -33,13 +34,14 @@ export default function BottomPanel() {
   }, [copied]);
 
   async function handleCopy() {
+    const s = useStore.getState();
     const sections = generateCode(
-      nodes,
-      edges,
-      { anchors },
+      s.nodes,
+      s.edges,
+      { anchors: s.anchors },
       getComponent,
-      resources,
-      { bcMode, bcSymmetric },
+      s.resources,
+      { bcMode: s.bcMode, bcSymmetric: s.bcSymmetric },
     );
     try {
       await navigator.clipboard.writeText(serializeSections(sections));
@@ -52,18 +54,19 @@ export default function BottomPanel() {
   }
 
   async function handleExport() {
+    const s = useStore.getState();
     const sections = generateCode(
-      nodes,
-      edges,
-      { anchors },
+      s.nodes,
+      s.edges,
+      { anchors: s.anchors },
       getComponent,
-      resources,
-      { bcMode, bcSymmetric },
+      s.resources,
+      { bcMode: s.bcMode, bcSymmetric: s.bcSymmetric },
     );
     // Boolean return discarded — exportCode handles its own validation gate
     // (writes validationResult side-effect for the existing dialog) and
     // user-cancel path. Matches Toolbar.tsx's handleExport behavior.
-    await exportCode({ sections, nodes });
+    await exportCode({ sections, nodes: s.nodes });
   }
 
   if (!bottomPanelOpen) return null;
@@ -86,7 +89,7 @@ export default function BottomPanel() {
             <Button
               size="sm"
               variant="outline"
-              disabled={nodes.length === 0}
+              disabled={!hasNodes}
               onClick={handleCopy}
               aria-label="Copy generated Julia code to clipboard"
             >
@@ -105,7 +108,7 @@ export default function BottomPanel() {
             <Button
               size="sm"
               variant="outline"
-              disabled={nodes.length === 0}
+              disabled={!hasNodes}
               onClick={handleExport}
               aria-label="Export generated Julia code to file"
             >
