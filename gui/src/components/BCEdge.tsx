@@ -33,6 +33,7 @@ function stripSideSuffix(name: string): string {
 function BCEdge({
   id,
   source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -51,6 +52,26 @@ function BCEdge({
   });
 
   const edgeData = data as BCEdgeData | undefined;
+
+  // Phase 66 — same code-panel <-> edge bidirectional traceability pattern as
+  // HydraulicEdge: light up when BOTH endpoint UUIDs are in the hovered or
+  // pinned source-ids set, which happens when a BC-anchor comment sub-block
+  // (`# TODO: set channel_1.T_wall_left[i] here`) carrying both consumer +
+  // source UUIDs is hovered/pinned in the code panel.
+  const isCodeHovered = useStore(
+    useCallback(
+      (s: { hoveredSourceIds: Set<string> }) =>
+        s.hoveredSourceIds.has(source) && s.hoveredSourceIds.has(target),
+      [source, target],
+    ),
+  );
+  const isCodePinned = useStore(
+    useCallback(
+      (s: { pinnedSourceIds: Set<string> }) =>
+        s.pinnedSourceIds.has(source) && s.pinnedSourceIds.has(target),
+      [source, target],
+    ),
+  );
 
   // Read both sibling bcMode entries and check whether each points to this
   // edge's source. The label collapses to "L+R" when both bind, "L" / "R"
@@ -88,8 +109,13 @@ function BCEdge({
         id={id}
         path={path}
         style={{
-          stroke: "var(--muted-foreground)",
-          strokeWidth: 1.5,
+          // Pinned wins over hover; both override the default muted dash.
+          stroke: isCodePinned
+            ? "#7dd3fc"
+            : isCodeHovered
+              ? "#38bdf8"
+              : "var(--muted-foreground)",
+          strokeWidth: isCodePinned ? 2.5 : isCodeHovered ? 2 : 1.5,
           strokeDasharray: "6 3",
         }}
       />
