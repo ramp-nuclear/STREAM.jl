@@ -29,19 +29,14 @@ use windows_sys::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, NULL_BRUSH};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
+    TrackMouseEvent, TME_LEAVE, TME_NONCLIENT, TRACKMOUSEEVENT,
 };
-// `WM_MOUSELEAVE` is in the Controls module in windows-sys 0.61 — not in
-// `WindowsAndMessaging` (alongside `WM_MOUSEMOVE`) and not in `KeyboardAndMouse`
-// (alongside `TrackMouseEvent`). A windows-sys module split quirk worth
-// documenting because the obvious-seeming locations both fail.
-use windows_sys::Win32::UI::Controls::WM_MOUSELEAVE;
 use windows_sys::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, RegisterClassExW, SetWindowPos,
     CS_HREDRAW, CS_VREDRAW, HTMAXBUTTON, HWND_TOP, SWP_ASYNCWINDOWPOS, SWP_SHOWWINDOW, WM_CLOSE,
-    WM_DPICHANGED, WM_MOUSEMOVE, WM_NCHITTEST, WM_SIZE, WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS,
-    WS_VISIBLE,
+    WM_DPICHANGED, WM_NCHITTEST, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_SIZE, WNDCLASSEXW, WS_CHILD,
+    WS_CLIPSIBLINGS, WS_VISIBLE,
 };
 
 const CLASS_NAME: &[u16] = &[
@@ -225,10 +220,15 @@ unsafe extern "system" fn overlay_proc(
 ) -> LRESULT {
     match msg {
         WM_NCHITTEST => return HTMAXBUTTON as LRESULT,
-        WM_MOUSEMOVE => {
+        // Because WM_NCHITTEST returns HTMAXBUTTON, Windows treats this area
+        // as the non-client maximize button. Mouse events arrive as the NC
+        // variants — WM_NCMOUSEMOVE / WM_NCMOUSELEAVE — not the regular ones.
+        // TrackMouseEvent must be armed with TME_NONCLIENT | TME_LEAVE to
+        // receive the NC leave notification.
+        WM_NCMOUSEMOVE => {
             // Rising-edge detection — only emit hover-enter once per visit.
-            // Subsequent WM_MOUSEMOVEs while still hovered are no-ops. We
-            // also (re-)arm TrackMouseEvent so WM_MOUSELEAVE will be sent
+            // Subsequent WM_NCMOUSEMOVEs while still hovered are no-ops. We
+            // also (re-)arm TrackMouseEvent so WM_NCMOUSELEAVE will be sent
             // when the cursor exits the overlay.
             let map = HOVERED.get_or_init(|| Mutex::new(HashMap::new()));
             let mut g = map.lock().unwrap();
@@ -238,7 +238,7 @@ unsafe extern "system" fn overlay_proc(
                 drop(g);
                 let mut tme = TRACKMOUSEEVENT {
                     cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32,
-                    dwFlags: TME_LEAVE,
+                    dwFlags: TME_LEAVE | TME_NONCLIENT,
                     hwndTrack: hwnd,
                     dwHoverTime: 0,
                 };
@@ -248,7 +248,7 @@ unsafe extern "system" fn overlay_proc(
                 }
             }
         }
-        WM_MOUSELEAVE => {
+        WM_NCMOUSELEAVE => {
             let map = HOVERED.get_or_init(|| Mutex::new(HashMap::new()));
             let mut g = map.lock().unwrap();
             g.insert(hwnd as isize, false);
