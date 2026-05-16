@@ -92,7 +92,7 @@ export default function WindowControls() {
         size="icon"
         aria-label="Close window"
         onClick={onClose}
-        className="rounded-none h-full w-10 hover:bg-destructive hover:text-destructive-foreground"
+        className="rounded-none h-full w-10 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white"
       >
         <X className="h-4 w-4" />
       </Button>
