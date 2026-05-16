@@ -48,7 +48,12 @@ const TITLEBAR_PX: u32 = 36;
 const BUTTON_PX: u32 = 46;
 const RIGHT_INDEX: i32 = 1; // maximize button is 2nd from the right (Close=0, Max=1, Min=2)
 
-static OVERLAYS: OnceLock<Mutex<HashMap<isize, HWND>>> = OnceLock::new();
+// HWND is `*mut c_void`, which is not Send/Sync — but storing the handle in a
+// `static` requires Sync. The portable workaround is to keep handles as `isize`
+// (their representation as integers) and cast back to HWND at use sites.
+// Round-tripping `*mut c_void` ↔ `isize` is safe on Windows for both 32- and
+// 64-bit targets (pointer width matches isize on all `cfg(windows)` targets).
+static OVERLAYS: OnceLock<Mutex<HashMap<isize, isize>>> = OnceLock::new();
 
 pub fn install<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), String> {
     let handle = window.window_handle().map_err(|e| e.to_string())?;
@@ -85,8 +90,8 @@ unsafe fn install_native(hwnd: HWND) {
     }
     let map = OVERLAYS.get_or_init(|| Mutex::new(HashMap::new()));
     let mut g = map.lock().unwrap();
-    if let Some(old) = g.insert(hwnd as isize, overlay) {
-        DestroyWindow(old);
+    if let Some(old) = g.insert(hwnd as isize, overlay as isize) {
+        DestroyWindow(old as HWND);
     }
     drop(g);
     SetWindowSubclass(hwnd, Some(parent_proc), SUBCLASS_ID, 0);
@@ -117,10 +122,11 @@ unsafe fn register_class_once() {
 unsafe fn reposition(hwnd: HWND) {
     let map = OVERLAYS.get_or_init(|| Mutex::new(HashMap::new()));
     let g = map.lock().unwrap();
-    let Some(&overlay) = g.get(&(hwnd as isize)) else {
+    let Some(&overlay_isize) = g.get(&(hwnd as isize)) else {
         return;
     };
     drop(g);
+    let overlay = overlay_isize as HWND;
     let mut rect = std::mem::zeroed();
     if GetClientRect(hwnd, &mut rect) == 0 {
         return;
@@ -160,8 +166,8 @@ unsafe extern "system" fn parent_proc(
         WM_CLOSE => {
             RemoveWindowSubclass(hwnd, Some(parent_proc), SUBCLASS_ID);
             let map = OVERLAYS.get_or_init(|| Mutex::new(HashMap::new()));
-            if let Some(overlay) = map.lock().unwrap().remove(&(hwnd as isize)) {
-                DestroyWindow(overlay);
+            if let Some(overlay_isize) = map.lock().unwrap().remove(&(hwnd as isize)) {
+                DestroyWindow(overlay_isize as HWND);
             }
         }
         _ => {}
