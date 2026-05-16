@@ -27,9 +27,21 @@ key-files:
   created:
     - gui/src/components/__tests__/StreamNode.codeHover.test.tsx
     - .planning/notes/phase-66-hover-ring-tuning.md
+    - gui/PERFORMANCE.md
+    - PERF-AUDIT.md
+    - .planning/phases/66-code-preview-rework/66-PERF-AUDIT-SUMMARY.md
   modified:
     - gui/src/components/StreamNode.tsx
     - gui/src/index.css
+    - gui/src/components/HydraulicEdge.tsx
+    - gui/src/components/BCEdge.tsx
+    - gui/src/components/CodePreview.tsx
+    - gui/src/components/BottomPanel.tsx
+    - gui/src/components/Toolbar.tsx
+    - gui/src/components/CanvasPanel.tsx
+    - gui/src/components/WelcomeOverlay.tsx
+    - gui/src/components/sidebar/SidebarPanel.tsx
+    - .planning/BACKLOG.md
 
 key-decisions:
   - "Use template-literal className composition (matching the existing StreamNode pattern) rather than introducing the cn() helper — the plan said 'whatever class-composition helper StreamNode already uses', and StreamNode already used template literals, not cn."
@@ -42,19 +54,17 @@ patterns-established:
 requirements-completed: []
 
 # Metrics
-duration: ~18min (partial — Task 3 manual UAT pending)
-completed: 2026-05-16 (Tasks 1+2; Task 3 awaits user UAT)
+duration: ~3h 15min including UAT iterations (Tasks 1+2 ~18min; UAT polish + perf sweep + UAT pass ~2h 55min)
+completed: 2026-05-16
 ---
 
 # Phase 66 Plan 05: StreamNode Hover Ring Summary
 
-**StreamNode wired to the code-panel ↔ canvas traceability ring via per-node primitive-boolean selectors; placeholder CSS lands; Phase 72 handoff doc commits the re-tune scope. Manual UAT is the acceptance gate (Task 3, pending).**
+**StreamNode wired to the code-panel ↔ canvas traceability ring; placeholder CSS landed; UAT passed after several rounds of polish (visible hover/pin styling, Julia syntax tinting, non-interactive scaffolding sub-blocks, clean text-selection) AND a full systematic GUI perf sweep that fixed a CanvasPanel `useStore()` no-selector antipattern that had been re-rendering the whole canvas on every store mutation. Edges now also light up when a connect() sub-block is hovered/pinned (final UAT note).**
 
 ## Status
 
-**Tasks 1 and 2 complete and committed. Task 3 (manual UAT) is the
-checkpoint gate — the user must walk the end-to-end bidirectional
-traceability flow before the plan can be marked complete.**
+**ALL 3 TASKS COMPLETE. UAT PASSED. Phase 66 ready for goal-backward verification.**
 
 ## Performance
 
@@ -164,27 +174,65 @@ section ("modulo the 1 pre-existing SidebarPanel.anchors failure and the
   `gui/node_modules` from the main repo into the worktree. No source-tree
   side effects; the symlink lives only in the temp worktree.
 
-## Pending — Task 3 (Manual UAT)
+## Task 3 — Manual UAT — PASSED 2026-05-16
 
-The plan's Task 3 is a `checkpoint:human-verify` gate. The user must walk
-the full bidirectional traceability flow with a live dev server before
-the plan can be finalized. Verification script lives in the plan file
-(Task 3 `how-to-verify`) — covers:
+User walked the full bidirectional traceability flow and approved phase 66
+with two notes:
 
-- Code → Canvas hover (sub-block hover lights up canvas node ring)
-- Code → Canvas pin (sub-block click toggles sticky ring; additive pin;
-  click-empty / Esc clears pins)
-- Canvas → Code jump (right-click "Show generated Julia code" → panel
-  opens, scrolls, flashes, pins; canvas node gets pinned ring)
-- Copy / Export buttons in BottomPanel (D-12 header format, disabled
-  state, Tauri save dialog)
-- Text-selection across sub-block boundaries
-- Disabled state with empty canvas
-- Regression sweep (full vitest run shows the same 5 pre-existing failures
-  and nothing new)
+1. **Hovering a `connect()` sub-block should also highlight the canvas edge** — addressed
+   in commit `7e2b360` (this plan's final fix). HydraulicEdge and BCEdge each subscribe to
+   two per-edge primitive-boolean selectors that fire when BOTH endpoint UUIDs appear in
+   `hoveredSourceIds` / `pinnedSourceIds`. Sky-400 (2.25px) for hover, sky-300 (3px) for pin.
 
-The user types "approved" to mark Phase 66 ready for `/gsd:verify-work 66`,
-or "regression: <describe>" to flag a gap and trigger a Plan 06 gap-closure.
+2. **Canvas-component hover doesn't push state into the code panel** — confirmed by design.
+   Ambient hover the other direction would be too noisy; explicit `Show generated Julia code`
+   right-click is the canvas→code path per D-08.
+
+3. **KFW-1 (StreamNode O(N²) port-assignment selectors) backlogged**, NOT fixed in this
+   phase. Documented in `gui/PERFORMANCE.md` Known Followup Work and promoted to
+   `.planning/BACKLOG.md` (commit `426bebd`) for sizing in a future GUI perf phase.
+
+## Follow-up commits beyond Tasks 1+2
+
+The original Plan 05 scope assumed the prior plans 01–04 were UAT-ready. In practice
+UAT surfaced several gaps that needed to be resolved before Task 3 could pass. All were
+fixed as follow-up commits on top of the original 3 task commits, all on the
+`gui-redesign` branch:
+
+| Commit | What | Why |
+|---|---|---|
+| `47b32bb` | `fix(66-04): code panel polish — visible hover/pin + Julia syntax tinting` | UAT screenshot showed dim/dead panel: `hover:bg-accent/40` invisible in dark mode (--accent === --muted), no syntax colors, no pinned visual on code side, section labels faded. Added Julia tokenizer, sky-tinted hover/pin, sky-bar section labels. |
+| `b097bfa` | `fix(66): refine code-panel interactivity model + distinguish pin from hover` | UAT round 2: Imports/scaffolding sub-blocks felt interactive but did nothing; canvas pin-ring looked identical to hover-ring. Made empty-sourceIds sub-blocks non-interactive; canvas pin now 3px sky-300 + halo. |
+| `6c08bcd` | `perf(66): stop code-tab re-rendering on every ReactFlow position tick` | "Super laggy, unusable" — CodePreview was re-rendering on every drag-frame position update. Added string-fingerprint subscription (excludes positions), React.memo with content-equality on a new `CodeSubBlockView`, module-level tokenize cache, BottomPanel dropped live subscriptions, replaced blur box-shadow on pin ring with crisp halo. |
+| `7939714` | `fix(66): clean code-panel text selection + drop box affordance from scaffolding` | UAT round 3 (from select_all.png): drag-select bled into section labels / inter-block gaps; scaffolding lines looked like clickable cells. select-none on panel root + select-text on each `<pre>`; non-interactive sub-blocks render as plain code. |
+| `6325be2` | `perf(gui): systematic perf sweep — drop unused subscriptions, derive primitives` | "Lag sometimes exists and sometimes does not" — agent-driven full systematic audit of `gui/src/`. **Found a `useStore()` with no selector in `CanvasPanel.tsx`** that was re-rendering the entire ReactFlow canvas on ANY store mutation (root cause of intermittent lag). Also fixed Toolbar/WelcomeOverlay/SidebarPanel. Created `gui/PERFORMANCE.md` (9-rule perf ruleset + subscription decision tree + Known Followup Work register). Zero behavior changes. |
+| `7e2b360` | `feat(66): highlight canvas edges when their connect() sub-block is hovered/pinned` | UAT note 1: edges between hovered/pinned nodes now light up sky-tinted, matching the canvas-node ring color tokens. |
+| `426bebd` | `docs(backlog): capture KFW-1 — StreamNode O(N²) port-assignment selectors` | KFW-1 promoted from `PERFORMANCE.md` Followup section to `BACKLOG.md` per UAT close-out. |
+
+Plus orchestrator hygiene: removed 14 stale worktree-agent-* worktrees from earlier
+phases (~2.2 GB reclaimed, freed VS Code file watchers from indexing duplicate copies
+of the codebase — likely cause of an intermittent VmmemWSL CPU spike the user noticed
+during UAT).
+
+## Test baseline (final, on UAT pass)
+
+- **vitest:** `827 pass | 5 fail (pre-existing) | 10 todo | 2 failed test files (pre-existing)`
+- **tsc:** `12 errors (pre-existing baseline)`
+- **Phase 66 tests:** all 16 GREEN (11 CodePreview + 5 StreamNode hover-ring)
+- **Pre-existing failures unchanged from Phase 66 start:** 4 contextMenus tests + 1 SidebarPanel.anchors test
+
+Zero new failures, zero new tsc errors across all 7 follow-up commits.
+
+## Phase 66 outcomes (consolidated)
+
+- **Codegen** returns `CodeSection[]` with per-emission-site `sourceIds` (Plan 02).
+- **Store** has 3 ephemeral slices (`hoveredSourceIds`, `pinnedSourceIds`, `pendingShowCodeFor`) with overlap-removes-all toggle semantics, fresh-reference discipline, and `.scp` exclusion (Plan 03).
+- **`stream:show-code-for`** event listener mounted at App root + Esc-clears-pins handler (Plan 03).
+- **`exportCode`** util extracted as the single export-path; called from both Toolbar (D-18) and BottomPanel (Plan 03/04).
+- **`CodePreview`** is a section-by-section renderer over `CodeSection[]` with sub-block-level hover/click/pin/scroll/flash, Julia syntax tinting, select-text contract preserved (Plan 04 + follow-up polish).
+- **Canvas StreamNodes** subscribe to hover/pin slices via per-node primitive-boolean selectors and render outline rings (sky-400 hover, sky-300 pin) (Plan 05).
+- **Canvas edges (HydraulicEdge + BCEdge)** subscribe to hover/pin slices via per-edge primitive-boolean selectors and light up when both endpoints are in scope (Plan 05 final UAT note).
+- **`gui/PERFORMANCE.md`** durably codifies the 9 perf antipatterns + canonical fixes + subscription decision tree + Known Followup Work register so the patterns don't recur.
 
 ## Self-Check
 
@@ -194,15 +242,17 @@ or "regression: <describe>" to flag a gap and trigger a Plan 06 gap-closure.
 - `grep -q "isCodeHovered" gui/src/components/StreamNode.tsx` → FOUND.
 - `grep -q "stream-node--code-hover" gui/src/index.css` → FOUND.
 
-## Self-Check: PASSED (Tasks 1+2 only — Task 3 pending UAT)
+## Self-Check: PASSED (all 3 tasks + 7 follow-up commits)
 
 ## Next Phase Readiness
 
-After Task 3 user approval, Phase 66 is functionally complete. The next
-step is `/gsd:verify-work 66` (goal-backward verification), followed by
-archiving. Phase 72 will pick up the visual tuning per the handoff doc.
+Phase 66 functionally complete. Next step: `/gsd:verify-work 66` (goal-backward
+verification), followed by archiving. Phase 72 will pick up the visual tuning
+per the handoff doc (`.planning/notes/phase-66-hover-ring-tuning.md`). A future
+GUI perf phase (call it 66.5 or 67-perf) can pick up KFW-1 from BACKLOG when
+graph sizes start hitting 50+ nodes.
 
 ---
 *Phase: 66-code-preview-rework*
 *Plan: 5 — streamnode-hover-ring*
-*Status: 2/3 tasks complete; manual UAT pending*
+*Status: 3/3 tasks complete; UAT passed 2026-05-16; ready for goal-backward verification*
