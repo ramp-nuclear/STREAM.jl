@@ -23,6 +23,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Node } from "@xyflow/react";
 import type { CodeSection } from "../codeGenerator";
+import type { TopologyResult } from "../validation";
 
 // --- Mocks ------------------------------------------------------------------
 
@@ -37,7 +38,7 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
 // Mock the validation gate by hooking useStore.getState().validateAndGate.
 // We mutate the module-shared `vi.fn()` per test so each case controls the
 // gate's response without re-importing the store.
-const validateAndGateMock = vi.fn(() => ({
+const validateAndGateMock = vi.fn<() => TopologyResult>(() => ({
   valid: true,
   nodeErrors: [],
   systemErrors: [],
@@ -115,7 +116,9 @@ describe("exportCode — validation gate", () => {
   it("returns false and does NOT call save() when validateAndGate reports invalid", async () => {
     validateAndGateMock.mockReturnValue({
       valid: false,
-      nodeErrors: [{ nodeId: "n1", message: "broken" }],
+      nodeErrors: [
+        { nodeId: "n1", instanceName: "pump1", portName: "port_in" },
+      ],
       systemErrors: [],
     });
 
