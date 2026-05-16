@@ -2,13 +2,20 @@ import { Button } from "./ui/button";
 import useStore from "../store/useStore";
 
 export default function WelcomeOverlay() {
-  const nodes = useStore((s) => s.nodes);
-  const edges = useStore((s) => s.edges);
+  // PERF — render only depends on whether the canvas is empty. Previously we
+  // subscribed to the full `nodes` and `edges` arrays, which ReactFlow
+  // replaces on every drag tick — so WelcomeOverlay (always mounted inside
+  // CanvasPanel) re-rendered 60 Hz during drags. A derived boolean primitive
+  // fires only when the canvas crosses the empty/non-empty boundary. Same
+  // rule as BottomPanel.tsx (commit 6c08bcd) / gui/PERFORMANCE.md §3.
+  const isEmpty = useStore(
+    (s) => s.nodes.length === 0 && s.edges.length === 0,
+  );
   const recentFiles = useStore((s) => s.recentFiles);
   const loadProject = useStore((s) => s.loadProject);
   const loadProjectFromPath = useStore((s) => s.loadProjectFromPath);
 
-  if (nodes.length > 0 || edges.length > 0) {
+  if (!isEmpty) {
     return null;
   }
 
