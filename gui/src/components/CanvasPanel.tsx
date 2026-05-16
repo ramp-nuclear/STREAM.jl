@@ -63,8 +63,21 @@ interface CanvasPanelProps {
 }
 
 export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
-  const { nodes, edges, onNodesChange, onEdgesChange, addNode, addEdge, selectNode } =
-    useStore();
+  // PERF — destructuring `useStore()` with NO selector subscribes to the
+  // entire store, re-rendering CanvasPanel (and ReactFlow inside it) on
+  // any store change anywhere — hoveredSourceIds toggles, pinned-id flips,
+  // BC-mode mutations, every unrelated slice. Split into individual
+  // selectors: actions (`onNodesChange`, `onEdgesChange`, `addNode`,
+  // `addEdge`, `selectNode`) are stable refs by zustand contract, and
+  // `nodes`/`edges` are the live arrays ReactFlow needs as props. See
+  // gui/PERFORMANCE.md §1.
+  const nodes = useStore((s) => s.nodes);
+  const edges = useStore((s) => s.edges);
+  const onNodesChange = useStore((s) => s.onNodesChange);
+  const onEdgesChange = useStore((s) => s.onEdgesChange);
+  const addNode = useStore((s) => s.addNode);
+  const addEdge = useStore((s) => s.addEdge);
+  const selectNode = useStore((s) => s.selectNode);
   const activeLayer = useStore((s) => s.activeLayer);
   // Phase 65 D-09: snap-to-grid state read from store
   const snapEnabled = useStore((s) => s.snapToGrid);

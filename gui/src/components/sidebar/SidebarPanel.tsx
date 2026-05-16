@@ -65,7 +65,21 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
   const selectedResourceId = useStore((s) => s.selectedResourceId);
   const selectedResourceKind = useStore((s) => s.selectedResourceKind);
   const activeLeftTab = useStore((s) => s.activeLeftTab);
-  const nodes = useStore((s) => s.nodes);
+  // PERF — previously this subscribed to the full `nodes` array just to
+  // look up the selected node in `renderBody()`. ReactFlow replaces the
+  // `nodes` array on every drag tick (60 Hz), re-rendering this always-
+  // mounted right panel every tick even when the user is dragging an
+  // unselected node. Subscribe only to the selected node instead.
+  // `applyNodeChanges` from xyflow preserves the `data` reference across
+  // position-only updates, so this selector is stable while dragging
+  // even the selected node — only re-renders when the selected node's
+  // data actually changes (rename, param edit, etc.). See
+  // gui/PERFORMANCE.md §1.
+  const selectedNode = useStore((s) =>
+    selectedNodeId != null
+      ? s.nodes.find((n) => n.id === selectedNodeId)
+      : undefined,
+  );
   const resources = useStore((s) => s.resources);
   const updateNodeParams = useStore((s) => s.updateNodeParams);
   const updateResource = useStore((s) => s.updateResource);
@@ -159,9 +173,8 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
   function renderBody() {
     // ----- component branch ---------------------------------------------
     if (selectionKind === "component" && selectedNodeId != null) {
-      const node = nodes.find((n) => n.id === selectedNodeId);
-      if (!node) return null;
-      const data = node.data as unknown as StreamNodeData;
+      if (!selectedNode) return null;
+      const data = selectedNode.data as unknown as StreamNodeData;
       const component = getComponent(data.componentId);
       if (!component) {
         return (
