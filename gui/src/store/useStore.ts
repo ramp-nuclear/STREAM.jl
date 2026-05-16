@@ -187,6 +187,28 @@ interface AppState {
   validationResult: TopologyResult | null;
   validateAndGate: () => TopologyResult;
   clearValidation: () => void;
+  // Phase 66 Plan 03: code-panel ephemeral slices (session-only, NOT persisted in .scp).
+  //
+  // hoveredSourceIds — sub-block hover in CodePreview drives a hover ring on
+  //   the matching canvas StreamNode(s). Mirrors the errorNodeIds Set pattern
+  //   for primitive-boolean selector subscriptions (Pitfall 1: every mutation
+  //   produces a NEW Set reference so Zustand shallow equality fires re-renders).
+  // pinnedSourceIds — sub-block click toggles a "sticky" pin ring on the
+  //   matching canvas StreamNode(s). D-10 overlap-toggle: any overlap with an
+  //   already-pinned id removes ALL of the second sub-block's ids.
+  // pendingShowCodeFor — one-shot signal written by useShowCodeFor() when a
+  //   `stream:show-code-for` CustomEvent fires; consumed (read + cleared
+  //   atomically) by CodePreview on next mount/update to scroll-into-view +
+  //   flash the matching sub-blocks. null = no pending request.
+  hoveredSourceIds: Set<string>;
+  pinnedSourceIds: Set<string>;
+  pendingShowCodeFor: string[] | null;
+  setHoveredSourceIds: (ids: string[]) => void;
+  clearHoveredSourceIds: () => void;
+  togglePinnedForSubBlock: (subBlockSourceIds: string[]) => void;
+  clearPinnedSourceIds: () => void;
+  setPendingShowCodeFor: (ids: string[]) => void;
+  consumePendingShowCodeFor: () => string[] | null;
   // Layer view state (persisted in .scp layout block, NOT in undo stack)
   activeLayer: LayerView;
   setActiveLayer: (layer: LayerView) => void;
@@ -796,6 +818,12 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   // Topology validation (Phase 39) initial state
   errorNodeIds: new Set<string>(),
   validationResult: null,
+  // Phase 66 Plan 03: code-panel ephemeral slices initial state.
+  // All three start empty/null. Session-only — NOT serialized to .scp
+  // (verified: serializeProject's args list does not include these keys).
+  hoveredSourceIds: new Set<string>(),
+  pinnedSourceIds: new Set<string>(),
+  pendingShowCodeFor: null,
   // Layer view initial state
   activeLayer: "Both" as LayerView,
   // Snap-to-grid initial state (Phase 65 D-10 — OFF by default)
@@ -1796,6 +1824,47 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
 
   clearValidation: () => {
     set({ errorNodeIds: new Set<string>(), validationResult: null });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 66 Plan 03: code-panel ephemeral actions
+  //
+  // Every mutation produces a NEW Set / array reference (Pitfall 1 — in-place
+  // mutation would keep the same reference, Zustand's shallow equality
+  // returns true, and subscribed components would never re-render).
+  // Session-only — none of these set isDirty.
+  // ---------------------------------------------------------------------------
+
+  setHoveredSourceIds: (ids) =>
+    set({ hoveredSourceIds: new Set(ids) }),
+
+  clearHoveredSourceIds: () =>
+    set({ hoveredSourceIds: new Set<string>() }),
+
+  togglePinnedForSubBlock: (subBlockSourceIds) =>
+    set((s) => {
+      const next = new Set(s.pinnedSourceIds);
+      // CONTEXT D-10: any overlap with currently-pinned ids → remove ALL of
+      // this sub-block's ids (overlap-removes-all). Otherwise → add ALL.
+      const anyPinned = subBlockSourceIds.some((id) => next.has(id));
+      if (anyPinned) {
+        for (const id of subBlockSourceIds) next.delete(id);
+      } else {
+        for (const id of subBlockSourceIds) next.add(id);
+      }
+      return { pinnedSourceIds: next };
+    }),
+
+  clearPinnedSourceIds: () =>
+    set({ pinnedSourceIds: new Set<string>() }),
+
+  setPendingShowCodeFor: (ids) =>
+    set({ pendingShowCodeFor: [...ids] }),
+
+  consumePendingShowCodeFor: () => {
+    const current = get().pendingShowCodeFor;
+    set({ pendingShowCodeFor: null });
+    return current;
   },
 
   // Panel collapse is NOT content-mutating — do NOT set isDirty
