@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: planning
-stopped_at: Phase 67 context gathered
-last_updated: "2026-05-16T10:11:44.457Z"
-last_activity: 2026-05-16
+status: executing
+stopped_at: Phase 67 UI-SPEC approved
+last_updated: "2026-05-16T11:44:26.835Z"
+last_activity: 2026-05-16 -- Phase 67 planning complete
 progress:
   total_phases: 15
   completed_phases: 9
-  total_plans: 67
+  total_plans: 70
   completed_plans: 68
   percent: 60
 ---
@@ -60,8 +60,8 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 Phase: 67
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-16
+Status: Ready to execute
+Last activity: 2026-05-16 -- Phase 67 planning complete
 Next: `/gsd:verify-work 65` to re-run UAT against the gap-closure surfaces, then `/gsd:discuss-phase 66` (Code preview rework). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far (covers Phases 59 → 65).
 
 Phase 65 deferred manual UAT (require running Tauri build):
@@ -142,10 +142,10 @@ Outstanding non-blocking items (NOT 66's job):
 
 ## Session Continuity
 
-**Last session:** 2026-05-16T10:11:44.401Z
-**Stopped at:** Phase 67 context gathered
+**Last session:** 2026-05-16T11:05:23.696Z
+**Stopped at:** Phase 67 UI-SPEC approved
 **Next action:** `/gsd:discuss-phase 66` (Code preview rework) — or `/gsd:ship` to open a milestone PR first and run UAT on the 6 deferred Phase 65 surfaces
-**Resume file:** .planning/phases/67-custom-titlebar/67-CONTEXT.md
+**Resume file:** .planning/phases/67-custom-titlebar/67-UI-SPEC.md
 **Branch:** `gui-redesign`
 **Stash:** none
 
