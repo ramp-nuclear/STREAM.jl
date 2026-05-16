@@ -117,3 +117,17 @@ Deferred items, polish tasks, and future work captured during development.
   cadence question is real. Deferred for v1.2 — milestone proceeds in current monorepo.
 - Priority: medium (infrastructure decision, no immediate user-visible impact)
 - Captured during `/gsd:explore` session — Section 6 parked items
+
+---
+
+## KFW-1: StreamNode per-port `resolveFlowPortAssignment` is O(N²) per store update (from Phase 66 perf sweep, 2026-05-16)
+
+- Source: `gui/src/components/StreamNode.tsx:187` (FlowPortHandle) and `:261` (ThermalPortHandle)
+- Problem: each StreamNode subscribes via `useStore(useCallback((s) => resolveFlowPortAssignment(s.nodes, s.edges, ...)[port.name], ...))`. The selector body walks the entire `nodes` + `edges` graph. With N nodes × ~3 ports each × O(N+M) work, every store mutation triggers O(N²) work across all StreamNodes — including unrelated mutations like `setHoveredSourceIds` from hovering a code-panel sub-block.
+- Current impact: typical STREAM circuits are 5–30 components — well within the safe zone (<1ms per drag tick). At 50+ nodes it becomes perceptible; at 100+ it dominates frame cost.
+- Suggested fix: lift port-assignment computation into an App-level `useMemo<Map<string, Side>>` keyed by `{nodeId, portName}`, recomputed only when `nodes`/`edges` actually change (via the `useShallow` pattern that ignores positions). Each `<Handle>` then subscribes to a single primitive string from the Map.
+- Risk: port autoflip (Phase 64) is intricate and user-facing. Regression here is visually loud (handles snap to wrong sides during edits). Refactor needs careful manual verification, not just unit tests.
+- Documented in: `gui/PERFORMANCE.md` Known Followup Work section
+- Priority: medium-low (only bites at scale; current behavior is correct, just wasteful)
+- When to fix: dedicated Phase 67+ perf phase (estimate 3–5 focused hours)
+- Captured during `/gsd:execute-phase 66` UAT, post perf-sweep commit 6325be2
