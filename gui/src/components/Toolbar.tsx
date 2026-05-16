@@ -18,16 +18,17 @@ interface Props {
 }
 
 export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
-  const nodes = useStore((s) => s.nodes);
-  const edges = useStore((s) => s.edges);
-  // Phase 63.1 Plan 04: subscribe to the anchors slice and pass it directly
-  // to generateCode as `{ anchors }`. The codegen signature now accepts the
-  // Record shape natively (no BCEntry[] adapter).
-  const anchors = useStore((s) => s.anchors);
-  const resources = useStore((s) => s.resources);
-  // Phase 63: BC slices feed into the per-mode codegen emission.
-  const bcMode = useStore((s) => s.bcMode);
-  const bcSymmetric = useStore((s) => s.bcSymmetric);
+  // PERF — only subscribe to the things this component actually reads in its
+  // render output. The Export click handler reads live state via
+  // useStore.getState() at click time. Previously Toolbar subscribed to the
+  // full nodes/edges/anchors/resources/bcMode/bcSymmetric set just to pass
+  // them to generateCode in handleExport — every one of those fired on every
+  // ReactFlow drag tick (60 Hz), re-rendering the always-mounted Toolbar.
+  // We still need a boolean for the disabled state on the Export button, so
+  // we subscribe to a derived primitive (re-renders only when the canvas
+  // crosses the empty/non-empty boundary). Same pattern as BottomPanel.tsx
+  // (commit 6c08bcd) and the rule documented in gui/PERFORMANCE.md §3.
+  const hasNodes = useStore((s) => s.nodes.length > 0);
   const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
   const toggleBottomPanel = useStore((s) => s.toggleBottomPanel);
   const isDirty = useStore((s) => s.isDirty);
@@ -42,15 +43,16 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
   // state without paying for memoization that the now-unused
   // `serializeSections` wrap previously required.
   async function handleExport() {
+    const s = useStore.getState();
     const sections = generateCode(
-      nodes,
-      edges,
-      { anchors },
+      s.nodes,
+      s.edges,
+      { anchors: s.anchors },
       getComponent,
-      resources,
-      { bcMode, bcSymmetric },
+      s.resources,
+      { bcMode: s.bcMode, bcSymmetric: s.bcSymmetric },
     );
-    await exportCode({ sections, nodes });
+    await exportCode({ sections, nodes: s.nodes });
   }
 
   return (
@@ -116,7 +118,7 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
         <Button
           variant="default"
           size="sm"
-          disabled={nodes.length === 0}
+          disabled={!hasNodes}
           onClick={handleExport}
         >
           <Download className="h-4 w-4 mr-1" />
