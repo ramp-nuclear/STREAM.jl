@@ -34,7 +34,11 @@ export default function EditMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-normal">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-full rounded-none px-3 py-0 text-xs font-normal"
+        >
           Edit
         </Button>
       </DropdownMenuTrigger>
