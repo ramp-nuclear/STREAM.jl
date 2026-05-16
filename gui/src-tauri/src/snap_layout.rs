@@ -23,20 +23,22 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use tauri::{Emitter, Runtime, WebviewWindow};
+use tauri::{Emitter, Manager, Runtime, WebviewWindow};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, NULL_BRUSH};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
+// `WM_MOUSELEAVE` lives in `KeyboardAndMouse` (it's tied to TrackMouseEvent), NOT
+// `WindowsAndMessaging` — a windows-sys module split quirk.
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
+    TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT, WM_MOUSELEAVE,
 };
 use windows_sys::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, RegisterClassExW, SetWindowPos,
     CS_HREDRAW, CS_VREDRAW, HTMAXBUTTON, HWND_TOP, SWP_ASYNCWINDOWPOS, SWP_SHOWWINDOW, WM_CLOSE,
-    WM_DPICHANGED, WM_MOUSELEAVE, WM_MOUSEMOVE, WM_NCHITTEST, WM_SIZE, WNDCLASSEXW, WS_CHILD,
-    WS_CLIPSIBLINGS, WS_VISIBLE,
+    WM_DPICHANGED, WM_MOUSEMOVE, WM_NCHITTEST, WM_SIZE, WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS,
+    WS_VISIBLE,
 };
 
 const CLASS_NAME: &[u16] = &[
