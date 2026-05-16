@@ -1,0 +1,110 @@
+{
+  "version": 2,
+  "nodes": [
+    {
+      "id": "f2101769-fff3-4562-9a4b-56247f9ef4e7",
+      "type": "streamNode",
+      "position": {
+        "x": 78.28302958708144,
+        "y": 247.74453980053045
+      },
+      "data": {
+        "componentId": "Channel",
+        "instanceName": "channel_1",
+        "parameters": {
+          "g": 0,
+          "htc_correlation": "dittus_boelter",
+          "friction_correlation": "blasius_friction"
+        },
+        "constructorMode": "default"
+      },
+      "measured": {
+        "width": 140,
+        "height": 54
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "f24931b3-4d4e-450a-b0ce-33a4515e3a5f",
+      "type": "streamNode",
+      "position": {
+        "x": 361.83653198264744,
+        "y": 142.23524608606238
+      },
+      "data": {
+        "componentId": "HeatDiffusion",
+        "instanceName": "heatdiffusion_1",
+        "parameters": {
+          "power": 1000000,
+          "T0": 600
+        },
+        "constructorMode": "default"
+      },
+      "measured": {
+        "width": 141,
+        "height": 54
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "6a843389-476c-41d3-b159-fc9f60c4aa78",
+      "type": "streamNode",
+      "position": {
+        "x": -19,
+        "y": 49.25
+      },
+      "data": {
+        "componentId": "Pump",
+        "instanceName": "pump_1",
+        "parameters": {},
+        "constructorMode": "fixed-dP"
+      },
+      "measured": {
+        "width": 140,
+        "height": 54
+      },
+      "selected": false,
+      "dragging": false
+    }
+  ],
+  "edges": [
+    {
+      "type": "smoothstep",
+      "source": "f2101769-fff3-4562-9a4b-56247f9ef4e7",
+      "sourceHandle": "port_out",
+      "target": "6a843389-476c-41d3-b159-fc9f60c4aa78",
+      "targetHandle": "port_in",
+      "id": "xy-edge__f2101769-fff3-4562-9a4b-56247f9ef4e7port_out-6a843389-476c-41d3-b159-fc9f60c4aa78port_in"
+    },
+    {
+      "type": "smoothstep",
+      "source": "6a843389-476c-41d3-b159-fc9f60c4aa78",
+      "sourceHandle": "port_out",
+      "target": "f2101769-fff3-4562-9a4b-56247f9ef4e7",
+      "targetHandle": "port_in",
+      "id": "xy-edge__6a843389-476c-41d3-b159-fc9f60c4aa78port_out-f2101769-fff3-4562-9a4b-56247f9ef4e7port_in"
+    },
+    {
+      "type": "smoothstep",
+      "source": "f24931b3-4d4e-450a-b0ce-33a4515e3a5f",
+      "sourceHandle": "thermal_right",
+      "target": "f2101769-fff3-4562-9a4b-56247f9ef4e7",
+      "targetHandle": "thermal",
+      "id": "xy-edge__f24931b3-4d4e-450a-b0ce-33a4515e3a5fthermal_right-f2101769-fff3-4562-9a4b-56247f9ef4e7thermal",
+      "style": {
+        "stroke": "#f59e0b",
+        "strokeDasharray": "6 3"
+      }
+    }
+  ],
+  "bcs": [
+    {
+      "nodeId": "6a843389-476c-41d3-b159-fc9f60c4aa78",
+      "portField": "port_in.P",
+      "value": 100000
+    }
+  ],
+  "activeLayer": "Both"
+}
