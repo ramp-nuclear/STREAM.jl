@@ -35,8 +35,8 @@ use windows_sys::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWi
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, RegisterClassExW, SetWindowPos,
     CS_HREDRAW, CS_VREDRAW, HTMAXBUTTON, HWND_TOP, SWP_ASYNCWINDOWPOS, SWP_SHOWWINDOW, WM_CLOSE,
-    WM_DPICHANGED, WM_NCHITTEST, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_SIZE, WNDCLASSEXW, WS_CHILD,
-    WS_CLIPSIBLINGS, WS_VISIBLE,
+    WM_DPICHANGED, WM_NCHITTEST, WM_NCLBUTTONUP, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_SIZE,
+    WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_VISIBLE,
 };
 
 const CLASS_NAME: &[u16] = &[
@@ -61,6 +61,10 @@ const RIGHT_INDEX: i32 = 1; // maximize button is 2nd from the right (Close=0, M
 // the codebase (e.g. `snap-layout://hover-enter`).
 const EVT_HOVER_ENTER: &str = "snap-layout://hover-enter";
 const EVT_HOVER_LEAVE: &str = "snap-layout://hover-leave";
+// Emitted on WM_NCLBUTTONUP — clicks on the overlay never reach the React
+// Maximize button because Windows routes them as non-client clicks to the
+// overlay HWND (HTMAXBUTTON area). React subscribes and calls toggleMaximize.
+const EVT_CLICK: &str = "snap-layout://click";
 
 // HWND is `*mut c_void`, which is not Send/Sync — but storing the handle in a
 // `static` requires Sync. The portable workaround is to keep handles as `isize`
@@ -256,6 +260,20 @@ unsafe extern "system" fn overlay_proc(
             if let Some(emit) = EMITTER.get() {
                 emit(EVT_HOVER_LEAVE);
             }
+        }
+        // Clicks on the overlay arrive as WM_NCLBUTTONUP because the
+        // WM_NCHITTEST return value (HTMAXBUTTON) put the entire overlay
+        // area into the non-client space. The overlay's DefWindowProcW
+        // would react to this by trying to system-maximize itself — a
+        // child window — which is a no-op. Emit our event and return 0
+        // (consumed); React's onClick handler on the Maximize button
+        // listens and calls getCurrentWindow().toggleMaximize() on the
+        // parent webview.
+        WM_NCLBUTTONUP => {
+            if let Some(emit) = EMITTER.get() {
+                emit(EVT_CLICK);
+            }
+            return 0;
         }
         _ => {}
     }
