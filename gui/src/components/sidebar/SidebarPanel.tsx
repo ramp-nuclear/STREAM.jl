@@ -355,7 +355,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
   }
 
   return (
-    <div className="relative h-full border-l shrink-0 overflow-hidden" style={{ width }}>
+    <div className="relative h-full border-l shrink-0 overflow-hidden bg-panel" style={{ width }}>
       {onResizeMouseDown && (
         <div
           role="separator"

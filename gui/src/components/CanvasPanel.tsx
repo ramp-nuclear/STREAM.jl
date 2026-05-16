@@ -316,7 +316,7 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       : null;
 
   return (
-    <div ref={containerRef} className="flex-1 h-full relative focus:outline-none" tabIndex={-1}>
+    <div ref={containerRef} className="flex-1 h-full relative focus:outline-none bg-canvas" tabIndex={-1}>
       <ReactFlow
         colorMode={resolvedTheme === "dark" ? "dark" : "light"}
         style={resolvedTheme === "dark" ? ({ "--xy-background-color": "#282c34" } as React.CSSProperties) : undefined}

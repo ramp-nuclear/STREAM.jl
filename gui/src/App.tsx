@@ -398,7 +398,7 @@ function App() {
           <div className="flex flex-1 min-h-0">
             {!toolboxCollapsed && (
               <div
-                className="relative h-full border-r shrink-0 flex flex-col overflow-hidden"
+                className="relative h-full border-r shrink-0 flex flex-col overflow-hidden bg-panel"
                 style={{ width: toolboxResize.width }}
               >
                 {/* VS Code-style sash on inner edge: 4px hit area, transparent at

@@ -22,6 +22,13 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  /* Phase 67 Plan 04 — VSCode-style three-tier depth tokens (same hue,
+     luminance steps only). Chrome darkest, panel mid, canvas lightest.
+     Light mode: chrome is a noticeably-darker neutral, panel is off-white,
+     canvas is pure white. */
+  --chrome: oklch(0.92 0 0);
+  --panel: oklch(0.97 0 0);
+  --canvas: oklch(1 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -71,6 +78,15 @@
   --sidebar-accent-foreground: oklch(0.73 0.012 250);
   --sidebar-border: oklch(1 0 0 / 11%);
   --sidebar-ring: oklch(0.50 0.01 250);
+  /* Phase 67 Plan 04 — three-tier depth tokens, dark mode.
+     Chrome darkest (≈#181b20), panel mid (≈#21252b — matches existing
+     sidebar tone for hue continuity), canvas lightest (≈#282c34 — same
+     as the existing One Dark Pro --background to keep the canvas color
+     stable with all prior canvas/ReactFlow tuning). Same warm blue-grey
+     hue across all three; only luminance steps. */
+  --chrome: oklch(0.19 0.011 254);
+  --panel: oklch(0.215 0.012 254);
+  --canvas: oklch(0.24 0.012 254);
 }
 
 @theme inline {
@@ -109,6 +125,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* Phase 67 Plan 04 — expose three-tier depth tokens as Tailwind utilities:
+     bg-chrome / bg-panel / bg-canvas (and matching text-/border- variants).
+     Tailwind v4 generates utilities from any --color-* token declared inside
+     @theme inline. */
+  --color-chrome: var(--chrome);
+  --color-panel: var(--panel);
+  --color-canvas: var(--canvas);
 }
 
 * {

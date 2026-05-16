@@ -72,7 +72,7 @@ export default function BottomPanel() {
   if (!bottomPanelOpen) return null;
 
   return (
-    <div style={{ height: bottomPanelHeight }} className="border-t flex flex-col">
+    <div style={{ height: bottomPanelHeight }} className="border-t flex flex-col bg-panel">
       {/* Drag handle */}
       <div
         className="h-2 w-full cursor-row-resize hover:bg-ring/30 transition-colors flex-shrink-0"
