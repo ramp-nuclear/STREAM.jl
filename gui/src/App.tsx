@@ -6,7 +6,8 @@ import ResourcesTreePanel from "./components/resources/ResourcesTreePanel";
 import ModelOptionsPanel from "./components/project/ModelOptionsPanel";
 import CanvasPanel from "./components/CanvasPanel";
 import SidebarPanel from "./components/SidebarPanel";
-import Toolbar from "./components/Toolbar";
+import CustomTitlebar from "./components/CustomTitlebar";
+import SecondaryToolbar from "./components/SecondaryToolbar";
 import BottomPanel from "./components/BottomPanel";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import ValidationDialog from "./components/ValidationDialog";
@@ -388,6 +389,12 @@ function App() {
     <ReactFlowProvider>
       <TooltipProvider delayDuration={500} skipDelayDuration={300}>
         <div className="flex flex-col h-screen w-screen overflow-hidden">
+          <CustomTitlebar
+            onUnsavedCheck={showUnsavedDialog}
+            theme={theme}
+            setTheme={setTheme}
+          />
+          <SecondaryToolbar />
           <div className="flex flex-1 min-h-0">
             {!toolboxCollapsed && (
               <div
@@ -453,7 +460,6 @@ function App() {
               />
             )}
             <div className="flex flex-col flex-1 min-w-0">
-              <Toolbar onUnsavedCheck={showUnsavedDialog} theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} />
               <CanvasPanel resolvedTheme={resolvedTheme} />
             </div>
             {sidebarCollapsed && (
