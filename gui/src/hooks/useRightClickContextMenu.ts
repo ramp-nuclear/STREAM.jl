@@ -84,14 +84,22 @@ export function useRightClickContextMenu(): {
     };
 
     // Listener 3: contextmenu (CAPTURE phase — runs BEFORE React's delegated
-    // handlers). If the preceding gesture was a drag (exceeded threshold), call
-    // preventDefault() to suppress the OS-native context menu. This resolves
-    // checker B2: ReactFlow forwards onPaneContextMenu regardless of pan state,
-    // and the browser may also fire a native contextmenu after a right-drag on
-    // Linux/X11/Windows.
+    // handlers). Unconditionally suppress the browser/WebView2 native context
+    // menu EXCEPT inside editable fields (where users expect copy/paste/
+    // spellcheck). The previous "only on drag" rule worked on WSLg/WebKitGTK
+    // because that backend doesn't show a browser context menu by default —
+    // but WebView2 on Windows DOES in dev builds, and React's synthetic
+    // preventDefault inside ReactFlow's onPaneContextMenu doesn't reliably
+    // propagate back to the native event there. Suppressing at capture is the
+    // load-bearing line; the gesture logic below is for OUR custom menu's
+    // state, not the browser default.
     const handleContextMenu = (event: MouseEvent) => {
-      if (gestureRef.current === null) return;
-      if (!isQuickShortGesture()) {
+      const target = event.target as HTMLElement | null;
+      const inEditableField =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable === true;
+      if (!inEditableField) {
         event.preventDefault();
       }
     };

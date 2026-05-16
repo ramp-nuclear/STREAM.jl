@@ -279,8 +279,13 @@ describe("useRightClickContextMenu", () => {
     window.removeEventListener("contextmenu", controlListener, false);
   });
 
-  // Quick-click on pane context menu also suppresses native contextmenu (defaultPrevented=false for quick click)
-  it("quick right-click does NOT suppress the window contextmenu event (defaultPrevented=false)", () => {
+  // Quick-click ALSO suppresses the native contextmenu now (Phase 67 round 3
+  // Windows fix). Previously the hook only preventDefault'd on drag gestures
+  // and relied on React's synthetic preventDefault from onPaneContextMenu for
+  // quick-clicks — but WebView2 on Windows shows its own native context menu
+  // before React's delegated handler can run. The hook now unconditionally
+  // preventDefaults at capture-phase outside editable input fields.
+  it("quick right-click suppresses the window contextmenu event (defaultPrevented=true)", () => {
     const controlSpy: Mock = vi.fn();
     const controlListener = (e: MouseEvent) => controlSpy(e.defaultPrevented);
     window.addEventListener("contextmenu", controlListener, false);
@@ -293,9 +298,42 @@ describe("useRightClickContextMenu", () => {
       dispatchContextMenu(102, 201);
     });
 
-    // For quick-short gesture, hook should NOT call preventDefault on the window event
+    // Hook now suppresses the native contextmenu unconditionally (outside inputs)
+    expect(controlSpy).toHaveBeenCalledWith(true);
+
+    window.removeEventListener("contextmenu", controlListener, false);
+    unmount();
+  });
+
+  // Editable-field exemption: contextmenu in an <input> / <textarea> / contentEditable
+  // is NOT suppressed so users keep the OS copy/paste/spellcheck menu.
+  it("right-click inside an <input> does NOT suppress the contextmenu (defaultPrevented=false)", () => {
+    const controlSpy: Mock = vi.fn();
+    const controlListener = (e: MouseEvent) => controlSpy(e.defaultPrevented);
+    window.addEventListener("contextmenu", controlListener, false);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    document.body.appendChild(input);
+
+    const { unmount } = renderHook(() => useRightClickContextMenu());
+
+    act(() => {
+      // Dispatch contextmenu directly on the input element.
+      const event = new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        button: 2,
+        clientX: 5,
+        clientY: 5,
+      });
+      input.dispatchEvent(event);
+    });
+
+    // Editable target → preventDefault NOT called → native menu allowed
     expect(controlSpy).toHaveBeenCalledWith(false);
 
+    document.body.removeChild(input);
     window.removeEventListener("contextmenu", controlListener, false);
     unmount();
   });
