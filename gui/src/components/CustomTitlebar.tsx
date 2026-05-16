@@ -5,6 +5,7 @@ import EditMenu from "./EditMenu";
 import ViewMenu from "./ViewMenu";
 import HelpMenu from "./HelpMenu";
 import WindowControls from "./WindowControls";
+import { Menubar } from "./ui/menubar";
 import type { Theme } from "../hooks/useTheme";
 
 interface Props {
@@ -65,10 +66,16 @@ export default function CustomTitlebar({
           ●
         </span>
       )}
-      <FileMenu onUnsavedCheck={onUnsavedCheck} />
-      <EditMenu />
-      <ViewMenu theme={theme} setTheme={setTheme} />
-      <HelpMenu />
+      {/* Single <Menubar> parent coordinates click-once switching between
+          sibling menus (Office / VSCode / IntelliJ pattern — UAT round 2 #5).
+          Override shadcn's default border / bg / padding so the menubar
+          is transparent and inherits the chrome bg from the titlebar. */}
+      <Menubar className="border-0 bg-transparent shadow-none p-0 h-full rounded-none gap-0">
+        <FileMenu onUnsavedCheck={onUnsavedCheck} />
+        <EditMenu />
+        <ViewMenu theme={theme} setTheme={setTheme} />
+        <HelpMenu />
+      </Menubar>
       {/* D-26: drag region MUST be a sibling (not a wrapper) — wrapping the
           menu cluster inside data-tauri-drag-region breaks Radix click
           handlers (Tauri #9901). */}
