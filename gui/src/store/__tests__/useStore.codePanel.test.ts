@@ -223,7 +223,9 @@ describe(".scp exclusion — new slices never appear in serializeProject output"
       resources: s.resources,
       modelOptions: s.modelOptions,
       activeLeftTab: s.activeLeftTab,
-      activeLayer: s.activeLayer,
+      // Phase 68: 4-layer fixture (replaces v0.8 `activeLayer: s.activeLayer`)
+      activeLayers: s.activeLayers,
+      hideOffLayer: s.hideOffLayer,
       snapToGrid: s.snapToGrid,
     });
 

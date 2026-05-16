@@ -71,7 +71,9 @@ function resetStore() {
     recentFiles: [],
     missingFilePowerShapes: [],
     activeLeftTab: "Components",
-    activeLayer: "Both",
+    // Phase 68: 4-layer fixture (replaces v0.8 `activeLayer: "Both"`).
+    activeLayers: { Hydraulic: true, Thermal: true, Sources: true, ReactorPhysics: true },
+    hideOffLayer: false,
     errorNodeIds: new Set<string>(),
     validationResult: null,
     // Stub the validation gate so saveProject / saveProjectAs reach the

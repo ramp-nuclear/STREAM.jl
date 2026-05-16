@@ -11,7 +11,7 @@
 
 import type { Node, Edge } from "@xyflow/react";
 import type { AnchorEntry } from "./anchors";
-import type { LayerView } from "./layers";
+import { type LayerKey, type ActiveLayers, ALL_LAYERS_ON } from "./layers";
 import {
   SENTINEL_UNSET_POWER_SHAPE,
   type GeometryResource,
@@ -57,7 +57,12 @@ export interface StreamProject {
   anchors: Record<string, AnchorEntry>;
   layout: {
     active_left_tab: ActiveLeftTab; // D-08 / D-29
-    active_layer: LayerView; // moved from top-level (was StreamProject.activeLayer)
+    // Phase 68 D-05: 4-layer independent toggles replace v0.8 `active_layer`
+    // string. `active_layer` is no longer written; on read the deserializer
+    // accepts the legacy field as a one-shot translation (see
+    // `deserializeProject` shim).
+    active_layers: ActiveLayers;
+    hide_off_layer: boolean;
     snap_to_grid: boolean; // Phase 65 D-10 — persisted per-project, default false
   };
 }
@@ -80,7 +85,13 @@ function defaultModelOptions(): ModelOptionsSliceState {
 }
 
 function defaultLayout(): StreamProject["layout"] {
-  return { active_left_tab: "Components", active_layer: "Both", snap_to_grid: false };
+  return {
+    active_left_tab: "Components",
+    // Phase 68 D-05: 4-layer defaults (all on, dim mode).
+    active_layers: { ...ALL_LAYERS_ON },
+    hide_off_layer: false,
+    snap_to_grid: false,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +112,10 @@ export interface SerializeProjectArgs {
   };
   modelOptions: ModelOptionsSliceState;
   activeLeftTab: ActiveLeftTab;
-  activeLayer: LayerView;
+  // Phase 68 D-05: 4-layer independent toggles + hide/dim preference. Replaces
+  // the v0.8 `activeLayer: LayerView` field.
+  activeLayers: ActiveLayers;
+  hideOffLayer: boolean;
   snapToGrid: boolean; // Phase 65 D-10
 }
 
@@ -112,7 +126,7 @@ export interface SerializeProjectArgs {
  *  - resources.geometries / .powerShapes / .fluids: Record<uuid, T> -> T[]
  *  - SENTINEL_UNSET_POWER_SHAPE is filtered out (D-26 — sentinel is in-memory only)
  *  - light_water Fluid placeholder is filtered out (re-injected at load time)
- *  - activeLeftTab + activeLayer are nested under `layout` (D-29)
+ *  - activeLeftTab + activeLayers + hideOffLayer nested under `layout` (D-29 / Phase 68 D-05)
  *
  * # Arguments
  * - `args` — single args object; see {@link SerializeProjectArgs}
@@ -140,7 +154,11 @@ export function serializeProject(args: SerializeProjectArgs): string {
     anchors: args.anchors,
     layout: {
       active_left_tab: args.activeLeftTab,
-      active_layer: args.activeLayer,
+      // Phase 68 D-05: write the 4-layer object + hide/dim flag. The legacy
+      // `active_layer` string is intentionally NOT written — load-side has a
+      // one-shot shim for old files.
+      active_layers: args.activeLayers,
+      hide_off_layer: args.hideOffLayer,
       snap_to_grid: args.snapToGrid,
     },
   };
@@ -193,11 +211,48 @@ export function deserializeProject(json: string): StreamProject {
   const fluids = (rawResources.fluids as FluidResource[]) ?? [];
 
   const rawLayout = (parsed.layout as Record<string, unknown>) ?? {};
+
+  // Phase 68 D-05: 4-layer active_layers + hide_off_layer with one-shot legacy
+  // `active_layer` shim. Mapping (per CONTEXT.md Claude's-Discretion):
+  //   new `active_layers` present → use it (overlay onto ALL_LAYERS_ON so
+  //                                          missing keys default to true)
+  //   legacy "Both"  / missing    → ALL_LAYERS_ON
+  //   legacy "Hydraulic"          → only Hydraulic true
+  //   legacy "Thermal"            → only Thermal true
+  // The new field always wins when both are present.
+  const rawActiveLayers = rawLayout.active_layers as
+    | Partial<Record<LayerKey, boolean>>
+    | undefined;
+  const legacyLayer = rawLayout.active_layer as string | undefined;
+  let active_layers: ActiveLayers;
+  if (rawActiveLayers) {
+    active_layers = { ...ALL_LAYERS_ON, ...rawActiveLayers };
+  } else if (legacyLayer === "Hydraulic") {
+    active_layers = {
+      Hydraulic: true,
+      Thermal: false,
+      Sources: false,
+      ReactorPhysics: false,
+    };
+  } else if (legacyLayer === "Thermal") {
+    active_layers = {
+      Hydraulic: false,
+      Thermal: true,
+      Sources: false,
+      ReactorPhysics: false,
+    };
+  } else {
+    // "Both" or missing/unknown → all on.
+    active_layers = { ...ALL_LAYERS_ON };
+  }
+  const hide_off_layer: boolean =
+    (rawLayout.hide_off_layer as boolean | undefined) ?? false;
+
   const layout: StreamProject["layout"] = {
     active_left_tab:
       (rawLayout.active_left_tab as ActiveLeftTab) ?? defaultLayout().active_left_tab,
-    active_layer:
-      (rawLayout.active_layer as LayerView) ?? defaultLayout().active_layer,
+    active_layers,
+    hide_off_layer,
     // Phase 65 D-10: empty-state tolerance — missing field defaults to false (RESEARCH Pitfall 3)
     snap_to_grid: (rawLayout.snap_to_grid as boolean) ?? false,
   };

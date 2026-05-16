@@ -22,6 +22,7 @@ import {
   PROJECT_FORMAT_VERSION,
 } from "../projectIO";
 import { SENTINEL_UNSET_POWER_SHAPE, SENTINEL_LIGHT_WATER_FLUID } from "../../store/useStore";
+import { ALL_LAYERS_ON } from "../layers";
 import type {
   GeometryResource,
   PowerShapeResource,
@@ -182,7 +183,8 @@ function makeSerializeArgs() {
     },
     modelOptions: makeModelOptions(),
     activeLeftTab: "Resources" as const,
-    activeLayer: "Both" as const,
+    activeLayers: { ...ALL_LAYERS_ON },
+    hideOffLayer: false,
     snapToGrid: false, // Phase 65 D-10
   };
 }
@@ -240,7 +242,10 @@ describe("serializeProject (INV-06, INV-08)", () => {
     const parsed = JSON.parse(json);
     expect(parsed.layout).toBeDefined();
     expect(parsed.layout.active_left_tab).toBe("Resources");
-    expect(parsed.layout.active_layer).toBe("Both");
+    // Phase 68 D-05: 4-layer independent toggles replace v0.8 `active_layer`
+    expect(parsed.layout.active_layers).toEqual(ALL_LAYERS_ON);
+    expect(parsed.layout.hide_off_layer).toBe(false);
+    expect(parsed.layout.active_layer).toBeUndefined();
   });
 
   it("emits components / connections arrays (renamed from nodes / edges)", () => {
@@ -310,9 +315,10 @@ describe("deserializeProject — round-trip (INV-06, INV-13)", () => {
     expect(project.model_options.g_default).toBe(9.80665);
     expect(project.model_options.solver.abstol).toBe(1e-8);
 
-    // layout (INV-11)
+    // layout (INV-11, Phase 68 D-05)
     expect(project.layout.active_left_tab).toBe("Resources");
-    expect(project.layout.active_layer).toBe("Both");
+    expect(project.layout.active_layers).toEqual(ALL_LAYERS_ON);
+    expect(project.layout.hide_off_layer).toBe(false);
   });
 
   it("preserves file_loaded path as a plain relative string (INV-09)", () => {
@@ -393,7 +399,9 @@ describe("deserializeProject — empty-state tolerance", () => {
     // Phase 63.1 D-02: anchors defaults to empty Record (not Array).
     expect(project.anchors).toEqual({});
     expect(project.layout.active_left_tab).toBe("Components");
-    expect(project.layout.active_layer).toBe("Both");
+    // Phase 68 D-05: deserialize defaults to ALL_LAYERS_ON, hide_off_layer false
+    expect(project.layout.active_layers).toEqual(ALL_LAYERS_ON);
+    expect(project.layout.hide_off_layer).toBe(false);
     expect(project.model_options).toBeDefined();
     expect(project.model_options.g_default).toBe(9.80665);
   });
@@ -405,7 +413,14 @@ describe("deserializeProject — empty-state tolerance", () => {
     });
     const project = deserializeProject(json);
     expect(project.layout.active_left_tab).toBe("Components");
-    expect(project.layout.active_layer).toBe("Hydraulic");
+    // Phase 68 D-05 legacy shim: "Hydraulic" → hydraulic on, others off
+    expect(project.layout.active_layers).toEqual({
+      Hydraulic: true,
+      Thermal: false,
+      Sources: false,
+      ReactorPhysics: false,
+    });
+    expect(project.layout.hide_off_layer).toBe(false);
   });
 
   it("defaults missing resources sub-arrays to empty []", () => {

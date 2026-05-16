@@ -1,152 +1,171 @@
 import { describe, it, expect } from "vitest";
 import {
+  ALL_LAYERS_ON,
+  LAYER_KEYS,
   getComponentLayers,
-  isComponentVisibleInLayer,
-  isNodeDimmed,
+  isNodeVisible,
   isEdgeDimmed,
 } from "../layers";
+import type { ActiveLayers, LayerKey } from "../layers";
 import type { ComponentDefinition } from "../../registry/types";
-import type { LayerView } from "../layers";
 
 // ---------------------------------------------------------------------------
-// Mock component helpers
+// Fixture helpers
 // ---------------------------------------------------------------------------
+//
+// The new 4-layer API derives layer membership from `ComponentDefinition.category`
+// only — port types, parameters, and constructor modes are irrelevant. Fixtures
+// are minimal `as ComponentDefinition` casts that set only the fields the API
+// reads (`category`).
+//
+// Category strings are the registry values verbatim — see
+// gui/src/registry/components.json (D-05 / CONTEXT decision: category is the
+// source of truth).
 
-function makeComp(
-  ports: Array<{ name: string; type: "FlowPort" | "ThermalPort"; side: "left" | "right" }>,
-): ComponentDefinition {
+function compWithCategory(category: string): ComponentDefinition {
   return {
-    id: "test",
-    label: "Test",
-    category: "Hydraulic",
+    id: "fixture",
+    label: "Fixture",
+    category: category as ComponentDefinition["category"],
     description: "",
-    ports: ports.map((p) => ({ ...p })),
+    ports: [],
     parameters: [],
     constructorModes: [],
   };
 }
 
-const hydraulicOnly = makeComp([
-  { name: "port_in", type: "FlowPort", side: "left" },
-  { name: "port_out", type: "FlowPort", side: "right" },
-]);
+// Note: "Reactor Physics" has a space (registry value). The LayerKey form drops
+// the space ("ReactorPhysics") so it can be used as a TypeScript identifier.
+const hydraulicComp = compWithCategory("Hydraulic");
+const thermalComp = compWithCategory("Thermal");
+const sourcesComp = compWithCategory("Sources");
+const reactorPhysicsComp = compWithCategory("Reactor Physics");
+const resourcesComp = compWithCategory("Resources");
+const unknownComp = compWithCategory("Unknown");
 
-const thermalOnly = makeComp([
-  { name: "thermal_left", type: "ThermalPort", side: "left" },
-  { name: "thermal_right", type: "ThermalPort", side: "right" },
-]);
+const ALL_OFF: ActiveLayers = {
+  Hydraulic: false,
+  Thermal: false,
+  Sources: false,
+  ReactorPhysics: false,
+};
 
-const dualLayer = makeComp([
-  { name: "port_in", type: "FlowPort", side: "left" },
-  { name: "port_out", type: "FlowPort", side: "right" },
-  { name: "thermal_left", type: "ThermalPort", side: "left" },
-  { name: "thermal_right", type: "ThermalPort", side: "right" },
-]);
+// ---------------------------------------------------------------------------
+// ALL_LAYERS_ON
+// ---------------------------------------------------------------------------
+
+describe("ALL_LAYERS_ON", () => {
+  it("Test 1: equals { Hydraulic: true, Thermal: true, Sources: true, ReactorPhysics: true }", () => {
+    expect(ALL_LAYERS_ON).toEqual({
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LAYER_KEYS (ordering contract for the LayersChip popover row order)
+// ---------------------------------------------------------------------------
+
+describe("LAYER_KEYS", () => {
+  it("preserves the canonical ordering Hydraulic, Thermal, Sources, ReactorPhysics", () => {
+    expect(LAYER_KEYS).toEqual([
+      "Hydraulic",
+      "Thermal",
+      "Sources",
+      "ReactorPhysics",
+    ] as readonly LayerKey[]);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // getComponentLayers
 // ---------------------------------------------------------------------------
 
 describe("getComponentLayers", () => {
-  it("returns hasFlow=true, hasThermal=false for hydraulic-only component", () => {
-    const layers = getComponentLayers(hydraulicOnly);
-    expect(layers).toEqual({ hasFlow: true, hasThermal: false });
+  it("Test 2: category 'Hydraulic' → ['Hydraulic']", () => {
+    expect(getComponentLayers(hydraulicComp)).toEqual(["Hydraulic"]);
   });
 
-  it("returns hasFlow=false, hasThermal=true for thermal-only component", () => {
-    const layers = getComponentLayers(thermalOnly);
-    expect(layers).toEqual({ hasFlow: false, hasThermal: true });
+  it("Test 3: category 'Thermal' → ['Thermal']", () => {
+    expect(getComponentLayers(thermalComp)).toEqual(["Thermal"]);
   });
 
-  it("returns hasFlow=true, hasThermal=true for dual-layer component", () => {
-    const layers = getComponentLayers(dualLayer);
-    expect(layers).toEqual({ hasFlow: true, hasThermal: true });
+  it("Test 4: category 'Sources' → ['Sources']", () => {
+    expect(getComponentLayers(sourcesComp)).toEqual(["Sources"]);
   });
 
-  it("returns hasFlow=false, hasThermal=false for component with no ports", () => {
-    const noPortComp = makeComp([]);
-    const layers = getComponentLayers(noPortComp);
-    expect(layers).toEqual({ hasFlow: false, hasThermal: false });
+  it("Test 5: category 'Reactor Physics' (with space) → ['ReactorPhysics'] (no space)", () => {
+    expect(getComponentLayers(reactorPhysicsComp)).toEqual(["ReactorPhysics"]);
+  });
+
+  it("Test 6: category 'Resources' → [] (excluded from layer system)", () => {
+    expect(getComponentLayers(resourcesComp)).toEqual([]);
+  });
+
+  it("Test 7: unknown category → []", () => {
+    expect(getComponentLayers(unknownComp)).toEqual([]);
   });
 });
 
 // ---------------------------------------------------------------------------
-// isComponentVisibleInLayer
+// isNodeVisible
 // ---------------------------------------------------------------------------
 
-describe("isComponentVisibleInLayer", () => {
-  const cases: Array<{ comp: ComponentDefinition; label: string; layer: LayerView; expected: boolean }> = [
-    // Both view: all visible
-    { comp: hydraulicOnly, label: "hydraulic-only", layer: "Both", expected: true },
-    { comp: thermalOnly, label: "thermal-only", layer: "Both", expected: true },
-    { comp: dualLayer, label: "dual-layer", layer: "Both", expected: true },
-    // Hydraulic view
-    { comp: hydraulicOnly, label: "hydraulic-only", layer: "Hydraulic", expected: true },
-    { comp: thermalOnly, label: "thermal-only", layer: "Hydraulic", expected: false },
-    { comp: dualLayer, label: "dual-layer", layer: "Hydraulic", expected: true },
-    // Thermal view
-    { comp: hydraulicOnly, label: "hydraulic-only", layer: "Thermal", expected: false },
-    { comp: thermalOnly, label: "thermal-only", layer: "Thermal", expected: true },
-    { comp: dualLayer, label: "dual-layer", layer: "Thermal", expected: true },
-  ];
-
-  for (const { comp, label, layer, expected } of cases) {
-    it(`${label} in ${layer} view returns ${expected}`, () => {
-      expect(isComponentVisibleInLayer(comp, layer)).toBe(expected);
-    });
-  }
-});
-
-// ---------------------------------------------------------------------------
-// isNodeDimmed
-// ---------------------------------------------------------------------------
-
-describe("isNodeDimmed", () => {
-  const compMap: Record<string, ComponentDefinition> = {
-    Pump: hydraulicOnly,
-    HeatDiffusion: thermalOnly,
-    ChannelAndContacts: dualLayer,
-  };
-  const getComp = (id: string) => compMap[id];
-
-  it("dual-layer node is never dimmed in Both view", () => {
-    expect(isNodeDimmed("ChannelAndContacts", "Both", getComp)).toBe(false);
+describe("isNodeVisible", () => {
+  it("Test 8: Hydraulic comp with { Hydraulic: true, ... } → true", () => {
+    const active: ActiveLayers = { ...ALL_LAYERS_ON };
+    expect(isNodeVisible(hydraulicComp, active)).toBe(true);
   });
 
-  it("dual-layer node is never dimmed in Hydraulic view", () => {
-    expect(isNodeDimmed("ChannelAndContacts", "Hydraulic", getComp)).toBe(false);
+  it("Test 9: Hydraulic comp with { Hydraulic: false, Thermal: true, Sources: true, ReactorPhysics: true } → false", () => {
+    const active: ActiveLayers = {
+      Hydraulic: false,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    };
+    expect(isNodeVisible(hydraulicComp, active)).toBe(false);
   });
 
-  it("dual-layer node is never dimmed in Thermal view", () => {
-    expect(isNodeDimmed("ChannelAndContacts", "Thermal", getComp)).toBe(false);
+  it("Test 10: Thermal comp with { Thermal: false, ...rest true } → false", () => {
+    const active: ActiveLayers = {
+      Hydraulic: true,
+      Thermal: false,
+      Sources: true,
+      ReactorPhysics: true,
+    };
+    expect(isNodeVisible(thermalComp, active)).toBe(false);
   });
 
-  it("hydraulic-only node is not dimmed in Hydraulic view", () => {
-    expect(isNodeDimmed("Pump", "Hydraulic", getComp)).toBe(false);
+  it("Test 11: Sources comp with { Sources: false, ...rest true } → false", () => {
+    const active: ActiveLayers = {
+      Hydraulic: true,
+      Thermal: true,
+      Sources: false,
+      ReactorPhysics: true,
+    };
+    expect(isNodeVisible(sourcesComp, active)).toBe(false);
   });
 
-  it("hydraulic-only node is not dimmed in Both view", () => {
-    expect(isNodeDimmed("Pump", "Both", getComp)).toBe(false);
+  it("Test 12: Reactor Physics comp with { ReactorPhysics: false, ...rest true } → false", () => {
+    const active: ActiveLayers = {
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: false,
+    };
+    expect(isNodeVisible(reactorPhysicsComp, active)).toBe(false);
   });
 
-  it("hydraulic-only node is dimmed in Thermal view", () => {
-    expect(isNodeDimmed("Pump", "Thermal", getComp)).toBe(true);
+  it("Test 13: Resources comp (no layer) with all-off activeLayers → true (always visible)", () => {
+    expect(isNodeVisible(resourcesComp, ALL_OFF)).toBe(true);
   });
 
-  it("thermal-only node is not dimmed in Thermal view", () => {
-    expect(isNodeDimmed("HeatDiffusion", "Thermal", getComp)).toBe(false);
-  });
-
-  it("thermal-only node is not dimmed in Both view", () => {
-    expect(isNodeDimmed("HeatDiffusion", "Both", getComp)).toBe(false);
-  });
-
-  it("thermal-only node is dimmed in Hydraulic view", () => {
-    expect(isNodeDimmed("HeatDiffusion", "Hydraulic", getComp)).toBe(true);
-  });
-
-  it("returns false for unknown component", () => {
-    expect(isNodeDimmed("NonExistent", "Hydraulic", getComp)).toBe(false);
+  it("Test 14: Hydraulic comp with all layers off → false", () => {
+    expect(isNodeVisible(hydraulicComp, ALL_OFF)).toBe(false);
   });
 });
 
@@ -155,27 +174,22 @@ describe("isNodeDimmed", () => {
 // ---------------------------------------------------------------------------
 
 describe("isEdgeDimmed", () => {
-  it("thermal edge is not dimmed in Both view", () => {
-    expect(isEdgeDimmed(true, "Both")).toBe(false);
+  it("Test 15: isEdgeDimmed('Hydraulic', { Hydraulic: true, ... }) → false", () => {
+    expect(isEdgeDimmed("Hydraulic", { ...ALL_LAYERS_ON })).toBe(false);
   });
 
-  it("flow edge is not dimmed in Both view", () => {
-    expect(isEdgeDimmed(false, "Both")).toBe(false);
+  it("Test 16: isEdgeDimmed('Hydraulic', { Hydraulic: false, ... }) → true", () => {
+    const active: ActiveLayers = { ...ALL_LAYERS_ON, Hydraulic: false };
+    expect(isEdgeDimmed("Hydraulic", active)).toBe(true);
   });
 
-  it("thermal edge is dimmed in Hydraulic view", () => {
-    expect(isEdgeDimmed(true, "Hydraulic")).toBe(true);
+  it("Test 17: isEdgeDimmed('Thermal', { Thermal: false, ...rest true }) → true", () => {
+    const active: ActiveLayers = { ...ALL_LAYERS_ON, Thermal: false };
+    expect(isEdgeDimmed("Thermal", active)).toBe(true);
   });
 
-  it("flow edge is not dimmed in Hydraulic view", () => {
-    expect(isEdgeDimmed(false, "Hydraulic")).toBe(false);
-  });
-
-  it("thermal edge is not dimmed in Thermal view", () => {
-    expect(isEdgeDimmed(true, "Thermal")).toBe(false);
-  });
-
-  it("flow edge is dimmed in Thermal view", () => {
-    expect(isEdgeDimmed(false, "Thermal")).toBe(true);
+  it("Test 18: isEdgeDimmed(null, activeLayers) → false (edges with no layer association are never dimmed)", () => {
+    expect(isEdgeDimmed(null, { ...ALL_LAYERS_ON })).toBe(false);
+    expect(isEdgeDimmed(null, ALL_OFF)).toBe(false);
   });
 });
