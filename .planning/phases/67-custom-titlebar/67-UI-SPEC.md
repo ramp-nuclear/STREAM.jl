@@ -71,18 +71,23 @@ Source: existing codebase uses 8-point Tailwind scale throughout (confirmed in T
 
 | Token | Value | Usage in Phase 67 |
 |-------|-------|-------------------|
-| xs | 4px (`gap-1`, `px-1`) | Icon gap within menu triggers, window control button gap |
-| sm | 8px (`gap-2`, `px-2`) | Titlebar horizontal padding, button spacing in strips |
+| xs | 4px (`gap-1`, `px-1`) | Icon gap within menu triggers |
+| sm | 8px (`gap-2`, `px-2`) | Titlebar horizontal padding, button spacing in strips, macOS window control circle gap |
 | md | 16px (`px-4`) | Menu content inner padding |
 | lg | 24px | Not used in this phase (no section-level spacing) |
 | xl | 32px | Secondary strip height (`h-8`) |
 | 2xl | — | Not used in this phase |
 | 3xl | — | Not used in this phase |
 
-Exceptions:
-- Titlebar height: `h-9` = 36px (matches existing Toolbar.tsx — not a clean 8-multiple, but established by the existing contract; do not change)
-- Secondary strip height: `h-8` = 32px (per D-01)
-- Window control macOS circles: 12px diameter (`w-3 h-3`), 6px gap (`gap-1.5`) — tight for traffic-light convention
+### Inherited Exceptions
+
+The following values deviate from the 4-multiple rule. They are **carryovers from the existing `Toolbar.tsx` contract** — not new choices introduced in Phase 67. The executor MUST NOT change them; doing so would alter the existing visual contract and risk layout regressions.
+
+| Value | Pixel size | Why it is here | Executor instruction |
+|-------|-----------|----------------|----------------------|
+| `h-9` | 36px | Matches the current `Toolbar.tsx` height exactly (established pre-Phase 67) | Keep as-is. Do not change to `h-8` (32px) or `h-10` (40px). |
+
+All other spacing values introduced in Phase 67 are on the 4-multiple scale. Specifically, macOS window control circles use `gap-2` (8px) — not `gap-1.5` (6px). 8px spacing between 12px circles produces appropriate visual separation consistent with the traffic-light convention.
 
 ---
 
@@ -132,6 +137,10 @@ macOS traffic-light colors are hardcoded constants (not CSS tokens) — these ar
 
 ## Layout Contract
 
+### Visual Hierarchy
+
+The drag region (center, `flex-1`) is the dominant visual void in the titlebar. Its empty expanse frames the menus on the left and the window controls on the right — this is intentional, not dead space. The executor must ensure the drag region truly expands to fill all remaining horizontal space (`flex-1 h-full`) so that the left and right clusters read as anchored edges against a wide, grabbable center.
+
 ### Strip 1 — CustomTitlebar (36px / `h-9`)
 
 Full-width, `bg-muted border-b`, positioned as the first child of the root `<div className="flex flex-col h-screen w-screen overflow-hidden">` — OUTSIDE the `<div className="flex flex-1 min-h-0">` row.
@@ -168,7 +177,7 @@ ThemeMenu is removed from the secondary strip (per D-03) — theme moves to View
 
 | Platform | Visual style |
 |----------|-------------|
-| macOS | Three filled circles `w-3 h-3 rounded-full`; at rest: `bg-[#ff5f57]/40`, `bg-[#ffbd2e]/40`, `bg-[#28c840]/40` (dimmed); on group hover: full opacity colors; no icons |
+| macOS | Three filled circles `w-3 h-3 rounded-full` with `gap-2` (8px) between them; at rest: `bg-[#ff5f57]/40`, `bg-[#ffbd2e]/40`, `bg-[#28c840]/40` (dimmed); on group hover: full opacity colors; no icons |
 | Windows / Linux | Three icon buttons using Lucide `Minus`, `Maximize2`, `X`; `variant="ghost" size="icon"`; Close hover: `bg-destructive text-destructive-foreground`; Min/Max hover: `hover:bg-muted-foreground/20` |
 
 Platform detection: call `platform()` from `@tauri-apps/plugin-os` once on mount, store in component state (`useState<"macos" | "windows" | "linux" | null>`). `@tauri-apps/plugin-os` is NOT currently in `package.json` — planner must add it.
