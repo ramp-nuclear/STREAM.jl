@@ -36,7 +36,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] **Phase 64: Connection routing** — Per-port autoflip for FlowPorts with asymmetric same-side placement. Independent axis-flip for thermal-pair ports on CAC/HD. Anti-parallel offset for bidirectional pairs as polish hook. (completed 2026-05-14)
 - [x] **Phase 65: Interaction model overhaul** ✓ shipped 2026-05-14 — Left-marquee selection, right-click drag pan, right-click no-drag context menu. Edge deletion (Del/Backspace + right-click). Copy/Cut/Paste/Duplicate (Ctrl+C/X/V/D) with smart-parse-and-increment naming. Reset-to-empty rule for property fields. Snap-to-grid toggle. AutoRecover sidecar snapshot mechanism.
 - [x] **Phase 66: Code preview rework** — Structured `CodeSection[]` output replacing flat string code-gen. Section blocks (Imports / Resources / Components / Composition / Main). Bidirectional traceability (code-hover → canvas-highlight; canvas-select → explicit code-jump). Click-to-pin sections. Copy + Export buttons in code panel toolbar. Hand-rolled formatting rules. (completed 2026-05-16)
-- [ ] **Phase 67: Custom titlebar** — Tauri `decorations: false` + custom HTML titlebar. Integrated File/Edit/View/Help menubar, app icon, project name, dirty dot (left); min/max/close buttons (right). Cross-platform consistency.
+- [x] **Phase 67: Custom titlebar** — Tauri `decorations: false` + custom HTML titlebar. Integrated File/Edit/View/Help menubar, app icon, project name, dirty dot (left); min/max/close buttons (right). Cross-platform consistency. (completed 2026-05-16)
 - [ ] **Phase 68: Layers system overhaul** — Four-layer taxonomy (Hydraulic / Thermal / Sources / Reactor Physics). Independent checkbox toggles. Floating Layers chip top-right of canvas with layer-state color indicators. Hide-vs-dim setting. Off-layer locked (non-interactive). Non-clunky layer-aware connect tool.
 - [ ] **Phase 69: Command palette (jump-only)** — Ctrl+P fuzzy search across component instance names + Resource names. Focus-on-canvas for components, focus-in-navigator for Resources. No action invocation in v1.
 - [ ] **Phase 70: Presets and templates** — `.scpr` file format (slimmed-down `.scp` sub-graph). Save-selection-as-preset, Load-preset. Presets toolbox category. Auto-resource-create on load with smart-name collision handling. No identity (Option 1 per issue #14).
@@ -216,11 +216,11 @@ Plans:
 
 **Design-decisions reference:** Section 3.6.
 **Depends on:** —.
-**Plans:** 2/3 plans executed
+**Plans:** 5/3 plans complete
 
 - [x] 67-01-PLAN.md (Wave 1) — Tauri 4-layer foundation: npm install @tauri-apps/plugin-os; Cargo + lib.rs plugin register; 5 capability permissions; `decorations: false`; copy app icon to gui/public/. Isolates the dominant silent-failure risk per RESEARCH.md.
 - [x] 67-02-PLAN.md (Wave 2, depends on 01) — Leaf primitives: useTheme.ts `THEMES` export (D-21 array-driven), `useWindowMaximized` hook, `WindowControls.tsx` (platform-branched macOS circles vs Windows/Linux Lucide icons), shadcn `dialog` install, `AboutDialog.tsx`.
-- [ ] 67-03-PLAN.md (Wave 3, depends on 01+02; HAS CHECKPOINT) — Composition + integration: `EditMenu.tsx`/`ViewMenu.tsx`/`HelpMenu.tsx`, `CustomTitlebar.tsx` shell with drag-region sibling per D-26, `SecondaryToolbar.tsx`, App.tsx root restructure, delete Toolbar.tsx + ThemeMenu.tsx; manual WSLg UAT covering drag/double-click/min/max/close + known-risk edge-resize (D-18).
+- [x] 67-03-PLAN.md (Wave 3, depends on 01+02; HAS CHECKPOINT) — Composition + integration: `EditMenu.tsx`/`ViewMenu.tsx`/`HelpMenu.tsx`, `CustomTitlebar.tsx` shell with drag-region sibling per D-26, `SecondaryToolbar.tsx`, App.tsx root restructure, delete Toolbar.tsx + ThemeMenu.tsx; manual WSLg UAT covering drag/double-click/min/max/close + known-risk edge-resize (D-18).
 
 ### Phase 68: Layers system overhaul
 
@@ -309,7 +309,7 @@ contract document drafted in parallel throughout.
 | 64. Connection routing                               | 4/4 | Complete    | 2026-05-14 |
 | 65. Interaction model overhaul                       | 8/14 | Gap closure in flight | — |
 | 66. Code preview rework                              | 6/5 | Complete    | 2026-05-16 |
-| 67. Custom titlebar                                  | 2/3 | In Progress|  |
+| 67. Custom titlebar                                  | 5/3 | Complete   | 2026-05-16 |
 | 68. Layers system overhaul                           | 0/TBD | Planned | — |
 | 69. Command palette (jump-only)                      | 0/TBD | Planned | — |
 | 70. Presets and templates                            | 0/TBD | Planned | — |

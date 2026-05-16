@@ -2,7 +2,10 @@
 phase: 67-custom-titlebar
 plan: 03
 subsystem: gui
-status: awaiting-uat
+status: complete
+uat_completed_at: 2026-05-16
+uat_passed_via: Windows-native build (decorations:false works correctly; WSLg was a degraded preview)
+follow_up_plans: [67-04 visual polish, 67-05 chrome round 2 menubar/centered name, plus hot-fix commits ee73b35 / 74a4371 / 354a409 for Windows regression sweep]
 tags: [custom-titlebar, menus, app-restructure, checkpoint:human-verify]
 dependency_graph:
   requires: [67-01, 67-02]
