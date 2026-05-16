@@ -1,12 +1,10 @@
-import { useMemo } from "react";
 import { Code2, Download, Layers } from "lucide-react";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { Button } from "./ui/button";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import useStore from "../store/useStore";
 import { getComponent } from "../registry";
-import { generateCode, serializeSections } from "../lib/codeGenerator";
+import { generateCode } from "../lib/codeGenerator";
+import { exportCode } from "../lib/exportCode";
 import type { LayerView } from "../lib/layers";
 import FileMenu from "./FileMenu";
 import ThemeMenu from "./ThemeMenu";
@@ -37,35 +35,22 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
   const activeLayer = useStore((s) => s.activeLayer);
   const setActiveLayer = useStore((s) => s.setActiveLayer);
 
-  // TEMP — Phase 66 Plan 03 takes over this consumer.
-  // Plan 02 changed generateCode's return to CodeSection[]; we wrap with
-  // serializeSections so the existing `writeTextFile(filePath, code)` path
-  // keeps exporting a Julia string (now with D-12 `# === <Section> ===`
-  // section headers). Plan 03 extracts handleExport into a shared
-  // `gui/src/lib/exportCode.ts` util so this Toolbar.tsx call site and the
-  // BottomPanel Export button drive the same path.
-  const code = useMemo(
-    () =>
-      serializeSections(
-        generateCode(nodes, edges, { anchors }, getComponent, resources, {
-          bcMode,
-          bcSymmetric,
-        }),
-      ),
-    [nodes, edges, anchors, resources, bcMode, bcSymmetric],
-  );
-
+  // Phase 66 Plan 03: the Tauri save-dialog + file-write path moved into
+  // gui/src/lib/exportCode.ts so Toolbar.tsx (here) and BottomPanel.tsx
+  // (Plan 04) share the same util. `generateCode` is called inline at
+  // export-time so the freshly-computed sections reflect the current store
+  // state without paying for memoization that the now-unused
+  // `serializeSections` wrap previously required.
   async function handleExport() {
-    const result = useStore.getState().validateAndGate();
-    if (!result.valid) return; // Dialog will show via validationResult state
-
-    const filePath = await save({
-      defaultPath: "system.jl",
-      filters: [{ name: "Julia files", extensions: ["jl"] }],
-    });
-    if (filePath) {
-      await writeTextFile(filePath, code);
-    }
+    const sections = generateCode(
+      nodes,
+      edges,
+      { anchors },
+      getComponent,
+      resources,
+      { bcMode, bcSymmetric },
+    );
+    await exportCode({ sections, nodes });
   }
 
   return (
