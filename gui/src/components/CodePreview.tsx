@@ -272,7 +272,7 @@ export default function CodePreview() {
               className="mb-5 last:mb-0"
               onClick={handlePanelBodyClick}
             >
-              <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-300/90 mb-2 select-text">
+              <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-300/90 mb-2 select-none">
                 <span
                   aria-hidden
                   className="inline-block h-3 w-[3px] rounded-sm bg-sky-400/80"
@@ -283,9 +283,16 @@ export default function CodePreview() {
                 {section.subBlocks.map((sub, i) => {
                   const id = subBlockId(section, i);
                   const flashed = flashedIds.has(id);
-                  const pinned = sub.sourceIds.some((sid) =>
-                    pinnedSourceIds.has(sid),
-                  );
+                  // Sub-blocks with no sourceIds (Imports header, Composition
+                  // scaffolding `eqs = [` / `]`, Main `@named sys = ...` block)
+                  // have no canvas counterpart — hovering/clicking them has no
+                  // useful effect. Mark them non-interactive so the panel
+                  // reads as: "interactive lines have hover affordance;
+                  // scaffolding lines don't."
+                  const interactive = sub.sourceIds.length > 0;
+                  const pinned =
+                    interactive &&
+                    sub.sourceIds.some((sid) => pinnedSourceIds.has(sid));
                   return (
                     <pre
                       key={id}
@@ -295,24 +302,39 @@ export default function CodePreview() {
                       data-source-ids={sub.sourceIds.join(",")}
                       data-flash={flashed ? "true" : undefined}
                       data-pinned={pinned ? "true" : undefined}
-                      onMouseEnter={() =>
-                        handleSubBlockMouseEnter(sub.sourceIds)
+                      data-interactive={interactive ? "true" : undefined}
+                      onMouseEnter={
+                        interactive
+                          ? () => handleSubBlockMouseEnter(sub.sourceIds)
+                          : undefined
                       }
-                      onMouseLeave={handleSubBlockMouseLeave}
-                      onClick={(e) => {
-                        // Prevent bubbling to panel-body so the empty-space
-                        // clear-pins handler doesn't fire after this toggle.
-                        e.stopPropagation();
-                        handleSubBlockClick(sub.sourceIds);
-                      }}
+                      onMouseLeave={
+                        interactive ? handleSubBlockMouseLeave : undefined
+                      }
+                      onClick={
+                        interactive
+                          ? (e) => {
+                              // Prevent bubbling to panel-body so the
+                              // empty-space clear-pins handler doesn't fire
+                              // after this toggle.
+                              e.stopPropagation();
+                              handleSubBlockClick(sub.sourceIds);
+                            }
+                          : undefined
+                      }
                       className={[
-                        "whitespace-pre overflow-x-auto rounded-md cursor-pointer transition-colors duration-150",
+                        "whitespace-pre overflow-x-auto rounded-md transition-colors duration-150",
                         "px-3 py-1.5 border-l-2",
+                        interactive
+                          ? "cursor-pointer"
+                          : "cursor-text opacity-80",
                         flashed
                           ? "bg-amber-500/30 border-amber-400 ring-1 ring-amber-400/70"
                           : pinned
                             ? "bg-sky-500/[0.14] border-sky-400 ring-1 ring-sky-400/40"
-                            : "border-transparent hover:bg-sky-500/[0.09] hover:border-sky-400/60",
+                            : interactive
+                              ? "border-transparent hover:bg-sky-500/[0.09] hover:border-sky-400/60"
+                              : "border-transparent",
                       ]
                         .filter(Boolean)
                         .join(" ")}

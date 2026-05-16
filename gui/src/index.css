@@ -166,10 +166,15 @@ body {
    the cascade resolves to a single outline; the pinned color wins by source
    order, which is the intended distinction for now. */
 .stream-node--code-hover {
-  outline: 2px solid var(--stream-code-hover-ring-color, #38bdf8);  /* sky-400 placeholder */
+  outline: 2px solid var(--stream-code-hover-ring-color, #38bdf8);  /* sky-400 */
   outline-offset: 2px;
 }
 .stream-node--code-pinned {
-  outline: 2px solid var(--stream-code-pinned-ring-color, #0ea5e9);  /* sky-500 — slightly heavier */
-  outline-offset: 2px;
+  /* Pin must look CLEARLY different from hover so click feedback is obvious.
+     Thicker (3px) + lighter shade (sky-300) + a soft glow halo make it
+     unmistakably "this is the active pinned node" vs the subtler hover. */
+  outline: 3px solid var(--stream-code-pinned-ring-color, #7dd3fc);  /* sky-300 */
+  outline-offset: 3px;
+  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.35),
+              0 0 12px 2px rgba(56, 189, 248, 0.45);
 }
