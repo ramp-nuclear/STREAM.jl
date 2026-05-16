@@ -51,7 +51,7 @@ export default function CustomTitlebar({
   }
 
   return (
-    <div className="flex items-center h-9 bg-muted border-b w-full">
+    <div className="flex items-center h-9 bg-chrome border-b w-full">
       <img
         src="/32x32.png"
         alt=""
