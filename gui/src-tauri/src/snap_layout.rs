@@ -28,11 +28,14 @@ use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, NULL_BRUSH};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
-// `WM_MOUSELEAVE` lives in `KeyboardAndMouse` (it's tied to TrackMouseEvent), NOT
-// `WindowsAndMessaging` — a windows-sys module split quirk.
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT, WM_MOUSELEAVE,
+    TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
 };
+// `WM_MOUSELEAVE` is in the Controls module in windows-sys 0.61 — not in
+// `WindowsAndMessaging` (alongside `WM_MOUSEMOVE`) and not in `KeyboardAndMouse`
+// (alongside `TrackMouseEvent`). A windows-sys module split quirk worth
+// documenting because the obvious-seeming locations both fail.
+use windows_sys::Win32::UI::Controls::WM_MOUSELEAVE;
 use windows_sys::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, RegisterClassExW, SetWindowPos,
