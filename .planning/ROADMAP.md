@@ -216,10 +216,10 @@ Plans:
 
 **Design-decisions reference:** Section 3.6.
 **Depends on:** —.
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 - [x] 67-01-PLAN.md (Wave 1) — Tauri 4-layer foundation: npm install @tauri-apps/plugin-os; Cargo + lib.rs plugin register; 5 capability permissions; `decorations: false`; copy app icon to gui/public/. Isolates the dominant silent-failure risk per RESEARCH.md.
-- [ ] 67-02-PLAN.md (Wave 2, depends on 01) — Leaf primitives: useTheme.ts `THEMES` export (D-21 array-driven), `useWindowMaximized` hook, `WindowControls.tsx` (platform-branched macOS circles vs Windows/Linux Lucide icons), shadcn `dialog` install, `AboutDialog.tsx`.
+- [x] 67-02-PLAN.md (Wave 2, depends on 01) — Leaf primitives: useTheme.ts `THEMES` export (D-21 array-driven), `useWindowMaximized` hook, `WindowControls.tsx` (platform-branched macOS circles vs Windows/Linux Lucide icons), shadcn `dialog` install, `AboutDialog.tsx`.
 - [ ] 67-03-PLAN.md (Wave 3, depends on 01+02; HAS CHECKPOINT) — Composition + integration: `EditMenu.tsx`/`ViewMenu.tsx`/`HelpMenu.tsx`, `CustomTitlebar.tsx` shell with drag-region sibling per D-26, `SecondaryToolbar.tsx`, App.tsx root restructure, delete Toolbar.tsx + ThemeMenu.tsx; manual WSLg UAT covering drag/double-click/min/max/close + known-risk edge-resize (D-18).
 
 ### Phase 68: Layers system overhaul
@@ -309,7 +309,7 @@ contract document drafted in parallel throughout.
 | 64. Connection routing                               | 4/4 | Complete    | 2026-05-14 |
 | 65. Interaction model overhaul                       | 8/14 | Gap closure in flight | — |
 | 66. Code preview rework                              | 6/5 | Complete    | 2026-05-16 |
-| 67. Custom titlebar                                  | 1/3 | In Progress|  |
+| 67. Custom titlebar                                  | 2/3 | In Progress|  |
 | 68. Layers system overhaul                           | 0/TBD | Planned | — |
 | 69. Command palette (jump-only)                      | 0/TBD | Planned | — |
 | 70. Presets and templates                            | 0/TBD | Planned | — |
