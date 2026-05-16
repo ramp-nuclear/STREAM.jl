@@ -11,6 +11,11 @@
 //! upstream plugin (`clarifei/tauri-plugin-frame`). Mechanism is
 //! identical to the audited plugin: HTMAXBUTTON overlay HWND, no Win+Z
 //! key simulation.
+//!
+//! Phase 67 round 2 — hover bridge: the overlay HWND eats the React
+//! Maximize button's `:hover`, so we re-emit hover-enter / hover-leave
+//! as Tauri global events that the React component subscribes to and
+//! mirrors as a synthetic `is-hovered` class.
 
 #![cfg(target_os = "windows")]
 
@@ -18,16 +23,20 @@ use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use tauri::{Runtime, WebviewWindow};
+use tauri::{Emitter, Runtime, WebviewWindow};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{GetStockObject, HBRUSH, NULL_BRUSH};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
+};
 use windows_sys::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, RegisterClassExW, SetWindowPos,
     CS_HREDRAW, CS_VREDRAW, HTMAXBUTTON, HWND_TOP, SWP_ASYNCWINDOWPOS, SWP_SHOWWINDOW, WM_CLOSE,
-    WM_DPICHANGED, WM_NCHITTEST, WM_SIZE, WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_VISIBLE,
+    WM_DPICHANGED, WM_MOUSELEAVE, WM_MOUSEMOVE, WM_NCHITTEST, WM_SIZE, WNDCLASSEXW, WS_CHILD,
+    WS_CLIPSIBLINGS, WS_VISIBLE,
 };
 
 const CLASS_NAME: &[u16] = &[
@@ -48,6 +57,11 @@ const TITLEBAR_PX: u32 = 36;
 const BUTTON_PX: u32 = 46;
 const RIGHT_INDEX: i32 = 1; // maximize button is 2nd from the right (Close=0, Max=1, Min=2)
 
+// Tauri event names — kebab namespaced. Matches D-style used elsewhere in
+// the codebase (e.g. `snap-layout://hover-enter`).
+const EVT_HOVER_ENTER: &str = "snap-layout://hover-enter";
+const EVT_HOVER_LEAVE: &str = "snap-layout://hover-leave";
+
 // HWND is `*mut c_void`, which is not Send/Sync — but storing the handle in a
 // `static` requires Sync. The portable workaround is to keep handles as `isize`
 // (their representation as integers) and cast back to HWND at use sites.
@@ -55,12 +69,35 @@ const RIGHT_INDEX: i32 = 1; // maximize button is 2nd from the right (Close=0, M
 // 64-bit targets (pointer width matches isize on all `cfg(windows)` targets).
 static OVERLAYS: OnceLock<Mutex<HashMap<isize, isize>>> = OnceLock::new();
 
+// Per-overlay hover state. WM_MOUSEMOVE fires continuously while the cursor
+// is over the window; we only want to emit hover-enter once per visit, so we
+// track the boolean here and only emit on the rising edge. WM_MOUSELEAVE
+// resets the flag.
+static HOVERED: OnceLock<Mutex<HashMap<isize, bool>>> = OnceLock::new();
+
+// Boxed Tauri event emitter — set once in `install()` and read from
+// `overlay_proc`. Storing a `Box<dyn Fn>` rather than `AppHandle<R>` lets us
+// avoid threading the Runtime generic through static storage.
+type Emit = Box<dyn Fn(&str) + Send + Sync>;
+static EMITTER: OnceLock<Emit> = OnceLock::new();
+
 pub fn install<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), String> {
     let handle = window.window_handle().map_err(|e| e.to_string())?;
     let RawWindowHandle::Win32(h) = handle.as_raw() else {
         return Ok(()); // non-Win32 — no-op
     };
     let hwnd_isize = h.hwnd.get();
+
+    // Capture an AppHandle clone so the overlay WndProc can emit events
+    // without holding a borrow of `window`. `get_or_init` is idempotent —
+    // multiple `install()` calls (e.g. plugin re-init) are safe.
+    let app = window.app_handle().clone();
+    EMITTER.get_or_init(|| {
+        Box::new(move |evt: &str| {
+            let _ = app.emit(evt, ());
+        })
+    });
+
     window
         .run_on_main_thread(move || unsafe {
             install_native(hwnd_isize as HWND);
@@ -181,8 +218,41 @@ unsafe extern "system" fn overlay_proc(
     wp: WPARAM,
     lp: LPARAM,
 ) -> LRESULT {
-    if msg == WM_NCHITTEST {
-        return HTMAXBUTTON as LRESULT;
+    match msg {
+        WM_NCHITTEST => return HTMAXBUTTON as LRESULT,
+        WM_MOUSEMOVE => {
+            // Rising-edge detection — only emit hover-enter once per visit.
+            // Subsequent WM_MOUSEMOVEs while still hovered are no-ops. We
+            // also (re-)arm TrackMouseEvent so WM_MOUSELEAVE will be sent
+            // when the cursor exits the overlay.
+            let map = HOVERED.get_or_init(|| Mutex::new(HashMap::new()));
+            let mut g = map.lock().unwrap();
+            let was = g.get(&(hwnd as isize)).copied().unwrap_or(false);
+            if !was {
+                g.insert(hwnd as isize, true);
+                drop(g);
+                let mut tme = TRACKMOUSEEVENT {
+                    cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32,
+                    dwFlags: TME_LEAVE,
+                    hwndTrack: hwnd,
+                    dwHoverTime: 0,
+                };
+                TrackMouseEvent(&mut tme);
+                if let Some(emit) = EMITTER.get() {
+                    emit(EVT_HOVER_ENTER);
+                }
+            }
+        }
+        WM_MOUSELEAVE => {
+            let map = HOVERED.get_or_init(|| Mutex::new(HashMap::new()));
+            let mut g = map.lock().unwrap();
+            g.insert(hwnd as isize, false);
+            drop(g);
+            if let Some(emit) = EMITTER.get() {
+                emit(EVT_HOVER_LEAVE);
+            }
+        }
+        _ => {}
     }
     DefWindowProcW(hwnd, msg, wp, lp)
 }
