@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "8553fbca-21ac-4860-bb09-fd3a57dfa0f1",
+      "type": "streamNode",
+      "position": {
+        "x": 168,
+        "y": -166.5
+      },
+      "data": {
+        "componentId": "Channel",
+        "instanceName": "channel_1",
+        "parameters": {
+          "g": 0,
+          "htc_correlation": "dittus_boelter",
+          "friction_correlation": "blasius_friction"
+        },
+        "constructorMode": "default"
+      },
+      "measured": {
+        "width": 140,
+        "height": 54
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "4904b4c2-8293-4ef8-8a16-9c76bfc4d7b2",
+      "type": "streamNode",
+      "position": {
+        "x": 95.32790326220504,
+        "y": -76.61533522547063
+      },
+      "data": {
+        "componentId": "Channel",
+        "instanceName": "channel_2",
+        "parameters": {
+          "g": 0,
+          "htc_correlation": "dittus_boelter",
+          "friction_correlation": "blasius_friction"
+        },
+        "constructorMode": "default"
+      },
+      "measured": {
+        "width": 140,
+        "height": 54
+      },
+      "selected": true,
+      "dragging": false
+    }
+  ],
+  "edges": [],
+  "bcs": []
+}

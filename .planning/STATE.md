@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.2
-milestone_name: milestone
-status: completed
-stopped_at: Phase 67 UI-SPEC approved
-last_updated: "2026-05-16T18:01:32.464Z"
-last_activity: 2026-05-16 -- Phase 67 marked complete
+milestone_name: "**Goal:** Bring `gui/src/registry/components.json` into alignment with v1.1 source. Stream version bump to `1.1.0`. Add 4 missing components. Rewrite Channel/CHF entries"
+status: ready_to_plan
+stopped_at: Phase 68 complete (5/5) — ready to discuss Phase 69
+last_updated: 2026-05-16T20:57:03.012Z
+last_activity: 2026-05-16 -- Phase 68 execution started
 progress:
   total_phases: 15
   completed_phases: 10
-  total_plans: 70
-  completed_plans: 73
+  total_plans: 75
+  completed_plans: 78
   percent: 67
 ---
 
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 67 — custom titlebar
+**Current focus:** Phase 69 — command palette (jump only)
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -58,10 +58,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 67 — COMPLETE
+Phase: 69
 Plan: Not started
-Status: Phase 67 complete
-Last activity: 2026-05-16 -- Phase 67 marked complete
+Status: Ready to plan
+Last activity: 2026-05-16
 Next: `/gsd:verify-work 65` to re-run UAT against the gap-closure surfaces, then `/gsd:discuss-phase 66` (Code preview rework). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far (covers Phases 59 → 65).
 
 Phase 65 deferred manual UAT (require running Tauri build):
@@ -142,10 +142,10 @@ Outstanding non-blocking items (NOT 66's job):
 
 ## Session Continuity
 
-**Last session:** 2026-05-16T11:05:23.696Z
-**Stopped at:** Phase 67 UI-SPEC approved
+**Last session:** 2026-05-16T19:06:36.767Z
+**Stopped at:** Phase 68 UI-SPEC approved
 **Next action:** `/gsd:discuss-phase 66` (Code preview rework) — or `/gsd:ship` to open a milestone PR first and run UAT on the 6 deferred Phase 65 surfaces
-**Resume file:** .planning/phases/67-custom-titlebar/67-UI-SPEC.md
+**Resume file:** .planning/phases/68-layers-system-overhaul/68-UI-SPEC.md
 **Branch:** `gui-redesign`
 **Stash:** none
 
