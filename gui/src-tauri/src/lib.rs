@@ -1,3 +1,5 @@
+mod snap_layout;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -24,6 +26,24 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
+        .setup(|app| {
+            // Win11 Snap Layout overlay — see src/snap_layout.rs.
+            // Module is target_os = "windows" gated; no-ops on other platforms.
+            #[cfg(target_os = "windows")]
+            {
+                use tauri::Manager;
+                if let Some(main) = app.get_webview_window("main") {
+                    if let Err(e) = snap_layout::install(&main) {
+                        eprintln!("snap_layout: install failed: {e}");
+                    }
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = app; // unused on non-Windows
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![greet, is_pid_alive, get_pid])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
