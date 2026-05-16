@@ -65,48 +65,57 @@ export default function SecondaryToolbar() {
           onValueChange={(value: string) => {
             if (value) setActiveLayer(value as LayerView);
           }}
-          variant="outline"
           size="sm"
-          className="border rounded-md"
+          className="gap-0.5"
         >
+          {/* Phase 67 Plan 04 — VSCode tab-style: no resting border, hover-only
+              background, active gets a subtle filled bg (no border outline).
+              The colored tint on active state preserves the hydraulic/thermal
+              hue affordance without the boxed-control look. */}
           <ToggleGroupItem
             value="Hydraulic"
-            className="data-[state=on]:bg-blue-500/25 data-[state=on]:text-blue-700 data-[state=on]:border-blue-400 dark:data-[state=on]:text-blue-300"
+            className="h-7 px-2 text-xs font-normal border-0 bg-transparent hover:bg-accent data-[state=on]:bg-blue-500/15 data-[state=on]:text-blue-700 dark:data-[state=on]:text-blue-300"
           >
             Hydraulic
           </ToggleGroupItem>
           <ToggleGroupItem
             value="Both"
-            className="data-[state=on]:bg-slate-200 data-[state=on]:text-slate-700 dark:data-[state=on]:bg-slate-700 dark:data-[state=on]:text-slate-200"
+            className="h-7 px-2 text-xs font-normal border-0 bg-transparent hover:bg-accent data-[state=on]:bg-accent data-[state=on]:text-accent-foreground"
           >
             Both
           </ToggleGroupItem>
           <ToggleGroupItem
             value="Thermal"
-            className="data-[state=on]:bg-amber-500/25 data-[state=on]:text-amber-700 data-[state=on]:border-amber-400 dark:data-[state=on]:text-amber-300"
+            className="h-7 px-2 text-xs font-normal border-0 bg-transparent hover:bg-accent data-[state=on]:bg-amber-500/15 data-[state=on]:text-amber-700 dark:data-[state=on]:text-amber-300"
           >
             Thermal
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
 
-      {/* Right cluster: Code button + Export button */}
-      <div className="flex items-center gap-1">
+      {/* Right cluster: Code button + Export button.
+          Phase 67 Plan 04 — ghost-style chrome controls. Code is a toggle
+          (active = subtle accent bg, no border). Export is a flat chrome
+          action — keeps the primary-fill ONLY when actively focused or
+          hovered; otherwise sits flat alongside Code. */}
+      <div className="flex items-center gap-0.5">
         <Button
-          variant={bottomPanelOpen ? "default" : "outline"}
+          variant="ghost"
           size="sm"
           onClick={toggleBottomPanel}
+          className={`h-7 px-2 text-xs font-normal ${bottomPanelOpen ? "bg-accent text-accent-foreground" : ""}`}
         >
-          <Code2 className="h-4 w-4 mr-1" />
+          <Code2 className="h-3.5 w-3.5 mr-1" />
           Code
         </Button>
         <Button
-          variant="default"
+          variant="ghost"
           size="sm"
           disabled={!hasNodes}
           onClick={handleExport}
+          className="h-7 px-2 text-xs font-normal"
         >
-          <Download className="h-4 w-4 mr-1" />
+          <Download className="h-3.5 w-3.5 mr-1" />
           Export
         </Button>
       </div>

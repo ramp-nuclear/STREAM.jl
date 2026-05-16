@@ -1,4 +1,3 @@
-import { ChevronDown } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -35,9 +34,8 @@ export default function EditMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-normal">
           Edit
-          <ChevronDown className="h-3.5 w-3.5 ml-1" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
