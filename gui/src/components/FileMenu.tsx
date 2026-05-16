@@ -1,16 +1,26 @@
-import { Button } from "./ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+  MenubarContent,
+  MenubarItem,
+  MenubarMenu,
+  MenubarTrigger,
+} from "./ui/menubar";
 import useStore from "../store/useStore";
 
 interface Props {
   onUnsavedCheck: () => Promise<"save" | "discard" | "cancel">;
 }
 
+/**
+ * File menu (Phase 67 D-10).
+ *
+ * Round 2 — migrated from DropdownMenu to shadcn Menubar primitive so the
+ * parent <Menubar> in CustomTitlebar coordinates click-once switching
+ * between sibling menus (Office / VSCode / IntelliJ pattern — UAT round 2 #5).
+ *
+ * Trigger styles override the Menubar defaults to match the chrome strip:
+ * full titlebar height, zero rounding, ghost hover, text-xs font-normal —
+ * preserving the round-2 Task 3 trigger height work.
+ */
 export default function FileMenu({ onUnsavedCheck }: Props) {
   const isDirty = useStore((s) => s.isDirty);
   const saveProject = useStore((s) => s.saveProject);
@@ -45,42 +55,36 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-full rounded-none px-3 py-0 text-xs font-normal"
-        >
-          File
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuItem onClick={handleNew}>
+    <MenubarMenu>
+      <MenubarTrigger className="h-full rounded-none px-3 py-0 text-xs font-normal hover:bg-accent hover:text-accent-foreground">
+        File
+      </MenubarTrigger>
+      <MenubarContent align="start">
+        <MenubarItem onClick={handleNew}>
           <span className="flex justify-between w-full items-center gap-4">
             <span>New</span>
             <span className="text-muted-foreground text-xs">Ctrl+N</span>
           </span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleOpen}>
+        </MenubarItem>
+        <MenubarItem onClick={handleOpen}>
           <span className="flex justify-between w-full items-center gap-4">
             <span>Open...</span>
             <span className="text-muted-foreground text-xs">Ctrl+O</span>
           </span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleSave}>
+        </MenubarItem>
+        <MenubarItem onClick={handleSave}>
           <span className="flex justify-between w-full items-center gap-4">
             <span>Save</span>
             <span className="text-muted-foreground text-xs">Ctrl+S</span>
           </span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleSaveAs}>
+        </MenubarItem>
+        <MenubarItem onClick={handleSaveAs}>
           <span className="flex justify-between w-full items-center gap-4">
             <span>Save As...</span>
             <span className="text-muted-foreground text-xs">Ctrl+Shift+S</span>
           </span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </MenubarItem>
+      </MenubarContent>
+    </MenubarMenu>
   );
 }
