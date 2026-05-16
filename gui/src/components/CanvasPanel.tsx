@@ -17,7 +17,12 @@ import "@xyflow/react/dist/style.css";
 import useStore from "../store/useStore";
 import type { StreamNodeData } from "../store/useStore";
 import { getComponent } from "../registry";
-import { isNodeDimmed, isEdgeDimmed } from "../lib/layers";
+import {
+  type LayerKey,
+  getComponentLayers,
+  isNodeVisible,
+  isEdgeDimmed,
+} from "../lib/layers";
 import StreamNode from "./StreamNode";
 import HydraulicEdge from "./HydraulicEdge";
 import BCEdge from "./BCEdge";
@@ -78,7 +83,8 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   const addNode = useStore((s) => s.addNode);
   const addEdge = useStore((s) => s.addEdge);
   const selectNode = useStore((s) => s.selectNode);
-  const activeLayer = useStore((s) => s.activeLayer);
+  const activeLayers = useStore((s) => s.activeLayers);
+  const hideOffLayer = useStore((s) => s.hideOffLayer);
   // Phase 65 D-09: snap-to-grid state read from store
   const snapEnabled = useStore((s) => s.snapToGrid);
   // Phase 65 Plan 13: interactive lock — when true, all interactions disabled.
@@ -93,13 +99,20 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   // rcMenu.state is consumed by Plan 05 — no menu UI is rendered here.
   const rcMenu = useRightClickContextMenu();
 
-  // Enrich nodes with dimming styles based on active layer
+  // Phase 68 Plan 03: per-node enrichment for the 4-layer independent-toggle
+  // API. Visibility is "any of the node's layers active" (D-02); off-layer
+  // nodes are either hidden (hideOffLayer=true) or dimmed + locked
+  // non-interactive (selectable/draggable false) in dim mode. Nodes with no
+  // layer association (e.g. Resources) are always visible.
   const enrichedNodes = useMemo(() => {
-    if (activeLayer === "Both") return nodes;
-    return nodes.map(node => {
+    return nodes.map((node) => {
       const nodeData = node.data as unknown as StreamNodeData;
-      const dimmed = isNodeDimmed(nodeData.componentId, activeLayer, getComponent);
-      if (!dimmed) return node;
+      const comp = getComponent(nodeData.componentId);
+      if (!comp) return node;
+      if (isNodeVisible(comp, activeLayers)) return node;
+      if (hideOffLayer) {
+        return { ...node, hidden: true };
+      }
       return {
         ...node,
         style: {
@@ -108,16 +121,39 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
           pointerEvents: "none" as const,
           transition: "opacity 150ms ease",
         },
+        selectable: false,
+        draggable: false,
       };
     });
-  }, [nodes, activeLayer]);
+  }, [nodes, activeLayers, hideOffLayer]);
 
-  // Enrich edges with dimming styles based on active layer
+  // Phase 68 Plan 03: per-edge enrichment. Edges follow their OWN layer (D-04)
+  // — derive LayerKey from `edge.type` ("hydraulicEdge" → Hydraulic,
+  // "bcEdge" → Sources, anything else → Thermal — the thermal styling pass in
+  // useStore.addEdge does not set a custom type, so it's the residual case).
+  // In hide mode also suppress edges whose BOTH endpoints are hidden to avoid
+  // phantom dangling edges (Pitfall 5).
   const enrichedEdges = useMemo(() => {
-    if (activeLayer === "Both") return edges;
-    return edges.map(edge => {
-      const isThermalEdge = edge.style?.stroke === "#f59e0b";
-      const dimmed = isEdgeDimmed(isThermalEdge, activeLayer);
+    const hiddenNodeIds = new Set<string>();
+    if (hideOffLayer) {
+      for (const n of enrichedNodes) {
+        if ((n as { hidden?: boolean }).hidden) hiddenNodeIds.add(n.id);
+      }
+    }
+    return edges.map((edge) => {
+      let edgeLayerKey: LayerKey | null;
+      if (edge.type === "hydraulicEdge") edgeLayerKey = "Hydraulic";
+      else if (edge.type === "bcEdge") edgeLayerKey = "Sources";
+      else edgeLayerKey = "Thermal";
+      const dimmed = isEdgeDimmed(edgeLayerKey, activeLayers);
+      if (hideOffLayer) {
+        const endpointsHidden =
+          hiddenNodeIds.has(edge.source) && hiddenNodeIds.has(edge.target);
+        if (dimmed || endpointsHidden) {
+          return { ...edge, hidden: true };
+        }
+        return edge;
+      }
       if (!dimmed) return edge;
       return {
         ...edge,
@@ -128,7 +164,7 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         },
       };
     });
-  }, [edges, activeLayer]);
+  }, [edges, activeLayers, hideOffLayer, enrichedNodes]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
@@ -161,15 +197,36 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   const onConnect = useCallback(
     (connection: Connection) => {
       addEdge(connection);
+      // Phase 68 Plan 03: layer-aware connect (D-04 forgiving rule). After the
+      // connection is added, walk both endpoints and auto-enable any layer
+      // they belong to that is currently off. Never blocks the connection;
+      // store is read via getState() so the callback is stable.
+      const state = useStore.getState();
+      const currentNodes = state.nodes;
+      const currentActive = state.activeLayers;
+      const setLayerVisible = state.setLayerVisible;
+      for (const nodeId of [connection.source, connection.target]) {
+        if (!nodeId) continue;
+        const node = currentNodes.find((n) => n.id === nodeId);
+        if (!node) continue;
+        const comp = getComponent(
+          (node.data as unknown as StreamNodeData).componentId,
+        );
+        if (!comp) continue;
+        for (const key of getComponentLayers(comp)) {
+          if (!currentActive[key]) setLayerVisible(key, true);
+        }
+      }
     },
     [addEdge],
   );
 
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      const nodeData = node.data as unknown as StreamNodeData;
-      const dimmed = isNodeDimmed(nodeData.componentId, useStore.getState().activeLayer, getComponent);
-      if (dimmed) return; // Don't select dimmed nodes
+      // Phase 68 Plan 03: the off-layer dim guard is gone — off-layer nodes
+      // now carry `selectable: false` from `enrichedNodes`, so ReactFlow
+      // never fires this handler for them. No `isNodeDimmed(...)` check
+      // needed here anymore.
       selectNode(node.id);
     },
     [selectNode],
@@ -270,20 +327,9 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
           useStore.getState().duplicateSelection();
         }
       }
-      // Tab cycles layers globally; skip when a text input has focus
-      if (e.key === "Tab") {
-        const target = e.target as HTMLElement;
-        if (
-          target instanceof HTMLInputElement ||
-          target instanceof HTMLTextAreaElement ||
-          target instanceof HTMLSelectElement ||
-          target.isContentEditable
-        ) {
-          return;
-        }
-        e.preventDefault();
-        useStore.getState().cycleLayer();
-      }
+      // Phase 68 D-06: the Tab→cycleLayer shortcut is removed. The floating
+      // Layers chip is the sole layer-toggle UI; Tab now follows browser
+      // default focus traversal.
       // Esc clears selection (nodes AND edges); skip when a text input has focus
       if (e.key === "Escape") {
         const target = e.target as HTMLElement;
@@ -356,7 +402,9 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         <MiniMap />
         <Background variant={BackgroundVariant.Dots} color={resolvedTheme === "dark" ? "#4b5263" : "#ccc"} />
       </ReactFlow>
-      {/* Phase 65 Plan 13: top-right overlay — Zoom/Fit/Lock replace ReactFlow built-in Controls panel; SnapToGridButton from Plan 06. */}
+      {/* Phase 65 Plan 13: top-right overlay — Zoom/Fit/Lock replace ReactFlow built-in Controls panel; SnapToGridButton from Plan 06.
+          Phase 68 UAT 2026-05-17 — LayersChip moved out of this overlay
+          into the docked left-sidebar LayersPanel; this column is now icons-only. */}
       <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
         <ZoomInButton />
         <ZoomOutButton />

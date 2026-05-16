@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Copy, Check, Download } from "lucide-react";
+import { Copy, Check, Download, ChevronDown, ChevronUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Button } from "./ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import useStore from "../store/useStore";
 import { useBottomPanelResize } from "../hooks/useBottomPanelResize";
 import { getComponent } from "../registry";
@@ -12,6 +13,7 @@ import CodePreview from "./CodePreview";
 export default function BottomPanel() {
   const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
   const bottomPanelHeight = useStore((s) => s.bottomPanelHeight);
+  const toggleBottomPanel = useStore((s) => s.toggleBottomPanel);
   const { onMouseDown } = useBottomPanelResize();
 
   // PERF — only subscribe to the things this component actually reads in its
@@ -69,13 +71,38 @@ export default function BottomPanel() {
     await exportCode({ sections, nodes: s.nodes });
   }
 
-  if (!bottomPanelOpen) return null;
+  // Phase 68 D-10 — closed-state stub strip. Replaces the previous
+  // `return null` early-exit so a persistent 20px (h-5) clickable affordance
+  // always sits at the bottom of the window, mirroring VSCode's bottom-panel
+  // collapsed state. Click anywhere on the strip to re-open the panel.
+  // No animation between open/closed — switching is instantaneous per
+  // UI-SPEC §4 (hidden mode does NOT animate).
+  if (!bottomPanelOpen) {
+    // Slimmer stub strip (Phase 68 UAT 2026-05-17 polish — keep until
+    // Phase 72 full design pass). 14px tall, bg-background instead of
+    // bg-chrome so it reads as a subtle edge affordance rather than a
+    // persistent dark bar. Label drops to 10px to fit the new height.
+    return (
+      <div
+        className="h-3.5 border-t flex items-center justify-center gap-1 cursor-pointer bg-background hover:bg-accent/40 transition-colors select-none"
+        onClick={toggleBottomPanel}
+        role="button"
+        aria-label="Expand code panel"
+      >
+        <span className="text-[10px] font-normal text-muted-foreground leading-none">
+          Code
+        </span>
+        <ChevronUp className="w-2.5 h-2.5 text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ height: bottomPanelHeight }} className="border-t flex flex-col bg-panel">
-      {/* Drag handle */}
+      {/* Drag handle — VS Code-style 4px sash: transparent at rest, subtle
+          tint on hover. Phase 68 UAT 2026-05-17 polish (was h-2/8px). */}
       <div
-        className="h-2 w-full cursor-row-resize hover:bg-ring/30 transition-colors flex-shrink-0"
+        className="h-1 w-full cursor-row-resize hover:bg-ring/30 transition-colors flex-shrink-0"
         onMouseDown={onMouseDown}
       />
       <Tabs defaultValue="code" className="flex-1 min-h-0 flex flex-col">
@@ -86,6 +113,24 @@ export default function BottomPanel() {
             </TabsTrigger>
           </TabsList>
           <div className="ml-auto flex items-center gap-1">
+            {/* Phase 68 D-10 — collapse button. Same toggleBottomPanel store
+                action as the View-menu "Toggle Code Preview" item and the
+                App.tsx Ctrl+` shortcut. Tooltip surfaces the keyboard
+                shortcut so users discover the third entry point. */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleBottomPanel}
+                  aria-label="Collapse code panel"
+                  className="h-7 w-7 p-0"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Collapse (Ctrl+`)</TooltipContent>
+            </Tooltip>
             <Button
               size="sm"
               variant="outline"

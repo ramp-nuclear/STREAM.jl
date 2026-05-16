@@ -11,8 +11,7 @@ import {
 } from "@xyflow/react";
 import { getComponent } from "../registry";
 import { getComponentIcon } from "@/registry/icons";
-import { getComponentLayers } from "../lib/layers";
-import type { LayerView } from "../lib/layers";
+import { getComponentLayers, type ActiveLayers } from "../lib/layers";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
 import { selectNodeErrors, type NodeErrorsInput } from "@/lib/selectors/nodeErrors";
@@ -162,10 +161,12 @@ function FlowPortHandle({
   nodeId,
   port,
   dimFlowHandles,
+  hideFlowHandles,
 }: {
   nodeId: string;
   port: FlowPortLike;
   dimFlowHandles: boolean;
+  hideFlowHandles: boolean;
 }) {
   const isInPort = port.name.includes("in");
   const portFieldKey = isInPort ? "port_in.P" : "port_out.P";
@@ -215,10 +216,16 @@ function FlowPortHandle({
         style={{
           background: isInPort ? FLOW_IN_BG : FLOW_OUT_BG,
           border: `1.5px solid ${isInPort ? FLOW_IN_BORDER : FLOW_OUT_BORDER}`,
-          ...(dimFlowHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
+          // Phase 68 D-03: per-handle off-layer treatment. Hide mode takes
+          // precedence over dim mode (display:none beats opacity 0.2).
+          ...(hideFlowHandles
+            ? { display: "none" as const }
+            : dimFlowHandles
+              ? { opacity: 0.2, pointerEvents: "none" as const }
+              : {}),
         }}
       />
-      {hasAnchor && (
+      {hasAnchor && !hideFlowHandles && (
         <Anchor
           data-testid="anchor-indicator"
           aria-label="Pressure anchor"
@@ -248,10 +255,12 @@ function ThermalPortHandle({
   nodeId,
   port,
   dimThermalHandles,
+  hideThermalHandles,
 }: {
   nodeId: string;
   port: ThermalPortLike;
   dimThermalHandles: boolean;
+  hideThermalHandles: boolean;
 }) {
   const pairWith = port.pair_with!;
   const defaultAxis = port.default_axis ?? "horizontal";
@@ -298,7 +307,13 @@ function ThermalPortHandle({
         height: 12,
         borderRadius: 0,
         transform: "rotate(45deg)",
-        ...(dimThermalHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
+        // Phase 68 D-03: per-handle off-layer treatment for the Thermal
+        // layer. Hide mode beats dim mode.
+        ...(hideThermalHandles
+          ? { display: "none" as const }
+          : dimThermalHandles
+            ? { opacity: 0.2, pointerEvents: "none" as const }
+            : {}),
       }}
     />
   );
@@ -331,7 +346,18 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
   const isCodePinned = useStore(
     useCallback((s: { pinnedSourceIds: Set<string> }) => s.pinnedSourceIds.has(id), [id]),
   );
-  const activeLayer = useStore(useCallback((s: { activeLayer: LayerView }) => s.activeLayer, []));
+  // Phase 68 Plan 03 — 4-layer independent-toggle state. Per-handle dim is
+  // driven by activeLayers.Hydraulic / activeLayers.Thermal directly. The
+  // node-body visibility (D-02) is handled in CanvasPanel's enrichedNodes
+  // pass; this component is responsible only for the per-port-handle
+  // dim/lock behavior for dual-layer nodes (D-03), e.g. CAC with one of its
+  // two layers off.
+  const activeLayers = useStore(
+    useCallback((s: { activeLayers: ActiveLayers }) => s.activeLayers, []),
+  );
+  const hideOffLayer = useStore(
+    useCallback((s: { hideOffLayer: boolean }) => s.hideOffLayer, []),
+  );
   const component = getComponent(nodeData.componentId);
   if (!component) return null;
 
@@ -342,11 +368,19 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
   const thermalPorts = component.ports.filter((p) => p.type === "ThermalPort");
   const bcPorts = component.ports.filter((p) => p.type === "BCPort");
 
-  // Handle dimming for dual-layer nodes (e.g. ChannelAndContacts)
-  const { hasFlow, hasThermal } = getComponentLayers(component);
-  const isDualLayer = hasFlow && hasThermal;
-  const dimFlowHandles = isDualLayer && activeLayer === "Thermal";
-  const dimThermalHandles = isDualLayer && activeLayer === "Hydraulic";
+  // Phase 68 D-03: when a node belongs to BOTH Hydraulic and Thermal layers
+  // (CAC today) and one of those layers is off, the off-layer port handles
+  // dim + lock (dim mode) or are display:none (hide mode); the node body
+  // stays visible because the OTHER layer is on (D-02).
+  const componentLayers = getComponentLayers(component);
+  const isDualLayer =
+    componentLayers.includes("Hydraulic") && componentLayers.includes("Thermal");
+  const flowOff = isDualLayer && activeLayers.Hydraulic === false;
+  const thermalOff = isDualLayer && activeLayers.Thermal === false;
+  const dimFlowHandles = flowOff && !hideOffLayer;
+  const hideFlowHandles = flowOff && hideOffLayer;
+  const dimThermalHandles = thermalOff && !hideOffLayer;
+  const hideThermalHandles = thermalOff && hideOffLayer;
 
   // Combined error surface — legacy Phase-39 + BC tag list. The red-ring
   // outline lights up when EITHER source has a flag for this node.
@@ -397,6 +431,7 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           nodeId={id}
           port={port}
           dimFlowHandles={dimFlowHandles}
+          hideFlowHandles={hideFlowHandles}
         />
       ))}
       {thermalPorts.map((port) => {
@@ -413,6 +448,7 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
               nodeId={id}
               port={port as ThermalPortLike}
               dimThermalHandles={dimThermalHandles}
+              hideThermalHandles={hideThermalHandles}
             />
           );
         }
@@ -431,7 +467,14 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
               height: 12,
               borderRadius: 0,
               transform: "rotate(45deg)",
-              ...(dimThermalHandles ? { opacity: 0.2, pointerEvents: "none" as const } : {}),
+              // Phase 68 D-03: per-handle off-layer treatment for the
+              // Thermal layer (single-port branch — ConstantTemperature etc.).
+              // Hide mode beats dim mode.
+              ...(hideThermalHandles
+                ? { display: "none" as const }
+                : dimThermalHandles
+                  ? { opacity: 0.2, pointerEvents: "none" as const }
+                  : {}),
             }}
           />
         );

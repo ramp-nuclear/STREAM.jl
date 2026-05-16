@@ -2,9 +2,13 @@ import {
   MenubarContent,
   MenubarItem,
   MenubarMenu,
+  MenubarSeparator,
   MenubarTrigger,
 } from "./ui/menubar";
 import useStore from "../store/useStore";
+import { getComponent } from "../registry";
+import { generateCode } from "../lib/codeGenerator";
+import { exportCode } from "../lib/exportCode";
 
 interface Props {
   onUnsavedCheck: () => Promise<"save" | "discard" | "cancel">;
@@ -54,6 +58,23 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
     await saveProjectAs();
   }
 
+  // Phase 68 D-09 — Export to Julia rehomed from the now-deleted secondary
+  // toolbar strip. Same generateCode + exportCode arg shape as the previous
+  // toolbar Export handler so the menu entry and the BottomPanel Export
+  // button (D-12, kept by design) are behaviorally identical.
+  async function handleExportToJulia() {
+    const s = useStore.getState();
+    const sections = generateCode(
+      s.nodes,
+      s.edges,
+      { anchors: s.anchors },
+      getComponent,
+      s.resources,
+      { bcMode: s.bcMode, bcSymmetric: s.bcSymmetric },
+    );
+    await exportCode({ sections, nodes: s.nodes });
+  }
+
   return (
     <MenubarMenu>
       <MenubarTrigger className="h-full rounded-none px-3 py-0 text-xs font-normal hover:bg-accent hover:text-accent-foreground">
@@ -83,6 +104,13 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
             <span>Save As...</span>
             <span className="text-muted-foreground text-xs">Ctrl+Shift+S</span>
           </span>
+        </MenubarItem>
+        <MenubarSeparator />
+        <MenubarItem
+          onClick={handleExportToJulia}
+          className="text-xs font-normal"
+        >
+          Export to Julia…
         </MenubarItem>
       </MenubarContent>
     </MenubarMenu>

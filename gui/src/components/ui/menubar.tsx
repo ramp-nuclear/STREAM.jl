@@ -53,8 +53,15 @@ function MenubarTrigger({
   return (
     <MenubarPrimitive.Trigger
       data-slot="menubar-trigger"
+      // Phase 68 UAT 2026-05-17 — `focus:bg-accent focus:text-accent-foreground`
+      // was removed. After the open menu is closed (either by user action or
+      // by the CustomTitlebar mouse-leave handler), Radix re-focuses the
+      // trigger via onCloseAutoFocus; the focus: styling then kept the
+      // trigger highlighted indefinitely. data-[state=open] is the canonical
+      // "menu is actually open" signal; that's what should highlight.
+      // focus-visible:ring-1 still gives keyboard users a focus cue.
       className={cn(
-        "flex items-center rounded-sm px-2 py-1 text-sm font-medium outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+        "flex items-center rounded-sm px-2 py-1 text-sm font-medium outline-hidden select-none data-[state=open]:bg-accent data-[state=open]:text-accent-foreground focus-visible:ring-1 focus-visible:ring-ring",
         className
       )}
       {...props}
@@ -65,8 +72,8 @@ function MenubarTrigger({
 function MenubarContent({
   className,
   align = "start",
-  alignOffset = -4,
-  sideOffset = 8,
+  alignOffset = 0,
+  sideOffset = 0,
   ...props
 }: React.ComponentProps<typeof MenubarPrimitive.Content>) {
   return (
