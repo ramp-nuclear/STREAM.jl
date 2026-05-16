@@ -1447,6 +1447,7 @@ dependencies = [
 name = "gui"
 version = "0.1.0"
 dependencies = [
+ "raw-window-handle",
  "serde",
  "serde_json",
  "sysinfo",
@@ -1456,6 +1457,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-opener",
  "tauri-plugin-os",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
