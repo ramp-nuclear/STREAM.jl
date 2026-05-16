@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign — Phases 59-72 align src/, gui/registry, and visual ergonomics for the next Composer iteration
-status: verifying
-stopped_at: Phase 66 context gathered
-last_updated: "2026-05-15T18:33:07.882Z"
-last_activity: 2026-05-15 -- Phase 65 gap-closure execution complete (Plans 09–14, six parallel worktree merges to `gui-redesign`)
+status: ready_to_plan
+stopped_at: Phase 66 complete (6/5) — ready to discuss Phase 67
+last_updated: 2026-05-16T09:42:33.041Z
+last_activity: 2026-05-15 -- Phase 66 execution started
 progress:
   total_phases: 15
   completed_phases: 8
-  total_plans: 62
-  completed_plans: 62
+  total_plans: 67
+  completed_plans: 68
   percent: 53
 ---
 
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 66 — code-preview-rework (Phase 65 just shipped 2026-05-14)
+**Current focus:** Phase 67 — custom titlebar
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -58,10 +58,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 65 — COMPLETE (incl. gap closure)
-Plan: 14 of 14 shipped (8 original + 6 gap closure 09–14)
-Status: Phase 65 complete (verification PASS for original 8/8; gap closure 09–14 shipped 2026-05-15 — re-verify via `/gsd:verify-work 65` once user runs deferred manual UAT)
-Last activity: 2026-05-15 -- Phase 65 gap-closure execution complete (Plans 09–14, six parallel worktree merges to `gui-redesign`)
+Phase: 67
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-16
 Next: `/gsd:verify-work 65` to re-run UAT against the gap-closure surfaces, then `/gsd:discuss-phase 66` (Code preview rework). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far (covers Phases 59 → 65).
 
 Phase 65 deferred manual UAT (require running Tauri build):

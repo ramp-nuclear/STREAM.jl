@@ -35,7 +35,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] **Phase 63: BCs tab + value-source components in GUI** — Properties tab vs BCs tab separation. Five BC modes (value / profile / function / mark-in-code / driven-by-source-block). `WallTemperature` and `HeatFluxSource` toolbox entries. Dashed BC edge style. Bidirectional sync between BCs tab and canvas connections. (completed 2026-05-13)
 - [x] **Phase 64: Connection routing** — Per-port autoflip for FlowPorts with asymmetric same-side placement. Independent axis-flip for thermal-pair ports on CAC/HD. Anti-parallel offset for bidirectional pairs as polish hook. (completed 2026-05-14)
 - [x] **Phase 65: Interaction model overhaul** ✓ shipped 2026-05-14 — Left-marquee selection, right-click drag pan, right-click no-drag context menu. Edge deletion (Del/Backspace + right-click). Copy/Cut/Paste/Duplicate (Ctrl+C/X/V/D) with smart-parse-and-increment naming. Reset-to-empty rule for property fields. Snap-to-grid toggle. AutoRecover sidecar snapshot mechanism.
-- [ ] **Phase 66: Code preview rework** — Structured `CodeSection[]` output replacing flat string code-gen. Section blocks (Imports / Resources / Components / Composition / Main). Bidirectional traceability (code-hover → canvas-highlight; canvas-select → explicit code-jump). Click-to-pin sections. Copy + Export buttons in code panel toolbar. Hand-rolled formatting rules.
+- [x] **Phase 66: Code preview rework** — Structured `CodeSection[]` output replacing flat string code-gen. Section blocks (Imports / Resources / Components / Composition / Main). Bidirectional traceability (code-hover → canvas-highlight; canvas-select → explicit code-jump). Click-to-pin sections. Copy + Export buttons in code panel toolbar. Hand-rolled formatting rules. (completed 2026-05-16)
 - [ ] **Phase 67: Custom titlebar** — Tauri `decorations: false` + custom HTML titlebar. Integrated File/Edit/View/Help menubar, app icon, project name, dirty dot (left); min/max/close buttons (right). Cross-platform consistency.
 - [ ] **Phase 68: Layers system overhaul** — Four-layer taxonomy (Hydraulic / Thermal / Sources / Reactor Physics). Independent checkbox toggles. Floating Layers chip top-right of canvas with layer-state color indicators. Hide-vs-dim setting. Off-layer locked (non-interactive). Non-clunky layer-aware connect tool.
 - [ ] **Phase 69: Command palette (jump-only)** — Ctrl+P fuzzy search across component instance names + Resource names. Focus-on-canvas for components, focus-in-navigator for Resources. No action invocation in v1.
@@ -203,12 +203,12 @@ Plans:
 
 **Design-decisions reference:** Section 3.11 (code-gen impact), plus the code-tab rework discussion captured in the conversation lineage.
 **Depends on:** Phase 62 (resources are part of generated sections).
-**Plans:** 5 plans
-- [ ] 66-01-red-tests-structured-codegen-PLAN.md — Wave 0: RED tests for CodeSection[] + serializeSections + CodePreview UI behavior (5 new vitest files; all RED to lock the contract before implementation)
-- [ ] 66-02-codegenerator-structured-output-PLAN.md — Wave 1: refactor codeGenerator.ts to return CodeSection[]; add serializeSections; migrate 5 existing codegen test files via one-line adapter + D-12 header updates; TEMP-wrap CodePreview/Toolbar to preserve runtime
-- [ ] 66-03-store-slices-hooks-exportcode-PLAN.md — Wave 2: hoveredSourceIds/pinnedSourceIds/pendingShowCodeFor Zustand slices; useShowCodeFor hook; global Esc handler in App.tsx; exportCode.ts shared util; Toolbar migration to use the util
-- [ ] 66-04-codepreview-ui-rewrite-PLAN.md — Wave 3: CodePreview.tsx full rewrite (section-by-section, hover/click/scroll/flash); BottomPanel.tsx Copy + Export buttons in TabsList; flips Plan 01 RED CodePreview tests to GREEN
-- [ ] 66-05-streamnode-hover-ring-PLAN.md — Wave 4: StreamNode.tsx subscribes to hoveredSourceIds/pinnedSourceIds; index.css placeholder ring CSS; Phase 72 handoff doc; manual UAT checkpoint (end-to-end bidirectional traceability)
+**Plans:** 6/5 plans complete
+- [x] 66-01-red-tests-structured-codegen-PLAN.md — Wave 0: RED tests for CodeSection[] + serializeSections + CodePreview UI behavior (5 new vitest files; all RED to lock the contract before implementation)
+- [x] 66-02-codegenerator-structured-output-PLAN.md — Wave 1: refactor codeGenerator.ts to return CodeSection[]; add serializeSections; migrate 5 existing codegen test files via one-line adapter + D-12 header updates; TEMP-wrap CodePreview/Toolbar to preserve runtime
+- [x] 66-03-store-slices-hooks-exportcode-PLAN.md — Wave 2: hoveredSourceIds/pinnedSourceIds/pendingShowCodeFor Zustand slices; useShowCodeFor hook; global Esc handler in App.tsx; exportCode.ts shared util; Toolbar migration to use the util
+- [x] 66-04-codepreview-ui-rewrite-PLAN.md — Wave 3: CodePreview.tsx full rewrite (section-by-section, hover/click/scroll/flash); BottomPanel.tsx Copy + Export buttons in TabsList; flips Plan 01 RED CodePreview tests to GREEN
+- [x] 66-05-streamnode-hover-ring-PLAN.md — Wave 4: StreamNode.tsx subscribes to hoveredSourceIds/pinnedSourceIds; index.css placeholder ring CSS; Phase 72 handoff doc; manual UAT checkpoint (end-to-end bidirectional traceability)
 
 ### Phase 67: Custom titlebar
 
@@ -304,7 +304,7 @@ contract document drafted in parallel throughout.
 | 63.1. BC architecture rework — unified BCs tab       | 14/14 | Complete   | 2026-05-14 |
 | 64. Connection routing                               | 4/4 | Complete    | 2026-05-14 |
 | 65. Interaction model overhaul                       | 8/14 | Gap closure in flight | — |
-| 66. Code preview rework                              | 0/TBD | Planned | — |
+| 66. Code preview rework                              | 6/5 | Complete    | 2026-05-16 |
 | 67. Custom titlebar                                  | 0/TBD | Planned | — |
 | 68. Layers system overhaul                           | 0/TBD | Planned | — |
 | 69. Command palette (jump-only)                      | 0/TBD | Planned | — |
