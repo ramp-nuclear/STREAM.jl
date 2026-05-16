@@ -535,29 +535,31 @@ All shown inline in Patterns 1-5 above. Key snippets summarized:
 | A7 | shadcn `dialog` install (`npx shadcn add dialog`) will not conflict with existing shadcn components | Standard Stack | LOW — shadcn adds files into `gui/src/components/ui/`; no overwrites for components already installed |
 | A8 | The user will not be running macOS during Phase 67 UAT, so macOS rounded-corners (Pitfall 4) can be deferred | Pitfall 4 | LOW — confirmed via STATE.md "Working branch: gui-redesign" + Phase 65 lessons referencing WSLg; macOS support is out of scope |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **WSLg edge-resize behavior with `decorations: false`.**
+> All five questions below were resolved in `67-CONTEXT.md` after research. Resolution markers added inline.
+
+1. **WSLg edge-resize behavior with `decorations: false`.** — **RESOLVED: D-18 — defer.** Ship as-is; Plan 67-03 Task 4 UAT items 18-19 capture status without blocking. No CSS resize-gutter task added.
    - What we know: known buggy on Linux (Tauri issues #8519, #6609, #9053) but the severity ranges from "unusable" to "minor cosmetic."
    - What's unclear: whether the user's WSLg setup specifically lands in the "unusable" bucket or "tolerable" bucket.
    - Recommendation: Phase 67 UAT must include "drag each window edge — does the window resize correctly?" as a first-class check. If broken, the planner should pre-stage a contingency task to add a 4px transparent CSS resize-gutter or revert `decorations` for Linux only via runtime config.
 
-2. **What does the title bar look like across virtual-desktop / window-snap workflows on WSLg?**
+2. **What does the title bar look like across virtual-desktop / window-snap workflows on WSLg?** — **RESOLVED: handled as UAT step in Plan 67-03 Task 4.**
    - What we know: WSLg windows are Wayland-presented; window snapping behavior differs from native Linux Wayland.
    - What's unclear: whether `toggleMaximize()` produces the expected "occupy the WSLg work area" behavior.
    - Recommendation: UAT step.
 
-3. **Should the Edit menu items also honor the Phase 65 input-focus guard?**
+3. **Should the Edit menu items also honor the Phase 65 input-focus guard?** — **RESOLVED: D-19 — always-fire.** Menu items unconditionally call store actions; the Phase 65 keyboard guard remains for keypresses only.
    - What we know: Phase 65's keyboard handler in `CanvasPanel.tsx` lets Ctrl+C/X/V/D pass through to text inputs.
    - What's unclear: when a user is editing a text input and clicks the Edit menu → Copy, do they want the **canvas** copy or the **input** copy?
    - Recommendation: Match the keyboard behavior — if the active element is a text input, the menu items also pass through (default OS behavior). Or simpler: just always fire `copySelection()` and document the asymmetry. **Assumed default = always fire (A4).**
 
-4. **About dialog GitHub URL — is the repo public yet?**
+4. **About dialog GitHub URL — is the repo public yet?** — **RESOLVED: D-20 — `https://github.com/ramp-nuclear/STREAM.jl`** (user-supplied).
    - What we know: v1.0 was "Open-Source Release" per STATE.md.
    - What's unclear: actual canonical URL.
    - Recommendation: planner should pick a placeholder URL constant and flag for user confirmation before About dialog ships.
 
-5. **Theme list extension hook.** Phase 72 will add more themes. Should Phase 67 declare `THEME_OPTIONS` array in `useTheme.ts` (centralized) or in `ViewMenu.tsx` (local)?
+5. **Theme list extension hook.** Phase 72 will add more themes. Should Phase 67 declare `THEME_OPTIONS` array in `useTheme.ts` (centralized) or in `ViewMenu.tsx` (local)? — **RESOLVED: D-21 — centralize in `useTheme.ts` as `THEMES` const array.**
    - Recommendation: centralize in `useTheme.ts` next to `Theme` type — the type and the list are coupled.
 
 ## Environment Availability

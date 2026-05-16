@@ -216,7 +216,11 @@ Plans:
 
 **Design-decisions reference:** Section 3.6.
 **Depends on:** —.
-**Plans:** TBD via `/gsd:plan-phase`.
+**Plans:** 3 plans
+
+- [ ] 67-01-PLAN.md (Wave 1) — Tauri 4-layer foundation: npm install @tauri-apps/plugin-os; Cargo + lib.rs plugin register; 5 capability permissions; `decorations: false`; copy app icon to gui/public/. Isolates the dominant silent-failure risk per RESEARCH.md.
+- [ ] 67-02-PLAN.md (Wave 2, depends on 01) — Leaf primitives: useTheme.ts `THEMES` export (D-21 array-driven), `useWindowMaximized` hook, `WindowControls.tsx` (platform-branched macOS circles vs Windows/Linux Lucide icons), shadcn `dialog` install, `AboutDialog.tsx`.
+- [ ] 67-03-PLAN.md (Wave 3, depends on 01+02; HAS CHECKPOINT) — Composition + integration: `EditMenu.tsx`/`ViewMenu.tsx`/`HelpMenu.tsx`, `CustomTitlebar.tsx` shell with drag-region sibling per D-26, `SecondaryToolbar.tsx`, App.tsx root restructure, delete Toolbar.tsx + ThemeMenu.tsx; manual WSLg UAT covering drag/double-click/min/max/close + known-risk edge-resize (D-18).
 
 ### Phase 68: Layers system overhaul
 
