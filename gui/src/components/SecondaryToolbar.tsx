@@ -6,42 +6,38 @@ import { getComponent } from "../registry";
 import { generateCode } from "../lib/codeGenerator";
 import { exportCode } from "../lib/exportCode";
 import type { LayerView } from "../lib/layers";
-import FileMenu from "./FileMenu";
-import ThemeMenu from "./ThemeMenu";
-import type { Theme } from "../hooks/useTheme";
 
-interface Props {
-  onUnsavedCheck: () => Promise<"save" | "discard" | "cancel">;
-  theme: Theme;
-  resolvedTheme: "light" | "dark";
-  setTheme: (t: Theme) => void;
-}
-
-export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
+/**
+ * Secondary toolbar strip (Phase 67 D-01/D-16/D-17).
+ *
+ * 32px full-width strip below the CustomTitlebar:
+ *   [Layer toggle]            [Code button] [Export button]
+ *
+ * D-03/D-16 — ThemeMenu does NOT live here anymore (folded into ViewMenu);
+ * FileMenu lives in CustomTitlebar.
+ *
+ * D-17 — Rendered at the root flex-col level, NOT inside the center column
+ * (App.tsx restructure in Plan 03 Task 3 handles placement).
+ */
+export default function SecondaryToolbar() {
   // PERF — only subscribe to the things this component actually reads in its
   // render output. The Export click handler reads live state via
-  // useStore.getState() at click time. Previously Toolbar subscribed to the
-  // full nodes/edges/anchors/resources/bcMode/bcSymmetric set just to pass
-  // them to generateCode in handleExport — every one of those fired on every
-  // ReactFlow drag tick (60 Hz), re-rendering the always-mounted Toolbar.
-  // We still need a boolean for the disabled state on the Export button, so
-  // we subscribe to a derived primitive (re-renders only when the canvas
-  // crosses the empty/non-empty boundary). Same pattern as BottomPanel.tsx
-  // (commit 6c08bcd) and the rule documented in gui/PERFORMANCE.md §3.
+  // useStore.getState() at click time. We still need a boolean for the
+  // disabled state on the Export button, so we subscribe to a derived
+  // primitive (re-renders only when the canvas crosses the empty/non-empty
+  // boundary). Same pattern as BottomPanel.tsx (commit 6c08bcd) and the rule
+  // documented in gui/PERFORMANCE.md §3.
   const hasNodes = useStore((s) => s.nodes.length > 0);
   const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
   const toggleBottomPanel = useStore((s) => s.toggleBottomPanel);
-  const isDirty = useStore((s) => s.isDirty);
-  const currentFilePath = useStore((s) => s.currentFilePath);
   const activeLayer = useStore((s) => s.activeLayer);
   const setActiveLayer = useStore((s) => s.setActiveLayer);
 
   // Phase 66 Plan 03: the Tauri save-dialog + file-write path moved into
-  // gui/src/lib/exportCode.ts so Toolbar.tsx (here) and BottomPanel.tsx
-  // (Plan 04) share the same util. `generateCode` is called inline at
+  // gui/src/lib/exportCode.ts so SecondaryToolbar.tsx (here) and
+  // BottomPanel.tsx share the same util. `generateCode` is called inline at
   // export-time so the freshly-computed sections reflect the current store
-  // state without paying for memoization that the now-unused
-  // `serializeSections` wrap previously required.
+  // state without paying for memoization.
   async function handleExport() {
     const s = useStore.getState();
     const sections = generateCode(
@@ -56,31 +52,13 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
   }
 
   return (
-    <div className="flex items-center justify-between h-9 px-2 bg-muted border-b">
-      {/* Left section: FileMenu, filename, Code button */}
-      <div className="flex items-center gap-1">
-        <FileMenu onUnsavedCheck={onUnsavedCheck} />
-        <span className="text-xs text-muted-foreground ml-2 select-none">
-          {currentFilePath
-            ? `${currentFilePath.split(/[/\\]/).pop()}${isDirty ? " *" : ""}`
-            : isDirty
-              ? "Untitled *"
-              : ""}
-        </span>
-        <Button
-          variant={bottomPanelOpen ? "default" : "outline"}
-          size="sm"
-          onClick={toggleBottomPanel}
-        >
-          <Code2 className="h-4 w-4 mr-1" />
-          Code
-        </Button>
-      </div>
-
-      {/* Center section: Layer toggle */}
+    <div className="flex items-center justify-between h-8 px-2 bg-muted border-b w-full">
+      {/* Left cluster: Layer toggle */}
       <div className="flex items-center gap-1.5">
         <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-muted-foreground select-none">Layer</span>
+        <span className="text-xs font-semibold text-muted-foreground select-none">
+          Layer
+        </span>
         <ToggleGroup
           type="single"
           value={activeLayer}
@@ -112,9 +90,16 @@ export default function Toolbar({ onUnsavedCheck, theme, setTheme }: Props) {
         </ToggleGroup>
       </div>
 
-      {/* Right section: ThemeMenu + Export button */}
+      {/* Right cluster: Code button + Export button */}
       <div className="flex items-center gap-1">
-        <ThemeMenu theme={theme} setTheme={setTheme} />
+        <Button
+          variant={bottomPanelOpen ? "default" : "outline"}
+          size="sm"
+          onClick={toggleBottomPanel}
+        >
+          <Code2 className="h-4 w-4 mr-1" />
+          Code
+        </Button>
         <Button
           variant="default"
           size="sm"
