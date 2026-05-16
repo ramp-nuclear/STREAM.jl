@@ -8,15 +8,7 @@
 //   window" rightmost, hover styling on Close.
 // - platform() throwing falls back to Windows/Linux variant (vitest env).
 // - Click handlers invoke the correct getCurrentWindow().* method.
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-  type Mock,
-} from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 
 // Mocks must be set up BEFORE the component import so the module bindings
