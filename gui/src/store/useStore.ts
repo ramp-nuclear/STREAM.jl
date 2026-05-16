@@ -25,7 +25,7 @@ import {
   deserializeProject,
   addToRecent,
 } from "../lib/projectIO";
-import type { LayerView } from "../lib/layers";
+import { type LayerKey, type ActiveLayers, ALL_LAYERS_ON } from "../lib/layers";
 import {
   type ClipboardPayload,
   CLIPBOARD_FORMAT_TAG,
@@ -209,10 +209,16 @@ interface AppState {
   clearPinnedSourceIds: () => void;
   setPendingShowCodeFor: (ids: string[]) => void;
   consumePendingShowCodeFor: () => string[] | null;
-  // Layer view state (persisted in .scp layout block, NOT in undo stack)
-  activeLayer: LayerView;
-  setActiveLayer: (layer: LayerView) => void;
-  cycleLayer: () => void;
+  // Phase 68: 4-layer independent-toggle state (persisted in .scp layout
+  // block, NOT in undo stack). Replaces the v0.8 `activeLayer: LayerView`
+  // three-mode shape per D-05. See `gui/src/lib/layers.ts` for the LayerKey
+  // taxonomy (Hydraulic / Thermal / Sources / ReactorPhysics).
+  activeLayers: ActiveLayers;
+  hideOffLayer: boolean;
+  toggleLayer: (key: LayerKey) => void;
+  setLayerVisible: (key: LayerKey, visible: boolean) => void;
+  setAllLayersVisible: (visible: boolean) => void;
+  setHideOffLayer: (value: boolean) => void;
   // Snap-to-grid (Phase 65 D-10 — persisted in .scp layout block)
   snapToGrid: boolean;
   setSnapToGrid: (v: boolean) => void;
@@ -824,8 +830,10 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   hoveredSourceIds: new Set<string>(),
   pinnedSourceIds: new Set<string>(),
   pendingShowCodeFor: null,
-  // Layer view initial state
-  activeLayer: "Both" as LayerView,
+  // Phase 68: 4-layer independent-toggle initial state. Shallow-clone the
+  // constant so consumer mutations cannot leak back to ALL_LAYERS_ON.
+  activeLayers: { ...ALL_LAYERS_ON },
+  hideOffLayer: false,
   // Snap-to-grid initial state (Phase 65 D-10 — OFF by default)
   snapToGrid: false,
   interactiveLocked: false,
@@ -1025,17 +1033,34 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   },
 
   // ---------------------------------------------------------------------------
-  // Layer view actions (persisted in .scp layout block — set isDirty so saves capture)
+  // Phase 68: 4-layer independent-toggle actions (persisted in .scp layout
+  // block — every setter marks isDirty so saves capture the change).
   // ---------------------------------------------------------------------------
 
-  setActiveLayer: (layer) => set({ activeLayer: layer, isDirty: true }),
+  toggleLayer: (key) =>
+    set((state) => ({
+      activeLayers: { ...state.activeLayers, [key]: !state.activeLayers[key] },
+      isDirty: true,
+    })),
 
-  cycleLayer: () => {
-    const order: LayerView[] = ["Hydraulic", "Both", "Thermal"];
-    const { activeLayer } = get();
-    const idx = order.indexOf(activeLayer);
-    set({ activeLayer: order[(idx + 1) % 3], isDirty: true });
-  },
+  setLayerVisible: (key, visible) =>
+    set((state) => ({
+      activeLayers: { ...state.activeLayers, [key]: visible },
+      isDirty: true,
+    })),
+
+  setAllLayersVisible: (visible) =>
+    set(() => ({
+      activeLayers: {
+        Hydraulic: visible,
+        Thermal: visible,
+        Sources: visible,
+        ReactorPhysics: visible,
+      },
+      isDirty: true,
+    })),
+
+  setHideOffLayer: (value) => set({ hideOffLayer: value, isDirty: true }),
 
   // Phase 65 D-10: snap-to-grid toggle — persisted in .scp layout block
   setSnapToGrid: (v) => set({ snapToGrid: v, isDirty: true }),
@@ -2158,7 +2183,8 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
         },
         modelOptions: state.modelOptions,
         activeLeftTab: state.activeLeftTab,
-        activeLayer: state.activeLayer,
+        activeLayers: state.activeLayers,
+        hideOffLayer: state.hideOffLayer,
         snapToGrid: state.snapToGrid,
       });
       await writeTextFile(currentFilePath, json);
@@ -2224,7 +2250,8 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
         },
         modelOptions: state.modelOptions,
         activeLeftTab: state.activeLeftTab,
-        activeLayer: state.activeLayer,
+        activeLayers: state.activeLayers,
+        hideOffLayer: state.hideOffLayer,
         snapToGrid: state.snapToGrid,
       });
       await writeTextFile(filePath, json);
@@ -2370,7 +2397,12 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
         // boundary-conditions array on load. No legacy fallback per D-14 —
         // old .streamgui files lose their anchor data (accepted breakage).
         anchors: project.anchors,
-        activeLayer: (project.layout.active_layer ?? "Both") as LayerView,
+        // Phase 68: 4-layer state restored from .scp. The legacy
+        // `active_layer` string field is auto-converted by deserializeProject
+        // (see projectIO.ts shim — "Both"/missing → all true, "Hydraulic" /
+        // "Thermal" → only that key true).
+        activeLayers: project.layout.active_layers,
+        hideOffLayer: project.layout.hide_off_layer,
         // Phase 65 D-10: restore snap-to-grid from .scp layout block (default false)
         snapToGrid: project.layout.snap_to_grid ?? false,
         currentFilePath: filePath,
@@ -2450,7 +2482,9 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       edges: [],
       // Phase 63.1 D-02: reset anchors Record on newProject.
       anchors: {},
-      activeLayer: "Both" as LayerView,
+      // Phase 68: reset to 4-layer defaults (all on, dim off).
+      activeLayers: { ...ALL_LAYERS_ON },
+      hideOffLayer: false,
       // Phase 65 D-10: snap-to-grid defaults to OFF on new projects
       snapToGrid: false,
       currentFilePath: null,
@@ -2644,7 +2678,10 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       nodes: project.components,
       edges: enrichedEdges,
       anchors: project.anchors,
-      activeLayer: (project.layout.active_layer ?? "Both") as LayerView,
+      // Phase 68: 4-layer state restored from sidecar (same shim path as
+      // loadProjectFromPath — projectIO normalizes legacy active_layer).
+      activeLayers: project.layout.active_layers,
+      hideOffLayer: project.layout.hide_off_layer,
       snapToGrid: project.layout.snap_to_grid ?? false,
       // D-04: recovered state is always in-memory unsaved; user must Save As
       currentFilePath: null,
@@ -2752,7 +2789,8 @@ export async function initAutoRecover(): Promise<{ teardown: () => Promise<void>
         resources: state.resources,
         modelOptions: state.modelOptions,
         activeLeftTab: state.activeLeftTab,
-        activeLayer: state.activeLayer,
+        activeLayers: state.activeLayers,
+        hideOffLayer: state.hideOffLayer,
         snapToGrid: state.snapToGrid,
       });
     },

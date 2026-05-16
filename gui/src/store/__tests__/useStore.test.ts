@@ -3,6 +3,7 @@ import { MarkerType } from "@xyflow/react";
 import useStore from "../useStore";
 import { enrichEdges } from "../useStore";
 import type { StreamNodeData } from "../useStore";
+import { ALL_LAYERS_ON } from "../../lib/layers";
 
 // Reset store and undo history before each test
 beforeEach(() => {
@@ -305,41 +306,131 @@ describe("isDirty tracking", () => {
   });
 });
 
-describe("activeLayer", () => {
-  it("defaults to Both", () => {
-    expect(useStore.getState().activeLayer).toBe("Both");
+describe("activeLayers (Phase 68 — 4-layer independent toggles)", () => {
+  beforeEach(() => {
+    // Reset the new layer slice to defaults so each test starts clean.
+    useStore.setState({
+      activeLayers: { ...ALL_LAYERS_ON },
+      hideOffLayer: false,
+      isDirty: false,
+    });
   });
 
-  it("setActiveLayer updates activeLayer", () => {
-    useStore.getState().setActiveLayer("Hydraulic");
-    expect(useStore.getState().activeLayer).toBe("Hydraulic");
+  // -------------------------------------------------------------------------
+  // Default state
+  // -------------------------------------------------------------------------
+
+  it("default activeLayers equals ALL_LAYERS_ON (all four true)", () => {
+    expect(useStore.getState().activeLayers).toEqual({
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    });
   });
 
-  it("setActiveLayer sets isDirty", () => {
+  it("default hideOffLayer is false", () => {
+    expect(useStore.getState().hideOffLayer).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // toggleLayer(key)
+  // -------------------------------------------------------------------------
+
+  it("toggleLayer flips Hydraulic from true to false; other keys unchanged", () => {
+    useStore.getState().toggleLayer("Hydraulic");
+    const al = useStore.getState().activeLayers;
+    expect(al.Hydraulic).toBe(false);
+    expect(al.Thermal).toBe(true);
+    expect(al.Sources).toBe(true);
+    expect(al.ReactorPhysics).toBe(true);
+  });
+
+  it("toggleLayer called twice on Thermal returns Thermal to true", () => {
+    useStore.getState().toggleLayer("Thermal");
+    expect(useStore.getState().activeLayers.Thermal).toBe(false);
+    useStore.getState().toggleLayer("Thermal");
+    expect(useStore.getState().activeLayers.Thermal).toBe(true);
+  });
+
+  it("toggleLayer marks the project dirty", () => {
     useStore.setState({ isDirty: false });
-    useStore.getState().setActiveLayer("Thermal");
+    useStore.getState().toggleLayer("Hydraulic");
     expect(useStore.getState().isDirty).toBe(true);
   });
 
-  it("cycleLayer rotates Hydraulic->Both->Thermal->Hydraulic", () => {
-    useStore.getState().setActiveLayer("Hydraulic");
-    useStore.getState().cycleLayer();
-    expect(useStore.getState().activeLayer).toBe("Both");
-    useStore.getState().cycleLayer();
-    expect(useStore.getState().activeLayer).toBe("Thermal");
-    useStore.getState().cycleLayer();
-    expect(useStore.getState().activeLayer).toBe("Hydraulic");
+  // -------------------------------------------------------------------------
+  // setLayerVisible(key, visible)
+  // -------------------------------------------------------------------------
+
+  it("setLayerVisible(Sources, false) sets Sources to false; idempotent on second call", () => {
+    useStore.getState().setLayerVisible("Sources", false);
+    expect(useStore.getState().activeLayers.Sources).toBe(false);
+    useStore.getState().setLayerVisible("Sources", false);
+    expect(useStore.getState().activeLayers.Sources).toBe(false);
   });
 
-  it("activeLayer is NOT in CanvasSnapshot (undo stack)", () => {
-    // Change activeLayer, then perform undoable action, undo — activeLayer should be unchanged
-    useStore.getState().setActiveLayer("Thermal");
-    useStore.getState().addNode("Pump", { x: 0, y: 0 });
-    expect(useStore.getState().nodes).toHaveLength(1);
-    useStore.getState().undo();
-    expect(useStore.getState().nodes).toHaveLength(0);
-    // activeLayer should still be Thermal — undo does not touch it
-    expect(useStore.getState().activeLayer).toBe("Thermal");
+  it("setLayerVisible(Sources, true) restores Sources to true after being set false", () => {
+    useStore.getState().setLayerVisible("Sources", false);
+    expect(useStore.getState().activeLayers.Sources).toBe(false);
+    useStore.getState().setLayerVisible("Sources", true);
+    expect(useStore.getState().activeLayers.Sources).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // setAllLayersVisible(visible)
+  // -------------------------------------------------------------------------
+
+  it("setAllLayersVisible(false) sets all four keys to false at once", () => {
+    useStore.getState().setAllLayersVisible(false);
+    expect(useStore.getState().activeLayers).toEqual({
+      Hydraulic: false,
+      Thermal: false,
+      Sources: false,
+      ReactorPhysics: false,
+    });
+  });
+
+  it("setAllLayersVisible(true) sets all four keys to true", () => {
+    useStore.getState().setAllLayersVisible(false);
+    useStore.getState().setAllLayersVisible(true);
+    expect(useStore.getState().activeLayers).toEqual({
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // setHideOffLayer(value)
+  // -------------------------------------------------------------------------
+
+  it("setHideOffLayer(true) flips hideOffLayer to true and marks dirty", () => {
+    useStore.setState({ isDirty: false });
+    useStore.getState().setHideOffLayer(true);
+    expect(useStore.getState().hideOffLayer).toBe(true);
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // Removal verification — D-05 (old API physically gone)
+  // -------------------------------------------------------------------------
+
+  it("cycleLayer is undefined on the store (action removed per D-05)", () => {
+    expect((useStore.getState() as unknown as Record<string, unknown>).cycleLayer).toBeUndefined();
+  });
+
+  it("setActiveLayer is undefined on the store (action removed per D-05)", () => {
+    expect(
+      (useStore.getState() as unknown as Record<string, unknown>).setActiveLayer,
+    ).toBeUndefined();
+  });
+
+  it("activeLayer (singular) is undefined on the store (field removed per D-05)", () => {
+    expect(
+      (useStore.getState() as unknown as Record<string, unknown>).activeLayer,
+    ).toBeUndefined();
   });
 });
 

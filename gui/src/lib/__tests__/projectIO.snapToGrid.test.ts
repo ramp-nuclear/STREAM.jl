@@ -23,7 +23,8 @@ import type {
   ActiveLeftTab,
 } from "../../store/useStore";
 import type { AnchorEntry } from "../anchors";
-import type { LayerView } from "../layers";
+import { ALL_LAYERS_ON } from "../layers";
+import type { ActiveLayers } from "../layers";
 
 // ---------------------------------------------------------------------------
 // Minimal fixtures
@@ -58,7 +59,14 @@ function makeMinimalSerializeArgs(snapToGrid: boolean) {
     solver: { abstol: 1e-8, reltol: 1e-6, dtmax: null },
   };
   const activeLeftTab: ActiveLeftTab = "Components";
-  const activeLayer: LayerView = "Both";
+  // Phase 68: 4-layer fixture (was `activeLayer: "Both"`).
+  const activeLayers: ActiveLayers = {
+    Hydraulic: true,
+    Thermal: true,
+    Sources: true,
+    ReactorPhysics: true,
+  };
+  const hideOffLayer = false;
 
   return {
     nodes,
@@ -67,7 +75,8 @@ function makeMinimalSerializeArgs(snapToGrid: boolean) {
     resources,
     modelOptions,
     activeLeftTab,
-    activeLayer,
+    activeLayers,
+    hideOffLayer,
     snapToGrid,
   };
 }
@@ -116,5 +125,143 @@ describe("snap_to_grid round-trip (D-10)", () => {
     const json = serializeProject(makeMinimalSerializeArgs(true));
     const project = deserializeProject(json);
     expect(project.layout.snap_to_grid).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 68 Plan 02 — active_layers round-trip + legacy active_layer compat
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the same minimal-args fixture as `makeMinimalSerializeArgs(false)`
+ * but with caller-supplied `activeLayers` + `hideOffLayer` overrides so we
+ * can exercise the round-trip with non-default values.
+ */
+function makeArgsWithLayers(
+  activeLayers: ActiveLayers,
+  hideOffLayer: boolean,
+) {
+  const base = makeMinimalSerializeArgs(false);
+  return { ...base, activeLayers, hideOffLayer };
+}
+
+describe("active_layers + hide_off_layer round-trip (Phase 68 D-05)", () => {
+  it("Test A: round-trips non-default activeLayers + hideOffLayer=true", () => {
+    const layers: ActiveLayers = {
+      Hydraulic: false,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: false,
+    };
+    const json = serializeProject(makeArgsWithLayers(layers, true));
+    const project = deserializeProject(json);
+    expect(project.layout.active_layers).toEqual(layers);
+    expect(project.layout.hide_off_layer).toBe(true);
+  });
+
+  it("Test B: serialize(ALL_LAYERS_ON, hideOffLayer=false) writes the explicit object", () => {
+    const json = serializeProject(makeArgsWithLayers({ ...ALL_LAYERS_ON }, false));
+    const parsed = JSON.parse(json) as {
+      layout: { active_layers: unknown; hide_off_layer: unknown };
+    };
+    expect(parsed.layout.active_layers).toEqual({
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    });
+    expect(parsed.layout.hide_off_layer).toBe(false);
+  });
+});
+
+describe("legacy active_layer read compat (Phase 68 D-05)", () => {
+  it("Test C: legacy active_layer=\"Both\" with no active_layers → ALL_LAYERS_ON", () => {
+    const raw = JSON.stringify({
+      format_version: PROJECT_FORMAT_VERSION,
+      layout: { active_left_tab: "Components", active_layer: "Both" },
+    });
+    const project = deserializeProject(raw);
+    expect(project.layout.active_layers).toEqual({
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    });
+    expect(project.layout.hide_off_layer).toBe(false);
+  });
+
+  it("Test D: legacy active_layer=\"Hydraulic\" → only Hydraulic true", () => {
+    const raw = JSON.stringify({
+      format_version: PROJECT_FORMAT_VERSION,
+      layout: { active_left_tab: "Components", active_layer: "Hydraulic" },
+    });
+    const project = deserializeProject(raw);
+    expect(project.layout.active_layers).toEqual({
+      Hydraulic: true,
+      Thermal: false,
+      Sources: false,
+      ReactorPhysics: false,
+    });
+  });
+
+  it("Test E: legacy active_layer=\"Thermal\" → only Thermal true", () => {
+    const raw = JSON.stringify({
+      format_version: PROJECT_FORMAT_VERSION,
+      layout: { active_left_tab: "Components", active_layer: "Thermal" },
+    });
+    const project = deserializeProject(raw);
+    expect(project.layout.active_layers).toEqual({
+      Hydraulic: false,
+      Thermal: true,
+      Sources: false,
+      ReactorPhysics: false,
+    });
+  });
+
+  it("Test F: NEITHER active_layer nor active_layers → ALL_LAYERS_ON default", () => {
+    const raw = JSON.stringify({
+      format_version: PROJECT_FORMAT_VERSION,
+      layout: { active_left_tab: "Components" },
+    });
+    const project = deserializeProject(raw);
+    expect(project.layout.active_layers).toEqual({
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    });
+    expect(project.layout.hide_off_layer).toBe(false);
+  });
+
+  it("Test G: both new active_layers AND legacy active_layer → new wins", () => {
+    const newLayers = {
+      Hydraulic: false,
+      Thermal: true,
+      Sources: false,
+      ReactorPhysics: true,
+    };
+    const raw = JSON.stringify({
+      format_version: PROJECT_FORMAT_VERSION,
+      layout: {
+        active_left_tab: "Components",
+        active_layer: "Hydraulic",   // legacy says only Hydraulic
+        active_layers: newLayers,    // new field says Thermal + ReactorPhysics
+      },
+    });
+    const project = deserializeProject(raw);
+    expect(project.layout.active_layers).toEqual(newLayers);
+  });
+});
+
+describe("write-side absence of legacy active_layer (Phase 68 D-05)", () => {
+  it("Test H: serializeProject output layout does NOT contain `active_layer` field", () => {
+    const json = serializeProject(makeArgsWithLayers({ ...ALL_LAYERS_ON }, false));
+    const parsed = JSON.parse(json) as {
+      layout: Record<string, unknown>;
+    };
+    expect(parsed.layout.active_layer).toBeUndefined();
+    // Sanity: new fields ARE present.
+    expect(parsed.layout).toHaveProperty("active_layers");
+    expect(parsed.layout).toHaveProperty("hide_off_layer");
   });
 });
