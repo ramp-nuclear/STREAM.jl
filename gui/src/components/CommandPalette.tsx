@@ -42,7 +42,7 @@
 //     re-evaluates while the palette is mounted/visible.
 
 import * as React from "react";
-import { Box, Library, Settings2 } from "lucide-react";
+import { Box, EyeOff, Library, Settings2 } from "lucide-react";
 import { useReactFlow } from "@xyflow/react";
 
 import {
@@ -73,17 +73,11 @@ import useStore from "@/store/useStore";
 // screen-pixels at zoom 0.75 (still legible). UAT-tunable.
 const ZOOM_MIN_LEGIBLE = 0.75;
 
-// D-08 — per-layer accent palette. Copied verbatim from LayersPanel.tsx
-// (LAYER_COLORS / LAYER_LABELS). LayersPanel deliberately does NOT export
-// these — the duplication is a documented Phase 72 design-system
-// consolidation target. Keeping them local to each consumer for now per the
-// note in LayersPanel.tsx.
-const LAYER_COLORS: Record<LayerKey, string> = {
-  Hydraulic: "#3b82f6",
-  Thermal: "#f59e0b",
-  Sources: "#8b5cf6",
-  ReactorPhysics: "#f43f5e",
-};
+// D-08 originally specified per-layer accent colors here too, but the
+// post-UAT redesign replaced the colored chip/dot with the same muted-gray
+// EyeOff icon used by LayersPanel so the palette shares one visual
+// vocabulary with the rest of the app. Per-layer color is no longer
+// surfaced in the palette — the tooltip names the layer in plain text.
 const LAYER_LABELS: Record<LayerKey, string> = {
   Hydraulic: "Hydraulic",
   Thermal: "Thermal",
@@ -414,31 +408,32 @@ function RenderItem({
       const offLayers = getComponentLayers(item.comp).filter(
         (k) => !activeLayers[k],
       );
-      const isOffLayer = offLayers.length > 0;
       return (
         <CommandItem
           value={`${item.name} ${item.typeLabel}`}
           onSelect={() => onSelect(item)}
           data-testid={`cmdk-row-component-${item.id}`}
-          data-off-layer={isOffLayer ? "true" : undefined}
-          className={cn(isOffLayer && "opacity-65")}
         >
           <Box />
           <span className="font-medium">{item.name}</span>
           <span className="text-xs text-muted-foreground ml-1">
             {item.typeLabel}
           </span>
-          {isOffLayer && (
-            <span className="ml-auto flex items-center gap-1.5">
+          {offLayers.length > 0 && (
+            <span className="ml-auto flex items-center gap-1">
               {offLayers.map((k) => (
                 <span
                   key={k}
                   data-testid={`off-layer-chip-${k}`}
                   title={`${LAYER_LABELS[k]} layer off — will enable on select`}
                   aria-label={`${LAYER_LABELS[k]} layer off — will enable on select`}
-                  className="inline-block size-1.5 rounded-full"
-                  style={{ backgroundColor: LAYER_COLORS[k] }}
-                />
+                  className="inline-flex items-center"
+                >
+                  <EyeOff
+                    className="h-3.5 w-3.5 text-muted-foreground shrink-0 opacity-50"
+                    aria-hidden="true"
+                  />
+                </span>
               ))}
             </span>
           )}

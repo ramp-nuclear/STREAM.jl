@@ -232,26 +232,23 @@ describe("CommandPalette — browse vs flat", () => {
 // ---------------------------------------------------------------------------
 
 describe("CommandPalette — off-layer hint chip (D-08)", () => {
-  it("renders a layer-color dot with tooltip when a layer is off (D-08 dim+dot)", () => {
+  it("renders an EyeOff icon with tooltip when a layer is off (matches LayersPanel vocabulary)", () => {
     seedStore({
       nodes: [makeChannelNode()],
       activeLayers: { ...ALL_LAYERS_ON, Hydraulic: false },
     });
     renderPalette({ open: true });
-    const dot = screen.getByTestId("off-layer-chip-Hydraulic");
-    // happy-dom serializes hex to rgb(...).
-    const expectedHex = "#3b82f6";
-    const expectedRgb = "rgb(59, 130, 246)";
-    const bg = dot.style.backgroundColor || "";
-    expect([expectedHex, expectedRgb]).toContain(bg);
-    // Detail moved from inline text to title/aria-label for hover-on-demand.
-    expect(dot.getAttribute("title")).toMatch(/Hydraulic/);
-    expect(dot.getAttribute("title")).toMatch(/off/);
-    expect(dot.getAttribute("title")).toMatch(/will enable/);
-    // Parent CommandItem is dimmed so the off-layer state is also legible
-    // at-a-glance even without hovering the dot.
-    const row = dot.closest('[data-testid^="cmdk-row-component-"]');
-    expect(row?.getAttribute("data-off-layer")).toBe("true");
+    const wrapper = screen.getByTestId("off-layer-chip-Hydraulic");
+    // Detail lives in title/aria-label for hover-on-demand.
+    expect(wrapper.getAttribute("title")).toMatch(/Hydraulic/);
+    expect(wrapper.getAttribute("title")).toMatch(/off/);
+    expect(wrapper.getAttribute("title")).toMatch(/will enable/);
+    // Wrapper contains the lucide EyeOff svg — same visual vocabulary as
+    // LayersPanel's off-layer indicator (h-3.5 w-3.5 muted gray, opacity-50).
+    const svg = wrapper.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg?.classList.contains("h-3.5")).toBe(true);
+    expect(svg?.classList.contains("opacity-50")).toBe(true);
   });
 });
 
