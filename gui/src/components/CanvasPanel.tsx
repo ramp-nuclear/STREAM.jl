@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ReactFlow,
-  MiniMap,
   Background,
   BackgroundVariant,
   ConnectionLineType,
@@ -366,6 +365,12 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       <ReactFlow
         colorMode={resolvedTheme === "dark" ? "dark" : "light"}
         style={resolvedTheme === "dark" ? ({ "--xy-background-color": "#282c34" } as React.CSSProperties) : undefined}
+        // Hide the bottom-right "React Flow" attribution. We're not under
+        // a Pro license (and don't need one for this — the attribution is a
+        // visual nuisance for a scientific tool, not a meaningful brand
+        // touchpoint). xyflow accepts this opt-out on the open-source tier
+        // per their docs; if they ever revoke that, we'll revisit.
+        proOptions={{ hideAttribution: true }}
         nodes={enrichedNodes}
         edges={enrichedEdges}
         onNodesChange={onNodesChange}
@@ -399,7 +404,6 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         snapGrid={[16, 16]}
         fitView
       >
-        <MiniMap />
         <Background variant={BackgroundVariant.Dots} color={resolvedTheme === "dark" ? "#4b5263" : "#ccc"} />
       </ReactFlow>
       {/* Phase 65 Plan 13: top-right overlay — Zoom/Fit/Lock replace ReactFlow built-in Controls panel; SnapToGridButton from Plan 06.
