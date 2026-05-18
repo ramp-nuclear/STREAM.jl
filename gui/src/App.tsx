@@ -313,7 +313,15 @@ function App() {
   // Ctrl+Shift+P is intentionally NOT intercepted (CONTEXT.md: Ctrl+P-only).
   useEffect(() => {
     const handlePaletteKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.key !== "p" || e.shiftKey) return;
+      // e.key is uppercase when caps lock is on ("P" instead of "p"), so
+      // compare case-insensitively. UAT round 2 caught the original `=== "p"`
+      // missing the caps-lock case (Linux/GTK confirmed; Windows/macOS too).
+      if (
+        !(e.ctrlKey || e.metaKey) ||
+        e.key.toLowerCase() !== "p" ||
+        e.shiftKey
+      )
+        return;
       // Always-swallow: preventDefault first to suppress the OS Print dialog
       // (Pitfall 1). Then toggle the palette regardless of focus — Ctrl+P is
       // a navigation shortcut with no in-input semantics, and every
