@@ -314,18 +314,13 @@ function App() {
   useEffect(() => {
     const handlePaletteKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key !== "p" || e.shiftKey) return;
-      // Always-swallow: preventDefault first, then the input-focus guard
-      // skips only the palette toggle (Print is still suppressed in inputs).
+      // Always-swallow: preventDefault first to suppress the OS Print dialog
+      // (Pitfall 1). Then toggle the palette regardless of focus — Ctrl+P is
+      // a navigation shortcut with no in-input semantics, and every
+      // comparable tool (VSCode, Linear, Notion, Figma) opens the palette
+      // even while a text field is focused. UAT round 1 flagged the prior
+      // input-focus skip as overly cautious.
       e.preventDefault();
-      const target = e.target as HTMLElement | null;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        (target && target.isContentEditable)
-      ) {
-        return;
-      }
       setPaletteOpen((v) => !v);
     };
     // Discoverability hook: View → Jump to… (ViewMenu.tsx) dispatches this
