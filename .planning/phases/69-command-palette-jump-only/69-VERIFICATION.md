@@ -1,9 +1,10 @@
 ---
 phase: 69-command-palette-jump-only
 verified: 2026-05-19T00:30:00Z
-status: human_needed
-score: 22/22 must-haves verified
+status: passed
+score: 22/22 must-haves verified; 18/19 UAT rows passed, 1 skipped (D-08 superseded by chip→EyeOff redesign)
 overrides_applied: 0
+uat_completed: 2026-05-19T01:50:00Z
 human_verification:
   - test: "D-01 audit artifact inspection"
     expected: "69-CMDK-AUDIT.md exists with `Audit verdict: PASS`"
