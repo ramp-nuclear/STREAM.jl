@@ -48,15 +48,24 @@ Ship a `Ctrl+P` fuzzy-search palette restricted to navigation — jump-to-compon
 
 - **D-04:** **`setCenter` + zoom floor.** On component select: `setCenter(node.x, node.y, { zoom: max(currentZoom, ZOOM_MIN_LEGIBLE), duration: 250 })`. Preserves the user's chosen zoom unless they're zoomed so far out that the node label wouldn't be legible — then zooms in to the legibility threshold. Selection ring confirms target. The exact `ZOOM_MIN_LEGIBLE` value is a tuning parameter for the executor to pick (likely 0.6–0.8 based on existing node label sizing).
 
+### Research-driven additions (locked 2026-05-18)
+
+Research surfaced four items requiring decisions before planning. All resolved:
+
+- **D-05:** **Model Options is a single "Project Options" row.** `ModelOptionsPanel.tsx` is a flat form with no per-field selection identity, so §3.7's "Model Options child" framing doesn't map to current code. The palette emits ONE row for Model Options; on-select switches the left tab to Project / ModelOptions. Per-field anchoring deferred to Phase 72 design system pass.
+- **D-06:** **Jump-to-resource uses tab switch + `scrollIntoView`, no new expand-state slice.** ResourcesTreePanel renders all three groups flat with no expand/collapse state today. On-select: `setActiveLeftTab("Resources")` + `selectResource(uuid, kind)` + `scrollIntoView({ block: "center" })` on the matched row. Do NOT add a `resourceExpandedCategories` store slice — that's speculative scaffolding (`feedback_no_back_compat_during_heavy_dev`).
+- **D-07:** **No matched-character highlighting in v1.** cmdk doesn't ship it; building a custom highlight renderer is Phase 72 polish work. Ship v1 with plain row text + kind icon + cmdk's default fuzzy ranking. §3.7's mention of highlighting was a nice-to-have, not a contract.
+- **D-08:** **Off-layer hint chip uses per-layer accent color**, matching `LayersPanel.tsx`'s `LAYER_COLORS` palette (hydraulic blue, thermal red, etc.). Reinforces the layer-color mental model from Phase 68 rather than introducing a generic amber warning treatment.
+
 ### Claude's Discretion
 
 The following weren't worth a question; flagging them so the planner knows they're not under-specified:
 
-- **Empty-query state:** when the user opens the palette with no input, show all items grouped by kind (Components / Geometries / Power Shapes / Fluids / Model Options) so the palette also serves as a browse surface. As soon as the user types, collapse to a flat fuzzy-ranked list. Both modes are native cmdk capabilities.
-- **Result grouping with typed input:** flat fuzzy-ranked list (no group headers), kind icon inline per row, matched-char highlighting on.
+- **Empty-query state:** when the user opens the palette with no input, show all items grouped by kind (Components / Geometries / Power Shapes / Fluids / Project Options) so the palette also serves as a browse surface. As soon as the user types, collapse to a flat fuzzy-ranked list. Both modes are native cmdk capabilities.
+- **Result grouping with typed input:** flat fuzzy-ranked list (no group headers), kind icon inline per row. No matched-char highlighting (see D-07).
 - **Max results shown with typed input:** ~50 (internal scroll handles the rest); avoids palette becoming a giant scrollable wall when the user types a single character.
-- **Resource navigator focus** — likely needs a small store action like `expandResourceCategoryAndSelect(uuid)` that ensures the right `ResourceGroupHeader` is expanded before setting `selectedResourceId`. Planner to decide whether this goes in the store or is composed at the call site.
 - **Bottom-panel status bar palette trigger button:** none. Section 3.7 says "the palette is Ctrl+P-only" (see also `.planning/notes/gui-redesign-design-decisions.md:567`). Do not add a button.
+- **`ZOOM_MIN_LEGIBLE` starting value:** 0.75 (research recommendation based on `StreamNode.tsx` `text-sm` 14px labels rendering at 10.5px screen-px at zoom 0.75). UAT-tunable.
 
 </decisions>
 
