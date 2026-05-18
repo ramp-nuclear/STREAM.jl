@@ -212,6 +212,13 @@ function CommandPaletteInner({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
+        // Pitfall 6 / CONTEXT.md D-08: Radix calls onEscapeKeyDown BEFORE its
+        // own default close, so stopping propagation here both (a) lets the
+        // dialog still close (we do NOT preventDefault) and (b) blocks the
+        // bubble up to the window-level Esc handler in App.tsx that clears
+        // pinned code-preview blocks. Without this, every palette dismissal
+        // would silently nuke the user's pinned sub-blocks.
+        onEscapeKeyDown={(e) => e.stopPropagation()}
         className={cn(
           // D-02: top-anchored override. Cancels DialogContent's default
           // top-[50%] translate-y-[-50%] centering via two higher-priority
