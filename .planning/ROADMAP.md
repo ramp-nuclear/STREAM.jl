@@ -265,12 +265,12 @@ Plans:
 
 **Design-decisions reference:** Section 3.7.
 **Depends on:** Phase 62.
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 69-01-PLAN.md (Wave 1) — cmdk dependency audit + install + shadcn command.tsx shim + buildSearchPool helper with unit tests + ResourcesTreePanel scrollIntoView effect (D-01, D-06 foundations).
+- [x] 69-01-PLAN.md (Wave 1) — cmdk dependency audit + install + shadcn command.tsx shim + buildSearchPool helper with unit tests + ResourcesTreePanel scrollIntoView effect (D-01, D-06 foundations).
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -353,7 +353,7 @@ contract document drafted in parallel throughout.
 | 66. Code preview rework                              | 6/5 | Complete    | 2026-05-16 |
 | 67. Custom titlebar                                  | 5/3 | Complete   | 2026-05-16 |
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
-| 69. Command palette (jump-only)                      | 0/TBD | Planned | — |
+| 69. Command palette (jump-only)                      | 1/3 | In Progress|  |
 | 70. Presets and templates                            | 0/TBD | Planned | — |
 | 71. Validation framework                             | 0/TBD | Planned | — |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
