@@ -47,12 +47,23 @@ export default function ViewMenu({ theme, setTheme }: Props) {
     useStore.getState().toggleBottomPanel();
   }
 
+  // Phase 69 discoverability: dispatch the same custom event App.tsx listens
+  // for on Ctrl+P. Keeps paletteOpen as local App state (no store churn)
+  // while giving newcomers a menubar surface to find the shortcut.
+  function handleJumpTo() {
+    window.dispatchEvent(new Event("gsd:open-command-palette"));
+  }
+
   return (
     <MenubarMenu>
       <MenubarTrigger className="h-full rounded-none px-3 py-0 text-xs font-normal hover:bg-accent hover:text-accent-foreground">
         View
       </MenubarTrigger>
       <MenubarContent align="start">
+        <MenubarItem onClick={handleJumpTo}>
+          Jump to&hellip;
+          <MenubarShortcut>Ctrl+P</MenubarShortcut>
+        </MenubarItem>
         <MenubarItem onClick={handleToggleCodePreview}>
           Toggle Code Preview
           <MenubarShortcut>Ctrl+`</MenubarShortcut>
