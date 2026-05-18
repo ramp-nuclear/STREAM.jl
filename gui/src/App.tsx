@@ -11,6 +11,7 @@ import CustomTitlebar from "./components/CustomTitlebar";
 import BottomPanel from "./components/BottomPanel";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import ValidationDialog from "./components/ValidationDialog";
+import CommandPalette from "./components/CommandPalette";
 import AutoRecoverRestoreModal, {
   type RestoreCandidate,
 } from "./components/AutoRecoverRestoreModal";
@@ -38,6 +39,12 @@ function App() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const dialogCallbackRef = useRef<DialogCallback | null>(null);
+
+  // Phase 69 Plan 03 — Ctrl+P command palette open/closed state.
+  // Local component state, not zustand (CONTEXT.md: "No new top-level state
+  // slices for transient UI"). Toggled by the Ctrl+P branch in handleKeyDown
+  // below and by the palette's onOpenChange (Esc / click-outside / select).
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // Panel collapse state
   const toolboxCollapsed = useStore((s) => s.toolboxCollapsed);
@@ -259,6 +266,28 @@ function App() {
           }
           e.preventDefault();
           useStore.getState().toggleBottomPanel();
+          return;
+        }
+        // Ctrl+P (no Shift) — Toggle command palette (Phase 69 D-02).
+        // Pitfall 1 (RESEARCH.md): preventDefault() MUST be the FIRST
+        // statement inside this branch — before any state read, branch, or
+        // logging — so the OS/browser Print dialog never leaks. This is
+        // stricter than the Ctrl+` precedent above, which returns without
+        // preventDefault on input focus (so backtick still types). For Ctrl+P,
+        // the Print-leak risk justifies always-swallow: preventDefault first,
+        // then the input-focus guard skips only the palette toggle.
+        if ((e.ctrlKey || e.metaKey) && e.key === "p" && !e.shiftKey) {
+          e.preventDefault();
+          const target = e.target as HTMLElement | null;
+          if (
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            target instanceof HTMLSelectElement ||
+            (target && target.isContentEditable)
+          ) {
+            return;
+          }
+          setPaletteOpen((v) => !v);
           return;
         }
       } catch (err) {
@@ -510,6 +539,12 @@ function App() {
           onCancel={handleDialogCancel}
         />
         <ValidationDialog />
+        {/* Phase 69 Plan 03 — CommandPalette mounted as a sibling to the
+            other dialogs INSIDE <ReactFlowProvider> + <TooltipProvider>
+            (Pitfall 2: useReactFlow() inside the palette requires a parent
+            ReactFlowProvider; mounting at the root above the render gate
+            would crash on open). */}
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </TooltipProvider>
     </ReactFlowProvider>
   );
