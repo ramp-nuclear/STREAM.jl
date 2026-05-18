@@ -268,8 +268,16 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 69-01-PLAN.md (Wave 1) — cmdk dependency audit + install + shadcn command.tsx shim + buildSearchPool helper with unit tests + ResourcesTreePanel scrollIntoView effect (D-01, D-06 foundations).
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 69-02-PLAN.md (Wave 2, depends 01) — CommandPalette.tsx component: top-anchored Dialog (D-02), browse-vs-flat modes, per-layer accent off-layer chip (D-03/D-08), per-kind on-select dispatch (D-04/D-05/D-06), no matched-char highlighting (D-07); vitest behavior suite.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 69-03-PLAN.md (Wave 3, depends 02) — App.tsx Ctrl+P shortcut (synchronous preventDefault, Pitfall 1) + CommandPalette mount inside ReactFlowProvider (Pitfall 2); 69-UAT-CHECKLIST.md artifact; blocking human-verify UAT.
 
 ### Phase 70: Presets and templates

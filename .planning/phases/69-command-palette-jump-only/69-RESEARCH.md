@@ -1047,15 +1047,19 @@ test map from those decisions.
 | A7 | `tailwind-merge` correctly overrides `top-[50%]` with `top-[80px]` via `cn()` | Pattern 3 / Pitfall 3 | Verified in pattern docs but not in this codebase yet. Plan 02 smoke test catches it. Low risk. |
 | A8 | The amber chip color for off-layer hint is acceptable without per-layer tinting | Pattern 6 | Design contract (Section 3.8) reserves amber for Thermal; using amber for ALL off-layer hints conflates with Thermal-layer meaning. Recommendation in pattern is to use per-layer tint; assumption here is the planner picks one. Low risk. |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All four questions below were resolved during `/gsd:discuss-phase` and locked
+into CONTEXT.md decisions. Kept in this file for audit trail.
 
 1. **Matched-character highlighting in v1 — ship or skip?**
    - What we know: CONTEXT.md says "matched-char highlighting on" in the
      Claude's Discretion block. cmdk does NOT ship this out of the box.
    - What's unclear: whether the user expects this in v1 or is fine deferring
      to Phase 72 polish.
-   - Recommendation: discuss-phase asks explicitly; default skip in v1 to
-     keep this phase tight.
+   - RESOLVED: deferred to Phase 72 (CONTEXT.md D-07). v1 ships without
+     matched-character highlighting; cmdk's selected-item bg-shift +
+     sort-to-top is the primary discovery mechanism.
 
 2. **Model Options handling — one row or per-field rows?**
    - What we know: CONTEXT.md `<domain>` says "Model Options child → opens the
@@ -1065,16 +1069,17 @@ test map from those decisions.
      the tab" (research recommendation), or do we add field-anchor focus
      (each field gets an `id` + `scrollIntoView` on jump) as part of this
      phase?
-   - Recommendation: discuss-phase asks. Default to the simpler "one row,
-     switch tab" — per-field anchoring belongs with Phase 72 polish.
+   - RESOLVED: single 'Project Options' row, switches left tab (CONTEXT.md
+     D-05). Per-field anchoring deferred to Phase 72.
 
 3. **50-result cap — drop or keep?**
    - What we know: CONTEXT.md `<decisions>` Claude's Discretion says ~50 to
      "avoid the palette becoming a giant scrollable wall."
    - What's unclear: whether internal scroll already solves the perceived
      problem.
-   - Recommendation: drop the cap; rely on internal scroll. If UAT shows
-     overwhelm, add back.
+   - RESOLVED: keep cap at 50 with internal scroll for overflow (CONTEXT.md
+     Claude's Discretion, retained from original). Research had recommended
+     dropping the cap; user-locked decision overrides — cap stays.
 
 4. **Per-layer chip tint or single amber tint?**
    - What we know: the off-layer hint is amber in the Pattern 6 example.
@@ -1083,9 +1088,9 @@ test map from those decisions.
      consistent with Section 3.8's color-discipline rule.
    - What's unclear: whether the chip is supposed to read as "warning"
      (single amber) or as "this layer" (per-layer color).
-   - Recommendation: per-layer tint. Section 3.8 says "restricted accent
-     palette" — using each layer's accent color in its own chip is the more
-     disciplined choice.
+   - RESOLVED: per-layer accent from LayersPanel.tsx LAYER_COLORS
+     (CONTEXT.md D-08). Section 3.8's restricted-accent palette rule is
+     honored by using each layer's own accent color in its own chip.
 
 ## Sources
 
