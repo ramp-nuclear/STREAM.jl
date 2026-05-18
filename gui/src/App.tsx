@@ -268,28 +268,6 @@ function App() {
           useStore.getState().toggleBottomPanel();
           return;
         }
-        // Ctrl+P (no Shift) — Toggle command palette (Phase 69 D-02).
-        // Pitfall 1 (RESEARCH.md): preventDefault() MUST be the FIRST
-        // statement inside this branch — before any state read, branch, or
-        // logging — so the OS/browser Print dialog never leaks. This is
-        // stricter than the Ctrl+` precedent above, which returns without
-        // preventDefault on input focus (so backtick still types). For Ctrl+P,
-        // the Print-leak risk justifies always-swallow: preventDefault first,
-        // then the input-focus guard skips only the palette toggle.
-        if ((e.ctrlKey || e.metaKey) && e.key === "p" && !e.shiftKey) {
-          e.preventDefault();
-          const target = e.target as HTMLElement | null;
-          if (
-            target instanceof HTMLInputElement ||
-            target instanceof HTMLTextAreaElement ||
-            target instanceof HTMLSelectElement ||
-            (target && target.isContentEditable)
-          ) {
-            return;
-          }
-          setPaletteOpen((v) => !v);
-          return;
-        }
       } catch (err) {
         console.error("[handleKeyDown] unhandled error:", err);
       } finally {
@@ -322,6 +300,37 @@ function App() {
     window.addEventListener("keydown", handleLeftTabKey);
     return () => window.removeEventListener("keydown", handleLeftTabKey);
   }, [setActiveLeftTab]);
+
+  // Phase 69 D-02 — Ctrl+P toggles the command palette.
+  // Pitfall 1 (RESEARCH.md): preventDefault() MUST run synchronously before
+  // any state mutation or early-return so the OS/browser Print dialog never
+  // leaks. The earlier consolidated handleKeyDown gates ALL its branches
+  // behind `if (kbLock.current) return;` — if a Ctrl+S save dialog is
+  // awaiting IPC, kbLock is true and the Ctrl+P branch would be skipped
+  // BEFORE preventDefault ran, letting the Print dialog through. Hoisting
+  // Ctrl+P into its own listener (mirroring the Ctrl+1/2/3 pattern above)
+  // bypasses kbLock entirely.
+  // Ctrl+Shift+P is intentionally NOT intercepted (CONTEXT.md: Ctrl+P-only).
+  useEffect(() => {
+    const handlePaletteKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== "p" || e.shiftKey) return;
+      // Always-swallow: preventDefault first, then the input-focus guard
+      // skips only the palette toggle (Print is still suppressed in inputs).
+      e.preventDefault();
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target && target.isContentEditable)
+      ) {
+        return;
+      }
+      setPaletteOpen((v) => !v);
+    };
+    window.addEventListener("keydown", handlePaletteKey);
+    return () => window.removeEventListener("keydown", handlePaletteKey);
+  }, []);
 
   // Phase 66 Plan 03: Esc clears pinned code-panel sub-blocks.
   // Coexists with the CanvasPanel.tsx Esc handler and the SidebarPanel.tsx

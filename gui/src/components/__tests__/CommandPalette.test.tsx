@@ -447,4 +447,33 @@ describe("CommandPalette — Esc dismissal (Section 3.8)", () => {
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  // Pitfall 6 / CONTEXT.md D-08 regression guard:
+  // Esc must close the palette without bubbling to the window-level Esc
+  // handler in App.tsx that clears pinned code-preview blocks. We assert
+  // this at the source by capturing the keydown on `window` and confirming
+  // propagation was stopped by the time it reaches there.
+  it("Esc does NOT bubble past the dialog (no double-fire to window)", async () => {
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ReactFlowProvider>
+        <CommandPalette open={true} onOpenChange={onOpenChange} />
+      </ReactFlowProvider>,
+    );
+
+    const windowEsc = vi.fn();
+    const listener = (e: KeyboardEvent) => {
+      if (e.key === "Escape") windowEsc();
+    };
+    window.addEventListener("keydown", listener);
+    try {
+      await user.keyboard("{Escape}");
+    } finally {
+      window.removeEventListener("keydown", listener);
+    }
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(windowEsc).not.toHaveBeenCalled();
+  });
 });
