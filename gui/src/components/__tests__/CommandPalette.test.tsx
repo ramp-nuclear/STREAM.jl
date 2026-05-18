@@ -206,7 +206,7 @@ describe("CommandPalette — browse vs flat", () => {
     expect(screen.getByText("Project")).toBeTruthy();
   });
 
-  it("typed query hides group headings (flat list)", async () => {
+  it("typed query keeps group headings, reordered so best-match group leads (post-UAT)", async () => {
     seedStore({
       nodes: [makeChannelNode()],
       resources: {
@@ -230,9 +230,40 @@ describe("CommandPalette — browse vs flat", () => {
     const user = userEvent.setup();
     renderPalette({ open: true });
     const input = screen.getByPlaceholderText(/Type to search/i);
+    // Typing "channel" should still surface the "Components" heading (channel
+    // node is a component) and the heading should be present — original
+    // plan-02 flat-list design was reverted mid-UAT.
     await user.type(input, "channel");
-    expect(screen.queryByText("Components")).toBeNull();
-    expect(screen.queryByText("Geometries")).toBeNull();
+    expect(screen.queryByText("Components")).not.toBeNull();
+  });
+
+  it("typed query reorders categories so the best-match group leads", async () => {
+    // Seed a geometry whose name starts with the query while no component
+    // matches it as strongly; expect the Geometries heading to appear before
+    // the Components heading in DOM order.
+    seedStore({
+      nodes: [makeChannelNode({ instanceName: "pump_main" })],
+      resources: {
+        geometries: { g1: { uuid: "g1", name: "rect_inlet" } },
+        powerShapes: {},
+        fluids: {},
+      },
+    });
+    const user = userEvent.setup();
+    renderPalette({ open: true });
+    const input = screen.getByPlaceholderText(/Type to search/i);
+    await user.type(input, "rect");
+    const geomHeading = screen.getByText("Geometries");
+    const compHeading = screen.queryByText("Components");
+    // Geometries should be the first (and possibly only) group visible.
+    expect(geomHeading).not.toBeNull();
+    if (compHeading) {
+      // Compare DOM position.
+      expect(
+        geomHeading.compareDocumentPosition(compHeading) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
   });
 });
 

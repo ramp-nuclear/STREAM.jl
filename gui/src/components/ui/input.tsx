@@ -34,13 +34,21 @@ function Input({
       // by calling e.preventDefault() (rare).
       onFocus?.(e);
       if (e.defaultPrevented) return;
-      const inputType = (e.currentTarget.type || "text").toLowerCase();
-      if (
-        SELECT_ON_FOCUS_TYPES.has(inputType) &&
-        e.currentTarget.value !== ""
-      ) {
-        e.currentTarget.select();
-      }
+      const el = e.currentTarget;
+      const inputType = (el.type || "text").toLowerCase();
+      if (!SELECT_ON_FOCUS_TYPES.has(inputType) || el.value === "") return;
+      // Defer to the next animation frame. If we call select() synchronously
+      // here, the mouseup that completes the click runs AFTER focus and
+      // positions the caret at the click point — undoing the selection
+      // visually a few ms after it appears. rAF runs after the click event
+      // chain finishes, so the selection sticks. Recheck `document.activeElement`
+      // to skip the call when the user has already moved focus elsewhere
+      // (rapid tab/click sequences).
+      requestAnimationFrame(() => {
+        if (document.activeElement === el && el.value !== "") {
+          el.select();
+        }
+      });
     },
     [onFocus],
   );
