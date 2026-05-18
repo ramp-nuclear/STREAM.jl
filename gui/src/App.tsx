@@ -328,8 +328,17 @@ function App() {
       }
       setPaletteOpen((v) => !v);
     };
+    // Discoverability hook: View → Jump to… (ViewMenu.tsx) dispatches this
+    // custom event so the menu entry shares one open path with Ctrl+P.
+    // Keeps paletteOpen as local App state (no store churn) while still
+    // letting any chrome surface open the palette by name.
+    const handleOpenEvent = () => setPaletteOpen(true);
     window.addEventListener("keydown", handlePaletteKey);
-    return () => window.removeEventListener("keydown", handlePaletteKey);
+    window.addEventListener("gsd:open-command-palette", handleOpenEvent);
+    return () => {
+      window.removeEventListener("keydown", handlePaletteKey);
+      window.removeEventListener("gsd:open-command-palette", handleOpenEvent);
+    };
   }, []);
 
   // Phase 66 Plan 03: Esc clears pinned code-panel sub-blocks.
