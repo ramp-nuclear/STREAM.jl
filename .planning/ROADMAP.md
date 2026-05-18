@@ -265,7 +265,7 @@ Plans:
 
 **Design-decisions reference:** Section 3.7.
 **Depends on:** Phase 62.
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 **Wave 1**
@@ -274,7 +274,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 69-02-PLAN.md (Wave 2, depends 01) — CommandPalette.tsx component: top-anchored Dialog (D-02), browse-vs-flat modes, per-layer accent off-layer chip (D-03/D-08), per-kind on-select dispatch (D-04/D-05/D-06), no matched-char highlighting (D-07); vitest behavior suite.
+- [x] 69-02-PLAN.md (Wave 2, depends 01) — CommandPalette.tsx component: top-anchored Dialog (D-02), browse-vs-flat modes, per-layer accent off-layer chip (D-03/D-08), per-kind on-select dispatch (D-04/D-05/D-06), no matched-char highlighting (D-07); vitest behavior suite.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -353,7 +353,7 @@ contract document drafted in parallel throughout.
 | 66. Code preview rework                              | 6/5 | Complete    | 2026-05-16 |
 | 67. Custom titlebar                                  | 5/3 | Complete   | 2026-05-16 |
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
-| 69. Command palette (jump-only)                      | 1/3 | In Progress|  |
+| 69. Command palette (jump-only)                      | 2/3 | In Progress|  |
 | 70. Presets and templates                            | 0/TBD | Planned | — |
 | 71. Validation framework                             | 0/TBD | Planned | — |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
