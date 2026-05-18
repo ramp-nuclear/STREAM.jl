@@ -232,22 +232,26 @@ describe("CommandPalette — browse vs flat", () => {
 // ---------------------------------------------------------------------------
 
 describe("CommandPalette — off-layer hint chip (D-08)", () => {
-  it("renders a chip tinted with the per-layer accent color when a layer is off", () => {
+  it("renders a layer-color dot with tooltip when a layer is off (D-08 dim+dot)", () => {
     seedStore({
       nodes: [makeChannelNode()],
       activeLayers: { ...ALL_LAYERS_ON, Hydraulic: false },
     });
     renderPalette({ open: true });
-    const chip = screen.getByTestId("off-layer-chip-Hydraulic");
-    // happy-dom serializes the hex back to rgb(...).
+    const dot = screen.getByTestId("off-layer-chip-Hydraulic");
+    // happy-dom serializes hex to rgb(...).
     const expectedHex = "#3b82f6";
     const expectedRgb = "rgb(59, 130, 246)";
-    const color = chip.style.color || "";
-    const border = chip.style.borderColor || "";
-    expect([expectedHex, expectedRgb]).toContain(color);
-    expect([expectedHex, expectedRgb]).toContain(border);
-    expect(chip.textContent).toMatch(/Hydraulic/);
-    expect(chip.textContent).toMatch(/off/);
+    const bg = dot.style.backgroundColor || "";
+    expect([expectedHex, expectedRgb]).toContain(bg);
+    // Detail moved from inline text to title/aria-label for hover-on-demand.
+    expect(dot.getAttribute("title")).toMatch(/Hydraulic/);
+    expect(dot.getAttribute("title")).toMatch(/off/);
+    expect(dot.getAttribute("title")).toMatch(/will enable/);
+    // Parent CommandItem is dimmed so the off-layer state is also legible
+    // at-a-glance even without hovering the dot.
+    const row = dot.closest('[data-testid^="cmdk-row-component-"]');
+    expect(row?.getAttribute("data-off-layer")).toBe("true");
   });
 });
 
