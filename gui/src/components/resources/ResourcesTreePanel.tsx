@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useStore, { SENTINEL_UNSET_POWER_SHAPE } from "@/store/useStore";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -34,6 +34,42 @@ export default function ResourcesTreePanel() {
   const selectedResourceId = useStore((s) => s.selectedResourceId);
   const selectedResourceKind = useStore((s) => s.selectedResourceKind);
 
+  // Phase 69 D-06 — scroll the selected ResourceRow into view when
+  // `selectedResourceId`/`selectedResourceKind` change (e.g., the user picked
+  // a resource via Ctrl+P). The mechanism is purely DOM-side: no new store
+  // slice, no expand-state slice — D-06 explicitly forbids that. We query the
+  // matching ResourceRow by its existing `data-resource-uuid` /
+  // `data-resource-kind` attributes (already emitted by ResourceRow.tsx) and
+  // call scrollIntoView with `{ block: "center", behavior: "smooth" }`.
+  //
+  // Single retry via requestAnimationFrame handles the mount race when the
+  // user is on a different left tab at selection time and the Resources panel
+  // hasn't rendered yet. We deliberately don't loop — a missing row after one
+  // RAF means the row genuinely isn't in the DOM (e.g., filtered out by the
+  // search box).
+  const panelRootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (selectedResourceId == null || selectedResourceKind == null) return;
+
+    function scrollTarget(): boolean {
+      const root = panelRootRef.current;
+      if (!root) return false;
+      const el = root.querySelector<HTMLElement>(
+        `[data-resource-uuid="${selectedResourceId}"][data-resource-kind="${selectedResourceKind}"]`,
+      );
+      if (!el) return false;
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      return true;
+    }
+
+    if (!scrollTarget()) {
+      const raf = requestAnimationFrame(() => {
+        scrollTarget();
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [selectedResourceId, selectedResourceKind]);
+
   const q = searchQuery.toLowerCase();
 
   const geometries = Object.values(resources.geometries).filter((g) =>
@@ -65,7 +101,7 @@ export default function ResourcesTreePanel() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div ref={panelRootRef} className="h-full flex flex-col">
       <div className="px-[8px] py-[8px] border-b">
         <Input
           type="text"
