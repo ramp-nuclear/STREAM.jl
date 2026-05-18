@@ -86,10 +86,70 @@ const LAYER_LABELS: Record<LayerKey, string> = {
   ReactorPhysics: "Reactor Physics",
 };
 
-// Cap of how many rows the flat (typed-input) list renders. Browse mode
-// (empty input) shows all items grouped by kind. Per CONTEXT.md
-// Claude's Discretion: "Max results shown with typed input: ~50".
-const FLAT_LIST_CAP = 50;
+// Category taxonomy for both browse-mode order and typed-mode reorder-by-
+// best-match. Mid-UAT change from plan-02's "typed mode = flat list":
+// keeping headers in typed mode preserves the meaningful category context
+// of this app (component vs resource is a real distinction users care
+// about), and reordering by best-score-per-group avoids the only real cost
+// of grouping (top hit not always first).
+type CategoryKey =
+  | "components"
+  | "geometries"
+  | "powerShapes"
+  | "fluids"
+  | "project";
+const CATEGORY_HEADINGS: Record<CategoryKey, string> = {
+  components: "Components",
+  geometries: "Geometries",
+  powerShapes: "Power Shapes",
+  fluids: "Fluids",
+  project: "Project",
+};
+const BROWSE_ORDER: readonly CategoryKey[] = [
+  "components",
+  "geometries",
+  "powerShapes",
+  "fluids",
+  "project",
+];
+
+// Lightweight score used ONLY for cross-category ordering. cmdk still owns
+// per-group filtering + ranking with its full command-score; this just lets
+// us pick which category surfaces first. Ranges roughly 0 (no match) to ~1.
+function scoreMatch(value: string, query: string): number {
+  if (!query) return 0;
+  const v = value.toLowerCase();
+  const q = query.toLowerCase();
+  if (v.startsWith(q)) {
+    return 1 - ((v.length - q.length) / Math.max(v.length, 1)) * 0.1;
+  }
+  const idx = v.indexOf(q);
+  if (idx >= 0) {
+    return 0.7 - Math.min(idx, 30) / 100;
+  }
+  // Subsequence fuzzy match.
+  let i = 0;
+  for (let j = 0; j < v.length && i < q.length; j++) {
+    if (v[j] === q[i]) i++;
+  }
+  if (i === q.length) return 0.3;
+  return 0;
+}
+
+function itemValueForScoring(item: SearchItem): string {
+  if (item.kind === "component") return `${item.name} ${item.typeLabel}`;
+  if (item.kind === "modelOptions") return "Project Options Model Options";
+  return item.name;
+}
+
+function bestScoreInGroup(group: SearchItem[], query: string): number {
+  let best = 0;
+  for (const it of group) {
+    const s = scoreMatch(itemValueForScoring(it), query);
+    if (s > best) best = s;
+  }
+  return best;
+}
 
 interface CommandPaletteProps {
   open: boolean;
@@ -215,8 +275,20 @@ function CommandPaletteInner({
     return { components, geometries, powerShapes, fluids, project };
   }, [items]);
 
-  const isBrowseMode = search.length === 0;
-  const flatItems = isBrowseMode ? items : items.slice(0, FLAT_LIST_CAP);
+  // Group rendering order. Browse mode (empty query) uses the canonical
+  // taxonomy order. Typed mode reorders categories by their best-scoring
+  // item — the group with the strongest match surfaces first — so users
+  // still see headers but the most-likely-matched category leads. Mid-UAT
+  // change from plan-02's flat-list-in-typed-mode design after the user
+  // flagged that category context is meaningful in this app.
+  const groupOrder = React.useMemo<readonly CategoryKey[]>(() => {
+    if (search.length === 0) return BROWSE_ORDER;
+    return BROWSE_ORDER.slice().sort((a, b) => {
+      const aMax = bestScoreInGroup(grouped[a], search);
+      const bMax = bestScoreInGroup(grouped[b], search);
+      return bMax - aMax;
+    });
+  }, [grouped, search]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -262,19 +334,12 @@ function CommandPaletteInner({
               max-h-[400px] baseline. tailwind-merge resolves the override. */}
           <CommandList className="max-h-[480px]">
             <CommandEmpty>No matches.</CommandEmpty>
-            {isBrowseMode ? (
-              <BrowseGroups
-                grouped={grouped}
-                activeLayers={activeLayers}
-                onSelect={handleSelect}
-              />
-            ) : (
-              <FlatList
-                items={flatItems}
-                activeLayers={activeLayers}
-                onSelect={handleSelect}
-              />
-            )}
+            <OrderedGroups
+              grouped={grouped}
+              order={groupOrder}
+              activeLayers={activeLayers}
+              onSelect={handleSelect}
+            />
           </CommandList>
         </Command>
       </DialogContent>
@@ -283,119 +348,44 @@ function CommandPaletteInner({
 }
 
 // ---------------------------------------------------------------------------
-// BrowseGroups — empty-input mode. One <CommandGroup> per non-empty kind.
+// OrderedGroups — single renderer for both browse-mode (BROWSE_ORDER) and
+// typed-mode (best-score-first). cmdk owns intra-group filtering + ranking;
+// we own the cross-group order. Empty groups are hidden via key (omitted)
+// at the call site.
 // ---------------------------------------------------------------------------
 
-interface BrowseGroupsProps {
-  grouped: {
-    components: SearchItem[];
-    geometries: SearchItem[];
-    powerShapes: SearchItem[];
-    fluids: SearchItem[];
-    project: SearchItem[];
-  };
+interface OrderedGroupsProps {
+  grouped: Record<CategoryKey, SearchItem[]>;
+  order: readonly CategoryKey[];
   activeLayers: Record<LayerKey, boolean>;
   onSelect: (item: SearchItem) => void;
 }
 
-function BrowseGroups({
+function OrderedGroups({
   grouped,
+  order,
   activeLayers,
   onSelect,
-}: BrowseGroupsProps): React.JSX.Element {
+}: OrderedGroupsProps): React.JSX.Element {
   return (
     <>
-      {grouped.components.length > 0 && (
-        <CommandGroup heading="Components">
-          {grouped.components.map((it) => (
-            <RenderItem
-              key={it.id}
-              item={it}
-              activeLayers={activeLayers}
-              onSelect={onSelect}
-            />
-          ))}
-        </CommandGroup>
-      )}
-      {grouped.geometries.length > 0 && (
-        <CommandGroup heading="Geometries">
-          {grouped.geometries.map((it) => (
-            <RenderItem
-              key={it.id}
-              item={it}
-              activeLayers={activeLayers}
-              onSelect={onSelect}
-            />
-          ))}
-        </CommandGroup>
-      )}
-      {grouped.powerShapes.length > 0 && (
-        <CommandGroup heading="Power Shapes">
-          {grouped.powerShapes.map((it) => (
-            <RenderItem
-              key={it.id}
-              item={it}
-              activeLayers={activeLayers}
-              onSelect={onSelect}
-            />
-          ))}
-        </CommandGroup>
-      )}
-      {grouped.fluids.length > 0 && (
-        <CommandGroup heading="Fluids">
-          {grouped.fluids.map((it) => (
-            <RenderItem
-              key={it.id}
-              item={it}
-              activeLayers={activeLayers}
-              onSelect={onSelect}
-            />
-          ))}
-        </CommandGroup>
-      )}
-      {grouped.project.length > 0 && (
-        <CommandGroup heading="Project">
-          {grouped.project.map((it) => (
-            <RenderItem
-              key={it.id}
-              item={it}
-              activeLayers={activeLayers}
-              onSelect={onSelect}
-            />
-          ))}
-        </CommandGroup>
-      )}
+      {order.map((key) => {
+        const items = grouped[key];
+        if (items.length === 0) return null;
+        return (
+          <CommandGroup key={key} heading={CATEGORY_HEADINGS[key]}>
+            {items.map((it) => (
+              <RenderItem
+                key={it.id}
+                item={it}
+                activeLayers={activeLayers}
+                onSelect={onSelect}
+              />
+            ))}
+          </CommandGroup>
+        );
+      })}
     </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// FlatList — typed-input mode. No group headers; cmdk's command-score does
-// the filtering. Cap at FLAT_LIST_CAP rows.
-// ---------------------------------------------------------------------------
-
-interface FlatListProps {
-  items: SearchItem[];
-  activeLayers: Record<LayerKey, boolean>;
-  onSelect: (item: SearchItem) => void;
-}
-
-function FlatList({
-  items,
-  activeLayers,
-  onSelect,
-}: FlatListProps): React.JSX.Element {
-  return (
-    <CommandGroup>
-      {items.map((it) => (
-        <RenderItem
-          key={it.id}
-          item={it}
-          activeLayers={activeLayers}
-          onSelect={onSelect}
-        />
-      ))}
-    </CommandGroup>
   );
 }
 
