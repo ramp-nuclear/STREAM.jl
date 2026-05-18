@@ -68,10 +68,11 @@ import {
 import { getComponentLayers, type LayerKey } from "@/lib/layers";
 import useStore from "@/store/useStore";
 
-// D-04 — zoom floor for setCenter. 0.75 is the research-recommended starting
-// value based on StreamNode.tsx's text-sm (14px) label rendering at ~10.5px
-// screen-pixels at zoom 0.75 (still legible). UAT-tunable.
-const ZOOM_MIN_LEGIBLE = 0.75;
+// D-04 — zoom floor for setCenter. Started at the research-recommended 0.75
+// (StreamNode.tsx text-sm labels render at ~10.5px screen-px at z=0.75) but
+// UAT round 1 found it still too small to read comfortably, so bumped to 1.0
+// — labels at full size, no scaling tax on the eye.
+const ZOOM_MIN_LEGIBLE = 1.0;
 
 // D-08 originally specified per-layer accent colors here too, but the
 // post-UAT redesign replaced the colored chip/dot with the same muted-gray
@@ -144,10 +145,25 @@ function CommandPaletteInner({
       // D-04: setCenter + zoom floor. getZoom() is called inline (not stored
       // beforehand) so the current viewport zoom drives the floor calc and
       // the verify grep gate `Math.max(getZoom()` matches literally.
-      setCenter(item.node.position.x, item.node.position.y, {
-        zoom: Math.max(getZoom(), ZOOM_MIN_LEGIBLE),
-        duration: 250,
-      });
+      //
+      // ReactFlow node.position is the TOP-LEFT corner; setCenter centers the
+      // viewport on the world coordinate passed in, so we add half the node's
+      // measured size to land on the node's actual center. measured is the
+      // current xyflow v12 surface; fall back to top-level width/height (set
+      // when a node has explicit dimensions) and finally to 0 for nodes that
+      // haven't been measured yet (pre-render edge case).
+      const w =
+        item.node.measured?.width ?? item.node.width ?? 0;
+      const h =
+        item.node.measured?.height ?? item.node.height ?? 0;
+      setCenter(
+        item.node.position.x + w / 2,
+        item.node.position.y + h / 2,
+        {
+          zoom: Math.max(getZoom(), ZOOM_MIN_LEGIBLE),
+          duration: 250,
+        },
+      );
       selectNode(item.id);
     } else if (
       item.kind === "geometry" ||

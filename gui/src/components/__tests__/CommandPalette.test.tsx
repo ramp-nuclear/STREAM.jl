@@ -10,7 +10,8 @@
 //   5. off-layer component renders hint chip with per-layer accent color (D-08)
 //   6. selecting an off-layer component dispatches setLayerVisible → setCenter
 //      → selectNode → onOpenChange in order (D-03 / D-04)
-//   7. setCenter zoom respects ZOOM_MIN_LEGIBLE = 0.75 floor (D-04)
+//   7. setCenter zoom respects ZOOM_MIN_LEGIBLE = 1.0 floor (D-04)
+//      and centers on node center, not top-left (post-UAT centering fix)
 //   8. selecting a resource calls setActiveLeftTab("Resources") + selectResource
 //      + onOpenChange (D-06)
 //   9. selecting Project Options calls setActiveLeftTab("Project") +
@@ -70,11 +71,19 @@ function makeChannelNode(opts: {
   instanceName?: string;
   x?: number;
   y?: number;
+  width?: number;
+  height?: number;
 } = {}) {
+  const width = opts.width ?? 200;
+  const height = opts.height ?? 100;
   return {
     id: opts.id ?? "node-1",
     type: "streamNode",
     position: { x: opts.x ?? 100, y: opts.y ?? 200 },
+    // xyflow v12 publishes node size on .measured after layout; the centering
+    // math in CommandPalette uses measured.{width,height}/2 to land on the
+    // node's center instead of its top-left corner (D-04 centering bug fix).
+    measured: { width, height },
     data: {
       componentId: "Channel",
       instanceName: opts.instanceName ?? "channel",
@@ -283,8 +292,10 @@ describe("CommandPalette — component on-select dispatch", () => {
 
     // D-03 — layer enable happens BEFORE pan/select.
     expect(setLayerVisibleSpy).toHaveBeenCalledWith("Hydraulic", true);
-    // D-04 — setCenter with current zoom (1.0, above the floor).
-    expect(setCenterSpy).toHaveBeenCalledWith(100, 200, {
+    // D-04 — setCenter on the node's CENTER (position + measured/2), with
+    // current zoom (1.0, at the floor). Fixture: position=(100,200),
+    // measured=(200,100) → center=(200,250).
+    expect(setCenterSpy).toHaveBeenCalledWith(200, 250, {
       zoom: 1.0,
       duration: 250,
     });
@@ -302,7 +313,7 @@ describe("CommandPalette — component on-select dispatch", () => {
     expect(selectNodeCallOrder).toBeLessThan(openCallOrder);
   });
 
-  it("setCenter zoom respects ZOOM_MIN_LEGIBLE (0.75) when currentZoom < 0.75", async () => {
+  it("setCenter zoom respects ZOOM_MIN_LEGIBLE (1.0) when currentZoom < floor", async () => {
     const node = makeChannelNode({ x: 50, y: 50, id: "node-z" });
     seedStore({
       nodes: [node],
@@ -315,8 +326,11 @@ describe("CommandPalette — component on-select dispatch", () => {
     const row = screen.getByTestId("cmdk-row-component-node-z");
     await user.click(row);
 
-    expect(setCenterSpy).toHaveBeenCalledWith(50, 50, {
-      zoom: 0.75,
+    // Fixture: position=(50,50), measured=(200,100) → center=(150,100).
+    // Floor was 0.75 in plan-02; bumped to 1.0 after UAT round 1 found 0.75
+    // still too small to read comfortably.
+    expect(setCenterSpy).toHaveBeenCalledWith(150, 100, {
+      zoom: 1.0,
       duration: 250,
     });
   });
