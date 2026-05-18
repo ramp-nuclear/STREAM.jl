@@ -414,31 +414,31 @@ function RenderItem({
       const offLayers = getComponentLayers(item.comp).filter(
         (k) => !activeLayers[k],
       );
+      const isOffLayer = offLayers.length > 0;
       return (
         <CommandItem
           value={`${item.name} ${item.typeLabel}`}
           onSelect={() => onSelect(item)}
           data-testid={`cmdk-row-component-${item.id}`}
+          data-off-layer={isOffLayer ? "true" : undefined}
+          className={cn(isOffLayer && "opacity-65")}
         >
           <Box />
           <span className="font-medium">{item.name}</span>
           <span className="text-xs text-muted-foreground ml-1">
             {item.typeLabel}
           </span>
-          {offLayers.length > 0 && (
-            <span className="ml-auto flex items-center gap-1">
+          {isOffLayer && (
+            <span className="ml-auto flex items-center gap-1.5">
               {offLayers.map((k) => (
                 <span
                   key={k}
                   data-testid={`off-layer-chip-${k}`}
-                  className="rounded-sm border px-1.5 py-0.5 text-[10px] font-medium"
-                  style={{
-                    borderColor: LAYER_COLORS[k],
-                    color: LAYER_COLORS[k],
-                  }}
-                >
-                  {LAYER_LABELS[k]} off — will enable
-                </span>
+                  title={`${LAYER_LABELS[k]} layer off — will enable on select`}
+                  aria-label={`${LAYER_LABELS[k]} layer off — will enable on select`}
+                  className="inline-block size-1.5 rounded-full"
+                  style={{ backgroundColor: LAYER_COLORS[k] }}
+                />
               ))}
             </span>
           )}
