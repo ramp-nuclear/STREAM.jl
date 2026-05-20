@@ -72,6 +72,18 @@ export default function SavePresetModal({ open, onOpenChange }: Props) {
   const projectIsOpen = currentFilePath !== null;
 
   // ---------------------------------------------------------------------------
+  // WR-08: reset fields on every close (any path: Discard, ESC, click-outside)
+  // so a re-open never shows stale name/description from a prior session.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (open) return;
+    setName("");
+    setDescription("");
+    setStore("library");
+    setSaving(false);
+  }, [open]);
+
+  // ---------------------------------------------------------------------------
   // On open: focus name input + paint amber outline on auto-extended nodes.
   // Cleanup runs on every open change (including close), clearing the flag.
   // ---------------------------------------------------------------------------
@@ -157,10 +169,7 @@ export default function SavePresetModal({ open, onOpenChange }: Props) {
     try {
       await useStore.getState().saveSelectionAsPreset(name, description, store);
       onOpenChange(false);
-      // Reset field state for the next open.
-      setName("");
-      setDescription("");
-      setStore("library");
+      // Field reset is handled by the close useEffect (WR-08).
     } catch (err) {
       console.error("Save preset failed", err);
     } finally {
