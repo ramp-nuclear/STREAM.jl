@@ -49,7 +49,13 @@ export default function PresetsPanel() {
       // ── Library store ────────────────────────────────────────────────────
       const libDir = await join(await appConfigDir(), "presets");
       // Pitfall 8: ensure the directory exists before watching.
-      await mkdir(libDir, { recursive: true }).catch(() => {});
+      // WR-02: log unexpected errors; only swallow EEXIST-equivalent.
+      await mkdir(libDir, { recursive: true }).catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!/already exists|EEXIST/i.test(msg)) {
+          console.error("[PresetsPanel] mkdir library presets failed:", err);
+        }
+      });
 
       if (cancelled) return;
 
