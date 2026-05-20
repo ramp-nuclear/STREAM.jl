@@ -130,8 +130,15 @@ export default function PresetRow({ entry, onRequestReveal }: PresetRowProps) {
   }
 
   async function handleConfirmedDelete() {
-    await useStore.getState().deletePreset(entry.filePath);
-    setConfirmOpen(false);
+    // WR-07: use try/finally so the modal always closes, even on FS error.
+    try {
+      await useStore.getState().deletePreset(entry.filePath);
+    } catch (err) {
+      console.error("[PresetRow] Delete preset failed:", err);
+      // TODO: surface to user via toast (Phase 72 design system)
+    } finally {
+      setConfirmOpen(false);
+    }
   }
 
   function handleRowKeyDown(e: React.KeyboardEvent) {
