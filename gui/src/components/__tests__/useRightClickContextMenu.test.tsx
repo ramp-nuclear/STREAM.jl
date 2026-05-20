@@ -146,24 +146,21 @@ describe("useRightClickContextMenu", () => {
 
   // Case 4: Right-drag pan (over distance threshold) → window contextmenu suppressed
   it("right-drag over 5px suppresses the window contextmenu event", () => {
-    // Attach a spy BEFORE mounting the hook so it runs AFTER the hook's capture listener
-    const controlSpy: Mock = vi.fn();
-    const controlListener = (e: MouseEvent) => controlSpy(e.defaultPrevented);
-    window.addEventListener("contextmenu", controlListener, false);
-
     const { result, unmount } = renderHook(() => useRightClickContextMenu());
 
+    // Hook listens on bubble phase (Phase 70 fix — was capture, broke Radix triggers).
+    // The contract we verify: after full dispatch the event's defaultPrevented is true,
+    // which is what the browser checks before showing its native menu.
+    let dispatched!: MouseEvent;
     act(() => {
       // Manhattan distance = |200-100| + |300-200| = 200 > 5 → drag
       dispatchMouseDown(100, 200, 0);
       dispatchMouseUp(200, 300, 100);
       // Simulate the browser firing contextmenu after right-mouseup
-      dispatchContextMenu(200, 300);
+      dispatched = dispatchContextMenu(200, 300);
     });
 
-    // The hook's capture-phase listener should have called preventDefault BEFORE
-    // the control bubble listener fires, so controlSpy should see defaultPrevented = true
-    expect(controlSpy).toHaveBeenCalledWith(true);
+    expect(dispatched.defaultPrevented).toBe(true);
 
     // If ReactFlow's onPaneContextMenu was also called, state should stay null
     const preventDefaultSpy = vi.fn();
@@ -172,7 +169,6 @@ describe("useRightClickContextMenu", () => {
     });
     expect(result.current.state.kind).toBeNull();
 
-    window.removeEventListener("contextmenu", controlListener, false);
     unmount();
   });
 
@@ -279,29 +275,26 @@ describe("useRightClickContextMenu", () => {
     window.removeEventListener("contextmenu", controlListener, false);
   });
 
-  // Quick-click ALSO suppresses the native contextmenu now (Phase 67 round 3
+  // Quick-click ALSO suppresses the native contextmenu (Phase 67 round 3
   // Windows fix). Previously the hook only preventDefault'd on drag gestures
   // and relied on React's synthetic preventDefault from onPaneContextMenu for
   // quick-clicks — but WebView2 on Windows shows its own native context menu
   // before React's delegated handler can run. The hook now unconditionally
-  // preventDefaults at capture-phase outside editable input fields.
+  // preventDefaults outside editable input fields. Phase 70: moved from
+  // capture to bubble phase so Radix ContextMenuTriggers still receive a
+  // synthetic event with defaultPrevented=false and can open their menus.
   it("quick right-click suppresses the window contextmenu event (defaultPrevented=true)", () => {
-    const controlSpy: Mock = vi.fn();
-    const controlListener = (e: MouseEvent) => controlSpy(e.defaultPrevented);
-    window.addEventListener("contextmenu", controlListener, false);
-
     const { unmount } = renderHook(() => useRightClickContextMenu());
 
+    let dispatched!: MouseEvent;
     act(() => {
       dispatchMouseDown(100, 200, 0);
       dispatchMouseUp(102, 201, 120); // Quick-short
-      dispatchContextMenu(102, 201);
+      dispatched = dispatchContextMenu(102, 201);
     });
 
-    // Hook now suppresses the native contextmenu unconditionally (outside inputs)
-    expect(controlSpy).toHaveBeenCalledWith(true);
+    expect(dispatched.defaultPrevented).toBe(true);
 
-    window.removeEventListener("contextmenu", controlListener, false);
     unmount();
   });
 
