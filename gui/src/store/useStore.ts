@@ -173,6 +173,10 @@ export interface StreamNodeData {
   instanceName: string;
   parameters: Record<string, unknown>;
   constructorMode?: string;
+  /** Transient flag set by SavePresetModal to paint the amber dashed outline
+   * on auto-extended (BC-hop-included) nodes. Cleared on modal close.
+   * Stripped by serializeProject before writing to disk (Pitfall 7). */
+  autoExtended?: boolean;
 }
 
 interface AppState {

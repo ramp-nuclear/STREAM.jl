@@ -406,7 +406,11 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
         selected ? "ring-2 ring-[var(--ring)]" : ""
       } ${hasAnyError ? "outline outline-2 outline-offset-1 ring-2 ring-destructive" : ""} ${
         isCodeHovered ? "stream-node--code-hover" : ""
-      } ${isCodePinned ? "stream-node--code-pinned" : ""}`}
+      } ${isCodePinned ? "stream-node--code-pinned" : ""} ${
+        nodeData.autoExtended
+          ? "outline outline-2 outline-dashed outline-[oklch(0.769_0.188_70.08)] outline-offset-2"
+          : ""
+      }`}
       style={{
         ...(accentColor ? { borderLeftWidth: "3px", borderLeftColor: accentColor } : {}),
         ...(hasAnyError ? { outlineColor: "var(--destructive)" } : {}),
