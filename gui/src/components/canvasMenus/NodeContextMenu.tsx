@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import useStore from "@/store/useStore";
+import { autoExtendSelection } from "@/lib/presetIO";
 
 interface NodeContextMenuProps {
   nodeId: string;
@@ -25,21 +26,22 @@ export default function NodeContextMenu({ nodeId, onClose }: NodeContextMenuProp
 
   // Mirrors the FileMenu handler: pre-paint auto-extend amber outline then
   // dispatch the custom event to open SavePresetModal in App.tsx.
+  // CR-03: use static import (presetIO is already in the main bundle via
+  // SavePresetModal) so autoExtendSelection + dispatchEvent run synchronously
+  // before onClose(), eliminating the stale-autoExtended race.
   function handleSaveSelectionAsPreset() {
     const { nodes, edges } = useStore.getState();
     const selectedIds = new Set(nodes.filter((n) => n.selected).map((n) => n.id));
-    import("@/lib/presetIO").then(({ autoExtendSelection }) => {
-      const { extendedIds } = autoExtendSelection(selectedIds, nodes, edges);
-      const extras = new Set([...extendedIds].filter((id) => !selectedIds.has(id)));
-      if (extras.size > 0) {
-        useStore.setState((state) => ({
-          nodes: state.nodes.map((n) =>
-            extras.has(n.id) ? { ...n, data: { ...n.data, autoExtended: true } } : n,
-          ),
-        }));
-      }
-      window.dispatchEvent(new CustomEvent("stream:open-save-preset"));
-    });
+    const { extendedIds } = autoExtendSelection(selectedIds, nodes, edges);
+    const extras = new Set([...extendedIds].filter((id) => !selectedIds.has(id)));
+    if (extras.size > 0) {
+      useStore.setState((state) => ({
+        nodes: state.nodes.map((n) =>
+          extras.has(n.id) ? { ...n, data: { ...n.data, autoExtended: true } } : n,
+        ),
+      }));
+    }
+    window.dispatchEvent(new CustomEvent("stream:open-save-preset"));
     onClose();
   }
 
