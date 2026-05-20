@@ -24,12 +24,6 @@
     {
       "identifier": "fs:scope",
       "allow": [
-        { "path": "$APPCONFIG/presets/**" }
-      ]
-    },
-    {
-      "identifier": "fs:scope",
-      "allow": [
         { "path": "$APPDATA/STREAM-Composer/autorecover/**" }
       ]
     },
