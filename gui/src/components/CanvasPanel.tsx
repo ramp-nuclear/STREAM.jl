@@ -166,8 +166,33 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   }, [edges, activeLayers, hideOffLayer, enrichedNodes]);
 
   const onDrop = useCallback(
-    (event: React.DragEvent) => {
+    async (event: React.DragEvent) => {
       event.preventDefault();
+
+      // Phase 70 D-16 — preset drop: bbox-center at cursor on release.
+      // loadPresetAtPosition uses the anchor as the bbox-center target and
+      // subtracts layout half-extents internally (plan 70-03, action B step 4).
+      const presetRaw = event.dataTransfer.getData("application/stream-preset");
+      if (presetRaw) {
+        try {
+          const payload = JSON.parse(presetRaw) as {
+            filePath: string;
+            store: "project" | "library";
+          };
+          const flowPos = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+          });
+          await useStore.getState().loadPresetAtPosition(payload.filePath, {
+            x: flowPos.x,
+            y: flowPos.y,
+          });
+        } catch (err) {
+          console.error("[CanvasPanel] Preset drop failed", err);
+        }
+        return;
+      }
+
       const componentId = event.dataTransfer.getData(
         "application/streamcomponent",
       );

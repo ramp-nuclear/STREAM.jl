@@ -5,6 +5,7 @@ import {
   MenubarSeparator,
   MenubarTrigger,
 } from "./ui/menubar";
+import { useReactFlow } from "@xyflow/react";
 import useStore from "../store/useStore";
 import { getComponent } from "../registry";
 import { generateCode } from "../lib/codeGenerator";
@@ -58,6 +59,44 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
     await saveProjectAs();
   }
 
+  // Phase 70 D-15.1 — Preset menu handlers.
+  // FileMenu is rendered inside ReactFlowProvider (App.tsx line 457), so
+  // useReactFlow() is safe here.
+  const { getViewport } = useReactFlow();
+  const selectedNodeCount = useStore((s) => s.nodes.filter((n) => n.selected).length);
+
+  // Pre-paint the auto-extend amber outline BEFORE opening the modal so the
+  // highlight is visible while the modal animates in (defensive UX — the modal's
+  // own useEffect also paints, but doing it here avoids a one-frame flash).
+  function handleSaveSelectionAsPreset() {
+    const { nodes, edges } = useStore.getState();
+    const selectedIds = new Set(nodes.filter((n) => n.selected).map((n) => n.id));
+    import("../lib/presetIO").then(({ autoExtendSelection }) => {
+      const { extendedIds } = autoExtendSelection(selectedIds, nodes, edges);
+      const extras = new Set([...extendedIds].filter((id) => !selectedIds.has(id)));
+      if (extras.size > 0) {
+        useStore.setState((state) => ({
+          nodes: state.nodes.map((n) =>
+            extras.has(n.id) ? { ...n, data: { ...n.data, autoExtended: true } } : n,
+          ),
+        }));
+      }
+      window.dispatchEvent(new CustomEvent("stream:open-save-preset"));
+    });
+  }
+
+  async function handleLoadPreset() {
+    const vp = getViewport();
+    // D-17: bbox-center at the current viewport center.
+    const centerX = (-vp.x + window.innerWidth / 2) / vp.zoom;
+    const centerY = (-vp.y + window.innerHeight / 2) / vp.zoom;
+    try {
+      await useStore.getState().loadPresetFromPath({ x: centerX, y: centerY });
+    } catch (err) {
+      console.error("[FileMenu] Load preset failed", err);
+    }
+  }
+
   // Phase 68 D-09 — Export to Julia rehomed from the now-deleted secondary
   // toolbar strip. Same generateCode + exportCode arg shape as the previous
   // toolbar Export handler so the menu entry and the BottomPanel Export
@@ -104,6 +143,16 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
             <span>Save As...</span>
             <span className="text-muted-foreground text-xs">Ctrl+Shift+S</span>
           </span>
+        </MenubarItem>
+        <MenubarSeparator />
+        <MenubarItem onClick={handleLoadPreset}>
+          Load preset…
+        </MenubarItem>
+        <MenubarItem
+          onClick={handleSaveSelectionAsPreset}
+          disabled={selectedNodeCount < 2}
+        >
+          Save selection as preset…
         </MenubarItem>
         <MenubarSeparator />
         <MenubarItem
