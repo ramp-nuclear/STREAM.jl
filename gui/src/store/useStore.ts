@@ -2799,9 +2799,12 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
           console.error("[refreshPresetsDir] Failed to read preset", f.name, err);
         }
       }
-    } catch {
-      // Directory may not exist yet (first run). Silent no-op — caller
-      // (PresetsPanel useEffect) calls mkdir before watch, but defense in depth.
+    } catch (err) {
+      // WR-01: only "directory does not exist" is expected; log everything else.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/no such file|not found|ENOENT/i.test(msg)) {
+        console.error("[refreshPresetsDir] readDir failed for", dir, err);
+      }
     }
     if (store === "project") {
       set({ projectPresets: entries });
