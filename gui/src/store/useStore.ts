@@ -2920,8 +2920,14 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     }
 
     // Ensure directory exists (Pitfall 8).
+    // WR-02: log unexpected errors; only swallow EEXIST-equivalent.
     const { mkdir, writeTextFile } = await import("@tauri-apps/plugin-fs");
-    await mkdir(dir, { recursive: true }).catch(() => {});
+    await mkdir(dir, { recursive: true }).catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/already exists|EEXIST/i.test(msg)) {
+        console.error("[saveSelectionAsPreset] mkdir failed:", err);
+      }
+    });
 
     // Serialize and write.
     const json = serializePreset({
