@@ -70,25 +70,43 @@ export default function PresetsPanel() {
 
       // ── Project store (only if a project is open) ────────────────────────
       if (currentProjectDir) {
-        const projDir = await join(currentProjectDir, "presets");
-        await mkdir(projDir, { recursive: true }).catch(() => {});
+        // CR-01: wrap the project-store setup so scope-denied / out-of-HOME
+        // errors surface clearly instead of silently emptying the section.
+        try {
+          const projDir = await join(currentProjectDir, "presets");
+          await mkdir(projDir, { recursive: true }).catch((err) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (!/already exists|EEXIST/i.test(msg)) {
+              console.error("[PresetsPanel] mkdir project presets failed:", err);
+            }
+          });
 
-        if (cancelled) return;
+          if (cancelled) return;
 
-        await refreshPresetsDir("project", projDir);
-        const unwatchProj = await watch(
-          projDir,
-          () => {
-            refreshPresetsDir("project", projDir).catch(console.error);
-          },
-          { delayMs: 200 },
-        );
+          await refreshPresetsDir("project", projDir);
+          const unwatchProj = await watch(
+            projDir,
+            () => {
+              refreshPresetsDir("project", projDir).catch(console.error);
+            },
+            { delayMs: 200 },
+          );
 
-        if (cancelled) {
-          unwatchProj();
-          return;
+          if (cancelled) {
+            unwatchProj();
+            return;
+          }
+          unwatchers.push(unwatchProj);
+        } catch (err) {
+          // Project directory is outside the granted FS scope (CR-01) or
+          // another IO error. Log clearly; leave project section empty.
+          console.error(
+            "[PresetsPanel] Project preset directory unavailable " +
+            "(path may be outside FS scope — see Tauri capability CR-01):",
+            err,
+          );
+          if (!cancelled) useStore.getState().setProjectPresets([]);
         }
-        unwatchers.push(unwatchProj);
       } else {
         // No project open — clear any stale project presets.
         if (cancelled) return; // CR-02: guard the clear against cleanup races
