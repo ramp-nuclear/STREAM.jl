@@ -146,7 +146,7 @@ export interface ModelOptionsSliceState {
   };
 }
 
-export type ActiveLeftTab = "Components" | "Resources" | "Project" | "Presets";
+export type ActiveLeftTab = "Components" | "Presets" | "Resources" | "Project";
 
 // Snapshot of undoable canvas + resources content (not UI state like selection,
 // active tab, or panels). Phase 62 extension: `resources` and `modelOptions` are

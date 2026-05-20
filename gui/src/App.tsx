@@ -280,11 +280,14 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showUnsavedDialog]);
 
-  // Phase 62 D-07 / INV-12 — Ctrl+1 / Ctrl+2 / Ctrl+3 left-tab accelerators.
+  // Phase 62 D-07 / INV-12 — Ctrl+1..Ctrl+4 left-tab accelerators.
   // Bound globally on window per UI-SPEC §"Tab strip — preventDefault on
   // accelerator". Only bare Ctrl is honored — Ctrl+Shift+N / Alt+N / Meta+N
   // are passed through so Ctrl+Shift+S (Save As) still wins. Ctrl+Tab is
   // intentionally NOT intercepted (D-07: browser-collision avoidance).
+  // Order (Phase 70 UAT reshuffle): 1=Components, 2=Presets, 3=Resources, 4=Project.
+  // Components and Presets are both drag-source palettes (grouped left); Resources
+  // configures already-dropped nodes; Project is metadata/file-ops (rightmost).
   useEffect(() => {
     const handleLeftTabKey = (e: KeyboardEvent) => {
       if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return;
@@ -293,13 +296,13 @@ function App() {
         setActiveLeftTab("Components");
       } else if (e.key === "2") {
         e.preventDefault();
-        setActiveLeftTab("Resources");
+        setActiveLeftTab("Presets");
       } else if (e.key === "3") {
         e.preventDefault();
-        setActiveLeftTab("Project");
+        setActiveLeftTab("Resources");
       } else if (e.key === "4") {
         e.preventDefault();
-        setActiveLeftTab("Presets");
+        setActiveLeftTab("Project");
       }
     };
     window.addEventListener("keydown", handleLeftTabKey);
@@ -495,40 +498,43 @@ function App() {
                   onMouseDown={toolboxResize.onMouseDown}
                   onDoubleClick={() => setToolboxCollapsed(true)}
                 />
-                {/* Phase 62 D-01 — left-panel tab strip [Components][Resources][Project].
+                {/* Phase 62 D-01 — left-panel tab strip. Phase 70 reshuffle:
+                    order is [Components][Presets][Resources][Project] — drag-source
+                    palettes (Components, Presets) grouped left; Resources configures
+                    dropped nodes; Project (mostly handled via File menu) rightmost.
                     ResponsiveTabsList collapses overflowing tabs into a "..." menu
                     when the panel is too narrow. UI-SPEC §Tab strip: text-only,
                     bottom-border active indicator, no bg pill. */}
                 <Tabs
                   value={activeLeftTab}
                   onValueChange={(v) =>
-                    setActiveLeftTab(v as "Components" | "Resources" | "Project" | "Presets")
+                    setActiveLeftTab(v as "Components" | "Presets" | "Resources" | "Project")
                   }
                   className="flex-1 min-h-0 gap-0"
                 >
                   <ResponsiveTabsList
                     tabs={[
                       { value: "Components", label: "Components", icon: Boxes },
+                      { value: "Presets", label: "Presets", icon: BookMarked },
                       { value: "Resources", label: "Resources", icon: Library },
                       { value: "Project", label: "Project", icon: Settings2 },
-                      { value: "Presets", label: "Presets", icon: BookMarked },
                     ]}
                     value={activeLeftTab}
                     onValueChange={(v) =>
-                      setActiveLeftTab(v as "Components" | "Resources" | "Project" | "Presets")
+                      setActiveLeftTab(v as "Components" | "Presets" | "Resources" | "Project")
                     }
                   />
                   <TabsContent value="Components" className="flex-1 min-h-0 overflow-hidden mt-0">
                     <ToolboxPanel />
+                  </TabsContent>
+                  <TabsContent value="Presets" className="flex-1 min-h-0 overflow-hidden mt-0">
+                    <PresetsPanel />
                   </TabsContent>
                   <TabsContent value="Resources" className="flex-1 min-h-0 overflow-hidden mt-0">
                     <ResourcesTreePanel />
                   </TabsContent>
                   <TabsContent value="Project" className="flex-1 min-h-0 overflow-hidden mt-0">
                     <ModelOptionsPanel />
-                  </TabsContent>
-                  <TabsContent value="Presets" className="flex-1 min-h-0 overflow-hidden mt-0">
-                    <PresetsPanel />
                   </TabsContent>
                 </Tabs>
                 {/* Phase 68 — LayersPanel docked at the bottom of the left
