@@ -33,6 +33,14 @@ import {
   isClipboardPayload,
   smartParseAndIncrement,
 } from "@/lib/clipboard";
+import {
+  autoExtendSelection,
+  deserializePreset,
+  normalizeLayout,
+  serializePreset,
+  isValidPresetName,
+  type PresetIndexEntry,
+} from "../lib/presetIO";
 
 // ---------------------------------------------------------------------------
 // Phase 65 Plan 04: paste-offset counter (B4 lock).
@@ -138,7 +146,7 @@ export interface ModelOptionsSliceState {
   };
 }
 
-export type ActiveLeftTab = "Components" | "Resources" | "Project";
+export type ActiveLeftTab = "Components" | "Resources" | "Project" | "Presets";
 
 // Snapshot of undoable canvas + resources content (not UI state like selection,
 // active tab, or panels). Phase 62 extension: `resources` and `modelOptions` are
@@ -349,6 +357,26 @@ interface AppState {
   // Phase 65 Plan 08: AutoRecover restore actions (D-03/D-04)
   recoverFromSidecar: (basename: string) => Promise<void>;
   discardAllSidecars: () => Promise<void>;
+  // ---------------------------------------------------------------------------
+  // Phase 70 Plan 03: Presets slice (D-04, D-06)
+  // ---------------------------------------------------------------------------
+  projectPresets: PresetIndexEntry[];
+  libraryPresets: PresetIndexEntry[];
+  setProjectPresets: (entries: PresetIndexEntry[]) => void;
+  setLibraryPresets: (entries: PresetIndexEntry[]) => void;
+  refreshPresetsDir: (store: "project" | "library", dir: string) => Promise<void>;
+  saveSelectionAsPreset: (
+    name: string,
+    description: string,
+    targetStore: "project" | "library",
+  ) => Promise<{ filePath: string }>;
+  loadPresetAtPosition: (
+    filePath: string,
+    anchor: { x: number; y: number },
+  ) => Promise<void>;
+  loadPresetFromPath: (anchor: { x: number; y: number }) => Promise<void>;
+  renamePreset: (filePath: string, newName: string) => Promise<void>;
+  deletePreset: (filePath: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -909,6 +937,12 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   bcMode: {},
   bcSymmetric: {},
   // Phase 63.1 D-15: errorTagsByNodeId initial state removed (slice deleted).
+
+  // ---------------------------------------------------------------------------
+  // Phase 70 Plan 03: Presets slice initial state (D-04)
+  // ---------------------------------------------------------------------------
+  projectPresets: [] as PresetIndexEntry[],
+  libraryPresets: [] as PresetIndexEntry[],
 
   // ---------------------------------------------------------------------------
   // Undo / redo — explicit history stack
@@ -2725,6 +2759,401 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     const basenames = await enumerateSidecars();
     await Promise.all(basenames.map((b) => clearSidecar(b)));
     await clearLockfile();
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 70 Plan 03: Presets slice actions (D-04, D-06, D-09, D-10, D-11,
+  // D-12, D-18, D-18.1, D-19)
+  // ---------------------------------------------------------------------------
+
+  setProjectPresets: (entries) => set({ projectPresets: entries }),
+  setLibraryPresets: (entries) => set({ libraryPresets: entries }),
+
+  // refreshPresetsDir — scan a directory for .scpr files, parse each, and
+  // populate the corresponding presets array. Per-file try/catch tolerates
+  // mid-write states (Pitfall 3). Directory-level try/catch tolerates the
+  // directory not existing on first run (Pitfall 8 defense-in-depth).
+  // NO _pushSnapshot — file I/O is not an undo-able action.
+  refreshPresetsDir: async (store, dir) => {
+    const { readDir, readTextFile } = await import("@tauri-apps/plugin-fs");
+    const entries: PresetIndexEntry[] = [];
+    try {
+      const files = await readDir(dir);
+      for (const f of files) {
+        if (!f.name?.endsWith(".scpr")) continue;
+        if (!f.isFile) continue;
+        try {
+          const json = await readTextFile(dir + "/" + f.name);
+          const preset = deserializePreset(json);
+          entries.push({
+            name: preset.name,
+            description: preset.description,
+            filePath: dir + "/" + f.name,
+            store,
+          });
+        } catch (err) {
+          console.error("[refreshPresetsDir] Failed to read preset", f.name, err);
+        }
+      }
+    } catch {
+      // Directory may not exist yet (first run). Silent no-op — caller
+      // (PresetsPanel useEffect) calls mkdir before watch, but defense in depth.
+    }
+    if (store === "project") {
+      set({ projectPresets: entries });
+    } else {
+      set({ libraryPresets: entries });
+    }
+  },
+
+  // saveSelectionAsPreset — serialize the current selection (auto-extended per
+  // D-12) to a .scpr file in the chosen store directory. Guards charset (T-70-08)
+  // and project-open state. NO _pushSnapshot — file I/O is not undo-able.
+  saveSelectionAsPreset: async (name, description, targetStore) => {
+    // T-70-08: charset guard (defense-in-depth; UI also validates).
+    if (!isValidPresetName(name)) {
+      throw new Error(
+        "Invalid preset name '" + name + "': must match [A-Za-z0-9_-]+",
+      );
+    }
+
+    const { nodes, edges, resources, currentFilePath } = get();
+
+    // Require at least 2 selected components.
+    const selectedIds = new Set(
+      nodes.filter((n) => n.selected).map((n) => n.id),
+    );
+    if (selectedIds.size < 2) {
+      throw new Error("Need at least 2 selected components to save as preset");
+    }
+
+    // D-12: auto-extend one hop along BC edges; drop cross-boundary edges.
+    const { extendedIds, keptEdges } = autoExtendSelection(
+      selectedIds,
+      nodes,
+      edges,
+    );
+
+    // Filter nodes to the extended set; strip data.autoExtended (Pitfall 7).
+    const presetNodes = nodes
+      .filter((n) => extendedIds.has(n.id))
+      .map((n) => {
+        const d = n.data as Record<string, unknown>;
+        if ("autoExtended" in d) {
+          const { autoExtended: _stripped, ...rest } = d;
+          void _stripped;
+          return { ...n, data: rest };
+        }
+        return n;
+      });
+
+    // Q5: collect embedded resource copies by UUID (dedup by UUID).
+    // PARAM_KEY_BY_KIND inlined to avoid component-from-store import (Pitfall 5).
+    const PARAM_RESOURCE_KEYS = [
+      "geometry",
+      "geometry_ref",
+      "power_shape",
+      "power_shape_ref",
+    ] as const;
+
+    const seenGeomUuids = new Set<string>();
+    const seenPsUuids = new Set<string>();
+    const collectedGeometries: GeometryResource[] = [];
+    const collectedPowerShapes: PowerShapeResource[] = [];
+
+    for (const node of presetNodes) {
+      const params = (node.data as Record<string, unknown>).parameters as
+        | Record<string, unknown>
+        | undefined;
+      if (!params) continue;
+      for (const key of PARAM_RESOURCE_KEYS) {
+        const val = params[key];
+        if (typeof val !== "string") continue;
+        const uuid = val;
+        // Geometry keys
+        if (key === "geometry" || key === "geometry_ref") {
+          if (!seenGeomUuids.has(uuid) && resources.geometries[uuid]) {
+            seenGeomUuids.add(uuid);
+            collectedGeometries.push({ ...resources.geometries[uuid] });
+          }
+        }
+        // PowerShape keys — exclude the sentinel (unset)
+        if (key === "power_shape" || key === "power_shape_ref") {
+          if (
+            !seenPsUuids.has(uuid) &&
+            resources.powerShapes[uuid] &&
+            uuid !== SENTINEL_UNSET_POWER_SHAPE
+          ) {
+            seenPsUuids.add(uuid);
+            collectedPowerShapes.push({ ...resources.powerShapes[uuid] });
+          }
+        }
+      }
+    }
+
+    // D-11: normalize layout to bbox-top-left at (0,0).
+    const layout = normalizeLayout(presetNodes);
+
+    // Resolve target directory (D-04, T-70-13).
+    const { join } = await import("@tauri-apps/api/path");
+    let dir: string;
+    if (targetStore === "library") {
+      const { appConfigDir } = await import("@tauri-apps/api/path");
+      dir = await join(await appConfigDir(), "presets");
+    } else {
+      // Project store: derive dir from currentFilePath (T-70-13).
+      if (!currentFilePath) {
+        throw new Error(
+          "Cannot save to Project preset store: no project file is open",
+        );
+      }
+      // Strip filename — support both POSIX and Windows separators.
+      const projDir = currentFilePath.replace(/[/\\][^/\\]+$/, "");
+      dir = await join(projDir, "presets");
+    }
+
+    // Ensure directory exists (Pitfall 8).
+    const { mkdir, writeTextFile } = await import("@tauri-apps/plugin-fs");
+    await mkdir(dir, { recursive: true }).catch(() => {});
+
+    // Serialize and write.
+    const json = serializePreset({
+      name,
+      description,
+      components: presetNodes,
+      connections: keptEdges,
+      geometries: collectedGeometries,
+      powerShapes: collectedPowerShapes,
+      layout,
+    });
+    const filePath = dir + "/" + name + ".scpr";
+    await writeTextFile(filePath, json);
+
+    // Refresh the slice immediately (watcher may fire later too, but be
+    // consistent right away — D-06).
+    await get().refreshPresetsDir(targetStore, dir);
+
+    return { filePath };
+  },
+
+  // loadPresetAtPosition — mint new UUIDs for every node/edge/resource, apply
+  // smart-name-increment, remap resource UUID references, position bundle with
+  // bbox-center at anchor, auto-select all placed nodes (D-18, D-18.1, Q7).
+  loadPresetAtPosition: async (filePath, anchor) => {
+    const { readTextFile } = await import("@tauri-apps/plugin-fs");
+    const json = await readTextFile(filePath);
+    const preset = deserializePreset(json);
+
+    // PARAM_KEY_BY_KIND inlined (Pitfall 5).
+    const GEOM_KEYS = ["geometry", "geometry_ref"] as const;
+    const PS_KEYS = ["power_shape", "power_shape_ref"] as const;
+
+    // ---- Step 1: Resource UUID remap — add embedded resources with new UUIDs.
+    const resOldToNew = new Map<string, string>();
+    const currentResources = get().resources;
+
+    // Smart-name sets per kind (built from current store).
+    const existingGeomNames = new Set(
+      Object.values(currentResources.geometries).map((r) => r.name),
+    );
+    const existingPsNames = new Set(
+      Object.values(currentResources.powerShapes)
+        .filter((r) => r.uuid !== SENTINEL_UNSET_POWER_SHAPE)
+        .map((r) => r.name),
+    );
+
+    // Accumulated new resource maps to add atomically in the set() call.
+    const newGeomsTyped: Record<string, GeometryResource> = {};
+    const newPSTyped: Record<string, PowerShapeResource> = {};
+
+    for (const emb of preset.resources.geometries) {
+      const newResId = crypto.randomUUID();
+      const incrementedName = smartParseAndIncrement(emb.name, existingGeomNames);
+      existingGeomNames.add(incrementedName);
+      resOldToNew.set(emb.uuid, newResId);
+      newGeomsTyped[newResId] = { ...emb, uuid: newResId, name: incrementedName };
+    }
+    for (const emb of preset.resources.power_shapes) {
+      if (emb.uuid === SENTINEL_UNSET_POWER_SHAPE) continue;
+      const newResId = crypto.randomUUID();
+      const incrementedName = smartParseAndIncrement(emb.name, existingPsNames);
+      existingPsNames.add(incrementedName);
+      resOldToNew.set(emb.uuid, newResId);
+      newPSTyped[newResId] = { ...emb, uuid: newResId, name: incrementedName };
+    }
+
+    // ---- Step 2: Component UUID remap + smart-name + position.
+    const oldToNew = new Map<string, string>();
+    const existingNames = new Set(
+      get().nodes.map((n) => (n.data as unknown as StreamNodeData).instanceName),
+    );
+
+    // Compute bbox-center offset from normalized layout (D-11: top-left at 0,0).
+    const layoutValues = Object.values(preset.layout);
+    const maxX =
+      layoutValues.length > 0 ? Math.max(...layoutValues.map((p) => p.x)) : 0;
+    const maxY =
+      layoutValues.length > 0 ? Math.max(...layoutValues.map((p) => p.y)) : 0;
+    const offsetX = anchor.x - maxX / 2;
+    const offsetY = anchor.y - maxY / 2;
+
+    const newNodes = preset.components.map((srcNode) => {
+      const newId = crypto.randomUUID();
+      oldToNew.set(srcNode.id, newId);
+
+      const srcData = srcNode.data as unknown as StreamNodeData;
+      const newName = smartParseAndIncrement(srcData.instanceName, existingNames);
+      existingNames.add(newName);
+
+      // Remap resource UUID references in parameters (Pitfall 5).
+      const newParams = { ...(srcData.parameters as Record<string, unknown>) };
+      for (const key of [...GEOM_KEYS, ...PS_KEYS]) {
+        const val = newParams[key];
+        if (typeof val === "string" && resOldToNew.has(val)) {
+          newParams[key] = resOldToNew.get(val);
+        }
+      }
+
+      const layoutPos = preset.layout[srcNode.id] ?? { x: 0, y: 0 };
+
+      return {
+        ...srcNode,
+        id: newId,
+        position: {
+          x: offsetX + layoutPos.x,
+          y: offsetY + layoutPos.y,
+        },
+        selected: true, // D-18: auto-select all placed nodes.
+        data: {
+          ...srcData,
+          instanceName: newName,
+          parameters: newParams,
+        } as unknown as Record<string, unknown>,
+      };
+    });
+
+    // ---- Step 3: Edge UUID remap.
+    const newEdges = preset.connections.flatMap((srcEdge) => {
+      const newSource = oldToNew.get(srcEdge.source);
+      const newTarget = oldToNew.get(srcEdge.target);
+      if (!newSource || !newTarget) return []; // defensive drop
+      return [
+        {
+          ...srcEdge,
+          id: crypto.randomUUID(),
+          source: newSource,
+          target: newTarget,
+        },
+      ];
+    });
+
+    // ---- Step 4: Single set() — deselect existing + add new + merge resources.
+    const currentResState = get().resources;
+    get()._pushSnapshot(); // load is undo-able as a single op (D-18).
+    set((state) => ({
+      nodes: [
+        ...state.nodes.map((n) => (n.selected ? { ...n, selected: false } : n)),
+        ...newNodes,
+      ],
+      edges: [...state.edges, ...newEdges],
+      resources: {
+        ...currentResState,
+        geometries: { ...currentResState.geometries, ...newGeomsTyped },
+        powerShapes: { ...currentResState.powerShapes, ...newPSTyped },
+      },
+      isDirty: true,
+    }));
+  },
+
+  // loadPresetFromPath — file picker then delegate to loadPresetAtPosition.
+  // The anchor (viewport center) is computed by the caller (FileMenu handler).
+  loadPresetFromPath: async (anchor) => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const selected = await open({
+      filters: [{ name: "STREAM Composer Preset", extensions: ["scpr"] }],
+      multiple: false,
+    });
+    if (!selected) return; // user cancelled
+    await get().loadPresetAtPosition(selected as string, anchor);
+  },
+
+  // renamePreset — rewrite the on-disk JSON name field AND rename the file
+  // (D-09, D-19). Guards charset (T-70-08) and collision.
+  // NO _pushSnapshot — file I/O is not undo-able.
+  renamePreset: async (filePath, newName) => {
+    if (!isValidPresetName(newName)) {
+      throw new Error(
+        "Invalid preset name '" + newName + "': must match [A-Za-z0-9_-]+",
+      );
+    }
+
+    const { readTextFile, writeTextFile, remove } = await import(
+      "@tauri-apps/plugin-fs"
+    );
+
+    // Read + parse existing file to get the full preset object.
+    const oldJson = await readTextFile(filePath);
+    const preset = deserializePreset(oldJson);
+
+    // Derive parent directory and new path.
+    const dir = filePath.replace(/[/\\][^/\\]+$/, "");
+    const newPath = dir + "/" + newName + ".scpr";
+
+    // Guard collision: if target path differs, check it doesn't already exist.
+    if (newPath !== filePath) {
+      try {
+        await readTextFile(newPath);
+        // If readTextFile succeeds, the file exists — collision.
+        throw new Error(
+          "A preset named '" + newName + "' already exists in this store",
+        );
+      } catch (err) {
+        // Re-throw only the collision error; other errors (file not found) are expected.
+        if (
+          err instanceof Error &&
+          err.message.startsWith("A preset named")
+        ) {
+          throw err;
+        }
+        // Otherwise the file does not exist — safe to proceed.
+      }
+    }
+
+    // Rewrite JSON with updated name field.
+    const newJson = serializePreset({
+      name: newName,
+      description: preset.description,
+      components: preset.components,
+      connections: preset.connections,
+      geometries: preset.resources.geometries,
+      powerShapes: preset.resources.power_shapes,
+      layout: preset.layout,
+    });
+
+    await writeTextFile(newPath, newJson);
+    if (newPath !== filePath) {
+      await remove(filePath);
+    }
+
+    // Determine which store the entry lives in and refresh.
+    const { projectPresets, libraryPresets } = get();
+    const inProject = projectPresets.some((e) => e.filePath === filePath);
+    const store = inProject ? "project" : "library";
+    await get().refreshPresetsDir(store, dir);
+  },
+
+  // deletePreset — unlink the .scpr file and refresh the relevant store slice.
+  // NO _pushSnapshot — file I/O is not undo-able.
+  deletePreset: async (filePath) => {
+    const { remove } = await import("@tauri-apps/plugin-fs");
+    await remove(filePath);
+
+    // Determine store from current arrays then refresh.
+    const { projectPresets, libraryPresets } = get();
+    const inProject = projectPresets.some((e) => e.filePath === filePath);
+    const dir = filePath.replace(/[/\\][^/\\]+$/, "");
+    const store = inProject ? "project" : "library";
+    await get().refreshPresetsDir(store, dir);
   },
 })));
 
