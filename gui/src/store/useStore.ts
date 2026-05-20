@@ -2923,7 +2923,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
 
     // Ensure directory exists (Pitfall 8).
     // WR-02: log unexpected errors; only swallow EEXIST-equivalent.
-    const { mkdir, writeTextFile } = await import("@tauri-apps/plugin-fs");
+    const { mkdir, readTextFile, writeTextFile } = await import("@tauri-apps/plugin-fs");
     await mkdir(dir, { recursive: true }).catch((err) => {
       const msg = err instanceof Error ? err.message : String(err);
       if (!/already exists|EEXIST/i.test(msg)) {
@@ -2942,6 +2942,20 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       layout,
     });
     const filePath = await join(dir, name + ".scpr"); // WR-03: platform-safe join
+
+    // WR-05: collision guard — mirror renamePreset's check so callers bypassing
+    // the modal cannot silently overwrite an existing preset.
+    try {
+      await readTextFile(filePath);
+      // readTextFile succeeded → file exists.
+      throw new Error(
+        "A preset named '" + name + "' already exists in " + targetStore,
+      );
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("A preset named")) throw err;
+      // Otherwise the file doesn't exist — safe to proceed.
+    }
+
     await writeTextFile(filePath, json);
 
     // Refresh the slice immediately (watcher may fire later too, but be
