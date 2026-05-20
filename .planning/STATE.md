@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: "**Goal:** Bring `gui/src/registry/components.json` into alignment with v1.1 source. Stream version bump to `1.1.0`. Add 4 missing components. Rewrite Channel/CHF entries"
-status: executing
-stopped_at: Phase 70 UI-SPEC approved
-last_updated: "2026-05-20T19:54:49.918Z"
+status: ready_to_plan
+stopped_at: Phase 70 complete (6/6) — ready to discuss Phase 71
+last_updated: 2026-05-20T23:50:12.372Z
 last_activity: 2026-05-20 -- Phase 70 execution started
 progress:
   total_phases: 15
   completed_phases: 12
   total_plans: 84
-  completed_plans: 81
+  completed_plans: 87
   percent: 80
 ---
 
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 70 — presets-and-templates
+**Current focus:** Phase 71 — validation framework
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -58,10 +58,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 70 (presets-and-templates) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 70
-Last activity: 2026-05-20 -- Phase 70 execution started
+Phase: 71
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-20
 Next: `/gsd:verify-work 65` to re-run UAT against the gap-closure surfaces, then `/gsd:discuss-phase 66` (Code preview rework). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far (covers Phases 59 → 65).
 
 Phase 65 deferred manual UAT (require running Tauri build):
