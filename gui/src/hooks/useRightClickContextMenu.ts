@@ -83,16 +83,18 @@ export function useRightClickContextMenu(): {
       gestureRef.current.upT = event.timeStamp;
     };
 
-    // Listener 3: contextmenu (CAPTURE phase — runs BEFORE React's delegated
-    // handlers). Unconditionally suppress the browser/WebView2 native context
-    // menu EXCEPT inside editable fields (where users expect copy/paste/
-    // spellcheck). The previous "only on drag" rule worked on WSLg/WebKitGTK
-    // because that backend doesn't show a browser context menu by default —
-    // but WebView2 on Windows DOES in dev builds, and React's synthetic
+    // Listener 3: contextmenu (BUBBLE phase — runs AFTER React's delegated
+    // handlers). Suppresses the browser/WebView2 native context menu EXCEPT
+    // inside editable fields (where users expect copy/paste/spellcheck).
+    // The previous "only on drag" rule worked on WSLg/WebKitGTK because
+    // that backend doesn't show a browser context menu by default — but
+    // WebView2 on Windows DOES in dev builds, and React's synthetic
     // preventDefault inside ReactFlow's onPaneContextMenu doesn't reliably
-    // propagate back to the native event there. Suppressing at capture is the
-    // load-bearing line; the gesture logic below is for OUR custom menu's
-    // state, not the browser default.
+    // propagate back to the native event there. BUBBLE phase (vs. CAPTURE)
+    // is deliberate so Radix triggers (which check `event.defaultPrevented`
+    // via composeEventHandlers) still receive the synthetic event undefaulted
+    // and can open their menu. preventDefault here still suppresses the
+    // browser default because the action check happens after full dispatch.
     const handleContextMenu = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
       const inEditableField =
@@ -104,18 +106,32 @@ export function useRightClickContextMenu(): {
       }
     };
 
-    // Capture phase for ALL three. ReactFlow's pane handler can stopPropagation
-    // on right-button mousedown during pan handling; using bubble phase meant the
-    // very first right-click after page load could miss the listener (gestureRef
-    // stayed null). Capture phase runs before any descendant can stop the event.
+    // Capture phase for mousedown/mouseup: ReactFlow's pane handler can
+    // stopPropagation on right-button mousedown during pan handling; bubble
+    // phase meant the very first right-click after page load missed the
+    // listener (gestureRef stayed null). Capture runs before any descendant
+    // can stop the event.
+    //
+    // BUBBLE phase for contextmenu: capture-phase preventDefault sets
+    // `event.defaultPrevented = true` on the synthetic event *before* React
+    // dispatches it. Radix's ContextMenuTrigger (used by PresetRow et al.)
+    // composes its open-menu handler via `composeEventHandlers`, which
+    // skips the handler when `defaultPrevented` is true — so Radix
+    // triggers anywhere in the app silently fail. Bubble phase fires AFTER
+    // React's synthetic dispatch on the React root: Radix sees a fresh
+    // event and opens its menu, then this listener runs at the window
+    // bubble tail and preventDefault still suppresses the WebView2 native
+    // menu (preventDefault is effective at any dispatch phase). The pane
+    // / node / edge handlers below already call preventDefault on the
+    // synthetic event for the ReactFlow path.
     window.addEventListener("mousedown", handleMouseDown, true);
     window.addEventListener("mouseup", handleMouseUp, true);
-    window.addEventListener("contextmenu", handleContextMenu, true);
+    window.addEventListener("contextmenu", handleContextMenu, false);
 
     return () => {
       window.removeEventListener("mousedown", handleMouseDown, true);
       window.removeEventListener("mouseup", handleMouseUp, true);
-      window.removeEventListener("contextmenu", handleContextMenu, true);
+      window.removeEventListener("contextmenu", handleContextMenu, false);
     };
   }, [isQuickShortGesture]);
 
