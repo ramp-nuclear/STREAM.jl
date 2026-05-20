@@ -1,13 +1,16 @@
 ---
 phase: 70-presets-and-templates
 verified: 2026-05-21T00:10:00Z
-status: human_needed
+status: passed
 score: 22/22 must-haves verified
 overrides_applied: 0
+human_verification_resolved: 2026-05-21T03:00:00Z
+human_verification_log: 70-UAT.md
 human_verification:
   - test: "Full Tauri UAT — rebuild and run all 16 steps from 70-06 Task 6"
     expected: "All 16 steps pass: Ctrl+4 keybind, Presets tab, Library/Project sections, Save selection modal with amber preview, drag-to-canvas, File→Load, Rename/Delete/Reveal, watcher live-update (~200ms), project switch rebinding, bad-file skip"
     why_human: "The fs:watch feature in Cargo.toml only activates after a Tauri rebuild (npm run tauri dev). The watcher, FS events, and cross-window drag-drop cannot be exercised in vitest/jsdom. Plan 70-06 Task 6 is a blocking-gate human checkpoint."
+    resolved: "All 16 steps passed via /gsd:verify-work on 2026-05-21. Four bug fixes shipped during UAT (drag image, tab order, Radix ContextMenu regression, rename focus, WSL reveal). See 70-UAT.md for full session."
 ---
 
 # Phase 70: Presets and Templates — Verification Report
