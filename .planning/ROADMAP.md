@@ -39,7 +39,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] **Phase 67: Custom titlebar** — Tauri `decorations: false` + custom HTML titlebar. Integrated File/Edit/View/Help menubar, app icon, project name, dirty dot (left); min/max/close buttons (right). Cross-platform consistency. (completed 2026-05-16)
 - [x] **Phase 68: Layers system overhaul** — Four-layer taxonomy (Hydraulic / Thermal / Sources / Reactor Physics). Independent checkbox toggles. Floating Layers chip top-right of canvas with layer-state color indicators. Hide-vs-dim setting. Off-layer locked (non-interactive). Non-clunky layer-aware connect tool. (completed 2026-05-16)
 - [x] **Phase 69: Command palette (jump-only)** — Ctrl+P fuzzy search across component instance names + Resource names. Focus-on-canvas for components, focus-in-navigator for Resources. No action invocation in v1. (completed 2026-05-18)
-- [ ] **Phase 70: Presets and templates** — `.scpr` file format (slimmed-down `.scp` sub-graph). Save-selection-as-preset, Load-preset. Presets toolbox category. Auto-resource-create on load with smart-name collision handling. No identity (Option 1 per issue #14).
+- [x] **Phase 70: Presets and templates** — `.scpr` file format (slimmed-down `.scp` sub-graph). Save-selection-as-preset, Load-preset. Presets toolbox category. Auto-resource-create on load with smart-name collision handling. No identity (Option 1 per issue #14). (completed 2026-05-20)
 - [ ] **Phase 71: Validation framework** — Pluggable validator registry. Uniform panel UX with severity (error/warning/info) + click-to-focus + action buttons (lossless-sync / value-transfer-picker / navigation-only). Red-ring markers on offending nodes + red highlights on offending property fields. Compact status-bar indicator (VS-Code-style: icons + counts). Initial rule set: z_N/length match, n-match for value sources, all-required-connections, port-type matching, dangling FlowPort, loop closure, gravity sum per loop, geometry consistency across shared coupling. Gates code-gen export on errors.
 - [ ] **Phase 72: Design system / interaction contract** — Write the rules document (spatial / interaction / feedback / defaults / visual-restraint discipline) committing to "professional engineering tool, not consumer SaaS playground." Audit-and-apply pass over every existing panel. Deliverables include: thermal port handle restyle (outlined circle + chain-link state icons), tooltip system, Settings dialog (modal with left-nav categories), canvas cheatsheet (auto-generated demo component with numbered legend), accent palette for Sources and Reactor Physics layers, density expectations, visual style commitments (font, color, shadow, radius scales).
 
@@ -286,7 +286,7 @@ Plans:
 
 **Design-decisions reference:** Section 3.14.
 **Depends on:** Phase 62.
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 - [x] 70-01-PLAN.md (Wave 1) — Tauri substrate: `watch` Cargo feature + 4 ACL permissions (incl. `$APPCONFIG/presets/**` scope) + shadcn `textarea` / `radio-group` installs (HAS CHECKPOINT for shadcn install).
@@ -294,7 +294,7 @@ Plans:
 - [x] 70-03-PLAN.md (Wave 2, depends 01+02) — `useStore` presets slice: `projectPresets` / `libraryPresets` state, `refreshPresetsDir`, `saveSelectionAsPreset`, `loadPresetAtPosition`, `loadPresetFromPath`, `renamePreset`, `deletePreset` actions + Tauri-mocked vitest coverage.
 - [x] 70-04-PLAN.md (Wave 3, depends 01+02+03) — `PresetsPanel.tsx` 4th-tab body with two collapsible sections + file-system watcher useEffect + `PresetRow.tsx` (drag handle / inline rename / context menu / delete confirmation).
 - [x] 70-05-PLAN.md (Wave 3, depends 01+02+03, parallel to 04) — `SavePresetModal.tsx` Radix Dialog (Name / Description / Store-radio default Library) + auto-extend preview painting `data.autoExtended` + `StreamNode.tsx` amber dashed outline + `projectIO.serializeProject` strips the transient flag (Pitfall 7 defense).
-- [ ] 70-06-PLAN.md (Wave 4, depends 01-05) — Wiring: `App.tsx` Ctrl+4 + 4th TabsContent + lifted `SavePresetModal` mount via custom-event; `ResponsiveTabsList` widened; `FileMenu` Load preset… + Save selection as preset… (disabled <2); `NodeContextMenu` Save selection as preset… (visible only ≥2); `CanvasPanel` `application/stream-preset` drop branch; manual UAT checkpoint (rebuild Tauri + 16-step end-to-end verification).
+- [x] 70-06-PLAN.md (Wave 4, depends 01-05) — Wiring: `App.tsx` Ctrl+4 + 4th TabsContent + lifted `SavePresetModal` mount via custom-event; `ResponsiveTabsList` widened; `FileMenu` Load preset… + Save selection as preset… (disabled <2); `NodeContextMenu` Save selection as preset… (visible only ≥2); `CanvasPanel` `application/stream-preset` drop branch; manual UAT checkpoint (rebuild Tauri + 16-step end-to-end verification).
 
 ### Phase 71: Validation framework
 
@@ -362,7 +362,7 @@ contract document drafted in parallel throughout.
 | 67. Custom titlebar                                  | 5/3 | Complete   | 2026-05-16 |
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
 | 69. Command palette (jump-only)                      | 3/3 | Complete    | 2026-05-18 |
-| 70. Presets and templates                            | 5/6 | In Progress|  |
+| 70. Presets and templates                            | 6/6 | Complete   | 2026-05-20 |
 | 71. Validation framework                             | 0/TBD | Planned | — |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
 
