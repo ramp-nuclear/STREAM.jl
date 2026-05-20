@@ -286,12 +286,12 @@ Plans:
 
 **Design-decisions reference:** Section 3.14.
 **Depends on:** Phase 62.
-**Plans:** 2/6 plans executed
+**Plans:** 3/6 plans executed
 
 Plans:
 - [x] 70-01-PLAN.md (Wave 1) — Tauri substrate: `watch` Cargo feature + 4 ACL permissions (incl. `$APPCONFIG/presets/**` scope) + shadcn `textarea` / `radio-group` installs (HAS CHECKPOINT for shadcn install).
 - [x] 70-02-PLAN.md (Wave 1, parallel to 01) — Pure `gui/src/lib/presetIO.ts` (schema v1.0, `autoExtendSelection` BC-hop algorithm, `normalizeLayout`, `isValidPresetName`) + full vitest coverage.
-- [ ] 70-03-PLAN.md (Wave 2, depends 01+02) — `useStore` presets slice: `projectPresets` / `libraryPresets` state, `refreshPresetsDir`, `saveSelectionAsPreset`, `loadPresetAtPosition`, `loadPresetFromPath`, `renamePreset`, `deletePreset` actions + Tauri-mocked vitest coverage.
+- [x] 70-03-PLAN.md (Wave 2, depends 01+02) — `useStore` presets slice: `projectPresets` / `libraryPresets` state, `refreshPresetsDir`, `saveSelectionAsPreset`, `loadPresetAtPosition`, `loadPresetFromPath`, `renamePreset`, `deletePreset` actions + Tauri-mocked vitest coverage.
 - [ ] 70-04-PLAN.md (Wave 3, depends 01+02+03) — `PresetsPanel.tsx` 4th-tab body with two collapsible sections + file-system watcher useEffect + `PresetRow.tsx` (drag handle / inline rename / context menu / delete confirmation).
 - [ ] 70-05-PLAN.md (Wave 3, depends 01+02+03, parallel to 04) — `SavePresetModal.tsx` Radix Dialog (Name / Description / Store-radio default Library) + auto-extend preview painting `data.autoExtended` + `StreamNode.tsx` amber dashed outline + `projectIO.serializeProject` strips the transient flag (Pitfall 7 defense).
 - [ ] 70-06-PLAN.md (Wave 4, depends 01-05) — Wiring: `App.tsx` Ctrl+4 + 4th TabsContent + lifted `SavePresetModal` mount via custom-event; `ResponsiveTabsList` widened; `FileMenu` Load preset… + Save selection as preset… (disabled <2); `NodeContextMenu` Save selection as preset… (visible only ≥2); `CanvasPanel` `application/stream-preset` drop branch; manual UAT checkpoint (rebuild Tauri + 16-step end-to-end verification).
@@ -362,7 +362,7 @@ contract document drafted in parallel throughout.
 | 67. Custom titlebar                                  | 5/3 | Complete   | 2026-05-16 |
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
 | 69. Command palette (jump-only)                      | 3/3 | Complete    | 2026-05-18 |
-| 70. Presets and templates                            | 2/6 | In Progress|  |
+| 70. Presets and templates                            | 3/6 | In Progress|  |
 | 71. Validation framework                             | 0/TBD | Planned | — |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
 
