@@ -108,21 +108,39 @@ export default function PresetsPanel() {
   }, [currentProjectDir]); // Re-runs on project switch (D-06).
 
   // ── Reveal handler (passed to PresetRow) ──────────────────────────────────
-  // `revealItemInDir` selects the file in the OS file manager. Its Linux
-  // implementation uses dbus + org.freedesktop.FileManager1 which is not
-  // available in bare WSL2 environments — the call throws and the user sees
-  // nothing happen. Fall back to `openPath` on the parent directory so the
-  // file manager (or whatever xdg-open routes to, e.g. wslview → Explorer)
-  // at least opens the containing folder.
+  // Three-tier strategy, ordered by reliability per platform:
+  //
+  //   1. Custom Rust command `reveal_in_wsl_explorer` (src-tauri/src/lib.rs):
+  //      on WSL2 it converts the Linux path via `wslpath -w` and hands it to
+  //      `explorer.exe /select,…`. Returns Err on non-WSL hosts so we move on.
+  //   2. plugin-opener `revealItemInDir`: native Finder / Explorer / Linux
+  //      DBus FileManager1 path. Works on macOS, Windows, and Linux desktops
+  //      with a freedesktop file manager.
+  //   3. plugin-opener `openPath(parentDir)`: last-resort — open the
+  //      containing folder via xdg-open / Finder / Explorer. Won't select
+  //      the file, but the user lands in the right place.
   async function reveal(filePath: string) {
     const opener = await import("@tauri-apps/plugin-opener");
+    const { invoke } = await import("@tauri-apps/api/core");
+
+    // Tier 1 — WSL fast-path (no-ops with Err on non-WSL hosts).
+    try {
+      await invoke("reveal_in_wsl_explorer", { path: filePath });
+      return;
+    } catch (wslErr) {
+      // Quiet on non-WSL hosts; the Rust command returns a "not WSL" message.
+      console.debug("reveal_in_wsl_explorer:", wslErr);
+    }
+
+    // Tier 2 — native reveal-and-select.
     try {
       await opener.revealItemInDir(filePath);
       return;
     } catch (revealErr) {
       console.warn("revealItemInDir failed, falling back to openPath:", revealErr);
     }
-    // Fallback: open the parent directory.
+
+    // Tier 3 — open the parent directory.
     const parent = filePath.replace(/[/\\][^/\\]+$/, "");
     try {
       await opener.openPath(parent);
