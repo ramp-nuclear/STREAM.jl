@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: "**Goal:** Bring `gui/src/registry/components.json` into alignment with v1.1 source. Stream version bump to `1.1.0`. Add 4 missing components. Rewrite Channel/CHF entries"
-status: ready_to_plan
-stopped_at: Phase 69 complete (3/3) — ready to discuss Phase 70
-last_updated: 2026-05-18T22:51:34.123Z
-last_activity: 2026-05-18 -- Phase 69 execution started
+status: planning
+stopped_at: Phase 70 context gathered
+last_updated: "2026-05-20T19:02:36.110Z"
+last_activity: 2026-05-18
 progress:
   total_phases: 15
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 78
   completed_plans: 81
-  percent: 73
+  percent: 80
 ---
 
 # STATE: STREAM.jl
@@ -142,10 +142,10 @@ Outstanding non-blocking items (NOT 66's job):
 
 ## Session Continuity
 
-**Last session:** 2026-05-18T18:47:50.249Z
-**Stopped at:** Phase 69 context gathered
+**Last session:** 2026-05-20T19:02:36.091Z
+**Stopped at:** Phase 70 context gathered
 **Next action:** `/gsd:discuss-phase 66` (Code preview rework) — or `/gsd:ship` to open a milestone PR first and run UAT on the 6 deferred Phase 65 surfaces
-**Resume file:** .planning/phases/69-command-palette-jump-only/69-CONTEXT.md
+**Resume file:** .planning/phases/70-presets-and-templates/70-CONTEXT.md
 **Branch:** `gui-redesign`
 **Stash:** none
 
