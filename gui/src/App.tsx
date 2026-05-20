@@ -5,6 +5,8 @@ import ToolboxPanel from "./components/ToolboxPanel";
 import LayersPanel from "./components/LayersPanel";
 import ResourcesTreePanel from "./components/resources/ResourcesTreePanel";
 import ModelOptionsPanel from "./components/project/ModelOptionsPanel";
+import PresetsPanel from "./components/PresetsPanel";
+import SavePresetModal from "./components/SavePresetModal";
 import CanvasPanel from "./components/CanvasPanel";
 import SidebarPanel from "./components/SidebarPanel";
 import CustomTitlebar from "./components/CustomTitlebar";
@@ -18,7 +20,7 @@ import AutoRecoverRestoreModal, {
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList } from "./components/ResponsiveTabsList";
-import { Boxes, Library, Settings2 } from "lucide-react";
+import { Boxes, Library, Settings2, BookMarked } from "lucide-react";
 import useStore from "./store/useStore";
 import { initializeRecentFiles, initAutoRecover } from "./store/useStore";
 import { detectCrashOnLaunch } from "./lib/autoRecover";
@@ -295,11 +297,24 @@ function App() {
       } else if (e.key === "3") {
         e.preventDefault();
         setActiveLeftTab("Project");
+      } else if (e.key === "4") {
+        e.preventDefault();
+        setActiveLeftTab("Presets");
       }
     };
     window.addEventListener("keydown", handleLeftTabKey);
     return () => window.removeEventListener("keydown", handleLeftTabKey);
   }, [setActiveLeftTab]);
+
+  // Phase 70 D-01 — SavePresetModal open state. Lifted to App.tsx so both
+  // FileMenu (sibling) and NodeContextMenu (deep descendant) can open it via
+  // a custom DOM event, keeping coupling low (mirrors the Ctrl+P / palette pattern).
+  const [savePresetOpen, setSavePresetOpen] = useState(false);
+  useEffect(() => {
+    const handler = () => setSavePresetOpen(true);
+    window.addEventListener("stream:open-save-preset", handler);
+    return () => window.removeEventListener("stream:open-save-preset", handler);
+  }, []);
 
   // Phase 69 D-02 — Ctrl+P toggles the command palette.
   // Pitfall 1 (RESEARCH.md): preventDefault() MUST run synchronously before
@@ -487,7 +502,7 @@ function App() {
                 <Tabs
                   value={activeLeftTab}
                   onValueChange={(v) =>
-                    setActiveLeftTab(v as "Components" | "Resources" | "Project")
+                    setActiveLeftTab(v as "Components" | "Resources" | "Project" | "Presets")
                   }
                   className="flex-1 min-h-0 gap-0"
                 >
@@ -496,10 +511,11 @@ function App() {
                       { value: "Components", label: "Components", icon: Boxes },
                       { value: "Resources", label: "Resources", icon: Library },
                       { value: "Project", label: "Project", icon: Settings2 },
+                      { value: "Presets", label: "Presets", icon: BookMarked },
                     ]}
                     value={activeLeftTab}
                     onValueChange={(v) =>
-                      setActiveLeftTab(v as "Components" | "Resources" | "Project")
+                      setActiveLeftTab(v as "Components" | "Resources" | "Project" | "Presets")
                     }
                   />
                   <TabsContent value="Components" className="flex-1 min-h-0 overflow-hidden mt-0">
@@ -510,6 +526,9 @@ function App() {
                   </TabsContent>
                   <TabsContent value="Project" className="flex-1 min-h-0 overflow-hidden mt-0">
                     <ModelOptionsPanel />
+                  </TabsContent>
+                  <TabsContent value="Presets" className="flex-1 min-h-0 overflow-hidden mt-0">
+                    <PresetsPanel />
                   </TabsContent>
                 </Tabs>
                 {/* Phase 68 — LayersPanel docked at the bottom of the left
@@ -566,6 +585,10 @@ function App() {
             ReactFlowProvider; mounting at the root above the render gate
             would crash on open). */}
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+        {/* Phase 70 Plan 06 — SavePresetModal mounted at the top level so both
+            FileMenu and NodeContextMenu can open it via the
+            "stream:open-save-preset" custom event without prop drilling. */}
+        <SavePresetModal open={savePresetOpen} onOpenChange={setSavePresetOpen} />
       </TooltipProvider>
     </ReactFlowProvider>
   );
