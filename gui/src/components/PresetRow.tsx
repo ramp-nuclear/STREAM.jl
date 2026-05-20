@@ -148,12 +148,6 @@ export default function PresetRow({ entry, onRequestReveal }: PresetRowProps) {
       JSON.stringify({ filePath: entry.filePath, store: entry.store }),
     );
     e.dataTransfer.effectAllowed = "move";
-    // Pin the drag image to the row itself with the cursor offset matching the
-    // click point. Without this the browser picks the Radix ContextMenuTrigger
-    // wrapper, which has an ambiguous bounding box and renders an invisible
-    // ghost so the drag doesn't visually follow the cursor.
-    const el = e.currentTarget as HTMLElement;
-    e.dataTransfer.setDragImage(el, e.nativeEvent.offsetX, e.nativeEvent.offsetY);
   }
 
   // ── Row body ───────────────────────────────────────────────────────────────
@@ -163,7 +157,16 @@ export default function PresetRow({ entry, onRequestReveal }: PresetRowProps) {
       onDragStart={handleDragStart}
       onKeyDown={handleRowKeyDown}
       tabIndex={0}
-      className="h-[22px] px-[8px] text-[13px] flex items-center gap-2 cursor-grab select-none min-w-0 overflow-hidden hover:bg-accent rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      className={cn(
+        // Base row layout. `select-none` and `overflow-hidden` are deliberately
+        // NOT here in the non-renaming state: Chromium produces a blank drag
+        // image when either is set on a `draggable` element, which is why
+        // ToolboxItem omits them too. We add them back only during inline
+        // rename, where the row isn't draggable and we want to suppress text
+        // selection / Input overflow.
+        "h-[22px] px-[8px] text-[13px] flex items-center gap-2 min-w-0 hover:bg-accent rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        renaming ? "select-none overflow-hidden cursor-text" : "cursor-grab",
+      )}
     >
       <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
 
