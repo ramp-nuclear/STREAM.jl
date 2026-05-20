@@ -362,7 +362,7 @@ contract document drafted in parallel throughout.
 | 67. Custom titlebar                                  | 5/3 | Complete   | 2026-05-16 |
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
 | 69. Command palette (jump-only)                      | 3/3 | Complete    | 2026-05-18 |
-| 70. Presets and templates                            | 6/6 | Complete   | 2026-05-20 |
+| 70. Presets and templates                            | 6/6 | Complete    | 2026-05-20 |
 | 71. Validation framework                             | 0/TBD | Planned | — |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
 
