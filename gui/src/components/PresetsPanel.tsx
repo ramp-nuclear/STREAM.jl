@@ -40,6 +40,7 @@ export default function PresetsPanel() {
   useEffect(() => {
     let cancelled = false;
     const unwatchers: UnwatchFn[] = [];
+    setLoading(true); // CR-02: reset skeleton on every project rebind (D-06)
 
     async function setup() {
       const { appConfigDir, join } = await import("@tauri-apps/api/path");
@@ -90,9 +91,11 @@ export default function PresetsPanel() {
         unwatchers.push(unwatchProj);
       } else {
         // No project open — clear any stale project presets.
+        if (cancelled) return; // CR-02: guard the clear against cleanup races
         useStore.getState().setProjectPresets([]);
       }
 
+      if (cancelled) return; // CR-02: don't setLoading(false) after cleanup
       setLoading(false);
     }
 
