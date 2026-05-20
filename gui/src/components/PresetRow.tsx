@@ -222,7 +222,14 @@ export default function PresetRow({ entry, onRequestReveal }: PresetRowProps) {
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>{rowBody}</ContextMenuTrigger>
-        <ContextMenuContent>
+        <ContextMenuContent
+          // Radix's default close behavior returns focus to the trigger element.
+          // When the user clicks Rename, the trigger (the `<li>`) steals focus
+          // back from the freshly-mounted rename Input — text gets selected
+          // for a frame then blurs. preventDefault here keeps focus on the
+          // Input, where the `renaming` useEffect places it.
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
           <ContextMenuItem onSelect={startRename}>Rename</ContextMenuItem>
           <ContextMenuItem
             variant="destructive"

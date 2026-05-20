@@ -108,12 +108,26 @@ export default function PresetsPanel() {
   }, [currentProjectDir]); // Re-runs on project switch (D-06).
 
   // ── Reveal handler (passed to PresetRow) ──────────────────────────────────
+  // `revealItemInDir` selects the file in the OS file manager. Its Linux
+  // implementation uses dbus + org.freedesktop.FileManager1 which is not
+  // available in bare WSL2 environments — the call throws and the user sees
+  // nothing happen. Fall back to `openPath` on the parent directory so the
+  // file manager (or whatever xdg-open routes to, e.g. wslview → Explorer)
+  // at least opens the containing folder.
   async function reveal(filePath: string) {
+    const opener = await import("@tauri-apps/plugin-opener");
     try {
-      const { revealItemInDir } = await import("@tauri-apps/plugin-opener");
-      await revealItemInDir(filePath);
-    } catch (err) {
-      console.error("Reveal failed", err);
+      await opener.revealItemInDir(filePath);
+      return;
+    } catch (revealErr) {
+      console.warn("revealItemInDir failed, falling back to openPath:", revealErr);
+    }
+    // Fallback: open the parent directory.
+    const parent = filePath.replace(/[/\\][^/\\]+$/, "");
+    try {
+      await opener.openPath(parent);
+    } catch (openErr) {
+      console.error("openPath fallback also failed:", openErr);
     }
   }
 
