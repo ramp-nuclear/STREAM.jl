@@ -143,11 +143,21 @@ export function serializeProject(args: SerializeProjectArgs): string {
     (f) => f.name !== "light_water",
   );
 
+  // Pitfall 7 (defense in depth): strip the transient `data.autoExtended` field
+  // from every node before writing to disk. This field is set by SavePresetModal
+  // to paint the amber dashed outline on auto-extended nodes and must never leak
+  // into the persisted .scp schema.
+  const sanitizedNodes = args.nodes.map((n) => {
+    if (!n.data || !("autoExtended" in (n.data as Record<string, unknown>))) return n;
+    const { autoExtended: _autoExtended, ...rest } = n.data as Record<string, unknown>;
+    return { ...n, data: rest };
+  });
+
   const project: StreamProject = {
     format_version: PROJECT_FORMAT_VERSION,
     model_options: args.modelOptions,
     resources: { geometries, power_shapes, fluids },
-    components: args.nodes,
+    components: sanitizedNodes,
     connections: args.edges,
     // Phase 63.1 D-02: write the anchors Record verbatim — keys are nodeIds,
     // values are AnchorEntry; no Array conversion (Record on disk).
