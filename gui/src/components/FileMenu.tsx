@@ -10,6 +10,7 @@ import useStore from "../store/useStore";
 import { getComponent } from "../registry";
 import { generateCode } from "../lib/codeGenerator";
 import { exportCode } from "../lib/exportCode";
+import { autoExtendSelection } from "../lib/presetIO";
 
 interface Props {
   onUnsavedCheck: () => Promise<"save" | "discard" | "cancel">;
@@ -65,24 +66,21 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
   const { getViewport } = useReactFlow();
   const selectedNodeCount = useStore((s) => s.nodes.filter((n) => n.selected).length);
 
-  // Pre-paint the auto-extend amber outline BEFORE opening the modal so the
-  // highlight is visible while the modal animates in (defensive UX — the modal's
-  // own useEffect also paints, but doing it here avoids a one-frame flash).
+  // CR-03: static import (presetIO is already in the main bundle via
+  // SavePresetModal) so paint + dispatch are synchronous — no microtask race.
   function handleSaveSelectionAsPreset() {
     const { nodes, edges } = useStore.getState();
     const selectedIds = new Set(nodes.filter((n) => n.selected).map((n) => n.id));
-    import("../lib/presetIO").then(({ autoExtendSelection }) => {
-      const { extendedIds } = autoExtendSelection(selectedIds, nodes, edges);
-      const extras = new Set([...extendedIds].filter((id) => !selectedIds.has(id)));
-      if (extras.size > 0) {
-        useStore.setState((state) => ({
-          nodes: state.nodes.map((n) =>
-            extras.has(n.id) ? { ...n, data: { ...n.data, autoExtended: true } } : n,
-          ),
-        }));
-      }
-      window.dispatchEvent(new CustomEvent("stream:open-save-preset"));
-    });
+    const { extendedIds } = autoExtendSelection(selectedIds, nodes, edges);
+    const extras = new Set([...extendedIds].filter((id) => !selectedIds.has(id)));
+    if (extras.size > 0) {
+      useStore.setState((state) => ({
+        nodes: state.nodes.map((n) =>
+          extras.has(n.id) ? { ...n, data: { ...n.data, autoExtended: true } } : n,
+        ),
+      }));
+    }
+    window.dispatchEvent(new CustomEvent("stream:open-save-preset"));
   }
 
   async function handleLoadPreset() {
