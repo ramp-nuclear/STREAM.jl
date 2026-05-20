@@ -2973,6 +2973,17 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     const json = await readTextFile(filePath);
     const preset = deserializePreset(json);
 
+    // WR-06: fail loudly on unknown componentIds rather than silently adding
+    // invisible nodes that break edge endpoints and undo slots.
+    const unknownIds = preset.components
+      .map((n) => (n.data as unknown as StreamNodeData).componentId)
+      .filter((id) => !getComponent(id));
+    if (unknownIds.length > 0) {
+      throw new Error(
+        "Preset references unknown components: " + unknownIds.join(", "),
+      );
+    }
+
     // PARAM_KEY_BY_KIND inlined (Pitfall 5).
     const GEOM_KEYS = ["geometry", "geometry_ref"] as const;
     const PS_KEYS = ["power_shape", "power_shape_ref"] as const;
