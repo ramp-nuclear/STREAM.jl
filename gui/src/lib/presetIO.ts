@@ -270,17 +270,20 @@ export function autoExtendSelection(
   _allNodes: Node[],
   allEdges: Edge[],
 ): { extendedIds: Set<string>; keptEdges: Edge[]; droppedEdges: Edge[] } {
-  // Copy the selected IDs into a mutable set.
+  // Snapshot the original selection so the XOR check is evaluated against
+  // the initial set only. This enforces the one-hop invariant (D-13):
+  // nodes added during the loop cannot trigger further hops.
+  const originalIds = new Set(selectedNodeIds);
   const extendedIds = new Set(selectedNodeIds);
 
   // Single-pass: for each BC edge, add the other endpoint if exactly one
-  // endpoint is currently in the extended set (XOR check).
+  // endpoint is in the ORIGINAL selection (XOR check against snapshot).
   for (const edge of allEdges) {
     if (edge.type !== "bcEdge") continue;
-    const sourceIn = extendedIds.has(edge.source);
-    const targetIn = extendedIds.has(edge.target);
+    const sourceIn = originalIds.has(edge.source);
+    const targetIn = originalIds.has(edge.target);
     if (sourceIn !== targetIn) {
-      // Exactly one endpoint is in the set — add the other (one hop only).
+      // Exactly one endpoint is in the original set — add the other (one hop).
       if (sourceIn) {
         extendedIds.add(edge.target);
       } else {
