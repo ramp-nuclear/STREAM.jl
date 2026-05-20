@@ -17,6 +17,15 @@
     "fs:allow-appdata-write-recursive",
     "fs:allow-remove",
     "fs:allow-read-dir",
+    "fs:allow-watch",
+    "fs:allow-unwatch",
+    "fs:scope-appconfig-recursive",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$APPCONFIG/presets/**" }
+      ]
+    },
     {
       "identifier": "fs:scope",
       "allow": [
