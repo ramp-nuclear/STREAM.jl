@@ -2780,6 +2780,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   // NO _pushSnapshot — file I/O is not an undo-able action.
   refreshPresetsDir: async (store, dir) => {
     const { readDir, readTextFile } = await import("@tauri-apps/plugin-fs");
+    const { join } = await import("@tauri-apps/api/path");
     const entries: PresetIndexEntry[] = [];
     try {
       const files = await readDir(dir);
@@ -2787,12 +2788,13 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
         if (!f.name?.endsWith(".scpr")) continue;
         if (!f.isFile) continue;
         try {
-          const json = await readTextFile(dir + "/" + f.name);
+          const fullPath = await join(dir, f.name); // WR-03: platform-safe join
+          const json = await readTextFile(fullPath);
           const preset = deserializePreset(json);
           entries.push({
             name: preset.name,
             description: preset.description,
-            filePath: dir + "/" + f.name,
+            filePath: fullPath,
             store,
           });
         } catch (err) {
@@ -2939,7 +2941,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       powerShapes: collectedPowerShapes,
       layout,
     });
-    const filePath = dir + "/" + name + ".scpr";
+    const filePath = await join(dir, name + ".scpr"); // WR-03: platform-safe join
     await writeTextFile(filePath, json);
 
     // Refresh the slice immediately (watcher may fire later too, but be
@@ -3103,14 +3105,15 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     const { readTextFile, writeTextFile, remove } = await import(
       "@tauri-apps/plugin-fs"
     );
+    const { join } = await import("@tauri-apps/api/path");
 
     // Read + parse existing file to get the full preset object.
     const oldJson = await readTextFile(filePath);
     const preset = deserializePreset(oldJson);
 
-    // Derive parent directory and new path.
+    // Derive parent directory and new path (WR-03: platform-safe join).
     const dir = filePath.replace(/[/\\][^/\\]+$/, "");
-    const newPath = dir + "/" + newName + ".scpr";
+    const newPath = await join(dir, newName + ".scpr");
 
     // Guard collision: if target path differs, check it doesn't already exist.
     if (newPath !== filePath) {
