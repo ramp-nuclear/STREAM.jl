@@ -148,6 +148,12 @@ export default function PresetRow({ entry, onRequestReveal }: PresetRowProps) {
       JSON.stringify({ filePath: entry.filePath, store: entry.store }),
     );
     e.dataTransfer.effectAllowed = "move";
+    // Pin the drag image to the row itself with the cursor offset matching the
+    // click point. Without this the browser picks the Radix ContextMenuTrigger
+    // wrapper, which has an ambiguous bounding box and renders an invisible
+    // ghost so the drag doesn't visually follow the cursor.
+    const el = e.currentTarget as HTMLElement;
+    e.dataTransfer.setDragImage(el, e.nativeEvent.offsetX, e.nativeEvent.offsetY);
   }
 
   // ── Row body ───────────────────────────────────────────────────────────────
