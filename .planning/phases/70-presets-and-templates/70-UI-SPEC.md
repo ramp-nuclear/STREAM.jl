@@ -1,10 +1,11 @@
 ---
 phase: 70
 slug: presets-and-templates
-status: draft
+status: approved
 shadcn_initialized: true
 preset: "new-york / zinc / dark-first One Dark Pro"
 created: 2026-05-20
+reviewed_at: 2026-05-20
 ---
 
 # Phase 70 — UI Design Contract: Presets and Templates
@@ -41,7 +42,7 @@ Declared values (multiples of 4 only):
 | 3xl | 64px | Not used in this phase |
 
 Exceptions:
-- Preset entry row height: 22px (matches ResourceRow h-[22px] — inherited from Phase 62 tree density)
+- Preset entry row height: 22px (component-height token, not a gap/padding value — grid alignment unaffected; matches ResourceRow h-[22px] inherited from Phase 62 tree density)
 - Inline rename input height: 24px (matches ResourceRow rename Input h-[24px])
 - Tab strip icon button: 32×32px (matches ResponsiveTabsList IconTabsList size-[32px])
 - Tab strip container height: 40px (matches ResponsiveTabsList IconTabsList h-[40px])
@@ -133,6 +134,7 @@ Overall structure: full-height scrollable column, `bg-panel`, `p-2 overflow-y-au
 - Entry name: `truncate flex-1` — truncated with full name in tooltip (Tooltip on the name span)
 - Description: NOT shown inline — shown as Tooltip on hover (`side="right"`, max-width 200px, wraps). If description is empty, no tooltip.
 - Context menu: Radix `ContextMenu` wrapping the entry row (`ContextMenuTrigger asChild`)
+- **Primary visual anchor:** entry name text (foreground color, 13px); section headers (muted, uppercase) are secondary
 
 #### Empty states
 
@@ -175,8 +177,8 @@ Uses shadcn `AlertDialog` (matches ResourceRow delete-with-usages pattern — sa
 | Component | `AlertDialog` / `AlertDialogContent` |
 | Title | "Delete preset?" |
 | Description | "Delete {name}? This removes the file from {store} and cannot be undone." |
-| Cancel button | `AlertDialogCancel` — "Cancel" |
-| Confirm button | `AlertDialogAction variant="destructive"` — "Delete" |
+| Cancel button | `AlertDialogCancel` — "Keep Preset" |
+| Confirm button | `AlertDialogAction variant="destructive"` — "Delete Preset" |
 | ESC | Closes (AlertDialog default) |
 
 ### Surface 5 — Save-as-Preset Modal
@@ -216,8 +218,8 @@ Uses Radix `Dialog` (same chrome as Phase 67 Settings / About / AutoRecoverResto
    - When Project is disabled, show muted helper text: `text-xs text-muted-foreground` → "Open a project first."
 
 5. `DialogFooter` (right-aligned, gap-[8px]):
-   - `Button variant="ghost"` → "Cancel" (closes dialog, no action)
-   - `Button variant="default"` → "Save" (disabled when Name is empty or has validation error)
+   - `Button variant="ghost"` → "Discard" (closes dialog, no action)
+   - `Button variant="default"` → "Save Preset" (disabled when Name is empty or has validation error)
 
 **Field groups are separated by `gap-[16px]` in a `flex flex-col` container.**
 
@@ -281,13 +283,13 @@ Before the Save-as-Preset modal opens, components pulled in by the BC-edge auto-
 
 | Element | Copy |
 |---------|------|
-| Primary CTA (Save modal) | "Save" |
+| Primary CTA (Save modal) | "Save Preset" |
 | Save modal title | "Save as Preset" |
-| Cancel button | "Cancel" |
+| Discard button (Save modal) | "Discard" |
 | Delete modal title | "Delete preset?" |
 | Delete modal description | "Delete {name}? This removes the file from {store} and cannot be undone." |
-| Delete confirm CTA | "Delete" |
-| Delete cancel | "Cancel" |
+| Delete confirm CTA | "Delete Preset" |
+| Delete cancel | "Keep Preset" |
 | Project section empty — no project open | "Open a project to use the Project store." |
 | Project section empty — project open, no presets | "No project presets yet." + "Multi-select components and right-click to save." |
 | Library section empty | "No library presets yet." + "Save a selection to add your first template." |
@@ -320,12 +322,12 @@ Tone: terse, imperative, engineering-tool register. No exclamation marks. No mar
 | Escape | Save-as-Preset modal | Close modal, discard |
 | Escape | Delete confirmation modal | Close modal, no action |
 | F2 | Preset entry row (focused) | Enter inline rename mode |
-| Tab / Shift+Tab | Save modal fields | Move between Name → Description → Store radio → Save → Cancel |
+| Tab / Shift+Tab | Save modal fields | Move between Name → Description → Store radio → Save Preset → Discard |
 
 ### Focus management
 
 - Save modal: focus lands on the Name Input on open (autoFocus or useEffect focus)
-- Delete modal: focus lands on Cancel button on open (safe default for destructive dialogs)
+- Delete modal: focus lands on Keep Preset button on open (safe default for destructive dialogs)
 - After inline rename commit: focus returns to the renamed row
 
 ### Auto-select after load
