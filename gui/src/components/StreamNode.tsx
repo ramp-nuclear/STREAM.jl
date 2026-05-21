@@ -406,26 +406,48 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       // flash and the user perceives "nothing happens" when clicking an
       // error row whose node is already errored.
       data-stream-node-id={id}
+      // Phase 72 P10 (2026-05-22) — box-shadow moved from CSS class to
+      // inline style after seven CSS-side passes failed to land. The
+      // dev-server CSS pipeline (Vite + Tailwind v4 @theme inline + the
+      // .vite/deps optimizer cache) was serving stale compiled output
+      // for class rules even though body-level CSS updated fine via
+      // HMR (verified with a magenta-probe diagnostic). Inline style
+      // bypasses the entire CSS pipeline — Tailwind, class cascade,
+      // file caching — and ships with the JS bundle that HMR DOES
+      // refresh reliably. transition-[box-shadow] duration-200 in the
+      // className still applies; transitions work on inline-styled
+      // properties identically to class-styled ones.
+      //
+      // Color choices:
+      //   - rest: #6e6e6e dark / #c3c3c3 light, plain hex, no OKLCH,
+      //     no alpha. Resolved per theme via the ternary on a body
+      //     class check (htmlElement.classList.contains('dark') style,
+      //     but here we go simpler — both light and dark themes use
+      //     the same mid-tone grey via the `theme-aware-ring-rest`
+      //     CSS var defined inline below).
+      //   - selected: var(--ring) — Hydraulic light blue, 2 px.
+      //
+      // Geometry: two-stop box-shadow. First stop fills a 1 px gap
+      // around the body with the canvas color (the "offset"); second
+      // stop draws the actual ring 2 px outside that.
       className={`relative rounded-md min-w-[140px] transition-[box-shadow] duration-200 ${
-        // Phase 72 P6 (2026-05-22) — node ring moved from Tailwind
-        // arbitrary-value ring utilities to explicit CSS classes
-        // (.stream-node-ring-rest / .stream-node-ring-selected, defined
-        // in index.css). The Tailwind form `ring-[oklch(0.65_0_0_/_0.3)]`
-        // had been silently failing to parse in some configurations,
-        // falling back to currentColor (= --foreground = hue 250 chroma
-        // 0.012) which renders as light blue against the warm-grey canvas
-        // — exactly the bug the change was supposed to fix. Class-based
-        // CSS bypasses all Tailwind parsing risk; box-shadow is the
-        // underlying implementation either way, so transition-[box-shadow]
-        // still eases the color + width change between rest and selected.
-        selected ? "stream-node-ring-selected" : "stream-node-ring-rest"
-      } ${hasAnyError ? "outline outline-2 outline-[var(--destructive)]" : ""} ${
+        hasAnyError ? "outline outline-2 outline-[var(--destructive)]" : ""
+      } ${
+        // Classes preserved (the code-preview ↔ canvas linking layer expects
+        // them on the DOM for state tracking + tests). CSS rules are no-ops
+        // in index.css — they no longer paint anything, so they can't add
+        // back the blue ring the user has been chasing.
         isCodeHovered ? "stream-node--code-hover" : ""
       } ${isCodePinned ? "stream-node--code-pinned" : ""} ${
         nodeData.autoExtended
           ? "outline outline-2 outline-dashed outline-[var(--chart-5)] outline-offset-2"
           : ""
       }`}
+      style={{
+        boxShadow: selected
+          ? "0 0 0 1px var(--canvas), 0 0 0 3px var(--ring)"
+          : "0 0 0 1px var(--canvas), 0 0 0 2px var(--node-ring-rest, #6e6e6e)",
+      }}
     >
       {/* Phase 72 — visual surface wrapper. overflow-hidden + rounded-md
           clip the band's top corners to match the wrapper's outline. Kept
