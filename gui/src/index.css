@@ -365,23 +365,28 @@ body {
     0 0 0 3px var(--ring) !important;
 }
 
-/* Phase 72 P7 — code-hover / code-pinned outline colors also moved to
-   fully opaque chroma 0. Same alpha-compositing bug as the rest ring:
-   any alpha bleeds the canvas hue (254) through and reads as cool/blue.
-   Outline values consume --node-ring-rest derivatives — a slightly
-   stronger opaque grey for hover, stronger still for pin. */
+/* Phase 72 P8 (2026-05-22) — code-hover / code-pinned visuals on the
+   canvas are now NO-OPS per user request: "nodes that are sources work
+   perfectly... copy that behaviour exactly over to all the rest."
+   Sources nodes never had the .stream-node--code-pinned class applied
+   (their component type doesn't link to code-preview source lines the
+   same way Hydraulic/Thermal/ReactorPhysics do), so they showed only
+   the base .stream-node-ring-rest grey ring. With these rules emptied,
+   every non-Sources node now matches: just the base ring at rest, the
+   Hydraulic-blue selection ring on click. The code-preview ↔ canvas
+   bidirectional link (Phase 66) keeps working at the data layer
+   (hoveredSourceIds / pinnedSourceIds zustand state still set + read);
+   only the canvas-side visual is suppressed. The
+   edges-and-code-preview shape session (queued) is where any future
+   visual signal for this link belongs — likely on the edge / code-line
+   side, not painted over the node body. */
 .stream-node--code-hover {
-  outline: 1px solid oklch(0.55 0 0) !important;
-  outline-offset: 2px;
+  outline: none !important;
+  box-shadow: none !important;
 }
 .stream-node--code-pinned {
-  /* Pin reads as "more committed than hover" via thickness, not color.
-     Zero-blur box-shadow halo (the perf doctrine from DESIGN.md §4 —
-     blurred shadows on @xyflow/react-transformed children force a full
-     layer repaint on every pan/zoom frame). */
-  outline: 2px solid oklch(0.65 0 0) !important;
-  outline-offset: 2px;
-  box-shadow: 0 0 0 1px oklch(0.50 0 0) !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Phase 71 Plan 10 — ValidationStatusBar 0→N pulse animation (D-03).
