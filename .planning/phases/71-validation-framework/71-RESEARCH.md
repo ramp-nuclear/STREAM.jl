@@ -787,22 +787,25 @@ All 10 rule files can be written in parallel since each is a pure function with 
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`activeBottomTab` store slice vs custom event**
    - What we know: BottomPanel currently uses uncontrolled `<Tabs defaultValue="code">`; the export gate must programmatically switch to the Validation tab.
    - What's unclear: Whether to add `activeBottomTab` to the store (cleaner, more discoverable) or use a `CustomEvent` dispatch (avoids one store key, mirrors the `stream:open-save-preset` pattern).
    - Recommendation: Store slice — the `activeLeftTab` precedent already exists, and store slice is more testable.
+   - **RESOLVED:** Store slice approach adopted. `activeBottomTab: 'code' | 'validation'` is added to `AppState` with a `setActiveBottomTab` action — implemented in Plan 01 Task 3 (useStore.ts AppState interface + initial-state defaults + reset blocks + setter action) and consumed by Plan 09 Task 2 (BottomPanel switched to controlled `<Tabs value={activeBottomTab} onValueChange={setActiveBottomTab}>`). Plan 10 Task 1 (statusbar chip onClick) and Plan 11 Task 3 (NodeContextMenu "Show errors for this component") both write `activeBottomTab: 'validation'` via `useStore.setState`.
 
 2. **`data-field-path` for BCsTabForm**
    - What we know: `BCsTabForm.tsx` renders per-field rows for BC input variables. The `data-field-path` attribute must be injected there too.
    - What's unclear: The exact render helper structure in BCsTabForm (not read in detail for this research).
    - Recommendation: Planner reads BCsTabForm and identifies the equivalent of `renderField` there.
+   - **RESOLVED:** Plan 11 Task 1 wraps the `FieldRow` root in `<div data-field-path={externalInput.name}>` for both the symmetric-paired case and the asymmetric pair case (per-side wrappers). The matching ParameterForm site is `renderField` at `ParameterForm.tsx:277-383` — its switch is rewritten to assign to a single `inner` variable and fall through to a single wrapped return. D-13's whole-array fieldPath convention (`'T_wall_left'`, `'q_left'`, `'h_left'`) is honored by using `externalInput.name` as the fieldPath value.
 
 3. **11 pre-existing tsc errors**
    - What we know: STATE.md notes "11 pre-existing tsc errors + 1 pre-existing vitest failure" that Phase 71 owns reconciliation for (per Phase 61 deferred items).
    - What's unclear: Whether any of these tsc errors touch files that Phase 71 modifies (which would block compilation of Phase 71 deliverables).
    - Recommendation: Planner allocates a Wave 0 or Wave 5 task to run `tsc --noEmit` and reconcile the 11 errors as a precondition gate.
+   - **RESOLVED:** Baseline-only comparison adopted (no reconciliation in scope). Plan 01 Task 1's acceptance criterion records the `npm run typecheck` baseline error count BEFORE any change; every subsequent task in every plan asserts "typecheck does not exceed Plan 01 baseline." This converts the 11-error legacy into a non-regression guarantee without forcing Phase 71 to fix unrelated pre-existing issues. If any Phase 71 file modification touches a file with a pre-existing error, the executor fixes only the new error introduced by their change; the baseline remains stable.
 
 ---
 

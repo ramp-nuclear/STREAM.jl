@@ -289,6 +289,7 @@ Plans:
 **Plans:** 6/6 plans complete
 
 Plans:
+
 - [x] 70-01-PLAN.md (Wave 1) — Tauri substrate: `watch` Cargo feature + 4 ACL permissions (incl. `$APPCONFIG/presets/**` scope) + shadcn `textarea` / `radio-group` installs (HAS CHECKPOINT for shadcn install).
 - [x] 70-02-PLAN.md (Wave 1, parallel to 01) — Pure `gui/src/lib/presetIO.ts` (schema v1.0, `autoExtendSelection` BC-hop algorithm, `normalizeLayout`, `isValidPresetName`) + full vitest coverage.
 - [x] 70-03-PLAN.md (Wave 2, depends 01+02) — `useStore` presets slice: `projectPresets` / `libraryPresets` state, `refreshPresetsDir`, `saveSelectionAsPreset`, `loadPresetAtPosition`, `loadPresetFromPath`, `renamePreset`, `deletePreset` actions + Tauri-mocked vitest coverage.
@@ -302,7 +303,49 @@ Plans:
 
 **Design-decisions reference:** Section 3.9.
 **Depends on:** Phase 62 (operates on Resources + components).
-**Plans:** TBD via `/gsd:plan-phase`.
+**Plans:** 13 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 71-01-PLAN.md (Wave 1) — Validator registry foundation: types, snapshot, runner, fields.ts migration, validationResults + activeBottomTab store slices, initValidation() subscription, ad-hoc errorNodeIds mutation removal.
+- [ ] 71-02-PLAN.md (Wave 1, parallel to 01) — loopTraversal.ts pure graph utility (findHydraulicLoops) + co-located vitest suite.
+- [ ] 71-03-PLAN.md (Wave 1, parallel to 01/02) — sonner install + shadcn ui/sonner.tsx Toaster wrapper (HAS legitimacy CHECKPOINT).
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 71-04-PLAN.md (Wave 2, depends 01) — Structural rules: portType (D-19 single source of truth), requiredConnections, danglingFlowPort (VALD-01 fold) + index.ts registration.
+- [ ] 71-09-PLAN.md (Wave 2, parallel to rule files) — ValidationPanel.tsx (list + sort + click-to-focus + empty state + severity-filter listener + node-filter listener) + BottomPanel.tsx Validation tab + controlled Tabs via activeBottomTab. (Wave dropped from 7 to 2 in revision; UI consumes empty validationResults until rules land, then re-renders automatically.)
+- [ ] 71-10-PLAN.md (Wave 2, parallel to 09) — ValidationStatusBar.tsx + App.tsx mount + Toaster mount + initValidation() useEffect + pulse-once CSS keyframes + REQUIRED 'stream:validation-filter' CustomEvent dispatch on chip click (Plan 09 listens). (Wave dropped from 7 to 2 in revision.)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 71-05-PLAN.md (Wave 3, depends 04) — Geometry rules: zNMatch, lengthMatch (Resource-FK aware), geometryConsistency (warning severity) + index.ts registration.
+- [ ] 71-11-PLAN.md (Wave 3, depends 09 + 10) — data-field-path injection (ParameterForm + BCsTabForm), useValidationFieldHighlight hook, CanvasPanel focus-on-result event listener, NodeContextMenu "Show errors for this component" entry + REQUIRED 'stream:validation-filter-node' CustomEvent dispatch (Plan 09 listens). (Wave dropped from 8 to 3 in revision.)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 71-06-PLAN.md (Wave 4, depends 05) — nMatch rule (D-20 supersedes selectNodeErrors; D-13 whole-array fieldPath) + index.ts registration.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 71-07-PLAN.md (Wave 5, depends 02 + 06) — Loop-physics rules: loopClosure, gravitySumPerLoop (consume findHydraulicLoops) + index.ts registration.
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 71-08-PLAN.md (Wave 6, depends 07) — System-level rules: pressureBoundaryRequired (VALD-02), drivingElementRequired (VALD-03) + index.ts registration. (Rule plans serialized 04→05→06→07→08 because all touch index.ts; rules within a plan stay parallel-friendly.)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 71-12-PLAN.md (Wave 7, depends 03+04..08+09+10+11) — Export gate rewire (runValidators + sonner toast + disabled Export button) + ValidationDialog.tsx deletion (D-17). (Wave dropped from 9 to 7 in revision because 11 dropped to 3 and 08 is still max-dep at wave 6.)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 71-13-PLAN.md (Wave 8, depends 04+06+08+11+12) — Final cleanup: onConnect reroute through portType (D-19), StreamNode hasBCError removal (D-20), useStore.ts legacy slice/action deletion, delete validation.ts + validation.test.ts + selectors/nodeErrors.ts (D-16, D-18, D-20). (Wave dropped from 10 to 8 in revision; max-dep is Plan 12 at wave 7.)
+
+**Cross-cutting constraints:**
+
+- Both rules are pure functions and registered in the explicit array.
 
 ### Phase 72: Design system / interaction contract
 
@@ -363,7 +406,7 @@ contract document drafted in parallel throughout.
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
 | 69. Command palette (jump-only)                      | 3/3 | Complete    | 2026-05-18 |
 | 70. Presets and templates                            | 6/6 | Complete    | 2026-05-20 |
-| 71. Validation framework                             | 0/TBD | Planned | — |
+| 71. Validation framework                             | 0/13 | Planned | — |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
 
 ## Coverage
