@@ -397,6 +397,15 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
 
   return (
     <div
+      // Phase 72 — `data-stream-node-id` is the flash target for the
+      // canvas-pan-to-validation-result animation (CanvasPanel onNodeFlash).
+      // Anchored on THIS element (not on xyflow's outer wrapper carrying
+      // `data-id`) so the flash outline lives on the same element as the
+      // persistent error outline below — otherwise the persistent outline
+      // (which is a DOM child of the xyflow wrapper) paints on top of the
+      // flash and the user perceives "nothing happens" when clicking an
+      // error row whose node is already errored.
+      data-stream-node-id={id}
       className={`relative rounded-md min-w-[140px] transition-[box-shadow] ${
         selected ? "ring-2 ring-[var(--ring)] ring-offset-1 ring-offset-canvas" : ""
       } ${hasAnyError ? "outline outline-2 outline-[var(--destructive)]" : ""} ${
