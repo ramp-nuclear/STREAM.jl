@@ -4,6 +4,10 @@ examples/output/
 
 # Node / GUI
 node_modules/
+
+# Vendored Claude Code skill content (re-installable from skills-lock.json
+# via `npx skills add <source>`). Pin lives in skills-lock.json (tracked).
+.agents/
 # Phase 62 ships fresh .scp example fixtures under gui/export_examples/ (see
 # 62-11 plan); previously this whole directory was ignored because it held
 # stale developer dumps. Version-control the directory now; runtime artifacts
