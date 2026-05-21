@@ -32,6 +32,7 @@ import { nMatch } from "./rules/nMatch";
 import { loopClosure } from "./rules/loopClosure";
 import { gravitySumPerLoop } from "./rules/gravitySumPerLoop";
 import { pressureBoundaryRequired } from "./rules/pressureBoundaryRequired";
+import { drivingElementRequired } from "./rules/drivingElementRequired";
 
 /** All registered validators. Rules plans append by importing each rule and
  *  pushing to this array. The runner (runner.ts) flat-maps over this array
@@ -47,4 +48,5 @@ export const validators: Validator[] = [
   loopClosure,
   gravitySumPerLoop,
   pressureBoundaryRequired,
+  drivingElementRequired,
 ];
