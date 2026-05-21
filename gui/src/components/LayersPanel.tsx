@@ -28,20 +28,13 @@
 
 import { Eye, EyeOff } from "lucide-react";
 import { LAYER_KEYS, type LayerKey } from "../lib/layers";
+import { LAYER_COLOR_VAR } from "../lib/layerColors";
 import useStore from "../store/useStore";
 import { cn } from "../lib/utils";
 
-// D-01 accent palette — LOCKED. Applies to the per-row color dot.
-// (Phase 72 will extend these accents to node borders / port handles; until
-// then they live alongside the consumer that uses them. StreamNode.tsx has
-// its own Hydraulic/Thermal hex constants — REVIEW.md Info-finding flagged
-// the duplication for a future consolidation pass.)
-const LAYER_COLORS: Record<LayerKey, string> = {
-  Hydraulic: "#3b82f6",
-  Thermal: "#f59e0b",
-  Sources: "#8b5cf6",
-  ReactorPhysics: "#f43f5e",
-};
+// Layer accents are CSS var() expressions; values live in index.css under
+// --color-layer-*. See lib/layerColors.ts for the single-source-of-truth
+// mapping (Phase 72 — resolves the audit's P0-4 duplicated-hex finding).
 
 const LAYER_LABELS: Record<LayerKey, string> = {
   Hydraulic: "Hydraulic",
@@ -84,7 +77,7 @@ export default function LayersPanel() {
                 data-testid={`layer-dot-${key}`}
                 className="w-2.5 h-2.5 rounded-full inline-block shrink-0 transition-opacity"
                 style={{
-                  backgroundColor: LAYER_COLORS[key],
+                  backgroundColor: LAYER_COLOR_VAR[key],
                   opacity: on ? 1 : 0.25,
                 }}
               />

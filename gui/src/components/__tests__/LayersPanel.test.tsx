@@ -17,20 +17,11 @@ import useStore, {
   SENTINEL_LIGHT_WATER_FLUID,
 } from "../../store/useStore";
 import { ALL_LAYERS_ON, LAYER_KEYS } from "../../lib/layers";
+import { LAYER_COLOR_VAR } from "../../lib/layerColors";
 
-const EXPECTED_HEX: Record<string, string> = {
-  Hydraulic: "#3b82f6",
-  Thermal: "#f59e0b",
-  Sources: "#8b5cf6",
-  ReactorPhysics: "#f43f5e",
-};
-
-const EXPECTED_RGB: Record<string, string> = {
-  Hydraulic: "rgb(59, 130, 246)",
-  Thermal: "rgb(245, 158, 11)",
-  Sources: "rgb(139, 92, 246)",
-  ReactorPhysics: "rgb(244, 63, 94)",
-};
+// Phase 72 — color contract is now tokenized via CSS custom properties
+// (see lib/layerColors.ts). Tests assert the var() expression rather than
+// resolved hex/rgb values (happy-dom does not compute CSS custom properties).
 
 beforeEach(() => {
   useStore.setState({
@@ -80,8 +71,10 @@ function getDot(key: string): HTMLElement {
 }
 
 function dotColorMatches(el: HTMLElement, key: string): boolean {
-  const bg = el.style.backgroundColor;
-  return bg === EXPECTED_HEX[key] || bg === EXPECTED_RGB[key];
+  // The inline style holds the var() expression verbatim; the browser
+  // resolves it at paint time. happy-dom does not compute custom-property
+  // resolution, so we assert against the raw token reference.
+  return el.style.backgroundColor === LAYER_COLOR_VAR[key as keyof typeof LAYER_COLOR_VAR];
 }
 
 describe("LayersPanel — render + header", () => {
