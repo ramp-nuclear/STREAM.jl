@@ -26,8 +26,9 @@ import StreamNode from "./StreamNode";
 import HydraulicEdge from "./HydraulicEdge";
 import BCEdge from "./BCEdge";
 import WelcomeOverlay from "./WelcomeOverlay";
-import { isAllowedBCConnection } from "@/lib/bcMode";
 import { useRightClickContextMenu } from "@/hooks/useRightClickContextMenu";
+import { portType } from "@/lib/validation/rules/portType";
+import type { ValidationSnapshot } from "@/lib/validation/snapshot";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -269,22 +270,32 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
     ) {
       return false;
     }
-    // Port-type enforcement (per D-05): FlowPort-to-FlowPort only, ThermalPort-to-ThermalPort only
-    const sourceType = getPortType(connection.source, connection.sourceHandle);
-    const targetType = getPortType(connection.target, connection.targetHandle);
-    if (sourceType && targetType && sourceType !== targetType) return false;
-    // Phase 63 D-21 — BCPort allow-list. Pure read-only registry check (no
-    // store mutation here per RESEARCH Pitfall 7; n-mismatch flagging lives
-    // in `useStore.addEdge` / `setBCMode`).
-    if (sourceType === "BCPort") {
-      const srcNode = useStore.getState().nodes.find((n) => n.id === connection.source);
-      const tgtNode = useStore.getState().nodes.find((n) => n.id === connection.target);
-      if (!srcNode || !tgtNode) return false;
-      const srcCompId = (srcNode.data as unknown as StreamNodeData).componentId;
-      const tgtCompId = (tgtNode.data as unknown as StreamNodeData).componentId;
-      return isAllowedBCConnection(srcCompId, tgtCompId);
-    }
-    return true;
+
+    const s = useStore.getState();
+    const srcNode = s.nodes.find((n) => n.id === connection.source);
+    const tgtNode = s.nodes.find((n) => n.id === connection.target);
+    if (!srcNode || !tgtNode) return false;
+
+    // Build a synthetic single-edge snapshot for one-shot portType validation.
+    // D-19: do NOT run the full validator suite here — only the portType rule.
+    // (RESEARCH Pitfall 2: full runValidators would call loopTraversal on every hover tick.)
+    const syntheticEdge: Edge = {
+      id: "__pending__",
+      source: connection.source,
+      target: connection.target,
+      sourceHandle: connection.sourceHandle,
+      targetHandle: connection.targetHandle,
+    };
+    const snapshot: ValidationSnapshot = {
+      nodes: [srcNode, tgtNode],
+      edges: [syntheticEdge],
+      anchors: {},  // not used by portType
+      bcMode: s.bcMode,
+      resources: s.resources,
+      getComponentDef: getComponent,
+    };
+    const results = portType.run(snapshot);
+    return results.length === 0;
   }, []);
 
   useEffect(() => {
