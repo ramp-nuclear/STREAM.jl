@@ -57,9 +57,7 @@ describe("drivingElementRequired validator", () => {
     expect(results[0].validatorId).toBe("driving_element_required");
     expect(results[0].id).toBe("driving_element_required::system");
     expect(results[0].targets).toEqual([]);
-    expect(results[0].description).toBe(
-      "No driving element (add a Pump or Gravity component).",
-    );
+    expect(results[0].description).toBe("No driving element");
   });
 
   it("emits no result when a Pump node exists", () => {

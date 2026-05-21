@@ -46,8 +46,7 @@ export const drivingElementRequired: Validator = {
         id: "driving_element_required::system",
         validatorId: "driving_element_required",
         severity: "error",
-        description:
-          "No driving element (add a Pump or Gravity component).",
+        description: "No driving element",
         targets: [],
       },
     ];
