@@ -93,8 +93,18 @@ function SeverityIcon({ severity }: { severity: "error" | "warning" | "info" }) 
   if (severity === "error")
     return <AlertCircle className="w-4 h-4 shrink-0 text-destructive" />;
   if (severity === "warning")
-    return <AlertTriangle className="w-4 h-4 shrink-0 text-yellow-500" />;
-  return <Info className="w-4 h-4 shrink-0 text-blue-500" />;
+    return (
+      <AlertTriangle
+        className="w-4 h-4 shrink-0"
+        style={{ color: "var(--color-warning)" }}
+      />
+    );
+  return (
+    <Info
+      className="w-4 h-4 shrink-0"
+      style={{ color: "var(--color-info)" }}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
