@@ -22,13 +22,35 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  /* Phase 67 Plan 04 — VSCode-style three-tier depth tokens (same hue,
-     luminance steps only). Chrome darkest, panel mid, canvas lightest.
-     Light mode: chrome is a noticeably-darker neutral, panel is off-white,
-     canvas is pure white. */
-  --chrome: oklch(0.92 0 0);
-  --panel: oklch(0.97 0 0);
-  --canvas: oklch(1 0 0);
+  /* Phase 72 — three-tier depth tokens recommitted with stronger steps and
+     hue tint per OKLCH no-#fff rule. Chrome darkest, panel mid, canvas
+     lightest (warmest). Light mode: tinted toward hue 254 (matches dark
+     mode lineage) at near-imperceptible chroma 0.003–0.005. */
+  --chrome: oklch(0.95 0.005 254);
+  --panel: oklch(0.98 0.003 254);
+  --canvas: oklch(0.99 0.003 254);
+  /* Phase 72 — layer-accent palette (single source of truth — see
+     gui/src/lib/layerColors.ts for the LayerKey → CSS-var mapping consumed
+     by LayersPanel + StreamNode). Hues chosen with domain intent +
+     deuteranopia margin: Hydraulic blue (flow/water convention), Thermal
+     amber (heat convention), Sources yellow-green (input/source LED
+     convention), ReactorPhysics deep crimson (criticality, distinguished
+     from --destructive via lightness step). */
+  --color-layer-hydraulic: oklch(0.50 0.18 240);
+  --color-layer-thermal: oklch(0.60 0.16 75);
+  --color-layer-sources: oklch(0.60 0.18 130);
+  --color-layer-reactor-physics: oklch(0.48 0.22 15);
+  /* Phase 72 — canvas grid lines (CAD/Houdini convention replacing the
+     ReactFlow default dot pattern). Two tiers: major every 24 px @ 1.0
+     zoom, minor every 12 px @ 1.0 zoom. Both are 1px solid; spacing
+     scales with zoom via xyflow's Background gap prop. */
+  --color-canvas-grid-major: oklch(0.86 0.005 254);
+  --color-canvas-grid-minor: oklch(0.92 0.003 254);
+  /* Phase 72 — warning + info functional tokens (replaces text-yellow-500
+     / text-blue-500 raw Tailwind in ValidationPanel and any future
+     warning/info surface). OKLCH per the locked OKLCH-only doctrine. */
+  --color-warning: oklch(0.74 0.16 75);
+  --color-info: oklch(0.62 0.18 240);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -46,19 +68,24 @@
 }
 
 .dark {
-  /* One Dark Pro inspired: warm blue-grey palette (#282c34 family) */
-  --background: oklch(0.24 0.012 254);      /* #282c34 — editor bg */
-  --foreground: oklch(0.73 0.012 250);      /* #abb2bf — warm grey-blue text */
-  --card: oklch(0.27 0.014 254);            /* #2c313a — panel/card surfaces */
+  /* Phase 72 — dark mode neutrals. Broke from the One Dark Pro lineage
+     (warm blue-grey hue 254 retained for continuity, but luminance steps
+     recommitted for stronger depth contrast). Phase 72 brief explicitly
+     flagged the One Dark Pro inheritance as a Claude default up for
+     redesign — values now derive from the depth hierarchy decision, not
+     from matching #282c34. */
+  --background: oklch(0.27 0.012 254);      /* matches new --canvas */
+  --foreground: oklch(0.73 0.012 250);      /* unchanged — warm grey-blue text reads well on the lifted canvas */
+  --card: oklch(0.27 0.012 254);            /* tracks canvas */
   --card-foreground: oklch(0.73 0.012 250);
   --popover: oklch(0.265 0.014 254);
   --popover-foreground: oklch(0.73 0.012 250);
   --primary: oklch(0.73 0.012 250);
-  --primary-foreground: oklch(0.24 0.012 254);
-  --secondary: oklch(0.315 0.016 252);      /* #3e4451 — hover/selected */
+  --primary-foreground: oklch(0.27 0.012 254);
+  --secondary: oklch(0.315 0.016 252);
   --secondary-foreground: oklch(0.73 0.012 250);
   --muted: oklch(0.315 0.016 252);
-  --muted-foreground: oklch(0.50 0.01 250); /* #5c6370 — subdued labels */
+  --muted-foreground: oklch(0.50 0.01 250);
   --accent: oklch(0.315 0.016 252);
   --accent-foreground: oklch(0.73 0.012 250);
   --destructive: oklch(0.704 0.191 22.216);
@@ -70,7 +97,7 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.215 0.012 254);        /* #21252b — sidebar (slightly darker) */
+  --sidebar: oklch(0.21 0.012 254);         /* tracks new --panel */
   --sidebar-foreground: oklch(0.73 0.012 250);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.73 0.012 250);
@@ -78,15 +105,25 @@
   --sidebar-accent-foreground: oklch(0.73 0.012 250);
   --sidebar-border: oklch(1 0 0 / 11%);
   --sidebar-ring: oklch(0.50 0.01 250);
-  /* Phase 67 Plan 04 — three-tier depth tokens, dark mode.
-     Chrome darkest (≈#181b20), panel mid (≈#21252b — matches existing
-     sidebar tone for hue continuity), canvas lightest (≈#282c34 — same
-     as the existing One Dark Pro --background to keep the canvas color
-     stable with all prior canvas/ReactFlow tuning). Same warm blue-grey
-     hue across all three; only luminance steps. */
-  --chrome: oklch(0.19 0.011 254);
-  --panel: oklch(0.215 0.012 254);
-  --canvas: oklch(0.24 0.012 254);
+  /* Phase 72 — three-tier depth tokens, dark mode. Recommitted steps:
+     chrome 0.16 → panel 0.21 → canvas 0.27 (was 0.19/0.215/0.24). ~2x
+     the contrast between tiers for a more committed depth hierarchy. */
+  --chrome: oklch(0.16 0.012 254);
+  --panel: oklch(0.21 0.012 254);
+  --canvas: oklch(0.27 0.012 254);
+  /* Phase 72 — layer-accent palette, dark-mode lift. Higher lightness so
+     accents read against the darker canvas/chrome surfaces. */
+  --color-layer-hydraulic: oklch(0.62 0.16 240);
+  --color-layer-thermal: oklch(0.74 0.15 75);
+  --color-layer-sources: oklch(0.74 0.17 130);
+  --color-layer-reactor-physics: oklch(0.62 0.22 15);
+  /* Phase 72 — canvas grid lines, dark-mode tones. Visible but recessive
+     against the lifted canvas. */
+  --color-canvas-grid-major: oklch(0.35 0.012 254);
+  --color-canvas-grid-minor: oklch(0.31 0.012 254);
+  /* Phase 72 — warning + info, dark-mode lift. */
+  --color-warning: oklch(0.78 0.15 75);
+  --color-info: oklch(0.72 0.16 240);
 }
 
 @theme inline {
@@ -219,29 +256,37 @@ body {
 
 /* Phase 71 Plan 11 — validation field highlight (D-12).
    Applied by useValidationFieldHighlight to data-field-path elements.
-   outline (not border) avoids any layout impact (Pitfall 3). Phase 72 sweeps visual tokens. */
+   outline (not border) avoids any layout impact (Pitfall 3).
+   Phase 72 — fixed broken `hsl(var(--destructive))` wrapping (OKLCH
+   variable can't be re-parsed as HSL — was silently falling back to
+   currentColor); switched warning hue from raw HSL to --color-warning. */
 .validation-field-error {
-  outline: 2px solid hsl(var(--destructive));
+  outline: 2px solid var(--destructive);
   outline-offset: 2px;
   border-radius: 4px;
 }
 .validation-field-warning {
-  outline: 2px solid hsl(38 92% 50%);
+  outline: 2px solid var(--color-warning);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 /* Phase 71 Plan 11 — canvas node flash on ValidationPanel row click (D-05).
+   This is NAVIGATION feedback (user clicked a result row → canvas pans →
+   node flashes to confirm "this one"), NOT error notification — Phase 72
+   brief evaluated and intentionally kept it.
    ReactFlow positions every node wrapper via transform: translate(x, y).
    The flash MUST NOT touch `transform` or `opacity` — pulse-once's scale()
    wipes the translate and visually rips the node out of position
-   (Phase 71 UAT Test 5 #2026-05-21). Animate outline-color only. */
+   (Phase 71 UAT Test 5 #2026-05-21). Animate outline-color only.
+   Phase 72 — fixed broken `hsl(var(--destructive) / 0.25)` syntax
+   (invalid against the OKLCH variable); switched to color-mix in OKLCH. */
 @keyframes node-flash-outline {
-  0%, 100% { outline-color: hsl(var(--destructive) / 1.0); }
-  50%      { outline-color: hsl(var(--destructive) / 0.25); }
+  0%, 100% { outline-color: var(--destructive); }
+  50%      { outline-color: color-mix(in oklch, var(--destructive) 25%, transparent); }
 }
 .validation-flash {
-  outline: 2px solid hsl(var(--destructive));
+  outline: 2px solid var(--destructive);
   outline-offset: 4px;
   animation: node-flash-outline 600ms ease-out 1;
 }
