@@ -13,6 +13,9 @@ import {
 } from "@xyflow/react";
 import { getComponent } from "../registry";
 import { validateTopology, type TopologyResult } from "../lib/validation";
+import { runValidators } from "../lib/validation/runner";
+import { buildValidationSnapshot } from "../lib/validation/snapshot";
+import type { ValidationResult } from "../lib/validation/types";
 import {
   bcModeKey,
   type BCModeEntry,
@@ -190,15 +193,23 @@ export interface AppState {
   bottomPanelOpen: boolean;
   bottomPanelHeight: number;
   setBottomPanelHeight: (height: number) => void;
+  // Phase 71 D-01: active bottom tab (session-only, NOT persisted in .scp).
+  // Mirrors the activeLeftTab convention — controls which tab is shown in BottomPanel.
+  activeBottomTab: 'code' | 'validation';
+  setActiveBottomTab: (tab: 'code' | 'validation') => void;
   toolboxCollapsed: boolean;
   sidebarCollapsed: boolean;
   setToolboxCollapsed: (collapsed: boolean) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  // Topology validation (Phase 39)
+  // Topology validation (Phase 39 — kept until Plans 12/13 rewire consumers)
   errorNodeIds: Set<string>;
   validationResult: TopologyResult | null;
   validateAndGate: () => TopologyResult;
   clearValidation: () => void;
+  // Phase 71 D-09/D-18: new validation slices (alongside the legacy topology slice).
+  // validationResults is populated exclusively by initValidation() subscription.
+  // errorNodeIds remains a stored Set but is also written by initValidation() only.
+  validationResults: ValidationResult[];
   // Phase 66 Plan 03: code-panel ephemeral slices (session-only, NOT persisted in .scp).
   //
   // hoveredSourceIds — sub-block hover in CodePreview drives a hover ring on
@@ -851,11 +862,14 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   bottomPanelOpen: false,
   bottomPanelHeight: 240,
   setBottomPanelHeight: (height) => set({ bottomPanelHeight: height }),
+  activeBottomTab: 'code' as const,
   toolboxCollapsed: false,
   sidebarCollapsed: false,
   // Topology validation (Phase 39) initial state
   errorNodeIds: new Set<string>(),
   validationResult: null,
+  // Phase 71: new validation slices (alongside the legacy topology slice)
+  validationResults: [],
   // Phase 66 Plan 03: code-panel ephemeral slices initial state.
   // All three start empty/null. Session-only — NOT serialized to .scp
   // (verified: serializeProject's args list does not include these keys).
@@ -1026,6 +1040,8 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       isDirty: true,
       errorNodeIds: new Set<string>(),
       validationResult: null,
+      validationResults: [],
+      activeBottomTab: 'code' as const,
     });
   },
 
@@ -1067,6 +1083,8 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       isDirty: true,
       errorNodeIds: new Set<string>(),
       validationResult: null,
+      validationResults: [],
+      activeBottomTab: 'code' as const,
     });
   },
 
@@ -1336,32 +1354,8 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       }
     }
 
-    const { errorNodeIds } = get();
-
-    if (errorNodeIds.size > 0) {
-      const updatedErrors = new Set(errorNodeIds);
-      for (const nodeId of [connection.source, connection.target]) {
-        if (!nodeId || !updatedErrors.has(nodeId)) continue;
-        const node = get().nodes.find((n) => n.id === nodeId);
-        if (!node) continue;
-        const data = node.data as { componentId: string };
-        const def = getComponent(data.componentId);
-        if (!def) continue;
-        const flowPorts = def.ports.filter((p) => p.type === "FlowPort");
-        const allConnected = flowPorts.every((port) => {
-          const isInput = port.name.includes("in");
-          return finalEdges.some((e) =>
-            isInput
-              ? e.target === nodeId && e.targetHandle === port.name
-              : e.source === nodeId && e.sourceHandle === port.name,
-          );
-        });
-        if (allConnected) updatedErrors.delete(nodeId);
-      }
-      set({ edges: finalEdges, isDirty: true, errorNodeIds: updatedErrors });
-    } else {
-      set({ edges: finalEdges, isDirty: true });
-    }
+    // errorNodeIds is now populated exclusively by initValidation() (Phase 71 D-18).
+    set({ edges: finalEdges, isDirty: true });
   },
 
   removeEdge: (edgeId) => {
@@ -1868,6 +1862,10 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
 
   // toggleBottomPanel is NOT content-mutating — do NOT set isDirty
   toggleBottomPanel: () => set({ bottomPanelOpen: !get().bottomPanelOpen }),
+
+  // Phase 71 D-01: setActiveBottomTab — session-only, NOT persisted in .scp.
+  // Mirrors the activeLeftTab convention. isDirty is NOT set (UI state only).
+  setActiveBottomTab: (tab) => set({ activeBottomTab: tab }),
 
   // ---------------------------------------------------------------------------
   // Topology validation (Phase 39)
@@ -2451,6 +2449,8 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
         _undoFuture: [],
         errorNodeIds: new Set<string>(),
         validationResult: null,
+        validationResults: [],
+        activeBottomTab: 'code' as const,
         // Phase 62: resources + modelOptions + activeLeftTab restored from .scp
         resources: {
           geometries: geometriesRecord,
@@ -2535,6 +2535,8 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       _undoFuture: [],
       errorNodeIds: new Set<string>(),
       validationResult: null,
+      validationResults: [],
+      activeBottomTab: 'code' as const,
       // Phase 62: reset Resources / ModelOptions / Tabs / Selection to initial values
       resources: {
         geometries: {},
@@ -2729,6 +2731,8 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       _undoFuture: [],
       errorNodeIds: new Set<string>(),
       validationResult: null,
+      validationResults: [],
+      activeBottomTab: 'code' as const,
       resources: {
         geometries: geometriesRecord,
         powerShapes: powerShapesRecord,
@@ -3295,6 +3299,66 @@ export async function initAutoRecover(): Promise<{ teardown: () => Promise<void>
   }
 
   return { teardown };
+}
+
+/**
+ * Initialize the validation subscription (Phase 71 D-09/D-18).
+ *
+ * Call this from App.tsx on mount (alongside initAutoRecover).
+ * Returns a teardown function to call on app unmount (clears timer + unsubscribes).
+ *
+ * Wires a single debounced (~150ms) useStore.subscribe listener on
+ * nodes/edges/anchors/bcMode/resources. On each fire:
+ *   1. Reads fresh store state via useStore.getState()
+ *   2. Builds a ValidationSnapshot via buildValidationSnapshot()
+ *   3. Calls runValidators(snapshot) (pure, no cache in v1)
+ *   4. Derives errorNodeIds from results (severity='error', kind=node|port)
+ *   5. Writes validationResults + errorNodeIds atomically via useStore.setState
+ *
+ * D-18: errorNodeIds is populated EXCLUSIVELY by this subscription after this
+ * plan lands — no other write path creates or clears errorNodeIds from addEdge.
+ */
+export function initValidation(): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const unsubscribe = useStore.subscribe(
+    (s) => ({
+      nodes: s.nodes,
+      edges: s.edges,
+      anchors: s.anchors,
+      bcMode: s.bcMode,
+      resources: s.resources,
+    }),
+    (_slice) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const s = useStore.getState();
+        const snapshot = buildValidationSnapshot(s);
+        const results = runValidators(snapshot);
+        const errorNodeIds = new Set(
+          results
+            .filter((r) => r.severity === "error")
+            .flatMap((r) => r.targets)
+            .filter((t) => t.kind === "node" || t.kind === "port")
+            .map((t) => (t as { nodeId: string }).nodeId),
+        );
+        useStore.setState({ validationResults: results, errorNodeIds });
+      }, 150);
+    },
+    {
+      equalityFn: (a, b) =>
+        a.nodes === b.nodes &&
+        a.edges === b.edges &&
+        a.anchors === b.anchors &&
+        a.bcMode === b.bcMode &&
+        a.resources === b.resources,
+    },
+  );
+
+  return () => {
+    unsubscribe();
+    if (timer) clearTimeout(timer);
+  };
 }
 
 export default useStore;
