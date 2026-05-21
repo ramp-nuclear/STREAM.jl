@@ -225,10 +225,8 @@ describe("geometryConsistency", () => {
     expect(fieldTargets.length).toBeGreaterThanOrEqual(2);
     // Both CACs + HD
     expect(nodeTargets.length).toBeGreaterThanOrEqual(3);
-    // fixAction navigation-only
-    expect(r.fixAction).toBeDefined();
-    expect(r.fixAction!.kind).toBe("navigation-only");
-    expect((r.fixAction as { kind: string; label: string }).label).toBe("Go to components");
+    // Phase 71 UAT (2026-05-21): FixActions removed across all rules.
+    expect(r.fixAction).toBeUndefined();
   });
 
   it("returns no result for a single CAC connected to an HD (no shared coupling)", () => {
@@ -266,15 +264,10 @@ describe("geometryConsistency", () => {
     expect(results).toHaveLength(0);
   });
 
-  it("fixAction is navigation-only with no apply property", () => {
+  it("emits no fixAction (Phase 71 UAT 2026-05-21 removed FixActions)", () => {
     const snapshot = makeTwoCacTopology(GEOM_1_MATCHING, GEOM_2_MISMATCHING);
     const results = geometryConsistency.run(snapshot);
     expect(results).toHaveLength(1);
-    const fixAction = results[0].fixAction;
-    expect(fixAction).toBeDefined();
-    expect(fixAction!.kind).toBe("navigation-only");
-    expect((fixAction as { kind: string; label: string }).label).toBe("Go to components");
-    // No apply closure — navigation-only has no mechanical fix
-    expect((fixAction as Record<string, unknown>)["apply"]).toBeUndefined();
+    expect(results[0].fixAction).toBeUndefined();
   });
 });

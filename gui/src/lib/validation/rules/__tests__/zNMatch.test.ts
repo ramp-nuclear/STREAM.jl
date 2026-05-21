@@ -11,7 +11,7 @@
 //   5. No thermal edges → no result
 //   6. fixAction.apply calls updateNodeParam with correct args on both sides
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import type { Node, Edge } from "@xyflow/react";
 import type { ValidationSnapshot } from "../../snapshot";
 import type { ComponentDefinition } from "../../../../registry/types";
@@ -191,31 +191,15 @@ describe("zNMatch", () => {
     expect(results).toHaveLength(0);
   });
 
-  it("fixAction is lossless-sync with correct label and calls updateNodeParam on both sides", () => {
-    const cacId = "cac1";
-    const hdId = "hd1";
-    const cac = makeNode(cacId, "ChannelAndContacts", "cac_1", { n: 4 });
-    const hd = makeNode(hdId, "HeatDiffusion", "hd_1", { nz: 5 });
-    const edge = makeEdge("e1", cacId, "thermal_right", hdId, "thermal_left");
+  // Phase 71 UAT (2026-05-21): FixActions removed across all rules.
+  // Rule degrades to navigation-only behavior (row click focuses the node).
+  it("emits no fixAction", () => {
+    const cac = makeNode("cac1", "ChannelAndContacts", "cac_1", { n: 4 });
+    const hd = makeNode("hd1", "HeatDiffusion", "hd_1", { nz: 5 });
+    const edge = makeEdge("e1", "cac1", "thermal_right", "hd1", "thermal_left");
     const snapshot = makeSnapshot([cac, hd], [edge]);
     const results = zNMatch.run(snapshot);
     expect(results).toHaveLength(1);
-    const fixAction = results[0].fixAction;
-    expect(fixAction).toBeDefined();
-    expect(fixAction!.kind).toBe("lossless-sync");
-    // winning n = max(4, 5) = 5
-    expect((fixAction as { kind: string; label: string }).label).toBe("Sync n to 5");
-
-    // Apply: mock get() returning updateNodeParam spy
-    const updateNodeParam = vi.fn();
-    const mockGet = vi.fn(() => ({
-      updateNodeParams: updateNodeParam,
-    }));
-    const mockSet = vi.fn();
-    (fixAction as { kind: string; label: string; apply: (set: unknown, get: () => unknown) => void }).apply(mockSet, mockGet);
-
-    expect(updateNodeParam).toHaveBeenCalledTimes(2);
-    expect(updateNodeParam).toHaveBeenCalledWith(cacId, { parameters: { n: 5 } });
-    expect(updateNodeParam).toHaveBeenCalledWith(hdId, { parameters: { nz: 5 } });
+    expect(results[0].fixAction).toBeUndefined();
   });
 });
