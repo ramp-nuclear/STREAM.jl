@@ -325,11 +325,14 @@ body {
 
 /* Always-on thin grey ring on every unselected node. 1 px ring outside
    a 1 px canvas-color offset (same offset geometry as the previous
-   ring-offset-1 ring-offset-canvas Tailwind setup). */
+   ring-offset-1 ring-offset-canvas Tailwind setup).
+   `!important` is defensive against any stale cached rule competing on
+   the same selector — we want this to win unconditionally so the user
+   doesn't see another iteration of the same blue-ring bug. */
 .stream-node-ring-rest {
   box-shadow:
     0 0 0 1px var(--canvas),
-    0 0 0 2px oklch(0.65 0 0 / 0.30);
+    0 0 0 2px oklch(0.65 0 0 / 0.30) !important;
 }
 
 /* Selected — animates from rest via transition-[box-shadow] on the
@@ -338,11 +341,11 @@ body {
 .stream-node-ring-selected {
   box-shadow:
     0 0 0 1px var(--canvas),
-    0 0 0 3px var(--ring);
+    0 0 0 3px var(--ring) !important;
 }
 
 .stream-node--code-hover {
-  outline: 1px solid var(--stream-code-hover-ring-color, oklch(0.65 0 0 / 0.35));
+  outline: 1px solid oklch(0.65 0 0 / 0.35) !important;
   outline-offset: 2px;
 }
 .stream-node--code-pinned {
@@ -350,9 +353,9 @@ body {
      Zero-blur box-shadow halo (the perf doctrine from DESIGN.md §4 —
      blurred shadows on @xyflow/react-transformed children force a full
      layer repaint on every pan/zoom frame). */
-  outline: 2px solid var(--stream-code-pinned-ring-color, oklch(0.65 0 0 / 0.55));
+  outline: 2px solid oklch(0.65 0 0 / 0.55) !important;
   outline-offset: 2px;
-  box-shadow: 0 0 0 1px oklch(0.65 0 0 / 0.30);
+  box-shadow: 0 0 0 1px oklch(0.65 0 0 / 0.30) !important;
 }
 
 /* Phase 71 Plan 10 — ValidationStatusBar 0→N pulse animation (D-03).
