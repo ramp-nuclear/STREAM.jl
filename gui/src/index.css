@@ -43,6 +43,12 @@
   --shadow-dialog:
     0 8px 24px -8px oklch(0.20 0.012 254 / 0.20),
     0 2px 6px -2px oklch(0.20 0.012 254 / 0.10);
+  /* Phase 72 P7 — unselected-node ring color, FULLY OPAQUE pure neutral.
+     Light mode: oklch(0.78 0 0) — visible against canvas 0.99 without
+     reading as a black hairline. Must stay fully opaque (no alpha) — at
+     any alpha the rendered color composites with --canvas's hue tint
+     and ends up reading as cool/blue. */
+  --node-ring-rest: oklch(0.78 0 0);
   /* Phase 72 — three-tier depth tokens recommitted with stronger steps and
      hue tint per OKLCH no-#fff rule. Chrome darkest, panel mid, canvas
      lightest (warmest). Light mode: tinted toward hue 254 (matches dark
@@ -148,6 +154,11 @@
   --shadow-dialog:
     0 8px 24px -8px oklch(0.05 0.012 254 / 0.50),
     0 2px 6px -2px oklch(0.05 0.012 254 / 0.30);
+  /* Phase 72 P7 — unselected-node ring, dark-mode value. Fully opaque
+     pure neutral grey (chroma 0) at lightness 0.42 — visible against
+     canvas 0.27 (Δ 0.15 lightness) without hue contamination from
+     alpha compositing. */
+  --node-ring-rest: oklch(0.42 0 0);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -326,13 +337,23 @@ body {
 /* Always-on thin grey ring on every unselected node. 1 px ring outside
    a 1 px canvas-color offset (same offset geometry as the previous
    ring-offset-1 ring-offset-canvas Tailwind setup).
-   `!important` is defensive against any stale cached rule competing on
-   the same selector — we want this to win unconditionally so the user
-   doesn't see another iteration of the same blue-ring bug. */
+
+   Phase 72 P7 (2026-05-22) — color is FULLY OPAQUE pure neutral grey.
+   The previous oklch(0.65 0 0 / 0.30) was "chroma 0" at the CSS-token
+   level, but 30 % alpha composites with the canvas background; canvas
+   is oklch(0.27 0.012 254) (hue 254 = cool, chroma 0.012). The
+   composited rendering inherits the canvas hue: ~oklch(0.39 0.008 254),
+   which the eye reads as light blue. Fully opaque grey at the target
+   visible lightness eliminates the alpha-blending hue contamination —
+   the only way to guarantee neutral grey on a hue-tinted surround.
+
+   Dark + light values defined via var(--node-ring-rest) so the same
+   class works in both themes (token declared in :root + .dark above).
+   `!important` is defensive against any stale cached rule. */
 .stream-node-ring-rest {
   box-shadow:
     0 0 0 1px var(--canvas),
-    0 0 0 2px oklch(0.65 0 0 / 0.30) !important;
+    0 0 0 2px var(--node-ring-rest) !important;
 }
 
 /* Selected — animates from rest via transition-[box-shadow] on the
@@ -344,8 +365,13 @@ body {
     0 0 0 3px var(--ring) !important;
 }
 
+/* Phase 72 P7 — code-hover / code-pinned outline colors also moved to
+   fully opaque chroma 0. Same alpha-compositing bug as the rest ring:
+   any alpha bleeds the canvas hue (254) through and reads as cool/blue.
+   Outline values consume --node-ring-rest derivatives — a slightly
+   stronger opaque grey for hover, stronger still for pin. */
 .stream-node--code-hover {
-  outline: 1px solid oklch(0.65 0 0 / 0.35) !important;
+  outline: 1px solid oklch(0.55 0 0) !important;
   outline-offset: 2px;
 }
 .stream-node--code-pinned {
@@ -353,9 +379,9 @@ body {
      Zero-blur box-shadow halo (the perf doctrine from DESIGN.md §4 —
      blurred shadows on @xyflow/react-transformed children force a full
      layer repaint on every pan/zoom frame). */
-  outline: 2px solid oklch(0.65 0 0 / 0.55) !important;
+  outline: 2px solid oklch(0.65 0 0) !important;
   outline-offset: 2px;
-  box-shadow: 0 0 0 1px oklch(0.65 0 0 / 0.30) !important;
+  box-shadow: 0 0 0 1px oklch(0.50 0 0) !important;
 }
 
 /* Phase 71 Plan 10 — ValidationStatusBar 0→N pulse animation (D-03).
