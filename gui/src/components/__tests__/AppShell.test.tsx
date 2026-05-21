@@ -84,14 +84,17 @@ afterEach(() => {
   cleanup();
 });
 
-describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () => {
-  it("D-01: renders three tab triggers labeled Components / Resources / Project", async () => {
+describe("App shell — left-panel Tabs (D-01) + Ctrl+1..4 (D-07, INV-12)", () => {
+  // Phase 70: tab order reshuffled to Components / Presets / Resources / Project
+  // with Ctrl+1..Ctrl+4 mirroring that order. Pre-Phase-70 the order was three
+  // tabs (Components / Resources / Project) with Ctrl+1..Ctrl+3.
+  it("D-01: renders four tab triggers (Components / Presets / Resources / Project)", async () => {
     render(<App />);
-    // Phase 65 Plan 08: App now waits on detectCrashOnLaunch before rendering
-    // the workspace, so query asynchronously.
+    // Phase 65 Plan 08: App waits on detectCrashOnLaunch before rendering, so query async.
     expect(
       await screen.findByRole("tab", { name: /^Components$/ }),
     ).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /^Presets$/ })).toBeTruthy();
     expect(screen.getByRole("tab", { name: /^Resources$/ })).toBeTruthy();
     expect(screen.getByRole("tab", { name: /^Project$/ })).toBeTruthy();
   });
@@ -100,10 +103,11 @@ describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () 
     render(<App />);
     const componentsTab = await screen.findByRole("tab", { name: /^Components$/ });
     expect(componentsTab.getAttribute("aria-selected")).toBe("true");
-    const resourcesTab = screen.getByRole("tab", { name: /^Resources$/ });
-    expect(resourcesTab.getAttribute("aria-selected")).toBe("false");
-    const projectTab = screen.getByRole("tab", { name: /^Project$/ });
-    expect(projectTab.getAttribute("aria-selected")).toBe("false");
+    for (const name of ["Presets", "Resources", "Project"] as const) {
+      expect(
+        screen.getByRole("tab", { name: new RegExp(`^${name}$`) }).getAttribute("aria-selected"),
+      ).toBe("false");
+    }
   });
 
   it("D-01: activating Resources trigger flips aria-selected and updates store", async () => {
@@ -119,7 +123,7 @@ describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () 
     ).toBe("true");
   });
 
-  it("INV-12 / D-07: Ctrl+2 keydown switches to Resources AND calls preventDefault", () => {
+  it("INV-12 / D-07: Ctrl+2 keydown switches to Presets AND calls preventDefault", () => {
     render(<App />);
     const event = new KeyboardEvent("keydown", {
       key: "2",
@@ -130,12 +134,12 @@ describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () 
     const dispatched = window.dispatchEvent(event);
     // dispatchEvent returns false if preventDefault was called on a cancelable event.
     expect(dispatched).toBe(false);
-    expect(useStore.getState().activeLeftTab).toBe("Resources");
+    expect(useStore.getState().activeLeftTab).toBe("Presets");
   });
 
   it("INV-12 / D-07: Ctrl+1 keydown switches to Components", () => {
-    // Start from Resources to verify the change.
-    useStore.getState().setActiveLeftTab("Resources");
+    // Start from Presets to verify the change (Phase 70 — was "Resources" pre-reorder).
+    useStore.getState().setActiveLeftTab("Presets");
     render(<App />);
     const event = new KeyboardEvent("keydown", {
       key: "1",
@@ -148,10 +152,23 @@ describe("App shell — left-panel Tabs (D-01) + Ctrl+1/2/3 (D-07, INV-12)", () 
     expect(useStore.getState().activeLeftTab).toBe("Components");
   });
 
-  it("INV-12 / D-07: Ctrl+3 keydown switches to Project", () => {
+  it("INV-12 / D-07: Ctrl+3 keydown switches to Resources", () => {
     render(<App />);
     const event = new KeyboardEvent("keydown", {
       key: "3",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const dispatched = window.dispatchEvent(event);
+    expect(dispatched).toBe(false);
+    expect(useStore.getState().activeLeftTab).toBe("Resources");
+  });
+
+  it("INV-12 / D-07: Ctrl+4 keydown switches to Project", () => {
+    render(<App />);
+    const event = new KeyboardEvent("keydown", {
+      key: "4",
       ctrlKey: true,
       bubbles: true,
       cancelable: true,
