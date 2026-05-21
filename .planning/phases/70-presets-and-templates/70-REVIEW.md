@@ -541,3 +541,84 @@ double-checking with the design owner. Not a bug — flagging as info.
 _Reviewed: 2026-05-20T23:55:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+---
+
+## Fix Log
+
+**Fixed at:** 2026-05-21T03:05:00Z
+**TSC errors before:** 15 | **TSC errors after:** 13 (WR-10 removed 2 pre-existing unused-var errors)
+**Vitest before:** 12 failing | **Vitest after:** 10 failing (2 pre-existing presetActions failures resolved as a side-effect of WR-05 test update)
+
+### CR-01 — FIXED
+**Commit:** `6550740`
+Wrapped the project-store `mkdir`/`watch` block in `try/catch` in `PresetsPanel.tsx`. Scope-denied and other IO errors now log a clear message with `[PresetsPanel] Project preset directory unavailable (path may be outside FS scope — see Tauri capability CR-01)` instead of silently leaving the Project section empty. The capability JSON fix (adding a permissive runtime scope for arbitrary project paths) is deferred — that requires a Tauri design decision beyond a code fix.
+
+### CR-02 — FIXED
+**Commit:** `1af1fe6`
+Added `setLoading(true)` at the top of the `useEffect` callback in `PresetsPanel.tsx` so the skeleton resets on every project rebind. Added `if (cancelled) return;` guards before `setProjectPresets([])` (no-project branch) and before `setLoading(false)` to prevent stale state updates after cleanup.
+
+### CR-03 — FIXED
+**Commit:** `4ddac3f`
+Replaced dynamic `import("@/lib/presetIO").then(...)` with a static top-of-file `import { autoExtendSelection } from "@/lib/presetIO"` in both `NodeContextMenu.tsx` and `FileMenu.tsx`. The paint + `dispatchEvent` now run synchronously before `onClose()`, eliminating the stale-`autoExtended` race window. Zero bundle-size cost — `presetIO` is already in the main chunk via `SavePresetModal`.
+
+### WR-01 — FIXED
+**Commit:** `7a25fc7`
+Narrowed the blanket `catch {}` in `refreshPresetsDir` (`useStore.ts`) to log unexpected errors. Only messages matching `no such file|not found|ENOENT` are silently swallowed; all others get `console.error("[refreshPresetsDir] readDir failed for", dir, err)`.
+
+### WR-02 — FIXED
+**Commit:** `16b1aee`
+Replaced `.catch(() => {})` with a logging catch on all three `mkdir` sites: library store in `PresetsPanel.tsx`, and `saveSelectionAsPreset` in `useStore.ts`. (The project-store `mkdir` in `PresetsPanel.tsx` was already upgraded as part of CR-01.) EEXIST-equivalent messages are still silently swallowed; all others log.
+
+### WR-03 — FIXED
+**Commit:** `00589ad`
+Replaced all `dir + "/" + f.name` / `dir + "/" + name + ".scpr"` path concatenations with `await join(dir, ...)` from `@tauri-apps/api/path` in `useStore.ts`. Affected: `refreshPresetsDir` (2 sites), `saveSelectionAsPreset` (1 site), `renamePreset` (1 site, also added the `join` import to that function).
+
+### WR-04 — FIXED (deduplication only)
+**Commit:** `37651cc`
+Removed the redundant `{"identifier": "fs:scope", "allow": [{"path": "$APPCONFIG/presets/**"}]}` block from `default.json` — it was fully subsumed by `fs:scope-appconfig-recursive`. The deeper recommendation (rename library dir to `$APPCONFIG/STREAM-Composer/presets/` and drop `fs:scope-appconfig-recursive` for least-privilege) is deferred — requires coordinated changes to the store path logic and is a pre-release concern.
+
+### WR-05 — FIXED
+**Commits:** `23482a6`, `82cb803`
+Added a read-before-write collision guard in `saveSelectionAsPreset` (`useStore.ts`), mirroring `renamePreset`'s existing check. Also updated two `presetActions.test.ts` tests that set `mockReadTextFile` globally — they now use `mockRejectedValueOnce(new Error("ENOENT"))` for the collision-check read before falling through to the fixture for the `refreshPresetsDir` read.
+
+### WR-06 — FIXED
+**Commit:** `d79df0f`
+Added a `unknownIds` filter after `deserializePreset` in `loadPresetAtPosition`. If any `componentId` is not found in the registry via `getComponent(id)`, the function throws `"Preset references unknown components: ..."` rather than silently adding invisible nodes.
+
+### WR-07 — FIXED
+**Commit:** `f83caba`
+Wrapped `deletePreset` call in `handleConfirmedDelete` (`PresetRow.tsx`) in `try/catch/finally`. The modal now always closes via the `finally` block; errors are logged with `console.error`. TODO toast left in place for Phase 72 design system.
+
+### WR-08 — FIXED
+**Commit:** `daf8055`
+Added a `useEffect(() => { if (open) return; setName(""); setDescription(""); setStore("library"); setSaving(false); }, [open])` to `SavePresetModal.tsx`. Fields reset on every close path (Discard, ESC, click-outside, successful Save). Removed the redundant explicit reset from the `handleSave` success path.
+
+### WR-09 — FIXED
+**Commit:** `b7207f8`
+Removed the dead `const currentResState = get().resources;` read in Step 4 of `loadPresetAtPosition`. The `set()` callback now references `currentResources` (from Step 1) throughout — no intervening mutation makes the second read observably different.
+
+### WR-10 — FIXED (unused-variable part)
+**Commit:** `30574dd`
+Dropped the unused `libraryPresets` from the destructure in `renamePreset` and `deletePreset` (`useStore.ts`). This was the root cause of the two `TS6133` errors in the pre-fix baseline. The broader WR-10 recommendation (rename library preset directory to `$APPCONFIG/STREAM-Composer/presets/` and update capability + store path) is deferred alongside WR-04 as a pre-release namespace cleanup.
+
+### WR-11 — FIXED
+**Commit:** `ad470de`
+Extracted `collisionSet` as a `useMemo` in `PresetRow.tsx`, computed once when `renaming` flips to `true` (deps: `[renaming, entry.store, entry.filePath]`). `validateNewName` now does a `collisionSet.has(name)` O(1) lookup instead of calling `useStore.getState()` and running `pool.some(...)` on every keystroke.
+
+### IN-01 — DEFERRED
+Covered by CR-03 (static import applied to both NodeContextMenu and FileMenu). No separate action needed.
+
+### IN-02 — DEFERRED
+`_allNodes` parameter in `autoExtendSelection` is intentionally padded for API stability (D-13 one-hop invariant may be lifted in a future phase). Adding the JSDoc note is cosmetic; deferred to a documentation pass.
+
+### IN-03 — DEFERRED
+`data: rest as typeof n.data` cast in `SavePresetModal.tsx` is a known imprecision. The safer `const { autoExtended: _x, ...rest } = n.data as StreamNodeData` cast improvement is safe to apply but Info-tier; deferred to Phase 72 type-safety pass.
+
+### IN-04 — DEFERRED
+Right-click-doesn't-select-node behavior is intentional per D-15.1 / UI-SPEC Surface 6. Not a bug. Deferred for design owner review if UAT raises it.
+
+---
+
+_Fixed: 2026-05-21T03:05:00Z_
+_Fixer: Claude (gsd-code-fixer)_
