@@ -182,16 +182,13 @@ export const geometryConsistency: Validator = {
       const pairKey = [hdId, ...cacGeomParams.map((c) => c.cacId).sort()].join("::");
       const cacNames = cacGeomParams.map((c) => c.instanceName).join(", ");
 
+      // Phase 71 UAT (2026-05-21): FixActions removed across all rules.
       results.push({
         id: `geometry_consistency::${pairKey}`,
         validatorId: "geometry_consistency",
         severity: "warning",
         description: `${cacNames} → ${hdData.instanceName}: geometry resources differ`,
         targets,
-        fixAction: {
-          kind: "navigation-only",
-          label: "Go to components",
-        },
       });
     }
 

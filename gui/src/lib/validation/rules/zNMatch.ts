@@ -134,16 +134,12 @@ export const zNMatch: Validator = {
       if (cacN === null || hdNz === null) continue;
       if (cacN === hdNz) continue;
 
-      const winningN = Math.max(cacN, hdNz);
-
-      // Capture primitives for the closure — safe (no snapshot reference).
-      const cacIdCapture = cacId;
-      const hdIdCapture = hdId;
-      const winningNCapture = winningN;
-
       const edgeId = edgeIds[0]; // first edge for the edge target
 
       const pairKey = [cacId, hdId].sort().join("::");
+      // Phase 71 UAT (2026-05-21): FixActions removed across all rules.
+      // User rejected opinionated auto-fix directions — set values manually.
+      // Row click still focuses node via ValidationPanel.
       results.push({
         id: `z_n_match::${pairKey}`,
         validatorId: "z_n_match",
@@ -156,16 +152,6 @@ export const zNMatch: Validator = {
           { kind: "node", nodeId: cacId },
           { kind: "node", nodeId: hdId },
         ],
-        fixAction: {
-          kind: "lossless-sync",
-          label: `Sync n to ${winningNCapture}`,
-          apply: (_set, get) => {
-            // Re-read live state at invocation time (RESEARCH §Pitfall 7).
-            const live = get();
-            live.updateNodeParams(cacIdCapture, { parameters: { n: winningNCapture } });
-            live.updateNodeParams(hdIdCapture, { parameters: { nz: winningNCapture } });
-          },
-        },
       });
     }
 

@@ -139,12 +139,9 @@ export const lengthMatch: Validator = {
       const edgeId = edgeIds[0];
       const pairKey = [cacId, hdId].sort().join("::");
 
-      // Capture primitives for closures (safe — no snapshot reference).
-      const hdIdCapture = hdId;
-      const cacLCapture = cacL;
-      const hdLzCapture = hdLz;
-      const geomUuidCapture = geomUuid;
-
+      // Phase 71 UAT (2026-05-21): FixActions removed across all rules.
+      // User rejected opinionated auto-fix directions — set values manually.
+      // Row click still focuses node via ValidationPanel.
       results.push({
         id: `length_match::${pairKey}`,
         validatorId: "length_match",
@@ -157,26 +154,6 @@ export const lengthMatch: Validator = {
           { kind: "node", nodeId: cacId },
           { kind: "node", nodeId: hdId },
         ],
-        fixAction: {
-          kind: "value-transfer-picker",
-          leftLabel: `Use ${cacLCapture}`,
-          rightLabel: `Use ${hdLzCapture}`,
-          applyLeft: (_set, get) => {
-            // CAC's L propagates to HD.Lz — direct node-param write.
-            const live = get();
-            live.updateNodeParams(hdIdCapture, { parameters: { Lz: cacLCapture } });
-          },
-          applyRight: (_set, get) => {
-            // HD's Lz propagates to the CAC's geometry resource.
-            // Must read current geometry resource params to preserve other fields.
-            const live = get();
-            const currentGeom = live.resources?.geometries?.[geomUuidCapture];
-            const currentParams = currentGeom?.params ?? {};
-            live.updateResource("geometry", geomUuidCapture, {
-              params: { ...currentParams, L: hdLzCapture },
-            });
-          },
-        },
       });
     }
 
