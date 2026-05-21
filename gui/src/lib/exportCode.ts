@@ -1,22 +1,22 @@
 /**
  * exportCode — Phase 71 Plan 12 + UAT Test 14 follow-up (2026-05-21).
  *
- * Calls runValidators synchronously and splits errors into:
- *   - STRUCTURAL: Julia code won't parse/compile in MTK (port-type mismatch,
- *     self-loop, unconnected required port, dangling FlowPort). Hard-blocks
- *     export with a toast.error — same behavior as before.
- *   - DIAGNOSTIC: file parses fine but the solver won't converge / will
- *     produce nonsense (no pressure anchor, no driving element, n/L mismatch,
- *     loop closure, gravity sum, geometry consistency). Surfaces a toast
- *     with an "Export anyway" action button; clicking it bypasses the gate.
+ * Runs validators synchronously and splits errors into two classes:
+ *   - STRUCTURAL: generated Julia won't parse/compile in MTK (port-type
+ *     mismatch, self-loop, unconnected required port, dangling FlowPort).
+ *     Hard-blocks export with toast.error. Never bypassable.
+ *   - DIAGNOSTIC: file compiles, but the solver won't converge or returns
+ *     nonsense (no pressure anchor, no driving element, n/L mismatch,
+ *     loop closure, gravity sum, geometry consistency). Soft-blocks with
+ *     an AlertDialog modal: "Export with errors?" — Cancel / Export anyway.
  *
- * `bypassDiagnosticGate=true` is the override pathway used by the toast's
- * Export-anyway action when called recursively. Structural errors are NEVER
- * bypassable.
+ * The modal lives in ExportConfirmDialog (mounted in App.tsx). When the
+ * user clicks "Export anyway" the dialog calls `confirmPendingExport()`
+ * exported below, which re-invokes exportCode with bypassDiagnosticGate=true.
  *
- * Returns a Promise<boolean>:
- *   - true  → file written successfully
- *   - false → bailed safely (empty nodes, gate hit, OR user cancel)
+ * Returns Promise<boolean>:
+ *   true  → file written
+ *   false → bailed (empty, gate, user cancel, OR awaiting modal confirm)
  */
 
 import { save } from "@tauri-apps/plugin-dialog";
@@ -32,16 +32,20 @@ import { toast } from "../components/ui/sonner";
 export interface ExportCodeOptions {
   sections: CodeSection[];
   nodes: Node[];
-  /** Set to true by the "Export anyway" toast action to bypass the diagnostic
-   *  gate. Structural errors are never bypassable regardless of this flag. */
+  /** Override the diagnostic-only soft-block. Set by `confirmPendingExport()`
+   *  on the modal's confirm. Structural errors are never bypassable. */
   bypassDiagnosticGate?: boolean;
 }
 
-// Build a one-shot lookup: validatorId → structural?
-// Computed at module load (cheap; validators array is fixed).
+// validatorId → structural? lookup, computed once at module load.
 const STRUCTURAL_IDS = new Set(
   validators.filter((v) => v.structural === true).map((v) => v.id),
 );
+
+// Module-local: continuation stashed when exportCode bails awaiting modal
+// confirm. Closure captures sections + nodes so the dialog component does
+// not need to know them. Cleared on confirm OR cancel.
+let _pendingContinuation: (() => Promise<boolean>) | null = null;
 
 export async function exportCode(opts: ExportCodeOptions): Promise<boolean> {
   if (opts.nodes.length === 0) return false;
@@ -51,14 +55,13 @@ export async function exportCode(opts: ExportCodeOptions): Promise<boolean> {
   const results = runValidators(snapshot);
 
   const errorResults = results.filter((r) => r.severity === "error");
-  const structuralErrors = errorResults.filter((r) =>
+  const structural = errorResults.filter((r) =>
     STRUCTURAL_IDS.has(r.validatorId),
   );
-  const diagnosticErrors = errorResults.filter(
+  const diagnostic = errorResults.filter(
     (r) => !STRUCTURAL_IDS.has(r.validatorId),
   );
 
-  // errorNodeIds — same derivation as initValidation (covers all error severities).
   const errorNodeIds = new Set(
     errorResults
       .flatMap((r) => r.targets)
@@ -66,11 +69,11 @@ export async function exportCode(opts: ExportCodeOptions): Promise<boolean> {
       .map((t) => (t as { nodeId: string }).nodeId),
   );
 
-  // Hard-block: structural errors are never bypassable.
-  if (structuralErrors.length > 0) {
-    const n = structuralErrors.length;
+  // Hard-block on structural — never bypassable.
+  if (structural.length > 0) {
+    const n = structural.length;
     toast.error(
-      `Export blocked: ${n} structural ${n === 1 ? "error" : "errors"}. Generated Julia will not compile.`,
+      `${n} structural ${n === 1 ? "error" : "errors"} — code won't compile`,
       { duration: 2500 },
     );
     useStore.setState({
@@ -82,31 +85,21 @@ export async function exportCode(opts: ExportCodeOptions): Promise<boolean> {
     return false;
   }
 
-  // Soft-block: diagnostic-only errors — warn with override.
-  if (diagnosticErrors.length > 0 && !opts.bypassDiagnosticGate) {
-    const n = diagnosticErrors.length;
-    toast.warning(
-      `${n} ${n === 1 ? "error" : "errors"}: file will compile but solver may not converge.`,
-      {
-        duration: 5000,
-        action: {
-          label: "Export anyway",
-          onClick: () => {
-            void exportCode({ ...opts, bypassDiagnosticGate: true });
-          },
-        },
-      },
-    );
+  // Soft-block: defer to modal.
+  if (diagnostic.length > 0 && !opts.bypassDiagnosticGate) {
+    _pendingContinuation = () =>
+      exportCode({ ...opts, bypassDiagnosticGate: true });
     useStore.setState({
       validationResults: results,
       errorNodeIds,
       bottomPanelOpen: true,
       activeBottomTab: "validation",
+      pendingDiagnosticExport: { count: diagnostic.length },
     });
     return false;
   }
 
-  // Either clean, or diagnostic-bypass invoked from the toast action.
+  // Clean, or user confirmed via modal.
   useStore.setState({ validationResults: results, errorNodeIds });
 
   const filePath = await save({
@@ -118,4 +111,27 @@ export async function exportCode(opts: ExportCodeOptions): Promise<boolean> {
   const code = serializeSections(opts.sections);
   await writeTextFile(filePath, code);
   return true;
+}
+
+/**
+ * Called by ExportConfirmDialog on confirm: runs the stashed continuation
+ * (which re-enters exportCode with bypassDiagnosticGate=true), then clears
+ * the dialog state. Safe to call when no continuation is pending — no-ops.
+ */
+export async function confirmPendingExport(): Promise<void> {
+  const cont = _pendingContinuation;
+  _pendingContinuation = null;
+  useStore.getState().setPendingDiagnosticExport(null);
+  if (cont) {
+    await cont();
+  }
+}
+
+/**
+ * Called by ExportConfirmDialog on cancel/close: clears the stashed
+ * continuation and the dialog-visibility slice without writing the file.
+ */
+export function cancelPendingExport(): void {
+  _pendingContinuation = null;
+  useStore.getState().setPendingDiagnosticExport(null);
 }

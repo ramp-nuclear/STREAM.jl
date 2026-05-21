@@ -196,6 +196,12 @@ export interface AppState {
   // Mirrors the activeLeftTab convention — controls which tab is shown in BottomPanel.
   activeBottomTab: 'code' | 'validation';
   setActiveBottomTab: (tab: 'code' | 'validation') => void;
+  // Phase 71 UAT Test 14 follow-up (2026-05-21): diagnostic-export confirmation
+  // dialog. Session-only, NOT persisted. Set by exportCode when it bails on
+  // diagnostic-only errors; cleared by the dialog component on confirm/cancel.
+  // The actual save closure is stashed in a module-local in exportCode.ts.
+  pendingDiagnosticExport: { count: number } | null;
+  setPendingDiagnosticExport: (v: { count: number } | null) => void;
   toolboxCollapsed: boolean;
   sidebarCollapsed: boolean;
   setToolboxCollapsed: (collapsed: boolean) => void;
@@ -859,6 +865,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   bottomPanelHeight: 240,
   setBottomPanelHeight: (height) => set({ bottomPanelHeight: height }),
   activeBottomTab: 'code' as const,
+      pendingDiagnosticExport: null as { count: number } | null,
   toolboxCollapsed: false,
   sidebarCollapsed: false,
   // Phase 71 D-18: errorNodeIds populated by initValidation subscription
@@ -1036,6 +1043,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       errorNodeIds: new Set<string>(),
       validationResults: [],
       activeBottomTab: 'code' as const,
+      pendingDiagnosticExport: null as { count: number } | null,
     });
   },
 
@@ -1078,6 +1086,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       errorNodeIds: new Set<string>(),
       validationResults: [],
       activeBottomTab: 'code' as const,
+      pendingDiagnosticExport: null as { count: number } | null,
     });
   },
 
@@ -1860,6 +1869,9 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   // Mirrors the activeLeftTab convention. isDirty is NOT set (UI state only).
   setActiveBottomTab: (tab) => set({ activeBottomTab: tab }),
 
+  // Phase 71 UAT Test 14: diagnostic-export confirmation dialog state.
+  setPendingDiagnosticExport: (v) => set({ pendingDiagnosticExport: v }),
+
   // ---------------------------------------------------------------------------
   // Phase 66 Plan 03: code-panel ephemeral actions
   //
@@ -2415,6 +2427,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
         errorNodeIds: new Set<string>(),
         validationResults: [],
         activeBottomTab: 'code' as const,
+      pendingDiagnosticExport: null as { count: number } | null,
         // Phase 62: resources + modelOptions + activeLeftTab restored from .scp
         resources: {
           geometries: geometriesRecord,
@@ -2500,6 +2513,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       errorNodeIds: new Set<string>(),
       validationResults: [],
       activeBottomTab: 'code' as const,
+      pendingDiagnosticExport: null as { count: number } | null,
       // Phase 62: reset Resources / ModelOptions / Tabs / Selection to initial values
       resources: {
         geometries: {},
@@ -2695,6 +2709,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       errorNodeIds: new Set<string>(),
       validationResults: [],
       activeBottomTab: 'code' as const,
+      pendingDiagnosticExport: null as { count: number } | null,
       resources: {
         geometries: geometriesRecord,
         powerShapes: powerShapesRecord,

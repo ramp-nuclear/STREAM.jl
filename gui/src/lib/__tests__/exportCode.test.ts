@@ -179,7 +179,8 @@ describe("exportCode — structural gate (hard-block)", () => {
 
     expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1);
     const [msg] = vi.mocked(toast.error).mock.calls[0];
-    expect(msg).toContain("Export blocked: 1 structural error");
+    expect(msg).toContain("1 structural error");
+    expect(msg).toContain("won't compile");
   });
 
   it("sets bottomPanelOpen=true and activeBottomTab='validation' on structural error", async () => {
@@ -196,8 +197,8 @@ describe("exportCode — structural gate (hard-block)", () => {
   });
 });
 
-describe("exportCode — diagnostic gate (soft-block with override)", () => {
-  it("fires toast.warning (not error) for diagnostic-only errors", async () => {
+describe("exportCode — diagnostic gate (soft-block via modal)", () => {
+  it("sets pendingDiagnosticExport on the store and does NOT call save() for diagnostic-only errors", async () => {
     vi.mocked(runValidators).mockReturnValue([makeDiagnosticErrorResult()]);
 
     const result = await exportCode({
@@ -205,12 +206,18 @@ describe("exportCode — diagnostic gate (soft-block with override)", () => {
       nodes: makeNodes(),
     });
     expect(result).toBe(false);
-    expect(vi.mocked(toast.warning)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
     expect(vi.mocked(save)).not.toHaveBeenCalled();
+    // No error toast — diagnostic path uses the modal, not a toast.
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+    // pendingDiagnosticExport set with count.
+    expect(vi.mocked(useStore.setState)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pendingDiagnosticExport: { count: 1 },
+      }),
+    );
   });
 
-  it("bypassDiagnosticGate=true skips the warning and proceeds to save", async () => {
+  it("bypassDiagnosticGate=true skips the modal and proceeds to save", async () => {
     vi.mocked(runValidators).mockReturnValue([makeDiagnosticErrorResult()]);
     vi.mocked(save).mockResolvedValue("/tmp/out.jl");
     vi.mocked(writeTextFile).mockResolvedValue(undefined);
@@ -221,7 +228,6 @@ describe("exportCode — diagnostic gate (soft-block with override)", () => {
       bypassDiagnosticGate: true,
     });
     expect(result).toBe(true);
-    expect(vi.mocked(toast.warning)).not.toHaveBeenCalled();
     expect(vi.mocked(save)).toHaveBeenCalledTimes(1);
   });
 });

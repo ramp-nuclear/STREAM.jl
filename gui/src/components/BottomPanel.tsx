@@ -195,10 +195,10 @@ export default function BottomPanel() {
               </TooltipTrigger>
               <TooltipContent>
                 {structuralErrorCount > 0
-                  ? `Resolve ${structuralErrorCount} structural ${structuralErrorCount === 1 ? "error" : "errors"} first (generated Julia will not compile)`
+                  ? `${structuralErrorCount} structural ${structuralErrorCount === 1 ? "error" : "errors"} — code won't compile`
                   : !hasNodes
-                    ? "Add components first"
-                    : "Export generated Julia code to file"}
+                    ? "No components"
+                    : "Export Julia code"}
               </TooltipContent>
             </Tooltip>
           </div>
