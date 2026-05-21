@@ -449,7 +449,10 @@ describe("StreamNode — BC error persistent outline (D-22 via errorNodeIds, Pha
     // Phase 71 D-20: hasBCError removed; red-ring now derives solely from
     // errorNodeIds which is populated by nMatch via initValidation.
     // Phase 72: simplified from `outline-2 outline-offset-1 ring-2 ring-destructive`
-    // (double-outline-plus-ring) to a single `outline-2 outline-[var(--destructive)]`.
+    // (double-outline-plus-ring) to a single outline-2 destructive.
+    // Phase 72 P11: outline moved from Tailwind className to inline style
+    // (CSS-pipeline workaround); assertion now reads element.style.outline
+    // instead of className.
     useStore.setState({
       errorNodeIds: new Set<string>(["wt_red"]),
     });
@@ -458,7 +461,7 @@ describe("StreamNode — BC error persistent outline (D-22 via errorNodeIds, Pha
       { id: "wt_red" },
     );
     const nodeEl = container.firstElementChild as HTMLElement;
-    expect(nodeEl.className).toMatch(/outline-\[var\(--destructive\)\]/);
+    expect(nodeEl.style.outline).toMatch(/var\(--destructive\)/);
   });
 
   it("does NOT apply the destructive outline when errorNodeIds does not contain the node id", () => {
@@ -472,6 +475,6 @@ describe("StreamNode — BC error persistent outline (D-22 via errorNodeIds, Pha
       { id: "wt_clean" },
     );
     const nodeEl = container.firstElementChild as HTMLElement;
-    expect(nodeEl.className).not.toMatch(/outline-\[var\(--destructive\)\]/);
+    expect(nodeEl.style.outline).not.toMatch(/var\(--destructive\)/);
   });
 });

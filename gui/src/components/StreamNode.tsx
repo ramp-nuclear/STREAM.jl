@@ -406,47 +406,42 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       // flash and the user perceives "nothing happens" when clicking an
       // error row whose node is already errored.
       data-stream-node-id={id}
-      // Phase 72 P10 (2026-05-22) — box-shadow moved from CSS class to
-      // inline style after seven CSS-side passes failed to land. The
-      // dev-server CSS pipeline (Vite + Tailwind v4 @theme inline + the
-      // .vite/deps optimizer cache) was serving stale compiled output
-      // for class rules even though body-level CSS updated fine via
-      // HMR (verified with a magenta-probe diagnostic). Inline style
-      // bypasses the entire CSS pipeline — Tailwind, class cascade,
-      // file caching — and ships with the JS bundle that HMR DOES
-      // refresh reliably. transition-[box-shadow] duration-200 in the
-      // className still applies; transitions work on inline-styled
-      // properties identically to class-styled ones.
+      // Phase 72 P11 (2026-05-22) — EVERY visual on the node's outer
+      // wrapper (outline, outline-offset, outline-style, box-shadow) is
+      // now set via inline style. The CSS pipeline in this Vite + Tailwind
+      // v4 dev configuration has been serving stale compiled rules for
+      // .stream-node--* classes (verified: the user's devtools computed
+      // box-shadow returned an older value than what was in index.css,
+      // even after a clean .vite/deps cache nuke). Inline style ships
+      // with the JS bundle that HMR refreshes reliably AND wins CSS
+      // specificity against any stale class rule.
       //
-      // Color choices:
-      //   - rest: #6e6e6e dark / #c3c3c3 light, plain hex, no OKLCH,
-      //     no alpha. Resolved per theme via the ternary on a body
-      //     class check (htmlElement.classList.contains('dark') style,
-      //     but here we go simpler — both light and dark themes use
-      //     the same mid-tone grey via the `theme-aware-ring-rest`
-      //     CSS var defined inline below).
-      //   - selected: var(--ring) — Hydraulic light blue, 2 px.
+      // The .stream-node--code-hover / .stream-node--code-pinned
+      // classes are still added below to satisfy the Phase 66
+      // code-preview ↔ canvas linking layer + the 4 unit tests that
+      // verify state propagation. They cannot paint anything because
+      // the inline styles below override them.
       //
-      // Geometry: two-stop box-shadow. First stop fills a 1 px gap
-      // around the body with the canvas color (the "offset"); second
-      // stop draws the actual ring 2 px outside that.
+      // State priority (highest to lowest):
+      //   1. Error → red destructive outline, no offset
+      //   2. autoExtended → orange dashed outline, offset 2 px
+      //   3. Default (incl. code-hover, code-pinned) → no outline
+      // Ring (box-shadow) is independent of outline, always present:
+      //   - Selected: 2 px Hydraulic blue (var(--ring))
+      //   - Unselected: 2 px mid-grey hex
       className={`relative rounded-md min-w-[140px] transition-[box-shadow] duration-200 ${
-        hasAnyError ? "outline outline-2 outline-[var(--destructive)]" : ""
-      } ${
-        // Classes preserved (the code-preview ↔ canvas linking layer expects
-        // them on the DOM for state tracking + tests). CSS rules are no-ops
-        // in index.css — they no longer paint anything, so they can't add
-        // back the blue ring the user has been chasing.
         isCodeHovered ? "stream-node--code-hover" : ""
-      } ${isCodePinned ? "stream-node--code-pinned" : ""} ${
-        nodeData.autoExtended
-          ? "outline outline-2 outline-dashed outline-[var(--chart-5)] outline-offset-2"
-          : ""
-      }`}
+      } ${isCodePinned ? "stream-node--code-pinned" : ""}`}
       style={{
         boxShadow: selected
           ? "0 0 0 1px var(--canvas), 0 0 0 3px var(--ring)"
-          : "0 0 0 1px var(--canvas), 0 0 0 2px var(--node-ring-rest, #6e6e6e)",
+          : "0 0 0 1px var(--canvas), 0 0 0 2px #6e6e6e",
+        outline: hasAnyError
+          ? "2px solid var(--destructive)"
+          : nodeData.autoExtended
+            ? "2px dashed var(--chart-5)"
+            : "none",
+        outlineOffset: nodeData.autoExtended ? "2px" : "0",
       }}
     >
       {/* Phase 72 — visual surface wrapper. overflow-hidden + rounded-md
