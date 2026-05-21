@@ -11,7 +11,11 @@
      the dark-mode pattern (--card slightly darker than --canvas). */
   --card: oklch(0.97 0.003 254);
   --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
+  /* Phase 72 P2 — light-mode --popover recommitted from oklch(1 0 0) (= #fff
+     == --background == --canvas in light mode) to a token Δ 0.03 BELOW
+     canvas. Old value was indistinguishable from canvas; dropdowns blended
+     into the background with no visible separation. */
+  --popover: oklch(0.96 0.003 254);
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
@@ -104,7 +108,13 @@
      tier (it's between panel 0.21 and canvas 0.27). */
   --card: oklch(0.23 0.012 254);
   --card-foreground: oklch(0.73 0.012 250);
-  --popover: oklch(0.265 0.014 254);
+  /* Phase 72 P2 — dark --popover lifted from 0.265 → 0.33 (Δ +0.06 ABOVE
+     canvas 0.27 instead of -0.005 below it). At the old value dropdowns
+     rendering over the canvas had near-zero figure-ground separation —
+     the surface blended into the work area with no visible edge. The new
+     value sits clearly above canvas (the floating-surface signal) AND
+     clearly above panel (Δ 0.12) for dropdowns triggered from chrome. */
+  --popover: oklch(0.33 0.012 254);
   --popover-foreground: oklch(0.73 0.012 250);
   --primary: oklch(0.73 0.012 250);
   --primary-foreground: oklch(0.27 0.012 254);
@@ -115,13 +125,18 @@
   --accent: oklch(0.315 0.016 252);
   --accent-foreground: oklch(0.73 0.012 250);
   --destructive: oklch(0.704 0.191 22.216);
-  /* Phase 72 — --border relocked from alpha-on-white (oklch(1 0 0 / 11%))
+  /* Phase 72 P2 — chroma reduced 0.012 → 0.005 to match --panel's hue
+     subtlety. At 0.012 chroma the borders read perceptibly blue against
+     the warm-grey canvas/panel (eye anchors on the contrast and amplifies
+     the hue); at 0.005 they read as proper neutral grey with the faintest
+     hint of warmth, which is what "tinted neutral" should mean.
+     Phase 72 — --border relocked from alpha-on-white (oklch(1 0 0 / 11%))
      to solid hue-tinted OKLCH. Alpha-on-pure-white violated the OKLCH-only
      doctrine (it's effectively HSL alpha trickery). --border-hover is the
      +Δ0.08 lightness step Input lifts to on hover. */
-  --border: oklch(0.30 0.012 254);
-  --border-hover: oklch(0.38 0.012 254);
-  --input: oklch(0.30 0.012 254);
+  --border: oklch(0.30 0.005 254);
+  --border-hover: oklch(0.38 0.005 254);
+  --input: oklch(0.30 0.005 254);
   /* Phase 72 — --ring relocked from pure-neutral oklch(0.50 0.01 250) to a
      low-chroma Hydraulic tint (hue 240). Focus reads as "selected" with
      minor identity. */

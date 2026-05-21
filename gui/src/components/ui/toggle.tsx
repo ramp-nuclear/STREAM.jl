@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 // ring. On state uses bg-card + border-border-hover (tonal step + border
 // emphasis) instead of accent fill — chrome doesn't carry accent.
 const toggleVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 rounded-sm text-body font-medium whitespace-nowrap outline-none transition-colors duration-[80ms] motion-reduce:transition-none hover:bg-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50 aria-invalid:ring-2 aria-invalid:ring-destructive data-[state=on]:bg-card data-[state=on]:border-border-hover [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5]",
+  "inline-flex items-center justify-center gap-1.5 rounded-sm text-[12px] font-medium whitespace-nowrap outline-none transition-colors duration-[80ms] motion-reduce:transition-none hover:bg-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50 aria-invalid:ring-2 aria-invalid:ring-destructive data-[state=on]:bg-card data-[state=on]:border-border-hover [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5]",
   {
     variants: {
       variant: {

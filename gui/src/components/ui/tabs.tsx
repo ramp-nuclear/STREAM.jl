@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 // Phase 72 — primitive-layer recommit:
 //   - List h-9 → h-8; rounded-lg → rounded-md; bg-muted → bg-card (denser
 //     tonal step, more committed depth contrast)
-//   - Trigger rounded-md → rounded-sm; text-sm → text-body
+//   - Trigger rounded-md → rounded-sm; text-sm → text-[12px]
 //   - Active bg-background → bg-popover (consumes the dedicated surface
 //     token; one step lighter than --panel)
 //   - Focus ring 3px → 2px, no offset, no border swap
@@ -76,7 +76,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-sm border border-transparent px-2 py-1 text-body font-medium whitespace-nowrap text-foreground/65 outline-none transition-colors duration-[80ms] motion-reduce:transition-none group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5]",
+        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-sm border border-transparent px-2 py-1 text-[12px] font-medium whitespace-nowrap text-foreground/65 outline-none transition-colors duration-[80ms] motion-reduce:transition-none group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5]",
         "data-[state=active]:bg-popover data-[state=active]:text-foreground",
         "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
         // Underline indicator for line variant. 2 px solid foreground bar
