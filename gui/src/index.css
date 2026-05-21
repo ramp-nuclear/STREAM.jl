@@ -43,12 +43,9 @@
   --shadow-dialog:
     0 8px 24px -8px oklch(0.20 0.012 254 / 0.20),
     0 2px 6px -2px oklch(0.20 0.012 254 / 0.10);
-  /* Phase 72 P9 — unselected-node ring, light mode. PLAIN HEX, not
-     OKLCH. The OKLCH spelling oklch(0.78 0 0) (chroma 0 hue 0) is a
-     degenerate input that some WebKit parsers silently reject; box-
-     shadow color then falls back to currentColor = --foreground (cool
-     grey-blue), which is the persistent "blue ring" the user has been
-     reporting. Hex is universally supported, no parser ambiguity. */
+  /* Phase 72 — unselected-node ring color. Plain hex (not OKLCH) because
+     chroma-0 OKLCH inputs are a degenerate case in WebKitGTK parsers
+     and silently fall back to currentColor on this dev configuration. */
   --node-ring-rest: #c3c3c3;
   /* Phase 72 — three-tier depth tokens recommitted with stronger steps and
      hue tint per OKLCH no-#fff rule. Chrome darkest, panel mid, canvas
@@ -155,9 +152,7 @@
   --shadow-dialog:
     0 8px 24px -8px oklch(0.05 0.012 254 / 0.50),
     0 2px 6px -2px oklch(0.05 0.012 254 / 0.30);
-  /* Phase 72 P9 — unselected-node ring, dark mode. PLAIN HEX (see
-     :root note above for parser rationale). #6e6e6e is mid-grey,
-     visible against canvas without becoming a hard hairline. */
+  /* Phase 72 — unselected-node ring, dark mode. See :root for rationale. */
   --node-ring-rest: #6e6e6e;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -318,75 +313,24 @@ body {
    Both classes can coexist (sub-block-hovered + previously-pinned node) —
    the cascade resolves to a single outline; the pinned color wins by source
    order, which is the intended distinction for now. */
-/* Phase 72 P6 (2026-05-22) — node ring + code-hover / code-pinned colors
-   moved into explicit CSS classes (no Tailwind interpretation) to nail
-   down "no blue on unselected nodes" definitively. Prior attempts used
-   Tailwind arbitrary values like `ring-[oklch(0.65_0_0_/_0.3)]` which is
-   the documented syntax for ring + arbitrary OKLCH + alpha — but Tailwind
-   v4's parser silently fails on the slash inside oklch() in some build
-   configurations, falling back to `currentColor` (= --foreground,
-   hue 250 chroma 0.012) and rendering as light blue. Class-based CSS
-   bypasses all parsing risk.
+/* Phase 72 — node visual state (rest ring, selection ring, error outline,
+   autoExtended outline) is rendered via inline style on the StreamNode
+   outer div, not via these classes. The CSS pipeline in this dev
+   configuration (Vite + Tailwind v4 + .vite/deps optimizer) serves stale
+   compiled output for .stream-node--* class rules even after cache nuke;
+   inline style ships with the JS bundle and wins specificity over any
+   class rule. See StreamNode.tsx for the inline-style logic.
 
-   The values are TRUE NEUTRAL GREY at oklch chroma 0. DESIGN.md §2's
-   "no pure neutrals" rule assumed large background fills where the eye
-   normalizes — narrow ring/outline geometry on dark surfaces is the
-   opposite case (the eye locks onto a 1-2 px edge and any chroma
-   contribution dominates the perception). Pure neutral is correct here. */
-
-/* Always-on thin grey ring on every unselected node. 1 px ring outside
-   a 1 px canvas-color offset (same offset geometry as the previous
-   ring-offset-1 ring-offset-canvas Tailwind setup).
-
-   Phase 72 P7 (2026-05-22) — color is FULLY OPAQUE pure neutral grey.
-   The previous oklch(0.65 0 0 / 0.30) was "chroma 0" at the CSS-token
-   level, but 30 % alpha composites with the canvas background; canvas
-   is oklch(0.27 0.012 254) (hue 254 = cool, chroma 0.012). The
-   composited rendering inherits the canvas hue: ~oklch(0.39 0.008 254),
-   which the eye reads as light blue. Fully opaque grey at the target
-   visible lightness eliminates the alpha-blending hue contamination —
-   the only way to guarantee neutral grey on a hue-tinted surround.
-
-   Dark + light values defined via var(--node-ring-rest) so the same
-   class works in both themes (token declared in :root + .dark above).
-   `!important` is defensive against any stale cached rule. */
-.stream-node-ring-rest {
-  box-shadow:
-    0 0 0 1px var(--canvas),
-    0 0 0 2px var(--node-ring-rest) !important;
-}
-
-/* Selected — animates from rest via transition-[box-shadow] on the
-   element. 2 px ring in --ring (Hydraulic low-chroma blue) outside the
-   same 1 px canvas offset. */
-.stream-node-ring-selected {
-  box-shadow:
-    0 0 0 1px var(--canvas),
-    0 0 0 3px var(--ring) !important;
-}
-
-/* Phase 72 P8 (2026-05-22) — code-hover / code-pinned visuals on the
-   canvas are now NO-OPS per user request: "nodes that are sources work
-   perfectly... copy that behaviour exactly over to all the rest."
-   Sources nodes never had the .stream-node--code-pinned class applied
-   (their component type doesn't link to code-preview source lines the
-   same way Hydraulic/Thermal/ReactorPhysics do), so they showed only
-   the base .stream-node-ring-rest grey ring. With these rules emptied,
-   every non-Sources node now matches: just the base ring at rest, the
-   Hydraulic-blue selection ring on click. The code-preview ↔ canvas
-   bidirectional link (Phase 66) keeps working at the data layer
-   (hoveredSourceIds / pinnedSourceIds zustand state still set + read);
-   only the canvas-side visual is suppressed. The
-   edges-and-code-preview shape session (queued) is where any future
-   visual signal for this link belongs — likely on the edge / code-line
-   side, not painted over the node body. */
-.stream-node--code-hover {
-  outline: none !important;
-  box-shadow: none !important;
-}
+   The code-hover / code-pinned classes remain attached to the DOM as
+   state markers — the Phase 66 code-preview ↔ canvas linking layer and
+   the corresponding unit tests assert their presence — but they paint
+   nothing. Any future visual treatment for this link belongs in the
+   queued edges-and-code-preview shape session, on the edge / code-line
+   side, not the node body. */
+.stream-node--code-hover,
 .stream-node--code-pinned {
-  outline: none !important;
-  box-shadow: none !important;
+  outline: none;
+  box-shadow: none;
 }
 
 /* Phase 71 Plan 10 — ValidationStatusBar 0→N pulse animation (D-03).

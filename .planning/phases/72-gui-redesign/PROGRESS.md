@@ -151,6 +151,20 @@ a456111  feat(72-primitives): Surface family
 10 errors (was 11 before this session — incidental drop, no new errors
 introduced).
 
+### Post-primitive walkthrough fixes (2026-05-22)
+
+After first dev-server walkthrough of the primitive-layer pass, six
+ordered corrections shipped on top:
+
+| Commit | Fix |
+|---|---|
+| `25c98cf` | Borders dropped from chroma 0.012 → 0.005 (dark); popover lifted above canvas (0.265 → 0.33 dark, 1.0 → 0.96 light); menubar handoff fixed via instant close; control text 13 → 12 px on Button / Toggle / Menus / Tabs / Select / Command |
+| `9f2f803` | Node ring color committed fully opaque (alpha compositing was bleeding canvas hue 254 into the "neutral" grey ring) |
+| `e31e746` | `.stream-node--code-hover` / `.stream-node--code-pinned` CSS rules emptied to no-ops — the persistent "blue ring on non-Sources nodes" was that class painting sky-300 outline on top of the base ring |
+| `c5d0c01` | Node ring (box-shadow only) moved from CSS class to inline `style={}` after diagnosis that Vite + Tailwind v4 + `.vite/deps` cache was serving stale compiled output for `.stream-node-*` class rules while body-level CSS HMR updated normally |
+| `3c2961b` | Outline + outline-offset ALSO moved to inline style — the prior commit had left outline on the class, and the stale `.stream-node--code-pinned` `outline: 3px solid sky-300` rule was still painting through |
+| `[cleanup]` | Long P-series comment blocks tightened; dead `.stream-node-ring-rest` / `.stream-node-ring-selected` CSS classes removed; `--node-ring-rest` consumed via inline `var()` for theme-awareness |
+
 ### Lessons (worth re-reading at the start of the next session)
 
 1. **The validation-flash bug took 3 sub-fixes** (offset → border-radius →
@@ -181,6 +195,34 @@ introduced).
    `h-9` as a compromise, but the brief was explicit. Lesson: greppable
    "no consumers" + explicit brief language is enough to drop API surface
    without a deprecation period (heavy-dev policy per `feedback_no_back_compat_during_heavy_dev`).
+6. **The "blue ring on non-Sources nodes" bug took eight commits** because
+   three independent contributors were stacked:
+   (a) the `.stream-node--code-pinned` CSS rule (sky-300 placeholder) was
+       being added only to Hydraulic / Thermal / ReactorPhysics nodes
+       (Sources don't index to code-preview source lines), creating the
+       Sources-vs-others visual asymmetry;
+   (b) every "chroma 0 grey" attempted source value was either (i) a
+       Tailwind arbitrary value like `ring-[oklch(0.65_0_0_/_0.3)]`
+       whose `/` inside `oklch()` failed to parse in this Tailwind v4 +
+       Vite configuration, silently falling back to `currentColor` =
+       `--foreground` (hue 250 cool grey-blue), OR (ii) low-alpha grey
+       that composited with the canvas background (`oklch(0.27 0.012 254)`)
+       and inherited the canvas hue through the alpha;
+   (c) the Vite + Tailwind v4 + `.vite/deps` dev pipeline was serving
+       stale compiled CSS for `.stream-node--*` class rules even after a
+       full cache nuke — verified via the magenta-probe diagnostic
+       (body-level CSS edits did refresh; node class rules didn't).
+   Lesson: when a "purely cosmetic" fix takes more than 2 passes,
+   **inspect the compiled CSS in the running webview, not just the
+   source file**. Cache + parse failures are invisible from the source
+   side. Inline style on the React component is the unconditional
+   workaround when class-side CSS won't refresh.
+7. **OKLCH chroma-0 inputs are degenerate** — `oklch(L 0 0)` is "no hue
+   at any chroma" which some browser parsers handle inconsistently. For
+   intentionally pure-neutral colors in narrow geometry (rings, hairlines)
+   where the doctrine "tint every neutral toward hue 254" produces an
+   eye-amplified blue cast, prefer plain hex (`#6e6e6e`) over chroma-0
+   OKLCH. The doctrine carve-out is documented in DESIGN.md §5.
 
 ## Re-entry instructions for the next session
 

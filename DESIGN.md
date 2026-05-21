@@ -333,11 +333,12 @@ end.
 | Body | `bg-card p-2`, contains icon + component label (11 px micro) + instance name (13 px body, font-semibold) + optional source-block value summary line (11 px label, muted) |
 | Body radius | `rounded-md` (8 px via `--radius-md`) |
 | Perimeter border | removed (band carries identity, no border needed) |
-| Selected state | top band thickens 4 → 8 px + `ring-2 ring-[var(--ring)] ring-offset-1 ring-offset-canvas` |
-| Persistent error state | `outline outline-2 outline-[var(--destructive)]` (simpler than the prior outline+ring double signal) |
-| autoExtended state | `outline outline-2 outline-dashed outline-[var(--chart-5)] outline-offset-2` |
-| Code-hovered (transient) | `.stream-node--code-hover` class — outline 2 px, sky-400 placeholder (will be tokenized in edges-and-code-preview shape) |
-| Code-pinned (transient) | `.stream-node--code-pinned` class — 3 px outline + zero-blur 1 px halo, sky-300 placeholder |
+| Selected state | top band thickens 4 → 8 px + 2 px Hydraulic-blue ring (`var(--ring)`) with 1 px `var(--canvas)` offset; animates 200 ms via `transition-[box-shadow]` from the unselected mid-grey rest ring (`var(--node-ring-rest)`, hex `#6e6e6e` dark / `#c3c3c3` light) |
+| Unselected rest ring | 1 px mid-grey ring (`var(--node-ring-rest)`) with 1 px `var(--canvas)` offset, always present on every node; same color for every component type so the canvas reads as a uniform field |
+| Persistent error state | 2 px solid `var(--destructive)` outline |
+| autoExtended state | 2 px dashed `var(--chart-5)` outline, `outline-offset: 2px` |
+| Code-hovered / pinned (transient) | `.stream-node--code-hover` / `.stream-node--code-pinned` classes added to DOM as state markers (Phase 66 code-preview ↔ canvas linking); CSS rules are no-ops — visual treatment deferred to the queued `edges-and-code-preview` shape session |
+| Render mechanism | Outline + box-shadow set via inline `style={}` on the outer wrapper (not via CSS classes) — bypasses a known partial-update issue in the Vite + Tailwind v4 + `.vite/deps` cache where `.stream-node--*` class rules served stale compiled output |
 | Validation flash (navigation feedback) | `.validation-flash` class added by CanvasPanel.onNodeFlash; targets `data-stream-node-id` (NOT xyflow's `data-id` wrapper) so it lives on the same element as the persistent error outline; outline-offset 0, animates outline-color over 600 ms |
 | Multi-layer split band | Components with both FlowPort AND ThermalPort (ChannelAndContacts today) render a 2-segment band: left half = first layer, right half = second layer. Detected via `getDisplayLayers()` in `gui/src/lib/layers.ts` |
 
