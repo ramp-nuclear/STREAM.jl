@@ -10,21 +10,14 @@
 // with a co-located test at
 //   gui/src/lib/validation/rules/__tests__/<name>.test.ts
 //
-// Example (once rules land in Plans 04-08):
-//   import { zNMatch } from './rules/zNMatch';
-//   import { lengthMatch } from './rules/lengthMatch';
-//   ...
-//   export const validators: Validator[] = [
-//     zNMatch, lengthMatch, nMatch, portType,
-//     requiredConnections, danglingFlowPort,
-//     loopClosure, gravitySumPerLoop, geometryConsistency,
-//     pressureBoundaryRequired, drivingElementRequired,
-//   ];
+// Phase 71 UAT (2026-05-21): danglingFlowPort removed — requiredConnections
+// subsumes it for the FlowPort case. The two rules were double-counting
+// unconnected FlowPorts (6 errors on a bare Channel where 4 was correct).
+// D-16's "verbatim VALD-01 lift" no longer applies post-Plan-13 cleanup.
 
 import type { Validator } from "./types";
 import { portType } from "./rules/portType";
 import { requiredConnections } from "./rules/requiredConnections";
-import { danglingFlowPort } from "./rules/danglingFlowPort";
 import { zNMatch } from "./rules/zNMatch";
 import { lengthMatch } from "./rules/lengthMatch";
 import { geometryConsistency } from "./rules/geometryConsistency";
@@ -34,13 +27,11 @@ import { gravitySumPerLoop } from "./rules/gravitySumPerLoop";
 import { pressureBoundaryRequired } from "./rules/pressureBoundaryRequired";
 import { drivingElementRequired } from "./rules/drivingElementRequired";
 
-/** All registered validators. Rules plans append by importing each rule and
- *  pushing to this array. The runner (runner.ts) flat-maps over this array
+/** All registered validators. The runner (runner.ts) flat-maps over this array
  *  once per debounced tick — no per-rule cache in v1. */
 export const validators: Validator[] = [
   portType,
   requiredConnections,
-  danglingFlowPort,
   zNMatch,
   lengthMatch,
   geometryConsistency,
