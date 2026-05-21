@@ -27,6 +27,9 @@ export default function BottomPanel() {
   // subscribe to a derived primitive instead of the array — re-renders fire
   // only when the canvas crosses the empty/non-empty boundary.
   const hasNodes = useStore((s) => s.nodes.length > 0);
+  const errorCount = useStore(
+    (s) => s.validationResults.filter((r) => r.severity === "error").length,
+  );
   const activeBottomTab = useStore((s) => s.activeBottomTab);
   const setActiveBottomTab = useStore((s) => s.setActiveBottomTab);
 
@@ -156,16 +159,32 @@ export default function BottomPanel() {
                 </>
               )}
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!hasNodes}
-              onClick={handleExport}
-              aria-label="Export generated Julia code to file"
-            >
-              <Download className="h-4 w-4 mr-1" />
-              Export
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* Tooltip requires a focusable child; span wrapper keeps the
+                    button semantics intact when disabled (disabled buttons
+                    don't fire mouse events, so the span captures the hover). */}
+                <span tabIndex={errorCount > 0 || !hasNodes ? 0 : -1} className="inline-flex">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!hasNodes || errorCount > 0}
+                    onClick={handleExport}
+                    aria-label="Export generated Julia code to file"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Export
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {errorCount > 0
+                  ? `Resolve ${errorCount} validation ${errorCount === 1 ? "error" : "errors"} first`
+                  : !hasNodes
+                    ? "Add components first"
+                    : "Export generated Julia code to file"}
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
         <TabsContent value="code" className="flex-1 min-h-0">
