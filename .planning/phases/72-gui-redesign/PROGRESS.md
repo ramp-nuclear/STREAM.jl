@@ -38,12 +38,7 @@ capture the final tokens into a proper frontmatter + sidecar.
 | Surface | Status | Commits | DESIGN.md |
 |---|---|---|---|
 | Canvas + StreamNode + Layer accents + 3-tier depth + grid background | ✅ | 5 initial + 3 visual-bug fixes + cleanup (see Decision log below) | §2 fully locked; §3 type scale locked, font/direction TBD; §4 depth approach locked, shadow vocab TBD; §5 StreamNode locked |
-
-### Up next (Session 1 part 2 — same session if context allows, otherwise Session 2)
-
-| Surface | Status | Notes |
-|---|---|---|
-| shadcn primitive layer (Button / Input / Dialog / Tabs / etc.) | ⬜ | Inherits canvas decisions (color strategy, depth approach, type scale). Owns the final shadow vocab + radius application across all shadcn-derived components. Resolves audit Systemic-1 ("default shadcn everywhere"). |
+| shadcn primitive layer (Button / Input / Dialog / Tabs / etc.) | ✅ | 6 cluster commits (tokens, Button, Input, Surface, Menu, Navigation) — see Decision log | §2 --ring/--border/--popover/--shadow-dialog/--border-hover locked; §3 type-scale tokens exposed; §4 shadow vocab locked (single tier); §5 primitive layer fully locked |
 
 ### Queued (Session 2)
 
@@ -115,6 +110,47 @@ e79b242  fix(72-canvas): validation-flash border-radius matches node body
 **Tests:** 1028 / 1028 pass. Pre-existing 11 tsc errors unchanged (per
 CLAUDE.md baseline).
 
+### shadcn primitive layer (locked 2026-05-22)
+
+**Commits on `gui-redesign` branch (oldest → newest):**
+
+```
+965d781  feat(72-primitives): tokens + Button family
+a2d17ca  feat(72-primitives): Input family
+a456111  feat(72-primitives): Surface family
+98e84aa  feat(72-primitives): Menu family
+63fbe9e  feat(72-primitives): Navigation + misc
+[this commit]  docs(72-primitives): lock DESIGN.md + PROGRESS.md
+```
+
+**Three confirmed locks** (via AskUserQuestion during shape):
+1. Shadow vocabulary = single tier (`--shadow-dialog` on Dialog/AlertDialog/Sheet only)
+2. Primary-action posture = context-aware (neutral high-contrast slab everywhere; modal scrim does the work of permitting it to read confidently)
+3. Density = balanced 32 px (`h-8`) globally; `h-7` sm for property forms; `h-6` xs for chips
+
+**Cross-cutting commitments** (full detail in `DESIGN.md` §2–§5):
+
+- Two-tier radius: `--radius-sm` 4 px (compact controls) / `--radius-md` 8 px (surfaces); no `rounded-lg`
+- Five-tier type scale tokens: `--text-{micro,label,body,title,display}` (10/11/13/16/20 px)
+- 100 ms fade-in / 80 ms fade-out, `motion-reduce:!duration-0`. Zoom + slide entrance removed.
+- Focus ring 2 px `--ring` at offset 0; inset on Input/Textarea
+- Hover surface = `bg-card` (tonal step; chrome doesn't carry accent fill)
+- Icons: Lucide stays; size-3.5 stroke-1.5 in h-8 controls (was size-4 stroke-2)
+- `--ring` relocked to Hydraulic-hue tint (low chroma); `--border` relocked to solid OKLCH (no alpha-on-white)
+- New token `--popover` exposed in light mode; `--border-hover` and `--shadow-dialog` introduced
+- `Sheet` primitive added (built on Radix Dialog; no consumers yet)
+
+**Audit deltas this session resolves:**
+- Systemic-1 ("default shadcn everywhere") — primitive layer no longer reads as the unmodified new-york template
+- P0-4 (theming layer broken) — every primitive now consumes tokens; no inline hex inside `gui/src/components/ui/`
+- P1-1 (backdrop-blur on AutoRecoverRestoreModal) — Dialog scrim is now `bg-foreground/40` with no blur; consumer-side fix is mechanical
+- P2-6 (arbitrary `text-[Npx]`) — primitive layer migrated to type-scale tokens; consumer migration deferred to `/impeccable polish`
+- Doctrine §4 violations on `shadow-xs` on Input/Toggle/Select — all removed
+
+**Tests:** 1028 / 1028 pass (same as canvas-locked baseline). tsc baseline:
+10 errors (was 11 before this session — incidental drop, no new errors
+introduced).
+
 ### Lessons (worth re-reading at the start of the next session)
 
 1. **The validation-flash bug took 3 sub-fixes** (offset → border-radius →
@@ -131,6 +167,20 @@ CLAUDE.md baseline).
    "subtle structural texture, not decorative". Recommitted at Δ 0.05/0.02.
    Lesson: grids should be slightly less visible than feels right when
    coding (the contrast looks higher in real use because eye anchors on it).
+4. **`--shadow-dialog` was self-referential in the first `@theme inline`
+   pass.** Wrote `--shadow-dialog: var(--shadow-dialog)` — recursive
+   reference. Tailwind v4 generates utilities from `@theme inline` shadow
+   tokens with static values; for dark-mode-switching shadows the right
+   pattern is to declare the token in `:root` and `.dark` and consume it
+   via `shadow-[var(--shadow-dialog)]` arbitrary-value form at the
+   primitive site. Lesson: when a token needs theme-switched values, don't
+   try to expose it as a Tailwind utility — use arbitrary-value form.
+5. **Removed `lg` button + `lg` icon-button sizes confidently** because
+   grep showed zero consumers. The brief banned `h-9` / `h-10` from the
+   primitive layer; the conservative move would have been to set `lg` to
+   `h-9` as a compromise, but the brief was explicit. Lesson: greppable
+   "no consumers" + explicit brief language is enough to drop API surface
+   without a deprecation period (heavy-dev policy per `feedback_no_back_compat_during_heavy_dev`).
 
 ## Re-entry instructions for the next session
 
@@ -140,10 +190,15 @@ Open a new Claude Code session, then say something like:
 > `.planning/phases/72-gui-redesign/AUDIT.md`,
 > `.planning/phases/72-gui-redesign/PROGRESS.md`, and the latest critique
 > snapshot in `.impeccable/critique/`. Then start `/impeccable shape
-> shadcn-primitive-layer` (or whatever surface is next per PROGRESS.md).
+> ValidationPanel` (or whatever surface is next per PROGRESS.md).
 
 The new session will load doctrine + queue + locked values + recent
 lessons in 1–2 minutes and resume cleanly.
+
+**Next surface per queue:** `/impeccable shape ValidationPanel` (Session 2,
+first item — Audit P0-2, Critique P1-3, `project_phase72_validator_ui_revisit`,
+`feedback_no_validator_fixaction_buttons`). The data layer is correct;
+rebuild the visual + spatial layer from scratch.
 
 **Related memories** (loaded automatically — don't need to re-read):
 

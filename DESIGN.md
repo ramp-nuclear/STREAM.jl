@@ -6,15 +6,30 @@ description: Desktop visual editor that produces STREAM.jl Julia scripts for MTR
 <!-- PARTIAL SEED — Phase 72 in progress.
 
 LOCKED (from /impeccable shape canvas, 2026-05-21):
-  - §2 Colors except --destructive / --ring / --border (still provisional)
-  - §3 Type scale (1.25 Major Third); font choice + typography direction still TBD
-  - §4 Depth approach (3-tier tonal layering with structural shadows); shadow vocab still TBD
+  - §2 Colors except --destructive (still provisional)
+  - §3 Type scale (1.25 Major Third) + scale tokens; font choice + typography direction still TBD
+  - §4 Depth approach (3-tier tonal layering with structural shadows) + shadow vocabulary (single tier, --shadow-dialog)
   - §5 StreamNode visual treatment + canvas background (grid lines)
 
+LOCKED (from /impeccable shape shadcn-primitive-layer, 2026-05-22):
+  - §2 --ring relocked (hue-240 tint, low chroma)
+  - §2 --border relocked (solid OKLCH, no alpha-on-white)
+  - §2 new tokens: --border-hover, --popover (light mode), --shadow-dialog
+  - §3 Type scale tokens exposed (--text-{micro,label,body,title,display})
+  - §4 Shadow vocabulary: SINGLE TIER (--shadow-dialog applied to
+        Dialog/AlertDialog/Sheet only; all other primitives are tonal+border)
+  - §5 Radius scale committed (--radius-sm 4 px, --radius-md 8 px; no
+        rounded-lg/xl in the primitive layer)
+  - §5 All shadcn primitives recommitted: Button family, Input family,
+        Surface family (Dialog/AlertDialog/Popover/Tooltip/Sonner + new
+        Sheet), Menu family (DropdownMenu/ContextMenu/Menubar/Select/Command),
+        Navigation (Tabs/ScrollArea/Separator)
+
 STILL HELD OPEN:
-  - §3 Font choice and typography direction — pending /impeccable shape first-run + help-system
-  - §4 Shadow vocabulary specifics — pending /impeccable shape shadcn-primitive-layer
-  - §5 All non-StreamNode component surfaces — see "Held open" list at the end of §5
+  - §2 --destructive still provisional (semantic gravity earns it as the
+       one chrome-permitted accent, but the exact OKLCH value is inherited)
+  - §3 Font choice and typography direction — pending /impeccable shape
+       first-run + help-system
 
 Two-pass protocol per Impeccable's `document.md`:
   1. This file documents locked doctrine + locked-so-far values + held-open slots.
@@ -154,13 +169,27 @@ for ports) cover the remaining edge cases.
 | Token | Dark | Light | Status |
 |---|---|---|---|
 | `--destructive`    | `oklch(0.704 0.191 22.216)` | `oklch(0.577 0.245 27.325)` | provisional (inherited, not yet redesigned) |
-| `--ring`           | `oklch(0.50 0.01 250)`       | `oklch(0.708 0 0)`           | provisional |
-| `--border`         | `oklch(1 0 0 / 11%)`         | `oklch(0.922 0 0)`           | provisional |
+| `--ring`           | `oklch(0.65 0.10 240)`       | `oklch(0.55 0.14 240)`       | **locked** — Hydraulic-hue tint at low chroma; focus reads as "selected" with minor identity (Linear/Cursor lineage) |
+| `--border`         | `oklch(0.30 0.012 254)`      | `oklch(0.88 0.005 254)`      | **locked** — solid OKLCH (was alpha-on-white; the alpha trickery violated OKLCH-only doctrine) |
+| `--border-hover`   | `oklch(0.38 0.012 254)`      | `oklch(0.80 0.005 254)`      | **locked** — +Δ0.08 lightness step; Input + Select hover lift here |
+| `--shadow-dialog`  | `0 8px 24px -8px oklch(0.05 0.012 254 / 0.50), 0 2px 6px -2px oklch(0.05 0.012 254 / 0.30)` | `0 8px 24px -8px oklch(0.20 0.012 254 / 0.20), 0 2px 6px -2px oklch(0.20 0.012 254 / 0.10)` | **locked** — the ONE structural shadow in the system (Dialog/AlertDialog/Sheet only) |
 | `--color-warning`  | `oklch(0.78 0.15 75)`        | `oklch(0.74 0.16 75)`        | **locked** |
 | `--color-info`     | `oklch(0.72 0.16 240)`       | `oklch(0.62 0.18 240)`       | **locked** |
 
-`--color-warning` and `--color-info` were introduced this phase to replace
-raw `text-yellow-500` / `text-blue-500` in ValidationPanel.
+`--color-warning` and `--color-info` were introduced earlier to replace
+raw `text-yellow-500` / `text-blue-500` in ValidationPanel. `--border-hover`
+and `--shadow-dialog` were introduced in the primitive-layer shape pass.
+
+### Popover surface (locked)
+
+`--popover` is the 5th tonal slot in the hierarchy — one step lighter than
+`--panel`, one step darker than `--canvas`. Used by Popover, DropdownMenu,
+ContextMenu, Menubar, Select dropdown, Dialog body, Tooltip background
+(via inverse), Sonner toast.
+
+| Token | Dark | Light |
+|---|---|---|
+| `--popover` | `oklch(0.265 0.014 254)` | `oklch(0.985 0.003 254)` |
 
 ### Canvas grid (locked)
 
@@ -202,10 +231,16 @@ ever competes for attention with the nodes, tighten contrast further.
 | display | 20 px | Reserved for future major hierarchy moments (currently unused) |
 
 Step ratio 1.25 (Major Third). Conventional for tools at this density;
-matches Linear/Cursor/Rive lineage. Tailwind utilities currently use
-arbitrary `text-[Npx]` values — migration to a real scale (e.g.
-`text-micro` / `text-label` / `text-body`) is deferred to the
-shadcn-primitive shape session.
+matches Linear/Cursor/Rive lineage.
+
+**Scale tokens (locked — primitive-layer shape, 2026-05-22).** Exposed via
+`@theme inline` as `--text-{micro,label,body,title,display}`; Tailwind
+generates `text-micro` / `text-label` / `text-body` / `text-title` /
+`text-display` utilities. Primitive components consume the tokens (no more
+`text-[Npx]` arbitrary values inside `gui/src/components/ui/`). Consumer
+surfaces (panels, sidebars, dialogs body content) still carry the old
+arbitrary values; consumer-side migration to the token scale is
+`/impeccable polish` work at phase end.
 
 ### Font choice — `[TBD]`
 
@@ -253,11 +288,24 @@ itself adds a faint grid as additional structural texture.
 steps in the depth hierarchy first; shadows are reserved for state changes
 (focus, modal lift) — never for ambient atmosphere.
 
-### Shadow vocabulary — `[TBD]`
+### Shadow vocabulary (locked — primitive-layer shape, 2026-05-22)
 
-Specific shadow values are still inherited shadcn defaults (`shadow-xs`,
-`shadow-md`, `shadow-lg`, `shadow-xl`). Recommitment deferred to the
-shadcn-primitive shape session.
+**Single tier.** `--shadow-dialog` is the only structural shadow in the
+system. Applied to Dialog, AlertDialog, and Sheet — the surfaces where the
+modal scrim flattens the tonal hierarchy and a crisp lift cue is needed to
+restore "this floats above the canvas." Tuned for "lift, not glow" — low
+alpha, low blur, double-stop with a tight near-shadow.
+
+**Zero shadow** on Popover, DropdownMenu, ContextMenu, Menubar, Tooltip,
+Select dropdown, HoverCard, Sonner toast, Input, Textarea, Checkbox,
+RadioGroup, Button, Toggle, ToggleGroup, Badge, Card, Tabs. These float on
+the tonal step alone — `bg-popover` is one tone lighter than `--panel` and
+darker than `--canvas`, which provides visible contrast on its own.
+
+The inherited shadcn defaults (`shadow-xs`, `shadow-md`, `shadow-lg`,
+`shadow-xl`) are no longer applied by any primitive. Consumer surfaces that
+still reference them will get migrated during `/impeccable polish` at phase
+end.
 
 ## 5. Components
 
@@ -293,14 +341,62 @@ shadcn-primitive shape session.
 | Validation flash (navigation feedback) | `.validation-flash` class added by CanvasPanel.onNodeFlash; targets `data-stream-node-id` (NOT xyflow's `data-id` wrapper) so it lives on the same element as the persistent error outline; outline-offset 0, animates outline-color over 600 ms |
 | Multi-layer split band | Components with both FlowPort AND ThermalPort (ChannelAndContacts today) render a 2-segment band: left half = first layer, right half = second layer. Detected via `getDisplayLayers()` in `gui/src/lib/layers.ts` |
 
-### Held open — per-surface decisions (queued shape sessions)
+### shadcn primitive layer (locked — primitive-layer shape, 2026-05-22)
 
-All other component styling is **still provisional**. Existing shadcn
-primitives provide working defaults; each is decided per-surface during
-the queued `/impeccable shape` sessions (see
-`.planning/phases/72-gui-redesign/PROGRESS.md` for the active queue).
+Every primitive under `gui/src/components/ui/` has been recommitted. The
+canonical decisions cascade to every consumer surface (no per-consumer
+override is required to read on-brand; consumers that want to override
+still can per-instance via `className`).
 
-Surfaces still requiring per-surface shape decisions:
+**Cross-cutting vocabulary**
+
+| Axis | Commitment |
+|---|---|
+| Density | `h-8` (32 px) default for Button, Input, Toggle, Select trigger, Tabs trigger, Menubar root; `h-7` (28 px) `sm` variant for property-form density; `h-6` (24 px) `xs` for Badge / DropdownMenu items. No `h-9` / `h-10` in the primitive layer. |
+| Radius | Two tiers: `rounded-sm` (4 px) for compact controls (Button, Input, Toggle, Checkbox, Badge, menu items, Tooltip pill); `rounded-md` (8 px) for surfaces (Popover, DropdownMenu, Select, Dialog, Sheet, Card, Tabs list container). No `rounded-lg` (12 px). |
+| Motion | 100 ms fade-in / 80 ms fade-out on open/close; `transition-colors duration-[80ms]` on hover/active; `motion-reduce:!duration-0` collapses to instant under `prefers-reduced-motion: reduce`. No zoom-in/zoom-out. No slide-in-from-* (Sheet keeps slide-in-from-side as its identity). |
+| Focus ring | `ring-2 ring-ring` at offset 0. Inset on Input/Textarea (so the ring lives inside the bounding box and doesn't overflow stacked rows). Outer on Button, Toggle, Checkbox, RadioGroup, Tabs trigger. Replaced the doubled shadcn `focus-visible:border-ring + ring-[3px] ring-ring/50` pattern. |
+| Hover surface | `bg-card` (tonal step from current surface — chrome doesn't carry accent fill). |
+| Aria-invalid | `ring-2 ring-destructive` (was `border-destructive` + `ring-destructive/20`). Consistent error vocabulary across all primitives. |
+| Icons | Lucide stays the library. Sizes: `size-3.5` (14 px) in `h-8` controls, `size-3` (12 px) in chips/badges. Stroke `1.5` (was the Lucide default `2`; the new stroke matches the 13 px text weight). |
+| Shortcut chips | `text-micro font-mono text-foreground/55` (was `text-xs tracking-widest text-muted-foreground` — `tracking-widest` is a SaaS-template letter-spacing pattern; mono font is the project's keyboard-hint idiom). |
+| Primary posture | `Button variant="default"` = `bg-primary text-primary-foreground` neutral high-contrast slab. Already resolved that way in both themes (`--primary` is the light neutral text in dark mode and the canvas dark in light mode). Context-aware by surrounding scrim, not by separate variant. |
+| Removed | `shadow-xs` on all form fields and small controls (doctrine §4); `transition-all` (sweeps layout properties); `dark:bg-input/30` and similar alpha-on-white hacks (token-side fix lets us delete the consumer-side workaround). |
+
+**Token additions** (see §2 for token table values)
+
+- `--border-hover` (Input + Select hover-lift target)
+- `--popover` in light mode (was tracking `--background = #fff`)
+- `--shadow-dialog` (the single structural shadow)
+- `--text-micro`, `--text-label`, `--text-body`, `--text-title`, `--text-display`
+  (full type-scale tokens; consumer-side migration deferred to polish pass)
+
+**New primitive added**
+
+- `Sheet` (built on Radix Dialog; edge-aligned panel with slide-in identity)
+  — styled now even though no consumer exists, so the next surface that
+  wants a side drawer doesn't reach for a Dialog instead.
+
+**Per-primitive consumers to watch during the next session**
+
+These primitives have visual deltas large enough that consuming surfaces
+will read differently the first time they're seen:
+
+- **Tooltip**: open delay 0 → 400 ms (deliberate-hover convention). Any
+  consumer relying on "appears on glance" will feel slower; that's intended.
+- **Badge**: `destructive` and `link` variants dropped. Any consumer using
+  them must switch to a different variant + className with `text-destructive`.
+- **Button**: `lg` and `icon-lg` sizes dropped (no consumers existed at
+  shape time; subsequent additions must use `default` or `sm`).
+- **Sonner**: every toast now consumes the project visual vocab via
+  `toastOptions.classNames`. Custom-styled toasts in consumer code may
+  need to be re-verified.
+
+**Held open — per-surface decisions still queued**
+
+The non-`ui/` consumer surfaces below remain provisional. Each will be
+decided in its own `/impeccable shape <surface>` session (see
+`.planning/phases/72-gui-redesign/PROGRESS.md`).
 
 **Application chrome**
 - `CustomTitlebar` + `WindowControls`
@@ -323,18 +419,10 @@ Surfaces still requiring per-surface shape decisions:
 - Property forms in the sidebar (`SidebarPanel/*` subtree)
 - BCs tab layout (Phase 65 deferred layout-fit issues land here)
 
-**Menus + dialogs**
+**Menus + dialogs (consumer-side)**
 - `EditMenu` / `ViewMenu` / `HelpMenu` / `FileMenu` / `NodeContextMenu`
-- `Dialog` + `AlertDialog` core presentation
 - `AboutDialog`, `AutoRecoverRestoreModal`, `ExportConfirmDialog`,
   `SavePresetModal`, `UnsavedChangesDialog`
-
-**shadcn primitives** — `/impeccable shape shadcn-primitive-layer`
-- `Button` (variants + sizes), `Input`, `Textarea`, `Label`,
-  `Checkbox`, `RadioGroup`, `Toggle`, `ToggleGroup`,
-  `Select`, `DropdownMenu`, `Menubar`, `ContextMenu`,
-  `Tabs`, `Popover`, `Tooltip`, `Separator`, `ScrollArea`,
-  `Badge`, `Command`, `Sonner`
 
 ## 6. Do's and Don'ts
 
