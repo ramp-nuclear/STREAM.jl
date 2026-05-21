@@ -13,6 +13,16 @@ import {
 import useStore from "@/store/useStore";
 import { autoExtendSelection } from "@/lib/presetIO";
 
+// Phase 71 Plan 11 — D-05 locked decision: right-click "Show errors for this
+// component" opens BottomPanel + switches to Validation tab + dispatches
+// 'stream:validation-filter-node' (Plan 09's ValidationPanel owns the listener).
+declare global {
+  interface WindowEventMap {
+    "stream:validation-filter-node": CustomEvent<{ nodeId: string }>;
+    "stream:node-flash": CustomEvent<{ nodeIds: string[] }>;
+  }
+}
+
 interface NodeContextMenuProps {
   nodeId: string;
   onClose: () => void;
@@ -23,6 +33,19 @@ export default function NodeContextMenu({ nodeId, onClose }: NodeContextMenuProp
   // render time (Pitfall 9: must reflect the full multi-selection, not just
   // the right-clicked node).
   const selectionCount = useStore((s) => s.nodes.filter((n) => n.selected).length);
+
+  // Phase 71 Plan 11 — D-05: "Show errors for this component" is visible only
+  // when at least one ValidationResult has a target referencing this nodeId.
+  // Predicate: any target with a nodeId field (node / port / field) matching.
+  const hasErrors = useStore((s) =>
+    s.validationResults.some((r) =>
+      r.targets.some(
+        (t) =>
+          (t.kind === "node" || t.kind === "port" || t.kind === "field") &&
+          t.nodeId === nodeId,
+      ),
+    ),
+  );
 
   // Mirrors the FileMenu handler: pre-paint auto-extend amber outline then
   // dispatch the custom event to open SavePresetModal in App.tsx.
@@ -74,6 +97,17 @@ export default function NodeContextMenu({ nodeId, onClose }: NodeContextMenuProp
     onClose();
   }
 
+  // Phase 71 Plan 11 — D-05 (locked): opens BottomPanel, switches to Validation
+  // tab, and dispatches 'stream:validation-filter-node' so Plan 09's
+  // ValidationPanel filters + scrolls to this node's errors.
+  function handleShowErrors() {
+    useStore.setState({ bottomPanelOpen: true, activeBottomTab: "validation" });
+    window.dispatchEvent(
+      new CustomEvent("stream:validation-filter-node", { detail: { nodeId } }),
+    );
+    onClose();
+  }
+
   return (
     <div role="menu" data-slot="node-context-menu">
       <DropdownMenuItem onSelect={handleRename}>Rename</DropdownMenuItem>
@@ -81,7 +115,13 @@ export default function NodeContextMenu({ nodeId, onClose }: NodeContextMenuProp
       <DropdownMenuItem onSelect={handleShowCode}>
         Show generated Julia code
       </DropdownMenuItem>
-      {/* Phase 71: render Show errors item when validation state exists for nodeId */}
+      {/* Phase 71 Plan 11 — D-05: visible only when this node has at least one
+          ValidationResult targeting it. Render guard (not disabled) per UI-SPEC. */}
+      {hasErrors && (
+        <DropdownMenuItem onSelect={handleShowErrors}>
+          Show errors for this component
+        </DropdownMenuItem>
+      )}
       {/* Phase 70 D-15.1: visible only when ≥ 2 nodes are selected (render guard,
           not disabled — per UI-SPEC Surface 6). */}
       {selectionCount >= 2 && (
