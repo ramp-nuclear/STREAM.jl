@@ -303,13 +303,13 @@ Plans:
 
 **Design-decisions reference:** Section 3.9.
 **Depends on:** Phase 62 (operates on Resources + components).
-**Plans:** 13 plans
+**Plans:** 2/13 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 71-01-PLAN.md (Wave 1) — Validator registry foundation: types, snapshot, runner, fields.ts migration, validationResults + activeBottomTab store slices, initValidation() subscription, ad-hoc errorNodeIds mutation removal.
-- [ ] 71-02-PLAN.md (Wave 1, parallel to 01) — loopTraversal.ts pure graph utility (findHydraulicLoops) + co-located vitest suite.
+- [x] 71-01-PLAN.md (Wave 1) — Validator registry foundation: types, snapshot, runner, fields.ts migration, validationResults + activeBottomTab store slices, initValidation() subscription, ad-hoc errorNodeIds mutation removal.
+- [x] 71-02-PLAN.md (Wave 1, parallel to 01) — loopTraversal.ts pure graph utility (findHydraulicLoops) + co-located vitest suite.
 - [ ] 71-03-PLAN.md (Wave 1, parallel to 01/02) — sonner install + shadcn ui/sonner.tsx Toaster wrapper (HAS legitimacy CHECKPOINT).
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -406,7 +406,7 @@ contract document drafted in parallel throughout.
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
 | 69. Command palette (jump-only)                      | 3/3 | Complete    | 2026-05-18 |
 | 70. Presets and templates                            | 6/6 | Complete    | 2026-05-20 |
-| 71. Validation framework                             | 0/13 | Planned | — |
+| 71. Validation framework                             | 2/13 | In Progress|  |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
 
 ## Coverage
