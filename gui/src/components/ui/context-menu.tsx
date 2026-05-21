@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
+import { CheckIcon, ChevronRightIcon } from "lucide-react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
@@ -8,10 +8,18 @@ import { cn } from "@/lib/utils"
 // `destructive` variant. Per Phase 62 UI-SPEC §"Per-row context menu", the
 // Delete row should use `text-destructive` styling, but this shim mirrors the
 // `dropdown-menu.tsx` convention that supports a `variant="destructive"` prop
-// via `data-variant` for parity with that sibling shim. The plan
-// (Action point 3) leaves the destructive styling to the consumer (62-06) via
-// className — both paths work; consumers may pass either
-// `variant="destructive"` or a custom `className`.
+// via `data-variant` for parity with that sibling shim.
+//
+// Phase 72 — primitive-layer recommit. Mirrors dropdown-menu.tsx visual
+// vocabulary: h-7 items, text-body, rounded-sm, hover/focus bg-card, plain
+// fade animation, no shadow, no zoom/slide. Sub-content uses --shadow-dialog
+// loadout? — no; sub-menus still float on tonal step alone like the parent.
+
+const CONTENT_CLASS =
+  "z-50 max-h-(--radix-context-menu-content-available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1 text-foreground motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100"
+
+const ITEM_CLASS =
+  "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-body outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none focus:bg-card data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/15 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55 data-[variant=destructive]:*:[svg]:text-destructive!"
 
 export function ContextMenu({
   ...props
@@ -72,14 +80,11 @@ export function ContextMenuSubTrigger({
     <ContextMenuPrimitive.SubTrigger
       data-slot="context-menu-sub-trigger"
       data-inset={inset}
-      className={cn(
-        "flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[inset]:pl-8 data-[state=open]:bg-accent data-[state=open]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
-        className
-      )}
+      className={cn(ITEM_CLASS, "data-[state=open]:bg-card", className)}
       {...props}
     >
       {children}
-      <ChevronRightIcon className="ml-auto size-4" />
+      <ChevronRightIcon className="ml-auto size-3.5 stroke-[1.5]" />
     </ContextMenuPrimitive.SubTrigger>
   )
 }
@@ -91,10 +96,7 @@ export function ContextMenuSubContent({
   return (
     <ContextMenuPrimitive.SubContent
       data-slot="context-menu-sub-content"
-      className={cn(
-        "z-50 min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-        className
-      )}
+      className={cn(CONTENT_CLASS, className)}
       {...props}
     />
   )
@@ -108,10 +110,7 @@ export function ContextMenuContent({
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
-        className={cn(
-          "z-50 max-h-(--radix-context-menu-content-available-height) min-w-[8rem] origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-          className
-        )}
+        className={cn(CONTENT_CLASS, className)}
         {...props}
       />
     </ContextMenuPrimitive.Portal>
@@ -124,12 +123,6 @@ export function ContextMenuContent({
  * Popover (Phase 65 Plan 05 canvas context menus) where a ContextMenu.Root ancestor
  * is absent and we cannot use ContextMenuPrimitive.Item (which requires
  * MenuContentContext). Pure HTML + Tailwind — no Radix Item wrapper.
- *
- * Phase 65 Plan 11: PopoverMenuSub / PopoverMenuSubTrigger / PopoverMenuSubContent /
- * PopoverMenuSubContext were removed — they hand-rolled `absolute left-full top-0`
- * positioning with no Floating UI, which clipped submenus offscreen near the right
- * edge of the viewport. Submenus now use Radix DropdownMenu.Sub primitives from
- * `@/components/ui/dropdown-menu` (viewport-collision-aware via Floating UI flip()).
  */
 
 export function PopoverMenuItem({
@@ -155,16 +148,17 @@ export function PopoverMenuItem({
       data-disabled={disabled || undefined}
       aria-disabled={disabled || undefined}
       tabIndex={disabled ? undefined : 0}
+      // hover: mouse-over highlight. focus-visible: keyboard-only highlight.
+      // Plain `focus:` would persist after Radix Popover's autoFocus-on-open
+      // (programmatic focus counts as :focus but not :focus-visible), making
+      // the first item appear "selected" before the mouse arrives.
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none",
-        // hover: mouse-over highlight. focus-visible: keyboard-only highlight.
-        // Plain `focus:` would persist after Radix Popover's autoFocus-on-open
-        // (programmatic focus counts as :focus but not :focus-visible), making
-        // the first item appear "selected" before the mouse arrives.
-        "hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground",
+        "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-body outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none",
+        "hover:bg-card focus-visible:bg-card",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "data-[inset]:pl-8",
-        "data-[variant=destructive]:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:focus-visible:text-destructive",
+        "data-[inset]:pl-7",
+        "data-[variant=destructive]:text-destructive data-[variant=destructive]:hover:bg-destructive/15 data-[variant=destructive]:focus-visible:bg-destructive/15",
+        "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55",
         className
       )}
       onClick={disabled ? undefined : onSelect}
@@ -209,10 +203,7 @@ export function ContextMenuItem({
       data-slot="context-menu-item"
       data-inset={inset}
       data-variant={variant}
-      className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground data-[variant=destructive]:*:[svg]:text-destructive!",
-        className
-      )}
+      className={cn(ITEM_CLASS, className)}
       {...props}
     />
   )
@@ -227,16 +218,13 @@ export function ContextMenuCheckboxItem({
   return (
     <ContextMenuPrimitive.CheckboxItem
       data-slot="context-menu-checkbox-item"
-      className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
+      className={cn(ITEM_CLASS, "pl-7", className)}
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
+      <span className="pointer-events-none absolute left-2 flex size-3 items-center justify-center">
         <ContextMenuPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
+          <CheckIcon className="size-3 stroke-[2]" />
         </ContextMenuPrimitive.ItemIndicator>
       </span>
       {children}
@@ -252,15 +240,12 @@ export function ContextMenuRadioItem({
   return (
     <ContextMenuPrimitive.RadioItem
       data-slot="context-menu-radio-item"
-      className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
+      className={cn(ITEM_CLASS, "pl-7", className)}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
+      <span className="pointer-events-none absolute left-2 flex size-3 items-center justify-center">
         <ContextMenuPrimitive.ItemIndicator>
-          <CircleIcon className="size-2 fill-current" />
+          <span className="size-1.5 rounded-full bg-foreground" />
         </ContextMenuPrimitive.ItemIndicator>
       </span>
       {children}
@@ -280,7 +265,7 @@ export function ContextMenuLabel({
       data-slot="context-menu-label"
       data-inset={inset}
       className={cn(
-        "px-2 py-1.5 text-sm font-medium text-foreground data-[inset]:pl-8",
+        "px-2 py-1 text-micro font-medium uppercase tracking-wider text-foreground/55 data-[inset]:pl-7",
         className
       )}
       {...props}
@@ -309,7 +294,7 @@ export function ContextMenuShortcut({
     <span
       data-slot="context-menu-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground",
+        "ml-auto text-micro font-mono text-foreground/55",
         className
       )}
       {...props}
