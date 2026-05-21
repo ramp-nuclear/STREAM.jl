@@ -275,4 +275,19 @@ describe("portType validator", () => {
     const results = portType.run(snapshot);
     expect(results).toHaveLength(0);
   });
+
+  // Phase 71 UAT (2026-05-21): self-loops rejected outright. CanvasPanel's
+  // isValidConnection delegates here (D-19), so this also hard-blocks the
+  // candidate edge at drop time on the canvas.
+  it("emits error for self-loop edge (source === target)", () => {
+    const pump = makeNode("pump1", "Pump", "pump1");
+    const edge = makeEdge("e1", "pump1", "port_out", "pump1", "port_in");
+
+    const snapshot = makeSnapshot([pump], [edge]);
+    const results = portType.run(snapshot);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].severity).toBe("error");
+    expect(results[0].description).toContain("self-loop");
+  });
 });

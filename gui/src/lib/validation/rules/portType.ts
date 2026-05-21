@@ -46,6 +46,27 @@ export const portType: Validator = {
         instanceName: string;
       };
 
+      // Phase 71 UAT (2026-05-21): reject self-loops outright.
+      // A component connecting to itself is never physically meaningful in
+      // the steady-state network model. Because CanvasPanel.isValidConnection
+      // delegates to this rule via D-19, this also hard-blocks the candidate
+      // edge at drop time — the user cannot draw a self-loop on the canvas.
+      if (edge.source === edge.target) {
+        const srcHandle = edge.sourceHandle ?? "unknown";
+        const tgtHandle = edge.targetHandle ?? "unknown";
+        results.push({
+          id: `port_type::${edge.id}`,
+          validatorId: "port_type",
+          severity: "error",
+          description: `${srcData.instanceName}.${srcHandle} → ${srcData.instanceName}.${tgtHandle}: self-loop`,
+          targets: [
+            { kind: "edge", edgeId: edge.id },
+            { kind: "port", nodeId: edge.source, portName: srcHandle },
+          ],
+        });
+        continue;
+      }
+
       const srcDef = snapshot.getComponentDef(srcData.componentId);
       const tgtDef = snapshot.getComponentDef(tgtData.componentId);
 
