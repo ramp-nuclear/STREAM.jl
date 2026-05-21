@@ -41,7 +41,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] **Phase 69: Command palette (jump-only)** — Ctrl+P fuzzy search across component instance names + Resource names. Focus-on-canvas for components, focus-in-navigator for Resources. No action invocation in v1. (completed 2026-05-18)
 - [x] **Phase 70: Presets and templates** — `.scpr` file format (slimmed-down `.scp` sub-graph). Save-selection-as-preset, Load-preset. Presets toolbox category. Auto-resource-create on load with smart-name collision handling. No identity (Option 1 per issue #14). (completed 2026-05-20)
 - [x] **Phase 71: Validation framework** — Pluggable validator registry. Uniform panel UX with severity (error/warning/info) + click-to-focus + action buttons (lossless-sync / value-transfer-picker / navigation-only). Red-ring markers on offending nodes + red highlights on offending property fields. Compact status-bar indicator (VS-Code-style: icons + counts). Initial rule set: z_N/length match, n-match for value sources, all-required-connections, port-type matching, dangling FlowPort, loop closure, gravity sum per loop, geometry consistency across shared coupling. Gates code-gen export on errors. (completed 2026-05-21)
-- [ ] **Phase 72: Design system / interaction contract** — Write the rules document (spatial / interaction / feedback / defaults / visual-restraint discipline) committing to "professional engineering tool, not consumer SaaS playground." Audit-and-apply pass over every existing panel. Deliverables include: thermal port handle restyle (outlined circle + chain-link state icons), tooltip system, Settings dialog (modal with left-nav categories), canvas cheatsheet (auto-generated demo component with numbered legend), accent palette for Sources and Reactor Physics layers, density expectations, visual style commitments (font, color, shadow, radius scales).
+- [ ] **Phase 72: GUI redesign — design system + audit-and-apply via Impeccable** — Bring every GUI surface into compliance with a committed, professional, tool-grade visual identity. Method: runs entirely through the Impeccable Claude Code skill (`/impeccable document` → `audit` → `critique` → per-surface `shape`/`polish` loop → `extract` → final `audit` gate). Skips GSD discuss/plan/execute/ui-phase/ui-review/verify-work. Design contract: `PRODUCT.md` (project root, written 2026-05-21). Deliverables include DESIGN.md, thermal port handle restyle, tooltip system, Settings dialog (modal with left-nav), canvas cheatsheet, Sources + Reactor Physics accent palette, BCs tab layout fixes, panel-resize overflow fix, density + typography + color + radius + shadow scales.
 
 ## Phase Details
 
@@ -347,13 +347,33 @@ Plans:
 
 - Both rules are pure functions and registered in the explicit array.
 
-### Phase 72: Design system / interaction contract
+### Phase 72: GUI redesign — design system + audit-and-apply via Impeccable
 
-**Goal:** Establish the design contract document that codifies the spatial / interaction / feedback / defaults / visual-restraint rules. Run an audit-and-apply pass over every existing panel to bring it into compliance. Deliver the visual surfaces: thermal port handle restyle, tooltip system, Settings dialog, canvas cheatsheet, accent palette extensions for Sources and Reactor Physics layers, density commitments. This is where the "professional engineering tool, not consumer SaaS playground" framing becomes concrete decisions about fonts, colors, shadows, radii, spacing.
+**Goal:** Bring every GUI surface into compliance with a committed, professional, tool-grade visual identity. Establish the design system (tokens, typography, color, density, motion, components) in `DESIGN.md` and apply it across every panel, dialog, and canvas surface. Ship the queued visual deliverables: thermal port handle restyle, tooltip system, Settings dialog (modal with left-nav), canvas cheatsheet, Sources + Reactor Physics accent palette, BCs tab layout fixes, panel-resize overflow fix.
 
-**Design-decisions reference:** Section 3.8.
-**Depends on:** All prior phases (it audits and applies the contract to every functional surface). The contract *document* itself can be drafted in parallel with earlier phases.
-**Plans:** TBD via `/gsd:plan-phase`.
+**Method:** This phase runs **entirely through the Impeccable Claude Code skill** — bypassing `/gsd:discuss-phase`, `/gsd:plan-phase`, `/gsd:execute-phase`, `/gsd:ui-phase`, `/gsd:ui-review`, and `/gsd:verify-work`. The phase plan IS the Impeccable workflow:
+
+1. `/impeccable document` — capture current visual state → `DESIGN.md`
+2. `/impeccable audit src/` — P0–P3 inventory across the entire GUI
+3. `/impeccable critique src/` — Nielsen heuristic persona reviews per surface
+4. Per-surface loop (priority order from audit + critique):
+   `/impeccable shape <surface>` → implement → `/impeccable polish <surface>` → commit
+5. Cross-cutting passes when relevant: `typeset`, `colorize`, `layout`, `animate`, `clarify`, `adapt`, `harden`, `optimize`, `distill` / `quieter` / `bolder` as needed
+6. `/impeccable extract` — promote reusable tokens and components into the design system
+7. Final gate: `/impeccable audit src/` returns 0 P0/P1 issues; `/impeccable critique src/` clears the target heuristic score
+8. `live` mode is intentionally **NOT** used in v1 (the localhost HMR server's security surface review is deferred)
+
+**Design contract:** `PRODUCT.md` (project root, written 2026-05-21 via `/impeccable teach`). `DESIGN.md` is produced in step 1 above.
+
+**Inputs from queued todos (surfaced automatically by `audit`):**
+- Phase 72 handle visual rework (Phase 64 cosmetic deferral)
+- Channel BCs tab visual layout fit (Phase 65 deferral)
+- Panel-resize overflow
+- GUI visual design pass
+
+**Design-decisions reference:** Section 3.8 + `PRODUCT.md`.
+**Depends on:** All prior phases (it audits and applies the contract to every functional surface).
+**Plans:** No `PLAN.md`. The Impeccable workflow above is the plan. `SUMMARY.md` will be written at phase end pointing at `DESIGN.md`, the final `audit` + `critique` outputs, and the git log of the phase's commits.
 
 ## Dependency Graph Summary
 
