@@ -397,7 +397,7 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
 
   return (
     <div
-      className={`relative rounded-md bg-canvas overflow-hidden min-w-[140px] transition-[box-shadow] ${
+      className={`relative rounded-md min-w-[140px] transition-[box-shadow] ${
         selected ? "ring-2 ring-[var(--ring)] ring-offset-1 ring-offset-canvas" : ""
       } ${hasAnyError ? "outline outline-2 outline-[var(--destructive)]" : ""} ${
         isCodeHovered ? "stream-node--code-hover" : ""
@@ -407,44 +407,57 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           : ""
       }`}
     >
-      {/* Phase 72 — leading-band layer identity. Replaces the prior
-          border-left accent. Solid for single-layer components; split
-          half/half for dual-layer (CAC on Hydraulic+Thermal); n-way
-          split for >2 layers (forward-compatible — no component has
-          this today). Band height thickens 4 → 8 px on selection. */}
-      {layers.length > 0 && (
-        <div
-          className="flex w-full transition-[height]"
-          style={{ height: bandHeightPx }}
-          aria-hidden="true"
-          data-testid="stream-node-band"
-        >
-          {layers.map((layer) => (
-            <div
-              key={layer}
-              data-layer={layer}
-              style={{
-                flex: 1,
-                backgroundColor: LAYER_COLOR_VAR[layer],
-              }}
-            />
-          ))}
-        </div>
-      )}
-      <div className="p-2">
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-          <Icon className="w-3.5 h-3.5" />
-          {component.label}
-        </div>
-        <div className="font-semibold text-sm">{nodeData.instanceName}</div>
-        {sourceLabel && (
+      {/* Phase 72 — visual surface wrapper. overflow-hidden + rounded-md
+          clip the band's top corners to match the wrapper's outline. Kept
+          INSIDE the positioned outer div so xyflow's port Handles (which
+          attach to the positioned ancestor and project outside its
+          bounding box) are NOT clipped by this overflow. First-pass put
+          overflow-hidden on the outer wrapper itself, which clipped half
+          of every port handle. */}
+      <div className="rounded-md overflow-hidden">
+        {/* Leading-band layer identity. Replaces the prior border-left
+            accent. Solid for single-layer components; split half/half
+            for dual-layer (CAC on Hydraulic+Thermal); n-way split for
+            >2 layers (forward-compatible — no component has this
+            today). Band height thickens 4 → 8 px on selection. */}
+        {layers.length > 0 && (
           <div
-            className={`text-[11px] ${sourceLabel.muted ? "text-destructive/80" : "text-muted-foreground"}`}
-            data-testid="source-block-label"
+            className="flex w-full transition-[height]"
+            style={{ height: bandHeightPx }}
+            aria-hidden="true"
+            data-testid="stream-node-band"
           >
-            {sourceLabel.text}
+            {layers.map((layer) => (
+              <div
+                key={layer}
+                data-layer={layer}
+                style={{
+                  flex: 1,
+                  backgroundColor: LAYER_COLOR_VAR[layer],
+                }}
+              />
+            ))}
           </div>
         )}
+        {/* Body uses bg-card (recommitted in index.css to be distinctly
+            darker than --canvas) so the node reads as a cell on the work
+            surface. First-pass used bg-canvas, which matched the canvas
+            color exactly and rendered bodies invisible. */}
+        <div className="bg-card p-2">
+          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <Icon className="w-3.5 h-3.5" />
+            {component.label}
+          </div>
+          <div className="font-semibold text-sm">{nodeData.instanceName}</div>
+          {sourceLabel && (
+            <div
+              className={`text-[11px] ${sourceLabel.muted ? "text-destructive/80" : "text-muted-foreground"}`}
+              data-testid="source-block-label"
+            >
+              {sourceLabel.text}
+            </div>
+          )}
+        </div>
       </div>
       {flowPorts.map((port) => (
         <FlowPortHandle
