@@ -406,36 +406,21 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       // flash and the user perceives "nothing happens" when clicking an
       // error row whose node is already errored.
       data-stream-node-id={id}
-      // Phase 72 P11 (2026-05-22) — EVERY visual on the node's outer
-      // wrapper (outline, outline-offset, outline-style, box-shadow) is
-      // now set via inline style. The CSS pipeline in this Vite + Tailwind
-      // v4 dev configuration has been serving stale compiled rules for
-      // .stream-node--* classes (verified: the user's devtools computed
-      // box-shadow returned an older value than what was in index.css,
-      // even after a clean .vite/deps cache nuke). Inline style ships
-      // with the JS bundle that HMR refreshes reliably AND wins CSS
-      // specificity against any stale class rule.
-      //
-      // The .stream-node--code-hover / .stream-node--code-pinned
-      // classes are still added below to satisfy the Phase 66
-      // code-preview ↔ canvas linking layer + the 4 unit tests that
-      // verify state propagation. They cannot paint anything because
-      // the inline styles below override them.
-      //
-      // State priority (highest to lowest):
-      //   1. Error → red destructive outline, no offset
-      //   2. autoExtended → orange dashed outline, offset 2 px
-      //   3. Default (incl. code-hover, code-pinned) → no outline
-      // Ring (box-shadow) is independent of outline, always present:
-      //   - Selected: 2 px Hydraulic blue (var(--ring))
-      //   - Unselected: 2 px mid-grey hex
+      // Phase 72 — outline + box-shadow set via inline style. The CSS
+      // pipeline in the dev configuration serves stale compiled output
+      // for .stream-node--* class rules; inline style ships via JS HMR
+      // and wins specificity over any class rule. Outline state
+      // priority: error → autoExtended → none. Ring is always present
+      // (mid-grey at rest, Hydraulic --ring when selected, 200 ms ease).
+      // The code-hover / code-pinned classes are state markers only
+      // (Phase 66 linking + unit tests); their CSS rules are no-ops.
       className={`relative rounded-md min-w-[140px] transition-[box-shadow] duration-200 ${
         isCodeHovered ? "stream-node--code-hover" : ""
       } ${isCodePinned ? "stream-node--code-pinned" : ""}`}
       style={{
         boxShadow: selected
           ? "0 0 0 1px var(--canvas), 0 0 0 3px var(--ring)"
-          : "0 0 0 1px var(--canvas), 0 0 0 2px #6e6e6e",
+          : "0 0 0 1px var(--canvas), 0 0 0 2px var(--node-ring-rest)",
         outline: hasAnyError
           ? "2px solid var(--destructive)"
           : nodeData.autoExtended
