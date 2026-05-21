@@ -299,20 +299,13 @@ body {
   50%      { outline-color: color-mix(in oklch, var(--destructive) 25%, transparent); }
 }
 .validation-flash {
+  /* Phase 72 — added by CanvasPanel.onNodeFlash to the StreamNode outer
+     div (targeted via `[data-stream-node-id]`, NOT xyflow's `[data-id]`
+     wrapper). Because the target already has `rounded-md` from Tailwind,
+     the outline follows the rounded path automatically — no explicit
+     border-radius needed here. Offset 0 keeps the flash flush with the
+     node edge, matching the persistent error outline's geometry. */
   outline: 2px solid var(--destructive);
-  /* Phase 72 — outline-offset was 4 px, which floated the flash as a
-     disconnected halo around the node. Reduced to 0 so it hugs the node
-     edge and matches the visual language of every other outline state
-     (persistent error outline, autoExtended dashed, selection ring). */
   outline-offset: 0;
-  /* CRITICAL — this class is added via classList.add to xyflow's node
-     wrapper (the element carrying `data-id`), NOT to the StreamNode
-     React component's outer div. The xyflow wrapper has no border-radius
-     of its own, so without this declaration the outline draws around a
-     RECTANGLE while the visible node body inside is rounded-md (8 px).
-     Result without it: square corner brackets sticking out where the
-     node body curves in. border-radius here makes the outline follow
-     the same rounded path as the node body underneath. */
-  border-radius: var(--radius-md);
   animation: node-flash-outline 600ms ease-out 1;
 }
