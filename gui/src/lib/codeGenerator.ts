@@ -21,7 +21,7 @@ import type {
   FunctionOption,
   FactoryCorrelationValue,
 } from "../registry/types";
-import { validateJuliaIdentifier } from "./validation";
+import { validateJuliaIdentifier } from "./validation/fields";
 import { bcModeKey, type BCModeEntry } from "@/lib/bcMode";
 import { isSourceValueEntry, type SourceValueEntry } from "@/lib/sourceValueEntry";
 import type { CodegenAnchorsState } from "@/lib/anchors";

@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { validateReal } from "@/lib/validation";
+import { validateReal } from "@/lib/validation/fields";
 import {
   isSourceValueEntry,
   defaultSourceValueEntry,
