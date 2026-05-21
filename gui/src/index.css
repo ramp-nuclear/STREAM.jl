@@ -202,3 +202,17 @@ body {
   outline-offset: 3px;
   box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.55);
 }
+
+/* Phase 71 Plan 10 — ValidationStatusBar 0→N pulse animation (D-03).
+   Single-shot 600ms keyframe: the error chip pulses once when error count rises
+   from 0 to N, then returns to normal. No persistent spinner. Phase 72 sweeps
+   the visual tokens (color, timing curve). */
+@keyframes pulse-once {
+  0%   { opacity: 1; transform: scale(1); }
+  50%  { opacity: 0.4; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.pulse-once {
+  animation: pulse-once 600ms ease-out 1;
+}
