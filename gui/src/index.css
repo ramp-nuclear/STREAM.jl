@@ -22,9 +22,23 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Phase 72 — --border relocked from oklch(0.922 0 0) to a hue-tinted solid
+     OKLCH (no pure-neutral, no alpha trickery). --border-hover is a +Δ0.08
+     lightness step used by Input on hover. */
+  --border: oklch(0.88 0.005 254);
+  --border-hover: oklch(0.80 0.005 254);
+  --input: oklch(0.88 0.005 254);
+  /* Phase 72 — --ring relocked from pure-neutral to a low-chroma Hydraulic
+     tint (hue 240, chroma 0.14). Focus reads as "selected" with minor
+     identity, not decoration. Matches Linear/Cursor lineage. */
+  --ring: oklch(0.55 0.14 240);
+  /* Phase 72 — --shadow-dialog is the ONE structural shadow in the system.
+     Applied to Dialog + AlertDialog + Sheet only. Tonal-layering does
+     elevation work everywhere else. Tuned for "lift, not glow" — low alpha,
+     low blur, double-stop with a tight near-shadow. */
+  --shadow-dialog:
+    0 8px 24px -8px oklch(0.20 0.012 254 / 0.20),
+    0 2px 6px -2px oklch(0.20 0.012 254 / 0.10);
   /* Phase 72 — three-tier depth tokens recommitted with stronger steps and
      hue tint per OKLCH no-#fff rule. Chrome darkest, panel mid, canvas
      lightest (warmest). Light mode: tinted toward hue 254 (matches dark
@@ -101,9 +115,24 @@
   --accent: oklch(0.315 0.016 252);
   --accent-foreground: oklch(0.73 0.012 250);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 11%);
-  --input: oklch(1 0 0 / 13%);
-  --ring: oklch(0.50 0.01 250);
+  /* Phase 72 — --border relocked from alpha-on-white (oklch(1 0 0 / 11%))
+     to solid hue-tinted OKLCH. Alpha-on-pure-white violated the OKLCH-only
+     doctrine (it's effectively HSL alpha trickery). --border-hover is the
+     +Δ0.08 lightness step Input lifts to on hover. */
+  --border: oklch(0.30 0.012 254);
+  --border-hover: oklch(0.38 0.012 254);
+  --input: oklch(0.30 0.012 254);
+  /* Phase 72 — --ring relocked from pure-neutral oklch(0.50 0.01 250) to a
+     low-chroma Hydraulic tint (hue 240). Focus reads as "selected" with
+     minor identity. */
+  --ring: oklch(0.65 0.10 240);
+  /* Phase 72 — --shadow-dialog is the ONE structural shadow in the system.
+     Dark-mode values: darker base + slightly higher alpha to lift correctly
+     against the dark panel/canvas. Applied to Dialog + AlertDialog + Sheet
+     only. */
+  --shadow-dialog:
+    0 8px 24px -8px oklch(0.05 0.012 254 / 0.50),
+    0 2px 6px -2px oklch(0.05 0.012 254 / 0.30);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -156,6 +185,9 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
+  /* Phase 72 — --border-hover is the +Δ0.08 lightness step Input lifts to
+     on hover (and any control that wants a hover border emphasis). */
+  --color-border-hover: var(--border-hover);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
@@ -163,10 +195,32 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  /* Phase 72 — radius scale committed to two tiers: --radius-sm 4px for
+     compact controls (Button, Input, Badge, menu items), --radius-md 8px
+     for surfaces (Popover, Dialog, Card). --radius-lg/xl retained for
+     downstream code that already consumes them, but the primitive layer
+     does not use them. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Phase 72 — typographic scale (1.25 Major Third). Tailwind v4 reads
+     --text-* tokens to generate text-{name} utilities. */
+  --text-micro: 0.625rem;       /* 10 px — layer headers, validator-id chips, keyboard hint chips */
+  --text-micro--line-height: 1rem;
+  --text-label: 0.6875rem;      /* 11 px — status bar chips, node summary, Badge, Label */
+  --text-label--line-height: 1rem;
+  --text-body: 0.8125rem;       /* 13 px — inputs, buttons, menu items, node instance name */
+  --text-body--line-height: 1.25rem;
+  --text-title: 1rem;           /* 16 px — panel headers, dialog titles */
+  --text-title--line-height: 1.5rem;
+  --text-display: 1.25rem;      /* 20 px — reserved for future hierarchy moments */
+  --text-display--line-height: 1.75rem;
+  /* Phase 72 — --shadow-dialog (defined in :root + .dark) is consumed by
+     Dialog / AlertDialog / Sheet via the arbitrary-value form
+     `shadow-[var(--shadow-dialog)]`. Not exposed as a Tailwind utility
+     here because @theme inline would require static values, breaking the
+     dark-mode override. */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
