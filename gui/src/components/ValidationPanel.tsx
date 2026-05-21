@@ -30,6 +30,7 @@ import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { Button } from "./ui/button";
 import useStore from "../store/useStore";
 import type { ValidationResult, FixAction } from "../lib/validation/types";
+import { type StreamNodeData } from "../store/useStore";
 
 // ---------------------------------------------------------------------------
 // Custom-event type declarations (consumed here; dispatched by Plan 10 + 11).
@@ -102,12 +103,23 @@ function SeverityIcon({ severity }: { severity: "error" | "warning" | "info" }) 
 
 export default function ValidationPanel() {
   const validationResults = useStore((s) => s.validationResults);
+  const nodes = useStore((s) => s.nodes);
 
   // D-05 filter state — mutually exclusive.
   const [severityFilter, setSeverityFilter] = useState<
     "error" | "warning" | "info" | null
   >(null);
   const [nodeFilter, setNodeFilter] = useState<string | null>(null);
+
+  // Display label for the node filter banner: prefer the user-facing
+  // instance name; fall back to the raw nodeId if the node has been
+  // deleted (filter persists until Clear filter is clicked).
+  const nodeFilterLabel =
+    nodeFilter === null
+      ? null
+      : (nodes.find((n) => n.id === nodeFilter)?.data as
+          | StreamNodeData
+          | undefined)?.instanceName ?? nodeFilter;
 
   // Ref for the first rendered row so we can scrollIntoView on node-filter
   // activation (D-05 "scrolls the first matching row into view").
@@ -211,7 +223,7 @@ export default function ValidationPanel() {
             </span>
           ) : (
             <span>
-              Filtered to <span className="font-mono font-medium">{nodeFilter}</span>{" "}
+              Filtered to <span className="font-medium">{nodeFilterLabel}</span>{" "}
               &middot; {count}
             </span>
           )}

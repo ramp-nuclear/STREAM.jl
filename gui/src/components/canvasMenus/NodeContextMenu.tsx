@@ -119,7 +119,7 @@ export default function NodeContextMenu({ nodeId, onClose }: NodeContextMenuProp
           ValidationResult targeting it. Render guard (not disabled) per UI-SPEC. */}
       {hasErrors && (
         <DropdownMenuItem onSelect={handleShowErrors}>
-          Show errors for this component
+          Show errors
         </DropdownMenuItem>
       )}
       {/* Phase 70 D-15.1: visible only when ≥ 2 nodes are selected (render guard,
