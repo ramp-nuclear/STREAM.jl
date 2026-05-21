@@ -26,6 +26,7 @@ import { portType } from "./rules/portType";
 import { requiredConnections } from "./rules/requiredConnections";
 import { danglingFlowPort } from "./rules/danglingFlowPort";
 import { zNMatch } from "./rules/zNMatch";
+import { lengthMatch } from "./rules/lengthMatch";
 
 /** All registered validators. Rules plans append by importing each rule and
  *  pushing to this array. The runner (runner.ts) flat-maps over this array
@@ -35,4 +36,5 @@ export const validators: Validator[] = [
   requiredConnections,
   danglingFlowPort,
   zNMatch,
+  lengthMatch,
 ];
