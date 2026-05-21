@@ -12,22 +12,42 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Node } from "@xyflow/react";
 import useStore from "../useStore";
-import {
-  selectNodeErrors,
-  type NodeErrorsInput,
-} from "../../lib/selectors/nodeErrors";
 
-// Phase 63.1 D-15: errorTagsByNodeId slice dropped from store; ring/error
-// state is now derived by selectNodeErrors. Tests that previously read
-// state.errorTagsByNodeId[id] now call selectNodeErrors(state, id) instead.
+// Phase 71 D-20: selectNodeErrors deleted; inline the n-mismatch check here
+// so these store-layer tests can assert the same BC wiring contract without
+// depending on the deleted selector module.
+function readN(nodeId: string): number | undefined {
+  const node = useStore.getState().nodes.find((n) => n.id === nodeId);
+  const params = (node?.data as { parameters?: Record<string, unknown> } | undefined)?.parameters;
+  const n = params?.["n"];
+  return typeof n === "number" ? n : undefined;
+}
+
 function errorsFor(nodeId: string): string[] {
-  const s = useStore.getState() as unknown as NodeErrorsInput & { anchors?: Record<string, never> };
-  // Plan 03 lands the `anchors` slice; until then, fall back to {} so the
-  // selector's typed input is satisfied without depending on slice ordering.
-  return selectNodeErrors(
-    { ...s, anchors: s.anchors ?? {} } as NodeErrorsInput,
-    nodeId,
-  );
+  const { bcMode } = useStore.getState();
+  const myN = readN(nodeId);
+  const tags: string[] = [];
+  for (const [key, entry] of Object.entries(bcMode)) {
+    if (entry.mode !== "source") continue;
+    if (key.startsWith(`${nodeId}::`)) {
+      const srcN = readN(entry.sourceNodeId);
+      if (typeof myN === "number" && typeof srcN === "number" && myN !== srcN) {
+        tags.push("bc-n-mismatch");
+        break;
+      }
+    }
+    if (entry.sourceNodeId === nodeId) {
+      const sepIdx = key.indexOf("::");
+      if (sepIdx < 0) continue;
+      const consumerId = key.slice(0, sepIdx);
+      const consN = readN(consumerId);
+      if (typeof myN === "number" && typeof consN === "number" && myN !== consN) {
+        tags.push("bc-n-mismatch");
+        break;
+      }
+    }
+  }
+  return tags;
 }
 
 // Reset to a clean slate before every test. Mirrors the canonical reset
