@@ -1,29 +1,22 @@
 /**
- * exportCode — Phase 66 Plan 03 shared util.
+ * exportCode — Phase 71 Plan 12 rewrite (D-17).
  *
- * Encapsulates the Tauri save-dialog + writeTextFile flow that exports the
- * generated Julia code to a .jl file. Both Toolbar.tsx (this plan) and
- * BottomPanel.tsx (Plan 04) call this util so the validation gate, dialog
- * config, and serialization happen in exactly one place.
+ * Calls runValidators synchronously before opening the save dialog.
+ * If any error-severity result is present:
+ *   - fires a sonner toast.error (≤2s)
+ *   - writes validationResults + errorNodeIds to the store
+ *   - auto-opens the BottomPanel and switches to the Validation tab
+ *   - aborts the export (returns false)
+ *
+ * On success the fresh validation results are still propagated to the store
+ * so the Validation panel matches the moment of export.
  *
  * Returns a Promise<boolean>:
  *   - true  → file written successfully
- *   - false → bailed safely (empty nodes, validation failed, OR user cancel)
+ *   - false → bailed safely (empty nodes, validation errors, OR user cancel)
  *
  * Write errors are NOT swallowed: writeTextFile rejection propagates so the
- * caller's existing .catch / console.error path keeps surfacing them. This
- * matches Toolbar.tsx's pre-extraction behavior (line 58-69, no try/catch).
- *
- * Defensive empty-nodes gate (Pattern 11 in 66-RESEARCH.md): the UI
- * disables the Export button when nodes.length === 0 (D-19), but the util
- * still bails early on empty nodes as a safety net — that way Plan 04's
- * BottomPanel call site doesn't need to duplicate the predicate.
- *
- * The validation gate itself runs `useStore.getState().validateAndGate()`,
- * which writes `useStore.validationResult` as a side effect — that side
- * effect drives the existing ValidationDialog. Calling it (rather than
- * bypassing it) is load-bearing for the UX, even though we also use the
- * return value to gate the save dialog.
+ * caller's existing .catch / console.error path keeps surfacing them.
  */
 
 import { save } from "@tauri-apps/plugin-dialog";
@@ -31,6 +24,9 @@ import { writeTextFile } from "@tauri-apps/plugin-fs";
 import type { Node } from "@xyflow/react";
 import useStore from "../store/useStore";
 import { serializeSections, type CodeSection } from "./codeGenerator";
+import { buildValidationSnapshot } from "./validation/snapshot";
+import { runValidators } from "./validation/runner";
+import { toast } from "../components/ui/sonner";
 
 export interface ExportCodeOptions {
   sections: CodeSection[];
@@ -38,20 +34,46 @@ export interface ExportCodeOptions {
 }
 
 export async function exportCode(opts: ExportCodeOptions): Promise<boolean> {
-  // Defensive empty-nodes gate — see header comment.
+  // Defensive empty-nodes gate.
   if (opts.nodes.length === 0) return false;
 
-  // Validation gate. validateAndGate writes useStore.validationResult; the
-  // existing ValidationDialog surfaces invalid-state to the user. Mirrors
-  // Toolbar.tsx:59-60's pre-extraction behavior.
-  const result = useStore.getState().validateAndGate();
-  if (!result.valid) return false;
+  const s = useStore.getState();
+  const snapshot = buildValidationSnapshot(s);
+  const results = runValidators(snapshot);
+  const errorCount = results.filter((r) => r.severity === "error").length;
+
+  // D-17: derive errorNodeIds the same way initValidation does it.
+  const errorNodeIds = new Set(
+    results
+      .filter((r) => r.severity === "error")
+      .flatMap((r) => r.targets)
+      .filter((t) => t.kind === "node" || t.kind === "port")
+      .map((t) => (t as { nodeId: string }).nodeId),
+  );
+
+  if (errorCount > 0) {
+    toast.error(
+      `Export blocked: ${errorCount} validation ${errorCount === 1 ? "error" : "errors"}. See Validation panel.`,
+      { duration: 2000 },
+    );
+    useStore.setState({
+      validationResults: results,
+      errorNodeIds,
+      bottomPanelOpen: true,
+      activeBottomTab: "validation",
+    });
+    return false;
+  }
+
+  // Even on success, propagate the fresh results so the panel matches the
+  // moment of export.
+  useStore.setState({ validationResults: results, errorNodeIds });
 
   const filePath = await save({
     defaultPath: "system.jl",
     filters: [{ name: "Julia files", extensions: ["jl"] }],
   });
-  if (!filePath) return false; // user dismissed the dialog
+  if (!filePath) return false;
 
   const code = serializeSections(opts.sections);
   await writeTextFile(filePath, code);
