@@ -14,7 +14,6 @@ import { getComponentIcon } from "@/registry/icons";
 import { getComponentLayers, type ActiveLayers } from "../lib/layers";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
-import { selectNodeErrors, type NodeErrorsInput } from "@/lib/selectors/nodeErrors";
 import { isSourceValueEntry } from "@/lib/sourceValueEntry";
 import {
   resolveFlowPortAssignment,
@@ -121,7 +120,7 @@ const SOURCE_LABEL_FIELD: Record<string, string> = {
 //
 // The hasAnchor selector returns a *primitive boolean*, not a fresh object —
 // this keeps zustand's shallow equality stable and avoids the max-update-
-// depth re-render loop (Pitfall 1, same rationale as `hasBCError` above).
+// depth re-render loop (Pitfall 1 — return a primitive, never a fresh object).
 
 type FlowPortLike = {
   name: string;
@@ -322,24 +321,12 @@ function ThermalPortHandle({
 export default function StreamNode({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as StreamNodeData;
   const hasError = useStore(useCallback((s: { errorNodeIds: Set<string> }) => s.errorNodeIds.has(id), [id]));
-  // Phase 63 D-22 / 63.1 D-15 — BC-specific error tag surface (sibling to the
-  // legacy Phase-39 `errorNodeIds: Set<string>`; both contribute to the red-ring).
-  // Select a primitive (boolean) — not a fresh array — to keep zustand's
-  // shallow equality stable and avoid the maximum-update-depth re-render loop.
-  // Phase 63.1 D-15: ring state now derives from selectNodeErrors (pure
-  // function of nodes + edges + bcMode + bcSymmetric + anchors); there is no
-  // stored errorTagsByNodeId slice anymore.
-  const hasBCError = useStore(
-    useCallback(
-      (s) => selectNodeErrors(s as unknown as NodeErrorsInput, id).length > 0,
-      [id],
-    ),
-  );
+  // nMatch validator results flow through errorNodeIds via initValidation (Phase 71 D-20).
   // Phase 66 — code-panel ↔ canvas bidirectional traceability (D-05, D-09, D-11).
-  // Per-node primitive-boolean selectors mirror the `hasAnchor` / `hasBCError`
-  // shape above. Re-render fanout: toggling one ID only re-renders the
-  // affected StreamNode(s), not all N nodes — zustand sees the boolean flip
-  // for `n1` only and skips the other subscribers (Research Pattern 9).
+  // Per-node primitive-boolean selectors mirror the `hasAnchor` shape above.
+  // Re-render fanout: toggling one ID only re-renders the affected StreamNode(s),
+  // not all N nodes — zustand sees the boolean flip for `n1` only and skips
+  // the other subscribers (Research Pattern 9).
   const isCodeHovered = useStore(
     useCallback((s: { hoveredSourceIds: Set<string> }) => s.hoveredSourceIds.has(id), [id]),
   );
@@ -382,9 +369,8 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
   const dimThermalHandles = thermalOff && !hideOffLayer;
   const hideThermalHandles = thermalOff && hideOffLayer;
 
-  // Combined error surface — legacy Phase-39 + BC tag list. The red-ring
-  // outline lights up when EITHER source has a flag for this node.
-  const hasAnyError = hasError || hasBCError;
+  // Combined error surface — errorNodeIds is now the sole source (Phase 71 D-20).
+  const hasAnyError = hasError;
 
   // -------------------------------------------------------------------------
   // Source-block label (D-19)
