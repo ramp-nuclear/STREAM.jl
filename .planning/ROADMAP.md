@@ -303,7 +303,7 @@ Plans:
 
 **Design-decisions reference:** Section 3.9.
 **Depends on:** Phase 62 (operates on Resources + components).
-**Plans:** 3/13 plans executed
+**Plans:** 4/13 plans executed
 
 Plans:
 **Wave 1**
@@ -314,7 +314,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 71-04-PLAN.md (Wave 2, depends 01) — Structural rules: portType (D-19 single source of truth), requiredConnections, danglingFlowPort (VALD-01 fold) + index.ts registration.
+- [x] 71-04-PLAN.md (Wave 2, depends 01) — Structural rules: portType (D-19 single source of truth), requiredConnections, danglingFlowPort (VALD-01 fold) + index.ts registration.
 - [ ] 71-09-PLAN.md (Wave 2, parallel to rule files) — ValidationPanel.tsx (list + sort + click-to-focus + empty state + severity-filter listener + node-filter listener) + BottomPanel.tsx Validation tab + controlled Tabs via activeBottomTab. (Wave dropped from 7 to 2 in revision; UI consumes empty validationResults until rules land, then re-renders automatically.)
 - [ ] 71-10-PLAN.md (Wave 2, parallel to 09) — ValidationStatusBar.tsx + App.tsx mount + Toaster mount + initValidation() useEffect + pulse-once CSS keyframes + REQUIRED 'stream:validation-filter' CustomEvent dispatch on chip click (Plan 09 listens). (Wave dropped from 7 to 2 in revision.)
 
@@ -406,7 +406,7 @@ contract document drafted in parallel throughout.
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
 | 69. Command palette (jump-only)                      | 3/3 | Complete    | 2026-05-18 |
 | 70. Presets and templates                            | 6/6 | Complete    | 2026-05-20 |
-| 71. Validation framework                             | 3/13 | In Progress|  |
+| 71. Validation framework                             | 4/13 | In Progress|  |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
 
 ## Coverage
