@@ -114,16 +114,15 @@ function makeNodes(): Node[] {
 }
 
 // Phase 71 UAT Test 14 follow-up (2026-05-21): the export gate now splits
-// errors by structural-vs-diagnostic. The pre-existing tests used the dangling
-// FlowPort case to exercise the hard-block path — that rule IS structural, so
-// the validatorId must match the real id (`dangling_flow_port`, snake_case)
-// for STRUCTURAL_IDS lookup in exportCode to recognize it.
+// errors by structural-vs-diagnostic. validatorId must match a real structural
+// rule for the STRUCTURAL_IDS lookup in exportCode. Using required_connections
+// since danglingFlowPort was deleted after the UAT Test 3 gap resolution.
 function makeStructuralErrorResult(): ValidationResult {
   return {
     id: "test-err-1",
-    validatorId: "dangling_flow_port",
+    validatorId: "required_connections",
     severity: "error",
-    description: "pump1.port_out unconnected",
+    description: "pump1.port_out not connected",
     targets: [{ kind: "node", nodeId: "pump1-uuid" }],
   };
 }
