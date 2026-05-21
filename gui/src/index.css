@@ -307,16 +307,40 @@ body {
    Both classes can coexist (sub-block-hovered + previously-pinned node) —
    the cascade resolves to a single outline; the pinned color wins by source
    order, which is the intended distinction for now. */
-/* Phase 72 P5 (2026-05-22) — code-hover / code-pinned outline colors
-   relocked to TRUE NEUTRAL GREY (oklch chroma 0). The previous neutral
-   used --foreground's hue 250 chroma 0.012 — technically low-chroma, but
-   at the small contrast levels of a ring on the canvas the eye anchors on
-   the edge and amplifies any residual hue, reading the result as blue.
-   Pure chroma 0 is the only way to render as truly grey here. DESIGN.md
-   §2's "no pure neutrals" doctrine assumed large background fills where
-   the eye normalizes — not narrow ring/outline geometry on dark surfaces.
-   The "edges-and-code-preview" shape session (queued) still owns the
-   final tokenization. */
+/* Phase 72 P6 (2026-05-22) — node ring + code-hover / code-pinned colors
+   moved into explicit CSS classes (no Tailwind interpretation) to nail
+   down "no blue on unselected nodes" definitively. Prior attempts used
+   Tailwind arbitrary values like `ring-[oklch(0.65_0_0_/_0.3)]` which is
+   the documented syntax for ring + arbitrary OKLCH + alpha — but Tailwind
+   v4's parser silently fails on the slash inside oklch() in some build
+   configurations, falling back to `currentColor` (= --foreground,
+   hue 250 chroma 0.012) and rendering as light blue. Class-based CSS
+   bypasses all parsing risk.
+
+   The values are TRUE NEUTRAL GREY at oklch chroma 0. DESIGN.md §2's
+   "no pure neutrals" rule assumed large background fills where the eye
+   normalizes — narrow ring/outline geometry on dark surfaces is the
+   opposite case (the eye locks onto a 1-2 px edge and any chroma
+   contribution dominates the perception). Pure neutral is correct here. */
+
+/* Always-on thin grey ring on every unselected node. 1 px ring outside
+   a 1 px canvas-color offset (same offset geometry as the previous
+   ring-offset-1 ring-offset-canvas Tailwind setup). */
+.stream-node-ring-rest {
+  box-shadow:
+    0 0 0 1px var(--canvas),
+    0 0 0 2px oklch(0.65 0 0 / 0.30);
+}
+
+/* Selected — animates from rest via transition-[box-shadow] on the
+   element. 2 px ring in --ring (Hydraulic low-chroma blue) outside the
+   same 1 px canvas offset. */
+.stream-node-ring-selected {
+  box-shadow:
+    0 0 0 1px var(--canvas),
+    0 0 0 3px var(--ring);
+}
+
 .stream-node--code-hover {
   outline: 1px solid var(--stream-code-hover-ring-color, oklch(0.65 0 0 / 0.35));
   outline-offset: 2px;
