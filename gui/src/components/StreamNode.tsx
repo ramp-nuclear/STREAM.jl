@@ -11,7 +11,8 @@ import {
 } from "@xyflow/react";
 import { getComponent } from "../registry";
 import { getComponentIcon } from "@/registry/icons";
-import { getComponentLayers, type ActiveLayers } from "../lib/layers";
+import { getComponentLayers, getDisplayLayers, type ActiveLayers } from "../lib/layers";
+import { LAYER_COLOR_VAR } from "../lib/layerColors";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
 import { isSourceValueEntry } from "@/lib/sourceValueEntry";
@@ -21,19 +22,18 @@ import {
   type Side,
 } from "@/lib/autoflip";
 
-// Inline colors: immune to Tailwind JIT scanning gaps and * { border-color } cascade.
-const CATEGORY_LEFT_BORDER_COLOR: Record<string, string> = {
-  Hydraulic: "#3b82f6", // blue-500
-  Thermal: "#f59e0b", // amber-500
-};
-
+// Phase 72 — flow-port colors stay as inline hex (documented JIT-bypass);
+// per Phase 72 brief their tokenization is deferred to the edges-and-code-
+// preview shape session. THERMAL_HANDLE values consume the new layer-thermal
+// token (handle is per definition the Thermal layer's signal).
 const FLOW_IN_BG = "#60a5fa";       // blue-400 (port_in — incoming flow)
 const FLOW_IN_BORDER = "#1d4ed8";   // blue-700
 const FLOW_OUT_BG = "#f87171";      // red-400 (port_out — outgoing flow)
 const FLOW_OUT_BORDER = "#b91c1c";  // red-700
 
-const THERMAL_HANDLE_COLOR = "#f59e0b"; // amber-500
-const THERMAL_HANDLE_BORDER = "#d97706"; // amber-600
+const THERMAL_HANDLE_COLOR = "var(--color-layer-thermal)";
+const THERMAL_HANDLE_BORDER =
+  "color-mix(in oklch, var(--color-layer-thermal) 75%, black)";
 
 const sideToPosition: Record<string, Position> = {
   left: Position.Left,
@@ -349,7 +349,16 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
   if (!component) return null;
 
   const Icon = getComponentIcon(nodeData.componentId);
-  const accentColor = CATEGORY_LEFT_BORDER_COLOR[component.category];
+
+  // Phase 72 — leading-band identity (replaces border-as-accent). One band
+  // div per layer the component belongs to, side by side horizontally. For
+  // single-layer components (most), one solid band. For dual-layer
+  // (ChannelAndContacts has both FlowPorts and ThermalPorts), the band
+  // splits half/half. Components with no layer association (e.g. Resources)
+  // render no band. Visual-only — uses getDisplayLayers, not
+  // getComponentLayers, so visibility/dim behavior is unaffected.
+  const layers = getDisplayLayers(component);
+  const bandHeightPx = selected ? 8 : 4;
 
   const flowPorts = component.ports.filter((p) => p.type === "FlowPort");
   const thermalPorts = component.ports.filter((p) => p.type === "ThermalPort");
@@ -388,33 +397,55 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
 
   return (
     <div
-      className={`relative border rounded-[var(--radius)] bg-card p-2 min-w-[140px] ${
-        selected ? "ring-2 ring-[var(--ring)]" : ""
-      } ${hasAnyError ? "outline outline-2 outline-offset-1 ring-2 ring-destructive" : ""} ${
+      className={`relative rounded-md bg-canvas overflow-hidden min-w-[140px] transition-[box-shadow] ${
+        selected ? "ring-2 ring-[var(--ring)] ring-offset-1 ring-offset-canvas" : ""
+      } ${hasAnyError ? "outline outline-2 outline-[var(--destructive)]" : ""} ${
         isCodeHovered ? "stream-node--code-hover" : ""
       } ${isCodePinned ? "stream-node--code-pinned" : ""} ${
         nodeData.autoExtended
-          ? "outline outline-2 outline-dashed outline-[oklch(0.769_0.188_70.08)] outline-offset-2"
+          ? "outline outline-2 outline-dashed outline-[var(--chart-5)] outline-offset-2"
           : ""
       }`}
-      style={{
-        ...(accentColor ? { borderLeftWidth: "3px", borderLeftColor: accentColor } : {}),
-        ...(hasAnyError ? { outlineColor: "var(--destructive)" } : {}),
-      }}
     >
-      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-        <Icon className="w-3.5 h-3.5" />
-        {component.label}
-      </div>
-      <div className="font-semibold text-sm">{nodeData.instanceName}</div>
-      {sourceLabel && (
+      {/* Phase 72 — leading-band layer identity. Replaces the prior
+          border-left accent. Solid for single-layer components; split
+          half/half for dual-layer (CAC on Hydraulic+Thermal); n-way
+          split for >2 layers (forward-compatible — no component has
+          this today). Band height thickens 4 → 8 px on selection. */}
+      {layers.length > 0 && (
         <div
-          className={`text-[11px] ${sourceLabel.muted ? "text-destructive/80" : "text-muted-foreground"}`}
-          data-testid="source-block-label"
+          className="flex w-full transition-[height]"
+          style={{ height: bandHeightPx }}
+          aria-hidden="true"
+          data-testid="stream-node-band"
         >
-          {sourceLabel.text}
+          {layers.map((layer) => (
+            <div
+              key={layer}
+              data-layer={layer}
+              style={{
+                flex: 1,
+                backgroundColor: LAYER_COLOR_VAR[layer],
+              }}
+            />
+          ))}
         </div>
       )}
+      <div className="p-2">
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <Icon className="w-3.5 h-3.5" />
+          {component.label}
+        </div>
+        <div className="font-semibold text-sm">{nodeData.instanceName}</div>
+        {sourceLabel && (
+          <div
+            className={`text-[11px] ${sourceLabel.muted ? "text-destructive/80" : "text-muted-foreground"}`}
+            data-testid="source-block-label"
+          >
+            {sourceLabel.text}
+          </div>
+        )}
+      </div>
       {flowPorts.map((port) => (
         <FlowPortHandle
           key={port.name}

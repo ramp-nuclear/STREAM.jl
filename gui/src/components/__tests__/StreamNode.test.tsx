@@ -81,24 +81,52 @@ describe("StreamNode", () => {
     expect(handles.length).toBe(2);
   });
 
-  it("renders with category border stripe for Hydraulic component", () => {
+  it("renders leading-band for Hydraulic component (Phase 72 D-canvas — replaces border-left stripe)", () => {
     const { container } = renderStreamNode({
       componentId: "Pump",
       instanceName: "pump_1",
       parameters: {},
     });
-    const nodeEl = container.firstElementChild as HTMLElement;
-    expect(nodeEl?.style.borderLeftColor).toBe("#3b82f6");
+    const band = container.querySelector('[data-testid="stream-node-band"]');
+    expect(band).toBeTruthy();
+    // Solid single-layer band: one child div with the Hydraulic layer var.
+    const segments = band!.querySelectorAll("[data-layer]");
+    expect(segments.length).toBe(1);
+    expect(segments[0].getAttribute("data-layer")).toBe("Hydraulic");
+    expect((segments[0] as HTMLElement).style.backgroundColor).toBe(
+      "var(--color-layer-hydraulic)",
+    );
   });
 
-  it("renders with category border stripe for Thermal component", () => {
+  it("renders leading-band for Thermal component (Phase 72 D-canvas)", () => {
     const { container } = renderStreamNode({
       componentId: "ConstantTemperature",
       instanceName: "ct_1",
       parameters: {},
     });
-    const nodeEl = container.firstElementChild as HTMLElement;
-    expect(nodeEl?.style.borderLeftColor).toBe("#f59e0b");
+    const band = container.querySelector('[data-testid="stream-node-band"]');
+    expect(band).toBeTruthy();
+    const segments = band!.querySelectorAll("[data-layer]");
+    expect(segments.length).toBe(1);
+    expect(segments[0].getAttribute("data-layer")).toBe("Thermal");
+    expect((segments[0] as HTMLElement).style.backgroundColor).toBe(
+      "var(--color-layer-thermal)",
+    );
+  });
+
+  it("renders split leading-band for dual-layer ChannelAndContacts (Phase 72 D-canvas)", () => {
+    const { container } = renderStreamNode({
+      componentId: "ChannelAndContacts",
+      instanceName: "cac_1",
+      parameters: {},
+    });
+    const band = container.querySelector('[data-testid="stream-node-band"]');
+    expect(band).toBeTruthy();
+    const segments = band!.querySelectorAll("[data-layer]");
+    expect(segments.length).toBe(2);
+    const layerKeys = Array.from(segments).map((s) => s.getAttribute("data-layer"));
+    expect(layerKeys).toContain("Hydraulic");
+    expect(layerKeys).toContain("Thermal");
   });
 
   it("renders an SVG icon element", () => {
@@ -143,7 +171,7 @@ describe("StreamNode", () => {
     expect(handles.length).toBe(1);
   });
 
-  it("ThermalPort handles have amber background", () => {
+  it("ThermalPort handles consume the Thermal layer var (Phase 72 — tokenized from #f59e0b)", () => {
     const { container } = renderStreamNode({
       componentId: "ConstantTemperature",
       instanceName: "ct_1",
@@ -151,7 +179,11 @@ describe("StreamNode", () => {
     });
     const handle = container.querySelector(".react-flow__handle") as HTMLElement;
     expect(handle).toBeTruthy();
-    expect(handle.style.background).toContain("#f59e0b");
+    // CSSOM may discard var() values from the `background` shorthand depending
+    // on environment; verify both the property (best-effort) AND the raw
+    // style-attribute string (definitive).
+    const raw = handle.getAttribute("style") ?? "";
+    expect(raw).toContain("--color-layer-thermal");
   });
 
   it("ThermalPort handles have diamond rotation", () => {
@@ -412,11 +444,12 @@ describe("StreamNode — Plan 14 sourceLabelLine SourceValueEntry (GAP-RC-4)", (
 // Phase 63 D-22: errorTagsByNodeId-driven red-ring outline
 // ---------------------------------------------------------------------------
 
-describe("StreamNode — BC error red-ring (D-22 via errorNodeIds, Phase 71 D-20)", () => {
-  it("applies red-ring outline when errorNodeIds contains the node id (D-22)", () => {
+describe("StreamNode — BC error persistent outline (D-22 via errorNodeIds, Phase 71 D-20, Phase 72 simplification)", () => {
+  it("applies persistent destructive outline when errorNodeIds contains the node id (D-22)", () => {
     // Phase 71 D-20: hasBCError removed; red-ring now derives solely from
     // errorNodeIds which is populated by nMatch via initValidation.
-    // Test directly by seeding errorNodeIds with the node id.
+    // Phase 72: simplified from `outline-2 outline-offset-1 ring-2 ring-destructive`
+    // (double-outline-plus-ring) to a single `outline-2 outline-[var(--destructive)]`.
     useStore.setState({
       errorNodeIds: new Set<string>(["wt_red"]),
     });
@@ -425,10 +458,10 @@ describe("StreamNode — BC error red-ring (D-22 via errorNodeIds, Phase 71 D-20
       { id: "wt_red" },
     );
     const nodeEl = container.firstElementChild as HTMLElement;
-    expect(nodeEl.className).toMatch(/ring-destructive/);
+    expect(nodeEl.className).toMatch(/outline-\[var\(--destructive\)\]/);
   });
 
-  it("does NOT apply red-ring when errorNodeIds does not contain the node id", () => {
+  it("does NOT apply the destructive outline when errorNodeIds does not contain the node id", () => {
     useStore.setState({
       nodes: [],
       bcMode: {},
@@ -439,6 +472,6 @@ describe("StreamNode — BC error red-ring (D-22 via errorNodeIds, Phase 71 D-20
       { id: "wt_clean" },
     );
     const nodeEl = container.firstElementChild as HTMLElement;
-    expect(nodeEl.className).not.toMatch(/ring-destructive/);
+    expect(nodeEl.className).not.toMatch(/outline-\[var\(--destructive\)\]/);
   });
 });
