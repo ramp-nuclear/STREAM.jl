@@ -403,7 +403,10 @@ function FieldRow({
     return compId ? getComponent(compId)?.category === "Sources" : false;
   });
   return (
-    <div className="flex flex-col gap-[8px]">
+    // D-12 + D-13 (Phase 71 Plan 11): data-field-path keyed by externalInput.name
+    // (whole-array fieldPath per D-13 — e.g. 'T_wall_left', 'q_left', 'h_left').
+    // The wrapper carries no layout-affecting className changes (Pitfall 3).
+    <div data-field-path={externalInput.name} className="flex flex-col gap-[8px]">
       <Label className="text-[13px] font-semibold leading-[1.4]">
         {displayLabel}
       </Label>
