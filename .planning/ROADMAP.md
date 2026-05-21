@@ -303,7 +303,7 @@ Plans:
 
 **Design-decisions reference:** Section 3.9.
 **Depends on:** Phase 62 (operates on Resources + components).
-**Plans:** 6/13 plans executed
+**Plans:** 7/13 plans executed
 
 Plans:
 **Wave 1**
@@ -320,7 +320,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 71-05-PLAN.md (Wave 3, depends 04) — Geometry rules: zNMatch, lengthMatch (Resource-FK aware), geometryConsistency (warning severity) + index.ts registration.
+- [x] 71-05-PLAN.md (Wave 3, depends 04) — Geometry rules: zNMatch, lengthMatch (Resource-FK aware), geometryConsistency (warning severity) + index.ts registration.
 - [ ] 71-11-PLAN.md (Wave 3, depends 09 + 10) — data-field-path injection (ParameterForm + BCsTabForm), useValidationFieldHighlight hook, CanvasPanel focus-on-result event listener, NodeContextMenu "Show errors for this component" entry + REQUIRED 'stream:validation-filter-node' CustomEvent dispatch (Plan 09 listens). (Wave dropped from 8 to 3 in revision.)
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -406,7 +406,7 @@ contract document drafted in parallel throughout.
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
 | 69. Command palette (jump-only)                      | 3/3 | Complete    | 2026-05-18 |
 | 70. Presets and templates                            | 6/6 | Complete    | 2026-05-20 |
-| 71. Validation framework                             | 6/13 | In Progress|  |
+| 71. Validation framework                             | 7/13 | In Progress|  |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
 
 ## Coverage
