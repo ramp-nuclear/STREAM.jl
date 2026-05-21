@@ -6,7 +6,10 @@
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
+  /* Phase 72 — light-mode --card recommitted darker than --canvas (0.99)
+     so node bodies read as a distinct cell on the work surface. Tracks
+     the dark-mode pattern (--card slightly darker than --canvas). */
+  --card: oklch(0.97 0.003 254);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
@@ -44,8 +47,12 @@
      ReactFlow default dot pattern). Two tiers: major every 24 px @ 1.0
      zoom, minor every 12 px @ 1.0 zoom. Both are 1px solid; spacing
      scales with zoom via xyflow's Background gap prop. */
-  --color-canvas-grid-major: oklch(0.86 0.005 254);
-  --color-canvas-grid-minor: oklch(0.92 0.003 254);
+  /* Phase 72 — grid line tones tuned for "subtle structural texture, not
+     decorative" (PRODUCT.md). Light: Δ 0.05 (major) / 0.02 (minor) from
+     canvas. Tightened down from first-pass values (0.86/0.92) after user
+     verification — initial values read as a loud CAD grid. */
+  --color-canvas-grid-major: oklch(0.94 0.003 254);
+  --color-canvas-grid-minor: oklch(0.97 0.003 254);
   /* Phase 72 — warning + info functional tokens (replaces text-yellow-500
      / text-blue-500 raw Tailwind in ValidationPanel and any future
      warning/info surface). OKLCH per the locked OKLCH-only doctrine. */
@@ -76,7 +83,12 @@
      from matching #282c34. */
   --background: oklch(0.27 0.012 254);      /* matches new --canvas */
   --foreground: oklch(0.73 0.012 250);      /* unchanged — warm grey-blue text reads well on the lifted canvas */
-  --card: oklch(0.27 0.012 254);            /* tracks canvas */
+  /* Phase 72 — --card recommitted DARKER than canvas so node bodies read as
+     a distinct cell within the work surface. First-pass mistake: setting
+     --card == --canvas made bodies invisible (zero contrast). Δ 0.04
+     downward from canvas — clear figure-ground without becoming a separate
+     tier (it's between panel 0.21 and canvas 0.27). */
+  --card: oklch(0.23 0.012 254);
   --card-foreground: oklch(0.73 0.012 250);
   --popover: oklch(0.265 0.014 254);
   --popover-foreground: oklch(0.73 0.012 250);
@@ -117,10 +129,11 @@
   --color-layer-thermal: oklch(0.74 0.15 75);
   --color-layer-sources: oklch(0.74 0.17 130);
   --color-layer-reactor-physics: oklch(0.62 0.22 15);
-  /* Phase 72 — canvas grid lines, dark-mode tones. Visible but recessive
-     against the lifted canvas. */
-  --color-canvas-grid-major: oklch(0.35 0.012 254);
-  --color-canvas-grid-minor: oklch(0.31 0.012 254);
+  /* Phase 72 — grid line tones, dark mode, recessive. Δ 0.05 (major) /
+     0.02 (minor) from canvas — tuned down from first-pass values
+     (0.35/0.31) which read as a loud CAD grid. */
+  --color-canvas-grid-major: oklch(0.32 0.012 254);
+  --color-canvas-grid-minor: oklch(0.295 0.012 254);
   /* Phase 72 — warning + info, dark-mode lift. */
   --color-warning: oklch(0.78 0.15 75);
   --color-info: oklch(0.72 0.16 240);
