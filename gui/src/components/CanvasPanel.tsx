@@ -480,7 +480,11 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
     <div ref={containerRef} className="flex-1 h-full relative focus:outline-none bg-canvas" tabIndex={-1}>
       <ReactFlow
         colorMode={resolvedTheme === "dark" ? "dark" : "light"}
-        style={resolvedTheme === "dark" ? ({ "--xy-background-color": "#282c34" } as React.CSSProperties) : undefined}
+        // Phase 72 — drop the hardcoded `--xy-background-color: #282c34` dark
+        // override (One Dark Pro lineage). The parent wrapper carries
+        // `bg-canvas` which tracks the new `--canvas` token (dark + light);
+        // ReactFlow's pane is transparent over that.
+        style={{ "--xy-background-color": "transparent" } as React.CSSProperties}
         // Hide the bottom-right "React Flow" attribution. We're not under
         // a Pro license (and don't need one for this — the attribution is a
         // visual nuisance for a scientific tool, not a meaningful brand
@@ -520,7 +524,25 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         snapGrid={[16, 16]}
         fitView
       >
-        <Background variant={BackgroundVariant.Dots} color={resolvedTheme === "dark" ? "#4b5263" : "#ccc"} />
+        {/* Phase 72 — CAD/Houdini-style grid lines replace the ReactFlow
+            default dot pattern. Two stacked Background layers give a
+            dual-tier grid: minor every 12 px, major every 24 px (xyflow
+            scales both with zoom). Colors resolve via CSS custom
+            properties — they swap automatically with dark/light theme. */}
+        <Background
+          id="grid-minor"
+          variant={BackgroundVariant.Lines}
+          gap={12}
+          lineWidth={1}
+          color="var(--color-canvas-grid-minor)"
+        />
+        <Background
+          id="grid-major"
+          variant={BackgroundVariant.Lines}
+          gap={24}
+          lineWidth={1}
+          color="var(--color-canvas-grid-major)"
+        />
       </ReactFlow>
       {/* Phase 65 Plan 13: top-right overlay — Zoom/Fit/Lock replace ReactFlow built-in Controls panel; SnapToGridButton from Plan 06.
           Phase 68 UAT 2026-05-17 — LayersChip moved out of this overlay
