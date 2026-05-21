@@ -3088,7 +3088,8 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     });
 
     // ---- Step 4: Single set() — deselect existing + add new + merge resources.
-    const currentResState = get().resources;
+    // WR-09: reuse currentResources from Step 1; no intervening set() so the
+    // second get().resources read was dead code.
     get()._pushSnapshot(); // load is undo-able as a single op (D-18).
     set((state) => ({
       nodes: [
@@ -3097,9 +3098,9 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       ],
       edges: [...state.edges, ...newEdges],
       resources: {
-        ...currentResState,
-        geometries: { ...currentResState.geometries, ...newGeomsTyped },
-        powerShapes: { ...currentResState.powerShapes, ...newPSTyped },
+        ...currentResources,
+        geometries: { ...currentResources.geometries, ...newGeomsTyped },
+        powerShapes: { ...currentResources.powerShapes, ...newPSTyped },
       },
       isDirty: true,
     }));
