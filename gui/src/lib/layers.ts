@@ -95,6 +95,42 @@ export function getComponentLayers(comp: ComponentDefinition): LayerKey[] {
 }
 
 // ---------------------------------------------------------------------------
+// getDisplayLayers (Phase 72 — visual-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Visual-only extension of `getComponentLayers` for surfaces that paint per-
+ * layer identity (StreamNode leading band today). Returns all layers a
+ * component visually participates in, including those derivable from port
+ * composition but not from `category` alone.
+ *
+ * The canonical case: `ChannelAndContacts` has `category: "Hydraulic"` but
+ * carries `ThermalPort` handles — visually it belongs to both layers, even
+ * though for visibility/dim purposes it follows its category (Hydraulic).
+ *
+ * Behavioral functions (`isNodeVisible`, `isEdgeDimmed`, layer-aware connect,
+ * the per-layer dim logic in StreamNode for dual-layer nodes) keep using
+ * `getComponentLayers` to preserve current behavior. This function is *only*
+ * for rendering layer-accent identity.
+ *
+ * Detection rule: a component has both `FlowPort` and `ThermalPort` → it's
+ * visually on Hydraulic AND Thermal, in that left-to-right order for the
+ * leading band's split rendering.
+ */
+export function getDisplayLayers(comp: ComponentDefinition): LayerKey[] {
+  const base = getComponentLayers(comp);
+  const hasFlow = comp.ports.some((p) => p.type === "FlowPort");
+  const hasThermal = comp.ports.some((p) => p.type === "ThermalPort");
+  if (hasFlow && hasThermal) {
+    const result = [...base];
+    if (!result.includes("Hydraulic")) result.unshift("Hydraulic");
+    if (!result.includes("Thermal")) result.push("Thermal");
+    return result;
+  }
+  return base;
+}
+
+// ---------------------------------------------------------------------------
 // isNodeVisible
 // ---------------------------------------------------------------------------
 
