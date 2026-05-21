@@ -307,19 +307,27 @@ body {
    Both classes can coexist (sub-block-hovered + previously-pinned node) —
    the cascade resolves to a single outline; the pinned color wins by source
    order, which is the intended distinction for now. */
+/* Phase 72 P4 (2026-05-22) — code-hover / code-pinned outline colors
+   relocked from sky-400 / sky-300 to neutral foreground-tinted greys at
+   progressive opacities. The original sky-300 ring on every pinned node
+   was reading as "every non-source node has a blue outline" because
+   most source-block-bearing components are Hydraulic/Thermal (not
+   Sources). The "edges-and-code-preview" shape session (queued) will
+   own the final tokenization; this is the interim neutral that keeps
+   pin/hover differentiable without dumping saturated blue on the canvas
+   for unselected nodes. */
 .stream-node--code-hover {
-  outline: 2px solid var(--stream-code-hover-ring-color, #38bdf8);  /* sky-400 */
+  outline: 1px solid var(--stream-code-hover-ring-color, oklch(0.73 0.012 250 / 0.35));
   outline-offset: 2px;
 }
 .stream-node--code-pinned {
-  /* Pin must look CLEARLY different from hover so click feedback is obvious.
-     Thicker (3px) + lighter shade (sky-300) + a CRISP halo via a zero-blur
-     box-shadow. We deliberately avoid blur-based glows: blurred shadows on
-     transformed children of the ReactFlow canvas force a full layer repaint
-     on every pan/zoom frame and were a measurable contributor to canvas lag. */
-  outline: 3px solid var(--stream-code-pinned-ring-color, #7dd3fc);  /* sky-300 */
-  outline-offset: 3px;
-  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.55);
+  /* Pin reads as "more committed than hover" via thickness, not color.
+     Zero-blur box-shadow halo (the perf doctrine from DESIGN.md §4 —
+     blurred shadows on @xyflow/react-transformed children force a full
+     layer repaint on every pan/zoom frame). */
+  outline: 2px solid var(--stream-code-pinned-ring-color, oklch(0.73 0.012 250 / 0.55));
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px oklch(0.73 0.012 250 / 0.30);
 }
 
 /* Phase 71 Plan 10 — ValidationStatusBar 0→N pulse animation (D-03).

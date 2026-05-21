@@ -406,17 +406,15 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       // flash and the user perceives "nothing happens" when clicking an
       // error row whose node is already errored.
       data-stream-node-id={id}
-      className={`relative rounded-md min-w-[140px] transition-[box-shadow] ${
-        // Phase 72 P3 (2026-05-22) — selection ring relocked from
-        // ring-2 ring-[var(--ring)] (Hydraulic blue, 2 px) to ring-1
-        // ring-foreground/40 (thin neutral grey, 1 px). The original Hydraulic
-        // tint read as "every non-source node turns blue when selected"
-        // because the ring color is the same on every node and most clicks
-        // land on Hydraulic components. --ring stays Hydraulic for button /
-        // input focus indicators — that context still wants a saturated
-        // signal — but node selection is a different signal that should
-        // recede, not color-shift.
-        selected ? "ring-1 ring-foreground/40 ring-offset-1 ring-offset-canvas" : ""
+      className={`relative rounded-md min-w-[140px] ring-offset-1 ring-offset-canvas transition-[box-shadow] duration-200 ${
+        // Phase 72 P4 (2026-05-22) — every node has an always-on thin grey
+        // ring; selection animates it to a thicker Hydraulic-blue ring. The
+        // grey-at-rest comes from --foreground/25; the selected color is
+        // --ring (low-chroma Hydraulic tint, hue 240, same token Button +
+        // Input focus consumes). `transition-[box-shadow] duration-200`
+        // gives the visible color-and-thickness ease between the two states
+        // (Tailwind ring is implemented via box-shadow under the hood).
+        selected ? "ring-2 ring-[var(--ring)]" : "ring-1 ring-foreground/25"
       } ${hasAnyError ? "outline outline-2 outline-[var(--destructive)]" : ""} ${
         isCodeHovered ? "stream-node--code-hover" : ""
       } ${isCodePinned ? "stream-node--code-pinned" : ""} ${
