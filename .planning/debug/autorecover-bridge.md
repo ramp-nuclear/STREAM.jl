@@ -1,8 +1,10 @@
 ---
-status: diagnosed
+status: resolved
+resolved: 2026-05-21
+resolved_in: "Phase 65 follow-up — capabilities/default.json now grants fs:scope-appdata-recursive, fs:allow-appdata-write-recursive, fs:allow-remove, fs:allow-read-dir, fs:allow-watch, fs:allow-unwatch, fs:scope-appconfig-recursive, plus an explicit fs:scope override for $APPDATA/STREAM-Composer/autorecover/**. AutoRecover writes succeed; sidecars land in ~/.local/share/com.stream.composer/STREAM-Composer/autorecover/."
 trigger: "Phase 65 UAT Tests 16 + 17 (AutoRecover) — sidecar files never written; window.__TAURI__.core undefined; crash modal never appears"
 created: 2026-05-15T12:00:00Z
-updated: 2026-05-15T12:25:00Z
+updated: 2026-05-21
 ---
 
 ## Current Focus

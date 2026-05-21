@@ -1,8 +1,10 @@
 ---
-status: diagnosed
+status: resolved
+resolved: 2026-05-21
+resolved_in: "Phase 65 follow-up — gui/src/index.css now contains both override blocks (.react-flow__selection at line 161 with solid color-mix border + .react-flow__nodesselection-rect display:none at line 173). Marquee renders with solid theme-aligned border; post-release bounding box is suppressed."
 trigger: "Two cosmetic UX issues with left-marquee selection: (1) dotted border on selection rectangle, (2) bounding box wraps selected nodes after release"
 created: 2026-05-15T13:22:18Z
-updated: 2026-05-15T13:24:30Z
+updated: 2026-05-21
 ---
 
 ## Current Focus

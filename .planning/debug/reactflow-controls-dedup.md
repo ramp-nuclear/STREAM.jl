@@ -1,8 +1,10 @@
 ---
-status: diagnosed
+status: resolved
+resolved: 2026-05-21
+resolved_in: "Phase 65 Plan 13 — bottom-left ReactFlow <Controls /> removed; CanvasPanel.tsx:434 top-right overlay now hosts Zoom/Fit/Lock buttons (plus the pre-existing SnapToGridButton from Plan 06). All zoom/fit/lock entry points preserved; redundant chrome eliminated."
 trigger: "Phase 65 Plan 06 UAT Test 14 / Gap: hide ReactFlow's built-in bottom-left Controls (zoom/fit/lock) — they feel redundant alongside the new top-right canvas overlay."
 created: 2026-05-15
-updated: 2026-05-15
+updated: 2026-05-21
 ---
 
 ## Current Focus

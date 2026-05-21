@@ -1,8 +1,10 @@
 ---
-status: diagnosed
+status: resolved
+resolved: 2026-05-21
+resolved_in: "Phase 63.1 Plan 11 (D-10 type_union + input_modes contract) + registry rework — all three root causes addressed: (RC-1) gui/src/components/sidebar/ParameterForm.tsx now has a type_union branch (lines 28-31, 269-281); (RC-2) gui/src/registry/components.json Channel + ChannelHeatFlux entries now declare BCPort target handles (Channel.T_wall_left line 13, CHF.q_left line 573, type:'BCPort' / array_size:'n' / side:'bottom'); (RC-3) falls out of RC-1 — once T_wall/q is editable in Properties, the destructive sourceLabelLine 'unset' state is reachable and resolves to a normal value display."
 trigger: "Phase 63.1 UAT test 5 surfaced four blockers/majors on WallTemperature + HeatFluxSource source nodes after Promote-to-shared-source flow"
 created: 2026-05-14T00:00:00Z
-updated: 2026-05-14T00:00:00Z
+updated: 2026-05-21
 ---
 
 ## Current Focus

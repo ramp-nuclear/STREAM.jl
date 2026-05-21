@@ -1,8 +1,9 @@
 ---
 phase: 65-interaction-model-overhaul
 verified: 2026-05-14T18:45:00Z
-status: human_needed
-score: 8/8 must-haves verified
+human_uat_resolved: 2026-05-21
+status: complete
+score: 8/8 must-haves verified; human UAT closed 2026-05-21 — all 20 tests pass in 65-UAT.md (including the 6 originally-deferred interactive items)
 overrides_applied: 0
 human_verification:
   - test: "Canvas interaction matrix — live Tauri app"
@@ -29,7 +30,7 @@ human_verification:
 
 **Phase Goal:** Rewire the Composer canvas interaction model from v0.8 ReactFlow defaults to the drawio convention, delivering 8 sub-goals: naming retrofit (D-17/D-18), reset-to-empty rule (§3.5), interaction matrix (§3.5), context menus (D-11..D-14), clipboard (D-15/D-16/D-19), snap-to-grid (D-07..D-10), AutoRecover substrate (D-01/D-02/D-04/D-05/D-06), and AutoRecover restore modal (D-03).
 **Verified:** 2026-05-14T18:45:00Z
-**Status:** human_needed — all 8 deliverables are implemented and wired in the codebase; automated test suite passes (757/758, 1 pre-existing baseline failure); interactive behavior requires live Tauri app verification.
+**Status:** complete — all 8 deliverables wired in code; automated test suite passes (757/758, 1 pre-existing baseline failure); live Tauri UAT closed 2026-05-21 with all 20 tests passing in 65-UAT.md.
 **Re-verification:** No — initial verification.
 
 ---

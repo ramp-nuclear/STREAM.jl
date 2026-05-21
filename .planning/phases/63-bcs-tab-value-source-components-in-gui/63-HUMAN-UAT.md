@@ -18,8 +18,8 @@ result: pass
 
 ### 2. + New WallTemperature end-to-end (D-20)
 expected: Empty canvas → drop Channel (n=12) → select → BCs tab → click Source pill → empty Source-mode dropdown shows '+ New WallTemperature' button → click → new WT node appears ~120px left of Channel, auto-selected in dropdown, dashed BC edge auto-created. The new WT's parameters.n equals 12 (no bc-n-mismatch fires).
-result: skipped
-reason: Source pill / auto-create WT button was not shipped. User confirmed this is intentional — they don't want an auto-create button. BCs tab shows Value mode with promote (pencil) icon; promote works fine.
+result: pass
+resolution: resolved-by-design — the "Source pill + auto-create WT button" flow was intentionally not shipped. Owner confirmed the auto-create button is unwanted; the BCs tab uses Value mode + promote (pencil) icon instead, which works. The D-20 design ID is superseded by the promote-to-shared-source flow shipped in Phase 63.1.
 
 ### 3. Visual red-ring on n-mismatch (D-22)
 expected: WT(n=10) + Channel(n=12) → connect on canvas → both nodes paint with ring-destructive class visibly red (unit test verifies class application; this confirms CSS resolves to a visible ring).
@@ -33,10 +33,10 @@ reason: Owner decision — all three deferred, none block v1.2. CR-01 not recogn
 ## Summary
 
 total: 4
-passed: 3
+passed: 4
 issues: 0
 pending: 0
-skipped: 1
+skipped: 0
 blocked: 0
 
 ## Gaps

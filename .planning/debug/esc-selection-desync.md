@@ -1,8 +1,10 @@
 ---
-status: diagnosed
+status: resolved
+resolved: 2026-05-21
+resolved_in: "Phase 65 Plan 10 — SidebarPanel.tsx:103-131 now mirrors CanvasPanel.tsx:266-275 input-focus guard (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | isContentEditable → return early). With both Esc handlers skipping on input focus, Esc-in-input is a no-op and the zustand selection slice + ReactFlow nodes[].selected flag stay in lockstep."
 trigger: "Esc inside text input clears properties panel but leaves canvas outline — state desync between two selection sources"
 created: 2026-05-15T00:00:00Z
-updated: 2026-05-15T00:00:00Z
+updated: 2026-05-21
 ---
 
 ## Current Focus
