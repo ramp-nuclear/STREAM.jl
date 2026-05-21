@@ -11,6 +11,7 @@ import CanvasPanel from "./components/CanvasPanel";
 import SidebarPanel from "./components/SidebarPanel";
 import CustomTitlebar from "./components/CustomTitlebar";
 import BottomPanel from "./components/BottomPanel";
+import ValidationStatusBar from "./components/ValidationStatusBar";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import ValidationDialog from "./components/ValidationDialog";
 import CommandPalette from "./components/CommandPalette";
@@ -18,11 +19,12 @@ import AutoRecoverRestoreModal, {
   type RestoreCandidate,
 } from "./components/AutoRecoverRestoreModal";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { Toaster } from "./components/ui/sonner";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList } from "./components/ResponsiveTabsList";
 import { Boxes, Library, Settings2, BookMarked } from "lucide-react";
 import useStore from "./store/useStore";
-import { initializeRecentFiles, initAutoRecover } from "./store/useStore";
+import { initializeRecentFiles, initAutoRecover, initValidation } from "./store/useStore";
 import { detectCrashOnLaunch } from "./lib/autoRecover";
 import type { LockfileContent } from "./lib/autoRecover";
 import { useResizable } from "./hooks/useResizable";
@@ -201,6 +203,17 @@ function App() {
   // Initialize recent files on mount
   useEffect(() => {
     initializeRecentFiles();
+  }, []);
+
+  // Phase 71 Plan 10: bootstrap validation subscription on App lifetime.
+  // initValidation() wires a zustand subscribe listener that runs all validators
+  // on every store mutation affecting nodes/edges/anchors/bcMode/resources, and
+  // writes validationResults + errorNodeIds back to the store (D-09).
+  // The returned teardown cleans up the listener + any pending debounce timer.
+  // Separate useEffect from autoRecover — these are independent subscriptions.
+  useEffect(() => {
+    const teardown = initValidation();
+    return teardown;
   }, []);
 
   // Keyboard shortcuts (global)
@@ -577,6 +590,7 @@ function App() {
             )}
           </div>
           <BottomPanel />
+          <ValidationStatusBar />
         </div>
         <UnsavedChangesDialog
           open={dialogOpen}
@@ -595,6 +609,11 @@ function App() {
             FileMenu and NodeContextMenu can open it via the
             "stream:open-save-preset" custom event without prop drilling. */}
         <SavePresetModal open={savePresetOpen} onOpenChange={setSavePresetOpen} />
+        {/* Phase 71 Plan 10 — sonner Toaster mounted once at app lifetime.
+            Position bottom-right, 2s duration, theme-aware via useTheme()
+            inside the Toaster wrapper. Plan 12 fires the export-gate toast
+            here. Mounted inside <TooltipProvider> per plan instructions. */}
+        <Toaster />
       </TooltipProvider>
     </ReactFlowProvider>
   );
