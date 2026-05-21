@@ -406,22 +406,19 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       // flash and the user perceives "nothing happens" when clicking an
       // error row whose node is already errored.
       data-stream-node-id={id}
-      className={`relative rounded-md min-w-[140px] ring-offset-1 ring-offset-canvas transition-[box-shadow] duration-200 ${
-        // Phase 72 P5 (2026-05-22) — unselected ring is TRUE NEUTRAL GREY
-        // (oklch chroma 0). Prior pass used ring-foreground/25, which
-        // inherited --foreground's hue 250 chroma 0.012 — "low chroma" but
-        // the eye amplified the cool hue against the warm canvas and read
-        // it as blue. DESIGN.md §2 doctrine says no chroma-0 neutrals, but
-        // that rule was tuned for background tones (large fills where the
-        // eye normalizes the field). Small contrast rings on a dark canvas
-        // are the opposite — the eye anchors on the ring edge and any
-        // residual hue dominates. Pure neutral wins here.
-        //
-        // Selected state stays --ring (Hydraulic light-blue, hue 240
-        // chroma 0.10) — color animation between grey at rest → light blue
-        // on select, with 200 ms transition-[box-shadow] easing the
-        // box-shadow-implemented ring color + width together.
-        selected ? "ring-2 ring-[var(--ring)]" : "ring-1 ring-[oklch(0.65_0_0_/_0.3)]"
+      className={`relative rounded-md min-w-[140px] transition-[box-shadow] duration-200 ${
+        // Phase 72 P6 (2026-05-22) — node ring moved from Tailwind
+        // arbitrary-value ring utilities to explicit CSS classes
+        // (.stream-node-ring-rest / .stream-node-ring-selected, defined
+        // in index.css). The Tailwind form `ring-[oklch(0.65_0_0_/_0.3)]`
+        // had been silently failing to parse in some configurations,
+        // falling back to currentColor (= --foreground = hue 250 chroma
+        // 0.012) which renders as light blue against the warm-grey canvas
+        // — exactly the bug the change was supposed to fix. Class-based
+        // CSS bypasses all Tailwind parsing risk; box-shadow is the
+        // underlying implementation either way, so transition-[box-shadow]
+        // still eases the color + width change between rest and selected.
+        selected ? "stream-node-ring-selected" : "stream-node-ring-rest"
       } ${hasAnyError ? "outline outline-2 outline-[var(--destructive)]" : ""} ${
         isCodeHovered ? "stream-node--code-hover" : ""
       } ${isCodePinned ? "stream-node--code-pinned" : ""} ${
