@@ -8,19 +8,41 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import useStore from "../../store/useStore";
 import { isAllowedBCConnection } from "../../lib/bcMode";
-import {
-  selectNodeErrors,
-  type NodeErrorsInput,
-} from "../../lib/selectors/nodeErrors";
 import type { Node } from "@xyflow/react";
 
-// Phase 63.1 D-15: errorTagsByNodeId removed; assert via selectNodeErrors.
+// Phase 71 D-20: selectNodeErrors deleted; inline the n-mismatch check here.
+function readN(nodeId: string): number | undefined {
+  const node = useStore.getState().nodes.find((n) => n.id === nodeId);
+  const params = (node?.data as { parameters?: Record<string, unknown> } | undefined)?.parameters;
+  const n = params?.["n"];
+  return typeof n === "number" ? n : undefined;
+}
+
 function errorsFor(nodeId: string): string[] {
-  const s = useStore.getState() as unknown as NodeErrorsInput & { anchors?: Record<string, never> };
-  return selectNodeErrors(
-    { ...s, anchors: s.anchors ?? {} } as NodeErrorsInput,
-    nodeId,
-  );
+  const { bcMode } = useStore.getState();
+  const myN = readN(nodeId);
+  const tags: string[] = [];
+  for (const [key, entry] of Object.entries(bcMode)) {
+    if (entry.mode !== "source") continue;
+    if (key.startsWith(`${nodeId}::`)) {
+      const srcN = readN(entry.sourceNodeId);
+      if (typeof myN === "number" && typeof srcN === "number" && myN !== srcN) {
+        tags.push("bc-n-mismatch");
+        break;
+      }
+    }
+    if (entry.sourceNodeId === nodeId) {
+      const sepIdx = key.indexOf("::");
+      if (sepIdx < 0) continue;
+      const consumerId = key.slice(0, sepIdx);
+      const consN = readN(consumerId);
+      if (typeof myN === "number" && typeof consN === "number" && myN !== consN) {
+        tags.push("bc-n-mismatch");
+        break;
+      }
+    }
+  }
+  return tags;
 }
 
 function makeNode(id: string, componentId: string, n = 10): Node {
