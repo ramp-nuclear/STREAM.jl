@@ -140,7 +140,6 @@ export const lengthMatch: Validator = {
       const pairKey = [cacId, hdId].sort().join("::");
 
       // Capture primitives for closures (safe — no snapshot reference).
-      const cacIdCapture = cacId;
       const hdIdCapture = hdId;
       const cacLCapture = cacL;
       const hdLzCapture = hdLz;

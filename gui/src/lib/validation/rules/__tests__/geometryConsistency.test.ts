@@ -69,8 +69,8 @@ const CAC_DEF: ComponentDefinition = {
     { name: "thermal_right", type: "ThermalPort", side: "bottom" },
   ],
   parameters: [
-    { name: "n", type: "Int", default: 4 },
-    { name: "geometry", type: "PipeGeometry", default: "" },
+    { name: "n", type: "Int", default: 4, required: true, positional: false },
+    { name: "geometry", type: "PipeGeometry", default: "", required: true, positional: false },
   ],
   constructorModes: [],
 };
@@ -85,8 +85,8 @@ const HD_DEF: ComponentDefinition = {
     { name: "thermal_right", type: "ThermalPort", side: "right" },
   ],
   parameters: [
-    { name: "nz", type: "Int", default: 4 },
-    { name: "Lz", type: "Real", default: 0.5 },
+    { name: "nz", type: "Int", default: 4, required: true, positional: false },
+    { name: "Lz", type: "Real", default: 0.5, required: true, positional: false },
   ],
   constructorModes: [],
 };
