@@ -12,6 +12,9 @@ import { cn } from "@/lib/utils"
 // subsequent clicks (browser positions the caret on click-within-focused).
 // Only fires for text-like types where .select() is meaningful (some types
 // like checkbox/radio/file/range throw or no-op).
+//
+// LOAD-BEARING: do not remove or alter the rAF.select() chokepoint without
+// reading feedback_input_select_on_focus in user memory first.
 const SELECT_ON_FOCUS_TYPES = new Set([
   "text",
   "number",
@@ -22,6 +25,19 @@ const SELECT_ON_FOCUS_TYPES = new Set([
   "password",
 ]);
 
+// Phase 72 — primitive-layer recommit:
+//   - shadow-xs removed (doctrine §4: no ambient atmosphere on form fields)
+//   - rounded-md → rounded-sm (compact-control radius)
+//   - text-[13px] → text-body (consumes the locked --text-body token)
+//   - hover lifts border to --border-hover for affordance without filling
+//   - focus ring is inset (ring-inset) so it sits inside the bounding box
+//     and doesn't overflow into stacked form rows; the doubled
+//     focus-visible:border-ring + focus-visible:ring-[3px] pattern collapses
+//     to a single 2px inset ring
+//   - aria-invalid renders the destructive ring instead of a border tint;
+//     this matches the Toggle/Button error vocabulary (ring everywhere)
+//   - dark:bg-input/30 removed; --input now resolves to a solid OKLCH so
+//     the opacity-on-alpha hack is unnecessary
 function Input({
   className,
   type,
@@ -59,9 +75,9 @@ function Input({
       data-slot="input"
       onFocus={handleFocus}
       className={cn(
-        "h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 py-1 text-[13px] shadow-xs transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30",
-        "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-        "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
+        "h-8 w-full min-w-0 rounded-sm border border-border bg-transparent px-2.5 py-1 text-body outline-none transition-colors duration-[80ms] motion-reduce:transition-none selection:bg-foreground/85 selection:text-background hover:border-border-hover file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-body file:font-medium file:text-foreground placeholder:text-foreground/45 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:border-transparent",
+        "aria-invalid:ring-2 aria-invalid:ring-destructive aria-invalid:ring-inset",
         className
       )}
       {...props}
