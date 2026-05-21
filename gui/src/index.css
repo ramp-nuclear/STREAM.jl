@@ -300,6 +300,10 @@ body {
 }
 .validation-flash {
   outline: 2px solid var(--destructive);
-  outline-offset: 4px;
+  /* Phase 72 — outline-offset was 4 px, which floated the flash as a
+     disconnected halo around the node. Reduced to 0 so it hugs the node
+     edge and matches the visual language of every other outline state
+     (persistent error outline, autoExtended dashed, selection ring). */
+  outline-offset: 0;
   animation: node-flash-outline 600ms ease-out 1;
 }
