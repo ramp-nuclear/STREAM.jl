@@ -232,10 +232,16 @@ body {
 }
 
 /* Phase 71 Plan 11 — canvas node flash on ValidationPanel row click (D-05).
-   Single-shot 600ms animation; reuses pulse-once keyframe from Plan 10.
-   Applied transiently via stream:node-flash CustomEvent in CanvasPanel. */
+   ReactFlow positions every node wrapper via transform: translate(x, y).
+   The flash MUST NOT touch `transform` or `opacity` — pulse-once's scale()
+   wipes the translate and visually rips the node out of position
+   (Phase 71 UAT Test 5 #2026-05-21). Animate outline-color only. */
+@keyframes node-flash-outline {
+  0%, 100% { outline-color: hsl(var(--destructive) / 1.0); }
+  50%      { outline-color: hsl(var(--destructive) / 0.25); }
+}
 .validation-flash {
-  animation: pulse-once 600ms ease-out 1;
   outline: 2px solid hsl(var(--destructive));
   outline-offset: 4px;
+  animation: node-flash-outline 600ms ease-out 1;
 }
