@@ -9,6 +9,7 @@ import { getComponent } from "../registry";
 import { generateCode, serializeSections } from "../lib/codeGenerator";
 import { exportCode } from "../lib/exportCode";
 import CodePreview from "./CodePreview";
+import ValidationPanel from "./ValidationPanel";
 
 export default function BottomPanel() {
   const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
@@ -26,6 +27,8 @@ export default function BottomPanel() {
   // subscribe to a derived primitive instead of the array — re-renders fire
   // only when the canvas crosses the empty/non-empty boundary.
   const hasNodes = useStore((s) => s.nodes.length > 0);
+  const activeBottomTab = useStore((s) => s.activeBottomTab);
+  const setActiveBottomTab = useStore((s) => s.setActiveBottomTab);
 
   // 1.5s confirmation state for the Copy button (Research Pattern 8).
   const [copied, setCopied] = useState(false);
@@ -105,11 +108,14 @@ export default function BottomPanel() {
         className="h-1 w-full cursor-row-resize hover:bg-ring/30 transition-colors flex-shrink-0"
         onMouseDown={onMouseDown}
       />
-      <Tabs defaultValue="code" className="flex-1 min-h-0 flex flex-col">
+      <Tabs value={activeBottomTab} onValueChange={(v) => setActiveBottomTab(v as 'code' | 'validation')} className="flex-1 min-h-0 flex flex-col">
         <div className="mx-2 mt-1 flex items-center">
           <TabsList>
             <TabsTrigger value="code" className="text-[13px] font-medium">
               Code
+            </TabsTrigger>
+            <TabsTrigger value="validation" className="text-[13px] font-medium">
+              Validation
             </TabsTrigger>
           </TabsList>
           <div className="ml-auto flex items-center gap-1">
@@ -164,6 +170,9 @@ export default function BottomPanel() {
         </div>
         <TabsContent value="code" className="flex-1 min-h-0">
           <CodePreview />
+        </TabsContent>
+        <TabsContent value="validation" className="flex-1 min-h-0">
+          <ValidationPanel />
         </TabsContent>
       </Tabs>
     </div>
