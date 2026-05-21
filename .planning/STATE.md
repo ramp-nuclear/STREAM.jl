@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: "**Goal:** Bring `gui/src/registry/components.json` into alignment with v1.1 source. Stream version bump to `1.1.0`. Add 4 missing components. Rewrite Channel/CHF entries"
-status: executing
-stopped_at: Phase 71 context gathered
-last_updated: "2026-05-21T12:47:40.972Z"
-last_activity: 2026-05-21
+status: phase_complete
+stopped_at: Phase 71 complete (verification 20/20 passed)
+last_updated: "2026-05-21T15:50:00.000Z"
+last_activity: 2026-05-21 -- Phase 71 (validation framework) shipped
 progress:
   total_phases: 15
   completed_phases: 14
@@ -25,7 +25,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 71 — validation-framework
+**Current focus:** Phase 71 complete (2026-05-21) — next is Phase 66 (Code preview rework) or whichever phase the user routes to next
 **Python STREAM reference:** ~/projects/STREAM
 **Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
 
@@ -58,11 +58,11 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 71 (validation-framework) — EXECUTING
-Plan: 12 of 13
-Status: Ready to execute
+Phase: 71 (validation-framework) — ✓ COMPLETE (2026-05-21)
+Plans: 13/13 shipped (50 commits, 11 rule files, 1033/1033 vitest pass, 10 tsc errors down from 13 baseline)
+Verification: VERIFICATION.md — 20/20 must-haves passed
 Last activity: 2026-05-21
-Next: Plan 05 (lengthMatch rule) — or next plan in the wave-2 parallel rule batch.
+Next: route to Phase 66 (Code preview rework) or take a pause / decide next milestone direction.
 
 Phase 65 manual UAT: CLOSED 2026-05-21. All 20 tests in 65-UAT.md pass — including the 6 originally-deferred interactive items (canvas interaction matrix, clipboard, context menus + Rename focus, snap-to-grid persistence, AutoRecover crash sim, Untitled→Save As). VERIFICATION.md status flipped from `human_needed` to `complete`. (Phase 64 manual UAT also closed in the same sweep: 4/5 pass + 1 cosmetic issue routed to Phase 72 follow-up todo.)
 
