@@ -13,7 +13,6 @@ import CustomTitlebar from "./components/CustomTitlebar";
 import BottomPanel from "./components/BottomPanel";
 import ValidationStatusBar from "./components/ValidationStatusBar";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
-import ValidationDialog from "./components/ValidationDialog";
 import CommandPalette from "./components/CommandPalette";
 import AutoRecoverRestoreModal, {
   type RestoreCandidate,
@@ -598,7 +597,6 @@ function App() {
           onDiscard={handleDialogDiscard}
           onCancel={handleDialogCancel}
         />
-        <ValidationDialog />
         {/* Phase 69 Plan 03 — CommandPalette mounted as a sibling to the
             other dialogs INSIDE <ReactFlowProvider> + <TooltipProvider>
             (Pitfall 2: useReactFlow() inside the palette requires a parent
