@@ -132,14 +132,7 @@ function resetStore(name: string = "") {
     activeLeftTab: "Components",
     activeLayer: "Both",
     errorNodeIds: new Set<string>(),
-    validationResult: null,
-    // Stub the validation gate to always pass. The real validateTopology
-    // requires a non-empty graph with a pressure BC and a driving element
-    // (Pump/Gravity); an empty-canvas state would short-circuit
-    // saveProjectAs before the dialog opens, and we want to test the
-    // dialog-arg plumbing, not the gate. Plan 62-14 vitest_mock_pattern
-    // approach (b).
-    validateAndGate: () => ({ valid: true, nodeErrors: [], systemErrors: [] }),
+    // Phase 71 D-16: validateAndGate removed; saveProjectAs no longer has a validation gate.
     modelOptions: {
       name,
       description: "",

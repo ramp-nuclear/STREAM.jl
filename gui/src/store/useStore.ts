@@ -12,7 +12,6 @@ import {
   MarkerType,
 } from "@xyflow/react";
 import { getComponent } from "../registry";
-import { validateTopology, type TopologyResult } from "../lib/validation";
 import { runValidators } from "../lib/validation/runner";
 import { buildValidationSnapshot } from "../lib/validation/snapshot";
 import type { ValidationResult } from "../lib/validation/types";
@@ -201,11 +200,8 @@ export interface AppState {
   sidebarCollapsed: boolean;
   setToolboxCollapsed: (collapsed: boolean) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  // Topology validation (Phase 39 — kept until Plans 12/13 rewire consumers)
+  // Phase 71 D-18: errorNodeIds populated exclusively by initValidation() subscription.
   errorNodeIds: Set<string>;
-  validationResult: TopologyResult | null;
-  validateAndGate: () => TopologyResult;
-  clearValidation: () => void;
   // Phase 71 D-09/D-18: new validation slices (alongside the legacy topology slice).
   // validationResults is populated exclusively by initValidation() subscription.
   // errorNodeIds remains a stored Set but is also written by initValidation() only.
@@ -865,10 +861,9 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   activeBottomTab: 'code' as const,
   toolboxCollapsed: false,
   sidebarCollapsed: false,
-  // Topology validation (Phase 39) initial state
+  // Phase 71 D-18: errorNodeIds populated by initValidation subscription
   errorNodeIds: new Set<string>(),
-  validationResult: null,
-  // Phase 71: new validation slices (alongside the legacy topology slice)
+  // Phase 71: new validation slices
   validationResults: [],
   // Phase 66 Plan 03: code-panel ephemeral slices initial state.
   // All three start empty/null. Session-only — NOT serialized to .scp
@@ -1039,7 +1034,6 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       ].slice(0, 50),
       isDirty: true,
       errorNodeIds: new Set<string>(),
-      validationResult: null,
       validationResults: [],
       activeBottomTab: 'code' as const,
     });
@@ -1082,7 +1076,6 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       _undoFuture: _undoFuture.slice(1),
       isDirty: true,
       errorNodeIds: new Set<string>(),
-      validationResult: null,
       validationResults: [],
       activeBottomTab: 'code' as const,
     });
@@ -1868,26 +1861,6 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   setActiveBottomTab: (tab) => set({ activeBottomTab: tab }),
 
   // ---------------------------------------------------------------------------
-  // Topology validation (Phase 39)
-  // ---------------------------------------------------------------------------
-
-  validateAndGate: () => {
-    const { nodes, edges, anchors } = get();
-    // 63.1-04: anchors slice replaces the legacy boundary-conditions array
-    // for the export gate. validateTopology now takes the anchors Record
-    // directly and checks `Object.keys(anchors).length === 0` to surface the
-    // "No pressure boundary condition" SystemError.
-    const result = validateTopology(nodes, edges, anchors, getComponent);
-    const errorIds = new Set(result.nodeErrors.map((e) => e.nodeId));
-    set({ errorNodeIds: errorIds, validationResult: result });
-    return result;
-  },
-
-  clearValidation: () => {
-    set({ errorNodeIds: new Set<string>(), validationResult: null });
-  },
-
-  // ---------------------------------------------------------------------------
   // Phase 66 Plan 03: code-panel ephemeral actions
   //
   // Every mutation produces a NEW Set / array reference (Pitfall 1 — in-place
@@ -2190,10 +2163,6 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   // ---------------------------------------------------------------------------
 
   saveProject: async () => {
-    // Phase 39: validation gate (D-01, D-02)
-    const result = get().validateAndGate();
-    if (!result.valid) return;
-
     const { currentFilePath } = get();
     if (!currentFilePath) {
       return get().saveProjectAs();
@@ -2249,10 +2218,6 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   // ---------------------------------------------------------------------------
 
   saveProjectAs: async () => {
-    // Phase 39: validation gate (D-01, D-02)
-    const result = get().validateAndGate();
-    if (!result.valid) return;
-
     try {
       const { save } = await import("@tauri-apps/plugin-dialog");
       // Phase 62-14 (Critical Gap #3): derive defaultPath from the current
@@ -2448,7 +2413,6 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
         _undoPast: [],
         _undoFuture: [],
         errorNodeIds: new Set<string>(),
-        validationResult: null,
         validationResults: [],
         activeBottomTab: 'code' as const,
         // Phase 62: resources + modelOptions + activeLeftTab restored from .scp
@@ -2534,7 +2498,6 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       _undoPast: [],
       _undoFuture: [],
       errorNodeIds: new Set<string>(),
-      validationResult: null,
       validationResults: [],
       activeBottomTab: 'code' as const,
       // Phase 62: reset Resources / ModelOptions / Tabs / Selection to initial values
@@ -2730,7 +2693,6 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       _undoPast: [],
       _undoFuture: [],
       errorNodeIds: new Set<string>(),
-      validationResult: null,
       validationResults: [],
       activeBottomTab: 'code' as const,
       resources: {

@@ -75,10 +75,7 @@ function resetStore() {
     activeLayers: { Hydraulic: true, Thermal: true, Sources: true, ReactorPhysics: true },
     hideOffLayer: false,
     errorNodeIds: new Set<string>(),
-    validationResult: null,
-    // Stub the validation gate so saveProject / saveProjectAs reach the
-    // write step regardless of canvas content.
-    validateAndGate: () => ({ valid: true, nodeErrors: [], systemErrors: [] }),
+    // Phase 71 D-16: validateAndGate removed; saveProject no longer has a validation gate.
     modelOptions: {
       name: "demo",
       description: "",
