@@ -15,6 +15,15 @@ import { cn } from "@/lib/utils"
 // wrapper composes a centered DialogContent, which would defeat D-02
 // (top-anchored overlay). Plan 02 rolls a top-anchored variant directly in
 // CommandPalette.tsx using radix Dialog primitives + this shim's parts.
+//
+// Phase 72 — primitive-layer recommit:
+//   - Container rounded-md, bg-popover (unchanged at this layer)
+//   - Input wrapper h-8 (was h-9), text-body (was text-sm), placeholder
+//     foreground/45 (was muted-foreground)
+//   - Group heading: text-micro uppercase tracking-wider opacity-55
+//   - Item h-7, hover/selected bg-card (was bg-accent)
+//   - Shortcut: text-micro font-mono opacity-55 (was text-xs tracking-widest)
+//   - Empty: text-body opacity-65 (was text-sm)
 
 function Command({
   className,
@@ -24,7 +33,7 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
+        "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-foreground",
         className
       )}
       {...props}
@@ -37,12 +46,15 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    <div data-slot="command-input-wrapper" className="flex h-9 items-center gap-2 border-b px-3">
-      <SearchIcon className="size-4 shrink-0 opacity-50" />
+    <div
+      data-slot="command-input-wrapper"
+      className="flex h-8 items-center gap-1.5 border-b border-border px-3"
+    >
+      <SearchIcon className="size-3.5 shrink-0 stroke-[1.5] text-foreground/55" />
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-8 w-full bg-transparent text-body outline-hidden placeholder:text-foreground/45 disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         {...props}
@@ -58,7 +70,10 @@ function CommandList({
   return (
     <CommandPrimitive.List
       data-slot="command-list"
-      className={cn("max-h-[400px] scroll-py-1 overflow-x-hidden overflow-y-auto", className)}
+      className={cn(
+        "max-h-[400px] scroll-py-1 overflow-x-hidden overflow-y-auto",
+        className
+      )}
       {...props}
     />
   )
@@ -70,7 +85,7 @@ function CommandEmpty({
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className="py-6 text-center text-sm"
+      className="py-6 text-center text-body text-foreground/65"
       {...props}
     />
   )
@@ -84,7 +99,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        "overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground",
+        "overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-micro [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-foreground/55",
         className
       )}
       {...props}
@@ -113,7 +128,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-body outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-card [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55",
         className
       )}
       {...props}
@@ -128,10 +143,22 @@ function CommandShortcut({
   return (
     <span
       data-slot="command-shortcut"
-      className={cn("ml-auto text-xs tracking-widest text-muted-foreground", className)}
+      className={cn(
+        "ml-auto text-micro font-mono text-foreground/55",
+        className
+      )}
       {...props}
     />
   )
 }
 
-export { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator, CommandShortcut }
+export {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandSeparator,
+  CommandShortcut,
+}
