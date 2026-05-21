@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "./ui/input";
@@ -74,20 +74,26 @@ export default function PresetRow({ entry, onRequestReveal }: PresetRowProps) {
     }
   }, [renaming]);
 
+  // WR-11: compute the collision set once when renaming starts, not on every
+  // keystroke. pool.some() on hundreds of presets per keystroke is wasteful;
+  // the set is stable for the duration of a single rename interaction.
+  const collisionSet = useMemo(() => {
+    if (!renaming) return new Set<string>();
+    const state = useStore.getState();
+    const pool =
+      entry.store === "project" ? state.projectPresets : state.libraryPresets;
+    return new Set(
+      pool.filter((e) => e.filePath !== entry.filePath).map((e) => e.name),
+    );
+  }, [renaming, entry.store, entry.filePath]);
+
   // ── Validation ─────────────────────────────────────────────────────────────
   function validateNewName(name: string): string | null {
     if (!name) return "Name is required.";
     if (!isValidPresetName(name)) {
       return "Use only letters, digits, underscores, or hyphens.";
     }
-    // Collision check: look in the same store as this entry.
-    const state = useStore.getState();
-    const pool =
-      entry.store === "project" ? state.projectPresets : state.libraryPresets;
-    const collision = pool.some(
-      (e) => e.name === name && e.filePath !== entry.filePath,
-    );
-    if (collision) {
+    if (collisionSet.has(name)) {
       return `A preset with this name already exists in ${entry.store}.`;
     }
     return null;
