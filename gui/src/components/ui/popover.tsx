@@ -7,6 +7,16 @@ import { cn } from "@/lib/utils"
 // Consumers that need click-outside-no-dismiss (e.g., Phase 62 `+ New…` picker
 // per UI-SPEC §"+ New… anchored popover" + D-16) pass the relevant prop per
 // use. Baking it in here would break other consumers.
+//
+// Phase 72 — primitive-layer recommit:
+//   - shadow-md removed (doctrine §4: no ambient atmosphere; popovers float
+//     on tonal step alone — bg-popover is one tone lighter than --panel)
+//   - rounded-md retained (compact surface radius)
+//   - p-4 → p-2 (denser; consumers can override per-surface)
+//   - zoom-in/zoom-out removed; slide-in-from-* removed
+//   - Plain 100 ms fade-in / 80 ms fade-out, motion-reduce → instant
+//   - text-popover-foreground → text-foreground (popover-foreground inherits
+//     foreground in our token system; explicit reference adds nothing)
 
 export function Popover({
   ...props
@@ -45,7 +55,7 @@ export function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+          "z-50 w-72 rounded-md border border-border bg-popover p-2 text-foreground outline-hidden motion-reduce:!duration-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:fade-in-0 data-[state=open]:duration-100",
           className
         )}
         {...props}
