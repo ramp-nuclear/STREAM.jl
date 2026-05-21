@@ -81,23 +81,52 @@ describe("StreamNode", () => {
     expect(handles.length).toBe(2);
   });
 
-  // Phase 72 P3 (2026-05-22) — leading layer-accent band removed per user
-  // feedback ("we still have the outline border for every non-source node
-  // be the light blue color... we need a thin thin grey... same across all
-  // nodes"). Layer identity moved entirely off the node body — it lives in
-  // LayersPanel dots, port handle colors, and layer-aware connect logic.
-  // The visual edge of every node is now a uniform 1 px --border line.
-  // The three replaced tests previously asserted Hydraulic / Thermal /
-  // dual-layer band colors; those signals no longer exist on the node.
-  it("does not render a layer-color band (Phase 72 P3 — band removed)", () => {
+  it("renders leading-band for Hydraulic component (Phase 72 D-canvas — replaces border-left stripe)", () => {
     const { container } = renderStreamNode({
       componentId: "Pump",
       instanceName: "pump_1",
       parameters: {},
     });
-    expect(
-      container.querySelector('[data-testid="stream-node-band"]'),
-    ).toBeNull();
+    const band = container.querySelector('[data-testid="stream-node-band"]');
+    expect(band).toBeTruthy();
+    // Solid single-layer band: one child div with the Hydraulic layer var.
+    const segments = band!.querySelectorAll("[data-layer]");
+    expect(segments.length).toBe(1);
+    expect(segments[0].getAttribute("data-layer")).toBe("Hydraulic");
+    expect((segments[0] as HTMLElement).style.backgroundColor).toBe(
+      "var(--color-layer-hydraulic)",
+    );
+  });
+
+  it("renders leading-band for Thermal component (Phase 72 D-canvas)", () => {
+    const { container } = renderStreamNode({
+      componentId: "ConstantTemperature",
+      instanceName: "ct_1",
+      parameters: {},
+    });
+    const band = container.querySelector('[data-testid="stream-node-band"]');
+    expect(band).toBeTruthy();
+    const segments = band!.querySelectorAll("[data-layer]");
+    expect(segments.length).toBe(1);
+    expect(segments[0].getAttribute("data-layer")).toBe("Thermal");
+    expect((segments[0] as HTMLElement).style.backgroundColor).toBe(
+      "var(--color-layer-thermal)",
+    );
+  });
+
+  it("renders split leading-band for dual-layer ChannelAndContacts (Phase 72 D-canvas)", () => {
+    const { container } = renderStreamNode({
+      componentId: "ChannelAndContacts",
+      instanceName: "cac_1",
+      parameters: {},
+    });
+    const band = container.querySelector('[data-testid="stream-node-band"]');
+    expect(band).toBeTruthy();
+    const segments = band!.querySelectorAll("[data-layer]");
+    expect(segments.length).toBe(2);
+    const layerKeys = Array.from(segments).map((s) => s.getAttribute("data-layer"));
+    expect(layerKeys).toContain("Hydraulic");
+    expect(layerKeys).toContain("Thermal");
   });
 
   it("renders an SVG icon element", () => {
