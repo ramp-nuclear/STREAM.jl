@@ -21,7 +21,7 @@ import type { ValidationSnapshot } from "../snapshot";
 export const requiredConnections: Validator = {
   id: "required_connections",
   severity: "error",
-  description: "Required port missing a connection",
+  description: "Required port not connected",
   scope: ["nodes", "edges"],
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
@@ -60,7 +60,7 @@ export const requiredConnections: Validator = {
                 id: `required_connections::${node.id}::${port.name}::${i}`,
                 validatorId: "required_connections",
                 severity: "error",
-                description: `${data.instanceName}.${portName} requires a connection`,
+                description: `${data.instanceName}.${portName} not connected`,
                 targets: [
                   { kind: "port", nodeId: node.id, portName },
                   { kind: "node", nodeId: node.id },
@@ -81,7 +81,7 @@ export const requiredConnections: Validator = {
               id: `required_connections::${node.id}::${port.name}`,
               validatorId: "required_connections",
               severity: "error",
-              description: `${data.instanceName}.${port.name} requires a connection`,
+              description: `${data.instanceName}.${port.name} not connected`,
               targets: [
                 { kind: "port", nodeId: node.id, portName: port.name },
                 { kind: "node", nodeId: node.id },

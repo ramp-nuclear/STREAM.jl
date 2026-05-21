@@ -31,24 +31,29 @@ import type { ValidationSnapshot } from "../snapshot";
 export const nMatch: Validator = {
   id: "n_match",
   severity: "error",
-  description: "Value-source n does not match the bound channel's n",
+  description: "n mismatch on source binding",
   scope: ["nodes", "bcMode"],
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
     const results: ValidationResult[] = [];
+    // Phase 71 UAT Test 8 (2026-05-21): dedup by (consumerId, sourceId) pair.
+    // Multiple external-input bindings between the same consumer/source produced
+    // duplicate rows in the panel; the user-observable mismatch is one fact.
+    const seen = new Set<string>();
 
     for (const [key, entry] of Object.entries(snapshot.bcMode)) {
-      // Only source-mode bindings are relevant.
       if (entry.mode !== "source") continue;
       if (!entry.sourceNodeId) continue;
 
-      // Parse the key: `${consumerId}::${externalInputName}`
       const sepIdx = key.indexOf("::");
       if (sepIdx < 0) continue;
 
       const consumerId = key.slice(0, sepIdx);
       const externalInputName = key.slice(sepIdx + 2);
       const sourceId = entry.sourceNodeId;
+
+      const pairKey = `${consumerId}::${sourceId}`;
+      if (seen.has(pairKey)) continue;
 
       const consumerNode = snapshot.nodes.find((n) => n.id === consumerId);
       const sourceNode = snapshot.nodes.find((n) => n.id === sourceId);
@@ -66,12 +71,10 @@ export const nMatch: Validator = {
       const consumerN = consumerParams["n"];
       const sourceN = sourceParams["n"];
 
-      // Defensive: if either n is not a number (undefined / unset), skip.
-      // Another validator should flag the missing parameter.
       if (typeof consumerN !== "number" || typeof sourceN !== "number") continue;
-
-      // No mismatch — nothing to emit.
       if (consumerN === sourceN) continue;
+
+      seen.add(pairKey);
 
       const consumerData = consumerNode.data as {
         componentId: string;
@@ -82,42 +85,22 @@ export const nMatch: Validator = {
         instanceName: string;
       };
 
-      // Capture primitives at rule-run time for the closure — safe (no snapshot
-      // reference). Channel n is canonical; propagate consumer→source.
-      const consumerNCapture: number = consumerN;
-      const sourceIdCapture: string = sourceId;
-
+      // Phase 71 UAT Test 8: fix action removed by user request. Channel-wins
+      // direction is opinionated; user wants to set both sides manually.
+      // Rule degrades to navigation-only (no apply closure, row click focuses
+      // the consumer node via ValidationPanel's standard handler).
       results.push({
-        id: `n_match::${consumerId}::${externalInputName}::${sourceId}`,
+        id: `n_match::${consumerId}::${sourceId}`,
         validatorId: "n_match",
         severity: "error",
-        description:
-          `${sourceData.instanceName} (n=${sourceN}) bound to ` +
-          `${consumerData.instanceName} (n=${consumerN}) — mismatched cell counts`,
+        description: `${consumerData.instanceName}.n=${consumerN} ≠ ${sourceData.instanceName}.n=${sourceN}`,
         targets: [
-          // D-14: node targets for canvas red-ring on both sides.
           { kind: "node", nodeId: consumerId },
           { kind: "node", nodeId: sourceId },
-          // D-14: field targets for property-panel highlights on both n fields.
           { kind: "field", nodeId: consumerId, fieldPath: "n" },
           { kind: "field", nodeId: sourceId, fieldPath: "n" },
-          // D-13: whole-array fieldPath for the BC field row on the consumer side.
           { kind: "field", nodeId: consumerId, fieldPath: externalInputName },
         ],
-        fixAction: {
-          kind: "lossless-sync",
-          // §3.9 lines 993-995 canonical example: "Sync n to 3"
-          // Channel n wins — terse label names the parameter and the winning value.
-          label: `Sync n to ${consumerNCapture}`,
-          apply: (_set, get) => {
-            // Re-read live state at invocation time (RESEARCH §Pitfall 7).
-            // Channel n is canonical (derives from z_N / L); propagate to source.
-            const live = get();
-            live.updateNodeParams(sourceIdCapture, {
-              parameters: { n: consumerNCapture },
-            });
-          },
-        },
       });
     }
 

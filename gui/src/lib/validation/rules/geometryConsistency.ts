@@ -23,7 +23,7 @@ import type { ValidationSnapshot } from "../snapshot";
 export const geometryConsistency: Validator = {
   id: "geometry_consistency",
   severity: "warning",
-  description: "CACs sharing an HD plate have inconsistent geometry resources",
+  description: "Inconsistent geometry on shared HD",
   scope: ["nodes", "edges", "resources"],
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
@@ -186,7 +186,7 @@ export const geometryConsistency: Validator = {
         id: `geometry_consistency::${pairKey}`,
         validatorId: "geometry_consistency",
         severity: "warning",
-        description: `Geometry mismatch: ${cacNames} share ${hdData.instanceName} but have different geometry resources`,
+        description: `${cacNames} → ${hdData.instanceName}: geometry resources differ`,
         targets,
         fixAction: {
           kind: "navigation-only",

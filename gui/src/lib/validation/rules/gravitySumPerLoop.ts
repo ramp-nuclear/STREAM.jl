@@ -51,7 +51,7 @@ const GRAVITY_TOLERANCE = 1e-6;
 export const gravitySumPerLoop: Validator = {
   id: "gravity_sum_per_loop",
   severity: "error",
-  description: "Gravity contributions do not net to zero around a hydraulic loop",
+  description: "Loop ΣH ≠ 0",
   scope: ["nodes", "edges"],
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
@@ -149,10 +149,7 @@ export const gravitySumPerLoop: Validator = {
       const sign = netH > 0 ? "+" : "";
       const netFormatted = `${sign}${netH.toFixed(2)} m`;
 
-      const description =
-        `Gravity sum across loop [${gravityNodesInLoop.join(", ")}] ` +
-        `is ${netFormatted} (expected 0.00 m). ` +
-        "Check H signs on each Gravity component.";
+      const description = `Loop ΣH = ${netFormatted} (expected 0)`;
 
       results.push({
         id: stableId,

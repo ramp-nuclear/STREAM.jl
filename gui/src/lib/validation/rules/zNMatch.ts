@@ -19,7 +19,7 @@ import type { ValidationSnapshot } from "../snapshot";
 export const zNMatch: Validator = {
   id: "z_n_match",
   severity: "error",
-  description: "CAC channel count (n) does not match HeatDiffusion nz",
+  description: "CAC.n ≠ HD.nz",
   scope: ["nodes", "edges"],
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
@@ -148,7 +148,7 @@ export const zNMatch: Validator = {
         id: `z_n_match::${pairKey}`,
         validatorId: "z_n_match",
         severity: "error",
-        description: `${cacData.instanceName}.n (${cacN}) does not match ${hdData.instanceName}.nz (${hdNz})`,
+        description: `${cacData.instanceName}.n=${cacN} ≠ ${hdData.instanceName}.nz=${hdNz}`,
         targets: [
           { kind: "edge", edgeId },
           { kind: "field", nodeId: cacId, fieldPath: "n" },

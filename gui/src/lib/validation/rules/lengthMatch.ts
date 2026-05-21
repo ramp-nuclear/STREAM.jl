@@ -32,7 +32,7 @@ import type { ValidationSnapshot } from "../snapshot";
 export const lengthMatch: Validator = {
   id: "length_match",
   severity: "error",
-  description: "CAC geometry length (L) does not match HeatDiffusion Lz",
+  description: "CAC geometry L ≠ HD.Lz",
   scope: ["nodes", "edges", "resources"],
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
@@ -149,7 +149,7 @@ export const lengthMatch: Validator = {
         id: `length_match::${pairKey}`,
         validatorId: "length_match",
         severity: "error",
-        description: `${cacData.instanceName} geometry L (${cacL}) does not match ${hdData.instanceName}.Lz (${hdLz})`,
+        description: `${cacData.instanceName} L=${cacL} ≠ ${hdData.instanceName}.Lz=${hdLz}`,
         targets: [
           { kind: "edge", edgeId },
           { kind: "field", nodeId: cacId, fieldPath: "geometry" },

@@ -16,7 +16,7 @@
 //   7. fixAction is lossless-sync with label "Sync n to <consumerN>" (channel wins)
 //   8. fixAction.apply calls updateNodeParams(sourceId, 'n', consumerN) — channel-wins policy
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import type { Node } from "@xyflow/react";
 import type { BCModeEntry } from "../../../bcMode";
 import type { ValidationSnapshot } from "../../snapshot";
@@ -94,7 +94,6 @@ describe("nMatch", () => {
     expect(r.description).toContain("ch_1");
     expect(r.description).toContain("n=4");
     expect(r.description).toContain("n=3");
-    expect(r.description).toContain("mismatched cell counts");
 
     // D-14: BOTH node targets.
     const nodeTargets = r.targets.filter((t) => t.kind === "node");
@@ -201,7 +200,9 @@ describe("nMatch", () => {
     expect(nTargets).toHaveLength(2);
   });
 
-  it("fixAction is lossless-sync; label names channel n (channel wins)", () => {
+  // Phase 71 UAT Test 8 (2026-05-21): user removed the FixAction on nMatch.
+  // Rule degrades to navigation-only; result.fixAction must be undefined.
+  it("emits no fixAction (rule is navigation-only after UAT Test 8)", () => {
     const ch = makeNode("ch1", "Channel", "ch_1", { n: 3 });
     const wt = makeNode("wt1", "WallTemperature", "wt_1", { n: 4 });
     const bcMode: Record<string, BCModeEntry> = {
@@ -210,41 +211,20 @@ describe("nMatch", () => {
     const snapshot = makeSnapshot([ch, wt], bcMode);
     const results = nMatch.run(snapshot);
     expect(results).toHaveLength(1);
-
-    const fixAction = results[0].fixAction;
-    expect(fixAction).toBeDefined();
-    expect(fixAction!.kind).toBe("lossless-sync");
-    // Channel n=3 wins (NOT max-wins which would give 4).
-    expect((fixAction as { kind: string; label: string }).label).toBe("Sync n to 3");
+    expect(results[0].fixAction).toBeUndefined();
   });
 
-  it("fixAction.apply calls updateNodeParams(sourceId, {parameters:{n:consumerN}}) — channel-wins policy", () => {
+  // Phase 71 UAT Test 8 dedup: multiple BC bindings between the same
+  // (consumerId, sourceId) pair must produce a single result.
+  it("dedupes results by (consumerId, sourceId) pair across multiple bindings", () => {
     const ch = makeNode("ch1", "Channel", "ch_1", { n: 3 });
     const wt = makeNode("wt1", "WallTemperature", "wt_1", { n: 4 });
     const bcMode: Record<string, BCModeEntry> = {
       "ch1::T_wall_left": { mode: "source", sourceNodeId: "wt1" },
+      "ch1::T_wall_right": { mode: "source", sourceNodeId: "wt1" },
     };
     const snapshot = makeSnapshot([ch, wt], bcMode);
     const results = nMatch.run(snapshot);
-    const fixAction = results[0].fixAction!;
-
-    const updateNodeParams = vi.fn();
-    const mockGet = vi.fn(() => ({ updateNodeParams }));
-    const mockSet = vi.fn();
-
-    (
-      fixAction as {
-        kind: string;
-        label: string;
-        apply: (set: unknown, get: () => unknown) => void;
-      }
-    ).apply(mockSet, mockGet);
-
-    // Must write the consumer's n (3) to the SOURCE (wt1) — channel wins.
-    expect(updateNodeParams).toHaveBeenCalledTimes(1);
-    expect(updateNodeParams).toHaveBeenCalledWith("wt1", { parameters: { n: 3 } });
-
-    // Must NOT have written to the channel side.
-    expect(updateNodeParams).not.toHaveBeenCalledWith("ch1", expect.anything());
+    expect(results).toHaveLength(1);
   });
 });

@@ -36,7 +36,7 @@ import { findHydraulicLoops } from "../loopTraversal";
 export const loopClosure: Validator = {
   id: "loop_closure",
   severity: "error",
-  description: "Driving element(s) present but no closed hydraulic loop",
+  description: "No closed hydraulic loop",
   scope: ["nodes", "edges"],
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
@@ -74,17 +74,12 @@ export const loopClosure: Validator = {
       (nodeId) => ({ kind: "node" as const, nodeId }),
     );
 
-    const drivingCount = drivingNodes.length;
-    const description =
-      `${drivingCount} driving element${drivingCount === 1 ? "" : "s"} but no closed hydraulic loop. ` +
-      "Fluid cannot circulate.";
-
     return [
       {
         id: "loop_closure::system",
         validatorId: "loop_closure",
         severity: "error",
-        description,
+        description: "No closed hydraulic loop",
         targets,
       },
     ];

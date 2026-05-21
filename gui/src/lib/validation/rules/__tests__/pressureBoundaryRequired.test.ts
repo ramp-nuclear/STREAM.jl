@@ -47,9 +47,7 @@ describe("pressureBoundaryRequired validator", () => {
     expect(results[0].validatorId).toBe("pressure_boundary_required");
     expect(results[0].id).toBe("pressure_boundary_required::system");
     expect(results[0].targets).toEqual([]);
-    expect(results[0].description).toBe(
-      "No pressure boundary condition. Set a pressure anchor on a FlowPort.",
-    );
+    expect(results[0].description).toBe("No pressure anchor");
   });
 
   it("emits no result when at least one anchor exists", () => {

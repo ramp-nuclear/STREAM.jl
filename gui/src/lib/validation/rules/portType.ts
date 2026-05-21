@@ -88,7 +88,7 @@ export const portType: Validator = {
           id: `port_type::${edge.id}`,
           validatorId: "port_type",
           severity: "error",
-          description: `${srcData.instanceName}.${srcHandle} (${srcType}) cannot connect to ${tgtData.instanceName}.${tgtHandle} (${tgtType})`,
+          description: `${srcData.instanceName}.${srcHandle} → ${tgtData.instanceName}.${tgtHandle}: ${srcType} ↔ ${tgtType}`,
           targets: [
             { kind: "edge", edgeId: edge.id },
             { kind: "port", nodeId: edge.source, portName: srcHandle },

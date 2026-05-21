@@ -146,8 +146,7 @@ describe("loopClosure validator", () => {
     expect(results[0].severity).toBe("error");
     expect(results[0].validatorId).toBe("loop_closure");
     expect(results[0].id).toBe("loop_closure::system");
-    // Should mention the count of driving elements
-    expect(results[0].description).toContain("1");
+    expect(results[0].description).toBe("No closed hydraulic loop");
     // Targets must include the pump node
     const nodeTargets = results[0].targets.filter((t) => t.kind === "node");
     expect(nodeTargets.some((t) => t.kind === "node" && t.nodeId === "pump1")).toBe(true);

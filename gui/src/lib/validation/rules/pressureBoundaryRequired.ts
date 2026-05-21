@@ -26,7 +26,7 @@ import type { ValidationSnapshot } from "../snapshot";
 export const pressureBoundaryRequired: Validator = {
   id: "pressure_boundary_required",
   severity: "error",
-  description: "No pressure boundary condition",
+  description: "No pressure anchor",
   scope: ["anchors"],
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
@@ -37,8 +37,7 @@ export const pressureBoundaryRequired: Validator = {
         id: "pressure_boundary_required::system",
         validatorId: "pressure_boundary_required",
         severity: "error",
-        description:
-          "No pressure boundary condition. Set a pressure anchor on a FlowPort.",
+        description: "No pressure anchor",
         targets: [],
       },
     ];
