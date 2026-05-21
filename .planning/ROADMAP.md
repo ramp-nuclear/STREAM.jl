@@ -303,7 +303,7 @@ Plans:
 
 **Design-decisions reference:** Section 3.9.
 **Depends on:** Phase 62 (operates on Resources + components).
-**Plans:** 8/13 plans executed
+**Plans:** 9/13 plans executed
 
 Plans:
 **Wave 1**
@@ -325,7 +325,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 71-06-PLAN.md (Wave 4, depends 05) — nMatch rule (D-20 supersedes selectNodeErrors; D-13 whole-array fieldPath) + index.ts registration.
+- [x] 71-06-PLAN.md (Wave 4, depends 05) — nMatch rule (D-20 supersedes selectNodeErrors; D-13 whole-array fieldPath) + index.ts registration.
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -406,7 +406,7 @@ contract document drafted in parallel throughout.
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
 | 69. Command palette (jump-only)                      | 3/3 | Complete    | 2026-05-18 |
 | 70. Presets and templates                            | 6/6 | Complete    | 2026-05-20 |
-| 71. Validation framework                             | 8/13 | In Progress|  |
+| 71. Validation framework                             | 9/13 | In Progress|  |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
 
 ## Coverage
