@@ -34,9 +34,9 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   writeTextFile: vi.fn(),
 }));
 
-// Mock sonner toast so we can assert on toast.error calls.
+// Mock sonner toast — both error (structural) and warning (diagnostic) paths.
 vi.mock("../../components/ui/sonner", () => ({
-  toast: { error: vi.fn() },
+  toast: { error: vi.fn(), warning: vi.fn() },
 }));
 
 // Mock buildValidationSnapshot — returns a trivial snapshot object.
@@ -113,12 +113,29 @@ function makeNodes(): Node[] {
   ];
 }
 
-function makeErrorResult(): ValidationResult {
+// Phase 71 UAT Test 14 follow-up (2026-05-21): the export gate now splits
+// errors by structural-vs-diagnostic. The pre-existing tests used the dangling
+// FlowPort case to exercise the hard-block path — that rule IS structural, so
+// the validatorId must match the real id (`dangling_flow_port`, snake_case)
+// for STRUCTURAL_IDS lookup in exportCode to recognize it.
+function makeStructuralErrorResult(): ValidationResult {
   return {
     id: "test-err-1",
-    validatorId: "danglingFlowPort",
+    validatorId: "dangling_flow_port",
     severity: "error",
     description: "pump1.port_out unconnected",
+    targets: [{ kind: "node", nodeId: "pump1-uuid" }],
+  };
+}
+
+// Diagnostic-only error fixture for the soft-block path (warning toast +
+// Export-anyway override).
+function makeDiagnosticErrorResult(): ValidationResult {
+  return {
+    id: "test-err-2",
+    validatorId: "n_match",
+    severity: "error",
+    description: "Channel.1.n=5 ≠ WallTemperature.1.n=10",
     targets: [{ kind: "node", nodeId: "pump1-uuid" }],
   };
 }
@@ -132,9 +149,10 @@ beforeEach(() => {
   vi.mocked(runValidators).mockReturnValue([]);
   vi.mocked(useStore.setState).mockReset();
   vi.mocked(toast.error).mockReset();
+  vi.mocked(toast.warning).mockReset();
 });
 
-describe("exportCode — validation gate", () => {
+describe("exportCode — structural gate (hard-block)", () => {
   it("returns false and does NOT call save() when nodes array is empty", async () => {
     const result = await exportCode({ sections: makeSections(), nodes: [] });
     expect(result).toBe(false);
@@ -142,8 +160,8 @@ describe("exportCode — validation gate", () => {
     expect(vi.mocked(writeTextFile)).not.toHaveBeenCalled();
   });
 
-  it("returns false and does NOT call save() when runValidators returns errors", async () => {
-    vi.mocked(runValidators).mockReturnValue([makeErrorResult()]);
+  it("returns false and does NOT call save() when a structural error is present", async () => {
+    vi.mocked(runValidators).mockReturnValue([makeStructuralErrorResult()]);
 
     const result = await exportCode({
       sections: makeSections(),
@@ -154,18 +172,18 @@ describe("exportCode — validation gate", () => {
     expect(vi.mocked(writeTextFile)).not.toHaveBeenCalled();
   });
 
-  it("fires toast.error with error count when runValidators returns errors", async () => {
-    vi.mocked(runValidators).mockReturnValue([makeErrorResult()]);
+  it("fires toast.error with structural count on hard-block", async () => {
+    vi.mocked(runValidators).mockReturnValue([makeStructuralErrorResult()]);
 
     await exportCode({ sections: makeSections(), nodes: makeNodes() });
 
     expect(vi.mocked(toast.error)).toHaveBeenCalledTimes(1);
     const [msg] = vi.mocked(toast.error).mock.calls[0];
-    expect(msg).toContain("Export blocked: 1 validation error");
+    expect(msg).toContain("Export blocked: 1 structural error");
   });
 
-  it("sets bottomPanelOpen=true and activeBottomTab='validation' on error", async () => {
-    vi.mocked(runValidators).mockReturnValue([makeErrorResult()]);
+  it("sets bottomPanelOpen=true and activeBottomTab='validation' on structural error", async () => {
+    vi.mocked(runValidators).mockReturnValue([makeStructuralErrorResult()]);
 
     await exportCode({ sections: makeSections(), nodes: makeNodes() });
 
@@ -175,6 +193,36 @@ describe("exportCode — validation gate", () => {
         activeBottomTab: "validation",
       }),
     );
+  });
+});
+
+describe("exportCode — diagnostic gate (soft-block with override)", () => {
+  it("fires toast.warning (not error) for diagnostic-only errors", async () => {
+    vi.mocked(runValidators).mockReturnValue([makeDiagnosticErrorResult()]);
+
+    const result = await exportCode({
+      sections: makeSections(),
+      nodes: makeNodes(),
+    });
+    expect(result).toBe(false);
+    expect(vi.mocked(toast.warning)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+    expect(vi.mocked(save)).not.toHaveBeenCalled();
+  });
+
+  it("bypassDiagnosticGate=true skips the warning and proceeds to save", async () => {
+    vi.mocked(runValidators).mockReturnValue([makeDiagnosticErrorResult()]);
+    vi.mocked(save).mockResolvedValue("/tmp/out.jl");
+    vi.mocked(writeTextFile).mockResolvedValue(undefined);
+
+    const result = await exportCode({
+      sections: makeSections(),
+      nodes: makeNodes(),
+      bypassDiagnosticGate: true,
+    });
+    expect(result).toBe(true);
+    expect(vi.mocked(toast.warning)).not.toHaveBeenCalled();
+    expect(vi.mocked(save)).toHaveBeenCalledTimes(1);
   });
 });
 

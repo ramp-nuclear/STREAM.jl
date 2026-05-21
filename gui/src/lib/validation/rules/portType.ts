@@ -24,6 +24,7 @@ export const portType: Validator = {
   severity: "error",
   description: "Incompatible port types",
   scope: ["edges"],
+  structural: true,
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
     const results: ValidationResult[] = [];
