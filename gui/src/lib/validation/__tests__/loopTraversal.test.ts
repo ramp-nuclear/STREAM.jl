@@ -5,7 +5,7 @@
 // discovery order, which is stable but rotation-arbitrary for a given cycle.
 
 import { describe, it, expect } from "vitest";
-import { findHydraulicLoops, type HydraulicLoop } from "../loopTraversal";
+import { findHydraulicLoops } from "../loopTraversal";
 import type { Node, Edge } from "@xyflow/react";
 import type { ComponentDefinition } from "@/registry/types";
 
