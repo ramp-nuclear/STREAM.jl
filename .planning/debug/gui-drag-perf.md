@@ -1,8 +1,24 @@
 ---
-status: investigating
+status: not-a-bug
+resolved: 2026-05-21
+resolved_in: |
+  Closed as not-a-bug per owner 2026-05-21. Cross-platform behavior measured after Plan 65-14:
+    - Windows build: smooth, no lag — accepted.
+    - WSL2 build: very minor chop — accepted environmental floor (WebKitGTK + WSLg).
+  Diagnosis still valid as a historical record:
+    - (2) in-app contributors FIXED by Plan 65-14 — App.tsx title-sync subscribe (gui/src/App.tsx:407-415)
+      now uses subscribeWithSelector with equalityFn so setTitle IPC fires only on currentFilePath
+      or isDirty change; useStore autoRecover subscribe (gui/src/store/useStore.ts:3280-3286)
+      gated to isDirty transitions only.
+    - (1) WSL2 + WebKitGTK environmental floor — primary suspect for right-click pan chop —
+      confirmed not actionable: Windows build is smooth, proving there is no in-app issue.
+    - Autoflip per-port selectors remain unmemoized in StreamNode.tsx (resolveFlowPortAssignment /
+      resolveThermalPairSides) but Windows-smooth-WSL2-acceptable result means no fix is warranted.
+      If a future, much larger scene exposes drag chop on Windows, reopen and implement
+      WeakMap-keyed memoization on (nodes, edges) identity.
 trigger: "dragging with right click is not smooth (not something new but I will mention it now). It may be FPS locked or something like that, because it feels chopped to drag around and drag stuff around. Maybe the performance of the entire GUI is capped in some way?"
 created: 2026-05-15T00:00:00Z
-updated: 2026-05-15T00:00:00Z
+updated: 2026-05-21
 ---
 
 ## Current Focus

@@ -1,25 +1,37 @@
 ---
 phase: 64-connection-routing
 verified: 2026-05-14T14:08:00Z
-status: human_needed
-score: 18/18 must-haves verified
+human_uat_resolved: 2026-05-21
+status: complete
+score: 18/18 must-haves verified; human UAT closed 2026-05-21 (4/5 pass, 1 cosmetic issue routed to Phase 72 follow-up — see 64-HUMAN-UAT.md Test 5 + .planning/todos/pending/2026-05-16-phase72-handle-port-visual-rework.md)
 overrides_applied: 0
 human_verification:
   - test: "Open `gui/export_examples/simple_loop.scp` (or build a pump-CAC-pump loop) and confirm each FlowPort handle visually sits on the side facing its connected neighbor (no more ugly arrows from the §3.3 example_*.png screenshots)."
     expected: "Handles face their neighbors; CAC thermal pair lands on opposing top/bottom faces; brief 1-pixel flicker at 45° dominant-axis transition is acceptable per D-14."
     why_human: "The phase goal is rooted in visual ugliness verified in the example_*.png screenshots. Programmatic tests assert the math + DOM class names but cannot verify the human perception of 'no longer ugly'."
+    result: pass
+    resolved_in: 64-HUMAN-UAT.md Test 1
   - test: "Wire two pumps with bidirectional hydraulic edges (`pump1.port_out → pump2.port_in` and `pump2.port_out → pump1.port_in`) and confirm the two edges render as a ±8px parallel offset instead of overlapping on a single midline (Example-1 X-cross fix)."
     expected: "Two clearly separated parallel paths; deterministic direction (smaller-id bow on one side, larger-id on the other); no flicker on re-render."
     why_human: "Visual confirmation that the anti-parallel bow renders correctly on the real canvas; tests assert path-d-attribute math but eyeball confirmation of 'looks good in the GUI' is human."
+    result: pass
+    resolved_in: 64-HUMAN-UAT.md Test 2
   - test: "Drag a node around and confirm autoflip recomputes live (handles flip as the dominant axis to the neighbor changes) without sticky edges. If sticky-edge race surfaces during rapid drag, switch the per-handle `useEffect` body to `setTimeout(() => updateNodeInternals(nodeId), 0)` per Pitfall 2 (inline comment in StreamNode.tsx flags the location)."
     expected: "Edges follow handles fluidly during drag; `useUpdateNodeInternals` keeps the wires attached to the live handle positions."
     why_human: "Real-time drag interaction with rendering loop and ReactFlow internals — cannot be exercised programmatically."
+    result: pass
+    resolved_in: 64-HUMAN-UAT.md Test 3
   - test: "Switch active layer from Hydraulic to Thermal and back. Confirm edges DIM but do NOT re-route (D-05 invariant)."
     expected: "Visual dimming applied via `dimFlowHandles` / `dimThermalHandles` opacity; edge paths remain identical across layer switches."
     why_human: "Visual perception of dimming vs re-routing; programmatic tests cover that selectors don't read `activeLayer` but the live render needs a smoke check."
+    result: pass
+    resolved_in: 64-HUMAN-UAT.md Test 4
   - test: "Trigger D-15 by arranging a CAC with hydraulic neighbor on one side AND a thermal neighbor on the SAME horizontal axis. Confirm the amber chip 'Hydraulic and thermal neighbors on same axis — consider repositioning.' appears at the bottom-right of the CAC and the red ring does NOT light up."
     expected: "Chip is non-blocking; node root has NO `ring-destructive` class when only the topology hint fires."
     why_human: "Visual confirmation of warning vs error severity separation; D-15 is genuinely rare per the design doc and was not exercised by the parallel executor's smoke checkpoint."
+    result: issue-deferred
+    resolved_in: 64-HUMAN-UAT.md Test 5
+    resolution: "Owner rejected the topology-hint chip feature outright AND flagged separate handle-design visual problems (color, shape, size, behavior). Routed to Phase 72 follow-up via .planning/todos/pending/2026-05-16-phase72-handle-port-visual-rework.md. Severity: cosmetic. Not a Phase 64 routing-correctness gap."
 ---
 
 # Phase 64: Connection Routing Verification Report
@@ -27,7 +39,7 @@ human_verification:
 **Phase Goal:** Solve the connection-arrow ugliness verified in the example_*.png screenshots. Per-port autoflip moves each FlowPort handle to the side facing its connected neighbor. Asymmetric same-side placement disambiguates when both ports of a component end up on the same edge. Thermal-port-pair axis-flip for CAC/HD (left/right or top/bottom). Optional polish hook for anti-parallel offset of bidirectional pairs.
 
 **Verified:** 2026-05-14T14:08:00Z
-**Status:** human_needed
+**Status:** complete (human UAT closed 2026-05-21 — see 64-HUMAN-UAT.md; 4/5 pass, 1 cosmetic issue routed to Phase 72)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement

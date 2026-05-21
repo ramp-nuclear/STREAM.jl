@@ -62,18 +62,11 @@ Phase: 71
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-05-20
-Next: `/gsd:verify-work 65` to re-run UAT against the gap-closure surfaces, then `/gsd:discuss-phase 66` (Code preview rework). Optional intermediate: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far (covers Phases 59 → 65).
+Next: `/gsd:discuss-phase 71` (Validation framework — current next phase per ROADMAP.md). Optional: `/gsd:ship` to open a PR for the work shipped on `gui-redesign` so far (covers Phases 59 → 70).
 
-Phase 65 deferred manual UAT (require running Tauri build):
+Phase 65 manual UAT: CLOSED 2026-05-21. All 20 tests in 65-UAT.md pass — including the 6 originally-deferred interactive items (canvas interaction matrix, clipboard, context menus + Rename focus, snap-to-grid persistence, AutoRecover crash sim, Untitled→Save As). VERIFICATION.md status flipped from `human_needed` to `complete`. (Phase 64 manual UAT also closed in the same sweep: 4/5 pass + 1 cosmetic issue routed to Phase 72 follow-up todo.)
 
-1. Canvas interaction matrix (left-marquee / right-drag pan / right-click menu with 5px/250ms threshold) — 65-03 Task 3
-2. Clipboard `navigator.clipboard` round-trip + Ctrl+D fixed-offset stacking — 65-04 Task 4
-3. Node/Edge/Canvas context menus + Rename inline-edit focus — 65-05 Task 4
-4. Snap-to-grid visual drag/drop behavior + per-project persistence round-trip — 65-06 Task 4
-5. AutoRecover crash simulation (`kill -9` while sidecar exists) → blocking restore modal on relaunch — 65-08 Task 3
-6. Untitled-project recovery flow → Save As required (D-04) — 65-08 Task 3
-
-Outstanding non-blocking items (NOT 66's job):
+Outstanding non-blocking items (NOT 71's job, but Phase 71 owns the tsc/vitest reconciliation):
 
 - 11 pre-existing tsc errors + 1 pre-existing vitest failure (`SidebarPanel.anchors.test.tsx "Symmetric (L = R)"`) — Phase 71 owns reconciliation per Phase 61's deferred-items.
 - Channel BCs tab visual layout fit issues — explicitly deferred to Phase 72 (v1.2 cosmetics / design system audit). Originally tagged for Phase 65 but Phase 65 scope was interaction model + AutoRecover, not BC visual layout.
@@ -125,18 +118,15 @@ Outstanding non-blocking items (NOT 66's job):
 
 ### Pending Todos
 
-- **[v1.1 close blocker]** Decide MTR L/R wiring convention (Julia spatial-absolute vs Python channel-relative). 92 parity FAIL rows in `test/data/parity_report.csv` trace to this. See `.planning/phases/56-python-stream-cross-validation/56-RESUME-PLAN.md` task 5.
-- **[v1.1 close blocker]** After convention fix: regenerate parity_report.csv, expect MTR FAILs → 0/GRAY.
-- **[v1.1 close blocker]** Resume Plan 56-06 (cleanup grep, MILESTONES.md narrative entry, gsd-verifier on Phase 56).
-- **[v1.1 cleanup]** NET-03 KINSOL halts `bin/jl test/runtests.jl` orchestrator — being marked `@test_skip` with documented reason during this resume cycle.
-- **[v1.1 cleanup]** REQUIREMENTS.md checkbox sweep: VAR-01..04 → `[x]` (already wired in code; just stale checkboxes).
+(v1.1 close blockers + cleanup items removed 2026-05-21 — all resolved during Plan 56-06 close-up. MTR L/R wiring fixed via R-1 minimal-diff fix in tests; parity_report.csv regenerated to 424 CLEAN / 78 GRAY / 34 FAIL; NET-03 `@test_skip` markers in place; REQUIREMENTS.md VAR-01..04 already marked complete. See `.planning/archive/v1.1/phases/56-python-stream-cross-validation/56-06-SUMMARY.md` and `.planning/v1.1-MILESTONE-AUDIT.md` (status: tech_debt, 22/22 requirements complete). Numerical residuals VAL-01 + NET-03 carried forward to `.planning/todos/pending/v12-numerical-investigation-val01-net03.md` for a future numerical phase.)
+
+No v1.2-active pending todos currently tracked in STATE.md. See `.planning/todos/pending/` for the live backlog (4 items: Phase 72 handle visual rework, codegen resource dedup, GUI visual design pass, panel-resize overflow, plus the v1.2 numerical-investigation entry just filed).
 
 ### Blockers/Concerns
 
-- **MTR L/R convention disagreement.** `src/composition/helpers.jl` (`symmetric_plate`, `plate`, `one_sided_connection`) wires LEFT-channel's RIGHT face → plate's LEFT face (spatial-absolute). Python `stream/composition/mtr_geometry.py:60-63` wires LEFT-channel's LEFT face (channel-relative). Result: 92 FAIL rows on MTR scenarios in `parity_report.csv`. Decision pending.
-- VAL-01 (Fourier series validation) — `solve` returns `ReturnCode.InitialFailure`. Phase 58 fixed structural determinacy; numerical convergence is a v1.2 follow-up (out-of-scope per 58-CONTEXT.md).
-- NET-03 (Cube flow) KINSOL flag −11 — pre-existing flaky from Phase 55 D-22; halts runtests.jl orchestrator. Being skipped this cycle.
-- v1.1 milestone audit (.planning/v1.1-MILESTONE-AUDIT.md) verdict: `gaps_found` — TEST-04 unsatisfied, ROADMAP/STATE rollup was lying about completion until this update corrected it.
+(v1.1-era blockers cleared 2026-05-21 — MTR L/R convention disagreement resolved via R-1 fix; NET-03 KINSol flakies absorbed by `@test_skip` markers; v1.1 milestone audit re-audited to `tech_debt` with 22/22 requirements complete; VAL-01 + NET-03 numerical residuals routed to v1.2-numerical-investigation backlog todo.)
+
+No v1.2-active blockers currently tracked. Phase 71 (validation framework, next up) is unstarted, not blocked.
 
 ---
 

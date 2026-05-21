@@ -1,8 +1,9 @@
 ---
 phase: 63-bcs-tab-value-source-components-in-gui
 verified: 2026-05-13T18:05:00Z
-status: human_needed
-score: 7/8 must-haves verified (1 partial — bidirectional sync)
+human_uat_resolved: 2026-05-21
+status: complete
+score: 7/8 must-haves verified (1 partial — bidirectional sync; human UAT closed 2026-05-21, see 63-HUMAN-UAT.md)
 overrides_applied: 0
 gaps:
   - truth: "Bidirectional sync between BCs-tab dropdown selection and canvas BC edge"
@@ -59,15 +60,25 @@ human_verification:
   - test: "BCs tab manual smoke (D-10 whole-body drop overlay)"
     expected: "cd gui && npm run tauri dev → drop Channel, drag from WallTemperature.T_wall_out, expect dashed-outline overlay + 'Connect BC' chip on Channel body, release → dashed BC edge created with targetSide='both'."
     why_human: "useConnection() drag state is not faithfully reproducible in jsdom — listed as Manual-Only in 63-VALIDATION.md."
+    result: pass
+    resolved_in: 63-HUMAN-UAT.md Test 1
   - test: "+ New WallTemperature end-to-end (D-20)"
     expected: "Empty canvas → drop Channel (n=12) → select → BCs tab → click Source pill → empty Source-mode dropdown shows '+ New WallTemperature' button → click → new WT node appears ~120px left of Channel, auto-selected in dropdown, dashed BC edge auto-created. The new WT's parameters.n equals 12 (no bc-n-mismatch fires)."
     why_human: "Spatial layout + auto-select + visual confirmation; unit-tested at store level but visual flow needs eyes."
+    result: resolved-by-design
+    resolved_in: 63-HUMAN-UAT.md Test 2
+    resolution: "Source pill + auto-create WT button intentionally not shipped per owner decision; superseded by the promote-to-shared-source flow shipped in Phase 63.1. D-20 spec is obsolete."
   - test: "Visual red-ring on n-mismatch (D-22)"
     expected: "WT(n=10) + Channel(n=12) → connect on canvas → both nodes paint with ring-destructive class visibly red (unit test verifies class application; this confirms CSS resolves to a visible ring)."
     why_human: "Visual rendering only — unit test covers the class attribute, not paint."
+    result: pass
+    resolved_in: 63-HUMAN-UAT.md Test 3
   - test: "Goal-level decision: do CR-01/CR-02/CR-03 block phase completion?"
     expected: "Owner decides whether the three state-sync gaps (canvas-drag-no-bcMode; symmetric-toggle-left-undefined; symmetric-toggle-source-mode-no-edge-resync) are blocking the v1.2 milestone or can be deferred to a polish/correctness phase. The phase goal specifically lists 'bidirectional sync' as an in-scope deliverable, and CR-01 partially breaks it; CR-02 and CR-03 are narrower transition-only correctness gaps. If deferred, file as a follow-up phase before milestone close."
     why_human: "Scope/severity judgment call — code clearly works for the dominant user paths (BCs-tab → canvas, BCs-tab edit, edge-removal-reverts-bcMode); the gaps only manifest on specific cross-path transitions."
+    result: deferred-no-followup
+    resolved_in: 63-HUMAN-UAT.md Test 4
+    resolution: "Owner decision — all three deferred, none block v1.2. CR-01 not recognized as a real issue. CR-02 and CR-03 explicitly ignored. No follow-up phase needed."
 ---
 
 # Phase 63: BCs Tab + Value-Source Components in GUI — Verification Report

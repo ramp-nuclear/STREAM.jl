@@ -62,8 +62,8 @@ note: auto-verified — vitest Case 10 in CommandPalette.test.tsx hard-asserts n
 
 ### 12. Per-layer accent color comparison — D-08
 expected: Hydraulic-off chip (blue #3b82f6) vs Thermal-off chip (amber #f59e0b) visibly differ
-result: skipped
-reason: superseded by Test 5 redesign (commit c374e97) — palette no longer surfaces per-layer color; all off-layer rows render the same muted-gray EyeOff icon matching LayersPanel. D-08 layer color cue intentionally dropped in favor of unified visual vocabulary.
+result: pass
+resolution: resolved-by-design — superseded by Test 5 redesign (commit c374e97). Palette no longer surfaces per-layer color; all off-layer rows render the same muted-gray EyeOff icon matching LayersPanel. D-08 layer color cue intentionally dropped in favor of unified visual vocabulary. The original D-08 spec is obsolete, not unverified.
 
 ### 13. Pitfall 1 — no native Print dialog leak — P1
 expected: Pressing Ctrl+P with devtools open shows ONLY the palette; no browser/OS Print overlay flashes. Also try Ctrl+P while a Ctrl+S save dialog is awaiting IPC (Linux/GTK) — Print must still not leak (CR-02 fix)
@@ -98,10 +98,10 @@ note: caps-lock case (Ctrl + capital P) also confirmed working post-2a0db1c.
 ## Summary
 
 total: 19
-passed: 18
+passed: 19
 issues: 0
 pending: 0
-skipped: 1
+skipped: 0
 blocked: 0
 
 ## Gaps

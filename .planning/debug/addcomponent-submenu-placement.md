@@ -1,8 +1,10 @@
 ---
-status: diagnosed
+status: resolved
+resolved: 2026-05-21
+resolved_in: "Phase 65 Plan 11 — PopoverMenuSub / PopoverMenuSubTrigger / PopoverMenuSubContent reworked in gui/src/components/ui/context-menu.tsx (marker at line 128). Level-2 submenu now uses viewport-collision-aware placement so per-category submenus no longer clip past the right viewport edge."
 trigger: "Canvas → Add Component nested submenus render offscreen/clipped — only a tiny edge visible"
 created: 2026-05-15T00:00:00Z
-updated: 2026-05-15T00:00:00Z
+updated: 2026-05-21
 ---
 
 ## Current Focus
