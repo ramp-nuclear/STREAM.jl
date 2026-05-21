@@ -3178,7 +3178,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     }
 
     // Determine which store the entry lives in and refresh.
-    const { projectPresets, libraryPresets } = get();
+    const { projectPresets } = get();
     const inProject = projectPresets.some((e) => e.filePath === filePath);
     const store = inProject ? "project" : "library";
     await get().refreshPresetsDir(store, dir);
@@ -3191,7 +3191,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     await remove(filePath);
 
     // Determine store from current arrays then refresh.
-    const { projectPresets, libraryPresets } = get();
+    const { projectPresets } = get();
     const inProject = projectPresets.some((e) => e.filePath === filePath);
     const dir = filePath.replace(/[/\\][^/\\]+$/, "");
     const store = inProject ? "project" : "library";
