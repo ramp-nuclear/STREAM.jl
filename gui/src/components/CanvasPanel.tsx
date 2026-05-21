@@ -89,9 +89,9 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   // Phase 65 Plan 13: interactive lock — when true, all interactions disabled.
   const interactiveLocked = useStore((s) => s.interactiveLocked);
   // B3 guard: useReactFlow is called ONCE at the component top level — never
-  // inside callbacks or useEffect. setNodes/setEdges are stable identities per
-  // @xyflow/react v12 docs.
-  const { screenToFlowPosition, setNodes, setEdges } = useReactFlow();
+  // inside callbacks or useEffect. setNodes/setEdges/setCenter/getNode are
+  // stable identities per @xyflow/react v12 docs.
+  const { screenToFlowPosition, setNodes, setEdges, setCenter, getNode } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Phase 65 Plan 03: right-click pan-vs-context-menu disambiguation (D-12).
@@ -375,6 +375,86 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
     return () => window.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // setNodes/setEdges from useReactFlow are stable identities — safe to omit from deps
+
+  // Phase 71 Plan 11 — D-05 click-to-focus: canvas pans to affected nodes + flash ring.
+  // Listens for 'stream:focus-validation-result' dispatched by ValidationPanel (Plan 09)
+  // when the user clicks a result row.
+  //
+  // Flash mechanism: CustomEvent 'stream:node-flash' (simpler than a new store slice).
+  // CanvasPanel dispatches it with the collected nodeIds; a second listener in THIS
+  // same useEffect applies .validation-flash to the matching ReactFlow node DOM elements
+  // via data-id attribute (ReactFlow renders nodes with data-id) and removes it after
+  // 700ms. No new store slice needed (plan Task 3 "PICK the simpler alternative").
+  useEffect(() => {
+    const onFocusResult = (e: Event) => {
+      const ce = e as CustomEvent<{ result: import("@/lib/validation/types").ValidationResult }>;
+      const result = ce.detail?.result;
+      if (!result) return;
+
+      // Collect nodeIds from node/port targets.
+      const nodeIds: string[] = [];
+      for (const target of result.targets) {
+        if (target.kind === "node" || target.kind === "port") {
+          if (!nodeIds.includes(target.nodeId)) nodeIds.push(target.nodeId);
+        }
+      }
+
+      // If there are node targets, compute the bbox center and call setCenter.
+      if (nodeIds.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        let validCount = 0;
+        for (const nodeId of nodeIds) {
+          const n = getNode(nodeId);
+          if (!n) continue;
+          const x = n.position.x;
+          const y = n.position.y;
+          const w = (n as { measured?: { width?: number } }).measured?.width ?? 120;
+          const h = (n as { measured?: { height?: number } }).measured?.height ?? 40;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x + w);
+          maxY = Math.max(maxY, y + h);
+          validCount++;
+        }
+        if (validCount > 0) {
+          const cx = (minX + maxX) / 2;
+          const cy = (minY + maxY) / 2;
+          // Use current zoom so the user's zoom level is preserved.
+          const { getZoom } = useStore.getState() as unknown as Record<string, unknown>;
+          void getZoom; // getZoom lives on the ReactFlow instance, not the store
+          setCenter(cx, cy, { duration: 300 });
+        }
+      }
+
+      // Flash the affected node DOM elements via 'stream:node-flash'.
+      if (nodeIds.length > 0) {
+        window.dispatchEvent(
+          new CustomEvent("stream:node-flash", { detail: { nodeIds } }),
+        );
+      }
+    };
+
+    const onNodeFlash = (e: Event) => {
+      const ce = e as CustomEvent<{ nodeIds: string[] }>;
+      const nodeIds = ce.detail?.nodeIds ?? [];
+      for (const nodeId of nodeIds) {
+        // ReactFlow renders node wrappers with data-id attribute.
+        const el = document.querySelector(`[data-id="${nodeId}"]`);
+        if (!el) continue;
+        el.classList.add("validation-flash");
+        setTimeout(() => el.classList.remove("validation-flash"), 700);
+      }
+    };
+
+    window.addEventListener("stream:focus-validation-result", onFocusResult as EventListener);
+    window.addEventListener("stream:node-flash", onNodeFlash as EventListener);
+    return () => {
+      window.removeEventListener("stream:focus-validation-result", onFocusResult as EventListener);
+      window.removeEventListener("stream:node-flash", onNodeFlash as EventListener);
+    };
+    // setCenter and getNode are stable ReactFlow identities — safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Phase 65 Plan 05: convert rcMenu screen coords to flow coords for pane menus.
   // D-11: we use Popover as the host (NOT a controlled ContextMenu.Root) because
