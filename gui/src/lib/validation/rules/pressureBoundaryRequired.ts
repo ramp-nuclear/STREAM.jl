@@ -1,0 +1,46 @@
+// pressureBoundaryRequired.ts — Pressure boundary required validator (Phase 71, Plan 08)
+//
+// Folds VALD-02 from gui/src/lib/validation.ts:110-112 per D-16.
+// System-level rule: no specific node target (targets = []).
+//
+// D-15 / D-16: "pressure boundary exists" — if Object.keys(snapshot.anchors).length === 0
+//   the model has no pressure anchor; solver cannot determine absolute pressures.
+//
+// D-11: stable result id 'pressure_boundary_required::system' (one result per model state).
+//
+// Pure function: zero useStore imports, zero React imports.
+
+import type { Validator, ValidationResult } from "../types";
+import type { ValidationSnapshot } from "../snapshot";
+
+/**
+ * pressureBoundaryRequired — flags models with no pressure anchor.
+ *
+ * # Arguments
+ * - `snapshot`: ValidationSnapshot — pure read-only model state
+ *
+ * # Returns
+ * - Empty array when at least one pressure anchor is present.
+ * - One ValidationResult (severity 'error') when anchors is empty.
+ */
+export const pressureBoundaryRequired: Validator = {
+  id: "pressure_boundary_required",
+  severity: "error",
+  description: "No pressure boundary condition",
+  scope: ["anchors"],
+
+  run(snapshot: ValidationSnapshot): ValidationResult[] {
+    if (Object.keys(snapshot.anchors).length > 0) return [];
+
+    return [
+      {
+        id: "pressure_boundary_required::system",
+        validatorId: "pressure_boundary_required",
+        severity: "error",
+        description:
+          "No pressure boundary condition. Set a pressure anchor on a FlowPort.",
+        targets: [],
+      },
+    ];
+  },
+};
