@@ -172,55 +172,29 @@ describe("gravitySumPerLoop validator", () => {
     expect(results).toHaveLength(0);
   });
 
-  it("respects traversal direction: Gravity traversed target→source contributes -H", () => {
-    // Two Gravity nodes in a 4-node loop, traversed in opposite directions.
-    // Loop edges (in order stored): e1=pump→g1, e2=g1→ch, e3=ch→g2, e4=g2→pump
+  it("respects traversal direction: Gravity traversed backward (port_out → port_in) contributes -H", () => {
+    // The signed-traversal convention is based on the sourceHandle of the outgoing edge
+    // from the Gravity node:
+    //   sourceHandle = 'port_out' → forward traversal (port_in → port_out) → +H
+    //   sourceHandle = 'port_in'  → backward traversal (port_out → port_in) → -H
     //
-    // For a loop where BOTH gravity nodes are traversed source→target:
-    //   g1(H=+10) source→target: add +10
-    //   g2(H=+10) source→target: add +10
-    //   Net = +20 → error
-    //
-    // For a loop where g1 source→target (+10) and g2 target→source (-H = -10):
-    //   Net = 0 → no error
-    //
-    // To get g2 traversed target→source, we can reverse the edge: edge source=pump, target=g2
-    // means when traversal walks "pump→g2", it's source→target on the edge,
-    // but the "Gravity is on the target side" (edge.target === g2Id) → subtract H.
-    // Wait — let's be precise: the convention used in the rule is:
-    //   For each edge in the loop: if edge.source === gravityNodeId → add +H
-    //                              if edge.target === gravityNodeId → add -H
-    //
-    // Test: g1(H=10), edge e1: source=g1, target=ch (g1 is source → +10)
-    //       g2(H=10), edge e2: source=ch, target=g2 (g2 is target → -10)
-    //       Net = 0 → no error
+    // This loop has one Gravity traversed forward (+H) and one traversed backward (-H):
+    //   g_fwd(H=10): outgoing edge uses port_out → +10
+    //   g_bwd(H=10): outgoing edge uses port_in  → -10  (flow goes "downhill" through it)
+    //   Net = +10 - 10 = 0 → no error
     const pump = makeNode("pump1", "Pump");
-    const g1 = makeNode("g1", "Gravity", { H: 10 });
+    const g_fwd = makeNode("g_fwd", "Gravity", { H: 10 });
     const ch = makeNode("ch1", "Channel");
-    const g2 = makeNode("g2", "Gravity", { H: 10 });
-    // Loop: pump → g1 → ch → (edge has ch as source, g2 as target) → pump
-    const snapshot = makeSnapshot([pump, g1, ch, g2], [
-      makeEdge("e1", "pump1", "port_out", "g1", "port_in"),   // g1 is target → -H = -10
-      makeEdge("e2", "g1", "port_out", "ch1", "port_in"),     // g1 is source → +H = +10  (net g1 = 0)
-      makeEdge("e3", "ch1", "port_out", "g2", "port_in"),     // g2 is target → -H = -10
-      makeEdge("e4", "g2", "port_out", "pump1", "port_in"),   // g2 is source → +H = +10  (net g2 = 0)
+    const g_bwd = makeNode("g_bwd", "Gravity", { H: 10 });
+    // Loop: pump → g_fwd (forward) → ch → g_bwd (backward: exits via port_in) → pump
+    const snapshot = makeSnapshot([pump, g_fwd, ch, g_bwd], [
+      makeEdge("e1", "pump1", "port_out", "g_fwd", "port_in"),    // entering g_fwd
+      makeEdge("e2", "g_fwd", "port_out", "ch1", "port_in"),      // g_fwd forward: sourceHandle=port_out → +10
+      makeEdge("e3", "ch1", "port_out", "g_bwd", "port_out"),     // entering g_bwd via port_out
+      makeEdge("e4", "g_bwd", "port_in", "pump1", "port_in"),     // g_bwd backward: sourceHandle=port_in → -10
     ]);
-    // Net over loop = 0 (each gravity appears once as source and once as target in the SCC)
-    // Actually since we walk ALL edges of the SCC (not just a cycle path),
-    // let's build a simple case where the net is clearly calculable:
-    //
-    // Simpler: single Gravity in loop traversed once as source and once NOT at all
-    // vs just verify the unbalanced case.
-    //
-    // Let's use a different fixture: only 3 nodes, g1(H=10) appears once as source
-    // and pump appears as target:
-    //   pump → g1: g1 is target → -10
-    //   g1 → ch:  g1 is source → +10
-    //   ch → pump: pump only (not gravity)
-    // Net = 0 → no error (g1 appears in both source and target roles)
+    // Net = +10 (g_fwd forward) + (-10) (g_bwd backward) = 0 → no error
     const results = gravitySumPerLoop.run(snapshot);
-    // The g1 appears as both source (e2) and target (e1); similarly g2 as source (e4) and target (e3)
-    // Net = -10 + 10 - 10 + 10 = 0
     expect(results).toHaveLength(0);
   });
 
