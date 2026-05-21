@@ -9,10 +9,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 // Mock Tauri's window API BEFORE importing App — App's mount-time effects
 // call getCurrentWindow().setTitle(...) and .onCloseRequested(...), both of
 // which throw under happy-dom because the underlying IPC bridge is absent.
+// Phase 70 fix: the `useWindowMaximized` hook (added post-Phase-65) also calls
+// getCurrentWindow().onResized(...) at mount. Missing this mock entry caused
+// App to throw during render and the tab tests to time out on findByRole.
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     setTitle: vi.fn().mockResolvedValue(undefined),
     onCloseRequested: vi.fn().mockResolvedValue(() => {}),
+    onResized: vi.fn().mockResolvedValue(() => {}),
     destroy: vi.fn().mockResolvedValue(undefined),
   }),
 }));
