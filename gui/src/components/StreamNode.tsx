@@ -407,7 +407,16 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       // error row whose node is already errored.
       data-stream-node-id={id}
       className={`relative rounded-md min-w-[140px] transition-[box-shadow] ${
-        selected ? "ring-2 ring-[var(--ring)] ring-offset-1 ring-offset-canvas" : ""
+        // Phase 72 P3 (2026-05-22) — selection ring relocked from
+        // ring-2 ring-[var(--ring)] (Hydraulic blue, 2 px) to ring-1
+        // ring-foreground/40 (thin neutral grey, 1 px). The original Hydraulic
+        // tint read as "every non-source node turns blue when selected"
+        // because the ring color is the same on every node and most clicks
+        // land on Hydraulic components. --ring stays Hydraulic for button /
+        // input focus indicators — that context still wants a saturated
+        // signal — but node selection is a different signal that should
+        // recede, not color-shift.
+        selected ? "ring-1 ring-foreground/40 ring-offset-1 ring-offset-canvas" : ""
       } ${hasAnyError ? "outline outline-2 outline-[var(--destructive)]" : ""} ${
         isCodeHovered ? "stream-node--code-hover" : ""
       } ${isCodePinned ? "stream-node--code-pinned" : ""} ${
