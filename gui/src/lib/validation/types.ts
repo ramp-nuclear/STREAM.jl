@@ -136,5 +136,15 @@ export interface Validator {
   /** Documentation-only in v1. Reserved for future targeted invalidation.
    *  D-09: scope metadata is not used by the runner in v1; run-all is the policy. */
   scope: ("nodes" | "edges" | "anchors" | "bcMode" | "resources")[];
+  /** Phase 71 UAT (2026-05-21): export-gate severity split.
+   *  - `structural: true` — failures here produce Julia code that will not parse
+   *    or compile in MTK (port-type mismatch, unconnected required ports, dangling
+   *    FlowPorts, self-loops). Export is hard-blocked on these.
+   *  - `structural: false` or omitted (default) — failures produce a Julia file
+   *    that parses but the solver won't converge / will produce nonsense
+   *    (no pressure anchor, no driving element, mismatched n/L, gravity sum ≠ 0,
+   *    inconsistent geometry). Export is allowed with a warning + "Export anyway"
+   *    override on the toast. */
+  structural?: boolean;
   run(snapshot: ValidationSnapshot): ValidationResult[];
 }

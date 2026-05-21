@@ -23,6 +23,7 @@ export const requiredConnections: Validator = {
   severity: "error",
   description: "Required port not connected",
   scope: ["nodes", "edges"],
+  structural: true,
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
     const results: ValidationResult[] = [];

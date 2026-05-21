@@ -8,8 +8,15 @@ import { useBottomPanelResize } from "../hooks/useBottomPanelResize";
 import { getComponent } from "../registry";
 import { generateCode, serializeSections } from "../lib/codeGenerator";
 import { exportCode } from "../lib/exportCode";
+import { validators } from "../lib/validation";
 import CodePreview from "./CodePreview";
 import ValidationPanel from "./ValidationPanel";
+
+// Phase 71 UAT Test 14 follow-up: structural-vs-diagnostic split. Computed at
+// module load (validators array is fixed). Mirror of the same set in exportCode.ts.
+const STRUCTURAL_VALIDATOR_IDS = new Set(
+  validators.filter((v) => v.structural === true).map((v) => v.id),
+);
 
 export default function BottomPanel() {
   const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
@@ -27,8 +34,17 @@ export default function BottomPanel() {
   // subscribe to a derived primitive instead of the array — re-renders fire
   // only when the canvas crosses the empty/non-empty boundary.
   const hasNodes = useStore((s) => s.nodes.length > 0);
-  const errorCount = useStore(
-    (s) => s.validationResults.filter((r) => r.severity === "error").length,
+  // Phase 71 UAT Test 14 follow-up (2026-05-21): Export-button gate softened
+  // to structural errors only. Diagnostic errors still fire the warning toast
+  // (with an "Export anyway" override) but no longer disable the button.
+  // STRUCTURAL_VALIDATOR_IDS mirrors the structural:true tag in validation/rules/*.
+  const structuralErrorCount = useStore(
+    (s) =>
+      s.validationResults.filter(
+        (r) =>
+          r.severity === "error" &&
+          STRUCTURAL_VALIDATOR_IDS.has(r.validatorId),
+      ).length,
   );
   const activeBottomTab = useStore((s) => s.activeBottomTab);
   const setActiveBottomTab = useStore((s) => s.setActiveBottomTab);
@@ -164,11 +180,11 @@ export default function BottomPanel() {
                 {/* Tooltip requires a focusable child; span wrapper keeps the
                     button semantics intact when disabled (disabled buttons
                     don't fire mouse events, so the span captures the hover). */}
-                <span tabIndex={errorCount > 0 || !hasNodes ? 0 : -1} className="inline-flex">
+                <span tabIndex={structuralErrorCount > 0 || !hasNodes ? 0 : -1} className="inline-flex">
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={!hasNodes || errorCount > 0}
+                    disabled={!hasNodes || structuralErrorCount > 0}
                     onClick={handleExport}
                     aria-label="Export generated Julia code to file"
                   >
@@ -178,8 +194,8 @@ export default function BottomPanel() {
                 </span>
               </TooltipTrigger>
               <TooltipContent>
-                {errorCount > 0
-                  ? `Resolve ${errorCount} validation ${errorCount === 1 ? "error" : "errors"} first`
+                {structuralErrorCount > 0
+                  ? `Resolve ${structuralErrorCount} structural ${structuralErrorCount === 1 ? "error" : "errors"} first (generated Julia will not compile)`
                   : !hasNodes
                     ? "Add components first"
                     : "Export generated Julia code to file"}

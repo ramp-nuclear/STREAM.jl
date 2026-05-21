@@ -20,6 +20,7 @@ export const danglingFlowPort: Validator = {
   severity: "error",
   description: "Unconnected FlowPort",
   scope: ["nodes", "edges"],
+  structural: true,
 
   run(snapshot: ValidationSnapshot): ValidationResult[] {
     const results: ValidationResult[] = [];
