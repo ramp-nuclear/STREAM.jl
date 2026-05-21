@@ -11,7 +11,8 @@ import {
 } from "@xyflow/react";
 import { getComponent } from "../registry";
 import { getComponentIcon } from "@/registry/icons";
-import { getComponentLayers, type ActiveLayers } from "../lib/layers";
+import { getComponentLayers, getDisplayLayers, type ActiveLayers } from "../lib/layers";
+import { LAYER_COLOR_VAR } from "../lib/layerColors";
 import type { StreamNodeData } from "../store/useStore";
 import useStore from "../store/useStore";
 import { isSourceValueEntry } from "@/lib/sourceValueEntry";
@@ -349,19 +350,15 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
 
   const Icon = getComponentIcon(nodeData.componentId);
 
-  // Phase 72 P3 (2026-05-22) — leading-band color identity removed per user
-  // request: "the outline border for every non-source node reads light blue;
-  // we need a thin thin grey... same across all nodes." The band's color
-  // signal (Hydraulic blue dominated the canvas because most components are
-  // Hydraulic) created the perception that "every node except Sources is
-  // blue." Layer identity now lives entirely in: (1) LayersPanel dots
-  // (unchanged), (2) port handle colors (still differentiated — FlowPort
-  // blue/red, ThermalPort amber, BCPort sources-green), (3) the layer-aware
-  // connect highlighting.
-  //
-  // The visual edge of the node is now a uniform 1 px --border line around
-  // the body — a quiet, identical perimeter for every node. Selection still
-  // signals via the outer wrapper's ring-2 ring-ring.
+  // Phase 72 — leading-band identity (replaces border-as-accent). One band
+  // div per layer the component belongs to, side by side horizontally. For
+  // single-layer components (most), one solid band. For dual-layer
+  // (ChannelAndContacts has both FlowPorts and ThermalPorts), the band
+  // splits half/half. Components with no layer association (e.g. Resources)
+  // render no band. Visual-only — uses getDisplayLayers, not
+  // getComponentLayers, so visibility/dim behavior is unaffected.
+  const layers = getDisplayLayers(component);
+  const bandHeightPx = selected ? 8 : 4;
 
   const flowPorts = component.ports.filter((p) => p.type === "FlowPort");
   const thermalPorts = component.ports.filter((p) => p.type === "ThermalPort");
@@ -427,15 +424,35 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
           overflow-hidden on the outer wrapper itself, which clipped half
           of every port handle. */}
       <div className="rounded-md overflow-hidden">
-        {/* Phase 72 P3 — leading layer-accent band removed (see comment
-            block above). The visual edge of the node is now a uniform 1 px
-            --border line on the body; layer identity moved off-card. */}
+        {/* Leading-band layer identity. Replaces the prior border-left
+            accent. Solid for single-layer components; split half/half
+            for dual-layer (CAC on Hydraulic+Thermal); n-way split for
+            >2 layers (forward-compatible — no component has this
+            today). Band height thickens 4 → 8 px on selection. */}
+        {layers.length > 0 && (
+          <div
+            className="flex w-full transition-[height]"
+            style={{ height: bandHeightPx }}
+            aria-hidden="true"
+            data-testid="stream-node-band"
+          >
+            {layers.map((layer) => (
+              <div
+                key={layer}
+                data-layer={layer}
+                style={{
+                  flex: 1,
+                  backgroundColor: LAYER_COLOR_VAR[layer],
+                }}
+              />
+            ))}
+          </div>
+        )}
         {/* Body uses bg-card (recommitted in index.css to be distinctly
             darker than --canvas) so the node reads as a cell on the work
             surface. First-pass used bg-canvas, which matched the canvas
-            color exactly and rendered bodies invisible. The border is the
-            uniform thin neutral edge applied to every node. */}
-        <div className="bg-card border border-border rounded-md p-2">
+            color exactly and rendered bodies invisible. */}
+        <div className="bg-card p-2">
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
             <Icon className="w-3.5 h-3.5" />
             {component.label}
