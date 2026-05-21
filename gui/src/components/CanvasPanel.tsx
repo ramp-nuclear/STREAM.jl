@@ -449,8 +449,13 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       const ce = e as CustomEvent<{ nodeIds: string[] }>;
       const nodeIds = ce.detail?.nodeIds ?? [];
       for (const nodeId of nodeIds) {
-        // ReactFlow renders node wrappers with data-id attribute.
-        const el = document.querySelector(`[data-id="${nodeId}"]`);
+        // Phase 72 — target StreamNode's `data-stream-node-id` (its
+        // rounded outer div), NOT xyflow's `data-id` wrapper. The
+        // persistent error outline lives on the StreamNode element;
+        // if the flash class lives on the parent xyflow wrapper
+        // instead, the persistent outline paints OVER the flash and
+        // the user sees nothing happen on already-errored nodes.
+        const el = document.querySelector(`[data-stream-node-id="${nodeId}"]`);
         if (!el) continue;
         el.classList.add("validation-flash");
         setTimeout(() => el.classList.remove("validation-flash"), 700);
