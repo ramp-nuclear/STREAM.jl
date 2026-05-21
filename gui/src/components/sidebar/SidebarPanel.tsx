@@ -35,7 +35,7 @@
 //     The `e.defaultPrevented` guard here is belt-and-braces: if any
 //     higher-precedence handler called preventDefault, we skip the tail.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useStore, {
   SENTINEL_UNSET_POWER_SHAPE,
   type StreamNodeData,
@@ -52,6 +52,7 @@ import BCsTabForm from "./BCsTabForm";
 import AnchorsSection from "./AnchorsSection";
 import GeometryResourceEditor from "./GeometryResourceEditor";
 import PowerShapeResourceEditor from "./PowerShapeResourceEditor";
+import { useValidationFieldHighlight } from "@/hooks/useValidationFieldHighlight";
 
 interface SidebarPanelProps {
   width: number;
@@ -60,6 +61,11 @@ interface SidebarPanelProps {
 }
 
 export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: SidebarPanelProps) {
+  // Phase 71 Plan 11 — D-12 field-highlight bridge: containerRef spans the
+  // whole panel so querySelector('[data-field-path="..."]') can find any field
+  // regardless of which tab (Properties vs BCs) is active.
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const selectionKind = useStore((s) => s.selectionKind);
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const selectedResourceId = useStore((s) => s.selectedResourceId);
@@ -84,6 +90,43 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
   const updateNodeParams = useStore((s) => s.updateNodeParams);
   const updateResource = useStore((s) => s.updateResource);
   const clearSelection = useStore((s) => s.clearSelection);
+  const selectNode = useStore((s) => s.selectNode);
+
+  // Phase 71 Plan 11 — D-12 field-highlight bridge.
+  // Paints .validation-field-error / .validation-field-warning on matching
+  // data-field-path elements whenever validationResults or selectedNodeId changes.
+  useValidationFieldHighlight(selectedNodeId ?? null, containerRef);
+
+  // Phase 71 Plan 11 — D-05 stream:open-property-field listener.
+  // Dispatched by ValidationPanel (Plan 09) when a result row with exactly one
+  // 'field' target is clicked. Selects the target node, then scrolls to + focuses
+  // the matching data-field-path element after the next render.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ nodeId: string; fieldPath: string }>;
+      const { nodeId, fieldPath } = ce.detail ?? {};
+      if (!nodeId || !fieldPath) return;
+      selectNode(nodeId);
+      // Defer until after React re-renders the sidebar for the newly selected node.
+      setTimeout(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const el = container.querySelector(
+          `[data-field-path="${CSS.escape(fieldPath)}"]`,
+        );
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Focus the first focusable input/select inside the field wrapper.
+        const focusable = el.querySelector<HTMLElement>(
+          "input, select, button, textarea, [tabindex]",
+        );
+        focusable?.focus();
+      }, 0);
+    };
+    window.addEventListener("stream:open-property-field", handler as EventListener);
+    return () =>
+      window.removeEventListener("stream:open-property-field", handler as EventListener);
+  }, [selectNode]);
 
   // ---------------------------------------------------------------------
   // Esc cascade tail (UI-SPEC §"Esc precedence cascade" item 4 only).
@@ -355,7 +398,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
   }
 
   return (
-    <div className="relative h-full border-l shrink-0 overflow-hidden bg-panel" style={{ width }}>
+    <div ref={containerRef} className="relative h-full border-l shrink-0 overflow-hidden bg-panel" style={{ width }}>
       {onResizeMouseDown && (
         <div
           role="separator"
