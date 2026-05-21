@@ -40,7 +40,7 @@ A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlo
 - [x] **Phase 68: Layers system overhaul** — Four-layer taxonomy (Hydraulic / Thermal / Sources / Reactor Physics). Independent checkbox toggles. Floating Layers chip top-right of canvas with layer-state color indicators. Hide-vs-dim setting. Off-layer locked (non-interactive). Non-clunky layer-aware connect tool. (completed 2026-05-16)
 - [x] **Phase 69: Command palette (jump-only)** — Ctrl+P fuzzy search across component instance names + Resource names. Focus-on-canvas for components, focus-in-navigator for Resources. No action invocation in v1. (completed 2026-05-18)
 - [x] **Phase 70: Presets and templates** — `.scpr` file format (slimmed-down `.scp` sub-graph). Save-selection-as-preset, Load-preset. Presets toolbox category. Auto-resource-create on load with smart-name collision handling. No identity (Option 1 per issue #14). (completed 2026-05-20)
-- [ ] **Phase 71: Validation framework** — Pluggable validator registry. Uniform panel UX with severity (error/warning/info) + click-to-focus + action buttons (lossless-sync / value-transfer-picker / navigation-only). Red-ring markers on offending nodes + red highlights on offending property fields. Compact status-bar indicator (VS-Code-style: icons + counts). Initial rule set: z_N/length match, n-match for value sources, all-required-connections, port-type matching, dangling FlowPort, loop closure, gravity sum per loop, geometry consistency across shared coupling. Gates code-gen export on errors.
+- [x] **Phase 71: Validation framework** — Pluggable validator registry. Uniform panel UX with severity (error/warning/info) + click-to-focus + action buttons (lossless-sync / value-transfer-picker / navigation-only). Red-ring markers on offending nodes + red highlights on offending property fields. Compact status-bar indicator (VS-Code-style: icons + counts). Initial rule set: z_N/length match, n-match for value sources, all-required-connections, port-type matching, dangling FlowPort, loop closure, gravity sum per loop, geometry consistency across shared coupling. Gates code-gen export on errors. (completed 2026-05-21)
 - [ ] **Phase 72: Design system / interaction contract** — Write the rules document (spatial / interaction / feedback / defaults / visual-restraint discipline) committing to "professional engineering tool, not consumer SaaS playground." Audit-and-apply pass over every existing panel. Deliverables include: thermal port handle restyle (outlined circle + chain-link state icons), tooltip system, Settings dialog (modal with left-nav categories), canvas cheatsheet (auto-generated demo component with numbered legend), accent palette for Sources and Reactor Physics layers, density expectations, visual style commitments (font, color, shadow, radius scales).
 
 ## Phase Details
@@ -303,7 +303,7 @@ Plans:
 
 **Design-decisions reference:** Section 3.9.
 **Depends on:** Phase 62 (operates on Resources + components).
-**Plans:** 11/13 plans executed
+**Plans:** 13/13 plans complete
 
 Plans:
 **Wave 1**
@@ -337,11 +337,11 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 71-12-PLAN.md (Wave 7, depends 03+04..08+09+10+11) — Export gate rewire (runValidators + sonner toast + disabled Export button) + ValidationDialog.tsx deletion (D-17). (Wave dropped from 9 to 7 in revision because 11 dropped to 3 and 08 is still max-dep at wave 6.)
+- [x] 71-12-PLAN.md (Wave 7, depends 03+04..08+09+10+11) — Export gate rewire (runValidators + sonner toast + disabled Export button) + ValidationDialog.tsx deletion (D-17). (Wave dropped from 9 to 7 in revision because 11 dropped to 3 and 08 is still max-dep at wave 6.)
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 71-13-PLAN.md (Wave 8, depends 04+06+08+11+12) — Final cleanup: onConnect reroute through portType (D-19), StreamNode hasBCError removal (D-20), useStore.ts legacy slice/action deletion, delete validation.ts + validation.test.ts + selectors/nodeErrors.ts (D-16, D-18, D-20). (Wave dropped from 10 to 8 in revision; max-dep is Plan 12 at wave 7.)
+- [x] 71-13-PLAN.md (Wave 8, depends 04+06+08+11+12) — Final cleanup: onConnect reroute through portType (D-19), StreamNode hasBCError removal (D-20), useStore.ts legacy slice/action deletion, delete validation.ts + validation.test.ts + selectors/nodeErrors.ts (D-16, D-18, D-20). (Wave dropped from 10 to 8 in revision; max-dep is Plan 12 at wave 7.)
 
 **Cross-cutting constraints:**
 
@@ -406,7 +406,7 @@ contract document drafted in parallel throughout.
 | 68. Layers system overhaul                           | 5/5 | Complete    | 2026-05-16 |
 | 69. Command palette (jump-only)                      | 3/3 | Complete    | 2026-05-18 |
 | 70. Presets and templates                            | 6/6 | Complete    | 2026-05-20 |
-| 71. Validation framework                             | 11/13 | In Progress|  |
+| 71. Validation framework                             | 13/13 | Complete   | 2026-05-21 |
 | 72. Design system / interaction contract             | 0/TBD | Planned | — |
 
 ## Coverage
