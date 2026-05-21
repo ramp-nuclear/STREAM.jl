@@ -216,3 +216,26 @@ body {
 .pulse-once {
   animation: pulse-once 600ms ease-out 1;
 }
+
+/* Phase 71 Plan 11 — validation field highlight (D-12).
+   Applied by useValidationFieldHighlight to data-field-path elements.
+   outline (not border) avoids any layout impact (Pitfall 3). Phase 72 sweeps visual tokens. */
+.validation-field-error {
+  outline: 2px solid hsl(var(--destructive));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.validation-field-warning {
+  outline: 2px solid hsl(38 92% 50%);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Phase 71 Plan 11 — canvas node flash on ValidationPanel row click (D-05).
+   Single-shot 600ms animation; reuses pulse-once keyframe from Plan 10.
+   Applied transiently via stream:node-flash CustomEvent in CanvasPanel. */
+.validation-flash {
+  animation: pulse-once 600ms ease-out 1;
+  outline: 2px solid hsl(var(--destructive));
+  outline-offset: 4px;
+}

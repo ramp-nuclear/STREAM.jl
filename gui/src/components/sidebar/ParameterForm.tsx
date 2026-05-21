@@ -275,11 +275,17 @@ export default function ParameterForm({
   const matrixParams = visibleParams.filter((p) => p.type === "Matrix");
 
   function renderField(param: Parameter) {
+    // D-12 (Phase 71 Plan 11): every renderable field is wrapped in a single
+    // <div data-field-path={param.name}> so the field-highlight hook can query
+    // it via querySelector('[data-field-path="<name>"]'). The wrapper carries
+    // NO className — layout-transparent per Pitfall 3.
+    let inner: React.ReactNode = null;
+
     // type_union branch — runs BEFORE the type switch because type_union params
     // have no `param.type` (mutually exclusive per D-10). The switch's default
     // arm would otherwise return null, which is the RC-1 silent-drop bug.
     if (param.type_union !== undefined) {
-      return (
+      inner = (
         <TypeUnionField
           key={param.name}
           param={param}
@@ -288,85 +294,58 @@ export default function ParameterForm({
           onChange={(v) => onParamChange(param.name, v)}
         />
       );
-    }
-    switch (param.type) {
-      case "Int":
-      case "Real":
-        return (
-          <NumericField
-            key={param.name}
-            param={param}
-            value={values[param.name]}
-            onChange={(v) => onParamChange(param.name, v)}
-          />
-        );
-      case "Bool":
-        return (
-          <div key={param.name} className="flex flex-col gap-[8px]">
-            <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
-              {param.name}
-              {param.description && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-3 w-3 text-muted-foreground cursor-default" />
-                    </TooltipTrigger>
-                    <TooltipContent>{param.description}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </Label>
-            <Button
-              variant={values[param.name] ? "default" : "outline"}
-              size="sm"
-              onClick={() => onParamChange(param.name, !values[param.name])}
-            >
-              {values[param.name] ? "On" : "Off"}
-            </Button>
-          </div>
-        );
-      case "PipeGeometry":
-        // Phase 62 Plan 62-08 Task 2 — Assumption A1 reinterpretation.
-        // The registry still tags this param as `type: "PipeGeometry"` (per
-        // components.json lines 24, 128, 583) for `Channel.geometry`,
-        // `ChannelHeatFlux.geometry`, and `ChannelAndContacts.geometry`.
-        // Phase 62 keeps the tag string as-is and the consumer reinterprets
-        // it as a Resource-FK marker (Geometry resource). The `value` stored
-        // under `parameters.geometry` is now a UUID string, not the inline
-        // {type: "circular"|"rectangular", ...} object.
-        return (
-          <ResourceReferencePicker
-            key={param.name}
-            resourceKind="geometry"
-            value={
-              typeof values[param.name] === "string"
-                ? (values[param.name] as string)
-                : null
-            }
-            onChange={(uuid) => onParamChange(param.name, uuid)}
-          />
-        );
-      case "Function":
-        return (
-          <FunctionSelect
-            key={param.name}
-            param={param}
-            value={values[param.name]}
-            onChange={(v) => onParamChange(param.name, v)}
-          />
-        );
-      case "Matrix":
-        // Phase 62 Plan 62-08 Task 2 — Assumption A1 reinterpretation.
-        // The registry tags `HeatDiffusion.power_shape` as `type: "Matrix"`
-        // (components.json line 983). Phase 62 reinterprets the
-        // Matrix-typed `power_shape` param as a Resource-FK marker
-        // (Power Shape resource). Defensive: future Matrix-typed params
-        // that are NOT `power_shape` fall back to MatrixBadge.
-        if (param.name === "power_shape") {
-          return (
+    } else {
+      switch (param.type) {
+        case "Int":
+        case "Real":
+          inner = (
+            <NumericField
+              key={param.name}
+              param={param}
+              value={values[param.name]}
+              onChange={(v) => onParamChange(param.name, v)}
+            />
+          );
+          break;
+        case "Bool":
+          inner = (
+            <div key={param.name} className="flex flex-col gap-[8px]">
+              <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
+                {param.name}
+                {param.description && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-default" />
+                      </TooltipTrigger>
+                      <TooltipContent>{param.description}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </Label>
+              <Button
+                variant={values[param.name] ? "default" : "outline"}
+                size="sm"
+                onClick={() => onParamChange(param.name, !values[param.name])}
+              >
+                {values[param.name] ? "On" : "Off"}
+              </Button>
+            </div>
+          );
+          break;
+        case "PipeGeometry":
+          // Phase 62 Plan 62-08 Task 2 — Assumption A1 reinterpretation.
+          // The registry still tags this param as `type: "PipeGeometry"` (per
+          // components.json lines 24, 128, 583) for `Channel.geometry`,
+          // `ChannelHeatFlux.geometry`, and `ChannelAndContacts.geometry`.
+          // Phase 62 keeps the tag string as-is and the consumer reinterprets
+          // it as a Resource-FK marker (Geometry resource). The `value` stored
+          // under `parameters.geometry` is now a UUID string, not the inline
+          // {type: "circular"|"rectangular", ...} object.
+          inner = (
             <ResourceReferencePicker
               key={param.name}
-              resourceKind="powerShape"
+              resourceKind="geometry"
               value={
                 typeof values[param.name] === "string"
                   ? (values[param.name] as string)
@@ -375,11 +354,52 @@ export default function ParameterForm({
               onChange={(uuid) => onParamChange(param.name, uuid)}
             />
           );
-        }
-        return <MatrixBadge key={param.name} param={param} />;
-      default:
-        return null;
+          break;
+        case "Function":
+          inner = (
+            <FunctionSelect
+              key={param.name}
+              param={param}
+              value={values[param.name]}
+              onChange={(v) => onParamChange(param.name, v)}
+            />
+          );
+          break;
+        case "Matrix":
+          // Phase 62 Plan 62-08 Task 2 — Assumption A1 reinterpretation.
+          // The registry tags `HeatDiffusion.power_shape` as `type: "Matrix"`
+          // (components.json line 983). Phase 62 reinterprets the
+          // Matrix-typed `power_shape` param as a Resource-FK marker
+          // (Power Shape resource). Defensive: future Matrix-typed params
+          // that are NOT `power_shape` fall back to MatrixBadge.
+          if (param.name === "power_shape") {
+            inner = (
+              <ResourceReferencePicker
+                key={param.name}
+                resourceKind="powerShape"
+                value={
+                  typeof values[param.name] === "string"
+                    ? (values[param.name] as string)
+                    : null
+                }
+                onChange={(uuid) => onParamChange(param.name, uuid)}
+              />
+            );
+          } else {
+            inner = <MatrixBadge key={param.name} param={param} />;
+          }
+          break;
+        default:
+          return null;
+      }
     }
+
+    if (!inner) return null;
+    return (
+      <div data-field-path={param.name}>
+        {inner}
+      </div>
+    );
   }
 
   const sections: { heading: string; params: Parameter[] }[] = [];
