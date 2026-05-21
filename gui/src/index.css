@@ -305,5 +305,14 @@ body {
      edge and matches the visual language of every other outline state
      (persistent error outline, autoExtended dashed, selection ring). */
   outline-offset: 0;
+  /* CRITICAL — this class is added via classList.add to xyflow's node
+     wrapper (the element carrying `data-id`), NOT to the StreamNode
+     React component's outer div. The xyflow wrapper has no border-radius
+     of its own, so without this declaration the outline draws around a
+     RECTANGLE while the visible node body inside is rounded-md (8 px).
+     Result without it: square corner brackets sticking out where the
+     node body curves in. border-radius here makes the outline follow
+     the same rounded path as the node body underneath. */
+  border-radius: var(--radius-md);
   animation: node-flash-outline 600ms ease-out 1;
 }
