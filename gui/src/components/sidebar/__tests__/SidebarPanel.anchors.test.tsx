@@ -111,7 +111,7 @@ describe("SidebarPanel — BCs tab Anchors integration (Phase 63.1 Plan 06)", ()
     expect(order & 4).toBeTruthy();
   });
 
-  it("Channel BCs tab body still renders the existing BCsTabForm content below Anchors", () => {
+  it("Channel BCs tab body still renders BCsTabForm content below Anchors", () => {
     useStore.getState().addNode("Channel", { x: 0, y: 0 });
     const nodeId = useStore.getState().nodes[0].id;
     useStore.getState().selectNode(nodeId);
@@ -119,8 +119,11 @@ describe("SidebarPanel — BCs tab Anchors integration (Phase 63.1 Plan 06)", ()
     const bcsTrigger = screen.getByRole("tab", { name: /BCs/i });
     fireEvent.mouseDown(bcsTrigger);
     fireEvent.click(bcsTrigger);
-    // Existing BCsTabForm artifact still present (Plan 07 will retire this
-    // copy; for Plan 06 it must still render).
-    expect(screen.getByText("Symmetric (L = R)")).toBeTruthy();
+    // Phase 63.1 D-12 replaced the legacy "Symmetric (L = R)" custom switch
+    // with a SegmentedButtonGroup ("Symmetric" / "Asymmetric"). The original
+    // test targeted the deleted literal; assert against the current copy so
+    // we still verify that BCsTabForm renders below the Anchors section.
+    expect(screen.getByText("Symmetric")).toBeTruthy();
+    expect(screen.getByText("Asymmetric")).toBeTruthy();
   });
 });
