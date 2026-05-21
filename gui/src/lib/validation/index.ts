@@ -22,8 +22,11 @@
 //   ];
 
 import type { Validator } from "./types";
+import { portType } from "./rules/portType";
 
 /** All registered validators. Rules plans append by importing each rule and
  *  pushing to this array. The runner (runner.ts) flat-maps over this array
  *  once per debounced tick — no per-rule cache in v1. */
-export const validators: Validator[] = [];
+export const validators: Validator[] = [
+  portType,
+];
