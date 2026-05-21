@@ -19,6 +19,7 @@ import AutoRecoverRestoreModal, {
 } from "./components/AutoRecoverRestoreModal";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { Toaster } from "./components/ui/sonner";
+import ExportConfirmDialog from "./components/ExportConfirmDialog";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList } from "./components/ResponsiveTabsList";
 import { Boxes, Library, Settings2, BookMarked } from "lucide-react";
@@ -612,6 +613,7 @@ function App() {
             inside the Toaster wrapper. Plan 12 fires the export-gate toast
             here. Mounted inside <TooltipProvider> per plan instructions. */}
         <Toaster />
+        <ExportConfirmDialog />
       </TooltipProvider>
     </ReactFlowProvider>
   );
