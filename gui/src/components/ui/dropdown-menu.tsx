@@ -16,8 +16,11 @@ import { cn } from "@/lib/utils"
 const CONTENT_CLASS =
   "z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1 text-foreground motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100"
 
+// Phase 72 P2 — items text-body (13 px) → text-[12px]; the 13 px label was
+// reading chunky in chrome menus. Body text stays at 13 px for content
+// surfaces (inputs, node names); control text drops to 12.
 const ITEM_CLASS =
-  "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-body outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none hover:bg-card focus-visible:bg-card data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:hover:bg-destructive/15 data-[variant=destructive]:focus-visible:bg-destructive/15 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55 data-[variant=destructive]:*:[svg]:text-destructive!"
+  "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-[12px] outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none hover:bg-card focus-visible:bg-card data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:hover:bg-destructive/15 data-[variant=destructive]:focus-visible:bg-destructive/15 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55 data-[variant=destructive]:*:[svg]:text-destructive!"
 
 function DropdownMenu({
   ...props

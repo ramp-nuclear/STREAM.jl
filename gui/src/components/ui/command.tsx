@@ -18,12 +18,12 @@ import { cn } from "@/lib/utils"
 //
 // Phase 72 — primitive-layer recommit:
 //   - Container rounded-md, bg-popover (unchanged at this layer)
-//   - Input wrapper h-8 (was h-9), text-body (was text-sm), placeholder
+//   - Input wrapper h-8 (was h-9), text-[12px] (was text-sm), placeholder
 //     foreground/45 (was muted-foreground)
 //   - Group heading: text-micro uppercase tracking-wider opacity-55
 //   - Item h-7, hover/selected bg-card (was bg-accent)
 //   - Shortcut: text-micro font-mono opacity-55 (was text-xs tracking-widest)
-//   - Empty: text-body opacity-65 (was text-sm)
+//   - Empty: text-[12px] opacity-65 (was text-sm)
 
 function Command({
   className,
@@ -54,7 +54,7 @@ function CommandInput({
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          "flex h-8 w-full bg-transparent text-body outline-hidden placeholder:text-foreground/45 disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-8 w-full bg-transparent text-[12px] outline-hidden placeholder:text-foreground/45 disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         {...props}
@@ -85,7 +85,7 @@ function CommandEmpty({
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className="py-6 text-center text-body text-foreground/65"
+      className="py-6 text-center text-[12px] text-foreground/65"
       {...props}
     />
   )
@@ -128,7 +128,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-body outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-card [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55",
+        "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-[12px] outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-card [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55",
         className
       )}
       {...props}

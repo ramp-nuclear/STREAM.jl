@@ -14,11 +14,17 @@ import { cn } from "@/lib/utils"
 //   - Icons size-3.5 stroke-1.5
 //   - rounded-xs for checkbox/radio items → rounded-sm (consistent w/ scale)
 
+// Phase 72 P2 — Menubar content close animation set to duration-0. The
+// 80 ms close on Content was blocking Radix's hover-handoff between adjacent
+// Menubar.Trigger siblings (click trigger A → menu A opens → mouse to
+// trigger B → menu A close animation runs → menu B refuses to open during
+// the close). Menubar parity with Linear/VSCode needs instant close so the
+// next trigger's hover registers immediately. Open animation kept at 100 ms.
 const CONTENT_CLASS =
-  "z-50 min-w-[12rem] overflow-hidden rounded-md border border-border bg-popover p-1 text-foreground motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100"
+  "z-50 min-w-[12rem] overflow-hidden rounded-md border border-border bg-popover p-1 text-foreground motion-reduce:!duration-0 data-[state=closed]:duration-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100"
 
 const ITEM_CLASS =
-  "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-body outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none focus:bg-card data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/15 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55 data-[variant=destructive]:*:[svg]:text-destructive!"
+  "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-[12px] outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none focus:bg-card data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[inset]:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/15 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55 data-[variant=destructive]:*:[svg]:text-destructive!"
 
 function Menubar({
   className,
@@ -76,8 +82,14 @@ function MenubarTrigger({
       // highlighted indefinitely. data-[state=open] is the canonical
       // "menu is actually open" signal; that's what should highlight.
       // focus-visible:ring-1 still gives keyboard users a focus cue.
+      // Phase 72 P2 — explicit h-6 removed (natural height inside Menubar's
+      // h-8 row). Forcing h-6 made the hit-target shorter than the row,
+      // contributing to feeling like adjacent triggers don't take over the
+      // open menu. transition-colors also dropped from the trigger so the
+      // open/close state is instantly reflected (matches the instant-close
+      // doctrine on Content above).
       className={cn(
-        "flex h-6 items-center rounded-sm px-2 text-body font-medium outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none hover:bg-card data-[state=open]:bg-card focus-visible:ring-1 focus-visible:ring-ring",
+        "flex h-7 items-center rounded-sm px-2 text-[12px] font-medium outline-hidden select-none hover:bg-card data-[state=open]:bg-card focus-visible:ring-1 focus-visible:ring-ring",
         className
       )}
       {...props}

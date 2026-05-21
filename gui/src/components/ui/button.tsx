@@ -28,7 +28,12 @@ import { cn } from "@/lib/utils"
 // text color in dark mode; --primary-foreground is the canvas-dark). No accent
 // fill — that stays canvas-side per the canvas-as-product hierarchy.
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-sm text-body font-medium whitespace-nowrap outline-none transition-colors duration-[80ms] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50 aria-invalid:ring-2 aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5]",
+  // Phase 72 P2 — control text 13 px → 12 px. The 13 px label combined
+  // with h-8 was reading chunky in chrome; 12 px reads as proper tool-grade
+  // density (Linear/Cursor/Rive baseline). text-body (13 px) is reserved
+  // for surfaces where the text IS the content (inputs, node names,
+  // dialog descriptions), not for control labels.
+  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-sm text-[12px] font-medium whitespace-nowrap outline-none transition-colors duration-[80ms] motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50 aria-invalid:ring-2 aria-invalid:ring-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5]",
   {
     variants: {
       variant: {
