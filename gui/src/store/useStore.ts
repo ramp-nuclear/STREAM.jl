@@ -179,7 +179,7 @@ export interface StreamNodeData {
   autoExtended?: boolean;
 }
 
-interface AppState {
+export interface AppState {
   nodes: Node[];
   edges: Edge[];
   selectedNodeId: string | null;
