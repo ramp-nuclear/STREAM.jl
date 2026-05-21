@@ -43,12 +43,13 @@
   --shadow-dialog:
     0 8px 24px -8px oklch(0.20 0.012 254 / 0.20),
     0 2px 6px -2px oklch(0.20 0.012 254 / 0.10);
-  /* Phase 72 P7 — unselected-node ring color, FULLY OPAQUE pure neutral.
-     Light mode: oklch(0.78 0 0) — visible against canvas 0.99 without
-     reading as a black hairline. Must stay fully opaque (no alpha) — at
-     any alpha the rendered color composites with --canvas's hue tint
-     and ends up reading as cool/blue. */
-  --node-ring-rest: oklch(0.78 0 0);
+  /* Phase 72 P9 — unselected-node ring, light mode. PLAIN HEX, not
+     OKLCH. The OKLCH spelling oklch(0.78 0 0) (chroma 0 hue 0) is a
+     degenerate input that some WebKit parsers silently reject; box-
+     shadow color then falls back to currentColor = --foreground (cool
+     grey-blue), which is the persistent "blue ring" the user has been
+     reporting. Hex is universally supported, no parser ambiguity. */
+  --node-ring-rest: #c3c3c3;
   /* Phase 72 — three-tier depth tokens recommitted with stronger steps and
      hue tint per OKLCH no-#fff rule. Chrome darkest, panel mid, canvas
      lightest (warmest). Light mode: tinted toward hue 254 (matches dark
@@ -154,11 +155,10 @@
   --shadow-dialog:
     0 8px 24px -8px oklch(0.05 0.012 254 / 0.50),
     0 2px 6px -2px oklch(0.05 0.012 254 / 0.30);
-  /* Phase 72 P7 — unselected-node ring, dark-mode value. Fully opaque
-     pure neutral grey (chroma 0) at lightness 0.42 — visible against
-     canvas 0.27 (Δ 0.15 lightness) without hue contamination from
-     alpha compositing. */
-  --node-ring-rest: oklch(0.42 0 0);
+  /* Phase 72 P9 — unselected-node ring, dark mode. PLAIN HEX (see
+     :root note above for parser rationale). #6e6e6e is mid-grey,
+     visible against canvas without becoming a hard hairline. */
+  --node-ring-rest: #6e6e6e;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
