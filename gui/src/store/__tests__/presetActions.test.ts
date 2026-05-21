@@ -263,6 +263,9 @@ describe("saveSelectionAsPreset", () => {
     mockReadDir.mockResolvedValue([
       { name: "my_preset.scpr", isFile: true, isDirectory: false },
     ]);
+    // WR-05 collision check calls readTextFile first; reject = file doesn't exist yet.
+    mockReadTextFile.mockRejectedValueOnce(new Error("ENOENT"));
+    // Subsequent readTextFile calls (refreshPresetsDir) return the preset JSON.
     mockReadTextFile.mockResolvedValue(
       makePresetJson({ name: "my_preset", description: "desc" }),
     );
@@ -342,6 +345,8 @@ describe("saveSelectionAsPreset", () => {
       ],
     });
     mockReadDir.mockResolvedValue([]);
+    // WR-05 collision check: reject = file doesn't exist yet (safe to write).
+    mockReadTextFile.mockRejectedValueOnce(new Error("ENOENT"));
 
     await useStore.getState().saveSelectionAsPreset("auto_preset", "", "library");
 
