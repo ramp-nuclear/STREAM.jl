@@ -204,12 +204,25 @@ describe("addNode default population", () => {
   it("populates default parameter values from registry", () => {
     useStore.getState().addNode("Channel", { x: 0, y: 0 });
     const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
-    // v1.1: Channel has g default 0.0, h_left/h_right default 0.0, friction_correlation default blasius_friction.
+    // Phase 72: `g` is now cascaded from modelOptions.g_default (Earth's 9.80665)
+    // rather than the registry's literal 0.0. Other defaults are unchanged.
     // htc_correlation is no longer a Channel parameter (D-18) — only ChannelAndContacts keeps it.
-    expect(data.parameters.g).toBe(0.0);
+    expect(data.parameters.g).toBe(9.80665);
     expect(data.parameters.h_left).toBe(0.0);
     expect(data.parameters.h_right).toBe(0.0);
     expect(data.parameters.friction_correlation).toBe("blasius_friction");
+  });
+
+  it("cascades modelOptions.g_default into any top-level `g` parameter", () => {
+    // Change the project's gravity setting first, then add a Channel —
+    // the channel's g should reflect the project setting, not the registry default.
+    useStore.setState({
+      modelOptions: { ...useStore.getState().modelOptions, g_default: 3.71 }, // Mars
+    });
+    useStore.getState().addNode("Channel", { x: 0, y: 0 });
+    const nodes = useStore.getState().nodes;
+    const data = nodes[nodes.length - 1].data as unknown as StreamNodeData;
+    expect(data.parameters.g).toBe(3.71);
   });
 
   it("sets constructorMode to first mode", () => {
