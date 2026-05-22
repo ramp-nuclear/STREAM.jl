@@ -366,6 +366,17 @@ export interface AppState {
   loadProjectFromPath: (path: string) => Promise<void>;
   newProject: () => Promise<void>;
   setRecentFiles: (files: string[]) => void;
+  /** Prune recentFiles entries whose paths no longer exist on disk.
+   *  Updates in-memory state AND persisted recents.json. Used by the
+   *  empty-canvas hint (Phase 72) so external deletions disappear from
+   *  the visible recents list without requiring a full app restart. */
+  pruneStaleRecentFiles: () => Promise<void>;
+  /** Per-session flag: once any project lifecycle action runs (new / open
+   *  recent / start working) we hide the WelcomeOverlay even on the empty
+   *  canvas. Cold-start defaults to false (welcome visible). Standard
+   *  splash-once-per-session pattern (Blender, Cursor, etc.). */
+  welcomeDismissed: boolean;
+  dismissWelcome: () => void;
   // Phase 65 Plan 04: Clipboard actions (D-15, D-16, D-19)
   copySelection: () => Promise<void>;
   cutSelection: () => Promise<void>;
@@ -889,6 +900,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   isDirty: false,
   currentFilePath: null,
   recentFiles: [],
+  welcomeDismissed: false,
   untitledProjectUuid: crypto.randomUUID(),
 
   // ---------------------------------------------------------------------------
@@ -1931,6 +1943,37 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
 
   setRecentFiles: (files) => set({ recentFiles: files }),
 
+  dismissWelcome: () => set({ welcomeDismissed: true }),
+
+  // pruneStaleRecentFiles (Phase 72 first-run) — drop any recent-file
+  // path that no longer resolves on disk. Triggered from WelcomeOverlay's
+  // mount effect so external deletions disappear from the visible list
+  // without requiring a full app restart.
+  //
+  // Failure modes are swallowed (non-Tauri test env, fs plugin import
+  // failure, single-path exists() rejection) — the recents list is a
+  // convenience surface; we never want a pruning error to crash the
+  // empty-canvas hint. Persisted recents.json is rewritten only when
+  // something actually changed to avoid unnecessary disk churn.
+  pruneStaleRecentFiles: async () => {
+    const current = get().recentFiles;
+    if (current.length === 0) return;
+    try {
+      const { exists } = await import("@tauri-apps/plugin-fs");
+      const checks = await Promise.all(
+        current.map(
+          async (p) => [p, await exists(p).catch(() => false)] as const,
+        ),
+      );
+      const surviving = checks.filter(([, ok]) => ok).map(([p]) => p);
+      if (surviving.length === current.length) return;
+      set({ recentFiles: surviving });
+      await saveRecentFiles(surviving);
+    } catch {
+      // non-Tauri env or plugin import failure — leave list alone
+    }
+  },
+
   // ---------------------------------------------------------------------------
   // Phase 65 Plan 04: Clipboard actions (D-15, D-16, D-19)
   // ---------------------------------------------------------------------------
@@ -2503,6 +2546,11 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     set({
       nodes: [],
       edges: [],
+      // Phase 72: clicking New (from WelcomeOverlay or File menu) is the
+      // user explicitly choosing to start working — dismiss the welcome
+      // panel for the rest of the session even though the canvas remains
+      // empty (so the action feels responsive instead of looking dead).
+      welcomeDismissed: true,
       // Phase 63.1 D-02: reset anchors Record on newProject.
       anchors: {},
       // Phase 68: reset to 4-layer defaults (all on, dim off).
