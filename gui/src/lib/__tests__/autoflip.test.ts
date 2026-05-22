@@ -250,12 +250,15 @@ describe("resolveFlowPortAssignment", () => {
     });
   });
 
-  it("collision: both neighbors on the right — port_in keeps 'right', port_out displaces to orthogonal axis", () => {
-    // Both pumps neighbor p1 from the right half-plane: e1 brings p2 to the
-    // upper-right (dy < 0 for the neighbor → top is the orthogonal pick), and
-    // e2 sends p1.port_out to p3 in the lower-right (dy > 0 → bottom).
-    // port_in is declared first in the Pump registry, so it claims its
-    // preferred side ('right') first; port_out's 2nd-best is 'bottom'.
+  // Phase 72 — same-side collisions displace to the OPPOSITE side (not
+  // perpendicular). Tiebreaker order: more connections wins; otherwise port_out
+  // wins. Perpendicular preferences are kept as-is. Two ports never end up on
+  // the same side of a node.
+
+  it("collision (same dominant side, both 1 connection): port_out keeps preferred, port_in moves to opposite", () => {
+    // port_in's neighbor is upper-right, port_out's is lower-right. Both
+    // prefer right. Tied connection count → port_out wins by tiebreak →
+    // port_in displaces to LEFT (opposite of right).
     const nodes = [
       makeNode("p1", 0, 0, "Pump"),
       makeNode("p2", 300, -50, "Pump"),
@@ -266,34 +269,38 @@ describe("resolveFlowPortAssignment", () => {
       makeEdge("e2", "p1", "p3", "port_out", "port_in"),
     ];
     expect(resolveFlowPortAssignment(nodes, edges, "p1", getComp)).toEqual({
-      port_in: "right",
-      port_out: "bottom",
+      port_in: "left",
+      port_out: "right",
     });
   });
 
-  it("collision: both neighbors directly to the right — port_out's 2nd-best falls back to vertical axis", () => {
-    // Both neighbors at exactly dy=0 → vertical scores tie at 0. Stable sort
-    // (right, bottom, top, left in initial declaration order) preserves
-    // 'bottom' ahead of 'top' on tie, so port_out lands on 'bottom'.
+  it("pump with multiple consumers below + return from below: port_out=bottom, port_in=top", () => {
+    // The canonical vertical-loop topology that motivated the Phase 72 fix:
+    // pump on top, two consumers directly below feeding port_out (2 edges),
+    // and one return into port_in (1 edge). port_out has more connections so
+    // it wins the collision and keeps bottom; port_in displaces to TOP
+    // (opposite). The return edge then wraps around the system.
     const nodes = [
       makeNode("p1", 0, 0, "Pump"),
-      makeNode("p2", 300, 0, "Pump"),
-      makeNode("p3", 400, 0, "Pump"),
+      makeNode("c1", -100, 200, "Pump"),
+      makeNode("c2", 100, 200, "Pump"),
+      makeNode("c3", 0, 300, "Pump"), // returns into p1.port_in
     ];
     const edges = [
-      makeEdge("e1", "p2", "p1", "port_out", "port_in"),
-      makeEdge("e2", "p1", "p3", "port_out", "port_in"),
+      makeEdge("e1", "p1", "c1", "port_out", "port_in"),
+      makeEdge("e2", "p1", "c2", "port_out", "port_in"),
+      makeEdge("e3", "c3", "p1", "port_out", "port_in"),
     ];
-    expect(resolveFlowPortAssignment(nodes, edges, "p1", getComp)).toEqual({
-      port_in: "right",
-      port_out: "bottom",
-    });
+    const out = resolveFlowPortAssignment(nodes, edges, "p1", getComp);
+    expect(out.port_out).toBe("bottom");
+    expect(out.port_in).toBe("top");
   });
 
-  it("connected port outranks unconnected sibling on contested side", () => {
-    // Only port_in is wired; port_out has no edge. port_in's neighbor is on
-    // the right → port_in wants 'right' (which happens to be port_out's
-    // registry default). port_out yields and lands on its 2nd-best fallback.
+  it("unconnected port that defaults to the same side as a connected sibling displaces to opposite", () => {
+    // Only port_in is wired; port_out has no edge → port_out falls back to its
+    // registry default 'right'. port_in's neighbor is to the right → port_in
+    // also wants 'right'. Collision. port_in has more connections (1 vs 0) →
+    // port_in keeps 'right'; port_out displaces to LEFT (opposite).
     const nodes = [
       makeNode("p1", 0, 0, "Pump"),
       makeNode("p2", 200, 0, "Pump"),
@@ -301,7 +308,60 @@ describe("resolveFlowPortAssignment", () => {
     const edges = [makeEdge("e1", "p2", "p1", "port_out", "port_in")];
     const out = resolveFlowPortAssignment(nodes, edges, "p1", getComp);
     expect(out.port_in).toBe("right");
-    expect(out.port_out).not.toBe("right"); // displaced — unconnected loses
+    expect(out.port_out).toBe("left");
+  });
+
+  // -------------------------------------------------------------------------
+  // Phase 72 — convention-driven layout regressions.
+  // -------------------------------------------------------------------------
+
+  it("vertical 2-node loop: both nodes get port_in=top, port_out=bottom (convention)", () => {
+    // imp_edge_bug.png scenario. Two nodes stacked vertically with two edges
+    // between them forming a loop. Cluster bbox is tall → vertical axis.
+    // Both nodes end up with the canonical port_in=top, port_out=bottom.
+    const nodes = [
+      makeNode("a", 0, 0, "Pump"),
+      makeNode("b", 0, 300, "Pump"),
+    ];
+    const edges = [
+      makeEdge("e1", "a", "b", "port_out", "port_in"),
+      makeEdge("e2", "b", "a", "port_out", "port_in"),
+    ];
+    expect(resolveFlowPortAssignment(nodes, edges, "a", getComp)).toEqual({
+      port_in: "top",
+      port_out: "bottom",
+    });
+    expect(resolveFlowPortAssignment(nodes, edges, "b", getComp)).toEqual({
+      port_in: "top",
+      port_out: "bottom",
+    });
+  });
+
+  it("off-axis neighbor pulls snap to natural side in vertical flow", () => {
+    // imp_edge_bug2.png scenario. The cluster is vertical (height > width),
+    // but one node's downstream consumer is off to the right (|dx| slightly
+    // greater than |dy|). Local geometry would pick port_out=right, but the
+    // axis-snap rule moves it to bottom (natural for port_out in vertical).
+    const nodes = [
+      makeNode("pump1", 500, 0, "Pump"),
+      makeNode("a", 300, 400, "Pump"),    // middle-left — the node under test
+      makeNode("b", 700, 400, "Pump"),    // middle-right
+      makeNode("c", 800, 800, "Pump"),    // bottom-right
+    ];
+    const edges = [
+      makeEdge("e1", "pump1", "a", "port_out", "port_in"),
+      makeEdge("e2", "pump1", "b", "port_out", "port_in"),
+      makeEdge("e3", "a", "c", "port_out", "port_in"), // a → c (right-and-down)
+      makeEdge("e4", "b", "c", "port_out", "port_in"),
+      makeEdge("e5", "c", "pump1", "port_out", "port_in"), // return
+    ];
+    // For 'a': port_in's neighbor is pump1 (above), local = top. port_out's
+    // neighbor is c (right-and-down), local = right (|dx|=500 > |dy|=400).
+    // Vertical axis → right snaps to bottom. No collision after snap.
+    expect(resolveFlowPortAssignment(nodes, edges, "a", getComp)).toEqual({
+      port_in: "top",
+      port_out: "bottom",
+    });
   });
 
   it("zero FlowPorts (HeatDiffusion-only component): returns empty assignment", () => {

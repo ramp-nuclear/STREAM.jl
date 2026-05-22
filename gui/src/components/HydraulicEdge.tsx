@@ -1,31 +1,33 @@
 import { memo, useCallback } from "react";
-import {
-  getSmoothStepPath,
-  BaseEdge,
-  type EdgeProps,
-} from "@xyflow/react";
+import { BaseEdge, type EdgeProps } from "@xyflow/react";
 import useStore from "../store/useStore";
+import {
+  computeRoutePoints,
+  pointsToSvgPath,
+  type Bbox,
+} from "../lib/edgeRouting";
 
 /**
- * Custom hydraulic edge — smoothstep routing with closed arrowhead.
+ * Custom hydraulic edge — obstacle-avoiding orthogonal router.
  *
- * The anti-parallel ±8px bow from Phase 64 Plan 02 was removed once the
- * one-port-per-side FlowPort rule landed: under that rule, bidirectional
- * pairs between two components leave from different sides of each component
- * (e.g. pump_1.port_in on right + pump_1.port_out on bottom), so the two
- * edges no longer share a midline and the bow's only job evaporated. The bow
- * also detached path endpoints from handle DOM positions, leaving a visible
- * 8px gap between each port dot and its arrowhead — actively harmful once
- * the underlying overlap was already solved.
+ * Phase 72 Phase B — the previous smoothstep router treated edges as
+ * point-to-point and was happy to cut through any node bbox in its way (the
+ * canonical bug: a vertical loop's return edge passing straight through every
+ * node between source and target). The new router pulls every node bbox from
+ * the store, computes 5 candidate orthogonal paths (naive Z, plus wrap via
+ * left / right / top / bottom lane), and picks the candidate that crosses no
+ * bboxes — tiebreaking on fewer turns, then shorter total length.
  *
- * Phase 66 — code-panel <-> edge bidirectional traceability.
- * Per-edge primitive-boolean selectors (matches StreamNode pattern,
- * see gui/PERFORMANCE.md rule 1) light the edge up when BOTH endpoint
- * UUIDs appear in `hoveredSourceIds` / `pinnedSourceIds` — which happens
- * exactly when a `connect(<src>.port_*, <tgt>.port_*)` sub-block is
- * hovered/pinned in the code panel. Single-endpoint matches (e.g. just
- * hovering `@named pump_1 = Pump()`) deliberately do NOT light edges:
- * only the pump node ring would, and the edge is incidental.
+ * Source and target nodes are included as obstacles: the path must approach
+ * their port from outside the body, not through it.
+ *
+ * The rendered path uses rounded corners (~6 px radius) to match the visual
+ * style of the previous smoothstep edges.
+ *
+ * Phase 66 — code-panel <-> edge bidirectional traceability. Per-edge
+ * primitive-boolean selectors (matches StreamNode pattern, see PERFORMANCE.md
+ * rule 1) light the edge up when BOTH endpoint UUIDs appear in
+ * `hoveredSourceIds` / `pinnedSourceIds`.
  */
 function HydraulicEdge({
   sourceX,
@@ -40,14 +42,31 @@ function HydraulicEdge({
   style,
   markerEnd,
 }: EdgeProps) {
-  const [path] = getSmoothStepPath({
+  // Subscribe to the nodes array directly. xyflow replaces this reference
+  // whenever any node mutates (position drag, resize, etc.) — exactly when
+  // we need to re-route. Other store changes don't replace this reference,
+  // so the edge doesn't re-render on unrelated state changes.
+  const nodes = useStore((s) => s.nodes);
+  const obstacles: Bbox[] = [];
+  for (const n of nodes) {
+    const measured = n.measured as
+      | { width?: number; height?: number }
+      | undefined;
+    const w = measured?.width ?? 140;
+    const h = measured?.height ?? 70;
+    obstacles.push({ x: n.position.x, y: n.position.y, width: w, height: h });
+  }
+
+  const points = computeRoutePoints({
     sourceX,
     sourceY,
+    sourcePosition,
     targetX,
     targetY,
-    sourcePosition,
     targetPosition,
+    obstacles,
   });
+  const path = pointsToSvgPath(points);
 
   const isCodeHovered = useStore(
     useCallback(
@@ -64,11 +83,6 @@ function HydraulicEdge({
     ),
   );
 
-  // Pinned wins over hover (same cascade rule the canvas node ring uses).
-  // Caller-provided `style` is the base; we override stroke + strokeWidth
-  // only when an interaction is active. Colors mirror the canvas-node ring
-  // tokens for visual consistency: sky-400 (#38bdf8) hover, sky-300 (#7dd3fc)
-  // pinned, both ~30-50% thicker than the default edge.
   const mergedStyle = isCodePinned
     ? { ...style, stroke: "#7dd3fc", strokeWidth: 3 }
     : isCodeHovered

@@ -203,10 +203,10 @@ afterEach(() => {
 
 // ---------------------------------------------------------------------------
 // §3.3 Example 1 — bidirectional X-cross between two pumps placed left/right.
-// Both edges terminate at the same neighbor (p2 on the right). Under the
-// one-port-per-side rule, port_in (declared first) claims its preferred side
-// 'right'; port_out displaces to its 2nd-best 'bottom' (orthogonal axis,
-// stable-sort tie-break with dy = 0).
+// Both edges terminate at the same neighbor (p2 on the right). Phase 72 rule:
+// same-side collisions displace the loser to the OPPOSITE side (not
+// perpendicular). Tied connection counts → port_out wins by tiebreak,
+// port_in moves to the opposite side (left).
 // ---------------------------------------------------------------------------
 
 describe("StreamNode autoflip — FlowPort §3.3 Example 1 X-cross", () => {
@@ -220,20 +220,20 @@ describe("StreamNode autoflip — FlowPort §3.3 Example 1 X-cross", () => {
     );
   }
 
-  it("port_in (declared first) claims 'right' on collision", () => {
+  it("port_in is displaced to 'left' (opposite of the shared preferred side)", () => {
     primeXCross();
     const { container } = renderStreamNode("p1", "Pump", "pump1");
     const handle = getHandle(container, "port_in");
     expect(handle).toBeTruthy();
-    expect(handle!.className).toContain("react-flow__handle-right");
+    expect(handle!.className).toContain("react-flow__handle-left");
   });
 
-  it("port_out displaces to 'bottom' (one-port-per-side rule)", () => {
+  it("port_out keeps its preferred side 'right' on collision (wins tiebreak)", () => {
     primeXCross();
     const { container } = renderStreamNode("p1", "Pump", "pump1");
     const handle = getHandle(container, "port_out");
     expect(handle).toBeTruthy();
-    expect(handle!.className).toContain("react-flow__handle-bottom");
+    expect(handle!.className).toContain("react-flow__handle-right");
   });
 
   it("no asymmetric same-side offsets — handles carry no `top:25%` or `top:75%` overrides", () => {
@@ -247,7 +247,7 @@ describe("StreamNode autoflip — FlowPort §3.3 Example 1 X-cross", () => {
     expect(portOut.style.left).toBe("");
   });
 
-  it("D-04 anchor co-location: anchor follows port_in's resolved side (right → style.right === -16px)", () => {
+  it("D-04 anchor co-location: anchor follows port_in's resolved side (Phase 72: displaced to left → style.left === -16px)", () => {
     primeXCross();
     useStore.setState({
       anchors: { p1: { portField: "port_in.P", value: 1e5 } },
@@ -257,7 +257,7 @@ describe("StreamNode autoflip — FlowPort §3.3 Example 1 X-cross", () => {
       '[data-testid="anchor-indicator"]',
     ) as HTMLElement | null;
     expect(indicator).toBeTruthy();
-    expect(indicator!.style.right).toBe("-16px");
+    expect(indicator!.style.left).toBe("-16px");
   });
 });
 

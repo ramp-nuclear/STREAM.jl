@@ -22,11 +22,8 @@ import type { ComponentDefinition } from "../registry/types";
 
 export type Side = "left" | "right" | "top" | "bottom";
 
-const ALL_SIDES: readonly Side[] = ["left", "right", "top", "bottom"];
-
-function sidesExcept(s: Side): Side[] {
-  return ALL_SIDES.filter((x) => x !== s);
-}
+// (Helpers for "one port per side" displacement removed in Phase 72; we now
+// allow multiple ports on the same side and rely on xyflow auto-spreading.)
 
 // ---------------------------------------------------------------------------
 // nodeCenter (internal)
@@ -106,19 +103,56 @@ export function resolveFlowPortSide(
 // ---------------------------------------------------------------------------
 
 /**
- * Per-component FlowPort side assignment with the "one port per side" rule.
+ * Per-component FlowPort side assignment.
  *
- * Each FlowPort scores all four sides by signed projection of its (dx, dy)
- * neighbor-vector onto the side's outward normal; the dominant axis wins.
- * Ports are then assigned greedily in registry declaration order — connected
- * ports first, unconnected last — and a port whose preferred side is already
- * taken falls back to its next-best ranked side.
+ * Phase 72 rewrite — convention-driven with local-geometry refinement:
  *
- * Result: every FlowPort lands on a different side of the component (left,
- * right, top, or bottom). For the common 2-FlowPort case, port_in keeps its
- * dominant-axis vote and port_out displaces to its orthogonal-axis preference
- * when they collide.
+ *   1. Determine the network's dominant flow axis from the cluster bbox
+ *      (vertical if the canvas of nodes is taller than wide; horizontal
+ *      otherwise). This is the "axis of flow" the user laid out, and ports
+ *      should align with it.
+ *
+ *   2. Aggregate-across-edges: compute each port's local-geometry preference
+ *      by summing the (dx, dy) vectors to ALL neighbors of that port (not
+ *      just the first edge). port_in pulls from upstream, port_out pushes
+ *      to downstream.
+ *
+ *   3. Axis snap: if a port's local preference is perpendicular to the
+ *      dominant flow axis (e.g. the neighbor is slightly off to the side
+ *      while the network as a whole runs vertically), snap to the natural
+ *      side along the axis. Vertical natural: port_in=top, port_out=bottom.
+ *      Horizontal natural: port_in=left, port_out=right.
+ *
+ *   4. Collision resolution (after snap):
+ *      - Both ports connected and still want the same side → use the natural
+ *        sides on the flow axis (the "convention" overrides local geometry
+ *        when both ports' local pulls collide; the return-path edge wraps
+ *        around the network, which is what the user expects in a hydraulic
+ *        loop).
+ *      - One port connected, the other disconnected → connected port keeps
+ *        its (snapped) preference; disconnected port moves to opposite.
  */
+const OPPOSITE: Record<Side, Side> = {
+  left: "right",
+  right: "left",
+  top: "bottom",
+  bottom: "top",
+};
+
+/** Sides that align with each flow axis. */
+const AXIS_SIDES: Record<"vertical" | "horizontal", Set<Side>> = {
+  vertical: new Set<Side>(["top", "bottom"]),
+  horizontal: new Set<Side>(["left", "right"]),
+};
+
+/** Natural side per port kind, per flow axis. port_in flows "in from upstream"
+ *  (top in vertical, left in horizontal); port_out flows "out to downstream"
+ *  (bottom / right). */
+function naturalSide(axis: "vertical" | "horizontal", isInPort: boolean): Side {
+  if (axis === "vertical") return isInPort ? "top" : "bottom";
+  return isInPort ? "left" : "right";
+}
+
 export function resolveFlowPortAssignment(
   nodes: Node[],
   edges: Edge[],
@@ -137,59 +171,115 @@ export function resolveFlowPortAssignment(
 
   const meC = nodeCenter(me);
 
-  type Ranked = { name: string; order: Side[]; connected: boolean };
-  const ranked: Ranked[] = flowPorts.map((p) => {
+  // Determine the dominant flow axis from the spread of NODE CENTERS — not
+  // the full bbox including node widths. Hydraulic component nodes are
+  // intrinsically wide rectangles (~280 px) and short (~80 px), so the full
+  // bbox over-weights the horizontal dimension and misclassifies a clearly
+  // vertical layout as horizontal. Centers reflect spatial arrangement, not
+  // node geometry.
+  //
+  // We further apply a 1.5× vertical bias: hydraulic loops are gravity-driven
+  // and read most naturally as top-down flow, so the algorithm should default
+  // toward vertical unless the layout is clearly more horizontal.
+  let minCx = Infinity,
+    maxCx = -Infinity,
+    minCy = Infinity,
+    maxCy = -Infinity;
+  for (const n of nodes) {
+    const measured = n.measured as { width?: number; height?: number } | undefined;
+    const w = measured?.width ?? 140;
+    const h = measured?.height ?? 70;
+    const cx = n.position.x + w / 2;
+    const cy = n.position.y + h / 2;
+    if (cx < minCx) minCx = cx;
+    if (cx > maxCx) maxCx = cx;
+    if (cy < minCy) minCy = cy;
+    if (cy > maxCy) maxCy = cy;
+  }
+  const spreadX = Number.isFinite(minCx) ? maxCx - minCx : 0;
+  const spreadY = Number.isFinite(minCy) ? maxCy - minCy : 0;
+  const flowAxis: "vertical" | "horizontal" =
+    spreadY * 1.5 >= spreadX ? "vertical" : "horizontal";
+
+  // First pass: per-port local preference + connection count.
+  type Pref = { name: string; isInPort: boolean; preferred: Side; connections: number };
+  const prefs: Pref[] = flowPorts.map((p) => {
     const isInPort = p.name.includes("in");
-    const myEdge = edges.find((e) =>
-      isInPort
-        ? e.target === nodeId && e.targetHandle === p.name
-        : e.source === nodeId && e.sourceHandle === p.name,
-    );
     const defaultSide = (p.side as Side | undefined) ?? "left";
-    if (!myEdge) {
-      return {
-        name: p.name,
-        order: [defaultSide, ...sidesExcept(defaultSide)],
-        connected: false,
-      };
+
+    let sumDx = 0;
+    let sumDy = 0;
+    let connections = 0;
+    for (const e of edges) {
+      const isThisPort = isInPort
+        ? e.target === nodeId && e.targetHandle === p.name
+        : e.source === nodeId && e.sourceHandle === p.name;
+      if (!isThisPort) continue;
+      const neighborId = isInPort ? e.source : e.target;
+      const them = nodes.find((n) => n.id === neighborId);
+      if (!them) continue;
+      const tc = nodeCenter(them);
+      sumDx += tc.x - meC.x;
+      sumDy += tc.y - meC.y;
+      connections++;
     }
-    const neighborId = isInPort ? myEdge.source : myEdge.target;
-    const them = nodes.find((n) => n.id === neighborId);
-    if (!them) {
-      return {
-        name: p.name,
-        order: [defaultSide, ...sidesExcept(defaultSide)],
-        connected: false,
-      };
+
+    let preferred: Side;
+    if (connections === 0) {
+      preferred = defaultSide;
+    } else {
+      // Project onto each side's outward normal; dominant axis wins.
+      // D-13 horizontal-preferring tie-break via stable sort.
+      const scores: { side: Side; score: number }[] = [
+        { side: "right", score: sumDx },
+        { side: "left", score: -sumDx },
+        { side: "bottom", score: sumDy },
+        { side: "top", score: -sumDy },
+      ];
+      scores.sort((a, b) => b.score - a.score);
+      preferred = scores[0].side;
     }
-    const tc = nodeCenter(them);
-    const dx = tc.x - meC.x;
-    const dy = tc.y - meC.y;
-    // Project onto each side's outward normal. Initial declaration order
-    // (right, left, bottom, top) gives D-13 horizontal-preferring tie-breaking
-    // via stable sort.
-    const scores: { side: Side; score: number }[] = [
-      { side: "right", score: dx },
-      { side: "left", score: -dx },
-      { side: "bottom", score: dy },
-      { side: "top", score: -dy },
-    ];
-    scores.sort((a, b) => b.score - a.score);
-    return { name: p.name, order: scores.map((s) => s.side), connected: true };
+
+    // Axis snap: if local pref is perpendicular to the flow axis, snap to the
+    // natural side along the axis. Keep on-axis preferences untouched so
+    // a clear "neighbor above" pull continues to put port_in on top.
+    //
+    // Disconnected ports are EXEMPT from snap — D-11 says isolated ports
+    // render on the registry-declared default side. Snapping would override
+    // that contract for any node that happens to live in a vertical cluster.
+    if (connections > 0 && !AXIS_SIDES[flowAxis].has(preferred)) {
+      preferred = naturalSide(flowAxis, isInPort);
+    }
+
+    return { name: p.name, isInPort, preferred, connections };
   });
 
-  // Connected ports outrank unconnected for any contested side. Among ports of
-  // equal connection status, registry declaration order wins — port_in is
-  // declared before port_out in every 2-FlowPort component today.
-  const ordered = ranked
-    .slice()
-    .sort((a, b) => Number(b.connected) - Number(a.connected));
-  const taken = new Set<Side>();
-  for (const r of ordered) {
-    const pick = r.order.find((s) => !taken.has(s)) ?? r.order[0];
-    out[r.name] = pick;
-    taken.add(pick);
+  // Second pass: collision resolution (post-snap).
+  // - Both connected & both still want the same side → convention wins:
+  //   each port lands on its natural side along the flow axis.
+  // - One connected, one disconnected, same side → connected keeps its
+  //   (snapped) preference; disconnected port moves to opposite.
+  for (let i = 0; i < prefs.length; i++) {
+    for (let j = i + 1; j < prefs.length; j++) {
+      if (prefs[i].preferred !== prefs[j].preferred) continue;
+      const a = prefs[i];
+      const b = prefs[j];
+      const bothConnected = a.connections > 0 && b.connections > 0;
+      if (bothConnected) {
+        a.preferred = naturalSide(flowAxis, a.isInPort);
+        b.preferred = naturalSide(flowAxis, b.isInPort);
+        continue;
+      }
+      // Partial-connection collision — connected port keeps, disconnected moves.
+      const aWins =
+        a.connections > b.connections ||
+        (a.connections === b.connections && !a.isInPort && b.isInPort);
+      const loser = aWins ? b : a;
+      loser.preferred = OPPOSITE[loser.preferred];
+    }
   }
+
+  for (const p of prefs) out[p.name] = p.preferred;
   return out;
 }
 
