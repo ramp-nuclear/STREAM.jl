@@ -567,15 +567,21 @@ function LegendColumn({
 // number → description.
 // ---------------------------------------------------------------------------
 
-const EDGE_SRC_X = 220;
-const EDGE_TGT_X = 500;
+// Edges + convention schematic centered in the tile. TILE_W=640, so the
+// tile center is at x=320. Edges span 180..460 (length 280, midpoint 320).
+// The convention schematic (source rect + target rect) spans the same
+// 180..460 range so the bottom row reads aligned with the three edge rows
+// above it. Chips for each edge sit in a LEFT column at x=140 so they
+// don't push the edges off-center.
+const EDGE_SRC_X = 180;
+const EDGE_TGT_X = 460;
 const ROW_Y = [140, 240, 340];
 const CONV_ROW_Y = 450;
-const CONV_SRC_LEFT = 220;
-const CONV_TGT_LEFT = 430;
+const CONV_SRC_LEFT = 180;
+const CONV_TGT_LEFT = 390;
 const CONV_NODE_W = 70;
 const CONV_NODE_H = 36;
-const EDGES_CHIP_X = 540; // right of target ports
+const EDGES_CHIP_X = 140; // LEFT of source ports
 
 interface EdgeChip {
   n: number;
