@@ -1,29 +1,171 @@
 /**
- * ValidationStatusBar — Phase 71 Plan 10
+ * ValidationStatusBar — unified bottom-chrome footer (Phase 72 redesign).
  *
- * Always-visible 22px statusbar strip mounted under BottomPanel (D-02).
- * Shows three count chips: errors / warnings / info.
+ * Always-visible 22 px strip pinned to the absolute bottom of the window.
+ * The single source of truth for the bottom-panel's open / closed state AND
+ * its active tab. The BottomPanel header no longer carries tabs.
  *
- * UX contract (D-02, D-03, D-05):
- *   - Always rendered; never collapsible.
- *   - Each chip: icon + count. When count === 0 the chip dims to opacity-60.
- *   - Click a chip → opens BottomPanel, switches to Validation tab, dispatches
- *     'stream:validation-filter' CustomEvent so ValidationPanel pre-filters by
- *     that severity (D-05 locked decision — dispatch is REQUIRED).
- *   - 0→N pulse: when error count rises from 0 to N, the error chip plays
- *     'pulse-once' CSS animation (~600ms, single shot). D-03: panel does NOT
- *     auto-open on count change — only the chip pulses.
+ * Layout:
+ *   left   — severity count segments: `ERR 12   WRN 4   INF 2`, mono,
+ *            color-tokenized. Click → opens BottomPanel on Validation tab
+ *            with that severity filter pre-applied.
+ *   center — divider hairline (visual separation between status and control).
+ *   right  — `Code | Validation` tab buttons + close chevron. Click an
+ *            inactive tab → opens panel on that tab. Click active tab →
+ *            closes panel. The `⌄` chevron is a redundant close affordance
+ *            shown only when the panel is open.
+ *
+ * Severity vocabulary (ERR/WRN/INF) intentionally matches ValidationPanel row
+ * prefixes — one severity language across the system, not two.
+ *
+ * 0 → N error pulse retained: when error count rises from 0 the ERR segment
+ * plays `pulse-once` once. Panel does NOT auto-open on count change.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, Info } from "lucide-react";
-import { Button } from "./ui/button";
+import { ChevronDown } from "lucide-react";
 import useStore from "../store/useStore";
+
+type Severity = "error" | "warning" | "info";
+type BottomTab = "code" | "validation";
+
+const SEVERITY_LABEL: Record<Severity, string> = {
+  error: "ERR",
+  warning: "WRN",
+  info: "INF",
+};
+
+const SEVERITY_COLOR_VAR: Record<Severity, string> = {
+  error: "var(--destructive)",
+  warning: "var(--color-warning)",
+  info: "var(--color-info)",
+};
+
+// ---------------------------------------------------------------------------
+// Severity segment — left cluster
+// ---------------------------------------------------------------------------
+
+interface SeveritySegmentProps {
+  severity: Severity;
+  count: number;
+  pulse?: boolean;
+}
+
+function SeveritySegment({ severity, count, pulse }: SeveritySegmentProps) {
+  const active = count > 0;
+
+  function handleClick() {
+    useStore.setState({ bottomPanelOpen: true, activeBottomTab: "validation" });
+    window.dispatchEvent(
+      new CustomEvent("stream:validation-filter", { detail: { severity } }),
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      aria-label={`${count} ${severity}${count === 1 ? "" : "s"}`}
+      title={
+        severity === "error" && count > 0
+          ? `${count} ${count === 1 ? "error" : "errors"} block export`
+          : `${count} ${severity}${count === 1 ? "" : "s"}`
+      }
+      className={
+        "h-full px-2 inline-flex items-center gap-1.5 font-mono text-[11px] " +
+        "leading-none cursor-pointer select-none " +
+        "transition-colors duration-[80ms] " +
+        "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover " +
+        (active ? "" : "opacity-55 ") +
+        (pulse ? "pulse-once" : "")
+      }
+    >
+      <span
+        style={{ color: active ? SEVERITY_COLOR_VAR[severity] : undefined }}
+        className="tracking-tight"
+      >
+        {SEVERITY_LABEL[severity]}
+      </span>
+      <span className="text-foreground/85 tabular-nums">{count}</span>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tab button — right cluster
+// ---------------------------------------------------------------------------
+
+interface TabButtonProps {
+  tab: BottomTab;
+  label: string;
+  panelOpen: boolean;
+  activeTab: BottomTab;
+}
+
+function TabButton({ tab, label, panelOpen, activeTab }: TabButtonProps) {
+  const isActive = panelOpen && activeTab === tab;
+
+  function handleClick() {
+    if (!panelOpen) {
+      // Closed → open on this tab.
+      useStore.setState({ bottomPanelOpen: true, activeBottomTab: tab });
+      return;
+    }
+    if (activeTab === tab) {
+      // Active tab clicked while open → close.
+      useStore.setState({ bottomPanelOpen: false });
+      return;
+    }
+    // Inactive tab clicked while open → switch tab.
+    useStore.setState({ activeBottomTab: tab });
+  }
+
+  // Active-tab indicator: a 1 px top accent rule using --ring (Hydraulic
+  // hue, locked focus color), plus brighter text. Rest state is foreground/65
+  // mono. Hover lifts background to --popover/60 like the severity segments.
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      role="tab"
+      aria-selected={isActive}
+      aria-label={
+        !panelOpen
+          ? `Open ${label.toLowerCase()} panel`
+          : isActive
+            ? `Close ${label.toLowerCase()} panel`
+            : `Switch to ${label.toLowerCase()} panel`
+      }
+      className={
+        "relative h-full px-3 inline-flex items-center font-mono text-[11px] " +
+        "leading-none cursor-pointer select-none " +
+        "transition-colors duration-[80ms] " +
+        "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover " +
+        (isActive ? "text-foreground" : "text-foreground/65 hover:text-foreground")
+      }
+    >
+      {/* Active-tab top accent — 1 px line at the top edge using --ring. */}
+      {isActive && (
+        <span
+          aria-hidden
+          className="absolute left-1.5 right-1.5 top-0 h-px"
+          style={{ background: "var(--ring)" }}
+        />
+      )}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Status bar
+// ---------------------------------------------------------------------------
 
 export default function ValidationStatusBar() {
   const validationResults = useStore((s) => s.validationResults);
+  const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
+  const activeBottomTab = useStore((s) => s.activeBottomTab);
 
-  // Derive counts inline via useMemo — avoids derived-state race on every render.
   const errorCount = useMemo(
     () => validationResults.filter((r) => r.severity === "error").length,
     [validationResults],
@@ -37,8 +179,7 @@ export default function ValidationStatusBar() {
     [validationResults],
   );
 
-  // 0→N pulse logic (D-03): track previous error count via ref; on a 0→N
-  // transition add the CSS class for 700ms then clear it.
+  // 0 → N error pulse.
   const prevErrorCountRef = useRef<number>(errorCount);
   const [pulseActive, setPulseActive] = useState(false);
 
@@ -51,81 +192,53 @@ export default function ValidationStatusBar() {
     }
   }, [errorCount]);
 
-  // Update previous ref AFTER the effect runs (mirrors each render).
   useEffect(() => {
     prevErrorCountRef.current = errorCount;
   });
 
-  // Chip click handler factory — open panel + dispatch severity filter (D-05).
-  function handleChipClick(severity: "error" | "warning" | "info") {
-    useStore.setState({ bottomPanelOpen: true, activeBottomTab: "validation" });
-    window.dispatchEvent(
-      new CustomEvent("stream:validation-filter", {
-        detail: { severity },
-      }),
-    );
-  }
-
   return (
     <div
-      className="flex flex-row items-center justify-between px-2 border-t bg-chrome shrink-0"
-      style={{ height: 22, fontSize: 11 }}
-      aria-label="Validation status"
+      className="flex flex-row items-stretch justify-between border-t bg-chrome shrink-0 select-none"
+      style={{ height: 22 }}
+      aria-label="Status bar"
     >
-      {/* Left side: three chips */}
-      <div className="flex flex-row items-center gap-0.5">
-        {/* Error chip */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={
-            "h-5 w-auto px-1.5 gap-1 text-[11px] rounded-sm " +
-            (errorCount === 0 ? "opacity-60" : "") +
-            (pulseActive ? " pulse-once" : "")
-          }
-          onClick={() => handleChipClick("error")}
-          aria-label={`${errorCount} errors`}
-          title={`${errorCount} error${errorCount === 1 ? "" : "s"} — click to filter`}
-        >
-          <AlertCircle className="h-3 w-3 shrink-0" />
-          <span>{errorCount}</span>
-        </Button>
-
-        {/* Warning chip */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={
-            "h-5 w-auto px-1.5 gap-1 text-[11px] rounded-sm " +
-            (warningCount === 0 ? "opacity-60" : "")
-          }
-          onClick={() => handleChipClick("warning")}
-          aria-label={`${warningCount} warnings`}
-          title={`${warningCount} warning${warningCount === 1 ? "" : "s"} — click to filter`}
-        >
-          <AlertTriangle className="h-3 w-3 shrink-0" />
-          <span>{warningCount}</span>
-        </Button>
-
-        {/* Info chip */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={
-            "h-5 w-auto px-1.5 gap-1 text-[11px] rounded-sm " +
-            (infoCount === 0 ? "opacity-60" : "")
-          }
-          onClick={() => handleChipClick("info")}
-          aria-label={`${infoCount} info`}
-          title={`${infoCount} info — click to filter`}
-        >
-          <Info className="h-3 w-3 shrink-0" />
-          <span>{infoCount}</span>
-        </Button>
+      {/* Left cluster — severity segments */}
+      <div className="flex flex-row items-stretch" role="group" aria-label="Validation counts">
+        <SeveritySegment severity="error" count={errorCount} pulse={pulseActive} />
+        <SeveritySegment severity="warning" count={warningCount} />
+        <SeveritySegment severity="info" count={infoCount} />
       </div>
 
-      {/* Right side: reserved for Phase 72 positional indicators */}
-      <div />
+      {/* Right cluster — bottom-panel tabs + close chevron */}
+      <div className="flex flex-row items-stretch" role="tablist" aria-label="Bottom panel">
+        <TabButton
+          tab="code"
+          label="Code"
+          panelOpen={bottomPanelOpen}
+          activeTab={activeBottomTab}
+        />
+        <TabButton
+          tab="validation"
+          label="Validation"
+          panelOpen={bottomPanelOpen}
+          activeTab={activeBottomTab}
+        />
+        {bottomPanelOpen && (
+          <button
+            type="button"
+            onClick={() => useStore.setState({ bottomPanelOpen: false })}
+            aria-label="Close bottom panel"
+            title="Close panel (Ctrl+`)"
+            className={
+              "h-full px-2 inline-flex items-center cursor-pointer text-foreground/65 " +
+              "hover:text-foreground transition-colors duration-[80ms] " +
+              "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover"
+            }
+          >
+            <ChevronDown className="h-3 w-3" strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

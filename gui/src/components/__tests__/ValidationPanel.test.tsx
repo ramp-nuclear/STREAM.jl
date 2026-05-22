@@ -1,21 +1,17 @@
 // @vitest-environment happy-dom
 //
-// ValidationPanel.test.tsx — Phase 71 Plan 09
+// ValidationPanel.test.tsx — Phase 72 (column headers + filter pills + group-by).
 //
-// Tests for ValidationPanel: empty state, sort order, click-to-focus
-// CustomEvent dispatch, severity + node filter CustomEvents, clear-filter,
-// and all three fix-action button kinds (lossless-sync, value-transfer-picker,
-// navigation-only). Covers D-04, D-05, D-14.
+// Tests for ValidationPanel after the panel-header rebuild: empty state, sort
+// order, row click-to-focus, severity + node filter events, filter-pill toggle,
+// inline node-filter clear, column-header presence, and group-by-rule
+// expand/collapse.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import ValidationPanel from "../ValidationPanel";
 import useStore from "../../store/useStore";
 import type { ValidationResult } from "../../lib/validation/types";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function makeResult(overrides: Partial<ValidationResult> = {}): ValidationResult {
   return {
@@ -32,10 +28,6 @@ function renderPanel() {
   return render(<ValidationPanel />);
 }
 
-// ---------------------------------------------------------------------------
-// Setup / teardown
-// ---------------------------------------------------------------------------
-
 beforeEach(() => {
   useStore.setState({ validationResults: [] });
 });
@@ -45,23 +37,28 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+// Locate a row by its description text content. There are non-row buttons in
+// the panel header (filter pills, settings trigger) and group parents, so a
+// plain getByRole("button", { name: ... }) wouldn't disambiguate.
+function findRowByDescription(description: string): HTMLElement {
+  const row = screen
+    .getAllByRole("button")
+    .find((b) => b.textContent?.includes(description));
+  if (!row) throw new Error(`Row not found: ${description}`);
+  return row;
+}
 
-describe("ValidationPanel", () => {
-  // -----------------------------------------------------------------------
-  // 1. Empty state
-  // -----------------------------------------------------------------------
-  it("renders 'No issues.' when validationResults is empty and no filter is active", () => {
+describe("ValidationPanel (Phase 72)", () => {
+  // ---------------------------------------------------------------------
+  // Empty + sort
+  // ---------------------------------------------------------------------
+
+  it("renders 'No issues.' when validationResults is empty", () => {
     renderPanel();
     expect(screen.getByText("No issues.")).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // 2. Sort order: error → warning → info, then validatorId within each bucket
-  // -----------------------------------------------------------------------
-  it("renders three results in severity order (error → warning → info)", () => {
+  it("renders results in severity order (error → warning → info)", () => {
     const results: ValidationResult[] = [
       makeResult({ id: "r-info", severity: "info", validatorId: "info_rule", description: "Info msg" }),
       makeResult({ id: "r-err", severity: "error", validatorId: "err_rule", description: "Error msg" }),
@@ -71,7 +68,6 @@ describe("ValidationPanel", () => {
     renderPanel();
 
     const rows = screen.getAllByRole("button");
-    // Row order is based on which text appears first in the DOM.
     const texts = rows.map((r) => r.textContent ?? "");
     const errorIdx = texts.findIndex((t) => t.includes("Error msg"));
     const warnIdx = texts.findIndex((t) => t.includes("Warn msg"));
@@ -80,9 +76,10 @@ describe("ValidationPanel", () => {
     expect(warnIdx).toBeLessThan(infoIdx);
   });
 
-  // -----------------------------------------------------------------------
-  // 3. Row click dispatches 'stream:focus-validation-result'
-  // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------
+  // Row click → focus dispatch
+  // ---------------------------------------------------------------------
+
   it("dispatches stream:focus-validation-result on row click", () => {
     const result = makeResult({ id: "r1", description: "Test error" });
     useStore.setState({ validationResults: [result] });
@@ -92,11 +89,7 @@ describe("ValidationPanel", () => {
     const spy = (e: Event) => dispatched.push(e as CustomEvent);
     window.addEventListener("stream:focus-validation-result", spy as EventListener);
 
-    // Find the row by its text content (the row div has role=button).
-    const allButtons = screen.getAllByRole("button");
-    const rowBtn = allButtons.find((b) => b.textContent?.includes("Test error"));
-    expect(rowBtn).toBeTruthy();
-    fireEvent.click(rowBtn!);
+    fireEvent.click(findRowByDescription("Test error"));
 
     expect(dispatched.length).toBeGreaterThanOrEqual(1);
     const ev = dispatched.find((e) => e.type === "stream:focus-validation-result");
@@ -106,9 +99,6 @@ describe("ValidationPanel", () => {
     window.removeEventListener("stream:focus-validation-result", spy as EventListener);
   });
 
-  // -----------------------------------------------------------------------
-  // 4. Row click with single field target also dispatches stream:open-property-field
-  // -----------------------------------------------------------------------
   it("dispatches stream:open-property-field when result has exactly one field target", () => {
     const result = makeResult({
       id: "r-field",
@@ -118,29 +108,21 @@ describe("ValidationPanel", () => {
     useStore.setState({ validationResults: [result] });
     renderPanel();
 
-    const focusEvents: CustomEvent[] = [];
     const fieldEvents: CustomEvent[] = [];
-    const spyFocus = (e: Event) => focusEvents.push(e as CustomEvent);
-    const spyField = (e: Event) => fieldEvents.push(e as CustomEvent);
-    window.addEventListener("stream:focus-validation-result", spyFocus as EventListener);
-    window.addEventListener("stream:open-property-field", spyField as EventListener);
+    window.addEventListener("stream:open-property-field", ((e: Event) =>
+      fieldEvents.push(e as CustomEvent)) as EventListener);
 
-    const allButtons = screen.getAllByRole("button");
-    const rowBtn = allButtons.find((b) => b.textContent?.includes("Field error"));
-    fireEvent.click(rowBtn!);
+    fireEvent.click(findRowByDescription("Field error"));
 
-    expect(focusEvents.length).toBeGreaterThanOrEqual(1);
     expect(fieldEvents.length).toBe(1);
     expect(fieldEvents[0].detail.nodeId).toBe("node-1");
     expect(fieldEvents[0].detail.fieldPath).toBe("n");
-
-    window.removeEventListener("stream:focus-validation-result", spyFocus as EventListener);
-    window.removeEventListener("stream:open-property-field", spyField as EventListener);
   });
 
-  // -----------------------------------------------------------------------
-  // 5. stream:validation-filter event filters list to that severity
-  // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------
+  // Severity filter — via window event (status-bar dispatch path)
+  // ---------------------------------------------------------------------
+
   it("filters to only error results when stream:validation-filter severity=error is dispatched", () => {
     const results: ValidationResult[] = [
       makeResult({ id: "e1", severity: "error", description: "Error one" }),
@@ -158,9 +140,6 @@ describe("ValidationPanel", () => {
     expect(screen.queryByText("Warning one")).toBeFalsy();
   });
 
-  // -----------------------------------------------------------------------
-  // 6. stream:validation-filter REPLACES the prior filter (no stacking)
-  // -----------------------------------------------------------------------
   it("replaces a prior severity filter when a new one is dispatched", () => {
     const results: ValidationResult[] = [
       makeResult({ id: "e1", severity: "error", description: "Error one" }),
@@ -169,7 +148,6 @@ describe("ValidationPanel", () => {
     useStore.setState({ validationResults: results });
     renderPanel();
 
-    // First: filter to error
     fireEvent(
       window,
       new CustomEvent("stream:validation-filter", { detail: { severity: "error" } }),
@@ -177,7 +155,6 @@ describe("ValidationPanel", () => {
     expect(screen.queryByText("Error one")).toBeTruthy();
     expect(screen.queryByText("Warning one")).toBeFalsy();
 
-    // Then: switch to warning — error row must disappear
     fireEvent(
       window,
       new CustomEvent("stream:validation-filter", { detail: { severity: "warning" } }),
@@ -186,9 +163,49 @@ describe("ValidationPanel", () => {
     expect(screen.queryByText("Warning one")).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // 7. stream:validation-filter-node filters to results matching that nodeId
-  // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------
+  // Filter pills (new in Phase 72)
+  // ---------------------------------------------------------------------
+
+  it("clicking a severity filter pill activates that filter", () => {
+    const results: ValidationResult[] = [
+      makeResult({ id: "e1", severity: "error", description: "Error one" }),
+      makeResult({ id: "w1", severity: "warning", description: "Warning one" }),
+    ];
+    useStore.setState({ validationResults: results });
+    renderPanel();
+
+    const errorPill = screen.getByRole("button", { name: /^Filter to error$/i });
+    fireEvent.click(errorPill);
+
+    expect(screen.queryByText("Error one")).toBeTruthy();
+    expect(screen.queryByText("Warning one")).toBeFalsy();
+  });
+
+  it("clicking the active severity filter pill clears the filter", () => {
+    const results: ValidationResult[] = [
+      makeResult({ id: "e1", severity: "error", description: "Error one" }),
+      makeResult({ id: "w1", severity: "warning", description: "Warning one" }),
+    ];
+    useStore.setState({ validationResults: results });
+    renderPanel();
+
+    // Activate
+    fireEvent.click(screen.getByRole("button", { name: /^Filter to error$/i }));
+    expect(screen.queryByText("Warning one")).toBeFalsy();
+
+    // Active aria-label now ends with " (active)"
+    const activePill = screen.getByRole("button", { name: /^Filter to error \(active\)$/i });
+    fireEvent.click(activePill);
+
+    expect(screen.queryByText("Error one")).toBeTruthy();
+    expect(screen.queryByText("Warning one")).toBeTruthy();
+  });
+
+  // ---------------------------------------------------------------------
+  // Node filter
+  // ---------------------------------------------------------------------
+
   it("filters to only results matching the nodeId when stream:validation-filter-node is dispatched", () => {
     const results: ValidationResult[] = [
       makeResult({
@@ -214,35 +231,38 @@ describe("ValidationPanel", () => {
     expect(screen.queryByText("Node B error")).toBeFalsy();
   });
 
-  // -----------------------------------------------------------------------
-  // 8. Clear filter button restores full list
-  // -----------------------------------------------------------------------
-  it("removes the filter and shows all results when Clear filter is clicked", () => {
+  it("clears the node filter when the inline 'clear' link is clicked", () => {
     const results: ValidationResult[] = [
-      makeResult({ id: "e1", severity: "error", description: "Error one" }),
-      makeResult({ id: "w1", severity: "warning", description: "Warning one" }),
+      makeResult({
+        id: "r-a",
+        description: "Node A error",
+        targets: [{ kind: "node", nodeId: "node-A" }],
+      }),
+      makeResult({
+        id: "r-b",
+        description: "Node B error",
+        targets: [{ kind: "node", nodeId: "node-B" }],
+      }),
     ];
     useStore.setState({ validationResults: results });
     renderPanel();
 
-    // Activate filter
     fireEvent(
       window,
-      new CustomEvent("stream:validation-filter", { detail: { severity: "error" } }),
+      new CustomEvent("stream:validation-filter-node", { detail: { nodeId: "node-A" } }),
     );
-    expect(screen.queryByText("Warning one")).toBeFalsy();
+    expect(screen.queryByText("Node B error")).toBeFalsy();
 
-    // Clear it
-    const clearBtn = screen.getByText("Clear filter");
-    fireEvent.click(clearBtn);
+    fireEvent.click(screen.getByText("clear"));
 
-    expect(screen.queryByText("Error one")).toBeTruthy();
-    expect(screen.queryByText("Warning one")).toBeTruthy();
+    expect(screen.queryByText("Node A error")).toBeTruthy();
+    expect(screen.queryByText("Node B error")).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // 9. Filtered empty state shows "No results match the active filter."
-  // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------
+  // Empty-with-filter + column headers
+  // ---------------------------------------------------------------------
+
   it("shows 'No results match the active filter.' when a filter is active and no results match", () => {
     const results: ValidationResult[] = [
       makeResult({ id: "w1", severity: "warning", description: "Warning one" }),
@@ -250,132 +270,133 @@ describe("ValidationPanel", () => {
     useStore.setState({ validationResults: results });
     renderPanel();
 
-    // Filter to error — no error results exist
     fireEvent(
       window,
       new CustomEvent("stream:validation-filter", { detail: { severity: "error" } }),
     );
 
     expect(screen.queryByText("No issues.")).toBeFalsy();
-    expect(screen.getByText("No results match the active filter.")).toBeTruthy();
+    expect(screen.getByText(/No results match the active filter\./)).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // 10. No fix-action buttons when result has no fixAction
-  // -----------------------------------------------------------------------
-  it("renders no fix-action buttons when result.fixAction is undefined", () => {
-    const result = makeResult({ id: "r1", description: "Plain error", fixAction: undefined });
-    useStore.setState({ validationResults: [result] });
-    renderPanel();
-
-    // Only the row itself is a button (role=button on the row div)
-    const buttons = screen.getAllByRole("button");
-    // The row itself counts as a button. There should be no Button components
-    // rendered — just the row. The Button component renders a <button> element.
-    // We confirm there is no <button> with text that would come from a fix label.
-    const buttonTexts = buttons.map((b) => b.tagName.toLowerCase() + ":" + (b.textContent ?? "").trim());
-    const hasSyncButton = buttonTexts.some((t) => t.startsWith("button:") && t.length > "button:".length && !t.includes("Plain error") && !t.includes("test_validator"));
-    expect(hasSyncButton).toBe(false);
-  });
-
-  // -----------------------------------------------------------------------
-  // 11. lossless-sync: renders one button, clicking calls apply, no row dispatch
-  // -----------------------------------------------------------------------
-  it("renders a single button for lossless-sync and calls apply on click without row focus event", () => {
-    const applySpy = vi.fn();
+  it("renders column-label row (Sev / Rule / Message) when there is at least one result", () => {
     const result = makeResult({
-      id: "r-sync",
-      description: "Sync error",
-      fixAction: { kind: "lossless-sync", label: "Sync n to 5", apply: applySpy },
+      id: "r1",
+      validatorId: "z_n_match",
+      description: "n × L mismatch",
     });
     useStore.setState({ validationResults: [result] });
     renderPanel();
 
-    // Find the fix button by its label text
-    const syncBtn = screen.getByText("Sync n to 5");
-    expect(syncBtn).toBeTruthy();
-
-    // Set up spy on window.dispatchEvent to assert row event NOT fired
-    const dispatchedEvents: string[] = [];
-    const dispatchSpy = vi.spyOn(window, "dispatchEvent").mockImplementation((e) => {
-      dispatchedEvents.push((e as Event).type);
-      return true;
-    });
-
-    fireEvent.click(syncBtn);
-
-    // apply called exactly once with two function args
-    expect(applySpy).toHaveBeenCalledTimes(1);
-    expect(typeof applySpy.mock.calls[0][0]).toBe("function");
-    expect(typeof applySpy.mock.calls[0][1]).toBe("function");
-
-    // Row focus event must NOT have been dispatched
-    expect(dispatchedEvents).not.toContain("stream:focus-validation-result");
-
-    dispatchSpy.mockRestore();
+    expect(screen.getByText("Sev")).toBeTruthy();
+    expect(screen.getByText("Rule")).toBeTruthy();
+    expect(screen.getByText("Message")).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // 12. value-transfer-picker: two buttons, each calls the correct closure
-  // -----------------------------------------------------------------------
-  it("renders two buttons for value-transfer-picker and routes clicks to the correct closure", () => {
-    const leftSpy = vi.fn();
-    const rightSpy = vi.fn();
-    const result = makeResult({
-      id: "r-picker",
-      description: "Picker error",
-      fixAction: {
-        kind: "value-transfer-picker",
-        leftLabel: "Use 0.5",
-        rightLabel: "Use 0.6",
-        applyLeft: leftSpy,
-        applyRight: rightSpy,
-      },
-    });
-    useStore.setState({ validationResults: [result] });
+  it("does NOT render column labels when there are zero results", () => {
     renderPanel();
-
-    const leftBtn = screen.getByText("Use 0.5");
-    const rightBtn = screen.getByText("Use 0.6");
-    expect(leftBtn).toBeTruthy();
-    expect(rightBtn).toBeTruthy();
-
-    // Click left — only leftSpy called
-    fireEvent.click(leftBtn);
-    expect(leftSpy).toHaveBeenCalledTimes(1);
-    expect(rightSpy).not.toHaveBeenCalled();
-
-    // Click right — only rightSpy called (leftSpy still 1)
-    fireEvent.click(rightBtn);
-    expect(rightSpy).toHaveBeenCalledTimes(1);
-    expect(leftSpy).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Sev")).toBeNull();
+    expect(screen.queryByText("Rule")).toBeNull();
+    expect(screen.queryByText("Message")).toBeNull();
   });
 
-  // -----------------------------------------------------------------------
-  // 13. navigation-only: ghost button triggers the focus event like a row click
-  // -----------------------------------------------------------------------
-  it("renders a ghost button for navigation-only that triggers focus-validation-result", () => {
+  // ---------------------------------------------------------------------
+  // Group-by — popover + parent rows + expand/collapse
+  // ---------------------------------------------------------------------
+
+  it("flat-list by default: shows every row without group parents", () => {
+    const results: ValidationResult[] = [
+      makeResult({ id: "r1", validatorId: "z_n_match", description: "Z-N mismatch A" }),
+      makeResult({ id: "r2", validatorId: "z_n_match", description: "Z-N mismatch B" }),
+      makeResult({ id: "r3", validatorId: "gravity_sum", severity: "warning", description: "ΣΔh ≠ 0" }),
+    ];
+    useStore.setState({ validationResults: results });
+    renderPanel();
+
+    expect(screen.queryByText("Z-N mismatch A")).toBeTruthy();
+    expect(screen.queryByText("Z-N mismatch B")).toBeTruthy();
+    expect(screen.queryByText("ΣΔh ≠ 0")).toBeTruthy();
+    // No parent row reads "× rule" in flat mode
+    expect(screen.queryByText(/× rule/)).toBeNull();
+  });
+
+  it("group-by-rule switch via the Group by popover collapses rows by validatorId", () => {
+    const results: ValidationResult[] = [
+      makeResult({ id: "r1", validatorId: "z_n_match", description: "Z-N mismatch A" }),
+      makeResult({ id: "r2", validatorId: "z_n_match", description: "Z-N mismatch B" }),
+      makeResult({ id: "r3", validatorId: "gravity_sum", severity: "warning", description: "ΣΔh ≠ 0" }),
+    ];
+    useStore.setState({ validationResults: results });
+    renderPanel();
+
+    // Open the Group by popover and pick "Rule".
+    fireEvent.click(screen.getByRole("button", { name: /Group by settings/i }));
+    // ToggleGroup items render as toggles; click "Rule".
+    fireEvent.click(screen.getByRole("radio", { name: "Rule" }));
+
+    // Both children still rendered (parent expanded by default).
+    expect(screen.queryByText("Z-N mismatch A")).toBeTruthy();
+    expect(screen.queryByText("Z-N mismatch B")).toBeTruthy();
+    // Parent rows: "2 × rule" for z_n_match, "1 × rule" for gravity_sum.
+    expect(screen.queryByText("2 × rule")).toBeTruthy();
+    expect(screen.queryByText("1 × rule")).toBeTruthy();
+  });
+
+  it("collapsing a group parent hides its child rows", () => {
+    const results: ValidationResult[] = [
+      makeResult({ id: "r1", validatorId: "z_n_match", description: "Z-N mismatch A" }),
+      makeResult({ id: "r2", validatorId: "z_n_match", description: "Z-N mismatch B" }),
+    ];
+    useStore.setState({ validationResults: results });
+    renderPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: /Group by settings/i }));
+    fireEvent.click(screen.getByRole("radio", { name: "Rule" }));
+
+    // Click the parent ("2 × rule") to collapse.
+    const parent = screen.getByText("2 × rule").closest("button");
+    expect(parent).toBeTruthy();
+    fireEvent.click(parent!);
+
+    expect(screen.queryByText("Z-N mismatch A")).toBeFalsy();
+    expect(screen.queryByText("Z-N mismatch B")).toBeFalsy();
+    // Parent still rendered after collapse.
+    expect(screen.queryByText("2 × rule")).toBeTruthy();
+  });
+
+  // ---------------------------------------------------------------------
+  // Light sanity on the row body (validator-id column + severity prefix)
+  // ---------------------------------------------------------------------
+
+  it("each row renders the validator ID and severity prefix", () => {
     const result = makeResult({
-      id: "r-nav",
-      description: "Nav error",
-      fixAction: { kind: "navigation-only", label: "Go to component" },
+      id: "r1",
+      validatorId: "z_n_match",
+      description: "n × L mismatch across plate",
     });
     useStore.setState({ validationResults: [result] });
     renderPanel();
 
-    const navBtn = screen.getByText("Go to component");
-    expect(navBtn).toBeTruthy();
+    // Validator id should appear in its column (and only its column).
+    expect(screen.getByText("z_n_match")).toBeTruthy();
+    expect(screen.getByText("n × L mismatch across plate")).toBeTruthy();
 
-    const dispatchedEvents: string[] = [];
-    const dispatchSpy = vi.spyOn(window, "dispatchEvent").mockImplementation((e) => {
-      dispatchedEvents.push((e as Event).type);
-      return true;
-    });
+    // "ERR" appears in BOTH the filter pill and the row body now. Assert at
+    // least one occurrence inside an actual data row (role=button + truncate
+    // description matches), via screen.getAllByText.
+    const errMatches = screen.getAllByText("ERR");
+    expect(errMatches.length).toBeGreaterThanOrEqual(1);
 
-    fireEvent.click(navBtn);
-
-    expect(dispatchedEvents).toContain("stream:focus-validation-result");
-
-    dispatchSpy.mockRestore();
+    // Sanity: at least one ERR token sits in a clickable row that ALSO
+    // contains the description text.
+    const rowWithErrAndDesc = screen
+      .getAllByRole("button")
+      .find(
+        (b) =>
+          b.textContent?.includes("ERR") &&
+          b.textContent?.includes("n × L mismatch across plate"),
+      );
+    expect(rowWithErrAndDesc).toBeTruthy();
+    expect(within(rowWithErrAndDesc!).getByText("z_n_match")).toBeTruthy();
   });
 });

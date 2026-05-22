@@ -1,15 +1,15 @@
-// zNMatch.ts — Z-axis node-count consistency validator (Phase 71, Plan 05)
+// zNMatch.ts — Z-axis node-count consistency validator.
 //
 // D-15 rule 1: "z_N match" — when a ChannelAndContacts (CAC) is thermally
 // connected to a HeatDiffusion (HD), CAC.n must equal HD.nz.
 //
-// §3.9 line 790: error severity; lossless-sync fix.
 // D-14: edge-level rule emits edge + both endpoint field and node targets.
 // D-12: fieldPath 'n' for CAC, 'nz' for HD (property-panel red highlight).
 //
-// FixAction: lossless-sync — picks Math.max(cac.n, hd.nz) and writes to both
-// sides. The apply closure takes (set, get) as parameters so ValidationPanel
-// (Plan 09) passes fresh store handles at click time (RESEARCH §Pitfall 7).
+// Navigation-only: row click in ValidationPanel focuses the offending pair;
+// user fixes n / nz manually. Auto-fix buttons were removed Phase 71 UAT
+// (feedback_no_validator_fixaction_buttons) — max-wins guessed an answer the
+// engineer didn't ask for.
 //
 // Pure function: zero useStore imports, zero React imports (D-06).
 

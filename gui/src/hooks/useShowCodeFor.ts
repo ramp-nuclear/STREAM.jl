@@ -53,6 +53,10 @@ export function useShowCodeFor(): void {
       if (useStore.getState().bottomPanelOpen === false) {
         useStore.getState().toggleBottomPanel();
       }
+      // Phase 72: "Show generated Julia code" is a Code-tab request. The
+      // panel might already be open on the Validation tab (BottomPanel +
+      // status-bar tab control share state), so force the active tab here.
+      useStore.getState().setActiveBottomTab("code");
 
       useStore.getState().setPendingShowCodeFor(ids);
     };
