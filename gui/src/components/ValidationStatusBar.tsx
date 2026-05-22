@@ -72,7 +72,7 @@ function SeveritySegment({ severity, count, pulse }: SeveritySegmentProps) {
           : `${count} ${severity}${count === 1 ? "" : "s"}`
       }
       className={
-        "h-full px-2 inline-flex items-center gap-1.5 font-mono text-[11px] " +
+        "h-full px-3 inline-flex items-center gap-2 font-mono text-body " +
         "leading-none cursor-pointer select-none " +
         "transition-colors duration-[80ms] " +
         "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover " +
@@ -137,7 +137,7 @@ function TabButton({ tab, label, panelOpen, activeTab }: TabButtonProps) {
             : `Switch to ${label.toLowerCase()} panel`
       }
       className={
-        "relative h-full px-3 inline-flex items-center font-mono text-[11px] " +
+        "relative h-full px-4 inline-flex items-center font-mono text-body " +
         "leading-none cursor-pointer select-none " +
         "transition-colors duration-[80ms] " +
         "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover " +
@@ -148,7 +148,7 @@ function TabButton({ tab, label, panelOpen, activeTab }: TabButtonProps) {
       {isActive && (
         <span
           aria-hidden
-          className="absolute left-1.5 right-1.5 top-0 h-px"
+          className="absolute left-2 right-2 top-0 h-px"
           style={{ background: "var(--ring)" }}
         />
       )}
@@ -199,7 +199,7 @@ export default function ValidationStatusBar() {
   return (
     <div
       className="flex flex-row items-stretch justify-between border-t bg-chrome shrink-0 select-none"
-      style={{ height: 22 }}
+      style={{ height: 28 }}
       aria-label="Status bar"
     >
       {/* Left cluster — severity segments */}
@@ -230,12 +230,12 @@ export default function ValidationStatusBar() {
             aria-label="Close bottom panel"
             title="Close panel (Ctrl+`)"
             className={
-              "h-full px-2 inline-flex items-center cursor-pointer text-foreground/65 " +
+              "h-full px-3 inline-flex items-center cursor-pointer text-foreground/65 " +
               "hover:text-foreground transition-colors duration-[80ms] " +
               "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover"
             }
           >
-            <ChevronDown className="h-3 w-3" strokeWidth={1.5} />
+            <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
         )}
       </div>

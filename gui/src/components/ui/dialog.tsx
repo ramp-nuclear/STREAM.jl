@@ -74,13 +74,18 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  overlayClassName,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** Override the default `bg-foreground/40` scrim. Used by surfaces that
+   *  shouldn't dim the whole canvas — e.g. CommandPalette, which wants a
+   *  near-transparent overlay (VSCode/Cursor pattern). */
+  overlayClassName?: string
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
