@@ -393,6 +393,221 @@ will read differently the first time they're seen:
   `toastOptions.classNames`. Custom-styled toasts in consumer code may
   need to be re-verified.
 
+### ValidationPanel + ValidationStatusBar (locked — Phase 72, 2026-05-22)
+
+The validator UX uses a **compiler-output silhouette**: every result row
+reads like a `tsc TS2304:` or `eslint no-unused-vars:` line, not like a
+SaaS alert card.
+
+**Row layout (three columns, fixed pixel widths):**
+
+| Column | Width | Style |
+|---|---|---|
+| Severity prefix | 32 px (resizable, min 28 / max 64) | Mono 11 px, color-tokenized via `--destructive` / `--color-warning` / `--color-info`. Labels: `ERR`, `WRN`, `INF`. **No Lucide AlertCircle/Triangle/Info icons.** |
+| Validator id    | 200 px (resizable, min 80 / max 480)  | Mono 13 px, `foreground/85`, `truncate` with native `title` tooltip. **Leads the row** — Linear-issue-id pattern; the engineer reads the rule identity first. |
+| Message         | fluid remainder                       | Sans 13 px, `foreground`, `truncate` with native `title`. |
+
+Pinned in absolute pixel widths (not `ch` units): the column-header row uses
+mono 10 px and data rows use mono+sans 11–13 px, so `ch` would resolve
+differently in each grid container and the header would drift left of the
+data. Px keeps them locked.
+
+**Row vocabulary that's banned:**
+
+- No Lucide alert icons in any cell. Severity is conveyed by the mono
+  prefix + color token alone.
+- No FixAction buttons. The `FixAction` discriminated union and the
+  `fixAction?` field on `ValidationResult` were deleted at the type level
+  Phase 72. Validation is a recognize-and-locate surface, not a remediation
+  surface (`feedback_no_validator_fixaction_buttons`).
+- No `text-yellow-500` / `text-blue-500` raw Tailwind for severity colors.
+  Severity flows through `--destructive` / `--color-warning` / `--color-info`
+  tokens only.
+
+**Panel header (two sub-rows above the data):**
+
+1. Controls row — left side: `{N} issues` count in mono 11 px. Right side
+   in this order: severity filter pills (`ERR 12 WRN 4 INF 2`) + sliders
+   icon that opens a Group-by popover.
+2. Column labels row — `SEV / RULE / MESSAGE` in mono 10 px uppercase
+   `foreground/45`. Hairline `--border` underneath.
+
+The header has TWO draggable column-resize handles (between SEV/RULE and
+RULE/MESSAGE), 6 px wide hit-zones with a 1 px `--ring` visible on hover
+and `col-resize` cursor. Drag updates BOTH the column-header row and
+every data row via a shared `gridTemplate` state.
+
+**Filter pills** replace the prior `12 issues · ERR only · clear` inline
+header. Click a pill to toggle its severity filter. Pills are
+color-tokenized text without chip backgrounds (flat type with hover
+background lift to `--popover`). Aria-label format: `Filter to ${severity}`
+(or with ` (active)` suffix when active).
+
+**Group-by popover** (sliders icon): single-select Toggle Group with
+`None` / `Rule` / `Component`. Per-session local state, no persistence.
+When grouped, identical-key rows collapse into expandable parent rows
+reading `▸ N × rule` or `▸ N × node`. Parent's severity-glyph color
+mirrors the highest-severity child.
+
+**Selected-row indicator:** the most-recently-clicked row gets a 2 px
+`--ring` left-edge stripe + a `bg-popover` row tint. Clears on filter
+change or canvas click. Connects visually to the active loop-trace on
+the canvas (the trace persists alongside the selected row).
+
+**Empty state:** the literal string `No issues.` in mono 13 px,
+`foreground/65`, left-aligned in the panel body. NOT centered with an
+icon and consumer-SaaS framing.
+
+### Unified bottom-chrome footer (locked — Phase 72, 2026-05-22)
+
+A single 22 px strip pinned to the absolute bottom of the window is the
+source of truth for `activeBottomTab`. Replaces the prior 14 px BottomPanel
+stub strip + 22 px ValidationStatusBar pair (was 36 px of stacked chrome
+with no content when the panel was closed).
+
+**Layout:**
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  ERR 12   WRN 4   INF 2          Code  Validation        ⌄       │   ← 22 px footer (always)
+├──────────────────────────────────────────────────────────────────┤
+│  [ BottomPanel body when open ]                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+- Left cluster — severity count segments. `ERR` / `WRN` / `INF` mono labels
+  + tabular-nums count. Click any segment → opens panel on Validation tab
+  with that severity filter pre-applied via `stream:validation-filter`.
+  Zero counts dim to ~55% opacity. 0 → N pulse on the error segment
+  preserved.
+- Right cluster — `Code` / `Validation` tab buttons. Click an inactive tab
+  while panel closed → opens on that tab. Click an inactive tab while
+  open → switches without closing. Click the **active** tab while open →
+  closes the panel. Active-tab indicator: 1 px `--ring` hairline at the
+  tab's top edge. Plus an explicit `⌄` close chevron at the far right,
+  visible only when the panel is open.
+- The duplicate `Code | Validation` Tabs that used to live in BottomPanel's
+  header are gone. BottomPanel header keeps Copy / Export buttons only.
+
+**The Bottom-Chrome-Is-The-Tab-Source Rule.** Anything that needs to set
+the active bottom tab dispatches through `setActiveBottomTab` — including
+the right-click "Show generated Julia code" path, which had been opening
+the panel without setting `activeBottomTab: "code"` (so users on the
+Validation tab silently stayed there). Fixed by `useShowCodeFor.ts`.
+
+### Loop-highlight system (locked — Phase 72, 2026-05-22)
+
+Loop-scoped validation results (gravity sum, future loop-scoped rules)
+highlight the entire offending cycle on the canvas via a **marching-ants
+flow trace**.
+
+**The Trace-Conveys-Loop-Direction Rule.** Animated dashes on edges move
+in the cycle's flow direction (matching the original source→target
+direction xyflow paths use). This is functional motion: it identifies
+the loop AS a cycle and conveys flow direction simultaneously.
+Per PRODUCT.md "no decorative motion" but motion-that-conveys-state is
+in-bounds.
+
+**CSS** (in `index.css`):
+
+- `.validation-flash-persistent` — node-level. Steady-state pulse animation
+  (1.5 s ease-in-out infinite), outline 2 px solid using
+  `--validation-trace-color` (inline-set per severity).
+- `.validation-flow-trace` — edge-level. Targets the inner `.react-flow__edge-path`.
+  Sets `stroke: var(--validation-trace-color)`, `stroke-width: 2.5`,
+  `stroke-dasharray: 6 4`, `animation: flow-trace-march 1.5s linear infinite`
+  where the keyframe moves `stroke-dashoffset` from 0 to −10 (negative shifts
+  dashes toward the path's target end).
+- `prefers-reduced-motion: reduce` → animations stop. Dashed pattern stays
+  visible so the user can still see which edges are in the loop.
+
+**Severity → color mapping:**
+
+| Severity | `--validation-trace-color` |
+|---|---|
+| error    | `var(--destructive)` |
+| warning  | `var(--color-warning)` |
+| info     | `var(--color-info)` |
+
+**CanvasPanel handler:** when `stream:focus-validation-result` arrives with
+≥2 node targets, treat as a loop trace — `fitBounds` to enclose, apply
+`.validation-flash-persistent` to every node target + `.validation-flow-trace`
+to every edge target. The trace **persists** until any `mousedown` inside
+the ReactFlow viewport or a new focus event replaces it. Single-node-target
+results keep the existing 600 ms one-shot `.validation-flash` navigation
+behavior.
+
+### Smart port-side convention (locked — Phase 72, 2026-05-22)
+
+Replaces the original Phase 64 local-geometry algorithm in
+`gui/src/lib/autoflip.ts`. The new algorithm is **convention-driven with
+local-geometry refinement**.
+
+1. **Dominant flow axis** is computed from the spread of NODE CENTERS
+   (not full bboxes) with a **1.5× vertical bias**:
+   `flowAxis = (spreadY × 1.5 ≥ spreadX) ? vertical : horizontal`.
+   Hydraulic components are wide and short (~280 × 80 px); full-bbox
+   spread misclassifies clearly vertical layouts. Center spread + bias
+   matches the gravity-driven nature of hydraulic loops.
+
+2. **Per-port local preference** aggregates `(dx, dy)` across ALL edges
+   wired to that port (not first-edge-only). A pump.port_out feeding two
+   consumers correctly resolves to "down" instead of arbitrarily picking
+   left or right.
+
+3. **Axis snap.** If a connected port's preference is perpendicular to the
+   flow axis, snap to the natural side along the axis: port_in → TOP/LEFT,
+   port_out → BOTTOM/RIGHT. **Disconnected ports are exempt** — D-11
+   contract (registry-default for isolated ports) stays intact.
+
+4. **Same-side collisions** resolve via convention: both ports go to their
+   natural sides on the flow axis. The "tiebreak port_out wins" rule is
+   gone; the convention wins on both-connected. When only one port is
+   connected and the other is disconnected, the connected port keeps its
+   preference and the disconnected one moves to the **opposite** side.
+
+5. **Two ports never share a side.** Convention or opposite-displacement
+   guarantees one-port-per-side. xyflow auto-spread of co-side handles is
+   no longer relied on.
+
+The Layer-Of-Flow-Convention Rule: even when local geometry would place
+a port on a perpendicular side, the axis-snap forces the layout to read
+as a clean "in from above, out below" (vertical) or "in from left, out
+right" (horizontal) silhouette. Mixed-axis topologies still resolve
+sanely because perpendicular preferences only snap when they conflict
+with the flow axis.
+
+### Obstacle-avoiding edge router (locked — Phase 72, 2026-05-22)
+
+`gui/src/components/HydraulicEdge.tsx` consumes
+`gui/src/lib/edgeRouting.ts`. xyflow's built-in `getSmoothStepPath`
+treats edges as point-to-point and has zero awareness of node bboxes —
+that produced the canonical "edge cuts through every node in the way"
+bug.
+
+**Router contract** (`computeRoutePoints({source, target, obstacles, ...})`):
+
+1. Compute 5 candidate orthogonal paths: naive Z, plus wraps via the
+   right / left / top / bottom lane. Each lane sits at
+   `outermost-bbox-edge ± laneMargin` (default 32 px).
+2. Wrap paths use **cluster-edge pivots**, not the port's own Y/X. For
+   a T-shape topology where the port sits inside the cluster, the wrap
+   extends from the port in its outward direction past the cluster bbox,
+   travels along a side lane (outside all bboxes), and approaches target
+   via the cluster-edge lane on the target's side.
+3. Source and target nodes ARE included in `obstacles`. The path must
+   stay outside their bodies, not just other nodes'.
+4. Ranking priority: `(crossings, turns, length)`. The router always
+   picks a zero-crossing candidate if any exists.
+
+**Visual:** rounded corners (~6 px) via quadratic Bezier joints at each
+turn. Matches the prior smoothstep visual style.
+
+**The Edges-Never-Through-Bodies Rule.** Whatever the candidate cost,
+zero bbox crossings is a hard invariant. If a future topology produces
+no clean candidate, the candidate set is expanded (more lane variants,
+multi-step detours), not relaxed.
+
 **Held open — per-surface decisions still queued**
 
 The non-`ui/` consumer surfaces below remain provisional. Each will be
@@ -401,22 +616,19 @@ decided in its own `/impeccable shape <surface>` session (see
 
 **Application chrome**
 - `CustomTitlebar` + `WindowControls`
-- `BottomPanel` (collapsed-state stub strip + expanded body)
 - `SidebarPanel`
 - `ResponsiveTabsList`
 - `WelcomeOverlay` (will be replaced by `/impeccable shape first-run`)
 
 **Canvas + signature surfaces still pending**
-- `BCEdge`, `HydraulicEdge` (typed edges + dashed BC edge variant) —
-  `/impeccable shape edges-and-code-preview`
-- Pinned-node halo + hover-ring color tokenization — same session
+- `BCEdge` (dashed BC edge variant) — HydraulicEdge already done
+- Pinned-node halo + hover-ring color tokenization
 
 **Workflow surfaces**
 - `CommandPalette` (cmdk-based)
-- `ValidationPanel` + `ValidationStatusBar` — `/impeccable shape ValidationPanel`
 - `ToolboxPanel` + `ToolboxItem`
 - `PresetsPanel` + `PresetRow`
-- `CodePreview` — `/impeccable shape edges-and-code-preview`
+- `CodePreview`
 - Property forms in the sidebar (`SidebarPanel/*` subtree)
 - BCs tab layout (Phase 65 deferred layout-fit issues land here)
 

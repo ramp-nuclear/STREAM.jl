@@ -39,21 +39,23 @@ capture the final tokens into a proper frontmatter + sidecar.
 |---|---|---|---|
 | Canvas + StreamNode + Layer accents + 3-tier depth + grid background | ✅ | 5 initial + 3 visual-bug fixes + cleanup (see Decision log below) | §2 fully locked; §3 type scale locked, font/direction TBD; §4 depth approach locked, shadow vocab TBD; §5 StreamNode locked |
 | shadcn primitive layer (Button / Input / Dialog / Tabs / etc.) | ✅ | 6 cluster commits (tokens, Button, Input, Surface, Menu, Navigation) — see Decision log | §2 --ring/--border/--popover/--shadow-dialog/--border-hover locked; §3 type-scale tokens exposed; §4 shadow vocab locked (single tier); §5 primitive layer fully locked |
+| ValidationPanel + ValidationStatusBar + unified bottom-chrome footer | ✅ | 1 cluster commit (validator UX redesign) — see Decision log | §5 validator vocabulary, filter pills, group-by, resizable columns, selected-row indicator, status-bar tabs locked |
+| Loop-highlight system + validator targeting rewrite (gravity_sum_per_loop) | ✅ | 1 cluster commit — see Decision log | §4 marching-ants flow trace motion; §5 .validation-flow-trace + .validation-flash-persistent + loop targeting contract locked |
+| HydraulicEdge — obstacle-avoiding orthogonal router (Phase B) + smart port-side convention (Phase A v2) | ✅ | 1 cluster commit — see Decision log | §5 router contract + Phase 72 port-side convention (axis-snap, vertical bias, no-share-side invariant) locked |
 
-### Queued (Session 2)
+### Queued (next session — Session 3)
 
 | Surface | Status | Audit / critique reference |
 |---|---|---|
-| ValidationPanel + ValidationStatusBar (full visual rebuild; remove FixAction per memory) | ⬜ | Audit P0-2 · Critique P1-3 · `project_phase72_validator_ui_revisit` · `feedback_no_validator_fixaction_buttons` |
 | First-run empty state (replaces WelcomeOverlay; engineering-voice) | ⬜ | Audit P0-1 · Critique P1-1 |
 | Help system (Radix Tooltip primitive layer + `?` shortcut overview card) | ⬜ | Critique P0-2 |
 
-### Queued (Session 3)
+### Queued (Session 4+)
 
 | Surface | Status | Notes |
 |---|---|---|
-| BCEdge + HydraulicEdge + CodePreview (tokenize remaining inline hex; finalize edge visual language) | ⬜ | Audit P1-4..7 · resolves sky-300/400 placeholders + `#0d1117` GitHub-dark hardcode |
-| `/impeccable harden gui/src/` (cross-cutting: `prefers-reduced-motion`, div-as-button conversions, WCAG AA contrast pass) | ⬜ | Audit P0-3 · Critique Sam persona |
+| BCEdge tokenization + CodePreview (tokenize remaining inline hex; finalize BC dashed-edge visual language) | ⬜ | HydraulicEdge already done (Phase B router); BCEdge sky-300/400 placeholders still pending. CodePreview `#0d1117` GitHub-dark hardcode also pending. |
+| `/impeccable harden gui/src/` (cross-cutting: `prefers-reduced-motion`, div-as-button conversions, WCAG AA contrast pass) | ⬜ | Audit P0-3 · Critique Sam persona. Note: loop-highlight motion already has `prefers-reduced-motion` fallback. |
 | `/impeccable clarify gui/src/` (copy pass: em dashes, consumer-SaaS framing in PresetsPanel, empty-state copy unification) | ⬜ | Audit P2-3 · Critique minor observations |
 
 ### Queued (Session 4 — phase close)
@@ -165,6 +167,173 @@ ordered corrections shipped on top:
 | `3c2961b` | Outline + outline-offset ALSO moved to inline style — the prior commit had left outline on the class, and the stale `.stream-node--code-pinned` `outline: 3px solid sky-300` rule was still painting through |
 | `[cleanup]` | Long P-series comment blocks tightened; dead `.stream-node-ring-rest` / `.stream-node-ring-selected` CSS classes removed; `--node-ring-rest` consumed via inline `var()` for theme-awareness |
 
+### ValidationPanel + ValidationStatusBar + unified bottom-chrome footer (locked 2026-05-22)
+
+Full visual rebuild of the validator UX plus a chrome-topology refactor. The
+data layer (validator results, severity sort, click-to-focus dispatch) was
+already correct; this pass replaces the rendering + spatial layer wholesale
+and merges the bottom-strip / panel-toggle chrome into a single 22 px
+footer.
+
+**Cluster commit (1):** `feat(72-validation): redesign ValidationPanel + unified bottom-chrome footer`
+
+**Key commitments** (full detail in `DESIGN.md` §5):
+
+- Row vocabulary: `ERR` / `WRN` / `INF` mono prefix, color-tokenized via
+  `--destructive` / `--color-warning` / `--color-info`. No Lucide
+  AlertCircle/Triangle/Info icons anywhere.
+- Three-column row grid (absolute pixel widths, not `ch`): 32 px severity,
+  200 px validator-id, fluid message. Pinned in px so the column-label row
+  (10 px mono) and data rows (mixed 11/13 px) resolve identical columns.
+- Validator ID leads the row (Linear-style rule-id pattern). The trailing
+  10 px muted chip is gone.
+- Resizable columns via drag handles between SEV/RULE and RULE/MESSAGE.
+- Selected-row indicator: 2 px `--ring` left edge + `bg-popover` tint;
+  clears on filter change or canvas click.
+- Filter pills (ERR/WRN/INF) + group-by popover (None/Rule/Component) at the
+  right of the panel header. Replace the prior banner-style `clear` flow.
+- FixAction discriminated union deleted from `ValidationResult`. Rule
+  emissions stopped emitting `fixAction:` in Phase 71 UAT; this session
+  removed the type and the render branch.
+
+**Unified bottom-chrome footer:**
+
+- One 22 px always-present strip replaces the prior 14 px stub strip +
+  22 px status bar pair (was 36 px of stacked chrome with no content when
+  the panel was closed).
+- Left cluster: severity segments `ERR 12 WRN 4 INF 2`. Click filters.
+- Right cluster: `Code | Validation` tab buttons + explicit close chevron
+  (visible only when panel open). Click an inactive tab → opens panel on
+  that tab. Click active tab → closes. Active-tab indicator: 1 px `--ring`
+  hairline at the tab's top edge.
+- Source of truth for `activeBottomTab` moves from BottomPanel's header
+  Tabs to the status-bar tabs. BottomPanel header keeps Copy / Export only.
+
+**Right-click "Show generated Julia code" routing fix:**
+
+- `useShowCodeFor.ts` now sets `activeBottomTab: "code"` in addition to
+  opening the panel — the prior code only opened the panel without
+  switching tabs, so right-clicking while on the Validation tab silently
+  left the user on Validation.
+
+**Tests:** 1038 / 1038 pass. tsc baseline 10 (unchanged).
+
+### Loop-highlight system + validator targeting rewrite (locked 2026-05-22)
+
+Reworked `gravity_sum_per_loop` to detect simple cycles correctly (not
+SCCs), reclassified severities, and added a canvas-side loop-trace
+visualization that the user can read at a glance.
+
+**Cluster commit (1):** `feat(72-validation): loop-highlight system + gravity rule rewrite`
+
+**Severity reclassification** (matches Phase 72 severity audit):
+
+| Rule | Before | After | Why |
+|---|---|---|---|
+| `length_match` | error | warning | Code compiles, solver runs; physically inconsistent but not a compile-fail. |
+| `gravity_sum_per_loop` | error | warning | Same — solver runs, the steady state is non-physical. |
+
+**gravity_sum_per_loop algorithmic rewrite:**
+
+- New `findAllSimpleCycles` in `lib/validation/loopTraversal.ts` —
+  enumerates every simple directed cycle, rooted at the lowest node id to
+  avoid duplicates. Replaces `findHydraulicLoops` (SCC-based) for this
+  rule's needs. `loopClosure.ts` still uses the SCC traversal for its
+  "any cycle?" check.
+- Per-node ΣH walk uses BOTH entry-port and exit-port (not just exit) to
+  handle "bounce" cases where the cycle visits a node via the same port
+  it leaves on.
+- Targets emitted per result are SCOPED to a single broken cycle: nodes
+  and edges from THAT cycle only. Other cycles in the same SCC are
+  unimplicated.
+- Height-bearing components extended: Gravity (`H`) + Channel-family
+  (`g × geometry.L` when `g != 0`). Matches Python STREAM
+  `check_gravity_mismatch` convention (sum pressure drops per
+  hydrostatic-bearing component around each loop).
+- Project gravity cascade: `addNode` in `useStore.ts` initializes any new
+  component's top-level `g` parameter from `modelOptions.g_default`
+  (default Earth's 9.80665 m/s²) instead of the registry literal.
+- Σ(g·h) check (not Σh): solver-relevant invariant is
+  `ρ × g × h` integrated around a loop. We sum `g × h` per component
+  using each component's own `g` (Channel uses its parameter; Gravity
+  uses hardcoded 9.80665 matching the Julia STREAM `Gravity()` equation).
+- Tight tolerance kept: `|Σ(g·h)| < 1e-5 m²/s²` ≈ 1 µm of effective
+  height. A residual 1 mm would be a constant pressure source for the
+  solver — physically wrong.
+- Description format adaptive: `Loop ΣH = +3.40 mm (tol 1.02 µm)`.
+  Units adapt by magnitude (m / mm / µm). Tolerance is disclosed inline.
+
+**Canvas-side loop visualization:**
+
+- New `.validation-flow-trace` CSS class with marching-ants animation
+  (1.5 s linear infinite stroke-dashoffset). Severity-tinted via
+  `--validation-trace-color` custom property. Reduced-motion fallback
+  preserves the dashed pattern but stops the marching.
+- New `.validation-flash-persistent` for steady-pulse node highlight
+  (1.5 s infinite, color-mix at 40% transparency). Also reduced-motion
+  aware.
+- CanvasPanel handler detects multi-node-target results (≥2 nodes) and
+  treats them as a TRACE: fitBounds to enclose all, apply persistent
+  flash to nodes + flow-trace to edges. Single-node results keep the
+  existing 600 ms one-shot navigation flash.
+- Persistence: trace stays visible until any `mousedown` inside the
+  ReactFlow viewport (matches the user's "stay until I look at something
+  else" mental model).
+
+**Tests:** 1047 / 1047 pass. tsc baseline 10.
+
+### HydraulicEdge router + smart port-side convention (locked 2026-05-22)
+
+Phase A (smart port-side assignment) and Phase B (obstacle-avoiding edge
+router) shipped together. Built convention-driven port placement on top
+of the existing Phase 64 local-geometry algorithm, then added an
+orthogonal router that avoids node bodies.
+
+**Cluster commit (1):** `feat(72-canvas): smart port placement + obstacle-avoiding edge router`
+
+**Phase A — port-side convention** (`lib/autoflip.ts`):
+
+- Aggregate-across-edges: a port with multiple connections now sums all
+  neighbor vectors instead of using the first edge only.
+- Dominant flow axis derived from cluster spread of NODE CENTERS
+  (not full bboxes). Hydraulic components are wide and short; including
+  widths would misclassify a clearly vertical layout as horizontal.
+- 1.5× vertical bias: `flowAxis = (spreadY × 1.5 ≥ spreadX) ? vertical : horizontal`.
+  Hydraulic loops are gravity-driven; the default leans vertical.
+- Axis snap: a port's perpendicular-to-axis preference snaps to its
+  "natural" side (port_in TOP/LEFT, port_out BOTTOM/RIGHT for vertical/
+  horizontal). On-axis preferences are kept. Disconnected ports are
+  EXEMPT from snap so D-11 (registry-default for isolated ports) stays
+  intact.
+- Collision resolution: ports never share a side. When both ports'
+  preferences collide, both ports go to their natural sides (convention
+  wins on both-connected). When only one port is connected, the
+  connected port keeps its preference; the disconnected one moves to
+  the opposite side.
+
+**Phase B — obstacle-avoiding edge router** (`lib/edgeRouting.ts` + `HydraulicEdge.tsx`):
+
+- 5 candidate paths per edge: naive Z-path, plus wraps via right / left /
+  top / bottom lanes. Each lane sits at `outermost-bbox-edge ± laneMargin`.
+- Source and target nodes are included as obstacles. The path is forced
+  outside both bodies, not just other nodes'.
+- Wrap pivots use CLUSTER-EDGE lanes (not port's own Y/X). For a T-shape
+  topology where source/target sit inside the cluster, the wrap path
+  extends from the source in its outward direction past the cluster
+  bbox, travels along a side lane, and approaches target from outside.
+  Guarantees zero crossings.
+- Ranking: `(crossings, turns, length)` priority. Always picks the path
+  with zero crossings if any candidate is clean.
+- Rounded corners (~6 px) via quadratic Bezier joints — matches the
+  prior smoothstep visual.
+
+**Tests:** 1049 / 1049 pass. New tests:
+- `edgeRouting.test.ts` — 9 tests, including a T-shape regression test
+  matching `imp_bad_edges.png` topology (verifies zero crossings).
+- `autoflip.test.ts` — 23 tests, including convention-driven layouts
+  for vertical 2-node loops and the off-axis-neighbor case from
+  `imp_edge_bug2.png`.
+
 ### Lessons (worth re-reading at the start of the next session)
 
 1. **The validation-flash bug took 3 sub-fixes** (offset → border-radius →
@@ -223,6 +392,42 @@ ordered corrections shipped on top:
    where the doctrine "tint every neutral toward hue 254" produces an
    eye-amplified blue cast, prefer plain hex (`#6e6e6e`) over chroma-0
    OKLCH. The doctrine carve-out is documented in DESIGN.md §5.
+8. **Auto-fix buttons in inspection panels violate the engineer's
+   "tell-me-what-broke" expectation.** The original Phase 71 FixAction
+   union (lossless-sync / value-transfer-picker / navigation-only) was
+   removed wholesale in this session: type, render branch, emission. The
+   panel is a recognize-and-locate surface, not a remediation surface.
+9. **SCC-based cycle detection is the wrong tool for per-loop physics.**
+   A graph with two cycles sharing one return edge has ONE SCC but TWO
+   independent cycles. Use `findAllSimpleCycles` (Johnson-style DFS,
+   rooted at lowest node id) when the rule needs to reason about each
+   cycle independently — gravity sum is the canonical example.
+10. **For per-cycle traversal physics, check entry-port AND exit-port at
+    each node visit.** A cycle can enter and exit a node via the same
+    port (parallel-paths topology); that's a "bounce" with zero
+    contribution to ΣH, not a traversal contributing ±H. Symmetric
+    in vs out is required for correctness.
+11. **Hydraulic components are wide and short** (~280 × 80 px). Using the
+    full bbox (including widths) for cluster-spread → axis-decision
+    classifies clearly vertical layouts as horizontal because each row
+    contributes node-width to X spread but only node-height to Y spread.
+    Use NODE CENTERS, and apply a 1.5× vertical bias on top.
+12. **xyflow's smoothstep / step / bezier edge routers have zero
+    awareness of other nodes' bboxes.** A long edge happily cuts through
+    every node body in its way. Custom edge components with explicit
+    obstacle-avoidance routing are mandatory once the network has more
+    than a handful of nodes.
+13. **For obstacle-avoiding wrap paths, pivot points must be at
+    cluster-edge lanes, not the source port's own Y/X.** If the source
+    port sits inside the cluster (T-shape topology), using `sourceY` as
+    the horizontal-pivot Y produces a segment that crosses other nodes.
+    The pivot must extend along the source's outward direction past the
+    cluster bbox first.
+14. **Disconnected ports should be exempt from axis-snap.** When an
+    isolated node has no edges, the D-11 contract says "use the
+    registry-declared side." Auto-snapping disconnected ports to the
+    flow-axis natural side broke that contract for any isolated node in
+    a vertically-laid-out canvas.
 
 ## Re-entry instructions for the next session
 
@@ -232,15 +437,17 @@ Open a new Claude Code session, then say something like:
 > `.planning/phases/72-gui-redesign/AUDIT.md`,
 > `.planning/phases/72-gui-redesign/PROGRESS.md`, and the latest critique
 > snapshot in `.impeccable/critique/`. Then start `/impeccable shape
-> ValidationPanel` (or whatever surface is next per PROGRESS.md).
+> first-run` (or whatever surface is next per PROGRESS.md).
 
 The new session will load doctrine + queue + locked values + recent
 lessons in 1–2 minutes and resume cleanly.
 
-**Next surface per queue:** `/impeccable shape ValidationPanel` (Session 2,
-first item — Audit P0-2, Critique P1-3, `project_phase72_validator_ui_revisit`,
-`feedback_no_validator_fixaction_buttons`). The data layer is correct;
-rebuild the visual + spatial layer from scratch.
+**Next surface per queue:** `/impeccable shape first-run` — the empty-state
+that replaces `WelcomeOverlay`. Audit P0-1 (textbook consumer-SaaS empty
+state), Critique P1-1 (working-memory overload on first render). The
+"to get started" copy is verbatim a PRODUCT.md anti-reference and the
+recent-file rows are div-onClick a11y violations. Engineering-voice
+empty canvas, no shadow-lg rounded card.
 
 **Related memories** (loaded automatically — don't need to re-read):
 
