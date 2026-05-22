@@ -92,7 +92,7 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   // B3 guard: useReactFlow is called ONCE at the component top level — never
   // inside callbacks or useEffect. setNodes/setEdges/setCenter/getNode are
   // stable identities per @xyflow/react v12 docs.
-  const { screenToFlowPosition, setNodes, setEdges, setCenter, getNode } = useReactFlow();
+  const { screenToFlowPosition, setNodes, setEdges, setCenter, getNode, fitBounds } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Phase 65 Plan 03: right-click pan-vs-context-menu disambiguation (D-12).
@@ -387,58 +387,138 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // setNodes/setEdges from useReactFlow are stable identities — safe to omit from deps
 
-  // Phase 71 Plan 11 — D-05 click-to-focus: canvas pans to affected nodes + flash ring.
-  // Listens for 'stream:focus-validation-result' dispatched by ValidationPanel (Plan 09)
-  // when the user clicks a result row.
+  // Click-to-focus from ValidationPanel rows. Two modes:
   //
-  // Flash mechanism: CustomEvent 'stream:node-flash' (simpler than a new store slice).
-  // CanvasPanel dispatches it with the collected nodeIds; a second listener in THIS
-  // same useEffect applies .validation-flash to the matching ReactFlow node DOM elements
-  // via data-id attribute (ReactFlow renders nodes with data-id) and removes it after
-  // 700ms. No new store slice needed (plan Task 3 "PICK the simpler alternative").
+  //   SINGLE-NODE result (1 node target) → pan to that node and play the
+  //   600 ms one-shot .validation-flash on it. Existing behavior.
+  //
+  //   MULTI-NODE result (≥2 node targets, e.g. gravity_sum_per_loop) → treat
+  //   as a loop/subgraph TRACE:
+  //     - fitBounds to enclose every node target
+  //     - apply .validation-flash-persistent to every node target (steady
+  //       severity-tinted pulse, no auto-clear)
+  //     - apply .validation-flow-trace to every edge target (marching-ants
+  //       flow direction)
+  //     - persist until the user clicks anywhere on the canvas OR a different
+  //       result row replaces the trace
+  //
+  // Severity → trace color via inline `--validation-trace-color`:
+  //   error → --destructive, warning → --color-warning, info → --color-info.
   useEffect(() => {
+    // Module-scoped active trace state — cleared on canvas click or replaced
+    // by a new focus event. Stored on window so the click-clear listener
+    // (also installed in this effect) sees the same state without React deps.
+    let activeTrace: { nodeIds: string[]; edgeIds: string[] } | null = null;
+
+    function clearActiveTrace() {
+      if (!activeTrace) return;
+      for (const nodeId of activeTrace.nodeIds) {
+        const el = document.querySelector<HTMLElement>(`[data-stream-node-id="${nodeId}"]`);
+        if (!el) continue;
+        el.classList.remove("validation-flash-persistent");
+        el.style.removeProperty("--validation-trace-color");
+      }
+      for (const edgeId of activeTrace.edgeIds) {
+        const el = document.querySelector<HTMLElement>(
+          `.react-flow__edge[data-id="${edgeId}"]`,
+        );
+        if (!el) continue;
+        el.classList.remove("validation-flow-trace");
+        el.style.removeProperty("--validation-trace-color");
+      }
+      activeTrace = null;
+    }
+
+    function applyTrace(
+      nodeIds: string[],
+      edgeIds: string[],
+      severity: "error" | "warning" | "info",
+    ) {
+      const colorVar =
+        severity === "error"
+          ? "var(--destructive)"
+          : severity === "info"
+            ? "var(--color-info)"
+            : "var(--color-warning)";
+
+      for (const nodeId of nodeIds) {
+        const el = document.querySelector<HTMLElement>(`[data-stream-node-id="${nodeId}"]`);
+        if (!el) continue;
+        el.style.setProperty("--validation-trace-color", colorVar);
+        el.classList.add("validation-flash-persistent");
+      }
+      for (const edgeId of edgeIds) {
+        const el = document.querySelector<HTMLElement>(
+          `.react-flow__edge[data-id="${edgeId}"]`,
+        );
+        if (!el) continue;
+        el.style.setProperty("--validation-trace-color", colorVar);
+        el.classList.add("validation-flow-trace");
+      }
+      activeTrace = { nodeIds, edgeIds };
+    }
+
     const onFocusResult = (e: Event) => {
       const ce = e as CustomEvent<{ result: import("@/lib/validation/types").ValidationResult }>;
       const result = ce.detail?.result;
       if (!result) return;
 
-      // Collect nodeIds from node/port targets.
       const nodeIds: string[] = [];
+      const edgeIds: string[] = [];
       for (const target of result.targets) {
         if (target.kind === "node" || target.kind === "port") {
           if (!nodeIds.includes(target.nodeId)) nodeIds.push(target.nodeId);
+        } else if (target.kind === "edge") {
+          if (!edgeIds.includes(target.edgeId)) edgeIds.push(target.edgeId);
         }
       }
 
-      // If there are node targets, compute the bbox center and call setCenter.
-      if (nodeIds.length > 0) {
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        let validCount = 0;
-        for (const nodeId of nodeIds) {
-          const n = getNode(nodeId);
-          if (!n) continue;
-          const x = n.position.x;
-          const y = n.position.y;
-          const w = (n as { measured?: { width?: number } }).measured?.width ?? 120;
-          const h = (n as { measured?: { height?: number } }).measured?.height ?? 40;
-          minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x + w);
-          maxY = Math.max(maxY, y + h);
-          validCount++;
-        }
-        if (validCount > 0) {
-          const cx = (minX + maxX) / 2;
-          const cy = (minY + maxY) / 2;
-          // Use current zoom so the user's zoom level is preserved.
-          const { getZoom } = useStore.getState() as unknown as Record<string, unknown>;
-          void getZoom; // getZoom lives on the ReactFlow instance, not the store
-          setCenter(cx, cy, { duration: 300 });
-        }
+      // Always clear any previous trace before starting a new one.
+      clearActiveTrace();
+
+      if (nodeIds.length === 0) return;
+
+      // Compute bounding box from node positions.
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let validCount = 0;
+      for (const nodeId of nodeIds) {
+        const n = getNode(nodeId);
+        if (!n) continue;
+        const x = n.position.x;
+        const y = n.position.y;
+        const w = (n as { measured?: { width?: number } }).measured?.width ?? 120;
+        const h = (n as { measured?: { height?: number } }).measured?.height ?? 40;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + w);
+        maxY = Math.max(maxY, y + h);
+        validCount++;
       }
 
-      // Flash the affected node DOM elements via 'stream:node-flash'.
-      if (nodeIds.length > 0) {
+      if (validCount === 0) return;
+
+      const isMulti = nodeIds.length >= 2;
+
+      if (isMulti) {
+        // Multi-target: zoom-to-fit the entire trace + persistent highlight.
+        const pad = 80;
+        fitBounds(
+          {
+            x: minX - pad,
+            y: minY - pad,
+            width: maxX - minX + 2 * pad,
+            height: maxY - minY + 2 * pad,
+          },
+          { duration: 300 },
+        );
+        // RAF so the xyflow nodes have measured / rendered before we attach
+        // classes (otherwise the data-id elements may not yet exist).
+        requestAnimationFrame(() => applyTrace(nodeIds, edgeIds, result.severity));
+      } else {
+        // Single-target: preserve existing pan + one-shot flash behavior.
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+        setCenter(cx, cy, { duration: 300 });
         window.dispatchEvent(
           new CustomEvent("stream:node-flash", { detail: { nodeIds } }),
         );
@@ -449,12 +529,6 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       const ce = e as CustomEvent<{ nodeIds: string[] }>;
       const nodeIds = ce.detail?.nodeIds ?? [];
       for (const nodeId of nodeIds) {
-        // Phase 72 — target StreamNode's `data-stream-node-id` (its
-        // rounded outer div), NOT xyflow's `data-id` wrapper. The
-        // persistent error outline lives on the StreamNode element;
-        // if the flash class lives on the parent xyflow wrapper
-        // instead, the persistent outline paints OVER the flash and
-        // the user sees nothing happen on already-errored nodes.
         const el = document.querySelector(`[data-stream-node-id="${nodeId}"]`);
         if (!el) continue;
         el.classList.add("validation-flash");
@@ -462,13 +536,29 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       }
     };
 
+    // Canvas-click clear: any click on the canvas surface (pane, node, edge)
+    // collapses the persistent trace. The clear listener is on the document
+    // because xyflow's pane/node/edge handlers fire after their own state
+    // updates and we want this to be cheap + universal.
+    const onCanvasClick = (ev: MouseEvent) => {
+      if (!activeTrace) return;
+      // Only clear when the click is inside the ReactFlow viewport.
+      const target = ev.target as Element | null;
+      if (target?.closest(".react-flow")) {
+        clearActiveTrace();
+      }
+    };
+
     window.addEventListener("stream:focus-validation-result", onFocusResult as EventListener);
     window.addEventListener("stream:node-flash", onNodeFlash as EventListener);
+    document.addEventListener("mousedown", onCanvasClick, true);
     return () => {
+      clearActiveTrace();
       window.removeEventListener("stream:focus-validation-result", onFocusResult as EventListener);
       window.removeEventListener("stream:node-flash", onNodeFlash as EventListener);
+      document.removeEventListener("mousedown", onCanvasClick, true);
     };
-    // setCenter and getNode are stable ReactFlow identities — safe to omit from deps.
+    // xyflow setters (setCenter / fitBounds / getNode) are stable identities.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

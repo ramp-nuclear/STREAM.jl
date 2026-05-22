@@ -1210,9 +1210,17 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     const id = crypto.randomUUID();
     const component = getComponent(componentId);
     const defaultParams: Record<string, unknown> = {};
+    // Top-level `g` parameters (gravitational acceleration) inherit from the
+    // project's modelOptions.g_default (default: Earth's 9.80665 m/s²) so a
+    // change in the project tab cascades to every new component drag. The
+    // registry-side `default: 9.81` was historically a hardcoded fallback;
+    // the project setting now wins.
+    const projectG = get().modelOptions?.g_default;
     if (component) {
       for (const param of component.parameters) {
-        if (param.default !== undefined && param.default !== null) {
+        if (param.name === "g" && typeof projectG === "number") {
+          defaultParams[param.name] = projectG;
+        } else if (param.default !== undefined && param.default !== null) {
           defaultParams[param.name] = param.default;
         }
       }

@@ -384,8 +384,64 @@ body {
      wrapper). Because the target already has `rounded-md` from Tailwind,
      the outline follows the rounded path automatically — no explicit
      border-radius needed here. Offset 0 keeps the flash flush with the
-     node edge, matching the persistent error outline's geometry. */
-  outline: 2px solid var(--destructive);
+     node edge, matching the persistent error outline's geometry.
+
+     Severity color comes from the inline `--validation-trace-color` var
+     set by CanvasPanel (defaults to --destructive for legacy single-node
+     navigation flash). Used by both the single-node click-to-focus flash
+     AND the multi-target loop trace. */
+  outline: 2px solid var(--validation-trace-color, var(--destructive));
   outline-offset: 0;
   animation: node-flash-outline 600ms ease-out 1;
+}
+
+/* Phase 72 — persistent loop trace highlight.
+   `.validation-flash-persistent` is the loop-trace flavor of `.validation-flash`.
+   Same outline geometry, but the animation runs forever (steady glow rather than
+   one-shot decay), and the outline color is taken from the inline
+   `--validation-trace-color` var so the severity colorizes both node and edge
+   trace together. Cleared by CanvasPanel when the user clicks anywhere else or
+   focuses a different validation result. */
+@keyframes node-trace-pulse {
+  0%, 100% { outline-color: var(--validation-trace-color, var(--color-warning)); }
+  50%      { outline-color: color-mix(in oklch, var(--validation-trace-color, var(--color-warning)) 40%, transparent); }
+}
+.validation-flash-persistent {
+  outline: 2px solid var(--validation-trace-color, var(--color-warning));
+  outline-offset: 0;
+  animation: node-trace-pulse 1.5s ease-in-out infinite;
+}
+
+/* Phase 72 — `.validation-flow-trace` is the multi-edge flow-trace highlight
+   applied by CanvasPanel to xyflow edge group elements (`[data-id]` on the
+   `.react-flow__edge` wrapper). Marching-ants animation conveys both loop
+   membership and flow direction simultaneously.
+
+   stroke-dashoffset animates from 0 → -10 (negative shifts dashes toward the
+   target end of each path; xyflow paths go source → target, so this matches
+   the topology flow direction the user drew).
+
+   Severity tint comes from `--validation-trace-color` (set inline by CanvasPanel
+   per result severity). Default falls back to `--color-warning` since the most
+   common consumer today (gravity_sum_per_loop) emits at warning severity.
+
+   prefers-reduced-motion: the dashed-pattern stays visible — you can still see
+   *which* edges are in the loop — but the marching stops, per the doctrine
+   "animations collapse to instant under reduced motion." */
+.validation-flow-trace .react-flow__edge-path {
+  stroke: var(--validation-trace-color, var(--color-warning)) !important;
+  stroke-width: 2.5 !important;
+  stroke-dasharray: 6 4 !important;
+  animation: flow-trace-march 1.5s linear infinite;
+}
+@keyframes flow-trace-march {
+  to { stroke-dashoffset: -10; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .validation-flow-trace .react-flow__edge-path {
+    animation: none;
+  }
+  .validation-flash-persistent {
+    animation: none;
+  }
 }

@@ -165,7 +165,7 @@ describe("lengthMatch", () => {
     expect(results).toHaveLength(1);
     const r = results[0];
     expect(r.validatorId).toBe("length_match");
-    expect(r.severity).toBe("error");
+    expect(r.severity).toBe("warning");
     expect(r.description).toContain("0.5");
     expect(r.description).toContain("0.6");
     // Targets: edge, field('geometry') on CAC, field('Lz') on HD, both node targets
@@ -180,8 +180,6 @@ describe("lengthMatch", () => {
       fieldTargets.some((t) => t.kind === "field" && t.fieldPath === "Lz"),
     ).toBe(true);
     expect(nodeTargets).toHaveLength(2);
-    // Phase 71 UAT (2026-05-21): FixActions removed across all rules.
-    expect(r.fixAction).toBeUndefined();
   });
 
   it("returns no result when CAC geometry UUID is not in resources (dangling ref)", () => {
@@ -207,14 +205,4 @@ describe("lengthMatch", () => {
     expect(results).toHaveLength(0);
   });
 
-  // Phase 71 UAT (2026-05-21): the value-transfer-picker FixAction was
-  // removed across all rules. The user-driven applyLeft / applyRight closure
-  // tests below previously covered the removed paths and are now obsolete.
-  it.skip("fixAction.applyLeft removed in Phase 71 UAT", () => {
-    // intentionally empty — kept to preserve test count
-  });
-
-  it.skip("fixAction.applyRight removed in Phase 71 UAT", () => {
-    // intentionally empty — kept to preserve test count
-  });
 });

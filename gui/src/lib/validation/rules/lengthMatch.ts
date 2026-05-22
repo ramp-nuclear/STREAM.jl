@@ -1,4 +1,4 @@
-// lengthMatch.ts — Active length consistency validator (Phase 71, Plan 05)
+// lengthMatch.ts — Active length consistency validator.
 //
 // D-15 rule 2: "length match" — when a ChannelAndContacts (CAC) is thermally
 // connected to a HeatDiffusion (HD), the CAC's geometry resource L must equal
@@ -8,21 +8,15 @@
 // length lives in snapshot.resources.geometries[uuid].params.L. The rule must
 // resolve the UUID before comparison.
 //
-// §3.9 line 792: error severity; value-transfer-picker fix.
 // D-14: edge-level rule emits edge + both endpoint field and node targets.
 // D-12: fieldPath 'geometry' for CAC (highlights the resource-picker),
 //       'Lz' for HD.
 //
-// FixAction: value-transfer-picker — user picks which length is canonical.
-//   applyLeft: CAC.geometry.L propagates to HD.Lz (node-param write).
-//   applyRight: HD.Lz propagates to CAC geometry resource (resource write).
-//
-// Per §3.9 lines 768-778: "changing length makes the component physically
-// different; the GUI cannot guess which side the user actually meant."
-// Never auto-apply — always require user pick.
-//
-// The apply closures take (set, get) as parameters so ValidationPanel
-// (Plan 09) passes fresh store handles at click time (RESEARCH §Pitfall 7).
+// Navigation-only: row click in ValidationPanel focuses the offending pair;
+// user picks the canonical side and edits manually. Auto-fix buttons were
+// removed Phase 71 UAT (feedback_no_validator_fixaction_buttons) — the rule
+// cannot guess which side is canonical and asking via a picker still framed
+// the GUI as opinionated.
 //
 // Pure function: zero useStore imports, zero React imports (D-06).
 
@@ -31,7 +25,11 @@ import type { ValidationSnapshot } from "../snapshot";
 
 export const lengthMatch: Validator = {
   id: "length_match",
-  severity: "error",
+  // Phase 72 severity audit: dropped from error → warning. Mismatched L
+  // values produce Julia code that compiles and runs; the result is
+  // physically inconsistent but the solver doesn't fail. Error tier is
+  // reserved for compile-fail or solver-blocking conditions.
+  severity: "warning",
   description: "CAC geometry L ≠ HD.Lz",
   scope: ["nodes", "edges", "resources"],
 
@@ -145,7 +143,7 @@ export const lengthMatch: Validator = {
       results.push({
         id: `length_match::${pairKey}`,
         validatorId: "length_match",
-        severity: "error",
+        severity: "warning",
         description: `${cacData.instanceName} L=${cacL} ≠ ${hdData.instanceName}.Lz=${hdLz}`,
         targets: [
           { kind: "edge", edgeId },
