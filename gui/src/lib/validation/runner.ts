@@ -19,5 +19,12 @@ import type { ValidationResult } from "./types";
  * Flat array of ValidationResult from all validators, in registration order.
  */
 export function runValidators(snapshot: ValidationSnapshot): ValidationResult[] {
+  // Phase 72 — empty-canvas suppression. An empty canvas is not a model
+  // and not a partial model; it's a workspace waiting for a project. The
+  // status-bar `ERR 0 · WRN 0 · INF 0` reflects that. System-level rules
+  // like pressure_boundary_required would otherwise fire on every fresh
+  // app launch which is noise, not signal.
+  if (snapshot.nodes.length === 0 && snapshot.edges.length === 0) return [];
+
   return validators.flatMap((v) => v.run(snapshot));
 }

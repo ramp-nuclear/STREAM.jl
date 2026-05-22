@@ -27,9 +27,13 @@ import type { ValidationSnapshot } from "../snapshot";
  * - Empty array when at least one Pump or Gravity node exists.
  * - One ValidationResult (severity 'error') when no driving element is found.
  */
+// Phase 72 — severity demoted error → warning. Missing Pump/Gravity means
+// fluid won't circulate at steady state, but the solver still runs and
+// codegen still produces a valid Julia script. Warning preserves user
+// attention for actual blockers.
 export const drivingElementRequired: Validator = {
   id: "driving_element_required",
-  severity: "error",
+  severity: "warning",
   description: "No driving element",
   scope: ["nodes"],
 
@@ -45,7 +49,7 @@ export const drivingElementRequired: Validator = {
       {
         id: "driving_element_required::system",
         validatorId: "driving_element_required",
-        severity: "error",
+        severity: "warning",
         description: "No driving element",
         targets: [],
       },
