@@ -124,7 +124,7 @@ export default function CustomTitlebar({
       <img
         src="/32x32.png"
         alt=""
-        className="w-5 h-5 ml-2 shrink-0"
+        className="w-5 h-5 mx-3 shrink-0 [filter:brightness(0)_invert(1)]"
       />
       {/* Single <Menubar> parent coordinates click-once switching between
           sibling menus (Office / VSCode / IntelliJ pattern — UAT round 2 #5).

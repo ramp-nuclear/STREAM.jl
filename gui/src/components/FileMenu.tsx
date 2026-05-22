@@ -3,6 +3,9 @@ import {
   MenubarItem,
   MenubarMenu,
   MenubarSeparator,
+  MenubarSub,
+  MenubarSubContent,
+  MenubarSubTrigger,
   MenubarTrigger,
 } from "./ui/menubar";
 import { useReactFlow } from "@xyflow/react";
@@ -32,7 +35,9 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
   const saveProject = useStore((s) => s.saveProject);
   const saveProjectAs = useStore((s) => s.saveProjectAs);
   const loadProject = useStore((s) => s.loadProject);
+  const loadProjectFromPath = useStore((s) => s.loadProjectFromPath);
   const newProject = useStore((s) => s.newProject);
+  const recentFiles = useStore((s) => s.recentFiles);
 
   async function handleNew() {
     if (isDirty) {
@@ -50,6 +55,15 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
       if (action === "save") await saveProject();
     }
     await loadProject();
+  }
+
+  async function handleOpenRecent(filePath: string) {
+    if (isDirty) {
+      const action = await onUnsavedCheck();
+      if (action === "cancel") return;
+      if (action === "save") await saveProject();
+    }
+    await loadProjectFromPath(filePath);
   }
 
   async function handleSave() {
@@ -130,6 +144,26 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
             <span className="text-muted-foreground text-xs">Ctrl+O</span>
           </span>
         </MenubarItem>
+        <MenubarSub>
+          <MenubarSubTrigger disabled={recentFiles.length === 0}>
+            Open Recent
+          </MenubarSubTrigger>
+          <MenubarSubContent>
+            {recentFiles.slice(0, 5).map((path) => {
+              const basename = path.split(/[/\\]/).pop() ?? path;
+              const stem = basename.replace(/\.[^.]+$/, "");
+              return (
+                <MenubarItem
+                  key={path}
+                  onClick={() => void handleOpenRecent(path)}
+                  title={path}
+                >
+                  {stem}
+                </MenubarItem>
+              );
+            })}
+          </MenubarSubContent>
+        </MenubarSub>
         <MenubarItem onClick={handleSave}>
           <span className="flex justify-between w-full items-center gap-4">
             <span>Save</span>
