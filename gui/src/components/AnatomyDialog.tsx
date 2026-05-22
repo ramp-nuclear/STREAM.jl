@@ -1,31 +1,37 @@
-// AnatomyDialog — Phase 72 (help-system shape v2, 2026-05-22).
+// AnatomyDialog — Phase 72 (help-system shape v3, 2026-05-22).
 //
 // A schematic-style visual legend for the canvas vocabulary. Renders a
-// stylized StreamNode plus three edge specimens with numbered callouts
-// connected by dashed orthogonal leader lines (technical-drawing
-// convention). Opens from HelpMenu → "Anatomy" via the `stream:open-anatomy`
-// custom event; no keybind by design.
+// visual mirror of StreamNode plus four edge specimens with numbered
+// callouts connected by dashed *diagonal* leader lines (technical-drawing
+// convention, vertebra-anatomy-diagram lineage).
 //
-// v2 redesign (2026-05-22, after user walkthrough of v1):
-//   - No modal scrim (overlayClassName="bg-transparent"). Behavioural
-//     intent: this is an opt-in reference card, not a state-blocking modal.
-//     Matches CommandPalette's VS Code-style "tool overlay" idiom.
-//   - Dialog surface tone matches CommandPalette / shortcut palette tone —
-//     dedicated tool-overlay tier distinctly off chrome/panel/canvas
-//     (oklch(0.93_0.012_254) light / oklch(0.13_0.012_254) dark).
-//   - Dialog is much larger (~1200 × auto). Callouts have room to breathe.
-//   - Leader lines: dashed, orthogonal-only (90° elbows), all numbers
-//     aligned to a single vertical column per tile side. Matches
-//     Houdini / Modelica / Bauhaus technical-drawing convention.
-//   - Legend reads at text-body (13 px) not text-label (11 px).
-//   - Engineering-voice copy. No em dashes (PRODUCT.md anti-pattern).
-//   - autoExtended documented correctly as the "save-preview" outline
-//     (Save Preset Modal flags BC-coupled neighbors with this violet
-//     dashed outline — see SavePresetModal.tsx).
+// v3 redesign (after user walkthrough of v2):
+//   - Leader lines are SINGLE-SEGMENT DIAGONALS at varying angles, not
+//     orthogonal Z-bends. Matches the inspiration the user named (medical
+//     anatomy diagram with fanned-out angled leaders).
+//   - Two number columns per tile (LEFT + RIGHT) instead of single-column.
+//     With scattered source points, a single-column fan is geometrically
+//     forced to cross some pairs of leaders; two columns split the load.
+//   - Within each column, features are sorted top-to-bottom by feature y
+//     and assigned slots top-to-bottom by chip y, which guarantees no
+//     crossing within that column (sorted bipartite matching property).
+//   - Every feature gets a small filled-square MARKER (~5×5 px) at its
+//     anchor point so the leader's destination is unambiguous.
+//   - Chips slightly larger (20×20 px) for better legibility.
+//   - Numbering goes 1..9 top-to-bottom in spatial order across both
+//     columns combined, so the diagram reads naturally as the eye scans
+//     the node from top to bottom.
+//   - Legend stays below the tile (per user direction; labels do NOT
+//     ride alongside the chips in the diagram).
 //
-// Doctrine fidelity strategy unchanged from v1: render a *visual mirror* of
-// StreamNode rather than the real component. The mirror consumes the same
-// tokens and band geometry; when StreamNode changes visually, update here.
+// v2 carry-overs unchanged:
+//   - No modal scrim (overlayClassName="bg-transparent").
+//   - Palette surface tone matching CommandPalette / shortcut palette.
+//   - Visual mirror of StreamNode (not the real component — see file
+//     header on v1/v2 for the fidelity rationale).
+//   - Local marching-ants animation (anatomy-flow-march) for the loop
+//     trace specimen, scoped to this file so it doesn't depend on the
+//     xyflow-global `.validation-flow-trace` selector.
 
 import * as React from "react";
 import { Anchor, Box as BoxIcon } from "lucide-react";
@@ -43,15 +49,21 @@ interface AnatomyDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Surface palette tone — same as CommandPalette so the help surfaces share
-// one visual vocab. Defined as className strings to keep theme-switching
-// working via Tailwind dark: variant.
 const PALETTE_SURFACE = cn(
   "bg-[oklch(0.93_0.012_254)] dark:bg-[oklch(0.13_0.012_254)]",
   "border-[oklch(0.86_0.012_254)] dark:border-[oklch(0.24_0.012_254)]",
   "shadow-[0_16px_40px_-12px_oklch(0.05_0_0/0.18),0_4px_12px_-4px_oklch(0.05_0_0/0.12)]",
   "dark:shadow-[0_16px_40px_-12px_oklch(0.05_0_0/0.55),0_4px_12px_-4px_oklch(0.05_0_0/0.40)]",
 );
+
+// Leader line shared style. Single dashed segment from feature marker to
+// chip; varies in angle per callout. shapeRendering="auto" lets diagonals
+// antialias smoothly.
+const LEADER_STROKE = "var(--foreground)";
+const LEADER_OPACITY = 0.5;
+const LEADER_DASH = "4 3";
+const LEADER_WIDTH = 1;
+const MARKER_SIZE = 5; // filled square at feature anchor
 
 export default function AnatomyDialog({
   open,
@@ -60,14 +72,11 @@ export default function AnatomyDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        // No scrim — this is an opt-in reference card, not state-blocking
-        // chrome. Click-outside-to-close still works because DialogOverlay
-        // mounts; it just paints nothing.
         overlayClassName="bg-transparent"
         className={cn(
           "p-0 gap-0 overflow-hidden rounded-md",
-          "w-[1200px] max-w-[95vw] sm:max-w-[1200px]",
-          "top-[8vh] translate-y-0",
+          "w-[1300px] max-w-[95vw] sm:max-w-[1300px]",
+          "top-[6vh] translate-y-0",
           PALETTE_SURFACE,
         )}
         data-testid="anatomy-dialog"
@@ -104,7 +113,7 @@ export default function AnatomyDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Section — column wrapper. Hosts the diagram tile and the legend.
+// Section — tile + legend column wrapper.
 // ---------------------------------------------------------------------------
 
 interface SectionProps {
@@ -124,51 +133,134 @@ function Section({ title, children }: SectionProps): React.JSX.Element {
 }
 
 // ---------------------------------------------------------------------------
-// NodeTile — the hero node with callouts. Layout grid:
-//   tile is 560 × 360
-//   node body is 240 × 96, centered around (280, 200)
-//     (node spans x=160..400, y=152..248)
-//   LEFT  number column at x=44 (chip right edge at x=44+18=62)
-//   RIGHT number column at x=498 (chip left edge at x=498)
-//   Each callout's number is y-aligned to its feature so the dashed leader
-//   is a single horizontal segment (no elbows). Where two features sit too
-//   close, the closer number is offset and a 2-segment Z-leader is drawn
-//   instead — but in practice the body lines (label/instance/value) are at
-//   y={172, 188, 208}, enough spacing for 18-px chips.
+// Callout — one numbered marker. `n` is the display number; (fx, fy) is the
+// feature anchor in tile coords; `side` picks the chip column; `chipY` is
+// the chip's y-position in tile coords (caller computes from sorted slot).
 // ---------------------------------------------------------------------------
 
 interface Callout {
-  /** Display number. */
   n: number;
-  /** Number-chip side. "L" → left column; "R" → right column. */
   side: "L" | "R";
-  /** Feature pointer x in the SVG coord system. */
   fx: number;
-  /** Feature pointer y in the SVG coord system. */
   fy: number;
-  /** Number-chip y (defaults to fy so the leader is pure horizontal). */
-  ny?: number;
+  chipY: number;
 }
 
-const NODE_TILE_W = 560;
-const NODE_TILE_H = 380;
-const LEFT_CHIP_X = 44;
-const RIGHT_CHIP_X = 498;
-const CHIP_SIZE = 18;
+const CHIP_SIZE = 20;
+const LEFT_CHIP_X = 24;
+const RIGHT_CHIP_X_NODE = 596;
+const RIGHT_CHIP_X_EDGES = 596;
 
-const NODE_CALLOUTS: Callout[] = [
-  // LEFT column (5 features)
-  { n: 1, side: "L", fx: 160, fy: 156, ny: 132 }, // layer band (top edge of band)
-  { n: 2, side: "L", fx: 160, fy: 174, ny: 160 }, // component icon + label
-  { n: 3, side: "L", fx: 160, fy: 192, ny: 188 }, // instance name
-  { n: 4, side: "L", fx: 160, fy: 212, ny: 216 }, // value summary
-  { n: 5, side: "L", fx: 142, fy: 148, ny: 244 }, // pressure anchor (icon outside node)
-  // RIGHT column (4 features)
-  { n: 6, side: "R", fx: 280, fy: 145, ny: 140 }, // flow port (top, in)
-  { n: 7, side: "R", fx: 408, fy: 200, ny: 172 }, // thermal port (paired, right)
-  { n: 8, side: "R", fx: 400, fy: 152, ny: 200 }, // selected ring (upper-right corner)
-  { n: 9, side: "R", fx: 400, fy: 244, ny: 228 }, // persistent error outline (lower-right)
+// Inner edge of each chip — the point where the leader line attaches.
+function chipAttachmentPoint(c: Callout, tileSide: "node" | "edges"): {
+  x: number;
+  y: number;
+} {
+  const rightChipX = tileSide === "node" ? RIGHT_CHIP_X_NODE : RIGHT_CHIP_X_EDGES;
+  if (c.side === "L") {
+    return { x: LEFT_CHIP_X + CHIP_SIZE, y: c.chipY };
+  }
+  return { x: rightChipX, y: c.chipY };
+}
+
+// ---------------------------------------------------------------------------
+// NodeTile — hero node with two-column callout fan.
+//
+// Layout:
+//   tile 620 × 480
+//   node body 240 × 96 positioned at (130, 220) — spans y=220..316
+//   LEFT  chip column at x=24 (chip occupies x=24..44)
+//   RIGHT chip column at x=596 (chip occupies x=596..616)
+//
+// Feature positions (anchors for leader lines) and their column assignments
+// follow the natural "left or right side of the node" partition.
+// ---------------------------------------------------------------------------
+
+const NODE_TILE_W = 620;
+const NODE_TILE_H = 480;
+const NODE_LEFT = 130;
+const NODE_TOP = 220;
+const NODE_WIDTH = 240;
+const NODE_HEIGHT = 96;
+
+// Raw feature anchor positions on the rendered node. Computed from the
+// NodeMirror layout (see NodeMirror() below). Each is annotated with which
+// chip column hosts its callout. The number assignment (1..9) is then
+// computed by sorting all features by fy ascending (so the diagram reads
+// top-to-bottom).
+interface RawFeature {
+  key: string;
+  fx: number;
+  fy: number;
+  side: "L" | "R";
+  legend: string;
+}
+
+const NODE_FEATURES: readonly RawFeature[] = [
+  { key: "anchor",  fx: NODE_LEFT - 14,                 fy: NODE_TOP - 4,           side: "L", legend: "Pressure anchor." },
+  { key: "topPort", fx: NODE_LEFT + NODE_WIDTH / 2,     fy: NODE_TOP - 4,           side: "R", legend: "Flow port. Blue ports flow in, red ports flow out." },
+  { key: "band",    fx: NODE_LEFT + NODE_WIDTH / 2,     fy: NODE_TOP + 4,           side: "R", legend: "Layer accent band. Split for dual-layer components." },
+  { key: "label",   fx: NODE_LEFT + 38,                 fy: NODE_TOP + 24,          side: "L", legend: "Component type." },
+  { key: "ring",    fx: NODE_LEFT + NODE_WIDTH,         fy: NODE_TOP + 20,          side: "R", legend: "Selected ring." },
+  { key: "name",    fx: NODE_LEFT + 38,                 fy: NODE_TOP + 44,          side: "L", legend: "Instance name." },
+  { key: "thermal", fx: NODE_LEFT + NODE_WIDTH + 2,     fy: NODE_TOP + NODE_HEIGHT / 2, side: "R", legend: "Thermal port. Paired across opposing faces." },
+  { key: "value",   fx: NODE_LEFT + 38,                 fy: NODE_TOP + 64,          side: "L", legend: "Value summary. Source blocks only." },
+  { key: "error",   fx: NODE_LEFT + NODE_WIDTH,         fy: NODE_TOP + NODE_HEIGHT, side: "R", legend: "Persistent validation error outline." },
 ];
+
+// Build callouts:
+//   1. Sort features by fy ascending (then fx ascending for ties) → this
+//      becomes the numbering order (1..9 top-to-bottom).
+//   2. Partition into LEFT / RIGHT lists preserving fy order.
+//   3. Assign chip y-positions to each list at equal spacing within
+//      the chip column's vertical range. Because features in each list
+//      are y-sorted AND slots are y-sorted, monotonic pairing within
+//      each list guarantees no crossing within that column.
+//   4. Cross-column crossings are impossible because LEFT chips are at
+//      x=24..44 and RIGHT chips at x=596..616 — every LEFT leader stays
+//      left of x=middle, every RIGHT stays right.
+//
+// Slot vertical range: y=180..420 for both columns (240 px tall).
+const SLOT_TOP = 180;
+const SLOT_BOTTOM = 420;
+
+function buildCallouts(features: readonly RawFeature[]): {
+  callouts: Callout[];
+  legendByN: Map<number, string>;
+} {
+  const sorted = [...features].sort((a, b) =>
+    a.fy === b.fy ? a.fx - b.fx : a.fy - b.fy,
+  );
+  // Assign numbers in sort order.
+  const numbered = sorted.map((f, i) => ({ ...f, n: i + 1 }));
+
+  // Partition by column, keeping internal y-order.
+  const leftList = numbered.filter((f) => f.side === "L");
+  const rightList = numbered.filter((f) => f.side === "R");
+
+  function slotY(idx: number, total: number): number {
+    if (total === 1) return (SLOT_TOP + SLOT_BOTTOM) / 2;
+    return SLOT_TOP + (idx * (SLOT_BOTTOM - SLOT_TOP)) / (total - 1);
+  }
+
+  const callouts: Callout[] = [];
+  const legendByN = new Map<number, string>();
+
+  leftList.forEach((f, i) => {
+    callouts.push({ n: f.n, side: "L", fx: f.fx, fy: f.fy, chipY: slotY(i, leftList.length) });
+    legendByN.set(f.n, f.legend);
+  });
+  rightList.forEach((f, i) => {
+    callouts.push({ n: f.n, side: "R", fx: f.fx, fy: f.fy, chipY: slotY(i, rightList.length) });
+    legendByN.set(f.n, f.legend);
+  });
+
+  callouts.sort((a, b) => a.n - b.n);
+  return { callouts, legendByN };
+}
+
+const { callouts: NODE_CALLOUTS, legendByN: NODE_LEGEND_BY_N } =
+  buildCallouts(NODE_FEATURES);
 
 function NodeTile(): React.JSX.Element {
   return (
@@ -187,12 +279,8 @@ function NodeTile(): React.JSX.Element {
           backgroundSize: "12px 12px, 12px 12px, 24px 24px, 24px 24px",
         }}
       >
-        {/* Rendered node (HTML, absolutely positioned in the tile's coord
-            system). Coords match the leader fx/fy constants. */}
-        <NodeMirror left={160} top={152} width={240} />
+        <NodeMirror left={NODE_LEFT} top={NODE_TOP} width={NODE_WIDTH} />
 
-        {/* SVG overlay for leader lines, beneath the chips so chips paint
-            over the line ends cleanly. */}
         <svg
           width={NODE_TILE_W}
           height={NODE_TILE_H}
@@ -201,13 +289,15 @@ function NodeTile(): React.JSX.Element {
           aria-hidden
         >
           {NODE_CALLOUTS.map((c) => (
-            <LeaderLine key={c.n} callout={c} />
+            <Leader key={c.n} callout={c} tileSide="node" />
+          ))}
+          {NODE_CALLOUTS.map((c) => (
+            <FeatureMarker key={c.n} fx={c.fx} fy={c.fy} />
           ))}
         </svg>
 
-        {/* Number chips. */}
         {NODE_CALLOUTS.map((c) => (
-          <ChipBadge key={c.n} callout={c} />
+          <ChipBadge key={c.n} callout={c} tileSide="node" />
         ))}
       </div>
     </div>
@@ -215,8 +305,83 @@ function NodeTile(): React.JSX.Element {
 }
 
 // ---------------------------------------------------------------------------
-// NodeMirror — visual mirror of StreamNode. See file header for the
-// fidelity strategy.
+// Leader — dashed diagonal segment from feature marker to chip edge.
+// Single straight line, no bends.
+// ---------------------------------------------------------------------------
+
+function Leader({
+  callout,
+  tileSide,
+}: {
+  callout: Callout;
+  tileSide: "node" | "edges";
+}): React.JSX.Element {
+  const chip = chipAttachmentPoint(callout, tileSide);
+  return (
+    <line
+      x1={callout.fx}
+      y1={callout.fy}
+      x2={chip.x}
+      y2={chip.y}
+      stroke={LEADER_STROKE}
+      strokeOpacity={LEADER_OPACITY}
+      strokeWidth={LEADER_WIDTH}
+      strokeDasharray={LEADER_DASH}
+      fill="none"
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FeatureMarker — small filled square at the leader's source point. Same
+// visual idiom as the medical-anatomy diagram the user pointed to.
+// ---------------------------------------------------------------------------
+
+function FeatureMarker({ fx, fy }: { fx: number; fy: number }): React.JSX.Element {
+  return (
+    <rect
+      x={fx - MARKER_SIZE / 2}
+      y={fy - MARKER_SIZE / 2}
+      width={MARKER_SIZE}
+      height={MARKER_SIZE}
+      fill="var(--foreground)"
+      fillOpacity={0.85}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ChipBadge — numbered chip in a column.
+// ---------------------------------------------------------------------------
+
+function ChipBadge({
+  callout,
+  tileSide,
+}: {
+  callout: Callout;
+  tileSide: "node" | "edges";
+}): React.JSX.Element {
+  const rightChipX = tileSide === "node" ? RIGHT_CHIP_X_NODE : RIGHT_CHIP_X_EDGES;
+  const left = callout.side === "L" ? LEFT_CHIP_X : rightChipX;
+  return (
+    <span
+      aria-hidden
+      style={{
+        position: "absolute",
+        left,
+        top: callout.chipY - CHIP_SIZE / 2,
+        width: CHIP_SIZE,
+        height: CHIP_SIZE,
+      }}
+      className="inline-flex items-center justify-center rounded-sm font-mono text-label tabular-nums bg-popover text-foreground border border-border z-10"
+    >
+      {callout.n}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NodeMirror — visual mirror of StreamNode. Same content as v2.
 // ---------------------------------------------------------------------------
 
 interface NodeMirrorProps {
@@ -227,43 +392,20 @@ interface NodeMirrorProps {
 
 function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
   return (
-    <div
-      className="absolute"
-      style={{ left, top, width }}
-    >
+    <div className="absolute" style={{ left, top, width }}>
       <div
         className="relative rounded-md"
         style={{
-          // Selected ring + 1 px canvas offset. Matches StreamNode selected
-          // box-shadow vocabulary line for line.
           boxShadow:
             "0 0 0 1px var(--canvas), 0 0 0 3px var(--ring)",
-          // Persistent error outline. (Selected + error coexist on the hero
-          // to populate two callouts; the footer note explains they're
-          // mutually exclusive in production.)
           outline: "2px solid var(--destructive)",
           outlineOffset: "0",
         }}
       >
         <div className="rounded-md overflow-hidden">
-          {/* Dual-layer split band. Selected = 8 px tall. */}
-          <div
-            className="flex w-full"
-            style={{ height: 8 }}
-            aria-hidden
-          >
-            <div
-              style={{
-                flex: 1,
-                backgroundColor: "var(--color-layer-hydraulic)",
-              }}
-            />
-            <div
-              style={{
-                flex: 1,
-                backgroundColor: "var(--color-layer-thermal)",
-              }}
-            />
+          <div className="flex w-full" style={{ height: 8 }} aria-hidden>
+            <div style={{ flex: 1, backgroundColor: "var(--color-layer-hydraulic)" }} />
+            <div style={{ flex: 1, backgroundColor: "var(--color-layer-thermal)" }} />
           </div>
           <div className="bg-card p-2">
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -276,15 +418,12 @@ function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
             </div>
           </div>
         </div>
-
-        {/* Pressure anchor (icon left of node, matches StreamNode offset). */}
         <Anchor
           aria-hidden
           className="w-3 h-3 text-foreground"
           style={{ position: "absolute", left: -18, top: -8 }}
         />
-
-        {/* FlowPort in (top, circular blue-on-blue). */}
+        {/* FlowPort in (top) */}
         <span
           aria-hidden
           style={{
@@ -299,7 +438,7 @@ function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
             borderRadius: "50%",
           }}
         />
-        {/* FlowPort out (bottom, circular red-on-red). */}
+        {/* FlowPort out (bottom) */}
         <span
           aria-hidden
           style={{
@@ -314,7 +453,7 @@ function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
             borderRadius: "50%",
           }}
         />
-        {/* ThermalPort (left, paired). */}
+        {/* ThermalPort left */}
         <span
           aria-hidden
           style={{
@@ -329,7 +468,7 @@ function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
               "1.5px solid color-mix(in oklch, var(--color-layer-thermal) 75%, black)",
           }}
         />
-        {/* ThermalPort (right, paired). */}
+        {/* ThermalPort right */}
         <span
           aria-hidden
           style={{
@@ -350,121 +489,36 @@ function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
 }
 
 // ---------------------------------------------------------------------------
-// LeaderLine — dashed orthogonal polyline from number chip to feature.
-// Pure horizontal when feature.y === chip.y; otherwise a 2-segment Z
-// (horizontal → vertical → horizontal) with the elbow at a fixed lane x.
+// NodeLegend
 // ---------------------------------------------------------------------------
-
-const LEFT_LANE_X = 132;
-const RIGHT_LANE_X = 432;
-
-function LeaderLine({ callout }: { callout: Callout }): React.JSX.Element {
-  const chipY = callout.ny ?? callout.fy;
-  // The line starts at the inner edge of the chip (so it appears to
-  // emanate from the chip's number side).
-  const startX =
-    callout.side === "L" ? LEFT_CHIP_X + CHIP_SIZE : RIGHT_CHIP_X;
-  const laneX = callout.side === "L" ? LEFT_LANE_X : RIGHT_LANE_X;
-  const endX = callout.fx;
-  const endY = callout.fy;
-
-  // Build the polyline points.
-  //  L: chip-edge → lane → vertical → feature.x → feature.y
-  //  R: chip-edge → lane → vertical → feature.x → feature.y (mirrored)
-  // When chipY === endY, the vertical segment collapses; the lane point
-  // and the elbow are coincident, and the path reads as a single straight
-  // horizontal line.
-  const points: [number, number][] = [
-    [startX, chipY],
-    [laneX, chipY],
-    [laneX, endY],
-    [endX, endY],
-  ];
-
-  const pathD = points
-    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`)
-    .join(" ");
-
-  return (
-    <path
-      d={pathD}
-      stroke="var(--foreground)"
-      strokeOpacity={0.45}
-      strokeWidth={1}
-      strokeDasharray="4 3"
-      fill="none"
-      shapeRendering="crispEdges"
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ChipBadge — the numbered chip itself, absolutely positioned on the tile.
-// ---------------------------------------------------------------------------
-
-function ChipBadge({ callout }: { callout: Callout }): React.JSX.Element {
-  const chipY = callout.ny ?? callout.fy;
-  const left = callout.side === "L" ? LEFT_CHIP_X : RIGHT_CHIP_X;
-  return (
-    <span
-      aria-hidden
-      style={{
-        position: "absolute",
-        left,
-        top: chipY - CHIP_SIZE / 2,
-        width: CHIP_SIZE,
-        height: CHIP_SIZE,
-      }}
-      className="inline-flex items-center justify-center rounded-sm font-mono text-micro tabular-nums bg-popover text-foreground/85 border border-border z-10"
-    >
-      {callout.n}
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// NodeLegend — two-column legend matching the callout numbers. Reads at
-// text-body (13 px). Engineering voice. No em dashes.
-// ---------------------------------------------------------------------------
-
-interface LegendItem {
-  n: number;
-  text: string;
-}
-
-const NODE_LEGEND_LEFT: readonly LegendItem[] = [
-  { n: 1, text: "Layer accent band. Split for dual-layer components." },
-  { n: 2, text: "Component type." },
-  { n: 3, text: "Instance name." },
-  { n: 4, text: "Value summary. Source blocks only." },
-  { n: 5, text: "Pressure anchor." },
-];
-
-const NODE_LEGEND_RIGHT: readonly LegendItem[] = [
-  { n: 6, text: "Flow port. Blue ports flow in, red ports flow out." },
-  { n: 7, text: "Thermal port. Paired across opposing faces." },
-  { n: 8, text: "Selected ring." },
-  { n: 9, text: "Persistent validation error outline." },
-];
 
 function NodeLegend(): React.JSX.Element {
+  // Render numerically — 1..9 in two columns top-to-bottom.
+  const entries = Array.from(NODE_LEGEND_BY_N.entries()).sort(
+    (a, b) => a[0] - b[0],
+  );
+  const half = Math.ceil(entries.length / 2);
+  const left = entries.slice(0, half);
+  const right = entries.slice(half);
   return (
     <div className="px-6 pb-5 pt-3 grid grid-cols-2 gap-x-6 gap-y-2">
-      <LegendColumn items={NODE_LEGEND_LEFT} />
-      <LegendColumn items={NODE_LEGEND_RIGHT} />
+      <LegendColumn entries={left} />
+      <LegendColumn entries={right} />
     </div>
   );
 }
 
-function LegendColumn({ items }: { items: readonly LegendItem[] }): React.JSX.Element {
+function LegendColumn({
+  entries,
+}: {
+  entries: ReadonlyArray<[number, string]>;
+}): React.JSX.Element {
   return (
     <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-body items-baseline">
-      {items.map((item) => (
-        <React.Fragment key={item.n}>
-          <span className="font-mono text-foreground/85 tabular-nums">
-            {item.n}
-          </span>
-          <span className="text-foreground/85 leading-snug">{item.text}</span>
+      {entries.map(([n, text]) => (
+        <React.Fragment key={n}>
+          <span className="font-mono text-foreground/85 tabular-nums">{n}</span>
+          <span className="text-foreground/85 leading-snug">{text}</span>
         </React.Fragment>
       ))}
     </div>
@@ -472,26 +526,62 @@ function LegendColumn({ items }: { items: readonly LegendItem[] }): React.JSX.El
 }
 
 // ---------------------------------------------------------------------------
-// EdgesTile — three edge specimens stacked vertically + a port-side
-// convention diagram. Same leader-line system as the node tile.
+// EdgesTile — three edge specimens + port-side convention schematic.
+// Same two-column callout machinery. Four callouts; spread across LEFT and
+// RIGHT columns.
 // ---------------------------------------------------------------------------
 
-const EDGES_TILE_W = 560;
-const EDGES_TILE_H = 380;
-const EDGE_SRC_X = 130;
-const EDGE_TGT_X = 430;
+const EDGES_TILE_W = 620;
+const EDGES_TILE_H = 480;
+const EDGE_SRC_X = 140;
+const EDGE_TGT_X = 480;
+const ROW_Y = [120, 200, 280];
+const CONV_ROW_Y = 380;
 
-// Three specimen rows. Port-side convention sits below as a small 2-node
-// schematic.
-const ROW_Y = [88, 152, 216];
-const CONV_ROW_Y = 304;
+// Convention mini-schematic positions.
+const CONV_SRC_LEFT = 130;
+const CONV_TGT_LEFT = 410;
+const CONV_NODE_W = 50;
+const CONV_NODE_H = 28;
 
-const EDGES_CALLOUTS: Callout[] = [
-  { n: 1, side: "R", fx: EDGE_TGT_X - 30, fy: ROW_Y[0] },
-  { n: 2, side: "R", fx: EDGE_TGT_X - 30, fy: ROW_Y[1] },
-  { n: 3, side: "R", fx: EDGE_TGT_X - 30, fy: ROW_Y[2] },
-  { n: 4, side: "R", fx: EDGE_TGT_X - 30, fy: CONV_ROW_Y },
+// Edge-side features. Each callout points at a specific marker spot on or
+// near its edge so the leader's destination is unambiguous.
+const EDGES_FEATURES: readonly RawFeature[] = [
+  {
+    key: "hydraulic",
+    fx: (EDGE_SRC_X + EDGE_TGT_X) / 2,
+    fy: ROW_Y[0],
+    side: "R",
+    legend: "Hydraulic edge.",
+  },
+  {
+    key: "bc",
+    fx: (EDGE_SRC_X + EDGE_TGT_X) / 2,
+    fy: ROW_Y[1],
+    side: "L",
+    legend:
+      "Boundary-condition edge. Dashed. Side tag (L, R, L+R) marks which sides of the consumer it drives.",
+  },
+  {
+    key: "loopTrace",
+    fx: (EDGE_SRC_X + EDGE_TGT_X) / 2,
+    fy: ROW_Y[2],
+    side: "R",
+    legend:
+      "Validation loop trace. Marching ants. Tinted by severity (red, amber, blue).",
+  },
+  {
+    key: "convention",
+    fx: CONV_SRC_LEFT + CONV_NODE_W / 2,
+    fy: CONV_ROW_Y - CONV_NODE_H / 2,
+    side: "L",
+    legend:
+      "Port-side convention. Flow enters from the top or left, exits from the bottom or right.",
+  },
 ];
+
+const { callouts: EDGES_CALLOUTS, legendByN: EDGES_LEGEND_BY_N } =
+  buildCallouts(EDGES_FEATURES);
 
 function EdgesTile(): React.JSX.Element {
   return (
@@ -517,7 +607,7 @@ function EdgesTile(): React.JSX.Element {
           className="absolute inset-0"
           aria-hidden
         >
-          {/* Row 1 — hydraulic default (solid 1.5 px). */}
+          {/* Row 1 — hydraulic default (solid). */}
           <path
             d={`M${EDGE_SRC_X + 10},${ROW_Y[0]} L${EDGE_TGT_X - 10},${ROW_Y[0]}`}
             stroke="var(--foreground)"
@@ -526,7 +616,7 @@ function EdgesTile(): React.JSX.Element {
             fill="none"
             strokeLinecap="round"
           />
-          {/* Row 2 — BC dashed 6/3. */}
+          {/* Row 2 — BC dashed. */}
           <path
             d={`M${EDGE_SRC_X + 10},${ROW_Y[1]} L${EDGE_TGT_X - 10},${ROW_Y[1]}`}
             stroke="var(--muted-foreground)"
@@ -535,7 +625,7 @@ function EdgesTile(): React.JSX.Element {
             fill="none"
             strokeLinecap="round"
           />
-          {/* Row 3 — loop trace marching ants (warning severity). */}
+          {/* Row 3 — marching-ants loop trace (warning severity). */}
           <path
             d={`M${EDGE_SRC_X + 10},${ROW_Y[2]} L${EDGE_TGT_X - 10},${ROW_Y[2]}`}
             stroke="var(--color-warning)"
@@ -546,36 +636,32 @@ function EdgesTile(): React.JSX.Element {
             className="anatomy-flow-march"
           />
 
-          {/* Port-side convention — 2-node mini schematic. Source on the
-              left, target on the right, with a clear "port_in at top/left,
-              port_out at bottom/right" silhouette. */}
-          {/* Source node body */}
+          {/* Port-side convention mini schematic — source rect + target
+              rect + connecting edge. */}
           <rect
-            x={EDGE_SRC_X - 30}
-            y={CONV_ROW_Y - 14}
-            width={50}
-            height={28}
+            x={CONV_SRC_LEFT}
+            y={CONV_ROW_Y - CONV_NODE_H / 2}
+            width={CONV_NODE_W}
+            height={CONV_NODE_H}
             rx={3}
             stroke="var(--foreground)"
             strokeOpacity={0.6}
             strokeWidth={1}
             fill="var(--card)"
           />
-          {/* Target node body */}
           <rect
-            x={EDGE_TGT_X - 50}
-            y={CONV_ROW_Y - 14}
-            width={50}
-            height={28}
+            x={CONV_TGT_LEFT}
+            y={CONV_ROW_Y - CONV_NODE_H / 2}
+            width={CONV_NODE_W}
+            height={CONV_NODE_H}
             rx={3}
             stroke="var(--foreground)"
             strokeOpacity={0.6}
             strokeWidth={1}
             fill="var(--card)"
           />
-          {/* Edge between them */}
           <path
-            d={`M${EDGE_SRC_X + 20},${CONV_ROW_Y} L${EDGE_TGT_X - 50},${CONV_ROW_Y}`}
+            d={`M${CONV_SRC_LEFT + CONV_NODE_W},${CONV_ROW_Y} L${CONV_TGT_LEFT},${CONV_ROW_Y}`}
             stroke="var(--foreground)"
             strokeOpacity={0.7}
             strokeWidth={1.5}
@@ -583,13 +669,13 @@ function EdgesTile(): React.JSX.Element {
             strokeLinecap="round"
           />
 
-          {/* Leader lines */}
           {EDGES_CALLOUTS.map((c) => (
-            <LeaderLine key={c.n} callout={c} />
+            <Leader key={c.n} callout={c} tileSide="edges" />
+          ))}
+          {EDGES_CALLOUTS.map((c) => (
+            <FeatureMarker key={c.n} fx={c.fx} fy={c.fy} />
           ))}
 
-          {/* Local marching-ants keyframe (scoped to this file to avoid
-              dependence on xyflow's `.validation-flow-trace` global). */}
           <style>
             {`
             .anatomy-flow-march {
@@ -605,7 +691,7 @@ function EdgesTile(): React.JSX.Element {
           </style>
         </svg>
 
-        {/* Endpoint port dots for the three specimens. */}
+        {/* Edge endpoint ports (blue source-side, red target-side). */}
         {ROW_Y.map((y, i) => (
           <React.Fragment key={i}>
             <span
@@ -637,7 +723,7 @@ function EdgesTile(): React.JSX.Element {
           </React.Fragment>
         ))}
 
-        {/* BC mid-edge side tag, matching BCEdge's EdgeLabelRenderer. */}
+        {/* BC mid-edge side tag. */}
         <span
           className="absolute rounded border bg-background px-[6px] py-[2px] text-[11px] text-muted-foreground font-mono pointer-events-none"
           style={{
@@ -648,13 +734,16 @@ function EdgesTile(): React.JSX.Element {
           L+R
         </span>
 
-        {/* Port-side convention ports: port_in (blue) at LEFT of source,
-            port_out (red) at RIGHT of target. */}
+        {/* Convention ports — port_in (blue) at source top/left + target
+            top/left, port_out (red) at source bottom/right + target
+            bottom/right. We render only the LEFT-most port_in and
+            RIGHT-most port_out for clarity — same convention idea, less
+            visual noise. */}
         <span
           aria-hidden
           style={{
             position: "absolute",
-            left: EDGE_SRC_X - 30 - 6,
+            left: CONV_SRC_LEFT - 6,
             top: CONV_ROW_Y - 6,
             width: 12,
             height: 12,
@@ -667,33 +756,7 @@ function EdgesTile(): React.JSX.Element {
           aria-hidden
           style={{
             position: "absolute",
-            left: EDGE_SRC_X + 20 - 6,
-            top: CONV_ROW_Y - 6,
-            width: 12,
-            height: 12,
-            background: "#f87171",
-            border: "1.5px solid #b91c1c",
-            borderRadius: "50%",
-          }}
-        />
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: EDGE_TGT_X - 50 - 6,
-            top: CONV_ROW_Y - 6,
-            width: 12,
-            height: 12,
-            background: "#60a5fa",
-            border: "1.5px solid #1d4ed8",
-            borderRadius: "50%",
-          }}
-        />
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: EDGE_TGT_X - 6,
+            left: CONV_TGT_LEFT + CONV_NODE_W - 6,
             top: CONV_ROW_Y - 6,
             width: 12,
             height: 12,
@@ -703,26 +766,21 @@ function EdgesTile(): React.JSX.Element {
           }}
         />
 
-        {/* Number chips. */}
         {EDGES_CALLOUTS.map((c) => (
-          <ChipBadge key={c.n} callout={c} />
+          <ChipBadge key={c.n} callout={c} tileSide="edges" />
         ))}
       </div>
     </div>
   );
 }
 
-const EDGES_LEGEND: readonly LegendItem[] = [
-  { n: 1, text: "Hydraulic edge." },
-  { n: 2, text: "Boundary-condition edge. Dashed. Side tag (L, R, L+R) marks which sides of the consumer it drives." },
-  { n: 3, text: "Validation loop trace. Marching ants. Tinted by severity (red, amber, blue)." },
-  { n: 4, text: "Port-side convention. Flow enters from the top or left, exits from the bottom or right." },
-];
-
 function EdgesLegend(): React.JSX.Element {
+  const entries = Array.from(EDGES_LEGEND_BY_N.entries()).sort(
+    (a, b) => a[0] - b[0],
+  );
   return (
     <div className="px-6 pb-5 pt-3">
-      <LegendColumn items={EDGES_LEGEND} />
+      <LegendColumn entries={entries} />
     </div>
   );
 }
