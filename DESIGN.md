@@ -537,6 +537,64 @@ the ReactFlow viewport or a new focus event replaces it. Single-node-target
 results keep the existing 600 ms one-shot `.validation-flash` navigation
 behavior.
 
+### First-run empty-canvas hint (locked — Phase 72, 2026-05-22)
+
+Replaces `WelcomeOverlay`'s prior centered card with a chromeless typographic
+anchor on the canvas surface. Renders only when
+`nodes.length === 0 && edges.length === 0` (gated on a single boolean
+primitive selector so it doesn't repaint during ReactFlow drags). Resolves
+Audit P0-1 + P2-1 + Critique P1-1.
+
+**Visual:** no card, no shadow, no border, no rounded panel, no wordmark.
+Block is `w-[280px]`, centered horizontally and vertically inside the
+canvas, pointer-events-none on the outer wrapper so the empty area still
+accepts drag-drop / pan / zoom; pointer-events-auto on the inner block so
+recent rows are clickable.
+
+**Layout:**
+
+```
+recent                              ← text-micro mono uppercase foreground/45 (only when ≥1 recent)
+loop_v2                             ← text-label mono foreground/85, <button>, rounded-sm
+hex_cube_transient                    hover bg-card, 80 ms transition-colors, focus-visible ring-2 ring
+mtr_3plate                            extension stripped; native title= for full path
+plate_lof_demo                        max 5 rows
+                                    ← hairline --border, my-2 mx-2 (only when ≥1 recent)
+Ctrl+O   open project               ← shortcut chip (text-micro mono foreground/55, w-16 fixed)
+Ctrl+N   new                          + sans label (text-label foreground/65)
+Ctrl+P   command palette              static text — the keybind IS the affordance
+```
+
+Cold-start (no recents) collapses to the keymap alone — no `recent`
+section label, no separator.
+
+**Copy doctrine:**
+- Section label `recent` lowercase. NOT "Recent Projects."
+- Shortcut labels lowercase, action-only: `open project`, `new`,
+  `command palette`. No "Open Project…" with title-case + ellipsis.
+- No "Welcome to STREAM Composer", no "to get started", no drag-drop
+  instruction text. The empty canvas + visible toolbox panel + menubar
+  already say "drop something here."
+
+**Shortcut idiom:** plain `Ctrl+...` text matching the menubar
+(FileMenu / EditMenu / etc.). No `⌘` glyph branching; consistency with
+the menubar wins over per-platform glyph correctness in a tool whose
+primary deployment is Linux/WSL2 desktop.
+
+**The Shortcut-Is-Static-Text Rule.** The keymap rows are documentation,
+not click affordances. Users press the keybind; they don't click the
+shortcut chip. Duplicating the menubar's click paths on the canvas
+would introduce two cmdk-mount / file-dialog-mount paths for the same
+action. Recents ARE buttons because they encode a *specific path*
+(`loop_v2.scp`) the menubar's "Open Recent" submenu doesn't anchor on
+the eye-landing spot.
+
+**A11y:** recent rows are real `<button>` elements with native keyboard
+nav, `focus-visible:ring-2 ring-ring`, and `motion-reduce:!duration-0`
+on the hover transition. Replaces the prior `div onClick` a11y
+violation. Shortcut rows are static text (no role, no tabIndex —
+nothing to focus).
+
 ### Smart port-side convention (locked — Phase 72, 2026-05-22)
 
 Replaces the original Phase 64 local-geometry algorithm in
@@ -618,7 +676,6 @@ decided in its own `/impeccable shape <surface>` session (see
 - `CustomTitlebar` + `WindowControls`
 - `SidebarPanel`
 - `ResponsiveTabsList`
-- `WelcomeOverlay` (will be replaced by `/impeccable shape first-run`)
 
 **Canvas + signature surfaces still pending**
 - `BCEdge` (dashed BC edge variant) — HydraulicEdge already done

@@ -42,12 +42,12 @@ capture the final tokens into a proper frontmatter + sidecar.
 | ValidationPanel + ValidationStatusBar + unified bottom-chrome footer | ✅ | 1 cluster commit (validator UX redesign) — see Decision log | §5 validator vocabulary, filter pills, group-by, resizable columns, selected-row indicator, status-bar tabs locked |
 | Loop-highlight system + validator targeting rewrite (gravity_sum_per_loop) | ✅ | 1 cluster commit — see Decision log | §4 marching-ants flow trace motion; §5 .validation-flow-trace + .validation-flash-persistent + loop targeting contract locked |
 | HydraulicEdge — obstacle-avoiding orthogonal router (Phase B) + smart port-side convention (Phase A v2) | ✅ | 1 cluster commit — see Decision log | §5 router contract + Phase 72 port-side convention (axis-snap, vertical bias, no-share-side invariant) locked |
+| First-run empty-canvas hint (replaces WelcomeOverlay; chromeless typographic anchor) | ✅ | 1 commit — see Decision log | §5 first-run vocabulary locked (no card / no shadow / no wordmark, mono recents + Ctrl+ keymap, static-shortcut rule) |
 
 ### Queued (next session — Session 3)
 
 | Surface | Status | Audit / critique reference |
 |---|---|---|
-| First-run empty state (replaces WelcomeOverlay; engineering-voice) | ⬜ | Audit P0-1 · Critique P1-1 |
 | Help system (Radix Tooltip primitive layer + `?` shortcut overview card) | ⬜ | Critique P0-2 |
 
 ### Queued (Session 4+)
@@ -333,6 +333,55 @@ orthogonal router that avoids node bodies.
 - `autoflip.test.ts` — 23 tests, including convention-driven layouts
   for vertical 2-node loops and the off-axis-neighbor case from
   `imp_edge_bug2.png`.
+
+### First-run empty-canvas hint (locked 2026-05-22)
+
+Replaces the prior `WelcomeOverlay` (centered rounded card with shadow-lg +
+"to get started" copy + div-onClick recent rows) — the canonical PRODUCT.md
+anti-reference and the single highest-priority audit finding (P0-1). Built
+through `/impeccable shape first-run`; brief was compact because doctrine
+pinned the vast majority of the design (engineering voice, no card/shadow/
+rounded panel, canvas-as-lightest, Restrained).
+
+**Single commit:** `feat(72-first-run): chromeless typographic anchor replaces WelcomeOverlay card`
+
+**Three confirmed locks** (via AskUserQuestion during shape):
+1. Topology = centered chromeless block (over bottom-center status line / completely empty canvas)
+2. Wordmark = none (titlebar already carries app identity)
+3. Recents surfacing = tight mono list inline (over File-menu-only / two-column with dates)
+
+**Key commitments** (full detail in `DESIGN.md` §5):
+
+- `w-[280px]` block, absolute-centered in canvas, pointer-events split:
+  outer wrapper passes through (canvas pan/zoom/drag-drop unaffected on
+  the empty area surrounding the hint); inner block accepts clicks.
+- Two-column shortcut keymap: mono chip (`w-16` fixed) + sans label.
+  Static text — the keybind IS the affordance. Three rows:
+  `Ctrl+O open project` / `Ctrl+N new` / `Ctrl+P command palette`.
+- Recents (when present): mono `text-label` `<button>` rows, basename
+  stem (extension stripped), native `title=` for full path, max 5,
+  rounded-sm + `hover:bg-card` + 80 ms transition-colors + focus-visible
+  ring-2, `motion-reduce:!duration-0`. Hairline `--border` separator
+  between recents and keymap. Lowercase section label `recent`
+  (`text-micro mono foreground/45`).
+- Shortcut glyph idiom: plain `Ctrl+...` matching the menubar
+  (FileMenu/EditMenu literal `Ctrl+O` style). No `⌘`/Ctrl branching.
+
+**Audit deltas this session resolves:**
+- P0-1 (textbook consumer-SaaS empty state — verbatim PRODUCT.md
+  anti-reference) — entire surface rebuilt
+- P2-1 (`<div onClick>` recent rows lacked keyboard nav) — recents are
+  now real `<button>` elements with proper keyboard nav + focus-visible
+  ring
+- Critique P1-1 (working-memory overload on first render) — block went
+  from card+heading+helper-paragraph+button (4 distinct attention units)
+  to recents + 3-row keymap; the keymap reads as a single typographic
+  unit
+- "to get started" verbatim anti-reference copy — deleted
+
+**Tests:** 1049 / 1049 pass. tsc baseline 10 (unchanged). No tests
+existed for `WelcomeOverlay` (still none — surface is doctrine-locked
+visual + a `<button>` click path already covered by store-action tests).
 
 ### Lessons (worth re-reading at the start of the next session)
 
