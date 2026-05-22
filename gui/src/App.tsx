@@ -14,6 +14,7 @@ import BottomPanel from "./components/BottomPanel";
 import ValidationStatusBar from "./components/ValidationStatusBar";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import CommandPalette from "./components/CommandPalette";
+import AnatomyDialog from "./components/AnatomyDialog";
 import AutoRecoverRestoreModal, {
   type RestoreCandidate,
 } from "./components/AutoRecoverRestoreModal";
@@ -33,6 +34,16 @@ import { useShowCodeFor } from "./hooks/useShowCodeFor";
 
 type DialogCallback = (action: "save" | "discard" | "cancel") => void;
 
+// Phase 72 (help-system) — declare the help-surface custom events so the
+// keydown/dispatch wiring below is fully typed. `gsd:open-command-palette`
+// is the legacy ViewMenu hook (Phase 69 D-02); kept for parity.
+declare global {
+  interface WindowEventMap {
+    "stream:open-shortcuts": CustomEvent<void>;
+    "stream:open-anatomy": CustomEvent<void>;
+  }
+}
+
 function App() {
   // Phase 66 Plan 03: install the window-level `stream:show-code-for` listener
   // at app root so it survives BottomPanel mount/unmount cycles (CodePreview
@@ -49,6 +60,15 @@ function App() {
   // slices for transient UI"). Toggled by the Ctrl+P branch in handleKeyDown
   // below and by the palette's onOpenChange (Esc / click-outside / select).
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Phase 72 (help-system) — which view the palette opens in. Set by the
+  // opener (`?` → "shortcuts"; `Ctrl+P` → "commands"; menu entries pass the
+  // same). The palette then owns mode internally and lets the user swap.
+  const [paletteMode, setPaletteMode] = useState<"commands" | "shortcuts">(
+    "commands",
+  );
+  // Phase 72 (help-system) — AnatomyDialog open/closed. Same local-state
+  // pattern as paletteOpen.
+  const [anatomyOpen, setAnatomyOpen] = useState(false);
 
   // Panel collapse state
   const toolboxCollapsed = useStore((s) => s.toolboxCollapsed);
@@ -366,12 +386,50 @@ function App() {
     // custom event so the menu entry shares one open path with Ctrl+P.
     // Keeps paletteOpen as local App state (no store churn) while still
     // letting any chrome surface open the palette by name.
-    const handleOpenEvent = () => setPaletteOpen(true);
+    const handleOpenEvent = () => {
+      setPaletteMode("commands");
+      setPaletteOpen(true);
+    };
+    // Phase 72 (help-system) — `?` opens the palette in shortcut mode. Sits
+    // beside Ctrl+P in its own handler. Same input-focus guard as Ctrl+`
+    // and Esc — typing `?` into a text input must still produce a literal
+    // `?` rather than open the palette.
+    const handleShortcutsKey = (e: KeyboardEvent) => {
+      if (e.key !== "?") return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target && target.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setPaletteMode("shortcuts");
+      setPaletteOpen(true);
+    };
+    // Phase 72 (help-system) — menu entry "Show Shortcuts… ?" dispatches
+    // a custom event so the menu and `?` share one open path.
+    const handleOpenShortcuts = () => {
+      setPaletteMode("shortcuts");
+      setPaletteOpen(true);
+    };
+    // Phase 72 (help-system) — menu entry "Show Anatomy…" dispatches a
+    // custom event from HelpMenu. AnatomyDialog has no global keybind by
+    // design (low-frequency reference doesn't earn one).
+    const handleOpenAnatomy = () => setAnatomyOpen(true);
     window.addEventListener("keydown", handlePaletteKey);
+    window.addEventListener("keydown", handleShortcutsKey);
     window.addEventListener("gsd:open-command-palette", handleOpenEvent);
+    window.addEventListener("stream:open-shortcuts", handleOpenShortcuts);
+    window.addEventListener("stream:open-anatomy", handleOpenAnatomy);
     return () => {
       window.removeEventListener("keydown", handlePaletteKey);
+      window.removeEventListener("keydown", handleShortcutsKey);
       window.removeEventListener("gsd:open-command-palette", handleOpenEvent);
+      window.removeEventListener("stream:open-shortcuts", handleOpenShortcuts);
+      window.removeEventListener("stream:open-anatomy", handleOpenAnatomy);
     };
   }, []);
 
@@ -603,7 +661,15 @@ function App() {
             (Pitfall 2: useReactFlow() inside the palette requires a parent
             ReactFlowProvider; mounting at the root above the render gate
             would crash on open). */}
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          initialMode={paletteMode}
+        />
+        {/* Phase 72 (help-system) — AnatomyDialog. Visual legend for the
+            canvas vocabulary (StreamNode + edges + their states). Opens from
+            HelpMenu only; no keybind by design. */}
+        <AnatomyDialog open={anatomyOpen} onOpenChange={setAnatomyOpen} />
         {/* Phase 70 Plan 06 — SavePresetModal mounted at the top level so both
             FileMenu and NodeContextMenu can open it via the
             "stream:open-save-preset" custom event without prop drilling. */}

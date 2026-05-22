@@ -43,12 +43,7 @@ capture the final tokens into a proper frontmatter + sidecar.
 | Loop-highlight system + validator targeting rewrite (gravity_sum_per_loop) | ✅ | 1 cluster commit — see Decision log | §4 marching-ants flow trace motion; §5 .validation-flow-trace + .validation-flash-persistent + loop targeting contract locked |
 | HydraulicEdge — obstacle-avoiding orthogonal router (Phase B) + smart port-side convention (Phase A v2) | ✅ | 1 cluster commit — see Decision log | §5 router contract + Phase 72 port-side convention (axis-snap, vertical bias, no-share-side invariant) locked |
 | First-run empty-canvas hint (replaces WelcomeOverlay; chromeless typographic anchor) | ✅ | 1 commit — see Decision log | §5 first-run vocabulary locked (no card / no shadow / no wordmark, mono recents + Ctrl+ keymap, static-shortcut rule) |
-
-### Queued (next session — Session 3)
-
-| Surface | Status | Audit / critique reference |
-|---|---|---|
-| Help system (Radix Tooltip primitive layer + `?` shortcut overview card) | ⬜ | Critique P0-2 |
+| Help system (Tooltip discipline + cmdk shortcut mode + AnatomyDialog visual legend) | ✅ | 1 cluster commit — see Decision log | §5 tooltip consumption discipline + shortcut catalog SSOT + AnatomyDialog (real-component mirror) + HelpMenu rebuilt |
 
 ### Queued (Session 4+)
 
@@ -383,6 +378,80 @@ rounded panel, canvas-as-lightest, Restrained).
 existed for `WelcomeOverlay` (still none — surface is doctrine-locked
 visual + a `<button>` click path already covered by store-action tests).
 
+### Help system (locked 2026-05-22)
+
+Three coordinated artifacts that close the Critique P0-2 "no in-app help"
+gap. Shipped through `/impeccable shape help-system`; brief was compact for
+artifacts 1 and 2 (doctrine pinned almost everything) and discovery-led for
+the Anatomy dialog (user explicitly added it to scope mid-discovery, asking
+for an "appliance-guide-style visual cheatsheet").
+
+**Cluster commit (1):** `feat(72-help): tooltip discipline + cmdk shortcut mode + anatomy dialog`
+
+**Three confirmed locks** (via AskUserQuestion during shape):
+1. Shortcut overview surface = cmdk in shortcut mode (over Sheet, over centered card)
+2. Anatomy scope = Node + Edges (over node-only, over node + edges + layers)
+3. Tooltip discipline = icon-only + shortcut-bearing-without-visible-binding (over icon-only-only, over "every actionable element")
+
+**User-driven scope expansion (mid-discovery):** the Anatomy dialog wasn't in
+the original brief; the user surfaced an "appliance-guide visual cheatsheet"
+idea that fit the doctrine perfectly (schematic-legend tradition; Houdini
+node-anatomy reference). Brief expanded; rendering strategy locked as
+"real-component mirror" (visual fidelity to StreamNode without consuming the
+zustand selectors that would force every store path to be stubbed in a
+non-canvas context).
+
+**Key commitments** (full detail in `DESIGN.md` §5):
+
+- **Tooltip consumption discipline.** Two cases earn a Tooltip: (a) icon-only
+  chrome controls where label is implicit, (b) clickable surface with a
+  keyboard shortcut whose binding isn't already visibly displayed. Concrete
+  inventory: WindowControls Min/Max/Close (Windows/Linux variant),
+  ValidationPanel Group-by sliders icon, ValidationStatusBar close chevron
+  (Ctrl+`). Explicitly excluded: menubar items, LayersPanel rows,
+  status-bar Code/Validation tab buttons, App.tsx collapsed-edge re-expand
+  strips. The Tooltip-Earns-Its-Pixels Rule.
+- **cmdk shortcut mode.** `?` keybind opens existing palette in
+  `mode: "shortcuts"`. Mode chip in the palette header swaps modes
+  in-place; swapping clears search. Rows are read-only — closing the
+  palette on select but NOT invoking the underlying action (mirrors the
+  first-run Shortcut-Is-Static-Text Rule). `gui/src/lib/shortcuts.ts` is
+  the SSOT for the catalog; new keybinds must be added there.
+- **Anatomy dialog.** Modal Dialog (`!max-w-[920px]`), two tiles side by
+  side (Node | Edges) on the canvas grid texture. Numbered callout chips
+  (18×18 px rounded-sm mono micro) overlaid via absolute positioning;
+  legend lists below each tile; `not all states co-occur on a real node`
+  footnote at the bottom. Marching-ants edge animation scoped locally as
+  `anatomy-flow-march` (so it doesn't depend on xyflow's
+  `.validation-flow-trace .react-flow__edge-path` global selector).
+- **HelpMenu rebuilt.** Shortcuts (with `?` shortcut chip) / Anatomy /
+  About. The prior disabled `Keyboard Shortcuts` stub is removed. Both
+  new entries dispatch custom events (`stream:open-shortcuts`,
+  `stream:open-anatomy`) listened to in App.tsx — same pattern as
+  `stream:open-save-preset`, no prop drilling.
+
+**Files touched (production):**
+
+- New: `gui/src/lib/shortcuts.ts` (SHORTCUTS_CATALOG SSOT)
+- New: `gui/src/components/AnatomyDialog.tsx`
+- Updated: `gui/src/components/CommandPalette.tsx` (mode prop + ShortcutGroups + ModeChip)
+- Updated: `gui/src/App.tsx` (`?` keybind + custom-event wiring + AnatomyDialog mount + paletteMode state)
+- Updated: `gui/src/components/HelpMenu.tsx` (two new entries, stub removed)
+- Updated: `gui/src/components/WindowControls.tsx` (Tooltip on Windows/Linux buttons)
+- Updated: `gui/src/components/ValidationStatusBar.tsx` (Tooltip on close chevron)
+- Updated: `gui/src/components/ValidationPanel.tsx` (Tooltip on Group-by sliders icon, nested asChild with PopoverTrigger)
+
+**Files touched (tests):** ValidationPanel / ValidationStatusBar /
+WindowControls test files wrap their renders in `<TooltipProvider
+delayDuration={0}>` because tooltips that mount in isolation need a provider
+in scope. Production-side, the one provider lives at the app root in
+`App.tsx` (existing).
+
+**Tests:** 1046 / 1050 pass (the 4 failing are the pre-existing
+`codeGenerator.smoke.test.ts` fixture-missing baseline, unchanged). tsc
+baseline 10 errors (unchanged — none of the 10 are in surfaces this session
+touched).
+
 ### Lessons (worth re-reading at the start of the next session)
 
 1. **The validation-flash bug took 3 sub-fixes** (offset → border-radius →
@@ -477,6 +546,33 @@ visual + a `<button>` click path already covered by store-action tests).
     registry-declared side." Auto-snapping disconnected ports to the
     flow-axis natural side broke that contract for any isolated node in
     a vertically-laid-out canvas.
+15. **Tooltip discipline isn't "add Tooltip everywhere title= lives."** A
+    400 ms tooltip showing information already visible at rest is friction
+    (and PRODUCT.md flags it as the consumer-SaaS anti-pattern by name).
+    The rule lands at: icon-only chrome OR shortcut-bearing-without-visible-
+    binding. Everything else stays bare. Mechanical replacement of all 5
+    existing `title=` attrs would have failed the audit; targeted
+    application passes it.
+16. **Real-component-in-the-Anatomy hits a hard wall on store coupling.**
+    StreamNode reads from 5+ zustand selectors (errorNodeIds, anchors,
+    hoveredSourceIds, pinnedSourceIds, activeLayers, hideOffLayer). Mounting
+    a real StreamNode inside an Anatomy dialog would require either (a)
+    seeding fake IDs into the production store (polluting state for an
+    inert reference dialog) or (b) wrapping it in a mock-zustand Provider
+    (zustand 4 doesn't support per-tree store overrides natively).
+    The "visual mirror" middle ground — recreate the visual shell exactly
+    using the same tokens / dimensions / DOM structure, but without the
+    xyflow Handle plumbing — is the correct trade. Drift surface is the
+    visual shell only; a marker comment on AnatomyDialog flags the dual-
+    maintenance requirement.
+17. **Adding `<Tooltip>` inside a component breaks isolated tests.** Radix
+    Tooltip requires a `<TooltipProvider>` context, which production mounts
+    once at the app root. Tests that render the leaf component in isolation
+    have no provider and Radix throws a hard error
+    (`Tooltip must be used within TooltipProvider`). Fix is to wrap the
+    test render in `<TooltipProvider delayDuration={0}>`, not to pile
+    multiple providers into production. Three test files touched in this
+    session.
 
 ## Re-entry instructions for the next session
 
@@ -491,12 +587,17 @@ Open a new Claude Code session, then say something like:
 The new session will load doctrine + queue + locked values + recent
 lessons in 1–2 minutes and resume cleanly.
 
-**Next surface per queue:** `/impeccable shape first-run` — the empty-state
-that replaces `WelcomeOverlay`. Audit P0-1 (textbook consumer-SaaS empty
-state), Critique P1-1 (working-memory overload on first render). The
-"to get started" copy is verbatim a PRODUCT.md anti-reference and the
-recent-file rows are div-onClick a11y violations. Engineering-voice
-empty canvas, no shadow-lg rounded card.
+**Next surface per queue:** `/impeccable shape BCEdge` (or pair it with the
+`CodePreview` token sweep). HydraulicEdge is already done in Phase B of
+the router pass; BCEdge still carries `#7dd3fc / #38bdf8` sky-300/400
+placeholder hex for the code-hovered / code-pinned states, and CodePreview
+still hardcodes the GitHub-dark `#0d1117` body background. After that the
+queue runs the cross-cutting passes: `/impeccable harden gui/src/`
+(prefers-reduced-motion sweep, div-as-button conversions, axe-core WCAG
+pass), `/impeccable clarify gui/src/` (em-dash purge + PresetsPanel
+consumer-voice rewrite), then `/impeccable polish gui/src/` to migrate any
+remaining ad-hoc values onto the token scale before re-running audit /
+critique and writing SUMMARY.md.
 
 **Related memories** (loaded automatically — don't need to re-read):
 

@@ -40,6 +40,7 @@ import { SlidersHorizontal, ChevronRight, ChevronDown } from "lucide-react";
 import useStore from "../store/useStore";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import type { ValidationResult } from "../lib/validation/types";
 import { type StreamNodeData } from "../store/useStore";
 
@@ -604,22 +605,29 @@ interface GroupBySettingsProps {
 function GroupBySettings({ groupBy, onChange }: GroupBySettingsProps) {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label="Group by settings"
-          title="Group by"
-          className={
-            "inline-flex items-center justify-center px-1.5 py-1 ml-1 rounded-sm cursor-pointer " +
-            "text-foreground/65 hover:text-foreground " +
-            "transition-colors duration-[80ms] " +
-            "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
-            (groupBy !== "none" ? "text-foreground" : "")
-          }
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
-        </button>
-      </PopoverTrigger>
+      {/* Phase 72 (help-system) — icon-only chrome button. Tooltip
+          discipline applies. Nested asChild: TooltipTrigger and
+          PopoverTrigger both forward refs/props to the button. */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Group by settings"
+              className={
+                "inline-flex items-center justify-center px-1.5 py-1 ml-1 rounded-sm cursor-pointer " +
+                "text-foreground/65 hover:text-foreground " +
+                "transition-colors duration-[80ms] " +
+                "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
+                (groupBy !== "none" ? "text-foreground" : "")
+              }
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top">Group by</TooltipContent>
+      </Tooltip>
       <PopoverContent align="end" className="w-auto p-3">
         <div className="flex flex-col gap-2">
           <span className="text-[10px] uppercase tracking-wide text-foreground/55 font-mono">

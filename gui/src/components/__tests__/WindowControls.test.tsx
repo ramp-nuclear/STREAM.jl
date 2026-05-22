@@ -10,6 +10,19 @@
 // - Click handlers invoke the correct getCurrentWindow().* method.
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, cleanup } from "@testing-library/react";
+import { TooltipProvider } from "../ui/tooltip";
+
+// Phase 72 (help-system) — WindowControls' Windows/Linux branch wraps each
+// button in a Radix Tooltip; that requires a TooltipProvider in scope. The
+// macOS branch (traffic-light circles) is unaffected. Wrapping every render
+// keeps the test surface uniform without per-branch divergence.
+function renderControls() {
+  return render(
+    <TooltipProvider delayDuration={0}>
+      <WindowControls />
+    </TooltipProvider>,
+  );
+}
 
 // Mocks must be set up BEFORE the component import so the module bindings
 // are stubbed at evaluation time.
@@ -59,7 +72,7 @@ afterEach(() => {
 describe("WindowControls — macOS branch", () => {
   it("renders three rounded-full buttons with traffic-light hex colors", async () => {
     platformMock.mockReturnValue("macos");
-    const { container } = render(<WindowControls />);
+    const { container } = renderControls();
     await flushEffects();
 
     const circles = container.querySelectorAll("button.rounded-full");
@@ -76,7 +89,7 @@ describe("WindowControls — macOS branch", () => {
 
   it("invokes close() when the red leftmost circle is clicked", async () => {
     platformMock.mockReturnValue("macos");
-    const { container } = render(<WindowControls />);
+    const { container } = renderControls();
     await flushEffects();
 
     const circles = container.querySelectorAll("button.rounded-full");
@@ -94,7 +107,7 @@ describe("WindowControls — macOS branch", () => {
 describe("WindowControls — Windows/Linux branch", () => {
   it("renders Lucide icons with Close rightmost (windows)", async () => {
     platformMock.mockReturnValue("windows");
-    const { container } = render(<WindowControls />);
+    const { container } = renderControls();
     await flushEffects();
 
     // No traffic-light circles
@@ -116,7 +129,7 @@ describe("WindowControls — Windows/Linux branch", () => {
     platformMock.mockImplementation(() => {
       throw new Error("platform unavailable");
     });
-    const { container } = render(<WindowControls />);
+    const { container } = renderControls();
     await flushEffects();
 
     expect(container.querySelectorAll("button.rounded-full").length).toBe(0);
@@ -129,7 +142,7 @@ describe("WindowControls — Windows/Linux branch", () => {
 
   it("invokes the correct IPC method when each Lucide button is clicked", async () => {
     platformMock.mockReturnValue("linux");
-    const { container } = render(<WindowControls />);
+    const { container } = renderControls();
     await flushEffects();
 
     const buttons = container.querySelectorAll("button");

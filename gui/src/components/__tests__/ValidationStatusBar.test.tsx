@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 import ValidationStatusBar from "../ValidationStatusBar";
+import { TooltipProvider } from "../ui/tooltip";
 import useStore from "../../store/useStore";
 import type { ValidationResult } from "../../lib/validation/types";
 
@@ -31,7 +32,14 @@ function makeResult(overrides: Partial<ValidationResult> = {}): ValidationResult
 }
 
 function renderBar() {
-  return render(<ValidationStatusBar />);
+  // Phase 72 (help-system) — the close chevron is now a Radix Tooltip
+  // trigger; without a TooltipProvider in scope Radix throws. Production
+  // mounts the provider at the app root.
+  return render(
+    <TooltipProvider delayDuration={0}>
+      <ValidationStatusBar />
+    </TooltipProvider>,
+  );
 }
 
 beforeEach(() => {

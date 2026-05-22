@@ -3,22 +3,24 @@ import {
   MenubarContent,
   MenubarItem,
   MenubarMenu,
+  MenubarShortcut,
   MenubarTrigger,
 } from "./ui/menubar";
 import AboutDialog from "./AboutDialog";
 
 /**
- * Help menu (Phase 67 D-12).
+ * Help menu (Phase 67 D-12, expanded Phase 72 help-system shape).
  *
- * Round 2 — migrated from DropdownMenu to shadcn Menubar so the parent
- * <Menubar> in CustomTitlebar coordinates click-once switching between
- * sibling menus (UAT round 2 #5).
+ * Entries:
+ *   - "Shortcuts" → opens the command palette in shortcut mode via the
+ *     `stream:open-shortcuts` custom event. Mirrors the `?` keybind.
+ *   - "Anatomy" → opens the AnatomyDialog visual legend via
+ *     `stream:open-anatomy`. No keybind by design (low-frequency reference).
+ *   - "About STREAM Composer" → AboutDialog (unchanged).
  *
- * - About STREAM Composer opens AboutDialog (controlled via local state).
- * - Keyboard Shortcuts is a disabled stub deferred to Phase 72.
- *
- * The AboutDialog is rendered as a sibling AFTER the closing </MenubarMenu>
- * to keep JSX flat — Radix Portal handles z-order either way.
+ * Custom events are dispatched on `window` and listened to in App.tsx, where
+ * the open state for each surface lives — keeps HelpMenu free of prop drilling
+ * and matches the existing `stream:open-save-preset` pattern.
  */
 export default function HelpMenu() {
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -30,11 +32,23 @@ export default function HelpMenu() {
           Help
         </MenubarTrigger>
         <MenubarContent align="start">
+          <MenubarItem
+            onClick={() =>
+              window.dispatchEvent(new CustomEvent("stream:open-shortcuts"))
+            }
+          >
+            <span>Shortcuts</span>
+            <MenubarShortcut>?</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem
+            onClick={() =>
+              window.dispatchEvent(new CustomEvent("stream:open-anatomy"))
+            }
+          >
+            <span>Anatomy</span>
+          </MenubarItem>
           <MenubarItem onClick={() => setAboutOpen(true)}>
             <span>About STREAM Composer</span>
-          </MenubarItem>
-          <MenubarItem disabled>
-            <span>Keyboard Shortcuts</span>
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>

@@ -25,6 +25,15 @@ LOCKED (from /impeccable shape shadcn-primitive-layer, 2026-05-22):
         Sheet), Menu family (DropdownMenu/ContextMenu/Menubar/Select/Command),
         Navigation (Tabs/ScrollArea/Separator)
 
+LOCKED (from /impeccable shape help-system, 2026-05-22):
+  - §5 Tooltip consumption discipline (icon-only OR shortcut-bearing-without-
+        visible-binding); inventory of consumers; explicit exclusions
+  - §5 cmdk shortcut mode + ? keybind (Linear convention), ModeChip swap,
+        SHORTCUTS_CATALOG SSOT in gui/src/lib/shortcuts.ts
+  - §5 AnatomyDialog — visual legend, dialog modal, real-component mirror
+        strategy, Node + Edges tiles, numbered callouts, footnote
+  - §5 HelpMenu rebuilt (Shortcuts / Anatomy / About)
+
 STILL HELD OPEN:
   - §2 --destructive still provisional (semantic gravity earns it as the
        one chrome-permitted accent, but the exact OKLCH value is inherited)
@@ -594,6 +603,123 @@ nav, `focus-visible:ring-2 ring-ring`, and `motion-reduce:!duration-0`
 on the hover transition. Replaces the prior `div onClick` a11y
 violation. Shortcut rows are static text (no role, no tabIndex —
 nothing to focus).
+
+### Help system (locked — Phase 72, 2026-05-22)
+
+Three coordinated artifacts that close the Critique P0-2 "no in-app help"
+gap without drifting into consumer-SaaS documentation.
+
+**1. Tooltip consumption discipline.**
+
+The Phase-72-locked Radix Tooltip primitive (400 ms delay, no shadow, plain
+fade open/close) is consumed under one rule:
+
+> Tooltip exists for two reasons only:
+> (a) icon-only chrome controls where the label is implicit, and
+> (b) any clickable surface that has a keyboard shortcut whose binding
+>     isn't already visibly displayed.
+> Everything else stays bare.
+
+Locked inventory at this commit:
+
+| Surface | Tooltip content | Reason |
+|---|---|---|
+| `WindowControls` Min / Max / Close (Windows/Linux variant) | `Minimize` / `Maximize` (or `Restore`) / `Close` | Icon-only |
+| `ValidationPanel` Group-by sliders icon | `Group by` | Icon-only |
+| `ValidationStatusBar` close chevron (⌄) | `Close panel · Ctrl+\`` | Icon-only + shortcut |
+
+Explicitly **excluded**: menubar items (shortcut chip already right-aligned
+in the row — tooltip would repeat); `LayersPanel` rows (text-labeled, no
+shortcut); `ValidationStatusBar` Code / Validation tab buttons (text-labeled,
+share `Ctrl+\`` only for panel toggle, not per-tab); `App.tsx` collapsed-edge
+re-expand strips (4 px wide, no shortcut — native `title=` is fine).
+
+**The Tooltip-Earns-Its-Pixels Rule.** A 400 ms tooltip showing information
+already visible at rest is friction. Adding tooltips broadly drifts toward
+the consumer-SaaS "explain every button" anti-pattern. The discipline above
+keeps the tooltip surface narrow and purposeful.
+
+**2. Shortcut overview (cmdk shortcut mode).**
+
+The existing `CommandPalette` gains an internal
+`mode: "commands" | "shortcuts"` state. `Ctrl+P` opens with
+`mode: "commands"` (current behavior); `?` (Shift+/) opens with
+`mode: "shortcuts"`. The mode chip in the palette header swaps modes
+in-place (no close + reopen); swapping clears the search query.
+
+| Mode | Input placeholder | Empty state | Listing |
+|---|---|---|---|
+| `commands` | `Type to search components and resources...` | `No matches.` | Existing component / resource / project rows |
+| `shortcuts` | `Type to search shortcuts...` | `No bindings.` | `SHORTCUTS_CATALOG` from `gui/src/lib/shortcuts.ts`, grouped by `File / Edit / View / Canvas / Help`, mono shortcut chip right-aligned |
+
+The shortcuts catalog (`gui/src/lib/shortcuts.ts`) is the single source of
+truth. New keybinds must be added there in addition to the real keydown
+handler that owns the binding.
+
+**The Shortcut-Row-Is-Read-Only Rule.** A `<CommandItem>` in shortcut mode
+closes the palette on select but does NOT invoke the underlying action. The
+shortcut row is a *reference*: the user reads the binding, dismisses, and
+presses it. Duplicating action paths (palette row + keybind + menubar) would
+create two cmdk-mount / file-dialog-mount surfaces per intent. Mirrors the
+first-run keymap's "Shortcut-Is-Static-Text Rule".
+
+**Trigger key = `?` (Shift+/).** Linear / Notion / Figma convention. Same
+input-focus guard as `Ctrl+\`` and `Esc` — typing `?` into a text input
+must still produce a literal `?`.
+
+**3. Anatomy dialog.**
+
+`gui/src/components/AnatomyDialog.tsx`. A modal visual legend for the canvas
+vocabulary. Opens from `HelpMenu → "Anatomy"` via the `stream:open-anatomy`
+custom event; no keybind by design (low-frequency reference doesn't earn a
+binding, mirroring the menu-only `About` precedent).
+
+**Surface:** Dialog at `!max-w-[920px] w-[92vw]`. Body uses the standard
+DialogContent surface (`bg-popover` + `--shadow-dialog`). Two tiles arranged
+horizontally with `divide-x divide-border/60`; legend lists sit below each
+tile; a single-line `not all states co-occur on a real node` footnote runs
+across the dialog bottom.
+
+**Diagram source = visual mirror.** The dialog renders a *visual mirror* of
+the production `StreamNode` rather than the real component, because
+`StreamNode` reads from the global zustand store (`errorNodeIds`, `anchors`,
+`hoveredSourceIds`, `pinnedSourceIds`, `activeLayers`, `hideOffLayer`) and
+would need every selector path stubbed out to render in a non-canvas context.
+The mirror consumes the same tokens (`--card`, `--ring`, `--destructive`,
+`--color-layer-*`, `--node-ring-rest`, `--chart-5`) and matches the band
+geometry / body structure / ring + outline values pixel-for-pixel. When
+`StreamNode` changes, update the mirror here too. Drift surface is
+intentionally small (visual shell only, not behavior).
+
+Edges are inline SVG paths matching `HydraulicEdge` (solid 1.5 px),
+`BCEdge` (dashed 6/3 with mid-edge tag), and `.validation-flow-trace`
+(2.5 px warning-tinted dashed with marching-ants animation, severity =
+warning). The marching-ants keyframe is scoped locally as
+`anatomy-flow-march` to avoid depending on the global xyflow-scoped
+`.validation-flow-trace .react-flow__edge-path` selector. Same
+`prefers-reduced-motion` collapse rule.
+
+**Callouts:** 18×18 px rounded-sm chips, mono micro-text numbering, hairline
+`--border`, positioned absolutely over the diagram tile. Node tile carries
+10 callouts (1=Hydraulic band, 2=Thermal band, 3=icon+label, 4=instance,
+5=value summary, 6=ports, 7=selected ring, 8=error outline, 9=pressure
+anchor, 10=autoExtended sample). Edges tile carries 4 callouts (1=hydraulic
+default, 2=BC dashed, 3=loop trace, 4=port-side convention).
+
+**The Anatomy-Is-A-Legend-Not-Docs Rule.** Anatomy shows visual vocabulary;
+it does NOT explain physics, components, or workflows. Documentation
+(component reference, validation rule descriptions, STREAM.jl link-out)
+explicitly stays out of scope — PRODUCT.md's "trust the expert" applies to
+prose hand-holding, not to disambiguating visual cues. If a future need
+arises for in-app rule documentation, that's a separate surface.
+
+**HelpMenu entries (rebuilt):**
+- `Shortcuts ?` — dispatches `stream:open-shortcuts`, opens palette in
+  shortcut mode (mirrors `?` keybind path).
+- `Anatomy` — dispatches `stream:open-anatomy`, opens AnatomyDialog.
+- `About STREAM Composer` — unchanged (existing AboutDialog).
+
+The prior disabled `Keyboard Shortcuts` stub is gone.
 
 ### Smart port-side convention (locked — Phase 72, 2026-05-22)
 
