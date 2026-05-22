@@ -200,20 +200,6 @@ describe("nMatch", () => {
     expect(nTargets).toHaveLength(2);
   });
 
-  // Phase 71 UAT Test 8 (2026-05-21): user removed the FixAction on nMatch.
-  // Rule degrades to navigation-only; result.fixAction must be undefined.
-  it("emits no fixAction (rule is navigation-only after UAT Test 8)", () => {
-    const ch = makeNode("ch1", "Channel", "ch_1", { n: 3 });
-    const wt = makeNode("wt1", "WallTemperature", "wt_1", { n: 4 });
-    const bcMode: Record<string, BCModeEntry> = {
-      "ch1::T_wall_left": { mode: "source", sourceNodeId: "wt1" },
-    };
-    const snapshot = makeSnapshot([ch, wt], bcMode);
-    const results = nMatch.run(snapshot);
-    expect(results).toHaveLength(1);
-    expect(results[0].fixAction).toBeUndefined();
-  });
-
   // Phase 71 UAT Test 8 dedup: multiple BC bindings between the same
   // (consumerId, sourceId) pair must produce a single result.
   it("dedupes results by (consumerId, sourceId) pair across multiple bindings", () => {

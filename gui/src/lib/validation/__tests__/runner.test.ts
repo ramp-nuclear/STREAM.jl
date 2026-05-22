@@ -1,10 +1,12 @@
-// runner.test.ts — Unit tests for the validator runner (Phase 71)
+// runner.test.ts — Unit tests for the validator runner.
 //
 // Environment: node (vitest.config.ts default — no JSDOM needed for pure functions).
 // Tests pin:
 //   1. Empty registry → runValidators returns []
 //   2. Stub validator → runValidators returns its results
-//   3. FixAction lossless-sync apply closure invocation (contract pin)
+//
+// Phase 72: the third test (FixAction lossless-sync apply closure contract)
+// was removed when the FixAction type was deleted from ValidationResult.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ValidationSnapshot } from "../snapshot";
@@ -91,50 +93,4 @@ describe("runValidators", () => {
     expect(results[0]).toEqual(stubResult);
   });
 
-  // ---------------------------------------------------------------------------
-  // Test 3: FixAction lossless-sync apply closure — contract pin
-  //
-  // This test verifies the FixAction shape at both the type level and runtime
-  // level: a ValidationResult with a 'lossless-sync' fixAction can be
-  // constructed, and its apply() can be invoked with (mockSet, mockGet).
-  // ---------------------------------------------------------------------------
-
-  it("invokes lossless-sync apply with set and get handles", () => {
-    const mockSet = vi.fn();
-    const mockGet = vi.fn(() => ({}));
-
-    const result: ValidationResult = {
-      id: "test::lossless",
-      validatorId: "test",
-      severity: "warning",
-      description: "Test lossless-sync fix action",
-      targets: [{ kind: "node", nodeId: "n1" }],
-      fixAction: {
-        kind: "lossless-sync",
-        label: "Sync n to 10",
-        apply: (set, get) => {
-          // Closure uses get() to read fresh state and set() to apply fix.
-          // In real rules the closure would call set({ someField: value }).
-          void get();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (set as any)({ nodes: [] });
-        },
-      },
-    };
-
-    // Verify the FixAction discriminant is correct
-    expect(result.fixAction).toBeDefined();
-    expect(result.fixAction!.kind).toBe("lossless-sync");
-
-    // Invoke the apply closure with mock handles (as ValidationPanel will at click time)
-    if (result.fixAction?.kind === "lossless-sync") {
-      const fa = result.fixAction;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fa.apply(mockSet as any, mockGet as any);
-    }
-
-    // Both handles should have been called exactly once
-    expect(mockGet).toHaveBeenCalledOnce();
-    expect(mockSet).toHaveBeenCalledOnce();
-  });
 });

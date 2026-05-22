@@ -9,10 +9,9 @@
 // Test cases:
 //   1. Two CACs with same geometry UUID → no result (trivially consistent)
 //   2. Two CACs with different UUIDs but same Dh/L/W → no result (values match)
-//   3. Two CACs with Dh mismatch → 1 warning result, navigation-only
+//   3. Two CACs with Dh mismatch → 1 warning result
 //   4. Single CAC on an HD → no result (rule only fires for 2+ CACs)
 //   5. No thermal edges → no result
-//   6. fixAction is navigation-only with label 'Go to components' and no apply
 
 import { describe, it, expect } from "vitest";
 import type { Node, Edge } from "@xyflow/react";
@@ -225,8 +224,6 @@ describe("geometryConsistency", () => {
     expect(fieldTargets.length).toBeGreaterThanOrEqual(2);
     // Both CACs + HD
     expect(nodeTargets.length).toBeGreaterThanOrEqual(3);
-    // Phase 71 UAT (2026-05-21): FixActions removed across all rules.
-    expect(r.fixAction).toBeUndefined();
   });
 
   it("returns no result for a single CAC connected to an HD (no shared coupling)", () => {
@@ -264,10 +261,4 @@ describe("geometryConsistency", () => {
     expect(results).toHaveLength(0);
   });
 
-  it("emits no fixAction (Phase 71 UAT 2026-05-21 removed FixActions)", () => {
-    const snapshot = makeTwoCacTopology(GEOM_1_MATCHING, GEOM_2_MISMATCHING);
-    const results = geometryConsistency.run(snapshot);
-    expect(results).toHaveLength(1);
-    expect(results[0].fixAction).toBeUndefined();
-  });
 });

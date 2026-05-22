@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, Check, Download, ChevronDown, ChevronUp } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Copy, Check, Download } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import useStore from "../store/useStore";
@@ -21,7 +20,6 @@ const STRUCTURAL_VALIDATOR_IDS = new Set(
 export default function BottomPanel() {
   const bottomPanelOpen = useStore((s) => s.bottomPanelOpen);
   const bottomPanelHeight = useStore((s) => s.bottomPanelHeight);
-  const toggleBottomPanel = useStore((s) => s.toggleBottomPanel);
   const { onMouseDown } = useBottomPanelResize();
 
   // PERF — only subscribe to the things this component actually reads in its
@@ -47,7 +45,6 @@ export default function BottomPanel() {
       ).length,
   );
   const activeBottomTab = useStore((s) => s.activeBottomTab);
-  const setActiveBottomTab = useStore((s) => s.setActiveBottomTab);
 
   // 1.5s confirmation state for the Copy button (Research Pattern 8).
   const [copied, setCopied] = useState(false);
@@ -93,31 +90,10 @@ export default function BottomPanel() {
     await exportCode({ sections, nodes: s.nodes });
   }
 
-  // Phase 68 D-10 — closed-state stub strip. Replaces the previous
-  // `return null` early-exit so a persistent 20px (h-5) clickable affordance
-  // always sits at the bottom of the window, mirroring VSCode's bottom-panel
-  // collapsed state. Click anywhere on the strip to re-open the panel.
-  // No animation between open/closed — switching is instantaneous per
-  // UI-SPEC §4 (hidden mode does NOT animate).
-  if (!bottomPanelOpen) {
-    // Slimmer stub strip (Phase 68 UAT 2026-05-17 polish — keep until
-    // Phase 72 full design pass). 14px tall, bg-background instead of
-    // bg-chrome so it reads as a subtle edge affordance rather than a
-    // persistent dark bar. Label drops to 10px to fit the new height.
-    return (
-      <div
-        className="h-3.5 border-t flex items-center justify-center gap-1 cursor-pointer bg-background hover:bg-accent/40 transition-colors select-none"
-        onClick={toggleBottomPanel}
-        role="button"
-        aria-label="Expand code panel"
-      >
-        <span className="text-[10px] font-normal text-muted-foreground leading-none">
-          Code
-        </span>
-        <ChevronUp className="w-2.5 h-2.5 text-muted-foreground" />
-      </div>
-    );
-  }
+  // Phase 72 — closed state renders nothing. The unified ValidationStatusBar
+  // (sibling, mounted right below this component in App.tsx) carries the
+  // `Code ⌃` toggle affordance, so the prior 14 px stub strip is gone.
+  if (!bottomPanelOpen) return null;
 
   return (
     <div style={{ height: bottomPanelHeight }} className="border-t flex flex-col bg-panel">
@@ -127,89 +103,60 @@ export default function BottomPanel() {
         className="h-1 w-full cursor-row-resize hover:bg-ring/30 transition-colors flex-shrink-0"
         onMouseDown={onMouseDown}
       />
-      <Tabs value={activeBottomTab} onValueChange={(v) => setActiveBottomTab(v as 'code' | 'validation')} className="flex-1 min-h-0 flex flex-col">
-        <div className="mx-2 mt-1 flex items-center">
-          <TabsList>
-            <TabsTrigger value="code" className="text-[13px] font-medium">
-              Code
-            </TabsTrigger>
-            <TabsTrigger value="validation" className="text-[13px] font-medium">
-              Validation
-            </TabsTrigger>
-          </TabsList>
-          <div className="ml-auto flex items-center gap-1">
-            {/* Phase 68 D-10 — collapse button. Same toggleBottomPanel store
-                action as the View-menu "Toggle Code Preview" item and the
-                App.tsx Ctrl+` shortcut. Tooltip surfaces the keyboard
-                shortcut so users discover the third entry point. */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleBottomPanel}
-                  aria-label="Collapse code panel"
-                  className="h-7 w-7 p-0"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Collapse (Ctrl+`)</TooltipContent>
-            </Tooltip>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!hasNodes}
-              onClick={handleCopy}
-              aria-label="Copy generated Julia code to clipboard"
+      {/* Phase 72: the duplicate Tabs control was removed from this header.
+          The ValidationStatusBar at the very bottom is the single source of
+          truth for activeBottomTab (Code | Validation). The header now only
+          carries the Copy / Export actions, right-aligned. */}
+      <div className="mx-2 mt-1 flex items-center justify-end gap-1">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!hasNodes}
+          onClick={handleCopy}
+          aria-label="Copy generated Julia code to clipboard"
+        >
+          {copied ? (
+            <>
+              <Check className="h-4 w-4 mr-1" />
+              Copied
+            </>
+          ) : (
+            <>
+              <Copy className="h-4 w-4 mr-1" />
+              Copy
+            </>
+          )}
+        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              tabIndex={structuralErrorCount > 0 || !hasNodes ? 0 : -1}
+              className="inline-flex"
             >
-              {copied ? (
-                <>
-                  <Check className="h-4 w-4 mr-1" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 mr-1" />
-                  Copy
-                </>
-              )}
-            </Button>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                {/* Tooltip requires a focusable child; span wrapper keeps the
-                    button semantics intact when disabled (disabled buttons
-                    don't fire mouse events, so the span captures the hover). */}
-                <span tabIndex={structuralErrorCount > 0 || !hasNodes ? 0 : -1} className="inline-flex">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!hasNodes || structuralErrorCount > 0}
-                    onClick={handleExport}
-                    aria-label="Export generated Julia code to file"
-                  >
-                    <Download className="h-4 w-4 mr-1" />
-                    Export
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                {structuralErrorCount > 0
-                  ? `${structuralErrorCount} structural ${structuralErrorCount === 1 ? "error" : "errors"} — code won't compile`
-                  : !hasNodes
-                    ? "No components"
-                    : "Export Julia code"}
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-        <TabsContent value="code" className="flex-1 min-h-0">
-          <CodePreview />
-        </TabsContent>
-        <TabsContent value="validation" className="flex-1 min-h-0">
-          <ValidationPanel />
-        </TabsContent>
-      </Tabs>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!hasNodes || structuralErrorCount > 0}
+                onClick={handleExport}
+                aria-label="Export generated Julia code to file"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Export
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {structuralErrorCount > 0
+              ? `${structuralErrorCount} structural ${structuralErrorCount === 1 ? "error" : "errors"} — code won't compile`
+              : !hasNodes
+                ? "No components"
+                : "Export Julia code"}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+      <div className="flex-1 min-h-0">
+        {activeBottomTab === "code" ? <CodePreview /> : <ValidationPanel />}
+      </div>
     </div>
   );
 }

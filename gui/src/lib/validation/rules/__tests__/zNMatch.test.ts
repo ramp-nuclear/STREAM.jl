@@ -191,15 +191,7 @@ describe("zNMatch", () => {
     expect(results).toHaveLength(0);
   });
 
-  // Phase 71 UAT (2026-05-21): FixActions removed across all rules.
-  // Rule degrades to navigation-only behavior (row click focuses the node).
-  it("emits no fixAction", () => {
-    const cac = makeNode("cac1", "ChannelAndContacts", "cac_1", { n: 4 });
-    const hd = makeNode("hd1", "HeatDiffusion", "hd_1", { nz: 5 });
-    const edge = makeEdge("e1", "cac1", "thermal_right", "hd1", "thermal_left");
-    const snapshot = makeSnapshot([cac, hd], [edge]);
-    const results = zNMatch.run(snapshot);
-    expect(results).toHaveLength(1);
-    expect(results[0].fixAction).toBeUndefined();
-  });
+  // Phase 72: the FixAction field on ValidationResult was deleted entirely.
+  // Validator UI is navigation-only — row click in ValidationPanel focuses
+  // the offending pair. No per-rule emission contract to verify.
 });

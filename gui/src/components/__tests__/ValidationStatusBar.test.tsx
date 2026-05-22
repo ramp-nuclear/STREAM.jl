@@ -1,24 +1,23 @@
 // @vitest-environment happy-dom
 //
-// ValidationStatusBar.test.tsx — Phase 71 Plan 10
+// ValidationStatusBar.test.tsx — Phase 72 (unified bottom-chrome footer +
+// status-bar tabs).
 //
 // Covers:
-//   1. Three chips render with correct counts from the store.
-//   2. Click on error chip → sets bottomPanelOpen=true, activeBottomTab='validation'.
-//   3. Click on error chip dispatches 'stream:validation-filter' with severity='error'.
-//   4. Click on warning chip dispatches 'stream:validation-filter' with severity='warning'.
-//   5. Click on info chip dispatches 'stream:validation-filter' with severity='info'.
-//   6. 0→N error transition adds 'pulse-once' class to the error chip.
+//   1. Three severity segments render with correct counts.
+//   2. Click on a severity segment → opens panel + Validation tab + dispatches filter.
+//   3. 0 → N error transition flags the error segment for `pulse-once`.
+//   4. Code + Validation tab buttons always render (left-of-chevron right cluster).
+//   5. Click an inactive tab while closed → opens panel on that tab.
+//   6. Click the active tab while open → closes panel.
+//   7. Click an inactive tab while open → switches active tab, panel stays open.
+//   8. Close chevron renders only when the panel is open.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 import ValidationStatusBar from "../ValidationStatusBar";
 import useStore from "../../store/useStore";
 import type { ValidationResult } from "../../lib/validation/types";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function makeResult(overrides: Partial<ValidationResult> = {}): ValidationResult {
   return {
@@ -35,10 +34,6 @@ function renderBar() {
   return render(<ValidationStatusBar />);
 }
 
-// ---------------------------------------------------------------------------
-// Setup / teardown
-// ---------------------------------------------------------------------------
-
 beforeEach(() => {
   act(() => {
     useStore.setState({
@@ -54,15 +49,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe("ValidationStatusBar (Phase 71 D-02 / D-03 / D-05)", () => {
-  // -----------------------------------------------------------------------
-  // 1. Three chips render with correct counts
-  // -----------------------------------------------------------------------
-  it("renders three chips with counts derived from validationResults", () => {
+describe("ValidationStatusBar (Phase 72 with tabs)", () => {
+  it("renders three severity segments with counts derived from validationResults", () => {
     act(() => {
       useStore.setState({
         validationResults: [
@@ -75,50 +63,33 @@ describe("ValidationStatusBar (Phase 71 D-02 / D-03 / D-05)", () => {
     });
     renderBar();
 
-    const errorBtn = screen.getByRole("button", { name: /2 errors/i });
-    const warnBtn = screen.getByRole("button", { name: /1 warning/i });
-    const infoBtn = screen.getByRole("button", { name: /1 info/i });
-
-    expect(errorBtn).toBeTruthy();
-    expect(warnBtn).toBeTruthy();
-    expect(infoBtn).toBeTruthy();
+    expect(screen.getByRole("button", { name: /2 errors/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /1 warning/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /1 info/i })).toBeTruthy();
   });
 
-  it("renders chips with count 0 when validationResults is empty", () => {
+  it("renders segments with count 0 when validationResults is empty", () => {
     renderBar();
-    const errorBtn = screen.getByRole("button", { name: /0 errors/i });
-    const warnBtn = screen.getByRole("button", { name: /0 warnings/i });
-    const infoBtn = screen.getByRole("button", { name: /0 info/i });
-    expect(errorBtn).toBeTruthy();
-    expect(warnBtn).toBeTruthy();
-    expect(infoBtn).toBeTruthy();
+    expect(screen.getByRole("button", { name: /0 errors/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /0 warnings/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /0 info/i })).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // 2. Click on error chip → store side effect
-  // -----------------------------------------------------------------------
-  it("clicking the error chip opens the panel and switches to the Validation tab", () => {
+  it("clicking the error segment opens the panel and switches to the Validation tab", () => {
     renderBar();
-    const errorBtn = screen.getByRole("button", { name: /errors/i });
-    fireEvent.click(errorBtn);
-
+    fireEvent.click(screen.getByRole("button", { name: /errors/i }));
     const state = useStore.getState();
     expect(state.bottomPanelOpen).toBe(true);
     expect(state.activeBottomTab).toBe("validation");
   });
 
-  // -----------------------------------------------------------------------
-  // 3. Error chip dispatch
-  // -----------------------------------------------------------------------
-  it("clicking the error chip dispatches stream:validation-filter with severity='error'", () => {
+  it("clicking the error segment dispatches stream:validation-filter with severity='error'", () => {
     renderBar();
     const received: CustomEvent[] = [];
     const listener = (e: Event) => received.push(e as CustomEvent);
     window.addEventListener("stream:validation-filter", listener);
-
     try {
-      const errorBtn = screen.getByRole("button", { name: /errors/i });
-      fireEvent.click(errorBtn);
+      fireEvent.click(screen.getByRole("button", { name: /errors/i }));
       expect(received).toHaveLength(1);
       expect((received[0] as CustomEvent).detail.severity).toBe("error");
     } finally {
@@ -126,18 +97,13 @@ describe("ValidationStatusBar (Phase 71 D-02 / D-03 / D-05)", () => {
     }
   });
 
-  // -----------------------------------------------------------------------
-  // 4. Warning chip dispatch
-  // -----------------------------------------------------------------------
-  it("clicking the warning chip dispatches stream:validation-filter with severity='warning'", () => {
+  it("clicking the warning segment dispatches stream:validation-filter with severity='warning'", () => {
     renderBar();
     const received: CustomEvent[] = [];
     const listener = (e: Event) => received.push(e as CustomEvent);
     window.addEventListener("stream:validation-filter", listener);
-
     try {
-      const warnBtn = screen.getByRole("button", { name: /warnings/i });
-      fireEvent.click(warnBtn);
+      fireEvent.click(screen.getByRole("button", { name: /warnings/i }));
       expect(received).toHaveLength(1);
       expect((received[0] as CustomEvent).detail.severity).toBe("warning");
     } finally {
@@ -145,18 +111,13 @@ describe("ValidationStatusBar (Phase 71 D-02 / D-03 / D-05)", () => {
     }
   });
 
-  // -----------------------------------------------------------------------
-  // 5. Info chip dispatch
-  // -----------------------------------------------------------------------
-  it("clicking the info chip dispatches stream:validation-filter with severity='info'", () => {
+  it("clicking the info segment dispatches stream:validation-filter with severity='info'", () => {
     renderBar();
     const received: CustomEvent[] = [];
     const listener = (e: Event) => received.push(e as CustomEvent);
     window.addEventListener("stream:validation-filter", listener);
-
     try {
-      const infoBtn = screen.getByRole("button", { name: /0 info/i });
-      fireEvent.click(infoBtn);
+      fireEvent.click(screen.getByRole("button", { name: /0 info/i }));
       expect(received).toHaveLength(1);
       expect((received[0] as CustomEvent).detail.severity).toBe("info");
     } finally {
@@ -164,29 +125,82 @@ describe("ValidationStatusBar (Phase 71 D-02 / D-03 / D-05)", () => {
     }
   });
 
-  // -----------------------------------------------------------------------
-  // 6. 0→N pulse: error chip gets 'pulse-once' class on 0→N transition
-  // -----------------------------------------------------------------------
-  it("adds pulse-once class to error chip when error count rises from 0 to N", async () => {
+  it("adds pulse-once class to error segment when error count rises from 0 to N", () => {
     renderBar();
 
-    // Start with no errors — confirmed already in beforeEach
-    const buttons = screen.getAllByRole("button");
-    // The error chip is the first chip button (leftmost)
-    const errorBtn = buttons.find((b) => (b.getAttribute("aria-label") ?? "").includes("error"));
-    expect(errorBtn).toBeTruthy();
-
-    // Transition from 0 → 1 error
     act(() => {
       useStore.setState({
         validationResults: [makeResult({ id: "e1", severity: "error" })],
       });
     });
 
-    // After re-render, the error chip should carry the pulse-once class.
-    // Note: the class is removed after 700ms via setTimeout; we only check
-    // that it was applied (the clearTimeout in the component handles teardown).
     const updatedBtn = screen.getByRole("button", { name: /1 error/i });
     expect(updatedBtn.className).toContain("pulse-once");
+  });
+
+  // -----------------------------------------------------------------------
+  // Phase 72 tab control — Code | Validation in the right cluster.
+  // -----------------------------------------------------------------------
+
+  it("renders both Code and Validation tabs when the panel is closed", () => {
+    renderBar();
+    expect(screen.getByRole("tab", { name: /Open code panel/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Open validation panel/i })).toBeTruthy();
+  });
+
+  it("clicking the Code tab while closed opens the panel on the Code tab", () => {
+    renderBar();
+    fireEvent.click(screen.getByRole("tab", { name: /Open code panel/i }));
+    const state = useStore.getState();
+    expect(state.bottomPanelOpen).toBe(true);
+    expect(state.activeBottomTab).toBe("code");
+  });
+
+  it("clicking the Validation tab while closed opens the panel on the Validation tab", () => {
+    renderBar();
+    fireEvent.click(screen.getByRole("tab", { name: /Open validation panel/i }));
+    const state = useStore.getState();
+    expect(state.bottomPanelOpen).toBe(true);
+    expect(state.activeBottomTab).toBe("validation");
+  });
+
+  it("clicking the active tab while open closes the panel", () => {
+    act(() => {
+      useStore.setState({ bottomPanelOpen: true, activeBottomTab: "code" });
+    });
+    renderBar();
+    fireEvent.click(screen.getByRole("tab", { name: /Close code panel/i }));
+    expect(useStore.getState().bottomPanelOpen).toBe(false);
+  });
+
+  it("clicking the inactive tab while open switches active tab without closing", () => {
+    act(() => {
+      useStore.setState({ bottomPanelOpen: true, activeBottomTab: "code" });
+    });
+    renderBar();
+    fireEvent.click(screen.getByRole("tab", { name: /Switch to validation panel/i }));
+    const state = useStore.getState();
+    expect(state.bottomPanelOpen).toBe(true);
+    expect(state.activeBottomTab).toBe("validation");
+  });
+
+  it("renders an explicit Close bottom panel chevron only when the panel is open", () => {
+    renderBar();
+    expect(screen.queryByRole("button", { name: /Close bottom panel/i })).toBeNull();
+
+    act(() => {
+      useStore.setState({ bottomPanelOpen: true });
+    });
+
+    expect(screen.getByRole("button", { name: /Close bottom panel/i })).toBeTruthy();
+  });
+
+  it("clicking the close chevron closes the panel", () => {
+    act(() => {
+      useStore.setState({ bottomPanelOpen: true, activeBottomTab: "code" });
+    });
+    renderBar();
+    fireEvent.click(screen.getByRole("button", { name: /Close bottom panel/i }));
+    expect(useStore.getState().bottomPanelOpen).toBe(false);
   });
 });

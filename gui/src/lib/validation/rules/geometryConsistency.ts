@@ -1,19 +1,15 @@
-// geometryConsistency.ts — Geometry consistency across shared coupling (Phase 71, Plan 05)
+// geometryConsistency.ts — Geometry consistency across shared coupling.
 //
 // D-15 rule 9: "geometry consistency across shared coupling" — when two CACs
 // share one HD plate (each thermally connected to the same HD on opposite sides),
 // their geometry resources must agree on cross-section fields (L, W/H/D).
 //
-// Planner-discretion rationale (§3.9 spirit — rule 9 has no explicit FixAction assignment):
-//   Navigation-only is the right disposition here because:
-//   (a) The mismatch can span multiple fields of the geometry resource (L, W, H, D).
-//   (b) When 3+ surfaces (CAC1, CAC2, HD) participate, there is no single dominant
-//       pair to transfer between.
-//   (c) The Julia solver tolerates this with a runtime warning — it's a config smell,
-//       not a hard invariant. Manual review is safer than an automatic fix.
+// Severity: 'warning' (not 'error') — Julia does not hard-fail on this; the
+// solver tolerates it with a runtime warning. Config smell, not invariant.
 //
-// Severity: 'warning' (not 'error') — Julia does not hard-fail on this.
-// FixAction: navigation-only — "Go to components"; no apply closure.
+// Navigation-only: row click in ValidationPanel focuses the offending nodes;
+// user fixes manually. Mismatches can span multiple fields and 3+ surfaces,
+// so manual review beats any auto-fix.
 //
 // Pure function: zero useStore imports, zero React imports (D-06).
 

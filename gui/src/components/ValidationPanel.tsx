@@ -1,39 +1,50 @@
 /**
- * ValidationPanel — Phase 71 Plan 09
+ * ValidationPanel — Phase 72 redesign (notes 3a + 3b + 3c iteration).
  *
- * The canonical surface for every ValidationResult emitted by the validator
- * registry (Plan 01). Lives as the body of the "Validation" tab in
- * BottomPanel (D-01, D-04).
+ * Engineering-inspection table for the canonical ValidationResults list.
+ * Lives as the body of the "Validation" tab in BottomPanel.
  *
- * UX contract (D-05, D-14, §3.9):
- *   - Lists all results sorted: severity (error → warning → info), then
- *     validatorId (stable ASCII sort within each bucket).
- *   - Empty-state copy: "No issues." (D-04, engineering voice).
- *   - Click a row → dispatches 'stream:focus-validation-result' (canvas
- *     pan + flash ring). If the result has exactly one 'field' target,
- *     also dispatches 'stream:open-property-field' (property panel focus).
- *   - Listens for 'stream:validation-filter' (dispatched by Plan 10
- *     ValidationStatusBar chip) → filters the list to a single severity.
- *   - Listens for 'stream:validation-filter-node' (dispatched by Plan 11
- *     NodeContextMenu) → filters the list to results whose targets reference
- *     a specific nodeId, then scrolls the first matching row into view.
- *   - Fix-action buttons per §3.9: lossless-sync (secondary), value-transfer-
- *     picker (two secondary), navigation-only (ghost). Apply closures receive
- *     (useStore.setState, useStore.getState) at click time — Pitfall 7
- *     mitigation (closures read fresh state via get(); no stale snapshot).
- *   - Severity + node filters are mutually exclusive — activating one clears
- *     the other.
+ * Header is two sub-rows:
+ *   1. Controls row:
+ *        left  — `12 issues` (sans 11 px, foreground/65)
+ *        right — severity filter pills (ERR 12 / WRN 4 / INF 2), then a
+ *                settings icon that opens a Group-by popover
+ *        + when a node filter is active, an inline `· in <name> · clear`
+ *          chip joins the count side.
+ *   2. Column labels row (10 px mono uppercase, foreground/55, hairline
+ *      under it): SEV / RULE / MESSAGE aligned to the row grid.
+ *
+ * Filter pills replace the prior `12 issues · ERR only · clear` inline
+ * header — one click toggles a severity filter active/inactive instead of
+ * forcing the user to go through the status bar for filtering and "clear"
+ * for unfiltering.
+ *
+ * Group-by settings (per-session local state, no persistence):
+ *   - None (default) — flat list, sorted by severity then validatorId.
+ *   - Rule — group by validatorId. Parent row reads `▸ 5 × z_n_match`.
+ *   - Component — group by first node target's instanceName. Parent reads
+ *     `▸ 5 × Channel \`riser\``. Results without a node target fall into
+ *     a `(unscoped)` group.
+ *
+ * Interactions preserved from Phase 71:
+ *   - Row click → 'stream:focus-validation-result' (+ 'stream:open-property-field'
+ *     for single-field-target results).
+ *   - 'stream:validation-filter' (StatusBar) → severity filter.
+ *   - 'stream:validation-filter-node' (NodeContextMenu) → node filter +
+ *     scrollIntoView on first match.
+ *   - Severity + node filters mutually exclusive.
  */
 
-import { useEffect, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, Info } from "lucide-react";
-import { Button } from "./ui/button";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { SlidersHorizontal, ChevronRight, ChevronDown } from "lucide-react";
 import useStore from "../store/useStore";
-import type { ValidationResult, FixAction } from "../lib/validation/types";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+import type { ValidationResult } from "../lib/validation/types";
 import { type StreamNodeData } from "../store/useStore";
 
 // ---------------------------------------------------------------------------
-// Custom-event type declarations (consumed here; dispatched by Plan 10 + 11).
+// Custom-event type declarations
 // ---------------------------------------------------------------------------
 
 interface ValidationFilterDetail {
@@ -59,10 +70,43 @@ declare global {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Severity vocabulary
 // ---------------------------------------------------------------------------
 
-const SEVERITY_RANK: Record<string, number> = { error: 0, warning: 1, info: 2 };
+type Severity = "error" | "warning" | "info";
+type GroupBy = "none" | "rule" | "component";
+
+const SEVERITY_RANK: Record<Severity, number> = {
+  error: 0,
+  warning: 1,
+  info: 2,
+};
+
+const SEVERITY_LABEL: Record<Severity, string> = {
+  error: "ERR",
+  warning: "WRN",
+  info: "INF",
+};
+
+const SEVERITY_COLOR_VAR: Record<Severity, string> = {
+  error: "var(--destructive)",
+  warning: "var(--color-warning)",
+  info: "var(--color-info)",
+};
+
+// Default column widths in pixels. The user can drag the SEV↔RULE and
+// RULE↔MESSAGE dividers to resize; min/max enforced below. MESSAGE is the
+// fluid remainder (`minmax(0, 1fr)`), so only the first two are tunable.
+const DEFAULT_SEV_WIDTH = 32;
+const DEFAULT_RULE_WIDTH = 200;
+const MIN_SEV_WIDTH = 28;
+const MAX_SEV_WIDTH = 64;
+const MIN_RULE_WIDTH = 80;
+const MAX_RULE_WIDTH = 480;
+
+function gridTemplate(sevWidth: number, ruleWidth: number): string {
+  return `${sevWidth}px ${ruleWidth}px minmax(0, 1fr)`;
+}
 
 function sortResults(results: ValidationResult[]): ValidationResult[] {
   return [...results].sort((a, b) => {
@@ -73,9 +117,6 @@ function sortResults(results: ValidationResult[]): ValidationResult[] {
   });
 }
 
-/** Returns true when at least one target in the result references nodeId
- *  (by node / port / field). Edge-only targets are not matched here —
- *  Plan 11's NodeContextMenu does not dispatch for edge-only results. */
 function resultMatchesNode(result: ValidationResult, nodeId: string): boolean {
   return result.targets.some(
     (t) =>
@@ -85,26 +126,17 @@ function resultMatchesNode(result: ValidationResult, nodeId: string): boolean {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Severity icon — color baseline; Phase 72 sweeps visual tokens.
-// ---------------------------------------------------------------------------
-
-function SeverityIcon({ severity }: { severity: "error" | "warning" | "info" }) {
-  if (severity === "error")
-    return <AlertCircle className="w-4 h-4 shrink-0 text-destructive" />;
-  if (severity === "warning")
-    return (
-      <AlertTriangle
-        className="w-4 h-4 shrink-0"
-        style={{ color: "var(--color-warning)" }}
-      />
-    );
-  return (
-    <Info
-      className="w-4 h-4 shrink-0"
-      style={{ color: "var(--color-info)" }}
-    />
+/** Component key for group-by-component. Uses the first node-target; if
+ *  there is none, returns null (caller bucket as "(unscoped)"). */
+function primaryNodeId(result: ValidationResult): string | null {
+  const t = result.targets.find(
+    (t) => t.kind === "node" || t.kind === "port" || t.kind === "field",
   );
+  if (!t) return null;
+  if (t.kind === "node" || t.kind === "port" || t.kind === "field") {
+    return t.nodeId;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,15 +147,21 @@ export default function ValidationPanel() {
   const validationResults = useStore((s) => s.validationResults);
   const nodes = useStore((s) => s.nodes);
 
-  // D-05 filter state — mutually exclusive.
-  const [severityFilter, setSeverityFilter] = useState<
-    "error" | "warning" | "info" | null
-  >(null);
+  const [severityFilter, setSeverityFilter] = useState<Severity | null>(null);
   const [nodeFilter, setNodeFilter] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<GroupBy>("none");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // Selected-row state: tracks the most-recently clicked validation result so
+  // the panel can render a visible left-edge accent on it. Matches the
+  // persistent canvas trace lifetime (CanvasPanel auto-clears on canvas click;
+  // we clear here on filter changes and on canvas-side trace clears too —
+  // listen for an explicit 'stream:validation-trace-cleared' if we add one).
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
+  // Per-session column widths. Dragging the dividers updates these.
+  const [sevWidth, setSevWidth] = useState<number>(DEFAULT_SEV_WIDTH);
+  const [ruleWidth, setRuleWidth] = useState<number>(DEFAULT_RULE_WIDTH);
+  const currentGrid = gridTemplate(sevWidth, ruleWidth);
 
-  // Display label for the node filter banner: prefer the user-facing
-  // instance name; fall back to the raw nodeId if the node has been
-  // deleted (filter persists until Clear filter is clicked).
   const nodeFilterLabel =
     nodeFilter === null
       ? null
@@ -131,18 +169,17 @@ export default function ValidationPanel() {
           | StreamNodeData
           | undefined)?.instanceName ?? nodeFilter;
 
-  // Ref for the first rendered row so we can scrollIntoView on node-filter
-  // activation (D-05 "scrolls the first matching row into view").
+  // First row ref for scrollIntoView on node-filter activation.
   const firstRowRef = useRef<HTMLDivElement | null>(null);
 
-  // Window event listeners — single useEffect, proper teardown.
+  // Window event listeners.
   useEffect(() => {
     const onSeverityFilter = (e: Event) => {
       const ce = e as CustomEvent<ValidationFilterDetail>;
       const sev = ce.detail?.severity;
       if (sev) {
         setSeverityFilter(sev);
-        setNodeFilter(null); // mutual exclusion
+        setNodeFilter(null);
       }
     };
 
@@ -151,8 +188,7 @@ export default function ValidationPanel() {
       const nodeId = ce.detail?.nodeId;
       if (nodeId) {
         setNodeFilter(nodeId);
-        setSeverityFilter(null); // mutual exclusion
-        // Scroll first matching row into view after DOM paint.
+        setSeverityFilter(null);
         requestAnimationFrame(() => {
           firstRowRef.current?.scrollIntoView({
             block: "nearest",
@@ -183,7 +219,20 @@ export default function ValidationPanel() {
     };
   }, []);
 
-  // Filter pipeline (D-05 locked behavior).
+  // Total counts (per-severity over ALL results, not just filtered) —
+  // these feed the filter pills so they show stable totals regardless of
+  // which filter is active.
+  const totals = useMemo(() => {
+    let e = 0, w = 0, i = 0;
+    for (const r of validationResults) {
+      if (r.severity === "error") e++;
+      else if (r.severity === "warning") w++;
+      else if (r.severity === "info") i++;
+    }
+    return { error: e, warning: w, info: i };
+  }, [validationResults]);
+
+  // Filter pipeline.
   let filtered = validationResults;
   if (severityFilter !== null) {
     filtered = filtered.filter((r) => r.severity === severityFilter);
@@ -195,14 +244,56 @@ export default function ValidationPanel() {
   const count = sorted.length;
   const filterActive = severityFilter !== null || nodeFilter !== null;
 
-  // Row click-to-focus handler — dispatches cross-component CustomEvents.
+  // Group projection. Keyed by validatorId (rule) or instanceName (component).
+  type Group = {
+    key: string;
+    displayLabel: string;
+    results: ValidationResult[];
+  };
+  const groups: Group[] = useMemo(() => {
+    if (groupBy === "none") return [];
+
+    const buckets = new Map<string, ValidationResult[]>();
+    const labelByKey = new Map<string, string>();
+
+    for (const r of sorted) {
+      let key: string;
+      let label: string;
+      if (groupBy === "rule") {
+        key = r.validatorId;
+        label = r.validatorId;
+      } else {
+        const nid = primaryNodeId(r);
+        if (nid === null) {
+          key = "__unscoped__";
+          label = "(unscoped)";
+        } else {
+          key = nid;
+          const inst = (nodes.find((n) => n.id === nid)?.data as
+            | StreamNodeData
+            | undefined)?.instanceName;
+          label = inst ?? nid;
+        }
+      }
+      labelByKey.set(key, label);
+      const bucket = buckets.get(key);
+      if (bucket) bucket.push(r);
+      else buckets.set(key, [r]);
+    }
+
+    return Array.from(buckets.entries()).map(([key, results]) => ({
+      key,
+      displayLabel: labelByKey.get(key) ?? key,
+      results,
+    }));
+  }, [sorted, groupBy, nodes]);
+
   function handleResultClick(result: ValidationResult) {
+    setSelectedResultId(result.id);
     window.dispatchEvent(
       new CustomEvent("stream:focus-validation-result", { detail: { result } }),
     );
 
-    // If there is exactly one 'field' target, also open the property panel
-    // field focus.
     const fieldTargets = result.targets.filter((t) => t.kind === "field");
     if (fieldTargets.length === 1) {
       const ft = fieldTargets[0];
@@ -216,102 +307,242 @@ export default function ValidationPanel() {
     }
   }
 
-  function clearFilters() {
-    setSeverityFilter(null);
-    setNodeFilter(null);
+  function togglePill(severity: Severity) {
+    if (severityFilter === severity) {
+      setSeverityFilter(null);
+    } else {
+      setSeverityFilter(severity);
+      setNodeFilter(null);
+    }
+    setSelectedResultId(null);
   }
+
+  function clearNodeFilter() {
+    setNodeFilter(null);
+    setSelectedResultId(null);
+  }
+
+  // Column resize: tracks a drag-in-progress and a `which` flag identifying
+  // which boundary is being dragged. Mouse events are bound to the document
+  // so the user can drag the pointer outside the visible handle area.
+  const dragStateRef = useRef<{
+    which: "sev" | "rule";
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+
+  useEffect(() => {
+    function onMove(ev: MouseEvent) {
+      const drag = dragStateRef.current;
+      if (!drag) return;
+      const dx = ev.clientX - drag.startX;
+      if (drag.which === "sev") {
+        const next = Math.min(
+          MAX_SEV_WIDTH,
+          Math.max(MIN_SEV_WIDTH, drag.startWidth + dx),
+        );
+        setSevWidth(next);
+      } else {
+        const next = Math.min(
+          MAX_RULE_WIDTH,
+          Math.max(MIN_RULE_WIDTH, drag.startWidth + dx),
+        );
+        setRuleWidth(next);
+      }
+    }
+    function onUp() {
+      if (!dragStateRef.current) return;
+      dragStateRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  function startResize(which: "sev" | "rule", ev: React.MouseEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    dragStateRef.current = {
+      which,
+      startX: ev.clientX,
+      startWidth: which === "sev" ? sevWidth : ruleWidth,
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }
+
+  function toggleGroup(key: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const hasAnyResults = validationResults.length > 0;
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      {/* Filter banner */}
-      {filterActive && (
-        <div className="flex items-center gap-2 px-3 py-1 text-xs text-muted-foreground border-b bg-muted/30 shrink-0">
-          {severityFilter !== null ? (
-            <span>
-              Showing only <span className="font-medium">{severityFilter}</span>{" "}
-              results &middot; {count}
-            </span>
-          ) : (
-            <span>
-              Filtered to <span className="font-medium">{nodeFilterLabel}</span>{" "}
-              &middot; {count}
-            </span>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 px-1.5 text-xs"
-            onClick={clearFilters}
-          >
-            Clear filter
-          </Button>
-        </div>
-      )}
+      {/* Header: controls row + node-filter chip + column labels.
+          Only rendered when there's something to control over (any results
+          exist OR a filter is active). */}
+      {(hasAnyResults || filterActive) && (
+        <div className="border-b border-border shrink-0">
+          {/* Controls row */}
+          <div className="flex items-center justify-between px-3 py-1.5 gap-3">
+            <div className="flex items-center gap-2 text-[11px] text-foreground/65 min-w-0">
+              <span className="tabular-nums">
+                {count} {count === 1 ? "issue" : "issues"}
+              </span>
+              {nodeFilter !== null && (
+                <>
+                  <span aria-hidden className="text-foreground/40">·</span>
+                  <span className="truncate">
+                    in <span className="text-foreground/85">{nodeFilterLabel}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearNodeFilter}
+                    className="text-foreground/75 hover:text-foreground underline-offset-2 hover:underline cursor-pointer"
+                  >
+                    clear
+                  </button>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-0.5 shrink-0">
+              <FilterPill
+                severity="error"
+                count={totals.error}
+                active={severityFilter === "error"}
+                onClick={() => togglePill("error")}
+              />
+              <FilterPill
+                severity="warning"
+                count={totals.warning}
+                active={severityFilter === "warning"}
+                onClick={() => togglePill("warning")}
+              />
+              <FilterPill
+                severity="info"
+                count={totals.info}
+                active={severityFilter === "info"}
+                onClick={() => togglePill("info")}
+              />
+              <GroupBySettings groupBy={groupBy} onChange={setGroupBy} />
+            </div>
+          </div>
 
-      {/* Header — only when there are results */}
-      {count > 0 && (
-        <div className="px-3 py-1 text-[11px] text-muted-foreground shrink-0">
-          {count} {count === 1 ? "issue" : "issues"}
-          {filterActive ? " (filtered)" : ""}
+          {/* Column labels — only when there is content to label.
+              The two `<ColumnResizeHandle>`s sit at the right edge of the
+              SEV and RULE columns. They're 4 px wide invisible drag zones
+              that show a 1 px ring hairline on hover and switch the cursor
+              to col-resize. Drag adjusts the corresponding column width;
+              both this row AND every data row + group header consume the
+              same `currentGrid`, so widths stay in sync. */}
+          {count > 0 && (
+            <div className="relative">
+              <div
+                className="grid items-baseline gap-3 px-3 pb-1 text-[10px] uppercase tracking-wide text-foreground/45 font-mono"
+                style={{ gridTemplateColumns: currentGrid }}
+                aria-hidden
+              >
+                <span>Sev</span>
+                <span>Rule</span>
+                <span>Message</span>
+              </div>
+              <ColumnResizeHandle
+                left={12 + sevWidth}
+                onMouseDown={(e) => startResize("sev", e)}
+              />
+              <ColumnResizeHandle
+                left={12 + sevWidth + 12 + ruleWidth}
+                onMouseDown={(e) => startResize("rule", e)}
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* Empty state */}
       {count === 0 && (
-        <div className="flex flex-col items-center justify-center gap-2 flex-1 p-4 text-center">
+        <div className="flex-1 px-3 py-3 text-[13px] text-foreground/65 font-mono">
           {filterActive ? (
             <>
-              <p className="text-muted-foreground text-sm">
-                No results match the active filter.
-              </p>
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear filter
-              </Button>
+              No results match the active filter.{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setSeverityFilter(null);
+                  setNodeFilter(null);
+                }}
+                className="underline-offset-2 hover:underline text-foreground/85 hover:text-foreground transition-colors duration-[80ms] cursor-pointer"
+              >
+                clear
+              </button>
             </>
           ) : (
-            <p className="text-muted-foreground text-sm">No issues.</p>
+            "No issues."
           )}
         </div>
       )}
 
-      {/* Result list */}
-      {count > 0 && (
-        <div className="flex flex-col divide-y">
+      {/* Body — flat list or grouped */}
+      {count > 0 && groupBy === "none" && (
+        <div className="flex flex-col">
           {sorted.map((result, index) => (
-            <div
+            <Row
               key={result.id}
               ref={index === 0 ? firstRowRef : undefined}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-accent/30 cursor-pointer transition-colors"
+              result={result}
+              gridTemplate={currentGrid}
+              selected={selectedResultId === result.id}
               onClick={() => handleResultClick(result)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") handleResultClick(result);
-              }}
-            >
-              {/* 1. Severity icon */}
-              <SeverityIcon severity={result.severity} />
-
-              {/* 2. Description */}
-              <span className="flex-1 text-sm truncate" title={result.description}>
-                {result.description}
-              </span>
-
-              {/* 3. Fix-action buttons (conditionally rendered) */}
-              {result.fixAction && (
-                <FixActionButtons
-                  fixAction={result.fixAction}
-                  result={result}
-                  onNavigate={handleResultClick}
-                />
-              )}
-
-              {/* 4. Validator ID chip */}
-              <span className="text-[10px] text-muted-foreground font-mono shrink-0">
-                {result.validatorId}
-              </span>
-            </div>
+            />
           ))}
+        </div>
+      )}
+
+      {count > 0 && groupBy !== "none" && (
+        <div className="flex flex-col">
+          {groups.map((group, gIdx) => {
+            const collapsed = collapsedGroups.has(group.key);
+            const groupSeverity: Severity =
+              group.results.reduce<Severity>((acc, r) => {
+                return SEVERITY_RANK[r.severity] < SEVERITY_RANK[acc] ? r.severity : acc;
+              }, "info");
+            return (
+              <div key={group.key}>
+                <GroupHeader
+                  collapsed={collapsed}
+                  severity={groupSeverity}
+                  count={group.results.length}
+                  label={group.displayLabel}
+                  groupBy={groupBy}
+                  gridTemplate={currentGrid}
+                  onClick={() => toggleGroup(group.key)}
+                />
+                {!collapsed &&
+                  group.results.map((result, rIdx) => (
+                    <Row
+                      key={result.id}
+                      ref={gIdx === 0 && rIdx === 0 ? firstRowRef : undefined}
+                      result={result}
+                      gridTemplate={currentGrid}
+                      selected={selectedResultId === result.id}
+                      onClick={() => handleResultClick(result)}
+                      indented
+                    />
+                  ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -319,78 +550,261 @@ export default function ValidationPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// FixActionButtons — renders the 3 FixAction kinds per §3.9.
-// Extracted to a named component to keep the row JSX readable.
+// FilterPill — toggle a severity filter from inside the panel header.
+// Inactive: foreground/55, no background. Active: color-tokenized text, faint
+// background tint. No chip silhouette — flat type with a hover bg lift.
 // ---------------------------------------------------------------------------
 
-interface FixActionButtonsProps {
-  fixAction: FixAction;
-  result: ValidationResult;
-  onNavigate: (result: ValidationResult) => void;
+interface FilterPillProps {
+  severity: Severity;
+  count: number;
+  active: boolean;
+  onClick: () => void;
 }
 
-function FixActionButtons({ fixAction: fa, result, onNavigate }: FixActionButtonsProps) {
-  const stop = (e: React.MouseEvent) => e.stopPropagation();
-
-  if (fa.kind === "lossless-sync") {
-    return (
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={(e) => {
-          stop(e);
-          fa.apply(useStore.setState, useStore.getState);
-        }}
+function FilterPill({ severity, count, active, onClick }: FilterPillProps) {
+  const dim = count === 0 && !active;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={`Filter to ${severity}${active ? " (active)" : ""}`}
+      className={
+        "inline-flex items-center gap-1 font-mono text-[11px] leading-none " +
+        "px-1.5 py-1 rounded-sm cursor-pointer select-none " +
+        "transition-colors duration-[80ms] " +
+        "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
+        (active ? "bg-popover " : "") +
+        (dim ? "opacity-55 " : "")
+      }
+    >
+      <span
+        style={{ color: active || count > 0 ? SEVERITY_COLOR_VAR[severity] : undefined }}
+        className="tracking-tight"
       >
-        {fa.label}
-      </Button>
-    );
-  }
+        {SEVERITY_LABEL[severity]}
+      </span>
+      <span className={active ? "text-foreground tabular-nums" : "text-foreground/75 tabular-nums"}>
+        {count}
+      </span>
+    </button>
+  );
+}
 
-  if (fa.kind === "value-transfer-picker") {
-    return (
-      <div className="flex gap-1" onClick={stop}>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={(e) => {
-            stop(e);
-            fa.applyLeft(useStore.setState, useStore.getState);
-          }}
-        >
-          {fa.leftLabel}
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={(e) => {
-            stop(e);
-            fa.applyRight(useStore.setState, useStore.getState);
-          }}
-        >
-          {fa.rightLabel}
-        </Button>
-      </div>
-    );
-  }
+// ---------------------------------------------------------------------------
+// GroupBySettings — sliders icon → popover with a single-select toggle group.
+// ---------------------------------------------------------------------------
 
-  if (fa.kind === "navigation-only") {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={(e) => {
-          stop(e);
-          // Reuse the row click-to-focus path — one focus implementation.
-          onNavigate(result);
-        }}
+interface GroupBySettingsProps {
+  groupBy: GroupBy;
+  onChange: (v: GroupBy) => void;
+}
+
+function GroupBySettings({ groupBy, onChange }: GroupBySettingsProps) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Group by settings"
+          title="Group by"
+          className={
+            "inline-flex items-center justify-center px-1.5 py-1 ml-1 rounded-sm cursor-pointer " +
+            "text-foreground/65 hover:text-foreground " +
+            "transition-colors duration-[80ms] " +
+            "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
+            (groupBy !== "none" ? "text-foreground" : "")
+          }
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto p-3">
+        <div className="flex flex-col gap-2">
+          <span className="text-[10px] uppercase tracking-wide text-foreground/55 font-mono">
+            Group by
+          </span>
+          <ToggleGroup
+            type="single"
+            value={groupBy}
+            onValueChange={(v) => {
+              // ToggleGroup emits "" when the user clicks the active item;
+              // coerce to "none" so the control always has a definite state.
+              if (v === "" || v === undefined) {
+                onChange("none");
+                return;
+              }
+              onChange(v as GroupBy);
+            }}
+            size="sm"
+          >
+            <ToggleGroupItem value="none">None</ToggleGroupItem>
+            <ToggleGroupItem value="rule">Rule</ToggleGroupItem>
+            <ToggleGroupItem value="component">Component</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GroupHeader — parent row for a collapsed/expanded group bucket.
+// Layout matches the row grid so the message column lines up between groups
+// and leaves. Chevron + count chip live in the SEV/RULE cells; the label fills
+// the MESSAGE cell.
+// ---------------------------------------------------------------------------
+
+interface GroupHeaderProps {
+  collapsed: boolean;
+  severity: Severity;
+  count: number;
+  label: string;
+  groupBy: GroupBy;
+  gridTemplate: string;
+  onClick: () => void;
+}
+
+function GroupHeader({
+  collapsed,
+  severity,
+  count,
+  label,
+  groupBy,
+  gridTemplate,
+  onClick,
+}: GroupHeaderProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={!collapsed}
+      className={
+        "grid items-baseline gap-3 px-3 py-1.5 cursor-pointer text-left w-full " +
+        "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover/80 " +
+        "transition-colors duration-[80ms] border-t border-border/60 first:border-t-0"
+      }
+      style={{ gridTemplateColumns: gridTemplate }}
+    >
+      <span className="font-mono text-[11px] leading-snug inline-flex items-center text-foreground/65">
+        {collapsed ? (
+          <ChevronRight className="h-3 w-3" strokeWidth={1.5} />
+        ) : (
+          <ChevronDown className="h-3 w-3" strokeWidth={1.5} />
+        )}
+      </span>
+      <span
+        className="font-mono text-[11px] leading-snug tabular-nums"
+        style={{ color: SEVERITY_COLOR_VAR[severity] }}
+        title={`${count} ${count === 1 ? "issue" : "issues"} (highest: ${severity})`}
       >
-        {fa.label}
-      </Button>
-    );
-  }
+        {count} × {groupBy === "rule" ? "rule" : "node"}
+      </span>
+      <span
+        className="text-[13px] leading-snug text-foreground truncate font-mono"
+        title={label}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
 
-  // TypeScript exhaustiveness check — error here if a new kind is added.
-  void (fa as never);
-  return null;
+// ---------------------------------------------------------------------------
+// Row — three-column compiler-output silhouette.
+// ---------------------------------------------------------------------------
+
+interface RowProps {
+  result: ValidationResult;
+  onClick: () => void;
+  ref?: React.Ref<HTMLDivElement>;
+  indented?: boolean;
+  gridTemplate: string;
+  selected: boolean;
+}
+
+function Row({ result, onClick, ref, indented, gridTemplate, selected }: RowProps) {
+  // Selected rows render a 2 px left-edge accent in --ring (Hydraulic-hue
+  // focus color, locked Phase 72) so the user can tell which row is producing
+  // the persistent canvas trace at a glance. Clears when the user clicks
+  // anywhere on the canvas (CanvasPanel clears the trace, panel re-renders
+  // and selected state is dropped via filter-change paths).
+  return (
+    <div
+      ref={ref}
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      data-selected={selected || undefined}
+      className={
+        "relative grid items-baseline gap-3 py-1.5 cursor-pointer " +
+        "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
+        "transition-colors duration-[80ms] " +
+        (indented ? "pl-6 pr-3" : "px-3") +
+        (selected ? " bg-popover" : "")
+      }
+      style={{ gridTemplateColumns: gridTemplate }}
+    >
+      {selected && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 bottom-0 w-[2px]"
+          style={{ background: "var(--ring)" }}
+        />
+      )}
+      <span
+        className="font-mono text-[11px] leading-snug tracking-tight"
+        style={{ color: SEVERITY_COLOR_VAR[result.severity] }}
+      >
+        {SEVERITY_LABEL[result.severity]}
+      </span>
+      <span
+        className="font-mono text-[13px] leading-snug text-foreground/85 truncate"
+        title={result.validatorId}
+      >
+        {result.validatorId}
+      </span>
+      <span
+        className="text-[13px] leading-snug text-foreground truncate"
+        title={result.description}
+      >
+        {result.description}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ColumnResizeHandle — invisible 6 px drag zone overlaying the column boundary.
+// Renders absolutely-positioned over the column-label row's `relative` parent.
+// Shows a 1 px --ring hairline + col-resize cursor on hover.
+// ---------------------------------------------------------------------------
+
+interface ColumnResizeHandleProps {
+  left: number;
+  onMouseDown: (ev: React.MouseEvent) => void;
+}
+
+function ColumnResizeHandle({ left, onMouseDown }: ColumnResizeHandleProps) {
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      onMouseDown={onMouseDown}
+      style={{ left: `${left}px` }}
+      className={
+        "absolute top-0 bottom-0 w-1.5 -ml-[3px] cursor-col-resize z-10 group/handle " +
+        "before:absolute before:left-1/2 before:-translate-x-1/2 before:top-0 before:bottom-0 " +
+        "before:w-px before:bg-transparent before:transition-colors before:duration-[80ms] " +
+        "hover:before:bg-[var(--ring)] active:before:bg-[var(--ring)]"
+      }
+    />
+  );
 }
