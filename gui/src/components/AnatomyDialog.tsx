@@ -1,29 +1,31 @@
-// AnatomyDialog — Phase 72 (help-system shape, 2026-05-22).
+// AnatomyDialog — Phase 72 (help-system shape v2, 2026-05-22).
 //
-// A modal visual legend for the canvas vocabulary. Renders a stylized
-// StreamNode + edge specimens with every state forced on simultaneously,
-// numbered callouts over the diagram, and a side legend mapping number →
-// description. Opens from HelpMenu → "Show Anatomy…"; no keybind (low-
-// frequency reference doesn't earn one — see PROGRESS.md "Re-entry
-// instructions").
+// A schematic-style visual legend for the canvas vocabulary. Renders a
+// stylized StreamNode plus three edge specimens with numbered callouts
+// connected by dashed orthogonal leader lines (technical-drawing
+// convention). Opens from HelpMenu → "Anatomy" via the `stream:open-anatomy`
+// custom event; no keybind by design.
 //
-// Doctrine fidelity strategy:
-//   The dialog renders a *visual mirror* of `StreamNode` rather than the
-//   real component, because StreamNode reads from the global zustand store
-//   (errorNodeIds, anchors, hoveredSourceIds, activeLayers, ...) and would
-//   need every selector path stubbed out to render in a non-canvas context.
-//   The mirror consumes the same tokens (`--card`, `--ring`, `--destructive`,
-//   `--color-layer-*`, `--node-ring-rest`) and the same band geometry, body
-//   structure, and ring/outline values — so the legend stays accurate. When
-//   StreamNode's visual changes, update the mirror here too. Drift surface
-//   intentionally small (only the visual shell, not behavior).
+// v2 redesign (2026-05-22, after user walkthrough of v1):
+//   - No modal scrim (overlayClassName="bg-transparent"). Behavioural
+//     intent: this is an opt-in reference card, not a state-blocking modal.
+//     Matches CommandPalette's VS Code-style "tool overlay" idiom.
+//   - Dialog surface tone matches CommandPalette / shortcut palette tone —
+//     dedicated tool-overlay tier distinctly off chrome/panel/canvas
+//     (oklch(0.93_0.012_254) light / oklch(0.13_0.012_254) dark).
+//   - Dialog is much larger (~1200 × auto). Callouts have room to breathe.
+//   - Leader lines: dashed, orthogonal-only (90° elbows), all numbers
+//     aligned to a single vertical column per tile side. Matches
+//     Houdini / Modelica / Bauhaus technical-drawing convention.
+//   - Legend reads at text-body (13 px) not text-label (11 px).
+//   - Engineering-voice copy. No em dashes (PRODUCT.md anti-pattern).
+//   - autoExtended documented correctly as the "save-preview" outline
+//     (Save Preset Modal flags BC-coupled neighbors with this violet
+//     dashed outline — see SavePresetModal.tsx).
 //
-// Edges are inline SVG paths with the same stroke vocabulary as HydraulicEdge
-// + BCEdge — solid 1.5 px for default Hydraulic, dashed 6/3 for BC, and a
-// marching-ants 2.5 px dashed for loop trace (severity = warning).
-//
-// PRODUCT.md anchor references: Houdini node-anatomy diagrams (single hero
-// specimen + side legend), schematic-editor legend tradition.
+// Doctrine fidelity strategy unchanged from v1: render a *visual mirror* of
+// StreamNode rather than the real component. The mirror consumes the same
+// tokens and band geometry; when StreamNode changes visually, update here.
 
 import * as React from "react";
 import { Anchor, Box as BoxIcon } from "lucide-react";
@@ -34,11 +36,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
+import { cn } from "@/lib/utils";
 
 interface AnatomyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Surface palette tone — same as CommandPalette so the help surfaces share
+// one visual vocab. Defined as className strings to keep theme-switching
+// working via Tailwind dark: variant.
+const PALETTE_SURFACE = cn(
+  "bg-[oklch(0.93_0.012_254)] dark:bg-[oklch(0.13_0.012_254)]",
+  "border-[oklch(0.86_0.012_254)] dark:border-[oklch(0.24_0.012_254)]",
+  "shadow-[0_16px_40px_-12px_oklch(0.05_0_0/0.18),0_4px_12px_-4px_oklch(0.05_0_0/0.12)]",
+  "dark:shadow-[0_16px_40px_-12px_oklch(0.05_0_0/0.55),0_4px_12px_-4px_oklch(0.05_0_0/0.40)]",
+);
 
 export default function AnatomyDialog({
   open,
@@ -47,10 +60,19 @@ export default function AnatomyDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="!max-w-[920px] w-[92vw] p-0 gap-0 overflow-hidden"
+        // No scrim — this is an opt-in reference card, not state-blocking
+        // chrome. Click-outside-to-close still works because DialogOverlay
+        // mounts; it just paints nothing.
+        overlayClassName="bg-transparent"
+        className={cn(
+          "p-0 gap-0 overflow-hidden rounded-md",
+          "w-[1200px] max-w-[95vw] sm:max-w-[1200px]",
+          "top-[8vh] translate-y-0",
+          PALETTE_SURFACE,
+        )}
         data-testid="anatomy-dialog"
       >
-        <DialogHeader className="px-5 pt-4 pb-3 border-b border-border/60">
+        <DialogHeader className="px-6 pt-5 pb-3 border-b border-border/40">
           <DialogTitle className="text-title font-normal tracking-tight">
             Anatomy
           </DialogTitle>
@@ -59,17 +81,22 @@ export default function AnatomyDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-0 divide-x divide-border/60">
-          <Section title="Node" legend={NODE_LEGEND}>
-            <NodeShowcase />
+        <div className="grid grid-cols-2 divide-x divide-border/40">
+          <Section title="Node">
+            <NodeTile />
+            <NodeLegend />
           </Section>
-          <Section title="Edges" legend={EDGES_LEGEND}>
-            <EdgesShowcase />
+          <Section title="Edges">
+            <EdgesTile />
+            <EdgesLegend />
           </Section>
         </div>
 
-        <div className="border-t border-border/60 px-5 py-2 text-micro font-mono text-foreground/55">
-          not all states co-occur on a real node
+        <div className="border-t border-border/40 px-6 py-3 text-label text-foreground/65 font-mono leading-relaxed">
+          Outline states (selected ring, persistent error, auto-add preview)
+          are mutually exclusive on a real node. The auto-add preview outline
+          appears only while Save Preset is open, marking BC-coupled
+          neighbors that would be pulled into the saved preset.
         </div>
       </DialogContent>
     </Dialog>
@@ -77,57 +104,110 @@ export default function AnatomyDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Section — one column of the dialog. Contains a labeled diagram tile and a
-// numbered legend list. Tile uses the canvas grid tone behind it so the
-// rendered node/edges sit on the same texture they appear on in the canvas.
+// Section — column wrapper. Hosts the diagram tile and the legend.
 // ---------------------------------------------------------------------------
-
-interface LegendEntry {
-  /** Display number ("1", "2", ...). Mono chip both in the diagram and the
-   *  legend. */
-  n: string;
-  /** Short engineering-voice description; no sentence-final period. */
-  text: string;
-}
 
 interface SectionProps {
   title: string;
-  legend: readonly LegendEntry[];
   children: React.ReactNode;
 }
 
-function Section({ title, legend, children }: SectionProps): React.JSX.Element {
+function Section({ title, children }: SectionProps): React.JSX.Element {
   return (
     <div className="flex flex-col">
-      <div className="px-5 pt-4 pb-2 text-micro font-mono uppercase tracking-wide text-foreground/55">
+      <div className="px-6 pt-5 pb-2 text-micro font-mono uppercase tracking-wider text-foreground/55">
         {title}
       </div>
-      <div className="px-5 pb-3">
-        <div
-          className="relative rounded-md border border-border/60 min-h-[260px] flex items-center justify-center overflow-hidden"
-          style={{
-            // Match the actual canvas grid texture. Two stacked linear-
-            // gradient layers replicate xyflow's BackgroundVariant.Lines.
-            backgroundColor: "var(--canvas)",
-            backgroundImage:
-              "linear-gradient(to right, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
-              "linear-gradient(to bottom, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
-              "linear-gradient(to right, var(--color-canvas-grid-major) 1px, transparent 1px), " +
-              "linear-gradient(to bottom, var(--color-canvas-grid-major) 1px, transparent 1px)",
-            backgroundSize: "12px 12px, 12px 12px, 24px 24px, 24px 24px",
-          }}
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NodeTile — the hero node with callouts. Layout grid:
+//   tile is 560 × 360
+//   node body is 240 × 96, centered around (280, 200)
+//     (node spans x=160..400, y=152..248)
+//   LEFT  number column at x=44 (chip right edge at x=44+18=62)
+//   RIGHT number column at x=498 (chip left edge at x=498)
+//   Each callout's number is y-aligned to its feature so the dashed leader
+//   is a single horizontal segment (no elbows). Where two features sit too
+//   close, the closer number is offset and a 2-segment Z-leader is drawn
+//   instead — but in practice the body lines (label/instance/value) are at
+//   y={172, 188, 208}, enough spacing for 18-px chips.
+// ---------------------------------------------------------------------------
+
+interface Callout {
+  /** Display number. */
+  n: number;
+  /** Number-chip side. "L" → left column; "R" → right column. */
+  side: "L" | "R";
+  /** Feature pointer x in the SVG coord system. */
+  fx: number;
+  /** Feature pointer y in the SVG coord system. */
+  fy: number;
+  /** Number-chip y (defaults to fy so the leader is pure horizontal). */
+  ny?: number;
+}
+
+const NODE_TILE_W = 560;
+const NODE_TILE_H = 380;
+const LEFT_CHIP_X = 44;
+const RIGHT_CHIP_X = 498;
+const CHIP_SIZE = 18;
+
+const NODE_CALLOUTS: Callout[] = [
+  // LEFT column (5 features)
+  { n: 1, side: "L", fx: 160, fy: 156, ny: 132 }, // layer band (top edge of band)
+  { n: 2, side: "L", fx: 160, fy: 174, ny: 160 }, // component icon + label
+  { n: 3, side: "L", fx: 160, fy: 192, ny: 188 }, // instance name
+  { n: 4, side: "L", fx: 160, fy: 212, ny: 216 }, // value summary
+  { n: 5, side: "L", fx: 142, fy: 148, ny: 244 }, // pressure anchor (icon outside node)
+  // RIGHT column (4 features)
+  { n: 6, side: "R", fx: 280, fy: 145, ny: 140 }, // flow port (top, in)
+  { n: 7, side: "R", fx: 408, fy: 200, ny: 172 }, // thermal port (paired, right)
+  { n: 8, side: "R", fx: 400, fy: 152, ny: 200 }, // selected ring (upper-right corner)
+  { n: 9, side: "R", fx: 400, fy: 244, ny: 228 }, // persistent error outline (lower-right)
+];
+
+function NodeTile(): React.JSX.Element {
+  return (
+    <div className="px-6 pb-2">
+      <div
+        className="relative rounded-sm border border-border/40 overflow-hidden"
+        style={{
+          width: NODE_TILE_W,
+          height: NODE_TILE_H,
+          backgroundColor: "var(--canvas)",
+          backgroundImage:
+            "linear-gradient(to right, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
+            "linear-gradient(to bottom, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
+            "linear-gradient(to right, var(--color-canvas-grid-major) 1px, transparent 1px), " +
+            "linear-gradient(to bottom, var(--color-canvas-grid-major) 1px, transparent 1px)",
+          backgroundSize: "12px 12px, 12px 12px, 24px 24px, 24px 24px",
+        }}
+      >
+        {/* Rendered node (HTML, absolutely positioned in the tile's coord
+            system). Coords match the leader fx/fy constants. */}
+        <NodeMirror left={160} top={152} width={240} />
+
+        {/* SVG overlay for leader lines, beneath the chips so chips paint
+            over the line ends cleanly. */}
+        <svg
+          width={NODE_TILE_W}
+          height={NODE_TILE_H}
+          viewBox={`0 0 ${NODE_TILE_W} ${NODE_TILE_H}`}
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden
         >
-          {children}
-        </div>
-      </div>
-      <div className="px-5 pb-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-label">
-        {legend.map((entry) => (
-          <React.Fragment key={entry.n}>
-            <span className="font-mono text-foreground/85 tabular-nums">
-              {entry.n}
-            </span>
-            <span className="text-foreground/85">{entry.text}</span>
-          </React.Fragment>
+          {NODE_CALLOUTS.map((c) => (
+            <LeaderLine key={c.n} callout={c} />
+          ))}
+        </svg>
+
+        {/* Number chips. */}
+        {NODE_CALLOUTS.map((c) => (
+          <ChipBadge key={c.n} callout={c} />
         ))}
       </div>
     </div>
@@ -135,377 +215,514 @@ function Section({ title, legend, children }: SectionProps): React.JSX.Element {
 }
 
 // ---------------------------------------------------------------------------
-// CalloutChip — a small numbered marker overlaid on the diagram tile.
-// Absolutely positioned by parent; consumes plain CSS top/left props.
-// 18×18 px, rounded-sm, mono micro. Hairline 1 px border so it reads on either
-// a dark or light grid background.
+// NodeMirror — visual mirror of StreamNode. See file header for the
+// fidelity strategy.
 // ---------------------------------------------------------------------------
 
-interface CalloutChipProps {
-  n: string;
-  /** Absolute position relative to the parent tile. */
-  top: string | number;
-  left: string | number;
+interface NodeMirrorProps {
+  left: number;
+  top: number;
+  width: number;
 }
 
-function CalloutChip({ n, top, left }: CalloutChipProps): React.JSX.Element {
+function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
+  return (
+    <div
+      className="absolute"
+      style={{ left, top, width }}
+    >
+      <div
+        className="relative rounded-md"
+        style={{
+          // Selected ring + 1 px canvas offset. Matches StreamNode selected
+          // box-shadow vocabulary line for line.
+          boxShadow:
+            "0 0 0 1px var(--canvas), 0 0 0 3px var(--ring)",
+          // Persistent error outline. (Selected + error coexist on the hero
+          // to populate two callouts; the footer note explains they're
+          // mutually exclusive in production.)
+          outline: "2px solid var(--destructive)",
+          outlineOffset: "0",
+        }}
+      >
+        <div className="rounded-md overflow-hidden">
+          {/* Dual-layer split band. Selected = 8 px tall. */}
+          <div
+            className="flex w-full"
+            style={{ height: 8 }}
+            aria-hidden
+          >
+            <div
+              style={{
+                flex: 1,
+                backgroundColor: "var(--color-layer-hydraulic)",
+              }}
+            />
+            <div
+              style={{
+                flex: 1,
+                backgroundColor: "var(--color-layer-thermal)",
+              }}
+            />
+          </div>
+          <div className="bg-card p-2">
+            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <BoxIcon className="w-3.5 h-3.5" strokeWidth={1.5} />
+              ChannelAndContacts
+            </div>
+            <div className="font-semibold text-sm">channel_1</div>
+            <div className="text-[11px] text-muted-foreground">
+              L = 1.2 m  Dh = 12 mm
+            </div>
+          </div>
+        </div>
+
+        {/* Pressure anchor (icon left of node, matches StreamNode offset). */}
+        <Anchor
+          aria-hidden
+          className="w-3 h-3 text-foreground"
+          style={{ position: "absolute", left: -18, top: -8 }}
+        />
+
+        {/* FlowPort in (top, circular blue-on-blue). */}
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: -7,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 12,
+            height: 12,
+            background: "#60a5fa",
+            border: "1.5px solid #1d4ed8",
+            borderRadius: "50%",
+          }}
+        />
+        {/* FlowPort out (bottom, circular red-on-red). */}
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            bottom: -7,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 12,
+            height: 12,
+            background: "#f87171",
+            border: "1.5px solid #b91c1c",
+            borderRadius: "50%",
+          }}
+        />
+        {/* ThermalPort (left, paired). */}
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: -8,
+            top: "50%",
+            transform: "translateY(-50%) rotate(45deg)",
+            width: 12,
+            height: 12,
+            background: "var(--color-layer-thermal)",
+            border:
+              "1.5px solid color-mix(in oklch, var(--color-layer-thermal) 75%, black)",
+          }}
+        />
+        {/* ThermalPort (right, paired). */}
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            right: -8,
+            top: "50%",
+            transform: "translateY(-50%) rotate(45deg)",
+            width: 12,
+            height: 12,
+            background: "var(--color-layer-thermal)",
+            border:
+              "1.5px solid color-mix(in oklch, var(--color-layer-thermal) 75%, black)",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LeaderLine — dashed orthogonal polyline from number chip to feature.
+// Pure horizontal when feature.y === chip.y; otherwise a 2-segment Z
+// (horizontal → vertical → horizontal) with the elbow at a fixed lane x.
+// ---------------------------------------------------------------------------
+
+const LEFT_LANE_X = 132;
+const RIGHT_LANE_X = 432;
+
+function LeaderLine({ callout }: { callout: Callout }): React.JSX.Element {
+  const chipY = callout.ny ?? callout.fy;
+  // The line starts at the inner edge of the chip (so it appears to
+  // emanate from the chip's number side).
+  const startX =
+    callout.side === "L" ? LEFT_CHIP_X + CHIP_SIZE : RIGHT_CHIP_X;
+  const laneX = callout.side === "L" ? LEFT_LANE_X : RIGHT_LANE_X;
+  const endX = callout.fx;
+  const endY = callout.fy;
+
+  // Build the polyline points.
+  //  L: chip-edge → lane → vertical → feature.x → feature.y
+  //  R: chip-edge → lane → vertical → feature.x → feature.y (mirrored)
+  // When chipY === endY, the vertical segment collapses; the lane point
+  // and the elbow are coincident, and the path reads as a single straight
+  // horizontal line.
+  const points: [number, number][] = [
+    [startX, chipY],
+    [laneX, chipY],
+    [laneX, endY],
+    [endX, endY],
+  ];
+
+  const pathD = points
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`)
+    .join(" ");
+
+  return (
+    <path
+      d={pathD}
+      stroke="var(--foreground)"
+      strokeOpacity={0.45}
+      strokeWidth={1}
+      strokeDasharray="4 3"
+      fill="none"
+      shapeRendering="crispEdges"
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ChipBadge — the numbered chip itself, absolutely positioned on the tile.
+// ---------------------------------------------------------------------------
+
+function ChipBadge({ callout }: { callout: Callout }): React.JSX.Element {
+  const chipY = callout.ny ?? callout.fy;
+  const left = callout.side === "L" ? LEFT_CHIP_X : RIGHT_CHIP_X;
   return (
     <span
       aria-hidden
-      style={{ top, left }}
-      className="absolute inline-flex items-center justify-center w-[18px] h-[18px] rounded-sm font-mono text-micro tabular-nums bg-popover text-foreground/85 border border-border z-10"
+      style={{
+        position: "absolute",
+        left,
+        top: chipY - CHIP_SIZE / 2,
+        width: CHIP_SIZE,
+        height: CHIP_SIZE,
+      }}
+      className="inline-flex items-center justify-center rounded-sm font-mono text-micro tabular-nums bg-popover text-foreground/85 border border-border z-10"
     >
-      {n}
+      {callout.n}
     </span>
   );
 }
 
 // ---------------------------------------------------------------------------
-// NodeShowcase — a visual mirror of StreamNode with every state forced on.
-// See doctrine-fidelity note at file top.
+// NodeLegend — two-column legend matching the callout numbers. Reads at
+// text-body (13 px). Engineering voice. No em dashes.
 // ---------------------------------------------------------------------------
 
-function NodeShowcase(): React.JSX.Element {
-  // Dimensions roughly matching a real CAC node (~220 × ~80). Hardcoded so
-  // the callout positions stay deterministic; the real node auto-sizes to
-  // content.
-  const NODE_W = 220;
-  const NODE_H = 88;
-  const BAND_H = 8; // selected state → 8 px (locked DESIGN.md §5)
+interface LegendItem {
+  n: number;
+  text: string;
+}
 
+const NODE_LEGEND_LEFT: readonly LegendItem[] = [
+  { n: 1, text: "Layer accent band. Split for dual-layer components." },
+  { n: 2, text: "Component type." },
+  { n: 3, text: "Instance name." },
+  { n: 4, text: "Value summary. Source blocks only." },
+  { n: 5, text: "Pressure anchor." },
+];
+
+const NODE_LEGEND_RIGHT: readonly LegendItem[] = [
+  { n: 6, text: "Flow port. Blue ports flow in, red ports flow out." },
+  { n: 7, text: "Thermal port. Paired across opposing faces." },
+  { n: 8, text: "Selected ring." },
+  { n: 9, text: "Persistent validation error outline." },
+];
+
+function NodeLegend(): React.JSX.Element {
   return (
-    <div className="relative" style={{ width: 360, height: 220 }}>
-      {/* Centered node wrapper */}
-      <div
-        className="absolute"
-        style={{
-          left: (360 - NODE_W) / 2,
-          top: (220 - NODE_H) / 2,
-          width: NODE_W,
-        }}
-      >
-        {/* Outer wrapper — carries selected ring + persistent error outline.
-            Mirrors StreamNode's outer div line for line. */}
-        <div
-          className="relative rounded-md"
-          style={{
-            // Selected: 8 px band + 3 px Hydraulic-blue ring with 1 px
-            // canvas-offset. Tracks StreamNode.tsx style={} block.
-            boxShadow:
-              "0 0 0 1px var(--canvas), 0 0 0 3px var(--ring)",
-            // Persistent error outline (one of three mutually-exclusive
-            // outline states; we show error here. autoExtended dashed is
-            // shown via a small "callout 8" sample below).
-            outline: "2px solid var(--destructive)",
-            outlineOffset: "0",
-          }}
-        >
-          <div className="rounded-md overflow-hidden">
-            {/* Dual-layer split band — Hydraulic (left) + Thermal (right),
-                each half the width. Matches getDisplayLayers() output for
-                ChannelAndContacts. */}
-            <div
-              className="flex w-full"
-              style={{ height: BAND_H }}
-              aria-hidden
-            >
-              <div
-                style={{
-                  flex: 1,
-                  backgroundColor: "var(--color-layer-hydraulic)",
-                }}
-              />
-              <div
-                style={{
-                  flex: 1,
-                  backgroundColor: "var(--color-layer-thermal)",
-                }}
-              />
-            </div>
-            <div className="bg-card p-2">
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <BoxIcon className="w-3.5 h-3.5" strokeWidth={1.5} />
-                ChannelAndContacts
-              </div>
-              <div className="font-semibold text-sm">channel_1</div>
-              <div className="text-[11px] text-muted-foreground">
-                L = 1.2 m  Dh = 12 mm
-              </div>
-            </div>
-          </div>
-
-          {/* Anchor indicator (same Anchor lucide as StreamNode, same offset). */}
-          <Anchor
-            aria-hidden
-            className="w-3 h-3 text-foreground"
-            style={{ position: "absolute", left: -16, top: -6 }}
-          />
-
-          {/* Fake port handles, matching StreamNode geometry. FlowPort:
-              circular 12 px, blue-on-blue-border (in) / red-on-red-border
-              (out). ThermalPort: rotated 45° square 12 px, amber-on-darker. */}
-          {/* FlowPort in (top) */}
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              top: -7,
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: 12,
-              height: 12,
-              background: "#60a5fa",
-              border: "1.5px solid #1d4ed8",
-              borderRadius: "50%",
-            }}
-          />
-          {/* FlowPort out (bottom) */}
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              bottom: -7,
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: 12,
-              height: 12,
-              background: "#f87171",
-              border: "1.5px solid #b91c1c",
-              borderRadius: "50%",
-            }}
-          />
-          {/* ThermalPort (left, paired CAC) */}
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: -8,
-              top: "50%",
-              transform: "translateY(-50%) rotate(45deg)",
-              width: 12,
-              height: 12,
-              background: "var(--color-layer-thermal)",
-              border:
-                "1.5px solid color-mix(in oklch, var(--color-layer-thermal) 75%, black)",
-            }}
-          />
-          {/* ThermalPort (right, paired CAC) */}
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              right: -8,
-              top: "50%",
-              transform: "translateY(-50%) rotate(45deg)",
-              width: 12,
-              height: 12,
-              background: "var(--color-layer-thermal)",
-              border:
-                "1.5px solid color-mix(in oklch, var(--color-layer-thermal) 75%, black)",
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Callout overlays. Positions are tuned against the rendered node;
-          each chip sits ~6 px outside the feature it labels. */}
-      {/* 1 — Hydraulic layer band (left half) */}
-      <CalloutChip n="1" top={47} left={70} />
-      {/* 2 — Thermal layer band (right half) */}
-      <CalloutChip n="2" top={47} left={196} />
-      {/* 3 — Component icon + label */}
-      <CalloutChip n="3" top={70} left={28} />
-      {/* 4 — Instance name */}
-      <CalloutChip n="4" top={92} left={28} />
-      {/* 5 — Value summary line */}
-      <CalloutChip n="5" top={112} left={28} />
-      {/* 6 — Flow ports (top + bottom) */}
-      <CalloutChip n="6" top={50} left={172} />
-      {/* 7 — Selected ring */}
-      <CalloutChip n="7" top={62} left={302} />
-      {/* 8 — Error outline */}
-      <CalloutChip n="8" top={150} left={302} />
-      {/* 9 — Anchor */}
-      <CalloutChip n="9" top={62} left={50} />
-
-      {/* Tiny inline sample tiles for outline variants — autoExtended (dashed
-          chart-5) + flash. Stacking all outline states on a single hero would
-          be visually impossible (they're mutually exclusive). The legend
-          mentions both; here they sit as 24×16 micro-samples in the corner so
-          the legend's claim is grounded in something visual. */}
-      <div className="absolute bottom-2 right-2 flex gap-2 items-center bg-popover/60 backdrop-blur-0 rounded-sm border border-border px-2 py-1">
-        <div
-          aria-hidden
-          title="autoExtended"
-          style={{
-            width: 24,
-            height: 16,
-            outline: "2px dashed var(--chart-5)",
-            outlineOffset: 2,
-            borderRadius: 4,
-            background: "var(--card)",
-          }}
-        />
-        <span className="font-mono text-foreground/65 text-micro">
-          10 autoExtended
-        </span>
-      </div>
+    <div className="px-6 pb-5 pt-3 grid grid-cols-2 gap-x-6 gap-y-2">
+      <LegendColumn items={NODE_LEGEND_LEFT} />
+      <LegendColumn items={NODE_LEGEND_RIGHT} />
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// EdgesShowcase — three edge specimens stacked vertically.
-//
-//   1. Hydraulic default — solid 1.5 px stroke, rounded orthogonal path,
-//      ports at each end.
-//   2. BC dashed — 1.5 px stroke, 6/3 dasharray (matches BCEdge.tsx), with
-//      the mid-edge `L+R` tag.
-//   3. Loop trace — 2.5 px warning-tinted stroke, 6/4 dasharray with
-//      marching-ants animation (matches `.validation-flow-trace`). Severity
-//      tint = `--color-warning`.
-// ---------------------------------------------------------------------------
-
-function EdgesShowcase(): React.JSX.Element {
-  const W = 360;
-  const H = 220;
-  const colX = { src: 60, mid: W / 2, tgt: W - 60 };
-
-  // Three horizontal rows, evenly spaced.
-  const rowY = [60, 110, 160];
-
+function LegendColumn({ items }: { items: readonly LegendItem[] }): React.JSX.Element {
   return (
-    <div className="relative" style={{ width: W, height: H }}>
-      <svg
-        width={W}
-        height={H}
-        viewBox={`0 0 ${W} ${H}`}
-        className="absolute inset-0"
-      >
-        {/* Row 1 — hydraulic default. Rounded orthogonal (straight here for
-            clarity; the real router would route around obstacles). */}
-        <path
-          d={`M${colX.src + 10},${rowY[0]} L${colX.tgt - 10},${rowY[0]}`}
-          stroke="var(--foreground)"
-          strokeOpacity={0.65}
-          strokeWidth={1.5}
-          fill="none"
-          strokeLinecap="round"
-        />
-        {/* Row 2 — BC dashed */}
-        <path
-          d={`M${colX.src + 10},${rowY[1]} L${colX.tgt - 10},${rowY[1]}`}
-          stroke="var(--muted-foreground)"
-          strokeWidth={1.5}
-          strokeDasharray="6 3"
-          fill="none"
-          strokeLinecap="round"
-        />
-        {/* Row 3 — loop trace marching ants */}
-        <path
-          d={`M${colX.src + 10},${rowY[2]} L${colX.tgt - 10},${rowY[2]}`}
-          stroke="var(--color-warning)"
-          strokeWidth={2.5}
-          strokeDasharray="6 4"
-          fill="none"
-          strokeLinecap="round"
-          className="anatomy-flow-march"
-        />
-        {/* Local marching-ants keyframe — scoped here so we don't depend on
-            the global xyflow-scoped `.validation-flow-trace` selector. */}
-        <style>
-          {`
-          .anatomy-flow-march {
-            animation: anatomy-flow-march 1.5s linear infinite;
-          }
-          @keyframes anatomy-flow-march {
-            to { stroke-dashoffset: -10; }
-          }
-          @media (prefers-reduced-motion: reduce) {
-            .anatomy-flow-march { animation: none; }
-          }
-          `}
-        </style>
-      </svg>
-
-      {/* Edge endpoint dots (8 dots: source + target for each of 3 rows + a
-          single port-convention pair on the leftmost / topmost). Drawn as
-          small circles using the FlowPort palette so the user reads the
-          dots as ports. */}
-      {rowY.map((y, i) => (
-        <React.Fragment key={i}>
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: colX.src - 6,
-              top: y - 6,
-              width: 12,
-              height: 12,
-              background: "#60a5fa",
-              border: "1.5px solid #1d4ed8",
-              borderRadius: "50%",
-            }}
-          />
-          <span
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: colX.tgt - 6,
-              top: y - 6,
-              width: 12,
-              height: 12,
-              background: "#f87171",
-              border: "1.5px solid #b91c1c",
-              borderRadius: "50%",
-            }}
-          />
+    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-body items-baseline">
+      {items.map((item) => (
+        <React.Fragment key={item.n}>
+          <span className="font-mono text-foreground/85 tabular-nums">
+            {item.n}
+          </span>
+          <span className="text-foreground/85 leading-snug">{item.text}</span>
         </React.Fragment>
       ))}
-
-      {/* BC mid-edge side tag — matches BCEdge's EdgeLabelRenderer
-          rendering. Static "L+R" here. */}
-      <span
-        className="absolute rounded border bg-background px-[6px] py-[2px] text-[11px] text-muted-foreground font-mono pointer-events-none"
-        style={{
-          left: colX.mid - 18,
-          top: rowY[1] - 12,
-        }}
-      >
-        L+R
-      </span>
-
-      {/* Callout chips — one per edge specimen + one for port-side convention. */}
-      <CalloutChip n="1" top={rowY[0] - 22} left={colX.mid - 10} />
-      <CalloutChip n="2" top={rowY[1] - 36} left={colX.mid + 30} />
-      <CalloutChip n="3" top={rowY[2] - 22} left={colX.mid - 10} />
-      {/* 4 — Port-side convention indicator: left dot = port_in, right dot =
-          port_out. Anchored to the top row's source port. */}
-      <CalloutChip n="4" top={rowY[0] - 22} left={colX.src - 18} />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Legend content. Numbers MUST match the callout chips above.
+// EdgesTile — three edge specimens stacked vertically + a port-side
+// convention diagram. Same leader-line system as the node tile.
 // ---------------------------------------------------------------------------
 
-const NODE_LEGEND: readonly LegendEntry[] = [
-  { n: "1", text: "Hydraulic layer band" },
-  { n: "2", text: "Thermal layer band (dual-layer split)" },
-  { n: "3", text: "Component icon and type label" },
-  { n: "4", text: "Instance name" },
-  { n: "5", text: "Value summary (source blocks)" },
-  { n: "6", text: "Flow ports — round, blue = in, red = out" },
-  { n: "7", text: "Selected ring (8 px band, blue ring)" },
-  { n: "8", text: "Persistent error outline (red)" },
-  { n: "9", text: "Pressure anchor" },
-  { n: "10", text: "autoExtended outline (dashed, violet)" },
+const EDGES_TILE_W = 560;
+const EDGES_TILE_H = 380;
+const EDGE_SRC_X = 130;
+const EDGE_TGT_X = 430;
+
+// Three specimen rows. Port-side convention sits below as a small 2-node
+// schematic.
+const ROW_Y = [88, 152, 216];
+const CONV_ROW_Y = 304;
+
+const EDGES_CALLOUTS: Callout[] = [
+  { n: 1, side: "R", fx: EDGE_TGT_X - 30, fy: ROW_Y[0] },
+  { n: 2, side: "R", fx: EDGE_TGT_X - 30, fy: ROW_Y[1] },
+  { n: 3, side: "R", fx: EDGE_TGT_X - 30, fy: ROW_Y[2] },
+  { n: 4, side: "R", fx: EDGE_TGT_X - 30, fy: CONV_ROW_Y },
 ];
 
-const EDGES_LEGEND: readonly LegendEntry[] = [
-  { n: "1", text: "Hydraulic edge (default)" },
-  { n: "2", text: "Boundary condition (dashed, L / R / L+R tag)" },
-  { n: "3", text: "Loop trace (marching ants, validation)" },
-  { n: "4", text: "Port-side convention (in from top / left, out from bottom / right)" },
+function EdgesTile(): React.JSX.Element {
+  return (
+    <div className="px-6 pb-2">
+      <div
+        className="relative rounded-sm border border-border/40 overflow-hidden"
+        style={{
+          width: EDGES_TILE_W,
+          height: EDGES_TILE_H,
+          backgroundColor: "var(--canvas)",
+          backgroundImage:
+            "linear-gradient(to right, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
+            "linear-gradient(to bottom, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
+            "linear-gradient(to right, var(--color-canvas-grid-major) 1px, transparent 1px), " +
+            "linear-gradient(to bottom, var(--color-canvas-grid-major) 1px, transparent 1px)",
+          backgroundSize: "12px 12px, 12px 12px, 24px 24px, 24px 24px",
+        }}
+      >
+        <svg
+          width={EDGES_TILE_W}
+          height={EDGES_TILE_H}
+          viewBox={`0 0 ${EDGES_TILE_W} ${EDGES_TILE_H}`}
+          className="absolute inset-0"
+          aria-hidden
+        >
+          {/* Row 1 — hydraulic default (solid 1.5 px). */}
+          <path
+            d={`M${EDGE_SRC_X + 10},${ROW_Y[0]} L${EDGE_TGT_X - 10},${ROW_Y[0]}`}
+            stroke="var(--foreground)"
+            strokeOpacity={0.7}
+            strokeWidth={1.5}
+            fill="none"
+            strokeLinecap="round"
+          />
+          {/* Row 2 — BC dashed 6/3. */}
+          <path
+            d={`M${EDGE_SRC_X + 10},${ROW_Y[1]} L${EDGE_TGT_X - 10},${ROW_Y[1]}`}
+            stroke="var(--muted-foreground)"
+            strokeWidth={1.5}
+            strokeDasharray="6 3"
+            fill="none"
+            strokeLinecap="round"
+          />
+          {/* Row 3 — loop trace marching ants (warning severity). */}
+          <path
+            d={`M${EDGE_SRC_X + 10},${ROW_Y[2]} L${EDGE_TGT_X - 10},${ROW_Y[2]}`}
+            stroke="var(--color-warning)"
+            strokeWidth={2.5}
+            strokeDasharray="6 4"
+            fill="none"
+            strokeLinecap="round"
+            className="anatomy-flow-march"
+          />
+
+          {/* Port-side convention — 2-node mini schematic. Source on the
+              left, target on the right, with a clear "port_in at top/left,
+              port_out at bottom/right" silhouette. */}
+          {/* Source node body */}
+          <rect
+            x={EDGE_SRC_X - 30}
+            y={CONV_ROW_Y - 14}
+            width={50}
+            height={28}
+            rx={3}
+            stroke="var(--foreground)"
+            strokeOpacity={0.6}
+            strokeWidth={1}
+            fill="var(--card)"
+          />
+          {/* Target node body */}
+          <rect
+            x={EDGE_TGT_X - 50}
+            y={CONV_ROW_Y - 14}
+            width={50}
+            height={28}
+            rx={3}
+            stroke="var(--foreground)"
+            strokeOpacity={0.6}
+            strokeWidth={1}
+            fill="var(--card)"
+          />
+          {/* Edge between them */}
+          <path
+            d={`M${EDGE_SRC_X + 20},${CONV_ROW_Y} L${EDGE_TGT_X - 50},${CONV_ROW_Y}`}
+            stroke="var(--foreground)"
+            strokeOpacity={0.7}
+            strokeWidth={1.5}
+            fill="none"
+            strokeLinecap="round"
+          />
+
+          {/* Leader lines */}
+          {EDGES_CALLOUTS.map((c) => (
+            <LeaderLine key={c.n} callout={c} />
+          ))}
+
+          {/* Local marching-ants keyframe (scoped to this file to avoid
+              dependence on xyflow's `.validation-flow-trace` global). */}
+          <style>
+            {`
+            .anatomy-flow-march {
+              animation: anatomy-flow-march 1.5s linear infinite;
+            }
+            @keyframes anatomy-flow-march {
+              to { stroke-dashoffset: -10; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .anatomy-flow-march { animation: none; }
+            }
+            `}
+          </style>
+        </svg>
+
+        {/* Endpoint port dots for the three specimens. */}
+        {ROW_Y.map((y, i) => (
+          <React.Fragment key={i}>
+            <span
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: EDGE_SRC_X - 6,
+                top: y - 6,
+                width: 12,
+                height: 12,
+                background: "#60a5fa",
+                border: "1.5px solid #1d4ed8",
+                borderRadius: "50%",
+              }}
+            />
+            <span
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: EDGE_TGT_X - 6,
+                top: y - 6,
+                width: 12,
+                height: 12,
+                background: "#f87171",
+                border: "1.5px solid #b91c1c",
+                borderRadius: "50%",
+              }}
+            />
+          </React.Fragment>
+        ))}
+
+        {/* BC mid-edge side tag, matching BCEdge's EdgeLabelRenderer. */}
+        <span
+          className="absolute rounded border bg-background px-[6px] py-[2px] text-[11px] text-muted-foreground font-mono pointer-events-none"
+          style={{
+            left: (EDGE_SRC_X + EDGE_TGT_X) / 2 - 18,
+            top: ROW_Y[1] - 12,
+          }}
+        >
+          L+R
+        </span>
+
+        {/* Port-side convention ports: port_in (blue) at LEFT of source,
+            port_out (red) at RIGHT of target. */}
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: EDGE_SRC_X - 30 - 6,
+            top: CONV_ROW_Y - 6,
+            width: 12,
+            height: 12,
+            background: "#60a5fa",
+            border: "1.5px solid #1d4ed8",
+            borderRadius: "50%",
+          }}
+        />
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: EDGE_SRC_X + 20 - 6,
+            top: CONV_ROW_Y - 6,
+            width: 12,
+            height: 12,
+            background: "#f87171",
+            border: "1.5px solid #b91c1c",
+            borderRadius: "50%",
+          }}
+        />
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: EDGE_TGT_X - 50 - 6,
+            top: CONV_ROW_Y - 6,
+            width: 12,
+            height: 12,
+            background: "#60a5fa",
+            border: "1.5px solid #1d4ed8",
+            borderRadius: "50%",
+          }}
+        />
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: EDGE_TGT_X - 6,
+            top: CONV_ROW_Y - 6,
+            width: 12,
+            height: 12,
+            background: "#f87171",
+            border: "1.5px solid #b91c1c",
+            borderRadius: "50%",
+          }}
+        />
+
+        {/* Number chips. */}
+        {EDGES_CALLOUTS.map((c) => (
+          <ChipBadge key={c.n} callout={c} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const EDGES_LEGEND: readonly LegendItem[] = [
+  { n: 1, text: "Hydraulic edge." },
+  { n: 2, text: "Boundary-condition edge. Dashed. Side tag (L, R, L+R) marks which sides of the consumer it drives." },
+  { n: 3, text: "Validation loop trace. Marching ants. Tinted by severity (red, amber, blue)." },
+  { n: 4, text: "Port-side convention. Flow enters from the top or left, exits from the bottom or right." },
 ];
+
+function EdgesLegend(): React.JSX.Element {
+  return (
+    <div className="px-6 pb-5 pt-3">
+      <LegendColumn items={EDGES_LEGEND} />
+    </div>
+  );
+}
