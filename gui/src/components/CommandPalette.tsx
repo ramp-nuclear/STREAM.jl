@@ -66,7 +66,15 @@ import {
   type SearchItem,
 } from "@/lib/commandPalette/searchPool";
 import { getComponentLayers, type LayerKey } from "@/lib/layers";
+import {
+  SHORTCUT_GROUP_ORDER,
+  SHORTCUTS_CATALOG,
+  type ShortcutEntry,
+  type ShortcutGroup,
+} from "@/lib/shortcuts";
 import useStore from "@/store/useStore";
+
+export type CommandPaletteMode = "commands" | "shortcuts";
 
 // D-04 — zoom floor for setCenter. Started at the research-recommended 0.75
 // (StreamNode.tsx text-sm labels render at ~10.5px screen-px at z=0.75) but
@@ -154,12 +162,18 @@ function bestScoreInGroup(group: SearchItem[], query: string): number {
 interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Phase 72 (help-system) — which view the palette opens in. `Ctrl+P` passes
+   * "commands" (default); `?` passes "shortcuts". The user can swap modes via
+   * the mode chip in the palette header after open.
+   */
+  initialMode?: CommandPaletteMode;
 }
 
 export default function CommandPalette(
   props: CommandPaletteProps,
 ): React.JSX.Element | null {
-  const { open, onOpenChange } = props;
+  const { open, onOpenChange, initialMode } = props;
 
   // Pitfall 8: don't even build the pool / subscribe to nodes when palette
   // is closed. App.tsx may render <CommandPalette open={false} /> permanently
@@ -167,12 +181,19 @@ export default function CommandPalette(
   // triggering buildSearchPool churn.
   if (!open) return null;
 
-  return <CommandPaletteInner open={open} onOpenChange={onOpenChange} />;
+  return (
+    <CommandPaletteInner
+      open={open}
+      onOpenChange={onOpenChange}
+      initialMode={initialMode}
+    />
+  );
 }
 
 function CommandPaletteInner({
   open,
   onOpenChange,
+  initialMode,
 }: CommandPaletteProps): React.JSX.Element {
   const nodes = useStore((s) => s.nodes);
   const resources = useStore((s) => s.resources);
@@ -193,6 +214,18 @@ function CommandPaletteInner({
   );
 
   const [search, setSearch] = React.useState("");
+  // Phase 72 (help-system) — mode is a per-open-cycle local state seeded from
+  // initialMode. The mode chip in the header lets the user swap without
+  // closing and re-opening. Clearing search on swap keeps cmdk filtering
+  // honest (a query that matched commands probably won't match shortcuts).
+  const [mode, setMode] = React.useState<CommandPaletteMode>(
+    initialMode ?? "commands",
+  );
+
+  function swapMode(next: CommandPaletteMode): void {
+    setMode(next);
+    setSearch("");
+  }
 
   function handleSelect(item: SearchItem): void {
     if (item.kind === "component") {
@@ -358,21 +391,40 @@ function CommandPaletteInner({
           // gets erased.
           className="bg-transparent"
         >
+          {/* Phase 72 — mode chip strip. Lives between the input and the
+              list when the palette is in any non-default mode, OR persistently
+              so users discover the swap. Click swaps modes. */}
+          <ModeChipRow mode={mode} onSwap={swapMode} />
           <CommandInput
             value={search}
             onValueChange={setSearch}
-            placeholder="Type to search components and resources..."
+            placeholder={
+              mode === "shortcuts"
+                ? "Type to search shortcuts..."
+                : "Type to search components and resources..."
+            }
           />
           {/* D-02: max-h-[480px] override of the shim's canonical
               max-h-[400px] baseline. tailwind-merge resolves the override. */}
           <CommandList className="max-h-[480px]">
-            <CommandEmpty>No matches.</CommandEmpty>
-            <OrderedGroups
-              grouped={grouped}
-              order={groupOrder}
-              activeLayers={activeLayers}
-              onSelect={handleSelect}
-            />
+            <CommandEmpty>
+              {mode === "shortcuts" ? "No bindings." : "No matches."}
+            </CommandEmpty>
+            {mode === "commands" ? (
+              <OrderedGroups
+                grouped={grouped}
+                order={groupOrder}
+                activeLayers={activeLayers}
+                onSelect={handleSelect}
+              />
+            ) : (
+              <ShortcutGroups
+                onSelect={() => {
+                  onOpenChange(false);
+                  setSearch("");
+                }}
+              />
+            )}
           </CommandList>
         </Command>
       </DialogContent>
@@ -506,4 +558,135 @@ function RenderItem({
       );
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// ModeChipRow — Phase 72 help-system. The mode chip lives directly under the
+// dialog's top edge and above the input. Both modes are always available; the
+// chip swaps. The currently-active mode shows in mono uppercase
+// foreground/85; the inactive mode is foreground/45 and clickable.
+//
+// Aria-pressed encodes which mode is current. Click swaps and clears the
+// search query (`swapMode` upstream).
+// ---------------------------------------------------------------------------
+
+interface ModeChipRowProps {
+  mode: CommandPaletteMode;
+  onSwap: (next: CommandPaletteMode) => void;
+}
+
+function ModeChipRow({ mode, onSwap }: ModeChipRowProps): React.JSX.Element {
+  return (
+    <div
+      role="tablist"
+      aria-label="Palette mode"
+      className="flex items-center gap-3 px-3 py-1.5 border-b border-border/60 font-mono text-[10px] uppercase tracking-wide select-none"
+    >
+      <ModeChip
+        active={mode === "commands"}
+        label="Commands"
+        keyHint="Ctrl+P"
+        onClick={() => onSwap("commands")}
+      />
+      <ModeChip
+        active={mode === "shortcuts"}
+        label="Shortcuts"
+        keyHint="?"
+        onClick={() => onSwap("shortcuts")}
+      />
+    </div>
+  );
+}
+
+interface ModeChipProps {
+  active: boolean;
+  label: string;
+  keyHint: string;
+  onClick: () => void;
+}
+
+function ModeChip({ active, label, keyHint, onClick }: ModeChipProps): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 cursor-pointer",
+        "transition-colors duration-[80ms] focus-visible:outline-none",
+        active
+          ? "text-foreground/85"
+          : "text-foreground/45 hover:text-foreground/75 hover:bg-popover/60 focus-visible:bg-popover/60",
+      )}
+    >
+      <span>{label}</span>
+      <span className="text-foreground/45 font-mono normal-case">{keyHint}</span>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ShortcutGroups — renders the SHORTCUTS_CATALOG into the cmdk list, grouped
+// by area. Each row is a non-action `CommandItem` (the row closes the palette
+// on select; it does NOT fire the underlying action). The shortcut row is a
+// REFERENCE: the user reads the binding, dismisses, and presses it.
+//
+// Matches the first-run keymap doctrine "Shortcut-Is-Static-Text Rule" —
+// duplicating action paths would create two cmdk-mount / file-dialog-mount
+// surfaces for the same intent. cmdk owns the filter + the keyboard nav; the
+// row's onSelect is the "dismiss-after-read" hook.
+// ---------------------------------------------------------------------------
+
+interface ShortcutGroupsProps {
+  onSelect: () => void;
+}
+
+function ShortcutGroups({ onSelect }: ShortcutGroupsProps): React.JSX.Element {
+  const byGroup = React.useMemo(() => {
+    const m = new Map<ShortcutGroup, ShortcutEntry[]>();
+    for (const g of SHORTCUT_GROUP_ORDER) m.set(g, []);
+    for (const entry of SHORTCUTS_CATALOG) {
+      const bucket = m.get(entry.group);
+      if (bucket) bucket.push(entry);
+    }
+    return m;
+  }, []);
+
+  return (
+    <>
+      {SHORTCUT_GROUP_ORDER.map((group) => {
+        const entries = byGroup.get(group);
+        if (!entries || entries.length === 0) return null;
+        return (
+          <CommandGroup key={group} heading={group}>
+            {entries.map((entry) => (
+              <ShortcutRow key={entry.label} entry={entry} onSelect={onSelect} />
+            ))}
+          </CommandGroup>
+        );
+      })}
+    </>
+  );
+}
+
+interface ShortcutRowProps {
+  entry: ShortcutEntry;
+  onSelect: () => void;
+}
+
+function ShortcutRow({ entry, onSelect }: ShortcutRowProps): React.JSX.Element {
+  const value = [entry.label, entry.keys, ...(entry.aliases ?? [])].join(" ");
+  return (
+    <CommandItem
+      value={value}
+      onSelect={onSelect}
+      data-testid={`cmdk-shortcut-${entry.label.replace(/\s+/g, "-")}`}
+    >
+      <span className="flex-1">{entry.label}</span>
+      <span className="ml-auto font-mono text-foreground/65 text-[11px]">
+        {entry.keys}
+      </span>
+    </CommandItem>
+  );
 }

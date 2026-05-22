@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { platform } from "@tauri-apps/plugin-os";
 import { Minus, Maximize2, Minimize2, X } from "lucide-react";
 import { Button } from "./ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { useWindowMaximized } from "../hooks/useWindowMaximized";
 
 type Platform = "macos" | "windows" | "linux" | null;
@@ -126,42 +127,63 @@ export default function WindowControls() {
 
   // Windows / Linux (also the vitest fallback when platform() throws or plat
   // is still null pre-mount — render Windows/Linux variant pre-emptively).
+  //
+  // Phase 72 (help-system tooltip discipline) — each button is icon-only, so
+  // a Tooltip with the action label is required. Triggers use `asChild` so
+  // the existing <Button> is the trigger surface (no extra wrapper).
   return (
     <div className="flex items-stretch h-full">
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Minimize window"
-        onClick={onMin}
-        className="rounded-none h-full w-10 hover:bg-muted-foreground/20"
-      >
-        <Minus className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Toggle maximize"
-        onClick={onMax}
-        className={
-          "rounded-none h-full w-10 hover:bg-muted-foreground/20" +
-          (snapHover ? " bg-muted-foreground/20" : "")
-        }
-      >
-        {isMax ? (
-          <Minimize2 className="h-4 w-4" />
-        ) : (
-          <Maximize2 className="h-4 w-4" />
-        )}
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Close window"
-        onClick={onClose}
-        className="rounded-none h-full w-10 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white"
-      >
-        <X className="h-4 w-4" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Minimize window"
+            onClick={onMin}
+            className="rounded-none h-full w-10 hover:bg-muted-foreground/20"
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Minimize</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle maximize"
+            onClick={onMax}
+            className={
+              "rounded-none h-full w-10 hover:bg-muted-foreground/20" +
+              (snapHover ? " bg-muted-foreground/20" : "")
+            }
+          >
+            {isMax ? (
+              <Minimize2 className="h-4 w-4" />
+            ) : (
+              <Maximize2 className="h-4 w-4" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          {isMax ? "Restore" : "Maximize"}
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Close window"
+            onClick={onClose}
+            className="rounded-none h-full w-10 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">Close</TooltipContent>
+      </Tooltip>
     </div>
   );
 }

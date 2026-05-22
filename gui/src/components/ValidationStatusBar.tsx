@@ -25,6 +25,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import useStore from "../store/useStore";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 type Severity = "error" | "warning" | "info";
 type BottomTab = "code" | "validation";
@@ -224,19 +225,26 @@ export default function ValidationStatusBar() {
           activeTab={activeBottomTab}
         />
         {bottomPanelOpen && (
-          <button
-            type="button"
-            onClick={() => useStore.setState({ bottomPanelOpen: false })}
-            aria-label="Close bottom panel"
-            title="Close panel (Ctrl+`)"
-            className={
-              "h-full px-3 inline-flex items-center cursor-pointer text-foreground/65 " +
-              "hover:text-foreground transition-colors duration-[80ms] " +
-              "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover"
-            }
-          >
-            <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.5} />
-          </button>
+          // Phase 72 (help-system) — icon-only chrome button + has a
+          // keyboard shortcut whose binding isn't visibly displayed.
+          // Tooltip discipline applies: tooltip shows the binding.
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => useStore.setState({ bottomPanelOpen: false })}
+                aria-label="Close bottom panel"
+                className={
+                  "h-full px-3 inline-flex items-center cursor-pointer text-foreground/65 " +
+                  "hover:text-foreground transition-colors duration-[80ms] " +
+                  "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover"
+                }
+              >
+                <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Close panel · Ctrl+`</TooltipContent>
+          </Tooltip>
         )}
       </div>
     </div>

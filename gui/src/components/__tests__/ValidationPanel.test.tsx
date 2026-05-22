@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import ValidationPanel from "../ValidationPanel";
+import { TooltipProvider } from "../ui/tooltip";
 import useStore from "../../store/useStore";
 import type { ValidationResult } from "../../lib/validation/types";
 
@@ -25,7 +26,15 @@ function makeResult(overrides: Partial<ValidationResult> = {}): ValidationResult
 }
 
 function renderPanel() {
-  return render(<ValidationPanel />);
+  // Phase 72 (help-system) — ValidationPanel's Group-by sliders icon now
+  // sits inside a Tooltip + Popover stack. Radix Tooltip requires a
+  // TooltipProvider in scope; production mounts it once at the app root
+  // (App.tsx). Tests render the panel in isolation, so we wrap here.
+  return render(
+    <TooltipProvider delayDuration={0}>
+      <ValidationPanel />
+    </TooltipProvider>,
+  );
 }
 
 beforeEach(() => {
