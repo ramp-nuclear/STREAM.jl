@@ -39,11 +39,11 @@ function makeSnapshot(
 // ---------------------------------------------------------------------------
 
 describe("pressureBoundaryRequired validator", () => {
-  it("emits one error when anchors is empty", () => {
+  it("emits one warning when anchors is empty", () => {
     const snapshot = makeSnapshot({});
     const results = pressureBoundaryRequired.run(snapshot);
     expect(results).toHaveLength(1);
-    expect(results[0].severity).toBe("error");
+    expect(results[0].severity).toBe("warning");
     expect(results[0].validatorId).toBe("pressure_boundary_required");
     expect(results[0].id).toBe("pressure_boundary_required::system");
     expect(results[0].targets).toEqual([]);

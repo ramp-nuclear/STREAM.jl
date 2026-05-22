@@ -49,11 +49,11 @@ function makeSnapshot(nodes: Node[], edges: Edge[] = []): ValidationSnapshot {
 // ---------------------------------------------------------------------------
 
 describe("drivingElementRequired validator", () => {
-  it("emits one error when nodes list is empty", () => {
+  it("emits one warning when nodes list is empty", () => {
     const snapshot = makeSnapshot([]);
     const results = drivingElementRequired.run(snapshot);
     expect(results).toHaveLength(1);
-    expect(results[0].severity).toBe("error");
+    expect(results[0].severity).toBe("warning");
     expect(results[0].validatorId).toBe("driving_element_required");
     expect(results[0].id).toBe("driving_element_required::system");
     expect(results[0].targets).toEqual([]);
@@ -78,14 +78,14 @@ describe("drivingElementRequired validator", () => {
     expect(results).toHaveLength(0);
   });
 
-  it("emits one error when nodes contain only non-driving elements", () => {
+  it("emits one warning when nodes contain only non-driving elements", () => {
     const snapshot = makeSnapshot([
       makeNode("n1", "Channel"),
       makeNode("n2", "HeatExchanger"),
     ]);
     const results = drivingElementRequired.run(snapshot);
     expect(results).toHaveLength(1);
-    expect(results[0].severity).toBe("error");
+    expect(results[0].severity).toBe("warning");
     expect(results[0].validatorId).toBe("driving_element_required");
   });
 });

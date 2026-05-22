@@ -87,10 +87,44 @@ describe("runValidators", () => {
 
     _validators.push(stubValidator);
 
-    const snapshot = makeEmptySnapshot();
+    // Phase 72 — runner short-circuits to [] when the canvas is fully empty
+    // (no nodes AND no edges). Use a snapshot with at least one node so the
+    // forwarding path is exercised.
+    const snapshot: ValidationSnapshot = {
+      ...makeEmptySnapshot(),
+      nodes: [
+        // Minimal node shape — runner doesn't inspect data; the stub
+        // validator ignores its argument.
+        { id: "n1", type: "stream", position: { x: 0, y: 0 }, data: {} } as never,
+      ],
+    };
     const results = runValidators(snapshot);
     expect(results).toHaveLength(1);
     expect(results[0]).toEqual(stubResult);
+  });
+
+  // Phase 72 — empty-canvas suppression.
+  it("returns [] when the canvas is fully empty, regardless of registered validators", () => {
+    const stubValidator: Validator = {
+      id: "stub",
+      severity: "warning",
+      description: "Stub validator",
+      scope: ["nodes"],
+      run: () => [
+        {
+          id: "stub::would-fire",
+          validatorId: "stub",
+          severity: "warning",
+          description: "Would fire if not for the empty-canvas short-circuit",
+          targets: [],
+        },
+      ],
+    };
+
+    _validators.push(stubValidator);
+
+    const snapshot = makeEmptySnapshot();
+    expect(runValidators(snapshot)).toEqual([]);
   });
 
 });
