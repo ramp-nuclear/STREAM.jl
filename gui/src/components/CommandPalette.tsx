@@ -327,13 +327,14 @@ function CommandPaletteInner({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        // VSCode-style: ZERO scrim. The editor/canvas/sidebars stay fully
-        // visible behind the palette. The palette stands out via tonal
-        // distinction (its own darker tinted bg, below) + shadow + border
-        // + top-anchored position — not via dimming the rest of the GUI.
-        // Empty class still goes through DialogOverlay so click-outside-to-
-        // close still works; it just paints nothing.
-        overlayClassName="bg-transparent"
+        // Phase 72 post-Preferences — the CommandPalette's bespoke surface
+        // (transparent overlay, --dialog-surface body, atmospheric shadow)
+        // was promoted to the Dialog primitive default. The
+        // overlayClassName="bg-transparent" override is now redundant; the
+        // primitive default IS transparent. Same for the body bg/border/
+        // shadow — all served by the locked tokens. Leaving only the
+        // palette-specific overrides: top-anchored, fixed width, stripped
+        // padding (the cmdk Command owns the inner box).
         // Pitfall 6 / CONTEXT.md D-08: Radix calls onEscapeKeyDown BEFORE its
         // own default close, so stopping propagation here both (a) lets the
         // dialog still close (we do NOT preventDefault) and (b) blocks the
@@ -351,25 +352,6 @@ function CommandPaletteInner({
           // Strip DialogContent's default padding/gap so the cmdk Command
           // owns the inner box.
           "p-0 gap-0 overflow-hidden",
-          // Tonal distinction: the palette is its OWN surface tone,
-          // distinctly darker than the bg-popover the default DialogContent
-          // would carry. Slight hue-254 tint shared with the project's
-          // neutral hue family, but at lower lightness so the palette
-          // visibly recedes from the surrounding chrome/canvas — the
-          // VSCode/Cursor "tool overlay" idiom.
-          "rounded-md",
-          // Theme-aware palette surface — both modes pick a tone that's
-          // distinctly off the chrome/panel/canvas trio. Dark mode goes
-          // below chrome (0.16 → 0.13); light mode goes below chrome
-          // (0.95 → 0.93) without flipping to a dark palette on light
-          // theme (which would be jarring).
-          "bg-[oklch(0.93_0.012_254)] dark:bg-[oklch(0.13_0.012_254)]",
-          "border-[oklch(0.86_0.012_254)] dark:border-[oklch(0.24_0.012_254)]",
-          // Real shadow for elevation — VSCode-style "this is the active
-          // tool, it floats above your work" cue. Tighter dark shadow in
-          // dark mode, softer in light.
-          "shadow-[0_16px_40px_-12px_oklch(0.05_0_0/0.18),0_4px_12px_-4px_oklch(0.05_0_0/0.12)]",
-          "dark:shadow-[0_16px_40px_-12px_oklch(0.05_0_0/0.55),0_4px_12px_-4px_oklch(0.05_0_0/0.40)]",
         )}
         data-testid="command-palette-content"
       >
@@ -385,10 +367,7 @@ function CommandPaletteInner({
         <Command
           label="Jump to component or resource"
           // Strip the cmdk primitive's default bg-popover so the
-          // DialogContent's darker palette tone shows through. Without
-          // this the outer dark surface gets re-painted with the
-          // grey-on-grey popover bg and the VSCode tonal distinction
-          // gets erased.
+          // DialogContent's --dialog-surface shows through.
           className="bg-transparent"
         >
           {/* Phase 72 — mode chip strip. Lives between the input and the

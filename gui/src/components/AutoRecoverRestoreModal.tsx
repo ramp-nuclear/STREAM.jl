@@ -67,7 +67,7 @@ export default function AutoRecoverRestoreModal({
       <Dialog.Portal>
         {/* Overlay covers the entire screen to prevent interaction with anything behind */}
         <Dialog.Overlay
-          className="fixed inset-0 z-50 bg-foreground/40"
+          className="fixed inset-0 z-50 bg-transparent"
         />
         <Dialog.Content
           // Block Esc from closing the dialog (D-03 invariant — decision must be made)
@@ -76,7 +76,7 @@ export default function AutoRecoverRestoreModal({
           onPointerDownOutside={(e) => e.preventDefault()}
           // Block focus leaving the dialog
           onInteractOutside={(e) => e.preventDefault()}
-          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-md border border-border bg-popover p-6 shadow-[var(--shadow-dialog)]"
+          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-md border border-[var(--dialog-border)] bg-[var(--dialog-surface)] p-6 shadow-[var(--shadow-dialog)]"
           aria-describedby="autorecover-description"
         >
           {/* Header */}

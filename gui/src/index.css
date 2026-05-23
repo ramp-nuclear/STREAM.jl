@@ -41,13 +41,24 @@
      tint (hue 240, chroma 0.14). Focus reads as "selected" with minor
      identity, not decoration. Matches Linear/Cursor lineage. */
   --ring: oklch(0.55 0.14 240);
-  /* Phase 72 — --shadow-dialog is the ONE structural shadow in the system.
-     Applied to Dialog + AlertDialog + Sheet only. Tonal-layering does
-     elevation work everywhere else. Tuned for "lift, not glow" — low alpha,
-     low blur, double-stop with a tight near-shadow. */
+  /* Phase 72 (post-Preferences) — --shadow-dialog relocked to the atmospheric
+     CommandPalette lineage. Applied to Dialog + AlertDialog + Sheet. The
+     prior 8/24 px shadow paired with a dim grey scrim; the scrim was
+     rejected by the user as ugly (see feedback_no_grey_modal_surface_or_scrim).
+     With the scrim gone, the shadow takes over the lift work — 16/40 px
+     blur reads as "this overlay floats above your work" without a dim
+     filter on the canvas. */
   --shadow-dialog:
-    0 8px 24px -8px oklch(0.20 0.012 254 / 0.20),
-    0 2px 6px -2px oklch(0.20 0.012 254 / 0.10);
+    0 16px 40px -12px oklch(0.05 0 0 / 0.18),
+    0 4px 12px -4px oklch(0.05 0 0 / 0.12);
+  /* Phase 72 (post-Preferences) — dialog surface + border, distinct from
+     --popover (which lifts ABOVE the canvas as a tonal step). Dialogs sit
+     "off the chrome/panel/canvas trio" — light mode: 0.93 (Δ 0.02 below
+     chrome 0.95); dark mode (in .dark below): 0.13 (Δ 0.03 below chrome
+     0.16). The CommandPalette established this tone earlier as its
+     bespoke surface; now promoted to the default Dialog body. */
+  --dialog-surface: oklch(0.93 0.012 254);
+  --dialog-border: oklch(0.86 0.012 254);
   /* Phase 72 — unselected-node ring color. Plain hex (not OKLCH) because
      chroma-0 OKLCH inputs are a degenerate case in WebKitGTK parsers
      and silently fall back to currentColor on this dev configuration. */
@@ -175,13 +186,17 @@
      low-chroma Hydraulic tint (hue 240). Focus reads as "selected" with
      minor identity. */
   --ring: oklch(0.65 0.10 240);
-  /* Phase 72 — --shadow-dialog is the ONE structural shadow in the system.
-     Dark-mode values: darker base + slightly higher alpha to lift correctly
-     against the dark panel/canvas. Applied to Dialog + AlertDialog + Sheet
-     only. */
+  /* Phase 72 (post-Preferences) — --shadow-dialog dark-mode relocked to the
+     atmospheric CommandPalette lineage (see :root header for the why). */
   --shadow-dialog:
-    0 8px 24px -8px oklch(0.05 0.012 254 / 0.50),
-    0 2px 6px -2px oklch(0.05 0.012 254 / 0.30);
+    0 16px 40px -12px oklch(0.05 0 0 / 0.55),
+    0 4px 12px -4px oklch(0.05 0 0 / 0.40);
+  /* Phase 72 (post-Preferences) — dialog surface + border, dark mode.
+     0.13 lightness sits BELOW --chrome (0.16) so the dialog reads as a
+     distinct tool overlay rather than a lifted panel. Border at 0.24 is
+     subtle but visible against the dark surface. */
+  --dialog-surface: oklch(0.13 0.012 254);
+  --dialog-border: oklch(0.24 0.012 254);
   /* Phase 72 — unselected-node ring, dark mode. See :root for rationale. */
   --node-ring-rest: #6e6e6e;
   --chart-1: oklch(0.488 0.243 264.376);
@@ -232,6 +247,14 @@
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  /* Phase 72 (post-Preferences) — dialog surface tokens. Distinct from
+     --popover (which is the LIFTED chrome surface for menus / popovers).
+     Dialogs use a tone that sits OFF the chrome/panel/canvas trio so they
+     read as a tool overlay rather than another panel. Established by
+     CommandPalette; promoted to default Dialog body when the dim grey
+     scrim was banned. */
+  --color-dialog-surface: var(--dialog-surface);
+  --color-dialog-border: var(--dialog-border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
