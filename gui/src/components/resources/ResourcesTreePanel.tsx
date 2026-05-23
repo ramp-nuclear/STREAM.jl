@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ResourceGroupHeader from "./ResourceGroupHeader";
 import ResourceRow from "./ResourceRow";
+import { scrollIntoViewSafe } from "@/lib/scrollIntoViewSafe";
 
 // Phase 62 Plan 62-06 — Resources tab body.
 //
@@ -58,7 +59,7 @@ export default function ResourcesTreePanel() {
         `[data-resource-uuid="${selectedResourceId}"][data-resource-kind="${selectedResourceKind}"]`,
       );
       if (!el) return false;
-      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      scrollIntoViewSafe(el, { block: "center", behavior: "smooth" });
       return true;
     }
 

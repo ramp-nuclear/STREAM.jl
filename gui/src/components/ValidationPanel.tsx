@@ -43,6 +43,7 @@ import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import type { ValidationResult } from "../lib/validation/types";
 import { type StreamNodeData } from "../store/useStore";
+import { scrollIntoViewSafe } from "../lib/scrollIntoViewSafe";
 
 // ---------------------------------------------------------------------------
 // Custom-event type declarations
@@ -181,7 +182,7 @@ export default function ValidationPanel() {
           | undefined)?.instanceName ?? nodeFilter;
 
   // First row ref for scrollIntoView on node-filter activation.
-  const firstRowRef = useRef<HTMLDivElement | null>(null);
+  const firstRowRef = useRef<HTMLButtonElement | null>(null);
 
   // Window event listeners.
   useEffect(() => {
@@ -201,10 +202,12 @@ export default function ValidationPanel() {
         setNodeFilter(nodeId);
         setSeverityFilter(null);
         requestAnimationFrame(() => {
-          firstRowRef.current?.scrollIntoView({
-            block: "nearest",
-            behavior: "smooth",
-          });
+          if (firstRowRef.current) {
+            scrollIntoViewSafe(firstRowRef.current, {
+              block: "nearest",
+              behavior: "smooth",
+            });
+          }
         });
       }
     };
@@ -744,35 +747,38 @@ function GroupHeader({
 interface RowProps {
   result: ValidationResult;
   onClick: () => void;
-  ref?: React.Ref<HTMLDivElement>;
+  ref?: React.Ref<HTMLButtonElement>;
   indented?: boolean;
   gridTemplate: string;
   selected: boolean;
 }
 
 function Row({ result, onClick, ref, indented, gridTemplate, selected }: RowProps) {
+  // Phase 72 harden — converted from `<div role="button" tabIndex={0}
+  // onKeyDown>` to a native `<button>`. The prior shim was correct for
+  // axe-core, but the native element wins on screen-reader announcement
+  // (announces "button" with state, no role coercion), supports Enter/Space
+  // activation for free, participates in form-tab order without an explicit
+  // tabIndex, and `type="button"` guarantees no accidental submit if this
+  // panel ever lands inside a <form>.
+  //
   // Selected rows render a 2 px left-edge accent in --ring (Hydraulic-hue
   // focus color, locked Phase 72) so the user can tell which row is producing
   // the persistent canvas trace at a glance. Clears when the user clicks
   // anywhere on the canvas (CanvasPanel clears the trace, panel re-renders
   // and selected state is dropped via filter-change paths).
   return (
-    <div
+    <button
       ref={ref}
-      role="button"
-      tabIndex={0}
+      type="button"
       onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
       data-selected={selected || undefined}
       className={
-        "relative grid items-baseline gap-3 py-1.5 cursor-pointer " +
+        // `text-left font-normal` reset native <button> centering + bold
+        // defaults (the row reads as a list item, not a chrome button).
+        "relative grid items-baseline gap-3 py-1.5 text-left font-normal cursor-pointer w-full " +
         "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
-        "transition-colors duration-[80ms] " +
+        "transition-colors duration-[80ms] motion-reduce:transition-none " +
         (indented ? "pl-6 pr-3" : "px-3") +
         (selected ? " bg-popover" : "")
       }
@@ -807,7 +813,7 @@ function Row({ result, onClick, ref, indented, gridTemplate, selected }: RowProp
       >
         {result.description}
       </span>
-    </div>
+    </button>
   );
 }
 

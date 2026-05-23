@@ -22,7 +22,12 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* Phase 72 harden — light muted-foreground darkened from oklch(0.556 0 0)
+     to oklch(0.50 0.005 254) (and aligned to the hue-254 neutral lineage).
+     Old value gave ~4.47:1 on panel — short of the WCAG AA 4.5:1 floor
+     for body text. New value clears 4.5:1 on every chrome/panel/canvas/
+     popover/card surface (worst case 5.19 on chrome). */
+  --muted-foreground: oklch(0.50 0.005 254);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -77,9 +82,13 @@
   --color-canvas-grid-minor: oklch(0.97 0.003 254);
   /* Phase 72 — warning + info functional tokens (replaces text-yellow-500
      / text-blue-500 raw Tailwind in ValidationPanel and any future
-     warning/info surface). OKLCH per the locked OKLCH-only doctrine. */
-  --color-warning: oklch(0.74 0.16 75);
-  --color-info: oklch(0.62 0.18 240);
+     warning/info surface). OKLCH per the locked OKLCH-only doctrine.
+     Phase 72 harden — darkened both for WCAG AA contrast in light mode:
+     warning 0.74 → 0.55 (was 2.23:1 on panel — well below body floor);
+     info 0.62 → 0.535 (was 3.26:1 on panel). Hue and chroma unchanged so
+     the perceptual identity stays. */
+  --color-warning: oklch(0.55 0.16 75);
+  --color-info: oklch(0.535 0.18 240);
   /* Phase 72 — Code editor lane carve-out. The 5 --syntax-* tokens are the
      CodePreview syntax-highlight palette, anchored to One Dark Pro (the most-
      installed VSCode theme + the Julia editor lineage via Juno/Atom). Scoped
@@ -137,7 +146,16 @@
   --secondary: oklch(0.315 0.016 252);
   --secondary-foreground: oklch(0.73 0.012 250);
   --muted: oklch(0.315 0.016 252);
-  --muted-foreground: oklch(0.50 0.01 250);
+  /* Phase 72 harden — dark muted-foreground lifted from oklch(0.50 0.01 250)
+     to oklch(0.65 0.01 250). Old value gave 2.51:1 on canvas / 2.96 on panel
+     — well below the WCAG AA 4.5:1 body-text floor. New value clears 4.5:1
+     on canvas (4.48 — within rounding), 5.27 on panel, 5.78 on chrome,
+     5.02 on card. On --popover (the LIFTED surface in dark mode, brighter
+     than canvas) it reads at 3.63:1 — passes the 3:1 large-text/icon floor
+     but should not be used for body text on popover; that's a code-side
+     discipline (use --foreground/85 or --foreground for body inside popover/
+     dialog content). */
+  --muted-foreground: oklch(0.65 0.01 250);
   --accent: oklch(0.315 0.016 252);
   --accent-foreground: oklch(0.73 0.012 250);
   --destructive: oklch(0.704 0.191 22.216);
@@ -505,5 +523,39 @@ textarea,
 @media (prefers-reduced-motion: reduce) {
   .code-link-active {
     animation: none;
+  }
+}
+
+/* Phase 72 harden — global prefers-reduced-motion safety net.
+   PRODUCT.md locks "Reduced-motion respect via prefers-reduced-motion. All
+   animations are functional (state transitions, focus rings), not decorative;
+   under reduced-motion, transitions collapse to instant."
+
+   The shadcn primitive layer already honors this via per-class
+   `motion-reduce:!duration-0` / `motion-reduce:transition-none`. The
+   per-surface @media blocks above handle the canvas marching-ants idioms.
+   This universal block is the belt-and-suspenders catch-all for any animation
+   site that slips the net (Tailwind `animate-pulse` on skeletons, third-party
+   library transitions in the @xyflow / react-flow tree, future surfaces).
+
+   `0.01ms` rather than `0ms` is the WebKit-recommended idiom — some browsers
+   race on a literal 0ms (rendering before the animation start callback
+   fires); 0.01ms still produces a single end-state frame deterministically.
+
+   `animation-iteration-count: 1` forces infinite-loop animations (the only
+   pre-harden site was .pulse-once, but new infinite animations like
+   xyflow's edge-update spinner would otherwise still loop at ~0 duration).
+
+   `scroll-behavior: auto` covers CSS-side smooth scrolling. JS-side
+   `scrollIntoView({ behavior: "smooth" })` is NOT affected by CSS — that's
+   handled by `lib/scrollIntoViewSafe.ts` at the call site. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
