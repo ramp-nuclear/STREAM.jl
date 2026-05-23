@@ -12,8 +12,9 @@ import { scrollIntoViewSafe } from "@/lib/scrollIntoViewSafe";
 // headers GEOMETRIES / POWER SHAPES / FLUIDS, each with a trailing `+`
 // button (Fluids' is disabled per D-03 + UI-SPEC). A top search box does
 // case-insensitive substring matching across all three groups. Empty
-// groups post-filter collapse to the locked `(none yet — click +)`
-// placeholder line.
+// groups (post-filter or natively empty) collapse to the locked `(none)`
+// placeholder line. Phase 72 clarify retoned this from `(none yet — click
+// +)` — em-dash banned + "click +" restated a visible affordance.
 //
 // The sentinel PowerShape (uuid SENTINEL_UNSET_POWER_SHAPE) is filtered out
 // of the visible tree per D-26 — it only lives as the fixed top entry in
@@ -125,8 +126,8 @@ export default function ResourcesTreePanel() {
             />
             <ul role="group" className="mt-[2px]">
               {geometries.length === 0 ? (
-                <li className="text-[12px] italic text-muted-foreground pl-[8px]">
-                  (none yet — click +)
+                <li className="text-[12px] text-muted-foreground pl-[8px]">
+                  (none)
                 </li>
               ) : (
                 geometries.map((g) => (
@@ -154,8 +155,8 @@ export default function ResourcesTreePanel() {
             />
             <ul role="group" className="mt-[2px]">
               {powerShapes.length === 0 ? (
-                <li className="text-[12px] italic text-muted-foreground pl-[8px]">
-                  (none yet — click +)
+                <li className="text-[12px] text-muted-foreground pl-[8px]">
+                  (none)
                 </li>
               ) : (
                 powerShapes.map((p) => (
@@ -184,8 +185,8 @@ export default function ResourcesTreePanel() {
             />
             <ul role="group" className="mt-[2px]">
               {fluids.length === 0 ? (
-                <li className="text-[12px] italic text-muted-foreground pl-[8px]">
-                  (none yet — click +)
+                <li className="text-[12px] text-muted-foreground pl-[8px]">
+                  (none)
                 </li>
               ) : (
                 fluids.map((f) => (

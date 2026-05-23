@@ -11,11 +11,11 @@
 //         SENTINEL_UNSET_POWER_SHAPE (D-26: sentinel is uneditable).
 //       - fluid      → read-only light_water placeholder (D-03;
 //         RESEARCH Open Question 3 recommendation copy).
-//   • "none" / "project" → no-selection body:
-//       - Resources tab active → variant copy "Select a resource to edit it."
-//         (UI-SPEC §"Right Properties panel — no-selection body";
-//         rewritten in 62-15 per VERIFICATION.md Gap #4)
-//       - Otherwise → standard "Select a component to view its properties."
+//   • "none" / "project" → no-selection body shows a single "No selection"
+//       heading. The per-tab variant copy (Phase 62 D-05 + UI-SPEC §"Right
+//       Properties panel — no-selection body") was dropped Phase 72 clarify:
+//       restating "select a resource" / "select a component" when the panel
+//       IS the property panel is consumer-SaaS hand-holding per PRODUCT.md.
 //
 // Header text (D-06, UI-SPEC §"Right Properties panel — header text"):
 //   • component → "Properties"
@@ -71,7 +71,6 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
   const selectedNodeId = useStore((s) => s.selectedNodeId);
   const selectedResourceId = useStore((s) => s.selectedResourceId);
   const selectedResourceKind = useStore((s) => s.selectedResourceKind);
-  const activeLeftTab = useStore((s) => s.activeLeftTab);
   // PERF — previously this subscribed to the full `nodes` array just to
   // look up the selected node in `renderBody()`. ReactFlow replaces the
   // `nodes` array on every drag tick (60 Hz), re-rendering this always-
@@ -379,20 +378,17 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
 
     // ----- no selection / project tab -----------------------------------
     // D-04: the Project tab body IS the form; the right panel is unused.
-    // We surface the same no-selection body. When the Resources tab is
-    // active with no resource selected, swap the body description for the
-    // variant copy.
-    const variantCopy =
-      activeLeftTab === "Resources"
-        ? "Select a resource to edit it."
-        : "Select a component to view its properties.";
+    // We surface the same no-selection body across Components / Resources /
+    // Project tabs. Phase 72 clarify — dropped the second-line variant copy
+    // ("Select a resource to edit it." / "Select a component to view its
+    // properties."). The right panel IS the property panel by definition;
+    // restating that in the empty state is consumer-SaaS hand-holding
+    // (PRODUCT.md anti-reference). "No selection" alone reads as a status,
+    // not as instructions.
     return (
       <div className="mt-[32px]">
         <p className="text-[14px] font-semibold text-muted-foreground">
           No selection
-        </p>
-        <p className="text-[14px] text-muted-foreground mt-[8px]">
-          {variantCopy}
         </p>
       </div>
     );

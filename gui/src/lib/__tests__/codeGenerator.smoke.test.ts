@@ -80,7 +80,7 @@ function toCodegenResources(project: ReturnType<typeof deserializeProject>): Cod
     // `# TODO: fill in your power shape` (D-26 + INV-CG-04).
     [SENTINEL_UNSET_POWER_SHAPE]: {
       uuid: SENTINEL_UNSET_POWER_SHAPE,
-      name: "(leave unset — set in code)",
+      name: "(leave unset; set in code)",
       kind: "unset",
       params: {},
     },

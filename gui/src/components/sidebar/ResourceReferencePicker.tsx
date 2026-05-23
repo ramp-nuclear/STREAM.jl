@@ -7,7 +7,7 @@
 //
 // • Dropdown lists resources of the matching kind in creation order.
 // • For Power Shape, the dropdown also renders the sentinel
-//   `(leave unset — set in code)` as the fixed top entry, followed by
+//   `(leave unset; set in code)` as the fixed top entry, followed by
 //   a `<SelectSeparator />`, then the user's named Power Shapes
 //   (D-26 + UI-SPEC §"Power Shape picker — extra fixed top entry";
 //   sentinel copy updated in 62-15 per VERIFICATION.md Gap #4).
@@ -163,7 +163,7 @@ export default function ResourceReferencePicker({
               <>
                 <SelectItem value={SENTINEL_UNSET_POWER_SHAPE}>
                   <span className="italic text-muted-foreground">
-                    (leave unset — set in code)
+                    (leave unset; set in code)
                   </span>
                 </SelectItem>
                 {userResources.length > 0 && <SelectSeparator />}

@@ -81,10 +81,10 @@ const DEFAULT_SOLVER = {
 };
 
 // Verbatim user-facing copy per 62-UI-SPEC "Power Shape picker — extra fixed top
-// entry". Contains a U+2014 em-dash; this is user-facing UI copy, NOT a Julia
-// identifier, so the Unicode exception in CLAUDE.md / feedback_ascii_variable_names
-// (Julia identifiers only) does not apply.
-const SENTINEL_POWER_SHAPE_NAME = "(leave unset — set in code)";
+// entry". Phase 72 clarify — em-dash replaced with semicolon per locked
+// PRODUCT.md / DESIGN.md ban on em-dashes in user-visible strings; the two
+// halves are parallel imperatives and a semicolon coordinates them cleanly.
+const SENTINEL_POWER_SHAPE_NAME = "(leave unset; set in code)";
 
 // Julia identifier regex used to validate user-supplied Resource names (per 62
 // UI-SPEC popover validation messages; matches §3.5 instance-name rules).
@@ -2727,7 +2727,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     const powerShapesRecord: Record<string, PowerShapeResource> = {
       [SENTINEL_UNSET_POWER_SHAPE]: {
         uuid: SENTINEL_UNSET_POWER_SHAPE,
-        name: "(leave unset — set in code)",
+        name: "(leave unset; set in code)",
         kind: "unset",
         params: {},
       },

@@ -108,7 +108,7 @@ export default function PresetsPanel() {
           // another IO error. Log clearly; leave project section empty.
           console.error(
             "[PresetsPanel] Project preset directory unavailable " +
-            "(path may be outside FS scope — see Tauri capability CR-01):",
+            "(path may be outside FS scope, see Tauri capability CR-01):",
             err,
           );
           if (!cancelled) useStore.getState().setProjectPresets([]);
@@ -213,16 +213,13 @@ export default function PresetsPanel() {
           ) : !currentProjectDir ? (
             <div className="px-[8px] py-[4px]">
               <p className="text-xs text-muted-foreground">
-                Open a project to use the Project store.
+                No project open.
               </p>
             </div>
           ) : projectPresets.length === 0 ? (
             <div className="px-[8px] py-[4px]">
-              <p className="text-xs font-medium text-muted-foreground">
-                No project presets yet.
-              </p>
               <p className="text-xs text-muted-foreground">
-                Multi-select components and right-click to save.
+                No project presets.
               </p>
             </div>
           ) : (
@@ -271,11 +268,8 @@ export default function PresetsPanel() {
             </ul>
           ) : libraryPresets.length === 0 ? (
             <div className="px-[8px] py-[4px]">
-              <p className="text-xs font-medium text-muted-foreground">
-                No library presets yet.
-              </p>
               <p className="text-xs text-muted-foreground">
-                Save a selection to add your first template.
+                No library presets.
               </p>
             </div>
           ) : (

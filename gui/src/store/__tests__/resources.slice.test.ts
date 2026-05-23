@@ -24,7 +24,7 @@ beforeEach(() => {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — set in code)",
+          name: "(leave unset; set in code)",
           kind: "unset",
           params: {},
         },
@@ -295,7 +295,7 @@ describe("resources slice", () => {
       const sentinel = resources.powerShapes[SENTINEL_UNSET_POWER_SHAPE];
       expect(sentinel).toBeDefined();
       expect(sentinel.kind).toBe("unset");
-      expect(sentinel.name).toBe("(leave unset — set in code)");
+      expect(sentinel.name).toBe("(leave unset; set in code)");
       expect(sentinel.uuid).toBe(SENTINEL_UNSET_POWER_SHAPE);
     });
 
@@ -322,7 +322,7 @@ describe("resources slice", () => {
       expect(
         useStore.getState().resources.powerShapes[SENTINEL_UNSET_POWER_SHAPE]
           .name,
-      ).toBe("(leave unset — set in code)");
+      ).toBe("(leave unset; set in code)");
     });
 
     it("D-26: user cannot create another 'unset' Power Shape — addPowerShape throws", () => {

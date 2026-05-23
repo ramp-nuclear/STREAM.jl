@@ -516,8 +516,8 @@ function RenderItem({
                 <span
                   key={k}
                   data-testid={`off-layer-chip-${k}`}
-                  title={`${LAYER_LABELS[k]} layer off — will enable on select`}
-                  aria-label={`${LAYER_LABELS[k]} layer off — will enable on select`}
+                  title={`${LAYER_LABELS[k]} layer off; will enable on select`}
+                  aria-label={`${LAYER_LABELS[k]} layer off; will enable on select`}
                   className="inline-flex items-center"
                 >
                   <EyeOff
