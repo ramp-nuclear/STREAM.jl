@@ -991,6 +991,113 @@ active state). Same token (`--foreground`) on both sides of the link: edges
 One signal, one token, no hue ambiguity with the layer accents or selection
 ring.
 
+### Preferences (locked — Phase 72, 2026-05-23)
+
+User-global Preferences dialog reached from `Edit > Preferences…` and
+`Ctrl+,` (Linear / Cursor / VSCode convention). Two-pane modal: 180 px
+category rail (left) + dense setting rows (right). Locked Dialog vocab on
+the outside; the ValidationPanel selected-row idiom on the rail.
+
+**Strict user-global / per-project split.** Preferences carries strictly
+app-scoped settings. Per-project values (`modelOptions.name`,
+`description`, `default_fluid`, `g_default`, `solver`) stay on the
+existing Project Options surface inside the Project tab. Settings that
+moved from per-project to user-global in this phase (off-layer behavior,
+snap to grid) drop from `.scp` on save and ignore on load — heavy-dev
+policy (`feedback_no_back_compat_during_heavy_dev`) covers the file
+break.
+
+**Persistence.** `localStorage` with namespaced one-key-per-setting keys
+(`stream-composer-pref.<category>.<setting>`). Per-key over one-blob so a
+single corrupt value doesn't poison the whole prefs object, and future
+Tauri config write-side maps cleanly to TOML. Cross-component sync via a
+`stream:prefs-changed` CustomEvent broadcast on every `setPreference`.
+
+**Surface dimensions.** Fixed `720 × 560` px. Desktop only (Tauri scope;
+no responsive scaling). Categories list — Editor / Appearance / Files /
+Validation / Code Export / Advanced — pinned in that order; Editor leads
+because the canvas-behavior knobs are the highest-frequency reason to
+open the dialog.
+
+| Property | Value |
+|---|---|
+| Frame | `bg-popover` + `rounded-md` + `border-border` + `--shadow-dialog` (locked Dialog vocab) |
+| Header | `DialogTitle` "Preferences" at `text-title font-semibold`; no description string (self-explanatory); `DialogClose` X via the primitive default |
+| Left rail | `w-[180px] shrink-0 border-r border-border bg-panel` — one tonal step darker than the popover body so it recedes |
+| Rail row | `<button>` `h-9 px-3 mx-1 my-px rounded-sm text-body font-medium`; rest `text-foreground/65 hover:bg-card/60`; selected `bg-card text-foreground` + 2 px `--ring` left-edge stripe (mirrors ValidationPanel selected-row idiom — single project-wide selected-row vocabulary) |
+| Right pane | `flex-1 overflow-y-auto px-6 py-5`; ScrollArea primitive; per-category header at the top uses the locked compact-uppercase-header idiom (`text-micro font-mono uppercase tracking-wide text-foreground/45`) |
+| Setting row | `grid grid-cols-[1fr_auto] gap-6 items-center py-3 border-b border-border/40 last:border-b-0`; label-stack carries label (`text-body font-medium`) + one-line description (`text-label text-foreground/65`); right cell carries the control |
+| Footer | `h-12 border-t border-border px-4`; left = `Reset all preferences` (ghost Button, destructive hover); right = `Done` (default Button, closes dialog); footer inline-replaces with a confirm row on Reset click (no separate AlertDialog — one less modal layer) |
+
+**The Pref-Persists-Even-When-Unwired Rule.** Settings whose downstream
+consumer doesn't read from the pref yet (Auto-flip ports, Density,
+Reduce-motion override, Default zoom, Default open / export paths,
+Code-export options, Daemon status, Performance overlay) render with a
+disabled control + `Not yet wired.` mono micro line below the
+description. The preference value still persists in localStorage on
+change so future phases that wire the consumer don't need to touch the
+dialog. The placeholder vocabulary (control disabled + mono note) is the
+same for all such rows.
+
+**The Theme-Lives-In-useTheme Rule.** Preferences > Appearance > Theme
+consumes `useTheme()` directly, not a separate `appearance.theme` pref
+key. `View > Theme` keeps its menu entry; both surfaces write to the
+same `stream-composer-theme` localStorage key. Two entry points, one
+source of truth. Mirrors the Off-layer / Snap to grid / Interactive
+lock pattern: canonical state lives in the pref, multiple surfaces
+write to it.
+
+**The Canvas-Overlay-Buttons-Write-Through-Prefs Rule.** SnapToGridButton
+and InteractiveLockButton on the canvas overlay no longer call
+`useStore.setSnapToGrid` / `setInteractiveLocked` directly; they call
+`setPreference("editor", "snapToGrid", …)` and the bridge
+(`initPreferencesBridge` in `lib/preferences.ts`, mounted by App.tsx)
+propagates the change back into the store's runtime mirrors. Reads
+still come from useStore (selective primitive selectors) — the bridge
+makes the canvas button and the Preferences dialog show the same
+state without either knowing about the other.
+
+**Reset all.** Inline confirm in the footer row — `Reset every
+preference to its default?` + Cancel / Reset all buttons. On confirm,
+`resetAllPreferences()` deletes every namespaced key and broadcasts a
+single `stream:prefs-changed` event with `category: "*"`. Every
+`usePreference` subscriber re-reads defaults. No Sonner toast — the
+controls visibly reverting is the feedback.
+
+**Wired side-effects** (downstream consumes the pref at run-time):
+- `editor.offLayerBehavior` — useStore.hideOffLayer mirror via bridge
+- `editor.snapToGrid` — useStore.snapToGrid mirror via bridge; canvas overlay button writes through
+- `editor.interactiveLock` — useStore.interactiveLocked mirror via bridge; overlay button writes through
+- `appearance.theme` — useTheme directly (not via pref store)
+- `files.autorecoverEnabled` — gates `writer.schedule()` at fire-time
+- `files.autorecoverIntervalMs` — read once at `initAutoRecover()`; changes require app restart
+- `files.recentFilesMax` — read at `addToRecent` call-time
+- `files.undoHistoryDepth` — read at `_pushSnapshot` call-time (inline localStorage to avoid pref-lib overhead on hot path)
+- `validation.rulesEnabled` — runner filters validators at run-time
+- `validation.defaultGroupBy`, `validation.defaultSeverityFilter` — ValidationPanel reads on mount (lazy initializer)
+
+**Not-yet-wired** (pref persists; downstream doesn't read yet — surfaced
+in the dialog with the disabled `Not yet wired.` placeholder vocab):
+- `editor.autoFlipPortsOnConnect`
+- `editor.showPortTypeOnHover`
+- `editor.defaultZoomOnOpen`
+- `appearance.density`
+- `appearance.reduceMotion`
+- `files.defaultOpenLocation`
+- `validation.loopTracePersistence` (control is enabled — the loop-trace timeout consumer isn't wired yet but the dialog setting persists)
+- `codeExport.defaultPath`, `indentWidth`, `includeSourceComments`, `openExportedFile`
+- `advanced.showDaemonStatus`, `performanceOverlay`
+
+**Switch primitive added.** `gui/src/components/ui/switch.tsx` — sliding
+pill toggle (Radix Switch). The semantic for "binary on/off setting"
+distinct from Toggle (toolbar press-button) and Checkbox (form-field
+list selection). Documented radius exception: `rounded-full` (vs the
+locked sm/md scale) because the pill shape IS the affordance —
+"rounded-sm switch" reads as a wrong primitive. `h-5 w-9` (20 × 36 px)
+matches Badge density. Off `bg-border`, on `bg-primary` (neutral
+high-contrast slab matching Button primary posture). Thumb
+`bg-background` so it reads against the track regardless of theme.
+
 ### Held open — per-surface decisions still queued
 
 The non-`ui/` consumer surfaces below remain provisional. Each will be

@@ -48,6 +48,7 @@ capture the final tokens into a proper frontmatter + sidecar.
 | `/impeccable harden gui/src/` (prefers-reduced-motion safety net + scrollIntoViewSafe + ValidationPanel Row div→button + 3 token contrast fixes) | ✅ | 1 commit — see Decision log | (no DESIGN.md doctrine change — closes Audit P0-3 / Critique Sam persona findings) |
 | `/impeccable clarify gui/src/` (em-dash purge + engineering-voice empty states across PresetsPanel / SidebarPanel / CodePreview / ResourcesTreePanel / AboutDialog / BottomPanel / CommandPalette) | ✅ | 1 commit — see Decision log | (no DESIGN.md doctrine change — closes Audit P2-3 + feedback_engineering_voice_copy) |
 | `/impeccable polish gui/src/` (type-scale + section-header + border-l-2 sweep + AutoRecover dialog migration to locked surfaces + canvas-menu shadow removal) | ✅ | 1 commit — see Decision log | (no DESIGN.md doctrine change — closes Audit P2-4 + P2-6 + P1-1, and brings five consumer surfaces onto the locked primitive layer) |
+| Preferences (Edit > Preferences… + Ctrl+,; two-pane Dialog; 6 categories; user-global persistence; Switch primitive added) | ✅ | 1 commit — see Decision log | §5 Preferences subsection locked |
 
 ### Queued (Session 4 — phase close)
 
@@ -946,6 +947,74 @@ AutoRecoverRestoreModal; `Textarea` to ModelOptionsPanel.
 assertion updated (`BCsTabForm.test.tsx` "BC required — select a mode" →
 "BC required; select a mode") to track the inline em-dash purge in the
 copy. tsc baseline: 10 errors, unchanged.
+
+### Preferences — Edit > Preferences (locked 2026-05-23)
+
+Net-new surface. User-global Preferences dialog reached from
+`Edit > Preferences…` and `Ctrl+,`. Replaces the temporary LayersPanel
+off-layer toggle (which was always meant as a temporary placeholder),
+rehomes Theme as the canonical home (View > Theme stays as a quick-access
+duplicate), surfaces 25+ knobs across 6 categories. Shape ran first
+(documented brief in this session's earlier turns); discovery answers
+locked Dialog two-pane topology + full catalog scope + strict user-global
+persistence.
+
+**Single commit:** `feat(72-prefs): Edit > Preferences (Ctrl+,) — two-pane Dialog + user-global prefs lib`
+
+**Three confirmed locks** (via AskUserQuestion during shape):
+1. Topology = Dialog with two-pane (categories left, content right) — over Dialog top-tabs / Sheet / Routed page
+2. Scope = Full catalog (6 categories, ~25 settings) — over MVP / Mid cut
+3. Persistence = Strict split (Preferences = user-global only; Project Options keeps `modelOptions`) — over merged / partial migration
+
+**Architecture commitments** (full detail in `DESIGN.md` §5 Preferences):
+
+- **`lib/preferences.ts` — single source of truth.** Type-safe `Preferences` interface, `DEFAULT_PREFERENCES` constant, `getPreference` / `setPreference` / `resetAllPreferences` functions, `usePreference` React hook backed by a `stream:prefs-changed` CustomEvent broadcast for cross-component sync. localStorage with namespaced one-key-per-setting keys (`stream-composer-pref.<category>.<setting>`).
+- **Why per-key over one-blob:** future Tauri config write-side maps cleanly to TOML; corrupt single value doesn't poison the whole prefs; reads short-circuit defaults without parsing JSON.
+- **Why not zustand for prefs:** prefs are user-global, not project-scoped. Living in `useStore` would pollute the undo stack (one Ctrl+Z would revert prefs) AND the `.scp` serialization would have to filter them out. Separate hook with localStorage backing is the cleaner boundary.
+- **`initPreferencesBridge()`** — App.tsx-mounted listener that propagates pref changes for the three runtime-mirrored values (`hideOffLayer`, `snapToGrid`, `interactiveLocked`) into useStore. Other prefs are read by their consumers at call-time (`getPreference` from runner, autorecover gate, undo trim, addToRecent cap) — no bridging needed.
+- **Canvas overlay buttons write through prefs.** SnapToGridButton + InteractiveLockButton now call `setPreference("editor", …)`; the bridge updates the runtime mirror. Reads still come from useStore. Click → pref → bridge → store → re-render.
+- **Theme is canonical in useTheme.** Preferences > Appearance > Theme uses `useTheme()` directly, not an `appearance.theme` pref entry — two entry points (Preferences and View menu) share one localStorage key.
+
+**Surface commitments:**
+
+- Fixed `720 × 560` px Dialog. Desktop-only Tauri scope.
+- 6 categories pinned in order: Editor / Appearance / Files / Validation / Code Export / Advanced.
+- Left rail `w-[180px]` darker tonal step (`bg-panel`) so it recedes; selected row carries the 2 px `--ring` left-edge stripe (mirrors ValidationPanel selected-row idiom).
+- Setting rows `grid grid-cols-[1fr_auto] gap-6 items-center py-3 border-b border-border/40`. Label-stack: `text-body font-medium` + `text-label text-foreground/65` description (one-line, engineering voice).
+- Footer: ghost-button `Reset all preferences` (left, destructive on hover) + default `Done` (right). Reset replaces the footer inline with a confirm row — one less modal layer than an AlertDialog.
+
+**The Pref-Persists-Even-When-Unwired Rule.** Settings whose downstream consumer doesn't read from the pref yet render with a **disabled** control + `Not yet wired.` mono micro line. The pref still persists in localStorage on change — future phases wire the consumer without touching the dialog. Currently disabled: Auto-flip ports, Show port type on hover, Default zoom, Density, Reduce-motion override, Default open / export paths, Indent width, Include source comments, Open exported file, Daemon status, Performance overlay (11 rows of 25).
+
+**Wired settings (14 rows):** Off-layer behavior, Snap to grid, Interactive lock, Theme, Autorecover on/off, Autorecover interval (read once at init; change requires app restart), Recent files max, Undo history depth, all 10 Validation rule switches, Default group-by + Default severity filter (lazy initializer on ValidationPanel mount), Loop-trace persistence (the control is enabled but the canvas-side consumer for the timeout is not wired yet — categorically the control IS a valid pref to set even if a future phase wires the timeout).
+
+**New Switch primitive.** `gui/src/components/ui/switch.tsx` added when Preferences became its first consumer. Sliding pill (Radix Switch). Documented radius exception: `rounded-full` vs the locked sm/md scale — the pill shape IS the affordance. `h-5 w-9` matches Badge density. Off `bg-border`, on `bg-primary`. Thumb `bg-background` reads against the track in both themes.
+
+**Off-layer / snap-to-grid moved from per-project to user-global.** The `.scp` `layout.hide_off_layer` and `layout.snap_to_grid` fields are still serialized (back-compat for files written by older app versions) but **ignored on load** — the runtime mirror is seeded from prefs at store creation, and load paths drop the fields. Per `feedback_no_back_compat_during_heavy_dev`, no migration code.
+
+**Files touched (production):**
+
+- New: `gui/src/lib/preferences.ts` (types + storage + hook + bridge)
+- New: `gui/src/components/PreferencesDialog.tsx` (Dialog + 6 category panes)
+- New: `gui/src/components/ui/switch.tsx` (Radix Switch wrapper)
+- Updated: `gui/src/App.tsx` (`Ctrl+,` keybind + bridge init + Dialog mount + custom-event wiring)
+- Updated: `gui/src/components/EditMenu.tsx` (enables Preferences entry + MenubarShortcut + custom-event dispatch)
+- Updated: `gui/src/lib/shortcuts.ts` (catalog entry for `Ctrl+,`)
+- Updated: `gui/src/components/LayersPanel.tsx` (off-layer footer button removed)
+- Updated: `gui/src/components/ValidationPanel.tsx` (group-by + severity filter lazy initializers from prefs)
+- Updated: `gui/src/lib/validation/runner.ts` (filter validators by `rulesEnabled` pref at run-time)
+- Updated: `gui/src/lib/projectIO.ts` (`addToRecent` cap reads from prefs)
+- Updated: `gui/src/components/canvasMenus/SnapToGridButton.tsx`, `InteractiveLockButton.tsx` (write through `setPreference`)
+- Updated: `gui/src/store/useStore.ts` (initial values from prefs; undo trim from prefs; autorecover gate + interval from prefs; ignore hideOffLayer/snapToGrid on load)
+
+**Files touched (tests):**
+
+- Removed: `LayersPanel.test.tsx` Dim/Hide footer toggle block (3 assertions across 2 tests) — surface no longer exists.
+- Updated: `SnapToGridButton.test.tsx` — mounts the preferences bridge in `beforeEach` so the click → pref → bridge → store propagation completes in isolation.
+- Updated: BC required hint copy (em-dash carry-over from the polish pass; this commit only re-runs the suite).
+
+**Tests:** 1044/1058 (4 pre-existing fixture failures in `codeGenerator.smoke.test.ts`, unchanged baseline; 2 deleted tests for the removed footer surface — 1046 − 2 = 1044 net pre-baseline). tsc baseline: 10 errors, unchanged.
+
+**Lessons captured below as #27 onward.**
 
 ### Lessons (worth re-reading at the start of the next session)
 

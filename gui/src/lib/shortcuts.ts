@@ -54,6 +54,7 @@ export const SHORTCUTS_CATALOG: readonly ShortcutEntry[] = [
   { group: "Edit", label: "copy", keys: "Ctrl+C" },
   { group: "Edit", label: "paste", keys: "Ctrl+V" },
   { group: "Edit", label: "duplicate", keys: "Ctrl+D" },
+  { group: "Edit", label: "preferences", keys: "Ctrl+,", aliases: ["settings"] },
 
   // View
   { group: "View", label: "command palette", keys: "Ctrl+P" },

@@ -44,6 +44,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import type { ValidationResult } from "../lib/validation/types";
 import { type StreamNodeData } from "../store/useStore";
 import { scrollIntoViewSafe } from "../lib/scrollIntoViewSafe";
+import { getPreference } from "../lib/preferences";
 
 // ---------------------------------------------------------------------------
 // Custom-event type declarations
@@ -159,9 +160,24 @@ export default function ValidationPanel() {
   const validationResults = useStore((s) => s.validationResults);
   const nodes = useStore((s) => s.nodes);
 
-  const [severityFilter, setSeverityFilter] = useState<Severity | null>(null);
+  // Phase 72 Preferences — seed severity filter + group-by from user prefs.
+  // Reading via lazy initializer so localStorage hits exactly once on mount.
+  // Subsequent pref edits in the dialog don't reach back through this state
+  // — the user already has the panel open and will see their explicit
+  // selection win until the next mount (matches Linear/Figma "defaults apply
+  // on open" model).
+  const [severityFilter, setSeverityFilter] = useState<Severity | null>(() => {
+    const pref = getPreference("validation", "defaultSeverityFilter");
+    if (pref === "errors") return "error";
+    // "warnings+" / "info+" / "all" all start with a null filter and the
+    // user's filter pills do the rest. (warnings+/info+ would require a
+    // multi-tier filter which the current pill UI doesn't support.)
+    return null;
+  });
   const [nodeFilter, setNodeFilter] = useState<string | null>(null);
-  const [groupBy, setGroupBy] = useState<GroupBy>("none");
+  const [groupBy, setGroupBy] = useState<GroupBy>(() =>
+    getPreference("validation", "defaultGroupBy"),
+  );
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   // Selected-row state: tracks the most-recently clicked validation result so
   // the panel can render a visible left-edge accent on it. Matches the

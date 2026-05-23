@@ -12,15 +12,30 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 import SnapToGridButton from "../canvasMenus/SnapToGridButton";
 import useStore from "../../store/useStore";
+import { initPreferencesBridge, setPreference } from "../../lib/preferences";
+
+// Phase 72 Preferences — the canvas overlay button now writes through
+// setPreference; the runtime mirror in useStore is updated by the bridge that
+// App.tsx mounts on app load. In isolated component tests, we mount the
+// bridge manually so the click → pref → store propagation completes.
+let teardownBridge: (() => void) | null = null;
 
 beforeEach(() => {
-  // Reset snapToGrid to false before each test
   act(() => {
     useStore.setState({ snapToGrid: false });
+  });
+  // Clear any pref value lingering from a previous test
+  setPreference("editor", "snapToGrid", false);
+  teardownBridge = initPreferencesBridge({
+    setHideOffLayer: useStore.getState().setHideOffLayer,
+    setSnapToGrid: useStore.getState().setSnapToGrid,
+    setInteractiveLocked: useStore.getState().setInteractiveLocked,
   });
 });
 
 afterEach(() => {
+  teardownBridge?.();
+  teardownBridge = null;
   cleanup();
 });
 

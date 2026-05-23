@@ -9,10 +9,14 @@
 
 import { Grid } from "lucide-react";
 import useStore from "../../store/useStore";
+import { setPreference } from "../../lib/preferences";
 
 export default function SnapToGridButton() {
+  // Phase 72 Preferences — snap is canonical in user-global prefs
+  // (`editor.snapToGrid`). Read the runtime mirror from useStore (kept in
+  // sync by initPreferencesBridge) but WRITE through setPreference so the
+  // Preferences dialog stays consistent with the overlay button.
   const snapToGrid = useStore((s) => s.snapToGrid);
-  const setSnapToGrid = useStore((s) => s.setSnapToGrid);
 
   return (
     <button
@@ -20,7 +24,7 @@ export default function SnapToGridButton() {
       aria-pressed={snapToGrid}
       data-state={snapToGrid ? "on" : "off"}
       title="Snap to grid (16px)"
-      onClick={() => setSnapToGrid(!snapToGrid)}
+      onClick={() => setPreference("editor", "snapToGrid", !snapToGrid)}
       className={
         "flex items-center justify-center w-8 h-8 rounded border transition-colors " +
         (snapToGrid

@@ -6,6 +6,7 @@
 import { validators } from "./index";
 import type { ValidationSnapshot } from "./snapshot";
 import type { ValidationResult } from "./types";
+import { getPreference } from "../preferences";
 
 /** Run all registered validators against a snapshot and return the combined results.
  *
@@ -26,5 +27,13 @@ export function runValidators(snapshot: ValidationSnapshot): ValidationResult[] 
   // app launch which is noise, not signal.
   if (snapshot.nodes.length === 0 && snapshot.edges.length === 0) return [];
 
-  return validators.flatMap((v) => v.run(snapshot));
+  // Phase 72 Preferences — user can disable individual rules via the
+  // Preferences > Validation > Rules panel. The pref is a per-rule-id boolean
+  // record; unknown ids default to enabled. Read at run-time (not registration
+  // time) so toggling the switch reflects on the next validation tick without
+  // an app restart.
+  const enabled = getPreference("validation", "rulesEnabled");
+  return validators
+    .filter((v) => enabled[v.id] !== false)
+    .flatMap((v) => v.run(snapshot));
 }

@@ -190,28 +190,11 @@ describe("LayersPanel — row click toggles", () => {
   });
 });
 
-describe("LayersPanel — Dim/Hide cycle-toggle footer", () => {
-  it("default state: footer shows 'Dim'; clicking it flips hideOffLayer to true and shows 'Hide'", async () => {
-    const user = userEvent.setup();
-    render(<LayersPanel />);
-    const toggle = screen.getByTestId("layer-off-mode-toggle");
-    expect(toggle.textContent).toMatch(/Dim/);
-
-    await user.click(toggle);
-    expect(useStore.getState().hideOffLayer).toBe(true);
-    expect(screen.getByTestId("layer-off-mode-toggle").textContent).toMatch(/Hide/);
-  });
-
-  it("from 'Hide' state: clicking the cycle-toggle returns to 'Dim'", async () => {
-    useStore.setState({ hideOffLayer: true });
-    const user = userEvent.setup();
-    render(<LayersPanel />);
-    const toggle = screen.getByTestId("layer-off-mode-toggle");
-    expect(toggle.textContent).toMatch(/Hide/);
-    await user.click(toggle);
-    expect(useStore.getState().hideOffLayer).toBe(false);
-  });
-});
+// Phase 72 Preferences — the Off-layer Dim/Hide footer toggle was removed
+// from LayersPanel and rehomed to `Edit > Preferences > Editor > Off-layer
+// behavior`. The store action `setHideOffLayer` is still tested via the
+// PreferencesDialog + the preferences bridge; the panel no longer owns the
+// surface.
 
 describe("LayersPanel — accessibility", () => {
   it("each row carries role='switch' + aria-checked + descriptive aria-label", () => {

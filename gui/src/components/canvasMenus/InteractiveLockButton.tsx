@@ -7,10 +7,13 @@
 
 import { Lock } from "lucide-react";
 import useStore from "../../store/useStore";
+import { setPreference } from "../../lib/preferences";
 
 export default function InteractiveLockButton() {
+  // Phase 72 Preferences — lock state is canonical in user-global prefs
+  // (`editor.interactiveLock`). Read the runtime mirror from useStore; WRITE
+  // through setPreference so the Preferences dialog stays consistent.
   const interactiveLocked = useStore((s) => s.interactiveLocked);
-  const setInteractiveLocked = useStore((s) => s.setInteractiveLocked);
 
   return (
     <button
@@ -18,7 +21,7 @@ export default function InteractiveLockButton() {
       aria-pressed={interactiveLocked}
       data-state={interactiveLocked ? "on" : "off"}
       title={interactiveLocked ? "Unlock canvas interactions" : "Lock canvas interactions"}
-      onClick={() => setInteractiveLocked(!interactiveLocked)}
+      onClick={() => setPreference("editor", "interactiveLock", !interactiveLocked)}
       className={
         "flex items-center justify-center w-8 h-8 rounded border transition-colors " +
         (interactiveLocked

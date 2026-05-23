@@ -80,6 +80,30 @@ const DEFAULT_SOLVER = {
   dtmax: null as number | null,
 };
 
+// Phase 72 Preferences — read user-global prefs synchronously at store
+// creation. Direct localStorage access (not the React hook) so the values
+// are available BEFORE the first render. Falls back to the legacy literal
+// when the key is missing / corrupt / localStorage unavailable.
+function readPrefBoolean(category: string, setting: string, fallback: boolean): boolean {
+  try {
+    const raw = localStorage.getItem(`stream-composer-pref.${category}.${setting}`);
+    if (raw === null) return fallback;
+    const v = JSON.parse(raw);
+    return typeof v === "boolean" ? v : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function readPrefOffLayerHide(): boolean {
+  try {
+    const raw = localStorage.getItem("stream-composer-pref.editor.offLayerBehavior");
+    if (raw === null) return false; // "dim"
+    return JSON.parse(raw) === "hide";
+  } catch {
+    return false;
+  }
+}
+
 // Verbatim user-facing copy per 62-UI-SPEC "Power Shape picker — extra fixed top
 // entry". Phase 72 clarify — em-dash replaced with semicolon per locked
 // PRODUCT.md / DESIGN.md ban on em-dashes in user-visible strings; the two
@@ -893,10 +917,14 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   // Phase 68: 4-layer independent-toggle initial state. Shallow-clone the
   // constant so consumer mutations cannot leak back to ALL_LAYERS_ON.
   activeLayers: { ...ALL_LAYERS_ON },
-  hideOffLayer: false,
-  // Snap-to-grid initial state (Phase 65 D-10 — OFF by default)
-  snapToGrid: false,
-  interactiveLocked: false,
+  // Phase 72 Preferences: hideOffLayer / snapToGrid / interactiveLocked seed
+  // from user-global prefs instead of compile-time false. They remain in the
+  // store as runtime mirrors; UI entry points (PreferencesDialog, canvas
+  // overlay buttons) write to prefs, and the bridge in App.tsx propagates
+  // changes back into the store via the existing setters.
+  hideOffLayer: readPrefOffLayerHide(),
+  snapToGrid: readPrefBoolean("editor", "snapToGrid", false),
+  interactiveLocked: readPrefBoolean("editor", "interactiveLock", false),
   // Persistence initial state
   isDirty: false,
   currentFilePath: null,
@@ -1000,6 +1028,23 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       bcSymmetric,
       _undoPast,
     } = get();
+    // Phase 72 Preferences — undo depth from `files.undoHistoryDepth`
+    // (was a hardcoded 50; default now 200). Read at push-time so changes to
+    // the preference take effect immediately for subsequent pushes; existing
+    // longer-than-new-cap stacks naturally trim on the next push.
+    //
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const depth = (() => {
+      try {
+        const raw = localStorage.getItem(
+          "stream-composer-pref.files.undoHistoryDepth",
+        );
+        const n = raw === null ? 200 : Number(JSON.parse(raw));
+        return Number.isFinite(n) && n >= 1 ? n : 200;
+      } catch {
+        return 200;
+      }
+    })();
     set({
       _undoPast: [
         ..._undoPast,
@@ -1012,7 +1057,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
           bcMode,
           bcSymmetric,
         },
-      ].slice(-50),
+      ].slice(-depth),
       _undoFuture: [],
     });
   },
@@ -2467,9 +2512,11 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
         // (see projectIO.ts shim — "Both"/missing → all true, "Hydraulic" /
         // "Thermal" → only that key true).
         activeLayers: project.layout.active_layers,
-        hideOffLayer: project.layout.hide_off_layer,
-        // Phase 65 D-10: restore snap-to-grid from .scp layout block (default false)
-        snapToGrid: project.layout.snap_to_grid ?? false,
+        // Phase 72 Preferences — hideOffLayer + snapToGrid moved to the
+        // user-global Preferences surface (`editor.offLayerBehavior` and
+        // `editor.snapToGrid`). The .scp fields are still serialized (and
+        // ignored on load) for back-compat with files written by older app
+        // versions; new mutations route through the prefs store.
         currentFilePath: filePath,
         isDirty: false,
         selectedNodeId: null,
@@ -2755,8 +2802,9 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
       // Phase 68: 4-layer state restored from sidecar (same shim path as
       // loadProjectFromPath — projectIO normalizes legacy active_layer).
       activeLayers: project.layout.active_layers,
-      hideOffLayer: project.layout.hide_off_layer,
-      snapToGrid: project.layout.snap_to_grid ?? false,
+      // Phase 72 Preferences — hideOffLayer + snapToGrid ignored on sidecar
+      // recovery; they live in user-global prefs (`editor.offLayerBehavior`,
+      // `editor.snapToGrid`). See loadProjectFromPath for parity.
       // D-04: recovered state is always in-memory unsaved; user must Save As
       currentFilePath: null,
       isDirty: true,
@@ -3287,8 +3335,15 @@ export async function initAutoRecover(): Promise<{ teardown: () => Promise<void>
   // Build the debounced writer.
   // serialize() is called at write time (not schedule time) so it captures the
   // latest state at the moment the debounce fires. D-06: bit-identical to Save.
+  //
+  // Phase 72 Preferences — interval is read from the user preference at init.
+  // Subsequent changes require an app restart to take effect; we don't tear
+  // down + recreate the writer on every interval change (the active debounce
+  // timer would orphan, and the next edit re-schedules anyway).
+  const { getPreference } = await import("../lib/preferences");
+  const intervalMs = getPreference("files", "autorecoverIntervalMs");
   const writer = createDebouncedSidecarWriter(
-    2000,
+    intervalMs,
     () => {
       const state = useStore.getState();
       return serializeProject({
@@ -3315,11 +3370,19 @@ export async function initAutoRecover(): Promise<{ teardown: () => Promise<void>
   // in the dirty session". Both satisfy the AutoRecover goal of "save within ~2s of
   // user activity" — the new semantics is a stricter, simpler guarantee. Source:
   // .planning/debug/gui-drag-perf.md (per-pixel mousemove no longer reschedules timer).
+  //
+  // Phase 72 Preferences — the `files.autorecoverEnabled` pref gates the
+  // schedule path. When disabled, isDirty transitions still cancel any in-
+  // flight timer but no fresh write is scheduled. Read at fire-time (not
+  // init-time) so the toggle takes effect immediately.
   const unsubscribe = useStore.subscribe(
     (state) => state.isDirty,
     (isDirty) => {
-      if (isDirty) writer.schedule();
-      else writer.cancel();
+      if (isDirty && getPreference("files", "autorecoverEnabled")) {
+        writer.schedule();
+      } else {
+        writer.cancel();
+      }
     },
   );
 

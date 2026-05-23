@@ -12,10 +12,12 @@
 //   - 4 click-rows in LAYER_KEYS canonical order. Each row: color dot + full
 //     layer name + Eye/EyeOff icon (visibility metaphor universal across
 //     Figma/Photoshop/Blender). Click anywhere on the row to toggle.
-//   - Footer: single click-line cycle-toggle for Off-layer mode (Dim / Hide).
-//     Lives here until the Settings dialog ships in Phase 72 — D-04 says
-//     hide-vs-dim is a per-project preference; until Settings exists, the
-//     panel is the closest home that makes sense.
+//
+// Phase 72 Preferences — the Off-layer Dim/Hide toggle that previously lived
+// here as a footer row has moved to `Edit > Preferences > Editor > Off-layer
+// behavior` (it was always meant to be a user preference, not a per-project
+// layout setting). The pref also moved from per-project to user-global; the
+// .scp `layout.hide_off_layer` field is now ignored on load.
 //
 // Replaces the canvas-overlay LayersChip from Plan 04. UAT feedback:
 //   - icon-only trigger in the overlay column was illegible
@@ -45,9 +47,7 @@ const LAYER_LABELS: Record<LayerKey, string> = {
 
 export default function LayersPanel() {
   const activeLayers = useStore((s) => s.activeLayers);
-  const hideOffLayer = useStore((s) => s.hideOffLayer);
   const toggleLayer = useStore((s) => s.toggleLayer);
-  const setHideOffLayer = useStore((s) => s.setHideOffLayer);
 
   return (
     <div data-testid="layers-panel" className="border-t bg-panel shrink-0">
@@ -105,28 +105,6 @@ export default function LayersPanel() {
             </button>
           );
         })}
-      </div>
-      <div className="border-t px-1 py-1">
-        <button
-          type="button"
-          data-testid="layer-off-mode-toggle"
-          onClick={() => setHideOffLayer(!hideOffLayer)}
-          title={
-            hideOffLayer
-              ? "Off-layer items are hidden. Click to dim instead."
-              : "Off-layer items are dimmed. Click to hide instead."
-          }
-          className={cn(
-            "w-full flex items-center justify-between px-2 py-1.5 rounded-sm text-left text-[11px] text-muted-foreground transition-colors",
-            "hover:bg-accent hover:text-accent-foreground",
-            "focus:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground",
-          )}
-        >
-          <span>Off-layer</span>
-          <span className="font-medium text-foreground">
-            {hideOffLayer ? "Hide" : "Dim"}
-          </span>
-        </button>
       </div>
     </div>
   );
