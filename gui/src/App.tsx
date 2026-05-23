@@ -15,6 +15,7 @@ import ValidationStatusBar from "./components/ValidationStatusBar";
 import UnsavedChangesDialog from "./components/UnsavedChangesDialog";
 import CommandPalette from "./components/CommandPalette";
 import AnatomyDialog from "./components/AnatomyDialog";
+import PreferencesDialog from "./components/PreferencesDialog";
 import AutoRecoverRestoreModal, {
   type RestoreCandidate,
 } from "./components/AutoRecoverRestoreModal";
@@ -28,6 +29,7 @@ import useStore from "./store/useStore";
 import { initializeRecentFiles, initAutoRecover, initValidation } from "./store/useStore";
 import { detectCrashOnLaunch } from "./lib/autoRecover";
 import type { LockfileContent } from "./lib/autoRecover";
+import { initPreferencesBridge } from "./lib/preferences";
 import { useResizable } from "./hooks/useResizable";
 import { useTheme } from "./hooks/useTheme";
 import { useShowCodeFor } from "./hooks/useShowCodeFor";
@@ -41,6 +43,7 @@ declare global {
   interface WindowEventMap {
     "stream:open-shortcuts": CustomEvent<void>;
     "stream:open-anatomy": CustomEvent<void>;
+    "stream:open-preferences": CustomEvent<void>;
   }
 }
 
@@ -69,6 +72,8 @@ function App() {
   // Phase 72 (help-system) — AnatomyDialog open/closed. Same local-state
   // pattern as paletteOpen.
   const [anatomyOpen, setAnatomyOpen] = useState(false);
+  // Phase 72 (Preferences) — PreferencesDialog open/closed.
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
 
   // Panel collapse state
   const toolboxCollapsed = useStore((s) => s.toolboxCollapsed);
@@ -419,18 +424,54 @@ function App() {
     // custom event from HelpMenu. AnatomyDialog has no global keybind by
     // design (low-frequency reference doesn't earn one).
     const handleOpenAnatomy = () => setAnatomyOpen(true);
+    // Phase 72 (Preferences) — Ctrl+, opens / toggles the PreferencesDialog.
+    // Same input-focus guard as Ctrl+` and `?` — typing a literal comma
+    // inside a text input must still produce a comma. Edit menu entry +
+    // `stream:open-preferences` custom event share this open path.
+    const handlePreferencesKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key !== "," || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target && target.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setPreferencesOpen((v) => !v);
+    };
+    const handleOpenPreferences = () => setPreferencesOpen(true);
     window.addEventListener("keydown", handlePaletteKey);
     window.addEventListener("keydown", handleShortcutsKey);
+    window.addEventListener("keydown", handlePreferencesKey);
     window.addEventListener("gsd:open-command-palette", handleOpenEvent);
     window.addEventListener("stream:open-shortcuts", handleOpenShortcuts);
     window.addEventListener("stream:open-anatomy", handleOpenAnatomy);
+    window.addEventListener("stream:open-preferences", handleOpenPreferences);
     return () => {
       window.removeEventListener("keydown", handlePaletteKey);
       window.removeEventListener("keydown", handleShortcutsKey);
+      window.removeEventListener("keydown", handlePreferencesKey);
       window.removeEventListener("gsd:open-command-palette", handleOpenEvent);
       window.removeEventListener("stream:open-shortcuts", handleOpenShortcuts);
       window.removeEventListener("stream:open-anatomy", handleOpenAnatomy);
+      window.removeEventListener("stream:open-preferences", handleOpenPreferences);
     };
+  }, []);
+
+  // Phase 72 Preferences — bridge user-global prefs to the per-runtime
+  // mirrors in useStore. The store's slice already seeds initial values from
+  // localStorage at module-eval time; this bridge keeps them in sync when
+  // the dialog (or a canvas overlay button writing through setPreference)
+  // flips a setting at runtime.
+  useEffect(() => {
+    return initPreferencesBridge({
+      setHideOffLayer: useStore.getState().setHideOffLayer,
+      setSnapToGrid: useStore.getState().setSnapToGrid,
+      setInteractiveLocked: useStore.getState().setInteractiveLocked,
+    });
   }, []);
 
   // Phase 66 Plan 03: Esc clears pinned code-panel sub-blocks.
@@ -670,6 +711,14 @@ function App() {
             canvas vocabulary (StreamNode + edges + their states). Opens from
             HelpMenu only; no keybind by design. */}
         <AnatomyDialog open={anatomyOpen} onOpenChange={setAnatomyOpen} />
+        {/* Phase 72 (Preferences) — user-global Preferences dialog. Opens
+            from Edit > Preferences… or Ctrl+, (Linear / Cursor / VSCode
+            convention). Strictly user-global; per-project state stays in
+            Project Options. */}
+        <PreferencesDialog
+          open={preferencesOpen}
+          onOpenChange={setPreferencesOpen}
+        />
         {/* Phase 70 Plan 06 — SavePresetModal mounted at the top level so both
             FileMenu and NodeContextMenu can open it via the
             "stream:open-save-preset" custom event without prop drilling. */}

@@ -67,8 +67,13 @@ export default function EditMenu() {
           <MenubarShortcut>Ctrl+D</MenubarShortcut>
         </MenubarItem>
         <MenubarSeparator />
-        <MenubarItem disabled>
+        <MenubarItem
+          onClick={() =>
+            window.dispatchEvent(new CustomEvent("stream:open-preferences"))
+          }
+        >
           Preferences...
+          <MenubarShortcut>Ctrl+,</MenubarShortcut>
         </MenubarItem>
       </MenubarContent>
     </MenubarMenu>

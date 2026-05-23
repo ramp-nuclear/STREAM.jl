@@ -12,6 +12,7 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { AnchorEntry } from "./anchors";
 import { type LayerKey, type ActiveLayers, ALL_LAYERS_ON } from "./layers";
+import { getPreference } from "./preferences";
 import {
   SENTINEL_UNSET_POWER_SHAPE,
   type GeometryResource,
@@ -300,7 +301,8 @@ export function deserializeProject(json: string): StreamProject {
  * Behaviour (per D-07):
  *  - Deduplicate: if `newPath` already exists it is removed first.
  *  - Prepend: `newPath` is inserted at index 0.
- *  - Truncate: result is limited to 5 entries.
+ *  - Truncate: result is limited to the user preference `files.recentFilesMax`
+ *    (Phase 72 Preferences); was a hardcoded 5 in the pre-prefs world.
  *
  * # Arguments
  * - `files`   — Current recent-files array
@@ -310,7 +312,11 @@ export function deserializeProject(json: string): StreamProject {
  * New array (does not mutate `files`).
  */
 export function addToRecent(files: string[], newPath: string): string[] {
+  // Phase 72 Preferences: cap read from `files.recentFilesMax` (was a
+  // hardcoded 5). `getPreference` returns the default if localStorage is
+  // unavailable, so this stays safe under test envs that don't stub it.
+  const max = Math.max(1, getPreference("files", "recentFilesMax"));
   const deduped = files.filter((f) => f !== newPath);
-  return [newPath, ...deduped].slice(0, 5);
+  return [newPath, ...deduped].slice(0, max);
 }
 
