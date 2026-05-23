@@ -573,12 +573,30 @@ textarea,
    `scrollIntoView({ behavior: "smooth" })` is NOT affected by CSS — that's
    handled by `lib/scrollIntoViewSafe.ts` at the call site. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  /* OS-level preference (system reduced motion enabled). The user pref
+     `appearance.reduceMotion = "never"` can OVERRIDE this — see the
+     `[data-motion="full"]` block below — for users who keep their OS in
+     reduced-motion mode but want animations inside this tool. */
+  html:not([data-motion="full"]) *,
+  html:not([data-motion="full"]) *::before,
+  html:not([data-motion="full"]) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Phase 72 (post-Preferences) — user override "Always on" for reduce-motion.
+   App.tsx sets `data-motion="reduced"` on <html> when the user pref forces
+   reduced motion regardless of OS setting. The `@media` block above does
+   the same job when the OS pref is set, except `data-motion="full"` opts
+   OUT of it. */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

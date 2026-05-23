@@ -29,7 +29,11 @@ import useStore from "./store/useStore";
 import { initializeRecentFiles, initAutoRecover, initValidation } from "./store/useStore";
 import { detectCrashOnLaunch } from "./lib/autoRecover";
 import type { LockfileContent } from "./lib/autoRecover";
-import { initPreferencesBridge } from "./lib/preferences";
+import {
+  initPreferencesBridge,
+  getPreference,
+  onPreferenceChange,
+} from "./lib/preferences";
 import { useResizable } from "./hooks/useResizable";
 import { useTheme } from "./hooks/useTheme";
 import { useShowCodeFor } from "./hooks/useShowCodeFor";
@@ -471,6 +475,26 @@ function App() {
       setHideOffLayer: useStore.getState().setHideOffLayer,
       setSnapToGrid: useStore.getState().setSnapToGrid,
       setInteractiveLocked: useStore.getState().setInteractiveLocked,
+    });
+  }, []);
+
+  // Phase 72 (post-Preferences) — apply the `appearance.reduceMotion`
+  // override by writing a `data-motion` attribute on <html>. CSS rules in
+  // index.css consume it (see the data-motion blocks). Three states:
+  //   - "system" (default) → no attribute; OS pref drives motion
+  //   - "always" → data-motion="full"; OS reduced-motion is overridden OFF
+  //   - "never"  → data-motion="reduced"; OS pref is overridden ON
+  useEffect(() => {
+    function apply() {
+      const v = getPreference("appearance", "reduceMotion");
+      const html = document.documentElement;
+      if (v === "always") html.setAttribute("data-motion", "full");
+      else if (v === "never") html.setAttribute("data-motion", "reduced");
+      else html.removeAttribute("data-motion");
+    }
+    apply();
+    return onPreferenceChange((detail) => {
+      if (detail.category === "*" || detail.category === "appearance") apply();
     });
   }, []);
 

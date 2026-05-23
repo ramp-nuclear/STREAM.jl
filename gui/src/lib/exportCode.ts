@@ -102,14 +102,57 @@ export async function exportCode(opts: ExportCodeOptions): Promise<boolean> {
   // Clean, or user confirmed via modal.
   useStore.setState({ validationResults: results, errorNodeIds });
 
+  // Phase 72 Preferences — consume the 4 code-export prefs:
+  //   - codeExport.defaultPath: seed the save dialog (empty = "system.jl")
+  //   - codeExport.indentWidth: post-process the serialized code
+  //   - codeExport.openExportedFile: open the .jl in the OS handler on success
+  // includeSourceComments stays as a placeholder — the source-line comment
+  // emitter doesn't exist in codeGenerator yet, so the pref has nothing to
+  // gate.
+  const { getPreference } = await import("./preferences");
+  const defaultExportPath = getPreference("codeExport", "defaultPath");
+  const indentWidth = getPreference("codeExport", "indentWidth");
+  const openAfterExport = getPreference("codeExport", "openExportedFile");
+
   const filePath = await save({
-    defaultPath: "system.jl",
+    defaultPath: defaultExportPath || "system.jl",
     filters: [{ name: "Julia files", extensions: ["jl"] }],
   });
   if (!filePath) return false;
 
-  const code = serializeSections(opts.sections);
+  // Re-indent post-serialization. serializeSections emits 2-space indents
+  // baked into sub-block lines; we re-leading-pad to the target unit. Each
+  // 2-space pair at line start = one indent level; replace with N copies of
+  // the target unit. Lines past the first non-leading-space character are
+  // untouched (no in-string transformation).
+  let code = serializeSections(opts.sections);
+  if (indentWidth !== "2-spaces") {
+    const unit = indentWidth === "tab" ? "\t" : "    "; // 4-spaces
+    code = code
+      .split("\n")
+      .map((line) => {
+        // Count leading 2-space pairs
+        let level = 0;
+        while (line.startsWith("  ", level * 2)) level++;
+        if (level === 0) return line;
+        return unit.repeat(level) + line.slice(level * 2);
+      })
+      .join("\n");
+  }
+
   await writeTextFile(filePath, code);
+
+  // Open the .jl in the OS default handler when the user opted in.
+  if (openAfterExport) {
+    try {
+      const { openPath } = await import("@tauri-apps/plugin-opener");
+      await openPath(filePath);
+    } catch (err) {
+      // Non-fatal — the file is already written successfully.
+      console.warn("[exportCode] openPath failed:", err);
+    }
+  }
+
   return true;
 }
 
