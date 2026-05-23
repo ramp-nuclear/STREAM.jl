@@ -80,6 +80,18 @@
      warning/info surface). OKLCH per the locked OKLCH-only doctrine. */
   --color-warning: oklch(0.74 0.16 75);
   --color-info: oklch(0.62 0.18 240);
+  /* Phase 72 — Code editor lane carve-out. The 5 --syntax-* tokens are the
+     CodePreview syntax-highlight palette, anchored to One Dark Pro (the most-
+     installed VSCode theme + the Julia editor lineage via Juno/Atom). Scoped
+     exception to the project's perceptual palette — code editors are their
+     own established convention domain (parallel to WindowControls' platform
+     mimicry exemption). NOT consumed by canvas/chrome surfaces. Comments
+     reuse --muted-foreground (italic) — no separate token. */
+  --syntax-keyword: oklch(0.55 0.18 295);
+  --syntax-string:  oklch(0.55 0.16 145);
+  --syntax-type:    oklch(0.55 0.14 230);
+  --syntax-macro:   oklch(0.60 0.17 80);
+  --syntax-number:  oklch(0.58 0.17 50);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -187,6 +199,12 @@
   /* Phase 72 — warning + info, dark-mode lift. */
   --color-warning: oklch(0.78 0.15 75);
   --color-info: oklch(0.72 0.16 240);
+  /* Phase 72 — Code editor lane (dark-mode lift). See :root for rationale. */
+  --syntax-keyword: oklch(0.74 0.16 295);
+  --syntax-string:  oklch(0.78 0.14 145);
+  --syntax-type:    oklch(0.78 0.11 230);
+  --syntax-macro:   oklch(0.83 0.13 80);
+  --syntax-number:  oklch(0.78 0.13 50);
 }
 
 @theme inline {
@@ -339,17 +357,11 @@ textarea,
    inline style ships with the JS bundle and wins specificity over any
    class rule. See StreamNode.tsx for the inline-style logic.
 
-   The code-hover / code-pinned classes remain attached to the DOM as
-   state markers — the Phase 66 code-preview ↔ canvas linking layer and
-   the corresponding unit tests assert their presence — but they paint
-   nothing. Any future visual treatment for this link belongs in the
-   queued edges-and-code-preview shape session, on the edge / code-line
-   side, not the node body. */
-.stream-node--code-hover,
-.stream-node--code-pinned {
-  outline: none;
-  box-shadow: none;
-}
+   The Phase 66 code-link visual is rendered entirely via inline box-shadow
+   in StreamNode.tsx; no className-side CSS rule survives here. The
+   `data-code-link` attribute (set on the node root) is the modern state
+   marker that tests + future selectors hook into. See the "Code-link
+   active state" doctrine in DESIGN.md §2 for the contract. */
 
 /* Phase 71 Plan 10 — ValidationStatusBar 0→N pulse animation (D-03).
    Single-shot 600ms keyframe: the error chip pulses once when error count rises
@@ -460,6 +472,38 @@ textarea,
     animation: none;
   }
   .validation-flash-persistent {
+    animation: none;
+  }
+}
+
+/* Phase 72 — code-link active edge state (BCEdge + HydraulicEdge).
+   Reuses the flow-trace-march keyframe shared with .validation-flow-trace
+   (same visual idiom: marching-ants dashed pattern). Marching motion is
+   the PRIMARY signal — stroke width changes are minimal (hover keeps rest
+   width; pin adds +0.25 px) so xyflow's strokeWidth-scaled arrowhead
+   barely grows. The custom marker defined in CanvasPanel uses
+   markerUnits="userSpaceOnUse" so its size is fully decoupled from stroke
+   regardless — these stroke-width restraints are belt + suspenders.
+
+   `!important` is required because BaseEdge applies the rest stroke +
+   strokeWidth via inline style (which would otherwise win over a class
+   rule). The CSS class is the override channel for the active state.
+
+   Color = --foreground (high-contrast neutral); the marching is what
+   makes it read as "linked", not the contrast level alone, so the
+   foreground value can stay loud without overpowering the canvas
+   (motion conveys the signal, eye doesn't anchor on it the way it
+   would on a steady-state white). */
+.code-link-active {
+  stroke: var(--foreground) !important;
+  stroke-dasharray: 6 4 !important;
+  animation: flow-trace-march 1.2s linear infinite;
+}
+.code-link-pinned {
+  stroke-width: 1.75 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .code-link-active {
     animation: none;
   }
 }

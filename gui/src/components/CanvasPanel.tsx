@@ -85,6 +85,15 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   const selectNode = useStore((s) => s.selectNode);
   const activeLayers = useStore((s) => s.activeLayers);
   const hideOffLayer = useStore((s) => s.hideOffLayer);
+  // Phase 72 — subscribe to hover/pin sets so the enrichedEdges memo can
+  // bump zIndex on code-link active edges (SVG paint order is DOM order;
+  // xyflow's `Edge.zIndex` is the supported mechanism to reorder). The
+  // PERF comment above warns against whole-store subscriptions — these
+  // SELECTIVE subscriptions are intentional and the re-render frequency
+  // is bounded (hover toggles fire on code sub-block mouseenter/leave;
+  // pin toggles on click). Compared to node-drag (~60 Hz), this is rare.
+  const hoveredSourceIds = useStore((s) => s.hoveredSourceIds);
+  const pinnedSourceIds = useStore((s) => s.pinnedSourceIds);
   // Phase 65 D-09: snap-to-grid state read from store
   const snapEnabled = useStore((s) => s.snapToGrid);
   // Phase 65 Plan 13: interactive lock — when true, all interactions disabled.
@@ -146,17 +155,31 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       else if (edge.type === "bcEdge") edgeLayerKey = "Sources";
       else edgeLayerKey = "Thermal";
       const dimmed = isEdgeDimmed(edgeLayerKey, activeLayers);
+      // Phase 72 — code-link z-order bump. When BOTH endpoint nodes are in
+      // the hovered or pinned source-id set, this edge is in the active
+      // state (matches BCEdge / HydraulicEdge's per-component check).
+      // Bumping zIndex above xyflow's default 0 (selected = 1000) ensures
+      // the marching-ants animation is never visually obscured by an
+      // overlapping inactive edge. Without this, when two edges share an
+      // endpoint or overlap (e.g. parallel bottom-port connections),
+      // whichever sibling renders later in the SVG paints on top — the
+      // active edge's dashes appeared to flicker behind the static line.
+      const isCodeActive =
+        (hoveredSourceIds.has(edge.source) && hoveredSourceIds.has(edge.target)) ||
+        (pinnedSourceIds.has(edge.source) && pinnedSourceIds.has(edge.target));
+      const zIndexBump = isCodeActive ? { zIndex: 1500 } : undefined;
       if (hideOffLayer) {
         const endpointsHidden =
           hiddenNodeIds.has(edge.source) && hiddenNodeIds.has(edge.target);
         if (dimmed || endpointsHidden) {
           return { ...edge, hidden: true };
         }
-        return edge;
+        return zIndexBump ? { ...edge, ...zIndexBump } : edge;
       }
-      if (!dimmed) return edge;
+      if (!dimmed) return zIndexBump ? { ...edge, ...zIndexBump } : edge;
       return {
         ...edge,
+        ...zIndexBump,
         style: {
           ...edge.style,
           opacity: 0.15,
@@ -164,7 +187,14 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         },
       };
     });
-  }, [edges, activeLayers, hideOffLayer, enrichedNodes]);
+  }, [
+    edges,
+    activeLayers,
+    hideOffLayer,
+    enrichedNodes,
+    hoveredSourceIds,
+    pinnedSourceIds,
+  ]);
 
   const onDrop = useCallback(
     async (event: React.DragEvent) => {
@@ -573,6 +603,34 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
 
   return (
     <div ref={containerRef} className="flex-1 h-full relative focus:outline-none bg-canvas" tabIndex={-1}>
+      {/* Phase 72 — custom SVG marker definitions for hydraulic edge
+          arrowheads. Defined ONCE here so every HydraulicEdge instance
+          can reference them by URL. `markerUnits="userSpaceOnUse"` is
+          the load-bearing attribute: it decouples marker size from the
+          edge's stroke-width, so the arrow stays fixed when an edge
+          fattens for hover/pin/code-link active states. xyflow's default
+          `MarkerType.ArrowClosed` uses `markerUnits="strokeWidth"`
+          (scaling with the stroke), which is the wrong behavior for our
+          code-link UX. fill = --muted-foreground always (the arrow is
+          structural, NOT a state signal — only the stroke conveys state).
+          width=8 / height=8 user units = ~12 px on a normal stroke,
+          matching the prior MarkerType.ArrowClosed visual weight. */}
+      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
+        <defs>
+          <marker
+            id="stream-hydraulic-arrow"
+            viewBox="0 0 12 12"
+            refX="11"
+            refY="6"
+            markerUnits="userSpaceOnUse"
+            markerWidth="12"
+            markerHeight="12"
+            orient="auto"
+          >
+            <path d="M 0 0 L 12 6 L 0 12 z" fill="var(--muted-foreground)" />
+          </marker>
+        </defs>
+      </svg>
       <ReactFlow
         colorMode={resolvedTheme === "dark" ? "dark" : "light"}
         // Phase 72 — drop the hardcoded `--xy-background-color: #282c34` dark

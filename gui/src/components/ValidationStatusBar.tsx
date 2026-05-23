@@ -15,25 +15,35 @@
  *            closes panel. The `⌄` chevron is a redundant close affordance
  *            shown only when the panel is open.
  *
- * Severity vocabulary (ERR/WRN/INF) intentionally matches ValidationPanel row
- * prefixes — one severity language across the system, not two.
+ * Severity vocabulary in the STATUS BAR uses icons (circle-x / triangle-
+ * alert / info) — the IDE-status-bar lineage (VSCode/IntelliJ/Sublime/
+ * Eclipse all use these exact glyphs at this exact size). This is a
+ * deliberate departure from the ValidationPanel row vocabulary which uses
+ * mono `ERR/WRN/INF` text prefixes — Lucide alert icons were explicitly
+ * banned IN THE PANEL because they pattern-matched the canonical
+ * shadcn-admin "AlertCircle + muted-foreground chip" silhouette (the very
+ * pattern PRODUCT.md anti-references). In the compact status bar, the
+ * same icons read as tool-grade (the IDE convention they actually come
+ * from), not as SaaS-admin. Different surface, different convention. See
+ * DESIGN.md §5 unified bottom-chrome footer doctrine for the carve-out.
  *
- * 0 → N error pulse retained: when error count rises from 0 the ERR segment
- * plays `pulse-once` once. Panel does NOT auto-open on count change.
+ * 0 → N error pulse retained: when error count rises from 0 the error
+ * segment plays `pulse-once` once. Panel does NOT auto-open on count change.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ChevronDown, CircleX, Info, TriangleAlert } from "lucide-react";
 import useStore from "../store/useStore";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 type Severity = "error" | "warning" | "info";
 type BottomTab = "code" | "validation";
 
-const SEVERITY_LABEL: Record<Severity, string> = {
-  error: "ERR",
-  warning: "WRN",
-  info: "INF",
+const SEVERITY_ICON: Record<Severity, LucideIcon> = {
+  error: CircleX,
+  warning: TriangleAlert,
+  info: Info,
 };
 
 const SEVERITY_COLOR_VAR: Record<Severity, string> = {
@@ -54,6 +64,7 @@ interface SeveritySegmentProps {
 
 function SeveritySegment({ severity, count, pulse }: SeveritySegmentProps) {
   const active = count > 0;
+  const Icon = SEVERITY_ICON[severity];
 
   function handleClick() {
     useStore.setState({ bottomPanelOpen: true, activeBottomTab: "validation" });
@@ -73,21 +84,44 @@ function SeveritySegment({ severity, count, pulse }: SeveritySegmentProps) {
           : `${count} ${severity}${count === 1 ? "" : "s"}`
       }
       className={
-        "h-full px-3 inline-flex items-center gap-2 font-mono text-body " +
-        "leading-none cursor-pointer select-none " +
+        "h-full px-3.5 inline-flex items-center gap-2 font-mono " +
+        "cursor-pointer select-none " +
         "transition-colors duration-[80ms] " +
         "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover " +
         (active ? "" : "opacity-55 ") +
         (pulse ? "pulse-once" : "")
       }
     >
-      <span
+      {/* Icon + number share an explicit 18 px line-box (icon h/w = 18,
+          number leading-[18px]) so their top + bottom Y edges align
+          exactly regardless of font cap-height differences. items-center
+          on the parent flex row centers the matched-height boxes
+          together. strokeWidth bumped 1.5 → 1.75 for visual weight at
+          the larger icon size (the primitive-layer's 1.5 stroke is
+          tuned for size-3.5 / 14 px controls — at 18 px the same
+          stroke reads thin). Number text-[15px] reads visually
+          balanced with the 18 px icon (mono digit cap height ≈ 0.72
+          of font-size, so 15 px font ≈ 11 px cap, vs ~14 px icon glyph
+          inside the 18 px bbox — close enough to read as harmonized).
+          Color: severity token when count > 0, currentColor inherits
+          from the parent's opacity-55 dim when count is 0. */}
+      <Icon
+        className="h-[18px] w-[18px] shrink-0"
+        strokeWidth={1.75}
+        aria-hidden
         style={{ color: active ? SEVERITY_COLOR_VAR[severity] : undefined }}
-        className="tracking-tight"
-      >
-        {SEVERITY_LABEL[severity]}
+      />
+      {/* Phase 72 — the count span is an explicit inline-flex container
+          (h-[18px] matching the icon) with items-center forcing the
+          digit's visual center to the box center. Prior pass used only
+          `leading-[18px]` which set the line-box but left the digit
+          baseline-anchored to the box bottom — at mono font with no
+          descenders, that put the visible digit visibly low relative
+          to the icon's center-aligned glyph. inline-flex items-center
+          on the span itself overrides the baseline behavior. */}
+      <span className="inline-flex items-center h-[18px] text-[15px] text-foreground/85 tabular-nums">
+        {count}
       </span>
-      <span className="text-foreground/85 tabular-nums">{count}</span>
     </button>
   );
 }
@@ -138,8 +172,8 @@ function TabButton({ tab, label, panelOpen, activeTab }: TabButtonProps) {
             : `Switch to ${label.toLowerCase()} panel`
       }
       className={
-        "relative h-full px-4 inline-flex items-center font-mono text-body " +
-        "leading-none cursor-pointer select-none " +
+        "relative h-full px-4 inline-flex items-center font-mono text-[15px] " +
+        "leading-[18px] cursor-pointer select-none " +
         "transition-colors duration-[80ms] " +
         "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover " +
         (isActive ? "text-foreground" : "text-foreground/65 hover:text-foreground")
@@ -200,7 +234,12 @@ export default function ValidationStatusBar() {
   return (
     <div
       className="flex flex-row items-stretch justify-between border-t bg-chrome shrink-0 select-none"
-      style={{ height: 28 }}
+      // Phase 72 — bar height bumped 28 → 32 px to accommodate the larger
+      // 18 px severity icons + 15 px count text without crowding. Still
+      // squarely in IDE-status-bar territory (VSCode 22, JetBrains 27,
+      // Sublime 28-30, Eclipse 32). No external consumers of the 28 px
+      // value (verified via grep).
+      style={{ height: 32 }}
       aria-label="Status bar"
     >
       {/* Left cluster — severity segments */}
@@ -240,7 +279,7 @@ export default function ValidationStatusBar() {
                   "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover"
                 }
               >
-                <ChevronDown className="h-3.5 w-3.5" strokeWidth={1.5} />
+                <ChevronDown className="h-[18px] w-[18px]" strokeWidth={1.75} />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top">Close panel · Ctrl+`</TooltipContent>

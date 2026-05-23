@@ -9,7 +9,6 @@ import {
   addEdge as rfAddEdge,
   NodeChange,
   EdgeChange,
-  MarkerType,
 } from "@xyflow/react";
 import { getComponent } from "../registry";
 import { runValidators } from "../lib/validation/runner";
@@ -846,16 +845,18 @@ export function enrichEdges(edges: Edge[], nodes: Node[]): Edge[] {
         data: bcData as unknown as Record<string, unknown>,
       } as Edge;
     }
-    // Hydraulic edge: custom type + filled arrowhead
+    // Hydraulic edge: custom type + filled arrowhead.
+    // Phase 72 — markerEnd is a string URL referencing the custom
+    // <marker> definition rendered in CanvasPanel. The custom marker uses
+    // markerUnits="userSpaceOnUse" so its size is decoupled from
+    // stroke-width — needed so code-link active states can fatten the
+    // stroke without the arrowhead ballooning. fill is fixed at
+    // --muted-foreground (the arrow is structural; only the stroke
+    // conveys link state).
     return {
       ...e,
       type: "hydraulicEdge",
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 16,
-        height: 16,
-        color: "#b1b1b7",
-      },
+      markerEnd: "url(#stream-hydraulic-arrow)",
     };
   });
 

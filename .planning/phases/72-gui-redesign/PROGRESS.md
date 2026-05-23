@@ -44,12 +44,12 @@ capture the final tokens into a proper frontmatter + sidecar.
 | HydraulicEdge — obstacle-avoiding orthogonal router (Phase B) + smart port-side convention (Phase A v2) | ✅ | 1 cluster commit — see Decision log | §5 router contract + Phase 72 port-side convention (axis-snap, vertical bias, no-share-side invariant) locked |
 | First-run empty-canvas hint (replaces WelcomeOverlay; chromeless typographic anchor) | ✅ | 1 commit — see Decision log | §5 first-run vocabulary locked (no card / no shadow / no wordmark, mono recents + Ctrl+ keymap, static-shortcut rule) |
 | Help system (Tooltip discipline + cmdk shortcut mode + AnatomyDialog visual legend) | ✅ | 1 cluster commit — see Decision log | §5 tooltip consumption discipline + shortcut catalog SSOT + AnatomyDialog (real-component mirror) + HelpMenu rebuilt |
+| BCEdge + HydraulicEdge + CodePreview tokenization (canvas↔code link state retoken to --foreground; 5 --syntax-* tokens; remove GitHub-dark borrow + border-l-2 + section-header slab) | ✅ | 1 cluster commit — see Decision log | §2 --syntax-* tokens + Code editor lane carve-out + Code-link active state (uses --foreground, no new hue); §5 CodePreview subsection locked |
 
 ### Queued (Session 4+)
 
 | Surface | Status | Notes |
 |---|---|---|
-| BCEdge tokenization + CodePreview (tokenize remaining inline hex; finalize BC dashed-edge visual language) | ⬜ | HydraulicEdge already done (Phase B router); BCEdge sky-300/400 placeholders still pending. CodePreview `#0d1117` GitHub-dark hardcode also pending. |
 | `/impeccable harden gui/src/` (cross-cutting: `prefers-reduced-motion`, div-as-button conversions, WCAG AA contrast pass) | ⬜ | Audit P0-3 · Critique Sam persona. Note: loop-highlight motion already has `prefers-reduced-motion` fallback. |
 | `/impeccable clarify gui/src/` (copy pass: em dashes, consumer-SaaS framing in PresetsPanel, empty-state copy unification) | ⬜ | Audit P2-3 · Critique minor observations |
 
@@ -452,6 +452,151 @@ in scope. Production-side, the one provider lives at the app root in
 baseline 10 errors (unchanged — none of the 10 are in surfaces this session
 touched).
 
+### BCEdge + HydraulicEdge + CodePreview tokenization (locked 2026-05-23)
+
+Closes the last hardcoded-hex signature surfaces flagged by Audit P0-4
+(`BCEdge.tsx:114–117`, `HydraulicEdge.tsx:70–75`, `CodePreview.tsx:460`).
+Three coupled surfaces in one session because they share the Phase 66
+bidirectional canvas↔code link signal.
+
+**Cluster commit (1):** `feat(72-tokens): BCEdge + HydraulicEdge + CodePreview retoken`
+
+**Three confirmed locks** (via AskUserQuestion during shape):
+1. Code-link active state = **`--foreground` neutral** (over magenta hue 340,
+   over `--ring` reuse, over `--chart-5` reuse). Initial proposal was a new
+   `--color-code-link` magenta token; user pushed back ("is that color
+   fitting the software? wouldn't it be too strong?"). Honest reconsideration
+   landed on neutral high-contrast as the most tool-grade move: the link
+   state is FOCUS, and `--foreground` is literally that semantic. No new
+   hue earned.
+2. CodePreview body = **inherit `--panel`** (no `--code-surface` token, no
+   GitHub-dark borrow). Depth hierarchy already carries the tonal step.
+3. Syntax palette = **One Dark Pro anchored** + documented "Code editor
+   lane" carve-out (parallel to WindowControls' platform-mimicry
+   exemption). User explicitly delegated theme choice: "look online on
+   user trusted and accepted and liked Julia themes". One Dark Pro chosen
+   for install count + Julia heritage via Juno/Atom.
+
+**Tokens introduced** (5 new — fewer than the original brief because the
+code-link hue was dropped in favor of `--foreground`):
+
+| Token | Dark | Light | Surface |
+|---|---|---|---|
+| `--syntax-keyword` | `oklch(0.74 0.16 295)` | `oklch(0.55 0.18 295)` | CodePreview only |
+| `--syntax-string`  | `oklch(0.78 0.14 145)` | `oklch(0.55 0.16 145)` | CodePreview only |
+| `--syntax-type`    | `oklch(0.78 0.11 230)` | `oklch(0.55 0.14 230)` | CodePreview only |
+| `--syntax-macro`   | `oklch(0.83 0.13 80)`  | `oklch(0.60 0.17 80)`  | CodePreview only |
+| `--syntax-number`  | `oklch(0.78 0.13 50)`  | `oklch(0.58 0.17 50)`  | CodePreview only |
+
+Syntax comments reuse `--muted-foreground` (italic) — the muted family is
+already correct for "deprioritized prose inside code".
+
+**Concrete surface changes:**
+
+- **BCEdge + HydraulicEdge — final form** (after two iterations of live
+  verification): `.code-link-active` CSS class applied to the `<path>`
+  via `BaseEdge`'s className prop. Class rule sets stroke = `--foreground`,
+  `stroke-dasharray: 6 4`, animation = `flow-trace-march 1.2s linear
+  infinite` (reuses the validation-flow-trace keyframe). `.code-link-pinned`
+  modifier bumps stroke-width 1.5 → 1.75 (barely heavier than hover).
+  Marching motion is the primary signal — strokeWidth changes are minimal.
+  `prefers-reduced-motion: reduce` stops the marching but keeps the dashed
+  pattern. The old softened-color + width-ladder approach (`color-mix`
+  hover, full `--foreground` pin at 1.5 / 2.0) was abandoned because
+  multiple highlighted edges still made the canvas pulse — static
+  contrast can't escape that. Motion-as-state is the durable answer.
+- **Custom arrowhead marker**: `<marker id="stream-hydraulic-arrow"
+  markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12">` defined
+  once in CanvasPanel inside a hidden `<svg>`. Replaces xyflow's
+  `MarkerType.ArrowClosed` (which uses `markerUnits="strokeWidth"` and
+  scales 1:1 with stroke). `useStore.createEdges` switches to
+  `markerEnd: "url(#stream-hydraulic-arrow)"`. `MarkerType` import removed
+  from useStore. Fill is `var(--muted-foreground)` always; arrow is
+  structural, not a state signal.
+- **Active-edge zIndex bump**: `enrichedEdges` in CanvasPanel subscribes
+  to `hoveredSourceIds` + `pinnedSourceIds` (selective subscriptions; the
+  PERF comment's warning was about whole-store destructuring) and bumps
+  `zIndex: 1500` on any edge whose both endpoints are in either set.
+  Above xyflow's default selected-zIndex of 1000 so active edges always
+  paint on top. Fixes the "marching dashes appear behind overlapping
+  static line" bug — SVG paint order is DOM order, `z-index` doesn't
+  apply to SVG siblings.
+- **ValidationStatusBar — severity icons replace text labels.** The left
+  cluster `ERR 12 WRN 4 INF 2` mono text → Lucide `CircleX` /
+  `TriangleAlert` / `Info`, color-tokenized via `--destructive` /
+  `--color-warning` / `--color-info`. Reads as the IDE status-bar lineage
+  (VSCode/IntelliJ/Sublime/Eclipse). Doctrine carve-out documented in
+  DESIGN.md §5 unified bottom-chrome footer ("The Status-Bar-Icons-Are-
+  The-IDE-Convention exception"). Tests pass unchanged (they assert via
+  aria-label, not literal text).
+- **ValidationStatusBar — size + alignment iteration.** After live
+  verification: bar 28 → 32 px, icons 14 → 18 px (stroke 1.5 → 1.75),
+  count text 13 → 15 px. The count span is now `inline-flex items-center
+  h-[18px]` so the digit visually centers within the same 18 px box as
+  the icon — `leading-[18px]` alone wasn't enough because mono digit
+  baselines anchor to the box bottom (no descenders), putting the
+  visible digit visibly below the icon's centered glyph. Right cluster
+  text + chevron icon harmonized to match.
+- **ValidationPanel — severity relabel to full words + bigger filter
+  controls.** `SEVERITY_LABEL` 3-letter `ERR/WRN/INF` → lowercase full
+  words `error / warning / info`. Applied in both the row severity cell
+  AND the filter pills (single source of truth). SEV column width
+  default 32 → 80 px (min 28 → 60, max 64 → 120) to fit the longest
+  label. FilterPill bumped text 11 → 13 px, padding px-1.5 py-1 →
+  px-2.5 py-1.5 (~50% larger hit area + better visual weight against
+  the bottom panel's empty space). GroupBy slider icon 3.5 → 4 (16 px),
+  padding harmonized to match. Row SEV cell text 11 → 13 px (matches
+  RULE / MESSAGE for cross-row uniformity); dropped `tracking-tight`
+  since the full word doesn't need abbreviation-style condensation.
+  Tests updated: `getAllByText("ERR")` → `getAllByText("error")`. All
+  pass. Carve-out doctrine in DESIGN.md §5 explicitly notes the status-
+  bar still uses icons (no room for full words there) while the panel
+  uses words (no room shortage; words read better at a glance).
+- **StreamNode — final form**: code-link box-shadow ring via inline
+  style + `data-code-link` attribute on root. Hover ring = 2 px solid
+  `--foreground`; pinned ring = 3 px solid `--foreground`; selected
+  (3 px `--ring`) wins. Integer spreads (no more 2.5 px — sub-pixel
+  rounding made the bottom render fatter than the top). The
+  `transition-[box-shadow] duration-200` was removed for non-selected
+  states — code-link snaps because the edge marching is the
+  ongoing signal and the ring just needs to mark "which nodes" without
+  a 200 ms ease that read as laggy on every click. Selected keeps its
+  transition (band thickens 4 → 8 px in sync; gentle is right). The
+  `.stream-node--code-hover` / `.stream-node--code-pinned` className
+  additions are gone (they were dead-state markers — the CSS rules
+  were no-ops); state marker moved to `data-code-link="hover|pinned"`.
+  Tests rewritten to assert on `data-code-link`.
+- **CodePreview**:
+  - Body `bg-[#0d1117]` removed → inherits `--panel`.
+  - Body text `text-zinc-200` → `text-foreground`.
+  - Section-header dot slab (`bg-sky-400/80`) + heading color (`text-sky-300/90`)
+    → muted-foreground uppercase tracking, no marker.
+  - Sub-block `border-l-2 cursor-pointer` → `rounded-sm cursor-pointer`
+    (absolute-ban side-stripe removed).
+  - Sub-block hover: `hover:bg-sky-500/[0.09] hover:border-sky-400/60` →
+    `hover:bg-[color-mix(in_oklch,var(--foreground)_5%,transparent)]`.
+  - Sub-block pinned: `bg-sky-500/[0.14] border-sky-400 ring-1 ring-sky-400/40` →
+    `bg-[color-mix(in_oklch,var(--foreground)_8%,transparent)] ring-2 ring-[var(--foreground)]`.
+  - Sub-block flash: `bg-amber-500/30 border-amber-400 ring-1 ring-amber-400/70` →
+    `bg-[color-mix(in_oklch,var(--color-warning)_22%,transparent)] ring-2 ring-[var(--color-warning)]`.
+  - `TOKEN_CLASS` map: 6 raw Tailwind classes → 5 `--syntax-*` arbitrary-
+    value classes + `text-muted-foreground italic` for comments.
+  - Empty-state copy `text-zinc-500` → `text-muted-foreground`.
+  - Transition duration tightened 150 ms → 80 ms (matches primitive-layer
+    motion vocabulary locked in the shadcn-primitive-layer pass).
+
+**Audit deltas this session resolves:**
+- **P0-4** (theming layer broken) — closes the last three file-list entries
+  (BCEdge, HydraulicEdge, CodePreview). All signature surfaces now consume
+  tokens; the only remaining hardcoded hex in `gui/src/` is documented
+  exception territory (WindowControls' macOS traffic-light values).
+- **P1-3..P1-8** (hardcoded colors across signature surfaces) — completed.
+- **P2-4** (colored `border-l-2` accent stripes) — `CodePreview.tsx:224`
+  removed. `FunctionSelect.tsx:125` is the remaining site (deferred to
+  polish pass).
+- Critique P1-2 (visual consistency drift) — last raw-Tailwind color
+  references in signature surfaces resolved.
+
 ### Lessons (worth re-reading at the start of the next session)
 
 1. **The validation-flash bug took 3 sub-fixes** (offset → border-radius →
@@ -573,6 +718,126 @@ touched).
     test render in `<TooltipProvider delayDuration={0}>`, not to pile
     multiple providers into production. Three test files touched in this
     session.
+18. **A new "signal" doesn't automatically earn a new hue.** Initial shape
+    proposal for the canvas↔code link state was a new `--color-code-link`
+    magenta token (hue 340, chroma 0.20) — geometry-distinct from every
+    existing hue. User pushed back: "is that color fitting the software?
+    wouldn't it be too strong?" Reconsidering from first principles: the
+    link state is FOCUS, the canvas already has 4 domain hues + 4 state
+    hues, adding a 9th hue for "this is what you're looking at" would
+    push the palette into the AI-workflow-tool territory PRODUCT.md
+    anti-references. Neutral high-contrast (`--foreground`) is the
+    semantic match AND the tool-grade move. Lesson: when a "third
+    category" appears (focus, here), check if weight/contrast can carry
+    the signal before reaching for a new hue slot — restraint compounds.
+19. **Hover and pin earn different visual budgets.** First pass at the
+    code-link active state gave hover and pin the same `--foreground`
+    stroke at proportionally fatter widths (1.5 → 2 → 2.5). Live
+    verification: hover was "way too loud" — moving the cursor across a
+    code panel walks the hover signal across many edges + nodes in
+    sequence, and a stream of full-contrast highlights makes the canvas
+    pulse. Pin is fine being loud because the user committed to it.
+    Final discipline: hover = color shift only (softened-foreground mix,
+    no width change), pin = full foreground + modest +0.5 width fatten.
+    Plus a second gotcha: xyflow's default arrowhead uses
+    `markerUnits="strokeWidth"`, so arrows scale 1:1 with stroke. The
+    "huge arrow on pin" complaint was the marker doing what it's
+    supposed to do — fixed by tightening the stroke delta.
+20. **"Don't paint node-side visual" doctrine was color-bound, not
+    structural.** PROGRESS.md previously locked "any future code-link
+    visual treatment belongs on edges, not nodes." Reasoning was: edges
+    already convey the link, doubling on the node would be noise. That
+    held under the sky-300 proposal (loud color, doubling = overpowering)
+    but inverts under softened foreground (quiet color, doubling reads
+    as harmonized). The doctrine call was implicitly a function of the
+    proposed color value, not a structural principle. More importantly,
+    component-definition lines (`@named pump = Pump(...)`) carry one
+    node sourceId and zero edges — the edge-only doctrine left those
+    lines producing no canvas feedback at all. Lesson: when re-reading
+    a locked doctrine note in a new context, check whether the
+    reasoning still holds with the current proposed values; "we
+    previously decided X" is not load-bearing if the inputs changed.
+21. **Motion-as-state beats contrast-as-state for high-fan-out
+    highlights.** First-pass code-link active state was static
+    `--foreground` stroke + width fatten. Second pass softened the
+    color (color-mix toward canvas) + dropped the width fatten on
+    hover. Both still made the canvas pulse when the cursor walked
+    across many code lines — the eye anchors on the lit edges, no
+    matter how clever the static color choice. Marching-ants on a
+    near-rest stroke width fixes this categorically: motion conveys
+    "linked" while the static visual weight stays near rest, so the
+    eye registers the signal without being pulled to it. We already
+    had this idiom in `.validation-flow-trace` for loop highlights;
+    reusing the keyframe was the right call (consistency of motion
+    grammar). Lesson: when a static-state design produces "too loud"
+    feedback at scale, check whether motion can carry the signal at
+    a lower static-weight floor. PRODUCT.md's "no decorative motion"
+    bans choreography, NOT functional motion that conveys state.
+22. **xyflow's default arrowhead scales with stroke
+    (`markerUnits="strokeWidth"`).** No CSS or JS workaround can override
+    that on a `MarkerType.ArrowClosed` — the markerUnits attribute is
+    baked into xyflow's marker-generation code. The fix is to define a
+    custom `<marker>` in a hidden SVG (inside the React tree so it lives
+    in document scope) with `markerUnits="userSpaceOnUse"`, reference it
+    via `markerEnd: "url(#id)"` from edge specs, and drop the
+    MarkerType-based marker entirely. Took one tiny SVG component +
+    a one-line useStore change. Lesson: when xyflow defaults don't fit,
+    custom SVG defs are cleaner than fighting the framework — and the
+    marker primitive is well-established SVG, no xyflow-specific API
+    knowledge required.
+23. **Sub-pixel box-shadow spreads render asymmetrically at some
+    zooms.** First-pass code-pin ring used 2.5 px spread; user reported
+    "bottom thicker than top." Sub-pixel rounding makes 2.5 → 2 on one
+    side and 2.5 → 3 on the other depending on the box's subpixel offset
+    (which varies with zoom level and DPI). Integer spreads (2, 3, 4)
+    render symmetrically at every zoom. Lesson: in box-shadow / outline
+    / border thicknesses, prefer integer pixel values unless there's a
+    specific design reason for the half-pixel.
+24. **CSS transitions on box-shadow read as click latency.** A 200 ms
+    ease on a state change feels gentle when YOU initiate the state
+    locally (selecting a node by clicking it), but feels laggy when the
+    state is reactive to a remote input (clicking a code-panel sub-block
+    → ring appears on the canvas node). The 200 ms ease was lifted from
+    Linear/Cursor's selection-feel and was right for canvas-side
+    selection; for cross-panel reactive state it needed to snap. Lesson:
+    transition timing is a function of WHERE the state change is
+    initiated, not just what changes. Snap for reactive, ease for
+    self-initiated.
+25. **SVG paint order is DOM order; `z-index` doesn't apply to SVG
+    siblings.** Overlapping edges (e.g. parallel connections from a
+    bottom port to two side-by-side targets) revealed that the marching-
+    ants animation on an active edge could appear *behind* a static
+    overlapping sibling — the dashes flickered as the sibling's solid
+    stroke painted on top. CSS `z-index` and stacking contexts do not
+    affect SVG sibling paint order; only DOM order does. xyflow's
+    `Edge.zIndex` IS the supported mechanism — xyflow re-sorts edges
+    by zIndex in the rendered DOM. Set 1500 for active edges (above
+    xyflow's default selected zIndex of 1000). This required a
+    selective subscription to `hoveredSourceIds` / `pinnedSourceIds` in
+    CanvasPanel — the existing PERF comment warns against whole-store
+    subscriptions, but scoped selectors are fine; hover/pin toggle
+    frequency (mouseenter/leave on code lines, ~clicks/sec at most) is
+    well below the node-drag tick rate (~60 Hz) the PERF doctrine was
+    written to protect against. Lesson: when SVG layering matters, the
+    fix lives in the framework's z-property (xyflow.Edge.zIndex) or in
+    DOM reordering, NOT in CSS.
+26. **An anti-pattern in one surface can be the convention in another.**
+    Lucide `AlertCircle` / `AlertTriangle` / `Info` icons were banned
+    earlier in Phase 72 from the ValidationPanel rows — they were a
+    canonical shadcn-admin tell ("AlertCircle + chip + hover row"). The
+    bottom-chrome status bar now uses the same icon family (`CircleX` /
+    `TriangleAlert` / `Info`) for severity counts, and that's the right
+    call: compact severity glyphs in a status-bar context are the
+    IDE convention (VSCode / IntelliJ / Sublime / Eclipse). The icons
+    don't carry the shadcn-admin meaning intrinsically — they carry it
+    contextually, in combination with adjacent shadcn-admin patterns
+    (chips, muted-foreground rows, hover-tinted list cells). Stripped
+    of that surrounding context and used as a single-glyph + tabular-
+    number cluster in a chrome bar, they read as the IDE family they
+    actually come from. Lesson: anti-pattern rulings should be scoped
+    to the surface where the pattern accumulates, not promoted to
+    project-wide blanket bans. Document the carve-out where you take it
+    so future sessions don't re-litigate the conflict.
 
 ## Re-entry instructions for the next session
 

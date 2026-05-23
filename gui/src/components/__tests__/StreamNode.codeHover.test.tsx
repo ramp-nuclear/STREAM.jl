@@ -1,12 +1,16 @@
 // @vitest-environment happy-dom
 // StreamNode.codeHover.test.tsx — Phase 66 Plan 05 (Wave-4 RED).
 //
-// Covers the canvas hover/pin ring (D-05, D-09, D-11):
-//   - When `hoveredSourceIds.has(id)`, the StreamNode root element carries the
-//     `stream-node--code-hover` class.
-//   - When `pinnedSourceIds.has(id)`, the root element carries the
-//     `stream-node--code-pinned` class.
-//   - Both classes can coexist (sub-block-hovered + previously-pinned node).
+// Covers the canvas hover/pin ring (D-05, D-09, D-11). Originally asserted on
+// the `.stream-node--code-{hover,pinned}` classNames; Phase 72 moved the
+// canonical state marker to the `data-code-link` attribute (the className
+// additions were dropped along with their now-dead CSS no-op rules — the
+// actual visual is the inline box-shadow ring in StreamNode.tsx).
+//
+//   - When `hoveredSourceIds.has(id)`, the root carries `data-code-link="hover"`.
+//   - When `pinnedSourceIds.has(id)`, the root carries `data-code-link="pinned"`.
+//   - When both sets include the id, pinned wins (matches the ring-priority
+//     ladder: selected → pinned → hover → rest).
 //
 // Wiring is via per-node primitive-boolean selectors (Research Pattern 9),
 // matching the established `hasAnchor` / `hasBCError` shape so re-render
@@ -88,43 +92,42 @@ afterEach(() => {
   cleanup();
 });
 
-describe("StreamNode code-hover / pinned ring (Phase 66)", () => {
-  it("does NOT carry the hover / pinned classes initially", () => {
+describe("StreamNode code-hover / pinned ring (Phase 66 / Phase 72)", () => {
+  it("does NOT set data-code-link initially", () => {
     const { container } = renderStreamNode("n1");
     const el = rootEl(container);
-    expect(el.className).not.toContain("stream-node--code-hover");
-    expect(el.className).not.toContain("stream-node--code-pinned");
+    expect(el.getAttribute("data-code-link")).toBeNull();
   });
 
-  it("applies stream-node--code-hover when hoveredSourceIds includes the node id", () => {
+  it("sets data-code-link=\"hover\" when hoveredSourceIds includes the node id", () => {
     const { container } = renderStreamNode("n1");
     act(() => {
       useStore.setState({ hoveredSourceIds: new Set(["n1"]) });
     });
-    expect(rootEl(container).className).toContain("stream-node--code-hover");
+    expect(rootEl(container).getAttribute("data-code-link")).toBe("hover");
   });
 
-  it("removes stream-node--code-hover when the id leaves hoveredSourceIds", () => {
+  it("removes data-code-link when the id leaves hoveredSourceIds", () => {
     const { container } = renderStreamNode("n1");
     act(() => {
       useStore.setState({ hoveredSourceIds: new Set(["n1"]) });
     });
-    expect(rootEl(container).className).toContain("stream-node--code-hover");
+    expect(rootEl(container).getAttribute("data-code-link")).toBe("hover");
     act(() => {
       useStore.setState({ hoveredSourceIds: new Set<string>() });
     });
-    expect(rootEl(container).className).not.toContain("stream-node--code-hover");
+    expect(rootEl(container).getAttribute("data-code-link")).toBeNull();
   });
 
-  it("applies stream-node--code-pinned when pinnedSourceIds includes the node id", () => {
+  it("sets data-code-link=\"pinned\" when pinnedSourceIds includes the node id", () => {
     const { container } = renderStreamNode("n1");
     act(() => {
       useStore.setState({ pinnedSourceIds: new Set(["n1"]) });
     });
-    expect(rootEl(container).className).toContain("stream-node--code-pinned");
+    expect(rootEl(container).getAttribute("data-code-link")).toBe("pinned");
   });
 
-  it("applies BOTH classes when the id is in both sets simultaneously", () => {
+  it("pinned wins over hover when the id is in both sets simultaneously", () => {
     const { container } = renderStreamNode("n1");
     act(() => {
       useStore.setState({
@@ -132,8 +135,9 @@ describe("StreamNode code-hover / pinned ring (Phase 66)", () => {
         pinnedSourceIds: new Set(["n1"]),
       });
     });
-    const cls = rootEl(container).className;
-    expect(cls).toContain("stream-node--code-hover");
-    expect(cls).toContain("stream-node--code-pinned");
+    // Phase 72 — single-attribute model (pinned beats hover) replaces the
+    // dual-class model. The priority ladder is selected → pinned → hover →
+    // rest; the ring + edge animation both follow this ordering.
+    expect(rootEl(container).getAttribute("data-code-link")).toBe("pinned");
   });
 });

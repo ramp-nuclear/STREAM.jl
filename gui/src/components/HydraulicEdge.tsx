@@ -83,14 +83,29 @@ function HydraulicEdge({
     ),
   );
 
-  const mergedStyle = isCodePinned
-    ? { ...style, stroke: "#7dd3fc", strokeWidth: 3 }
+  // Phase 72 — code-link active state is a CLASS (not inline style).
+  // The `.code-link-active` rule (defined in index.css, reuses the
+  // flow-trace-march keyframe shared with .validation-flow-trace) paints
+  // a marching-ants dashed pattern in --foreground over the path. Pinned
+  // adds a small width fatten via `.code-link-pinned`. Marching motion
+  // is the primary signal, not stroke thickness — and the custom marker
+  // in CanvasPanel (`url(#stream-hydraulic-arrow)`,
+  // `markerUnits="userSpaceOnUse"`) keeps the arrowhead fixed regardless
+  // of the stroke fatten. See DESIGN.md §2 Code-link active state.
+  const className = isCodePinned
+    ? "code-link-active code-link-pinned"
     : isCodeHovered
-      ? { ...style, stroke: "#38bdf8", strokeWidth: 2.25 }
-      : style;
+      ? "code-link-active"
+      : "";
 
   return (
-    <BaseEdge id={id} path={path} style={mergedStyle} markerEnd={markerEnd} />
+    <BaseEdge
+      id={id}
+      path={path}
+      style={style}
+      markerEnd={markerEnd}
+      className={className}
+    />
   );
 }
 
