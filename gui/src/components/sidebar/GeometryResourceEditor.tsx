@@ -202,11 +202,11 @@ export default function GeometryResourceEditor({
 
   return (
     <div className="flex flex-col gap-[16px]">
-      <h3 className="text-[16px] font-semibold leading-[1.3]">{headerCopy}</h3>
+      <h3 className="text-title font-semibold leading-[1.3]">{headerCopy}</h3>
 
       {/* Name */}
       <div className="flex flex-col gap-[8px]">
-        <Label className="text-[13px] font-semibold leading-[1.4]">Name</Label>
+        <Label className="text-body font-semibold leading-[1.4]">Name</Label>
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -214,13 +214,13 @@ export default function GeometryResourceEditor({
           autoFocus
         />
         {nameError && (
-          <p className="text-destructive text-xs leading-[1.4]">{nameError}</p>
+          <p className="text-destructive text-label leading-[1.4]">{nameError}</p>
         )}
       </div>
 
       {/* Kind */}
       <div className="flex flex-col gap-[8px]">
-        <Label className="text-[13px] font-semibold leading-[1.4]">Kind</Label>
+        <Label className="text-body font-semibold leading-[1.4]">Kind</Label>
         <ToggleGroup
           type="single"
           value={kind}
@@ -250,7 +250,7 @@ export default function GeometryResourceEditor({
       )}
 
       {dimError && (
-        <p className="text-destructive text-xs leading-[1.4]">{dimError}</p>
+        <p className="text-destructive text-label leading-[1.4]">{dimError}</p>
       )}
 
       {/* Actions */}
@@ -276,7 +276,7 @@ interface DimensionFieldProps {
 function DimensionField({ label, unit, value, onChange }: DimensionFieldProps) {
   return (
     <div className="flex flex-col gap-[8px]">
-      <Label className="text-[13px] font-semibold leading-[1.4]">{label}</Label>
+      <Label className="text-body font-semibold leading-[1.4]">{label}</Label>
       <div className="relative">
         <Input
           value={value}
@@ -284,7 +284,7 @@ function DimensionField({ label, unit, value, onChange }: DimensionFieldProps) {
           inputMode="decimal"
           className="pr-12"
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[13px] font-semibold pointer-events-none">
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-body font-semibold pointer-events-none">
           {unit}
         </span>
       </div>

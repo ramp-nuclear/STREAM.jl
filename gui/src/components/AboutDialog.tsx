@@ -41,7 +41,7 @@ export default function AboutDialog({ open, onOpenChange }: Props) {
           <DialogTitle>STREAM Composer</DialogTitle>
           <DialogDescription>Version {version}</DialogDescription>
         </DialogHeader>
-        <div className="py-2 text-sm">
+        <div className="py-2 text-body">
           <a
             href="https://github.com/ramp-nuclear/STREAM.jl"
             target="_blank"

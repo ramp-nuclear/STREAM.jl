@@ -27,6 +27,7 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -34,7 +35,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
-import { cn } from "@/lib/utils";
 import useStore from "@/store/useStore";
 
 // Stringify a number with a sensible default placeholder for empty / null.
@@ -64,7 +64,7 @@ function FieldRow({
     <div className="flex flex-col gap-[8px] mb-[16px]">
       <Label
         htmlFor={id}
-        className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1"
+        className="text-body font-semibold leading-[1.4] flex items-center gap-1"
       >
         {label}
         {description && (
@@ -81,7 +81,7 @@ function FieldRow({
       <div className="relative">
         {children(id, Boolean(unit))}
         {unit && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[13px] font-semibold pointer-events-none">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-body font-semibold pointer-events-none">
             {unit}
           </span>
         )}
@@ -217,7 +217,7 @@ export default function ModelOptionsPanel() {
 
   return (
     <div className="p-[16px] pt-[32px] overflow-y-auto h-full">
-      <h2 className="text-[16px] font-semibold leading-[1.3] mb-[24px]">
+      <h2 className="text-title font-semibold leading-[1.3] mb-[24px]">
         Project Options
       </h2>
 
@@ -237,28 +237,21 @@ export default function ModelOptionsPanel() {
       <div className="flex flex-col gap-[8px] mb-[16px]">
         <Label
           htmlFor="mo-description"
-          className="text-[13px] font-semibold leading-[1.4]"
+          className="text-body font-semibold leading-[1.4]"
         >
           Description
         </Label>
-        {/* Plain styled <textarea> rather than a new shadcn `textarea.tsx`
-            shim: single use, doesn't justify a reusable primitive yet. The
-            className spine matches `<Input>` for visual consistency. */}
-        <textarea
+        {/* Phase 72 polish — switched from inline <textarea> with stale shadcn
+            defaults (shadow-xs, ring-[3px], md:text-sm, dark:bg-input/30) to the
+            locked Textarea primitive. The primitive carries the locked vocab:
+            rounded-sm, text-body, border-hover lift, ring-2 inset focus. */}
+        <Textarea
           id="mo-description"
           value={localDescription}
           onChange={(e) => setLocalDescription(e.target.value)}
           onBlur={commitDescription}
           rows={3}
-          className={cn(
-            "w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs",
-            "transition-[color,box-shadow] outline-none",
-            "selection:bg-primary selection:text-primary-foreground",
-            "placeholder:text-muted-foreground",
-            "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-            "md:text-sm dark:bg-input/30",
-            "resize-y",
-          )}
+          className="resize-y"
         />
       </div>
 
@@ -266,7 +259,7 @@ export default function ModelOptionsPanel() {
       <div className="flex flex-col gap-[8px] mb-[16px]">
         <Label
           htmlFor="mo-default-fluid"
-          className="text-[13px] font-semibold leading-[1.4]"
+          className="text-body font-semibold leading-[1.4]"
         >
           Default fluid
         </Label>
@@ -314,7 +307,7 @@ export default function ModelOptionsPanel() {
 
       {/* Solver Defaults section ------------------------------------------ */}
       <Separator className="my-[24px]" />
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-[16px]">
+      <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 mb-[16px]">
         Solver Defaults
       </h3>
 

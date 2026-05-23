@@ -28,7 +28,7 @@ export default function HelpMenu() {
   return (
     <>
       <MenubarMenu>
-        <MenubarTrigger className="h-full rounded-none px-3 py-0 text-xs font-normal hover:bg-accent hover:text-accent-foreground">
+        <MenubarTrigger className="h-full rounded-none px-3 py-0 font-normal hover:bg-accent hover:text-accent-foreground">
           Help
         </MenubarTrigger>
         <MenubarContent align="start">

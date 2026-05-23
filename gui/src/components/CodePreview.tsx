@@ -482,7 +482,7 @@ export default function CodePreview() {
           across code blocks copies only the code text (no section labels,
           no gap whitespace). */}
       <div
-        className="p-4 font-mono text-[13px] leading-[1.55] text-foreground select-none"
+        className="p-4 font-mono text-body leading-[1.55] text-foreground select-none"
         onClick={handlePanelBodyClick}
       >
         {sections.length === 0 ? (
@@ -491,7 +491,7 @@ export default function CodePreview() {
           // restates the obvious (the canvas IS the only place to add
           // components). Match ValidationPanel "No issues." idiom: single
           // declarative sentence, no italic, no parenthesis cruft.
-          <div className="text-muted-foreground text-xs">
+          <div className="text-muted-foreground text-label">
             No code yet.
           </div>
         ) : (
@@ -507,7 +507,7 @@ export default function CodePreview() {
                   ValidationPanel column-label idiom: muted foreground +
                   uppercase + tracking, no marker. The mb-5 rhythm + typography
                   contrast carry the divider. */}
-              <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2 select-none">
+              <h4 className="text-micro font-mono uppercase tracking-wide text-foreground/45 mb-2 select-none">
                 {section.name}
               </h4>
               <div className="flex flex-col gap-1.5">

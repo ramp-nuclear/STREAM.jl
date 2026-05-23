@@ -52,7 +52,7 @@ export default function InstanceNameField({ value, onChange }: InstanceNameField
 
   return (
     <div className="flex flex-col gap-[8px]">
-      <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
+      <Label className="text-body font-semibold leading-[1.4] flex items-center gap-1">
         Name
         <TooltipProvider>
           <Tooltip>
@@ -70,11 +70,11 @@ export default function InstanceNameField({ value, onChange }: InstanceNameField
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         onBlur={handleBlur}
-        className="text-base font-semibold"
+        className="text-title font-semibold"
         data-instance-name-input
       />
       {error && (
-        <p className="text-destructive text-xs">{error}</p>
+        <p className="text-destructive text-label">{error}</p>
       )}
     </div>
   );

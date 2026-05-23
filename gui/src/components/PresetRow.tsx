@@ -177,7 +177,7 @@ export default function PresetRow({ entry, onRequestReveal }: PresetRowProps) {
         // ToolboxItem omits them too. We add them back only during inline
         // rename, where the row isn't draggable and we want to suppress text
         // selection / Input overflow.
-        "h-[22px] px-[8px] text-[13px] flex items-center gap-2 min-w-0 hover:bg-accent rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        "h-[22px] px-[8px] text-body flex items-center gap-2 min-w-0 hover:bg-accent rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         renaming ? "select-none overflow-hidden cursor-text" : "cursor-grab",
       )}
     >
@@ -193,7 +193,7 @@ export default function PresetRow({ entry, onRequestReveal }: PresetRowProps) {
               setRenameError(validateNewName(e.target.value));
             }}
             className={cn(
-              "h-[24px] py-0 px-[6px] text-[13px] shadow-none",
+              "h-[24px] py-0 px-[6px] text-body shadow-none",
               renameError && "border-destructive ring-destructive/30",
             )}
             title={renameError ?? undefined}

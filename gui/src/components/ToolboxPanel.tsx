@@ -29,7 +29,7 @@ export default function ToolboxPanel() {
     <div className="h-full p-2 overflow-y-auto min-w-0">
       {hydraulicComponents.length > 0 && (
         <>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-2 mb-1 mt-2">
+          <div className="text-micro font-mono uppercase tracking-wide text-foreground/45 px-2 mb-1 mt-2">
             Hydraulic
           </div>
           <div className="space-y-px">
@@ -46,7 +46,7 @@ export default function ToolboxPanel() {
 
       {thermalComponents.length > 0 && (
         <>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-2 mb-1 mt-3">
+          <div className="text-micro font-mono uppercase tracking-wide text-foreground/45 px-2 mb-1 mt-3">
             Thermal
           </div>
           <div className="space-y-px">
@@ -63,7 +63,7 @@ export default function ToolboxPanel() {
 
       {sourceComponents.length > 0 && (
         <>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-2 mb-1 mt-3">
+          <div className="text-micro font-mono uppercase tracking-wide text-foreground/45 px-2 mb-1 mt-3">
             Sources
           </div>
           <div className="space-y-px">

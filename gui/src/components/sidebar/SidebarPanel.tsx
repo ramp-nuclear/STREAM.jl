@@ -221,7 +221,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
       const component = getComponent(data.componentId);
       if (!component) {
         return (
-          <p className="text-destructive text-sm mt-[16px]">
+          <p className="text-destructive text-body mt-[16px]">
             Unknown component: {data.componentId}
           </p>
         );
@@ -251,7 +251,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
                 updateNodeParams(selectedNodeId, { instanceName: name })
               }
             />
-            <Badge variant="secondary" className="text-[12px] h-5 px-1.5">{component.label}</Badge>
+            <Badge variant="secondary" className="h-5 px-1.5">{component.label}</Badge>
           </div>
 
           <Separator className="my-[24px]" />
@@ -329,7 +329,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
       // disabled controls would be misleading.
       if (selectedPowerShape.uuid === SENTINEL_UNSET_POWER_SHAPE) {
         return (
-          <div className="mt-[24px] text-[14px] text-muted-foreground leading-[1.5]">
+          <div className="mt-[24px] text-body text-muted-foreground leading-[1.5]">
             <p>
               This Power Shape is the global "unset" placeholder. Selecting it
               means the generated script has a TODO marker for you to fill in.
@@ -368,7 +368,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
     // ----- resource: fluid (read-only placeholder, RESEARCH Q3) ---------
     if (selectedFluid) {
       return (
-        <div className="mt-[24px] text-[14px] text-muted-foreground leading-[1.5] flex flex-col gap-[8px]">
+        <div className="mt-[24px] text-body text-muted-foreground leading-[1.5] flex flex-col gap-[8px]">
           <p>Fluid: {selectedFluid.name}</p>
           <p>rho, cp, mu, k are baked in for v1.</p>
           <p>Multi-fluid abstraction is v0.6+.</p>
@@ -387,7 +387,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
     // not as instructions.
     return (
       <div className="mt-[32px]">
-        <p className="text-[14px] font-semibold text-muted-foreground">
+        <p className="text-body font-semibold text-muted-foreground">
           No selection
         </p>
       </div>
@@ -408,7 +408,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
       )}
       <ScrollArea className="h-full">
         <div className="p-[10px] pt-[10px] min-w-0">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground leading-[1.3] mb-[8px]">
+          <h2 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
             {headerText}
           </h2>
           {renderBody()}
@@ -492,7 +492,7 @@ function ComponentTabs({
             render with neither section eligible. */}
         {hasFlowPort && (
           <>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground leading-[1.3] mb-[8px]">
+            <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
               Anchors
             </h3>
             <AnchorsSection nodeId={selectedNodeId} component={component} />
@@ -501,14 +501,14 @@ function ComponentTabs({
         )}
         {hasExternalInputs && (
           <>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground leading-[1.3] mb-[8px]">
+            <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
               External Inputs
             </h3>
             <BCsTabForm component={component} nodeId={selectedNodeId} />
           </>
         )}
         {!hasFlowPort && !hasExternalInputs && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-label text-muted-foreground">
             This component has no boundary conditions.
           </p>
         )}

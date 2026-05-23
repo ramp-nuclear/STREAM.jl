@@ -20,7 +20,7 @@ export default function InteractiveLockButton() {
       title={interactiveLocked ? "Unlock canvas interactions" : "Lock canvas interactions"}
       onClick={() => setInteractiveLocked(!interactiveLocked)}
       className={
-        "flex items-center justify-center w-8 h-8 rounded border shadow-sm transition-colors " +
+        "flex items-center justify-center w-8 h-8 rounded border transition-colors " +
         (interactiveLocked
           ? "bg-primary text-primary-foreground border-primary"
           : "bg-background text-foreground border-border hover:bg-accent hover:text-accent-foreground")

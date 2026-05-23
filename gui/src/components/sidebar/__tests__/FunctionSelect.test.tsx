@@ -136,7 +136,7 @@ describe("FunctionSelect", () => {
     render(
       <FunctionSelect param={frictionParam} value="blasius_friction" onChange={vi.fn()} />
     );
-    const subContainer = document.querySelector(".border-l-2");
+    const subContainer = document.querySelector("[data-testid='function-subparams']");
     expect(subContainer).toBeNull();
   });
 

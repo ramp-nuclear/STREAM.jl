@@ -119,7 +119,7 @@ describe("BCsTabForm", () => {
     // The required-unset placeholder is shown on the trigger.
     expect(screen.getByText("Select BC mode...")).toBeTruthy();
     // The required-unset destructive hint is rendered (D-09 carry-over).
-    expect(screen.getByText("BC required — select a mode")).toBeTruthy();
+    expect(screen.getByText("BC required; select a mode")).toBeTruthy();
     // The section heading (base field name) appears.
     expect(screen.getAllByText("T_wall").length).toBeGreaterThanOrEqual(1);
   });
@@ -148,7 +148,7 @@ describe("BCsTabForm", () => {
     const combo = screen.getByRole("combobox");
     expect(combo.textContent).toContain("Value");
     // Required-unset hint is no longer shown.
-    expect(screen.queryByText("BC required — select a mode")).toBeNull();
+    expect(screen.queryByText("BC required; select a mode")).toBeNull();
   });
 
   it("renders NumericField below the picker when mode is Value", () => {

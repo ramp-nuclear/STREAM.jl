@@ -132,7 +132,7 @@ function BCEdge({
       {sideTag && (
         <EdgeLabelRenderer>
           <span
-            className="nopan absolute rounded border bg-background px-[6px] py-[2px] text-xs text-muted-foreground"
+            className="nopan absolute rounded border bg-background px-[6px] py-[2px] text-label text-muted-foreground"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
               pointerEvents: "none",

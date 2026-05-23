@@ -93,8 +93,8 @@ function TypeUnionField({ param, value, isSourceValueParam, onChange }: TypeUnio
           paramRequired={param.required ?? false}
           onChange={(v) => onChange(v)}
         />
-        <p className="text-[11px] text-muted-foreground leading-[1.3]">
-          Vector or function values — edit in the generated Julia.
+        <p className="text-label text-muted-foreground leading-[1.3]">
+          Vector or function values; edit in the generated Julia.
         </p>
       </div>
     );
@@ -225,12 +225,12 @@ function ScalarInput({ value, unit, paramDefault, paramRequired, onChange }: Sca
           }
         />
         {unit && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[13px] font-semibold pointer-events-none">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-body font-semibold pointer-events-none">
             {unit}
           </span>
         )}
       </div>
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p className="text-destructive text-label">{error}</p>}
     </div>
   );
 }
@@ -310,7 +310,7 @@ export default function ParameterForm({
         case "Bool":
           inner = (
             <div key={param.name} className="flex flex-col gap-[8px]">
-              <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
+              <Label className="text-body font-semibold leading-[1.4] flex items-center gap-1">
                 {param.name}
                 {param.description && (
                   <TooltipProvider>
@@ -431,7 +431,7 @@ export default function ParameterForm({
       {sections.map((section, idx) => (
         <div key={section.heading} className="min-w-0">
           {idx > 0 && <Separator className="mb-[12px]" />}
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground leading-[1.3] mb-[8px]">
+          <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
             {section.heading}
           </h3>
           <div className="flex flex-col gap-[8px]">
