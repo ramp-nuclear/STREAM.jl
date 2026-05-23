@@ -16,7 +16,7 @@ export default function ZoomInButton() {
       title="Zoom in"
       onClick={() => zoomIn()}
       className={
-        "flex items-center justify-center w-8 h-8 rounded border shadow-sm transition-colors " +
+        "flex items-center justify-center w-8 h-8 rounded border transition-colors " +
         "bg-background text-foreground border-border hover:bg-accent hover:text-accent-foreground"
       }
     >

@@ -158,11 +158,11 @@ export default function CustomTitlebar({
           ensures clicks fall through to the sibling drag region underneath, so
           the absolute overlay never intercepts window-drag events. */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center max-w-[40%]">
-        <span className="text-xs text-muted-foreground select-none truncate">
+        <span className="text-label text-muted-foreground select-none truncate">
           {projectName}
         </span>
         {isDirty && (
-          <span className="text-xs text-muted-foreground ml-0.5 select-none">
+          <span className="text-label text-muted-foreground ml-0.5 select-none">
             ●
           </span>
         )}

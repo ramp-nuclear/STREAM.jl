@@ -507,7 +507,7 @@ function RenderItem({
         >
           <Box />
           <span className="font-medium">{item.name}</span>
-          <span className="text-xs text-muted-foreground ml-1">
+          <span className="text-label text-muted-foreground ml-1">
             {item.typeLabel}
           </span>
           {offLayers.length > 0 && (
@@ -580,7 +580,7 @@ function ModeChipRow({ mode, onSwap }: ModeChipRowProps): React.JSX.Element {
     <div
       role="tablist"
       aria-label="Palette mode"
-      className="flex items-center gap-3 px-3 py-1.5 border-b border-border/60 font-mono text-[10px] uppercase tracking-wide select-none"
+      className="flex items-center gap-3 px-3 py-1.5 border-b border-border/60 font-mono text-micro uppercase tracking-wide select-none"
     >
       <ModeChip
         active={mode === "commands"}
@@ -684,7 +684,7 @@ function ShortcutRow({ entry, onSelect }: ShortcutRowProps): React.JSX.Element {
       data-testid={`cmdk-shortcut-${entry.label.replace(/\s+/g, "-")}`}
     >
       <span className="flex-1">{entry.label}</span>
-      <span className="ml-auto font-mono text-foreground/65 text-[11px]">
+      <span className="ml-auto font-mono text-foreground/65 text-label">
         {entry.keys}
       </span>
     </CommandItem>

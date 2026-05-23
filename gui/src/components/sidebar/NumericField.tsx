@@ -83,13 +83,13 @@ export default function NumericField({ param, value, onChange }: NumericFieldPro
           )}
         />
         {param.unit && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[13px] font-semibold pointer-events-none">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-body font-semibold pointer-events-none">
             {param.unit}
           </span>
         )}
       </div>
       {error && (
-        <p className="text-destructive text-xs">{error}</p>
+        <p className="text-destructive text-label">{error}</p>
       )}
     </div>
   );

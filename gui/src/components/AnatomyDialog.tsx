@@ -447,12 +447,12 @@ function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
             <div style={{ flex: 1, backgroundColor: "var(--color-layer-thermal)" }} />
           </div>
           <div className="bg-card p-3">
-            <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-body text-muted-foreground">
               <BoxIcon className="w-5 h-5" strokeWidth={1.5} />
               ChannelAndContacts
             </div>
-            <div className="font-semibold text-base mt-1">channel_1</div>
-            <div className="text-[13px] text-muted-foreground mt-1">
+            <div className="font-semibold text-title mt-1">channel_1</div>
+            <div className="text-body text-muted-foreground mt-1">
               L = 1.2 m  Dh = 12 mm
             </div>
           </div>
@@ -754,7 +754,7 @@ function EdgesTile(): React.JSX.Element {
 
         {/* BC mid-edge side tag. */}
         <span
-          className="absolute rounded border bg-background px-[6px] py-[2px] text-[11px] text-muted-foreground font-mono pointer-events-none"
+          className="absolute rounded border bg-background px-[6px] py-[2px] text-label text-muted-foreground font-mono pointer-events-none"
           style={{
             left: (EDGE_SRC_X + EDGE_TGT_X) / 2 - 18,
             top: ROW_Y[1] - 12,

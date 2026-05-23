@@ -59,7 +59,7 @@ export default function AnchorsSection({ nodeId, component }: AnchorsSectionProp
   if (entry === undefined) {
     return (
       <div data-testid="anchors-section">
-        <p className="text-xs text-muted-foreground mb-[8px]">No anchor set</p>
+        <p className="text-label text-muted-foreground mb-[8px]">No anchor set</p>
         <Button
           variant="outline"
           size="sm"

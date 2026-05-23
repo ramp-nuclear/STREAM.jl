@@ -39,7 +39,7 @@ export default function ModeToggle({
   }));
   return (
     <div className="flex flex-col gap-[8px]">
-      <Label className="text-[13px] font-semibold leading-[1.4]">Mode</Label>
+      <Label className="text-body font-semibold leading-[1.4]">Mode</Label>
       <SegmentedButtonGroup
         options={options}
         active={activeMode}

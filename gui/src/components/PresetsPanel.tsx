@@ -186,7 +186,7 @@ export default function PresetsPanel() {
         role="heading"
         aria-level={2}
       >
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate min-w-0">
+        <span className="text-micro font-mono uppercase tracking-wide text-foreground/45 truncate min-w-0">
           Project
         </span>
         <button
@@ -212,13 +212,13 @@ export default function PresetsPanel() {
             </ul>
           ) : !currentProjectDir ? (
             <div className="px-[8px] py-[4px]">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-label text-muted-foreground">
                 No project open.
               </p>
             </div>
           ) : projectPresets.length === 0 ? (
             <div className="px-[8px] py-[4px]">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-label text-muted-foreground">
                 No project presets.
               </p>
             </div>
@@ -242,7 +242,7 @@ export default function PresetsPanel() {
         role="heading"
         aria-level={2}
       >
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate min-w-0">
+        <span className="text-micro font-mono uppercase tracking-wide text-foreground/45 truncate min-w-0">
           Library
         </span>
         <button
@@ -268,7 +268,7 @@ export default function PresetsPanel() {
             </ul>
           ) : libraryPresets.length === 0 ? (
             <div className="px-[8px] py-[4px]">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-label text-muted-foreground">
                 No library presets.
               </p>
             </div>

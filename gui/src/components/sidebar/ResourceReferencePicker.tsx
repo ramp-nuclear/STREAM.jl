@@ -144,13 +144,13 @@ export default function ResourceReferencePicker({
               // render when value is empty AND no item matches; passing it
               // through here keeps the empty-state copy stable even when
               // the user hovers the dropdown.
-              <span className="text-[14px] italic text-muted-foreground truncate">
+              <span className="text-body italic text-muted-foreground truncate">
                 {emptyCopy}
               </span>
             ) : (
               <SelectValue
                 placeholder={
-                  <span className="text-[14px] italic text-muted-foreground truncate">
+                  <span className="text-body italic text-muted-foreground truncate">
                     {emptyCopy}
                   </span>
                 }

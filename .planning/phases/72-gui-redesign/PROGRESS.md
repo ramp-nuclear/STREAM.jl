@@ -47,12 +47,12 @@ capture the final tokens into a proper frontmatter + sidecar.
 | BCEdge + HydraulicEdge + CodePreview tokenization (canvas↔code link state retoken to --foreground; 5 --syntax-* tokens; remove GitHub-dark borrow + border-l-2 + section-header slab) | ✅ | 1 cluster commit — see Decision log | §2 --syntax-* tokens + Code editor lane carve-out + Code-link active state (uses --foreground, no new hue); §5 CodePreview subsection locked |
 | `/impeccable harden gui/src/` (prefers-reduced-motion safety net + scrollIntoViewSafe + ValidationPanel Row div→button + 3 token contrast fixes) | ✅ | 1 commit — see Decision log | (no DESIGN.md doctrine change — closes Audit P0-3 / Critique Sam persona findings) |
 | `/impeccable clarify gui/src/` (em-dash purge + engineering-voice empty states across PresetsPanel / SidebarPanel / CodePreview / ResourcesTreePanel / AboutDialog / BottomPanel / CommandPalette) | ✅ | 1 commit — see Decision log | (no DESIGN.md doctrine change — closes Audit P2-3 + feedback_engineering_voice_copy) |
+| `/impeccable polish gui/src/` (type-scale + section-header + border-l-2 sweep + AutoRecover dialog migration to locked surfaces + canvas-menu shadow removal) | ✅ | 1 commit — see Decision log | (no DESIGN.md doctrine change — closes Audit P2-4 + P2-6 + P1-1, and brings five consumer surfaces onto the locked primitive layer) |
 
 ### Queued (Session 4 — phase close)
 
 | Surface | Status | Notes |
 |---|---|---|
-| `/impeccable polish gui/src/` (final migration sweep — tokenize any remaining ad-hoc values) | ⬜ | |
 | `/impeccable extract` (promote new reusable tokens + components into design system; write `.impeccable/design.json` sidecar) | ⬜ | |
 | Re-run `/impeccable audit gui/src/` | ⬜ | Target ≥17/20 |
 | Re-run `/impeccable critique gui/src/` | ⬜ | Target ≥32/40 |
@@ -781,6 +781,172 @@ affordances (the Resources tab) is in-bounds.
 **Tests:** 1046/1050 (4 pre-existing fixture failures, unchanged).
 tsc baseline: 10 errors, unchanged.
 
+### Polish pass — type-scale + section-header + border-l-2 sweep (locked 2026-05-23)
+
+Cross-cutting polish pass that promotes the locked primitive-layer choices
+(type-scale tokens, ValidationPanel column-label idiom, locked Dialog vocab)
+across the remaining consumer surfaces. Mechanical mostly. Closes the last
+three Audit findings that were deferred from prior sessions and brings the
+ad-hoc-survivor dialogs onto the locked primitive layer.
+
+**Single commit:** `polish(72): type-scale tokens + section-header retoken + ad-hoc-value sweep`
+
+**1. Type-scale token migration (Audit P2-6).**
+
+Replaced every `text-[10|11|13|16|20px]` arbitrary value in consumer surfaces
+with the locked `--text-{micro,label,body,title,display}` token utilities.
+Same scale (10/11/13/16/20 px); the rewrite enforces SSOT — restyling those
+sizes now happens in `index.css` `@theme inline`, not across 30 files.
+
+The primitive layer was migrated in the shadcn-primitive-layer shape pass;
+this closes the consumer-side migration that was explicitly deferred.
+
+Carve-outs kept verbatim:
+
+- `text-[12px]` — control-text density (Button / Input / Toggle / Tabs /
+  Select / Menu items / property-form Labels). Locked primitive-layer
+  convention; intentionally off-the-five-tier-scale.
+- `text-[15px]` — ValidationStatusBar count text. Locked status-bar
+  carve-out (DESIGN.md §5).
+- `text-base` on the body-level Anatomy node mirror — already routed via
+  Anatomy's "visual mirror" strategy; one site, switched to `text-title`
+  inline to consume the token rather than the Tailwind default.
+
+Off-scale `text-[14px]` instances (SidebarPanel empty-state body,
+ResourceReferencePicker placeholders) migrated to `text-body` (13 px).
+13 px reads closer to the body-text density of the rest of the chrome;
+14 px was a Tailwind-default leak.
+
+**2. `text-xs` / `text-sm` Tailwind defaults swept.**
+
+- `text-xs` (12 px) — drift target. Three flavors:
+  1. Redundant on menubar triggers (primitive already sets `text-[12px]`):
+     dropped. `text-xs font-normal` → `font-normal` on FileMenu / EditMenu /
+     ViewMenu / HelpMenu triggers.
+  2. Inline shortcut spans inside menubar items (`<span className="text-muted-foreground text-xs">Ctrl+Z</span>`):
+     refactored to `<MenubarShortcut>Ctrl+Z</MenubarShortcut>` so the locked
+     shortcut-chip idiom (`text-micro font-mono text-foreground/55`) flows
+     from the primitive. The `<span className="flex justify-between w-full
+     items-center gap-4">` wrapping (manual right-alignment) is gone —
+     MenubarShortcut does `ml-auto` itself. Net DOM is simpler AND
+     on-brand.
+  3. Status/body text outside menubars (CodePreview empty state,
+     CustomTitlebar filename, BCEdge mid-tag, error hints below inputs):
+     mapped to `text-label` (11 px from the token scale).
+- `text-sm` (14 px) — Tailwind default, off-scale. Migrated to `text-body`
+  (UnsavedChangesDialog description, AboutDialog body, AutoRecover body).
+  `text-sm font-medium` Recover/Discard buttons in AutoRecoverRestoreModal
+  switched to the `<Button>` primitive (locked default size + variant).
+- `text-base` — 16 px = `text-title`. Migrated InstanceNameField input
+  emphasis and Anatomy mirror instance label.
+
+**3. `border-l-2` colored side-stripe — last absolute-ban survivor (Audit P2-4).**
+
+`FunctionSelect.tsx:125` sub-fields container — replaced `border-l-2
+border-muted pl-3` with `border-l border-border pl-3`. The absolute ban
+targets stripes >1 px used as colored accents; a 1 px neutral hairline is
+within the ban's exemption and carries the "nested under selection"
+structural cue without violating doctrine.
+
+Test selector moved from `.border-l-2` querySelector to
+`data-testid="function-subparams"` so future styling iterations don't
+break test assertions on incidental classes.
+
+**4. Section-header pattern retokened to the ValidationPanel column-label idiom.**
+
+Six surfaces aligned to the locked compact-uppercase-header idiom
+(`text-micro font-mono uppercase tracking-wide text-foreground/45`):
+
+- LayersPanel "Layers" group label (was `text-[10px] font-semibold sans
+  text-muted-foreground tracking-[0.08em]`)
+- ResourceGroupHeader "Geometries / Power Shapes / Fluids" labels (was
+  `text-xs font-semibold sans uppercase tracking-wide text-muted-foreground`)
+- PresetsPanel "Project / Library" headers
+- ToolboxPanel "Hydraulic / Thermal / Sources" categories
+- SidebarPanel `<h2>` + `<h3>` ("Components / Resources / Project / Anchors
+  / External Inputs")
+- ParameterForm section group headers
+- BCsTabForm group-base-field header
+- ModelOptionsPanel "Solver Defaults"
+- CodePreview section headers (was `text-[11px] font-semibold sans
+  tracking-[0.12em] text-muted-foreground`)
+
+Single section-header vocabulary across the chrome. Prior treatments lived
+across at least three idioms (sans/mono, semibold/regular, 10/11/12 px,
+muted-foreground/foreground-45); they now read as one.
+
+**5. Locked-Dialog vocab applied to the two hand-rolled dialogs.**
+
+- `AutoRecoverRestoreModal` (Radix Dialog directly, not the shadcn Dialog
+  primitive — it pre-dates the primitive layer):
+  - Scrim `bg-black/60 backdrop-blur-sm` → `bg-foreground/40` (locked
+    Dialog scrim; closes Audit P1-1 glassmorphism finding).
+  - Surface `rounded-lg bg-background shadow-xl` → `rounded-md bg-popover
+    shadow-[var(--shadow-dialog)]` (locked surface vocab).
+  - Custom-styled `<button className="px-4 py-2 text-sm font-medium
+    rounded-md ...">` actions → `<Button>` primitive (one with className
+    override for destructive intent on outline variant).
+  - `AlertTriangle text-yellow-500` → `text-[color:var(--color-warning)]`
+    (the last raw Tailwind color in `gui/src/` outside documented
+    carve-outs).
+- `UnsavedChangesDialog` (hand-rolled overlay, similarly pre-primitive-
+  layer):
+  - Scrim `bg-black/50` → `bg-foreground/40`.
+  - Surface `rounded-lg bg-background shadow-lg` → `rounded-md bg-popover
+    shadow-[var(--shadow-dialog)]`.
+  - `<h2 className="text-base font-semibold">` title → `text-title
+    font-semibold`.
+  - Description `text-sm text-muted-foreground` → `text-body
+    text-foreground/65`.
+
+These were the two remaining hand-rolled dialogs in `gui/src/` that bypassed
+the shadcn Dialog primitive. The locked vocab now reads through to both,
+closing the gap left by the primitive-layer recommit.
+
+**6. ModelOptionsPanel textarea → Textarea primitive.**
+
+The Description field was a hand-styled `<textarea>` carrying every
+pre-primitive-layer shadcn default the brief banned (`shadow-xs`, doubled
+3 px focus ring, `md:text-sm`, `dark:bg-input/30`). Switched to the locked
+`<Textarea>` primitive (`rounded-sm`, `text-body`, `border-hover` lift,
+2 px inset focus ring). Net: one fewer surface bypasses the primitive
+layer; one component file's `cn` import removed as a side-effect.
+
+**7. Canvas-menu floating buttons — ambient shadow removed.**
+
+ZoomIn / ZoomOut / FitView / SnapToGrid / InteractiveLockButton had
+`shadow-sm` on their button shells. Doctrine §4 reserves shadows for modal
+lift only; ambient atmospheric shadows on chrome controls are prohibited.
+The buttons sit on the canvas as floating overlays — the `bg-background
+border-border` already provides the tonal step + edge against the canvas
+surface; the shadow was atmospheric. Removed across all five files.
+
+**Audit deltas this session resolves:**
+
+- **Audit P2-4** (colored `border-l-2` accent stripes) — FULLY closed.
+  FunctionSelect was the last known site; CodePreview was removed during
+  the BCEdge/CodePreview tokenization session.
+- **Audit P2-6** (arbitrary `text-[Npx]` sizes) — FULLY closed for consumer
+  surfaces. The primitive layer was already migrated; this pass cleared
+  the consumer side. Locked carve-outs (12 px control text, 15 px status
+  bar) intentionally retained.
+- **Audit P1-1** (backdrop-blur glassmorphism on AutoRecoverRestoreModal) —
+  FULLY closed. Scrim retokened; blur removed.
+- **Audit P1-3..P1-8 systemic remainders** — every signature surface that
+  still carried raw Tailwind colors closed. The only remaining hardcoded
+  values in `gui/src/` are documented exception territory (WindowControls
+  macOS traffic-light hex + the close-button red-600 platform mimicry).
+
+**Files touched (production, 36):** consumer surfaces only; no primitive-
+layer changes (those were locked previously). Imports added: `MenubarShortcut`
+to FileMenu / EditMenu (existing in ViewMenu); `Button` to
+AutoRecoverRestoreModal; `Textarea` to ModelOptionsPanel.
+
+**Tests:** 1046/1050 (4 pre-existing fixture failures, unchanged). One test
+assertion updated (`BCsTabForm.test.tsx` "BC required — select a mode" →
+"BC required; select a mode") to track the inline em-dash purge in the
+copy. tsc baseline: 10 errors, unchanged.
+
 ### Lessons (worth re-reading at the start of the next session)
 
 1. **The validation-flash bug took 3 sub-fixes** (offset → border-radius →
@@ -1036,19 +1202,12 @@ Open a new Claude Code session, then say something like:
 The new session will load doctrine + queue + locked values + recent
 lessons in 1–2 minutes and resume cleanly.
 
-**Next surface per queue:** `/impeccable polish gui/src/` — final
-ad-hoc-value migration sweep. Targets: remaining `text-[Npx]`
-arbitrary-px sizes that should consume the `--text-{micro,label,body,
-title,display}` token scale (Audit P2-6); remaining `text-xs`/`text-sm`
-Tailwind defaults that should align; the `FunctionSelect.tsx:125`
-`border-l-2` colored side-stripe (Audit P2-4 — the only known absolute-
-ban survivor); the `text-xs font-semibold uppercase tracking-wide`
-section-header pattern (PresetsPanel + sidebar) that should retoken to
-the `--text-micro` mono-uppercase ValidationPanel column-label idiom.
-After polish: re-run `/impeccable audit gui/src/` (target ≥17/20) and
+**Next surface per queue:** phase-close — `/impeccable polish gui/src/`
+landed. Run `/impeccable audit gui/src/` (target ≥17/20), then
 `/impeccable critique gui/src/` (target ≥32/40), then
-`/impeccable document` in scan mode (DESIGN.md seed → real spec) and
-write Phase 72 SUMMARY.md.
+`/impeccable document` in scan mode (DESIGN.md seed → real spec), then
+write Phase 72 SUMMARY.md per the ROADMAP row contract (supersedes this
+file).
 
 **Related memories** (loaded automatically — don't need to re-read):
 

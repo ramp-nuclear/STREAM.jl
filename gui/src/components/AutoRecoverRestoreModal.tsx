@@ -7,6 +7,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 /**
  * A candidate for restoration. Typically one entry per crashed session.
@@ -66,7 +67,7 @@ export default function AutoRecoverRestoreModal({
       <Dialog.Portal>
         {/* Overlay covers the entire screen to prevent interaction with anything behind */}
         <Dialog.Overlay
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-foreground/40"
         />
         <Dialog.Content
           // Block Esc from closing the dialog (D-03 invariant — decision must be made)
@@ -75,19 +76,19 @@ export default function AutoRecoverRestoreModal({
           onPointerDownOutside={(e) => e.preventDefault()}
           // Block focus leaving the dialog
           onInteractOutside={(e) => e.preventDefault()}
-          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-lg border border-border bg-background p-6 shadow-xl"
+          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-md border border-border bg-popover p-6 shadow-[var(--shadow-dialog)]"
           aria-describedby="autorecover-description"
         >
           {/* Header */}
-          <Dialog.Title className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0" aria-hidden />
+          <Dialog.Title className="flex items-center gap-2 text-title font-semibold text-foreground">
+            <AlertTriangle className="h-5 w-5 text-[color:var(--color-warning)] shrink-0" aria-hidden />
             Unsaved changes detected
           </Dialog.Title>
 
           {/* Body — verbatim D-03 wording */}
           <p
             id="autorecover-description"
-            className="mt-3 text-sm text-muted-foreground leading-relaxed"
+            className="mt-3 text-body text-foreground/65 leading-relaxed"
           >
             Recover unsaved work from{" "}
             <span className="font-medium text-foreground">{displayTimestamp}</span>
@@ -95,27 +96,27 @@ export default function AutoRecoverRestoreModal({
             <span className="font-medium text-foreground">{candidate.displayName}</span>?
           </p>
 
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 text-label text-muted-foreground">
             The app did not close gracefully last time. You can restore your
             unsaved changes or discard them and start fresh.
           </p>
 
-          {/* Actions */}
+          {/* Actions — switched from hand-rolled buttons (px-4 py-2 + rounded-md
+              + transition-colors) to the Button primitive. The Discard button
+              keeps its destructive intent via className overrides on the
+              outline variant; locked Button doesn't carry a destructive-outline
+              variant so the local override is the right surface for it. */}
           <div className="mt-6 flex justify-end gap-3">
-            <button
-              type="button"
+            <Button
+              variant="outline"
               onClick={() => onDiscard()}
-              className="px-4 py-2 text-sm font-medium rounded-md border border-border bg-background text-destructive hover:bg-destructive/10 transition-colors"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               Discard
-            </button>
-            <button
-              type="button"
-              onClick={() => onRecover(candidate.basename)}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
+            </Button>
+            <Button onClick={() => onRecover(candidate.basename)}>
               Recover
-            </button>
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

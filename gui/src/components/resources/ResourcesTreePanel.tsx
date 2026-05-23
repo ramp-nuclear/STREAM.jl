@@ -111,7 +111,7 @@ export default function ResourcesTreePanel() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           aria-label="Search resources"
-          className="h-[28px] text-[13px]"
+          className="h-[28px] text-body"
         />
       </div>
       <ScrollArea className="flex-1 min-h-0">
@@ -126,7 +126,7 @@ export default function ResourcesTreePanel() {
             />
             <ul role="group" className="mt-[2px]">
               {geometries.length === 0 ? (
-                <li className="text-[12px] text-muted-foreground pl-[8px]">
+                <li className="text-label text-muted-foreground pl-[8px]">
                   (none)
                 </li>
               ) : (
@@ -155,7 +155,7 @@ export default function ResourcesTreePanel() {
             />
             <ul role="group" className="mt-[2px]">
               {powerShapes.length === 0 ? (
-                <li className="text-[12px] text-muted-foreground pl-[8px]">
+                <li className="text-label text-muted-foreground pl-[8px]">
                   (none)
                 </li>
               ) : (
@@ -185,7 +185,7 @@ export default function ResourcesTreePanel() {
             />
             <ul role="group" className="mt-[2px]">
               {fluids.length === 0 ? (
-                <li className="text-[12px] text-muted-foreground pl-[8px]">
+                <li className="text-label text-muted-foreground pl-[8px]">
                   (none)
                 </li>
               ) : (

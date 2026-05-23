@@ -123,7 +123,7 @@ export default function ResourceGroupHeader({
   return (
     <div className="flex items-center justify-between gap-1 pl-[8px] pr-[4px] mt-[8px] min-w-0">
       <div
-        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate min-w-0"
+        className="text-micro font-mono uppercase tracking-wide text-foreground/45 truncate min-w-0"
         title={label}
       >
         {label}

@@ -215,7 +215,7 @@ export default function ResourceRow({
   // text, weight 600 when selected. Fluid placeholder gets text-muted and
   // no hover bg shift.
   const rowClass = cn(
-    "h-[22px] px-[8px] text-[13px] flex items-center cursor-pointer select-none min-w-0 overflow-hidden",
+    "h-[22px] px-[8px] text-body flex items-center cursor-pointer select-none min-w-0 overflow-hidden",
     isFluidPlaceholder
       ? "text-muted-foreground cursor-default"
       : "hover:bg-muted",
@@ -254,7 +254,7 @@ export default function ResourceRow({
       aria-invalid={renameError ? true : undefined}
       aria-label={`Rename ${resource.name}`}
       className={cn(
-        "h-[24px] py-0 px-[6px] text-[13px] shadow-none",
+        "h-[24px] py-0 px-[6px] text-body shadow-none",
         renameError && "border-destructive ring-destructive/30",
       )}
       title={renameError ?? undefined}
@@ -309,7 +309,7 @@ export default function ResourceRow({
             sideOffset={4}
             className="w-[240px] p-0"
           >
-            <div className="px-[12px] py-[8px] text-xs font-semibold border-b">
+            <div className="px-[12px] py-[8px] text-body font-semibold border-b">
               Used by {usages.length} component(s)
             </div>
             <ScrollArea className="max-h-[200px]">

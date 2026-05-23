@@ -244,11 +244,11 @@ export default function PowerShapeResourceEditor({
 
   return (
     <div className="flex flex-col gap-[16px]">
-      <h3 className="text-[16px] font-semibold leading-[1.3]">{headerCopy}</h3>
+      <h3 className="text-title font-semibold leading-[1.3]">{headerCopy}</h3>
 
       {/* Name */}
       <div className="flex flex-col gap-[8px]">
-        <Label className="text-[13px] font-semibold leading-[1.4]">Name</Label>
+        <Label className="text-body font-semibold leading-[1.4]">Name</Label>
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -256,13 +256,13 @@ export default function PowerShapeResourceEditor({
           autoFocus
         />
         {nameError && (
-          <p className="text-destructive text-xs leading-[1.4]">{nameError}</p>
+          <p className="text-destructive text-label leading-[1.4]">{nameError}</p>
         )}
       </div>
 
       {/* Kind */}
       <div className="flex flex-col gap-[8px]">
-        <Label className="text-[13px] font-semibold leading-[1.4]">Kind</Label>
+        <Label className="text-body font-semibold leading-[1.4]">Kind</Label>
         <Select
           value={kind}
           onValueChange={(v) =>
@@ -282,7 +282,7 @@ export default function PowerShapeResourceEditor({
 
       {kind === "z_cosine" && (
         <div className="flex flex-col gap-[8px]">
-          <Label className="text-[13px] font-semibold leading-[1.4]">
+          <Label className="text-body font-semibold leading-[1.4]">
             Amplitude
           </Label>
           <Input
@@ -295,11 +295,11 @@ export default function PowerShapeResourceEditor({
 
       {kind === "file_loaded" && (
         <div className="flex flex-col gap-[8px]">
-          <Label className="text-[13px] font-semibold leading-[1.4]">Path</Label>
+          <Label className="text-body font-semibold leading-[1.4]">Path</Label>
           <div className="flex items-center gap-[8px]">
             <div
               className={cn(
-                "flex-1 truncate text-[13px] text-muted-foreground border border-input rounded-md px-2 h-9 flex items-center",
+                "flex-1 truncate text-body text-muted-foreground border border-input rounded-md px-2 h-9 flex items-center",
                 pathError && "border-destructive",
               )}
               title={path || "(no file selected)"}
@@ -311,13 +311,13 @@ export default function PowerShapeResourceEditor({
             </Button>
           </div>
           {pathError && (
-            <p className="text-destructive text-xs leading-[1.4]">{pathError}</p>
+            <p className="text-destructive text-label leading-[1.4]">{pathError}</p>
           )}
         </div>
       )}
 
       {dimError && (
-        <p className="text-destructive text-xs leading-[1.4]">{dimError}</p>
+        <p className="text-destructive text-label leading-[1.4]">{dimError}</p>
       )}
 
       <div className="flex justify-end gap-[8px] mt-[8px]">

@@ -481,14 +481,14 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
             surface. First-pass used bg-canvas, which matched the canvas
             color exactly and rendered bodies invisible. */}
         <div className="bg-card p-2">
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1 text-label text-muted-foreground">
             <Icon className="w-3.5 h-3.5" />
             {component.label}
           </div>
-          <div className="font-semibold text-sm">{nodeData.instanceName}</div>
+          <div className="font-semibold text-body">{nodeData.instanceName}</div>
           {sourceLabel && (
             <div
-              className={`text-[11px] ${sourceLabel.muted ? "text-destructive/80" : "text-muted-foreground"}`}
+              className={`text-label ${sourceLabel.muted ? "text-destructive/80" : "text-muted-foreground"}`}
               data-testid="source-block-label"
             >
               {sourceLabel.text}

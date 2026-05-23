@@ -3,6 +3,7 @@ import {
   MenubarItem,
   MenubarMenu,
   MenubarSeparator,
+  MenubarShortcut,
   MenubarSub,
   MenubarSubContent,
   MenubarSubTrigger,
@@ -128,21 +129,17 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
 
   return (
     <MenubarMenu>
-      <MenubarTrigger className="h-full rounded-none px-3 py-0 text-xs font-normal hover:bg-accent hover:text-accent-foreground">
+      <MenubarTrigger className="h-full rounded-none px-3 py-0 font-normal hover:bg-accent hover:text-accent-foreground">
         File
       </MenubarTrigger>
       <MenubarContent align="start">
         <MenubarItem onClick={handleNew}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>New</span>
-            <span className="text-muted-foreground text-xs">Ctrl+N</span>
-          </span>
+          New
+          <MenubarShortcut>Ctrl+N</MenubarShortcut>
         </MenubarItem>
         <MenubarItem onClick={handleOpen}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Open...</span>
-            <span className="text-muted-foreground text-xs">Ctrl+O</span>
-          </span>
+          Open...
+          <MenubarShortcut>Ctrl+O</MenubarShortcut>
         </MenubarItem>
         <MenubarSub>
           <MenubarSubTrigger disabled={recentFiles.length === 0}>
@@ -165,16 +162,12 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
           </MenubarSubContent>
         </MenubarSub>
         <MenubarItem onClick={handleSave}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Save</span>
-            <span className="text-muted-foreground text-xs">Ctrl+S</span>
-          </span>
+          Save
+          <MenubarShortcut>Ctrl+S</MenubarShortcut>
         </MenubarItem>
         <MenubarItem onClick={handleSaveAs}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Save As...</span>
-            <span className="text-muted-foreground text-xs">Ctrl+Shift+S</span>
-          </span>
+          Save As...
+          <MenubarShortcut>Ctrl+Shift+S</MenubarShortcut>
         </MenubarItem>
         <MenubarSeparator />
         <MenubarItem onClick={handleLoadPreset}>
@@ -187,10 +180,7 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
           Save selection as preset…
         </MenubarItem>
         <MenubarSeparator />
-        <MenubarItem
-          onClick={handleExportToJulia}
-          className="text-xs font-normal"
-        >
+        <MenubarItem onClick={handleExportToJulia}>
           Export to Julia…
         </MenubarItem>
       </MenubarContent>

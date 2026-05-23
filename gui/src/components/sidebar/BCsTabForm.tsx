@@ -176,7 +176,7 @@ export default function BCsTabForm({ component, nodeId }: BCsTabFormProps) {
     // Defensive — SidebarPanel only renders the BCs tab when external_inputs
     // is non-empty, so this branch should be unreachable.
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="text-label text-muted-foreground">
         This component has no external inputs.
       </p>
     );
@@ -276,7 +276,7 @@ function GroupBlock({
 
   return (
     <>
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground leading-[1.3] mb-[8px]">
+      <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
         {group.baseField}
       </h3>
 
@@ -407,7 +407,7 @@ function FieldRow({
     // (whole-array fieldPath per D-13 — e.g. 'T_wall_left', 'q_left', 'h_left').
     // The wrapper carries no layout-affecting className changes (Pitfall 3).
     <div data-field-path={externalInput.name} className="flex flex-col gap-[8px]">
-      <Label className="text-[13px] font-semibold leading-[1.4]">
+      <Label className="text-body font-semibold leading-[1.4]">
         {displayLabel}
       </Label>
       <div className="flex items-center gap-[8px]">
@@ -430,8 +430,8 @@ function FieldRow({
             </SelectContent>
           </Select>
           {entry === undefined && (
-            <p className="text-xs text-destructive/80 mt-[6px]">
-              BC required — select a mode
+            <p className="text-label text-destructive/80 mt-[6px]">
+              BC required; select a mode
             </p>
           )}
         </div>
@@ -509,8 +509,8 @@ function ModeEditorBody({
       return <FunctionModeEditor entry={entry} onUpdate={onEntryUpdate} />;
     case "mark":
       return (
-        <p className="text-xs text-muted-foreground">
-          Marked in code — set {component.id}.{fieldName}[i] manually in
+        <p className="text-label text-muted-foreground">
+          Marked in code; set {component.id}.{fieldName}[i] manually in
           generated .jl.
         </p>
       );

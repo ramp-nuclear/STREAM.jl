@@ -192,7 +192,7 @@ export default function SavePresetModal({ open, onOpenChange }: Props) {
           <div className="flex flex-col gap-[8px]">
             <Label
               htmlFor="preset-name"
-              className="text-[13px] font-semibold leading-[1.4]"
+              className="text-body font-semibold leading-[1.4]"
             >
               Name
             </Label>
@@ -206,7 +206,7 @@ export default function SavePresetModal({ open, onOpenChange }: Props) {
               className={cn(nameError && "border-destructive ring-destructive/30")}
             />
             {nameError && name.length > 0 && (
-              <p className="text-destructive text-xs leading-[1.4]">{nameError}</p>
+              <p className="text-destructive text-label leading-[1.4]">{nameError}</p>
             )}
           </div>
 
@@ -214,7 +214,7 @@ export default function SavePresetModal({ open, onOpenChange }: Props) {
           <div className="flex flex-col gap-[8px]">
             <Label
               htmlFor="preset-desc"
-              className="text-[13px] font-semibold leading-[1.4]"
+              className="text-body font-semibold leading-[1.4]"
             >
               Description
             </Label>
@@ -229,7 +229,7 @@ export default function SavePresetModal({ open, onOpenChange }: Props) {
 
           {/* Store */}
           <div className="flex flex-col gap-[8px]">
-            <Label className="text-[13px] font-semibold leading-[1.4]">Store</Label>
+            <Label className="text-body font-semibold leading-[1.4]">Store</Label>
             <RadioGroup
               value={store}
               onValueChange={(v) => setStore(v as "library" | "project")}
@@ -253,13 +253,13 @@ export default function SavePresetModal({ open, onOpenChange }: Props) {
               </div>
             </RadioGroup>
             {!projectIsOpen && (
-              <p className="text-xs text-muted-foreground">Open a project first.</p>
+              <p className="text-label text-muted-foreground">Open a project first.</p>
             )}
           </div>
 
           {/* Auto-extend info (hidden when count is 0, per A-07) */}
           {autoExtendedCount > 0 && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-label text-muted-foreground">
               {autoExtendedCount} additional component(s) included via BC connections.
             </p>
           )}

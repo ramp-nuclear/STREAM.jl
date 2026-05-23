@@ -3,6 +3,7 @@ import {
   MenubarItem,
   MenubarMenu,
   MenubarSeparator,
+  MenubarShortcut,
   MenubarTrigger,
 } from "./ui/menubar";
 import useStore from "../store/useStore";
@@ -36,53 +37,38 @@ export default function EditMenu() {
 
   return (
     <MenubarMenu>
-      <MenubarTrigger className="h-full rounded-none px-3 py-0 text-xs font-normal hover:bg-accent hover:text-accent-foreground">
+      <MenubarTrigger className="h-full rounded-none px-3 py-0 font-normal hover:bg-accent hover:text-accent-foreground">
         Edit
       </MenubarTrigger>
       <MenubarContent align="start">
         <MenubarItem onClick={() => undo()}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Undo</span>
-            <span className="text-muted-foreground text-xs">Ctrl+Z</span>
-          </span>
+          Undo
+          <MenubarShortcut>Ctrl+Z</MenubarShortcut>
         </MenubarItem>
         <MenubarItem onClick={() => redo()}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Redo</span>
-            <span className="text-muted-foreground text-xs">Ctrl+Y</span>
-          </span>
+          Redo
+          <MenubarShortcut>Ctrl+Y</MenubarShortcut>
         </MenubarItem>
         <MenubarSeparator />
         <MenubarItem onClick={() => void cutSelection()}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Cut</span>
-            <span className="text-muted-foreground text-xs">Ctrl+X</span>
-          </span>
+          Cut
+          <MenubarShortcut>Ctrl+X</MenubarShortcut>
         </MenubarItem>
         <MenubarItem onClick={() => void copySelection()}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Copy</span>
-            <span className="text-muted-foreground text-xs">Ctrl+C</span>
-          </span>
+          Copy
+          <MenubarShortcut>Ctrl+C</MenubarShortcut>
         </MenubarItem>
         <MenubarItem onClick={() => void pasteFromClipboard()}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Paste</span>
-            <span className="text-muted-foreground text-xs">Ctrl+V</span>
-          </span>
+          Paste
+          <MenubarShortcut>Ctrl+V</MenubarShortcut>
         </MenubarItem>
         <MenubarItem onClick={() => duplicateSelection()}>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Duplicate</span>
-            <span className="text-muted-foreground text-xs">Ctrl+D</span>
-          </span>
+          Duplicate
+          <MenubarShortcut>Ctrl+D</MenubarShortcut>
         </MenubarItem>
         <MenubarSeparator />
         <MenubarItem disabled>
-          <span className="flex justify-between w-full items-center gap-4">
-            <span>Preferences...</span>
-            <span className="text-muted-foreground text-xs"></span>
-          </span>
+          Preferences...
         </MenubarItem>
       </MenubarContent>
     </MenubarMenu>

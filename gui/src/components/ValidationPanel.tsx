@@ -410,7 +410,7 @@ export default function ValidationPanel() {
         <div className="border-b border-border shrink-0">
           {/* Controls row */}
           <div className="flex items-center justify-between px-3 py-1.5 gap-3">
-            <div className="flex items-center gap-2 text-[11px] text-foreground/65 min-w-0">
+            <div className="flex items-center gap-2 text-label text-foreground/65 min-w-0">
               <span className="tabular-nums">
                 {count} {count === 1 ? "issue" : "issues"}
               </span>
@@ -463,7 +463,7 @@ export default function ValidationPanel() {
           {count > 0 && (
             <div className="relative">
               <div
-                className="grid items-baseline gap-3 px-3 pb-1 text-[10px] uppercase tracking-wide text-foreground/45 font-mono"
+                className="grid items-baseline gap-3 px-3 pb-1 text-micro uppercase tracking-wide text-foreground/45 font-mono"
                 style={{ gridTemplateColumns: currentGrid }}
                 aria-hidden
               >
@@ -486,7 +486,7 @@ export default function ValidationPanel() {
 
       {/* Empty state */}
       {count === 0 && (
-        <div className="flex-1 px-3 py-3 text-[13px] text-foreground/65 font-mono">
+        <div className="flex-1 px-3 py-3 text-body text-foreground/65 font-mono">
           {filterActive ? (
             <>
               No results match the active filter.{" "}
@@ -590,7 +590,7 @@ function FilterPill({ severity, count, active, onClick }: FilterPillProps) {
       // tap-target / hit-area. gap-1.5 (was gap-1) keeps the label and
       // count visually balanced at the larger text size.
       className={
-        "inline-flex items-center gap-1.5 font-mono text-[13px] leading-none " +
+        "inline-flex items-center gap-1.5 font-mono text-body leading-none " +
         "px-2.5 py-1.5 rounded-sm cursor-pointer select-none " +
         "transition-colors duration-[80ms] " +
         "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
@@ -651,7 +651,7 @@ function GroupBySettings({ groupBy, onChange }: GroupBySettingsProps) {
       </Tooltip>
       <PopoverContent align="end" className="w-auto p-3">
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] uppercase tracking-wide text-foreground/55 font-mono">
+          <span className="text-micro uppercase tracking-wide text-foreground/55 font-mono">
             Group by
           </span>
           <ToggleGroup
@@ -716,7 +716,7 @@ function GroupHeader({
       }
       style={{ gridTemplateColumns: gridTemplate }}
     >
-      <span className="font-mono text-[11px] leading-snug inline-flex items-center text-foreground/65">
+      <span className="font-mono text-label leading-snug inline-flex items-center text-foreground/65">
         {collapsed ? (
           <ChevronRight className="h-3 w-3" strokeWidth={1.5} />
         ) : (
@@ -724,14 +724,14 @@ function GroupHeader({
         )}
       </span>
       <span
-        className="font-mono text-[11px] leading-snug tabular-nums"
+        className="font-mono text-label leading-snug tabular-nums"
         style={{ color: SEVERITY_COLOR_VAR[severity] }}
         title={`${count} ${count === 1 ? "issue" : "issues"} (highest: ${severity})`}
       >
         {count} × {groupBy === "rule" ? "rule" : "node"}
       </span>
       <span
-        className="text-[13px] leading-snug text-foreground truncate font-mono"
+        className="text-body leading-snug text-foreground truncate font-mono"
         title={label}
       >
         {label}
@@ -796,19 +796,19 @@ function Row({ result, onClick, ref, indented, gridTemplate, selected }: RowProp
         // the prior 3-letter prefix) to text-[13px] matching the RULE +
         // MESSAGE cells. Drops the tight tracking — full-word "warning"
         // doesn't need the abbreviation-style condensation.
-        className="font-mono text-[13px] leading-snug"
+        className="font-mono text-body leading-snug"
         style={{ color: SEVERITY_COLOR_VAR[result.severity] }}
       >
         {SEVERITY_LABEL[result.severity]}
       </span>
       <span
-        className="font-mono text-[13px] leading-snug text-foreground/85 truncate"
+        className="font-mono text-body leading-snug text-foreground/85 truncate"
         title={result.validatorId}
       >
         {result.validatorId}
       </span>
       <span
-        className="text-[13px] leading-snug text-foreground truncate"
+        className="text-body leading-snug text-foreground truncate"
         title={result.description}
       >
         {result.description}
