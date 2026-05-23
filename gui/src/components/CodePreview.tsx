@@ -48,6 +48,7 @@ import {
   type CodeSection,
   type CodeSubBlock,
 } from "../lib/codeGenerator";
+import { scrollIntoViewSafe } from "../lib/scrollIntoViewSafe";
 
 // Lightweight Julia tokenizer for in-panel syntax tinting. Operates on one
 // line at a time; comment-from-# wins over everything else on that line
@@ -405,7 +406,7 @@ export default function CodePreview() {
       // Scroll first match into view.
       const el = subBlockRefs.current.get(first.id);
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        scrollIntoViewSafe(el, { behavior: "smooth", block: "center" });
       }
 
       // Flash all matches.

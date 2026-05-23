@@ -53,6 +53,7 @@ import AnchorsSection from "./AnchorsSection";
 import GeometryResourceEditor from "./GeometryResourceEditor";
 import PowerShapeResourceEditor from "./PowerShapeResourceEditor";
 import { useValidationFieldHighlight } from "@/hooks/useValidationFieldHighlight";
+import { scrollIntoViewSafe } from "@/lib/scrollIntoViewSafe";
 
 interface SidebarPanelProps {
   width: number;
@@ -115,7 +116,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
           `[data-field-path="${CSS.escape(fieldPath)}"]`,
         );
         if (!el) return;
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        scrollIntoViewSafe(el, { behavior: "smooth", block: "center" });
         // Focus the first focusable input/select inside the field wrapper.
         const focusable = el.querySelector<HTMLElement>(
           "input, select, button, textarea, [tabindex]",
