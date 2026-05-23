@@ -5,21 +5,25 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
-// Phase 72 — primitive-layer recommit.
+// Phase 72 — primitive-layer recommit, relocked post-Preferences when the
+// user banned the prior visual outright (see
+// `feedback_no_grey_modal_surface_or_scrim`).
 //
 // Surface treatment:
-//   - bg-background → bg-popover (consumes the dedicated surface token;
-//     visually one step lighter than --panel, one darker than --canvas)
-//   - rounded-lg → rounded-md (compact surface radius)
-//   - shadow-lg → shadow-[var(--shadow-dialog)] (the ONE structural shadow
-//     in the system, tuned for "lift, not glow")
+//   - bg-popover → bg-[var(--dialog-surface)] (own tone, OFF the
+//     chrome/panel/canvas trio — established by CommandPalette, promoted to
+//     the default when the dim grey scrim was banned)
+//   - rounded-md, border-[var(--dialog-border)] (own border tone matching
+//     the lower-lightness surface)
+//   - shadow-[var(--shadow-dialog)] now carries atmospheric 16/40 px values
+//     (was 8/24 px); with no scrim, the shadow takes over the lift work
 //
 // Scrim:
-//   - bg-black/50 → bg-foreground/40 (token-driven, tints with the theme;
-//     #000 alpha would have violated OKLCH-only doctrine)
-//   - No backdrop-blur (resolves AutoRecoverRestoreModal P1 finding even
-//     though that surface lives outside ui/; the dialog primitive now
-//     refuses to compose with backdrop-blur by not modeling it)
+//   - bg-foreground/40 → bg-transparent (HARD BAN on the prior dim grey).
+//     The Dialog floats above its content via tone + shadow + border, never
+//     by dimming the canvas behind it. Consumers can opt INTO a scrim by
+//     passing `overlayClassName`, but the default is transparent.
+//   - No backdrop-blur (same rule).
 //
 // Motion:
 //   - 100 ms fade-in / 80 ms fade-out (was 200 ms duration with zoom-in-95
@@ -62,7 +66,11 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-foreground/40 motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100",
+        // Transparent by default (hard ban on the dim grey scrim per
+        // feedback_no_grey_modal_surface_or_scrim). The overlay still mounts
+        // so click-outside-to-close works; it just paints nothing. Consumers
+        // can override via DialogContent's `overlayClassName` prop.
+        "fixed inset-0 z-50 bg-transparent motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100",
         className
       )}
       {...props}
@@ -78,9 +86,9 @@ function DialogContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
-  /** Override the default `bg-foreground/40` scrim. Used by surfaces that
-   *  shouldn't dim the whole canvas — e.g. CommandPalette, which wants a
-   *  near-transparent overlay (VSCode/Cursor pattern). */
+  /** Add a custom overlay class (e.g. a faint tint) on top of the default
+   *  transparent scrim. Default behavior — no dim — is what 99% of dialogs
+   *  want (feedback_no_grey_modal_surface_or_scrim). */
   overlayClassName?: string
 }) {
   return (
@@ -89,7 +97,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-border bg-popover p-6 shadow-[var(--shadow-dialog)] outline-none motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100 sm:max-w-lg",
+          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-[var(--dialog-border)] bg-[var(--dialog-surface)] p-6 shadow-[var(--shadow-dialog)] outline-none motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100 sm:max-w-lg",
           className
         )}
         {...props}

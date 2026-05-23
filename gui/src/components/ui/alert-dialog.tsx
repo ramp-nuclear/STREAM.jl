@@ -42,7 +42,10 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-foreground/40 motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100",
+        // Phase 72 post-Preferences — scrim banned project-wide
+        // (feedback_no_grey_modal_surface_or_scrim). AlertDialog floats above
+        // its trigger via shadow + tonal surface, not by dimming the canvas.
+        "fixed inset-0 z-50 bg-transparent motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100",
         className
       )}
       {...props}
@@ -64,7 +67,10 @@ function AlertDialogContent({
         data-slot="alert-dialog-content"
         data-size={size}
         className={cn(
-          "group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-border bg-popover p-6 shadow-[var(--shadow-dialog)] outline-none data-[size=sm]:max-w-xs motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100 data-[size=default]:sm:max-w-lg",
+          // Phase 72 post-Preferences — body uses --dialog-surface +
+          // --dialog-border (was bg-popover + border-border). Matches the
+          // CommandPalette lineage now locked across all modal primitives.
+          "group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-[var(--dialog-border)] bg-[var(--dialog-surface)] p-6 shadow-[var(--shadow-dialog)] outline-none data-[size=sm]:max-w-xs motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100 data-[size=default]:sm:max-w-lg",
           className
         )}
         {...props}

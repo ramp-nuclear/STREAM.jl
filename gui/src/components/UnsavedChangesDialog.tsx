@@ -17,15 +17,15 @@ export default function UnsavedChangesDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop — bg-foreground/40 matches the locked Dialog scrim (no blur,
-          no glassmorphism per DESIGN.md §4). */}
+      {/* Backdrop — transparent. Click-outside still cancels; no dim grey
+          filter on the canvas (feedback_no_grey_modal_surface_or_scrim). */}
       <div
-        className="absolute inset-0 bg-foreground/40"
+        className="absolute inset-0 bg-transparent"
         onClick={onCancel}
       />
-      {/* Dialog — bg-popover + --shadow-dialog match the locked Dialog vocab
-          (DESIGN.md §4 single-tier structural shadow + popover tonal step). */}
-      <div className="relative z-10 bg-popover border border-border rounded-md shadow-[var(--shadow-dialog)] p-6 w-80 flex flex-col gap-4">
+      {/* Dialog — --dialog-surface + --dialog-border + atmospheric
+          --shadow-dialog match the locked Dialog vocab post-Preferences. */}
+      <div className="relative z-10 bg-[var(--dialog-surface)] border border-[var(--dialog-border)] rounded-md shadow-[var(--shadow-dialog)] p-6 w-80 flex flex-col gap-4">
         <div>
           <h2 className="text-title font-semibold mb-1">Save changes?</h2>
           <p className="text-body text-foreground/65">

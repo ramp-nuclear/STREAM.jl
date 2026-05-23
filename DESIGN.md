@@ -181,13 +181,18 @@ for ports) cover the remaining edge cases.
 | `--ring`           | `oklch(0.65 0.10 240)`       | `oklch(0.55 0.14 240)`       | **locked** — Hydraulic-hue tint at low chroma; focus reads as "selected" with minor identity (Linear/Cursor lineage) |
 | `--border`         | `oklch(0.30 0.012 254)`      | `oklch(0.88 0.005 254)`      | **locked** — solid OKLCH (was alpha-on-white; the alpha trickery violated OKLCH-only doctrine) |
 | `--border-hover`   | `oklch(0.38 0.012 254)`      | `oklch(0.80 0.005 254)`      | **locked** — +Δ0.08 lightness step; Input + Select hover lift here |
-| `--shadow-dialog`  | `0 8px 24px -8px oklch(0.05 0.012 254 / 0.50), 0 2px 6px -2px oklch(0.05 0.012 254 / 0.30)` | `0 8px 24px -8px oklch(0.20 0.012 254 / 0.20), 0 2px 6px -2px oklch(0.20 0.012 254 / 0.10)` | **locked** — the ONE structural shadow in the system (Dialog/AlertDialog/Sheet only) |
+| `--shadow-dialog`  | `0 16px 40px -12px oklch(0.05 0 0 / 0.55), 0 4px 12px -4px oklch(0.05 0 0 / 0.40)` | `0 16px 40px -12px oklch(0.05 0 0 / 0.18), 0 4px 12px -4px oklch(0.05 0 0 / 0.12)` | **locked** — atmospheric lift for modals (Dialog/AlertDialog/Sheet). Relocked post-Preferences when the scrim was banned; shadow now carries the lift work alone. |
+| `--dialog-surface` | `oklch(0.13 0.012 254)`      | `oklch(0.93 0.012 254)`      | **locked** — modal body fill. Distinct tone OFF the chrome/panel/canvas trio so dialogs read as a tool overlay (CommandPalette lineage) rather than a lifted panel (popover lineage). |
+| `--dialog-border`  | `oklch(0.24 0.012 254)`      | `oklch(0.86 0.012 254)`      | **locked** — pairs with `--dialog-surface`; one step lighter in dark / darker in light so the modal edge reads clean against its own body. |
 | `--color-warning`  | `oklch(0.78 0.15 75)`        | `oklch(0.74 0.16 75)`        | **locked** |
 | `--color-info`     | `oklch(0.72 0.16 240)`       | `oklch(0.62 0.18 240)`       | **locked** |
 
 `--color-warning` and `--color-info` were introduced earlier to replace
 raw `text-yellow-500` / `text-blue-500` in ValidationPanel. `--border-hover`
 and `--shadow-dialog` were introduced in the primitive-layer shape pass.
+`--dialog-surface` / `--dialog-border` and the relocked atmospheric
+`--shadow-dialog` landed when the prior dim grey scrim + popover body
+were banned project-wide (see Modal Lock below).
 
 ### Code editor lane carve-out (locked — BCEdge/CodePreview, 2026-05-23)
 
@@ -445,24 +450,66 @@ itself adds a faint grid as additional structural texture.
 steps in the depth hierarchy first; shadows are reserved for state changes
 (focus, modal lift) — never for ambient atmosphere.
 
-### Shadow vocabulary (locked — primitive-layer shape, 2026-05-22)
+### Shadow vocabulary (relocked — Preferences feedback, 2026-05-23)
 
 **Single tier.** `--shadow-dialog` is the only structural shadow in the
-system. Applied to Dialog, AlertDialog, and Sheet — the surfaces where the
-modal scrim flattens the tonal hierarchy and a crisp lift cue is needed to
-restore "this floats above the canvas." Tuned for "lift, not glow" — low
-alpha, low blur, double-stop with a tight near-shadow.
+system. Applied to Dialog, AlertDialog, and Sheet. **Atmospheric, not
+hairline** — 16/40 px blur (was 8/24 px before the feedback). With the
+modal scrim banned, the shadow carries the entire lift cue alone, so it
+earns the heavier values.
 
 **Zero shadow** on Popover, DropdownMenu, ContextMenu, Menubar, Tooltip,
 Select dropdown, HoverCard, Sonner toast, Input, Textarea, Checkbox,
 RadioGroup, Button, Toggle, ToggleGroup, Badge, Card, Tabs. These float on
-the tonal step alone — `bg-popover` is one tone lighter than `--panel` and
+the tonal step alone — `--popover` is one tone lighter than `--panel` and
 darker than `--canvas`, which provides visible contrast on its own.
 
 The inherited shadcn defaults (`shadow-xs`, `shadow-md`, `shadow-lg`,
-`shadow-xl`) are no longer applied by any primitive. Consumer surfaces that
-still reference them will get migrated during `/impeccable polish` at phase
-end.
+`shadow-xl`) are no longer applied by any primitive.
+
+### Modal lock (locked — Preferences feedback, 2026-05-23)
+
+Triggered by `feedback_no_grey_modal_surface_or_scrim`. The prior locked
+Dialog visual — `bg-popover` body + `bg-foreground/40` scrim — was
+rejected outright as ugly. Both rules below are project-wide, not just
+the Preferences surface.
+
+**The No-Modal-Scrim Rule.** Modal dialogs MUST NOT dim the content
+behind them. `DialogOverlay` and `AlertDialogOverlay` default to
+`bg-transparent`; the canvas / chrome / panels stay fully visible while
+the modal is open. The modal stands out via tone + shadow + border, not
+by suppressing everything else. Consumers can opt INTO a scrim per-
+instance via `overlayClassName` (no current consumer does, and adding
+one needs a real reason).
+
+**The Dialog-Surface-Is-Its-Own-Tone Rule.** Modal body uses
+`--dialog-surface` + `--dialog-border` (introduced 2026-05-23). The
+tone sits OFF the chrome → panel → canvas trio — light mode 0.93
+(Δ −0.02 below chrome 0.95); dark mode 0.13 (Δ −0.03 below chrome 0.16).
+A modal reads as a tool overlay, not a lifted panel. (Lifted panels are
+`bg-popover` territory — that's `Popover`, `DropdownMenu`, `Menubar`,
+`Select` dropdown, etc., which keep using `--popover` unchanged.)
+
+**The Shadow-Does-The-Lift Rule.** With the scrim gone, the
+atmospheric `--shadow-dialog` (16/40 px) does the entire "this floats
+above the canvas" job. The combination of (a) tone distinct from
+chrome, (b) atmospheric shadow, (c) visible border at a hue-matched
+tone is what reads as elevation. No scrim, no blur, no glassmorphism.
+
+**Where it applies.** Dialog + AlertDialog primitives default to this
+treatment. The two hand-rolled modal surfaces (UnsavedChangesDialog,
+AutoRecoverRestoreModal) consume the same `--dialog-surface` /
+`--dialog-border` / `--shadow-dialog` tokens inline. CommandPalette
+established this lineage earlier (its bespoke overrides got promoted
+to the primitive default when the doctrine landed); its per-instance
+overrides reduce to the position + width + zero-padding overrides
+specific to a top-anchored palette.
+
+**What's NOT affected.** `bg-popover` keeps its meaning everywhere it
+already exists — Popover, DropdownMenu, ContextMenu, Menubar, Sonner
+toast, Select dropdown, Tooltip background, plus the hover-tint /
+selected-tint uses in ValidationPanel + ValidationStatusBar. Those are
+lifted chrome surfaces, not modals.
 
 ## 5. Components
 
@@ -850,7 +897,7 @@ custom event; no keybind by design (low-frequency reference doesn't earn a
 binding, mirroring the menu-only `About` precedent).
 
 **Surface:** Dialog at `!max-w-[920px] w-[92vw]`. Body uses the standard
-DialogContent surface (`bg-popover` + `--shadow-dialog`). Two tiles arranged
+DialogContent surface (now `--dialog-surface` + atmospheric `--shadow-dialog` per the Modal Lock above; AnatomyDialog inherits the new default automatically). Two tiles arranged
 horizontally with `divide-x divide-border/60`; legend lists sit below each
 tile; a single-line `not all states co-occur on a real node` footnote runs
 across the dialog bottom.
@@ -1021,7 +1068,7 @@ open the dialog.
 
 | Property | Value |
 |---|---|
-| Frame | `bg-popover` + `rounded-md` + `border-border` + `--shadow-dialog` (locked Dialog vocab) |
+| Frame | Inherits the locked Dialog vocab (`--dialog-surface` + `--dialog-border` + atmospheric `--shadow-dialog` + transparent overlay). Top-anchored (`top-[80px] translate-y-0`) to match the CommandPalette + shortcuts-mode keymap lineage — the surfaces the user explicitly asked Preferences to "look like". |
 | Header | `DialogTitle` "Preferences" at `text-title font-semibold`; no description string (self-explanatory); `DialogClose` X via the primitive default |
 | Left rail | `w-[180px] shrink-0 border-r border-border bg-panel` — one tonal step darker than the popover body so it recedes |
 | Rail row | `<button>` `h-9 px-3 mx-1 my-px rounded-sm text-body font-medium`; rest `text-foreground/65 hover:bg-card/60`; selected `bg-card text-foreground` + 2 px `--ring` left-edge stripe (mirrors ValidationPanel selected-row idiom — single project-wide selected-row vocabulary) |

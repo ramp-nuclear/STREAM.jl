@@ -579,10 +579,17 @@ export default function PreferencesDialog({ open, onOpenChange }: PreferencesDia
       }}
     >
       <DialogContent
+        // Phase 72 post-Preferences-feedback — Preferences inherits the
+        // CommandPalette visual lineage: transparent scrim, --dialog-surface
+        // body, atmospheric --shadow-dialog (all now Dialog-primitive
+        // defaults). Position is top-anchored (top-[80px]) to match the
+        // CommandPalette and shortcuts-mode keymap, both of which the user
+        // asked Preferences to look like.
+        //
         // Fixed 720 × 560 — desktop-only per scope. Override the primitive's
         // grid + gap so the two-pane layout sits flush, and zero the inner
         // padding so the rail's border-r reaches the dialog edges.
-        className="!max-w-[720px] w-[720px] h-[560px] !p-0 !gap-0 flex flex-col overflow-hidden"
+        className="top-[80px] translate-y-0 !max-w-[720px] w-[720px] h-[560px] !p-0 !gap-0 flex flex-col overflow-hidden"
       >
         <DialogHeader className="px-6 py-4 border-b border-border">
           <DialogTitle className="text-title font-semibold">Preferences</DialogTitle>
