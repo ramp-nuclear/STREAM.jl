@@ -46,12 +46,7 @@ capture the final tokens into a proper frontmatter + sidecar.
 | Help system (Tooltip discipline + cmdk shortcut mode + AnatomyDialog visual legend) | ✅ | 1 cluster commit — see Decision log | §5 tooltip consumption discipline + shortcut catalog SSOT + AnatomyDialog (real-component mirror) + HelpMenu rebuilt |
 | BCEdge + HydraulicEdge + CodePreview tokenization (canvas↔code link state retoken to --foreground; 5 --syntax-* tokens; remove GitHub-dark borrow + border-l-2 + section-header slab) | ✅ | 1 cluster commit — see Decision log | §2 --syntax-* tokens + Code editor lane carve-out + Code-link active state (uses --foreground, no new hue); §5 CodePreview subsection locked |
 | `/impeccable harden gui/src/` (prefers-reduced-motion safety net + scrollIntoViewSafe + ValidationPanel Row div→button + 3 token contrast fixes) | ✅ | 1 commit — see Decision log | (no DESIGN.md doctrine change — closes Audit P0-3 / Critique Sam persona findings) |
-
-### Queued (Session 4+)
-
-| Surface | Status | Notes |
-|---|---|---|
-| `/impeccable clarify gui/src/` (copy pass: em dashes, consumer-SaaS framing in PresetsPanel, empty-state copy unification) | ⬜ | Audit P2-3 · Critique minor observations |
+| `/impeccable clarify gui/src/` (em-dash purge + engineering-voice empty states across PresetsPanel / SidebarPanel / CodePreview / ResourcesTreePanel / AboutDialog / BottomPanel / CommandPalette) | ✅ | 1 commit — see Decision log | (no DESIGN.md doctrine change — closes Audit P2-3 + feedback_engineering_voice_copy) |
 
 ### Queued (Session 4 — phase close)
 
@@ -695,6 +690,97 @@ it would cascade across every surface.
 `codeGenerator.smoke.test.ts` fixture-missing baseline, unchanged).
 tsc baseline: 10 errors, unchanged.
 
+### Clarify pass — em-dash purge + engineering-voice empty states (locked 2026-05-23)
+
+Cross-cutting copy pass that closes Audit P2-3 + the locked
+engineering-voice doctrine (`feedback_engineering_voice_copy`). Single
+commit, mechanical mostly, with a few opinion calls on what "engineering
+voice" actually means at the empty-state level.
+
+**Single commit:** `clarify(72): em-dash purge + engineering-voice empty states`
+
+**Em-dash purge** across every user-visible string (locked DESIGN.md +
+PRODUCT.md "no em-dashes" rule):
+
+| Site | Before | After |
+|---|---|---|
+| `useStore.ts` SENTINEL_POWER_SHAPE_NAME | `"(leave unset — set in code)"` | `"(leave unset; set in code)"` |
+| `AboutDialog.tsx` version placeholder + catch | `"—"` (×2) | `"unknown"` (×2) |
+| `BottomPanel.tsx` Export-button tooltip | `"...errors — code won't compile"` | `"...errors (code won't compile)"` |
+| `lib/exportCode.ts` toast | (same as above) | parens |
+| `CommandPalette.tsx` off-layer chip title + aria-label | `"X layer off — will enable on select"` | `"X layer off; will enable on select"` |
+| `PresetsPanel.tsx` console.error | `"...(path may be outside FS scope — see CR-01)"` | comma |
+| `CodePreview.tsx` empty body | `"(empty — add components on the canvas to see generated Julia code)"` | `"No code yet."` (also drops hand-holding) |
+| `ResourcesTreePanel.tsx` group placeholder (×3 groups) | `"(none yet — click +)"` | `"(none)"` |
+
+The sentinel-name change cascaded through 28 test files (mechanical
+sed). Sentinel string also lives hardcoded at
+`ResourceReferencePicker.tsx:165` (duplicated rather than imported from
+the SENTINEL_POWER_SHAPE_NAME constant); the sed swept it consistently —
+that duplication is a separate code-smell, out of scope for clarify.
+
+**Engineering-voice empty-state rewrites:**
+
+- **PresetsPanel** — three rewrites:
+  - "No project open" body: `"Open a project to use the Project store."`
+    → `"No project open."` (single declarative, drops the "store" jargon
+    and the imperative "open a project").
+  - "No project presets" body: dropped the instruction line
+    `"Multi-select components and right-click to save."` Kept
+    `"No project presets."` (dropped "yet" — emotive suffix).
+  - "No library presets" body: dropped the canonical hand-holding line
+    `"Save a selection to add your first template."` Kept
+    `"No library presets."`
+- **SidebarPanel** — dropped the per-tab variantCopy second sentence
+  (`"Select a resource to edit it."` /
+  `"Select a component to view its properties."`). The right panel IS
+  the property panel by definition — restating that in the empty state
+  is consumer-SaaS hand-holding. `"No selection"` heading alone reads as
+  status, not as instructions. Removed the now-unused
+  `activeLeftTab` selector. `SidebarRouter.test.tsx` updated: two
+  variantCopy assertions rewritten to assert on `"No selection"`.
+- **CodePreview** — `"No code yet."` matches the ValidationPanel
+  `"No issues."` idiom: declarative, no italic, no parenthesis. The
+  prior italic-parenthetical-with-instruction was both italic
+  (decoration) AND restating-the-obvious (the canvas is the only place
+  to add components).
+- **ResourcesTreePanel** — `"(none)"` matches the established
+  "parenthetical-status" pattern from other compact lists. The prior
+  `"(none yet — click +)"` did three things at once: status + emotive
+  suffix + restated-visible-affordance.
+
+**Surfaces NOT changed** (deliberate):
+
+- **ValidationPanel** `"No issues."` — already canonical.
+- **CommandPalette** `"No bindings."` / `"No matches."` — already
+  canonical.
+- **ResourceReferencePicker** `"No geometries. Use + New or the
+  Resources tab."` — wayfinding pointer (the picker IS the discovery
+  surface for + New + a separate tab); not hand-holding.
+- **BottomPanel** `"No components"` tooltip — single declarative.
+
+**The Empty-State-Reads-As-Status Rule.** Engineering-voice empty
+states answer "what's the state?" with a noun phrase or single
+sentence. They do NOT answer "what should I do?" — that's hand-holding
+in surfaces where the affordance is visible (canvas, "+ New" buttons,
+context menus). The doctrine carve-out for ResourceReferencePicker is
+that pickers ARE discovery surfaces, so wayfinding to adjacent
+affordances (the Resources tab) is in-bounds.
+
+**Audit deltas this session resolves:**
+- **Audit P2-3** (em dashes in user-visible strings) — every flagged
+  site rewritten, plus three additional sites found during the sweep
+  (BottomPanel/exportCode tooltip, CommandPalette off-layer chip,
+  CodePreview empty state, ResourcesTreePanel group placeholders).
+- **`feedback_engineering_voice_copy`** (specifically the
+  `"Save a selection to add your first template."` line called out as
+  the canonical hand-holding pattern to remove) — closed.
+- **Critique minor observations** on PresetsPanel + SidebarPanel
+  consumer-SaaS framing — closed.
+
+**Tests:** 1046/1050 (4 pre-existing fixture failures, unchanged).
+tsc baseline: 10 errors, unchanged.
+
 ### Lessons (worth re-reading at the start of the next session)
 
 1. **The validation-flash bug took 3 sub-fixes** (offset → border-radius →
@@ -950,15 +1036,19 @@ Open a new Claude Code session, then say something like:
 The new session will load doctrine + queue + locked values + recent
 lessons in 1–2 minutes and resume cleanly.
 
-**Next surface per queue:** `/impeccable clarify gui/src/` — copy pass:
-em-dash purge (Audit P2-3 — useStore.ts:88,2673; PresetsPanel.tsx:111;
-AboutDialog.tsx:28,33), PresetsPanel consumer-voice rewrite ("Save a
-selection to add your first template." is the canonical
-hand-holding line per `feedback_engineering_voice_copy`), and an
-empty-state-copy unification sweep. After that the queue runs
-`/impeccable polish gui/src/` (final ad-hoc-value migration onto the
-token scale) before re-running audit / critique and writing
-SUMMARY.md.
+**Next surface per queue:** `/impeccable polish gui/src/` — final
+ad-hoc-value migration sweep. Targets: remaining `text-[Npx]`
+arbitrary-px sizes that should consume the `--text-{micro,label,body,
+title,display}` token scale (Audit P2-6); remaining `text-xs`/`text-sm`
+Tailwind defaults that should align; the `FunctionSelect.tsx:125`
+`border-l-2` colored side-stripe (Audit P2-4 — the only known absolute-
+ban survivor); the `text-xs font-semibold uppercase tracking-wide`
+section-header pattern (PresetsPanel + sidebar) that should retoken to
+the `--text-micro` mono-uppercase ValidationPanel column-label idiom.
+After polish: re-run `/impeccable audit gui/src/` (target ≥17/20) and
+`/impeccable critique gui/src/` (target ≥32/40), then
+`/impeccable document` in scan mode (DESIGN.md seed → real spec) and
+write Phase 72 SUMMARY.md.
 
 **Related memories** (loaded automatically — don't need to re-read):
 
