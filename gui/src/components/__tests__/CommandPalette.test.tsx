@@ -112,7 +112,7 @@ function seedStore(overrides: Record<string, unknown> = {}): void {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — set in code)",
+          name: "(leave unset; set in code)",
           kind: "unset",
           params: {},
         },
@@ -186,7 +186,7 @@ describe("CommandPalette — browse vs flat", () => {
         powerShapes: {
           [SENTINEL_UNSET_POWER_SHAPE]: {
             uuid: SENTINEL_UNSET_POWER_SHAPE,
-            name: "(leave unset — set in code)",
+            name: "(leave unset; set in code)",
             kind: "unset",
             params: {},
           },
@@ -214,7 +214,7 @@ describe("CommandPalette — browse vs flat", () => {
         powerShapes: {
           [SENTINEL_UNSET_POWER_SHAPE]: {
             uuid: SENTINEL_UNSET_POWER_SHAPE,
-            name: "(leave unset — set in code)",
+            name: "(leave unset; set in code)",
             kind: "unset",
             params: {},
           },
@@ -383,7 +383,7 @@ describe("CommandPalette — resource on-select dispatch (D-06)", () => {
         powerShapes: {
           [SENTINEL_UNSET_POWER_SHAPE]: {
             uuid: SENTINEL_UNSET_POWER_SHAPE,
-            name: "(leave unset — set in code)",
+            name: "(leave unset; set in code)",
             kind: "unset",
             params: {},
           },

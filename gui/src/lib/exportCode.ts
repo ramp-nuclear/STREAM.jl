@@ -73,7 +73,7 @@ export async function exportCode(opts: ExportCodeOptions): Promise<boolean> {
   if (structural.length > 0) {
     const n = structural.length;
     toast.error(
-      `${n} structural ${n === 1 ? "error" : "errors"} — code won't compile`,
+      `${n} structural ${n === 1 ? "error" : "errors"} (code won't compile)`,
       { duration: 2500 },
     );
     useStore.setState({

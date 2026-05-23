@@ -139,7 +139,7 @@ function resetStore(extra: Record<string, unknown> = {}) {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — set in code)",
+          name: "(leave unset; set in code)",
           kind: "unset",
           params: {},
         },

@@ -20,17 +20,18 @@ interface Props {
  *
  * - Controlled via `open` / `onOpenChange` (same shape as ValidationDialog).
  * - Fetches `getVersion()` asynchronously (Pitfall 8: getVersion() is a
- *   Promise — render `{getVersion()}` directly would print
- *   "[object Promise]"). Initial placeholder is an em-dash.
+ *   Promise; rendering `{getVersion()}` directly would print
+ *   "[object Promise]"). Phase 72 clarify — placeholder switched from
+ *   em-dash to "unknown" (engineering-voice; em-dash is a locked Don't).
  * - GitHub URL is hardcoded inline per D-20.
  */
 export default function AboutDialog({ open, onOpenChange }: Props) {
-  const [version, setVersion] = useState<string>("—");
+  const [version, setVersion] = useState<string>("unknown");
 
   useEffect(() => {
     getVersion()
       .then(setVersion)
-      .catch(() => setVersion("—"));
+      .catch(() => setVersion("unknown"));
   }, []);
 
   return (

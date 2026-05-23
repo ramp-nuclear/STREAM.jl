@@ -34,7 +34,7 @@ function resetStore() {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — set in code)",
+          name: "(leave unset; set in code)",
           kind: "unset",
           params: {},
         },
@@ -110,7 +110,7 @@ describe("ResourceReferencePicker", () => {
     });
   });
 
-  describe("D-26: Power Shape sentinel — `(leave unset — set in code)` is the fixed top entry", () => {
+  describe("D-26: Power Shape sentinel — `(leave unset; set in code)` is the fixed top entry", () => {
     it("D-26: Power Shape picker dropdown includes the sentinel item", async () => {
       renderPicker({ resourceKind: "powerShape" });
       // Open the Select menu by clicking the trigger.
@@ -120,7 +120,7 @@ describe("ResourceReferencePicker", () => {
       // The sentinel option renders the verbatim copy "(leave unset — set
       // in code)" — it must be present (62-15 rewrite per VERIFICATION Gap #4;
       // supersedes the original D-26 "(leave unset — fill in code)" form).
-      expect(screen.getByText("(leave unset — set in code)")).toBeTruthy();
+      expect(screen.getByText("(leave unset; set in code)")).toBeTruthy();
     });
   });
 

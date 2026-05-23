@@ -88,7 +88,7 @@ function resetStore() {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — set in code)",
+          name: "(leave unset; set in code)",
           kind: "unset",
           params: {},
         },
@@ -192,7 +192,7 @@ describe("Missing power-shape dialog copy (62-15 — VERIFICATION Gap #4)", () =
         powerShapes: {
           [SENTINEL_UNSET_POWER_SHAPE]: {
             uuid: SENTINEL_UNSET_POWER_SHAPE,
-            name: "(leave unset — set in code)",
+            name: "(leave unset; set in code)",
             kind: "unset",
             params: {},
           },

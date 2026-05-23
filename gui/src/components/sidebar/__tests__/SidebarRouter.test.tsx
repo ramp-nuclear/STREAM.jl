@@ -40,7 +40,7 @@ function resetStore() {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — set in code)",
+          name: "(leave unset; set in code)",
           kind: "unset",
           params: {},
         },
@@ -167,24 +167,22 @@ describe("SidebarPanel — D-05 body branching by selection kind", () => {
     expect(screen.getByText(/Multi-fluid abstraction is v0\.6\+/i)).toBeTruthy();
   });
 
-  it("D-05: no-selection body — Resources tab active shows variant copy", () => {
+  // Phase 72 clarify — the per-tab variant copy ("Select a resource to edit
+  // it." / "Select a component to view its properties.") was dropped per
+  // PRODUCT.md engineering-voice doctrine; the right panel IS the property
+  // panel by definition, restating that in the empty state is consumer-SaaS
+  // hand-holding. Single "No selection" heading shows regardless of which
+  // left tab is active.
+  it("D-05: no-selection body shows 'No selection' on Resources tab", () => {
     useStore.getState().setActiveLeftTab("Resources");
     renderPanel();
-    // 62-15 (VERIFICATION Gap #4) — was "Select a resource on the left to edit it."
-    expect(
-      screen.getByText("Select a resource to edit it."),
-    ).toBeTruthy();
+    expect(screen.getByText("No selection")).toBeTruthy();
   });
 
-  it("D-05: no-selection body — Components tab active shows standard copy", () => {
+  it("D-05: no-selection body shows 'No selection' on Components tab", () => {
     useStore.getState().setActiveLeftTab("Components");
     renderPanel();
-    // 62-15 (VERIFICATION Gap #4) — was "Select a component on the canvas to view its properties."
-    expect(
-      screen.getByText(
-        "Select a component to view its properties.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("No selection")).toBeTruthy();
   });
 
   it("D-05 / INV-17: mutual exclusivity — switching from component to resource swaps the body cleanly", () => {

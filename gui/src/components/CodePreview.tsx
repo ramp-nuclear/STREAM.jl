@@ -486,8 +486,13 @@ export default function CodePreview() {
         onClick={handlePanelBodyClick}
       >
         {sections.length === 0 ? (
-          <div className="text-muted-foreground italic text-xs">
-            (empty — add components on the canvas to see generated Julia code)
+          // Phase 72 clarify — was "(empty — add components on the canvas
+          // to see generated Julia code)". Em-dash banned; instruction copy
+          // restates the obvious (the canvas IS the only place to add
+          // components). Match ValidationPanel "No issues." idiom: single
+          // declarative sentence, no italic, no parenthesis cruft.
+          <div className="text-muted-foreground text-xs">
+            No code yet.
           </div>
         ) : (
           sections.map((section) => (

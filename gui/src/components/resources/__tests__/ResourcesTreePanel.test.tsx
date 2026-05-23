@@ -52,7 +52,7 @@ beforeEach(() => {
       powerShapes: {
         [SENTINEL_UNSET_POWER_SHAPE]: {
           uuid: SENTINEL_UNSET_POWER_SHAPE,
-          name: "(leave unset — set in code)",
+          name: "(leave unset; set in code)",
           kind: "unset",
           params: {},
         },
@@ -123,10 +123,10 @@ describe("ResourcesTreePanel — Fluids placeholder row", () => {
 describe("ResourcesTreePanel — D-26 sentinel filter", () => {
   it("D-26: the unset PowerShape sentinel is NOT rendered as a row in Power Shapes", () => {
     renderTree();
-    // The sentinel's name is "(leave unset — set in code)" — it must not
+    // The sentinel's name is "(leave unset; set in code)" — it must not
     // appear in the tree body (it only lives in the field-level picker).
     // (62-15 rewrite per VERIFICATION Gap #4.)
-    expect(screen.queryByText("(leave unset — set in code)")).toBeNull();
+    expect(screen.queryByText("(leave unset; set in code)")).toBeNull();
     // No <li> in the tree carries the sentinel UUID.
     const sentinelLi = document.querySelector(
       `li[data-resource-uuid="${SENTINEL_UNSET_POWER_SHAPE}"]`,
@@ -134,11 +134,12 @@ describe("ResourcesTreePanel — D-26 sentinel filter", () => {
     expect(sentinelLi).toBeNull();
   });
 
-  it("D-26: empty Power Shapes group (post sentinel filter) renders the (none yet — click +) placeholder", () => {
+  it("D-26: empty Power Shapes group (post sentinel filter) renders the (none) placeholder", () => {
     renderTree();
     // Initial state has only the sentinel; after filtering, the group is
     // empty, so the placeholder copy appears at least once.
-    const placeholders = screen.getAllByText(/\(none yet — click \+\)/);
+    // Phase 72 clarify — placeholder retoned `(none yet — click +)` → `(none)`.
+    const placeholders = screen.getAllByText("(none)");
     expect(placeholders.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -178,7 +179,7 @@ describe("ResourcesTreePanel — search filter", () => {
     renderTree();
     const search = screen.getByLabelText(/Search resources/i);
     fireEvent.change(search, { target: { value: "zzzzzzzz_no_match" } });
-    const placeholders = screen.getAllByText(/\(none yet — click \+\)/);
+    const placeholders = screen.getAllByText("(none)");
     // Three groups => three placeholder lines.
     expect(placeholders.length).toBe(3);
   });
