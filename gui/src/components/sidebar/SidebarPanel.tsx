@@ -251,7 +251,7 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
                 updateNodeParams(selectedNodeId, { instanceName: name })
               }
             />
-            <Badge variant="secondary" className="h-5 px-1.5">{component.label}</Badge>
+            <Badge variant="secondary" className="text-[12px] h-5 px-1.5">{component.label}</Badge>
           </div>
 
           <Separator className="my-[24px]" />
