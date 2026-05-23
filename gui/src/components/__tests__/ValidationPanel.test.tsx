@@ -390,19 +390,20 @@ describe("ValidationPanel (Phase 72)", () => {
     expect(screen.getByText("z_n_match")).toBeTruthy();
     expect(screen.getByText("n × L mismatch across plate")).toBeTruthy();
 
-    // "ERR" appears in BOTH the filter pill and the row body now. Assert at
-    // least one occurrence inside an actual data row (role=button + truncate
-    // description matches), via screen.getAllByText.
-    const errMatches = screen.getAllByText("ERR");
+    // Phase 72 (relabel) — "error" now appears in BOTH the filter pill and
+    // the row body (was "ERR"). Assert at least one occurrence inside an
+    // actual data row (role=button + truncate description matches) via
+    // screen.getAllByText.
+    const errMatches = screen.getAllByText("error");
     expect(errMatches.length).toBeGreaterThanOrEqual(1);
 
-    // Sanity: at least one ERR token sits in a clickable row that ALSO
+    // Sanity: at least one "error" token sits in a clickable row that ALSO
     // contains the description text.
     const rowWithErrAndDesc = screen
       .getAllByRole("button")
       .find(
         (b) =>
-          b.textContent?.includes("ERR") &&
+          b.textContent?.includes("error") &&
           b.textContent?.includes("n × L mismatch across plate"),
       );
     expect(rowWithErrAndDesc).toBeTruthy();

@@ -189,6 +189,154 @@ for ports) cover the remaining edge cases.
 raw `text-yellow-500` / `text-blue-500` in ValidationPanel. `--border-hover`
 and `--shadow-dialog` were introduced in the primitive-layer shape pass.
 
+### Code editor lane carve-out (locked — BCEdge/CodePreview, 2026-05-23)
+
+A documented exception to the project's perceptual palette: the CodePreview
+syntax-highlighting palette is anchored to **One Dark Pro** (the most-installed
+VSCode theme, and the Julia editor identity by lineage through Juno/Atom)
+rather than derived from the canvas/chrome token system. Parallel to
+WindowControls' macOS traffic-light hex exception: code editors are their own
+established convention domain, and a bespoke "STREAM syntax palette" would
+read as strange-without-purpose to engineers who live in VSCode/JetBrains
+all day.
+
+Five tokens, scoped to CodePreview's `TOKEN_CLASS` map only. Comments reuse
+`--muted-foreground` (italic) — the muted family is already the right read
+for "deprioritized prose inside code", no separate token earned.
+
+| Token | Dark | Light | Julia tokens |
+|---|---|---|---|
+| `--syntax-keyword` | `oklch(0.74 0.16 295)` | `oklch(0.55 0.18 295)` | `function`, `end`, `return`, `if`, `using`, … |
+| `--syntax-string`  | `oklch(0.78 0.14 145)` | `oklch(0.55 0.16 145)` | `"text"` |
+| `--syntax-type`    | `oklch(0.78 0.11 230)` | `oklch(0.55 0.14 230)` | `Channel`, `Pump`, `HeatDiffusion` (Caps-named) |
+| `--syntax-macro`   | `oklch(0.83 0.13 80)`  | `oklch(0.60 0.17 80)`  | `@named`, `@variables`, … |
+| `--syntax-number`  | `oklch(0.78 0.13 50)`  | `oklch(0.58 0.17 50)`  | numeric literals |
+
+**The Editor-Lane-Is-Convention Rule.** The `--syntax-*` tokens MUST NOT be
+consumed by canvas, chrome, or any non-code surface. They exist to honor a
+cross-tool convention; reusing them elsewhere would import that convention
+into surfaces where it doesn't belong. New consumers of code-like rendering
+(future error-tooltip with stack trace, future REPL panel) are valid; UI
+chrome that happens to want a similar amber is not — use `--color-warning`.
+
+### Code-link active state (locked — BCEdge/CodePreview, 2026-05-23)
+
+The Phase 66 bidirectional link (hovering or pinning a sub-block in
+CodePreview lights up the corresponding canvas nodes + connecting edges)
+uses **`--foreground`** — the neutral high-contrast text color — for its
+active stroke and ring, NOT a new hue token.
+
+Reasoning: the link state is FOCUS (these things are the current attention
+target), and `--foreground` is literally the token for "what's foregrounded."
+A hue-distinct signal was rejected at shape: the canvas already carries 4
+domain hues (layer accents) + 4 state hues (destructive, warning, info, ring);
+adding a fifth "focus" hue would push the palette into the AI-workflow-tool
+territory PRODUCT.md anti-references. Weight (strokeWidth, ring-2) plus
+near-white-on-dark contrast carries the signal without earning a hue slot.
+
+**Motion-led signal, not contrast-led** (iterated twice after live
+verification):
+
+The link state on edges is conveyed by a **marching-ants animation**, not
+by stroke contrast or stroke thickness. Reuses the `flow-trace-march`
+keyframe shared with the validation flow trace — same visual idiom, same
+1.2 s linear infinite cycle (slightly faster than the validation trace's
+1.5 s so the two read as distinct when both happen to be active).
+
+The reasoning chain:
+1. Static high-contrast strokes (`--foreground` solid) on many edges
+   simultaneously overpower the canvas — the eye anchors on the lit edges
+   instead of the components they connect.
+2. Pure-color softening (mix toward canvas) helped contrast but didn't
+   solve the "many edges = canvas pulse" problem when the cursor walks
+   across the code panel.
+3. A marching-ants pattern at near-rest stroke width is read as
+   motion-conveys-state, not as "this edge is now LOUD." The eye registers
+   "linked" without being pulled.
+
+- **Hover** = `.code-link-active` class on the edge `<path>`: stroke
+  `--foreground`, `stroke-dasharray: 6 4`, marching-ants animation. Stroke
+  width unchanged from rest (1.5).
+- **Pin** = `.code-link-active .code-link-pinned`: same animation, stroke
+  width +0.25 px (1.75) — barely heavier than hover.
+- `prefers-reduced-motion: reduce` stops the marching; the dashed pattern
+  stays visible so the link can still be located.
+
+Edge widths (BCEdge / HydraulicEdge):
+- rest:    1.5 / smoothstep default, stroke = `--muted-foreground` (BC) or layer-tinted (Hydraulic), solid for Hydraulic / dashed-6/3 for BC
+- hovered: 1.5 / 1.5, stroke = `--foreground`, marching dashed-6/4
+- pinned:  1.75 / 1.75, stroke = `--foreground`, marching dashed-6/4
+
+**Arrowhead is fixed-size.** A custom `<marker id="stream-hydraulic-arrow">`
+is defined once in `CanvasPanel.tsx`, attached to hydraulic edges via
+`markerEnd: "url(#stream-hydraulic-arrow)"` from `useStore.createEdges`.
+The marker uses `markerUnits="userSpaceOnUse"` with fixed 12×12 user-unit
+dimensions, so its size is fully decoupled from edge stroke width — the
+arrow stays constant when the stroke fattens for pin (or hover, or future
+states). Fill is `--muted-foreground` always; the arrow is **structural**
+(reads as "flow direction"), not a state signal. Only the stroke conveys
+state. xyflow's `MarkerType.ArrowClosed` (default `markerUnits="strokeWidth"`)
+was the source of the "arrowhead gets huge on pin" bug observed in live
+verification; the custom marker replaces it entirely.
+
+**Active edges paint on top.** SVG paint order is purely DOM order — `z-index`
+doesn't apply to SVG siblings. xyflow's `Edge.zIndex` is the supported
+mechanism (xyflow translates it into DOM order at render). `enrichedEdges`
+in `CanvasPanel.tsx` checks each edge: when BOTH endpoint UUIDs are in
+`hoveredSourceIds` or `pinnedSourceIds` (matching BCEdge/HydraulicEdge's
+per-component activation check), it bumps `zIndex` to 1500. xyflow's
+default selected-edge zIndex is 1000, so 1500 puts code-active edges above
+selected too — the link signal is the most important visual state to read
+clearly. Without this bump, overlapping edges (e.g. parallel bottom-port
+connections to two side-by-side targets) caused the marching dashes on the
+active edge to appear behind the static line of its sibling.
+
+Node ring (StreamNode, via inline `box-shadow` on the outer `<div>`; no
+CSS transition, snaps on state flip):
+- rest:         `0 0 0 1px var(--canvas), 0 0 0 2px var(--node-ring-rest)`
+- code-hovered: `0 0 0 1px var(--canvas), 0 0 0 2px var(--foreground)`
+- code-pinned:  `0 0 0 1px var(--canvas), 0 0 0 3px var(--foreground)`
+- selected:     `0 0 0 1px var(--canvas), 0 0 0 3px var(--ring)` — wins over both
+
+**Priority: selected → code-pinned → code-hovered → rest.** Selected always
+wins because it's the user's explicit canvas-side intent; code-link rings
+are reactive to a remote (code-panel) input. Node-side rings are necessary
+because component-definition lines (e.g. `@named pump = Pump(...)`) have a
+single node sourceId and no edges in their sub-block — without the node
+ring those lines produced no canvas feedback at all (a real bug observed
+in live verification).
+
+**The Node-Ring-Snaps Rule.** The transition on the box-shadow was removed
+for code-link state changes (kept for `selected`, because the band thickens
+in sync at 200 ms — gentle is right there). Code-link snaps because the
+marching animation on the edges is the primary, ongoing signal; the
+ring's job is to mark "which nodes" without contributing a second timing
+budget. Live verification flagged the prior 200 ms ease as feeling
+"laggy" on every code-panel click.
+
+**Integer box-shadow spreads only.** The first pass used 2.5 px for the
+pinned ring. Sub-pixel rounding in the browser made the bottom side render
+fatter than the top on some zoom levels. Integer spreads (2 / 3) render
+symmetrically across all zooms.
+
+State marker is the `data-code-link` attribute on the node root
+(`"hover"` / `"pinned"` / absent). Replaced the prior className-side
+markers (`.stream-node--code-hover` / `.stream-node--code-pinned`) which
+existed only because the CSS rules were no-ops anyway — a dead-state
+marker pattern. Tests assert on `data-code-link`.
+
+CodePreview sub-block (uses full `--foreground` because the small sub-block
+ring against panel chrome doesn't suffer the multi-edge-pulse problem):
+- rest:    no bg, no ring
+- hover:   `bg-[color-mix(in_oklch,var(--foreground)_5%,transparent)]`, no ring
+- pinned:  `bg-[color-mix(in_oklch,var(--foreground)_8%,transparent)]` + `ring-2 ring-[var(--foreground)]`
+- flash:   `bg-[color-mix(in_oklch,var(--color-warning)_22%,transparent)]` + `ring-2 ring-[var(--color-warning)]`
+
+The flash state uses `--color-warning` (already locked) — same semantic as
+the canvas validation-flash navigation feedback. Distinct from the
+steady-state pinned/hover so a one-shot navigation read doesn't get confused
+with a sticky link.
+
 ### Popover surface (locked)
 
 `--popover` is the 5th tonal slot in the hierarchy — one step lighter than
@@ -412,7 +560,7 @@ SaaS alert card.
 
 | Column | Width | Style |
 |---|---|---|
-| Severity prefix | 32 px (resizable, min 28 / max 64) | Mono 11 px, color-tokenized via `--destructive` / `--color-warning` / `--color-info`. Labels: `ERR`, `WRN`, `INF`. **No Lucide AlertCircle/Triangle/Info icons.** |
+| Severity label  | 80 px (resizable, min 60 / max 120)  | Mono 13 px, color-tokenized via `--destructive` / `--color-warning` / `--color-info`. Labels: `error`, `warning`, `info` (lowercase full words, NOT the 3-letter prefix). **No Lucide AlertCircle/Triangle/Info icons.** |
 | Validator id    | 200 px (resizable, min 80 / max 480)  | Mono 13 px, `foreground/85`, `truncate` with native `title` tooltip. **Leads the row** — Linear-issue-id pattern; the engineer reads the rule identity first. |
 | Message         | fluid remainder                       | Sans 13 px, `foreground`, `truncate` with native `title`. |
 
@@ -424,7 +572,7 @@ data. Px keeps them locked.
 **Row vocabulary that's banned:**
 
 - No Lucide alert icons in any cell. Severity is conveyed by the mono
-  prefix + color token alone.
+  lowercase-word label + color token alone.
 - No FixAction buttons. The `FixAction` discriminated union and the
   `fixAction?` field on `ValidationResult` were deleted at the type level
   Phase 72. Validation is a recognize-and-locate surface, not a remediation
@@ -436,8 +584,10 @@ data. Px keeps them locked.
 **Panel header (two sub-rows above the data):**
 
 1. Controls row — left side: `{N} issues` count in mono 11 px. Right side
-   in this order: severity filter pills (`ERR 12 WRN 4 INF 2`) + sliders
-   icon that opens a Group-by popover.
+   in this order: severity filter pills (`error 12   warning 4   info 2`,
+   full lowercase words at mono 13 px / px-2.5 py-1.5; replaces the prior
+   3-letter `ERR/WRN/INF` 11 px treatment) + sliders icon (16 px, padded
+   px-2 py-1.5 to match pill silhouette) that opens a Group-by popover.
 2. Column labels row — `SEV / RULE / MESSAGE` in mono 10 px uppercase
    `foreground/45`. Hairline `--border` underneath.
 
@@ -478,17 +628,42 @@ with no content when the panel was closed).
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  ERR 12   WRN 4   INF 2          Code  Validation        ⌄       │   ← 22 px footer (always)
+│  ⊗ 12   △ 4   ⓘ 2                Code  Validation        ⌄       │   ← 32 px footer (always)
 ├──────────────────────────────────────────────────────────────────┤
 │  [ BottomPanel body when open ]                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-- Left cluster — severity count segments. `ERR` / `WRN` / `INF` mono labels
-  + tabular-nums count. Click any segment → opens panel on Validation tab
-  with that severity filter pre-applied via `stream:validation-filter`.
-  Zero counts dim to ~55% opacity. 0 → N pulse on the error segment
+- Bar height — **32 px** (bumped from 28 to accommodate the larger
+  icon + count sizes below). Still in IDE-status-bar territory (VSCode
+  22, JetBrains 27, Sublime 28-30, Eclipse 32). No external consumers
+  of the prior 28 px value.
+- Left cluster — severity count segments. **Icon + mono count**, NOT mono
+  text labels: `CircleX 12   TriangleAlert 4   Info 2` (Lucide
+  `CircleX` / `TriangleAlert` / `Info` at **18 px** / `stroke-1.75`,
+  colored via `--destructive` / `--color-warning` / `--color-info`).
+  Count text is `text-[15px] leading-[18px] tabular-nums font-mono`. The
+  explicit `leading-[18px]` matches the icon's 18 px box exactly, so
+  icon + number share a precisely-aligned line-box (top + bottom Y edges
+  identical). Click any segment → opens panel on Validation tab with
+  that severity filter pre-applied via `stream:validation-filter`. Zero
+  counts dim to ~55% opacity (icon stays visible so "validation is
+  running, no issues" still reads). 0 → N pulse on the error segment
   preserved.
+
+  **The Status-Bar-Icons-Are-The-IDE-Convention exception.** Lucide alert
+  icons are explicitly **banned** in the ValidationPanel result rows
+  (those rows use the mono lowercase-word severity label — `error` /
+  `warning` / `info` — see the row vocabulary block above). The status
+  bar takes the opposite call: icons instead of words, because (a) the
+  bar is a strip with no room for full words across three severity
+  segments, (b) the IDE lineage (VSCode / IntelliJ / Sublime / Eclipse
+  status bars all use exactly these glyphs at exactly this size) makes
+  the icons read as tool-grade rather than SaaS-admin. The shadcn-admin
+  liability of the icons exists in the panel-row context (icon + chip +
+  hover-tinted row = the canonical "generic admin dashboard" pattern
+  PRODUCT.md anti-references) and **not** in the compact status-bar
+  context. Different surface, different convention, different read.
 - Right cluster — `Code` / `Validation` tab buttons. Click an inactive tab
   while panel closed → opens on that tab. Click an inactive tab while
   open → switches without closing. Click the **active** tab while open →
@@ -792,7 +967,31 @@ zero bbox crossings is a hard invariant. If a future topology produces
 no clean candidate, the candidate set is expanded (more lane variants,
 multi-step detours), not relaxed.
 
-**Held open — per-surface decisions still queued**
+### CodePreview (locked — Phase 72, 2026-05-23)
+
+The bottom-panel code preview surface. Reads as a productized code panel
+sitting inside the chrome, not a borrowed editor surface.
+
+| Property | Value |
+|---|---|
+| Body background | inherits `--panel` from `BottomPanel` (no separate `--code-surface`); the chrome → panel → canvas depth hierarchy carries the surface step |
+| Body text | `--foreground` mono 13 px, leading-1.55 |
+| Section header | `text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground` — no marker dot, no slab, no chip. mb-5 rhythm + typography contrast carries the divider (same idiom as ValidationPanel column-label row) |
+| Sub-block — interactive | `px-3 py-1.5 rounded-sm cursor-pointer`. NO `border-l-2` colored stripe (PRODUCT.md absolute ban) — the pinned ring + bg tint provide the affordance |
+| Sub-block — non-interactive scaffolding | `px-3 cursor-text` — plain code, no box affordance. Used for Imports header, `eqs = [` / `]`, Main `@named sys = …` block (sub-blocks with no `sourceIds`) |
+| Hover state (interactive only) | `bg-[color-mix(in_oklch,var(--foreground)_5%,transparent)]`, no ring; `transition-colors duration-[80ms]` (matches primitive-layer motion vocabulary) |
+| Pinned state | `bg-[color-mix(in_oklch,var(--foreground)_8%,transparent)]` + `ring-2 ring-[var(--foreground)]` |
+| Flash state (one-shot navigation feedback) | `bg-[color-mix(in_oklch,var(--color-warning)_22%,transparent)]` + `ring-2 ring-[var(--color-warning)]`. Auto-clears after 1.5 s |
+| Empty state | `text-muted-foreground italic text-xs` literal: `(empty — add components on the canvas to see generated Julia code)` |
+| Syntax tinting | Consumes `--syntax-{keyword,string,type,macro,number}` per the §2 Code editor lane carve-out. Comments use `text-muted-foreground italic` (no separate token) |
+
+The hover/pinned color is the canvas↔code link signal (see §2 Code-link
+active state). Same token (`--foreground`) on both sides of the link: edges
++ canvas node rings on the canvas, sub-block ring + bg tint in the panel.
+One signal, one token, no hue ambiguity with the layer accents or selection
+ring.
+
+### Held open — per-surface decisions still queued
 
 The non-`ui/` consumer surfaces below remain provisional. Each will be
 decided in its own `/impeccable shape <surface>` session (see
@@ -803,15 +1002,10 @@ decided in its own `/impeccable shape <surface>` session (see
 - `SidebarPanel`
 - `ResponsiveTabsList`
 
-**Canvas + signature surfaces still pending**
-- `BCEdge` (dashed BC edge variant) — HydraulicEdge already done
-- Pinned-node halo + hover-ring color tokenization
-
 **Workflow surfaces**
 - `CommandPalette` (cmdk-based)
 - `ToolboxPanel` + `ToolboxItem`
 - `PresetsPanel` + `PresetRow`
-- `CodePreview`
 - Property forms in the sidebar (`SidebarPanel/*` subtree)
 - BCs tab layout (Phase 65 deferred layout-fit issues land here)
 

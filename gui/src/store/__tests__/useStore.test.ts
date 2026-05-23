@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { MarkerType } from "@xyflow/react";
 import useStore from "../useStore";
 import { enrichEdges } from "../useStore";
 import type { StreamNodeData } from "../useStore";
@@ -448,8 +447,11 @@ describe("activeLayers (Phase 68 — 4-layer independent toggles)", () => {
 });
 
 describe("addEdge arrowheads and offset", () => {
-  it("adds MarkerType.ArrowClosed markerEnd to hydraulic edges", () => {
-    // Add two Pump nodes (FlowPort connections)
+  it("attaches the custom url(#stream-hydraulic-arrow) markerEnd to hydraulic edges", () => {
+    // Phase 72 — replaces the prior MarkerType.ArrowClosed assertion. The
+    // custom marker (defined in CanvasPanel) uses markerUnits="userSpaceOnUse"
+    // so the arrowhead size is decoupled from stroke-width, fixing the
+    // "arrowhead grows huge on pin" bug from xyflow's default marker.
     useStore.getState().addNode("Pump", { x: 0, y: 0 });
     useStore.getState().addNode("Pump", { x: 200, y: 0 });
     const { nodes } = useStore.getState();
@@ -464,8 +466,7 @@ describe("addEdge arrowheads and offset", () => {
     });
 
     const edge = useStore.getState().edges[0];
-    expect(edge.markerEnd).toBeDefined();
-    expect((edge.markerEnd as { type: string }).type).toBe(MarkerType.ArrowClosed);
+    expect(edge.markerEnd).toBe("url(#stream-hydraulic-arrow)");
   });
 
   it("does not add markerEnd to thermal edges", () => {
@@ -562,7 +563,9 @@ describe("enrichEdges", () => {
 
     const result = enrichEdges(edges, nodes);
     expect(result).toHaveLength(1);
-    expect(result[0].markerEnd).toBeDefined();
-    expect((result[0].markerEnd as { type: string }).type).toBe(MarkerType.ArrowClosed);
+    // Phase 72 — markerEnd is now the custom-marker URL string. See the
+    // "attaches the custom url(#stream-hydraulic-arrow) markerEnd" test
+    // above for the rationale.
+    expect(result[0].markerEnd).toBe("url(#stream-hydraulic-arrow)");
   });
 });

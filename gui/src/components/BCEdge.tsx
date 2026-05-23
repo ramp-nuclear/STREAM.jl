@@ -108,14 +108,24 @@ function BCEdge({
       <BaseEdge
         id={id}
         path={path}
-        style={{
-          // Pinned wins over hover; both override the default muted dash.
-          stroke: isCodePinned
-            ? "#7dd3fc"
+        // Phase 72 — code-link active state is a CLASS (not inline style)
+        // so the marching-ants animation can be reuse the global
+        // .code-link-active rule shared with HydraulicEdge, and so
+        // prefers-reduced-motion can target it. The class overrides
+        // stroke + stroke-dasharray + adds the animation via !important;
+        // stroke-width is the only state-dependent inline value (kept
+        // very close to rest so the dashed-pattern motion is what reads
+        // as "active", not stroke thickness).
+        className={
+          isCodePinned
+            ? "code-link-active code-link-pinned"
             : isCodeHovered
-              ? "#38bdf8"
-              : "var(--muted-foreground)",
-          strokeWidth: isCodePinned ? 2.5 : isCodeHovered ? 2 : 1.5,
+              ? "code-link-active"
+              : ""
+        }
+        style={{
+          stroke: "var(--muted-foreground)",
+          strokeWidth: 1.5,
           strokeDasharray: "6 3",
         }}
       />

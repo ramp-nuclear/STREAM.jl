@@ -410,17 +410,32 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
       // pipeline in the dev configuration serves stale compiled output
       // for .stream-node--* class rules; inline style ships via JS HMR
       // and wins specificity over any class rule. Outline state
-      // priority: error → autoExtended → none. Ring is always present
-      // (mid-grey at rest, Hydraulic --ring when selected, 200 ms ease).
-      // The code-hover / code-pinned classes are state markers only
-      // (Phase 66 linking + unit tests); their CSS rules are no-ops.
-      className={`relative rounded-md min-w-[140px] transition-[box-shadow] duration-200 ${
-        isCodeHovered ? "stream-node--code-hover" : ""
-      } ${isCodePinned ? "stream-node--code-pinned" : ""}`}
+      // priority: error → autoExtended → none. Ring priority:
+      // selected → code-pinned → code-hovered → rest. The selected ring
+      // keeps its 200 ms transition (the band thickens in sync; gentle
+      // is the right feel for explicit canvas-side selection). Code-link
+      // rings SNAP — no transition — because (a) a delay made the click
+      // feel laggy in live verification, (b) the marching-ants edge
+      // animation is the primary signal anyway, the node ring is a
+      // reinforcement. Integer spreads (2 px / 3 px) instead of 2.5 to
+      // avoid subpixel-rounding asymmetry where one side rendered fatter
+      // than the other. The `data-code-link` attribute is the modern
+      // state marker for tests + selectors; the old className-side
+      // markers (.stream-node--code-{hover,pinned}) are gone.
+      data-code-link={
+        isCodePinned ? "pinned" : isCodeHovered ? "hover" : undefined
+      }
+      className={`relative rounded-md min-w-[140px] ${
+        selected ? "transition-[box-shadow] duration-200" : ""
+      }`}
       style={{
         boxShadow: selected
           ? "0 0 0 1px var(--canvas), 0 0 0 3px var(--ring)"
-          : "0 0 0 1px var(--canvas), 0 0 0 2px var(--node-ring-rest)",
+          : isCodePinned
+            ? "0 0 0 1px var(--canvas), 0 0 0 3px var(--foreground)"
+            : isCodeHovered
+              ? "0 0 0 1px var(--canvas), 0 0 0 2px var(--foreground)"
+              : "0 0 0 1px var(--canvas), 0 0 0 2px var(--node-ring-rest)",
         outline: hasAnyError
           ? "2px solid var(--destructive)"
           : nodeData.autoExtended

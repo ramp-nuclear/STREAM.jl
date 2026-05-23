@@ -83,10 +83,18 @@ const SEVERITY_RANK: Record<Severity, number> = {
   info: 2,
 };
 
+// Phase 72 — severity labels are full lowercase words ("error" / "warning"
+// / "info"), not the 3-letter mono ERR/WRN/INF prefixes. The compact prefix
+// has its place in the bottom-chrome status bar where space is tight and
+// icons carry the recognition load — see ValidationStatusBar's icon-based
+// severity glyphs. In the panel itself, vertical space is ample and the
+// full word reads better: clearer at a glance, no abbreviation parsing,
+// and consistent with the rest of the panel's full-word vocabulary
+// (Group by None / Rule / Component, etc.).
 const SEVERITY_LABEL: Record<Severity, string> = {
-  error: "ERR",
-  warning: "WRN",
-  info: "INF",
+  error: "error",
+  warning: "warning",
+  info: "info",
 };
 
 const SEVERITY_COLOR_VAR: Record<Severity, string> = {
@@ -98,10 +106,12 @@ const SEVERITY_COLOR_VAR: Record<Severity, string> = {
 // Default column widths in pixels. The user can drag the SEV↔RULE and
 // RULE↔MESSAGE dividers to resize; min/max enforced below. MESSAGE is the
 // fluid remainder (`minmax(0, 1fr)`), so only the first two are tunable.
-const DEFAULT_SEV_WIDTH = 32;
+// SEV bumped from 32 → 80 to fit the longest full-word label ("warning")
+// at the panel's 13 px mono font with breathing room.
+const DEFAULT_SEV_WIDTH = 80;
 const DEFAULT_RULE_WIDTH = 200;
-const MIN_SEV_WIDTH = 28;
-const MAX_SEV_WIDTH = 64;
+const MIN_SEV_WIDTH = 60;
+const MAX_SEV_WIDTH = 120;
 const MIN_RULE_WIDTH = 80;
 const MAX_RULE_WIDTH = 480;
 
@@ -571,9 +581,14 @@ function FilterPill({ severity, count, active, onClick }: FilterPillProps) {
       onClick={onClick}
       aria-pressed={active}
       aria-label={`Filter to ${severity}${active ? " (active)" : ""}`}
+      // Phase 72 — bumped from text-[11px] px-1.5 py-1 (cramped) to
+      // text-[13px] px-2.5 py-1.5 to match the panel's body text scale
+      // (RULE / MESSAGE cells are 13 px) and give the controls more
+      // tap-target / hit-area. gap-1.5 (was gap-1) keeps the label and
+      // count visually balanced at the larger text size.
       className={
-        "inline-flex items-center gap-1 font-mono text-[11px] leading-none " +
-        "px-1.5 py-1 rounded-sm cursor-pointer select-none " +
+        "inline-flex items-center gap-1.5 font-mono text-[13px] leading-none " +
+        "px-2.5 py-1.5 rounded-sm cursor-pointer select-none " +
         "transition-colors duration-[80ms] " +
         "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
         (active ? "bg-popover " : "") +
@@ -582,7 +597,6 @@ function FilterPill({ severity, count, active, onClick }: FilterPillProps) {
     >
       <span
         style={{ color: active || count > 0 ? SEVERITY_COLOR_VAR[severity] : undefined }}
-        className="tracking-tight"
       >
         {SEVERITY_LABEL[severity]}
       </span>
@@ -614,15 +628,19 @@ function GroupBySettings({ groupBy, onChange }: GroupBySettingsProps) {
             <button
               type="button"
               aria-label="Group by settings"
+              // Phase 72 — padded to match the new bigger FilterPill
+              // (px-2.5 py-1.5 vs prior px-1.5 py-1). Icon size 3.5 → 4
+              // (16 px) so the glyph keeps proportional presence in the
+              // larger button.
               className={
-                "inline-flex items-center justify-center px-1.5 py-1 ml-1 rounded-sm cursor-pointer " +
+                "inline-flex items-center justify-center px-2 py-1.5 ml-1 rounded-sm cursor-pointer " +
                 "text-foreground/65 hover:text-foreground " +
                 "transition-colors duration-[80ms] " +
                 "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
                 (groupBy !== "none" ? "text-foreground" : "")
               }
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
+              <SlidersHorizontal className="h-4 w-4" strokeWidth={1.5} />
             </button>
           </PopoverTrigger>
         </TooltipTrigger>
@@ -768,7 +786,11 @@ function Row({ result, onClick, ref, indented, gridTemplate, selected }: RowProp
         />
       )}
       <span
-        className="font-mono text-[11px] leading-snug tracking-tight"
+        // Phase 72 — bumped from text-[11px] tracking-tight (sized for
+        // the prior 3-letter prefix) to text-[13px] matching the RULE +
+        // MESSAGE cells. Drops the tight tracking — full-word "warning"
+        // doesn't need the abbreviation-style condensation.
+        className="font-mono text-[13px] leading-snug"
         style={{ color: SEVERITY_COLOR_VAR[result.severity] }}
       >
         {SEVERITY_LABEL[result.severity]}

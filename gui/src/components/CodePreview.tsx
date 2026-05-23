@@ -60,14 +60,18 @@ const JULIA_KEYWORDS = new Set([
   "try", "catch", "finally", "struct", "mutable",
   "true", "false", "nothing", "missing",
 ]);
+// Phase 72 — syntax classes consume the --syntax-* tokens (One Dark Pro
+// anchored, code-editor-lane carve-out per DESIGN.md §2). Comment reuses
+// --muted-foreground (no separate token). Theme-aware: light + dark
+// resolve via the OKLCH values declared in index.css :root + .dark.
 const TOKEN_CLASS: Record<TokKind, string> = {
   plain: "",
-  comment: "text-zinc-500 italic",
-  string: "text-emerald-300",
-  macro: "text-amber-300",
-  kw: "text-purple-300",
-  type: "text-sky-300",
-  num: "text-orange-300",
+  comment: "text-muted-foreground italic",
+  string: "text-[var(--syntax-string)]",
+  macro: "text-[var(--syntax-macro)]",
+  kw: "text-[var(--syntax-keyword)]",
+  type: "text-[var(--syntax-type)]",
+  num: "text-[var(--syntax-number)]",
 };
 type Token = { kind: TokKind; text: string };
 
@@ -215,20 +219,27 @@ const CodeSubBlockView = memo(
           // select-text re-enables selection inside this pre (the panel root
           // is select-none so visual selection bands don't bleed across
           // section headers and inter-block gaps; see CodePreview body).
-          "whitespace-pre overflow-x-auto transition-colors duration-150 select-text",
-          // Interactive sub-blocks get the box affordance (rounded bg, left
-          // border, hover tint). Non-interactive scaffolding lines (`eqs = [`,
-          // `]`, Imports header, Main) render as plain code so the panel
-          // doesn't look like every line is its own clickable cell.
+          "whitespace-pre overflow-x-auto transition-colors duration-[80ms] select-text",
+          // Phase 72 — border-l-2 colored stripe removed (absolute-ban in
+          // PRODUCT.md; ring on pinned + bg-tint already provide the
+          // affordance). Interactive sub-blocks get rounded bg + cursor;
+          // non-interactive scaffolding (Imports header, `eqs = [`, `]`,
+          // Main) renders as plain code so the panel doesn't read as a list
+          // of clickable cells.
           interactive
-            ? "px-3 py-1.5 rounded-md border-l-2 cursor-pointer"
+            ? "px-3 py-1.5 rounded-sm cursor-pointer"
             : "px-3 cursor-text",
+          // Phase 72 — flash/pinned/hover retokenized. Flash = warning amber
+          // (same semantic as canvas validation-flash). Pinned/hover = neutral
+          // --foreground (Option A: link state is "foregrounded", no new hue).
+          // motion-reduce respected via transition-colors above (duration-0
+          // collapses under prefers-reduced-motion via global rule in index.css).
           flashed
-            ? "bg-amber-500/30 border-amber-400 ring-1 ring-amber-400/70"
+            ? "bg-[color-mix(in_oklch,var(--color-warning)_22%,transparent)] ring-2 ring-[var(--color-warning)]"
             : pinned
-              ? "bg-sky-500/[0.14] border-sky-400 ring-1 ring-sky-400/40"
+              ? "bg-[color-mix(in_oklch,var(--foreground)_8%,transparent)] ring-2 ring-[var(--foreground)]"
               : interactive
-                ? "border-transparent hover:bg-sky-500/[0.09] hover:border-sky-400/60"
+                ? "hover:bg-[color-mix(in_oklch,var(--foreground)_5%,transparent)]"
                 : "",
         ].join(" ")}
       >
@@ -457,18 +468,24 @@ export default function CodePreview() {
   );
 
   return (
-    <ScrollArea className="h-full bg-[#0d1117]">
-      {/* select-none on the root suppresses the browser's visual selection
+    <ScrollArea className="h-full">
+      {/* Phase 72 — body bg removed (was bg-[#0d1117] GitHub-dark borrow,
+          a PRODUCT.md anti-reference). CodePreview now inherits --panel
+          from BottomPanel — the depth hierarchy (chrome → panel → canvas)
+          already gives the code surface its tonal step; no separate
+          --code-surface token earned.
+
+          select-none on the root suppresses the browser's visual selection
           band on inter-block gaps, section header rows, and padding. Each
           <pre> sub-block re-enables select-text on itself, so drag-selecting
           across code blocks copies only the code text (no section labels,
           no gap whitespace). */}
       <div
-        className="p-4 font-mono text-[13px] leading-[1.55] text-zinc-200 select-none"
+        className="p-4 font-mono text-[13px] leading-[1.55] text-foreground select-none"
         onClick={handlePanelBodyClick}
       >
         {sections.length === 0 ? (
-          <div className="text-zinc-500 italic text-xs">
+          <div className="text-muted-foreground italic text-xs">
             (empty — add components on the canvas to see generated Julia code)
           </div>
         ) : (
@@ -478,11 +495,13 @@ export default function CodePreview() {
               className="mb-5 last:mb-0"
               onClick={handlePanelBodyClick}
             >
-              <h4 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-300/90 mb-2 select-none">
-                <span
-                  aria-hidden
-                  className="inline-block h-3 w-[3px] rounded-sm bg-sky-400/80"
-                />
+              {/* Phase 72 — section header retoken. Dropped the bg-sky-400/80
+                  dot slab (SaaS-leading-indicator pattern + raw Tailwind sky)
+                  and the text-sky-300/90 heading color. Header is now the
+                  ValidationPanel column-label idiom: muted foreground +
+                  uppercase + tracking, no marker. The mb-5 rhythm + typography
+                  contrast carry the divider. */}
+              <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2 select-none">
                 {section.name}
               </h4>
               <div className="flex flex-col gap-1.5">
