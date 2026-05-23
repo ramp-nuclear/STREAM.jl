@@ -2392,11 +2392,17 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   loadProject: async () => {
     try {
       const { open } = await import("@tauri-apps/plugin-dialog");
+      // Phase 72 Preferences — seed the dialog with `files.defaultOpenLocation`
+      // when the user has configured one. Empty string = OS default (Tauri
+      // omits the `defaultPath` option when undefined).
+      const { getPreference } = await import("../lib/preferences");
+      const defaultOpenLocation = getPreference("files", "defaultOpenLocation");
       const filePath = await open({
         filters: [
           { name: PROJECT_FILE_LABEL, extensions: [PROJECT_FILE_EXTENSION] },
         ],
         multiple: false,
+        ...(defaultOpenLocation ? { defaultPath: defaultOpenLocation } : {}),
       });
       if (!filePath) return;
       const path = Array.isArray(filePath) ? filePath[0] : filePath;

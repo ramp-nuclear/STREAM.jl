@@ -17,10 +17,21 @@ export function scrollIntoViewSafe(
   el: Element,
   opts: ScrollIntoViewOptions = {},
 ): void {
+  // Phase 72 (post-Preferences) — honor the user `appearance.reduceMotion`
+  // override in addition to the OS preference. Inline check (no pref-lib
+  // import) keeps this helper dependency-free; the data-motion attribute
+  // on <html> is the source of truth (set by App.tsx).
+  const root = typeof document !== "undefined" ? document.documentElement : null;
+  const userPref = root?.getAttribute("data-motion");
+  // "full" → user forces motion on regardless of OS pref
+  // "reduced" → user forces reduced regardless of OS pref
+  // anything else → follow the OS
   const reduceMotion =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    userPref === "reduced" ||
+    (userPref !== "full" &&
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   el.scrollIntoView({
     ...opts,

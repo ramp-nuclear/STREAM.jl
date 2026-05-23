@@ -128,25 +128,21 @@ function EditorPane() {
         control={<Switch checked={lock} onCheckedChange={setLock} />}
       />
       <SettingRow
-        notYetWired
         label="Auto-flip ports on connect"
         description="Reorient ports to the connection's natural axis on drop."
-        control={<Switch checked={autoFlip} disabled onCheckedChange={setAutoFlip} />}
+        control={<Switch checked={autoFlip} onCheckedChange={setAutoFlip} />}
       />
       <SettingRow
-        notYetWired
         label="Show port type on hover"
         description="Reveal FlowPort or ThermalPort labels on hover."
-        control={<Switch checked={showPortType} onCheckedChange={setShowPortType} disabled />}
+        control={<Switch checked={showPortType} onCheckedChange={setShowPortType} />}
       />
       <SettingRow
-        notYetWired
         label="Default zoom on open"
         description="What File > Open and File > New zoom the canvas to."
         control={
           <Select
             value={defaultZoom}
-            disabled
             onValueChange={(v) => setDefaultZoom(v as "fit" | "100" | "last")}
           >
             <SelectTrigger size="sm" className="w-[140px]">
@@ -213,13 +209,11 @@ function AppearancePane() {
         }
       />
       <SettingRow
-        notYetWired
         label="Reduce motion"
         description="Animation respect override for prefers-reduced-motion."
         control={
           <Select
             value={reduceMotion}
-            disabled
             onValueChange={(v) =>
               setReduceMotion(v as "system" | "always" | "never")
             }
@@ -312,12 +306,10 @@ function FilesPane() {
         }
       />
       <SettingRow
-        notYetWired
         label="Default open location"
         description="Where File > Open starts. Empty means OS default."
         control={
           <Input
-            disabled
             value={defaultOpen}
             onChange={(e) => setDefaultOpen(e.target.value)}
             placeholder="OS default"
@@ -460,12 +452,10 @@ function CodeExportPane() {
   return (
     <>
       <SettingRow
-        notYetWired
         label="Default export path"
         description="Where File > Export to Julia writes. Empty means alongside .scp."
         control={
           <Input
-            disabled
             value={exportPath}
             onChange={(e) => setExportPath(e.target.value)}
             placeholder="alongside .scp"
@@ -474,13 +464,11 @@ function CodeExportPane() {
         }
       />
       <SettingRow
-        notYetWired
         label="Indent width"
         description="Julia source indentation."
         control={
           <Select
             value={indent}
-            disabled
             onValueChange={(v) =>
               setIndent(v as "2-spaces" | "4-spaces" | "tab")
             }
@@ -505,10 +493,9 @@ function CodeExportPane() {
         }
       />
       <SettingRow
-        notYetWired
         label="Open exported file"
         description="Open the .jl file in the OS default handler after export."
-        control={<Switch checked={openAfter} disabled onCheckedChange={setOpenAfter} />}
+        control={<Switch checked={openAfter} onCheckedChange={setOpenAfter} />}
       />
     </>
   );

@@ -14,6 +14,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import useStore from "../store/useStore";
+import { getPreference } from "../lib/preferences";
 import type { StreamNodeData } from "../store/useStore";
 import { getComponent } from "../registry";
 import {
@@ -103,6 +104,57 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   // stable identities per @xyflow/react v12 docs.
   const { screenToFlowPosition, setNodes, setEdges, setCenter, getNode, fitBounds } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Phase 72 (post-Preferences) — `editor.defaultZoomOnOpen` decides the
+  // initial viewport at canvas mount:
+  //   - "fit"  → pass `fitView` prop (xyflow auto-fits content)
+  //   - "100"  → pass `defaultViewport={{x:0,y:0,zoom:1}}` (no fitView)
+  //   - "last" → restore the viewport saved at the last session via
+  //              `stream-composer-viewport` localStorage key; fall back to
+  //              fitView when the key is missing / corrupt.
+  // Computed once at mount via useMemo so subsequent pref changes don't
+  // remount the canvas — the pref applies on the NEXT app launch.
+  const initialViewport = useMemo(() => {
+    const pref = getPreference("editor", "defaultZoomOnOpen");
+    if (pref === "100") return { fitView: false, defaultViewport: { x: 0, y: 0, zoom: 1 } };
+    if (pref === "last") {
+      try {
+        const raw = localStorage.getItem("stream-composer-viewport");
+        if (raw !== null) {
+          const v = JSON.parse(raw);
+          if (
+            typeof v?.x === "number" &&
+            typeof v?.y === "number" &&
+            typeof v?.zoom === "number"
+          ) {
+            return { fitView: false, defaultViewport: v };
+          }
+        }
+      } catch {
+        // fall through to fitView
+      }
+    }
+    return { fitView: true, defaultViewport: undefined };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Phase 72 (post-Preferences) — persist viewport on move-end so the
+  // "Last used" defaultZoomOnOpen pref can restore it on next launch.
+  // Debounced via the inline rAF guard (onMoveEnd already fires only on
+  // pan/zoom settling, so additional throttling isn't necessary).
+  const onMoveEnd = useCallback(
+    (_e: unknown, viewport: { x: number; y: number; zoom: number }) => {
+      try {
+        localStorage.setItem(
+          "stream-composer-viewport",
+          JSON.stringify({ x: viewport.x, y: viewport.y, zoom: viewport.zoom }),
+        );
+      } catch {
+        // Best-effort.
+      }
+    },
+    [],
+  );
 
   // Phase 65 Plan 03: right-click pan-vs-context-menu disambiguation (D-12).
   // rcMenu.state is consumed by Plan 05 — no menu UI is rendered here.
@@ -543,7 +595,34 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         );
         // RAF so the xyflow nodes have measured / rendered before we attach
         // classes (otherwise the data-id elements may not yet exist).
-        requestAnimationFrame(() => applyTrace(nodeIds, edgeIds, result.severity));
+        requestAnimationFrame(() => {
+          applyTrace(nodeIds, edgeIds, result.severity);
+          // Phase 72 (post-Preferences) — auto-clear timeout per
+          // `validation.loopTracePersistence`. "until-click" keeps the prior
+          // behavior (no timeout; canvas-click clears). "5s" / "10s" auto-
+          // clear after that interval. The timeout is captured in a closure
+          // tied to the current `activeTrace`; if a new focus event replaces
+          // the trace before the timeout fires, the new applyTrace call's
+          // requestAnimationFrame schedules a fresh timeout, and the old one
+          // becomes a no-op because activeTrace points elsewhere by then.
+          const traceAtSchedule = activeTrace;
+          // Inline pref read to avoid pulling the pref lib at hot-path.
+          let persistence: string = "until-click";
+          try {
+            const raw = localStorage.getItem(
+              "stream-composer-pref.validation.loopTracePersistence",
+            );
+            if (raw !== null) persistence = JSON.parse(raw);
+          } catch {
+            // Default to until-click.
+          }
+          if (persistence === "5s" || persistence === "10s") {
+            const ms = persistence === "5s" ? 5000 : 10000;
+            setTimeout(() => {
+              if (activeTrace === traceAtSchedule) clearActiveTrace();
+            }, ms);
+          }
+        });
       } else {
         // Single-target: preserve existing pan + one-shot flash behavior.
         const cx = (minX + maxX) / 2;
@@ -675,7 +754,13 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         // Phase 65 D-08/D-09: 16px fixed grid snapping via ReactFlow built-in props
         snapToGrid={snapEnabled}
         snapGrid={[16, 16]}
-        fitView
+        // Phase 72 (post-Preferences) — initial viewport per
+        // `editor.defaultZoomOnOpen`. fitView is mount-time only in xyflow;
+        // it applies on app launch, not on File > Open mid-session.
+        {...(initialViewport.fitView
+          ? { fitView: true }
+          : { defaultViewport: initialViewport.defaultViewport })}
+        onMoveEnd={onMoveEnd}
       >
         {/* Phase 72 — CAD/Houdini-style grid lines replace the ReactFlow
             default dot pattern. Two stacked Background layers give a

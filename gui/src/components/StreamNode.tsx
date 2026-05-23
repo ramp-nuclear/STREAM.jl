@@ -21,6 +21,7 @@ import {
   resolveThermalPairSides,
   type Side,
 } from "@/lib/autoflip";
+import { usePreference } from "@/lib/preferences";
 
 // Phase 72 — flow-port colors stay as inline hex (documented JIT-bypass);
 // per Phase 72 brief their tokenization is deferred to the edges-and-code-
@@ -183,14 +184,25 @@ function FlowPortHandle({
   // FlowPort scores its 4-side preference by neighbor projection; siblings
   // displace each other so two ports never collide. Selector returns a
   // primitive string so zustand's shallow equality stays stable (Pitfall 3).
+  //
+  // Phase 72 (post-Preferences) — `editor.autoFlipPortsOnConnect` gates the
+  // resolver: when OFF, the port stays on its registry-declared side and
+  // ignores neighbor geometry. The resolver still runs (its result is
+  // discarded) — short-circuiting it would require threading the boolean
+  // through every selector, which the autoflip doctrine ("zero runtime
+  // imports from react/zustand") refuses. The wasted work is per-handle
+  // and bounded by the canvas node count; negligible.
   const defaultSide = (port.side as Side | undefined) ?? "left";
+  const [autoFlipEnabled] = usePreference("editor", "autoFlipPortsOnConnect");
   const resolvedSide = useStore(
     useCallback(
-      (s: { nodes: Node[]; edges: Edge[] }) =>
-        (resolveFlowPortAssignment(s.nodes, s.edges, nodeId, getComponent)[
+      (s: { nodes: Node[]; edges: Edge[] }) => {
+        if (!autoFlipEnabled) return defaultSide;
+        return (resolveFlowPortAssignment(s.nodes, s.edges, nodeId, getComponent)[
           port.name
-        ] ?? defaultSide) as Side,
-      [nodeId, port.name, defaultSide],
+        ] ?? defaultSide) as Side;
+      },
+      [nodeId, port.name, defaultSide, autoFlipEnabled],
     ),
   );
 
@@ -205,6 +217,17 @@ function FlowPortHandle({
     updateNodeInternals(nodeId);
   }, [nodeId, resolvedSide, updateNodeInternals]);
 
+  // Phase 72 (post-Preferences) — showPortTypeOnHover reveals "FlowPort"
+  // on hover via a native `title` attribute. Native title (vs. Radix
+  // Tooltip) is the right call per the locked tooltip discipline:
+  // (a) handles are 12-14 px hit targets — too small for a 400 ms
+  //     Radix tooltip's positioning math to feel right;
+  // (b) the dialog's per-handle TooltipProvider overhead is real on a
+  //     100-node canvas (handle count = 2-4× node count);
+  // (c) native title preserves the OS-native floating behavior and
+  //     respects screen-reader announce paths for free.
+  const [showPortType] = usePreference("editor", "showPortTypeOnHover");
+
   return (
     <>
       <Handle
@@ -212,6 +235,7 @@ function FlowPortHandle({
         type={isInPort ? "target" : "source"}
         position={sideToPosition[resolvedSide]}
         data={{ portType: port.type }}
+        {...(showPortType ? { title: "FlowPort" } : {})}
         style={{
           background: isInPort ? FLOW_IN_BG : FLOW_OUT_BG,
           border: `1.5px solid ${isInPort ? FLOW_IN_BORDER : FLOW_OUT_BORDER}`,
@@ -264,12 +288,28 @@ function ThermalPortHandle({
   const pairWith = port.pair_with!;
   const defaultAxis = port.default_axis ?? "horizontal";
 
+  // Phase 72 (post-Preferences) — autoFlipPortsOnConnect gate; same model
+  // as FlowPortHandle above. When OFF, the port stays on its registry-
+  // declared side (`port.side` or — if absent — the natural side derived
+  // from default_axis + "in"/"out" name convention).
+  const [autoFlipEnabled] = usePreference("editor", "autoFlipPortsOnConnect");
+  const registryDefaultSide: Side =
+    (port.side as Side | undefined) ??
+    (defaultAxis === "horizontal"
+      ? port.name.includes("right")
+        ? "right"
+        : "left"
+      : port.name.includes("bottom")
+        ? "bottom"
+        : "top");
+
   // Pitfall 3: pull just the primitive `thisSide` out of the selector body so
   // the returned value is a string, not a fresh object.
   const resolvedSide: Side = useStore(
     useCallback(
-      (s: { nodes: Node[]; edges: Edge[] }) =>
-        resolveThermalPairSides(
+      (s: { nodes: Node[]; edges: Edge[] }) => {
+        if (!autoFlipEnabled) return registryDefaultSide;
+        return resolveThermalPairSides(
           s.nodes,
           s.edges,
           nodeId,
@@ -277,8 +317,9 @@ function ThermalPortHandle({
           pairWith,
           defaultAxis,
           getComponent,
-        ).thisSide,
-      [nodeId, port.name, pairWith, defaultAxis],
+        ).thisSide;
+      },
+      [nodeId, port.name, pairWith, defaultAxis, autoFlipEnabled, registryDefaultSide],
     ),
   );
 
@@ -293,12 +334,17 @@ function ThermalPortHandle({
   // alongside autoflip so edges connect to the correct end.
   const isSourceHandle = resolvedSide === "right" || resolvedSide === "bottom";
 
+  // Phase 72 (post-Preferences) — port-type-on-hover. See FlowPortHandle
+  // for why this is native title= rather than Radix Tooltip.
+  const [showPortType] = usePreference("editor", "showPortTypeOnHover");
+
   return (
     <Handle
       id={port.name}
       type={isSourceHandle ? "source" : "target"}
       position={sideToPosition[resolvedSide]}
       data={{ portType: port.type }}
+      {...(showPortType ? { title: "ThermalPort" } : {})}
       style={{
         background: THERMAL_HANDLE_COLOR,
         border: `1.5px solid ${THERMAL_HANDLE_BORDER}`,

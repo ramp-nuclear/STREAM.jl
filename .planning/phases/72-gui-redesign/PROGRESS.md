@@ -1016,6 +1016,51 @@ persistence.
 
 **Lessons captured below as #27 onward.**
 
+### Preferences — wire-up sweep (locked 2026-05-23)
+
+User feedback after the initial Preferences ship was "what is with
+everything not being wired yet? can you not do it now or what?" — the
+11 `Not yet wired.` placeholders read as deliberate gaps, not deferred
+work. Wire-up pass closes 8 of the 11.
+
+**Single commit:** `feat(72-prefs-wire): wire 8 deferred prefs (reduce-motion, autoflip, port-hover, default-zoom, default-open/export paths, indent width, open-after-export, loop-trace timeout)`
+
+**Side-effects wired (8 controls):**
+
+| Pref | Where it's read | Mechanism |
+|---|---|---|
+| `appearance.reduceMotion` | App.tsx + index.css + scrollIntoViewSafe | Writes `data-motion="full"\|"reduced"` on `<html>`. CSS targets the attribute; `html:not([data-motion="full"])` carves out the OS-pref reduce so "always on" overrides it. `scrollIntoViewSafe` inline-reads the attribute for JS-side smooth scroll. |
+| `editor.autoFlipPortsOnConnect` | StreamNode FlowPortHandle + ThermalPortHandle | `usePreference` per handle; when OFF, the resolver is short-circuited and the port stays on its registry-declared side. Wasted resolver work is per-handle and bounded. |
+| `editor.showPortTypeOnHover` | StreamNode FlowPortHandle + ThermalPortHandle | Native `title="FlowPort"\|"ThermalPort"` (not Radix Tooltip — 12-14 px hit targets, 400 ms Tooltip positioning math doesn't fit; native title preserves OS floating behavior + screen-reader announce). |
+| `editor.defaultZoomOnOpen` | CanvasPanel | Memo at mount; "fit" → `fitView` prop, "100" → `defaultViewport={x:0,y:0,zoom:1}`, "last" → restored from `stream-composer-viewport` localStorage key (persisted on `onMoveEnd`). Falls back to fit if the key is missing/corrupt. |
+| `files.defaultOpenLocation` | useStore.loadProject | Passed as `defaultPath` to Tauri `open()` when non-empty. |
+| `codeExport.defaultPath` | exportCode | Seeds the save dialog's `defaultPath` (was hardcoded `"system.jl"`). |
+| `codeExport.indentWidth` | exportCode | Post-processes the serialized output: each `"  "` (2-space) at line start → N×target unit. "tab" → `"\t"`. "4-spaces" → `"    "`. Avoids the full codeGenerator refactor (every `"  "` literal inside generation paths would need to thread). |
+| `codeExport.openExportedFile` | exportCode | After `writeTextFile` succeeds, calls `@tauri-apps/plugin-opener.openPath()`. Non-fatal on failure. |
+| `validation.loopTracePersistence` | CanvasPanel onFocusResult | When pref is "5s" or "10s", schedules a setTimeout after applying the trace. Closure-captures the current `activeTrace` reference so a replacement trace doesn't get cleared by the old timeout. |
+
+**Still placeholder-disabled (3 controls, plus 1 explicit cosmetic):**
+
+- `appearance.density` — needs an actual density-token system across the chrome (Compact vs Comfortable padding scales). Real feature, not just wiring.
+- `advanced.showDaemonStatus` — needs a `bin/jl` liveness API in the status bar; daemon integration is a future phase.
+- `advanced.performanceOverlay` — needs an FPS / paint-budget overlay component that doesn't exist.
+- `codeExport.includeSourceComments` — the source-line comment emitter (`# from canvas: <node>`) doesn't exist in codeGenerator; the pref has nothing to gate.
+
+These four stay disabled with the `Not yet wired.` mono micro line because there's no downstream feature to consume them yet. The pref persists either way, so adding the feature in a future phase doesn't touch PreferencesDialog.
+
+**Files touched (production, 7):**
+
+- `gui/src/index.css` — `data-motion` attribute selectors carving the OS-pref reduce-motion rule.
+- `gui/src/lib/scrollIntoViewSafe.ts` — inline `data-motion` read for JS-side smooth scroll.
+- `gui/src/App.tsx` — `data-motion` attribute writer + subscriber.
+- `gui/src/store/useStore.ts` — `loadProject` consumes `files.defaultOpenLocation`.
+- `gui/src/lib/exportCode.ts` — consumes `codeExport.defaultPath`/`indentWidth`/`openExportedFile`.
+- `gui/src/components/CanvasPanel.tsx` — `editor.defaultZoomOnOpen` mount memo + viewport persistence + loop-trace timeout.
+- `gui/src/components/StreamNode.tsx` — auto-flip gate + port-type-on-hover for both FlowPortHandle and ThermalPortHandle.
+- `gui/src/components/PreferencesDialog.tsx` — dropped `notYetWired` + `disabled` on the 8 newly-wired controls.
+
+**Tests:** 1044/1058 (4 pre-existing fixture failures, unchanged baseline). tsc: 10 errors (unchanged baseline).
+
 ### Lessons (worth re-reading at the start of the next session)
 
 1. **The validation-flash bug took 3 sub-fixes** (offset → border-radius →
