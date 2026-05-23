@@ -67,7 +67,7 @@ export default function LayersPanel() {
               data-testid={`layer-row-${key}`}
               onClick={() => toggleLayer(key)}
               className={cn(
-                "flex items-center gap-2 px-2 py-1.5 rounded-sm text-left text-body transition-colors",
+                "flex items-center gap-2 px-2 py-1.5 rounded-sm text-left text-[13px] transition-colors",
                 "hover:bg-accent hover:text-accent-foreground",
                 "focus:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground",
               )}
@@ -117,7 +117,7 @@ export default function LayersPanel() {
               : "Off-layer items are dimmed. Click to hide instead."
           }
           className={cn(
-            "w-full flex items-center justify-between px-2 py-1.5 rounded-sm text-left text-label text-muted-foreground transition-colors",
+            "w-full flex items-center justify-between px-2 py-1.5 rounded-sm text-left text-[11px] text-muted-foreground transition-colors",
             "hover:bg-accent hover:text-accent-foreground",
             "focus:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground",
           )}
