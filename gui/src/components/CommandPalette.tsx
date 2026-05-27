@@ -352,6 +352,11 @@ function CommandPaletteInner({
           // Strip DialogContent's default padding/gap so the cmdk Command
           // owns the inner box.
           "p-0 gap-0 overflow-hidden",
+          // Chrome-toned surface per feedback_chrome_color_for_anatomy_modals
+          // (2026-05-28). Palette/reference dialogs use bg-chrome (top-toolbar
+          // tone), not the darker --dialog-surface — the prior darker slab
+          // was hard to read against and felt dropped-in.
+          "bg-chrome border-border",
         )}
         data-testid="command-palette-content"
       >
