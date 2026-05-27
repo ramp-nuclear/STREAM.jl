@@ -27,6 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SectionHeader } from "@/components/ui/section-header";
 import { cn } from "@/lib/utils";
 import { usePreference, resetAllPreferences } from "@/lib/preferences";
+import { SEVERITY_COLOR_VAR } from "@/lib/severity";
 import { THEMES, useTheme, type Theme } from "@/hooks/useTheme";
 import { validators } from "@/lib/validation";
 
@@ -349,14 +350,7 @@ function ValidationPane() {
                 <span className="text-body font-mono text-foreground">{v.id}</span>
                 <span
                   className="text-micro uppercase tracking-wide font-mono"
-                  style={{
-                    color:
-                      v.severity === "error"
-                        ? "var(--destructive)"
-                        : v.severity === "warning"
-                        ? "var(--color-warning)"
-                        : "var(--color-info)",
-                  }}
+                  style={{ color: SEVERITY_COLOR_VAR[v.severity] }}
                 >
                   {v.severity}
                 </span>
