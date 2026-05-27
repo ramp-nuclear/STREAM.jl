@@ -20,13 +20,13 @@ const TOAST_CLASSES = {
   toast:
     "group toast group-[.toaster]:bg-popover group-[.toaster]:text-foreground group-[.toaster]:border group-[.toaster]:border-border group-[.toaster]:rounded-md group-[.toaster]:p-3 group-[.toaster]:text-body group-[.toaster]:shadow-none",
   title: "text-body font-medium",
-  description: "text-label text-foreground/65",
+  description: "text-label text-foreground",
   actionButton:
     "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:rounded-sm group-[.toast]:text-label group-[.toast]:h-6 group-[.toast]:px-2",
   cancelButton:
-    "group-[.toast]:bg-transparent group-[.toast]:text-foreground/65 group-[.toast]:rounded-sm group-[.toast]:text-label group-[.toast]:h-6 group-[.toast]:px-2 group-[.toast]:hover:bg-card",
+    "group-[.toast]:bg-transparent group-[.toast]:text-foreground group-[.toast]:rounded-sm group-[.toast]:text-label group-[.toast]:h-6 group-[.toast]:px-2 group-[.toast]:hover:bg-card",
   closeButton:
-    "group-[.toast]:bg-transparent group-[.toast]:border-border group-[.toast]:text-foreground/55 group-[.toast]:hover:bg-card",
+    "group-[.toast]:bg-transparent group-[.toast]:border-border group-[.toast]:text-foreground/85 group-[.toast]:hover:bg-card",
 }
 
 function Toaster({ className, ...props }: ToasterProps) {

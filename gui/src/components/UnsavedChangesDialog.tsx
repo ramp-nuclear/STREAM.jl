@@ -28,7 +28,7 @@ export default function UnsavedChangesDialog({
       <div className="relative z-10 bg-[var(--dialog-surface)] border border-[var(--dialog-border)] rounded-md shadow-[var(--shadow-dialog)] p-6 w-80 flex flex-col gap-4">
         <div>
           <h2 className="text-title font-semibold mb-1">Save changes?</h2>
-          <p className="text-body text-foreground/65">
+          <p className="text-body text-foreground/85">
             Your project has unsaved changes that will be lost if you don't save.
           </p>
         </div>

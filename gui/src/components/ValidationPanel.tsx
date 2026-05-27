@@ -434,7 +434,7 @@ export default function ValidationPanel() {
         <div className="border-b border-border shrink-0">
           {/* Controls row */}
           <div className="flex items-center justify-between px-3 py-1.5 gap-3">
-            <div className="flex items-center gap-2 text-label text-foreground/65 min-w-0">
+            <div className="flex items-center gap-2 text-label text-foreground/85 min-w-0">
               <span className="tabular-nums">
                 {count} {count === 1 ? "issue" : "issues"}
               </span>
@@ -518,7 +518,7 @@ export default function ValidationPanel() {
 
       {/* Empty state */}
       {count === 0 && (
-        <div className="flex-1 px-3 py-3 text-body text-foreground/65 font-mono">
+        <div className="flex-1 px-3 py-3 text-body text-foreground font-mono">
           {filterActive ? (
             <>
               No results match the active filter.{" "}
@@ -669,7 +669,7 @@ function GroupBySettings({ groupBy, onChange }: GroupBySettingsProps) {
               // larger button.
               className={
                 "inline-flex items-center justify-center px-2 py-1.5 ml-1 rounded-sm cursor-pointer " +
-                "text-foreground/65 hover:text-foreground " +
+                "text-foreground/85 hover:text-foreground " +
                 "transition-colors duration-[80ms] " +
                 "hover:bg-popover focus-visible:outline-none focus-visible:bg-popover " +
                 (groupBy !== "none" ? "text-foreground" : "")
@@ -748,7 +748,7 @@ function GroupHeader({
       }
       style={{ gridTemplateColumns: gridTemplate }}
     >
-      <span className="font-mono text-label leading-snug inline-flex items-center text-foreground/65">
+      <span className="font-mono text-label leading-snug inline-flex items-center text-foreground/85">
         {collapsed ? (
           <ChevronRight className="h-3 w-3" strokeWidth={1.5} />
         ) : (
