@@ -185,7 +185,7 @@ export default function ResourceReferencePicker({
       />
 
       {isEditDisabled ? (
-        <Tooltip>
+        <Tooltip disabled>
           <TooltipTrigger asChild>
             {/* 62-12: `shrink-0` on the span wrapper keeps the disabled-Edit
                 button at intrinsic width when the row wraps. The wrapper
