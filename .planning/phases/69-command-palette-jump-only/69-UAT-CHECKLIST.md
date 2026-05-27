@@ -1,3 +1,8 @@
+---
+status: complete
+closed_by: user UAT confirmed during v1.2 milestone close-out (2026-05-28)
+---
+
 # Phase 69 — Command Palette UAT Checklist
 
 **Phase:** 69-command-palette-jump-only

@@ -1,6 +1,7 @@
 ---
 phase: quick
 plan: 260322-l7z
+status: complete
 subsystem: examples
 tags: [lof, transient, visualization, bypass-topology, natural-circulation]
 dependency_graph:
