@@ -1,5 +1,44 @@
 # Milestones
 
+## v1.2 GUI Redesign (Shipped: 2026-05-28)
+
+**Phases:** 59–72 + 63.1 (15 phases, 97 plans)
+**Working branch:** `gui-redesign` (single PR vehicle to `main`)
+**Timeline:** 2026-05-11 → 2026-05-28 (17 days)
+
+**Goal:** A from-the-ground refresh of the STREAM Composer GUI (Tauri 2 + React + ReactFlow), driven by the v1.1 channels-redesign architecture and a committed visual identity. Bring every GUI surface from "amateur playbox" to professional engineering tool.
+
+**Key accomplishments:**
+
+- **Correlation geom-first refactor + fuel_assembly helper + registry rewrite** (Phases 59–61): every HTC + friction factory takes `geom::PipeGeometry` as first positional argument (eliminates duplicate-Dh-input in the GUI); new `fuel_assembly(channels, plates; bookend, closed, name)` composition helper covering four alternating CAC↔Plate variants; `gui/src/registry/components.json` rewritten for v1.1 with `WallTemperature`, `HeatFluxSource`, `PointKinetics`, `ReactivityController`; `scope` field per parameter for Properties-tab vs BCs-tab split.
+- **Resources panel + BCs tab + value-source components** (Phases 62–63, 63.1): Navigator restructured to `Project → Model Options + Resources + Components`; foreign-key UUID references; `.scp` save format; five BC modes (value / profile / function / mark-in-code / driven-by-source-block); dashed BC edge style; bidirectional sync between BCs tab and canvas connections; symmetric `rebin_intensive` + `cosine_T_wall_profile` and conservative `rebin_extensive` + `cosine_power_shape` helpers shipped as STREAM exports.
+- **Connection routing + interaction model** (Phases 64–65): per-port autoflip for FlowPorts with asymmetric same-side placement; independent axis-flip for thermal-pair ports on CAC/HD; left-marquee selection, right-click drag pan with 5px/250ms context-menu disambiguation, edge deletion (Del/Backspace + right-click), Copy/Cut/Paste/Duplicate with smart-parse-and-increment naming, snap-to-grid toggle, AutoRecover sidecar snapshot mechanism with crash-restore modal.
+- **Code preview rework + custom titlebar + layers system** (Phases 66–68): structured `CodeSection[]` output replacing flat string code-gen; bidirectional traceability (code-hover → canvas-highlight; canvas-select → explicit code-jump); click-to-pin; Tauri `decorations: false` + custom HTML titlebar with integrated File/Edit/View/Help menubar; four-layer taxonomy (Hydraulic / Thermal / Sources / Reactor Physics) with independent checkbox toggles + layer-aware connect tool + floating chip with D-01 state indicators.
+- **Command palette + presets + validation framework** (Phases 69–71): Ctrl+P fuzzy search across component instance names + Resource names (jump-only, no action invocation in v1); `.scpr` file format for save-selection-as-preset / load-preset with auto-resource-create + smart-name collision handling; pluggable validator registry with severity (error/warning/info), click-to-focus, red-ring markers on offending nodes + red highlights on offending property fields, compact VS-Code-style status-bar indicator, eight initial rules including loop closure + gravity sum per loop + geometry consistency, gates code-gen export on errors.
+- **GUI redesign via Impeccable** (Phase 72): 12 locked surfaces ran entirely through the Impeccable Claude Code skill (bypassing GSD discuss/plan/execute/ui-phase/ui-review/verify-work). Final audit **19/20** (up from 12/20 at phase start), critique **38/40**. Outputs: `PRODUCT.md` (design contract, anti-references shadcn-admin silhouette), `DESIGN.md` (Stitch v2 spec, SSOT for all GUI tokens), `.impeccable/design.json` (v1 schema sidecar, `version: phase-72-closed`), extracted `lib/severity.ts` + `SectionHeader.tsx`. Cross-cutting `/impeccable harden` + `clarify` + `polish` passes closed all P0 audit findings.
+
+**Side-channel work landed on `gui-redesign`:**
+
+- **Physics fix** (`7c6f8b1`, 2026-05-28): cell-center average for per-cell `P_i` in `src/components/channels.jl` — manual cherry-pick of upstream `channels-redesign` commit `d8810e3` ("Add small physical correction to the base equations for channel"). Applied to both `_channel_core` (line 122) and the SCB-branch inline copy (line 557).
+
+**Known deferred items (carry-forward, not v1.2 blockers):**
+
+- **StreamNode flow-port Tailwind hex** — single remaining theming gap noted in the 19/20 Phase 72 audit. The hex values (`#60a5fa / #1d4ed8 / #f87171 / #b91c1c`) are functional but not tokenized.
+- **CLAUDE.md still references `bin/jl` / `bin/jl-up`** which were removed from the tree in the upstream cleanup mirror. Doc fix in a later milestone.
+- **2 quick tasks (260322-l7z, 260408-qv7)** were complete (full SUMMARY.md present) but flagged by `gsd-sdk query audit-open` because the SUMMARY files don't match the audit's hard-coded filename expectation (`SUMMARY.md` vs project's `<slug>-SUMMARY.md` convention).
+
+**Branch status at close:**
+
+- `gui-redesign` is **not** a descendant of `origin/channels-redesign` tip. PR #15 (`channels-redesign → main`) is OPEN; when it merges, `gui-redesign` will need to rebase onto fresh `main` before merging. The conflict surface is limited: gui-redesign's Julia changes (Phase 59 geom-first signatures, Phase 60 `fuel_assembly`, Phase 62/63 source helpers) and channels-redesign's recent cleanup commits touch different lines of the same files (signatures vs comments), so conflicts should be mechanical.
+
+**Method note — Impeccable for Phase 72:**
+
+Phase 72 is the first phase in STREAM.jl history to run entirely outside the standard GSD pipeline. Instead of `discuss-phase` → `plan-phase` → `execute-phase` → `verify-work`, it used `/impeccable document --seed` → `/impeccable shape <surface>` (×12) → `/impeccable harden` / `clarify` / `polish` (cross-cutting) → `/impeccable extract` → `/impeccable audit` + `critique` (gates) → `/impeccable document` (scan mode). `PRODUCT.md` replaces the would-be CONTEXT.md / RESEARCH.md; `DESIGN.md` replaces a per-plan PLAN.md. The model is captured in `feedback_opinionated_design_no_inertia_no_churn` + `project_impeccable_design_workflow` memories.
+
+**Git range:** `b85ab42` → `a46d2ca` (Phase 59 first commit → Phase 72 close commit).
+
+---
+
 ## v1.1 Final Channel-Family Redesign (Shipped: 2026-05-09)
 
 **Phases:** 52-58 (7 phases, 33 plans)
@@ -68,6 +107,7 @@ After 56-PAUSE-CONTEXT.md's resume gate ("after 57+58 ship, expect zero FAIL bey
 - PackageCompiler+Julia1.12+WSL2 incompatibility documented (SIGTERM at ~7min on incremental LLVM link step regardless of package list); persistent REPL + Revise.jl established as primary development workflow
 
 **Known Gaps:**
+
 - Sysimage not buildable on Julia 1.12 + WSL2 (TTFX-04 requirement not met on this platform); build infrastructure retained for future Julia versions or non-WSL2 environments
 
 ---

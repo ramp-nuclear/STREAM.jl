@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.2
-milestone_name: milestone
-status: phase_complete
-stopped_at: context exhaustion at 76% (2026-05-22)
-last_updated: "2026-05-22T14:31:10.361Z"
-last_activity: 2026-05-21
+milestone_name: GUI Redesign
+status: shipped — awaiting next milestone
+last_updated: "2026-05-28T00:00:00.000Z"
+last_activity: 2026-05-28 — Milestone v1.2 completed and archived; awaiting PR rebase onto main (post PR #15 merge)
 progress:
   total_phases: 15
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 97
-  completed_plans: 100
-  percent: 93
+  completed_plans: 101
+  percent: 100
 ---
 
 # STATE: STREAM.jl
@@ -25,9 +24,9 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** Phase 71 complete (2026-05-21) — next is Phase 66 (Code preview rework) or whichever phase the user routes to next
+**Current focus:** v1.2 shipped 2026-05-28. PR to `main` pending — needs rebase onto `main` after PR #15 (channels-redesign) merges. Next: `/gsd:new-milestone` or planning work.
 **Python STREAM reference:** ~/projects/STREAM
-**Working branch:** `gui-redesign` (off `main`; PR #15 — v1.1 `channels-redesign` → `main` — is currently OPEN but not a blocker; `gui-redesign` already contains the full v1.1 architecture and will fast-forward once PR #15 merges).
+**Working branch:** `gui-redesign` (off `main`). v1.2 milestone closed; awaiting rebase + PR.
 
 **Roadmap summary:**
 
@@ -58,20 +57,10 @@ See: .planning/PROJECT.md (updated 2026-05-05)
 
 ## Current Position
 
-Phase: 71 (validation-framework) — ✓ COMPLETE (2026-05-21)
-Plans: 13/13 shipped (50 commits, 11 rule files, 1033/1033 vitest pass, 10 tsc errors down from 13 baseline)
-Verification: VERIFICATION.md — 20/20 must-haves passed
-Last activity: 2026-05-21
-Next: route to Phase 66 (Code preview rework) or take a pause / decide next milestone direction.
-
-Phase 65 manual UAT: CLOSED 2026-05-21. All 20 tests in 65-UAT.md pass — including the 6 originally-deferred interactive items (canvas interaction matrix, clipboard, context menus + Rename focus, snap-to-grid persistence, AutoRecover crash sim, Untitled→Save As). VERIFICATION.md status flipped from `human_needed` to `complete`. (Phase 64 manual UAT also closed in the same sweep: 4/5 pass + 1 cosmetic issue routed to Phase 72 follow-up todo.)
-
-Outstanding non-blocking items (NOT 71's job, but Phase 71 owns the tsc/vitest reconciliation):
-
-- 11 pre-existing tsc errors + 1 pre-existing vitest failure (`SidebarPanel.anchors.test.tsx "Symmetric (L = R)"`) — Phase 71 owns reconciliation per Phase 61's deferred-items.
-- Channel BCs tab visual layout fit issues — explicitly deferred to Phase 72 (v1.2 cosmetics / design system audit). Originally tagged for Phase 65 but Phase 65 scope was interaction model + AutoRecover, not BC visual layout.
-
----
+Phase: Milestone v1.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-27 — Milestone v1.2 completed and archived
 
 ## Accumulated Context
 
@@ -163,3 +152,7 @@ No v1.2-active blockers currently tracked. Phase 71 (validation framework, next 
 ---
 
 *Last updated: 2026-05-14 — Phase 65 complete (8/8 plans, verification PASS); ready for Phase 66*
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

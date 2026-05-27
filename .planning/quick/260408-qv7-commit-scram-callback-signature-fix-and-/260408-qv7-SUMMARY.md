@@ -1,6 +1,7 @@
 ---
 phase: quick
 plan: 260408-qv7
+status: complete
 subsystem: point-kinetics
 tags: [scram, callback, refactor, state-update]
 key-files:
