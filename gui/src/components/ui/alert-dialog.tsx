@@ -70,7 +70,7 @@ function AlertDialogContent({
           // Phase 72 post-Preferences — body uses --dialog-surface +
           // --dialog-border (was bg-popover + border-border). Matches the
           // CommandPalette lineage now locked across all modal primitives.
-          "group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-[var(--dialog-border)] bg-[var(--dialog-surface)] p-6 shadow-[var(--shadow-dialog)] outline-none data-[size=sm]:max-w-xs motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100 data-[size=default]:sm:max-w-lg",
+          "group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-border bg-chrome p-6 shadow-[var(--shadow-dialog)] outline-none data-[size=sm]:max-w-xs motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100 data-[size=default]:sm:max-w-lg",
           className
         )}
         {...props}

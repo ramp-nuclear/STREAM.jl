@@ -76,7 +76,7 @@ export default function AutoRecoverRestoreModal({
           onPointerDownOutside={(e) => e.preventDefault()}
           // Block focus leaving the dialog
           onInteractOutside={(e) => e.preventDefault()}
-          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-md border border-[var(--dialog-border)] bg-[var(--dialog-surface)] p-6 shadow-[var(--shadow-dialog)]"
+          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-md border border-border bg-chrome p-6 shadow-[var(--shadow-dialog)]"
           aria-describedby="autorecover-description"
         >
           {/* Header */}

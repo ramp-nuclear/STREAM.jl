@@ -558,11 +558,15 @@ export default function PreferencesDialog({ open, onOpenChange }: PreferencesDia
     >
       <DialogContent
         // Phase 72 post-Preferences-feedback — Preferences inherits the
-        // CommandPalette visual lineage: transparent scrim, --dialog-surface
-        // body, atmospheric --shadow-dialog (all now Dialog-primitive
-        // defaults). Position is top-anchored (top-[80px]) to match the
-        // CommandPalette and shortcuts-mode keymap, both of which the user
-        // asked Preferences to look like.
+        // CommandPalette visual lineage: transparent scrim, atmospheric
+        // --shadow-dialog. Top-anchored (top-[80px]) to match the
+        // CommandPalette and shortcuts-mode keymap.
+        //
+        // Surface is bg-chrome (top-toolbar tone) per the 2026-05-28
+        // unified dialog tone rule (feedback_chrome_color_for_anatomy_modals
+        // extended to form dialogs after the post-critique pass). Same tone
+        // as AnatomyDialog / CommandPalette / AboutDialog — one dialog
+        // doctrine across the app.
         //
         // Fixed 720 × 560 — desktop-only per scope. Override the primitive's
         // grid + gap so the two-pane layout sits flush, and zero the inner

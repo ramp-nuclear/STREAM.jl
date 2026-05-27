@@ -53,9 +53,6 @@ export default function AnatomyDialog({
           "p-0 gap-0 overflow-hidden rounded-md",
           "w-[1300px] max-w-[95vw] sm:max-w-[1300px]",
           "top-[6vh] translate-y-0",
-          // Chrome-toned surface (top-toolbar color), same border weight,
-          // atmospheric shadow inherited from DialogContent default.
-          "bg-chrome border-border",
         )}
         data-testid="anatomy-dialog"
       >

@@ -7,14 +7,16 @@ import { Button } from "@/components/ui/button"
 
 // Phase 72 — primitive-layer recommit, relocked post-Preferences when the
 // user banned the prior visual outright (see
-// `feedback_no_grey_modal_surface_or_scrim`).
+// `feedback_no_grey_modal_surface_or_scrim`). Surface tone unified again
+// 2026-05-28 to bg-chrome (top-toolbar color) across every floating
+// dialog — replaces the prior --dialog-surface darker slab which read
+// as a separate dropped-in modal rather than part of the app shell.
 //
 // Surface treatment:
-//   - bg-popover → bg-[var(--dialog-surface)] (own tone, OFF the
-//     chrome/panel/canvas trio — established by CommandPalette, promoted to
-//     the default when the dim grey scrim was banned)
-//   - rounded-md, border-[var(--dialog-border)] (own border tone matching
-//     the lower-lightness surface)
+//   - bg-chrome — same tone as the top toolbar + bottom status bar; the
+//     dialog reads as the app shell raised, not as a foreign panel
+//   - rounded-md, border-border (matches the chrome surface's natural
+//     edge tone)
 //   - shadow-[var(--shadow-dialog)] now carries atmospheric 16/40 px values
 //     (was 8/24 px); with no scrim, the shadow takes over the lift work
 //
@@ -97,7 +99,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-[var(--dialog-border)] bg-[var(--dialog-surface)] p-6 shadow-[var(--shadow-dialog)] outline-none motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100 sm:max-w-lg",
+          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-border bg-chrome p-6 shadow-[var(--shadow-dialog)] outline-none motion-reduce:!duration-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-[80ms] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:duration-100 sm:max-w-lg",
           className
         )}
         {...props}

@@ -23,9 +23,10 @@ export default function UnsavedChangesDialog({
         className="absolute inset-0 bg-transparent"
         onClick={onCancel}
       />
-      {/* Dialog — --dialog-surface + --dialog-border + atmospheric
-          --shadow-dialog match the locked Dialog vocab post-Preferences. */}
-      <div className="relative z-10 bg-[var(--dialog-surface)] border border-[var(--dialog-border)] rounded-md shadow-[var(--shadow-dialog)] p-6 w-80 flex flex-col gap-4">
+      {/* Dialog — bg-chrome + atmospheric --shadow-dialog per the unified
+          2026-05-28 dialog tone (all dialogs match top-toolbar color now,
+          not just reference/legend ones). */}
+      <div className="relative z-10 bg-chrome border border-border rounded-md shadow-[var(--shadow-dialog)] p-6 w-80 flex flex-col gap-4">
         <div>
           <h2 className="text-title font-semibold mb-1">Save changes?</h2>
           <p className="text-body text-foreground/85">
