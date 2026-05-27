@@ -1027,37 +1027,66 @@ vocabulary. Opens from `HelpMenu → "Anatomy"` via the `stream:open-anatomy`
 custom event; no keybind by design (low-frequency reference doesn't earn a
 binding, mirroring the menu-only `About` precedent).
 
-**Surface:** Dialog at `!max-w-[920px] w-[92vw]`. Body uses the standard
-DialogContent surface (now `--dialog-surface` + atmospheric `--shadow-dialog` per the Modal Lock above; AnatomyDialog inherits the new default automatically). Two tiles arranged
-horizontally with `divide-x divide-border/60`; legend lists sit below each
-tile; a single-line `not all states co-occur on a real node` footnote runs
-across the dialog bottom.
+**Surface:** Dialog at `w-[1300px] max-w-[95vw]`, top-anchored
+(`top-[6vh]`). Body uses `bg-chrome` (top-toolbar tone) rather than the
+darker `--dialog-surface` — the prior darker slab was hard to read against
+and felt dropped-in. Atmospheric `--shadow-dialog` inherited from
+`DialogContent` still carries the lift; the [[modal lock]] no-dim-scrim
+doctrine still applies. `showCloseButton={false}` — click outside or press
+Esc dismisses (the X read as ceremony for a panel that's already
+two-action-away from canvas). Two showcases arranged horizontally with
+`divide-x divide-border`. A single-line footer enumerates the four
+outline states (rest / selected / error / preview) — the prior
+"not-all-states-co-occur" disclaimer is unnecessary because the specimens
+render rest state only.
+
+**Typography (upsized 2026-05-28).** `DialogTitle` uses `text-display`
+(20 px); section headers use `text-body uppercase`; inline node labels +
+body-row caption + footer use `text-body text-foreground` (full opacity,
+no `/55`/`/65` dim); edge row name uses `text-title`, description uses
+`text-body`. The earlier `text-label`/`text-micro` + foreground/55-65
+treatment was unreadable at the dialog's surface contrast.
+
+**Distilled from the leader-and-chip diagram (Phase 72 critique P2-1,
+2026-05-27).** The prior implementation was a 1340 px dialog with 640×520
+tiles, dashed two-segment SVG leaders at constant slope (m=2.0), numbered
+chips at the tile perimeter, and a two-column numbered legend below each
+tile. The critique called it "a diagram, not a help surface" — a long-term
+maintenance liability for a low-frequency reference panel. The leader
+topology, slope math, chip-routing engine, and legend mapping are deleted;
+each feature gets a plain text label positioned next to it (proximity =
+relationship). Node specimen is ~220 px wide; total dialog is 800 px.
 
 **Diagram source = visual mirror.** The dialog renders a *visual mirror* of
 the production `StreamNode` rather than the real component, because
 `StreamNode` reads from the global zustand store (`errorNodeIds`, `anchors`,
 `hoveredSourceIds`, `pinnedSourceIds`, `activeLayers`, `hideOffLayer`) and
-would need every selector path stubbed out to render in a non-canvas context.
-The mirror consumes the same tokens (`--card`, `--ring`, `--destructive`,
-`--color-layer-*`, `--node-ring-rest`, `--chart-5`) and matches the band
-geometry / body structure / ring + outline values pixel-for-pixel. When
-`StreamNode` changes, update the mirror here too. Drift surface is
-intentionally small (visual shell only, not behavior).
+would need every selector path stubbed out to render in a non-canvas
+context. The mirror consumes the same tokens (`--card`, `--color-layer-*`,
+`--color-port-*`, `--border`) and matches the band geometry / body
+structure / port placements. Only the **rest** state is shown — selected
+ring, error outline, and Save Preset preview outline are documented in the
+dialog footer line but not rendered on the specimen. When `StreamNode`
+changes, update the mirror here too. Drift surface is intentionally small
+(visual shell only, not behavior).
 
-Edges are inline SVG paths matching `HydraulicEdge` (solid 1.5 px),
-`BCEdge` (dashed 6/3 with mid-edge tag), and `.validation-flow-trace`
-(2.5 px warning-tinted dashed with marching-ants animation, severity =
-warning). The marching-ants keyframe is scoped locally as
+Edges are rendered as a list of four rows. Each row: `[96×28 SVG specimen]
+{name} {one-line description}`. Specimens are inline SVG paths matching
+`HydraulicEdge` (solid 1.5 px), `BCEdge` (dashed 6/3), `.validation-flow-
+trace` (2.5 px warning-tinted dashed with marching ants), and a two-box
+port-convention schematic. The marching-ants keyframe is scoped locally as
 `anatomy-flow-march` to avoid depending on the global xyflow-scoped
 `.validation-flow-trace .react-flow__edge-path` selector. Same
 `prefers-reduced-motion` collapse rule.
 
-**Callouts:** 18×18 px rounded-sm chips, mono micro-text numbering, hairline
-`--border`, positioned absolutely over the diagram tile. Node tile carries
-10 callouts (1=Hydraulic band, 2=Thermal band, 3=icon+label, 4=instance,
-5=value summary, 6=ports, 7=selected ring, 8=error outline, 9=pressure
-anchor, 10=autoExtended sample). Edges tile carries 4 callouts (1=hydraulic
-default, 2=BC dashed, 3=loop trace, 4=port-side convention).
+**Inline labels (not callouts):** named features on the node specimen
+(`anchor`, `flow in`, `layer band`, `thermal port`, `flow out`) are plain
+mono text positioned absolutely next to the feature with
+`text-foreground/65`. No numbered chips, no leader lines, no legend
+mapping. The three body-text rows (component type, instance name, value
+summary) share a single mono caption below the specimen — they are
+self-evident from their visible content, so naming the row CATEGORY in
+prose is enough.
 
 **The Anatomy-Is-A-Legend-Not-Docs Rule.** Anatomy shows visual vocabulary;
 it does NOT explain physics, components, or workflows. Documentation
