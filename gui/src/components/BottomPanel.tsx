@@ -97,10 +97,12 @@ export default function BottomPanel() {
 
   return (
     <div style={{ height: bottomPanelHeight }} className="border-t flex flex-col bg-panel">
-      {/* Drag handle — VS Code-style 4px sash: transparent at rest, subtle
-          tint on hover. Phase 68 UAT 2026-05-17 polish (was h-2/8px). */}
+      {/* Drag handle — 4px hit zone with a 1px hairline centered inside.
+          Hairline sits at `--border` at rest (subtle but visible — same
+          discoverability move as the validator column-resize handles per
+          the 2026-05-27 Alex-flag fix) and lifts to `--ring` on hover. */}
       <div
-        className="h-1 w-full cursor-row-resize hover:bg-ring/30 transition-colors flex-shrink-0"
+        className="relative h-1 w-full cursor-row-resize flex-shrink-0 group/sash before:absolute before:inset-x-0 before:top-1/2 before:-translate-y-1/2 before:h-px before:bg-border before:transition-colors before:duration-[80ms] hover:before:bg-[var(--ring)]"
         onMouseDown={onMouseDown}
       />
       {/* Phase 72: the duplicate Tabs control was removed from this header.
