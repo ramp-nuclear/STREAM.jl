@@ -404,6 +404,36 @@ surfaces (panels, sidebars, dialogs body content) still carry the old
 arbitrary values; consumer-side migration to the token scale is
 `/impeccable polish` work at phase end.
 
+### Separator idiom — middle-dot `·` (locked, 2026-05-28)
+
+The canonical user-visible separator is **U+00B7 MIDDLE DOT** (`·`), surrounded
+by one regular space on each side: ` · `. Use it to join short related
+phrases in a single line — caption fragments, status-line segments, footer
+state enumerations, tooltip "title · binding" pairs, inline filter chips
+that read as `count · label`.
+
+Current consumers (verified 2026-05-28):
+
+- `AnatomyDialog` footer — outline state enumeration.
+- `AnatomyDialog` body-rows caption.
+- `ValidationStatusBar` close-button tooltip — `Close panel · Ctrl+\``.
+- `ValidationPanel` header — `{N} issues · in <node> · clear`.
+
+**Why `·` and not `/`.** The slash convention (Linear paths, `Workspace /
+Project / Issue`) implies hierarchy. The middle-dot implies sibling
+enumeration — multiple equally-weighted items joined into one line. The
+Composer's separator usage is always the latter (state enumerations,
+related-but-flat fragments), so `·` is the semantic match.
+
+**Why not `•`, `,`, or `-`.** Bullet `•` (U+2022) reads heavier and
+implies list. Comma reads as prose. Hyphen-minus `-` is ambiguous with
+negatives and ranges. Em-dash `—` is on the locked Don't list. The
+middle-dot is the unique semantic-neutral inline separator.
+
+**Spacing.** Always ` · ` with a regular space on each side. No
+non-breaking space, no narrow space — keeps copy editable without
+character-pickers.
+
 ### Font choice — `[TBD]`
 
 Current code uses the Tailwind default system stack:
