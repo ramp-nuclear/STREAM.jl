@@ -97,7 +97,7 @@ export default function ResourceGroupHeader({
     // receives pointer events — `disabled` on a <button> swallows mouse
     // events in some browsers and the Radix Tooltip would never open.
     rightAffordance = (
-      <Tooltip>
+      <Tooltip disabled>
         <TooltipTrigger asChild>
           <span tabIndex={0} className="inline-flex">
             {plusButton}

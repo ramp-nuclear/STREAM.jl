@@ -265,7 +265,7 @@ export default function ModelOptionsPanel() {
           Default fluid
         </Label>
         <TooltipProvider>
-          <Tooltip>
+          <Tooltip disabled>
             <TooltipTrigger asChild>
               {/* Wrap in a span so the disabled <input> still receives pointer
                   events for the tooltip (Radix needs a focusable trigger). */}

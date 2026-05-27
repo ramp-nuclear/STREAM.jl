@@ -129,7 +129,7 @@ export default function BottomPanel() {
             </>
           )}
         </Button>
-        <Tooltip>
+        <Tooltip disabled={!hasNodes || structuralErrorCount > 0}>
           <TooltipTrigger asChild>
             <span
               tabIndex={structuralErrorCount > 0 || !hasNodes ? 0 : -1}
