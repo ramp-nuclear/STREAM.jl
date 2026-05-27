@@ -8,6 +8,11 @@ import ReactDOM from "react-dom/client";
 // in CanvasPanel.tsx stays — both resolve to the same module so Vite
 // deduplicates them.
 import "@xyflow/react/dist/style.css";
+// JetBrains Mono — locked project mono per DESIGN.md §3 (2026-05-28). The
+// variable-font asset registers `JetBrains Mono Variable` family, consumed
+// via the `--font-mono` token in index.css. Imported here at the entry so
+// font-display=swap rendering doesn't FOUT-flash in the production build.
+import "@fontsource-variable/jetbrains-mono";
 import App from "./App";
 import "./index.css";
 

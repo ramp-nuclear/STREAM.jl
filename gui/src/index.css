@@ -346,6 +346,14 @@
   --text-title--line-height: 1.5rem;
   --text-display: 1.25rem;      /* 20 px — reserved for future hierarchy moments */
   --text-display--line-height: 1.75rem;
+  /* Font families. The mono is the only committed face (2026-05-28); body
+     stays on the system stack since native rendering is high-quality and
+     the engineering-voice lives in mono surfaces (status bar counts,
+     validator IDs, keyboard hints, value summaries). JetBrains Mono is
+     registered as `JetBrains Mono Variable` by @fontsource-variable/jetbrains-mono
+     (imported in main.tsx). Falls back through ui-monospace → native mono
+     stack if the variable font fails to load. */
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   /* Phase 72 — --shadow-dialog (defined in :root + .dark) is consumed by
      Dialog / AlertDialog / Sheet via the arbitrary-value form
      `shadow-[var(--shadow-dialog)]`. Not exposed as a Tailwind utility
