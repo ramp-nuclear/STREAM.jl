@@ -237,6 +237,43 @@ function Section({ title, children }: SectionProps): React.JSX.Element {
 // Leader & marker (shared between node tile and edges tile when needed).
 // ---------------------------------------------------------------------------
 
+// FlowPortMirror — faithful render of StreamNode's FlowDiscMark for use in
+// the anatomy legend. Renders the graphite disc + Hydraulic-accent chevron
+// at the same 14×14 viewBox StreamNode uses. `rotation` follows the same
+// convention as `flowChevronRotation` (0 = chevron points right, 90 = down,
+// 180 = left, 270 = up).
+function FlowPortMirror({
+  rotation,
+  style,
+}: {
+  rotation: number;
+  style: React.CSSProperties;
+}): React.JSX.Element {
+  return (
+    <svg
+      aria-hidden
+      width="16"
+      height="16"
+      viewBox="0 0 14 14"
+      style={style}
+    >
+      <circle
+        cx="7"
+        cy="7"
+        r="6"
+        fill="var(--color-port-disc)"
+        stroke="var(--color-port-disc-border)"
+        strokeWidth="1"
+      />
+      <polygon
+        points="5.5,4.5 8.5,7 5.5,9.5"
+        fill="var(--color-port-chevron)"
+        transform={`rotate(${rotation} 7 7)`}
+      />
+    </svg>
+  );
+}
+
 function Leader({ callout }: { callout: Callout }): React.JSX.Element {
   const chipCenterX =
     callout.side === "L" ? LEFT_CHIP_CENTER_X : RIGHT_CHIP_CENTER_X;
@@ -348,7 +385,7 @@ const NODE_FEATURES: readonly RawFeature[] = [
     fx: NODE_LEFT + NODE_WIDTH / 2,
     fy: NODE_TOP - 6,
     side: "R",
-    legend: "Flow port. Blue ports flow in, red ports flow out.",
+    legend: "Flow port. Chevron points the topological direction (in vs out).",
   },
   {
     key: "band",
@@ -462,34 +499,26 @@ function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
           className="w-4 h-4 text-foreground"
           style={{ position: "absolute", left: -22, top: -10 }}
         />
-        {/* FlowPort in (top). */}
-        <span
-          aria-hidden
+        {/* FlowPort in (top) — chevron points down, into the node body
+            (side="top", isInPort=true → rotation 90). */}
+        <FlowPortMirror
+          rotation={90}
           style={{
             position: "absolute",
             top: -8,
             left: "50%",
             transform: "translateX(-50%)",
-            width: 16,
-            height: 16,
-            background: "#60a5fa",
-            border: "1.5px solid #1d4ed8",
-            borderRadius: "50%",
           }}
         />
-        {/* FlowPort out (bottom). */}
-        <span
-          aria-hidden
+        {/* FlowPort out (bottom) — chevron also points down, away from
+            the node body (side="bottom", isInPort=false → 270 + 180 = 90). */}
+        <FlowPortMirror
+          rotation={90}
           style={{
             position: "absolute",
             bottom: -8,
             left: "50%",
             transform: "translateX(-50%)",
-            width: 16,
-            height: 16,
-            background: "#f87171",
-            border: "1.5px solid #b91c1c",
-            borderRadius: "50%",
           }}
         />
         {/* ThermalPort (left). */}
@@ -720,33 +749,24 @@ function EdgesTile(): React.JSX.Element {
           </style>
         </svg>
 
-        {/* Edge endpoint ports. */}
+        {/* Edge endpoint ports. Both chevrons point right (source port_out
+            flows toward target; target port_in receives from source). */}
         {ROW_Y.map((y, i) => (
           <React.Fragment key={i}>
-            <span
-              aria-hidden
+            <FlowPortMirror
+              rotation={0}
               style={{
                 position: "absolute",
                 left: EDGE_SRC_X - 8,
                 top: y - 8,
-                width: 16,
-                height: 16,
-                background: "#60a5fa",
-                border: "1.5px solid #1d4ed8",
-                borderRadius: "50%",
               }}
             />
-            <span
-              aria-hidden
+            <FlowPortMirror
+              rotation={0}
               style={{
                 position: "absolute",
                 left: EDGE_TGT_X - 8,
                 top: y - 8,
-                width: 16,
-                height: 16,
-                background: "#f87171",
-                border: "1.5px solid #b91c1c",
-                borderRadius: "50%",
               }}
             />
           </React.Fragment>
@@ -763,31 +783,22 @@ function EdgesTile(): React.JSX.Element {
           L+R
         </span>
 
-        {/* Convention port dots. */}
-        <span
-          aria-hidden
+        {/* Convention port dots. Both chevrons point right (source on left
+            sends flow rightward; target on right receives from rightward). */}
+        <FlowPortMirror
+          rotation={0}
           style={{
             position: "absolute",
             left: CONV_SRC_LEFT - 8,
             top: CONV_ROW_Y - 8,
-            width: 16,
-            height: 16,
-            background: "#60a5fa",
-            border: "1.5px solid #1d4ed8",
-            borderRadius: "50%",
           }}
         />
-        <span
-          aria-hidden
+        <FlowPortMirror
+          rotation={0}
           style={{
             position: "absolute",
             left: CONV_TGT_LEFT + CONV_NODE_W - 8,
             top: CONV_ROW_Y - 8,
-            width: 16,
-            height: 16,
-            background: "#f87171",
-            border: "1.5px solid #b91c1c",
-            borderRadius: "50%",
           }}
         />
 

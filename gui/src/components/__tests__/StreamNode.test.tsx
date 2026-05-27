@@ -171,7 +171,10 @@ describe("StreamNode", () => {
     expect(handles.length).toBe(1);
   });
 
-  it("ThermalPort handles consume the Thermal layer var (Phase 72 — tokenized from #f59e0b)", () => {
+  it("Phase 73: ThermalPort handle paints a hex SVG mark that consumes the Thermal layer var", () => {
+    // Phase 73 reshape — Handle itself is a transparent hit target; the
+    // visible mark is an SVG polygon child. The layer token now lives on the
+    // SVG `fill` attribute, not the Handle's inline `background`.
     const { container } = renderStreamNode({
       componentId: "ConstantTemperature",
       instanceName: "ct_1",
@@ -179,14 +182,14 @@ describe("StreamNode", () => {
     });
     const handle = container.querySelector(".react-flow__handle") as HTMLElement;
     expect(handle).toBeTruthy();
-    // CSSOM may discard var() values from the `background` shorthand depending
-    // on environment; verify both the property (best-effort) AND the raw
-    // style-attribute string (definitive).
-    const raw = handle.getAttribute("style") ?? "";
-    expect(raw).toContain("--color-layer-thermal");
+    expect(handle.getAttribute("data-port-type")).toBe("thermal");
+    expect(handle.style.background).toBe("transparent");
+    const polygon = handle.querySelector("svg polygon");
+    expect(polygon).toBeTruthy();
+    expect(polygon!.getAttribute("fill")).toContain("--color-layer-thermal");
   });
 
-  it("ThermalPort handles have diamond rotation", () => {
+  it("Phase 73: ThermalPort handle is a rounded hexagon (replaces diamond rotation)", () => {
     const { container } = renderStreamNode({
       componentId: "ConstantTemperature",
       instanceName: "ct_1",
@@ -194,7 +197,13 @@ describe("StreamNode", () => {
     });
     const handle = container.querySelector(".react-flow__handle") as HTMLElement;
     expect(handle).toBeTruthy();
-    expect(handle.style.transform).toContain("rotate(45deg)");
+    // Handle no longer carries the rotate(45deg) diamond transform.
+    expect(handle.style.transform).toBe("");
+    // SVG hex has six vertices.
+    const polygon = handle.querySelector("svg polygon");
+    expect(polygon).toBeTruthy();
+    const points = polygon!.getAttribute("points") ?? "";
+    expect(points.split(/\s+/).filter(Boolean).length).toBe(6);
   });
 });
 
@@ -203,7 +212,7 @@ describe("StreamNode", () => {
 // ---------------------------------------------------------------------------
 
 describe("StreamNode — Phase 63 BCPort handle (D-18)", () => {
-  it("renders BCPort hollow-square handle on WallTemperature (D-18)", () => {
+  it("Phase 73: BCPort renders a dashed rounded-square SVG mark on WallTemperature", () => {
     const { container } = renderStreamNode({
       componentId: "WallTemperature",
       instanceName: "wt_1",
@@ -213,16 +222,18 @@ describe("StreamNode — Phase 63 BCPort handle (D-18)", () => {
     // Exactly one handle — the T_wall_out BCPort.
     expect(handles.length).toBe(1);
     const handle = handles[0] as HTMLElement;
+    expect(handle.getAttribute("data-port-type")).toBe("bc");
     expect(handle.style.background).toBe("transparent");
-    // CSSOM may discard the `var()` color from the `border` shorthand, so we
-    // check the width/style portion here and verify the var() reference made
-    // it into the inline `style` attribute string.
-    expect(handle.style.border).toContain("1.5px");
-    expect(handle.getAttribute("style") ?? "").toContain("--muted-foreground");
-    expect(handle.style.borderRadius).toBe("0px");
+    // Handle is a circular 14px hit target now — the visible mark is the SVG.
+    expect(handle.style.borderRadius).toBe("50%");
+    const rect = handle.querySelector("svg rect");
+    expect(rect).toBeTruthy();
+    expect(rect!.getAttribute("stroke")).toContain("--muted-foreground");
+    expect(rect!.getAttribute("stroke-dasharray")).toBeTruthy();
+    expect(Number(rect!.getAttribute("rx"))).toBeGreaterThan(0);
   });
 
-  it("renders BCPort hollow-square handle on HeatFluxSource (D-18)", () => {
+  it("Phase 73: BCPort renders the same dashed rounded-square mark on HeatFluxSource", () => {
     const { container } = renderStreamNode({
       componentId: "HeatFluxSource",
       instanceName: "hfs_1",
@@ -231,8 +242,10 @@ describe("StreamNode — Phase 63 BCPort handle (D-18)", () => {
     const handles = container.querySelectorAll(".react-flow__handle");
     expect(handles.length).toBe(1);
     const handle = handles[0] as HTMLElement;
+    expect(handle.getAttribute("data-port-type")).toBe("bc");
     expect(handle.style.background).toBe("transparent");
-    expect(handle.style.borderRadius).toBe("0px");
+    expect(handle.style.borderRadius).toBe("50%");
+    expect(handle.querySelector("svg rect")).toBeTruthy();
   });
 
   // Plan 63.1-12 RC-2: Channel + ChannelHeatFlux now declare a BCPort TARGET
@@ -254,12 +267,16 @@ describe("StreamNode — Phase 63 BCPort handle (D-18)", () => {
       (h) => h.getAttribute("data-handleid") === "T_wall_left",
     );
     expect(tWallTarget).toBeDefined();
+    // Isolated Channel has registry-default flow ports on left/right (no
+    // edges connected) → flowAxis horizontal → BC default 'bottom' is free
+    // → BC stays on bottom. Phase 73 only moves it when flow occupies bottom.
     expect(tWallTarget!.getAttribute("data-handlepos")).toBe("bottom");
     // type='target' on a consumer; ReactFlow encodes type on the className.
     expect(tWallTarget!.className).toContain("target");
-    // Same hollow-square visual as the source-side BCPort.
+    // Phase 73 — same crafted BC mark as the source-side BCPort.
+    expect(tWallTarget!.getAttribute("data-port-type")).toBe("bc");
     expect(tWallTarget!.style.background).toBe("transparent");
-    expect(tWallTarget!.style.borderRadius).toBe("0px");
+    expect(tWallTarget!.style.borderRadius).toBe("50%");
   });
 
   it("renders BCPort target handle on a ChannelHeatFlux (RC-2, bottom edge)", () => {

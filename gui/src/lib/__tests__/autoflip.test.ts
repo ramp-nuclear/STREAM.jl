@@ -16,7 +16,11 @@ import {
   resolveFlowPortSide,
   resolveFlowPortAssignment,
   resolveThermalPairSides,
+  resolveBCPortSide,
+  computePortOffset,
+  getFlowAxis,
   detectAxisCollision,
+  type Side,
 } from "../autoflip";
 
 // ---------------------------------------------------------------------------
@@ -502,13 +506,15 @@ describe("detectAxisCollision", () => {
     Pump: pumpComponent(),
   });
 
-  it("D-15: CAC with FlowPort axis horizontal AND thermal pair horizontal returns true", () => {
-    // CAC at origin, hydraulic neighbor on the left, thermal neighbor on the right.
-    // Both axes resolve to horizontal -> collision.
+  it("Phase 73 v2: CAC w/ flow horizontal + thermal neighbor right — both on horizontal axis (collision = true, handled visually by offset)", () => {
+    // Phase 73 v2 — thermal pair uses neighbor projection, lands horizontal
+    // when neighbor is horizontal. Same axis as flow → `detectAxisCollision`
+    // returns true. The visual collision is resolved by `computePortOffset`
+    // on the StreamNode side, not by relocating the thermal pair.
     const nodes = [
       makeNode("c1", 0, 0, "ChannelAndContacts"),
-      makeNode("p1", -300, 0, "Pump"), // hydraulic neighbor (direct left)
-      makeNode("hd1", 300, 0, "HeatDiffusion"), // thermal neighbor (direct right)
+      makeNode("p1", -300, 0, "Pump"),
+      makeNode("hd1", 300, 0, "HeatDiffusion"),
     ];
     const edges = [
       makeEdge("e1", "p1", "c1", "port_out", "port_in", "hydraulicEdge"),
@@ -556,3 +562,195 @@ describe("detectAxisCollision", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Phase 73 — getFlowAxis
+// ---------------------------------------------------------------------------
+
+describe("getFlowAxis", () => {
+  const getComp = makeGetComponent({
+    Pump: pumpComponent(),
+    HeatDiffusion: hdComponent(),
+  });
+
+  it("returns null for a component with no FlowPorts", () => {
+    const nodes = [makeNode("h1", 0, 0, "HeatDiffusion")];
+    const edges: Edge[] = [];
+    expect(getFlowAxis(nodes, edges, "h1", getComp)).toBeNull();
+  });
+
+  it("returns 'horizontal' when flow ports resolve to left/right", () => {
+    const nodes = [
+      makeNode("p1", 0, 0, "Pump"),
+      makeNode("p2", 300, 0, "Pump"),
+    ];
+    const edges = [makeEdge("e1", "p1", "p2", "port_out", "port_in")];
+    expect(getFlowAxis(nodes, edges, "p1", getComp)).toBe("horizontal");
+  });
+
+  it("returns 'vertical' for a vertical 2-node loop (convention-driven natural sides)", () => {
+    // Mirrors the vertical-loop test in resolveFlowPortAssignment — both nodes
+    // resolve port_in=top, port_out=bottom. Axis = vertical.
+    const nodes = [
+      makeNode("a", 0, 0, "Pump"),
+      makeNode("b", 0, 300, "Pump"),
+    ];
+    const edges = [
+      makeEdge("e1", "a", "b", "port_out", "port_in"),
+      makeEdge("e2", "b", "a", "port_out", "port_in"),
+    ];
+    expect(getFlowAxis(nodes, edges, "a", getComp)).toBe("vertical");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 73 v2 — resolveBCPortSide (neighbor projection, no occupied-avoidance)
+// ---------------------------------------------------------------------------
+
+describe("resolveBCPortSide", () => {
+  const getComp = makeGetComponent({ Pump: pumpComponent() });
+
+  it("returns the registry default when no BC edge is connected", () => {
+    const nodes = [makeNode("c1", 0, 0, "Pump")];
+    const edges: Edge[] = [];
+    const result = resolveBCPortSide(
+      nodes,
+      edges,
+      "c1",
+      { name: "T_wall_left", side: "bottom" },
+      getComp,
+    );
+    expect(result).toBe("bottom");
+  });
+
+  it("connected BC source directly above → resolves to 'top' (closest to neighbor)", () => {
+    const nodes = [
+      makeNode("c1", 0, 0, "Pump"),
+      makeNode("wt1", 0, -300, "Pump"),
+    ];
+    const edges = [
+      makeEdge("bc1", "wt1", "c1", "T_wall_out", "T_wall_left", "bcEdge"),
+    ];
+    const result = resolveBCPortSide(
+      nodes,
+      edges,
+      "c1",
+      { name: "T_wall_left", side: "bottom" },
+      getComp,
+    );
+    expect(result).toBe("top");
+  });
+
+  it("connected BC source to the right → resolves to 'right'", () => {
+    const nodes = [
+      makeNode("c1", 0, 0, "Pump"),
+      makeNode("wt1", 300, 0, "Pump"),
+    ];
+    const edges = [
+      makeEdge("bc1", "wt1", "c1", "T_wall_out", "T_wall_left", "bcEdge"),
+    ];
+    const result = resolveBCPortSide(
+      nodes,
+      edges,
+      "c1",
+      { name: "T_wall_left", side: "bottom" },
+      getComp,
+    );
+    expect(result).toBe("right");
+  });
+
+  it("WallTemperature source-side: BC port routes toward its consumer's direction", () => {
+    // WT at (0,0) with T_wall_out, Channel at (300, 0). Neighbor is right.
+    const nodes = [
+      makeNode("wt1", 0, 0, "Pump"),
+      makeNode("c1", 300, 0, "Pump"),
+    ];
+    const edges = [
+      makeEdge("bc1", "wt1", "c1", "T_wall_out", "T_wall_left", "bcEdge"),
+    ];
+    const result = resolveBCPortSide(
+      nodes,
+      edges,
+      "wt1",
+      { name: "T_wall_out", side: "right" },
+      getComp,
+    );
+    expect(result).toBe("right");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 73 v2 — computePortOffset (along-edge offset when colliding w/ flow)
+// ---------------------------------------------------------------------------
+
+describe("computePortOffset", () => {
+  it("returns null when the side has no flow port (no collision)", () => {
+    expect(
+      computePortOffset("T_wall_left", "top", new Set<Side>(["left", "right"])),
+    ).toBeNull();
+  });
+
+  it("`_left` suffix on a left/right edge offsets via top: 25%", () => {
+    const off = computePortOffset(
+      "thermal_left",
+      "left",
+      new Set<Side>(["left"]),
+    );
+    expect(off).toEqual({ top: "25%" });
+  });
+
+  it("`_right` suffix on a left/right edge offsets via top: 75% (suffix-based, no options)", () => {
+    const off = computePortOffset(
+      "thermal_right",
+      "right",
+      new Set<Side>(["right"]),
+    );
+    expect(off).toEqual({ top: "75%" });
+  });
+
+  it("uniformOffset option overrides suffix-based — both pair members land at the same %", () => {
+    // Thermal pair calls pass `uniformOffset: "25%"` so thermal_left and
+    // thermal_right read as a coherent shelf across opposite edges instead
+    // of a zigzag (25% on one edge, 75% on the other).
+    const left = computePortOffset(
+      "thermal_left",
+      "left",
+      new Set<Side>(["left"]),
+      { uniformOffset: "25%" },
+    );
+    const right = computePortOffset(
+      "thermal_right",
+      "right",
+      new Set<Side>(["right"]),
+      { uniformOffset: "25%" },
+    );
+    expect(left).toEqual({ top: "25%" });
+    expect(right).toEqual({ top: "25%" });
+  });
+
+  it("`_left` suffix on a top/bottom edge offsets via left: 25%", () => {
+    const off = computePortOffset(
+      "T_wall_left",
+      "bottom",
+      new Set<Side>(["bottom"]),
+    );
+    expect(off).toEqual({ left: "25%" });
+  });
+
+  it("`_right` suffix on a top/bottom edge offsets via left: 75%", () => {
+    const off = computePortOffset(
+      "q_right",
+      "top",
+      new Set<Side>(["top"]),
+    );
+    expect(off).toEqual({ left: "75%" });
+  });
+
+  it("no `_left/_right` suffix → defaults to 75% so the mark sits clear of flow's centered position", () => {
+    const off = computePortOffset(
+      "T_wall_out",
+      "bottom",
+      new Set<Side>(["bottom"]),
+    );
+    expect(off).toEqual({ left: "75%" });
+  });
+});

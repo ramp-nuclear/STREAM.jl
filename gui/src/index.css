@@ -63,6 +63,23 @@
      chroma-0 OKLCH inputs are a degenerate case in WebKitGTK parsers
      and silently fall back to currentColor on this dev configuration. */
   --node-ring-rest: #c3c3c3;
+  /* Phase 72 — flow-port disc tokens (Lane 2.5, 2026-05-23). Refined after
+     Lane 2 first pass read as "graphite disc with a saturated sticker on
+     top": the chevron was at full Hydraulic chroma (0.18) against a near-
+     neutral disc, and small high-saturation-on-neutral always reads toyish
+     regardless of disc tone. Three knobs adjusted:
+       1. Chevron desaturated chroma 0.18 → 0.07; hue 240 preserved so the
+          chevron still reads as Hydraulic, just whispered rather than
+          shouted (introduced as --color-port-chevron below).
+       2. Disc tones deepened and hue-shifted 254 → 250 (cooler, less
+          generic plastic-grey, more brushed-instrument).
+       3. Border tone deepened for a precise cut-edge read at thinner
+          stroke width (1.5 px → 1 px applied at the SVG level).
+     Disc still pops off --card (light: Δ-0.14 vs card 0.97; dark: Δ+0.22
+     vs card 0.23). */
+  --color-port-disc: oklch(0.83 0.006 250);
+  --color-port-disc-border: oklch(0.50 0.012 250);
+  --color-port-chevron: oklch(0.46 0.07 240);
   /* Phase 72 — three-tier depth tokens recommitted with stronger steps and
      hue tint per OKLCH no-#fff rule. Chrome darkest, panel mid, canvas
      lightest (warmest). Light mode: tinted toward hue 254 (matches dark
@@ -126,6 +143,15 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Phase 73 — edge stroke tokens (light mode).
+     Rationale: unselected sits at body-text legibility (matches
+     --foreground 0.145 lightness). Selected lifts to near-pure-ink AND
+     gains a thicker stroke — two stacked signals so selection is
+     unmissable without going neon. Tinted toward brand hue 254 at low
+     chroma (PRODUCT.md no-#000 rule). */
+  --edge-stroke: oklch(0.18 0.008 254);
+  --edge-stroke-selected: oklch(0.06 0.01 254);
 }
 
 .dark {
@@ -199,6 +225,14 @@
   --dialog-border: oklch(0.24 0.012 254);
   /* Phase 72 — unselected-node ring, dark mode. See :root for rationale. */
   --node-ring-rest: #6e6e6e;
+  /* Phase 72 — flow-port disc tokens, dark mode (Lane 2.5). See :root for
+     the desaturation rationale. Dark-mode disc bumped 0.42 → 0.45 (very
+     slight lift); border deepened 0.28 → 0.22 for a crisper rim against
+     the lighter disc; chevron at chroma 0.07 (was 0.16 layer-hydraulic
+     direct) reads as a Hydraulic hint rather than a saturated sticker. */
+  --color-port-disc: oklch(0.45 0.014 250);
+  --color-port-disc-border: oklch(0.22 0.018 250);
+  --color-port-chevron: oklch(0.80 0.07 240);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -238,6 +272,22 @@
   --syntax-type:    oklch(0.78 0.11 230);
   --syntax-macro:   oklch(0.83 0.13 80);
   --syntax-number:  oklch(0.78 0.13 50);
+
+  /* Phase 73 — dedicated edge stroke tokens (dark mode).
+     Pushed to near-pure-white so edges pop hard against the 0.27 canvas
+     + dot grid (--foreground at 0.73 was the previous ceiling and read
+     too quiet). Selected goes the rest of the way to the lightness
+     ceiling; the width bump in the .react-flow rule is small so the
+     selection signal is mostly color + a touch of weight. */
+  /* Phase 73 — edge stroke tokens (dark mode).
+     Rationale: unselected sits at body-text legibility (matches
+     --foreground 0.73 lightness). Selected lifts to near-display-white
+     (0.93) AND gains a thicker stroke — two stacked signals so
+     selection is unmissable without making the rest-state edges scream.
+     Cool blue tint at chroma 0.008 (just enough to escape pure neutral
+     without competing with the layer-color tokens). */
+  --edge-stroke: oklch(0.73 0.008 254);
+  --edge-stroke-selected: oklch(0.93 0.005 254);
 }
 
 @theme inline {
@@ -347,6 +397,46 @@ textarea,
   -webkit-user-select: text;
 }
 
+/* Phase 73 — edge stroke color tokens.
+   xyflow's defaults (`#b1b1b7` light / `#3e3e3e` dark) blend into the
+   canvas + dot grid. We push the resting state to `var(--edge-stroke)`
+   (a dedicated token brighter than --foreground in dark mode, darker in
+   light mode) so unselected edges read clearly at rest. Selected uses
+   the same color + a slightly thicker stroke; selection conveys via
+   width since the rest state is already loud.
+
+   No `!important` direct rule — that would shadow BCEdge's intentional
+   inline `stroke: var(--muted-foreground)` (dashed BC edges should stay
+   distinct from hydraulic lines). xyflow's edge-path stroke uses
+   `var(--xy-edge-stroke, var(--xy-edge-stroke-default))` so our
+   variable override applies wherever no inline stroke is set.
+
+   The .react-flow__edge.selected path-width rule does need !important
+   because xyflow's selection-stroke-width is baked into a CSS rule of
+   equal specificity that we want to override. */
+.react-flow {
+  --xy-edge-stroke-default: var(--edge-stroke);
+  --xy-edge-stroke-width-default: 1.5;
+  --xy-edge-stroke-selected-default: var(--edge-stroke-selected);
+}
+/* `!important` on both stroke + stroke-width. The variable cascade alone
+   isn't enough: xyflow ships a `.react-flow__edge.updating` rule with a
+   hard-coded `stroke: #777` that lands AFTER our variable override in
+   source order. BCEdge's intentional `stroke: var(--muted-foreground)`
+   gets overridden too, but BC still reads as distinct because of its
+   `strokeDasharray` (set inline) — the dashed pattern is the BC signal,
+   not the color. */
+.react-flow .react-flow__edge:not(.selected) .react-flow__edge-path {
+  stroke: var(--edge-stroke) !important;
+  stroke-width: 1.5 !important;
+}
+.react-flow .react-flow__edge.selected .react-flow__edge-path,
+.react-flow .react-flow__edge:focus .react-flow__edge-path,
+.react-flow .react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: var(--edge-stroke-selected) !important;
+  stroke-width: 3.5 !important;
+}
+
 /* Phase 42: Fix cursor disappearance on ReactFlow handles during edge drag */
 .react-flow__handle {
   cursor: crosshair;
@@ -354,6 +444,48 @@ textarea,
 
 .react-flow__handle:hover {
   cursor: crosshair;
+}
+
+/* Phase 73 — crafted port states (Lane A).
+   Hover halo is a circular box-shadow on the Handle div, independent of the
+   port mark's actual shape (circle / hex / dashed square). All three port
+   types get the same affordance: idle → hover → drag-target valid/invalid.
+   Color codes the type so the user knows which "network" the port belongs to
+   without reading any text. */
+.react-flow__handle[data-port-type] {
+  transition: box-shadow 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Hover — soft layer-color halo. */
+.react-flow__handle[data-port-type="flow-in"]:hover,
+.react-flow__handle[data-port-type="flow-out"]:hover {
+  box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-layer-hydraulic) 28%, transparent);
+}
+.react-flow__handle[data-port-type="thermal"]:hover {
+  box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-layer-thermal) 32%, transparent);
+}
+.react-flow__handle[data-port-type="bc"]:hover {
+  box-shadow: 0 0 0 5px color-mix(in oklch, var(--muted-foreground) 26%, transparent);
+}
+
+/* Drag-target valid — brighter, slightly larger halo. xyflow adds the
+   `.connectingto` class to a handle when it's the current hover target during
+   an in-progress connection drag, and the `.valid` class when the target is a
+   compatible drop site. */
+.react-flow__handle.connectingto.valid[data-port-type="flow-in"],
+.react-flow__handle.connectingto.valid[data-port-type="flow-out"] {
+  box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-layer-hydraulic) 45%, transparent);
+}
+.react-flow__handle.connectingto.valid[data-port-type="thermal"] {
+  box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-layer-thermal) 48%, transparent);
+}
+.react-flow__handle.connectingto.valid[data-port-type="bc"] {
+  box-shadow: 0 0 0 6px color-mix(in oklch, var(--muted-foreground) 42%, transparent);
+}
+
+/* Drag-target invalid — dim the mark so the user reads "won't accept this." */
+.react-flow__handle.connectingto:not(.valid)[data-port-type] {
+  opacity: 0.3;
 }
 
 /* Phase 65 Plan 12 — marquee selection rectangle (in-drag).

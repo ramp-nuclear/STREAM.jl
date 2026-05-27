@@ -19,22 +19,53 @@ import { isSourceValueEntry } from "@/lib/sourceValueEntry";
 import {
   resolveFlowPortAssignment,
   resolveThermalPairSides,
+  resolveBCPortSide,
+  computePortOffset,
   type Side,
 } from "@/lib/autoflip";
 import { usePreference } from "@/lib/preferences";
 
-// Phase 72 — flow-port colors stay as inline hex (documented JIT-bypass);
-// per Phase 72 brief their tokenization is deferred to the edges-and-code-
-// preview shape session. THERMAL_HANDLE values consume the new layer-thermal
-// token (handle is per definition the Thermal layer's signal).
-const FLOW_IN_BG = "#60a5fa";       // blue-400 (port_in — incoming flow)
-const FLOW_IN_BORDER = "#1d4ed8";   // blue-700
-const FLOW_OUT_BG = "#f87171";      // red-400 (port_out — outgoing flow)
-const FLOW_OUT_BORDER = "#b91c1c";  // red-700
+// Phase 72 — flow-port visual treatment (Lane 2, 2026-05-23). The disc
+// itself is a tinted-neutral graphite pad (--color-port-disc); the chevron
+// inside carries the Hydraulic accent. Inverts the prior "Hydraulic disc +
+// near-white chevron" treatment, which read as a saturated sticker rather
+// than an instrument port. The shape (filled circle) still says Hydraulic;
+// the colour signal moves to a smaller, more precise element. AnatomyDialog
+// mirrors must track these tokens.
+const FLOW_FILL = "var(--color-port-disc)";
+const FLOW_STROKE = "var(--color-port-disc-border)";
 
-const THERMAL_HANDLE_COLOR = "var(--color-layer-thermal)";
-const THERMAL_HANDLE_BORDER =
-  "color-mix(in oklch, var(--color-layer-thermal) 75%, black)";
+// Phase 73 — crafted shape language. Flow is a filled circle with a small
+// directional chevron pointing in/out (so port_in vs port_out reads at a
+// glance, not just "blue vs red"). Thermal is a flat-top rounded hexagon
+// (replaces the rotated diamond — reads more deliberate, less "rotated
+// square as afterthought"). BC is a dashed rounded square (echoes the
+// dashed BCEdge stroke at the handle).
+// All three: 14 px hit target, 1.5 px stroke, circular hover halo via CSS
+// targeting `data-port-type`.
+const THERMAL_FILL = "var(--color-layer-thermal)";
+const THERMAL_STROKE = "color-mix(in oklch, var(--color-layer-thermal) 60%, black)";
+const BC_STROKE = "var(--muted-foreground)";
+
+// Rotation (deg) for the in-port chevron given the resolved side. The chevron
+// glyph is drawn pointing RIGHT in its local frame (▶); we rotate it so it
+// points INWARD into the node when on `port_in`, and OUTWARD when on
+// `port_out`.
+//   port_in  on left  → chevron points right (into node)
+//   port_in  on right → chevron points left
+//   port_in  on top   → chevron points down
+//   port_in  on bottom→ chevron points up
+//   port_out is the opposite of each of those.
+function flowChevronRotation(side: string, isInPort: boolean): number {
+  const inwardDeg: Record<string, number> = {
+    left: 0,    // ▶ default = right = inward when on left edge
+    right: 180,
+    top: 90,    // ▼ pointing down
+    bottom: 270,
+  };
+  const base = inwardDeg[side] ?? 0;
+  return isInPort ? base : (base + 180) % 360;
+}
 
 const sideToPosition: Record<string, Position> = {
   left: Position.Left,
@@ -157,6 +188,99 @@ function anchorIndicatorStyleFor(side: string | undefined): React.CSSProperties 
   }
 }
 
+// ---------------------------------------------------------------------------
+// SVG mark components (Phase 73 — Lane A: crafted shapes).
+// ---------------------------------------------------------------------------
+//
+// Rendered as children of the React Flow `Handle`. The Handle itself is a
+// 14×14 transparent hit target with `border-radius: 50%` (so the hover
+// box-shadow halo is circular regardless of mark shape). `pointer-events: none`
+// on the SVG keeps drag events targeting the Handle div, not the SVG paint.
+
+/**
+ * Filled circle + small inner chevron pointing in flow direction.
+ * `direction` controls the chevron rotation (degrees, CW from "points right").
+ */
+function FlowDiscMark({
+  fill,
+  stroke,
+  direction,
+}: {
+  fill: string;
+  stroke: string;
+  direction: number;
+}) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      aria-hidden="true"
+    >
+      <circle cx="7" cy="7" r="6" fill={fill} stroke={stroke} strokeWidth="1" />
+      {/* Chevron uses --color-port-chevron (desaturated Hydraulic, chroma
+          0.07 vs the layer accent's 0.18). Whispers "Hydraulic" rather
+          than shouting it — small saturated marks on neutral discs read
+          toyish, this drops chroma until the chevron reads as an etched
+          indicator. */}
+      <polygon
+        points="5.5,4.5 8.5,7 5.5,9.5"
+        fill="var(--color-port-chevron)"
+        transform={`rotate(${direction} 7 7)`}
+      />
+    </svg>
+  );
+}
+
+// Hexagon: flat-top, inscribed in a 14×14 viewBox with 0.6 px stroke inset on
+// every side so the 1.5 px stroke doesn't get clipped at the SVG edge.
+function ThermalHexMark() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      aria-hidden="true"
+    >
+      <polygon
+        points="3.5,0.9 10.5,0.9 13.1,7 10.5,13.1 3.5,13.1 0.9,7"
+        fill={THERMAL_FILL}
+        stroke={THERMAL_STROKE}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function BCDashedMark() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      aria-hidden="true"
+    >
+      <rect
+        x="1.5"
+        y="1.5"
+        width="11"
+        height="11"
+        rx="2"
+        ry="2"
+        fill="transparent"
+        stroke={BC_STROKE}
+        strokeWidth="1.5"
+        strokeDasharray="2.5 1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function FlowPortHandle({
   nodeId,
   port,
@@ -235,10 +359,17 @@ function FlowPortHandle({
         type={isInPort ? "target" : "source"}
         position={sideToPosition[resolvedSide]}
         data={{ portType: port.type }}
+        data-port-type={isInPort ? "flow-in" : "flow-out"}
         {...(showPortType ? { title: "FlowPort" } : {})}
         style={{
-          background: isInPort ? FLOW_IN_BG : FLOW_OUT_BG,
-          border: `1.5px solid ${isInPort ? FLOW_IN_BORDER : FLOW_OUT_BORDER}`,
+          // Phase 73 — Handle is a transparent 14×14 hit target; the visible
+          // disc + chevron are painted by the SVG child. `border-radius: 50%`
+          // keeps the hover halo circular and aligned with the disc.
+          background: "transparent",
+          border: "none",
+          width: 14,
+          height: 14,
+          borderRadius: "50%",
           // Phase 68 D-03: per-handle off-layer treatment. Hide mode takes
           // precedence over dim mode (display:none beats opacity 0.2).
           ...(hideFlowHandles
@@ -247,7 +378,13 @@ function FlowPortHandle({
               ? { opacity: 0.2, pointerEvents: "none" as const }
               : {}),
         }}
-      />
+      >
+        <FlowDiscMark
+          fill={FLOW_FILL}
+          stroke={FLOW_STROKE}
+          direction={flowChevronRotation(resolvedSide, isInPort)}
+        />
+      </Handle>
       {hasAnchor && !hideFlowHandles && (
         <Anchor
           data-testid="anchor-indicator"
@@ -305,6 +442,10 @@ function ThermalPortHandle({
 
   // Pitfall 3: pull just the primitive `thisSide` out of the selector body so
   // the returned value is a string, not a fresh object.
+  //
+  // Phase 73 v2 — thermal pair uses neighbor projection for axis selection
+  // (legacy resolveThermalPairSides). Collision with flow on the same axis
+  // is handled visually via `computePortOffset` below, not by relocating.
   const resolvedSide: Side = useStore(
     useCallback(
       (s: { nodes: Node[]; edges: Edge[] }) => {
@@ -322,6 +463,37 @@ function ThermalPortHandle({
       [nodeId, port.name, pairWith, defaultAxis, autoFlipEnabled, registryDefaultSide],
     ),
   );
+
+  // Phase 73 v2 — along-edge offset when the resolved side coincides with a
+  // flow port. Subscribed as a primitive (serialized JSON) so zustand's
+  // shallow equality stays stable and we don't re-render per store tick.
+  //
+  // Thermal pair: uniform 25% offset for BOTH members. Even though
+  // suffix-based offset (left→25%, right→75%) would visually separate them,
+  // pair members live on OPPOSITE edges by the suffix-locked rule and never
+  // share an edge — so a fixed 25% reads as a coherent "shelf" parallel to
+  // the flow axis instead of a zigzag.
+  const offsetJson = useStore(
+    useCallback(
+      (s: { nodes: Node[]; edges: Edge[] }) => {
+        const flow = resolveFlowPortAssignment(
+          s.nodes,
+          s.edges,
+          nodeId,
+          getComponent,
+        );
+        const flowSides = new Set<Side>(Object.values(flow));
+        const offset = computePortOffset(port.name, resolvedSide, flowSides, {
+          uniformOffset: "25%",
+        });
+        return offset ? JSON.stringify(offset) : "";
+      },
+      [nodeId, port.name, resolvedSide],
+    ),
+  );
+  const offsetStyle: { top?: string; left?: string } = offsetJson
+    ? JSON.parse(offsetJson)
+    : {};
 
   // Pattern 2 / Pitfall 1 — re-measure when the side flips.
   const updateNodeInternals = useUpdateNodeInternals();
@@ -344,14 +516,20 @@ function ThermalPortHandle({
       type={isSourceHandle ? "source" : "target"}
       position={sideToPosition[resolvedSide]}
       data={{ portType: port.type }}
+      data-port-type="thermal"
       {...(showPortType ? { title: "ThermalPort" } : {})}
       style={{
-        background: THERMAL_HANDLE_COLOR,
-        border: `1.5px solid ${THERMAL_HANDLE_BORDER}`,
-        width: 12,
-        height: 12,
-        borderRadius: 0,
-        transform: "rotate(45deg)",
+        // Phase 73 — Handle is a transparent hit target; SVG child paints the
+        // hex. `border-radius: 50%` so the CSS hover halo (box-shadow) is
+        // circular regardless of the inner shape.
+        background: "transparent",
+        border: "none",
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        // Phase 73 v2 — along-edge offset wins when set (collision w/ flow);
+        // override default cross-edge centering only on the collision axis.
+        ...offsetStyle,
         // Phase 68 D-03: per-handle off-layer treatment for the Thermal
         // layer. Hide mode beats dim mode.
         ...(hideThermalHandles
@@ -360,7 +538,95 @@ function ThermalPortHandle({
             ? { opacity: 0.2, pointerEvents: "none" as const }
             : {}),
       }}
-    />
+    >
+      <ThermalHexMark />
+    </Handle>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BCPortHandle — dashed rounded square (Phase 73).
+// ---------------------------------------------------------------------------
+//
+// BC ports now participate in the side-priority engine: flow first, thermal
+// perpendicular to flow, BC takes whichever side is free and closest to its
+// connected source. The registry's static `port.side` becomes a default —
+// `resolveBCPortSide` overrides it when a flow port wants that side.
+//
+// The structural fix here: in vertical hydraulic loops, Channel's port_out
+// autoflips to `bottom`, and the legacy BC rendering pinned T_wall_left to
+// `bottom` too (overlap). With the new resolver, T_wall_left moves to the
+// perpendicular axis (left or right) instead.
+function BCPortHandle({
+  nodeId,
+  port,
+  isBCSource,
+}: {
+  nodeId: string;
+  port: { name: string; type: string; side?: string };
+  isBCSource: boolean;
+}) {
+  const [autoFlipEnabled] = usePreference("editor", "autoFlipPortsOnConnect");
+  const registryDefault = (port.side as Side | undefined) ?? "bottom";
+
+  // Phase 73 v2 — neighbor projection only. Collision with flow on the
+  // same side gets resolved by `computePortOffset` below.
+  const resolvedSide: Side = useStore(
+    useCallback(
+      (s: { nodes: Node[]; edges: Edge[] }) => {
+        if (!autoFlipEnabled) return registryDefault;
+        return resolveBCPortSide(s.nodes, s.edges, nodeId, port, getComponent);
+      },
+      [nodeId, port, autoFlipEnabled, registryDefault],
+    ),
+  );
+
+  const offsetJson = useStore(
+    useCallback(
+      (s: { nodes: Node[]; edges: Edge[] }) => {
+        const flow = resolveFlowPortAssignment(
+          s.nodes,
+          s.edges,
+          nodeId,
+          getComponent,
+        );
+        const flowSides = new Set<Side>(Object.values(flow));
+        const offset = computePortOffset(port.name, resolvedSide, flowSides);
+        return offset ? JSON.stringify(offset) : "";
+      },
+      [nodeId, port.name, resolvedSide],
+    ),
+  );
+  const offsetStyle: { top?: string; left?: string } = offsetJson
+    ? JSON.parse(offsetJson)
+    : {};
+
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(nodeId);
+  }, [nodeId, resolvedSide, updateNodeInternals]);
+
+  const [showPortType] = usePreference("editor", "showPortTypeOnHover");
+
+  return (
+    <Handle
+      id={port.name}
+      type={isBCSource ? "source" : "target"}
+      position={sideToPosition[resolvedSide]}
+      data={{ portType: port.type }}
+      data-port-type="bc"
+      {...(showPortType ? { title: "BCPort" } : {})}
+      style={{
+        background: "transparent",
+        border: "none",
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        ...offsetStyle,
+      }}
+    >
+      <BCDashedMark />
+    </Handle>
   );
 }
 
@@ -555,9 +821,10 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
         // Phase 64 Pitfall 6 fix: pair-thermal ports (CAC + HD — they carry
         // `pair_with` and have no static `side`) route through
         // `ThermalPortHandle`, which resolves a defined side via D-18
-        // suffix-locked axis-flip. Single-port thermal entries (e.g.
-        // ConstantTemperature.thermal) keep the registry-default `side` —
-        // they have no pair to swing.
+        // suffix-locked axis-flip (now with Phase 73 flow-axis hint so the
+        // pair lands perpendicular to flow on dual-domain nodes).
+        // Single-port thermal entries (e.g. ConstantTemperature.thermal) keep
+        // the registry-default `side` — they have no pair to swing.
         if (port.pair_with) {
           return (
             <ThermalPortHandle
@@ -569,6 +836,7 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
             />
           );
         }
+        // Phase 73 — single thermal ports adopt the crafted hex mark too.
         const singleSide = (port.side ?? "left") as Side;
         return (
           <Handle
@@ -577,13 +845,13 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
             type={singleSide === "right" || singleSide === "bottom" ? "source" : "target"}
             position={sideToPosition[singleSide]}
             data={{ portType: port.type }}
+            data-port-type="thermal"
             style={{
-              background: THERMAL_HANDLE_COLOR,
-              border: `1.5px solid ${THERMAL_HANDLE_BORDER}`,
-              width: 12,
-              height: 12,
-              borderRadius: 0,
-              transform: "rotate(45deg)",
+              background: "transparent",
+              border: "none",
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
               // Phase 68 D-03: per-handle off-layer treatment for the
               // Thermal layer (single-port branch — ConstantTemperature etc.).
               // Hide mode beats dim mode.
@@ -593,7 +861,9 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
                   ? { opacity: 0.2, pointerEvents: "none" as const }
                   : {}),
             }}
-          />
+          >
+            <ThermalHexMark />
+          </Handle>
         );
       })}
       {bcPorts.map((port) => {
@@ -602,21 +872,18 @@ export default function StreamNode({ id, data, selected }: NodeProps) {
         // Channel.T_wall_left on the bottom edge). The dispatch keys off the
         // component category — see registry.test.ts "BCPort allowed on
         // Sources OR Hydraulic" invariant.
+        //
+        // Phase 73 — BC handles now route through BCPortHandle, which uses
+        // the side-priority engine (flow > thermal > BC) to pick a side that
+        // doesn't collide with flow/thermal. Fixes Channel.T_wall_left
+        // (static bottom) ↔ port_out (autoflipped to bottom) overlap.
         const isBCSource = component.category === "Sources";
         return (
-          <Handle
+          <BCPortHandle
             key={port.name}
-            id={port.name}
-            type={isBCSource ? "source" : "target"}
-            position={sideToPosition[port.side ?? "right"]}
-            data={{ portType: port.type }}
-            style={{
-              background: "transparent",
-              border: `1.5px solid var(--muted-foreground)`,
-              width: 10,
-              height: 10,
-              borderRadius: 0,
-            }}
+            nodeId={id}
+            port={port}
+            isBCSource={isBCSource}
           />
         );
       })}

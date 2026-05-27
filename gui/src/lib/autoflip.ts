@@ -26,6 +26,71 @@ export type Side = "left" | "right" | "top" | "bottom";
 // allow multiple ports on the same side and rely on xyflow auto-spreading.)
 
 // ---------------------------------------------------------------------------
+// reachableNodes — connected-component BFS over the (undirected) edge graph.
+// ---------------------------------------------------------------------------
+//
+// Phase 73 — orphan-node bug fix. Both flow-axis classification (this module)
+// and obstacle-avoiding edge routing (gui/src/lib/edgeRouting.ts consumers)
+// were considering ALL nodes on the canvas, including ones with zero
+// connections. An unrelated WallTemperature parked off to the right stretched
+// the cluster bbox sideways, which flipped the dominant flow axis to
+// horizontal in a clearly vertical loop. Same node also became an obstacle
+// the edge router wrapped around even though no edge touched it.
+//
+// The fix is to restrict either computation to the connected component
+// reachable from the seed node(s) via the edge graph. We treat edges as
+// undirected for traversal — a flow edge from A→B still makes B reachable
+// from A and vice versa.
+//
+// Cost: BFS over E edges, V vertices reachable. O(V+E) per call. The caller
+// computes it once per render and reuses for every per-port resolver call.
+export function reachableNodes(
+  nodes: ReadonlyArray<Node>,
+  edges: ReadonlyArray<Edge>,
+  seeds: ReadonlyArray<string>,
+): Set<string> {
+  const adj = new Map<string, Set<string>>();
+  for (const e of edges) {
+    let s = adj.get(e.source);
+    if (!s) {
+      s = new Set();
+      adj.set(e.source, s);
+    }
+    s.add(e.target);
+    let t = adj.get(e.target);
+    if (!t) {
+      t = new Set();
+      adj.set(e.target, t);
+    }
+    t.add(e.source);
+  }
+  const visited = new Set<string>();
+  const queue: string[] = [];
+  for (const seed of seeds) {
+    if (visited.has(seed)) continue;
+    visited.add(seed);
+    queue.push(seed);
+  }
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    const neighbors = adj.get(id);
+    if (!neighbors) continue;
+    for (const n of neighbors) {
+      if (visited.has(n)) continue;
+      visited.add(n);
+      queue.push(n);
+    }
+  }
+  // Defensive: ensure the seed is present even if the node doesn't appear in
+  // any edge — orphan source/target should still register as "reachable from
+  // itself" so single-node cases don't fall through to an empty set.
+  // (Set semantics already cover this; explicit comment for the reader.)
+  void nodes; // currently unused — kept in the signature for parity with
+              //   future callers that might filter on node properties.
+  return visited;
+}
+
+// ---------------------------------------------------------------------------
 // nodeCenter (internal)
 // ---------------------------------------------------------------------------
 
@@ -181,11 +246,22 @@ export function resolveFlowPortAssignment(
   // We further apply a 1.5× vertical bias: hydraulic loops are gravity-driven
   // and read most naturally as top-down flow, so the algorithm should default
   // toward vertical unless the layout is clearly more horizontal.
+  //
+  // Phase 73 fix (v2): include ONLY nodes reachable via FLOW edges (type
+  // "hydraulicEdge"). The previous filter used the full edge graph, which
+  // pulled in BC sources and thermal-only nodes via their non-flow edges and
+  // still let them deform the flow axis (e.g. a WallTemperature placed off
+  // to the side, connected via a dashed BC edge to a Channel in the loop,
+  // stretched spreadX and flipped vertical → horizontal). Flow direction
+  // should be determined by flow components alone.
+  const flowEdges = edges.filter((e) => e.type === "hydraulicEdge");
+  const reachable = reachableNodes(nodes, flowEdges, [nodeId]);
   let minCx = Infinity,
     maxCx = -Infinity,
     minCy = Infinity,
     maxCy = -Infinity;
   for (const n of nodes) {
+    if (!reachable.has(n.id)) continue;
     const measured = n.measured as { width?: number; height?: number } | undefined;
     const w = measured?.width ?? 140;
     const h = measured?.height ?? 70;
@@ -298,6 +374,13 @@ export function resolveFlowPortAssignment(
  * - Axis selection: aggregate `|sumDx|` vs `|sumDy|` across ALL thermal edges
  *   touching either pair member; D-13 tie-break prefers horizontal.
  * - D-11: zero thermal edges → return the registry `default_axis`-derived pair.
+ *
+ * Phase 73 v2 — flow takes 100% priority for DIRECTIONS, but non-flow ports
+ * are no longer relocated to avoid flow. They land on the side their neighbor
+ * pulls them to (neighbor projection); when that side is also occupied by a
+ * flow port, they get an inline OFFSET along the edge via `computePortOffset`.
+ * The legacy `flowAxisHint` parameter is kept for backward compatibility but
+ * is now intentionally ignored.
  */
 export function resolveThermalPairSides(
   nodes: Node[],
@@ -308,6 +391,8 @@ export function resolveThermalPairSides(
   defaultAxis: "horizontal" | "vertical",
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _getComponent: (id: string) => ComponentDefinition | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _flowAxisHint?: "horizontal" | "vertical" | null,
 ): { thisSide: Side; pairSide: Side } {
   const isLeftSuffix = thisPortName.endsWith("_left");
 
@@ -362,6 +447,138 @@ export function resolveThermalPairSides(
 }
 
 // ---------------------------------------------------------------------------
+// getFlowAxis — derive the flow axis a node's flow ports resolved to.
+// ---------------------------------------------------------------------------
+
+/**
+ * Phase 73 — read which axis a node's FlowPorts ended up on, so dependent
+ * resolvers (thermal pair, BC port) can place themselves perpendicular.
+ * Returns `null` when the component has no FlowPorts.
+ *
+ * Uses `resolveFlowPortAssignment` as the source of truth so flow's resolved
+ * sides — including its convention-driven natural-side fallback — drive the
+ * axis answer, not the registry's static `side` field.
+ */
+export function getFlowAxis(
+  nodes: Node[],
+  edges: Edge[],
+  nodeId: string,
+  getComponent: (id: string) => ComponentDefinition | undefined,
+): "horizontal" | "vertical" | null {
+  const assignment = resolveFlowPortAssignment(nodes, edges, nodeId, getComponent);
+  const sides = Object.values(assignment);
+  if (sides.length === 0) return null;
+  // Both flow ports collapse to one axis by construction (collision resolution
+  // ensures port_in + port_out land on the same axis). Read either to decide.
+  for (const s of sides) {
+    if (s === "left" || s === "right") return "horizontal";
+    if (s === "top" || s === "bottom") return "vertical";
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// resolveBCPortSide — BC port placement that yields to flow + thermal.
+// ---------------------------------------------------------------------------
+
+/**
+ * Phase 73 v2 — resolve which side of a node a BCPort renders on.
+ *
+ * Pure neighbor projection: BC ports land on the side closest to their
+ * connected source. The registry's `port.side` is the no-edge default.
+ *
+ * BC ports DO NOT get relocated to dodge flow/thermal — they're allowed to
+ * share a side. The visual collision is resolved by `computePortOffset`,
+ * which slides the BC mark along the edge so it sits next to (not under)
+ * the flow port that occupies that side's center.
+ */
+export function resolveBCPortSide(
+  nodes: Node[],
+  edges: Edge[],
+  nodeId: string,
+  port: { name: string; side?: string },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _getComponent: (id: string) => ComponentDefinition | undefined,
+): Side {
+  const defaultSide = (port.side as Side | undefined) ?? "bottom";
+
+  // Find a BC edge touching this port. BC ports usually carry at most one
+  // edge but loops are theoretically allowed — pick the first.
+  const myEdge = edges.find(
+    (e) =>
+      (e.source === nodeId && e.sourceHandle === port.name) ||
+      (e.target === nodeId && e.targetHandle === port.name),
+  );
+
+  if (!myEdge) return defaultSide;
+
+  const neighborId =
+    myEdge.source === nodeId ? myEdge.target : myEdge.source;
+  const me = nodes.find((n) => n.id === nodeId);
+  const them = nodes.find((n) => n.id === neighborId);
+  if (!me || !them) return defaultSide;
+
+  const a = nodeCenter(me);
+  const b = nodeCenter(them);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+
+  // D-13 tie-break: `|dx| >= |dy|` → horizontal.
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? "right" : "left";
+  }
+  return dy >= 0 ? "bottom" : "top";
+}
+
+// ---------------------------------------------------------------------------
+// computePortOffset — along-edge offset when non-flow port collides with flow.
+// ---------------------------------------------------------------------------
+
+/**
+ * Phase 73 v2 — when a non-flow port (thermal / BC) resolves to a side that's
+ * also occupied by a flow port, return an inline-style offset that slides it
+ * along that edge so it sits adjacent to the flow port, not on top of it.
+ *
+ * Returns `null` when no collision — the port renders centered (default).
+ *
+ * Two offset strategies:
+ *
+ *   - **Uniform** (`options.uniformOffset`): both pair members at the same
+ *     percentage. Used for thermal pairs so the two thermal marks visually
+ *     line up across the node (e.g. both at top-25% on opposite edges → reads
+ *     as a "thermal shelf" parallel to the flow axis).
+ *   - **Suffix-based** (default): `_left` → 25%, `_right` → 75`, no suffix
+ *     → 75%. Used for BC ports, where the `_left/_right` suffix encodes
+ *     spatial intent in the underlying simulation (left vs right channel
+ *     wall) and should be preserved in the rendered position.
+ *
+ * The percentage gets written to `top` (when port is on `left`/`right` edge)
+ * or `left` (when on `top`/`bottom` edge); xyflow's default Handle CSS uses
+ * those properties for cross-edge centering, so inline overrides win.
+ */
+export function computePortOffset(
+  portName: string,
+  side: Side,
+  flowOccupiedSides: ReadonlySet<Side>,
+  options?: { uniformOffset?: string },
+): { top?: string; left?: string } | null {
+  if (!flowOccupiedSides.has(side)) return null;
+
+  let pct: string;
+  if (options?.uniformOffset) {
+    pct = options.uniformOffset;
+  } else {
+    const isLeftSuffix = portName.endsWith("_left");
+    pct = isLeftSuffix ? "25%" : "75%";
+  }
+
+  if (side === "left" || side === "right") {
+    return { top: pct };
+  }
+  return { left: pct };
+}
+
+// ---------------------------------------------------------------------------
 // detectAxisCollision
 // ---------------------------------------------------------------------------
 
@@ -413,6 +630,10 @@ export function detectAxisCollision(
     getComponent,
   );
 
+  // Phase 73 v2 — flow + thermal can legitimately share the axis now; the
+  // collision is resolved visually via `computePortOffset`. This predicate
+  // remains a pure geometric fact lookup ("are they on the same axis?"), not
+  // a warning. Callers decide whether to surface it.
   const flowHoriz = flowSide === "left" || flowSide === "right";
   const thermalHoriz = thermalSide === "left" || thermalSide === "right";
   return flowHoriz === thermalHoriz;

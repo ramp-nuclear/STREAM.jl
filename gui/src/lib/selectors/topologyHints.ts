@@ -84,24 +84,20 @@ export function selectTopologyHints(
   const comp = getComponent(componentId);
   if (!comp) return [];
 
-  // D-15 dual-layer pre-check: only fires when BOTH a FlowPort AND a thermal
-  // pair (i.e., a ThermalPort carrying `pair_with`) exist on the component.
-  // Plain Pumps (flow-only) and plain HeatDiffusions (thermal-only) are
-  // exempt by construction.
+  // Phase 73 v2 — the "topology-axis-collision" hint is no longer surfaced.
+  // Flow and thermal sharing the same axis used to be a warning condition;
+  // now it's handled visually by `computePortOffset`, which slides the
+  // thermal mark along the shared edge so it sits adjacent to the flow port.
+  // The collision is the expected state, not a problem. The hint code is
+  // retained so the constant import + pre-check structure stay intact for
+  // any future hint additions, but no tags are emitted today.
   const hasFlowPort = comp.ports.some((p) => p.type === "FlowPort");
   const hasThermalPair = comp.ports.some(
     (p) => p.type === "ThermalPort" && typeof p.pair_with === "string",
   );
   if (!hasFlowPort || !hasThermalPair) return [];
 
-  // Delegate the axis-collision math to Plan 01's pure helper. Note that
-  // `detectAxisCollision` also performs its own pre-checks (component
-  // lookup, port presence, default_axis presence); duplicating the
-  // dual-layer guard here keeps `selectTopologyHints` self-documenting and
-  // ensures the tag's contract is locally legible.
-  if (!detectAxisCollision(state.nodes, state.edges, nodeId, getComponent)) {
-    return [];
-  }
-
-  return [HINT_AXIS_COLLISION];
+  // Geometric fact lookup (unused for tagging today — see note above).
+  detectAxisCollision(state.nodes, state.edges, nodeId, getComponent);
+  return [];
 }
