@@ -8,6 +8,7 @@ import MatrixBadge from "./MatrixBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SectionHeader } from "@/components/ui/section-header";
 import {
   Select,
   SelectContent,
@@ -431,9 +432,9 @@ export default function ParameterForm({
       {sections.map((section, idx) => (
         <div key={section.heading} className="min-w-0">
           {idx > 0 && <Separator className="mb-[12px]" />}
-          <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
+          <SectionHeader as="h3" className="leading-[1.3] mb-[8px]">
             {section.heading}
-          </h3>
+          </SectionHeader>
           <div className="flex flex-col gap-[8px]">
             {section.params.map((param) => renderField(param))}
           </div>

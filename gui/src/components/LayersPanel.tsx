@@ -31,6 +31,7 @@
 import { Eye, EyeOff } from "lucide-react";
 import { LAYER_KEYS, type LayerKey } from "../lib/layers";
 import { LAYER_COLOR_VAR } from "../lib/layerColors";
+import { SectionHeader } from "./ui/section-header";
 import useStore from "../store/useStore";
 import { cn } from "../lib/utils";
 
@@ -51,9 +52,7 @@ export default function LayersPanel() {
 
   return (
     <div data-testid="layers-panel" className="border-t bg-panel shrink-0">
-      <div className="px-3 pt-2 pb-1 text-micro font-mono uppercase tracking-wide text-foreground/45">
-        Layers
-      </div>
+      <SectionHeader className="px-3 pt-2 pb-1">Layers</SectionHeader>
       <div className="flex flex-col px-1 pb-1">
         {LAYER_KEYS.map((key) => {
           const on = activeLayers[key];

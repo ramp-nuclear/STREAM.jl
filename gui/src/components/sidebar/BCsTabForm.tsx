@@ -34,6 +34,7 @@
 // "switch dropdown to Source → click + New".
 
 import { Label } from "@/components/ui/label";
+import { SectionHeader } from "@/components/ui/section-header";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
@@ -276,9 +277,9 @@ function GroupBlock({
 
   return (
     <>
-      <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
+      <SectionHeader as="h3" className="leading-[1.3] mb-[8px]">
         {group.baseField}
-      </h3>
+      </SectionHeader>
 
       {isPaired && (
         // Phase 63.1 D-12: labeled SegmentedButtonGroup replaces the legacy

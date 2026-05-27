@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import useStore from "@/store/useStore";
+import { SectionHeader } from "@/components/ui/section-header";
 import PresetRow from "./PresetRow";
 import type { UnwatchFn } from "@tauri-apps/plugin-fs";
 
@@ -186,9 +187,9 @@ export default function PresetsPanel() {
         role="heading"
         aria-level={2}
       >
-        <span className="text-micro font-mono uppercase tracking-wide text-foreground/45 truncate min-w-0">
+        <SectionHeader as="span" className="truncate min-w-0">
           Project
-        </span>
+        </SectionHeader>
         <button
           onClick={() => setProjectExpanded((v) => !v)}
           className="rounded-sm hover:bg-accent p-0.5 text-muted-foreground"
@@ -242,9 +243,9 @@ export default function PresetsPanel() {
         role="heading"
         aria-level={2}
       >
-        <span className="text-micro font-mono uppercase tracking-wide text-foreground/45 truncate min-w-0">
+        <SectionHeader as="span" className="truncate min-w-0">
           Library
-        </span>
+        </SectionHeader>
         <button
           onClick={() => setLibraryExpanded((v) => !v)}
           className="rounded-sm hover:bg-accent p-0.5 text-muted-foreground"

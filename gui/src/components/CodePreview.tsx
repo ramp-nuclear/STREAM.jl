@@ -40,6 +40,7 @@ import {
   useCallback,
 } from "react";
 import { ScrollArea } from "./ui/scroll-area";
+import { SectionHeader } from "./ui/section-header";
 import useStore from "../store/useStore";
 import { useShowCodeFor } from "../hooks/useShowCodeFor";
 import { getComponent } from "../registry";
@@ -507,9 +508,9 @@ export default function CodePreview() {
                   ValidationPanel column-label idiom: muted foreground +
                   uppercase + tracking, no marker. The mb-5 rhythm + typography
                   contrast carry the divider. */}
-              <h4 className="text-micro font-mono uppercase tracking-wide text-foreground/45 mb-2 select-none">
+              <SectionHeader as="h4" className="mb-2 select-none">
                 {section.name}
-              </h4>
+              </SectionHeader>
               <div className="flex flex-col gap-1.5">
                 {section.subBlocks.map((sub, i) => {
                   const id = makeSubBlockId(section.name, i);

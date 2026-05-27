@@ -43,6 +43,7 @@ import useStore, {
 import { getComponent } from "@/registry";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { SectionHeader } from "@/components/ui/section-header";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InstanceNameField from "./InstanceNameField";
@@ -408,9 +409,9 @@ export default function SidebarPanel({ width, onResizeMouseDown, onCollapse }: S
       )}
       <ScrollArea className="h-full">
         <div className="p-[10px] pt-[10px] min-w-0">
-          <h2 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
+          <SectionHeader as="h2" className="leading-[1.3] mb-[8px]">
             {headerText}
-          </h2>
+          </SectionHeader>
           {renderBody()}
         </div>
       </ScrollArea>
@@ -492,18 +493,18 @@ function ComponentTabs({
             render with neither section eligible. */}
         {hasFlowPort && (
           <>
-            <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
+            <SectionHeader as="h3" className="leading-[1.3] mb-[8px]">
               Anchors
-            </h3>
+            </SectionHeader>
             <AnchorsSection nodeId={selectedNodeId} component={component} />
             {hasExternalInputs && <Separator className="my-[16px]" />}
           </>
         )}
         {hasExternalInputs && (
           <>
-            <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 leading-[1.3] mb-[8px]">
+            <SectionHeader as="h3" className="leading-[1.3] mb-[8px]">
               External Inputs
-            </h3>
+            </SectionHeader>
             <BCsTabForm component={component} nodeId={selectedNodeId} />
           </>
         )}

@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SectionHeader } from "@/components/ui/section-header";
 import { cn } from "@/lib/utils";
 import { usePreference, resetAllPreferences } from "@/lib/preferences";
 import { THEMES, useTheme, type Theme } from "@/hooks/useTheme";
@@ -81,11 +82,7 @@ function SettingRow({ label, description, control, notYetWired }: SettingRowProp
 /** Tight sub-header used inside categories that have sub-clusters (e.g. the
  *  per-rule Validation switches sit under a "Rules" sub-header). */
 function SubHeader({ label }: { label: string }) {
-  return (
-    <div className="text-micro font-mono uppercase tracking-wide text-foreground/45 mt-4 mb-1">
-      {label}
-    </div>
-  );
+  return <SectionHeader className="mt-4 mb-1">{label}</SectionHeader>;
 }
 
 // ---------------------------------------------------------------------------
@@ -618,9 +615,7 @@ export default function PreferencesDialog({ open, onOpenChange }: PreferencesDia
           {/* Right pane */}
           <ScrollArea className="flex-1 min-h-0">
             <div className="px-6 py-5">
-              <div className="text-micro font-mono uppercase tracking-wide text-foreground/45 mb-3">
-                {activeLabel}
-              </div>
+              <SectionHeader className="mb-3">{activeLabel}</SectionHeader>
               {activeCategory === "editor" && <EditorPane />}
               {activeCategory === "appearance" && <AppearancePane />}
               {activeCategory === "files" && <FilesPane />}
