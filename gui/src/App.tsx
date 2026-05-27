@@ -388,7 +388,16 @@ function App() {
       // comparable tool (VSCode, Linear, Notion, Figma) opens the palette
       // even while a text field is focused. UAT round 1 flagged the prior
       // input-focus skip as overly cautious.
+      //
+      // Always reset mode to "commands" so the next open lands on the right
+      // view. `paletteMode` is sticky across open/close cycles (the inner
+      // palette re-mounts on each open and seeds from `initialMode`), so if
+      // the user opened shortcuts via `?`, closed it, and then pressed
+      // Ctrl+P, the stale "shortcuts" mode would persist into the next open.
+      // Setting mode here is safe when closing too — palette unmounts before
+      // the mode prop is consumed again.
       e.preventDefault();
+      setPaletteMode("commands");
       setPaletteOpen((v) => !v);
     };
     // Discoverability hook: View → Jump to… (ViewMenu.tsx) dispatches this
