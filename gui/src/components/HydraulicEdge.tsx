@@ -6,6 +6,7 @@ import {
   pointsToSvgPath,
   type Bbox,
 } from "../lib/edgeRouting";
+import { reachableNodes } from "../lib/autoflip";
 
 /**
  * Custom hydraulic edge — obstacle-avoiding orthogonal router.
@@ -47,8 +48,25 @@ function HydraulicEdge({
   // we need to re-route. Other store changes don't replace this reference,
   // so the edge doesn't re-render on unrelated state changes.
   const nodes = useStore((s) => s.nodes);
+  // Subscribe to edges so the obstacle filter recomputes when the connected
+  // component changes (e.g. user deletes the edge that was bridging this
+  // edge's source/target to an unrelated cluster — that cluster's nodes
+  // should drop out of the obstacle set on the next render).
+  const edges = useStore((s) => s.edges);
+
+  // Phase 73 fix (v2) — obstacles are restricted to the FLOW connected
+  // component (edges with type "hydraulicEdge" only). The previous filter
+  // used the full edge graph, which still pulled in BC sources and thermal
+  // nodes whenever they happened to connect into the flow loop via a BC or
+  // thermal edge. A WallTemperature wired up off to the side still made
+  // every flow edge wrap around it. Flow routing should consider only flow
+  // components — non-flow nodes get ignored even when they share a node
+  // with the flow graph.
+  const flowEdges = edges.filter((e) => e.type === "hydraulicEdge");
+  const reachable = reachableNodes(nodes, flowEdges, [source, target]);
   const obstacles: Bbox[] = [];
   for (const n of nodes) {
+    if (!reachable.has(n.id)) continue;
     const measured = n.measured as
       | { width?: number; height?: number }
       | undefined;

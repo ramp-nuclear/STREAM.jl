@@ -366,7 +366,7 @@ describe("StreamNode autoflip — Pitfall 6 CAC thermal latent bug", () => {
 // suffix `_left` maps to spatial left and `_right` to spatial right.
 // ---------------------------------------------------------------------------
 
-describe("StreamNode autoflip — D-18 thermal axis flip on neighbor", () => {
+describe("StreamNode autoflip — D-18 thermal axis flip on neighbor (Phase 73 v2)", () => {
   function primeHorizontalCacHd() {
     primeStore(
       [
@@ -379,20 +379,52 @@ describe("StreamNode autoflip — D-18 thermal axis flip on neighbor", () => {
     );
   }
 
-  it("D-18: CAC.thermal_left flips to spatial left when neighbor is horizontal (|dx| > |dy|)", () => {
+  it("D-18: CAC.thermal_left flips to spatial left when neighbor is horizontal — collision w/ flow handled via along-edge offset", () => {
+    // Phase 73 v2 — thermal pair uses neighbor projection. The HD neighbor
+    // is to the right; the pair lands horizontally with thermal_left=left.
+    // Same axis as flow → the StreamNode applies a top: 25% offset via
+    // `computePortOffset` so the marks don't sit on top of each other.
     primeHorizontalCacHd();
     const { container } = renderStreamNode("c1", "ChannelAndContacts", "cac_1", { n: 4 });
     const handle = getHandle(container, "thermal_left");
     expect(handle).toBeTruthy();
     expect(handle!.className).toContain("react-flow__handle-left");
+    // Inline offset applied via `style.top` when colliding with port_in.
+    expect(handle!.style.top).toBe("25%");
   });
 
-  it("D-18: CAC.thermal_right flips to spatial right (suffix-locked pair opposite)", () => {
+  it("D-18: CAC.thermal_right flips to spatial right (suffix-locked pair opposite) — uniform 25% offset matches thermal_left's", () => {
+    // Phase 73 v2 — thermal pair uses a uniform offset so both members sit
+    // at the same percentage on their respective edges, reading as a
+    // coherent shelf rather than a zigzag.
     primeHorizontalCacHd();
     const { container } = renderStreamNode("c1", "ChannelAndContacts", "cac_1", { n: 4 });
     const handle = getHandle(container, "thermal_right");
     expect(handle).toBeTruthy();
     expect(handle!.className).toContain("react-flow__handle-right");
+    expect(handle!.style.top).toBe("25%");
+  });
+
+  it("HD-only (no flow ports): thermal pair follows neighbor projection unaffected — no offset applied", () => {
+    primeStore(
+      [
+        hdNode("h1", { x: 0, y: 0 }),
+        cacNode("c_above", { x: 0, y: -300 }),
+        cacNode("c_below", { x: 0, y: 300 }),
+      ],
+      [
+        thermalEdge("te1", "h1", "thermal_left", "c_above", "thermal_right"),
+        thermalEdge("te2", "h1", "thermal_right", "c_below", "thermal_left"),
+      ],
+    );
+    const { container } = renderStreamNode("h1", "HeatDiffusion", "hd_1", { nz: 4, nx: 4 });
+    const left = getHandle(container, "thermal_left");
+    const right = getHandle(container, "thermal_right");
+    expect(left!.className).toContain("react-flow__handle-top");
+    expect(right!.className).toContain("react-flow__handle-bottom");
+    // No flow ports on HD → no collision → no offset.
+    expect(left!.style.left).toBe("");
+    expect(right!.style.left).toBe("");
   });
 });
 

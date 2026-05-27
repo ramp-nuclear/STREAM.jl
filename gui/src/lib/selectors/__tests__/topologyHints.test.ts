@@ -158,12 +158,12 @@ const getComponent = (id: string): ComponentDefinition | undefined => {
 // ---------------------------------------------------------------------------
 
 describe("selectTopologyHints (D-15)", () => {
-  it("D-15: CAC with hydraulic neighbor LEFT and thermal neighbor RIGHT (both horizontal axes) → emits 'topology-axis-collision'", () => {
-    // Layout:
-    //   pump (-300, 0) --flow--> cac (0, 0) --thermal--> hd (300, 0)
-    // Flow axis: cac.port_in faces LEFT (neighbor pump is left of cac).
-    // Thermal axis: thermal neighbor hd is RIGHT — pair axis flips to horizontal.
-    // Both layers want the horizontal axis → collision.
+  it("Phase 73 v2: CAC with flow + thermal on same axis — hint NOT surfaced (collision handled visually via offset)", () => {
+    // Pre-Phase-73 contract: this geometry triggered 'topology-axis-collision'.
+    // Phase 73 v2 — flow + thermal can legitimately share an axis; the
+    // StreamNode applies an along-edge offset so the marks don't overlap.
+    // The hint is no longer emitted (it became user-facing noise once the
+    // collision became the expected, handled state).
     const state = {
       nodes: [
         makeNode("pump1", "Pump", -300, 0),
@@ -175,10 +175,8 @@ describe("selectTopologyHints (D-15)", () => {
         thermalEdge("e_th", "cac1", "thermal_right", "hd1", "thermal_left"),
       ],
     };
-    expect(selectTopologyHints(state, "cac1", getComponent)).toEqual([
-      "topology-axis-collision",
-    ]);
-    expect(selectTopologyHints(state, "cac1", getComponent)).toContain(
+    expect(selectTopologyHints(state, "cac1", getComponent)).toEqual([]);
+    expect(selectTopologyHints(state, "cac1", getComponent)).not.toContain(
       HINT_AXIS_COLLISION,
     );
   });
