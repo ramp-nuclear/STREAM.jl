@@ -1,51 +1,123 @@
 ---
 name: STREAM Composer
 description: Desktop visual editor that produces STREAM.jl Julia scripts for MTR plate-fuel safety analysis
+colors:
+  # Three-tier depth (chrome darkest → panel mid → canvas lightest, VSCode lineage).
+  # Dark-theme values shown; light-theme equivalents in the prose tables below.
+  chrome:                  "oklch(0.16 0.012 254)"
+  panel:                   "oklch(0.21 0.012 254)"
+  canvas:                  "oklch(0.27 0.012 254)"
+  # Neutrals
+  foreground:              "oklch(0.73 0.012 250)"
+  muted-foreground:        "oklch(0.65 0.01 250)"
+  card:                    "oklch(0.23 0.012 254)"
+  popover:                 "oklch(0.33 0.012 254)"
+  border:                  "oklch(0.30 0.005 254)"
+  border-hover:            "oklch(0.38 0.005 254)"
+  # Functional
+  ring:                    "oklch(0.65 0.10 240)"
+  destructive:             "oklch(0.704 0.191 22.216)"
+  color-warning:           "oklch(0.78 0.15 75)"
+  color-info:              "oklch(0.72 0.16 240)"
+  # Layer accents (4 slots — Phase 68 taxonomy)
+  layer-hydraulic:         "oklch(0.62 0.16 240)"
+  layer-thermal:           "oklch(0.74 0.15 75)"
+  layer-sources:           "oklch(0.74 0.17 130)"
+  layer-reactor-physics:   "oklch(0.62 0.22 15)"
+  # Port glyph (Phase 73 Lane 2.5)
+  port-disc:               "oklch(0.45 0.014 250)"
+  port-disc-border:        "oklch(0.22 0.018 250)"
+  port-chevron:            "oklch(0.80 0.07 240)"
+  # Edges
+  edge-stroke:             "oklch(0.73 0.008 254)"
+  edge-stroke-selected:    "oklch(0.93 0.005 254)"
+  # Code editor lane (One Dark Pro lineage)
+  syntax-keyword:          "oklch(0.74 0.16 295)"
+  syntax-string:           "oklch(0.78 0.14 145)"
+  syntax-type:             "oklch(0.78 0.11 230)"
+  syntax-macro:            "oklch(0.83 0.13 80)"
+  syntax-number:           "oklch(0.78 0.13 50)"
+typography:
+  micro:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Inter, sans-serif"
+    fontSize: "0.625rem"
+    lineHeight: "1rem"
+  label:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Inter, sans-serif"
+    fontSize: "0.6875rem"
+    lineHeight: "1rem"
+  body:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Inter, sans-serif"
+    fontSize: "0.8125rem"
+    lineHeight: "1.25rem"
+  title:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Inter, sans-serif"
+    fontSize: "1rem"
+    fontWeight: 500
+    lineHeight: "1.5rem"
+  display:
+    fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Inter, sans-serif"
+    fontSize: "1.25rem"
+    fontWeight: 400
+    lineHeight: "1.75rem"
+  mono:
+    fontFamily: "JetBrains Mono Variable, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace"
+    fontSize: "0.8125rem"
+    lineHeight: "1.25rem"
+rounded:
+  sm: "4px"
+  md: "10px"
+  pill: "9999px"
+components:
+  button-primary:
+    backgroundColor: "{colors.foreground}"
+    textColor: "{colors.chrome}"
+    rounded: "{rounded.sm}"
+    padding: "0.5rem 0.75rem"
+  button-outline:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.sm}"
+    padding: "0.5rem 0.75rem"
+  button-ghost:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.sm}"
+    padding: "0.5rem 0.75rem"
+  input:
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.sm}"
+    padding: "0.5rem 0.625rem"
+  dialog:
+    backgroundColor: "{colors.chrome}"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.md}"
+    padding: "1.5rem"
+  popover:
+    backgroundColor: "{colors.popover}"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.md}"
+    padding: "0.25rem"
+  tooltip:
+    backgroundColor: "{colors.foreground}"
+    textColor: "{colors.chrome}"
+    rounded: "{rounded.sm}"
+    padding: "0.25rem 0.5rem"
+  node:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.md}"
+    padding: "0.75rem"
 ---
 
-<!-- PARTIAL SEED — Phase 72 in progress.
-
-LOCKED (from /impeccable shape canvas, 2026-05-21):
-  - §2 Colors except --destructive (still provisional)
-  - §3 Type scale (1.25 Major Third) + scale tokens; font choice + typography direction still TBD
-  - §4 Depth approach (3-tier tonal layering with structural shadows) + shadow vocabulary (single tier, --shadow-dialog)
-  - §5 StreamNode visual treatment + canvas background (grid lines)
-
-LOCKED (from /impeccable shape shadcn-primitive-layer, 2026-05-22):
-  - §2 --ring relocked (hue-240 tint, low chroma)
-  - §2 --border relocked (solid OKLCH, no alpha-on-white)
-  - §2 new tokens: --border-hover, --popover (light mode), --shadow-dialog
-  - §3 Type scale tokens exposed (--text-{micro,label,body,title,display})
-  - §4 Shadow vocabulary: SINGLE TIER (--shadow-dialog applied to
-        Dialog/AlertDialog/Sheet only; all other primitives are tonal+border)
-  - §5 Radius scale committed (--radius-sm 4 px, --radius-md 8 px; no
-        rounded-lg/xl in the primitive layer)
-  - §5 All shadcn primitives recommitted: Button family, Input family,
-        Surface family (Dialog/AlertDialog/Popover/Tooltip/Sonner + new
-        Sheet), Menu family (DropdownMenu/ContextMenu/Menubar/Select/Command),
-        Navigation (Tabs/ScrollArea/Separator)
-
-LOCKED (from /impeccable shape help-system, 2026-05-22):
-  - §5 Tooltip consumption discipline (icon-only OR shortcut-bearing-without-
-        visible-binding); inventory of consumers; explicit exclusions
-  - §5 cmdk shortcut mode + ? keybind (Linear convention), ModeChip swap,
-        SHORTCUTS_CATALOG SSOT in gui/src/lib/shortcuts.ts
-  - §5 AnatomyDialog — visual legend, dialog modal, real-component mirror
-        strategy, Node + Edges tiles, numbered callouts, footnote
-  - §5 HelpMenu rebuilt (Shortcuts / Anatomy / About)
-
-STILL HELD OPEN:
-  - §2 --destructive still provisional (semantic gravity earns it as the
-       one chrome-permitted accent, but the exact OKLCH value is inherited)
-  - §3 Font choice and typography direction — pending /impeccable shape
-       first-run + help-system
-
-Two-pass protocol per Impeccable's `document.md`:
-  1. This file documents locked doctrine + locked-so-far values + held-open slots.
-  2. As subsequent `/impeccable shape <surface>` decisions land, promote each
-     [TBD] to a locked value here.
-  3. At Phase 72 end, re-run `/impeccable document` in scan mode to capture
-     the now-decided tokens into a real frontmatter + sidecar. -->
+<!-- Phase 72 closed 2026-05-28 at 38/40 design-health score.
+     Token primitives above are normative (consumed by Stitch / awesome-design-md /
+     the impeccable live panel). Tonal ramps, shadow / motion tokens, full
+     component HTML+CSS snippets, and narrative live in .impeccable/design.json.
+     The 35 locked-doctrine subsections below preserve institutional decisions
+     from Phase 72/73; the frontmatter mirrors the dark-theme values (light-theme
+     equivalents are in the §2 Colors table). -->
 
 # Design System: STREAM Composer
 
@@ -182,17 +254,31 @@ for ports) cover the remaining edge cases.
 | `--border`         | `oklch(0.30 0.012 254)`      | `oklch(0.88 0.005 254)`      | **locked** — solid OKLCH (was alpha-on-white; the alpha trickery violated OKLCH-only doctrine) |
 | `--border-hover`   | `oklch(0.38 0.012 254)`      | `oklch(0.80 0.005 254)`      | **locked** — +Δ0.08 lightness step; Input + Select hover lift here |
 | `--shadow-dialog`  | `0 16px 40px -12px oklch(0.05 0 0 / 0.55), 0 4px 12px -4px oklch(0.05 0 0 / 0.40)` | `0 16px 40px -12px oklch(0.05 0 0 / 0.18), 0 4px 12px -4px oklch(0.05 0 0 / 0.12)` | **locked** — atmospheric lift for modals (Dialog/AlertDialog/Sheet). Relocked post-Preferences when the scrim was banned; shadow now carries the lift work alone. |
-| `--dialog-surface` | `oklch(0.13 0.012 254)`      | `oklch(0.93 0.012 254)`      | **locked** — modal body fill. Distinct tone OFF the chrome/panel/canvas trio so dialogs read as a tool overlay (CommandPalette lineage) rather than a lifted panel (popover lineage). |
-| `--dialog-border`  | `oklch(0.24 0.012 254)`      | `oklch(0.86 0.012 254)`      | **locked** — pairs with `--dialog-surface`; one step lighter in dark / darker in light so the modal edge reads clean against its own body. |
+| `--dialog-surface` | `oklch(0.13 0.012 254)`      | `oklch(0.93 0.012 254)`      | **historical (2026-05-28 supersede)** — was modal body fill 2026-05-23 → 2026-05-28; the post-critique decision unified dialogs on `bg-chrome`. Token retained in tree as documentation; no current consumer. |
+| `--dialog-border`  | `oklch(0.24 0.012 254)`      | `oklch(0.86 0.012 254)`      | **historical (2026-05-28 supersede)** — paired with `--dialog-surface`; superseded by `--border` on the new chrome-toned dialogs. Token retained; no current consumer. |
 | `--color-warning`  | `oklch(0.78 0.15 75)`        | `oklch(0.74 0.16 75)`        | **locked** |
 | `--color-info`     | `oklch(0.72 0.16 240)`       | `oklch(0.62 0.18 240)`       | **locked** |
 
 `--color-warning` and `--color-info` were introduced earlier to replace
 raw `text-yellow-500` / `text-blue-500` in ValidationPanel. `--border-hover`
 and `--shadow-dialog` were introduced in the primitive-layer shape pass.
-`--dialog-surface` / `--dialog-border` and the relocked atmospheric
-`--shadow-dialog` landed when the prior dim grey scrim + popover body
-were banned project-wide (see Modal Lock below).
+`--dialog-surface` / `--dialog-border` landed 2026-05-23 to host modal
+bodies on their own tone after the dim grey scrim was banned, and were
+superseded 2026-05-28 by `bg-chrome` + `border-border` after the unified
+dialog tone decision (see Modal Lock below). The tokens stay in the
+codebase as historical artifacts; no current primitive or consumer reads
+them.
+
+**`--node-ring-rest` raw-hex carveout (locked, 2026-05-28).** The
+`--node-ring-rest` token uses raw hex values (`#c3c3c3` light, `#6e6e6e`
+dark) rather than OKLCH. The carveout exists because the OKLCH parser in
+xyflow / lower-level SVG paths hit an edge case where alpha-compositing
+against the node body's --card surface produced hue-bleed at low chroma
+(commit `171a79e fix(72-canvas): node ring color → plain hex (bypass
+OKLCH parser edge case)`). The hex values are tuned to render the exact
+intended grey; converting them to OKLCH reproduces the bug. Sibling
+carveouts: macOS traffic-light hex (WindowControls), Windows close-button
+red.
 
 ### Code editor lane carve-out (locked — BCEdge/CodePreview, 2026-05-23)
 
@@ -1280,12 +1366,12 @@ open the dialog.
 
 | Property | Value |
 |---|---|
-| Frame | Inherits the locked Dialog vocab (`--dialog-surface` + `--dialog-border` + atmospheric `--shadow-dialog` + transparent overlay). Top-anchored (`top-[80px] translate-y-0`) to match the CommandPalette + shortcuts-mode keymap lineage — the surfaces the user explicitly asked Preferences to "look like". |
+| Frame | Inherits the unified Dialog vocab (`bg-chrome` + `border-border` + atmospheric `--shadow-dialog` + transparent overlay; primitive default since 2026-05-28). Top-anchored (`top-[80px] translate-y-0`) to match the CommandPalette + shortcuts-mode keymap lineage. |
 | Header | `DialogTitle` "Preferences" at `text-title font-semibold`; no description string (self-explanatory); `DialogClose` X via the primitive default |
 | Left rail | `w-[180px] shrink-0 border-r border-border bg-panel` — one tonal step darker than the popover body so it recedes |
-| Rail row | `<button>` `h-9 px-3 mx-1 my-px rounded-sm text-body font-medium`; rest `text-foreground/65 hover:bg-card/60`; selected `bg-card text-foreground` + 2 px `--ring` left-edge stripe (mirrors ValidationPanel selected-row idiom — single project-wide selected-row vocabulary) |
+| Rail row | `<button>` `h-9 px-3 mx-1 my-px rounded-sm text-body font-medium`; rest `text-foreground/85 hover:bg-card/60` (was `/65` before the 2026-05-28 low-opacity sweep — bumped a tier for legibility per `feedback_avoid_low_opacity_text`); selected `bg-card text-foreground` + 2 px `--ring` left-edge stripe (mirrors ValidationPanel selected-row idiom — single project-wide selected-row vocabulary) |
 | Right pane | `flex-1 overflow-y-auto px-6 py-5`; ScrollArea primitive; per-category header at the top uses the locked compact-uppercase-header idiom (`text-micro font-mono uppercase tracking-wide text-foreground/45`) |
-| Setting row | `grid grid-cols-[1fr_auto] gap-6 items-center py-3 border-b border-border/40 last:border-b-0`; label-stack carries label (`text-body font-medium`) + one-line description (`text-label text-foreground/65`); right cell carries the control |
+| Setting row | `grid grid-cols-[1fr_auto] gap-6 items-center py-3 border-b border-border/40 last:border-b-0`; label-stack carries label (`text-body font-medium`) + one-line description (`text-label text-foreground/85`, bumped from `/65` in the 2026-05-28 sweep); right cell carries the control |
 | Footer | `h-12 border-t border-border px-4`; left = `Reset all preferences` (ghost Button, destructive hover); right = `Done` (default Button, closes dialog); footer inline-replaces with a confirm row on Reset click (no separate AlertDialog — one less modal layer) |
 
 **The Pref-Persists-Even-When-Unwired Rule.** Settings whose downstream
