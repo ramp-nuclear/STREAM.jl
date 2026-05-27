@@ -38,6 +38,10 @@ beforeEach(() => {
     activeLeftTab: "Components",
     activeLayers: { ...ALL_LAYERS_ON },
     hideOffLayer: false,
+    // Phase 72 — LayersPanel rows are disabled when NoProjectHome is
+    // showing (nodes empty + welcomeDismissed=false). Tests exercise
+    // layer toggle behavior in the post-dismiss state, so set the flag.
+    welcomeDismissed: true,
     resources: {
       geometries: {},
       powerShapes: {

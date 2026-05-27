@@ -49,6 +49,13 @@ const LAYER_LABELS: Record<LayerKey, string> = {
 export default function LayersPanel() {
   const activeLayers = useStore((s) => s.activeLayers);
   const toggleLayer = useStore((s) => s.toggleLayer);
+  // Phase 72 — disable layer toggles when no project is open. Layer
+  // visibility only affects canvas rendering; with no nodes there's
+  // nothing to toggle. Boolean primitive selector, value-equality.
+  const noProjectVisible = useStore(
+    (s) =>
+      s.nodes.length === 0 && s.edges.length === 0 && !s.welcomeDismissed,
+  );
 
   return (
     <div data-testid="layers-panel" className="border-t bg-panel shrink-0">
@@ -65,10 +72,12 @@ export default function LayersPanel() {
               aria-label={`${LAYER_LABELS[key]} layer`}
               data-testid={`layer-row-${key}`}
               onClick={() => toggleLayer(key)}
+              disabled={noProjectVisible}
               className={cn(
                 "flex items-center gap-2 px-2 py-1.5 rounded-sm text-left text-[13px] transition-colors",
                 "hover:bg-accent hover:text-accent-foreground",
                 "focus:outline-none focus-visible:bg-accent focus-visible:text-accent-foreground",
+                "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-current",
               )}
             >
               <span

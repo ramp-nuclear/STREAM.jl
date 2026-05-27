@@ -34,6 +34,14 @@ export default function EditMenu() {
   const copySelection = useStore((s) => s.copySelection);
   const pasteFromClipboard = useStore((s) => s.pasteFromClipboard);
   const duplicateSelection = useStore((s) => s.duplicateSelection);
+  // Phase 72 — gate every canvas-mutation item when no project is open.
+  // Undo / Redo / Cut / Copy / Paste / Duplicate all act on canvas state;
+  // disable them while NoProjectHome is showing. Preferences is global
+  // and stays enabled.
+  const noProjectVisible = useStore(
+    (s) =>
+      s.nodes.length === 0 && s.edges.length === 0 && !s.welcomeDismissed,
+  );
 
   return (
     <MenubarMenu>
@@ -41,28 +49,28 @@ export default function EditMenu() {
         Edit
       </MenubarTrigger>
       <MenubarContent align="start">
-        <MenubarItem onClick={() => undo()}>
+        <MenubarItem onClick={() => undo()} disabled={noProjectVisible}>
           Undo
           <MenubarShortcut>Ctrl+Z</MenubarShortcut>
         </MenubarItem>
-        <MenubarItem onClick={() => redo()}>
+        <MenubarItem onClick={() => redo()} disabled={noProjectVisible}>
           Redo
           <MenubarShortcut>Ctrl+Y</MenubarShortcut>
         </MenubarItem>
         <MenubarSeparator />
-        <MenubarItem onClick={() => void cutSelection()}>
+        <MenubarItem onClick={() => void cutSelection()} disabled={noProjectVisible}>
           Cut
           <MenubarShortcut>Ctrl+X</MenubarShortcut>
         </MenubarItem>
-        <MenubarItem onClick={() => void copySelection()}>
+        <MenubarItem onClick={() => void copySelection()} disabled={noProjectVisible}>
           Copy
           <MenubarShortcut>Ctrl+C</MenubarShortcut>
         </MenubarItem>
-        <MenubarItem onClick={() => void pasteFromClipboard()}>
+        <MenubarItem onClick={() => void pasteFromClipboard()} disabled={noProjectVisible}>
           Paste
           <MenubarShortcut>Ctrl+V</MenubarShortcut>
         </MenubarItem>
-        <MenubarItem onClick={() => duplicateSelection()}>
+        <MenubarItem onClick={() => duplicateSelection()} disabled={noProjectVisible}>
           Duplicate
           <MenubarShortcut>Ctrl+D</MenubarShortcut>
         </MenubarItem>

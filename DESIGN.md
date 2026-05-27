@@ -768,63 +768,174 @@ the ReactFlow viewport or a new focus event replaces it. Single-node-target
 results keep the existing 600 ms one-shot `.validation-flash` navigation
 behavior.
 
-### First-run empty-canvas hint (locked — Phase 72, 2026-05-22)
+### No-project home surface (locked — Phase 72, 2026-05-27)
 
-Replaces `WelcomeOverlay`'s prior centered card with a chromeless typographic
-anchor on the canvas surface. Renders only when
-`nodes.length === 0 && edges.length === 0` (gated on a single boolean
-primitive selector so it doesn't repaint during ReactFlow drags). Resolves
-Audit P0-1 + P2-1 + Critique P1-1.
+**Supersedes the 2026-05-22 "chromeless typographic anchor" doctrine**
+and the prior letterhead-card `WelcomeOverlay`. Both treatments were
+rejected during the 2026-05-27 critique session: the anchor read as "an
+ugly thing barely visible on the canvas background," and the letterhead
+read as a marketing splash (PRODUCT.md anti-reference). This subsection
+is the new locked spec; the component is `NoProjectHome.tsx`.
 
-**Visual:** no card, no shadow, no border, no rounded panel, no wordmark.
-Block is `w-[280px]`, centered horizontally and vertically inside the
-canvas, pointer-events-none on the outer wrapper so the empty area still
-accepts drag-drop / pan / zoom; pointer-events-auto on the inner block so
-recent rows are clickable.
+**Topology — the canvas region renders the home surface when no project
+is open.** Not an overlay floating on the canvas; the canvas region IS
+the home. Renders when
+`nodes.length === 0 && edges.length === 0 && !welcomeDismissed`. The
+ReactFlow canvas stays mounted underneath (preserves xyflow internal
+state for fast project-open); `NoProjectHome` is a full-bleed
+`absolute inset-0 bg-canvas` opaque surface covering it. Result reads
+as "no canvas because no project," not as "splash on top of canvas."
 
-**Layout:**
+**Chrome behavior when no project is open:**
+
+| Chrome | Behavior |
+|---|---|
+| Titlebar (CustomTitlebar) | Unchanged — always-on brand zone (brand mark + window title). |
+| Menubar / File | New / Open / Open Recent: ENABLED (primary "create / open project" affordances). Save / Save As / Load preset / Save selection as preset / Export to Julia: **DISABLED** (act on a project that doesn't exist). |
+| Menubar / Edit | Undo / Redo / Cut / Copy / Paste / Duplicate: **DISABLED** (canvas mutations). Preferences: ENABLED (global). |
+| Menubar / View | Jump to (palette) / Toggle Code Preview / Theme: ENABLED. Bottom-panel content has its own empty states (CodePreview "No code yet.", ValidationPanel "No issues."). |
+| Menubar / Help | All entries ENABLED (Shortcuts / Anatomy / About are global discovery surfaces). |
+| Toolbox | ENABLED. Dragging a component onto the home surface fires the dashed drop-affordance border; on drop a fresh project is created and the component auto-places near canvas origin. The toolbox drag IS a `+ New` affordance. |
+| LayersPanel | Layer-toggle buttons **DISABLED** (`disabled:opacity-50 disabled:cursor-not-allowed`). Section header + dots stay visible so the chrome structure reads continuously; the rows just don't respond. |
+| Right sidebar (Properties) | "No selection" empty state. Unchanged. |
+| Status bar | Theme + Snap + Lock + severity-counts (at zero) — fully functional, no behavior change. |
+| Canvas overlay buttons (Zoom in/out, FitView, Lock, Snap) | **Hidden** when home is showing. They operate on canvas state and at `top-2 right-2` would collide with the dashed drop-affordance border. `CanvasPanel.tsx` gates this cluster on `!noProjectVisible`. |
+| BottomPanel Copy / Export | Already disabled via `!hasNodes` check — no change needed. |
+
+**The Gate Doctrine.** Every consumer that needs to know about no-project state subscribes to the same boolean primitive via `useStore`:
+
+```ts
+const noProjectVisible = useStore(
+  (s) => s.nodes.length === 0 && s.edges.length === 0 && !s.welcomeDismissed,
+);
+```
+
+Selector returns a boolean, so zustand value-equality means the consumer only re-renders on transition. The condition matches `NoProjectHome`'s own visibility gate verbatim — wherever the home shows, the gate is true; wherever it doesn't, the gate is false. Used today by FileMenu, EditMenu, LayersPanel, CanvasPanel (overlay buttons).
+
+The chrome-continuity rule: opening a project swaps the home surface
+for the canvas in-place; toolbox / layers / sidebar / status do not
+reflow. This keeps the transition zero-cost and lets the toolbox drag
+double as the project-creation entry point.
+
+**Visual treatment — VSCode "Welcome" tab lineage:**
 
 ```
-recent                              ← text-micro mono uppercase foreground/45 (only when ≥1 recent)
-loop_v2                             ← text-label mono foreground/85, <button>, rounded-sm
-hex_cube_transient                    hover bg-card, 80 ms transition-colors, focus-visible ring-2 ring
-mtr_3plate                            extension stripped; native title= for full path
-plate_lof_demo                        max 5 rows
-                                    ← hairline --border, my-2 mx-2 (only when ≥1 recent)
-Ctrl+O   open project               ← shortcut chip (text-micro mono foreground/55, w-16 fixed)
-Ctrl+N   new                          + sans label (text-label foreground/65)
-Ctrl+P   command palette              static text — the keybind IS the affordance
+┌─ canvas region ────────────────────────────────────────────┐
+│                                                            │
+│                                                            │ ← top 15 % breathing room (pt-[15vh])
+│                                                            │
+│        ┌─── 720 px max ──────────────────────────┐         │
+│        │  recent          │   start              │         │ ← SectionHeader (mb-4)
+│        │                  │                      │         │
+│        │  loop_v2         │   +  New project     │         │ ← Action rows (text-body mono, h ~28 px)
+│        │  hex_cube_xxx    │   ⌗  Open project…   │         │
+│        │  mtr_3plate      │                      │         │
+│        │  plate_lof_demo  │   ──────────────     │         │ ← 1 px hairline (--border)
+│        │                  │   templates          │         │ ← SectionHeader (only when templates exist)
+│        │                  │   simple_loop        │         │
+│        │                  │   two_channel_plate  │         │
+│        └──────────────────┴──────────────────────┘         │
+│                                                            │
+│                                  [STREAM-wordmark] v0.1.0  │ ← bottom-right stamp
+└────────────────────────────────────────────────────────────┘
 ```
 
-Cold-start (no recents) collapses to the keymap alone — no `recent`
-section label, no separator.
+- **Background:** `bg-canvas` (no card, no border, no shadow, no
+  rounded panel wrapping the surface). The home IS the canvas region.
+- **Two columns** separated by a 1 px vertical hairline `bg-border`,
+  centered horizontally. Container max-width scales with viewport:
+  `720 px` default → `920 px` at `xl:` (1280 px+) → `1120 px` at `2xl:`
+  (1536 px+). At fullscreen the cluster grows to fill more horizontal
+  real estate so the surface doesn't read as half-empty. Top padding
+  similarly shrinks from `pt-[15vh]` default to `2xl:pt-[10vh]` so
+  content lifts toward the top when the viewport is tall. The earlier
+  watermark-icon-as-ambient-texture attempt was rejected by visual
+  verification (read as decorative-marketing); growing the content
+  cluster itself is the right answer.
+- **Row vocabulary** shared across recents + actions + templates: full-
+  width `<button>`, `text-body font-mono text-foreground`, `rounded-sm
+  px-2 py-1.5`, `hover:bg-card`, `transition-colors duration-[80ms]
+  motion-reduce:!duration-0`, `focus-visible:ring-2 ring-ring`. Action
+  rows carry a small Lucide icon (Plus, FolderOpen) at `h-3.5 w-3.5
+  stroke-1.5` in `text-foreground/55`.
+- **Recents** show the basename stem (extension stripped) with full
+  path via native `title=`. Max 10 entries (was 5; bumped so wider /
+  taller viewports get a denser column for free). Empty state: a
+  single mono line `no recent projects yet` in
+  `text-foreground/45 text-label`.
+- **Templates** section renders only when ≥1 template exists. No empty
+  state — the section earns its pixels only with content.
+- **No canvas grid.** Grid only renders when a project IS open; the
+  home surface keeps a clean `bg-canvas` tone with no structural
+  texture (no spatial reference earned without nodes).
+
+**Identity stamp — bottom-right corner:**
+
+The wordmark SVG at `gui/public/stream-wordmark.svg` (icon + STREAM.JL
+text, brand blue `#003569`) at `h-9` (36 px tall, ~230 px wide), full
+opacity, scaling to `h-11` at `2xl:` viewports. Next to it: the
+Tauri-reported version in `text-label font-mono text-foreground/65`.
+The stamp is the entire brand presence on this surface; titlebar still
+carries the always-on brand mark.
+
+**Important asset note:** the deployed `gui/public/stream-wordmark.svg`
+has a **CROPPED viewBox** (`57 465 966 150`) tight on the actual icon+
+text content. The original source asset at `gui/icons/SVG/horizontal_
+blue.svg` carries `viewBox="0 0 1080 1080"` (square) with the content
+occupying only the y=465–615 band — that's 14 % of the vertical
+viewBox. At `h-N` the original asset rendered as a thin smudge because
+the wordmark content shrank with the empty viewBox. The cropped copy
+in `public/` produces a true-sized wordmark; `h-7` first iteration
+(28 px) and even `h-9` (36 px) on the un-cropped asset were both
+illegible. The source SVG is preserved as the original (re-derived
+from it via viewBox override + path inline + `<g fill="...">`).
+
+**Drop-affordance — static dashed border:**
+
+When a Toolbox-component drag enters the home surface (HTML5 `dragenter`
+with `application/streamcomponent` dataTransfer type), a CSS `<div>`
+inset 16 px from the canvas edge fades in with `border: 2px dashed
+var(--ring); border-radius: var(--radius-md)`. Tailwind's
+`box-sizing: border-box` keeps the stroke strictly inside the
+inset-4 bounds. The first iteration used an SVG rect with
+`stroke-dashoffset` marching-ants animation reusing the
+`flow-trace-march` keyframe; that approach over-painted past the
+SVG viewport on WebKitGTK (percentage-coord rect on a sized SVG).
+The static-border approach is simpler, respects bounds, and matches
+the user's "drop file here" reference cleanly. On drop,
+`newProject()` is called and the dragged component is `addNode()`ed
+at flow-space `(160, 120)` — the project boots with a starter
+component in place.
+
+**The Drop-Is-The-Affordance Rule.** No "Drop file here" caption, no
+overlay text. The dashed receptive border IS the affordance. Power
+users learn it once; the canvas-region-as-receptive-zone metaphor
+matches every other drop target in the app (xyflow's canvas pane
+accepts the same toolbox drag with identical visual feedback once a
+project is open).
 
 **Copy doctrine:**
-- Section label `recent` lowercase. NOT "Recent Projects."
-- Shortcut labels lowercase, action-only: `open project`, `new`,
-  `command palette`. No "Open Project…" with title-case + ellipsis.
-- No "Welcome to STREAM Composer", no "to get started", no drag-drop
-  instruction text. The empty canvas + visible toolbox panel + menubar
-  already say "drop something here."
+- Section labels lowercase: `recent`, `start`, `templates`. Never
+  "Recent Projects" / "Start" / "Templates".
+- Action labels title-case verb-led: `New project`, `Open project…`.
+  Ellipsis on `Open` because it opens a native dialog (Apple HIG
+  convention; the user is not committing to an open yet).
+- Empty-state mono line for recents only: `no recent projects yet`.
+  No empty state for templates section (it just doesn't render).
+- No "Welcome to STREAM Composer", no "Get started", no walkthrough
+  links, no tutorials.
 
-**Shortcut idiom:** plain `Ctrl+...` text matching the menubar
-(FileMenu / EditMenu / etc.). No `⌘` glyph branching; consistency with
-the menubar wins over per-platform glyph correctness in a tool whose
-primary deployment is Linux/WSL2 desktop.
+**A11y:** every interactive row is a real `<button>` (no `div role=button`
+shims). Keyboard tab order: recent rows → action rows → template rows.
+Focus-visible ring tokenized. The corner stamp is decorative
+(`select-none pointer-events-none`); the wordmark `<img>` carries
+`alt="STREAM Composer"` so screen readers announce the app identity
+once when entering the surface, not as repeating decoration.
 
-**The Shortcut-Is-Static-Text Rule.** The keymap rows are documentation,
-not click affordances. Users press the keybind; they don't click the
-shortcut chip. Duplicating the menubar's click paths on the canvas
-would introduce two cmdk-mount / file-dialog-mount paths for the same
-action. Recents ARE buttons because they encode a *specific path*
-(`loop_v2.scp`) the menubar's "Open Recent" submenu doesn't anchor on
-the eye-landing spot.
-
-**A11y:** recent rows are real `<button>` elements with native keyboard
-nav, `focus-visible:ring-2 ring-ring`, and `motion-reduce:!duration-0`
-on the hover transition. Replaces the prior `div onClick` a11y
-violation. Shortcut rows are static text (no role, no tabIndex —
-nothing to focus).
+**Performance:** gated on the same `isEmpty && !welcomeDismissed`
+boolean derived from primitive selectors — does not repaint during
+ReactFlow drags once a project is open (the wrapper unmounts entirely
+once `welcomeDismissed === true`).
 
 ### Help system (locked — Phase 72, 2026-05-22)
 
