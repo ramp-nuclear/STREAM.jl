@@ -177,9 +177,13 @@ describe("ValidationPanel (Phase 72)", () => {
   // ---------------------------------------------------------------------
 
   it("clicking a severity filter pill activates that filter", () => {
+    // FULL_HEADER_THRESHOLD = 4 — pills only render once the result count
+    // crosses into "scan-as-a-table" territory (Phase 72 critique P1-1).
     const results: ValidationResult[] = [
       makeResult({ id: "e1", severity: "error", description: "Error one" }),
+      makeResult({ id: "e2", severity: "error", description: "Error two" }),
       makeResult({ id: "w1", severity: "warning", description: "Warning one" }),
+      makeResult({ id: "w2", severity: "warning", description: "Warning two" }),
     ];
     useStore.setState({ validationResults: results });
     renderPanel();
@@ -194,7 +198,9 @@ describe("ValidationPanel (Phase 72)", () => {
   it("clicking the active severity filter pill clears the filter", () => {
     const results: ValidationResult[] = [
       makeResult({ id: "e1", severity: "error", description: "Error one" }),
+      makeResult({ id: "e2", severity: "error", description: "Error two" }),
       makeResult({ id: "w1", severity: "warning", description: "Warning one" }),
+      makeResult({ id: "w2", severity: "warning", description: "Warning two" }),
     ];
     useStore.setState({ validationResults: results });
     renderPanel();
@@ -209,6 +215,49 @@ describe("ValidationPanel (Phase 72)", () => {
 
     expect(screen.queryByText("Error one")).toBeTruthy();
     expect(screen.queryByText("Warning one")).toBeTruthy();
+  });
+
+  it("hides filter pills when result count is below the disclosure threshold", () => {
+    // 1-3 results: management-widget header outweighs the content; pills
+    // and column labels collapse to a single `{N} issues + group-by` row.
+    const results: ValidationResult[] = [
+      makeResult({ id: "e1", severity: "error", description: "Error one" }),
+      makeResult({ id: "e2", severity: "error", description: "Error two" }),
+      makeResult({ id: "w1", severity: "warning", description: "Warning one" }),
+    ];
+    useStore.setState({ validationResults: results });
+    renderPanel();
+
+    // No filter pills rendered.
+    expect(screen.queryByRole("button", { name: /^Filter to error$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Filter to warning$/i })).toBeNull();
+    // But the group-by icon trigger is still present.
+    expect(screen.queryByRole("button", { name: /Group by settings/i })).toBeTruthy();
+  });
+
+  it("re-renders the pills when a severity filter becomes active at low count", () => {
+    // Carve-out: when severityFilter is active, pills always render so the
+    // user has a way to toggle/clear, even at small filtered counts. The
+    // status-bar segment is the canonical low-N filter entry point.
+    const results: ValidationResult[] = [
+      makeResult({ id: "e1", severity: "error", description: "Error one" }),
+      makeResult({ id: "w1", severity: "warning", description: "Warning one" }),
+    ];
+    useStore.setState({ validationResults: results });
+    renderPanel();
+
+    expect(screen.queryByRole("button", { name: /^Filter to error$/i })).toBeNull();
+
+    fireEvent(
+      window,
+      new CustomEvent("stream:validation-filter", { detail: { severity: "error" } }),
+    );
+
+    // Pills now visible (active one carries " (active)" suffix).
+    expect(
+      screen.queryByRole("button", { name: /^Filter to error \(active\)$/i }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Filter to warning$/i })).toBeTruthy();
   });
 
   // ---------------------------------------------------------------------
@@ -288,13 +337,16 @@ describe("ValidationPanel (Phase 72)", () => {
     expect(screen.getByText(/No results match the active filter\./)).toBeTruthy();
   });
 
-  it("renders column-label row (Sev / Rule / Message) when there is at least one result", () => {
-    const result = makeResult({
-      id: "r1",
-      validatorId: "z_n_match",
-      description: "n × L mismatch",
-    });
-    useStore.setState({ validationResults: [result] });
+  it("renders column-label row (Sev / Rule / Message) once result count crosses the disclosure threshold", () => {
+    // FULL_HEADER_THRESHOLD = 4. Below that, the data scans as a list and
+    // labels are inferable from row content (Phase 72 critique P1-1).
+    const results: ValidationResult[] = [
+      makeResult({ id: "r1", validatorId: "z_n_match", description: "n × L mismatch" }),
+      makeResult({ id: "r2", validatorId: "z_n_match", description: "n × L mismatch B" }),
+      makeResult({ id: "r3", validatorId: "gravity_sum", severity: "warning", description: "ΣΔh ≠ 0" }),
+      makeResult({ id: "r4", validatorId: "ofi_margin", severity: "info", description: "OFI margin low" }),
+    ];
+    useStore.setState({ validationResults: results });
     renderPanel();
 
     expect(screen.getByText("Sev")).toBeTruthy();
@@ -304,6 +356,21 @@ describe("ValidationPanel (Phase 72)", () => {
 
   it("does NOT render column labels when there are zero results", () => {
     renderPanel();
+    expect(screen.queryByText("Sev")).toBeNull();
+    expect(screen.queryByText("Rule")).toBeNull();
+    expect(screen.queryByText("Message")).toBeNull();
+  });
+
+  it("does NOT render column labels when result count is below the disclosure threshold", () => {
+    // 1-3 results: header collapses; labels hidden alongside the pills.
+    const results: ValidationResult[] = [
+      makeResult({ id: "r1", validatorId: "z_n_match", description: "n × L mismatch" }),
+      makeResult({ id: "r2", validatorId: "z_n_match", description: "n × L mismatch B" }),
+      makeResult({ id: "r3", validatorId: "gravity_sum", severity: "warning", description: "ΣΔh ≠ 0" }),
+    ];
+    useStore.setState({ validationResults: results });
+    renderPanel();
+
     expect(screen.queryByText("Sev")).toBeNull();
     expect(screen.queryByText("Rule")).toBeNull();
     expect(screen.queryByText("Message")).toBeNull();
