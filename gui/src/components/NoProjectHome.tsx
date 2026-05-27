@@ -250,7 +250,7 @@ export default function NoProjectHome(): React.ReactElement | null {
           className="h-9 2xl:h-11 w-auto"
         />
         {version && (
-          <span className="text-label font-mono text-foreground/65 pb-0.5">
+          <span className="text-label font-mono text-foreground/85 pb-0.5">
             v{version}
           </span>
         )}
@@ -273,7 +273,7 @@ function ActionRow({ icon, label, onActivate }: ActionRowProps) {
         onClick={onActivate}
         className="w-full text-left text-body font-mono text-foreground flex items-center gap-2 rounded-sm px-2 py-1.5 outline-none transition-colors duration-[80ms] hover:bg-card focus-visible:ring-2 focus-visible:ring-ring motion-reduce:!duration-0"
       >
-        <span className="text-foreground/55">{icon}</span>
+        <span className="text-foreground/85">{icon}</span>
         <span>{label}</span>
       </button>
     </li>

@@ -68,7 +68,7 @@ function SettingRow({ label, description, control, notYetWired }: SettingRowProp
         <div className={cn("text-body font-medium", notYetWired && "text-foreground/55")}>
           {label}
         </div>
-        <div className="text-label text-foreground/65 mt-0.5">{description}</div>
+        <div className="text-label text-foreground/85 mt-0.5">{description}</div>
         {notYetWired && (
           <div className="text-label text-foreground/45 mt-0.5 font-mono">
             Not yet wired.
@@ -355,7 +355,7 @@ function ValidationPane() {
                   {v.severity}
                 </span>
               </div>
-              <div className="text-label text-foreground/65 mt-0.5">
+              <div className="text-label text-foreground/85 mt-0.5">
                 {v.description}
               </div>
             </div>
@@ -590,7 +590,7 @@ export default function PreferencesDialog({ open, onOpenChange }: PreferencesDia
                     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0",
                     selected
                       ? "bg-card text-foreground"
-                      : "text-foreground/65 hover:bg-card/60 hover:text-foreground",
+                      : "text-foreground/85 hover:bg-card/60 hover:text-foreground",
                   )}
                 >
                   {selected && (
@@ -650,7 +650,7 @@ export default function PreferencesDialog({ open, onOpenChange }: PreferencesDia
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-foreground/65 hover:text-destructive hover:bg-destructive/10"
+                className="text-foreground/85 hover:text-destructive hover:bg-destructive/10"
                 onClick={() => setConfirmingReset(true)}
               >
                 Reset all preferences

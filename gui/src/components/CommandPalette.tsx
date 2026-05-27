@@ -663,7 +663,7 @@ function ShortcutRow({ entry, onSelect }: ShortcutRowProps): React.JSX.Element {
       data-testid={`cmdk-shortcut-${entry.label.replace(/\s+/g, "-")}`}
     >
       <span className="flex-1">{entry.label}</span>
-      <span className="ml-auto font-mono text-foreground/65 text-label">
+      <span className="ml-auto font-mono text-foreground/85 text-label">
         {entry.keys}
       </span>
     </CommandItem>

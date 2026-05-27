@@ -88,7 +88,7 @@ export default function AutoRecoverRestoreModal({
           {/* Body — verbatim D-03 wording */}
           <p
             id="autorecover-description"
-            className="mt-3 text-body text-foreground/65 leading-relaxed"
+            className="mt-3 text-body text-foreground/85 leading-relaxed"
           >
             Recover unsaved work from{" "}
             <span className="font-medium text-foreground">{displayTimestamp}</span>

@@ -167,7 +167,7 @@ function TabButton({ tab, label, panelOpen, activeTab }: TabButtonProps) {
         "leading-[18px] cursor-pointer select-none " +
         "transition-colors duration-[80ms] " +
         "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover " +
-        (isActive ? "text-foreground" : "text-foreground/65 hover:text-foreground")
+        (isActive ? "text-foreground" : "text-foreground/85 hover:text-foreground")
       }
     >
       {/* Active-tab top accent — 1 px line at the top edge using --ring. */}
@@ -265,7 +265,7 @@ export default function ValidationStatusBar() {
                 onClick={() => useStore.setState({ bottomPanelOpen: false })}
                 aria-label="Close bottom panel"
                 className={
-                  "h-full px-3 inline-flex items-center cursor-pointer text-foreground/65 " +
+                  "h-full px-3 inline-flex items-center cursor-pointer text-foreground/85 " +
                   "hover:text-foreground transition-colors duration-[80ms] " +
                   "hover:bg-popover/60 focus-visible:outline-none focus-visible:bg-popover"
                 }

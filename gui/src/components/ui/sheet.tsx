@@ -89,7 +89,7 @@ function SheetContent({
         {showCloseButton && (
           <SheetPrimitive.Close
             data-slot="sheet-close"
-            className="absolute top-3 right-3 inline-flex size-6 items-center justify-center rounded-sm text-foreground/55 outline-none transition-colors duration-[80ms] motion-reduce:transition-none hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:pointer-events-none [&_svg]:size-3.5 [&_svg]:stroke-[1.5]"
+            className="absolute top-3 right-3 inline-flex size-6 items-center justify-center rounded-sm text-foreground/85 outline-none transition-colors duration-[80ms] motion-reduce:transition-none hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:pointer-events-none [&_svg]:size-3.5 [&_svg]:stroke-[1.5]"
           >
             <XIcon />
             <span className="sr-only">Close</span>
@@ -140,7 +140,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("text-body text-foreground/65", className)}
+      className={cn("text-body text-foreground/85", className)}
       {...props}
     />
   )

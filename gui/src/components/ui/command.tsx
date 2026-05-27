@@ -50,7 +50,7 @@ function CommandInput({
       data-slot="command-input-wrapper"
       className="flex h-8 items-center gap-1.5 border-b border-border px-3"
     >
-      <SearchIcon className="size-3.5 shrink-0 stroke-[1.5] text-foreground/55" />
+      <SearchIcon className="size-3.5 shrink-0 stroke-[1.5] text-foreground/85" />
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
@@ -85,7 +85,7 @@ function CommandEmpty({
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className="py-6 text-center text-[12px] text-foreground/65"
+      className="py-6 text-center text-[12px] text-foreground"
       {...props}
     />
   )
@@ -128,7 +128,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-[12px] outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-card [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/55",
+        "relative flex h-7 cursor-default items-center gap-1.5 rounded-sm px-2 text-[12px] outline-hidden select-none transition-colors duration-[80ms] motion-reduce:transition-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-card [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:stroke-[1.5] [&_svg:not([class*='text-'])]:text-foreground/85",
         className
       )}
       {...props}
