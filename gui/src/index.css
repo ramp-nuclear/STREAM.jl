@@ -413,7 +413,17 @@ textarea,
 
    The .react-flow__edge.selected path-width rule does need !important
    because xyflow's selection-stroke-width is baked into a CSS rule of
-   equal specificity that we want to override. */
+   equal specificity that we want to override.
+
+   CARVE-OUTS — the rest-state rule below explicitly does NOT match
+   edges with `.validation-flow-trace` (loop trace) on the group OR
+   `.code-link-active` on the path. Both of those classes are STATE
+   overrides that need to win the stroke; without the :not() carve-outs
+   the rest-state rule's higher specificity (0,4,0 vs trace 0,2,0 / code-link
+   0,1,0) was beating them under !important rules, painting traced loops
+   and code-link-active edges with the rest-state edge-stroke (a near-white
+   token in dark mode). Confirmed bug 2026-05-28: gravity-loop warning trace
+   rendered white instead of orange after Phase 73's edge-stroke commit. */
 .react-flow {
   --xy-edge-stroke-default: var(--edge-stroke);
   --xy-edge-stroke-width-default: 1.5;
@@ -426,13 +436,13 @@ textarea,
    gets overridden too, but BC still reads as distinct because of its
    `strokeDasharray` (set inline) — the dashed pattern is the BC signal,
    not the color. */
-.react-flow .react-flow__edge:not(.selected) .react-flow__edge-path {
+.react-flow .react-flow__edge:not(.selected):not(.validation-flow-trace) .react-flow__edge-path:not(.code-link-active) {
   stroke: var(--edge-stroke) !important;
   stroke-width: 1.5 !important;
 }
-.react-flow .react-flow__edge.selected .react-flow__edge-path,
-.react-flow .react-flow__edge:focus .react-flow__edge-path,
-.react-flow .react-flow__edge:focus-visible .react-flow__edge-path {
+.react-flow .react-flow__edge.selected:not(.validation-flow-trace) .react-flow__edge-path:not(.code-link-active),
+.react-flow .react-flow__edge:focus:not(.validation-flow-trace) .react-flow__edge-path:not(.code-link-active),
+.react-flow .react-flow__edge:focus-visible:not(.validation-flow-trace) .react-flow__edge-path:not(.code-link-active) {
   stroke: var(--edge-stroke-selected) !important;
   stroke-width: 3.5 !important;
 }
