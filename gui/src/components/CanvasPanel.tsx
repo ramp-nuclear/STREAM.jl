@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -105,6 +105,18 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   // pin toggles on click). Compared to node-drag (~60 Hz), this is rare.
   const hoveredSourceIds = useStore((s) => s.hoveredSourceIds);
   const pinnedSourceIds = useStore((s) => s.pinnedSourceIds);
+  // Currently-traced edge ids — the loop-trace effect below populates this
+  // when a multi-target validation result is focused, and clears it on
+  // canvas click / replacement / persistence timeout. Lifted into React
+  // state (rather than a useEffect-local closure) so enrichedEdges can bump
+  // `Edge.zIndex` on traced edges, mirroring the code-link z-order lift —
+  // SVG paint order is DOM order, and without a zIndex bump the marching-
+  // ants dashes are visually obscured by static neighbors when paths
+  // overlap. Local component state, NOT zustand (transient UI, no other
+  // surface needs to subscribe).
+  const [tracedEdgeIds, setTracedEdgeIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   // Phase 65 D-09: snap-to-grid state read from store
   const snapEnabled = useStore((s) => s.snapToGrid);
   // Phase 65 Plan 13: interactive lock — when true, all interactions disabled.
@@ -229,7 +241,10 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       const isCodeActive =
         (hoveredSourceIds.has(edge.source) && hoveredSourceIds.has(edge.target)) ||
         (pinnedSourceIds.has(edge.source) && pinnedSourceIds.has(edge.target));
-      const zIndexBump = isCodeActive ? { zIndex: 1500 } : undefined;
+      // Loop-trace edges share the z-order lift: marching-ants needs to
+      // paint above overlapping siblings (same reasoning as code-link).
+      const isTraced = tracedEdgeIds.has(edge.id);
+      const zIndexBump = isCodeActive || isTraced ? { zIndex: 1500 } : undefined;
       if (hideOffLayer) {
         const endpointsHidden =
           hiddenNodeIds.has(edge.source) && hiddenNodeIds.has(edge.target);
@@ -256,6 +271,7 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
     enrichedNodes,
     hoveredSourceIds,
     pinnedSourceIds,
+    tracedEdgeIds,
   ]);
 
   const onDrop = useCallback(
@@ -519,6 +535,8 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         el.style.removeProperty("--validation-trace-color");
       }
       activeTrace = null;
+      // Mirror to React state so enrichedEdges drops the zIndex bump.
+      setTracedEdgeIds(new Set());
     }
 
     function applyTrace(
@@ -543,6 +561,10 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
         el.classList.add("validation-flow-trace");
       }
       activeTrace = { nodeIds, edgeIds };
+      // Mirror to React state so enrichedEdges bumps Edge.zIndex on
+      // traced edges (DOM-side .validation-flow-trace handles the visual
+      // stroke; this handles paint-order vs static neighbors).
+      setTracedEdgeIds(new Set(edgeIds));
     }
 
     const onFocusResult = (e: Event) => {
