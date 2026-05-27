@@ -434,25 +434,36 @@ middle-dot is the unique semantic-neutral inline separator.
 non-breaking space, no narrow space — keeps copy editable without
 character-pickers.
 
-### Font choice — `[TBD]`
+### Font choice (locked — 2026-05-28)
 
-Current code uses the Tailwind default system stack:
+**Body / sans:** native system stack —
 `-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif`.
+Native rendering is high-quality across all three Tauri targets
+(macOS / Windows / Linux) and the body face is not where the
+engineering-voice lives. Deliberate non-commit.
 
-This is a *default*, not a chosen pairing. Decision deferred to the
-`/impeccable shape first-run` or `/impeccable shape help-system` session
-where typographic identity becomes load-bearing. Options on the table when
-that decision lands: keep system fonts (good performance, native feel, no
-commit); commit to a specific sans pairing (Inter / IBM Plex Sans / Söhne
-/ Geist / Suisse Int'l); add a monospaced face for numerics and code
-surfaces (JetBrains Mono / Berkeley Mono / Commit Mono / IBM Plex Mono).
-The Composer is not a content-reading tool, so an editorial serif is
-unlikely to earn its weight.
+**Mono: JetBrains Mono Variable (committed).** Bundled via
+`@fontsource-variable/jetbrains-mono` (imported at `gui/src/main.tsx`),
+exposed through the `--font-mono` token in `@theme inline`. Tailwind v4
+generates `font-mono` from that token; all 40+ `font-mono` consumers
+across the GUI (status-bar counts, validator IDs, keyboard hint chips,
+node value summaries, CodePreview, AnatomyDialog labels) inherit it
+automatically.
 
-### Typography direction — `[TBD]`
+Why JetBrains Mono and not Berkeley / Commit / Geist Mono:
 
-Single sans / sans + mono pairing / mono-forward / sans with selective
-serif. Same shape session as font choice will resolve this.
+- **Free + OFL.** No license-management overhead; ships with the desktop
+  bundle.
+- **Tool lineage.** JetBrains IDEs, Linear's code blocks, Cursor — the
+  font reads as engineering-voice rather than SaaS-decorative.
+- **Numerics are honest.** Tabular figures, distinct `0` vs `O` and
+  `1`/`l`/`I` — directly serves the status-bar count + validator-id use
+  cases.
+- **Variable font.** Single `woff2` covers all weights; no per-weight
+  download.
+
+Fallback chain (when the variable font fails to load):
+`ui-monospace → SFMono-Regular → Menlo → Monaco → Consolas → Liberation Mono → Courier New → monospace`.
 
 ## 4. Elevation
 
