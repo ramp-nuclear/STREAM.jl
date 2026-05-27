@@ -26,6 +26,7 @@
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SectionHeader } from "@/components/ui/section-header";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -307,9 +308,9 @@ export default function ModelOptionsPanel() {
 
       {/* Solver Defaults section ------------------------------------------ */}
       <Separator className="my-[24px]" />
-      <h3 className="text-micro font-mono uppercase tracking-wide text-foreground/45 mb-[16px]">
+      <SectionHeader as="h3" className="mb-[16px]">
         Solver Defaults
-      </h3>
+      </SectionHeader>
 
       <FieldRow
         id="mo-solver-abstol"

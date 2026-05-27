@@ -1,4 +1,5 @@
 import ToolboxItem from "./ToolboxItem";
+import { SectionHeader } from "./ui/section-header";
 import { getComponentsByCategory } from "../registry";
 
 // Phase 62 D-02 — ToolboxPanel is now rendered inside the left-panel Tabs
@@ -29,9 +30,7 @@ export default function ToolboxPanel() {
     <div className="h-full p-2 overflow-y-auto min-w-0">
       {hydraulicComponents.length > 0 && (
         <>
-          <div className="text-micro font-mono uppercase tracking-wide text-foreground/45 px-2 mb-1 mt-2">
-            Hydraulic
-          </div>
+          <SectionHeader className="px-2 mb-1 mt-2">Hydraulic</SectionHeader>
           <div className="space-y-px">
             {hydraulicComponents.map((comp) => (
               <ToolboxItem
@@ -46,9 +45,7 @@ export default function ToolboxPanel() {
 
       {thermalComponents.length > 0 && (
         <>
-          <div className="text-micro font-mono uppercase tracking-wide text-foreground/45 px-2 mb-1 mt-3">
-            Thermal
-          </div>
+          <SectionHeader className="px-2 mb-1 mt-3">Thermal</SectionHeader>
           <div className="space-y-px">
             {thermalComponents.map((comp) => (
               <ToolboxItem
@@ -63,9 +60,7 @@ export default function ToolboxPanel() {
 
       {sourceComponents.length > 0 && (
         <>
-          <div className="text-micro font-mono uppercase tracking-wide text-foreground/45 px-2 mb-1 mt-3">
-            Sources
-          </div>
+          <SectionHeader className="px-2 mb-1 mt-3">Sources</SectionHeader>
           <div className="space-y-px">
             {sourceComponents.map((comp) => (
               <ToolboxItem
