@@ -39,6 +39,14 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
   const loadProjectFromPath = useStore((s) => s.loadProjectFromPath);
   const newProject = useStore((s) => s.newProject);
   const recentFiles = useStore((s) => s.recentFiles);
+  // Phase 72 — gate save / load-preset / save-preset / export when no
+  // project is open (NoProjectHome visible). New / Open / Open Recent stay
+  // enabled — those ARE the affordances for entering a project. Boolean
+  // primitive selector so this doesn't repaint on every node mutation.
+  const noProjectVisible = useStore(
+    (s) =>
+      s.nodes.length === 0 && s.edges.length === 0 && !s.welcomeDismissed,
+  );
 
   async function handleNew() {
     if (isDirty) {
@@ -161,26 +169,26 @@ export default function FileMenu({ onUnsavedCheck }: Props) {
             })}
           </MenubarSubContent>
         </MenubarSub>
-        <MenubarItem onClick={handleSave}>
+        <MenubarItem onClick={handleSave} disabled={noProjectVisible}>
           Save
           <MenubarShortcut>Ctrl+S</MenubarShortcut>
         </MenubarItem>
-        <MenubarItem onClick={handleSaveAs}>
+        <MenubarItem onClick={handleSaveAs} disabled={noProjectVisible}>
           Save As...
           <MenubarShortcut>Ctrl+Shift+S</MenubarShortcut>
         </MenubarItem>
         <MenubarSeparator />
-        <MenubarItem onClick={handleLoadPreset}>
+        <MenubarItem onClick={handleLoadPreset} disabled={noProjectVisible}>
           Load preset…
         </MenubarItem>
         <MenubarItem
           onClick={handleSaveSelectionAsPreset}
-          disabled={selectedNodeCount < 2}
+          disabled={noProjectVisible || selectedNodeCount < 2}
         >
           Save selection as preset…
         </MenubarItem>
         <MenubarSeparator />
-        <MenubarItem onClick={handleExportToJulia}>
+        <MenubarItem onClick={handleExportToJulia} disabled={noProjectVisible}>
           Export to Julia…
         </MenubarItem>
       </MenubarContent>

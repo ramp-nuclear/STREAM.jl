@@ -27,7 +27,7 @@ import {
 import StreamNode from "./StreamNode";
 import HydraulicEdge from "./HydraulicEdge";
 import BCEdge from "./BCEdge";
-import WelcomeOverlay from "./WelcomeOverlay";
+import NoProjectHome from "./NoProjectHome";
 import { useRightClickContextMenu } from "@/hooks/useRightClickContextMenu";
 import { portType } from "@/lib/validation/rules/portType";
 import type { ValidationSnapshot } from "@/lib/validation/snapshot";
@@ -87,6 +87,15 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
   const selectNode = useStore((s) => s.selectNode);
   const activeLayers = useStore((s) => s.activeLayers);
   const hideOffLayer = useStore((s) => s.hideOffLayer);
+  // Phase 72 — primitive selectors gating the canvas-overlay button
+  // cluster (Zoom in/out, FitView, Lock, Snap). Hide them when
+  // NoProjectHome is showing so they don't float over the home surface;
+  // they only act on canvas state and have nothing to do without nodes.
+  const isEmptyCanvas = useStore(
+    (s) => s.nodes.length === 0 && s.edges.length === 0,
+  );
+  const welcomeDismissed = useStore((s) => s.welcomeDismissed);
+  const noProjectVisible = isEmptyCanvas && !welcomeDismissed;
   // Phase 72 — subscribe to hover/pin sets so the enrichedEdges memo can
   // bump zIndex on code-link active edges (SVG paint order is DOM order;
   // xyflow's `Edge.zIndex` is the supported mechanism to reorder). The
@@ -780,15 +789,21 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       </ReactFlow>
       {/* Phase 65 Plan 13: top-right overlay — Zoom/Fit/Lock replace ReactFlow built-in Controls panel; SnapToGridButton from Plan 06.
           Phase 68 UAT 2026-05-17 — LayersChip moved out of this overlay
-          into the docked left-sidebar LayersPanel; this column is now icons-only. */}
-      <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
-        <ZoomInButton />
-        <ZoomOutButton />
-        <FitViewButton />
-        <InteractiveLockButton />
-        <SnapToGridButton />
-      </div>
-      <WelcomeOverlay />
+          into the docked left-sidebar LayersPanel; this column is now icons-only.
+          Phase 72 — hidden while NoProjectHome is showing. The buttons
+          operate on canvas state (zoom, fit, lock, snap) which doesn't
+          exist until a project opens; rendering them over the home
+          would also collide with the dashed drop-affordance border. */}
+      {!noProjectVisible && (
+        <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+          <ZoomInButton />
+          <ZoomOutButton />
+          <FitViewButton />
+          <InteractiveLockButton />
+          <SnapToGridButton />
+        </div>
+      )}
+      <NoProjectHome />
       {/* Phase 65 Plan 05 — context menus via Popover (W10 lock / D-11).
           PopoverAnchor is a 1×1 invisible fixed element at the right-click coords;
           Radix Floating UI anchors PopoverContent to it via side/align. */}

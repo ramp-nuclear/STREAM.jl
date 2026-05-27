@@ -395,9 +395,9 @@ export interface AppState {
    *  the visible recents list without requiring a full app restart. */
   pruneStaleRecentFiles: () => Promise<void>;
   /** Per-session flag: once any project lifecycle action runs (new / open
-   *  recent / start working) we hide the WelcomeOverlay even on the empty
-   *  canvas. Cold-start defaults to false (welcome visible). Standard
-   *  splash-once-per-session pattern (Blender, Cursor, etc.). */
+   *  recent / start working) we hide the NoProjectHome surface even on
+   *  the empty canvas. Cold-start defaults to false (home surface
+   *  visible). Standard once-per-session pattern. */
   welcomeDismissed: boolean;
   dismissWelcome: () => void;
   // Phase 65 Plan 04: Clipboard actions (D-15, D-16, D-19)
@@ -1992,7 +1992,7 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
   dismissWelcome: () => set({ welcomeDismissed: true }),
 
   // pruneStaleRecentFiles (Phase 72 first-run) — drop any recent-file
-  // path that no longer resolves on disk. Triggered from WelcomeOverlay's
+  // path that no longer resolves on disk. Triggered from NoProjectHome's
   // mount effect so external deletions disappear from the visible list
   // without requiring a full app restart.
   //
@@ -2600,9 +2600,9 @@ const useStore = create<AppState>()(subscribeWithSelector((set, get) => ({
     set({
       nodes: [],
       edges: [],
-      // Phase 72: clicking New (from WelcomeOverlay or File menu) is the
-      // user explicitly choosing to start working — dismiss the welcome
-      // panel for the rest of the session even though the canvas remains
+      // Phase 72: clicking New (from NoProjectHome or File menu) is the
+      // user explicitly choosing to start working — dismiss the home
+      // surface for the rest of the session even though the canvas remains
       // empty (so the action feels responsive instead of looking dead).
       welcomeDismissed: true,
       // Phase 63.1 D-02: reset anchors Record on newProject.
