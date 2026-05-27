@@ -523,13 +523,25 @@ by suppressing everything else. Consumers can opt INTO a scrim per-
 instance via `overlayClassName` (no current consumer does, and adding
 one needs a real reason).
 
-**The Dialog-Surface-Is-Its-Own-Tone Rule.** Modal body uses
-`--dialog-surface` + `--dialog-border` (introduced 2026-05-23). The
-tone sits OFF the chrome → panel → canvas trio — light mode 0.93
-(Δ −0.02 below chrome 0.95); dark mode 0.13 (Δ −0.03 below chrome 0.16).
-A modal reads as a tool overlay, not a lifted panel. (Lifted panels are
-`bg-popover` territory — that's `Popover`, `DropdownMenu`, `Menubar`,
-`Select` dropdown, etc., which keep using `--popover` unchanged.)
+**The Dialog-Body-Matches-Chrome Rule (locked — 2026-05-28).** Modal body
+uses `bg-chrome` — the same tone as the top toolbar and bottom status
+bar. The dialog reads as the app shell raised, not as a foreign panel
+dropped in.
+
+This supersedes the prior 2026-05-23 `--dialog-surface` doctrine (which
+positioned the modal body on its own darker tone, Δ −0.03 below chrome
+in dark mode). That tone was hard to read against in production and felt
+visually disconnected from the rest of the app shell. After confirming
+the chrome tone on AnatomyDialog + CommandPalette + AboutDialog (Phase
+72 post-critique, 2026-05-28), the rule was unified across all dialogs.
+
+The `--dialog-surface` / `--dialog-border` tokens are kept as
+historical artifacts (still defined in `:root` + `.dark`) but no
+primitive consumes them. Future surfaces can read them if a tonal
+distinction needs to come back, but the default is chrome.
+
+(Lifted panels are `bg-popover` territory — `Popover`, `DropdownMenu`,
+`Menubar`, `Select` dropdown, etc., which keep using `--popover` unchanged.)
 
 **The Shadow-Does-The-Lift Rule.** With the scrim gone, the
 atmospheric `--shadow-dialog` (16/40 px) does the entire "this floats
@@ -537,14 +549,13 @@ above the canvas" job. The combination of (a) tone distinct from
 chrome, (b) atmospheric shadow, (c) visible border at a hue-matched
 tone is what reads as elevation. No scrim, no blur, no glassmorphism.
 
-**Where it applies.** Dialog + AlertDialog primitives default to this
-treatment. The two hand-rolled modal surfaces (UnsavedChangesDialog,
-AutoRecoverRestoreModal) consume the same `--dialog-surface` /
-`--dialog-border` / `--shadow-dialog` tokens inline. CommandPalette
-established this lineage earlier (its bespoke overrides got promoted
-to the primitive default when the doctrine landed); its per-instance
-overrides reduce to the position + width + zero-padding overrides
-specific to a top-anchored palette.
+**Where it applies.** Dialog + AlertDialog primitives default to
+`bg-chrome border-border` + atmospheric `--shadow-dialog`. The two
+hand-rolled modal surfaces (UnsavedChangesDialog, AutoRecoverRestoreModal)
+consume the same `bg-chrome` + `border-border` + `--shadow-dialog` inline.
+CommandPalette and Preferences keep only their position + width +
+zero-padding overrides specific to a top-anchored palette; the surface
+tone is fully primitive-default.
 
 **What's NOT affected.** `bg-popover` keeps its meaning everywhere it
 already exists — Popover, DropdownMenu, ContextMenu, Menubar, Sonner

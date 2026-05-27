@@ -36,7 +36,7 @@ export default function AboutDialog({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-chrome border-border">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>STREAM Composer</DialogTitle>
           <DialogDescription>Version {version}</DialogDescription>
