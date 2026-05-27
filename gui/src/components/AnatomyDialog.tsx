@@ -1,49 +1,18 @@
-// AnatomyDialog — Phase 72 (help-system shape v6, 2026-05-22).
+// AnatomyDialog — distilled (Phase 72 critique P2-1, 2026-05-27) then
+// upsized 2026-05-28 per feedback_chrome_color_for_anatomy_modals and
+// feedback_avoid_low_opacity_text.
 //
-// Visual legend for the canvas vocabulary. Node tile uses dashed two-segment
-// leaders (horizontal-stub-at-feature + constant-angle diagonal to chip);
-// Edges tile uses leader-less numbered chips placed next to each edge.
+// Visual legend for the canvas vocabulary. The prior implementation was a
+// 1340 px dialog with 640×520 tiles, dashed two-segment SVG leaders at
+// slope-2, numbered chips and a numbered legend — "a diagram, not a help
+// surface." Distilled to inline labels positioned next to each named
+// feature; edges become a list of [specimen | name | description] rows.
 //
-// v6 fixes (after v5 dev-server walkthrough):
-//   - NODE MIRROR IS MUCH LARGER (240×96 → 320×140). The smaller node
-//     packed all 4 LEFT-side features (anchor + 3 body text rows) into
-//     ~80 px of vertical real estate, so leaders converged crowdedly and
-//     the diagonals had no room to fan. The larger node spreads body
-//     rows to ~30 px apart and lets diagonals reach distinct points.
-//   - SCALED-UP NODE TEXT AND PORTS. Band 8→12 px, body p-2→p-3,
-//     body label 11→13 px, instance name text-sm→text-base, value
-//     summary 11→13 px, icon w-3.5→w-5, port handles 12→16 px, anchor
-//     icon w-3→w-4. Everything proportional so the bigger node reads
-//     correctly, not as the small node in a stretched frame.
-//   - DIAGONAL SLOPE m=2.0 (≈63°). v5 used 1.732 (60°), which left the
-//     anchor's horizontal stub only ~7 px wide. m=2.0 keeps the visual
-//     "tech diagram" angle while giving every leader's horizontal stub
-//     at least 16 px of visible length.
-//   - EDGES TILE NO LONGER USES LEADERS. Each edge specimen is already
-//     a distinct horizontal stripe, so a numbered chip floating next to
-//     its target port is unambiguous. Leader lines on top added noise
-//     without information.
-//   - Tile size 620×460 → 640×520 to host the larger node + extended
-//     diagonals. Both tiles share these dimensions.
-//
-// Topology (non-crossing proof):
-//   Each leader: feature → horizontal stub (outward at fy) → kink at
-//   (kinkX, fy) → diagonal up to chip at (chipCenterX, chipY).
-//   - All diagonals share the same slope magnitude (m=2.0). Parallel
-//     lines cannot cross.
-//   - Horizontal stubs each sit at their feature's fy. All horizontals
-//     at distinct y → no horizontal-horizontal crossings.
-//   - For LEFT side: diagonal i passes y=fy_j (j<i, j above in fy sort)
-//     at x = chipCenter + (fy_j - chipY_i)/m, which is < kinkX_j
-//     because chipY_j < chipY_i. So diagonal i's pass-through of
-//     horizontal j's y happens to the LEFT of horizontal j's start;
-//     no crossing. RIGHT mirrors.
-//
-// Carry-overs from v2/v3/v4/v5:
-//   - No modal scrim (overlayClassName="bg-transparent").
-//   - Palette surface tone matching CommandPalette / shortcut palette.
-//   - Visual mirror of StreamNode (not the real component).
-//   - Local marching-ants animation (anatomy-flow-march) for loop trace.
+// Surface uses `bg-chrome` (top-toolbar color) instead of the previously-
+// locked `--dialog-surface`, so the dialog reads as part of the app shell
+// rather than a separate darker slab. No close X — click outside or press
+// Esc to dismiss. Typography bumped a tier across the board; opacity-dimmed
+// grey text removed in favor of full foreground.
 
 import * as React from "react";
 import { Anchor, Box as BoxIcon } from "lucide-react";
@@ -61,112 +30,14 @@ interface AnatomyDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const PALETTE_SURFACE = cn(
-  "bg-[oklch(0.93_0.012_254)] dark:bg-[oklch(0.13_0.012_254)]",
-  "border-[oklch(0.86_0.012_254)] dark:border-[oklch(0.24_0.012_254)]",
-  "shadow-[0_16px_40px_-12px_oklch(0.05_0_0/0.18),0_4px_12px_-4px_oklch(0.05_0_0/0.12)]",
-  "dark:shadow-[0_16px_40px_-12px_oklch(0.05_0_0/0.55),0_4px_12px_-4px_oklch(0.05_0_0/0.40)]",
-);
+// Inline node-feature labels — full foreground, mono, text-body. No opacity
+// dimming (the surface contrast is already low; layering /55 or /65 on top
+// pushed legibility into the unacceptable band per the 2026-05-28 review).
+const LABEL_CLASS =
+  "absolute font-mono text-body text-foreground leading-none whitespace-nowrap pointer-events-none";
 
 // ---------------------------------------------------------------------------
-// Geometry constants.
-// ---------------------------------------------------------------------------
-
-const TILE_W = 640;
-const TILE_H = 520;
-
-// Node placement — centered horizontally, sized large enough that all body-
-// text features are at least 30 px apart in y.
-const NODE_LEFT = 160;
-const NODE_TOP = 220;
-const NODE_WIDTH = 320;
-const NODE_HEIGHT = 140;
-
-// Chip column geometry.
-const CHIP_SIZE = 24;
-const CHIP_SPACING = 36;
-const FIRST_CHIP_Y = 100;
-const LEFT_CHIP_X = 60;
-const RIGHT_CHIP_X = 556;
-const LEFT_CHIP_CENTER_X = LEFT_CHIP_X + CHIP_SIZE / 2;
-const RIGHT_CHIP_CENTER_X = RIGHT_CHIP_X + CHIP_SIZE / 2;
-
-// Diagonal slope magnitude — m = 2.0, angle = atan(2.0) ≈ 63° from
-// horizontal. Steeper than v5's 60° to keep anchor's horizontal stub
-// long enough to read.
-const SLOPE = 2.0;
-
-// Leader visuals.
-const LEADER_STROKE = "var(--foreground)";
-const LEADER_OPACITY = 0.55;
-const LEADER_DASH = "4 3";
-const LEADER_WIDTH = 1;
-const MARKER_SIZE = 7;
-
-// ---------------------------------------------------------------------------
-// Callout types.
-// ---------------------------------------------------------------------------
-
-interface Callout {
-  n: number;
-  side: "L" | "R";
-  fx: number;
-  fy: number;
-  chipY: number;
-}
-
-interface RawFeature {
-  key: string;
-  fx: number;
-  fy: number;
-  side: "L" | "R";
-  legend: string;
-}
-
-function buildLeaderedCallouts(features: readonly RawFeature[]): {
-  callouts: Callout[];
-  legendByN: Map<number, string>;
-} {
-  const leftSorted = features
-    .filter((f) => f.side === "L")
-    .sort((a, b) => a.fy - b.fy);
-  const rightSorted = features
-    .filter((f) => f.side === "R")
-    .sort((a, b) => a.fy - b.fy);
-
-  const callouts: Callout[] = [];
-  const legendByN = new Map<number, string>();
-
-  leftSorted.forEach((f, i) => {
-    const n = i + 1;
-    callouts.push({
-      n,
-      side: "L",
-      fx: f.fx,
-      fy: f.fy,
-      chipY: FIRST_CHIP_Y + i * CHIP_SPACING,
-    });
-    legendByN.set(n, f.legend);
-  });
-
-  rightSorted.forEach((f, i) => {
-    const n = leftSorted.length + i + 1;
-    callouts.push({
-      n,
-      side: "R",
-      fx: f.fx,
-      fy: f.fy,
-      chipY: FIRST_CHIP_Y + i * CHIP_SPACING,
-    });
-    legendByN.set(n, f.legend);
-  });
-
-  callouts.sort((a, b) => a.n - b.n);
-  return { callouts, legendByN };
-}
-
-// ---------------------------------------------------------------------------
-// Top-level dialog.
+// Top-level dialog
 // ---------------------------------------------------------------------------
 
 export default function AnatomyDialog({
@@ -177,40 +48,37 @@ export default function AnatomyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="bg-transparent"
+        showCloseButton={false}
         className={cn(
           "p-0 gap-0 overflow-hidden rounded-md",
-          "w-[1340px] max-w-[95vw] sm:max-w-[1340px]",
-          "top-[4vh] translate-y-0",
-          PALETTE_SURFACE,
+          "w-[1300px] max-w-[95vw] sm:max-w-[1300px]",
+          "top-[6vh] translate-y-0",
+          // Chrome-toned surface (top-toolbar color), same border weight,
+          // atmospheric shadow inherited from DialogContent default.
+          "bg-chrome border-border",
         )}
         data-testid="anatomy-dialog"
       >
-        <DialogHeader className="px-6 pt-5 pb-3 border-b border-border/40">
-          <DialogTitle className="text-title font-normal tracking-tight">
+        <DialogHeader className="px-8 pt-6 pb-4 border-b border-border">
+          <DialogTitle className="text-display font-normal tracking-tight text-foreground">
             Anatomy
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Visual legend for canvas components and their states.
+            Visual legend for canvas components.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 divide-x divide-border/40">
+        <div className="grid grid-cols-2 divide-x divide-border">
           <Section title="Node">
-            <NodeTile />
-            <NodeLegend />
+            <NodeShowcase />
           </Section>
           <Section title="Edges">
-            <EdgesTile />
-            <EdgesLegend />
+            <EdgesShowcase />
           </Section>
         </div>
 
-        <div className="border-t border-border/40 px-6 py-3 text-label text-foreground/65 font-mono leading-relaxed">
-          Outline states (blue selected ring, red persistent error, violet
-          auto-add preview) are mutually exclusive on a real node. The
-          auto-add preview outline appears only while Save Preset is open,
-          marking BC-coupled neighbors that would be pulled into the saved
-          preset.
+        <div className="border-t border-border px-8 py-4 text-body text-foreground font-mono leading-relaxed">
+          Outline states: blue ring (selected) · red (validator error) · violet (Save Preset auto-add).
         </div>
       </DialogContent>
     </Dialog>
@@ -225,7 +93,7 @@ interface SectionProps {
 function Section({ title, children }: SectionProps): React.JSX.Element {
   return (
     <div className="flex flex-col">
-      <div className="px-6 pt-5 pb-2 text-micro font-mono uppercase tracking-wider text-foreground/55">
+      <div className="px-8 pt-6 pb-4 text-body font-mono uppercase tracking-wider text-foreground/85">
         {title}
       </div>
       {children}
@@ -234,29 +102,23 @@ function Section({ title, children }: SectionProps): React.JSX.Element {
 }
 
 // ---------------------------------------------------------------------------
-// Leader & marker (shared between node tile and edges tile when needed).
+// FlowPortMirror — faithful render of StreamNode's flow-port disc + chevron.
+// rotation: 0=right, 90=down, 180=left, 270=up.
 // ---------------------------------------------------------------------------
 
-// FlowPortMirror — faithful render of StreamNode's FlowDiscMark for use in
-// the anatomy legend. Renders the graphite disc + Hydraulic-accent chevron
-// at the same 14×14 viewBox StreamNode uses. `rotation` follows the same
-// convention as `flowChevronRotation` (0 = chevron points right, 90 = down,
-// 180 = left, 270 = up).
+interface FlowPortMirrorProps {
+  rotation: number;
+  size?: number;
+  style?: React.CSSProperties;
+}
+
 function FlowPortMirror({
   rotation,
+  size = 22,
   style,
-}: {
-  rotation: number;
-  style: React.CSSProperties;
-}): React.JSX.Element {
+}: FlowPortMirrorProps): React.JSX.Element {
   return (
-    <svg
-      aria-hidden
-      width="16"
-      height="16"
-      viewBox="0 0 14 14"
-      style={style}
-    >
+    <svg aria-hidden width={size} height={size} viewBox="0 0 14 14" style={style}>
       <circle
         cx="7"
         cy="7"
@@ -274,554 +136,364 @@ function FlowPortMirror({
   );
 }
 
-function Leader({ callout }: { callout: Callout }): React.JSX.Element {
-  const chipCenterX =
-    callout.side === "L" ? LEFT_CHIP_CENTER_X : RIGHT_CHIP_CENTER_X;
-  const sign = callout.side === "L" ? 1 : -1;
-  // V5 topology: horizontal stub from feature at fy, then diagonal up to
-  // chip. kinkX = chipCenter ± (fy - chipY)/m so the diagonal meets the
-  // chip center at the configured slope.
-  const kinkX = chipCenterX + (sign * (callout.fy - callout.chipY)) / SLOPE;
-  const d = `M${callout.fx},${callout.fy} L${kinkX},${callout.fy} L${chipCenterX},${callout.chipY}`;
-  return (
-    <path
-      d={d}
-      stroke={LEADER_STROKE}
-      strokeOpacity={LEADER_OPACITY}
-      strokeWidth={LEADER_WIDTH}
-      strokeDasharray={LEADER_DASH}
-      fill="none"
-    />
-  );
-}
-
-function FeatureMarker({
-  fx,
-  fy,
-}: {
-  fx: number;
-  fy: number;
-}): React.JSX.Element {
-  return (
-    <rect
-      x={fx - MARKER_SIZE / 2}
-      y={fy - MARKER_SIZE / 2}
-      width={MARKER_SIZE}
-      height={MARKER_SIZE}
-      fill="var(--foreground)"
-    />
-  );
-}
-
-interface ChipBadgeProps {
-  n: number;
-  side: "L" | "R";
-  y: number;
-  /** Override the side-derived x position (used by the edges tile, which
-   *  places chips at custom x positions next to edges). */
-  xOverride?: number;
-}
-
-function ChipBadge({ n, side, y, xOverride }: ChipBadgeProps): React.JSX.Element {
-  const left =
-    xOverride !== undefined
-      ? xOverride - CHIP_SIZE / 2
-      : side === "L"
-        ? LEFT_CHIP_X
-        : RIGHT_CHIP_X;
-  return (
-    <span
-      aria-hidden
-      style={{
-        position: "absolute",
-        left,
-        top: y - CHIP_SIZE / 2,
-        width: CHIP_SIZE,
-        height: CHIP_SIZE,
-      }}
-      className="inline-flex items-center justify-center rounded-sm font-mono text-label tabular-nums bg-popover text-foreground border border-border z-10"
-    >
-      {n}
-    </span>
-  );
-}
-
 // ---------------------------------------------------------------------------
-// Node features — 4 LEFT + 4 RIGHT. Numbering 1..4 LEFT top→bottom,
-// 5..8 RIGHT top→bottom.
+// NodeMirror — visual mirror of StreamNode at rest state. Selected ring +
+// error outline live in the dialog footer line; the specimen here shows
+// rest only.
 // ---------------------------------------------------------------------------
 
-const NODE_FEATURES: readonly RawFeature[] = [
-  {
-    key: "anchor",
-    fx: NODE_LEFT - 18,
-    fy: NODE_TOP - 6,
-    side: "L",
-    legend: "Pressure anchor.",
-  },
-  {
-    key: "label",
-    fx: NODE_LEFT + 50,
-    fy: NODE_TOP + 36,
-    side: "L",
-    legend: "Component type.",
-  },
-  {
-    key: "name",
-    fx: NODE_LEFT + 50,
-    fy: NODE_TOP + 70,
-    side: "L",
-    legend: "Instance name.",
-  },
-  {
-    key: "value",
-    fx: NODE_LEFT + 50,
-    fy: NODE_TOP + 100,
-    side: "L",
-    legend: "Value summary. Source blocks only.",
-  },
-  {
-    key: "topPort",
-    fx: NODE_LEFT + NODE_WIDTH / 2,
-    fy: NODE_TOP - 6,
-    side: "R",
-    legend: "Flow port. Chevron points the topological direction (in vs out).",
-  },
-  {
-    key: "band",
-    fx: NODE_LEFT + NODE_WIDTH / 2,
-    fy: NODE_TOP + 6,
-    side: "R",
-    legend: "Layer accent band. Split for dual-layer components.",
-  },
-  {
-    key: "ring",
-    fx: NODE_LEFT + NODE_WIDTH,
-    fy: NODE_TOP + 20,
-    side: "R",
-    legend: "Selected ring.",
-  },
-  {
-    key: "thermal",
-    fx: NODE_LEFT + NODE_WIDTH + 2,
-    fy: NODE_TOP + NODE_HEIGHT / 2,
-    side: "R",
-    legend: "Thermal port. Paired across opposing faces.",
-  },
-];
-
-const { callouts: NODE_CALLOUTS, legendByN: NODE_LEGEND_BY_N } =
-  buildLeaderedCallouts(NODE_FEATURES);
-
-function NodeTile(): React.JSX.Element {
+function NodeMirror(): React.JSX.Element {
   return (
-    <div className="px-6 pb-2">
-      <div
-        className="relative rounded-sm border border-border/40 overflow-hidden"
-        style={{
-          width: TILE_W,
-          height: TILE_H,
-          backgroundColor: "var(--canvas)",
-          backgroundImage:
-            "linear-gradient(to right, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
-            "linear-gradient(to bottom, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
-            "linear-gradient(to right, var(--color-canvas-grid-major) 1px, transparent 1px), " +
-            "linear-gradient(to bottom, var(--color-canvas-grid-major) 1px, transparent 1px)",
-          backgroundSize: "12px 12px, 12px 12px, 24px 24px, 24px 24px",
-        }}
-      >
-        <NodeMirror left={NODE_LEFT} top={NODE_TOP} width={NODE_WIDTH} />
-
-        <svg
-          width={TILE_W}
-          height={TILE_H}
-          viewBox={`0 0 ${TILE_W} ${TILE_H}`}
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden
-        >
-          {NODE_CALLOUTS.map((c) => (
-            <Leader key={c.n} callout={c} />
-          ))}
-          {NODE_CALLOUTS.map((c) => (
-            <FeatureMarker key={c.n} fx={c.fx} fy={c.fy} />
-          ))}
-        </svg>
-
-        {NODE_CALLOUTS.map((c) => (
-          <ChipBadge key={c.n} n={c.n} side={c.side} y={c.chipY} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// NodeMirror — scaled-up visual mirror of StreamNode. Larger band, larger
-// body padding, larger text and icon, larger port handles.
-// ---------------------------------------------------------------------------
-
-interface NodeMirrorProps {
-  left: number;
-  top: number;
-  width: number;
-}
-
-function NodeMirror({ left, top, width }: NodeMirrorProps): React.JSX.Element {
-  return (
-    <div className="absolute" style={{ left, top, width }}>
-      <div
-        className="relative rounded-md"
-        style={{
-          boxShadow:
-            "0 0 0 1px var(--canvas), 0 0 0 3px var(--ring)",
-          outline: "2px solid var(--destructive)",
-          outlineOffset: "0",
-        }}
-      >
-        <div className="rounded-md overflow-hidden">
-          <div className="flex w-full" style={{ height: 12 }} aria-hidden>
-            <div style={{ flex: 1, backgroundColor: "var(--color-layer-hydraulic)" }} />
-            <div style={{ flex: 1, backgroundColor: "var(--color-layer-thermal)" }} />
+    <div className="relative rounded-md w-[340px]">
+      <div className="rounded-md overflow-hidden border border-border">
+        {/* Two-tone layer band */}
+        <div className="flex w-full" style={{ height: 14 }} aria-hidden>
+          <div style={{ flex: 1, backgroundColor: "var(--color-layer-hydraulic)" }} />
+          <div style={{ flex: 1, backgroundColor: "var(--color-layer-thermal)" }} />
+        </div>
+        {/* Body */}
+        <div className="bg-card px-3.5 py-3">
+          <div className="flex items-center gap-2 text-body text-foreground">
+            <BoxIcon className="w-5 h-5" strokeWidth={1.5} />
+            ChannelAndContacts
           </div>
-          <div className="bg-card p-3">
-            <div className="flex items-center gap-1.5 text-body text-muted-foreground">
-              <BoxIcon className="w-5 h-5" strokeWidth={1.5} />
-              ChannelAndContacts
-            </div>
-            <div className="font-semibold text-title mt-1">channel_1</div>
-            <div className="text-body text-muted-foreground mt-1">
-              L = 1.2 m  Dh = 12 mm
-            </div>
+          <div className="font-semibold text-title mt-1">channel_1</div>
+          <div className="text-body text-foreground mt-1">
+            L = 1.2 m  Dh = 12 mm
           </div>
         </div>
-        <Anchor
-          aria-hidden
-          className="w-4 h-4 text-foreground"
-          style={{ position: "absolute", left: -22, top: -10 }}
-        />
-        {/* FlowPort in (top) — chevron points down, into the node body
-            (side="top", isInPort=true → rotation 90). */}
-        <FlowPortMirror
-          rotation={90}
-          style={{
-            position: "absolute",
-            top: -8,
-            left: "50%",
-            transform: "translateX(-50%)",
-          }}
-        />
-        {/* FlowPort out (bottom) — chevron also points down, away from
-            the node body (side="bottom", isInPort=false → 270 + 180 = 90). */}
-        <FlowPortMirror
-          rotation={90}
-          style={{
-            position: "absolute",
-            bottom: -8,
-            left: "50%",
-            transform: "translateX(-50%)",
-          }}
-        />
-        {/* ThermalPort (left). */}
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: -10,
-            top: "50%",
-            transform: "translateY(-50%) rotate(45deg)",
-            width: 16,
-            height: 16,
-            background: "var(--color-layer-thermal)",
-            border:
-              "1.5px solid color-mix(in oklch, var(--color-layer-thermal) 75%, black)",
-          }}
-        />
-        {/* ThermalPort (right). */}
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            right: -10,
-            top: "50%",
-            transform: "translateY(-50%) rotate(45deg)",
-            width: 16,
-            height: 16,
-            background: "var(--color-layer-thermal)",
-            border:
-              "1.5px solid color-mix(in oklch, var(--color-layer-thermal) 75%, black)",
-          }}
-        />
       </div>
-    </div>
-  );
-}
 
-// ---------------------------------------------------------------------------
-// Legends.
-// ---------------------------------------------------------------------------
-
-function NodeLegend(): React.JSX.Element {
-  const entries = Array.from(NODE_LEGEND_BY_N.entries()).sort(
-    (a, b) => a[0] - b[0],
-  );
-  const half = Math.ceil(entries.length / 2);
-  return (
-    <div className="px-6 pb-5 pt-3 grid grid-cols-2 gap-x-6 gap-y-2">
-      <LegendColumn entries={entries.slice(0, half)} />
-      <LegendColumn entries={entries.slice(half)} />
-    </div>
-  );
-}
-
-function LegendColumn({
-  entries,
-}: {
-  entries: ReadonlyArray<[number, string]>;
-}): React.JSX.Element {
-  return (
-    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-body items-baseline">
-      {entries.map(([n, text]) => (
-        <React.Fragment key={n}>
-          <span className="font-mono text-foreground/85 tabular-nums">{n}</span>
-          <span className="text-foreground/85 leading-snug">{text}</span>
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Edges tile — NO LEADER LINES. Each edge specimen gets a numbered chip
-// placed directly to the right of its target port. The legend below maps
-// number → description.
-// ---------------------------------------------------------------------------
-
-// Edges + convention schematic centered in the tile. TILE_W=640, so the
-// tile center is at x=320. Edges span 180..460 (length 280, midpoint 320).
-// The convention schematic (source rect + target rect) spans the same
-// 180..460 range so the bottom row reads aligned with the three edge rows
-// above it. Chips for each edge sit in a LEFT column at x=140 so they
-// don't push the edges off-center.
-const EDGE_SRC_X = 180;
-const EDGE_TGT_X = 460;
-const ROW_Y = [140, 240, 340];
-const CONV_ROW_Y = 450;
-const CONV_SRC_LEFT = 180;
-const CONV_TGT_LEFT = 390;
-const CONV_NODE_W = 70;
-const CONV_NODE_H = 36;
-const EDGES_CHIP_X = 140; // LEFT of source ports
-
-interface EdgeChip {
-  n: number;
-  y: number;
-  x: number;
-  legend: string;
-}
-
-const EDGE_CHIPS: readonly EdgeChip[] = [
-  {
-    n: 1,
-    y: ROW_Y[0],
-    x: EDGES_CHIP_X,
-    legend: "Hydraulic edge.",
-  },
-  {
-    n: 2,
-    y: ROW_Y[1],
-    x: EDGES_CHIP_X,
-    legend:
-      "Boundary-condition edge. Dashed. Side tag (L, R, L+R) marks which sides of the consumer it drives.",
-  },
-  {
-    n: 3,
-    y: ROW_Y[2],
-    x: EDGES_CHIP_X,
-    legend:
-      "Validation loop trace. Marching ants. Tinted by severity (red, amber, blue).",
-  },
-  {
-    n: 4,
-    y: CONV_ROW_Y,
-    x: EDGES_CHIP_X,
-    legend:
-      "Port-side convention. Flow enters from the top or left, exits from the bottom or right.",
-  },
-];
-
-function EdgesTile(): React.JSX.Element {
-  return (
-    <div className="px-6 pb-2">
-      <div
-        className="relative rounded-sm border border-border/40 overflow-hidden"
+      {/* Pressure anchor — top-left exterior */}
+      <Anchor
+        aria-hidden
+        className="w-5 h-5 text-foreground"
+        style={{ position: "absolute", left: -28, top: -12 }}
+      />
+      {/* Flow port IN — top edge, chevron down */}
+      <FlowPortMirror
+        rotation={90}
         style={{
-          width: TILE_W,
-          height: TILE_H,
-          backgroundColor: "var(--canvas)",
-          backgroundImage:
-            "linear-gradient(to right, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
-            "linear-gradient(to bottom, var(--color-canvas-grid-minor) 1px, transparent 1px), " +
-            "linear-gradient(to right, var(--color-canvas-grid-major) 1px, transparent 1px), " +
-            "linear-gradient(to bottom, var(--color-canvas-grid-major) 1px, transparent 1px)",
-          backgroundSize: "12px 12px, 12px 12px, 24px 24px, 24px 24px",
+          position: "absolute",
+          top: -11,
+          left: "50%",
+          transform: "translateX(-50%)",
         }}
-      >
-        <svg
-          width={TILE_W}
-          height={TILE_H}
-          viewBox={`0 0 ${TILE_W} ${TILE_H}`}
-          className="absolute inset-0"
-          aria-hidden
-        >
-          {/* Row 1 — hydraulic default. */}
-          <path
-            d={`M${EDGE_SRC_X + 10},${ROW_Y[0]} L${EDGE_TGT_X - 10},${ROW_Y[0]}`}
-            stroke="var(--foreground)"
-            strokeOpacity={0.7}
-            strokeWidth={1.5}
-            fill="none"
-            strokeLinecap="round"
-          />
-          {/* Row 2 — BC dashed. */}
-          <path
-            d={`M${EDGE_SRC_X + 10},${ROW_Y[1]} L${EDGE_TGT_X - 10},${ROW_Y[1]}`}
-            stroke="var(--muted-foreground)"
-            strokeWidth={1.5}
-            strokeDasharray="6 3"
-            fill="none"
-            strokeLinecap="round"
-          />
-          {/* Row 3 — marching-ants loop trace. */}
-          <path
-            d={`M${EDGE_SRC_X + 10},${ROW_Y[2]} L${EDGE_TGT_X - 10},${ROW_Y[2]}`}
-            stroke="var(--color-warning)"
-            strokeWidth={2.5}
-            strokeDasharray="6 4"
-            fill="none"
-            strokeLinecap="round"
-            className="anatomy-flow-march"
-          />
+      />
+      {/* Flow port OUT — bottom edge, chevron down (flow leaves downward) */}
+      <FlowPortMirror
+        rotation={90}
+        style={{
+          position: "absolute",
+          bottom: -11,
+          left: "50%",
+          transform: "translateX(-50%)",
+        }}
+      />
+      {/* Thermal port — left side (diamond) */}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: -10,
+          top: "50%",
+          transform: "translateY(-50%) rotate(45deg)",
+          width: 16,
+          height: 16,
+          background: "var(--color-layer-thermal)",
+          border:
+            "1.5px solid color-mix(in oklch, var(--color-layer-thermal) 75%, black)",
+        }}
+      />
+      {/* Thermal port — right side (diamond) */}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          right: -10,
+          top: "50%",
+          transform: "translateY(-50%) rotate(45deg)",
+          width: 16,
+          height: 16,
+          background: "var(--color-layer-thermal)",
+          border:
+            "1.5px solid color-mix(in oklch, var(--color-layer-thermal) 75%, black)",
+        }}
+      />
+    </div>
+  );
+}
 
-          {/* Port-side convention schematic. */}
-          <rect
-            x={CONV_SRC_LEFT}
-            y={CONV_ROW_Y - CONV_NODE_H / 2}
-            width={CONV_NODE_W}
-            height={CONV_NODE_H}
-            rx={3}
-            stroke="var(--foreground)"
-            strokeOpacity={0.6}
-            strokeWidth={1}
-            fill="var(--card)"
-          />
-          <rect
-            x={CONV_TGT_LEFT}
-            y={CONV_ROW_Y - CONV_NODE_H / 2}
-            width={CONV_NODE_W}
-            height={CONV_NODE_H}
-            rx={3}
-            stroke="var(--foreground)"
-            strokeOpacity={0.6}
-            strokeWidth={1}
-            fill="var(--card)"
-          />
-          <path
-            d={`M${CONV_SRC_LEFT + CONV_NODE_W},${CONV_ROW_Y} L${CONV_TGT_LEFT},${CONV_ROW_Y}`}
-            stroke="var(--foreground)"
-            strokeOpacity={0.7}
-            strokeWidth={1.5}
-            fill="none"
-            strokeLinecap="round"
-          />
+// ---------------------------------------------------------------------------
+// NodeShowcase — node specimen with inline labels positioned next to each
+// named feature. Labels are children of a `<div className="relative">`
+// sized to the node-mirror, so each label's offset from its feature stays
+// constant regardless of dialog/column width.
+// ---------------------------------------------------------------------------
 
-          <style>
-            {`
-            .anatomy-flow-march {
-              animation: anatomy-flow-march 1.5s linear infinite;
-            }
-            @keyframes anatomy-flow-march {
-              to { stroke-dashoffset: -10; }
-            }
-            @media (prefers-reduced-motion: reduce) {
-              .anatomy-flow-march { animation: none; }
-            }
-            `}
-          </style>
-        </svg>
+function NodeShowcase(): React.JSX.Element {
+  return (
+    <div className="px-8 pb-8">
+      <div className="relative h-[360px] flex items-center justify-center">
+        <div className="relative">
+          <NodeMirror />
 
-        {/* Edge endpoint ports. Both chevrons point right (source port_out
-            flows toward target; target port_in receives from source). */}
-        {ROW_Y.map((y, i) => (
-          <React.Fragment key={i}>
-            <FlowPortMirror
-              rotation={0}
-              style={{
-                position: "absolute",
-                left: EDGE_SRC_X - 8,
-                top: y - 8,
-              }}
-            />
-            <FlowPortMirror
-              rotation={0}
-              style={{
-                position: "absolute",
-                left: EDGE_TGT_X - 8,
-                top: y - 8,
-              }}
-            />
-          </React.Fragment>
-        ))}
+          {/* Anchor — sits to the LEFT of the anchor icon. */}
+          <span
+            className={LABEL_CLASS}
+            style={{ top: -4, right: "calc(100% + 38px)" }}
+          >
+            anchor
+          </span>
 
-        {/* BC mid-edge side tag. */}
-        <span
-          className="absolute rounded border bg-background px-[6px] py-[2px] text-label text-muted-foreground font-mono pointer-events-none"
-          style={{
-            left: (EDGE_SRC_X + EDGE_TGT_X) / 2 - 18,
-            top: ROW_Y[1] - 12,
-          }}
-        >
-          L+R
-        </span>
+          {/* Flow in — centered above the top port. */}
+          <span
+            className={LABEL_CLASS}
+            style={{
+              bottom: "calc(100% + 36px)",
+              left: "50%",
+              transform: "translateX(-50%)",
+            }}
+          >
+            flow in
+          </span>
 
-        {/* Convention port dots. Both chevrons point right (source on left
-            sends flow rightward; target on right receives from rightward). */}
-        <FlowPortMirror
-          rotation={0}
-          style={{
-            position: "absolute",
-            left: CONV_SRC_LEFT - 8,
-            top: CONV_ROW_Y - 8,
-          }}
-        />
-        <FlowPortMirror
-          rotation={0}
-          style={{
-            position: "absolute",
-            left: CONV_TGT_LEFT + CONV_NODE_W - 8,
-            top: CONV_ROW_Y - 8,
-          }}
-        />
+          {/* Layer band — to the RIGHT of the band area. */}
+          <span
+            className={LABEL_CLASS}
+            style={{ top: 2, left: "calc(100% + 22px)" }}
+          >
+            layer band
+          </span>
 
-        {/* Numbered chips placed directly next to each edge. No leaders. */}
-        {EDGE_CHIPS.map((c) => (
-          <ChipBadge
-            key={c.n}
-            n={c.n}
-            side="R"
-            y={c.y}
-            xOverride={c.x}
-          />
-        ))}
+          {/* Thermal port — vertically centered with the right thermal
+              diamond. */}
+          <span
+            className={LABEL_CLASS}
+            style={{
+              top: "50%",
+              left: "calc(100% + 22px)",
+              transform: "translateY(-50%)",
+            }}
+          >
+            thermal port
+          </span>
+
+          {/* Flow out — centered below the bottom port. */}
+          <span
+            className={LABEL_CLASS}
+            style={{
+              top: "calc(100% + 36px)",
+              left: "50%",
+              transform: "translateX(-50%)",
+            }}
+          >
+            flow out
+          </span>
+        </div>
+      </div>
+
+      {/* Body-row vocabulary — names the three visible body rows in prose. */}
+      <p className="mt-2 text-body text-foreground font-mono leading-relaxed">
+        Body lines: component type · instance name · value summary (source blocks only).
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// EdgesShowcase — list of edge types, each row: [specimen | name + description].
+// ---------------------------------------------------------------------------
+
+function EdgesShowcase(): React.JSX.Element {
+  return (
+    <div className="px-8 pb-8 flex flex-col gap-6">
+      <EdgeRow
+        edge={<HydraulicSpecimen />}
+        name="hydraulic"
+        description="Default flow edge."
+      />
+      <EdgeRow
+        edge={<BCSpecimen />}
+        name="BC"
+        description={
+          <>
+            Dashed. Side tag (<code className="font-mono">L</code>,{" "}
+            <code className="font-mono">R</code>,{" "}
+            <code className="font-mono">L+R</code>) marks driven sides.
+          </>
+        }
+      />
+      <EdgeRow
+        edge={<LoopTraceSpecimen />}
+        name="loop trace"
+        description="Marching ants. Tinted by severity."
+      />
+      <EdgeRow
+        edge={<PortConventionSpecimen />}
+        name="port convention"
+        description="Flow enters from top or left, exits from bottom or right."
+      />
+    </div>
+  );
+}
+
+interface EdgeRowProps {
+  edge: React.ReactNode;
+  name: string;
+  description: React.ReactNode;
+}
+
+function EdgeRow({ edge, name, description }: EdgeRowProps): React.JSX.Element {
+  return (
+    <div className="flex items-center gap-6">
+      <div className="shrink-0 w-[140px] flex items-center justify-center">
+        {edge}
+      </div>
+      <div className="min-w-0">
+        <div className="font-mono text-title text-foreground leading-tight">
+          {name}
+        </div>
+        <div className="text-body text-foreground leading-snug mt-1">
+          {description}
+        </div>
       </div>
     </div>
   );
 }
 
-function EdgesLegend(): React.JSX.Element {
-  const entries = EDGE_CHIPS.map((c) => [c.n, c.legend] as [number, string]);
+// ---------------------------------------------------------------------------
+// Edge specimens — 140×40 SVGs sharing dimensions and flow-port endpoints
+// so the rows align vertically as a list.
+// ---------------------------------------------------------------------------
+
+function HydraulicSpecimen(): React.JSX.Element {
   return (
-    <div className="px-6 pb-5 pt-3">
-      <LegendColumn entries={entries} />
-    </div>
+    <SpecimenSvg>
+      <FlowDot cx={14} cy={20} />
+      <path
+        d="M24,20 L116,20"
+        stroke="var(--foreground)"
+        strokeOpacity={0.85}
+        strokeWidth={2}
+        fill="none"
+        strokeLinecap="round"
+      />
+      <FlowDot cx={126} cy={20} />
+    </SpecimenSvg>
+  );
+}
+
+function BCSpecimen(): React.JSX.Element {
+  return (
+    <SpecimenSvg>
+      <FlowDot cx={14} cy={20} />
+      <path
+        d="M24,20 L116,20"
+        stroke="var(--foreground)"
+        strokeOpacity={0.65}
+        strokeWidth={2}
+        strokeDasharray="7 4"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <FlowDot cx={126} cy={20} />
+    </SpecimenSvg>
+  );
+}
+
+function LoopTraceSpecimen(): React.JSX.Element {
+  return (
+    <SpecimenSvg>
+      <FlowDot cx={14} cy={20} />
+      <path
+        d="M24,20 L116,20"
+        stroke="var(--color-warning)"
+        strokeWidth={3}
+        strokeDasharray="7 5"
+        fill="none"
+        strokeLinecap="round"
+        className="anatomy-flow-march"
+      />
+      <FlowDot cx={126} cy={20} />
+      <style>
+        {`
+        .anatomy-flow-march { animation: anatomy-flow-march 1.5s linear infinite; }
+        @keyframes anatomy-flow-march { to { stroke-dashoffset: -12; } }
+        @media (prefers-reduced-motion: reduce) { .anatomy-flow-march { animation: none; } }
+        `}
+      </style>
+    </SpecimenSvg>
+  );
+}
+
+function PortConventionSpecimen(): React.JSX.Element {
+  // Render order: both rects first, then connector + dots, so the
+  // flow-port glyphs sit ON TOP of the rect edges (right rect's --card
+  // fill would otherwise paint over its left-edge dot).
+  return (
+    <SpecimenSvg>
+      <rect
+        x={14}
+        y={9}
+        width={42}
+        height={22}
+        rx={3}
+        stroke="var(--foreground)"
+        strokeOpacity={0.7}
+        strokeWidth={1.25}
+        fill="var(--card)"
+      />
+      <rect
+        x={84}
+        y={9}
+        width={42}
+        height={22}
+        rx={3}
+        stroke="var(--foreground)"
+        strokeOpacity={0.7}
+        strokeWidth={1.25}
+        fill="var(--card)"
+      />
+      <path
+        d="M62,20 L78,20"
+        stroke="var(--foreground)"
+        strokeOpacity={0.85}
+        strokeWidth={2}
+        fill="none"
+        strokeLinecap="round"
+      />
+      <FlowDot cx={56} cy={20} />
+      <FlowDot cx={84} cy={20} />
+    </SpecimenSvg>
+  );
+}
+
+function SpecimenSvg({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <svg width="140" height="40" viewBox="0 0 140 40" aria-hidden>
+      {children}
+    </svg>
+  );
+}
+
+// FlowDot — compact inline-svg variant of FlowPortMirror sized for the edge
+// specimens. Uses the same disc + chevron tokens as the production port.
+function FlowDot({ cx, cy }: { cx: number; cy: number }): React.JSX.Element {
+  return (
+    <g aria-hidden>
+      <circle
+        cx={cx}
+        cy={cy}
+        r={7}
+        fill="var(--color-port-disc)"
+        stroke="var(--color-port-disc-border)"
+        strokeWidth={1}
+      />
+      <polygon
+        points={`${cx - 2.2},${cy - 3.5} ${cx + 2.4},${cy} ${cx - 2.2},${cy + 3.5}`}
+        fill="var(--color-port-chevron)"
+      />
+    </g>
   );
 }
