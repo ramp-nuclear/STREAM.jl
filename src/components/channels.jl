@@ -115,11 +115,11 @@ function _channel_core(;
         push!(obs, Pe[i] ~ Re_i_for_friction * Pr_i)  # Re*Pr (Peclet)
         push!(obs, v[i]  ~ port_in.mdot / (rho_water(T[i]) * A))  # canonical form (CAC line 202)
 
-        # Per-cell absolute pressure (distributed inertia correction; CAC pattern).
+        # Per-cell absolute pressure — cell-center average (upstream physics
+        # correction from channels-redesign d8810e3).
         # P_i is a Julia local expression (NOT the P[i] symbol) to avoid an
         # observed-to-observed chain when used inside T_sat[i] / T_ONB[i] (Pitfall 7).
-        P_i = port_in.P - sum(dp[j] for j in 1:i) -
-              (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+        P_i = port_in.P - sum(dp[j] for j in 1:i) + dp[i] / 2
         push!(obs, P[i]    ~ P_i)
         push!(obs, T_sat[i] ~ sat_temperature(P_i))
 
@@ -552,9 +552,9 @@ function ChannelAndContacts(;
             Pr_i     = cp_water(T_film_i) * mu_water(T_film_i) / k_water(T_film_i)
             h_spl_i  = htc_correlation(Re_i, Pr_i, T[i], T_w_i) * k_water(T_film_i) / Dh
 
-            # Inline P[i] (NOT the P[i] symbol) — Pitfall 7 (avoid observed-to-observed chain)
-            P_i = port_in.P - sum(dp[j] for j in 1:i) -
-                  (i/n) * ((port_in.P - port_out.P) - sum(dp[j] for j in 1:n))
+            # Inline P[i] (NOT the P[i] symbol) — Pitfall 7. Cell-center average
+            # (upstream physics correction from channels-redesign d8810e3).
+            P_i = port_in.P - sum(dp[j] for j in 1:i) + dp[i] / 2
             T_sat_i = sat_temperature(P_i)
             # max(q_spl, 0) guards _bergles_rohsenow_dT_ONB against DomainError
             # (SCB-01 / v0.7 retrospective).
