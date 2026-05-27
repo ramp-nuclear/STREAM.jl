@@ -105,13 +105,23 @@ const SEVERITY_RANK: Record<Severity, number> = {
 // RULE↔MESSAGE dividers to resize; min/max enforced below. MESSAGE is the
 // fluid remainder (`minmax(0, 1fr)`), so only the first two are tunable.
 // SEV bumped from 32 → 80 to fit the longest full-word label ("warning")
-// at the panel's 13 px mono font with breathing room.
+// at the panel's 13 px mono font with breathing room. RULE default dropped
+// 200 → 140 (Phase 72 critique) so MESSAGE gets the room it earns at
+// default panel width; long validator-ids drag wider as needed.
 const DEFAULT_SEV_WIDTH = 80;
-const DEFAULT_RULE_WIDTH = 200;
+const DEFAULT_RULE_WIDTH = 140;
 const MIN_SEV_WIDTH = 60;
 const MAX_SEV_WIDTH = 120;
 const MIN_RULE_WIDTH = 80;
 const MAX_RULE_WIDTH = 480;
+
+// Progressive disclosure threshold. Below this count, the column-labels row
+// and severity filter pills are hidden — at three or fewer rows, the data
+// scans as a list, not a table, and the management-widget header outweighs
+// the content (Phase 72 critique P1-1). Pills still show when a severity
+// filter is currently active so the user always has a way to toggle/clear
+// it; column labels stay hidden at all small counts.
+const FULL_HEADER_THRESHOLD = 4;
 
 function gridTemplate(sevWidth: number, ruleWidth: number): string {
   return `${sevWidth}px ${ruleWidth}px minmax(0, 1fr)`;
@@ -269,6 +279,8 @@ export default function ValidationPanel() {
   const sorted = sortResults(filtered);
   const count = sorted.length;
   const filterActive = severityFilter !== null || nodeFilter !== null;
+  const showColumnLabels = count >= FULL_HEADER_THRESHOLD;
+  const showFilterPills = count >= FULL_HEADER_THRESHOLD || severityFilter !== null;
 
   // Group projection. Keyed by validatorId (rule) or instanceName (component).
   type Group = {
@@ -443,36 +455,44 @@ export default function ValidationPanel() {
               )}
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
-              <FilterPill
-                severity="error"
-                count={totals.error}
-                active={severityFilter === "error"}
-                onClick={() => togglePill("error")}
-              />
-              <FilterPill
-                severity="warning"
-                count={totals.warning}
-                active={severityFilter === "warning"}
-                onClick={() => togglePill("warning")}
-              />
-              <FilterPill
-                severity="info"
-                count={totals.info}
-                active={severityFilter === "info"}
-                onClick={() => togglePill("info")}
-              />
+              {showFilterPills && (
+                <>
+                  <FilterPill
+                    severity="error"
+                    count={totals.error}
+                    active={severityFilter === "error"}
+                    onClick={() => togglePill("error")}
+                  />
+                  <FilterPill
+                    severity="warning"
+                    count={totals.warning}
+                    active={severityFilter === "warning"}
+                    onClick={() => togglePill("warning")}
+                  />
+                  <FilterPill
+                    severity="info"
+                    count={totals.info}
+                    active={severityFilter === "info"}
+                    onClick={() => togglePill("info")}
+                  />
+                </>
+              )}
               <GroupBySettings groupBy={groupBy} onChange={setGroupBy} />
             </div>
           </div>
 
-          {/* Column labels — only when there is content to label.
+          {/* Column labels — only when the result count is large enough that
+              a header earns its visual weight (FULL_HEADER_THRESHOLD). At
+              ≤3 results the data scans as a list and the SEV/RULE/MESSAGE
+              contract is inferable from row content; rendering labels
+              there is the management-widget header the critique flagged.
               The two `<ColumnResizeHandle>`s sit at the right edge of the
-              SEV and RULE columns. They're 4 px wide invisible drag zones
-              that show a 1 px ring hairline on hover and switch the cursor
-              to col-resize. Drag adjusts the corresponding column width;
-              both this row AND every data row + group header consume the
-              same `currentGrid`, so widths stay in sync. */}
-          {count > 0 && (
+              SEV and RULE columns: a 1 px `--border` hairline at rest
+              (discoverability) that lifts to `--ring` on hover/drag, plus
+              `col-resize` cursor. Drag adjusts the corresponding column
+              width; both this row AND every data row + group header
+              consume the same `currentGrid`, so widths stay in sync. */}
+          {showColumnLabels && (
             <div className="relative">
               <div
                 className="grid items-baseline gap-3 px-3 pb-1 text-micro uppercase tracking-wide text-foreground/45 font-mono"
@@ -847,10 +867,15 @@ function ColumnResizeHandle({ left, onMouseDown }: ColumnResizeHandleProps) {
       aria-orientation="vertical"
       onMouseDown={onMouseDown}
       style={{ left: `${left}px` }}
+      // Rest: 1 px `--border` hairline so the divider is visible at rest
+      // (Phase 72 critique — Alex flag: handles were unmarked at rest, no
+      // hint they were draggable). Hover/active lifts to `--ring`. The
+      // hairline doubles as a column separator inside the SEV/RULE/MESSAGE
+      // label row, which is the only place the handle renders.
       className={
         "absolute top-0 bottom-0 w-1.5 -ml-[3px] cursor-col-resize z-10 group/handle " +
         "before:absolute before:left-1/2 before:-translate-x-1/2 before:top-0 before:bottom-0 " +
-        "before:w-px before:bg-transparent before:transition-colors before:duration-[80ms] " +
+        "before:w-px before:bg-border before:transition-colors before:duration-[80ms] " +
         "hover:before:bg-[var(--ring)] active:before:bg-[var(--ring)]"
       }
     />

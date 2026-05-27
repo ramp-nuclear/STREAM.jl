@@ -608,7 +608,7 @@ SaaS alert card.
 | Column | Width | Style |
 |---|---|---|
 | Severity label  | 80 px (resizable, min 60 / max 120)  | Mono 13 px, color-tokenized via `--destructive` / `--color-warning` / `--color-info`. Labels: `error`, `warning`, `info` (lowercase full words, NOT the 3-letter prefix). **No Lucide AlertCircle/Triangle/Info icons.** |
-| Validator id    | 200 px (resizable, min 80 / max 480)  | Mono 13 px, `foreground/85`, `truncate` with native `title` tooltip. **Leads the row** — Linear-issue-id pattern; the engineer reads the rule identity first. |
+| Validator id    | 140 px (resizable, min 80 / max 480)  | Mono 13 px, `foreground/85`, `truncate` with native `title` tooltip. **Leads the row** — Linear-issue-id pattern; the engineer reads the rule identity first. Default dropped 200 → 140 (Phase 72 critique) so MESSAGE gets the room it earns at default panel width; engineers with long rule ids drag the divider wider. |
 | Message         | fluid remainder                       | Sans 13 px, `foreground`, `truncate` with native `title`. |
 
 Pinned in absolute pixel widths (not `ch` units): the column-header row uses
@@ -628,7 +628,15 @@ data. Px keeps them locked.
   Severity flows through `--destructive` / `--color-warning` / `--color-info`
   tokens only.
 
-**Panel header (two sub-rows above the data):**
+**Panel header — progressive disclosure (Phase 72 critique P1-1):**
+
+The header collapses at small result counts. The threshold is **count ≥ 4**
+(`FULL_HEADER_THRESHOLD` in `ValidationPanel.tsx`): three results still scan
+as a list, four becomes a table where headers + filters earn their visual
+weight. With 1–3 rows, the management-widget header outweighs the content
+and visually contradicts the locked compiler-output silhouette.
+
+At **count ≥ 4** the header is two sub-rows:
 
 1. Controls row — left side: `{N} issues` count in mono 11 px. Right side
    in this order: severity filter pills (`error 12   warning 4   info 2`,
@@ -638,10 +646,22 @@ data. Px keeps them locked.
 2. Column labels row — `SEV / RULE / MESSAGE` in mono 10 px uppercase
    `foreground/45`. Hairline `--border` underneath.
 
+At **count 1–3** the header collapses to a single Controls row: `{N} issues`
++ group-by icon. The column-labels row is hidden (row contract is inferable
+from the data at that scale). The severity filter pills are hidden too —
+**unless** a severity filter is currently active, in which case the pills
+remain so the user always has a way to toggle/clear it. Filter entry at
+small N happens via the status-bar severity segments (the canonical entry
+point); the panel header doesn't need to re-host that affordance.
+
 The header has TWO draggable column-resize handles (between SEV/RULE and
-RULE/MESSAGE), 6 px wide hit-zones with a 1 px `--ring` visible on hover
-and `col-resize` cursor. Drag updates BOTH the column-header row and
-every data row via a shared `gridTemplate` state.
+RULE/MESSAGE), 6 px wide hit-zones with a **1 px `--border` hairline at
+rest** (discoverability — Alex flag from the critique; the handles were
+previously unmarked at rest) that lifts to **1 px `--ring`** on hover and
+during drag. `col-resize` cursor. Drag updates BOTH the column-header row
+and every data row via a shared `gridTemplate` state. The handles only
+render when the column-labels row is visible (count ≥ 4); at small N the
+column widths are at their defaults and resizing is not exposed.
 
 **Filter pills** replace the prior `12 issues · ERR only · clear` inline
 header. Click a pill to toggle its severity filter. Pills are
