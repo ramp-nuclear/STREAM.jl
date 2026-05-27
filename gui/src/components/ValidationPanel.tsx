@@ -45,6 +45,11 @@ import type { ValidationResult } from "../lib/validation/types";
 import { type StreamNodeData } from "../store/useStore";
 import { scrollIntoViewSafe } from "../lib/scrollIntoViewSafe";
 import { getPreference } from "../lib/preferences";
+import {
+  type Severity,
+  SEVERITY_COLOR_VAR,
+  SEVERITY_LABEL,
+} from "../lib/severity";
 
 // ---------------------------------------------------------------------------
 // Custom-event type declarations
@@ -76,7 +81,6 @@ declare global {
 // Severity vocabulary
 // ---------------------------------------------------------------------------
 
-type Severity = "error" | "warning" | "info";
 type GroupBy = "none" | "rule" | "component";
 
 const SEVERITY_RANK: Record<Severity, number> = {
@@ -93,17 +97,9 @@ const SEVERITY_RANK: Record<Severity, number> = {
 // full word reads better: clearer at a glance, no abbreviation parsing,
 // and consistent with the rest of the panel's full-word vocabulary
 // (Group by None / Rule / Component, etc.).
-const SEVERITY_LABEL: Record<Severity, string> = {
-  error: "error",
-  warning: "warning",
-  info: "info",
-};
-
-const SEVERITY_COLOR_VAR: Record<Severity, string> = {
-  error: "var(--destructive)",
-  warning: "var(--color-warning)",
-  info: "var(--color-info)",
-};
+//
+// SEVERITY_LABEL + SEVERITY_COLOR_VAR live in `lib/severity.ts` (Phase 72
+// extract — shared with ValidationStatusBar, PreferencesDialog, CanvasPanel).
 
 // Default column widths in pixels. The user can drag the SEV↔RULE and
 // RULE↔MESSAGE dividers to resize; min/max enforced below. MESSAGE is the

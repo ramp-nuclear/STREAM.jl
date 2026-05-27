@@ -32,25 +32,16 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { LucideIcon } from "lucide-react";
-import { ChevronDown, CircleX, Info, TriangleAlert } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import useStore from "../store/useStore";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import {
+  type Severity,
+  SEVERITY_COLOR_VAR,
+  SEVERITY_ICON,
+} from "../lib/severity";
 
-type Severity = "error" | "warning" | "info";
 type BottomTab = "code" | "validation";
-
-const SEVERITY_ICON: Record<Severity, LucideIcon> = {
-  error: CircleX,
-  warning: TriangleAlert,
-  info: Info,
-};
-
-const SEVERITY_COLOR_VAR: Record<Severity, string> = {
-  error: "var(--destructive)",
-  warning: "var(--color-warning)",
-  info: "var(--color-info)",
-};
 
 // ---------------------------------------------------------------------------
 // Severity segment — left cluster

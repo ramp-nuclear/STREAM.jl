@@ -15,6 +15,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import useStore from "../store/useStore";
 import { getPreference } from "../lib/preferences";
+import { SEVERITY_COLOR_VAR } from "../lib/severity";
 import type { StreamNodeData } from "../store/useStore";
 import { getComponent } from "../registry";
 import {
@@ -516,12 +517,7 @@ export default function CanvasPanel({ resolvedTheme }: CanvasPanelProps = {}) {
       edgeIds: string[],
       severity: "error" | "warning" | "info",
     ) {
-      const colorVar =
-        severity === "error"
-          ? "var(--destructive)"
-          : severity === "info"
-            ? "var(--color-info)"
-            : "var(--color-warning)";
+      const colorVar = SEVERITY_COLOR_VAR[severity];
 
       for (const nodeId of nodeIds) {
         const el = document.querySelector<HTMLElement>(`[data-stream-node-id="${nodeId}"]`);
