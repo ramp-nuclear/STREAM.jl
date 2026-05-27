@@ -34,9 +34,24 @@ function TooltipProvider({
 }
 
 function Tooltip({
+  disabled,
+  delayDuration,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+}: React.ComponentProps<typeof TooltipPrimitive.Root> & {
+  /** Set true when the tooltip target is a disabled control. Drops the
+   *  delay to 0 ms so the "why is this blocked?" explanation appears
+   *  immediately on hover — the standard 400-500 ms delay reads as the
+   *  app stalling when the user is actively hunting for a block reason.
+   *  Matches VSCode / JetBrains / Linear behavior on disabled controls. */
+  disabled?: boolean
+}) {
+  return (
+    <TooltipPrimitive.Root
+      data-slot="tooltip"
+      delayDuration={disabled ? 0 : delayDuration}
+      {...props}
+    />
+  )
 }
 
 function TooltipTrigger({
