@@ -636,8 +636,8 @@ end
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=330.0)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=330.0)
 
-        htc_scb = [sol_scb[ssys_scb.cac.h_tc[i]] for i in 1:n_scb]
-        htc_noscb = [sol_noscb[ssys_noscb.cac.h_tc[i]] for i in 1:n_scb]
+        htc_scb = [sol_scb[ssys_scb.cac.h_tc_left[i]] for i in 1:n_scb]
+        htc_noscb = [sol_noscb[ssys_noscb.cac.h_tc_left[i]] for i in 1:n_scb]
         # Should be identical (ifelse selects uncorrected branch).
         for i in 1:n_scb
             @test htc_scb[i] ≈ htc_noscb[i] rtol=1e-10

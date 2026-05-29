@@ -135,7 +135,7 @@ end
         sol_phy02 = solve_steady(ssys_phy02, op_phy02)
 
         @test sol_phy02.retcode == ReturnCode.Success
-        @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu[:]], 8.235, rtol=1e-4))
+        @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu_left[:]], 8.235, rtol=1e-4))
     end
 
     @testset "PHY-03: laminar_friction integration — dP > 0 in solution" begin
