@@ -403,7 +403,10 @@ end
 
 function _h_spl(T_w::Real, T::Real, mdot::Real, Dh::Real, A::Real, nu_f::Function)
     T_film   = (T_w + T) / 2
-    return _nu_film(T_film, mdot, Dh, A, nu_f) * k_water(T_film) / Dh
+    # Route through the (T_w, T)-aware `_nu_film` so strict 4-arg correlations
+    # (e.g. `regime_dependent` with NC switching) receive `(Re, Pr, T_w, T)`.
+    # Simple `(Re, Pr, args...)` correlations absorb the extra temps unchanged.
+    return _nu_film(T_w, T, mdot, Dh, A, nu_f) * k_water(T_film) / Dh
 end
 
 
@@ -478,8 +481,12 @@ function ChannelAndContacts(;
     L  = geometry.L
     dz = L / n
     exvars = @variables begin
-        (h_tc_left(t))[1:n]
-        (h_tc_right(t))[1:n]
+        # Default 5000.0 seeds the nonlinear initialization solve. h_tc[i] ~ Nu*k/Dh
+        # with Nu evaluated at T_film makes h_tc a tearing variable whose init
+        # guess-map is self-referential without a numeric seed (MTK "Cyclic guesses").
+        # Restored from the v1.1 baseline, where it was dropped in the refactor.
+        (h_tc_left(t))[1:n] = fill(5000.0, n)
+        (h_tc_right(t))[1:n] = fill(5000.0, n)
         (Nu_left(t))[1:n]
         (Nu_right(t))[1:n]
         (velocity(t))[1:n]
