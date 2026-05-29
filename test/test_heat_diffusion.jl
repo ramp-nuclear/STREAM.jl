@@ -227,3 +227,40 @@ end
     @test T_left > T_bc
     @test T_right > T_bc
 end
+
+@testset "HDIFF-06: lateral symmetry — symmetric BCs + uniform power give T[:,j]==T[:,nx+1-j]" begin
+    # Regression guard for the right-boundary cell equation. With both walls at the
+    # same T and a uniform volumetric source, the steady lateral profile must be
+    # mirror-symmetric: T[i,j] == T[i, nx+1-j]. A wrong/duplicated boundary-cell
+    # equation (right cell not evolved) breaks this symmetry.
+    nz, nx = 2, 5
+    T_bc = 500.0
+    pwr = 8e4
+    ps = fill(1.0 / (nz * nx), nz, nx)
+
+    @named hd = HeatDiffusion(
+        nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0,
+        power_shape=ps, power=pwr,
+    )
+    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct6_l, i)) for i in 1:nz]
+    ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct6_r, i)) for i in 1:nz]
+    conns = [
+        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for i in 1:nz]...,
+        [connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for i in 1:nz]...,
+        hd.power ~ pwr,
+    ]
+    @named sys = compose(System(conns, t; name=:sys6), hd, ct_l..., ct_r...)
+    ssys = mtkcompile(sys)
+    op = [ssys.hd.T[i, j] => T_bc + 5.0 for i in 1:nz for j in 1:nx]
+    sol = solve_steady(ssys, op)
+
+    for i in 1:nz, j in 1:nx
+        @test isapprox(sol[ssys.hd.T[i, j]], sol[ssys.hd.T[i, nx + 1 - j]]; rtol=1e-6)
+    end
+    # And the boundary cells must actually be evolved (hotter than the wall they touch).
+    for i in 1:nz
+        @test sol[ssys.hd.T[i, 1]]  > T_bc
+        @test sol[ssys.hd.T[i, nx]] > T_bc
+    end
+end

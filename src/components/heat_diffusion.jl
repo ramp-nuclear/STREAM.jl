@@ -34,9 +34,9 @@ function _diffusion_eqs(;
                 ) / (rho_s * cp_s * dx) + q_vol[i, 1] for i in 1:nz
         ]...
         [
-            Dt(T[i, 1]) ~
+            Dt(T[i, nx]) ~
                 (
-                    k_s * (T[i, 2] - T[i, 1]) / dx  # Right cell temperature equation
+                    k_s * (T[i, nx - 1] - T[i, nx]) / dx  # Right cell temperature equation
                     -
                     k_s * (T[i, nx] - thermal_right[i].T) / (dx / 2)
                 ) / (rho_s * cp_s * dx) + q_vol[i, nx] for i in 1:nz
