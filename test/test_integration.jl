@@ -294,63 +294,53 @@ end
     end
 
     @testset "LOF-02: Flapper fires at correct threshold" begin
-        # SKIPPED: pre-existing numerical flaky (transient solver instability).
-        # Halts runtests.jl orchestrator. See:
-        #   .planning/phases/56-python-stream-cross-validation/56-RESUME-PLAN.md (task 1)
-        #   .planning/v1.1-MILESTONE-AUDIT.md (out-of-scope deferrals)
-        # Numerical fix deferred to v1.2.
-        @test_skip false
-        if false
-            # Migrated from test_loss_of_flow.jl LOF-02 (lines 143-155).
-            ssys, op, _, cb = _lof_bypass_ic()
+        # Re-enabled (was @test_skip'd as a "transient solver instability" flaky).
+        # The instability was a DaemonMode dev-loop artifact (stale world-age /
+        # recompilation state), not a real solver defect — the daemon was removed
+        # 2026-05-29 and the transient converges deterministically under cold-start
+        # julia (retcode Success, flapper fires ~0.72s, NC establishes).
+        # Migrated from test_loss_of_flow.jl LOF-02 (lines 143-155).
+        ssys, op, _, cb = _lof_bypass_ic()
 
-            t_arr = range(0.0, 300.0; length=3001)
-            sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+        t_arr = range(0.0, 300.0; length=3001)
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
-            @test sol.retcode == ReturnCode.Success
+        @test sol.retcode == ReturnCode.Success
 
-            T_open_end = sol[ssys.flapper.T_open, end]
-            @test T_open_end < 1.0e10
-            @test T_open_end >= 0.0
-            @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-4)
-        end
+        T_open_end = sol[ssys.flapper.T_open, end]
+        @test T_open_end < 1.0e10
+        @test T_open_end >= 0.0
+        @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-4)
     end
 
     @testset "LOF-03: channel flow reversal (mdot crosses zero)" begin
-        # SKIPPED: pre-existing numerical flaky (transient solver instability).
-        # Same family as LOF-02; halts runtests.jl orchestrator. See LOF-02 above
-        # and 56-RESUME-PLAN.md task 1. Defer to v1.2.
-        @test_skip false
-        if false
-            # Migrated from test_loss_of_flow.jl LOF-03 (lines 162-176).
-            # Heated channel has g=-G_ACC (assists downward flow). Positive mdot =
-            # downward (A->B). After NC establishes, heated.ch reverses to upward:
-            # mdot < 0.
-            ssys, op, _, cb = _lof_bypass_ic()
+        # Re-enabled alongside LOF-02 — same shared transient (DaemonMode artifact,
+        # not a solver defect; see LOF-02). Converges deterministically under
+        # cold-start julia: heated.ch reverses from +0.41 to ~-0.0042 kg/s.
+        # Migrated from test_loss_of_flow.jl LOF-03 (lines 162-176).
+        # Heated channel has g=-G_ACC (assists downward flow). Positive mdot =
+        # downward (A->B). After NC establishes, heated.ch reverses to upward:
+        # mdot < 0.
+        ssys, op, _, cb = _lof_bypass_ic()
 
-            t_arr = range(0.0, 300.0; length=3001)
-            sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+        t_arr = range(0.0, 300.0; length=3001)
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
-            mdot_ch_initial = sol[ssys.heated.ch.port_in.mdot, 1]
-            @test mdot_ch_initial > 0.0
+        mdot_ch_initial = sol[ssys.heated.ch.port_in.mdot, 1]
+        @test mdot_ch_initial > 0.0
 
-            mdot_ch_final = sol[ssys.heated.ch.port_in.mdot, end]
-            @test mdot_ch_final < 0.0
+        mdot_ch_final = sol[ssys.heated.ch.port_in.mdot, end]
+        @test mdot_ch_final < 0.0
 
-            mdot_nc = abs(mdot_ch_final)
-            @test 0.001 < mdot_nc < 2.0
-        end
+        mdot_nc = abs(mdot_ch_final)
+        @test 0.001 < mdot_nc < 2.0
     end
 
     @testset "VAL-01: energy balance (forced-flow instantaneous; NC time-averaged)" begin
-        # SKIPPED: pre-existing numerical flaky (transient NC equilibrium does
-        # not reliably converge under daemon mode). Halts runtests.jl orchestrator.
-        # See:
-        #   .planning/phases/56-python-stream-cross-validation/56-RESUME-PLAN.md (task 1)
-        #   .planning/v1.1-MILESTONE-AUDIT.md (out-of-scope deferrals)
-        # Defer numerical fix to v1.2.
-        @test_skip false
-        if false
+        # Re-enabled: the skip reason named the cause itself — "does not reliably
+        # converge under daemon mode". The daemon dev loop was removed 2026-05-29;
+        # under cold-start julia the NC equilibrium converges deterministically
+        # (Q_wall ≈ 444 W in equilibrium, Q_meas/Q_wall ratio ≈ 0.44, retcode Success).
         # Spike B redesign per 55-09 SUMMARY deferred work + plan 55-10 D-19
         # ("introduce the proper Spike B-aware LOF gates"). The legacy gate
         # (Q_meas vs Q_wall within 2%) compared instantaneous channel-side
@@ -428,15 +418,13 @@ end
         @test mean(Q_meas_nc) > 0
         ratio = mean(Q_meas_nc) / mean(Q_wall_nc)
         @test 0.3 < ratio < 3.0     # within factor of 3 in either direction
-        end  # close `if false` for VAL-01 NC skip
     end
 
     @testset "VAL-02: NC equilibrium mdot within 30% of analytical buoyancy estimate" begin
-        # SKIPPED: pre-existing numerical flaky — same family as VAL-01 NC and
-        # LOF-02/03. Halts runtests.jl orchestrator. See VAL-01 above and
-        # 56-RESUME-PLAN.md task 1. Defer to v1.2.
-        @test_skip false
-        if false
+        # Re-enabled alongside VAL-01/LOF-02/03 — same shared transient. The
+        # "flaky under daemon mode" behavior was a DaemonMode artifact (removed
+        # 2026-05-29); cold-start julia reaches the NC equilibrium deterministically
+        # (|mdot_nc| ≈ 4.2 g/s reversed, T_max ≈ 519 K, Q_wall ≈ 444 W).
         # Spike B redesign per 55-09 SUMMARY deferred work + plan 55-10 D-19.
         # The legacy gate compared NC mdot to a sqrt-buoyancy estimate that
         # assumed an unbounded heat source pinning the wall temperature; the
@@ -512,7 +500,6 @@ end
         @test T_max_nc > BYPASS_T_INLET                # heating did happen
         @test T_max_nc - BYPASS_T_INLET > 0.0          # finite ΔT (positive)
         @test T_max_nc < 647.0                          # below H2O critical T
-        end  # close `if false` for VAL-02 NC skip
     end
 end
 
