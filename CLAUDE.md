@@ -119,64 +119,19 @@ When `Dt(port_in.mdot)` appears in an equation, MTK automatically promotes `port
 
 MTK's symbolic IR requires structural analysis (index reduction from DAE to ODE), Jacobian sparsity detection, and code generation before a numerical solver can use it. Always call `mtkcompile(sys)` to produce a compiled system. Passing an uncompiled `System` to `solve` will error or produce wrong results.
 
-## Performance — Daemon dev loop
-
-### Daemon dev loop — primary workflow
-
-The fastest dev loop is a persistent Julia daemon running `Revise + DaemonMode`. Once warm, every script submission is sub-second + actual work; `using STREAM` and `mtkcompile` are paid exactly once per daemon lifetime instead of per `julia ...` invocation.
-
-**One-time per work session — start the daemon:**
+## Running the code
 
 ```bash
-bin/jl-up
+julia --project=. test/runtests.jl        # full suite
+julia --project=. test/test_channels.jl   # a single file
+julia --project=. examples/simple_loop.jl
 ```
 
-`bin/jl-up` is idempotent: if the daemon is already running it tells you so and exits 0; otherwise it launches it in detached tmux session `stream-jl` and waits until the listener is up. It refuses to start if port 3000 is held by a foreign process or if the tmux session already exists in a stuck state.
+Each invocation pays full cold-start (~30–90s `using STREAM` plus first `mtkcompile` ~10–30s). That is the accepted dev loop.
 
-Inspect / watch live:
-```bash
-tmux attach -t stream-jl       # detach with Ctrl-B then D
-# or
-tail -f /tmp/stream-jl-daemon.log
-```
+### Abandoned approaches — do not re-introduce
 
-The daemon prints one block per submitted script (request id, mode, cwd, first lines of the wrapped expression, and `✓ done in X.XXs`).
+Two attempts to beat cold-start were tried and abandoned. Do not bring either back:
 
-**Submit any Julia script — `bin/jl`:**
-
-```bash
-bin/jl test/runtests.jl
-bin/jl examples/simple_loop.jl
-bin/jl -- some_script.jl arg1 arg2
-```
-
-`bin/jl` requires a daemon, but auto-recovers: if the daemon is not running, it announces `[bin/jl] daemon not reachable — auto-starting via bin/jl-up...` on stderr, runs `bin/jl-up`, and retries the submission. The daemon still lives in tmux session `stream-jl` (visible via `tmux attach`); auto-start does not change that. If `bin/jl-up` itself fails (e.g. port 3000 is held by a foreign process, or the tmux session is wedged), `bin/jl` exits 3 with the full error chain. Silent fallback to plain `julia ...` is intentionally NOT provided — that would hide a daemon that's silently failing to start.
-
-**Revise is automatic** — `bin/jl-client.jl` prepends `Revise.revise()` to every submission, so source edits between calls are picked up without anything in your script. Caveat: a syntactically broken edit logs a warning and silently keeps the old code (Revise default behavior).
-
-**Limits worth knowing:**
-
-- **Struct/type definition edits don't hot-reload** — Julia limit, not Revise. Restart the daemon (`tmux kill-session -t stream-jl` then re-launch) when struct fields change.
-- **Worktree-isolated executor agents bypass the daemon.** They run in temporary `worktree-agent-*` directories on a different file path; Revise on the main daemon is watching the wrong files. Worktree work uses cold-start `julia ...` — accepted tradeoff (memory budget on this WSL2 box doesn't support multiple parallel daemons).
-- **`bin/jl` Julia client startup is ~1s.** That's the floor. To beat it would require a non-Julia client speaking the DaemonMode protocol — out of scope.
-- **Daemon dies on parse errors in submitted code** if those parse errors reach `serverRunExpr`. `bin/jl-client.jl` pre-validates with `Meta.parse` client-side and refuses to send unparseable expressions, so this should not happen in practice. If it does, restart the daemon.
-
-### Plain `julia` — fallback when daemon isn't desired
-
-```bash
-julia --project=. test/runtests.jl
-```
-
-Pays full cold-start (~30-90s `using STREAM` plus first `mtkcompile` ~10-30s) every invocation. Use only when you specifically want a clean slate.
-
-### Measuring TTFX
-
-```bash
-julia --project=. time_startup.jl
-```
-
-Reports `using STREAM` load time and first `mtkcompile` time for a fresh Julia process. The daemon path avoids paying these on every invocation — once warm, any second-or-later submission via `bin/jl` is sub-second plus actual work.
-
-### Sysimage — abandoned, do not attempt
-
-A PackageCompiler-based `stream.so` sysimage was attempted in v1.0 and abandoned. PackageCompiler's incremental link step is killed by SIGTERM at ~7 min on Julia 1.12 + WSL2 regardless of package list size. The daemon dev loop replaces it; tooling (`build_sysimage.sh` etc.) was removed. If you find `--sysimage stream.so` references in old phase artifacts under `.planning/`, those are historical — do not act on them. See `.planning/RETROSPECTIVE.md` for the full story.
+- **Daemon dev loop** (`Revise` + `DaemonMode`, `bin/jl*` scripts, tmux session `stream-jl`). A Claude-Code-specific speedup that did not pay off; fully removed from this branch (scripts, the `DaemonMode`/`Revise` deps, and `time_startup.jl`).
+- **PackageCompiler sysimage** (`stream.so`). PackageCompiler's incremental link step is killed by SIGTERM at ~7 min on Julia 1.12 + WSL2 regardless of package set. Tooling was removed in v1.0. Historical `--sysimage` references under `.planning/` are archive only — do not act on them.
