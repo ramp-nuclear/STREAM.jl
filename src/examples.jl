@@ -317,10 +317,19 @@ Gravity signs:
 - heated channel (`heated.ch`, A->B, nominally downward): g = -g_acc
 - ret (B->C, nominally upward): g = +g_acc
 
-Physics: Pump coasts to 0 dP. Inertia carries momentum; ch flow decays. Flapper
-opens when pump branch mdot (ine.port_in.mdot) drops below threshold (provided
-externally via `flapper_callback`). After Flapper opens, flow redistributes:
-heated-channel flow reverses (upward NC driven by buoyancy).
+Physics: the pump head `dP_pump_fn(t)` trips toward 0 (loss of flow). Inertia
+carries momentum; ch flow decays. Flapper opens when pump branch mdot
+(ine.port_in.mdot) drops below threshold (provided externally via
+`flapper_callback`). After Flapper opens, flow redistributes: heated-channel flow
+reverses (upward NC driven by buoyancy).
+
+Recommended IC idiom (canonical steady-then-transient): build with a `dP_pump_fn`
+that trips at some `t_trip > 0`, `solve_steady` the system with the pump head held
+at its pre-trip value (a constant-valued `dP_pump_fn`, passed via
+`ssys.pump.dP_pump_fn => fn`) to obtain a consistent forced-flow IC, then
+`solve_transient` from that steady state with the tripping `dP_pump_fn`. Because the
+IC is a true steady state of this system and the head is continuous at `t=0`, the
+transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integration.jl`.
 
 # Arguments
 - `n`: number of axial cells (default 10)
@@ -335,6 +344,10 @@ heated-channel flow reverses (upward NC driven by buoyancy).
 - `g_acc`: gravitational acceleration magnitude [m/s^2] (default 9.80665)
 - `R_ext`: external hydraulic resistance [Pa·s/kg] (default 1.0e6)
 - `dt_ramp`: Flapper opening ramp duration [s] (default 5.0)
+- `dP_pump_fn`: callable `f(t) -> Float64` giving the pump head [Pa] over time, stored
+  as the MTK callable parameter `pump.dP_pump_fn` (pass `ssys.pump.dP_pump_fn => f` in
+  the solve `op`). Default `t -> 0.0` (pump off — NC only). For a loss-of-flow run,
+  supply a function that holds the pre-trip head then ramps to 0 (see the IC idiom above).
 
 # Returns
 Compiled `ODESystem` (via `mtkcompile(sys)`).
@@ -352,6 +365,7 @@ function build_loop_lof_bypass(;
     g_acc     = 9.80665,
     R_ext     = 1.0e6,
     dt_ramp   = 5.0,
+    dP_pump_fn = (_t -> 0.0),
 )
 #! format: on
     geom = PipeGeometry_circular(L_ch, D_ch)
@@ -366,7 +380,7 @@ function build_loop_lof_bypass(;
         g=g_acc,
     )
 
-    @named pump = Pump(0.0)
+    @named pump = Pump(dP_pump_fn)
     @named ine = Inertia(L_over_A)
     @named hx = HeatExchanger(T_inlet)
     @named ch = ChannelAndContacts(;
