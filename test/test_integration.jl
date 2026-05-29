@@ -18,7 +18,7 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-using OrdinaryDiffEq: ReturnCode, BrownFullBasicInit
+using OrdinaryDiffEq: ReturnCode
 using Statistics
 using STREAM
 import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger,
@@ -183,64 +183,40 @@ end
     BYPASS_R_EXT     = 1.0e6
     BYPASS_THRESHOLD = 0.01
     BYPASS_DT_RAMP   = 5.0
-    BYPASS_DP_REF    = 1.5e4
     # Spike B-specific:
     BYPASS_POWER_W   = 1.0e3   # matches build_loop_lof_bypass default
     BYPASS_FUEL_NX   = 2
     BYPASS_FUEL_LX   = 0.005
     #! format: on
 
-    function _lof_bypass_ic(; n=BYPASS_N)
-        # Reference loop: Pump(DP_REF) -> HX(T_inlet) -> CAC(g=-G_ACC, h_tc) -> Pump
-        # Per-cell ConstantTemperature(T_wall_eff) sources wire to CAC's
-        # thermal_left[i] / thermal_right[i] ports to provide a Spike-B-like
-        # heating profile for IC generation. T_wall_eff is the CAC-equivalent
-        # wall temperature that produces a similar ΔT to the Spike-B 1 kW power
-        # input: ΔT ≈ power_W / (mdot · cp) ≈ 1000 / (0.4 · 4180) ≈ 0.6 K.
-        # We pin T_wall_eff = T_inlet + 60 K (yields ~12-14 K rise — seeds the
-        # bypass system's heated.ch.T[i] within reasonable convergence range).
-        T_wall_eff = BYPASS_T_INLET + 60.0
-        @named pump_ref = Pump(BYPASS_DP_REF)
-        @named hx_ref = HeatExchanger(BYPASS_T_INLET)
-        @named ch_ref = ChannelAndContacts(;
-            n=n,
-            geometry=PipeGeometry_circular(BYPASS_L_CH, BYPASS_D_CH),
-            g=(-BYPASS_G_ACC),
-        )
-        ct_l = [ConstantTemperature(T_wall_eff; name=Symbol(:ct_l_ref, i)) for i in 1:n]
-        ct_r = [ConstantTemperature(T_wall_eff; name=Symbol(:ct_r_ref, i)) for i in 1:n]
+    # Loss-of-flow IC via the canonical steady-then-transient pattern — no separate
+    # reference loop, no state transplant. We solve_steady the ACTUAL bypass system
+    # with the pump head held at its pre-trip value (forced flow), then run the
+    # transient from that consistent steady state while the pump head ramps to zero
+    # (the loss-of-flow event). Because the IC is a true steady state of the system
+    # being integrated AND the pump head is continuous at t=0, the transient starts
+    # fully consistent — no NoInit blow-up / hardware-sensitive instability (the old
+    # reference-loop transplant produced an inconsistent IC that solved locally but
+    # went Unstable / InitialFailure at t=0 on CI hardware).
+    BYPASS_DP_PRE   = 2.0e5   # pre-trip pump head [Pa]
+    BYPASS_T_TRIP   = 10.0    # pump trips at t = 10 s
+    BYPASS_TRIP_TAU = 5.0     # C1 Hermite ramp duration [s]
 
-        conns_ref = Equation[
-            connect(pump_ref.port_out, hx_ref.port_in),
-            connect(hx_ref.port_out, ch_ref.port_in),
-            connect(ch_ref.port_out, pump_ref.port_in),
-            [connect(ct_l[i].thermal,
-                     getproperty(ch_ref, Symbol(:thermal_left,  i))) for i in 1:n]...,
-            [connect(ct_r[i].thermal,
-                     getproperty(ch_ref, Symbol(:thermal_right, i))) for i in 1:n]...,
-            pump_ref.port_in.P ~ 1.0e5,
-        ]
-        @named ref_sys = compose(
-            System(conns_ref, t; name=:ref),
-            pump_ref, hx_ref, ch_ref, ct_l..., ct_r...,
-        )
-        ref_ssys = mtkcompile(ref_sys)
-
-        op_ref = Pair{Any,Any}[ref_ssys.ch_ref.port_in.mdot => 0.3]
-        for i in 1:n
-            push!(
-                op_ref,
-                ref_ssys.ch_ref.T[i] =>
-                    BYPASS_T_INLET + i * (T_wall_eff - BYPASS_T_INLET) / (2 * n),
-            )
+    # Pump head: pre-trip value at t=0 (continuous with the steady IC), C1 Hermite
+    # ramp to 0 over TRIP_TAU starting at t_trip. t_trip = Inf gives a constant
+    # pre-trip head for the steady solve (same closure type as the trip function,
+    # so both can be assigned to the single `dP_pump_fn` callable parameter).
+    function _bypass_pump_fn(t_trip)
+        return tt -> begin
+            xi = clamp((tt - t_trip) / BYPASS_TRIP_TAU, 0.0, 1.0)
+            BYPASS_DP_PRE * (1.0 - (3 * xi^2 - 2 * xi^3))
         end
-        ss_sol = solve_steady(ref_ssys, op_ref)
+    end
 
-        mdot_ss = ss_sol[ref_ssys.ch_ref.port_in.mdot]
-        T_ss = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
+    function _lof_bypass_ic(; n=BYPASS_N)
+        dP_fn_steady = _bypass_pump_fn(Inf)            # constant pre-trip head
+        dP_fn        = _bypass_pump_fn(BYPASS_T_TRIP)  # trips at t_trip
 
-        # Build bypass system with Spike-B builder API (power_W kwarg replaces
-        # legacy T_wall kwarg; fuel_nx / fuel_Lx control the plate geometry).
         ssys = build_loop_lof_bypass(;
             n=n,
             L_ch=BYPASS_L_CH,
@@ -253,29 +229,45 @@ end
             g_acc=BYPASS_G_ACC,
             R_ext=BYPASS_R_EXT,
             dt_ramp=BYPASS_DT_RAMP,
+            dP_pump_fn=dP_fn,
         )
 
         Dt = Differential(t)
-        op = Pair{Any,Any}[
-            ssys.ine.port_in.mdot => mdot_ss,                     # total loop flow
-            ssys.ret.port_in.mdot => mdot_ss,                     # all flow through heated.ch -> ret (flapper closed)
-            Dt(ssys.ret.port_in.mdot) => 0.0,                      # index-reduced derivative (quasi-SS)
-            ssys.flapper.T_open => 1.0e30,                         # sentinel — flapper not yet fired
+        # Forced-flow steady state of the actual system (pump on, flapper closed).
+        # DynamicSS(Rodas5P()) integrates to steady — avoids the spurious
+        # root the default root-finder converges to on this multi-branch network.
+        op_steady = Pair{Any,Any}[
+            ssys.pump.dP_pump_fn => dP_fn_steady,
+            ssys.flapper.T_open => 1.0e30,
+            ssys.ine.port_in.mdot => 0.2,
+            ssys.ret.port_in.mdot => 0.2,
+            Dt(ssys.heated.ch.port_in.mdot) => 0.0,
+            Dt(ssys.ret.port_in.mdot) => 0.0,
+            Dt(ssys.ine.port_in.mdot) => 0.0,
         ]
-        # Heated channel ICs (Spike B path: heated.ch.T[i])
         for i in 1:n
-            push!(op, ssys.heated.ch.T[i] => T_ss[i])
+            push!(op_steady, ssys.heated.ch.T[i] => BYPASS_T_INLET + i * 20.0 / n)
+            push!(op_steady, ssys.ret.T[i] => BYPASS_T_INLET)
         end
-        # Heated fuel-plate ICs — broadcast T_ss[i] over plate width (seeds the
-        # 2D plate close enough to drive convergence under 1 kW input).
-        for i in 1:n
-            for j in 1:BYPASS_FUEL_NX
-                push!(op, ssys.heated.fuel.T[i, j] => T_ss[i])
-            end
+        for i in 1:n, j in 1:BYPASS_FUEL_NX
+            push!(op_steady, ssys.heated.fuel.T[i, j] => BYPASS_T_INLET + i * 20.0 / n)
         end
-        # Return-leg cold ICs
+        ss = solve_steady(ssys, op_steady; solver=DynamicSS(Rodas5P()))
+        mdot_ss = ss[ssys.ine.port_in.mdot]
+
+        # Transient IC = the consistent steady state; pump head now ramps to 0.
+        op = Pair{Any,Any}[
+            ssys.pump.dP_pump_fn => dP_fn,
+            ssys.flapper.T_open => 1.0e30,                  # sentinel — flapper not yet fired
+            ssys.ine.port_in.mdot => mdot_ss,
+            ssys.ret.port_in.mdot => ss[ssys.ret.port_in.mdot],
+        ]
         for i in 1:n
-            push!(op, ssys.ret.T[i] => BYPASS_T_INLET)
+            push!(op, ssys.heated.ch.T[i] => ss[ssys.heated.ch.T[i]])
+            push!(op, ssys.ret.T[i] => ss[ssys.ret.T[i]])
+        end
+        for i in 1:n, j in 1:BYPASS_FUEL_NX
+            push!(op, ssys.heated.fuel.T[i, j] => ss[ssys.heated.fuel.T[i, j]])
         end
 
         cb = flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=BYPASS_THRESHOLD)
@@ -303,8 +295,7 @@ end
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
-        sol = solve_transient(ssys, op, t_arr; callbacks=cb,
-                              initializealg=BrownFullBasicInit())
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
         @test sol.retcode == ReturnCode.Success
 
@@ -325,8 +316,7 @@ end
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
-        sol = solve_transient(ssys, op, t_arr; callbacks=cb,
-                              initializealg=BrownFullBasicInit())
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
         mdot_ch_initial = sol[ssys.heated.ch.port_in.mdot, 1]
         @test mdot_ch_initial > 0.0
@@ -368,8 +358,7 @@ end
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
-        sol = solve_transient(ssys, op, t_arr; callbacks=cb,
-                              initializealg=BrownFullBasicInit())
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
         n = BYPASS_N
 
@@ -458,8 +447,7 @@ end
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
-        sol = solve_transient(ssys, op, t_arr; callbacks=cb,
-                              initializealg=BrownFullBasicInit())
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
         n = BYPASS_N
         nc_indices = 2701:3001
