@@ -18,7 +18,7 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-using OrdinaryDiffEq: ReturnCode
+using OrdinaryDiffEq: ReturnCode, BrownFullBasicInit
 using Statistics
 using STREAM
 import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger,
@@ -303,7 +303,8 @@ end
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
-        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb,
+                              initializealg=BrownFullBasicInit())
 
         @test sol.retcode == ReturnCode.Success
 
@@ -324,7 +325,8 @@ end
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
-        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb,
+                              initializealg=BrownFullBasicInit())
 
         mdot_ch_initial = sol[ssys.heated.ch.port_in.mdot, 1]
         @test mdot_ch_initial > 0.0
@@ -366,7 +368,8 @@ end
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
-        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb,
+                              initializealg=BrownFullBasicInit())
 
         n = BYPASS_N
 
@@ -455,7 +458,8 @@ end
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
-        sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+        sol = solve_transient(ssys, op, t_arr; callbacks=cb,
+                              initializealg=BrownFullBasicInit())
 
         n = BYPASS_N
         nc_indices = 2701:3001

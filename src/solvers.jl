@@ -69,12 +69,21 @@ Solve a transient simulation over a time array.
 - `solver`: ODE solver (default `Rodas5P()`)
 - `callbacks`: optional `CallbackSet` for user-supplied events (passed to DifferentialEquations
   `solve`); pre-wired for Phase 23 Flapper support
+- `initializealg`: DAE initialization algorithm (default `SciMLBase.NoInit()`, which trusts the
+  supplied `op` as a fully consistent initial condition). Pass `SciMLBase.BrownFullBasicInit()`
+  to have the solver solve the algebraic constraints for consistency at `t[1]` (holding the
+  differential states fixed) before stepping — needed when `op` is an approximate / transplanted
+  IC that does not exactly satisfy the algebraic equations, where `NoInit` + a stiff solver can
+  abort at `t=0` (`dt` driven below floating-point epsilon, `NaN` error estimate).
 - `kwargs...`: additional keyword arguments forwarded to `solve`
 
 # Returns
 `SciMLBase.ODESolution`. Access time-dependent results via `sol[ssys.component.variable, :]`.
 """
-function solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...)
+function solve_transient(
+    ssys, op, t; solver=Rodas5P(), callbacks=nothing,
+    initializealg=SciMLBase.NoInit(), kwargs...,
+)
     tspan = (Float64(t[1]), Float64(t[end]))
     prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false)
     sol = solve(
@@ -82,7 +91,7 @@ function solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwarg
         solver;
         saveat=t,
         callback=callbacks,
-        initializealg=SciMLBase.NoInit(),
+        initializealg=initializealg,
         kwargs...,
     )
     return sol
