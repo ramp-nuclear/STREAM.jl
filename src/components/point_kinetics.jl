@@ -170,7 +170,15 @@ callable). The power ODE becomes:
 
 where `rho_val` is a constant base/bias reactivity, `rho_c_fn(t)` is the time-varying
 control contribution (D-01 additive composition), and `feedback_expr` is the per-cell
-temperature reactivity sum (Phase 47).
+temperature reactivity sum (Phase 47):
+
+    feedback_expr = sum_j alpha_j * (T_j - Tref_j)
+
+i.e. each `temp_worth` weight `alpha_j` is the temperature coefficient of reactivity
+(d_rho/d_T) for that cell and enters the reactivity additively, signed. It is used with
+its absolute sign: a stabilizing reactor has a NEGATIVE coefficient, so `alpha_j` is
+normally a negative value (hotter -> less reactive). A positive value gives destabilizing
+feedback.
 
 When solving, the callable must be passed in the initial conditions dict:
     `op = [ssys.rho_c_fn => rho_c_fn, ssys.P => ic.P, ...]`
