@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GUI Redesign
 status: shipped — awaiting next milestone
-last_updated: "2026-05-28T00:00:00.000Z"
-last_activity: 2026-05-28 — Milestone v1.2 completed and archived; awaiting PR rebase onto main (post PR #15 merge)
+last_updated: "2026-05-30T00:00:00.000Z"
+last_activity: 2026-05-30 — Rebased gui-redesign onto main after PR #15 (v1.1) merged; full test suite green; v1.2 phase dirs archived to milestones/v1.2-phases/. v1.2 ready for its own PR to main.
 progress:
   total_phases: 15
   completed_phases: 15
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** v1.2 shipped 2026-05-28. PR to `main` pending — needs rebase onto `main` after PR #15 (channels-redesign) merges. Next: `/gsd:new-milestone` or planning work.
+**Current focus:** v1.2 shipped 2026-05-28; rebased onto `main` 2026-05-30 after PR #15 (v1.1 channels-redesign) merged — full test suite green (one post-rebase fix: `elenbaas_htc` Gr call reconciled to main's 7-arg signature). Next: open the v1.2 PR to `main`, then `/gsd:new-milestone` or planning work.
 **Python STREAM reference:** ~/projects/STREAM
-**Working branch:** `gui-redesign` (off `main`). v1.2 milestone closed; awaiting rebase + PR.
+**Working branch:** `gui-redesign` (rebased onto `main` 2026-05-30). v1.2 milestone closed; ready to PR into `main`.
 
 **Roadmap summary:**
 
 - v0.8 (shipped): Phases 33-44 — STREAM Composer GUI
 - v0.9 (shipped): Phases 45-49 — Point Kinetics & Reactor Control
 - v1.0 (shipped): Phases 50-51 — Open-Source Release
-- v1.1 (shipped to `gui-redesign`; PR #15 → `main` open): Phases 52-58 — Final Channel-Family Redesign + cross-validation + HTC film-temperature + MTK determinacy repair
+- v1.1 (shipped; PR #15 merged to `main` 2026-05-30): Phases 52-58 — Final Channel-Family Redesign + cross-validation + HTC film-temperature + MTK determinacy repair
   - Phase 52: Channel Connectors (CONN-01..04)
   - Phase 53: Shared `_channel_core` + Enthalpy-Form Energy Balance (CORE-01..05, NRG-01..04)
   - Phase 54: Variant Rewrites & File Consolidation (VAR-01..04)
@@ -41,7 +41,7 @@ See: .planning/PROJECT.md (updated 2026-05-05)
   - Phase 56: Python STREAM Cross-Validation (TEST-04)
   - Phase 57: HTC film-temperature evaluation
   - Phase 58: MTK system determinacy repair
-- v1.2 (active): Phases 59-72 — GUI Redesign (canonical decisions: `.planning/notes/gui-redesign-design-decisions.md`)
+- v1.2 (shipped 2026-05-28; rebased onto `main` 2026-05-30): Phases 59-72 — GUI Redesign (canonical decisions: `.planning/notes/gui-redesign-design-decisions.md`)
   - Phase 59: Correlation `geom`-first refactor ✓ shipped 2026-05-11
   - Phase 60: `fuel_assembly` composition helper ✓ shipped 2026-05-11
   - Phase 61: Registry audit + rewrite for v1.1 source ✓ shipped 2026-05-12
