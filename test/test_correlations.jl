@@ -477,7 +477,6 @@ end
 
     # Uses _two_sided_heating_nusselt, NOT Marco_Han_Nusselt
     # Reference: _two_sided_heating_nusselt(0.0) = 8.235
-    # ar=0.0: depth=0.0, width=1.0 → aspect_ratio = 0.0. Dh = 4*0/(2*1) = 0 (unused).
     htc_fn = fully_developed_laminar_h_spl(_geom_for_ar(0.0))
     @test htc_fn(1000.0, 7.0, 313.0, 333.0) == 8.235
 
