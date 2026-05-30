@@ -73,7 +73,7 @@
                 { "name": "epsilon", "type": "Real", "unit": "m", "default": 0.0, "description": "Pipe surface roughness", "required": false, "positional": false }
               ]
             },
-            { "value": "laminar_friction", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
+            { "value": "laminar_friction_rectangular", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
           ]
         }
       ],
@@ -288,7 +288,7 @@
                         { "name": "epsilon", "type": "Real", "unit": "m", "default": 0.0, "description": "Pipe surface roughness", "required": false, "positional": false }
                       ]
                     },
-                    { "value": "laminar_friction", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
+                    { "value": "laminar_friction_rectangular", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
                   ]
                 },
                 {
@@ -307,7 +307,7 @@
                         { "name": "epsilon", "type": "Real", "unit": "m", "default": 0.0, "description": "Pipe surface roughness", "required": false, "positional": false }
                       ]
                     },
-                    { "value": "laminar_friction", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
+                    { "value": "laminar_friction_rectangular", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
                   ]
                 },
                 {
@@ -375,7 +375,7 @@
                 { "name": "epsilon", "type": "Real", "unit": "m", "default": 0.0, "description": "Pipe surface roughness", "required": false, "positional": false }
               ]
             },
-            { "value": "laminar_friction", "label": "Laminar", "kind": "factory", "geom_source": "parent" },
+            { "value": "laminar_friction_rectangular", "label": "Laminar", "kind": "factory", "geom_source": "parent" },
             {
               "value": "regime_dependent",
               "label": "Regime Dependent",
@@ -483,7 +483,7 @@
                         { "name": "epsilon", "type": "Real", "unit": "m", "default": 0.0, "description": "Pipe surface roughness", "required": false, "positional": false }
                       ]
                     },
-                    { "value": "laminar_friction", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
+                    { "value": "laminar_friction_rectangular", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
                   ]
                 },
                 {
@@ -502,7 +502,7 @@
                         { "name": "epsilon", "type": "Real", "unit": "m", "default": 0.0, "description": "Pipe surface roughness", "required": false, "positional": false }
                       ]
                     },
-                    { "value": "laminar_friction", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
+                    { "value": "laminar_friction_rectangular", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
                   ]
                 },
                 {
@@ -613,7 +613,7 @@
                 { "name": "epsilon", "type": "Real", "unit": "m", "default": 0.0, "description": "Pipe surface roughness", "required": false, "positional": false }
               ]
             },
-            { "value": "laminar_friction", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
+            { "value": "laminar_friction_rectangular", "label": "Laminar", "kind": "factory", "geom_source": "parent" }
           ]
         }
       ],

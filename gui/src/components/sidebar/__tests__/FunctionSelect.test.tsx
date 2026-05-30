@@ -62,7 +62,7 @@ const frictionParam: Parameter = {
   positional: false,
   options: [
     { value: "blasius_friction", label: "Blasius", kind: "simple" },
-    { value: "laminar_friction", label: "Laminar", kind: "simple" },
+    { value: "laminar_friction_rectangular", label: "Laminar", kind: "simple" },
   ],
 };
 

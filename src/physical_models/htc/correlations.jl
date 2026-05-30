@@ -6,7 +6,7 @@
 #   - Factories (constant_Nusselt, regime_dependent(geom; ...), elenbaas_htc(geom; g),
 #     fully_developed_laminar_h_spl(geom), developing_laminar_h_spl(geom; develop_length)):
 #     take `geom::PipeGeometry` as first positional argument when they consume geometry
-#     fields (D-00, Phase 59); return closures that capture construction-time scalars
+#     fields; return closures that capture construction-time scalars
 #     derived from `geom.depth`, `geom.width`, `geom.L`, `geom.Dh`. Inner function
 #     receives only symbolic Re/Pr.
 #   - No @register_symbolic on any function in this file — all are plain arithmetic.
@@ -81,10 +81,9 @@ from `geom.Dh`. In this mode, the HTC closure computes:
   is provided; otherwise unused).
 - `Re_transition`: Reynolds number transition threshold (default 2300).
 
-Group validation (Phase 59 D-01): if `htc_natural` is provided, `g` must also be supplied;
-otherwise an `ArgumentError` is raised. The pre-Phase-59 stray-kwarg `@warn` (Dh/g without
-htc_natural) is removed — `Dh` is no longer a user-facing kwarg, and a lone `g` is a
-permitted no-op.
+If `htc_natural` is provided, `g` must be too, otherwise an `ArgumentError` is raised.
+`Dh` is not a user-facing kwarg (it is read from `geom.Dh`); a lone `g` without
+`htc_natural` is simply ignored.
 
 Returns:
 ```julia
@@ -100,7 +99,7 @@ geom = PipeGeometry_rectangular(L, e1, e2, he)
 rd = regime_dependent(geom;
     htc_laminar        = constant_Nusselt(Nu=8.235),
     htc_turbulent      = dittus_boelter,
-    friction_laminar   = laminar_friction(geom),
+    friction_laminar   = laminar_friction_rectangular(geom),
     friction_turbulent = blasius_friction,
 )
 ChannelAndContacts(htc_correlation = rd.htc, friction_correlation = rd.friction, ...)
@@ -109,7 +108,7 @@ ChannelAndContacts(htc_correlation = rd.htc, friction_correlation = rd.friction,
 rd_nc = regime_dependent(geom;
     htc_laminar        = constant_Nusselt(Nu=8.235),
     htc_turbulent      = dittus_boelter,
-    friction_laminar   = laminar_friction(geom),
+    friction_laminar   = laminar_friction_rectangular(geom),
     friction_turbulent = blasius_friction,
     htc_natural        = elenbaas_htc(geom; g=9.81),
     g                  = 9.81,
@@ -129,10 +128,7 @@ function regime_dependent(geom::PipeGeometry;
 )
     Re_tr = Float64(Re_transition)
 
-    # Phase 59 D-01: collapsed group validation — (htc_natural, g) must come together.
-    # Pre-Phase-59 group was (htc_natural, Dh, g); Dh is no longer user-facing (read from
-    # geom.Dh internally). The stray-kwarg @warn was also dropped: a lone `g` without
-    # htc_natural is a permitted no-op (no useful diagnostic remained after the Dh removal).
+    # htc_natural and g must be supplied together.
     if !isnothing(htc_natural) && isnothing(g)
         throw(
             ArgumentError(
@@ -211,12 +207,10 @@ Compatible with the 4-arg HTC interface `(Re, Pr, T_bulk, T_wall) -> Nu`.
 When T_wall = T_bulk (dT=0), returns Nu=0 (physically correct: no buoyancy
 driving force).
 
-Domain note (Phase 59 D-03): this correlation is for **parallel-vertical-plates
-natural convection**. It expects a rectangular `PipeGeometry` where `geom.depth`
-is the plate gap. No runtime check is performed; passing a circular or non-plate
-geometry will yield an aspect-ratio-blind Nu that may not be physical. The
-trust-the-user posture is consistent with the rest of the library; a stricter
-geometry-kind check is intentionally deferred (see CONTEXT.md `<deferred>`).
+This correlation is for **parallel-vertical-plates natural convection** and expects a
+rectangular `PipeGeometry` where `geom.depth` is the plate gap. There is no runtime
+check: a circular or non-plate geometry yields an aspect-ratio-blind Nu that may not
+be physical. Validating the geometry is left to the caller.
 
 Note: Re and Pr arguments are accepted for interface compatibility but
 are NOT used in the Elenbaas correlation (natural convection does not
@@ -280,9 +274,7 @@ rectangular duct with 2-sided heating.
 
 # Arguments
 - `geom`: `PipeGeometry`; the factory reads `geom.depth` and `geom.width` to
-  derive `aspect_ratio = depth / width`. `geom.Dh` is not consumed by the Nu
-  calculation (matches the documented pre-Phase-59 behavior where `Dh` was an
-  ignored interface-consistency kwarg).
+  derive `aspect_ratio = depth / width`. `geom.Dh` is not used by the Nu calculation.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
@@ -301,9 +293,9 @@ end
 Factory returning an HTC correlation for thermally developing laminar flow in a
 rectangular duct with 2-sided heating.
 
-`develop_length` is a **mandatory** kwarg with no default (Phase 59 D-04). The caller
-must explicitly choose the evaluation point along the channel; no silent substitution
-with `geom.L` is performed.
+`develop_length` is a **mandatory** kwarg with no default. The caller must explicitly
+choose the evaluation point along the channel; there is no silent substitution with
+`geom.L`.
 
 # Arguments
 - `geom`: `PipeGeometry`; the factory reads `geom.Dh`, `geom.depth`, and `geom.width`,

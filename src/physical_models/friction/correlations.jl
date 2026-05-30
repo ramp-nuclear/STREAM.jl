@@ -4,7 +4,7 @@
 #   - Standalone named functions (blasius_friction, turbulent_friction, viscosity_correction,
 #     rectangular_laminar_correction): plain Julia arithmetic, NOT @register_symbolic.
 #     MTK traces through these symbolically when Re is symbolic.
-#   - Factory (laminar_friction): returns closure capturing geom-derived state.
+#   - Factory (laminar_friction_rectangular): returns closure capturing geom-derived state.
 #   - No @register_symbolic on any function in this file — all are plain arithmetic.
 
 """
@@ -44,7 +44,7 @@ function rectangular_laminar_correction(aspect_ratio::Real)
 end
 
 """
-    laminar_friction(geom::PipeGeometry) -> (Re) -> f_darcy
+    laminar_friction_rectangular(geom::PipeGeometry) -> (Re) -> f_darcy
 
 Factory returning a friction correlation for fully-developed laminar flow in a
 rectangular duct.
@@ -66,11 +66,11 @@ instead of this factory.
 Usage:
 ```julia
 geom = PipeGeometry_rectangular(L, e1, e2, he)
-f_fn = laminar_friction(geom)
+f_fn = laminar_friction_rectangular(geom)
 ChannelAndContacts(friction_correlation = f_fn, ...)
 ```
 """
-function laminar_friction(geom::PipeGeometry)
+function laminar_friction_rectangular(geom::PipeGeometry)
     aspect_ratio = geom.depth / geom.width
     k_R = rectangular_laminar_correction(aspect_ratio)
     return (Re) -> 64.0 / (Re * k_R)

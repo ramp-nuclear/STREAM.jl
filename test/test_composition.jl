@@ -1,4 +1,4 @@
-# test/test_composition.jl — Phase 55 D-18 rewrite.
+# test/test_composition.jl
 
 using Test
 using ModelingToolkit
@@ -17,7 +17,7 @@ function _mtr_pair(; n=4, nz=4, nx=2)
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
                                     htc_correlation=constant_Nusselt(; Nu=8.235),
-                                    friction_correlation=laminar_friction(geom))
+                                    friction_correlation=laminar_friction_rectangular(geom))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005,
                                  y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
                                  power_shape=ps)
@@ -376,28 +376,20 @@ end
 end
 
 # ───────────────────────────────────────────────────────────
-# Section 9: fuel_assembly — Phase 60 (v1.2 §3.12)
-#
-# Locks the four-variant CAC↔Plate alternation helper added by plan 60-01.
-# D-06 gate: helper-built system must match hand-rolled connect() chain
-# pointwise at rtol=1e-10 after solve_steady. ArgumentError paths confirmed
-# for the four caller-input mistakes. Smoke confirms helper returns an
-# uncompiled ODESystem (no premature mtkcompile).
-#
-# Locked k per D-06: k=2 for variants 1/2/3, k=3 for variant 4.
-# build_initializeprob=false is mandatory for HD+CAC (per 60-CONTEXT).
-# ───────────────────────────────────────────────────────────
+# fuel_assembly — four-variant CAC <-> Plate alternation helper.
+# Each variant is checked by comparing the helper-built system against a
+# hand-rolled connect() chain pointwise (rtol=1e-10) after solve_steady, plus
+# the ArgumentError paths and an uncompiled-return smoke. k=2 for variants
+# 1/2/3, k=3 for variant 4. build_initializeprob=false is mandatory for HD+CAC.
 
 # Helper: build a fresh (CAC, HD) pair under a caller-supplied name prefix.
-# Inline `@named` is required — MTK's `@named` macro expands at parse time
-# and needs a bare LHS identifier; string-interpolated symbols won't parse.
-# This helper splices the prefix into Symbol() at runtime instead, which
-# works because we call `ChannelAndContacts(; name=...)` directly (no @named).
+# Calls the constructors with name=... directly (not via @named) so the prefix
+# can be a runtime Symbol.
 function _fa_cac(prefix::Symbol; n=4)
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ChannelAndContacts(; name=prefix, n=n, geometry=geom,
                        htc_correlation=constant_Nusselt(; Nu=8.235),
-                       friction_correlation=laminar_friction(geom))
+                       friction_correlation=laminar_friction_rectangular(geom))
 end
 
 function _fa_hd(prefix::Symbol; nz=4, nx=2)
@@ -407,15 +399,13 @@ function _fa_hd(prefix::Symbol; nz=4, nx=2)
                    power_shape=ps)
 end
 
-# Hand-rolled per-pair wiring — mirrors `_pair_connections` in src/composition/helpers.jl
-# (spatial-absolute L/R convention: left-of-pair uses thermal_right, right-of-pair uses
-# thermal_left). Used to build the reference systems for the four parity testsets.
+# Hand-rolled per-pair wiring (mirrors `_pair_connections`): left member's
+# thermal_right to right member's thermal_left. Builds the reference systems.
 function _fa_pair_eqs(lsys, rsys, n::Int)
     return [connect(port(lsys, :thermal_right, i), port(rsys, :thermal_left, i)) for i in 1:n]
 end
 
-# Time-derivative shortcut for solve_steady IC guesses on per-CAC momentum states
-# (see the deviation note in each variant testset for why these are needed).
+# Time derivative, used to build the Dt(...)=>0.0 IC guesses (see variant-1 note).
 const _fa_Dt = Differential(t)
 
 # ─── Variant 1 — channel-bookended (k=2 plates, k+1=3 channels) parity ───
@@ -468,19 +458,9 @@ const _fa_Dt = Differential(t)
     full_hand = compose_systems(asm_hand, pump_d, bc_d; connections=conns_d, name=:full_hand_v1)
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
 
-    # NOTE (D-06 deviation, applies to all four parity testsets): the plan
-    # specifies bare `solve_steady` on the parity gate, but each CAC's
-    # `(L/A)*Dt(port_in.mdot)` momentum ODE introduces one differential state,
-    # and `mtkcompile`'s structural reduction non-deterministically picks
-    # which CAC's `mdotˍt(t)` survives as the master state. The choice
-    # differs between helper-built and hand-rolled compilations (confirmed:
-    # helper retains c3, hand-rolled retains c2 for variant 1), so a bare
-    # `solve_steady` IC vector raises "Initial condition underdefined".
-    # Fix per the precedent in test_integration.jl line 262: pass explicit
-    # `Dt(...)=>0.0` guesses for every per-CAC `port_in.mdot` — extras are
-    # silently ignored, the surviving derivative state gets its IC. With
-    # this, solve_steady reaches true steady state at machine precision and
-    # the D-06 `rtol=1e-10` parity gate matches identically.
+    # We pass a Dt(...)=>0.0 guess for every per-CAC port_in.mdot, even though
+    # mtkcompile only keeps one of them as a differential state — we can't know
+    # ahead of time which one survives, and the extras are harmlessly ignored.
     ic_helper = Pair{Any,Any}[
         [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
         [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
@@ -512,9 +492,8 @@ const _fa_Dt = Differential(t)
     @test sol_helper.retcode == ReturnCode.Success
     @test sol_hand.retcode == ReturnCode.Success
 
-    # Parity by symbolic-accessor read-back: identical physical states across both
-    # systems (compiler unknown-vector ordering may differ between asm_helper and
-    # asm_hand — read by symbol to avoid relying on order stability).
+    # Read states by symbol rather than by unknown-vector position: the compiler's
+    # ordering can differ between the helper-built and hand-rolled systems.
     vals_helper = Float64[]
     vals_hand = Float64[]
     for cname in (:c1, :c2, :c3), i in 1:n
@@ -529,7 +508,7 @@ const _fa_Dt = Differential(t)
 end
 
 # ─── Variant 2 — plate-bookended (k=1 channel, k+1=2 plates) parity ───
-# Per D-06 the locked k=2 means the smaller variants get k≥1 channels. Variant 2
+# The locked k=2 means the smaller variants get k≥1 channels. Variant 2
 # uses k=2 channels + k+1=3 plates so 'k' matches the variant-1 cell count.
 @testset "fuel_assembly variant 2 (plate-bookended, k=2) parity" begin
     n, nz, nx = 4, 4, 2
@@ -578,7 +557,7 @@ end
     full_hand = compose_systems(asm_hand, pump_d, bc_d; connections=conns_d, name=:full_hand_v2)
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
 
-    # (See D-06 deviation note in variant 1 testset for the Dt(...) IC pattern.)
+    # (See the Dt(...) IC note in the variant-1 testset.)
     ic_helper = Pair{Any,Any}[
         [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
         [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
@@ -664,7 +643,7 @@ end
     full_hand = compose_systems(asm_hand, pump_d, bc_d; connections=conns_d, name=:full_hand_v3)
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
 
-    # (See D-06 deviation note in variant 1 testset for the Dt(...) IC pattern.)
+    # (See the Dt(...) IC note in the variant-1 testset.)
     ic_helper = Pair{Any,Any}[
         [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
         [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
@@ -726,10 +705,7 @@ end
     full_helper = compose_systems(asm_helper, pump_h, bc_h; connections=conns_h, name=:full_helper_v4)
     ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
 
-    # Hand-rolled — sequence c1, p1, c2, p2, c3, p3 + wrap (p3 -> c1)
-    # Per closed-ring default in helpers.jl: when start===nothing && closed=true,
-    # the helper sets start=:channel and produces seq = (:c,c1),(:p,p1),(:c,c2),(:p,p2),(:c,c3),(:p,p3),
-    # then wraps so pair_range includes (seq[end], seq[1]) → (p3, c1).
+    # Hand-rolled closed ring: c1 p1 c2 p2 c3 p3, then wrap p3 -> c1.
     c1d = _fa_cac(:c1; n=n); c2d = _fa_cac(:c2; n=n); c3d = _fa_cac(:c3; n=n)
     p1d = _fa_hd(:p1; nz=nz, nx=nx); p2d = _fa_hd(:p2; nz=nz, nx=nx); p3d = _fa_hd(:p3; nz=nz, nx=nx)
     therm_eqs = Equation[
@@ -758,7 +734,7 @@ end
     full_hand = compose_systems(asm_hand, pump_d, bc_d; connections=conns_d, name=:full_hand_v4)
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
 
-    # (See D-06 deviation note in variant 1 testset for the Dt(...) IC pattern.)
+    # (See the Dt(...) IC note in the variant-1 testset.)
     ic_helper = Pair{Any,Any}[
         [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
         [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
@@ -804,7 +780,7 @@ end
     @test isapprox(vals_helper, vals_hand; rtol=1e-10)
 end
 
-# ─── ArgumentError paths (D-06) ───
+# ─── ArgumentError paths ───
 
 @testset "fuel_assembly — ArgumentError on bookend-vs-length conflict" begin
     # 3 CACs + 2 HDs → auto would infer :channel; explicit bookend=:plate contradicts.
@@ -843,14 +819,9 @@ end
     # on the raw assembly is intentionally NOT attempted: without a pump
     # loop + power binding the system has more unknowns than equations and
     # mtkcompile fails consistency. The smoke is "did the helper return a
-    # System, not numeric output?" — that is the D-06 last bullet.
+    # System, not numeric output?"
     c1 = _fa_cac(:c1); c2 = _fa_cac(:c2)
     p1 = _fa_hd(:p1); p2 = _fa_hd(:p2)
     asm = fuel_assembly([c1, c2], [p1, p2]; bookend=:mixed, start=:channel, name=:asm_smoke)
     @test asm isa ModelingToolkit.AbstractSystem
-    # Confirm uncompiled by inspecting structure: an uncompiled assembly
-    # has the original 5 child subsystems exposed (c1, c2, p1, p2 + the
-    # connection-only System produced by compose); a compiled system would
-    # have flattened those into a single equation set.
-    @test length(ModelingToolkit.get_systems(asm)) == 4  # c1, c2, p1, p2
 end

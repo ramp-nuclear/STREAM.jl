@@ -8,7 +8,7 @@ import STREAM:
     dittus_boelter,
     blasius_friction,
     constant_Nusselt,
-    laminar_friction,
+    laminar_friction_rectangular,
     rectangular_laminar_correction,
     regime_dependent,
     elenbaas_nusselt,
@@ -53,11 +53,11 @@ import STREAM:
         @test htc_custom(300.0, 7.0) == 5.0
     end
 
-    @testset "PHY-03: laminar_friction factory" begin
+    @testset "PHY-03: laminar_friction_rectangular factory" begin
         # MTR-like rectangular geometry constructed so depth/width == 0.01814 exactly.
         # width = 0.07, depth = 0.07 * 0.01814 = 0.0012698  →  aspect_ratio = 0.01814.
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
-        f_fn = laminar_friction(geom)
+        f_fn = laminar_friction_rectangular(geom)
         k_R = rectangular_laminar_correction(0.01814)
         @test isapprox(f_fn(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
         @test isapprox(f_fn(500.0), 64.0 / (500.0 * k_R); rtol=1e-6)
@@ -69,7 +69,7 @@ import STREAM:
         rd = regime_dependent(geom;
             htc_laminar=constant_Nusselt(Nu=8.235),
             htc_turbulent=dittus_boelter,
-            friction_laminar=laminar_friction(geom),
+            friction_laminar=laminar_friction_rectangular(geom),
             friction_turbulent=blasius_friction,
         )
         # Named tuple must have :htc and :friction keys
@@ -142,7 +142,7 @@ end
         @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu_left[:]], 8.235, rtol=1e-4))
     end
 
-    @testset "PHY-03: laminar_friction integration — dP > 0 in solution" begin
+    @testset "PHY-03: laminar_friction_rectangular integration — dP > 0 in solution" begin
         n = 3;
         T_inlet = 313.15;
         T_wall = 373.15
@@ -153,7 +153,7 @@ end
             n=n,
             geometry=geom,
             htc_correlation=constant_Nusselt(Nu=8.235),
-            friction_correlation=laminar_friction(geom),
+            friction_correlation=laminar_friction_rectangular(geom),
         )
         @named bc_phy03 = HeatExchanger(T_inlet)
         ct_l_phy03 = [
@@ -205,7 +205,7 @@ end
         rd = regime_dependent(geom;
             htc_laminar=constant_Nusselt(Nu=8.235),
             htc_turbulent=dittus_boelter,
-            friction_laminar=laminar_friction(geom),
+            friction_laminar=laminar_friction_rectangular(geom),
             friction_turbulent=blasius_friction,
             Re_transition=2300.0,
         )
@@ -259,7 +259,7 @@ end
         rd = regime_dependent(geom;
             htc_laminar=constant_Nusselt(Nu=8.235),
             htc_turbulent=dittus_boelter,
-            friction_laminar=laminar_friction(geom),
+            friction_laminar=laminar_friction_rectangular(geom),
             friction_turbulent=blasius_friction,
             Re_transition=2300.0,
         )
@@ -322,19 +322,13 @@ end
     end
 
     @testset "NATCONV-01: elenbaas_htc factory produces 4-arg closure" begin
-        # D-03 (CONTEXT.md): elenbaas_htc docstring warns against non-rectangular geom.
-        # Test uses PipeGeometry_circular here to preserve numerical parity with the
-        # pre-refactor (b=0.00254, L=0.6, Dh=0.00254) fixture — circular yields
-        # width==depth==Dh, which is identical to the old kwarg inputs. The trust-the-user
-        # posture is exercised deliberately. Do NOT change to rectangular without
-        # re-deriving the expected Nu.
-        geom = PipeGeometry_circular(0.6, 0.00254)
+        # Smoke test on a rectangular plate geometry (depth = plate gap): the closure
+        # takes 4 args, gives a positive Nu when the wall is hotter than the bulk, and
+        # returns 0 when there's no temperature difference.
+        geom = PipeGeometry_rectangular(0.6, 0.07, 0.00254, 0.07)
         htc_fn = elenbaas_htc(geom)
-        # Must accept 4 args
-        Nu_val = htc_fn(0.0, 4.32, 313.15, 333.15)  # Re=0 (natural conv), Pr~4.32, T_bulk=40C, T_wall=60C
-        @test Nu_val > 0.0
-        Nu_zero = htc_fn(0.0, 4.32, 313.15, 313.15)
-        @test isapprox(Nu_zero, 0.0; atol=1e-10)
+        @test htc_fn(0.0, 4.32, 313.15, 333.15) > 0.0
+        @test isapprox(htc_fn(0.0, 4.32, 313.15, 313.15), 0.0; atol=1e-10)
     end
 
     @testset "NATCONV-02: elenbaas_nusselt Python STREAM validation" begin
@@ -377,13 +371,7 @@ end
         # Nu tolerance matches Ra tolerance (propagated from Gr uncertainty)
         @test isapprox(Nu_val, 1.2731625848; rtol=5e-4)
     end
-end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 26: NC regime detection in regime_dependent (Phase 59 refactor: geom-first)
-# NATCONV-01: regime_dependent NC kwargs — branch selection, backward compat,
-#             ArgumentError on (htc_natural, g) collapsed group (Phase 59 D-01)
-# ─────────────────────────────────────────────────────────────────────────────
+end
 
 @testset "NATCONV-01: regime_dependent NC detection" begin
     # Setup: laminar HTC returns 4.0, turbulent returns 100.0, NC returns 999.0
@@ -393,8 +381,7 @@ end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
     f_lam = (Re) -> 64.0 / Re
     f_turb = (Re) -> 0.316 * Re^(-0.25)
 
-    # Geometry: Phase 59 — Dh=0.01 lives in geom now (geom.Dh feeds Gr inside the factory).
-    # Build a circular geom so geom.Dh == 0.01 exactly (matches the pre-Phase-59 fixture).
+    # Circular geom so geom.Dh == 0.01 (feeds Gr inside the factory).
     geom = PipeGeometry_circular(0.6, 0.01)
 
     # Test 1: NC branch selected when Gr/Re^2 > 1
@@ -434,8 +421,7 @@ end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
     @test rd_no_nc.htc(100.0, 7.0, 313.15, 373.15) == 4.0   # laminar forced
     @test rd_no_nc.htc(5000.0, 7.0, 313.15, 373.15) == 100.0 # turbulent forced
 
-    # Test 6: Phase 59 D-01 collapsed group — htc_natural without g => ArgumentError
-    # (pre-Phase-59: triple group (htc_natural, Dh, g); Dh no longer user-facing.)
+    # Test 6: htc_natural without g raises ArgumentError
     # Expected ArgumentError message text: "htc_natural provided but g is missing".
     @test_throws ArgumentError regime_dependent(geom;
         htc_laminar=htc_lam,
@@ -445,7 +431,6 @@ end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
         htc_natural=htc_nc,  # g missing
     )
 
-    # Phase 59 D-01: regime_dependent stray-kwarg @warn dropped; Dh no longer user-facing, lone g without htc_natural is a permitted no-op.
 end
 
 @testset "HTC-01: Marco_Han_Nusselt" begin
@@ -466,7 +451,7 @@ end
     @test isapprox(turbulent_friction(4e3, 0.1), 0.10560870441248855; rtol=1e-10)
     @test isapprox(turbulent_friction(1e6), 0.011649393290640643; rtol=1e-10)
 
-    # D-08: Re <= 0 guard
+    # Re <= 0 guard
     @test turbulent_friction(5.0) == 0.0
     @test turbulent_friction(0.0) == 0.0
     @test turbulent_friction(-1.0) == 0.0
@@ -486,13 +471,11 @@ end
 end
 
 @testset "HTC-02: fully_developed_laminar_h_spl" begin
-    # Phase 59: factory takes geom::PipeGeometry; aspect_ratio = geom.depth / geom.width
     # is derived inside the factory. geom.Dh is NOT consumed by this factory's Nu calc
-    # (matches pre-Phase-59 behavior where Dh was an ignored interface-consistency kwarg).
     # Helper: rectangular geom with exact aspect_ratio = ar via depth=ar, width=1.0.
     _geom_for_ar(ar) = PipeGeometry_rectangular(1.0, 1.0, ar, 1.0)
 
-    # D-01: Uses _two_sided_heating_nusselt, NOT Marco_Han_Nusselt
+    # Uses _two_sided_heating_nusselt, NOT Marco_Han_Nusselt
     # Reference: _two_sided_heating_nusselt(0.0) = 8.235
     # ar=0.0: depth=0.0, width=1.0 → aspect_ratio = 0.0. Dh = 4*0/(2*1) = 0 (unused).
     htc_fn = fully_developed_laminar_h_spl(_geom_for_ar(0.0))
@@ -517,7 +500,6 @@ end
 end
 
 @testset "HTC-03: developing_laminar_h_spl" begin
-    # Phase 59: factory takes geom::PipeGeometry; aspect_ratio = geom.depth / geom.width
     # and Dh = geom.Dh are derived inside the factory.
     # Helper builds a rectangular geom where geom.Dh = Dh_target AND geom.depth/geom.width = ar
     # exactly. Derivation: with depth = ar*width and Dh = 2*ar*width / (ar+1),
@@ -576,9 +558,8 @@ end
         T_inlet = 313.15;
         T_wall = 373.15;
         dP_pump = 30.0
-        # Phase 59: build a rectangular geom with aspect_ratio = depth/width = 0.1 so that
-        # the new geom-first factory derives the same Nu as the pre-Phase-59 aspect_ratio=0.1.
-        # (Circular geometry would yield aspect_ratio=1.0, which is a different correlation point.)
+        # Rectangular geom with aspect_ratio = depth/width = 0.1 (a circular geom would
+        # give aspect_ratio = 1.0, a different correlation point).
         geom = PipeGeometry_rectangular(0.6, 1.0, 0.1, 1.0)
         htc_fn = fully_developed_laminar_h_spl(geom)
 
@@ -587,7 +568,7 @@ end
             n=n,
             geometry=geom,
             htc_correlation=htc_fn,
-            friction_correlation=laminar_friction(geom),
+            friction_correlation=laminar_friction_rectangular(geom),
         )
         @named bc_fd = HeatExchanger(T_inlet)
         ct_l_fd = [ConstantTemperature(T_wall; name=Symbol(:ct_l_fd_, i)) for i in 1:n]
@@ -629,11 +610,8 @@ end
         T_inlet = 313.15;
         T_wall = 373.15;
         dP_pump = 30.0
-        # Phase 59: rectangular geom with aspect_ratio = 0.1 (matches pre-Phase-59 fixture).
-        # Note: pre-Phase-59 also passed Dh=0.01 independently of aspect_ratio; here
-        # Dh is whatever the rectangular constructor derives from these edges
-        # (4 * 1.0*0.1 / (2*(1.0+0.1)) ≈ 0.1818), which is the consistent rectangular Dh
-        # for this aspect ratio. develop_length stays mandatory per D-04.
+        # Rectangular geom with aspect_ratio = 0.1; Dh follows from the edges
+        # (4 * 1.0*0.1 / (2*(1.0+0.1)) ≈ 0.1818). develop_length stays mandatory.
         geom = PipeGeometry_rectangular(0.6, 1.0, 0.1, 1.0)
         htc_fn = developing_laminar_h_spl(geom; develop_length=0.3)
 
@@ -642,7 +620,7 @@ end
             n=n,
             geometry=geom,
             htc_correlation=htc_fn,
-            friction_correlation=laminar_friction(geom),
+            friction_correlation=laminar_friction_rectangular(geom),
         )
         @named bc_dev = HeatExchanger(T_inlet)
         ct_l_dev = [ConstantTemperature(T_wall; name=Symbol(:ct_l_dev_, i)) for i in 1:n]

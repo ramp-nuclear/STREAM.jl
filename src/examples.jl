@@ -374,7 +374,7 @@ function build_loop_lof_bypass(;
     rd_ch = regime_dependent(geom;
         htc_laminar=constant_Nusselt(; Nu=8.235),
         htc_turbulent=dittus_boelter,
-        friction_laminar=laminar_friction(geom),
+        friction_laminar=laminar_friction_rectangular(geom),
         friction_turbulent=blasius_friction,
         htc_natural=elenbaas_htc(geom; g=g_acc),
         g=g_acc,
@@ -510,7 +510,7 @@ function build_loop_pk(ctrl;
         n=n,
         geometry=geom,
         htc_correlation=constant_Nusselt(; Nu=8.235),
-        friction_correlation=laminar_friction(geom),
+        friction_correlation=laminar_friction_rectangular(geom),
     )
     @named fuel = HeatDiffusion(;
         nz=nz,

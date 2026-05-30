@@ -3,9 +3,8 @@ module STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 
-# Type alias for closure-arg clarity at call sites (documentation value, not enforcement).
-# Per Phase 59 D-00 / gui-redesign design-decisions §3.1.
-# Declared before includes so physical_models/htc/correlations.jl can reference it at parse time.
+# Alias used to label HTC-closure arguments at call sites (documentation only, not enforced).
+# Declared before the includes so the correlation files can reference it at parse time.
 const HTCCorrelation = Function
 
 include("fluids.jl")
@@ -52,7 +51,7 @@ export Channel,
 export dittus_boelter,
     blasius_friction,
     constant_Nusselt,
-    laminar_friction,
+    laminar_friction_rectangular,
     rectangular_laminar_correction,
     regime_dependent,
     elenbaas_nusselt,

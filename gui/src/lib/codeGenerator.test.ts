@@ -156,7 +156,7 @@ const channelDef: ComponentDefinition = {
     { name: "htc_correlation", type: "Function", default: "dittus_boelter", description: "HTC", required: false, positional: false, options: htcOptions },
     { name: "friction_correlation", type: "Function", default: "blasius_friction", description: "Friction", required: false, positional: false, options: [
       { value: "blasius_friction", label: "Blasius", kind: "simple" },
-      { value: "laminar_friction", label: "Laminar", kind: "simple" },
+      { value: "laminar_friction_rectangular", label: "Laminar", kind: "simple" },
     ]},
   ],
   constructorModes: [
