@@ -14,7 +14,8 @@
     "code_review_depth": "standard",
     "tdd_mode": false,
     "use_worktrees": true,
-    "_auto_chain_active": false
+    "_auto_chain_active": false,
+    "ai_integration_phase": true
   },
   "git": {
     "branching_strategy": "none",
