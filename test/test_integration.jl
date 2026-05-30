@@ -11,7 +11,9 @@
 #   test_solvers.jl           (SYS-01, SYS-02, SOLV-01, SOLV-02 solver-wrapper integration)
 #   test_loss_of_flow.jl      (LOF-01..03, VAL-01..02 — Spike B heated leg + bypass topology)
 #   test_subcooled_boiling.jl (ISCB-01..02 full-loop CAC + SCB; SCB-01..04 stay in test_thresholds.jl)
-#   test_point_kinetics.jl    (TF-06, TF-07 — full PK loop integration RELOCATED HERE)
+#   test_point_kinetics.jl    (coupled PK-loop feedback tests: PK-IC-01 + PK-FB-01/02;
+#                              these replaced the retired TF-06/TF-07 — see
+#                              .planning/notes/2026-05-29-pk-coupling-investigation.md)
 #
 
 using Test
@@ -731,195 +733,105 @@ end
         @test any(entry -> entry[1] == :SCRAM, ctrl.log)  # SCRAM logged
     end
 
-    @testset "TF-06: reactivity observable includes feedback" begin
-        # Migrated from test_point_kinetics.jl TF-06 (line 468).
-        # Build a CAC + HeatDiffusion via symmetric_plate, wire a PointKinetics
-        # with temp_worth on the channel, solve a short transient, and verify
-        # sol[pk.reactivity, :] is a finite vector.
-        n = 3
-        geom_tf = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-        ps_tf = fill(1.0 / (n * 2), n, 2)  # nz=3, nx=2 uniform power shape
-        @named cac = ChannelAndContacts(
-            n=n,
-            geometry=geom_tf,
-            htc_correlation=constant_Nusselt(Nu=8.235),
-            friction_correlation=laminar_friction(0.0025/0.070),
+    # ─────────────────────────────────────────────────────────────────────────
+    # PK-IC / PK-FB: coupled point-kinetics feedback physics.
+    # These REPLACE the retired TF-06 (hollow `isfinite`-only) and TF-07 (which
+    # tested a pure initialization artifact and mis-mirrored Python). The boundary-
+    # cell init artifact and its fix are documented in
+    # .planning/notes/2026-05-29-pk-coupling-investigation.md. All three build on the
+    # now-consistent build_loop_pk IC (port/contact temperatures seeded to T_inlet).
+    # ─────────────────────────────────────────────────────────────────────────
+
+    @testset "PK-IC-01: consistent cold IC has zero startup reactivity" begin
+        # REGRESSION GUARD for the boundary-cell initialization artifact. FlowPort/
+        # ThermalPort temperatures default to 300 K; the boundary coolant cells and
+        # the channel↔fuel contact nodes alias to those ports, so a per-cell T seed
+        # alone does NOT pin them. If build_loop_pk fails to seed the port/contact
+        # temperatures, feedback sees a spurious (300 − ref_temp) offset and the loop
+        # starts far from critical. With a consistent IC and ref_temp = T_inlet, the
+        # loop MUST start exactly critical: net reactivity ≈ 0 at t=0. This single
+        # assertion would have caught the whole TF-07 pathology.
+        Tin = 293.15
+        for (tw, rt) in (
+            (Dict(:cac => fill(-0.01, 7)),    Dict(:cac => fill(Tin, 7))),       # coolant feedback
+            (Dict(:fuel => fill(-0.1, 7, 2)), Dict(:fuel => fill(Tin, 7, 2))),   # fuel feedback
         )
-        @named fuel = HeatDiffusion(
-            nz=n,
-            nx=2,
-            Lz=0.6,
-            Lx=0.005,
-            y=0.07,
-            rho_s=19300.0,
-            cp_s=116.0,
-            k_s=174.0,
-            power_shape=ps_tf,
-        )
-
-        rods = symmetric_plate(cac, fuel; name=:rods)
-
-        alpha_ch = fill(-1e-4, n)
-        Tref_ch = fill(293.15, n)
-
-        ctrl_tf6 = ReactivityController()  # returns 0.0 always (default :NORMAL state)
-        @named pk = PointKinetics(
-            ctrl_tf6;
-            rho_val=0.0,
-            temp_worth=Dict(rods.cac => alpha_ch),
-            ref_temp=Dict(rods.cac => Tref_ch),
-        )
-
-        # Hydraulic BCs.
-        @named pump_tf6 = Pump(3.0e4)
-        @named hx_tf6 = HeatExchanger(293.15)
-
-        fb_eqs = connect_temperature_feedback(pk, [rods.cac])
-        hydro_eqs = Equation[
-            connect(pump_tf6.port_out, hx_tf6.port_in),
-            connect(hx_tf6.port_out, rods.cac.port_in),
-            connect(rods.cac.port_out, pump_tf6.port_in),
-            pump_tf6.port_in.P ~ 1.0e5,
-            rods.fuel.power ~ 1e3,
-        ]
-        all_eqs = vcat(fb_eqs, hydro_eqs)
-        full = compose_systems(rods, pk, pump_tf6, hx_tf6; connections=all_eqs, name=:core)
-        ssys = mtkcompile(full)
-
-        T0 = 293.15
-        ic = point_kinetics_steady_state(1.0)
-        op = Pair{Any,Any}[
-            ssys.pk.rho_c_fn => ctrl_tf6,
-            ssys.pk.P => ic.P,
-            ssys.pk.C_1 => ic.C_k[1],
-            ssys.pk.C_2 => ic.C_k[2],
-            ssys.pk.C_3 => ic.C_k[3],
-            ssys.pk.C_4 => ic.C_k[4],
-            ssys.pk.C_5 => ic.C_k[5],
-            ssys.pk.C_6 => ic.C_k[6],
-            ssys.rods.cac.port_in.mdot => 0.2,
-            [ssys.rods.cac.T[i] => T0 for i in 1:n]...,
-            [ssys.rods.fuel.T[i, j] => T0 for i in 1:n for j in 1:2]...,
-        ]
-
-        t_arr = range(0.0, 1.0, length=20)
-        sol = solve_transient(ssys, op, t_arr)
-
-        rho_trace = sol[ssys.pk.reactivity]
-        @test rho_trace isa AbstractVector
-        @test length(rho_trace) > 1
-        @test all(isfinite, rho_trace)
+            ctrl = ReactivityController()
+            ssys, ic = build_loop_pk(
+                ctrl; n=7, nz=7, nx=2, T_inlet=Tin, P0=1.0, power_scale=1e4,
+                temp_worth=tw, ref_temp=rt,
+            )
+            sol = solve_transient(ssys, ic, [0.0, 1e-6])
+            @test sol.retcode == ReturnCode.Success
+            @test abs(sol[ssys.pk.reactivity][1]) < 1e-9   # exactly critical at t=0
+            @test sol[ssys.pk.P][1] == 1.0
+        end
     end
 
-    @testset "TF-07: strong negative feedback bounds power (analytical)" begin
-        # Migrated from test_point_kinetics.jl TF-07 (line 548).
-        # Mirror Python STREAM test_integrations.py:352-428 (fuel/coolant feedback).
-        # Setup: inject a positive step reactivity via rho_c_fn; attach strong
-        # negative temperature feedback on the channel. Expect:
-        #   (1) power rises initially after the step (prompt jump),
-        #   (2) power peaks at some finite value,
-        #   (3) power does NOT diverge — max(P) / P0 is bounded,
-        #   (4) reactivity at late time is reduced by feedback < delta_rho.
-        n = 3
-        geom_tf7 = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-        ps_tf7 = fill(1.0 / (n * 2), n, 2)
-        @named cac7 = ChannelAndContacts(
-            n=n,
-            geometry=geom_tf7,
-            htc_correlation=constant_Nusselt(Nu=8.235),
-            friction_correlation=laminar_friction(0.0025/0.070),
+    @testset "PK-FB-01: coolant feedback suppresses power to a self-consistent equilibrium" begin
+        # Corrected mirror of Python STREAM test_integrations.py:390-428
+        # (test_power_is_negligible_for_negative_Tcool_feedback_and_ref_temp_is_inlet).
+        # Start from the cold critical IC (reactivity[0] = 0). Under power the coolant
+        # heats above the inlet reference, driving feedback negative until power
+        # collapses to a low, self-consistent (net reactivity ≈ 0) equilibrium. Strong
+        # negative alpha ⇒ power becomes negligible — and crucially, here that is REAL
+        # feedback physics, not the old 300 K init artifact (guarded by PK-IC-01).
+        Tin = 293.15
+        ctrl = ReactivityController()
+        ssys, ic = build_loop_pk(
+            ctrl; n=7, T_inlet=Tin, P0=1.0, power_scale=1e4,
+            temp_worth=Dict(:cac => fill(-0.1, 7)), ref_temp=Dict(:cac => fill(Tin, 7)),
         )
-        @named fuel7 = HeatDiffusion(
-            nz=n,
-            nx=2,
-            Lz=0.6,
-            Lx=0.005,
-            y=0.07,
-            rho_s=19300.0,
-            cp_s=116.0,
-            k_s=174.0,
-            power_shape=ps_tf7,
+        sol = solve_transient(ssys, ic, range(0.0, 100.0; length=300); maxiters=1_000_000)
+        @test sol.retcode == ReturnCode.Success
+        P = sol[ssys.pk.P]
+        rho = sol[ssys.pk.reactivity]
+        @test abs(rho[1]) < 1e-9        # starts exactly critical (no startup artifact)
+        @test all(isfinite, P)
+        @test all(>(0.0), P)            # power positive throughout — decays, never crashes negative
+        @test P[end] < 0.01             # feedback drives power negligible
+        @test abs(rho[end]) < 1e-3      # late-time state is self-consistent (critical)
+    end
+
+    @testset "PK-FB-02: coupled prompt jump then feedback turnover" begin
+        # The high-value coupled physics test that the suite was missing. Procedure
+        # (steady-then-perturb, mirroring the LOF transient IC fix): start from the
+        # cold critical IC, let the loop settle to its low-power feedback equilibrium,
+        # THEN insert a positive reactivity step. Assert:
+        #   (1) the loop starts exactly critical (reactivity[0] = 0),
+        #   (2) a textbook prompt jump P+/P- ≈ beta/(beta − delta_rho), sampled PAST
+        #       the prompt discontinuity (à la PK-03c; sampling immediately is float-
+        #       noise fragile — that is what made the legacy TF-07 check version-flaky),
+        #   (3) power stays BOUNDED — without feedback a sustained +delta_rho diverges,
+        #   (4) feedback subtracts the inserted reactivity, settling to a new critical
+        #       equilibrium (late-time net reactivity pulled back below delta_rho, ≈ 0).
+        Tin = 293.15
+        beta_total = 0.006502        # = sum(STREAM.U235_BETA_K)
+        delta_rho = 5e-4             # < beta_total ⇒ delayed-supercritical, bounded jump
+        t_step = 40.0                # insert after the loop has settled (~30 s)
+        ctrl = ReactivityController((s, ts, tt) -> (tt >= t_step ? delta_rho : 0.0))
+        ssys, ic = build_loop_pk(
+            ctrl; n=7, T_inlet=Tin, P0=1.0, power_scale=1e4,
+            temp_worth=Dict(:cac => fill(-0.002, 7)), ref_temp=Dict(:cac => fill(Tin, 7)),
         )
+        t_arr = sort(unique(vcat(collect(range(0.0, 80.0; length=300)), [t_step, t_step + 0.03])))
+        sol = solve_transient(ssys, ic, t_arr; tstops=[t_step], maxiters=1_000_000)
+        @test sol.retcode == ReturnCode.Success
+        P = sol[ssys.pk.P]
+        rho = sol[ssys.pk.reactivity]
+        @test abs(rho[1]) < 1e-9                       # (1) cold IC exactly critical
 
-        rods7 = symmetric_plate(cac7, fuel7; name=:rods7)
-        # Cache scoped reference — MTK getproperty may return new objects per call;
-        # Dict key identity mismatch causes ref_temp lookup to fall back to 0.0
-        # instead of Tref, producing massive spurious negative feedback at startup.
-        rods7_cac7 = rods7.cac7
+        ipre = findlast(<(t_step), sol.t)
+        ijump = findfirst(x -> x >= t_step + 0.03, sol.t)
+        jump_ratio = P[ijump] / P[ipre]
+        jump_expected = beta_total / (beta_total - delta_rho)   # ≈ 1.083
+        @test isapprox(jump_ratio, jump_expected; rtol=0.05)    # (2) textbook prompt jump
 
-        t_step = 0.1            # reactivity insertion time [s]
-        delta_rho = 0.0005      # step reactivity (well below beta_total=0.006502)
-        alpha_strong = -0.01    # strong negative alpha [dk/k per K] — stabilizing
-        Tref = 293.15
-
-        step_ctrl = t -> (t >= t_step ? delta_rho : 0.0)
-
-        @named pk7 = PointKinetics(
-            step_ctrl;
-            rho_val=0.0,
-            temp_worth=Dict(rods7_cac7 => fill(alpha_strong, n)),
-            ref_temp=Dict(rods7_cac7 => fill(Tref, n)),
-        )
-
-        @named pump_tf7 = Pump(3.0e4)
-        @named hx_tf7 = HeatExchanger(293.15)
-
-        fb_eqs7 = connect_temperature_feedback(pk7, [rods7_cac7])
-        hydro_eqs7 = Equation[
-            connect(pump_tf7.port_out, hx_tf7.port_in),
-            connect(hx_tf7.port_out, rods7.cac7.port_in),
-            connect(rods7.cac7.port_out, pump_tf7.port_in),
-            pump_tf7.port_in.P ~ 1.0e5,
-            rods7.fuel7.power ~ 0.0,
-        ]
-        all_eqs7 = vcat(fb_eqs7, hydro_eqs7)
-        full7 = compose_systems(
-            rods7, pk7, pump_tf7, hx_tf7; connections=all_eqs7, name=:core7,
-        )
-        ssys7 = mtkcompile(full7)
-
-        P0 = 1.0
-        T0 = 293.15
-        ic7 = point_kinetics_steady_state(P0)
-        op7 = Pair{Any,Any}[
-            ssys7.pk7.rho_c_fn => step_ctrl,
-            ssys7.pk7.P => ic7.P,
-            ssys7.pk7.C_1 => ic7.C_k[1],
-            ssys7.pk7.C_2 => ic7.C_k[2],
-            ssys7.pk7.C_3 => ic7.C_k[3],
-            ssys7.pk7.C_4 => ic7.C_k[4],
-            ssys7.pk7.C_5 => ic7.C_k[5],
-            ssys7.pk7.C_6 => ic7.C_k[6],
-            ssys7.rods7.cac7.port_in.mdot => 0.2,
-            [ssys7.rods7.cac7.T[i] => T0 for i in 1:n]...,
-            [ssys7.rods7.fuel7.T[i, j] => T0 for i in 1:n for j in 1:2]...,
-        ]
-
-        t_arr7 = sort(vcat(collect(range(0.0, 2.0, length=50)), t_step + 1e-3))
-        sol7 = solve_transient(ssys7, op7, t_arr7; tstops=[t_step])
-        @test sol7.retcode == ReturnCode.Success
-
-        P_trace = sol7[ssys7.pk7.P]
-
-        # This loop is STRONGLY over-damped: the feedback (alpha = -0.01 dk/k per K)
-        # is far stronger than the +delta_rho = 5e-4 insertion, so the power produces
-        # NO prompt-jump overshoot — it monotonically relaxes to a feedback-stabilized
-        # equilibrium below nominal. (Confirmed at <=10 us resolution: P never exceeds
-        # P0 at any step timing. The legacy `P_max > P0` "prompt jump" check only
-        # passed on 1.12.5 via sub-noise float dust; on 1.12.6 P_max == P0 exactly.)
-        # So we test what "strong negative feedback BOUNDS power" (the test's name)
-        # actually means here:
-        #   (a) no power excursion above nominal — feedback caps the +rho insertion,
-        #   (b) power stays strictly positive and finite (no divergence, no crash),
-        #   (c) it settles to a bounded, REDUCED, non-trivial equilibrium,
-        #   (d) late-time net reactivity is pulled below the inserted step by feedback.
-        @test all(isfinite, P_trace)
-        @test all(>(0.0), P_trace)
-        @test maximum(P_trace) <= P0 * (1 + 1e-6)              # (a)
-        P_end = mean(P_trace[max(1, end - 4):end])             # (c)
-        @test 0.3 < P_end < P0
-        rho_trace7 = sol7[ssys7.pk7.reactivity]                # (d)
-        @test rho_trace7[end] <= delta_rho
+        P_post = P[ipre:end]
+        @test all(isfinite, P_post)
+        @test maximum(P_post) < 0.5                    # (3) bounded — feedback caps the excursion
+        @test rho[end] < delta_rho                     # (4) feedback subtracted reactivity
+        @test abs(rho[end]) < 1e-3                      #     new self-consistent critical equilibrium
     end
 end
 
