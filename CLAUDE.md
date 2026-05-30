@@ -71,7 +71,9 @@ test/
   test_validation.jl        # Quantitative cross-validation against Python STREAM (Phase 56)
   test_integration.jl       # NEW: single big integration file — builders, solvers,
                             # LOF transient, ISCB, PK loops, COMPAT (Phase 55 D-19)
-  test_point_kinetics.jl    # PK component-unit tests only (TF-06/07 moved to test_integration.jl)
+  test_point_kinetics.jl    # PK component-unit tests only (coupled-loop feedback now in
+                            # test_integration.jl as PK-IC-01 + PK-FB-01/02, which replaced the
+                            # retired TF-06/TF-07 — see .planning/notes/2026-05-29-pk-coupling-investigation.md)
 ```
 
 **Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_misc.jl` alongside `ConstantTemperature` (same value-source family) per Phase 55 D-21.
