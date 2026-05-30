@@ -206,75 +206,37 @@ function compose_systems(systems...; connections::Vector{<:Equation}, name::Symb
 end
 
 # ----------------------------------------------------------------
-# fuel_assembly — Phase 60 (v1.2 §3.12)
-# Walks the four variants of alternating CAC↔Plate chains and emits the
-# per-cell connect(port(...), port(...)) chain (plus the wrap pair when
-# closed=true). Returns the raw uncompiled ODESystem. Caller compiles.
+# fuel_assembly — alternating channel <-> plate chains.
+# Builds the per-cell thermal connections for the four chain shapes
+# (channel-bookended, plate-bookended, mixed, and closed ring) and returns the
+# uncompiled ODESystem. The caller adds boundary conditions and compiles.
 #
-# Variants:
-#   1. Channel-bookended: k plates, k+1 channels  (bookend=:channel)
-#   2. Plate-bookended:   k+1 plates, k channels  (bookend=:plate)
-#   3. Mixed:             equal counts, start pins orientation (bookend=:mixed)
-#   4. Closed annular:    equal counts, last wraps to first (closed=true)
-#
-# Wiring convention (matches `plate(...)` lines 217–230):
-#   (channel-left, plate-right) → connect(channel.thermal_right[i], plate.thermal_left[i])
-#   (plate-left,  channel-right) → connect(plate.thermal_right[i],  channel.thermal_left[i])
-# Adjacent unconnected outer faces remain unconnected (MTK adiabatic default,
-# same as one_sided_connection).
+# Wiring: each adjacent pair connects the left member's right face to the right
+# member's left face (same convention as `plate`). Outer faces left dangling
+# stay adiabatic, like `one_sided_connection`.
 # ----------------------------------------------------------------
 
-# Internal helper: build the alternation sequence as an ordered Vector of
-# (kind, sys) tuples where kind ∈ (:c, :p). Private — `_` prefix, not exported.
+# Build the alternation as an ordered Vector of (kind, sys) tuples, kind :c or :p.
 function _walk_alternation(channels, plates, effective_bookend::Symbol, start)
-    nc, np = length(channels), length(plates)
-    seq = Tuple{Symbol,Any}[]
-    if effective_bookend == :channel
-        # c1, p1, c2, p2, …, pk, c_{k+1}   (nc = np + 1)
-        for k in 1:np
-            push!(seq, (:c, channels[k]))
-            push!(seq, (:p, plates[k]))
-        end
-        push!(seq, (:c, channels[nc]))
-    elseif effective_bookend == :plate
-        # p1, c1, p2, c2, …, ck, p_{k+1}   (np = nc + 1)
-        for k in 1:nc
-            push!(seq, (:p, plates[k]))
-            push!(seq, (:c, channels[k]))
-        end
-        push!(seq, (:p, plates[np]))
-    else  # :mixed (equal counts)
-        if start == :channel
-            # c1, p1, c2, p2, …, ck, pk
-            for k in 1:nc
-                push!(seq, (:c, channels[k]))
-                push!(seq, (:p, plates[k]))
-            end
-        else  # start == :plate
-            # p1, c1, p2, c2, …, pk, ck
-            for k in 1:nc
-                push!(seq, (:p, plates[k]))
-                push!(seq, (:c, channels[k]))
-            end
-        end
+    C = [(:c, ch) for ch in channels]
+    P = [(:p, pl) for pl in plates]
+    if effective_bookend == :channel        # nc = np + 1  ->  c p c p ... c
+        return [collect(Iterators.flatten(zip(C, P))); C[end]]
+    elseif effective_bookend == :plate       # np = nc + 1  ->  p c p c ... p
+        return [collect(Iterators.flatten(zip(P, C))); P[end]]
+    elseif start == :plate                    # mixed, equal counts, plate first
+        return collect(Iterators.flatten(zip(P, C)))
+    else                                      # mixed, equal counts, channel first
+        return collect(Iterators.flatten(zip(C, P)))
     end
-    return seq
 end
 
-# Internal helper: emit the per-pair thermal-port comprehension between two
-# adjacent (kind, sys) entries, choosing face orientation per the spatial-
-# absolute L/R convention used throughout this file.
+# Wire one adjacent pair: left member's right face to right member's left face,
+# per cell. The kind tags don't change the wiring, so they're ignored here.
 function _pair_connections(left::Tuple{Symbol,Any}, right::Tuple{Symbol,Any}, n::Int)
-    lk, lsys = left
-    rk, rsys = right
-    if lk == :c && rk == :p
-        return [connect(port(lsys, :thermal_right, i), port(rsys, :thermal_left, i)) for i in 1:n]
-    elseif lk == :p && rk == :c
-        return [connect(port(lsys, :thermal_right, i), port(rsys, :thermal_left, i)) for i in 1:n]
-    else
-        # Defense-in-depth: alternation invariant should make this unreachable.
-        error("fuel_assembly: internal error — adjacent entries share kind :$lk")
-    end
+    _, lsys = left
+    _, rsys = right
+    return [connect(port(lsys, :thermal_right, i), port(rsys, :thermal_left, i)) for i in 1:n]
 end
 
 """
@@ -311,9 +273,9 @@ Handles the four variants from the v1.2 design contract §3.12:
 - `name::Symbol`: system name (kwarg-only; supplied by `@named` macro).
 
 Per-pair `n` matching (`cac.n == plate.nz` for every adjacent pair) is the caller's
-responsibility (same contract as `symmetric_plate` / `plate`). `_infer_n(channels[1])`
-is called once for the per-cell port-loop bound. Mismatched `n` across the vector is
-caught by MTK at `mtkcompile()` time.
+responsibility (same contract as `symmetric_plate` / `plate`). The per-cell port count
+is taken from `channels[1]`; a mismatch across the vector is caught by MTK at
+`mtkcompile()` time.
 
 # Returns
 Uncompiled `ODESystem` from `compose()`. Add boundary conditions (pump loop, pressure
@@ -377,7 +339,7 @@ function fuel_assembly(
         bookend
     end
 
-    # 5. start cross-checks (D-03)
+    # 5. start cross-checks
     if effective_bookend == :mixed && start === nothing && !closed
         throw(ArgumentError("fuel_assembly: bookend=:mixed requires start=:channel or start=:plate"))
     end
@@ -385,30 +347,20 @@ function fuel_assembly(
         throw(ArgumentError("fuel_assembly: start=:$start is only valid when bookend=:mixed (got bookend=:$effective_bookend)"))
     end
 
-    # 6. closed cross-checks (D-04)
+    # 6. closed cross-checks
     if closed && nc != np
         throw(ArgumentError("fuel_assembly: closed=true requires equal lengths, got channels=$nc, plates=$np"))
     end
-    if closed && effective_bookend != :mixed
-        # Defense-in-depth: equal lengths already resolved to :mixed in step 4.
-        throw(ArgumentError("fuel_assembly: closed=true requires equal lengths (resolved bookend must be :mixed), got effective bookend :$effective_bookend"))
-    end
-    # Closed ring with no explicit start: pick :channel as canonical orientation.
+    # A closed ring needs no explicit start (it's rotationally symmetric); default it.
     if closed && start === nothing
         start = :channel
     end
 
-    # 7. Per-cell port count (caller-responsibility for homogeneity, D-05)
+    # 7. Per-cell port count (homogeneity is the caller's responsibility).
     n = _infer_n(channels[1])
 
-    # 8. Build the alternation sequence + adjacent-pair connections.
-    # Sequence is an alternation of (:c, ch) and (:p, pl). For each adjacent
-    # pair (seq[m], seq[m+1]) we emit one per-cell connect() comprehension
-    # over i in 1:n; for closed=true we also include the wrap pair
-    # (seq[end], seq[1]). The flat Equation[] double-comprehension below
-    # yields the same per-pair-per-cell shape as the splatted comprehensions
-    # in `plate(...)` lines 219–228, generalized for a dynamic number of
-    # adjacent pairs.
+    # 8. Build the alternation and wire each adjacent pair per cell. For a closed
+    #    ring we also wire the wrap pair (seq[end] -> seq[1]).
     seq = _walk_alternation(channels, plates, effective_bookend, start)
     pair_range = closed ? (1:length(seq)) : (1:length(seq)-1)
     next_idx(m) = m == length(seq) ? 1 : m + 1
