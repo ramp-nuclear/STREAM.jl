@@ -239,9 +239,15 @@ function elenbaas_htc(geom::PipeGeometry; g=9.81)
     L_h = Float64(geom.L)
     Dh_v = Float64(geom.Dh)
     return (Re, Pr, T_bulk, T_wall) -> begin
-        beta = beta_water(T_bulk)
-        nu = mu_water(T_bulk) / rho_water(T_bulk)
-        Gr_val = Gr(beta, g, T_wall - T_bulk, Dh_v, nu)
+        Gr_val = Gr(
+            rho_water(T_bulk),
+            mu_water(T_bulk),
+            beta_water(T_bulk),
+            T_wall,
+            T_bulk,
+            Dh_v,
+            g,
+        )
         Ra_val = Ra(Gr_val, Pr)
         elenbaas_nusselt(Ra_val, b, L_h)
     end
