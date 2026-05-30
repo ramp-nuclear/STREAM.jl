@@ -599,11 +599,20 @@ function build_loop_pk(ctrl;
     # cells and the channel↔fuel contact nodes are aliased to those port temperatures, and the
     # per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT pin the port representatives under NoInit.
     # Left unseeded, a temperature-feedback PK loop with ref_temp≠300 sees a spurious (300 − ref_temp)
-    # reactivity offset at t=0 that crashes power — a pure initialization artifact, not physics. Seed
-    # every port/contact temperature to T_inlet so the cold IC is genuinely consistent
-    # (reactivity[0] = 0 when ref_temp = T_inlet).
+    # reactivity offset at t=0 that crashes power — a pure initialization artifact, not physics.
+    #
+    # Each connected port pair (hx↔cac, cac↔pump, pump↔hx, and each cac↔fuel contact) collapses to one
+    # alias-elimination representative, and WHICH member survives is not stable across MTK versions /
+    # runs (it differed between local and CI). So seed EVERY member of every connection set to T_inlet:
+    # whichever representative survives is then always hit, and the duplicate members are harmless
+    # (distinct symbolic keys, same value). The cold IC is then genuinely consistent — reactivity[0] = 0
+    # when ref_temp = T_inlet, independent of the alias-elimination choice.
     push!(ic, ssys.rods.cac.port_in.T => T_inlet)
     push!(ic, ssys.rods.cac.port_out.T => T_inlet)
+    push!(ic, ssys.pump.port_in.T => T_inlet)
+    push!(ic, ssys.pump.port_out.T => T_inlet)
+    push!(ic, ssys.bc.port_in.T => T_inlet)
+    push!(ic, ssys.bc.port_out.T => T_inlet)
     for i in 1:n
         push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_left, i)).T => T_inlet)
         push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_right, i)).T => T_inlet)
