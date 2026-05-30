@@ -594,5 +594,23 @@ function build_loop_pk(ctrl;
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]
+    # ── Consistent-IC seeding (see .planning/notes/2026-05-29-pk-coupling-investigation.md) ──
+    # FlowPort/ThermalPort temperatures default to 300 K (src/connectors.jl). The boundary coolant
+    # cells and the channel↔fuel contact nodes are aliased to those port temperatures, and the
+    # per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT pin the port representatives under NoInit.
+    # Left unseeded, a temperature-feedback PK loop with ref_temp≠300 sees a spurious (300 − ref_temp)
+    # reactivity offset at t=0 that crashes power — a pure initialization artifact, not physics. Seed
+    # every port/contact temperature to T_inlet so the cold IC is genuinely consistent
+    # (reactivity[0] = 0 when ref_temp = T_inlet).
+    push!(ic, ssys.rods.cac.port_in.T => T_inlet)
+    push!(ic, ssys.rods.cac.port_out.T => T_inlet)
+    for i in 1:n
+        push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_left, i)).T => T_inlet)
+        push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_right, i)).T => T_inlet)
+    end
+    for i in 1:nz
+        push!(ic, getproperty(ssys.rods.fuel, Symbol(:thermal_left, i)).T => T_inlet)
+        push!(ic, getproperty(ssys.rods.fuel, Symbol(:thermal_right, i)).T => T_inlet)
+    end
     return (ssys, ic)
 end
