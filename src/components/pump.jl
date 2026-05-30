@@ -40,7 +40,6 @@ Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
 function Pump(dP_pump::Real; name)
-    # Fixed-pressure mode: pressure rise is a constant parameter
     pars = @parameters dP_pump = dP_pump
     @named port_in = FlowPort()
     @named port_out = FlowPort()
@@ -50,12 +49,10 @@ function Pump(dP_pump::Real; name)
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 
 function Pump(dP_pump::Any; name)
-    # Callable fixed-pressure mode: dP_pump is a callable f(t) -> Float64
-    # FType must be concrete so MTK can generate the correct symbolic node.
     FType = typeof(dP_pump)
     pars = @parameters (dP_pump_fn::FType)(..)
     @named port_in = FlowPort()
@@ -66,11 +63,10 @@ function Pump(dP_pump::Any; name)
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
 
 function Pump(; name, mdot0)
-    # Fixed-flow mode: mass flow is a parameter; no pressure equation
     pars = @parameters mdot0 = mdot0
     @named port_in = FlowPort()
     @named port_out = FlowPort()
@@ -80,5 +76,5 @@ function Pump(; name, mdot0)
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]
-    compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end

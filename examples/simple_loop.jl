@@ -22,42 +22,32 @@ using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
+
 using Plots
 ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
-gr()
-
-# =============================================================================
-# SECTION 1: Parameters
-# =============================================================================
+Plots.gr()
 
 #! format: off
 const N_CELLS   = 10        # axial discretization cells
 const T_INLET   = 313.15    # K (40°C) coolant inlet temperature
 const T_WALL    = 373.15    # K (~100°C) wall temperature
+const H_WALL    = 5000.0    # W/(m²K) convective HTC on the heated face
 const DP_PUMP   = 3.0e4     # Pa pump pressure rise
 const L_CHANNEL = 0.6       # m channel length
 const D_CHANNEL = 0.01      # m hydraulic diameter
 #! format: on
-
-# =============================================================================
-# SECTION 2: Build and compile
-# =============================================================================
 
 println("Building loop...")
 ssys = build_loop(;
     n=N_CELLS,
     T_inlet=T_INLET,
     T_wall=T_WALL,
+    h_wall=H_WALL,
     L_ch=L_CHANNEL,
     D_ch=D_CHANNEL,
     dP_pump=DP_PUMP,
 )
 
-# =============================================================================
-# SECTION 3: Initial guess and solve
-# =============================================================================
-
-# Initial guess using steady_state_guess helper
 T_guess = steady_state_guess(; T_inlet=T_INLET, Q_wall=1e4, mdot_guess=0.490, n=N_CELLS)
 op = [ssys.ch.T[i] => T_guess[i] for i in 1:N_CELLS]
 push!(op, ssys.ch.port_in.mdot => 0.490)
@@ -69,10 +59,6 @@ if sol.retcode != ReturnCode.Success
     error("Steady-state solve failed with retcode: $(sol.retcode)")
 end
 
-# =============================================================================
-# SECTION 4: Extract and print results
-# =============================================================================
-
 T_out = sol[ssys.ch.T_out]
 mdot = abs(sol[ssys.ch.port_in.mdot])
 T_axial = [sol[ssys.ch.T[i]] for i in 1:N_CELLS]
@@ -81,10 +67,6 @@ println("Steady-state results:")
 println("  T_outlet = $(round(T_out - 273.15, digits=2)) °C")
 println("  mdot     = $(round(mdot, digits=4)) kg/s")
 println("  T_rise   = $(round(T_out - T_INLET, digits=2)) K")
-
-# =============================================================================
-# SECTION 5: Plot axial temperature profile
-# =============================================================================
 
 z_positions = range(0.0, L_CHANNEL; length=N_CELLS)
 p = plot(

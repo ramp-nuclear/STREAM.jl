@@ -11,12 +11,12 @@ include("physical_models/friction/correlations.jl")
 include("physical_models/subcooled_boiling.jl")
 include("physical_models/threshold_analysis.jl")
 include("physical_models/dimensionless.jl")
-include("components/channel.jl")
 include("components/pump.jl")
 include("components/flapper.jl")
 include("components/resistors.jl")
 include("components/misc.jl")
-include("components/thermal_channel.jl")
+include("components/sources.jl")
+include("components/channels.jl")
 include("components/heat_diffusion.jl")
 include("components/point_kinetics.jl")
 include("composition/helpers.jl")
@@ -37,6 +37,8 @@ export Channel,
     ChannelAndContacts,
     ChannelHeatFlux,
     ConstantTemperature,
+    WallTemperature,
+    HeatFluxSource,
     HeatDiffusion,
     PipeGeometry,
     PipeGeometry_rectangular,

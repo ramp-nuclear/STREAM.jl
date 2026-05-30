@@ -95,7 +95,7 @@ Grashof number.
 Float64
 Grashof number (dimensionless).
 """
-Gr(rho, mu, beta, T_wall, T, L, g) = rho^2 * beta * g * (T_wall-T) * L^3 / mu^2
+Gr(rho, mu, beta, T_wall, T, L, g) = rho^2 * beta * g * (T_wall - T) * L^3 / mu^2
 
 """
     Ra(Gr_val, Pr_val) -> Float64

@@ -31,13 +31,10 @@ using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
+
 using Plots
 ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
-gr()
-
-# =============================================================================
-# SECTION 1: Parameters
-# =============================================================================
+Plots.gr()
 
 #! format: off
 const NZ        = 10        # axial cells
@@ -55,18 +52,9 @@ const CP_AL     = 900.0     # J/(kg*K)
 const K_AL      = 200.0     # W/(m*K)
 #! format: on
 
-# =============================================================================
-# SECTION 2: Build and compile
-# =============================================================================
-
 println("Building MTR assembly...")
 
-# Step 1: Define rectangular channel geometry.
-# PipeGeometry_rectangular(L, y, gap, wetted_perimeter)
-# Dh = 2*gap*y / (gap + y) for rectangular duct (approximation).
 geom = PipeGeometry_rectangular(L_PLATE, Y_PLATE, LX_PLATE, Y_PLATE)
-
-# Step 2: Fuel plate — uniform normalized power shape.
 ps = fill(1.0 / (NZ * NX), NZ, NX)
 @named hd = HeatDiffusion(;
     nz=NZ,
@@ -81,18 +69,10 @@ ps = fill(1.0 / (NZ * NX), NZ, NX)
     power=POWER,
 )
 
-# Step 3: Left and right coolant channels (ChannelAndContacts provides thermal ports).
 @named cac_l = ChannelAndContacts(; n=NZ, geometry=geom)
 @named cac_r = ChannelAndContacts(; n=NZ, geometry=geom)
-
-# Step 4: Thermal coupling via plate().
-# plate(ch_left, ch_right, fuel; name) wires:
-#   ch_left.thermal_right[i]  <-> fuel.thermal_left[i]
-#   ch_right.thermal_left[i]  <-> fuel.thermal_right[i]
-# For a single-channel symmetric assembly, use symmetric_plate(cac, fuel; name) instead.
 @named rods = plate(cac_l, cac_r, hd)
 
-# Step 5: Complete hydraulic loops (pump + heat exchanger for each channel).
 @named pump_l = Pump(DP_PUMP)
 @named hx_l = HeatExchanger(T_INLET)
 @named pump_r = Pump(DP_PUMP)
@@ -112,10 +92,6 @@ conns = [
 @named sys = compose(System(conns, t; name=:mtr_example), pump_l, hx_l, pump_r, hx_r, rods)
 ssys = mtkcompile(sys)
 
-# =============================================================================
-# SECTION 3: Initial guess and solve
-# =============================================================================
-
 T_w = 315.0
 op = vcat(
     [ssys.rods.hd.T[i, j] => T_w for i in 1:NZ for j in 1:NX],
@@ -132,10 +108,6 @@ if sol.retcode != ReturnCode.Success
     error("Steady-state solve failed with retcode: $(sol.retcode)")
 end
 
-# =============================================================================
-# SECTION 4: Extract and print results
-# =============================================================================
-
 T_out_l = sol[ssys.rods.cac_l.T_out]
 T_out_r = sol[ssys.rods.cac_r.T_out]
 T_center = sol[ssys.rods.hd.T[NZ ÷ 2, (NX + 1) ÷ 2]]
@@ -145,10 +117,6 @@ println("  Left channel T_out  = $(round(T_out_l - 273.15, digits=2)) degC")
 println("  Right channel T_out = $(round(T_out_r - 273.15, digits=2)) degC")
 println("  Plate center T      = $(round(T_center - 273.15, digits=2)) degC")
 println("  T_plate_center > T_fluid: $(T_center > T_out_l)")
-
-# =============================================================================
-# SECTION 5: Plot axial temperature profiles
-# =============================================================================
 
 T_plate_center_col = [sol[ssys.rods.hd.T[i, (NX + 1) ÷ 2]] for i in 1:NZ]
 T_fluid_l = [sol[ssys.rods.cac_l.T[i]] for i in 1:NZ]

@@ -35,20 +35,13 @@ using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-using Plots
 using Statistics
 using Printf
 
-# mm unit for plot margins — sourced from Plots' internal dependency
+using Plots
 const mm = Plots.PlotMeasures.mm
-
 ENV["GKSwstype"] = "100"   # headless GR — no display window, avoids X11 errors
-gr()
-
-# =============================================================================
-# SECTION 1: Parameters
-# (Matches test/test_loss_of_flow.jl constants exactly)
-# =============================================================================
+Plots.gr()
 
 #! format: off
 const n          = 50          # axial cells in each channel
@@ -74,30 +67,24 @@ println("  T_inlet   = $T_inlet K  ($(round(T_inlet - 273.15; digits=1)) °C)")
 println("  threshold = $threshold kg/s,  dt_ramp = $dt_ramp s")
 println()
 
-# =============================================================================
-# SECTION 2: Steady-state reference loop
-#
-# Purpose: Obtain mdot_ss and T_ss[1:n] for the bypass system's initial conditions.
-# Reference loop: Pump(dP_ref) -> HeatExchanger(T_inlet) -> ChannelHeatFlux(g=-g_acc)
-# No Flapper, no Inertia — KINSOL-friendly (avoids D(T_open)=0 zero-Jacobian issue).
-#
-# Physical: at t=0- the system is at forced-flow SS with pump providing dP_ref.
-# ch flows downward (positive mdot), heated from T_inlet to ~T_max_ss.
-# =============================================================================
+const h_wall = 5000.0   # convective HTC [W/(m^2·K)] for the SS reference loop
 
 println("Building steady-state reference loop...")
 
 @named pump_ref = Pump(dP_ref)
 @named hx_ref = HeatExchanger(T_inlet)
-@named ch_ref = ChannelHeatFlux(;
-    n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=(-g_acc), T_wall=T_wall
+
+@named ch_ref = STREAM.Channel(;
+    n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=(-g_acc), h_left=h_wall, h_right=0.0
 )
 
-conns_ref = [
+conns_ref = Equation[
     connect(pump_ref.port_out, hx_ref.port_in),
     connect(hx_ref.port_out, ch_ref.port_in),
     connect(ch_ref.port_out, pump_ref.port_in),
     pump_ref.port_in.P ~ 1.0e5,
+    [ch_ref.T_wall_left[i] ~ T_wall for i in 1:n]...,
+    [ch_ref.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
 ]
 @named ref_sys = compose(System(conns_ref, t; name=:ref), pump_ref, hx_ref, ch_ref)
 ref_ssys = mtkcompile(ref_sys)
@@ -118,36 +105,22 @@ println("  T_ss min  = $(round(minimum(T_ss) - 273.15; digits=2)) °C")
 println("  T_ss max  = $(round(maximum(T_ss) - 273.15; digits=2)) °C")
 println()
 
-# =============================================================================
-# SECTION 3: Build bypass system and set initial conditions
-#
-# IC strategy (matches _lof_bypass_ic in test/test_loss_of_flow.jl):
-#   - ine.port_in.mdot = mdot_ss  (total loop flow; Inertia carries this momentum)
-#   - ret.port_in.mdot = mdot_ss  (all flow through ch-ret path; flapper closed at t=0)
-#   - Dt(ret.port_in.mdot) = 0.0  (index-reduced derivative state; zero at quasi-SS)
-#   - flapper.T_open = 1e30       (sentinel: valve not yet fired; ramp = 0 for all t << 1e30)
-#   - ch.T[i] = T_ss[i]           (channel cells initialized from SS reference)
-#   - ret.T[i] = T_inlet          (return channel starts cold)
-#
-# Callback strategy:
-#   MTK SymbolicContinuousCallback is incompatible with parallel topologies where
-#   channel inertia (Dt(mdot)) appears in the callback's pressure balance equations.
-#   Instead: native DifferentialEquations ContinuousCallback monitors ine.port_in.mdot,
-#   and directly sets T_open in the ODE state vector when mdot drops below threshold.
-# =============================================================================
-
 println("Building bypass LOF system...")
+
+const power_W = 1.0e3   # total fuel-plate power [W] (Spike B baseline; produces NC ~ 4 g/s)
+const fuel_nx = 2       # lateral cells in HeatDiffusion plate
 
 #! format: off
 ssys = build_loop_lof_bypass(;
     n         = n,
     L_ch      = L_ch,
     D_ch      = D_ch,
-    T_wall    = T_wall,
     T_inlet   = T_inlet,
+    power_W   = power_W,
+    fuel_nx   = fuel_nx,
     L_over_A  = L_over_A,
     g_acc     = g_acc,
-    R_ext=R_ext,
+    R_ext     = R_ext,
     dt_ramp   = dt_ramp,
 )
 #! format: on
@@ -156,20 +129,21 @@ Dt = Differential(t)
 op = Pair{Any,Any}[
     ssys.ine.port_in.mdot => mdot_ss,  # Inertia carries forced-flow momentum
     ssys.ret.port_in.mdot => mdot_ss,  # return channel flow (flapper closed at t=0)
-    Dt(ssys.ret.port_in.mdot) => 0.0,      # index-reduced state; zero at quasi-SS
-    ssys.flapper.T_open => 1.0e30,   # sentinel: flapper has not fired yet
+    Dt(ssys.ret.port_in.mdot) => 0.0,  # index-reduced state; zero at quasi-SS
+    ssys.flapper.T_open => 1.0e30,     # sentinel: flapper has not fired yet
 ]
 for i in 1:n
-    push!(op, ssys.ch.T[i] => T_ss[i])     # heated channel cells from SS reference
+    push!(op, ssys.heated.ch.T[i] => T_ss[i])      # heated-channel cells from SS reference
 end
 for i in 1:n
-    push!(op, ssys.ret.T[i] => T_inlet)    # return channel starts cold
+    for j in 1:fuel_nx
+        push!(op, ssys.heated.fuel.T[i, j] => T_ss[i])  # fuel-plate cells seeded from coolant
+    end
+end
+for i in 1:n
+    push!(op, ssys.ret.T[i] => T_inlet)            # return channel starts cold
 end
 
-# Native ContinuousCallback:
-#   Condition: u[i_ine_mdot] - threshold (zero crossing = flapper trigger)
-#   affect_neg: downward crossing -> latch T_open = current solver time
-#   nothing: ignore upward crossing
 i_T_open = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
 i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.port_in.mdot)
 
@@ -181,17 +155,6 @@ cb = ContinuousCallback(
 
 println("Bypass system compiled. Variables: $(length(unknowns(ssys)))")
 println()
-
-# =============================================================================
-# SECTION 4: Solve transient
-#
-# 300 seconds at 0.1s resolution (3001 points).
-# After pump trip at t=0, we expect:
-#   - Exponential-like mdot decay (time constant ~ L_over_A / R_loop)
-#   - Flapper fires at ~20-30s (when mdot crosses threshold)
-#   - Flow reversal and NC establishment by ~100-150s
-#   - NC equilibrium by ~270s: ch.mdot < 0, |mdot_nc| << mdot_ss
-# =============================================================================
 
 t_arr = range(0.0, 300.0; length=3001)
 
@@ -207,60 +170,37 @@ end
 println("Transient solve complete. retcode = $(sol.retcode)")
 println()
 
-# =============================================================================
-# SECTION 5: Extract time series into plain arrays for plotting
-#
-# Note: The solver inserts extra time points at callback events (flapper firing).
-# sol.t has length > length(t_arr). We use sol.t as the common time axis so all
-# extracted arrays have the same length. The dt_step for NC detection uses the
-# uniform portion: approx (t_arr[end] - t_arr[1]) / (length(t_arr) - 1).
-# =============================================================================
-
 t_vec = sol.t  # actual solver time points (may include callback-inserted extras)
 
-# Mass flow rates
-mdot_ch = sol[ssys.ch.port_in.mdot, :]
+mdot_ch = sol[ssys.heated.ch.port_in.mdot, :]
 mdot_ret = sol[ssys.ret.port_in.mdot, :]
 mdot_flap = sol[ssys.flapper.port_in.mdot, :]
 mdot_ine = sol[ssys.ine.port_in.mdot, :]
 
 # Cell temperatures
-T_ch = [sol[ssys.ch.T[i], :] for i in 1:n]   # T_ch[i][time_idx]
+T_ch = [sol[ssys.heated.ch.T[i], :] for i in 1:n]   # T_ch[i][time_idx]
 T_ret = [sol[ssys.ret.T[i], :] for i in 1:n]
 
 # Heat flux, Reynolds, HTC in heated channel
-q_wall_ch = [sol[ssys.ch.q_wall[i], :] for i in 1:n]
-Re_ch = [sol[ssys.ch.Re[i], :] for i in 1:n]
-htc_ch = [sol[ssys.ch.h_tc[i], :] for i in 1:n]
+q_wall_ch = [sol[ssys.heated.ch.q_wall_left[i], :] for i in 1:n]
+Re_ch = [sol[ssys.heated.ch.Re[i], :] for i in 1:n]
+htc_ch = [sol[ssys.heated.ch.h_tc[i], :] for i in 1:n]
 
 # Flapper state
 xi_arr = sol[ssys.flapper.xi, :]
 T_open_arr = sol[ssys.flapper.T_open, :]
 
 # Pressure drops
-dP_ch = sol[ssys.ch.dP, :]
+dP_ch = sol[ssys.heated.ch.dP, :]
 dP_ret = sol[ssys.ret.dP, :]
-
-# =============================================================================
-# SECTION 6: Compute and print key metrics
-#
-# Physical summary of each metric:
-#   mdot_nc     — NC mass flow at t=300s. Should be << mdot_ss (buoyancy-driven)
-#   T_max_nc    — max cell temperature at NC steady state (at ch cell 1, top of upward ch)
-#   flapper_fire_time — when Flapper triggered; T_open latched from sentinel 1e30 to t_fire
-#   nc_time     — estimated NC establishment time (|d(mdot)/dt| < 1e-5 kg/s^2)
-#   energy_balance_ratio — Q_wall / Q_advect at final time (should be ~1.0 at 5% rtol)
-# =============================================================================
 
 mdot_nc = abs(mdot_ch[end])
 T_max_nc = maximum(T_ch[i][end] for i in 1:n)
 T_max_ss = maximum(T_ss)
 
-# Flapper fire time: T_open latched from 1e30 sentinel to actual time when mdot crossed threshold
 flapper_fire_time = T_open_arr[end] < 1.0e10 ? T_open_arr[end] : NaN
 flapper_open_time = isnan(flapper_fire_time) ? NaN : flapper_fire_time + dt_ramp
 
-# NC establishment: first index (after flapper fully open) where |d(mdot_ch)/dt| < 1e-5
 dt_step = (t_arr[end] - t_arr[1]) / (length(t_arr) - 1)  # nominal 0.1s step
 nc_time_found = Ref(NaN)
 if !isnan(flapper_open_time)
@@ -277,8 +217,6 @@ if !isnan(flapper_open_time)
 end
 nc_time = nc_time_found[]
 
-# Energy balance at final time
-# Backward flow (NC): inlet to ch is from ret.T[1] at Node B; outlet is T[1] (cell 1 = top, hottest)
 T_inlet_ch_final = sol[ssys.ret.T[1], end]
 T_outlet_ch_final = T_ch[1][end]  # T[1] = hottest in NC reversed flow
 Q_wall_final = abs(sum(q_wall_ch[i][end] for i in 1:n))
@@ -313,15 +251,6 @@ end
 println("="^70)
 println()
 
-# =============================================================================
-# SECTION 7: Output directories and helpers
-#
-# Plots are organized into 4 sub-folders by time scale / purpose:
-#   01_overview/            — full 0-300s: orientation and big picture
-#   02_transition_0to60s/   — zoomed 0-60s: the critical action window
-#   03_nc_equilibrium/      — 200-300s: NC plateau, verify steady NC values
-#   04_spatial_profiles/    — spatial snapshots + 2D heatmap (cell × time)
-# =============================================================================
 #! format: off
 outdir_base  = "examples/output/lof_transient"
 dir_overview = joinpath(outdir_base, "01_overview")
@@ -336,11 +265,12 @@ end
 println("Output directories created under: $outdir_base/")
 println()
 
-# Color gradient for n cells: blue (cell 1, port_in side) → red (cell n, port_out side)
-colors_cells = range(colorant"navy"; stop=colorant"firebrick", length=n)
+colors_cells = range(
+    parse(Plots.Colors.Colorant, "navy");
+    stop=parse(Plots.Colors.Colorant, "firebrick"),
+    length=n,
+)
 
-# Add vertical event lines to a plot for flapper fire / fully-open events.
-# tmin/tmax gate which lines are drawn (skip if outside the plot's x window).
 function add_events!(
     p; tfire=flapper_fire_time, topen=flapper_open_time, tmin=(-Inf), tmax=Inf
 )
@@ -370,18 +300,7 @@ end
 # Return indices of t_vec that fall in [t_lo, t_hi]
 wmask(t_lo, t_hi) = findall(x -> t_lo <= x <= t_hi, t_vec)
 
-# =============================================================================
-# SECTION 8: Overview plots (0–300s)
-#
-# Purpose: orient the reader. Everything important is compressed here, but
-# these plots confirm the big-picture sequence: forced flow → NC.
-# =============================================================================
 println("=== 01_overview (0–300s) ===")
-
-# --- 8a. Mass flows: 4-panel, each component on its own y-axis ---------------
-# Separate panels avoid the "everything hidden under ine spike" problem.
-# Physical: ine decays from mdot_ss → ~0; ch and ret reverse sign; flapper
-# path appears after valve opens and carries a fraction of the NC flow.
 println("  01_flow_all_components.png")
 
 p8a_ch = plot(
@@ -435,7 +354,6 @@ pov_flow = plot(
 )
 savefig(pov_flow, joinpath(dir_overview, "01_flow_all_components.png"))
 
-# --- 8b. ch + ret on same axes (shows anti-symmetric reversal clearly) -------
 println("  02_flow_ch_ret.png")
 p8b = plot(
     t_vec,
@@ -454,8 +372,6 @@ hline!(p8b, [0.0]; color=:black, lw=1, ls=:dot, label="zero")
 add_events!(p8b)
 savefig(p8b, joinpath(dir_overview, "02_flow_ch_ret.png"))
 
-# --- 8c. ch cell temperatures overview (T[1]..T[n] all 300s) ----------------
-# Physical: At SS T[n] is hottest (outlet); at NC T[1] is hottest (reversed flow).
 println("  03_temperatures_ch.png")
 p8c = plot(;
     xlabel="Time [s]",
@@ -471,7 +387,6 @@ end
 add_events!(p8c)
 savefig(p8c, joinpath(dir_overview, "03_temperatures_ch.png"))
 
-# --- 8d. Flapper xi overview (confirms xi=0→1 transition) -------------------
 println("  04_flapper_xi.png")
 p8d = plot(
     t_vec,
@@ -489,13 +404,6 @@ p8d = plot(
 add_events!(p8d)
 savefig(p8d, joinpath(dir_overview, "04_flapper_xi.png"))
 
-# =============================================================================
-# SECTION 9: Transition plots (0–60s) — the critical action window
-#
-# The flapper fires at ~t_fire (sub-second to a few seconds depending on L_over_A).
-# Flow reversal and NC onset all happen before t≈60s. These zoomed plots show
-# the details that are completely invisible in 0-300s views.
-# =============================================================================
 println()
 println("=== 02_transition_0to60s ===")
 
@@ -515,8 +423,6 @@ Re_t = [Re_ch[i][idx_t] for i in 1:n]
 htc_t = [htc_ch[i][idx_t] for i in 1:n]
 qw_t = [q_wall_ch[i][idx_t] for i in 1:n]
 
-# --- 9a. ch and ret flows — reversal with zero-crossing annotated ------------
-# This is the most important plot: shows ch going negative (NC reversed flow).
 println("  01_flow_ch_ret_zoom.png")
 p9a = plot(
     tv_t,
@@ -551,7 +457,6 @@ end
 add_events!(p9a; tmin=0.0, tmax=t_trans_hi)
 savefig(p9a, joinpath(dir_trans, "01_flow_ch_ret_zoom.png"))
 
-# --- 9b. All 4 flows, 2-panel layout ----------------------------------------
 println("  02_flow_all_zoom.png")
 p9b_top = plot(
     tv_t,
@@ -590,7 +495,6 @@ p9b = plot(
 )
 savefig(p9b, joinpath(dir_trans, "02_flow_all_zoom.png"))
 
-# --- 9c. Flapper xi zoomed on the opening event -----------------------------
 println("  03_flapper_xi_zoom.png")
 t_xi_hi = isnan(flapper_fire_time) ? 20.0 : min(flapper_fire_time + 15.0, t_trans_hi)
 idx_xi = wmask(0.0, t_xi_hi)
@@ -610,9 +514,6 @@ p9c = plot(
 add_events!(p9c; tmin=0.0, tmax=t_xi_hi)
 savefig(p9c, joinpath(dir_trans, "03_flapper_xi_zoom.png"))
 
-# --- 9d. ch temperatures during transition ----------------------------------
-# Watch for the temperature dip (mdot → 0, heat accumulates) then
-# re-stratification in the reversed NC direction.
 println("  04_temperatures_ch_zoom.png")
 p9d = plot(;
     xlabel="Time [s]",
@@ -628,9 +529,6 @@ end
 add_events!(p9d; tmin=0.0, tmax=t_trans_hi)
 savefig(p9d, joinpath(dir_trans, "04_temperatures_ch_zoom.png"))
 
-# --- 9e. Wall heat flux during transition ------------------------------------
-# Q_wall = h_tc * perimeter * dz * (T_wall - T[i]). Drops sharply with Re.
-# Small bump after flapper opens as flow re-establishes.
 println("  05_heat_flux_zoom.png")
 p9e = plot(;
     xlabel="Time [s]",
@@ -646,9 +544,6 @@ end
 add_events!(p9e; tmin=0.0, tmax=t_trans_hi)
 savefig(p9e, joinpath(dir_trans, "05_heat_flux_zoom.png"))
 
-# --- 9f. Re and HTC on log scale — shows laminar/turbulent transition --------
-# Log scale reveals both the high-Re forced-flow regime and the low-Re NC regime.
-# Dittus-Boelter: Nu ~ Re^0.8 → HTC ~ Re^0.8 → ratio ~40-100x between regimes.
 println("  06_re_htc_log_zoom.png")
 # Use mid-channel cell (cell 5) as representative; all cells behave similarly.
 Re5_pos = max.(Re_t[5], 1.0)   # floor at 1 to avoid log(0) issues
@@ -692,10 +587,6 @@ p9f = plot(
 )
 savefig(p9f, joinpath(dir_trans, "06_re_htc_log_zoom.png"))
 
-# --- 9g. Pressure drops during transition ------------------------------------
-# dP_ch sign reversal: positive under forced downward flow, negative at NC
-# (gravity head drives reversed upward flow). dP_ret is always positive (gravity
-# opposes the return upward leg). Together their sum drives the NC loop.
 println("  07_pressure_drops_zoom.png")
 p9g = plot(
     tv_t,
@@ -714,12 +605,6 @@ hline!(p9g, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
 add_events!(p9g; tmin=0.0, tmax=t_trans_hi)
 savefig(p9g, joinpath(dir_trans, "07_pressure_drops_zoom.png"))
 
-# =============================================================================
-# SECTION 10: NC equilibrium plots (200–300s)
-#
-# Purpose: verify that NC has settled to a steady state. Flat lines confirm
-# equilibrium. Annotate with the mean NC mdot and temperature values.
-# =============================================================================
 println()
 println("=== 03_nc_equilibrium (200–300s) ===")
 
@@ -737,8 +622,6 @@ htc_nc = [htc_ch[i][idx_nc] for i in 1:n]
 
 mdot_nc_mean = mean(abs.(mch_nc))
 
-# --- 10a. NC flow rates (all components) ------------------------------------
-# ch.mdot < 0 (upward NC), ret.mdot > 0 (downward return), ine ≈ 0, flapper > 0.
 println("  01_nc_flow.png")
 p10a = plot(
     tv_nc,
@@ -765,9 +648,6 @@ plot!(p10a, tv_nc, mine_nc; label="ine (pump branch, ≈ 0)", lw=1.5, color=:gra
 hline!(p10a, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
 savefig(p10a, joinpath(dir_nc, "01_nc_flow.png"))
 
-# --- 10b. NC channel temperatures -- should be flat, T[1] hottest -----------
-# In reversed NC flow: cell 1 is the outlet (top of upward ch); hottest.
-# Cell n is the inlet (bottom, coolest fluid entering from ret/HX side).
 println("  02_nc_temperatures_ch.png")
 T_nc_max_mean = mean(Tch_nc[1])   # cell 1 = outlet in NC = hottest
 p10b = plot(;
@@ -783,9 +663,6 @@ for i in 1:n
 end
 savefig(p10b, joinpath(dir_nc, "02_nc_temperatures_ch.png"))
 
-# --- 10c. NC wall heat flux per cell -----------------------------------------
-# q_wall is small but nonzero at NC. Spatial variation shows which cells are
-# most active. In NC with reversed flow, cell 1 (coolest inlet-side) has highest q.
 println("  03_nc_heat_flux.png")
 p10c = plot(;
     xlabel="Time [s]",
@@ -800,8 +677,6 @@ for i in 1:n
 end
 savefig(p10c, joinpath(dir_nc, "03_nc_heat_flux.png"))
 
-# --- 10d. NC Reynolds and HTC (2-panel) --------------------------------------
-# Re should be well below 2300 (laminar NC). HTC is low but finite.
 println("  04_nc_re_htc.png")
 Re_nc_mid = Re_nc[5]
 htc_nc_mid = htc_nc[5]
@@ -828,15 +703,6 @@ p10d_htc = plot(
 p10d = plot(p10d_re, p10d_htc; layout=(2, 1), size=(900, 700), dpi=150, left_margin=8mm)
 savefig(p10d, joinpath(dir_nc, "04_nc_re_htc.png"))
 
-# =============================================================================
-# SECTION 11: Spatial profile snapshots
-#
-# Show how the temperature (and heat flux) profile along the channel evolves
-# from SS → coastdown → reversal → NC. Multiple time snapshots reveal:
-#   - Forward SS: T increases cell 1→n (inlet to outlet)
-#   - During reversal: flat or dip as mdot → 0
-#   - NC: T increases cell n→1 (reversed direction; cell 1 is now the outlet)
-# =============================================================================
 println()
 println("=== 04_spatial_profiles ===")
 
@@ -848,10 +714,13 @@ snap_t = [t_vec[i] for i in snap_idx]
 n_snaps = length(snap_idx)
 
 # Color: early times = cool blue, late times = warm red
-snap_colors_range = range(colorant"steelblue"; stop=colorant"darkred", length=n_snaps)
+snap_colors_range = range(
+    parse(Plots.Colors.Colorant, "steelblue");
+    stop=parse(Plots.Colors.Colorant, "darkred"),
+    length=n_snaps,
+)
 cell_axis = 1:n
 
-# --- 11a. ch Temperature spatial profiles ------------------------------------
 println("  01_temperature_ch_multitime.png")
 p11a = plot(;
     xlabel="Cell index (1=Node A, n=Node B)",
@@ -877,7 +746,6 @@ for (k, idx) in enumerate(snap_idx)
 end
 savefig(p11a, joinpath(dir_spatial, "01_temperature_ch_multitime.png"))
 
-# --- 11b. ret Temperature spatial profiles -----------------------------------
 println("  02_temperature_ret_multitime.png")
 p11b = plot(;
     xlabel="Cell index (1=Node B, n=Node C)",
@@ -903,7 +771,6 @@ for (k, idx) in enumerate(snap_idx)
 end
 savefig(p11b, joinpath(dir_spatial, "02_temperature_ret_multitime.png"))
 
-# --- 11c. ch Heat flux spatial profiles --------------------------------------
 println("  03_heat_flux_ch_multitime.png")
 p11c = plot(;
     xlabel="Cell index",
@@ -928,18 +795,11 @@ for (k, idx) in enumerate(snap_idx)
     )
 end
 savefig(p11c, joinpath(dir_spatial, "03_heat_flux_ch_multitime.png"))
-
-# --- 11d. 2D temperature heatmap (cell index × time) ------------------------
-# Best single plot for understanding the spatio-temporal temperature evolution.
-# Color encodes temperature; x=time, y=cell index.
-# Visually shows: SS gradient → gradient collapse → gradient inversion at NC.
 println("  04_temperature_heatmap_ch.png")
 
-# Subsample time to ~600 points for a clean, readable heatmap
 sub_step = max(1, div(length(t_vec), 600))
 idx_sub = 1:sub_step:length(t_vec)
 t_sub = t_vec[idx_sub]
-# Matrix: rows = cells (1..n), cols = time (subsampled); values in °C
 T_matrix = Float64[T_ch[i][j] - 273.15 for i in 1:n, j in idx_sub]
 
 p11d = heatmap(
@@ -970,9 +830,6 @@ if !isnan(flapper_fire_time)
 end
 savefig(p11d, joinpath(dir_spatial, "04_temperature_heatmap_ch.png"))
 
-# =============================================================================
-# SECTION 12: Final summary
-# =============================================================================
 println()
 println("="^70)
 println("ALL PLOTS SAVED")

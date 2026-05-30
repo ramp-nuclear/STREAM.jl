@@ -23,16 +23,8 @@ import STREAM:
     developing_laminar_h_spl,
     maximal_htc
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 14: Laminar Correlations
-# PHY-02: constant_Nusselt factory
-# PHY-03: rectangular_laminar_correction + laminar_friction factory
-# PHY-04: regime_dependent switching wrapper
-# ─────────────────────────────────────────────────────────────────────────────
-
 @testset "PHY-02/03/04: Correlation Library" begin
     @testset "PHY-03: rectangular_laminar_correction reference values" begin
-        # Verified reference values from Python STREAM friction.py (2026-03-15)
         @test isapprox(rectangular_laminar_correction(0.0), 0.66685; atol=1e-4)
         @test isapprox(rectangular_laminar_correction(0.01814), 0.68544; atol=1e-4)
         @test isapprox(rectangular_laminar_correction(0.5), 1.03639; atol=1e-4)
@@ -66,7 +58,6 @@ import STREAM:
         f_fn = laminar_friction(0.01814)
         k_R = rectangular_laminar_correction(0.01814)
         @test isapprox(f_fn(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
-        # Different Re
         @test isapprox(f_fn(500.0), 64.0 / (500.0 * k_R); rtol=1e-6)
     end
 
@@ -92,21 +83,9 @@ import STREAM:
         )
         @test isapprox(rd.friction(8000.0), blasius_friction(8000.0); rtol=1e-6)
     end
-end  # @testset "PHY-02/03/04: Correlation Library"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 14 Integration Tests: Pluggable correlations in solved systems
-# PHY-02: constant_Nusselt integration — ChannelAndContacts with Nu=8.235 constant
-# PHY-03: laminar_friction integration — ChannelAndContacts with laminar friction
-# PHY-04: regime_dependent integration — both laminar (Re<2300) and turbulent (Re>2300) branches
-# ─────────────────────────────────────────────────────────────────────────────
+end 
 
 @testset "PHY-02/03/04: Integration Tests — Pluggable Correlations in Solved Systems" begin
-
-    # ─────────────────────────────────────────────────────────────────
-    # PHY-02: constant_Nusselt(Nu=8.235) plugged into ChannelAndContacts
-    # Solved system must return Nu≈8.235 for all cells.
-    # ─────────────────────────────────────────────────────────────────
     @testset "PHY-02: constant_Nusselt integration — Nu≈8.235 in solution" begin
         n = 3;
         T_inlet = 313.15;
@@ -156,27 +135,17 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         sol_phy02 = solve_steady(ssys_phy02, op_phy02)
 
         @test sol_phy02.retcode == ReturnCode.Success
-        for i in 1:n
-            @test isapprox(sol_phy02[ssys_phy02.cac_phy02.Nu[i]], 8.235; atol=0.01)
-        end
+        @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu_left[:]], 8.235, rtol=1e-4))
     end
 
-    # ─────────────────────────────────────────────────────────────────
-    # PHY-03: laminar_friction(0.01814) plugged into ChannelAndContacts
-    # Solved system must return retcode==Success and dP > 0 (positive pressure drop).
-    # ─────────────────────────────────────────────────────────────────
     @testset "PHY-03: laminar_friction integration — dP > 0 in solution" begin
-        # Use MTR rectangular geometry with laminar friction for which the K_R was derived.
-        # Combine constant_Nusselt (well-conditioned HTC) with laminar_friction to isolate
-        # friction pluggability. Low pump dP (30 Pa) to stay firmly in laminar regime.
-        # Physics: mdot = dP*rho*A*K_R*Dh^2 / (32*mu*L) ≈ 8.8e-4 kg/s at 313 K
         n = 3;
         T_inlet = 313.15;
         T_wall = 373.15
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         ar = geom.depth / geom.width   # aspect_ratio for MTR geometry (~0.01814)
 
-        @named pump_phy03 = Pump(30.0)   # 30 Pa → Re << 2300 → laminar regime
+        @named pump_phy03 = Pump(30.0)
         @named cac_phy03 = ChannelAndContacts(
             n=n,
             geometry=geom,
@@ -215,7 +184,6 @@ end  # @testset "PHY-02/03/04: Correlation Library"
             ct_r_phy03...,
         )
         ssys_phy03 = mtkcompile(sys_phy03)
-        # Initial guess: mdot≈8.8e-4 kg/s from laminar Hagen-Poiseuille estimate at 30 Pa
         op_phy03 = [ssys_phy03.cac_phy03.T[i] => T_inlet for i in 1:n]
         push!(op_phy03, ssys_phy03.cac_phy03.port_in.mdot => 8.8e-4)
         sol_phy03 = solve_steady(ssys_phy03, op_phy03)
@@ -226,11 +194,6 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         @test sol_phy03[ssys_phy03.cac_phy03.Re[1]] < 2300.0
     end
 
-    # ─────────────────────────────────────────────────────────────────
-    # PHY-04: regime_dependent tested in both branches
-    # Low-dP (laminar, Re < 2300): Nu≈8.235; solver converges.
-    # High-dP (turbulent, Re > 2300): solver converges; Re > 2300.
-    # ─────────────────────────────────────────────────────────────────
     @testset "PHY-04: regime_dependent integration — laminar branch (Re < 2300)" begin
         n = 3;
         T_inlet = 313.15;
@@ -243,8 +206,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
             friction_turbulent=blasius_friction,
             Re_transition=2300.0,
         )
-        # Very low dP to force laminar regime
-        dP_lam = 30.0   # ~30 Pa gives very low mdot -> Re << 2300
+        dP_lam = 30.0
 
         @named pump_lam = Pump(dP_lam)
         @named cac_lam = ChannelAndContacts(
@@ -278,7 +240,6 @@ end  # @testset "PHY-02/03/04: Correlation Library"
             ct_r_lam...,
         )
         ssys_lam = mtkcompile(sys_lam)
-        # For laminar regime: very low mdot — initial guess near zero
         op_lam = [ssys_lam.cac_lam.T[i] => T_inlet for i in 1:n]
         push!(op_lam, ssys_lam.cac_lam.port_in.mdot => 1e-4)
         sol_lam = solve_steady(ssys_lam, op_lam)
@@ -299,7 +260,7 @@ end  # @testset "PHY-02/03/04: Correlation Library"
             friction_turbulent=blasius_friction,
             Re_transition=2300.0,
         )
-        dP_turb = 3.0e4   # standard MTR dP, gives Re >> 2300
+        dP_turb = 3.0e4
 
         @named pump_turb = Pump(dP_turb)
         @named cac_turb = ChannelAndContacts(
@@ -341,28 +302,17 @@ end  # @testset "PHY-02/03/04: Correlation Library"
         @test sol_turb.retcode == ReturnCode.Success
         @test sol_turb[ssys_turb.cac_turb.Re[1]] > 2300.0
     end
-end  # @testset "PHY-02/03/04: Integration Tests — Pluggable Correlations in Solved Systems"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 21: Natural Convection Correlations
-# NATCONV-01: elenbaas_nusselt standalone + elenbaas_htc factory
-# NATCONV-02: Validation against Python STREAM reference values
-# ─────────────────────────────────────────────────────────────────────────────
+end
 
 @testset "NATCONV-01/02: Elenbaas Natural Convection" begin
-    @testset "NATCONV-01: elenbaas_nusselt standalone" begin
-        # Reference: RESEARCH.md MTR-scale test point
-        # Ra=12375.512696, b=0.00254m, L=0.6m
-        # Expected Nu = 1.2731625848
+    @testset "NATCONV-01: elenbaas_nusselt standalone for known values" begin
         @test isapprox(
             elenbaas_nusselt(12375.512696, 0.00254, 0.6), 1.2731625848; rtol=1e-6
         )
     end
 
     @testset "NATCONV-01: elenbaas_nusselt limiting cases" begin
-        # Ra -> 0: Nu -> 0 (no buoyancy)
         @test isapprox(elenbaas_nusselt(0.0, 0.00254, 0.6), 0.0; atol=1e-10)
-        # Large Ra: Nu should be positive and growing
         Nu_large = elenbaas_nusselt(1e6, 0.00254, 0.6)
         @test Nu_large > 0.0
         @test Nu_large > elenbaas_nusselt(1e4, 0.00254, 0.6)
@@ -370,11 +320,8 @@ end  # @testset "PHY-02/03/04: Integration Tests — Pluggable Correlations in S
 
     @testset "NATCONV-01: elenbaas_htc factory produces 4-arg closure" begin
         htc_fn = elenbaas_htc(b=0.00254, L=0.6, Dh=0.00254)
-        # Must accept 4 args
-        Nu_val = htc_fn(0.0, 4.32, 313.15, 333.15)  # Re=0 (natural conv), Pr~4.32, T_bulk=40C, T_wall=60C
+        Nu_val = htc_fn(0.0, 4.32, 313.15, 333.15)
         @test Nu_val > 0.0
-
-        # T_wall = T_bulk -> dT=0 -> Nu=0
         Nu_zero = htc_fn(0.0, 4.32, 313.15, 313.15)
         @test isapprox(Nu_zero, 0.0; atol=1e-10)
     end
@@ -419,13 +366,7 @@ end  # @testset "PHY-02/03/04: Integration Tests — Pluggable Correlations in S
         # Nu tolerance matches Ra tolerance (propagated from Gr uncertainty)
         @test isapprox(Nu_val, 1.2731625848; rtol=5e-4)
     end
-end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 26: NC regime detection in regime_dependent
-# NATCONV-01: regime_dependent NC kwargs — branch selection, backward compat,
-#             ArgumentError on partial kwargs, @warn on Dh/g without htc_natural
-# ─────────────────────────────────────────────────────────────────────────────
+end 
 
 @testset "NATCONV-01: regime_dependent NC detection" begin
     # Setup: laminar HTC returns 4.0, turbulent returns 100.0, NC returns 999.0
@@ -435,8 +376,6 @@ end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
     f_lam = (Re) -> 64.0 / Re
     f_turb = (Re) -> 0.316 * Re^(-0.25)
 
-    # Test 1: NC branch selected when Gr/Re^2 > 1
-    # Use low Re (high Gr/Re^2) and large dT to trigger NC
     rd = regime_dependent(
         htc_laminar=htc_lam,
         htc_turbulent=htc_turb,
@@ -493,13 +432,6 @@ end  # @testset "NATCONV-01/02: Elenbaas Natural Convection"
         g=9.81,  # htc_natural missing
     )
 end
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 30: HTC & Friction Completions
-# HTC-01: Marco_Han_Nusselt
-# FRIC-01: turbulent_friction (Colebrook-White)
-# FRIC-02: viscosity_correction
-# ─────────────────────────────────────────────────────────────────────────────
 
 @testset "HTC-01: Marco_Han_Nusselt" begin
     # Reference values from Python STREAM laminar.py doctest
@@ -563,8 +495,6 @@ end
 end
 
 @testset "HTC-03: developing_laminar_h_spl" begin
-    # At very high Re (large x_star), developing flow Nu should approach
-    # the fully-developed value _two_sided_heating_nusselt(ar)
     ar = 0.2
     htc_dev = developing_laminar_h_spl(Dh=0.005, develop_length=0.3, aspect_ratio=ar)
     htc_fd = fully_developed_laminar_h_spl(Dh=0.005, aspect_ratio=ar)
@@ -578,48 +508,32 @@ end
     # Re=1 with develop_length=0.3 -> x_star is large -> _nusselt_coefficient_developing ~ 8.235
     Nu_dev_low_Re = htc_dev(1.0, 7.0, 313.0, 333.0)
     @test isapprox(Nu_dev_low_Re, Nu_fd; rtol=0.05)  # within 5% of fully developed
-
-    # Positive for all reasonable inputs
     @test htc_dev(500.0, 5.0, 310.0, 350.0) > 0.0
 
-    # x_star correction factor test: changing aspect_ratio changes the result
     htc_dev_ar05 = developing_laminar_h_spl(Dh=0.005, develop_length=0.3, aspect_ratio=0.5)
     @test htc_dev(1000.0, 7.0, 313.0, 333.0) != htc_dev_ar05(1000.0, 7.0, 313.0, 333.0)
 end
 
 @testset "HTC-04: maximal_htc" begin
-    # max of two constant correlations
     c5 = constant_Nusselt(Nu=5.0)
     c10 = constant_Nusselt(Nu=10.0)
     htc_max = maximal_htc(c5, c10)
     @test htc_max(100.0, 7.0, 313.0, 333.0) == 10.0
 
-    # max of three correlations
     c1 = constant_Nusselt(Nu=1.0)
     htc_max3 = maximal_htc(c1, c5, c10)
     @test htc_max3(100.0, 7.0, 313.0, 333.0) == 10.0
 
-    # Single correlation passthrough
     htc_single = maximal_htc(c5)
     @test htc_single(100.0, 7.0, 313.0, 333.0) == 5.0
 
-    # Works with non-constant correlations (dittus_boelter)
     htc_mixed = maximal_htc(c5, dittus_boelter)
-    # At Re=100, Pr=7: dittus_boelter ~ 0.023 * 100^0.8 * 7^0.4 ~ 2.7 < 5
     @test htc_mixed(100.0, 7.0, 313.0, 333.0) == 5.0
-    # At Re=10000, Pr=7: dittus_boelter ~ 0.023 * 10000^0.8 * 7^0.4 ~ 55.2 > 5
     @test htc_mixed(10000.0, 7.0, 313.0, 333.0) > 5.0
     @test isapprox(
         htc_mixed(10000.0, 7.0, 313.0, 333.0), dittus_boelter(10000.0, 7.0); rtol=1e-10
     )
 end
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 30 in-system smoke tests
-# HTC-02/03: Phase 30 laminar HTC factories plugged into a real compiled Channel
-# Closes audit gap: fully_developed_laminar_h_spl and developing_laminar_h_spl
-# have never been passed as htc_correlation to a Channel and mtkcompiled.
-# ─────────────────────────────────────────────────────────────────────────────
 
 @testset "HTC-02/03: Phase 30 laminar HTC factories in compiled Channel" begin
     @testset "HTC-02: fully_developed_laminar_h_spl compiles in Channel" begin
@@ -666,7 +580,6 @@ end
         ssys_fd = @test_nowarn mtkcompile(sys_fd)
         @test ssys_fd !== nothing
 
-        # Solve to verify the system is also numerically tractable
         op_fd = [ssys_fd.cac_fd.T[i] => T_inlet for i in 1:n]
         push!(op_fd, ssys_fd.cac_fd.port_in.mdot => 1e-3)
         sol_fd = solve_steady(ssys_fd, op_fd)
@@ -715,14 +628,12 @@ end
             ct_l_dev...,
             ct_r_dev...,
         )
-        # Critical assertion: mtkcompile must succeed without symbolic tracing error
         ssys_dev = @test_nowarn mtkcompile(sys_dev)
         @test ssys_dev !== nothing
 
-        # Solve to verify the system is also numerically tractable
         op_dev = [ssys_dev.cac_dev.T[i] => T_inlet for i in 1:n]
         push!(op_dev, ssys_dev.cac_dev.port_in.mdot => 1e-3)
         sol_dev = solve_steady(ssys_dev, op_dev)
         @test sol_dev.retcode == ReturnCode.Success
     end
-end  # @testset "HTC-02/03: Phase 30 laminar HTC factories in compiled Channel"
+end

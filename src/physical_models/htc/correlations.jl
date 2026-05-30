@@ -18,6 +18,8 @@ the 4-arg HTC interface `(Re, Pr, T_bulk, T_wall) -> Nu`.
 
 Valid for: Re > 10,000, 0.6 <= Pr <= 160, L/D > 10.
 MTK-compatible: plain arithmetic on symbolic Re/Pr traces correctly.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 dittus_boelter(Re, Pr, args...) = 0.023 * Re^0.8 * Pr^0.4
 
@@ -36,6 +38,8 @@ htc_fn = constant_Nusselt()          # Nu = 8.235
 htc_fn = constant_Nusselt(Nu = 5.0)  # custom Nu
 ChannelAndContacts(htc_correlation = htc_fn, ...)
 ```
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function constant_Nusselt(; Nu=8.235)
     return (Re, Pr, args...) -> Nu
@@ -100,6 +104,8 @@ rd_nc = regime_dependent(
     g                  = g_acc,
 )
 ```
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function regime_dependent(;
     htc_laminar,
@@ -111,11 +117,8 @@ function regime_dependent(;
     Dh=nothing,
     g=nothing,
 )
-
-    # Convert to Float64 immediately — avoids type-promotion issues with symbolic Re
     Re_tr = Float64(Re_transition)
 
-    # D-04: htc_natural requires both Dh and g
     if !isnothing(htc_natural) && (isnothing(Dh) || isnothing(g))
         throw(
             ArgumentError(
@@ -124,13 +127,11 @@ function regime_dependent(;
         )
     end
 
-    # D-03: Dh or g without htc_natural is a likely miscall — warn
     if isnothing(htc_natural) && (!isnothing(Dh) || !isnothing(g))
         @warn "regime_dependent: Dh and g supplied but htc_natural not provided — NC regime will not be detected."
     end
 
     if !isnothing(htc_natural)
-        # NC-enabled path: switch on Gr/Re^2 > 1
         Dh_val = Float64(Dh)
         g_val = Float64(g)
         htc_forced_fn =
@@ -157,7 +158,6 @@ function regime_dependent(;
                 )
             end
     else
-        # Existing forced-convection-only path (backward compatible)
         htc_fn =
             (Re, Pr, T_bulk, T_wall) -> ifelse(
                 Re < Re_tr,
@@ -187,7 +187,7 @@ Source: Elenbaas (1942), as implemented in Python STREAM `_Elenbaas`.
 # Returns
 Nusselt number (dimensionless).
 """
-elenbaas_nusselt(Ra, b, L) = (1/24) * Ra * (b / L) * (1 - exp(-35 * L / (Ra * b)))^0.75
+elenbaas_nusselt(Ra, b, L) = (1 / 24) * Ra * (b / L) * (1 - exp(-35 * L / (Ra * b)))^0.75
 
 """
     elenbaas_htc(; b, L, Dh, g=9.81) -> (Re, Pr, T_bulk, T_wall) -> Nu
@@ -212,6 +212,9 @@ depend on forced-flow Reynolds number).
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
+NC exception: this closure evaluates `beta_water`, `mu_water`, `rho_water` INTERNALLY at `T_bulk` (NOT at film) — natural-convection driving force is a bulk-vs-wall ΔT phenomenon and Python STREAM evaluates β, ν at bulk for Gr.
 """
 function elenbaas_htc(; b, L, Dh, g=9.81)
     return (Re, Pr, T_bulk, T_wall) -> begin
@@ -229,21 +232,11 @@ function elenbaas_htc(; b, L, Dh, g=9.81)
     end
 end
 
-# _bergles_rohsenow_dT_ONB: Bergles-Rohsenow onset of nucleate boiling
-# temperature difference. Private helper for T_ONB[i] observables.
-# Phase 29 will elevate this to public Bergles_Rohsenow_T_ONB export.
-#
-# Source: Python STREAM temperatures.py lines 103-105
-# Formula: dT = 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
-# where p = P_Pa / 1e5 (pressure in bar)
 function _bergles_rohsenow_dT_ONB(P_Pa, q_spl)
     p = P_Pa / 1e5
     return 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
 end
 
-# Kakac Table 44 case 3 — 2-sided heating in rectangular duct.
-# Private helper used by HTC-02 and HTC-03 factories.
-# NOT the same as Marco_Han_Nusselt (which is 4-sided uniform heat flux).
 function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     return nu0 * (
         1.0 - 1.4122 * aspect_ratio + 2.3473 * aspect_ratio^2 - 2.8983 * aspect_ratio^3 +
@@ -251,12 +244,9 @@ function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     )
 end
 
-# Shah & London equations 317-319 for parallel plates, thermally developing flow.
-# Uses ifelse() (not if/else) so that MTK can trace through this function when x is
-# a symbolic Num expression. See CLAUDE.md MTK Patterns.
 function _nusselt_coefficient_developing(x)
-    nu_low = 1.49 * x^(-1/3)
-    nu_mid = 1.49 * x^(-1/3) - 0.4
+    nu_low = 1.49 * x^(-1 / 3)
+    nu_mid = 1.49 * x^(-1 / 3) - 0.4
     nu_high = 8.235 + 8.68 * exp(-164 * x) * (1e3 * x)^(-0.506)
     return ifelse(x <= 2e-4, nu_low, ifelse(x <= 1e-3, nu_mid, nu_high))
 end
@@ -273,6 +263,8 @@ rectangular duct with 2-sided heating.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function fully_developed_laminar_h_spl(; Dh, aspect_ratio)
     nu = _two_sided_heating_nusselt(aspect_ratio)
@@ -292,6 +284,8 @@ rectangular duct with 2-sided heating.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function developing_laminar_h_spl(; Dh, develop_length, aspect_ratio)
     correction = 6 - 5 * exp(-0.75 * aspect_ratio / 0.3257)
@@ -313,6 +307,8 @@ and returns the maximum Nusselt number.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> max(c1(...), c2(...), ...)`.
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function maximal_htc(correlations...)
     return (Re, Pr, T_bulk, T_wall) -> begin
@@ -331,6 +327,8 @@ through rectangular ducts with uniform wall temperature (4-sided heating).
 
 # Returns
 Nusselt number (dimensionless).
+
+Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function Marco_Han_Nusselt(aspect_ratio)
     return 8.235 * (

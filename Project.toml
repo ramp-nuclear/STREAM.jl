@@ -17,11 +17,12 @@ OrdinaryDiffEq = "6.109.0"
 QuadGK = "2.11.2"
 Statistics = "1.11.1"
 SteadyStateDiffEq = "2.11.0"
-julia = "1.10"
+julia = "1.12"
 
 [extras]
-PackageCompiler = "9b87118b-4619-50d2-8e1e-99f35a4d4d9d"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["DelimitedFiles", "Printf", "Test"]

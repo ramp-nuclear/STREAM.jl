@@ -1,5 +1,17 @@
 # STREAM.jl — Claude Code Instructions
 
+## Branching Policy
+
+**The user owns branch creation. GSD must never create its own branches.**
+
+The user creates one working branch per milestone (e.g. `channels-redesign` for v1.1) off `main`, and Claude works only on that branch for the duration of the milestone. When the milestone is complete and archived through GSD, the user opens a single PR from the working branch into `main`.
+
+Hard rules:
+- `.planning/config.json` `git.branching_strategy` MUST stay `"none"`. Do not "fix" it back to `"milestone"` or `"phase"` — those values cause GSD's `handle_branching` step to auto-create a `gsd/<...>` branch off the working branch, which has happened before and required manual consolidation.
+- Never run `git switch`, `git checkout -b`, or `git branch <new>` without an explicit instruction from the user in the current message.
+- At session start, before any commit, verify the current branch matches the user's intended working branch (read `.planning/STATE.md` "Working branch" line and confirm `git rev-parse --abbrev-ref HEAD` matches). If it does not, stop and ask before committing.
+- Worktree-isolated executor agents (Claude Code's `isolation="worktree"`) are exempt — they create temporary `worktree-agent-*` branches that exist only inside the worktree and are deleted after merge. That is not a violation of this policy.
+
 ## File Structure Standard
 
 This is the canonical layout. **Always follow it when editing or adding files.**
@@ -16,8 +28,8 @@ src/
     pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
     resistors.jl              # Friction, Gravity, Resistor
     misc.jl                   # Inertia, HeatExchanger, ConstantTemperature
-    channel.jl                # Channel + _channel_base_eqs (basic convective channel)
-    thermal_channel.jl        # ChannelAndContacts, ChannelHeatFlux (with ThermalPort arrays)
+    sources.jl                # WallTemperature, HeatFluxSource (value-source subsystems for channel external inputs)
+    channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + _channel_core (shared private core)
     heat_diffusion.jl         # HeatDiffusion + _diffusion_eqs (2D FD solid plate)
   physical_models/
     correlations.jl           # HTC + friction correlation closures
@@ -38,23 +50,33 @@ src/
 
 ```
 test/
-  runtests.jl               # Thin orchestrator: one @testset per include(), nothing else
+  runtests.jl               # Thin orchestrator: one include() per test file, nothing else
   test_geometry.jl          # PipeGeometry tests (PHY-01)
-  test_connectors.jl        # FlowPort, ThermalPort, package load (FOUND-01, CONN-01/02)
+  test_connectors.jl        # FlowPort, ThermalPort (HeatFluxPort retired in Phase 55 D-06)
   test_fluids.jl            # Fluid property functions (FOUND-02)
-  test_channel.jl           # Channel, ChannelAndContacts, ChannelHeatFlux (COMP-01, GRAV-*, CHAN-*, THERM-*, PHY-02/03/04)
+  test_channels.jl          # Channel/CHF/CAC variants + _channel_core enthalpy-form physics
+                            # + flow-reversal sign safety (Phase 55 D-17 unified file —
+                            # absorbs legacy test_channel.jl, test_channel_core.jl,
+                            # test_sign_safety.jl)
   test_pump.jl              # Pump tests (COMP-02, PHY-05)
+  test_flapper.jl           # Flapper tests
   test_resistors.jl         # Friction, Gravity, Resistor, network tests (COMP-03/04, NET-*)
-  test_misc.jl              # Inertia, HeatExchanger (phase 8 COMP-01/02)
+  test_misc.jl              # Inertia, HeatExchanger, ConstantTemperature, WallTemperature, HeatFluxSource
   test_heat_diffusion.jl    # HeatDiffusion (HDIFF-01..05)
-  test_correlations.jl      # Correlation function unit tests (PHY-02/03/04 standalone)
-  test_composition.jl       # Composition helpers, QoL (COMP-01..04, QOL-01..03)
-  test_solvers.jl           # Solver integration tests (SYS-*, SOLV-*)
-  test_validation.jl        # Quantitative cross-validation against Python STREAM (VAL-*)
-  test_examples.jl          # build_loop / build_cube smoke tests (COMPAT)
+  test_correlations.jl      # HTC + friction correlation function unit tests
+  test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState (renamed from test_analysis.jl, Phase 55 D-20)
+  test_composition.jl       # symmetric_plate, plate, one_sided_connection, compose_systems,
+                            # port, check_gravity_mismatch, _infer_n, connect_temperature_feedback
+                            # — heavy CAC↔HD coverage (Phase 55 D-18)
+  test_validation.jl        # Quantitative cross-validation against Python STREAM (Phase 56)
+  test_integration.jl       # NEW: single big integration file — builders, solvers,
+                            # LOF transient, ISCB, PK loops, COMPAT (Phase 55 D-19)
+  test_point_kinetics.jl    # PK component-unit tests only (coupled-loop feedback now in
+                            # test_integration.jl as PK-IC-01 + PK-FB-01/02, which replaced the
+                            # retired TF-06/TF-07 — see .planning/notes/2026-05-29-pk-coupling-investigation.md)
 ```
 
-**Test placement rule:** test file mirrors src file. `components/channel.jl` → `test_channel.jl`. New component file → new test file.
+**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_misc.jl` alongside `ConstantTemperature` (same value-source family) per Phase 55 D-21.
 
 ## Component authoring conventions
 
@@ -99,41 +121,19 @@ When `Dt(port_in.mdot)` appears in an equation, MTK automatically promotes `port
 
 MTK's symbolic IR requires structural analysis (index reduction from DAE to ODE), Jacobian sparsity detection, and code generation before a numerical solver can use it. Always call `mtkcompile(sys)` to produce a compiled system. Passing an uncompiled `System` to `solve` will error or produce wrong results.
 
-## Performance — Sysimage
+## Running the code
 
-**The recommended development workflow for fast iteration:**
-
-1. Keep a persistent Julia REPL open — don't restart Julia between runs
-2. Use `Revise.jl` for code changes — edits are picked up automatically without restarting
-3. `mtkcompile` is slow only on the *first* call in a session (~10-30s); subsequent calls reuse compiled dispatch
-
-**Build once** (2-5 min, rebuild when `Manifest.toml` changes):
 ```bash
-./build_sysimage.sh
-```
-The shell script sets `--heap-size-hint` dynamically (75% of free RAM) and `--threads=1` to prevent OOM freezes on WSL2.
-Do **not** run `julia --project=. build_sysimage.jl` directly — it will exhaust memory.
-
-The sysimage bakes `STREAM` and `QuadGK` only. `ModelingToolkit`, `Symbolics`, `OrdinaryDiffEq`, and `Sundials` are intentionally excluded — their LLVM IR is large enough to OOM-kill the PackageCompiler linker even on 32 GB machines. MTK's `using` load time is handled by Julia's automatic pkgimage cache (`~/.julia/compiled/`), which is built on first use and reused across sessions.
-
-> **Note:** PackageCompiler's incremental link step crashes on Julia 1.12 + WSL2 regardless
-> of package list size. If `./build_sysimage.sh` is killed by signal 15 at ~7 min, the
-> sysimage cannot be built on this configuration. Use the persistent REPL workflow instead.
-> The build infrastructure remains in place for future Julia versions or non-WSL2 machines.
-
-**Always use the sysimage** when running tests or verification:
-```bash
-test -f stream.so && SYSIMG="--sysimage stream.so" || SYSIMG=""
-julia $SYSIMG --project=. test/runtests.jl
+julia --project=. test/runtests.jl        # full suite
+julia --project=. test/test_channels.jl   # a single file
+julia --project=. examples/simple_loop.jl
 ```
 
-`stream.so` is git-ignored and platform-specific — each machine builds its own. The sysimage bakes deps, not STREAM source, so source edits are picked up without rebuilding.
+Each invocation pays full cold-start (~30–90s `using STREAM` plus first `mtkcompile` ~10–30s). That is the accepted dev loop.
 
-**Measuring TTFX improvement:**
-```bash
-# Baseline (no sysimage):
-julia --project=. time_startup.jl
+### Abandoned approaches — do not re-introduce
 
-# With sysimage (after building):
-julia --sysimage stream.so --project=. time_startup.jl
-```
+Two attempts to beat cold-start were tried and abandoned. Do not bring either back:
+
+- **Daemon dev loop** (`Revise` + `DaemonMode`, `bin/jl*` scripts, tmux session `stream-jl`). A Claude-Code-specific speedup that did not pay off; fully removed from this branch (scripts, the `DaemonMode`/`Revise` deps, and `time_startup.jl`).
+- **PackageCompiler sysimage** (`stream.so`). PackageCompiler's incremental link step is killed by SIGTERM at ~7 min on Julia 1.12 + WSL2 regardless of package set. Tooling was removed in v1.0. Historical `--sysimage` references under `.planning/` are archive only — do not act on them.
