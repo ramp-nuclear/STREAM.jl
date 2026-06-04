@@ -2,7 +2,7 @@ using Printf
 using DelimitedFiles
 using Test
 using STREAM
-import STREAM: cp_water, rho_water, mu_water, k_water
+using STREAM: cp_water, rho_water, mu_water, k_water
 
 const TIER_CLEAN = :CLEAN   # rtol ≤ gray_floor (1e-6)
 const TIER_GRAY  = :GRAY    # gray_floor < rtol < hard_ceiling (default 0.02)
@@ -129,20 +129,20 @@ const PYTHON_K_AT_REF   = (0.63015562705599992, 0.66106740247825002, 0.679397572
     assert_equivalence_fluid_props(; rtol=1e-12)
 
 Hard-assert Julia rho/cp/mu/k at REF_T_K match Python STREAM Simantov
-correlations (PYTHON_*_AT_REF constants) within `rtol`. Aborts via @assert
+correlations (PYTHON_*_AT_REF constants) within `rtol`. Aborts via `error()`
 if any property drifts. Per D-10 fluid-props tier.
 """
 function assert_equivalence_fluid_props(; rtol::Float64=1e-12)
     for (i, T_K) in enumerate(REF_T_K)
-        @assert isapprox(rho_water(T_K), PYTHON_RHO_AT_REF[i]; rtol=rtol) (
+        isapprox(rho_water(T_K), PYTHON_RHO_AT_REF[i]; rtol=rtol) || error(
             "EQUIVALENCE FAIL: rho_water($T_K) Julia=$(rho_water(T_K)) " *
             "vs Python=$(PYTHON_RHO_AT_REF[i])")
-        @assert isapprox(cp_water(T_K),  PYTHON_CP_AT_REF[i];  rtol=rtol) (
+        isapprox(cp_water(T_K),  PYTHON_CP_AT_REF[i];  rtol=rtol) || error(
             "EQUIVALENCE FAIL: cp_water($T_K) Julia=$(cp_water(T_K)) " *
             "vs Python=$(PYTHON_CP_AT_REF[i])")
-        @assert isapprox(mu_water(T_K),  PYTHON_MU_AT_REF[i];  rtol=rtol) (
+        isapprox(mu_water(T_K),  PYTHON_MU_AT_REF[i];  rtol=rtol) || error(
             "EQUIVALENCE FAIL: mu_water($T_K)")
-        @assert isapprox(k_water(T_K),   PYTHON_K_AT_REF[i];   rtol=rtol) (
+        isapprox(k_water(T_K),   PYTHON_K_AT_REF[i];   rtol=rtol) || error(
             "EQUIVALENCE FAIL: k_water($T_K)")
     end
     @info "Equivalence checklist: fluid props match within rtol=$rtol at T = $REF_T_K"
@@ -158,7 +158,7 @@ function assert_equivalence_dittus_boelter(; rtol::Float64=1e-12)
     Re_ref, Pr_ref = 10_000.0, 1.0
     Nu_python = 0.023 * Re_ref^0.8 * Pr_ref^0.4
     Nu_julia  = STREAM.dittus_boelter(Re_ref, Pr_ref)
-    @assert isapprox(Nu_julia, Nu_python; rtol=rtol) (
+    isapprox(Nu_julia, Nu_python; rtol=rtol) || error(
         "EQUIVALENCE FAIL: Dittus-Boelter at Re=$Re_ref, Pr=$Pr_ref: " *
         "Julia=$Nu_julia, Python-formula=$Nu_python")
     @info "Equivalence checklist: Dittus-Boelter constants (0.023, 0.8, 0.4) match"
@@ -173,7 +173,7 @@ function assert_equivalence_blasius(; rtol::Float64=1e-12)
     Re_ref = 10_000.0
     f_python = 0.3164 / Re_ref^0.25
     f_julia  = STREAM.blasius_friction(Re_ref)
-    @assert isapprox(f_julia, f_python; rtol=rtol) (
+    isapprox(f_julia, f_python; rtol=rtol) || error(
         "EQUIVALENCE FAIL: Blasius at Re=$Re_ref: Julia=$f_julia, " *
         "Python-formula=$f_python")
     @info "Equivalence checklist: Blasius constants (0.3164, 0.25) match"
@@ -192,15 +192,15 @@ generator and pasted into the parity testset).
 function assert_equivalence_geometry(geom, expected_Dh, expected_A,
                                      expected_wet_perim, expected_heated_parts;
                                      rtol::Float64=1e-12)
-    @assert isapprox(geom.Dh, expected_Dh; rtol=rtol) (
+    isapprox(geom.Dh, expected_Dh; rtol=rtol) || error(
         "EQUIVALENCE FAIL: Dh: Julia=$(geom.Dh), Expected=$expected_Dh")
-    @assert isapprox(geom.A, expected_A; rtol=rtol) (
+    isapprox(geom.A, expected_A; rtol=rtol) || error(
         "EQUIVALENCE FAIL: A: Julia=$(geom.A), Expected=$expected_A")
-    @assert isapprox(geom.wet_perimeter, expected_wet_perim; rtol=rtol) (
+    isapprox(geom.wet_perimeter, expected_wet_perim; rtol=rtol) || error(
         "EQUIVALENCE FAIL: wet_perimeter")
-    @assert isapprox(geom.heated_parts[1], expected_heated_parts[1]; rtol=rtol) (
+    isapprox(geom.heated_parts[1], expected_heated_parts[1]; rtol=rtol) || error(
         "EQUIVALENCE FAIL: heated_parts[1] (left)")
-    @assert isapprox(geom.heated_parts[2], expected_heated_parts[2]; rtol=rtol) (
+    isapprox(geom.heated_parts[2], expected_heated_parts[2]; rtol=rtol) || error(
         "EQUIVALENCE FAIL: heated_parts[2] (right)")
     @info "Equivalence checklist: geometry matches"
 end

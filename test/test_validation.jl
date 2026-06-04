@@ -4,7 +4,7 @@ using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using DelimitedFiles
 using STREAM
-import STREAM: Channel, HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
+using STREAM: Channel, HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
 
 
 include(joinpath(@__DIR__, "parity_helpers.jl"))
@@ -96,15 +96,15 @@ _h_eff(sol, cac, i) = abs(sol[cac.q_wall_left[i]]) >= abs(sol[cac.q_wall_right[i
     catch e
         @test false  # should not throw
     end
-    # Self-test 12: equivalence checklist mechanism — assert FIRES on a wrong reference.
-    # (Plan 56-04 made PYTHON_*_AT_REF bit-identical to Julia at rtol=1e-12, so the
-    # native checklist passes; we exercise the @assert by calling assert_equivalence_dittus_boelter
-    # via a manually-broken context. Simulate the failure path with a direct @assert false.)
+    # Self-test 12: equivalence checklist mechanism fires on a wrong reference.
+    # (Plan 56-04 made PYTHON_*_AT_REF bit-identical to Julia at rtol=1e-12, so the native
+    # checklist passes; here we exercise the guard mechanism directly by simulating the
+    # failure path with the same `cond || error(...)` form the checklist functions use.)
     threw = false
     try
-        @assert isapprox(STREAM.dittus_boelter(10_000.0, 1.0), 1e10; rtol=1e-12) "self-test 12"
+        isapprox(STREAM.dittus_boelter(10_000.0, 1.0), 1e10; rtol=1e-12) || error("self-test 12")
     catch e
-        threw = e isa AssertionError
+        threw = e isa ErrorException
     end
     @test threw
 end
