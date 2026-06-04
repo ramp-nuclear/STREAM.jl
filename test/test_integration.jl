@@ -23,7 +23,7 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 using Statistics
 using STREAM
-import STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger,
+using STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger,
     ConstantTemperature, PipeGeometry_circular, PipeGeometry_rectangular,
     HeatDiffusion, solve_steady, solve_transient, steady_state_guess,
     regime_dependent_q_scb, _bergles_rohsenow_dT_ONB
@@ -842,5 +842,5 @@ end
 # which Pkg.test() invokes as the package test entry point.
 # ───────────────────────────────────────────────────────────
 @testset "COMPAT: Test suite runs automatically via Pkg.test()" begin
-    @test true
+    @test STREAM isa Module
 end
