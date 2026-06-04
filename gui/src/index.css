@@ -6,22 +6,129 @@
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
+  /* Phase 72 — light-mode --card recommitted darker than --canvas (0.99)
+     so node bodies read as a distinct cell on the work surface. Tracks
+     the dark-mode pattern (--card slightly darker than --canvas). */
+  --card: oklch(0.97 0.003 254);
   --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
+  /* Phase 72 P2 — light-mode --popover recommitted from oklch(1 0 0) (= #fff
+     == --background == --canvas in light mode) to a token Δ 0.03 BELOW
+     canvas. Old value was indistinguishable from canvas; dropdowns blended
+     into the background with no visible separation. */
+  --popover: oklch(0.96 0.003 254);
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* Phase 72 harden — light muted-foreground darkened from oklch(0.556 0 0)
+     to oklch(0.50 0.005 254) (and aligned to the hue-254 neutral lineage).
+     Old value gave ~4.47:1 on panel — short of the WCAG AA 4.5:1 floor
+     for body text. New value clears 4.5:1 on every chrome/panel/canvas/
+     popover/card surface (worst case 5.19 on chrome). */
+  --muted-foreground: oklch(0.50 0.005 254);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Phase 72 — --border relocked from oklch(0.922 0 0) to a hue-tinted solid
+     OKLCH (no pure-neutral, no alpha trickery). --border-hover is a +Δ0.08
+     lightness step used by Input on hover. */
+  --border: oklch(0.88 0.005 254);
+  --border-hover: oklch(0.80 0.005 254);
+  --input: oklch(0.88 0.005 254);
+  /* Phase 72 — --ring relocked from pure-neutral to a low-chroma Hydraulic
+     tint (hue 240, chroma 0.14). Focus reads as "selected" with minor
+     identity, not decoration. Matches Linear/Cursor lineage. */
+  --ring: oklch(0.55 0.14 240);
+  /* Phase 72 (post-Preferences) — --shadow-dialog relocked to the atmospheric
+     CommandPalette lineage. Applied to Dialog + AlertDialog + Sheet. The
+     prior 8/24 px shadow paired with a dim grey scrim; the scrim was
+     rejected by the user as ugly (see feedback_no_grey_modal_surface_or_scrim).
+     With the scrim gone, the shadow takes over the lift work — 16/40 px
+     blur reads as "this overlay floats above your work" without a dim
+     filter on the canvas. */
+  --shadow-dialog:
+    0 16px 40px -12px oklch(0.05 0 0 / 0.18),
+    0 4px 12px -4px oklch(0.05 0 0 / 0.12);
+  /* Phase 72 (post-Preferences) — dialog surface + border, distinct from
+     --popover (which lifts ABOVE the canvas as a tonal step). Dialogs sit
+     "off the chrome/panel/canvas trio" — light mode: 0.93 (Δ 0.02 below
+     chrome 0.95); dark mode (in .dark below): 0.13 (Δ 0.03 below chrome
+     0.16). The CommandPalette established this tone earlier as its
+     bespoke surface; now promoted to the default Dialog body. */
+  --dialog-surface: oklch(0.93 0.012 254);
+  --dialog-border: oklch(0.86 0.012 254);
+  /* Phase 72 — unselected-node ring color. Plain hex (not OKLCH) because
+     chroma-0 OKLCH inputs are a degenerate case in WebKitGTK parsers
+     and silently fall back to currentColor on this dev configuration. */
+  --node-ring-rest: #c3c3c3;
+  /* Phase 72 — flow-port disc tokens (Lane 2.5, 2026-05-23). Refined after
+     Lane 2 first pass read as "graphite disc with a saturated sticker on
+     top": the chevron was at full Hydraulic chroma (0.18) against a near-
+     neutral disc, and small high-saturation-on-neutral always reads toyish
+     regardless of disc tone. Three knobs adjusted:
+       1. Chevron desaturated chroma 0.18 → 0.07; hue 240 preserved so the
+          chevron still reads as Hydraulic, just whispered rather than
+          shouted (introduced as --color-port-chevron below).
+       2. Disc tones deepened and hue-shifted 254 → 250 (cooler, less
+          generic plastic-grey, more brushed-instrument).
+       3. Border tone deepened for a precise cut-edge read at thinner
+          stroke width (1.5 px → 1 px applied at the SVG level).
+     Disc still pops off --card (light: Δ-0.14 vs card 0.97; dark: Δ+0.22
+     vs card 0.23). */
+  --color-port-disc: oklch(0.83 0.006 250);
+  --color-port-disc-border: oklch(0.50 0.012 250);
+  --color-port-chevron: oklch(0.46 0.07 240);
+  /* Phase 72 — three-tier depth tokens recommitted with stronger steps and
+     hue tint per OKLCH no-#fff rule. Chrome darkest, panel mid, canvas
+     lightest (warmest). Light mode: tinted toward hue 254 (matches dark
+     mode lineage) at near-imperceptible chroma 0.003–0.005. */
+  --chrome: oklch(0.95 0.005 254);
+  --panel: oklch(0.98 0.003 254);
+  --canvas: oklch(0.99 0.003 254);
+  /* Phase 72 — layer-accent palette (single source of truth — see
+     gui/src/lib/layerColors.ts for the LayerKey → CSS-var mapping consumed
+     by LayersPanel + StreamNode). Hues chosen with domain intent +
+     deuteranopia margin: Hydraulic blue (flow/water convention), Thermal
+     amber (heat convention), Sources yellow-green (input/source LED
+     convention), ReactorPhysics deep crimson (criticality, distinguished
+     from --destructive via lightness step). */
+  --color-layer-hydraulic: oklch(0.50 0.18 240);
+  --color-layer-thermal: oklch(0.60 0.16 75);
+  --color-layer-sources: oklch(0.60 0.18 130);
+  --color-layer-reactor-physics: oklch(0.48 0.22 15);
+  /* Phase 72 — canvas grid lines (CAD/Houdini convention replacing the
+     ReactFlow default dot pattern). Two tiers: major every 24 px @ 1.0
+     zoom, minor every 12 px @ 1.0 zoom. Both are 1px solid; spacing
+     scales with zoom via xyflow's Background gap prop. */
+  /* Phase 72 — grid line tones tuned for "subtle structural texture, not
+     decorative" (PRODUCT.md). Light: Δ 0.05 (major) / 0.02 (minor) from
+     canvas. Tightened down from first-pass values (0.86/0.92) after user
+     verification — initial values read as a loud CAD grid. */
+  --color-canvas-grid-major: oklch(0.94 0.003 254);
+  --color-canvas-grid-minor: oklch(0.97 0.003 254);
+  /* Phase 72 — warning + info functional tokens (replaces text-yellow-500
+     / text-blue-500 raw Tailwind in ValidationPanel and any future
+     warning/info surface). OKLCH per the locked OKLCH-only doctrine.
+     Phase 72 harden — darkened both for WCAG AA contrast in light mode:
+     warning 0.74 → 0.55 (was 2.23:1 on panel — well below body floor);
+     info 0.62 → 0.535 (was 3.26:1 on panel). Hue and chroma unchanged so
+     the perceptual identity stays. */
+  --color-warning: oklch(0.55 0.16 75);
+  --color-info: oklch(0.535 0.18 240);
+  /* Phase 72 — Code editor lane carve-out. The 5 --syntax-* tokens are the
+     CodePreview syntax-highlight palette, anchored to One Dark Pro (the most-
+     installed VSCode theme + the Julia editor lineage via Juno/Atom). Scoped
+     exception to the project's perceptual palette — code editors are their
+     own established convention domain (parallel to WindowControls' platform
+     mimicry exemption). NOT consumed by canvas/chrome surfaces. Comments
+     reuse --muted-foreground (italic) — no separate token. */
+  --syntax-keyword: oklch(0.55 0.18 295);
+  --syntax-string:  oklch(0.55 0.16 145);
+  --syntax-type:    oklch(0.55 0.14 230);
+  --syntax-macro:   oklch(0.60 0.17 80);
+  --syntax-number:  oklch(0.58 0.17 50);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -36,34 +143,102 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Phase 73 — edge stroke tokens (light mode).
+     Rationale: unselected sits at body-text legibility (matches
+     --foreground 0.145 lightness). Selected lifts to near-pure-ink AND
+     gains a thicker stroke — two stacked signals so selection is
+     unmissable without going neon. Tinted toward brand hue 254 at low
+     chroma (PRODUCT.md no-#000 rule). */
+  --edge-stroke: oklch(0.18 0.008 254);
+  --edge-stroke-selected: oklch(0.06 0.01 254);
 }
 
 .dark {
-  /* One Dark Pro inspired: warm blue-grey palette (#282c34 family) */
-  --background: oklch(0.24 0.012 254);      /* #282c34 — editor bg */
-  --foreground: oklch(0.73 0.012 250);      /* #abb2bf — warm grey-blue text */
-  --card: oklch(0.27 0.014 254);            /* #2c313a — panel/card surfaces */
+  /* Phase 72 — dark mode neutrals. Broke from the One Dark Pro lineage
+     (warm blue-grey hue 254 retained for continuity, but luminance steps
+     recommitted for stronger depth contrast). Phase 72 brief explicitly
+     flagged the One Dark Pro inheritance as a Claude default up for
+     redesign — values now derive from the depth hierarchy decision, not
+     from matching #282c34. */
+  --background: oklch(0.27 0.012 254);      /* matches new --canvas */
+  --foreground: oklch(0.73 0.012 250);      /* unchanged — warm grey-blue text reads well on the lifted canvas */
+  /* Phase 72 — --card recommitted DARKER than canvas so node bodies read as
+     a distinct cell within the work surface. First-pass mistake: setting
+     --card == --canvas made bodies invisible (zero contrast). Δ 0.04
+     downward from canvas — clear figure-ground without becoming a separate
+     tier (it's between panel 0.21 and canvas 0.27). */
+  --card: oklch(0.23 0.012 254);
   --card-foreground: oklch(0.73 0.012 250);
-  --popover: oklch(0.265 0.014 254);
+  /* Phase 72 P2 — dark --popover lifted from 0.265 → 0.33 (Δ +0.06 ABOVE
+     canvas 0.27 instead of -0.005 below it). At the old value dropdowns
+     rendering over the canvas had near-zero figure-ground separation —
+     the surface blended into the work area with no visible edge. The new
+     value sits clearly above canvas (the floating-surface signal) AND
+     clearly above panel (Δ 0.12) for dropdowns triggered from chrome. */
+  --popover: oklch(0.33 0.012 254);
   --popover-foreground: oklch(0.73 0.012 250);
   --primary: oklch(0.73 0.012 250);
-  --primary-foreground: oklch(0.24 0.012 254);
-  --secondary: oklch(0.315 0.016 252);      /* #3e4451 — hover/selected */
+  --primary-foreground: oklch(0.27 0.012 254);
+  --secondary: oklch(0.315 0.016 252);
   --secondary-foreground: oklch(0.73 0.012 250);
   --muted: oklch(0.315 0.016 252);
-  --muted-foreground: oklch(0.50 0.01 250); /* #5c6370 — subdued labels */
+  /* Phase 72 harden — dark muted-foreground lifted from oklch(0.50 0.01 250)
+     to oklch(0.65 0.01 250). Old value gave 2.51:1 on canvas / 2.96 on panel
+     — well below the WCAG AA 4.5:1 body-text floor. New value clears 4.5:1
+     on canvas (4.48 — within rounding), 5.27 on panel, 5.78 on chrome,
+     5.02 on card. On --popover (the LIFTED surface in dark mode, brighter
+     than canvas) it reads at 3.63:1 — passes the 3:1 large-text/icon floor
+     but should not be used for body text on popover; that's a code-side
+     discipline (use --foreground/85 or --foreground for body inside popover/
+     dialog content). */
+  --muted-foreground: oklch(0.65 0.01 250);
   --accent: oklch(0.315 0.016 252);
   --accent-foreground: oklch(0.73 0.012 250);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 11%);
-  --input: oklch(1 0 0 / 13%);
-  --ring: oklch(0.50 0.01 250);
+  /* Phase 72 P2 — chroma reduced 0.012 → 0.005 to match --panel's hue
+     subtlety. At 0.012 chroma the borders read perceptibly blue against
+     the warm-grey canvas/panel (eye anchors on the contrast and amplifies
+     the hue); at 0.005 they read as proper neutral grey with the faintest
+     hint of warmth, which is what "tinted neutral" should mean.
+     Phase 72 — --border relocked from alpha-on-white (oklch(1 0 0 / 11%))
+     to solid hue-tinted OKLCH. Alpha-on-pure-white violated the OKLCH-only
+     doctrine (it's effectively HSL alpha trickery). --border-hover is the
+     +Δ0.08 lightness step Input lifts to on hover. */
+  --border: oklch(0.30 0.005 254);
+  --border-hover: oklch(0.38 0.005 254);
+  --input: oklch(0.30 0.005 254);
+  /* Phase 72 — --ring relocked from pure-neutral oklch(0.50 0.01 250) to a
+     low-chroma Hydraulic tint (hue 240). Focus reads as "selected" with
+     minor identity. */
+  --ring: oklch(0.65 0.10 240);
+  /* Phase 72 (post-Preferences) — --shadow-dialog dark-mode relocked to the
+     atmospheric CommandPalette lineage (see :root header for the why). */
+  --shadow-dialog:
+    0 16px 40px -12px oklch(0.05 0 0 / 0.55),
+    0 4px 12px -4px oklch(0.05 0 0 / 0.40);
+  /* Phase 72 (post-Preferences) — dialog surface + border, dark mode.
+     0.13 lightness sits BELOW --chrome (0.16) so the dialog reads as a
+     distinct tool overlay rather than a lifted panel. Border at 0.24 is
+     subtle but visible against the dark surface. */
+  --dialog-surface: oklch(0.13 0.012 254);
+  --dialog-border: oklch(0.24 0.012 254);
+  /* Phase 72 — unselected-node ring, dark mode. See :root for rationale. */
+  --node-ring-rest: #6e6e6e;
+  /* Phase 72 — flow-port disc tokens, dark mode (Lane 2.5). See :root for
+     the desaturation rationale. Dark-mode disc bumped 0.42 → 0.45 (very
+     slight lift); border deepened 0.28 → 0.22 for a crisper rim against
+     the lighter disc; chevron at chroma 0.07 (was 0.16 layer-hydraulic
+     direct) reads as a Hydraulic hint rather than a saturated sticker. */
+  --color-port-disc: oklch(0.45 0.014 250);
+  --color-port-disc-border: oklch(0.22 0.018 250);
+  --color-port-chevron: oklch(0.80 0.07 240);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.215 0.012 254);        /* #21252b — sidebar (slightly darker) */
+  --sidebar: oklch(0.21 0.012 254);         /* tracks new --panel */
   --sidebar-foreground: oklch(0.73 0.012 250);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.73 0.012 250);
@@ -71,6 +246,48 @@
   --sidebar-accent-foreground: oklch(0.73 0.012 250);
   --sidebar-border: oklch(1 0 0 / 11%);
   --sidebar-ring: oklch(0.50 0.01 250);
+  /* Phase 72 — three-tier depth tokens, dark mode. Recommitted steps:
+     chrome 0.16 → panel 0.21 → canvas 0.27 (was 0.19/0.215/0.24). ~2x
+     the contrast between tiers for a more committed depth hierarchy. */
+  --chrome: oklch(0.16 0.012 254);
+  --panel: oklch(0.21 0.012 254);
+  --canvas: oklch(0.27 0.012 254);
+  /* Phase 72 — layer-accent palette, dark-mode lift. Higher lightness so
+     accents read against the darker canvas/chrome surfaces. */
+  --color-layer-hydraulic: oklch(0.62 0.16 240);
+  --color-layer-thermal: oklch(0.74 0.15 75);
+  --color-layer-sources: oklch(0.74 0.17 130);
+  --color-layer-reactor-physics: oklch(0.62 0.22 15);
+  /* Phase 72 — grid line tones, dark mode, recessive. Δ 0.05 (major) /
+     0.02 (minor) from canvas — tuned down from first-pass values
+     (0.35/0.31) which read as a loud CAD grid. */
+  --color-canvas-grid-major: oklch(0.32 0.012 254);
+  --color-canvas-grid-minor: oklch(0.295 0.012 254);
+  /* Phase 72 — warning + info, dark-mode lift. */
+  --color-warning: oklch(0.78 0.15 75);
+  --color-info: oklch(0.72 0.16 240);
+  /* Phase 72 — Code editor lane (dark-mode lift). See :root for rationale. */
+  --syntax-keyword: oklch(0.74 0.16 295);
+  --syntax-string:  oklch(0.78 0.14 145);
+  --syntax-type:    oklch(0.78 0.11 230);
+  --syntax-macro:   oklch(0.83 0.13 80);
+  --syntax-number:  oklch(0.78 0.13 50);
+
+  /* Phase 73 — dedicated edge stroke tokens (dark mode).
+     Pushed to near-pure-white so edges pop hard against the 0.27 canvas
+     + dot grid (--foreground at 0.73 was the previous ceiling and read
+     too quiet). Selected goes the rest of the way to the lightness
+     ceiling; the width bump in the .react-flow rule is small so the
+     selection signal is mostly color + a touch of weight. */
+  /* Phase 73 — edge stroke tokens (dark mode).
+     Rationale: unselected sits at body-text legibility (matches
+     --foreground 0.73 lightness). Selected lifts to near-display-white
+     (0.93) AND gains a thicker stroke — two stacked signals so
+     selection is unmissable without making the rest-state edges scream.
+     Cool blue tint at chroma 0.008 (just enough to escape pure neutral
+     without competing with the layer-color tokens). */
+  --edge-stroke: oklch(0.73 0.008 254);
+  --edge-stroke-selected: oklch(0.93 0.005 254);
 }
 
 @theme inline {
@@ -80,6 +297,14 @@
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  /* Phase 72 (post-Preferences) — dialog surface tokens. Distinct from
+     --popover (which is the LIFTED chrome surface for menus / popovers).
+     Dialogs use a tone that sits OFF the chrome/panel/canvas trio so they
+     read as a tool overlay rather than another panel. Established by
+     CommandPalette; promoted to default Dialog body when the dim grey
+     scrim was banned. */
+  --color-dialog-surface: var(--dialog-surface);
+  --color-dialog-border: var(--dialog-border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -90,6 +315,9 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
+  /* Phase 72 — --border-hover is the +Δ0.08 lightness step Input lifts to
+     on hover (and any control that wants a hover border emphasis). */
+  --color-border-hover: var(--border-hover);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
@@ -97,10 +325,40 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  /* Phase 72 — radius scale committed to two tiers: --radius-sm 4px for
+     compact controls (Button, Input, Badge, menu items), --radius-md 8px
+     for surfaces (Popover, Dialog, Card). --radius-lg/xl retained for
+     downstream code that already consumes them, but the primitive layer
+     does not use them. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  /* Phase 72 — typographic scale (1.25 Major Third). Tailwind v4 reads
+     --text-* tokens to generate text-{name} utilities. */
+  --text-micro: 0.625rem;       /* 10 px — layer headers, validator-id chips, keyboard hint chips */
+  --text-micro--line-height: 1rem;
+  --text-label: 0.6875rem;      /* 11 px — status bar chips, node summary, Badge, Label */
+  --text-label--line-height: 1rem;
+  --text-body: 0.8125rem;       /* 13 px — inputs, buttons, menu items, node instance name */
+  --text-body--line-height: 1.25rem;
+  --text-title: 1rem;           /* 16 px — panel headers, dialog titles */
+  --text-title--line-height: 1.5rem;
+  --text-display: 1.25rem;      /* 20 px — reserved for future hierarchy moments */
+  --text-display--line-height: 1.75rem;
+  /* Font families. The mono is the only committed face (2026-05-28); body
+     stays on the system stack since native rendering is high-quality and
+     the engineering-voice lives in mono surfaces (status bar counts,
+     validator IDs, keyboard hints, value summaries). JetBrains Mono is
+     registered as `JetBrains Mono Variable` by @fontsource-variable/jetbrains-mono
+     (imported in main.tsx). Falls back through ui-monospace → native mono
+     stack if the variable font fails to load. */
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* Phase 72 — --shadow-dialog (defined in :root + .dark) is consumed by
+     Dialog / AlertDialog / Sheet via the arbitrary-value form
+     `shadow-[var(--shadow-dialog)]`. Not exposed as a Tailwind utility
+     here because @theme inline would require static values, breaking the
+     dark-mode override. */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -109,6 +367,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* Phase 67 Plan 04 — expose three-tier depth tokens as Tailwind utilities:
+     bg-chrome / bg-panel / bg-canvas (and matching text-/border- variants).
+     Tailwind v4 generates utilities from any --color-* token declared inside
+     @theme inline. */
+  --color-chrome: var(--chrome);
+  --color-panel: var(--panel);
+  --color-canvas: var(--canvas);
 }
 
 * {
@@ -120,6 +385,74 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+  /* Phase 72 — global no-select chrome policy. Stops accidental text drag-
+     selection during marquee selection on the canvas, sidebar list scans,
+     and toolbox drags. Inputs, textareas, [contenteditable], and the
+     opt-in `.select-text` Tailwind utility re-enable selection at the
+     element level. Add `.select-text` (or className=select-text) wherever
+     a user genuinely needs to copy text — e.g. CodePreview, validation
+     descriptions, project paths, generated Julia output. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.select-text,
+.select-text * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Phase 73 — edge stroke color tokens.
+   xyflow's defaults (`#b1b1b7` light / `#3e3e3e` dark) blend into the
+   canvas + dot grid. We push the resting state to `var(--edge-stroke)`
+   (a dedicated token brighter than --foreground in dark mode, darker in
+   light mode) so unselected edges read clearly at rest. Selected uses
+   the same color + a slightly thicker stroke; selection conveys via
+   width since the rest state is already loud.
+
+   No `!important` direct rule — that would shadow BCEdge's intentional
+   inline `stroke: var(--muted-foreground)` (dashed BC edges should stay
+   distinct from hydraulic lines). xyflow's edge-path stroke uses
+   `var(--xy-edge-stroke, var(--xy-edge-stroke-default))` so our
+   variable override applies wherever no inline stroke is set.
+
+   The .react-flow__edge.selected path-width rule does need !important
+   because xyflow's selection-stroke-width is baked into a CSS rule of
+   equal specificity that we want to override.
+
+   CARVE-OUTS — the rest-state rule below explicitly does NOT match
+   edges with `.validation-flow-trace` (loop trace) on the group OR
+   `.code-link-active` on the path. Both of those classes are STATE
+   overrides that need to win the stroke; without the :not() carve-outs
+   the rest-state rule's higher specificity (0,4,0 vs trace 0,2,0 / code-link
+   0,1,0) was beating them under !important rules, painting traced loops
+   and code-link-active edges with the rest-state edge-stroke (a near-white
+   token in dark mode). Confirmed bug 2026-05-28: gravity-loop warning trace
+   rendered white instead of orange after Phase 73's edge-stroke commit. */
+.react-flow {
+  --xy-edge-stroke-default: var(--edge-stroke);
+  --xy-edge-stroke-width-default: 1.5;
+  --xy-edge-stroke-selected-default: var(--edge-stroke-selected);
+}
+/* `!important` on both stroke + stroke-width. The variable cascade alone
+   isn't enough: xyflow ships a `.react-flow__edge.updating` rule with a
+   hard-coded `stroke: #777` that lands AFTER our variable override in
+   source order. BCEdge's intentional `stroke: var(--muted-foreground)`
+   gets overridden too, but BC still reads as distinct because of its
+   `strokeDasharray` (set inline) — the dashed pattern is the BC signal,
+   not the color. */
+.react-flow .react-flow__edge:not(.selected):not(.validation-flow-trace) .react-flow__edge-path:not(.code-link-active) {
+  stroke: var(--edge-stroke) !important;
+  stroke-width: 1.5 !important;
+}
+.react-flow .react-flow__edge.selected:not(.validation-flow-trace) .react-flow__edge-path:not(.code-link-active),
+.react-flow .react-flow__edge:focus:not(.validation-flow-trace) .react-flow__edge-path:not(.code-link-active),
+.react-flow .react-flow__edge:focus-visible:not(.validation-flow-trace) .react-flow__edge-path:not(.code-link-active) {
+  stroke: var(--edge-stroke-selected) !important;
+  stroke-width: 3.5 !important;
 }
 
 /* Phase 42: Fix cursor disappearance on ReactFlow handles during edge drag */
@@ -129,4 +462,292 @@ body {
 
 .react-flow__handle:hover {
   cursor: crosshair;
+}
+
+/* Phase 73 — crafted port states (Lane A).
+   Hover halo is a circular box-shadow on the Handle div, independent of the
+   port mark's actual shape (circle / hex / dashed square). All three port
+   types get the same affordance: idle → hover → drag-target valid/invalid.
+   Color codes the type so the user knows which "network" the port belongs to
+   without reading any text. */
+.react-flow__handle[data-port-type] {
+  transition: box-shadow 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Hover — soft layer-color halo. */
+.react-flow__handle[data-port-type="flow-in"]:hover,
+.react-flow__handle[data-port-type="flow-out"]:hover {
+  box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-layer-hydraulic) 28%, transparent);
+}
+.react-flow__handle[data-port-type="thermal"]:hover {
+  box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-layer-thermal) 32%, transparent);
+}
+.react-flow__handle[data-port-type="bc"]:hover {
+  box-shadow: 0 0 0 5px color-mix(in oklch, var(--muted-foreground) 26%, transparent);
+}
+
+/* Drag-target valid — brighter, slightly larger halo. xyflow adds the
+   `.connectingto` class to a handle when it's the current hover target during
+   an in-progress connection drag, and the `.valid` class when the target is a
+   compatible drop site. */
+.react-flow__handle.connectingto.valid[data-port-type="flow-in"],
+.react-flow__handle.connectingto.valid[data-port-type="flow-out"] {
+  box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-layer-hydraulic) 45%, transparent);
+}
+.react-flow__handle.connectingto.valid[data-port-type="thermal"] {
+  box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-layer-thermal) 48%, transparent);
+}
+.react-flow__handle.connectingto.valid[data-port-type="bc"] {
+  box-shadow: 0 0 0 6px color-mix(in oklch, var(--muted-foreground) 42%, transparent);
+}
+
+/* Drag-target invalid — dim the mark so the user reads "won't accept this." */
+.react-flow__handle.connectingto:not(.valid)[data-port-type] {
+  opacity: 0.3;
+}
+
+/* Phase 65 Plan 12 — marquee selection rectangle (in-drag).
+   Replaces default `1px dotted rgba(0,89,220,0.8)` with a solid border in the
+   primary design token, slightly brighter than the fill. Auto-adapts to light/dark
+   via the .dark class on :root (color-mix consumes the resolved --primary value). */
+.react-flow__selection {
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--primary) 55%, transparent);
+  border-radius: 2px;
+}
+
+/* Phase 65 Plan 12 — hide the post-selection NodesSelection bounding box.
+   @xyflow/react v12 always renders this overlay when 2+ nodes are selected; no
+   prop disables it. Selection state is conveyed by per-node .selected highlight
+   on StreamNode (StreamNode.tsx:361 — ring-2 ring-[var(--ring)]). Parent
+   .react-flow__nodesselection already has pointer-events: none, so hiding the
+   child rect does not affect dragging or selection state. */
+.react-flow__nodesselection-rect {
+  display: none;
+}
+
+/* Phase 66 — code-panel hover/pin ring on canvas nodes.
+   Lit up by StreamNode subscriptions to useStore.hoveredSourceIds /
+   pinnedSourceIds (per-node primitive-boolean selectors). Visual styling is
+   intentionally a placeholder — Phase 72 owns final tuning (color, animation,
+   stroke); see .planning/notes/phase-66-hover-ring-tuning.md.
+
+   `outline` not `border`: outline does NOT contribute to box dimensions, so
+   Phase 64's autoflip handle-position math (which reads node geometry) stays
+   correct. `outline-offset: 2px` keeps the new ring visually distinct from
+   ReactFlow's box-shadow-based selection ring.
+
+   Both classes can coexist (sub-block-hovered + previously-pinned node) —
+   the cascade resolves to a single outline; the pinned color wins by source
+   order, which is the intended distinction for now. */
+/* Phase 72 — node visual state (rest ring, selection ring, error outline,
+   autoExtended outline) is rendered via inline style on the StreamNode
+   outer div, not via these classes. The CSS pipeline in this dev
+   configuration (Vite + Tailwind v4 + .vite/deps optimizer) serves stale
+   compiled output for .stream-node--* class rules even after cache nuke;
+   inline style ships with the JS bundle and wins specificity over any
+   class rule. See StreamNode.tsx for the inline-style logic.
+
+   The Phase 66 code-link visual is rendered entirely via inline box-shadow
+   in StreamNode.tsx; no className-side CSS rule survives here. The
+   `data-code-link` attribute (set on the node root) is the modern state
+   marker that tests + future selectors hook into. See the "Code-link
+   active state" doctrine in DESIGN.md §2 for the contract. */
+
+/* Phase 71 Plan 10 — ValidationStatusBar 0→N pulse animation (D-03).
+   Single-shot 600ms keyframe: the error chip pulses once when error count rises
+   from 0 to N, then returns to normal. No persistent spinner. Phase 72 sweeps
+   the visual tokens (color, timing curve). */
+@keyframes pulse-once {
+  0%   { opacity: 1; transform: scale(1); }
+  50%  { opacity: 0.4; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.pulse-once {
+  animation: pulse-once 600ms ease-out 1;
+}
+
+/* Phase 71 Plan 11 — validation field highlight (D-12).
+   Applied by useValidationFieldHighlight to data-field-path elements.
+   outline (not border) avoids any layout impact (Pitfall 3).
+   Phase 72 — fixed broken `hsl(var(--destructive))` wrapping (OKLCH
+   variable can't be re-parsed as HSL — was silently falling back to
+   currentColor); switched warning hue from raw HSL to --color-warning. */
+.validation-field-error {
+  outline: 2px solid var(--destructive);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.validation-field-warning {
+  outline: 2px solid var(--color-warning);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Phase 71 Plan 11 — canvas node flash on ValidationPanel row click (D-05).
+   This is NAVIGATION feedback (user clicked a result row → canvas pans →
+   node flashes to confirm "this one"), NOT error notification — Phase 72
+   brief evaluated and intentionally kept it.
+   ReactFlow positions every node wrapper via transform: translate(x, y).
+   The flash MUST NOT touch `transform` or `opacity` — pulse-once's scale()
+   wipes the translate and visually rips the node out of position
+   (Phase 71 UAT Test 5 #2026-05-21). Animate outline-color only.
+   Phase 72 — fixed broken `hsl(var(--destructive) / 0.25)` syntax
+   (invalid against the OKLCH variable); switched to color-mix in OKLCH. */
+@keyframes node-flash-outline {
+  0%, 100% { outline-color: var(--destructive); }
+  50%      { outline-color: color-mix(in oklch, var(--destructive) 25%, transparent); }
+}
+.validation-flash {
+  /* Phase 72 — added by CanvasPanel.onNodeFlash to the StreamNode outer
+     div (targeted via `[data-stream-node-id]`, NOT xyflow's `[data-id]`
+     wrapper). Because the target already has `rounded-md` from Tailwind,
+     the outline follows the rounded path automatically — no explicit
+     border-radius needed here. Offset 0 keeps the flash flush with the
+     node edge, matching the persistent error outline's geometry.
+
+     Severity color comes from the inline `--validation-trace-color` var
+     set by CanvasPanel (defaults to --destructive for legacy single-node
+     navigation flash). Used by both the single-node click-to-focus flash
+     AND the multi-target loop trace. */
+  outline: 2px solid var(--validation-trace-color, var(--destructive));
+  outline-offset: 0;
+  animation: node-flash-outline 600ms ease-out 1;
+}
+
+/* Phase 72 — persistent loop trace highlight.
+   `.validation-flash-persistent` is the loop-trace flavor of `.validation-flash`.
+   Same outline geometry, but the animation runs forever (steady glow rather than
+   one-shot decay), and the outline color is taken from the inline
+   `--validation-trace-color` var so the severity colorizes both node and edge
+   trace together. Cleared by CanvasPanel when the user clicks anywhere else or
+   focuses a different validation result. */
+@keyframes node-trace-pulse {
+  0%, 100% { outline-color: var(--validation-trace-color, var(--color-warning)); }
+  50%      { outline-color: color-mix(in oklch, var(--validation-trace-color, var(--color-warning)) 40%, transparent); }
+}
+.validation-flash-persistent {
+  outline: 2px solid var(--validation-trace-color, var(--color-warning));
+  outline-offset: 0;
+  animation: node-trace-pulse 1.5s ease-in-out infinite;
+}
+
+/* Phase 72 — `.validation-flow-trace` is the multi-edge flow-trace highlight
+   applied by CanvasPanel to xyflow edge group elements (`[data-id]` on the
+   `.react-flow__edge` wrapper). Marching-ants animation conveys both loop
+   membership and flow direction simultaneously.
+
+   stroke-dashoffset animates from 0 → -10 (negative shifts dashes toward the
+   target end of each path; xyflow paths go source → target, so this matches
+   the topology flow direction the user drew).
+
+   Severity tint comes from `--validation-trace-color` (set inline by CanvasPanel
+   per result severity). Default falls back to `--color-warning` since the most
+   common consumer today (gravity_sum_per_loop) emits at warning severity.
+
+   prefers-reduced-motion: the dashed-pattern stays visible — you can still see
+   *which* edges are in the loop — but the marching stops, per the doctrine
+   "animations collapse to instant under reduced motion." */
+.validation-flow-trace .react-flow__edge-path {
+  stroke: var(--validation-trace-color, var(--color-warning)) !important;
+  stroke-width: 2.5 !important;
+  stroke-dasharray: 6 4 !important;
+  animation: flow-trace-march 1.5s linear infinite;
+}
+@keyframes flow-trace-march {
+  to { stroke-dashoffset: -10; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .validation-flow-trace .react-flow__edge-path {
+    animation: none;
+  }
+  .validation-flash-persistent {
+    animation: none;
+  }
+}
+
+
+/* Phase 72 — code-link active edge state (BCEdge + HydraulicEdge).
+   Reuses the flow-trace-march keyframe shared with .validation-flow-trace
+   (same visual idiom: marching-ants dashed pattern). Marching motion is
+   the PRIMARY signal — stroke width changes are minimal (hover keeps rest
+   width; pin adds +0.25 px) so xyflow's strokeWidth-scaled arrowhead
+   barely grows. The custom marker defined in CanvasPanel uses
+   markerUnits="userSpaceOnUse" so its size is fully decoupled from stroke
+   regardless — these stroke-width restraints are belt + suspenders.
+
+   `!important` is required because BaseEdge applies the rest stroke +
+   strokeWidth via inline style (which would otherwise win over a class
+   rule). The CSS class is the override channel for the active state.
+
+   Color = --foreground (high-contrast neutral); the marching is what
+   makes it read as "linked", not the contrast level alone, so the
+   foreground value can stay loud without overpowering the canvas
+   (motion conveys the signal, eye doesn't anchor on it the way it
+   would on a steady-state white). */
+.code-link-active {
+  stroke: var(--foreground) !important;
+  stroke-dasharray: 6 4 !important;
+  animation: flow-trace-march 1.2s linear infinite;
+}
+.code-link-pinned {
+  stroke-width: 1.75 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .code-link-active {
+    animation: none;
+  }
+}
+
+/* Phase 72 harden — global prefers-reduced-motion safety net.
+   PRODUCT.md locks "Reduced-motion respect via prefers-reduced-motion. All
+   animations are functional (state transitions, focus rings), not decorative;
+   under reduced-motion, transitions collapse to instant."
+
+   The shadcn primitive layer already honors this via per-class
+   `motion-reduce:!duration-0` / `motion-reduce:transition-none`. The
+   per-surface @media blocks above handle the canvas marching-ants idioms.
+   This universal block is the belt-and-suspenders catch-all for any animation
+   site that slips the net (Tailwind `animate-pulse` on skeletons, third-party
+   library transitions in the @xyflow / react-flow tree, future surfaces).
+
+   `0.01ms` rather than `0ms` is the WebKit-recommended idiom — some browsers
+   race on a literal 0ms (rendering before the animation start callback
+   fires); 0.01ms still produces a single end-state frame deterministically.
+
+   `animation-iteration-count: 1` forces infinite-loop animations (the only
+   pre-harden site was .pulse-once, but new infinite animations like
+   xyflow's edge-update spinner would otherwise still loop at ~0 duration).
+
+   `scroll-behavior: auto` covers CSS-side smooth scrolling. JS-side
+   `scrollIntoView({ behavior: "smooth" })` is NOT affected by CSS — that's
+   handled by `lib/scrollIntoViewSafe.ts` at the call site. */
+@media (prefers-reduced-motion: reduce) {
+  /* OS-level preference (system reduced motion enabled). The user pref
+     `appearance.reduceMotion = "never"` can OVERRIDE this — see the
+     `[data-motion="full"]` block below — for users who keep their OS in
+     reduced-motion mode but want animations inside this tool. */
+  html:not([data-motion="full"]) *,
+  html:not([data-motion="full"]) *::before,
+  html:not([data-motion="full"]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Phase 72 (post-Preferences) — user override "Always on" for reduce-motion.
+   App.tsx sets `data-motion="reduced"` on <html> when the user pref forces
+   reduced motion regardless of OS setting. The `@media` block above does
+   the same job when the OS pref is set, except `data-motion="full"` opts
+   OUT of it. */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

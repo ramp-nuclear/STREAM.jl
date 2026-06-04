@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { MarkerType } from "@xyflow/react";
 import useStore from "../useStore";
 import { enrichEdges } from "../useStore";
 import type { StreamNodeData } from "../useStore";
+import { ALL_LAYERS_ON } from "../../lib/layers";
 
 // Reset store and undo history before each test
 beforeEach(() => {
-  useStore.setState({ nodes: [], edges: [], selectedNodeId: null, bcs: [], isDirty: false, _undoPast: [], _undoFuture: [] });
+  // Phase 63.1: legacy boundary-conditions slice removed; reset the new
+  // anchors Record (D-02) instead.
+  useStore.setState({ nodes: [], edges: [], selectedNodeId: null, anchors: {}, isDirty: false, _undoPast: [], _undoFuture: [] });
 });
 
 describe("addNode", () => {
@@ -201,10 +203,25 @@ describe("addNode default population", () => {
   it("populates default parameter values from registry", () => {
     useStore.getState().addNode("Channel", { x: 0, y: 0 });
     const data = useStore.getState().nodes[0].data as unknown as StreamNodeData;
-    // Channel has g default 0.0, htc_correlation default dittus_boelter, friction_correlation default blasius_friction
-    expect(data.parameters.g).toBe(0.0);
-    expect(data.parameters.htc_correlation).toBe("dittus_boelter");
+    // Phase 72: `g` is now cascaded from modelOptions.g_default (Earth's 9.80665)
+    // rather than the registry's literal 0.0. Other defaults are unchanged.
+    // htc_correlation is no longer a Channel parameter (D-18) — only ChannelAndContacts keeps it.
+    expect(data.parameters.g).toBe(9.80665);
+    expect(data.parameters.h_left).toBe(0.0);
+    expect(data.parameters.h_right).toBe(0.0);
     expect(data.parameters.friction_correlation).toBe("blasius_friction");
+  });
+
+  it("cascades modelOptions.g_default into any top-level `g` parameter", () => {
+    // Change the project's gravity setting first, then add a Channel —
+    // the channel's g should reflect the project setting, not the registry default.
+    useStore.setState({
+      modelOptions: { ...useStore.getState().modelOptions, g_default: 3.71 }, // Mars
+    });
+    useStore.getState().addNode("Channel", { x: 0, y: 0 });
+    const nodes = useStore.getState().nodes;
+    const data = nodes[nodes.length - 1].data as unknown as StreamNodeData;
+    expect(data.parameters.g).toBe(3.71);
   });
 
   it("sets constructorMode to first mode", () => {
@@ -273,16 +290,18 @@ describe("isDirty tracking", () => {
     expect(useStore.getState().isDirty).toBe(true);
   });
 
-  it("addBC sets isDirty true", () => {
+  it("setAnchor sets isDirty true", () => {
+    // Phase 63.1 D-02: setAnchor replaces legacy addBC.
     useStore.setState({ isDirty: false });
-    useStore.getState().addBC({ nodeId: "n1", portField: "port_in.P", value: 1e5 });
+    useStore.getState().setAnchor("n1", { portField: "port_in.P", value: 1e5 });
     expect(useStore.getState().isDirty).toBe(true);
   });
 
-  it("removeBC sets isDirty true", () => {
-    useStore.getState().addBC({ nodeId: "n1", portField: "port_in.P", value: 1e5 });
+  it("clearAnchor sets isDirty true", () => {
+    // Phase 63.1 D-02: clearAnchor replaces legacy removeBC.
+    useStore.getState().setAnchor("n1", { portField: "port_in.P", value: 1e5 });
     useStore.setState({ isDirty: false });
-    useStore.getState().removeBC(0);
+    useStore.getState().clearAnchor("n1");
     expect(useStore.getState().isDirty).toBe(true);
   });
 
@@ -299,47 +318,140 @@ describe("isDirty tracking", () => {
   });
 });
 
-describe("activeLayer", () => {
-  it("defaults to Both", () => {
-    expect(useStore.getState().activeLayer).toBe("Both");
+describe("activeLayers (Phase 68 — 4-layer independent toggles)", () => {
+  beforeEach(() => {
+    // Reset the new layer slice to defaults so each test starts clean.
+    useStore.setState({
+      activeLayers: { ...ALL_LAYERS_ON },
+      hideOffLayer: false,
+      isDirty: false,
+    });
   });
 
-  it("setActiveLayer updates activeLayer", () => {
-    useStore.getState().setActiveLayer("Hydraulic");
-    expect(useStore.getState().activeLayer).toBe("Hydraulic");
+  // -------------------------------------------------------------------------
+  // Default state
+  // -------------------------------------------------------------------------
+
+  it("default activeLayers equals ALL_LAYERS_ON (all four true)", () => {
+    expect(useStore.getState().activeLayers).toEqual({
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    });
   });
 
-  it("setActiveLayer sets isDirty", () => {
+  it("default hideOffLayer is false", () => {
+    expect(useStore.getState().hideOffLayer).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // toggleLayer(key)
+  // -------------------------------------------------------------------------
+
+  it("toggleLayer flips Hydraulic from true to false; other keys unchanged", () => {
+    useStore.getState().toggleLayer("Hydraulic");
+    const al = useStore.getState().activeLayers;
+    expect(al.Hydraulic).toBe(false);
+    expect(al.Thermal).toBe(true);
+    expect(al.Sources).toBe(true);
+    expect(al.ReactorPhysics).toBe(true);
+  });
+
+  it("toggleLayer called twice on Thermal returns Thermal to true", () => {
+    useStore.getState().toggleLayer("Thermal");
+    expect(useStore.getState().activeLayers.Thermal).toBe(false);
+    useStore.getState().toggleLayer("Thermal");
+    expect(useStore.getState().activeLayers.Thermal).toBe(true);
+  });
+
+  it("toggleLayer marks the project dirty", () => {
     useStore.setState({ isDirty: false });
-    useStore.getState().setActiveLayer("Thermal");
+    useStore.getState().toggleLayer("Hydraulic");
     expect(useStore.getState().isDirty).toBe(true);
   });
 
-  it("cycleLayer rotates Hydraulic->Both->Thermal->Hydraulic", () => {
-    useStore.getState().setActiveLayer("Hydraulic");
-    useStore.getState().cycleLayer();
-    expect(useStore.getState().activeLayer).toBe("Both");
-    useStore.getState().cycleLayer();
-    expect(useStore.getState().activeLayer).toBe("Thermal");
-    useStore.getState().cycleLayer();
-    expect(useStore.getState().activeLayer).toBe("Hydraulic");
+  // -------------------------------------------------------------------------
+  // setLayerVisible(key, visible)
+  // -------------------------------------------------------------------------
+
+  it("setLayerVisible(Sources, false) sets Sources to false; idempotent on second call", () => {
+    useStore.getState().setLayerVisible("Sources", false);
+    expect(useStore.getState().activeLayers.Sources).toBe(false);
+    useStore.getState().setLayerVisible("Sources", false);
+    expect(useStore.getState().activeLayers.Sources).toBe(false);
   });
 
-  it("activeLayer is NOT in CanvasSnapshot (undo stack)", () => {
-    // Change activeLayer, then perform undoable action, undo — activeLayer should be unchanged
-    useStore.getState().setActiveLayer("Thermal");
-    useStore.getState().addNode("Pump", { x: 0, y: 0 });
-    expect(useStore.getState().nodes).toHaveLength(1);
-    useStore.getState().undo();
-    expect(useStore.getState().nodes).toHaveLength(0);
-    // activeLayer should still be Thermal — undo does not touch it
-    expect(useStore.getState().activeLayer).toBe("Thermal");
+  it("setLayerVisible(Sources, true) restores Sources to true after being set false", () => {
+    useStore.getState().setLayerVisible("Sources", false);
+    expect(useStore.getState().activeLayers.Sources).toBe(false);
+    useStore.getState().setLayerVisible("Sources", true);
+    expect(useStore.getState().activeLayers.Sources).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // setAllLayersVisible(visible)
+  // -------------------------------------------------------------------------
+
+  it("setAllLayersVisible(false) sets all four keys to false at once", () => {
+    useStore.getState().setAllLayersVisible(false);
+    expect(useStore.getState().activeLayers).toEqual({
+      Hydraulic: false,
+      Thermal: false,
+      Sources: false,
+      ReactorPhysics: false,
+    });
+  });
+
+  it("setAllLayersVisible(true) sets all four keys to true", () => {
+    useStore.getState().setAllLayersVisible(false);
+    useStore.getState().setAllLayersVisible(true);
+    expect(useStore.getState().activeLayers).toEqual({
+      Hydraulic: true,
+      Thermal: true,
+      Sources: true,
+      ReactorPhysics: true,
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // setHideOffLayer(value)
+  // -------------------------------------------------------------------------
+
+  it("setHideOffLayer(true) flips hideOffLayer to true and marks dirty", () => {
+    useStore.setState({ isDirty: false });
+    useStore.getState().setHideOffLayer(true);
+    expect(useStore.getState().hideOffLayer).toBe(true);
+    expect(useStore.getState().isDirty).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // Removal verification — D-05 (old API physically gone)
+  // -------------------------------------------------------------------------
+
+  it("cycleLayer is undefined on the store (action removed per D-05)", () => {
+    expect((useStore.getState() as unknown as Record<string, unknown>).cycleLayer).toBeUndefined();
+  });
+
+  it("setActiveLayer is undefined on the store (action removed per D-05)", () => {
+    expect(
+      (useStore.getState() as unknown as Record<string, unknown>).setActiveLayer,
+    ).toBeUndefined();
+  });
+
+  it("activeLayer (singular) is undefined on the store (field removed per D-05)", () => {
+    expect(
+      (useStore.getState() as unknown as Record<string, unknown>).activeLayer,
+    ).toBeUndefined();
   });
 });
 
 describe("addEdge arrowheads and offset", () => {
-  it("adds MarkerType.ArrowClosed markerEnd to hydraulic edges", () => {
-    // Add two Pump nodes (FlowPort connections)
+  it("attaches the custom url(#stream-hydraulic-arrow) markerEnd to hydraulic edges", () => {
+    // Phase 72 — replaces the prior MarkerType.ArrowClosed assertion. The
+    // custom marker (defined in CanvasPanel) uses markerUnits="userSpaceOnUse"
+    // so the arrowhead size is decoupled from stroke-width, fixing the
+    // "arrowhead grows huge on pin" bug from xyflow's default marker.
     useStore.getState().addNode("Pump", { x: 0, y: 0 });
     useStore.getState().addNode("Pump", { x: 200, y: 0 });
     const { nodes } = useStore.getState();
@@ -354,8 +466,7 @@ describe("addEdge arrowheads and offset", () => {
     });
 
     const edge = useStore.getState().edges[0];
-    expect(edge.markerEnd).toBeDefined();
-    expect((edge.markerEnd as { type: string }).type).toBe(MarkerType.ArrowClosed);
+    expect(edge.markerEnd).toBe("url(#stream-hydraulic-arrow)");
   });
 
   it("does not add markerEnd to thermal edges", () => {
@@ -452,7 +563,9 @@ describe("enrichEdges", () => {
 
     const result = enrichEdges(edges, nodes);
     expect(result).toHaveLength(1);
-    expect(result[0].markerEnd).toBeDefined();
-    expect((result[0].markerEnd as { type: string }).type).toBe(MarkerType.ArrowClosed);
+    // Phase 72 — markerEnd is now the custom-marker URL string. See the
+    // "attaches the custom url(#stream-hydraulic-arrow) markerEnd" test
+    // above for the rationale.
+    expect(result[0].markerEnd).toBe("url(#stream-hydraulic-arrow)");
   });
 });

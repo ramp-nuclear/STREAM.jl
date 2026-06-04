@@ -1,71 +1,77 @@
 import ToolboxItem from "./ToolboxItem";
+import { SectionHeader } from "./ui/section-header";
 import { getComponentsByCategory } from "../registry";
-import useStore from "../store/useStore";
-import { isComponentVisibleInLayer } from "../lib/layers";
 
-interface ToolboxPanelProps {
-  width: number;
-  onResizeMouseDown?: (e: React.MouseEvent) => void;
-}
+// Phase 62 D-02 — ToolboxPanel is now rendered inside the left-panel Tabs
+// `<TabsContent value="Components">` wrapper in App.tsx. The wrapper supplies
+// width, the resize handle, the right border, and the outer height; this
+// component renders the inner scrollable content only.
+//
+// Phase 63.1 D-06 — value-sources (WallTemperature, HeatFluxSource) were
+// removed from the toolbox in 63.1 because promoteToSharedSource (Plan 08)
+// was the only intended spawn path. Phase 65 UAT 2026-05-15: user reverted
+// that decision — direct drag works fine in practice. Sources category is
+// re-surfaced as a drag-from-toolbox affordance. promoteToSharedSource
+// remains the canonical seed path for the type_union → Source promotion
+// flow, but is no longer the only path.
+//
+// Phase 68 Plan 03 D-11 — the toolbox is a stable drag palette: every
+// registry-listed draggable component appears regardless of `activeLayers`
+// state. The previous per-category `isComponentVisibleInLayer` filter is
+// gone; the canvas (not the toolbox) is where layer toggles surface their
+// effect. Category headings are preserved purely as rendering structure.
 
-export default function ToolboxPanel({ width, onResizeMouseDown }: ToolboxPanelProps) {
-  const activeLayer = useStore((s) => s.activeLayer);
+export default function ToolboxPanel() {
   const hydraulicComponents = getComponentsByCategory("Hydraulic");
   const thermalComponents = getComponentsByCategory("Thermal");
-
-  const visibleHydraulic = hydraulicComponents.filter(comp =>
-    isComponentVisibleInLayer(comp, activeLayer)
-  );
-  const visibleThermal = thermalComponents.filter(comp =>
-    isComponentVisibleInLayer(comp, activeLayer)
-  );
+  const sourceComponents = getComponentsByCategory("Sources");
 
   return (
-    <div className="relative h-full border-r shrink-0" style={{ width }}>
-      {/* Resize handle — thin overlay on right edge, does not add visual thickness */}
-      {onResizeMouseDown && (
-        <div
-          className="absolute right-0 top-0 w-1 h-full cursor-col-resize z-10 hover:bg-border/50"
-          onMouseDown={onResizeMouseDown}
-        />
+    <div className="h-full p-2 overflow-y-auto min-w-0">
+      {hydraulicComponents.length > 0 && (
+        <>
+          <SectionHeader className="px-2 mb-1 mt-2">Hydraulic</SectionHeader>
+          <div className="space-y-px">
+            {hydraulicComponents.map((comp) => (
+              <ToolboxItem
+                key={comp.id}
+                componentId={comp.id}
+                label={comp.label}
+              />
+            ))}
+          </div>
+        </>
       )}
-      <div className="h-full p-4 overflow-y-auto">
-        <h2 className="text-lg font-semibold mb-4">Components</h2>
 
-        {visibleHydraulic.length > 0 && (
-          <>
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 mt-4">
-              Hydraulic
-            </div>
-            <div className="space-y-0.5">
-              {visibleHydraulic.map((comp) => (
-                <ToolboxItem
-                  key={comp.id}
-                  componentId={comp.id}
-                  label={comp.label}
-                />
-              ))}
-            </div>
-          </>
-        )}
+      {thermalComponents.length > 0 && (
+        <>
+          <SectionHeader className="px-2 mb-1 mt-3">Thermal</SectionHeader>
+          <div className="space-y-px">
+            {thermalComponents.map((comp) => (
+              <ToolboxItem
+                key={comp.id}
+                componentId={comp.id}
+                label={comp.label}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
-        {visibleThermal.length > 0 && (
-          <>
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 mt-4">
-              Thermal
-            </div>
-            <div className="space-y-0.5">
-              {visibleThermal.map((comp) => (
-                <ToolboxItem
-                  key={comp.id}
-                  componentId={comp.id}
-                  label={comp.label}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+      {sourceComponents.length > 0 && (
+        <>
+          <SectionHeader className="px-2 mb-1 mt-3">Sources</SectionHeader>
+          <div className="space-y-px">
+            {sourceComponents.map((comp) => (
+              <ToolboxItem
+                key={comp.id}
+                componentId={comp.id}
+                label={comp.label}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

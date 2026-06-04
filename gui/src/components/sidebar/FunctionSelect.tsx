@@ -93,8 +93,8 @@ export default function FunctionSelect({
   }
 
   return (
-    <div className="flex flex-col gap-[8px]">
-      <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
+    <div className="flex flex-col gap-[4px] min-w-0">
+      <Label className="text-[12px] font-medium leading-[1.4] flex items-center gap-1 min-w-0">
         {param.name}
         {param.description && (
           <TooltipProvider>
@@ -120,9 +120,16 @@ export default function FunctionSelect({
         </SelectContent>
       </Select>
 
-      {/* Sub-field container: only shown when a factory option is selected and has sub_parameters */}
+      {/* Sub-field container: only shown when a factory option is selected and has sub_parameters.
+          Phase 72 polish — `border-l-2` colored side-stripe removed (absolute-ban,
+          DESIGN.md §6 Don't). Nesting cue carried by a 1 px neutral hairline
+          (within the ban's >1 px exemption) + `pl-3` indent. Test selector
+          moved to `data-testid` so styling can evolve without breaking tests. */}
       {isFactory && subParams.length > 0 && (
-        <div className="border-l-2 border-muted pl-3 mt-1 flex flex-col gap-[12px]">
+        <div
+          data-testid="function-subparams"
+          className="border-l border-border pl-3 mt-1 flex flex-col gap-[12px]"
+        >
           {subParams.map((subParam) => {
             if (subParam.type === "Function") {
               // Sub-dropdown: only simple closures from sub_param.options (D-11 enforced by registry)

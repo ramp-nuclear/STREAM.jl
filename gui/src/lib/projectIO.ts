@@ -1,51 +1,179 @@
-// projectIO.ts -- Pure serialization/deserialization and recent-files logic.
+// projectIO.ts — Pure serialization / deserialization for the .scp v2.0 schema.
 //
-// Zero side-effects in this module. All file system I/O is handled in useStore.ts.
-// These functions are pure and fully testable in a vitest node environment.
+// Phase 62 hard-cutover: legacy numeric-version (v1/v2) form is rejected
+// outright (D-28). There is NO migration shim. The deserialize side throws
+// cleanly on any non-"2.0" format_version (INV-07 / INV-08).
+//
+// Zero side-effects in this module. All file system I/O is handled in
+// useStore.ts (which is responsible for absolute->relative path conversion of
+// file_loaded Power Shape paths per D-24 / RESEARCH Pitfall 5). projectIO is
+// fully testable in a vitest node environment.
 
 import type { Node, Edge } from "@xyflow/react";
-import type { BCEntry } from "./codeGenerator";
+import type { AnchorEntry } from "./anchors";
+import { type LayerKey, type ActiveLayers, ALL_LAYERS_ON } from "./layers";
+import { getPreference } from "./preferences";
+import {
+  SENTINEL_UNSET_POWER_SHAPE,
+  type GeometryResource,
+  type PowerShapeResource,
+  type FluidResource,
+  type ModelOptionsSliceState,
+  type ActiveLeftTab,
+} from "../store/useStore";
+
+// Re-export the sentinel constant so consumers of projectIO can filter without
+// dual-importing from the store.
+export { SENTINEL_UNSET_POWER_SHAPE };
 
 // ---------------------------------------------------------------------------
-// Types
+// Format constant
+// ---------------------------------------------------------------------------
+
+/**
+ * Single source of truth for the .scp format version.
+ *
+ * Per D-27, the on-disk schema is `format_version: "2.0"`. Hard-cutover from
+ * the legacy numeric-version form (pre-v2.0) (D-28); no migration.
+ */
+export const PROJECT_FORMAT_VERSION = "2.0" as const;
+
+// ---------------------------------------------------------------------------
+// Types — the v2.0 schema (D-27, D-29)
 // ---------------------------------------------------------------------------
 
 export interface StreamProject {
-  version: 1 | 2;
-  nodes: Node[];
-  edges: Edge[];
-  bcs: BCEntry[];
-  activeLayer?: "Hydraulic" | "Both" | "Thermal";
+  format_version: typeof PROJECT_FORMAT_VERSION;
+  model_options: ModelOptionsSliceState;
+  resources: {
+    geometries: GeometryResource[];
+    power_shapes: PowerShapeResource[]; // sentinel NOT included
+    fluids: FluidResource[]; // light_water NOT included
+  };
+  components: Node[]; // ReactFlow Node[] — same in-memory shape as pre-Phase-62
+  connections: Edge[]; // renamed from "edges" per CONTEXT.md storage shape
+  // Phase 63.1 D-02 / D-14: pressure-anchor Record keyed by nodeId (replaces
+  // the legacy boundary-conditions Array). No legacy fallback on load — old
+  // .streamgui files lose their anchor data on deserialize (accepted breakage).
+  anchors: Record<string, AnchorEntry>;
+  layout: {
+    active_left_tab: ActiveLeftTab; // D-08 / D-29
+    // Phase 68 D-05: 4-layer independent toggles replace v0.8 `active_layer`
+    // string. `active_layer` is no longer written; on read the deserializer
+    // accepts the legacy field as a one-shot translation (see
+    // `deserializeProject` shim).
+    active_layers: ActiveLayers;
+    hide_off_layer: boolean;
+    snap_to_grid: boolean; // Phase 65 D-10 — persisted per-project, default false
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Default factories (used by deserializeProject empty-state tolerance — Pitfall 3)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_FLUID = "water";
+const DEFAULT_G = 9.80665;
+
+function defaultModelOptions(): ModelOptionsSliceState {
+  return {
+    name: "",
+    description: "",
+    default_fluid: DEFAULT_FLUID,
+    g_default: DEFAULT_G,
+    solver: { abstol: 1e-8, reltol: 1e-6, dtmax: null },
+  };
+}
+
+function defaultLayout(): StreamProject["layout"] {
+  return {
+    active_left_tab: "Components",
+    // Phase 68 D-05: 4-layer defaults (all on, dim mode).
+    active_layers: { ...ALL_LAYERS_ON },
+    hide_off_layer: false,
+    snap_to_grid: false,
+  };
 }
 
 // ---------------------------------------------------------------------------
 // serializeProject
 // ---------------------------------------------------------------------------
 
+export interface SerializeProjectArgs {
+  nodes: Node[];
+  edges: Edge[];
+  // Phase 63.1 D-02: pressure-anchor Record (replaces legacy
+  // boundary-conditions Array). Keys are nodeIds (stable UUIDs); written
+  // verbatim to disk (no Array conversion).
+  anchors: Record<string, AnchorEntry>;
+  resources: {
+    geometries: Record<string, GeometryResource>;
+    powerShapes: Record<string, PowerShapeResource>;
+    fluids: Record<string, FluidResource>;
+  };
+  modelOptions: ModelOptionsSliceState;
+  activeLeftTab: ActiveLeftTab;
+  // Phase 68 D-05: 4-layer independent toggles + hide/dim preference. Replaces
+  // the v0.8 `activeLayer: LayerView` field.
+  activeLayers: ActiveLayers;
+  hideOffLayer: boolean;
+  snapToGrid: boolean; // Phase 65 D-10
+}
+
 /**
- * Serialize canvas state to a JSON string for writing to a `.streamgui` file.
+ * Serialize the in-memory state to a JSON string for writing to a `.scp` file.
+ *
+ * Conversions:
+ *  - resources.geometries / .powerShapes / .fluids: Record<uuid, T> -> T[]
+ *  - SENTINEL_UNSET_POWER_SHAPE is filtered out (D-26 — sentinel is in-memory only)
+ *  - light_water Fluid placeholder is filtered out (re-injected at load time)
+ *  - activeLeftTab + activeLayers + hideOffLayer nested under `layout` (D-29 / Phase 68 D-05)
  *
  * # Arguments
- * - `nodes` — ReactFlow node array
- * - `edges` — ReactFlow edge array
- * - `bcs`   — Boundary condition entries
+ * - `args` — single args object; see {@link SerializeProjectArgs}
  *
  * # Returns
- * A pretty-printed JSON string with `{ version: 2, nodes, edges, bcs, activeLayer }`.
+ * Pretty-printed JSON matching the v2.0 schema.
  */
-export function serializeProject(
-  nodes: Node[],
-  edges: Edge[],
-  bcs: BCEntry[],
-  activeLayer: "Hydraulic" | "Both" | "Thermal" = "Both",
-): string {
+export function serializeProject(args: SerializeProjectArgs): string {
+  const geometries = Object.values(args.resources.geometries);
+  const power_shapes = Object.values(args.resources.powerShapes).filter(
+    (p) => p.uuid !== SENTINEL_UNSET_POWER_SHAPE,
+  );
+  const fluids = Object.values(args.resources.fluids).filter(
+    (f) => f.name !== "light_water",
+  );
+
+  // Pitfall 7 (defense in depth): strip the transient `data.autoExtended` field
+  // from every node before writing to disk. This field is set by SavePresetModal
+  // to paint the amber dashed outline on auto-extended nodes and must never leak
+  // into the persisted .scp schema.
+  const sanitizedNodes = args.nodes.map((n) => {
+    if (!n.data || !("autoExtended" in (n.data as Record<string, unknown>))) return n;
+    const { autoExtended: _autoExtended, ...rest } = n.data as Record<string, unknown>;
+    return { ...n, data: rest };
+  });
+
   const project: StreamProject = {
-    version: 2,
-    nodes,
-    edges,
-    bcs,
-    activeLayer,
+    format_version: PROJECT_FORMAT_VERSION,
+    model_options: args.modelOptions,
+    resources: { geometries, power_shapes, fluids },
+    components: sanitizedNodes,
+    connections: args.edges,
+    // Phase 63.1 D-02: write the anchors Record verbatim — keys are nodeIds,
+    // values are AnchorEntry; no Array conversion (Record on disk).
+    anchors: args.anchors,
+    layout: {
+      active_left_tab: args.activeLeftTab,
+      // Phase 68 D-05: write the 4-layer object + hide/dim flag. The legacy
+      // `active_layer` string is intentionally NOT written — load-side has a
+      // one-shot shim for old files.
+      active_layers: args.activeLayers,
+      hide_off_layer: args.hideOffLayer,
+      snap_to_grid: args.snapToGrid,
+    },
   };
+
   return JSON.stringify(project, null, 2);
 }
 
@@ -54,45 +182,117 @@ export function serializeProject(
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a `.streamgui` JSON string back into a StreamProject object.
+ * Parse a `.scp` JSON string back into a {@link StreamProject}.
  *
- * # Arguments
- * - `json` — Raw text content of a `.streamgui` file
- *
- * # Returns
- * A `StreamProject` object with validated fields.
+ * Behaviour:
+ *  - Strict on `format_version`: anything other than the literal string "2.0"
+ *    throws. Legacy numeric-version form throws (D-28).
+ *  - Empty-state tolerant: missing top-level fields default gracefully so a
+ *    minimal `{"format_version":"2.0"}` parses to a fully-populated empty
+ *    project (RESEARCH Pitfall 3).
+ *  - No defensive try/catch around individual fields — the function either
+ *    succeeds or throws. The consumer wraps in try/catch and surfaces the
+ *    user-facing dialog.
  *
  * # Throws
- * `Error("Invalid .streamgui file")` if required fields are missing or of the
- * wrong type. Also re-throws `SyntaxError` from `JSON.parse` on malformed JSON.
+ *  - `SyntaxError` if `json` is not valid JSON (from `JSON.parse`)
+ *  - `Error` with a message containing "format_version" if version is missing
+ *    or not the literal "2.0"
  */
 export function deserializeProject(json: string): StreamProject {
   // Let JSON.parse throw SyntaxError on malformed input — don't swallow it.
   const parsed = JSON.parse(json) as Record<string, unknown>;
 
-  if (typeof parsed.version !== "number") {
-    throw new Error("Invalid .streamgui file");
-  }
-  if (!Array.isArray(parsed.nodes)) {
-    throw new Error("Invalid .streamgui file");
-  }
-  if (!Array.isArray(parsed.edges)) {
-    throw new Error("Invalid .streamgui file");
-  }
-  if (!Array.isArray(parsed.bcs)) {
-    throw new Error("Invalid .streamgui file");
+  // Strict format_version check (INV-07, INV-08, D-28). Hard-cutover guard:
+  // any missing / wrong / numeric version is a rejection — no migration.
+  if (parsed.format_version !== PROJECT_FORMAT_VERSION) {
+    const got =
+      parsed.format_version === undefined
+        ? "missing format_version"
+        : "got '" + String(parsed.format_version) + "'";
+    throw new Error("Invalid .scp file: expected format_version '" + PROJECT_FORMAT_VERSION + "', " + got);
   }
 
-  // v1 -> v2 migration: default activeLayer to "Both"
-  if (parsed.version === 1 || !parsed.activeLayer) {
-    return { ...parsed, version: 2, activeLayer: "Both" } as unknown as StreamProject;
-  }
+  // Empty-state tolerance — every top-level field is optional once
+  // format_version has validated.
+  const rawResources = (parsed.resources as Record<string, unknown>) ?? {};
+  const geometries = (rawResources.geometries as GeometryResource[]) ?? [];
+  const power_shapes =
+    (rawResources.power_shapes as PowerShapeResource[]) ?? [];
+  const fluids = (rawResources.fluids as FluidResource[]) ?? [];
 
-  return parsed as unknown as StreamProject;
+  const rawLayout = (parsed.layout as Record<string, unknown>) ?? {};
+
+  // Phase 68 D-05: 4-layer active_layers + hide_off_layer with one-shot legacy
+  // `active_layer` shim. Mapping (per CONTEXT.md Claude's-Discretion):
+  //   new `active_layers` present → use it (overlay onto ALL_LAYERS_ON so
+  //                                          missing keys default to true)
+  //   legacy "Both"  / missing    → ALL_LAYERS_ON
+  //   legacy "Hydraulic"          → only Hydraulic true
+  //   legacy "Thermal"            → only Thermal true
+  // The new field always wins when both are present.
+  const rawActiveLayers = rawLayout.active_layers as
+    | Partial<Record<LayerKey, boolean>>
+    | undefined;
+  const legacyLayer = rawLayout.active_layer as string | undefined;
+  let active_layers: ActiveLayers;
+  if (rawActiveLayers) {
+    active_layers = { ...ALL_LAYERS_ON, ...rawActiveLayers };
+  } else if (legacyLayer === "Hydraulic") {
+    active_layers = {
+      Hydraulic: true,
+      Thermal: false,
+      Sources: false,
+      ReactorPhysics: false,
+    };
+  } else if (legacyLayer === "Thermal") {
+    active_layers = {
+      Hydraulic: false,
+      Thermal: true,
+      Sources: false,
+      ReactorPhysics: false,
+    };
+  } else {
+    // "Both" or missing/unknown → all on.
+    active_layers = { ...ALL_LAYERS_ON };
+  }
+  const hide_off_layer: boolean =
+    (rawLayout.hide_off_layer as boolean | undefined) ?? false;
+
+  const layout: StreamProject["layout"] = {
+    active_left_tab:
+      (rawLayout.active_left_tab as ActiveLeftTab) ?? defaultLayout().active_left_tab,
+    active_layers,
+    hide_off_layer,
+    // Phase 65 D-10: empty-state tolerance — missing field defaults to false (RESEARCH Pitfall 3)
+    snap_to_grid: (rawLayout.snap_to_grid as boolean) ?? false,
+  };
+
+  const model_options =
+    (parsed.model_options as ModelOptionsSliceState) ?? defaultModelOptions();
+
+  const components = (parsed.components as Node[]) ?? [];
+  const connections = (parsed.connections as Edge[]) ?? [];
+  // Phase 63.1 D-14: no legacy boundary-conditions fallback. Old .streamgui
+  // files lose their anchor data on load — accepted breakage (per
+  // CLAUDE.md "no back-compat during heavy dev"). When both the legacy
+  // field and `anchors` are present in the JSON, `anchors` wins and the
+  // legacy field is silently dropped.
+  const anchors = (parsed.anchors as Record<string, AnchorEntry>) ?? {};
+
+  return {
+    format_version: PROJECT_FORMAT_VERSION,
+    model_options,
+    resources: { geometries, power_shapes, fluids },
+    components,
+    connections,
+    anchors,
+    layout,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// addToRecent
+// addToRecent (unchanged from pre-Phase-62)
 // ---------------------------------------------------------------------------
 
 /**
@@ -101,7 +301,8 @@ export function deserializeProject(json: string): StreamProject {
  * Behaviour (per D-07):
  *  - Deduplicate: if `newPath` already exists it is removed first.
  *  - Prepend: `newPath` is inserted at index 0.
- *  - Truncate: result is limited to 5 entries.
+ *  - Truncate: result is limited to the user preference `files.recentFilesMax`
+ *    (Phase 72 Preferences); was a hardcoded 5 in the pre-prefs world.
  *
  * # Arguments
  * - `files`   — Current recent-files array
@@ -111,49 +312,11 @@ export function deserializeProject(json: string): StreamProject {
  * New array (does not mutate `files`).
  */
 export function addToRecent(files: string[], newPath: string): string[] {
+  // Phase 72 Preferences: cap read from `files.recentFilesMax` (was a
+  // hardcoded 5). `getPreference` returns the default if localStorage is
+  // unavailable, so this stays safe under test envs that don't stub it.
+  const max = Math.max(1, getPreference("files", "recentFilesMax"));
   const deduped = files.filter((f) => f !== newPath);
-  return [newPath, ...deduped].slice(0, 5);
+  return [newPath, ...deduped].slice(0, max);
 }
 
-// ---------------------------------------------------------------------------
-// reconstructInstanceCounters
-// ---------------------------------------------------------------------------
-
-/**
- * Reconstruct module-level instance counters from a loaded node array.
- *
- * When a project is loaded the in-memory `instanceCounters` object must be
- * restored so that subsequent `addNode` calls continue numbering correctly
- * (e.g. if loaded nodes include `pump_3`, the next pump should be `pump_4`).
- *
- * Naming convention assumed: `<componentId_lowercase>_<N>` (e.g. `pump_3`).
- * Nodes whose `instanceName` does not match this pattern are ignored.
- *
- * # Arguments
- * - `nodes` — ReactFlow node array from the loaded project
- *
- * # Returns
- * Record mapping lowercase component prefix to the max counter seen.
- */
-export function reconstructInstanceCounters(
-  nodes: Node[],
-): Record<string, number> {
-  const counters: Record<string, number> = {};
-
-  for (const node of nodes) {
-    const data = node.data as { componentId?: string; instanceName?: unknown };
-    if (!data?.componentId || typeof data.instanceName !== "string") continue;
-
-    const key = data.componentId.toLowerCase();
-    const pattern = new RegExp(`^${key}_(\\d+)$`);
-    const match = pattern.exec(data.instanceName);
-    if (!match) continue;
-
-    const num = parseInt(match[1], 10);
-    if (counters[key] === undefined || num > counters[key]) {
-      counters[key] = num;
-    }
-  }
-
-  return counters;
-}

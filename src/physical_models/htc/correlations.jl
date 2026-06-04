@@ -3,8 +3,12 @@
 # Design:
 #   - Standalone named functions (dittus_boelter, elenbaas_nusselt, Marco_Han_Nusselt):
 #     plain Julia arithmetic, NOT @register_symbolic. MTK traces through these symbolically.
-#   - Factories (constant_Nusselt, regime_dependent, elenbaas_htc): return closures
-#     that capture construction-time scalars; inner function receives only symbolic Re/Pr.
+#   - Factories (constant_Nusselt, regime_dependent(geom; ...), elenbaas_htc(geom; g),
+#     fully_developed_laminar_h_spl(geom), developing_laminar_h_spl(geom; develop_length)):
+#     take `geom::PipeGeometry` as first positional argument when they consume geometry
+#     fields; return closures that capture construction-time scalars
+#     derived from `geom.depth`, `geom.width`, `geom.L`, `geom.Dh`. Inner function
+#     receives only symbolic Re/Pr.
 #   - No @register_symbolic on any function in this file — all are plain arithmetic.
 
 """
@@ -46,8 +50,8 @@ function constant_Nusselt(; Nu=8.235)
 end
 
 """
-    regime_dependent(; htc_laminar, htc_turbulent, friction_laminar, friction_turbulent,
-                       Re_transition=2300, htc_natural=nothing, Dh=nothing, g=nothing) -> (htc=fn, friction=fn)
+    regime_dependent(geom::PipeGeometry; htc_laminar, htc_turbulent, friction_laminar, friction_turbulent,
+                       htc_natural=nothing, g=nothing, Re_transition=2300) -> (htc=fn, friction=fn)
 
 Factory returning a named tuple of regime-switching HTC and friction correlations.
 Switches between laminar and turbulent correlations using `ifelse()` — MTK-compatible
@@ -56,23 +60,30 @@ smooth switching (established project pattern; same as flow reversal in Channel)
 `Re_transition` is converted to `Float64` immediately to avoid type-promotion issues
 when `Re` is a Symbolics.Num at system-build time.
 
-When `htc_natural`, `Dh`, and `g` are all provided, the returned `htc` closure additionally
+When `htc_natural` and `g` are both provided, the returned `htc` closure additionally
 switches to the natural convection correlation when `Gr/Re^2 > 1` (Grashof-over-Reynolds-squared
-criterion, matching Python STREAM convention). In this mode, the HTC closure computes:
-- `Gr = beta * g * dT * Dh^3 / nu^2` from T_bulk and T_wall
+criterion, matching Python STREAM convention). The Grashof characteristic length is taken
+from `geom.Dh`. In this mode, the HTC closure computes:
+- `Gr = beta * g * dT * geom.Dh^3 / nu^2` from T_bulk and T_wall
 - If `Gr/Re^2 > 1`: return `htc_natural(Re, Pr, T_bulk, T_wall)` (natural convection)
 - Else: return forced-convection (laminar or turbulent based on Re vs Re_transition)
 
 # Arguments
-- `htc_laminar`: HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu` for laminar forced convection
-- `htc_turbulent`: HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu` for turbulent forced convection
-- `friction_laminar`: friction closure `(Re) -> f` for laminar regime
-- `friction_turbulent`: friction closure `(Re) -> f` for turbulent regime
-- `Re_transition`: Reynolds number transition threshold (default 2300)
+- `geom`: `PipeGeometry` describing the channel geometry; `geom.Dh` is read for the Grashof
+  characteristic length when `htc_natural` is supplied.
+- `htc_laminar`: HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu` for laminar forced convection.
+- `htc_turbulent`: HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu` for turbulent forced convection.
+- `friction_laminar`: friction closure `(Re) -> f` for laminar regime.
+- `friction_turbulent`: friction closure `(Re) -> f` for turbulent regime.
 - `htc_natural`: optional NC HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu`; when provided
-  with `Dh` and `g`, enables NC regime switching via `Gr/Re^2 > 1`
-- `Dh`: hydraulic diameter [m] for Grashof computation (required when `htc_natural` is provided)
-- `g`: gravitational acceleration [m/s^2] for Grashof computation (required when `htc_natural` is provided)
+  together with `g`, enables NC regime switching via `Gr/Re^2 > 1`.
+- `g`: gravitational acceleration [m/s^2] for Grashof computation (required when `htc_natural`
+  is provided; otherwise unused).
+- `Re_transition`: Reynolds number transition threshold (default 2300).
+
+If `htc_natural` is provided, `g` must be too, otherwise an `ArgumentError` is raised.
+`Dh` is not a user-facing kwarg (it is read from `geom.Dh`); a lone `g` without
+`htc_natural` is simply ignored.
 
 Returns:
 ```julia
@@ -84,55 +95,51 @@ Returns:
 
 Usage:
 ```julia
-rd = regime_dependent(
+geom = PipeGeometry_rectangular(L, e1, e2, he)
+rd = regime_dependent(geom;
     htc_laminar        = constant_Nusselt(Nu=8.235),
     htc_turbulent      = dittus_boelter,
-    friction_laminar   = laminar_friction(geom.depth / geom.width),
+    friction_laminar   = laminar_friction_rectangular(geom),
     friction_turbulent = blasius_friction,
-    Re_transition      = 2300.0
 )
 ChannelAndContacts(htc_correlation = rd.htc, friction_correlation = rd.friction, ...)
 
 # With NC detection:
-rd_nc = regime_dependent(
+rd_nc = regime_dependent(geom;
     htc_laminar        = constant_Nusselt(Nu=8.235),
     htc_turbulent      = dittus_boelter,
-    friction_laminar   = laminar_friction(geom.depth / geom.width),
+    friction_laminar   = laminar_friction_rectangular(geom),
     friction_turbulent = blasius_friction,
-    htc_natural        = elenbaas_htc(b=D_ch, L=L_ch, Dh=D_ch, g=g_acc),
-    Dh                 = D_ch,
-    g                  = g_acc,
+    htc_natural        = elenbaas_htc(geom; g=9.81),
+    g                  = 9.81,
 )
 ```
 
 Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
-function regime_dependent(;
-    htc_laminar,
-    htc_turbulent,
-    friction_laminar,
-    friction_turbulent,
-    Re_transition=2300,
-    htc_natural=nothing,
-    Dh=nothing,
+function regime_dependent(geom::PipeGeometry;
+    htc_laminar::HTCCorrelation,
+    htc_turbulent::HTCCorrelation,
+    friction_laminar::Function,
+    friction_turbulent::Function,
+    htc_natural::Union{HTCCorrelation,Nothing}=nothing,
     g=nothing,
+    Re_transition=2300,
 )
     Re_tr = Float64(Re_transition)
 
-    if !isnothing(htc_natural) && (isnothing(Dh) || isnothing(g))
+    # htc_natural and g must be supplied together.
+    if !isnothing(htc_natural) && isnothing(g)
         throw(
             ArgumentError(
-                "regime_dependent: htc_natural provided but Dh or g is missing — all three (htc_natural, Dh, g) must be supplied together.",
+                "regime_dependent: htc_natural provided but g is missing — both (htc_natural, g) must be supplied together.",
             ),
         )
     end
 
-    if isnothing(htc_natural) && (!isnothing(Dh) || !isnothing(g))
-        @warn "regime_dependent: Dh and g supplied but htc_natural not provided — NC regime will not be detected."
-    end
-
     if !isnothing(htc_natural)
-        Dh_val = Float64(Dh)
+        # NC-enabled path: switch on Gr/Re^2 > 1
+        Dh_val = Float64(geom.Dh)
         g_val = Float64(g)
         htc_forced_fn =
             (Re, Pr, T_bulk, T_wall) -> ifelse(
@@ -190,25 +197,30 @@ Nusselt number (dimensionless).
 elenbaas_nusselt(Ra, b, L) = (1 / 24) * Ra * (b / L) * (1 - exp(-35 * L / (Ra * b)))^0.75
 
 """
-    elenbaas_htc(; b, L, Dh, g=9.81) -> (Re, Pr, T_bulk, T_wall) -> Nu
+    elenbaas_htc(geom::PipeGeometry; g=9.81) -> (Re, Pr, T_bulk, T_wall) -> Nu
 
 Factory returning an HTC correlation for Elenbaas natural convection.
-Captures geometry and gravity at construction time. The returned closure
-computes beta, nu, Gr, and Ra from T_bulk and T_wall at each evaluation.
+Captures geometry (via `geom`) and gravity at construction time. The returned
+closure computes beta, nu, Gr, and Ra from T_bulk and T_wall at each evaluation.
 
 Compatible with the 4-arg HTC interface `(Re, Pr, T_bulk, T_wall) -> Nu`.
 When T_wall = T_bulk (dT=0), returns Nu=0 (physically correct: no buoyancy
 driving force).
+
+This correlation is for **parallel-vertical-plates natural convection** and expects a
+rectangular `PipeGeometry` where `geom.depth` is the plate gap. There is no runtime
+check: a circular or non-plate geometry yields an aspect-ratio-blind Nu that may not
+be physical. Validating the geometry is left to the caller.
 
 Note: Re and Pr arguments are accepted for interface compatibility but
 are NOT used in the Elenbaas correlation (natural convection does not
 depend on forced-flow Reynolds number).
 
 # Arguments
-- `b`: gap between plates [m] (channel depth)
-- `L`: heated length [m]
-- `Dh`: hydraulic diameter [m] (used as characteristic length in Gr)
-- `g`: gravitational acceleration [m/s^2] (default 9.81)
+- `geom`: `PipeGeometry`; the factory reads `geom.depth` (gap between plates `b`),
+  `geom.L` (heated length), and `geom.Dh` (hydraulic diameter, used as
+  characteristic length in Gr).
+- `g`: gravitational acceleration [m/s^2] (default 9.81).
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
@@ -216,7 +228,10 @@ Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 NC exception: this closure evaluates `beta_water`, `mu_water`, `rho_water` INTERNALLY at `T_bulk` (NOT at film) — natural-convection driving force is a bulk-vs-wall ΔT phenomenon and Python STREAM evaluates β, ν at bulk for Gr.
 """
-function elenbaas_htc(; b, L, Dh, g=9.81)
+function elenbaas_htc(geom::PipeGeometry; g=9.81)
+    b = Float64(geom.depth)
+    L_h = Float64(geom.L)
+    Dh_v = Float64(geom.Dh)
     return (Re, Pr, T_bulk, T_wall) -> begin
         Gr_val = Gr(
             rho_water(T_bulk),
@@ -224,11 +239,11 @@ function elenbaas_htc(; b, L, Dh, g=9.81)
             beta_water(T_bulk),
             T_wall,
             T_bulk,
-            Dh,
+            Dh_v,
             g,
         )
         Ra_val = Ra(Gr_val, Pr)
-        elenbaas_nusselt(Ra_val, b, L)
+        elenbaas_nusselt(Ra_val, b, L_h)
     end
 end
 
@@ -252,45 +267,52 @@ function _nusselt_coefficient_developing(x)
 end
 
 """
-    fully_developed_laminar_h_spl(; Dh, aspect_ratio) -> (Re, Pr, T_bulk, T_wall) -> Nu
+    fully_developed_laminar_h_spl(geom::PipeGeometry) -> (Re, Pr, T_bulk, T_wall) -> Nu
 
 Factory returning an HTC correlation for fully-developed laminar flow in a
 rectangular duct with 2-sided heating.
 
 # Arguments
-- `Dh`: hydraulic diameter [m] (accepted for interface consistency, not used in Nu calculation)
-- `aspect_ratio`: channel depth / channel width (0 to 1)
+- `geom`: `PipeGeometry`; the factory reads `geom.depth` and `geom.width` to
+  derive `aspect_ratio = depth / width`. `geom.Dh` is not used by the Nu calculation.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 
 Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
-function fully_developed_laminar_h_spl(; Dh, aspect_ratio)
+function fully_developed_laminar_h_spl(geom::PipeGeometry)
+    aspect_ratio = geom.depth / geom.width
     nu = _two_sided_heating_nusselt(aspect_ratio)
     return (Re, Pr, args...) -> nu
 end
 
 """
-    developing_laminar_h_spl(; Dh, develop_length, aspect_ratio) -> (Re, Pr, T_bulk, T_wall) -> Nu
+    developing_laminar_h_spl(geom::PipeGeometry; develop_length) -> (Re, Pr, T_bulk, T_wall) -> Nu
 
 Factory returning an HTC correlation for thermally developing laminar flow in a
 rectangular duct with 2-sided heating.
 
+`develop_length` is a **mandatory** kwarg with no default. The caller must explicitly
+choose the evaluation point along the channel; there is no silent substitution with
+`geom.L`.
+
 # Arguments
-- `Dh`: hydraulic diameter [m]
-- `develop_length`: distance from channel entrance [m]
-- `aspect_ratio`: channel depth / channel width (0 to 1)
+- `geom`: `PipeGeometry`; the factory reads `geom.Dh`, `geom.depth`, and `geom.width`,
+  deriving `aspect_ratio = depth / width`.
+- `develop_length`: distance from channel entrance [m] (mandatory, no default).
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 
 Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
-function developing_laminar_h_spl(; Dh, develop_length, aspect_ratio)
+function developing_laminar_h_spl(geom::PipeGeometry; develop_length)
+    aspect_ratio = geom.depth / geom.width
+    Dh_v = Float64(geom.Dh)
     correction = 6 - 5 * exp(-0.75 * aspect_ratio / 0.3257)
     return (Re, Pr, args...) -> begin
-        x_star = develop_length / Dh / Re / Pr / correction
+        x_star = develop_length / Dh_v / Re / Pr / correction
         nudev = _nusselt_coefficient_developing(x_star)
         _two_sided_heating_nusselt(aspect_ratio, nudev)
     end

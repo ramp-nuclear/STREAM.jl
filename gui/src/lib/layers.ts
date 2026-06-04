@@ -1,7 +1,13 @@
-// layers.ts -- Pure layer detection utilities for the layered canvas feature.
+// layers.ts -- Pure 4-layer independent-toggle API (Phase 68).
 //
-// All functions are pure (no DOM, no React, no store) and fully testable.
-// Plan 02 wires these into UI components.
+// Replaces the v0.8 three-mode API (`LayerView = "Hydraulic" | "Both" | "Thermal"`)
+// per CONTEXT.md D-05. Layer membership is derived from
+// `ComponentDefinition.category` (the registry value), not port-type sniffing —
+// this handles Sources (BCPort) and Reactor Physics (no canvas ports) correctly.
+//
+// All functions are pure (no React, no Zustand, no DOM, no ReactFlow) and fully
+// testable. Plan 02 wires these into `useStore`; Plans 03/04 wire them into
+// CanvasPanel / LayersPanel.
 
 import type { ComponentDefinition } from "../registry/types";
 
@@ -9,75 +15,143 @@ import type { ComponentDefinition } from "../registry/types";
 // Types
 // ---------------------------------------------------------------------------
 
-export type LayerView = "Hydraulic" | "Both" | "Thermal";
+/**
+ * The four canonical layer keys, in canonical UI ordering. Spaces in registry
+ * category strings ("Reactor Physics") are dropped here so the key is a valid
+ * TypeScript identifier — see `CATEGORY_TO_LAYER_KEY` for the registry-string
+ * mapping.
+ */
+export type LayerKey = "Hydraulic" | "Thermal" | "Sources" | "ReactorPhysics";
+
+/**
+ * The active-layers state shape — one boolean per layer. Replaces the v0.8
+ * `LayerView` union type per D-05. Persisted in `.scp` `layout.active_layers`
+ * (see Plan 02 for the projectIO migration).
+ */
+export type ActiveLayers = Record<LayerKey, boolean>;
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/**
+ * Default active-layers state: all four layers on. Used as the seed for new
+ * projects and as the fallback when migrating old `.scp` files that lack the
+ * `active_layers` block.
+ */
+export const ALL_LAYERS_ON: ActiveLayers = {
+  Hydraulic: true,
+  Thermal: true,
+  Sources: true,
+  ReactorPhysics: true,
+};
+
+/**
+ * Canonical ordering of layer keys for UI rows (LayersPanel rows). Frozen
+ * `as const` tuple so consumers get a precise type.
+ */
+export const LAYER_KEYS: readonly LayerKey[] = [
+  "Hydraulic",
+  "Thermal",
+  "Sources",
+  "ReactorPhysics",
+] as const;
+
+/**
+ * Registry `category` string → `LayerKey`. Internal — not exported. Note the
+ * space in `"Reactor Physics"` (matches `gui/src/registry/components.json`
+ * exactly). `"Resources"` is intentionally omitted — Resources (e.g.
+ * ReactivityController) have no canvas presence, so they don't belong to any
+ * layer.
+ */
+const CATEGORY_TO_LAYER_KEY: Partial<Record<string, LayerKey>> = {
+  Hydraulic: "Hydraulic",
+  Thermal: "Thermal",
+  Sources: "Sources",
+  "Reactor Physics": "ReactorPhysics",
+};
 
 // ---------------------------------------------------------------------------
 // getComponentLayers
 // ---------------------------------------------------------------------------
 
 /**
- * Determine which layers a component belongs to based on its port types.
+ * The layer keys a component belongs to, derived from its registry `category`.
  *
- * A component with at least one FlowPort is on the hydraulic layer.
- * A component with at least one ThermalPort is on the thermal layer.
- * Components like ChannelAndContacts have both.
+ * - "Hydraulic"        → ["Hydraulic"]
+ * - "Thermal"          → ["Thermal"]
+ * - "Sources"          → ["Sources"]
+ * - "Reactor Physics"  → ["ReactorPhysics"]
+ * - "Resources"        → []  (no canvas presence — never participates in layers)
+ * - unknown category   → []
+ *
+ * The return is an array (not a single key) to keep room for future
+ * multi-layer components without breaking the signature; today every category
+ * maps to exactly 0 or 1 layers.
  */
-export function getComponentLayers(comp: ComponentDefinition): {
-  hasFlow: boolean;
-  hasThermal: boolean;
-} {
-  return {
-    hasFlow: comp.ports.some((p) => p.type === "FlowPort"),
-    hasThermal: comp.ports.some((p) => p.type === "ThermalPort"),
-  };
+export function getComponentLayers(comp: ComponentDefinition): LayerKey[] {
+  const key = CATEGORY_TO_LAYER_KEY[comp.category];
+  return key !== undefined ? [key] : [];
 }
 
 // ---------------------------------------------------------------------------
-// isComponentVisibleInLayer
+// getDisplayLayers (Phase 72 — visual-only)
 // ---------------------------------------------------------------------------
 
 /**
- * Whether a component should be visible (not hidden) in the given layer view.
+ * Visual-only extension of `getComponentLayers` for surfaces that paint per-
+ * layer identity (StreamNode leading band today). Returns all layers a
+ * component visually participates in, including those derivable from port
+ * composition but not from `category` alone.
  *
- * - "Both" view: everything is visible.
- * - "Hydraulic" view: only components with FlowPorts.
- * - "Thermal" view: only components with ThermalPorts.
+ * The canonical case: `ChannelAndContacts` has `category: "Hydraulic"` but
+ * carries `ThermalPort` handles — visually it belongs to both layers, even
+ * though for visibility/dim purposes it follows its category (Hydraulic).
+ *
+ * Behavioral functions (`isNodeVisible`, `isEdgeDimmed`, layer-aware connect,
+ * the per-layer dim logic in StreamNode for dual-layer nodes) keep using
+ * `getComponentLayers` to preserve current behavior. This function is *only*
+ * for rendering layer-accent identity.
+ *
+ * Detection rule: a component has both `FlowPort` and `ThermalPort` → it's
+ * visually on Hydraulic AND Thermal, in that left-to-right order for the
+ * leading band's split rendering.
  */
-export function isComponentVisibleInLayer(
+export function getDisplayLayers(comp: ComponentDefinition): LayerKey[] {
+  const base = getComponentLayers(comp);
+  const hasFlow = comp.ports.some((p) => p.type === "FlowPort");
+  const hasThermal = comp.ports.some((p) => p.type === "ThermalPort");
+  if (hasFlow && hasThermal) {
+    const result = [...base];
+    if (!result.includes("Hydraulic")) result.unshift("Hydraulic");
+    if (!result.includes("Thermal")) result.push("Thermal");
+    return result;
+  }
+  return base;
+}
+
+// ---------------------------------------------------------------------------
+// isNodeVisible
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether a canvas node should be visible given the current per-layer toggles.
+ *
+ * D-02 rule: a component is visible if **any** of its layers is active. A
+ * component with no layer association (e.g. Resources — `getComponentLayers`
+ * returns `[]`) is always visible; the layer system simply doesn't apply to it.
+ *
+ * Used by `CanvasPanel`'s per-node enrichment pass (Plan 03) to set the
+ * `hidden` ReactFlow prop in hide mode, or as the input to the dim/lock pass
+ * in dim mode.
+ */
+export function isNodeVisible(
   comp: ComponentDefinition,
-  activeLayer: LayerView,
+  activeLayers: ActiveLayers,
 ): boolean {
-  if (activeLayer === "Both") return true;
   const layers = getComponentLayers(comp);
-  if (activeLayer === "Hydraulic") return layers.hasFlow;
-  return layers.hasThermal;
-}
-
-// ---------------------------------------------------------------------------
-// isNodeDimmed
-// ---------------------------------------------------------------------------
-
-/**
- * Whether a canvas node should be visually dimmed in the current layer view.
- *
- * Rules (per D-01/D-02/D-06):
- * - "Both" view: nothing is dimmed.
- * - Dual-layer nodes (both FlowPort and ThermalPort) are never fully dimmed.
- * - Single-layer nodes are dimmed when viewing the opposite layer.
- */
-export function isNodeDimmed(
-  componentId: string,
-  activeLayer: LayerView,
-  getComp: (id: string) => ComponentDefinition | undefined,
-): boolean {
-  if (activeLayer === "Both") return false;
-  const comp = getComp(componentId);
-  if (!comp) return false;
-  const layers = getComponentLayers(comp);
-  // Dual-layer components are never fully dimmed
-  if (layers.hasFlow && layers.hasThermal) return false;
-  if (activeLayer === "Hydraulic") return !layers.hasFlow;
-  return !layers.hasThermal;
+  if (layers.length === 0) return true;
+  return layers.some((k) => activeLayers[k]);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,20 +159,19 @@ export function isNodeDimmed(
 // ---------------------------------------------------------------------------
 
 /**
- * Whether a canvas edge should be visually dimmed in the current layer view.
+ * Whether an edge should be dimmed given its layer association and the current
+ * per-layer toggles.
  *
- * The caller determines `edgeIsThermal` (e.g. by checking amber stroke style).
- * This keeps the utility pure -- no ReactFlow edge type knowledge here.
- *
- * - "Both" view: nothing is dimmed.
- * - "Hydraulic" view: thermal edges are dimmed.
- * - "Thermal" view: flow edges are dimmed.
+ * Edges follow **their own layer**, not their endpoints' layers (D-04). The
+ * caller is responsible for resolving each edge's `LayerKey` (e.g. by checking
+ * the port type of the source/target handle) — pass `null` for edges that have
+ * no layer association (e.g. virtual reactivity-controller links), which are
+ * never dimmed.
  */
 export function isEdgeDimmed(
-  edgeIsThermal: boolean,
-  activeLayer: LayerView,
+  edgeLayerKey: LayerKey | null,
+  activeLayers: ActiveLayers,
 ): boolean {
-  if (activeLayer === "Both") return false;
-  if (activeLayer === "Hydraulic") return edgeIsThermal;
-  return !edgeIsThermal;
+  if (!edgeLayerKey) return false;
+  return !activeLayers[edgeLayerKey];
 }

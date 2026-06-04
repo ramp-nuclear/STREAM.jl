@@ -1,0 +1,525 @@
+// @vitest-environment happy-dom
+//
+// Phase 69 Plan 02 Task 2 — behavior coverage for CommandPalette.tsx.
+//
+// Maps 1:1 to the 11 <behavior> cases in 69-02-PLAN.md:
+//   1. renders nothing when open=false
+//   2. renders top-anchored dialog when open=true (top-[80px] + translate-y-0)
+//   3. empty query shows group headings
+//   4. typed query shows flat list (no group headings)
+//   5. off-layer component renders hint chip with per-layer accent color (D-08)
+//   6. selecting an off-layer component dispatches setLayerVisible → setCenter
+//      → selectNode → onOpenChange in order (D-03 / D-04)
+//   7. setCenter zoom respects ZOOM_MIN_LEGIBLE = 1.0 floor (D-04)
+//      and centers on node center, not top-left (post-UAT centering fix)
+//   8. selecting a resource calls setActiveLeftTab("Resources") + selectResource
+//      + onOpenChange (D-06)
+//   9. selecting Project Options calls setActiveLeftTab("Project") +
+//      clearSelection + onOpenChange (D-05)
+//  10. no matched-character highlighting (D-07)
+//  11. Esc closes palette (Section 3.8 / radix default)
+//
+// useReactFlow is mocked via vi.mock("@xyflow/react") — the test owns the
+// setCenter/getZoom spies. ReactFlowProvider is the same module's export and
+// is re-exported as a no-op fragment by the mock factory.
+
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen, cleanup, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+// --- vi.mock for @xyflow/react -------------------------------------------
+// Hoisted spies so each test can read/reset them.
+const setCenterSpy = vi.fn();
+let currentZoom = 1.0;
+
+vi.mock("@xyflow/react", async () => {
+  const React = await import("react");
+  return {
+    useReactFlow: () => ({
+      setCenter: setCenterSpy,
+      getZoom: () => currentZoom,
+      // pass-throughs in case the component ever calls them — not exercised
+      // by these tests:
+      fitView: vi.fn(),
+    }),
+    ReactFlowProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+  };
+});
+// --------------------------------------------------------------------------
+
+import CommandPalette from "../CommandPalette";
+import useStore, {
+  SENTINEL_UNSET_POWER_SHAPE,
+  SENTINEL_LIGHT_WATER_FLUID,
+} from "../../store/useStore";
+import { ALL_LAYERS_ON } from "../../lib/layers";
+import { ReactFlowProvider } from "@xyflow/react";
+
+// ---------------------------------------------------------------------------
+// Test fixtures + helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a minimal canvas node for the search pool. `componentId: "Channel"`
+ * is a real registry entry whose category is "Hydraulic", so
+ * `getComponentLayers` returns `["Hydraulic"]` — that's how we drive the
+ * off-layer-chip and on-select-layer-enable tests.
+ */
+function makeChannelNode(opts: {
+  id?: string;
+  instanceName?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+} = {}) {
+  const width = opts.width ?? 200;
+  const height = opts.height ?? 100;
+  return {
+    id: opts.id ?? "node-1",
+    type: "streamNode",
+    position: { x: opts.x ?? 100, y: opts.y ?? 200 },
+    // xyflow v12 publishes node size on .measured after layout; the centering
+    // math in CommandPalette uses measured.{width,height}/2 to land on the
+    // node's center instead of its top-left corner (D-04 centering bug fix).
+    measured: { width, height },
+    data: {
+      componentId: "Channel",
+      instanceName: opts.instanceName ?? "channel",
+      parameters: {},
+    },
+  };
+}
+
+function seedStore(overrides: Record<string, unknown> = {}): void {
+  useStore.setState({
+    nodes: [],
+    edges: [],
+    anchors: {},
+    selectedNodeId: null,
+    selectedResourceId: null,
+    selectedResourceKind: null,
+    selectionKind: "none",
+    isDirty: false,
+    _undoPast: [],
+    _undoFuture: [],
+    activeLeftTab: "Components",
+    activeLayers: { ...ALL_LAYERS_ON },
+    hideOffLayer: false,
+    resources: {
+      geometries: {},
+      powerShapes: {
+        [SENTINEL_UNSET_POWER_SHAPE]: {
+          uuid: SENTINEL_UNSET_POWER_SHAPE,
+          name: "(leave unset; set in code)",
+          kind: "unset",
+          params: {},
+        },
+      },
+      fluids: {
+        [SENTINEL_LIGHT_WATER_FLUID]: {
+          uuid: SENTINEL_LIGHT_WATER_FLUID,
+          name: "light_water",
+        },
+      },
+    },
+    ...overrides,
+  });
+}
+
+/** Render CommandPalette wrapped in the mocked ReactFlowProvider. */
+function renderPalette(props: {
+  open: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const onOpenChange = props.onOpenChange ?? vi.fn();
+  const utils = render(
+    <ReactFlowProvider>
+      <CommandPalette open={props.open} onOpenChange={onOpenChange} />
+    </ReactFlowProvider>,
+  );
+  return { ...utils, onOpenChange };
+}
+
+beforeEach(() => {
+  setCenterSpy.mockReset();
+  currentZoom = 1.0;
+  seedStore();
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+// ---------------------------------------------------------------------------
+// Case 1 — renders nothing when open=false
+// ---------------------------------------------------------------------------
+
+describe("CommandPalette — mount gate", () => {
+  it("renders nothing when open=false", () => {
+    renderPalette({ open: false });
+    expect(
+      screen.queryByPlaceholderText(/Type to search/i),
+    ).toBeNull();
+  });
+
+  // Case 2 — top-anchored dialog when open=true
+  it("renders a top-anchored dialog when open=true (top-[80px] + translate-y-0)", () => {
+    renderPalette({ open: true });
+    const content = screen.getByTestId("command-palette-content");
+    expect(content.className).toContain("top-[80px]");
+    expect(content.className).toContain("translate-y-0");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case 3 + 4 — browse vs flat
+// ---------------------------------------------------------------------------
+
+describe("CommandPalette — browse vs flat", () => {
+  it("empty query shows group headings (Components + Geometries)", () => {
+    seedStore({
+      nodes: [makeChannelNode()],
+      resources: {
+        geometries: { g1: { uuid: "g1", name: "rect1" } },
+        powerShapes: {
+          [SENTINEL_UNSET_POWER_SHAPE]: {
+            uuid: SENTINEL_UNSET_POWER_SHAPE,
+            name: "(leave unset; set in code)",
+            kind: "unset",
+            params: {},
+          },
+        },
+        fluids: {
+          [SENTINEL_LIGHT_WATER_FLUID]: {
+            uuid: SENTINEL_LIGHT_WATER_FLUID,
+            name: "light_water",
+          },
+        },
+      },
+    });
+    renderPalette({ open: true });
+    expect(screen.getByText("Components")).toBeTruthy();
+    expect(screen.getByText("Geometries")).toBeTruthy();
+    // Project Options is always present per D-05.
+    expect(screen.getByText("Project")).toBeTruthy();
+  });
+
+  it("typed query keeps group headings, reordered so best-match group leads (post-UAT)", async () => {
+    seedStore({
+      nodes: [makeChannelNode()],
+      resources: {
+        geometries: { g1: { uuid: "g1", name: "rect1" } },
+        powerShapes: {
+          [SENTINEL_UNSET_POWER_SHAPE]: {
+            uuid: SENTINEL_UNSET_POWER_SHAPE,
+            name: "(leave unset; set in code)",
+            kind: "unset",
+            params: {},
+          },
+        },
+        fluids: {
+          [SENTINEL_LIGHT_WATER_FLUID]: {
+            uuid: SENTINEL_LIGHT_WATER_FLUID,
+            name: "light_water",
+          },
+        },
+      },
+    });
+    const user = userEvent.setup();
+    renderPalette({ open: true });
+    const input = screen.getByPlaceholderText(/Type to search/i);
+    // Typing "channel" should still surface the "Components" heading (channel
+    // node is a component) and the heading should be present — original
+    // plan-02 flat-list design was reverted mid-UAT.
+    await user.type(input, "channel");
+    expect(screen.queryByText("Components")).not.toBeNull();
+  });
+
+  it("typed query reorders categories so the best-match group leads", async () => {
+    // Seed a geometry whose name starts with the query while no component
+    // matches it as strongly; expect the Geometries heading to appear before
+    // the Components heading in DOM order.
+    seedStore({
+      nodes: [makeChannelNode({ instanceName: "pump_main" })],
+      resources: {
+        geometries: { g1: { uuid: "g1", name: "rect_inlet" } },
+        powerShapes: {},
+        fluids: {},
+      },
+    });
+    const user = userEvent.setup();
+    renderPalette({ open: true });
+    const input = screen.getByPlaceholderText(/Type to search/i);
+    await user.type(input, "rect");
+    const geomHeading = screen.getByText("Geometries");
+    const compHeading = screen.queryByText("Components");
+    // Geometries should be the first (and possibly only) group visible.
+    expect(geomHeading).not.toBeNull();
+    if (compHeading) {
+      // Compare DOM position.
+      expect(
+        geomHeading.compareDocumentPosition(compHeading) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case 5 — off-layer hint chip uses per-layer accent (D-08)
+// ---------------------------------------------------------------------------
+
+describe("CommandPalette — off-layer hint chip (D-08)", () => {
+  it("renders an EyeOff icon with tooltip when a layer is off (matches LayersPanel vocabulary)", () => {
+    seedStore({
+      nodes: [makeChannelNode()],
+      activeLayers: { ...ALL_LAYERS_ON, Hydraulic: false },
+    });
+    renderPalette({ open: true });
+    const wrapper = screen.getByTestId("off-layer-chip-Hydraulic");
+    // Detail lives in title/aria-label for hover-on-demand.
+    expect(wrapper.getAttribute("title")).toMatch(/Hydraulic/);
+    expect(wrapper.getAttribute("title")).toMatch(/off/);
+    expect(wrapper.getAttribute("title")).toMatch(/will enable/);
+    // Wrapper contains the lucide EyeOff svg — same visual vocabulary as
+    // LayersPanel's off-layer indicator (h-3.5 w-3.5 muted gray, opacity-50).
+    const svg = wrapper.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg?.classList.contains("h-3.5")).toBe(true);
+    expect(svg?.classList.contains("opacity-50")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case 6 + 7 — component on-select dispatch (D-03 / D-04) + zoom floor
+// ---------------------------------------------------------------------------
+
+describe("CommandPalette — component on-select dispatch", () => {
+  it("dispatches setLayerVisible → setCenter → selectNode → onOpenChange in order", async () => {
+    const node = makeChannelNode({ x: 100, y: 200, id: "node-1" });
+    const setLayerVisibleSpy = vi.fn();
+    const selectNodeSpy = vi.fn();
+    const onOpenChange = vi.fn();
+
+    seedStore({
+      nodes: [node],
+      activeLayers: { ...ALL_LAYERS_ON, Hydraulic: false },
+      setLayerVisible: setLayerVisibleSpy,
+      selectNode: selectNodeSpy,
+    });
+    currentZoom = 1.0;
+
+    const user = userEvent.setup();
+    render(
+      <ReactFlowProvider>
+        <CommandPalette open={true} onOpenChange={onOpenChange} />
+      </ReactFlowProvider>,
+    );
+
+    const row = screen.getByTestId("cmdk-row-component-node-1");
+    await user.click(row);
+
+    // D-03 — layer enable happens BEFORE pan/select.
+    expect(setLayerVisibleSpy).toHaveBeenCalledWith("Hydraulic", true);
+    // D-04 — setCenter on the node's CENTER (position + measured/2), with
+    // current zoom (1.0, at the floor). Fixture: position=(100,200),
+    // measured=(200,100) → center=(200,250).
+    expect(setCenterSpy).toHaveBeenCalledWith(200, 250, {
+      zoom: 1.0,
+      duration: 250,
+    });
+    expect(selectNodeSpy).toHaveBeenCalledWith("node-1");
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    // Order check: setLayerVisible invocation happened before setCenter,
+    // setCenter before selectNode, selectNode before onOpenChange.
+    const layerCallOrder = setLayerVisibleSpy.mock.invocationCallOrder[0];
+    const centerCallOrder = setCenterSpy.mock.invocationCallOrder[0];
+    const selectNodeCallOrder = selectNodeSpy.mock.invocationCallOrder[0];
+    const openCallOrder = onOpenChange.mock.invocationCallOrder[0];
+    expect(layerCallOrder).toBeLessThan(centerCallOrder);
+    expect(centerCallOrder).toBeLessThan(selectNodeCallOrder);
+    expect(selectNodeCallOrder).toBeLessThan(openCallOrder);
+  });
+
+  it("setCenter zoom respects ZOOM_MIN_LEGIBLE (1.0) when currentZoom < floor", async () => {
+    const node = makeChannelNode({ x: 50, y: 50, id: "node-z" });
+    seedStore({
+      nodes: [node],
+      activeLayers: { ...ALL_LAYERS_ON },
+    });
+    currentZoom = 0.5;
+
+    const user = userEvent.setup();
+    renderPalette({ open: true });
+    const row = screen.getByTestId("cmdk-row-component-node-z");
+    await user.click(row);
+
+    // Fixture: position=(50,50), measured=(200,100) → center=(150,100).
+    // Floor was 0.75 in plan-02; bumped to 1.0 after UAT round 1 found 0.75
+    // still too small to read comfortably.
+    expect(setCenterSpy).toHaveBeenCalledWith(150, 100, {
+      zoom: 1.0,
+      duration: 250,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case 8 — resource on-select dispatch (D-06)
+// ---------------------------------------------------------------------------
+
+describe("CommandPalette — resource on-select dispatch (D-06)", () => {
+  it("selecting a geometry calls setActiveLeftTab('Resources') + selectResource + onOpenChange", async () => {
+    const setActiveLeftTabSpy = vi.fn();
+    const selectResourceSpy = vi.fn();
+    const onOpenChange = vi.fn();
+
+    seedStore({
+      resources: {
+        geometries: { g1: { uuid: "g1", name: "rect1" } },
+        powerShapes: {
+          [SENTINEL_UNSET_POWER_SHAPE]: {
+            uuid: SENTINEL_UNSET_POWER_SHAPE,
+            name: "(leave unset; set in code)",
+            kind: "unset",
+            params: {},
+          },
+        },
+        fluids: {
+          [SENTINEL_LIGHT_WATER_FLUID]: {
+            uuid: SENTINEL_LIGHT_WATER_FLUID,
+            name: "light_water",
+          },
+        },
+      },
+      setActiveLeftTab: setActiveLeftTabSpy,
+      selectResource: selectResourceSpy,
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ReactFlowProvider>
+        <CommandPalette open={true} onOpenChange={onOpenChange} />
+      </ReactFlowProvider>,
+    );
+
+    const row = screen.getByTestId("cmdk-row-geometry-g1");
+    await user.click(row);
+
+    expect(setActiveLeftTabSpy).toHaveBeenCalledWith("Resources");
+    expect(selectResourceSpy).toHaveBeenCalledWith("g1", "geometry");
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    // No setCenter for resource jumps.
+    expect(setCenterSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case 9 — Project Options on-select dispatch (D-05)
+// ---------------------------------------------------------------------------
+
+describe("CommandPalette — Project Options on-select dispatch (D-05)", () => {
+  it("calls setActiveLeftTab('Project') + clearSelection + onOpenChange", async () => {
+    const setActiveLeftTabSpy = vi.fn();
+    const clearSelectionSpy = vi.fn();
+    const onOpenChange = vi.fn();
+
+    seedStore({
+      setActiveLeftTab: setActiveLeftTabSpy,
+      clearSelection: clearSelectionSpy,
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ReactFlowProvider>
+        <CommandPalette open={true} onOpenChange={onOpenChange} />
+      </ReactFlowProvider>,
+    );
+
+    const row = screen.getByTestId("cmdk-row-modelOptions");
+    await user.click(row);
+
+    expect(setActiveLeftTabSpy).toHaveBeenCalledWith("Project");
+    expect(clearSelectionSpy).toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case 10 — no matched-character highlighting (D-07)
+// ---------------------------------------------------------------------------
+
+describe("CommandPalette — no matched-character highlighting (D-07)", () => {
+  it("typing a substring does NOT wrap matched chars in <mark> or accent spans", async () => {
+    seedStore({
+      nodes: [makeChannelNode({ instanceName: "channel" })],
+    });
+
+    const user = userEvent.setup();
+    const { container } = renderPalette({ open: true });
+    const input = screen.getByPlaceholderText(/Type to search/i);
+    await user.type(input, "ch");
+
+    // No <mark> elements anywhere in the palette.
+    expect(container.querySelector("mark")).toBeNull();
+
+    // The row's name slot should still read "channel" as a single text run.
+    const row = screen.getByTestId("cmdk-row-component-node-1");
+    const nameSpan = within(row).getByText("channel");
+    // The name lives in a single <span> with no children that wrap a
+    // substring like "ch" in its own colored span.
+    expect(nameSpan.children.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Case 11 — Esc closes palette
+// ---------------------------------------------------------------------------
+
+describe("CommandPalette — Esc dismissal (Section 3.8)", () => {
+  it("pressing Esc fires onOpenChange(false)", async () => {
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ReactFlowProvider>
+        <CommandPalette open={true} onOpenChange={onOpenChange} />
+      </ReactFlowProvider>,
+    );
+
+    await user.keyboard("{Escape}");
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  // Pitfall 6 / CONTEXT.md D-08 regression guard:
+  // Esc must close the palette without bubbling to the window-level Esc
+  // handler in App.tsx that clears pinned code-preview blocks. We assert
+  // this at the source by capturing the keydown on `window` and confirming
+  // propagation was stopped by the time it reaches there.
+  it("Esc does NOT bubble past the dialog (no double-fire to window)", async () => {
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ReactFlowProvider>
+        <CommandPalette open={true} onOpenChange={onOpenChange} />
+      </ReactFlowProvider>,
+    );
+
+    const windowEsc = vi.fn();
+    const listener = (e: KeyboardEvent) => {
+      if (e.key === "Escape") windowEsc();
+    };
+    window.addEventListener("keydown", listener);
+    try {
+      await user.keyboard("{Escape}");
+    } finally {
+      window.removeEventListener("keydown", listener);
+    }
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(windowEsc).not.toHaveBeenCalled();
+  });
+});

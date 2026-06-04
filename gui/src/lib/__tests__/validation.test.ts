@@ -4,7 +4,7 @@ import {
   validateReal,
   validatePositiveReal,
   validateJuliaIdentifier,
-} from "../validation";
+} from "../validation/fields";
 
 describe("validateInt", () => {
   it("accepts positive integers", () => {

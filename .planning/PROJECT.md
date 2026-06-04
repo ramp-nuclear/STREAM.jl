@@ -12,23 +12,19 @@ v0.1 shipped a single forced-convection coolant loop validated against Python ST
 
 **2 phases, 7 plans | 4,301 src LOC / 5,066 test LOC at release**
 
-## Current Milestone: v1.1 Final Channel-Family Redesign
+## Shipped: v1.1 Final Channel-Family Redesign (2026-05-09)
 
-**Goal:** Rewrite the three Channel components (`Channel`, `ChannelHeatFlux`, `ChannelAndContacts`) so the design matches Python STREAM's intent and never needs touching again — single shared core, no flag-driven helpers, correct enthalpy-form energy balance.
+**Delivered:** The three Channel components (`Channel`, `ChannelHeatFlux`, `ChannelAndContacts`) rebuilt on a shared private `_channel_core` with enthalpy-form energy balance; flag-driven helpers (`_channel_base_eqs`, `observed_mode`, `skip_htc`) eliminated. Connector roster reduced to `FlowPort` + `ThermalPort` only; the architectural invariant is locked in (only `ChannelAndContacts` connects to `HeatDiffusion`). Python STREAM cross-validation passes at 424 CLEAN / 78 GRAY / 34 FAIL across 4 scenarios — simple_loop fully CLEAN at ≤1e-11 rtol; remaining FAILs traced to documented Python-side bugs or asymmetric MTR topology drift carried forward to v1.2.
 
-**Target features:**
-- New connector type(s) carrying `(T_wall, h)` for `Channel` and `q` for `ChannelHeatFlux`; per-cell, per-side, adiabatic-when-unconnected
-- Single private `_channel_core` (energy balance, mass cons, momentum, friction, port wiring, observables) as the only source of truth — eliminates `_channel_base_eqs`, `observed_mode`, `skip_htc`, dead `T_wall_cells=nothing` default
-- `Channel` becomes a passive recipient (external T_wall + h → q = h·(T_wall − T)); `ChannelHeatFlux` receives q directly per-cell per-side; `ChannelAndContacts` retains correlation-driven h with optional SCB
-- Convective enthalpy-form energy balance: face-averaged cp at cell faces with cp(T_in) at the boundary face; local cp(T[i]) in the heat-capacity denominator
-- Examples (`build_loop`, `build_loop_vertical`, `build_loop_transient`, `build_cube`), composition helpers (`symmetric_plate`, `plate`, `one_sided_connection`), and `test_channel.jl` updated for the new API
-- Cross-validation against Python STREAM passes within existing tolerances after the enthalpy-form switch
+**7 phases, 33 plans | working branch `channels-redesign`, PR #15 to `main` (still OPEN at v1.2 close)**
 
-**Constraints:**
-- This is the last channel rewrite — no flag accretion permitted
-- All work delivered on dedicated branch `channels-redesign` as a single PR
-- Per-cell water property handling already correct (`@register_symbolic` evaluated at local T[i]); only the convective scheme changes
-- Honor CLAUDE.md conventions (file layout, authoring rules, MTK patterns, single export list)
+## Shipped: v1.2 GUI Redesign (2026-05-28)
+
+**Delivered:** A from-the-ground refresh of the STREAM Composer GUI driven by the v1.1 channels-redesign architecture and a committed visual identity. Correlation `geom`-first API; `fuel_assembly` composition helper; registry rewrite for v1.1 components (`WallTemperature`, `HeatFluxSource`, `PointKinetics`, `ReactivityController`); Resources panel architecture with foreign-key UUID references and the new `.scp` save format; BCs tab + value-source components with 5 BC modes; Connection routing autoflip; drawio-style interaction model; structured `CodeSection[]` code preview with bidirectional code↔canvas traceability; custom Tauri titlebar; 4-layer system (Hydraulic / Thermal / Sources / Reactor Physics) with independent toggles; Ctrl+P command palette; `.scpr` presets and templates; pluggable validation framework gating code-gen export; and a full Impeccable-driven design-system pass on Phase 72 (12 locked surfaces, audit 19/20, critique 38/40, `PRODUCT.md` + `DESIGN.md` as design contract).
+
+**Side-channel:** physics fix `7c6f8b1` cell-center-average `P_i` in `_channel_core` (cherry-pick of `channels-redesign` `d8810e3`).
+
+**15 phases (incl. 63.1 decimal insertion), 97 plans | working branch `gui-redesign`, PR to `main` pending rebase post-PR-#15**
 
 ## Core Value
 
@@ -252,4 +248,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-08 — Phase 58 complete (MTK system determinacy repair: `hd.power ~ <value>` pins on the 5 broken scenarios, full `fully_determined=false` audit, `test/test_determinacy.jl` regression gate 11/11 PASS). v1.1 milestone phases 52–58 all complete.*
+*Last updated: 2026-05-28 — v1.2 GUI Redesign milestone complete and archived.*

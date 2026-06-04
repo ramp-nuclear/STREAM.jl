@@ -4,4 +4,7 @@ examples/output/
 
 # Node / GUI
 node_modules/
-gui/export_examples/
+
+# Vendored Claude Code skill content (re-installable from skills-lock.json
+# via `npx skills add <source>`). Pin lives in skills-lock.json (tracked).
+.agents/

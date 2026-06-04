@@ -1,0 +1,195 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { Node, Edge } from "@xyflow/react";
+
+// D-12: 5px Manhattan-distance + 250ms time threshold for pan-vs-menu disambiguation
+const MANHATTAN_THRESHOLD_PX = 5;
+const TIME_THRESHOLD_MS = 250;
+
+export interface ContextMenuState {
+  kind: "pane" | "node" | "edge" | null;
+  targetId: string | null; // node id or edge id; null for pane
+  screenX: number;
+  screenY: number;
+}
+
+const INITIAL_STATE: ContextMenuState = {
+  kind: null,
+  targetId: null,
+  screenX: 0,
+  screenY: 0,
+};
+
+interface GestureRef {
+  downX: number;
+  downY: number;
+  downT: number;
+  upX: number;
+  upY: number;
+  upT: number;
+}
+
+export function useRightClickContextMenu(): {
+  state: ContextMenuState;
+  close: () => void;
+  onPaneContextMenu: (event: MouseEvent | React.MouseEvent) => void;
+  onNodeContextMenu: (event: React.MouseEvent, node: Node) => void;
+  onEdgeContextMenu: (event: React.MouseEvent, edge: Edge) => void;
+} {
+  const [state, setState] = useState<ContextMenuState>(INITIAL_STATE);
+
+  // Track the right-button gesture (mousedown → mouseup) for disambiguation
+  const gestureRef = useRef<GestureRef | null>(null);
+
+  // Helper: returns true iff the last gesture qualifies as a quick-short right-click
+  // (not a pan). Reads gestureRef directly so it always sees the latest value.
+  //
+  // First-interaction fallback (UAT 2026-05-15): return TRUE when gestureRef is
+  // null. The previous "null → false" rule caused the very first right-click on
+  // the canvas to silently no-op when ReactFlow's pane mousedown handler swallowed
+  // the bubble phase. A right-click with no prior mousedown is, by definition,
+  // not a pan gesture — so treating it as quick-short is safe.
+  const isQuickShortGesture = useCallback((): boolean => {
+    const g = gestureRef.current;
+    if (!g) return true;
+    const manhattan = Math.abs(g.upX - g.downX) + Math.abs(g.upY - g.downY);
+    const elapsed = g.upT - g.downT;
+    return manhattan <= MANHATTAN_THRESHOLD_PX && elapsed <= TIME_THRESHOLD_MS;
+  }, []);
+
+  useEffect(() => {
+    // Listener 1: mousedown (bubble phase) — record right-button press coords.
+    // Seed upX/Y/T to the down values so a contextmenu-without-mouseup (e.g.,
+    // mousedown→contextmenu with no mouseup) computes zero distance and zero
+    // duration → qualifies as quick-short.
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button !== 2) return;
+      gestureRef.current = {
+        downX: event.clientX,
+        downY: event.clientY,
+        downT: event.timeStamp,
+        upX: event.clientX,
+        upY: event.clientY,
+        upT: event.timeStamp,
+      };
+    };
+
+    // Listener 2: mouseup (bubble phase) — update up coords when the right button
+    // is released. A new mousedown overwrites the ref (handles orphan mousedowns).
+    const handleMouseUp = (event: MouseEvent) => {
+      if (event.button !== 2) return;
+      if (!gestureRef.current) return;
+      gestureRef.current.upX = event.clientX;
+      gestureRef.current.upY = event.clientY;
+      gestureRef.current.upT = event.timeStamp;
+    };
+
+    // Listener 3: contextmenu (BUBBLE phase — runs AFTER React's delegated
+    // handlers). Suppresses the browser/WebView2 native context menu EXCEPT
+    // inside editable fields (where users expect copy/paste/spellcheck).
+    // The previous "only on drag" rule worked on WSLg/WebKitGTK because
+    // that backend doesn't show a browser context menu by default — but
+    // WebView2 on Windows DOES in dev builds, and React's synthetic
+    // preventDefault inside ReactFlow's onPaneContextMenu doesn't reliably
+    // propagate back to the native event there. BUBBLE phase (vs. CAPTURE)
+    // is deliberate so Radix triggers (which check `event.defaultPrevented`
+    // via composeEventHandlers) still receive the synthetic event undefaulted
+    // and can open their menu. preventDefault here still suppresses the
+    // browser default because the action check happens after full dispatch.
+    const handleContextMenu = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const inEditableField =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable === true;
+      if (!inEditableField) {
+        event.preventDefault();
+      }
+    };
+
+    // Capture phase for mousedown/mouseup: ReactFlow's pane handler can
+    // stopPropagation on right-button mousedown during pan handling; bubble
+    // phase meant the very first right-click after page load missed the
+    // listener (gestureRef stayed null). Capture runs before any descendant
+    // can stop the event.
+    //
+    // BUBBLE phase for contextmenu: capture-phase preventDefault sets
+    // `event.defaultPrevented = true` on the synthetic event *before* React
+    // dispatches it. Radix's ContextMenuTrigger (used by PresetRow et al.)
+    // composes its open-menu handler via `composeEventHandlers`, which
+    // skips the handler when `defaultPrevented` is true — so Radix
+    // triggers anywhere in the app silently fail. Bubble phase fires AFTER
+    // React's synthetic dispatch on the React root: Radix sees a fresh
+    // event and opens its menu, then this listener runs at the window
+    // bubble tail and preventDefault still suppresses the WebView2 native
+    // menu (preventDefault is effective at any dispatch phase). The pane
+    // / node / edge handlers below already call preventDefault on the
+    // synthetic event for the ReactFlow path.
+    window.addEventListener("mousedown", handleMouseDown, true);
+    window.addEventListener("mouseup", handleMouseUp, true);
+    window.addEventListener("contextmenu", handleContextMenu, false);
+
+    return () => {
+      window.removeEventListener("mousedown", handleMouseDown, true);
+      window.removeEventListener("mouseup", handleMouseUp, true);
+      window.removeEventListener("contextmenu", handleContextMenu, false);
+    };
+  }, [isQuickShortGesture]);
+
+  // ReactFlow handler: pane (empty canvas) right-click
+  const onPaneContextMenu = useCallback(
+    (event: MouseEvent | React.MouseEvent) => {
+      // Belt-and-suspenders: also call preventDefault on the React synthetic event.
+      // The window capture listener already handled the native contextmenu event,
+      // but the React synthetic event is separate.
+      if (typeof (event as React.MouseEvent).preventDefault === "function") {
+        (event as React.MouseEvent).preventDefault();
+      }
+      if (!isQuickShortGesture()) return;
+      setState({
+        kind: "pane",
+        targetId: null,
+        screenX: (event as MouseEvent).clientX,
+        screenY: (event as MouseEvent).clientY,
+      });
+    },
+    [isQuickShortGesture],
+  );
+
+  // ReactFlow handler: node right-click
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault();
+      if (!isQuickShortGesture()) return;
+      setState({
+        kind: "node",
+        targetId: node.id,
+        screenX: event.clientX,
+        screenY: event.clientY,
+      });
+    },
+    [isQuickShortGesture],
+  );
+
+  // ReactFlow handler: edge right-click
+  const onEdgeContextMenu = useCallback(
+    (event: React.MouseEvent, edge: Edge) => {
+      event.preventDefault();
+      if (!isQuickShortGesture()) return;
+      setState({
+        kind: "edge",
+        targetId: edge.id,
+        screenX: event.clientX,
+        screenY: event.clientY,
+      });
+    },
+    [isQuickShortGesture],
+  );
+
+  // Close the menu — Plan 05 will also attach outside-click and Esc handlers,
+  // but close() is exposed here for manual dismissal.
+  const close = useCallback(() => {
+    setState(INITIAL_STATE);
+  }, []);
+
+  return { state, close, onPaneContextMenu, onNodeContextMenu, onEdgeContextMenu };
+}

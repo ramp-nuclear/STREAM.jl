@@ -1,16 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: milestone
-status: shipped
-stopped_at: "v1.1 milestone shipped — phases archived to .planning/archive/v1.1/; rebase + squash to single FF-mergeable commit on origin/main complete; ready for PR"
-last_updated: "2026-05-09T03:00:00.000Z"
-last_activity: 2026-05-09 -- v1.1 closed: rebased onto origin/main (adopted main's Sundials-free solver, dropped Sundials, added Statistics, regenerated Manifest, un-skipped NET-03 + HTC-02 SPL); WR-01 docstring fix applied; phases 52-58 archived to .planning/archive/v1.1/phases/
+milestone: v1.2
+milestone_name: GUI Redesign
+status: shipped — awaiting next milestone
+last_updated: "2026-05-30T00:00:00.000Z"
+last_activity: 2026-05-30 — Rebased gui-redesign onto main after PR #15 (v1.1) merged; full test suite green; v1.2 phase dirs archived to milestones/v1.2-phases/. v1.2 ready for its own PR to main.
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 34
-  completed_plans: 34
+  total_phases: 15
+  completed_phases: 15
+  total_plans: 97
+  completed_plans: 101
   percent: 100
 ---
 
@@ -25,33 +24,43 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-05)
 
 **Core value:** A Julia MTK-based thermal-hydraulics library that matches Python STREAM results, proving the architecture is sound before large-scale porting begins.
-**Current focus:** v1.1 close-up — all 7 phases complete (52-58 + Phase 56-resume), running /gsd:audit-milestone before /gsd:complete-milestone + /gsd:ship
+**Current focus:** v1.2 shipped 2026-05-28; rebased onto `main` 2026-05-30 after PR #15 (v1.1 channels-redesign) merged — full test suite green (one post-rebase fix: `elenbaas_htc` Gr call reconciled to main's 7-arg signature). Next: open the v1.2 PR to `main`, then `/gsd:new-milestone` or planning work.
 **Python STREAM reference:** ~/projects/STREAM
-**Working branch:** `channels-redesign` (off origin/main, single PR at end)
+**Working branch:** `gui-redesign` (rebased onto `main` 2026-05-30). v1.2 milestone closed; ready to PR into `main`.
 
 **Roadmap summary:**
 
 - v0.8 (shipped): Phases 33-44 — STREAM Composer GUI
 - v0.9 (shipped): Phases 45-49 — Point Kinetics & Reactor Control
 - v1.0 (shipped): Phases 50-51 — Open-Source Release
-- v1.1 (active): Phases 52-56 — Final Channel-Family Redesign
+- v1.1 (shipped; PR #15 merged to `main` 2026-05-30): Phases 52-58 — Final Channel-Family Redesign + cross-validation + HTC film-temperature + MTK determinacy repair
   - Phase 52: Channel Connectors (CONN-01..04)
   - Phase 53: Shared `_channel_core` + Enthalpy-Form Energy Balance (CORE-01..05, NRG-01..04)
   - Phase 54: Variant Rewrites & File Consolidation (VAR-01..04)
-  - Phase 55: Composition Helpers, Examples & Test Suite (TEST-01, TEST-02, TEST-03, TEST-05)
+  - Phase 55: Composition Helpers, Examples & Test Suite
   - Phase 56: Python STREAM Cross-Validation (TEST-04)
+  - Phase 57: HTC film-temperature evaluation
+  - Phase 58: MTK system determinacy repair
+- v1.2 (shipped 2026-05-28; rebased onto `main` 2026-05-30): Phases 59-72 — GUI Redesign (canonical decisions: `.planning/notes/gui-redesign-design-decisions.md`)
+  - Phase 59: Correlation `geom`-first refactor ✓ shipped 2026-05-11
+  - Phase 60: `fuel_assembly` composition helper ✓ shipped 2026-05-11
+  - Phase 61: Registry audit + rewrite for v1.1 source ✓ shipped 2026-05-12
+  - Phase 62: Resources panel architecture ✓ shipped 2026-05-13 (15/15 plans, 18/18 UAT gaps closed)
+  - Phase 63: BCs tab + value-source components in GUI ✓ shipped 2026-05-13
+  - Phase 63.1: BC architecture rework — unified BCs tab ✓ shipped 2026-05-14 (14/14 plans, 7/7 UAT gaps closed via Plans 11–14)
+  - Phase 64: Connection routing ✓ shipped 2026-05-14
+  - Phase 65: Interaction model overhaul ✓ shipped 2026-05-14, gap closure 2026-05-15 (14/14 plans = 8 original + 6 gap-closure 09–14 from UAT 2026-05-15; manual UAT still pending for live-shell surfaces — see VERIFICATION.md and individual SUMMARYs)
+  - Phase 66: Code preview rework (next)
+  - Phases 67-72: see ROADMAP.md
 
 ---
 
 ## Current Position
 
-Phase: 56 (closed) — Plan 56-06 SUMMARY committed
-Plan: All v1.1 plans complete (34/34)
-Status: Ready for milestone audit + close
-Last activity: 2026-05-09 (parity 424 CLEAN / 78 GRAY / 34 FAIL, all FAILs documented)
-Next: `/gsd:audit-milestone v1.1` → `/gsd:complete-milestone v1.1` → `/gsd:ship`
-
----
+Phase: Milestone v1.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-27 — Milestone v1.2 completed and archived
 
 ## Accumulated Context
 
@@ -61,6 +70,10 @@ Next: `/gsd:audit-milestone v1.1` → `/gsd:complete-milestone v1.1` → `/gsd:s
 - v1.1 phasing: 5 phases (52-56), coarse granularity, sequenced as connectors → shared core + energy balance → variants + file consolidation → composition/tests → cross-validation
 - Phase 57 added: HTC film-temperature evaluation
 - Phase 58 added: MTK system determinacy repair
+- v1.2 milestone (2026-05-11): GUI Redesign — Phases 59-72. Phase 59 is a `src/` cleanup prerequisite (correlation factories take `geom::PipeGeometry` first), Phase 60 adds the `fuel_assembly` composition helper, Phase 61 rewrites the GUI component registry, then Phases 62-72 ship the actual GUI redesign (resources panel, BCs tab, connection routing, interaction model, code preview, etc.). Canonical decisions live in `.planning/notes/gui-redesign-design-decisions.md`.
+- Phase 59 (2026-05-11): Correlation `geom`-first refactor shipped. All HTC + friction factories take `geom::PipeGeometry` positionally; `const HTCCorrelation = Function` exported. Python parity gate held (424 CLEAN / 34 FAIL / 78 GRAY, zero verdict flips). Phase 61 handoff doc at `.planning/notes/correlation-geom-first-api.md`.
+- Phase 61 (2026-05-12): Registry audit + rewrite shipped — `gui/src/registry/components.json` now has 16 components (Channel/CHF/CAC/HD rewritten for v1.1; new: WallTemperature, HeatFluxSource, PointKinetics, ReactivityController). Envelope stream_version 1.1.0 / schema_version 2.0. 239 tests pass (was 232; +7 cross-validation tests for FK / array_size / pair_with resolution). `npm run build` baseline 7 pre-existing tsc errors (documented in `.planning/phases/61-.../deferred-items.md` — Phase 71 owns reconciliation). Phase 61 deliberately did NOT touch GUI rendering (`ToolboxPanel.tsx`, `StreamNode.tsx`, `ParameterForm.tsx`); the new categories (Sources / Reactor Physics / Resources) are invisible in the running app and Channel's new params don't render until Phase 62 (Resources panel + Sources toolbox category), Phase 63 (Properties vs BCs tab split + value-source UI), and Phase 68 (four-layer taxonomy) land. Plan 61-05 Task 3's smoke-test wording was over-eager — it described UI visibility that a data-only refactor cannot deliver; treat that as a planner-template lesson, not a Phase 61 gap.
+- Phase 63.1 inserted after Phase 63: BC architecture rework — unified BCs tab (URGENT)
 
 ### Key Decisions (carry-forward)
 
@@ -94,38 +107,52 @@ Next: `/gsd:audit-milestone v1.1` → `/gsd:complete-milestone v1.1` → `/gsd:s
 
 ### Pending Todos
 
-- **[v1.1 close blocker]** Decide MTR L/R wiring convention (Julia spatial-absolute vs Python channel-relative). 92 parity FAIL rows in `test/data/parity_report.csv` trace to this. See `.planning/phases/56-python-stream-cross-validation/56-RESUME-PLAN.md` task 5.
-- **[v1.1 close blocker]** After convention fix: regenerate parity_report.csv, expect MTR FAILs → 0/GRAY.
-- **[v1.1 close blocker]** Resume Plan 56-06 (cleanup grep, MILESTONES.md narrative entry, gsd-verifier on Phase 56).
-- **[v1.1 cleanup]** NET-03 KINSOL halts `bin/jl test/runtests.jl` orchestrator — being marked `@test_skip` with documented reason during this resume cycle.
-- **[v1.1 cleanup]** REQUIREMENTS.md checkbox sweep: VAR-01..04 → `[x]` (already wired in code; just stale checkboxes).
+(v1.1 close blockers + cleanup items removed 2026-05-21 — all resolved during Plan 56-06 close-up. MTR L/R wiring fixed via R-1 minimal-diff fix in tests; parity_report.csv regenerated to 424 CLEAN / 78 GRAY / 34 FAIL; NET-03 `@test_skip` markers in place; REQUIREMENTS.md VAR-01..04 already marked complete. See `.planning/archive/v1.1/phases/56-python-stream-cross-validation/56-06-SUMMARY.md` and `.planning/v1.1-MILESTONE-AUDIT.md` (status: tech_debt, 22/22 requirements complete). Numerical residuals VAL-01 + NET-03 carried forward to `.planning/todos/pending/v12-numerical-investigation-val01-net03.md` for a future numerical phase.)
+
+No v1.2-active pending todos currently tracked in STATE.md. See `.planning/todos/pending/` for the live backlog (4 items: Phase 72 handle visual rework, codegen resource dedup, GUI visual design pass, panel-resize overflow, plus the v1.2 numerical-investigation entry just filed).
 
 ### Blockers/Concerns
 
-- **MTR L/R convention disagreement.** `src/composition/helpers.jl` (`symmetric_plate`, `plate`, `one_sided_connection`) wires LEFT-channel's RIGHT face → plate's LEFT face (spatial-absolute). Python `stream/composition/mtr_geometry.py:60-63` wires LEFT-channel's LEFT face (channel-relative). Result: 92 FAIL rows on MTR scenarios in `parity_report.csv`. Decision pending.
-- VAL-01 (Fourier series validation) — `solve` returns `ReturnCode.InitialFailure`. Phase 58 fixed structural determinacy; numerical convergence is a v1.2 follow-up (out-of-scope per 58-CONTEXT.md).
-- NET-03 (Cube flow) KINSOL flag −11 — pre-existing flaky from Phase 55 D-22; halts runtests.jl orchestrator. Being skipped this cycle.
-- v1.1 milestone audit (.planning/v1.1-MILESTONE-AUDIT.md) verdict: `gaps_found` — TEST-04 unsatisfied, ROADMAP/STATE rollup was lying about completion until this update corrected it.
+(v1.1-era blockers cleared 2026-05-21 — MTR L/R convention disagreement resolved via R-1 fix; NET-03 KINSol flakies absorbed by `@test_skip` markers; v1.1 milestone audit re-audited to `tech_debt` with 22/22 requirements complete; VAL-01 + NET-03 numerical residuals routed to v1.2-numerical-investigation backlog todo.)
+
+No v1.2-active blockers currently tracked. Phase 71 (validation framework, next up) is unstarted, not blocked.
 
 ---
 
 ## Session Continuity
 
-**Last session:** 2026-05-08T15:26:43.716Z
-**Stopped at:** Phase 58 context gathered
-**Next action:** `/gsd-plan-phase 52` to decompose Phase 52 (Channel Connectors) into executable plans
-**Resume file:** .planning/phases/58-mtk-system-determinacy-repair/58-CONTEXT.md
-**Branch:** `channels-redesign`
-**Stash:** stash@{0} = "WIP before channels-redesign milestone: deps + snap research notes"
+**Last session:** 2026-05-22T14:31:10.356Z
+**Stopped at:** context exhaustion at 76% (2026-05-22)
+**Next action:** `/gsd:discuss-phase 66` (Code preview rework) — or `/gsd:ship` to open a milestone PR first and run UAT on the 6 deferred Phase 65 surfaces
+**Resume file:** None
+**Branch:** `gui-redesign`
+**Stash:** none
 
-**Phase 52 decisions locked (from 52-CONTEXT.md):**
+**Phase 65 outcomes (carry-forward):**
 
-- WallPort (T_wall, h, Q_flow [Flow]) and HeatFluxPort (q_flux, Q_flow [Flow]) — scalar connectors, used as arrays per side
-- Adiabatic default: IC `h=0` / `q_flux=0` alone — no `ifelse` guard in channel equations
-- Q_flow [W] positive=into-channel, matches existing ThermalPort convention
-- Tests: inline `_StubRecipient` / `_StubWallDriver` / `_StubFluxDriver` in `test_connectors.jl`
-- Smoke test: tiny pump→stub→pump loop with brief solve, asserts no MTK stream-connection warnings
+- Lowest-free `nextInstanceName` is canonical in `useStore.ts:328`; module-level `instanceCounters` is gone (Plan 65-01).
+- Clipboard payload contract: OS-clipboard JSON via `navigator.clipboard.writeText`; lowest-free renaming on paste; internal edges only (Plan 65-04, `gui/src/lib/clipboard.ts`).
+- Canvas interaction model now drawio-style: left-marquee, right-drag pan with 5px/250ms long-pan suppression (`gui/src/hooks/useRightClickContextMenu.ts`); 3 shadcn-based context menus (`gui/src/components/canvasMenus/`).
+- Snap-to-grid: 16px fixed grid via ReactFlow built-ins, canvas-overlay toggle button, persisted per-project in `.scp` `layout.snap_to_grid`.
+- AutoRecover: 2s debounced sidecar writer to `appDataDir/STREAM-Composer/autorecover/`; PID-alive lockfile crash detection; blocking Radix Dialog restore modal; bit-identical-to-Save payload via `projectIO.serialize`.
+
+**Process anomalies (no code impact, lessons for future phases):**
+
+- Plan 65-02 executor had a cwd-drift bug — committed directly to `gui-redesign` instead of its worktree branch. Code is correct but worktree isolation was bypassed.
+- Plan 65-07 worktree forked off an ancient commit (66dc2bf, pre-v1.1). Recovered via cherry-pick onto current HEAD; useStore.ts conflict resolved manually (dropped dead `clearInstanceCounters`, fixed outdated `serializeProject` signature).
+- Plan 65-08's render gate broke 3 AppShell tests; fixed by mocking `lib/autoRecover` and converting to `findByRole` (commit 46b07b0).
+
+**Phase 59 outcomes (carry-forward into Phase 60 and Phase 61):**
+
+- All correlation factories (`laminar_friction`, `elenbaas_htc`, `fully_developed_laminar_h_spl`, `developing_laminar_h_spl`, `regime_dependent`) take `geom::PipeGeometry` positionally. Old kwarg-only forms physically deleted (clean break per D-01). `const HTCCorrelation = Function` exported from `STREAM.jl` (declared BEFORE includes that reference it — see `f4a0042` fix).
+- Repo-wide closure check: zero non-geom call sites remain in `src/` or `test/`.
+- Python parity preserved exactly: 424 CLEAN / 34 FAIL / 78 GRAY (same as pre-refactor baseline; zero verdict flips).
+- API surface and remaining deferred items documented in `.planning/notes/correlation-geom-first-api.md` for Phase 61 to consume when rewriting the GUI registry.
 
 ---
 
-*Last updated: 2026-05-05 — Phase 52 context gathered*
+*Last updated: 2026-05-14 — Phase 65 complete (8/8 plans, verification PASS); ready for Phase 66*
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

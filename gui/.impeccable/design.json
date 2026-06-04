@@ -1,0 +1,266 @@
+{
+  "$schema": "https://impeccable.dev/schema/design.v1.json",
+  "name": "STREAM Composer",
+  "register": "product",
+  "version": "phase-72-closed",
+  "source_of_truth": "DESIGN.md",
+  "generated_at": "2026-05-28",
+  "notes": "Machine-readable extract of the Phase 72 locked design system, refreshed 2026-05-28 after the post-72 critique pass closed (38/40 health score). The canonical SSOT for token primitives is the YAML frontmatter at the top of DESIGN.md (Stitch v2 spec); this v1 sidecar mirrors the rich theme + token data and preserves the v1 schema for tooling that depends on it. --dialog-surface / --dialog-border below are historical artifacts; the unified dialog tone is now bg-chrome + border-border (see DESIGN.md §4 Modal Lock).",
+
+  "color_strategy": {
+    "canvas": "Full palette — 4 layer accents + 4 functional roles + 5 syntax tokens",
+    "chrome": "Restrained — tinted neutrals only; accents appear only as layer dots"
+  },
+
+  "themes": {
+    "dark": {
+      "neutrals": {
+        "background":         "oklch(0.27 0.012 254)",
+        "foreground":         "oklch(0.73 0.012 250)",
+        "muted-foreground":   "oklch(0.65 0.01 250)",
+        "card":               "oklch(0.23 0.012 254)",
+        "popover":            "oklch(0.33 0.012 254)",
+        "chrome":             "oklch(0.16 0.012 254)",
+        "panel":              "oklch(0.21 0.012 254)",
+        "canvas":             "oklch(0.27 0.012 254)",
+        "dialog-surface":     "oklch(0.13 0.012 254)",
+        "dialog-border":      "oklch(0.24 0.012 254)"
+      },
+      "borders": {
+        "border":             "oklch(0.30 0.005 254)",
+        "border-hover":       "oklch(0.38 0.005 254)",
+        "input":              "oklch(0.30 0.005 254)",
+        "ring":               "oklch(0.65 0.10 240)"
+      },
+      "functional": {
+        "destructive":        "oklch(0.704 0.191 22.216)",
+        "color-warning":      "oklch(0.78 0.15 75)",
+        "color-info":         "oklch(0.72 0.16 240)"
+      },
+      "layer_accents": {
+        "hydraulic":          "oklch(0.62 0.16 240)",
+        "thermal":            "oklch(0.74 0.15 75)",
+        "sources":            "oklch(0.74 0.17 130)",
+        "reactor-physics":    "oklch(0.62 0.22 15)"
+      },
+      "grid": {
+        "minor":              "oklch(0.295 0.012 254)",
+        "major":              "oklch(0.32 0.012 254)"
+      },
+      "syntax": {
+        "keyword":            "oklch(0.74 0.16 295)",
+        "string":             "oklch(0.78 0.14 145)",
+        "type":               "oklch(0.78 0.11 230)",
+        "macro":              "oklch(0.83 0.13 80)",
+        "number":             "oklch(0.78 0.13 50)"
+      },
+      "edge_stroke": {
+        "rest":               "oklch(0.73 0.008 254)",
+        "selected":           "oklch(0.93 0.005 254)"
+      },
+      "node_ring_rest":       "#6e6e6e",
+      "shadow_dialog":        "0 16px 40px -12px oklch(0.05 0 0 / 0.55), 0 4px 12px -4px oklch(0.05 0 0 / 0.40)"
+    },
+    "light": {
+      "neutrals": {
+        "background":         "oklch(1 0 0)",
+        "foreground":         "oklch(0.145 0 0)",
+        "muted-foreground":   "oklch(0.50 0.005 254)",
+        "card":               "oklch(0.97 0.003 254)",
+        "popover":            "oklch(0.96 0.003 254)",
+        "chrome":             "oklch(0.95 0.005 254)",
+        "panel":              "oklch(0.98 0.003 254)",
+        "canvas":             "oklch(0.99 0.003 254)",
+        "dialog-surface":     "oklch(0.93 0.012 254)",
+        "dialog-border":      "oklch(0.86 0.012 254)"
+      },
+      "borders": {
+        "border":             "oklch(0.88 0.005 254)",
+        "border-hover":       "oklch(0.80 0.005 254)",
+        "input":              "oklch(0.88 0.005 254)",
+        "ring":               "oklch(0.55 0.14 240)"
+      },
+      "functional": {
+        "destructive":        "oklch(0.577 0.245 27.325)",
+        "color-warning":      "oklch(0.55 0.16 75)",
+        "color-info":         "oklch(0.535 0.18 240)"
+      },
+      "layer_accents": {
+        "hydraulic":          "oklch(0.50 0.18 240)",
+        "thermal":            "oklch(0.60 0.16 75)",
+        "sources":            "oklch(0.60 0.18 130)",
+        "reactor-physics":    "oklch(0.48 0.22 15)"
+      },
+      "grid": {
+        "minor":              "oklch(0.97 0.003 254)",
+        "major":              "oklch(0.94 0.003 254)"
+      },
+      "syntax": {
+        "keyword":            "oklch(0.55 0.18 295)",
+        "string":             "oklch(0.55 0.16 145)",
+        "type":               "oklch(0.55 0.14 230)",
+        "macro":              "oklch(0.60 0.17 80)",
+        "number":             "oklch(0.58 0.17 50)"
+      },
+      "edge_stroke": {
+        "rest":               "oklch(0.18 0.008 254)",
+        "selected":           "oklch(0.06 0.01 254)"
+      },
+      "node_ring_rest":       "#c3c3c3",
+      "shadow_dialog":        "0 16px 40px -12px oklch(0.05 0 0 / 0.18), 0 4px 12px -4px oklch(0.05 0 0 / 0.12)"
+    }
+  },
+
+  "typography": {
+    "scale_ratio": 1.25,
+    "scale_name":  "Major Third",
+    "tokens": {
+      "micro":   { "size_px": 10, "line_height_rem": 1,    "use": "Layer headers, validator-id chips, section labels, keyboard chips" },
+      "label":   { "size_px": 11, "line_height_rem": 1,    "use": "Status bar chips, node value summary, Badge, Label" },
+      "body":    { "size_px": 13, "line_height_rem": 1.25, "use": "Inputs, buttons, menu items, node instance name" },
+      "title":   { "size_px": 16, "line_height_rem": 1.5,  "use": "Panel headers, dialog titles" },
+      "display": { "size_px": 20, "line_height_rem": 1.75, "use": "Reserved for future major hierarchy moments" }
+    },
+    "control_text_carveout_px": 12,
+    "status_bar_count_carveout_px": 15,
+    "font_stack": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Inter, sans-serif",
+    "font_decision_status": "TBD — Tailwind default system stack; final pairing deferred"
+  },
+
+  "radius": {
+    "sm":  "0.25rem",
+    "md":  "0.5rem",
+    "lg":  "0.625rem",
+    "xl":  "calc(0.625rem + 4px)",
+    "rules": [
+      "compact controls (Button, Input, Badge, menu items) use --radius-sm",
+      "surfaces (Dialog, AlertDialog, Sheet, hand-rolled modal bodies) use --radius-md",
+      "primitive layer never reaches for rounded-lg / rounded-xl"
+    ]
+  },
+
+  "shadow": {
+    "policy": "single tier",
+    "single_tier_token": "--shadow-dialog",
+    "applied_to": ["Dialog", "AlertDialog", "Sheet", "UnsavedChangesDialog", "AutoRecoverRestoreModal"],
+    "zero_shadow_on": [
+      "Popover", "DropdownMenu", "ContextMenu", "Menubar", "Tooltip",
+      "Select", "Sonner", "Input", "Textarea", "Checkbox", "RadioGroup",
+      "Button", "Toggle", "ToggleGroup", "Badge", "Card", "Tabs",
+      "canvas overlay buttons (ZoomIn / ZoomOut / FitView / SnapToGrid / InteractiveLockButton)"
+    ]
+  },
+
+  "modal": {
+    "scrim": "transparent",
+    "scrim_banned": ["bg-foreground/40", "bg-black/50", "bg-black/60", "backdrop-blur-*"],
+    "surface_token": "--dialog-surface",
+    "border_token":  "--dialog-border",
+    "shadow_token":  "--shadow-dialog",
+    "carveouts": {
+      "popover_lifted_chrome_keeps_popover_tone": true
+    }
+  },
+
+  "motion": {
+    "fade_in_ms": 100,
+    "fade_out_ms": 80,
+    "reactive_state_change": "snap (no transition on box-shadow for cross-panel reactive state)",
+    "self_initiated_state_change": "200ms ease on box-shadow (canvas-side selection)",
+    "marching_ants_keyframe": "flow-trace-march",
+    "marching_ants_uses": {
+      "validation-flow-trace": "1.5s linear infinite",
+      "code-link-active":      "1.2s linear infinite",
+      "anatomy-flow-march":    "scoped to AnatomyDialog"
+    },
+    "reduce_motion_policy": "Global @media (prefers-reduced-motion: reduce) plus per-class motion-reduce:!duration-0; JS-side scrollIntoViewSafe inline-reads data-motion attribute"
+  },
+
+  "severity": {
+    "vocabulary": ["error", "warning", "info"],
+    "color_var": {
+      "error":   "var(--destructive)",
+      "warning": "var(--color-warning)",
+      "info":    "var(--color-info)"
+    },
+    "icon": {
+      "error":   "lucide.CircleX",
+      "warning": "lucide.TriangleAlert",
+      "info":    "lucide.Info"
+    },
+    "label_strategy": {
+      "panel":      "full lowercase words",
+      "status_bar": "icon only (Status-Bar-Icons-Are-The-IDE-Convention carveout)"
+    },
+    "source_of_truth": "gui/src/lib/severity.ts"
+  },
+
+  "section_header": {
+    "vocabulary": "text-micro font-mono uppercase tracking-wide text-foreground/45",
+    "component": "gui/src/components/ui/section-header.tsx",
+    "tags": ["div", "span", "h2", "h3", "h4"],
+    "exception": {
+      "AnatomyDialog tile titles": "tracking-wider + text-foreground/55 (dialog-internal, distinct pattern)"
+    }
+  },
+
+  "layer_taxonomy": {
+    "slots": ["Hydraulic", "Thermal", "Sources", "ReactorPhysics"],
+    "color_var_map": "gui/src/lib/layerColors.ts (LAYER_COLOR_VAR)",
+    "visual_only_map": "gui/src/lib/layers.ts (getDisplayLayers)"
+  },
+
+  "shortcuts": {
+    "catalog_source": "gui/src/lib/shortcuts.ts (SHORTCUTS_CATALOG)",
+    "policy": "Static text affordance; shortcut chips never invoke on click in cmdk shortcut mode"
+  },
+
+  "preferences": {
+    "storage": "localStorage namespaced per-key (stream-composer-pref.<category>.<setting>)",
+    "module":  "gui/src/lib/preferences.ts",
+    "categories": ["editor", "appearance", "files", "validation", "codeExport", "advanced"]
+  },
+
+  "primitives": {
+    "directory": "gui/src/components/ui/",
+    "shipped": [
+      "alert-dialog", "badge", "button", "checkbox", "command",
+      "context-menu", "dialog", "dropdown-menu", "input", "label",
+      "menubar", "popover", "radio-group", "scroll-area", "section-header",
+      "select", "separator", "sheet", "sonner", "switch", "tabs",
+      "textarea", "toggle", "toggle-group", "tooltip"
+    ],
+    "density_baseline_px": 32,
+    "compact_density_px": 28,
+    "chip_density_px": 24
+  },
+
+  "bans": {
+    "absolute": [
+      "side-stripe colored borders > 1px",
+      "gradient text (background-clip: text + gradient)",
+      "glassmorphism / backdrop-blur as default",
+      "decorative motion",
+      "em dashes (use commas, colons, semicolons, periods, parentheses)",
+      "modal scrim (bg-*/N dimming the canvas)",
+      "FixAction buttons in inspection panels"
+    ],
+    "project_specific": [
+      "raw Tailwind color classes outside documented carveouts (WindowControls macOS traffic-light hex, close-button red-600 platform mimicry)",
+      "arbitrary text-[Npx] outside locked 12px control + 15px status-bar carveouts",
+      "consumer-SaaS empty-state hand-holding (\"Save a selection to add your first template.\")",
+      "auto-fix buttons in validation surfaces",
+      "ambient atmospheric shadows on chrome controls"
+    ]
+  },
+
+  "carveouts": [
+    "WindowControls macOS traffic-light hex values",
+    "Close-button red-600 Windows/Linux platform mimicry",
+    "Syntax tokens (--syntax-*) consumed only inside CodePreview",
+    "Status-bar severity icons (IDE convention)",
+    "AnatomyDialog tile titles (distinct from SectionHeader idiom)",
+    "Code-link active state uses --foreground (no new hue)",
+    "Switch primitive uses rounded-full (pill is the affordance)"
+  ]
+}

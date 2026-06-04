@@ -1,31 +1,130 @@
-import { memo } from "react";
-import { getSmoothStepPath, BaseEdge, type EdgeProps } from "@xyflow/react";
+import { memo, useCallback } from "react";
+import { BaseEdge, type EdgeProps } from "@xyflow/react";
+import useStore from "../store/useStore";
+import {
+  computeRoutePoints,
+  pointsToSvgPath,
+  type Bbox,
+} from "../lib/edgeRouting";
+import { reachableNodes } from "../lib/autoflip";
 
 /**
- * Custom hydraulic edge — smoothstep routing with closed arrowhead.
- * Bidirectional pairs overlap slightly but arrowheads distinguish direction.
+ * Custom hydraulic edge — obstacle-avoiding orthogonal router.
+ *
+ * Phase 72 Phase B — the previous smoothstep router treated edges as
+ * point-to-point and was happy to cut through any node bbox in its way (the
+ * canonical bug: a vertical loop's return edge passing straight through every
+ * node between source and target). The new router pulls every node bbox from
+ * the store, computes 5 candidate orthogonal paths (naive Z, plus wrap via
+ * left / right / top / bottom lane), and picks the candidate that crosses no
+ * bboxes — tiebreaking on fewer turns, then shorter total length.
+ *
+ * Source and target nodes are included as obstacles: the path must approach
+ * their port from outside the body, not through it.
+ *
+ * The rendered path uses rounded corners (~6 px radius) to match the visual
+ * style of the previous smoothstep edges.
+ *
+ * Phase 66 — code-panel <-> edge bidirectional traceability. Per-edge
+ * primitive-boolean selectors (matches StreamNode pattern, see PERFORMANCE.md
+ * rule 1) light the edge up when BOTH endpoint UUIDs appear in
+ * `hoveredSourceIds` / `pinnedSourceIds`.
  */
 function HydraulicEdge({
-  id,
   sourceX,
   sourceY,
   targetX,
   targetY,
   sourcePosition,
   targetPosition,
+  id,
+  source,
+  target,
   style,
   markerEnd,
 }: EdgeProps) {
-  const [path] = getSmoothStepPath({
+  // Subscribe to the nodes array directly. xyflow replaces this reference
+  // whenever any node mutates (position drag, resize, etc.) — exactly when
+  // we need to re-route. Other store changes don't replace this reference,
+  // so the edge doesn't re-render on unrelated state changes.
+  const nodes = useStore((s) => s.nodes);
+  // Subscribe to edges so the obstacle filter recomputes when the connected
+  // component changes (e.g. user deletes the edge that was bridging this
+  // edge's source/target to an unrelated cluster — that cluster's nodes
+  // should drop out of the obstacle set on the next render).
+  const edges = useStore((s) => s.edges);
+
+  // Phase 73 fix (v2) — obstacles are restricted to the FLOW connected
+  // component (edges with type "hydraulicEdge" only). The previous filter
+  // used the full edge graph, which still pulled in BC sources and thermal
+  // nodes whenever they happened to connect into the flow loop via a BC or
+  // thermal edge. A WallTemperature wired up off to the side still made
+  // every flow edge wrap around it. Flow routing should consider only flow
+  // components — non-flow nodes get ignored even when they share a node
+  // with the flow graph.
+  const flowEdges = edges.filter((e) => e.type === "hydraulicEdge");
+  const reachable = reachableNodes(nodes, flowEdges, [source, target]);
+  const obstacles: Bbox[] = [];
+  for (const n of nodes) {
+    if (!reachable.has(n.id)) continue;
+    const measured = n.measured as
+      | { width?: number; height?: number }
+      | undefined;
+    const w = measured?.width ?? 140;
+    const h = measured?.height ?? 70;
+    obstacles.push({ x: n.position.x, y: n.position.y, width: w, height: h });
+  }
+
+  const points = computeRoutePoints({
     sourceX,
     sourceY,
+    sourcePosition,
     targetX,
     targetY,
-    sourcePosition,
     targetPosition,
+    obstacles,
   });
+  const path = pointsToSvgPath(points);
 
-  return <BaseEdge id={id} path={path} style={style} markerEnd={markerEnd} />;
+  const isCodeHovered = useStore(
+    useCallback(
+      (s: { hoveredSourceIds: Set<string> }) =>
+        s.hoveredSourceIds.has(source) && s.hoveredSourceIds.has(target),
+      [source, target],
+    ),
+  );
+  const isCodePinned = useStore(
+    useCallback(
+      (s: { pinnedSourceIds: Set<string> }) =>
+        s.pinnedSourceIds.has(source) && s.pinnedSourceIds.has(target),
+      [source, target],
+    ),
+  );
+
+  // Phase 72 — code-link active state is a CLASS (not inline style).
+  // The `.code-link-active` rule (defined in index.css, reuses the
+  // flow-trace-march keyframe shared with .validation-flow-trace) paints
+  // a marching-ants dashed pattern in --foreground over the path. Pinned
+  // adds a small width fatten via `.code-link-pinned`. Marching motion
+  // is the primary signal, not stroke thickness — and the custom marker
+  // in CanvasPanel (`url(#stream-hydraulic-arrow)`,
+  // `markerUnits="userSpaceOnUse"`) keeps the arrowhead fixed regardless
+  // of the stroke fatten. See DESIGN.md §2 Code-link active state.
+  const className = isCodePinned
+    ? "code-link-active code-link-pinned"
+    : isCodeHovered
+      ? "code-link-active"
+      : "";
+
+  return (
+    <BaseEdge
+      id={id}
+      path={path}
+      style={style}
+      markerEnd={markerEnd}
+      className={className}
+    />
+  );
 }
 
 export default memo(HydraulicEdge);

@@ -3,6 +3,10 @@ module STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 
+# Alias used to label HTC-closure arguments at call sites (documentation only, not enforced).
+# Declared before the includes so the correlation files can reference it at parse time.
+const HTCCorrelation = Function
+
 include("fluids.jl")
 include("connectors.jl")
 include("geometry.jl")
@@ -23,6 +27,7 @@ include("composition/helpers.jl")
 include("solvers.jl")
 include("analysis.jl")
 include("examples.jl")
+include("utilities.jl")
 
 export rho_water, cp_water, mu_water, k_water, beta_water, sat_temperature
 export FlowPort, ThermalPort
@@ -46,7 +51,7 @@ export Channel,
 export dittus_boelter,
     blasius_friction,
     constant_Nusselt,
-    laminar_friction,
+    laminar_friction_rectangular,
     rectangular_laminar_correction,
     regime_dependent,
     elenbaas_nusselt,
@@ -56,7 +61,8 @@ export dittus_boelter,
     viscosity_correction,
     fully_developed_laminar_h_spl,
     developing_laminar_h_spl,
-    maximal_htc
+    maximal_htc,
+    HTCCorrelation
 export McAdams_SCB_heat_flux,
     Bergles_Rohsenow_SCB_heat_flux, partial_SCB_correction, regime_dependent_q_scb
 export Bergles_Rohsenow_T_ONB,
@@ -89,7 +95,8 @@ export build_loop,
     steady_state_guess,
     check_gravity_mismatch,
     port
-export symmetric_plate, plate, one_sided_connection, compose_systems
+export symmetric_plate, plate, one_sided_connection, compose_systems, fuel_assembly
+export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController, worth, change_state
 export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback

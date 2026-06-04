@@ -62,7 +62,7 @@ const frictionParam: Parameter = {
   positional: false,
   options: [
     { value: "blasius_friction", label: "Blasius", kind: "simple" },
-    { value: "laminar_friction", label: "Laminar", kind: "simple" },
+    { value: "laminar_friction_rectangular", label: "Laminar", kind: "simple" },
   ],
 };
 
@@ -136,7 +136,7 @@ describe("FunctionSelect", () => {
     render(
       <FunctionSelect param={frictionParam} value="blasius_friction" onChange={vi.fn()} />
     );
-    const subContainer = document.querySelector(".border-l-2");
+    const subContainer = document.querySelector("[data-testid='function-subparams']");
     expect(subContainer).toBeNull();
   });
 

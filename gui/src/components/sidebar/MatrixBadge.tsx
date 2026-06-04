@@ -11,7 +11,7 @@ interface MatrixBadgeProps {
 export default function MatrixBadge({ param }: MatrixBadgeProps) {
   return (
     <div className="flex flex-col gap-[8px]">
-      <Label className="text-[13px] font-semibold leading-[1.4] flex items-center gap-1">
+      <Label className="text-body font-semibold leading-[1.4] flex items-center gap-1">
         {param.name}
         {param.description && (
           <TooltipProvider>

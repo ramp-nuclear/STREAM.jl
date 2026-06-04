@@ -4,7 +4,7 @@
 #   - Standalone named functions (blasius_friction, turbulent_friction, viscosity_correction,
 #     rectangular_laminar_correction): plain Julia arithmetic, NOT @register_symbolic.
 #     MTK traces through these symbolically when Re is symbolic.
-#   - Factory (laminar_friction): returns closure capturing construction-time scalar.
+#   - Factory (laminar_friction_rectangular): returns closure capturing geom-derived state.
 #   - No @register_symbolic on any function in this file — all are plain arithmetic.
 
 """
@@ -44,28 +44,34 @@ function rectangular_laminar_correction(aspect_ratio::Real)
 end
 
 """
-    laminar_friction(aspect_ratio::Real) -> (Re) -> f_darcy
+    laminar_friction_rectangular(geom::PipeGeometry) -> (Re) -> f_darcy
 
 Factory returning a friction correlation for fully-developed laminar flow in a
 rectangular duct.
 
-`aspect_ratio` = `depth / width` where depth = min(edge1, edge2)
-and width = max(edge1, edge2). Precomputes the geometric correction factor
+Internally derives `aspect_ratio = geom.depth / geom.width` from the
+`PipeGeometry` descriptor (where `depth = min(edge1, edge2)` and
+`width = max(edge1, edge2)` for rectangular geometry; both equal `D` for
+circular). Precomputes the geometric correction factor
 `K_R = rectangular_laminar_correction(aspect_ratio)` at construction time.
 
 Returns `(Re) -> 64.0 / (Re * K_R)`.
 
-For truly circular geometry (no correction), use a raw lambda `(Re) -> 64.0 / Re`.
-For square (aspect_ratio=1.0): K_R ≈ 1.1246, giving f ≈ 56.9/Re (NOT 64/Re).
+Note: For circular geometry constructed via `PipeGeometry_circular(L, D)`,
+`depth == width == D` so `aspect_ratio == 1.0`. `rectangular_laminar_correction(1.0)`
+≈ 1.1246, giving `f ≈ 56.9/Re` (NOT the strict circular `64/Re`). Callers who
+want the strict circular `64/Re` should use a raw lambda `(Re) -> 64.0 / Re`
+instead of this factory.
 
 Usage:
 ```julia
 geom = PipeGeometry_rectangular(L, e1, e2, he)
-f_fn = laminar_friction(geom.depth / geom.width)
+f_fn = laminar_friction_rectangular(geom)
 ChannelAndContacts(friction_correlation = f_fn, ...)
 ```
 """
-function laminar_friction(aspect_ratio::Real)
+function laminar_friction_rectangular(geom::PipeGeometry)
+    aspect_ratio = geom.depth / geom.width
     k_R = rectangular_laminar_correction(aspect_ratio)
     return (Re) -> 64.0 / (Re * k_R)
 end

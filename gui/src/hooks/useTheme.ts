@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 
-export type Theme = "light" | "dark" | "system";
+// Phase 67 D-21: array-driven theme list so ViewMenu can map over it
+// (and Phase 72 can append without architectural change). `Theme` derives
+// from this array — adding a new entry widens the union automatically.
+export const THEMES = ["light", "dark", "system"] as const;
+export type Theme = (typeof THEMES)[number];
 
 export const STORAGE_KEY = "stream-composer-theme";
 

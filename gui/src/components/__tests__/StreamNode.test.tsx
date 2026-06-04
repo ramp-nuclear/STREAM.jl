@@ -1,18 +1,20 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import StreamNode from "../StreamNode";
+import useStore from "../../store/useStore";
 
 function renderStreamNode(data: {
   componentId: string;
   instanceName: string;
   parameters: Record<string, unknown>;
-}) {
+}, opts: { id?: string } = {}) {
+  const id = opts.id ?? "test-node";
   return render(
     <ReactFlowProvider>
       <StreamNode
-        id="test-node"
+        id={id}
         data={data as unknown as Record<string, unknown>}
         selected={false}
         type="streamNode"
@@ -32,6 +34,22 @@ function renderStreamNode(data: {
     </ReactFlowProvider>,
   );
 }
+
+beforeEach(() => {
+  // Reset the BC-relevant slices so error-ring tests start clean.
+  // Phase 63.1 D-15: errorTagsByNodeId removed; ring state now derives from
+  // selectNodeErrors over nodes + bcMode.
+  useStore.setState({
+    errorNodeIds: new Set<string>(),
+    nodes: [],
+    bcMode: {},
+    bcSymmetric: {},
+  });
+});
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("StreamNode", () => {
   it("renders component type label", () => {
@@ -63,24 +81,52 @@ describe("StreamNode", () => {
     expect(handles.length).toBe(2);
   });
 
-  it("renders with category border stripe for Hydraulic component", () => {
+  it("renders leading-band for Hydraulic component (Phase 72 D-canvas — replaces border-left stripe)", () => {
     const { container } = renderStreamNode({
       componentId: "Pump",
       instanceName: "pump_1",
       parameters: {},
     });
-    const nodeEl = container.firstElementChild as HTMLElement;
-    expect(nodeEl?.style.borderLeftColor).toBe("#3b82f6");
+    const band = container.querySelector('[data-testid="stream-node-band"]');
+    expect(band).toBeTruthy();
+    // Solid single-layer band: one child div with the Hydraulic layer var.
+    const segments = band!.querySelectorAll("[data-layer]");
+    expect(segments.length).toBe(1);
+    expect(segments[0].getAttribute("data-layer")).toBe("Hydraulic");
+    expect((segments[0] as HTMLElement).style.backgroundColor).toBe(
+      "var(--color-layer-hydraulic)",
+    );
   });
 
-  it("renders with category border stripe for Thermal component", () => {
+  it("renders leading-band for Thermal component (Phase 72 D-canvas)", () => {
     const { container } = renderStreamNode({
       componentId: "ConstantTemperature",
       instanceName: "ct_1",
       parameters: {},
     });
-    const nodeEl = container.firstElementChild as HTMLElement;
-    expect(nodeEl?.style.borderLeftColor).toBe("#f59e0b");
+    const band = container.querySelector('[data-testid="stream-node-band"]');
+    expect(band).toBeTruthy();
+    const segments = band!.querySelectorAll("[data-layer]");
+    expect(segments.length).toBe(1);
+    expect(segments[0].getAttribute("data-layer")).toBe("Thermal");
+    expect((segments[0] as HTMLElement).style.backgroundColor).toBe(
+      "var(--color-layer-thermal)",
+    );
+  });
+
+  it("renders split leading-band for dual-layer ChannelAndContacts (Phase 72 D-canvas)", () => {
+    const { container } = renderStreamNode({
+      componentId: "ChannelAndContacts",
+      instanceName: "cac_1",
+      parameters: {},
+    });
+    const band = container.querySelector('[data-testid="stream-node-band"]');
+    expect(band).toBeTruthy();
+    const segments = band!.querySelectorAll("[data-layer]");
+    expect(segments.length).toBe(2);
+    const layerKeys = Array.from(segments).map((s) => s.getAttribute("data-layer"));
+    expect(layerKeys).toContain("Hydraulic");
+    expect(layerKeys).toContain("Thermal");
   });
 
   it("renders an SVG icon element", () => {
@@ -125,7 +171,10 @@ describe("StreamNode", () => {
     expect(handles.length).toBe(1);
   });
 
-  it("ThermalPort handles have amber background", () => {
+  it("Phase 73: ThermalPort handle paints a hex SVG mark that consumes the Thermal layer var", () => {
+    // Phase 73 reshape — Handle itself is a transparent hit target; the
+    // visible mark is an SVG polygon child. The layer token now lives on the
+    // SVG `fill` attribute, not the Handle's inline `background`.
     const { container } = renderStreamNode({
       componentId: "ConstantTemperature",
       instanceName: "ct_1",
@@ -133,10 +182,14 @@ describe("StreamNode", () => {
     });
     const handle = container.querySelector(".react-flow__handle") as HTMLElement;
     expect(handle).toBeTruthy();
-    expect(handle.style.background).toContain("#f59e0b");
+    expect(handle.getAttribute("data-port-type")).toBe("thermal");
+    expect(handle.style.background).toBe("transparent");
+    const polygon = handle.querySelector("svg polygon");
+    expect(polygon).toBeTruthy();
+    expect(polygon!.getAttribute("fill")).toContain("--color-layer-thermal");
   });
 
-  it("ThermalPort handles have diamond rotation", () => {
+  it("Phase 73: ThermalPort handle is a rounded hexagon (replaces diamond rotation)", () => {
     const { container } = renderStreamNode({
       componentId: "ConstantTemperature",
       instanceName: "ct_1",
@@ -144,6 +197,301 @@ describe("StreamNode", () => {
     });
     const handle = container.querySelector(".react-flow__handle") as HTMLElement;
     expect(handle).toBeTruthy();
-    expect(handle.style.transform).toContain("rotate(45deg)");
+    // Handle no longer carries the rotate(45deg) diamond transform.
+    expect(handle.style.transform).toBe("");
+    // SVG hex has six vertices.
+    const polygon = handle.querySelector("svg polygon");
+    expect(polygon).toBeTruthy();
+    const points = polygon!.getAttribute("points") ?? "";
+    expect(points.split(/\s+/).filter(Boolean).length).toBe(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 63 D-18: BCPort hollow-square handle
+// ---------------------------------------------------------------------------
+
+describe("StreamNode — Phase 63 BCPort handle (D-18)", () => {
+  it("Phase 73: BCPort renders a dashed rounded-square SVG mark on WallTemperature", () => {
+    const { container } = renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: { n: 10, T_wall: 320 },
+    });
+    const handles = container.querySelectorAll(".react-flow__handle");
+    // Exactly one handle — the T_wall_out BCPort.
+    expect(handles.length).toBe(1);
+    const handle = handles[0] as HTMLElement;
+    expect(handle.getAttribute("data-port-type")).toBe("bc");
+    expect(handle.style.background).toBe("transparent");
+    // Handle is a circular 14px hit target now — the visible mark is the SVG.
+    expect(handle.style.borderRadius).toBe("50%");
+    const rect = handle.querySelector("svg rect");
+    expect(rect).toBeTruthy();
+    expect(rect!.getAttribute("stroke")).toContain("--muted-foreground");
+    expect(rect!.getAttribute("stroke-dasharray")).toBeTruthy();
+    expect(Number(rect!.getAttribute("rx"))).toBeGreaterThan(0);
+  });
+
+  it("Phase 73: BCPort renders the same dashed rounded-square mark on HeatFluxSource", () => {
+    const { container } = renderStreamNode({
+      componentId: "HeatFluxSource",
+      instanceName: "hfs_1",
+      parameters: { n: 10, q: 100000 },
+    });
+    const handles = container.querySelectorAll(".react-flow__handle");
+    expect(handles.length).toBe(1);
+    const handle = handles[0] as HTMLElement;
+    expect(handle.getAttribute("data-port-type")).toBe("bc");
+    expect(handle.style.background).toBe("transparent");
+    expect(handle.style.borderRadius).toBe("50%");
+    expect(handle.querySelector("svg rect")).toBeTruthy();
+  });
+
+  // Plan 63.1-12 RC-2: Channel + ChannelHeatFlux now declare a BCPort TARGET
+  // handle on the bottom edge (T_wall_left / q_left). The pre-Plan-12 negative
+  // test ("Channel has no BCPort port") is intentionally retired here under
+  // Rule 3 auto-fix; the new contract is enforced by registry.test.ts (BCPort
+  // allowed on Sources OR Hydraulic) and the positive tests below.
+  it("renders BCPort target handle on a Channel (RC-2, bottom edge)", () => {
+    const { container } = renderStreamNode({
+      componentId: "Channel",
+      instanceName: "ch_1",
+      parameters: { n: 4 },
+    });
+    const handles = Array.from(
+      container.querySelectorAll(".react-flow__handle"),
+    ) as HTMLElement[];
+    // The T_wall_left BCPort handle has data-handleid="T_wall_left".
+    const tWallTarget = handles.find(
+      (h) => h.getAttribute("data-handleid") === "T_wall_left",
+    );
+    expect(tWallTarget).toBeDefined();
+    // Isolated Channel has registry-default flow ports on left/right (no
+    // edges connected) → flowAxis horizontal → BC default 'bottom' is free
+    // → BC stays on bottom. Phase 73 only moves it when flow occupies bottom.
+    expect(tWallTarget!.getAttribute("data-handlepos")).toBe("bottom");
+    // type='target' on a consumer; ReactFlow encodes type on the className.
+    expect(tWallTarget!.className).toContain("target");
+    // Phase 73 — same crafted BC mark as the source-side BCPort.
+    expect(tWallTarget!.getAttribute("data-port-type")).toBe("bc");
+    expect(tWallTarget!.style.background).toBe("transparent");
+    expect(tWallTarget!.style.borderRadius).toBe("50%");
+  });
+
+  it("renders BCPort target handle on a ChannelHeatFlux (RC-2, bottom edge)", () => {
+    const { container } = renderStreamNode({
+      componentId: "ChannelHeatFlux",
+      instanceName: "chf_1",
+      parameters: { n: 4 },
+    });
+    const handles = Array.from(
+      container.querySelectorAll(".react-flow__handle"),
+    ) as HTMLElement[];
+    const qTarget = handles.find(
+      (h) => h.getAttribute("data-handleid") === "q_left",
+    );
+    expect(qTarget).toBeDefined();
+    expect(qTarget!.getAttribute("data-handlepos")).toBe("bottom");
+    expect(qTarget!.className).toContain("target");
+  });
+
+  it("renders BCPort handle as source on WallTemperature (category=Sources)", () => {
+    const { container } = renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: { n: 10, T_wall: 320 },
+    });
+    const handles = Array.from(
+      container.querySelectorAll(".react-flow__handle"),
+    ) as HTMLElement[];
+    const tOut = handles.find(
+      (h) => h.getAttribute("data-handleid") === "T_wall_out",
+    );
+    expect(tOut).toBeDefined();
+    expect(tOut!.className).toContain("source");
+  });
+
+  it("does NOT render the legacy 'Connect BC' decoy overlay (Plan 12 cleanup)", () => {
+    const { container } = renderStreamNode({
+      componentId: "Channel",
+      instanceName: "ch_1",
+      parameters: { n: 4 },
+    });
+    expect(container.textContent ?? "").not.toContain("Connect BC");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 63 D-19: Source-block two-line label
+// ---------------------------------------------------------------------------
+
+describe("StreamNode — Phase 63 source-block label (D-19)", () => {
+  it("renders source-block label 'T_wall = 320 K' when T_wall is a scalar (D-19)", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: { n: 10, T_wall: 320 },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/T_wall\s*=\s*320/);
+    expect(label.textContent).toContain("K");
+  });
+
+  it("renders source-block label 'T_wall = vector (n=10)' when T_wall is an array (D-19)", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: { n: 10, T_wall: [320, 325, 330, 335, 340, 345, 350, 355, 360, 365] },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toBe("T_wall = vector (n=10)");
+  });
+
+  it("renders source-block label 'T_wall = fn(t)' when T_wall is a function-typed value (D-19)", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: { n: 10, T_wall: "my_T_wall_fn" },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toBe("T_wall = fn(t)");
+  });
+
+  it("renders source-block label 'T_wall = (unset)' in muted-destructive when T_wall is unset (D-19)", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: { n: 10 }, // T_wall absent
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toBe("T_wall = (unset)");
+    expect(label.className).toContain("text-destructive");
+  });
+
+  it("renders source-block label 'q = ...' for HeatFluxSource (D-19)", () => {
+    renderStreamNode({
+      componentId: "HeatFluxSource",
+      instanceName: "hfs_1",
+      parameters: { n: 10, q: 100000 },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/q\s*=\s*100000/);
+    expect(label.textContent).toContain("W/m^2");
+  });
+
+  it("does NOT render source-block label on non-source components (e.g., Pump)", () => {
+    renderStreamNode({
+      componentId: "Pump",
+      instanceName: "pump_1",
+      parameters: {},
+    });
+    expect(screen.queryByTestId("source-block-label")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 63.1-14 GAP-RC-4: sourceLabelLine reads SourceValueEntry shapes
+// ---------------------------------------------------------------------------
+
+describe("StreamNode — Plan 14 sourceLabelLine SourceValueEntry (GAP-RC-4)", () => {
+  it("renders 'T_wall = 300 K' for value-mode SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: { n: 4, T_wall: { mode: "value", value: 300 } },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/T_wall\s*=\s*300/);
+    expect(label.textContent).toContain("K");
+  });
+
+  it("renders 'T_wall = profile (cosine)' for profile-cosine SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: {
+        n: 4,
+        T_wall: { mode: "profile", preset: "cosine", amplitude: 1.0, peakingFactor: 1.0 },
+      },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/T_wall\s*=\s*profile.*cosine/i);
+  });
+
+  it("renders 'T_wall = profile (file)' for profile-file SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: {
+        n: 4,
+        T_wall: { mode: "profile", preset: "file", path: "/data/twall.csv" },
+      },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/T_wall\s*=\s*profile.*file/i);
+  });
+
+  it("renders 'T_wall = fn(t)' for function SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "WallTemperature",
+      instanceName: "wt_1",
+      parameters: {
+        n: 4,
+        T_wall: { mode: "function", signature: "fn(t)", functionName: "my_fn" },
+      },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toBe("T_wall = fn(t)");
+  });
+
+  it("renders 'q = 1e5 W/m^2' for value-mode HFS SourceValueEntry", () => {
+    renderStreamNode({
+      componentId: "HeatFluxSource",
+      instanceName: "hfs_1",
+      parameters: { n: 4, q: { mode: "value", value: 100000 } },
+    });
+    const label = screen.getByTestId("source-block-label");
+    expect(label.textContent).toMatch(/q\s*=\s*100000/);
+    expect(label.textContent).toContain("W/m^2");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 63 D-22: errorTagsByNodeId-driven red-ring outline
+// ---------------------------------------------------------------------------
+
+describe("StreamNode — BC error persistent outline (D-22 via errorNodeIds, Phase 71 D-20, Phase 72 simplification)", () => {
+  it("applies persistent destructive outline when errorNodeIds contains the node id (D-22)", () => {
+    // Phase 71 D-20: hasBCError removed; red-ring now derives solely from
+    // errorNodeIds which is populated by nMatch via initValidation.
+    // Phase 72: simplified from `outline-2 outline-offset-1 ring-2 ring-destructive`
+    // (double-outline-plus-ring) to a single outline-2 destructive.
+    // Phase 72 P11: outline moved from Tailwind className to inline style
+    // (CSS-pipeline workaround); assertion now reads element.style.outline
+    // instead of className.
+    useStore.setState({
+      errorNodeIds: new Set<string>(["wt_red"]),
+    });
+    const { container } = renderStreamNode(
+      { componentId: "WallTemperature", instanceName: "wt_1", parameters: { n: 10, T_wall: 320 } },
+      { id: "wt_red" },
+    );
+    const nodeEl = container.firstElementChild as HTMLElement;
+    expect(nodeEl.style.outline).toMatch(/var\(--destructive\)/);
+  });
+
+  it("does NOT apply the destructive outline when errorNodeIds does not contain the node id", () => {
+    useStore.setState({
+      nodes: [],
+      bcMode: {},
+      errorNodeIds: new Set<string>(),
+    });
+    const { container } = renderStreamNode(
+      { componentId: "WallTemperature", instanceName: "wt_1", parameters: { n: 10, T_wall: 320 } },
+      { id: "wt_clean" },
+    );
+    const nodeEl = container.firstElementChild as HTMLElement;
+    expect(nodeEl.style.outline).not.toMatch(/var\(--destructive\)/);
   });
 });
