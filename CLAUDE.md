@@ -1,5 +1,9 @@
 # STREAM.jl — Claude Code Instructions
 
+## Coding Rules
+
+When writing or editing Julia code, follow the conventions in `JULIA.md` (repo root). For ModelingToolkit code, the `modelingtoolkit-jl` skill (`.claude/skills/modelingtoolkit-jl/`) auto-triggers and takes precedence on MTK-specific API usage; `JULIA.md` governs general Julia.
+
 ## Branching Policy
 
 **The user owns branch creation. GSD must never create its own branches.**
