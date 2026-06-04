@@ -6,26 +6,6 @@
 # (Base.Channel is Julia stdlib's task-communication channel; STREAM.Channel is unrelated)
 function Channel end
 
-
-struct NamedVars
-    T
-    dp
-    T_wall_left
-    T_wall_right
-    Re
-    Pe
-    v
-    P
-    T_sat
-    T_ONB
-    q_wall
-    q_wall_left
-    q_wall_right
-    T_out
-    dP
-end
-
-
 """
     _channel_core(; n, T, dp, port_in, port_out, geometry, g_acc,
                   friction_correlation=blasius_friction,
@@ -36,7 +16,7 @@ end
 
 Shared private helper for STREAM channel-family components. Single source of truth
 for energy balance (enthalpy form with face-averaged cp), mass conservation,
-momentum ODE `(L/A)*Dt(mdot)`, per-cell friction (algebraic dp[i]), port wiring,
+momentum ODE `(L/A)*D(mdot)`, per-cell friction (algebraic dp[i]), port wiring,
 and observables.
 
 Returns `(; eqs, obs)` — variant splices `eqs = [variant_specific_eqs; core.eqs]`,
@@ -62,7 +42,7 @@ splices these into its own equation lists before building the `System`.
 # Energy balance per cell (enthalpy form, face-averaged cp)
 
     cp_face = (cp_water(T_up) + cp_water(T[i])) / 2
-    Dt(T[i]) ~ (|mdot|*cp_face*(T_up - T[i]) + q_left_expr[i] + q_right_expr[i])
+    D(T[i]) ~ (|mdot|*cp_face*(T_up - T[i]) + q_left_expr[i] + q_right_expr[i])
               / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
 
 """
@@ -74,13 +54,12 @@ function _channel_core(;
     g_acc::Real,
     friction_correlation=blasius_friction,
     q_left_expr, q_right_expr,
-    vars::NamedVars
+    vars,
 )
     Dh = geometry.Dh
     A  = geometry.A
     L  = geometry.L
     dz = L / n
-    Dt = Differential(t)
 
     eqs = Equation[]
     obs = Equation[]
@@ -97,7 +76,7 @@ function _channel_core(;
 
         # Energy balance — enthalpy form
         push!(eqs,
-            Dt(vars.T[i]) ~ (
+            D(vars.T[i]) ~ (
                 abs(port_in.mdot) * cp_face * (T_up - vars.T[i])
               + q_left_expr[i]
               + q_right_expr[i]
@@ -131,7 +110,7 @@ function _channel_core(;
 
     push!(obs, vars.T_out ~ ifelse(port_in.mdot >=0, vars.T[n], vars.T[1]))
     push!(eqs, port_in.mdot + port_out.mdot ~ 0)
-    push!(eqs, (L / A) * Dt(port_in.mdot) ~ (port_in.P - port_out.P) - sum(vars.dp[i] for i in 1:n))
+    push!(eqs, (L / A) * D(port_in.mdot) ~ (port_in.P - port_out.P) - sum(vars.dp[i] for i in 1:n))
     push!(eqs, port_out.T ~ vars.T[n])
     push!(eqs, port_in.T  ~ vars.T[1])
     push!(obs, vars.dP ~ port_in.P - port_out.P)
@@ -148,7 +127,7 @@ function _setup(geometry, g, n)
         g_acc = g
     end
 
-    vars = @variables begin
+    @variables begin
         (T(t))[1:n]
         (dp(t))[1:n]
         (T_wall_left(t))[1:n]
@@ -169,11 +148,15 @@ function _setup(geometry, g, n)
     @named port_in  = FlowPort()
     @named port_out = FlowPort()
 
-    return pars, NamedVars(vars...), port_in, port_out
+    varstruct = (;
+        T, dp, T_wall_left, T_wall_right, Re, Pe, v, P, T_sat, T_ONB,
+        q_wall, q_wall_left, q_wall_right, T_out, dP,
+    )
 
+    return pars, varstruct, port_in, port_out
 end
 
-function _vcollect(vars::NamedVars)
+function _vcollect(vars)
     [
         collect(vars.T); collect(vars.dp);
         collect(vars.T_wall_left); collect(vars.T_wall_right);
@@ -248,7 +231,7 @@ function Channel(;
         hL_per_cell = fill(Num(h_left), n)
     elseif h_left isa AbstractVector
         length(h_left) == n ||
-            error("Channel: h_left vector length $(length(h_left)) ≠ n=$n")
+            throw(DimensionMismatch("h_left has length $(length(h_left)), expected n=$n"))
         hL_per_cell = Num.(h_left)
     else  # Function / callable — MTK callable-parameter pattern (RESEARCH.md §1)
         FType_L = typeof(h_left)
@@ -262,7 +245,7 @@ function Channel(;
         hR_per_cell = fill(Num(h_right), n)
     elseif h_right isa AbstractVector
         length(h_right) == n ||
-            error("Channel: h_right vector length $(length(h_right)) ≠ n=$n")
+            throw(DimensionMismatch("h_right has length $(length(h_right)), expected n=$n"))
         hR_per_cell = Num.(h_right)
     else  # Function / callable
         FType_R = typeof(h_right)
@@ -298,7 +281,7 @@ function Channel(;
 
     all_vars = _vcollect(varstruct)
 
-    compose(
+    return compose(
         System(eqs, t, all_vars, pars; observed=obs, name=name),
         port_in, port_out,
     )
@@ -382,7 +365,7 @@ function ChannelHeatFlux(;
     obs = core.obs
     all_vars = [_vcollect(varstruct); [collect(v) for v in exvars]...]
 
-    compose(
+    return compose(
         System(eqs, t, all_vars, pars; observed=obs, name=name),
         port_in, port_out,
     )
@@ -504,10 +487,10 @@ function ChannelAndContacts(;
         ]
     else
         variant_eqs = [
-            [_h_eq_scb_cor(thermal_left[i].T,  vars.T[i], sum([vars.dp[j] for j in 1:i]), 
+            [_h_eq_scb_cor(thermal_left[i].T,  vars.T[i], sum(vars.dp[j] for j in 1:i), 
                            vars.dp[i], h_tc_left[i],  port_in.mdot, port_in.P, Dh, A, htc_correlation, scb_correction) 
                            for i in 1:n]...;
-            [_h_eq_scb_cor(thermal_right[i].T, vars.T[i], sum([vars.dp[j] for j in 1:i]), 
+            [_h_eq_scb_cor(thermal_right[i].T, vars.T[i], sum(vars.dp[j] for j in 1:i), 
                            vars.dp[i], h_tc_right[i], port_in.mdot, port_in.P, Dh, A, htc_correlation, scb_correction) 
                            for i in 1:n]...;
         ]
@@ -554,7 +537,7 @@ function ChannelAndContacts(;
         [collect(v) for v in exvars]...
     ]
 
-    compose(
+    return compose(
         System(eqs, t, all_vars, pars; observed=obs, name=name),
         port_in, port_out, thermal_left..., thermal_right...,
     )
