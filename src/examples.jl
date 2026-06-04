@@ -24,7 +24,6 @@ function build_loop(;
     n::Int   = 10,
     L_ch     = 0.6,
     D_ch     = 0.01,
-    A_ch     = 7.85e-5,
     dP_pump  = 3.0e4,
     T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
     T_wall   = 373.15,   # wall temperature (K); ~100°C for forced convection
@@ -84,7 +83,6 @@ function build_loop_vertical(;
     n::Int   = 10,
     L_ch     = 0.6,
     D_ch     = 0.01,
-    A_ch     = 7.85e-5,
     dP_pump  = 3.0e4,
     T_inlet  = 313.15,    # coolant inlet temperature (K); 40°C
     T_wall   = 373.15,    # wall temperature (K); ~100°C for forced convection
@@ -156,7 +154,6 @@ function build_loop_transient(;
     n::Int   = 10,
     L_ch     = 0.6,
     D_ch     = 0.01,
-    A_ch     = 7.85e-5,
     dP_pump  = 3.0e4,
     T_inlet  = 313.15,    # coolant inlet temperature (K); 40°C
     T_wall_0 = 373.15,    # wall temperature (K); used when T_wall_fn is nothing
@@ -445,6 +442,24 @@ function build_loop_lof_bypass(;
     return ssys
 end
 
+# Resolve a temp_worth / ref_temp Dict keyed by :cac/:fuel into one keyed by the
+# scoped component systems that PointKinetics expects.
+function _resolve_tw(d, rods_cac, rods_fuel)
+    isnothing(d) && return nothing
+    resolved = Dict{Any,Any}()
+    for (k, v) in d
+        comp = if k == :cac
+            rods_cac
+        elseif k == :fuel
+            rods_fuel
+        else
+            throw(ArgumentError("unknown component key $k; expected :cac or :fuel"))
+        end
+        resolved[comp] = v
+    end
+    return resolved
+end
+
 """
     build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=293.15, dP_pump=3.0e4,
                   P0=1.0, power_scale=1e4, temp_worth=nothing, ref_temp=nothing,
@@ -526,22 +541,6 @@ function build_loop_pk(ctrl;
     rods = symmetric_plate(cac, fuel; name=:rods)
     rods_cac = rods.cac
     rods_fuel = rods.fuel
-
-    function _resolve_tw(d, rods_cac, rods_fuel)
-        isnothing(d) && return nothing
-        resolved = Dict{Any,Any}()
-        for (k, v) in d
-            comp = if k == :cac
-                rods_cac
-            elseif k == :fuel
-                rods_fuel
-            else
-                throw(ArgumentError("unknown component key $k; expected :cac or :fuel"))
-            end
-            resolved[comp] = v
-        end
-        return resolved
-    end
 
     tw = _resolve_tw(temp_worth, rods_cac, rods_fuel)
     rt = _resolve_tw(ref_temp, rods_cac, rods_fuel)
