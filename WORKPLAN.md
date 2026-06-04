@@ -62,6 +62,20 @@ Final wording lands in `CLAUDE.md` during W0/W5.
     (relevant to volumes/LOCA); #5 migrates to the GUI repo (W2).
 
 ### WA — Architecture design sprint *(design only; runs in parallel with W2)*
+
+**DECIDED 2026-06-04 (spike-validated; see issue #19).**
+- **Uncertainty (W6):** Float64 sampling. An opt-in registry of uncertain inputs feeds a
+  `remake`/`EnsembleProblem` ensemble; attribution via finite-difference local sensitivity
+  (cheap per-input budget) plus GlobalSensitivity Sobol (nonlinear, variance-based %).
+  Number-type packages (Measurements/Particles) are rejected: they StackOverflow through
+  STREAM's stiff DAE in every configuration tried.
+- **Model-authoring (W7):** derived geometry as expression-valued default parameters of
+  base "knob" parameters; rebuild-free scans via `remake`/`setp`. Validated end-to-end
+  through the steady-state solve with a guess. Requires reworking the Float64-only
+  `PipeGeometry` so components take base parameters and derive `Dh`/`A`/perimeter.
+- Both halves share one substrate: a named parameter interface varied at solve time via
+  `remake`. W6 and W7 should be co-designed at implementation time.
+
 Two design docs + spikes, no production code. Decided before the audit so the audit knows
 the target shape.
 - **Uncertainty (#1).** Opt-in uncertainty *registry layered over MTK parameters* (no
