@@ -10,8 +10,6 @@
 #            q_OSV_saha_zuber, q_CHF_sudo_kaminaga, q_CHF_mirshak,
 #            q_CHF_fabrega, twall_limit
 
-using QuadGK
-
 # ─── Private sub-correlation helpers for Sudo-Kaminaga CHF ──────────────────
 
 function _SKq1(G_star)
@@ -27,7 +25,7 @@ function _SKq3(A_ratio, w, lamda, dT_inlet, rho_v, rho_l)
 end
 
 function _SKq4(G_star, dT_outlet)
-    return G_star == 0 ? Inf : _SKq1(G_star) * (1 + 5000 * dT_outlet / abs(G_star))
+    return iszero(G_star) ? Inf : _SKq1(G_star) * (1 + 5000 * dT_outlet / abs(G_star))
 end
 
 # ─── Public API ─────────────────────────────────────────────────────────────
@@ -157,7 +155,6 @@ function q_OSV_saha_zuber(
         X = St_c * G * cp
     end
 
-    dT_sub = pipe.heated_perimeter  # placeholder; actual T_sat needed for full calc
     T_sat_est = sat_temperature(1e5)  # use 1 atm default for self-consistent bulk
 
     # Handle uniform vs provided flux shape
@@ -277,7 +274,7 @@ function q_CHF_mirshak(T_bulk, T_sat, pressure, v)
     return 1.51e6 *
            (1 + 0.1198 * v) *
            (1 + 0.00914 * (T_sat - T_bulk)) *
-           (1 + 0.19e-5 * pressure)
+           (1 + 1.9e-6 * pressure)
 end
 
 """
