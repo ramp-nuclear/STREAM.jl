@@ -28,38 +28,38 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
 
 # Fields
 - `n::Int`                     — number of axial cells
-- `T_bulk::AbstractVector`     — bulk coolant temperature per cell [K]
-- `T_wall::AbstractVector`     — conservative wall temperature: `max(T_wall_left, T_wall_right)` per cell [K]
-- `T_wall_left::AbstractVector`  — left face wall temperature per cell [K]
-- `T_wall_right::AbstractVector` — right face wall temperature per cell [K]
-- `T_sat::AbstractVector`      — saturation temperature per cell [K]
-- `T_ONB::AbstractVector`      — onset of nucleate boiling temperature per cell [K]
+- `T_bulk::AbstractArray`     — bulk coolant temperature per cell [K]
+- `T_wall::AbstractArray`     — conservative wall temperature: `max(T_wall_left, T_wall_right)` per cell [K]
+- `T_wall_left::AbstractArray`  — left face wall temperature per cell [K]
+- `T_wall_right::AbstractArray` — right face wall temperature per cell [K]
+- `T_sat::AbstractArray`      — saturation temperature per cell [K]
+- `T_ONB::AbstractArray`      — onset of nucleate boiling temperature per cell [K]
 - `T_inlet::Float64`           — inlet temperature from `port_in.T` [K]
-- `P::AbstractVector`          — absolute pressure per cell [Pa]
-- `q_flux::AbstractVector`     — conservative heat flux: `max(q_flux_left, q_flux_right)` per cell [W/m²]
-- `q_flux_left::AbstractVector`  — left face heat flux per cell [W/m²]
-- `q_flux_right::AbstractVector` — right face heat flux per cell [W/m²]
+- `P::AbstractArray`          — absolute pressure per cell [Pa]
+- `q_flux::AbstractArray`     — conservative heat flux: `max(q_flux_left, q_flux_right)` per cell [W/m²]
+- `q_flux_left::AbstractArray`  — left face heat flux per cell [W/m²]
+- `q_flux_right::AbstractArray` — right face heat flux per cell [W/m²]
 - `mdot::Float64`              — mass flow rate from `port_in.mdot` [kg/s]
-- `velocity::AbstractVector`   — absolute fluid velocity per cell [m/s]
+- `velocity::AbstractArray`   — absolute fluid velocity per cell [m/s]
 - `pipe::Union{PipeGeometry, Nothing}` — channel geometry, or `nothing` if unavailable
 - `gravity::Float64`           — gravitational acceleration [m/s²]
 """
 #! format: off
 @kwdef struct ChannelState
     n             ::Int
-    T_bulk        ::AbstractVector
-    T_wall        ::AbstractVector
-    T_wall_left   ::AbstractVector
-    T_wall_right  ::AbstractVector
-    T_sat         ::AbstractVector
-    T_ONB         ::AbstractVector
+    T_bulk        ::AbstractArray
+    T_wall        ::AbstractArray
+    T_wall_left   ::AbstractArray
+    T_wall_right  ::AbstractArray
+    T_sat         ::AbstractArray
+    T_ONB         ::AbstractArray
     T_inlet       ::Float64
-    P             ::AbstractVector
-    q_flux        ::AbstractVector
-    q_flux_left   ::AbstractVector
-    q_flux_right  ::AbstractVector
+    P             ::AbstractArray
+    q_flux        ::AbstractArray
+    q_flux_left   ::AbstractArray
+    q_flux_right  ::AbstractArray
     mdot          ::Float64
-    velocity      ::AbstractVector
+    velocity      ::AbstractArray
     pipe          ::Union{PipeGeometry, Nothing}
     gravity       ::Float64
 end
@@ -83,12 +83,8 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
     # Determine n from the length of the T array
     n = length(channel_sys.T)
 
-    # Detect steady vs transient: check if sol has multiple timepoints
-    is_transient = try
-        length(sol.t) > 1
-    catch
-        false
-    end
+    # Detect steady vs transient: a NonlinearSolution has no time field.
+    is_transient = hasproperty(sol, :t) && length(sol.t) > 1
 
     #! format: off
     if is_transient
