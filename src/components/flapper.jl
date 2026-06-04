@@ -64,7 +64,7 @@ function Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0)
         # ref_mdot has no equation here — user wires it during composition
     ]
 
-    compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
 end
 
 """
