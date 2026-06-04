@@ -272,7 +272,11 @@ function PointKinetics(
             alpha_flat, n_flat = _flatten_weights(alpha_raw, comp)
             Tref_raw = get(ref_dict, comp, 0.0)
             Tref_flat, _ = _flatten_weights(Tref_raw, comp)
-            @assert length(Tref_flat) == n_flat
+            length(Tref_flat) == n_flat || throw(
+                DimensionMismatch(
+                    "ref_temp for $(nameof(comp)) has length $(length(Tref_flat)), expected $n_flat",
+                ),
+            )
             var_sym = Symbol(:T_source_, cname)
             Tsrc = only(@variables $(var_sym)(t)[1:n_flat])
             append!(T_source_vars, collect(Tsrc))
@@ -345,7 +349,7 @@ NamedTuple `(P=P0, C_k=Vector{Float64})` where `C_k[i] = beta_k[i] / (lambda_k[i
 function point_kinetics_steady_state(
     P0; Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K
 )
-    C_k = [beta_k[i] / (lambda_k[i] * Lambda) * P0 for i in 1:length(beta_k)]
+    C_k = [beta_k[i] / (lambda_k[i] * Lambda) * P0 for i in eachindex(beta_k)]
     return (P=P0, C_k=C_k)
 end
 
