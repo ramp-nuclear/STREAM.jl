@@ -4,6 +4,13 @@
 
 When writing or editing Julia code, follow the conventions in `JULIA.md` (repo root). For ModelingToolkit code, the `modelingtoolkit-jl` skill (`.claude/skills/modelingtoolkit-jl/`) auto-triggers and takes precedence on MTK-specific API usage; `JULIA.md` governs general Julia.
 
+## Project Conventions
+
+- **No GSD jargon in code.** Source, comments, docstrings, and test names never reference GSD phases, plans, or milestone IDs (no `# Phase 55 D-17`, no `test_phase_NN`). Name things for what they are. Test files mirror their source file (see File Structure Standard).
+- **Docstrings have a purpose and read like a human wrote them.** Every exported name carries a docstring (description, `# Arguments`, `# Returns`). Run `/humanizer` over docstring prose; do not pad with AI-tone filler. General comment discipline lives in `JULIA.md` §0.
+- **Delete, don't archive.** When a milestone or phase completes, delete its planning `.md` files instead of moving them to an archive. Keep only currently-in-work planning docs.
+- **Merge is squash-only.** The repo ruleset permits only squash merges into `main` (linear history, PR required, review threads resolved). No rebase/FF or merge commits.
+
 ## Branching Policy
 
 **The user owns branch creation. GSD must never create its own branches.**
