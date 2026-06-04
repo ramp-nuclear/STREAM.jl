@@ -1,7 +1,7 @@
 # helpers.jl — QoL and composition helpers for STREAM.jl
 
 """
-    port(sys, face, i) -> SubsystemPort
+    port(sys, face, i)
 
 Access an indexed thermal port array element from a compiled subsystem.
 
@@ -11,7 +11,7 @@ Access an indexed thermal port array element from a compiled subsystem.
 - `i`: 1-based cell index (Int)
 
 # Returns
-The subsystem port object, suitable for use in `connect()` calls.
+The namespaced connector subsystem (e.g. `sys.thermal_left3`), suitable for `connect()`.
 """
 port(sys, face::Symbol, i::Int) = getproperty(sys, Symbol(face, i))
 
@@ -34,7 +34,7 @@ function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
         return :ok
     end
 
-    local_name(p) = begin
+    local_name = p -> begin
         s = string(p)
         idx = findlast('₊', s)
         idx === nothing ? s : s[nextind(s, idx):end]
@@ -363,7 +363,7 @@ function fuel_assembly(
     #    ring we also wire the wrap pair (seq[end] -> seq[1]).
     seq = _walk_alternation(channels, plates, effective_bookend, start)
     pair_range = closed ? (1:length(seq)) : (1:length(seq)-1)
-    next_idx(m) = m == length(seq) ? 1 : m + 1
+    next_idx = m -> m == length(seq) ? 1 : m + 1
     connections = Equation[
         eq
         for m in pair_range
