@@ -413,18 +413,14 @@ function connect_temperature_feedback(pk, components)
         cname = nameof(comp)
         pk_T_source = getproperty(pk, Symbol(:T_source_, cname))
         T_sym = getproperty(comp, :T)
-        if ndims(T_sym) == 1
+        comp_eqs = if ndims(T_sym) == 1
             n = length(T_sym)
-            for j in 1:n
-                push!(eqs, pk_T_source[j] ~ T_sym[j])
-            end
+            [pk_T_source[j] ~ T_sym[j] for j in 1:n]
         else
             nz, nx = size(T_sym)
-            for jz in 1:nz, jx in 1:nx
-                j = (jz - 1) * nx + jx
-                push!(eqs, pk_T_source[j] ~ T_sym[jz, jx])
-            end
+            [pk_T_source[(jz - 1) * nx + jx] ~ T_sym[jz, jx] for jz in 1:nz for jx in 1:nx]
         end
+        append!(eqs, comp_eqs)
     end
     return eqs
 end
