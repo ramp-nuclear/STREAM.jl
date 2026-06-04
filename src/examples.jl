@@ -536,7 +536,7 @@ function build_loop_pk(ctrl;
             elseif k == :fuel
                 rods_fuel
             else
-                error("Unknown component key: $k (expected :cac or :fuel)")
+                throw(ArgumentError("unknown component key $k; expected :cac or :fuel"))
             end
             resolved[comp] = v
         end

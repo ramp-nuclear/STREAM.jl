@@ -83,8 +83,10 @@ end
 function _infer_n(sys)
     sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
     n = count(s -> startswith(s, "thermal_left"), sub_names)
-    n == 0 && error(
-        "_infer_n: could not detect thermal port count in system $(ModelingToolkit.getname(sys)). Pass an uncompiled ChannelAndContacts instance.",
+    n == 0 && throw(
+        ArgumentError(
+            "could not detect thermal port count in system $(ModelingToolkit.getname(sys)); pass an uncompiled ChannelAndContacts instance",
+        ),
     )
     return n
 end
@@ -172,7 +174,7 @@ names and should not be used in equations or connection dicts after composition.
 """
 function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
     side in (:left, :right) ||
-        error("one_sided_connection: side must be :left or :right, got :$side")
+        throw(ArgumentError("side must be :left or :right, got :$side"))
     n = _infer_n(channel)
     connections = if side == :left
         Equation[[

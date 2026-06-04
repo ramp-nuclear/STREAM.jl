@@ -238,7 +238,7 @@ end
     #! format: on
     ratios_zero = ratio_fn(state_zero)
     @test all(ratios_zero .== Inf)
-    @test_throws ErrorException chfr(Mirshak_CHF; direction=:bad)(state)
+    @test_throws ArgumentError chfr(Mirshak_CHF; direction=:bad)(state)
 end
 
 @testset "THRS-09: threshold_analysis dispatch" begin

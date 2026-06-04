@@ -229,7 +229,9 @@ function chfr(chf_fn; direction=:max)
         elseif direction == :total
             state.q_flux
         else
-            error("Unknown direction: $direction. Use :left, :right, :max, or :total")
+            throw(
+                ArgumentError("direction must be :left, :right, :max, or :total, got :$direction"),
+            )
         end
         chf_vals = chf_fn(state)
         return [q_i > 0 ? c_i / q_i : Inf for (c_i, q_i) in zip(chf_vals, q)]

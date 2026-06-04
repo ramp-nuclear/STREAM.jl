@@ -109,12 +109,12 @@ end
 
 @testset "_infer_n: errors on Channel (no thermal port arrays under new design)" begin
     @named ch = Channel(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
-    @test_throws ErrorException _infer_n(ch)
+    @test_throws ArgumentError _infer_n(ch)
 end
 
 @testset "_infer_n: errors on ChannelHeatFlux (no thermal port arrays under new design)" begin
     @named chf = ChannelHeatFlux(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
-    @test_throws ErrorException _infer_n(chf)
+    @test_throws ArgumentError _infer_n(chf)
 end
 
 # ───────────────────────────────────────────────────────────
@@ -303,7 +303,7 @@ end
 
 @testset "one_sided_connection — invalid side errors" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    @test_throws ErrorException one_sided_connection(cac, fuel; side=:bogus, name=:bad)
+    @test_throws ArgumentError one_sided_connection(cac, fuel; side=:bogus, name=:bad)
 end
 
 # ───────────────────────────────────────────────────────────

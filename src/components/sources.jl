@@ -42,7 +42,7 @@ function WallTemperature(;
 
     elseif T_wall isa AbstractVector
         length(T_wall) == n ||
-            error("WallTemperature: T_wall vector length $(length(T_wall)) ≠ n=$n")
+            throw(DimensionMismatch("T_wall has length $(length(T_wall)), expected n=$n"))
         # Vector-of-Real branch: bake the values into the equations directly
         # (matches Channel.h_left's Vector branch — no @parameters needed).
         eqs = Equation[T_wall_out[i] ~ T_wall[i] for i in 1:n]
@@ -93,7 +93,8 @@ function HeatFluxSource(; name, n::Int, q::Union{Real,AbstractVector{<:Real},Fun
         return System(eqs, t, [collect(q_out)...], pars; name=name)
 
     elseif q isa AbstractVector
-        length(q) == n || error("HeatFluxSource: q vector length $(length(q)) ≠ n=$n")
+        length(q) == n ||
+            throw(DimensionMismatch("q has length $(length(q)), expected n=$n"))
         eqs = Equation[q_out[i] ~ q[i] for i in 1:n]
         return System(eqs, t, [collect(q_out)...], Num[]; name=name)
 

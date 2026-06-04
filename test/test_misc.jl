@@ -91,8 +91,8 @@ end
 
 @testset "WallTemperature: Vector length mismatch errors" begin
     n = 4
-    @test_throws ErrorException WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:3.0))
-    @test_throws ErrorException WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:5.0))
+    @test_throws DimensionMismatch WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:3.0))
+    @test_throws DimensionMismatch WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:5.0))
 end
 
 @testset "WallTemperature: Function (callable parameter) instantiation" begin
