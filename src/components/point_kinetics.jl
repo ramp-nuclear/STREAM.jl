@@ -71,7 +71,6 @@ Uncompiled `System` with 7 state variables (P, C_1..C_6) and 3 observed variable
 function PointKinetics(;
     name, rho=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K
 )
-    Dt = Differential(t)
 
     pars = @parameters begin
         rho_val = rho
@@ -116,13 +115,13 @@ function PointKinetics(;
         lambda_6 * C_6
 
     eqs = Equation[
-        Dt(P) ~ (rho_val - beta_sum) / Lambda_gen * P + precursor_source,
-        Dt(C_1) ~ -lambda_1 * C_1 + beta_1 / Lambda_gen * P,
-        Dt(C_2) ~ -lambda_2 * C_2 + beta_2 / Lambda_gen * P,
-        Dt(C_3) ~ -lambda_3 * C_3 + beta_3 / Lambda_gen * P,
-        Dt(C_4) ~ -lambda_4 * C_4 + beta_4 / Lambda_gen * P,
-        Dt(C_5) ~ -lambda_5 * C_5 + beta_5 / Lambda_gen * P,
-        Dt(C_6) ~ -lambda_6 * C_6 + beta_6 / Lambda_gen * P,
+        D(P) ~ (rho_val - beta_sum) / Lambda_gen * P + precursor_source,
+        D(C_1) ~ -lambda_1 * C_1 + beta_1 / Lambda_gen * P,
+        D(C_2) ~ -lambda_2 * C_2 + beta_2 / Lambda_gen * P,
+        D(C_3) ~ -lambda_3 * C_3 + beta_3 / Lambda_gen * P,
+        D(C_4) ~ -lambda_4 * C_4 + beta_4 / Lambda_gen * P,
+        D(C_5) ~ -lambda_5 * C_5 + beta_5 / Lambda_gen * P,
+        D(C_6) ~ -lambda_6 * C_6 + beta_6 / Lambda_gen * P,
     ]
 
     # Observed variables: diagnostics computed post-solve (never on RHS of another equation).
@@ -166,7 +165,7 @@ Callable-mode constructor for `PointKinetics`. The control reactivity is provide
 callable `rho_c_fn(t) -> Float64` (or a `ReactivityController` instance, which is itself
 callable). The power ODE becomes:
 
-    Dt(P) ~ (rho_val + rho_c_fn(t) + feedback_expr - beta_sum) / Lambda_gen * P + precursor_source
+    D(P) ~ (rho_val + rho_c_fn(t) + feedback_expr - beta_sum) / Lambda_gen * P + precursor_source
 
 where `rho_val` is a constant base/bias reactivity, `rho_c_fn(t)` is the time-varying
 control contribution (D-01 additive composition), and `feedback_expr` is the per-cell
@@ -222,7 +221,6 @@ function PointKinetics(
     temp_worth=nothing,
     ref_temp=nothing,
 )
-    Dt = Differential(t)
     FType = typeof(rho_c_fn)
     pars = @parameters begin
         rho_val = rho_val
@@ -285,13 +283,13 @@ function PointKinetics(
     end
 
     eqs = Equation[
-        Dt(P) ~ (rho_val + rho_c_fn(t) + feedback_expr - beta_sum) / Lambda_gen * P + precursor_source,
-        Dt(C_1) ~ -lambda_1 * C_1 + beta_1 / Lambda_gen * P,
-        Dt(C_2) ~ -lambda_2 * C_2 + beta_2 / Lambda_gen * P,
-        Dt(C_3) ~ -lambda_3 * C_3 + beta_3 / Lambda_gen * P,
-        Dt(C_4) ~ -lambda_4 * C_4 + beta_4 / Lambda_gen * P,
-        Dt(C_5) ~ -lambda_5 * C_5 + beta_5 / Lambda_gen * P,
-        Dt(C_6) ~ -lambda_6 * C_6 + beta_6 / Lambda_gen * P,
+        D(P) ~ (rho_val + rho_c_fn(t) + feedback_expr - beta_sum) / Lambda_gen * P + precursor_source,
+        D(C_1) ~ -lambda_1 * C_1 + beta_1 / Lambda_gen * P,
+        D(C_2) ~ -lambda_2 * C_2 + beta_2 / Lambda_gen * P,
+        D(C_3) ~ -lambda_3 * C_3 + beta_3 / Lambda_gen * P,
+        D(C_4) ~ -lambda_4 * C_4 + beta_4 / Lambda_gen * P,
+        D(C_5) ~ -lambda_5 * C_5 + beta_5 / Lambda_gen * P,
+        D(C_6) ~ -lambda_6 * C_6 + beta_6 / Lambda_gen * P,
     ]
 
     obs = Equation[

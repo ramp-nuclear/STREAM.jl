@@ -7,7 +7,7 @@ Concentrated fluid inertia element for transient simulations. Adds `L/A * d(mdot
 to the momentum equation.
 
 Note: Channel, ChannelAndContacts, and ChannelHeatFlux now carry their own distributed
-inertia via a momentum ODE `(L/A)*Dt(mdot)`. Use standalone Inertia only for concentrated
+inertia via a momentum ODE `(L/A)*D(mdot)`. Use standalone Inertia only for concentrated
 inertia effects (fittings, sudden area changes, valves, piping outside channels). When
 placed in series with a Channel, both momentum ODEs contribute additively through MTK
 network topology -- correct physics (distributed + concentrated).
@@ -23,13 +23,12 @@ network topology -- correct physics (distributed + concentrated).
 Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
 function Inertia(L_over_A; name)
-    Dt = Differential(t)           # same operator used in Channel energy balance
     pars = @parameters L_over_A = L_over_A
     @named port_in = FlowPort()
     @named port_out = FlowPort()
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ L_over_A * Dt(port_in.mdot),   # ODE pressure eq
+        port_in.P - port_out.P ~ L_over_A * D(port_in.mdot),   # ODE pressure eq
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
     ]

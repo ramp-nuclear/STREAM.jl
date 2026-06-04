@@ -54,8 +54,6 @@ function Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0)
     @named port_in = FlowPort()
     @named port_out = FlowPort()
 
-    D = Differential(t)
-
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
         D(T_open) ~ 0,

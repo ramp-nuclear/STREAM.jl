@@ -1,7 +1,7 @@
 module STREAM
 
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
+using ModelingToolkit: t_nounits as t, D_nounits as D
 
 # Alias used to label HTC-closure arguments at call sites (documentation only, not enforced).
 # Declared before the includes so the correlation files can reference it at parse time.
