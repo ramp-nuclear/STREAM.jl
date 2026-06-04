@@ -12,7 +12,6 @@ function _diffusion_eqs(;
     y,
     power,
     power_shape,
-    Dt,
 )
     q_vol = power .* power_shape / (rho_s * cp_s * y * dz * dx)
 
@@ -26,7 +25,7 @@ function _diffusion_eqs(;
                 k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2) for i in 1:nz
         ]...  # Right heat flux
         [
-            Dt(T[i, 1]) ~
+            D(T[i, 1]) ~
                 (
                     k_s * (T[i, 2] - T[i, 1]) / dx  # Left cell temperature equation
                     -
@@ -34,7 +33,7 @@ function _diffusion_eqs(;
                 ) / (rho_s * cp_s * dx) + q_vol[i, 1] for i in 1:nz
         ]...
         [
-            Dt(T[i, nx]) ~
+            D(T[i, nx]) ~
                 (
                     k_s * (T[i, nx - 1] - T[i, nx]) / dx  # Right cell temperature equation
                     -
@@ -42,7 +41,7 @@ function _diffusion_eqs(;
                 ) / (rho_s * cp_s * dx) + q_vol[i, nx] for i in 1:nz
         ]...
         [
-            Dt(T[i, j]) ~
+            D(T[i, j]) ~
                 k_s * (T[i, j + 1] - 2 * T[i, j] + T[i, j - 1]) / (dx^2 * rho_s * cp_s) +
                 q_vol[i, j] for i in 1:nz for j in 2:(nx - 1)
         ]...
@@ -84,7 +83,6 @@ function HeatDiffusion(; name,
                          T0     = 600.0)
 #! format: on
     power_init = power
-    Dt = Differential(t)
     dx = Lx / nx
     dz = Lz / nz
 
@@ -111,10 +109,9 @@ function HeatDiffusion(; name,
         dz            = dz, 
         y             = y,
         power         = power_var,
-        power_shape   = power_shape,
-        Dt            = Dt)
+        power_shape   = power_shape)
 
-    #!format: on
+    #! format: on
     all_vars = vcat(vec(collect(T_var)), [power_var])
     return compose(
         System(eqs, t, all_vars, []; name=name), thermal_left..., thermal_right...
