@@ -61,59 +61,63 @@ function _channel_core(;
     L  = geometry.L
     dz = L / n
 
-    eqs = Equation[]
-    obs = Equation[]
-
     T_inlet_fwd = instream(port_in.T)
     T_inlet_rev = instream(port_out.T)
 
-    for i in 1:n
+    cells = map(1:n) do i
         T_up_fwd = (i == 1) ? T_inlet_fwd : vars.T[i - 1]
         T_up_rev = (i == n) ? T_inlet_rev : vars.T[i + 1]
         T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
 
         cp_face = (cp_water(T_up) + cp_water(vars.T[i])) / 2
 
-        # Energy balance — enthalpy form
-        push!(eqs,
+        # Use Reynolds directly, not the observable variable, since it may only be observable.
+        Re_i = abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i]))
+        f_i = friction_correlation(Re_i)
+        Pr_i = cp_water(vars.T[i]) * mu_water(vars.T[i]) / k_water(vars.T[i])
+        P_i = port_in.P - sum(vars.dp[j] for j in 1:i) + vars.dp[i] / 2
+        q_density_i = (q_left_expr[i] + q_right_expr[i]) / (sum(geometry.heated_parts) * dz)
+
+        cell_eqs = Equation[
+            # Energy balance — enthalpy form
             D(vars.T[i]) ~ (
                 abs(port_in.mdot) * cp_face * (T_up - vars.T[i])
               + q_left_expr[i]
               + q_right_expr[i]
-            ) / (rho_water(vars.T[i]) * cp_water(vars.T[i]) * A * dz)
-        )
-
-        # Using Reynolds directly and not the variable because it may only be observable
-        Re_i_for_friction = abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i]))
-        f_i = friction_correlation(Re_i_for_friction)
-        push!(eqs,
+            ) / (rho_water(vars.T[i]) * cp_water(vars.T[i]) * A * dz),
             vars.dp[i] ~ f_i * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(vars.T[i]) * A^2)) * (dz / Dh)
-                  + rho_water(vars.T[i]) * g_acc * dz
-        )
-
-        Pr_i = cp_water(vars.T[i]) * mu_water(vars.T[i]) / k_water(vars.T[i])
-        push!(obs, vars.Re[i] ~ Re_i_for_friction)
-        push!(obs, vars.Pe[i] ~ Re_i_for_friction * Pr_i)
-        push!(obs, vars.v[i]  ~ port_in.mdot / (rho_water(vars.T[i]) * A))
-
-        P_i = port_in.P - sum(vars.dp[j] for j in 1:i) + vars.dp[i] / 2
-        push!(obs, vars.P[i]     ~ P_i)
-        push!(obs, vars.T_sat[i] ~ sat_temperature(P_i))
-
-        q_density_i = (q_left_expr[i] + q_right_expr[i]) / (sum(geometry.heated_parts) * dz)
-        push!(obs, vars.T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_density_i))
-
-        push!(obs, vars.q_wall_left[i]  ~ q_left_expr[i])
-        push!(obs, vars.q_wall_right[i] ~ q_right_expr[i])
-        push!(obs, vars.q_wall[i]       ~ q_left_expr[i] + q_right_expr[i])
+                  + rho_water(vars.T[i]) * g_acc * dz,
+        ]
+        cell_obs = Equation[
+            vars.Re[i] ~ Re_i,
+            vars.Pe[i] ~ Re_i * Pr_i,
+            vars.v[i]  ~ port_in.mdot / (rho_water(vars.T[i]) * A),
+            vars.P[i]     ~ P_i,
+            vars.T_sat[i] ~ sat_temperature(P_i),
+            vars.T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_density_i),
+            vars.q_wall_left[i]  ~ q_left_expr[i],
+            vars.q_wall_right[i] ~ q_right_expr[i],
+            vars.q_wall[i]       ~ q_left_expr[i] + q_right_expr[i],
+        ]
+        (eqs=cell_eqs, obs=cell_obs)
     end
 
-    push!(obs, vars.T_out ~ ifelse(port_in.mdot >=0, vars.T[n], vars.T[1]))
-    push!(eqs, port_in.mdot + port_out.mdot ~ 0)
-    push!(eqs, (L / A) * D(port_in.mdot) ~ (port_in.P - port_out.P) - sum(vars.dp[i] for i in 1:n))
-    push!(eqs, port_out.T ~ vars.T[n])
-    push!(eqs, port_in.T  ~ vars.T[1])
-    push!(obs, vars.dP ~ port_in.P - port_out.P)
+    eqs = vcat(
+        reduce(vcat, (c.eqs for c in cells)),
+        Equation[
+            port_in.mdot + port_out.mdot ~ 0,
+            (L / A) * D(port_in.mdot) ~ (port_in.P - port_out.P) - sum(vars.dp[i] for i in 1:n),
+            port_out.T ~ vars.T[n],
+            port_in.T  ~ vars.T[1],
+        ],
+    )
+    obs = vcat(
+        reduce(vcat, (c.obs for c in cells)),
+        Equation[
+            vars.T_out ~ ifelse(port_in.mdot >= 0, vars.T[n], vars.T[1]),
+            vars.dP ~ port_in.P - port_out.P,
+        ],
+    )
 
     return (; eqs, obs)
 end
