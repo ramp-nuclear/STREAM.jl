@@ -334,7 +334,7 @@ Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = 
 """
 function maximal_htc(correlations...)
     return (Re, Pr, T_bulk, T_wall) -> begin
-        reduce(max, (c(Re, Pr, T_bulk, T_wall) for c in correlations))
+        maximum(c(Re, Pr, T_bulk, T_wall) for c in correlations)
     end
 end
 
