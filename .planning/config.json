@@ -19,6 +19,6 @@
   },
   "git": {
     "branching_strategy": "none",
-    "merge_strategy": "rebase-ff"
+    "merge_strategy": "squash"
   }
 }
