@@ -3,7 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-import STREAM: Pump, Channel
+using STREAM: Pump, Channel
 
 @testset "PHY-05: Pump fixed-flow mode" begin
     @named pump = Pump(mdot0=0.6)

@@ -3,7 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-import STREAM: Inertia, HeatExchanger, WallTemperature, HeatFluxSource
+using STREAM: Inertia, HeatExchanger, WallTemperature, HeatFluxSource
 
 @testset "COMP-01: Inertia stub callable" begin
     @named L = Inertia(1e3)

@@ -3,7 +3,7 @@ using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-import STREAM: Channel, HeatDiffusion, ChannelAndContacts
+using STREAM: Channel, HeatDiffusion, ChannelAndContacts
 import ModelingToolkit: compose
 
 @testset "PointKinetics" begin

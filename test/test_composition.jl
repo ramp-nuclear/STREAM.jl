@@ -4,7 +4,7 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
-import STREAM: Channel, _infer_n
+using STREAM: Channel, _infer_n
 using OrdinaryDiffEq: ReturnCode
 
 # ───────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 using Test
 using STREAM
-import STREAM: rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
+using STREAM: rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
 
 # Invariants for the rebin / cosine helpers. We check that extensive rebinning
 # preserves the total and intensive rebinning preserves the value; per-cell

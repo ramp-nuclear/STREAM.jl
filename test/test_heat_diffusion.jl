@@ -3,7 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-import STREAM: HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
+using STREAM: HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
 
 @testset "HDIFF-01: HeatDiffusion callable and returns MTK System" begin
     ps = fill(1.0 / (5 * 3), 5, 3)

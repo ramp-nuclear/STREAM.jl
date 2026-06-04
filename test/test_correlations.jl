@@ -3,8 +3,8 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-import STREAM: Channel
-import STREAM:
+using STREAM: Channel
+using STREAM:
     dittus_boelter,
     blasius_friction,
     constant_Nusselt,

@@ -6,7 +6,7 @@ using ModelingToolkit: t_nounits as t
 using ModelingToolkit: connect    # disambiguate from Sockets.connect
                                   # (Phase 57 D-04 deviation #1; RESEARCH §R-1)
 using STREAM
-import STREAM: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion,
+using STREAM: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion,
                 ConstantTemperature, Channel,
                 PipeGeometry_circular, PipeGeometry_rectangular,
                 build_loop, build_loop_vertical, build_loop_transient,

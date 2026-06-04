@@ -1,6 +1,6 @@
 using Test
 using STREAM
-import STREAM: PipeGeometry_rectangular, PipeGeometry_circular
+using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
 @testset "PHY-01: PipeGeometry_rectangular geometry" begin
     geo = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)

@@ -5,7 +5,7 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
-import STREAM: Channel  # disambiguate from Base.Channel
+using STREAM: Channel  # disambiguate from Base.Channel
 using OrdinaryDiffEq: ReturnCode
 
 const N_DEFAULT      = 4
