@@ -38,7 +38,7 @@ function WallTemperature(;
     if T_wall isa Real
         pars = @parameters T_wall_const = T_wall
         eqs = Equation[T_wall_out[i] ~ T_wall_const for i in 1:n]
-        return System(eqs, t, [collect(T_wall_out)...], pars; name=name)
+        return System(eqs, t, collect(T_wall_out), pars; name=name)
 
     elseif T_wall isa AbstractVector
         length(T_wall) == n ||
@@ -46,14 +46,14 @@ function WallTemperature(;
         # Vector-of-Real branch: bake the values into the equations directly
         # (matches Channel.h_left's Vector branch — no @parameters needed).
         eqs = Equation[T_wall_out[i] ~ T_wall[i] for i in 1:n]
-        return System(eqs, t, [collect(T_wall_out)...], Num[]; name=name)
+        return System(eqs, t, collect(T_wall_out), Num[]; name=name)
 
     else  # Function / callable — MTK callable-parameter pattern (RESEARCH.md §1)
         FType = typeof(T_wall)
         pT = @parameters (T_wall_fn::FType)(..)
         eqs = Equation[T_wall_out[i] ~ pT[1](t) for i in 1:n]
         pars = Any[collect(pT)...]
-        return System(eqs, t, [collect(T_wall_out)...], pars; name=name)
+        return System(eqs, t, collect(T_wall_out), pars; name=name)
     end
 end
 
@@ -90,19 +90,19 @@ function HeatFluxSource(; name, n::Int, q::Union{Real,AbstractVector{<:Real},Fun
     if q isa Real
         pars = @parameters q_const = q
         eqs = Equation[q_out[i] ~ q_const for i in 1:n]
-        return System(eqs, t, [collect(q_out)...], pars; name=name)
+        return System(eqs, t, collect(q_out), pars; name=name)
 
     elseif q isa AbstractVector
         length(q) == n ||
             throw(DimensionMismatch("q has length $(length(q)), expected n=$n"))
         eqs = Equation[q_out[i] ~ q[i] for i in 1:n]
-        return System(eqs, t, [collect(q_out)...], Num[]; name=name)
+        return System(eqs, t, collect(q_out), Num[]; name=name)
 
     else  # Function / callable — MTK callable-parameter pattern
         FType = typeof(q)
         pq = @parameters (q_fn::FType)(..)
         eqs = Equation[q_out[i] ~ pq[1](t) for i in 1:n]
         pars = Any[collect(pq)...]
-        return System(eqs, t, [collect(q_out)...], pars; name=name)
+        return System(eqs, t, collect(q_out), pars; name=name)
     end
 end
