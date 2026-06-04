@@ -83,7 +83,8 @@ Colebrook-White approximation for turbulent Darcy friction factor, as written
 in RELAP and KAERI. `epsilon` is relative roughness (roughness height / Dh),
 defaults to smooth pipe.
 
-Returns 0.0 when `Re <= 0` to prevent NaN (per D-08).
+Returns 0.0 when `Re < 10`: the correlation is only valid for turbulent flow, and below
+that threshold the `log10` terms diverge.
 
 # Arguments
 - `Re`: Reynolds number
