@@ -1,10 +1,6 @@
 # solvers.jl -- Solver API for STREAM.jl
 #
 
-using ModelingToolkit
-using ModelingToolkit: t_nounits as t
-using OrdinaryDiffEq, SteadyStateDiffEq
-
 """
     steady_state_guess(; T_inlet, Q_wall, mdot_guess, n) -> Vector{Float64}
 
