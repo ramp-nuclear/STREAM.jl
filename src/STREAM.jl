@@ -35,7 +35,8 @@ include("utilities.jl")
 
 export rho_water, cp_water, mu_water, k_water, beta_water, sat_temperature
 export FlowPort, ThermalPort
-export Channel, Pump, Flapper, Friction, Gravity, Resistor, Inertia, HeatExchanger
+export Channel, Pump, Flapper, Friction, Gravity, Resistor, VolumetricFlowResistor
+export Inertia, HeatExchanger
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion, PipeGeometry, PipeGeometry_rectangular
 export PipeGeometry_circular
