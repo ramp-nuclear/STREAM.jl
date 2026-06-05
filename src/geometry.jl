@@ -16,11 +16,11 @@ Fields:
 - `heated_perimeter` — total heated perimeter [m]: sum of both face contributions
 - `wet_perimeter`    — total wetted perimeter [m]: used to derive Dh
 - `heated_parts`     — heated perimeter per face [m]: (left_face, right_face)
-- `width`            — longer cross-section dimension [m]: always `Float64` (nominal value for a knob)
-- `depth`            — shorter cross-section dimension [m]: always `Float64` (nominal value for a knob)
+- `width`            — longer cross-section dimension [m]: max(edge1, edge2) for rect; D for circular
+- `depth`            — shorter cross-section dimension [m]: min(edge1, edge2) for rect; D for circular
 
-`width` and `depth` stay numeric because they come from a `max`/`min` ordering that has no
-symbolic meaning; a knob resolves to its default for that comparison.
+The edge ordering for `width`/`depth` uses a symbolic `ifelse`, so a knob-driven edge scans
+through them too (and through aspect-ratio / plate-gap correlations that read them).
 
 Factory functions (preferred constructors):
 - `PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)` — rectangular channel
@@ -33,26 +33,14 @@ struct PipeGeometry{T<:Real}
     heated_perimeter ::T
     wet_perimeter    ::T
     heated_parts     ::NTuple{2,T}
-    width            ::Float64
-    depth            ::Float64
-end
-
-function PipeGeometry(L::T, Dh::T, A::T, heated_perimeter::T, wet_perimeter::T,
-                      heated_parts::NTuple{2,T}, width::Real, depth::Real) where {T<:Real}
-    return PipeGeometry{T}(
-        L, Dh, A, heated_perimeter, wet_perimeter, heated_parts, Float64(width), Float64(depth)
-    )
+    width            ::T
+    depth            ::T
 end
 
 # Coerce a length input: plain numbers become Float64 (the fixed-geometry behavior); a
 # design knob or any other Num passes through so geometry derives symbolically.
 _lenparam(x::Num) = x
 _lenparam(x::Real) = Float64(x)
-
-# Nominal Float64 value of a length, for the width/depth ordering: a knob's stored default,
-# or the number itself.
-_nominal(x::Num) = Float64(ModelingToolkit.getdefault(x))
-_nominal(x::Real) = Float64(x)
 
 """
     PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
@@ -73,10 +61,6 @@ function PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothin
     _e1 = _lenparam(edge1)
     _e2 = _lenparam(edge2)
     _he = _lenparam(heated_edge)
-    # Nominal width/depth ordering, taken before promotion while knobs (which carry a
-    # default) are still distinguishable from plain numbers.
-    _width = max(_nominal(_e1), _nominal(_e2))
-    _depth = min(_nominal(_e1), _nominal(_e2))
     # If any length is symbolic, promote all flow lengths to Num so the struct fields share
     # one element type. A fixed (all-numeric) geometry never enters this branch.
     if any(x -> x isa Num, (_L, _e1, _e2, _he))
@@ -97,6 +81,11 @@ function PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothin
     else
         throw(ArgumentError("one_sided must be :left, :right, or nothing; got $one_sided"))
     end
+    # Symbolic-safe ordering: ifelse evaluates correctly at any knob value, so a knob-driven
+    # edge scans through width/depth (and the correlations that read them). For a fixed
+    # geometry it folds to the same Float64 as max/min.
+    _width = ifelse(_e1 >= _e2, _e1, _e2)
+    _depth = ifelse(_e1 >= _e2, _e2, _e1)
     return PipeGeometry(
         _L, Dh, area, heated_perimeter, wet_perimeter, heated_parts, _width, _depth
     )
@@ -116,12 +105,11 @@ heated_parts = (perimeter, 0) because it is circular, not annular.
 function PipeGeometry_circular(L, D)
     _L = _lenparam(L)
     _D = _lenparam(D)
-    _Dn = _nominal(_D)   # before promotion, while a knob is still distinguishable
     if _L isa Num || _D isa Num
         _L, _D = Num(_L), Num(_D)
     end
     area = π * _D^2 / 4
     perimeter = π * _D
     heated_parts = (perimeter, zero(perimeter))
-    return PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts, _Dn, _Dn)
+    return PipeGeometry(_L, _D, area, perimeter, perimeter, heated_parts, _D, _D)
 end

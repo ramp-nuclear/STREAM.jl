@@ -43,9 +43,11 @@ end
     @test geo.Dh isa Num
     @test geo.A isa Num
     @test geo.heated_parts[1] isa Num
-    # width/depth resolve to the knob's nominal value
-    @test geo.width == 0.02
-    @test geo.depth == 0.02
+    # width/depth are symbolic too (circular: both equal the diameter knob)
+    @test geo.width isa Num
+    @test geo.depth isa Num
+    @test isapprox(at(geo.width, d, 0.02), 0.02; rtol=1e-12)
+    @test isapprox(at(geo.depth, d, 0.03), 0.03; rtol=1e-12)   # scans with the knob
     # evaluated at the knob default, the symbolic geometry matches the fixed geometry
     num = PipeGeometry_circular(0.6, 0.02)
     @test isapprox(at(geo.A, d, 0.02), num.A; rtol=1e-12)
@@ -57,8 +59,11 @@ end
     rect = PipeGeometry_rectangular(0.6, 0.0665, gap, 0.0665)
     @test rect isa PipeGeometry{Num}
     @test rect.A isa Num
-    @test rect.width == 0.0665
-    @test rect.depth == 0.0025
+    # depth is the gap knob and scans; width is the fixed plate edge
+    @test rect.depth isa Num
+    @test isapprox(at(rect.width, gap, 0.0025), 0.0665; rtol=1e-12)
+    @test isapprox(at(rect.depth, gap, 0.0025), 0.0025; rtol=1e-12)
+    @test isapprox(at(rect.depth, gap, 0.0010), 0.0010; rtol=1e-12)   # gap knob scans depth
     rnum = PipeGeometry_rectangular(0.6, 0.0665, 0.0025, 0.0665)
     @test isapprox(at(rect.Dh, gap, 0.0025), rnum.Dh; rtol=1e-12)
 
