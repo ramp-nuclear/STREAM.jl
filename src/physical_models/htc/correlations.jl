@@ -136,7 +136,7 @@ function regime_dependent(geom::PipeGeometry;
 
     if !isnothing(htc_natural)
         # NC-enabled path: switch on Gr/Re^2 > 1
-        Dh_val = Float64(geom.Dh)
+        Dh_val = geom.Dh
         g_val = Float64(g)
         htc_forced_fn =
             (Re, Pr, T_bulk, T_wall) -> ifelse(
@@ -224,9 +224,9 @@ Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 NC exception: this closure evaluates `beta_water`, `mu_water`, `rho_water` INTERNALLY at `T_bulk` (NOT at film) — natural-convection driving force is a bulk-vs-wall ΔT phenomenon and Python STREAM evaluates β, ν at bulk for Gr.
 """
 function elenbaas_htc(geom::PipeGeometry; g=9.81)
-    b = Float64(geom.depth)
-    L_h = Float64(geom.L)
-    Dh_v = Float64(geom.Dh)
+    b = geom.depth
+    L_h = geom.L
+    Dh_v = geom.Dh
     return (Re, Pr, T_bulk, T_wall) -> begin
         Gr_val = Gr(
             rho_water(T_bulk),
@@ -300,7 +300,7 @@ Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 """
 function developing_laminar_h_spl(geom::PipeGeometry; develop_length)
     aspect_ratio = geom.depth / geom.width
-    Dh_v = Float64(geom.Dh)
+    Dh_v = geom.Dh
     correction = 6 - 5 * exp(-0.75 * aspect_ratio / 0.3257)
     return (Re, Pr, args...) -> begin
         x_star = develop_length / Dh_v / Re / Pr / correction
