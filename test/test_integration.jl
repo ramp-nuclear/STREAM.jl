@@ -1026,3 +1026,67 @@ end
         @test isapprox(sol(tt; idxs=ssys.L_el.port_in.mdot), mdota; rtol=1e-4)
     end
 end
+
+@testset "kirchhoff significance in two in-series resistors" begin
+    # Python: test_kirchhoff_significance_in_two_in_series_resistors
+    # signify=s on R1 weights its Kirchhoff edge: m2 = s·m1, m1 = p/(r1 + s·r2). MTK has no
+    # mass-conserving flow-gain element, so the faithful re-expression scales the resistance:
+    # an R1 of r1/s carries the bundle flow (= m2 = s·m1) with the per-copy drop r1·m1; the
+    # per-copy flow m1 is then bundle/s.
+    r1 = 1.0e5
+    r2 = 2.0e5
+    p = 3.0e4
+    s = 2.5
+    @named pump = Pump(p)
+    @named hx = HeatExchanger(300.0)
+    @named R1 = Resistor(r1 / s)     # bundle resistance (s parallel copies of r1)
+    @named R2 = Resistor(r2)
+    conns = [
+        connect(pump.port_out, hx.port_in),
+        connect(hx.port_out, R1.port_in),
+        connect(R1.port_out, R2.port_in),
+        connect(R2.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:signify_series), pump, hx, R1, R2)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.R1.port_in.mdot => p / (r1 / s + r2)])
+    @test sol.retcode == ReturnCode.Success
+    bundle = sol[ssys.R1.port_in.mdot]      # = m2 = s·m1
+    m1 = bundle / s
+    m2 = sol[ssys.R2.port_in.mdot]
+    @test isapprox(m1 * s, m2; rtol=1e-8)
+    @test isapprox(m1, p / (r1 + s * r2); rtol=1e-8)
+end
+
+@testset "kirchhoff significance for many parallel edges" begin
+    # Python: test_kirchhoff_significance_for_many_parallel_edges
+    # Integer signify ≡ `signify` parallel copies of R1 — native MTK parallel topology.
+    # Each copy carries m1 = p/(r1 + signify·r2); R2 carries m2 = signify·m1.
+    r1 = 1.0e5
+    r2 = 2.0e5
+    p = 3.0e4
+    signify = 3
+    @named pump = Pump(p)
+    @named hx = HeatExchanger(300.0)
+    R1s = [Resistor(r1; name=Symbol(:R1_, i)) for i in 1:signify]
+    @named R2 = Resistor(r2)
+    conns = [
+        connect(pump.port_out, hx.port_in),
+        connect(hx.port_out, [R1.port_in for R1 in R1s]...),     # node J0
+        connect([R1.port_out for R1 in R1s]..., R2.port_in),    # node J1
+        connect(R2.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:signify_parallel), pump, hx, R1s..., R2)
+    ssys = mtkcompile(sys)
+    m1 = p / (r1 + signify * r2)
+    guess = vcat([getproperty(ssys, Symbol(:R1_, i)).port_in.mdot => m1 for i in 1:signify],
+                 [ssys.R2.port_in.mdot => signify * m1])
+    sol = solve_steady(ssys, guess)
+    @test sol.retcode == ReturnCode.Success
+    for i in 1:signify
+        @test isapprox(sol[getproperty(ssys, Symbol(:R1_, i)).port_in.mdot], m1; rtol=1e-8)
+    end
+    @test isapprox(sol[ssys.R2.port_in.mdot], signify * m1; rtol=1e-8)
+end

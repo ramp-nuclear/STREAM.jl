@@ -29,8 +29,8 @@ Status legend: ✅ ported & passing · 🟡 partial/divergent counterpart · ⬜
 | 8 | `test_power_is_negligible_for_negative_Tfuel_feedback_and_ref_temp_is_boundary_conditions` | 🟡 | B | Fuel+PK (have); steady power→0 assertion |
 | 9 | `test_power_is_negligible_for_negative_Tcool_feedback_and_ref_temp_is_inlet` | 🟡 | B | has counterpart; align numbers/method |
 | 10 | `test_inertia_through_RL_circuit_follows_analytic_solution` | ✅ | A | Inertia+Resistor (have); `exp(-rt/L)` assertion |
-| 11 | `test_kirchhoff_significance_in_two_in_series_resistors` | ⛔ | C | **`signify`** (network multiplicity) |
-| 12 | `test_kirchhoff_significance_for_many_parallel_edges` | ⛔ | C | **`signify`** |
+| 11 | `test_kirchhoff_significance_in_two_in_series_resistors` | ✅ | C | re-expressed: resistance scaling r1/s |
+| 12 | `test_kirchhoff_significance_for_many_parallel_edges` | ✅ | C | re-expressed: native parallel topology |
 | 13 | `test_pump_and_current_source` | ✅ | A | Pump fixed-dP + fixed-mdot (have) |
 | 14 | `test_flapper_opens_with_ref_mdot` | 🟡 | A | Flapper (have); analytic `t_open=log(10)` assertion |
 | 15 | `test_flapper_and_pump` | ⬜ | A | Flapper+Pump (have); pre-timed open |
@@ -41,7 +41,7 @@ Status legend: ✅ ported & passing · 🟡 partial/divergent counterpart · ⬜
 | 20 | `test_inertia_with_two_parallel_resistors` | ✅ | C | `VolumetricFlowResistor` (have) |
 | 21 | `test_local_pressure_with_flow_reversal` | ⛔ | C | **`LocalPressureDrop`** |
 
-Tally: 8 ✅ · 6 🟡 · 1 ⬜ · 4 ⛔ (target: 21 ✅).
+Tally: 10 ✅ · 6 🟡 · 1 ⬜ · 2 ⛔ (target: 21 ✅).
 
 ## New components to build (decided: implement, for true 1:1)
 
