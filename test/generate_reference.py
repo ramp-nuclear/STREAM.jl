@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-generate_reference.py -- Phase 56 Python STREAM cross-validation reference generator.
+generate_reference.py -- Python STREAM cross-validation reference generator.
 
-Run ONCE to obtain the simple-loop reference values for the Phase 56 parity testset:
+Run ONCE to obtain the simple-loop reference values for the parity testset:
   cd /home/itay/projects/Julia-STREAM/test && python3 generate_reference.py
 
 Requires Python STREAM at ~/projects/STREAM (override via STREAM_PYTHON_PATH).
 
-D-06 / D-17:
-  This script is NOT in CI. It is invoked by hand at reference-update time only
-  (Plan 56-04 is the manual regenerate-and-paste checkpoint).
 
-OUTPUT (D-17 / D-07 tiers a + b + c for simple loop):
+  This script is NOT in CI. It is invoked by hand at reference-update time only
+ .
+
+OUTPUT (tiers a + b + c for simple loop):
   Two pasteable const blocks, each bracketed by '# --- begin paste ---' /
-  '# --- end paste ---' markers (Phase 53 stage2_reference.py pattern).
+  '# --- end paste ---' markers.
 
   Block 1 — equivalence-checklist constants for test/parity_helpers.jl:
     PYTHON_RHO_AT_REF, PYTHON_CP_AT_REF, PYTHON_MU_AT_REF, PYTHON_K_AT_REF
@@ -32,7 +32,7 @@ OUTPUT (D-17 / D-07 tiers a + b + c for simple loop):
       PARITY_SIMPLE_Q_DENSITY_LEFT          (Float64[N], W/m^2)
       PARITY_SIMPLE_Q_DENSITY_RIGHT         (Float64[N], W/m^2)
 
-    Both _LEFT and _RIGHT q constants are required so Plan 56-05 can SUM them
+    Both _LEFT and _RIGHT q constants are required so the Julia side can SUM them
     (Gap #1 mitigation: Python emits q on πD-LEFT and 0-RIGHT for one-sided
     heating; Julia splits πD/2 each side; LEFT+RIGHT totals match).
 
@@ -41,12 +41,12 @@ UNIT CONVENTION:
   Julia-STREAM:   KELVIN. We convert *here* (T_K = T_C + 273.15) so the
   Julia consumer pastes ready-to-use Kelvin values verbatim.
 
-PHYSICS / TOPOLOGY (per RESEARCH.md Pitfall 1 + Open Question 3):
+PHYSICS / TOPOLOGY:
   Pump → HeatExchanger(40°C) → ChannelAndContacts → back to Pump
 
   ChannelAndContacts (NOT plain Channel) is mandatory: tier (c) wall
   observables (twall_left/right, h_left/right, heatflux_left/right) are
-  CAC-only state-dict keys. Pitfall 3: T_left/T_right MUST be passed in
+  CAC-only state-dict keys. Note: T_left/T_right MUST be passed in
   funcs={...} so save() emits the wall-temperature keys (channel.py:628).
 
   HeatExchanger pins inlet T to 40°C (equivalent to Julia's TempBC).
@@ -89,7 +89,7 @@ D_H     = 0.01
 DP_PUMP = 3.0e4
 P_ABS   = 1.0e5
 
-# Equivalence-checklist reference values (D-10 fluid-props tier).
+# Equivalence-checklist reference values (fluid-props tier).
 # parity_helpers.jl asserts these against Julia's rho_water/cp_water/etc.
 # at 1e-12 rtol. REF_T_K must match parity_helpers.jl's REF_T_K exactly.
 REF_T_K = (313.15, 343.15, 373.15)
@@ -103,8 +103,8 @@ from stream.jacobians import ALG_jacobian
 from stream.physical_models.pressure_drop import pressure_diff
 
 # ChannelVar enum — the import path has moved across Python STREAM revisions.
-# Try the most-likely paths first; record which branch fired so the SUMMARY
-# can document the working path for Plan 56-04. Extend this chain if a future
+# Try the most-likely paths first; record which branch fired so this script
+# can document the working path. Extend this chain if a future
 # revision moves it again.
 _CHANNELVAR_IMPORT_PATH = None
 try:
@@ -129,7 +129,7 @@ except ImportError:
             ) from e
 
 
-# Julia-const printers (Phase 53 stage2_reference.py pattern, generalised)
+# Julia-const printers
 def _emit_julia_array(name, values, fmt="%.10f", comment_each=False, comment_prefix=""):
     """Emit a Julia const Float64[ ... ] array. One value per line if comment_each."""
     print(f"const {name} = Float64[")
@@ -163,7 +163,7 @@ pump = Pump(pressure=DP_PUMP)
 # before it enters the heated channel, breaking the circular thermal dependency.
 hx = HeatExchanger(outlet=T_INLET_C, name="HX")
 
-# ChannelAndContacts (Pitfall 1: MUST be CAC for tier-(c) wall observables;
+# ChannelAndContacts (MUST be CAC for tier-(c) wall observables;
 # do NOT change to Channel). Computes Dittus-Boelter HTC self-consistently
 # from flow. Friction is included via pressure_diff (Darcy-Weisbach).
 # g=0 matches Julia build_loop() Channel default (no gravity term).
@@ -179,7 +179,7 @@ channel = ChannelAndContacts(
 
 # FlowGraph: Pump+HX on forward edge, Channel on return edge.
 # reference_node pins absolute pressure at "A" (matches Julia: pump.port_in.P ~ 1e5).
-# Pitfall 3: T_left/T_right MUST be set so save() emits ChannelVar.twall_*
+# T_left/T_right MUST be set so save() emits ChannelVar.twall_*
 # keys (channel.py:628 conditional). Both are set here.
 fg = FlowGraph(
     flow_edge(("A", "B"), pump, hx),
@@ -221,7 +221,7 @@ sol_vec   = agr.solve_steady(guess_vec, jac=ALG_jacobian(agr))
 state     = agr.save(sol_vec)
 
 
-# Extract ALL D-07 tiers from solver state
+# Extract all tiers from solver state
 ch_state = state[channel.name]
 
 # Tier (a): scalars
@@ -239,7 +239,7 @@ assert mdot > 1e-4,         f"mdot {mdot:.4f} kg/s too small"
 T_cells_K = [float(T_C) + 273.15 for T_C in ch_state["T_cool"]]
 assert len(T_cells_K) == N, f"expected {N} cells, got {len(T_cells_K)}"
 
-# Tier (c): per-cell wall observables. Pitfall-3 correction (Plan 56-04):
+# Tier (c): per-cell wall observables. correction:
 #
 # state[ChannelVar.twall_left] / twall_right echo back EXACTLY whatever was
 # passed in via funcs={channel: dict(T_left=..., T_right=...)} — see
@@ -248,7 +248,7 @@ assert len(T_cells_K) == N, f"expected {N} cells, got {len(T_cells_K)}"
 #         state[ChannelVar.get("twall", direction)] = wall_temp
 # When `wall_temp` is the SCALAR T_WALL_C=100.0 (as in the simple-loop's
 # constant-temperature BC), the state stores the scalar verbatim — NOT a
-# per-cell array. The original Plan 56-02 code `[T+273.15 for T in scalar]`
+# per-cell array. An earlier version `[T+273.15 for T in scalar]`
 # crashed with `TypeError: 'float' object is not iterable`.
 #
 # Physical interpretation: the simple-loop wall is fixed at T_WALL_C on
@@ -294,7 +294,7 @@ k_at_ref   = tuple(float(light_water.conductivity(T))  for T in ref_T_C)
 # Emit ready-to-paste Julia const blocks
 print()
 print("=" * 72)
-print("Phase 56 Python parity reference — SIMPLE LOOP")
+print("Python parity reference — SIMPLE LOOP")
 print("Generated by test/generate_reference.py — DO NOT EDIT BY HAND")
 print("Regenerate with: cd test && python3 generate_reference.py")
 print(f"ChannelVar import path used: {_CHANNELVAR_IMPORT_PATH}")
@@ -316,7 +316,7 @@ print()
 
 # Block 2: simple-loop reference const block for test/data/python_parity_reference.jl
 print("# --- begin paste: test/data/python_parity_reference.jl simple-loop block ---")
-print("# Phase 56 simple-loop Python parity reference — D-07 tiers (a)+(b)+(c)")
+print("# Simple-loop Python parity reference — tiers (a)+(b)+(c)")
 print(f"# Topology: Pump → HX → ChannelAndContacts (n={N}, L={L_CH}, D={D_H}) → Pump")
 print(f"# T_inlet = {T_INLET_K:.2f} K ({T_INLET_C:.1f} C); T_wall = {T_WALL_K:.2f} K ({T_WALL_C:.1f} C)")
 print(f"# Solver: scipy.optimize.root (default xtol=1.49e-8)")

@@ -97,7 +97,7 @@ _h_eff(sol, cac, i) = abs(sol[cac.q_wall_left[i]]) >= abs(sol[cac.q_wall_right[i
         @test false  # should not throw
     end
     # Self-test 12: equivalence checklist mechanism fires on a wrong reference.
-    # (Plan 56-04 made PYTHON_*_AT_REF bit-identical to Julia at rtol=1e-12, so the native
+    # (PYTHON_*_AT_REF are bit-identical to Julia at rtol=1e-12, so the native
     # checklist passes; here we exercise the guard mechanism directly by simulating the
     # failure path with the same `cond || error(...)` form the checklist functions use.)
     threw = false
@@ -133,7 +133,7 @@ try
 # Python parity: simple loop
 #
 # Topology: Pump → HX → ChannelAndContacts → Pump (n=10, circular pipe).
-# Built INLINE with CAC (NOT via build_loop, which uses Channel — Pitfall 1).
+# Built INLINE with CAC (NOT via build_loop, which uses Channel).
 # Wall BCs imposed via ConstantTemperature + connect() — canonical pattern,
 # mirrors HD Fourier testset. Avoids the raw `cac.thermal_left[i].T ~ T_wall`
 # equation pattern that bypasses MTK's connector-flow accounting (WARNING #5).
@@ -145,7 +145,7 @@ try
 #
 # KNOWN EQUIVALENCE GAPS:
 #   Gap #1: circular heated_parts partition Python(πD,0) vs Julia(πD/2,πD/2).
-#           Python's q_density emit is partition-INVARIANT — Plan 56-04 paste
+#           Python's q_density emit is partition-INVARIANT — the pasted reference
 #           shows PARITY_SIMPLE_Q_DENSITY_LEFT == PARITY_SIMPLE_Q_DENSITY_RIGHT,
 #           the same W/m^2 value. Julia's split also yields equal L/R density,
 #           so per-side density compares cleanly.
@@ -1030,7 +1030,7 @@ end
             ref_temp=Dict(:fuel => fill(T_inlet, nz, nx)),       # ref = initial T; feedback negative as fuel heats up
         )
 
-        # Override PK ICs to large values (Pitfall 4: helps KINSOL find P≈0 solution).
+        # Override PK ICs to large values (helps KINSOL find P≈0 solution).
         # Python STREAM uses y0[power]=1e5, y0[ck]=1e3 for the same purpose.
         ic_high = copy(ic)
         for (idx, pair) in enumerate(ic_high)
