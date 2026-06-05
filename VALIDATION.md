@@ -35,13 +35,13 @@ Status legend: ✅ ported & passing · 🟡 partial/divergent counterpart · ⬜
 | 14 | `test_flapper_opens_with_ref_mdot` | 🟡 | A | Flapper (have); analytic `t_open=log(10)` assertion |
 | 15 | `test_flapper_and_pump` | ⬜ | A | Flapper+Pump (have); pre-timed open |
 | 16 | `test_pump_coastdown_allows_channels_to_reverse_flow_direction` | 🟡 | A | Channels (have); analytic gravity zero-crossing |
-| 17 | `test_inertia_with_friction_in_PCS_coastdown` | ⬜ | A | Inertia+Friction (have); `mdot0/(1+αt)` assertion |
+| 17 | `test_inertia_with_friction_in_PCS_coastdown` | ✅ | A | Inertia+Friction (have); `mdot0/(1+αt)` assertion |
 | 18 | `test_inertia_with_flapper_in_PCS_coastdown` | ⛔ | C | **`VolumetricFlowResistor`** |
 | 19 | `test_inertia_with_transistor_in_PCS_coastdown` | ⛔ | C | **closure-resistor (`Transistor`)** + VFR |
-| 20 | `test_inertia_with_two_parallel_resistors` | ⛔ | C | **`VolumetricFlowResistor`** |
+| 20 | `test_inertia_with_two_parallel_resistors` | ✅ | C | `VolumetricFlowResistor` (have) |
 | 21 | `test_local_pressure_with_flow_reversal` | ⛔ | C | **`LocalPressureDrop`** |
 
-Tally: 6 ✅ · 6 🟡 · 2 ⬜ · 5 ⛔ (target: 21 ✅).
+Tally: 8 ✅ · 6 🟡 · 1 ⬜ · 4 ⛔ (target: 21 ✅).
 
 ## New components to build (decided: implement, for true 1:1)
 

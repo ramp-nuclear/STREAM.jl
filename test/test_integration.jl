@@ -960,3 +960,69 @@ end
         @test isapprox(sol(tt; idxs=ssys.L_el.port_in.mdot), exp(-(r / L) * tt); rtol=1e-4)
     end
 end
+
+@testset "inertia with friction in PCS coastdown" begin
+    # Python: test_inertia_with_friction_in_PCS_coastdown
+    # Inertia + quadratic friction, pump shutdown: mdot = mdot0/(1 + α·mdot0·t),
+    # α = |dp_out(mdot=1)|/inertia. Python's fixed-f Friction has dp = (dp0/mdot0²)·mdot|mdot|
+    # (the density cancels), so a VolumetricFlowResistor(k=dp0/mdot0², density=1) reproduces it.
+    inertia = 8.0e3
+    T = 293.15
+    dp0 = 1.6e5
+    rho0 = rho_water(T)
+    mdot0 = (2000.0 / 3600.0) * rho0
+    K = dp0 / mdot0^2
+    alpha = K / inertia
+    @named L_el = Inertia(inertia)
+    @named R = VolumetricFlowResistor(; k=K, density=1.0)
+    @named hx = HeatExchanger(T)
+    conns = [
+        connect(L_el.port_out, R.port_in),
+        connect(R.port_out, hx.port_in),
+        connect(hx.port_out, L_el.port_in),
+        L_el.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:friction_coastdown), L_el, R, hx)
+    ssys = mtkcompile(sys)
+    prob = ODEProblem(ssys, [ssys.L_el.port_in.mdot => mdot0], (0.0, 300.0))
+    sol = solve(prob, Rodas5P(); initializealg=SciMLBase.NoInit(), reltol=1e-10, abstol=1e-12)
+    @test sol.retcode == ReturnCode.Success
+    for tt in (0.0, 50.0, 150.0, 300.0)
+        mdota = mdot0 / (1 + alpha * mdot0 * tt)
+        @test isapprox(sol(tt; idxs=ssys.L_el.port_in.mdot), mdota; rtol=1e-4)
+    end
+end
+
+@testset "inertia with two parallel resistors" begin
+    # Python: test_inertia_with_two_parallel_resistors
+    # Inertia + two parallel quadratic resistors: total_k = k1·k2/(√k1+√k2)²,
+    # coastdown mdot = mdot0/(1 + (total_k/inertia)·mdot0·t).
+    inertia = 1.0e3
+    mdot0 = 1.0
+    k1 = 2.0
+    k2 = 5.0
+    total_k = k1 * k2 / (sqrt(k1) + sqrt(k2))^2
+    alpha = total_k / inertia
+    @named L_el = Inertia(inertia)
+    @named R1 = VolumetricFlowResistor(; k=k1, density=1.0)
+    @named R2 = VolumetricFlowResistor(; k=k2, density=1.0)
+    @named hx = HeatExchanger(300.0)
+    conns = [
+        connect(L_el.port_out, R1.port_in, R2.port_in),   # node J0
+        connect(R1.port_out, R2.port_out, hx.port_in),    # node J1
+        connect(hx.port_out, L_el.port_in),
+        L_el.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:parallel_coastdown), L_el, R1, R2, hx)
+    ssys = mtkcompile(sys)
+    prob = ODEProblem(ssys, [ssys.L_el.port_in.mdot => mdot0,
+                             ssys.R1.port_in.mdot => mdot0 / (1 + sqrt(k1 / k2)),
+                             ssys.R2.port_in.mdot => mdot0 / (1 + sqrt(k2 / k1))],
+                      (0.0, 100.0))
+    sol = solve(prob, Rodas5P(); initializealg=SciMLBase.NoInit(), reltol=1e-8, abstol=1e-10)
+    @test sol.retcode == ReturnCode.Success
+    for tt in (0.0, 20.0, 60.0, 100.0)
+        mdota = mdot0 / (1 + alpha * mdot0 * tt)
+        @test isapprox(sol(tt; idxs=ssys.L_el.port_in.mdot), mdota; rtol=1e-4)
+    end
+end
