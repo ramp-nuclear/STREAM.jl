@@ -10,6 +10,9 @@
 #     derived from `geom.depth`, `geom.width`, `geom.L`, `geom.Dh`. Inner function
 #     receives only symbolic Re/Pr.
 #   - No @register_symbolic on any function in this file — all are plain arithmetic.
+#
+# Eval-point convention: callers pass `Re` and `Pr` evaluated at the film temperature
+# `T_film = (T_bulk + T_wall)/2`. The Channel core (src/components/channels.jl) does this.
 
 """
     dittus_boelter(Re, Pr, args...) -> Nu
@@ -22,8 +25,6 @@ the 4-arg HTC interface `(Re, Pr, T_bulk, T_wall) -> Nu`.
 
 Valid for: Re > 10,000, 0.6 <= Pr <= 160, L/D > 10.
 MTK-compatible: plain arithmetic on symbolic Re/Pr traces correctly.
-
-Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 dittus_boelter(Re, Pr, args...) = 0.023 * Re^0.8 * Pr^0.4
 
@@ -42,8 +43,6 @@ htc_fn = constant_Nusselt()          # Nu = 8.235
 htc_fn = constant_Nusselt(Nu = 5.0)  # custom Nu
 ChannelAndContacts(htc_correlation = htc_fn, ...)
 ```
-
-Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function constant_Nusselt(; Nu=8.235)
     return (Re, Pr, args...) -> Nu
@@ -114,8 +113,6 @@ rd_nc = regime_dependent(geom;
     g                  = 9.81,
 )
 ```
-
-Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function regime_dependent(geom::PipeGeometry;
     htc_laminar::HTCCorrelation,
@@ -224,8 +221,6 @@ depend on forced-flow Reynolds number).
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
-
-Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 NC exception: this closure evaluates `beta_water`, `mu_water`, `rho_water` INTERNALLY at `T_bulk` (NOT at film) — natural-convection driving force is a bulk-vs-wall ΔT phenomenon and Python STREAM evaluates β, ν at bulk for Gr.
 """
 function elenbaas_htc(geom::PipeGeometry; g=9.81)
@@ -278,8 +273,6 @@ rectangular duct with 2-sided heating.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
-
-Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function fully_developed_laminar_h_spl(geom::PipeGeometry)
     aspect_ratio = geom.depth / geom.width
@@ -304,8 +297,6 @@ choose the evaluation point along the channel; there is no silent substitution w
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
-
-Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function developing_laminar_h_spl(geom::PipeGeometry; develop_length)
     aspect_ratio = geom.depth / geom.width
@@ -329,8 +320,6 @@ and returns the maximum Nusselt number.
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> max(c1(...), c2(...), ...)`.
-
-Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function maximal_htc(correlations...)
     return (Re, Pr, T_bulk, T_wall) -> begin
@@ -349,8 +338,6 @@ through rectangular ducts with uniform wall temperature (4-sided heating).
 
 # Returns
 Nusselt number (dimensionless).
-
-Eval-point convention: callers should pass `Re` and `Pr` evaluated at `T_film = (T_bulk + T_wall)/2`. The Channel core in `src/components/channels.jl` does this.
 """
 function Marco_Han_Nusselt(aspect_ratio)
     return 8.235 * (
