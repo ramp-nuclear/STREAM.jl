@@ -44,26 +44,24 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
 - `pipe::Union{PipeGeometry, Nothing}` — channel geometry, or `nothing` if unavailable
 - `gravity::Float64`           — gravitational acceleration [m/s²]
 """
-#! format: off
 @kwdef struct ChannelState
-    n             ::Int
-    T_bulk        ::AbstractArray
-    T_wall        ::AbstractArray
-    T_wall_left   ::AbstractArray
-    T_wall_right  ::AbstractArray
-    T_sat         ::AbstractArray
-    T_ONB         ::AbstractArray
-    T_inlet       ::Float64
-    P             ::AbstractArray
-    q_flux        ::AbstractArray
-    q_flux_left   ::AbstractArray
-    q_flux_right  ::AbstractArray
-    mdot          ::Float64
-    velocity      ::AbstractArray
-    pipe          ::Union{PipeGeometry, Nothing}
-    gravity       ::Float64
+    n::Int
+    T_bulk::AbstractArray
+    T_wall::AbstractArray
+    T_wall_left::AbstractArray
+    T_wall_right::AbstractArray
+    T_sat::AbstractArray
+    T_ONB::AbstractArray
+    T_inlet::Float64
+    P::AbstractArray
+    q_flux::AbstractArray
+    q_flux_left::AbstractArray
+    q_flux_right::AbstractArray
+    mdot::Float64
+    velocity::AbstractArray
+    pipe::Union{PipeGeometry,Nothing}
+    gravity::Float64
 end
-#! format: on
 
 # #### Private helper
 
@@ -86,7 +84,6 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
     # Detect steady vs transient: a NonlinearSolution has no time field.
     is_transient = hasproperty(sol, :t) && length(sol.t) > 1
 
-    #! format: off
     if is_transient
         # Transient: assemble [n_cells, n_times] matrices
         T_bulk = hcat([sol[channel_sys.T[i], :] for i in 1:n]...)'
@@ -115,7 +112,6 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         T_inlet_val = sol[channel_sys.port_in.T]
         mdot_val = sol[channel_sys.port_in.mdot]
     end
-    #! format: on
 
     # Conservative wall temperature: max of left and right face
     T_wall = max.(T_wall_left, T_wall_right)
@@ -133,26 +129,24 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
     # Conservative q_flux: max of both faces
     q_flux = max.(q_flux_left, q_flux_right)
 
-    #! format: off
-    return ChannelState(
-        n            = n,
-        T_bulk       = T_bulk,
-        T_wall       = T_wall,
-        T_wall_left  = T_wall_left,
-        T_wall_right = T_wall_right,
-        T_sat        = T_sat_arr,
-        T_ONB        = T_ONB_arr,
-        T_inlet      = T_inlet_val,
-        P            = P_arr,
-        q_flux       = q_flux,
-        q_flux_left  = q_flux_left,
-        q_flux_right = q_flux_right,
-        mdot         = mdot_val,
-        velocity     = vel_arr,
-        pipe         = pipe,
-        gravity      = gravity,
+    return ChannelState(;
+        n=n,
+        T_bulk=T_bulk,
+        T_wall=T_wall,
+        T_wall_left=T_wall_left,
+        T_wall_right=T_wall_right,
+        T_sat=T_sat_arr,
+        T_ONB=T_ONB_arr,
+        T_inlet=T_inlet_val,
+        P=P_arr,
+        q_flux=q_flux,
+        q_flux_left=q_flux_left,
+        q_flux_right=q_flux_right,
+        mdot=mdot_val,
+        velocity=vel_arr,
+        pipe=pipe,
+        gravity=gravity,
     )
-    #! format: on
 end
 
 """

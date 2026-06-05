@@ -91,26 +91,24 @@ end
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 5
 
-    #! format: off
-    state = ChannelState(
-        n            = n,
-        T_bulk       = fill(320.0, n),
-        T_wall       = fill(340.0, n),
-        T_wall_left  = fill(340.0, n),
-        T_wall_right = fill(335.0, n),
-        T_sat        = fill(373.15, n),
-        T_ONB        = fill(380.0, n),
-        T_inlet      = 300.0,
-        P            = fill(1e5, n),
-        q_flux       = fill(5e5, n),
-        q_flux_left  = fill(5e5, n),
-        q_flux_right = fill(4e5, n),
-        mdot         = 0.5,
-        velocity     = fill(3.0, n),
-        pipe         = pipe,
-        gravity      = 9.81,
+    state = ChannelState(;
+        n=n,
+        T_bulk=fill(320.0, n),
+        T_wall=fill(340.0, n),
+        T_wall_left=fill(340.0, n),
+        T_wall_right=fill(335.0, n),
+        T_sat=fill(373.15, n),
+        T_ONB=fill(380.0, n),
+        T_inlet=300.0,
+        P=fill(1e5, n),
+        q_flux=fill(5e5, n),
+        q_flux_left=fill(5e5, n),
+        q_flux_right=fill(4e5, n),
+        mdot=0.5,
+        velocity=fill(3.0, n),
+        pipe=pipe,
+        gravity=9.81,
     )
-    #! format: on
 
     @testset "ChannelState construction" begin
         @test state.n == n
@@ -182,26 +180,24 @@ end
 @testset "chfr helper" begin
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 3
-    #! format: off
-    state = ChannelState(
-        n            = n,
-        T_bulk       = fill(320.0, n),
-        T_wall       = fill(340.0, n),
-        T_wall_left  = fill(340.0, n),
-        T_wall_right = fill(335.0, n),
-        T_sat        = fill(373.15, n),
-        T_ONB        = fill(380.0, n),
-        T_inlet      = 300.0,
-        P            = fill(1e5, n),
-        q_flux       = fill(5e5, n),
-        q_flux_left  = fill(5e5, n),
-        q_flux_right = fill(4e5, n),
-        mdot         = 0.5,
-        velocity     = fill(3.0, n),
-        pipe         = pipe,
-        gravity      = 9.81,
+    state = ChannelState(;
+        n=n,
+        T_bulk=fill(320.0, n),
+        T_wall=fill(340.0, n),
+        T_wall_left=fill(340.0, n),
+        T_wall_right=fill(335.0, n),
+        T_sat=fill(373.15, n),
+        T_ONB=fill(380.0, n),
+        T_inlet=300.0,
+        P=fill(1e5, n),
+        q_flux=fill(5e5, n),
+        q_flux_left=fill(5e5, n),
+        q_flux_right=fill(4e5, n),
+        mdot=0.5,
+        velocity=fill(3.0, n),
+        pipe=pipe,
+        gravity=9.81,
     )
-    #! format: on
 
     ratio_fn = chfr(Mirshak_CHF; direction=:max)
     ratios = ratio_fn(state)
@@ -216,26 +212,24 @@ end
     @test length(ratio_total) == n
     @test all(ratio_right .>= ratio_left)
 
-    #! format: off
-    state_zero = ChannelState(
-        n            = n,
-        T_bulk       = fill(320.0, n),
-        T_wall       = fill(340.0, n),
-        T_wall_left  = fill(340.0, n),
-        T_wall_right = fill(335.0, n),
-        T_sat        = fill(373.15, n),
-        T_ONB        = fill(380.0, n),
-        T_inlet      = 300.0,
-        P            = fill(1e5, n),
-        q_flux       = fill(0.0, n),
-        q_flux_left  = fill(0.0, n),
-        q_flux_right = fill(0.0, n),
-        mdot         = 0.5,
-        velocity     = fill(3.0, n),
-        pipe         = pipe,
-        gravity      = 9.81,
+    state_zero = ChannelState(;
+        n=n,
+        T_bulk=fill(320.0, n),
+        T_wall=fill(340.0, n),
+        T_wall_left=fill(340.0, n),
+        T_wall_right=fill(335.0, n),
+        T_sat=fill(373.15, n),
+        T_ONB=fill(380.0, n),
+        T_inlet=300.0,
+        P=fill(1e5, n),
+        q_flux=fill(0.0, n),
+        q_flux_left=fill(0.0, n),
+        q_flux_right=fill(0.0, n),
+        mdot=0.5,
+        velocity=fill(3.0, n),
+        pipe=pipe,
+        gravity=9.81,
     )
-    #! format: on
     ratios_zero = ratio_fn(state_zero)
     @test all(ratios_zero .== Inf)
     @test_throws ArgumentError chfr(Mirshak_CHF; direction=:bad)(state)
@@ -244,26 +238,24 @@ end
 @testset "threshold_analysis dispatch" begin
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 3
-    #! format: off
-    state = ChannelState(
-        n            = n,
-        T_bulk       = fill(320.0, n),
-        T_wall       = fill(340.0, n),
-        T_wall_left  = fill(340.0, n),
-        T_wall_right = fill(335.0, n),
-        T_sat        = fill(373.15, n),
-        T_ONB        = fill(380.0, n),
-        T_inlet      = 300.0,
-        P            = fill(1e5, n),
-        q_flux       = fill(5e5, n),
-        q_flux_left  = fill(5e5, n),
-        q_flux_right = fill(4e5, n),
-        mdot         = 0.5,
-        velocity     = fill(3.0, n),
-        pipe         = pipe,
-        gravity      = 9.81,
+    state = ChannelState(;
+        n=n,
+        T_bulk=fill(320.0, n),
+        T_wall=fill(340.0, n),
+        T_wall_left=fill(340.0, n),
+        T_wall_right=fill(335.0, n),
+        T_sat=fill(373.15, n),
+        T_ONB=fill(380.0, n),
+        T_inlet=300.0,
+        P=fill(1e5, n),
+        q_flux=fill(5e5, n),
+        q_flux_left=fill(5e5, n),
+        q_flux_right=fill(4e5, n),
+        mdot=0.5,
+        velocity=fill(3.0, n),
+        pipe=pipe,
+        gravity=9.81,
     )
-    #! format: on
 
     manual_result = (mirshak=Mirshak_CHF(state), onb=ONB_temperature(state))
     @test manual_result.mirshak isa AbstractArray

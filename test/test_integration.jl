@@ -159,21 +159,19 @@ end
 
 @testset "Loss-of-flow transient" begin
     # Baseline constants for the bypass loss-of-flow loop.
-    #! format: off
-    BYPASS_N         = 10
-    BYPASS_L_CH      = 1.0
-    BYPASS_D_CH      = 0.01
-    BYPASS_T_INLET   = 313.15
-    BYPASS_G_ACC     = 9.80665
-    BYPASS_L_OVER_A  = 1.75e5
-    BYPASS_R_EXT     = 1.0e6
+    BYPASS_N = 10
+    BYPASS_L_CH = 1.0
+    BYPASS_D_CH = 0.01
+    BYPASS_T_INLET = 313.15
+    BYPASS_G_ACC = 9.80665
+    BYPASS_L_OVER_A = 1.75e5
+    BYPASS_R_EXT = 1.0e6
     BYPASS_THRESHOLD = 0.01
-    BYPASS_DT_RAMP   = 5.0
+    BYPASS_DT_RAMP = 5.0
     # Fuel-plate-specific:
-    BYPASS_POWER_W   = 1.0e3   # matches build_loop_lof_bypass default
-    BYPASS_FUEL_NX   = 2
-    BYPASS_FUEL_LX   = 0.005
-    #! format: on
+    BYPASS_POWER_W = 1.0e3   # matches build_loop_lof_bypass default
+    BYPASS_FUEL_NX = 2
+    BYPASS_FUEL_LX = 0.005
 
     # Loss-of-flow IC via the canonical steady-then-transient pattern — no separate
     # reference loop, no state transplant. We solve_steady the ACTUAL bypass system

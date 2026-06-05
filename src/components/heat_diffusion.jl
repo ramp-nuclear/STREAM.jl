@@ -73,15 +73,20 @@ end
 # Returns
 Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
-#! format: off
-function HeatDiffusion(; name,
-                         nz::Int, nx::Int,
-                         Lz, Lx, y,
-                         rho_s, cp_s, k_s,
-                         power_shape,
-                         power  = 1e6,
-                         T0     = 600.0)
-#! format: on
+function HeatDiffusion(;
+    name,
+    nz::Int,
+    nx::Int,
+    Lz,
+    Lx,
+    y,
+    rho_s,
+    cp_s,
+    k_s,
+    power_shape,
+    power=1e6,
+    T0=600.0,
+)
     power_init = power
     dx = Lx / nx
     dz = Lz / nz
@@ -95,23 +100,21 @@ function HeatDiffusion(; name,
     thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:nz]
 
     T_var, power_var = vars
-    #! format: off
     eqs = _diffusion_eqs(;
-        T             = T_var,
-        thermal_left  = thermal_left,
-        thermal_right = thermal_right,
-        nz            = nz,
-        nx            = nx,
-        k_s           = k_s,
-        rho_s         = rho_s,
-        cp_s          = cp_s,
-        dx            = dx,
-        dz            = dz,
-        y             = y,
-        power         = power_var,
-        power_shape   = power_shape)
-
-    #! format: on
+        T=T_var,
+        thermal_left=thermal_left,
+        thermal_right=thermal_right,
+        nz=nz,
+        nx=nx,
+        k_s=k_s,
+        rho_s=rho_s,
+        cp_s=cp_s,
+        dx=dx,
+        dz=dz,
+        y=y,
+        power=power_var,
+        power_shape=power_shape,
+    )
     all_vars = vcat(vec(collect(T_var)), [power_var])
     return compose(
         System(eqs, t, all_vars, []; name=name), thermal_left..., thermal_right...

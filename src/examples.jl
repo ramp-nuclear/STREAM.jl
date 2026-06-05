@@ -19,17 +19,15 @@ Build a simple steady-state horizontal flow loop (Pump + HeatExchanger + Channel
 # Returns
 Compiled `System` (already passed through `mtkcompile`).
 """
-#! format: off
 function build_loop(;
-    n::Int   = 10,
-    L_ch     = 0.6,
-    D_ch     = 0.01,
-    dP_pump  = 3.0e4,
-    T_inlet  = 313.15,   # coolant inlet temperature (K); 40°C
-    T_wall   = 373.15,   # wall temperature (K); ~100°C for forced convection
-    h_wall   = 5000.0,   # convective HTC [W/(m²K)] applied on the left face
+    n::Int=10,
+    L_ch=0.6,
+    D_ch=0.01,
+    dP_pump=3.0e4,
+    T_inlet=313.15,  # coolant inlet temperature (K); 40°C
+    T_wall=373.15,  # wall temperature (K); ~100°C for forced convection
+    h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
 )
-#! format: on
     @named pump = Pump(dP_pump)
     @named ch = Channel(;
         n=n, geometry=PipeGeometry_circular(L_ch, D_ch), h_left=h_wall, h_right=0.0
@@ -78,19 +76,17 @@ Build a vertical flow loop with gravity (Pump + HeatExchanger + Channel + Gravit
 # Returns
 Compiled `System`.
 """
-#! format: off
 function build_loop_vertical(;
-    n::Int   = 10,
-    L_ch     = 0.6,
-    D_ch     = 0.01,
-    dP_pump  = 3.0e4,
-    T_inlet  = 313.15,    # coolant inlet temperature (K); 40°C
-    T_wall   = 373.15,    # wall temperature (K); ~100°C for forced convection
-    h_wall   = 5000.0,    # convective HTC [W/(m²K)] applied on the left face
-    g_acc    = 9.80665,   # gravitational acceleration (m/s²)
-    H_return = nothing,   # height of return leg (m); defaults to L_ch for cancellation geometry
+    n::Int=10,
+    L_ch=0.6,
+    D_ch=0.01,
+    dP_pump=3.0e4,
+    T_inlet=313.15,  # coolant inlet temperature (K); 40°C
+    T_wall=373.15,  # wall temperature (K); ~100°C for forced convection
+    h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
+    g_acc=9.80665,  # gravitational acceleration (m/s²)
+    H_return=nothing,  # height of return leg (m); defaults to L_ch for cancellation geometry
 )
-#! format: on
     H = isnothing(H_return) ? L_ch : H_return
 
     @named pump = Pump(dP_pump)
@@ -149,18 +145,16 @@ When using a callable `T_wall_fn`, the caller must include the callable paramete
 # Returns
 Compiled `System` (already passed through `mtkcompile`).
 """
-#! format: off
 function build_loop_transient(;
-    n::Int   = 10,
-    L_ch     = 0.6,
-    D_ch     = 0.01,
-    dP_pump  = 3.0e4,
-    T_inlet  = 313.15,    # coolant inlet temperature (K); 40°C
-    T_wall_0 = 373.15,    # wall temperature (K); used when T_wall_fn is nothing
-    h_wall   = 5000.0,    # convective HTC [W/(m²K)] applied on the left face
-    T_wall_fn = nothing,  # optional callable (t) -> K for time-varying wall temperature
+    n::Int=10,
+    L_ch=0.6,
+    D_ch=0.01,
+    dP_pump=3.0e4,
+    T_inlet=313.15,  # coolant inlet temperature (K); 40°C
+    T_wall_0=373.15,  # wall temperature (K); used when T_wall_fn is nothing
+    h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
+    T_wall_fn=nothing,  # optional callable (t) -> K for time-varying wall temperature
 )
-#! format: on
     @named pump = Pump(dP_pump)
     @named ch = Channel(;
         n=n, geometry=PipeGeometry_circular(L_ch, D_ch), h_left=h_wall, h_right=0.0
@@ -348,22 +342,20 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
 # Returns
 Compiled `System` (via `mtkcompile(sys)`).
 """
-#! format: off
 function build_loop_lof_bypass(;
-    n::Int    = 10,
-    L_ch      = 1.0,
-    D_ch      = 0.01,
-    T_inlet   = 313.15,
-    power_W   = 1.0e3,
-    fuel_nx   = 2,
-    fuel_Lx   = 0.005,
-    L_over_A  = 1.75e5,
-    g_acc     = 9.80665,
-    R_ext     = 1.0e6,
-    dt_ramp   = 5.0,
-    dP_pump_fn = (_t -> 0.0),
+    n::Int=10,
+    L_ch=1.0,
+    D_ch=0.01,
+    T_inlet=313.15,
+    power_W=1.0e3,
+    fuel_nx=2,
+    fuel_Lx=0.005,
+    L_over_A=1.75e5,
+    g_acc=9.80665,
+    R_ext=1.0e6,
+    dt_ramp=5.0,
+    dP_pump_fn=(_t -> 0.0),
 )
-#! format: on
     geom = PipeGeometry_circular(L_ch, D_ch)
 
     # NC-enabled regime switching for heated channel
@@ -504,20 +496,18 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
   (P, C_1..C_6, rho_c_fn), hydraulic IC (port_in.mdot), and thermal ICs
   (cac.T[i] and fuel.T[i,j]). Pass directly to `solve_transient(ssys, ic, t)`.
 """
-#! format: off
 function build_loop_pk(ctrl;
-    n::Int      = 7,
-    nz::Int     = 7,
-    nx::Int     = 2,
-    T_inlet     = 293.15,
-    dP_pump     = 3.0e4,
-    P0          = 1.0,
-    power_scale = 1e4,
-    temp_worth  = nothing,
-    ref_temp    = nothing,
-    rho_val     = 0.0,
+    n::Int=7,
+    nz::Int=7,
+    nx::Int=2,
+    T_inlet=293.15,
+    dP_pump=3.0e4,
+    P0=1.0,
+    power_scale=1e4,
+    temp_worth=nothing,
+    ref_temp=nothing,
+    rho_val=0.0,
 )
-#! format: on
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ps = fill(1.0 / (nz * nx), nz, nx)  # uniform power shape, normalized
     @named cac = ChannelAndContacts(;
