@@ -354,7 +354,7 @@ function point_kinetics_steady_state(
 end
 
 """
-    ReactivityController{S, F}
+    ReactivityController{S, F, M}
 
 Pure-Julia state-machine controller that provides time-varying control reactivity
 for `PointKinetics` in callable mode. Mirrors the Python STREAM `ReactivityController`
@@ -369,19 +369,19 @@ Instances are callable: `ctrl(t)` returns `worth(ctrl, t)`. This lets users pass
 
 # Fields
 - `input_reactivity::F` : callable `(state, t_state, t) -> Float64`
-- `state_machine`       : callable `(state, t, power, dPdt) -> new_state` (untyped -- may be swapped)
+- `state_machine::M`    : callable `(state, t, power, dPdt) -> new_state`
 - `state::S`            : current controller state (typically a Symbol)
 - `t_state::Float64`    : simulation time when the current state was entered
 - `log::Vector{Tuple{S, Float64}}` : state transition history (state, entry-time) pairs
-- `abort_states::Set`   : states that signal downstream callbacks to stop integration
+- `abort_states::Set{S}` : states that signal downstream callbacks to stop integration
 """
-mutable struct ReactivityController{S,F}
+mutable struct ReactivityController{S,F,M}
     input_reactivity::F
-    state_machine
+    state_machine::M
     state::S
     t_state::Float64
     log::Vector{Tuple{S,Float64}}
-    abort_states::Set
+    abort_states::Set{S}
 end
 
 """
@@ -401,8 +401,9 @@ Construct a `ReactivityController` with sensible defaults.
   If `nothing`, defaults to an empty `Set()`.
 
 # Returns
-A `ReactivityController{S,F}` where `S = typeof(initial_state)` and
-`F = typeof(input_reactivity)`. The `log` field starts with `[(initial_state, initial_time)]`.
+A `ReactivityController{S,F,M}` where `S = typeof(initial_state)`,
+`F = typeof(input_reactivity)`, and `M = typeof(state_machine)`. The `log` field
+starts with `[(initial_state, initial_time)]`.
 """
 function ReactivityController(
     input_reactivity=nothing;
@@ -413,11 +414,12 @@ function ReactivityController(
 )
     ir = input_reactivity === nothing ? ((s, ts, t) -> 0.0) : input_reactivity
     sm = state_machine === nothing ? ((s, t, p, dp) -> s) : state_machine
-    ab = abort_states === nothing ? Set() : abort_states
     S_t = typeof(initial_state)
     F_t = typeof(ir)
+    M_t = typeof(sm)
+    ab = abort_states === nothing ? Set{S_t}() : Set{S_t}(abort_states)
     t0 = Float64(initial_time)
-    return ReactivityController{S_t,F_t}(
+    return ReactivityController{S_t,F_t,M_t}(
         ir, sm, initial_state, t0, Tuple{S_t,Float64}[(initial_state, t0)], ab
     )
 end
