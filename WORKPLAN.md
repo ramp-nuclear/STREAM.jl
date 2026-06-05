@@ -120,7 +120,7 @@ silent API changes, atomic commits, no new features. Closes #7/#8.
 - Macro-consistency sweep (proposal Phase I) folds in here.
 - Encode the comment/docstring/archival policies into `CLAUDE.md` as standing rules.
 
-### W9 — Multi-persona usability / gap study (#5)  *(runs LAST, after W8)*
+### W9 — Multi-persona usability / gap study (#5)  *(DEFERRED — runs LAST, after W8)*
 On the finished, documented product (post-W8). Multi-agent study spanning the trait axes (Julia proficiency ×
 physics proficiency × familiarity with peer codes × learning ability × internet access ×
 learning goal). Not the full outer product — a chosen spread. Each persona files an
@@ -129,18 +129,37 @@ directions. Goal: "what's missing" — tutorials/guides, usability features, mis
 (two-phase/drift-flux, volumes for LOCA), helper/analysis/debug/reporting tooling. Output
 feeds + reprioritizes the tracker. Good fit for a Workflow when we reach it.
 
-### W6 — Implement uncertainty (#1)  *(feature build-out; ∥ W7)*
-Per the WA design, on the clean base.
+### WV — Python-parity validation  *(CURRENT FOCUS; gates everything after it)*
 
-### W7 — Implement model-authoring paradigm (#7/#9)  *(∥ W6)*
-Per the WA design, on the clean base. The mechanism (expression-default base params +
-`remake` scans) is spike-validated; the user-facing authoring API is still open. If that
-API needs usability input, run a small targeted persona check here in W7's design step
-(the early-W9 substitute, see Locked decision 4).
+**Added 2026-06-05 (Itay + Aviv + Eshed). The team is not yet confident STREAM.jl
+reproduces Python STREAM, so this runs next, before the deferred W6/W8/W9.** Goal: all
+three agree 100% that Julia solves the same systems and gives the same numbers as Python.
 
-### W8 — Model-writing guide/manual (#8)  *(after W7)*
-Step-by-step manual for writing full dynamic, modular, parametrically-scannable models —
-down to file-system organization. Content is only knowable once W7 lands.
+North star: **`test/test_integration.jl` is a 1:1 port of Python
+`tests/test_general/test_integrations.py`** — same systems, same numbers, same methods,
+both passing, and *strictly* 1:1 (no Julia-only tests in that file; they move to the file
+that mirrors their source, or are removed). Python's integration tests assert against
+closed-form analytic solutions, so the port validates physics, not just code-to-code
+agreement. The living map is `VALIDATION.md`.
+
+Decisions taken: implement the missing components (`VolumetricFlowResistor`,
+`LocalPressureDrop`, the closure-resistor / `Transistor` pattern, network `signify`) and a
+mock-fluid path so all 21 Python tests can port with the same numbers; split
+`one_sided_connection` into the truthful one-sided helper (kept) plus a Python-matching
+both-faces helper (so `mtr_one_sided` parity goes clean). Sign-off is a human-reviewed
+`VALIDATION.md` matrix.
+
+### W6 — Implement uncertainty (#1)  *(DEFERRED — after WV)*
+Per the WA design, on the validated base. Deferred 2026-06-05: UQ amplifies the nominal
+solve, so it waits until WV establishes trust in nominal. The WA design + W7 knobs are kept.
+
+### W7 — Implement model-authoring paradigm (#7/#9)  — DONE (2026-06-05)
+Design knobs + symbolic geometry, 5 stages, parity held 434/20/72 throughout. Tagged
+`w7-complete`.
+
+### W8 — Model-writing guide/manual (#8)  *(DEFERRED — after WV, then W6)*
+Step-by-step manual. Deferred: documents a tool the team does not yet trust; content also
+depends on W6.
 
 ---
 
@@ -152,17 +171,17 @@ W0 ──┬──────────────────────�
      ├─ WA (design 1 & 7/9) ─┐
      ├─ W2 (GUI split)       ─┤
      │                        ▼  [GATE]
-     │                       W4 (audit) ─► W5 (cleanup) ─┐
-     │                                                   │
-     │                            ┌──────────────────────┴───────────────┐
-     │                            ▼                                       ▼
-     │                      W6 (uncertainty)                    W7 (model-authoring)
-     │                            └──────────────────┬────────────────────┘
-     │                                               ▼
-     │                                       W8 (model guide) ─► W9 (persona study)
+     │            W4 (audit) ─► W5 (cleanup) ─► W7 (model-authoring, DONE) ─┐
+     │                                                                      ▼
+     │                                              WV (Python-parity validation)  ◄── CURRENT
+     │                                                                      │  [TRUST GATE]
+     │                                                                      ▼
+     │                                                          W6 (uncertainty)
+     │                                                                      ▼
+     │                                              W8 (model guide) ─► W9 (persona study)
 ```
-*W9 moved to last (2026-06-05): evaluate the finished, documented product, not a
-pre-feature snapshot. See Locked decision 4.*
+*Pivot 2026-06-05: WV (validation) inserted as the trust gate before W6/W8/W9, which are
+deferred. W7 landed before W6 (it is W6's substrate). See the WV section.*
 
 ## Open items still to resolve
 - Tracker mechanism: confirm **Project board + issues** vs a pinned meta-issue.
