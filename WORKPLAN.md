@@ -19,9 +19,14 @@ the audit; its *ordering* — audit before GUI split — is overridden here).
    overturn. The contested zone is the parameter / geometry / model-assembly layer.
 3. **`JULIA.md` + MTK skill already exist** (Itay authors; drops them in). The audit
    blocks on them being present and wired.
-4. **Persona usability/gap study runs after the cleanup, before feature build-out** — so
-   personas evaluate clean code, and findings reprioritize the tracker before we commit
-   to feature work beyond the two already chosen.
+4. **Persona usability/gap study runs after feature build-out, not before** *(revised
+   2026-06-05)*. Originally W9 was slotted before W6/W7 so findings could reprioritize the
+   tracker. But WA already locked and spike-validated the two features, so W9 cannot steer
+   them; running it early would make personas evaluate an authoring surface that W7 is about
+   to replace, with no W8 guide to assess, and would mostly rediscover the gaps W6/W7/W8
+   already fill. The full study now runs **after W8**, on the finished, documented product.
+   Caveat: if W7's user-facing authoring API has open UX questions, fold a small targeted
+   usability check into W7's design step rather than relying on the early study.
 5. **Merge policy: squash only.** Repo ruleset enforces it; `config.json` reconciled.
 
 ---
@@ -115,8 +120,8 @@ silent API changes, atomic commits, no new features. Closes #7/#8.
 - Macro-consistency sweep (proposal Phase I) folds in here.
 - Encode the comment/docstring/archival policies into `CLAUDE.md` as standing rules.
 
-### W9 — Multi-persona usability / gap study (#5)
-On the cleaned codebase. Multi-agent study spanning the trait axes (Julia proficiency ×
+### W9 — Multi-persona usability / gap study (#5)  *(runs LAST, after W8)*
+On the finished, documented product (post-W8). Multi-agent study spanning the trait axes (Julia proficiency ×
 physics proficiency × familiarity with peer codes × learning ability × internet access ×
 learning goal). Not the full outer product — a chosen spread. Each persona files an
 individual report; then an adversarial cross-examination round to filter biased
@@ -128,7 +133,10 @@ feeds + reprioritizes the tracker. Good fit for a Workflow when we reach it.
 Per the WA design, on the clean base.
 
 ### W7 — Implement model-authoring paradigm (#7/#9)  *(∥ W6)*
-Per the WA design, on the clean base.
+Per the WA design, on the clean base. The mechanism (expression-default base params +
+`remake` scans) is spike-validated; the user-facing authoring API is still open. If that
+API needs usability input, run a small targeted persona check here in W7's design step
+(the early-W9 substitute, see Locked decision 4).
 
 ### W8 — Model-writing guide/manual (#8)  *(after W7)*
 Step-by-step manual for writing full dynamic, modular, parametrically-scannable models —
@@ -144,14 +152,17 @@ W0 ──┬──────────────────────�
      ├─ WA (design 1 & 7/9) ─┐
      ├─ W2 (GUI split)       ─┤
      │                        ▼  [GATE]
-     │                       W4 (audit) ─► W5 (cleanup) ─► W9 (persona study)
-     │                                                          │
-     │                                          ┌───────────────┴───────────────┐
-     │                                          ▼                               ▼
-     │                                    W6 (uncertainty)            W7 (model-authoring)
-     │                                                                          ▼
-     │                                                                  W8 (model guide)
+     │                       W4 (audit) ─► W5 (cleanup) ─┐
+     │                                                   │
+     │                            ┌──────────────────────┴───────────────┐
+     │                            ▼                                       ▼
+     │                      W6 (uncertainty)                    W7 (model-authoring)
+     │                            └──────────────────┬────────────────────┘
+     │                                               ▼
+     │                                       W8 (model guide) ─► W9 (persona study)
 ```
+*W9 moved to last (2026-06-05): evaluate the finished, documented product, not a
+pre-feature snapshot. See Locked decision 4.*
 
 ## Open items still to resolve
 - Tracker mechanism: confirm **Project board + issues** vs a pinned meta-issue.
