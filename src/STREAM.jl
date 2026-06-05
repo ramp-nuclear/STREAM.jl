@@ -19,6 +19,7 @@ include("physical_models/friction/correlations.jl")
 include("physical_models/subcooled_boiling.jl")
 include("physical_models/threshold_analysis.jl")
 include("physical_models/dimensionless.jl")
+include("physical_models/local_pressure.jl")
 include("components/pump.jl")
 include("components/flapper.jl")
 include("components/resistors.jl")
@@ -38,7 +39,7 @@ export AbstractFluid, Water, ConstantFluid
 export density, specific_heat, viscosity, conductivity, thermal_expansion
 export FlowPort, ThermalPort
 export Channel, Pump, Flapper, Friction, Gravity, Resistor, VolumetricFlowResistor
-export Inertia, HeatExchanger
+export LocalPressureDrop, Inertia, HeatExchanger
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion, PipeGeometry, PipeGeometry_rectangular
 export PipeGeometry_circular

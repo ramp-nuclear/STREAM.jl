@@ -95,3 +95,27 @@ end
     par_strs = string.(parameters(vfr))
     @test any(s -> occursin("k_fn", s), par_strs)
 end
+
+@testset "LocalPressureDrop — sudden expansion ΔP matches Idelchik closed form" begin
+    A1, A2 = 1.0, 2.0
+    Tin = 293.15
+    mdot = 3.0
+    @named pump = Pump(; mdot0=mdot)        # fixed-flow so mdot is exact
+    @named hx = HeatExchanger(Tin)
+    @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
+    conns = [
+        connect(pump.port_out, hx.port_in),
+        connect(hx.port_out, lpd.port_in),
+        connect(lpd.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:lpd_loop), pump, hx, lpd)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.lpd.port_in.mdot => mdot])
+    @test sol.retcode == ReturnCode.Success
+    A = min(A1, A2)
+    f = STREAM._local_loss_factor(mdot, A1, A2, mu_water(Tin))
+    dp_expected = f * mdot * abs(mdot) / (2 * rho_water(Tin) * A^2)
+    @test isapprox(sol[ssys.lpd.port_in.P] - sol[ssys.lpd.port_out.P], dp_expected; rtol=1e-6)
+    @test dp_expected > 0.0   # forward flow drops pressure
+end

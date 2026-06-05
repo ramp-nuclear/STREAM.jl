@@ -155,3 +155,40 @@ function VolumetricFlowResistor(;
     ]
     return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
 end
+
+"""
+    LocalPressureDrop(; name, A1, A2, fluid=Water()) -> System
+
+Minor (local) pressure loss across a sudden area change `A1 -> A2`, after Idelchik tables
+4.2 (expansion) and 4.10 (contraction). The loss is `ΔP = K·mdot·|mdot| / (2·ρ·A_min²)`,
+where the coefficient `K` depends on the area ratio and Reynolds number and on the flow
+direction — forward flow sees an expansion when `A2 ≥ A1` and a contraction otherwise, with
+the roles swapped under reversal. The `mdot·|mdot|` form keeps the drop direction-correct.
+
+# Arguments
+- `name`: system name (Symbol)
+- `A1`: upstream flow area [m^2]
+- `A2`: downstream flow area [m^2]
+- `fluid`: coolant property set (`AbstractFluid`), default `Water()` — supplies density and
+  viscosity at the inlet stream temperature
+
+# Ports
+- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+
+# Returns
+Uncompiled `System`. Call `mtkcompile(sys)` before solving.
+"""
+function LocalPressureDrop(; name, A1, A2, fluid::AbstractFluid=Water())
+    @named port_in = FlowPort()
+    @named port_out = FlowPort()
+    T_in = instream(port_in.T)
+    A = min(A1, A2)
+    f = _local_loss_factor(port_in.mdot, A1, A2, viscosity(fluid, T_in))
+    eqs = Equation[
+        port_in.mdot + port_out.mdot ~ 0,
+        port_in.P - port_out.P ~ f * port_in.mdot * abs(port_in.mdot) / (2 * density(fluid, T_in) * A^2),
+        port_out.T ~ instream(port_in.T),
+        port_in.T ~ instream(port_out.T),
+    ]
+    return compose(System(eqs, t, [], []; name=name), port_in, port_out)
+end
