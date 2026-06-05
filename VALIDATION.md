@@ -45,13 +45,27 @@ Tally: 0 ✅ · 6 🟡 · 8 ⬜ · 5 ⛔ (target: 21 ✅).
 
 ## New components to build (decided: implement, for true 1:1)
 
-- `VolumetricFlowResistor` — quadratic `dP ∝ mdot·|mdot|` resistor (unblocks #18, #20).
-- `LocalPressureDrop` — area-change minor loss `(A1,A2)` (unblocks #21).
-- closure-resistor / `Transistor` pattern — time-dependent resistance via callable parameter (unblocks #19).
-- network `signify` — channel-multiplicity weighting on a flow edge (unblocks #11, #12).
-- mock-fluid path — injectable cp/k/rho so channel tests hit Python's exact analytic numbers (Tier B).
+- ✅ `VolumetricFlowResistor` — quadratic `dP = k·Q·|Q| + klow·Q` resistor (unblocks #18, #20).
+  Commit `cd4ab8f`. Its callable-`k` path **is** the transistor pattern below.
+- ✅ closure-resistor / `Transistor` pattern — folded into `VolumetricFlowResistor`: pass `k`
+  as a callable `(t) -> k` (MTK callable-parameter idiom) for a time-varying resistance
+  (unblocks #19). Commit `cd4ab8f`.
+- ✅ mock-fluid path — `AbstractFluid` / `Water()` / `ConstantFluid`; channels take a `fluid`
+  kwarg threaded into `_channel_core`. `Water()` stays byte-identical (parity 526 CLEAN);
+  `ConstantFluid` = Python's `mock_liquid_funcs`. Mock solid needs no work — `HeatDiffusion`
+  already takes `k_s`/`cp_s`/`rho_s`. Commit `c36e2fc`. (Tier B: #4, #5.)
+- ✅ `LocalPressureDrop` — Idelchik sudden expansion/contraction minor loss `(A1,A2)`, a
+  `@register_symbolic` table lookup inside the MTK drop equation (unblocks #21). Commit `8f4c379`.
+- network `signify` — **no new component.** In Python `signify` is a Kirchhoff junction-weight;
+  it does not map to a mass-conserving MTK element (a single in-line flow-gain breaks KCL at the
+  other junction). The faithful MTK expression of "edge counts `N` times" is `N` parallel
+  branches (integer, #12's own construction) or, equivalently, scaling the resistance — a single
+  resistor of `r/N` carries the bundle flow `N·m1` with the per-copy drop `r·m1`, giving the
+  same `m1 = p/(r1 + N·r2)`. Handled in Phase 3 as a "re-express against MTK port variables"
+  case (#11, #12); the per-copy flow is `bundle / N`.
 
-Each is a real physics component and gets its own unit tests in the file mirroring its source, plus the integration test that uses it.
+Each real component gets its own unit tests in the file mirroring its source, plus the
+integration test that uses it.
 
 ## `one_sided_connection` split (precedes the port; clears `mtr_one_sided` parity) — ✅ DONE
 
