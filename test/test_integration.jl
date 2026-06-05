@@ -1198,3 +1198,65 @@ end
     @test isapprox(sol(2.0; idxs=ssys.pump.port_in.mdot), 0.0; atol=1e-8)   # closed ⇒ no flow
     @test abs(sol(4.5; idxs=ssys.pump.port_in.mdot)) > 1e-6                 # open ⇒ flow
 end
+
+@testset "inertia with flapper in PCS coastdown" begin
+    # Python: test_inertia_with_flapper_in_PCS_coastdown
+    # Inertia drives a coastdown through a VolumetricFlowResistor (k=1) in parallel with a
+    # pre-opened flapper (f=2k). At full open both are quadratic with the same coefficient
+    # (R: dp=k·mdot², flapper: dp=f·mdot²/(2A²)=k·mdot²), so the split is even: mdot_R = mdot_flap.
+    k = 1.0
+    @named ine = Inertia(1.0e3)
+    @named R = VolumetricFlowResistor(; k=k, density=1.0)
+    @named flapper = Flapper(; open_at_current=0.0, f=2 * k, area=1.0, open_rate=1.0,
+                             fluid=ConstantFluid())
+    @named hx = HeatExchanger(300.0)
+    conns = [
+        connect(ine.port_out, R.port_in, flapper.port_in),
+        connect(R.port_out, flapper.port_out, hx.port_in),
+        connect(hx.port_out, ine.port_in),
+        flapper.ref_mdot ~ ine.port_in.mdot,
+        ine.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:flapper_coastdown), ine, R, flapper, hx)
+    ssys = mtkcompile(sys; fully_determined=false)
+    op = Pair{Any,Any}[ssys.ine.port_in.mdot => 1.0, ssys.flapper.T_open => 100.0]
+    sol = solve_transient(ssys, op, range(0.0, 150.0; length=300))
+    @test sol.retcode == ReturnCode.Success
+    mdot_R = sol[ssys.R.port_in.mdot, end]
+    mdot_F = sol[ssys.flapper.port_in.mdot, end]
+    @test mdot_R > 0 && mdot_F > 0
+    @test isapprox(mdot_R, mdot_F; rtol=1e-3)    # even split at full open
+end
+
+@testset "inertia with transistor in PCS coastdown" begin
+    # Python: test_inertia_with_transistor_in_PCS_coastdown — convergence only.
+    # A time-dependent ("transistor") parabolic resistor that starts very stiff (k2) and
+    # collapses to k_final after t_open, in parallel with a constant VolumetricFlowResistor.
+    k1 = 1.0
+    k2 = 1.0e7
+    k_final = 1.0
+    t_open = 100.0
+    t_final = 300.0
+    kfn = (tt) -> tt <= t_open ? k2 : (k2 - k_final) * exp(-50 * (tt - t_open) / t_final) + k_final
+    @named ine = Inertia(1.0e3)
+    @named R = VolumetricFlowResistor(; k=k1, density=1.0)
+    @named transistor = VolumetricFlowResistor(; k=kfn, density=1.0)
+    @named hx = HeatExchanger(300.0)
+    conns = [
+        connect(ine.port_out, R.port_in, transistor.port_in),
+        connect(R.port_out, transistor.port_out, hx.port_in),
+        connect(hx.port_out, ine.port_in),
+        ine.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:transistor_coastdown), ine, R, transistor, hx)
+    ssys = mtkcompile(sys)
+    sr(a, b) = 1 + sqrt(a / b)
+    op = Pair{Any,Any}[
+        ssys.ine.port_in.mdot => 1.0,
+        ssys.R.port_in.mdot => 1.0 / sr(k1, k2),
+        ssys.transistor.port_in.mdot => 1.0 / sr(k2, k1),
+        ssys.transistor.k_fn => kfn,
+    ]
+    sol = solve_transient(ssys, op, range(0.0, t_final; length=302); reltol=1e-6, abstol=1e-7)
+    @test sol.retcode == ReturnCode.Success    # convergence is the gate
+end
