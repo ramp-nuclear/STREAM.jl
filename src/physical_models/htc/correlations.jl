@@ -1,7 +1,7 @@
 # htc/correlations.jl — Heat transfer coefficient correlation functions for STREAM.jl
 #
 # Design:
-#   - Standalone named functions (dittus_boelter, elenbaas_nusselt, Marco_Han_Nusselt):
+#   - Standalone named functions (dittus_boelter, elenbaas_nusselt, marco_han_nusselt):
 #     plain Julia arithmetic, NOT @register_symbolic. MTK traces through these symbolically.
 #   - Factories (constant_Nusselt, regime_dependent(geom; ...), elenbaas_htc(geom; g),
 #     fully_developed_laminar_h_spl(geom), developing_laminar_h_spl(geom; develop_length)):
@@ -328,7 +328,7 @@ function maximal_htc(correlations...)
 end
 
 """
-    Marco_Han_Nusselt(aspect_ratio) -> Nu
+    marco_han_nusselt(aspect_ratio) -> Nu
 
 Marco and Han approximation for Nusselt number in fully-developed laminar flow
 through rectangular ducts with uniform wall temperature (4-sided heating).
@@ -339,7 +339,7 @@ through rectangular ducts with uniform wall temperature (4-sided heating).
 # Returns
 Nusselt number (dimensionless).
 """
-function Marco_Han_Nusselt(aspect_ratio)
+function marco_han_nusselt(aspect_ratio)
     return 8.235 * (
         1.0 - 2.0421 * aspect_ratio + 3.853 * aspect_ratio^2 - 2.4765 * aspect_ratio^3 +
         1.0578 * aspect_ratio^4 - 0.1861 * aspect_ratio^5

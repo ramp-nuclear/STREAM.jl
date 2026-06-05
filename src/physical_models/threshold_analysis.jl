@@ -6,7 +6,7 @@
 #   - They operate on scalar (or vector) Float64 values from solver solutions.
 #   - No MTK dependencies here.
 #
-# Functions: Bergles_Rohsenow_T_ONB, q_boiling_onset, q_OFI_whittle_forgan,
+# Functions: bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan,
 #            q_OSV_saha_zuber, q_CHF_sudo_kaminaga, q_CHF_mirshak,
 #            q_CHF_fabrega, twall_limit
 
@@ -31,7 +31,7 @@ end
 # #### Public API
 
 """
-    Bergles_Rohsenow_T_ONB(pressure, q_wall, T_sat) -> T_ONB [K]
+    bergles_rohsenow_t_onb(pressure, q_wall, T_sat) -> T_ONB [K]
 
 Onset of Nucleate Boiling wall temperature using Bergles-Rohsenow (1964) correlation.
 Thin wrapper around the private `_bergles_rohsenow_dT_ONB` helper in correlations.jl.
@@ -39,7 +39,7 @@ Thin wrapper around the private `_bergles_rohsenow_dT_ONB` helper in correlation
 Formula: `T_ONB = T_sat + 0.556 * (q_wall / (1082 * p^1.156))^(0.463 * p^0.0234)`
 where `p = pressure / 1e5` (pressure in bar).
 
-Source: Python STREAM temperatures.py `Bergles_Rohsenow_T_ONB`.
+Source: Python STREAM temperatures.py `bergles_rohsenow_t_onb`.
 
 # Arguments
 - `pressure`: absolute system pressure [Pa]
@@ -49,7 +49,7 @@ Source: Python STREAM temperatures.py `Bergles_Rohsenow_T_ONB`.
 # Returns
 Wall temperature at onset of nucleate boiling `T_ONB` [K].
 """
-function Bergles_Rohsenow_T_ONB(pressure, q_wall, T_sat)
+function bergles_rohsenow_t_onb(pressure, q_wall, T_sat)
     return T_sat + _bergles_rohsenow_dT_ONB(pressure, q_wall)
 end
 
@@ -193,7 +193,7 @@ where `lamda = sqrt(sigma / drho / |gravity|)` (capillary length).
 
 Uses `pipe.width` (NOT `heated_perimeter/2`) for q3 per Mishima's experiments.
 
-Source: Python STREAM thresholds.py `Sudo_Kaminaga_CHF`.
+Source: Python STREAM thresholds.py `sudo_kaminaga_chf`.
 
 # Arguments
 - `T_bulk`: bulk coolant temperature [K] (scalar, at inlet cell)
@@ -259,7 +259,7 @@ Valid for rapid flows (v > 1.5 m/s).
 
 Formula: `q_CHF = 1.51e6 * (1 + 0.1198*v) * (1 + 0.00914*(T_sat - T_bulk)) * (1 + 1.9e-6*pressure)`
 
-Source: Python STREAM thresholds.py `Mirshak_CHF`.
+Source: Python STREAM thresholds.py `mirshak_chf`.
 
 # Arguments
 - `T_bulk`: bulk coolant temperature [K]
@@ -285,7 +285,7 @@ Valid for slow flows (v < 0.5 m/s).
 
 Formula: `q_CHF = 1e7 * Dh * (0.023*(T_sat - T_inlet) + 4.56)`
 
-Source: Python STREAM thresholds.py `Fabrega_CHF`.
+Source: Python STREAM thresholds.py `fabrega_chf`.
 
 # Arguments
 - `T_inlet`: coolant bulk temperature at inlet [K]

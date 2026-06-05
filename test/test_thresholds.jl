@@ -7,13 +7,13 @@ using STREAM
     # Matches typical MTR fuel assembly geometry used in Python STREAM tests
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
 
-    @testset "Bergles_Rohsenow_T_ONB" begin
-        result = Bergles_Rohsenow_T_ONB(1e5, 1e5, 373.15)
+    @testset "bergles_rohsenow_t_onb" begin
+        result = bergles_rohsenow_t_onb(1e5, 1e5, 373.15)
         @test result == 373.15 + STREAM._bergles_rohsenow_dT_ONB(1e5, 1e5)
-        result2 = Bergles_Rohsenow_T_ONB(1e5, 1e5, 350.0)
+        result2 = bergles_rohsenow_t_onb(1e5, 1e5, 350.0)
         @test result2 == 350.0 + STREAM._bergles_rohsenow_dT_ONB(1e5, 1e5)
-        @test Bergles_Rohsenow_T_ONB(1e5, 2e5, 373.15) >
-            Bergles_Rohsenow_T_ONB(1e5, 1e5, 373.15)
+        @test bergles_rohsenow_t_onb(1e5, 2e5, 373.15) >
+            bergles_rohsenow_t_onb(1e5, 1e5, 373.15)
     end
 
     @testset "q_boiling_onset" begin
@@ -119,15 +119,15 @@ end
         @test state.pipe === pipe
     end
 
-    @testset "ONB_temperature wrapper" begin
-        result = ONB_temperature(state)
+    @testset "onb_temperature wrapper" begin
+        result = onb_temperature(state)
         @test length(result) == n
         # T_ONB from Bergles-Rohsenow must be > T_sat for non-zero q
         @test all(result .> state.T_sat)
     end
 
-    @testset "Mirshak_CHF wrapper" begin
-        result = Mirshak_CHF(state)
+    @testset "mirshak_chf wrapper" begin
+        result = mirshak_chf(state)
         @test length(result) == n
         @test all(result .> 0)
         expected_val =
@@ -138,16 +138,16 @@ end
         @test result[1] ≈ expected_val rtol = 1e-10
     end
 
-    @testset "Fabrega_CHF wrapper" begin
-        result = Fabrega_CHF(state)
+    @testset "fabrega_chf wrapper" begin
+        result = fabrega_chf(state)
         @test length(result) == n
         @test all(result .> 0)
         expected_val = 1e7 * pipe.Dh * (0.023 * (373.15 - 300.0) + 4.56)
         @test result[1] ≈ expected_val rtol = 1e-10
     end
 
-    @testset "Sudo_Kaminaga_CHF wrapper" begin
-        result = Sudo_Kaminaga_CHF(state)
+    @testset "sudo_kaminaga_chf wrapper" begin
+        result = sudo_kaminaga_chf(state)
         @test length(result) == n
         @test all(result .> 0)
     end
@@ -199,14 +199,14 @@ end
         gravity=9.81,
     )
 
-    ratio_fn = chfr(Mirshak_CHF; direction=:max)
+    ratio_fn = chfr(mirshak_chf; direction=:max)
     ratios = ratio_fn(state)
     @test length(ratios) == n
     @test all(ratios .> 0)
 
-    ratio_left = chfr(Mirshak_CHF; direction=:left)(state)
-    ratio_right = chfr(Mirshak_CHF; direction=:right)(state)
-    ratio_total = chfr(Mirshak_CHF; direction=:total)(state)
+    ratio_left = chfr(mirshak_chf; direction=:left)(state)
+    ratio_right = chfr(mirshak_chf; direction=:right)(state)
+    ratio_total = chfr(mirshak_chf; direction=:total)(state)
     @test length(ratio_left) == n
     @test length(ratio_right) == n
     @test length(ratio_total) == n
@@ -232,7 +232,7 @@ end
     )
     ratios_zero = ratio_fn(state_zero)
     @test all(ratios_zero .== Inf)
-    @test_throws ArgumentError chfr(Mirshak_CHF; direction=:bad)(state)
+    @test_throws ArgumentError chfr(mirshak_chf; direction=:bad)(state)
 end
 
 @testset "threshold_analysis dispatch" begin
@@ -257,13 +257,13 @@ end
         gravity=9.81,
     )
 
-    manual_result = (mirshak=Mirshak_CHF(state), onb=ONB_temperature(state))
+    manual_result = (mirshak=mirshak_chf(state), onb=onb_temperature(state))
     @test manual_result.mirshak isa AbstractArray
     @test manual_result.onb isa AbstractArray
     @test length(manual_result.mirshak) == n
     @test length(manual_result.onb) == n
 
-    mirshak_chfr = chfr(Mirshak_CHF; direction=:max)
+    mirshak_chfr = chfr(mirshak_chf; direction=:max)
     chfr_result = mirshak_chfr(state)
     @test length(chfr_result) == n
     @test all(chfr_result .> 0)

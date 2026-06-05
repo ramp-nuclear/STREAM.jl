@@ -1,7 +1,7 @@
 # subcooled_boiling.jl — Subcooled boiling heat flux correlations for STREAM.jl
 #
 # Design:
-#   - Standalone named functions (McAdams_SCB_heat_flux, Bergles_Rohsenow_SCB_heat_flux,
+#   - Standalone named functions (mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux,
 #     partial_SCB_correction): plain Julia arithmetic, NOT @register_symbolic.
 #     MTK traces through these symbolically when T_wall/T_sat are symbolic.
 #   - Factory (regime_dependent_q_scb): returns a closure that captures construction-time
@@ -9,7 +9,7 @@
 #   - ifelse() for guards — same MTK pattern as flow reversal and regime switching.
 
 """
-    McAdams_SCB_heat_flux(T_sat, T_wall) -> q [W/m^2]
+    mcadams_scb_heat_flux(T_sat, T_wall) -> q [W/m^2]
 
 McAdams (1949) subcooled boiling heat flux correlation for water.
 Formula: `q = 740.0 * (T_wall - T_sat)^3.86` [W/m^2].
@@ -27,14 +27,14 @@ Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
 # Returns
 Subcooled boiling heat flux `q` [W/m^2].
 """
-function McAdams_SCB_heat_flux(T_sat, T_wall)
+function mcadams_scb_heat_flux(T_sat, T_wall)
     dT = T_wall - T_sat
     dT_safe = max(dT, 0.0)
     return ifelse(dT > 0, 740.0 * dT_safe^3.86, 0.0)
 end
 
 """
-    Bergles_Rohsenow_SCB_heat_flux(T_wall, T_sat, pressure; h_fg=2257e3, sigma=0.059) -> q [W/m^2]
+    bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure; h_fg=2257e3, sigma=0.059) -> q [W/m^2]
 
 Bergles-Rohsenow (1964) subcooled boiling heat flux correlation.
 Formula: `q = 1082.0 * p^1.156 * dT^(1.0 / (0.463 * p^0.0234))` [W/m^2]
@@ -56,7 +56,7 @@ Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
 # Returns
 Subcooled boiling heat flux `q` [W/m^2].
 """
-function Bergles_Rohsenow_SCB_heat_flux(T_wall, T_sat, pressure; h_fg=2257e3, sigma=0.059)
+function bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure; h_fg=2257e3, sigma=0.059)
     dT = T_wall - T_sat
     p = pressure / 1e5  # Pa to bar
     dT_safe = max(dT, 0.0)
@@ -123,7 +123,7 @@ function regime_dependent_q_scb(;
     Re_tr = Float64(Re_transition)
     return (T_wall, T_sat, Re) -> ifelse(
         Re >= Re_tr,
-        McAdams_SCB_heat_flux(T_sat, T_wall),
-        Bergles_Rohsenow_SCB_heat_flux(T_wall, T_sat, pressure; h_fg=h_fg, sigma=sigma),
+        mcadams_scb_heat_flux(T_sat, T_wall),
+        bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure; h_fg=h_fg, sigma=sigma),
     )
 end

@@ -40,14 +40,14 @@ export HeatFluxSource, HeatDiffusion, PipeGeometry, PipeGeometry_rectangular
 export PipeGeometry_circular
 export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction_rectangular
 export rectangular_laminar_correction, regime_dependent, elenbaas_nusselt, elenbaas_htc
-export Marco_Han_Nusselt, turbulent_friction, viscosity_correction, maximal_htc
+export marco_han_nusselt, turbulent_friction, viscosity_correction, maximal_htc
 export fully_developed_laminar_h_spl, developing_laminar_h_spl, HTCCorrelation
-export McAdams_SCB_heat_flux, Bergles_Rohsenow_SCB_heat_flux
+export mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux
 export partial_SCB_correction, regime_dependent_q_scb
-export Bergles_Rohsenow_T_ONB, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber
+export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber
 export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
-export ChannelState, threshold_analysis, chfr, ONB_temperature, boiling_onset_power
-export OFI_power, OSV_flux, Sudo_Kaminaga_CHF, Mirshak_CHF, Fabrega_CHF
+export ChannelState, threshold_analysis, chfr, onb_temperature, boiling_onset_power
+export OFI_power, OSV_flux, sudo_kaminaga_chf, mirshak_chf, fabrega_chf
 export Gr, Ra, Re_vel, Pe
 export build_loop, build_loop_vertical, build_loop_transient, build_cube
 export build_loop_lof_bypass, build_loop_pk

@@ -7,13 +7,13 @@
 #   ChannelState          — struct holding all pre-extracted MTK solution fields
 #   threshold_analysis    — dispatcher: extracts ChannelState, calls user-supplied analysis fns
 #   chfr                  — factory: returns CHF ratio closure with direction + guard
-#   ONB_temperature       — wrapper: Bergles_Rohsenow_T_ONB per cell
+#   onb_temperature       — wrapper: bergles_rohsenow_t_onb per cell
 #   boiling_onset_power   — wrapper: q_boiling_onset per cell
 #   OFI_power             — wrapper: q_OFI_whittle_forgan (scalar result)
 #   OSV_flux              — wrapper: q_OSV_saha_zuber (scalar result)
-#   Sudo_Kaminaga_CHF     — wrapper: q_CHF_sudo_kaminaga per cell
-#   Mirshak_CHF           — wrapper: q_CHF_mirshak per cell
-#   Fabrega_CHF           — wrapper: q_CHF_fabrega per cell
+#   sudo_kaminaga_chf     — wrapper: q_CHF_sudo_kaminaga per cell
+#   mirshak_chf           — wrapper: q_CHF_mirshak per cell
+#   fabrega_chf           — wrapper: q_CHF_fabrega per cell
 #   twall_limit(::ChannelState; ...) — method overload on ChannelState
 
 """
@@ -164,7 +164,7 @@ each function and collects results into a `NamedTuple`.
 - `channel_sys`: the compiled MTK subsystem with `T`, `T_wall_left`, `T_wall_right`, etc.
 - `pipe`: optional `PipeGeometry` — needed for `q_flux_*` computation and wrappers that use pipe geometry
 - `gravity`: gravitational acceleration [m/s²] (default 9.81)
-- `kwargs...`: named analysis functions, e.g. `chfr_mirshak=chfr(Mirshak_CHF), onb=ONB_temperature`
+- `kwargs...`: named analysis functions, e.g. `chfr_mirshak=chfr(mirshak_chf), onb=onb_temperature`
 
 # Returns
 `NamedTuple` with the same keys as `kwargs`, each containing the result of the corresponding function.
@@ -173,8 +173,8 @@ each function and collects results into a `NamedTuple`.
 ```julia
 result = threshold_analysis(sol, ssys.cac;
     pipe=pipe, gravity=9.81,
-    chfr_mirshak = chfr(Mirshak_CHF),
-    onb          = ONB_temperature,
+    chfr_mirshak = chfr(mirshak_chf),
+    onb          = onb_temperature,
 )
 result.chfr_mirshak  # Vector{Float64} of CHF ratios per cell
 result.onb           # Vector{Float64} of ONB temperatures per cell
@@ -197,7 +197,7 @@ The returned closure has signature `(state::ChannelState) -> AbstractArray`.
 
 # Arguments
 - `chf_fn`: a callable `(state::ChannelState) -> AbstractArray` — any CHF wrapper function,
-  e.g. `Mirshak_CHF`, `Sudo_Kaminaga_CHF`, `Fabrega_CHF`
+  e.g. `mirshak_chf`, `sudo_kaminaga_chf`, `fabrega_chf`
 - `direction`: which face's heat flux to use as denominator:
   - `:max` (default) — `max.(q_flux_left, q_flux_right)` (most conservative)
   - `:left`  — `state.q_flux_left`
@@ -229,11 +229,11 @@ function chfr(chf_fn; direction=:max)
 end
 
 """
-    ONB_temperature(state::ChannelState) -> AbstractArray
+    onb_temperature(state::ChannelState) -> AbstractArray
 
 Onset of Nucleate Boiling wall temperature per cell using Bergles-Rohsenow (1964).
 
-Calls `Bergles_Rohsenow_T_ONB.(state.P, state.q_flux, state.T_sat)`.
+Calls `bergles_rohsenow_t_onb.(state.P, state.q_flux, state.T_sat)`.
 
 # Arguments
 - `state`: extracted channel state
@@ -241,8 +241,8 @@ Calls `Bergles_Rohsenow_T_ONB.(state.P, state.q_flux, state.T_sat)`.
 # Returns
 Vector (or matrix for transient) of `T_ONB` wall temperatures [K] per cell.
 """
-function ONB_temperature(state::ChannelState)
-    return Bergles_Rohsenow_T_ONB.(state.P, state.q_flux, state.T_sat)
+function onb_temperature(state::ChannelState)
+    return bergles_rohsenow_t_onb.(state.P, state.q_flux, state.T_sat)
 end
 
 """
@@ -304,7 +304,7 @@ function OSV_flux(state::ChannelState)
 end
 
 """
-    Sudo_Kaminaga_CHF(state::ChannelState) -> AbstractArray
+    sudo_kaminaga_chf(state::ChannelState) -> AbstractArray
 
 Critical Heat Flux per Sudo-Kaminaga (1998) plate-type fuel correlation, per cell.
 
@@ -316,12 +316,12 @@ Calls `q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, state.pipe, state.gravity)
 # Returns
 Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
 """
-function Sudo_Kaminaga_CHF(state::ChannelState)
+function sudo_kaminaga_chf(state::ChannelState)
     return q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, Ref(state.pipe), state.gravity)
 end
 
 """
-    Mirshak_CHF(state::ChannelState) -> AbstractArray
+    mirshak_chf(state::ChannelState) -> AbstractArray
 
 Critical Heat Flux per Mirshak et al. (1959) correlation (valid for v > 1.5 m/s), per cell.
 
@@ -333,12 +333,12 @@ Calls `q_CHF_mirshak.(state.T_bulk, state.T_sat, state.P, state.velocity)`.
 # Returns
 Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
 """
-function Mirshak_CHF(state::ChannelState)
+function mirshak_chf(state::ChannelState)
     return q_CHF_mirshak.(state.T_bulk, state.T_sat, state.P, state.velocity)
 end
 
 """
-    Fabrega_CHF(state::ChannelState) -> AbstractArray
+    fabrega_chf(state::ChannelState) -> AbstractArray
 
 Critical Heat Flux per Fabréga (1971) correlation (valid for v < 0.5 m/s), per cell.
 
@@ -350,7 +350,7 @@ Calls `q_CHF_fabrega.(state.T_inlet, state.T_sat, state.pipe)`.
 # Returns
 Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
 """
-function Fabrega_CHF(state::ChannelState)
+function fabrega_chf(state::ChannelState)
     return q_CHF_fabrega.(state.T_inlet, state.T_sat, Ref(state.pipe))
 end
 

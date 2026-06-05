@@ -16,7 +16,7 @@ using STREAM:
     beta_water,
     Gr,
     Ra,
-    Marco_Han_Nusselt,
+    marco_han_nusselt,
     turbulent_friction,
     viscosity_correction,
     fully_developed_laminar_h_spl,
@@ -433,16 +433,16 @@ end
 
 end
 
-@testset "Marco_Han_Nusselt" begin
+@testset "marco_han_nusselt" begin
     # Reference values from Python STREAM laminar.py doctest
-    @test Marco_Han_Nusselt(0.0) == 8.235
-    @test isapprox(Marco_Han_Nusselt(0.2), 5.991134842079999; rtol=1e-10)
+    @test marco_han_nusselt(0.0) == 8.235
+    @test isapprox(marco_han_nusselt(0.2), 5.991134842079999; rtol=1e-10)
 
     # ar=0 to ar=0.5: Nu decreases (thin gap to moderate aspect ratio)
-    @test Marco_Han_Nusselt(0.0) > Marco_Han_Nusselt(0.5)
+    @test marco_han_nusselt(0.0) > marco_han_nusselt(0.5)
 
     # ar=1.0 (square duct): positive Nu
-    @test Marco_Han_Nusselt(1.0) > 0.0
+    @test marco_han_nusselt(1.0) > 0.0
 end
 
 @testset "turbulent_friction (Colebrook-White)" begin
@@ -475,12 +475,12 @@ end
     # Helper: rectangular geom with exact aspect_ratio = ar via depth=ar, width=1.0.
     _geom_for_ar(ar) = PipeGeometry_rectangular(1.0, 1.0, ar, 1.0)
 
-    # Uses _two_sided_heating_nusselt, NOT Marco_Han_Nusselt
+    # Uses _two_sided_heating_nusselt, NOT marco_han_nusselt
     # Reference: _two_sided_heating_nusselt(0.0) = 8.235
     htc_fn = fully_developed_laminar_h_spl(_geom_for_ar(0.0))
     @test htc_fn(1000.0, 7.0, 313.0, 333.0) == 8.235
 
-    # At ar=0.2: _two_sided_heating_nusselt(0.2) != Marco_Han_Nusselt(0.2)
+    # At ar=0.2: _two_sided_heating_nusselt(0.2) != marco_han_nusselt(0.2)
     # two_sided: 8.235*(1 - 1.4122*0.2 + 2.3473*0.04 - 2.8983*0.008 + 2.0629*0.0016 - 0.6077*0.00032)
     htc_fn_ar02 = fully_developed_laminar_h_spl(_geom_for_ar(0.2))
     nu_two_sided_02 =
@@ -488,7 +488,7 @@ end
         (1.0 - 1.4122*0.2 + 2.3473*0.2^2 - 2.8983*0.2^3 + 2.0629*0.2^4 - 0.6077*0.2^5)
     @test isapprox(htc_fn_ar02(500.0, 5.0, 310.0, 350.0), nu_two_sided_02; rtol=1e-10)
     # Confirm it differs from Marco_Han
-    @test htc_fn_ar02(500.0, 5.0, 310.0, 350.0) != Marco_Han_Nusselt(0.2)
+    @test htc_fn_ar02(500.0, 5.0, 310.0, 350.0) != marco_han_nusselt(0.2)
 
     # Closure ignores Re, Pr — same Nu for any inputs
     @test htc_fn_ar02(100.0, 3.0, 300.0, 400.0) == htc_fn_ar02(5000.0, 10.0, 290.0, 380.0)
