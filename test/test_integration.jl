@@ -900,3 +900,63 @@ end
     @test isapprox(sol[ssys.P2.port_in.mdot], mdot; rtol=1e-8)              # current source wins
     @test isapprox(sol[ssys.P1.port_out.P] - sol[ssys.P1.port_in.P], p; rtol=1e-8)  # pump adds p
 end
+
+@testset "Tin jumps at resistor between two HXs at flow reversal" begin
+    # Python: test_Tin_jumps_at_resistor_between_two_hxs_at_flow_reversal
+    # HX1(20) -> R -> HX2(60), pump closes the loop. Forward flow: the resistor's fluid is
+    # HX1's; reversed flow (pump flipped): it is HX2's.
+    T1, T2 = 20.0, 60.0
+    function build(dp)
+        @named pump = Pump(dp)
+        @named HX1 = HeatExchanger(T1)
+        @named HX2 = HeatExchanger(T2)
+        @named R = Resistor(1.0)
+        conns = [
+            connect(pump.port_out, HX1.port_in),
+            connect(HX1.port_out, R.port_in),
+            connect(R.port_out, HX2.port_in),
+            connect(HX2.port_out, pump.port_in),
+            pump.port_in.P ~ 1.0e5,
+        ]
+        @named sys = compose(System(conns, t; name=:tinjump), pump, HX1, HX2, R)
+        return mtkcompile(sys)
+    end
+    fwd = build(1.0)
+    sol_f = solve_steady(fwd, [fwd.R.port_in.mdot => 1.0])
+    @test sol_f.retcode == ReturnCode.Success
+    @test sol_f[fwd.R.port_in.mdot] > 0
+    @test isapprox(sol_f[fwd.R.port_out.T], T1; rtol=1e-8)   # forward: HX1 fluid through R
+
+    rev = build(-1.0)
+    sol_r = solve_steady(rev, [rev.R.port_in.mdot => -1.0])
+    @test sol_r.retcode == ReturnCode.Success
+    @test sol_r[rev.R.port_in.mdot] < 0
+    @test isapprox(sol_r[rev.R.port_in.T], T2; rtol=1e-8)    # reversed: HX2 fluid through R
+end
+
+@testset "inertia through RL circuit follows analytic solution" begin
+    # Python: test_inertia_through_RL_circuit_follows_analytic_solution
+    # An inertia L and resistor r in a loop, no driving: mdot decays as exp(-(r/L)·t).
+    L = 5.0
+    r = 3.0
+    @named L_el = Inertia(L)
+    @named R = Resistor(r)
+    @named hx = HeatExchanger(300.0)
+    conns = [
+        connect(L_el.port_out, R.port_in),
+        connect(R.port_out, hx.port_in),
+        connect(hx.port_out, L_el.port_in),
+        L_el.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:rl_circuit), L_el, R, hx)
+    ssys = mtkcompile(sys)
+    tspan = (0.0, 1.0)
+    # The IC mdot=1 is already consistent (the loop pressures are explicit observables), so
+    # skip the (overdetermined) initialization nonlinear solve and integrate from it directly.
+    prob = ODEProblem(ssys, [ssys.L_el.port_in.mdot => 1.0], tspan)
+    sol = solve(prob, Rodas5P(); initializealg=SciMLBase.NoInit(), reltol=1e-10, abstol=1e-12)
+    @test sol.retcode == ReturnCode.Success
+    for tt in (0.0, 0.25, 0.5, 0.75, 1.0)
+        @test isapprox(sol(tt; idxs=ssys.L_el.port_in.mdot), exp(-(r / L) * tt); rtol=1e-4)
+    end
+end

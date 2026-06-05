@@ -25,10 +25,10 @@ Status legend: ✅ ported & passing · 🟡 partial/divergent counterpart · ⬜
 | 4 | `test_channel_stable_state_with_uniform_heating_increases_linearly` | 🟡 | B | mock-fluid path for exact linear-rise numbers |
 | 5 | `test_channel_point_kinetics` | 🟡 | B | mock fluids; per-channel linear-Tc assertion |
 | 6 | `test_kirchhoff_with_decaying_pump_eventually_flips_flow_direction_gravity` | ⬜ | A | Pump (callable dP) + Gravity (have) |
-| 7 | `test_Tin_jumps_at_resistor_between_two_hxs_at_flow_reversal` | ⬜ | A | HX + Resistor (have) |
+| 7 | `test_Tin_jumps_at_resistor_between_two_hxs_at_flow_reversal` | ✅ | A | HX + Resistor (have) |
 | 8 | `test_power_is_negligible_for_negative_Tfuel_feedback_and_ref_temp_is_boundary_conditions` | 🟡 | B | Fuel+PK (have); steady power→0 assertion |
 | 9 | `test_power_is_negligible_for_negative_Tcool_feedback_and_ref_temp_is_inlet` | 🟡 | B | has counterpart; align numbers/method |
-| 10 | `test_inertia_through_RL_circuit_follows_analytic_solution` | ⬜ | A | Inertia+Resistor (have); `exp(-rt/L)` assertion |
+| 10 | `test_inertia_through_RL_circuit_follows_analytic_solution` | ✅ | A | Inertia+Resistor (have); `exp(-rt/L)` assertion |
 | 11 | `test_kirchhoff_significance_in_two_in_series_resistors` | ⛔ | C | **`signify`** (network multiplicity) |
 | 12 | `test_kirchhoff_significance_for_many_parallel_edges` | ⛔ | C | **`signify`** |
 | 13 | `test_pump_and_current_source` | ✅ | A | Pump fixed-dP + fixed-mdot (have) |
@@ -41,7 +41,7 @@ Status legend: ✅ ported & passing · 🟡 partial/divergent counterpart · ⬜
 | 20 | `test_inertia_with_two_parallel_resistors` | ⛔ | C | **`VolumetricFlowResistor`** |
 | 21 | `test_local_pressure_with_flow_reversal` | ⛔ | C | **`LocalPressureDrop`** |
 
-Tally: 4 ✅ · 6 🟡 · 4 ⬜ · 5 ⛔ (target: 21 ✅).
+Tally: 6 ✅ · 6 🟡 · 2 ⬜ · 5 ⛔ (target: 21 ✅).
 
 ## New components to build (decided: implement, for true 1:1)
 
