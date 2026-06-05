@@ -151,3 +151,44 @@ end
     ssys = mtkcompile(hfs; fully_determined=false)  # isolated component: value-source, only RHS-driven port equations
     @test ssys isa ModelingToolkit.AbstractSystem
 end
+
+@testset "ConvectiveBoundary: construction + single Q_flow equation" begin
+    @named cb = ConvectiveBoundary(; area=0.01)
+    @test cb isa ModelingToolkit.System
+    var_strs = string.(unknowns(cb))
+    @test any(s -> occursin("h(t)", s), var_strs)
+    @test any(s -> occursin("T_fluid(t)", s), var_strs)
+end
+
+@testset "ConvectiveBoundary: imposes Q_flow = h*area*(T_wall - T_fluid)" begin
+    area = 0.07 * 0.06
+    h_val = 5000.0
+    T_wall = 350.0
+    T_fluid = 313.15
+    @named cb = ConvectiveBoundary(; area=area)
+    @named wall = ConstantTemperature(T_wall)
+    conns = [
+        connect(cb.thermal, wall.thermal),
+        cb.h ~ h_val,
+        cb.T_fluid ~ T_fluid,
+    ]
+    @named s = compose(System(conns, t; name=:cbtest), cb, wall)
+    ss = mtkcompile(s; fully_determined=true)
+    prob = ODEProblem(ss, Pair[], (0.0, 1.0))
+    sol = solve(prob, Rodas5P())
+    @test sol[ss.cb.thermal.Q_flow][end] ≈ h_val * area * (T_wall - T_fluid)
+end
+
+@testset "ConvectiveBoundary: heat leaves the wall when fluid is cooler" begin
+    # Q_flow into the element is positive (heat absorbed by the fluid) when the wall is
+    # hotter than the fluid; the connected wall therefore sheds heat (one-way sink).
+    area = 0.02
+    @named cb = ConvectiveBoundary(; area=area)
+    @named wall = ConstantTemperature(320.0)
+    conns = [connect(cb.thermal, wall.thermal), cb.h ~ 4000.0, cb.T_fluid ~ 300.0]
+    @named s = compose(System(conns, t; name=:cbsign), cb, wall)
+    ss = mtkcompile(s; fully_determined=true)
+    sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())
+    @test sol[ss.cb.thermal.Q_flow][end] > 0.0
+    @test sol[ss.wall.thermal.Q_flow][end] < 0.0
+end

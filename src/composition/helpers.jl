@@ -177,6 +177,71 @@ function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
 end
 
 """
+    single_channel_connection(channel, fuel, geometry; fuel_side=:left, name) -> System
+
+Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*: the
+channel is heated on one face only, but the fuel plate is cooled on **both** faces — the
+near face by conjugate coupling to the channel, the far face by a one-way convective sink
+(`ConvectiveBoundary`) fed from the channel's far-side `h_tc` and coolant `T`.
+
+This reproduces the half-symmetric reduced unit used for the last plate in an array: the
+plate sits between two channels, so it loses heat on both faces, but only one channel is
+modelled. The far face's heat flows into the unmodelled equivalent twin, so the subsystem
+does not conserve energy — that is the modelling choice, not a defect. For the truthful
+one-face-insulated coupling, use [`one_sided_connection`](@ref) instead.
+
+# Arguments
+- `channel`: uncompiled `ChannelAndContacts` instance.
+- `fuel`: uncompiled `HeatDiffusion` instance (`nz` must equal `channel.n`).
+- `geometry`: the `PipeGeometry` the channel was built with (supplies `L` and
+  `heated_parts` for the far-face areas).
+- `fuel_side`: `:left` or `:right` — which fuel face is the near (conjugate) face
+  (default `:left`). The opposite face gets the convective sink.
+- `name`: system name (Symbol).
+
+# Returns
+Uncompiled `System` from `compose()` holding `channel`, `fuel`, and `n` per-cell
+`ConvectiveBoundary` elements. Add boundary conditions, then `mtkcompile()`.
+
+After composition, refer to sub-components through the returned system (e.g.
+`scc.channel`, `scc.fuel`).
+"""
+function single_channel_connection(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol=:left, name::Symbol)
+    fuel_side in (:left, :right) ||
+        throw(ArgumentError("fuel_side must be :left or :right, got :$fuel_side"))
+    n = _infer_n(channel)
+    dz = geometry.L / n
+
+    near = fuel_side
+    far = fuel_side == :left ? :right : :left
+    far_idx = far == :left ? 1 : 2
+
+    near_port = Symbol(:thermal_, near)
+    far_port = Symbol(:thermal_, far)
+    # The channel's far face is never connected, so its conductance is undefined; Python's
+    # `_other_if_none` copies the connected (near) face's h to it. Cool the fuel's far face
+    # with that same near-side h_tc and the channel's coolant T — the equivalent-twin proxy.
+    h_near = near == :left ? :h_tc_left : :h_tc_right
+
+    far_bcs = [
+        ConvectiveBoundary(; name=Symbol(name, :_far, i), area=geometry.heated_parts[far_idx] * dz)
+        for i in 1:n
+    ]
+
+    near_conns = [connect(port(channel, near_port, i), port(fuel, near_port, i)) for i in 1:n]
+    far_conns = [connect(far_bcs[i].thermal, port(fuel, far_port, i)) for i in 1:n]
+    h_channel = getproperty(channel, h_near)
+    T_channel = getproperty(channel, :T)
+    bindings = Equation[
+        [far_bcs[i].h ~ h_channel[i] for i in 1:n]...,
+        [far_bcs[i].T_fluid ~ T_channel[i] for i in 1:n]...,
+    ]
+
+    connections = Equation[near_conns...; far_conns...; bindings...]
+    return compose(System(connections, t; name=name), channel, fuel, far_bcs...)
+end
+
+"""
     compose_systems(systems...; connections, name) -> System
 
 Compose multiple MTK systems with explicit connection equations into a single system.

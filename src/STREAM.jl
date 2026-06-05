@@ -37,7 +37,7 @@ export rho_water, cp_water, mu_water, k_water, beta_water, sat_temperature
 export FlowPort, ThermalPort
 export Channel, Pump, Flapper, Friction, Gravity, Resistor, Inertia, HeatExchanger
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
-export HeatFluxSource, HeatDiffusion, PipeGeometry, PipeGeometry_rectangular
+export HeatFluxSource, ConvectiveBoundary, HeatDiffusion, PipeGeometry, PipeGeometry_rectangular
 export PipeGeometry_circular
 export knob_defaults, @design_knob
 export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction_rectangular
@@ -54,7 +54,8 @@ export Gr, Ra, Re_vel, Pe
 export build_loop, build_loop_vertical, build_loop_transient, build_cube
 export build_loop_lof_bypass, build_loop_pk
 export solve_steady, solve_transient, steady_state_guess, check_gravity_mismatch, port
-export symmetric_plate, plate, one_sided_connection, compose_systems, fuel_assembly
+export symmetric_plate, plate, one_sided_connection, single_channel_connection
+export compose_systems, fuel_assembly
 export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController, worth, change_state

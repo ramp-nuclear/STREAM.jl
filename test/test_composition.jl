@@ -292,6 +292,95 @@ end
     @test_throws ArgumentError one_sided_connection(cac, fuel; side=:bogus, name=:bad)
 end
 
+# Section 6b: single_channel_connection (edge-channel — plate cooled on both faces)
+# Verify-block requires: at least 2 "@testset \"single_channel_connection" testsets.
+@testset "single_channel_connection — fuel_side=:left compiles cleanly" begin
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    scc = single_channel_connection(cac, fuel, geom; fuel_side=:left, name=:scc_l)
+    @test scc isa ModelingToolkit.AbstractSystem
+    # One ConvectiveBoundary per axial cell on the far face (n=4).
+    sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(scc)))
+    @test count(s -> startswith(s, "scc_l_far"), sub_names) == 4
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, scc.cac.port_in),
+        connect(scc.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        scc.fuel.power ~ 1.0e3,
+    ]
+    full = compose_systems(scc, pump, bc; connections=conns, name=:scc_full_l)
+    ssys = mtkcompile(full; fully_determined=true)
+    @test ssys isa ModelingToolkit.AbstractSystem
+end
+
+@testset "single_channel_connection — fuel_side=:right compiles cleanly" begin
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    scc = single_channel_connection(cac, fuel, geom; fuel_side=:right, name=:scc_r)
+    @test scc isa ModelingToolkit.AbstractSystem
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, scc.cac.port_in),
+        connect(scc.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        scc.fuel.power ~ 1.0e3,
+    ]
+    full = compose_systems(scc, pump, bc; connections=conns, name=:scc_full_r)
+    ssys = mtkcompile(full; fully_determined=true)
+    @test ssys isa ModelingToolkit.AbstractSystem
+end
+
+@testset "single_channel_connection — both faces active, plate laterally symmetric" begin
+    # Use the parity-proven MTR config (dittus_boelter, both faces heated) so the steady
+    # solve converges. The far face sheds heat (unlike one_sided_connection) and, cooled
+    # by the same h and coolant as the near face, the plate is laterally symmetric.
+    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    nz = 10
+    nx = 3
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named cac = ChannelAndContacts(; n=nz, geometry=geom)
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
+                                power_shape=ps, power=1e4)
+    scc = single_channel_connection(cac, fuel, geom; fuel_side=:left, name=:scc_s)
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(313.15)
+    conns = [
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, scc.cac.port_in),
+        connect(scc.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        scc.fuel.power ~ 1e4,
+    ]
+    full = compose_systems(scc, pump, bc; connections=conns, name=:scc_full_s)
+    ssys = mtkcompile(full; fully_determined=true)
+    op = vcat(
+        [ssys.scc_s.fuel.T[i, j] => 317.0 for i in 1:nz for j in 1:nx],
+        [ssys.scc_s.cac.T[i] => 317.0 for i in 1:nz],
+        [ssys.scc_s.cac.port_in.mdot => 0.25],
+    )
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    # Far face carries heat into the convective sink (one_sided would be adiabatic here).
+    far_Q = sol[getproperty(ssys.scc_s.fuel, Symbol(:thermal_right, 1)).Q_flow]
+    @test abs(far_Q) > 1e-6
+    # Laterally symmetric plate (left col == right col).
+    for z in 1:nz
+        @test isapprox(sol[ssys.scc_s.fuel.T[z, 1]], sol[ssys.scc_s.fuel.T[z, nx]]; rtol=1e-6)
+    end
+end
+
+@testset "single_channel_connection — invalid fuel_side errors" begin
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    @test_throws ArgumentError single_channel_connection(cac, fuel, geom; fuel_side=:bogus, name=:bad)
+end
+
 # Section 7: compose_systems cross-plate wiring
 # Stitch two symmetric_plate assemblies via hydraulic-series connect equations.
 @testset "compose_systems — two plates in series" begin
