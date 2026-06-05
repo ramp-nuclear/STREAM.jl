@@ -80,19 +80,20 @@ Peclet number (dimensionless).
 Pe(Re_val, Pr_val) = Re_val * Pr_val
 
 """
+    Gr(rho, mu, beta, T_wall, T, L, g) -> Float64
+
 Grashof number.
 
 # Arguments
-- `rho`: density [kg/m³]
-- `mu`: viscosity [kg/(m°K)]
+- `rho`: density [kg/m^3]
+- `mu`: viscosity [Pa*s]
 - `beta`: thermal expansion coefficient [1/K]
-- `T_wall`: Wall temperature [°K]
-- `T`: Bulk temperature [°K]
-- `L`: characteristic length (aka hydraulic diameter) [m]
+- `T_wall`: wall temperature [K]
+- `T`: bulk temperature [K]
+- `L`: characteristic length (hydraulic diameter) [m]
 - `g`: gravitational acceleration [m/s^2]
 
 # Returns
-Float64
 Grashof number (dimensionless).
 """
 Gr(rho, mu, beta, T_wall, T, L, g) = rho^2 * beta * g * (T_wall - T) * L^3 / mu^2

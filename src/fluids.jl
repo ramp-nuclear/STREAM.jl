@@ -1,17 +1,15 @@
-# Fluid property functions for light water (Siman Tov correlations)
+# Fluid property functions for light water.
 # Source: Moshe Siman Tov et al.
-# Temperature input: Kelvin. Converts internally.
 
 # Internal helper — not exported
 _to_fahrenheit(T_C::Real) = 1.8 * T_C + 32.0
 
 """
-    rho_water(T_K) -> kg/m³
+    rho_water(T_K) -> kg/m^3
 
 Saturated liquid water density (Simantov correlation).
-T_K: temperature in Kelvin.
 
-Note: uses Fahrenheit internally — this is a quirk of the Simantov correlation.
+Note: uses Fahrenheit internally, a quirk of the Simantov correlation.
 
 # Arguments
 - `T_K`: temperature [K]
@@ -29,10 +27,9 @@ function rho_water(T_K::Real)
 end
 
 """
-    cp_water(T_K) -> J/(kg·K)
+    cp_water(T_K) -> J/(kg*K)
 
 Specific heat of saturated liquid water (Simantov correlation).
-T_K: temperature in Kelvin.
 
 # Arguments
 - `T_K`: temperature [K]
@@ -50,10 +47,9 @@ function cp_water(T_K::Real)
 end
 
 """
-    mu_water(T_K) -> Pa·s
+    mu_water(T_K) -> Pa*s
 
 Dynamic viscosity of saturated liquid water (Simantov correlation).
-T_K: temperature in Kelvin.
 
 # Arguments
 - `T_K`: temperature [K]
@@ -71,10 +67,9 @@ function mu_water(T_K::Real)
 end
 
 """
-    k_water(T_K) -> W/(m·K)
+    k_water(T_K) -> W/(m*K)
 
 Thermal conductivity of saturated liquid water (Simantov correlation).
-T_K: temperature in Kelvin.
 
 # Arguments
 - `T_K`: temperature [K]
