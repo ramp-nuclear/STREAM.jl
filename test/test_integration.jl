@@ -787,3 +787,116 @@ end
 @testset "COMPAT: Test suite runs automatically via Pkg.test()" begin
     @test STREAM isa Module
 end
+
+# ============================================================================
+# Python `tests/test_general/test_integrations.py` 1:1 ports.
+#
+# Each testset below mirrors one Python integration test: the same system with
+# the same numeric parameters, asserting the same closed-form analytic solution.
+# Where Python queries flows off its Kirchhoff/Junction graph, the same quantity
+# is read through MTK port variables ("same system, queried through MTK").
+# ============================================================================
+
+@testset "pump + resistor in series follows analytic solution" begin
+    # Python: test_pump_resistor_in_series_follows_analytic_solution
+    # Ideal pump (dp) and ideal resistor (r): mdot = dp/r, resistor drops dp, T uniform.
+    T = 300.0
+    dp = 3.0e4
+    r = 1.5e5
+    @named pump = Pump(dp)
+    @named hx = HeatExchanger(T)          # anchors the loop temperature (Python's Tin)
+    @named R = Resistor(r)
+    conns = [
+        connect(pump.port_out, hx.port_in),
+        connect(hx.port_out, R.port_in),
+        connect(R.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:pr_series), pump, hx, R)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.R.port_in.mdot => dp / r])
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol[ssys.R.port_in.mdot], dp / r; rtol=1e-8)              # mdot = dp/r
+    @test isapprox(sol[ssys.R.port_in.P] - sol[ssys.R.port_out.P], dp; rtol=1e-8)  # ΔP_R = dp
+    @test isapprox(sol[ssys.R.port_in.T], T; rtol=1e-8)                      # Tin = T
+end
+
+@testset "parallel resistors with pump against analytic solution" begin
+    # Python: test_parallel_resistors_with_pump_against_analytic_solution
+    # Two resistors in parallel: total flow = p / (r1·r2/(r1+r2)) = p·(r1+r2)/(r1·r2).
+    p = 2.0e4
+    r1 = 1.0e5
+    r2 = 3.0e5
+    @named pump = Pump(p)
+    @named hx = HeatExchanger(300.0)
+    @named R1 = Resistor(r1)
+    @named R2 = Resistor(r2)
+    conns = [
+        connect(pump.port_out, hx.port_in),
+        connect(hx.port_out, R1.port_in, R2.port_in),     # node J0
+        connect(R1.port_out, R2.port_out, pump.port_in),  # node J1
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:par_res), pump, hx, R1, R2)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.R1.port_in.mdot => p / r1, ssys.R2.port_in.mdot => p / r2])
+    @test sol.retcode == ReturnCode.Success
+    total_R = (r1 * r2) / (r1 + r2)
+    total_flow = sol[ssys.pump.port_out.mdot]
+    @test isapprox(abs(total_flow), p / total_R; rtol=1e-8)
+    @test isapprox(sol[ssys.R1.port_in.mdot], p / r1; rtol=1e-8)   # each branch drops p
+    @test isapprox(sol[ssys.R2.port_in.mdot], p / r2; rtol=1e-8)
+end
+
+@testset "resistors in series against analytic solution" begin
+    # Python: test_resistors_in_series_against_analytic_solution
+    # N equal resistors (each total_r/N) in series carry the full flow; each drops p/N.
+    N = 5
+    pressure = 4.0e4
+    total_r = 2.0e5
+    r = total_r / N
+    @named pump = Pump(pressure)
+    @named hx = HeatExchanger(300.0)
+    Rs = [Resistor(r; name=Symbol(:R, i)) for i in 1:N]
+    series = Equation[connect(Rs[i].port_out, Rs[i + 1].port_in) for i in 1:(N - 1)]
+    conns = [
+        connect(pump.port_out, hx.port_in),
+        connect(hx.port_out, Rs[1].port_in),
+        series...,
+        connect(Rs[N].port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:ser_res), pump, hx, Rs...)
+    ssys = mtkcompile(sys)
+    mdot_guess = pressure / total_r
+    sol = solve_steady(ssys, [getproperty(ssys, Symbol(:R, 1)).port_in.mdot => mdot_guess])
+    @test sol.retcode == ReturnCode.Success
+    for i in 1:N
+        Ri = getproperty(ssys, Symbol(:R, i))
+        @test isapprox(sol[Ri.port_in.mdot], pressure / total_r; rtol=1e-8)        # full flow
+        @test isapprox(sol[Ri.port_in.P] - sol[Ri.port_out.P], pressure / N; rtol=1e-8)  # each drops p/N
+        @test isapprox(sol[Ri.port_in.T], 300.0; rtol=1e-8)
+    end
+end
+
+@testset "pump and current source" begin
+    # Python: test_pump_and_current_source
+    # A fixed-pressure pump and a fixed-flow pump in a loop: the current source sets mdot.
+    p = 1.5e4
+    mdot = 0.7
+    @named P1 = Pump(p)               # fixed-pressure
+    @named P2 = Pump(; mdot0=mdot)    # fixed-flow (current source)
+    @named hx = HeatExchanger(300.0)
+    conns = [
+        connect(P1.port_out, hx.port_in),
+        connect(hx.port_out, P2.port_in),
+        connect(P2.port_out, P1.port_in),
+        P1.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:pump_current), P1, P2, hx)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.P2.port_in.mdot => mdot])
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol[ssys.P2.port_in.mdot], mdot; rtol=1e-8)              # current source wins
+    @test isapprox(sol[ssys.P1.port_out.P] - sol[ssys.P1.port_in.P], p; rtol=1e-8)  # pump adds p
+end
