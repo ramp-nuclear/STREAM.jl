@@ -1090,3 +1090,38 @@ end
     end
     @test isapprox(sol[ssys.R2.port_in.mdot], signify * m1; rtol=1e-8)
 end
+
+@testset "local pressure with flow reversal" begin
+    # Python: test_local_pressure_with_flow_reversal
+    # A decaying current source mdot0(t) = 3 - t drives flow through a LocalPressureDrop
+    # (A1=1, A2=2). The flow tracks the source down through zero and reverses; the
+    # direction-dependent loss stays finite across the reversal.
+    # No inertia ⇒ mdot is algebraic (the current source forces it), so the system is
+    # quasi-static: solve the steady algebraic system at each time with mdot0 = 3 - t,
+    # the MTK reading of Python's mdot0(t)=3-t current source over the transient.
+    A1, A2 = 1.0, 2.0
+    Tin = 293.15
+    @named pump = Pump(; mdot0=3.0)
+    @named hx = HeatExchanger(Tin)
+    @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
+    conns = [
+        connect(pump.port_out, hx.port_in),
+        connect(hx.port_out, lpd.port_in),
+        connect(lpd.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:lpd_reversal), pump, hx, lpd)
+    ssys = mtkcompile(sys)
+    mdot = Float64[]
+    for tt in 0.0:1.0:6.0
+        m = 3.0 - tt
+        sol = solve_steady(ssys, Pair{Any,Any}[ssys.pump.mdot0 => m, ssys.lpd.port_in.mdot => m])
+        @test sol.retcode == ReturnCode.Success
+        push!(mdot, sol[ssys.lpd.port_in.mdot])
+    end
+    @test all(mdot[1:4] .>= -1e-6)      # t = 0,1,2,3: forward (≥ 0)
+    @test all(mdot[4:7] .<= 1e-5)       # t = 3,4,5,6: stopped / reversed
+    for (i, tt) in enumerate(0.0:1.0:6.0)
+        @test isapprox(mdot[i], 3.0 - tt; atol=1e-5)   # tracks the current source
+    end
+end

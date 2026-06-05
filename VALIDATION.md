@@ -39,9 +39,9 @@ Status legend: ✅ ported & passing · 🟡 partial/divergent counterpart · ⬜
 | 18 | `test_inertia_with_flapper_in_PCS_coastdown` | ⛔ | C | **`VolumetricFlowResistor`** |
 | 19 | `test_inertia_with_transistor_in_PCS_coastdown` | ⛔ | C | **closure-resistor (`Transistor`)** + VFR |
 | 20 | `test_inertia_with_two_parallel_resistors` | ✅ | C | `VolumetricFlowResistor` (have) |
-| 21 | `test_local_pressure_with_flow_reversal` | ⛔ | C | **`LocalPressureDrop`** |
+| 21 | `test_local_pressure_with_flow_reversal` | ✅ | C | `LocalPressureDrop` (have); quasi-static per-t |
 
-Tally: 10 ✅ · 6 🟡 · 1 ⬜ · 2 ⛔ (target: 21 ✅).
+Tally: 11 ✅ · 6 🟡 · 1 ⬜ · 1 ⛔ (target: 21 ✅).
 
 ## New components to build (decided: implement, for true 1:1)
 
