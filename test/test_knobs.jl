@@ -72,3 +72,64 @@ end
     @test isapprox(sol2[ssys.fluid.A], pi * 0.025^2 / 4; rtol = 1e-9)
     @test isapprox(sol2[ssys.solid.G], 100.0 * 0.025; rtol = 1e-9)
 end
+
+# Flagship: one knob drives the coolant-channel geometry AND the fuel-plate
+# thickness (the same physical dimension) across a coupled CAC + HeatDiffusion
+# solve. Scanning it is rebuild-free (the system is compiled once).
+@testset "flagship: one knob scans CAC geometry + fuel plate, coupled solve" begin
+    nz, nx = 10, 3
+    T_in = 313.15
+    gap = @design_knob gap = 0.00127
+    geom = PipeGeometry_rectangular(0.6, 0.07, gap, 0.07)   # channel gap = knob
+
+    @named pump_l = Pump(3.0e4)
+    @named hx_l = HeatExchanger(T_in)
+    @named cac_l = ChannelAndContacts(; n=nz, geometry=geom)
+    @named pump_r = Pump(3.0e4)
+    @named hx_r = HeatExchanger(T_in)
+    @named cac_r = ChannelAndContacts(; n=nz, geometry=geom)
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=gap, y=0.07,   # plate thickness = SAME knob
+                              rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
+
+    conns = [
+        connect(pump_l.port_out, hx_l.port_in),
+        connect(hx_l.port_out, cac_l.port_in),
+        connect(cac_l.port_out, pump_l.port_in),
+        pump_l.port_in.P ~ 1.0e5,
+        connect(pump_r.port_out, hx_r.port_in),
+        connect(hx_r.port_out, cac_r.port_in),
+        connect(cac_r.port_out, pump_r.port_in),
+        pump_r.port_in.P ~ 1.0e5,
+        [connect(getproperty(hd, Symbol(:thermal_left, i)),
+                 getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
+        [connect(getproperty(hd, Symbol(:thermal_right, i)),
+                 getproperty(cac_r, Symbol(:thermal_left, i))) for i in 1:nz]...,
+        hd.power ~ 1e4,
+    ]
+    @named sys = compose(System(conns, t; name=:knob_mtr),
+                         pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    ssys = mtkcompile(sys; fully_determined=true)
+
+    # the gap is one shared knob across both channels and the plate
+    @test count(p -> occursin("gap", string(p)), parameters(ssys)) == 1
+
+    T_w = 315.0
+    baseop(gv) = vcat(
+        Pair[gap => gv],
+        [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
+        [ssys.cac_l.T[i] => T_w for i in 1:nz],
+        [ssys.cac_r.T[i] => T_w for i in 1:nz],
+        Pair[ssys.cac_l.port_in.mdot => +0.250, ssys.cac_r.port_in.mdot => +0.250],
+    )
+
+    s0 = solve_steady(ssys, baseop(0.00127))   # default gap
+    s1 = solve_steady(ssys, baseop(0.00090))   # narrower gap, no rebuild
+    @test string(s0.retcode) == "Success"
+    @test string(s1.retcode) == "Success"
+
+    # one knob moves the coolant outlet AND the fuel-plate temperature
+    @test isfinite(s0[ssys.cac_l.T_out]) && isfinite(s1[ssys.cac_l.T_out])
+    @test !isapprox(s0[ssys.cac_l.T_out], s1[ssys.cac_l.T_out]; rtol=1e-3)
+    @test !isapprox(s0[ssys.hd.T[5, 2]], s1[ssys.hd.T[5, 2]]; rtol=1e-3)
+end
