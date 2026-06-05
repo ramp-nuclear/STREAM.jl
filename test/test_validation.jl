@@ -252,15 +252,6 @@ try
     append_csv(PARITY_CSV, rows; truncate=false)
 
     for r in rows
-        # KNOWN-GAP rows compare against intentional design differences (see row notes).
-        occursin("KNOWN GAP", r.note) && continue
-        # One-sided heat distribution differs from Python BY DESIGN: Python's
-        # one_sided_connection couples BOTH plate faces; Julia's is truthful to
-        # "one-sided" (one face). That changes plate/wall temperatures, so only the
-        # hydraulics (mdot, dP) are comparable there — not the wall/HTC/q/T rows.
-        if r.scenario == "mtr_one_sided" && !(occursin("mdot", r.qid) || occursin("dP", r.qid))
-            continue
-        end
         @test r.tier != TIER_FAIL
     end
 end
@@ -445,15 +436,6 @@ end
     append_csv(PARITY_CSV, rows; truncate=false)
 
     for r in rows
-        # KNOWN-GAP rows compare against intentional design differences (see row notes).
-        occursin("KNOWN GAP", r.note) && continue
-        # One-sided heat distribution differs from Python BY DESIGN: Python's
-        # one_sided_connection couples BOTH plate faces; Julia's is truthful to
-        # "one-sided" (one face). That changes plate/wall temperatures, so only the
-        # hydraulics (mdot, dP) are comparable there — not the wall/HTC/q/T rows.
-        if r.scenario == "mtr_one_sided" && !(occursin("mdot", r.qid) || occursin("dP", r.qid))
-            continue
-        end
         @test r.tier != TIER_FAIL
     end
     end
@@ -610,27 +592,18 @@ end
     append_csv(PARITY_CSV, rows; truncate=false)
 
     for r in rows
-        # KNOWN-GAP rows compare against intentional design differences (see row notes).
-        occursin("KNOWN GAP", r.note) && continue
-        # One-sided heat distribution differs from Python BY DESIGN: Python's
-        # one_sided_connection couples BOTH plate faces; Julia's is truthful to
-        # "one-sided" (one face). That changes plate/wall temperatures, so only the
-        # hydraulics (mdot, dP) are comparable there — not the wall/HTC/q/T rows.
-        if r.scenario == "mtr_one_sided" && !(occursin("mdot", r.qid) || occursin("dP", r.qid))
-            continue
-        end
         @test r.tier != TIER_FAIL
     end
     end
 end
 
 @testset "Python parity: MTR one-sided" begin
-    # KNOWN GAP: Python one_sided_connection distributes heat to BOTH plate
-    # faces (Python bug). Julia correctly couples only the left face. Plate-T tier (d)
-    # is widened to hard_ceiling=0.20 with KNOWN GAP note; T_out_l widened to 0.05.
-    # The analytical T_max check is the actual correctness gate.
-    #
-    # Adiabatic right face emits T_wall = T_cool, q_density = 0 in the reference
+    # Edge-channel coupling via single_channel_connection: the channel is heated on its
+    # connected (left) face only, while the fuel plate is cooled on BOTH faces — the near
+    # face conjugately through the channel, the far face by a one-way ConvectiveBoundary
+    # fed from the channel's connected-side h_tc and coolant T (the equivalent-twin
+    # reduction Python's one_sided_connection models). With both faces cooled identically
+    # the plate is symmetric and every row matches the Python reference at normal tolerance.
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
@@ -653,125 +626,96 @@ end
         rho_s=2700.0, cp_s=900.0, k_s=200.0,
         power_shape=ps, power=1e4,
     )
+    scc = single_channel_connection(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
+    cac = scc.cac_l
+    fuel = scc.hd
     conns = [
         connect(pump_l.port_out, hx_l.port_in),
-        connect(hx_l.port_out, cac_l.port_in),
-        connect(cac_l.port_out, pump_l.port_in),
+        connect(hx_l.port_out, cac.port_in),
+        connect(cac.port_out, pump_l.port_in),
         pump_l.port_in.P ~ 1.0e5,
-        [connect(getproperty(hd, Symbol(:thermal_left, i)),
-                 getproperty(cac_l, Symbol(:thermal_left, i))) for i in 1:nz]...,
-        hd.power ~ 1e4,
+        fuel.power ~ 1e4,
     ]
-    @named sys = compose(System(conns, t; name=:mtr_onesided_parity), pump_l, hx_l, cac_l, hd)
+    @named sys = compose(System(conns, t; name=:mtr_onesided_parity), pump_l, hx_l, scc)
     ssys = mtkcompile(sys; fully_determined=true)
 
+    cac_s = ssys.scc.cac_l
+    fuel_s = ssys.scc.hd
     T_w = 317.0
     op = vcat(
-        [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
-        [ssys.cac_l.T[i] => T_w for i in 1:nz],
-        [ssys.cac_l.port_in.mdot => +0.250],
+        [fuel_s.T[i, j] => T_w for i in 1:nz for j in 1:nx],
+        [cac_s.T[i] => T_w for i in 1:nz],
+        [cac_s.port_in.mdot => +0.250],
     )
     rows = ParityRow[]
-    sol = try
-        s = solve_steady(ssys, op)
-        @test s.retcode == ReturnCode.Success
-        @test all(isfinite, [s[ssys.hd.T[i, j]] for i in 1:nz for j in 1:nx])
-        s
-    catch e
-        @warn "mtr_one_sided solve_steady raised; emitting sentinel row" exception=e
-        nothing
-    end
-    if sol === nothing
-        push!(rows, parity_check("mtr_one_sided", "solver_error",
-                                 NaN, NaN; hard_ceiling=Inf,
-                                 note="Pre-existing MTK API mismatch — deferred"))
-        print_drift_table(rows)
-        append_csv(PARITY_CSV, rows; truncate=false)
-    else
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    @test all(isfinite, [sol[fuel_s.T[i, j]] for i in 1:nz for j in 1:nx])
 
     push!(rows, parity_check("mtr_one_sided", "T_out_l",
-                             sol[ssys.cac_l.T_out], PARITY_MTR_ONESIDED_T_OUT_L;
-                             hard_ceiling=0.05,
-                             note="KNOWN GAP — Python one_sided distributes heat to both faces"))
+                             sol[cac_s.T_out], PARITY_MTR_ONESIDED_T_OUT_L))
     push!(rows, parity_check("mtr_one_sided", "mdot_l",
-                             abs(sol[ssys.cac_l.port_in.mdot]), PARITY_MTR_ONESIDED_MDOT_L))
+                             abs(sol[cac_s.port_in.mdot]), PARITY_MTR_ONESIDED_MDOT_L))
     push!(rows, parity_check("mtr_one_sided", "dP_loop",
-                             sol[ssys.cac_l.dP], PARITY_MTR_ONESIDED_DP))
+                             sol[cac_s.dP], PARITY_MTR_ONESIDED_DP))
 
     for i in 1:nz
         push!(rows, parity_check("mtr_one_sided", "T_l[$i]",
-                                 sol[ssys.cac_l.T[i]], PARITY_MTR_ONESIDED_T_CELLS_L[i];
-                                 hard_ceiling=0.05,
-                                 note="KNOWN GAP — Python both-faces distribution"))
+                                 sol[cac_s.T[i]], PARITY_MTR_ONESIDED_T_CELLS_L[i]))
     end
 
     dz = 0.6 / nz
     heated_part = geom_mtr.heated_parts[1]
     for i in 1:nz
         push!(rows, parity_check("mtr_one_sided", "T_wall_left_l[$i]",
-                                 sol[getproperty(ssys.cac_l, Symbol(:thermal_left, i)).T],
-                                 PARITY_MTR_ONESIDED_T_WALL_LEFT_L[i];
-                                 hard_ceiling=0.05,
-                                 note="KNOWN GAP — Python both-faces distribution"))
+                                 sol[getproperty(cac_s, Symbol(:thermal_left, i)).T],
+                                 PARITY_MTR_ONESIDED_T_WALL_LEFT_L[i]))
         push!(rows, parity_check("mtr_one_sided", "T_wall_right_l[$i]",
-                                 sol[getproperty(ssys.cac_l, Symbol(:thermal_right, i)).T],
+                                 sol[getproperty(cac_s, Symbol(:thermal_right, i)).T],
                                  PARITY_MTR_ONESIDED_T_WALL_RIGHT_L[i]))
-        h_eff_cac_l = _h_eff(sol, ssys.cac_l, i)
+        h_eff_cac_l = _h_eff(sol, cac_s, i)
         push!(rows, parity_check("mtr_one_sided", "h_tc_left_l[$i]",
                                  h_eff_cac_l,
                                  PARITY_MTR_ONESIDED_H_TC_LEFT_L[i];
-                                 hard_ceiling=0.05,
                                  note="connected-side h (heat-transferring face) — mirrors Python _other_if_none"))
         push!(rows, parity_check("mtr_one_sided", "h_tc_right_l[$i]",
                                  h_eff_cac_l,
                                  PARITY_MTR_ONESIDED_H_TC_RIGHT_L[i];
-                                 hard_ceiling=0.05,
                                  note="connected-side h (heat-transferring face) — mirrors Python _other_if_none"))
         push!(rows, parity_check("mtr_one_sided", "q_left_l[$i]",
-                                 sol[ssys.cac_l.q_wall_left[i]] / (heated_part * dz),
-                                 PARITY_MTR_ONESIDED_Q_LEFT_L[i];
-                                 hard_ceiling=0.50,
-                                 note="KNOWN GAP — Python both-faces; Julia all-q via left only"))
+                                 sol[cac_s.q_wall_left[i]] / (heated_part * dz),
+                                 PARITY_MTR_ONESIDED_Q_LEFT_L[i]))
         push!(rows, parity_check("mtr_one_sided", "q_right_l[$i]",
-                                 sol[ssys.cac_l.q_wall_right[i]] / (heated_part * dz),
+                                 sol[cac_s.q_wall_right[i]] / (heated_part * dz),
                                  PARITY_MTR_ONESIDED_Q_RIGHT_L[i]))
     end
 
     for z in 1:nz, x in 1:nx
         push!(rows, parity_check("mtr_one_sided", "T_plate[$(z)_$(x)]",
-                                 sol[ssys.hd.T[z, x]],
-                                 PARITY_MTR_ONESIDED_T_PLATE[z, x];
-                                 hard_ceiling=0.20,
-                                 note="KNOWN GAP — Python both-faces; T_max asserted analytically"))
+                                 sol[fuel_s.T[z, x]],
+                                 PARITY_MTR_ONESIDED_T_PLATE[z, x]))
     end
 
     print_drift_table(rows)
     append_csv(PARITY_CSV, rows; truncate=false)
     for r in rows
-        # KNOWN-GAP rows compare against intentional design differences (see row notes).
-        occursin("KNOWN GAP", r.note) && continue
-        # One-sided heat distribution differs from Python BY DESIGN: Python's
-        # one_sided_connection couples BOTH plate faces; Julia's is truthful to
-        # "one-sided" (one face). That changes plate/wall temperatures, so only the
-        # hydraulics (mdot, dP) are comparable there — not the wall/HTC/q/T rows.
-        if r.scenario == "mtr_one_sided" && !(occursin("mdot", r.qid) || occursin("dP", r.qid))
-            continue
-        end
         @test r.tier != TIER_FAIL
     end
 
-    T_max_numerical = sol[ssys.hd.T[nz ÷ 2, nx]]
-    left_syms = [getproperty(ssys.cac_l, Symbol(:thermal_left, i)) for i in 1:nz]
-    T_wall_vals = [sol[left_syms[i].T] for i in 1:nz]
-    T_wall_avg = sum(T_wall_vals) / nz
+    # Independent analytic anchor: with both faces cooled symmetrically the plate has a
+    # parabolic lateral profile peaking at the centre column, rising power*Lx/(8*k*A)
+    # above the wall (half-thickness conduction, both faces shedding equal flux).
     A_plate = 0.07 * 0.6
-    T_max_analytical = T_wall_avg + 1e4 * 0.00127 / (2 * 200.0 * A_plate)
-    @test isapprox(T_max_numerical, T_max_analytical; rtol=0.01)
+    mid = nz ÷ 2
+    centre = nx ÷ 2 + 1
+    T_centre_numerical = sol[fuel_s.T[mid, centre]]
+    T_wall_mid = sol[getproperty(cac_s, Symbol(:thermal_left, mid)).T]
+    T_centre_analytical = T_wall_mid + 1e4 * 0.00127 / (8 * 200.0 * A_plate)
+    @test isapprox(T_centre_numerical, T_centre_analytical; atol=0.05)
 
-    right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
-    for i in 1:nz
-        @test isapprox(sol[right_syms[i].Q_flow], 0.0; atol=1e-6)
-    end
+    # Both-faces signature: each plate row is laterally symmetric (left col == right col).
+    for z in 1:nz
+        @test isapprox(sol[fuel_s.T[z, 1]], sol[fuel_s.T[z, nx]]; rtol=1e-6)
     end
 
 end

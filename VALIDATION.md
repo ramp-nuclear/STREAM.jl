@@ -53,14 +53,29 @@ Tally: 0 ✅ · 6 🟡 · 8 ⬜ · 5 ⛔ (target: 21 ✅).
 
 Each is a real physics component and gets its own unit tests in the file mirroring its source, plus the integration test that uses it.
 
-## `one_sided_connection` split (precedes the port; clears `mtr_one_sided` parity)
+## `one_sided_connection` split (precedes the port; clears `mtr_one_sided` parity) — ✅ DONE
 
-Julia's current `one_sided_connection` couples one fuel face (the other adiabatic) —
-truthful one-sided. Python's couples the fuel on both faces to one channel. The Julia
-parity code currently treats Python's as a bug and diverges, which is the entire 20 FAIL /
-72 GRAY. Plan: keep the truthful helper, add a Python-matching both-faces helper, switch the
-`mtr_one_sided` parity scenario to it → parity goes clean. (Whether Python's convention is
-physically right is a separate ground-truth note, not a blocker for the 1:1 proof.)
+Julia's `one_sided_connection` couples one fuel face (the other adiabatic) — truthful
+one-sided; kept as-is. Python's `one_sided_connection` is an edge-channel reduced model:
+the channel is heated on its connected face only, but the fuel plate is cooled on BOTH
+faces — the far face by the *connected-side* h (Python's `_other_if_none` copies it) into
+an unmodelled equivalent twin. The old parity code treated this as a "Python bug" and
+diverged, which was the entire 20 FAIL / 72 GRAY.
+
+Shipped:
+- `ConvectiveBoundary(; name, area)` (src/components/sources.jl) — one-way convective sink
+  `Q_flow = h·area·(T_wall − T_fluid)`, fed by externally-bound `h` and `T_fluid`.
+- `single_channel_connection(channel, fuel, geometry; fuel_side, name)`
+  (src/composition/helpers.jl) — near face conjugate-connected, far face cooled by a
+  per-cell `ConvectiveBoundary` bound to the channel's connected-side `h_tc` and coolant `T`.
+- Switched the `mtr_one_sided` parity build to it; removed every widened tolerance, KNOWN-GAP
+  note, and the skip-logic. Fixed the mislabeled "Python bug" comments in
+  test/test_validation.jl and test/generate_mtr_reference.py.
+
+Result: `mtr_one_sided`'s 20 FAIL + 72 GRAY → all CLEAN (plate-T matches Python bit-on and
+is laterally symmetric, the both-faces signature). Parity harness 549/549, suite green.
+Unit tests: `ConvectiveBoundary` in test_misc.jl, `single_channel_connection` in
+test_composition.jl.
 
 ## Strict 1:1 — disposition of current Julia-only tests in `test_integration.jl`
 

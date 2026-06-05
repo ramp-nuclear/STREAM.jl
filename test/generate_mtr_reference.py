@@ -454,10 +454,11 @@ q_left_l_os       = list(ch_l_03_state[ChannelVar.heatflux_left])
 T_wall_right_l_os = list(T_cells_l_K_onesided)
 q_right_l_os      = [0.0] * NZ
 
-# tier (d) -- plate T(z,x). KNOWN GAP:
-# Python's one_sided_connection distributes heat to BOTH plate faces (acknowledged
-# Python bug), so this Python plate-T differs from Julia's correct one-sided plate-T.
-# the one-sided testset compares Julia plate-T against analytical T_max formula instead.
+# tier (d) -- plate T(z,x). one_sided_connection is an edge-channel reduced model:
+# the channel is heated on its connected face only, but the plate is cooled on BOTH
+# faces (the far face by the channel's connected-side h via _other_if_none, into an
+# unmodelled equivalent twin). Julia reproduces this with single_channel_connection,
+# so the plate-T matches this reference at normal tolerance.
 T_plate_K_onesided = state_03[fuel_03.name]["T"] + 273.15
 assert not np.isnan(T_plate_K_onesided).any(), "one-sided plate has NaN"
 
@@ -543,10 +544,9 @@ print()
 # Block 3: One-sided scenario (left channel only)
 print("# --- begin paste: test/data/python_parity_reference.jl MTR one-sided ---")
 print(f"# One-sided MTR: only left channel; T_inlet_l = {T_INLET_L_K} K")
-print(f"# KNOWN GAP:")
-print(f"#   Python one_sided_connection distributes heat to BOTH plate faces (acknowledged Python bug).")
-print(f"#   the one-sided testset compares Julia plate-T against analytical T_max formula, NOT Python plate-T.")
-print(f"#   Tier (a) T_out_l is also flagged as known-gap; the one-sided testset documents the magnitude.")
+print(f"# Edge-channel reduced model: channel heated on its connected face only, plate cooled")
+print(f"# on BOTH faces (far face via the connected-side h, into an unmodelled equivalent twin).")
+print(f"# Julia reproduces this with single_channel_connection; all rows match at normal tolerance.")
 _emit_julia_scalar("PARITY_MTR_ONESIDED_T_OUT_L", T_outlet_l_K_onesided)
 _emit_julia_scalar("PARITY_MTR_ONESIDED_MDOT_L",  mdot_l_onesided)
 _emit_julia_scalar("PARITY_MTR_ONESIDED_DP",      DP_PUMP)
@@ -566,4 +566,4 @@ print("Diagnostics (NOT pasted -- for human inspection only)")
 print("=" * 72)
 print(f"  SYM:      T_out_l = {T_outlet_l_K_sym:.4f} K, mdot_l = {mdot_l_sym:.6f} kg/s, T_plate_center = {T_plate_K_sym[NZ//2, NX//2]:.4f} K")
 print(f"  ASYM:     T_out_l = {T_outlet_l_K_asym:.4f} K, T_out_r = {T_outlet_r_K_asym:.4f} K, T_plate_center = {T_plate_K_asym[NZ//2, NX//2]:.4f} K")
-print(f"  ONESIDED: T_out_l = {T_outlet_l_K_onesided:.4f} K (KNOWN GAP -- Python both-faces dist), T_plate_center = {T_plate_K_onesided[NZ//2, NX//2]:.4f} K")
+print(f"  ONESIDED: T_out_l = {T_outlet_l_K_onesided:.4f} K (edge-channel, plate cooled both faces), T_plate_center = {T_plate_K_onesided[NZ//2, NX//2]:.4f} K")

@@ -16,17 +16,17 @@ simple_loop,T_wall_left[1],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.
 simple_loop,T_wall_right[1],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[1],3.7559980864e+04,3.7559980869e+04,5.4196643759e-06,1.442936e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[1],3.7559980864e+04,3.7559980869e+04,5.4196643759e-06,1.442936e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[1],2.1926332226e+06,2.1926332147e+06,7.9265795648e-03,3.615096e-09,CLEAN,0.0200,
-simple_loop,q_density_total[1],2.1926332226e+06,2.1926332147e+06,7.9265795648e-03,3.615096e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,q_density_left[1],2.1926332226e+06,2.1926332147e+06,7.9265800305e-03,3.615096e-09,CLEAN,0.0200,
+simple_loop,q_density_total[1],2.1926332226e+06,2.1926332147e+06,7.9265800305e-03,3.615096e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[2],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[2],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[2],3.7744135437e+04,3.7744135442e+04,4.5780398068e-06,1.212914e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[2],3.7744135437e+04,3.7744135442e+04,4.5780398068e-06,1.212914e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[2],2.1434965551e+06,2.1434965484e+06,6.7133381963e-03,3.131957e-09,CLEAN,0.0200,
-simple_loop,q_density_total[2],2.1434965551e+06,2.1434965484e+06,6.7133381963e-03,3.131957e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,q_density_left[2],2.1434965551e+06,2.1434965484e+06,6.7133386619e-03,3.131957e-09,CLEAN,0.0200,
+simple_loop,q_density_total[2],2.1434965551e+06,2.1434965484e+06,6.7133386619e-03,3.131957e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[3],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[3],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[3],3.7923475012e+04,3.7923475015e+04,3.5654884414e-06,9.401798e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_left[3],3.7923475012e+04,3.7923475015e+04,3.5654811654e-06,9.401779e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[3],3.7923475012e+04,3.7923475015e+04,3.5654884414e-06,9.401798e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,q_density_left[3],2.0948793483e+06,2.0948793431e+06,5.2293532062e-03,2.496255e-09,CLEAN,0.0200,
 simple_loop,q_density_total[3],2.0948793483e+06,2.0948793431e+06,5.2293532062e-03,2.496255e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
@@ -34,8 +34,8 @@ simple_loop,T_wall_left[4],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.
 simple_loop,T_wall_right[4],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[4],3.8098088972e+04,3.8098088974e+04,2.3879765649e-06,6.267969e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[4],3.8098088972e+04,3.8098088974e+04,2.3879765649e-06,6.267969e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[4],2.0468128274e+06,2.0468128240e+06,3.4719631076e-03,1.696278e-09,CLEAN,0.0200,
-simple_loop,q_density_total[4],2.0468128274e+06,2.0468128240e+06,3.4719631076e-03,1.696278e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,q_density_left[4],2.0468128274e+06,2.0468128240e+06,3.4719635732e-03,1.696278e-09,CLEAN,0.0200,
+simple_loop,q_density_total[4],2.0468128274e+06,2.0468128240e+06,3.4719635732e-03,1.696278e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[5],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[5],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[5],3.8268067713e+04,3.8268067714e+04,1.0569056030e-06,2.761847e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
@@ -45,15 +45,15 @@ simple_loop,q_density_total[5],1.9993255684e+06,1.9993255669e+06,1.4435341582e-0
 simple_loop,T_wall_left[6],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[6],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[6],3.8433502399e+04,3.8433502399e+04,4.0803570300e-07,1.061667e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[6],3.8433502399e+04,3.8433502399e+04,4.0803570300e-07,1.061667e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[6],3.8433502399e+04,3.8433502399e+04,4.0804297896e-07,1.061686e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,q_density_left[6],1.9524435868e+06,1.9524435877e+06,8.4393611178e-04,4.322461e-10,CLEAN,0.0200,
 simple_loop,q_density_total[6],1.9524435868e+06,1.9524435877e+06,8.4393611178e-04,4.322461e-10,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[7],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[7],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[7],3.8594484732e+04,3.8594484731e+04,1.9770086510e-06,5.122516e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[7],3.8594484732e+04,3.8594484731e+04,1.9770086510e-06,5.122516e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[7],1.9061904309e+06,1.9061904343e+06,3.3647180535e-03,1.765153e-09,CLEAN,0.0200,
-simple_loop,q_density_total[7],1.9061904309e+06,1.9061904343e+06,3.3647180535e-03,1.765153e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,h_tc_left[7],3.8594484732e+04,3.8594484731e+04,1.9770159270e-06,5.122535e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[7],3.8594484732e+04,3.8594484731e+04,1.9770159270e-06,5.122535e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[7],1.9061904309e+06,1.9061904343e+06,3.3647178207e-03,1.765153e-09,CLEAN,0.0200,
+simple_loop,q_density_total[7],1.9061904309e+06,1.9061904343e+06,3.3647178207e-03,1.765153e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[8],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[8],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[8],3.8751106743e+04,3.8751106739e+04,3.6080600694e-06,9.310857e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
@@ -63,12 +63,12 @@ simple_loop,q_density_total[8],1.8605872765e+06,1.8605872826e+06,6.0757659376e-0
 simple_loop,T_wall_left[9],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[9],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[9],3.8903460591e+04,3.8903460586e+04,5.2467221394e-06,1.348652e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[9],3.8903460591e+04,3.8903460586e+04,5.2467221394e-06,1.348652e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[9],3.8903460591e+04,3.8903460586e+04,5.2467148635e-06,1.348650e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,q_density_left[9],1.8156530242e+06,1.8156530332e+06,8.9137947652e-03,4.909415e-09,CLEAN,0.0200,
 simple_loop,q_density_total[9],1.8156530242e+06,1.8156530332e+06,8.9137947652e-03,4.909415e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[10],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[10],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[10],3.9051638388e+04,3.9051638381e+04,6.8266599555e-06,1.748111e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_left[10],3.9051638388e+04,3.9051638381e+04,6.8266672315e-06,1.748113e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[10],3.9051638388e+04,3.9051638381e+04,6.8266672315e-06,1.748113e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,q_density_left[10],1.7714043974e+06,1.7714044092e+06,1.1793112382e-02,6.657493e-09,CLEAN,0.0200,
 simple_loop,q_density_total[10],1.7714043974e+06,1.7714044092e+06,1.1793112382e-02,6.657493e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
@@ -102,36 +102,36 @@ mtr_symmetric,T_wall_right_l[1],3.2014454411e+02,3.2014454410e+02,5.0600306167e-
 mtr_symmetric,h_tc_left_l[1],1.8256631398e+04,1.8256631398e+04,1.9664366846e-07,1.077108e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_l[1],1.8256631398e+04,1.8256631398e+04,1.9664366846e-07,1.077108e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[1],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[1],1.1904761905e+05,1.1904761905e+05,5.0837115850e-07,4.270318e-12,CLEAN,0.0200,
+mtr_symmetric,q_right_l[1],1.1904761905e+05,1.1904761905e+05,5.0840026233e-07,4.270562e-12,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_r[1],3.2014454411e+02,3.2014454410e+02,5.0600306167e-09,1.580546e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_r[1],3.1362375632e+02,3.1362375632e+02,5.1815050028e-09,1.652140e-11,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_r[1],1.8256631398e+04,1.8256631398e+04,1.9664366846e-07,1.077108e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_r[1],1.8256631398e+04,1.8256631398e+04,1.9664366846e-07,1.077108e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[1],1.1904761905e+05,1.1904761905e+05,5.0837115850e-07,4.270318e-12,CLEAN,0.0200,
+mtr_symmetric,q_left_r[1],1.1904761905e+05,1.1904761905e+05,5.0838571042e-07,4.270440e-12,CLEAN,0.0200,
 mtr_symmetric,q_right_r[1],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_l[2],3.1409750279e+02,3.1409750280e+02,3.9947849473e-09,1.271830e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_l[2],3.2059314129e+02,3.2059314130e+02,3.4991671782e-09,1.091467e-11,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_l[2],1.8327315941e+04,1.8327315941e+04,1.6832927940e-08,9.184612e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_l[2],1.8327315941e+04,1.8327315941e+04,1.6832927940e-08,9.184612e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[2],1.1904761905e+05,1.1904761904e+05,9.5689611044e-06,8.037927e-11,CLEAN,0.0200,
+mtr_symmetric,q_right_l[2],1.1904761905e+05,1.1904761904e+05,9.5689756563e-06,8.037940e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_r[2],3.2059314129e+02,3.2059314130e+02,3.4991671782e-09,1.091467e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_r[2],3.1409750279e+02,3.1409750280e+02,3.9947849473e-09,1.271830e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[2],1.8327315941e+04,1.8327315941e+04,1.6832927940e-08,9.184612e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[2],1.8327315941e+04,1.8327315941e+04,1.6832927940e-08,9.184612e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[2],1.1904761905e+05,1.1904761904e+05,9.5689465525e-06,8.037915e-11,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[2],1.8327315941e+04,1.8327315941e+04,1.6829289962e-08,9.182627e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[2],1.8327315941e+04,1.8327315941e+04,1.6829289962e-08,9.182627e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[2],1.1904761905e+05,1.1904761904e+05,9.5689756563e-06,8.037940e-11,CLEAN,0.0200,
 mtr_symmetric,q_right_r[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_l[3],3.1457123906e+02,3.1457123907e+02,9.3680796454e-09,2.978047e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_l[3],3.2104195802e+02,3.2104195803e+02,8.9722789198e-09,2.794737e-11,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_l[3],1.8397896697e+04,1.8397896697e+04,2.6337875170e-07,1.431570e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_l[3],1.8397896697e+04,1.8397896697e+04,2.6337875170e-07,1.431570e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[3],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[3],1.1904761905e+05,1.1904761904e+05,6.0821184888e-06,5.108980e-11,CLEAN,0.0200,
+mtr_symmetric,q_right_l[3],1.1904761905e+05,1.1904761904e+05,6.0821475927e-06,5.109004e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_r[3],3.2104195802e+02,3.2104195803e+02,8.9722789198e-09,2.794737e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_r[3],3.1457123906e+02,3.1457123907e+02,9.3680796454e-09,2.978047e-11,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_r[3],1.8397896697e+04,1.8397896697e+04,2.6337875170e-07,1.431570e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_r[3],1.8397896697e+04,1.8397896697e+04,2.6337875170e-07,1.431570e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[3],1.1904761905e+05,1.1904761904e+05,6.0821330408e-06,5.108992e-11,CLEAN,0.0200,
+mtr_symmetric,q_left_r[3],1.1904761905e+05,1.1904761904e+05,6.0821475927e-06,5.109004e-11,CLEAN,0.0200,
 mtr_symmetric,q_right_r[3],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_l[4],3.1504496477e+02,3.1504496478e+02,1.0547580587e-08,3.347960e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_l[4],3.2149099113e+02,3.2149099114e+02,1.1373458619e-08,3.537722e-11,CLEAN,0.0200,
@@ -155,26 +155,26 @@ mtr_symmetric,T_wall_left_r[5],3.2194023747e+02,3.2194023748e+02,9.6587200460e-0
 mtr_symmetric,T_wall_right_r[5],3.1551867959e+02,3.1551867959e+02,7.7155277722e-09,2.445347e-11,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_r[5],1.8538744202e+04,1.8538744203e+04,1.0278999980e-06,5.544604e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_r[5],1.8538744202e+04,1.8538744203e+04,1.0278999980e-06,5.544604e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[5],1.1904761905e+05,1.1904761909e+05,4.3238513172e-05,3.632035e-10,CLEAN,0.0200,
+mtr_symmetric,q_left_r[5],1.1904761905e+05,1.1904761909e+05,4.3238498620e-05,3.632034e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[5],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_l[6],3.1599238314e+02,3.1599238315e+02,1.5307364265e-09,4.844219e-12,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_l[6],3.2238969398e+02,3.2238969398e+02,2.4895143724e-09,7.722066e-12,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_l[6],1.8609009659e+04,1.8609009660e+04,4.6220884542e-07,2.483791e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_l[6],1.8609009659e+04,1.8609009660e+04,4.6220884542e-07,2.483791e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[6],1.1904761905e+05,1.1904761907e+05,2.0257459255e-05,1.701627e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[6],1.1904761905e+05,1.1904761907e+05,2.0257473807e-05,1.701628e-10,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_r[6],3.2238969398e+02,3.2238969398e+02,2.4895143724e-09,7.722066e-12,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_r[6],3.1599238314e+02,3.1599238315e+02,1.5307364265e-09,4.844219e-12,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[6],1.8609009659e+04,1.8609009660e+04,4.6220884542e-07,2.483791e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[6],1.8609009659e+04,1.8609009660e+04,4.6220884542e-07,2.483791e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[6],1.1904761905e+05,1.1904761907e+05,2.0257473807e-05,1.701628e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[6],1.8609009659e+04,1.8609009660e+04,4.6220520744e-07,2.483771e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[6],1.8609009659e+04,1.8609009660e+04,4.6220520744e-07,2.483771e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[6],1.1904761905e+05,1.1904761907e+05,2.0257459255e-05,1.701627e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_l[7],3.1646607510e+02,3.1646607509e+02,5.8679461290e-09,1.854210e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_l[7],3.2283935759e+02,3.2283935758e+02,7.6191213338e-09,2.360035e-11,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_l[7],1.8679168744e+04,1.8679168743e+04,6.4541382017e-07,3.455260e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_l[7],1.8679168744e+04,1.8679168743e+04,6.4541382017e-07,3.455260e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[7],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[7],1.1904761905e+05,1.1904761901e+05,3.5885546822e-05,3.014386e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[7],1.1904761905e+05,1.1904761901e+05,3.5885532270e-05,3.014385e-10,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_r[7],3.2283935759e+02,3.2283935758e+02,7.6191213338e-09,2.360035e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_r[7],3.1646607510e+02,3.1646607509e+02,5.8679461290e-09,1.854210e-11,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_r[7],1.8679168744e+04,1.8679168743e+04,6.4541382017e-07,3.455260e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
@@ -186,23 +186,23 @@ mtr_symmetric,T_wall_right_l[8],3.2328922530e+02,3.2328922528e+02,1.1864301541e-
 mtr_symmetric,h_tc_left_l[8],1.8749220838e+04,1.8749220837e+04,7.0103487815e-07,3.739008e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_l[8],1.8749220838e+04,1.8749220837e+04,7.0103487815e-07,3.739008e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[8],1.1904761905e+05,1.1904761903e+05,2.2210238967e-05,1.865660e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[8],1.1904761905e+05,1.1904761903e+05,2.2210209863e-05,1.865658e-10,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_r[8],3.2328922530e+02,3.2328922528e+02,1.1864301541e-08,3.669872e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_r[8],3.1693975509e+02,3.1693975508e+02,1.0958331131e-08,3.457544e-11,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_r[8],1.8749220838e+04,1.8749220837e+04,7.0103487815e-07,3.739008e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_r[8],1.8749220838e+04,1.8749220837e+04,7.0103487815e-07,3.739008e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[8],1.1904761905e+05,1.1904761903e+05,2.2210224415e-05,1.865659e-10,CLEAN,0.0200,
+mtr_symmetric,q_left_r[8],1.1904761905e+05,1.1904761903e+05,2.2210238967e-05,1.865660e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_l[9],3.1741342277e+02,3.1741342277e+02,8.2317797023e-09,2.593394e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_l[9],3.2373929414e+02,3.2373929412e+02,1.1536030797e-08,3.563371e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[9],1.8819165334e+04,1.8819165333e+04,1.2671771401e-06,6.733440e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[9],1.8819165334e+04,1.8819165333e+04,1.2671771401e-06,6.733440e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_left_l[9],1.8819165334e+04,1.8819165333e+04,1.2671735021e-06,6.733420e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[9],1.8819165334e+04,1.8819165333e+04,1.2671735021e-06,6.733420e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_symmetric,q_right_l[9],1.1904761905e+05,1.1904761898e+05,7.0067500928e-05,5.885670e-10,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_r[9],3.2373929414e+02,3.2373929412e+02,1.1536030797e-08,3.563371e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_r[9],3.1741342277e+02,3.1741342277e+02,8.2317797023e-09,2.593394e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[9],1.8819165334e+04,1.8819165333e+04,1.2671771401e-06,6.733440e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[9],1.8819165334e+04,1.8819165333e+04,1.2671771401e-06,6.733440e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_left_r[9],1.8819165334e+04,1.8819165333e+04,1.2671735021e-06,6.733420e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[9],1.8819165334e+04,1.8819165333e+04,1.2671735021e-06,6.733420e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_r[9],1.1904761905e+05,1.1904761898e+05,7.0067500928e-05,5.885670e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_l[10],3.1788707779e+02,3.1788707780e+02,1.0410701634e-08,3.274968e-11,CLEAN,0.0200,
@@ -210,7 +210,7 @@ mtr_symmetric,T_wall_right_l[10],3.2418956117e+02,3.2418956119e+02,1.3389581000e
 mtr_symmetric,h_tc_left_l[10],1.8889001637e+04,1.8889001639e+04,1.2163509382e-06,6.439467e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,h_tc_right_l[10],1.8889001637e+04,1.8889001639e+04,1.2163509382e-06,6.439467e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[10],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[10],1.1904761905e+05,1.1904761911e+05,6.3820974901e-05,5.360962e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[10],1.1904761905e+05,1.1904761911e+05,6.3820989453e-05,5.360963e-10,CLEAN,0.0200,
 mtr_symmetric,T_wall_left_r[10],3.2418956117e+02,3.2418956119e+02,1.3389581000e-08,4.130170e-11,CLEAN,0.0200,
 mtr_symmetric,T_wall_right_r[10],3.1788707779e+02,3.1788707780e+02,1.0410701634e-08,3.274968e-11,CLEAN,0.0200,
 mtr_symmetric,h_tc_left_r[10],1.8889001637e+04,1.8889001639e+04,1.2163509382e-06,6.439467e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
@@ -221,7 +221,7 @@ mtr_symmetric,T_plate[1_1],3.2027053617e+02,3.2027053617e+02,5.0520725381e-09,1.
 mtr_symmetric,T_plate[1_2],3.2035453088e+02,3.2035453088e+02,5.1467736739e-09,1.606587e-11,CLEAN,0.0200,
 mtr_symmetric,T_plate[1_3],3.2027053617e+02,3.2027053617e+02,5.0520725381e-09,1.577439e-11,CLEAN,0.0200,
 mtr_symmetric,T_plate[2_1],3.2071913336e+02,3.2071913336e+02,3.5071252569e-09,1.093519e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[2_2],3.2080312806e+02,3.2080312807e+02,3.5123548514e-09,1.094863e-11,CLEAN,0.0200,
+mtr_symmetric,T_plate[2_2],3.2080312806e+02,3.2080312807e+02,3.5124116948e-09,1.094881e-11,CLEAN,0.0200,
 mtr_symmetric,T_plate[2_3],3.2071913336e+02,3.2071913336e+02,3.5071252569e-09,1.093519e-11,CLEAN,0.0200,
 mtr_symmetric,T_plate[3_1],3.2116795009e+02,3.2116795009e+02,8.9802369985e-09,2.796119e-11,CLEAN,0.0200,
 mtr_symmetric,T_plate[3_2],3.2125194479e+02,3.2125194480e+02,8.9855234364e-09,2.797033e-11,CLEAN,0.0200,
@@ -236,7 +236,7 @@ mtr_symmetric,T_plate[6_1],3.2251568604e+02,3.2251568604e+02,2.4974156076e-09,7.
 mtr_symmetric,T_plate[6_2],3.2259968075e+02,3.2259968075e+02,2.5027588890e-09,7.758095e-12,CLEAN,0.0200,
 mtr_symmetric,T_plate[6_3],3.2251568604e+02,3.2251568604e+02,2.4974156076e-09,7.743548e-12,CLEAN,0.0200,
 mtr_symmetric,T_plate[7_1],3.2296534965e+02,3.2296534964e+02,7.6111632552e-09,2.356650e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[7_2],3.2304934436e+02,3.2304934435e+02,7.6058768173e-09,2.354401e-11,CLEAN,0.0200,
+mtr_symmetric,T_plate[7_2],3.2304934436e+02,3.2304934435e+02,7.6058199738e-09,2.354383e-11,CLEAN,0.0200,
 mtr_symmetric,T_plate[7_3],3.2296534965e+02,3.2296534964e+02,7.6111632552e-09,2.356650e-11,CLEAN,0.0200,
 mtr_symmetric,T_plate[8_1],3.2341521736e+02,3.2341521735e+02,1.1856400306e-08,3.666000e-11,CLEAN,0.0200,
 mtr_symmetric,T_plate[8_2],3.2349921207e+02,3.2349921206e+02,1.1851113868e-08,3.663414e-11,CLEAN,0.0200,
@@ -282,19 +282,19 @@ mtr_asymmetric,T_wall_left_r[1],3.4757394500e+02,3.4757394507e+02,7.3717046689e-
 mtr_asymmetric,T_wall_right_r[1],3.6183708695e+02,3.6183708698e+02,3.9006749830e-08,1.078020e-10,CLEAN,0.0200,
 mtr_asymmetric,h_tc_left_r[1],2.5117686107e+04,2.5117686109e+04,2.3751526896e-06,9.456097e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,h_tc_right_r[1],2.5117686107e+04,2.5117686109e+04,2.3751526896e-06,9.456097e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[1],-3.5825712232e+05,-3.5825712148e+05,8.3925540093e-04,2.342606e-09,CLEAN,0.0200,
+mtr_asymmetric,q_left_r[1],-3.5825712232e+05,-3.5825712148e+05,8.3925545914e-04,2.342606e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[1],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_l[2],3.1767885115e+02,3.1767885120e+02,4.8373124173e-08,1.522705e-10,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_l[2],3.4486161877e+02,3.4486161882e+02,5.0336325330e-08,1.459609e-10,CLEAN,0.0200,
 mtr_asymmetric,h_tc_left_l[2],2.0705039507e+04,2.0705039514e+04,7.0529349614e-06,3.406386e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,h_tc_right_l[2],2.0705039507e+04,2.0705039514e+04,7.0529349614e-06,3.406386e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[2],5.6282027748e+05,5.6282027772e+05,2.3355579469e-04,4.149740e-10,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[2],5.6282027748e+05,5.6282027772e+05,2.3355567828e-04,4.149738e-10,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_r[2],3.4767957515e+02,3.4767957520e+02,5.1979270665e-08,1.495034e-10,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_r[2],3.6064671620e+02,3.6064671625e+02,5.3557471347e-08,1.485040e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[2],2.5042146006e+04,2.5042146003e+04,3.1990748539e-06,1.277476e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[2],2.5042146006e+04,2.5042146003e+04,3.1990748539e-06,1.277476e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[2],-3.2472503939e+05,-3.2472503938e+05,2.5571789593e-06,7.874905e-12,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[2],2.5042146006e+04,2.5042146003e+04,3.1990821299e-06,1.277479e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[2],2.5042146006e+04,2.5042146003e+04,3.1990821299e-06,1.277479e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[2],-3.2472503939e+05,-3.2472503938e+05,2.5571207516e-06,7.874726e-12,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_l[3],3.1975496191e+02,3.1975496195e+02,4.4483840611e-08,1.391185e-10,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_l[3],3.4520578523e+02,3.4520578524e+02,1.5633020212e-08,4.528609e-11,CLEAN,0.0200,
@@ -325,11 +325,11 @@ mtr_asymmetric,T_wall_right_l[5],3.4595509854e+02,3.4595509862e+02,8.2097130871e
 mtr_asymmetric,h_tc_left_l[5],2.1215460643e+04,2.1215460654e+04,1.1831303709e-05,5.576737e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,h_tc_right_l[5],2.1215460643e+04,2.1215460654e+04,1.1831303709e-05,5.576737e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[5],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[5],4.7488833266e+05,4.7488833406e+05,1.3925916865e-03,2.932461e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[5],4.7488833266e+05,4.7488833406e+05,1.3925915700e-03,2.932461e-09,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_r[5],3.4821468707e+02,3.4821468716e+02,8.9235982159e-08,2.562671e-10,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_r[5],3.5773366808e+02,3.5773366816e+02,7.7303695889e-08,2.160929e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[5],2.4875886855e+04,2.4875886857e+04,2.4529435905e-06,9.860728e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[5],2.4875886855e+04,2.4875886857e+04,2.4529435905e-06,9.860728e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_left_r[5],2.4875886855e+04,2.4875886857e+04,2.4529472284e-06,9.860743e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[5],2.4875886855e+04,2.4875886857e+04,2.4529472284e-06,9.860743e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_r[5],-2.3679309457e+05,-2.3679309429e+05,2.7403174317e-04,1.157262e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[5],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_l[6],3.2532577169e+02,3.2532577172e+02,2.2715823889e-08,6.982485e-11,CLEAN,0.0200,
@@ -340,9 +340,9 @@ mtr_asymmetric,q_left_l[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.
 mtr_asymmetric,q_right_l[6],4.4939406328e+05,4.4939406682e+05,3.5358465975e-03,7.868031e-09,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_r[6],3.4845139009e+02,3.4845139026e+02,1.7233838889e-07,4.945837e-10,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_r[6],3.5695843210e+02,3.5695843219e+02,8.4941405021e-08,2.379588e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[6],2.4838107639e+04,2.4838107659e+04,1.9268954929e-05,7.757819e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[6],2.4838107639e+04,2.4838107659e+04,1.9268954929e-05,7.757819e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[6],-2.1129882519e+05,-2.1129882318e+05,2.0059220551e-03,9.493295e-09,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[6],2.4838107639e+04,2.4838107659e+04,1.9268958567e-05,7.757821e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[6],2.4838107639e+04,2.4838107659e+04,1.9268958567e-05,7.757821e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[6],-2.1129882519e+05,-2.1129882318e+05,2.0059220842e-03,9.493295e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_l[7],3.2698743909e+02,3.2698743909e+02,8.5202600530e-10,2.605684e-12,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_l[7],3.4676464372e+02,3.4676464370e+02,2.1368066427e-08,6.162124e-11,CLEAN,0.0200,
@@ -357,39 +357,39 @@ mtr_asymmetric,h_tc_right_r[7],2.4808039911e+04,2.4808039898e+04,1.3124106772e-0
 mtr_asymmetric,q_left_r[7],-1.8752289164e+05,-1.8752289381e+05,2.1757482318e-03,1.160257e-08,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[7],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_l[8],3.2856234885e+02,3.2856234882e+02,3.1107504128e-08,9.467763e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[8],3.4718575542e+02,3.4718575543e+02,8.1280404629e-10,2.341122e-12,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[8],3.4718575542e+02,3.4718575543e+02,8.1274720287e-10,2.340958e-12,CLEAN,0.0200,
 mtr_asymmetric,h_tc_left_l[8],2.1663839326e+04,2.1663839332e+04,6.0632046370e-06,2.798767e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,h_tc_right_l[8],2.1663839326e+04,2.1663839332e+04,6.0632046370e-06,2.798767e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[8],4.0345448778e+05,4.0345448858e+05,8.0348848132e-04,1.991522e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[8],4.0345448778e+05,4.0345448858e+05,8.0348725896e-04,1.991519e-09,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_r[8],3.4899173904e+02,3.4899173905e+02,8.4757516561e-09,2.428640e-11,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_r[8],3.5566346161e+02,3.5566346165e+02,4.6941750043e-08,1.319836e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[8],2.4785090816e+04,2.4785090781e+04,3.4724729630e-05,1.401033e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[8],2.4785090816e+04,2.4785090781e+04,3.4724729630e-05,1.401033e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[8],-1.6535924968e+05,-1.6535925040e+05,7.1965338429e-04,4.352060e-09,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[8],2.4785090816e+04,2.4785090781e+04,3.4724725992e-05,1.401033e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[8],2.4785090816e+04,2.4785090781e+04,3.4724725992e-05,1.401033e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[8],-1.6535924968e+05,-1.6535925040e+05,7.1965341340e-04,4.352060e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_l[9],3.3005642372e+02,3.3005642366e+02,6.1955461206e-08,1.877117e-10,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_l[9],3.4761515308e+02,3.4761515304e+02,3.3757601159e-08,9.711200e-11,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[9],2.1801256723e+04,2.1801256725e+04,1.9041181076e-06,8.733983e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[9],2.1801256723e+04,2.1801256725e+04,1.9041181076e-06,8.733983e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_left_l[9],2.1801256723e+04,2.1801256725e+04,1.9041144697e-06,8.733967e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[9],2.1801256723e+04,2.1801256725e+04,1.9041144697e-06,8.733967e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_asymmetric,q_right_l[9],3.8280236634e+05,3.8280236699e+05,6.4919516444e-04,1.695902e-09,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_r[9],3.4928999572e+02,3.4928999570e+02,2.5291797101e-08,7.240917e-11,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_r[9],3.5513233145e+02,3.5513233147e+02,1.7682395992e-08,4.979101e-11,CLEAN,0.0200,
 mtr_asymmetric,h_tc_left_r[9],2.4768711507e+04,2.4768711490e+04,1.7001570086e-05,6.864132e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,h_tc_right_r[9],2.4768711507e+04,2.4768711490e+04,1.7001570086e-05,6.864132e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[9],-1.4470712825e+05,-1.4470712922e+05,9.6687258338e-04,6.681582e-09,CLEAN,0.0200,
+mtr_asymmetric,q_left_r[9],-1.4470712825e+05,-1.4470712922e+05,9.6687255427e-04,6.681582e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_l[10],3.3147521230e+02,3.3147521221e+02,9.4982624432e-08,2.865452e-10,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_l[10],3.4805125107e+02,3.4805125101e+02,6.6800396326e-08,1.919269e-10,CLEAN,0.0200,
 mtr_asymmetric,h_tc_left_l[10],2.1933238348e+04,2.1933238349e+04,4.8271249398e-07,2.200826e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,h_tc_right_l[10],2.1933238348e+04,2.1933238349e+04,4.8271249398e-07,2.200826e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[10],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[10],3.6356620919e+05,3.6356620981e+05,6.2536745099e-04,1.720092e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[10],3.6356620919e+05,3.6356620981e+05,6.2536750920e-04,1.720092e-09,CLEAN,0.0200,
 mtr_asymmetric,T_wall_left_r[10],3.4960394412e+02,3.4960394406e+02,5.7987733726e-08,1.658669e-10,CLEAN,0.0200,
 mtr_asymmetric,T_wall_right_r[10],3.5467175951e+02,3.5467175950e+02,1.2276700545e-08,3.461426e-11,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[10],2.4758394164e+04,2.4758394139e+04,2.4650271371e-05,9.956329e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[10],2.4758394164e+04,2.4758394139e+04,2.4650271371e-05,9.956329e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_left_r[10],2.4758394164e+04,2.4758394139e+04,2.4650267733e-05,9.956327e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[10],2.4758394164e+04,2.4758394139e+04,2.4650267733e-05,9.956327e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_r[10],-1.2547097109e+05,-1.2547097210e+05,1.0051887512e-03,8.011325e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[10],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 mtr_asymmetric,T_plate[1_1],3.4517419947e+02,3.4517419954e+02,7.1636520715e-08,2.075373e-10,CLEAN,0.0200,
@@ -422,106 +422,106 @@ mtr_asymmetric,T_plate[9_3],3.4913684735e+02,3.4913684732e+02,2.6694863209e-08,7
 mtr_asymmetric,T_plate[10_1],3.4843602531e+02,3.4843602525e+02,6.5356971390e-08,1.875724e-10,CLEAN,0.0200,
 mtr_asymmetric,T_plate[10_2],3.4903758437e+02,3.4903758431e+02,6.2380820509e-08,1.787224e-10,CLEAN,0.0200,
 mtr_asymmetric,T_plate[10_3],3.4947115401e+02,3.4947115395e+02,5.9415242504e-08,1.700147e-10,CLEAN,0.0200,
-mtr_one_sided,T_out_l,3.2256673781e+02,3.1788707780e+02,4.6796600098e+00,1.472114e-02,GRAY,0.0500,KNOWN GAP — Python one_sided distributes heat to both faces
-mtr_one_sided,mdot_l,2.5405247839e-01,2.5254714270e-01,1.5053356939e-03,5.960613e-03,GRAY,0.0200,
+mtr_one_sided,T_out_l,3.1788707779e+02,3.1788707780e+02,1.2710700048e-08,3.998495e-11,CLEAN,0.0200,
+mtr_one_sided,mdot_l,2.5254714269e-01,2.5254714270e-01,1.3660905740e-11,5.409250e-11,CLEAN,0.0200,
 mtr_one_sided,dP_loop,3.0000000000e+04,3.0000000000e+04,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_l[1],3.1409188851e+02,3.1362375632e+02,4.6813218741e-01,1.492655e-03,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_l[2],3.1503373670e+02,3.1409750280e+02,9.3623390324e-01,2.980711e-03,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_l[3],3.1597554183e+02,3.1457123907e+02,1.4043027628e+00,4.464180e-03,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_l[4],3.1691730113e+02,3.1504496478e+02,1.8723363509e+00,5.943077e-03,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_l[5],3.1785901183e+02,3.1551867959e+02,2.3403322378e+00,7.417413e-03,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_l[6],3.1880067112e+02,3.1599238315e+02,2.8082879782e+00,8.887201e-03,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_l[7],3.1974227620e+02,3.1646607509e+02,3.2762011112e+00,1.035246e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_l[8],3.2068382424e+02,3.1693975508e+02,3.7440691595e+00,1.181319e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_l[9],3.2162531240e+02,3.1741342277e+02,4.2118896296e+00,1.326941e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_l[10],3.2256673781e+02,3.1788707780e+02,4.6796600098e+00,1.472114e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_left_l[1],3.2670182798e+02,3.2014454410e+02,6.5572838712e+00,2.048226e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[1],3.1409188851e+02,3.1362375632e+02,4.6813218741e-01,1.492655e-03,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[1],1.8881552814e+04,1.8256631398e+04,6.2492141599e+02,3.422983e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[1],1.8881552814e+04,1.8256631398e+04,6.2492141599e+02,3.422983e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[1],2.3809523810e+05,1.1904761905e+05,1.1904761905e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
+mtr_one_sided,T_l[1],3.1362375632e+02,3.1362375632e+02,4.5815227168e-09,1.460834e-11,CLEAN,0.0200,
+mtr_one_sided,T_l[2],3.1409750279e+02,3.1409750280e+02,3.6947653825e-09,1.176312e-11,CLEAN,0.0200,
+mtr_one_sided,T_l[3],3.1457123906e+02,3.1457123907e+02,8.3680902208e-09,2.660157e-11,CLEAN,0.0200,
+mtr_one_sided,T_l[4],3.1504496477e+02,3.1504496478e+02,9.1475840236e-09,2.903580e-11,CLEAN,0.0200,
+mtr_one_sided,T_l[5],3.1551867959e+02,3.1551867959e+02,6.1154992181e-09,1.938237e-11,CLEAN,0.0200,
+mtr_one_sided,T_l[6],3.1599238314e+02,3.1599238315e+02,1.3073986338e-10,4.137437e-13,CLEAN,0.0200,
+mtr_one_sided,T_l[7],3.1646607510e+02,3.1646607509e+02,6.8679355536e-09,2.170196e-11,CLEAN,0.0200,
+mtr_one_sided,T_l[8],3.1693975509e+02,3.1693975508e+02,1.0958331131e-08,3.457544e-11,CLEAN,0.0200,
+mtr_one_sided,T_l[9],3.1741342277e+02,3.1741342277e+02,7.3317778515e-09,2.309851e-11,CLEAN,0.0200,
+mtr_one_sided,T_l[10],3.1788707779e+02,3.1788707780e+02,1.2710700048e-08,3.998495e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[1],3.2014454411e+02,3.2014454410e+02,4.5600359044e-09,1.424368e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[1],3.1362375632e+02,3.1362375632e+02,4.5815227168e-09,1.460834e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[1],1.8256631398e+04,1.8256631398e+04,1.4964462025e-07,8.196727e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[1],1.8256631398e+04,1.8256631398e+04,1.4964462025e-07,8.196727e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[1],1.1904761905e+05,1.1904761905e+05,7.8949960880e-07,6.631797e-12,CLEAN,0.0200,
 mtr_one_sided,q_right_l[1],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[2],3.2755337799e+02,3.2059314130e+02,6.9602366911e+00,2.171050e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[2],3.1503373670e+02,3.1409750280e+02,9.3623390324e-01,2.980711e-03,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[2],1.9017736420e+04,1.8327315942e+04,6.9042047823e+02,3.767166e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[2],1.9017736420e+04,1.8327315942e+04,6.9042047823e+02,3.767166e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[2],2.3809523810e+05,1.1904761904e+05,1.1904761905e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
+mtr_one_sided,T_wall_left_l[2],3.2059314129e+02,3.2059314130e+02,3.3991796045e-09,1.060278e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[2],3.1409750279e+02,3.1409750280e+02,3.6947653825e-09,1.176312e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[2],1.8327315941e+04,1.8327315942e+04,9.4569259090e-08,5.160017e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[2],1.8327315941e+04,1.8327315942e+04,9.4569259090e-08,5.160017e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[2],1.1904761905e+05,1.1904761904e+05,4.6933564590e-06,3.942419e-11,CLEAN,0.0200,
 mtr_one_sided,q_right_l[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[3],3.2840640027e+02,3.2104195803e+02,7.3644422384e+00,2.293919e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[3],3.1597554183e+02,3.1457123907e+02,1.4043027628e+00,4.464180e-03,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[3],1.9153563630e+04,1.8397896697e+04,7.5566693253e+02,4.107355e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[3],1.9153563630e+04,1.8397896697e+04,7.5566693253e+02,4.107355e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[3],2.3809523810e+05,1.1904761905e+05,1.1904761904e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
+mtr_one_sided,T_wall_left_l[3],3.2104195802e+02,3.2104195803e+02,8.5723286247e-09,2.670158e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[3],3.1457123906e+02,3.1457123907e+02,8.3680902208e-09,2.660157e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[3],1.8397896697e+04,1.8397896697e+04,4.8628135119e-07,2.643136e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[3],1.8397896697e+04,1.8397896697e+04,4.8628135119e-07,2.643136e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[3],1.1904761905e+05,1.1904761905e+05,6.6726934165e-06,5.605062e-11,CLEAN,0.0200,
 mtr_one_sided,q_right_l[3],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[4],3.2926085890e+02,3.2149099114e+02,7.7698677593e+00,2.416823e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[4],3.1691730113e+02,3.1504496478e+02,1.8723363509e+00,5.943077e-03,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[4],1.9289028551e+04,1.8468373002e+04,8.2065554880e+02,4.443573e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[4],1.9289028551e+04,1.8468373002e+04,8.2065554880e+02,4.443573e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[4],2.3809523810e+05,1.1904761908e+05,1.1904761901e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
+mtr_one_sided,T_wall_left_l[4],3.2149099113e+02,3.2149099114e+02,1.0773476333e-08,3.351097e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[4],3.1504496477e+02,3.1504496478e+02,9.1475840236e-09,2.903580e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[4],1.8468373001e+04,1.8468373002e+04,1.0165676940e-06,5.504371e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[4],1.8468373001e+04,1.8468373002e+04,1.0165676940e-06,5.504371e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[4],1.1904761905e+05,1.1904761908e+05,3.5963777918e-05,3.020957e-10,CLEAN,0.0200,
 mtr_one_sided,q_right_l[4],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[5],3.3011671879e+02,3.2194023748e+02,8.1764813133e+00,2.539751e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[5],3.1785901183e+02,3.1551867959e+02,2.3403322378e+00,7.417413e-03,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[5],1.9424125473e+04,1.8538744203e+04,8.8538126926e+02,4.775843e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[5],1.9424125473e+04,1.8538744203e+04,8.8538126926e+02,4.775843e-02,GRAY,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[5],2.3809523810e+05,1.1904761910e+05,1.1904761900e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
+mtr_one_sided,T_wall_left_l[5],3.2194023747e+02,3.2194023748e+02,8.5586862042e-09,2.658470e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[5],3.1551867959e+02,3.1551867959e+02,6.1154992181e-09,1.938237e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[5],1.8538744202e+04,1.8538744203e+04,1.1574011296e-06,6.243147e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[5],1.8538744202e+04,1.8538744203e+04,1.1574011296e-06,6.243147e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[5],1.1904761905e+05,1.1904761910e+05,5.0983202527e-05,4.282589e-10,CLEAN,0.0200,
 mtr_one_sided,q_right_l[5],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[6],3.3097394572e+02,3.2238969398e+02,8.5842517479e+00,2.662694e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[6],3.1880067112e+02,3.1599238315e+02,2.8082879782e+00,8.887201e-03,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[6],1.9558848864e+04,1.8609009660e+04,9.4983920379e+02,5.104190e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[6],1.9558848864e+04,1.8609009660e+04,9.4983920379e+02,5.104190e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[6],2.3809523810e+05,1.1904761906e+05,1.1904761904e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
+mtr_one_sided,T_wall_left_l[6],3.2238969398e+02,3.2238969398e+02,4.8953552323e-10,1.518459e-12,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[6],3.1599238314e+02,3.1599238315e+02,1.3073986338e-10,4.137437e-13,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[6],1.8609009659e+04,1.8609009660e+04,3.0401133699e-07,1.633678e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[6],1.8609009659e+04,1.8609009660e+04,3.0401133699e-07,1.633678e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[6],1.1904761905e+05,1.1904761906e+05,8.3980703494e-06,7.054379e-11,CLEAN,0.0200,
 mtr_one_sided,q_right_l[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[7],3.3183250625e+02,3.2283935758e+02,8.9931486686e+00,2.785642e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[7],3.1974227620e+02,3.1646607509e+02,3.2762011112e+00,1.035246e-02,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[7],1.9693193368e+04,1.8679168743e+04,1.0140246245e+03,5.428639e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[7],1.9693193368e+04,1.8679168743e+04,1.0140246245e+03,5.428639e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[7],2.3809523810e+05,1.1904761900e+05,1.1904761910e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
+mtr_one_sided,T_wall_left_l[7],3.2283935759e+02,3.2283935758e+02,9.3191374617e-09,2.886618e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[7],3.1646607510e+02,3.1646607509e+02,6.8679355536e-09,2.170196e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[7],1.8679168744e+04,1.8679168743e+04,8.5531064542e-07,4.578955e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[7],1.8679168744e+04,1.8679168743e+04,8.5531064542e-07,4.578955e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[7],1.1904761905e+05,1.1904761900e+05,5.2246527048e-05,4.388708e-10,CLEAN,0.0200,
 mtr_one_sided,q_right_l[7],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[8],3.3269236770e+02,3.2328922528e+02,9.4031424173e+00,2.908585e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[8],3.2068382424e+02,3.1693975508e+02,3.7440691595e+00,1.181319e-02,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[8],1.9827153799e+04,1.8749220837e+04,1.0779329617e+03,5.749215e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[8],1.9827153799e+04,1.8749220837e+04,1.0779329617e+03,5.749215e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[8],2.3809523810e+05,1.1904761903e+05,1.1904761906e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
-mtr_one_sided,q_right_l[8],1.0757722385e-09,0.0000000000e+00,1.0757722385e-09,1.075772e-09,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[9],3.3355349819e+02,3.2373929412e+02,9.8142040695e+00,3.031515e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[9],3.2162531240e+02,3.1741342277e+02,4.2118896296e+00,1.326941e-02,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[9],1.9960725139e+04,1.8819165333e+04,1.1415598062e+03,6.065943e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[9],1.9960725139e+04,1.8819165333e+04,1.1415598062e+03,6.065943e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[9],2.3809523810e+05,1.1904761894e+05,1.1904761916e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
+mtr_one_sided,T_wall_left_l[8],3.2328922530e+02,3.2328922528e+02,1.1664383237e-08,3.608033e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[8],3.1693975509e+02,3.1693975508e+02,1.0958331131e-08,3.457544e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[8],1.8749220838e+04,1.8749220837e+04,5.7083525462e-07,3.044581e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[8],1.8749220838e+04,1.8749220837e+04,5.7083525462e-07,3.044581e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[8],1.1904761905e+05,1.1904761903e+05,1.6288380721e-05,1.368224e-10,CLEAN,0.0200,
+mtr_one_sided,q_right_l[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[9],3.2373929414e+02,3.2373929412e+02,1.2536020222e-08,3.872258e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[9],3.1741342277e+02,3.1741342277e+02,7.3317778515e-09,2.309851e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[9],1.8819165334e+04,1.8819165333e+04,1.6835729184e-06,8.946055e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[9],1.8819165334e+04,1.8819165333e+04,1.6835729184e-06,8.946055e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[9],1.1904761905e+05,1.1904761894e+05,1.0911209392e-04,9.165416e-10,CLEAN,0.0200,
 mtr_one_sided,q_right_l[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[10],3.3441586655e+02,3.2418956119e+02,1.0226305363e+01,3.154422e-02,GRAY,0.0500,KNOWN GAP — Python both-faces distribution
-mtr_one_sided,T_wall_right_l[10],3.2256673781e+02,3.1788707780e+02,4.6796600098e+00,1.472114e-02,GRAY,0.0200,
-mtr_one_sided,h_tc_left_l[10],2.0093902530e+04,1.8889001639e+04,1.2049008912e+03,6.378849e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[10],2.0093902530e+04,1.8889001639e+04,1.2049008912e+03,6.378849e-02,FAIL,0.0500,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[10],2.3809523810e+05,1.1904761914e+05,1.1904761895e+05,1.000000e+00,FAIL,0.5000,KNOWN GAP — Python both-faces; Julia all-q via left only
-mtr_one_sided,q_right_l[10],1.0919790643e-09,0.0000000000e+00,1.0919790643e-09,1.091979e-09,CLEAN,0.0200,
-mtr_one_sided,T_plate[1_1],3.2695381210e+02,3.2027053617e+02,6.6832759347e+00,2.086760e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[1_2],3.2728979094e+02,3.2035453088e+02,6.9352600617e+00,2.164870e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[1_3],3.2745778036e+02,3.2027053617e+02,7.1872441887e+00,2.244117e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[2_1],3.2780536211e+02,3.2071913336e+02,7.0862287546e+00,2.209481e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[2_2],3.2814134095e+02,3.2080312807e+02,7.3382128816e+00,2.287451e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[2_3],3.2830933037e+02,3.2071913336e+02,7.5901970086e+00,2.366618e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[3_1],3.2865838440e+02,3.2116795009e+02,7.4904343019e+00,2.332248e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[3_2],3.2899436323e+02,3.2125194480e+02,7.7424184289e+00,2.410077e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[3_3],3.2916235265e+02,3.2116795009e+02,7.9944025559e+00,2.489166e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[4_1],3.2951284302e+02,3.2161698320e+02,7.8958598228e+00,2.455051e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[4_2],3.2984882186e+02,3.2170097791e+02,8.1478439498e+00,2.532738e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[4_3],3.3001681128e+02,3.2161698320e+02,8.3998280767e+00,2.611749e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[5_1],3.3036870292e+02,3.2206622954e+02,8.3024733769e+00,2.577878e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[5_2],3.3070468176e+02,3.2215022425e+02,8.5544575039e+00,2.655425e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[5_3],3.3087267118e+02,3.2206622954e+02,8.8064416309e+00,2.734357e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[6_1],3.3122592985e+02,3.2251568604e+02,8.7102438113e+00,2.700719e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[6_2],3.3156190869e+02,3.2259968075e+02,8.9622279383e+00,2.778127e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[6_3],3.3172989811e+02,3.2251568604e+02,9.2142120653e+00,2.856981e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[7_1],3.3208449037e+02,3.2296534964e+02,9.1191407321e+00,2.823566e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[7_2],3.3242046921e+02,3.2304934435e+02,9.3711248591e+00,2.900834e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[7_3],3.3258845863e+02,3.2296534964e+02,9.6231089860e+00,2.979610e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[8_1],3.3294435183e+02,3.2341521735e+02,9.5291344808e+00,2.946409e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[8_2],3.3328033066e+02,3.2349921206e+02,9.7811186077e+00,3.023537e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[8_3],3.3344832008e+02,3.2341521735e+02,1.0033102735e+01,3.102236e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[9_1],3.3380548232e+02,3.2386528619e+02,9.9401961330e+00,3.069238e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[9_2],3.3414146116e+02,3.2394928090e+02,1.0192180260e+01,3.146227e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[9_3],3.3430945057e+02,3.2386528619e+02,1.0444164387e+01,3.224848e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[10_1],3.3466785068e+02,3.2431555326e+02,1.0352297426e+01,3.192045e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[10_2],3.3500382952e+02,3.2439954796e+02,1.0604281553e+01,3.268895e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
-mtr_one_sided,T_plate[10_3],3.3517181894e+02,3.2431555326e+02,1.0856265680e+01,3.347439e-02,GRAY,0.2000,KNOWN GAP — Python both-faces; T_max asserted analytically
+mtr_one_sided,T_wall_left_l[10],3.2418956117e+02,3.2418956119e+02,1.7189563550e-08,5.302319e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[10],3.1788707779e+02,3.1788707780e+02,1.2710700048e-08,3.998495e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[10],1.8889001637e+04,1.8889001639e+04,1.7621532606e-06,9.328991e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[10],1.8889001637e+04,1.8889001639e+04,1.7621532606e-06,9.328991e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[10],1.1904761905e+05,1.1904761914e+05,9.4609713415e-05,7.947216e-10,CLEAN,0.0200,
+mtr_one_sided,q_right_l[10],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+mtr_one_sided,T_plate[1_1],3.2027053617e+02,3.2027053617e+02,4.5520778258e-09,1.421323e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[1_2],3.2035453088e+02,3.2035453088e+02,4.5467345444e-09,1.419282e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[1_3],3.2027053617e+02,3.2027053617e+02,4.5520778258e-09,1.421323e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[2_1],3.2071913336e+02,3.2071913336e+02,3.4070808397e-09,1.062325e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[2_2],3.2080312806e+02,3.2080312807e+02,3.4124241211e-09,1.063713e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[2_3],3.2071913336e+02,3.2071913336e+02,3.4070808397e-09,1.062325e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[3_1],3.2116795009e+02,3.2116795009e+02,8.5802298599e-09,2.671571e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[3_2],3.2125194479e+02,3.2125194480e+02,8.5855162979e-09,2.672518e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[3_3],3.2116795009e+02,3.2116795009e+02,8.5802298599e-09,2.671571e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[4_1],3.2161698319e+02,3.2161698320e+02,1.0781434412e-08,3.352259e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[4_2],3.2170097790e+02,3.2170097791e+02,1.0786664006e-08,3.353009e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[4_3],3.2161698319e+02,3.2161698320e+02,1.0781434412e-08,3.352259e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[5_1],3.2206622954e+02,3.2206622954e+02,8.4666567091e-09,2.628856e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[5_2],3.2215022425e+02,3.2215022425e+02,8.4719431470e-09,2.629811e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[5_3],3.2206622954e+02,3.2206622954e+02,8.4666567091e-09,2.628856e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[6_1],3.2251568604e+02,3.2251568604e+02,4.9743675845e-10,1.542365e-12,CLEAN,0.0200,
+mtr_one_sided,T_plate[6_2],3.2259968075e+02,3.2259968075e+02,5.0272319640e-10,1.558350e-12,CLEAN,0.0200,
+mtr_one_sided,T_plate[6_3],3.2251568604e+02,3.2251568604e+02,4.9743675845e-10,1.542365e-12,CLEAN,0.0200,
+mtr_one_sided,T_plate[7_1],3.2296534965e+02,3.2296534964e+02,9.3111793831e-09,2.883027e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[7_2],3.2304934436e+02,3.2304934435e+02,9.3058929451e-09,2.880641e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[7_3],3.2296534965e+02,3.2296534964e+02,9.3111793831e-09,2.883027e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[8_1],3.2341521736e+02,3.2341521735e+02,1.1656425158e-08,3.604167e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[8_2],3.2349921207e+02,3.2349921206e+02,1.1651081877e-08,3.601580e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[8_3],3.2341521736e+02,3.2341521735e+02,1.1656425158e-08,3.604167e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[9_1],3.2386528620e+02,3.2386528619e+02,1.2528062143e-08,3.868294e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[9_2],3.2394928091e+02,3.2394928090e+02,1.2522832549e-08,3.865677e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[9_3],3.2386528620e+02,3.2386528619e+02,1.2528062143e-08,3.868294e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[10_1],3.2431555324e+02,3.2431555326e+02,1.7197464786e-08,5.302695e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[10_2],3.2439954795e+02,3.2439954796e+02,1.7202751224e-08,5.302952e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[10_3],3.2431555324e+02,3.2431555326e+02,1.7197464786e-08,5.302695e-11,CLEAN,0.0200,
