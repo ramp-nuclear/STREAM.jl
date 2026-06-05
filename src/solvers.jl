@@ -64,7 +64,7 @@ Solve a transient simulation over a time array.
 - `t`: time array (e.g. `range(0, 100, length=1000)`); `tspan` derived as `(t[1], t[end])`
 - `solver`: ODE solver (default `Rodas5P()`)
 - `callbacks`: optional `CallbackSet` for user-supplied events (passed to DifferentialEquations
-  `solve`); pre-wired for Phase 23 Flapper support
+  `solve`); pre-wired for Flapper support
 - `initializealg`: DAE initialization algorithm (default `SciMLBase.NoInit()`, which trusts the
   supplied `op` as a fully consistent initial condition). Pass `SciMLBase.BrownFullBasicInit()`
   to have the solver solve the algebraic constraints for consistency at `t[1]` (holding the

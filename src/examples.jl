@@ -41,7 +41,7 @@ function build_loop(;
         connect(bc.port_out, ch.port_in),        # TempBC -> channel
         connect(ch.port_out, pump.port_in),      # channel -> pump (closed loop)
         pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
-        # Per-cell binding eqns (Phase 55 D-10 Style 1 — args.funcs idiom)
+        # Per-cell binding eqns (args.funcs idiom)
         [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
     ]
@@ -106,7 +106,7 @@ function build_loop_vertical(;
         connect(ch.port_out, grav.port_out),     # channel outlet (top) = grav port_out (top)
         connect(grav.port_in, pump.port_in),      # grav port_in (bottom) = pump inlet (bottom)
         pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
-        # Per-cell binding eqns (Phase 55 D-10 Style 1 — args.funcs idiom)
+        # Per-cell binding eqns (args.funcs idiom)
         [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
     ]
@@ -129,7 +129,7 @@ end
 
 Build a transient-capable flow loop. When `T_wall_fn` is provided (a callable `t -> K`),
 wall temperature is time-varying via an MTK callable parameter at the builder level
-(D-10 / Discretion #4 path b — preserves the v0.9 PK pattern; no `WallTemperature`
+(the callable stays wired at the builder level; no `WallTemperature`
 source component required). When `T_wall_fn` is `nothing`, wall temperature is pinned
 to the scalar `T_wall_0`.
 
@@ -169,7 +169,7 @@ function build_loop_transient(;
 
     if T_wall_fn === nothing
         # Scalar wall temperature — same as build_loop; no parameter declaration needed.
-        # Per-cell Style 1 binding (D-05) replaces the legacy single-port wall pin.
+        # Per-cell binding replaces the legacy single-port wall pin.
         connections = Equation[
             connect(pump.port_out, bc.port_in),
             connect(bc.port_out, ch.port_in),
@@ -181,7 +181,7 @@ function build_loop_transient(;
         @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
     else
         # Callable wall temperature — uses MTK callable parameter at builder level
-        # (D-10 / Discretion #4 path b — same `ps[1](t)` value broadcast per cell).
+        # (same `ps[1](t)` value broadcast per cell).
         # Caller must include ssys.T_wall_callable => T_wall_fn in op.
         FType = typeof(T_wall_fn)
         ps = @parameters (T_wall_callable::FType)(..)
@@ -287,9 +287,8 @@ end
                             R_ext=1.0e6, dt_ramp=5.0) -> System
 
 Build a loss-of-flow validation loop with bypass topology. Heated leg uses
-`ChannelAndContacts + HeatDiffusion` plate via `one_sided_connection` — Phase 55
-Spike B topology (real fuel-plate physics), per Wave 0 spike outcome
-(`spike_lof_winner: "B"`).
+`ChannelAndContacts + HeatDiffusion` plate via `one_sided_connection`
+(real fuel-plate physics).
 
 Topology (4-node parallel network):
 - Node A (top): ine output, heated channel input, flapper input (3-way junction)
@@ -301,14 +300,14 @@ Heated leg: `ChannelAndContacts` (`heated.ch`) + `HeatDiffusion` plate
 (`heated.fuel`) wired one-sided via `one_sided_connection(ch, fuel; side=:left)`.
 Sub-systems retain their `@named` symbols, so access paths inside `heated` are
 `heated.ch.*` and `heated.fuel.*` (not `heated.channel.*`). The right thermal
-side of `ch` dangles inside the `heated` subsystem; per Spike #1 outcome
-(HYPOTHESIS=A) the dangling per-cell `ThermalPort` Flow rule produces zero net
-heat flow there, so no extra binding is needed — the right face is adiabatic.
+side of `ch` dangles inside the `heated` subsystem; the dangling per-cell
+`ThermalPort` Flow rule produces zero net heat flow there, so no extra binding
+is needed — the right face is adiabatic.
 
-Return leg: `ret` is the new external-input `Channel` (Phase 55 D-01). Default
+Return leg: `ret` is an external-input `Channel`. Default
 `h_left=h_right=0.0` makes it adiabatic regardless of `T_wall_*[i]` values; the
 per-cell `T_wall_left[i] / T_wall_right[i]` `~`-bindings to `T_inlet` are
-decorative under H=A and required to keep MTK fully determined.
+decorative and required to keep MTK fully determined.
 
 Gravity signs:
 - heated channel (`heated.ch`, A->B, nominally downward): g = -g_acc
@@ -334,7 +333,7 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
 - `D_ch`: channel hydraulic diameter [m] (default 0.01)
 - `T_inlet`: inlet/HeatExchanger boundary temperature [K] (default 313.15)
 - `power_W`: total fuel-plate heat input [W], pinned via `heated.fuel.power ~ power_W`
-  (default 1.0e3, matching Spike B's NC-equilibrium-producing baseline)
+  (default 1.0e3, an NC-equilibrium-producing baseline)
 - `fuel_nx`: lateral cells in the HeatDiffusion plate (default 2)
 - `fuel_Lx`: plate lateral thickness [m] (default 0.005)
 - `L_over_A`: Inertia length-to-area ratio [1/m] (default 1.75e5)
@@ -367,7 +366,7 @@ function build_loop_lof_bypass(;
 #! format: on
     geom = PipeGeometry_circular(L_ch, D_ch)
 
-    # NC-enabled regime switching for heated channel (D-10)
+    # NC-enabled regime switching for heated channel
     rd_ch = regime_dependent(geom;
         htc_laminar=constant_Nusselt(; Nu=8.235),
         htc_turbulent=dittus_boelter,
@@ -467,7 +466,7 @@ end
 
 Build a full thermal-hydraulic loop coupled to a `PointKinetics` reactor model
 (pump + HeatExchanger + ChannelAndContacts + HeatDiffusion + PointKinetics).
-This is the primary integration-validation builder for Phase 49: it proves that
+This is the primary integration-validation builder: it proves that
 PK+T-H coupling compiles, solves stably, responds to reactivity insertion with
 negative temperature feedback, and terminates correctly on SCRAM.
 
@@ -593,7 +592,7 @@ function build_loop_pk(ctrl;
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]
-    # Consistent-IC seeding (see .planning/notes/2026-05-29-pk-coupling-investigation.md)
+    # Consistent-IC seeding
     # FlowPort/ThermalPort temperatures default to 300 K (src/connectors.jl). The boundary coolant
     # cells and the channel↔fuel contact nodes are aliased to those port temperatures, and the
     # per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT pin the port representatives under NoInit.

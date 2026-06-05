@@ -192,13 +192,13 @@ A `WallTemperature` source can be used as a closure, for example.
   default `0.0` per-side ⇒ adiabatic.
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
 
-# External-input variables (Phase 55 D-01)
+# External-input variables
 - `T_wall_left(t)[1:n]`: per-cell left-face wall temperature [K]
 - `T_wall_right(t)[1:n]`: per-cell right-face wall temperature [K]
 
 These have no internal equation. Close them via either of:
 ```julia
-# Style 1 — direct binding eqns at compose time (args.funcs idiom; D-05):
+# Style 1 — direct binding eqns at compose time (args.funcs idiom):
 connections = [
     ...,
     [ch.T_wall_left[i] ~ T_wall_value for i in 1:n]...,
@@ -237,7 +237,7 @@ function Channel(;
         length(h_left) == n ||
             throw(DimensionMismatch("h_left has length $(length(h_left)), expected n=$n"))
         hL_per_cell = Num.(h_left)
-    else  # Function / callable — MTK callable-parameter pattern (RESEARCH.md §1)
+    else  # Function / callable — MTK callable-parameter pattern
         FType_L = typeof(h_left)
         pL = @parameters (h_left_fn::FType_L)(..)
         hL_call = pL[1](t)
@@ -306,7 +306,7 @@ Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
 
-# External-input variables (Phase 55 D-03)
+# External-input variables
 - `q_left(t)[1:n]`: per-cell left-face heat flux density [W/m^2]
 - `q_right(t)[1:n]`: per-cell right-face heat flux density [W/m^2]
 

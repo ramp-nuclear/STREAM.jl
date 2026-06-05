@@ -168,8 +168,8 @@ callable). The power ODE becomes:
     D(P) ~ (rho_val + rho_c_fn(t) + feedback_expr - beta_sum) / Lambda_gen * P + precursor_source
 
 where `rho_val` is a constant base/bias reactivity, `rho_c_fn(t)` is the time-varying
-control contribution (D-01 additive composition), and `feedback_expr` is the per-cell
-temperature reactivity sum (Phase 47):
+control contribution (additive composition), and `feedback_expr` is the per-cell
+temperature reactivity sum:
 
     feedback_expr = sum_j alpha_j * (T_j - Tref_j)
 
@@ -182,7 +182,7 @@ feedback.
 When solving, the callable must be passed in the initial conditions dict:
     `op = [ssys.rho_c_fn => rho_c_fn, ssys.P => ic.P, ...]`
 
-This is required because MTK stores callable parameters by reference (D-10); omitting it
+This is required because MTK stores callable parameters by reference; omitting it
 causes `KeyError` at `solve_transient`.
 
 # Arguments
@@ -197,8 +197,8 @@ causes `KeyError` at `solve_transient`.
 - `temp_worth::Union{Nothing,Dict}=nothing`: per-component temperature feedback weights.
   Keys are uncompiled MTK Systems; values are scalar (broadcast to all cells), 1D vector
   (matches Channel n-cell structure), or 2D matrix (matches HeatDiffusion nz*nx, flattened
-  row-major per D-03: j_flat = (jz-1)*nx + jx). `nothing` (default) = no temperature
-  feedback, identical to Phase 46 behavior.
+  row-major: j_flat = (jz-1)*nx + jx). `nothing` (default) = no temperature
+  feedback.
 - `ref_temp::Union{Nothing,Dict}=nothing`: per-component reference temperatures [K].
   Same key structure as `temp_worth`. Missing keys default to zero (full T contributes).
 
@@ -209,7 +209,7 @@ Call `mtkcompile(sys)` before solving.
 
 **Important:** When `temp_worth` is provided, the resulting System has free T_source
 unknowns that MUST be bound by calling `connect_temperature_feedback` and wrapping in
-a composed System before `mtkcompile` (Phase 47 D-05).
+a composed System before `mtkcompile`.
 """
 function PointKinetics(
     rho_c_fn::Any;
@@ -361,7 +361,7 @@ for `PointKinetics` in callable mode. Mirrors the Python STREAM `ReactivityContr
 API: stores an `input_reactivity` callable with signature `(state, t_state, t) -> Float64`,
 a `state_machine` callable with signature `(state, t, power, dPdt) -> new_state`, the
 current state and time-of-entry, a transition log, and an `abort_states` set used by
-downstream callbacks (Phase 49) to signal early integrator termination.
+downstream callbacks to signal early integrator termination.
 
 Instances are callable: `ctrl(t)` returns `worth(ctrl, t)`. This lets users pass a
 `ReactivityController` directly as the MTK callable parameter to

@@ -76,7 +76,7 @@ For steady-state solutions (`NonlinearSolution` or single-timestep `ODESolution`
 all vector fields have length `n`. For transient solutions, each per-cell field is
 assembled into a matrix of shape `[n_cells, n_times]`.
 
-`q_flux_left[i] = q_wall_left[i] / (pipe.heated_parts[1] * dz)` per D-05.
+`q_flux_left[i] = q_wall_left[i] / (pipe.heated_parts[1] * dz)`.
 When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 """
 function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
@@ -120,7 +120,7 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
     # Conservative wall temperature: max of left and right face
     T_wall = max.(T_wall_left, T_wall_right)
 
-    # q_flux conversion: q_wall [W] -> q_flux [W/m²] per D-05
+    # q_flux conversion: q_wall [W] -> q_flux [W/m²]
     if pipe !== nothing
         dz = pipe.L / n
         q_flux_left = qwl_arr ./ (pipe.heated_parts[1] * dz)
@@ -208,7 +208,7 @@ The returned closure has signature `(state::ChannelState) -> AbstractArray`.
   - `:max` (default) — `max.(q_flux_left, q_flux_right)` (most conservative)
   - `:left`  — `state.q_flux_left`
   - `:right` — `state.q_flux_right`
-  - `:total` — `state.q_flux` (same as `:max` per D-04, but named separately for clarity)
+  - `:total` — `state.q_flux` (same as `:max`, but named separately for clarity)
 
 # Returns
 Closure `(state::ChannelState) -> Vector{Float64}` where each entry is `CHF[i] / q[i]`,

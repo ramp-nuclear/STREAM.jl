@@ -4,7 +4,7 @@
 #   - All functions are plain Julia arithmetic — NOT @register_symbolic, NOT ifelse().
 #     These are post-solve analysis functions, not embedded in MTK equations.
 #   - They operate on scalar (or vector) Float64 values from solver solutions.
-#   - Per Phase 29 design decision D-01: no MTK dependencies here.
+#   - No MTK dependencies here.
 #
 # Functions: Bergles_Rohsenow_T_ONB, q_boiling_onset, q_OFI_whittle_forgan,
 #            q_OSV_saha_zuber, q_CHF_sudo_kaminaga, q_CHF_mirshak,

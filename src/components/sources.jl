@@ -6,7 +6,7 @@
 
 Portless "value source" subsystem exposing per-cell wall temperature outputs
 `T_wall_out(t)[1:n]`. Used to drive `Channel.T_wall_left[i]` / `Channel.T_wall_right[i]`
-external-input variables (Phase 55 D-04 / D-05 Style 2).
+external-input variables.
 
 # Arguments
 - `name`: system name (Symbol; keyword-only, supplied by `@named`)
@@ -48,7 +48,7 @@ function WallTemperature(;
         eqs = Equation[T_wall_out[i] ~ T_wall[i] for i in 1:n]
         return System(eqs, t, collect(T_wall_out), Num[]; name=name)
 
-    else  # Function / callable — MTK callable-parameter pattern (RESEARCH.md §1)
+    else  # Function / callable — MTK callable-parameter pattern
         FType = typeof(T_wall)
         pT = @parameters (T_wall_fn::FType)(..)
         eqs = Equation[T_wall_out[i] ~ pT[1](t) for i in 1:n]
@@ -62,7 +62,7 @@ end
 
 Portless "value source" subsystem exposing per-cell heat flux density outputs
 `q_out(t)[1:n]` [W/m^2]. Used to drive `ChannelHeatFlux.q_left[i]` /
-`ChannelHeatFlux.q_right[i]` external-input variables (Phase 55 D-04 / D-05 Style 2).
+`ChannelHeatFlux.q_right[i]` external-input variables.
 
 # Arguments
 - `name`: system name (Symbol; keyword-only, supplied by `@named`)
