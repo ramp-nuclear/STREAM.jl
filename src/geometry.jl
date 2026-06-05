@@ -82,7 +82,7 @@ Construct a `PipeGeometry` for a circular pipe.
 - `L` — channel length [m]
 - `D` — pipe diameter [m]
 
-Dh = D (exact for circular cross-section). 
+Dh = D (exact for circular cross-section).
 heated_parts = (perimeter, 0) because it is circular, not annular.
 """
 function PipeGeometry_circular(L, D)

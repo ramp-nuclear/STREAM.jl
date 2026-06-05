@@ -87,7 +87,7 @@ using STREAM:
         )
         @test isapprox(rd.friction(8000.0), blasius_friction(8000.0); rtol=1e-6)
     end
-end 
+end
 
 @testset "PHY-02/03/04: Integration Tests — Pluggable Correlations in Solved Systems" begin
     @testset "PHY-02: constant_Nusselt integration — Nu≈8.235 in solution" begin

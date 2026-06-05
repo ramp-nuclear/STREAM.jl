@@ -293,7 +293,7 @@ end
     @test sol.retcode == ReturnCode.Success
     T_ts = sol[ssys.ch.T_out, :]
     @test !any(isnan, T_ts)
-    @test T_ts[end] > T_ts[1] 
+    @test T_ts[end] > T_ts[1]
 end
 
 @testset "Python parity: MTR symmetric" begin
@@ -473,7 +473,7 @@ end
     assert_equivalence_geometry(geom_mtr,
         PARITY_MTR_GEOM_DH, PARITY_MTR_GEOM_AREA,
         PARITY_MTR_GEOM_WETPERIM, PARITY_MTR_GEOM_HEATED;
-        rtol=1e-9) 
+        rtol=1e-9)
     assert_equivalence_anchors()
 
     nz = 10
@@ -851,7 +851,7 @@ try
     op_ic_v01 = [ssys_v01.hd_v01.T[i, j] => T0 for i in 1:nz_v01 for j in 1:nx_v01]
 
     t_checkpoints = [0.5 * tau_v01, tau_v01, 2 * tau_v01, 5 * tau_v01]
-    tspan_v01 = (0.0, 5.0 * tau_v01 * 1.01)  
+    tspan_v01 = (0.0, 5.0 * tau_v01 * 1.01)
     prob_v01 = ODEProblem(ssys_v01, op_ic_v01, tspan_v01; warn_initialize_determined=false)
     # All plate cells are given consistent ICs (uniform T0); the only algebraic vars
     # (thermal-port Q_flow) are explicit in those ICs. MTK's auto-generated OverrideInit

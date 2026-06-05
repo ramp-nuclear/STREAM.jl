@@ -19,7 +19,7 @@ function _diffusion_eqs(;
         [
             thermal_left[i].Q_flow ~
                 k_s * (y * dz) * (thermal_left[i].T - T[i, 1]) / (dx / 2) for i in 1:nz
-        ]...  # Left heat flux 
+        ]...  # Left heat flux
         [
             thermal_right[i].Q_flow ~
                 k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2) for i in 1:nz
@@ -100,13 +100,13 @@ function HeatDiffusion(; name,
         T             = T_var,
         thermal_left  = thermal_left,
         thermal_right = thermal_right,
-        nz            = nz, 
+        nz            = nz,
         nx            = nx,
-        k_s           = k_s, 
-        rho_s         = rho_s, 
+        k_s           = k_s,
+        rho_s         = rho_s,
         cp_s          = cp_s,
-        dx            = dx, 
-        dz            = dz, 
+        dx            = dx,
+        dz            = dz,
         y             = y,
         power         = power_var,
         power_shape   = power_shape)

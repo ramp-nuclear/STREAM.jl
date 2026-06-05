@@ -397,7 +397,7 @@ import ModelingToolkit: compose
             eqs = connect_temperature_feedback(pk, [ch, fuel])
             @test length(eqs) == 11
         end
-    end 
+    end
 
     @testset "TF-05: Components Unchanged (regression guard)" begin
         proj_root = pkgdir(STREAM)
@@ -410,7 +410,7 @@ import ModelingToolkit: compose
             @test !occursin("temp_worth", src)
             @test !occursin("connect_temperature_feedback", src)
         end
-    end  
+    end
 
     @testset "SCRAM-01: SCRAM_at_power struct and callable" begin
         sc = SCRAM_at_power(1.5)
@@ -469,4 +469,4 @@ import ModelingToolkit: compose
         t_scram = ctrl.log[end][2]
         @test t_scram > t_step
     end
-end 
+end

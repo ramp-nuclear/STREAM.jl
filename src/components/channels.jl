@@ -176,8 +176,8 @@ end
     Channel(; name, n, geometry, g=0.0, h_left=0.0, h_right=0.0,
             friction_correlation=blasius_friction) -> ODESystem
 
-Single-phase convective channel with `n` axial finite-volume cells. 
-`Heat flux is defined by external temperature (required closure post process) and 
+Single-phase convective channel with `n` axial finite-volume cells.
+`Heat flux is defined by external temperature (required closure post process) and
 `prescribed heat transfer coefficient.
 A `WallTemperature` source can be used as a closure, for example.
 
@@ -271,9 +271,9 @@ function Channel(;
     end
 
     core = _channel_core(;
-        n=n, 
-        port_in=port_in, 
-        port_out=port_out, 
+        n=n,
+        port_in=port_in,
+        port_out=port_out,
         geometry=geometry,
         g_acc=g, friction_correlation=friction_correlation,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
@@ -356,9 +356,9 @@ function ChannelHeatFlux(;
     end
 
     core = _channel_core(;
-        n=n, 
-        port_in=port_in, 
-        port_out=port_out, 
+        n=n,
+        port_in=port_in,
+        port_out=port_out,
         geometry=geometry,
         g_acc=g, friction_correlation=friction_correlation,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
@@ -402,7 +402,7 @@ function _h_eq_nocor(Tw::Real, T::Real, mdot::Real, Dh::Real, A::Real, htc, nu_f
 end
 
 
-function _h_eq_scb_cor(T_w::Real, T::Real, cumdp::Real, dp::Real, htc, mdot::Real, 
+function _h_eq_scb_cor(T_w::Real, T::Real, cumdp::Real, dp::Real, htc, mdot::Real,
                        P_in::Real, Dh::Real, A::Real, nu_f::Function, scb_f::Function)
     h_spl = _h_spl(T_w, T, mdot, Dh, A, nu_f)
     q_spl = max(h_spl * (T_w - T), 0.0)
@@ -426,8 +426,8 @@ end
 
 Convective channel with per-cell `ThermalPort` arrays on both sides for conjugate heat
 transfer (the variant that connects to `HeatDiffusion`). Internal HTC correlation
-(single-phase or correlation+SCB-enhanced) drives per-cell `h_tc[i]`; 
-Heat flux is computed as `h_tc[i] * heated_parts * dz * (T_wall - T[i])` 
+(single-phase or correlation+SCB-enhanced) drives per-cell `h_tc[i]`;
+Heat flux is computed as `h_tc[i] * heated_parts * dz * (T_wall - T[i])`
 The wall temperature is connected through thermal port arrays.
 
 # Arguments
@@ -458,7 +458,7 @@ function ChannelAndContacts(;
     friction_correlation=blasius_friction,
     scb_correction=nothing,
 )
-    
+
     pars, vars, port_in, port_out = _setup(geometry, g, n)
     thermal_left  = [ThermalPort(; name=Symbol(:thermal_left,  i)) for i in 1:n]
     thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:n]
@@ -484,33 +484,33 @@ function ChannelAndContacts(;
 
     if scb_correction === nothing
         variant_eqs = [
-            [_h_eq_nocor(thermal_left[i].T,  vars.T[i], port_in.mdot, Dh, A, h_tc_left[i], htc_correlation) 
+            [_h_eq_nocor(thermal_left[i].T,  vars.T[i], port_in.mdot, Dh, A, h_tc_left[i], htc_correlation)
              for i in 1:n]...;
-            [_h_eq_nocor(thermal_right[i].T, vars.T[i], port_in.mdot, Dh, A, h_tc_right[i], htc_correlation) 
+            [_h_eq_nocor(thermal_right[i].T, vars.T[i], port_in.mdot, Dh, A, h_tc_right[i], htc_correlation)
              for i in 1:n]...
         ]
     else
         variant_eqs = [
-            [_h_eq_scb_cor(thermal_left[i].T,  vars.T[i], sum(vars.dp[j] for j in 1:i), 
-                           vars.dp[i], h_tc_left[i],  port_in.mdot, port_in.P, Dh, A, htc_correlation, scb_correction) 
+            [_h_eq_scb_cor(thermal_left[i].T,  vars.T[i], sum(vars.dp[j] for j in 1:i),
+                           vars.dp[i], h_tc_left[i],  port_in.mdot, port_in.P, Dh, A, htc_correlation, scb_correction)
                            for i in 1:n]...;
-            [_h_eq_scb_cor(thermal_right[i].T, vars.T[i], sum(vars.dp[j] for j in 1:i), 
-                           vars.dp[i], h_tc_right[i], port_in.mdot, port_in.P, Dh, A, htc_correlation, scb_correction) 
+            [_h_eq_scb_cor(thermal_right[i].T, vars.T[i], sum(vars.dp[j] for j in 1:i),
+                           vars.dp[i], h_tc_right[i], port_in.mdot, port_in.P, Dh, A, htc_correlation, scb_correction)
                            for i in 1:n]...;
         ]
     end
 
     q_left_expr =  [h_tc_left[i]  * geometry.heated_parts[1] * dz * (thermal_left[i].T   - vars.T[i]) for i in 1:n]
     q_right_expr = [h_tc_right[i] * geometry.heated_parts[2] * dz * (thermal_right[i].T  - vars.T[i]) for i in 1:n]
-    variant_eqs = [variant_eqs...; 
+    variant_eqs = [variant_eqs...;
                    [thermal_left[i].Q_flow  ~ q_left_expr[i]  for i in 1:n]...;
                    [thermal_right[i].Q_flow ~ q_right_expr[i] for i in 1:n]...;
                    ]
 
     core = _channel_core(;
-        n=n, 
-        port_in=port_in, 
-        port_out=port_out, 
+        n=n,
+        port_in=port_in,
+        port_out=port_out,
         geometry=geometry,
         g_acc=g, friction_correlation=friction_correlation,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
@@ -521,9 +521,9 @@ function ChannelAndContacts(;
     Gr_left  = [Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_left[i].T ,  vars.T[i], Dh, g) for i in 1:n]
     Gr_right = [Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_right[i].T , vars.T[i], Dh, g) for i in 1:n]
     variant_obs = [
-        [Nu_left[i]  ~ _nu_film(thermal_left[i].T,  vars.T[i], port_in.mdot, Dh, A, htc_correlation) 
+        [Nu_left[i]  ~ _nu_film(thermal_left[i].T,  vars.T[i], port_in.mdot, Dh, A, htc_correlation)
          for i in 1:n]...;
-        [Nu_right[i] ~ _nu_film(thermal_right[i].T, vars.T[i], port_in.mdot, Dh, A, htc_correlation) 
+        [Nu_right[i] ~ _nu_film(thermal_right[i].T, vars.T[i], port_in.mdot, Dh, A, htc_correlation)
          for i in 1:n]...;
         [vars.T_wall_left[i] ~ thermal_left[i].T for i in 1:n]...;
         [vars.T_wall_right[i] ~ thermal_right[i].T for i in 1:n]...;

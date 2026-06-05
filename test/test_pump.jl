@@ -18,7 +18,7 @@ using STREAM: Pump, Channel
         pump5.port_in.P ~ 1e5,
     ]
     @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
-    ssys5 = mtkcompile(sys5; fully_determined=false) 
+    ssys5 = mtkcompile(sys5; fully_determined=false)
     op5 = Pair{Any,Any}[ssys5.ch5.port_in.mdot => 0.6]
     append!(op5, [ssys5.ch5.T[i] => 313.15 for i in 1:5])
     sol5 = solve_steady(ssys5, op5)
@@ -56,14 +56,14 @@ end
     push!(op_r, ssys_r.ch_r.port_in.mdot => 0.490)
     sol_r = solve_steady(ssys_r, op_r)
     @test sol_r.retcode == ReturnCode.Success
-    @test sol_r[ssys_r.ch_r.port_in.mdot] > 0 
+    @test sol_r[ssys_r.ch_r.port_in.mdot] > 0
 end
 
 @testset "PUMP-01: Callable pump dispatch" begin
     dP_fn = t -> 1e5 * (1 - t / 100.0)
     @named pump_c = Pump(dP_fn)
     @test pump_c isa ModelingToolkit.System
-    @test_nowarn mtkcompile(pump_c; fully_determined=false) 
+    @test_nowarn mtkcompile(pump_c; fully_determined=false)
 end
 
 @testset "PUMP-03: Callable pump ramp — mdot decays to zero" begin
@@ -93,7 +93,7 @@ end
     @named sys = compose(System(conns, t; name=:pump03), pump, ine, res)
     ssys = mtkcompile(sys; fully_determined=false)
 
-    mdot_0 = dP0 / R_val  
+    mdot_0 = dP0 / R_val
     op = [ssys.ine.port_in.mdot => mdot_0, ssys.pump.dP_pump_fn => dP_fn]
 
     t_arr = range(0.0, T_ramp, length=1000)
