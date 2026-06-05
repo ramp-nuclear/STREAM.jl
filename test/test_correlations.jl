@@ -34,13 +34,13 @@ using STREAM:
     @testset "dittus_boelter standalone function" begin
         # 0.023 * 8000^0.8 * 7^0.4
         expected_Nu = 0.023 * 8000.0^0.8 * 7.0^0.4
-        @test isapprox(dittus_boelter(8000.0, 7.0), expected_Nu; rtol=1e-6)
+        @test isapprox((@inferred dittus_boelter(8000.0, 7.0)), expected_Nu; rtol=1e-6)
     end
 
     @testset "blasius_friction standalone function" begin
         # 0.3164 * 8000^(-0.25)
         expected_f = 0.3164 * 8000.0^(-0.25)
-        @test isapprox(blasius_friction(8000.0), expected_f; rtol=1e-6)
+        @test isapprox((@inferred blasius_friction(8000.0)), expected_f; rtol=1e-6)
     end
 
     @testset "constant_Nusselt factory" begin
