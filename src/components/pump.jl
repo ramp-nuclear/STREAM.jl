@@ -1,9 +1,9 @@
 # pump.jl — Pump component for STREAM.jl
 
 """
-    Pump(dP_pump::Real; name) -> ODESystem
-    Pump(dP_pump::Any; name) -> ODESystem
-    Pump(; name, mdot0) -> ODESystem
+    Pump(dP_pump::Real; name) -> System
+    Pump(dP_pump::Any; name) -> System
+    Pump(; name, mdot0) -> System
 
 Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch methods:
 
@@ -37,7 +37,7 @@ Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function Pump(dP_pump::Real; name)
     pars = @parameters dP_pump = dP_pump

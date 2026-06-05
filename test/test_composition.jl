@@ -792,8 +792,8 @@ end
     @test_throws ArgumentError fuel_assembly([c1, c2, c3], [p1, p2]; closed=true, name=:bad)
 end
 
-# #### Smoke: helper returns an uncompiled ODESystem (no premature mtkcompile)
-@testset "fuel_assembly — uncompiled ODESystem smoke" begin
+# #### Smoke: helper returns an uncompiled System (no premature mtkcompile)
+@testset "fuel_assembly — uncompiled System smoke" begin
     # Build the cheapest variant-3 mixed k=2 instance and confirm the helper
     # returned an UNCOMPILED system (caller is responsible for adding BCs
     # then calling mtkcompile — see helper docstring). A bare `mtkcompile`

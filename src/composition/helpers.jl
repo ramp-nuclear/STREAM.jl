@@ -92,7 +92,7 @@ function _infer_n(sys)
 end
 
 """
-    symmetric_plate(cac, fuel; name) -> ODESystem
+    symmetric_plate(cac, fuel; name) -> System
 
 Wire one `HeatDiffusion` fuel plate symmetrically to one `ChannelAndContacts` channel.
 
@@ -102,7 +102,7 @@ Wire one `HeatDiffusion` fuel plate symmetrically to one `ChannelAndContacts` ch
 - `name`: system name (Symbol)
 
 # Returns
-Uncompiled `ODESystem` from `compose()`. Add boundary conditions, then `mtkcompile()`.
+Uncompiled `System` from `compose()`. Add boundary conditions, then `mtkcompile()`.
 
 After calling this function, refer to sub-components exclusively via the returned system
 (e.g. `rods.cac`, `rods.fuel`). The original component variables hold unscoped symbolic
@@ -122,7 +122,7 @@ function symmetric_plate(cac, fuel; name::Symbol)
 end
 
 """
-    plate(ch_left, ch_right, fuel; name) -> ODESystem
+    plate(ch_left, ch_right, fuel; name) -> System
 
 Wire a `HeatDiffusion` fuel plate between two `ChannelAndContacts` channels (left and right faces).
 
@@ -133,7 +133,7 @@ Wire a `HeatDiffusion` fuel plate between two `ChannelAndContacts` channels (lef
 - `name`: system name (Symbol)
 
 # Returns
-Uncompiled `ODESystem` from `compose()`.
+Uncompiled `System` from `compose()`.
 
 After calling this function, refer to sub-components exclusively via the returned system
 (e.g. `rods.ch_left`, `rods.fuel`). The original component variables hold unscoped symbolic
@@ -155,7 +155,7 @@ function plate(ch_left, ch_right, fuel; name::Symbol)
 end
 
 """
-    one_sided_connection(channel, fuel; side=:left, name) -> ODESystem
+    one_sided_connection(channel, fuel; side=:left, name) -> System
 
 Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channel.
 
@@ -166,7 +166,7 @@ Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channe
 - `name`: system name (Symbol)
 
 # Returns
-Uncompiled `ODESystem` from `compose()`.
+Uncompiled `System` from `compose()`.
 
 After calling this function, refer to sub-components exclusively via the returned system
 (e.g. `osc.channel`, `osc.fuel`). The original component variables hold unscoped symbolic
@@ -191,7 +191,7 @@ function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
 end
 
 """
-    compose_systems(systems...; connections, name) -> ODESystem
+    compose_systems(systems...; connections, name) -> System
 
 Compose multiple MTK systems with explicit connection equations into a single system.
 
@@ -201,7 +201,7 @@ Compose multiple MTK systems with explicit connection equations into a single sy
 - `name`: system name (Symbol)
 
 # Returns
-Uncompiled `ODESystem` ready for `mtkcompile()`.
+Uncompiled `System` ready for `mtkcompile()`.
 """
 function compose_systems(systems...; connections::Vector{<:Equation}, name::Symbol)
     return compose(System(connections, t; name=name), systems...)
@@ -211,7 +211,7 @@ end
 # fuel_assembly — alternating channel <-> plate chains.
 # Builds the per-cell thermal connections for the four chain shapes
 # (channel-bookended, plate-bookended, mixed, and closed ring) and returns the
-# uncompiled ODESystem. The caller adds boundary conditions and compiles.
+# uncompiled System. The caller adds boundary conditions and compiles.
 #
 # Wiring: each adjacent pair connects the left member's right face to the right
 # member's left face (same convention as `plate`). Outer faces left dangling
@@ -242,7 +242,7 @@ function _pair_connections(left::Tuple{Symbol,Any}, right::Tuple{Symbol,Any}, n:
 end
 
 """
-    fuel_assembly(channels, plates; bookend=:auto, start=nothing, closed=false, name) -> ODESystem
+    fuel_assembly(channels, plates; bookend=:auto, start=nothing, closed=false, name) -> System
 
 Compose an alternating CAC↔Plate chain (fuel-assembly topology) from a vector of
 `ChannelAndContacts` instances and a vector of `HeatDiffusion` plates.
@@ -280,7 +280,7 @@ is taken from `channels[1]`; a mismatch across the vector is caught by MTK at
 `mtkcompile()` time.
 
 # Returns
-Uncompiled `ODESystem` from `compose()`. Add boundary conditions (pump loop, pressure
+Uncompiled `System` from `compose()`. Add boundary conditions (pump loop, pressure
 anchor, power binding), then `mtkcompile(...; build_initializeprob=false)`.
 
 After composition, sub-components are reachable through their original `@named` names

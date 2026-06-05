@@ -48,7 +48,7 @@ function _diffusion_eqs(;
     ]
 end
 """
-    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=600.0) -> ODESystem
+    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=600.0) -> System
 
 2D finite-difference heat diffusion plate with axial (`nz`) and lateral (`nx`) cells.
 
@@ -71,7 +71,7 @@ end
 - `thermal_left[1:nz]`, `thermal_right[1:nz]` -- `ThermalPort` arrays (no FlowPorts)
 
 # Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 #! format: off
 function HeatDiffusion(; name,

@@ -2,7 +2,7 @@
 #
 
 """
-    WallTemperature(; name, n, T_wall) -> ODESystem
+    WallTemperature(; name, n, T_wall) -> System
 
 Portless "value source" subsystem exposing per-cell wall temperature outputs
 `T_wall_out(t)[1:n]`. Used to drive `Channel.T_wall_left[i]` / `Channel.T_wall_right[i]`
@@ -58,7 +58,7 @@ function WallTemperature(;
 end
 
 """
-    HeatFluxSource(; name, n, q) -> ODESystem
+    HeatFluxSource(; name, n, q) -> System
 
 Portless "value source" subsystem exposing per-cell heat flux density outputs
 `q_out(t)[1:n]` [W/m^2]. Used to drive `ChannelHeatFlux.q_left[i]` /

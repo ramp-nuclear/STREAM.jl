@@ -3,7 +3,7 @@
 
 """
     build_loop(; n=10, T_inlet=313.15, T_wall=373.15, h_wall=5000.0,
-                 L_ch=0.6, D_ch=0.01, dP_pump=3.0e4) -> ODESystem
+                 L_ch=0.6, D_ch=0.01, dP_pump=3.0e4) -> System
 
 Build a simple steady-state horizontal flow loop (Pump + HeatExchanger + Channel).
 
@@ -17,7 +17,7 @@ Build a simple steady-state horizontal flow loop (Pump + HeatExchanger + Channel
 - `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
 
 # Returns
-Compiled `ODESystem` (already passed through `mtkcompile`).
+Compiled `System` (already passed through `mtkcompile`).
 """
 #! format: off
 function build_loop(;
@@ -60,7 +60,7 @@ end
 """
     build_loop_vertical(; n=10, T_inlet=313.15, T_wall=373.15, h_wall=5000.0,
                          L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
-                         g_acc=9.80665, H_return=nothing) -> ODESystem
+                         g_acc=9.80665, H_return=nothing) -> System
 
 Build a vertical flow loop with gravity (Pump + HeatExchanger + Channel + Gravity).
 
@@ -76,7 +76,7 @@ Build a vertical flow loop with gravity (Pump + HeatExchanger + Channel + Gravit
 - `H_return`: height of return leg [m], defaults to `L_ch` for cancellation geometry
 
 # Returns
-Compiled `ODESystem`.
+Compiled `System`.
 """
 #! format: off
 function build_loop_vertical(;
@@ -125,7 +125,7 @@ end
 """
     build_loop_transient(; n=10, T_inlet=313.15, T_wall_0=373.15, h_wall=5000.0,
                           L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
-                          T_wall_fn=nothing) -> ODESystem
+                          T_wall_fn=nothing) -> System
 
 Build a transient-capable flow loop. When `T_wall_fn` is provided (a callable `t -> K`),
 wall temperature is time-varying via an MTK callable parameter at the builder level
@@ -147,7 +147,7 @@ When using a callable `T_wall_fn`, the caller must include the callable paramete
 - `T_wall_fn`: optional callable `(t) -> K` for time-varying wall temperature
 
 # Returns
-Compiled `ODESystem` (already passed through `mtkcompile`).
+Compiled `System` (already passed through `mtkcompile`).
 """
 #! format: off
 function build_loop_transient(;
@@ -207,7 +207,7 @@ function build_loop_transient(;
 end
 
 """
-    build_cube(; dP_pump=3.0e4, R=1.0e4) -> ODESystem
+    build_cube(; dP_pump=3.0e4, R=1.0e4) -> System
 
 Build a two-branch parallel network (cube topology) for network solver validation.
 
@@ -216,7 +216,7 @@ Build a two-branch parallel network (cube topology) for network solver validatio
 - `R`: branch resistance [Pa/(kg/s)] (default 1.0e4)
 
 # Returns
-Compiled `ODESystem`.
+Compiled `System`.
 """
 function build_cube(; dP_pump=3.0e4, R=1.0e4)
     @named pump = Pump(dP_pump)
@@ -284,7 +284,7 @@ end
     build_loop_lof_bypass(; n=10, L_ch=1.0, D_ch=0.01, T_inlet=313.15,
                             power_W=1.0e3, fuel_nx=2, fuel_Lx=0.005,
                             L_over_A=1.75e5, g_acc=9.80665,
-                            R_ext=1.0e6, dt_ramp=5.0) -> ODESystem
+                            R_ext=1.0e6, dt_ramp=5.0) -> System
 
 Build a loss-of-flow validation loop with bypass topology. Heated leg uses
 `ChannelAndContacts + HeatDiffusion` plate via `one_sided_connection` — Phase 55
@@ -347,7 +347,7 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
   supply a function that holds the pre-trip head then ramps to 0 (see the IC idiom above).
 
 # Returns
-Compiled `ODESystem` (via `mtkcompile(sys)`).
+Compiled `System` (via `mtkcompile(sys)`).
 """
 #! format: off
 function build_loop_lof_bypass(;
@@ -463,7 +463,7 @@ end
 """
     build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=293.15, dP_pump=3.0e4,
                   P0=1.0, power_scale=1e4, temp_worth=nothing, ref_temp=nothing,
-                  rho_val=0.0) -> (ODESystem, Vector{Pair{Any,Any}})
+                  rho_val=0.0) -> (System, Vector{Pair{Any,Any}})
 
 Build a full thermal-hydraulic loop coupled to a `PointKinetics` reactor model
 (pump + HeatExchanger + ChannelAndContacts + HeatDiffusion + PointKinetics).
@@ -471,7 +471,7 @@ This is the primary integration-validation builder for Phase 49: it proves that
 PK+T-H coupling compiles, solves stably, responds to reactivity insertion with
 negative temperature feedback, and terminates correctly on SCRAM.
 
-Unlike other `build_loop_*` builders which return only a compiled `ODESystem`,
+Unlike other `build_loop_*` builders which return only a compiled `System`,
 `build_loop_pk` returns `(ssys, ic)` — the compiled system AND a ready-to-use
 initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 `solve_transient`.
@@ -500,7 +500,7 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 
 # Returns
 `(ssys, ic)` where:
-- `ssys`: compiled `ODESystem` (passed through `mtkcompile`)
+- `ssys`: compiled `System` (passed through `mtkcompile`)
 - `ic`: `Vector{Pair{Any,Any}}` initial conditions including PK state
   (P, C_1..C_6, rho_c_fn), hydraulic IC (port_in.mdot), and thermal ICs
   (cac.T[i] and fuel.T[i,j]). Pass directly to `solve_transient(ssys, ic, t)`.

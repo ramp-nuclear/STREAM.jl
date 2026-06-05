@@ -174,7 +174,7 @@ end
 
 """
     Channel(; name, n, geometry, g=0.0, h_left=0.0, h_right=0.0,
-            friction_correlation=blasius_friction) -> ODESystem
+            friction_correlation=blasius_friction) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
 `Heat flux is defined by external temperature (required closure post process) and
@@ -217,7 +217,7 @@ connections = [
   *No thermal ports — see external-input variables above.*
 
 # Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function Channel(;
     name,
@@ -294,7 +294,7 @@ end
 
 """
     ChannelHeatFlux(; name, n, geometry, g=0.0,
-                    friction_correlation=blasius_friction) -> ODESystem
+                    friction_correlation=blasius_friction) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
 Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource` source).
@@ -331,7 +331,7 @@ connections = [
   *No heat-flux ports — see external-input variables above.*
 
 # Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function ChannelHeatFlux(;
     name,
@@ -422,7 +422,7 @@ end
     ChannelAndContacts(; name, n, geometry, g=0.0,
                        htc_correlation=dittus_boelter,
                        friction_correlation=blasius_friction,
-                       scb_correction=nothing) -> ODESystem
+                       scb_correction=nothing) -> System
 
 Convective channel with per-cell `ThermalPort` arrays on both sides for conjugate heat
 transfer (the variant that connects to `HeatDiffusion`). Internal HTC correlation
@@ -447,7 +447,7 @@ The wall temperature is connected through thermal port arrays.
 - `thermal_left[1:n]`, `thermal_right[1:n]` -- `ThermalPort` arrays (one per axial cell, per side)
 
 # Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function ChannelAndContacts(;
     name,

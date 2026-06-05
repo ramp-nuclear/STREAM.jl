@@ -1,7 +1,7 @@
 # misc.jl — Inertia, HeatExchanger, ConstantTemperature components for STREAM.jl
 
 """
-    Inertia(L_over_A; name) -> ODESystem
+    Inertia(L_over_A; name) -> System
 
 Concentrated fluid inertia element for transient simulations. Adds `L/A * d(mdot)/dt`
 to the momentum equation.
@@ -20,7 +20,7 @@ network topology -- correct physics (distributed + concentrated).
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function Inertia(L_over_A; name)
     pars = @parameters L_over_A = L_over_A
@@ -36,7 +36,7 @@ function Inertia(L_over_A; name)
 end
 
 """
-    HeatExchanger(T_bc; name) -> ODESystem
+    HeatExchanger(T_bc; name) -> System
 
 Ideal heat exchanger that resets fluid temperature to a fixed boundary condition.
 
@@ -48,7 +48,7 @@ Ideal heat exchanger that resets fluid temperature to a fixed boundary condition
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function HeatExchanger(T_bc; name)
     pars = @parameters T_bc = T_bc
@@ -64,7 +64,7 @@ function HeatExchanger(T_bc; name)
 end
 
 """
-    ConstantTemperature(T; name) -> ODESystem
+    ConstantTemperature(T; name) -> System
 
 Constant-temperature thermal boundary condition.
 
@@ -76,7 +76,7 @@ Constant-temperature thermal boundary condition.
 - `thermal` -- `ThermalPort` (single port, used as a wall BC)
 
 # Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function ConstantTemperature(T; name)
     pars = @parameters T_bc = T
