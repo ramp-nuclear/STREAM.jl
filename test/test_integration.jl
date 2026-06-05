@@ -1260,3 +1260,138 @@ end
     sol = solve_transient(ssys, op, range(0.0, t_final; length=302); reltol=1e-6, abstol=1e-7)
     @test sol.retcode == ReturnCode.Success    # convergence is the gate
 end
+
+@testset "kirchhoff with decaying pump eventually flips flow direction (gravity)" begin
+    # Python: test_kirchhoff_with_decaying_pump_eventually_flips_flow_direction_gravity
+    # A decaying-head pump drives flow against two opposed gravity legs (hot up / cold down)
+    # plus a resistor. Each leg's coolant temperature is pinned by a HeatExchanger (Python's
+    # per-component Tin). At t=0 the resistor pressure drop is p0 - g·Δρ; as the head decays
+    # past the buoyancy head g·Δρ the flow reverses. No inertia ⇒ the loop is quasi-static:
+    # solve_steady per time-point with the pump head overridden, the MTK reading of Python's
+    # decaying-pressure current source.
+    p0 = 4000.0
+    high_T = 333.15   # Python 60 C
+    low_T = 293.15    # Python 20 C
+    g_acc = 9.80665
+    @named pump = Pump(p0)              # fixed-pressure; dP_pump overridden per t (quasi-static)
+    @named HX_hot = HeatExchanger(high_T)
+    @named HX_cold = HeatExchanger(low_T)
+    # Gravity must oppose the pumped flow so the decay reverses it. Julia's Gravity drop is
+    # +ρgH along flow ("drop along flow"), the opposite reference to Python's "positive-down"
+    # pressure_diff, so the hot leg takes H=-1 and the cold leg H=+1 (Python's g1=+1, g2=-1).
+    @named G1 = Gravity(-1.0)           # hot leg
+    @named G2 = Gravity(1.0)            # cold leg
+    @named R = Resistor(1.0e5)
+    conns = [
+        connect(pump.port_out, HX_hot.port_in),
+        connect(HX_hot.port_out, G1.port_in),
+        connect(G1.port_out, HX_cold.port_in),
+        connect(HX_cold.port_out, G2.port_in),
+        connect(G2.port_out, R.port_in),
+        connect(R.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:decay_grav), pump, HX_hot, HX_cold, G1, G2, R)
+    ssys = mtkcompile(sys)
+    delta_rho = rho_water(low_T) - rho_water(high_T)   # = ρ(low_T) - ρ(high_T) > 0
+    times = range(0.0, 10.0; length=10)
+    mdot = Float64[]
+    rdrop0 = 0.0
+    for (i, tt) in enumerate(times)
+        sol = solve_steady(ssys, Pair{Any,Any}[ssys.pump.dP_pump => p0 * exp(-tt),
+                                               ssys.R.port_in.mdot => p0 / 1.0e5])
+        @test sol.retcode == ReturnCode.Success
+        push!(mdot, sol[ssys.R.port_in.mdot])
+        i == 1 && (rdrop0 = sol[ssys.R.port_in.P] - sol[ssys.R.port_out.P])
+    end
+    # Python asserts r.pressure = g·Δρ - p0; its "pressure" is the negative of the Julia
+    # in→out drop R·mdot, so the Julia drop is p0 - g·Δρ (same magnitude).
+    @test isapprox(rdrop0, p0 - g_acc * delta_rho; rtol=1e-6)
+    @test mdot[end] < 0    # flow reverses once the head decays past the buoyancy head
+end
+
+@testset "pump coastdown allows channels to reverse flow direction" begin
+    # Python: test_pump_coastdown_allows_channels_to_reverse_flow_direction
+    # Two vertical channels (one hot, one cold, opposite g) with a pump driving flow against
+    # buoyancy. As the pump coasts down the gravitational head wins and the flow reverses; the
+    # zero-crossing occurs when the pump head equals the buoyancy head L·g·Δρ. Python's #16 is
+    # inertia-free (no KirchhoffWDerivatives ⇒ the channel mdot2 term is None), so the faithful
+    # match is quasi-static: solve_steady per time-point with the head decaying. Julia channels
+    # always carry distributed inertia, so the per-point solve uses DynamicSS to reach the true
+    # quasi-static steady (the default root-finder converges to the spurious mdot=0 root).
+    D_pipe = 0.10
+    mdot0 = 1.0
+    T_cold = 293.15
+    T_hot = 353.15    # Python 80 C
+    g_acc = 9.80665
+    geom = PipeGeometry_circular(1.0, D_pipe)
+    nz = 9            # Python z_boundaries = linspace(0, L, 10) -> 9 cells
+    # Laminar friction f = 64/Re is linear in mdot near the zero-crossing (Python's
+    # regime_dependent reduces to laminar there), keeping the coastdown well-behaved through 0.
+    fric = (Re) -> 64.0 / Re
+    @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, fluid=Water(), friction_correlation=fric)
+    @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, fluid=Water(), friction_correlation=fric)
+    # Bracket each adiabatic channel with same-temperature HeatExchangers on BOTH ends so its
+    # coolant stays pinned under reversal too (Python pins both Tin and Tin_minus per channel).
+    @named HXc1 = HeatExchanger(T_cold)
+    @named HXc2 = HeatExchanger(T_cold)
+    @named HXh1 = HeatExchanger(T_hot)
+    @named HXh2 = HeatExchanger(T_hot)
+    function build_coastdown(pumpcomp)
+        conns = [
+            connect(pumpcomp.port_out, HXc1.port_in),
+            connect(HXc1.port_out, cold.port_in),
+            connect(cold.port_out, HXc2.port_in),
+            connect(HXc2.port_out, HXh1.port_in),
+            connect(HXh1.port_out, hot.port_in),
+            connect(hot.port_out, HXh2.port_in),
+            connect(HXh2.port_out, pumpcomp.port_in),
+            pumpcomp.port_in.P ~ 1.0e5,
+        ]
+        return mtkcompile(compose(System(conns, t; name=:coastdown), pumpcomp,
+                                  HXc1, HXc2, HXh1, HXh2, cold, hot))
+    end
+
+    # Forced-flow steady at mdot0 → the pump head that holds it (Python's steady pump pressure).
+    @named pump = Pump(; mdot0=mdot0)
+    ssys = build_coastdown(pump)
+    guess = Pair{Any,Any}[ssys.cold.port_in.mdot => mdot0]
+    append!(guess, [ssys.cold.T[i] => T_cold for i in 1:nz])
+    append!(guess, [ssys.hot.T[i] => T_hot for i in 1:nz])
+    sol0 = solve_steady(ssys, guess)
+    @test sol0.retcode == ReturnCode.Success
+    p_pump0 = sol0[ssys.pump.port_out.P] - sol0[ssys.pump.port_in.P]
+    delta_rho = rho_water(T_cold) - rho_water(T_hot)
+    grav_dp = 1.0 * g_acc * delta_rho   # L·g·Δρ, the buoyancy head
+
+    # Coastdown: fixed-pressure pump, head = p_pump0·exp(-t) overridden per time-point.
+    @named pump2 = Pump(p_pump0)
+    ssys2 = build_coastdown(pump2)
+    Dt = Differential(t)
+    K_eff = p_pump0 - grav_dp           # laminar ⇒ loop drop linear: pump - grav = K_eff·mdot
+    times = range(0.0, 0.05; length=150)
+    mdot = Float64[]
+    coldT = Float64[]
+    hotT = Float64[]
+    for tt in times
+        op = Pair{Any,Any}[ssys2.pump2.dP_pump => p_pump0 * exp(-tt),
+                           ssys2.cold.port_in.mdot => (p_pump0 * exp(-tt) - grav_dp) / K_eff,
+                           Dt(ssys2.hot.port_in.mdot) => 0.0,
+                           Dt(ssys2.cold.port_in.mdot) => 0.0]
+        append!(op, [ssys2.cold.T[i] => T_cold for i in 1:nz])
+        append!(op, [ssys2.hot.T[i] => T_hot for i in 1:nz])
+        sol = solve_steady(ssys2, op; solver=DynamicSS(Rodas5P()))
+        @test sol.retcode == ReturnCode.Success
+        push!(mdot, sol[ssys2.cold.port_in.mdot])
+        push!(coldT, sol[ssys2.cold.T_out])
+        push!(hotT, sol[ssys2.hot.T_out])
+    end
+    @test mdot[1] > 0                       # starts forward
+    @test all(diff(mdot) .< 0)              # monotonically decreasing
+    @test mdot[1] > 0 > mdot[end]           # reverses
+    @test all(isapprox.(coldT, T_cold; rtol=1e-4))   # coolant temps stay pinned (HX-bracketed)
+    @test all(isapprox.(hotT, T_hot; rtol=1e-4))
+    # Crossing occurs when the pump head equals the buoyancy head L·g·Δρ.
+    p_cross = p_pump0 * exp(-times[argmin(abs.(mdot))])
+    @test isapprox(p_cross, grav_dp; rtol=1e-3)
+end

@@ -24,7 +24,7 @@ Status legend: ✅ ported & passing · 🟡 partial/divergent counterpart · ⬜
 | 3 | `test_resistors_in_series_against_analytic_solution` | ✅ | A | Resistor (have) |
 | 4 | `test_channel_stable_state_with_uniform_heating_increases_linearly` | 🟡 | B | mock-fluid path for exact linear-rise numbers |
 | 5 | `test_channel_point_kinetics` | 🟡 | B | mock fluids; per-channel linear-Tc assertion |
-| 6 | `test_kirchhoff_with_decaying_pump_eventually_flips_flow_direction_gravity` | ⬜ | A | Pump (callable dP) + Gravity (have) |
+| 6 | `test_kirchhoff_with_decaying_pump_eventually_flips_flow_direction_gravity` | ✅ | A | quasi-static per-t solve_steady; HX-pinned leg temps; reverses |
 | 7 | `test_Tin_jumps_at_resistor_between_two_hxs_at_flow_reversal` | ✅ | A | HX + Resistor (have) |
 | 8 | `test_power_is_negligible_for_negative_Tfuel_feedback_and_ref_temp_is_boundary_conditions` | 🟡 | B | Fuel+PK (have); steady power→0 assertion |
 | 9 | `test_power_is_negligible_for_negative_Tcool_feedback_and_ref_temp_is_inlet` | 🟡 | B | has counterpart; align numbers/method |
@@ -34,14 +34,14 @@ Status legend: ✅ ported & passing · 🟡 partial/divergent counterpart · ⬜
 | 13 | `test_pump_and_current_source` | ✅ | A | Pump fixed-dP + fixed-mdot (have) |
 | 14 | `test_flapper_opens_with_ref_mdot` | ✅ | A | Flapper reworked to Python semantics; `t_open=log(10)` |
 | 15 | `test_flapper_and_pump` | ✅ | A | Flapper+Pump; pre-timed open |
-| 16 | `test_pump_coastdown_allows_channels_to_reverse_flow_direction` | 🟡 | A | Channels (have); analytic gravity zero-crossing |
+| 16 | `test_pump_coastdown_allows_channels_to_reverse_flow_direction` | ✅ | A | quasi-static per-t DynamicSS; crossing at L·g·Δρ; reverses |
 | 17 | `test_inertia_with_friction_in_PCS_coastdown` | ✅ | A | Inertia+Friction (have); `mdot0/(1+αt)` assertion |
 | 18 | `test_inertia_with_flapper_in_PCS_coastdown` | ✅ | C | VFR + reworked Flapper |
 | 19 | `test_inertia_with_transistor_in_PCS_coastdown` | ✅ | C | callable-k VFR (transistor) |
 | 20 | `test_inertia_with_two_parallel_resistors` | ✅ | C | `VolumetricFlowResistor` (have) |
 | 21 | `test_local_pressure_with_flow_reversal` | ✅ | C | `LocalPressureDrop` (have); quasi-static per-t |
 
-Tally: 15 ✅ · 5 🟡 · 1 ⬜ · 0 ⛔ (target: 21 ✅). Remaining: #4,#5,#8,#9 (Tier-B channel/PK), #6,#16 (channel-coastdown reversal).
+Tally: 17 ✅ · 4 🟡 · 0 ⬜ · 0 ⛔ (target: 21 ✅). Remaining: #4,#5,#8,#9 (Tier-B channel/PK feedback).
 
 ## New components to build (decided: implement, for true 1:1)
 
