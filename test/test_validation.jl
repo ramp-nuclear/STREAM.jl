@@ -130,7 +130,6 @@ end
 try
 @testset "Phase 56 parity harness" begin
 
-# ─────────────────────────────────────────────────────────────────────
 # Python parity: simple loop  (REPLACES old VAL-01 per D-13)
 #
 # Topology: Pump → HX → ChannelAndContacts → Pump (n=10, circular pipe).
@@ -154,9 +153,8 @@ try
 #           may surface as drift on h_tc and propagate to mdot. hard_ceiling
 #           stays at 2%; FAIL surfaces honestly.
 #   Gap #3: Sundials KINSOL vs scipy hybr solver tols — floor on CLEAN tier.
-# ─────────────────────────────────────────────────────────────────────
 @testset "Python parity: simple loop" begin
-    # ── Step 1: equivalence guard (D-10, 5 asserts; abort testset on fail) ──
+    # Step 1: equivalence guard (D-10, 5 asserts; abort testset on fail)
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
@@ -461,10 +459,8 @@ end
     end
 end
 
-# ─────────────────────────────────────────────────────────────────
 # VAL-02: Asymmetric MTR — right channel inlet at 90°C (363.15 K)
 # Right side of plate must be hotter than left side.
-# ─────────────────────────────────────────────────────────────────
 @testset "Python parity: MTR asymmetric" begin
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()

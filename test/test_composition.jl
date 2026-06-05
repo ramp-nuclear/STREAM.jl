@@ -7,11 +7,9 @@ using STREAM
 using STREAM: Channel, _infer_n
 using OrdinaryDiffEq: ReturnCode
 
-# ───────────────────────────────────────────────────────────
 # Test fixtures — local helpers that build canonical CAC + HD pairs.
 # Mirrors Python STREAM's MTR_fuel_and_channel(z_N, fuel_N, clad_N) function
 # in tests/test_composition/conftest.py.
-# ───────────────────────────────────────────────────────────
 function _mtr_pair(; n=4, nz=4, nx=2)
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ps = fill(1.0 / (nz * nx), nz, nx)
@@ -24,9 +22,7 @@ function _mtr_pair(; n=4, nz=4, nx=2)
     return cac, fuel
 end
 
-# ───────────────────────────────────────────────────────────
 # Section 1: port helper (D-18 first bullet)
-# ───────────────────────────────────────────────────────────
 @testset "port helper — indexed thermal port access on uncompiled CAC" begin
     cac, _ = _mtr_pair()
     p1 = port(cac, :thermal_left, 1)
@@ -45,10 +41,8 @@ end
     @test endswith(name_str_2, "thermal_right2")
 end
 
-# ───────────────────────────────────────────────────────────
 # Section 2: check_gravity_mismatch (D-18 second bullet)
 # Existing G_M tests carry forward — these don't touch Channel architecture.
-# ───────────────────────────────────────────────────────────
 @testset "check_gravity_mismatch — :ok when no gravity" begin
     geom = PipeGeometry_circular(0.6, 0.01)
     @named ch = ChannelAndContacts(; n=4, geometry=geom)  # default g=0.0
@@ -93,10 +87,8 @@ end
     @test check_gravity_mismatch(ssys) == :mismatch
 end
 
-# ───────────────────────────────────────────────────────────
 # Section 3: _infer_n (D-18 third bullet)
 # Works on CAC (ThermalPort arrays kept); errors on the new Channel/CHF.
-# ───────────────────────────────────────────────────────────
 @testset "_infer_n: counts thermal_left* on CAC (n=4)" begin
     cac, _ = _mtr_pair(; n=4)
     @test _infer_n(cac) == 4
@@ -117,12 +109,10 @@ end
     @test_throws ArgumentError _infer_n(chf)
 end
 
-# ───────────────────────────────────────────────────────────
 # Section 4: symmetric_plate compose-correctness (D-18 fourth bullet)
 # Multiple shapes; both faces wired correctly; no mtkcompile errors.
 # Verify-block requires: at least 2 distinct shape testsets (n=4 + n=10)
 # AND at least 2 asymmetric-shape testsets (nx=1, nx=3).
-# ───────────────────────────────────────────────────────────
 @testset "symmetric_plate(cac, fuel) — n=4, nz=4, nx=2 compiles cleanly" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
@@ -225,10 +215,8 @@ end
     @test sol.retcode == ReturnCode.Success
 end
 
-# ───────────────────────────────────────────────────────────
 # Section 5: plate (dual-CAC + HD) compose-correctness (D-18 fifth bullet)
 # Verify-block requires: at least 1 testset with name starting with "plate(".
-# ───────────────────────────────────────────────────────────
 @testset "plate(ch_left, ch_right, fuel) — both faces wired correctly" begin
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     @named ch_left = ChannelAndContacts(; n=4, geometry=geom)
@@ -260,11 +248,9 @@ end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-# ───────────────────────────────────────────────────────────
 # Section 6: one_sided_connection (D-18 sixth bullet)
 # Verify-block requires: at least 2 "@testset \"one_sided_connection" testsets
 # (one per side variant).
-# ───────────────────────────────────────────────────────────
 @testset "one_sided_connection — side=:left compiles cleanly" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     osc = one_sided_connection(cac, fuel; side=:left, name=:osc_l)
@@ -306,10 +292,8 @@ end
     @test_throws ArgumentError one_sided_connection(cac, fuel; side=:bogus, name=:bad)
 end
 
-# ───────────────────────────────────────────────────────────
 # Section 7: compose_systems cross-plate wiring (D-18 seventh bullet)
 # Stitch two symmetric_plate assemblies via hydraulic-series connect equations.
-# ───────────────────────────────────────────────────────────
 @testset "compose_systems — two plates in series" begin
     cac1, fuel1 = _mtr_pair(; n=4, nz=4, nx=2)
     cac2, fuel2 = _mtr_pair(; n=4, nz=4, nx=2)
@@ -340,10 +324,8 @@ end
     @test sol.retcode == ReturnCode.Success
 end
 
-# ───────────────────────────────────────────────────────────
 # Section 8: connect_temperature_feedback (D-18 eighth bullet)
 # TF-04 equation-counting tests from Phase 47.
-# ───────────────────────────────────────────────────────────
 @testset "connect_temperature_feedback — 1D (CAC) emits n equations" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
@@ -375,7 +357,6 @@ end
     @test length(eqs) == 4 + 4 * 2  # 4 cells + 4*2 grid
 end
 
-# ───────────────────────────────────────────────────────────
 # fuel_assembly — four-variant CAC <-> Plate alternation helper.
 # Each variant is checked by comparing the helper-built system against a
 # hand-rolled connect() chain pointwise (rtol=1e-10) after solve_steady, plus
@@ -408,7 +389,7 @@ end
 # Time derivative, used to build the Dt(...)=>0.0 IC guesses (see variant-1 note).
 const _fa_Dt = Differential(t)
 
-# ─── Variant 1 — channel-bookended (k=2 plates, k+1=3 channels) parity ───
+# #### Variant 1 — channel-bookended (k=2 plates, k+1=3 channels) parity
 @testset "fuel_assembly variant 1 (channel-bookended, k=2) parity" begin
     n, nz, nx = 4, 4, 2
     # Helper-built path
@@ -507,7 +488,7 @@ const _fa_Dt = Differential(t)
     @test isapprox(vals_helper, vals_hand; rtol=1e-10)
 end
 
-# ─── Variant 2 — plate-bookended (k=1 channel, k+1=2 plates) parity ───
+# #### Variant 2 — plate-bookended (k=1 channel, k+1=2 plates) parity
 # The locked k=2 means the smaller variants get k≥1 channels. Variant 2
 # uses k=2 channels + k+1=3 plates so 'k' matches the variant-1 cell count.
 @testset "fuel_assembly variant 2 (plate-bookended, k=2) parity" begin
@@ -597,7 +578,7 @@ end
     @test isapprox(vals_helper, vals_hand; rtol=1e-10)
 end
 
-# ─── Variant 3 — mixed (k=2 of each), start=:channel parity ───
+# #### Variant 3 — mixed (k=2 of each), start=:channel parity
 @testset "fuel_assembly variant 3 (mixed, k=2, start=:channel) parity" begin
     n, nz, nx = 4, 4, 2
     c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n)
@@ -681,7 +662,7 @@ end
     @test isapprox(vals_helper, vals_hand; rtol=1e-10)
 end
 
-# ─── Variant 4 — closed annular (k=3 of each, ring) parity ───
+# #### Variant 4 — closed annular (k=3 of each, ring) parity
 @testset "fuel_assembly variant 4 (closed annular, k=3) parity" begin
     n, nz, nx = 4, 4, 2
     c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n); c3h = _fa_cac(:c3; n=n)
@@ -780,7 +761,7 @@ end
     @test isapprox(vals_helper, vals_hand; rtol=1e-10)
 end
 
-# ─── ArgumentError paths ───
+# #### ArgumentError paths
 
 @testset "fuel_assembly — ArgumentError on bookend-vs-length conflict" begin
     # 3 CACs + 2 HDs → auto would infer :channel; explicit bookend=:plate contradicts.
@@ -811,7 +792,7 @@ end
     @test_throws ArgumentError fuel_assembly([c1, c2, c3], [p1, p2]; closed=true, name=:bad)
 end
 
-# ─── Smoke: helper returns an uncompiled ODESystem (no premature mtkcompile) ───
+# #### Smoke: helper returns an uncompiled ODESystem (no premature mtkcompile)
 @testset "fuel_assembly — uncompiled ODESystem smoke" begin
     # Build the cheapest variant-3 mixed k=2 instance and confirm the helper
     # returned an UNCOMPILED system (caller is responsible for adding BCs

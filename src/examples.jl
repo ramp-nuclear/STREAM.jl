@@ -593,7 +593,7 @@ function build_loop_pk(ctrl;
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]
-    # ── Consistent-IC seeding (see .planning/notes/2026-05-29-pk-coupling-investigation.md) ──
+    # Consistent-IC seeding (see .planning/notes/2026-05-29-pk-coupling-investigation.md)
     # FlowPort/ThermalPort temperatures default to 300 K (src/connectors.jl). The boundary coolant
     # cells and the channel↔fuel contact nodes are aliased to those port temperatures, and the
     # per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT pin the port representatives under NoInit.

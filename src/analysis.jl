@@ -65,7 +65,7 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
 end
 #! format: on
 
-# ─── Private helper ─────────────────────────────────────────────────────────
+# #### Private helper
 
 """
     _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81) -> ChannelState

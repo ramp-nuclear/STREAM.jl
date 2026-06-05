@@ -10,7 +10,7 @@
 #            q_OSV_saha_zuber, q_CHF_sudo_kaminaga, q_CHF_mirshak,
 #            q_CHF_fabrega, twall_limit
 
-# ─── Private sub-correlation helpers for Sudo-Kaminaga CHF ──────────────────
+# #### Private sub-correlation helpers for Sudo-Kaminaga CHF
 
 function _SKq1(G_star)
     return 0.005 * abs(G_star)^0.611
@@ -28,7 +28,7 @@ function _SKq4(G_star, dT_outlet)
     return iszero(G_star) ? Inf : _SKq1(G_star) * (1 + 5000 * dT_outlet / abs(G_star))
 end
 
-# ─── Public API ─────────────────────────────────────────────────────────────
+# #### Public API
 
 """
     Bergles_Rohsenow_T_ONB(pressure, q_wall, T_sat) -> T_ONB [K]

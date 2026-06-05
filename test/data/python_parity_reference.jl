@@ -18,9 +18,7 @@
 # Consumed by test/test_validation.jl via:
 #   include(joinpath(@__DIR__, "data", "python_parity_reference.jl"))
 
-# ─────────────────────────────────────────────────────────────────────
 # Block 0 — MTR rectangular geometry (shared across symmetric/asymmetric/one-sided)
-# ─────────────────────────────────────────────────────────────────────
 # Rectangular MTR: L=0.6, edge1=0.07, edge2=0.00127, heated_edge=0.07
 # Computed: Dh = 4*area/wet_perim ~= 0.002495 m; both faces heated.
 const PARITY_MTR_GEOM_DH = 2.4947383191e-03
@@ -28,14 +26,12 @@ const PARITY_MTR_GEOM_AREA = 8.8900000000e-05
 const PARITY_MTR_GEOM_WETPERIM = 1.4254000000e-01
 const PARITY_MTR_GEOM_HEATED = (7.0000000000e-02, 7.0000000000e-02)
 
-# ─────────────────────────────────────────────────────────────────────
 # Block 1 — Simple loop (Pump → HX → CAC → Pump, n=10, circular pipe)
 # Topology: matches generate_reference.py current scenario.
 # Adiabatic-side convention: T_wall_left = T_cool, q_density_left = 0;
 # h_left mirrors h_right (Python _other_if_none HTC convention).
 # heated_parts partition differs Python (πD,0) vs Julia (πD/2, πD/2);
 # parity testsets compare TOTAL q_wall (left+right) where applicable.
-# ─────────────────────────────────────────────────────────────────────
 # Phase 56 simple-loop Python parity reference — D-07 tiers (a)+(b)+(c)
 # Topology: Pump → HX → ChannelAndContacts (n=10, L=0.6, D=0.01) → Pump
 # T_inlet = 313.15 K (40.0 C); T_wall = 373.15 K (100.0 C)
@@ -137,11 +133,9 @@ const PARITY_SIMPLE_Q_DENSITY_RIGHT = Float64[
 ]
 
 
-# ─────────────────────────────────────────────────────────────────────
 # Block 2 — MTR symmetric (both inlets at 313.15 K)
 # Adiabatic-side convention: each channel's outer wall (channel_L's LEFT,
 # channel_R's RIGHT) is adiabatic — T_wall = T_cool, q_density = 0.
-# ─────────────────────────────────────────────────────────────────────
 # Symmetric MTR: T_inlet_l = T_inlet_r = 313.15 K; power = 10000.0 W
 const PARITY_MTR_SYM_T_OUT_L = 317.8870777964
 const PARITY_MTR_SYM_T_OUT_R = 317.8870777964
@@ -345,9 +339,7 @@ const PARITY_MTR_SYM_T_PLATE = Float64[
 ]  # size (10, 3)
 
 
-# ─────────────────────────────────────────────────────────────────────
 # Block 3 — MTR asymmetric (right inlet 363.15 K = 90°C)
-# ─────────────────────────────────────────────────────────────────────
 # Asymmetric MTR: T_inlet_l = 313.15 K, T_inlet_r = 363.15 K
 const PARITY_MTR_ASYM_T_OUT_L = 331.4752122088
 const PARITY_MTR_ASYM_T_OUT_R = 354.6717595024
@@ -551,14 +543,12 @@ const PARITY_MTR_ASYM_T_PLATE = Float64[
 ]  # size (10, 3)
 
 
-# ─────────────────────────────────────────────────────────────────────
 # Block 4 — MTR one-sided (left channel only)
 # KNOWN GAP: Python one_sided_connection distributes heat to BOTH plate
 # faces (acknowledged Python bug). Plan 05's testset compares Julia plate-T
 # against analytical T_max formula, NOT Python plate-T values below.
 # T_out_l Python value is also flagged as known-gap; Plan 05 uses gray-zone
 # tolerance for these specific quantities or asserts via analytical formula.
-# ─────────────────────────────────────────────────────────────────────
 # One-sided MTR: only left channel; T_inlet_l = 313.15 K
 # KNOWN GAP per RESEARCH.md Known-Different Master List:
 #   Python one_sided_connection distributes heat to BOTH plate faces (acknowledged Python bug).

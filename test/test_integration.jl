@@ -494,11 +494,9 @@ end
     end
 end
 
-# ───────────────────────────────────────────────────────────
 # §4 Subcooled-boiling integration (D-19 fourth bullet — ISCB only)
 # Migrated from test_subcooled_boiling.jl ISCB section. Pure-correlation
 # SCB-01..04 stays in test_thresholds.jl (renamed in plan 55-11).
-# ───────────────────────────────────────────────────────────
 @testset "Subcooled-boiling integration (ISCB)" begin
     n_scb = 5
     T_inlet_scb = 313.15
@@ -623,11 +621,9 @@ end
     end
 end
 
-# ───────────────────────────────────────────────────────────
 # §5 Point-kinetics + thermal-feedback loops (D-19 fifth bullet)
 # RELOCATED from test_examples.jl (LOOP-01..04) and test_point_kinetics.jl
 # (TF-06, TF-07).
-# ───────────────────────────────────────────────────────────
 @testset "Point-kinetics + thermal-feedback loops" begin
     @testset "LOOP-01: build_loop_pk compiles and returns (ssys, ic)" begin
         # Migrated from test_examples.jl LOOP-01 (line 16).
@@ -733,14 +729,12 @@ end
         @test any(entry -> entry[1] == :SCRAM, ctrl.log)  # SCRAM logged
     end
 
-    # ─────────────────────────────────────────────────────────────────────────
     # PK-IC / PK-FB: coupled point-kinetics feedback physics.
     # These REPLACE the retired TF-06 (hollow `isfinite`-only) and TF-07 (which
     # tested a pure initialization artifact and mis-mirrored Python). The boundary-
     # cell init artifact and its fix are documented in
     # .planning/notes/2026-05-29-pk-coupling-investigation.md. All three build on the
     # now-consistent build_loop_pk IC (port/contact temperatures seeded to T_inlet).
-    # ─────────────────────────────────────────────────────────────────────────
 
     @testset "PK-IC-01: consistent cold IC has zero startup reactivity" begin
         # REGRESSION GUARD for the boundary-cell initialization artifact. FlowPort/
@@ -835,12 +829,10 @@ end
     end
 end
 
-# ───────────────────────────────────────────────────────────
 # §6 COMPAT (D-19 sixth bullet — Pkg.test() integration smoke)
 # Migrated from test_examples.jl first testset (line 9). Reaching this
 # testset confirms `include("test_integration.jl")` ran from runtests.jl,
 # which Pkg.test() invokes as the package test entry point.
-# ───────────────────────────────────────────────────────────
 @testset "COMPAT: Test suite runs automatically via Pkg.test()" begin
     @test STREAM isa Module
 end

@@ -3,7 +3,6 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-# ─────────────────────────────────────────────────────────────────
 @testset "FLAP-REF: Flapper has no use_callback or threshold kwargs" begin
     # Passing use_callback kwarg must raise MethodError
     @test_throws Exception Flapper(; name=:flap_ref, use_callback=true)
@@ -52,7 +51,6 @@ end
     @test isapprox(sol[ssys.flapper.xi, end], 0.0; atol=1e-8)
 end
 
-# ─────────────────────────────────────────────────────────────────
 # FLAP-06: Flapper opens when ref_mdot crosses threshold
 #
 # Topology: Pump(0) → Inertia(L_over_A=5e5) → Resistor(1e5) → Flapper → Pump
@@ -62,7 +60,6 @@ end
 # mdot decays exponentially: mdot(t) ~ mdot_0 * exp(-t / tau_eff)
 # The event fires when mdot drops below threshold.
 # T_open is recorded at the crossing time; after T_open + dt=3s, xi = 1.0.
-# ─────────────────────────────────────────────────────────────────
 @testset "FLAP-06: Flapper opens when ref_mdot crosses threshold" begin
     threshold_val = 1e-4   # kg/s; well below the initial mdot of 1.0 kg/s
     dt_ramp = 3.0    # s; ramp duration

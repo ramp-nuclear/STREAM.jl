@@ -89,11 +89,9 @@ D_H     = 0.01
 DP_PUMP = 3.0e4
 P_ABS   = 1.0e5
 
-# ─────────────────────────────────────────────────────────────────────
 # Equivalence-checklist reference values (D-10 fluid-props tier).
 # parity_helpers.jl asserts these against Julia's rho_water/cp_water/etc.
 # at 1e-12 rtol. REF_T_K must match parity_helpers.jl's REF_T_K exactly.
-# ─────────────────────────────────────────────────────────────────────
 REF_T_K = (313.15, 343.15, 373.15)
 
 from stream.calculations import Pump, HeatExchanger
@@ -131,9 +129,7 @@ except ImportError:
             ) from e
 
 
-# ─────────────────────────────────────────────────────────────────────
 # Julia-const printers (Phase 53 stage2_reference.py pattern, generalised)
-# ─────────────────────────────────────────────────────────────────────
 def _emit_julia_array(name, values, fmt="%.10f", comment_each=False, comment_prefix=""):
     """Emit a Julia const Float64[ ... ] array. One value per line if comment_each."""
     print(f"const {name} = Float64[")
@@ -157,9 +153,7 @@ def _emit_julia_tuple3(name, values, fmt="%.10f"):
     print(f"const {name} = ({formatted})")
 
 
-# ─────────────────────────────────────────────────────────────────────
 # Build topology
-# ─────────────────────────────────────────────────────────────────────
 pipe_ch = EffectivePipe.circular(length=L_CH, diameter=D_H)
 
 pump = Pump(pressure=DP_PUMP)
@@ -227,9 +221,7 @@ sol_vec   = agr.solve_steady(guess_vec, jac=ALG_jacobian(agr))
 state     = agr.save(sol_vec)
 
 
-# ─────────────────────────────────────────────────────────────────────
 # Extract ALL D-07 tiers from solver state
-# ─────────────────────────────────────────────────────────────────────
 ch_state = state[channel.name]
 
 # Tier (a): scalars
@@ -299,9 +291,7 @@ mu_at_ref  = tuple(float(light_water.viscosity(T))     for T in ref_T_C)
 k_at_ref   = tuple(float(light_water.conductivity(T))  for T in ref_T_C)
 
 
-# ─────────────────────────────────────────────────────────────────────
 # Emit ready-to-paste Julia const blocks
-# ─────────────────────────────────────────────────────────────────────
 print()
 print("=" * 72)
 print("Phase 56 Python parity reference — SIMPLE LOOP")

@@ -13,18 +13,15 @@ using STREAM: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion,
                 build_cube, build_loop_lof_bypass, build_loop_pk,
                 ReactivityController
 
-# ─────────────────────────────────────────────────────────────
 # Helper: assert determinacy contract on an UNCOMPILED system. Calls
 # `mtkcompile(...; fully_determined=true)` which raises on imbalance,
 # then re-checks Δ=0 against the compiled system.
-# ─────────────────────────────────────────────────────────────
 function assert_determined(label::String, sys)
     ssys = mtkcompile(sys; fully_determined=true)   # raises on imbalance
     @test length(equations(ssys)) == length(unknowns(ssys))
     return ssys
 end
 
-# ─────────────────────────────────────────────────────────────
 # Helper: assert determinacy contract on an ALREADY-COMPILED system.
 # All `build_*` builders in src/examples.jl call `mtkcompile` internally
 # and return the compiled `ssys` — re-running `mtkcompile` would error
@@ -34,7 +31,6 @@ end
 # (under fully_determined=true) or silently returned an imbalanced
 # compiled system that downstream `process_SciMLProblem.check_eqs_u0`
 # would reject. The check below catches both regression classes.
-# ─────────────────────────────────────────────────────────────
 function assert_determined_compiled(label::String, ssys)
     @test length(equations(ssys)) == length(unknowns(ssys))
     return ssys
@@ -187,9 +183,7 @@ function _build_val02_twoplate()
     return sys_v02
 end
 
-# ─────────────────────────────────────────────────────────────
 # Testset 1 — canonical builders (GREEN at plan-end)
-# ─────────────────────────────────────────────────────────────
 @testset "Determinacy: canonical builders are fully determined" begin
     @testset "build_loop"            begin assert_determined_compiled("build_loop",            build_loop()) end
     @testset "build_loop_vertical"   begin assert_determined_compiled("build_loop_vertical",   build_loop_vertical()) end
@@ -204,11 +198,9 @@ end
     end
 end
 
-# ─────────────────────────────────────────────────────────────
 # Testset 2 — Phase 58 scenario topologies
 # RED-as-expected at plan-end of 58-01; each row flips to GREEN as its
 # corresponding fix plan (58-02 / 58-03 / 58-04) lands.
-# ─────────────────────────────────────────────────────────────
 @testset "Determinacy: Phase 58 scenarios" begin
     @testset "MTR symmetric"   begin assert_determined("MTR sym",       _build_mtr_sym()) end
     @testset "MTR asymmetric"  begin assert_determined("MTR asym",      _build_mtr_asym()) end
