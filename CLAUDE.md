@@ -62,32 +62,31 @@ src/
 ```
 test/
   runtests.jl               # Thin orchestrator: one include() per test file, nothing else
-  test_geometry.jl          # PipeGeometry tests (PHY-01)
-  test_connectors.jl        # FlowPort, ThermalPort (HeatFluxPort retired in Phase 55 D-06)
-  test_fluids.jl            # Fluid property functions (FOUND-02)
+  test_geometry.jl          # PipeGeometry
+  test_connectors.jl        # FlowPort, ThermalPort
+  test_fluids.jl            # Fluid property functions
   test_channels.jl          # Channel/CHF/CAC variants + _channel_core enthalpy-form physics
-                            # + flow-reversal sign safety (Phase 55 D-17 unified file —
-                            # absorbs legacy test_channel.jl, test_channel_core.jl,
-                            # test_sign_safety.jl)
-  test_pump.jl              # Pump tests (COMP-02, PHY-05)
-  test_flapper.jl           # Flapper tests
-  test_resistors.jl         # Friction, Gravity, Resistor, network tests (COMP-03/04, NET-*)
+                            # + flow-reversal sign safety
+  test_pump.jl              # Pump
+  test_flapper.jl           # Flapper
+  test_resistors.jl         # Friction, Gravity, Resistor, network tests
   test_misc.jl              # Inertia, HeatExchanger, ConstantTemperature, WallTemperature, HeatFluxSource
-  test_heat_diffusion.jl    # HeatDiffusion (HDIFF-01..05)
+  test_heat_diffusion.jl    # HeatDiffusion
   test_correlations.jl      # HTC + friction correlation function unit tests
-  test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState (renamed from test_analysis.jl, Phase 55 D-20)
+  test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState
   test_composition.jl       # symmetric_plate, plate, one_sided_connection, compose_systems,
-                            # port, check_gravity_mismatch, _infer_n, connect_temperature_feedback
-                            # — heavy CAC↔HD coverage (Phase 55 D-18)
-  test_validation.jl        # Quantitative cross-validation against Python STREAM (Phase 56)
-  test_integration.jl       # NEW: single big integration file — builders, solvers,
-                            # LOF transient, ISCB, PK loops, COMPAT (Phase 55 D-19)
-  test_point_kinetics.jl    # PK component-unit tests only (coupled-loop feedback now in
-                            # test_integration.jl as PK-IC-01 + PK-FB-01/02, which replaced the
-                            # retired TF-06/TF-07 — see .planning/notes/2026-05-29-pk-coupling-investigation.md)
+                            # port, check_gravity_mismatch, _infer_n, connect_temperature_feedback,
+                            # fuel_assembly — heavy CAC<->HD coverage
+  test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
+  test_determinacy.jl       # equation/unknown balance (fully_determined) for builders + scenarios
+  test_validation.jl        # Quantitative cross-validation against Python STREAM
+  test_integration.jl       # Single big integration file — builders, solvers,
+                            # loss-of-flow transient, subcooled boiling, PK loops, COMPAT
+  test_point_kinetics.jl    # PointKinetics component-unit tests (coupled-loop feedback lives
+                            # in test_integration.jl)
 ```
 
-**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_misc.jl` alongside `ConstantTemperature` (same value-source family) per Phase 55 D-21.
+**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_misc.jl` alongside `ConstantTemperature` (same value-source family).
 
 ## Component authoring conventions
 
