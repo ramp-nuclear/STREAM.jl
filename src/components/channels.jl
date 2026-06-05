@@ -124,12 +124,12 @@ end
 
 
 function _setup(geometry, g, n)
-    pars = @parameters begin
-        L = geometry.L
-        D_h = geometry.Dh
-        A = geometry.A
-        g_acc = g
-    end
+    # No geometry parameters are declared: L, Dh, and A enter the equations inline from
+    # `geometry` (see `_channel_core` and the variants). When a dimension is a design knob,
+    # that inline value is the knob expression, so `remake` scans it. g_acc is declared as
+    # a parameter only so `check_gravity_mismatch` can find which channels carry gravity;
+    # the equations use the inline `g` value, not this symbol.
+    pars = @parameters g_acc = g
 
     @variables begin
         (T(t))[1:n]

@@ -20,7 +20,6 @@ Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 function Friction(; name, L, D, A)
     pars = @parameters begin
         L = L
-        D_h = D
         A = A
     end
     vars = @variables begin
