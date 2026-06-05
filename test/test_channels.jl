@@ -127,6 +127,43 @@ end
     @test all(isapprox.(sol[ssys.chf.q_wall_right[:]], 0., atol=1e-9))
 end
 
+@testset "ChannelHeatFlux with ConstantFluid — uniform heating gives exact linear rise" begin
+    # With a constant-cp mock fluid the steady cell-to-cell rise is exactly
+    # ΔT = q·heated_perimeter·dz / (mdot·cp), the closed-form Python uses with mock_liquid_funcs.
+    n = 8
+    geom = PipeGeometry_circular(L_DEFAULT, D_DEFAULT)
+    dz = L_DEFAULT / n
+    cp_mock = 2000.0
+    mdot = 0.5
+    q = Q_FLUX_DEFAULT
+    fluid = ConstantFluid(; cp=cp_mock)
+    @named pump = Pump(; mdot0=mdot)        # fixed-flow (current source), so mdot is exact
+    @named bc = HeatExchanger(T_INLET)
+    @named chf = ChannelHeatFlux(; n=n, geometry=geom, fluid=fluid)
+    connections = Equation[
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, chf.port_in),
+        connect(chf.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        [chf.q_left[i] ~ q for i in 1:n]...,
+        [chf.q_right[i] ~ 0.0 for i in 1:n]...,
+    ]
+    @named sys = compose(System(connections, t; name=:s1_chf_mock), pump, bc, chf)
+    ssys = mtkcompile(sys)
+    ic = Pair{Any,Any}[
+        [ssys.chf.T[i] => T_INLET for i in 1:n]...,
+        ssys.chf.port_in.mdot => mdot,
+    ]
+    sol = solve_steady(ssys, ic)
+    @test sol.retcode == ReturnCode.Success
+    dT = q * geom.heated_parts[1] * dz / (mdot * cp_mock)
+    Tc = [sol[ssys.chf.T[i]] for i in 1:n]
+    @test isapprox(Tc[1] - T_INLET, dT; rtol=1e-6)
+    for i in 2:n
+        @test isapprox(Tc[i] - Tc[i - 1], dT; rtol=1e-6)
+    end
+end
+
 @testset "Channel with WallTemperature connection the same as direct equations" begin
     n = N_DEFAULT
     # Style 1 (binding eqn).

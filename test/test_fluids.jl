@@ -71,3 +71,30 @@ end
     @test dT > 0.0
     @test isfinite(dT)
 end
+
+@testset "AbstractFluid — Water() forwards to the *_water correlations" begin
+    for T in (300.0, 350.0, 400.0)
+        @test density(Water(), T) == rho_water(T)
+        @test specific_heat(Water(), T) == cp_water(T)
+        @test viscosity(Water(), T) == mu_water(T)
+        @test conductivity(Water(), T) == k_water(T)
+        @test thermal_expansion(Water(), T) == beta_water(T)
+    end
+end
+
+@testset "ConstantFluid — fixed properties, all-ones mock default" begin
+    mock = ConstantFluid()
+    for T in (1.0, 300.0, 600.0)   # temperature-independent
+        @test density(mock, T) == 1.0
+        @test specific_heat(mock, T) == 1.0
+        @test viscosity(mock, T) == 1.0
+        @test conductivity(mock, T) == 1.0
+        @test thermal_expansion(mock, T) == 1.0
+    end
+    cf = ConstantFluid(; rho=1000.0, cp=4200.0, mu=1.0e-3, k=0.6, beta=2.0e-4)
+    @test density(cf, 320.0) == 1000.0
+    @test specific_heat(cf, 320.0) == 4200.0
+    @test viscosity(cf, 320.0) == 1.0e-3
+    @test conductivity(cf, 320.0) == 0.6
+    @test thermal_expansion(cf, 320.0) == 2.0e-4
+end

@@ -55,6 +55,7 @@ function _channel_core(;
     friction_correlation=blasius_friction,
     q_left_expr, q_right_expr,
     vars,
+    fluid::AbstractFluid=Water(),
 )
     Dh = geometry.Dh
     A  = geometry.A
@@ -69,12 +70,12 @@ function _channel_core(;
         T_up_rev = (i == n) ? T_inlet_rev : vars.T[i + 1]
         T_up = ifelse(port_in.mdot >= 0, T_up_fwd, T_up_rev)
 
-        cp_face = (cp_water(T_up) + cp_water(vars.T[i])) / 2
+        cp_face = (specific_heat(fluid, T_up) + specific_heat(fluid, vars.T[i])) / 2
 
         # Use Reynolds directly, not the observable variable, since it may only be observable.
-        Re_i = abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i]))
+        Re_i = abs(port_in.mdot) * Dh / (A * viscosity(fluid, vars.T[i]))
         f_i = friction_correlation(Re_i)
-        Pr_i = cp_water(vars.T[i]) * mu_water(vars.T[i]) / k_water(vars.T[i])
+        Pr_i = specific_heat(fluid, vars.T[i]) * viscosity(fluid, vars.T[i]) / conductivity(fluid, vars.T[i])
         P_i = port_in.P - sum(vars.dp[j] for j in 1:i) + vars.dp[i] / 2
         q_density_i = (q_left_expr[i] + q_right_expr[i]) / (sum(geometry.heated_parts) * dz)
 
@@ -84,14 +85,14 @@ function _channel_core(;
                 abs(port_in.mdot) * cp_face * (T_up - vars.T[i])
               + q_left_expr[i]
               + q_right_expr[i]
-            ) / (rho_water(vars.T[i]) * cp_water(vars.T[i]) * A * dz),
-            vars.dp[i] ~ f_i * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(vars.T[i]) * A^2)) * (dz / Dh)
-                  + rho_water(vars.T[i]) * g_acc * dz,
+            ) / (density(fluid, vars.T[i]) * specific_heat(fluid, vars.T[i]) * A * dz),
+            vars.dp[i] ~ f_i * (port_in.mdot * abs(port_in.mdot) / (2 * density(fluid, vars.T[i]) * A^2)) * (dz / Dh)
+                  + density(fluid, vars.T[i]) * g_acc * dz,
         ]
         cell_obs = Equation[
             vars.Re[i] ~ Re_i,
             vars.Pe[i] ~ Re_i * Pr_i,
-            vars.v[i]  ~ port_in.mdot / (rho_water(vars.T[i]) * A),
+            vars.v[i]  ~ port_in.mdot / (density(fluid, vars.T[i]) * A),
             vars.P[i]     ~ P_i,
             vars.T_sat[i] ~ sat_temperature(P_i),
             vars.T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_density_i),
@@ -191,6 +192,8 @@ A `WallTemperature` source can be used as a closure, for example.
   MTK callable parameter pattern; user must pass `ch.h_left_fn => fn` in solve `op` dict);
   default `0.0` per-side ⇒ adiabatic.
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
+- `fluid`: coolant property set (`AbstractFluid`), default `Water()`. Pass a `ConstantFluid`
+  to drive the energy balance, friction, and dimensionless observables with fixed properties.
 
 # External-input variables
 - `T_wall_left(t)[1:n]`: per-cell left-face wall temperature [K]
@@ -227,6 +230,7 @@ function Channel(;
     h_left::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
     h_right::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
     friction_correlation=blasius_friction,
+    fluid::AbstractFluid=Water(),
 )
     pars_base, varstruct, port_in, port_out = _setup(geometry, g, n)
 
@@ -278,6 +282,7 @@ function Channel(;
         g_acc=g, friction_correlation=friction_correlation,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
         vars=varstruct,
+        fluid=fluid,
     )
 
     eqs = core.eqs        # NO variant_eqs — there is no port-Q_flow closure
@@ -305,6 +310,7 @@ Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource
 - `geometry`: pipe geometry descriptor (`PipeGeometry`)
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
+- `fluid`: coolant property set (`AbstractFluid`), default `Water()`.
 
 # External-input variables
 - `q_left(t)[1:n]`: per-cell left-face heat flux density [W/m^2]
@@ -339,6 +345,7 @@ function ChannelHeatFlux(;
     geometry::PipeGeometry,
     g=0.0,
     friction_correlation=blasius_friction,
+    fluid::AbstractFluid=Water(),
 )
     pars, varstruct, port_in, port_out = _setup(geometry, g, n)
     dz = geometry.L / n
@@ -363,6 +370,7 @@ function ChannelHeatFlux(;
         g_acc=g, friction_correlation=friction_correlation,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
         vars=varstruct,
+        fluid=fluid,
     )
 
     eqs = core.eqs
@@ -441,6 +449,9 @@ The wall temperature is connected through thermal port arrays.
   e.g. from `regime_dependent_q_scb(pressure=...)`. When provided, `h_tc[i]` is enhanced
   by the Bergles-Rohsenow partial boiling factor when `T_wall[i] >= T_ONB[i]`.
   Default `nothing` (pure single-phase).
+- `fluid`: coolant property set (`AbstractFluid`), default `Water()`. It drives the energy
+  balance, friction, and dimensionless observables; the HTC correlation and Grashof term
+  stay water-based.
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort`
@@ -457,6 +468,7 @@ function ChannelAndContacts(;
     htc_correlation=dittus_boelter,
     friction_correlation=blasius_friction,
     scb_correction=nothing,
+    fluid::AbstractFluid=Water(),
 )
 
     pars, vars, port_in, port_out = _setup(geometry, g, n)
@@ -515,6 +527,7 @@ function ChannelAndContacts(;
         g_acc=g, friction_correlation=friction_correlation,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
         vars=vars,
+        fluid=fluid,
     )
 
     Re_bulk = [abs(port_in.mdot) * Dh / (A * mu_water(vars.T[i])) for i in 1:n]

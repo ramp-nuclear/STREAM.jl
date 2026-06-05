@@ -141,3 +141,80 @@ end
 @register_symbolic k_water(T::Real)
 @register_symbolic beta_water(T::Real)
 @register_symbolic sat_temperature(P::Real)
+
+# ----------------------------------------------------------------------------
+# Injectable fluid properties.
+#
+# A channel's transport properties are looked up through an `AbstractFluid` so a
+# test (or a future second coolant) can supply its own property set without
+# editing the channel. `Water()` routes straight to the `*_water` correlations
+# above, so a water channel emits the identical symbolic expressions it always
+# has — the numeric path is unchanged. `ConstantFluid` returns fixed values, the
+# Julia counterpart of Python STREAM's `mock_liquid_funcs` (all properties 1.0),
+# which gives channel tests clean closed-form numbers.
+# ----------------------------------------------------------------------------
+
+"""
+    AbstractFluid
+
+Supertype for coolant property sets. Implement `density`, `specific_heat`,
+`viscosity`, `conductivity`, and `thermal_expansion` for a concrete fluid; the
+channel components dispatch on it.
+"""
+abstract type AbstractFluid end
+
+"""
+    Water() <: AbstractFluid
+
+Light-water coolant. Properties come from the Simantov `*_water` correlations, so a
+`Water` channel is identical to the original hard-coded behaviour.
+"""
+struct Water <: AbstractFluid end
+
+"""
+    ConstantFluid(; rho=1.0, cp=1.0, mu=1.0, k=1.0, beta=1.0) <: AbstractFluid
+
+Temperature-independent coolant returning fixed property values — the analogue of Python
+STREAM's `mock_liquid_funcs`. The all-ones default gives channel tests clean closed-form
+temperatures (e.g. a uniform-heating linear rise with `cp = 1`).
+
+# Arguments
+- `rho`: density [kg/m^3]
+- `cp`: specific heat [J/(kg·K)]
+- `mu`: dynamic viscosity [Pa·s]
+- `k`: thermal conductivity [W/(m·K)]
+- `beta`: thermal expansion coefficient [1/K]
+"""
+struct ConstantFluid{T<:Real} <: AbstractFluid
+    rho::T
+    cp::T
+    mu::T
+    k::T
+    beta::T
+end
+
+function ConstantFluid(; rho=1.0, cp=1.0, mu=1.0, k=1.0, beta=1.0)
+    return ConstantFluid(promote(rho, cp, mu, k, beta)...)
+end
+
+"""
+    density(fluid, T)        # [kg/m^3]
+    specific_heat(fluid, T)  # [J/(kg·K)]
+    viscosity(fluid, T)      # [Pa·s]
+    conductivity(fluid, T)   # [W/(m·K)]
+    thermal_expansion(fluid, T)  # [1/K]
+
+Transport properties of `fluid` at temperature `T` [K]. `Water` forwards to the
+`*_water` correlations; `ConstantFluid` returns its stored values.
+"""
+density(::Water, T) = rho_water(T)
+specific_heat(::Water, T) = cp_water(T)
+viscosity(::Water, T) = mu_water(T)
+conductivity(::Water, T) = k_water(T)
+thermal_expansion(::Water, T) = beta_water(T)
+
+density(f::ConstantFluid, T) = f.rho
+specific_heat(f::ConstantFluid, T) = f.cp
+viscosity(f::ConstantFluid, T) = f.mu
+conductivity(f::ConstantFluid, T) = f.k
+thermal_expansion(f::ConstantFluid, T) = f.beta

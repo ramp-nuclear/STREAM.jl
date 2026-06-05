@@ -34,6 +34,8 @@ include("examples.jl")
 include("utilities.jl")
 
 export rho_water, cp_water, mu_water, k_water, beta_water, sat_temperature
+export AbstractFluid, Water, ConstantFluid
+export density, specific_heat, viscosity, conductivity, thermal_expansion
 export FlowPort, ThermalPort
 export Channel, Pump, Flapper, Friction, Gravity, Resistor, VolumetricFlowResistor
 export Inertia, HeatExchanger
