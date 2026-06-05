@@ -12,6 +12,7 @@ const HTCCorrelation = Function
 
 include("fluids.jl")
 include("connectors.jl")
+include("knobs.jl")
 include("geometry.jl")
 include("physical_models/htc/correlations.jl")
 include("physical_models/friction/correlations.jl")
@@ -38,6 +39,7 @@ export Channel, Pump, Flapper, Friction, Gravity, Resistor, Inertia, HeatExchang
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, HeatDiffusion, PipeGeometry, PipeGeometry_rectangular
 export PipeGeometry_circular
+export knob_defaults, @design_knob
 export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction_rectangular
 export rectangular_laminar_correction, regime_dependent, elenbaas_nusselt, elenbaas_htc
 export marco_han_nusselt, turbulent_friction, viscosity_correction, maximal_htc

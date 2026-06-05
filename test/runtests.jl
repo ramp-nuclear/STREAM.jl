@@ -1,6 +1,7 @@
 # test/runtests.jl — thin orchestrator
 
 include("test_geometry.jl")
+include("test_knobs.jl")
 include("test_connectors.jl")
 include("test_fluids.jl")
 include("test_channels.jl")
