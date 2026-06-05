@@ -1,4 +1,4 @@
-# dimensionless.jl -- Dimensionless number utilities for STREAM.jl
+# dimensionless.jl -- Dimensionless number utilities
 # Mirrors Python STREAM dimensionless.py
 # All functions are plain Julia arithmetic -- MTK traces through them symbolically.
 # None are @register_symbolic.

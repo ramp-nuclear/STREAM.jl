@@ -1,4 +1,4 @@
-# point_kinetics.jl -- PointKinetics component and steady-state IC helper for STREAM.jl
+# point_kinetics.jl -- PointKinetics component and steady-state IC helper
 #
 # Implements the 6-group point kinetics equations (7 ODEs: 1 power + 6 precursor groups)
 # with a constant reactivity parameter. The companion point_kinetics_steady_state function

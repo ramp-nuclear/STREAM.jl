@@ -1,4 +1,4 @@
-# sources.jl — WallTemperature and HeatFluxSource value-source components for STREAM.jl
+# sources.jl -- WallTemperature and HeatFluxSource value-source components
 #
 
 """

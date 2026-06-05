@@ -1,4 +1,4 @@
-# resistors.jl — Friction, Gravity, Resistor components for STREAM.jl
+# resistors.jl -- Friction, Gravity, Resistor components
 
 """
     Friction(; name, L, D, A) -> System

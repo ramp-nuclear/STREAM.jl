@@ -1,4 +1,4 @@
-# misc.jl — Inertia, HeatExchanger, ConstantTemperature components for STREAM.jl
+# misc.jl -- Inertia, HeatExchanger, ConstantTemperature components
 
 """
     Inertia(L_over_A; name) -> System

@@ -1,4 +1,4 @@
-# pump.jl — Pump component for STREAM.jl
+# pump.jl -- Pump component
 
 """
     Pump(dP_pump::Real; name) -> System

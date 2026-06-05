@@ -1,4 +1,4 @@
-# flapper.jl — Flapper check-valve component for STREAM.jl
+# flapper.jl -- Flapper check-valve component
 
 """
     Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0) -> System

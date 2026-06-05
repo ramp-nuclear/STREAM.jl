@@ -1,4 +1,4 @@
-# htc/correlations.jl — Heat transfer coefficient correlation functions for STREAM.jl
+# htc/correlations.jl -- Heat transfer coefficient correlation functions
 #
 # Design:
 #   - Standalone named functions (dittus_boelter, elenbaas_nusselt, marco_han_nusselt):

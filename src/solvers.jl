@@ -1,4 +1,4 @@
-# solvers.jl -- Solver API for STREAM.jl
+# solvers.jl -- Solver API
 #
 
 """

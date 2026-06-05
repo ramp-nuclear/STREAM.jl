@@ -1,4 +1,4 @@
-# examples.jl — Example system builders for STREAM.jl
+# examples.jl -- Example system builders
 # build_loop, build_loop_vertical, build_loop_transient, build_cube
 
 """

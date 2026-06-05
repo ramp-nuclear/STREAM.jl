@@ -1,4 +1,4 @@
-# friction/correlations.jl — Friction factor correlation functions for STREAM.jl
+# friction/correlations.jl -- Friction factor correlation functions
 #
 # Design:
 #   - Standalone named functions (blasius_friction, turbulent_friction, viscosity_correction,

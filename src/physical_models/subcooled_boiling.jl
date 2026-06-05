@@ -1,4 +1,4 @@
-# subcooled_boiling.jl — Subcooled boiling heat flux correlations for STREAM.jl
+# subcooled_boiling.jl -- Subcooled boiling heat flux correlations
 #
 # Design:
 #   - Standalone named functions (mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux,

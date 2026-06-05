@@ -1,4 +1,4 @@
-# helpers.jl — QoL and composition helpers for STREAM.jl
+# helpers.jl -- QoL and composition helpers
 
 """
     port(sys, face, i)

@@ -1,5 +1,5 @@
-# channels.jl — Channel, ChannelHeatFlux, ChannelAndContacts variants
-# and shared `_channel_core` for STREAM.jl.
+# channels.jl -- Channel, ChannelHeatFlux, ChannelAndContacts variants
+# and shared `_channel_core`.
 #
 
 # Declare Channel as a new generic function independent of Base.Channel{T}

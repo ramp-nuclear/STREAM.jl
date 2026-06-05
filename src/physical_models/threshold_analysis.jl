@@ -1,4 +1,4 @@
-# threshold_analysis.jl — Post-solve nuclear safety threshold analysis functions
+# threshold_analysis.jl -- Post-solve nuclear safety threshold analysis functions
 #
 # Design:
 #   - All functions are plain Julia arithmetic — NOT @register_symbolic, NOT ifelse().
