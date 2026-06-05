@@ -13,8 +13,11 @@ using OrdinaryDiffEq: ReturnCode
 using Statistics
 using STREAM
 using STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger,
-    ConstantTemperature, PipeGeometry_circular, PipeGeometry_rectangular,
-    HeatDiffusion, solve_steady, solve_transient, steady_state_guess,
+    ConstantTemperature, PipeGeometry, PipeGeometry_circular, PipeGeometry_rectangular,
+    HeatDiffusion, ConstantFluid, PointKinetics, ReactivityController,
+    connect_temperature_feedback, compose_systems, symmetric_plate, one_sided_connection,
+    constant_Nusselt, point_kinetics_steady_state, port,
+    solve_steady, solve_transient, steady_state_guess,
     regime_dependent_q_scb, _bergles_rohsenow_dT_ONB
 
 @testset "Builders smokes" begin
@@ -1394,4 +1397,213 @@ end
     # Crossing occurs when the pump head equals the buoyancy head L·g·Δρ.
     p_cross = p_pump0 * exp(-times[argmin(abs.(mdot))])
     @test isapprox(p_cross, grav_dp; rtol=1e-3)
+end
+
+# ----------------------------------------------------------------------------
+# Tier-B channel / point-kinetics ports (#4, #5, #8, #9).
+#
+# These assert Python's closed-form *analytic results* (linear coolant rise,
+# h-weighted wall temperature, power driven negligible by negative feedback), not
+# byte-identical numbers — Julia's models differ from Python's mocks in ways that
+# are immaterial to those results:
+#   - Julia `HeatDiffusion` is single-material; Python's MTR fuel is multi-material
+#     (meat + clad). Used here with mock single-material solid (k_s=cp_s=rho_s=1).
+#   - Julia `ChannelAndContacts` computes its HTC from a correlation (water-based);
+#     Python prescribes a mock h. #4 reads Julia's computed `h_tc` into the same
+#     wall-temperature balance Python checks against its prescribed h.
+#   - Julia `PointKinetics` is fixed 6-group U-235; Python #8 uses a single group.
+#     The "power → 0 under negative feedback" result is group-count-independent.
+#   - Julia `HeatDiffusion` needs nx ≥ 2; Python uses nx = 1. The per-axial-slice
+#     power (hence the linear coolant rise) is independent of the lateral count.
+# `ConstantFluid()` is the Julia counterpart of Python's `mock_liquid_funcs` (all
+# properties 1.0), which gives the clean closed-form coolant temperatures.
+# ----------------------------------------------------------------------------
+
+@testset "channel stable state with uniform heating increases linearly" begin
+    # Python: test_channel_stable_state_with_uniform_heating_increases_linearly
+    # A channel heated on one face by a fuel plate under uniform power. With cp = 1
+    # (ConstantFluid) the coolant rises linearly, Tc[i] = T0 + i·P/(nz·mdot), and the
+    # conjugate wall temperature is the h-weighted mean Tw = (Tc·h + Tf·h_fw)/(h + h_fw).
+    T0 = 313.15
+    P = 10.0
+    mdot = 1.0
+    n = 10
+    nz = 10
+    nx = 2
+    k_s = 1.0
+    Lx = 1.0
+    # Mock one-sided pipe (heated_parts = (0, 1), area 1) + mock solid (all 1).
+    geom = PipeGeometry(1.0, 4.0, 1.0, 1.0, 1.0, (0.0, 1.0), 1.0, 1.0)
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named cac = ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
+                                    htc_correlation=constant_Nusselt(; Nu=8.235))
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.0, Lx=Lx, y=1.0,
+                                rho_s=1.0, cp_s=1.0, k_s=k_s, power_shape=ps, T0=T0)
+    osc = one_sided_connection(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
+    @named pump = Pump(; mdot0=mdot)
+    @named bc = HeatExchanger(T0)
+    conns = Equation[
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, osc.cac.port_in),
+        connect(osc.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        osc.fuel.power ~ P,
+        # Unheated left face (heated_parts[1]=0 ⇒ Q=0) has a floating wall T; pin it to the
+        # coolant temp (an insulated wall carries no heat, so this is just a closure).
+        [port(osc.cac, :thermal_left, i).T ~ osc.cac.T[i] for i in 1:n]...,
+    ]
+    full = compose_systems(osc, pump, bc; connections=conns, name=:sys4)
+    ssys = mtkcompile(full)
+    ic = Pair{Any,Any}[ssys.osc.cac.port_in.mdot => mdot]
+    append!(ic, [ssys.osc.cac.T[i] => T0 for i in 1:n])
+    append!(ic, [ssys.osc.fuel.T[i, j] => T0 for i in 1:nz for j in 1:nx])
+    sol = solve_transient(ssys, ic, range(0.0, 200.0; length=50);
+                          initializealg=BrownFullBasicInit(), maxiters=1_000_000)
+    @test sol.retcode == ReturnCode.Success
+    Tc = [sol[ssys.osc.cac.T[i], end] for i in 1:n]
+    Tc_analytic = [T0 + i * (P / (nz * mdot)) for i in 1:nz]   # cp = 1 (ConstantFluid)
+    @test all(isapprox.(Tc, Tc_analytic; rtol=1e-6))           # coolant rises linearly
+    # h-weighted wall temperature, reading Julia's computed h_tc (Python prescribes h).
+    h_fw = 2 * k_s / (Lx / nx)
+    Tw = [sol[port(ssys.osc.cac, :thermal_right, i).T, end] for i in 1:n]
+    Tf = [sol[ssys.osc.fuel.T[i, 1], end] for i in 1:nz]
+    h = [sol[ssys.osc.cac.h_tc_right[i], end] for i in 1:n]
+    Tw_pred = (Tc .* h .+ Tf .* h_fw) ./ (h .+ h_fw)
+    @test all(isapprox.(Tw, Tw_pred; rtol=1e-6))               # conjugate wall-temp balance
+end
+
+@testset "channel point kinetics — per-channel coolant rises linearly" begin
+    # Python: test_channel_point_kinetics
+    # A channel + fuel plate driven by a critical PointKinetics (reactivity 0, power held
+    # constant). With cp = 1 the steady coolant temperature rises linearly along the channel:
+    # strictly increasing with a vanishing second difference.
+    T0 = 313.15
+    n = 7
+    nz = 7
+    nx = 2
+    geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named cac = ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
+                                    htc_correlation=constant_Nusselt(; Nu=8.235))
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0,
+                                rho_s=1.0, cp_s=1.0, k_s=1.0, power_shape=ps, T0=T0)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+    ctrl = ReactivityController()                  # reactivity 0 ⇒ power stays constant
+    @named pk = PointKinetics(ctrl)
+    mdot0 = 1.0
+    @named pump = Pump(; mdot0=mdot0)
+    @named bc = HeatExchanger(T0)
+    conns = Equation[
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, rods.cac.port_in),
+        connect(rods.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        rods.fuel.power ~ pk.P,                     # power_scale = 1 (Python uses pk.P directly)
+    ]
+    full = compose_systems(rods, pk, pump, bc; connections=conns, name=:sys5)
+    ssys = mtkcompile(full)
+    pk_ic = point_kinetics_steady_state(1.0)
+    ic = Pair{Any,Any}[
+        ssys.pk.rho_c_fn => ctrl,
+        ssys.pk.P => 1.0,
+        ssys.pk.C_1 => pk_ic.C_k[1], ssys.pk.C_2 => pk_ic.C_k[2], ssys.pk.C_3 => pk_ic.C_k[3],
+        ssys.pk.C_4 => pk_ic.C_k[4], ssys.pk.C_5 => pk_ic.C_k[5], ssys.pk.C_6 => pk_ic.C_k[6],
+        ssys.rods.cac.port_in.mdot => mdot0,
+    ]
+    append!(ic, [ssys.rods.cac.T[i] => T0 for i in 1:n])
+    append!(ic, [ssys.rods.fuel.T[i, j] => T0 for i in 1:nz for j in 1:nx])
+    sol = solve_transient(ssys, ic, range(0.0, 200.0; length=200);
+                          initializealg=BrownFullBasicInit(), maxiters=1_000_000)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol[ssys.pk.P, end], 1.0; rtol=1e-6)   # critical PK holds power constant
+    Tc = [sol[ssys.rods.cac.T[i], end] for i in 1:n]
+    @test all(diff(Tc) .> 0)                              # strictly increasing
+    @test all(abs.(diff(diff(Tc))) .< 1e-6)               # vanishing second difference (linear)
+end
+
+@testset "power is negligible for negative Tfuel feedback (ref = boundary)" begin
+    # Python: test_power_is_negligible_for_negative_Tfuel_feedback_and_ref_temp_is_boundary
+    # A fuel plate tied to a T0 thermal bath, with PointKinetics fuel-temperature feedback whose
+    # reference is that same T0. Negative feedback drives the steady power to zero and every fuel
+    # temperature back to T0. (Julia's stabilizing feedback uses a negative coefficient, the
+    # opposite sign convention to Python's positive worth.)
+    T0 = 308.15
+    nz = 10
+    nx = 2
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
+                                rho_s=3000.0, cp_s=800.0, k_s=100.0, power_shape=ps, T0=T0)
+    bathsL = [ConstantTemperature(T0; name=Symbol(:bathL, i)) for i in 1:nz]
+    bathsR = [ConstantTemperature(T0; name=Symbol(:bathR, i)) for i in 1:nz]
+    ctrl = ReactivityController()
+    @named pk = PointKinetics(ctrl; temp_worth=Dict(fuel => fill(-0.1, nz, nx)),
+                              ref_temp=Dict(fuel => fill(T0, nz, nx)))
+    fb = connect_temperature_feedback(pk, [fuel])
+    bath_conns = vcat(
+        [connect(port(fuel, :thermal_left, i), bathsL[i].thermal) for i in 1:nz],
+        [connect(port(fuel, :thermal_right, i), bathsR[i].thermal) for i in 1:nz],
+    )
+    conns = Equation[fb...; fuel.power ~ pk.P * 1.0e3; bath_conns...]
+    full = compose_systems(fuel, pk, bathsL..., bathsR...; connections=conns, name=:sys8)
+    ssys = mtkcompile(full)
+    pk_ic = point_kinetics_steady_state(1.0e5)
+    ic = Pair{Any,Any}[
+        ssys.pk.rho_c_fn => ctrl,
+        ssys.pk.P => 1.0e5,
+        ssys.pk.C_1 => pk_ic.C_k[1], ssys.pk.C_2 => pk_ic.C_k[2], ssys.pk.C_3 => pk_ic.C_k[3],
+        ssys.pk.C_4 => pk_ic.C_k[4], ssys.pk.C_5 => pk_ic.C_k[5], ssys.pk.C_6 => pk_ic.C_k[6],
+    ]
+    append!(ic, [ssys.fuel.T[i, j] => 2 * T0 for i in 1:nz for j in 1:nx])   # start hot
+    sol = solve_steady(ssys, ic)
+    @test sol.retcode == ReturnCode.Success
+    @test sol[ssys.pk.P] < 1e-3                                              # power → 0
+    @test all(isapprox(sol[ssys.fuel.T[i, j]], T0; atol=1e-3) for i in 1:nz for j in 1:nx)
+end
+
+@testset "power is negligible for negative Tcool feedback (ref = inlet)" begin
+    # Python: test_power_is_negligible_for_negative_Tcool_feedback_and_ref_temp_is_inlet
+    # A channel + fuel plate with PointKinetics coolant-temperature feedback whose reference is
+    # the inlet T0. Negative feedback drives the steady power to zero and the coolant back to T0.
+    T0 = 308.15
+    n = 7
+    nz = 7
+    nx = 2
+    geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named cac = ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
+                                    htc_correlation=constant_Nusselt(; Nu=8.235))
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0,
+                                rho_s=1.0, cp_s=1.0, k_s=1.0, power_shape=ps, T0=T0)
+    rods = symmetric_plate(cac, fuel; name=:rods)
+    ctrl = ReactivityController()
+    @named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => fill(-0.1, n)),
+                              ref_temp=Dict(rods.cac => fill(T0, n)))
+    fb = connect_temperature_feedback(pk, [rods.cac])
+    mdot0 = 0.1
+    @named pump = Pump(; mdot0=mdot0)
+    @named bc = HeatExchanger(T0)
+    conns = Equation[
+        connect(pump.port_out, bc.port_in),
+        connect(bc.port_out, rods.cac.port_in),
+        connect(rods.cac.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+        rods.fuel.power ~ pk.P * 1.0e3,
+        fb...,
+    ]
+    full = compose_systems(rods, pk, pump, bc; connections=conns, name=:sys9)
+    ssys = mtkcompile(full)
+    pk_ic = point_kinetics_steady_state(1.0e5)
+    ic = Pair{Any,Any}[
+        ssys.pk.rho_c_fn => ctrl,
+        ssys.pk.P => 1.0e5,
+        ssys.pk.C_1 => pk_ic.C_k[1], ssys.pk.C_2 => pk_ic.C_k[2], ssys.pk.C_3 => pk_ic.C_k[3],
+        ssys.pk.C_4 => pk_ic.C_k[4], ssys.pk.C_5 => pk_ic.C_k[5], ssys.pk.C_6 => pk_ic.C_k[6],
+        ssys.rods.cac.port_in.mdot => mdot0,
+    ]
+    append!(ic, [ssys.rods.cac.T[i] => 2 * T0 for i in 1:n])    # start hot
+    append!(ic, [ssys.rods.fuel.T[i, j] => 2 * T0 for i in 1:nz for j in 1:nx])
+    sol = solve_steady(ssys, ic)
+    @test sol.retcode == ReturnCode.Success
+    @test sol[ssys.pk.P] < 1e-3                                 # power → 0
+    @test all(isapprox(sol[ssys.rods.cac.T[i]], T0; atol=1e-3) for i in 1:n)
 end
