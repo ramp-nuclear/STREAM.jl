@@ -15,6 +15,18 @@ The namespaced connector subsystem (e.g. `sys.thermal_left3`), suitable for `con
 """
 port(sys, face::Symbol, i::Int) = getproperty(sys, Symbol(face, i))
 
+# Real-valued defaults of `params`, skipping parameters with no default or a
+# non-Real default.
+function _real_defaults(params)
+    vals = Float64[]
+    for p in params
+        ModelingToolkit.hasdefault(p) || continue
+        d = ModelingToolkit.getdefault(p)
+        d isa Real && push!(vals, Float64(d))
+    end
+    return vals
+end
+
 """
     check_gravity_mismatch(sys) -> Symbol
 
@@ -28,11 +40,7 @@ Check whether gravity pressure contributions in a hydraulic loop are balanced.
 return-leg `Gravity` component.
 """
 function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
-    all_pars = try
-        ModelingToolkit.parameters(sys)
-    catch
-        return :ok
-    end
+    all_pars = ModelingToolkit.parameters(sys)
 
     local_name = p -> begin
         s = string(p)
@@ -40,30 +48,8 @@ function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
         idx === nothing ? s : s[nextind(s, idx):end]
     end
 
-    g_params = filter(p -> local_name(p) == "g_acc", all_pars)
-    h_params = filter(p -> local_name(p) == "H", all_pars)
-
-    g_vals = Float64[]
-    for p in g_params
-        try
-            val = ModelingToolkit.getdefault(p)
-            if val isa Real
-                push!(g_vals, Float64(val))
-            end
-        catch
-        end
-    end
-
-    h_vals = Float64[]
-    for p in h_params
-        try
-            val = ModelingToolkit.getdefault(p)
-            if val isa Real
-                push!(h_vals, Float64(val))
-            end
-        catch
-        end
-    end
+    g_vals = _real_defaults(filter(p -> local_name(p) == "g_acc", all_pars))
+    h_vals = _real_defaults(filter(p -> local_name(p) == "H", all_pars))
 
     if isempty(g_vals) || all(iszero, g_vals)
         return :ok
