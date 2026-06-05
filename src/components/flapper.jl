@@ -1,52 +1,56 @@
 # flapper.jl -- Flapper check-valve component
 
 """
-    Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0) -> System
+    Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0, fluid=Water()) -> System
 
-Flapper check-valve component. When the wired reference mass flow `ref_mdot` drops
-below a threshold (monitored externally via `flapper_callback`), the latching state
-`T_open` is set to the current solver time. After that, the valve resistance ramps
-smoothly from `R_closed` to `R_open` over `dt` seconds using a C1 Hermite cubic
-(`3*xi^2 - 2*xi^3`).
+Flapper (passive check valve). Closed, it admits **no flow** (`mdot = 0`); once open it is
+a quadratic resistor `ΔP = f·mdot·|mdot| / (2·ρ·area²)`. The valve opens when the wired
+reference flow `ref_mdot` drops to `open_at_current` (detected externally by
+`flapper_callback`, which latches `T_open` to the crossing time). After `T_open` the flow
+ramps in gradually through the relaxation factor `xi = r(open_rate·(t − T_open))`, a C1
+Hermite cubic (`-2x³ + 3x²`) rising 0→1, so `mdot = xi · mdot_open`. This mirrors Python
+STREAM's `Flapper` (closed ⇒ mdot 0, open ⇒ quadratic with an `open_rate` relaxation).
 
-`T_open` uses a large finite sentinel value (`1e30`) rather than `Inf` as its initial
-condition. `Inf` in the solver state vector causes Rodas5P to report instability. With
-`T_open = 1e30`, the ramp expression `clamp((t - 1e30)/dt, 0, 1)` evaluates to 0 for all
-practical `t` values, keeping the valve closed before the event fires.
+Because a closed flapper carries no flow, it is meant to sit in **parallel** with another
+branch (the bypass that carries flow while the valve is shut); a closed flapper placed in
+series would block the whole loop.
 
-`ref_mdot` has **no equation inside the component**. The user must wire it externally
-during system composition:
+`T_open` uses a large finite sentinel (`1e30`), not `Inf` — `Inf` in the state vector makes
+Rodas5P report instability; `1e30` keeps `t ≤ T_open` true (valve closed) until the event.
+
+`ref_mdot` has **no equation inside the component**. The caller wires it during composition:
 ```julia
 flapper.ref_mdot ~ pump.port_in.mdot
 ```
-`mtkcompile` will error if this equation is omitted (under-determined system).
-
-To detect the closing event, use `flapper_callback(ssys; threshold)` and pass the
-resulting `ContinuousCallback` to `solve_transient(...; callbacks=cb)`.
+To detect the opening event, use `flapper_callback(ssys, monitored; threshold=open_at_current)`
+and pass the resulting `ContinuousCallback` to `solve_transient(...; callbacks=cb)`.
 
 # Arguments
 - `name`: system name (Symbol), injected by `@named` macro
-- `dt`: ramp duration [s]; time for resistance to transition from closed to open (default: 5.0)
-- `R_closed`: closed-state hydraulic resistance [Pa*s/kg] (default: 1e8)
-- `R_open`: open-state hydraulic resistance [Pa*s/kg] (default: 100.0)
+- `open_at_current`: reference flow at/below which the valve opens [kg/s] (default 0.01).
+  Pass this as the `flapper_callback` threshold.
+- `f`: open-state quadratic loss coefficient (default 1.0)
+- `area`: flow area [m²] (default 1.0)
+- `open_rate`: relaxation rate [1/s]; the open ramp completes after `1/open_rate` s (default 1.0)
+- `fluid`: coolant property set (`AbstractFluid`), default `Water()` — supplies the density
+  at the inlet stream temperature
 
 # Ports
-- `port_in`: `FlowPort` — inlet (pressure, mass flow, temperature)
-- `port_out`: `FlowPort` — outlet (pressure, mass flow, temperature)
+- `port_in`, `port_out`: `FlowPort` (pressure, mass flow, temperature)
 
 # Returns
-Uncompiled `System`. The Flapper's `T_open(t)` state is set by an external
-`ContinuousCallback` (see `flapper_callback`), not by an MTK equation, so the system
-is intentionally structurally underdetermined. Additionally, `ref_mdot` has no
-in-component equation and must be wired by the caller. Call
-`mtkcompile(sys; fully_determined=false)` before solving a standalone Flapper, or
-compose it into a full system where `ref_mdot` is wired.
+Uncompiled `System`. `T_open(t)` is set by an external `ContinuousCallback` (see
+`flapper_callback`), not an MTK equation, and `ref_mdot` has no in-component equation, so a
+standalone Flapper is structurally underdetermined — call
+`mtkcompile(sys; fully_determined=false)`, or compose it into a system where `ref_mdot` is wired.
 """
-function Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0)
+function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
+                 fluid::AbstractFluid=Water())
     pars = @parameters begin
-        dt = dt
-        R_closed = R_closed
-        R_open = R_open
+        open_at_current = open_at_current
+        f = f
+        area = area
+        open_rate = open_rate
     end
 
     vars = @variables T_open(t) = 1e30 xi(t) ref_mdot(t)
@@ -54,11 +58,19 @@ function Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0)
     @named port_in = FlowPort()
     @named port_out = FlowPort()
 
+    rho = density(fluid, instream(port_in.T))
+    dp = port_in.P - port_out.P
+    x = open_rate * (t - T_open)
+    relax = ifelse(x <= 0.0, 0.0, ifelse(x >= 1.0, 1.0, -2 * x^3 + 3 * x^2))
+    # Open-state flow: invert ΔP = f·mdot·|mdot|/(2ρA²) ⇒ mdot = sign(dp)·sqrt(|dp|·2ρA²/f).
+    mdot_open = sign(dp) * sqrt(abs(dp) * 2 * rho * area^2 / f)
+
     eqs = Equation[
         port_in.mdot + port_out.mdot ~ 0,
         D(T_open) ~ 0,
-        xi ~ clamp((t - T_open) / dt, 0.0, 1.0),
-        port_in.P - port_out.P ~ (R_closed + (R_open - R_closed) * (3 * xi ^ 2 - 2 * xi ^ 3)) * port_in.mdot,
+        xi ~ relax,
+        # Closed (t ≤ T_open): mdot = 0. Open: mdot = xi · mdot_open (quadratic, ramped in).
+        ifelse(t <= T_open, port_in.mdot, port_in.mdot - relax * mdot_open) ~ 0,
         port_out.T ~ instream(port_in.T),
         port_in.T ~ instream(port_out.T),
         # ref_mdot has no equation here — user wires it during composition

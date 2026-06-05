@@ -1125,3 +1125,76 @@ end
         @test isapprox(mdot[i], 3.0 - tt; atol=1e-5)   # tracks the current source
     end
 end
+
+@testset "flapper opens with ref_mdot" begin
+    # Python: test_flapper_opens_with_ref_mdot
+    # Pump(p·exp(-t)) drives a resistor in parallel with a flapper; ref_mdot = resistor flow.
+    # The resistor flow mdot_R = exp(-t) (r=p=1), so the flapper opens when it hits 0.1, i.e.
+    # at t_open = log(10). The flapper carries no flow before t_open and opens after.
+    p = 1.0
+    mdot0 = 1.0
+    dp_fn = (tt) -> p * exp(-tt)   # one function object: passed to Pump AND the op (same type)
+    @named pump = Pump(dp_fn)
+    @named R = Resistor(p / mdot0)
+    @named flapper = Flapper(; open_at_current=0.1 * mdot0, f=1.0, area=1.0, open_rate=10.0,
+                             fluid=ConstantFluid())
+    @named hx = HeatExchanger(300.0)
+    conns = [
+        connect(pump.port_out, R.port_in, flapper.port_in),
+        connect(R.port_out, flapper.port_out, hx.port_in),
+        connect(hx.port_out, pump.port_in),
+        flapper.ref_mdot ~ R.port_in.mdot,
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:flapper_refmdot), pump, R, flapper, hx)
+    ssys = mtkcompile(sys; fully_determined=false)
+    op = Pair{Any,Any}[
+        ssys.flapper.T_open => 1e30,
+        ssys.R.port_in.mdot => 1.0,
+        ssys.pump.dP_pump_fn => dp_fn,
+    ]
+    # The flapper's ref_mdot is the resistor flow, which here is purely algebraic
+    # (no inertia ⇒ no state to root-find): R.mdot = pump_dP/r = p·exp(-t) exactly. So the
+    # opening event is detected on that analytic crossing of `t`, which root-finds cleanly.
+    T_open_idx = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
+    cb = ContinuousCallback(
+        (u, tt, integ) -> p * exp(-tt) - 0.1 * mdot0,
+        nothing,
+        integ -> (integ.u[T_open_idx] = integ.t),
+    )
+    t_arr = range(0.0, 5.0; length=500)
+    sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol[ssys.flapper.T_open, end], log(10.0); rtol=1e-3)   # analytic open time
+    @test isapprox(sol(1.0; idxs=ssys.flapper.port_in.mdot), 0.0; atol=1e-8)  # closed before
+    @test sol(4.0; idxs=ssys.flapper.port_in.mdot) > 1e-6                     # open after
+end
+
+@testset "flapper and pump" begin
+    # Python: test_flapper_and_pump
+    # A pre-timed flapper (open at t=2.5) in series with a decaying pump: no flow until the
+    # flapper opens, then the quadratic flapper conducts and flow becomes nonzero.
+    t_open = 2.5
+    dp_fn = (tt) -> exp(-tt)   # one function object for Pump + op
+    @named pump = Pump(dp_fn)
+    @named flapper = Flapper(; open_at_current=0.1, f=1.0, area=1.0, open_rate=10.0,
+                             fluid=ConstantFluid())
+    @named hx = HeatExchanger(300.0)
+    conns = [
+        connect(pump.port_out, flapper.port_in),
+        connect(flapper.port_out, hx.port_in),
+        connect(hx.port_out, pump.port_in),
+        flapper.ref_mdot ~ pump.port_in.mdot,
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:flapper_pump), pump, flapper, hx)
+    ssys = mtkcompile(sys; fully_determined=false)
+    op = Pair{Any,Any}[
+        ssys.flapper.T_open => t_open,            # pre-set open time (Python's F.open(2.5))
+        ssys.pump.dP_pump_fn => dp_fn,
+    ]
+    sol = solve_transient(ssys, op, range(0.0, 5.0; length=500))
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(2.0; idxs=ssys.pump.port_in.mdot), 0.0; atol=1e-8)   # closed ⇒ no flow
+    @test abs(sol(4.5; idxs=ssys.pump.port_in.mdot)) > 1e-6                 # open ⇒ flow
+end
