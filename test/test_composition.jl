@@ -22,7 +22,7 @@ function _mtr_pair(; n=4, nz=4, nx=2)
     return cac, fuel
 end
 
-# Section 1: port helper (D-18 first bullet)
+# Section 1: port helper
 @testset "port helper — indexed thermal port access on uncompiled CAC" begin
     cac, _ = _mtr_pair()
     p1 = port(cac, :thermal_left, 1)
@@ -41,7 +41,7 @@ end
     @test endswith(name_str_2, "thermal_right2")
 end
 
-# Section 2: check_gravity_mismatch (D-18 second bullet)
+# Section 2: check_gravity_mismatch
 # Existing G_M tests carry forward — these don't touch Channel architecture.
 @testset "check_gravity_mismatch — :ok when no gravity" begin
     geom = PipeGeometry_circular(0.6, 0.01)
@@ -51,7 +51,7 @@ end
     # CAC's per-cell thermal ports are Flow-based ThermalPort subsystems —
     # pinning `port.T` directly over-determines via the dangling Flow rule
     # (auto-zeros Q_flow). Drive them via ConstantTemperature `connect()`s
-    # (the canonical CAC wall-T pattern; see test_channels.jl SIGN-02 testset).
+    # (the canonical CAC wall-T pattern; see the flow-reversal testset in test_channels.jl).
     ct_l = [ConstantTemperature(313.15; name=Symbol(:ct_l_ok_, i)) for i in 1:4]
     ct_r = [ConstantTemperature(313.15; name=Symbol(:ct_r_ok_, i)) for i in 1:4]
     connections = [
@@ -87,7 +87,7 @@ end
     @test check_gravity_mismatch(ssys) == :mismatch
 end
 
-# Section 3: _infer_n (D-18 third bullet)
+# Section 3: _infer_n
 # Works on CAC (ThermalPort arrays kept); errors on the new Channel/CHF.
 @testset "_infer_n: counts thermal_left* on CAC (n=4)" begin
     cac, _ = _mtr_pair(; n=4)
@@ -109,7 +109,7 @@ end
     @test_throws ArgumentError _infer_n(chf)
 end
 
-# Section 4: symmetric_plate compose-correctness (D-18 fourth bullet)
+# Section 4: symmetric_plate compose-correctness
 # Multiple shapes; both faces wired correctly; no mtkcompile errors.
 # Verify-block requires: at least 2 distinct shape testsets (n=4 + n=10)
 # AND at least 2 asymmetric-shape testsets (nx=1, nx=3).
@@ -215,7 +215,7 @@ end
     @test sol.retcode == ReturnCode.Success
 end
 
-# Section 5: plate (dual-CAC + HD) compose-correctness (D-18 fifth bullet)
+# Section 5: plate (dual-CAC + HD) compose-correctness
 # Verify-block requires: at least 1 testset with name starting with "plate(".
 @testset "plate(ch_left, ch_right, fuel) — both faces wired correctly" begin
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
@@ -248,7 +248,7 @@ end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-# Section 6: one_sided_connection (D-18 sixth bullet)
+# Section 6: one_sided_connection
 # Verify-block requires: at least 2 "@testset \"one_sided_connection" testsets
 # (one per side variant).
 @testset "one_sided_connection — side=:left compiles cleanly" begin
@@ -292,7 +292,7 @@ end
     @test_throws ArgumentError one_sided_connection(cac, fuel; side=:bogus, name=:bad)
 end
 
-# Section 7: compose_systems cross-plate wiring (D-18 seventh bullet)
+# Section 7: compose_systems cross-plate wiring
 # Stitch two symmetric_plate assemblies via hydraulic-series connect equations.
 @testset "compose_systems — two plates in series" begin
     cac1, fuel1 = _mtr_pair(; n=4, nz=4, nx=2)
@@ -324,8 +324,8 @@ end
     @test sol.retcode == ReturnCode.Success
 end
 
-# Section 8: connect_temperature_feedback (D-18 eighth bullet)
-# TF-04 equation-counting tests from Phase 47.
+# Section 8: connect_temperature_feedback
+# Equation-counting tests for connect_temperature_feedback.
 @testset "connect_temperature_feedback — 1D (CAC) emits n equations" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)

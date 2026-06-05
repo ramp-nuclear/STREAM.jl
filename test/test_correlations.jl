@@ -23,8 +23,8 @@ using STREAM:
     developing_laminar_h_spl,
     maximal_htc
 
-@testset "PHY-02/03/04: Correlation Library" begin
-    @testset "PHY-03: rectangular_laminar_correction reference values" begin
+@testset "Correlation Library" begin
+    @testset "rectangular_laminar_correction reference values" begin
         @test isapprox(rectangular_laminar_correction(0.0), 0.66685; atol=1e-4)
         @test isapprox(rectangular_laminar_correction(0.01814), 0.68544; atol=1e-4)
         @test isapprox(rectangular_laminar_correction(0.5), 1.03639; atol=1e-4)
@@ -43,7 +43,7 @@ using STREAM:
         @test isapprox(blasius_friction(8000.0), expected_f; rtol=1e-6)
     end
 
-    @testset "PHY-02: constant_Nusselt factory" begin
+    @testset "constant_Nusselt factory" begin
         # Default Nu = 8.235
         htc_fn = constant_Nusselt()
         @test htc_fn(300.0, 7.0) == 8.235
@@ -53,7 +53,7 @@ using STREAM:
         @test htc_custom(300.0, 7.0) == 5.0
     end
 
-    @testset "PHY-03: laminar_friction_rectangular factory" begin
+    @testset "laminar_friction_rectangular factory" begin
         # MTR-like rectangular geometry constructed so depth/width == 0.01814 exactly.
         # width = 0.07, depth = 0.07 * 0.01814 = 0.0012698  →  aspect_ratio = 0.01814.
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
@@ -63,7 +63,7 @@ using STREAM:
         @test isapprox(f_fn(500.0), 64.0 / (500.0 * k_R); rtol=1e-6)
     end
 
-    @testset "PHY-04: regime_dependent switching" begin
+    @testset "regime_dependent switching" begin
         # MTR-like rectangular geometry: depth/width == 0.01814 (k_R ≈ 0.68544).
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
         rd = regime_dependent(geom;
@@ -89,8 +89,8 @@ using STREAM:
     end
 end
 
-@testset "PHY-02/03/04: Integration Tests — Pluggable Correlations in Solved Systems" begin
-    @testset "PHY-02: constant_Nusselt integration — Nu≈8.235 in solution" begin
+@testset "Integration Tests — Pluggable Correlations in Solved Systems" begin
+    @testset "constant_Nusselt integration — Nu≈8.235 in solution" begin
         n = 3;
         T_inlet = 313.15;
         T_wall = 373.15;
@@ -142,7 +142,7 @@ end
         @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu_left[:]], 8.235, rtol=1e-4))
     end
 
-    @testset "PHY-03: laminar_friction_rectangular integration — dP > 0 in solution" begin
+    @testset "laminar_friction_rectangular integration — dP > 0 in solution" begin
         n = 3;
         T_inlet = 313.15;
         T_wall = 373.15
@@ -197,7 +197,7 @@ end
         @test sol_phy03[ssys_phy03.cac_phy03.Re[1]] < 2300.0
     end
 
-    @testset "PHY-04: regime_dependent integration — laminar branch (Re < 2300)" begin
+    @testset "regime_dependent integration — laminar branch (Re < 2300)" begin
         n = 3;
         T_inlet = 313.15;
         T_wall = 373.15
@@ -251,7 +251,7 @@ end
         @test sol_lam[ssys_lam.cac_lam.Re[1]] < 2300.0
     end
 
-    @testset "PHY-04: regime_dependent integration — turbulent branch (Re > 2300)" begin
+    @testset "regime_dependent integration — turbulent branch (Re > 2300)" begin
         n = 3;
         T_inlet = 313.15;
         T_wall = 373.15
@@ -307,21 +307,21 @@ end
     end
 end
 
-@testset "NATCONV-01/02: Elenbaas Natural Convection" begin
-    @testset "NATCONV-01: elenbaas_nusselt standalone for known values" begin
+@testset "Elenbaas Natural Convection" begin
+    @testset "elenbaas_nusselt standalone for known values" begin
         @test isapprox(
             elenbaas_nusselt(12375.512696, 0.00254, 0.6), 1.2731625848; rtol=1e-6
         )
     end
 
-    @testset "NATCONV-01: elenbaas_nusselt limiting cases" begin
+    @testset "elenbaas_nusselt limiting cases" begin
         @test isapprox(elenbaas_nusselt(0.0, 0.00254, 0.6), 0.0; atol=1e-10)
         Nu_large = elenbaas_nusselt(1e6, 0.00254, 0.6)
         @test Nu_large > 0.0
         @test Nu_large > elenbaas_nusselt(1e4, 0.00254, 0.6)
     end
 
-    @testset "NATCONV-01: elenbaas_htc factory produces 4-arg closure" begin
+    @testset "elenbaas_htc factory produces 4-arg closure" begin
         # Smoke test on a rectangular plate geometry (depth = plate gap): the closure
         # takes 4 args, gives a positive Nu when the wall is hotter than the bulk, and
         # returns 0 when there's no temperature difference.
@@ -331,7 +331,7 @@ end
         @test isapprox(htc_fn(0.0, 4.32, 313.15, 313.15), 0.0; atol=1e-10)
     end
 
-    @testset "NATCONV-02: elenbaas_nusselt Python STREAM validation" begin
+    @testset "elenbaas_nusselt Python STREAM validation" begin
         # Full validation against pre-computed Python STREAM reference values
         # Test point: T_bulk=40C (313.15K), T_wall=60C (333.15K), S=0.00254m, Lh=0.6m
         #
@@ -373,7 +373,7 @@ end
     end
 end
 
-@testset "NATCONV-01: regime_dependent NC detection" begin
+@testset "regime_dependent NC detection" begin
     # Setup: laminar HTC returns 4.0, turbulent returns 100.0, NC returns 999.0
     htc_lam = (Re, Pr, T_b, T_w) -> 4.0
     htc_turb = (Re, Pr, T_b, T_w) -> 100.0
@@ -433,7 +433,7 @@ end
 
 end
 
-@testset "HTC-01: Marco_Han_Nusselt" begin
+@testset "Marco_Han_Nusselt" begin
     # Reference values from Python STREAM laminar.py doctest
     @test Marco_Han_Nusselt(0.0) == 8.235
     @test isapprox(Marco_Han_Nusselt(0.2), 5.991134842079999; rtol=1e-10)
@@ -445,7 +445,7 @@ end
     @test Marco_Han_Nusselt(1.0) > 0.0
 end
 
-@testset "FRIC-01: turbulent_friction (Colebrook-White)" begin
+@testset "turbulent_friction (Colebrook-White)" begin
     # Reference values from Python STREAM friction.py doctest
     @test isapprox(turbulent_friction(4e3), 0.039804935964641644; rtol=1e-10)
     @test isapprox(turbulent_friction(4e3, 0.1), 0.10560870441248855; rtol=1e-10)
@@ -460,7 +460,7 @@ end
     @test turbulent_friction(4e3) > turbulent_friction(1e6)
 end
 
-@testset "FRIC-02: viscosity_correction" begin
+@testset "viscosity_correction" begin
     # Reference values from Python STREAM friction.py doctest
     @test viscosity_correction(1.0, 1.0) == 1.0
     @test viscosity_correction(1.0, 0.0) == 0.0
@@ -470,7 +470,7 @@ end
     @test viscosity_correction(0.0, 5.0) == 1.0
 end
 
-@testset "HTC-02: fully_developed_laminar_h_spl" begin
+@testset "fully_developed_laminar_h_spl" begin
     # is derived inside the factory. geom.Dh is NOT consumed by this factory's Nu calc
     # Helper: rectangular geom with exact aspect_ratio = ar via depth=ar, width=1.0.
     _geom_for_ar(ar) = PipeGeometry_rectangular(1.0, 1.0, ar, 1.0)
@@ -498,7 +498,7 @@ end
     @test htc_sq(100.0, 7.0, 313.0, 333.0) > 0.0
 end
 
-@testset "HTC-03: developing_laminar_h_spl" begin
+@testset "developing_laminar_h_spl" begin
     # and Dh = geom.Dh are derived inside the factory.
     # Helper builds a rectangular geom where geom.Dh = Dh_target AND geom.depth/geom.width = ar
     # exactly. Derivation: with depth = ar*width and Dh = 2*ar*width / (ar+1),
@@ -530,7 +530,7 @@ end
     @test htc_dev(1000.0, 7.0, 313.0, 333.0) != htc_dev_ar05(1000.0, 7.0, 313.0, 333.0)
 end
 
-@testset "HTC-04: maximal_htc" begin
+@testset "maximal_htc" begin
     c5 = constant_Nusselt(Nu=5.0)
     c10 = constant_Nusselt(Nu=10.0)
     htc_max = maximal_htc(c5, c10)
@@ -551,8 +551,8 @@ end
     )
 end
 
-@testset "HTC-02/03: Phase 30 laminar HTC factories in compiled Channel" begin
-    @testset "HTC-02: fully_developed_laminar_h_spl compiles in Channel" begin
+@testset "laminar HTC factories in compiled Channel" begin
+    @testset "fully_developed_laminar_h_spl compiles in Channel" begin
         n = 5;
         T_inlet = 313.15;
         T_wall = 373.15;
@@ -604,7 +604,7 @@ end
         @test sol_fd.retcode == ReturnCode.Success
     end
 
-    @testset "HTC-03: developing_laminar_h_spl compiles in Channel" begin
+    @testset "developing_laminar_h_spl compiles in Channel" begin
         n = 5;
         T_inlet = 313.15;
         T_wall = 373.15;

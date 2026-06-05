@@ -4,7 +4,6 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using ModelingToolkit: connect    # disambiguate from Sockets.connect
-                                  # (Phase 57 D-04 deviation #1; RESEARCH §R-1)
 using STREAM
 using STREAM: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion,
                 ConstantTemperature, Channel,
@@ -174,7 +173,7 @@ function _build_val02_twoplate()
                  getproperty(cac_v02, Symbol(:thermal_left, i))) for i in 1:nz_v02]...,
         [connect(getproperty(hd2, Symbol(:thermal_left, i)),
                  getproperty(cac_v02, Symbol(:thermal_right, i))) for i in 1:nz_v02]...,
-        # Phase 58-04: close the Δ=−2 deficit (two HD instances → two `power(t)` pins).
+        # Close the Δ=−2 deficit (two HD instances → two `power(t)` pins).
         hd1.power ~ power_per_plate,
         hd2.power ~ power_per_plate,
     ]
@@ -198,13 +197,13 @@ end
     end
 end
 
-# Testset 2 — Phase 58 scenario topologies
+# Scenario topologies
 # RED-as-expected at plan-end of 58-01; each row flips to GREEN as its
 # corresponding fix plan (58-02 / 58-03 / 58-04) lands.
-@testset "Determinacy: Phase 58 scenarios" begin
+@testset "Determinacy scenarios" begin
     @testset "MTR symmetric"   begin assert_determined("MTR sym",       _build_mtr_sym()) end
     @testset "MTR asymmetric"  begin assert_determined("MTR asym",      _build_mtr_asym()) end
     @testset "MTR one-sided"   begin assert_determined("MTR onesided",  _build_mtr_onesided()) end
-    @testset "VAL-01 Fourier"  begin assert_determined("VAL-01",        _build_val01_fourier()) end
-    @testset "VAL-02 twoplate" begin assert_determined("VAL-02",        _build_val02_twoplate()) end
+    @testset "Fourier determinacy"  begin assert_determined("Fourier",        _build_val01_fourier()) end
+    @testset "two-plate determinacy" begin assert_determined("two-plate",        _build_val02_twoplate()) end
 end

@@ -7,13 +7,13 @@ using STREAM: Channel, HeatDiffusion, ChannelAndContacts
 import ModelingToolkit: compose
 
 @testset "PointKinetics" begin
-    @testset "PK-01a: component compiles with 7 state variables" begin
+    @testset "component compiles with 7 state variables" begin
         @named pk = PointKinetics(rho=0.0)
         ssys = mtkcompile(pk)
         @test length(unknowns(ssys)) == 7
     end
 
-    @testset "PK-02: steady-state IC formula" begin
+    @testset "steady-state IC formula" begin
         P0 = 1e6
         ic = point_kinetics_steady_state(P0)
         @test ic.P == P0
@@ -24,7 +24,7 @@ import ModelingToolkit: compose
         end
     end
 
-    @testset "PK-01b: precursor-only decay matches analytical" begin
+    @testset "precursor-only decay matches analytical" begin
         lambda_k = U235_LAMBDA_K
         @named pk = PointKinetics(rho=0.0, Lambda=1.0, beta_k=zeros(6), lambda_k=lambda_k)
         ssys = mtkcompile(pk)
@@ -57,7 +57,7 @@ import ModelingToolkit: compose
         end
     end
 
-    @testset "PK-01c: zero ICs yield trivial P=0 solution" begin
+    @testset "zero ICs yield trivial P=0 solution" begin
         @named pk = PointKinetics(rho=0.0)
         ssys = mtkcompile(pk)
         op = [
@@ -75,7 +75,7 @@ import ModelingToolkit: compose
         @test all(abs.(sol[ssys.P, :]) .< 1e-10)
     end
 
-    @testset "PK-01d: @observed variables accessible" begin
+    @testset "@observed variables accessible" begin
         @named pk = PointKinetics(rho=0.0)
         ssys = mtkcompile(pk)
         ic = point_kinetics_steady_state(1e6)
@@ -99,7 +99,7 @@ import ModelingToolkit: compose
         @test isfinite(sol[ssys.dPdt, 1])
     end
 
-    @testset "RC-01: ReactivityController" begin
+    @testset "ReactivityController" begin
         ctrl_default = ReactivityController()
         @test ctrl_default.state == :NORMAL
         @test ctrl_default.t_state == 0.0
@@ -166,7 +166,7 @@ import ModelingToolkit: compose
         @test capture[] == (:PHASE_A, 2.0, 8.0)
     end
 
-    @testset "PK-03: Callable Control Reactivity" begin
+    @testset "Callable Control Reactivity" begin
         fn_zero = t -> 0.0
         @named pk_a = PointKinetics(fn_zero; rho_val=0.0)
         ssys_a = mtkcompile(pk_a)
@@ -221,7 +221,7 @@ import ModelingToolkit: compose
         idx_pre = findfirst(tv -> tv >= 0.5, t_arr_c)
         @test isapprox(sol_c[ssys_c.P, idx_pre], P0; rtol=1e-2)
 
-        # PK-03d: ramp insertion produces monotonically increasing P during ramp
+        # Ramp insertion produces monotonically increasing P during ramp
         ramp_slope = 0.001  # 1/s -> reaches 0.002 at t=2s (still < beta/3)
         t_ramp_end = 2.0
         fn_ramp = (s, ts, t) -> ramp_slope * t
@@ -266,7 +266,7 @@ import ModelingToolkit: compose
         @test isapprox(sol_e[ssys_e.P, end], sol_c[ssys_c.P, end]; rtol=1e-3)
     end
 
-    @testset "TF-01..TF-03: Temperature Feedback Construction" begin
+    @testset "Temperature Feedback Construction" begin
         # Shared fixtures
         ctrl_zero = ReactivityController()  # always returns 0.0
 
@@ -285,19 +285,19 @@ import ModelingToolkit: compose
             power_shape=ps_3x2,
         )
 
-        @testset "TF-01a: default no temp_worth gives 7 state vars" begin
+        @testset "default no temp_worth gives 7 state vars" begin
             @named pk = PointKinetics(ctrl_zero)
             @test length(unknowns(pk)) == 7
             unames = string.(ModelingToolkit.getname.(unknowns(pk)))
             @test !any(n -> occursin("T_source", n), unames)
         end
 
-        @testset "TF-01b: temp_worth=nothing gives 7 state vars" begin
+        @testset "temp_worth=nothing gives 7 state vars" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=nothing)
             @test length(unknowns(pk)) == 7
         end
 
-        @testset "TF-02a: scalar alpha broadcasts to all channel cells" begin
+        @testset "scalar alpha broadcasts to all channel cells" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=Dict(ch => -0.001))
             unames = string.(ModelingToolkit.getname.(unknowns(pk)))
             @test any(n -> occursin("T_source_ch", n), unames)
@@ -305,7 +305,7 @@ import ModelingToolkit: compose
             @test length(unknowns(pk)) == 7 + 5
         end
 
-        @testset "TF-02b: 1D vector per channel cell" begin
+        @testset "1D vector per channel cell" begin
             @named pk = PointKinetics(
                 ctrl_zero; temp_worth=Dict(ch => [-0.001, -0.002, -0.003, -0.004, -0.005])
             )
@@ -314,7 +314,7 @@ import ModelingToolkit: compose
             @test length(unknowns(pk)) == 7 + 5
         end
 
-        @testset "TF-02c: 2D matrix for HeatDiffusion (3x2=6 cells)" begin
+        @testset "2D matrix for HeatDiffusion (3x2=6 cells)" begin
             @named pk = PointKinetics(
                 ctrl_zero; temp_worth=Dict(fuel => fill(-0.002, 3, 2))
             )
@@ -323,23 +323,23 @@ import ModelingToolkit: compose
             @test length(unknowns(pk)) == 7 + 6
         end
 
-        @testset "TF-02d: shape mismatch raises ArgumentError (vector)" begin
+        @testset "shape mismatch raises ArgumentError (vector)" begin
             @test_throws ArgumentError PointKinetics(
                 ctrl_zero; name=:pk, temp_worth=Dict(ch => [1.0, 2.0])
             )
         end
 
-        @testset "TF-02e: shape mismatch raises ArgumentError (matrix)" begin
+        @testset "shape mismatch raises ArgumentError (matrix)" begin
             @test_throws ArgumentError PointKinetics(
                 ctrl_zero; name=:pk, temp_worth=Dict(fuel => fill(0.0, 2, 2))
             )
         end
 
-        @testset "TF-03a: ref_temp omitted — constructor succeeds" begin
+        @testset "ref_temp omitted — constructor succeeds" begin
             @test_nowarn PointKinetics(ctrl_zero; name=:pk, temp_worth=Dict(ch => -0.001))
         end
 
-        @testset "TF-03b: ref_temp missing key — constructor succeeds" begin
+        @testset "ref_temp missing key — constructor succeeds" begin
             alpha1 = -0.001
             alpha2 = fill(-0.002, 3, 2)
             @test_nowarn PointKinetics(
@@ -350,14 +350,14 @@ import ModelingToolkit: compose
             )
         end
 
-        @testset "TF-03c: ref_temp=nothing — constructor succeeds" begin
+        @testset "ref_temp=nothing — constructor succeeds" begin
             @test_nowarn PointKinetics(
                 ctrl_zero; name=:pk, temp_worth=Dict(ch => -0.001), ref_temp=nothing
             )
         end
     end
 
-    @testset "TF-04: connect_temperature_feedback" begin
+    @testset "connect_temperature_feedback" begin
         ctrl_zero = ReactivityController()
 
         pg5 = PipeGeometry_rectangular(1.0, 0.04, 0.01, 0.04)
@@ -375,14 +375,14 @@ import ModelingToolkit: compose
             power_shape=ps_3x2,
         )
 
-        @testset "TF-04a: 1D channel generates 5 equations" begin
+        @testset "1D channel generates 5 equations" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=Dict(ch => -0.001))
             eqs = connect_temperature_feedback(pk, [ch])
             @test eqs isa Vector{Equation}
             @test length(eqs) == 5
         end
 
-        @testset "TF-04b: 2D HeatDiffusion generates 6 equations (row-major)" begin
+        @testset "2D HeatDiffusion generates 6 equations (row-major)" begin
             @named pk = PointKinetics(
                 ctrl_zero; temp_worth=Dict(fuel => fill(-0.002, 3, 2))
             )
@@ -391,7 +391,7 @@ import ModelingToolkit: compose
             @test length(eqs) == 6
         end
 
-        @testset "TF-04c: multiple components generates 5+6=11 equations" begin
+        @testset "multiple components generates 5+6=11 equations" begin
             tw = Dict(ch => -0.001, fuel => fill(-0.002, 3, 2))
             @named pk = PointKinetics(ctrl_zero; temp_worth=tw)
             eqs = connect_temperature_feedback(pk, [ch, fuel])
@@ -399,7 +399,7 @@ import ModelingToolkit: compose
         end
     end
 
-    @testset "TF-05: Components Unchanged (regression guard)" begin
+    @testset "Components Unchanged (regression guard)" begin
         proj_root = pkgdir(STREAM)
         for relpath in (
             "src/components/channels.jl",
@@ -412,7 +412,7 @@ import ModelingToolkit: compose
         end
     end
 
-    @testset "SCRAM-01: SCRAM_at_power struct and callable" begin
+    @testset "SCRAM_at_power struct and callable" begin
         sc = SCRAM_at_power(1.5)
         @test sc isa SCRAMCondition
         @test sc.power_limit == 1.5
@@ -426,7 +426,7 @@ import ModelingToolkit: compose
         @test sc(:NORMAL, 0.0, 1.5, 0.0) == :NORMAL
     end
 
-    @testset "SCRAM-02: scram_callback terminates solver on SCRAM" begin
+    @testset "scram_callback terminates solver on SCRAM" begin
         P0 = 1.0
         plimit = 1.5
         t_step = 0.5

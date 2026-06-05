@@ -46,7 +46,7 @@ end
 
 Compute rtol against `python_ref`, bin into tier, return one ParityRow.
 
-Tier binning (D-03):
+Tier binning:
   rtol ≤ gray_floor       → TIER_CLEAN  (≤ used; aspirational solver-floor target)
   rtol < hard_ceiling     → TIER_GRAY   (< used; reported, NOT @test-failed)
   rtol ≥ hard_ceiling     → TIER_FAIL   (boundary at exactly hard_ceiling fails)
@@ -130,7 +130,7 @@ const PYTHON_K_AT_REF   = (0.63015562705599992, 0.66106740247825002, 0.679397572
 
 Hard-assert Julia rho/cp/mu/k at REF_T_K match Python STREAM Simantov
 correlations (PYTHON_*_AT_REF constants) within `rtol`. Aborts via `error()`
-if any property drifts. Per D-10 fluid-props tier.
+if any property drifts.
 """
 function assert_equivalence_fluid_props(; rtol::Float64=1e-12)
     for (i, T_K) in enumerate(REF_T_K)

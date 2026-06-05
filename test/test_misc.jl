@@ -5,17 +5,17 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM: Inertia, HeatExchanger, WallTemperature, HeatFluxSource
 
-@testset "COMP-01: Inertia stub callable" begin
+@testset "Inertia stub callable" begin
     @named L = Inertia(1e3)
     @test L isa ModelingToolkit.System
 end
 
-@testset "COMP-01: Inertia mtkcompile" begin
+@testset "Inertia mtkcompile" begin
     @named L = Inertia(1e3)
     @test_nowarn mtkcompile(L; fully_determined=false)  # isolated component: dangling ports
 end
 
-@testset "COMP-01: RL-decay transient matches exp(-(R/L_over_A)*t) within 1%" begin
+@testset "RL-decay transient matches exp(-(R/L_over_A)*t) within 1%" begin
     R_val = 1.0
     L_over_A = 1e3
     tau = L_over_A / R_val   # 1000 s
@@ -50,21 +50,21 @@ end
     end
 end
 
-@testset "COMP-02: HeatExchanger stub callable" begin
+@testset "HeatExchanger stub callable" begin
     @named hx = HeatExchanger(313.15)
     @test hx isa ModelingToolkit.System
 end
 
-@testset "COMP-02: HeatExchanger mtkcompile" begin
+@testset "HeatExchanger mtkcompile" begin
     @named hx = HeatExchanger(313.15)
     @test_nowarn mtkcompile(hx; fully_determined=false)  # isolated component: HX is value-source, no port closure needed
 end
 
-@testset "COMP-02: HeatExchanger exported from STREAM" begin
+@testset "HeatExchanger exported from STREAM" begin
     @test isdefined(STREAM, :HeatExchanger)
 end
 
-@testset "COMP-02: build_loop compiles after HeatExchanger rename (regression)" begin
+@testset "build_loop compiles after HeatExchanger rename (regression)" begin
     ssys = build_loop()
     @test ssys isa ModelingToolkit.AbstractSystem
 end

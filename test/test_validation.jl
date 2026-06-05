@@ -10,10 +10,10 @@ using STREAM: Channel, HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_cir
 include(joinpath(@__DIR__, "parity_helpers.jl"))
 include(joinpath(@__DIR__, "data", "python_parity_reference.jl"))
 
-# CSV path + truncate-and-rewrite at file load (per RESEARCH.md Open Question 1
-# / Open Question 4: one fresh CSV per `julia --project=. test/test_validation.jl` run;
-# CSV in git represents the LAST run. Each parity testset thereafter calls
-# append_csv(...; truncate=false). The 3 KEPT testsets do NOT touch the CSV.)
+# CSV path + truncate-and-rewrite at file load: one fresh CSV per
+# `julia --project=. test/test_validation.jl` run; the CSV in git represents the
+# LAST run. Each parity testset thereafter calls append_csv(...; truncate=false).
+# The 3 KEPT testsets do NOT touch the CSV.
 const PARITY_CSV = joinpath(@__DIR__, "data", "parity_report.csv")
 function __init_parity_csv()
     open(PARITY_CSV, "w") do io
@@ -128,9 +128,9 @@ end
 end
 
 try
-@testset "Phase 56 parity harness" begin
+@testset "parity harness" begin
 
-# Python parity: simple loop  (REPLACES old VAL-01 per D-13)
+# Python parity: simple loop
 #
 # Topology: Pump → HX → ChannelAndContacts → Pump (n=10, circular pipe).
 # Built INLINE with CAC (NOT via build_loop, which uses Channel — Pitfall 1).
@@ -138,12 +138,12 @@ try
 # mirrors HD Fourier testset. Avoids the raw `cac.thermal_left[i].T ~ T_wall`
 # equation pattern that bypasses MTK's connector-flow accounting (WARNING #5).
 #
-# Tiers compared (D-07):
+# Tiers compared:
 #   (a) scalars  — T_out, mdot, dP_loop
 #   (b) per-cell — T[i] for i in 1:n
 #   (c) per-cell wall (CAC-only) — T_wall_left[i], h_tc_left[i], q_density_*[i]
 #
-# KNOWN EQUIVALENCE GAPS (D-11):
+# KNOWN EQUIVALENCE GAPS:
 #   Gap #1: circular heated_parts partition Python(πD,0) vs Julia(πD/2,πD/2).
 #           Python's q_density emit is partition-INVARIANT — Plan 56-04 paste
 #           shows PARITY_SIMPLE_Q_DENSITY_LEFT == PARITY_SIMPLE_Q_DENSITY_RIGHT,
@@ -154,7 +154,7 @@ try
 #           stays at 2%; FAIL surfaces honestly.
 #   Gap #3: Sundials KINSOL vs scipy hybr solver tols — floor on CLEAN tier.
 @testset "Python parity: simple loop" begin
-    # Step 1: equivalence guard (D-10, 5 asserts; abort testset on fail)
+    # Step 1: equivalence guard (5 asserts; abort testset on fail)
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
     assert_equivalence_blasius()
@@ -265,7 +265,7 @@ try
     end
 end
 
-@testset "VAL-02: Transient T_outlet rises after T_wall step" begin
+@testset "Transient T_outlet rises after T_wall step" begin
     n = 10
     T_inlet = 313.15
 
@@ -459,7 +459,7 @@ end
     end
 end
 
-# VAL-02: Asymmetric MTR — right channel inlet at 90°C (363.15 K)
+# Asymmetric MTR — right channel inlet at 90°C (363.15 K)
 # Right side of plate must be hotter than left side.
 @testset "Python parity: MTR asymmetric" begin
     assert_equivalence_fluid_props()
@@ -625,10 +625,10 @@ end
 end
 
 @testset "Python parity: MTR one-sided" begin
-    # KNOWN GAP (D-11): Python one_sided_connection distributes heat to BOTH plate
+    # KNOWN GAP: Python one_sided_connection distributes heat to BOTH plate
     # faces (Python bug). Julia correctly couples only the left face. Plate-T tier (d)
     # is widened to hard_ceiling=0.20 with KNOWN GAP note; T_out_l widened to 0.05.
-    # The analytical T_max check (preserved from VAL-03) is the actual correctness gate.
+    # The analytical T_max check is the actual correctness gate.
     #
     # Adiabatic right face emits T_wall = T_cool, q_density = 0 in the reference
     assert_equivalence_fluid_props()
@@ -775,13 +775,13 @@ end
     end
 
 end
-end  # @testset "Phase 56 parity harness"
+end  # @testset "parity harness"
 catch e
-    @warn "Phase 56 parity harness reported FAIL-tier rows; see drift tables and parity_report.csv" exception=(e, catch_backtrace())
+    @warn "parity harness reported FAIL-tier rows; see drift tables and parity_report.csv" exception=(e, catch_backtrace())
 end
 
 try
-@testset "VAL-01: HeatDiffusion transient — Fourier series validation" begin
+@testset "HeatDiffusion transient — Fourier series validation" begin
     nz_v01 = 10
     # nx_v01=13 lateral cells: the FD is O(dx^2), so the steepest early checkpoint needs
     # a fine-enough mesh to meet rtol=0.01 against the exact Fourier series. Convergence
@@ -868,7 +868,7 @@ try
     @test isapprox(T_center_series[end], T_wall; rtol=0.01)
 end
 
-@testset "VAL-02: Two-plate one-channel topology — both faces active" begin
+@testset "Two-plate one-channel topology — both faces active" begin
     nz_v02 = 10
     nx_v02 = 3
     T_in_v02 = 313.15
@@ -970,7 +970,7 @@ end
 end
 
 @testset "PointKinetics validation" begin
-    @testset "VAL-PK-01: steady-state coolant temperature rises linearly" begin
+    @testset "steady-state coolant temperature rises linearly" begin
         # Mirror Python STREAM test_integrations.py lines 201-267
         # (test_channel_point_kinetics): constant-power PK coupled loop,
         # solve to steady state, assert T_cool is strictly monotone and
@@ -1005,7 +1005,7 @@ end
         @test isapprox(ddT, zeros(length(ddT)); atol=0.5)  # approximately linear
     end
 
-    @testset "VAL-PK-02a: negative fuel feedback suppresses power to near zero" begin
+    @testset "negative fuel feedback suppresses power to near zero" begin
         # Mirror Python STREAM test_integrations.py lines 352-387:
         # negative alpha on fuel with ref_temp at the initial (boundary) temperature.
         # As power heats fuel above T_inlet, feedback = alpha * (T_fuel - T_ref) goes negative.
@@ -1063,7 +1063,7 @@ end
         @test abs(P_final) < 0.1
     end
 
-    @testset "VAL-PK-02b: negative coolant feedback suppresses power to near zero" begin
+    @testset "negative coolant feedback suppresses power to near zero" begin
         # Mirror Python STREAM test_integrations.py lines 390-428:
         # negative alpha on coolant with ref_temp=T_inlet.
         # Coolant heats above T_inlet → negative feedback → power collapses to near zero.
@@ -1082,7 +1082,7 @@ end
             ref_temp=Dict(:cac => fill(T_inlet, n)),
         )
 
-        # Override PK ICs to large values (same Pitfall 4 strategy as VAL-PK-02a)
+        # Override PK ICs to large values
         ic_high = copy(ic)
         for (idx, pair) in enumerate(ic_high)
             if pair.first === ssys.pk.P
@@ -1113,7 +1113,7 @@ end
         @test abs(P_final) < 0.1
     end
 
-    @testset "VAL-PK-03: reactivity observable accessible and correct at steady state" begin
+    @testset "reactivity observable accessible and correct at steady state" begin
         # Verify that sol[ssys.pk.reactivity, :] is accessible post-solve,
         # is a finite vector, and approaches zero at late time
         # (steady state requires net reactivity ≈ 0).
@@ -1148,5 +1148,5 @@ end
 end  # @testset "PointKinetics validation"
 
 catch e
-    @warn "KEPT testset block raised pre-existing failure; see deferred-items.md D-1" exception=(e, catch_backtrace())
+    @warn "KEPT testset block raised pre-existing failure" exception=(e, catch_backtrace())
 end

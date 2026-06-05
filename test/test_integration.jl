@@ -1,19 +1,8 @@
-# test/test_integration.jl — Phase 55 D-19 single big integration file.
+# Integration tests: multi-component, system-level scenarios.
 #
-# Mirrors Python STREAM's tests/test_general/test_integrations.py rule:
-# all multi-component system-level tests live in ONE file, organized as
-# @testset groups. Soft sectioning via testset titles — no comment-banner
-# sections (RESEARCH.md §4: 23 flat top-level test_* functions, no banner
-# comments; @testset titles serve as soft sections in Julia).
-#
-# Absorbs from:
-#   test_examples.jl          (LOOP-01..04 full-loop PK integration + COMPAT Pkg.test smoke)
-#   test_solvers.jl           (SYS-01, SYS-02, SOLV-01, SOLV-02 solver-wrapper integration)
-#   test_loss_of_flow.jl      (LOF-01..03, VAL-01..02 — Spike B heated leg + bypass topology)
-#   test_subcooled_boiling.jl (ISCB-01..02 full-loop CAC + SCB; SCB-01..04 stay in test_thresholds.jl)
-#   test_point_kinetics.jl    (coupled PK-loop feedback tests: PK-IC-01 + PK-FB-01/02;
-#                              these replaced the retired TF-06/TF-07 — see
-#                              .planning/notes/2026-05-29-pk-coupling-investigation.md)
+# Mirrors Python STREAM's tests/test_general/test_integrations.py: all
+# multi-component system-level tests live in one file, grouped as @testset
+# blocks whose titles serve as the section structure.
 #
 
 using Test
@@ -29,14 +18,13 @@ using STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger,
     regime_dependent_q_scb, _bergles_rohsenow_dT_ONB
 
 @testset "Builders smokes" begin
-    @testset "SYS-01: build_loop compiles closed loop" begin
+    @testset "build_loop compiles closed loop" begin
         ssys = build_loop()
         @test ssys isa ModelingToolkit.AbstractSystem
         # mtkcompile benchmark reported via @info (not asserted)
     end
 
-    @testset "SYS-02: steady_state_guess monotonically increasing" begin
-        # Migrated from test_solvers.jl SYS-02 (lines 20-25).
+    @testset "steady_state_guess monotonically increasing" begin
         T_guess = steady_state_guess(T_inlet=313.15, Q_wall=1e4, mdot_guess=0.1, n=10)
         @test length(T_guess) == 10
         @test T_guess[1] > 313.15        # first cell above inlet temperature
@@ -44,8 +32,7 @@ using STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger,
     end
 
     @testset "build_loop compiles + briefly solves" begin
-        # New smoke (Phase 55 D-09): demonstrate the full migrated `build_loop`
-        # API produces a working transient.
+        # Smoke: demonstrate the full `build_loop` API produces a working transient.
         ssys = build_loop()
         ic = Pair{Any,Any}[
             [ssys.ch.T[i] => 313.15 for i in 1:10]...,
@@ -85,8 +72,8 @@ using STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger,
     end
 
     @testset "build_loop_lof_bypass compiles + briefly solves" begin
-        # Smoke: post-Spike-B builder (CAC + HeatDiffusion plate). Compile only —
-        # the full transient is exercised in §3 below (LOF-01..03).
+        # Smoke: fuel-plate builder (CAC + HeatDiffusion plate). Compile only —
+        # the full transient is exercised in the loss-of-flow section below.
         ssys = build_loop_lof_bypass()
         @test ssys isa ModelingToolkit.AbstractSystem
         @test length(equations(ssys)) == length(unknowns(ssys))
@@ -102,8 +89,8 @@ using STREAM: Channel, ChannelAndContacts, ChannelHeatFlux, Pump, HeatExchanger,
     end
 end
 
-@testset "Solver wrappers (SOLV-01, SOLV-02)" begin
-    @testset "SOLV-01: solve_steady returns physical solution" begin
+@testset "Solver wrappers" begin
+    @testset "solve_steady returns physical solution" begin
         n = 10
         T_inlet = 313.15
         Q_wall = 1.0e4
@@ -124,14 +111,12 @@ end
         @test sol[ssys.ch.port_in.mdot] > 0     # positive mass flow
     end
 
-    @testset "SOLV-02: build_loop_transient compiles" begin
-        # Migrated from test_solvers.jl SOLV-02 first testset (lines 53-57).
+    @testset "build_loop_transient compiles" begin
         ssys = build_loop_transient()
         @test ssys isa ModelingToolkit.AbstractSystem
     end
 
-    @testset "SOLV-02: solve_transient returns time-series (callable T_wall step)" begin
-        # Migrated from test_solvers.jl SOLV-02 second testset (lines 59-99).
+    @testset "solve_transient returns time-series (callable T_wall step)" begin
         # Step-change: T_wall jumps from 373.15 to 393.15 at t=10s via callable.
         n = 10
         T_inlet = 313.15
@@ -173,8 +158,7 @@ end
 end
 
 @testset "Loss-of-flow transient" begin
-    # Baseline constants (preserved verbatim from test_loss_of_flow.jl
-    # lines 30-41 where applicable; new constants added for Spike B).
+    # Baseline constants for the bypass loss-of-flow loop.
     #! format: off
     BYPASS_N         = 10
     BYPASS_L_CH      = 1.0
@@ -185,7 +169,7 @@ end
     BYPASS_R_EXT     = 1.0e6
     BYPASS_THRESHOLD = 0.01
     BYPASS_DT_RAMP   = 5.0
-    # Spike B-specific:
+    # Fuel-plate-specific:
     BYPASS_POWER_W   = 1.0e3   # matches build_loop_lof_bypass default
     BYPASS_FUEL_NX   = 2
     BYPASS_FUEL_LX   = 0.005
@@ -273,8 +257,7 @@ end
         return ssys, op, mdot_ss, cb
     end
 
-    @testset "LOF-01: bypass topology compiles and SS IC is physical" begin
-        # Migrated from test_loss_of_flow.jl LOF-01 (lines 130-138).
+    @testset "bypass topology compiles and SS IC is physical" begin
         ssys, op, mdot_ss, _ = _lof_bypass_ic()
 
         @test length(equations(ssys)) == length(unknowns(ssys))
@@ -284,13 +267,9 @@ end
         @test T_open_init == 1.0e30
     end
 
-    @testset "LOF-02: Flapper fires at correct threshold" begin
-        # Re-enabled (was @test_skip'd as a "transient solver instability" flaky).
-        # The instability was a DaemonMode dev-loop artifact (stale world-age /
-        # recompilation state), not a real solver defect — the daemon was removed
-        # 2026-05-29 and the transient converges deterministically under cold-start
-        # julia (retcode Success, flapper fires ~0.72s, NC establishes).
-        # Migrated from test_loss_of_flow.jl LOF-02 (lines 143-155).
+    @testset "Flapper fires at correct threshold" begin
+        # The transient converges deterministically (retcode Success, flapper
+        # fires ~0.72s, NC establishes).
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
@@ -304,11 +283,9 @@ end
         @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-4)
     end
 
-    @testset "LOF-03: channel flow reversal (mdot crosses zero)" begin
-        # Re-enabled alongside LOF-02 — same shared transient (DaemonMode artifact,
-        # not a solver defect; see LOF-02). Converges deterministically under
-        # cold-start julia: heated.ch reverses from +0.41 to ~-0.0042 kg/s.
-        # Migrated from test_loss_of_flow.jl LOF-03 (lines 162-176).
+    @testset "channel flow reversal (mdot crosses zero)" begin
+        # The shared bypass transient converges deterministically: heated.ch
+        # reverses from +0.41 to ~-0.0042 kg/s.
         # Heated channel has g=-G_ACC (assists downward flow). Positive mdot =
         # downward (A->B). After NC establishes, heated.ch reverses to upward:
         # mdot < 0.
@@ -327,19 +304,15 @@ end
         @test 0.001 < mdot_nc < 2.0
     end
 
-    @testset "VAL-01: energy balance (forced-flow instantaneous; NC time-averaged)" begin
-        # Re-enabled: the skip reason named the cause itself — "does not reliably
-        # converge under daemon mode". The daemon dev loop was removed 2026-05-29;
-        # under cold-start julia the NC equilibrium converges deterministically
-        # (Q_wall ≈ 444 W in equilibrium, Q_meas/Q_wall ratio ≈ 0.44, retcode Success).
-        # Spike B redesign per 55-09 SUMMARY deferred work + plan 55-10 D-19
-        # ("introduce the proper Spike B-aware LOF gates"). The legacy gate
-        # (Q_meas vs Q_wall within 2%) compared instantaneous channel-side
+    @testset "energy balance (forced-flow instantaneous; NC time-averaged)" begin
+        # The NC equilibrium converges deterministically (Q_wall ≈ 444 W in
+        # equilibrium, Q_meas/Q_wall ratio ≈ 0.44, retcode Success). The legacy
+        # gate (Q_meas vs Q_wall within 2%) compared instantaneous channel-side
         # heat under a CHF wall-temperature pin to an mdot · cp · ΔT estimate.
-        # Under Spike B, the heated leg is a CAC + HeatDiffusion plate driven
+        # Under the fuel-plate design, the heated leg is a CAC + HeatDiffusion plate driven
         # by `heated.fuel.power ~ power_W = 1 kW`: the plate stores significant
         # heat at any non-equilibrium snapshot, so the channel-side q_wall is
-        # not equal to power_W instantaneously. The relevant Spike-B physics
+        # not equal to power_W instantaneously. The relevant fuel-plate physics
         # gates are:
         #
         # (a) Power balance: the channel-side heat absorbed never exceeds the
@@ -366,7 +339,7 @@ end
         #     equilibrium — during IC settle (~first 50 s) the CAC HTC drives
         #     a large transient q_wall as the fuel plate equilibrates. Energy
         #     conservation holds in the integral / equilibrium sense, which
-        #     is what we assert here. Spike B equilibrium per 55-09 SUMMARY
+        #     is what we assert here. the fuel-plate design equilibrium
         #     is established by ~47 s.
         nc_indices_pwr = 1001:3001  # t = 100..300 s, well past IC settle
         Q_wall_eq = [
@@ -384,7 +357,7 @@ end
         #     mdot · cp · ΔT should be the same order of magnitude as
         #     Q_wall_ch — both measure the same heat flow through the
         #     channel cells, so the comparison is a self-consistency check.
-        #     Spike B's plate storage adds bounded oscillation around the
+        #     the fuel-plate design's plate storage adds bounded oscillation around the
         #     equilibrium point; legacy 2% rtol does not apply.
         nc_indices = 2701:3001
         Q_wall_nc = [
@@ -403,46 +376,42 @@ end
         end
         # Same order-of-magnitude check (3x bracket) — both measurements should
         # be within a factor of 3 of each other in NC equilibrium. Stricter
-        # comparisons are not meaningful under Spike B's plate-storage
-        # oscillation. Pre-existing flakey behavior tolerated per CONTEXT.md D-22.
+        # comparisons are not meaningful under the fuel-plate design's plate-storage
+        # oscillation. Pre-existing flaky behavior tolerated.
         @test mean(Q_wall_nc) > 0
         @test mean(Q_meas_nc) > 0
         ratio = mean(Q_meas_nc) / mean(Q_wall_nc)
         @test 0.3 < ratio < 3.0     # within factor of 3 in either direction
     end
 
-    @testset "VAL-02: NC equilibrium mdot within 30% of analytical buoyancy estimate" begin
-        # Re-enabled alongside VAL-01/LOF-02/03 — same shared transient. The
-        # "flaky under daemon mode" behavior was a DaemonMode artifact (removed
-        # 2026-05-29); cold-start julia reaches the NC equilibrium deterministically
+    @testset "NC equilibrium mdot within 30% of analytical buoyancy estimate" begin
+        # The shared bypass transient reaches the NC equilibrium deterministically
         # (|mdot_nc| ≈ 4.2 g/s reversed, T_max ≈ 519 K, Q_wall ≈ 444 W).
-        # Spike B redesign per 55-09 SUMMARY deferred work + plan 55-10 D-19.
+        # the fuel-plate design redesign.
         # The legacy gate compared NC mdot to a sqrt-buoyancy estimate that
         # assumed an unbounded heat source pinning the wall temperature; the
         # implied delta_rho came from the wall pinning the maximum coolant
-        # temperature near saturation. Under Spike B's finite-power 1 kW input
+        # temperature near saturation. Under the fuel-plate design's finite-power 1 kW input
         # the actual T_max_nc is much closer to the inlet, delta_rho is small,
         # and the legacy mdot_analytical overestimates the achievable NC flow
-        # by an order of magnitude. The Spike-B-aware gate replaces the
+        # by an order of magnitude. The fuel-plate-aware gate replaces the
         # analytical comparison with sanity bounds derived from the documented
-        # Spike B baseline (55-09 SUMMARY: |mdot_nc| ≈ 4 g/s for 1 kW).
+        # the fuel-plate design baseline.
         #
-        # Spike B physical-sanity gates (matched to 55-09 SUMMARY's structured
-        # smoke output: NC mdot ≈ 2.5 g/s, T_max NC ≈ 511 K, NC equilibrium
+        # the fuel-plate design physical-sanity gates (matched to the structured smoke output (NC mdot ≈ 2.5 g/s, T_max NC ≈ 511 K, NC equilibrium
         # established by ~50s):
         #   (a) NC mdot is positive and finite, in 0.0005-0.1 kg/s range
-        #       (5 orders of magnitude window — covers Spike B's 2.5 g/s + IC
+        #       (5 orders of magnitude window — covers the fuel-plate design's 2.5 g/s + IC
         #       sensitivity).
         #   (b) NC flow direction is REVERSED relative to forced-flow at t=0
-        #       (heated.ch.mdot crosses zero from + to -). Already covered by
-        #       LOF-03; we re-assert it here for VAL-02 self-containment.
+        #       (heated.ch.mdot crosses zero from + to -). Already covered by the
+        #       flow-reversal test; re-asserted here so this gate stands alone.
         #   (c) Channel-side heat absorbed in equilibrium is bounded above by
         #       power_W (energy conservation across the heated leg).
         #   (d) Coolant max temperature stays below water saturation at 1 atm
         #       (T_sat ~ 373 K). Above T_sat would indicate the model entered
-        #       a boiling regime, which Spike B's 1 kW input is sized to avoid
-        #       per 55-09's smoke (T_max ~ 240°C in a different baseline; on
-        #       this NC equilibrium with 30% mdot ≈ 4 g/s, T_max stays sub-100°C).
+        #       a boiling regime, which the fuel-plate design's 1 kW input is
+        #       sized to avoid.
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
@@ -460,13 +429,13 @@ end
         ])
 
         # (a) NC mdot in physical-sanity window (5 orders of magnitude bound,
-        #     covers documented Spike B baseline and IC variation).
+        #     covers the documented fuel-plate baseline and IC variation).
         @test mdot_nc > 0.0
         @test mdot_nc < 0.1                    # << legacy CHF mdot_ss
         @test mdot_nc > 5.0e-4                 # bounded below — NC actually established
 
-        # (b) NC reversal direction (re-assertion from LOF-03; VAL-02 needs
-        #     this to be self-contained as a stand-alone NC equilibrium gate).
+        # (b) NC reversal direction (re-asserted here so this stands alone as an
+        #     NC equilibrium gate).
         mdot_force_initial = sol[ssys.heated.ch.port_in.mdot, 1]
         @test mdot_force_initial > 0.0
         @test mean(mdot_nc_series_signed) < 0.0   # reversed
@@ -483,9 +452,9 @@ end
         # (d) Coolant peak temperature in NC is physically bounded. The Channel
         #     family is single-phase only — no two-phase model is wired in this
         #     loop, so the math allows superheated solutions if power exceeds
-        #     what NC can advect. Per 55-09 SUMMARY's structured smoke,
-        #     T_max NC ≈ 511 K (~238°C) under the documented 1 kW baseline at
-        #     n=50 cells. With n=10 here the peak is similar; we bound it well
+        #     what NC can advect. Under the documented 1 kW baseline, T_max NC
+        #     ≈ 511 K (~238°C) at n=50 cells. With n=10 here the peak is similar;
+        #     we bound it well
         #     above that observed value but below water's critical temperature
         #     (647 K) as a "no runaway" gate.
         @test T_max_nc > BYPASS_T_INLET                # heating did happen
@@ -494,9 +463,8 @@ end
     end
 end
 
-# §4 Subcooled-boiling integration (D-19 fourth bullet — ISCB only)
-# Migrated from test_subcooled_boiling.jl ISCB section. Pure-correlation
-# SCB-01..04 stays in test_thresholds.jl (renamed in plan 55-11).
+# §4 Subcooled-boiling integration (in-loop CAC + SCB).
+# Pure-correlation subcooled-boiling tests live in test_thresholds.jl.
 @testset "Subcooled-boiling integration (ISCB)" begin
     n_scb = 5
     T_inlet_scb = 313.15
@@ -544,8 +512,7 @@ end
         return ssys, sol
     end
 
-    @testset "ISCB-01: SCB ChannelAndContacts compiles" begin
-        # Migrated from test_subcooled_boiling.jl ISCB-01 first testset (line 143).
+    @testset "SCB ChannelAndContacts compiles" begin
         scb_fn = regime_dependent_q_scb(pressure=2e5)
         @named cac = ChannelAndContacts(
             n=3,
@@ -555,8 +522,7 @@ end
         @test cac isa ModelingToolkit.System
     end
 
-    @testset "ISCB-01: SCB ChannelAndContacts solves (sub-ONB)" begin
-        # Migrated from test_subcooled_boiling.jl ISCB-01 second testset (line 153).
+    @testset "SCB ChannelAndContacts solves (sub-ONB)" begin
         # T_wall=380K < T_ONB (~408K at 2 bar): SCB present but inactive,
         # KINSOL converges.
         scb_fn = regime_dependent_q_scb(pressure=2e5)
@@ -564,14 +530,12 @@ end
         @test sol.retcode == ReturnCode.Success
     end
 
-    @testset "ISCB-01: Default (no SCB) backward compatibility" begin
-        # Migrated from test_subcooled_boiling.jl ISCB-01 third testset (line 160).
+    @testset "Default (no SCB) backward compatibility" begin
         ssys, sol = _build_scb_loop(scb_correction=nothing, T_wall_bc=373.15)
         @test sol.retcode == ReturnCode.Success
     end
 
-    @testset "ISCB-02: High T_wall -> enhanced HTC (numerical)" begin
-        # Migrated from test_subcooled_boiling.jl ISCB-02 first testset (line 165).
+    @testset "High T_wall -> enhanced HTC (numerical)" begin
         # Direct numerical evaluation: at T_wall >> T_sat, the SCB correction
         # factor > 1. Validates the physics without requiring KINSOL convergence
         # in the boiling regime.
@@ -604,8 +568,7 @@ end
         @test h_spl * factor > h_spl             # SCB h_tc > single-phase h_tc
     end
 
-    @testset "ISCB-02: Low T_wall -> matches single-phase exactly" begin
-        # Migrated from test_subcooled_boiling.jl ISCB-02 second testset (line 194).
+    @testset "Low T_wall -> matches single-phase exactly" begin
         # T_wall = 330K < T_sat (~393K at 2 bar) -> SCB inactive, pure
         # single-phase. Both SCB and non-SCB loops solve to identical h_tc values.
         scb_fn = regime_dependent_q_scb(pressure=2e5)
@@ -621,12 +584,9 @@ end
     end
 end
 
-# §5 Point-kinetics + thermal-feedback loops (D-19 fifth bullet)
-# RELOCATED from test_examples.jl (LOOP-01..04) and test_point_kinetics.jl
-# (TF-06, TF-07).
+# §5 Point-kinetics + thermal-feedback loops
 @testset "Point-kinetics + thermal-feedback loops" begin
-    @testset "LOOP-01: build_loop_pk compiles and returns (ssys, ic)" begin
-        # Migrated from test_examples.jl LOOP-01 (line 16).
+    @testset "build_loop_pk compiles and returns (ssys, ic)" begin
         ctrl = ReactivityController()
         ssys, ic = build_loop_pk(ctrl)
         @test length(equations(ssys)) > 0
@@ -635,8 +595,7 @@ end
         @test length(ic) > 0
     end
 
-    @testset "LOOP-02: quiescent stability P within 1% of P0 over 10s" begin
-        # Migrated from test_examples.jl LOOP-02 (line 30).
+    @testset "quiescent stability P within 1% of P0 over 10s" begin
         # ReactivityController() returns 0.0 always; no temp feedback. At
         # criticality (rho=0) with correct PK ICs, power must be stable.
         P0 = 1.0
@@ -652,14 +611,13 @@ end
         @test all(p -> abs(p - P0) / P0 < 0.01, P_trace)
     end
 
-    @testset "LOOP-03: step reactivity with temperature feedback" begin
-        # Migrated from test_examples.jl LOOP-03 (line 49).
+    @testset "step reactivity with temperature feedback" begin
         # After step insertion: power rises (P_max > P0) then feedback damps
         # the excursion (P[end] < P_max).
         P0 = 1.0
         t_step = 0.5
         delta_rho = 0.003   # 0.003 > beta/2; strong enough for visible prompt rise
-        alpha = -1e-4       # weak negative feedback (same magnitude as TF-06)
+        alpha = -1e-4       # weak negative feedback
         T_inlet = 293.15
 
         # ReactivityController.input_reactivity has signature (state, t_state, t) -> Float64.
@@ -686,8 +644,7 @@ end
         @test all(isfinite, P_trace)         # no NaN/Inf
     end
 
-    @testset "LOOP-04: SCRAM terminates coupled loop" begin
-        # Migrated from test_examples.jl LOOP-04 (line 86).
+    @testset "SCRAM terminates coupled loop" begin
         # Large step reactivity drives P above plimit; SCRAM_at_power fires,
         # transitions ctrl to :SCRAM, and scram_callback terminates the solver
         # before t=10s.
@@ -729,22 +686,19 @@ end
         @test any(entry -> entry[1] == :SCRAM, ctrl.log)  # SCRAM logged
     end
 
-    # PK-IC / PK-FB: coupled point-kinetics feedback physics.
-    # These REPLACE the retired TF-06 (hollow `isfinite`-only) and TF-07 (which
-    # tested a pure initialization artifact and mis-mirrored Python). The boundary-
-    # cell init artifact and its fix are documented in
-    # .planning/notes/2026-05-29-pk-coupling-investigation.md. All three build on the
-    # now-consistent build_loop_pk IC (port/contact temperatures seeded to T_inlet).
+    # Coupled point-kinetics feedback physics. All three tests build on the
+    # consistent build_loop_pk IC (port/contact temperatures seeded to T_inlet),
+    # which fixes a boundary-cell initialization artifact (see the regression
+    # guard below).
 
-    @testset "PK-IC-01: consistent cold IC has zero startup reactivity" begin
+    @testset "consistent cold IC has zero startup reactivity" begin
         # REGRESSION GUARD for the boundary-cell initialization artifact. FlowPort/
         # ThermalPort temperatures default to 300 K; the boundary coolant cells and
         # the channel↔fuel contact nodes alias to those ports, so a per-cell T seed
         # alone does NOT pin them. If build_loop_pk fails to seed the port/contact
         # temperatures, feedback sees a spurious (300 − ref_temp) offset and the loop
         # starts far from critical. With a consistent IC and ref_temp = T_inlet, the
-        # loop MUST start exactly critical: net reactivity ≈ 0 at t=0. This single
-        # assertion would have caught the whole TF-07 pathology.
+        # loop MUST start exactly critical: net reactivity ≈ 0 at t=0.
         Tin = 293.15
         for (tw, rt) in (
             (Dict(:cac => fill(-0.01, 7)),    Dict(:cac => fill(Tin, 7))),       # coolant feedback
@@ -762,7 +716,7 @@ end
         end
     end
 
-    @testset "PK-FB-01: coolant feedback suppresses power to a self-consistent equilibrium" begin
+    @testset "coolant feedback suppresses power to a self-consistent equilibrium" begin
         # Corrected mirror of Python STREAM test_integrations.py:390-428
         # (test_power_is_negligible_for_negative_Tcool_feedback_and_ref_temp_is_inlet).
         # Start from the cold critical IC (reactivity[0] = 0). Under power the coolant
@@ -787,15 +741,15 @@ end
         @test abs(rho[end]) < 1e-3      # late-time state is self-consistent (critical)
     end
 
-    @testset "PK-FB-02: coupled prompt jump then feedback turnover" begin
+    @testset "coupled prompt jump then feedback turnover" begin
         # The high-value coupled physics test that the suite was missing. Procedure
         # (steady-then-perturb, mirroring the LOF transient IC fix): start from the
         # cold critical IC, let the loop settle to its low-power feedback equilibrium,
         # THEN insert a positive reactivity step. Assert:
         #   (1) the loop starts exactly critical (reactivity[0] = 0),
         #   (2) a textbook prompt jump P+/P- ≈ beta/(beta − delta_rho), sampled PAST
-        #       the prompt discontinuity (à la PK-03c; sampling immediately is float-
-        #       noise fragile — that is what made the legacy TF-07 check version-flaky),
+        #       the prompt discontinuity (sampling immediately is float-noise
+        #       fragile),
         #   (3) power stays BOUNDED — without feedback a sustained +delta_rho diverges,
         #   (4) feedback subtracts the inserted reactivity, settling to a new critical
         #       equilibrium (late-time net reactivity pulled back below delta_rho, ≈ 0).
@@ -829,8 +783,7 @@ end
     end
 end
 
-# §6 COMPAT (D-19 sixth bullet — Pkg.test() integration smoke)
-# Migrated from test_examples.jl first testset (line 9). Reaching this
+# §6 COMPAT (Pkg.test() integration smoke)
 # testset confirms `include("test_integration.jl")` ran from runtests.jl,
 # which Pkg.test() invokes as the package test entry point.
 @testset "COMPAT: Test suite runs automatically via Pkg.test()" begin

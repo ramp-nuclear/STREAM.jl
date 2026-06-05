@@ -3,7 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-@testset "FLAP-REF: Flapper has no use_callback or threshold kwargs" begin
+@testset "Flapper has no use_callback or threshold kwargs" begin
     # Passing use_callback kwarg must raise MethodError
     @test_throws Exception Flapper(; name=:flap_ref, use_callback=true)
     # Passing threshold kwarg must raise MethodError
@@ -30,7 +30,7 @@ function _build_flapper_scalar_loop(dP_val)
     return sys
 end
 
-@testset "FLAP-05: Flapper remains closed under positive ref_mdot" begin
+@testset "Flapper remains closed under positive ref_mdot" begin
     sys = _build_flapper_scalar_loop(1e5)
     ssys = mtkcompile(sys; fully_determined=false)  # legitimate-structural: Flapper state(t) is set by ContinuousCallback, not an MTK equation
 
@@ -51,7 +51,7 @@ end
     @test isapprox(sol[ssys.flapper.xi, end], 0.0; atol=1e-8)
 end
 
-# FLAP-06: Flapper opens when ref_mdot crosses threshold
+# Flapper opens when ref_mdot crosses threshold
 #
 # Topology: Pump(0) → Inertia(L_over_A=5e5) → Resistor(1e5) → Flapper → Pump
 # With dP=0, the loop decays under inertia+resistance: tau = L/A / R = 5e5/1e5 = 5s
@@ -60,7 +60,7 @@ end
 # mdot decays exponentially: mdot(t) ~ mdot_0 * exp(-t / tau_eff)
 # The event fires when mdot drops below threshold.
 # T_open is recorded at the crossing time; after T_open + dt=3s, xi = 1.0.
-@testset "FLAP-06: Flapper opens when ref_mdot crosses threshold" begin
+@testset "Flapper opens when ref_mdot crosses threshold" begin
     threshold_val = 1e-4   # kg/s; well below the initial mdot of 1.0 kg/s
     dt_ramp = 3.0    # s; ramp duration
     L_over_A = 5e5   # m^{-1}; tau_eff = L_over_A / R_eff ~ 5s
@@ -114,7 +114,7 @@ end
     @test abs(sol[ssys.ine.port_in.mdot, end]) < 1e-6 * mdot_0
 end
 
-@testset "SOLV-01: solve_transient passes user callbacks" begin
+@testset "solve_transient passes user callbacks" begin
     sys = _build_flapper_scalar_loop(1e5)
     ssys = mtkcompile(sys; fully_determined=false)  # legitimate-structural: Flapper state(t) set by callback (see flapper.jl:38)
 

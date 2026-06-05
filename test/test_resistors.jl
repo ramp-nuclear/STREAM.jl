@@ -5,7 +5,7 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM: Resistor
 
-@testset "NET-03: Cube flow matches 5/6 R analytical within 1%" begin
+@testset "Cube flow matches 5/6 R analytical within 1%" begin
     R_val = 1.0e4
     dP_val = 3.0e4
     ssys = build_cube(dP_pump=dP_val, R=R_val)

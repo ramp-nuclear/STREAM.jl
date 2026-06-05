@@ -2,7 +2,7 @@ using Test
 using STREAM
 using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
-@testset "PHY-01: PipeGeometry_rectangular geometry" begin
+@testset "PipeGeometry_rectangular geometry" begin
     geo = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     @test isapprox(geo.A, 0.07 * 0.00127; rtol=1e-4)
     @test isapprox(geo.wet_perimeter, 2.0 * (0.07 + 0.00127); rtol=1e-4)
@@ -19,7 +19,7 @@ using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
     )
 end
 
-@testset "PHY-01: PipeGeometry_circular geometry" begin
+@testset "PipeGeometry_circular geometry" begin
     geo = PipeGeometry_circular(1.0, 0.01)
     @test isapprox(geo.Dh, 0.01; rtol=1e-10)
     @test isapprox(geo.wet_perimeter, π * 0.01; rtol=1e-10)

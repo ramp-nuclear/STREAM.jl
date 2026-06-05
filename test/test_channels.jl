@@ -1,4 +1,4 @@
-# test/test_channels.jl — Phase 55 TEST-01 unified channel-family unit tests.
+# Channel-family unit tests (Channel, ChannelHeatFlux, ChannelAndContacts).
 #
 
 using Test
@@ -383,7 +383,7 @@ end
         return ssys, sol
     end
 
-    @testset "ISCB-02: Low T_wall -> matches single-phase exactly" begin
+    @testset "Low T_wall -> matches single-phase exactly" begin
         # T_wall = 330K < T_sat (~393K at 2 bar) ⇒ SCB inactive, pure single-phase.
         # Both SCB and non-SCB loops solve to identical h_tc values.
         scb_fn = regime_dependent_q_scb(pressure=2e5)
@@ -436,7 +436,7 @@ const T_GUESS_REV_SIGN = reverse(T_GUESS_FWD_SIGN)
     @test all(Re_vals .> 0)
 end
 
-@testset "flow reversal: ChannelAndContacts mdot < 0 (SIGN-02/04)" begin
+@testset "flow reversal: ChannelAndContacts mdot < 0" begin
     @named pump = Pump(mdot0=MDOT_NEG)
     @named cac = ChannelAndContacts(n=N_SIGN, geometry=GEOM_SIGN)
     @named bc = HeatExchanger(T_INLET_SIGN)
@@ -473,7 +473,7 @@ end
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
 
-@testset "flow reversal: ChannelHeatFlux mdot < 0 (SIGN-03/04)" begin
+@testset "flow reversal: ChannelHeatFlux mdot < 0" begin
     # CHF flux is intrinsic — q_left[i] sign is direction-independent.
     @named pump = Pump(mdot0=MDOT_NEG)
     @named chf = ChannelHeatFlux(n=N_SIGN, geometry=GEOM_SIGN)
@@ -578,7 +578,7 @@ end
         [connect(ct_l_xeq[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
     ]
     @named sys_cac = compose(System(conns_cac, t; name=:xeq_cac), pump_cac, bc_cac, cac, ct_l_xeq...)
-    ssys_cac = mtkcompile(sys_cac; fully_determined=false)  # integration test: per-cell wall-T binding (Phase 55 D-08)
+    ssys_cac = mtkcompile(sys_cac; fully_determined=false)  # integration test: per-cell wall-T binding
     ic_cac = Pair{Any,Any}[
         [ssys_cac.cac.T[i] => T_INLET for i in 1:n]...,
         ssys_cac.cac.port_in.mdot => 0.5,

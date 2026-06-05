@@ -5,7 +5,7 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM: Pump, Channel
 
-@testset "PHY-05: Pump fixed-flow mode" begin
+@testset "Pump fixed-flow mode" begin
     @named pump = Pump(mdot0=0.6)
     @test_nowarn mtkcompile(pump; fully_determined=false)
     @named pump5 = Pump(mdot0=0.6)
@@ -26,7 +26,7 @@ using STREAM: Pump, Channel
     @test isapprox(sol5[ssys5.pump5.port_in.mdot], 0.6; rtol=1e-4)
 end
 
-@testset "PUMP-02: Pump dispatch correctness" begin
+@testset "Pump dispatch correctness" begin
     @named p_real = Pump(1e5)
     @test p_real isa ModelingToolkit.System
 
@@ -37,7 +37,7 @@ end
     @test p_mdot isa ModelingToolkit.System
 end
 
-@testset "PUMP-02: Scalar Pump(dP_pump) unchanged" begin
+@testset "Scalar Pump(dP_pump) unchanged" begin
     @named pump_s = Pump(1e5)
     @test_nowarn mtkcompile(pump_s; fully_determined=false)
 
@@ -59,14 +59,14 @@ end
     @test sol_r[ssys_r.ch_r.port_in.mdot] > 0
 end
 
-@testset "PUMP-01: Callable pump dispatch" begin
+@testset "Callable pump dispatch" begin
     dP_fn = t -> 1e5 * (1 - t / 100.0)
     @named pump_c = Pump(dP_fn)
     @test pump_c isa ModelingToolkit.System
     @test_nowarn mtkcompile(pump_c; fully_determined=false)
 end
 
-@testset "PUMP-03: Callable pump ramp — mdot decays to zero" begin
+@testset "Callable pump ramp — mdot decays to zero" begin
     dP0 = 1e5       # Pa
     T_ramp = 100.0     # s
     R_val = 1e5       # Pa/(kg/s) — steady-state mdot_0 = dP0/R = 1.0 kg/s

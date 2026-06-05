@@ -7,7 +7,7 @@ using STREAM
     # Matches typical MTR fuel assembly geometry used in Python STREAM tests
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
 
-    @testset "THRS-01: Bergles_Rohsenow_T_ONB" begin
+    @testset "Bergles_Rohsenow_T_ONB" begin
         result = Bergles_Rohsenow_T_ONB(1e5, 1e5, 373.15)
         @test result == 373.15 + STREAM._bergles_rohsenow_dT_ONB(1e5, 1e5)
         result2 = Bergles_Rohsenow_T_ONB(1e5, 1e5, 350.0)
@@ -16,7 +16,7 @@ using STREAM
             Bergles_Rohsenow_T_ONB(1e5, 1e5, 373.15)
     end
 
-    @testset "THRS-02: q_boiling_onset" begin
+    @testset "q_boiling_onset" begin
         @test q_boiling_onset(0.5, 373.15, 300.0, 4180.0) ≈ 0.5 * 4180.0 * (373.15 - 300.0) rtol =
             1e-10
         @test q_boiling_onset(-0.5, 373.15, 300.0, 4180.0) ≈
@@ -26,7 +26,7 @@ using STREAM
             q_boiling_onset(0.5, 373.15, 300.0, 4180.0)
     end
 
-    @testset "THRS-03: q_OFI_whittle_forgan" begin
+    @testset "q_OFI_whittle_forgan" begin
         result = q_OFI_whittle_forgan(0.5, 373.15, 300.0, pipe)
         @test result > 0
         q_onset = q_boiling_onset(0.5, 373.15, 300.0, cp_water(300.0))
@@ -34,7 +34,7 @@ using STREAM
         @test q_OFI_whittle_forgan(-0.5, 373.15, 300.0, pipe) ≈ result rtol = 1e-10
     end
 
-    @testset "THRS-04: q_OSV_saha_zuber" begin
+    @testset "q_OSV_saha_zuber" begin
         result = q_OSV_saha_zuber(300.0, 0.5, pipe)
         @test result > 0
         result2 = q_OSV_saha_zuber(
@@ -43,7 +43,7 @@ using STREAM
         @test result2 > 0
     end
 
-    @testset "THRS-05: q_CHF_sudo_kaminaga" begin
+    @testset "q_CHF_sudo_kaminaga" begin
         # Upward flow (positive gravity acceleration)
         result_up = q_CHF_sudo_kaminaga(320.0, 0.5, pipe, 9.81)
         @test result_up > 0
@@ -55,7 +55,7 @@ using STREAM
         @test result_down > 0
     end
 
-    @testset "THRS-06: q_CHF_mirshak" begin
+    @testset "q_CHF_mirshak" begin
         v = 2.0
         T_bulk = 320.0
         T_sat = 373.15
@@ -71,7 +71,7 @@ using STREAM
             q_CHF_mirshak(320.0, 373.15, 1e5, 2.0)
     end
 
-    @testset "THRS-07: q_CHF_fabrega" begin
+    @testset "q_CHF_fabrega" begin
         T_inlet = 300.0
         T_sat = 373.15
         expected = 1e7 * pipe.Dh * (0.023 * (T_sat - T_inlet) + 4.56)
@@ -79,7 +79,7 @@ using STREAM
         @test q_CHF_fabrega(280.0, 373.15, pipe) > q_CHF_fabrega(300.0, 373.15, pipe)
     end
 
-    @testset "THRS-08: twall_limit" begin
+    @testset "twall_limit" begin
         @test twall_limit(400.0, 1.2) ≈ 480.0
         @test twall_limit(400.0) ≈ 400.0
         @test twall_limit(300.0, 1.0) ≈ 300.0
@@ -87,7 +87,7 @@ using STREAM
     end
 end
 
-@testset "THRS-09: ChannelState and wrappers" begin
+@testset "ChannelState and wrappers" begin
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 5
 
@@ -179,7 +179,7 @@ end
     end
 end
 
-@testset "THRS-09: chfr helper" begin
+@testset "chfr helper" begin
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 3
     #! format: off
@@ -241,7 +241,7 @@ end
     @test_throws ArgumentError chfr(Mirshak_CHF; direction=:bad)(state)
 end
 
-@testset "THRS-09: threshold_analysis dispatch" begin
+@testset "threshold_analysis dispatch" begin
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 3
     #! format: off
