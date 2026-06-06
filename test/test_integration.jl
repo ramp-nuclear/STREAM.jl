@@ -464,7 +464,7 @@ end
 end
 
 @testset "inertia with transistor in PCS coastdown" begin
-    # Python: test_inertia_with_transistor_in_PCS_coastdown — convergence only.
+    # Python: test_inertia_with_transistor_in_PCS_coastdown — steady combined-resistance + convergence.
     # A time-dependent ("transistor") parabolic resistor that starts very stiff (k2) and
     # collapses to k_final after t_open, in parallel with a constant VolumetricFlowResistor.
     k1 = 1.0
@@ -494,6 +494,12 @@ end
     ]
     sol = solve_transient(ssys, op, range(0.0, t_final; length=302); reltol=1e-6, abstol=1e-7)
     @test sol.retcode == ReturnCode.Success    # convergence is the gate
+    # Two parallel quadratic resistors combine to an effective coefficient
+    # k1·k2/(√k1+√k2)². At t=0 the loop sits at the steady split (mdot_total = 1), so
+    # total_k = ΔP_block / mdot_total² reproduces that closed form (Python's total_k check).
+    total_k = sol(0.0; idxs=ssys.R.port_in.P - ssys.R.port_out.P) /
+              sol(0.0; idxs=ssys.ine.port_in.mdot)^2
+    @test isapprox(total_k, k1 * k2 / (sqrt(k1) + sqrt(k2))^2; rtol=1e-3)
 end
 
 @testset "kirchhoff with decaying pump eventually flips flow direction (gravity)" begin
@@ -561,8 +567,15 @@ end
     g_acc = 9.80665
     geom = PipeGeometry_circular(1.0, D_pipe)
     nz = 9            # Python z_boundaries = linspace(0, L, 10) -> 9 cells
-    # Laminar friction f = 64/Re is linear in mdot near the zero-crossing (Python's
-    # regime_dependent reduces to laminar there), keeping the coastdown well-behaved through 0.
+    # Laminar friction f = 64/Re makes the loop drop linear in mdot, so the per-point
+    # quasi-static guess below is exact and the coastdown stays well-behaved through the
+    # zero-crossing. Python uses regime_dependent friction, but here that diverges: at this
+    # operating point the per-point DynamicSS solve collapses to the spurious mdot=0 root at
+    # every step (it needs a true transient, not a per-point steady). regime_dependent reduces
+    # to laminar near mdot→0 anyway, and the asserted physics (crossing = buoyancy head, pinned
+    # temps) is friction-independent — friction is tiny here (p_pump0≈grav_dp) — so the laminar
+    # surrogate costs no fidelity. See WV notes; do not "restore" regime_dependent without
+    # also switching this to a transient solve.
     fric = (Re) -> 64.0 / Re
     @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, fluid=Water(), friction_correlation=fric)
     @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, fluid=Water(), friction_correlation=fric)
@@ -606,8 +619,8 @@ end
     K_eff = p_pump0 - grav_dp           # laminar ⇒ loop drop linear: pump - grav = K_eff·mdot
     times = range(0.0, 0.05; length=150)
     mdot = Float64[]
-    coldT = Float64[]
-    hotT = Float64[]
+    cold_cells = Float64[]   # every cell at every time (Python asserts allclose over the full T_cool array)
+    hot_cells = Float64[]
     for tt in times
         op = Pair{Any,Any}[ssys2.pump2.dP_pump => p_pump0 * exp(-tt),
                            ssys2.cold.port_in.mdot => (p_pump0 * exp(-tt) - grav_dp) / K_eff,
@@ -618,14 +631,14 @@ end
         sol = solve_steady(ssys2, op; solver=DynamicSS(Rodas5P()))
         @test sol.retcode == ReturnCode.Success
         push!(mdot, sol[ssys2.cold.port_in.mdot])
-        push!(coldT, sol[ssys2.cold.T_out])
-        push!(hotT, sol[ssys2.hot.T_out])
+        append!(cold_cells, sol[ssys2.cold.T])
+        append!(hot_cells, sol[ssys2.hot.T])
     end
     @test mdot[1] > 0                       # starts forward
     @test all(diff(mdot) .< 0)              # monotonically decreasing
     @test mdot[1] > 0 > mdot[end]           # reverses
-    @test all(isapprox.(coldT, T_cold; rtol=1e-4))   # coolant temps stay pinned (HX-bracketed)
-    @test all(isapprox.(hotT, T_hot; rtol=1e-4))
+    @test all(isapprox.(cold_cells, T_cold; rtol=1e-4))   # all cells stay pinned (HX-bracketed) under reversal
+    @test all(isapprox.(hot_cells, T_hot; rtol=1e-4))
     # Crossing occurs when the pump head equals the buoyancy head L·g·Δρ.
     p_cross = p_pump0 * exp(-times[argmin(abs.(mdot))])
     @test isapprox(p_cross, grav_dp; rtol=1e-3)
@@ -706,33 +719,42 @@ end
 
 @testset "channel point kinetics — per-channel coolant rises linearly" begin
     # Python: test_channel_point_kinetics
-    # A channel + fuel plate driven by a critical PointKinetics (reactivity 0, power held
-    # constant). With cp = 1 the steady coolant temperature rises linearly along the channel:
-    # strictly increasing with a vanishing second difference.
+    # Several channel+fuel-plate loops sharing one critical PointKinetics (reactivity 0, power
+    # held constant). With cp = 1 each channel's steady coolant rises linearly along its length,
+    # at its own slope P/(nz·mdot) — so the distinct mdots give distinct slopes, verifying the
+    # channels each couple to the single PK independently and correctly. Python drives 10
+    # channels through one PK with random temperature worths; here 3 with distinct mdot. (The
+    # channel→PK temperature-feedback path is exercised separately in #8/#9.)
     T0 = 313.15
     n = 7
     nz = 7
     nx = 2
+    mdots = [1.0, 0.7, 0.4]
+    N = length(mdots)
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
-    @named cac = ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
-                                    htc_correlation=constant_Nusselt(; Nu=8.235))
-    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0,
-                                rho_s=1.0, cp_s=1.0, k_s=1.0, power_shape=ps, T0=T0)
-    rods = symmetric_plate(cac, fuel; name=:rods)
     ctrl = ReactivityController()                  # reactivity 0 ⇒ power stays constant
     @named pk = PointKinetics(ctrl)
-    mdot0 = 1.0
-    @named pump = Pump(; mdot0=mdot0)
-    @named bc = HeatExchanger(T0)
-    conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods.cac.port_in),
-        connect(rods.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
-        rods.fuel.power ~ pk.P,                     # power_scale = 1 (Python uses pk.P directly)
-    ]
-    full = compose_systems(rods, pk, pump, bc; connections=conns, name=:sys5)
+    # One independent channel+plate loop per mdot; all fuels powered by the shared pk.P. The
+    # inner cac/fuel keep the name :cac/:fuel — the distinct rodsᵢ namespace disambiguates them.
+    cacs = [ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
+                               htc_correlation=constant_Nusselt(; Nu=8.235), name=:cac) for _ in 1:N]
+    fuels = [HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0, rho_s=1.0, cp_s=1.0, k_s=1.0,
+                           power_shape=ps, T0=T0, name=:fuel) for _ in 1:N]
+    rodss = [symmetric_plate(cacs[i], fuels[i]; name=Symbol(:rods, i)) for i in 1:N]
+    pumps = [Pump(; mdot0=mdots[i], name=Symbol(:pump, i)) for i in 1:N]
+    bcs = [HeatExchanger(T0; name=Symbol(:bc, i)) for i in 1:N]
+    conns = Equation[]
+    for i in 1:N
+        append!(conns, Equation[
+            connect(pumps[i].port_out, bcs[i].port_in),
+            connect(bcs[i].port_out, rodss[i].cac.port_in),
+            connect(rodss[i].cac.port_out, pumps[i].port_in),
+            pumps[i].port_in.P ~ 1.0e5,
+            rodss[i].fuel.power ~ pk.P,             # power_scale = 1 (Python uses pk.P directly)
+        ])
+    end
+    full = compose_systems(rodss..., pk, pumps..., bcs...; connections=conns, name=:sys5)
     ssys = mtkcompile(full)
     pk_ic = point_kinetics_steady_state(1.0)
     ic = Pair{Any,Any}[
@@ -740,17 +762,24 @@ end
         ssys.pk.P => 1.0,
         ssys.pk.C_1 => pk_ic.C_k[1], ssys.pk.C_2 => pk_ic.C_k[2], ssys.pk.C_3 => pk_ic.C_k[3],
         ssys.pk.C_4 => pk_ic.C_k[4], ssys.pk.C_5 => pk_ic.C_k[5], ssys.pk.C_6 => pk_ic.C_k[6],
-        ssys.rods.cac.port_in.mdot => mdot0,
     ]
-    append!(ic, [ssys.rods.cac.T[i] => T0 for i in 1:n])
-    append!(ic, [ssys.rods.fuel.T[i, j] => T0 for i in 1:nz for j in 1:nx])
+    for i in 1:N
+        rods = getproperty(ssys, Symbol(:rods, i))
+        push!(ic, rods.cac.port_in.mdot => mdots[i])
+        append!(ic, [rods.cac.T[j] => T0 for j in 1:n])
+        append!(ic, [rods.fuel.T[j, k] => T0 for j in 1:nz for k in 1:nx])
+    end
     sol = solve_transient(ssys, ic, range(0.0, 200.0; length=200);
                           initializealg=BrownFullBasicInit(), maxiters=1_000_000)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.pk.P, end], 1.0; rtol=1e-6)   # critical PK holds power constant
-    Tc = [sol[ssys.rods.cac.T[i], end] for i in 1:n]
-    @test all(diff(Tc) .> 0)                              # strictly increasing
-    @test all(abs.(diff(diff(Tc))) .< 1e-6)               # vanishing second difference (linear)
+    for i in 1:N
+        rods = getproperty(ssys, Symbol(:rods, i))
+        Tc = [sol[rods.cac.T[j], end] for j in 1:n]
+        @test all(diff(Tc) .> 0)                              # strictly increasing
+        @test all(abs.(diff(diff(Tc))) .< 1e-6)              # vanishing second difference (linear)
+        @test isapprox(Tc[1] - T0, 1.0 / (nz * mdots[i]); rtol=1e-6)   # slope P/(nz·mdot), P=pk.P=1
+    end
 end
 
 @testset "power is negligible for negative Tfuel feedback (ref = boundary)" begin
