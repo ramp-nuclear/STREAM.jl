@@ -383,29 +383,24 @@ end
         connect(pump.port_out, R.port_in, flapper.port_in),
         connect(R.port_out, flapper.port_out, hx.port_in),
         connect(hx.port_out, pump.port_in),
-        flapper.ref_mdot ~ R.port_in.mdot,
+        watch_flow(flapper, R.port_in.mdot),
         pump.port_in.P ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_refmdot), pump, R, flapper, hx)
     ssys = mtkcompile(sys; fully_determined=false)
     op = Pair{Any,Any}[
-        ssys.flapper.T_open => 1e30,
         ssys.R.port_in.mdot => 1.0,
         ssys.pump.dP_pump_fn => dp_fn,
-    ]
-    # The flapper's ref_mdot is the resistor flow, which here is purely algebraic
-    # (no inertia ⇒ no state to root-find): R.mdot = pump_dP/r = p·exp(-t) exactly. So the
-    # opening event is detected on that analytic crossing of `t`, which root-finds cleanly.
-    T_open_idx = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
-    cb = ContinuousCallback(
-        (u, tt, integ) -> p * exp(-tt) - 0.1 * mdot0,
-        nothing,
-        integ -> (integ.u[T_open_idx] = integ.t),
-    )
+    ]   # T_open defaults to Inf (flapper closed until the callback latches it)
+    # ref_mdot is the resistor flow R.mdot = pump_dP/r = p·exp(-t), which mtkcompile leaves
+    # purely algebraic (no inertia ⇒ no state). flapper_callback detects the crossing exactly
+    # anyway: it root-finds the observed function for ref_mdot at the solver's trial state, so
+    # the valve opens when the REAL wired flow reaches the threshold — no hardcoded analytic.
+    cb = flapper_callback(ssys, ssys.flapper)
     t_arr = range(0.0, 5.0; length=500)
     sol = solve_transient(ssys, op, t_arr; callbacks=cb)
     @test sol.retcode == ReturnCode.Success
-    @test isapprox(sol[ssys.flapper.T_open, end], log(10.0); rtol=1e-3)   # analytic open time
+    @test isapprox(sol.ps[ssys.flapper.T_open], log(10.0); rtol=1e-3)   # detected open time = log(10)
     @test isapprox(sol(1.0; idxs=ssys.flapper.port_in.mdot), 0.0; atol=1e-8)  # closed before
     @test sol(4.0; idxs=ssys.flapper.port_in.mdot) > 1e-6                     # open after
 end
@@ -424,7 +419,7 @@ end
         connect(pump.port_out, flapper.port_in),
         connect(flapper.port_out, hx.port_in),
         connect(hx.port_out, pump.port_in),
-        flapper.ref_mdot ~ pump.port_in.mdot,
+        watch_flow(flapper, pump.port_in.mdot),
         pump.port_in.P ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_pump), pump, flapper, hx)
@@ -454,7 +449,7 @@ end
         connect(ine.port_out, R.port_in, flapper.port_in),
         connect(R.port_out, flapper.port_out, hx.port_in),
         connect(hx.port_out, ine.port_in),
-        flapper.ref_mdot ~ ine.port_in.mdot,
+        watch_flow(flapper, ine.port_in.mdot),
         ine.port_in.P ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_coastdown), ine, R, flapper, hx)

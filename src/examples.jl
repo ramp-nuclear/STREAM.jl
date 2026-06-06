@@ -411,7 +411,7 @@ function build_loop_lof_bypass(;
         connect(ret.port_out, flapper.port_out, ext_res.port_in),
         # Boundary conditions
         pump.port_in.P ~ 1.0e5,
-        flapper.ref_mdot ~ ine.port_in.mdot,
+        watch_flow(flapper, ine.port_in.mdot),
         heated.fuel.power ~ power_W,
         [ret.T_wall_left[i] ~ T_inlet for i in 1:n]...,
         [ret.T_wall_right[i] ~ T_inlet for i in 1:n]...,

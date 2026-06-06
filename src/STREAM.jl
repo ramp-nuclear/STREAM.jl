@@ -63,7 +63,7 @@ export compose_systems, fuel_assembly
 export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController, worth, change_state
-export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback
+export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback, watch_flow
 export connect_temperature_feedback
 
 end  # module STREAM

@@ -19,7 +19,7 @@ function _flapper_parallel_loop(; flapper, pump, name)
         connect(pump.port_out, bypass.port_in, flapper.port_in),
         connect(bypass.port_out, flapper.port_out, hx.port_in),
         connect(hx.port_out, pump.port_in),
-        flapper.ref_mdot ~ bypass.port_in.mdot,
+        watch_flow(flapper, bypass.port_in.mdot),
         pump.port_in.P ~ 1.0e5,
     ]
     return compose(System(conns, t; name=name), pump, bypass, flapper, hx), bypass
@@ -31,7 +31,7 @@ end
                              fluid=ConstantFluid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_closed)
     ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[ssys.flapper.T_open => 1e30]   # never opens
+    op = Pair{Any,Any}[]   # T_open defaults to Inf ⇒ never opens
     sol = solve_transient(ssys, op, range(0.0, 5.0; length=20))
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.flapper.port_in.mdot, end], 0.0; atol=1e-8)   # closed ⇒ no flow
@@ -46,7 +46,7 @@ end
                              fluid=ConstantFluid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_open)
     ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[ssys.flapper.T_open => 0.0]   # open from t=0
+    op = Pair{Any,Any}[ssys.flapper.T_open => 0.0]   # pre-open from t=0 (Python's open(0.0))
     sol = solve_transient(ssys, op, range(0.0, 1.0; length=20))           # past the 1/open_rate ramp
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)             # fully open
@@ -59,6 +59,7 @@ end
 @testset "Flapper opens when ref_mdot crosses threshold" begin
     # A weak (large-f) flapper in parallel with a decaying inertia+resistor branch: the loop
     # flow coasts down past the threshold, the callback latches T_open, and the ramp completes.
+    # The detection is end-to-end — no pre-set open time — so this exercises flapper_callback.
     threshold = 0.01
     L_over_A = 5.0e5     # tau = L_over_A / R = 5 s
     R = 1.0e5
@@ -73,19 +74,45 @@ end
         connect(ine.port_out, res.port_in, flapper.port_in),
         connect(res.port_out, flapper.port_out, hx.port_in),
         connect(hx.port_out, pump.port_in),
-        flapper.ref_mdot ~ ine.port_in.mdot,
+        watch_flow(flapper, ine.port_in.mdot),
         pump.port_in.P ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flap_decay), pump, ine, res, flapper, hx)
     ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[ssys.ine.port_in.mdot => 1.0, ssys.flapper.T_open => 1e30]
+    op = Pair{Any,Any}[ssys.ine.port_in.mdot => 1.0]   # T_open defaults to Inf
     sol = solve_transient(ssys, op, range(0.0, 60.0; length=600);
-                          callbacks=flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=threshold))
+                          callbacks=flapper_callback(ssys, ssys.flapper))
     @test sol.retcode == ReturnCode.Success
-    T_open = sol[ssys.flapper.T_open, end]
-    @test 0.0 < T_open < 1e10                         # event fired at a positive time
-    @test isapprox(T_open, -5.0 * log(threshold); rtol=0.1)   # tau·ln(mdot0/threshold), mdot0=1
-    @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)  # ramp completed by t_end
+    T_open = sol.ps[ssys.flapper.T_open]
+    @test 0.0 < T_open < 1e10                                   # event fired at a positive time
+    @test isapprox(T_open, -5.0 * log(threshold); rtol=0.1)     # tau·ln(mdot0/threshold), mdot0=1
+    @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)   # ramp completed by t_end
+end
+
+@testset "flapper_callback stop_on_open terminates the solve" begin
+    threshold = 0.01
+    @named pump = Pump(0.0)
+    @named ine = Inertia(5.0e5)
+    @named res = Resistor(1.0e5)
+    @named flapper = Flapper(; open_at_current=threshold, f=1.0e6, area=1.0, open_rate=1.0 / 3.0,
+                             fluid=ConstantFluid())
+    @named hx = HeatExchanger(300.0)
+    conns = [
+        connect(pump.port_out, ine.port_in),
+        connect(ine.port_out, res.port_in, flapper.port_in),
+        connect(res.port_out, flapper.port_out, hx.port_in),
+        connect(hx.port_out, pump.port_in),
+        watch_flow(flapper, ine.port_in.mdot),
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:flap_stop), pump, ine, res, flapper, hx)
+    ssys = mtkcompile(sys; fully_determined=false)
+    op = Pair{Any,Any}[ssys.ine.port_in.mdot => 1.0]
+    sol = solve_transient(ssys, op, range(0.0, 60.0; length=600);
+                          callbacks=flapper_callback(ssys, ssys.flapper; stop_on_open=true))
+    @test sol.retcode == ReturnCode.Terminated
+    @test sol.t[end] < 60.0                                     # stopped at the opening, not t_end
+    @test isapprox(sol.t[end], -5.0 * log(threshold); rtol=0.1) # terminated right when it opened
 end
 
 @testset "solve_transient passes user callbacks" begin
@@ -93,7 +120,7 @@ end
     @named flapper = Flapper(; fluid=ConstantFluid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_cb)
     ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[ssys.flapper.T_open => 1e30]
+    op = Pair{Any,Any}[]   # T_open defaults to Inf
     fired = Ref(false)
     user_cb = ContinuousCallback((u, t_val, integ) -> t_val - 5.0, integ -> (fired[] = true))
     sol = solve_transient(ssys, op, range(0.0, 20.0; length=200); callbacks=CallbackSet(user_cb))

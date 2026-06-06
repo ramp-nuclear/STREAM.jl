@@ -142,7 +142,7 @@ end
         # root the default root-finder converges to on this multi-branch network.
         op_steady = Pair{Any,Any}[
             ssys.pump.dP_pump_fn => dP_fn_steady,
-            ssys.flapper.T_open => 1.0e30,
+            ssys.flapper.T_open => Inf,
             ssys.ine.port_in.mdot => 0.2,
             ssys.ret.port_in.mdot => 0.2,
             Dt(ssys.heated.ch.port_in.mdot) => 0.0,
@@ -166,12 +166,14 @@ end
         # Left unset, Julia 1.12.6 initializes it to NaN (1.12.5 used 0.0), so the
         # transient aborted at t=0 (dt below floating-point epsilon, NaN error
         # estimate) on CI while passing locally on 1.12.5. Copying ss[u] for every
-        # unknown sets it directly; flapper T_open carries over from steady at the
-        # 1e30 closed sentinel.
+        # unknown sets it directly. T_open is a parameter (not an unknown), so it
+        # defaults to Inf (flapper closed) for the transient; we set it explicitly
+        # for clarity, and flapper_callback latches it when ine.port_in.mdot crosses.
         op = Pair{Any,Any}[u => ss[u] for u in unknowns(ssys)]
         push!(op, ssys.pump.dP_pump_fn => dP_fn)
+        push!(op, ssys.flapper.T_open => Inf)
 
-        cb = flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=BYPASS_THRESHOLD)
+        cb = flapper_callback(ssys, ssys.flapper)
         return ssys, op, mdot_ss, cb
     end
 
@@ -182,7 +184,7 @@ end
         @test 0.001 < mdot_ss < 1.0
 
         T_open_init = op[findfirst(p -> isequal(p.first, ssys.flapper.T_open), op)].second
-        @test T_open_init == 1.0e30
+        @test T_open_init == Inf
     end
 
     @testset "Flapper fires at correct threshold" begin
@@ -195,7 +197,7 @@ end
 
         @test sol.retcode == ReturnCode.Success
 
-        T_open_end = sol[ssys.flapper.T_open, end]
+        T_open_end = sol.ps[ssys.flapper.T_open]
         @test T_open_end < 1.0e10
         @test T_open_end >= 0.0
         @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-4)
