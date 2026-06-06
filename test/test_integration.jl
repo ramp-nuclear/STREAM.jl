@@ -180,14 +180,15 @@ end
     ]
     @named sys = compose(System(conns, t; name=:rl_circuit), L_el, R, hx)
     ssys = mtkcompile(sys)
-    tspan = (0.0, 1.0)
     # The IC mdot=1 is already consistent (the loop pressures are explicit observables), so
-    # skip the (overdetermined) initialization nonlinear solve and integrate from it directly.
-    prob = ODEProblem(ssys, [ssys.L_el.port_in.mdot => 1.0], tspan)
-    sol = solve(prob, Rodas5P(); initializealg=SciMLBase.NoInit(), reltol=1e-10, abstol=1e-12)
+    # solve_transient's default NoInit integrates straight from it (the default DAE
+    # initialization is overdetermined here and would InitialFailure).
+    t_arr = range(0.0, 1.0; length=5)   # exactly [0, 0.25, 0.5, 0.75, 1.0]
+    sol = solve_transient(ssys, [ssys.L_el.port_in.mdot => 1.0], t_arr; reltol=1e-10, abstol=1e-12)
     @test sol.retcode == ReturnCode.Success
-    for tt in (0.0, 0.25, 0.5, 0.75, 1.0)
-        @test isapprox(sol(tt; idxs=ssys.L_el.port_in.mdot), exp(-(r / L) * tt); rtol=1e-4)
+    mdot = sol[ssys.L_el.port_in.mdot, :]
+    for (i, tt) in enumerate(t_arr)
+        @test isapprox(mdot[i], exp(-(r / L) * tt); rtol=1e-4)   # mdot = exp(-(r/L)·t)
     end
 end
 
@@ -214,12 +215,16 @@ end
     ]
     @named sys = compose(System(conns, t; name=:friction_coastdown), L_el, R, hx)
     ssys = mtkcompile(sys)
-    prob = ODEProblem(ssys, [ssys.L_el.port_in.mdot => mdot0], (0.0, 300.0))
-    sol = solve(prob, Rodas5P(); initializealg=SciMLBase.NoInit(), reltol=1e-10, abstol=1e-12)
+    # Python shuts the pump to p=0 at t=0; a zero-pressure pump is a pass-through, so we omit
+    # it and coast from the mdot0 IC. solve_transient's default NoInit integrates straight from
+    # the consistent IC (the default DAE init is overdetermined here and would InitialFailure).
+    t_arr = range(0.0, 300.0; length=7)   # includes 0, 50, 150, 300
+    sol = solve_transient(ssys, [ssys.L_el.port_in.mdot => mdot0], t_arr; reltol=1e-10, abstol=1e-12)
     @test sol.retcode == ReturnCode.Success
-    for tt in (0.0, 50.0, 150.0, 300.0)
+    mdot = sol[ssys.L_el.port_in.mdot, :]
+    for (i, tt) in enumerate(t_arr)
         mdota = mdot0 / (1 + alpha * mdot0 * tt)
-        @test isapprox(sol(tt; idxs=ssys.L_el.port_in.mdot), mdota; rtol=1e-4)
+        @test isapprox(mdot[i], mdota; rtol=1e-4)   # mdot = mdot0/(1 + α·mdot0·t)
     end
 end
 
@@ -245,15 +250,20 @@ end
     ]
     @named sys = compose(System(conns, t; name=:parallel_coastdown), L_el, R1, R2, hx)
     ssys = mtkcompile(sys)
-    prob = ODEProblem(ssys, [ssys.L_el.port_in.mdot => mdot0,
-                             ssys.R1.port_in.mdot => mdot0 / (1 + sqrt(k1 / k2)),
-                             ssys.R2.port_in.mdot => mdot0 / (1 + sqrt(k2 / k1))],
-                      (0.0, 100.0))
-    sol = solve(prob, Rodas5P(); initializealg=SciMLBase.NoInit(), reltol=1e-8, abstol=1e-10)
+    # Pump shut down (Python sets p=0); coast from the consistent steady split (the branch IC
+    # seeds m1/m2 = √(k2/k1)). solve_transient's default NoInit integrates straight from the
+    # consistent IC (the default DAE init is overdetermined here and would InitialFailure).
+    t_arr = range(0.0, 100.0; length=6)   # includes 0, 20, 60, 100
+    sol = solve_transient(ssys,
+                          [ssys.L_el.port_in.mdot => mdot0,
+                           ssys.R1.port_in.mdot => mdot0 / (1 + sqrt(k1 / k2)),
+                           ssys.R2.port_in.mdot => mdot0 / (1 + sqrt(k2 / k1))],
+                          t_arr; reltol=1e-8, abstol=1e-10)
     @test sol.retcode == ReturnCode.Success
-    for tt in (0.0, 20.0, 60.0, 100.0)
+    mdot = sol[ssys.L_el.port_in.mdot, :]
+    for (i, tt) in enumerate(t_arr)
         mdota = mdot0 / (1 + alpha * mdot0 * tt)
-        @test isapprox(sol(tt; idxs=ssys.L_el.port_in.mdot), mdota; rtol=1e-4)
+        @test isapprox(mdot[i], mdota; rtol=1e-4)   # mdot = mdot0/(1 + (total_k/inertia)·mdot0·t)
     end
 end
 
