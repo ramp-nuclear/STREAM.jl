@@ -6,6 +6,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
 using STREAM: Channel  # disambiguate from Base.Channel
+using STREAM: regime_dependent_q_scb, _bergles_rohsenow_dT_ONB  # for the SCB integration block
 using OrdinaryDiffEq: ReturnCode
 
 const N_DEFAULT      = 4
@@ -654,3 +655,125 @@ end
     T_out_chf = sol_chf[ssys_chf.chf.T_out, end]
     @test isapprox(T_out_cac, T_out_chf; rtol=1e-3)
 end
+
+# §4 Subcooled-boiling integration (in-loop CAC + SCB).
+# Pure-correlation subcooled-boiling tests live in test_thresholds.jl.
+@testset "Subcooled-boiling integration (ISCB)" begin
+    n_scb = 5
+    T_inlet_scb = 313.15
+    L_ch_scb = 0.6
+    D_ch_scb = 0.01
+    dP_pump_scb = 3.0e4
+
+    # Helper: build a minimal loop with CAC + Pump + HeatExchanger + per-cell
+    # ConstantTemperature BCs. Returns (compiled_sys, solution).
+    function _build_scb_loop(; scb_correction=nothing, T_wall_bc=373.15)
+        @named pump = Pump(dP_pump_scb)
+        @named cac = ChannelAndContacts(
+            n=n_scb,
+            geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
+            scb_correction=scb_correction,
+        )
+        @named bc = HeatExchanger(T_inlet_scb)
+        ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l_scb, i)) for i in 1:n_scb]
+        ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r_scb, i)) for i in 1:n_scb]
+        conns = [
+            connect(pump.port_out, bc.port_in),
+            connect(bc.port_out, cac.port_in),
+            connect(cac.port_out, pump.port_in),
+            [
+                connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i)))
+                for i in 1:n_scb
+            ]...,
+            [
+                connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i)))
+                for i in 1:n_scb
+            ]...,
+            pump.port_in.P ~ 2e5,
+        ]
+        @named sys = compose(
+            System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...,
+        )
+        ssys = mtkcompile(sys)
+        Q_guess = max(1e4, 1e3 * (T_wall_bc - T_inlet_scb))
+        T_guess = steady_state_guess(
+            T_inlet=T_inlet_scb, Q_wall=Q_guess, mdot_guess=0.490, n=n_scb,
+        )
+        op = [ssys.cac.T[i] => T_guess[i] for i in 1:n_scb]
+        push!(op, ssys.cac.port_in.mdot => 0.490)
+        sol = solve_steady(ssys, op)
+        return ssys, sol
+    end
+
+    @testset "SCB ChannelAndContacts compiles" begin
+        scb_fn = regime_dependent_q_scb(pressure=2e5)
+        @named cac = ChannelAndContacts(
+            n=3,
+            geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
+            scb_correction=scb_fn,
+        )
+        @test cac isa ModelingToolkit.System
+    end
+
+    @testset "SCB ChannelAndContacts solves (sub-ONB)" begin
+        # T_wall=380K < T_ONB (~408K at 2 bar): SCB present but inactive,
+        # KINSOL converges.
+        scb_fn = regime_dependent_q_scb(pressure=2e5)
+        ssys, sol = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=380.0)
+        @test sol.retcode == ReturnCode.Success
+    end
+
+    @testset "Default (no SCB) backward compatibility" begin
+        ssys, sol = _build_scb_loop(scb_correction=nothing, T_wall_bc=373.15)
+        @test sol.retcode == ReturnCode.Success
+    end
+
+    @testset "High T_wall -> enhanced HTC (numerical)" begin
+        # Direct numerical evaluation: at T_wall >> T_sat, the SCB correction
+        # factor > 1. Validates the physics without requiring KINSOL convergence
+        # in the boiling regime.
+        T_bulk = 320.0
+        P = 2e5
+        T_wall = 420.0
+        mdot = 0.49
+        Dh = D_ch_scb
+        Ac = pi/4 * Dh^2
+        Re_val = abs(mdot) * Dh / (Ac * STREAM.mu_water(T_bulk))
+        Pr_val =
+            STREAM.cp_water(T_bulk) * STREAM.mu_water(T_bulk) /
+            STREAM.k_water(T_bulk)
+
+        h_spl =
+            dittus_boelter(Re_val, Pr_val, T_bulk, T_wall) * STREAM.k_water(T_bulk) /
+            Dh
+        q_spl = h_spl * (T_wall - T_bulk)
+
+        T_sat = sat_temperature(P)
+        T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
+
+        scb_fn = regime_dependent_q_scb(pressure=P)
+        q_scb = scb_fn(T_wall, T_sat, Re_val)
+        q_scb_inc = scb_fn(T_ONB, T_sat, Re_val)
+        factor = partial_SCB_correction(q_spl, q_scb, q_scb_inc)
+
+        @test T_wall > T_ONB                     # boiling is active
+        @test factor > 1.0                       # correction enhances h_tc
+        @test h_spl * factor > h_spl             # SCB h_tc > single-phase h_tc
+    end
+
+    @testset "Low T_wall -> matches single-phase exactly" begin
+        # T_wall = 330K < T_sat (~393K at 2 bar) -> SCB inactive, pure
+        # single-phase. Both SCB and non-SCB loops solve to identical h_tc values.
+        scb_fn = regime_dependent_q_scb(pressure=2e5)
+        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=330.0)
+        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=330.0)
+
+        htc_scb = [sol_scb[ssys_scb.cac.h_tc_left[i]] for i in 1:n_scb]
+        htc_noscb = [sol_noscb[ssys_noscb.cac.h_tc_left[i]] for i in 1:n_scb]
+        # Should be identical (ifelse selects uncorrected branch).
+        for i in 1:n_scb
+            @test htc_scb[i] ≈ htc_noscb[i] rtol=1e-10
+        end
+    end
+end
+

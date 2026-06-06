@@ -3,6 +3,7 @@ using STREAM
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
+using OrdinaryDiffEq: ReturnCode
 using STREAM: Channel, HeatDiffusion, ChannelAndContacts
 import ModelingToolkit: compose
 
@@ -470,3 +471,197 @@ import ModelingToolkit: compose
         @test t_scram > t_step
     end
 end
+
+# Point-kinetics + thermal-feedback loops (moved from test_integration.jl: these exercise
+# the coupled neutronics<->thermal-hydraulics physics, not a Python test_integrations.py
+# mirror). The build_loop_pk return-shape smoke that lived here was dropped — it is
+# subsumed by "build_loop_pk compiles + briefly solves" in test_examples.jl.
+@testset "Point-kinetics + thermal-feedback loops" begin
+    @testset "quiescent stability P within 1% of P0 over 10s" begin
+        # ReactivityController() returns 0.0 always; no temp feedback. At
+        # criticality (rho=0) with correct PK ICs, power must be stable.
+        P0 = 1.0
+        ctrl = ReactivityController()
+        ssys, ic = build_loop_pk(ctrl; P0=P0, power_scale=1e4)
+
+        t_arr = range(0.0, 10.0; length=200)
+        sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
+        @test sol.retcode == ReturnCode.Success
+
+        P_trace = sol[ssys.pk.P, :]
+        @test all(isfinite, P_trace)
+        @test all(p -> abs(p - P0) / P0 < 0.01, P_trace)
+    end
+
+    @testset "step reactivity with temperature feedback" begin
+        # After step insertion: power rises (P_max > P0) then feedback damps
+        # the excursion (P[end] < P_max).
+        P0 = 1.0
+        t_step = 0.5
+        delta_rho = 0.003   # 0.003 > beta/2; strong enough for visible prompt rise
+        alpha = -1e-4       # weak negative feedback
+        T_inlet = 293.15
+
+        # ReactivityController.input_reactivity has signature (state, t_state, t) -> Float64.
+        step_fn = (state, t_state, t) -> (t >= t_step ? delta_rho : 0.0)
+        ctrl = ReactivityController(step_fn)
+
+        ssys, ic = build_loop_pk(
+            ctrl;
+            P0=P0,
+            power_scale=1e4,
+            temp_worth=Dict(:cac => fill(alpha, 7)),
+            ref_temp=Dict(:cac => fill(T_inlet, 7)),
+        )
+
+        t_arr = range(0.0, 5.0; length=500)
+        sol = solve_transient(ssys, ic, t_arr; tstops=[t_step], maxiters=1_000_000)
+        @test sol.retcode == ReturnCode.Success
+
+        P_trace = sol[ssys.pk.P, :]
+        P_max = maximum(P_trace)
+
+        @test P_max > P0                     # power rises after step
+        @test P_trace[end] < P_max           # feedback damps the excursion
+        @test all(isfinite, P_trace)         # no NaN/Inf
+    end
+
+    @testset "SCRAM terminates coupled loop" begin
+        # Large step reactivity drives P above plimit; SCRAM_at_power fires,
+        # transitions ctrl to :SCRAM, and scram_callback terminates the solver
+        # before t=10s.
+        P0 = 1.0
+        plimit = 1.2
+        t_step = 0.5
+        delta_rho = 0.005   # large enough to exceed plimit quickly
+        alpha = -0.01
+        T_inlet = 293.15
+
+        scram_ir =
+            (state, t_state, t) ->
+                state == :SCRAM ? -0.05 : (t >= t_step ? delta_rho : 0.0)
+        ctrl = ReactivityController(
+            scram_ir;
+            initial_state=:NORMAL,
+            state_machine=SCRAM_at_power(plimit),
+            abort_states=Set([:SCRAM]),
+        )
+
+        ssys, ic = build_loop_pk(
+            ctrl;
+            P0=P0,
+            power_scale=1e4,
+            temp_worth=Dict(:cac => fill(alpha, 7)),
+            ref_temp=Dict(:cac => fill(T_inlet, 7)),
+        )
+
+        cb = scram_callback(ssys, ssys.pk.P, ctrl)
+
+        t_arr = range(0.0, 10.0; length=1000)
+        sol = solve_transient(
+            ssys, ic, t_arr; tstops=[t_step], callbacks=cb, maxiters=1_000_000,
+        )
+
+        @test sol.retcode == ReturnCode.Terminated   # DiffEq terminate! sets this
+        @test sol.t[end] < 10.0                      # early stop confirmed by time
+        @test ctrl.state == :SCRAM                   # state machine transitioned
+        @test any(entry -> entry[1] == :SCRAM, ctrl.log)  # SCRAM logged
+    end
+
+    # Coupled point-kinetics feedback physics. All three tests build on the
+    # consistent build_loop_pk IC (port/contact temperatures seeded to T_inlet),
+    # which fixes a boundary-cell initialization artifact (see the regression
+    # guard below).
+
+    @testset "consistent cold IC has zero startup reactivity" begin
+        # REGRESSION GUARD for the boundary-cell initialization artifact. FlowPort/
+        # ThermalPort temperatures default to 300 K; the boundary coolant cells and
+        # the channel↔fuel contact nodes alias to those ports, so a per-cell T seed
+        # alone does NOT pin them. If build_loop_pk fails to seed the port/contact
+        # temperatures, feedback sees a spurious (300 − ref_temp) offset and the loop
+        # starts far from critical. With a consistent IC and ref_temp = T_inlet, the
+        # loop MUST start exactly critical: net reactivity ≈ 0 at t=0.
+        Tin = 293.15
+        for (tw, rt) in (
+            (Dict(:cac => fill(-0.01, 7)),    Dict(:cac => fill(Tin, 7))),       # coolant feedback
+            (Dict(:fuel => fill(-0.1, 7, 2)), Dict(:fuel => fill(Tin, 7, 2))),   # fuel feedback
+        )
+            ctrl = ReactivityController()
+            ssys, ic = build_loop_pk(
+                ctrl; n=7, nz=7, nx=2, T_inlet=Tin, P0=1.0, power_scale=1e4,
+                temp_worth=tw, ref_temp=rt,
+            )
+            sol = solve_transient(ssys, ic, [0.0, 1e-6])
+            @test sol.retcode == ReturnCode.Success
+            @test abs(sol[ssys.pk.reactivity][1]) < 1e-9   # exactly critical at t=0
+            @test sol[ssys.pk.P][1] == 1.0
+        end
+    end
+
+    @testset "coolant feedback suppresses power to a self-consistent equilibrium" begin
+        # Corrected mirror of Python STREAM test_integrations.py:390-428
+        # (test_power_is_negligible_for_negative_Tcool_feedback_and_ref_temp_is_inlet).
+        # Start from the cold critical IC (reactivity[0] = 0). Under power the coolant
+        # heats above the inlet reference, driving feedback negative until power
+        # collapses to a low, self-consistent (net reactivity ≈ 0) equilibrium. Strong
+        # negative alpha ⇒ power becomes negligible — and crucially, here that is REAL
+        # feedback physics, not the old 300 K init artifact (guarded by PK-IC-01).
+        Tin = 293.15
+        ctrl = ReactivityController()
+        ssys, ic = build_loop_pk(
+            ctrl; n=7, T_inlet=Tin, P0=1.0, power_scale=1e4,
+            temp_worth=Dict(:cac => fill(-0.1, 7)), ref_temp=Dict(:cac => fill(Tin, 7)),
+        )
+        sol = solve_transient(ssys, ic, range(0.0, 100.0; length=300); maxiters=1_000_000)
+        @test sol.retcode == ReturnCode.Success
+        P = sol[ssys.pk.P]
+        rho = sol[ssys.pk.reactivity]
+        @test abs(rho[1]) < 1e-9        # starts exactly critical (no startup artifact)
+        @test all(isfinite, P)
+        @test all(>(0.0), P)            # power positive throughout — decays, never crashes negative
+        @test P[end] < 0.01             # feedback drives power negligible
+        @test abs(rho[end]) < 1e-3      # late-time state is self-consistent (critical)
+    end
+
+    @testset "coupled prompt jump then feedback turnover" begin
+        # The high-value coupled physics test that the suite was missing. Procedure
+        # (steady-then-perturb, mirroring the LOF transient IC fix): start from the
+        # cold critical IC, let the loop settle to its low-power feedback equilibrium,
+        # THEN insert a positive reactivity step. Assert:
+        #   (1) the loop starts exactly critical (reactivity[0] = 0),
+        #   (2) a textbook prompt jump P+/P- ≈ beta/(beta − delta_rho), sampled PAST
+        #       the prompt discontinuity (sampling immediately is float-noise
+        #       fragile),
+        #   (3) power stays BOUNDED — without feedback a sustained +delta_rho diverges,
+        #   (4) feedback subtracts the inserted reactivity, settling to a new critical
+        #       equilibrium (late-time net reactivity pulled back below delta_rho, ≈ 0).
+        Tin = 293.15
+        beta_total = 0.006502        # = sum(STREAM.U235_BETA_K)
+        delta_rho = 5e-4             # < beta_total ⇒ delayed-supercritical, bounded jump
+        t_step = 40.0                # insert after the loop has settled (~30 s)
+        ctrl = ReactivityController((s, ts, tt) -> (tt >= t_step ? delta_rho : 0.0))
+        ssys, ic = build_loop_pk(
+            ctrl; n=7, T_inlet=Tin, P0=1.0, power_scale=1e4,
+            temp_worth=Dict(:cac => fill(-0.002, 7)), ref_temp=Dict(:cac => fill(Tin, 7)),
+        )
+        t_arr = sort(unique(vcat(collect(range(0.0, 80.0; length=300)), [t_step, t_step + 0.03])))
+        sol = solve_transient(ssys, ic, t_arr; tstops=[t_step], maxiters=1_000_000)
+        @test sol.retcode == ReturnCode.Success
+        P = sol[ssys.pk.P]
+        rho = sol[ssys.pk.reactivity]
+        @test abs(rho[1]) < 1e-9                       # (1) cold IC exactly critical
+
+        ipre = findlast(<(t_step), sol.t)
+        ijump = findfirst(x -> x >= t_step + 0.03, sol.t)
+        jump_ratio = P[ijump] / P[ipre]
+        jump_expected = beta_total / (beta_total - delta_rho)   # ≈ 1.083
+        @test isapprox(jump_ratio, jump_expected; rtol=0.05)    # (2) textbook prompt jump
+
+        P_post = P[ipre:end]
+        @test all(isfinite, P_post)
+        @test maximum(P_post) < 0.5                    # (3) bounded — feedback caps the excursion
+        @test rho[end] < delta_rho                     # (4) feedback subtracted reactivity
+        @test abs(rho[end]) < 1e-3                      #     new self-consistent critical equilibrium
+    end
+end
+

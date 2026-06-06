@@ -66,7 +66,7 @@ test/
   test_connectors.jl        # FlowPort, ThermalPort
   test_fluids.jl            # Fluid property functions
   test_channels.jl          # Channel/CHF/CAC variants + _channel_core enthalpy-form physics
-                            # + flow-reversal sign safety
+                            # + flow-reversal sign safety + subcooled-boiling integration (ISCB)
   test_pump.jl              # Pump
   test_flapper.jl           # Flapper
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
@@ -78,12 +78,14 @@ test/
                             # port, check_gravity_mismatch, _infer_n, connect_temperature_feedback,
                             # fuel_assembly — heavy CAC<->HD coverage
   test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
+  test_solvers.jl           # steady_state_guess + solve_steady/solve_transient wrappers (src/solvers.jl)
+  test_examples.jl          # build_loop* / build_cube builders + loss-of-flow transient (src/examples.jl)
   test_determinacy.jl       # equation/unknown balance (fully_determined) for builders + scenarios
   test_validation.jl        # Quantitative cross-validation against Python STREAM
-  test_integration.jl       # Single big integration file — builders, solvers,
-                            # loss-of-flow transient, subcooled boiling, PK loops, COMPAT
-  test_point_kinetics.jl    # PointKinetics component-unit tests (coupled-loop feedback lives
-                            # in test_integration.jl)
+  test_integration.jl       # STRICT 1:1 port of Python tests/test_general/test_integrations.py —
+                            # exactly the 21 Python integration tests, nothing else
+  test_point_kinetics.jl    # PointKinetics component-unit tests + coupled neutronics/T-H
+                            # feedback loops (SCRAM, cold-IC, prompt-jump)
 ```
 
 **Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_misc.jl` alongside `ConstantTemperature` (same value-source family).
