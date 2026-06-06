@@ -100,20 +100,22 @@ is laterally symmetric, the both-faces signature). Parity harness 549/549, suite
 Unit tests: `ConvectiveBoundary` in test_misc.jl, `single_channel_connection` in
 test_composition.jl.
 
-## Strict 1:1 — disposition of current Julia-only tests in `test_integration.jl`
+## Strict 1:1 — disposition of former Julia-only tests in `test_integration.jl` — ✅ DONE
 
-These have no Python `test_integrations.py` counterpart. Proposed move/remove, for review.
+`test_integration.jl` now holds exactly the 21 Python mirrors and nothing else. Every
+Julia-only testset moved to the file mirroring its source; the full suite stayed green.
 
-| Julia testset(s) | Proposed disposition |
+| Julia testset(s) | Disposition |
 |---|---|
-| `Builders smokes` (build_loop/vertical/transient/cube/lof/pk compiles+solves) | MOVE → new `test_examples.jl` (they test `src/examples.jl`) |
-| `steady_state_guess monotonically increasing` | MOVE → new `test_solvers.jl` (tests `src/solvers.jl`) |
-| `Solver wrappers` (solve_steady / solve_transient) | MOVE → `test_solvers.jl` |
-| `Loss-of-flow transient` | RECONCILE with Python #16 (pump coastdown); keep the Julia-specific energy-balance gate as a justified extra or move it |
-| `Subcooled-boiling integration (ISCB)` | **KEEP-JUSTIFIED?** Julia physics with no Python integration analog — flag for team: move to `test_channels.jl` or keep as a justified Julia-only integration block |
-| `Point-kinetics + thermal-feedback loops` | SPLIT: the parts mirroring Python #5/#8/#9 reconcile to the port; SCRAM + cold-IC regression MOVE → `test_point_kinetics.jl` |
-| `COMPAT: Pkg.test()` smoke | MOVE → `runtests.jl` or `test_utilities.jl` |
+| `Builders smokes` (build_loop/vertical/transient/cube/lof/pk) | MOVED → `test_examples.jl` |
+| `steady_state_guess monotonically increasing` | MOVED → `test_solvers.jl` |
+| `Solver wrappers` (solve_steady / solve_transient) | MOVED → `test_solvers.jl` |
+| `Loss-of-flow transient` | MOVED → `test_examples.jl` |
+| `Subcooled-boiling integration (ISCB)` | MOVED → `test_channels.jl` |
+| `Point-kinetics + thermal-feedback loops` | MOVED → `test_point_kinetics.jl` |
+| `COMPAT: Pkg.test()` smoke | DELETED (vacuous; `runtests.jl` already orchestrates every file) |
 
-Open question for the team: the strict-1:1 rule says `test_integration.jl` mirrors only
-the Python integration file. Julia has real physics (SCB, SCRAM) the Python *integration*
-file does not exercise — those belong in the test file mirroring their source, not deleted.
+Three tests were deleted as vacuous or fully subsumed by a stronger test: the
+`build_loop_pk` return-shape smoke (subsumed by the builders' compile-and-solve smoke),
+the `build_loop_transient compiles` `isa`-check (subsumed by its compile-and-solve smoke),
+and the COMPAT `STREAM isa Module` marker. No real coverage was lost.
