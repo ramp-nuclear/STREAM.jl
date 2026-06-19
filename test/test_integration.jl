@@ -708,7 +708,12 @@ end
                            Dt(ssys2.hot.port_in.mdot) => 0.0]
         append!(op, [ssys2.cold.T[i] => T_cold for i in 1:nz])
         append!(op, [ssys2.hot.T[i] => T_hot for i in 1:nz])
-        sol = solve_steady(ssys2, op)
+        # Solve with the stiff steady integrator explicitly. Left to pick its own algorithm the
+        # steady solver tips to ReturnCode.Unstable on some CI hardware while staying Success
+        # locally on the identical package set, because the auto-chosen integrator is borderline
+        # on this near-reversal balance. DynamicSS(Rodas5P()) is the same stiff steady solver the
+        # forced-flow steady states in test_examples.jl use, so the result is hardware independent.
+        sol = solve_steady(ssys2, op; solver=DynamicSS(Rodas5P()))
         @test sol.retcode == ReturnCode.Success
         push!(mdot, sol[ssys2.cold.port_in.mdot])
         append!(cold_cells, sol[ssys2.cold.T])
