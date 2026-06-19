@@ -2,7 +2,11 @@
 
 ## Coding Rules
 
-When writing or editing Julia code, follow the conventions in `JULIA.md` (repo root). For ModelingToolkit code, the `modelingtoolkit-jl` skill (`.claude/skills/modelingtoolkit-jl/`) auto-triggers and takes precedence on MTK-specific API usage; `JULIA.md` governs general Julia.
+When writing or editing Julia code, follow the conventions in `JULIA.md` (repo root). `JULIA.md` governs general Julia.
+
+**MUST USE — MTK skill.** Before writing or editing ANY ModelingToolkit code (anything touching `System`, `@mtkmodel`/`@mtkcompile`/`mtkcompile`, `@variables`/`@parameters`/`@connector`, `connect`, problem/solution construction, `unknowns`/`observed`, initialization, `GlobalScope`, callbacks, `@register_symbolic`, or any SciML solve), you MUST invoke the `modelingtoolkit-jl` skill (`.claude/skills/modelingtoolkit-jl/`) first and follow it — do not rely on auto-trigger or prior knowledge, since training data for MTK is stale and emits removed APIs (`ODESystem`, `structural_simplify`, `states`, 4-arg problems, integer indexing). The skill takes precedence on MTK-specific API; `JULIA.md` governs general Julia. Read the relevant `references/*.md` before writing in that area.
+
+**MUST USE — humanizer for outward prose.** Run the `/humanizer` skill over all docstrings and over every GitHub comment/PR/issue body before it is shown for posting (see also the no-auto-post rule: draft → humanize → show the user → they confirm → post).
 
 ## Project Conventions
 
