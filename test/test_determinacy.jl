@@ -182,7 +182,7 @@ function _build_val02_twoplate()
     return sys_v02
 end
 
-# Testset 1 — canonical builders (GREEN at plan-end)
+# The canonical example builders must each compile to a balanced system (equations == unknowns).
 @testset "Determinacy: canonical builders are fully determined" begin
     @testset "build_loop"            begin assert_determined_compiled("build_loop",            build_loop()) end
     @testset "build_loop_vertical"   begin assert_determined_compiled("build_loop_vertical",   build_loop_vertical()) end
@@ -197,9 +197,8 @@ end
     end
 end
 
-# Scenario topologies
-# RED-as-expected at plan-end of 58-01; each row flips to GREEN as its
-# corresponding fix plan (58-02 / 58-03 / 58-04) lands.
+# Scenario topologies: the MTR plate variants and the HeatDiffusion validation builds must each
+# resolve to a balanced system.
 @testset "Determinacy scenarios" begin
     @testset "MTR symmetric"   begin assert_determined("MTR sym",       _build_mtr_sym()) end
     @testset "MTR asymmetric"  begin assert_determined("MTR asym",      _build_mtr_asym()) end

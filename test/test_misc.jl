@@ -74,87 +74,118 @@ end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-@testset "WallTemperature: Real (broadcast) instantiation" begin
+# Helper: solve a portless value source in isolation and read back the per-cell
+# output it emits. The compiled system has no unknowns (every output is a pure
+# algebraic RHS that mtkcompile lifts into observed), so a trivial solve just
+# evaluates those observed quantities. Returns the n emitted values at the final
+# saved point.
+function _emitted(ssys, out, n; op=Pair[], tspan=(0.0, 1.0))
+    sol = solve(ODEProblem(ssys, op, tspan), Rodas5P())
+    return [sol[out[i]][end] for i in 1:n]
+end
+
+@testset "WallTemperature Real broadcast emits the scalar to every cell" begin
     n = 4
     @named wt = WallTemperature(; n=n, T_wall=350.0)
     @test wt isa ModelingToolkit.System
     var_names = string.(unknowns(wt))
     twl_count = count(s -> occursin("T_wall_out", s), var_names)
     @test twl_count == n
-    eqs = equations(wt)
-    @test length(eqs) == n
+    @test length(equations(wt)) == n
+
+    ssys = mtkcompile(wt; fully_determined=false)
+    emitted = _emitted(ssys, ssys.T_wall_out, n)
+    @test emitted == fill(350.0, n)
 end
 
-@testset "WallTemperature: Vector instantiation + per-cell binding" begin
+@testset "WallTemperature Vector emits the i-th element at cell i" begin
     n = 4
-    profile = collect(range(300.0, 400.0, length=n))
+    # An asymmetric, non-monotone profile so a transpose, a reversal, or an
+    # off-by-one would shift at least one cell and fail the exact match.
+    profile = [301.0, 422.0, 333.0, 414.0]
     @named wt = WallTemperature(; n=n, T_wall=profile)
     @test wt isa ModelingToolkit.System
-    eqs = equations(wt)
-    @test length(eqs) == n
+    @test length(equations(wt)) == n
+
+    ssys = mtkcompile(wt; fully_determined=false)
+    emitted = _emitted(ssys, ssys.T_wall_out, n)
+    @test emitted == profile
+    for i in 1:n
+        @test emitted[i] == profile[i]
+    end
 end
 
-@testset "WallTemperature: Vector length mismatch errors" begin
+@testset "WallTemperature Vector length mismatch errors" begin
     n = 4
     @test_throws DimensionMismatch WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:3.0))
     @test_throws DimensionMismatch WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:5.0))
 end
 
-@testset "WallTemperature: Function (callable parameter) instantiation" begin
+@testset "WallTemperature Function emits f(t) at every cell" begin
     n = 4
-    fn = (t) -> 350.0 + 10.0 * sin(t)
+    fn = (tt) -> 350.0 + 10.0 * tt   # linear so the read-back value is exact
     @named wt = WallTemperature(; n=n, T_wall=fn)
     @test wt isa ModelingToolkit.System
-    eqs = equations(wt)
-    @test length(eqs) == n
+    @test length(equations(wt)) == n
     par_strs = string.(parameters(wt))
     @test any(s -> occursin("T_wall_fn", s), par_strs)
-end
 
-@testset "WallTemperature: mtkcompile in isolation succeeds (Real branch)" begin
-    n = 4
-    @named wt = WallTemperature(; n=n, T_wall=350.0)
     ssys = mtkcompile(wt; fully_determined=false)
-    @test ssys isa ModelingToolkit.AbstractSystem
+    t_eval = 2.0
+    sol = solve(ODEProblem(ssys, [ssys.T_wall_fn => fn], (0.0, 3.0)), Rodas5P())
+    for i in 1:n
+        @test sol(t_eval; idxs=ssys.T_wall_out[i]) == fn(t_eval)   # 370.0
+    end
+    # Read at a second time to confirm the cells track the callable, not a frozen value.
+    @test sol(0.5; idxs=ssys.T_wall_out[1]) == fn(0.5)             # 355.0
 end
 
-@testset "HeatFluxSource: Real (broadcast) instantiation" begin
+@testset "HeatFluxSource Real broadcast emits the scalar to every cell" begin
     n = 4
     @named hfs = HeatFluxSource(; n=n, q=1.0e5)
     @test hfs isa ModelingToolkit.System
     var_names = string.(unknowns(hfs))
     q_count = count(s -> occursin("q_out", s), var_names)
     @test q_count == n
-    eqs = equations(hfs)
-    @test length(eqs) == n
+    @test length(equations(hfs)) == n
+
+    ssys = mtkcompile(hfs; fully_determined=false)
+    emitted = _emitted(ssys, ssys.q_out, n)
+    @test emitted == fill(1.0e5, n)
 end
 
-@testset "HeatFluxSource: Vector instantiation + per-cell binding" begin
+@testset "HeatFluxSource Vector emits the i-th element at cell i" begin
     n = 4
-    profile = collect(range(1.0e4, 1.0e5, length=n))
+    # Asymmetric, non-monotone so a transpose / reversal / off-by-one is caught.
+    profile = [1.0e4, 7.0e4, 3.0e4, 9.0e4]
     @named hfs = HeatFluxSource(; n=n, q=profile)
     @test hfs isa ModelingToolkit.System
-    eqs = equations(hfs)
-    @test length(eqs) == n
+    @test length(equations(hfs)) == n
+
+    ssys = mtkcompile(hfs; fully_determined=false)
+    emitted = _emitted(ssys, ssys.q_out, n)
+    @test emitted == profile
+    for i in 1:n
+        @test emitted[i] == profile[i]
+    end
 end
 
-
-@testset "HeatFluxSource: Function (callable parameter) instantiation" begin
+@testset "HeatFluxSource Function emits f(t) at every cell" begin
     n = 4
-    fn = (t) -> 1.0e5 * (1.0 + 0.1 * cos(t))
+    fn = (tt) -> 1.0e5 * (1.0 + 0.1 * tt)   # linear so the read-back is exact
     @named hfs = HeatFluxSource(; n=n, q=fn)
     @test hfs isa ModelingToolkit.System
-    eqs = equations(hfs)
-    @test length(eqs) == n
+    @test length(equations(hfs)) == n
     par_strs = string.(parameters(hfs))
     @test any(s -> occursin("q_fn", s), par_strs)
-end
 
-@testset "HeatFluxSource: mtkcompile in isolation succeeds (Real branch)" begin
-    n = 4
-    @named hfs = HeatFluxSource(; n=n, q=1.0e5)
-    ssys = mtkcompile(hfs; fully_determined=false)  # isolated component: value-source, only RHS-driven port equations
-    @test ssys isa ModelingToolkit.AbstractSystem
+    ssys = mtkcompile(hfs; fully_determined=false)
+    t_eval = 3.0
+    sol = solve(ODEProblem(ssys, [ssys.q_fn => fn], (0.0, 4.0)), Rodas5P())
+    for i in 1:n
+        @test sol(t_eval; idxs=ssys.q_out[i]) == fn(t_eval)   # 1.3e5
+    end
+    @test sol(1.0; idxs=ssys.q_out[1]) == fn(1.0)             # 1.1e5
 end
 
 @testset "ConvectiveBoundary: construction + single Q_flow equation" begin

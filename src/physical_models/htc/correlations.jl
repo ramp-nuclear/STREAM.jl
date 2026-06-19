@@ -181,6 +181,11 @@ end
 Elenbaas natural convection correlation for parallel vertical plates.
 Formula: Nu = (1/24) * Ra * (b/L) * (1 - exp(-35 * L / (Ra * b)))^0.75
 
+Natural convection has no driving force for non-positive Rayleigh (wall not
+hotter than bulk), so Nu = 0 for Ra <= 0. The shape term's base is clamped so
+the fractional power never sees a negative argument, even when the expression is
+eagerly constant-folded.
+
 Source: Elenbaas (1942), as implemented in Python STREAM `_Elenbaas`.
 
 # Arguments
@@ -189,9 +194,13 @@ Source: Elenbaas (1942), as implemented in Python STREAM `_Elenbaas`.
 - `L`: heated length [m]
 
 # Returns
-Nusselt number (dimensionless).
+Nusselt number (dimensionless). Zero for Ra <= 0.
 """
-elenbaas_nusselt(Ra, b, L) = (1 / 24) * Ra * (b / L) * (1 - exp(-35 * L / (Ra * b)))^0.75
+function elenbaas_nusselt(Ra, b, L)
+    Ra_pos = ifelse(Ra > 0, Ra, one(Ra))    # clamp so the shape term never sees Ra<=0
+    shape = (1 - exp(-35 * L / (Ra_pos * b)))^0.75
+    return ifelse(Ra > 0, (1 / 24) * Ra * (b / L) * shape, zero(Ra))
+end
 
 """
     elenbaas_htc(geom::PipeGeometry; g=9.81) -> (Re, Pr, T_bulk, T_wall) -> Nu

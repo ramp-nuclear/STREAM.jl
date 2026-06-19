@@ -584,18 +584,16 @@ end
     @test sol_fwd.retcode == ReturnCode.Success
     @test sol_rev.retcode == ReturnCode.Success
 
-    if sol_fwd.retcode == ReturnCode.Success && sol_rev.retcode == ReturnCode.Success
-        T_fwd = sol_fwd[ssys_fwd.chf.T[:]]
-        T_rev = sol_rev[ssys_rev.chf.T[:]]
+    T_fwd = sol_fwd[ssys_fwd.chf.T[:]]
+    T_rev = sol_rev[ssys_rev.chf.T[:]]
 
-        # Forward profile monotone increasing.
-        @test T_fwd[1] < T_fwd[2] < T_fwd[3]
-        # Reverse profile monotone decreasing.
-        @test T_rev[1] > T_rev[2] > T_rev[3]
+    # Forward profile monotone increasing.
+    @test T_fwd[1] < T_fwd[2] < T_fwd[3]
+    # Reverse profile monotone decreasing.
+    @test T_rev[1] > T_rev[2] > T_rev[3]
 
-        # Spatial mirror.
-        @test all(isapprox.(T_rev, T_fwd[end:-1:1], rtol=1e-9))
-    end
+    # Spatial mirror.
+    @test all(isapprox.(T_rev, T_fwd[end:-1:1], rtol=1e-9))
 end
 
 @testset "CAC ↔ CHF cross-equivalence" begin
@@ -715,12 +713,35 @@ end
         @test cac isa ModelingToolkit.System
     end
 
-    @testset "SCB ChannelAndContacts solves (sub-ONB)" begin
-        # T_wall=380K < T_ONB (~408K at 2 bar): SCB present but inactive,
-        # KINSOL converges.
+    @testset "SCB ChannelAndContacts solves (sub-ONB), matches non-SCB" begin
+        # T_wall=380K is below T_ONB at 2 bar, so _h_eq_scb_cor selects its
+        # uncorrected branch (htc = h_spl). The "SCB present but inactive" claim
+        # therefore means the SCB loop must reproduce the non-SCB loop exactly.
+        # Build both, solve both, and compare h_tc and coolant T cell by cell.
+        T_wall = 380.0
         scb_fn = regime_dependent_q_scb(pressure=2e5)
-        ssys, sol = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=380.0)
-        @test sol.retcode == ReturnCode.Success
+        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=T_wall)
+        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=T_wall)
+        @test sol_scb.retcode == ReturnCode.Success
+        @test sol_noscb.retcode == ReturnCode.Success
+
+        # The wall sits below ONB in every cell: confirm the regime the claim asserts.
+        P_cell = 2e5
+        T_sat = sat_temperature(P_cell)
+        for i in 1:n_scb
+            T_bulk = sol_scb[ssys_scb.cac.T[i]]
+            h_spl = sol_scb[ssys_scb.cac.h_tc_left[i]]
+            q_spl = h_spl * (T_wall - T_bulk)
+            T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P_cell, q_spl)
+            @test T_wall < T_ONB
+        end
+
+        # Inactive SCB => identical to the plain single-phase channel.
+        for i in 1:n_scb
+            @test sol_scb[ssys_scb.cac.h_tc_left[i]] ≈ sol_noscb[ssys_noscb.cac.h_tc_left[i]] rtol=1e-10
+            @test sol_scb[ssys_scb.cac.h_tc_right[i]] ≈ sol_noscb[ssys_noscb.cac.h_tc_right[i]] rtol=1e-10
+            @test sol_scb[ssys_scb.cac.T[i]] ≈ sol_noscb[ssys_noscb.cac.T[i]] rtol=1e-10
+        end
     end
 
     @testset "Default (no SCB) backward compatibility" begin

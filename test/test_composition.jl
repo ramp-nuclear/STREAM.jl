@@ -218,16 +218,24 @@ end
 # Section 5: plate (dual-CAC + HD) compose-correctness
 # Verify-block requires: at least 1 testset with name starting with "plate(".
 @testset "plate(ch_left, ch_right, fuel) — both faces wired correctly" begin
-    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-    @named ch_left = ChannelAndContacts(; n=4, geometry=geom)
-    @named ch_right = ChannelAndContacts(; n=4, geometry=geom)
-    ps = fill(1.0 / 8, 4, 2)
-    @named fuel = HeatDiffusion(; nz=4, nx=2, Lz=0.6, Lx=0.005,
-                                 y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                                 power_shape=ps)
+    # plate wires fuel.thermal_left[i] <-> ch_left.thermal_right[i] and
+    # fuel.thermal_right[i] <-> ch_right.thermal_left[i]. Solve a steady loop with
+    # both channels live (dittus_boelter, aluminum plate, same config as the
+    # single_channel_connection both-faces-active test) and verify the wiring is real:
+    # each fuel face actually sheds heat to its own channel, the signs are right
+    # (heat leaves the powered plate), and the plate temperature sits above both
+    # coolant temperatures.
+    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    nz = 10
+    nx = 3
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named ch_left = ChannelAndContacts(; n=nz, geometry=geom)
+    @named ch_right = ChannelAndContacts(; n=nz, geometry=geom)
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
+                                power_shape=ps, power=1e4)
     pl = plate(ch_left, ch_right, fuel; name=:pl)
     @test pl isa ModelingToolkit.AbstractSystem
-    # Power binding + minimal closure (skip pump loop — compose-correctness only)
     @named pump_l = Pump(3.0e4)
     @named bc_l = HeatExchanger(313.15)
     @named pump_r = Pump(3.0e4)
@@ -241,20 +249,55 @@ end
         connect(bc_r.port_out, pl.ch_right.port_in),
         connect(pl.ch_right.port_out, pump_r.port_in),
         pump_r.port_in.P ~ 1.0e5,
-        pl.fuel.power ~ 1.0e3,
+        pl.fuel.power ~ 1e4,
     ]
     full = compose_systems(pl, pump_l, bc_l, pump_r, bc_r; connections=conns, name=:dualcac)
-    ssys = mtkcompile(full)
-    @test ssys isa ModelingToolkit.AbstractSystem
+    ssys = mtkcompile(full; fully_determined=true)
+    op = vcat(
+        [ssys.pl.fuel.T[i, j] => 317.0 for i in 1:nz for j in 1:nx],
+        [ssys.pl.ch_left.T[i] => 317.0 for i in 1:nz],
+        [ssys.pl.ch_right.T[i] => 317.0 for i in 1:nz],
+        [ssys.pl.ch_left.port_in.mdot => 0.25],
+        [ssys.pl.ch_right.port_in.mdot => 0.25],
+    )
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    # Both fuel faces exchange heat with their own channel. thermal_left[i].Q_flow is
+    # heat INTO the fuel from ch_left; the powered plate is hotter than the coolant, so
+    # heat leaves the plate and Q_flow is negative on every cell of both faces.
+    left_face_Q = [sol[getproperty(ssys.pl.fuel, Symbol(:thermal_left, i)).Q_flow] for i in 1:nz]
+    right_face_Q = [sol[getproperty(ssys.pl.fuel, Symbol(:thermal_right, i)).Q_flow] for i in 1:nz]
+    for i in 1:nz
+        @test left_face_Q[i] < -1e-3       # left face sheds heat to ch_left
+        @test right_face_Q[i] < -1e-3      # right face sheds heat to ch_right
+    end
+    # Energy balance: the heat leaving both faces accounts for the injected power.
+    @test isapprox(-(sum(left_face_Q) + sum(right_face_Q)), 1e4; rtol=1e-3)
+    # The plate temperature sits above both coolant streams it dumps heat into.
+    for i in 1:nz
+        @test sol[ssys.pl.fuel.T[i, 1]] > sol[ssys.pl.ch_left.T[i]]
+        @test sol[ssys.pl.fuel.T[i, nx]] > sol[ssys.pl.ch_right.T[i]]
+    end
 end
 
 # Section 6: one_sided_connection
 # Verify-block requires: at least 2 "@testset \"one_sided_connection" testsets
 # (one per side variant).
-@testset "one_sided_connection — side=:left compiles cleanly" begin
-    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    osc = one_sided_connection(cac, fuel; side=:left, name=:osc_l)
-    @test osc isa ModelingToolkit.AbstractSystem
+# Shared config for the one_sided_connection physics tests: dittus_boelter +
+# aluminum plate (same family as the plate / single_channel tests) so the steady
+# loop converges. one_sided_connection wires exactly ONE fuel face to the channel
+# and leaves the opposite face dangling, which is adiabatic (Q_flow ~ 0) under the
+# ThermalPort Flow rule.
+function _build_osc_loop(side::Symbol, name_suffix)
+    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    nz = 10
+    nx = 3
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named cac = ChannelAndContacts(; n=nz, geometry=geom)
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
+                                power_shape=ps, power=1e4)
+    osc = one_sided_connection(cac, fuel; side=side, name=Symbol(:osc_, name_suffix))
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(313.15)
     conns = [
@@ -262,29 +305,57 @@ end
         connect(bc.port_out, osc.cac.port_in),
         connect(osc.cac.port_out, pump.port_in),
         pump.port_in.P ~ 1.0e5,
-        osc.fuel.power ~ 1.0e3,
+        osc.fuel.power ~ 1e4,
     ]
-    full = compose_systems(osc, pump, bc; connections=conns, name=:osc_full_l)
-    ssys = mtkcompile(full)
-    @test ssys isa ModelingToolkit.AbstractSystem
+    full = compose_systems(osc, pump, bc; connections=conns, name=Symbol(:osc_full_, name_suffix))
+    ssys = mtkcompile(full; fully_determined=true)
+    op = vcat(
+        [getproperty(ssys, Symbol(:osc_, name_suffix)).fuel.T[i, j] => 317.0 for i in 1:nz for j in 1:nx],
+        [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.T[i] => 317.0 for i in 1:nz],
+        [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.port_in.mdot => 0.25],
+    )
+    sol = solve_steady(ssys, op)
+    return ssys, sol, getproperty(ssys, Symbol(:osc_, name_suffix)), nz
 end
 
-@testset "one_sided_connection — side=:right compiles cleanly" begin
-    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    osc = one_sided_connection(cac, fuel; side=:right, name=:osc_r)
+@testset "one_sided_connection — side=:left connects right face, left face adiabatic" begin
+    osc = one_sided_connection(_mtr_pair(; n=4, nz=4, nx=2)...; side=:left, name=:osc_l)
     @test osc isa ModelingToolkit.AbstractSystem
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
-    conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, osc.cac.port_in),
-        connect(osc.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
-        osc.fuel.power ~ 1.0e3,
-    ]
-    full = compose_systems(osc, pump, bc; connections=conns, name=:osc_full_r)
-    ssys = mtkcompile(full)
-    @test ssys isa ModelingToolkit.AbstractSystem
+    # side=:left wires cac.thermal_left <-> fuel.thermal_right, so the fuel's RIGHT
+    # face carries heat and the LEFT face is left dangling (adiabatic).
+    ssys, sol, oscsys, nz = _build_osc_loop(:left, :l)
+    @test sol.retcode == ReturnCode.Success
+    conn_Q = [sol[getproperty(oscsys.fuel, Symbol(:thermal_right, i)).Q_flow] for i in 1:nz]
+    adia_Q = [sol[getproperty(oscsys.fuel, Symbol(:thermal_left, i)).Q_flow] for i in 1:nz]
+    for i in 1:nz
+        @test conn_Q[i] < -1e-3              # connected face sheds heat to the channel
+        @test isapprox(adia_Q[i], 0.0; atol=1e-9)   # opposite face is adiabatic
+    end
+    # All the injected power leaves through the single connected face.
+    @test isapprox(-sum(conn_Q), 1e4; rtol=1e-3)
+    # Plate hotter than the coolant it dumps heat into.
+    for i in 1:nz
+        @test sol[oscsys.fuel.T[i, end]] > sol[oscsys.cac.T[i]]
+    end
+end
+
+@testset "one_sided_connection — side=:right connects left face, right face adiabatic" begin
+    osc = one_sided_connection(_mtr_pair(; n=4, nz=4, nx=2)...; side=:right, name=:osc_r)
+    @test osc isa ModelingToolkit.AbstractSystem
+    # side=:right wires cac.thermal_right <-> fuel.thermal_left, so the fuel's LEFT
+    # face carries heat and the RIGHT face is left dangling (adiabatic).
+    ssys, sol, oscsys, nz = _build_osc_loop(:right, :r)
+    @test sol.retcode == ReturnCode.Success
+    conn_Q = [sol[getproperty(oscsys.fuel, Symbol(:thermal_left, i)).Q_flow] for i in 1:nz]
+    adia_Q = [sol[getproperty(oscsys.fuel, Symbol(:thermal_right, i)).Q_flow] for i in 1:nz]
+    for i in 1:nz
+        @test conn_Q[i] < -1e-3              # connected face sheds heat to the channel
+        @test isapprox(adia_Q[i], 0.0; atol=1e-9)   # opposite face is adiabatic
+    end
+    @test isapprox(-sum(conn_Q), 1e4; rtol=1e-3)
+    for i in 1:nz
+        @test sol[oscsys.fuel.T[i, 1]] > sol[oscsys.cac.T[i]]
+    end
 end
 
 @testset "one_sided_connection — invalid side errors" begin

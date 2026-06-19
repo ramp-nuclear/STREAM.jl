@@ -89,24 +89,15 @@ _h_eff(sol, cac, i) = abs(sol[cac.q_wall_left[i]]) >= abs(sol[cac.q_wall_right[i
     rm(tmp_csv2; force=true)
     # Self-test 11: print_drift_table on empty rows doesn't crash
     empty_rows = ParityRow[]
-    try
-        buf = IOBuffer()
-        print_drift_table(empty_rows; io=buf)
-        @test occursin("summary: 0 quantities", String(take!(buf)))
-    catch e
-        @test false  # should not throw
-    end
-    # Self-test 12: equivalence checklist mechanism fires on a wrong reference.
-    # (PYTHON_*_AT_REF are bit-identical to Julia at rtol=1e-12, so the native
-    # checklist passes; here we exercise the guard mechanism directly by simulating the
-    # failure path with the same `cond || error(...)` form the checklist functions use.)
-    threw = false
-    try
+    buf = IOBuffer()
+    print_drift_table(empty_rows; io=buf)   # a throw here would fail the testset on its own
+    @test occursin("summary: 0 quantities", String(take!(buf)))
+    # Self-test 12: the equivalence checklist mechanism fires on a wrong reference.
+    # PYTHON_*_AT_REF are bit-identical to Julia at rtol=1e-12, so the native checklist passes;
+    # this exercises the guard form `cond || error(...)` directly on a deliberately wrong value.
+    @test_throws ErrorException (
         isapprox(STREAM.dittus_boelter(10_000.0, 1.0), 1e10; rtol=1e-12) || error("self-test 12")
-    catch e
-        threw = e isa ErrorException
-    end
-    @test threw
+    )
 end
 
 @testset "HTC formula identity vs Python STREAM (exact on shared inputs)" begin
@@ -127,7 +118,6 @@ end
     end
 end
 
-try
 @testset "parity harness" begin
 
 # Python parity: simple loop
@@ -342,23 +332,9 @@ end
         [ssys.cac_r.port_in.mdot => +0.250],
     )
     rows = ParityRow[]
-    sol = try
-        s = solve_steady(ssys, op)
-        @test s.retcode == ReturnCode.Success
-        @test all(isfinite, [s[ssys.hd.T[i, j]] for i in 1:nz for j in 1:nx])
-        s
-    catch e
-        @warn "mtr_symmetric solve_steady raised; emitting sentinel row" exception=e
-        nothing
-    end
-    if sol === nothing
-        push!(rows, parity_check("mtr_symmetric", "solver_error",
-                                 NaN, NaN;
-                                 hard_ceiling=Inf,
-                                 note="Pre-existing MTK API mismatch — deferred"))
-        print_drift_table(rows)
-        append_csv(PARITY_CSV, rows; truncate=false)
-    else
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    @test all(isfinite, [sol[ssys.hd.T[i, j]] for i in 1:nz for j in 1:nx])
 
     push!(rows, parity_check("mtr_symmetric", "T_out_l",
                              sol[ssys.cac_l.T_out], PARITY_MTR_SYM_T_OUT_L))
@@ -438,7 +414,6 @@ end
     for r in rows
         @test r.tier != TIER_FAIL
     end
-    end
 end
 
 # Asymmetric MTR — right channel inlet at 90°C (363.15 K)
@@ -499,22 +474,9 @@ end
         [ssys.cac_r.port_in.mdot => +0.250],
     )
     rows = ParityRow[]
-    sol = try
-        s = solve_steady(ssys, op)
-        @test s.retcode == ReturnCode.Success
-        @test all(isfinite, [s[ssys.hd.T[i, j]] for i in 1:nz for j in 1:nx])
-        s
-    catch e
-        @warn "mtr_asymmetric solve_steady raised; emitting sentinel row" exception=e
-        nothing
-    end
-    if sol === nothing
-        push!(rows, parity_check("mtr_asymmetric", "solver_error",
-                                 NaN, NaN; hard_ceiling=Inf,
-                                 note="Pre-existing MTK API mismatch — deferred"))
-        print_drift_table(rows)
-        append_csv(PARITY_CSV, rows; truncate=false)
-    else
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    @test all(isfinite, [sol[ssys.hd.T[i, j]] for i in 1:nz for j in 1:nx])
 
     push!(rows, parity_check("mtr_asymmetric", "T_out_l",
                              sol[ssys.cac_l.T_out], PARITY_MTR_ASYM_T_OUT_L))
@@ -593,7 +555,6 @@ end
 
     for r in rows
         @test r.tier != TIER_FAIL
-    end
     end
 end
 
@@ -720,11 +681,7 @@ end
 
 end
 end  # @testset "parity harness"
-catch e
-    @warn "parity harness reported FAIL-tier rows; see drift tables and parity_report.csv" exception=(e, catch_backtrace())
-end
 
-try
 @testset "HeatDiffusion transient — Fourier series validation" begin
     nz_v01 = 10
     # nx_v01=13 lateral cells: the FD is O(dx^2), so the steepest early checkpoint needs
@@ -914,33 +871,30 @@ end
 end
 
 @testset "PointKinetics validation" begin
-    @testset "steady-state coolant temperature rises linearly" begin
+    @testset "constant-power coolant temperature rises linearly" begin
         # Mirror Python STREAM test_integrations.py lines 201-267
-        # (test_channel_point_kinetics): constant-power PK coupled loop,
-        # solve to steady state, assert T_cool is strictly monotone and
-        # approximately linear (second differences near zero).
+        # (test_channel_point_kinetics): constant-power PK coupled loop, time-march
+        # to thermal equilibrium, assert T_cool is strictly monotone along the channel
+        # and approximately linear (second differences near zero).
+        #
+        # No temperature feedback: rho stays 0, so the critical PK holds P at P0=1 and
+        # the channel sees a steady power. The genuine coupled physics is the transient
+        # that settles to the steady coolant profile. A coupled feedback-PK solve_steady
+        # is NOT used here: Julia's globalized nonlinear solver collapses critical point
+        # kinetics to the trivial P=0 root (the dynamically stable fixed point), so the
+        # steady channel would see no power. Time-marching reaches the real physical
+        # steady state (P=1, linearly rising coolant), the same as the reference coupled
+        # transients in test_point_kinetics.jl.
         n = 7
         T_inlet = 293.15
         ctrl = ReactivityController()
         ssys, ic = build_loop_pk(ctrl; n=n, T_inlet=T_inlet, P0=1.0, power_scale=1e4)
 
-        # Attempt steady-state solve first (KINSOL); fall back to long transient otherwise.
-        # IMPORTANT: KINSOL can converge with retcode=Success to the SPURIOUS trivial root
-        # of point-kinetics (P→0, power off, coolant unheated, mdot runs away) — a
-        # physically-impossible state. So accept the steady root only if power is physical
-        # (P ≈ P0); otherwise time-march the transient, which reliably reaches the true
-        # physical steady state (P=1, monotonically rising coolant). [Investigated 2026-05-29]
-        local T_cool
-        P0 = 1.0
-        ss_sol = solve_steady(ssys, ic)
-        if ss_sol.retcode == ReturnCode.Success && ss_sol[ssys.pk.P] > 0.5 * P0
-            T_cool = [ss_sol[ssys.rods.cac.T[i]] for i in 1:n]
-        else
-            # Fallback: run transient long enough to reach thermal equilibrium (~50 s)
-            t_arr = range(0.0, 50.0; length=200)
-            sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
-            T_cool = [sol[ssys.rods.cac.T[i], end] for i in 1:n]
-        end
+        t_arr = range(0.0, 50.0; length=200)
+        sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
+        @test sol.retcode == ReturnCode.Success
+        @test isapprox(sol[ssys.pk.P, end], 1.0; rtol=1e-3)   # critical PK holds power
+        T_cool = [sol[ssys.rods.cac.T[i], end] for i in 1:n]
 
         dT = diff(T_cool)       # first differences  (should all be > 0)
         ddT = diff(dT)           # second differences (should be near zero for linear rise)
@@ -952,9 +906,15 @@ end
     @testset "negative fuel feedback suppresses power to near zero" begin
         # Mirror Python STREAM test_integrations.py lines 352-387:
         # negative alpha on fuel with ref_temp at the initial (boundary) temperature.
-        # As power heats fuel above T_inlet, feedback = alpha * (T_fuel - T_ref) goes negative.
-        # Strong alpha=-0.1 with ~120K temperature rise → feedback ≈ -12 >> beta_total → P→0.
-        # Note: ref_temp=T_inlet (not 600K) — fuel starts at T_inlet, heats above it under power.
+        # As power heats the fuel above T_inlet, feedback = alpha * (T_fuel - T_ref) goes
+        # negative. Strong alpha=-0.1 over a ~120 K fuel rise gives feedback far past
+        # -beta_total, so the coupled loop drives power to near zero.
+        #
+        # Run the live coupled feedback transient from the cold critical IC (reactivity = 0
+        # at t=0), the same approach as the reference coupled tests in test_point_kinetics.jl.
+        # A feedback-PK solve_steady is not used: Julia's nonlinear solver collapses the
+        # coupled point kinetics to the trivial P=0 root regardless of guess, so it cannot
+        # report the real feedback-balanced state. The transient settles onto it honestly.
         n = 7
         nz = 7
         nx = 2
@@ -974,43 +934,24 @@ end
             ref_temp=Dict(:fuel => fill(T_inlet, nz, nx)),       # ref = initial T; feedback negative as fuel heats up
         )
 
-        # Override PK ICs to large values (helps KINSOL find P≈0 solution).
-        # Python STREAM uses y0[power]=1e5, y0[ck]=1e3 for the same purpose.
-        ic_high = copy(ic)
-        for (idx, pair) in enumerate(ic_high)
-            if pair.first === ssys.pk.P
-                ic_high[idx] = ssys.pk.P => 1e3
-            end
-            for k in 1:6
-                sym = getproperty(ssys.pk, Symbol(:C_, k))
-                if pair.first === sym
-                    ic_high[idx] = sym => 1e3
-                end
-            end
-        end
-
-        local P_final
-        ss_sol2a = solve_steady(ssys, ic_high)
-        P_candidate = ss_sol2a.retcode == ReturnCode.Success ? ss_sol2a[ssys.pk.P] : NaN
-        if isfinite(P_candidate)
-            P_final = P_candidate
-        else
-            # Fallback: long transient — steady state power for strong negative feedback
-            # Also covers KINSOL "Success" with NaN solution (known solver quirk)
-            t_arr = range(0.0, 200.0; length=500)
-            sol = solve_transient(ssys, ic_high, t_arr; maxiters=1_000_000)
-            P_final = sol[ssys.pk.P, end]
-        end
-
-        # Power driven to near zero by negative feedback
-        # Tolerance 0.1 (relaxed from 1e-3) — any value negligible vs P0=1.0 is acceptable
-        @test abs(P_final) < 0.1
+        t_arr = range(0.0, 200.0; length=500)
+        sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
+        @test sol.retcode == ReturnCode.Success
+        P = sol[ssys.pk.P]
+        @test all(isfinite, P)
+        @test all(>(0.0), P)              # power positive throughout — decays, never goes negative
+        @test abs(P[end]) < 1e-3          # feedback drives power negligible vs P0 = 1.0
     end
 
     @testset "negative coolant feedback suppresses power to near zero" begin
         # Mirror Python STREAM test_integrations.py lines 390-428:
-        # negative alpha on coolant with ref_temp=T_inlet.
-        # Coolant heats above T_inlet → negative feedback → power collapses to near zero.
+        # negative alpha on coolant with ref_temp=T_inlet. Coolant heats above T_inlet, so
+        # feedback goes negative and power collapses to near zero.
+        #
+        # Live coupled feedback transient from the cold critical IC, same as the fuel-feedback
+        # case above and the reference coupled tests in test_point_kinetics.jl. The coupled
+        # feedback solve_steady is not usable in Julia (it collapses to the trivial P=0 root),
+        # so the transient is the honest way to reach the feedback-balanced state.
         n = 7
         T_inlet = 293.15
         alpha_neg = -0.1   # strong negative feedback on coolant
@@ -1026,35 +967,13 @@ end
             ref_temp=Dict(:cac => fill(T_inlet, n)),
         )
 
-        # Override PK ICs to large values
-        ic_high = copy(ic)
-        for (idx, pair) in enumerate(ic_high)
-            if pair.first === ssys.pk.P
-                ic_high[idx] = ssys.pk.P => 1e3
-            end
-            for k in 1:6
-                sym = getproperty(ssys.pk, Symbol(:C_, k))
-                if pair.first === sym
-                    ic_high[idx] = sym => 1e3
-                end
-            end
-        end
-
-        local P_final
-        ss_sol2b = solve_steady(ssys, ic_high)
-        P_candidate = ss_sol2b.retcode == ReturnCode.Success ? ss_sol2b[ssys.pk.P] : NaN
-        if isfinite(P_candidate)
-            P_final = P_candidate
-        else
-            # Fallback: long transient
-            # Also covers KINSOL "Success" with NaN solution (known solver quirk)
-            t_arr = range(0.0, 200.0; length=500)
-            sol = solve_transient(ssys, ic_high, t_arr; maxiters=1_000_000)
-            P_final = sol[ssys.pk.P, end]
-        end
-
-        # Power driven to near zero by negative feedback
-        @test abs(P_final) < 0.1
+        t_arr = range(0.0, 200.0; length=500)
+        sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
+        @test sol.retcode == ReturnCode.Success
+        P = sol[ssys.pk.P]
+        @test all(isfinite, P)
+        @test all(>(0.0), P)              # power positive throughout — decays, never goes negative
+        @test abs(P[end]) < 1e-3          # feedback drives power negligible vs P0 = 1.0
     end
 
     @testset "reactivity observable accessible and correct at steady state" begin
@@ -1090,7 +1009,3 @@ end
         @test abs(rho_trace[end]) < 0.01
     end
 end  # @testset "PointKinetics validation"
-
-catch e
-    @warn "KEPT testset block raised pre-existing failure" exception=(e, catch_backtrace())
-end
