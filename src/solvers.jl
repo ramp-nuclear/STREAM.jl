@@ -71,6 +71,11 @@ Solve a transient simulation over a time array.
   differential states fixed) before stepping — needed when `op` is an approximate / transplanted
   IC that does not exactly satisfy the algebraic equations, where `NoInit` + a stiff solver can
   abort at `t=0` (`dt` driven below floating-point epsilon, `NaN` error estimate).
+- `build_initializeprob`: forwarded to the `ODEProblem` constructor when set (default `nothing`,
+  which leaves MTK's automatic choice). Pass `false` for a system that `mtkcompile` reduces to no
+  differential states (a purely algebraic loop, e.g. a flapper and pump with no inertia): newer MTK
+  builds an initialization problem that aborts at `t=0` for a stateless system, and there is no
+  state to make consistent, so skipping it is correct.
 - `kwargs...`: additional keyword arguments forwarded to `solve`
 
 # Returns
@@ -78,10 +83,13 @@ Solve a transient simulation over a time array.
 """
 function solve_transient(
     ssys, op, t; solver=Rodas5P(), callbacks=nothing,
-    initializealg=SciMLBase.NoInit(), kwargs...,
+    initializealg=SciMLBase.NoInit(), build_initializeprob=nothing, kwargs...,
 )
     tspan = (Float64(t[1]), Float64(t[end]))
-    prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false)
+    prob = build_initializeprob === nothing ?
+        ODEProblem(ssys, op, tspan; warn_initialize_determined=false) :
+        ODEProblem(ssys, op, tspan; warn_initialize_determined=false,
+                   build_initializeprob=build_initializeprob)
     sol = solve(
         prob,
         solver;

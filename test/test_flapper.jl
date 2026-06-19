@@ -57,13 +57,17 @@ end
 end
 
 @testset "Flapper opens when ref_mdot crosses threshold" begin
-    # A weak (large-f) flapper in parallel with a decaying inertia+resistor branch: the loop
-    # flow coasts down past the threshold, the callback latches T_open, and the ramp completes.
-    # The detection is end-to-end — no pre-set open time — so this exercises flapper_callback.
+    # A weak (large-f) flapper sits in parallel with a resistor branch. A pump holds the loop flow
+    # at mdot0, then shuts off and the flow coasts down past the threshold; the callback latches
+    # T_open and the ramp completes. Detection is end-to-end (no pre-set open time), so this
+    # exercises flapper_callback. The transient starts from the full solved steady state, which
+    # keeps the coastdown IC consistent across MTK versions. A hand-seeded partial IC left the flow
+    # frozen at mdot=0 on newer MTK, so it never crossed the threshold and the valve never opened.
     threshold = 0.01
     L_over_A = 5.0e5     # tau = L_over_A / R = 5 s
     R = 1.0e5
-    @named pump = Pump(0.0)
+    mdot0 = 1.0
+    @named pump = Pump(R * mdot0)   # head holds mdot0 through the resistor while the flapper is shut
     @named ine = Inertia(L_over_A)
     @named res = Resistor(R)
     @named flapper = Flapper(; open_at_current=threshold, f=1.0e6, area=1.0, open_rate=1.0 / 3.0,
@@ -79,8 +83,13 @@ end
     ]
     @named sys = compose(System(conns, t; name=:flap_decay), pump, ine, res, flapper, hx)
     ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[ssys.ine.port_in.mdot => 1.0]   # T_open defaults to Inf
-    sol = solve_transient(ssys, op, range(0.0, 60.0; length=600);
+    # Flapper default T_open=Inf ⇒ shut at the steady solve, so all flow goes through the resistor.
+    sol_ss = solve_steady(ssys, [ssys.ine.port_in.mdot => mdot0, ssys.res.port_in.mdot => mdot0])
+    @test sol_ss.retcode == ReturnCode.Success
+    # Shut the pump (head ⇒ 0) and coast; the callback detects the threshold crossing and latches
+    # T_open. T_open stays at its Inf default through the steady solve, so the callback owns it.
+    sol = solve_transient(ssys, sol_ss, range(0.0, 60.0; length=600);
+                          overrides=[ssys.pump.dP_pump => 0.0],
                           callbacks=flapper_callback(ssys, ssys.flapper))
     @test sol.retcode == ReturnCode.Success
     T_open = sol.ps[ssys.flapper.T_open]

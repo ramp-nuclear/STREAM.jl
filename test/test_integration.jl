@@ -425,7 +425,11 @@ end
 @testset "flapper and pump" begin
     # Python: test_flapper_and_pump
     # A pre-timed flapper (open at t=2.5) in series with a decaying pump: no flow until the
-    # flapper opens, then the quadratic flapper conducts and flow becomes nonzero.
+    # flapper opens, then the quadratic flapper conducts and flow becomes nonzero. With no inertia
+    # in the loop, mtkcompile reduces this to zero differential states (the opening fraction is an
+    # explicit function of time). Newer MTK builds an initialization problem that aborts at t=0 for
+    # a stateless system, so skip it with build_initializeprob=false; there is no state to make
+    # consistent, and the per-step algebraic solve still gives the closed/open flow.
     t_open = 2.5
     dp_fn = (tt) -> exp(-tt)   # one function object for Pump + op
     @named pump = Pump(dp_fn)
@@ -445,7 +449,7 @@ end
         ssys.flapper.T_open => t_open,            # pre-set open time (Python's F.open(2.5))
         ssys.pump.dP_pump_fn => dp_fn,
     ]
-    sol = solve_transient(ssys, op, range(0.0, 5.0; length=500))
+    sol = solve_transient(ssys, op, range(0.0, 5.0; length=500); build_initializeprob=false)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(2.0; idxs=ssys.pump.port_in.mdot), 0.0; atol=1e-8)   # closed ⇒ no flow
     @test abs(sol(4.5; idxs=ssys.pump.port_in.mdot)) > 1e-6                 # open ⇒ flow

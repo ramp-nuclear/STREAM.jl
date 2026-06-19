@@ -19,27 +19,32 @@ end
     R_val = 1.0
     L_over_A = 1e3
     tau = L_over_A / R_val   # 1000 s
+    mdot0 = 1.0
 
+    # A pump holds mdot0 through the linear resistor, then shuts off and the flow coasts as
+    # mdot = mdot0·exp(-(R/L)·t). Drive the loop to steady with the pump on, then start the
+    # transient from the full solved state with the pump head overridden to 0. Transplanting every
+    # state from the solved point keeps the IC consistent no matter which variables MTK keeps as
+    # states; the old partial NoInit IC collapsed onto the mdot=0 fixed point when MTK's state
+    # choice shifted across versions.
+    @named pump = Pump(R_val * mdot0)   # head R·mdot0 balances the linear drop R·mdot at mdot0
     @named L_comp = Inertia(L_over_A)
     @named R_comp = Resistor(R_val)
+    @named hx = HeatExchanger(300.0)
     connections = [
+        connect(pump.port_out, L_comp.port_in),
         connect(L_comp.port_out, R_comp.port_in),
-        connect(R_comp.port_out, L_comp.port_in),
-        L_comp.port_in.P ~ 1.0e5,
+        connect(R_comp.port_out, hx.port_in),
+        connect(hx.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
     ]
-    @named sys = compose(System(connections, t; name=:rl_sys), L_comp, R_comp)
-    ssys = mtkcompile(sys; fully_determined=false)
+    @named sys = compose(System(connections, t; name=:rl_sys), pump, L_comp, R_comp, hx)
+    ssys = mtkcompile(sys)
 
-
-    op = [
-        ssys.L_comp.port_in.mdot => 1.0,
-        ssys.L_comp.port_out.T => 300.0,
-        ssys.L_comp.port_in.T => 300.0,
-    ]
-    prob = ODEProblem(
-        ssys, op, (0.0, 5000.0); warn_initialize_determined=false, check_length=false
-    )
-    sol = solve(prob, Rodas5P(); initializealg=SciMLBase.NoInit())
+    sol_ss = solve_steady(ssys, [ssys.L_comp.port_in.mdot => mdot0])
+    @test sol_ss.retcode == ReturnCode.Success
+    sol = solve_transient(ssys, sol_ss, range(0.0, 5000.0; length=200);
+                          overrides=[ssys.pump.dP_pump => 0.0])
 
     @test sol.retcode == ReturnCode.Success
     t_check = [0.0, 500.0, 1000.0, 2000.0, 5000.0]
