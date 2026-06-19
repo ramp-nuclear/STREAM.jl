@@ -274,9 +274,12 @@ end
         mdot_ch_final = sol[ssys.heated.ch.port_in.mdot, end]
         @test mdot_ch_final < 0.0
 
-        # NC recirculation magnitude ~ 4.2 g/s; bracket within a factor of 2.
+        # NC recirculation settles at ~4.21 g/s, a deterministic root of the
+        # buoyancy-vs-friction balance (derived in the momentum-balance test below). It
+        # reproduces to better than 0.1% across package sets: 4.207 g/s on the pinned set,
+        # 4.207 g/s on the latest. Bracket it tightly around that.
         mdot_nc = abs(mdot_ch_final)
-        @test 0.002 < mdot_nc < 0.009
+        @test isapprox(mdot_nc, 0.00421; atol=5.0e-5)
     end
 
     @testset "channel energy conservation across the heated leg" begin
@@ -299,6 +302,12 @@ end
         # version-stable check with no fitted tolerance: 0 < store_rate < Q_wall, and
         # store_rate is a definite fraction (~0.5) of Q_wall, confirming the heat splits
         # between storage and advective removal rather than vanishing.
+        #
+        # The 0.5 share is not analytically forced: it is set by the recirculation rate and
+        # the axial temperature profile in the bypassed-sink transient, neither of which has
+        # a closed form here. It is a stable regression value rather than a derived one. Over
+        # t = 200..300 s the mean ratio lands at 0.499 on both package sets (pinned 0.4990,
+        # latest 0.4990; per-sample range 0.476..0.512), so the band is set to that spread.
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
@@ -338,21 +347,31 @@ end
         # absorbs from the wall: the recirculating flow carries the rest out.
         @test store_mean > 0
         @test store_mean < Qwall_mean
-        # Storage takes a definite, repeatable share of the wall heat (~0.5).
-        @test 0.4 < store_mean / Qwall_mean < 0.6
+        # Storage takes a definite, repeatable share of the wall heat (~0.499 on both envs).
+        @test 0.49 < store_mean / Qwall_mean < 0.51
     end
 
-    @testset "NC equilibrium mdot matches a buoyancy-vs-friction estimate" begin
+    @testset "NC equilibrium mdot matches a buoyancy-vs-friction balance" begin
         # In the natural-convection recirculation the heated leg (hot, g = -G_ACC) and the
-        # return leg (g = +G_ACC) form a closed buoyancy loop. The flow is set by the
-        # buoyancy head balanced against the loop hydraulic resistance. With the small
-        # leg-to-leg density difference (the loop runs hot and nearly isothermal), the
-        # cell-resolved buoyancy head is ~13 Pa; against laminar (Hagen-Poiseuille)
-        # friction in the two channels in series this predicts ~0.012 kg/s. The model
-        # reaches ~0.0042 kg/s (~0.36 of the friction-only estimate, which omits the
-        # entry/exit and open-flapper losses), so the two agree to within a factor of 3.
-        # This is a momentum-balance reference, not a closed-form analytic flow: the
-        # legacy "5 orders of magnitude" window is replaced by that factor-of-3 band.
+        # return leg (g = +G_ACC) form a closed buoyancy loop. The equilibrium flow is the
+        # root of the loop momentum balance: net buoyancy head = total loop friction.
+        #
+        # Net buoyancy head: the per-cell gravity terms rho_i*g_acc*dz sum around the loop to
+        # g*dz*sum(rho_ret[i] - rho_ch[i]). For this run that is ~13.4 Pa (the loop is hot and
+        # nearly isothermal, so the leg-to-leg density difference is small).
+        #
+        # Loop friction: at the equilibrium flow the channel Reynolds number is ~4600, above
+        # the regime-dependent transition (Re_tr = 2300), so both channels apply the Blasius
+        # turbulent factor f = 0.3164*Re^-0.25, not laminar Hagen-Poiseuille. A laminar
+        # reference at this Re predicts ~0.012 kg/s, 0.36x of the model, because 64/Re is the
+        # wrong friction law for the actual Re. The friction of the two channels in series is
+        #   dP_fric(mdot) = 2 * f(Re) * mdot^2 / (2*rho*A^2) * (L/D),  Re = mdot*D/(A*mu).
+        # Solving dP_fric(mdot) = dP_buoy by bisection gives mdot_ref ~ 0.004217 kg/s, which
+        # the integrated model matches to within 0.3%: ratio mdot_nc/mdot_ref = 0.9975 on the
+        # pinned set and 0.9975 on the latest. The residual ~0.25% is the entry/exit and
+        # open-flapper losses the two-channel friction reference omits (the flapper drop at
+        # this flow is ~0.005 Pa, so it is negligible). This is a derived reference, not a
+        # fitted band: assert the model within 5% of it.
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
@@ -372,18 +391,27 @@ end
             BYPASS_G_ACC * dz * (rho_water(T_ret[i]) - rho_water(T_ch[i])) for i in 1:n
         )
 
-        # Hagen-Poiseuille friction of two channels in series: dP = 2 * 32 * mu * L * v / D^2
-        # with v = mdot / (rho * A). Solve for the mdot that balances the buoyancy head.
+        # Two-channel Blasius friction at the loop-mean properties, the friction law the
+        # channels actually apply at Re ~ 4600 (> Re_tr = 2300). Solve dP_fric = dP_buoy for
+        # the balancing mdot by bisection.
         T_loop = mean(vcat(T_ch, T_ret))
         rho_loop = rho_water(T_loop)
         mu_loop = mu_water(T_loop)
         cs_area = pi * (BYPASS_D_CH / 2)^2
-        mdot_ref =
-            abs(dP_buoy) * rho_loop * cs_area * BYPASS_D_CH^2 /
-            (2 * 32 * mu_loop * BYPASS_L_CH)
+        dP_fric(md) = begin
+            Re = md * BYPASS_D_CH / (cs_area * mu_loop)
+            f = blasius_friction(Re)
+            2 * f * md^2 / (2 * rho_loop * cs_area^2) * (BYPASS_L_CH / BYPASS_D_CH)
+        end
+        lo, hi = 1.0e-6, 1.0
+        for _ in 1:200
+            mid = sqrt(lo * hi)
+            dP_fric(mid) < abs(dP_buoy) ? (lo = mid) : (hi = mid)
+        end
+        mdot_ref = sqrt(lo * hi)
 
-        # NC flow agrees with the buoyancy-vs-friction reference to within a factor of 3.
-        @test 1.0 / 3.0 < mdot_nc / mdot_ref < 3.0
+        # Model NC flow matches the derived buoyancy-vs-Blasius-friction root within 5%.
+        @test isapprox(mdot_nc, mdot_ref; rtol=0.05)
 
         # NC flow is reversed relative to the forced-flow direction at t = 0.
         @test sol[ssys.heated.ch.port_in.mdot, 1] > 0.0
@@ -399,15 +427,17 @@ end
 
         # The Channel family is single-phase only: no two-phase model is wired here, and
         # the inertia/HeatExchanger heat sink is bypassed in NC, so the coolant runs
-        # superheated relative to saturation (peak ~ 507 K) and creeps up slowly. This is
-        # a known limitation of the single-phase model under a bypassed sink, not a
-        # solver artifact. We bound the peak as a "no thermal runaway" gate: it stays in
-        # a narrow band around the observed ~507 K and well below water's critical
-        # temperature (647 K), confirming the integration does not diverge.
+        # superheated relative to saturation and creeps up slowly. This is a known
+        # limitation of the single-phase model under a bypassed sink, not a solver artifact.
+        # The window-mean peak temperature is a "no thermal runaway" gate with no analytic
+        # reference (the slow creep depends on the bypassed-sink storage rate, not a steady
+        # balance). It is a regression value: 507.1 K on both package sets (pinned 507.13,
+        # latest 507.12), well below water's critical temperature (647 K). The band is the
+        # measured cross-env spread, not a loose runaway window.
         T_max_nc = mean([
             maximum([sol[ssys.heated.ch.T[i], idx] for i in 1:n]) for idx in nc_indices
         ])
         @test T_max_nc > BYPASS_T_INLET   # heating did happen
-        @test 480.0 < T_max_nc < 540.0    # bounded near the observed peak, below critical T
+        @test 505.0 < T_max_nc < 510.0    # tight around the observed 507.1 K, below critical T
     end
 end

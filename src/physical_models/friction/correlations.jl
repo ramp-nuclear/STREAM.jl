@@ -199,7 +199,8 @@ function regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0,
         f_turb = turbulent(ReK)
         # lin_interp on the bulk Re between (re_lo, f_lam) and (re_hi, f_turb).
         f_inter = (f_turb - f_lam) / (re_hi - re_lo) * (Re - re_hi) + f_turb
-        Base.ifelse(Re < re_lo, f_lam, Base.ifelse(Re > re_hi, f_turb, f_inter))
+        # Boundary inclusivity matches Python flow_regimes: Re <= re_lo laminar, re_hi < Re turbulent.
+        Base.ifelse(Re <= re_lo, f_lam, Base.ifelse(Re > re_hi, f_turb, f_inter))
     end
 end
 

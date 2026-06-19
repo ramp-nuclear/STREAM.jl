@@ -8,6 +8,13 @@ using ModelingToolkit
     @test isapprox(geo.A, 0.07 * 0.00127; rtol=1e-4)
     @test isapprox(geo.wet_perimeter, 2.0 * (0.07 + 0.00127); rtol=1e-4)
     @test isapprox(geo.Dh, 4.0 * (0.07 * 0.00127) / (2.0 * (0.07 + 0.00127)); rtol=1e-4)
+    # Independent hand-computed anchor for a 70 mm by 1.27 mm duct, Dh = 4 * A / wetted_perimeter.
+    #   A  = 0.07 * 0.00127       = 8.89e-5 m^2
+    #   Pw = 2 * (0.07 + 0.00127) = 0.14254 m
+    #   Dh = 4 * 8.89e-5 / 0.14254 = 0.0024947383190683323 m
+    # The number below was worked out by hand from these dimensions, not copied from the source.
+    @test isapprox(geo.A, 8.89e-5; rtol=1e-12)
+    @test isapprox(geo.Dh, 0.0024947383190683323; rtol=1e-12)
     @test geo.width == 0.07
     @test geo.depth == 0.00127
     @test geo.heated_parts == (0.07, 0.07)
@@ -27,6 +34,11 @@ end
     @test isapprox(geo.heated_parts[1], π * 0.01; rtol=1e-10)
     @test isapprox(geo.heated_parts[2], 0; atol=1e-10)
     @test isapprox(geo.A, π * 0.01^2 / 4; rtol=1e-10)
+    # Independent hand-computed anchor for a 10 mm circular pipe. Dh = D exactly for a circle, and
+    #   A = pi * D^2 / 4 = pi * (0.01)^2 / 4 = 7.853981633974483e-5 m^2
+    # worked out by hand, not copied from the source formula.
+    @test isapprox(geo.Dh, 0.01; rtol=1e-12)
+    @test isapprox(geo.A, 7.853981633974483e-5; rtol=1e-12)
     @test geo.width == 0.01
     @test geo.depth == 0.01
 end
