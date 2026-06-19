@@ -99,9 +99,9 @@ end
 Capture every state of a compiled system from a solved point as a symbolic initial-condition map
 (`unknown => value` for each entry of `unknowns(ssys)`).
 
-MTK problem constructors require a symbolic map for the initial condition — a raw state vector or
-a bare solution object is rejected — and `unknowns(ssys)` is the complete, non-redundant state
-(observed variables are recomputed from it). Use this to seed a transient from a previously solved
+MTK problem constructors require a symbolic map for the initial condition; a raw state vector or a
+bare solution object is rejected. `unknowns(ssys)` is the complete, non-redundant state, since
+observed variables are recomputed from it. Use this to seed a transient from a previously solved
 state without guessing which variables MTK kept as states.
 
 # Arguments
@@ -119,15 +119,16 @@ state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
 Start a transient from an already-solved state.
 
 Snapshots every state of `ssys` from `sol_ss` (see [`state_snapshot`](@ref)), applies `overrides`
-(parameter or forcing changes — e.g. shutting a pump with `ssys.pump.dP_pump => 0.0`, a reactivity
-step, a valve actuation), and integrates from there. This expresses the settle-then-perturb
-pipeline: solve a steady state, change one thing, watch the transient.
+(parameter or forcing changes, such as shutting a pump with `ssys.pump.dP_pump => 0.0` or stepping
+a reactivity), and integrates from there. This expresses the settle-then-perturb pipeline: solve a
+steady state, change one thing, watch the transient.
 
 The default `BrownFullBasicInit` re-solves the algebraic constraints for the overridden parameters
 while holding the differential states at their snapshotted values, so the start point stays
 consistent even though the perturbation broke the old equilibrium. Because the whole state is
-transplanted by symbol, this does not depend on which variables MTK chose as states — the property
-that makes the hand-built partial initial condition fragile across MTK versions.
+transplanted by symbol, the result does not depend on which variables MTK chose as states. That
+independence is what the hand-built partial initial condition lacked, and what made it fragile
+across MTK versions.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
@@ -144,7 +145,6 @@ function solve_transient(
     ssys, sol_ss::SciMLBase.AbstractSciMLSolution, t;
     overrides=Pair[], initializealg=OrdinaryDiffEq.BrownFullBasicInit(), kwargs...,
 )
-    op = Pair{Any,Any}[state_snapshot(ssys, sol_ss)...]
-    append!(op, overrides)
+    op = Pair{Any,Any}[state_snapshot(ssys, sol_ss); overrides]
     return solve_transient(ssys, op, t; initializealg=initializealg, kwargs...)
 end

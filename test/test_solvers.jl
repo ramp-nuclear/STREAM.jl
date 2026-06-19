@@ -78,4 +78,43 @@ using STREAM
         @test !any(isnan, T_ts)
         @test T_ts[end] > T_ts[1]   # T_outlet rises after T_wall step
     end
+
+    @testset "state_snapshot + solve_transient from a solved state" begin
+        # Minimal inertia coastdown: a pump holds a steady flow, then shuts off and the flow
+        # coasts as mdot0·exp(-(r/L)·t). Exercises state_snapshot (the full IC map) and the
+        # solution overload of solve_transient (start from a solved state, apply an override).
+        r = 3.0
+        L = 5.0
+        mdot0 = 1.0
+        @named pump = Pump(r * mdot0)
+        @named ine = Inertia(L)
+        @named res = Resistor(r)
+        @named hx = HeatExchanger(300.0)
+        conns = [
+            connect(pump.port_out, ine.port_in),
+            connect(ine.port_out, res.port_in),
+            connect(res.port_out, hx.port_in),
+            connect(hx.port_out, pump.port_in),
+            pump.port_in.P ~ 1.0e5,
+        ]
+        @named sys = compose(System(conns, t; name=:coast), pump, ine, res, hx)
+        ssys = mtkcompile(sys)
+        sol_ss = solve_steady(ssys, [ssys.ine.port_in.mdot => mdot0])
+        @test sol_ss.retcode == ReturnCode.Success
+
+        snap = state_snapshot(ssys, sol_ss)
+        us = unknowns(ssys)
+        @test length(snap) == length(us)
+        @test Set(string.(first.(snap))) == Set(string.(us))
+        @test all(isfinite(last(p)) for p in snap)
+
+        t_arr = range(0.0, 1.0; length=5)
+        sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0])
+        @test sol.retcode == ReturnCode.Success
+        mdot = sol[ssys.ine.port_in.mdot, :]
+        @test isapprox(mdot[1], mdot0; rtol=1e-4)                       # starts at the solved steady
+        for (i, tt) in enumerate(t_arr)
+            @test isapprox(mdot[i], mdot0 * exp(-(r / L) * tt); rtol=1e-3)
+        end
+    end
 end

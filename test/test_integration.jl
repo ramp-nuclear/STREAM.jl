@@ -801,7 +801,7 @@ end
         append!(guess, [rods.cac.T[j] => T0 for j in 1:n])
         append!(guess, [rods.fuel.T[j, k] => T0 for j in 1:nz for k in 1:nx])
     end
-    solve_at(p) = solve_steady(ssys, Pair{Any,Any}[guess..., Pw => p])
+    solve_at(p) = solve_steady(ssys, Pair{Any,Any}[guess; Pw => p])
     excess(sol) = sum(
         sum(sol[getproperty(ssys, Symbol(:rods, i)).cac.T[j]] - T0 for j in 1:n) +
         sum(sol[getproperty(ssys, Symbol(:rods, i)).fuel.T[j, k]] - T0 for j in 1:nz for k in 1:nx)
