@@ -231,8 +231,10 @@ function q_CHF_sudo_kaminaga(
     G_star = mdot / pipe.A / sqrt(lamda * drho * rho_v * g_abs)
 
     dT_inlet = (cp_sat / hfg) * (T_sat - T_bulk)
-    # Use T_sat as conservative outlet temperature (maximum subcooling consumed)
-    dT_outlet = (cp_sat / hfg) * (T_sat - T_sat)  # 0.0 at saturated outlet
+    # Outlet subcooling for q4. Python STREAM (thresholds.py Sudo_Kaminaga_CHF) uses
+    # (cp/hfg)*(Tsat[-1] - T_bulk[-1]) at the outlet cell, NOT zero. This function runs
+    # per cell, so the cell's own subcooling is the local outlet term that matches Python.
+    dT_outlet = (cp_sat / hfg) * (T_sat - T_bulk)
 
     q1 = _SKq1(G_star)
     q2 = _SKq2(A_ratio, G_star, dT_inlet)

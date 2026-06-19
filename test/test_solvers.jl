@@ -77,6 +77,35 @@ using STREAM
         T_ts = sol[ssys.ch.T_out, :]
         @test !any(isnan, T_ts)
         @test T_ts[end] > T_ts[1]   # T_outlet rises after T_wall step
+
+        # Magnitude check: the outlet must approach the NEW steady state set by T_wall_final,
+        # not just rise. Solve the same loop pinned at T_wall_final to get the target outlet,
+        # and the loop pinned at T_wall_0 to confirm the pre-step outlet. The transient runs
+        # 20s after the t=10s step; that is many flow-through + thermal times for this 10-cell
+        # loop, so the end value should sit essentially on the new steady outlet.
+        ssys_final = build_loop_transient(T_inlet=T_inlet, T_wall_0=T_wall_final)
+        op_final = [ssys_final.ch.T[i] => T_guess[i] for i in 1:n]
+        push!(op_final, ssys_final.ch.port_in.mdot => mdot_guess)
+        sol_final = solve_steady(ssys_final, op_final)
+        @test sol_final.retcode == ReturnCode.Success
+        T_out_final_steady = sol_final[ssys_final.ch.T_out]
+
+        T_out_initial_steady = sol_ss[ssys_ss.ch.T_out]   # steady outlet at T_wall_0
+        # Sanity: raising the wall by 20 K must raise the steady outlet (positive step).
+        @test T_out_final_steady > T_out_initial_steady
+
+        # Pre-step outlet sits on the T_wall_0 steady value: the callable holds T_wall_0 for
+        # t<10s, so the loop stays at its IC there. Sample by interpolation at t=5s (well
+        # before the t=10s step) rather than the first saved point, whose observed T_out
+        # reads a placeholder. rtol=2e-3 covers integrator interpolation only.
+        T_out_pre_step = sol(5.0; idxs=ssys.ch.T_out)
+        @test isapprox(T_out_pre_step, T_out_initial_steady; rtol=2e-3)
+
+        # Settling value: the transient endpoint approaches the T_wall_final steady outlet.
+        # rtol=2e-3 (a few mK on a ~330 K outlet) reflects that 20s of relaxation leaves only
+        # a small residual short of the asymptote for this fast-settling loop; it is far
+        # tighter than the 20 K step size, so a wrong settling magnitude would fail.
+        @test isapprox(T_ts[end], T_out_final_steady; rtol=2e-3)
     end
 
     @testset "state_snapshot + solve_transient from a solved state" begin

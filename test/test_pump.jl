@@ -27,14 +27,88 @@ using STREAM: Pump, Channel
 end
 
 @testset "Pump dispatch correctness" begin
-    @named p_real = Pump(1e5)
+    # Each constructor dispatch must produce a System with the defining pressure/flow
+    # relation of its mode, not merely "a System". Solve a small resistor loop in each mode
+    # and check the relation the mode promises holds at the solved operating point.
+    R_val = 1.0e5   # Pa/(kg/s)
+
+    # --- Scalar fixed-pressure mode: port_out.P - port_in.P == dP_pump exactly. ---
+    dP_scalar = 1.2e5
+    @named p_real = Pump(dP_scalar)
     @test p_real isa ModelingToolkit.System
+    @named res_real = Resistor(R_val)
+    @named hx_real = HeatExchanger(313.15)
+    conns_real = [
+        connect(p_real.port_out, hx_real.port_in),
+        connect(hx_real.port_out, res_real.port_in),
+        connect(res_real.port_out, p_real.port_in),
+        p_real.port_in.P ~ 1.0e5,
+    ]
+    @named sys_real = compose(System(conns_real, t; name=:disp_real), p_real, hx_real, res_real)
+    ssys_real = mtkcompile(sys_real)
+    sol_real = solve_steady(ssys_real, Pair{Any,Any}[ssys_real.res_real.port_in.mdot => 1.0])
+    @test sol_real.retcode == ReturnCode.Success
+    # Defining relation of scalar mode: the head equals the prescribed dP (rtol=1e-8, the
+    # head is an exact algebraic equation, only float round-off separates them).
+    @test isapprox(
+        sol_real[ssys_real.p_real.port_out.P] - sol_real[ssys_real.p_real.port_in.P],
+        dP_scalar; rtol=1e-8,
+    )
+    # The same head also fixes the loop flow: mdot = dP/R through the single resistor.
+    @test isapprox(sol_real[ssys_real.res_real.port_in.mdot], dP_scalar / R_val; rtol=1e-6)
 
-    @named p_fn = Pump(t -> 1e5)
+    # --- Callable fixed-pressure mode: the head follows the callable at the solve time. ---
+    # A steady solve relaxes in real time to t where dP_pump_fn(t) is read; with a constant
+    # callable the head must equal that constant value, distinct from the scalar case above.
+    dP_call_val = 8.0e4
+    dP_call = (_tt) -> dP_call_val
+    @named p_fn = Pump(dP_call)
     @test p_fn isa ModelingToolkit.System
+    @named res_fn = Resistor(R_val)
+    @named hx_fn = HeatExchanger(313.15)
+    conns_fn = [
+        connect(p_fn.port_out, hx_fn.port_in),
+        connect(hx_fn.port_out, res_fn.port_in),
+        connect(res_fn.port_out, p_fn.port_in),
+        p_fn.port_in.P ~ 1.0e5,
+    ]
+    @named sys_fn = compose(System(conns_fn, t; name=:disp_fn), p_fn, hx_fn, res_fn)
+    ssys_fn = mtkcompile(sys_fn)
+    sol_fn = solve_steady(
+        ssys_fn,
+        Pair{Any,Any}[
+            ssys_fn.res_fn.port_in.mdot => 1.0,
+            ssys_fn.p_fn.dP_pump_fn => dP_call,
+        ],
+    )
+    @test sol_fn.retcode == ReturnCode.Success
+    # Defining relation of callable mode: the head equals the callable's value (rtol=1e-8,
+    # exact algebraic head). Confirms the callable, not a frozen constant, drove the solve.
+    @test isapprox(
+        sol_fn[ssys_fn.p_fn.port_out.P] - sol_fn[ssys_fn.p_fn.port_in.P],
+        dP_call_val; rtol=1e-8,
+    )
+    @test isapprox(sol_fn[ssys_fn.res_fn.port_in.mdot], dP_call_val / R_val; rtol=1e-6)
 
-    @named p_mdot = Pump(mdot0=0.6)
+    # --- Fixed-flow mode: port_in.mdot == mdot0 regardless of loop resistance. ---
+    mdot_set = 0.6
+    @named p_mdot = Pump(mdot0=mdot_set)
     @test p_mdot isa ModelingToolkit.System
+    @named res_m = Resistor(R_val)
+    @named hx_m = HeatExchanger(313.15)
+    conns_m = [
+        connect(p_mdot.port_out, hx_m.port_in),
+        connect(hx_m.port_out, res_m.port_in),
+        connect(res_m.port_out, p_mdot.port_in),
+        p_mdot.port_in.P ~ 1.0e5,
+    ]
+    @named sys_m = compose(System(conns_m, t; name=:disp_m), p_mdot, hx_m, res_m)
+    ssys_m = mtkcompile(sys_m; fully_determined=false)
+    sol_m = solve_steady(ssys_m, Pair{Any,Any}[ssys_m.res_m.port_in.mdot => mdot_set])
+    @test sol_m.retcode == ReturnCode.Success
+    # Defining relation of fixed-flow mode: the flow is pinned to mdot0 (rtol=1e-8, exact
+    # algebraic constraint port_in.mdot ~ mdot0).
+    @test isapprox(sol_m[ssys_m.p_mdot.port_in.mdot], mdot_set; rtol=1e-8)
 end
 
 @testset "Scalar Pump(dP_pump) unchanged" begin

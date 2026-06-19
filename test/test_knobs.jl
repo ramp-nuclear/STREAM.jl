@@ -128,8 +128,44 @@ end
     @test string(s0.retcode) == "Success"
     @test string(s1.retcode) == "Success"
 
-    # one knob moves the coolant outlet AND the fuel-plate temperature
-    @test isfinite(s0[ssys.cac_l.T_out]) && isfinite(s1[ssys.cac_l.T_out])
-    @test !isapprox(s0[ssys.cac_l.T_out], s1[ssys.cac_l.T_out]; rtol=1e-3)
-    @test !isapprox(s0[ssys.hd.T[5, 2]], s1[ssys.hd.T[5, 2]]; rtol=1e-3)
+    # One knob moves the coolant outlet AND the fuel-plate temperature, in a direction
+    # set by the physics. Narrowing the channel gap raises hydraulic resistance, so at
+    # the fixed pump head (3e4 Pa) the steady mass flow drops (the supplied mdot is only
+    # an IC guess; the real flow comes out of the pump/friction balance). The plate still
+    # dumps the same total power into the coolant, so a smaller mdot means a larger coolant
+    # temperature rise: T_out goes UP. The plate, cooled by hotter coolant across a higher
+    # wall resistance, also gets hotter. Both deltas are positive.
+    T_out0 = s0[ssys.cac_l.T_out]
+    T_out1 = s1[ssys.cac_l.T_out]
+    @test isfinite(T_out0) && isfinite(T_out1)
+
+    # Direction: narrower gap -> hotter outlet and hotter plate.
+    @test T_out1 > T_out0
+    @test s1[ssys.hd.T[5, 2]] > s0[ssys.hd.T[5, 2]]
+
+    # Magnitude is fixed by a per-channel energy balance, not a hand-picked number.
+    # Every watt the wall puts into the coolant must show up as enthalpy rise, so
+    #     T_out - T_in == Q_wall_total / (mdot * cp)
+    # with T_in the heat-exchanger setpoint, Q_wall_total the solved per-channel wall heat,
+    # and mdot the solved flow. Both Q_wall_total and mdot are read back from the solution,
+    # so this ties the thermal answer to the hydraulic one. The only slack is cp's mild
+    # temperature dependence across the channel, which the 2% tolerance covers (the raw
+    # residual is ~1e-5).
+    for s in (s0, s1)
+        Q_ch = s[ssys.cac_l.Q_wall_total]
+        mdot = s[ssys.cac_l.port_in.mdot]
+        T_out = s[ssys.cac_l.T_out]
+        cp = cp_water((T_in + T_out) / 2)
+        @test isapprox(T_out - T_in, Q_ch / (mdot * cp); rtol=0.02)
+    end
+
+    # Sanity-bound the throttling mechanism: the wall load splits evenly between the two
+    # channels (each carries half the 1e4 W plate power), and the narrower gap really did
+    # cut the flow, which is why the outlet climbed several K rather than wobbling at the
+    # rounding level.
+    @test isapprox(s0[ssys.cac_l.Q_wall_total], 5e3; rtol=1e-3)
+    @test isapprox(s1[ssys.cac_l.Q_wall_total], 5e3; rtol=1e-3)
+    @test s1[ssys.cac_l.port_in.mdot] < s0[ssys.cac_l.port_in.mdot]
+    @test (T_out1 - T_out0) > 1.0
+    @test (T_out1 - T_out0) < 15.0
 end

@@ -14,15 +14,41 @@ import ModelingToolkit: compose
         @test length(unknowns(ssys)) == 7
     end
 
-    @testset "steady-state IC formula" begin
+    @testset "steady-state ICs are a true fixed point of the PK ODE" begin
+        # Feed the returned ICs into the actual point-kinetics right-hand side and
+        # require every derivative to vanish. That is the definition of steady state
+        # at criticality (rho=0): dP/dt = 0 and dC_k/dt = 0. Reading dP/dt and dC_k/dt
+        # off MTK's generated RHS, rather than re-evaluating the C_k = beta_k/(lambda_k*
+        # Lambda)*P0 formula, makes the check independent of the source: it can fail if
+        # the ICs are wrong, whereas comparing the formula to itself never can.
         P0 = 1e6
         ic = point_kinetics_steady_state(P0)
         @test ic.P == P0
         @test length(ic.C_k) == 6
-        for i in 1:6
-            expected = U235_BETA_K[i] / (U235_LAMBDA_K[i] * U235_LAMBDA) * P0
-            @test isapprox(ic.C_k[i], expected, rtol=1e-12)
+
+        @named pk = PointKinetics(rho=0.0)
+        ssys = mtkcompile(pk)
+        op = vcat(
+            [ssys.P => ic.P],
+            [getproperty(ssys, Symbol(:C_, k)) => ic.C_k[k] for k in 1:6],
+        )
+        prob = ODEProblem(ssys, op, (0.0, 1.0))
+
+        # du = f(u, p, 0): the derivative vector the integrator would take at t=0.
+        du = similar(prob.u0)
+        prob.f(du, prob.u0, prob.p, 0.0)
+
+        # Each |du_i| must be tiny relative to its own state scale (C_k ~ 1e7..1e11,
+        # P ~ 1e6). A genuine fixed point closes to solver/roundoff level; the measured
+        # residual is ~1e-13 relative, far below this 1e-9 bound, which a wrong IC
+        # (e.g. a dropped Lambda or a swapped beta/lambda) would blow past.
+        for (i, u) in enumerate(unknowns(ssys))
+            scale = abs(prob.u0[i]) > 0 ? abs(prob.u0[i]) : 1.0
+            @test abs(du[i]) / scale < 1e-9
         end
+
+        # dP/dt specifically must vanish: power holds constant at criticality.
+        @test isapprox(prob[ssys.dPdt], 0.0; atol=1e-3)  # |dPdt| ~ 3e-8, scale P0 = 1e6
     end
 
     @testset "precursor-only decay matches analytical" begin

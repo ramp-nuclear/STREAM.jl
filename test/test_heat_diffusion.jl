@@ -136,8 +136,12 @@ end
     @test Q_left_total < 0.0
     @test Q_right_total < 0.0
 
-    # Energy balance check: |Q_left| + |Q_right| ≈ power (within 5% for FD approximation)
-    @test isapprox(abs(Q_left_total) + abs(Q_right_total), pwr; rtol=0.05)
+    # Energy balance: at steady state every watt deposited must leave through the two
+    # walls, so |Q_left| + |Q_right| == power as an exact conservation identity. It holds
+    # for any grid resolution (the finite-difference spatial error sits in the temperature
+    # profile, not in the integrated flux balance), so it closes to solver tolerance, not
+    # to a percent-level FD margin. Measured residual here is ~1e-14.
+    @test isapprox(abs(Q_left_total) + abs(Q_right_total), pwr; rtol=1e-6)
 end
 
 @testset "Unconnected thermal_right has Q_flow == 0 (adiabatic)" begin

@@ -32,15 +32,32 @@ using STREAM:
     end
 
     @testset "dittus_boelter standalone function" begin
-        # 0.023 * 8000^0.8 * 7^0.4
+        # Definition check: mirrors the source formula Nu = 0.023*Re^0.8*Pr^0.4.
         expected_Nu = 0.023 * 8000.0^0.8 * 7.0^0.4
         @test isapprox((@inferred dittus_boelter(8000.0, 7.0)), expected_Nu; rtol=1e-6)
+
+        # Anchored point computed independently at clean inputs (not a copy of the source
+        # expression). At Pr=1 the Pr^0.4 factor is exactly 1, and Re=1e4 gives
+        # Re^0.8 = (10^4)^0.8 = 10^3.2 = 1584.8932. The heating-mode Dittus-Boelter value is
+        # then 0.023 * 1584.8932 = 36.45255, which pins both the lead coefficient 0.023 and
+        # the Re exponent 0.8. rtol=1e-4 is pure float round-off on a hand value.
+        @test isapprox(dittus_boelter(1.0e4, 1.0), 36.45255; rtol=1e-4)
+        # Second clean point exercises the Pr exponent: at Re=1e4 the Re factor is the same
+        # 1584.8932, and Pr=32 gives Pr^0.4 = (2^5)^0.4 = 2^2 = 4 exactly, so the value is
+        # 0.023 * 1584.8932 * 4 = 145.8102. A wrong Pr exponent would miss this.
+        @test isapprox(dittus_boelter(1.0e4, 32.0), 145.8102; rtol=1e-4)
     end
 
     @testset "blasius_friction standalone function" begin
-        # 0.3164 * 8000^(-0.25)
+        # Definition check: mirrors the source formula f_darcy = 0.3164*Re^(-0.25).
         expected_f = 0.3164 * 8000.0^(-0.25)
         @test isapprox((@inferred blasius_friction(8000.0)), expected_f; rtol=1e-6)
+
+        # Anchored reference point. The Blasius smooth-pipe Darcy factor at Re=1e5 is the
+        # standard textbook value f = 0.3164/100000^0.25 = 0.01779 (e.g. White, Fluid
+        # Mechanics, 7th ed., the Moody-chart smooth-wall limit). rtol=1e-3 covers the
+        # 4-significant-figure rounding of the published 0.0178.
+        @test isapprox(blasius_friction(1.0e5), 0.0178; rtol=1e-3)
     end
 
     @testset "constant_Nusselt factory" begin
@@ -195,6 +212,28 @@ end
         @test sol_phy03[ssys_phy03.cac_phy03.dP] > 0.0
         # Re should be in laminar regime
         @test sol_phy03[ssys_phy03.cac_phy03.Re[1]] < 2300.0
+
+        # Magnitude check: the solved dP must equal the friction correlation evaluated at
+        # the solved state, not just be positive. The channel sets dP = sum_i dp[i] (steady
+        # momentum balance with port_in.P - port_out.P), and per cell (no gravity, g=0):
+        #   dp[i] = f(Re[i]) * mdot*|mdot|/(2*rho(T[i])*A^2) * (dz/Dh)
+        # with f = 64/(Re*K_R) the laminar rectangular factor. Reconstruct that sum here
+        # from the solved Re[i] and T[i] and the same friction closure the channel uses, so
+        # a 2x-wrong friction magnitude fails. rtol=1e-6: pure arithmetic re-evaluation of
+        # the same closed form on the converged state, only float round-off differs.
+        f_lam = laminar_friction_rectangular(geom)
+        A = geom.A
+        Dh = geom.Dh
+        dz = geom.L / n
+        mdot03 = sol_phy03[ssys_phy03.cac_phy03.port_in.mdot]
+        dP_expected_03 = sum(
+            let
+                Re_i = sol_phy03[ssys_phy03.cac_phy03.Re[i]]
+                T_i = sol_phy03[ssys_phy03.cac_phy03.T[i]]
+                f_lam(Re_i) * (mdot03 * abs(mdot03) / (2 * rho_water(T_i) * A^2)) * (dz / Dh)
+            end for i in 1:n
+        )
+        @test isapprox(sol_phy03[ssys_phy03.cac_phy03.dP], dP_expected_03; rtol=1e-6)
     end
 
     @testset "regime_dependent integration — laminar branch (Re < 2300)" begin
@@ -249,6 +288,27 @@ end
 
         @test sol_lam.retcode == ReturnCode.Success
         @test sol_lam[ssys_lam.cac_lam.Re[1]] < 2300.0
+
+        # Magnitude check: confirm the regime_dependent closure actually drove the solved dP
+        # through its laminar branch. rd.friction switches on Re_transition=2300; every cell
+        # here is below 2300, so it must return the laminar rectangular factor. Rebuild
+        # dP = sum_i f(Re[i]) * mdot*|mdot|/(2*rho(T[i])*A^2) * (dz/Dh) using rd.friction
+        # itself (same closure the channel evaluates) so a wrong-branch or 2x-wrong factor
+        # fails. rtol=1e-6: arithmetic re-evaluation of the same form on the converged state.
+        A = geom.A
+        Dh = geom.Dh
+        dz = geom.L / n
+        mdot_lam = sol_lam[ssys_lam.cac_lam.port_in.mdot]
+        dP_expected_lam = sum(
+            let
+                Re_i = sol_lam[ssys_lam.cac_lam.Re[i]]
+                T_i = sol_lam[ssys_lam.cac_lam.T[i]]
+                @test Re_i < 2300.0   # confirm the laminar branch is the one selected
+                rd.friction(Re_i) *
+                (mdot_lam * abs(mdot_lam) / (2 * rho_water(T_i) * A^2)) * (dz / Dh)
+            end for i in 1:n
+        )
+        @test isapprox(sol_lam[ssys_lam.cac_lam.dP], dP_expected_lam; rtol=1e-6)
     end
 
     @testset "regime_dependent integration — turbulent branch (Re > 2300)" begin
@@ -304,6 +364,28 @@ end
 
         @test sol_turb.retcode == ReturnCode.Success
         @test sol_turb[ssys_turb.cac_turb.Re[1]] > 2300.0
+
+        # Magnitude check: confirm the solved dP went through the turbulent (Blasius) branch.
+        # Above Re_transition=2300 rd.friction must return blasius_friction(Re). Rebuild
+        # dP = sum_i f(Re[i]) * mdot*|mdot|/(2*rho(T[i])*A^2) * (dz/Dh) from rd.friction on
+        # the converged Re[i]/T[i], so a wrong branch (e.g. still laminar 64/(Re*K_R)) or a
+        # 2x factor fails. rtol=1e-6: same-form arithmetic on the converged state.
+        A = geom.A
+        Dh = geom.Dh
+        dz = geom.L / n
+        mdot_turb = sol_turb[ssys_turb.cac_turb.port_in.mdot]
+        dP_expected_turb = sum(
+            let
+                Re_i = sol_turb[ssys_turb.cac_turb.Re[i]]
+                T_i = sol_turb[ssys_turb.cac_turb.T[i]]
+                @test Re_i > 2300.0   # confirm the turbulent branch is the one selected
+                # rd.friction must equal Blasius here, not the laminar rectangular factor.
+                @test isapprox(rd.friction(Re_i), blasius_friction(Re_i); rtol=1e-12)
+                rd.friction(Re_i) *
+                (mdot_turb * abs(mdot_turb) / (2 * rho_water(T_i) * A^2)) * (dz / Dh)
+            end for i in 1:n
+        )
+        @test isapprox(sol_turb[ssys_turb.cac_turb.dP], dP_expected_turb; rtol=1e-6)
     end
 end
 

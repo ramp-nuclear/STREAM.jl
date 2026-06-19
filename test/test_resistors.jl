@@ -96,6 +96,72 @@ end
     @test any(s -> occursin("k_fn", s), par_strs)
 end
 
+@testset "VolumetricFlowResistor callable k makes the resistance rise with time" begin
+    # The "transistor pattern" name promises the resistance varies in time. Drive a fixed-dP
+    # loop with k_fn(t) = k0*(1+t) and run a transient: as k(t) climbs, the quadratic drop
+    # dP = k(t)*Q*|Q| at fixed pump head forces the flow down. Check the defining relation
+    # dP = k_fn(t)*q*|q| holds at two distinct times AND that the flow actually fell, so the
+    # time-varying behavior the name evokes is exercised, not just compiled.
+    dP_head = 3.0e4   # Pa, fixed pump head
+    k0 = 1.0e5        # Pa*s^2/kg^2 at t=0 (density=1 -> Q = mdot)
+    # Build the ramp and the constant seed from one factory so they share a closure type.
+    # The resistor stores k as an MTK callable parameter typed to the function it was built
+    # with, so the steady-solve seed and the transient override must be the same type to be
+    # interchangeable in the operating point (same gotcha as the callable-pump ramp test).
+    make_k = rate -> (tt -> k0 * (1.0 + rate * tt))
+    kfn = make_k(1.0)     # the ramp k0*(1+t)
+    k_hold = make_k(0.0)  # constant k0, for the steady seed
+
+    @named pump = Pump(dP_head)
+    @named hx = HeatExchanger(300.0)
+    @named vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
+    conns = [
+        connect(pump.port_out, hx.port_in),
+        connect(hx.port_out, vfr.port_in),
+        connect(vfr.port_out, pump.port_in),
+        pump.port_in.P ~ 1.0e5,
+    ]
+    @named sys = compose(System(conns, t; name=:vfr_kfn_loop), pump, hx, vfr)
+    ssys = mtkcompile(sys)
+
+    # The loop is purely algebraic in flow (no inertia), so the flow tracks the instantaneous
+    # k(t): at each t, k(t)*Q*|Q| = dP_head. Seed and solve the steady balance at t=0, then
+    # integrate the transient with k_fn active. Q(t=0) = sqrt(dP/k0).
+    q0 = sqrt(dP_head / k0)
+    # DynamicSS(Rodas5P()): this loop is purely algebraic in the flow (no inertia), and the
+    # default steady solver goes unstable relaxing it; the stiff explicit relaxation settles
+    # cleanly (same choice as the callable-pump ramp test).
+    sol_ss = solve_steady(
+        ssys, Pair{Any,Any}[ssys.vfr.port_in.mdot => q0, ssys.vfr.k_fn => k_hold];
+        solver=DynamicSS(Rodas5P()),
+    )
+    @test sol_ss.retcode == ReturnCode.Success
+
+    t_arr = range(0.0, 3.0; length=4)
+    sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.vfr.k_fn => kfn])
+    @test sol.retcode == ReturnCode.Success
+
+    # Defining relation at two distinct times: the measured drop equals k_fn(t)*q*|q|.
+    # rtol=1e-4 because q here is a transient-integrated state carrying the Rodas5P solver's
+    # reltol (1e-6) and the algebraic dP is reconstructed from it, so a few-ppm residual is
+    # expected; 1e-4 stays far tighter than the 4x resistance change being verified.
+    for ti in (2, length(t_arr))
+        tt = t_arr[ti]
+        q = sol[ssys.vfr.port_in.mdot, ti]
+        dP_meas = sol[ssys.vfr.port_in.P, ti] - sol[ssys.vfr.port_out.P, ti]
+        @test isapprox(dP_meas, kfn(tt) * q * abs(q); rtol=1e-4)
+        # And the flow magnitude matches the closed form sqrt(dP_head / k(t)).
+        @test isapprox(abs(q), sqrt(dP_head / kfn(tt)); rtol=1e-4)
+    end
+
+    # The time-varying resistance must drive the flow strictly down between the first and
+    # last sample (k roughly quadruples from t=0 to t=3, so Q halves).
+    q_first = abs(sol[ssys.vfr.port_in.mdot, 1])
+    q_last = abs(sol[ssys.vfr.port_in.mdot, length(t_arr)])
+    @test q_last < q_first
+    @test isapprox(q_last / q_first, sqrt(kfn(0.0) / kfn(t_arr[end])); rtol=1e-4)
+end
+
 @testset "LocalPressureDrop — sudden expansion ΔP matches Idelchik closed form" begin
     A1, A2 = 1.0, 2.0
     Tin = 293.15

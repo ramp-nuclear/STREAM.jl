@@ -16,7 +16,7 @@ using STREAM: Channel, ChannelAndContacts, Pump, HeatExchanger, ConstantTemperat
     PipeGeometry, PipeGeometry_circular, HeatDiffusion, ConstantFluid, PointKinetics,
     ReactivityController, connect_temperature_feedback, compose_systems, symmetric_plate,
     one_sided_connection, constant_Nusselt, point_kinetics_steady_state, port,
-    solve_steady, solve_transient
+    solve_steady, solve_transient, regime_dependent_friction
 
 # ============================================================================
 # Python `tests/test_general/test_integrations.py` 1:1 ports.
@@ -604,9 +604,7 @@ end
     # buoyancy. As the pump coasts down the gravitational head wins and the flow reverses; the
     # zero-crossing occurs when the pump head equals the buoyancy head L·g·Δρ. Python's #16 is
     # inertia-free (no KirchhoffWDerivatives ⇒ the channel mdot2 term is None), so the faithful
-    # match is quasi-static: solve_steady per time-point with the head decaying. Julia channels
-    # always carry distributed inertia, so the per-point solve uses DynamicSS to reach the true
-    # quasi-static steady (the default root-finder converges to the spurious mdot=0 root).
+    # match is quasi-static: a nonlinear steady root per time-point with the head decaying.
     D_pipe = 0.10
     mdot0 = 1.0
     T_cold = 293.15
@@ -614,23 +612,16 @@ end
     g_acc = 9.80665
     geom = PipeGeometry_circular(1.0, D_pipe)
     nz = 9            # Python z_boundaries = linspace(0, L, 10) -> 9 cells
-    # Friction model. Python uses friction_factor("regime_dependent", re_bounds=(2000,5000),
-    # k_R=1.0): laminar 64/Re below Re 2000, turbulent Colebrook above 5000, linear blend between.
-    # That faithful correlation was retried here (the earlier compile bug is fixed — it now builds
-    # and the forced steady solves at Re≈12668, in the turbulent regime). But it genuinely diverges
-    # at THIS reversal operating point, two independent ways:
-    #   (1) per-point DynamicSS collapses to the spurious mdot=0 root at every step (verified: every
-    #       time-point returns Failure, mdot=0), and
-    #   (2) a true transient (callable decaying pump head, channel inertia carrying the dynamics)
-    #       cannot start: the turbulent Colebrook log10 term goes to -Inf as the solver probes Re→0
-    #       across the zero-crossing, so the DAE initialization throws DomainError / aborts at t=0
-    #       (InitialFailure / dt below epsilon, NaN error estimate).
-    # Near the crossing the flow IS laminar (Re→0), where regime_dependent reduces to 64/Re anyway,
-    # and friction is a tiny share of the loop balance here (p_pump0 ≈ grav_dp, both ≈ 255 Pa), so
-    # the laminar correlation 64/Re is the faithful local model at the physics being tested. Do not
-    # "restore" the full regime_dependent correlation here without also solving the numerical
-    # blow-up of its turbulent branch at the zero-crossing.
-    fric = (Re) -> 64.0 / Re
+    # Friction model: the faithful Python correlation,
+    # friction_factor("regime_dependent", re_bounds=(2000,5000), k_R=1.0) — laminar 64/Re below
+    # Re 2000, turbulent Colebrook above 5000, linear blend between. The branch functions are
+    # guarded finite through Re=0 (laminar -> 0, turbulent -> 0 below Re 10) and the interim blend
+    # makes the friction continuous across the regime boundary, so it integrates cleanly across the
+    # reversal where a hard single-point switch or an unguarded 64/Re would not. Critically, this
+    # regime friction grows with |mdot| in the turbulent branch, so it BOUNDS the reversed flow —
+    # the earlier laminar-only surrogate (64/Re, friction vanishing as Re->0) let the reversed flow
+    # run away to ~21x nominal, which this model does not.
+    fric = regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0)
     @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, fluid=Water(), friction_correlation=fric)
     @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, fluid=Water(), friction_correlation=fric)
     # Bracket each adiabatic channel with same-temperature HeatExchangers on BOTH ends so its
@@ -666,6 +657,30 @@ end
     delta_rho = rho_water(T_cold) - rho_water(T_hot)
     grav_dp = 1.0 * g_acc * delta_rho   # L·g·Δρ, the buoyancy head
 
+    # Reversed-flow magnitude ceiling, derived from the buoyancy-vs-friction balance. At full
+    # coastdown the pump head is gone and the buoyancy head grav_dp drives the reversed flow
+    # against the two channels' friction in series; the steady balance grav_dp = Σ f·|m|·m/(2ρA²)·(L/Dh)
+    # fixes a finite |mdot| ceiling. Any point in the window has driving head ≤ grav_dp, so the
+    # reversed flow can never exceed this ceiling. The runaway surrogate had no such ceiling.
+    A = geom.A
+    Dh = geom.Dh
+    L_ch = geom.L
+    function loop_friction(m)
+        Re_c = abs(m) * Dh / (A * mu_water(T_cold))
+        Re_h = abs(m) * Dh / (A * mu_water(T_hot))
+        rho_c = rho_water(T_cold)
+        rho_h = rho_water(T_hot)
+        fric(Re_c) * m * abs(m) / (2 * rho_c * A^2) * (L_ch / Dh) +
+        fric(Re_h) * m * abs(m) / (2 * rho_h * A^2) * (L_ch / Dh)
+    end
+    # bisection for loop_friction(m) == grav_dp, m > 0
+    lo, hi = 1.0e-6, 1.0e4
+    for _ in 1:200
+        mid = (lo + hi) / 2
+        (loop_friction(mid) - grav_dp) > 0 ? (hi = mid) : (lo = mid)
+    end
+    mdot_ceiling = (lo + hi) / 2   # ≈ 9.98 kg/s for this geometry; well below the 21 kg/s runaway
+
     # Coastdown: fixed-pressure pump, head = p_pump0·exp(-t) overridden per time-point.
     @named pump2 = Pump(p_pump0)
     ssys2 = build_coastdown(pump2)
@@ -674,20 +689,26 @@ end
     mdot = Float64[]
     cold_cells = Float64[]   # every cell at every time (Python asserts allclose over the full T_cool array)
     hot_cells = Float64[]
-    # Seed the per-point DynamicSS with a fixed FORWARD guess (mdot0/2), the SAME constant at every
-    # time-point. It is deliberately NOT the analytic per-time answer: the DynamicSS solve must find
-    # the true steady mdot itself (forward early, reversed late), so neither the reversal nor the
-    # crossing pressure below can be an artifact of the seed. The constant seed only gives the
-    # root-finder a forward starting point away from the spurious mdot=0 root.
+    # Quasi-static per-point steady (Python #16 is a nonlinear root-solve, not a transient). The two
+    # channel mdots are tied by the loop, so mtkcompile keeps one as the differential state and
+    # eliminates the other; which one it keeps depends on the tearing and differs across MTK
+    # versions. Seeding only an observed mdot left the true state unseeded and dropped the solver
+    # onto the spurious mdot=0 root, so seed the value of hot.port_in.mdot with a fixed FORWARD guess
+    # (mdot0/2), the SAME constant at every time-point. Pin BOTH channels' inertial derivatives to 0
+    # for the quasi-static balance: the kept state's derivative is the one the steady solve actually
+    # needs, and seeding the eliminated one as well is harmless, so this stays correct whichever
+    # channel a given MTK version keeps. The seed is deliberately NOT the per-time answer: the
+    # root-find must find the true steady mdot itself (forward early, reversed late), so neither the
+    # reversal nor the crossing pressure below is an artifact of the seed.
     seed = mdot0 / 2
     for tt in times
         op = Pair{Any,Any}[ssys2.pump2.dP_pump => p_pump0 * exp(-tt),
-                           ssys2.cold.port_in.mdot => seed,
-                           Dt(ssys2.hot.port_in.mdot) => 0.0,
-                           Dt(ssys2.cold.port_in.mdot) => 0.0]
+                           ssys2.hot.port_in.mdot => seed,
+                           Dt(ssys2.cold.port_in.mdot) => 0.0,
+                           Dt(ssys2.hot.port_in.mdot) => 0.0]
         append!(op, [ssys2.cold.T[i] => T_cold for i in 1:nz])
         append!(op, [ssys2.hot.T[i] => T_hot for i in 1:nz])
-        sol = solve_steady(ssys2, op; solver=DynamicSS(Rodas5P()))
+        sol = solve_steady(ssys2, op)
         @test sol.retcode == ReturnCode.Success
         push!(mdot, sol[ssys2.cold.port_in.mdot])
         append!(cold_cells, sol[ssys2.cold.T])
@@ -701,6 +722,9 @@ end
     # Crossing occurs when the pump head equals the buoyancy head L·g·Δρ.
     p_cross = p_pump0 * exp(-times[argmin(abs.(mdot))])
     @test isapprox(p_cross, grav_dp; rtol=1e-3)
+    # Reversed flow stays bounded by the buoyancy-vs-friction ceiling: the regime friction caps it,
+    # so the ~21x-nominal runaway the laminar-only surrogate produced can no longer pass.
+    @test all(abs.(mdot) .<= mdot_ceiling)
 end
 
 # ----------------------------------------------------------------------------
