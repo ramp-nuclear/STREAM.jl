@@ -119,3 +119,22 @@ Three tests were deleted as vacuous or fully subsumed by a stronger test: the
 `build_loop_pk` return-shape smoke (subsumed by the builders' compile-and-solve smoke),
 the `build_loop_transient compiles` `isa`-check (subsumed by its compile-and-solve smoke),
 and the COMPAT `STREAM isa Module` marker. No real coverage was lost.
+
+## Completeness audit — Julia assertions vs Python (2026-06-19) — ✅ DONE
+
+Per-test assertion comparison of all 21 `test_integration.jl` testsets against their Python
+`test_integrations.py` counterparts (prompted by the file being ~100 lines shorter). Result:
+**all 21 assert the same physics.** Julia is often *more* granular — Python packs several facts
+into one `np.allclose(vector, [...])`, which Julia expands into named per-quantity `@test` lines.
+The line gap comes from that packing plus Julia legitimately omitting Python solver-internal
+plumbing asserts (`compute(y0) == 0` "the analytic guess is an exact root" checks, and
+`KirchhoffWDerivatives` internal-variable-existence checks) that have no ModelingToolkit analog —
+the Julia ports assert against the *solved* state instead, which subsumes them.
+
+Property-based (hypothesis) Python tests are mirrored with concrete values; since each verifies a
+closed-form analytic relation that holds across the parameter range, a single well-chosen point
+exercises the same physics (no meaningful coverage lost).
+
+One genuinely missing physically-meaningful assertion was found and added: `#14
+flapper_opens_with_ref_mdot` now asserts the flapper starts closed (`isinf(T_open)` default),
+mirroring Python's `assert np.isinf(F.t_open)`.

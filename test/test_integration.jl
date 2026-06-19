@@ -408,6 +408,7 @@ end
         ssys.R.port_in.mdot => 1.0,
         ssys.pump.dP_pump_fn => dp_fn,
     ]   # T_open defaults to Inf (flapper closed until the callback latches it)
+    @test isinf(ModelingToolkit.getdefault(ssys.flapper.T_open))   # starts closed (Python: isinf(F.t_open))
     # ref_mdot is the resistor flow R.mdot = pump_dP/r = p·exp(-t), which mtkcompile leaves
     # purely algebraic (no inertia ⇒ no state). flapper_callback detects the crossing exactly
     # anyway: it root-finds the observed function for ref_mdot at the solver's trial state, so
