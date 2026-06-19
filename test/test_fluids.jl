@@ -3,6 +3,10 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
 
+# The `@inferred` on the first call of each property guards type stability: these functions are
+# `@register_symbolic` and run inside the solver's hot loops, so a type instability would be a real
+# performance regression. One per function is enough to catch a regression.
+
 @testset "rho_water" begin
     @test isapprox((@inferred rho_water(300.0)), 995.925708; rtol=1e-5)
     @test isapprox(rho_water(350.0), 973.771824; rtol=1e-5)

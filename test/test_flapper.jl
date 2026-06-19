@@ -89,32 +89,6 @@ end
     @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)   # ramp completed by t_end
 end
 
-@testset "flapper_callback stop_on_open terminates the solve" begin
-    threshold = 0.01
-    @named pump = Pump(0.0)
-    @named ine = Inertia(5.0e5)
-    @named res = Resistor(1.0e5)
-    @named flapper = Flapper(; open_at_current=threshold, f=1.0e6, area=1.0, open_rate=1.0 / 3.0,
-                             fluid=ConstantFluid())
-    @named hx = HeatExchanger(300.0)
-    conns = [
-        connect(pump.port_out, ine.port_in),
-        connect(ine.port_out, res.port_in, flapper.port_in),
-        connect(res.port_out, flapper.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        watch_flow(flapper, ine.port_in.mdot),
-        pump.port_in.P ~ 1.0e5,
-    ]
-    @named sys = compose(System(conns, t; name=:flap_stop), pump, ine, res, flapper, hx)
-    ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[ssys.ine.port_in.mdot => 1.0]
-    sol = solve_transient(ssys, op, range(0.0, 60.0; length=600);
-                          callbacks=flapper_callback(ssys, ssys.flapper; stop_on_open=true))
-    @test sol.retcode == ReturnCode.Terminated
-    @test sol.t[end] < 60.0                                     # stopped at the opening, not t_end
-    @test isapprox(sol.t[end], -5.0 * log(threshold); rtol=0.1) # terminated right when it opened
-end
-
 @testset "solve_transient passes user callbacks" begin
     @named pump = Pump(1.0e5)
     @named flapper = Flapper(; fluid=ConstantFluid())

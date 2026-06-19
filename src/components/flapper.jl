@@ -119,7 +119,7 @@ flow back through this equation, so the two must refer to the same `flapper`.
 watch_flow(flapper, sym) = flapper.ref_mdot ~ sym
 
 """
-    flapper_callback(ssys, flappers...; stop_on_open=false) -> ContinuousCallback | CallbackSet
+    flapper_callback(ssys, flappers...) -> ContinuousCallback | CallbackSet
 
 Build the opening-detection event(s) for one or more flappers in a compiled system. Each
 flapper opens when its wired `ref_mdot` falls through its own `open_at_current`; the callback
@@ -129,36 +129,32 @@ The crossing is found by root-finding the reference flow itself: the observed fu
 `flapper.ref_mdot` is evaluated at the integrator's trial state `(u, p, t)`, so detection is
 exact and works whether `ref_mdot` resolves to a differential state (a branch with inertia) or
 to a purely algebraic quantity (a quasi-static branch). This is the key difference from a
-per-step value check — while a flapper is closed it carries no flow and is dynamically
-decoupled from `ref_mdot`, so an adaptive solver places no steps near the crossing and a
-discrete check can sail past it; the root-finder seeks the crossing out regardless of where the
-steps land.
+per-step value check. While a flapper is closed it carries no flow and is dynamically decoupled
+from `ref_mdot`, so an adaptive solver places no steps near the crossing and a discrete check
+can sail past it; the root-finder seeks the crossing out regardless of where the steps land.
 
-Everything the event needs — the threshold `open_at_current`, the reference `ref_mdot`, and the
-latched `T_open` — is read off the component, so nothing is passed by hand. Pass several
-flappers to monitor them together; the result is a `CallbackSet`. With one flapper a single
-`ContinuousCallback` is returned. Only downward crossings open the valve; once latched it stays
-open (a later upward recovery is ignored).
+Everything the event needs (the threshold `open_at_current`, the reference `ref_mdot`, and the
+latched `T_open`) is read off the component, so nothing is passed by hand. Pass several flappers
+to monitor them together and the result is a `CallbackSet`; with one flapper a single
+`ContinuousCallback` is returned. Only downward crossings open the valve, and once latched it
+stays open (a later upward recovery is ignored).
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
 - `flappers`: one or more Flapper subsystems, e.g. `ssys.flapper` (or `ssys.flap1, ssys.flap2`)
-- `stop_on_open` (kwarg): if `true`, the solver terminates the instant a flapper opens
-  (Python's `stop_on_open`); default `false`.
 
 # Returns
-A `ContinuousCallback` (single flapper) or `CallbackSet` (several) — pass to
+A `ContinuousCallback` (single flapper) or `CallbackSet` (several). Pass it to
 `solve_transient(...; callbacks=cb)`.
 
 # Example
 ```julia
-cb  = flapper_callback(ssys, ssys.flapper)                       # one flapper
-cb2 = flapper_callback(ssys, ssys.flap1, ssys.flap2)            # several → CallbackSet
-cb3 = flapper_callback(ssys, ssys.flapper; stop_on_open=true)   # halt on opening
+cb  = flapper_callback(ssys, ssys.flapper)             # one flapper
+cb2 = flapper_callback(ssys, ssys.flap1, ssys.flap2)   # several -> CallbackSet
 sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 ```
 """
-function flapper_callback(ssys, flappers...; stop_on_open=false)
+function flapper_callback(ssys, flappers...)
     cbs = map(flappers) do flap
         ref_obs = ModelingToolkit.build_explicit_observed_function(ssys, flap.ref_mdot)
         get_threshold = ModelingToolkit.getp(ssys, flap.open_at_current)
@@ -167,10 +163,7 @@ function flapper_callback(ssys, flappers...; stop_on_open=false)
         # Condition crosses zero downward as ref_mdot falls through the threshold; evaluating
         # the observed function at the trial state is what makes this exact for algebraic refs.
         condition = (u, tt, integ) -> ref_obs(u, integ.p, tt) - get_threshold(integ)
-        affect_open = function (integ)
-            set_T_open(integ, integ.t)
-            return stop_on_open && terminate!(integ)
-        end
+        affect_open = integ -> set_T_open(integ, integ.t)
         # (condition, up-crossing affect = nothing, down-crossing affect = latch T_open)
         ContinuousCallback(condition, nothing, affect_open)
     end

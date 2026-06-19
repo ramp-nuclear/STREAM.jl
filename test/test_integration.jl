@@ -168,9 +168,9 @@ end
     # Python: test_inertia_through_RL_circuit_follows_analytic_solution
     # An inertia L and resistor r in a loop. A pump holds a steady mdot0=1, then shuts off
     # (Python drops the pump head to 0); the flow coasts as mdot = mdot0·exp(-(r/L)·t). The
-    # transient starts from the solved steady state — every state transplanted, not a hand-picked
-    # subset — so the initial condition stays consistent no matter which variables MTK keeps as
-    # states.
+    # transient starts from the solved steady state, with every state transplanted rather than a
+    # hand-picked subset, so the initial condition stays consistent no matter which variables MTK
+    # keeps as states.
     L = 5.0
     r = 3.0
     mdot0 = 1.0
@@ -489,7 +489,7 @@ end
 end
 
 @testset "inertia with transistor in PCS coastdown" begin
-    # Python: test_inertia_with_transistor_in_PCS_coastdown — steady combined-resistance + convergence.
+    # Python: test_inertia_with_transistor_in_PCS_coastdown. Steady combined resistance + convergence.
     # A time-dependent ("transistor") parabolic resistor that starts very stiff (k2) and
     # collapses to k_final after t_open, in parallel with a constant VolumetricFlowResistor.
     k1 = 1.0
@@ -751,13 +751,13 @@ end
 end
 
 @testset "channel point kinetics — per-channel coolant rises linearly" begin
-    # Python: test_channel_point_kinetics — several channel+fuel loops share one PointKinetics with
+    # Python: test_channel_point_kinetics. Several channel+fuel loops share one PointKinetics with
     # temperature feedback (a worth on every channel and fuel cell, reference T0, inlet T0-10). The
     # feedback self-balances the reactor at a nonzero critical power, and each channel's coolant
     # rises linearly along its length; Python asserts that linearity.
     #
     # MTK's coupled solve_steady on a live feedback PointKinetics collapses to the trivial P=0 root
-    # on every MTK version and solver — it zeros dP/dt by driving P->0 rather than by driving the
+    # on every MTK version and solver: it zeros dP/dt by driving P->0 rather than by driving the
     # reactivity to zero, which is the (dynamically unstable) root Python's algebraic-Jacobian
     # Newton lands on. We reach the identical physical steady by continuation instead: with a
     # uniform temperature worth the critical condition (reactivity = 0) is exactly "the total
