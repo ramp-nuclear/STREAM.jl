@@ -1,5 +1,7 @@
 # test/runtests.jl — thin orchestrator
 
+include("preamble.jl")
+
 include("test_geometry.jl")
 include("test_knobs.jl")
 include("test_connectors.jl")

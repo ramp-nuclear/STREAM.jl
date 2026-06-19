@@ -26,12 +26,20 @@ end
 """
     solve_steady(ssys, op; solver=nothing, kwargs...) -> SciMLSolution
 
-Solve a compiled system to steady state using KINSOL (or a user-specified solver).
+Solve a compiled system to steady state.
+
+With `solver=nothing` the SciML stack selects a steady-state algorithm for the problem, which is the
+right default across the range of loops in this package: a single fixed solver that suits one network
+fails on another (a stiff integrator that holds a near-reversal channel loop will not converge the
+purely algebraic resistor cube, and vice versa). For a borderline solve whose convergence depends on
+floating-point rounding, pass an explicit stiff solver such as `DynamicSS(Rodas5P())`; the
+near-reversal coastdown loop does this. Holding the BLAS thread count fixed (see `test/preamble.jl`)
+keeps the reduction order, and therefore the selected solver's result, the same across machines.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
 - `op`: operating point as `Vector{Pair}` of initial guesses
-- `solver`: nonlinear solver to use
+- `solver`: steady-state solver to use, or `nothing` to let the stack choose (default `nothing`)
 - `abstol`: absolute tolerance (default 1e-8)
 - `reltol`: relative tolerance (default 1e-6)
 - `build_initializeprob`: passed to `SteadyStateProblem` (default `false`)

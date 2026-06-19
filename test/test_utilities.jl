@@ -1,6 +1,11 @@
 using Test
+using Random
 using STREAM
 using STREAM: rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
+
+# Seed locally so the random-matrix invariants below are reproducible when this file runs on its
+# own, not only under runtests.jl (which seeds for the whole suite via preamble.jl).
+Random.seed!(20260620)
 
 # Invariants for the rebin / cosine helpers. We check that extensive rebinning
 # preserves the total and intensive rebinning preserves the value; per-cell

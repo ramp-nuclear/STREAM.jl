@@ -8,21 +8,23 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
-  # Reproducible gate: runs against the committed Manifest.toml (exact pinned versions).
+  # Reproducible gate: pinned Julia plus the committed Manifest.toml (exact pinned versions), so the
+  # gate resolves to the same world on every machine and every run.
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1'
+          version: '1.12.6'
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
 
-  # Forward-looking canary: drops the Manifest and resolves the latest compatible versions, so an
-  # upstream bump that breaks the suite shows up here instead of on a contributor's machine. Allowed
-  # to fail (continue-on-error) because a genuine upstream regression is outside our control — it
+  # Forward-looking canary: same pinned Julia, but it drops the Manifest and resolves the latest
+  # compatible packages, so an upstream bump that breaks the suite shows up here instead of on a
+  # contributor's machine. Pinning Julia keeps this signal about package drift alone. Allowed to
+  # fail (continue-on-error) because a genuine upstream regression is outside our control; it
   # surfaces as a visible red mark without blocking unrelated PRs.
   test-latest:
     runs-on: ubuntu-latest
@@ -31,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1'
+          version: '1.12.6'
       - uses: julia-actions/cache@v3
       - name: Resolve latest compatible versions
         run: julia --project=. -e 'rm("Manifest.toml"; force=true); using Pkg; Pkg.instantiate()'
