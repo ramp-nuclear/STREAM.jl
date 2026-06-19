@@ -92,3 +92,59 @@ function solve_transient(
     )
     return sol
 end
+
+"""
+    state_snapshot(ssys, sol) -> Vector{Pair}
+
+Capture every state of a compiled system from a solved point as a symbolic initial-condition map
+(`unknown => value` for each entry of `unknowns(ssys)`).
+
+MTK problem constructors require a symbolic map for the initial condition — a raw state vector or
+a bare solution object is rejected — and `unknowns(ssys)` is the complete, non-redundant state
+(observed variables are recomputed from it). Use this to seed a transient from a previously solved
+state without guessing which variables MTK kept as states.
+
+# Arguments
+- `ssys`: compiled system from `mtkcompile`
+- `sol`: a solved `SciMLBase` solution to read state values from
+
+# Returns
+`Vector` of `unknown => value` pairs, suitable as the operating point of an `ODEProblem`.
+"""
+state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
+
+"""
+    solve_transient(ssys, sol_ss, t; overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...)
+
+Start a transient from an already-solved state.
+
+Snapshots every state of `ssys` from `sol_ss` (see [`state_snapshot`](@ref)), applies `overrides`
+(parameter or forcing changes — e.g. shutting a pump with `ssys.pump.dP_pump => 0.0`, a reactivity
+step, a valve actuation), and integrates from there. This expresses the settle-then-perturb
+pipeline: solve a steady state, change one thing, watch the transient.
+
+The default `BrownFullBasicInit` re-solves the algebraic constraints for the overridden parameters
+while holding the differential states at their snapshotted values, so the start point stays
+consistent even though the perturbation broke the old equilibrium. Because the whole state is
+transplanted by symbol, this does not depend on which variables MTK chose as states — the property
+that makes the hand-built partial initial condition fragile across MTK versions.
+
+# Arguments
+- `ssys`: compiled system from `mtkcompile`
+- `sol_ss`: a solved state to start from (e.g. the result of `solve_steady`)
+- `t`: time array; `tspan` derived as `(t[1], t[end])`
+- `overrides`: `Vector{Pair}` of parameter/forcing changes applied at `t[1]`
+- `initializealg`: DAE initialization (default `BrownFullBasicInit()`)
+- `kwargs...`: forwarded to the lower-level `solve_transient`
+
+# Returns
+`SciMLBase.ODESolution`.
+"""
+function solve_transient(
+    ssys, sol_ss::SciMLBase.AbstractSciMLSolution, t;
+    overrides=Pair[], initializealg=OrdinaryDiffEq.BrownFullBasicInit(), kwargs...,
+)
+    op = Pair{Any,Any}[state_snapshot(ssys, sol_ss)...]
+    append!(op, overrides)
+    return solve_transient(ssys, op, t; initializealg=initializealg, kwargs...)
+end
