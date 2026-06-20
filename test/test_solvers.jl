@@ -108,10 +108,11 @@ using STREAM
         @test isapprox(T_ts[end], T_out_final_steady; rtol=2e-3)
     end
 
-    @testset "state_snapshot + solve_transient from a solved state" begin
+    @testset "solve_transient from a solved state" begin
         # Minimal inertia coastdown: a pump holds a steady flow, then shuts off and the flow
-        # coasts as mdot0·exp(-(r/L)·t). Exercises state_snapshot (the full IC map) and the
-        # solution overload of solve_transient (start from a solved state, apply an override).
+        # coasts as mdot0·exp(-(r/L)·t). Exercises the solution overload of solve_transient: start
+        # from a solved state, apply an override. The trajectory matching the analytic decay is the
+        # check that the full state was transplanted (an incomplete IC would not coast correctly).
         r = 3.0
         L = 5.0
         mdot0 = 1.0
@@ -130,12 +131,6 @@ using STREAM
         ssys = mtkcompile(sys)
         sol_ss = solve_steady(ssys, [ssys.ine.port_in.mdot => mdot0])
         @test sol_ss.retcode == ReturnCode.Success
-
-        snap = state_snapshot(ssys, sol_ss)
-        us = unknowns(ssys)
-        @test length(snap) == length(us)
-        @test Set(string.(first.(snap))) == Set(string.(us))
-        @test all(isfinite(last(p)) for p in snap)
 
         t_arr = range(0.0, 1.0; length=5)
         sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0])

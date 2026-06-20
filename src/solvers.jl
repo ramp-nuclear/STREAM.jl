@@ -28,13 +28,11 @@ end
 
 Solve a compiled system to steady state.
 
-With `solver=nothing` the SciML stack selects a steady-state algorithm for the problem, which is the
-right default across the range of loops in this package: a single fixed solver that suits one network
-fails on another (a stiff integrator that holds a near-reversal channel loop will not converge the
-purely algebraic resistor cube, and vice versa). For a borderline solve whose convergence depends on
-floating-point rounding, pass an explicit stiff solver such as `DynamicSS(Rodas5P())`; the
-near-reversal coastdown loop does this. Holding the BLAS thread count fixed (see `test/preamble.jl`)
-keeps the reduction order, and therefore the selected solver's result, the same across machines.
+With `solver=nothing` the SciML stack selects an algorithm. That is the right default across the
+loops here, because no single fixed solver suits all of them (a stiff integrator that holds a
+near-reversal channel loop will not converge the purely algebraic resistor cube, and the reverse).
+If a particular solve does not converge, pass an explicit solver; the coastdown reversal test in
+`test_integration.jl` passes `SSRootfind()`.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
@@ -79,11 +77,11 @@ Solve a transient simulation over a time array.
   differential states fixed) before stepping — needed when `op` is an approximate / transplanted
   IC that does not exactly satisfy the algebraic equations, where `NoInit` + a stiff solver can
   abort at `t=0` (`dt` driven below floating-point epsilon, `NaN` error estimate).
-- `build_initializeprob`: forwarded to the `ODEProblem` constructor when set (default `nothing`,
-  which leaves MTK's automatic choice). Pass `false` for a system that `mtkcompile` reduces to no
-  differential states (a purely algebraic loop, e.g. a flapper and pump with no inertia): newer MTK
-  builds an initialization problem that aborts at `t=0` for a stateless system, and there is no
-  state to make consistent, so skipping it is correct.
+- `build_initializeprob`: leave at the default `nothing` for almost everything (MTK chooses). Pass
+  `false` only for a loop that `mtkcompile` reduces to no differential states (a purely algebraic
+  system, such as a flapper and pump with no inertia), where MTK would otherwise build an
+  initialization problem that aborts at `t=0`. A stateless system has nothing to make consistent, so
+  skipping it is correct.
 - `kwargs...`: additional keyword arguments forwarded to `solve`
 
 # Returns
@@ -109,42 +107,28 @@ function solve_transient(
     return sol
 end
 
-"""
-    state_snapshot(ssys, sol) -> Vector{Pair}
-
-Capture every state of a compiled system from a solved point as a symbolic initial-condition map
-(`unknown => value` for each entry of `unknowns(ssys)`).
-
-MTK problem constructors require a symbolic map for the initial condition; a raw state vector or a
-bare solution object is rejected. `unknowns(ssys)` is the complete, non-redundant state, since
-observed variables are recomputed from it. Use this to seed a transient from a previously solved
-state without guessing which variables MTK kept as states.
-
-# Arguments
-- `ssys`: compiled system from `mtkcompile`
-- `sol`: a solved `SciMLBase` solution to read state values from
-
-# Returns
-`Vector` of `unknown => value` pairs, suitable as the operating point of an `ODEProblem`.
-"""
-state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
+# Internal helper. Capture every state of a compiled system from a solved point as a symbolic
+# initial-condition map (`unknown => value` for each entry of `unknowns(ssys)`). MTK problem
+# constructors require a symbolic map, not a raw state vector or a bare solution. `unknowns(ssys)`
+# is the complete, non-redundant state (observed variables are recomputed from it), so this seeds a
+# transient from a solved state without guessing which variables MTK kept. Used by the
+# `solve_transient(ssys, sol_ss, t; ...)` method below; not part of the public API.
+_state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
 
 """
     solve_transient(ssys, sol_ss, t; overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...)
 
 Start a transient from an already-solved state.
 
-Snapshots every state of `ssys` from `sol_ss` (see [`state_snapshot`](@ref)), applies `overrides`
-(parameter or forcing changes, such as shutting a pump with `ssys.pump.dP_pump => 0.0` or stepping
-a reactivity), and integrates from there. This expresses the settle-then-perturb pipeline: solve a
-steady state, change one thing, watch the transient.
+Takes the full state of `ssys` from `sol_ss`, applies `overrides` (parameter or forcing changes,
+such as shutting a pump with `ssys.pump.dP_pump => 0.0` or stepping a reactivity), and integrates
+from there. This expresses the settle-then-perturb pipeline: solve a steady state, change one thing,
+watch the transient.
 
 The default `BrownFullBasicInit` re-solves the algebraic constraints for the overridden parameters
 while holding the differential states at their snapshotted values, so the start point stays
-consistent even though the perturbation broke the old equilibrium. Because the whole state is
-transplanted by symbol, the result does not depend on which variables MTK chose as states. That
-independence is what the hand-built partial initial condition lacked, and what made it fragile
-across MTK versions.
+consistent even though the perturbation broke the old equilibrium. Transplanting the whole state by
+symbol means the result does not depend on which variables MTK chose as states.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
@@ -161,6 +145,6 @@ function solve_transient(
     ssys, sol_ss::SciMLBase.AbstractSciMLSolution, t;
     overrides=Pair[], initializealg=OrdinaryDiffEq.BrownFullBasicInit(), kwargs...,
 )
-    op = Pair{Any,Any}[state_snapshot(ssys, sol_ss); overrides]
+    op = Pair{Any,Any}[_state_snapshot(ssys, sol_ss); overrides]
     return solve_transient(ssys, op, t; initializealg=initializealg, kwargs...)
 end

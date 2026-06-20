@@ -23,24 +23,22 @@ blasius_friction(Re) = 0.3164 * Re^(-0.25)
 
 Hagen-Poiseuille analytic Darcy friction factor for fully-developed laminar flow in a
 circular duct, `f = 64 / Re`. Mirrors Python STREAM `friction.py::laminar_friction`
-(the `k_R = 1.0` case of the regime-dependent model).
+(the `k_R = 1.0` case of the regime-dependent model), which is the same pure `64 / re`.
 
-Returns 0.0 at `Re == 0` instead of `Inf`. In the pressure-drop form the friction term
-is `f * mdot*|mdot| / (...)`, and `mdot*|mdot| ~ Re^2`, so the true product
-`f * mdot*|mdot| ~ (64/Re) * Re^2 ~ Re` vanishes as the flow stops. Computing `f` on its
-own would hit `64/0 = Inf` and then `Inf * 0 = NaN` if the solver lands exactly on
-`Re = 0` at a flow reversal. The `Base.ifelse` guard returns 0 there, which is the exact
-limit of the product and matches Python's `regime_dependent_friction` returning `0.0`
-when `mdot == 0`. `Base.ifelse` (not a Julia `if`) keeps the function MTK-traceable for
-symbolic `Re`.
+This is the bare factor, so it goes to `Inf` as `Re -> 0`. That is the correct factor:
+the physical quantity is the pressure drop `f * mdot*|mdot| / (...)`, and with
+`mdot*|mdot| ~ Re^2` the product `~ (64/Re) * Re^2 ~ Re` vanishes smoothly as the flow
+stops (the Hagen-Poiseuille drop is linear in velocity). The no-flow case is handled by
+the caller that forms that product. For flow that reverses through `Re = 0`, use
+[`regime_dependent_friction`](@ref); it guards the no-flow point.
 
 # Arguments
 - `Re`: Reynolds number
 
 # Returns
-Darcy friction factor (dimensionless); 0.0 at `Re == 0`.
+Darcy friction factor (dimensionless).
 """
-laminar_friction(Re) = Base.ifelse(Re <= 0, zero(float(Re)), 64.0 / Re)
+laminar_friction(Re) = 64.0 / Re
 
 """
     rectangular_laminar_correction(aspect_ratio) -> K_R
@@ -58,6 +56,8 @@ Use: `f_darcy = 64 / (Re * K_R)` for rectangular laminar flow.
 
 Source: KAERI formula as used in TERMIC thermal-hydraulics code;
 matches Python STREAM friction.py `rectangular_laminar_correction`.
+Reference: KAERI, "Development of Research Reactor Technology", Korea Atomic Energy
+Research Institute, KAERI/RR-3818/2014, 2014.
 """
 function rectangular_laminar_correction(aspect_ratio::Real)
     return (
@@ -81,14 +81,13 @@ circular). Precomputes the geometric correction factor
 
 Returns a closure `(Re) -> 64.0 / (Re * K_R)`.
 
-This is the default friction for forced-flow channels, where `Re > 0` always, so it
-carries no flow-reversal guard. The friction term that must stay finite through a reversal
-is `f * mdot*|mdot|`, and that path is served instead by `regime_dependent_friction`, whose
-laminar and turbulent branch functions (`laminar_friction`, `turbulent_friction`) carry
-their own `Re == 0` guards. Leaving this closure as the plain `64/(Re*K_R)` keeps the
-generated residual and Jacobian for a forced-flow steady solve identical to the pre-reversal
+This is the rectangular companion to [`laminar_friction`]: the circular factor is `64/Re`,
+this one is `64/(Re*K_R)`. Both are bare `64/Re`-style factors with no no-flow guard, which
+is correct for a forced-flow channel where `Re > 0` always. The plain `64/(Re*K_R)` form
+keeps the residual and Jacobian for a forced-flow steady solve identical to the pre-reversal
 form, which a borderline forced-flow solve (two plates in hydraulic series) relies on to
-converge.
+converge. A loop whose flow reverses through `Re = 0` should use `regime_dependent_friction`
+instead, which guards the no-flow point in its returned closure.
 
 Note: For circular geometry constructed via `PipeGeometry_circular(L, D)`,
 `depth == width == D` so `aspect_ratio == 1.0`. `rectangular_laminar_correction(1.0)`
@@ -112,9 +111,9 @@ end
 """
     turbulent_friction(Re, epsilon=0) -> f_darcy
 
-Colebrook-White approximation for turbulent Darcy friction factor, as written
-in RELAP and KAERI. `epsilon` is relative roughness (roughness height / Dh),
-defaults to smooth pipe.
+Colebrook-White approximation for turbulent Darcy friction factor, as written in RELAP and
+in KAERI/RR-3818/2014 page 3 chapter 2.1.2 (full reference below). `epsilon` is relative
+roughness (roughness height / Dh), defaults to smooth pipe.
 
 Returns 0.0 when `Re < 10`: the correlation is only valid for turbulent flow, and below
 that threshold the `log10` terms diverge. Python guards the same way with
@@ -137,10 +136,13 @@ the `ifelse`.
 # Returns
 Darcy friction factor (dimensionless).
 
-Reference: `turbulent_friction(4e3) == 0.039804935964641644`,
+Known values: `turbulent_friction(4e3) == 0.039804935964641644`,
 `turbulent_friction(1e6) == 0.011649393290640643`,
 `turbulent_friction(4e3, 0.1) == 0.10560870441248855`,
 `turbulent_friction(5.0) == 0.0`.
+
+Reference: KAERI, "Development of Research Reactor Technology", Korea Atomic Energy
+Research Institute, KAERI/RR-3818/2014, 2014.
 """
 function turbulent_friction(Re, epsilon=0)
     # Clamp the Re feeding the log10 terms so they are evaluated at a turbulent Re even
@@ -168,17 +170,19 @@ factory). Returns a single closure `(Re) -> f` switching on the bulk Reynolds nu
 The geometric correction `k_R` scales the Reynolds fed to each branch (Python applies
 `re_bulk * k_R`); `k_R = 1.0` reproduces the strict circular `64/Re` laminar factor.
 
-Two properties matter for integrating through a flow reversal, both inherited from the
-guarded branch functions and the interim blend:
+Two properties matter for integrating through a flow reversal:
 
-- the closure is `Base.ifelse`-switched, so it traces symbolically (no Julia `if` on a
-  `Num`), and stays finite as `Re -> 0` (laminar `laminar_friction` returns 0 at Re=0,
-  turbulent `turbulent_friction` returns 0 below Re 10);
+- the closure guards the no-flow point. At `Re = 0` the bare laminar `64/Re` is `Inf`, so
+  the closure feeds its laminar branch a finite Reynolds there and returns 0 for the whole
+  factor. This is the symbolic-`Num` equivalent of Python's `if mdot == 0: return 0.0` at
+  the top of `regime_dependent_friction`, written with `Base.ifelse` because a Julia `if`
+  on a `Num` does not trace. For every `Re > 0` the result is exactly the plain blend.
 - the linear interim blend makes the friction continuous across the laminar/turbulent
   boundary. A hard single-point switch leaves a slope discontinuity at the transition Re
   that a stiff implicit solver reads as a kink and rejects (`dt` below epsilon, `NaN`
-  error estimate); the blend removes it. This is why the reversal coastdown integrates
-  with this closure but not with a hard `ifelse(Re < Re_tr, ...)` switch.
+  error estimate); the blend removes it. The blend value in the transition band is an
+  interpolation, not a measured correlation, so it carries a small modeling error there in
+  exchange for a residual the solver can integrate across the reversal.
 
 # Arguments
 - `re_bounds`: `(re_lo, re_hi)` regime boundaries on the bulk Reynolds number.
@@ -195,12 +199,17 @@ function regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0,
     re_hi = Float64(re_bounds[2])
     return (Re) -> begin
         ReK = Re * k_R
-        f_lam = laminar(ReK)
+        # Feed the laminar branch a finite Reynolds at no-flow so the bare 64/Re never forms
+        # an Inf while the not-taken branch is traced. For every Re > 0 this is just ReK.
+        ReK_lam = Base.ifelse(Re <= 0, one(ReK), ReK)
+        f_lam = laminar(ReK_lam)
         f_turb = turbulent(ReK)
         # lin_interp on the bulk Re between (re_lo, f_lam) and (re_hi, f_turb).
         f_inter = (f_turb - f_lam) / (re_hi - re_lo) * (Re - re_hi) + f_turb
         # Boundary inclusivity matches Python flow_regimes: Re <= re_lo laminar, re_hi < Re turbulent.
-        Base.ifelse(Re <= re_lo, f_lam, Base.ifelse(Re > re_hi, f_turb, f_inter))
+        f = Base.ifelse(Re <= re_lo, f_lam, Base.ifelse(Re > re_hi, f_turb, f_inter))
+        # No-flow guard, the symbolic equivalent of Python's `if mdot == 0: return 0.0`.
+        Base.ifelse(Re <= 0, zero(f), f)
     end
 end
 

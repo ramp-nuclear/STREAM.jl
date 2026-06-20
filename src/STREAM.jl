@@ -57,7 +57,7 @@ export OFI_power, OSV_flux, sudo_kaminaga_chf, mirshak_chf, fabrega_chf
 export Gr, Ra, Re_vel, Pe
 export build_loop, build_loop_vertical, build_loop_transient, build_cube
 export build_loop_lof_bypass, build_loop_pk
-export solve_steady, solve_transient, state_snapshot, steady_state_guess, check_gravity_mismatch, port
+export solve_steady, solve_transient, steady_state_guess, check_gravity_mismatch, port
 export symmetric_plate, plate, one_sided_connection, single_channel_connection
 export compose_systems, fuel_assembly
 export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
