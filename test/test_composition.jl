@@ -228,12 +228,13 @@ end
     geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     nz = 10
     nx = 3
+    power_val = 1.0e4
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named ch_left = ChannelAndContacts(; n=nz, geometry=geom)
     @named ch_right = ChannelAndContacts(; n=nz, geometry=geom)
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
                                 rho_s=2700.0, cp_s=900.0, k_s=200.0,
-                                power_shape=ps, power=1e4)
+                                power_shape=ps, power=power_val)
     pl = plate(ch_left, ch_right, fuel; name=:pl)
     @test pl isa ModelingToolkit.AbstractSystem
     @named pump_l = Pump(3.0e4)
@@ -249,7 +250,7 @@ end
         connect(bc_r.port_out, pl.ch_right.port_in),
         connect(pl.ch_right.port_out, pump_r.port_in),
         pump_r.port_in.P ~ 1.0e5,
-        pl.fuel.power ~ 1e4,
+        pl.fuel.power ~ power_val,
     ]
     full = compose_systems(pl, pump_l, bc_l, pump_r, bc_r; connections=conns, name=:dualcac)
     ssys = mtkcompile(full; fully_determined=true)
@@ -272,12 +273,10 @@ end
         @test right_face_Q[i] < -1e-3      # right face sheds heat to ch_right
     end
     # Energy balance: the heat leaving both faces accounts for the injected power.
-    @test isapprox(-(sum(left_face_Q) + sum(right_face_Q)), 1e4; rtol=1e-3)
+    @test isapprox(-(sum(left_face_Q) + sum(right_face_Q)), power_val; rtol=1e-3)
     # The plate temperature sits above both coolant streams it dumps heat into.
-    for i in 1:nz
-        @test sol[ssys.pl.fuel.T[i, 1]] > sol[ssys.pl.ch_left.T[i]]
-        @test sol[ssys.pl.fuel.T[i, nx]] > sol[ssys.pl.ch_right.T[i]]
-    end
+    @test all(sol[ssys.pl.fuel.T[i, 1]] > sol[ssys.pl.ch_left.T[i]] for i in 1:nz)
+    @test all(sol[ssys.pl.fuel.T[i, nx]] > sol[ssys.pl.ch_right.T[i]] for i in 1:nz)
 end
 
 # Section 6: one_sided_connection
@@ -327,16 +326,12 @@ end
     @test sol.retcode == ReturnCode.Success
     conn_Q = [sol[getproperty(oscsys.fuel, Symbol(:thermal_right, i)).Q_flow] for i in 1:nz]
     adia_Q = [sol[getproperty(oscsys.fuel, Symbol(:thermal_left, i)).Q_flow] for i in 1:nz]
-    for i in 1:nz
-        @test conn_Q[i] < -1e-3              # connected face sheds heat to the channel
-        @test isapprox(adia_Q[i], 0.0; atol=1e-9)   # opposite face is adiabatic
-    end
+    @test all(conn_Q[i] < -1e-3 for i in 1:nz)              # connected face sheds heat to the channel
+    @test all(isapprox(adia_Q[i], 0.0; atol=1e-9) for i in 1:nz)   # opposite face is adiabatic
     # All the injected power leaves through the single connected face.
     @test isapprox(-sum(conn_Q), 1e4; rtol=1e-3)
     # Plate hotter than the coolant it dumps heat into.
-    for i in 1:nz
-        @test sol[oscsys.fuel.T[i, end]] > sol[oscsys.cac.T[i]]
-    end
+    @test all(sol[oscsys.fuel.T[i, end]] > sol[oscsys.cac.T[i]] for i in 1:nz)
 end
 
 @testset "one_sided_connection — side=:right connects left face, right face adiabatic" begin

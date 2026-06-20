@@ -3,10 +3,6 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
 
-# The `@inferred` on the first call of each property checks that the scalar (Float64) method is
-# type stable and returns a concrete Float64. That is the numeric path callers and the registered
-# symbolic wrappers ultimately dispatch to; it does not exercise the symbolic-trace path itself.
-#
 # The expected property values are not golden masters captured from a first run. They are the
 # outputs of Python STREAM's stream.substances.light_water, which carries the same Simantov
 # correlations these Julia functions reimplement (identical coefficients in src/fluids.jl).
@@ -16,30 +12,42 @@ using STREAM
 # Independent physical sanity: rho_water(300 K) sits near 1000 kg/m^3 (liquid water near room
 # temperature) and sat_temperature(101325 Pa) lands at 373.15 K (boiling at 1 atm).
 
+@testset "fluid property type stability" begin
+    # The scalar (Float64) method of each property must be type stable and return a concrete
+    # Float64. That is the numeric path callers and the registered symbolic wrappers dispatch to;
+    # @inferred here isolates a type regression from a value regression in the testsets below.
+    @test (@inferred rho_water(300.0)) isa Float64
+    @test (@inferred cp_water(300.0)) isa Float64
+    @test (@inferred mu_water(300.0)) isa Float64
+    @test (@inferred k_water(300.0)) isa Float64
+    @test (@inferred beta_water(293.15)) isa Float64
+    @test (@inferred sat_temperature(1e5)) isa Float64
+end
+
 @testset "rho_water" begin
     # Python STREAM _density(T - 273.15), saturated liquid density [kg/m^3]
-    @test isapprox((@inferred rho_water(300.0)), 995.9257081113179; rtol=1e-5)
+    @test isapprox(rho_water(300.0), 995.9257081113179; rtol=1e-5)
     @test isapprox(rho_water(350.0), 973.771823739318; rtol=1e-5)
     @test isapprox(rho_water(400.0), 938.700383367318; rtol=1e-5)
 end
 
 @testset "cp_water" begin
     # Python STREAM _specific_heat(abs(T - 273.15)), specific heat [J/(kg*K)]
-    @test isapprox((@inferred cp_water(300.0)), 4177.78113807794; rtol=1e-5)
+    @test isapprox(cp_water(300.0), 4177.78113807794; rtol=1e-5)
     @test isapprox(cp_water(350.0), 4195.561824263842; rtol=1e-5)
     @test isapprox(cp_water(400.0), 4258.577497251415; rtol=1e-5)
 end
 
 @testset "mu_water" begin
     # Python STREAM _viscosity(T - 273.15), dynamic viscosity [Pa*s]
-    @test isapprox((@inferred mu_water(300.0)), 8.552485916327526e-4; rtol=1e-5)
+    @test isapprox(mu_water(300.0), 8.552485916327526e-4; rtol=1e-5)
     @test isapprox(mu_water(350.0), 3.681015967799774e-4; rtol=1e-5)
     @test isapprox(mu_water(400.0), 2.197326907637552e-4; rtol=1e-5)
 end
 
 @testset "k_water" begin
     # Python STREAM _conductivity(T - 273.15), thermal conductivity [W/(m*K)]
-    @test isapprox((@inferred k_water(300.0)), 0.6124047547796636; rtol=1e-5)
+    @test isapprox(k_water(300.0), 0.6124047547796636; rtol=1e-5)
     @test isapprox(k_water(350.0), 0.6663281213189647; rtol=1e-5)
     @test isapprox(k_water(400.0), 0.6858844508770785; rtol=1e-5)
 end
@@ -52,7 +60,7 @@ end
 
 @testset "beta_water" begin
     # Python STREAM _thermal_expansion(T - 273.15), expansion coefficient [1/K]
-    @test isapprox((@inferred beta_water(293.15)), 2.790788203166585e-04; rtol=1e-6)
+    @test isapprox(beta_water(293.15), 2.790788203166585e-04; rtol=1e-6)
     @test isapprox(beta_water(323.15), 4.3910662993617064e-04; rtol=1e-6)
     @test isapprox(beta_water(373.15), 7.213442303074213e-04; rtol=1e-6)
 end
@@ -91,7 +99,7 @@ end
 
 @testset "sat_temperature" begin
     # Python STREAM _sat_temperature(P) + 273.15, saturation temperature [K].
-    @test isapprox((@inferred sat_temperature(1e5)), 372.7807281085724; rtol=1e-4)   # 99.63 C
+    @test isapprox(sat_temperature(1e5), 372.7807281085724; rtol=1e-4)   # 99.63 C
     @test isapprox(sat_temperature(0.5e5), 354.43047959788385; rtol=1e-4)   # 81.28 C
     @test isapprox(sat_temperature(2e5), 393.44401952865115; rtol=1e-4)   # 120.29 C
     # Independent physical anchor: water boils at 373.15 K (100 C) at 1 atm.

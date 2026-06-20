@@ -42,10 +42,8 @@ import ModelingToolkit: compose
         # P ~ 1e6). A genuine fixed point closes to solver/roundoff level; the measured
         # residual is ~1e-13 relative, far below this 1e-9 bound, which a wrong IC
         # (e.g. a dropped Lambda or a swapped beta/lambda) would blow past.
-        for (i, u) in enumerate(unknowns(ssys))
-            scale = abs(prob.u0[i]) > 0 ? abs(prob.u0[i]) : 1.0
-            @test abs(du[i]) / scale < 1e-9
-        end
+        scale = [abs(prob.u0[i]) > 0 ? abs(prob.u0[i]) : 1.0 for i in eachindex(unknowns(ssys))]
+        @test all(abs(du[i]) / scale[i] < 1e-9 for i in eachindex(unknowns(ssys)))
 
         # dP/dt specifically must vanish: power holds constant at criticality.
         @test isapprox(prob[ssys.dPdt], 0.0; atol=1e-3)  # |dPdt| ~ 3e-8, scale P0 = 1e6

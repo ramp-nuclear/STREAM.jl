@@ -142,8 +142,6 @@ using STREAM
         @test sol.retcode == ReturnCode.Success
         mdot = sol[ssys.ine.port_in.mdot, :]
         @test isapprox(mdot[1], mdot0; rtol=1e-4)                       # starts at the solved steady
-        for (i, tt) in enumerate(t_arr)
-            @test isapprox(mdot[i], mdot0 * exp(-(r / L) * tt); rtol=1e-3)
-        end
+        @test all(isapprox(mdot[i], mdot0 * exp(-(r / L) * tt); rtol=1e-3) for (i, tt) in enumerate(t_arr))
     end
 end

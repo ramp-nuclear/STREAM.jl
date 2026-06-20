@@ -25,8 +25,7 @@ end
     # mdot = mdot0·exp(-(R/L)·t). Drive the loop to steady with the pump on, then start the
     # transient from the full solved state with the pump head overridden to 0. Transplanting every
     # state from the solved point keeps the IC consistent no matter which variables MTK keeps as
-    # states; the old partial NoInit IC collapsed onto the mdot=0 fixed point when MTK's state
-    # choice shifted across versions.
+    # states.
     @named pump = Pump(R_val * mdot0)   # head R·mdot0 balances the linear drop R·mdot at mdot0
     @named L_comp = Inertia(L_over_A)
     @named R_comp = Resistor(R_val)
@@ -110,9 +109,7 @@ end
     ssys = mtkcompile(wt; fully_determined=false)
     emitted = _emitted(ssys, ssys.T_wall_out, n)
     @test emitted == profile
-    for i in 1:n
-        @test emitted[i] == profile[i]
-    end
+    @test all(emitted[i] == profile[i] for i in 1:n)
 end
 
 @testset "WallTemperature Vector length mismatch errors" begin
@@ -133,9 +130,7 @@ end
     ssys = mtkcompile(wt; fully_determined=false)
     t_eval = 2.0
     sol = solve(ODEProblem(ssys, [ssys.T_wall_fn => fn], (0.0, 3.0)), Rodas5P())
-    for i in 1:n
-        @test sol(t_eval; idxs=ssys.T_wall_out[i]) == fn(t_eval)   # 370.0
-    end
+    @test all(sol(t_eval; idxs=ssys.T_wall_out[i]) == fn(t_eval) for i in 1:n)   # 370.0
     # Read at a second time to confirm the cells track the callable, not a frozen value.
     @test sol(0.5; idxs=ssys.T_wall_out[1]) == fn(0.5)             # 355.0
 end
@@ -165,9 +160,7 @@ end
     ssys = mtkcompile(hfs; fully_determined=false)
     emitted = _emitted(ssys, ssys.q_out, n)
     @test emitted == profile
-    for i in 1:n
-        @test emitted[i] == profile[i]
-    end
+    @test all(emitted[i] == profile[i] for i in 1:n)
 end
 
 @testset "HeatFluxSource Function emits f(t) at every cell" begin
@@ -182,9 +175,7 @@ end
     ssys = mtkcompile(hfs; fully_determined=false)
     t_eval = 3.0
     sol = solve(ODEProblem(ssys, [ssys.q_fn => fn], (0.0, 4.0)), Rodas5P())
-    for i in 1:n
-        @test sol(t_eval; idxs=ssys.q_out[i]) == fn(t_eval)   # 1.3e5
-    end
+    @test all(sol(t_eval; idxs=ssys.q_out[i]) == fn(t_eval) for i in 1:n)   # 1.3e5
     @test sol(1.0; idxs=ssys.q_out[1]) == fn(1.0)             # 1.1e5
 end
 

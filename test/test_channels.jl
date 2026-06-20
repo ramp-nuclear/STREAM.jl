@@ -737,11 +737,9 @@ end
         end
 
         # Inactive SCB => identical to the plain single-phase channel.
-        for i in 1:n_scb
-            @test sol_scb[ssys_scb.cac.h_tc_left[i]] ≈ sol_noscb[ssys_noscb.cac.h_tc_left[i]] rtol=1e-10
-            @test sol_scb[ssys_scb.cac.h_tc_right[i]] ≈ sol_noscb[ssys_noscb.cac.h_tc_right[i]] rtol=1e-10
-            @test sol_scb[ssys_scb.cac.T[i]] ≈ sol_noscb[ssys_noscb.cac.T[i]] rtol=1e-10
-        end
+        @test all(isapprox(sol_scb[ssys_scb.cac.h_tc_left[i]], sol_noscb[ssys_noscb.cac.h_tc_left[i]]; rtol=1e-10) for i in 1:n_scb)
+        @test all(isapprox(sol_scb[ssys_scb.cac.h_tc_right[i]], sol_noscb[ssys_noscb.cac.h_tc_right[i]]; rtol=1e-10) for i in 1:n_scb)
+        @test all(isapprox(sol_scb[ssys_scb.cac.T[i]], sol_noscb[ssys_noscb.cac.T[i]]; rtol=1e-10) for i in 1:n_scb)
     end
 
     @testset "Default (no SCB) backward compatibility" begin
