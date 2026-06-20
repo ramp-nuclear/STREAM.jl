@@ -72,9 +72,8 @@ end
 end
 
 @testset "Ra from real water properties" begin
-    # The old test multiplied two bare numbers and compared to their product, which only restates
-    # Ra = Gr * Pr. Instead feed Gr and Pr the actual water-property functions and check the
-    # composition holds and behaves physically. A 10 K wall superheat over a 5 mm channel:
+    # Feed Gr and Pr the actual water-property functions and check the composition Ra = Gr * Pr
+    # holds and behaves physically. A 10 K wall superheat over a 5 mm channel:
     using STREAM: Gr, Pr
     T = 320.0          # bulk [K]
     T_wall = 330.0     # wall [K], hotter than bulk

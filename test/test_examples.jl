@@ -53,10 +53,6 @@ using STREAM
     end
 
     @testset "build_cube solves its resistor-network steady state" begin
-        # build_cube is a pump driving the 12 edges of a cube graph between opposite
-        # corners (0 = pump out, 7 = pump in). No inertia and no thermal dynamics, so
-        # mtkcompile reduces it to a purely algebraic Kirchhoff network: solve its
-        # steady state and check the flow against the cube's known effective resistance.
         ssys = build_cube()
         @test ssys isa ModelingToolkit.AbstractSystem
 
@@ -116,24 +112,11 @@ end
     BYPASS_FUEL_NX = 2
     BYPASS_FUEL_LX = 0.005
 
-    # Loss-of-flow IC via the canonical steady-then-transient pattern: no separate
-    # reference loop, no state transplant. We solve_steady the ACTUAL bypass system
-    # with the pump head held at its pre-trip value (forced flow), then run the
-    # transient from that consistent steady state while the pump head ramps to zero
-    # (the loss-of-flow event). Because the IC is a true steady state of the system
-    # being integrated AND the pump head is continuous at t=0, the transient starts
-    # fully consistent.
-    #
-    # The forced-flow steady has a spurious co-existing root (mdot = 0, with flow
-    # recirculating through the closed flapper). DynamicSS picks whichever root its
-    # initial guess sits nearest, and that choice flips between MTK versions if the
-    # guess only seeds the aliased branch flows. The fix is to seed the variables
-    # mtkcompile actually keeps as unknowns: the channel flow heated.ch.port_in.mdot
-    # and its dummy derivative, plus the algebraic unknowns ext_res.port_in.mdot and
-    # ine.port_out.P, so the guess lands squarely in the forced-flow basin. With the
-    # real unknowns seeded, DynamicSS converges to mdot_ss ~ 0.187 kg/s on both the
-    # pinned and latest package sets; seeding only ine.port_in.mdot / ret.port_in.mdot
-    # (which are observed aliases, not unknowns) let the latest set fall into mdot = 0.
+    # Loss-of-flow IC via solve_steady then solve_transient on the same system: no
+    # separate reference loop, no state transplant. Solve the bypass system with the
+    # pump head at its pre-trip value (forced flow), then integrate from that steady
+    # state while the pump head ramps to zero. The IC is a true steady state and the
+    # pump head is continuous at t=0, so the transient starts consistent.
     BYPASS_DP_PRE   = 2.0e5   # pre-trip pump head [Pa]
     BYPASS_T_TRIP   = 10.0    # pump trips at t = 10 s
     BYPASS_TRIP_TAU = 5.0     # C1 Hermite ramp duration [s]
@@ -177,11 +160,15 @@ end
         dT_guess = BYPASS_POWER_W / (mdot_guess * cp)
         P_top = 1.0e5 + BYPASS_DP_PRE   # pump-out / node-A pressure (anchor + head)
 
-        # Forced-flow steady state of the actual system (pump on, flapper closed).
-        # DynamicSS(Rodas5P()) integrates to steady. Seeding the real unknowns
+        # Forced-flow steady state (pump on, flapper closed), integrated to steady by
+        # DynamicSS(Rodas5P()). The system has a second root at mdot = 0 (flow
+        # recirculating through the closed flapper); DynamicSS lands on whichever root
+        # its guess sits nearest. Seed the variables mtkcompile keeps as unknowns
         # (heated.ch.port_in.mdot + its dummy derivative, ext_res.port_in.mdot,
-        # ine.port_out.P) keeps it in the forced-flow basin; the aliased branch flows
-        # are seeded too so the guess is unambiguous either way.
+        # ine.port_out.P) so the guess lands in the forced-flow basin and DynamicSS
+        # converges to mdot_ss ~ 0.187 kg/s on both package sets. Seeding only the
+        # observed aliases (ine.port_in.mdot, ret.port_in.mdot) let the latest set fall
+        # into mdot = 0. The aliases are seeded too so the guess is unambiguous either way.
         op_steady = Pair{Any,Any}[
             ssys.pump.dP_pump_fn => dP_fn_steady,
             ssys.flapper.T_open => Inf,
@@ -216,12 +203,12 @@ end
         # (heated.ch.port_in.mdot_t) that a `Dt(mdot) => 0` op guess does NOT map to.
         # Left unset, the latest packages initialize it to NaN, so the transient
         # aborts at t=0 (dt below floating-point epsilon, NaN error estimate). Copying
-        # ss[u] for every unknown sets it directly. T_open is a parameter (not an
-        # unknown), so it defaults to Inf (flapper closed) for the transient; we set it
-        # explicitly for clarity, and flapper_callback latches it when ine.port_in.mdot
-        # crosses the threshold.
+        # ss[u] for every unknown sets it directly.
         op = Pair{Any,Any}[u => ss[u] for u in unknowns(ssys)]
         push!(op, ssys.pump.dP_pump_fn => dP_fn)
+        # T_open is the time the flapper opens. Start it at Inf (never opens); the
+        # callback below latches it to the real opening time once flow drops past the
+        # threshold.
         push!(op, ssys.flapper.T_open => Inf)
 
         cb = flapper_callback(ssys, ssys.flapper)
@@ -283,31 +270,16 @@ end
     end
 
     @testset "channel energy conservation across the heated leg" begin
-        # The bypass loss-of-flow run reaches a natural-convection recirculation, not a
-        # thermal steady state: once the flapper opens, the loop flow recirculates
-        # heated.ch -> ret -> flapper -> heated.ch while the inertia/HeatExchanger branch
-        # (the only heat sink) carries essentially zero flow (mdot_ine ~ 5e-9 kg/s). With
-        # the sink bypassed, the 1 kW plate input has nowhere to go, so the coolant keeps
-        # warming slowly (dT_max/dt ~ 0.7 K/s near t = 300 s). There is therefore NO
-        # equilibrium in which sum(q_wall) equals an mdot*cp*dT bulk estimate, and the
-        # legacy "Q_meas vs Q_wall within a factor of 3" gate compared two unrelated
-        # quantities (single-boundary-cell dT vs all-cell q_wall) that happen to land
-        # ~2x apart.
-        #
-        # What holds rigorously is energy conservation on the heated-channel coolant
-        # control volume: the rate the coolant stores enthalpy is positive (it is
-        # warming) and strictly less than the wall heat it absorbs (the remainder is
-        # carried away by the recirculating flow). Reconstructing the storage rate from
-        # the per-cell rho*cp*A*dz*dT/dt and comparing it to sum(q_wall) gives a
-        # version-stable check with no fitted tolerance: 0 < store_rate < Q_wall, and
-        # store_rate is a definite fraction (~0.5) of Q_wall, confirming the heat splits
-        # between storage and advective removal rather than vanishing.
-        #
-        # The 0.5 share is not analytically forced: it is set by the recirculation rate and
-        # the axial temperature profile in the bypassed-sink transient, neither of which has
-        # a closed form here. It is a stable regression value rather than a derived one. Over
-        # t = 200..300 s the mean ratio lands at 0.499 on both package sets (pinned 0.4990,
-        # latest 0.4990; per-sample range 0.476..0.512), so the band is set to that spread.
+        # The run reaches a natural-convection recirculation, not a thermal steady state:
+        # once the flapper opens, flow recirculates heated.ch -> ret -> flapper ->
+        # heated.ch while the inertia/HeatExchanger branch (the only heat sink) carries
+        # essentially zero flow. With the sink bypassed the 1 kW plate input has nowhere
+        # to go, so the coolant keeps warming and sum(q_wall) never equals an mdot*cp*dT
+        # bulk estimate. What does hold is energy conservation on the coolant control
+        # volume: the coolant stores enthalpy at a positive rate that stays below the wall
+        # heat it absorbs, with the rest carried out by the recirculating flow. The checks
+        # below assert 0 < store_rate < Q_wall, reconstructing store_rate from the per-cell
+        # rho*cp*A*dz*dT/dt.
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
@@ -353,7 +325,11 @@ end
         # absorbs from the wall: the recirculating flow carries the rest out.
         @test store_mean > 0
         @test store_mean < Qwall_mean
-        # Storage takes a definite, repeatable share of the wall heat (~0.499 on both envs).
+        # Storage takes a repeatable share of the wall heat. The 0.5 share is not
+        # analytically forced (it depends on the recirculation rate and the axial
+        # temperature profile, neither of which has a closed form here); it is a
+        # regression value. Over t = 200..300 s the ratio is 0.499 on both package sets
+        # (per-sample range 0.476..0.512), so the band is that spread.
         @test 0.49 < store_mean / Qwall_mean < 0.51
     end
 

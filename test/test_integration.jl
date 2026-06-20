@@ -199,7 +199,7 @@ end
     end
 end
 
-@testset "inertia with friction in PCS coastdown" begin
+@testset "quadratic-friction coastdown follows hyperbolic decay" begin
     # Python: test_inertia_with_friction_in_PCS_coastdown
     # Inertia + quadratic friction, pump shutdown: mdot = mdot0/(1 + α·mdot0·t),
     # α = |dp_out(mdot=1)|/inertia. Python's fixed-f Friction has dp = (dp0/mdot0²)·mdot|mdot|
@@ -424,12 +424,9 @@ end
 
 @testset "flapper and pump" begin
     # Python: test_flapper_and_pump
-    # A pre-timed flapper (open at t=2.5) in series with a decaying pump: no flow until the
-    # flapper opens, then the quadratic flapper conducts and flow becomes nonzero. With no inertia
-    # in the loop, mtkcompile reduces this to zero differential states (the opening fraction is an
-    # explicit function of time). Newer MTK builds an initialization problem that aborts at t=0 for
-    # a stateless system, so skip it with build_initializeprob=false; there is no state to make
-    # consistent, and the per-step algebraic solve still gives the closed/open flow.
+    # A pre-timed flapper (open at t=2.5) in series with a decaying pump: no flow until the flapper
+    # opens, then the quadratic flapper conducts. With no inertia, mtkcompile leaves zero
+    # differential states, so pass build_initializeprob=false (no state to make consistent).
     t_open = 2.5
     dp_fn = (tt) -> exp(-tt)   # one function object for Pump + op
     @named pump = Pump(dp_fn)
@@ -689,22 +686,14 @@ end
     mdot = Float64[]
     cold_cells = Float64[]   # every cell at every time (Python asserts allclose over the full T_cool array)
     hot_cells = Float64[]
-    # Quasi-static per-point steady (Python #16 is a nonlinear root-solve, not a transient). The head
-    # decays continuously, so consecutive steady states sit close together; each solve is seeded from
-    # the previous converged full state (continuation), so it starts near-steady and consistent and
-    # converges in a couple of Newton steps. The reversal is not a seed artifact: it emerges from the
-    # decaying head, and the forward start and crossing pressure are found by the solver, not imposed.
+    # Quasi-static per-point steady (Python #16 is a nonlinear root-solve, not a transient). Each
+    # solve is seeded from the previous converged full state, so it starts near-steady and converges
+    # in a couple of Newton steps. The reversal emerges from the decaying head, not the seed.
     #
-    # First point: seed BOTH channels' mdot forward (mdot0/2) and pin both inertial derivatives. The
-    # two channel mdots are tied by the loop, so mtkcompile keeps ONE as the state and eliminates the
-    # other, and which one it keeps changed between Julia 1.12.5 (hot) and 1.12.6 (cold). Seeding only
-    # one channel leaves the kept state at its 0 default on the version that keeps the other; the
-    # laminar 64/Re friction then divides by zero, the first residual is NaN, and every solver aborts
-    # at mdot=0. Seeding both channels lands the kept state in the forward basin whichever one a version
-    # keeps. This was the failure that passed locally on 1.12.5 and failed on CI's 1.12.6.
-    #
-    # Solve with SSRootfind, a direct nonlinear root-find with no time step, so it cannot underflow dt
-    # at t=0 the way the integrate-to-steady solvers can on a stiff near-reversal point.
+    # Seed BOTH channels forward (mdot0/2): mtkcompile keeps one channel mdot as the state and which
+    # one varies by Julia version, so seeding both lands the kept state in the forward basin either
+    # way (otherwise it sits at 0 and the laminar 64/Re friction divides by zero). SSRootfind is a
+    # direct root-find with no time step, so it cannot underflow dt at the stiff near-reversal point.
     carry = Pair{Any,Any}[ssys2.hot.port_in.mdot => mdot0 / 2,
                           ssys2.cold.port_in.mdot => mdot0 / 2,
                           Dt(ssys2.cold.port_in.mdot) => 0.0,
@@ -816,13 +805,8 @@ end
     # length.
     #
     # Julia's coupled solve_steady on a live feedback PointKinetics collapses to the trivial P=0
-    # root on every MTK version and solver (it zeros dP/dt by driving P->0 rather than by driving
-    # the reactivity to zero — the dynamically unstable root Python's algebraic-Jacobian Newton
-    # lands on). So we reach the same physical steady the way the working PK coupling tests do
-    # (test_point_kinetics.jl "coolant feedback suppresses power to ... equilibrium"): run the live
-    # coupled feedback transient from a consistent cold critical IC and let it settle. The reactor
-    # self-balances at a nonzero equilibrium power, the coolant profiles go linear, and the
-    # feedback path PK -> fuel power -> plate -> channel/fuel T -> reactivity is genuinely solved.
+    # root, so reach the same physical steady the way the PK coupling tests do: run the coupled
+    # feedback transient from a cold critical IC and let it settle at a nonzero equilibrium power.
     T0 = 313.15
     Tin = T0 - 10.0
     n = 7

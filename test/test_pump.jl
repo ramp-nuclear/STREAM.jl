@@ -174,13 +174,13 @@ end
 
     mdot_0 = dP0 / R_val
 
-    # solve_steady relaxes to steady in real time, so feed it the held head dP0 (not the ramp,
-    # which would keep falling during the solve and drive the flow unstable) and let it settle at
-    # mdot_0. The stiff DynamicSS solver is explicit here: the default steady solver goes unstable on
-    # this callable-head loop. Then run the ramp transient from that full solved state. Seeding every
-    # state from the solved point rather than a hand-picked mdot keeps the start consistent
-    # regardless of which variables MTK keeps as differential states. The old partial IC plus NoInit
-    # landed off the real state on newer MTK and the flow sat frozen at the mdot=0 fixed point.
+    # Initial condition: solve for steady flow under a held head dP0 first, then start the ramp
+    # transient from that full solved state. Carrying every state from the solved point (not just a
+    # hand-picked mdot) keeps the start consistent no matter which variables MTK keeps as states; a
+    # partial guess landed off the real state on newer MTK and the flow froze at mdot=0.
+    #
+    # Solver choice: this loop has a time-varying head, so the steady solve needs the stiff
+    # DynamicSS(Rodas5P) solver. The default steady solver goes unstable here.
     sol_ss = solve_steady(ssys,
         Pair{Any,Any}[ssys.ine.port_in.mdot => mdot_0, ssys.pump.dP_pump_fn => dP_hold];
         solver=DynamicSS(Rodas5P()))
