@@ -691,22 +691,22 @@ end
     hot_cells = Float64[]
     # Quasi-static per-point steady (Python #16 is a nonlinear root-solve, not a transient). The head
     # decays continuously, so consecutive steady states sit close together; each solve is seeded from
-    # the previous converged full state (continuation), so it starts from a near-steady, algebraically
-    # consistent point and converges in a couple of Newton steps. The first point uses an independent
-    # forward guess: the value of hot.port_in.mdot at mdot0/2, pinned coolant, and zero inertial
-    # derivatives. The two channel mdots are tied by the loop and mtkcompile keeps one as the state and
-    # eliminates the other, so seeding one channel's value plus pinning both inertial derivatives lands
-    # the first solve in the forward basin whichever channel a given MTK version keeps. The reversal is
-    # not a seed artifact: it emerges from the decaying head, and the forward start and crossing
-    # pressure are found by the solver, not imposed.
+    # the previous converged full state (continuation), so it starts near-steady and consistent and
+    # converges in a couple of Newton steps. The reversal is not a seed artifact: it emerges from the
+    # decaying head, and the forward start and crossing pressure are found by the solver, not imposed.
     #
-    # Solve with SSRootfind, a direct nonlinear root-find, not a time integrator. The integrate-to-
-    # steady solvers were borderline on this near-reversal balance: the auto-chosen one reported
-    # Unstable, and the stiff Rosenbrock one drove dt below floating-point epsilon at t=0 and aborted
-    # with a NaN error estimate. Both happened only on some CPUs (seen on CI, never locally) from
-    # floating-point path differences. A root find has no time step to underflow, so the per-point
-    # solve converges the same way on any machine here.
+    # First point: seed BOTH channels' mdot forward (mdot0/2) and pin both inertial derivatives. The
+    # two channel mdots are tied by the loop, so mtkcompile keeps ONE as the state and eliminates the
+    # other, and which one it keeps changed between Julia 1.12.5 (hot) and 1.12.6 (cold). Seeding only
+    # one channel leaves the kept state at its 0 default on the version that keeps the other; the
+    # laminar 64/Re friction then divides by zero, the first residual is NaN, and every solver aborts
+    # at mdot=0. Seeding both channels lands the kept state in the forward basin whichever one a version
+    # keeps. This was the failure that passed locally on 1.12.5 and failed on CI's 1.12.6.
+    #
+    # Solve with SSRootfind, a direct nonlinear root-find with no time step, so it cannot underflow dt
+    # at t=0 the way the integrate-to-steady solvers can on a stiff near-reversal point.
     carry = Pair{Any,Any}[ssys2.hot.port_in.mdot => mdot0 / 2,
+                          ssys2.cold.port_in.mdot => mdot0 / 2,
                           Dt(ssys2.cold.port_in.mdot) => 0.0,
                           Dt(ssys2.hot.port_in.mdot) => 0.0]
     append!(carry, [ssys2.cold.T[i] => T_cold for i in 1:nz])
