@@ -120,14 +120,11 @@ that threshold the `log10` terms diverge. Python guards the same way with
 `np.nan_to_num` (its docstring quotes "approx <7"); the `Re < 10` floor here is a touch
 more conservative and matches the published `turbulent_friction(5.0) == 0.0` reference.
 
-The guard is written with `Base.ifelse`, not a short-circuit `&&`, so the function
-stays MTK-traceable. Every channel and resistor passes a symbolic `Num` Reynolds; a
-Julia `if`/`&&` on `Re` raises `non-boolean (Num) used in boolean context`.
-`Base.ifelse` emits a symbolic conditional the solver evaluates each timestep, so the
-turbulent branch stays finite as `Re -> 0` across a flow reversal instead of letting
-`log10` run to `-Inf`. `max(Re, 10)` inside the diverging terms keeps the log10
-argument finite while the not-taken branch is traced, so no `Inf`/`NaN` leaks through
-the `ifelse`.
+`Base.ifelse`, not a Julia `if`/`&&`: MTK traces this function symbolically to build the
+equations and Jacobian, so `Re` is a symbolic value at trace time and a normal `if` errors
+on it. `Base.ifelse` records the branch into the expression for the solver to evaluate each
+step. `max(Re, 10)` keeps `log10` finite on the branch that is not taken, since tracing
+walks both.
 
 # Arguments
 - `Re`: Reynolds number
