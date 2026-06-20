@@ -230,16 +230,15 @@ function q_CHF_sudo_kaminaga(
 
     G_star = mdot / pipe.A / sqrt(lamda * drho * rho_v * g_abs)
 
-    dT_inlet = (cp_sat / hfg) * (T_sat - T_bulk)
-    # Outlet subcooling for q4. Python STREAM (thresholds.py Sudo_Kaminaga_CHF) uses
-    # (cp/hfg)*(Tsat[-1] - T_bulk[-1]) at the outlet cell, NOT zero. This function runs
-    # per cell, so the cell's own subcooling is the local outlet term that matches Python.
-    dT_outlet = (cp_sat / hfg) * (T_sat - T_bulk)
+    # Local subcooling at this cell. Python STREAM's Sudo_Kaminaga_CHF feeds q2/q3 the inlet
+    # subcooling and q4 the outlet subcooling (different cells of the channel). This function runs
+    # per cell, so both terms are the same cell's local subcooling; they collapse to one value here.
+    dT_sub = (cp_sat / hfg) * (T_sat - T_bulk)
 
     q1 = _SKq1(G_star)
-    q2 = _SKq2(A_ratio, G_star, dT_inlet)
-    q3 = _SKq3(A_ratio, pipe.width, lamda, dT_inlet, rho_v, rho_l)
-    q4 = _SKq4(G_star, dT_outlet)
+    q2 = _SKq2(A_ratio, G_star, dT_sub)
+    q3 = _SKq3(A_ratio, pipe.width, lamda, dT_sub, rho_v, rho_l)
+    q4 = _SKq4(G_star, dT_sub)
 
     # Direction-dependent selection
     if G_star >= 0

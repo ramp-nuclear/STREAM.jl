@@ -219,9 +219,9 @@ end
         ssys, op, mdot_ss, _ = _lof_bypass_ic()
 
         @test length(equations(ssys)) == length(unknowns(ssys))
-        # Forced-flow steady lands on the pump-driven branch, mdot_ss ~ 0.187 kg/s.
-        # Bracket it tightly around that value rather than over a broad window.
-        @test isapprox(mdot_ss, 0.187; atol=0.02)
+        # Forced-flow steady lands on the pump-driven branch at mdot_ss ~ 0.187 kg/s, which
+        # reproduces across package sets to well under 1%, so bracket it at 0.005.
+        @test isapprox(mdot_ss, 0.187; atol=0.005)
 
         T_open_init = op[findfirst(p -> isequal(p.first, ssys.flapper.T_open), op)].second
         @test T_open_init == Inf

@@ -197,7 +197,12 @@ Source: Elenbaas (1942), as implemented in Python STREAM `_Elenbaas`.
 Nusselt number (dimensionless). Zero for Ra <= 0.
 """
 function elenbaas_nusselt(Ra, b, L)
-    Ra_pos = ifelse(Ra > 0, Ra, one(Ra))    # clamp so the shape term never sees Ra<=0
+    # The return below already zeroes Nu for Ra <= 0, so this clamp only has to keep the shape
+    # term finite while that not-taken branch is traced. A symbolic Num cannot take an early
+    # `return`, hence the ifelse rather than a guard clause. The clamp value is arbitrary as long
+    # as it is finite and positive; one(Ra) is the simplest. An epsilon would be worse, it blows
+    # the 35*L/(Ra*b) exponent up toward Inf.
+    Ra_pos = ifelse(Ra > 0, Ra, one(Ra))
     shape = (1 - exp(-35 * L / (Ra_pos * b)))^0.75
     return ifelse(Ra > 0, (1 / 24) * Ra * (b / L) * shape, zero(Ra))
 end

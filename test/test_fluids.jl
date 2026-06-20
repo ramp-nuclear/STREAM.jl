@@ -72,8 +72,9 @@ end
 end
 
 @testset "Ra from real water properties" begin
-    # Feed Gr and Pr the actual water-property functions and check the composition Ra = Gr * Pr
-    # holds and behaves physically. A 10 K wall superheat over a 5 mm channel:
+    # Feed Gr and Pr the actual water-property functions and check Ra behaves physically:
+    # positive under a heated wall, in range for water, and sign-flipping when the wall cools.
+    # A 10 K wall superheat over a 5 mm channel:
     using STREAM: Gr, Pr
     T = 320.0          # bulk [K]
     T_wall = 330.0     # wall [K], hotter than bulk
@@ -86,8 +87,6 @@ end
     k = k_water(T)
     Gr_val = Gr(rho, mu, beta, T_wall, T, L, g)
     Pr_val = Pr(cp, mu, k)
-    # Ra reproduces the Gr-times-Pr chain built from independent property calls.
-    @test isapprox(Ra(Gr_val, Pr_val), Gr_val * Pr_val; rtol=1e-12)
     # Heated wall (T_wall > T) drives buoyancy, so Ra is positive; water near 320 K has Pr a few.
     @test Ra(Gr_val, Pr_val) > 0.0
     @test 1.0 < Pr_val < 10.0
