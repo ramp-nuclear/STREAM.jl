@@ -327,8 +327,14 @@ end
         ]
         @test maximum(Q_wall_eq) <= BYPASS_POWER_W   # plate output bounded by its input
 
-        # Forced-flow direction: heat flows plate -> coolant just after the IC settles.
-        @test sum(sol[ssys.heated.ch.q_wall[i], 11] for i in 1:n) > 0
+        # Direction: once the natural-convection recirculation is established (t = 200..300 s,
+        # the window the storage check below uses), the plate heats the coolant, so the summed
+        # wall flux stays positive across the whole window. Reading it here rather than just
+        # after t = 0 avoids the large startup swing the CAC HTC drives through the settle, where
+        # the instantaneous sign flips with the integration path and carries no physical meaning.
+        nc_dir = 2001:3000
+        q_wall_dir = [sum(sol[ssys.heated.ch.q_wall[i], idx] for i in 1:n) for idx in nc_dir]
+        @test minimum(q_wall_dir) > 0
 
         # Coolant storage rate vs wall heat, averaged over the NC window t = 200..300 s.
         # store_rate_i = rho(Ti)*cp(Ti)*A*dz*dTi/dt, with dTi/dt by central difference.
