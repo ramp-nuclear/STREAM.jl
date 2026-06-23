@@ -686,6 +686,7 @@ end
     mdot = Float64[]
     cold_cells = Float64[]   # every cell at every time (Python asserts allclose over the full T_cool array)
     hot_cells = Float64[]
+    retcodes = []
     # Quasi-static per-point steady (Python #16 is a nonlinear root-solve, not a transient). Each
     # solve is seeded from the previous converged full state, so it starts near-steady and converges
     # in a couple of Newton steps. The reversal emerges from the decaying head, not the seed.
@@ -704,12 +705,13 @@ end
         op = Pair{Any,Any}[ssys2.pump2.dP_pump => p_pump0 * exp(-tt)]
         append!(op, carry)
         sol = solve_steady(ssys2, op; solver=SSRootfind())
-        @test sol.retcode == ReturnCode.Success
+        push!(retcodes, sol.retcode) 
         push!(mdot, sol[ssys2.cold.port_in.mdot])
         append!(cold_cells, sol[ssys2.cold.T])
         append!(hot_cells, sol[ssys2.hot.T])
         carry = Pair{Any,Any}[u => sol[u] for u in unknowns(ssys2)]
     end
+    @test all(retcodes .== ReturnCode.Success)
     @test mdot[1] > 0                       # starts forward
     @test all(diff(mdot) .< 0)              # monotonically decreasing
     @test mdot[1] > 0 > mdot[end]           # reverses
