@@ -19,20 +19,14 @@ network topology -- correct physics (distributed + concentrated).
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
 
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
+
 """
 function Inertia(L_over_A; name)
     pars = @parameters L_over_A = L_over_A
     @named port_in = FlowPort()
     @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ L_over_A * D(port_in.mdot),   # ODE pressure eq
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    eqs = Equation[port_in.P - port_out.P ~ L_over_A * D(port_in.mdot)]   # ODE pressure eq
+    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
 end
 
 """
@@ -47,8 +41,7 @@ Ideal heat exchanger that resets fluid temperature to a fixed boundary condition
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
 
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
+
 """
 function HeatExchanger(T_bc; name)
     pars = @parameters T_bc = T_bc
@@ -74,9 +67,6 @@ Constant-temperature thermal boundary condition.
 
 # Ports
 - `thermal` -- `ThermalPort` (single port, used as a wall BC)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function ConstantTemperature(T; name)
     pars = @parameters T_bc = T

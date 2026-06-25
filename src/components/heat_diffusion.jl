@@ -69,9 +69,6 @@ end
 
 # Ports
 - `thermal_left[1:nz]`, `thermal_right[1:nz]` -- `ThermalPort` arrays (no FlowPorts)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function HeatDiffusion(;
     name,

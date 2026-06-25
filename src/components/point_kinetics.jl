@@ -66,7 +66,7 @@ initialized with the correct precursor concentrations from `point_kinetics_stead
 
 # Returns
 Uncompiled `System` with 7 state variables (P, C_1..C_6) and 3 observed variables
-(beta_total, dPdt, reactivity). Call `mtkcompile(sys)` before solving.
+(beta_total, dPdt, reactivity). 
 """
 function PointKinetics(;
     name, rho=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K
@@ -205,7 +205,6 @@ causes `KeyError` at `solve_transient`.
 # Returns
 Uncompiled `System` with 7 + sum(n_flat_per_component) state variables, 3 observed
 variables (beta_total, dPdt, reactivity), and an MTK callable parameter `rho_c_fn`.
-Call `mtkcompile(sys)` before solving.
 
 **Important:** When `temp_worth` is provided, the resulting System has free T_source
 unknowns that MUST be bound by calling `connect_temperature_feedback` and wrapping in

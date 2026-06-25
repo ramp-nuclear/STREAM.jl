@@ -13,9 +13,6 @@ Frictional pressure drop element using Darcy-Weisbach correlation.
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function Friction(; name, L, D, A)
     pars = @parameters begin
@@ -30,16 +27,13 @@ function Friction(; name, L, D, A)
     @named port_out = FlowPort()
     T_in = instream(port_in.T)
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
         Re ~ abs(port_in.mdot) * D / (A * mu_water(T_in)),
         f ~ 0.3164 * Re^(-0.25),
         port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(
             T_in
         ) * A^2)) * (L / D),
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
     ]
-    return compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
+    return HydraulicTwoPort(; name, port_in, port_out, eqs, vars, pars)
 end
 
 """
@@ -53,22 +47,14 @@ Hydrostatic pressure change for a vertical elevation change.
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function Gravity(H; name)
     pars = @parameters H = H
     @named port_in = FlowPort()
     @named port_out = FlowPort()
     T_in = instream(port_in.T)
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    eqs = Equation[port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H]
+    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
 end
 
 """
@@ -82,21 +68,13 @@ Generic flow resistance with a fixed resistance coefficient.
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function Resistor(R; name)
     pars = @parameters R = R
     @named port_in = FlowPort()
     @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ R * port_in.mdot,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    eqs = Equation[port_in.P - port_out.P ~ R * port_in.mdot]
+    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
 end
 
 """
@@ -120,9 +98,6 @@ same one `Channel`'s `h_left` uses).
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function VolumetricFlowResistor(;
     name,
@@ -130,12 +105,6 @@ function VolumetricFlowResistor(;
     klow::Real=0.0,
     density::Union{Real,Function}=rho_water,
 )
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    T_in = instream(port_in.T)
-    rho = density isa Real ? Num(density) : density(T_in)
-    q = port_in.mdot / rho
-
     pars = @parameters klow = klow
     if k isa Real
         kpars = @parameters k = k
@@ -146,14 +115,13 @@ function VolumetricFlowResistor(;
         k_expr = kpars[1](t)
     end
     pars = Any[pars...; kpars...]
-
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ k_expr * q * abs(q) + klow * q,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    @named port_in = FlowPort()
+    @named port_out = FlowPort()
+    T_in = instream(port_in.T)
+    rho = density isa Real ? Num(density) : density(T_in)
+    q = port_in.mdot / rho
+    eqs = Equation[port_in.P - port_out.P ~ k_expr * q * abs(q) + klow * q]
+    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
 end
 
 """
@@ -174,9 +142,6 @@ the roles swapped under reversal. The `mdot·|mdot|` form keeps the drop directi
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function LocalPressureDrop(; name, A1, A2, fluid::AbstractFluid=Water())
     @named port_in = FlowPort()
@@ -185,10 +150,9 @@ function LocalPressureDrop(; name, A1, A2, fluid::AbstractFluid=Water())
     A = min(A1, A2)
     f = _local_loss_factor(port_in.mdot, A1, A2, viscosity(fluid, T_in))
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ f * port_in.mdot * abs(port_in.mdot) / (2 * density(fluid, T_in) * A^2),
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
+    port_in.P - port_out.P ~ f * port_in.mdot * abs(port_in.mdot) / (2 * density(
+        fluid, T_in
+    ) * A^2),
     ]
-    return compose(System(eqs, t, [], []; name=name), port_in, port_out)
+    return HydraulicTwoPort(; name, port_in, port_out, eqs)
 end

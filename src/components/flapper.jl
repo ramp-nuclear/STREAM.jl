@@ -51,8 +51,7 @@ Then build the detection event with `flapper_callback(ssys, ssys.flapper)` and h
 # Ports
 - `port_in`, `port_out`: `FlowPort` (pressure, mass flow, temperature)
 
-# Returns
-Uncompiled `System`. `ref_mdot` has no in-component equation, so a standalone Flapper is
+`ref_mdot` has no in-component equation, so a standalone Flapper is
 structurally underdetermined — call `mtkcompile(sys; fully_determined=false)`, or compose it
 into a system where `ref_mdot` is wired.
 """
@@ -79,16 +78,13 @@ function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
     mdot_open = sign(dp) * sqrt(abs(dp) * 2 * rho * area^2 / f)
 
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
         xi ~ relax,
         # Closed (t ≤ T_open): mdot = 0. Open: mdot = xi · mdot_open (quadratic, ramped in).
         ifelse(t <= T_open, port_in.mdot, port_in.mdot - relax * mdot_open) ~ 0,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
         # ref_mdot has no equation here — wire it with watch_flow during composition
     ]
 
-    return compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
+    return HydraulicTwoPort(; name, port_in, port_out, eqs, vars, pars)
 end
 
 """

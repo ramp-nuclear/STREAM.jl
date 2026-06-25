@@ -132,9 +132,6 @@ component.
 # Input variables (bind externally)
 - `h(t)`: convective conductance [W/(m^2·K)].
 - `T_fluid(t)`: bulk fluid temperature [K].
-
-# Returns
-Uncompiled `System`. Compose it, bind `h` and `T_fluid`, then `mtkcompile()`.
 """
 function ConvectiveBoundary(; name, area)
     pars = @parameters area = area

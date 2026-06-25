@@ -218,9 +218,6 @@ connections = [
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (mass + momentum + stream T)
   *No thermal ports — see external-input variables above.*
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function Channel(;
     name,
@@ -335,9 +332,6 @@ connections = [
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (mass + momentum + stream T)
   *No heat-flux ports — see external-input variables above.*
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function ChannelHeatFlux(;
     name,
@@ -456,9 +450,6 @@ The wall temperature is connected through thermal port arrays.
 # Ports
 - `port_in`, `port_out` -- `FlowPort`
 - `thermal_left[1:n]`, `thermal_right[1:n]` -- `ThermalPort` arrays (one per axial cell, per side)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function ChannelAndContacts(;
     name,

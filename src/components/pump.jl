@@ -35,21 +35,13 @@ Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch
 
 # Ports
 - `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
 """
 function Pump(dP_pump::Real; name)
     pars = @parameters dP_pump = dP_pump
     @named port_in = FlowPort()
     @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_out.P - port_in.P ~ dP_pump,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    eqs = Equation[port_out.P - port_in.P ~ dP_pump]
+    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
 end
 
 function Pump(dP_pump::Any; name)
@@ -57,24 +49,14 @@ function Pump(dP_pump::Any; name)
     pars = @parameters (dP_pump_fn::FType)(..)
     @named port_in = FlowPort()
     @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_out.P - port_in.P ~ dP_pump_fn(t),
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    eqs = Equation[port_out.P - port_in.P ~ dP_pump_fn(t)]
+    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
 end
 
 function Pump(; name, mdot0)
     pars = @parameters mdot0 = mdot0
     @named port_in = FlowPort()
     @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.mdot ~ mdot0,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    eqs = Equation[port_in.mdot ~ mdot0]
+    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
 end
