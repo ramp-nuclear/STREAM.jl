@@ -35,10 +35,10 @@ function build_loop(;
     @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
 
     connections = Equation[
-        connect(pump.port_out, bc.port_in),       # pump -> TempBC
-        connect(bc.port_out, ch.port_in),        # TempBC -> channel
-        connect(ch.port_out, pump.port_in),      # channel -> pump (closed loop)
-        pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
+        connect(pump.outlet, bc.inlet),       # pump -> TempBC
+        connect(bc.outlet, ch.inlet),        # TempBC -> channel
+        connect(ch.outlet, pump.inlet),      # channel -> pump (closed loop)
+        pump.inlet.p ~ 1.0e5,                  # pressure gauge freedom fix
         # Per-cell binding eqns (args.funcs idiom)
         [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
@@ -97,11 +97,11 @@ function build_loop_vertical(;
     @named grav = Gravity(H)
 
     connections = Equation[
-        connect(pump.port_out, bc.port_in),       # pump -> TempBC
-        connect(bc.port_out, ch.port_in),        # TempBC -> channel (upward leg)
-        connect(ch.port_out, grav.port_out),     # channel outlet (top) = grav port_out (top)
-        connect(grav.port_in, pump.port_in),      # grav port_in (bottom) = pump inlet (bottom)
-        pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
+        connect(pump.outlet, bc.inlet),       # pump -> TempBC
+        connect(bc.outlet, ch.inlet),        # TempBC -> channel (upward leg)
+        connect(ch.outlet, grav.outlet),     # channel outlet (top) = grav outlet (top)
+        connect(grav.inlet, pump.inlet),      # grav inlet (bottom) = pump inlet (bottom)
+        pump.inlet.p ~ 1.0e5,                  # pressure gauge freedom fix
         # Per-cell binding eqns (args.funcs idiom)
         [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
@@ -165,10 +165,10 @@ function build_loop_transient(;
         # Scalar wall temperature — same as build_loop; no parameter declaration needed.
         # Per-cell binding replaces the legacy single-port wall pin.
         connections = Equation[
-            connect(pump.port_out, bc.port_in),
-            connect(bc.port_out, ch.port_in),
-            connect(ch.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
+            connect(pump.outlet, bc.inlet),
+            connect(bc.outlet, ch.inlet),
+            connect(ch.outlet, pump.inlet),
+            pump.inlet.p ~ 1.0e5,
             [ch.T_wall_left[i] ~ T_wall_0 for i in 1:n]...,
             [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
         ]
@@ -180,10 +180,10 @@ function build_loop_transient(;
         FType = typeof(T_wall_fn)
         ps = @parameters (T_wall_callable::FType)(..)
         connections = Equation[
-            connect(pump.port_out, bc.port_in),
-            connect(bc.port_out, ch.port_in),
-            connect(ch.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
+            connect(pump.outlet, bc.inlet),
+            connect(bc.outlet, ch.inlet),
+            connect(ch.outlet, pump.inlet),
+            pump.inlet.p ~ 1.0e5,
             # Style 1 binding with builder-level callable: same `ps[1](t)` value broadcast per cell.
             [ch.T_wall_left[i] ~ ps[1](t) for i in 1:n]...,
             [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
@@ -228,24 +228,24 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
     @named r67 = Resistor(R)
 
     connections = [
-        # Corner 0 (source): pump.port_out + 3 resistor inlets
-        connect(pump.port_out, r01.port_in, r02.port_in, r04.port_in),
+        # Corner 0 (source): pump.outlet + 3 resistor inlets
+        connect(pump.outlet, r01.inlet, r02.inlet, r04.inlet),
         # Corner 1: r01 out + r13 in + r15 in
-        connect(r01.port_out, r13.port_in, r15.port_in),
+        connect(r01.outlet, r13.inlet, r15.inlet),
         # Corner 2: r02 out + r23 in + r26 in
-        connect(r02.port_out, r23.port_in, r26.port_in),
+        connect(r02.outlet, r23.inlet, r26.inlet),
         # Corner 3: r13 out + r23 out + r37 in
-        connect(r13.port_out, r23.port_out, r37.port_in),
+        connect(r13.outlet, r23.outlet, r37.inlet),
         # Corner 4: r04 out + r45 in + r46 in
-        connect(r04.port_out, r45.port_in, r46.port_in),
+        connect(r04.outlet, r45.inlet, r46.inlet),
         # Corner 5: r15 out + r45 out + r57 in
-        connect(r15.port_out, r45.port_out, r57.port_in),
+        connect(r15.outlet, r45.outlet, r57.inlet),
         # Corner 6: r26 out + r46 out + r67 in
-        connect(r26.port_out, r46.port_out, r67.port_in),
-        # Corner 7 (sink): pump.port_in + 3 resistor outlets
-        connect(pump.port_in, r37.port_out, r57.port_out, r67.port_out),
+        connect(r26.outlet, r46.outlet, r67.inlet),
+        # Corner 7 (sink): pump.inlet + 3 resistor outlets
+        connect(pump.inlet, r37.outlet, r57.outlet, r67.outlet),
         # Pressure gauge anchor (absolute level is underdetermined by Kirchhoff equations)
-        pump.port_in.P ~ 1.0e5,
+        pump.inlet.p ~ 1.0e5,
     ]
 
     @named sys = compose(
@@ -308,8 +308,8 @@ Gravity signs:
 - ret (B->C, nominally upward): g = +g_acc
 
 Physics: the pump head `dP_pump_fn(t)` trips toward 0 (loss of flow). Inertia
-carries momentum; ch flow decays. Flapper opens when pump branch mdot
-(ine.port_in.mdot) drops below threshold (provided externally via
+carries momentum; ch flow decays. Flapper opens when pump branch ṁ
+(ine.inlet.ṁ) drops below threshold (provided externally via
 `flapper_callback`). After Flapper opens, flow redistributes: heated-channel flow
 reverses (upward NC driven by buoyancy).
 
@@ -400,18 +400,18 @@ function build_loop_lof_bypass(;
 
     connections = Equation[
         # D series branch: ext_res -> hx -> pump -> ine
-        connect(ext_res.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        connect(pump.port_out, ine.port_in),
+        connect(ext_res.outlet, hx.inlet),
+        connect(hx.outlet, pump.inlet),
+        connect(pump.outlet, ine.inlet),
         # Node A (3-way): ine output -> heated.ch input + flapper input
-        connect(ine.port_out, heated.ch.port_in, flapper.port_in),
+        connect(ine.outlet, heated.ch.inlet, flapper.inlet),
         # Node B (2-way): heated.ch output -> ret input
-        connect(heated.ch.port_out, ret.port_in),
+        connect(heated.ch.outlet, ret.inlet),
         # Node C (3-way): ret output + flapper output -> ext_res input
-        connect(ret.port_out, flapper.port_out, ext_res.port_in),
+        connect(ret.outlet, flapper.outlet, ext_res.inlet),
         # Boundary conditions
-        pump.port_in.P ~ 1.0e5,
-        watch_flow(flapper, ine.port_in.mdot),
+        pump.inlet.p ~ 1.0e5,
+        watch_flow(flapper, ine.inlet.ṁ),
         heated.fuel.power ~ power_W,
         [ret.T_wall_left[i] ~ T_inlet for i in 1:n]...,
         [ret.T_wall_right[i] ~ T_inlet for i in 1:n]...,
@@ -495,7 +495,7 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 `(ssys, ic)` where:
 - `ssys`: compiled `System` (passed through `mtkcompile`)
 - `ic`: `Vector{Pair{Any,Any}}` initial conditions including PK state
-  (P, C_1..C_6, rho_c_fn), hydraulic IC (port_in.mdot), and thermal ICs
+  (P, C_1..C_6, rho_c_fn), hydraulic IC (inlet.ṁ), and thermal ICs
   (cac.T[i] and fuel.T[i,j]). Pass directly to `solve_transient(ssys, ic, t)`.
 """
 function build_loop_pk(ctrl;
@@ -555,10 +555,10 @@ function build_loop_pk(ctrl;
     @named bc = HeatExchanger(T_inlet)
 
     all_connections = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods_cac.port_in),
-        connect(rods_cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, rods_cac.inlet),
+        connect(rods_cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         fb_eqs...,
         power_eqs...,
     ]
@@ -580,7 +580,7 @@ function build_loop_pk(ctrl;
         ssys.pk.C_4 => pk_ic.C_k[4],
         ssys.pk.C_5 => pk_ic.C_k[5],
         ssys.pk.C_6 => pk_ic.C_k[6],
-        ssys.rods.cac.port_in.mdot => 0.2,
+        ssys.rods.cac.inlet.ṁ => 0.2,
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]
@@ -597,12 +597,12 @@ function build_loop_pk(ctrl;
     # whichever representative survives is then always hit, and the duplicate members are harmless
     # (distinct symbolic keys, same value). The cold IC is then genuinely consistent — reactivity[0] = 0
     # when ref_temp = T_inlet, independent of the alias-elimination choice.
-    push!(ic, ssys.rods.cac.port_in.T => T_inlet)
-    push!(ic, ssys.rods.cac.port_out.T => T_inlet)
-    push!(ic, ssys.pump.port_in.T => T_inlet)
-    push!(ic, ssys.pump.port_out.T => T_inlet)
-    push!(ic, ssys.bc.port_in.T => T_inlet)
-    push!(ic, ssys.bc.port_out.T => T_inlet)
+    push!(ic, ssys.rods.cac.inlet.T => T_inlet)
+    push!(ic, ssys.rods.cac.outlet.T => T_inlet)
+    push!(ic, ssys.pump.inlet.T => T_inlet)
+    push!(ic, ssys.pump.outlet.T => T_inlet)
+    push!(ic, ssys.bc.inlet.T => T_inlet)
+    push!(ic, ssys.bc.outlet.T => T_inlet)
     for i in 1:n
         push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_left, i)).T => T_inlet)
         push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_right, i)).T => T_inlet)

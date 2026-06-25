@@ -25,11 +25,11 @@
 #     ret (B->C, nominally upward):  g = +g_acc => gravity OPPOSES positive (upward) flow
 #
 #   Event sequence:
-#     t=0       Pump dP = 0 (tripped). Inertia carries momentum; mdot decays.
-#     ~20-30s   mdot (ine) drops below threshold (0.01 kg/s). Flapper fires.
+#     t=0       Pump dP = 0 (tripped). Inertia carries momentum; ṁ decays.
+#     ~20-30s   ṁ (ine) drops below threshold (0.01 kg/s). Flapper fires.
 #     +dt_ramp  Flapper fully open (5s ramp). Resistance drops from 1e8 to 100 Pa.s/kg.
 #     ~60-120s  Buoyancy drives reversed upward flow through heated ch. NC establishes.
-#     ~270-300s NC equilibrium: ch.port_in.mdot < 0 (upward), ret.port_in.mdot > 0 (downward).
+#     ~270-300s NC equilibrium: ch.inlet.ṁ < 0 (upward), ret.inlet.ṁ > 0 (downward).
 
 using STREAM
 using ModelingToolkit
@@ -79,10 +79,10 @@ println("Building steady-state reference loop...")
 )
 
 conns_ref = Equation[
-    connect(pump_ref.port_out, hx_ref.port_in),
-    connect(hx_ref.port_out, ch_ref.port_in),
-    connect(ch_ref.port_out, pump_ref.port_in),
-    pump_ref.port_in.P ~ 1.0e5,
+    connect(pump_ref.outlet, hx_ref.inlet),
+    connect(hx_ref.outlet, ch_ref.inlet),
+    connect(ch_ref.outlet, pump_ref.inlet),
+    pump_ref.inlet.p ~ 1.0e5,
     [ch_ref.T_wall_left[i] ~ T_wall for i in 1:n]...,
     [ch_ref.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
 ]
@@ -90,13 +90,13 @@ conns_ref = Equation[
 ref_ssys = mtkcompile(ref_sys)
 
 # Initial guess for SS: linear temperature ramp from T_inlet to T_wall
-op_ref = Pair{Any,Any}[ref_ssys.ch_ref.port_in.mdot => 0.3]
+op_ref = Pair{Any,Any}[ref_ssys.ch_ref.inlet.ṁ => 0.3]
 for i in 1:n
     push!(op_ref, ref_ssys.ch_ref.T[i] => T_inlet + i * (T_wall - T_inlet) / n)
 end
 
 ss_sol = solve_steady(ref_ssys, op_ref)
-mdot_ss = ss_sol[ref_ssys.ch_ref.port_in.mdot]
+mdot_ss = ss_sol[ref_ssys.ch_ref.inlet.ṁ]
 T_ss = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
 
 println("Steady-state solved:")
@@ -127,9 +127,9 @@ ssys = build_loop_lof_bypass(;
 
 Dt = Differential(t)
 op = Pair{Any,Any}[
-    ssys.ine.port_in.mdot => mdot_ss,  # Inertia carries forced-flow momentum
-    ssys.ret.port_in.mdot => mdot_ss,  # return channel flow (flapper closed at t=0)
-    Dt(ssys.ret.port_in.mdot) => 0.0,  # index-reduced state; zero at quasi-SS
+    ssys.ine.inlet.ṁ => mdot_ss,  # Inertia carries forced-flow momentum
+    ssys.ret.inlet.ṁ => mdot_ss,  # return channel flow (flapper closed at t=0)
+    Dt(ssys.ret.inlet.ṁ) => 0.0,  # index-reduced state; zero at quasi-SS
     ssys.flapper.T_open => 1.0e30,     # sentinel: flapper has not fired yet
 ]
 for i in 1:n
@@ -145,7 +145,7 @@ for i in 1:n
 end
 
 i_T_open = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
-i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.port_in.mdot)
+i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.inlet.ṁ)
 
 cb = ContinuousCallback(
     (u, t_cb, integrator) -> u[i_ine_mdot] - threshold,
@@ -172,10 +172,10 @@ println()
 
 t_vec = sol.t  # actual solver time points (may include callback-inserted extras)
 
-mdot_ch = sol[ssys.heated.ch.port_in.mdot, :]
-mdot_ret = sol[ssys.ret.port_in.mdot, :]
-mdot_flap = sol[ssys.flapper.port_in.mdot, :]
-mdot_ine = sol[ssys.ine.port_in.mdot, :]
+mdot_ch = sol[ssys.heated.ch.inlet.ṁ, :]
+mdot_ret = sol[ssys.ret.inlet.ṁ, :]
+mdot_flap = sol[ssys.flapper.inlet.ṁ, :]
+mdot_ine = sol[ssys.ine.inlet.ṁ, :]
 
 # Cell temperatures
 T_ch = [sol[ssys.heated.ch.T[i], :] for i in 1:n]   # T_ch[i][time_idx]
@@ -226,8 +226,8 @@ energy_balance_ratio = (Q_advect_final > 1e-3) ? Q_wall_final / Q_advect_final :
 println("="^70)
 println("KEY METRICS")
 println("="^70)
-@printf "  Steady-state mdot     : %.6f kg/s\n" mdot_ss
-@printf "  NC mdot (t=300s)      : %.6f kg/s  (%.1f%% of SS)\n" mdot_nc (
+@printf "  Steady-state ṁ     : %.6f kg/s\n" mdot_ss
+@printf "  NC ṁ (t=300s)      : %.6f kg/s  (%.1f%% of SS)\n" mdot_nc (
     100 * mdot_nc / mdot_ss
 )
 @printf "  T_max at SS           : %.2f K  (%.2f °C)\n" T_max_ss (T_max_ss - 273.15)
@@ -631,7 +631,7 @@ p10a = plot(
     color=:royalblue,
     xlabel="Time [s]",
     ylabel="Mass flow [kg/s]",
-    title="LOF Bypass: Natural Circulation Mass Flows (200–300s)\nNC |mdot| = $(round(mdot_nc_mean; digits=5)) kg/s  ($(round(100*mdot_nc_mean/mdot_ss; digits=1))% of SS)",
+    title="LOF Bypass: Natural Circulation Mass Flows (200–300s)\nNC |ṁ| = $(round(mdot_nc_mean; digits=5)) kg/s  ($(round(100*mdot_nc_mean/mdot_ss; digits=1))% of SS)",
     size=(1000, 500),
     dpi=150,
 )
@@ -836,7 +836,7 @@ println("ALL PLOTS SAVED")
 println("="^70)
 println()
 println("  01_overview/                        (0–300s, big picture)")
-println("    01_flow_all_components.png        4-panel: each mdot separately")
+println("    01_flow_all_components.png        4-panel: each ṁ separately")
 println("    02_flow_ch_ret.png                ch vs ret reversal, full time")
 println("    03_temperatures_ch.png            all cell temps, full time")
 println("    04_flapper_xi.png                 flapper opening, full time")
@@ -851,7 +851,7 @@ println("    06_re_htc_log_zoom.png            Re & HTC log scale (lam/turb)")
 println("    07_pressure_drops_zoom.png        dP sign flip at NC onset")
 println()
 println("  03_nc_equilibrium/                  (200–300s, NC plateau)")
-println("    01_nc_flow.png                    NC mdot values + flat lines")
+println("    01_nc_flow.png                    NC ṁ values + flat lines")
 println("    02_nc_temperatures_ch.png         cell temps at NC equilibrium")
 println("    03_nc_heat_flux.png               wall heat flux at NC")
 println("    04_nc_re_htc.png                  Re & HTC at NC (laminar check)")

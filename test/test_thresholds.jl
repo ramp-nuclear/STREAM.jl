@@ -47,14 +47,14 @@ using STREAM
 
     @testset "q_OFI_whittle_forgan" begin
         # Anchor: Python physical_models.thresholds.Whittle_Forgan_OFI with the same pipe,
-        # mdot=0.5, and cp = light_water.specific_heat integrated over the same physical
+        # ṁ=0.5, and cp = light_water.specific_heat integrated over the same physical
         # range. Python cp takes Celsius, Julia cp_water takes Kelvin, so the Python call
         # used inlet=26.85 C, sat=100.0 C (= 300 K, 373.15 K). cp(26.85 C) = 4177.78 matches
         # Julia cp_water(300 K) = 4177.78, confirming the same Simantov correlation.
         # Whittle_Forgan_OFI(...) -> 135474.34677914483.
         result = q_OFI_whittle_forgan(0.5, 373.15, 300.0, pipe)
         @test result ≈ 135474.34677914483 rtol = 1e-7  # two adaptive quadratures
-        # mdot sign does not change OFI (the function takes |mdot| and |G|).
+        # ṁ sign does not change OFI (the function takes |ṁ| and |G|).
         @test q_OFI_whittle_forgan(-0.5, 373.15, 300.0, pipe) ≈ result rtol = 1e-10
         # OFI power stays below the boiling-onset power for the same channel.
         q_onset = q_boiling_onset(0.5, 373.15, 300.0, cp_water(300.0))
@@ -69,28 +69,28 @@ using STREAM
         # minimum cell. (Python's numba `directed` was monkeypatched to its plain-numpy
         # equivalent so the function would run; the formula is untouched.)
         #
-        # The two branches of the Pe<>70000 switch are still exercised. mdot=0.5 hits the
-        # convective St_c branch; mdot=0.3 hits the conductive Nu_c branch. We keep an
+        # The two branches of the Pe<>70000 switch are still exercised. ṁ=0.5 hits the
+        # convective St_c branch; ṁ=0.3 hits the conductive Nu_c branch. We keep an
         # explicit Pe guard so a future constant change that silently flips the branch is
         # caught rather than passing on the wrong branch.
         Nu_c = 455.0
         St_c = 0.0065
-        function pe_at(mdot)
-            G = abs(mdot) / pipe.A
+        function pe_at(ṁ)
+            G = abs(ṁ) / pipe.A
             return G * pipe.Dh * cp_water(300.0) / k_water(300.0)
         end
 
-        # High-Pe (convective) branch: Saha_Zuber_OSV_computed_bulk(mdot=0.5) -> 1443852.2363455354
+        # High-Pe (convective) branch: Saha_Zuber_OSV_computed_bulk(ṁ=0.5) -> 1443852.2363455354
         @test pe_at(0.5) >= 7e4  # guard: must be the convective St_c branch
         @test q_OSV_saha_zuber(300.0, 0.5, pipe) ≈ 1443852.2363455354 rtol = 1e-9
 
-        # Low-Pe (conductive) branch: Saha_Zuber_OSV_computed_bulk(mdot=0.3) -> 899904.7329676608
+        # Low-Pe (conductive) branch: Saha_Zuber_OSV_computed_bulk(ṁ=0.3) -> 899904.7329676608
         @test pe_at(0.3) < 7e4  # guard: must be the conductive Nu_c branch
         @test q_OSV_saha_zuber(300.0, 0.3, pipe) ≈ 899904.7329676608 rtol = 1e-9
 
         # Explicit flux_shape + dz path (dz = 0.06 each, uniform shape). Same total length
         # as the uniform default, so Python returns the same value:
-        # Saha_Zuber_OSV_computed_bulk(mdot=0.5, dz=0.06) -> 1443852.2363455354
+        # Saha_Zuber_OSV_computed_bulk(ṁ=0.5, dz=0.06) -> 1443852.2363455354
         @test q_OSV_saha_zuber(300.0, 0.5, pipe; flux_shape=ones(10), dz=0.06 * ones(10)) ≈
             1443852.2363455354 rtol = 1e-9
     end
@@ -110,32 +110,32 @@ using STREAM
         # so they fail unless the outlet subcooling is carried through.
 
         # Downward branch, q2 selected (subcooling term dominates):
-        # Sudo_Kaminaga_CHF(T_bulk=[320], mdot=0.5, g=9.81) -> 1391788.0650769984
+        # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=0.5, g=9.81) -> 1391788.0650769984
         @test q_CHF_sudo_kaminaga(320.0, 0.5, pipe, 9.81) ≈ 1391788.0650769984 rtol = 1e-9
         # Colder bulk -> larger subcooling -> higher CHF.
-        # Sudo_Kaminaga_CHF(T_bulk=[300], mdot=0.5, g=9.81) -> 1915508.8797814196
+        # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=0.5, g=9.81) -> 1915508.8797814196
         @test q_CHF_sudo_kaminaga(300.0, 0.5, pipe, 9.81) ≈ 1915508.8797814196 rtol = 1e-9
         @test q_CHF_sudo_kaminaga(300.0, 0.5, pipe, 9.81) >
             q_CHF_sudo_kaminaga(320.0, 0.5, pipe, 9.81)
 
-        # q4-binding cases (NONZERO outlet subcooling). Large mdot grows q2 past q4, so q4
+        # q4-binding cases (NONZERO outlet subcooling). Large ṁ grows q2 past q4, so q4
         # is the selected (most limiting) sub-correlation. These exercise the corrected
         # outlet term: q4 = q1*(1 + 5000*dT_outlet/|G*|) with dT_outlet > 0.
-        # Sudo_Kaminaga_CHF(T_bulk=[300], mdot=5.0, g=9.81) -> 11350154.095336435
+        # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=5.0, g=9.81) -> 11350154.095336435
         @test q_CHF_sudo_kaminaga(300.0, 5.0, pipe, 9.81) ≈ 11350154.095336435 rtol = 1e-9
-        # Sudo_Kaminaga_CHF(T_bulk=[300], mdot=8.0, g=9.81) -> 14693105.002503937
+        # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=8.0, g=9.81) -> 14693105.002503937
         @test q_CHF_sudo_kaminaga(300.0, 8.0, pipe, 9.81) ≈ 14693105.002503937 rtol = 1e-9
 
-        # Upward branch: negative mdot flips G* < 0, folding q1 into the max, so the
+        # Upward branch: negative ṁ flips G* < 0, folding q1 into the max, so the
         # selection genuinely differs from the downward branch and yields a higher CHF.
-        # Sudo_Kaminaga_CHF(T_bulk=[320], mdot=-0.5, g=9.81) -> 2567664.771611573
+        # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=-0.5, g=9.81) -> 2567664.771611573
         @test q_CHF_sudo_kaminaga(320.0, -0.5, pipe, 9.81) ≈ 2567664.771611573 rtol = 1e-9
         @test q_CHF_sudo_kaminaga(320.0, -0.5, pipe, 9.81) >
             q_CHF_sudo_kaminaga(320.0, 0.5, pipe, 9.81)
 
         # Gravity enters Julia only as |g| (Julia takes abs(gravity) for the capillary
         # length), so flipping the gravity sign leaves the result unchanged for positive
-        # mdot. This is a Julia-internal choice: Python does NOT abs g and returns NaN for
+        # ṁ. This is a Julia-internal choice: Python does NOT abs g and returns NaN for
         # negative g, so this assertion is a Julia self-check, not a Python anchor.
         @test q_CHF_sudo_kaminaga(320.0, 0.5, pipe, -9.81) ≈
             q_CHF_sudo_kaminaga(320.0, 0.5, pipe, 9.81) rtol = 1e-10
@@ -186,7 +186,7 @@ end
         q_flux=fill(5e5, n),
         q_flux_left=fill(5e5, n),
         q_flux_right=fill(4e5, n),
-        mdot=0.5,
+        ṁ=0.5,
         velocity=fill(3.0, n),
         pipe=pipe,
         gravity=9.81,
@@ -196,7 +196,7 @@ end
         @test state.n == n
         @test length(state.T_bulk) == n
         @test state.T_inlet == 300.0
-        @test state.mdot == 0.5
+        @test state.ṁ == 0.5
         @test state.gravity == 9.81
         @test state.pipe === pipe
     end
@@ -275,7 +275,7 @@ end
         q_flux=fill(5e5, n),
         q_flux_left=fill(5e5, n),
         q_flux_right=fill(4e5, n),
-        mdot=0.5,
+        ṁ=0.5,
         velocity=fill(3.0, n),
         pipe=pipe,
         gravity=9.81,
@@ -307,7 +307,7 @@ end
         q_flux=fill(0.0, n),
         q_flux_left=fill(0.0, n),
         q_flux_right=fill(0.0, n),
-        mdot=0.5,
+        ṁ=0.5,
         velocity=fill(3.0, n),
         pipe=pipe,
         gravity=9.81,
@@ -333,7 +333,7 @@ end
         q_flux=fill(5e5, n),
         q_flux_left=fill(5e5, n),
         q_flux_right=fill(4e5, n),
-        mdot=0.5,
+        ṁ=0.5,
         velocity=fill(3.0, n),
         pipe=pipe,
         gravity=9.81,

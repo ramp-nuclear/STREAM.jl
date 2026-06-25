@@ -13,55 +13,57 @@ using STREAM: Resistor, VolumetricFlowResistor
     mdot_analytical = dP_val / (5.0/6.0 * R_val)
 
     # Symmetric cube: 3 source branches from corner 0, 3 sink branches to corner 7
-    # Body-diagonal paths: each of 3 "short" 1-resistor paths carries mdot/3
-    # Each of 6 "long" 2-resistor paths carries mdot/6 (edge contribution)
-    # For initial guess: pump.port_out = full mdot; each direct branch ~ mdot/3
+    # Body-diagonal paths: each of 3 "short" 1-resistor paths carries ṁ/3
+    # Each of 6 "long" 2-resistor paths carries ṁ/6 (edge contribution)
+    # For initial guess: pump.outlet = full ṁ; each direct branch ~ ṁ/3
     mdot_full = mdot_analytical
 
     op = [
-        ssys.pump.port_out.mdot => mdot_full,
+        ssys.pump.outlet.ṁ => mdot_full,
         # Three source edges from corner 0
-        ssys.r01.port_in.mdot => mdot_full / 3.0,
-        ssys.r02.port_in.mdot => mdot_full / 3.0,
-        ssys.r04.port_in.mdot => mdot_full / 3.0,
+        ssys.r01.inlet.ṁ => mdot_full / 3.0,
+        ssys.r02.inlet.ṁ => mdot_full / 3.0,
+        ssys.r04.inlet.ṁ => mdot_full / 3.0,
         # Internal edges (rough equal split)
-        ssys.r13.port_in.mdot => mdot_full / 6.0,
-        ssys.r15.port_in.mdot => mdot_full / 6.0,
-        ssys.r23.port_in.mdot => mdot_full / 6.0,
-        ssys.r26.port_in.mdot => mdot_full / 6.0,
-        ssys.r45.port_in.mdot => mdot_full / 6.0,
-        ssys.r46.port_in.mdot => mdot_full / 6.0,
+        ssys.r13.inlet.ṁ => mdot_full / 6.0,
+        ssys.r15.inlet.ṁ => mdot_full / 6.0,
+        ssys.r23.inlet.ṁ => mdot_full / 6.0,
+        ssys.r26.inlet.ṁ => mdot_full / 6.0,
+        ssys.r45.inlet.ṁ => mdot_full / 6.0,
+        ssys.r46.inlet.ṁ => mdot_full / 6.0,
         # Three sink edges to corner 7
-        ssys.r37.port_in.mdot => mdot_full / 3.0,
-        ssys.r57.port_in.mdot => mdot_full / 3.0,
-        ssys.r67.port_in.mdot => mdot_full / 3.0,
+        ssys.r37.inlet.ṁ => mdot_full / 3.0,
+        ssys.r57.inlet.ṁ => mdot_full / 3.0,
+        ssys.r67.inlet.ṁ => mdot_full / 3.0,
     ]
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
-    mdot_numerical = abs(sol[ssys.pump.port_out.mdot])
+    mdot_numerical = abs(sol[ssys.pump.outlet.ṁ])
     @test isapprox(mdot_numerical, mdot_analytical; rtol=0.01)
 end
 
-@testset "VolumetricFlowResistor — quadratic drop dP = k*mdot^2 (rho=1)" begin
+@testset "VolumetricFlowResistor — quadratic drop dP = k*ṁ^2 (rho=1)" begin
     dP = 3.0e4
     k = 1.0e5
     @named pump = Pump(dP)
     @named hx = HeatExchanger(300.0)
     @named vfr = VolumetricFlowResistor(; k=k, density=1.0)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, vfr.port_in),
-        connect(vfr.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, hx.inlet),
+        connect(hx.outlet, vfr.inlet),
+        connect(vfr.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:vfr_loop), pump, hx, vfr)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.vfr.port_in.mdot => 0.5])
+    sol = solve_steady(ssys, [ssys.vfr.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
-    mdot = sol[ssys.vfr.port_in.mdot]
-    @test isapprox(mdot, sqrt(dP / k); rtol=1e-6)         # k*Q^2 = dP, Q = mdot (rho=1)
-    @test isapprox(sol[ssys.vfr.port_in.P] - sol[ssys.vfr.port_out.P], k * mdot * abs(mdot);
+    ṁ = sol[ssys.vfr.inlet.ṁ]
+    @test isapprox(ṁ, sqrt(dP / k); rtol=1e-6)         # k*Q^2 = dP, Q = ṁ (rho=1)
+    @test isapprox(
+        sol[ssys.vfr.inlet.p] - sol[ssys.vfr.outlet.p],
+        k * ṁ * abs(ṁ);
                    rtol=1e-6)
 end
 
@@ -73,17 +75,18 @@ end
     @named hx = HeatExchanger(300.0)
     @named vfr = VolumetricFlowResistor(; k=k, klow=klow, density=1.0)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, vfr.port_in),
-        connect(vfr.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, hx.inlet),
+        connect(hx.outlet, vfr.inlet),
+        connect(vfr.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:vfr_klow), pump, hx, vfr)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.vfr.port_in.mdot => 0.4])
+    sol = solve_steady(ssys, [ssys.vfr.inlet.ṁ => 0.4])
     @test sol.retcode == ReturnCode.Success
-    q = sol[ssys.vfr.port_in.mdot]                         # rho=1 ⇒ Q = mdot
-    @test isapprox(sol[ssys.vfr.port_in.P] - sol[ssys.vfr.port_out.P],
+    q = sol[ssys.vfr.inlet.ṁ]                         # rho=1 ⇒ Q = ṁ
+    @test isapprox(
+        sol[ssys.vfr.inlet.p] - sol[ssys.vfr.outlet.p],
                    k * q * abs(q) + klow * q; rtol=1e-6)
     @test isapprox(k * q^2 + klow * q, dP; rtol=1e-6)      # closed-form force balance
 end
@@ -103,7 +106,7 @@ end
     # dP = k_fn(t)*q*|q| holds at two distinct times AND that the flow actually fell, so the
     # time-varying behavior the name evokes is exercised, not just compiled.
     dP_head = 3.0e4   # Pa, fixed pump head
-    k0 = 1.0e5        # Pa*s^2/kg^2 at t=0 (density=1 -> Q = mdot)
+    k0 = 1.0e5        # Pa*s^2/kg^2 at t=0 (density=1 -> Q = ṁ)
     # Build the ramp and the constant seed from one factory so they share a closure type.
     # The resistor stores k as an MTK callable parameter typed to the function it was built
     # with, so the steady-solve seed and the transient override must be the same type to be
@@ -116,10 +119,10 @@ end
     @named hx = HeatExchanger(300.0)
     @named vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, vfr.port_in),
-        connect(vfr.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, hx.inlet),
+        connect(hx.outlet, vfr.inlet),
+        connect(vfr.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:vfr_kfn_loop), pump, hx, vfr)
     ssys = mtkcompile(sys)
@@ -132,7 +135,8 @@ end
     # default steady solver goes unstable relaxing it; the stiff explicit relaxation settles
     # cleanly (same choice as the callable-pump ramp test).
     sol_ss = solve_steady(
-        ssys, Pair{Any,Any}[ssys.vfr.port_in.mdot => q0, ssys.vfr.k_fn => k_hold];
+        ssys,
+        Pair{Any,Any}[ssys.vfr.inlet.ṁ => q0, ssys.vfr.k_fn => k_hold];
         solver=DynamicSS(Rodas5P()),
     )
     @test sol_ss.retcode == ReturnCode.Success
@@ -147,8 +151,8 @@ end
     # expected; 1e-4 stays far tighter than the 4x resistance change being verified.
     for ti in (2, length(t_arr))
         tt = t_arr[ti]
-        q = sol[ssys.vfr.port_in.mdot, ti]
-        dP_meas = sol[ssys.vfr.port_in.P, ti] - sol[ssys.vfr.port_out.P, ti]
+        q = sol[ssys.vfr.inlet.ṁ, ti]
+        dP_meas = sol[ssys.vfr.inlet.p, ti] - sol[ssys.vfr.outlet.p, ti]
         @test isapprox(dP_meas, kfn(tt) * q * abs(q); rtol=1e-4)
         # And the flow magnitude matches the closed form sqrt(dP_head / k(t)).
         @test isapprox(abs(q), sqrt(dP_head / kfn(tt)); rtol=1e-4)
@@ -156,8 +160,8 @@ end
 
     # The time-varying resistance must drive the flow strictly down between the first and
     # last sample (k roughly quadruples from t=0 to t=3, so Q halves).
-    q_first = abs(sol[ssys.vfr.port_in.mdot, 1])
-    q_last = abs(sol[ssys.vfr.port_in.mdot, length(t_arr)])
+    q_first = abs(sol[ssys.vfr.inlet.ṁ, 1])
+    q_last = abs(sol[ssys.vfr.inlet.ṁ, length(t_arr)])
     @test q_last < q_first
     @test isapprox(q_last / q_first, sqrt(kfn(0.0) / kfn(t_arr[end])); rtol=1e-4)
 end
@@ -165,23 +169,23 @@ end
 @testset "LocalPressureDrop — sudden expansion ΔP matches Idelchik closed form" begin
     A1, A2 = 1.0, 2.0
     Tin = 293.15
-    mdot = 3.0
-    @named pump = Pump(; mdot0=mdot)        # fixed-flow so mdot is exact
+    ṁ = 3.0
+    @named pump = Pump(; mdot0=ṁ)        # fixed-flow so ṁ is exact
     @named hx = HeatExchanger(Tin)
     @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, lpd.port_in),
-        connect(lpd.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, hx.inlet),
+        connect(hx.outlet, lpd.inlet),
+        connect(lpd.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:lpd_loop), pump, hx, lpd)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.lpd.port_in.mdot => mdot])
+    sol = solve_steady(ssys, [ssys.lpd.inlet.ṁ => ṁ])
     @test sol.retcode == ReturnCode.Success
     A = min(A1, A2)
-    f = STREAM._local_loss_factor(mdot, A1, A2, mu_water(Tin))
-    dp_expected = f * mdot * abs(mdot) / (2 * rho_water(Tin) * A^2)
-    @test isapprox(sol[ssys.lpd.port_in.P] - sol[ssys.lpd.port_out.P], dp_expected; rtol=1e-6)
+    f = STREAM._local_loss_factor(ṁ, A1, A2, mu_water(Tin))
+    dp_expected = f * ṁ * abs(ṁ) / (2 * rho_water(Tin) * A^2)
+    @test isapprox(sol[ssys.lpd.inlet.p] - sol[ssys.lpd.outlet.p], dp_expected; rtol=1e-6)
     @test dp_expected > 0.0   # forward flow drops pressure
 end

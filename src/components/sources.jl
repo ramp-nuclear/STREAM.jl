@@ -111,7 +111,7 @@ end
     ConvectiveBoundary(; name, area) -> System
 
 One-way convective heat sink at a single wall cell: imposes
-`thermal.Q_flow ~ h * area * (thermal.T - T_fluid)`. The conductance `h` and fluid
+`thermal.Q ~ h * area * (thermal.T - T_fluid)`. The conductance `h` and fluid
 temperature `T_fluid` are unbound input variables — supply them with binding equations
 to a channel's live `h_tc[i]` and coolant `T[i]`. The heat absorbed leaves through this
 element and is never returned to whatever supplies `h`/`T_fluid`, so the coupling is
@@ -137,6 +137,6 @@ function ConvectiveBoundary(; name, area)
     pars = @parameters area = area
     @named thermal = ThermalPort()
     vars = @variables h(t) T_fluid(t)
-    eqs = Equation[thermal.Q_flow ~ h * area * (thermal.T - T_fluid)]
+    eqs = Equation[thermal.Q ~ h * area * (thermal.T - T_fluid)]
     return compose(System(eqs, t, collect(vars), pars; name=name), thermal)
 end

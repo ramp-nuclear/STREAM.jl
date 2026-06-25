@@ -30,13 +30,13 @@ using STREAM
         )
 
         op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
-        push!(op, ssys.ch.port_in.mdot => mdot_guess)
+        push!(op, ssys.ch.inlet.ṁ => mdot_guess)
 
         sol = solve_steady(ssys, op)
         @test sol.retcode == ReturnCode.Success
         @test sol[ssys.ch.T_out] > T_inlet      # outlet > inlet (fluid heated)
         @test sol[ssys.ch.T_out] < 400.0        # physically reasonable (< 127°C)
-        @test sol[ssys.ch.port_in.mdot] > 0     # positive mass flow
+        @test sol[ssys.ch.inlet.ṁ] > 0     # positive mass flow
     end
 
     @testset "solve_transient returns time-series (callable T_wall step)" begin
@@ -61,11 +61,11 @@ using STREAM
         )
 
         op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
-        push!(op_guess, ssys_ss.ch.port_in.mdot => mdot_guess)
+        push!(op_guess, ssys_ss.ch.inlet.ṁ => mdot_guess)
 
         sol_ss = solve_steady(ssys_ss, op_guess)
         op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
-        push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys_ss.ch.port_in.mdot])
+        push!(op_ic, ssys.ch.inlet.ṁ => sol_ss[ssys_ss.ch.inlet.ṁ])
         # Include callable parameter in op for the transient system.
         T_wall_sym = last(parameters(ssys))   # T_wall_callable is the last parameter
         push!(op_ic, T_wall_sym => T_wall_step)
@@ -85,7 +85,7 @@ using STREAM
         # loop, so the end value should sit essentially on the new steady outlet.
         ssys_final = build_loop_transient(T_inlet=T_inlet, T_wall_0=T_wall_final)
         op_final = [ssys_final.ch.T[i] => T_guess[i] for i in 1:n]
-        push!(op_final, ssys_final.ch.port_in.mdot => mdot_guess)
+        push!(op_final, ssys_final.ch.inlet.ṁ => mdot_guess)
         sol_final = solve_steady(ssys_final, op_final)
         @test sol_final.retcode == ReturnCode.Success
         T_out_final_steady = sol_final[ssys_final.ch.T_out]
@@ -121,22 +121,25 @@ using STREAM
         @named res = Resistor(r)
         @named hx = HeatExchanger(300.0)
         conns = [
-            connect(pump.port_out, ine.port_in),
-            connect(ine.port_out, res.port_in),
-            connect(res.port_out, hx.port_in),
-            connect(hx.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
+            connect(pump.outlet, ine.inlet),
+            connect(ine.outlet, res.inlet),
+            connect(res.outlet, hx.inlet),
+            connect(hx.outlet, pump.inlet),
+            pump.inlet.p ~ 1.0e5,
         ]
         @named sys = compose(System(conns, t; name=:coast), pump, ine, res, hx)
         ssys = mtkcompile(sys)
-        sol_ss = solve_steady(ssys, [ssys.ine.port_in.mdot => mdot0])
+        sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => mdot0])
         @test sol_ss.retcode == ReturnCode.Success
 
         t_arr = range(0.0, 1.0; length=5)
         sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0])
         @test sol.retcode == ReturnCode.Success
-        mdot = sol[ssys.ine.port_in.mdot, :]
-        @test isapprox(mdot[1], mdot0; rtol=1e-4)                       # starts at the solved steady
-        @test all(isapprox(mdot[i], mdot0 * exp(-(r / L) * tt); rtol=1e-3) for (i, tt) in enumerate(t_arr))
+        ṁ = sol[ssys.ine.inlet.ṁ, :]
+        @test isapprox(ṁ[1], mdot0; rtol=1e-4)                       # starts at the solved steady
+        @test all(
+            isapprox(ṁ[i], mdot0 * exp(-(r / L) * tt); rtol=1e-3) for
+            (i, tt) in enumerate(t_arr)
+        )
     end
 end

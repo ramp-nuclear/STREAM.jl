@@ -93,14 +93,14 @@ end
                               rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
 
     conns = [
-        connect(pump_l.port_out, hx_l.port_in),
-        connect(hx_l.port_out, cac_l.port_in),
-        connect(cac_l.port_out, pump_l.port_in),
-        pump_l.port_in.P ~ 1.0e5,
-        connect(pump_r.port_out, hx_r.port_in),
-        connect(hx_r.port_out, cac_r.port_in),
-        connect(cac_r.port_out, pump_r.port_in),
-        pump_r.port_in.P ~ 1.0e5,
+        connect(pump_l.outlet, hx_l.inlet),
+        connect(hx_l.outlet, cac_l.inlet),
+        connect(cac_l.outlet, pump_l.inlet),
+        pump_l.inlet.p ~ 1.0e5,
+        connect(pump_r.outlet, hx_r.inlet),
+        connect(hx_r.outlet, cac_r.inlet),
+        connect(cac_r.outlet, pump_r.inlet),
+        pump_r.inlet.p ~ 1.0e5,
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
         [connect(getproperty(hd, Symbol(:thermal_right, i)),
@@ -120,7 +120,7 @@ end
         [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
         [ssys.cac_l.T[i] => T_w for i in 1:nz],
         [ssys.cac_r.T[i] => T_w for i in 1:nz],
-        Pair[ssys.cac_l.port_in.mdot => +0.250, ssys.cac_r.port_in.mdot => +0.250],
+        Pair[ssys.cac_l.inlet.ṁ => +0.250, ssys.cac_r.inlet.ṁ => +0.250],
     )
 
     s0 = solve_steady(ssys, baseop(0.00127))   # default gap
@@ -130,9 +130,9 @@ end
 
     # One knob moves the coolant outlet AND the fuel-plate temperature, in a direction
     # set by the physics. Narrowing the channel gap raises hydraulic resistance, so at
-    # the fixed pump head (3e4 Pa) the steady mass flow drops (the supplied mdot is only
+    # the fixed pump head (3e4 Pa) the steady mass flow drops (the supplied ṁ is only
     # an IC guess; the real flow comes out of the pump/friction balance). The plate still
-    # dumps the same total power into the coolant, so a smaller mdot means a larger coolant
+    # dumps the same total power into the coolant, so a smaller ṁ means a larger coolant
     # temperature rise: T_out goes UP. The plate, cooled by hotter coolant across a higher
     # wall resistance, also gets hotter. Both deltas are positive.
     T_out0 = s0[ssys.cac_l.T_out]
@@ -145,18 +145,18 @@ end
 
     # Magnitude is fixed by a per-channel energy balance, not a hand-picked number.
     # Every watt the wall puts into the coolant must show up as enthalpy rise, so
-    #     T_out - T_in == Q_wall_total / (mdot * cp)
+    #     T_out - T_in == Q_wall_total / (ṁ * cp)
     # with T_in the heat-exchanger setpoint, Q_wall_total the solved per-channel wall heat,
-    # and mdot the solved flow. Both Q_wall_total and mdot are read back from the solution,
+    # and ṁ the solved flow. Both Q_wall_total and ṁ are read back from the solution,
     # so this ties the thermal answer to the hydraulic one. The only slack is cp's mild
     # temperature dependence across the channel, which the 2% tolerance covers (the raw
     # residual is ~1e-5).
     for s in (s0, s1)
         Q_ch = s[ssys.cac_l.Q_wall_total]
-        mdot = s[ssys.cac_l.port_in.mdot]
+        ṁ = s[ssys.cac_l.inlet.ṁ]
         T_out = s[ssys.cac_l.T_out]
         cp = cp_water((T_in + T_out) / 2)
-        @test isapprox(T_out - T_in, Q_ch / (mdot * cp); rtol=0.02)
+        @test isapprox(T_out - T_in, Q_ch / (ṁ * cp); rtol=0.02)
     end
 
     # Sanity-bound the throttling mechanism: the wall load splits evenly between the two
@@ -165,7 +165,7 @@ end
     # rounding level.
     @test isapprox(s0[ssys.cac_l.Q_wall_total], 5e3; rtol=1e-3)
     @test isapprox(s1[ssys.cac_l.Q_wall_total], 5e3; rtol=1e-3)
-    @test s1[ssys.cac_l.port_in.mdot] < s0[ssys.cac_l.port_in.mdot]
+    @test s1[ssys.cac_l.inlet.ṁ] < s0[ssys.cac_l.inlet.ṁ]
     @test (T_out1 - T_out0) > 1.0
     @test (T_out1 - T_out0) < 15.0
 end

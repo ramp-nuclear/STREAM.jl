@@ -54,17 +54,17 @@ function bergles_rohsenow_t_onb(pressure, q_wall, T_sat)
 end
 
 """
-    q_boiling_onset(mdot, T_sat, T_inlet, cp) -> Q [W]
+    q_boiling_onset(ṁ, T_sat, T_inlet, cp) -> Q [W]
 
 Channel power required to reach the saturation temperature at the outlet (Boiling Power / BP).
 Also known as the "boiling power limit" per TERMIC/CONVEC.
 
-Formula: `Q = |mdot| * cp * (T_sat - T_inlet)`
+Formula: `Q = |ṁ| * cp * (T_sat - T_inlet)`
 
 Source: Python STREAM thresholds.py `boiling_power`.
 
 # Arguments
-- `mdot`: mass flow rate [kg/s] (sign-insensitive; uses `abs(mdot)`)
+- `ṁ`: mass flow rate [kg/s] (sign-insensitive; uses `abs(ṁ)`)
 - `T_sat`: saturation temperature [K]
 - `T_inlet`: coolant inlet temperature [K]
 - `cp`: specific heat at inlet temperature [J/(kg·K)]
@@ -72,26 +72,26 @@ Source: Python STREAM thresholds.py `boiling_power`.
 # Returns
 Channel power limit for boiling onset `Q` [W].
 """
-function q_boiling_onset(mdot, T_sat, T_inlet, cp)
-    return abs(mdot) * cp * (T_sat - T_inlet)
+function q_boiling_onset(ṁ, T_sat, T_inlet, cp)
+    return abs(ṁ) * cp * (T_sat - T_inlet)
 end
 
 """
-    q_OFI_whittle_forgan(mdot, T_sat, T_inlet, pipe) -> Q [W]
+    q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe) -> Q [W]
 
 Channel power at Onset of Flow Instability (OFI) per Whittle-Forgan (1967)
 with Fabréga correction.
 
 Formula:
-    Q_OFI = |mdot| * ∫cp(T)dT / (1 + 3.15*(Dh/L)*(1.08*G_cgs)^0.29)
+    Q_OFI = |ṁ| * ∫cp(T)dT / (1 + 3.15*(Dh/L)*(1.08*G_cgs)^0.29)
 
-where G_cgs = |mdot|/A / 10 (mass flux converted from SI to CGS).
+where G_cgs = |ṁ|/A / 10 (mass flux converted from SI to CGS).
 The cp integral ∫cp(T)dT is evaluated from T_inlet to T_sat using `quadgk`.
 
 Source: Python STREAM thresholds.py `Whittle_Forgan_OFI`.
 
 # Arguments
-- `mdot`: mass flow rate [kg/s] (sign-insensitive; uses `abs(mdot)`)
+- `ṁ`: mass flow rate [kg/s] (sign-insensitive; uses `abs(ṁ)`)
 - `T_sat`: saturation temperature [K]
 - `T_inlet`: coolant inlet temperature [K]
 - `pipe`: channel geometry [`PipeGeometry`]
@@ -99,15 +99,15 @@ Source: Python STREAM thresholds.py `Whittle_Forgan_OFI`.
 # Returns
 OFI limit power `Q_OFI` [W].
 """
-function q_OFI_whittle_forgan(mdot, T_sat, T_inlet, pipe)
-    G = abs(mdot) / pipe.A
+function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe)
+    G = abs(ṁ) / pipe.A
     G_cgs = G / 10  # SI to CGS conversion (G must be in CGS per Whittle-Forgan)
     integral_cp, _ = quadgk(cp_water, T_inlet, T_sat)
-    return abs(mdot) * integral_cp / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
+    return abs(ṁ) * integral_cp / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
 end
 
 """
-    q_OSV_saha_zuber(T_inlet, mdot, pipe; flux_shape=nothing, dz=nothing, flux_enworse=1.0) -> q_OSV [W/m^2]
+    q_OSV_saha_zuber(T_inlet, ṁ, pipe; flux_shape=nothing, dz=nothing, flux_enworse=1.0) -> q_OSV [W/m^2]
 
 Onset of Significant Void (OSV) heat flux using self-consistent Saha-Zuber (1974) formulation.
 
@@ -117,7 +117,7 @@ operates exactly at q_OSV, yielding a self-consistent result.
 Pe threshold: Pe < 70000 → `X = k/Dh * Nu_c` (Nu_c = 455);
               Pe >= 70000 → `X = St_c * G * cp` (St_c = 0.0065).
 
-Formula: `q_OSV = X * (T_sat - T_inlet) / (1 + X * Hp/(|mdot|*cp) * cumsum(q_shape*dz) / (q_shape*flux_enworse))`
+Formula: `q_OSV = X * (T_sat - T_inlet) / (1 + X * Hp/(|ṁ|*cp) * cumsum(q_shape*dz) / (q_shape*flux_enworse))`
 
 When `flux_shape` is `nothing`, uniform flux is assumed (all flux values equal; shape factor = 1 at each cell).
 
@@ -125,7 +125,7 @@ Source: Python STREAM thresholds.py `Saha_Zuber_OSV_computed_bulk`.
 
 # Arguments
 - `T_inlet`: coolant inlet temperature [K]
-- `mdot`: mass flow rate [kg/s]
+- `ṁ`: mass flow rate [kg/s]
 - `pipe`: channel geometry [`PipeGeometry`]
 - `flux_shape`: optional axial heat flux distribution vector (freely normalized); default: uniform
 - `dz`: optional axial cell lengths [m]; default: `pipe.L / n_cells` per cell
@@ -135,13 +135,18 @@ Source: Python STREAM thresholds.py `Saha_Zuber_OSV_computed_bulk`.
 OSV heat flux `q_OSV` [W/m^2]. Returns the minimum (most conservative) value along the channel.
 """
 function q_OSV_saha_zuber(
-    T_inlet, mdot, pipe; flux_shape=nothing, dz=nothing, flux_enworse=1.0
+    T_inlet,
+    ṁ,
+    pipe;
+    flux_shape=nothing,
+    dz=nothing,
+    flux_enworse=1.0,
 )
     # Coolant properties at inlet temperature
     rho = rho_water(T_inlet)
     cp = cp_water(T_inlet)
     k = k_water(T_inlet)
-    G = abs(mdot) / pipe.A
+    G = abs(ṁ) / pipe.A
     u = G / rho
     # Peclet number
     pe = rho * u * pipe.Dh * cp / k
@@ -170,7 +175,7 @@ function q_OSV_saha_zuber(
 
     dT = T_sat_est - T_inlet
     Hp = pipe.heated_perimeter
-    power_factor = Hp / (abs(mdot) * cp)
+    power_factor = Hp / (abs(ṁ) * cp)
     cumulative = cumsum(shape .* dz_local)
     shape_factor = cumulative ./ (shape .* flux_enworse)
     denominator = 1.0 .+ X .* power_factor .* shape_factor
@@ -180,7 +185,7 @@ function q_OSV_saha_zuber(
 end
 
 """
-    q_CHF_sudo_kaminaga(T_bulk, mdot, pipe, gravity; rho_l=958.4, rho_v=0.598, hfg=2257e3, sigma=0.059, cp_sat=4217.0, T_sat=373.15) -> q_CHF [W/m^2]
+    q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity; rho_l=958.4, rho_v=0.598, hfg=2257e3, sigma=0.059, cp_sat=4217.0, T_sat=373.15) -> q_CHF [W/m^2]
 
 Critical Heat Flux (CHF) per Sudo-Kaminaga (1998) correlation for plate-type fuel.
 
@@ -197,7 +202,7 @@ Source: Python STREAM thresholds.py `sudo_kaminaga_chf`.
 
 # Arguments
 - `T_bulk`: bulk coolant temperature [K] (scalar, at inlet cell)
-- `mdot`: mass flow rate [kg/s]
+- `ṁ`: mass flow rate [kg/s]
 - `pipe`: channel geometry [`PipeGeometry`]
 - `gravity`: gravitational acceleration [m/s^2] (sign: positive = upward-to-downward, negative = upward flow)
 - `rho_l`: saturated liquid density [kg/m^3] (default: 958.4 at 100°C)
@@ -212,7 +217,7 @@ CHF heat flux `q_CHF` [W/m^2].
 """
 function q_CHF_sudo_kaminaga(
     T_bulk,
-    mdot,
+    ṁ,
     pipe,
     gravity;
     rho_l=958.4,
@@ -228,7 +233,7 @@ function q_CHF_sudo_kaminaga(
     Aht = sum(pipe.heated_parts) * pipe.L
     A_ratio = pipe.A / Aht
 
-    G_star = mdot / pipe.A / sqrt(lamda * drho * rho_v * g_abs)
+    G_star = ṁ / pipe.A / sqrt(lamda * drho * rho_v * g_abs)
 
     # Local subcooling at this cell. Python STREAM's Sudo_Kaminaga_CHF feeds q2/q3 the inlet
     # subcooling and q4 the outlet subcooling (different cells of the channel). This function runs

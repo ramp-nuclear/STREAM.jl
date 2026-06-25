@@ -8,9 +8,9 @@ using STREAM: Channel  # resolve Base.Channel ambiguity
 const ModelingToolkitBase = ModelingToolkit.ModelingToolkitBase
 using ModelingToolkit: t_nounits as t
 
-@testset "mdot is a Flow variable" begin
+@testset "ṁ is a Flow variable" begin
     @named fp = FlowPort()
-    mdot_var = only(filter(v -> ModelingToolkit.getname(v) == :mdot, unknowns(fp)))
+    mdot_var = only(filter(v -> ModelingToolkit.getname(v) == :ṁ, unknowns(fp)))
     connect_type = Symbolics.getmetadata(
         mdot_var, ModelingToolkitBase.VariableConnectType, nothing
     )

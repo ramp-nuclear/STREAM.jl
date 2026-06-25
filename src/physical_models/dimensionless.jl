@@ -4,12 +4,12 @@
 # None are @register_symbolic.
 
 """
-    Re(mdot, A, Dh, mu) -> Float64
+    Re(ṁ, A, Dh, mu) -> Float64
 
 Reynolds number from mass flow rate.
 
 # Arguments
-- `mdot`: mass flow rate [kg/s] (absolute value taken internally)
+- `ṁ`: mass flow rate [kg/s] (absolute value taken internally)
 - `A`: flow area [m^2]
 - `Dh`: hydraulic diameter [m]
 - `mu`: dynamic viscosity [Pa*s]
@@ -17,7 +17,7 @@ Reynolds number from mass flow rate.
 # Returns
 Reynolds number (dimensionless).
 """
-Re(mdot, A, Dh, mu) = abs(mdot) * Dh / (A * mu)
+Re(ṁ, A, Dh, mu) = abs(ṁ) * Dh / (A * mu)
 
 """
     Re_vel(rho, u, L, mu) -> Float64

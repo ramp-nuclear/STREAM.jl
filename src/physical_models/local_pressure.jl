@@ -100,18 +100,18 @@ function _sudden_contraction_factor(aratio, re)
     )
 end
 
-# Loss coefficient K for a sudden area change A1 -> A2 at mass flow `mdot`, viscosity `mu`.
-# Forward flow (mdot >= 0) goes 1 -> 2: an expansion if A2 >= A1, a contraction otherwise.
-# Reverse flow swaps the role. Returns the dimensionless K used in dp = K*mdot|mdot|/(2 rho A^2).
-function _local_loss_factor(mdot::Real, A1::Real, A2::Real, mu::Real)
+# Loss coefficient K for a sudden area change A1 -> A2 at mass flow `ṁ`, viscosity `mu`.
+# Forward flow (ṁ >= 0) goes 1 -> 2: an expansion if A2 >= A1, a contraction otherwise.
+# Reverse flow swaps the role. Returns the dimensionless K used in dp = K*ṁ|ṁ|/(2 rho A^2).
+function _local_loss_factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
     A = min(A1, A2)
     aratio = min(A1 / A2, A2 / A1)
     Dh = sqrt(A / pi)
-    re = abs(mdot) * Dh / (A * mu)
+    re = abs(ṁ) * Dh / (A * mu)
     pos, neg = A2 >= A1 ?
                (_sudden_expansion_factor, _sudden_contraction_factor) :
                (_sudden_contraction_factor, _sudden_expansion_factor)
-    return mdot >= 0 ? pos(aratio, re) : neg(aratio, re)
+    return ṁ >= 0 ? pos(aratio, re) : neg(aratio, re)
 end
 
-@register_symbolic _local_loss_factor(mdot::Real, A1::Real, A2::Real, mu::Real)
+@register_symbolic _local_loss_factor(ṁ::Real, A1::Real, A2::Real, mu::Real)

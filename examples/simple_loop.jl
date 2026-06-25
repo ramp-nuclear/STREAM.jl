@@ -7,7 +7,7 @@
 # What this script demonstrates:
 #   1. Build a single closed forced-convection loop with build_loop().
 #   2. Solve the steady-state using solve_steady() with a temperature initial guess.
-#   3. Print key results (T_outlet, mdot, T_rise) and save an axial temperature profile.
+#   3. Print key results (T_outlet, ṁ, T_rise) and save an axial temperature profile.
 #
 # Physical overview:
 #   Topology (series loop):
@@ -50,7 +50,7 @@ ssys = build_loop(;
 
 T_guess = steady_state_guess(; T_inlet=T_INLET, Q_wall=1e4, mdot_guess=0.490, n=N_CELLS)
 op = [ssys.ch.T[i] => T_guess[i] for i in 1:N_CELLS]
-push!(op, ssys.ch.port_in.mdot => 0.490)
+push!(op, ssys.ch.inlet.ṁ => 0.490)
 
 println("Solving steady state...")
 sol = solve_steady(ssys, op)
@@ -60,12 +60,12 @@ if sol.retcode != ReturnCode.Success
 end
 
 T_out = sol[ssys.ch.T_out]
-mdot = abs(sol[ssys.ch.port_in.mdot])
+ṁ = abs(sol[ssys.ch.inlet.ṁ])
 T_axial = [sol[ssys.ch.T[i]] for i in 1:N_CELLS]
 
 println("Steady-state results:")
 println("  T_outlet = $(round(T_out - 273.15, digits=2)) °C")
-println("  mdot     = $(round(mdot, digits=4)) kg/s")
+println("  ṁ     = $(round(ṁ, digits=4)) kg/s")
 println("  T_rise   = $(round(T_out - T_INLET, digits=2)) K")
 
 z_positions = range(0.0, L_CHANNEL; length=N_CELLS)

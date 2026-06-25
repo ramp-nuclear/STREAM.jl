@@ -34,12 +34,12 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
 - `T_wall_right::AbstractArray` — right face wall temperature per cell [K]
 - `T_sat::AbstractArray`      — saturation temperature per cell [K]
 - `T_ONB::AbstractArray`      — onset of nucleate boiling temperature per cell [K]
-- `T_inlet::Float64`           — inlet temperature from `port_in.T` [K]
+- `T_inlet::Float64`           — inlet temperature from `inlet.T` [K]
 - `P::AbstractArray`          — absolute pressure per cell [Pa]
 - `q_flux::AbstractArray`     — conservative heat flux: `max(q_flux_left, q_flux_right)` per cell [W/m²]
 - `q_flux_left::AbstractArray`  — left face heat flux per cell [W/m²]
 - `q_flux_right::AbstractArray` — right face heat flux per cell [W/m²]
-- `mdot::Float64`              — mass flow rate from `port_in.mdot` [kg/s]
+- `ṁ::Float64`              — mass flow rate from `inlet.ṁ` [kg/s]
 - `velocity::AbstractArray`   — absolute fluid velocity per cell [m/s]
 - `pipe::Union{PipeGeometry, Nothing}` — channel geometry, or `nothing` if unavailable
 - `gravity::Float64`           — gravitational acceleration [m/s²]
@@ -57,7 +57,7 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
     q_flux::AbstractArray
     q_flux_left::AbstractArray
     q_flux_right::AbstractArray
-    mdot::Float64
+    ṁ::Float64
     velocity::AbstractArray
     pipe::Union{PipeGeometry,Nothing}
     gravity::Float64
@@ -96,8 +96,8 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         qwl_arr = hcat([sol[channel_sys.q_wall_left[i], :] for i in 1:n]...)'
         qwr_arr = hcat([sol[channel_sys.q_wall_right[i], :] for i in 1:n]...)'
         # Scalar fields: use first time point
-        T_inlet_val = sol[channel_sys.port_in.T, 1]
-        mdot_val = sol[channel_sys.port_in.mdot, 1]
+        T_inlet_val = sol[channel_sys.inlet.T, 1]
+        mdot_val = sol[channel_sys.inlet.ṁ, 1]
     else
         # Steady state: scalar per cell
         T_bulk = [sol[channel_sys.T[i]] for i in 1:n]
@@ -109,8 +109,8 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         vel_arr = [sol[channel_sys.velocity[i]] for i in 1:n]
         qwl_arr = [sol[channel_sys.q_wall_left[i]] for i in 1:n]
         qwr_arr = [sol[channel_sys.q_wall_right[i]] for i in 1:n]
-        T_inlet_val = sol[channel_sys.port_in.T]
-        mdot_val = sol[channel_sys.port_in.mdot]
+        T_inlet_val = sol[channel_sys.inlet.T]
+        mdot_val = sol[channel_sys.inlet.ṁ]
     end
 
     # Conservative wall temperature: max of left and right face
@@ -142,7 +142,7 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         q_flux=q_flux,
         q_flux_left=q_flux_left,
         q_flux_right=q_flux_right,
-        mdot=mdot_val,
+        ṁ=mdot_val,
         velocity=vel_arr,
         pipe=pipe,
         gravity=gravity,
@@ -250,7 +250,7 @@ end
 
 Channel power at which the bulk coolant reaches saturation temperature per cell.
 
-Calls `q_boiling_onset.(state.mdot, state.T_sat, state.T_inlet, cp_water.(state.T_bulk))`.
+Calls `q_boiling_onset.(state.ṁ, state.T_sat, state.T_inlet, cp_water.(state.T_bulk))`.
 
 # Arguments
 - `state`: extracted channel state
@@ -259,7 +259,7 @@ Calls `q_boiling_onset.(state.mdot, state.T_sat, state.T_inlet, cp_water.(state.
 Vector (or matrix for transient) of boiling onset power limits [W] per cell.
 """
 function boiling_onset_power(state::ChannelState)
-    return q_boiling_onset.(state.mdot, state.T_sat, state.T_inlet, cp_water.(state.T_bulk))
+    return q_boiling_onset.(state.ṁ, state.T_sat, state.T_inlet, cp_water.(state.T_bulk))
 end
 
 """
@@ -270,7 +270,7 @@ Returns a scalar (single value for the whole channel, not per cell).
 
 Requires `state.pipe !== nothing`.
 
-Calls `q_OFI_whittle_forgan(state.mdot, state.T_sat[1], state.T_inlet, state.pipe)`.
+Calls `q_OFI_whittle_forgan(state.ṁ, state.T_sat[1], state.T_inlet, state.pipe)`.
 
 # Arguments
 - `state`: extracted channel state (must have `pipe` set)
@@ -280,7 +280,7 @@ OFI power limit [W] for the channel.
 """
 function OFI_power(state::ChannelState)
     T_sat_rep = state.T_sat isa AbstractMatrix ? state.T_sat[1, 1] : state.T_sat[1]
-    return q_OFI_whittle_forgan(state.mdot, T_sat_rep, state.T_inlet, state.pipe)
+    return q_OFI_whittle_forgan(state.ṁ, T_sat_rep, state.T_inlet, state.pipe)
 end
 
 """
@@ -291,7 +291,7 @@ Returns a scalar (minimum over all cells — most conservative).
 
 Requires `state.pipe !== nothing`.
 
-Calls `q_OSV_saha_zuber(state.T_inlet, state.mdot, state.pipe)`.
+Calls `q_OSV_saha_zuber(state.T_inlet, state.ṁ, state.pipe)`.
 
 # Arguments
 - `state`: extracted channel state (must have `pipe` set)
@@ -300,7 +300,7 @@ Calls `q_OSV_saha_zuber(state.T_inlet, state.mdot, state.pipe)`.
 OSV heat flux limit [W/m²] (minimum over all channel cells).
 """
 function OSV_flux(state::ChannelState)
-    return q_OSV_saha_zuber(state.T_inlet, state.mdot, state.pipe)
+    return q_OSV_saha_zuber(state.T_inlet, state.ṁ, state.pipe)
 end
 
 """
@@ -308,7 +308,7 @@ end
 
 Critical Heat Flux per Sudo-Kaminaga (1998) plate-type fuel correlation, per cell.
 
-Calls `q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, state.pipe, state.gravity)`.
+Calls `q_CHF_sudo_kaminaga.(state.T_bulk, state.ṁ, state.pipe, state.gravity)`.
 
 # Arguments
 - `state`: extracted channel state (must have `pipe` set)
@@ -317,7 +317,7 @@ Calls `q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, state.pipe, state.gravity)
 Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
 """
 function sudo_kaminaga_chf(state::ChannelState)
-    return q_CHF_sudo_kaminaga.(state.T_bulk, state.mdot, Ref(state.pipe), state.gravity)
+    return q_CHF_sudo_kaminaga.(state.T_bulk, state.ṁ, Ref(state.pipe), state.gravity)
 end
 
 """

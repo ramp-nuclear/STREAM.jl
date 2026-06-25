@@ -22,25 +22,25 @@ end
     mdot0 = 1.0
 
     # A pump holds mdot0 through the linear resistor, then shuts off and the flow coasts as
-    # mdot = mdot0·exp(-(R/L)·t). Drive the loop to steady with the pump on, then start the
+    # ṁ = mdot0·exp(-(R/L)·t). Drive the loop to steady with the pump on, then start the
     # transient from the full solved state with the pump head overridden to 0. Transplanting every
     # state from the solved point keeps the IC consistent no matter which variables MTK keeps as
     # states.
-    @named pump = Pump(R_val * mdot0)   # head R·mdot0 balances the linear drop R·mdot at mdot0
+    @named pump = Pump(R_val * mdot0)   # head R·mdot0 balances the linear drop R·ṁ at mdot0
     @named L_comp = Inertia(L_over_A)
     @named R_comp = Resistor(R_val)
     @named hx = HeatExchanger(300.0)
     connections = [
-        connect(pump.port_out, L_comp.port_in),
-        connect(L_comp.port_out, R_comp.port_in),
-        connect(R_comp.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, L_comp.inlet),
+        connect(L_comp.outlet, R_comp.inlet),
+        connect(R_comp.outlet, hx.inlet),
+        connect(hx.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(connections, t; name=:rl_sys), pump, L_comp, R_comp, hx)
     ssys = mtkcompile(sys)
 
-    sol_ss = solve_steady(ssys, [ssys.L_comp.port_in.mdot => mdot0])
+    sol_ss = solve_steady(ssys, [ssys.L_comp.inlet.ṁ => mdot0])
     @test sol_ss.retcode == ReturnCode.Success
     sol = solve_transient(ssys, sol_ss, range(0.0, 5000.0; length=200);
                           overrides=[ssys.pump.dP_pump => 0.0])
@@ -48,7 +48,7 @@ end
     @test sol.retcode == ReturnCode.Success
     t_check = [0.0, 500.0, 1000.0, 2000.0, 5000.0]
     for tc in t_check
-        mdot_num = sol(tc, idxs=ssys.L_comp.port_in.mdot)
+        mdot_num = sol(tc; idxs=ssys.L_comp.inlet.ṁ)
         mdot_ana = exp(-tc / tau)
         @test isapprox(mdot_num, mdot_ana; rtol=0.01)
     end
@@ -179,7 +179,7 @@ end
     @test sol(1.0; idxs=ssys.q_out[1]) == fn(1.0)             # 1.1e5
 end
 
-@testset "ConvectiveBoundary: construction + single Q_flow equation" begin
+@testset "ConvectiveBoundary: construction + single Q equation" begin
     @named cb = ConvectiveBoundary(; area=0.01)
     @test cb isa ModelingToolkit.System
     var_strs = string.(unknowns(cb))
@@ -187,7 +187,7 @@ end
     @test any(s -> occursin("T_fluid(t)", s), var_strs)
 end
 
-@testset "ConvectiveBoundary: imposes Q_flow = h*area*(T_wall - T_fluid)" begin
+@testset "ConvectiveBoundary: imposes Q = h*area*(T_wall - T_fluid)" begin
     area = 0.07 * 0.06
     h_val = 5000.0
     T_wall = 350.0
@@ -203,11 +203,11 @@ end
     ss = mtkcompile(s; fully_determined=true)
     prob = ODEProblem(ss, Pair[], (0.0, 1.0))
     sol = solve(prob, Rodas5P())
-    @test sol[ss.cb.thermal.Q_flow][end] ≈ h_val * area * (T_wall - T_fluid)
+    @test sol[ss.cb.thermal.Q][end] ≈ h_val * area * (T_wall - T_fluid)
 end
 
 @testset "ConvectiveBoundary: heat leaves the wall when fluid is cooler" begin
-    # Q_flow into the element is positive (heat absorbed by the fluid) when the wall is
+    # Q into the element is positive (heat absorbed by the fluid) when the wall is
     # hotter than the fluid; the connected wall therefore sheds heat (one-way sink).
     area = 0.02
     @named cb = ConvectiveBoundary(; area=area)
@@ -216,6 +216,6 @@ end
     @named s = compose(System(conns, t; name=:cbsign), cb, wall)
     ss = mtkcompile(s; fully_determined=true)
     sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())
-    @test sol[ss.cb.thermal.Q_flow][end] > 0.0
-    @test sol[ss.wall.thermal.Q_flow][end] < 0.0
+    @test sol[ss.cb.thermal.Q][end] > 0.0
+    @test sol[ss.wall.thermal.Q][end] < 0.0
 end

@@ -17,11 +17,11 @@ function _diffusion_eqs(;
 
     return [
         [
-            thermal_left[i].Q_flow ~
+            thermal_left[i].Q ~
                 k_s * (y * dz) * (thermal_left[i].T - T[i, 1]) / (dx / 2) for i in 1:nz
         ]...  # Left heat flux
         [
-            thermal_right[i].Q_flow ~
+            thermal_right[i].Q ~
                 k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2) for i in 1:nz
         ]...  # Right heat flux
         [

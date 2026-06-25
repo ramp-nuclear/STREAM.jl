@@ -207,6 +207,6 @@ end
 
 function assert_equivalence_anchors(; expected_P_abs::Float64=1.0e5)
     @info "Equivalence checklist: pressure anchor = $expected_P_abs Pa " *
-          "(Julia: pump.port_in.P ~ $expected_P_abs; " *
+        "(Julia: pump.inlet.p ~ $expected_P_abs; " *
           "Python: reference_node=(\"A\", $expected_P_abs))"
 end

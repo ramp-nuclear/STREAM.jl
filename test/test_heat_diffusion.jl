@@ -82,7 +82,7 @@ end
     end
 end
 
-@testset "Steady-state plate T > T_boundary and Q_flow signs correct" begin
+@testset "Steady-state plate T > T_boundary and Q signs correct" begin
     nz, nx = 3, 3
     T_bc = 600.0
     pwr = 1e5
@@ -129,10 +129,10 @@ end
 
     left_syms = [getproperty(ssys.hd, Symbol(:thermal_left, i)) for i in 1:nz]
     right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
-    Q_left_total = sum(sol[left_syms[i].Q_flow] for i in 1:nz)
-    Q_right_total = sum(sol[right_syms[i].Q_flow] for i in 1:nz)
+    Q_left_total = sum(sol[left_syms[i].Q] for i in 1:nz)
+    Q_right_total = sum(sol[right_syms[i].Q] for i in 1:nz)
 
-    # Both Q_flow < 0: heat leaving the plate (symmetric, plate hotter than T_bc)
+    # Both Q < 0: heat leaving the plate (symmetric, plate hotter than T_bc)
     @test Q_left_total < 0.0
     @test Q_right_total < 0.0
 
@@ -143,7 +143,7 @@ end
     @test isapprox(abs(Q_left_total) + abs(Q_right_total), pwr; rtol=1e-10)
 end
 
-@testset "Unconnected thermal_right has Q_flow == 0 (adiabatic)" begin
+@testset "Unconnected thermal_right has Q == 0 (adiabatic)" begin
     nz, nx = 3, 3
     T_bc = 600.0
     pwr = 5e4
@@ -173,10 +173,10 @@ end
     op = [ssys.hd.T[i, j] => T_bc + 10.0 for i in 1:nz for j in 1:nx]
     sol = solve_steady(ssys, op)
 
-    # Unconnected thermal_right ports must have Q_flow == 0
+    # Unconnected thermal_right ports must have Q == 0
     right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
     for i in 1:nz
-        @test isapprox(sol[right_syms[i].Q_flow], 0.0; atol=1e-8)
+        @test isapprox(sol[right_syms[i].Q], 0.0; atol=1e-8)
     end
 end
 

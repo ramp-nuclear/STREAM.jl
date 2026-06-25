@@ -26,8 +26,8 @@ circular duct, `f = 64 / Re`. Mirrors Python STREAM `friction.py::laminar_fricti
 (the `k_R = 1.0` case of the regime-dependent model), which is the same pure `64 / re`.
 
 This is the bare factor, so it goes to `Inf` as `Re -> 0`. That is the correct factor:
-the physical quantity is the pressure drop `f * mdot*|mdot| / (...)`, and with
-`mdot*|mdot| ~ Re^2` the product `~ (64/Re) * Re^2 ~ Re` vanishes smoothly as the flow
+the physical quantity is the pressure drop `f * ṁ*|ṁ| / (...)`, and with
+`ṁ*|ṁ| ~ Re^2` the product `~ (64/Re) * Re^2 ~ Re` vanishes smoothly as the flow
 stops (the Hagen-Poiseuille drop is linear in velocity). The no-flow case is handled by
 the caller that forms that product. For flow that reverses through `Re = 0`, use
 [`regime_dependent_friction`](@ref); it guards the no-flow point.
@@ -171,7 +171,7 @@ Two properties matter for integrating through a flow reversal:
 
 - the closure guards the no-flow point. At `Re = 0` the bare laminar `64/Re` is `Inf`, so
   the closure feeds its laminar branch a finite Reynolds there and returns 0 for the whole
-  factor. This is the symbolic-`Num` equivalent of Python's `if mdot == 0: return 0.0` at
+  factor. This is the symbolic-`Num` equivalent of Python's `if ṁ == 0: return 0.0` at
   the top of `regime_dependent_friction`, written with `Base.ifelse` because a Julia `if`
   on a `Num` does not trace. For every `Re > 0` the result is exactly the plain blend.
 - the linear interim blend makes the friction continuous across the laminar/turbulent
@@ -205,7 +205,7 @@ function regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0,
         f_inter = (f_turb - f_lam) / (re_hi - re_lo) * (Re - re_hi) + f_turb
         # Boundary inclusivity matches Python flow_regimes: Re <= re_lo laminar, re_hi < Re turbulent.
         f = Base.ifelse(Re <= re_lo, f_lam, Base.ifelse(Re > re_hi, f_turb, f_inter))
-        # No-flow guard, the symbolic equivalent of Python's `if mdot == 0: return 0.0`.
+        # No-flow guard, the symbolic equivalent of Python's `if ṁ == 0: return 0.0`.
         Base.ifelse(Re <= 0, zero(f), f)
     end
 end

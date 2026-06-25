@@ -3,14 +3,14 @@
 """
     Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0, fluid=Water()) -> System
 
-Flapper (passive check valve). While closed it admits **no flow** (`mdot = 0`); once open it
-is a quadratic resistor `ΔP = f·mdot·|mdot| / (2·ρ·area²)`. The valve opens the moment the
+Flapper (passive check valve). While closed it admits **no flow** (`ṁ = 0`); once open it
+is a quadratic resistor `ΔP = f·mdot·|ṁ| / (2·ρ·area²)`. The valve opens the moment the
 wired reference flow `ref_mdot` falls to `open_at_current`, detected by `flapper_callback`,
 which latches the opening time into the parameter `T_open`. After `T_open` the flow ramps in
 gradually through `xi = r(open_rate·(t − T_open))`, the C1 Hermite cubic `−2x³ + 3x²` rising
-0→1, so `mdot = xi · mdot_open`.
+0→1, so `ṁ = xi · mdot_open`.
 
-This mirrors Python STREAM's `Flapper` (closed ⇒ `mdot` 0; open ⇒ quadratic local-pressure
+This mirrors Python STREAM's `Flapper` (closed ⇒ `ṁ` 0; open ⇒ quadratic local-pressure
 resistor relaxed in from `t_open`). Two deliberate conventions:
 
   - **Relaxation.** STREAM.jl always uses the continuously-differentiable ramp `−2x³ + 3x²`.
@@ -33,7 +33,7 @@ would block the whole loop.
 `ref_mdot` has **no equation inside the component** — the caller wires it during composition,
 most readably with [`watch_flow`](@ref):
 ```julia
-watch_flow(flapper, pump.port_in.mdot)      # ≡  flapper.ref_mdot ~ pump.port_in.mdot
+watch_flow(flapper, pump.inlet.ṁ)      # ≡  flapper.ref_mdot ~ pump.inlet.ṁ
 ```
 Then build the detection event with `flapper_callback(ssys, ssys.flapper)` and hand it to
 `solve_transient(...; callbacks=cb)`.
@@ -49,7 +49,7 @@ Then build the detection event with `flapper_callback(ssys, ssys.flapper)` and h
   the inlet stream temperature
 
 # Ports
-- `port_in`, `port_out`: `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet`: `FlowPort` (pressure, mass flow, temperature)
 
 `ref_mdot` has no in-component equation, so a standalone Flapper is
 structurally underdetermined — call `mtkcompile(sys; fully_determined=false)`, or compose it
@@ -67,24 +67,24 @@ function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
 
     vars = @variables xi(t) ref_mdot(t)
 
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
 
-    rho = density(fluid, instream(port_in.T))
-    dp = port_in.P - port_out.P
+    rho = density(fluid, instream(inlet.T))
+    dp = inlet.p - outlet.p
     x = open_rate * (t - T_open)
     relax = ifelse(x <= 0.0, 0.0, ifelse(x >= 1.0, 1.0, -2 * x^3 + 3 * x^2))
-    # Open-state flow: invert ΔP = f·mdot·|mdot|/(2ρA²) ⇒ mdot = sign(dp)·sqrt(|dp|·2ρA²/f).
+    # Open-state flow: invert ΔP = f·mdot·|ṁ|/(2ρA²) ⇒ ṁ = sign(dp)·sqrt(|dp|·2ρA²/f).
     mdot_open = sign(dp) * sqrt(abs(dp) * 2 * rho * area^2 / f)
 
     eqs = Equation[
         xi ~ relax,
-        # Closed (t ≤ T_open): mdot = 0. Open: mdot = xi · mdot_open (quadratic, ramped in).
-        ifelse(t <= T_open, port_in.mdot, port_in.mdot - relax * mdot_open) ~ 0,
+        # Closed (t ≤ T_open): ṁ = 0. Open: ṁ = xi · mdot_open (quadratic, ramped in).
+        ifelse(t <= T_open, inlet.ṁ, inlet.ṁ - relax * mdot_open) ~ 0,
         # ref_mdot has no equation here — wire it with watch_flow during composition
     ]
 
-    return HydraulicTwoPort(; name, port_in, port_out, eqs, vars, pars)
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)
 end
 
 """
@@ -95,13 +95,13 @@ Wire a Flapper's reference flow to the mass flow `sym` it should watch, returnin
 
 ```julia
 conns = [
-    connect(pump.port_out, bypass.port_in, flapper.port_in),
-    connect(bypass.port_out, flapper.port_out, hx.port_in),
-    watch_flow(flapper, bypass.port_in.mdot),     # flapper opens when the bypass flow decays
+    connect(pump.outlet, bypass.inlet, flapper.inlet),
+    connect(bypass.outlet, flapper.outlet, hx.inlet),
+    watch_flow(flapper, bypass.inlet.ṁ),     # flapper opens when the bypass flow decays
 ]
 ```
 
-The watched flow can be any mass-flow variable in the system (a port `mdot`, a resistor inlet,
+The watched flow can be any mass-flow variable in the system (a port `ṁ`, a resistor inlet,
 an inertia branch). The detection event built by [`flapper_callback`](@ref) reads the wired
 flow back through this equation, so the two must refer to the same `flapper`.
 

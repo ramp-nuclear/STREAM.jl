@@ -3,11 +3,11 @@
 """
     Inertia(L_over_A; name) -> System
 
-Concentrated fluid inertia element for transient simulations. Adds `L/A * d(mdot)/dt`
+Concentrated fluid inertia element for transient simulations. Adds `L/A * d(ṁ)/dt`
 to the momentum equation.
 
 Note: Channel, ChannelAndContacts, and ChannelHeatFlux now carry their own distributed
-inertia via a momentum ODE `(L/A)*D(mdot)`. Use standalone Inertia only for concentrated
+inertia via a momentum ODE `(L/A)*D(ṁ)`. Use standalone Inertia only for concentrated
 inertia effects (fittings, sudden area changes, valves, piping outside channels). When
 placed in series with a Channel, both momentum ODEs contribute additively through MTK
 network topology -- correct physics (distributed + concentrated).
@@ -17,16 +17,16 @@ network topology -- correct physics (distributed + concentrated).
 - `name`: system name (Symbol)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 
 
 """
 function Inertia(L_over_A; name)
     pars = @parameters L_over_A = L_over_A
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[port_in.P - port_out.P ~ L_over_A * D(port_in.mdot)]   # ODE pressure eq
-    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[inlet.p - outlet.p ~ L_over_A * D(inlet.ṁ)]   # ODE pressure eq
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
 """
@@ -39,21 +39,21 @@ Ideal heat exchanger that resets fluid temperature to a fixed boundary condition
 - `name`: system name (Symbol)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 
 
 """
 function HeatExchanger(T_bc; name)
     pars = @parameters T_bc = T_bc
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ 0,
-        port_out.T ~ T_bc,
-        port_in.T ~ T_bc,
+        inlet.ṁ + outlet.ṁ ~ 0,
+        inlet.p - outlet.p ~ 0,
+        outlet.T ~ T_bc,
+        inlet.T ~ T_bc,
     ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    return compose(System(eqs, t, [], pars; name=name), inlet, outlet)
 end
 
 """

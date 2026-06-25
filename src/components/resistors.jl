@@ -12,7 +12,7 @@ Frictional pressure drop element using Darcy-Weisbach correlation.
 - `A`: flow area [m^2]
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Friction(; name, L, D, A)
     pars = @parameters begin
@@ -23,17 +23,17 @@ function Friction(; name, L, D, A)
         Re(t)
         f(t)
     end
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    T_in = instream(port_in.T)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
     eqs = Equation[
-        Re ~ abs(port_in.mdot) * D / (A * mu_water(T_in)),
+        Re ~ abs(inlet.ṁ) * D / (A * mu_water(T_in)),
         f ~ 0.3164 * Re^(-0.25),
-        port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(
+        inlet.p - outlet.p ~ f * (inlet.ṁ * abs(inlet.ṁ) / (2 * rho_water(
             T_in
         ) * A^2)) * (L / D),
     ]
-    return HydraulicTwoPort(; name, port_in, port_out, eqs, vars, pars)
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)
 end
 
 """
@@ -46,15 +46,15 @@ Hydrostatic pressure change for a vertical elevation change.
 - `name`: system name (Symbol)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Gravity(H; name)
     pars = @parameters H = H
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    T_in = instream(port_in.T)
-    eqs = Equation[port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H]
-    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
+    eqs = Equation[inlet.p - outlet.p ~ rho_water(T_in) * 9.80665 * H]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
 """
@@ -67,20 +67,20 @@ Generic flow resistance with a fixed resistance coefficient.
 - `name`: system name (Symbol)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Resistor(R; name)
     pars = @parameters R = R
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[port_in.P - port_out.P ~ R * port_in.mdot]
-    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[inlet.p - outlet.p ~ R * inlet.ṁ]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
 """
     VolumetricFlowResistor(; name, k, klow=0.0, density=rho_water) -> System
 
-Resistor quadratic in volumetric flow: `ΔP = k·Q·|Q| + klow·Q`, where `Q = mdot/ρ` is the
+Resistor quadratic in volumetric flow: `ΔP = k·Q·|Q| + klow·Q`, where `Q = ṁ/ρ` is the
 volumetric flow rate. The `Q·|Q|` form keeps the drop direction-correct under flow reversal.
 
 A **time-dependent** resistance (the "transistor" pattern — a branch whose resistance
@@ -97,7 +97,7 @@ same one `Channel`'s `h_left` uses).
   (default `rho_water`, evaluated at the inlet stream temperature)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function VolumetricFlowResistor(;
     name,
@@ -115,23 +115,23 @@ function VolumetricFlowResistor(;
         k_expr = kpars[1](t)
     end
     pars = Any[pars...; kpars...]
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    T_in = instream(port_in.T)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
     rho = density isa Real ? Num(density) : density(T_in)
-    q = port_in.mdot / rho
-    eqs = Equation[port_in.P - port_out.P ~ k_expr * q * abs(q) + klow * q]
-    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
+    q = inlet.ṁ / rho
+    eqs = Equation[inlet.p - outlet.p ~ k_expr * q * abs(q) + klow * q]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
 """
     LocalPressureDrop(; name, A1, A2, fluid=Water()) -> System
 
 Minor (local) pressure loss across a sudden area change `A1 -> A2`, after Idelchik tables
-4.2 (expansion) and 4.10 (contraction). The loss is `ΔP = K·mdot·|mdot| / (2·ρ·A_min²)`,
+4.2 (expansion) and 4.10 (contraction). The loss is `ΔP = K·mdot·|ṁ| / (2·ρ·A_min²)`,
 where the coefficient `K` depends on the area ratio and Reynolds number and on the flow
 direction — forward flow sees an expansion when `A2 ≥ A1` and a contraction otherwise, with
-the roles swapped under reversal. The `mdot·|mdot|` form keeps the drop direction-correct.
+the roles swapped under reversal. The `mdot·|ṁ|` form keeps the drop direction-correct.
 
 # Arguments
 - `name`: system name (Symbol)
@@ -141,18 +141,18 @@ the roles swapped under reversal. The `mdot·|mdot|` form keeps the drop directi
   viscosity at the inlet stream temperature
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function LocalPressureDrop(; name, A1, A2, fluid::AbstractFluid=Water())
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    T_in = instream(port_in.T)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
     A = min(A1, A2)
-    f = _local_loss_factor(port_in.mdot, A1, A2, viscosity(fluid, T_in))
+    f = _local_loss_factor(inlet.ṁ, A1, A2, viscosity(fluid, T_in))
     eqs = Equation[
-    port_in.P - port_out.P ~ f * port_in.mdot * abs(port_in.mdot) / (2 * density(
+    inlet.p - outlet.p ~ f * inlet.ṁ * abs(inlet.ṁ) / (2 * density(
         fluid, T_in
     ) * A^2),
     ]
-    return HydraulicTwoPort(; name, port_in, port_out, eqs)
+    return HydraulicTwoPort(; name, inlet, outlet, eqs)
 end

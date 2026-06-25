@@ -34,29 +34,29 @@ Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch
 - `mdot0`: fixed mass flow rate [kg/s]
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Pump(dP_pump::Real; name)
     pars = @parameters dP_pump = dP_pump
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[port_out.P - port_in.P ~ dP_pump]
-    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[outlet.p - inlet.p ~ dP_pump]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
 function Pump(dP_pump::Any; name)
     FType = typeof(dP_pump)
     pars = @parameters (dP_pump_fn::FType)(..)
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[port_out.P - port_in.P ~ dP_pump_fn(t)]
-    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[outlet.p - inlet.p ~ dP_pump_fn(t)]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
 function Pump(; name, mdot0)
     pars = @parameters mdot0 = mdot0
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[port_in.mdot ~ mdot0]
-    return HydraulicTwoPort(; name, port_in, port_out, eqs, pars=pars)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[inlet.ṁ ~ mdot0]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
