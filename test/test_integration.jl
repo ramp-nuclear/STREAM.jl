@@ -61,8 +61,7 @@ end
     @named R2 = Resistor(r2)
     conns = [
         inseries(pump, hx)...,
-        connect(hx.outlet, R1.inlet, R2.inlet),     # node J0
-        connect(R1.outlet, R2.outlet, pump.inlet),  # node J1
+        inparallel(hx, (R1, R2), pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:par_res), pump, hx, R1, R2)
@@ -243,10 +242,9 @@ end
     @named R2 = VolumetricFlowResistor(; k=k2, density=1.0)
     @named hx = HeatExchanger(300.0)
     conns = [
-        connect(pump.outlet, L_el.inlet),
-        connect(L_el.outlet, R1.inlet, R2.inlet),   # node J0
-        connect(R1.outlet, R2.outlet, hx.inlet),    # node J1
-        connect(hx.outlet, pump.inlet),
+        inseries(pump, L_el)...,
+        inparallel(L_el, (R1, R2), hx)...,
+        inseries(hx, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:parallel_coastdown), pump, L_el, R1, R2, hx)
@@ -385,9 +383,8 @@ end
                              fluid=ConstantFluid())
     @named hx = HeatExchanger(300.0)
     conns = [
-        connect(pump.outlet, R.inlet, flapper.inlet),
-        connect(R.outlet, flapper.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inparallel(pump, (R, flapper), hx)...,
+        inseries(hx, pump)...,
         watch_flow(flapper, R.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
@@ -455,10 +452,9 @@ end
                              fluid=ConstantFluid())
     @named hx = HeatExchanger(300.0)
     conns = [
-        connect(pump.outlet, ine.inlet),
-        connect(ine.outlet, R.inlet, flapper.inlet),
-        connect(R.outlet, flapper.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inseries(pump, ine)...,
+        inparallel(ine, (R, flapper), hx)...,
+        inseries(hx, pump)...,
         watch_flow(flapper, ine.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
@@ -493,10 +489,9 @@ end
     @named transistor = VolumetricFlowResistor(; k=kfn, density=1.0)
     @named hx = HeatExchanger(300.0)
     conns = [
-        connect(pump.outlet, ine.inlet),
-        connect(ine.outlet, R.inlet, transistor.inlet),
-        connect(R.outlet, transistor.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inseries(pump, ine)...,
+        inparallel(ine, (R, transistor), hx)...,
+        inseries(hx, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:transistor_coastdown), pump, ine, R, transistor, hx)

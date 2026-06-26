@@ -95,8 +95,7 @@ Wire a Flapper's reference flow to the mass flow `sym` it should watch, returnin
 
 ```julia
 conns = [
-    connect(pump.outlet, bypass.inlet, flapper.inlet),
-    connect(bypass.outlet, flapper.outlet, hx.inlet),
+    inparallel(pump, (bypass, flapper), hx)...,
     watch_flow(flapper, bypass.inlet.ṁ),     # flapper opens when the bypass flow decays
 ]
 ```

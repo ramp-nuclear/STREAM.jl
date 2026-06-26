@@ -16,9 +16,8 @@ function _flapper_parallel_loop(; flapper, pump, name)
     @named bypass = Resistor(1.0e5)
     @named hx = HeatExchanger(300.0)
     conns = [
-        connect(pump.outlet, bypass.inlet, flapper.inlet),
-        connect(bypass.outlet, flapper.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inparallel(pump, (bypass, flapper), hx)...,
+        inseries(hx, pump)...,
         watch_flow(flapper, bypass.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
@@ -74,10 +73,9 @@ end
                              fluid=ConstantFluid())
     @named hx = HeatExchanger(300.0)
     conns = [
-        connect(pump.outlet, ine.inlet),
-        connect(ine.outlet, res.inlet, flapper.inlet),
-        connect(res.outlet, flapper.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inseries(pump, ine)...,
+        inparallel(ine, (res, flapper), hx)...,
+        inseries(hx, pump)...,
         watch_flow(flapper, ine.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]

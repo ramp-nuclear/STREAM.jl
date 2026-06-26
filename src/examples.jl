@@ -394,15 +394,11 @@ function build_loop_lof_bypass(;
 
     connections = Equation[
         # D series branch: ext_res -> hx -> pump -> ine
-        connect(ext_res.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
-        connect(pump.outlet, ine.inlet),
-        # Node A (3-way): ine output -> heated.ch input + flapper input
-        connect(ine.outlet, heated.ch.inlet, flapper.inlet),
-        # Node B (2-way): heated.ch output -> ret input
-        connect(heated.ch.outlet, ret.inlet),
-        # Node C (3-way): ret output + flapper output -> ext_res input
-        connect(ret.outlet, flapper.outlet, ext_res.inlet),
+        inseries(ext_res, hx, pump, ine)...,
+        # Bypass split/merge: ine -> (heated.ch || flapper) -> ret
+        inparallel(ine, (heated.ch, flapper), ret)...,
+        # Return to the external resistor
+        inseries(ret, ext_res)...,
         # Boundary conditions
         pump.inlet.p ~ 1.0e5,
         watch_flow(flapper, ine.inlet.ṁ),

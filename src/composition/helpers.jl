@@ -30,6 +30,52 @@ function inseries(systems...)
     ]
 end
 
+_branch_systems(branch::Tuple) = collect(branch)
+_branch_systems(branch::AbstractVector) = collect(branch)
+_branch_systems(branch) = Any[branch]
+
+"""
+    inparallel(upstream, branches, downstream) -> Vector{Equation}
+
+Build the hydraulic connection equations for a parallel block. `upstream.outlet` feeds every
+branch inlet, each branch may be a single two-port component or a tuple/vector of components
+connected in series internally, and all branch outlets merge into `downstream.inlet`.
+
+# Arguments
+- `upstream`: uncompiled system exposing an `outlet` `FlowPort`
+- `branches`: collection of branch paths; each branch is either one uncompiled two-port system
+  or a tuple/vector of such systems
+- `downstream`: uncompiled system exposing an `inlet` `FlowPort`
+
+# Returns
+`Vector{Equation}` suitable for splicing into a `conns = [...]` list or passing to
+`System(conns, t; name=...)`.
+
+# Example
+```julia
+conns = [
+    inseries(pump, hx)...,
+    inparallel(hx, ((R1, G1), R2), pump)...,
+    pump.inlet.p ~ 1.0e5,
+]
+```
+"""
+function inparallel(upstream, branches, downstream)
+    length(branches) >= 1 ||
+        throw(ArgumentError("inparallel requires at least one branch"))
+    branch_paths = [_branch_systems(branch) for branch in branches]
+    branch_inlets = [getproperty(path[1], :inlet) for path in branch_paths]
+    branch_outlets = [getproperty(path[end], :outlet) for path in branch_paths]
+    eqs = Equation[
+        connect(getproperty(upstream, :outlet), branch_inlets...),
+        connect(branch_outlets..., getproperty(downstream, :inlet)),
+    ]
+    for path in branch_paths
+        length(path) > 1 && append!(eqs, inseries(path...))
+    end
+    return eqs
+end
+
 """
     port(sys, face, i)
 
