@@ -264,13 +264,7 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
         r57,
         r67,
     )
-
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_cube compile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
-        n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 

@@ -26,9 +26,10 @@ function Friction(; name, L, D, A)
     @named inlet = FlowPort()
     @named outlet = FlowPort()
     T_in = instream(inlet.T)
+    re = STREAM.Re(inlet.ṁ, A, D, mu_water(T_in))
     eqs = Equation[
-        Re ~ abs(inlet.ṁ) * D / (A * mu_water(T_in)),
-        f ~ 0.3164 * Re^(-0.25),
+        Re ~ re,
+        f ~ blasius_friction(Re),
         inlet.p - outlet.p ~ f * (inlet.ṁ * abs(inlet.ṁ) / (2 * rho_water(
             T_in
         ) * A^2)) * (L / D),
@@ -149,10 +150,8 @@ function LocalPressureDrop(; name, A1, A2, fluid::AbstractFluid=Water())
     T_in = instream(inlet.T)
     A = min(A1, A2)
     f = _local_loss_factor(inlet.ṁ, A1, A2, viscosity(fluid, T_in))
-    eqs = Equation[
-    inlet.p - outlet.p ~ f * inlet.ṁ * abs(inlet.ṁ) / (2 * density(
-        fluid, T_in
-    ) * A^2),
-    ]
+    ρ = density(fluid, T_in)
+    Δp₋ = inlet.p - outlet.p
+    eqs = Equation[Δp₋ ~ f * inlet.ṁ * abs(inlet.ṁ) / (2ρ * A^2)]
     return HydraulicTwoPort(; name, inlet, outlet, eqs)
 end
