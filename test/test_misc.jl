@@ -31,10 +31,7 @@ end
     @named R_comp = Resistor(R_val)
     @named hx = HeatExchanger(300.0)
     connections = [
-        connect(pump.outlet, L_comp.inlet),
-        connect(L_comp.outlet, R_comp.inlet),
-        connect(R_comp.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inseries(pump, L_comp, R_comp, hx, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(connections, t; name=:rl_sys), pump, L_comp, R_comp, hx)

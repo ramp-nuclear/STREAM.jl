@@ -121,10 +121,7 @@ using STREAM
         @named res = Resistor(r)
         @named hx = HeatExchanger(300.0)
         conns = [
-            connect(pump.outlet, ine.inlet),
-            connect(ine.outlet, res.inlet),
-            connect(res.outlet, hx.inlet),
-            connect(hx.outlet, pump.inlet),
+            inseries(pump, ine, res, hx, pump)...,
             pump.inlet.p ~ 1.0e5,
         ]
         @named sys = compose(System(conns, t; name=:coast), pump, ine, res, hx)

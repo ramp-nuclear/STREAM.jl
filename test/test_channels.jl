@@ -26,9 +26,7 @@ _names(sys) = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys))
     @named bc = HeatExchanger(T_INLET)
     @named ch = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT))
     connections = Equation[
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, ch.inlet),
-        connect(ch.outlet, pump.inlet),
+        inseries(pump, bc, ch, pump)...,
         pump.inlet.p ~ 1.0e5,
         [ch.T_wall_left[i]  ~ T_INLET for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_INLET for i in 1:n]...,
@@ -51,9 +49,7 @@ end
     @named bc = HeatExchanger(T_INLET)
     @named chf = ChannelHeatFlux(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT))
     connections = Equation[
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, chf.inlet),
-        connect(chf.outlet, pump.inlet),
+        inseries(pump, bc, chf, pump)...,
         pump.inlet.p ~ 1.0e5,
         [chf.q_left[i]  ~ 0.0 for i in 1:n]...,
         [chf.q_right[i] ~ 0.0 for i in 1:n]...,
@@ -76,9 +72,7 @@ end
     @named ch = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                           h_left=H_DEFAULT, h_right=0.0)
     connections = Equation[
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, ch.inlet),
-        connect(ch.outlet, pump.inlet),
+        inseries(pump, bc, ch, pump)...,
         pump.inlet.p ~ 1.0e5,
         [ch.T_wall_left[i]  ~ T_WALL for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_INLET for i in 1:n]...,  # decorative; h_right=0
@@ -108,9 +102,7 @@ end
     @named bc = HeatExchanger(T_INLET)
     @named chf = ChannelHeatFlux(; n=n, geometry=geom)
     connections = Equation[
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, chf.inlet),
-        connect(chf.outlet, pump.inlet),
+        inseries(pump, bc, chf, pump)...,
         pump.inlet.p ~ 1.0e5,
         [chf.q_left[i]  ~ Q_FLUX_DEFAULT for i in 1:n]...,
         [chf.q_right[i] ~ 0.0 for i in 1:n]...,
@@ -142,9 +134,7 @@ end
     @named bc = HeatExchanger(T_INLET)
     @named chf = ChannelHeatFlux(; n=n, geometry=geom, fluid=fluid)
     connections = Equation[
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, chf.inlet),
-        connect(chf.outlet, pump.inlet),
+        inseries(pump, bc, chf, pump)...,
         pump.inlet.p ~ 1.0e5,
         [chf.q_left[i] ~ q for i in 1:n]...,
         [chf.q_right[i] ~ 0.0 for i in 1:n]...,
@@ -173,9 +163,7 @@ end
     @named ch_s1 = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                             h_left=H_DEFAULT, h_right=0.0)
     conns_s1 = Equation[
-        connect(pump_s1.outlet, bc_s1.inlet),
-        connect(bc_s1.outlet, ch_s1.inlet),
-        connect(ch_s1.outlet, pump_s1.inlet),
+        inseries(pump_s1, bc_s1, ch_s1, pump_s1)...,
         pump_s1.inlet.p ~ 1.0e5,
         [ch_s1.T_wall_left[i]  ~ T_WALL for i in 1:n]...,
         [ch_s1.T_wall_right[i] ~ T_INLET for i in 1:n]...,  # Decorative, h is 0
@@ -197,9 +185,7 @@ end
                           h_left=H_DEFAULT, h_right=0.0)
     @named wt = WallTemperature(; n=n, T_wall=T_WALL)
     connections = Equation[
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, ch.inlet),
-        connect(ch.outlet, pump.inlet),
+        inseries(pump, bc, ch, pump)...,
         pump.inlet.p ~ 1.0e5,
         [ch.T_wall_left[i]  ~ wt.T_wall_out[i] for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_INLET for i in 1:n]...,  # Decorative, h is 0
@@ -224,9 +210,7 @@ end
     @named bc_s1 = HeatExchanger(T_INLET)
     @named chf_s1 = ChannelHeatFlux(; n=n, geometry=geom)
     conns_s1 = Equation[
-        connect(pump_s1.outlet, bc_s1.inlet),
-        connect(bc_s1.outlet, chf_s1.inlet),
-        connect(chf_s1.outlet, pump_s1.inlet),
+        inseries(pump_s1, bc_s1, chf_s1, pump_s1)...,
         pump_s1.inlet.p ~ 1.0e5,
         [chf_s1.q_left[i]  ~ Q_FLUX_DEFAULT for i in 1:n]...,
         [chf_s1.q_right[i] ~ 0.0 for i in 1:n]...,
@@ -245,9 +229,7 @@ end
     @named chf = ChannelHeatFlux(; n=n, geometry=geom)
     @named hfs = HeatFluxSource(; n=n, q=Q_FLUX_DEFAULT)
     connections = Equation[
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, chf.inlet),
-        connect(chf.outlet, pump.inlet),
+        inseries(pump, bc, chf, pump)...,
         pump.inlet.p ~ 1.0e5,
         [chf.q_left[i]  ~ hfs.q_out[i] for i in 1:n]...,
         [chf.q_right[i] ~ 0.0 for i in 1:n]...,
@@ -795,4 +777,3 @@ end
         end
     end
 end
-

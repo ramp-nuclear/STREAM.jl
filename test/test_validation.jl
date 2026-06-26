@@ -166,9 +166,7 @@ end
     ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:n]
     ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:n]
     conns = vcat(
-            [connect(pump.outlet, hx.inlet)],
-            [connect(hx.outlet, cac.inlet)],
-            [connect(cac.outlet, pump.inlet)],
+            inseries(pump, hx, cac, pump),
             [pump.inlet.p ~ 1.0e5],
         [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:n],
         [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n],
@@ -308,13 +306,9 @@ end
         power_shape=ps, power=1e4,
     )
     conns = [
-            connect(pump_l.outlet, hx_l.inlet),
-            connect(hx_l.outlet, cac_l.inlet),
-            connect(cac_l.outlet, pump_l.inlet),
+            inseries(pump_l, hx_l, cac_l, pump_l)...,
             pump_l.inlet.p ~ 1.0e5,
-            connect(pump_r.outlet, hx_r.inlet),
-            connect(hx_r.outlet, cac_r.inlet),
-            connect(cac_r.outlet, pump_r.inlet),
+            inseries(pump_r, hx_r, cac_r, pump_r)...,
             pump_r.inlet.p ~ 1.0e5,
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
@@ -456,13 +450,9 @@ end
         power_shape=ps, power=1e4,
     )
     conns = [
-            connect(pump_l.outlet, hx_l.inlet),
-            connect(hx_l.outlet, cac_l.inlet),
-            connect(cac_l.outlet, pump_l.inlet),
+            inseries(pump_l, hx_l, cac_l, pump_l)...,
             pump_l.inlet.p ~ 1.0e5,
-            connect(pump_r.outlet, hx_r.inlet),
-            connect(hx_r.outlet, cac_r.inlet),
-            connect(cac_r.outlet, pump_r.inlet),
+            inseries(pump_r, hx_r, cac_r, pump_r)...,
             pump_r.inlet.p ~ 1.0e5,
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
@@ -607,9 +597,7 @@ end
     cac = scc.cac_l
     fuel = scc.hd
     conns = [
-            connect(pump_l.outlet, hx_l.inlet),
-            connect(hx_l.outlet, cac.inlet),
-            connect(cac.outlet, pump_l.inlet),
+            inseries(pump_l, hx_l, cac, pump_l)...,
             pump_l.inlet.p ~ 1.0e5,
         fuel.power ~ 1e4,
     ]
@@ -827,9 +815,7 @@ end
 
     conns_v02 = [
         # Hydraulic loop
-        connect(pump_v02.outlet, hx_v02.inlet),
-        connect(hx_v02.outlet, cac_v02.inlet),
-        connect(cac_v02.outlet, pump_v02.inlet),
+        inseries(pump_v02, hx_v02, cac_v02, pump_v02)...,
         pump_v02.inlet.p ~ 1.0e5,
         # hd1 left face → cac thermal_left (hd1 is on the left of the channel)
         [

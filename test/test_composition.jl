@@ -55,9 +55,7 @@ end
     ct_l = [ConstantTemperature(313.15; name=Symbol(:ct_l_ok_, i)) for i in 1:4]
     ct_r = [ConstantTemperature(313.15; name=Symbol(:ct_r_ok_, i)) for i in 1:4]
     connections = [
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, ch.inlet),
-        connect(ch.outlet, pump.inlet),
+        inseries(pump, bc, ch, pump)...,
         pump.inlet.p ~ 1.0e5,
         [connect(ct_l[i].thermal, port(ch, :thermal_left, i)) for i in 1:4]...,
         [connect(ct_r[i].thermal, port(ch, :thermal_right, i)) for i in 1:4]...,
@@ -75,9 +73,7 @@ end
     ct_l = [ConstantTemperature(313.15; name=Symbol(:ct_l_bad_, i)) for i in 1:4]
     ct_r = [ConstantTemperature(313.15; name=Symbol(:ct_r_bad_, i)) for i in 1:4]
     connections = [
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, ch.inlet),
-        connect(ch.outlet, pump.inlet),
+        inseries(pump, bc, ch, pump)...,
         pump.inlet.p ~ 1.0e5,
         [connect(ct_l[i].thermal, port(ch, :thermal_left, i)) for i in 1:4]...,
         [connect(ct_r[i].thermal, port(ch, :thermal_right, i)) for i in 1:4]...,
@@ -121,9 +117,7 @@ end
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(313.15)
     conns = [
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, rods.cac.inlet),
-        connect(rods.cac.outlet, pump.inlet),
+        inseries(pump, bc, rods.cac, pump)...,
         pump.inlet.p ~ 1.0e5,
         rods.fuel.power ~ 1.0e3,
     ]
@@ -147,9 +141,7 @@ end
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(313.15)
     conns = [
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, rods.cac.inlet),
-        connect(rods.cac.outlet, pump.inlet),
+        inseries(pump, bc, rods.cac, pump)...,
         pump.inlet.p ~ 1.0e5,
         rods.fuel.power ~ 1.0e3,
     ]
@@ -172,9 +164,7 @@ end
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(313.15)
     conns = [
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, rods.cac.inlet),
-        connect(rods.cac.outlet, pump.inlet),
+        inseries(pump, bc, rods.cac, pump)...,
         pump.inlet.p ~ 1.0e5,
         rods.fuel.power ~ 1.0e3,
     ]
@@ -242,13 +232,9 @@ end
     @named pump_r = Pump(3.0e4)
     @named bc_r = HeatExchanger(313.15)
     conns = [
-        connect(pump_l.outlet, bc_l.inlet),
-        connect(bc_l.outlet, pl.ch_left.inlet),
-        connect(pl.ch_left.outlet, pump_l.inlet),
+        inseries(pump_l, bc_l, pl.ch_left, pump_l)...,
         pump_l.inlet.p ~ 1.0e5,
-        connect(pump_r.outlet, bc_r.inlet),
-        connect(bc_r.outlet, pl.ch_right.inlet),
-        connect(pl.ch_right.outlet, pump_r.inlet),
+        inseries(pump_r, bc_r, pl.ch_right, pump_r)...,
         pump_r.inlet.p ~ 1.0e5,
         pl.fuel.power ~ power_val,
     ]

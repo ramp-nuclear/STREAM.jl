@@ -93,13 +93,9 @@ end
                               rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
 
     conns = [
-        connect(pump_l.outlet, hx_l.inlet),
-        connect(hx_l.outlet, cac_l.inlet),
-        connect(cac_l.outlet, pump_l.inlet),
+        inseries(pump_l, hx_l, cac_l, pump_l)...,
         pump_l.inlet.p ~ 1.0e5,
-        connect(pump_r.outlet, hx_r.inlet),
-        connect(hx_r.outlet, cac_r.inlet),
-        connect(cac_r.outlet, pump_r.inlet),
+        inseries(pump_r, hx_r, cac_r, pump_r)...,
         pump_r.inlet.p ~ 1.0e5,
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,

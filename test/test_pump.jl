@@ -12,9 +12,7 @@ using STREAM: Pump, Channel
     @named bc5 = HeatExchanger(313.15)
     @named ch5 = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns5 = [
-        connect(pump5.outlet, bc5.inlet),
-        connect(bc5.outlet, ch5.inlet),
-        connect(ch5.outlet, pump5.inlet),
+        inseries(pump5, bc5, ch5, pump5)...,
         pump5.inlet.p ~ 1e5,
     ]
     @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
@@ -39,9 +37,7 @@ end
     @named res_real = Resistor(R_val)
     @named hx_real = HeatExchanger(313.15)
     conns_real = [
-        connect(p_real.outlet, hx_real.inlet),
-        connect(hx_real.outlet, res_real.inlet),
-        connect(res_real.outlet, p_real.inlet),
+        inseries(p_real, hx_real, res_real, p_real)...,
         p_real.inlet.p ~ 1.0e5,
     ]
     @named sys_real = compose(System(conns_real, t; name=:disp_real), p_real, hx_real, res_real)
@@ -67,9 +63,7 @@ end
     @named res_fn = Resistor(R_val)
     @named hx_fn = HeatExchanger(313.15)
     conns_fn = [
-        connect(p_fn.outlet, hx_fn.inlet),
-        connect(hx_fn.outlet, res_fn.inlet),
-        connect(res_fn.outlet, p_fn.inlet),
+        inseries(p_fn, hx_fn, res_fn, p_fn)...,
         p_fn.inlet.p ~ 1.0e5,
     ]
     @named sys_fn = compose(System(conns_fn, t; name=:disp_fn), p_fn, hx_fn, res_fn)
@@ -97,9 +91,7 @@ end
     @named res_m = Resistor(R_val)
     @named hx_m = HeatExchanger(313.15)
     conns_m = [
-        connect(p_mdot.outlet, hx_m.inlet),
-        connect(hx_m.outlet, res_m.inlet),
-        connect(res_m.outlet, p_mdot.inlet),
+        inseries(p_mdot, hx_m, res_m, p_mdot)...,
         p_mdot.inlet.p ~ 1.0e5,
     ]
     @named sys_m = compose(System(conns_m, t; name=:disp_m), p_mdot, hx_m, res_m)
@@ -119,9 +111,7 @@ end
     @named bc_r = HeatExchanger(313.15)
     @named ch_r = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns_r = [
-        connect(pump_r.outlet, bc_r.inlet),
-        connect(bc_r.outlet, ch_r.inlet),
-        connect(ch_r.outlet, pump_r.inlet),
+        inseries(pump_r, bc_r, ch_r, pump_r)...,
         pump_r.inlet.p ~ 1e5,
     ]
     @named sys_r = compose(System(conns_r, t; name=:pump02_loop), pump_r, bc_r, ch_r)
@@ -163,10 +153,7 @@ end
     # the loop temperature (a bare hydraulics-only loop has degenerate circular instream temps) and
     # gives solve_steady the same well-posed topology the integration coastdowns use.
     conns = [
-        connect(pump.outlet, ine.inlet),
-        connect(ine.outlet, res.inlet),
-        connect(res.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inseries(pump, ine, res, hx, pump)...,
         pump.inlet.p ~ 1e5,       # pressure anchor
     ]
     @named sys = compose(System(conns, t; name=:pump03), pump, ine, res, hx)

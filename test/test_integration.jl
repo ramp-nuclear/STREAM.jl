@@ -37,9 +37,7 @@ using STREAM: Channel, ChannelAndContacts, Pump, HeatExchanger, ConstantTemperat
     @named hx = HeatExchanger(T)          # anchors the loop temperature (Python's Tin)
     @named R = Resistor(r)
     conns = [
-        connect(pump.outlet, hx.inlet),
-        connect(hx.outlet, R.inlet),
-        connect(R.outlet, pump.inlet),
+        inseries(pump, hx, R, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:pr_series), pump, hx, R)
@@ -62,7 +60,7 @@ end
     @named R1 = Resistor(r1)
     @named R2 = Resistor(r2)
     conns = [
-        connect(pump.outlet, hx.inlet),
+        inseries(pump, hx)...,
         connect(hx.outlet, R1.inlet, R2.inlet),     # node J0
         connect(R1.outlet, R2.outlet, pump.inlet),  # node J1
         pump.inlet.p ~ 1.0e5,
@@ -88,9 +86,9 @@ end
     @named pump = Pump(pressure)
     @named hx = HeatExchanger(300.0)
     Rs = [Resistor(r; name=Symbol(:R, i)) for i in 1:N]
-    series = Equation[connect(Rs[i].outlet, Rs[i + 1].inlet) for i in 1:(N - 1)]
+    series = inseries(Rs...)
     conns = [
-        connect(pump.outlet, hx.inlet),
+        inseries(pump, hx)...,
         connect(hx.outlet, Rs[1].inlet),
         series...,
         connect(Rs[N].outlet, pump.inlet),
@@ -118,9 +116,7 @@ end
     @named P2 = Pump(; mdot0=ṁ)    # fixed-flow (current source)
     @named hx = HeatExchanger(300.0)
     conns = [
-        connect(P1.outlet, hx.inlet),
-        connect(hx.outlet, P2.inlet),
-        connect(P2.outlet, P1.inlet),
+        inseries(P1, hx, P2, P1)...,
         P1.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:pump_current), P1, P2, hx)
@@ -142,10 +138,7 @@ end
         @named HX2 = HeatExchanger(T2)
         @named R = Resistor(1.0)
         conns = [
-            connect(pump.outlet, HX1.inlet),
-            connect(HX1.outlet, R.inlet),
-            connect(R.outlet, HX2.inlet),
-            connect(HX2.outlet, pump.inlet),
+            inseries(pump, HX1, R, HX2, pump)...,
             pump.inlet.p ~ 1.0e5,
         ]
         @named sys = compose(System(conns, t; name=:tinjump), pump, HX1, HX2, R)
@@ -179,10 +172,7 @@ end
     @named R = Resistor(r)
     @named hx = HeatExchanger(300.0)
     conns = [
-        connect(pump.outlet, L_el.inlet),
-        connect(L_el.outlet, R.inlet),
-        connect(R.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inseries(pump, L_el, R, hx, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:rl_circuit), pump, L_el, R, hx)
@@ -216,10 +206,7 @@ end
     @named R = VolumetricFlowResistor(; k=K, density=1.0)
     @named hx = HeatExchanger(T)
     conns = [
-        connect(pump.outlet, L_el.inlet),
-        connect(L_el.outlet, R.inlet),
-        connect(R.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inseries(pump, L_el, R, hx, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:friction_coastdown), pump, L_el, R, hx)
@@ -301,10 +288,7 @@ end
     @named R1 = Resistor(r1 / s)     # bundle resistance (s parallel copies of r1)
     @named R2 = Resistor(r2)
     conns = [
-        connect(pump.outlet, hx.inlet),
-        connect(hx.outlet, R1.inlet),
-        connect(R1.outlet, R2.inlet),
-        connect(R2.outlet, pump.inlet),
+        inseries(pump, hx, R1, R2, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:signify_series), pump, hx, R1, R2)
@@ -366,9 +350,7 @@ end
     @named hx = HeatExchanger(Tin)
     @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
     conns = [
-        connect(pump.outlet, hx.inlet),
-        connect(hx.outlet, lpd.inlet),
-        connect(lpd.outlet, pump.inlet),
+        inseries(pump, hx, lpd, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:lpd_reversal), pump, hx, lpd)
@@ -441,9 +423,7 @@ end
                              fluid=ConstantFluid())
     @named hx = HeatExchanger(300.0)
     conns = [
-        connect(pump.outlet, flapper.inlet),
-        connect(flapper.outlet, hx.inlet),
-        connect(hx.outlet, pump.inlet),
+        inseries(pump, flapper, hx, pump)...,
         watch_flow(flapper, pump.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
@@ -575,12 +555,7 @@ end
     @named G2 = Gravity(1.0)            # cold leg
     @named R = Resistor(1.0e5)
     conns = [
-        connect(pump.outlet, HX_hot.inlet),
-        connect(HX_hot.outlet, G1.inlet),
-        connect(G1.outlet, HX_cold.inlet),
-        connect(HX_cold.outlet, G2.inlet),
-        connect(G2.outlet, R.inlet),
-        connect(R.outlet, pump.inlet),
+        inseries(pump, HX_hot, G1, HX_cold, G2, R, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:decay_grav), pump, HX_hot, HX_cold, G1, G2, R)
@@ -638,13 +613,7 @@ end
     @named HXh2 = HeatExchanger(T_hot)
     function build_coastdown(pumpcomp)
         conns = [
-            connect(pumpcomp.outlet, HXc1.inlet),
-            connect(HXc1.outlet, cold.inlet),
-            connect(cold.outlet, HXc2.inlet),
-            connect(HXc2.outlet, HXh1.inlet),
-            connect(HXh1.outlet, hot.inlet),
-            connect(hot.outlet, HXh2.inlet),
-            connect(HXh2.outlet, pumpcomp.inlet),
+            inseries(pumpcomp, HXc1, cold, HXc2, HXh1, hot, HXh2, pumpcomp)...,
             pumpcomp.inlet.p ~ 1.0e5,
         ]
         return mtkcompile(compose(System(conns, t; name=:coastdown), pumpcomp,

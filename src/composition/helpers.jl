@@ -1,6 +1,36 @@
 # helpers.jl -- QoL and composition helpers
 
 """
+    inseries(systems...) -> Vector{Equation}
+
+Build the hydraulic connection equations for a simple series chain of two-port components,
+connecting each component's `outlet` to the next component's `inlet`.
+
+# Arguments
+- `systems`: two or more uncompiled systems exposing `inlet` and `outlet` `FlowPort`s
+
+# Returns
+`Vector{Equation}` suitable for splicing into a `conns = [...]` list or passing to
+`System(conns, t; name=...)`.
+
+# Example
+```julia
+conns = [
+    inseries(pump, hx, resistor, pump)...,
+    pump.inlet.p ~ 1.0e5,
+]
+```
+"""
+function inseries(systems...)
+    length(systems) >= 2 ||
+        throw(ArgumentError("inseries requires at least two systems"))
+    return Equation[
+        connect(getproperty(systems[i], :outlet), getproperty(systems[i + 1], :inlet)) for
+        i in 1:(length(systems) - 1)
+    ]
+end
+
+"""
     port(sys, face, i)
 
 Access an indexed thermal port array element from a compiled subsystem.

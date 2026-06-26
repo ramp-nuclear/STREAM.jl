@@ -50,13 +50,9 @@ function _build_mtr_sym()
     @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
         rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
     conns = Equation[
-        connect(pump_l.outlet, hx_l.inlet),
-        connect(hx_l.outlet, cac_l.inlet),
-        connect(cac_l.outlet, pump_l.inlet),
+        inseries(pump_l, hx_l, cac_l, pump_l)...,
         pump_l.inlet.p ~ 1.0e5,
-        connect(pump_r.outlet, hx_r.inlet),
-        connect(hx_r.outlet, cac_r.inlet),
-        connect(cac_r.outlet, pump_r.inlet),
+        inseries(pump_r, hx_r, cac_r, pump_r)...,
         pump_r.inlet.p ~ 1.0e5,
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_left, i))) for i in 1:nz]...,
@@ -83,13 +79,9 @@ function _build_mtr_asym()
     @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
         rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
     conns = Equation[
-        connect(pump_l.outlet, hx_l.inlet),
-        connect(hx_l.outlet, cac_l.inlet),
-        connect(cac_l.outlet, pump_l.inlet),
+        inseries(pump_l, hx_l, cac_l, pump_l)...,
         pump_l.inlet.p ~ 1.0e5,
-        connect(pump_r.outlet, hx_r.inlet),
-        connect(hx_r.outlet, cac_r.inlet),
-        connect(cac_r.outlet, pump_r.inlet),
+        inseries(pump_r, hx_r, cac_r, pump_r)...,
         pump_r.inlet.p ~ 1.0e5,
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_left, i))) for i in 1:nz]...,
@@ -113,9 +105,7 @@ function _build_mtr_onesided()
     @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
         rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
     conns = Equation[
-        connect(pump_l.outlet, hx_l.inlet),
-        connect(hx_l.outlet, cac_l.inlet),
-        connect(cac_l.outlet, pump_l.inlet),
+        inseries(pump_l, hx_l, cac_l, pump_l)...,
         pump_l.inlet.p ~ 1.0e5,
         [connect(getproperty(hd, Symbol(:thermal_left, i)),
                  getproperty(cac_l, Symbol(:thermal_left, i))) for i in 1:nz]...,
@@ -165,9 +155,7 @@ function _build_val02_twoplate()
         rho_s=2700.0, cp_s=900.0, k_s=200.0,
         power_shape=ps_v02, power=power_per_plate)
     conns_v02 = Equation[
-        connect(pump_v02.outlet, hx_v02.inlet),
-        connect(hx_v02.outlet, cac_v02.inlet),
-        connect(cac_v02.outlet, pump_v02.inlet),
+        inseries(pump_v02, hx_v02, cac_v02, pump_v02)...,
         pump_v02.inlet.p ~ 1.0e5,
         [connect(getproperty(hd1, Symbol(:thermal_left, i)),
                  getproperty(cac_v02, Symbol(:thermal_left, i))) for i in 1:nz_v02]...,

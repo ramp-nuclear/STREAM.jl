@@ -50,9 +50,7 @@ end
     @named hx = HeatExchanger(300.0)
     @named vfr = VolumetricFlowResistor(; k=k, density=1.0)
     conns = [
-        connect(pump.outlet, hx.inlet),
-        connect(hx.outlet, vfr.inlet),
-        connect(vfr.outlet, pump.inlet),
+        inseries(pump, hx, vfr, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:vfr_loop), pump, hx, vfr)
@@ -75,9 +73,7 @@ end
     @named hx = HeatExchanger(300.0)
     @named vfr = VolumetricFlowResistor(; k=k, klow=klow, density=1.0)
     conns = [
-        connect(pump.outlet, hx.inlet),
-        connect(hx.outlet, vfr.inlet),
-        connect(vfr.outlet, pump.inlet),
+        inseries(pump, hx, vfr, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:vfr_klow), pump, hx, vfr)
@@ -119,9 +115,7 @@ end
     @named hx = HeatExchanger(300.0)
     @named vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
     conns = [
-        connect(pump.outlet, hx.inlet),
-        connect(hx.outlet, vfr.inlet),
-        connect(vfr.outlet, pump.inlet),
+        inseries(pump, hx, vfr, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:vfr_kfn_loop), pump, hx, vfr)
@@ -174,9 +168,7 @@ end
     @named hx = HeatExchanger(Tin)
     @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
     conns = [
-        connect(pump.outlet, hx.inlet),
-        connect(hx.outlet, lpd.inlet),
-        connect(lpd.outlet, pump.inlet),
+        inseries(pump, hx, lpd, pump)...,
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:lpd_loop), pump, hx, lpd)
