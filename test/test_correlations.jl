@@ -150,7 +150,7 @@ end
             ct_r_phy02...,
         )
         ssys_phy02 = mtkcompile(sys_phy02)
-        T_g = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+        T_g = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.490, n=n)
         op_phy02 = [ssys_phy02.cac_phy02.T[i] => T_g[i] for i in 1:n]
         push!(op_phy02, ssys_phy02.cac_phy02.inlet.ṁ => 0.490)
         sol_phy02 = solve_steady(ssys_phy02, op_phy02)
@@ -225,12 +225,12 @@ end
         A = geom.A
         Dh = geom.Dh
         dz = geom.L / n
-        mdot03 = sol_phy03[ssys_phy03.cac_phy03.inlet.ṁ]
+        ṁ03 = sol_phy03[ssys_phy03.cac_phy03.inlet.ṁ]
         dP_expected_03 = sum(
             let
                 Re_i = sol_phy03[ssys_phy03.cac_phy03.Re[i]]
                 T_i = sol_phy03[ssys_phy03.cac_phy03.T[i]]
-                f_lam(Re_i) * (mdot03 * abs(mdot03) / (2 * rho_water(T_i) * A^2)) * (dz / Dh)
+                f_lam(Re_i) * (ṁ03 * abs(ṁ03) / (2 * rho_water(T_i) * A^2)) * (dz / Dh)
             end for i in 1:n
         )
         @test isapprox(sol_phy03[ssys_phy03.cac_phy03.dP], dP_expected_03; rtol=1e-6)
@@ -298,14 +298,15 @@ end
         A = geom.A
         Dh = geom.Dh
         dz = geom.L / n
-        mdot_lam = sol_lam[ssys_lam.cac_lam.inlet.ṁ]
+        ṁ_lam = sol_lam[ssys_lam.cac_lam.inlet.ṁ]
         dP_expected_lam = sum(
             let
                 Re_i = sol_lam[ssys_lam.cac_lam.Re[i]]
                 T_i = sol_lam[ssys_lam.cac_lam.T[i]]
                 @test Re_i < 2300.0   # confirm the laminar branch is the one selected
                 rd.friction(Re_i) *
-                (mdot_lam * abs(mdot_lam) / (2 * rho_water(T_i) * A^2)) * (dz / Dh)
+                (ṁ_lam * abs(ṁ_lam) / (2 * rho_water(T_i) * A^2)) *
+                (dz / Dh)
             end for i in 1:n
         )
         @test isapprox(sol_lam[ssys_lam.cac_lam.dP], dP_expected_lam; rtol=1e-6)
@@ -357,7 +358,7 @@ end
             ct_r_turb...,
         )
         ssys_turb = mtkcompile(sys_turb)
-        T_g_turb = steady_state_guess(T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.250, n=n)
+        T_g_turb = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.250, n=n)
         op_turb = [ssys_turb.cac_turb.T[i] => T_g_turb[i] for i in 1:n]
         push!(op_turb, ssys_turb.cac_turb.inlet.ṁ => 0.250)
         sol_turb = solve_steady(ssys_turb, op_turb)
@@ -373,7 +374,7 @@ end
         A = geom.A
         Dh = geom.Dh
         dz = geom.L / n
-        mdot_turb = sol_turb[ssys_turb.cac_turb.inlet.ṁ]
+        ṁ_turb = sol_turb[ssys_turb.cac_turb.inlet.ṁ]
         dP_expected_turb = sum(
             let
                 Re_i = sol_turb[ssys_turb.cac_turb.Re[i]]
@@ -382,7 +383,8 @@ end
                 # rd.friction must equal Blasius here, not the laminar rectangular factor.
                 @test isapprox(rd.friction(Re_i), blasius_friction(Re_i); rtol=1e-12)
                 rd.friction(Re_i) *
-                (mdot_turb * abs(mdot_turb) / (2 * rho_water(T_i) * A^2)) * (dz / Dh)
+                (ṁ_turb * abs(ṁ_turb) / (2 * rho_water(T_i) * A^2)) *
+                (dz / Dh)
             end for i in 1:n
         )
         @test isapprox(sol_turb[ssys_turb.cac_turb.dP], dP_expected_turb; rtol=1e-6)

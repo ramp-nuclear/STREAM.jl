@@ -55,9 +55,9 @@ end
     @test isapprox(dp, f * mf * abs(mf) / (2 * rho * area^2); rtol=1e-6)  # quadratic law
 end
 
-@testset "Flapper opens when ref_mdot crosses threshold" begin
+@testset "Flapper opens when ref_ṁ crosses threshold" begin
     # A weak (large-f) flapper sits in parallel with a resistor branch. A pump holds the loop flow
-    # at mdot0, then shuts off and the flow coasts down past the threshold; the callback latches
+    # at ṁ0, then shuts off and the flow coasts down past the threshold; the callback latches
     # T_open and the ramp completes. Detection is end-to-end (no pre-set open time), so this
     # exercises flapper_callback. The transient starts from the full solved steady state, which
     # keeps the coastdown IC consistent across MTK versions. A hand-seeded partial IC left the flow
@@ -65,8 +65,8 @@ end
     threshold = 0.01
     L_over_A = 5.0e5     # tau = L_over_A / R = 5 s
     R = 1.0e5
-    mdot0 = 1.0
-    @named pump = Pump(R * mdot0)   # head holds mdot0 through the resistor while the flapper is shut
+    ṁ0 = 1.0
+    @named pump = Pump(R * ṁ0)   # head holds ṁ0 through the resistor while the flapper is shut
     @named ine = Inertia(L_over_A)
     @named res = Resistor(R)
     @named flapper = Flapper(; open_at_current=threshold, f=1.0e6, area=1.0, open_rate=1.0 / 3.0,
@@ -82,7 +82,7 @@ end
     @named sys = compose(System(conns, t; name=:flap_decay), pump, ine, res, flapper, hx)
     ssys = mtkcompile(sys; fully_determined=false)
     # Flapper default T_open=Inf ⇒ shut at the steady solve, so all flow goes through the resistor.
-    sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => mdot0, ssys.res.inlet.ṁ => mdot0])
+    sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0, ssys.res.inlet.ṁ => ṁ0])
     @test sol_ss.retcode == ReturnCode.Success
     # Shut the pump (head ⇒ 0) and coast; the callback detects the threshold crossing and latches
     # T_open. T_open stays at its Inf default through the steady solve, so the callback owns it.
@@ -92,7 +92,7 @@ end
     @test sol.retcode == ReturnCode.Success
     T_open = sol.ps[ssys.flapper.T_open]
     @test 0.0 < T_open < 1e10                                   # event fired at a positive time
-    @test isapprox(T_open, -5.0 * log(threshold); rtol=0.1)     # tau·ln(mdot0/threshold), mdot0=1
+    @test isapprox(T_open, -5.0 * log(threshold); rtol=0.1)     # tau·ln(ṁ0/threshold), ṁ0=1
     @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)   # ramp completed by t_end
 end
 

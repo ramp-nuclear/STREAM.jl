@@ -6,9 +6,9 @@ using STREAM
 using STREAM: Pump, Channel
 
 @testset "Pump fixed-flow mode" begin
-    @named pump = Pump(mdot0=0.6)
+    @named pump = Pump(; ṁ0=0.6)
     @test_nowarn mtkcompile(pump; fully_determined=false)
-    @named pump5 = Pump(mdot0=0.6)
+    @named pump5 = Pump(; ṁ0=0.6)
     @named bc5 = HeatExchanger(313.15)
     @named ch5 = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns5 = [
@@ -84,23 +84,23 @@ end
     )
     @test isapprox(sol_fn[ssys_fn.res_fn.inlet.ṁ], dP_call_val / R_val; rtol=1e-6)
 
-    # --- Fixed-flow mode: inlet.ṁ == mdot0 regardless of loop resistance. ---
-    mdot_set = 0.6
-    @named p_mdot = Pump(mdot0=mdot_set)
-    @test p_mdot isa ModelingToolkit.System
+    # --- Fixed-flow mode: inlet.ṁ == ṁ0 regardless of loop resistance. ---
+    ṁ_set = 0.6
+    @named p_ṁ = Pump(; ṁ0=ṁ_set)
+    @test p_ṁ isa ModelingToolkit.System
     @named res_m = Resistor(R_val)
     @named hx_m = HeatExchanger(313.15)
     conns_m = [
-        inseries(p_mdot, hx_m, res_m, p_mdot)...,
-        p_mdot.inlet.p ~ 1.0e5,
+        inseries(p_ṁ, hx_m, res_m, p_ṁ)...,
+        p_ṁ.inlet.p ~ 1.0e5,
     ]
-    @named sys_m = compose(System(conns_m, t; name=:disp_m), p_mdot, hx_m, res_m)
+    @named sys_m = compose(System(conns_m, t; name=:disp_m), p_ṁ, hx_m, res_m)
     ssys_m = mtkcompile(sys_m; fully_determined=false)
-    sol_m = solve_steady(ssys_m, Pair{Any,Any}[ssys_m.res_m.inlet.ṁ => mdot_set])
+    sol_m = solve_steady(ssys_m, Pair{Any,Any}[ssys_m.res_m.inlet.ṁ => ṁ_set])
     @test sol_m.retcode == ReturnCode.Success
-    # Defining relation of fixed-flow mode: the flow is pinned to mdot0 (rtol=1e-8, exact
-    # algebraic constraint inlet.ṁ ~ mdot0).
-    @test isapprox(sol_m[ssys_m.p_mdot.inlet.ṁ], mdot_set; rtol=1e-8)
+    # Defining relation of fixed-flow mode: the flow is pinned to ṁ0 (rtol=1e-8, exact
+    # algebraic constraint inlet.ṁ ~ ṁ0).
+    @test isapprox(sol_m[ssys_m.p_ṁ.inlet.ṁ], ṁ_set; rtol=1e-8)
 end
 
 @testset "Scalar Pump(dP_pump) unchanged" begin
@@ -133,7 +133,7 @@ end
 @testset "Callable pump ramp — ṁ decays to zero" begin
     dP0 = 1e5       # Pa
     T_ramp = 100.0     # s
-    R_val = 1e5       # Pa/(kg/s) — steady-state mdot_0 = dP0/R = 1.0 kg/s
+    R_val = 1e5       # Pa/(kg/s) — steady-state ṁ_0 = dP0/R = 1.0 kg/s
     L_over_A = 5e5       # m^{-1} — tau = L_over_A/R = 5.0 s; T_ramp/tau = 20
     tau = L_over_A / R_val   # 5.0 s
 
@@ -159,7 +159,7 @@ end
     @named sys = compose(System(conns, t; name=:pump03), pump, ine, res, hx)
     ssys = mtkcompile(sys)
 
-    mdot_0 = dP0 / R_val
+    ṁ_0 = dP0 / R_val
 
     # Initial condition: solve for steady flow under a held head dP0 first, then start the ramp
     # transient from that full solved state. Carrying every state from the solved point (not just a
@@ -169,31 +169,31 @@ end
     # Solver choice: this loop has a time-varying head, so the steady solve needs the stiff
     # DynamicSS(Rodas5P) solver. The default steady solver goes unstable here.
     sol_ss = solve_steady(ssys,
-        Pair{Any,Any}[ssys.ine.inlet.ṁ => mdot_0, ssys.pump.dP_pump_fn => dP_hold];
+        Pair{Any,Any}[ssys.ine.inlet.ṁ => ṁ_0, ssys.pump.dP_pump_fn => dP_hold];
         solver=DynamicSS(Rodas5P()))
     @test sol_ss.retcode == ReturnCode.Success
-    @test isapprox(sol_ss[ssys.ine.inlet.ṁ], mdot_0; rtol=1e-3)   # relaxation endpoint, loose
+    @test isapprox(sol_ss[ssys.ine.inlet.ṁ], ṁ_0; rtol=1e-3)   # relaxation endpoint, loose
 
     t_arr = range(0.0, T_ramp, length=1000)
     sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump_fn => dP_fn])
 
     @test sol.retcode == ReturnCode.Success
 
-    function mdot_analytical(t_val)
+    function ṁ_analytical(t_val)
         return (dP0 / R_val) *
                (1 + tau/T_ramp - t_val/T_ramp - (tau/T_ramp) * exp(-t_val/tau))
     end
 
-    mdot_end_analytical = mdot_analytical(T_ramp)
-    mdot_end_numerical = sol[ssys.ine.inlet.ṁ, end]
+    ṁ_end_analytical = ṁ_analytical(T_ramp)
+    ṁ_end_numerical = sol[ssys.ine.inlet.ṁ, end]
 
-    @test isapprox(mdot_end_numerical, mdot_end_analytical; rtol=0.01)
+    @test isapprox(ṁ_end_numerical, ṁ_end_analytical; rtol=0.01)
 
-    @test isapprox(sol[ssys.ine.inlet.ṁ, 1], mdot_0; rtol=0.01)
-    @test abs(mdot_end_numerical) < 0.1 * mdot_0
+    @test isapprox(sol[ssys.ine.inlet.ṁ, 1], ṁ_0; rtol=0.01)
+    @test abs(ṁ_end_numerical) < 0.1 * ṁ_0
     idx_mid = length(t_arr) ÷ 2
     t_mid = t_arr[idx_mid]
-    mdot_mid_analytical = mdot_analytical(t_mid)
-    mdot_mid_numerical = sol[ssys.ine.inlet.ṁ, idx_mid]
-    @test isapprox(mdot_mid_numerical, mdot_mid_analytical; rtol=0.01)
+    ṁ_mid_analytical = ṁ_analytical(t_mid)
+    ṁ_mid_numerical = sol[ssys.ine.inlet.ṁ, idx_mid]
+    @test isapprox(ṁ_mid_numerical, ṁ_mid_analytical; rtol=0.01)
 end

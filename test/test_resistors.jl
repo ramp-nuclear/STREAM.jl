@@ -10,37 +10,37 @@ using STREAM: Resistor, VolumetricFlowResistor
     dP_val = 3.0e4
     ssys = build_cube(dP_pump=dP_val, R=R_val)
 
-    mdot_analytical = dP_val / (5.0/6.0 * R_val)
+    ṁ_analytical = dP_val / (5.0 / 6.0 * R_val)
 
     # Symmetric cube: 3 source branches from corner 0, 3 sink branches to corner 7
     # Body-diagonal paths: each of 3 "short" 1-resistor paths carries ṁ/3
     # Each of 6 "long" 2-resistor paths carries ṁ/6 (edge contribution)
     # For initial guess: pump.outlet = full ṁ; each direct branch ~ ṁ/3
-    mdot_full = mdot_analytical
+    ṁ_full = ṁ_analytical
 
     op = [
-        ssys.pump.outlet.ṁ => mdot_full,
+        ssys.pump.outlet.ṁ => ṁ_full,
         # Three source edges from corner 0
-        ssys.r01.inlet.ṁ => mdot_full / 3.0,
-        ssys.r02.inlet.ṁ => mdot_full / 3.0,
-        ssys.r04.inlet.ṁ => mdot_full / 3.0,
+        ssys.r01.inlet.ṁ => ṁ_full / 3.0,
+        ssys.r02.inlet.ṁ => ṁ_full / 3.0,
+        ssys.r04.inlet.ṁ => ṁ_full / 3.0,
         # Internal edges (rough equal split)
-        ssys.r13.inlet.ṁ => mdot_full / 6.0,
-        ssys.r15.inlet.ṁ => mdot_full / 6.0,
-        ssys.r23.inlet.ṁ => mdot_full / 6.0,
-        ssys.r26.inlet.ṁ => mdot_full / 6.0,
-        ssys.r45.inlet.ṁ => mdot_full / 6.0,
-        ssys.r46.inlet.ṁ => mdot_full / 6.0,
+        ssys.r13.inlet.ṁ => ṁ_full / 6.0,
+        ssys.r15.inlet.ṁ => ṁ_full / 6.0,
+        ssys.r23.inlet.ṁ => ṁ_full / 6.0,
+        ssys.r26.inlet.ṁ => ṁ_full / 6.0,
+        ssys.r45.inlet.ṁ => ṁ_full / 6.0,
+        ssys.r46.inlet.ṁ => ṁ_full / 6.0,
         # Three sink edges to corner 7
-        ssys.r37.inlet.ṁ => mdot_full / 3.0,
-        ssys.r57.inlet.ṁ => mdot_full / 3.0,
-        ssys.r67.inlet.ṁ => mdot_full / 3.0,
+        ssys.r37.inlet.ṁ => ṁ_full / 3.0,
+        ssys.r57.inlet.ṁ => ṁ_full / 3.0,
+        ssys.r67.inlet.ṁ => ṁ_full / 3.0,
     ]
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
-    mdot_numerical = abs(sol[ssys.pump.outlet.ṁ])
-    @test isapprox(mdot_numerical, mdot_analytical; rtol=0.01)
+    ṁ_numerical = abs(sol[ssys.pump.outlet.ṁ])
+    @test isapprox(ṁ_numerical, ṁ_analytical; rtol=0.01)
 end
 
 @testset "VolumetricFlowResistor — quadratic drop dP = k*ṁ^2 (rho=1)" begin
@@ -164,7 +164,7 @@ end
     A1, A2 = 1.0, 2.0
     Tin = 293.15
     ṁ = 3.0
-    @named pump = Pump(; mdot0=ṁ)        # fixed-flow so ṁ is exact
+    @named pump = Pump(; ṁ0=ṁ)        # fixed-flow so ṁ is exact
     @named hx = HeatExchanger(Tin)
     @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
     conns = [

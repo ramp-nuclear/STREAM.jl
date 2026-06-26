@@ -155,9 +155,9 @@ end
         # Forced-flow guess from the dominant linear branch: the pump head drives flow
         # through ext_res (R_ext), so ṁ ~ dP_pre / R_ext, and the coolant warms by
         # power_W / (ṁ * cp) across the channel.
-        mdot_guess = BYPASS_DP_PRE / BYPASS_R_EXT
+        ṁ_guess = BYPASS_DP_PRE / BYPASS_R_EXT
         cp = cp_water(BYPASS_T_INLET)
-        dT_guess = BYPASS_POWER_W / (mdot_guess * cp)
+        dT_guess = BYPASS_POWER_W / (ṁ_guess * cp)
         P_top = 1.0e5 + BYPASS_DP_PRE   # pump-out / node-A pressure (anchor + head)
 
         # Forced-flow steady state (pump on, flapper closed), integrated to steady by
@@ -166,18 +166,18 @@ end
         # its guess sits nearest. Seed the variables mtkcompile keeps as unknowns
         # (heated.ch.inlet.ṁ + its dummy derivative, ext_res.inlet.ṁ,
         # ine.outlet.p) so the guess lands in the forced-flow basin and DynamicSS
-        # converges to mdot_ss ~ 0.187 kg/s on both package sets. Seeding only the
+        # converges to ṁ_ss ~ 0.187 kg/s on both package sets. Seeding only the
         # observed aliases (ine.inlet.ṁ, ret.inlet.ṁ) let the latest set fall
         # into ṁ = 0. The aliases are seeded too so the guess is unambiguous either way.
         op_steady = Pair{Any,Any}[
             ssys.pump.dP_pump_fn => dP_fn_steady,
             ssys.flapper.T_open => Inf,
-            ssys.heated.ch.inlet.ṁ => mdot_guess,
+            ssys.heated.ch.inlet.ṁ => ṁ_guess,
             Dt(ssys.heated.ch.inlet.ṁ) => 0.0,
-            ssys.ext_res.inlet.ṁ => mdot_guess,
+            ssys.ext_res.inlet.ṁ => ṁ_guess,
             ssys.ine.outlet.p => P_top,
-            ssys.ine.inlet.ṁ => mdot_guess,
-            ssys.ret.inlet.ṁ => mdot_guess,
+            ssys.ine.inlet.ṁ => ṁ_guess,
+            ssys.ret.inlet.ṁ => ṁ_guess,
         ]
         for i in 1:n
             push!(op_steady, ssys.heated.ch.T[i] => BYPASS_T_INLET + (i / n) * dT_guess)
@@ -195,12 +195,12 @@ end
             )
         end
         ss = solve_steady(ssys, op_steady; solver=DynamicSS(Rodas5P()))
-        mdot_ss = ss[ssys.ine.inlet.ṁ]
+        ṁ_ss = ss[ssys.ine.inlet.ṁ]
 
         # Transient IC = the FULL consistent steady-state vector; pump head now
         # ramps to 0. Seeding EVERY unknown (not a hand-picked subset) is essential:
         # the coupled momentum ODEs + KCL index-reduce to a dummy-derivative state
-        # (heated.ch.inlet.mdot_t) that a `Dt(ṁ) => 0` op guess does NOT map to.
+        # (heated.ch.inlet.ṁ_t) that a `Dt(ṁ) => 0` op guess does NOT map to.
         # Left unset, the latest packages initialize it to NaN, so the transient
         # aborts at t=0 (dt below floating-point epsilon, NaN error estimate). Copying
         # ss[u] for every unknown sets it directly.
@@ -212,16 +212,16 @@ end
         push!(op, ssys.flapper.T_open => Inf)
 
         cb = flapper_callback(ssys, ssys.flapper)
-        return ssys, op, mdot_ss, cb
+        return ssys, op, ṁ_ss, cb
     end
 
     @testset "bypass topology compiles and SS IC is physical" begin
-        ssys, op, mdot_ss, _ = _lof_bypass_ic()
+        ssys, op, ṁ_ss, _ = _lof_bypass_ic()
 
         @test length(equations(ssys)) == length(unknowns(ssys))
-        # Forced-flow steady lands on the pump-driven branch at mdot_ss ~ 0.187 kg/s, which
+        # Forced-flow steady lands on the pump-driven branch at ṁ_ss ~ 0.187 kg/s, which
         # reproduces across package sets to well under 1%, so bracket it at 0.005.
-        @test isapprox(mdot_ss, 0.187; atol=0.005)
+        @test isapprox(ṁ_ss, 0.187; atol=0.005)
 
         T_open_init = op[findfirst(p -> isequal(p.first, ssys.flapper.T_open), op)].second
         @test T_open_init == Inf
@@ -255,18 +255,18 @@ end
         t_arr = range(0.0, 300.0; length=3001)
         sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 
-        mdot_ch_initial = sol[ssys.heated.ch.inlet.ṁ, 1]
-        @test mdot_ch_initial > 0.0
+        ṁ_ch_initial = sol[ssys.heated.ch.inlet.ṁ, 1]
+        @test ṁ_ch_initial > 0.0
 
-        mdot_ch_final = sol[ssys.heated.ch.inlet.ṁ, end]
-        @test mdot_ch_final < 0.0
+        ṁ_ch_final = sol[ssys.heated.ch.inlet.ṁ, end]
+        @test ṁ_ch_final < 0.0
 
         # NC recirculation settles at ~4.21 g/s, a deterministic root of the
         # buoyancy-vs-friction balance (derived in the momentum-balance test below). It
         # reproduces to better than 0.1% across package sets: 4.207 g/s on the pinned set,
         # 4.207 g/s on the latest. Bracket it tightly around that.
-        mdot_nc = abs(mdot_ch_final)
-        @test isapprox(mdot_nc, 0.00421; atol=5.0e-5)
+        ṁ_nc = abs(ṁ_ch_final)
+        @test isapprox(ṁ_nc, 0.00421; atol=5.0e-5)
     end
 
     @testset "channel energy conservation across the heated leg" begin
@@ -348,8 +348,8 @@ end
         # reference at this Re predicts ~0.012 kg/s, 0.36x of the model, because 64/Re is the
         # wrong friction law for the actual Re. The friction of the two channels in series is
         #   dP_fric(ṁ) = 2 * f(Re) * ṁ^2 / (2*rho*A^2) * (L/D),  Re = ṁ*D/(A*mu).
-        # Solving dP_fric(ṁ) = dP_buoy by bisection gives mdot_ref ~ 0.004217 kg/s, which
-        # the integrated model matches to within 0.3%: ratio mdot_nc/mdot_ref = 0.9975 on the
+        # Solving dP_fric(ṁ) = dP_buoy by bisection gives ṁ_ref ~ 0.004217 kg/s, which
+        # the integrated model matches to within 0.3%: ratio ṁ_nc/ṁ_ref = 0.9975 on the
         # pinned set and 0.9975 on the latest. The residual ~0.25% is the entry/exit and
         # open-flapper losses the two-channel friction reference omits (the flapper drop at
         # this flow is ~0.005 Pa, so it is negligible). This is a derived reference, not a
@@ -362,8 +362,8 @@ end
         n = BYPASS_N
         nc_indices = 2701:3001
 
-        mdot_nc_series_signed = sol[ssys.heated.ch.inlet.ṁ, nc_indices]
-        mdot_nc = mean(abs.(mdot_nc_series_signed))
+        ṁ_nc_series_signed = sol[ssys.heated.ch.inlet.ṁ, nc_indices]
+        ṁ_nc = mean(abs.(ṁ_nc_series_signed))
 
         # Cell-resolved buoyancy head: g * dz * sum(rho_ret[i] - rho_ch[i]) over the loop.
         dz = BYPASS_L_CH / n
@@ -390,14 +390,14 @@ end
             mid = sqrt(lo * hi)
             dP_fric(mid) < abs(dP_buoy) ? (lo = mid) : (hi = mid)
         end
-        mdot_ref = sqrt(lo * hi)
+        ṁ_ref = sqrt(lo * hi)
 
         # Model NC flow matches the derived buoyancy-vs-Blasius-friction root within 5%.
-        @test isapprox(mdot_nc, mdot_ref; rtol=0.05)
+        @test isapprox(ṁ_nc, ṁ_ref; rtol=0.05)
 
         # NC flow is reversed relative to the forced-flow direction at t = 0.
         @test sol[ssys.heated.ch.inlet.ṁ, 1] > 0.0
-        @test mean(mdot_nc_series_signed) < 0.0
+        @test mean(ṁ_nc_series_signed) < 0.0
 
         # Energy conservation across the heated leg: channel-side heat absorbed in the NC
         # window is bounded above by the fuel-plate input power.

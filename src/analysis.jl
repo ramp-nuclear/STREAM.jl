@@ -97,7 +97,7 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         qwr_arr = hcat([sol[channel_sys.q_wall_right[i], :] for i in 1:n]...)'
         # Scalar fields: use first time point
         T_inlet_val = sol[channel_sys.inlet.T, 1]
-        mdot_val = sol[channel_sys.inlet.ṁ, 1]
+        ṁ_val = sol[channel_sys.inlet.ṁ, 1]
     else
         # Steady state: scalar per cell
         T_bulk = [sol[channel_sys.T[i]] for i in 1:n]
@@ -110,7 +110,7 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         qwl_arr = [sol[channel_sys.q_wall_left[i]] for i in 1:n]
         qwr_arr = [sol[channel_sys.q_wall_right[i]] for i in 1:n]
         T_inlet_val = sol[channel_sys.inlet.T]
-        mdot_val = sol[channel_sys.inlet.ṁ]
+        ṁ_val = sol[channel_sys.inlet.ṁ]
     end
 
     # Conservative wall temperature: max of left and right face
@@ -142,7 +142,7 @@ function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
         q_flux=q_flux,
         q_flux_left=q_flux_left,
         q_flux_right=q_flux_right,
-        ṁ=mdot_val,
+        ṁ=ṁ_val,
         velocity=vel_arr,
         pipe=pipe,
         gravity=gravity,

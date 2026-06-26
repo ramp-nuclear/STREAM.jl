@@ -129,10 +129,10 @@ end
     LocalPressureDrop(; name, A1, A2, fluid=Water()) -> System
 
 Minor (local) pressure loss across a sudden area change `A1 -> A2`, after Idelchik tables
-4.2 (expansion) and 4.10 (contraction). The loss is `ΔP = K·mdot·|ṁ| / (2·ρ·A_min²)`,
+4.2 (expansion) and 4.10 (contraction). The loss is `ΔP = K·ṁ·|ṁ| / (2·ρ·A_min²)`,
 where the coefficient `K` depends on the area ratio and Reynolds number and on the flow
 direction — forward flow sees an expansion when `A2 ≥ A1` and a contraction otherwise, with
-the roles swapped under reversal. The `mdot·|ṁ|` form keeps the drop direction-correct.
+the roles swapped under reversal. The `ṁ·|ṁ|` form keeps the drop direction-correct.
 
 # Arguments
 - `name`: system name (Symbol)

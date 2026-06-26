@@ -264,12 +264,12 @@ end
     # ṁ*cp*(T_out - T_in) matches the heat into that channel. T_in is the bc inlet (313.15),
     # T_out is the last coolant cell. cp is taken at the mean coolant temperature.
     T_in = 313.15
-    mdot_l = sol[ssys.pl.ch_left.inlet.ṁ]
-    mdot_r = sol[ssys.pl.ch_right.inlet.ṁ]
+    ṁ_l = sol[ssys.pl.ch_left.inlet.ṁ]
+    ṁ_r = sol[ssys.pl.ch_right.inlet.ṁ]
     T_out_l = sol[ssys.pl.ch_left.T[nz]]
     T_out_r = sol[ssys.pl.ch_right.T[nz]]
-    Q_into_left = mdot_l * cp_water((T_in + T_out_l) / 2) * (T_out_l - T_in)
-    Q_into_right = mdot_r * cp_water((T_in + T_out_r) / 2) * (T_out_r - T_in)
+    Q_into_left = ṁ_l * cp_water((T_in + T_out_l) / 2) * (T_out_l - T_in)
+    Q_into_right = ṁ_r * cp_water((T_in + T_out_r) / 2) * (T_out_r - T_in)
     @test isapprox(Q_into_left, -sum(left_face_Q); rtol=2e-2)
     @test isapprox(Q_into_right, -sum(right_face_Q); rtol=2e-2)
     # The plate temperature sits above both coolant streams it dumps heat into.

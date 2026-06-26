@@ -12,7 +12,7 @@ using STREAM
 
 @testset "Solver wrappers" begin
     @testset "steady_state_guess monotonically increasing" begin
-        T_guess = steady_state_guess(T_inlet=313.15, Q_wall=1e4, mdot_guess=0.1, n=10)
+        T_guess = steady_state_guess(; T_inlet=313.15, Q_wall=1e4, ṁ_guess=0.1, n=10)
         @test length(T_guess) == 10
         @test T_guess[1] > 313.15        # first cell above inlet temperature
         @test all(diff(T_guess) .> 0)    # monotonically increasing
@@ -22,15 +22,18 @@ using STREAM
         n = 10
         T_inlet = 313.15
         Q_wall = 1.0e4
-        mdot_guess = 0.490  # physics-based estimate for 30 kPa pump, 0.01m pipe
+        ṁ_guess = 0.490  # physics-based estimate for 30 kPa pump, 0.01m pipe
 
         ssys = build_loop(T_inlet=T_inlet)
         T_guess = steady_state_guess(
-            T_inlet=T_inlet, Q_wall=Q_wall, mdot_guess=mdot_guess, n=n
+            T_inlet=T_inlet,
+            Q_wall=Q_wall,
+            ṁ_guess=ṁ_guess,
+            n=n,
         )
 
         op = [ssys.ch.T[i] => T_guess[i] for i in 1:n]
-        push!(op, ssys.ch.inlet.ṁ => mdot_guess)
+        push!(op, ssys.ch.inlet.ṁ => ṁ_guess)
 
         sol = solve_steady(ssys, op)
         @test sol.retcode == ReturnCode.Success
@@ -44,7 +47,7 @@ using STREAM
         n = 10
         T_inlet = 313.15
         Q_wall_0 = 1.0e4
-        mdot_guess = 0.490
+        ṁ_guess = 0.490
 
         T_wall_0 = 373.15
         T_wall_final = 393.15
@@ -57,11 +60,14 @@ using STREAM
         ssys = build_loop_transient(T_inlet=T_inlet, T_wall_fn=T_wall_step)
 
         T_guess = steady_state_guess(
-            T_inlet=T_inlet, Q_wall=Q_wall_0, mdot_guess=mdot_guess, n=n
+            T_inlet=T_inlet,
+            Q_wall=Q_wall_0,
+            ṁ_guess=ṁ_guess,
+            n=n,
         )
 
         op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
-        push!(op_guess, ssys_ss.ch.inlet.ṁ => mdot_guess)
+        push!(op_guess, ssys_ss.ch.inlet.ṁ => ṁ_guess)
 
         sol_ss = solve_steady(ssys_ss, op_guess)
         op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
@@ -85,7 +91,7 @@ using STREAM
         # loop, so the end value should sit essentially on the new steady outlet.
         ssys_final = build_loop_transient(T_inlet=T_inlet, T_wall_0=T_wall_final)
         op_final = [ssys_final.ch.T[i] => T_guess[i] for i in 1:n]
-        push!(op_final, ssys_final.ch.inlet.ṁ => mdot_guess)
+        push!(op_final, ssys_final.ch.inlet.ṁ => ṁ_guess)
         sol_final = solve_steady(ssys_final, op_final)
         @test sol_final.retcode == ReturnCode.Success
         T_out_final_steady = sol_final[ssys_final.ch.T_out]
@@ -110,13 +116,13 @@ using STREAM
 
     @testset "solve_transient from a solved state" begin
         # Minimal inertia coastdown: a pump holds a steady flow, then shuts off and the flow
-        # coasts as mdot0·exp(-(r/L)·t). Exercises the solution overload of solve_transient: start
+        # coasts as ṁ0·exp(-(r/L)·t). Exercises the solution overload of solve_transient: start
         # from a solved state, apply an override. The trajectory matching the analytic decay is the
         # check that the full state was transplanted (an incomplete IC would not coast correctly).
         r = 3.0
         L = 5.0
-        mdot0 = 1.0
-        @named pump = Pump(r * mdot0)
+        ṁ0 = 1.0
+        @named pump = Pump(r * ṁ0)
         @named ine = Inertia(L)
         @named res = Resistor(r)
         @named hx = HeatExchanger(300.0)
@@ -126,16 +132,16 @@ using STREAM
         ]
         @named sys = compose(System(conns, t; name=:coast), pump, ine, res, hx)
         ssys = mtkcompile(sys)
-        sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => mdot0])
+        sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0])
         @test sol_ss.retcode == ReturnCode.Success
 
         t_arr = range(0.0, 1.0; length=5)
         sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0])
         @test sol.retcode == ReturnCode.Success
         ṁ = sol[ssys.ine.inlet.ṁ, :]
-        @test isapprox(ṁ[1], mdot0; rtol=1e-4)                       # starts at the solved steady
+        @test isapprox(ṁ[1], ṁ0; rtol=1e-4)                       # starts at the solved steady
         @test all(
-            isapprox(ṁ[i], mdot0 * exp(-(r / L) * tt); rtol=1e-3) for
+            isapprox(ṁ[i], ṁ0 * exp(-(r / L) * tt); rtol=1e-3) for
             (i, tt) in enumerate(t_arr)
         )
     end

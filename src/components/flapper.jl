@@ -4,11 +4,11 @@
     Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0, fluid=Water()) -> System
 
 Flapper (passive check valve). While closed it admits **no flow** (`ṁ = 0`); once open it
-is a quadratic resistor `ΔP = f·mdot·|ṁ| / (2·ρ·area²)`. The valve opens the moment the
-wired reference flow `ref_mdot` falls to `open_at_current`, detected by `flapper_callback`,
+is a quadratic resistor `ΔP = f·ṁ·|ṁ| / (2·ρ·area²)`. The valve opens the moment the
+wired reference flow `ref_ṁ` falls to `open_at_current`, detected by `flapper_callback`,
 which latches the opening time into the parameter `T_open`. After `T_open` the flow ramps in
 gradually through `xi = r(open_rate·(t − T_open))`, the C1 Hermite cubic `−2x³ + 3x²` rising
-0→1, so `ṁ = xi · mdot_open`.
+0→1, so `ṁ = xi · ṁ_open`.
 
 This mirrors Python STREAM's `Flapper` (closed ⇒ `ṁ` 0; open ⇒ quadratic local-pressure
 resistor relaxed in from `t_open`). Two deliberate conventions:
@@ -17,7 +17,7 @@ resistor relaxed in from `t_open`). Two deliberate conventions:
     Python *defaults* to `legacy_relaxation` and only opts into this shape per-call, so the
     ramp *shape* differs for cases that take Python's default; the open/closed binary and the
     latch time — what the integration tests assert — do not.
-  - **Open-state sign.** `mdot_open = sign(P_in − P_out)·√(|ΔP|·2ρA²/f)`. Python writes
+  - **Open-state sign.** `ṁ_open = sign(P_in − P_out)·√(|ΔP|·2ρA²/f)`. Python writes
     `−sign(dp)·√(…)` against its own `dp = P_out − P_in`; the two sign flips cancel, so the two
     formulas are numerically identical (verified across both flow directions).
 
@@ -30,10 +30,10 @@ Because a closed flapper carries no flow, it is meant to sit in **parallel** wit
 branch (a bypass that carries flow while the valve is shut); a closed flapper placed in series
 would block the whole loop.
 
-`ref_mdot` has **no equation inside the component** — the caller wires it during composition,
+`ref_ṁ` has **no equation inside the component** — the caller wires it during composition,
 most readably with [`watch_flow`](@ref):
 ```julia
-watch_flow(flapper, pump.inlet.ṁ)      # ≡  flapper.ref_mdot ~ pump.inlet.ṁ
+watch_flow(flapper, pump.inlet.ṁ)      # ≡  flapper.ref_ṁ ~ pump.inlet.ṁ
 ```
 Then build the detection event with `flapper_callback(ssys, ssys.flapper)` and hand it to
 `solve_transient(...; callbacks=cb)`.
@@ -51,9 +51,9 @@ Then build the detection event with `flapper_callback(ssys, ssys.flapper)` and h
 # Ports
 - `inlet`, `outlet`: `FlowPort` (pressure, mass flow, temperature)
 
-`ref_mdot` has no in-component equation, so a standalone Flapper is
+`ref_ṁ` has no in-component equation, so a standalone Flapper is
 structurally underdetermined — call `mtkcompile(sys; fully_determined=false)`, or compose it
-into a system where `ref_mdot` is wired.
+into a system where `ref_ṁ` is wired.
 """
 function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
                  fluid::AbstractFluid=Water())
@@ -65,7 +65,7 @@ function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
         T_open = Inf
     end
 
-    vars = @variables xi(t) ref_mdot(t)
+    vars = @variables xi(t) ref_ṁ(t)
 
     @named inlet = FlowPort()
     @named outlet = FlowPort()
@@ -74,14 +74,14 @@ function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
     dp = inlet.p - outlet.p
     x = open_rate * (t - T_open)
     relax = ifelse(x <= 0.0, 0.0, ifelse(x >= 1.0, 1.0, -2 * x^3 + 3 * x^2))
-    # Open-state flow: invert ΔP = f·mdot·|ṁ|/(2ρA²) ⇒ ṁ = sign(dp)·sqrt(|dp|·2ρA²/f).
-    mdot_open = sign(dp) * sqrt(abs(dp) * 2 * rho * area^2 / f)
+    # Open-state flow: invert ΔP = f·ṁ·|ṁ|/(2ρA²) ⇒ ṁ = sign(dp)·sqrt(|dp|·2ρA²/f).
+    ṁ_open = sign(dp) * sqrt(abs(dp) * 2 * rho * area^2 / f)
 
     eqs = Equation[
         xi ~ relax,
-        # Closed (t ≤ T_open): ṁ = 0. Open: ṁ = xi · mdot_open (quadratic, ramped in).
-        ifelse(t <= T_open, inlet.ṁ, inlet.ṁ - relax * mdot_open) ~ 0,
-        # ref_mdot has no equation here — wire it with watch_flow during composition
+        # Closed (t ≤ T_open): ṁ = 0. Open: ṁ = xi · ṁ_open (quadratic, ramped in).
+        ifelse(t <= T_open, inlet.ṁ, inlet.ṁ - relax * ṁ_open) ~ 0,
+        # ref_ṁ has no equation here — wire it with watch_flow during composition
     ]
 
     return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)
@@ -91,7 +91,7 @@ end
     watch_flow(flapper, sym) -> Equation
 
 Wire a Flapper's reference flow to the mass flow `sym` it should watch, returning the equation
-`flapper.ref_mdot ~ sym`. Add it to the connection list during composition:
+`flapper.ref_ṁ ~ sym`. Add it to the connection list during composition:
 
 ```julia
 conns = [
@@ -109,26 +109,26 @@ flow back through this equation, so the two must refer to the same `flapper`.
 - `sym`: the mass-flow variable to watch [kg/s]
 
 # Returns
-`Equation` — `flapper.ref_mdot ~ sym`.
+`Equation` — `flapper.ref_ṁ ~ sym`.
 """
-watch_flow(flapper, sym) = flapper.ref_mdot ~ sym
+watch_flow(flapper, sym) = flapper.ref_ṁ ~ sym
 
 """
     flapper_callback(ssys, flappers...) -> ContinuousCallback | CallbackSet
 
 Build the opening-detection event(s) for one or more flappers in a compiled system. Each
-flapper opens when its wired `ref_mdot` falls through its own `open_at_current`; the callback
+flapper opens when its wired `ref_ṁ` falls through its own `open_at_current`; the callback
 latches that crossing time into the flapper's `T_open` parameter.
 
 The crossing is found by root-finding the reference flow itself: the observed function for
-`flapper.ref_mdot` is evaluated at the integrator's trial state `(u, p, t)`, so detection is
-exact and works whether `ref_mdot` resolves to a differential state (a branch with inertia) or
+`flapper.ref_ṁ` is evaluated at the integrator's trial state `(u, p, t)`, so detection is
+exact and works whether `ref_ṁ` resolves to a differential state (a branch with inertia) or
 to a purely algebraic quantity (a quasi-static branch). This is the key difference from a
 per-step value check. While a flapper is closed it carries no flow and is dynamically decoupled
-from `ref_mdot`, so an adaptive solver places no steps near the crossing and a discrete check
+from `ref_ṁ`, so an adaptive solver places no steps near the crossing and a discrete check
 can sail past it; the root-finder seeks the crossing out regardless of where the steps land.
 
-Everything the event needs (the threshold `open_at_current`, the reference `ref_mdot`, and the
+Everything the event needs (the threshold `open_at_current`, the reference `ref_ṁ`, and the
 latched `T_open`) is read off the component, so nothing is passed by hand. Pass several flappers
 to monitor them together and the result is a `CallbackSet`; with one flapper a single
 `ContinuousCallback` is returned. Only downward crossings open the valve, and once latched it
@@ -151,11 +151,11 @@ sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 """
 function flapper_callback(ssys, flappers...)
     cbs = map(flappers) do flap
-        ref_obs = ModelingToolkit.build_explicit_observed_function(ssys, flap.ref_mdot)
+        ref_obs = ModelingToolkit.build_explicit_observed_function(ssys, flap.ref_ṁ)
         get_threshold = ModelingToolkit.getp(ssys, flap.open_at_current)
         set_T_open = ModelingToolkit.setp(ssys, flap.T_open)
 
-        # Condition crosses zero downward as ref_mdot falls through the threshold; evaluating
+        # Condition crosses zero downward as ref_ṁ falls through the threshold; evaluating
         # the observed function at the trial state is what makes this exact for algebraic refs.
         condition = (u, tt, integ) -> ref_obs(u, integ.p, tt) - get_threshold(integ)
         affect_open = integ -> set_T_open(integ, integ.t)

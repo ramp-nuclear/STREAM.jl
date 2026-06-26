@@ -48,7 +48,7 @@ ssys = build_loop(;
     dP_pump=DP_PUMP,
 )
 
-T_guess = steady_state_guess(; T_inlet=T_INLET, Q_wall=1e4, mdot_guess=0.490, n=N_CELLS)
+T_guess = steady_state_guess(; T_inlet=T_INLET, Q_wall=1e4, ṁ_guess=0.490, n=N_CELLS)
 op = [ssys.ch.T[i] => T_guess[i] for i in 1:N_CELLS]
 push!(op, ssys.ch.inlet.ṁ => 0.490)
 

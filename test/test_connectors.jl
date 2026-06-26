@@ -10,9 +10,11 @@ using ModelingToolkit: t_nounits as t
 
 @testset "ṁ is a Flow variable" begin
     @named fp = FlowPort()
-    mdot_var = only(filter(v -> ModelingToolkit.getname(v) == :ṁ, unknowns(fp)))
+    ṁ_var = only(filter(v -> ModelingToolkit.getname(v) == :ṁ, unknowns(fp)))
     connect_type = Symbolics.getmetadata(
-        mdot_var, ModelingToolkitBase.VariableConnectType, nothing
+        ṁ_var,
+        ModelingToolkitBase.VariableConnectType,
+        nothing,
     )
     @test connect_type == ModelingToolkit.Flow
 end

@@ -19,14 +19,14 @@ end
     R_val = 1.0
     L_over_A = 1e3
     tau = L_over_A / R_val   # 1000 s
-    mdot0 = 1.0
+    ṁ0 = 1.0
 
-    # A pump holds mdot0 through the linear resistor, then shuts off and the flow coasts as
-    # ṁ = mdot0·exp(-(R/L)·t). Drive the loop to steady with the pump on, then start the
+    # A pump holds ṁ0 through the linear resistor, then shuts off and the flow coasts as
+    # ṁ = ṁ0·exp(-(R/L)·t). Drive the loop to steady with the pump on, then start the
     # transient from the full solved state with the pump head overridden to 0. Transplanting every
     # state from the solved point keeps the IC consistent no matter which variables MTK keeps as
     # states.
-    @named pump = Pump(R_val * mdot0)   # head R·mdot0 balances the linear drop R·ṁ at mdot0
+    @named pump = Pump(R_val * ṁ0)   # head R·ṁ0 balances the linear drop R·ṁ at ṁ0
     @named L_comp = Inertia(L_over_A)
     @named R_comp = Resistor(R_val)
     @named hx = HeatExchanger(300.0)
@@ -37,7 +37,7 @@ end
     @named sys = compose(System(connections, t; name=:rl_sys), pump, L_comp, R_comp, hx)
     ssys = mtkcompile(sys)
 
-    sol_ss = solve_steady(ssys, [ssys.L_comp.inlet.ṁ => mdot0])
+    sol_ss = solve_steady(ssys, [ssys.L_comp.inlet.ṁ => ṁ0])
     @test sol_ss.retcode == ReturnCode.Success
     sol = solve_transient(ssys, sol_ss, range(0.0, 5000.0; length=200);
                           overrides=[ssys.pump.dP_pump => 0.0])
@@ -45,9 +45,9 @@ end
     @test sol.retcode == ReturnCode.Success
     t_check = [0.0, 500.0, 1000.0, 2000.0, 5000.0]
     for tc in t_check
-        mdot_num = sol(tc; idxs=ssys.L_comp.inlet.ṁ)
-        mdot_ana = exp(-tc / tau)
-        @test isapprox(mdot_num, mdot_ana; rtol=0.01)
+        ṁ_num = sol(tc; idxs=ssys.L_comp.inlet.ṁ)
+        ṁ_ana = exp(-tc / tau)
+        @test isapprox(ṁ_num, ṁ_ana; rtol=0.01)
     end
 end
 

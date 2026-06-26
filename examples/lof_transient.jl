@@ -11,7 +11,7 @@
 #   3. Run the 300-second transient: pump trip -> momentum coastdown -> flapper fires ->
 #      flow reversal -> natural circulation (NC) establishment.
 #   4. Extract and plot all relevant time series and spatial profiles.
-#   5. Print key metrics: mdot_ss, mdot_nc, T_max, flapper fire time, energy balance.
+#   5. Print key metrics: ṁ_ss, ṁ_nc, T_max, flapper fire time, energy balance.
 #
 # Physical overview:
 #   Topology (bypass, 4-node parallel):
@@ -96,11 +96,11 @@ for i in 1:n
 end
 
 ss_sol = solve_steady(ref_ssys, op_ref)
-mdot_ss = ss_sol[ref_ssys.ch_ref.inlet.ṁ]
+ṁ_ss = ss_sol[ref_ssys.ch_ref.inlet.ṁ]
 T_ss = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
 
 println("Steady-state solved:")
-println("  mdot_ss   = $(round(mdot_ss; digits=6)) kg/s")
+println("  ṁ_ss   = $(round(ṁ_ss; digits=6)) kg/s")
 println("  T_ss min  = $(round(minimum(T_ss) - 273.15; digits=2)) °C")
 println("  T_ss max  = $(round(maximum(T_ss) - 273.15; digits=2)) °C")
 println()
@@ -127,8 +127,8 @@ ssys = build_loop_lof_bypass(;
 
 Dt = Differential(t)
 op = Pair{Any,Any}[
-    ssys.ine.inlet.ṁ => mdot_ss,  # Inertia carries forced-flow momentum
-    ssys.ret.inlet.ṁ => mdot_ss,  # return channel flow (flapper closed at t=0)
+    ssys.ine.inlet.ṁ => ṁ_ss,  # Inertia carries forced-flow momentum
+    ssys.ret.inlet.ṁ => ṁ_ss,  # return channel flow (flapper closed at t=0)
     Dt(ssys.ret.inlet.ṁ) => 0.0,  # index-reduced state; zero at quasi-SS
     ssys.flapper.T_open => 1.0e30,     # sentinel: flapper has not fired yet
 ]
@@ -145,10 +145,10 @@ for i in 1:n
 end
 
 i_T_open = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
-i_ine_mdot = ModelingToolkit.variable_index(ssys, ssys.ine.inlet.ṁ)
+i_ine_ṁ = ModelingToolkit.variable_index(ssys, ssys.ine.inlet.ṁ)
 
 cb = ContinuousCallback(
-    (u, t_cb, integrator) -> u[i_ine_mdot] - threshold,
+    (u, t_cb, integrator) -> u[i_ine_ṁ] - threshold,
     nothing,
     (integrator) -> (integrator.u[i_T_open] = integrator.t),
 )
@@ -172,10 +172,10 @@ println()
 
 t_vec = sol.t  # actual solver time points (may include callback-inserted extras)
 
-mdot_ch = sol[ssys.heated.ch.inlet.ṁ, :]
-mdot_ret = sol[ssys.ret.inlet.ṁ, :]
-mdot_flap = sol[ssys.flapper.inlet.ṁ, :]
-mdot_ine = sol[ssys.ine.inlet.ṁ, :]
+ṁ_ch = sol[ssys.heated.ch.inlet.ṁ, :]
+ṁ_ret = sol[ssys.ret.inlet.ṁ, :]
+ṁ_flap = sol[ssys.flapper.inlet.ṁ, :]
+ṁ_ine = sol[ssys.ine.inlet.ṁ, :]
 
 # Cell temperatures
 T_ch = [sol[ssys.heated.ch.T[i], :] for i in 1:n]   # T_ch[i][time_idx]
@@ -194,7 +194,7 @@ T_open_arr = sol[ssys.flapper.T_open, :]
 dP_ch = sol[ssys.heated.ch.dP, :]
 dP_ret = sol[ssys.ret.dP, :]
 
-mdot_nc = abs(mdot_ch[end])
+ṁ_nc = abs(ṁ_ch[end])
 T_max_nc = maximum(T_ch[i][end] for i in 1:n)
 T_max_ss = maximum(T_ss)
 
@@ -207,7 +207,7 @@ if !isnan(flapper_open_time)
     idx_open = findfirst(t_vec .>= flapper_open_time)
     if !isnothing(idx_open)
         for idx in idx_open:(length(t_vec) - 1)
-            dmdt = abs(mdot_ch[idx + 1] - mdot_ch[idx]) / dt_step
+            dmdt = abs(ṁ_ch[idx + 1] - ṁ_ch[idx]) / dt_step
             if dmdt < 1e-5
                 nc_time_found[] = t_vec[idx]
                 break
@@ -220,15 +220,15 @@ nc_time = nc_time_found[]
 T_inlet_ch_final = sol[ssys.ret.T[1], end]
 T_outlet_ch_final = T_ch[1][end]  # T[1] = hottest in NC reversed flow
 Q_wall_final = abs(sum(q_wall_ch[i][end] for i in 1:n))
-Q_advect_final = mdot_nc * cp_water(T_inlet) * abs(T_outlet_ch_final - T_inlet_ch_final)
+Q_advect_final = ṁ_nc * cp_water(T_inlet) * abs(T_outlet_ch_final - T_inlet_ch_final)
 energy_balance_ratio = (Q_advect_final > 1e-3) ? Q_wall_final / Q_advect_final : NaN
 
 println("="^70)
 println("KEY METRICS")
 println("="^70)
-@printf "  Steady-state ṁ     : %.6f kg/s\n" mdot_ss
-@printf "  NC ṁ (t=300s)      : %.6f kg/s  (%.1f%% of SS)\n" mdot_nc (
-    100 * mdot_nc / mdot_ss
+@printf "  Steady-state ṁ     : %.6f kg/s\n" ṁ_ss
+@printf "  NC ṁ (t=300s)      : %.6f kg/s  (%.1f%% of SS)\n" ṁ_nc (
+    100 * ṁ_nc / ṁ_ss
 )
 @printf "  T_max at SS           : %.2f K  (%.2f °C)\n" T_max_ss (T_max_ss - 273.15)
 @printf "  T_max at NC (t=300s)  : %.2f K  (%.2f °C)\n" T_max_nc (T_max_nc - 273.15)
@@ -246,7 +246,7 @@ end
 if !isnan(energy_balance_ratio)
     @printf "  Energy balance ratio  : %.4f  (1.0 = perfect, <5%% err expected)\n" energy_balance_ratio
 else
-    println("  Energy balance ratio  : N/A (mdot_nc too small)")
+    println("  Energy balance ratio  : N/A (ṁ_nc too small)")
 end
 println("="^70)
 println()
@@ -305,7 +305,7 @@ println("  01_flow_all_components.png")
 
 p8a_ch = plot(
     t_vec,
-    mdot_ch;
+    ṁ_ch;
     ylabel="ch [kg/s]",
     label="ch (heated)",
     lw=2,
@@ -316,20 +316,30 @@ hline!(p8a_ch, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
 add_events!(p8a_ch)
 
 p8a_ret = plot(
-    t_vec, mdot_ret; ylabel="ret [kg/s]", label="ret (return)", lw=2, color=:forestgreen
+    t_vec,
+    ṁ_ret;
+    ylabel="ret [kg/s]",
+    label="ret (return)",
+    lw=2,
+    color=:forestgreen,
 )
 hline!(p8a_ret, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
 add_events!(p8a_ret)
 
 p8a_ine = plot(
-    t_vec, mdot_ine; ylabel="ine [kg/s]", label="ine (pump branch)", lw=2, color=:gray
+    t_vec,
+    ṁ_ine;
+    ylabel="ine [kg/s]",
+    label="ine (pump branch)",
+    lw=2,
+    color=:gray,
 )
 hline!(p8a_ine, [0.0]; color=:black, lw=1, ls=:dot, label=nothing)
 add_events!(p8a_ine)
 
 p8a_flap = plot(
     t_vec,
-    mdot_flap;
+    ṁ_flap;
     xlabel="Time [s]",
     ylabel="flapper [kg/s]",
     label="flapper path",
@@ -357,7 +367,7 @@ savefig(pov_flow, joinpath(dir_overview, "01_flow_all_components.png"))
 println("  02_flow_ch_ret.png")
 p8b = plot(
     t_vec,
-    mdot_ch;
+    ṁ_ch;
     label="ch (heated)",
     lw=2.5,
     color=:royalblue,
@@ -367,7 +377,7 @@ p8b = plot(
     size=(1000, 500),
     dpi=150,
 )
-plot!(p8b, t_vec, mdot_ret; label="ret (return)", lw=2.5, color=:forestgreen)
+plot!(p8b, t_vec, ṁ_ret; label="ret (return)", lw=2.5, color=:forestgreen)
 hline!(p8b, [0.0]; color=:black, lw=1, ls=:dot, label="zero")
 add_events!(p8b)
 savefig(p8b, joinpath(dir_overview, "02_flow_ch_ret.png"))
@@ -410,10 +420,10 @@ println("=== 02_transition_0to60s ===")
 t_trans_hi = 60.0
 idx_t = wmask(0.0, t_trans_hi)
 tv_t = t_vec[idx_t]
-mch_t = mdot_ch[idx_t]
-mret_t = mdot_ret[idx_t]
-mine_t = mdot_ine[idx_t]
-mflap_t = mdot_flap[idx_t]
+mch_t = ṁ_ch[idx_t]
+mret_t = ṁ_ret[idx_t]
+mine_t = ṁ_ine[idx_t]
+mflap_t = ṁ_flap[idx_t]
 xi_t = xi_arr[idx_t]
 dPch_t = dP_ch[idx_t]
 dPret_t = dP_ret[idx_t]
@@ -611,16 +621,16 @@ println("=== 03_nc_equilibrium (200–300s) ===")
 t_nc_lo = 200.0
 idx_nc = wmask(t_nc_lo, 300.0)
 tv_nc = t_vec[idx_nc]
-mch_nc = mdot_ch[idx_nc]
-mret_nc = mdot_ret[idx_nc]
-mflap_nc = mdot_flap[idx_nc]
-mine_nc = mdot_ine[idx_nc]
+mch_nc = ṁ_ch[idx_nc]
+mret_nc = ṁ_ret[idx_nc]
+mflap_nc = ṁ_flap[idx_nc]
+mine_nc = ṁ_ine[idx_nc]
 Tch_nc = [T_ch[i][idx_nc] for i in 1:n]
 qw_nc = [q_wall_ch[i][idx_nc] for i in 1:n]
 Re_nc = [Re_ch[i][idx_nc] for i in 1:n]
 htc_nc = [htc_ch[i][idx_nc] for i in 1:n]
 
-mdot_nc_mean = mean(abs.(mch_nc))
+ṁ_nc_mean = mean(abs.(mch_nc))
 
 println("  01_nc_flow.png")
 p10a = plot(
@@ -631,7 +641,7 @@ p10a = plot(
     color=:royalblue,
     xlabel="Time [s]",
     ylabel="Mass flow [kg/s]",
-    title="LOF Bypass: Natural Circulation Mass Flows (200–300s)\nNC |ṁ| = $(round(mdot_nc_mean; digits=5)) kg/s  ($(round(100*mdot_nc_mean/mdot_ss; digits=1))% of SS)",
+    title="LOF Bypass: Natural Circulation Mass Flows (200–300s)\nNC |ṁ| = $(round(ṁ_nc_mean; digits=5)) kg/s  ($(round(100*ṁ_nc_mean/ṁ_ss; digits=1))% of SS)",
     size=(1000, 500),
     dpi=150,
 )

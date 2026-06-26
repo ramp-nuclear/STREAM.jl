@@ -3,7 +3,7 @@
 """
     Pump(dP_pump::Real; name) -> System
     Pump(dP_pump::Any; name) -> System
-    Pump(; name, mdot0) -> System
+    Pump(; name, ṁ0) -> System
 
 Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch methods:
 
@@ -15,7 +15,7 @@ Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch
    The callable is stored as an MTK callable parameter `dP_pump_fn`. The caller must pass
    `ssys.pump.dP_pump_fn => f` in the `op` dict to `ODEProblem` / `solve_transient`.
 
-3. `Pump(; name, mdot0)` — fixed-flow mode. `mdot0` is a fixed mass flow rate parameter
+3. `Pump(; name, ṁ0)` — fixed-flow mode. `ṁ0` is a fixed mass flow rate parameter
    [kg/s]. No pressure equation is added; the caller must anchor pressure elsewhere.
 
 # Arguments
@@ -31,7 +31,7 @@ Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch
 
 **Fixed-flow mode (method 3):**
 - `name`: system name (Symbol)
-- `mdot0`: fixed mass flow rate [kg/s]
+- `ṁ0`: fixed mass flow rate [kg/s]
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
@@ -53,10 +53,10 @@ function Pump(dP_pump::Any; name)
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
-function Pump(; name, mdot0)
-    pars = @parameters mdot0 = mdot0
+function Pump(; name, ṁ0)
+    pars = @parameters ṁ0 = ṁ0
     @named inlet = FlowPort()
     @named outlet = FlowPort()
-    eqs = Equation[inlet.ṁ ~ mdot0]
+    eqs = Equation[inlet.ṁ ~ ṁ0]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end

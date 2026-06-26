@@ -130,7 +130,7 @@ end
     ṁ = 0.5
     q = Q_FLUX_DEFAULT
     fluid = ConstantFluid(; cp=cp_mock)
-    @named pump = Pump(; mdot0=ṁ)        # fixed-flow (current source), so ṁ is exact
+    @named pump = Pump(; ṁ0=ṁ)        # fixed-flow (current source), so ṁ is exact
     @named bc = HeatExchanger(T_INLET)
     @named chf = ChannelHeatFlux(; n=n, geometry=geom, fluid=fluid)
     connections = Equation[
@@ -176,7 +176,7 @@ end
     ]
     sol_s1 = solve_steady(ssys_s1, ic_s1)
     @test sol_s1.retcode == ReturnCode.Success
-    mdot_s1 = sol_s1[ssys_s1.ch_s1.inlet.ṁ]
+    ṁ_s1 = sol_s1[ssys_s1.ch_s1.inlet.ṁ]
 
     # Style 2 — WallTemperature component connection.
     @named pump = Pump(DP_PUMP)
@@ -396,7 +396,9 @@ end
         @named sys = compose(System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...)
         ssys = mtkcompile(sys)
         Q_guess = max(1e4, 1e3 * (T_wall_bc - T_inlet_iscb))
-        T_guess = steady_state_guess(T_inlet=T_inlet_iscb, Q_wall=Q_guess, mdot_guess=0.490, n=n)
+        T_guess = steady_state_guess(;
+            T_inlet=T_inlet_iscb, Q_wall=Q_guess, ṁ_guess=0.490, n=n
+        )
         op = [ssys.cac.T[i] => T_guess[i] for i in 1:n]
         push!(op, ssys.cac.inlet.ṁ => 0.490)
         sol = solve_steady(ssys, op)
@@ -419,16 +421,19 @@ end
 const N_SIGN          = 5
 const T_INLET_SIGN    = 313.15
 const T_WALL_SIGN     = 373.15
-const MDOT_NEG        = -0.490
+const ṁ_NEG = -0.490
 const GEOM_SIGN       = PipeGeometry_circular(0.6, 0.01)
 
 const T_GUESS_FWD_SIGN = steady_state_guess(;
-    T_inlet=T_INLET_SIGN, Q_wall=1e4, mdot_guess=abs(MDOT_NEG), n=N_SIGN
+    T_inlet=T_INLET_SIGN,
+    Q_wall=1e4,
+    ṁ_guess=abs(ṁ_NEG),
+    n=N_SIGN,
 )
 const T_GUESS_REV_SIGN = reverse(T_GUESS_FWD_SIGN)
 
 @testset "flow reversal: Channel ṁ < 0 " begin
-    @named pump = Pump(mdot0=MDOT_NEG)
+    @named pump = Pump(; ṁ0=ṁ_NEG)
     @named ch = Channel(; n=N_SIGN, geometry=GEOM_SIGN,
                           h_left=H_DEFAULT, h_right=0.0)
     @named bc = HeatExchanger(T_INLET_SIGN)
@@ -443,7 +448,7 @@ const T_GUESS_REV_SIGN = reverse(T_GUESS_FWD_SIGN)
     @named sys = compose(System(conns, t; name=:sign_ch), pump, bc, ch)
     ssys = mtkcompile(sys)
     op = [ssys.ch.T[i] => T_GUESS_REV_SIGN[i] for i in 1:N_SIGN]
-    push!(op, ssys.ch.inlet.ṁ => MDOT_NEG)
+    push!(op, ssys.ch.inlet.ṁ => ṁ_NEG)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -457,7 +462,7 @@ const T_GUESS_REV_SIGN = reverse(T_GUESS_FWD_SIGN)
 end
 
 @testset "flow reversal: ChannelAndContacts ṁ < 0" begin
-    @named pump = Pump(mdot0=MDOT_NEG)
+    @named pump = Pump(; ṁ0=ṁ_NEG)
     @named cac = ChannelAndContacts(n=N_SIGN, geometry=GEOM_SIGN)
     @named bc = HeatExchanger(T_INLET_SIGN)
     ct_l = [ConstantTemperature(T_WALL_SIGN; name=Symbol(:ct_l, i)) for i in 1:N_SIGN]
@@ -473,7 +478,7 @@ end
     @named sys = compose(System(conns, t; name=:sign_cac), pump, bc, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys; fully_determined=false)
     op = [ssys.cac.T[i] => T_GUESS_REV_SIGN[i] for i in 1:N_SIGN]
-    push!(op, ssys.cac.inlet.ṁ => MDOT_NEG)
+    push!(op, ssys.cac.inlet.ṁ => ṁ_NEG)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -488,14 +493,14 @@ end
     @test all(vel_vals .> 0)
 
     T_mean = (sol[ssys.cac.T_out] + T_INLET_SIGN) / 2
-    Q_advect = abs(MDOT_NEG) * cp_water(T_mean) * (sol[ssys.cac.T_out] - T_INLET_SIGN)
+    Q_advect = abs(ṁ_NEG) * cp_water(T_mean) * (sol[ssys.cac.T_out] - T_INLET_SIGN)
     Q_wall_total = sol[ssys.cac.Q_wall_total]
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
 
 @testset "flow reversal: ChannelHeatFlux ṁ < 0" begin
     # CHF flux is intrinsic — q_left[i] sign is direction-independent.
-    @named pump = Pump(mdot0=MDOT_NEG)
+    @named pump = Pump(; ṁ0=ṁ_NEG)
     @named chf = ChannelHeatFlux(n=N_SIGN, geometry=GEOM_SIGN)
     @named bc = HeatExchanger(T_INLET_SIGN)
     conns = Equation[
@@ -509,7 +514,7 @@ end
     @named sys = compose(System(conns, t; name=:sign_chf), pump, bc, chf)
     ssys = mtkcompile(sys)
     op = [ssys.chf.T[i] => T_GUESS_REV_SIGN[i] for i in 1:N_SIGN]
-    push!(op, ssys.chf.inlet.ṁ => MDOT_NEG)
+    push!(op, ssys.chf.inlet.ṁ => ṁ_NEG)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -526,7 +531,7 @@ end
 
     # Energy balance: advective heat gain ≈ summed q_wall.
     T_mean = (sol[ssys.chf.T_out] + T_INLET_SIGN) / 2
-    Q_advect = abs(MDOT_NEG) * cp_water(T_mean) * (sol[ssys.chf.T_out] - T_INLET_SIGN)
+    Q_advect = abs(ṁ_NEG) * cp_water(T_mean) * (sol[ssys.chf.T_out] - T_INLET_SIGN)
     Q_wall_total = sum(sol[ssys.chf.q_wall[:]])
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
@@ -540,8 +545,8 @@ end
     q_density_g3b = Q / (geom.heated_parts[1] * dz)
     T_in = 320.0
 
-    function _build_loop_g3b(mdot0)
-        @named pump = Pump(; mdot0=mdot0)
+    function _build_loop_g3b(ṁ0)
+        @named pump = Pump(; ṁ0=ṁ0)
         @named hex  = HeatExchanger(T_in)
         @named chf  = ChannelHeatFlux(; n=n, geometry=geom)
         eqs = Equation[
@@ -552,7 +557,7 @@ end
             [chf.q_left[i]  ~ q_density_g3b for i in 1:n]...,
             [chf.q_right[i] ~ 0.0 for i in 1:n]...,
         ]
-        nm = mdot0 > 0 ? :g3b_loop_fwd : :g3b_loop_rev
+        nm = ṁ0 > 0 ? :g3b_loop_fwd : :g3b_loop_rev
         @named sys = compose(System(eqs, t; name=nm), pump, hex, chf)
         ssys = mtkcompile(sys)
         op = [ssys.chf.T[i] => T_in + 1.0*i for i in 1:n]
@@ -677,7 +682,10 @@ end
         ssys = mtkcompile(sys)
         Q_guess = max(1e4, 1e3 * (T_wall_bc - T_inlet_scb))
         T_guess = steady_state_guess(
-            T_inlet=T_inlet_scb, Q_wall=Q_guess, mdot_guess=0.490, n=n_scb,
+            T_inlet=T_inlet_scb,
+            Q_wall=Q_guess,
+            ṁ_guess=0.490,
+            n=n_scb,
         )
         op = [ssys.cac.T[i] => T_guess[i] for i in 1:n_scb]
         push!(op, ssys.cac.inlet.ṁ => 0.490)

@@ -113,7 +113,11 @@ end
     for i in 1:length(PARITY_MTR_ASYM_H_TC_LEFT_R)
         h_julia = STREAM._h_spl(PARITY_MTR_ASYM_T_WALL_LEFT_R[i],
                                 PARITY_MTR_ASYM_T_CELLS_R[i],
-                                PARITY_MTR_ASYM_MDOT_R, Dh, A, dittus_boelter)
+            PARITY_MTR_ASYM_ṁ_R,
+            Dh,
+            A,
+            dittus_boelter,
+        )
         @test isapprox(h_julia, PARITY_MTR_ASYM_H_TC_LEFT_R[i]; rtol=1e-6)
     end
 end
@@ -175,7 +179,7 @@ end
                           pump, hx, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys; fully_determined=true)
 
-    T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.5, n=n)
+        T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.5, n=n)
     op = vcat(
         [ssys.cac.T[i] => T_guess[i] for i in 1:n],
             [ssys.cac.inlet.ṁ => 0.5],
@@ -191,7 +195,10 @@ end
         push!(
             rows,
             parity_check(
-                "simple_loop", "ṁ", abs(sol[ssys.cac.inlet.ṁ]), PARITY_SIMPLE_MDOT
+                "simple_loop",
+                "ṁ",
+                abs(sol[ssys.cac.inlet.ṁ]),
+                PARITY_SIMPLE_ṁ,
             ),
         )
     push!(rows, parity_check("simple_loop", "dP_loop",
@@ -260,7 +267,7 @@ end
     ssys_ss = build_loop_transient(; T_inlet=T_inlet, T_wall_0=T_wall_0)
     ssys = build_loop_transient(; T_inlet=T_inlet, T_wall_fn=T_wall_step)
 
-    T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+        T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.490, n=n)
     op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
         push!(op_guess, ssys_ss.ch.inlet.ṁ => 0.490)
     sol_ss = solve_steady(ssys_ss, op_guess)
@@ -336,14 +343,22 @@ end
                              sol[ssys.cac_l.T_out], PARITY_MTR_SYM_T_OUT_L))
     push!(rows, parity_check("mtr_symmetric", "T_out_r",
                              sol[ssys.cac_r.T_out], PARITY_MTR_SYM_T_OUT_R))
-    push!(rows, parity_check("mtr_symmetric", "mdot_l",
+        push!(
+            rows,
+            parity_check(
+                "mtr_symmetric",
+                "ṁ_l",
                 abs(sol[ssys.cac_l.inlet.ṁ]),
-                PARITY_MTR_SYM_MDOT_L,
+                PARITY_MTR_SYM_ṁ_L,
             ),
         )
-    push!(rows, parity_check("mtr_symmetric", "mdot_r",
+        push!(
+            rows,
+            parity_check(
+                "mtr_symmetric",
+                "ṁ_r",
                 abs(sol[ssys.cac_r.inlet.ṁ]),
-                PARITY_MTR_SYM_MDOT_R,
+                PARITY_MTR_SYM_ṁ_R,
             ),
         )
     push!(rows, parity_check("mtr_symmetric", "dP_loop",
@@ -478,14 +493,22 @@ end
                              sol[ssys.cac_l.T_out], PARITY_MTR_ASYM_T_OUT_L))
     push!(rows, parity_check("mtr_asymmetric", "T_out_r",
                              sol[ssys.cac_r.T_out], PARITY_MTR_ASYM_T_OUT_R))
-    push!(rows, parity_check("mtr_asymmetric", "mdot_l",
+        push!(
+            rows,
+            parity_check(
+                "mtr_asymmetric",
+                "ṁ_l",
                 abs(sol[ssys.cac_l.inlet.ṁ]),
-                PARITY_MTR_ASYM_MDOT_L,
+                PARITY_MTR_ASYM_ṁ_L,
             ),
         )
-    push!(rows, parity_check("mtr_asymmetric", "mdot_r",
+        push!(
+            rows,
+            parity_check(
+                "mtr_asymmetric",
+                "ṁ_r",
                 abs(sol[ssys.cac_r.inlet.ṁ]),
-                PARITY_MTR_ASYM_MDOT_R,
+                PARITY_MTR_ASYM_ṁ_R,
             ),
         )
     push!(rows, parity_check("mtr_asymmetric", "dP_loop",
@@ -615,9 +638,13 @@ end
 
     push!(rows, parity_check("mtr_one_sided", "T_out_l",
                              sol[cac_s.T_out], PARITY_MTR_ONESIDED_T_OUT_L))
-    push!(rows, parity_check("mtr_one_sided", "mdot_l",
+        push!(
+            rows,
+            parity_check(
+                "mtr_one_sided",
+                "ṁ_l",
                 abs(sol[cac_s.inlet.ṁ]),
-                PARITY_MTR_ONESIDED_MDOT_L,
+                PARITY_MTR_ONESIDED_ṁ_L,
             ),
         )
     push!(rows, parity_check("mtr_one_sided", "dP_loop",
@@ -849,9 +876,9 @@ end
     @test sol_v02.retcode == ReturnCode.Success
 
     # Assertion 2: energy balance — both plates heat the single channel
-    mdot_v02 = sol_v02[ssys_v02.cac_v02.inlet.ṁ]
+    ṁ_v02 = sol_v02[ssys_v02.cac_v02.inlet.ṁ]
     cp_v02 = cp_water(T_in_v02)
-    T_rise_expected_v02 = (power_per_plate + power_per_plate) / (mdot_v02 * cp_v02)
+    T_rise_expected_v02 = (power_per_plate + power_per_plate) / (ṁ_v02 * cp_v02)
     @test isapprox(
         sol_v02[ssys_v02.cac_v02.T_out] - T_in_v02, T_rise_expected_v02; rtol=0.05
     )
