@@ -97,10 +97,8 @@ end
         pump_l.inlet.p ~ 1.0e5,
         inseries(pump_r, hx_r, cac_r, pump_r)...,
         pump_r.inlet.p ~ 1.0e5,
-        [connect(getproperty(hd, Symbol(:thermal_left, i)),
-                 getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
-        [connect(getproperty(hd, Symbol(:thermal_right, i)),
-                 getproperty(cac_r, Symbol(:thermal_left, i))) for i in 1:nz]...,
+        connect_faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
+        connect_faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(System(conns, t; name=:knob_mtr),

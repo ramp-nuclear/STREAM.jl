@@ -914,8 +914,8 @@ end
                               ref_temp=Dict(fuel => fill(T0, nz, nx)))
     fb = connect_temperature_feedback(pk, [fuel])
     bath_conns = vcat(
-        [connect(port(fuel, :thermal_left, i), bathsL[i].thermal) for i in 1:nz],
-        [connect(port(fuel, :thermal_right, i), bathsR[i].thermal) for i in 1:nz],
+        connect_face(bathsL, fuel, :thermal_left),
+        connect_face(bathsR, fuel, :thermal_right),
     )
     conns = Equation[fb...; fuel.power ~ pk.P * 1.0e3; bath_conns...]
     full = compose_systems(fuel, pk, bathsL..., bathsR...; connections=conns, name=:sys8)

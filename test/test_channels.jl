@@ -355,8 +355,8 @@ end
         connect(bc.outlet, cac.inlet),
         connect(cac.outlet, pump.inlet),
         pump.inlet.p ~ 1.0e5,
-        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:n]...,
-        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
+        connect_face(ct_l, cac, :thermal_left)...,
+        connect_face(ct_l, cac, :thermal_right)...,
     ]
     @named sys = compose(System(conns, t; name=:cac_db), pump, bc, cac, ct_l...)
     ssys = mtkcompile(sys; fully_determined=false)

@@ -91,6 +91,68 @@ The namespaced connector subsystem (e.g. `sys.thermal_left3`), suitable for `con
 """
 port(sys, face::Symbol, i::Int) = getproperty(sys, Symbol(face, i))
 
+"""
+    connect_face(sources, target, face; source_port=:thermal) -> Vector{Equation}
+
+Connect one per-cell source array to one thermal face of a target system.
+
+# Arguments
+- `sources`: vector of systems exposing the connector `source_port`
+- `target`: system exposing an indexed thermal face such as `:thermal_left` or `:thermal_right`
+- `face`: target face symbol (`:thermal_left` or `:thermal_right`)
+- `source_port`: connector name on each source system (default `:thermal`)
+
+# Returns
+`Vector{Equation}` with one `connect(...)` equation per cell.
+"""
+function connect_face(sources, target, face::Symbol; source_port::Symbol=:thermal)
+    return Equation[
+        connect(getproperty(sources[i], source_port), port(target, face, i)) for
+        i in eachindex(sources)
+    ]
+end
+
+"""
+    connect_faces(mapping::Pair) -> Vector{Equation}
+    connect_faces(mappings::Pair...) -> Vector{Equation}
+
+Connect indexed thermal faces cell-by-cell between systems.
+
+# Arguments
+- `mapping`: face mapping written as `(left_system, :left_face) => (right_system, :right_face)`
+- `mappings...`: one or more such mappings
+
+# Returns
+Flattened `Vector{Equation}` with one `connect(...)` equation per cell for each mapping.
+
+# Example
+```julia
+eqs = connect_faces(
+    (cac, :thermal_right) => (fuel, :thermal_left),
+    (cac, :thermal_left) => (fuel, :thermal_right),
+)
+```
+"""
+function connect_faces(mappings::Pair...)
+    eqs = Equation[]
+    for mapping in mappings
+        append!(eqs, connect_faces(mapping))
+    end
+    return eqs
+end
+
+function connect_faces(mapping::Pair)
+    (left_sys, left_face) = mapping.first
+    (right_sys, right_face) = mapping.second
+    n_left = _infer_n(left_sys)
+    n_right = _infer_n(right_sys)
+    n_left == n_right ||
+        throw(ArgumentError("face sizes do not match: $n_left != $n_right"))
+    return Equation[
+        connect(port(left_sys, left_face, i), port(right_sys, right_face, i)) for i in 1:n_left
+    ]
+end
+
 # Real-valued defaults of `params`, skipping parameters with no default or a
 # non-Real default.
 function _real_defaults(params)
@@ -171,15 +233,10 @@ After calling this function, refer to sub-components exclusively via the returne
 names and should not be used in equations or connection dicts after composition.
 """
 function symmetric_plate(cac, fuel; name::Symbol)
-    n = _infer_n(cac)
-    connections = Equation[
-        [
-            connect(port(cac, :thermal_right, i), port(fuel, :thermal_left, i)) for i in 1:n
-        ]...,
-        [
-            connect(port(cac, :thermal_left, i), port(fuel, :thermal_right, i)) for i in 1:n
-        ]...,
-    ]
+    connections = connect_faces(
+        (cac, :thermal_right) => (fuel, :thermal_left),
+        (cac, :thermal_left) => (fuel, :thermal_right),
+    )
     return compose(System(connections, t; name=name), cac, fuel)
 end
 
@@ -202,17 +259,10 @@ After calling this function, refer to sub-components exclusively via the returne
 names and should not be used in equations or connection dicts after composition.
 """
 function plate(ch_left, ch_right, fuel; name::Symbol)
-    n = _infer_n(ch_left)
-    connections = Equation[
-        [
-            connect(port(ch_left, :thermal_right, i), port(fuel, :thermal_left, i)) for
-            i in 1:n
-        ]...,
-        [
-            connect(port(ch_right, :thermal_left, i), port(fuel, :thermal_right, i)) for
-            i in 1:n
-        ]...,
-    ]
+    connections = connect_faces(
+        (ch_left, :thermal_right) => (fuel, :thermal_left),
+        (ch_right, :thermal_left) => (fuel, :thermal_right),
+    )
     return compose(System(connections, t; name=name), ch_left, ch_right, fuel)
 end
 
@@ -237,17 +287,10 @@ names and should not be used in equations or connection dicts after composition.
 function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
     side in (:left, :right) ||
         throw(ArgumentError("side must be :left or :right, got :$side"))
-    n = _infer_n(channel)
     connections = if side == :left
-        Equation[[
-            connect(port(channel, :thermal_left, i), port(fuel, :thermal_right, i)) for
-            i in 1:n
-        ]...]
+        connect_faces((channel, :thermal_left) => (fuel, :thermal_right))
     else
-        Equation[[
-            connect(port(channel, :thermal_right, i), port(fuel, :thermal_left, i)) for
-            i in 1:n
-        ]...]
+        connect_faces((channel, :thermal_right) => (fuel, :thermal_left))
     end
     return compose(System(connections, t; name=name), channel, fuel)
 end
@@ -365,7 +408,7 @@ end
 function _pair_connections(left::Tuple{Symbol,Any}, right::Tuple{Symbol,Any}, n::Int)
     _, lsys = left
     _, rsys = right
-    return [connect(port(lsys, :thermal_right, i), port(rsys, :thermal_left, i)) for i in 1:n]
+    return connect_faces((lsys, :thermal_right) => (rsys, :thermal_left))
 end
 
 """

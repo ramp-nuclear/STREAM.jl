@@ -54,10 +54,8 @@ function _build_mtr_sym()
         pump_l.inlet.p ~ 1.0e5,
         inseries(pump_r, hx_r, cac_r, pump_r)...,
         pump_r.inlet.p ~ 1.0e5,
-        [connect(getproperty(hd, Symbol(:thermal_left, i)),
-                 getproperty(cac_l, Symbol(:thermal_left, i))) for i in 1:nz]...,
-        [connect(getproperty(hd, Symbol(:thermal_right, i)),
-                 getproperty(cac_r, Symbol(:thermal_left, i))) for i in 1:nz]...,
+        connect_faces((hd, :thermal_left) => (cac_l, :thermal_left))...,
+        connect_faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(System(conns, t; name=:mtr_sym_det),
@@ -83,10 +81,8 @@ function _build_mtr_asym()
         pump_l.inlet.p ~ 1.0e5,
         inseries(pump_r, hx_r, cac_r, pump_r)...,
         pump_r.inlet.p ~ 1.0e5,
-        [connect(getproperty(hd, Symbol(:thermal_left, i)),
-                 getproperty(cac_l, Symbol(:thermal_left, i))) for i in 1:nz]...,
-        [connect(getproperty(hd, Symbol(:thermal_right, i)),
-                 getproperty(cac_r, Symbol(:thermal_left, i))) for i in 1:nz]...,
+        connect_faces((hd, :thermal_left) => (cac_l, :thermal_left))...,
+        connect_faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(System(conns, t; name=:mtr_asym_det),
@@ -107,8 +103,7 @@ function _build_mtr_onesided()
     conns = Equation[
         inseries(pump_l, hx_l, cac_l, pump_l)...,
         pump_l.inlet.p ~ 1.0e5,
-        [connect(getproperty(hd, Symbol(:thermal_left, i)),
-                 getproperty(cac_l, Symbol(:thermal_left, i))) for i in 1:nz]...,
+        connect_faces((hd, :thermal_left) => (cac_l, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(System(conns, t; name=:mtr_onesided_det),
@@ -157,10 +152,8 @@ function _build_val02_twoplate()
     conns_v02 = Equation[
         inseries(pump_v02, hx_v02, cac_v02, pump_v02)...,
         pump_v02.inlet.p ~ 1.0e5,
-        [connect(getproperty(hd1, Symbol(:thermal_left, i)),
-                 getproperty(cac_v02, Symbol(:thermal_left, i))) for i in 1:nz_v02]...,
-        [connect(getproperty(hd2, Symbol(:thermal_left, i)),
-                 getproperty(cac_v02, Symbol(:thermal_right, i))) for i in 1:nz_v02]...,
+        connect_faces((hd1, :thermal_left) => (cac_v02, :thermal_left))...,
+        connect_faces((hd2, :thermal_left) => (cac_v02, :thermal_right))...,
         # Close the Δ=−2 deficit (two HD instances → two `power(t)` pins).
         hd1.power ~ power_per_plate,
         hd2.power ~ power_per_plate,

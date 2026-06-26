@@ -532,7 +532,7 @@ end
 # Hand-rolled per-pair wiring (mirrors `_pair_connections`): left member's
 # thermal_right to right member's thermal_left. Builds the reference systems.
 function _fa_pair_eqs(lsys, rsys, n::Int)
-    return [connect(port(lsys, :thermal_right, i), port(rsys, :thermal_left, i)) for i in 1:n]
+    return connect_faces((lsys, :thermal_right) => (rsys, :thermal_left))
 end
 
 # Time derivative, used to build the Dt(...)=>0.0 IC guesses (see variant-1 note).

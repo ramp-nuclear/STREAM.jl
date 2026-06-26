@@ -168,8 +168,8 @@ end
     conns = vcat(
             inseries(pump, hx, cac, pump),
             [pump.inlet.p ~ 1.0e5],
-        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:n],
-        [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n],
+        connect_face(ct_l, cac, :thermal_left),
+        connect_face(ct_r, cac, :thermal_right),
     )
     @named sys = compose(System(conns, t; name=:simple_loop_parity),
                           pump, hx, cac, ct_l..., ct_r...)
@@ -310,10 +310,8 @@ end
             pump_l.inlet.p ~ 1.0e5,
             inseries(pump_r, hx_r, cac_r, pump_r)...,
             pump_r.inlet.p ~ 1.0e5,
-        [connect(getproperty(hd, Symbol(:thermal_left, i)),
-                 getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
-        [connect(getproperty(hd, Symbol(:thermal_right, i)),
-                 getproperty(cac_r, Symbol(:thermal_left, i))) for i in 1:nz]...,
+        connect_faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
+        connect_faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(
@@ -454,10 +452,8 @@ end
             pump_l.inlet.p ~ 1.0e5,
             inseries(pump_r, hx_r, cac_r, pump_r)...,
             pump_r.inlet.p ~ 1.0e5,
-        [connect(getproperty(hd, Symbol(:thermal_left, i)),
-                 getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
-        [connect(getproperty(hd, Symbol(:thermal_right, i)),
-                 getproperty(cac_r, Symbol(:thermal_left, i))) for i in 1:nz]...,
+        connect_faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
+        connect_faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(
