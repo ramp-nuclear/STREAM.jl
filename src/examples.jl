@@ -29,15 +29,12 @@ function build_loop(;
     h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
 )
     @named pump = Pump(dP_pump)
-    @named ch = Channel(;
-        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), h_left=h_wall, h_right=0.0
-    )
+    geo = PipeGeometry_circular(L_ch, D_ch)
+    @named ch = Channel(n=n, geometry=geo, h_left=h_wall, h_right=0.0)
     @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
 
     connections = Equation[
-        connect(pump.outlet, bc.inlet),       # pump -> TempBC
-        connect(bc.outlet, ch.inlet),        # TempBC -> channel
-        connect(ch.outlet, pump.inlet),      # channel -> pump (closed loop)
+        inseries(pump, bc, ch, pump)...,
         pump.inlet.p ~ 1.0e5,                  # pressure gauge freedom fix
         # Per-cell binding eqns (args.funcs idiom)
         [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
@@ -45,13 +42,7 @@ function build_loop(;
     ]
 
     @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
-
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop compile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
-        n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -97,10 +88,7 @@ function build_loop_vertical(;
     @named grav = Gravity(H)
 
     connections = Equation[
-        connect(pump.outlet, bc.inlet),       # pump -> TempBC
-        connect(bc.outlet, ch.inlet),        # TempBC -> channel (upward leg)
-        connect(ch.outlet, grav.outlet),     # channel outlet (top) = grav outlet (top)
-        connect(grav.inlet, pump.inlet),      # grav inlet (bottom) = pump inlet (bottom)
+        inseries(pump, bc, ch, grav, pump)...,
         pump.inlet.p ~ 1.0e5,                  # pressure gauge freedom fix
         # Per-cell binding eqns (args.funcs idiom)
         [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
@@ -109,12 +97,7 @@ function build_loop_vertical(;
 
     @named sys = compose(System(connections, t; name=:sys), pump, bc, ch, grav)
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_vertical compile time: $(round(t_compile; digits=2))s" n_equations =
-        n_eq n_unknowns = n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -156,18 +139,15 @@ function build_loop_transient(;
     T_wall_fn=nothing,  # optional callable (t) -> K for time-varying wall temperature
 )
     @named pump = Pump(dP_pump)
-    @named ch = Channel(;
-        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), h_left=h_wall, h_right=0.0
-    )
+    geo = PipeGeometry_circular(L_ch, D_ch)
+    @named ch = Channel(n=n, geometry=geo, h_left=h_wall, h_right=0.0)
     @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
 
     if T_wall_fn === nothing
         # Scalar wall temperature — same as build_loop; no parameter declaration needed.
         # Per-cell binding replaces the legacy single-port wall pin.
         connections = Equation[
-            connect(pump.outlet, bc.inlet),
-            connect(bc.outlet, ch.inlet),
-            connect(ch.outlet, pump.inlet),
+            inseries(pump, bc, ch, pump)...,
             pump.inlet.p ~ 1.0e5,
             [ch.T_wall_left[i] ~ T_wall_0 for i in 1:n]...,
             [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
@@ -180,9 +160,7 @@ function build_loop_transient(;
         FType = typeof(T_wall_fn)
         ps = @parameters (T_wall_callable::FType)(..)
         connections = Equation[
-            connect(pump.outlet, bc.inlet),
-            connect(bc.outlet, ch.inlet),
-            connect(ch.outlet, pump.inlet),
+            inseries(pump, bc, ch, pump)...,
             pump.inlet.p ~ 1.0e5,
             # Style 1 binding with builder-level callable: same `ps[1](t)` value broadcast per cell.
             [ch.T_wall_left[i] ~ ps[1](t) for i in 1:n]...,
@@ -191,12 +169,7 @@ function build_loop_transient(;
         @named sys = compose(System(connections, t, [], ps; name=:sys), pump, bc, ch)
     end
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_transient compile time: $(round(t_compile; digits=2))s" n_equations =
-        n_eq n_unknowns = n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -409,19 +382,14 @@ function build_loop_lof_bypass(;
         # The current MTK does not auto-zero an unconnected ThermalPort's flow, so
         # bind each right wall T to the local bulk T ⇒ q_right = h*(T-T) = 0 (adiabatic).
         # Supplies the n equations that keep the heated subsystem fully determined.
-        [getproperty(heated.ch, Symbol(:thermal_right, i)).T ~ heated.ch.T[i] for i in 1:n]...,
+        [port(heated.ch, :thermal_right, i).T ~ heated.ch.T[i] for i in 1:n]...,
     ]
 
     @named sys = compose_systems(
         heated, pump, ine, hx, ret, flapper, ext_res; connections=connections, name=:sys
     )
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_lof_bypass compile time: $(round(t_compile; digits=2))s" n_equations =
-        n_eq n_unknowns = n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -545,20 +513,14 @@ function build_loop_pk(ctrl;
     @named bc = HeatExchanger(T_inlet)
 
     all_connections = [
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, rods_cac.inlet),
-        connect(rods_cac.outlet, pump.inlet),
+        inseries(pump, bc, rods_cac, pump)...,
         pump.inlet.p ~ 1.0e5,
         fb_eqs...,
         power_eqs...,
     ]
 
     full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
-    t_compile = @elapsed ssys = mtkcompile(full)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_pk compile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
-        n_uk
+    ssys = mtkcompile(full)
 
     pk_ic = point_kinetics_steady_state(P0)
     ic = Pair{Any,Any}[
