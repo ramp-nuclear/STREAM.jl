@@ -199,7 +199,7 @@ causes `KeyError` at `solve_transient`.
   (matches Channel n-cell structure), or 2D matrix (matches HeatDiffusion nz*nx, flattened
   row-major: j_flat = (jz-1)*nx + jx). `nothing` (default) = no temperature
   feedback.
-- `ref_temp::Union{Nothing,Dict}=nothing`: per-component reference temperatures [K].
+- `ref_temp::Union{Nothing,Dict}=nothing`: per-component reference temperatures [°C].
   Same key structure as `temp_worth`. Missing keys default to zero (full T contributes).
 
 # Returns

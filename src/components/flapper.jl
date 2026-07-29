@@ -1,7 +1,7 @@
 # flapper.jl -- Flapper check-valve component
 
 """
-    Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0, fluid=Water()) -> System
+    Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0, liquid=H2O) -> System
 
 Flapper (passive check valve). While closed it admits **no flow** (`ṁ = 0`); once open it
 is a quadratic resistor `ΔP = f·ṁ·|ṁ| / (2·ρ·area²)`. The valve opens the moment the
@@ -45,7 +45,7 @@ Then build the detection event with `flapper_callback(ssys, ssys.flapper)` and h
 - `f`: open-state quadratic loss coefficient (default 1.0)
 - `area`: flow area [m²] (default 1.0)
 - `open_rate`: relaxation rate [1/s]; the open ramp completes after `1/open_rate` s (default 1.0)
-- `fluid`: coolant property set (`AbstractFluid`), default `Water()` — supplies the density at
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref), supplying the density at
   the inlet stream temperature
 
 # Ports
@@ -56,7 +56,7 @@ structurally underdetermined — call `mtkcompile(sys; fully_determined=false)`,
 into a system where `ref_ṁ` is wired.
 """
 function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
-                 fluid::AbstractFluid=Water())
+                 liquid::AbstractLiquid=H2O)
     pars = @parameters begin
         open_at_current = open_at_current
         f = f
@@ -70,7 +70,7 @@ function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
     @named inlet = FlowPort()
     @named outlet = FlowPort()
 
-    rho = density(fluid, instream(inlet.T))
+    rho = ρ(liquid, instream(inlet.T))
     dp = inlet.p - outlet.p
     x = open_rate * (t - T_open)
     relax = ifelse(x <= 0.0, 0.0, ifelse(x >= 1.0, 1.0, -2 * x^3 + 3 * x^2))

@@ -29,7 +29,7 @@ end
     @named pump = Pump(R_val * ṁ0)   # head R·ṁ0 balances the linear drop R·ṁ at ṁ0
     @named L_comp = Inertia(L_over_A)
     @named R_comp = Resistor(R_val)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     connections = [
         inseries(pump, L_comp, R_comp, hx, pump)...,
         pump.inlet.p ~ 1.0e5,
@@ -52,12 +52,12 @@ end
 end
 
 @testset "HeatExchanger stub callable" begin
-    @named hx = HeatExchanger(313.15)
+    @named hx = HeatExchanger(40.0)
     @test hx isa ModelingToolkit.System
 end
 
 @testset "HeatExchanger mtkcompile" begin
-    @named hx = HeatExchanger(313.15)
+    @named hx = HeatExchanger(40.0)
     @test_nowarn mtkcompile(hx; fully_determined=false)  # isolated component: HX is value-source, no port closure needed
 end
 
@@ -82,7 +82,7 @@ end
 
 @testset "WallTemperature Real broadcast emits the scalar to every cell" begin
     n = 4
-    @named wt = WallTemperature(; n=n, T_wall=350.0)
+    @named wt = WallTemperature(; n=n, T_wall=76.85)
     @test wt isa ModelingToolkit.System
     var_names = string.(unknowns(wt))
     twl_count = count(s -> occursin("T_wall_out", s), var_names)
@@ -91,14 +91,14 @@ end
 
     ssys = mtkcompile(wt; fully_determined=false)
     emitted = _emitted(ssys, ssys.T_wall_out, n)
-    @test emitted == fill(350.0, n)
+    @test emitted == fill(76.85, n)
 end
 
 @testset "WallTemperature Vector emits the i-th element at cell i" begin
     n = 4
     # An asymmetric, non-monotone profile so a transpose, a reversal, or an
     # off-by-one would shift at least one cell and fail the exact match.
-    profile = [301.0, 422.0, 333.0, 414.0]
+    profile = [27.85, 148.85, 59.85, 140.85]
     @named wt = WallTemperature(; n=n, T_wall=profile)
     @test wt isa ModelingToolkit.System
     @test length(equations(wt)) == n
@@ -117,7 +117,7 @@ end
 
 @testset "WallTemperature Function emits f(t) at every cell" begin
     n = 4
-    fn = (tt) -> 350.0 + 10.0 * tt   # linear so the read-back value is exact
+    fn = (tt) -> 76.85 + 10.0 * tt   # linear so the read-back value is exact
     @named wt = WallTemperature(; n=n, T_wall=fn)
     @test wt isa ModelingToolkit.System
     @test length(equations(wt)) == n
@@ -127,9 +127,9 @@ end
     ssys = mtkcompile(wt; fully_determined=false)
     t_eval = 2.0
     sol = solve(ODEProblem(ssys, [ssys.T_wall_fn => fn], (0.0, 3.0)), Rodas5P())
-    @test all(sol(t_eval; idxs=ssys.T_wall_out[i]) == fn(t_eval) for i in 1:n)   # 370.0
+    @test all(sol(t_eval; idxs=ssys.T_wall_out[i]) == fn(t_eval) for i in 1:n)   # 96.85
     # Read at a second time to confirm the cells track the callable, not a frozen value.
-    @test sol(0.5; idxs=ssys.T_wall_out[1]) == fn(0.5)             # 355.0
+    @test sol(0.5; idxs=ssys.T_wall_out[1]) == fn(0.5)             # 81.85
 end
 
 @testset "HeatFluxSource Real broadcast emits the scalar to every cell" begin
@@ -187,8 +187,8 @@ end
 @testset "ConvectiveBoundary: imposes Q = h*area*(T_wall - T_fluid)" begin
     area = 0.07 * 0.06
     h_val = 5000.0
-    T_wall = 350.0
-    T_fluid = 313.15
+    T_wall = 76.85
+    T_fluid = 40.0
     @named cb = ConvectiveBoundary(; area=area)
     @named wall = ConstantTemperature(T_wall)
     conns = [
@@ -208,8 +208,8 @@ end
     # hotter than the fluid; the connected wall therefore sheds heat (one-way sink).
     area = 0.02
     @named cb = ConvectiveBoundary(; area=area)
-    @named wall = ConstantTemperature(320.0)
-    conns = [connect(cb.thermal, wall.thermal), cb.h ~ 4000.0, cb.T_fluid ~ 300.0]
+    @named wall = ConstantTemperature(46.85)
+    conns = [connect(cb.thermal, wall.thermal), cb.h ~ 4000.0, cb.T_fluid ~ 26.85]
     @named s = compose(System(conns, t; name=:cbsign), cb, wall)
     ss = mtkcompile(s; fully_determined=true)
     sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())

@@ -12,8 +12,8 @@ using OrdinaryDiffEq: ReturnCode
 const N_DEFAULT      = 4
 const L_DEFAULT      = 0.6
 const D_DEFAULT      = 0.01
-const T_INLET        = 313.15
-const T_WALL         = 373.15
+const T_INLET        = 40.0
+const T_WALL         = 100.0
 const H_DEFAULT      = 5000.0
 const DP_PUMP        = 3.0e4
 const Q_FLUX_DEFAULT = 1.0e5
@@ -120,7 +120,7 @@ end
     @test all(isapprox.(sol[ssys.chf.q_wall_right[:]], 0., atol=1e-9))
 end
 
-@testset "ChannelHeatFlux with ConstantFluid — uniform heating gives exact linear rise" begin
+@testset "ChannelHeatFlux with a fixed-property Liquid — uniform heating gives exact linear rise" begin
     # With a constant-cp mock fluid the steady cell-to-cell rise is exactly
     # ΔT = q·heated_perimeter·dz / (ṁ·cp), the closed-form Python uses with mock_liquid_funcs.
     n = 8
@@ -129,10 +129,10 @@ end
     cp_mock = 2000.0
     ṁ = 0.5
     q = Q_FLUX_DEFAULT
-    fluid = ConstantFluid(; cp=cp_mock)
+    liquid = Liquid(; cₚ=cp_mock)
     @named pump = Pump(; ṁ0=ṁ)        # fixed-flow (current source), so ṁ is exact
     @named bc = HeatExchanger(T_INLET)
-    @named chf = ChannelHeatFlux(; n=n, geometry=geom, fluid=fluid)
+    @named chf = ChannelHeatFlux(; n=n, geometry=geom, liquid=liquid)
     connections = Equation[
         inseries(pump, bc, chf, pump)...,
         pump.inlet.p ~ 1.0e5,
@@ -372,12 +372,12 @@ end
 
 @testset "ISCB: In-loop SCB Correction" begin
     n = 5
-    T_inlet_iscb = 313.15
+    T_inlet_iscb = 40.0
     L_ch = 0.6
     D_ch = 0.01
     dP_pump_iscb = 3.0e4
 
-    function _build_scb_loop(; scb_correction=nothing, T_wall_bc=373.15)
+    function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
         @named pump = Pump(dP_pump_iscb)
         @named cac = ChannelAndContacts(
             n=n, geometry=PipeGeometry_circular(L_ch, D_ch), scb_correction=scb_correction
@@ -409,8 +409,8 @@ end
         # T_wall = 330K < T_sat (~393K at 2 bar) ⇒ SCB inactive, pure single-phase.
         # Both SCB and non-SCB loops solve to identical h_tc values.
         scb_fn = regime_dependent_q_scb(pressure=2e5)
-        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=330.0)
-        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=330.0)
+        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
+        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
 
         htc_scb = sol_scb[ssys_scb.cac.h_tc_left[:]]
         htc_noscb = sol_noscb[ssys_noscb.cac.h_tc_left[:]]
@@ -419,8 +419,8 @@ end
 end
 
 const N_SIGN          = 5
-const T_INLET_SIGN    = 313.15
-const T_WALL_SIGN     = 373.15
+const T_INLET_SIGN    = 40.0
+const T_WALL_SIGN     = 100.0
 const ṁ_NEG = -0.490
 const GEOM_SIGN       = PipeGeometry_circular(0.6, 0.01)
 
@@ -493,7 +493,7 @@ end
     @test all(vel_vals .> 0)
 
     T_mean = (sol[ssys.cac.T_out] + T_INLET_SIGN) / 2
-    Q_advect = abs(ṁ_NEG) * cp_water(T_mean) * (sol[ssys.cac.T_out] - T_INLET_SIGN)
+    Q_advect = abs(ṁ_NEG) * cₚ(H2O, T_mean) * (sol[ssys.cac.T_out] - T_INLET_SIGN)
     Q_wall_total = sol[ssys.cac.Q_wall_total]
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
@@ -531,7 +531,7 @@ end
 
     # Energy balance: advective heat gain ≈ summed q_wall.
     T_mean = (sol[ssys.chf.T_out] + T_INLET_SIGN) / 2
-    Q_advect = abs(ṁ_NEG) * cp_water(T_mean) * (sol[ssys.chf.T_out] - T_INLET_SIGN)
+    Q_advect = abs(ṁ_NEG) * cₚ(H2O, T_mean) * (sol[ssys.chf.T_out] - T_INLET_SIGN)
     Q_wall_total = sum(sol[ssys.chf.q_wall[:]])
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
@@ -543,7 +543,7 @@ end
     Q = 800.0
     dz = 0.3 / n
     q_density_g3b = Q / (geom.heated_parts[1] * dz)
-    T_in = 320.0
+    T_in = 46.85
 
     function _build_loop_g3b(ṁ0)
         @named pump = Pump(; ṁ0=ṁ0)
@@ -645,14 +645,14 @@ end
 # Pure-correlation subcooled-boiling tests live in test_thresholds.jl.
 @testset "Subcooled-boiling integration (ISCB)" begin
     n_scb = 5
-    T_inlet_scb = 313.15
+    T_inlet_scb = 40.0
     L_ch_scb = 0.6
     D_ch_scb = 0.01
     dP_pump_scb = 3.0e4
 
     # Helper: build a minimal loop with CAC + Pump + HeatExchanger + per-cell
     # ConstantTemperature BCs. Returns (compiled_sys, solution).
-    function _build_scb_loop(; scb_correction=nothing, T_wall_bc=373.15)
+    function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
         @named pump = Pump(dP_pump_scb)
         @named cac = ChannelAndContacts(
             n=n_scb,
@@ -708,7 +708,7 @@ end
         # uncorrected branch (htc = h_spl). The "SCB present but inactive" claim
         # therefore means the SCB loop must reproduce the non-SCB loop exactly.
         # Build both, solve both, and compare h_tc and coolant T cell by cell.
-        T_wall = 380.0
+        T_wall = 106.85
         scb_fn = regime_dependent_q_scb(pressure=2e5)
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=T_wall)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=T_wall)
@@ -717,7 +717,7 @@ end
 
         # The wall sits below ONB in every cell: confirm the regime the claim asserts.
         P_cell = 2e5
-        T_sat = sat_temperature(P_cell)
+        T_sat = Tsat(H2O, P_cell)
         for i in 1:n_scb
             T_bulk = sol_scb[ssys_scb.cac.T[i]]
             h_spl = sol_scb[ssys_scb.cac.h_tc_left[i]]
@@ -733,7 +733,7 @@ end
     end
 
     @testset "Default (no SCB) backward compatibility" begin
-        ssys, sol = _build_scb_loop(scb_correction=nothing, T_wall_bc=373.15)
+        ssys, sol = _build_scb_loop(scb_correction=nothing, T_wall_bc=100.0)
         @test sol.retcode == ReturnCode.Success
     end
 
@@ -741,23 +741,23 @@ end
         # Direct numerical evaluation: at T_wall >> T_sat, the SCB correction
         # factor > 1. Validates the physics without requiring KINSOL convergence
         # in the boiling regime.
-        T_bulk = 320.0
+        T_bulk = 46.85
         P = 2e5
-        T_wall = 420.0
+        T_wall = 146.85
         ṁ = 0.49
         Dh = D_ch_scb
         Ac = pi/4 * Dh^2
-        Re_val = abs(ṁ) * Dh / (Ac * STREAM.mu_water(T_bulk))
+        Re_val = abs(ṁ) * Dh / (Ac * μ(H2O, T_bulk))
         Pr_val =
-            STREAM.cp_water(T_bulk) * STREAM.mu_water(T_bulk) /
-            STREAM.k_water(T_bulk)
+            cₚ(H2O, T_bulk) * μ(H2O, T_bulk) /
+            κ(H2O, T_bulk)
 
         h_spl =
-            dittus_boelter(Re_val, Pr_val, T_bulk, T_wall) * STREAM.k_water(T_bulk) /
+            dittus_boelter(Re_val, Pr_val, T_bulk, T_wall) * κ(H2O, T_bulk) /
             Dh
         q_spl = h_spl * (T_wall - T_bulk)
 
-        T_sat = sat_temperature(P)
+        T_sat = Tsat(H2O, P)
         T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
 
         scb_fn = regime_dependent_q_scb(pressure=P)
@@ -774,8 +774,8 @@ end
         # T_wall = 330K < T_sat (~393K at 2 bar) -> SCB inactive, pure
         # single-phase. Both SCB and non-SCB loops solve to identical h_tc values.
         scb_fn = regime_dependent_q_scb(pressure=2e5)
-        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=330.0)
-        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=330.0)
+        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
+        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
 
         htc_scb = [sol_scb[ssys_scb.cac.h_tc_left[i]] for i in 1:n_scb]
         htc_noscb = [sol_noscb[ssys_noscb.cac.h_tc_left[i]] for i in 1:n_scb]

@@ -13,7 +13,6 @@ using STREAM:
     regime_dependent,
     elenbaas_nusselt,
     elenbaas_htc,
-    beta_water,
     Gr,
     Ra,
     marco_han_nusselt,
@@ -94,13 +93,13 @@ using STREAM:
         @test haskey(NamedTuple(pairs(rd)), :friction)
 
         # Laminar branch (Re=100 < 2300): 4-arg interface (Re, Pr, T_bulk, T_wall)
-        @test rd.htc(100.0, 7.0, 300.0, 320.0) == 8.235
+        @test rd.htc(100.0, 7.0, 26.85, 46.85) == 8.235
         k_R = rectangular_laminar_correction(0.01814)
         @test isapprox(rd.friction(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
 
         # Turbulent branch (Re=8000 > 2300): 4-arg interface
         @test isapprox(
-            rd.htc(8000.0, 7.0, 300.0, 320.0), dittus_boelter(8000.0, 7.0); rtol=1e-6
+            rd.htc(8000.0, 7.0, 26.85, 46.85), dittus_boelter(8000.0, 7.0); rtol=1e-6
         )
         @test isapprox(rd.friction(8000.0), blasius_friction(8000.0); rtol=1e-6)
     end
@@ -109,8 +108,8 @@ end
 @testset "Integration Tests — Pluggable Correlations in Solved Systems" begin
     @testset "constant_Nusselt integration — Nu≈8.235 in solution" begin
         n = 3;
-        T_inlet = 313.15;
-        T_wall = 373.15;
+        T_inlet = 40.0;
+        T_wall = 100.0;
         dP_pump = 3.0e4
         geom = PipeGeometry_circular(0.6, 0.01)
 
@@ -161,8 +160,8 @@ end
 
     @testset "laminar_friction_rectangular integration — dP > 0 in solution" begin
         n = 3;
-        T_inlet = 313.15;
-        T_wall = 373.15
+        T_inlet = 40.0;
+        T_wall = 100.0
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
 
         @named pump_phy03 = Pump(30.0)
@@ -230,7 +229,7 @@ end
             let
                 Re_i = sol_phy03[ssys_phy03.cac_phy03.Re[i]]
                 T_i = sol_phy03[ssys_phy03.cac_phy03.T[i]]
-                f_lam(Re_i) * (ṁ03 * abs(ṁ03) / (2 * rho_water(T_i) * A^2)) * (dz / Dh)
+                f_lam(Re_i) * (ṁ03 * abs(ṁ03) / (2 * ρ(H2O, T_i) * A^2)) * (dz / Dh)
             end for i in 1:n
         )
         @test isapprox(sol_phy03[ssys_phy03.cac_phy03.dP], dP_expected_03; rtol=1e-6)
@@ -238,8 +237,8 @@ end
 
     @testset "regime_dependent integration — laminar branch (Re < 2300)" begin
         n = 3;
-        T_inlet = 313.15;
-        T_wall = 373.15
+        T_inlet = 40.0;
+        T_wall = 100.0
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         rd = regime_dependent(geom;
             htc_laminar=constant_Nusselt(Nu=8.235),
@@ -305,7 +304,7 @@ end
                 T_i = sol_lam[ssys_lam.cac_lam.T[i]]
                 @test Re_i < 2300.0   # confirm the laminar branch is the one selected
                 rd.friction(Re_i) *
-                (ṁ_lam * abs(ṁ_lam) / (2 * rho_water(T_i) * A^2)) *
+                (ṁ_lam * abs(ṁ_lam) / (2 * ρ(H2O, T_i) * A^2)) *
                 (dz / Dh)
             end for i in 1:n
         )
@@ -314,8 +313,8 @@ end
 
     @testset "regime_dependent integration — turbulent branch (Re > 2300)" begin
         n = 3;
-        T_inlet = 313.15;
-        T_wall = 373.15
+        T_inlet = 40.0;
+        T_wall = 100.0
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         rd = regime_dependent(geom;
             htc_laminar=constant_Nusselt(Nu=8.235),
@@ -383,7 +382,7 @@ end
                 # rd.friction must equal Blasius here, not the laminar rectangular factor.
                 @test isapprox(rd.friction(Re_i), blasius_friction(Re_i); rtol=1e-12)
                 rd.friction(Re_i) *
-                (ṁ_turb * abs(ṁ_turb) / (2 * rho_water(T_i) * A^2)) *
+                (ṁ_turb * abs(ṁ_turb) / (2 * ρ(H2O, T_i) * A^2)) *
                 (dz / Dh)
             end for i in 1:n
         )
@@ -411,13 +410,13 @@ end
         # returns 0 when there's no temperature difference.
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.00254, 0.07)
         htc_fn = elenbaas_htc(geom)
-        @test htc_fn(0.0, 4.32, 313.15, 333.15) > 0.0
-        @test isapprox(htc_fn(0.0, 4.32, 313.15, 313.15), 0.0; atol=1e-10)
+        @test htc_fn(0.0, 4.32, 40.0, 60.0) > 0.0
+        @test isapprox(htc_fn(0.0, 4.32, 40.0, 40.0), 0.0; atol=1e-10)
     end
 
     @testset "elenbaas_nusselt Python STREAM validation" begin
         # Full validation against pre-computed Python STREAM reference values
-        # Test point: T_bulk=40C (313.15K), T_wall=60C (333.15K), S=0.00254m, Lh=0.6m
+        # Test point: T_bulk=40 °C, T_wall=60 °C, S=0.00254m, Lh=0.6m
         #
         # Python STREAM computation chain:
         #   rho   = 991.3511 kg/m^3
@@ -432,20 +431,20 @@ end
         #   Nu    = (1/24)*Ra*(b/L)*(1-exp(-35*L/(Ra*b)))^0.75 = 1.2731625848
         #
         # This test reproduces the full chain using Julia functions:
-        T_bulk = 313.15  # 40 C in Kelvin
-        T_wall = 333.15  # 60 C in Kelvin
+        T_bulk = 40.0  # °C
+        T_wall = 60.0  # °C
         b = 0.00254
         L_h = 0.6
 
-        beta_val = beta_water(T_bulk)
+        beta_val = β(H2O, T_bulk)
         @test isapprox(beta_val, 3.851798e-04; rtol=1e-4)
 
-        Gr_val = Gr(rho_water(T_bulk), mu_water(T_bulk), beta_val, T_wall, T_bulk, b, 9.81)
+        Gr_val = Gr(ρ(H2O, T_bulk), μ(H2O, T_bulk), beta_val, T_wall, T_bulk, b, 9.81)
         # rtol=5e-4: Gr is sensitive to rho/mu product; Julia and Python Simantov coefficients
         # produce numerically identical results but differ from the tabulated reference by ~0.034%
         @test isapprox(Gr_val, 2862.302086; rtol=5e-4)
 
-        Pr_val = cp_water(T_bulk) * mu_water(T_bulk) / k_water(T_bulk)
+        Pr_val = cₚ(H2O, T_bulk) * μ(H2O, T_bulk) / κ(H2O, T_bulk)
         @test isapprox(Pr_val, 4.323622; rtol=1e-4)
 
         Ra_val = Ra(Gr_val, Pr_val)
@@ -478,18 +477,18 @@ end
         htc_natural=htc_nc,
         g=9.81,
     )
-    # At Re=10, Pr=7, T_bulk=313.15 (40C), T_wall=373.15 (100C):
+    # At Re=10, Pr=7, T_bulk=40 °C, T_wall=100 °C:
     # beta ~ 3.85e-4, nu ~ 6.6e-7, Gr = beta*g*60*0.01^3/nu^2 ~ 520
     # Re^2 = 100. Gr/Re^2 ~ 5.2 > 1 => NC branch
-    @test rd.htc(10.0, 7.0, 313.15, 373.15) == 999.0
+    @test rd.htc(10.0, 7.0, 40.0, 100.0) == 999.0
 
     # Test 2: Forced-conv branch selected when Gr/Re^2 < 1
     # At Re=5000 (turbulent, Re^2=25e6 >> Gr): forced turb branch
-    @test rd.htc(5000.0, 7.0, 313.15, 373.15) == 100.0
+    @test rd.htc(5000.0, 7.0, 40.0, 100.0) == 100.0
 
     # Test 3: Laminar forced at low Re when Gr/Re^2 < 1 (small dT)
     # T_wall ~ T_bulk => Gr ~ 0 => forced branch => laminar at Re=100
-    @test rd.htc(100.0, 7.0, 313.15, 313.20) == 4.0
+    @test rd.htc(100.0, 7.0, 40.0, 40.05) == 4.0
 
     # Test 4: Friction unchanged by NC kwargs
     @test rd.friction(100.0) == 64.0 / 100.0     # laminar
@@ -502,8 +501,8 @@ end
         friction_laminar=f_lam,
         friction_turbulent=f_turb,
     )
-    @test rd_no_nc.htc(100.0, 7.0, 313.15, 373.15) == 4.0   # laminar forced
-    @test rd_no_nc.htc(5000.0, 7.0, 313.15, 373.15) == 100.0 # turbulent forced
+    @test rd_no_nc.htc(100.0, 7.0, 40.0, 100.0) == 4.0   # laminar forced
+    @test rd_no_nc.htc(5000.0, 7.0, 40.0, 100.0) == 100.0 # turbulent forced
 
     # Test 6: htc_natural without g raises ArgumentError
     # Expected ArgumentError message text: "htc_natural provided but g is missing".
@@ -562,7 +561,7 @@ end
     # Uses _two_sided_heating_nusselt, NOT marco_han_nusselt
     # Reference: _two_sided_heating_nusselt(0.0) = 8.235
     htc_fn = fully_developed_laminar_h_spl(_geom_for_ar(0.0))
-    @test htc_fn(1000.0, 7.0, 313.0, 333.0) == 8.235
+    @test htc_fn(1000.0, 7.0, 39.85, 59.85) == 8.235
 
     # At ar=0.2: _two_sided_heating_nusselt(0.2) != marco_han_nusselt(0.2)
     # two_sided: 8.235*(1 - 1.4122*0.2 + 2.3473*0.04 - 2.8983*0.008 + 2.0629*0.0016 - 0.6077*0.00032)
@@ -570,16 +569,16 @@ end
     nu_two_sided_02 =
         8.235 *
         (1.0 - 1.4122*0.2 + 2.3473*0.2^2 - 2.8983*0.2^3 + 2.0629*0.2^4 - 0.6077*0.2^5)
-    @test isapprox(htc_fn_ar02(500.0, 5.0, 310.0, 350.0), nu_two_sided_02; rtol=1e-10)
+    @test isapprox(htc_fn_ar02(500.0, 5.0, 36.85, 76.85), nu_two_sided_02; rtol=1e-10)
     # Confirm it differs from Marco_Han
-    @test htc_fn_ar02(500.0, 5.0, 310.0, 350.0) != marco_han_nusselt(0.2)
+    @test htc_fn_ar02(500.0, 5.0, 36.85, 76.85) != marco_han_nusselt(0.2)
 
     # Closure ignores Re, Pr — same Nu for any inputs
-    @test htc_fn_ar02(100.0, 3.0, 300.0, 400.0) == htc_fn_ar02(5000.0, 10.0, 290.0, 380.0)
+    @test htc_fn_ar02(100.0, 3.0, 26.85, 126.85) == htc_fn_ar02(5000.0, 10.0, 16.85, 106.85)
 
     # ar=1.0 (square): _two_sided gives different value than Marco_Han
     htc_sq = fully_developed_laminar_h_spl(_geom_for_ar(1.0))
-    @test htc_sq(100.0, 7.0, 313.0, 333.0) > 0.0
+    @test htc_sq(100.0, 7.0, 39.85, 59.85) > 0.0
 end
 
 @testset "developing_laminar_h_spl" begin
@@ -599,47 +598,47 @@ end
     htc_fd = fully_developed_laminar_h_spl(_geom_for(0.005, ar))
 
     # At high Re, x_star is small -> developing Nu is LARGER than fully developed
-    Nu_dev_high_Re = htc_dev(2000.0, 7.0, 313.0, 333.0)
-    Nu_fd = htc_fd(2000.0, 7.0, 313.0, 333.0)
+    Nu_dev_high_Re = htc_dev(2000.0, 7.0, 39.85, 59.85)
+    Nu_fd = htc_fd(2000.0, 7.0, 39.85, 59.85)
     @test Nu_dev_high_Re > Nu_fd  # developing flow enhances heat transfer
 
     # At very low Re (large x_star -> fully developed), should converge toward fd value
     # Re=1 with develop_length=0.3 -> x_star is large -> _nusselt_coefficient_developing ~ 8.235
-    Nu_dev_low_Re = htc_dev(1.0, 7.0, 313.0, 333.0)
+    Nu_dev_low_Re = htc_dev(1.0, 7.0, 39.85, 59.85)
     @test isapprox(Nu_dev_low_Re, Nu_fd; rtol=0.05)  # within 5% of fully developed
-    @test htc_dev(500.0, 5.0, 310.0, 350.0) > 0.0
+    @test htc_dev(500.0, 5.0, 36.85, 76.85) > 0.0
 
     # x_star correction factor test: changing aspect_ratio changes the result
     htc_dev_ar05 = developing_laminar_h_spl(_geom_for(0.005, 0.5); develop_length=0.3)
-    @test htc_dev(1000.0, 7.0, 313.0, 333.0) != htc_dev_ar05(1000.0, 7.0, 313.0, 333.0)
+    @test htc_dev(1000.0, 7.0, 39.85, 59.85) != htc_dev_ar05(1000.0, 7.0, 39.85, 59.85)
 end
 
 @testset "maximal_htc" begin
     c5 = constant_Nusselt(Nu=5.0)
     c10 = constant_Nusselt(Nu=10.0)
     htc_max = maximal_htc(c5, c10)
-    @test htc_max(100.0, 7.0, 313.0, 333.0) == 10.0
+    @test htc_max(100.0, 7.0, 39.85, 59.85) == 10.0
 
     c1 = constant_Nusselt(Nu=1.0)
     htc_max3 = maximal_htc(c1, c5, c10)
-    @test htc_max3(100.0, 7.0, 313.0, 333.0) == 10.0
+    @test htc_max3(100.0, 7.0, 39.85, 59.85) == 10.0
 
     htc_single = maximal_htc(c5)
-    @test htc_single(100.0, 7.0, 313.0, 333.0) == 5.0
+    @test htc_single(100.0, 7.0, 39.85, 59.85) == 5.0
 
     htc_mixed = maximal_htc(c5, dittus_boelter)
-    @test htc_mixed(100.0, 7.0, 313.0, 333.0) == 5.0
-    @test htc_mixed(10000.0, 7.0, 313.0, 333.0) > 5.0
+    @test htc_mixed(100.0, 7.0, 39.85, 59.85) == 5.0
+    @test htc_mixed(10000.0, 7.0, 39.85, 59.85) > 5.0
     @test isapprox(
-        htc_mixed(10000.0, 7.0, 313.0, 333.0), dittus_boelter(10000.0, 7.0); rtol=1e-10
+        htc_mixed(10000.0, 7.0, 39.85, 59.85), dittus_boelter(10000.0, 7.0); rtol=1e-10
     )
 end
 
 @testset "laminar HTC factories in compiled Channel" begin
     @testset "fully_developed_laminar_h_spl compiles in Channel" begin
         n = 5;
-        T_inlet = 313.15;
-        T_wall = 373.15;
+        T_inlet = 40.0;
+        T_wall = 100.0;
         dP_pump = 30.0
         # Rectangular geom with aspect_ratio = depth/width = 0.1 (a circular geom would
         # give aspect_ratio = 1.0, a different correlation point).
@@ -690,8 +689,8 @@ end
 
     @testset "developing_laminar_h_spl compiles in Channel" begin
         n = 5;
-        T_inlet = 313.15;
-        T_wall = 373.15;
+        T_inlet = 40.0;
+        T_wall = 100.0;
         dP_pump = 30.0
         # Rectangular geom with aspect_ratio = 0.1; Dh follows from the edges
         # (4 * 1.0*0.1 / (2*(1.0+0.1)) ≈ 0.1818). develop_length stays mandatory.

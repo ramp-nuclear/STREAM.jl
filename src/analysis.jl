@@ -28,13 +28,13 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
 
 # Fields
 - `n::Int`                     — number of axial cells
-- `T_bulk::AbstractArray`     — bulk coolant temperature per cell [K]
-- `T_wall::AbstractArray`     — conservative wall temperature: `max(T_wall_left, T_wall_right)` per cell [K]
-- `T_wall_left::AbstractArray`  — left face wall temperature per cell [K]
-- `T_wall_right::AbstractArray` — right face wall temperature per cell [K]
-- `T_sat::AbstractArray`      — saturation temperature per cell [K]
-- `T_ONB::AbstractArray`      — onset of nucleate boiling temperature per cell [K]
-- `T_inlet::Float64`           — inlet temperature from `inlet.T` [K]
+- `T_bulk::AbstractArray`     — bulk coolant temperature per cell [°C]
+- `T_wall::AbstractArray`     — conservative wall temperature: `max(T_wall_left, T_wall_right)` per cell [°C]
+- `T_wall_left::AbstractArray`  — left face wall temperature per cell [°C]
+- `T_wall_right::AbstractArray` — right face wall temperature per cell [°C]
+- `T_sat::AbstractArray`      — saturation temperature per cell [°C]
+- `T_ONB::AbstractArray`      — onset of nucleate boiling temperature per cell [°C]
+- `T_inlet::Float64`           — inlet temperature from `inlet.T` [°C]
 - `P::AbstractArray`          — absolute pressure per cell [Pa]
 - `q_flux::AbstractArray`     — conservative heat flux: `max(q_flux_left, q_flux_right)` per cell [W/m²]
 - `q_flux_left::AbstractArray`  — left face heat flux per cell [W/m²]
@@ -239,7 +239,7 @@ Calls `bergles_rohsenow_t_onb.(state.P, state.q_flux, state.T_sat)`.
 - `state`: extracted channel state
 
 # Returns
-Vector (or matrix for transient) of `T_ONB` wall temperatures [K] per cell.
+Vector (or matrix for transient) of `T_ONB` wall temperatures [°C] per cell.
 """
 function onb_temperature(state::ChannelState)
     return bergles_rohsenow_t_onb.(state.P, state.q_flux, state.T_sat)
@@ -250,16 +250,19 @@ end
 
 Channel power at which the bulk coolant reaches saturation temperature per cell.
 
-Calls `q_boiling_onset.(state.ṁ, state.T_sat, state.T_inlet, cp_water.(state.T_bulk))`.
+Calls `q_boiling_onset.(state.ṁ, state.T_sat, state.T_inlet, cₚ.(liquid, state.T_bulk))`.
 
 # Arguments
 - `state`: extracted channel state
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref), supplying the specific heat
 
 # Returns
 Vector (or matrix for transient) of boiling onset power limits [W] per cell.
 """
-function boiling_onset_power(state::ChannelState)
-    return q_boiling_onset.(state.ṁ, state.T_sat, state.T_inlet, cp_water.(state.T_bulk))
+function boiling_onset_power(state::ChannelState; liquid::AbstractLiquid=H2O)
+    return q_boiling_onset.(
+        state.ṁ, state.T_sat, state.T_inlet, cₚ.(liquid, state.T_bulk)
+    )
 end
 
 """
@@ -357,18 +360,21 @@ end
 """
     twall_limit(state::ChannelState; inhomogeneity_factor=1.0) -> AbstractArray
 
-Effective wall temperature limit per cell accounting for spatial inhomogeneity.
-This is a `ChannelState` method overload on the physics-layer `twall_limit(T_wall, factor)`.
+Wall temperature limit per cell, taking the hotter of the two faces.
 
-Calls `twall_limit.(state.T_wall, inhomogeneity_factor)`.
+This is a `ChannelState` method overload on the physics-layer
+`twall_limit(T_bulk, T_wall, factor)`. Each face is limited separately against the bulk
+and the two are then maxed, which is what Python STREAM's `twall_limit` does.
 
 # Arguments
 - `state`: extracted channel state
-- `inhomogeneity_factor`: dimensionless hot-spot multiplier (default 1.0, no correction)
+- `inhomogeneity_factor`: dimensionless flux multiplier (default 1.0, no correction)
 
 # Returns
-Vector (or matrix for transient) of effective wall temperature limits [K] per cell.
+Vector (or matrix for transient) of effective wall temperature limits [°C] per cell.
 """
 function twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
-    return twall_limit.(state.T_wall, inhomogeneity_factor)
+    left = twall_limit.(state.T_bulk, state.T_wall_left, inhomogeneity_factor)
+    right = twall_limit.(state.T_bulk, state.T_wall_right, inhomogeneity_factor)
+    return max.(left, right)
 end

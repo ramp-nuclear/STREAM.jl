@@ -48,7 +48,7 @@ function _diffusion_eqs(;
     ]
 end
 """
-    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=600.0) -> System
+    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=326.85) -> System
 
 2D finite-difference heat diffusion plate with axial (`nz`) and lateral (`nx`) cells.
 
@@ -65,7 +65,7 @@ end
 - `power_shape`: axial-lateral power shape matrix of size `(nz, nx)` (not normalized internally)
 - `power`: total power into plate [W], MTK variable — must be constrained via a connection equation
   (e.g. `fuel.power ~ 1e4` for standalone use, or `rods.fuel.power ~ pk.P * scale` for PK-coupled use)
-- `T0`: initial temperature [K], default 600.0
+- `T0`: initial temperature [°C], default 326.85 (600 K)
 
 # Ports
 - `thermal_left[1:nz]`, `thermal_right[1:nz]` -- `ThermalPort` arrays (no FlowPorts)
@@ -82,7 +82,7 @@ function HeatDiffusion(;
     k_s,
     power_shape,
     power=1e6,
-    T0=600.0,
+    T0=326.85,
 )
     power_init = power
     dx = Lx / nx

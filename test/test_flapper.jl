@@ -14,7 +14,7 @@ end
 # carries the loop flow while the valve is shut (Python STREAM's usage).
 function _flapper_parallel_loop(; flapper, pump, name)
     @named bypass = Resistor(1.0e5)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     conns = [
         inparallel(pump, (bypass, flapper), hx)...,
         inseries(hx, pump)...,
@@ -27,7 +27,7 @@ end
 @testset "Flapper closed admits no flow" begin
     @named pump = Pump(3.0e4)
     @named flapper = Flapper(; open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
-                             fluid=ConstantFluid())
+                             liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_closed)
     ssys = mtkcompile(sys; fully_determined=false)
     op = Pair{Any,Any}[]   # T_open defaults to Inf ⇒ never opens
@@ -42,7 +42,7 @@ end
     f, area, rho = 1.0, 1.0, 1.0
     @named pump = Pump(3.0e4)
     @named flapper = Flapper(; open_at_current=0.01, f=f, area=area, open_rate=10.0,
-                             fluid=ConstantFluid())
+                             liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_open)
     ssys = mtkcompile(sys; fully_determined=false)
     op = Pair{Any,Any}[ssys.flapper.T_open => 0.0]   # pre-open from t=0 (Python's open(0.0))
@@ -70,8 +70,8 @@ end
     @named ine = Inertia(L_over_A)
     @named res = Resistor(R)
     @named flapper = Flapper(; open_at_current=threshold, f=1.0e6, area=1.0, open_rate=1.0 / 3.0,
-                             fluid=ConstantFluid())
-    @named hx = HeatExchanger(300.0)
+                             liquid=Liquid())
+    @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, ine)...,
         inparallel(ine, (res, flapper), hx)...,
@@ -98,7 +98,7 @@ end
 
 @testset "solve_transient passes user callbacks" begin
     @named pump = Pump(1.0e5)
-    @named flapper = Flapper(; fluid=ConstantFluid())
+    @named flapper = Flapper(; liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_cb)
     ssys = mtkcompile(sys; fully_determined=false)
     op = Pair{Any,Any}[]   # T_open defaults to Inf

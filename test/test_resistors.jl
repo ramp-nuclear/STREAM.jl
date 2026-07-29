@@ -47,7 +47,7 @@ end
     dP = 3.0e4
     k = 1.0e5
     @named pump = Pump(dP)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     @named vfr = VolumetricFlowResistor(; k=k, density=1.0)
     conns = [
         inseries(pump, hx, vfr, pump)...,
@@ -70,7 +70,7 @@ end
     k = 5.0e4
     klow = 2.0e3
     @named pump = Pump(dP)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     @named vfr = VolumetricFlowResistor(; k=k, klow=klow, density=1.0)
     conns = [
         inseries(pump, hx, vfr, pump)...,
@@ -112,7 +112,7 @@ end
     k_hold = make_k(0.0)  # constant k0, for the steady seed
 
     @named pump = Pump(dP_head)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     @named vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
     conns = [
         inseries(pump, hx, vfr, pump)...,
@@ -162,7 +162,7 @@ end
 
 @testset "LocalPressureDrop — sudden expansion ΔP matches Idelchik closed form" begin
     A1, A2 = 1.0, 2.0
-    Tin = 293.15
+    Tin = 20.0
     ṁ = 3.0
     @named pump = Pump(; ṁ0=ṁ)        # fixed-flow so ṁ is exact
     @named hx = HeatExchanger(Tin)
@@ -176,8 +176,8 @@ end
     sol = solve_steady(ssys, [ssys.lpd.inlet.ṁ => ṁ])
     @test sol.retcode == ReturnCode.Success
     A = min(A1, A2)
-    f = STREAM._local_loss_factor(ṁ, A1, A2, mu_water(Tin))
-    dp_expected = f * ṁ * abs(ṁ) / (2 * rho_water(Tin) * A^2)
+    f = STREAM._local_loss_factor(ṁ, A1, A2, μ(H2O, Tin))
+    dp_expected = f * ṁ * abs(ṁ) / (2 * ρ(H2O, Tin) * A^2)
     @test isapprox(sol[ssys.lpd.inlet.p] - sol[ssys.lpd.outlet.p], dp_expected; rtol=1e-6)
     @test dp_expected > 0.0   # forward flow drops pressure
 end

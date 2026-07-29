@@ -22,7 +22,7 @@ Status legend: ✅ ported & passing · 🟡 partial/divergent counterpart · ⬜
 | 1 | `test_pump_resistor_in_series_follows_analytic_solution` | ✅ | A | Pump+Resistor (have); write analytic assertion |
 | 2 | `test_parallel_resistors_with_pump_against_analytic_solution` | ✅ | A | Resistor (have); query branch flows via MTK ports |
 | 3 | `test_resistors_in_series_against_analytic_solution` | ✅ | A | Resistor (have) |
-| 4 | `test_channel_stable_state_with_uniform_heating_increases_linearly` | ✅ | B | ConstantFluid cp=1; Tc linear + h-weighted wall temp (computed h) |
+| 4 | `test_channel_stable_state_with_uniform_heating_increases_linearly` | ✅ | B | Liquid cₚ=1; Tc linear + h-weighted wall temp (computed h) |
 | 5 | `test_channel_point_kinetics` | ✅ | B | CAC+Fuel+critical PK; per-channel Tc strictly linear |
 | 6 | `test_kirchhoff_with_decaying_pump_eventually_flips_flow_direction_gravity` | ✅ | A | quasi-static per-t solve_steady; HX-pinned leg temps; reverses |
 | 7 | `test_Tin_jumps_at_resistor_between_two_hxs_at_flow_reversal` | ✅ | A | HX + Resistor (have) |
@@ -47,10 +47,10 @@ Tally: 21 ✅ · 0 🟡 · 0 ⬜ · 0 ⛔ (target: 21 ✅ — **MET**).
 (linear coolant rise, h-weighted wall temperature, power driven negligible by negative
 feedback), not byte-identical numbers. Julia's models differ from Python's mocks in ways
 immaterial to those results: `HeatDiffusion` is single-material (Python MTR is meat+clad)
-and needs nx ≥ 2 (Python nx = 1); `ChannelAndContacts` computes its HTC from a water-based
+and needs nx ≥ 2 (Python nx = 1); `ChannelAndContacts` computes its HTC from a coolant-based
 correlation (Python prescribes mock h — #4 reads Julia's computed `h_tc` into the same
 wall-temperature balance); `PointKinetics` is fixed 6-group (Python #8 uses 1 group).
-`ConstantFluid()` = Python's `mock_liquid_funcs` (all properties 1.0).
+`Liquid()` = Python's `mock_liquid_funcs` (all properties 1.0).
 
 ## New components to build (decided: implement, for true 1:1)
 
@@ -59,9 +59,9 @@ wall-temperature balance); `PointKinetics` is fixed 6-group (Python #8 uses 1 gr
 - ✅ closure-resistor / `Transistor` pattern — folded into `VolumetricFlowResistor`: pass `k`
   as a callable `(t) -> k` (MTK callable-parameter idiom) for a time-varying resistance
   (unblocks #19). Commit `cd4ab8f`.
-- ✅ mock-fluid path — `AbstractFluid` / `Water()` / `ConstantFluid`; channels take a `fluid`
-  kwarg threaded into `_channel_core`. `Water()` stays byte-identical (parity 526 CLEAN);
-  `ConstantFluid` = Python's `mock_liquid_funcs`. Mock solid needs no work — `HeatDiffusion`
+- ✅ mock-fluid path — `AbstractLiquid` / `H2O` / `Liquid`; channels take a `liquid`
+  kwarg threaded into `_channel_core`. `H2O` stays byte-identical (parity 526 CLEAN);
+  `Liquid` = Python's `mock_liquid_funcs`. Mock solid needs no work — `HeatDiffusion`
   already takes `k_s`/`cp_s`/`rho_s`. Commit `c36e2fc`. (Tier B: #4, #5.)
 - ✅ `LocalPressureDrop` — Idelchik sudden expansion/contraction minor loss `(A1,A2)`, a
   `@register_symbolic` table lookup inside the MTK drop equation (unblocks #21). Commit `8f4c379`.

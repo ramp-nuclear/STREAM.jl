@@ -38,7 +38,7 @@ end
 
 function _build_mtr_sym()
     nz = 10; nx = 3
-    T_in = 313.15
+    T_in = 40.0
     geom_mtr = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
@@ -65,7 +65,7 @@ end
 
 function _build_mtr_asym()
     nz = 10; nx = 3
-    T_in_l = 313.15; T_in_r = 363.15
+    T_in_l = 40.0; T_in_r = 90.0
     geom_mtr = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in_l)
@@ -92,7 +92,7 @@ end
 
 function _build_mtr_onesided()
     nz = 10; nx = 3
-    T_in = 313.15
+    T_in = 40.0
     geom_mtr = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
@@ -114,7 +114,7 @@ end
 function _build_val01_fourier()
     nz_v01 = 10; nx_v01 = 5
     Lx_v01 = 0.00127
-    T_wall = 300.0
+    T_wall = 26.85
     ps_v01 = fill(1.0 / (nz_v01 * nx_v01), nz_v01, nx_v01)
     @named hd_v01 = HeatDiffusion(;
         nz=nz_v01, nx=nx_v01, Lz=0.6, Lx=Lx_v01, y=0.07,
@@ -134,7 +134,7 @@ end
 
 function _build_val02_twoplate()
     nz_v02 = 10; nx_v02 = 3
-    T_in_v02 = 313.15
+    T_in_v02 = 40.0
     power_per_plate = 1e4
     @named pump_v02 = Pump(3.0e4)
     @named hx_v02 = HeatExchanger(T_in_v02)
@@ -172,7 +172,7 @@ end
     @testset "build_loop_lof_bypass" begin assert_determined_compiled("build_loop_lof_bypass", build_loop_lof_bypass()) end
     @testset "build_loop_pk" begin
         ctrl = ReactivityController()
-        ssys, _ic = build_loop_pk(ctrl; n=7, T_inlet=293.15)
+        ssys, _ic = build_loop_pk(ctrl; n=7, T_inlet=20.0)
         # build_loop_pk returns (ssys, ic); ssys is already compiled.
         assert_determined_compiled("build_loop_pk", ssys)
     end

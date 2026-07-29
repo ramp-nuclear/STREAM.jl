@@ -47,8 +47,8 @@ Plots.gr()
 const n          = 50          # axial cells in each channel
 const L_ch       = 1.0         # channel length [m]
 const D_ch       = 0.01        # hydraulic diameter [m]
-const T_wall     = 373.15      # heated channel wall temperature [K] (~100°C)
-const T_inlet    = 313.15      # inlet / HX boundary temperature [K] (~40°C)
+const T_wall     = 100.0       # heated channel wall temperature [°C]
+const T_inlet    = 40.0        # inlet / HX boundary temperature [°C]
 const g_acc      = G_EARTH     # gravitational acceleration [m/s^2]
 const L_over_A   = 5e6         # Inertia L/A [1/m] — controls coastdown time constant
 const R_ext      = 1.0e6       # external bypass resistance [Pa·s/kg]
@@ -62,8 +62,8 @@ println("LOF Transient Example — STREAM.jl")
 println("="^70)
 println("Parameters:")
 println("  n         = $n cells,  L_ch = $L_ch m,  D_ch = $D_ch m")
-println("  T_wall    = $T_wall K  ($(round(T_wall - 273.15; digits=1)) °C)")
-println("  T_inlet   = $T_inlet K  ($(round(T_inlet - 273.15; digits=1)) °C)")
+println("  T_wall    = $T_wall °C")
+println("  T_inlet   = $T_inlet °C")
 println("  threshold = $threshold kg/s,  dt_ramp = $dt_ramp s")
 println()
 
@@ -101,8 +101,8 @@ T_ss = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
 
 println("Steady-state solved:")
 println("  ṁ_ss   = $(round(ṁ_ss; digits=6)) kg/s")
-println("  T_ss min  = $(round(minimum(T_ss) - 273.15; digits=2)) °C")
-println("  T_ss max  = $(round(maximum(T_ss) - 273.15; digits=2)) °C")
+println("  T_ss min  = $(round(minimum(T_ss); digits=2)) °C")
+println("  T_ss max  = $(round(maximum(T_ss); digits=2)) °C")
 println()
 
 println("Building bypass LOF system...")
@@ -220,7 +220,7 @@ nc_time = nc_time_found[]
 T_inlet_ch_final = sol[ssys.ret.T[1], end]
 T_outlet_ch_final = T_ch[1][end]  # T[1] = hottest in NC reversed flow
 Q_wall_final = abs(sum(q_wall_ch[i][end] for i in 1:n))
-Q_advect_final = ṁ_nc * cp_water(T_inlet) * abs(T_outlet_ch_final - T_inlet_ch_final)
+Q_advect_final = ṁ_nc * cₚ(H2O, T_inlet) * abs(T_outlet_ch_final - T_inlet_ch_final)
 energy_balance_ratio = (Q_advect_final > 1e-3) ? Q_wall_final / Q_advect_final : NaN
 
 println("="^70)
@@ -230,8 +230,8 @@ println("="^70)
 @printf "  NC ṁ (t=300s)      : %.6f kg/s  (%.1f%% of SS)\n" ṁ_nc (
     100 * ṁ_nc / ṁ_ss
 )
-@printf "  T_max at SS           : %.2f K  (%.2f °C)\n" T_max_ss (T_max_ss - 273.15)
-@printf "  T_max at NC (t=300s)  : %.2f K  (%.2f °C)\n" T_max_nc (T_max_nc - 273.15)
+@printf "  T_max at SS           : %.2f °C\n" T_max_ss
+@printf "  T_max at NC (t=300s)  : %.2f °C\n" T_max_nc
 if !isnan(flapper_fire_time)
     @printf "  Flapper fires at      : %.2f s\n" flapper_fire_time
     @printf "  Flapper fully open at : %.2f s\n" flapper_open_time
@@ -385,7 +385,7 @@ savefig(p8b, joinpath(dir_overview, "02_flow_ch_ret.png"))
 println("  03_temperatures_ch.png")
 p8c = plot(;
     xlabel="Time [s]",
-    ylabel="Temperature [K]",
+    ylabel="Temperature [°C]",
     title="LOF Bypass: Heated Channel (ch) Cell Temperatures — Overview (0-300s)\n(blue=cell 1, red=cell 10; reversed during NC)",
     size=(1000, 600),
     dpi=150,
@@ -527,7 +527,7 @@ savefig(p9c, joinpath(dir_trans, "03_flapper_xi_zoom.png"))
 println("  04_temperatures_ch_zoom.png")
 p9d = plot(;
     xlabel="Time [s]",
-    ylabel="Temperature [K]",
+    ylabel="Temperature [°C]",
     title="LOF Bypass: Heated Channel (ch) Temperatures — Transition 0–$(Int(t_trans_hi))s\n(blue=cell 1 / inlet forward, red=cell 10 / outlet forward)",
     size=(1000, 600),
     dpi=150,
@@ -662,8 +662,8 @@ println("  02_nc_temperatures_ch.png")
 T_nc_max_mean = mean(Tch_nc[1])   # cell 1 = outlet in NC = hottest
 p10b = plot(;
     xlabel="Time [s]",
-    ylabel="Temperature [K]",
-    title="LOF Bypass: Heated Channel Temperatures at NC Equilibrium (200–300s)\n(cell 1 = outlet under NC; T_max ≈ $(round(T_nc_max_mean - 273.15; digits=1)) °C)",
+    ylabel="Temperature [°C]",
+    title="LOF Bypass: Heated Channel Temperatures at NC Equilibrium (200–300s)\n(cell 1 = outlet under NC; T_max ≈ $(round(T_nc_max_mean; digits=1)) °C)",
     size=(1000, 600),
     dpi=150,
     legend=:right,
@@ -734,7 +734,7 @@ cell_axis = 1:n
 println("  01_temperature_ch_multitime.png")
 p11a = plot(;
     xlabel="Cell index (1=Node A, n=Node B)",
-    ylabel="Temperature [K]",
+    ylabel="Temperature [°C]",
     title="LOF Bypass: ch Temperature Profile at Key Times\n(gradient inversion = NC flow reversal established)",
     size=(1000, 650),
     dpi=150,
@@ -759,8 +759,8 @@ savefig(p11a, joinpath(dir_spatial, "01_temperature_ch_multitime.png"))
 println("  02_temperature_ret_multitime.png")
 p11b = plot(;
     xlabel="Cell index (1=Node B, n=Node C)",
-    ylabel="Temperature [K]",
-    title="LOF Bypass: ret Temperature Profile at Key Times\n(ret stays near T_inlet=$(T_inlet-273.15)°C — HX removes heat)",
+    ylabel="Temperature [°C]",
+    title="LOF Bypass: ret Temperature Profile at Key Times\n(ret stays near T_inlet=$(T_inlet)°C — HX removes heat)",
     size=(1000, 650),
     dpi=150,
     legend=:outerright,
@@ -810,7 +810,7 @@ println("  04_temperature_heatmap_ch.png")
 sub_step = max(1, div(length(t_vec), 600))
 idx_sub = 1:sub_step:length(t_vec)
 t_sub = t_vec[idx_sub]
-T_matrix = Float64[T_ch[i][j] - 273.15 for i in 1:n, j in idx_sub]
+T_matrix = Float64[T_ch[i][j] for i in 1:n, j in idx_sub]
 
 p11d = heatmap(
     t_sub,

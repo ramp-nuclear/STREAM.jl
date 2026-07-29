@@ -24,7 +24,7 @@
 #     Material: aluminum (rho=2700, cp=900, k=200)
 #
 #   Expected result (symmetric BCs):
-#     Left and right outlet temperatures equal (~317.9 K)
+#     Left and right outlet temperatures equal (~44.7 °C)
 #     Plate center temperature > fluid outlet (plate is the heat source)
 
 using STREAM
@@ -39,7 +39,7 @@ Plots.gr()
 #! format: off
 const NZ        = 10        # axial cells
 const NX        = 3         # lateral cells in plate
-const T_INLET   = 313.15    # K (40 degC) coolant inlet temperature
+const T_INLET   = 40.0      # °C coolant inlet temperature
 const DP_PUMP   = 3.0e4     # Pa pump pressure rise
 const POWER     = 1.0e4     # W total fission power deposited in the plate
 # MTR plate geometry (rectangular channel)
@@ -92,7 +92,7 @@ conns = [
 @named sys = compose(System(conns, t; name=:mtr_example), pump_l, hx_l, pump_r, hx_r, rods)
 ssys = mtkcompile(sys)
 
-T_w = 315.0
+T_w = 41.85
 op = vcat(
     [ssys.rods.hd.T[i, j] => T_w for i in 1:NZ for j in 1:NX],
     [ssys.rods.cac_l.T[i] => T_w for i in 1:NZ],
@@ -113,9 +113,9 @@ T_out_r = sol[ssys.rods.cac_r.T_out]
 T_center = sol[ssys.rods.hd.T[NZ ÷ 2, (NX + 1) ÷ 2]]
 
 println("Steady-state results:")
-println("  Left channel T_out  = $(round(T_out_l - 273.15, digits=2)) degC")
-println("  Right channel T_out = $(round(T_out_r - 273.15, digits=2)) degC")
-println("  Plate center T      = $(round(T_center - 273.15, digits=2)) degC")
+println("  Left channel T_out  = $(round(T_out_l, digits=2)) degC")
+println("  Right channel T_out = $(round(T_out_r, digits=2)) degC")
+println("  Plate center T      = $(round(T_center, digits=2)) degC")
 println("  T_plate_center > T_fluid: $(T_center > T_out_l)")
 
 T_plate_center_col = [sol[ssys.rods.hd.T[i, (NX + 1) ÷ 2]] for i in 1:NZ]
@@ -123,12 +123,12 @@ T_fluid_l = [sol[ssys.rods.cac_l.T[i]] for i in 1:NZ]
 T_fluid_r = [sol[ssys.rods.cac_r.T[i]] for i in 1:NZ]
 z = range(0.0, L_PLATE; length=NZ)
 
-p = plot(z, T_plate_center_col .- 273.15; label="Plate center", linewidth=2, color=:red)
-plot!(p, z, T_fluid_l .- 273.15; label="Left channel", linewidth=2, color=:blue)
+p = plot(z, T_plate_center_col; label="Plate center", linewidth=2, color=:red)
+plot!(p, z, T_fluid_l; label="Left channel", linewidth=2, color=:blue)
 plot!(
     p,
     z,
-    T_fluid_r .- 273.15;
+    T_fluid_r;
     label="Right channel",
     linewidth=2,
     color=:green,

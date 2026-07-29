@@ -13,7 +13,7 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 using STREAM
 using STREAM: Channel, ChannelAndContacts, Pump, HeatExchanger, ConstantTemperature,
-    PipeGeometry, PipeGeometry_circular, HeatDiffusion, ConstantFluid, PointKinetics,
+    PipeGeometry, PipeGeometry_circular, HeatDiffusion, Liquid, PointKinetics,
     ReactivityController, connect_temperature_feedback, compose_systems, symmetric_plate,
     one_sided_connection, constant_Nusselt, point_kinetics_steady_state, port,
     solve_steady, solve_transient, regime_dependent_friction
@@ -30,7 +30,7 @@ using STREAM: Channel, ChannelAndContacts, Pump, HeatExchanger, ConstantTemperat
 @testset "pump + resistor in series follows analytic solution" begin
     # Python: test_pump_resistor_in_series_follows_analytic_solution
     # Ideal pump (dp) and ideal resistor (r): ṁ = dp/r, resistor drops dp, T uniform.
-    T = 300.0
+    T = 26.85
     dp = 3.0e4
     r = 1.5e5
     @named pump = Pump(dp)
@@ -56,7 +56,7 @@ end
     r1 = 1.0e5
     r2 = 3.0e5
     @named pump = Pump(p)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     @named R1 = Resistor(r1)
     @named R2 = Resistor(r2)
     conns = [
@@ -83,7 +83,7 @@ end
     total_r = 2.0e5
     r = total_r / N
     @named pump = Pump(pressure)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     Rs = [Resistor(r; name=Symbol(:R, i)) for i in 1:N]
     series = inseries(Rs...)
     conns = [
@@ -102,7 +102,7 @@ end
         Ri = getproperty(ssys, Symbol(:R, i))
         @test isapprox(sol[Ri.inlet.ṁ], pressure / total_r; rtol=1e-8)        # full flow
         @test isapprox(sol[Ri.inlet.p] - sol[Ri.outlet.p], pressure / N; rtol=1e-8)  # each drops p/N
-        @test isapprox(sol[Ri.inlet.T], 300.0; rtol=1e-8)
+        @test isapprox(sol[Ri.inlet.T], 26.85; rtol=1e-8)
     end
 end
 
@@ -113,7 +113,7 @@ end
     ṁ = 0.7
     @named P1 = Pump(p)               # fixed-pressure
     @named P2 = Pump(; ṁ0=ṁ)    # fixed-flow (current source)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     conns = [
         inseries(P1, hx, P2, P1)...,
         P1.inlet.p ~ 1.0e5,
@@ -169,7 +169,7 @@ end
     @named pump = Pump(r * ṁ0)        # linear drop r·ṁ ⇒ head r·ṁ0 holds ṁ0 at steady
     @named L_el = Inertia(L)
     @named R = Resistor(r)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, L_el, R, hx, pump)...,
         pump.inlet.p ~ 1.0e5,
@@ -194,9 +194,9 @@ end
     # α = |dp_out(ṁ=1)|/inertia. Python's fixed-f Friction has dp = (dp0/ṁ0²)·ṁ|ṁ|
     # (the density cancels), so a VolumetricFlowResistor(k=dp0/ṁ0², density=1) reproduces it.
     inertia = 8.0e3
-    T = 293.15
+    T = 20.0
     dp0 = 1.6e5
-    rho0 = rho_water(T)
+    rho0 = ρ(H2O, T)
     ṁ0 = (2000.0 / 3600.0) * rho0
     K = dp0 / ṁ0^2
     alpha = K / inertia
@@ -240,7 +240,7 @@ end
     @named L_el = Inertia(inertia)
     @named R1 = VolumetricFlowResistor(; k=k1, density=1.0)
     @named R2 = VolumetricFlowResistor(; k=k2, density=1.0)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, L_el)...,
         inparallel(L_el, (R1, R2), hx)...,
@@ -282,7 +282,7 @@ end
     p = 3.0e4
     s = 2.5
     @named pump = Pump(p)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     @named R1 = Resistor(r1 / s)     # bundle resistance (s parallel copies of r1)
     @named R2 = Resistor(r2)
     conns = [
@@ -309,7 +309,7 @@ end
     p = 3.0e4
     signify = 3
     @named pump = Pump(p)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     R1s = [Resistor(r1; name=Symbol(:R1_, i)) for i in 1:signify]
     @named R2 = Resistor(r2)
     conns = [
@@ -343,7 +343,7 @@ end
     # quasi-static: solve the steady algebraic system at each time with ṁ0 = 3 - t,
     # the MTK reading of Python's ṁ0(t)=3-t current source over the transient.
     A1, A2 = 1.0, 2.0
-    Tin = 293.15
+    Tin = 20.0
     @named pump = Pump(; ṁ0=3.0)
     @named hx = HeatExchanger(Tin)
     @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
@@ -385,8 +385,8 @@ end
         f=1.0,
         area=1.0,
         open_rate=10.0,
-                             fluid=ConstantFluid())
-    @named hx = HeatExchanger(300.0)
+                             liquid=Liquid())
+    @named hx = HeatExchanger(26.85)
     conns = [
         inparallel(pump, (R, flapper), hx)...,
         inseries(hx, pump)...,
@@ -422,8 +422,8 @@ end
     dp_fn = (tt) -> exp(-tt)   # one function object for Pump + op
     @named pump = Pump(dp_fn)
     @named flapper = Flapper(; open_at_current=0.1, f=1.0, area=1.0, open_rate=10.0,
-                             fluid=ConstantFluid())
-    @named hx = HeatExchanger(300.0)
+                             liquid=Liquid())
+    @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, flapper, hx, pump)...,
         watch_flow(flapper, pump.inlet.ṁ),
@@ -454,8 +454,8 @@ end
     @named ine = Inertia(1.0e3)
     @named R = VolumetricFlowResistor(; k=k, density=1.0)
     @named flapper = Flapper(; open_at_current=0.0, f=2 * k, area=1.0, open_rate=1.0,
-                             fluid=ConstantFluid())
-    @named hx = HeatExchanger(300.0)
+                             liquid=Liquid())
+    @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, ine)...,
         inparallel(ine, (R, flapper), hx)...,
@@ -492,7 +492,7 @@ end
     @named ine = Inertia(1.0e3)
     @named R = VolumetricFlowResistor(; k=k1, density=1.0)
     @named transistor = VolumetricFlowResistor(; k=kfn, density=1.0)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, ine)...,
         inparallel(ine, (R, transistor), hx)...,
@@ -542,8 +542,8 @@ end
     # solve_steady per time-point with the pump head overridden, the MTK reading of Python's
     # decaying-pressure current source.
     p0 = 4000.0
-    high_T = 333.15   # Python 60 C
-    low_T = 293.15    # Python 20 C
+    high_T = 60.0   # Python 60 C
+    low_T = 20.0    # Python 20 C
     g_acc = G_EARTH
     @named pump = Pump(p0)              # fixed-pressure; dP_pump overridden per t (quasi-static)
     @named HX_hot = HeatExchanger(high_T)
@@ -560,7 +560,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:decay_grav), pump, HX_hot, HX_cold, G1, G2, R)
     ssys = mtkcompile(sys)
-    delta_rho = rho_water(low_T) - rho_water(high_T)   # = ρ(low_T) - ρ(high_T) > 0
+    delta_rho = ρ(H2O, low_T) - ρ(H2O, high_T)   # = ρ(low_T) - ρ(high_T) > 0
     times = range(0.0, 10.0; length=10)
     ṁ = Float64[]
     rdrop0 = 0.0
@@ -588,8 +588,8 @@ end
     # match is quasi-static: a nonlinear steady root per time-point with the head decaying.
     D_pipe = 0.10
     ṁ0 = 1.0
-    T_cold = 293.15
-    T_hot = 353.15    # Python 80 C
+    T_cold = 20.0
+    T_hot = 80.0    # Python 80 C
     g_acc = G_EARTH
     geom = PipeGeometry_circular(1.0, D_pipe)
     nz = 9            # Python z_boundaries = linspace(0, L, 10) -> 9 cells
@@ -603,8 +603,8 @@ end
     # the earlier laminar-only surrogate (64/Re, friction vanishing as Re->0) let the reversed flow
     # run away to ~21x nominal, which this model does not.
     fric = regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0)
-    @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, fluid=Water(), friction_correlation=fric)
-    @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, fluid=Water(), friction_correlation=fric)
+    @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, liquid=H2O, friction_correlation=fric)
+    @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, liquid=H2O, friction_correlation=fric)
     # Bracket each adiabatic channel with same-temperature HeatExchangers on BOTH ends so its
     # coolant stays pinned under reversal too (Python pins both Tin and Tin_minus per channel).
     @named HXc1 = HeatExchanger(T_cold)
@@ -629,7 +629,7 @@ end
     sol0 = solve_steady(ssys, guess)
     @test sol0.retcode == ReturnCode.Success
     p_pump0 = sol0[ssys.pump.outlet.p] - sol0[ssys.pump.inlet.p]
-    delta_rho = rho_water(T_cold) - rho_water(T_hot)
+    delta_rho = ρ(H2O, T_cold) - ρ(H2O, T_hot)
     grav_dp = 1.0 * g_acc * delta_rho   # L·g·Δρ, the buoyancy head
 
     # Reversed-flow magnitude ceiling, derived from the buoyancy-vs-friction balance. At full
@@ -641,10 +641,10 @@ end
     Dh = geom.Dh
     L_ch = geom.L
     function loop_friction(m)
-        Re_c = abs(m) * Dh / (A * mu_water(T_cold))
-        Re_h = abs(m) * Dh / (A * mu_water(T_hot))
-        rho_c = rho_water(T_cold)
-        rho_h = rho_water(T_hot)
+        Re_c = abs(m) * Dh / (A * μ(H2O, T_cold))
+        Re_h = abs(m) * Dh / (A * μ(H2O, T_hot))
+        rho_c = ρ(H2O, T_cold)
+        rho_h = ρ(H2O, T_hot)
         fric(Re_c) * m * abs(m) / (2 * rho_c * A^2) * (L_ch / Dh) +
         fric(Re_h) * m * abs(m) / (2 * rho_h * A^2) * (L_ch / Dh)
     end
@@ -721,16 +721,16 @@ end
 #     The "power → 0 under negative feedback" result is group-count-independent.
 #   - Julia `HeatDiffusion` needs nx ≥ 2; Python uses nx = 1. The per-axial-slice
 #     power (hence the linear coolant rise) is independent of the lateral count.
-# `ConstantFluid()` is the Julia counterpart of Python's `mock_liquid_funcs` (all
+# `Liquid()` is the Julia counterpart of Python's `mock_liquid_funcs` (all
 # properties 1.0), which gives the clean closed-form coolant temperatures.
 # ----------------------------------------------------------------------------
 
 @testset "channel stable state with uniform heating increases linearly" begin
     # Python: test_channel_stable_state_with_uniform_heating_increases_linearly
     # A channel heated on one face by a fuel plate under uniform power. With cp = 1
-    # (ConstantFluid) the coolant rises linearly, Tc[i] = T0 + i·P/(nz·ṁ), and the
+    # (Liquid) the coolant rises linearly, Tc[i] = T0 + i·P/(nz·ṁ), and the
     # conjugate wall temperature is the h-weighted mean Tw = (Tc·h + Tf·h_fw)/(h + h_fw).
-    T0 = 313.15
+    T0 = 40.0
     P = 10.0
     ṁ = 1.0
     n = 10
@@ -741,7 +741,7 @@ end
     # Mock one-sided pipe (heated_parts = (0, 1), area 1) + mock solid (all 1).
     geom = PipeGeometry(1.0, 4.0, 1.0, 1.0, 1.0, (0.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
-    @named cac = ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
+    @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc_correlation=constant_Nusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.0, Lx=Lx, y=1.0,
                                 rho_s=1.0, cp_s=1.0, k_s=k_s, power_shape=ps, T0=T0)
@@ -767,7 +767,7 @@ end
                           initializealg=BrownFullBasicInit(), maxiters=1_000_000)
     @test sol.retcode == ReturnCode.Success
     Tc = [sol[ssys.osc.cac.T[i], end] for i in 1:n]
-    Tc_analytic = [T0 + i * (P / (nz * ṁ)) for i in 1:nz]   # cp = 1 (ConstantFluid)
+    Tc_analytic = [T0 + i * (P / (nz * ṁ)) for i in 1:nz]   # cp = 1 (Liquid)
     @test all(isapprox.(Tc, Tc_analytic; rtol=1e-6))           # coolant rises linearly
     # h-weighted wall temperature, reading Julia's computed h_tc (Python prescribes h).
     h_fw = 2 * k_s / (Lx / nx)
@@ -789,7 +789,7 @@ end
     # Julia's coupled solve_steady on a live feedback PointKinetics collapses to the trivial P=0
     # root, so reach the same physical steady the way the PK coupling tests do: run the coupled
     # feedback transient from a cold critical IC and let it settle at a nonzero equilibrium power.
-    T0 = 313.15
+    T0 = 40.0
     Tin = T0 - 10.0
     n = 7
     nz = 7
@@ -800,7 +800,7 @@ end
     ps = fill(1.0 / (nz * nx), nz, nx)
     # Distinct names per channel/fuel so the shared PK gets a distinct T_source_<name> feedback
     # group for each component (connect_temperature_feedback keys off nameof).
-    cacs = [ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
+    cacs = [ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                htc_correlation=constant_Nusselt(; Nu=8.235),
                                name=Symbol(:cac, i)) for i in 1:N]
     fuels = [HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0, rho_s=1.0, cp_s=1.0, k_s=1.0,
@@ -844,7 +844,7 @@ end
 
     # Consistent cold critical IC. ref_temp = T0, so seeding every coolant / contact / fuel
     # temperature to T0 makes the initial feedback reactivity exactly zero (the loop starts
-    # critical). Seed every member of each connection set (port temperatures default to 300 K and
+    # critical). Seed every member of each connection set (port temperatures default to 26.85 °C and
     # which alias representative survives is not stable across MTK versions), matching build_loop_pk.
     pk_ic = point_kinetics_steady_state(1.0)
     ic = Pair{Any,Any}[
@@ -906,7 +906,7 @@ end
     # reference is that same T0. Negative feedback drives the steady power to zero and every fuel
     # temperature back to T0. (Julia's stabilizing feedback uses a negative coefficient, the
     # opposite sign convention to Python's positive worth.)
-    T0 = 308.15
+    T0 = 35.0
     nz = 10
     nx = 2
     ps = fill(1.0 / (nz * nx), nz, nx)
@@ -943,13 +943,13 @@ end
     # Python: test_power_is_negligible_for_negative_Tcool_feedback_and_ref_temp_is_inlet
     # A channel + fuel plate with PointKinetics coolant-temperature feedback whose reference is
     # the inlet T0. Negative feedback drives the steady power to zero and the coolant back to T0.
-    T0 = 308.15
+    T0 = 35.0
     n = 7
     nz = 7
     nx = 2
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
-    @named cac = ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
+    @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc_correlation=constant_Nusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0,
                                 rho_s=1.0, cp_s=1.0, k_s=1.0, power_shape=ps, T0=T0)

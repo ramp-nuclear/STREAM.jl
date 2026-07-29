@@ -35,7 +35,7 @@ end
 Ideal heat exchanger that resets fluid temperature to a fixed boundary condition.
 
 # Arguments
-- `T_bc`: boundary condition temperature [K]
+- `T_bc`: boundary condition temperature [°C]
 - `name`: system name (Symbol)
 
 # Ports
@@ -62,7 +62,7 @@ end
 Constant-temperature thermal boundary condition.
 
 # Arguments
-- `T`: fixed surface temperature [K]
+- `T`: fixed surface temperature [°C]
 - `name`: system name (Symbol)
 
 # Ports

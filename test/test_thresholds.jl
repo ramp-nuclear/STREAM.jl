@@ -21,50 +21,49 @@ using STREAM
         # what the correlation actually produces, so we anchor T_ONB = base + Python dT.
         # Bergles_Rohsenow_dT_ONB(1e5, 1e5) -> 4.520927784528019
         dT_1e5_1e5 = 4.520927784528019
-        @test bergles_rohsenow_t_onb(1e5, 1e5, 373.15) ≈ 373.15 + dT_1e5_1e5 rtol = 1e-9
-        @test bergles_rohsenow_t_onb(1e5, 1e5, 350.0) ≈ 350.0 + dT_1e5_1e5 rtol = 1e-9
+        @test bergles_rohsenow_t_onb(1e5, 1e5, 100.0) ≈ 100.0 + dT_1e5_1e5 rtol = 1e-9
+        @test bergles_rohsenow_t_onb(1e5, 1e5, 76.85) ≈ 76.85 + dT_1e5_1e5 rtol = 1e-9
 
         # Off-atmospheric pressure exercises the p-dependent exponents.
         # Bergles_Rohsenow_dT_ONB(2e5, 5e5) -> 6.84338482835126
         dT_2e5_5e5 = 6.84338482835126
-        @test bergles_rohsenow_t_onb(2e5, 5e5, 372.0) ≈ 372.0 + dT_2e5_5e5 rtol = 1e-9
+        @test bergles_rohsenow_t_onb(2e5, 5e5, 98.85) ≈ 98.85 + dT_2e5_5e5 rtol = 1e-9
 
         # Bergles_Rohsenow_dT_ONB(1e5, 2e5) -> 6.2316701544241235 (higher flux -> higher dT).
-        @test bergles_rohsenow_t_onb(1e5, 2e5, 373.15) ≈ 373.15 + 6.2316701544241235 rtol = 1e-9
-        @test bergles_rohsenow_t_onb(1e5, 2e5, 373.15) >
-            bergles_rohsenow_t_onb(1e5, 1e5, 373.15)
+        @test bergles_rohsenow_t_onb(1e5, 2e5, 100.0) ≈ 100.0 + 6.2316701544241235 rtol = 1e-9
+        @test bergles_rohsenow_t_onb(1e5, 2e5, 100.0) >
+            bergles_rohsenow_t_onb(1e5, 1e5, 100.0)
     end
 
     @testset "q_boiling_onset" begin
-        @test q_boiling_onset(0.5, 373.15, 300.0, 4180.0) ≈ 0.5 * 4180.0 * (373.15 - 300.0) rtol =
+        @test q_boiling_onset(0.5, 100.0, 26.85, 4180.0) ≈ 0.5 * 4180.0 * (100.0 - 26.85) rtol =
             1e-10
-        @test q_boiling_onset(-0.5, 373.15, 300.0, 4180.0) ≈
-            q_boiling_onset(0.5, 373.15, 300.0, 4180.0)
-        @test q_boiling_onset(0.5, 373.15, 373.15, 4180.0) ≈ 0.0 atol = 1e-10
-        @test q_boiling_onset(1.0, 373.15, 300.0, 4180.0) >
-            q_boiling_onset(0.5, 373.15, 300.0, 4180.0)
+        @test q_boiling_onset(-0.5, 100.0, 26.85, 4180.0) ≈
+            q_boiling_onset(0.5, 100.0, 26.85, 4180.0)
+        @test q_boiling_onset(0.5, 100.0, 100.0, 4180.0) ≈ 0.0 atol = 1e-10
+        @test q_boiling_onset(1.0, 100.0, 26.85, 4180.0) >
+            q_boiling_onset(0.5, 100.0, 26.85, 4180.0)
     end
 
     @testset "q_OFI_whittle_forgan" begin
         # Anchor: Python physical_models.thresholds.Whittle_Forgan_OFI with the same pipe,
         # ṁ=0.5, and cp = light_water.specific_heat integrated over the same physical
-        # range. Python cp takes Celsius, Julia cp_water takes Kelvin, so the Python call
-        # used inlet=26.85 C, sat=100.0 C (= 300 K, 373.15 K). cp(26.85 C) = 4177.78 matches
-        # Julia cp_water(300 K) = 4177.78, confirming the same Simantov correlation.
+        # range. Both sides now take Celsius, so the Python call used the same inlet=26.85,
+        # sat=100.0. cp(26.85) = 4177.78 on both, confirming the same Simantov correlation.
         # Whittle_Forgan_OFI(...) -> 135474.34677914483.
-        result = q_OFI_whittle_forgan(0.5, 373.15, 300.0, pipe)
+        result = q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe)
         @test result ≈ 135474.34677914483 rtol = 1e-7  # two adaptive quadratures
         # ṁ sign does not change OFI (the function takes |ṁ| and |G|).
-        @test q_OFI_whittle_forgan(-0.5, 373.15, 300.0, pipe) ≈ result rtol = 1e-10
+        @test q_OFI_whittle_forgan(-0.5, 100.0, 26.85, pipe) ≈ result rtol = 1e-10
         # OFI power stays below the boiling-onset power for the same channel.
-        q_onset = q_boiling_onset(0.5, 373.15, 300.0, cp_water(300.0))
+        q_onset = q_boiling_onset(0.5, 100.0, 26.85, cₚ(H2O, 26.85))
         @test result < q_onset
     end
 
     @testset "q_OSV_saha_zuber" begin
         # Anchor: Python physical_models.thresholds.Saha_Zuber_OSV_computed_bulk, fed a
-        # Liquid carrying STREAM's own rho/cp/k_water at T_inlet=300 K and
-        # sat_temperature(1e5) = 372.78 (so the Python coolant matches Julia bit-for-bit).
+        # Liquid carrying STREAM's own ρ/cₚ/k at T_inlet=26.85 and
+        # Tsat(H2O, 1e5) = 99.63 (so the Python coolant matches Julia bit-for-bit).
         # Pipe and 10-cell uniform flux match the Julia inputs. Reported value is the
         # minimum cell. (Python's numba `directed` was monkeypatched to its plain-numpy
         # equivalent so the function would run; the formula is untouched.)
@@ -77,28 +76,28 @@ using STREAM
         St_c = 0.0065
         function pe_at(ṁ)
             G = abs(ṁ) / pipe.A
-            return G * pipe.Dh * cp_water(300.0) / k_water(300.0)
+            return G * pipe.Dh * cₚ(H2O, 26.85) / κ(H2O, 26.85)
         end
 
         # High-Pe (convective) branch: Saha_Zuber_OSV_computed_bulk(ṁ=0.5) -> 1443852.2363455354
         @test pe_at(0.5) >= 7e4  # guard: must be the convective St_c branch
-        @test q_OSV_saha_zuber(300.0, 0.5, pipe) ≈ 1443852.2363455354 rtol = 1e-9
+        @test q_OSV_saha_zuber(26.85, 0.5, pipe) ≈ 1443852.2363455354 rtol = 1e-9
 
         # Low-Pe (conductive) branch: Saha_Zuber_OSV_computed_bulk(ṁ=0.3) -> 899904.7329676608
         @test pe_at(0.3) < 7e4  # guard: must be the conductive Nu_c branch
-        @test q_OSV_saha_zuber(300.0, 0.3, pipe) ≈ 899904.7329676608 rtol = 1e-9
+        @test q_OSV_saha_zuber(26.85, 0.3, pipe) ≈ 899904.7329676608 rtol = 1e-9
 
         # Explicit flux_shape + dz path (dz = 0.06 each, uniform shape). Same total length
         # as the uniform default, so Python returns the same value:
         # Saha_Zuber_OSV_computed_bulk(ṁ=0.5, dz=0.06) -> 1443852.2363455354
-        @test q_OSV_saha_zuber(300.0, 0.5, pipe; flux_shape=ones(10), dz=0.06 * ones(10)) ≈
+        @test q_OSV_saha_zuber(26.85, 0.5, pipe; flux_shape=ones(10), dz=0.06 * ones(10)) ≈
             1443852.2363455354 rtol = 1e-9
     end
 
     @testset "q_CHF_sudo_kaminaga" begin
         # Anchor: Python physical_models.thresholds.Sudo_Kaminaga_CHF, fed a sat_coolant
         # Liquid carrying exactly the Julia defaults (rho_l=958.4, rho_v=0.598, hfg=2257e3,
-        # sigma=0.059, cp_sat=4217.0, T_sat=373.15) and the same pipe. The Julia function is
+        # sigma=0.059, cp_sat=4217.0, T_sat=100.0) and the same pipe. The Julia function is
         # scalar (one cell); Python is vectorized over the cell axis, so each Python anchor
         # was taken from a single-element T_bulk array, which is the exact per-cell
         # restriction of the Python function (T_bulk[0] == T_bulk[-1]).
@@ -111,61 +110,66 @@ using STREAM
 
         # Downward branch, q2 selected (subcooling term dominates):
         # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=0.5, g=9.81) -> 1391788.0650769984
-        @test q_CHF_sudo_kaminaga(320.0, 0.5, pipe, 9.81) ≈ 1391788.0650769984 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81) ≈ 1391788.0650769984 rtol = 1e-9
         # Colder bulk -> larger subcooling -> higher CHF.
         # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=0.5, g=9.81) -> 1915508.8797814196
-        @test q_CHF_sudo_kaminaga(300.0, 0.5, pipe, 9.81) ≈ 1915508.8797814196 rtol = 1e-9
-        @test q_CHF_sudo_kaminaga(300.0, 0.5, pipe, 9.81) >
-            q_CHF_sudo_kaminaga(320.0, 0.5, pipe, 9.81)
+        @test q_CHF_sudo_kaminaga(26.85, 0.5, pipe, 9.81) ≈ 1915508.8797814196 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(26.85, 0.5, pipe, 9.81) >
+            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81)
 
         # q4-binding cases (NONZERO outlet subcooling). Large ṁ grows q2 past q4, so q4
         # is the selected (most limiting) sub-correlation. These exercise the corrected
         # outlet term: q4 = q1*(1 + 5000*dT_outlet/|G*|) with dT_outlet > 0.
         # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=5.0, g=9.81) -> 11350154.095336435
-        @test q_CHF_sudo_kaminaga(300.0, 5.0, pipe, 9.81) ≈ 11350154.095336435 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(26.85, 5.0, pipe, 9.81) ≈ 11350154.095336435 rtol = 1e-9
         # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=8.0, g=9.81) -> 14693105.002503937
-        @test q_CHF_sudo_kaminaga(300.0, 8.0, pipe, 9.81) ≈ 14693105.002503937 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(26.85, 8.0, pipe, 9.81) ≈ 14693105.002503937 rtol = 1e-9
 
         # Upward branch: negative ṁ flips G* < 0, folding q1 into the max, so the
         # selection genuinely differs from the downward branch and yields a higher CHF.
         # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=-0.5, g=9.81) -> 2567664.771611573
-        @test q_CHF_sudo_kaminaga(320.0, -0.5, pipe, 9.81) ≈ 2567664.771611573 rtol = 1e-9
-        @test q_CHF_sudo_kaminaga(320.0, -0.5, pipe, 9.81) >
-            q_CHF_sudo_kaminaga(320.0, 0.5, pipe, 9.81)
+        @test q_CHF_sudo_kaminaga(46.85, -0.5, pipe, 9.81) ≈ 2567664.771611573 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(46.85, -0.5, pipe, 9.81) >
+            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81)
 
         # Gravity enters Julia only as |g| (Julia takes abs(gravity) for the capillary
         # length), so flipping the gravity sign leaves the result unchanged for positive
         # ṁ. This is a Julia-internal choice: Python does NOT abs g and returns NaN for
         # negative g, so this assertion is a Julia self-check, not a Python anchor.
-        @test q_CHF_sudo_kaminaga(320.0, 0.5, pipe, -9.81) ≈
-            q_CHF_sudo_kaminaga(320.0, 0.5, pipe, 9.81) rtol = 1e-10
+        @test q_CHF_sudo_kaminaga(46.85, 0.5, pipe, -9.81) ≈
+            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81) rtol = 1e-10
     end
 
     @testset "q_CHF_mirshak" begin
-        # Anchor: Python physical_models.thresholds.Mirshak_CHF(T_bulk=320, T_sat=373.15,
+        # Anchor: Python physical_models.thresholds.Mirshak_CHF(T_bulk=320, T_sat=100.0,
         # pressure=1e5, v=2.0) -> 3309506.2042568396.
-        @test q_CHF_mirshak(320.0, 373.15, 1e5, 2.0) ≈ 3309506.2042568396 rtol = 1e-9
+        @test q_CHF_mirshak(46.85, 100.0, 1e5, 2.0) ≈ 3309506.2042568396 rtol = 1e-9
         # Higher velocity -> higher CHF.
-        @test q_CHF_mirshak(320.0, 373.15, 1e5, 3.0) >
-            q_CHF_mirshak(320.0, 373.15, 1e5, 2.0)
+        @test q_CHF_mirshak(46.85, 100.0, 1e5, 3.0) >
+            q_CHF_mirshak(46.85, 100.0, 1e5, 2.0)
         # Higher subcooling -> higher CHF.
-        @test q_CHF_mirshak(300.0, 373.15, 1e5, 2.0) >
-            q_CHF_mirshak(320.0, 373.15, 1e5, 2.0)
+        @test q_CHF_mirshak(26.85, 100.0, 1e5, 2.0) >
+            q_CHF_mirshak(46.85, 100.0, 1e5, 2.0)
     end
 
     @testset "q_CHF_fabrega" begin
-        # Anchor: Python physical_models.thresholds.Fabrega_CHF(Tin=300, T_sat=373.15,
+        # Anchor: Python physical_models.thresholds.Fabrega_CHF(Tin=300, T_sat=100.0,
         # Dh=pipe.hydraulic_diameter) -> 289290.4023021582.
-        @test q_CHF_fabrega(300.0, 373.15, pipe) ≈ 289290.4023021582 rtol = 1e-9
+        @test q_CHF_fabrega(26.85, 100.0, pipe) ≈ 289290.4023021582 rtol = 1e-9
         # Colder inlet -> larger subcooling -> higher CHF.
-        @test q_CHF_fabrega(280.0, 373.15, pipe) > q_CHF_fabrega(300.0, 373.15, pipe)
+        @test q_CHF_fabrega(6.85, 100.0, pipe) > q_CHF_fabrega(26.85, 100.0, pipe)
     end
 
     @testset "twall_limit" begin
-        @test twall_limit(400.0, 1.2) ≈ 480.0
-        @test twall_limit(400.0) ≈ 400.0
-        @test twall_limit(300.0, 1.0) ≈ 300.0
-        @test twall_limit(400.0, 1.5) > twall_limit(400.0, 1.2)
+        # T_bulk + factor*(T_wall - T_bulk): a 100 degree rise worsened by 1.2 becomes 120.
+        @test twall_limit(26.85, 126.85, 1.2) ≈ 146.85
+        @test twall_limit(26.85, 126.85) ≈ 126.85          # factor 1.0 is the identity
+        @test twall_limit(26.85, 26.85, 5.0) ≈ 26.85       # no rise to worsen
+        @test twall_limit(26.85, 126.85, 1.5) > twall_limit(26.85, 126.85, 1.2)
+        # Equivalent to Python's T_bulk + q*factor/h under q = h*(T_wall - T_bulk).
+        T_b, T_w, h, f = 26.85, 126.85, 25000.0, 1.3
+        q = h * (T_w - T_b)
+        @test twall_limit(T_b, T_w, f) ≈ T_b + q * f / h
     end
 end
 
@@ -175,13 +179,13 @@ end
 
     state = ChannelState(;
         n=n,
-        T_bulk=fill(320.0, n),
-        T_wall=fill(340.0, n),
-        T_wall_left=fill(340.0, n),
-        T_wall_right=fill(335.0, n),
-        T_sat=fill(373.15, n),
-        T_ONB=fill(380.0, n),
-        T_inlet=300.0,
+        T_bulk=fill(46.85, n),
+        T_wall=fill(66.85, n),
+        T_wall_left=fill(66.85, n),
+        T_wall_right=fill(61.85, n),
+        T_sat=fill(100.0, n),
+        T_ONB=fill(106.85, n),
+        T_inlet=26.85,
         P=fill(1e5, n),
         q_flux=fill(5e5, n),
         q_flux_left=fill(5e5, n),
@@ -195,7 +199,7 @@ end
     @testset "ChannelState construction" begin
         @test state.n == n
         @test length(state.T_bulk) == n
-        @test state.T_inlet == 300.0
+        @test state.T_inlet == 26.85
         @test state.ṁ == 0.5
         @test state.gravity == 9.81
         @test state.pipe === pipe
@@ -215,7 +219,7 @@ end
         expected_val =
             1.51e6 *
             (1 + 0.1198 * 3.0) *
-            (1 + 0.00914 * (373.15 - 320.0)) *
+            (1 + 0.00914 * (100.0 - 46.85)) *
             (1 + 0.19e-5 * 1e5)
         @test result[1] ≈ expected_val rtol = 1e-10
     end
@@ -224,7 +228,7 @@ end
         result = fabrega_chf(state)
         @test length(result) == n
         @test all(result .> 0)
-        expected_val = 1e7 * pipe.Dh * (0.023 * (373.15 - 300.0) + 4.56)
+        expected_val = 1e7 * pipe.Dh * (0.023 * (100.0 - 26.85) + 4.56)
         @test result[1] ≈ expected_val rtol = 1e-10
     end
 
@@ -238,7 +242,7 @@ end
         result = boiling_onset_power(state)
         @test length(result) == n
         @test all(result .> 0)
-        expected_val = abs(0.5) * cp_water(320.0) * (373.15 - 300.0)
+        expected_val = abs(0.5) * cₚ(H2O, 46.85) * (100.0 - 26.85)
         @test result[1] ≈ expected_val rtol = 1e-8
     end
 
@@ -246,16 +250,19 @@ end
         result = OFI_power(state)
         @test result isa Float64
         @test result > 0
-        q_onset = q_boiling_onset(0.5, 373.15, 300.0, cp_water(300.0))
+        q_onset = q_boiling_onset(0.5, 100.0, 26.85, cₚ(H2O, 26.85))
         @test result < q_onset
     end
 
     @testset "twall_limit wrapper (ChannelState overload)" begin
+        # Fixture: T_bulk 46.85, T_wall_left 66.85, T_wall_right 61.85. The left face is
+        # hotter, so it sets the limit: 46.85 + 1.2*20 = 70.85.
         result = twall_limit(state; inhomogeneity_factor=1.2)
         @test length(result) == n
-        @test all(result .≈ 340.0 * 1.2)
+        @test all(result .≈ 70.85)
+        # Factor 1.0 gives back the hotter face untouched.
         result_default = twall_limit(state)
-        @test all(result_default .≈ 340.0)
+        @test all(result_default .≈ 66.85)
     end
 end
 
@@ -264,13 +271,13 @@ end
     n = 3
     state = ChannelState(;
         n=n,
-        T_bulk=fill(320.0, n),
-        T_wall=fill(340.0, n),
-        T_wall_left=fill(340.0, n),
-        T_wall_right=fill(335.0, n),
-        T_sat=fill(373.15, n),
-        T_ONB=fill(380.0, n),
-        T_inlet=300.0,
+        T_bulk=fill(46.85, n),
+        T_wall=fill(66.85, n),
+        T_wall_left=fill(66.85, n),
+        T_wall_right=fill(61.85, n),
+        T_sat=fill(100.0, n),
+        T_ONB=fill(106.85, n),
+        T_inlet=26.85,
         P=fill(1e5, n),
         q_flux=fill(5e5, n),
         q_flux_left=fill(5e5, n),
@@ -296,13 +303,13 @@ end
 
     state_zero = ChannelState(;
         n=n,
-        T_bulk=fill(320.0, n),
-        T_wall=fill(340.0, n),
-        T_wall_left=fill(340.0, n),
-        T_wall_right=fill(335.0, n),
-        T_sat=fill(373.15, n),
-        T_ONB=fill(380.0, n),
-        T_inlet=300.0,
+        T_bulk=fill(46.85, n),
+        T_wall=fill(66.85, n),
+        T_wall_left=fill(66.85, n),
+        T_wall_right=fill(61.85, n),
+        T_sat=fill(100.0, n),
+        T_ONB=fill(106.85, n),
+        T_inlet=26.85,
         P=fill(1e5, n),
         q_flux=fill(0.0, n),
         q_flux_left=fill(0.0, n),
@@ -322,13 +329,13 @@ end
     n = 3
     state = ChannelState(;
         n=n,
-        T_bulk=fill(320.0, n),
-        T_wall=fill(340.0, n),
-        T_wall_left=fill(340.0, n),
-        T_wall_right=fill(335.0, n),
-        T_sat=fill(373.15, n),
-        T_ONB=fill(380.0, n),
-        T_inlet=300.0,
+        T_bulk=fill(46.85, n),
+        T_wall=fill(66.85, n),
+        T_wall_left=fill(66.85, n),
+        T_wall_right=fill(61.85, n),
+        T_sat=fill(100.0, n),
+        T_ONB=fill(106.85, n),
+        T_inlet=26.85,
         P=fill(1e5, n),
         q_flux=fill(5e5, n),
         q_flux_left=fill(5e5, n),

@@ -88,8 +88,8 @@ Grashof number.
 - `rho`: density [kg/m^3]
 - `mu`: viscosity [Pa*s]
 - `beta`: thermal expansion coefficient [1/K]
-- `T_wall`: wall temperature [K]
-- `T`: bulk temperature [K]
+- `T_wall`: wall temperature [°C]
+- `T`: bulk temperature [°C]
 - `L`: characteristic length (hydraulic diameter) [m]
 - `g`: gravitational acceleration [m/s^2]
 

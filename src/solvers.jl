@@ -7,7 +7,7 @@
 Generate a linear temperature guess for steady-state initialization.
 
 # Arguments
-- `T_inlet`: inlet temperature [K]
+- `T_inlet`: inlet temperature [°C]
 - `Q_wall`: total wall heat input [W]
 - `ṁ_guess`: estimated mass flow rate [kg/s]
 - `n`: number of axial cells (Int)
@@ -21,8 +21,9 @@ function steady_state_guess(;
     Q_wall::Float64,
     ṁ_guess::Float64,
     n::Int,
+    liquid::AbstractLiquid=H2O,
 )
-    cp = cp_water(T_inlet)
+    cp = cₚ(liquid, T_inlet)
     return [T_inlet + i * Q_wall / (n * ṁ_guess * cp) for i in 1:n]
 end
 

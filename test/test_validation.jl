@@ -117,6 +117,7 @@ end
             Dh,
             A,
             dittus_boelter,
+            H2O,
         )
         @test isapprox(h_julia, PARITY_MTR_ASYM_H_TC_LEFT_R[i]; rtol=1e-6)
     end
@@ -162,8 +163,8 @@ end
     assert_equivalence_anchors()
 
     n = 10
-    T_inlet = 313.15
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     @named pump = Pump(3.0e4)
     @named hx = HeatExchanger(T_inlet)
     @named cac = ChannelAndContacts(; n=n, geometry=geom_simple)
@@ -257,10 +258,10 @@ end
 
 @testset "Transient T_outlet rises after T_wall step" begin
     n = 10
-    T_inlet = 313.15
+    T_inlet = 40.0
 
-    T_wall_0 = 373.15
-    T_wall_final = 393.15
+    T_wall_0 = 100.0
+    T_wall_final = 120.0
     t_step = 10.0
     T_wall_step = t -> t < t_step ? T_wall_0 : T_wall_final
 
@@ -299,7 +300,7 @@ end
 
     nz = 10
     nx = 3
-    T_in = 313.15
+    T_in = 40.0
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
@@ -326,7 +327,7 @@ end
     )
     ssys = mtkcompile(sys; fully_determined=true)
 
-    T_w = 315.0
+    T_w = 41.85
     op = vcat(
         [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
         [ssys.cac_l.T[i] => T_w for i in 1:nz],
@@ -433,7 +434,7 @@ end
     end
 end
 
-# Asymmetric MTR — right channel inlet at 90°C (363.15 K)
+# Asymmetric MTR — right channel inlet at 90°C (90.0 °C)
 # Right side of plate must be hotter than left side.
 @testset "Python parity: MTR asymmetric" begin
     assert_equivalence_fluid_props()
@@ -448,8 +449,8 @@ end
 
     nz = 10
     nx = 3
-    T_in_l = 313.15
-    T_in_r = 363.15
+    T_in_l = 40.0
+    T_in_r = 90.0
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in_l)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
@@ -477,10 +478,10 @@ end
     ssys = mtkcompile(sys; fully_determined=true)
 
     op = vcat(
-        [ssys.hd.T[i, j] => 318.15 for i in 1:nz for j in 1:(nx - 1)],
-        [ssys.hd.T[i, nx] => 368.15 for i in 1:nz],
-        [ssys.cac_l.T[i] => 318.15 for i in 1:nz],
-        [ssys.cac_r.T[i] => 368.15 for i in 1:nz],
+        [ssys.hd.T[i, j] => 45.0 for i in 1:nz for j in 1:(nx - 1)],
+        [ssys.hd.T[i, nx] => 95.0 for i in 1:nz],
+        [ssys.cac_l.T[i] => 45.0 for i in 1:nz],
+        [ssys.cac_r.T[i] => 95.0 for i in 1:nz],
             [ssys.cac_l.inlet.ṁ => +0.250],
             [ssys.cac_r.inlet.ṁ => +0.250],
     )
@@ -602,7 +603,7 @@ end
 
     nz = 10
     nx = 3
-    T_in = 313.15
+    T_in = 40.0
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
@@ -625,7 +626,7 @@ end
 
     cac_s = ssys.scc.cac_l
     fuel_s = ssys.scc.hd
-    T_w = 317.0
+    T_w = 43.85
     op = vcat(
         [fuel_s.T[i, j] => T_w for i in 1:nz for j in 1:nx],
         [cac_s.T[i] => T_w for i in 1:nz],
@@ -725,8 +726,8 @@ end  # @testset "parity harness"
     Lx_v01 = 0.00127
     Lz_v01 = 0.6
     y_v01 = 0.07
-    T_wall = 300.0
-    T0 = 400.0    # 100 K step-down for clear signal
+    T_wall = 26.85
+    T0 = 126.85   # 100 K step-down for clear signal
 
     alpha_v01 = k_s_v01 / (rho_s_v01 * cp_s_v01)   # ≈ 8.23e-5 m²/s
     tau_v01 = Lx_v01^2 / (π^2 * alpha_v01)        # ≈ 0.002 s
@@ -790,19 +791,24 @@ end  # @testset "parity harness"
 
     T_center_sym = ssys_v01.hd_v01.T[nz_v01 ÷ 2, (nx_v01 + 1) ÷ 2]
     T_center_series = sol_v01[T_center_sym, :]
+    # Tolerances are a fraction of the imposed step, not of the temperature itself. A
+    # relative tolerance on a Celsius reading is measured against where the scale happens
+    # to put its zero, so the same 1% would mean a different physical band here than it
+    # does at, say, 300 °C. The step is the scale the problem actually sets.
+    tol_v01 = 0.01 * abs(T0 - T_wall)
     for (k, t_k) in enumerate(t_checkpoints)
         T_num = T_center_series[k]
         T_ref = fourier_T_center(t_k)
-        @test isapprox(T_num, T_ref; rtol=0.01)
+        @test isapprox(T_num, T_ref; atol=tol_v01)
     end
 
-    @test isapprox(T_center_series[end], T_wall; rtol=0.01)
+    @test isapprox(T_center_series[end], T_wall; atol=tol_v01)
 end
 
 @testset "Two-plate one-channel topology — both faces active" begin
     nz_v02 = 10
     nx_v02 = 3
-    T_in_v02 = 313.15
+    T_in_v02 = 40.0
     power_per_plate = 1e4   # W each → 20 kW total to one channel
 
     @named pump_v02 = Pump(3.0e4)
@@ -877,7 +883,7 @@ end
 
     # Assertion 2: energy balance — both plates heat the single channel
     ṁ_v02 = sol_v02[ssys_v02.cac_v02.inlet.ṁ]
-    cp_v02 = cp_water(T_in_v02)
+    cp_v02 = cₚ(H2O, T_in_v02)
     T_rise_expected_v02 = (power_per_plate + power_per_plate) / (ṁ_v02 * cp_v02)
     @test isapprox(
         sol_v02[ssys_v02.cac_v02.T_out] - T_in_v02, T_rise_expected_v02; rtol=0.05
@@ -914,7 +920,7 @@ end
         # steady state (P=1, linearly rising coolant), the same as the reference coupled
         # transients in test_point_kinetics.jl.
         n = 7
-        T_inlet = 293.15
+        T_inlet = 20.0
         ctrl = ReactivityController()
         ssys, ic = build_loop_pk(ctrl; n=n, T_inlet=T_inlet, P0=1.0, power_scale=1e4)
 
@@ -946,7 +952,7 @@ end
         n = 7
         nz = 7
         nx = 2
-        T_inlet = 293.15
+        T_inlet = 20.0
         alpha_neg = -0.1    # strong negative feedback (same magnitude as Python STREAM)
 
         ctrl = ReactivityController()
@@ -981,7 +987,7 @@ end
         # feedback solve_steady is not usable in Julia (it collapses to the trivial P=0 root),
         # so the transient is the honest way to reach the feedback-balanced state.
         n = 7
-        T_inlet = 293.15
+        T_inlet = 20.0
         alpha_neg = -0.1   # strong negative feedback on coolant
 
         ctrl = ReactivityController()
@@ -1009,7 +1015,7 @@ end
         # is a finite vector, and approaches zero at late time
         # (steady state requires net reactivity ≈ 0).
         n = 7
-        T_inlet = 293.15
+        T_inlet = 20.0
         alpha = -0.005   # mild negative feedback — allows some power at late time
         ctrl = ReactivityController()
 

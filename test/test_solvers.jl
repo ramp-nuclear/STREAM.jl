@@ -12,15 +12,15 @@ using STREAM
 
 @testset "Solver wrappers" begin
     @testset "steady_state_guess monotonically increasing" begin
-        T_guess = steady_state_guess(; T_inlet=313.15, Q_wall=1e4, ṁ_guess=0.1, n=10)
+        T_guess = steady_state_guess(; T_inlet=40.0, Q_wall=1e4, ṁ_guess=0.1, n=10)
         @test length(T_guess) == 10
-        @test T_guess[1] > 313.15        # first cell above inlet temperature
+        @test T_guess[1] > 40.0        # first cell above inlet temperature
         @test all(diff(T_guess) .> 0)    # monotonically increasing
     end
 
     @testset "solve_steady returns physical solution" begin
         n = 10
-        T_inlet = 313.15
+        T_inlet = 40.0
         Q_wall = 1.0e4
         ṁ_guess = 0.490  # physics-based estimate for 30 kPa pump, 0.01m pipe
 
@@ -38,19 +38,19 @@ using STREAM
         sol = solve_steady(ssys, op)
         @test sol.retcode == ReturnCode.Success
         @test sol[ssys.ch.T_out] > T_inlet      # outlet > inlet (fluid heated)
-        @test sol[ssys.ch.T_out] < 400.0        # physically reasonable (< 127°C)
+        @test sol[ssys.ch.T_out] < 126.85       # physically reasonable
         @test sol[ssys.ch.inlet.ṁ] > 0     # positive mass flow
     end
 
     @testset "solve_transient returns time-series (callable T_wall step)" begin
-        # Step-change: T_wall jumps from 373.15 to 393.15 at t=10s via callable.
+        # Step-change: T_wall jumps from 100.0 to 120.0 at t=10s via callable.
         n = 10
-        T_inlet = 313.15
+        T_inlet = 40.0
         Q_wall_0 = 1.0e4
         ṁ_guess = 0.490
 
-        T_wall_0 = 373.15
-        T_wall_final = 393.15
+        T_wall_0 = 100.0
+        T_wall_final = 120.0
         t_step = 10.0
         T_wall_step = t -> t < t_step ? T_wall_0 : T_wall_final
 
@@ -108,7 +108,7 @@ using STREAM
         @test isapprox(T_out_pre_step, T_out_initial_steady; rtol=2e-3)
 
         # Settling value: the transient endpoint approaches the T_wall_final steady outlet.
-        # rtol=2e-3 (a few mK on a ~330 K outlet) reflects that 20s of relaxation leaves only
+        # rtol=2e-3 (a few mK on a ~57 °C outlet) reflects that 20s of relaxation leaves only
         # a small residual short of the asymptote for this fast-settling loop; it is far
         # tighter than the 20 K step size, so a wrong settling magnitude would fail.
         @test isapprox(T_ts[end], T_out_final_steady; rtol=2e-3)
@@ -125,7 +125,7 @@ using STREAM
         @named pump = Pump(r * ṁ0)
         @named ine = Inertia(L)
         @named res = Resistor(r)
-        @named hx = HeatExchanger(300.0)
+        @named hx = HeatExchanger(26.85)
         conns = [
             inseries(pump, ine, res, hx, pump)...,
             pump.inlet.p ~ 1.0e5,

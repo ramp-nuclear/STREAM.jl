@@ -15,6 +15,13 @@ When writing or editing Julia code, follow the conventions in `JULIA.md` (repo r
 
 **MUST USE — humanizer for ALL prose.** No text anywhere in this repo should read as AI slop. Every piece of prose you write or edit — inline comments, docstrings, test/`@testset` names, commit messages, and `.md` files — must pass the `/humanizer` skill: no em dashes, no rule-of-three padding, no "AI vocabulary" or promotional/significance filler, plain and specific. Run `/humanizer` over prose before committing it, and over every GitHub comment/PR/issue body before it is shown for posting (see the no-auto-post rule: draft → humanize → show the user → they confirm → post). The whole existing codebase is also slated for a humanizer sweep; until then, at minimum leave any prose you touch cleaner than you found it.
 
+## Units
+
+Temperatures are **Celsius** everywhere: component arguments, connector variables, solution
+values, and correlation inputs. This matches Python STREAM, which is the reference
+implementation. Pressures are Pa, and the per-degree units (`J/(kg·K)`, `W/(m·K)`, `1/K`) are
+unchanged since a degree Celsius and a kelvin are the same size.
+
 ## Project Conventions
 
 - **No GSD jargon in code.** Source, comments, docstrings, and test names never reference GSD phases, plans, or milestone IDs (no `# Phase 55 D-17`, no `test_phase_NN`). Name things for what they are. Test files mirror their source file (see File Structure Standard).
@@ -45,7 +52,10 @@ src/
   STREAM.jl                   # Module entry point: imports, includes, exports only
   geometry.jl                 # PipeGeometry struct + PipeGeometry_rectangular, PipeGeometry_circular
   connectors.jl               # FlowPort, ThermalPort acausal connectors
-  fluids.jl                   # @register_symbolic fluid properties (rho_water, cp_water, mu_water, k_water)
+  substances/
+    liquid.jl                 # AbstractLiquid interface, Liquid snapshot, unicode aliases (ρ, cₚ, μ, κ, β, Tsat)
+    light_water.jl            # LightWater / H2O correlations
+    heavy_water.jl            # HeavyWater / D2O correlations
   components/
     pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
     resistors.jl              # Friction, Gravity, Resistor
@@ -65,7 +75,7 @@ src/
 - New component (single MTK component) → `src/components/` in the most relevant file, or a new file if it's a new domain (e.g. `point_kinetics.jl`, `flapper.jl`)
 - New physical correlation (HTC, friction, etc.) → `src/physical_models/correlations.jl` until that file exceeds ~300 lines, then split into `src/physical_models/htc/` and `src/physical_models/friction/` (mirroring Python STREAM `physical_models/`)
 - New composition helper → `src/composition/helpers.jl`
-- New fluid → `src/fluids/` subfolder (e.g. `src/fluids/light_water.jl`, `src/fluids/heavy_water.jl`) when multi-fluid support is added
+- New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the nine `AbstractLiquid` property methods
 - Build/example helpers → `src/examples.jl` only (never add examples to core files)
 
 ### `test/` — Tests
@@ -75,7 +85,7 @@ test/
   runtests.jl               # Thin orchestrator: one include() per test file, nothing else
   test_geometry.jl          # PipeGeometry
   test_connectors.jl        # FlowPort, ThermalPort
-  test_fluids.jl            # Fluid property functions
+  test_substances.jl        # AbstractLiquid interface, H2O/D2O correlations, Liquid snapshot
   test_channels.jl          # Channel/CHF/CAC variants + _channel_core enthalpy-form physics
                             # + flow-reversal sign safety + subcooled-boiling integration (ISCB)
   test_pump.jl              # Pump

@@ -41,9 +41,9 @@ splices these into its own equation lists before building the `System`.
 
 # Energy balance per cell (enthalpy form, face-averaged cp)
 
-    cp_face = (cp_water(T_up) + cp_water(T[i])) / 2
+    cp_face = (cₚ(liquid, T_up) + cₚ(liquid, T[i])) / 2
     D(T[i]) ~ (|ṁ|*cp_face*(T_up - T[i]) + q_left_expr[i] + q_right_expr[i])
-              / (rho_water(T[i]) * cp_water(T[i]) * A * dz)
+              / (ρ(liquid, T[i]) * cₚ(liquid, T[i]) * A * dz)
 
 """
 function _channel_core(;
@@ -55,7 +55,7 @@ function _channel_core(;
     friction_correlation=blasius_friction,
     q_left_expr, q_right_expr,
     vars,
-    fluid::AbstractFluid=Water(),
+    liquid::AbstractLiquid=H2O,
 )
     Dh = geometry.Dh
     A  = geometry.A
@@ -70,12 +70,12 @@ function _channel_core(;
         T_up_rev = (i == n) ? T_inlet_rev : vars.T[i + 1]
         T_up = ifelse(inlet.ṁ >= 0, T_up_fwd, T_up_rev)
 
-        cp_face = (specific_heat(fluid, T_up) + specific_heat(fluid, vars.T[i])) / 2
+        cp_face = (cₚ(liquid, T_up) + cₚ(liquid, vars.T[i])) / 2
 
         # Use Reynolds directly, not the observable variable, since it may only be observable.
-        Re_i = Re(inlet.ṁ, A, Dh, viscosity(fluid, vars.T[i]))
+        Re_i = Re(inlet.ṁ, A, Dh, μ(liquid, vars.T[i]))
         f_i = friction_correlation(Re_i)
-        Pr_i = Pr(specific_heat(fluid, vars.T[i]), viscosity(fluid, vars.T[i]), conductivity(fluid, vars.T[i]))
+        Pr_i = Pr(cₚ(liquid, vars.T[i]), μ(liquid, vars.T[i]), κ(liquid, vars.T[i]))
         P_i = inlet.p - sum(vars.dp[j] for j in 1:i) + vars.dp[i] / 2
         q_density_i = (q_left_expr[i] + q_right_expr[i]) / (sum(geometry.heated_parts) * dz)
 
@@ -85,17 +85,17 @@ function _channel_core(;
             abs(inlet.ṁ) * cp_face * (T_up - vars.T[i])
               + q_left_expr[i]
               + q_right_expr[i]
-            ) / (density(fluid, vars.T[i]) * specific_heat(fluid, vars.T[i]) * A * dz),
-            vars.dp[i] ~ f_i * (inlet.ṁ * abs(inlet.ṁ) / (2 * density(fluid, vars.T[i]) * A^2)) * (dz / Dh)
-                  + density(fluid, vars.T[i]) * g_acc * dz,
+            ) / (ρ(liquid, vars.T[i]) * cₚ(liquid, vars.T[i]) * A * dz),
+            vars.dp[i] ~ f_i * (inlet.ṁ * abs(inlet.ṁ) / (2 * ρ(liquid, vars.T[i]) * A^2)) * (dz / Dh)
+                  + ρ(liquid, vars.T[i]) * g_acc * dz,
         ]
         cell_obs = Equation[
             vars.Re[i] ~ Re_i,
             vars.Pe[i] ~ Re_i * Pr_i,
-            vars.v[i] ~ inlet.ṁ / (density(fluid, vars.T[i]) * A),
+            vars.v[i] ~ inlet.ṁ / (ρ(liquid, vars.T[i]) * A),
             vars.P[i]     ~ P_i,
-            vars.T_sat[i] ~ sat_temperature(P_i),
-            vars.T_ONB[i] ~ sat_temperature(P_i) + _bergles_rohsenow_dT_ONB(P_i, q_density_i),
+            vars.T_sat[i] ~ Tsat(liquid, P_i),
+            vars.T_ONB[i] ~ Tsat(liquid, P_i) + _bergles_rohsenow_dT_ONB(P_i, q_density_i),
             vars.q_wall_left[i]  ~ q_left_expr[i],
             vars.q_wall_right[i] ~ q_right_expr[i],
             vars.q_wall[i]       ~ q_left_expr[i] + q_right_expr[i],
@@ -192,12 +192,12 @@ A `WallTemperature` source can be used as a closure, for example.
   MTK callable parameter pattern; user must pass `ch.h_left_fn => fn` in solve `op` dict);
   default `0.0` per-side ⇒ adiabatic.
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
-- `fluid`: coolant property set (`AbstractFluid`), default `Water()`. Pass a `ConstantFluid`
-  to drive the energy balance, friction, and dimensionless observables with fixed properties.
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). Pass a [`Liquid`](@ref) to
+  drive the energy balance, friction, and dimensionless observables with fixed properties.
 
 # External-input variables
-- `T_wall_left(t)[1:n]`: per-cell left-face wall temperature [K]
-- `T_wall_right(t)[1:n]`: per-cell right-face wall temperature [K]
+- `T_wall_left(t)[1:n]`: per-cell left-face wall temperature [°C]
+- `T_wall_right(t)[1:n]`: per-cell right-face wall temperature [°C]
 
 These have no internal equation. Close them via either of:
 ```julia
@@ -227,7 +227,7 @@ function Channel(;
     h_left::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
     h_right::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
     friction_correlation=blasius_friction,
-    fluid::AbstractFluid=Water(),
+    liquid::AbstractLiquid=H2O,
 )
     pars_base, varstruct, inlet, outlet = _setup(geometry, g, n)
 
@@ -279,7 +279,7 @@ function Channel(;
         g_acc=g, friction_correlation=friction_correlation,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
         vars=varstruct,
-        fluid=fluid,
+        liquid=liquid,
     )
 
     eqs = core.eqs        # NO variant_eqs — there is no port-Q closure
@@ -308,7 +308,7 @@ Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource
 - `geometry`: pipe geometry descriptor (`PipeGeometry`)
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
-- `fluid`: coolant property set (`AbstractFluid`), default `Water()`.
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref).
 
 # External-input variables
 - `q_left(t)[1:n]`: per-cell left-face heat flux density [W/m^2]
@@ -340,7 +340,7 @@ function ChannelHeatFlux(;
     geometry::PipeGeometry,
     g=0.0,
     friction_correlation=blasius_friction,
-    fluid::AbstractFluid=Water(),
+    liquid::AbstractLiquid=H2O,
 )
     pars, varstruct, inlet, outlet = _setup(geometry, g, n)
     dz = geometry.L / n
@@ -365,7 +365,7 @@ function ChannelHeatFlux(;
         g_acc=g, friction_correlation=friction_correlation,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
         vars=varstruct,
-        fluid=fluid,
+        liquid=liquid,
     )
 
     eqs = core.eqs
@@ -380,29 +380,29 @@ function ChannelHeatFlux(;
 end
 
 
-function _nu_film(T_film::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function)
-    Re = STREAM.Re(ṁ, A, Dh, mu_water(T_film))
-    Pr = STREAM.Pr(cp_water(T_film), mu_water(T_film), k_water(T_film))
+function _nu_film(T_film::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function, liquid)
+    Re = STREAM.Re(ṁ, A, Dh, μ(liquid, T_film))
+    Pr = STREAM.Pr(cₚ(liquid, T_film), μ(liquid, T_film), κ(liquid, T_film))
     return nu_f(Re, Pr)
 end
 
-function _nu_film(T_w::Real, T::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function)
+function _nu_film(T_w::Real, T::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function, liquid)
     T_film   = (T_w + T) / 2
     nupartial(Re, Pr) = nu_f(Re, Pr, T_w, T)
-    return _nu_film(T_film, ṁ, Dh, A, nupartial)
+    return _nu_film(T_film, ṁ, Dh, A, nupartial, liquid)
 end
 
-function _h_spl(T_w::Real, T::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function)
+function _h_spl(T_w::Real, T::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function, liquid)
     T_film   = (T_w + T) / 2
     # Route through the (T_w, T)-aware `_nu_film` so strict 4-arg correlations
     # (e.g. `regime_dependent` with NC switching) receive `(Re, Pr, T_w, T)`.
     # Simple `(Re, Pr, args...)` correlations absorb the extra temps unchanged.
-    return _nu_film(T_w, T, ṁ, Dh, A, nu_f) * k_water(T_film) / Dh
+    return _nu_film(T_w, T, ṁ, Dh, A, nu_f, liquid) * κ(liquid, T_film) / Dh
 end
 
 
-function _h_eq_nocor(Tw::Real, T::Real, ṁ::Real, Dh::Real, A::Real, htc, nu_f::Function)
-    return htc ~ _h_spl(Tw, T, ṁ, Dh, A, nu_f)
+function _h_eq_nocor(Tw::Real, T::Real, ṁ::Real, Dh::Real, A::Real, htc, nu_f::Function, liquid)
+    return htc ~ _h_spl(Tw, T, ṁ, Dh, A, nu_f, liquid)
 end
 
 
@@ -413,12 +413,12 @@ function _h_eq_scb_cor(
     dp::Real,
     htc,
     ṁ::Real,
-                       P_in::Real, Dh::Real, A::Real, nu_f::Function, scb_f::Function)
-    h_spl = _h_spl(T_w, T, ṁ, Dh, A, nu_f)
+                       P_in::Real, Dh::Real, A::Real, nu_f::Function, scb_f::Function, liquid)
+    h_spl = _h_spl(T_w, T, ṁ, Dh, A, nu_f, liquid)
     q_spl = max(h_spl * (T_w - T), 0.0)
     P = P_in - cumdp + dp/2
-    T_sat = sat_temperature(P)
-    Re = STREAM.Re(ṁ, A, Dh, mu_water(T))
+    T_sat = Tsat(liquid, P)
+    Re = STREAM.Re(ṁ, A, Dh, μ(liquid, T))
     q_scb  = scb_f(T_w, T_sat, Re)
     T_ONB  = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
     q_scb_inc  = scb_f(T_ONB, T_sat, Re)
@@ -451,9 +451,8 @@ The wall temperature is connected through thermal port arrays.
   e.g. from `regime_dependent_q_scb(pressure=...)`. When provided, `h_tc[i]` is enhanced
   by the Bergles-Rohsenow partial boiling factor when `T_wall[i] >= T_ONB[i]`.
   Default `nothing` (pure single-phase).
-- `fluid`: coolant property set (`AbstractFluid`), default `Water()`. It drives the energy
-  balance, friction, and dimensionless observables; the HTC correlation and Grashof term
-  stay water-based.
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). It drives the energy balance,
+  friction, the HTC correlation, and the dimensionless observables.
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort`
@@ -467,7 +466,7 @@ function ChannelAndContacts(;
     htc_correlation=dittus_boelter,
     friction_correlation=blasius_friction,
     scb_correction=nothing,
-    fluid::AbstractFluid=Water(),
+    liquid::AbstractLiquid=H2O,
 )
 
     pars, vars, inlet, outlet = _setup(geometry, g, n)
@@ -504,6 +503,7 @@ function ChannelAndContacts(;
                     A,
                     h_tc_left[i],
                     htc_correlation,
+                    liquid,
                 )
              for i in 1:n]...;
             [
@@ -515,6 +515,7 @@ function ChannelAndContacts(;
                     A,
                     h_tc_right[i],
                     htc_correlation,
+                    liquid,
                 )
              for i in 1:n]...
         ]
@@ -529,6 +530,7 @@ function ChannelAndContacts(;
                     A,
                     htc_correlation,
                     scb_correction,
+                    liquid,
                 )
                            for i in 1:n]...;
             [_h_eq_scb_cor(thermal_right[i].T, vars.T[i], sum(vars.dp[j] for j in 1:i),
@@ -540,6 +542,7 @@ function ChannelAndContacts(;
                     A,
                     htc_correlation,
                     scb_correction,
+                    liquid,
                 )
                            for i in 1:n]...;
         ]
@@ -560,21 +563,21 @@ function ChannelAndContacts(;
         g_acc=g, friction_correlation=friction_correlation,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
         vars=vars,
-        fluid=fluid,
+        liquid=liquid,
     )
 
-    Re_bulk = [Re(inlet.ṁ, A, Dh, mu_water(vars.T[i])) for i in 1:n]
-    Gr_left  = [Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_left[i].T ,  vars.T[i], Dh, g) for i in 1:n]
-    Gr_right = [Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_right[i].T , vars.T[i], Dh, g) for i in 1:n]
+    Re_bulk = [Re(inlet.ṁ, A, Dh, μ(liquid, vars.T[i])) for i in 1:n]
+    Gr_left  = [Gr(ρ(liquid, vars.T[i]), μ(liquid, vars.T[i]), β(liquid, vars.T[i]), thermal_left[i].T ,  vars.T[i], Dh, g) for i in 1:n]
+    Gr_right = [Gr(ρ(liquid, vars.T[i]), μ(liquid, vars.T[i]), β(liquid, vars.T[i]), thermal_right[i].T , vars.T[i], Dh, g) for i in 1:n]
     variant_obs = [
         [
             Nu_left[i] ~ _nu_film(
-                thermal_left[i].T, vars.T[i], inlet.ṁ, Dh, A, htc_correlation
+                thermal_left[i].T, vars.T[i], inlet.ṁ, Dh, A, htc_correlation, liquid
             )
          for i in 1:n]...;
         [
             Nu_right[i] ~ _nu_film(
-                thermal_right[i].T, vars.T[i], inlet.ṁ, Dh, A, htc_correlation
+                thermal_right[i].T, vars.T[i], inlet.ṁ, Dh, A, htc_correlation, liquid
             )
          for i in 1:n]...;
         [vars.T_wall_left[i] ~ thermal_left[i].T for i in 1:n]...;

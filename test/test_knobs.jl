@@ -30,10 +30,10 @@ function _knob_fluid(D_in; name)
     @variables Tf(t) qf(t) Twf(t) A(t)
     area = pi * D_in^2 / 4
     dh = D_in
-    Re = abs(0.3) * dh / (area * mu_water(Tf))
-    Pr = cp_water(Tf) * mu_water(Tf) / k_water(Tf)
-    h = 0.023 * Re^0.8 * Pr^0.4 * k_water(Tf) / dh
-    System([D(Tf) ~ 0.3 * cp_water(Tf) * (320.0 - Tf) + qf, qf ~ h * area * (Twf - Tf),
+    Re = abs(0.3) * dh / (area * μ(H2O, Tf))
+    Pr = cₚ(H2O, Tf) * μ(H2O, Tf) / κ(H2O, Tf)
+    h = 0.023 * Re^0.8 * Pr^0.4 * κ(H2O, Tf) / dh
+    System([D(Tf) ~ 0.3 * cₚ(H2O, Tf) * (46.85 - Tf) + qf, qf ~ h * area * (Twf - Tf),
             A ~ area], t, [Tf, qf, Twf, A], []; name)
 end
 function _knob_solid(D_out; name)
@@ -55,8 +55,8 @@ end
     @test length(ps) == 1
     @test string(only(ps)) == "outer_d"
 
-    guesses = Pair[ssys.fluid.Tf => 330, ssys.solid.Ts => 360, ssys.fluid.Twf => 350,
-                   ssys.fluid.qf => 1500, ssys.solid.Tw => 350, ssys.solid.q => 1500]
+    guesses = Pair[ssys.fluid.Tf => 56.85, ssys.solid.Ts => 86.85, ssys.fluid.Twf => 76.85,
+                   ssys.fluid.qf => 1500, ssys.solid.Tw => 76.85, ssys.solid.q => 1500]
 
     # runs on the declared default with no knob supplied beyond knob_defaults
     op = [knob_defaults([outer_d]); guesses]
@@ -78,7 +78,7 @@ end
 # solve. Scanning it is rebuild-free (the system is compiled once).
 @testset "flagship: one knob scans CAC geometry + fuel plate, coupled solve" begin
     nz, nx = 10, 3
-    T_in = 313.15
+    T_in = 40.0
     gap = @design_knob gap = 0.00127
     geom = PipeGeometry_rectangular(0.6, 0.07, gap, 0.07)   # channel gap = knob
 
@@ -108,7 +108,7 @@ end
     # the gap is one shared knob across both channels and the plate
     @test count(p -> occursin("gap", string(p)), parameters(ssys)) == 1
 
-    T_w = 315.0
+    T_w = 41.85
     baseop(gv) = vcat(
         Pair[gap => gv],
         [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
@@ -149,7 +149,7 @@ end
         Q_ch = s[ssys.cac_l.Q_wall_total]
         ṁ = s[ssys.cac_l.inlet.ṁ]
         T_out = s[ssys.cac_l.T_out]
-        cp = cp_water((T_in + T_out) / 2)
+        cp = cₚ(H2O, (T_in + T_out) / 2)
         @test isapprox(T_out - T_in, Q_ch / (ṁ * cp); rtol=0.02)
     end
 

@@ -2,15 +2,15 @@
 # build_loop, build_loop_vertical, build_loop_transient, build_cube
 
 """
-    build_loop(; n=10, T_inlet=313.15, T_wall=373.15, h_wall=5000.0,
+    build_loop(; n=10, T_inlet=40.0, T_wall=100.0, h_wall=5000.0,
                  L_ch=0.6, D_ch=0.01, dP_pump=3.0e4) -> System
 
 Build a simple steady-state horizontal flow loop (Pump + HeatExchanger + Channel).
 
 # Arguments
 - `n`: number of axial cells (default 10)
-- `T_inlet`: inlet temperature [K] (default 313.15)
-- `T_wall`: wall temperature [K] (default 373.15)
+- `T_inlet`: inlet temperature [°C] (default 40.0)
+- `T_wall`: wall temperature [°C] (default 100.0)
 - `h_wall`: convective HTC [W/(m²K)] applied on the left face (default 5000.0)
 - `L_ch`: channel length [m] (default 0.6)
 - `D_ch`: channel diameter [m] (default 0.01)
@@ -24,8 +24,8 @@ function build_loop(;
     L_ch=0.6,
     D_ch=0.01,
     dP_pump=3.0e4,
-    T_inlet=313.15,  # coolant inlet temperature (K); 40°C
-    T_wall=373.15,  # wall temperature (K); ~100°C for forced convection
+    T_inlet=40.0,  # coolant inlet temperature [°C]
+    T_wall=100.0,  # wall temperature [°C], typical for forced convection
     h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
 )
     @named pump = Pump(dP_pump)
@@ -47,7 +47,7 @@ function build_loop(;
 end
 
 """
-    build_loop_vertical(; n=10, T_inlet=313.15, T_wall=373.15, h_wall=5000.0,
+    build_loop_vertical(; n=10, T_inlet=40.0, T_wall=100.0, h_wall=5000.0,
                          L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
                          g_acc=G_EARTH, H_return=nothing) -> System
 
@@ -55,8 +55,8 @@ Build a vertical flow loop with gravity (Pump + HeatExchanger + Channel + Gravit
 
 # Arguments
 - `n`: number of axial cells (default 10)
-- `T_inlet`: inlet temperature [K] (default 313.15)
-- `T_wall`: wall temperature [K] (default 373.15)
+- `T_inlet`: inlet temperature [°C] (default 40.0)
+- `T_wall`: wall temperature [°C] (default 100.0)
 - `h_wall`: convective HTC [W/(m²K)] applied on the left face (default 5000.0)
 - `L_ch`: channel length [m] (default 0.6)
 - `D_ch`: channel diameter [m] (default 0.01)
@@ -72,8 +72,8 @@ function build_loop_vertical(;
     L_ch=0.6,
     D_ch=0.01,
     dP_pump=3.0e4,
-    T_inlet=313.15,  # coolant inlet temperature (K); 40°C
-    T_wall=373.15,  # wall temperature (K); ~100°C for forced convection
+    T_inlet=40.0,  # coolant inlet temperature [°C]
+    T_wall=100.0,  # wall temperature [°C], typical for forced convection
     h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
     g_acc=G_EARTH,  # gravitational acceleration (m/s²)
     H_return=nothing,  # height of return leg (m); defaults to L_ch for cancellation geometry
@@ -102,7 +102,7 @@ function build_loop_vertical(;
 end
 
 """
-    build_loop_transient(; n=10, T_inlet=313.15, T_wall_0=373.15, h_wall=5000.0,
+    build_loop_transient(; n=10, T_inlet=40.0, T_wall_0=100.0, h_wall=5000.0,
                           L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
                           T_wall_fn=nothing) -> System
 
@@ -117,8 +117,8 @@ When using a callable `T_wall_fn`, the caller must include the callable paramete
 
 # Arguments
 - `n`: number of axial cells (default 10)
-- `T_inlet`: inlet temperature [K] (default 313.15)
-- `T_wall_0`: wall temperature [K] (default 373.15); used when `T_wall_fn` is `nothing`
+- `T_inlet`: inlet temperature [°C] (default 40.0)
+- `T_wall_0`: wall temperature [°C] (default 100.0); used when `T_wall_fn` is `nothing`
 - `h_wall`: convective HTC [W/(m²K)] applied on the left face (default 5000.0)
 - `L_ch`: channel length [m] (default 0.6)
 - `D_ch`: channel diameter [m] (default 0.01)
@@ -133,8 +133,8 @@ function build_loop_transient(;
     L_ch=0.6,
     D_ch=0.01,
     dP_pump=3.0e4,
-    T_inlet=313.15,  # coolant inlet temperature (K); 40°C
-    T_wall_0=373.15,  # wall temperature (K); used when T_wall_fn is nothing
+    T_inlet=40.0,  # coolant inlet temperature [°C]
+    T_wall_0=100.0,  # wall temperature [°C], used when T_wall_fn is nothing
     h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
     T_wall_fn=nothing,  # optional callable (t) -> K for time-varying wall temperature
 )
@@ -242,7 +242,7 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
 end
 
 """
-    build_loop_lof_bypass(; n=10, L_ch=1.0, D_ch=0.01, T_inlet=313.15,
+    build_loop_lof_bypass(; n=10, L_ch=1.0, D_ch=0.01, T_inlet=40.0,
                             power_W=1.0e3, fuel_nx=2, fuel_Lx=0.005,
                             L_over_A=1.75e5, g_acc=G_EARTH,
                             R_ext=1.0e6, dt_ramp=5.0) -> System
@@ -292,7 +292,7 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
 - `n`: number of axial cells (default 10)
 - `L_ch`: channel length [m] (default 1.0)
 - `D_ch`: channel hydraulic diameter [m] (default 0.01)
-- `T_inlet`: inlet/HeatExchanger boundary temperature [K] (default 313.15)
+- `T_inlet`: inlet/HeatExchanger boundary temperature [°C] (default 40.0)
 - `power_W`: total fuel-plate heat input [W], pinned via `heated.fuel.power ~ power_W`
   (default 1.0e3, an NC-equilibrium-producing baseline)
 - `fuel_nx`: lateral cells in the HeatDiffusion plate (default 2)
@@ -313,7 +313,7 @@ function build_loop_lof_bypass(;
     n::Int=10,
     L_ch=1.0,
     D_ch=0.01,
-    T_inlet=313.15,
+    T_inlet=40.0,
     power_W=1.0e3,
     fuel_nx=2,
     fuel_Lx=0.005,
@@ -410,7 +410,7 @@ function _resolve_tw(d, rods_cac, rods_fuel)
 end
 
 """
-    build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=293.15, dP_pump=3.0e4,
+    build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, dP_pump=3.0e4,
                   P0=1.0, power_scale=1e4, temp_worth=nothing, ref_temp=nothing,
                   rho_val=0.0) -> (System, Vector{Pair{Any,Any}})
 
@@ -432,7 +432,7 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 - `n::Int`: number of axial cells in `ChannelAndContacts` (default 7)
 - `nz::Int`: number of axial slices in `HeatDiffusion` (default 7)
 - `nx::Int`: number of lateral slices in `HeatDiffusion` (default 2)
-- `T_inlet`: coolant inlet temperature [K] (default 293.15)
+- `T_inlet`: coolant inlet temperature [°C] (default 20.0)
 - `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
 - `P0`: initial reactor power [dimensionless or W] passed to
   `point_kinetics_steady_state(P0)` for IC generation (default 1.0)
@@ -443,7 +443,7 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
   1D vector (length `n` for `:cac`), or 2D matrix (shape `nz×nx` for `:fuel`)
   reactivity coefficients. Keys are internally resolved to scoped component
   references inside `symmetric_plate`. `nothing` = no temperature feedback.
-- `ref_temp`: per-component reference temperatures [K]. Same key structure as
+- `ref_temp`: per-component reference temperatures [°C]. Same key structure as
   `temp_worth`. `nothing` = use zero reference (full T contributes to feedback).
 - `rho_val`: constant base reactivity bias [-] (default 0.0 = critical)
 
@@ -458,7 +458,7 @@ function build_loop_pk(ctrl;
     n::Int=7,
     nz::Int=7,
     nx::Int=2,
-    T_inlet=293.15,
+    T_inlet=20.0,
     dP_pump=3.0e4,
     P0=1.0,
     power_scale=1e4,

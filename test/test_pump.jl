@@ -9,7 +9,7 @@ using STREAM: Pump, Channel
     @named pump = Pump(; ṁ0=0.6)
     @test_nowarn mtkcompile(pump; fully_determined=false)
     @named pump5 = Pump(; ṁ0=0.6)
-    @named bc5 = HeatExchanger(313.15)
+    @named bc5 = HeatExchanger(40.0)
     @named ch5 = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns5 = [
         inseries(pump5, bc5, ch5, pump5)...,
@@ -18,7 +18,7 @@ using STREAM: Pump, Channel
     @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
     ssys5 = mtkcompile(sys5; fully_determined=false)
     op5 = Pair{Any,Any}[ssys5.ch5.inlet.ṁ => 0.6]
-    append!(op5, [ssys5.ch5.T[i] => 313.15 for i in 1:5])
+    append!(op5, [ssys5.ch5.T[i] => 40.0 for i in 1:5])
     sol5 = solve_steady(ssys5, op5)
     @test sol5.retcode == ReturnCode.Success
     @test isapprox(sol5[ssys5.pump5.inlet.ṁ], 0.6; rtol=1e-4)
@@ -35,7 +35,7 @@ end
     @named p_real = Pump(dP_scalar)
     @test p_real isa ModelingToolkit.System
     @named res_real = Resistor(R_val)
-    @named hx_real = HeatExchanger(313.15)
+    @named hx_real = HeatExchanger(40.0)
     conns_real = [
         inseries(p_real, hx_real, res_real, p_real)...,
         p_real.inlet.p ~ 1.0e5,
@@ -61,7 +61,7 @@ end
     @named p_fn = Pump(dP_call)
     @test p_fn isa ModelingToolkit.System
     @named res_fn = Resistor(R_val)
-    @named hx_fn = HeatExchanger(313.15)
+    @named hx_fn = HeatExchanger(40.0)
     conns_fn = [
         inseries(p_fn, hx_fn, res_fn, p_fn)...,
         p_fn.inlet.p ~ 1.0e5,
@@ -89,7 +89,7 @@ end
     @named p_ṁ = Pump(; ṁ0=ṁ_set)
     @test p_ṁ isa ModelingToolkit.System
     @named res_m = Resistor(R_val)
-    @named hx_m = HeatExchanger(313.15)
+    @named hx_m = HeatExchanger(40.0)
     conns_m = [
         inseries(p_ṁ, hx_m, res_m, p_ṁ)...,
         p_ṁ.inlet.p ~ 1.0e5,
@@ -108,7 +108,7 @@ end
     @test_nowarn mtkcompile(pump_s; fully_determined=false)
 
     @named pump_r = Pump(3.0e4)
-    @named bc_r = HeatExchanger(313.15)
+    @named bc_r = HeatExchanger(40.0)
     @named ch_r = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns_r = [
         inseries(pump_r, bc_r, ch_r, pump_r)...,
@@ -116,7 +116,7 @@ end
     ]
     @named sys_r = compose(System(conns_r, t; name=:pump02_loop), pump_r, bc_r, ch_r)
     ssys_r = mtkcompile(sys_r; fully_determined=false)
-    op_r = [ssys_r.ch_r.T[i] => 313.15 for i in 1:5]
+    op_r = [ssys_r.ch_r.T[i] => 40.0 for i in 1:5]
     push!(op_r, ssys_r.ch_r.inlet.ṁ => 0.490)
     sol_r = solve_steady(ssys_r, op_r)
     @test sol_r.retcode == ReturnCode.Success
@@ -147,7 +147,7 @@ end
     @named pump = Pump(dP_fn)
     @named ine = Inertia(L_over_A)
     @named res = Resistor(R_val)
-    @named hx = HeatExchanger(313.15)
+    @named hx = HeatExchanger(40.0)
 
     # Closed loop: pump -> inertia -> resistor -> heat exchanger -> pump. The heat exchanger pins
     # the loop temperature (a bare hydraulics-only loop has degenerate circular instream temps) and

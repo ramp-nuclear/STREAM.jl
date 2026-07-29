@@ -31,7 +31,7 @@ end
 # #### Public API
 
 """
-    bergles_rohsenow_t_onb(pressure, q_wall, T_sat) -> T_ONB [K]
+    bergles_rohsenow_t_onb(pressure, q_wall, T_sat) -> T_ONB [°C]
 
 Onset of Nucleate Boiling wall temperature using Bergles-Rohsenow (1964) correlation.
 Thin wrapper around the private `_bergles_rohsenow_dT_ONB` helper in correlations.jl.
@@ -44,10 +44,10 @@ Source: Python STREAM temperatures.py `bergles_rohsenow_t_onb`.
 # Arguments
 - `pressure`: absolute system pressure [Pa]
 - `q_wall`: wall heat flux [W/m^2]
-- `T_sat`: saturation temperature [K]
+- `T_sat`: saturation temperature [°C]
 
 # Returns
-Wall temperature at onset of nucleate boiling `T_ONB` [K].
+Wall temperature at onset of nucleate boiling `T_ONB` [°C].
 """
 function bergles_rohsenow_t_onb(pressure, q_wall, T_sat)
     return T_sat + _bergles_rohsenow_dT_ONB(pressure, q_wall)
@@ -65,8 +65,8 @@ Source: Python STREAM thresholds.py `boiling_power`.
 
 # Arguments
 - `ṁ`: mass flow rate [kg/s] (sign-insensitive; uses `abs(ṁ)`)
-- `T_sat`: saturation temperature [K]
-- `T_inlet`: coolant inlet temperature [K]
+- `T_sat`: saturation temperature [°C]
+- `T_inlet`: coolant inlet temperature [°C]
 - `cp`: specific heat at inlet temperature [J/(kg·K)]
 
 # Returns
@@ -92,17 +92,17 @@ Source: Python STREAM thresholds.py `Whittle_Forgan_OFI`.
 
 # Arguments
 - `ṁ`: mass flow rate [kg/s] (sign-insensitive; uses `abs(ṁ)`)
-- `T_sat`: saturation temperature [K]
-- `T_inlet`: coolant inlet temperature [K]
+- `T_sat`: saturation temperature [°C]
+- `T_inlet`: coolant inlet temperature [°C]
 - `pipe`: channel geometry [`PipeGeometry`]
 
 # Returns
 OFI limit power `Q_OFI` [W].
 """
-function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe)
+function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=H2O)
     G = abs(ṁ) / pipe.A
     G_cgs = G / 10  # SI to CGS conversion (G must be in CGS per Whittle-Forgan)
-    integral_cp, _ = quadgk(cp_water, T_inlet, T_sat)
+    integral_cp, _ = quadgk(T -> cₚ(liquid, T), T_inlet, T_sat)
     return abs(ṁ) * integral_cp / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
 end
 
@@ -124,7 +124,7 @@ When `flux_shape` is `nothing`, uniform flux is assumed (all flux values equal; 
 Source: Python STREAM thresholds.py `Saha_Zuber_OSV_computed_bulk`.
 
 # Arguments
-- `T_inlet`: coolant inlet temperature [K]
+- `T_inlet`: coolant inlet temperature [°C]
 - `ṁ`: mass flow rate [kg/s]
 - `pipe`: channel geometry [`PipeGeometry`]
 - `flux_shape`: optional axial heat flux distribution vector (freely normalized); default: uniform
@@ -141,26 +141,27 @@ function q_OSV_saha_zuber(
     flux_shape=nothing,
     dz=nothing,
     flux_enworse=1.0,
+    liquid::AbstractLiquid=H2O,
 )
     # Coolant properties at inlet temperature
-    rho = rho_water(T_inlet)
-    cp = cp_water(T_inlet)
-    k = k_water(T_inlet)
+    rho = ρ(liquid, T_inlet)
+    cp = cₚ(liquid, T_inlet)
+    k_l = κ(liquid, T_inlet)
     G = abs(ṁ) / pipe.A
     u = G / rho
     # Peclet number
-    pe = rho * u * pipe.Dh * cp / k
+    pe = rho * u * pipe.Dh * cp / k_l
 
     # Saha-Zuber coefficient X
     Nu_c = 455.0
     St_c = 0.0065
     if pe <= 7e4
-        X = k / pipe.Dh * Nu_c
+        X = k_l / pipe.Dh * Nu_c
     else
         X = St_c * G * cp
     end
 
-    T_sat_est = sat_temperature(1e5)  # use 1 atm default for self-consistent bulk
+    T_sat_est = Tsat(liquid, 1e5)  # use 1 atm default for self-consistent bulk
 
     # Handle uniform vs provided flux shape
     n_cells = flux_shape === nothing ? 10 : length(flux_shape)
@@ -185,7 +186,7 @@ function q_OSV_saha_zuber(
 end
 
 """
-    q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity; rho_l=958.4, rho_v=0.598, hfg=2257e3, sigma=0.059, cp_sat=4217.0, T_sat=373.15) -> q_CHF [W/m^2]
+    q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity; rho_l=958.4, rho_v=0.598, hfg=2257e3, sigma=0.059, cp_sat=4217.0, T_sat=100.0) -> q_CHF [W/m^2]
 
 Critical Heat Flux (CHF) per Sudo-Kaminaga (1998) correlation for plate-type fuel.
 
@@ -201,7 +202,7 @@ Uses `pipe.width` (NOT `heated_perimeter/2`) for q3 per Mishima's experiments.
 Source: Python STREAM thresholds.py `sudo_kaminaga_chf`.
 
 # Arguments
-- `T_bulk`: bulk coolant temperature [K] (scalar, at inlet cell)
+- `T_bulk`: bulk coolant temperature [°C] (scalar, at inlet cell)
 - `ṁ`: mass flow rate [kg/s]
 - `pipe`: channel geometry [`PipeGeometry`]
 - `gravity`: gravitational acceleration [m/s^2] (sign: positive = upward-to-downward, negative = upward flow)
@@ -210,7 +211,7 @@ Source: Python STREAM thresholds.py `sudo_kaminaga_chf`.
 - `hfg`: latent heat of vaporization [J/kg] (default: 2257e3)
 - `sigma`: surface tension [N/m] (default: 0.059)
 - `cp_sat`: specific heat at saturation [J/(kg·K)] (default: 4217.0)
-- `T_sat`: saturation temperature [K] (default: 373.15)
+- `T_sat`: saturation temperature [°C] (default: 100.0)
 
 # Returns
 CHF heat flux `q_CHF` [W/m^2].
@@ -225,7 +226,7 @@ function q_CHF_sudo_kaminaga(
     hfg=2257e3,
     sigma=0.059,
     cp_sat=4217.0,
-    T_sat=373.15,
+    T_sat=100.0,
 )
     g_abs = abs(gravity)
     drho = rho_l - rho_v
@@ -268,8 +269,8 @@ Formula: `q_CHF = 1.51e6 * (1 + 0.1198*v) * (1 + 0.00914*(T_sat - T_bulk)) * (1 
 Source: Python STREAM thresholds.py `mirshak_chf`.
 
 # Arguments
-- `T_bulk`: bulk coolant temperature [K]
-- `T_sat`: saturation temperature [K]
+- `T_bulk`: bulk coolant temperature [°C]
+- `T_sat`: saturation temperature [°C]
 - `pressure`: system pressure [Pa]
 - `v`: coolant flow velocity [m/s]
 
@@ -294,8 +295,8 @@ Formula: `q_CHF = 1e7 * Dh * (0.023*(T_sat - T_inlet) + 4.56)`
 Source: Python STREAM thresholds.py `fabrega_chf`.
 
 # Arguments
-- `T_inlet`: coolant bulk temperature at inlet [K]
-- `T_sat`: saturation temperature [K]
+- `T_inlet`: coolant bulk temperature at inlet [°C]
+- `T_sat`: saturation temperature [°C]
 - `pipe`: channel geometry [`PipeGeometry`] (uses `pipe.Dh`)
 
 # Returns
@@ -306,22 +307,30 @@ function q_CHF_fabrega(T_inlet, T_sat, pipe)
 end
 
 """
-    twall_limit(T_wall, inhomogeneity_factor=1.0) -> T_limit [K]
+    twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0) -> T_limit [°C]
 
-Effective wall temperature limit accounting for spatial inhomogeneity.
+Wall temperature the face would reach if the local heat flux were worse by
+`inhomogeneity_factor`.
 
-Formula: `T_limit = T_wall * inhomogeneity_factor`
+Formula: `T_limit = T_bulk + inhomogeneity_factor * (T_wall - T_bulk)`
 
-Used to adjust the nominal wall temperature by a multiplier that accounts
-for hot-spot factors, burnup inhomogeneities, or manufacturing tolerances.
+The physical solution does not know about fuel inhomogeneity, so the measured wall
+temperature understates the hot spot. Scaling the flux by the factor and re-reading the
+wall temperature off Newton's law is what gives the limit to check against.
+
+Source: Python STREAM analysis/thresholds.py `twall_limit`, which computes
+`T_bulk + q * inhomogeneity_factor / h` per face. Since the channel components define
+`q = h * (T_wall - T_bulk)`, the `h` divides out and leaves the form above, so this needs
+no heat transfer coefficient of its own.
 
 # Arguments
-- `T_wall`: nominal wall temperature [K]
-- `inhomogeneity_factor`: dimensionless multiplier (default: 1.0, no correction)
+- `T_bulk`: bulk coolant temperature [°C]
+- `T_wall`: wall temperature on the face being checked [°C]
+- `inhomogeneity_factor`: dimensionless flux multiplier (default: 1.0, no correction)
 
 # Returns
-Effective wall temperature limit `T_limit` [K].
+Effective wall temperature limit `T_limit` [°C].
 """
-function twall_limit(T_wall, inhomogeneity_factor=1.0)
-    return T_wall * inhomogeneity_factor
+function twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0)
+    return T_bulk + inhomogeneity_factor * (T_wall - T_bulk)
 end

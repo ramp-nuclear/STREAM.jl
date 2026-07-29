@@ -23,29 +23,29 @@ using STREAM
         # Smoke: demonstrate the full `build_loop` API produces a working transient.
         ssys = build_loop()
         ic = Pair{Any,Any}[
-            [ssys.ch.T[i] => 313.15 for i in 1:10]...,
+            [ssys.ch.T[i] => 40.0 for i in 1:10]...,
             ssys.ch.inlet.ṁ => 0.5,
         ]
         sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
         @test sol.retcode == ReturnCode.Success
-        @test sol[ssys.ch.T_out, end] > 313.15  # heating worked
+        @test sol[ssys.ch.T_out, end] > 40.0  # heating worked
     end
 
     @testset "build_loop_vertical compiles + briefly solves" begin
         ssys = build_loop_vertical()
         ic = Pair{Any,Any}[
-            [ssys.ch.T[i] => 313.15 for i in 1:10]...,
+            [ssys.ch.T[i] => 40.0 for i in 1:10]...,
             ssys.ch.inlet.ṁ => 0.5,
         ]
         sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
         @test sol.retcode == ReturnCode.Success
-        @test sol[ssys.ch.T_out, end] > 313.15
+        @test sol[ssys.ch.T_out, end] > 40.0
     end
 
     @testset "build_loop_transient compiles + briefly solves" begin
         ssys = build_loop_transient()
         ic = Pair{Any,Any}[
-            [ssys.ch.T[i] => 313.15 for i in 1:10]...,
+            [ssys.ch.T[i] => 40.0 for i in 1:10]...,
             ssys.ch.inlet.ṁ => 0.5,
         ]
         sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
@@ -101,7 +101,7 @@ end
     BYPASS_N = 10
     BYPASS_L_CH = 1.0
     BYPASS_D_CH = 0.01
-    BYPASS_T_INLET = 313.15
+    BYPASS_T_INLET = 40.0
     BYPASS_G_ACC = G_EARTH
     BYPASS_L_OVER_A = 1.75e5
     BYPASS_R_EXT = 1.0e6
@@ -156,7 +156,7 @@ end
         # through ext_res (R_ext), so ṁ ~ dP_pre / R_ext, and the coolant warms by
         # power_W / (ṁ * cp) across the channel.
         ṁ_guess = BYPASS_DP_PRE / BYPASS_R_EXT
-        cp = cp_water(BYPASS_T_INLET)
+        cp = cₚ(H2O, BYPASS_T_INLET)
         dT_guess = BYPASS_POWER_W / (ṁ_guess * cp)
         P_top = 1.0e5 + BYPASS_DP_PRE   # pump-out / node-A pressure (anchor + head)
 
@@ -311,8 +311,8 @@ end
         # Coolant storage rate vs wall heat, averaged over the NC window t = 200..300 s.
         # store_rate_i = rho(Ti)*cp(Ti)*A*dz*dTi/dt, with dTi/dt by central difference.
         store_rate(idx) = sum(
-            rho_water(sol[ssys.heated.ch.T[i], idx]) *
-            cp_water(sol[ssys.heated.ch.T[i], idx]) * v_cell *
+            ρ(H2O, sol[ssys.heated.ch.T[i], idx]) *
+            cₚ(H2O, sol[ssys.heated.ch.T[i], idx]) * v_cell *
             (sol[ssys.heated.ch.T[i], idx + 1] - sol[ssys.heated.ch.T[i], idx - 1]) /
             (t_arr[idx + 1] - t_arr[idx - 1])
             for i in 1:n
@@ -370,15 +370,15 @@ end
         T_ch = [mean(sol[ssys.heated.ch.T[i], nc_indices]) for i in 1:n]
         T_ret = [mean(sol[ssys.ret.T[i], nc_indices]) for i in 1:n]
         dP_buoy = sum(
-            BYPASS_G_ACC * dz * (rho_water(T_ret[i]) - rho_water(T_ch[i])) for i in 1:n
+            BYPASS_G_ACC * dz * (ρ(H2O, T_ret[i]) - ρ(H2O, T_ch[i])) for i in 1:n
         )
 
         # Two-channel Blasius friction at the loop-mean properties, the friction law the
         # channels actually apply at Re ~ 4600 (> Re_tr = 2300). Solve dP_fric = dP_buoy for
         # the balancing ṁ by bisection.
         T_loop = mean(vcat(T_ch, T_ret))
-        rho_loop = rho_water(T_loop)
-        mu_loop = mu_water(T_loop)
+        rho_loop = ρ(H2O, T_loop)
+        mu_loop = μ(H2O, T_loop)
         cs_area = pi * (BYPASS_D_CH / 2)^2
         dP_fric(md) = begin
             Re = md * BYPASS_D_CH / (cs_area * mu_loop)
@@ -413,13 +413,13 @@ end
         # limitation of the single-phase model under a bypassed sink, not a solver artifact.
         # The window-mean peak temperature is a "no thermal runaway" gate with no analytic
         # reference (the slow creep depends on the bypassed-sink storage rate, not a steady
-        # balance). It is a regression value: 507.1 K on both package sets (pinned 507.13,
-        # latest 507.12), well below water's critical temperature (647 K). The band is the
+        # balance). It is a regression value: 233.95 °C on both package sets (pinned 233.98,
+        # latest 233.97), well below water's critical temperature (373.95 °C). The band is the
         # measured cross-env spread, not a loose runaway window.
         T_max_nc = mean([
             maximum([sol[ssys.heated.ch.T[i], idx] for i in 1:n]) for idx in nc_indices
         ])
         @test T_max_nc > BYPASS_T_INLET   # heating did happen
-        @test 505.0 < T_max_nc < 510.0    # tight around the observed 507.1 K, below critical T
+        @test 231.85 < T_max_nc < 236.85    # tight around the observed 233.95 °C, below critical T
     end
 end

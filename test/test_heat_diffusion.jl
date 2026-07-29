@@ -84,7 +84,7 @@ end
 
 @testset "Steady-state plate T > T_boundary and Q signs correct" begin
     nz, nx = 3, 3
-    T_bc = 600.0
+    T_bc = 326.85
     pwr = 1e5
     ps = fill(1.0 / (nz * nx), nz, nx)
 
@@ -145,7 +145,7 @@ end
 
 @testset "Unconnected thermal_right has Q == 0 (adiabatic)" begin
     nz, nx = 3, 3
-    T_bc = 600.0
+    T_bc = 326.85
     pwr = 5e4
     ps = fill(1.0 / (nz * nx), nz, nx)
 
@@ -182,7 +182,7 @@ end
 
 @testset "Non-uniform power_shape: center-only source cell is hottest" begin
     nz, nx = 1, 3
-    T_bc = 600.0
+    T_bc = 326.85
     pwr = 1e4
     ps = reshape([0.0, 1.0, 0.0], nz, nx)
     @test isapprox(sum(ps), 1.0; atol=1e-12)
@@ -237,7 +237,7 @@ end
     # mirror-symmetric: T[i,j] == T[i, nx+1-j]. A wrong/duplicated boundary-cell
     # equation (right cell not evolved) breaks this symmetry.
     nz, nx = 2, 5
-    T_bc = 500.0
+    T_bc = 226.85
     pwr = 8e4
     ps = fill(1.0 / (nz * nx), nz, nx)
 

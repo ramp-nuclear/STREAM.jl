@@ -371,7 +371,7 @@ import ModelingToolkit: compose
                 ctrl_zero;
                 name=:pk,
                 temp_worth=Dict(ch => alpha1, fuel => alpha2),
-                ref_temp=Dict(ch => 293.0),
+                ref_temp=Dict(ch => 19.85),
             )
         end
 
@@ -524,7 +524,7 @@ end
         t_step = 0.5
         delta_rho = 0.003   # 0.003 > beta/2; strong enough for visible prompt rise
         alpha = -1e-4       # weak negative feedback
-        T_inlet = 293.15
+        T_inlet = 20.0
 
         # ReactivityController.input_reactivity has signature (state, t_state, t) -> Float64.
         step_fn = (state, t_state, t) -> (t >= t_step ? delta_rho : 0.0)
@@ -559,7 +559,7 @@ end
         t_step = 0.5
         delta_rho = 0.005   # large enough to exceed plimit quickly
         alpha = -0.01
-        T_inlet = 293.15
+        T_inlet = 20.0
 
         scram_ir =
             (state, t_state, t) ->
@@ -599,13 +599,13 @@ end
 
     @testset "consistent cold IC has zero startup reactivity" begin
         # REGRESSION GUARD for the boundary-cell initialization artifact. FlowPort/
-        # ThermalPort temperatures default to 300 K; the boundary coolant cells and
+        # ThermalPort temperatures default to 26.85 °C; the boundary coolant cells and
         # the channel↔fuel contact nodes alias to those ports, so a per-cell T seed
         # alone does NOT pin them. If build_loop_pk fails to seed the port/contact
-        # temperatures, feedback sees a spurious (300 − ref_temp) offset and the loop
+        # temperatures, feedback sees a spurious (26.85 − ref_temp) offset and the loop
         # starts far from critical. With a consistent IC and ref_temp = T_inlet, the
         # loop MUST start exactly critical: net reactivity ≈ 0 at t=0.
-        Tin = 293.15
+        Tin = 20.0
         for (tw, rt) in (
             (Dict(:cac => fill(-0.01, 7)),    Dict(:cac => fill(Tin, 7))),       # coolant feedback
             (Dict(:fuel => fill(-0.1, 7, 2)), Dict(:fuel => fill(Tin, 7, 2))),   # fuel feedback
@@ -629,8 +629,8 @@ end
         # heats above the inlet reference, driving feedback negative until power
         # collapses to a low, self-consistent (net reactivity ≈ 0) equilibrium. Strong
         # negative alpha ⇒ power becomes negligible — and crucially, here that is REAL
-        # feedback physics, not the old 300 K init artifact (guarded by PK-IC-01).
-        Tin = 293.15
+        # feedback physics, not the old init artifact (guarded by PK-IC-01).
+        Tin = 20.0
         ctrl = ReactivityController()
         ssys, ic = build_loop_pk(
             ctrl; n=7, T_inlet=Tin, P0=1.0, power_scale=1e4,
@@ -659,7 +659,7 @@ end
         #   (3) power stays BOUNDED — without feedback a sustained +delta_rho diverges,
         #   (4) feedback subtracts the inserted reactivity, settling to a new critical
         #       equilibrium (late-time net reactivity pulled back below delta_rho, ≈ 0).
-        Tin = 293.15
+        Tin = 20.0
         beta_total = 0.006502        # = sum(STREAM.U235_BETA_K)
         delta_rho = 5e-4             # < beta_total ⇒ delayed-supercritical, bounded jump
         t_step = 40.0                # insert after the loop has settled (~30 s)

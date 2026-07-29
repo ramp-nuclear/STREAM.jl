@@ -122,6 +122,7 @@ function regime_dependent(geom::PipeGeometry;
     htc_natural::Union{HTCCorrelation,Nothing}=nothing,
     g=nothing,
     Re_transition=2300,
+    liquid::AbstractLiquid=H2O,
 )
     Re_tr = Float64(Re_transition)
 
@@ -147,9 +148,9 @@ function regime_dependent(geom::PipeGeometry;
         htc_fn =
             (Re, Pr, T_bulk, T_wall) -> begin
                 Gr_val = Gr(
-                    rho_water(T_bulk),
-                    mu_water(T_bulk),
-                    beta_water(T_bulk),
+                    ρ(liquid, T_bulk),
+                    μ(liquid, T_bulk),
+                    β(liquid, T_bulk),
                     T_wall,
                     T_bulk,
                     Dh_val,
@@ -231,21 +232,22 @@ depend on forced-flow Reynolds number).
 - `geom`: `PipeGeometry`; the factory reads `geom.depth` (gap between plates `b`),
   `geom.L` (heated length), and `geom.Dh` (hydraulic diameter, used as
   characteristic length in Gr).
-- `g`: gravitational acceleration [m/s^2] (default `G_EARTH` = G_EARTH).
+- `g`: gravitational acceleration [m/s^2] (default `G_EARTH`).
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref).
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
-NC exception: this closure evaluates `beta_water`, `mu_water`, `rho_water` INTERNALLY at `T_bulk` (NOT at film) — natural-convection driving force is a bulk-vs-wall ΔT phenomenon and Python STREAM evaluates β, ν at bulk for Gr.
+NC exception: this closure evaluates the coolant's β, μ, ρ INTERNALLY at `T_bulk` (NOT at film) — natural-convection driving force is a bulk-vs-wall ΔT phenomenon and Python STREAM evaluates β, ν at bulk for Gr.
 """
-function elenbaas_htc(geom::PipeGeometry; g=G_EARTH)
+function elenbaas_htc(geom::PipeGeometry; g=G_EARTH, liquid::AbstractLiquid=H2O)
     b = geom.depth
     L_h = geom.L
     Dh_v = geom.Dh
     return (Re, Pr, T_bulk, T_wall) -> begin
         Gr_val = Gr(
-            rho_water(T_bulk),
-            mu_water(T_bulk),
-            beta_water(T_bulk),
+            ρ(liquid, T_bulk),
+            μ(liquid, T_bulk),
+            β(liquid, T_bulk),
             T_wall,
             T_bulk,
             Dh_v,

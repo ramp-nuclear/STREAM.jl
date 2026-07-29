@@ -21,8 +21,8 @@ Returns 0.0 when `T_wall <= T_sat` (no boiling below saturation).
 Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
 
 # Arguments
-- `T_sat`: saturation temperature [K]
-- `T_wall`: wall temperature [K]
+- `T_sat`: saturation temperature [°C]
+- `T_wall`: wall temperature [°C]
 
 # Returns
 Subcooled boiling heat flux `q` [W/m^2].
@@ -47,8 +47,8 @@ Returns 0.0 when `T_wall <= T_sat` (no boiling below saturation).
 Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
 
 # Arguments
-- `T_wall`: wall temperature [K]
-- `T_sat`: saturation temperature [K]
+- `T_wall`: wall temperature [°C]
+- `T_sat`: saturation temperature [°C]
 - `pressure`: system pressure [Pa]
 - `h_fg`: latent heat of vaporization [J/kg] (reserved for forward compatibility; not used in current formula)
 - `sigma`: surface tension [N/m] (reserved for forward compatibility; not used in current formula)

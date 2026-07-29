@@ -11,7 +11,9 @@ using SteadyStateDiffEq
 const HTCCorrelation = Function
 
 include("constants.jl")
-include("fluids.jl")
+include("substances/liquid.jl")
+include("substances/light_water.jl")
+include("substances/heavy_water.jl")
 include("connectors.jl")
 include("knobs.jl")
 include("geometry.jl")
@@ -36,9 +38,10 @@ include("analysis.jl")
 include("examples.jl")
 include("utilities.jl")
 
-export rho_water, cp_water, mu_water, k_water, beta_water, sat_temperature
-export AbstractFluid, Water, ConstantFluid
-export density, specific_heat, viscosity, conductivity, thermal_expansion
+export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O, ATM
+export density, vapor_density, specific_heat, viscosity, conductivity
+export surface_tension, latent_heat, thermal_expansion, sat_temperature
+export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
 export FlowPort, ThermalPort
 export Channel, Pump, Flapper, Friction, Gravity, Resistor, VolumetricFlowResistor
 export LocalPressureDrop, Inertia, HeatExchanger

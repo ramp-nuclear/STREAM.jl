@@ -11,7 +11,7 @@ external-input variables.
 # Arguments
 - `name`: system name (Symbol; keyword-only, supplied by `@named`)
 - `n`: number of output cells (Int)
-- `T_wall`: wall temperature value [K]; one of:
+- `T_wall`: wall temperature value [°C]; one of:
   - `Real`: broadcast — `T_wall_out[i] ~ T_wall` for all `i ∈ 1:n`
   - `AbstractVector{<:Real}` of length `n`: per-cell static profile —
     `T_wall_out[i] ~ T_wall[i]`
@@ -26,7 +26,7 @@ equations.
 
 # Example
 ```julia
-@named wt = WallTemperature(; n=10, T_wall=373.15)
+@named wt = WallTemperature(; n=10, T_wall=100.0)
 connections = [..., [ch.T_wall_left[i] ~ wt.T_wall_out[i] for i in 1:10]...]
 ```
 """
@@ -131,7 +131,7 @@ component.
 
 # Input variables (bind externally)
 - `h(t)`: convective conductance [W/(m^2·K)].
-- `T_fluid(t)`: bulk fluid temperature [K].
+- `T_fluid(t)`: bulk fluid temperature [°C].
 """
 function ConvectiveBoundary(; name, area)
     pars = @parameters area = area
