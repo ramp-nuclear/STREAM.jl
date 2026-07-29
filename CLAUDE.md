@@ -1,5 +1,12 @@
 # STREAM.jl — Claude Code Instructions
 
+## Purpose
+
+This project aims to replace eventually the Python STREAM implementation
+and should be compared against it, especially for physics and features.
+The Python implementation can be found at [here](https://github.com/ramp-nuclear/STREAM),
+or locally in a nearby folder.
+
 ## Coding Rules
 
 When writing or editing Julia code, follow the conventions in `JULIA.md` (repo root). `JULIA.md` governs general Julia.
