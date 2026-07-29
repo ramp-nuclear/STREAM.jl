@@ -67,7 +67,7 @@ end
 
 @testset "check_gravity_mismatch — :mismatch when CAC has g but no Gravity component" begin
     geom = PipeGeometry_circular(0.6, 0.01)
-    @named ch = ChannelAndContacts(; n=4, geometry=geom, g=9.80665)
+    @named ch = ChannelAndContacts(; n=4, geometry=geom, g=G_EARTH)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(313.15)
     ct_l = [ConstantTemperature(313.15; name=Symbol(:ct_l_bad_, i)) for i in 1:4]

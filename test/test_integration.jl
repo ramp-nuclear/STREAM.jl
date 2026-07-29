@@ -544,7 +544,7 @@ end
     p0 = 4000.0
     high_T = 333.15   # Python 60 C
     low_T = 293.15    # Python 20 C
-    g_acc = 9.80665
+    g_acc = G_EARTH
     @named pump = Pump(p0)              # fixed-pressure; dP_pump overridden per t (quasi-static)
     @named HX_hot = HeatExchanger(high_T)
     @named HX_cold = HeatExchanger(low_T)
@@ -590,7 +590,7 @@ end
     ṁ0 = 1.0
     T_cold = 293.15
     T_hot = 353.15    # Python 80 C
-    g_acc = 9.80665
+    g_acc = G_EARTH
     geom = PipeGeometry_circular(1.0, D_pipe)
     nz = 9            # Python z_boundaries = linspace(0, L, 10) -> 9 cells
     # Friction model: the faithful Python correlation,

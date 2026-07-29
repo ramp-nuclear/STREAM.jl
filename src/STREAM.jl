@@ -10,6 +10,7 @@ using SteadyStateDiffEq
 # Declared before the includes so the correlation files can reference it at parse time.
 const HTCCorrelation = Function
 
+include("constants.jl")
 include("fluids.jl")
 include("connectors.jl")
 include("knobs.jl")
@@ -56,6 +57,7 @@ export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
 export ChannelState, threshold_analysis, chfr, onb_temperature, boiling_onset_power
 export OFI_power, OSV_flux, sudo_kaminaga_chf, mirshak_chf, fabrega_chf
 export Gr, Ra, Re_vel, Pe
+export G_EARTH
 export build_loop, build_loop_vertical, build_loop_transient, build_cube
 export build_loop_lof_bypass, build_loop_pk
 export solve_steady,

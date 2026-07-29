@@ -73,9 +73,9 @@ function _channel_core(;
         cp_face = (specific_heat(fluid, T_up) + specific_heat(fluid, vars.T[i])) / 2
 
         # Use Reynolds directly, not the observable variable, since it may only be observable.
-        Re_i = abs(inlet.ṁ) * Dh / (A * viscosity(fluid, vars.T[i]))
+        Re_i = Re(inlet.ṁ, A, Dh, viscosity(fluid, vars.T[i]))
         f_i = friction_correlation(Re_i)
-        Pr_i = specific_heat(fluid, vars.T[i]) * viscosity(fluid, vars.T[i]) / conductivity(fluid, vars.T[i])
+        Pr_i = Pr(specific_heat(fluid, vars.T[i]), viscosity(fluid, vars.T[i]), conductivity(fluid, vars.T[i]))
         P_i = inlet.p - sum(vars.dp[j] for j in 1:i) + vars.dp[i] / 2
         q_density_i = (q_left_expr[i] + q_right_expr[i]) / (sum(geometry.heated_parts) * dz)
 
@@ -381,8 +381,8 @@ end
 
 
 function _nu_film(T_film::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function)
-    Re = abs(ṁ) * Dh / (A * mu_water(T_film))
-    Pr = cp_water(T_film) * mu_water(T_film) / k_water(T_film)
+    Re = STREAM.Re(ṁ, A, Dh, mu_water(T_film))
+    Pr = STREAM.Pr(cp_water(T_film), mu_water(T_film), k_water(T_film))
     return nu_f(Re, Pr)
 end
 
@@ -418,7 +418,7 @@ function _h_eq_scb_cor(
     q_spl = max(h_spl * (T_w - T), 0.0)
     P = P_in - cumdp + dp/2
     T_sat = sat_temperature(P)
-    Re = abs(ṁ) * Dh / (A * mu_water(T))
+    Re = STREAM.Re(ṁ, A, Dh, mu_water(T))
     q_scb  = scb_f(T_w, T_sat, Re)
     T_ONB  = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
     q_scb_inc  = scb_f(T_ONB, T_sat, Re)
@@ -563,7 +563,7 @@ function ChannelAndContacts(;
         fluid=fluid,
     )
 
-    Re_bulk = [abs(inlet.ṁ) * Dh / (A * mu_water(vars.T[i])) for i in 1:n]
+    Re_bulk = [Re(inlet.ṁ, A, Dh, mu_water(vars.T[i])) for i in 1:n]
     Gr_left  = [Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_left[i].T ,  vars.T[i], Dh, g) for i in 1:n]
     Gr_right = [Gr(rho_water(vars.T[i]), mu_water(vars.T[i]), beta_water(vars.T[i]), thermal_right[i].T , vars.T[i], Dh, g) for i in 1:n]
     variant_obs = [

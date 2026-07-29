@@ -109,8 +109,8 @@ rd_nc = regime_dependent(geom;
     htc_turbulent      = dittus_boelter,
     friction_laminar   = laminar_friction_rectangular(geom),
     friction_turbulent = blasius_friction,
-    htc_natural        = elenbaas_htc(geom; g=9.81),
-    g                  = 9.81,
+    htc_natural        = elenbaas_htc(geom; g=G_EARTH),
+    g                  = G_EARTH,
 )
 ```
 """
@@ -231,13 +231,13 @@ depend on forced-flow Reynolds number).
 - `geom`: `PipeGeometry`; the factory reads `geom.depth` (gap between plates `b`),
   `geom.L` (heated length), and `geom.Dh` (hydraulic diameter, used as
   characteristic length in Gr).
-- `g`: gravitational acceleration [m/s^2] (default 9.81).
+- `g`: gravitational acceleration [m/s^2] (default `G_EARTH` = G_EARTH).
 
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 NC exception: this closure evaluates `beta_water`, `mu_water`, `rho_water` INTERNALLY at `T_bulk` (NOT at film) — natural-convection driving force is a bulk-vs-wall ΔT phenomenon and Python STREAM evaluates β, ν at bulk for Gr.
 """
-function elenbaas_htc(geom::PipeGeometry; g=9.81)
+function elenbaas_htc(geom::PipeGeometry; g=G_EARTH)
     b = geom.depth
     L_h = geom.L
     Dh_v = geom.Dh

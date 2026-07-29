@@ -44,17 +44,18 @@ Hydrostatic pressure change for a vertical elevation change.
 
 # Arguments
 - `H`: elevation change [m], positive = upward
+- `g`: gravitational acceleration
 - `name`: system name (Symbol)
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
-function Gravity(H; name)
+function Gravity(H, g=G_EARTH; name)
     pars = @parameters H = H
     @named inlet = FlowPort()
     @named outlet = FlowPort()
     T_in = instream(inlet.T)
-    eqs = Equation[inlet.p - outlet.p ~ rho_water(T_in) * 9.80665 * H]
+    eqs = Equation[inlet.p - outlet.p ~ rho_water(T_in) * g * H]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 

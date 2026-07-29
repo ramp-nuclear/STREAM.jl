@@ -49,7 +49,7 @@ end
 """
     build_loop_vertical(; n=10, T_inlet=313.15, T_wall=373.15, h_wall=5000.0,
                          L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
-                         g_acc=9.80665, H_return=nothing) -> System
+                         g_acc=G_EARTH, H_return=nothing) -> System
 
 Build a vertical flow loop with gravity (Pump + HeatExchanger + Channel + Gravity).
 
@@ -61,7 +61,7 @@ Build a vertical flow loop with gravity (Pump + HeatExchanger + Channel + Gravit
 - `L_ch`: channel length [m] (default 0.6)
 - `D_ch`: channel diameter [m] (default 0.01)
 - `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
-- `g_acc`: gravitational acceleration [m/s^2] (default 9.80665)
+- `g_acc`: gravitational acceleration [m/s^2] (default G_EARTH)
 - `H_return`: height of return leg [m], defaults to `L_ch` for cancellation geometry
 
 # Returns
@@ -75,7 +75,7 @@ function build_loop_vertical(;
     T_inlet=313.15,  # coolant inlet temperature (K); 40°C
     T_wall=373.15,  # wall temperature (K); ~100°C for forced convection
     h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
-    g_acc=9.80665,  # gravitational acceleration (m/s²)
+    g_acc=G_EARTH,  # gravitational acceleration (m/s²)
     H_return=nothing,  # height of return leg (m); defaults to L_ch for cancellation geometry
 )
     H = isnothing(H_return) ? L_ch : H_return
@@ -244,7 +244,7 @@ end
 """
     build_loop_lof_bypass(; n=10, L_ch=1.0, D_ch=0.01, T_inlet=313.15,
                             power_W=1.0e3, fuel_nx=2, fuel_Lx=0.005,
-                            L_over_A=1.75e5, g_acc=9.80665,
+                            L_over_A=1.75e5, g_acc=G_EARTH,
                             R_ext=1.0e6, dt_ramp=5.0) -> System
 
 Build a loss-of-flow validation loop with bypass topology. Heated leg uses
@@ -298,7 +298,7 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
 - `fuel_nx`: lateral cells in the HeatDiffusion plate (default 2)
 - `fuel_Lx`: plate lateral thickness [m] (default 0.005)
 - `L_over_A`: Inertia length-to-area ratio [1/m] (default 1.75e5)
-- `g_acc`: gravitational acceleration magnitude [m/s^2] (default 9.80665)
+- `g_acc`: gravitational acceleration magnitude [m/s^2] (default G_EARTH)
 - `R_ext`: external hydraulic resistance [Pa·s/kg] (default 1.0e6)
 - `dt_ramp`: Flapper opening ramp duration [s] (default 5.0)
 - `dP_pump_fn`: callable `f(t) -> Float64` giving the pump head [Pa] over time, stored
@@ -318,7 +318,7 @@ function build_loop_lof_bypass(;
     fuel_nx=2,
     fuel_Lx=0.005,
     L_over_A=1.75e5,
-    g_acc=9.80665,
+    g_acc=G_EARTH,
     R_ext=1.0e6,
     dt_ramp=5.0,
     dP_pump_fn=(_t -> 0.0),
@@ -368,10 +368,8 @@ function build_loop_lof_bypass(;
     connections = Equation[
         # D series branch: ext_res -> hx -> pump -> ine
         inseries(ext_res, hx, pump, ine)...,
-        # Bypass split/merge: ine -> (heated.ch || flapper) -> ret
-        inparallel(ine, (heated.ch, flapper), ret)...,
-        # Return to the external resistor
-        inseries(ret, ext_res)...,
+        # Bypass split/merge: ine -> (heated.ch -> ret) in series, or flapper directly -> ext_res
+        inparallel(ine, ((heated.ch, ret), flapper), ext_res)...,
         # Boundary conditions
         pump.inlet.p ~ 1.0e5,
         watch_flow(flapper, ine.inlet.ṁ),
