@@ -8,6 +8,14 @@
 #     scalars (pressure, h_fg, sigma); inner function receives symbolic T_wall, T_sat, Re.
 #   - ifelse() for guards — same MTK pattern as flow reversal and regime switching.
 
+# Bergles-Rohsenow wall superheat at the onset of nucleate boiling, T_ONB - T_sat, for a
+# single-phase wall heat flux `q_spl` [W/m^2] at pressure `P_Pa`. It sets where boiling
+# starts, so it belongs with the boiling physics rather than with the HTC correlations.
+function _bergles_rohsenow_dT_ONB(P_Pa, q_spl)
+    p = P_Pa / 1e5
+    return 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
+end
+
 """
     mcadams_scb_heat_flux(T_sat, T_wall) -> q [W/m^2]
 

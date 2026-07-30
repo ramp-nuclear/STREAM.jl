@@ -1,4 +1,7 @@
-# threshold_analysis.jl -- Post-solve nuclear safety threshold analysis functions
+# thresholds.jl -- Safety threshold correlations (CHF, OFI, OSV, ONB, wall-temperature limit)
+#
+# The correlations themselves. The wrappers that read a solved channel and apply them live
+# in analysis.jl.
 #
 # Design:
 #   - All functions are plain Julia arithmetic — NOT @register_symbolic, NOT ifelse().

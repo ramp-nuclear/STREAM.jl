@@ -1,7 +1,7 @@
 # analysis.jl -- Post-processing framework for nuclear safety threshold analysis
 #
 # Bridges MTK solver output (NonlinearSolution or ODESolution) to the physics
-# correlation functions in src/physical_models/threshold_analysis.jl.
+# correlation functions in src/physical_models/thresholds.jl.
 #
 # Public API:
 #   ChannelState          — struct holding all pre-extracted MTK solution fields

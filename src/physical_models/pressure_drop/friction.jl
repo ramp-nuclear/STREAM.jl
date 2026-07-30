@@ -1,4 +1,4 @@
-# friction/correlations.jl -- Friction factor correlation functions
+# friction.jl -- Darcy friction factor correlations
 #
 # Design:
 #   - Standalone named functions (blasius_friction, turbulent_friction, viscosity_correction,

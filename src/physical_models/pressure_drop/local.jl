@@ -1,4 +1,4 @@
-# local_pressure.jl -- Idelchik sudden expansion / contraction local-loss factors.
+# local.jl -- Idelchik sudden expansion / contraction local-loss factors.
 #
 # Faithful port of Python STREAM's stream/physical_models/pressure_drop/local.py. The
 # loss coefficient K depends on the area ratio and the Reynolds number through Idelchik

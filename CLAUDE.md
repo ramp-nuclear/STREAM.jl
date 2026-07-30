@@ -50,33 +50,55 @@ This is the canonical layout. **Always follow it when editing or adding files.**
 ```
 src/
   STREAM.jl                   # Module entry point: imports, includes, exports only
+  constants.jl                # G_EARTH and friends
   geometry.jl                 # PipeGeometry struct + PipeGeometry_rectangular, PipeGeometry_circular
   connectors.jl               # FlowPort, ThermalPort acausal connectors
+  knobs.jl                    # @design_knob, knob_defaults
   substances/
     liquid.jl                 # AbstractLiquid interface, Liquid snapshot, unicode aliases (ρ, cₚ, μ, κ, β, Tsat)
     light_water.jl            # LightWater / H2O correlations
     heavy_water.jl            # HeavyWater / D2O correlations
-  components/
-    pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
-    resistors.jl              # Friction, Gravity, Resistor
-    misc.jl                   # Inertia, HeatExchanger, ConstantTemperature
-    sources.jl                # WallTemperature, HeatFluxSource (value-source subsystems for channel external inputs)
-    channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + _channel_core (shared private core)
-    heat_diffusion.jl         # HeatDiffusion + _diffusion_eqs (2D FD solid plate)
   physical_models/
-    correlations.jl           # HTC + friction correlation closures
+    dimensionless.jl          # Re, Pr, Nu, Pe, Gr, Ra, including the (liquid, T) forms
+    htc/
+      correlations.jl         # Nusselt correlations and the closures that select between them
+      single_phase.jl         # h_single_phase: a Nusselt correlation evaluated at film temperature
+    subcooled_boiling.jl      # SCB heat flux, ONB superheat, h_subcooled_boiling
+    pressure_drop/
+      friction.jl             # Darcy friction factor correlations
+      local.jl                # Idelchik expansion / contraction local losses
+    thresholds.jl             # CHF, OFI, OSV, ONB, wall-temperature limit correlations
+  components/
+    twoports.jl               # HydraulicTwoPort, shared by the two-port components
+    pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
+    flapper.jl                # Flapper
+    resistors.jl              # Friction, Gravity, Resistor, VolumetricFlowResistor, LocalPressureDrop
+    ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
+    sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
+    channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
+    heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
+    point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM
   composition/
-    helpers.jl                # symmetric_plate, plate, one_sided_connection, compose_systems, port, check_gravity_mismatch
+    connections.jl            # inseries, inparallel, connect_face(s), port, compose_systems,
+                              # check_gravity_mismatch, connect_temperature_feedback
+    assemblies.jl             # symmetric_plate, plate, one_sided_connection,
+                              # single_channel_connection, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient, steady_state_guess
-  examples.jl                 # build_loop, build_loop_vertical, build_loop_transient, build_cube
+  analysis.jl                 # ChannelState + the post-solve threshold wrappers
+  utilities.jl                # rebin_*, cosine_power_shape, cosine_T_wall_profile
+  examples.jl                 # build_loop*, build_cube, build_loop_pk
 ```
 
 **Where new code goes:**
-- New component (single MTK component) → `src/components/` in the most relevant file, or a new file if it's a new domain (e.g. `point_kinetics.jl`, `flapper.jl`)
-- New physical correlation (HTC, friction, etc.) → `src/physical_models/correlations.jl` until that file exceeds ~300 lines, then split into `src/physical_models/htc/` and `src/physical_models/friction/` (mirroring Python STREAM `physical_models/`)
-- New composition helper → `src/composition/helpers.jl`
+- New component (single MTK component) → `src/components/` in the most relevant file, or a new file if it's a new domain
+- New correlation → the matching `src/physical_models/` folder: Nusselt into `htc/`, friction or local loss into `pressure_drop/`, a safety limit into `thresholds.jl`
+- New composition helper → `connections.jl` for wiring primitives, `assemblies.jl` for named arrangements of components
 - New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the nine `AbstractLiquid` property methods
 - Build/example helpers → `src/examples.jl` only (never add examples to core files)
+
+Placement beats file length. A long file whose contents all belong together is fine; a short
+file named `misc` or `helpers` is not. Physics goes in `physical_models/`, even when a
+component is its only caller: components state equations, they do not define correlations.
 
 ### `test/` — Tests
 
@@ -91,7 +113,7 @@ test/
   test_pump.jl              # Pump
   test_flapper.jl           # Flapper
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
-  test_misc.jl              # Inertia, HeatExchanger, ConstantTemperature, WallTemperature, HeatFluxSource
+  test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, WallTemperature, HeatFluxSource
   test_heat_diffusion.jl    # HeatDiffusion
   test_correlations.jl      # HTC + friction correlation function unit tests
   test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState
@@ -109,7 +131,7 @@ test/
                             # feedback loops (SCRAM, cold-IC, prompt-jump)
 ```
 
-**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_misc.jl` alongside `ConstantTemperature` (same value-source family).
+**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). `physical_models/` is covered by `test_correlations.jl` (htc, pressure_drop) and `test_thresholds.jl`.
 
 ## Component authoring conventions
 

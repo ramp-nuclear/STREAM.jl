@@ -242,11 +242,6 @@ function elenbaas_htc(geom::PipeGeometry; g=G_EARTH, liquid::AbstractLiquid=H2O)
     end
 end
 
-function _bergles_rohsenow_dT_ONB(P_Pa, q_spl)
-    p = P_Pa / 1e5
-    return 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
-end
-
 function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     return nu0 * (
         1.0 - 1.4122 * aspect_ratio + 2.3473 * aspect_ratio^2 - 2.8983 * aspect_ratio^3 +
