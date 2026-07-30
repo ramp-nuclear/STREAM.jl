@@ -50,22 +50,17 @@ end
 
 """
     regime_dependent(geom::PipeGeometry; htc_laminar, htc_turbulent, friction_laminar, friction_turbulent,
-                       htc_natural=nothing, g=nothing, Re_transition=2300) -> (htc=fn, friction=fn)
+                       htc_natural=nothing, g=nothing, re_bounds=(2000.0, 5000.0)) -> (htc=fn, friction=fn)
 
 Factory returning a named tuple of regime-switching HTC and friction correlations.
-Switches between laminar and turbulent correlations using `ifelse()` — MTK-compatible
-smooth switching (established project pattern; same as flow reversal in Channel).
 
-`Re_transition` is converted to `Float64` immediately to avoid type-promotion issues
-when `Re` is a Symbolics.Num at system-build time.
+Both closures pass through [`flow_regime_blend`](@ref): laminar at or below `re_bounds[1]`,
+turbulent above `re_bounds[2]`, and linearly interpolated in between, which is what Python
+STREAM's `regime_dependent_h_spl` does.
 
-When `htc_natural` and `g` are both provided, the returned `htc` closure additionally
-switches to the natural convection correlation when `Gr/Re^2 > 1` (Grashof-over-Reynolds-squared
-criterion, matching Python STREAM convention). The Grashof characteristic length is taken
-from `geom.Dh`. In this mode, the HTC closure computes:
-- `Gr = beta * g * dT * geom.Dh^3 / nu^2` from T_bulk and T_wall
-- If `Gr/Re^2 > 1`: return `htc_natural(Re, Pr, T_bulk, T_wall)` (natural convection)
-- Else: return forced-convection (laminar or turbulent based on Re vs Re_transition)
+When `htc_natural` and `g` are both provided, the `htc` closure additionally switches to the
+natural-convection correlation once `Gr/Re^2 > 1`, with the Grashof characteristic length
+taken from `geom.Dh`.
 
 # Arguments
 - `geom`: `PipeGeometry` describing the channel geometry; `geom.Dh` is read for the Grashof
@@ -78,7 +73,8 @@ from `geom.Dh`. In this mode, the HTC closure computes:
   together with `g`, enables NC regime switching via `Gr/Re^2 > 1`.
 - `g`: gravitational acceleration [m/s^2] for Grashof computation (required when `htc_natural`
   is provided; otherwise unused).
-- `Re_transition`: Reynolds number transition threshold (default 2300).
+- `re_bounds`: `(re_lo, re_hi)` transition band on the Reynolds number
+(default `(2000.0, 5000.0)`, matching `regime_dependent_friction`).
 
 If `htc_natural` is provided, `g` must be too, otherwise an `ArgumentError` is raised.
 `Dh` is not a user-facing kwarg (it is read from `geom.Dh`); a lone `g` without
@@ -121,10 +117,10 @@ function regime_dependent(geom::PipeGeometry;
     friction_turbulent::Function,
     htc_natural::Union{HTCCorrelation,Nothing}=nothing,
     g=nothing,
-    Re_transition=2300,
+    re_bounds=(2000.0, 5000.0),
     liquid::AbstractLiquid=H2O,
 )
-    Re_tr = Float64(Re_transition)
+    bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))
 
     # htc_natural and g must be supplied together.
     if !isnothing(htc_natural) && isnothing(g)
@@ -135,35 +131,28 @@ function regime_dependent(geom::PipeGeometry;
         )
     end
 
-    if !isnothing(htc_natural)
-        # NC-enabled path: switch on Gr/Re^2 > 1
-        Dh_val = geom.Dh
-        g_val = Float64(g)
-        htc_forced_fn =
-            (Re, Pr, T_bulk, T_wall) -> ifelse(
-                Re < Re_tr,
-                htc_laminar(Re, Pr, T_bulk, T_wall),
-                htc_turbulent(Re, Pr, T_bulk, T_wall),
-            )
-        htc_fn =
-            (Re, Pr, T_bulk, T_wall) -> begin
-                Gr_val = Gr(liquid, T_bulk, T_wall, Dh_val, g_val)
-                ifelse(
-                    Gr_val / Re^2 > 1,
-                    htc_natural(Re, Pr, T_bulk, T_wall),
-                    htc_forced_fn(Re, Pr, T_bulk, T_wall),
-                )
-            end
+    # Forced convection: laminar, turbulent, or a blend across the transition band.
+    htc_forced =
+        (Re, Pr, T_bulk, T_wall) -> flow_regime_blend(
+            Re, bounds,
+            htc_laminar(Re, Pr, T_bulk, T_wall),
+            htc_turbulent(Re, Pr, T_bulk, T_wall),
+        )
+
+    # Given a natural-convection correlation, buoyancy takes over once Gr/Re² passes 1.
+    htc_fn = if isnothing(htc_natural)
+        htc_forced
     else
-        htc_fn =
-            (Re, Pr, T_bulk, T_wall) -> ifelse(
-                Re < Re_tr,
-                htc_laminar(Re, Pr, T_bulk, T_wall),
-                htc_turbulent(Re, Pr, T_bulk, T_wall),
-            )
+        Dh_val, g_val = geom.Dh, Float64(g)
+        (Re, Pr, T_bulk, T_wall) -> ifelse(
+            Gr(liquid, T_bulk, T_wall, Dh_val, g_val) / Re^2 > 1,
+            htc_natural(Re, Pr, T_bulk, T_wall),
+            htc_forced(Re, Pr, T_bulk, T_wall),
+        )
     end
 
-    friction_fn = (Re) -> ifelse(Re < Re_tr, friction_laminar(Re), friction_turbulent(Re))
+    friction_fn =
+(Re) -> flow_regime_blend(Re, bounds, friction_laminar(Re), friction_turbulent(Re))
 
     return (htc=htc_fn, friction=friction_fn)
 end

@@ -62,7 +62,7 @@ export partial_SCB_correction, regime_dependent_q_scb
 export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber
 export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
 export ChannelState, threshold_analysis, chfr
-export Gr, Ra, Re_vel, Pe
+export Gr, Ra, Re_vel, Pe, flow_regime_blend
 export G_EARTH
 export build_loop, build_loop_vertical, build_loop_transient, build_cube
 export build_loop_lof_bypass, build_loop_pk

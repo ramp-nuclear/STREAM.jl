@@ -199,12 +199,7 @@ function regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0,
         # Feed the laminar branch a finite Reynolds at no-flow so the bare 64/Re never forms
         # an Inf while the not-taken branch is traced. For every Re > 0 this is just ReK.
         ReK_lam = Base.ifelse(Re <= 0, one(ReK), ReK)
-        f_lam = laminar(ReK_lam)
-        f_turb = turbulent(ReK)
-        # lin_interp on the bulk Re between (re_lo, f_lam) and (re_hi, f_turb).
-        f_inter = (f_turb - f_lam) / (re_hi - re_lo) * (Re - re_hi) + f_turb
-        # Boundary inclusivity matches Python flow_regimes: Re <= re_lo laminar, re_hi < Re turbulent.
-        f = Base.ifelse(Re <= re_lo, f_lam, Base.ifelse(Re > re_hi, f_turb, f_inter))
+        f = flow_regime_blend(Re, (re_lo, re_hi), laminar(ReK_lam), turbulent(ReK))
         # No-flow guard, the symbolic equivalent of Python's `if ṁ == 0: return 0.0`.
         Base.ifelse(Re <= 0, zero(f), f)
     end

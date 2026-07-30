@@ -59,6 +59,34 @@ Re(liquid::AbstractLiquid, T, ṁ, A, Dh) = Re(ṁ, A, Dh, μ(liquid, T))
 Pr(liquid::AbstractLiquid, T) = Pr(cₚ(liquid, T), μ(liquid, T), κ(liquid, T))
 
 """
+    flow_regime_blend(Re, re_bounds, laminar, turbulent)
+
+Choose between a laminar and a turbulent value on Reynolds number, blending linearly across
+the transition band instead of stepping.
+
+`re_bounds` is `(re_lo, re_hi)`: at or below `re_lo` the flow is laminar, above `re_hi` it is
+turbulent, and between them the two values are interpolated linearly in `Re`. Transition is
+gradual in reality, and a step would put a discontinuity in the residual for the solver to
+trip over. This is Python STREAM's `flow_regimes` plus `lin_interp`.
+
+Both `laminar` and `turbulent` are evaluated, since `ifelse` keeps this a symbolic branch the
+solver takes per step rather than one fixed while tracing.
+
+# Arguments
+- `Re`: Reynolds number to classify
+- `re_bounds`: `(re_lo, re_hi)` band edges
+- `laminar`, `turbulent`: the two values to select between or blend
+
+# Returns
+The laminar value, the turbulent value, or their linear blend.
+"""
+function flow_regime_blend(Re, re_bounds, laminar, turbulent)
+    re_lo, re_hi = re_bounds
+    interim = (turbulent - laminar) / (re_hi - re_lo) * (Re - re_hi) + turbulent
+    return ifelse(Re <= re_lo, laminar, ifelse(Re > re_hi, turbulent, interim))
+end
+
+"""
     Nu(h, Dh, k) -> Float64
 
 Nusselt number.

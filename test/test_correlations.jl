@@ -245,7 +245,7 @@ end
             htc_turbulent=dittus_boelter,
             friction_laminar=laminar_friction_rectangular(geom),
             friction_turbulent=blasius_friction,
-            Re_transition=2300.0,
+            re_bounds=(2000.0, 5000.0),
         )
         dP_lam = 30.0
 
@@ -289,7 +289,7 @@ end
         @test sol_lam[ssys_lam.cac_lam.Re[1]] < 2300.0
 
         # Magnitude check: confirm the regime_dependent closure actually drove the solved dP
-        # through its laminar branch. rd.friction switches on Re_transition=2300; every cell
+        # through its laminar branch. rd.friction blends over re_bounds; every cell
         # here is below 2300, so it must return the laminar rectangular factor. Rebuild
         # dP = sum_i f(Re[i]) * ṁ*|ṁ|/(2*rho(T[i])*A^2) * (dz/Dh) using rd.friction
         # itself (same closure the channel evaluates) so a wrong-branch or 2x-wrong factor
@@ -321,7 +321,7 @@ end
             htc_turbulent=dittus_boelter,
             friction_laminar=laminar_friction_rectangular(geom),
             friction_turbulent=blasius_friction,
-            Re_transition=2300.0,
+            re_bounds=(2000.0, 5000.0),
         )
         dP_turb = 3.0e4
 
@@ -366,7 +366,7 @@ end
         @test sol_turb[ssys_turb.cac_turb.Re[1]] > 2300.0
 
         # Magnitude check: confirm the solved dP went through the turbulent (Blasius) branch.
-        # Above Re_transition=2300 rd.friction must return blasius_friction(Re). Rebuild
+        # Above re_bounds[2] rd.friction must return blasius_friction(Re). Rebuild
         # dP = sum_i f(Re[i]) * ṁ*|ṁ|/(2*rho(T[i])*A^2) * (dz/Dh) from rd.friction on
         # the converged Re[i]/T[i], so a wrong branch (e.g. still laminar 64/(Re*K_R)) or a
         # 2x factor fails. rtol=1e-6: same-form arithmetic on the converged state.
@@ -456,6 +456,55 @@ end
     end
 end
 
+@testset "flow_regime_blend" begin
+    bounds = (2000.0, 5000.0)
+    lam, turb = 4.0, 100.0
+
+    # Outside the band each limit comes through untouched. re_lo itself counts as laminar.
+    @test flow_regime_blend(1000.0, bounds, lam, turb) == lam
+    @test flow_regime_blend(2000.0, bounds, lam, turb) == lam
+    @test flow_regime_blend(8000.0, bounds, lam, turb) == turb
+
+    # Inside it the blend is linear in Re, so the band midpoint is the average.
+    @test flow_regime_blend(3500.0, bounds, lam, turb) ≈ (lam + turb) / 2
+    @test flow_regime_blend(2750.0, bounds, lam, turb) ≈ lam + 0.25 * (turb - lam)
+
+    # Continuous at both edges: that is the point of blending rather than stepping, since a
+    # jump here lands in the solver residual.
+    @test flow_regime_blend(nextfloat(2000.0), bounds, lam, turb) ≈ lam atol = 1e-6
+    @test flow_regime_blend(5000.0, bounds, lam, turb) ≈ turb rtol = 1e-12
+end
+
+@testset "regime_dependent blends across the transition band" begin
+    geom = PipeGeometry_circular(0.6, 0.01)
+    rd = regime_dependent(geom;
+        htc_laminar=(Re, Pr, T_b, T_w) -> 4.0,
+        htc_turbulent=(Re, Pr, T_b, T_w) -> 100.0,
+        friction_laminar=(Re) -> 0.1,
+        friction_turbulent=(Re) -> 0.5,
+        re_bounds=(2000.0, 5000.0),
+    )
+    # T_wall == T_bulk keeps Gr at zero, so nothing here depends on natural convection.
+    @test rd.htc(1000.0, 7.0, 40.0, 40.0) == 4.0
+    @test rd.htc(8000.0, 7.0, 40.0, 40.0) == 100.0
+    @test rd.htc(3500.0, 7.0, 40.0, 40.0) ≈ 52.0
+    @test rd.friction(3500.0) ≈ 0.3
+end
+
+@testset "regime_dependent_q_scb blends across the transition band" begin
+    pressure = 1e5
+    q_scb = regime_dependent_q_scb(; pressure=pressure, re_bounds=(2000.0, 5000.0))
+    T_sat, T_wall = 100.0, 130.0
+    q_lam = bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure)
+    q_turb = mcadams_scb_heat_flux(T_sat, T_wall)
+    # The two correlations must actually disagree, or the blend proves nothing.
+    @test !isapprox(q_lam, q_turb; rtol=1e-3)
+
+    @test q_scb(T_wall, T_sat, 1000.0) ≈ q_lam
+    @test q_scb(T_wall, T_sat, 8000.0) ≈ q_turb
+    @test q_scb(T_wall, T_sat, 3500.0) ≈ (q_lam + q_turb) / 2
+end
+
 @testset "regime_dependent NC detection" begin
     # Setup: laminar HTC returns 4.0, turbulent returns 100.0, NC returns 999.0
     htc_lam = (Re, Pr, T_b, T_w) -> 4.0
@@ -483,8 +532,8 @@ end
     @test rd.htc(10.0, 7.0, 40.0, 100.0) == 999.0
 
     # Test 2: Forced-conv branch selected when Gr/Re^2 < 1
-    # At Re=5000 (turbulent, Re^2=25e6 >> Gr): forced turb branch
-    @test rd.htc(5000.0, 7.0, 40.0, 100.0) == 100.0
+    # At Re=8000 (turbulent, and Re^2 >> Gr): forced turbulent branch
+    @test rd.htc(8000.0, 7.0, 40.0, 100.0) == 100.0
 
     # Test 3: Laminar forced at low Re when Gr/Re^2 < 1 (small dT)
     # T_wall ~ T_bulk => Gr ~ 0 => forced branch => laminar at Re=100
@@ -492,7 +541,7 @@ end
 
     # Test 4: Friction unchanged by NC kwargs
     @test rd.friction(100.0) == 64.0 / 100.0     # laminar
-    @test rd.friction(5000.0) == 0.316 * 5000.0^(-0.25)  # turbulent
+    @test rd.friction(8000.0) == 0.316 * 8000.0^(-0.25)  # turbulent
 
     # Test 5: Backward compat — no NC kwargs => identical to existing regime_dependent
     rd_no_nc = regime_dependent(geom;
@@ -502,7 +551,7 @@ end
         friction_turbulent=f_turb,
     )
     @test rd_no_nc.htc(100.0, 7.0, 40.0, 100.0) == 4.0   # laminar forced
-    @test rd_no_nc.htc(5000.0, 7.0, 40.0, 100.0) == 100.0 # turbulent forced
+    @test rd_no_nc.htc(8000.0, 7.0, 40.0, 100.0) == 100.0 # turbulent forced
 
     # Test 6: htc_natural without g raises ArgumentError
     # Expected ArgumentError message text: "htc_natural provided but g is missing".

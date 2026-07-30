@@ -103,11 +103,12 @@ function partial_SCB_correction(q_spl, q_scb, q_scb_inc)
 end
 
 """
-    regime_dependent_q_scb(; pressure=1e5, h_fg=2257e3, sigma=0.059, Re_transition=2300) -> (T_wall, T_sat, Re) -> q [W/m^2]
+    regime_dependent_q_scb(; pressure=1e5, h_fg=2257e3, sigma=0.059, re_bounds=(2000.0, 5000.0)) -> (T_wall, T_sat, Re) -> q [W/m^2]
 
-Factory returning a regime-dependent subcooled boiling heat flux closure.
-Sharp cutoff at `Re_transition`: McAdams for `Re >= Re_transition`,
-Bergles-Rohsenow for `Re < Re_transition`.
+Factory returning a regime-dependent subcooled boiling heat flux closure: Bergles-Rohsenow
+in the laminar regime, McAdams in the turbulent one, and a linear blend across the
+transition band, via [`flow_regime_blend`](@ref). Python STREAM's `regime_dependent_q_scb`
+partitions the same way.
 
 Captures `pressure`, `h_fg`, and `sigma` at construction time. The returned
 closure signature `(T_wall, T_sat, Re) -> q_scb` is compatible with the
@@ -120,19 +121,20 @@ Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
 - `pressure`: system pressure [Pa] (default 1e5 = 1 bar)
 - `h_fg`: latent heat of vaporization [J/kg] (default 2257e3 for water at ~100C)
 - `sigma`: surface tension [N/m] (default 0.059 for water at ~100C)
-- `Re_transition`: Reynolds number transition threshold (default 2300)
+- `re_bounds`: `(re_lo, re_hi)` transition band on the Reynolds number
+(default `(2000.0, 5000.0)`)
 
 # Returns
 Closure `(T_wall, T_sat, Re) -> q_scb [W/m^2]`.
 """
 function regime_dependent_q_scb(;
-    pressure=1e5, h_fg=2257e3, sigma=0.059, Re_transition=2300
+    pressure=1e5, h_fg=2257e3, sigma=0.059, re_bounds=(2000.0, 5000.0)
 )
-    Re_tr = Float64(Re_transition)
-    return (T_wall, T_sat, Re) -> ifelse(
-        Re >= Re_tr,
-        mcadams_scb_heat_flux(T_sat, T_wall),
+    bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))
+    return (T_wall, T_sat, Re) -> flow_regime_blend(
+        Re, bounds,
         bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure; h_fg=h_fg, sigma=sigma),
+        mcadams_scb_heat_flux(T_sat, T_wall),
     )
 end
 
