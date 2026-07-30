@@ -289,6 +289,35 @@ end
     end
 end
 
+@testset "ChannelState from a solved channel" begin
+    # Built from a solution rather than by hand, which is what exercises the extraction.
+    geo = PipeGeometry_circular(0.6, 0.01)
+    ssys = build_loop(; n=5)
+    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
+    push!(op, ssys.ch.inlet.ṁ => 0.5)
+    sol = solve_steady(ssys, op)
+
+    # A plain Channel has no `velocity` variable (only ChannelAndContacts declares it), so
+    # the extraction has to fall back to the signed `v` and take its magnitude.
+    state = ChannelState(sol, ssys.ch; pipe=geo)
+    @test state.n == 5
+    @test length(state.T_bulk) == 5
+    @test all(state.velocity .>= 0)
+    @test state.ṁ > 0
+
+    # A circular pipe puts the whole heated perimeter on one face, so the other has zero
+    # area. That face carries no flux; dividing by its area would give NaN and poison
+    # q_flux, and through it every CHF ratio.
+    @test all(iszero, state.q_flux_right)
+    @test all(isfinite, state.q_flux)
+    @test all(state.q_flux .> 0)
+    @test all(isfinite, chfr(q_CHF_mirshak)(state))
+
+    # Without a geometry there is no area at all, so both faces read zero.
+    bare = ChannelState(sol, ssys.ch)
+    @test all(iszero, bare.q_flux)
+end
+
 @testset "chfr helper" begin
     pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
     n = 3

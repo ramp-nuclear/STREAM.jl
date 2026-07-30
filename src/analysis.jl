@@ -4,7 +4,8 @@
 # correlation functions in src/physical_models/thresholds.jl.
 #
 # Public API:
-#   ChannelState       — the solution fields a threshold correlation needs, pre-extracted
+#   ChannelState       — the solution fields a threshold correlation needs; construct it
+#                        from a solution with ChannelState(sol, channel_sys; pipe, gravity)
 #   threshold_analysis — extracts a ChannelState and applies the functions you name
 #   chfr               — CHF ratio closure, with face selection and a zero-flux guard
 #
@@ -14,8 +15,9 @@
 """
     ChannelState
 
-Pre-extracted MTK solution fields for a single channel system.
-Used as the input to all pre-built analysis wrappers and `threshold_analysis`.
+Pre-extracted MTK solution fields for a single channel system, built with
+`ChannelState(sol, channel_sys; pipe, gravity)` and accepted by every threshold correlation
+and by `threshold_analysis`.
 
 For **steady-state** solutions, each vector field has length `n` (one value per axial cell).
 For **transient** solutions, each field that was `AbstractVector` becomes `AbstractMatrix`
@@ -58,10 +60,8 @@ with shape `[n_cells, n_times]` — broadcasting in wrappers handles both unifor
     gravity::Float64
 end
 
-# #### Private helper
-
 """
-    _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81) -> ChannelState
+    ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81) -> ChannelState
 
 Extract MTK solution data from `sol` for `channel_sys` into a `ChannelState` bundle.
 
@@ -72,73 +72,58 @@ assembled into a matrix of shape `[n_cells, n_times]`.
 `q_flux_left[i] = q_wall_left[i] / (pipe.heated_parts[1] * dz)`.
 When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 """
-function _extract_channel_state(sol, channel_sys; pipe=nothing, gravity=9.81)
-    # Determine n from the length of the T array
+function ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81)
     n = length(channel_sys.T)
-
-    # Detect steady vs transient: a NonlinearSolution has no time field.
+    # A NonlinearSolution has no time axis; a single-step ODESolution is steady too.
     is_transient = hasproperty(sol, :t) && length(sol.t) > 1
 
-    if is_transient
-        # Transient: assemble [n_cells, n_times] matrices
-        T_bulk = hcat([sol[channel_sys.T[i], :] for i in 1:n]...)'
-        T_wall_left = hcat([sol[channel_sys.T_wall_left[i], :] for i in 1:n]...)'
-        T_wall_right = hcat([sol[channel_sys.T_wall_right[i], :] for i in 1:n]...)'
-        T_sat_arr = hcat([sol[channel_sys.T_sat[i], :] for i in 1:n]...)'
-        T_ONB_arr = hcat([sol[channel_sys.T_ONB[i], :] for i in 1:n]...)'
-        P_arr = hcat([sol[channel_sys.P[i], :] for i in 1:n]...)'
-        vel_arr = hcat([sol[channel_sys.velocity[i], :] for i in 1:n]...)'
-        qwl_arr = hcat([sol[channel_sys.q_wall_left[i], :] for i in 1:n]...)'
-        qwr_arr = hcat([sol[channel_sys.q_wall_right[i], :] for i in 1:n]...)'
-        # Scalar fields: use first time point
-        T_inlet_val = sol[channel_sys.inlet.T, 1]
-        ṁ_val = sol[channel_sys.inlet.ṁ, 1]
-    else
-        # Steady state: scalar per cell
-        T_bulk = [sol[channel_sys.T[i]] for i in 1:n]
-        T_wall_left = [sol[channel_sys.T_wall_left[i]] for i in 1:n]
-        T_wall_right = [sol[channel_sys.T_wall_right[i]] for i in 1:n]
-        T_sat_arr = [sol[channel_sys.T_sat[i]] for i in 1:n]
-        T_ONB_arr = [sol[channel_sys.T_ONB[i]] for i in 1:n]
-        P_arr = [sol[channel_sys.P[i]] for i in 1:n]
-        vel_arr = [sol[channel_sys.velocity[i]] for i in 1:n]
-        qwl_arr = [sol[channel_sys.q_wall_left[i]] for i in 1:n]
-        qwr_arr = [sol[channel_sys.q_wall_right[i]] for i in 1:n]
-        T_inlet_val = sol[channel_sys.inlet.T]
-        ṁ_val = sol[channel_sys.inlet.ṁ]
+    # One reader for both layouts, so the field list is written once: steady gives a value
+    # per cell, transient a [cell, time] matrix.
+    cells(sym) = is_transient ?
+        permutedims(reduce(hcat, (sol[sym[i], :] for i in 1:n))) :
+        [sol[sym[i]] for i in 1:n]
+    scalar(sym) = is_transient ? sol[sym, 1] : sol[sym]
+
+    # `velocity` is the unsigned speed and only ChannelAndContacts declares it. The other
+    # variants expose the signed `v`, so read that and take the magnitude, which lets a plain
+    # Channel or a ChannelHeatFlux be analyzed too.
+    signed_velocity = !hasproperty(channel_sys, :velocity)
+    velocity = cells(signed_velocity ? channel_sys.v : channel_sys.velocity)
+    signed_velocity && (velocity = abs.(velocity))
+
+    T_wall_left = cells(channel_sys.T_wall_left)
+    T_wall_right = cells(channel_sys.T_wall_right)
+
+    # q_wall is a heat flow [W]; dividing by the face area gives the flux the correlations
+    # want. Without a geometry there is no area, so the fluxes stay zero.
+    q_wall_left = cells(channel_sys.q_wall_left)
+    q_wall_right = cells(channel_sys.q_wall_right)
+    # A face with no heated perimeter (the second face of a circular pipe, or the dangling
+    # side of a one-sided channel) has no area to divide by, and its flux is zero rather than
+    # 0/0. Leaving that as NaN would propagate through max() into every CHF ratio.
+    function face_flux(q_wall, perimeter)
+        (pipe === nothing || iszero(perimeter)) && return zero(q_wall)
+        return q_wall ./ (perimeter * (pipe.L / n))
     end
-
-    # Conservative wall temperature: max of left and right face
-    T_wall = max.(T_wall_left, T_wall_right)
-
-    # q_flux conversion: q_wall [W] -> q_flux [W/m²]
-    if pipe !== nothing
-        dz = pipe.L / n
-        q_flux_left = qwl_arr ./ (pipe.heated_parts[1] * dz)
-        q_flux_right = qwr_arr ./ (pipe.heated_parts[2] * dz)
-    else
-        q_flux_left = zero(T_bulk)
-        q_flux_right = zero(T_bulk)
-    end
-
-    # Conservative q_flux: max of both faces
-    q_flux = max.(q_flux_left, q_flux_right)
+    q_flux_left = face_flux(q_wall_left, pipe === nothing ? 0 : pipe.heated_parts[1])
+    q_flux_right = face_flux(q_wall_right, pipe === nothing ? 0 : pipe.heated_parts[2])
 
     return ChannelState(;
         n=n,
-        T_bulk=T_bulk,
-        T_wall=T_wall,
+        T_bulk=cells(channel_sys.T),
+        # The conservative face: whichever is hotter, and whichever carries more flux.
+        T_wall=max.(T_wall_left, T_wall_right),
         T_wall_left=T_wall_left,
         T_wall_right=T_wall_right,
-        T_sat=T_sat_arr,
-        T_ONB=T_ONB_arr,
-        T_inlet=T_inlet_val,
-        P=P_arr,
-        q_flux=q_flux,
+        T_sat=cells(channel_sys.T_sat),
+        T_ONB=cells(channel_sys.T_ONB),
+        T_inlet=scalar(channel_sys.inlet.T),
+        P=cells(channel_sys.P),
+        q_flux=max.(q_flux_left, q_flux_right),
         q_flux_left=q_flux_left,
         q_flux_right=q_flux_right,
-        ṁ=ṁ_val,
-        velocity=vel_arr,
+        ṁ=scalar(channel_sys.inlet.ṁ),
+        velocity=velocity,
         pipe=pipe,
         gravity=gravity,
     )
@@ -151,7 +136,7 @@ Post-process an MTK solution by extracting channel state and applying user-speci
 analysis functions.
 
 Each keyword argument must be a callable `fn(state::ChannelState) -> AbstractArray`.
-The function calls `_extract_channel_state` to build the `ChannelState`, then dispatches
+The function builds the `ChannelState` from the solution, then dispatches
 each function and collects results into a `NamedTuple`.
 
 # Arguments
@@ -176,7 +161,7 @@ result.onb           # ONB wall temperature per cell
 ```
 """
 function threshold_analysis(sol, channel_sys; pipe=nothing, gravity=9.81, kwargs...)
-    state = _extract_channel_state(sol, channel_sys; pipe=pipe, gravity=gravity)
+    state = ChannelState(sol, channel_sys; pipe=pipe, gravity=gravity)
     names = keys(kwargs)
     values = [fn(state) for fn in Base.values(kwargs)]
     return NamedTuple{names}(Tuple(values))
@@ -276,4 +261,16 @@ q_OSV_saha_zuber(s::ChannelState) = q_OSV_saha_zuber(s.T_inlet, s.ṁ, s.pipe)
 function twall_limit(s::ChannelState; inhomogeneity_factor=1.0)
     limit(T_wall) = twall_limit.(s.T_bulk, T_wall, inhomogeneity_factor)
     return max.(limit(s.T_wall_left), limit(s.T_wall_right))
+end
+
+function Base.show(io::IO, ::MIME"text/plain", s::ChannelState)
+    kind = s.T_bulk isa AbstractMatrix ? "transient, $(size(s.T_bulk, 2)) time points" : "steady"
+    rng(v) = "$(round(minimum(v); sigdigits=5))..$(round(maximum(v); sigdigits=5))"
+    print(io, "ChannelState: ", s.n, " cells, ", kind)
+    print(io, "\n  ṁ        ", round(s.ṁ; sigdigits=5), " kg/s")
+    print(io, "\n  T_bulk   ", rng(s.T_bulk), " °C")
+    print(io, "\n  T_wall   ", rng(s.T_wall), " °C")
+    print(io, "\n  T_sat    ", rng(s.T_sat), " °C")
+    print(io, "\n  q_flux   ", rng(s.q_flux), " W/m^2")
+    print(io, "\n  pipe     ", s.pipe === nothing ? "not given (q_flux is zero)" : "given")
 end

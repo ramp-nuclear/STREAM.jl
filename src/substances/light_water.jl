@@ -181,3 +181,6 @@ function vapor_density(::LightWater, T, p)
     return (A + C * T + E * T^2 + G * T^3) /
            (1 + B * T + D * T^2 + F * T^3 + H * T^4)
 end
+
+# `H2O` is how this singleton is referred to everywhere, so print it that way.
+Base.show(io::IO, ::LightWater) = print(io, "H2O")

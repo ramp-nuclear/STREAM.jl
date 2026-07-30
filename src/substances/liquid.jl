@@ -194,3 +194,22 @@ function (liquid::AbstractLiquid)(T::AbstractArray, p=ATM)
 end
 
 Base.broadcastable(liquid::AbstractLiquid) = Ref(liquid)
+
+# A bare struct dump is nine unlabelled floats, which is unreadable at the REPL. Show the
+# properties with their names and units instead, and summarise array-valued fields (which is
+# what calling a liquid on a vector of temperatures produces) rather than printing them.
+_show_property(v::Real) = string(round(v; sigdigits=6))
+_show_property(v) = summary(v)
+
+const _LIQUID_UNITS = (
+    (:ρ, "kg/m^3"), (:ρᵥ, "kg/m^3"), (:cₚ, "J/(kg·K)"), (:μ, "Pa·s"), (:κ, "W/(m·K)"),
+    (:β, "1/K"), (:σ, "N/m"), (:hfg, "J/kg"), (:Tsat, "°C"),
+)
+
+function Base.show(io::IO, ::MIME"text/plain", l::Liquid)
+    print(io, "Liquid")
+    for (name, unit) in _LIQUID_UNITS
+        print(io, "\n  ", rpad(string(name), 4), " ",
+              lpad(_show_property(getfield(l, name)), 12), " ", unit)
+    end
+end

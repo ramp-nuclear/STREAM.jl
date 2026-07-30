@@ -169,3 +169,5 @@ function vapor_density(::HeavyWater, T, p)
     E = -1.1136e-4
     return exp((A + C * T + E * T^2) / (1 + B * T + D * T^2))
 end
+
+Base.show(io::IO, ::HeavyWater) = print(io, "D2O")
