@@ -2,175 +2,89 @@
 # build_loop, build_loop_vertical, build_loop_transient, build_cube
 
 """
-    build_loop(; n=10, T_inlet=40.0, T_wall=100.0, h_wall=5000.0,
-                 L_ch=0.6, D_ch=0.01, dP_pump=3.0e4) -> System
+    build_loop(; n=10, L_ch=0.6, D_ch=0.01, dP_pump=3.0e4, T_inlet=40.0,
+               T_wall=100.0, h_wall=5000.0, g_acc=0.0, H_return=nothing) -> System
 
-Build a simple steady-state horizontal flow loop (Pump + HeatExchanger + Channel).
+Closed forced-convection loop: Pump, HeatExchanger, and a single `Channel` heated on its
+left face.
+
+Two arguments change the topology. A non-zero `g_acc` makes the loop vertical and adds a
+return leg of height `H_return` (defaulting to `L_ch`, which cancels the channel's
+hydrostatic head). A callable `T_wall` makes the wall temperature time-varying through an
+MTK callable parameter, in which case the caller passes `ssys.T_wall_callable => T_wall` in
+the operating point.
 
 # Arguments
-- `n`: number of axial cells (default 10)
-- `T_inlet`: inlet temperature [°C] (default 40.0)
-- `T_wall`: wall temperature [°C] (default 100.0)
-- `h_wall`: convective HTC [W/(m²K)] applied on the left face (default 5000.0)
-- `L_ch`: channel length [m] (default 0.6)
-- `D_ch`: channel diameter [m] (default 0.01)
-- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
+- `n`: number of axial cells
+- `L_ch`, `D_ch`: channel length and diameter [m]
+- `dP_pump`: pump pressure rise [Pa]
+- `T_inlet`: inlet temperature [°C]
+- `T_wall`: left-face wall temperature [°C], or a callable `(t) -> °C`
+- `h_wall`: convective HTC on the left face [W/(m²K)]
+- `g_acc`: gravitational acceleration [m/s^2]; 0 gives a horizontal loop
+- `H_return`: return-leg height [m], used only when `g_acc` is non-zero
 
 # Returns
-Compiled `System` (already passed through `mtkcompile`).
+Compiled `System`, ready to solve.
 """
 function build_loop(;
     n::Int=10,
     L_ch=0.6,
     D_ch=0.01,
     dP_pump=3.0e4,
-    T_inlet=40.0,  # coolant inlet temperature [°C]
-    T_wall=100.0,  # wall temperature [°C], typical for forced convection
-    h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
+    T_inlet=40.0,
+    T_wall=100.0,
+    h_wall=5000.0,
+    g_acc=0.0,
+    H_return=nothing,
 )
     @named pump = Pump(dP_pump)
-    geo = PipeGeometry_circular(L_ch, D_ch)
-    @named ch = Channel(n=n, geometry=geo, h_left=h_wall, h_right=0.0)
-    @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
-
-    connections = Equation[
-        inseries(pump, bc, ch, pump)...,
-        pump.inlet.p ~ 1.0e5,                  # pressure gauge freedom fix
-        # Per-cell binding eqns (args.funcs idiom)
-        [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
-        [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
-    ]
-
-    @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
-    ssys = mtkcompile(sys)
-    return ssys
-end
-
-"""
-    build_loop_vertical(; n=10, T_inlet=40.0, T_wall=100.0, h_wall=5000.0,
-                         L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
-                         g_acc=G_EARTH, H_return=nothing) -> System
-
-Build a vertical flow loop with gravity (Pump + HeatExchanger + Channel + Gravity).
-
-# Arguments
-- `n`: number of axial cells (default 10)
-- `T_inlet`: inlet temperature [°C] (default 40.0)
-- `T_wall`: wall temperature [°C] (default 100.0)
-- `h_wall`: convective HTC [W/(m²K)] applied on the left face (default 5000.0)
-- `L_ch`: channel length [m] (default 0.6)
-- `D_ch`: channel diameter [m] (default 0.01)
-- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
-- `g_acc`: gravitational acceleration [m/s^2] (default G_EARTH)
-- `H_return`: height of return leg [m], defaults to `L_ch` for cancellation geometry
-
-# Returns
-Compiled `System`.
-"""
-function build_loop_vertical(;
-    n::Int=10,
-    L_ch=0.6,
-    D_ch=0.01,
-    dP_pump=3.0e4,
-    T_inlet=40.0,  # coolant inlet temperature [°C]
-    T_wall=100.0,  # wall temperature [°C], typical for forced convection
-    h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
-    g_acc=G_EARTH,  # gravitational acceleration (m/s²)
-    H_return=nothing,  # height of return leg (m); defaults to L_ch for cancellation geometry
-)
-    H = isnothing(H_return) ? L_ch : H_return
-
-    @named pump = Pump(dP_pump)
-    @named ch = Channel(;
-        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=g_acc, h_left=h_wall, h_right=0.0
-    )
     @named bc = HeatExchanger(T_inlet)
-    @named grav = Gravity(H)
+    @named ch = Channel(;
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=g_acc,
+        h_left=h_wall, h_right=0.0,
+    )
 
-    connections = Equation[
-        inseries(pump, bc, ch, grav, pump)...,
-        pump.inlet.p ~ 1.0e5,                  # pressure gauge freedom fix
-        # Per-cell binding eqns (args.funcs idiom)
-        [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
-        [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
-    ]
-
-    @named sys = compose(System(connections, t; name=:sys), pump, bc, ch, grav)
-
-    ssys = mtkcompile(sys)
-    return ssys
-end
-
-"""
-    build_loop_transient(; n=10, T_inlet=40.0, T_wall_0=100.0, h_wall=5000.0,
-                          L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
-                          T_wall_fn=nothing) -> System
-
-Build a transient-capable flow loop. When `T_wall_fn` is provided (a callable `t -> K`),
-wall temperature is time-varying via an MTK callable parameter at the builder level
-(the callable stays wired at the builder level; no `WallTemperature`
-source component required). When `T_wall_fn` is `nothing`, wall temperature is pinned
-to the scalar `T_wall_0`.
-
-When using a callable `T_wall_fn`, the caller must include the callable parameter in `op`:
-`ssys.T_wall_callable => T_wall_fn` (where `ssys` is the compiled system).
-
-# Arguments
-- `n`: number of axial cells (default 10)
-- `T_inlet`: inlet temperature [°C] (default 40.0)
-- `T_wall_0`: wall temperature [°C] (default 100.0); used when `T_wall_fn` is `nothing`
-- `h_wall`: convective HTC [W/(m²K)] applied on the left face (default 5000.0)
-- `L_ch`: channel length [m] (default 0.6)
-- `D_ch`: channel diameter [m] (default 0.01)
-- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
-- `T_wall_fn`: optional callable `(t) -> K` for time-varying wall temperature
-
-# Returns
-Compiled `System` (already passed through `mtkcompile`).
-"""
-function build_loop_transient(;
-    n::Int=10,
-    L_ch=0.6,
-    D_ch=0.01,
-    dP_pump=3.0e4,
-    T_inlet=40.0,  # coolant inlet temperature [°C]
-    T_wall_0=100.0,  # wall temperature [°C], used when T_wall_fn is nothing
-    h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
-    T_wall_fn=nothing,  # optional callable (t) -> K for time-varying wall temperature
-)
-    @named pump = Pump(dP_pump)
-    geo = PipeGeometry_circular(L_ch, D_ch)
-    @named ch = Channel(n=n, geometry=geo, h_left=h_wall, h_right=0.0)
-    @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
-
-    if T_wall_fn === nothing
-        # Scalar wall temperature — same as build_loop; no parameter declaration needed.
-        # Per-cell binding replaces the legacy single-port wall pin.
-        connections = Equation[
-            inseries(pump, bc, ch, pump)...,
-            pump.inlet.p ~ 1.0e5,
-            [ch.T_wall_left[i] ~ T_wall_0 for i in 1:n]...,
-            [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
-        ]
-        @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
-    else
-        # Callable wall temperature — uses MTK callable parameter at builder level
-        # (same `ps[1](t)` value broadcast per cell).
-        # Caller must include ssys.T_wall_callable => T_wall_fn in op.
-        FType = typeof(T_wall_fn)
-        ps = @parameters (T_wall_callable::FType)(..)
-        connections = Equation[
-            inseries(pump, bc, ch, pump)...,
-            pump.inlet.p ~ 1.0e5,
-            # Style 1 binding with builder-level callable: same `ps[1](t)` value broadcast per cell.
-            [ch.T_wall_left[i] ~ ps[1](t) for i in 1:n]...,
-            [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
-        ]
-        @named sys = compose(System(connections, t, [], ps; name=:sys), pump, bc, ch)
+    parts = Any[pump, bc, ch]
+    if !iszero(g_acc)
+        @named grav = Gravity(isnothing(H_return) ? L_ch : H_return)
+        push!(parts, grav)
     end
 
-    ssys = mtkcompile(sys)
-    return ssys
+    pars = []
+    T_wall_expr = T_wall
+    if T_wall isa Function
+        FType = typeof(T_wall)
+        pars = @parameters (T_wall_callable::FType)(..)
+        T_wall_expr = pars[1](t)
+    end
+
+    connections = Equation[
+        inseries(parts..., pump)...,
+        pump.inlet.p ~ 1.0e5,                            # fixes the pressure gauge freedom
+        [ch.T_wall_left[i] ~ T_wall_expr for i in 1:n]...,
+        [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # inert: h_right is 0
+    ]
+
+    @named sys = compose(System(connections, t, [], pars; name=:sys), parts...)
+    return mtkcompile(sys)
+end
+
+"""
+    build_loop_vertical(; g_acc=G_EARTH, kwargs...) -> System
+
+[`build_loop`](@ref) with gravity on, so the loop gets a return leg.
+"""
+build_loop_vertical(; g_acc=G_EARTH, kwargs...) = build_loop(; g_acc=g_acc, kwargs...)
+
+"""
+    build_loop_transient(; T_wall_0=100.0, T_wall_fn=nothing, kwargs...) -> System
+
+[`build_loop`](@ref) with the wall temperature named the way a transient run reads: a
+callable `T_wall_fn` when the wall varies in time, otherwise the constant `T_wall_0`.
+"""
+function build_loop_transient(; T_wall_0=100.0, T_wall_fn=nothing, kwargs...)
+    return build_loop(; T_wall=something(T_wall_fn, T_wall_0), kwargs...)
 end
 
 """
