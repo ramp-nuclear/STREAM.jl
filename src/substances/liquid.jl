@@ -8,14 +8,6 @@
 # Temperatures are Celsius and pressures are Pa throughout.
 
 """
-    ATM
-
-Standard atmospheric pressure [Pa]. Used as the default pressure by the two-argument
-property calls.
-"""
-const ATM = 101325.0
-
-"""
     AbstractLiquid
 
 Supertype for coolants. A concrete liquid implements the nine three-argument methods

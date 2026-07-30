@@ -4,6 +4,14 @@
 # the film temperature, (T_wall + T_bulk)/2, which is the convention Python STREAM uses and
 # what the parity references were generated against.
 
+"""
+    film_temperature(T_wall, T_bulk) -> °C
+
+The temperature single-phase properties are evaluated at, midway between the wall and the
+bulk. Named rather than inlined so the convention is one place to find and to change.
+"""
+film_temperature(T_wall, T_bulk) = (T_wall + T_bulk) / 2
+
 # Nusselt at a given film temperature. `nusselt` is called as `(Re, Pr)`.
 function _nu_film(T_film::Real, ṁ::Real, Dh::Real, A::Real, nusselt::Function, liquid)
     return nusselt(Re(liquid, T_film, ṁ, A, Dh), Pr(liquid, T_film))
@@ -15,7 +23,7 @@ end
 # Correlations written as `(Re, Pr, args...)` absorb the extra arguments unchanged.
 function _nu_film(T_wall::Real, T_bulk::Real, ṁ::Real, Dh::Real, A::Real,
                   nusselt::Function, liquid)
-    T_film = (T_wall + T_bulk) / 2
+    T_film = film_temperature(T_wall, T_bulk)
     with_temps(Re_val, Pr_val) = nusselt(Re_val, Pr_val, T_wall, T_bulk)
     return _nu_film(T_film, ṁ, Dh, A, with_temps, liquid)
 end
@@ -40,6 +48,6 @@ Heat transfer coefficient [W/(m^2·K)].
 """
 function h_single_phase(T_wall::Real, T_bulk::Real, ṁ::Real, Dh::Real, A::Real,
                         nusselt::Function, liquid)
-    T_film = (T_wall + T_bulk) / 2
+    T_film = film_temperature(T_wall, T_bulk)
     return _nu_film(T_wall, T_bulk, ṁ, Dh, A, nusselt, liquid) * κ(liquid, T_film) / Dh
 end

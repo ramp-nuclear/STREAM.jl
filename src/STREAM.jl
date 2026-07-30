@@ -36,6 +36,7 @@ include("components/heat_diffusion.jl")
 include("components/point_kinetics.jl")
 include("composition/connections.jl")
 include("composition/assemblies.jl")
+include("initial_conditions.jl")
 include("solvers.jl")
 include("analysis.jl")
 include("examples.jl")
@@ -56,13 +57,13 @@ export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction_rect
 export rectangular_laminar_correction, regime_dependent, elenbaas_nusselt, elenbaas_htc
 export marco_han_nusselt, turbulent_friction, viscosity_correction, maximal_htc
 export fully_developed_laminar_h_spl, developing_laminar_h_spl, HTCCorrelation
-export h_single_phase, h_subcooled_boiling
+export h_single_phase, h_subcooled_boiling, film_temperature
 export mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux
 export partial_SCB_correction, regime_dependent_q_scb
 export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber
 export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
 export ChannelState, threshold_analysis, chfr
-export Gr, Ra, Re_vel, Pe, flow_regime_blend
+export Gr, Ra, Re_vel, Pe, flow_regime_blend, Re, Pr, Nu
 export G_EARTH
 export build_loop, build_loop_vertical, build_loop_transient, build_cube
 export build_loop_lof_bypass, build_loop_pk
