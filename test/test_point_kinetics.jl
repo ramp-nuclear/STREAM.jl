@@ -30,7 +30,7 @@ import ModelingToolkit: compose
         ssys = mtkcompile(pk)
         op = vcat(
             [ssys.P => ic.P],
-            [getproperty(ssys, Symbol(:C_, k)) => ic.C_k[k] for k in 1:6],
+            [ssys.C[k] => ic.C_k[k] for k in 1:6],
         )
         prob = ODEProblem(ssys, op, (0.0, 1.0))
 
@@ -49,6 +49,36 @@ import ModelingToolkit: compose
         @test isapprox(prob[ssys.dPdt], 0.0; atol=1e-3)  # |dPdt| ~ 3e-8, scale P0 = 1e6
     end
 
+    @testset "group count follows beta_k" begin
+        # The component is not fixed at six groups: length(beta_k) sets it, and criticality
+        # has to hold for any count. A one-group model is the classic textbook reduction.
+        for G in (1, 2, 3, 11)
+            beta_k = fill(sum(U235_BETA_K) / G, G)
+            lambda_k = G == 1 ? [0.5] : collect(range(0.1, 60.0; length=G))
+            pk_g = PointKinetics(; name=:pk_g, rho=0.0, beta_k=beta_k, lambda_k=lambda_k)
+            ssys_g = mtkcompile(pk_g)
+            @test length(unknowns(ssys_g)) == 1 + G
+
+            ic_g = point_kinetics_steady_state(1e6; beta_k=beta_k, lambda_k=lambda_k)
+            @test length(ic_g.C_k) == G
+            op_g = Pair{Any,Any}[ssys_g.P => ic_g.P]
+            append!(op_g, [ssys_g.C[k] => ic_g.C_k[k] for k in 1:G])
+            sol_g = solve(
+                ODEProblem(ssys_g, op_g, (0.0, 5.0)), Rodas5P(); abstol=1e-10, reltol=1e-10
+            )
+            @test sol_g.retcode == ReturnCode.Success
+            # Critical and started at the fixed point, so power must not move.
+            @test isapprox(sol_g[ssys_g.P, end], 1e6; rtol=1e-8)
+            @test isapprox(sol_g[ssys_g.beta_total, 1], sum(beta_k); rtol=1e-10)
+        end
+    end
+
+    @testset "mismatched beta_k and lambda_k lengths are rejected" begin
+        @test_throws DimensionMismatch PointKinetics(;
+            name=:bad, beta_k=[1e-3, 2e-3], lambda_k=[1.0]
+        )
+    end
+
     @testset "precursor-only decay matches analytical" begin
         lambda_k = U235_LAMBDA_K
         @named pk = PointKinetics(rho=0.0, Lambda=1.0, beta_k=zeros(6), lambda_k=lambda_k)
@@ -58,12 +88,7 @@ import ModelingToolkit: compose
         C_k0 = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
         op = [
             ssys.P => P0,
-            ssys.C_1 => C_k0[1],
-            ssys.C_2 => C_k0[2],
-            ssys.C_3 => C_k0[3],
-            ssys.C_4 => C_k0[4],
-            ssys.C_5 => C_k0[5],
-            ssys.C_6 => C_k0[6],
+            Pair{Any,Any}[ssys.C[k] => C_k0[k] for k in 1:6]...,
         ]
 
         t_span = range(0.0, 100.0, length=500)
@@ -77,7 +102,7 @@ import ModelingToolkit: compose
 
         for (j, tj) in enumerate(t_span)
             @test isapprox(
-                sol[ssys.C_1, j], C_k0[1] * exp(-lambda_k[1] * tj), rtol=1e-3, atol=1e-6
+                sol[ssys.C[1], j], C_k0[1] * exp(-lambda_k[1] * tj), rtol=1e-3, atol=1e-6
             )
         end
     end
@@ -87,12 +112,7 @@ import ModelingToolkit: compose
         ssys = mtkcompile(pk)
         op = [
             ssys.P => 0.0,
-            ssys.C_1 => 0.0,
-            ssys.C_2 => 0.0,
-            ssys.C_3 => 0.0,
-            ssys.C_4 => 0.0,
-            ssys.C_5 => 0.0,
-            ssys.C_6 => 0.0,
+            Pair{Any,Any}[ssys.C[k] => 0.0 for k in 1:6]...,
         ]
         t_span = range(0.0, 10.0, length=100)
         sol = solve_transient(ssys, op, t_span)
@@ -106,12 +126,7 @@ import ModelingToolkit: compose
         ic = point_kinetics_steady_state(1e6)
         op = [
             ssys.P => ic.P,
-            ssys.C_1 => ic.C_k[1],
-            ssys.C_2 => ic.C_k[2],
-            ssys.C_3 => ic.C_k[3],
-            ssys.C_4 => ic.C_k[4],
-            ssys.C_5 => ic.C_k[5],
-            ssys.C_6 => ic.C_k[6],
+            Pair{Any,Any}[ssys.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_span = range(0.0, 1.0, length=10)
         sol = solve_transient(ssys, op, t_span)
@@ -204,12 +219,7 @@ import ModelingToolkit: compose
         op_b = Pair{Any,Any}[
             ssys_b.rho_c_fn => ctrl_zero,
             ssys_b.P => ic.P,
-            ssys_b.C_1 => ic.C_k[1],
-            ssys_b.C_2 => ic.C_k[2],
-            ssys_b.C_3 => ic.C_k[3],
-            ssys_b.C_4 => ic.C_k[4],
-            ssys_b.C_5 => ic.C_k[5],
-            ssys_b.C_6 => ic.C_k[6],
+            Pair{Any,Any}[ssys_b.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_arr_b = range(0.0, 2.0, length=100)
         sol_b = solve_transient(ssys_b, op_b, t_arr_b)
@@ -227,12 +237,7 @@ import ModelingToolkit: compose
         op_c = Pair{Any,Any}[
             ssys_c.rho_c_fn => ctrl_step,
             ssys_c.P => ic.P,
-            ssys_c.C_1 => ic.C_k[1],
-            ssys_c.C_2 => ic.C_k[2],
-            ssys_c.C_3 => ic.C_k[3],
-            ssys_c.C_4 => ic.C_k[4],
-            ssys_c.C_5 => ic.C_k[5],
-            ssys_c.C_6 => ic.C_k[6],
+            Pair{Any,Any}[ssys_c.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_sample = t_step + 0.028
         t_arr_c = range(0.0, t_sample, length=500)
@@ -256,12 +261,7 @@ import ModelingToolkit: compose
         op_d = Pair{Any,Any}[
             ssys_d.rho_c_fn => ctrl_ramp,
             ssys_d.P => ic.P,
-            ssys_d.C_1 => ic.C_k[1],
-            ssys_d.C_2 => ic.C_k[2],
-            ssys_d.C_3 => ic.C_k[3],
-            ssys_d.C_4 => ic.C_k[4],
-            ssys_d.C_5 => ic.C_k[5],
-            ssys_d.C_6 => ic.C_k[6],
+            Pair{Any,Any}[ssys_d.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_arr_d = range(0.0, t_ramp_end, length=200)
         sol_d = solve_transient(ssys_d, op_d, t_arr_d)
@@ -279,12 +279,7 @@ import ModelingToolkit: compose
         op_e = Pair{Any,Any}[
             ssys_e.rho_c_fn => plain_fn,
             ssys_e.P => ic.P,
-            ssys_e.C_1 => ic.C_k[1],
-            ssys_e.C_2 => ic.C_k[2],
-            ssys_e.C_3 => ic.C_k[3],
-            ssys_e.C_4 => ic.C_k[4],
-            ssys_e.C_5 => ic.C_k[5],
-            ssys_e.C_6 => ic.C_k[6],
+            Pair{Any,Any}[ssys_e.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_arr_e = range(0.0, t_sample, length=500)
         sol_e = solve_transient(ssys_e, op_e, t_arr_e; tstops=[t_step])
@@ -475,12 +470,7 @@ import ModelingToolkit: compose
         op = Pair{Any,Any}[
             ssys.rho_c_fn => ctrl,
             ssys.P => ic.P,
-            ssys.C_1 => ic.C_k[1],
-            ssys.C_2 => ic.C_k[2],
-            ssys.C_3 => ic.C_k[3],
-            ssys.C_4 => ic.C_k[4],
-            ssys.C_5 => ic.C_k[5],
-            ssys.C_6 => ic.C_k[6],
+            Pair{Any,Any}[ssys.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
 
         t_arr = range(0.0, 10.0; length=1000)

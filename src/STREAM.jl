@@ -2,6 +2,7 @@ module STREAM
 
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
+using ModelingToolkit: ⋅
 using OrdinaryDiffEq
 using QuadGK
 using SteadyStateDiffEq

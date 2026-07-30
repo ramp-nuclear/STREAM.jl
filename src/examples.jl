@@ -524,12 +524,7 @@ function build_loop_pk(ctrl;
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
         ssys.pk.P => pk_ic.P,
-        ssys.pk.C_1 => pk_ic.C_k[1],
-        ssys.pk.C_2 => pk_ic.C_k[2],
-        ssys.pk.C_3 => pk_ic.C_k[3],
-        ssys.pk.C_4 => pk_ic.C_k[4],
-        ssys.pk.C_5 => pk_ic.C_k[5],
-        ssys.pk.C_6 => pk_ic.C_k[6],
+        [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
         ssys.rods.cac.inlet.ṁ => 0.2,
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
