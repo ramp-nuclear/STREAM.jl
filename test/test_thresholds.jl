@@ -205,15 +205,15 @@ end
         @test state.pipe === pipe
     end
 
-    @testset "onb_temperature wrapper" begin
-        result = onb_temperature(state)
+    @testset "bergles_rohsenow_t_onb on a ChannelState" begin
+        result = bergles_rohsenow_t_onb(state)
         @test length(result) == n
         # T_ONB from Bergles-Rohsenow must be > T_sat for non-zero q
         @test all(result .> state.T_sat)
     end
 
-    @testset "mirshak_chf wrapper" begin
-        result = mirshak_chf(state)
+    @testset "q_CHF_mirshak on a ChannelState" begin
+        result = q_CHF_mirshak(state)
         @test length(result) == n
         @test all(result .> 0)
         expected_val =
@@ -224,37 +224,60 @@ end
         @test result[1] ≈ expected_val rtol = 1e-10
     end
 
-    @testset "fabrega_chf wrapper" begin
-        result = fabrega_chf(state)
+    @testset "q_CHF_fabrega on a ChannelState" begin
+        result = q_CHF_fabrega(state)
         @test length(result) == n
         @test all(result .> 0)
         expected_val = 1e7 * pipe.Dh * (0.023 * (100.0 - 26.85) + 4.56)
         @test result[1] ≈ expected_val rtol = 1e-10
     end
 
-    @testset "sudo_kaminaga_chf wrapper" begin
-        result = sudo_kaminaga_chf(state)
+    @testset "q_CHF_sudo_kaminaga on a ChannelState" begin
+        result = q_CHF_sudo_kaminaga(state)
         @test length(result) == n
         @test all(result .> 0)
     end
 
-    @testset "boiling_onset_power wrapper" begin
-        result = boiling_onset_power(state)
+    @testset "q_boiling_onset on a ChannelState" begin
+        result = q_boiling_onset(state)
         @test length(result) == n
         @test all(result .> 0)
         expected_val = abs(0.5) * cₚ(H2O, 46.85) * (100.0 - 26.85)
         @test result[1] ≈ expected_val rtol = 1e-8
     end
 
-    @testset "OFI_power wrapper" begin
-        result = OFI_power(state)
+    @testset "q_OFI_whittle_forgan on a ChannelState" begin
+        result = q_OFI_whittle_forgan(state)
         @test result isa Float64
         @test result > 0
         q_onset = q_boiling_onset(0.5, 100.0, 26.85, cₚ(H2O, 26.85))
         @test result < q_onset
+
+        # Pressure falls along the channel, so T_sat does too, and OFI has to read the
+        # downstream cell. The fixture above is uniform in T_sat and cannot tell the ends
+        # apart, so use a sloped profile and check both flow directions pick their own
+        # outlet. Reading the wrong end silently overstates the margin.
+        sloped = collect(range(110.0, 90.0; length=n))   # hot inlet, cooler outlet
+        fwd = ChannelState(; n=n, T_bulk=fill(46.85, n), T_wall=fill(66.85, n),
+            T_wall_left=fill(66.85, n), T_wall_right=fill(61.85, n),
+            T_sat=sloped, T_ONB=fill(106.85, n), T_inlet=26.85, P=fill(1e5, n),
+            q_flux=fill(5e5, n), q_flux_left=fill(5e5, n), q_flux_right=fill(4e5, n),
+            ṁ=0.5, velocity=fill(3.0, n), pipe=pipe, gravity=9.81)
+        rev = ChannelState(; n=n, T_bulk=fwd.T_bulk, T_wall=fwd.T_wall,
+            T_wall_left=fwd.T_wall_left, T_wall_right=fwd.T_wall_right,
+            T_sat=sloped, T_ONB=fwd.T_ONB, T_inlet=fwd.T_inlet, P=fwd.P,
+            q_flux=fwd.q_flux, q_flux_left=fwd.q_flux_left, q_flux_right=fwd.q_flux_right,
+            ṁ=-0.5, velocity=fwd.velocity, pipe=pipe, gravity=9.81)
+
+        @test q_OFI_whittle_forgan(fwd) ≈
+              q_OFI_whittle_forgan(0.5, last(sloped), 26.85, pipe) rtol = 1e-12
+        @test q_OFI_whittle_forgan(rev) ≈
+              q_OFI_whittle_forgan(-0.5, first(sloped), 26.85, pipe) rtol = 1e-12
+        # The two ends really do differ, so the assertions above have teeth.
+        @test !isapprox(q_OFI_whittle_forgan(fwd), q_OFI_whittle_forgan(rev); rtol=1e-6)
     end
 
-    @testset "twall_limit wrapper (ChannelState overload)" begin
+    @testset "twall_limit on a ChannelState" begin
         # Fixture: T_bulk 46.85, T_wall_left 66.85, T_wall_right 61.85. The left face is
         # hotter, so it sets the limit: 46.85 + 1.2*20 = 70.85.
         result = twall_limit(state; inhomogeneity_factor=1.2)
@@ -288,14 +311,14 @@ end
         gravity=9.81,
     )
 
-    ratio_fn = chfr(mirshak_chf; direction=:max)
+    ratio_fn = chfr(q_CHF_mirshak; direction=:max)
     ratios = ratio_fn(state)
     @test length(ratios) == n
     @test all(ratios .> 0)
 
-    ratio_left = chfr(mirshak_chf; direction=:left)(state)
-    ratio_right = chfr(mirshak_chf; direction=:right)(state)
-    ratio_total = chfr(mirshak_chf; direction=:total)(state)
+    ratio_left = chfr(q_CHF_mirshak; direction=:left)(state)
+    ratio_right = chfr(q_CHF_mirshak; direction=:right)(state)
+    ratio_total = chfr(q_CHF_mirshak; direction=:total)(state)
     @test length(ratio_left) == n
     @test length(ratio_right) == n
     @test length(ratio_total) == n
@@ -321,7 +344,7 @@ end
     )
     ratios_zero = ratio_fn(state_zero)
     @test all(ratios_zero .== Inf)
-    @test_throws ArgumentError chfr(mirshak_chf; direction=:bad)(state)
+    @test_throws ArgumentError chfr(q_CHF_mirshak; direction=:bad)(state)
 end
 
 @testset "threshold_analysis dispatch" begin
@@ -346,13 +369,13 @@ end
         gravity=9.81,
     )
 
-    manual_result = (mirshak=mirshak_chf(state), onb=onb_temperature(state))
+    manual_result = (mirshak=q_CHF_mirshak(state), onb=bergles_rohsenow_t_onb(state))
     @test manual_result.mirshak isa AbstractArray
     @test manual_result.onb isa AbstractArray
     @test length(manual_result.mirshak) == n
     @test length(manual_result.onb) == n
 
-    mirshak_chfr = chfr(mirshak_chf; direction=:max)
+    mirshak_chfr = chfr(q_CHF_mirshak; direction=:max)
     chfr_result = mirshak_chfr(state)
     @test length(chfr_result) == n
     @test all(chfr_result .> 0)

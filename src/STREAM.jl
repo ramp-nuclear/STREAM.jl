@@ -61,8 +61,7 @@ export mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux
 export partial_SCB_correction, regime_dependent_q_scb
 export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber
 export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
-export ChannelState, threshold_analysis, chfr, onb_temperature, boiling_onset_power
-export OFI_power, OSV_flux, sudo_kaminaga_chf, mirshak_chf, fabrega_chf
+export ChannelState, threshold_analysis, chfr
 export Gr, Ra, Re_vel, Pe
 export G_EARTH
 export build_loop, build_loop_vertical, build_loop_transient, build_cube

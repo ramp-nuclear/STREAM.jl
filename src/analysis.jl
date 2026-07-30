@@ -4,17 +4,12 @@
 # correlation functions in src/physical_models/thresholds.jl.
 #
 # Public API:
-#   ChannelState          — struct holding all pre-extracted MTK solution fields
-#   threshold_analysis    — dispatcher: extracts ChannelState, calls user-supplied analysis fns
-#   chfr                  — factory: returns CHF ratio closure with direction + guard
-#   onb_temperature       — wrapper: bergles_rohsenow_t_onb per cell
-#   boiling_onset_power   — wrapper: q_boiling_onset per cell
-#   OFI_power             — wrapper: q_OFI_whittle_forgan (scalar result)
-#   OSV_flux              — wrapper: q_OSV_saha_zuber (scalar result)
-#   sudo_kaminaga_chf     — wrapper: q_CHF_sudo_kaminaga per cell
-#   mirshak_chf           — wrapper: q_CHF_mirshak per cell
-#   fabrega_chf           — wrapper: q_CHF_fabrega per cell
-#   twall_limit(::ChannelState; ...) — method overload on ChannelState
+#   ChannelState       — the solution fields a threshold correlation needs, pre-extracted
+#   threshold_analysis — extracts a ChannelState and applies the functions you name
+#   chfr               — CHF ratio closure, with face selection and a zero-flux guard
+#
+# Each correlation in thresholds.jl also gains a ChannelState method here, so the state is
+# just another way to call it rather than a parallel set of names.
 
 """
     ChannelState
@@ -162,22 +157,22 @@ each function and collects results into a `NamedTuple`.
 # Arguments
 - `sol`: solver output — `NonlinearSolution` (steady) or `ODESolution` (transient)
 - `channel_sys`: the compiled MTK subsystem with `T`, `T_wall_left`, `T_wall_right`, etc.
-- `pipe`: optional `PipeGeometry` — needed for `q_flux_*` computation and wrappers that use pipe geometry
+- `pipe`: optional `PipeGeometry`, needed for `q_flux_*` and any correlation that uses geometry
 - `gravity`: gravitational acceleration [m/s²] (default 9.81)
-- `kwargs...`: named analysis functions, e.g. `chfr_mirshak=chfr(mirshak_chf), onb=onb_temperature`
+- `kwargs...`: named analysis functions
 
 # Returns
-`NamedTuple` with the same keys as `kwargs`, each containing the result of the corresponding function.
+`NamedTuple` with the same keys as `kwargs`, each holding that function's result.
 
 # Example
 ```julia
 result = threshold_analysis(sol, ssys.cac;
     pipe=pipe, gravity=9.81,
-    chfr_mirshak = chfr(mirshak_chf),
-    onb          = onb_temperature,
+    chfr_mirshak = chfr(q_CHF_mirshak),
+    onb          = bergles_rohsenow_t_onb,
 )
-result.chfr_mirshak  # Vector{Float64} of CHF ratios per cell
-result.onb           # Vector{Float64} of ONB temperatures per cell
+result.chfr_mirshak  # CHF ratio per cell
+result.onb           # ONB wall temperature per cell
 ```
 """
 function threshold_analysis(sol, channel_sys; pipe=nothing, gravity=9.81, kwargs...)
@@ -196,8 +191,8 @@ and a guard for zero/negative flux.
 The returned closure has signature `(state::ChannelState) -> AbstractArray`.
 
 # Arguments
-- `chf_fn`: a callable `(state::ChannelState) -> AbstractArray` — any CHF wrapper function,
-  e.g. `mirshak_chf`, `sudo_kaminaga_chf`, `fabrega_chf`
+- `chf_fn`: a callable `(state::ChannelState) -> AbstractArray`, i.e. any of
+  `q_CHF_mirshak`, `q_CHF_sudo_kaminaga`, `q_CHF_fabrega`
 - `direction`: which face's heat flux to use as denominator:
   - `:max` (default) — `max.(q_flux_left, q_flux_right)` (most conservative)
   - `:left`  — `state.q_flux_left`
@@ -229,152 +224,56 @@ function chfr(chf_fn; direction=:max)
 end
 
 """
-    onb_temperature(state::ChannelState) -> AbstractArray
+    bergles_rohsenow_t_onb(state::ChannelState)
+    q_boiling_onset(state::ChannelState; liquid=H2O)
+    q_CHF_mirshak(state::ChannelState)
+    q_CHF_fabrega(state::ChannelState)
+    q_CHF_sudo_kaminaga(state::ChannelState)
+    q_OFI_whittle_forgan(state::ChannelState)
+    q_OSV_saha_zuber(state::ChannelState)
+    twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
 
-Onset of Nucleate Boiling wall temperature per cell using Bergles-Rohsenow (1964).
+Every threshold correlation also accepts a solved channel, taking its arguments out of the
+`ChannelState`. These are methods on the correlations themselves, not a second set of names
+for them. Results come back per cell, or as `[cell, time]` for a transient.
 
-Calls `bergles_rohsenow_t_onb.(state.P, state.q_flux, state.T_sat)`.
+`q_OFI_whittle_forgan` and `q_OSV_saha_zuber` return one number for the whole channel: the
+first is a channel power, the second reports the most conservative cell. Those two and the
+two geometry-dependent CHF correlations need `state.pipe`.
 
-# Arguments
-- `state`: extracted channel state
+`q_OFI_whittle_forgan` reads its saturation temperature from the downstream cell, since
+pressure falls along the channel and the outlet is what limits the margin. Under reversed
+flow the downstream end is the other one, and it follows.
 
-# Returns
-Vector (or matrix for transient) of `T_ONB` wall temperatures [°C] per cell.
+What each correlation computes is in its own docstring.
 """
-function onb_temperature(state::ChannelState)
-    return bergles_rohsenow_t_onb.(state.P, state.q_flux, state.T_sat)
+bergles_rohsenow_t_onb(s::ChannelState) = bergles_rohsenow_t_onb.(s.P, s.q_flux, s.T_sat)
+
+function q_boiling_onset(s::ChannelState; liquid::AbstractLiquid=H2O)
+    return q_boiling_onset.(s.ṁ, s.T_sat, s.T_inlet, cₚ.(liquid, s.T_bulk))
 end
 
-"""
-    boiling_onset_power(state::ChannelState) -> AbstractArray
+q_CHF_mirshak(s::ChannelState) = q_CHF_mirshak.(s.T_bulk, s.T_sat, s.P, s.velocity)
 
-Channel power at which the bulk coolant reaches saturation temperature per cell.
+q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, Ref(s.pipe))
 
-Calls `q_boiling_onset.(state.ṁ, state.T_sat, state.T_inlet, cₚ.(liquid, state.T_bulk))`.
-
-# Arguments
-- `state`: extracted channel state
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref), supplying the specific heat
-
-# Returns
-Vector (or matrix for transient) of boiling onset power limits [W] per cell.
-"""
-function boiling_onset_power(state::ChannelState; liquid::AbstractLiquid=H2O)
-    return q_boiling_onset.(
-        state.ṁ, state.T_sat, state.T_inlet, cₚ.(liquid, state.T_bulk)
-    )
+function q_CHF_sudo_kaminaga(s::ChannelState)
+    return q_CHF_sudo_kaminaga.(s.T_bulk, s.ṁ, Ref(s.pipe), s.gravity)
 end
 
-"""
-    OFI_power(state::ChannelState) -> Float64
-
-Channel power at Onset of Flow Instability (OFI) per Whittle-Forgan / Fabréga.
-Returns a scalar (single value for the whole channel, not per cell).
-
-Requires `state.pipe !== nothing`.
-
-Calls `q_OFI_whittle_forgan(state.ṁ, state.T_sat[1], state.T_inlet, state.pipe)`.
-
-# Arguments
-- `state`: extracted channel state (must have `pipe` set)
-
-# Returns
-OFI power limit [W] for the channel.
-"""
-function OFI_power(state::ChannelState)
-    T_sat_rep = state.T_sat isa AbstractMatrix ? state.T_sat[1, 1] : state.T_sat[1]
-    return q_OFI_whittle_forgan(state.ṁ, T_sat_rep, state.T_inlet, state.pipe)
+# T_sat is taken at the downstream end of the channel, where the coolant has warmed the most
+# and the pressure has dropped the furthest, so it is the cell that limits OFI. Which end is
+# downstream follows the flow direction. Matches Python STREAM's
+# `pressure[-1 if mdot >= 0 else 0]`.
+function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
+    per_cell = s.T_sat isa AbstractMatrix ? view(s.T_sat, :, 1) : s.T_sat
+    T_sat_out = s.ṁ >= 0 ? last(per_cell) : first(per_cell)
+    return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.pipe; liquid=liquid)
 end
 
-"""
-    OSV_flux(state::ChannelState) -> Float64
+q_OSV_saha_zuber(s::ChannelState) = q_OSV_saha_zuber(s.T_inlet, s.ṁ, s.pipe)
 
-Onset of Significant Void (OSV) heat flux per Saha-Zuber self-consistent formulation.
-Returns a scalar (minimum over all cells — most conservative).
-
-Requires `state.pipe !== nothing`.
-
-Calls `q_OSV_saha_zuber(state.T_inlet, state.ṁ, state.pipe)`.
-
-# Arguments
-- `state`: extracted channel state (must have `pipe` set)
-
-# Returns
-OSV heat flux limit [W/m²] (minimum over all channel cells).
-"""
-function OSV_flux(state::ChannelState)
-    return q_OSV_saha_zuber(state.T_inlet, state.ṁ, state.pipe)
-end
-
-"""
-    sudo_kaminaga_chf(state::ChannelState) -> AbstractArray
-
-Critical Heat Flux per Sudo-Kaminaga (1998) plate-type fuel correlation, per cell.
-
-Calls `q_CHF_sudo_kaminaga.(state.T_bulk, state.ṁ, state.pipe, state.gravity)`.
-
-# Arguments
-- `state`: extracted channel state (must have `pipe` set)
-
-# Returns
-Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
-"""
-function sudo_kaminaga_chf(state::ChannelState)
-    return q_CHF_sudo_kaminaga.(state.T_bulk, state.ṁ, Ref(state.pipe), state.gravity)
-end
-
-"""
-    mirshak_chf(state::ChannelState) -> AbstractArray
-
-Critical Heat Flux per Mirshak et al. (1959) correlation (valid for v > 1.5 m/s), per cell.
-
-Calls `q_CHF_mirshak.(state.T_bulk, state.T_sat, state.P, state.velocity)`.
-
-# Arguments
-- `state`: extracted channel state
-
-# Returns
-Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
-"""
-function mirshak_chf(state::ChannelState)
-    return q_CHF_mirshak.(state.T_bulk, state.T_sat, state.P, state.velocity)
-end
-
-"""
-    fabrega_chf(state::ChannelState) -> AbstractArray
-
-Critical Heat Flux per Fabréga (1971) correlation (valid for v < 0.5 m/s), per cell.
-
-Calls `q_CHF_fabrega.(state.T_inlet, state.T_sat, state.pipe)`.
-
-# Arguments
-- `state`: extracted channel state (must have `pipe` set)
-
-# Returns
-Vector (or matrix for transient) of CHF heat fluxes [W/m²] per cell.
-"""
-function fabrega_chf(state::ChannelState)
-    return q_CHF_fabrega.(state.T_inlet, state.T_sat, Ref(state.pipe))
-end
-
-"""
-    twall_limit(state::ChannelState; inhomogeneity_factor=1.0) -> AbstractArray
-
-Wall temperature limit per cell, taking the hotter of the two faces.
-
-This is a `ChannelState` method overload on the physics-layer
-`twall_limit(T_bulk, T_wall, factor)`. Each face is limited separately against the bulk
-and the two are then maxed, which is what Python STREAM's `twall_limit` does.
-
-# Arguments
-- `state`: extracted channel state
-- `inhomogeneity_factor`: dimensionless flux multiplier (default 1.0, no correction)
-
-# Returns
-Vector (or matrix for transient) of effective wall temperature limits [°C] per cell.
-"""
-function twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
-    left = twall_limit.(state.T_bulk, state.T_wall_left, inhomogeneity_factor)
-    right = twall_limit.(state.T_bulk, state.T_wall_right, inhomogeneity_factor)
-    return max.(left, right)
+function twall_limit(s::ChannelState; inhomogeneity_factor=1.0)
+    limit(T_wall) = twall_limit.(s.T_bulk, T_wall, inhomogeneity_factor)
+    return max.(limit(s.T_wall_left), limit(s.T_wall_right))
 end
