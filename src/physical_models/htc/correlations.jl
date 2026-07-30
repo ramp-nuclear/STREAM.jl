@@ -147,15 +147,7 @@ function regime_dependent(geom::PipeGeometry;
             )
         htc_fn =
             (Re, Pr, T_bulk, T_wall) -> begin
-                Gr_val = Gr(
-                    ρ(liquid, T_bulk),
-                    μ(liquid, T_bulk),
-                    β(liquid, T_bulk),
-                    T_wall,
-                    T_bulk,
-                    Dh_val,
-                    g_val,
-                )
+                Gr_val = Gr(liquid, T_bulk, T_wall, Dh_val, g_val)
                 ifelse(
                     Gr_val / Re^2 > 1,
                     htc_natural(Re, Pr, T_bulk, T_wall),
@@ -244,15 +236,7 @@ function elenbaas_htc(geom::PipeGeometry; g=G_EARTH, liquid::AbstractLiquid=H2O)
     L_h = geom.L
     Dh_v = geom.Dh
     return (Re, Pr, T_bulk, T_wall) -> begin
-        Gr_val = Gr(
-            ρ(liquid, T_bulk),
-            μ(liquid, T_bulk),
-            β(liquid, T_bulk),
-            T_wall,
-            T_bulk,
-            Dh_v,
-            g,
-        )
+        Gr_val = Gr(liquid, T_bulk, T_wall, Dh_v, g)
         Ra_val = Ra(Gr_val, Pr)
         elenbaas_nusselt(Ra_val, b, L_h)
     end

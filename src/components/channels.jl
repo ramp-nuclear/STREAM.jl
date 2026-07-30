@@ -68,16 +68,13 @@ function _channel_core(;
     T_inlet_fwd = instream(inlet.T)
     T_inlet_rev = instream(outlet.T)
 
-    # One property evaluation per cell. The correlations are traced straight into the
-    # equations, so asking for the same property at the same T twice would emit the
-    # subexpression twice.
+    # Density and specific heat are named because several equations below reuse them; the
+    # rest of the properties are reached through the dimensionless numbers that want them.
     ρ_c  = ρ.(liquid, T)
     cp_c = cₚ.(liquid, T)
-    μ_c  = μ.(liquid, T)
-    κ_c  = κ.(liquid, T)
 
-    Re_c = Re.(inlet.ṁ, A, Dh, μ_c)
-    Pr_c = Pr.(cp_c, μ_c, κ_c)
+    Re_c = Re.(liquid, T, inlet.ṁ, A, Dh)
+    Pr_c = Pr.(liquid, T)
     # Cell-centre pressure: inlet minus the drop accumulated up to this cell, plus back
     # half a cell to land at the centre rather than the outlet face.
     P_c = inlet.p .- cumsum(dp) .+ dp ./ 2
@@ -404,53 +401,6 @@ function ChannelHeatFlux(;
 end
 
 
-function _nu_film(T_film::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function, liquid)
-    Re = STREAM.Re(ṁ, A, Dh, μ(liquid, T_film))
-    Pr = STREAM.Pr(cₚ(liquid, T_film), μ(liquid, T_film), κ(liquid, T_film))
-    return nu_f(Re, Pr)
-end
-
-function _nu_film(T_w::Real, T::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function, liquid)
-    T_film   = (T_w + T) / 2
-    nupartial(Re, Pr) = nu_f(Re, Pr, T_w, T)
-    return _nu_film(T_film, ṁ, Dh, A, nupartial, liquid)
-end
-
-function _h_spl(T_w::Real, T::Real, ṁ::Real, Dh::Real, A::Real, nu_f::Function, liquid)
-    T_film   = (T_w + T) / 2
-    # Route through the (T_w, T)-aware `_nu_film` so strict 4-arg correlations
-    # (e.g. `regime_dependent` with NC switching) receive `(Re, Pr, T_w, T)`.
-    # Simple `(Re, Pr, args...)` correlations absorb the extra temps unchanged.
-    return _nu_film(T_w, T, ṁ, Dh, A, nu_f, liquid) * κ(liquid, T_film) / Dh
-end
-
-
-function _h_eq_nocor(Tw::Real, T::Real, ṁ::Real, Dh::Real, A::Real, htc, nu_f::Function, liquid)
-    return htc ~ _h_spl(Tw, T, ṁ, Dh, A, nu_f, liquid)
-end
-
-
-function _h_eq_scb_cor(
-    T_w::Real,
-    T::Real,
-    cumdp::Real,
-    dp::Real,
-    htc,
-    ṁ::Real,
-                       P_in::Real, Dh::Real, A::Real, nu_f::Function, scb_f::Function, liquid)
-    h_spl = _h_spl(T_w, T, ṁ, Dh, A, nu_f, liquid)
-    q_spl = max(h_spl * (T_w - T), 0.0)
-    P = P_in - cumdp + dp/2
-    T_sat = Tsat(liquid, P)
-    Re = STREAM.Re(ṁ, A, Dh, μ(liquid, T))
-    q_scb  = scb_f(T_w, T_sat, Re)
-    T_ONB  = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
-    q_scb_inc  = scb_f(T_ONB, T_sat, Re)
-    factor     = partial_SCB_correction(q_spl, q_scb, q_scb_inc)
-
-    return htc ~ ifelse(T_w >= T_ONB, h_spl * factor, h_spl)
-end
-
 
 """
     ChannelAndContacts(; name, n, geometry, g=0.0,
@@ -527,45 +477,37 @@ function ChannelAndContacts(;
     )
 
     T = collect(vars.T)
-    cumdp = cumsum(collect(vars.dp))
+    # Cell-centre pressure, which the subcooled-boiling HTC needs for T_sat and the ONB
+    # superheat. Same expression `_channel_core` uses for its P observable.
+    P_cell = inlet.p .- cumsum(collect(vars.dp)) .+ collect(vars.dp) ./ 2
     wall_T(face) = [port.T for port in face.port]
     q_wall(face) = collect(face.h) .* face.perimeter .* dz .* (wall_T(face) .- T)
 
-    function htc_eqs(face)
-        if scb_correction === nothing
-            return [
-                _h_eq_nocor(
-                    face.port[i].T, T[i], inlet.ṁ, Dh, A, face.h[i], htc_correlation, liquid
-                ) for i in 1:n
-            ]
-        end
-        return [
-            _h_eq_scb_cor(
-                face.port[i].T, T[i], cumdp[i], vars.dp[i], face.h[i], inlet.ṁ, inlet.p,
-                Dh, A, htc_correlation, scb_correction, liquid,
-            ) for i in 1:n
-        ]
-    end
+    # Which HTC physics applies is the only thing `scb_correction` changes.
+    wall_htc(face, i) =
+        scb_correction === nothing ?
+        h_single_phase(face.port[i].T, T[i], inlet.ṁ, Dh, A, htc_correlation, liquid) :
+        h_subcooled_boiling(
+            face.port[i].T, T[i], P_cell[i], inlet.ṁ, Dh, A,
+            htc_correlation, scb_correction, liquid,
+        )
 
     q_left_expr, q_right_expr = q_wall.(faces)
 
     variant_eqs = Equation[]
     for face in faces
-        append!(variant_eqs, htc_eqs(face))
+        append!(variant_eqs, [face.h[i] ~ wall_htc(face, i) for i in 1:n])
     end
     for (face, q) in zip(faces, (q_left_expr, q_right_expr))
         append!(variant_eqs, [face.port[i].Q ~ q[i] for i in 1:n])
     end
 
-    ρ_c = ρ.(liquid, T)
-    μ_c = μ.(liquid, T)
-    β_c = β.(liquid, T)
-    Re_bulk = Re.(inlet.ṁ, A, Dh, μ_c)
+    Re_bulk = Re.(liquid, T, inlet.ṁ, A, Dh)
 
     variant_obs = Equation[]
     for face in faces
         T_wall = wall_T(face)
-        Gr_face = Gr.(ρ_c, μ_c, β_c, T_wall, T, Dh, g)
+        Gr_face = Gr.(liquid, T, T_wall, Dh, g)
         append!(variant_obs, collect(face.Nu) .~
             [_nu_film(T_wall[i], T[i], inlet.ṁ, Dh, A, htc_correlation, liquid) for i in 1:n])
         append!(variant_obs, collect(face.T_wall) .~ T_wall)

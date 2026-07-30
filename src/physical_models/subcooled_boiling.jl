@@ -127,3 +127,40 @@ function regime_dependent_q_scb(;
         bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure; h_fg=h_fg, sigma=sigma),
     )
 end
+
+"""
+    h_subcooled_boiling(T_wall, T_bulk, P, ṁ, Dh, A, nusselt, q_scb, liquid) -> W/(m^2·K)
+
+Heat transfer coefficient with partial subcooled boiling folded in: the single-phase value
+below the onset of nucleate boiling, and that value scaled by the Bergles-Rohsenow partial
+boiling factor at or above it.
+
+The switch is `ifelse` on `T_wall >= T_ONB`, so it stays a symbolic branch the solver
+evaluates per step rather than one fixed at trace time.
+
+# Arguments
+- `T_wall`, `T_bulk`: wall and bulk coolant temperature [°C]
+- `P`: local absolute pressure [Pa], which sets `T_sat` and the ONB superheat
+- `ṁ`: mass flow rate [kg/s]
+- `Dh`: hydraulic diameter [m]
+- `A`: flow area [m^2]
+- `nusselt`: single-phase Nusselt correlation, as for [`h_single_phase`](@ref)
+- `q_scb`: subcooled boiling heat flux closure `(T_wall, T_sat, Re) -> q [W/m^2]`, e.g. from
+  [`regime_dependent_q_scb`](@ref)
+- `liquid`: coolant (`AbstractLiquid`)
+
+# Returns
+Heat transfer coefficient [W/(m^2·K)].
+"""
+function h_subcooled_boiling(T_wall::Real, T_bulk::Real, P::Real, ṁ::Real, Dh::Real,
+                             A::Real, nusselt::Function, q_scb::Function, liquid)
+    h_spl = h_single_phase(T_wall, T_bulk, ṁ, Dh, A, nusselt, liquid)
+    q_spl = max(h_spl * (T_wall - T_bulk), 0.0)
+    T_sat = Tsat(liquid, P)
+    Re_bulk = Re(ṁ, A, Dh, μ(liquid, T_bulk))
+    T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
+    factor = partial_SCB_correction(
+        q_spl, q_scb(T_wall, T_sat, Re_bulk), q_scb(T_ONB, T_sat, Re_bulk)
+    )
+    return ifelse(T_wall >= T_ONB, h_spl * factor, h_spl)
+end

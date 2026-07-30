@@ -19,6 +19,7 @@ include("connectors.jl")
 include("knobs.jl")
 include("geometry.jl")
 include("physical_models/htc/correlations.jl")
+include("physical_models/htc/single_phase.jl")
 include("physical_models/friction/correlations.jl")
 include("physical_models/subcooled_boiling.jl")
 include("physical_models/threshold_analysis.jl")
@@ -54,6 +55,7 @@ export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction_rect
 export rectangular_laminar_correction, regime_dependent, elenbaas_nusselt, elenbaas_htc
 export marco_han_nusselt, turbulent_friction, viscosity_correction, maximal_htc
 export fully_developed_laminar_h_spl, developing_laminar_h_spl, HTCCorrelation
+export h_single_phase, h_subcooled_boiling
 export mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux
 export partial_SCB_correction, regime_dependent_q_scb
 export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber

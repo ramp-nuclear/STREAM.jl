@@ -704,7 +704,7 @@ end
     end
 
     @testset "SCB ChannelAndContacts solves (sub-ONB), matches non-SCB" begin
-        # T_wall=380K is below T_ONB at 2 bar, so _h_eq_scb_cor selects its
+        # T_wall is below T_ONB at 2 bar, so h_subcooled_boiling selects its
         # uncorrected branch (htc = h_spl). The "SCB present but inactive" claim
         # therefore means the SCB loop must reproduce the non-SCB loop exactly.
         # Build both, solve both, and compare h_tc and coolant T cell by cell.

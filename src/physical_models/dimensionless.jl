@@ -51,6 +51,14 @@ Prandtl number (dimensionless).
 Pr(cp, mu, k) = cp * mu / k
 
 """
+    Re(liquid, T, ṁ, A, Dh) -> Float64
+    Pr(liquid, T) -> Float64
+    Gr(liquid, T, T_wall, L, g) -> Float64
+"""
+Re(liquid::AbstractLiquid, T, ṁ, A, Dh) = Re(ṁ, A, Dh, μ(liquid, T))
+Pr(liquid::AbstractLiquid, T) = Pr(cₚ(liquid, T), μ(liquid, T), κ(liquid, T))
+
+"""
     Nu(h, Dh, k) -> Float64
 
 Nusselt number.
@@ -97,6 +105,12 @@ Grashof number.
 Grashof number (dimensionless).
 """
 Gr(rho, mu, beta, T_wall, T, L, g) = rho^2 * beta * g * (T_wall - T) * L^3 / mu^2
+
+# Buoyancy is driven by the bulk-to-wall difference, so ρ, μ and β are taken at the bulk
+# temperature `T`.
+function Gr(liquid::AbstractLiquid, T, T_wall, L, g)
+    return Gr(ρ(liquid, T), μ(liquid, T), β(liquid, T), T_wall, T, L, g)
+end
 
 """
     Ra(Gr_val, Pr_val) -> Float64
