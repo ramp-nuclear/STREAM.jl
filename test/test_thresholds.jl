@@ -94,6 +94,10 @@ using STREAM
             1443852.2363455354 rtol = 1e-9
     end
 
+    # The saturated coolant the Sudo-Kaminaga anchors were generated against: the rounded
+    # book values for water near 1 atm, which differ from H2O(100.0) in the fourth digit.
+    sat_water = Liquid(; ρ=958.4, ρᵥ=0.598, cₚ=4217.0, hfg=2257e3, σ=0.059, Tsat=100.0)
+
     @testset "q_CHF_sudo_kaminaga" begin
         # Anchor: Python physical_models.thresholds.Sudo_Kaminaga_CHF, fed a sat_coolant
         # Liquid carrying exactly the Julia defaults (rho_l=958.4, rho_v=0.598, hfg=2257e3,
@@ -110,34 +114,34 @@ using STREAM
 
         # Downward branch, q2 selected (subcooling term dominates):
         # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=0.5, g=9.81) -> 1391788.0650769984
-        @test q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81) ≈ 1391788.0650769984 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat_water) ≈ 1391788.0650769984 rtol = 1e-9
         # Colder bulk -> larger subcooling -> higher CHF.
         # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=0.5, g=9.81) -> 1915508.8797814196
-        @test q_CHF_sudo_kaminaga(26.85, 0.5, pipe, 9.81) ≈ 1915508.8797814196 rtol = 1e-9
-        @test q_CHF_sudo_kaminaga(26.85, 0.5, pipe, 9.81) >
-            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81)
+        @test q_CHF_sudo_kaminaga(26.85, 0.5, pipe, 9.81, sat_water) ≈ 1915508.8797814196 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(26.85, 0.5, pipe, 9.81, sat_water) >
+            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat_water)
 
         # q4-binding cases (NONZERO outlet subcooling). Large ṁ grows q2 past q4, so q4
         # is the selected (most limiting) sub-correlation. These exercise the corrected
         # outlet term: q4 = q1*(1 + 5000*dT_outlet/|G*|) with dT_outlet > 0.
         # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=5.0, g=9.81) -> 11350154.095336435
-        @test q_CHF_sudo_kaminaga(26.85, 5.0, pipe, 9.81) ≈ 11350154.095336435 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(26.85, 5.0, pipe, 9.81, sat_water) ≈ 11350154.095336435 rtol = 1e-9
         # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=8.0, g=9.81) -> 14693105.002503937
-        @test q_CHF_sudo_kaminaga(26.85, 8.0, pipe, 9.81) ≈ 14693105.002503937 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(26.85, 8.0, pipe, 9.81, sat_water) ≈ 14693105.002503937 rtol = 1e-9
 
         # Upward branch: negative ṁ flips G* < 0, folding q1 into the max, so the
         # selection genuinely differs from the downward branch and yields a higher CHF.
         # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=-0.5, g=9.81) -> 2567664.771611573
-        @test q_CHF_sudo_kaminaga(46.85, -0.5, pipe, 9.81) ≈ 2567664.771611573 rtol = 1e-9
-        @test q_CHF_sudo_kaminaga(46.85, -0.5, pipe, 9.81) >
-            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81)
+        @test q_CHF_sudo_kaminaga(46.85, -0.5, pipe, 9.81, sat_water) ≈ 2567664.771611573 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(46.85, -0.5, pipe, 9.81, sat_water) >
+            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat_water)
 
         # Gravity enters Julia only as |g| (Julia takes abs(gravity) for the capillary
         # length), so flipping the gravity sign leaves the result unchanged for positive
         # ṁ. This is a Julia-internal choice: Python does NOT abs g and returns NaN for
         # negative g, so this assertion is a Julia self-check, not a Python anchor.
-        @test q_CHF_sudo_kaminaga(46.85, 0.5, pipe, -9.81) ≈
-            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81) rtol = 1e-10
+        @test q_CHF_sudo_kaminaga(46.85, 0.5, pipe, -9.81, sat_water) ≈
+            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat_water) rtol = 1e-10
     end
 
     @testset "q_CHF_mirshak" begin
@@ -233,9 +237,49 @@ end
     end
 
     @testset "q_CHF_sudo_kaminaga on a ChannelState" begin
+        # Per cell, like the other correlations: the state method builds the saturated
+        # snapshot from the channel's own saturation state and hands the whole profile over.
         result = q_CHF_sudo_kaminaga(state)
         @test length(result) == n
         @test all(result .> 0)
+
+        # q2/q3 read the inlet subcooling and q4 the outlet, so a channel that heats along
+        # its length is not the same as a uniform one at either end temperature. The fixture
+        # is uniform in T_bulk, so build a sloped one to tell them apart.
+        warming = collect(range(40.0, 70.0; length=n))
+        sloped = ChannelState(; n=n, T_bulk=warming, T_wall=fill(90.0, n),
+            T_wall_left=fill(90.0, n), T_wall_right=fill(85.0, n),
+            T_sat=fill(100.0, n), T_ONB=fill(106.85, n), T_inlet=40.0, P=fill(1e5, n),
+            q_flux=fill(5e5, n), q_flux_left=fill(5e5, n), q_flux_right=fill(4e5, n),
+            ṁ=0.5, velocity=fill(3.0, n), pipe=pipe, gravity=9.81)
+
+        # The state method takes its saturated properties from the coolant at the channel's
+        # own saturation state, so the explicit call needs the same snapshot to agree.
+        sat = H2O(fill(100.0, n), fill(1e5, n))
+        @test q_CHF_sudo_kaminaga(sloped) ≈
+              q_CHF_sudo_kaminaga(warming, 0.5, pipe, 9.81, sat) rtol = 1e-12
+
+        # The inlet always matters: q2 and q3 both read it.
+        @test !isapprox(q_CHF_sudo_kaminaga(sloped),
+                        q_CHF_sudo_kaminaga(fill(last(warming), n), 0.5, pipe, 9.81, sat);
+                        rtol=1e-6)
+
+        # The outlet only shows up when q4 is the selected sub-correlation, which needs a
+        # high enough flow for q2 to grow past it. At ṁ = 0.5 both ends give the same answer,
+        # so a test there would pass no matter which end q4 was fed.
+        flat = q_CHF_sudo_kaminaga(fill(40.0, n), 0.5, pipe, 9.81, sat)
+        warm = q_CHF_sudo_kaminaga([fill(40.0, n - 1); 70.0], 0.5, pipe, 9.81, sat)
+        @test flat ≈ warm rtol = 1e-12
+        fast_flat = q_CHF_sudo_kaminaga(fill(40.0, n), 5.0, pipe, 9.81, sat)
+        fast_warm = q_CHF_sudo_kaminaga([fill(40.0, n - 1); 70.0], 5.0, pipe, 9.81, sat)
+        @test !isapprox(fast_flat, fast_warm; rtol=1e-6)
+        # Hotter outlet means less subcooling to absorb, so a lower limit.
+        @test all(fast_warm .< fast_flat)
+
+        # A one-cell profile and a scalar call are the same thing.
+        one_cell = H2O(100.0, 1e5)
+        @test only(q_CHF_sudo_kaminaga([46.85], 0.5, pipe, 9.81, H2O([100.0], [1e5]))) ≈
+              q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, one_cell)
     end
 
     @testset "q_boiling_onset on a ChannelState" begin

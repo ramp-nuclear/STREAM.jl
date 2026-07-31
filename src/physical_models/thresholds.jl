@@ -189,76 +189,69 @@ function q_OSV_saha_zuber(
 end
 
 """
-    q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity; rho_l=958.4, rho_v=0.598, hfg=2257e3, sigma=0.059, cp_sat=4217.0, T_sat=100.0) -> q_CHF [W/m^2]
+    q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant) -> q_CHF [W/m^2]
 
 Critical Heat Flux (CHF) per Sudo-Kaminaga (1998) correlation for plate-type fuel.
 
-Four sub-correlations (_SKq1..4) with direction-dependent selection:
-- G_star >= 0 (downward/horizontal flow): q_star = max(min(q2,q4), q3)
-- G_star < 0 (upward flow): q_star = max(max(min(q2,q4), q1), q3)
+Four sub-correlations (`_SKq1..4`) with direction-dependent selection:
+- `G_star >= 0` (downward/horizontal flow): `q_star = max(min(q2, q4), q3)`
+- `G_star < 0` (upward flow): the same, then also maxed against `q1`
 
-Final result: `q_CHF = q_star * hfg * sqrt(lamda * drho * rho_v * gravity)`
-where `lamda = sqrt(sigma / drho / |gravity|)` (capillary length).
+Final result: `q_CHF = q_star * hfg * sqrt(lamda * drho * rho_v * gravity)` where
+`lamda = sqrt(sigma / drho / |gravity|)` is the capillary length.
+
+Everything is elementwise, so passing per-cell `T_bulk` and a per-cell `sat_coolant` gives a
+per-cell CHF, and passing scalars gives a scalar.
+
+The subcooling is the exception, and it is what makes this a channel correlation rather than
+a per-cell one. It was fitted to experiments that characterised a whole test section, so q2
+and q3 are driven by the temperature difference at the **inlet** and q4 by the one at the
+**outlet**. Only those two differences come from the channel ends; the `cp/hfg` factor
+multiplying them stays per cell, as in Python STREAM.
 
 Uses `pipe.width` (NOT `heated_perimeter/2`) for q3 per Mishima's experiments.
 
-Source: Python STREAM thresholds.py `sudo_kaminaga_chf`.
+Source: Python STREAM thresholds.py `Sudo_Kaminaga_CHF`.
 
 # Arguments
-- `T_bulk`: bulk coolant temperature [°C] (scalar, at inlet cell)
-- `ṁ`: mass flow rate [kg/s]
+- `T_bulk`: bulk coolant temperature, per cell [°C]
+- `ṁ`: mass flow rate [kg/s]
 - `pipe`: channel geometry [`PipeGeometry`]
-- `gravity`: gravitational acceleration [m/s^2] (sign: positive = upward-to-downward, negative = upward flow)
-- `rho_l`: saturated liquid density [kg/m^3] (default: 958.4 at 100°C)
-- `rho_v`: saturated vapor density [kg/m^3] (default: 0.598 at 100°C)
-- `hfg`: latent heat of vaporization [J/kg] (default: 2257e3)
-- `sigma`: surface tension [N/m] (default: 0.059)
-- `cp_sat`: specific heat at saturation [J/(kg·K)] (default: 4217.0)
-- `T_sat`: saturation temperature [°C] (default: 100.0)
+- `gravity`: gravitational acceleration [m/s^2] (sign: positive = upward-to-downward,
+  negative = upward flow)
+- `sat_coolant`: saturated-coolant properties as a [`Liquid`](@ref), supplying ρ, ρᵥ, cₚ,
+  hfg, σ and Tsat. Build it by calling a coolant at the channel's saturation state, e.g.
+  `H2O(T_sat, P)`. There is no default: which coolant, and at which state, is the caller's
+  to state.
 
 # Returns
-CHF heat flux `q_CHF` [W/m^2].
+CHF heat flux `q_CHF` [W/m^2], shaped like the inputs.
 """
-function q_CHF_sudo_kaminaga(
-    T_bulk,
-    ṁ,
-    pipe,
-    gravity;
-    rho_l=958.4,
-    rho_v=0.598,
-    hfg=2257e3,
-    sigma=0.059,
-    cp_sat=4217.0,
-    T_sat=100.0,
-)
+function q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant::Liquid)
     g_abs = abs(gravity)
-    drho = rho_l - rho_v
-    lamda = sqrt(sigma / drho / g_abs)
-    Aht = sum(pipe.heated_parts) * pipe.L
-    A_ratio = pipe.A / Aht
+    rho_l, rho_v = sat_coolant.ρ, sat_coolant.ρᵥ
+    hfg, cp, T_sat = sat_coolant.hfg, sat_coolant.cₚ, sat_coolant.Tsat
 
-    G_star = ṁ / pipe.A / sqrt(lamda * drho * rho_v * g_abs)
+    drho = rho_l .- rho_v
+    lamda = sqrt.(sat_coolant.σ ./ drho ./ g_abs)
+    G_star = ṁ ./ pipe.A ./ sqrt.(lamda .* drho .* rho_v .* g_abs)
+    A_ratio = pipe.A / (sum(pipe.heated_parts) * pipe.L)
 
-    # Local subcooling at this cell. Python STREAM's Sudo_Kaminaga_CHF feeds q2/q3 the inlet
-    # subcooling and q4 the outlet subcooling (different cells of the channel). This function runs
-    # per cell, so both terms are the same cell's local subcooling; they collapse to one value here.
-    dT_sub = (cp_sat / hfg) * (T_sat - T_bulk)
+    # The driving temperature differences are the channel's, taken at its two ends. The
+    # cp/hfg factor in front of them is local.
+    dT_inlet = (cp ./ hfg) .* (first(T_sat) - first(T_bulk))
+    dT_outlet = (cp ./ hfg) .* (last(T_sat) - last(T_bulk))
 
-    q1 = _SKq1(G_star)
-    q2 = _SKq2(A_ratio, G_star, dT_sub)
-    q3 = _SKq3(A_ratio, pipe.width, lamda, dT_sub, rho_v, rho_l)
-    q4 = _SKq4(G_star, dT_sub)
+    q1 = _SKq1.(G_star)
+    q2 = _SKq2.(A_ratio, G_star, dT_inlet)
+    q3 = _SKq3.(A_ratio, pipe.width, lamda, dT_inlet, rho_v, rho_l)
+    q4 = _SKq4.(G_star, dT_outlet)
 
-    # Direction-dependent selection
-    if G_star >= 0
-        # Downward or horizontal flow
-        q_star = max(min(q2, q4), q3)
-    else
-        # Upward flow
-        q_star = max(max(min(q2, q4), q1), q3)
-    end
+    # Downward or horizontal flow takes the forced selection; upward flow also admits q1.
+    forced = max.(min.(q2, q4), q3)
+    q_star = ifelse.(G_star .>= 0, forced, max.(forced, q1))
 
-    return q_star * hfg * sqrt(lamda * drho * rho_v * g_abs)
+    return q_star .* hfg .* sqrt.(lamda .* drho .* rho_v .* g_abs)
 end
 
 """

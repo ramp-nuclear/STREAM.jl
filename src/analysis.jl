@@ -203,8 +203,10 @@ function chfr(chf_fn; direction=:max)
                 ArgumentError("direction must be :left, :right, :max, or :total, got :$direction"),
             )
         end
-        chf_vals = chf_fn(state)
-        return [q_i > 0 ? c_i / q_i : Inf for (c_i, q_i) in zip(chf_vals, q)]
+        # Broadcast rather than zip: a channel-level correlation such as
+# q_CHF_sudo_kaminaga gives one number for the whole channel, and it has to divide
+# into the per-cell flux just the same.
+return ifelse.(q .> 0, chf_fn(state) ./ q, Inf)
     end
 end
 
@@ -242,8 +244,14 @@ q_CHF_mirshak(s::ChannelState) = q_CHF_mirshak.(s.T_bulk, s.T_sat, s.P, s.veloci
 
 q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, Ref(s.pipe))
 
-function q_CHF_sudo_kaminaga(s::ChannelState)
-    return q_CHF_sudo_kaminaga.(s.T_bulk, s.ṁ, Ref(s.pipe), s.gravity)
+# The correlation needs saturated-coolant properties, and this is where the coolant is
+# known, so the snapshot is built here: one entry per cell at that cell's saturation state.
+function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=H2O)
+    per_cell(v) = v isa AbstractMatrix ? collect(view(v, :, 1)) : collect(v)
+    T_sat, P = per_cell(s.T_sat), per_cell(s.P)
+    return q_CHF_sudo_kaminaga(
+        per_cell(s.T_bulk), s.ṁ, s.pipe, s.gravity, liquid(T_sat, P)
+    )
 end
 
 # T_sat is taken at the downstream end of the channel, where the coolant has warmed the most

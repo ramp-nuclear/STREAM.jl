@@ -133,6 +133,34 @@ test/
 
 **Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). `physical_models/` is covered by `test_correlations.jl` (htc, pressure_drop) and `test_thresholds.jl`.
 
+## Known gaps against Python STREAM
+
+Deliberately open, in rough priority order. Each has been checked against the Python source,
+so do not re-derive them from scratch.
+
+- **Decay heat is missing entirely.** Python has `physical_models/decay_heat/` (actinides,
+  activation, fission products, fissions) with ANS-5.1-1973, ANS-5.1-2014 and JAERI-91. It is
+  the dominant heat source after shutdown, so every loss-of-flow and SCRAM transient here is
+  currently missing its main post-trip source term. Plan: Way-Wigner first, then user-supplied
+  databases, the same shape Python takes.
+- **Single-phase HTC evaluates every branch at film temperature.** Python's
+  `regime_dependent_h_spl` selects the regime on the *bulk* Reynolds number, evaluates the
+  laminar branch at *bulk* properties and the turbulent branch at *film*. Ours does all three
+  at film. Fixing it is an interface change, not a patch: our pluggable `htc_correlation` is a
+  Nusselt closure `(Re, Pr, T_bulk, T_wall) -> Nu` and by the time it runs the `Re`/`Pr` are
+  already film-based, so the distinction cannot be expressed. Python's pluggable unit is an
+  `h` function, which is why it can vary the basis per branch. The fix is to make
+  `htc_correlation` an h-closure with `h_single_phase(nusselt)` as an adapter. This is
+  `test_validation.jl`'s "Gap #2".
+- **`test_examples.jl` loss-of-flow bypass fails** (7 failed, 2 errored). Pre-existing and
+  confirmed identical on a clean checkout of `d212321`'s parent. The steady solve lands on the
+  ṁ = 0 root instead of the forced-flow branch, which the test's own comments predict. Because
+  of it the natural-convection HTC path has no working in-channel coverage.
+
+Not gaps, checked and matching: the developing-laminar Nusselt (Python defaults to the same
+analytic approximation, using its Shah & London table only to bound that approximation's
+error), and the whole HTC / friction / local-loss / threshold / dimensionless inventory.
+
 ## Component authoring conventions
 
 - **Positional arguments** when: (a) the argument type determines behavior, enabling multiple dispatch (e.g., `Pump(dP::Real; name)` vs `Pump(dP::Any; name)`); OR (b) the constructor/function has 1 or fewer physics parameters and its role is unambiguous from the function name (e.g., `Resistor(R; name)`, `Gravity(H; name)`, `HeatExchanger(T_bc; name)`).
