@@ -1,160 +1,35 @@
-# htc/correlations.jl -- Heat transfer coefficient correlation functions
+# htc/correlations.jl -- Nusselt number correlations.
 #
-# Design:
-#   - Standalone named functions (dittus_boelter, elenbaas_nusselt, marco_han_nusselt):
-#     plain Julia arithmetic, NOT @register_symbolic. MTK traces through these symbolically.
-#   - Factories (constant_Nusselt, regime_dependent(geom; ...), elenbaas_htc(geom; g),
-#     fully_developed_laminar_h_spl(geom), developing_laminar_h_spl(geom; develop_length)):
-#     take `geom::PipeGeometry` as first positional argument when they consume geometry
-#     fields; return closures that capture construction-time scalars
-#     derived from `geom.depth`, `geom.width`, `geom.L`, `geom.Dh`. Inner function
-#     receives only symbolic Re/Pr.
-#   - No @register_symbolic on any function in this file — all are plain arithmetic.
+# Everything here is dimensionless: a correlation takes `(Re, Pr, T_wall, T_bulk)` and
+# returns Nu. Closing one into a heat transfer coefficient, which is where the choice of
+# film or bulk properties lives, is [`NusseltHTC`](@ref)'s job in htc.jl.
 #
-# Eval-point convention: callers pass `Re` and `Pr` evaluated at the film temperature
-# `T_film = (T_bulk + T_wall)/2`. The Channel core (src/components/channels.jl) does this.
+# Geometry-dependent factories take `geom::PipeGeometry` first and capture the scalars they
+# need (`geom.depth`, `geom.width`, `geom.L`, `geom.Dh`) at construction, so the returned
+# closure sees only symbolic Re and Pr.
+#
+# Nothing here is @register_symbolic: it is all plain arithmetic that MTK traces through.
 
 """
     dittus_boelter(Re, Pr, args...) -> Nu
 
-Dittus-Boelter heat transfer correlation for turbulent forced convection.
-Returns Nusselt number Nu = 0.023 * Re^0.8 * Pr^0.4.
+Dittus-Boelter turbulent forced convection, `Nu = 0.023·Re^0.8·Pr^0.4`. Trailing arguments
+are accepted and ignored so the correlation fits the `(Re, Pr, T_wall, T_bulk)` signature.
 
-The `args...` accepts and ignores extra arguments for backward compatibility with
-the 4-arg HTC interface `(Re, Pr, T_bulk, T_wall) -> Nu`.
-
-Valid for: Re > 10,000, 0.6 <= Pr <= 160, L/D > 10.
-MTK-compatible: plain arithmetic on symbolic Re/Pr traces correctly.
+Valid for Re > 10,000, 0.6 <= Pr <= 160, L/D > 10.
 """
 dittus_boelter(Re, Pr, args...) = 0.023 * Re^0.8 * Pr^0.4
 
 """
-    constant_Nusselt(; Nu=8.235) -> (Re, Pr) -> Nu
+    constant_Nusselt(; Nu=8.235) -> (Re, Pr, args...) -> Nu
 
-Factory returning an HTC correlation that yields a fixed Nusselt number `Nu`.
+A fixed Nusselt number. The default is the Shah and London fully-developed value for
+parallel plates under uniform heat flux.
 
-Default `Nu = 8.235` is the Shah & London fully-developed value for uniform-heat-flux
-parallel plates (FIXED_FLUXES). The returned closure is MTK-compatible: `Nu[i] ~ 8.235`
-is a valid algebraic equation in a ModelingToolkit system.
-
-Usage:
-```julia
-htc_fn = constant_Nusselt()          # Nu = 8.235
-htc_fn = constant_Nusselt(Nu = 5.0)  # custom Nu
-ChannelAndContacts(htc_correlation = htc_fn, ...)
-```
+Wrap it in [`ConstantNusselt`](@ref) to hand it to a channel.
 """
 function constant_Nusselt(; Nu=8.235)
     return (Re, Pr, args...) -> Nu
-end
-
-"""
-    regime_dependent(geom::PipeGeometry; htc_laminar, htc_turbulent, friction_laminar, friction_turbulent,
-                       htc_natural=nothing, g=nothing, re_bounds=(2000.0, 5000.0)) -> (htc=fn, friction=fn)
-
-Factory returning a named tuple of regime-switching HTC and friction correlations.
-
-Both closures pass through [`flow_regime_blend`](@ref): laminar at or below `re_bounds[1]`,
-turbulent above `re_bounds[2]`, and linearly interpolated in between, which is what Python
-STREAM's `regime_dependent_h_spl` does.
-
-When `htc_natural` and `g` are both provided, the `htc` closure additionally switches to the
-natural-convection correlation once `Gr/Re^2 > 1`, with the Grashof characteristic length
-taken from `geom.Dh`.
-
-# Arguments
-- `geom`: `PipeGeometry` describing the channel geometry; `geom.Dh` is read for the Grashof
-  characteristic length when `htc_natural` is supplied.
-- `htc_laminar`: HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu` for laminar forced convection.
-- `htc_turbulent`: HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu` for turbulent forced convection.
-- `friction_laminar`: friction closure `(Re) -> f` for laminar regime.
-- `friction_turbulent`: friction closure `(Re) -> f` for turbulent regime.
-- `htc_natural`: optional NC HTC closure `(Re, Pr, T_bulk, T_wall) -> Nu`; when provided
-  together with `g`, enables NC regime switching via `Gr/Re^2 > 1`.
-- `g`: gravitational acceleration [m/s^2] for Grashof computation (required when `htc_natural`
-  is provided; otherwise unused).
-- `re_bounds`: `(re_lo, re_hi)` transition band on the Reynolds number
-(default `(2000.0, 5000.0)`, matching `regime_dependent_friction`).
-
-If `htc_natural` is provided, `g` must be too, otherwise an `ArgumentError` is raised.
-`Dh` is not a user-facing kwarg (it is read from `geom.Dh`); a lone `g` without
-`htc_natural` is simply ignored.
-
-Returns:
-```julia
-(
-    htc      = (Re, Pr, T_bulk, T_wall) -> ifelse(Re < Re_tr, htc_laminar(Re, Pr, T_bulk, T_wall), htc_turbulent(Re, Pr, T_bulk, T_wall)),
-    friction = (Re)                     -> ifelse(Re < Re_tr, friction_laminar(Re), friction_turbulent(Re))
-)
-```
-
-Usage:
-```julia
-geom = PipeGeometry_rectangular(L, e1, e2, he)
-rd = regime_dependent(geom;
-    htc_laminar        = constant_Nusselt(Nu=8.235),
-    htc_turbulent      = dittus_boelter,
-    friction_laminar   = laminar_friction_rectangular(geom),
-    friction_turbulent = blasius_friction,
-)
-ChannelAndContacts(htc_correlation = rd.htc, friction_correlation = rd.friction, ...)
-
-# With NC detection:
-rd_nc = regime_dependent(geom;
-    htc_laminar        = constant_Nusselt(Nu=8.235),
-    htc_turbulent      = dittus_boelter,
-    friction_laminar   = laminar_friction_rectangular(geom),
-    friction_turbulent = blasius_friction,
-    htc_natural        = elenbaas_htc(geom; g=G_EARTH),
-    g                  = G_EARTH,
-)
-```
-"""
-function regime_dependent(geom::PipeGeometry;
-    htc_laminar::HTCCorrelation,
-    htc_turbulent::HTCCorrelation,
-    friction_laminar::Function,
-    friction_turbulent::Function,
-    htc_natural::Union{HTCCorrelation,Nothing}=nothing,
-    g=nothing,
-    re_bounds=(2000.0, 5000.0),
-    liquid::AbstractLiquid=H2O,
-)
-    bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))
-
-    # htc_natural and g must be supplied together.
-    if !isnothing(htc_natural) && isnothing(g)
-        throw(
-            ArgumentError(
-                "regime_dependent: htc_natural provided but g is missing — both (htc_natural, g) must be supplied together.",
-            ),
-        )
-    end
-
-    # Forced convection: laminar, turbulent, or a blend across the transition band.
-    htc_forced =
-        (Re, Pr, T_bulk, T_wall) -> flow_regime_blend(
-            Re, bounds,
-            htc_laminar(Re, Pr, T_bulk, T_wall),
-            htc_turbulent(Re, Pr, T_bulk, T_wall),
-        )
-
-    # Given a natural-convection correlation, buoyancy takes over once Gr/Re² passes 1.
-    htc_fn = if isnothing(htc_natural)
-        htc_forced
-    else
-        Dh_val, g_val = geom.Dh, Float64(g)
-        (Re, Pr, T_bulk, T_wall) -> ifelse(
-            Gr(liquid, T_bulk, T_wall, Dh_val, g_val) / Re^2 > 1,
-            htc_natural(Re, Pr, T_bulk, T_wall),
-            htc_forced(Re, Pr, T_bulk, T_wall),
-        )
-    end
-
-    friction_fn =
-(Re) -> flow_regime_blend(Re, bounds, friction_laminar(Re), friction_turbulent(Re))
-
-    return (htc=htc_fn, friction=friction_fn)
 end
 
 """
@@ -189,47 +64,6 @@ function elenbaas_nusselt(Ra, b, L)
     return ifelse(Ra > 0, (1 / 24) * Ra * (b / L) * shape, zero(Ra))
 end
 
-"""
-    elenbaas_htc(geom::PipeGeometry; g=9.81) -> (Re, Pr, T_bulk, T_wall) -> Nu
-
-Factory returning an HTC correlation for Elenbaas natural convection.
-Captures geometry (via `geom`) and gravity at construction time. The returned
-closure computes beta, nu, Gr, and Ra from T_bulk and T_wall at each evaluation.
-
-Compatible with the 4-arg HTC interface `(Re, Pr, T_bulk, T_wall) -> Nu`.
-When T_wall = T_bulk (dT=0), returns Nu=0 (physically correct: no buoyancy
-driving force).
-
-This correlation is for **parallel-vertical-plates natural convection** and expects a
-rectangular `PipeGeometry` where `geom.depth` is the plate gap. There is no runtime
-check: a circular or non-plate geometry yields an aspect-ratio-blind Nu that may not
-be physical. Validating the geometry is left to the caller.
-
-Note: Re and Pr arguments are accepted for interface compatibility but
-are NOT used in the Elenbaas correlation (natural convection does not
-depend on forced-flow Reynolds number).
-
-# Arguments
-- `geom`: `PipeGeometry`; the factory reads `geom.depth` (gap between plates `b`),
-  `geom.L` (heated length), and `geom.Dh` (hydraulic diameter, used as
-  characteristic length in Gr).
-- `g`: gravitational acceleration [m/s^2] (default `G_EARTH`).
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref).
-
-# Returns
-Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
-NC exception: this closure evaluates the coolant's β, μ, ρ INTERNALLY at `T_bulk` (NOT at film) — natural-convection driving force is a bulk-vs-wall ΔT phenomenon and Python STREAM evaluates β, ν at bulk for Gr.
-"""
-function elenbaas_htc(geom::PipeGeometry; g=G_EARTH, liquid::AbstractLiquid=H2O)
-    b = geom.depth
-    L_h = geom.L
-    Dh_v = geom.Dh
-    return (Re, Pr, T_bulk, T_wall) -> begin
-        Gr_val = Gr(liquid, T_bulk, T_wall, Dh_v, g)
-        Ra_val = Ra(Gr_val, Pr)
-        elenbaas_nusselt(Ra_val, b, L_h)
-    end
-end
 
 function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     return nu0 * (
@@ -290,24 +124,6 @@ function developing_laminar_h_spl(geom::PipeGeometry; develop_length)
         x_star = develop_length / Dh_v / Re / Pr / correction
         nudev = _nusselt_coefficient_developing(x_star)
         _two_sided_heating_nusselt(aspect_ratio, nudev)
-    end
-end
-
-"""
-    maximal_htc(correlations...) -> (Re, Pr, T_bulk, T_wall) -> Nu
-
-Combinator returning an HTC correlation that evaluates all provided correlations
-and returns the maximum Nusselt number.
-
-# Arguments
-- `correlations...`: one or more HTC closures `(Re, Pr, T_bulk, T_wall) -> Nu`
-
-# Returns
-Closure `(Re, Pr, T_bulk, T_wall) -> max(c1(...), c2(...), ...)`.
-"""
-function maximal_htc(correlations...)
-    return (Re, Pr, T_bulk, T_wall) -> begin
-        maximum(c(Re, Pr, T_bulk, T_wall) for c in correlations)
     end
 end
 

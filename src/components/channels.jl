@@ -404,29 +404,27 @@ end
 
 """
     ChannelAndContacts(; name, n, geometry, g=0.0,
-                       htc_correlation=dittus_boelter,
+                       htc=DittusBoelter(),
                        friction_correlation=blasius_friction,
-                       scb_correction=nothing) -> System
+                       liquid=H2O) -> System
 
 Convective channel with per-cell `ThermalPort` arrays on both sides for conjugate heat
-transfer (the variant that connects to `HeatDiffusion`). Internal HTC correlation
-(single-phase or correlation+SCB-enhanced) drives per-cell `h_tc[i]`;
-Heat flux is computed as `h_tc[i] * heated_parts * dz * (T_wall - T[i])`
-The wall temperature is connected through thermal port arrays.
+transfer (the variant that connects to `HeatDiffusion`). The `htc` model gives each cell its
+`h_tc[i]`, the wall temperature arrives through the thermal ports, and the heat into the cell
+is `h_tc[i] * heated_parts * dz * (T_wall - T[i])`.
 
 # Arguments
 - `name`: system name (Symbol)
 - `n`: number of axial cells (Int)
 - `geometry`: pipe geometry descriptor (PipeGeometry)
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
-- `htc_correlation`: HTC function `(Re, Pr, T_bulk, T_wall) -> Nu`, default `dittus_boelter`
+- `htc`: wall heat transfer model ([`HTC`](@ref)), default [`DittusBoelter`](@ref). It is
+  handed `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)` per cell and returns `h`. Subcooled boiling
+  is a model like any other: wrap one in [`SubcooledBoilingHTC`](@ref). Regime switching is
+  [`RegimeDependentHTC`](@ref).
 - `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
-- `scb_correction`: optional SCB heat flux closure `(T_wall, T_sat, Re) -> q_scb [W/m^2]`,
-  e.g. from `regime_dependent_q_scb(pressure=...)`. When provided, `h_tc[i]` is enhanced
-  by the Bergles-Rohsenow partial boiling factor when `T_wall[i] >= T_ONB[i]`.
-  Default `nothing` (pure single-phase).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). It drives the energy balance,
-  friction, the HTC correlation, and the dimensionless observables.
+  friction, the HTC model, and the dimensionless observables.
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort`
@@ -437,9 +435,8 @@ function ChannelAndContacts(;
     n::Int,
     geometry::PipeGeometry,
     g=0.0,
-    htc_correlation=dittus_boelter,
+    htc::HTC=DittusBoelter(),
     friction_correlation=blasius_friction,
-    scb_correction=nothing,
     liquid::AbstractLiquid=H2O,
 )
 
@@ -483,14 +480,8 @@ function ChannelAndContacts(;
     wall_T(face) = [port.T for port in face.port]
     q_wall(face) = collect(face.h) .* face.perimeter .* dz .* (wall_T(face) .- T)
 
-    # Which HTC physics applies is the only thing `scb_correction` changes.
-    wall_htc(face, i) =
-        scb_correction === nothing ?
-        h_single_phase(face.port[i].T, T[i], inlet.ṁ, Dh, A, htc_correlation, liquid) :
-        h_subcooled_boiling(
-            face.port[i].T, T[i], P_cell[i], inlet.ṁ, Dh, A,
-            htc_correlation, scb_correction, liquid,
-        )
+    # Every model takes the local pressure; only one that boils looks at it.
+    wall_htc(face, i) = htc(face.port[i].T, T[i], inlet.ṁ, Dh, A, liquid, P_cell[i])
 
     q_left_expr, q_right_expr = q_wall.(faces)
 
@@ -508,8 +499,10 @@ function ChannelAndContacts(;
     for face in faces
         T_wall = wall_T(face)
         Gr_face = Gr.(liquid, T, T_wall, Dh, g)
+        # Nu implied by the h in use, rather than by re-running a correlation the model
+        # may not have: Nu = h·Dh/κ at the film temperature.
         append!(variant_obs, collect(face.Nu) .~
-            [_nu_film(T_wall[i], T[i], inlet.ṁ, Dh, A, htc_correlation, liquid) for i in 1:n])
+            Nu.(collect(face.h), Dh, κ.(liquid, film_temperature.(T_wall, T))))
         append!(variant_obs, collect(face.T_wall) .~ T_wall)
         append!(variant_obs, collect(face.Gr_over_Re2) .~ Gr_face ./ Re_bulk .^ 2)
     end

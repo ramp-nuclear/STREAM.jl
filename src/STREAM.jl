@@ -7,10 +7,6 @@ using OrdinaryDiffEq
 using QuadGK
 using SteadyStateDiffEq
 
-# Alias used to label HTC-closure arguments at call sites (documentation only, not enforced).
-# Declared before the includes so the correlation files can reference it at parse time.
-const HTCCorrelation = Function
-
 include("constants.jl")
 include("substances/liquid.jl")
 include("substances/light_water.jl")
@@ -20,7 +16,7 @@ include("knobs.jl")
 include("geometry.jl")
 include("physical_models/dimensionless.jl")
 include("physical_models/htc/correlations.jl")
-include("physical_models/htc/single_phase.jl")
+include("physical_models/htc/htc.jl")
 include("physical_models/subcooled_boiling.jl")
 include("physical_models/pressure_drop/friction.jl")
 include("physical_models/pressure_drop/local.jl")
@@ -54,10 +50,12 @@ export HeatFluxSource, ConvectiveBoundary, HeatDiffusion, PipeGeometry, PipeGeom
 export PipeGeometry_circular
 export knob_defaults, @design_knob
 export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction_rectangular
-export rectangular_laminar_correction, regime_dependent, elenbaas_nusselt, elenbaas_htc
-export marco_han_nusselt, turbulent_friction, viscosity_correction, maximal_htc
-export fully_developed_laminar_h_spl, developing_laminar_h_spl, HTCCorrelation
-export h_single_phase, h_subcooled_boiling, film_temperature
+export rectangular_laminar_correction, elenbaas_nusselt, marco_han_nusselt
+export turbulent_friction, laminar_friction, regime_dependent_friction, viscosity_correction
+export fully_developed_laminar_h_spl, developing_laminar_h_spl, film_temperature
+export HTC, FunctionHTC, NusseltHTC, PropertyBasis, AtFilm, AtBulk, property_temperature
+export DittusBoelter, ConstantNusselt, FullyDevelopedLaminar, DevelopingLaminar
+export Elenbaas, RegimeDependentHTC, MaximalHTC, SubcooledBoilingHTC
 export mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux
 export partial_SCB_correction, regime_dependent_q_scb
 export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber

@@ -61,9 +61,9 @@ src/
   physical_models/
     dimensionless.jl          # Re, Pr, Nu, Pe, Gr, Ra, including the (liquid, T) forms
     htc/
-      correlations.jl         # Nusselt correlations and the closures that select between them
-      single_phase.jl         # h_single_phase: a Nusselt correlation evaluated at film temperature
-    subcooled_boiling.jl      # SCB heat flux, ONB superheat, h_subcooled_boiling
+      htc.jl                  # HTC: the wall heat transfer model a channel is handed
+      correlations.jl         # Nusselt correlations (dimensionless, no property basis)
+    subcooled_boiling.jl      # SCB heat flux correlations and the ONB superheat
     pressure_drop/
       friction.jl             # Darcy friction factor correlations
       local.jl                # Idelchik expansion / contraction local losses
@@ -115,7 +115,9 @@ test/
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
   test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, WallTemperature, HeatFluxSource
   test_heat_diffusion.jl    # HeatDiffusion
-  test_correlations.jl      # HTC + friction correlation function unit tests
+  test_correlations.jl      # Nusselt + friction correlation function unit tests
+  test_htc.jl               # HTC models: property basis, named constructors, regime
+                            # switching, subcooled boiling, user-defined models
   test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState
   test_composition.jl       # symmetric_plate, plate, one_sided_connection, compose_systems,
                             # port, check_gravity_mismatch, _infer_n, connect_temperature_feedback,
@@ -131,7 +133,7 @@ test/
                             # feedback loops (SCRAM, cold-IC, prompt-jump)
 ```
 
-**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). `physical_models/` is covered by `test_correlations.jl` (htc, pressure_drop) and `test_thresholds.jl`.
+**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). `physical_models/` is covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), and `test_thresholds.jl`.
 
 ## Known gaps against Python STREAM
 
@@ -143,15 +145,6 @@ so do not re-derive them from scratch.
   the dominant heat source after shutdown, so every loss-of-flow and SCRAM transient here is
   currently missing its main post-trip source term. Plan: Way-Wigner first, then user-supplied
   databases, the same shape Python takes.
-- **Single-phase HTC evaluates every branch at film temperature.** Python's
-  `regime_dependent_h_spl` selects the regime on the *bulk* Reynolds number, evaluates the
-  laminar branch at *bulk* properties and the turbulent branch at *film*. Ours does all three
-  at film. Fixing it is an interface change, not a patch: our pluggable `htc_correlation` is a
-  Nusselt closure `(Re, Pr, T_bulk, T_wall) -> Nu` and by the time it runs the `Re`/`Pr` are
-  already film-based, so the distinction cannot be expressed. Python's pluggable unit is an
-  `h` function, which is why it can vary the basis per branch. The fix is to make
-  `htc_correlation` an h-closure with `h_single_phase(nusselt)` as an adapter. This is
-  `test_validation.jl`'s "Gap #2".
 - **`test_examples.jl` loss-of-flow bypass fails** (7 failed, 2 errored). Pre-existing and
   confirmed identical on a clean checkout of `d212321`'s parent. The steady solve lands on the
   ṁ = 0 root instead of the forced-flow branch, which the test's own comments predict. Because

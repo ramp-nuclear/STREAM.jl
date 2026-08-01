@@ -340,13 +340,13 @@ end
     @test all(isapprox.(sol2[ssys2.ch2.q_wall_left[:]], sol[ssys.ch.q_wall_left[:]], rtol=1e-6))
 end
 
-@testset "CAC htc_correlation=dittus_boelter solves transient without crash" begin
+@testset "CAC with DittusBoelter solves a transient without crashing" begin
     n = N_DEFAULT
     geom = PipeGeometry_circular(L_DEFAULT, D_DEFAULT)
     @named pump = Pump(DP_PUMP)
     @named bc = HeatExchanger(T_INLET)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                     htc_correlation=dittus_boelter,
+                                     htc=DittusBoelter(),
                                      friction_correlation=blasius_friction)
     # Pin each cell's left thermal port T to T_WALL via per-cell ConstantTemperature.
     ct_l = [ConstantTemperature(T_WALL; name=Symbol(:ct_l, i)) for i in 1:n]
@@ -378,9 +378,11 @@ end
     dP_pump_iscb = 3.0e4
 
     function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
+        htc = scb_correction === nothing ? DittusBoelter() :
+              SubcooledBoilingHTC(DittusBoelter(), scb_correction)
         @named pump = Pump(dP_pump_iscb)
         @named cac = ChannelAndContacts(
-            n=n, geometry=PipeGeometry_circular(L_ch, D_ch), scb_correction=scb_correction
+            n=n, geometry=PipeGeometry_circular(L_ch, D_ch), htc=htc
         )
         @named bc = HeatExchanger(T_inlet_iscb)
         ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l, i)) for i in 1:n]
@@ -590,7 +592,7 @@ end
     @named pump_cac = Pump(DP_PUMP)
     @named bc_cac = HeatExchanger(T_INLET)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                     htc_correlation=constant_Nusselt(Nu=4.0))
+                                     htc=ConstantNusselt(; Nu=4.0))
     ct_l_xeq = [ConstantTemperature(T_WALL; name=Symbol(:ct_l_xeq, i)) for i in 1:n]
     conns_cac = Equation[
         connect(pump_cac.outlet, bc_cac.inlet),
@@ -653,11 +655,13 @@ end
     # Helper: build a minimal loop with CAC + Pump + HeatExchanger + per-cell
     # ConstantTemperature BCs. Returns (compiled_sys, solution).
     function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
+        htc = scb_correction === nothing ? DittusBoelter() :
+              SubcooledBoilingHTC(DittusBoelter(), scb_correction)
         @named pump = Pump(dP_pump_scb)
         @named cac = ChannelAndContacts(
             n=n_scb,
             geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
-            scb_correction=scb_correction,
+            htc=htc,
         )
         @named bc = HeatExchanger(T_inlet_scb)
         ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l_scb, i)) for i in 1:n_scb]
@@ -698,14 +702,14 @@ end
         @named cac = ChannelAndContacts(
             n=3,
             geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
-            scb_correction=scb_fn,
+            htc=SubcooledBoilingHTC(DittusBoelter(), scb_fn),
         )
         @test cac isa ModelingToolkit.System
     end
 
     @testset "SCB ChannelAndContacts solves (sub-ONB), matches non-SCB" begin
-        # T_wall is below T_ONB at 2 bar, so h_subcooled_boiling selects its
-        # uncorrected branch (htc = h_spl). The "SCB present but inactive" claim
+        # T_wall is below T_ONB at 2 bar, so SubcooledBoilingHTC returns its
+        # single-phase value unchanged. The "SCB present but inactive" claim
         # therefore means the SCB loop must reproduce the non-SCB loop exactly.
         # Build both, solve both, and compare h_tc and coolant T cell by cell.
         T_wall = 106.85

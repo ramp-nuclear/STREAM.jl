@@ -104,19 +104,20 @@ end
     # PROOF that Julia's single-phase HTC — the Dittus-Boelter formula AND the water
     # property correlations (μ, k, cp) — is identical to Python STREAM's, isolated from
     # solver convergence: feed Python's CONVERGED (T_wall, T_cool, ṁ) into Julia's
-    # `h_single_phase` and require it to reproduce Python's reference h_tc to machine precision.
+    # `DittusBoelter` and require it to reproduce Python's reference h_tc to machine precision.
     # This is why the connected-face HTC matches Python to 0.000% in the live parity:
     # the formula is exact, and `_h_eff` selects the physically-meaningful (q≠0) face.
     geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     Dh = geom.Dh
     A = geom.A
+    htc = DittusBoelter()
     for i in 1:length(PARITY_MTR_ASYM_H_TC_LEFT_R)
-        h_julia = h_single_phase(PARITY_MTR_ASYM_T_WALL_LEFT_R[i],
-                                PARITY_MTR_ASYM_T_CELLS_R[i],
+        h_julia = htc(
+            PARITY_MTR_ASYM_T_WALL_LEFT_R[i],
+            PARITY_MTR_ASYM_T_CELLS_R[i],
             PARITY_MTR_ASYM_ṁ_R,
             Dh,
             A,
-            dittus_boelter,
             H2O,
         )
         @test isapprox(h_julia, PARITY_MTR_ASYM_H_TC_LEFT_R[i]; rtol=1e-6)

@@ -239,14 +239,18 @@ function build_loop_lof_bypass(;
 )
     geom = PipeGeometry_circular(L_ch, D_ch)
 
-    # NC-enabled regime switching for heated channel
-    rd_ch = regime_dependent(geom;
-        htc_laminar=constant_Nusselt(; Nu=8.235),
-        htc_turbulent=dittus_boelter,
-        friction_laminar=laminar_friction_rectangular(geom),
-        friction_turbulent=blasius_friction,
-        htc_natural=elenbaas_htc(geom; g=g_acc),
+    # The heated channel switches regime on its own, natural convection included, so the
+    # loss-of-flow transient stays physical once the pump stops driving it.
+    htc_ch = RegimeDependentHTC(;
+        laminar=ConstantNusselt(; Nu=8.235),
+        turbulent=DittusBoelter(),
+        natural=Elenbaas(geom; g=g_acc),
+        geom=geom,
         g=g_acc,
+    )
+    friction_ch = regime_dependent_friction(;
+        laminar=laminar_friction_rectangular(geom),
+        turbulent=blasius_friction,
     )
 
     @named pump = Pump(dP_pump_fn)
@@ -256,8 +260,8 @@ function build_loop_lof_bypass(;
         n=n,
         geometry=geom,
         g=(-g_acc),
-        htc_correlation=rd_ch.htc,
-        friction_correlation=rd_ch.friction,
+        htc=htc_ch,
+        friction_correlation=friction_ch,
     )
     @named ret = Channel(; n=n, geometry=geom, g=g_acc)
     # Open-state quadratic loss tuned (area, f) so the bypass conductance is comparable to the
@@ -385,7 +389,7 @@ function build_loop_pk(ctrl;
     @named cac = ChannelAndContacts(;
         n=n,
         geometry=geom,
-        htc_correlation=constant_Nusselt(; Nu=8.235),
+        htc=ConstantNusselt(; Nu=8.235),
         friction_correlation=laminar_friction_rectangular(geom),
     )
     @named fuel = HeatDiffusion(;

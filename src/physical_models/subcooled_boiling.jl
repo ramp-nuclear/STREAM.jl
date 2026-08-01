@@ -110,12 +110,8 @@ in the laminar regime, McAdams in the turbulent one, and a linear blend across t
 transition band, via [`flow_regime_blend`](@ref). Python STREAM's `regime_dependent_q_scb`
 partitions the same way.
 
-Captures `pressure`, `h_fg`, and `sigma` at construction time. The returned
-closure signature `(T_wall, T_sat, Re) -> q_scb` is compatible with the
-`scb_correction` kwarg of `ChannelAndContacts`.
-
-Follows the same factory pattern as `regime_dependent` in correlations.jl.
-Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
+Captures `pressure`, `h_fg`, and `sigma` at construction time. Hand the returned closure to
+[`SubcooledBoilingHTC`](@ref) to layer partial boiling on a single-phase model.
 
 # Arguments
 - `pressure`: system pressure [Pa] (default 1e5 = 1 bar)
@@ -138,36 +134,14 @@ function regime_dependent_q_scb(;
     )
 end
 
-"""
-    h_subcooled_boiling(T_wall, T_bulk, P, ṁ, Dh, A, nusselt, q_scb, liquid) -> W/(m^2·K)
-
-Heat transfer coefficient with partial subcooled boiling folded in: the single-phase value
-below the onset of nucleate boiling, and that value scaled by the Bergles-Rohsenow partial
-boiling factor at or above it.
-
-The switch is `ifelse` on `T_wall >= T_ONB`, so it stays a symbolic branch the solver
-evaluates per step rather than one fixed at trace time.
-
-# Arguments
-- `T_wall`, `T_bulk`: wall and bulk coolant temperature [°C]
-- `P`: local absolute pressure [Pa], which sets `T_sat` and the ONB superheat
-- `ṁ`: mass flow rate [kg/s]
-- `Dh`: hydraulic diameter [m]
-- `A`: flow area [m^2]
-- `nusselt`: single-phase Nusselt correlation, as for [`h_single_phase`](@ref)
-- `q_scb`: subcooled boiling heat flux closure `(T_wall, T_sat, Re) -> q [W/m^2]`, e.g. from
-  [`regime_dependent_q_scb`](@ref)
-- `liquid`: coolant (`AbstractLiquid`)
-
-# Returns
-Heat transfer coefficient [W/(m^2·K)].
-"""
-function h_subcooled_boiling(T_wall::Real, T_bulk::Real, P::Real, ṁ::Real, Dh::Real,
-                             A::Real, nusselt::Function, q_scb::Function, liquid)
-    h_spl = h_single_phase(T_wall, T_bulk, ṁ, Dh, A, nusselt, liquid)
+# The Bergles-Rohsenow partial boiling blend, given a single-phase h that some `HTC` has
+# already produced: below the onset of nucleate boiling nothing changes, at or above it the
+# single-phase value is scaled by the partial boiling factor. `ifelse` keeps the switch a
+# symbolic branch the solver takes per step.
+function _scb_corrected(h_spl, q_scb, T_wall, T_bulk, ṁ, Dh, A, liquid, P)
     q_spl = max(h_spl * (T_wall - T_bulk), 0.0)
     T_sat = Tsat(liquid, P)
-    Re_bulk = Re(ṁ, A, Dh, μ(liquid, T_bulk))
+    Re_bulk = Re(liquid, T_bulk, ṁ, A, Dh)
     T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
     factor = partial_SCB_correction(
         q_spl, q_scb(T_wall, T_sat, Re_bulk), q_scb(T_ONB, T_sat, Re_bulk)

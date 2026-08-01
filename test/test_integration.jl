@@ -742,7 +742,7 @@ end
     geom = PipeGeometry(1.0, 4.0, 1.0, 1.0, 1.0, (0.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
-                                    htc_correlation=constant_Nusselt(; Nu=8.235))
+                                    htc=ConstantNusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.0, Lx=Lx, y=1.0,
                                 rho_s=1.0, cp_s=1.0, k_s=k_s, power_shape=ps, T0=T0)
     osc = one_sided_connection(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
@@ -801,7 +801,7 @@ end
     # Distinct names per channel/fuel so the shared PK gets a distinct T_source_<name> feedback
     # group for each component (connect_temperature_feedback keys off nameof).
     cacs = [ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
-                               htc_correlation=constant_Nusselt(; Nu=8.235),
+                               htc=ConstantNusselt(; Nu=8.235),
                                name=Symbol(:cac, i)) for i in 1:N]
     fuels = [HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0, rho_s=1.0, cp_s=1.0, k_s=1.0,
                            power_shape=ps, T0=T0, name=Symbol(:fuel, i)) for i in 1:N]
@@ -948,7 +948,7 @@ end
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
-                                    htc_correlation=constant_Nusselt(; Nu=8.235))
+                                    htc=ConstantNusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0,
                                 rho_s=1.0, cp_s=1.0, k_s=1.0, power_shape=ps, T0=T0)
     rods = symmetric_plate(cac, fuel; name=:rods)
