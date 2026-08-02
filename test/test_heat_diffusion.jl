@@ -3,7 +3,9 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-using STREAM: HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
 @testset "HeatDiffusion callable and returns MTK System" begin
     ps = fill(1.0 / (5 * 3), 5, 3)
@@ -22,7 +24,7 @@ using STREAM: HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
 end
 
 @testset "HeatDiffusion exported from STREAM" begin
-    @test isdefined(STREAM, :HeatDiffusion)
+    @test isdefined(STREAM.Components, :HeatDiffusion)
 end
 
 @testset "HeatDiffusion mtkcompile bare (no connections)" begin

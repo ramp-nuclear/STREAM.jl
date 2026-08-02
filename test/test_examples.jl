@@ -11,6 +11,10 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 using Statistics
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Friction
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
 
 @testset "Builders smokes" begin

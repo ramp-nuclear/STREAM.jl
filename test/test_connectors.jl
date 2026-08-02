@@ -4,7 +4,7 @@
 using Test
 using ModelingToolkit
 using STREAM
-using STREAM: Channel  # resolve Base.Channel ambiguity
+using STREAM.Components
 const ModelingToolkitBase = ModelingToolkit.ModelingToolkitBase
 using ModelingToolkit: t_nounits as t
 

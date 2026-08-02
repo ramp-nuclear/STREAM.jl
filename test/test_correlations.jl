@@ -3,21 +3,11 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-using STREAM: Channel
-using STREAM:
-    dittus_boelter,
-    blasius_friction,
-    constant_Nusselt,
-    laminar_friction_rectangular,
-    rectangular_laminar_correction,
-    elenbaas_nusselt,
-    Gr,
-    Ra,
-    marco_han_nusselt,
-    turbulent_friction,
-    viscosity_correction,
-    fully_developed_laminar_h_spl,
-    developing_laminar_h_spl
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.Friction
+using STREAM.HTC
+using STREAM: Gr, Ra
 
 @testset "Correlation Library" begin
     @testset "rectangular_laminar_correction reference values" begin

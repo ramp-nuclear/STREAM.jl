@@ -2,6 +2,8 @@ using Printf
 using DelimitedFiles
 using Test
 using STREAM
+using STREAM.Friction
+using STREAM.HTC
 
 const TIER_CLEAN = :CLEAN   # rtol ≤ gray_floor (1e-6)
 const TIER_GRAY  = :GRAY    # gray_floor < rtol < hard_ceiling (default 0.02)
@@ -156,7 +158,7 @@ by direct evaluation at Re=10000, Pr=1. Self-check (no Python runtime).
 function assert_equivalence_dittus_boelter(; rtol::Float64=1e-12)
     Re_ref, Pr_ref = 10_000.0, 1.0
     Nu_python = 0.023 * Re_ref^0.8 * Pr_ref^0.4
-    Nu_julia  = STREAM.dittus_boelter(Re_ref, Pr_ref)
+    Nu_julia  = STREAM.HTC.dittus_boelter(Re_ref, Pr_ref)
     isapprox(Nu_julia, Nu_python; rtol=rtol) || error(
         "EQUIVALENCE FAIL: Dittus-Boelter at Re=$Re_ref, Pr=$Pr_ref: " *
         "Julia=$Nu_julia, Python-formula=$Nu_python")
@@ -171,7 +173,7 @@ Assert Julia's Blasius (0.3164 / Re^0.25) matches the formula at Re=10000.
 function assert_equivalence_blasius(; rtol::Float64=1e-12)
     Re_ref = 10_000.0
     f_python = 0.3164 / Re_ref^0.25
-    f_julia  = STREAM.blasius_friction(Re_ref)
+    f_julia  = STREAM.Friction.blasius_friction(Re_ref)
     isapprox(f_julia, f_python; rtol=rtol) || error(
         "EQUIVALENCE FAIL: Blasius at Re=$Re_ref: Julia=$f_julia, " *
         "Python-formula=$f_python")

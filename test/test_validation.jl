@@ -4,8 +4,12 @@ using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using DelimitedFiles
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.HTC
 using STREAM.Examples
-using STREAM: Channel, HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
+using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
 
 include(joinpath(@__DIR__, "parity_helpers.jl"))
@@ -97,7 +101,7 @@ _h_eff(sol, cac, i) = abs(sol[cac.q_wall_left[i]]) >= abs(sol[cac.q_wall_right[i
     # PYTHON_*_AT_REF are bit-identical to Julia at rtol=1e-12, so the native checklist passes;
     # this exercises the guard form `cond || error(...)` directly on a deliberately wrong value.
     @test_throws ErrorException (
-        isapprox(STREAM.dittus_boelter(10_000.0, 1.0), 1e10; rtol=1e-12) || error("self-test 12")
+        isapprox(STREAM.HTC.dittus_boelter(10_000.0, 1.0), 1e10; rtol=1e-12) || error("self-test 12")
     )
 end
 

@@ -3,8 +3,10 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-using STREAM: dittus_boelter, constant_Nusselt, laminar_friction_rectangular,
-              blasius_friction, elenbaas_nusselt, Re, Pr, Gr, Ra, film_temperature
+using STREAM.Components
+using STREAM.Friction
+using STREAM.HTC
+using STREAM: Re, Pr, Gr, Ra
 
 const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
 

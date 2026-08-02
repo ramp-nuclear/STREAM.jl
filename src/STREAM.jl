@@ -54,7 +54,6 @@ export AbstractHTC, FunctionHTC, NusseltHTC, PropertyBasis, AtFilm, AtBulk, prop
 export DittusBoelter, ConstantNusselt, FullyDevelopedLaminar, DevelopingLaminar
 export Elenbaas, RegimeDependentHTC, MaximalHTC, SubcooledBoilingHTC
 end
-using .HTC
 
 module Friction
 using ModelingToolkit
@@ -68,14 +67,12 @@ export darcy_weisbach_dp
 export DarcyFactor, FunctionDarcy, ReynoldsFactor, BlasiusFriction, LaminarFriction
 export TurbulentFriction, RectangularLaminarFriction, RegimeDependentFriction
 end
-using .Friction
 
 module LocalLoss
 using ModelingToolkit
 include("local_loss.jl")
 export local_dp
 end
-using .LocalLoss
 
 module Thresholds
 using ModelingToolkit
@@ -90,7 +87,6 @@ export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha
 export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
 export ChannelState, threshold_analysis, chfr
 end
-using .Thresholds
 
 module Components
 using ModelingToolkit
@@ -125,9 +121,6 @@ export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U23
 export ReactivityController, worth, change_state
 export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback, watch_flow
 end
-using .Components
-# Explicit, because an implicit `using` cannot resolve Channel against Base.Channel.
-using .Components: Channel
 
 module Assemblies
 using ModelingToolkit
@@ -140,13 +133,11 @@ export inseries, inparallel, connect_face, connect_faces, port
 export check_gravity_mismatch, compose_systems, connect_temperature_feedback
 export symmetric_plate, plate, one_sided_connection, single_channel_connection, fuel_assembly
 end
-using .Assemblies
 
 module Utilities
 include("utilities.jl")
 export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
 end
-using .Utilities
 
 include("initial_conditions.jl")
 include("solvers.jl")
@@ -166,48 +157,37 @@ export build_loop, build_loop_vertical, build_loop_transient, build_cube
 export build_loop_lof_bypass, build_loop_pk
 end
 
-export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O, ATM
+# ---------------------------------------------------------------------------------------
+# The public surface.
+#
+# A name reaches the top level only by being listed here, which is deliberate: everything
+# else is reached through its module. The rule for what earns a place is "written in almost
+# every script" -- the coolant properties, the dimensionless numbers, the geometry, the
+# solve entry points.
+#
+# Two ways to reach anything else:
+#
+#     using STREAM              -> Components.Channel(...), HTC.DittusBoelter()
+#     using STREAM.Components   -> Channel(...)
+#
+# Note that a blanket `using .HTC, .Friction` here would not work: both define
+# RegimeDependent, and that is the point of having modules. Names arrive by explicit list.
+# ---------------------------------------------------------------------------------------
+
+export Substances, HTC, Friction, LocalLoss, Thresholds, Components, Assemblies, Utilities
+
+# Coolant properties, spelled out and in the usual notation. Substances holds the types
+# (AbstractLiquid, Liquid, LightWater, HeavyWater); the two liquids themselves are used
+# often enough to sit here.
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
-export FlowPort, ThermalPort
-export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFlowResistor
-export LocalPressureDrop, Inertia, HeatExchanger
-export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
-export HeatFluxSource, ConvectiveBoundary, HeatDiffusion, PipeGeometry, PipeGeometry_rectangular
-export PipeGeometry_circular
+export H2O, D2O
+
+export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend
+export PipeGeometry, PipeGeometry_rectangular, PipeGeometry_circular
+export solve_steady, solve_transient, steady_state_guess
+export G_EARTH, ATM
 export knob_defaults, @design_knob
-export bilinear_inertia
-export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction_rectangular
-export rectangular_laminar_correction, elenbaas_nusselt, marco_han_nusselt
-export turbulent_friction, laminar_friction, viscosity_correction
-export darcy_weisbach_dp, local_dp
-export DarcyFactor, FunctionDarcy, ReynoldsFactor, BlasiusFriction, LaminarFriction
-export TurbulentFriction, RectangularLaminarFriction, RegimeDependentFriction
-export fully_developed_laminar_h_spl, developing_laminar_h_spl, film_temperature
-export AbstractHTC, FunctionHTC, NusseltHTC, PropertyBasis, AtFilm, AtBulk, property_temperature
-export DittusBoelter, ConstantNusselt, FullyDevelopedLaminar, DevelopingLaminar
-export Elenbaas, RegimeDependentHTC, MaximalHTC, SubcooledBoilingHTC
-export mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux
-export partial_SCB_correction, regime_dependent_q_scb
-export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber
-export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
-export ChannelState, threshold_analysis, chfr
-export Gr, Ra, Re_vel, Pe, flow_regime_blend, Re, Pr, Nu
-export G_EARTH
-export solve_steady,
-    solve_transient,
-    steady_state_guess,
-    check_gravity_mismatch,
-    port,
-    connect_face,
-    connect_faces
-export symmetric_plate, plate, one_sided_connection, single_channel_connection, inseries, inparallel
-export compose_systems, fuel_assembly
-export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
-export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
-export ReactivityController, worth, change_state
-export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback, watch_flow
-export connect_temperature_feedback
 
 end  # module STREAM

@@ -12,12 +12,14 @@ using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.Friction
+using STREAM.HTC
+using STREAM.Substances
 using STREAM.Examples
-using STREAM: Channel, ChannelAndContacts, Pump, HeatExchanger, ConstantTemperature,
-    PipeGeometry, PipeGeometry_circular, HeatDiffusion, Liquid, PointKinetics,
-    ReactivityController, connect_temperature_feedback, compose_systems, symmetric_plate,
-    one_sided_connection, constant_Nusselt, point_kinetics_steady_state, port,
-    solve_steady, solve_transient
+using STREAM: PipeGeometry, PipeGeometry_circular, solve_steady, solve_transient
 
 # ============================================================================
 # Python `tests/test_general/test_integrations.py` 1:1 ports.

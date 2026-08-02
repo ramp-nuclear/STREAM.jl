@@ -3,8 +3,9 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
 using STREAM.Examples
-using STREAM: Resistor, VolumetricFlowResistor
 
 @testset "Cube flow matches 5/6 R analytical within 1%" begin
     R_val = 1.0e4

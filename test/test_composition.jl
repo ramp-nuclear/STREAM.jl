@@ -4,7 +4,11 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
-using STREAM: Channel
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.Friction
+using STREAM.HTC
 using STREAM.Assemblies: _infer_n  # private to Assemblies
 using OrdinaryDiffEq: ReturnCode
 

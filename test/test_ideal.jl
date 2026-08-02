@@ -3,8 +3,9 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
 using STREAM.Examples
-using STREAM: Inertia, HeatExchanger, WallTemperature, HeatFluxSource
 
 @testset "Inertia stub callable" begin
     @named L = Inertia(1e3)
@@ -63,7 +64,7 @@ end
 end
 
 @testset "HeatExchanger exported from STREAM" begin
-    @test isdefined(STREAM, :HeatExchanger)
+    @test isdefined(STREAM.Components, :HeatExchanger)
 end
 
 @testset "build_loop compiles after HeatExchanger rename (regression)" begin

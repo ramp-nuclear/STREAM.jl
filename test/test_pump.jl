@@ -3,7 +3,9 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-using STREAM: Pump, Channel
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
 
 @testset "Pump fixed-flow mode" begin
     @named pump = Pump(; ṁ0=0.6)

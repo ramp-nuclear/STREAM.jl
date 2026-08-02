@@ -3,8 +3,10 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-using STREAM: blasius_friction, laminar_friction, turbulent_friction,
-              laminar_friction_rectangular, rectangular_laminar_correction, Re
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Friction
+using STREAM: Re
 
 # MTR-like channel: aspect ratio 0.01814, which is where k_R departs from 1 the most.
 const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)

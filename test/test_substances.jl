@@ -2,6 +2,7 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
+using STREAM.Substances
 
 # Property values below are the reference values recorded in each correlation's docstring in
 # src/substances/. They come from the ORNL/TM-12322 fits (Crabtree and Siman-Tov, 1993) that

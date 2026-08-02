@@ -1,5 +1,7 @@
 using Test
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using OrdinaryDiffEq

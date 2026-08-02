@@ -3,6 +3,9 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Substances
 
 @testset "Flapper has no use_callback or threshold kwargs" begin
     @test_throws Exception Flapper(; name=:flap_ref, use_callback=true)

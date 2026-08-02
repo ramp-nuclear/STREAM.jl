@@ -1,11 +1,13 @@
 using Test
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
-using STREAM: Channel, HeatDiffusion, ChannelAndContacts
 import ModelingToolkit: compose
 
 @testset "PointKinetics" begin
@@ -651,7 +653,7 @@ end
         #   (4) feedback subtracts the inserted reactivity, settling to a new critical
         #       equilibrium (late-time net reactivity pulled back below delta_rho, ≈ 0).
         Tin = 20.0
-        beta_total = 0.006502        # = sum(STREAM.U235_BETA_K)
+        beta_total = 0.006502        # = sum(STREAM.Components.U235_BETA_K)
         delta_rho = 5e-4             # < beta_total ⇒ delayed-supercritical, bounded jump
         t_step = 40.0                # insert after the loop has settled (~30 s)
         ctrl = ReactivityController((s, ts, tt) -> (tt >= t_step ? delta_rho : 0.0))

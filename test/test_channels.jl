@@ -5,9 +5,13 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
-using STREAM: Channel  # disambiguate from Base.Channel
+using STREAM.HTC
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.Friction
+using STREAM.Substances
 using STREAM.Examples
-using STREAM: regime_dependent_q_scb
 using STREAM.HTC: _bergles_rohsenow_dT_ONB  # private to HTC, for the SCB integration block
 using OrdinaryDiffEq: ReturnCode
 

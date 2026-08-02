@@ -5,11 +5,11 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using ModelingToolkit: connect    # disambiguate from Sockets.connect
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
-using STREAM: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion,
-                ConstantTemperature, Channel,
-                PipeGeometry_circular, PipeGeometry_rectangular,
-                ReactivityController
+using STREAM: PipeGeometry_circular, PipeGeometry_rectangular
 
 # Helper: assert determinacy contract on an UNCOMPILED system. Calls
 # `mtkcompile(...; fully_determined=true)` which raises on imbalance,

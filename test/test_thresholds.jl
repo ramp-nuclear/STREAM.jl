@@ -1,5 +1,9 @@
 using Test
 using STREAM
+using STREAM.Components
+using STREAM.Substances
+using STREAM.Thresholds
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
 
 @testset "Threshold Analysis" begin
