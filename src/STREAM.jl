@@ -6,19 +6,6 @@ using OrdinaryDiffEq
 using QuadGK
 using SteadyStateDiffEq
 
-# ---------------------------------------------------------------------------------------
-# Layout
-#
-# The package is a stack of submodules, each one a layer that only ever reaches downward:
-#
-#   Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
-#              -> Components -> Assemblies -> {Solvers, Examples}
-#
-# Names that every layer needs (the coolant properties, the dimensionless numbers, the
-# geometry, the constants) are defined at this level and pulled into the submodules that
-# want them. Everything else lives in its module and is reached through it.
-# ---------------------------------------------------------------------------------------
-
 include("constants.jl")
 
 module Substances
@@ -126,13 +113,8 @@ module Assemblies
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ..STREAM: PipeGeometry
-using ..Components
-
-# A getter, not a verb, and Connect below leans on it.
-include("assemblies/port.jl")
-
-# The wiring verbs. Reading `Connect.face(cts, cac, :thermal_left)` beats
-# `connect_face(...)`: the module already said "connect", so the name need not.
+    using ..Components
+    include("assemblies/port.jl")
 module Connect
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
@@ -177,11 +159,6 @@ end
 # ---------------------------------------------------------------------------------------
 # The public surface.
 #
-# A name reaches the top level only by being listed here, which is deliberate: everything
-# else is reached through its module. The rule for what earns a place is "written in almost
-# every script" -- the coolant properties, the dimensionless numbers, the geometry, the
-# solve entry points.
-#
 # Two ways to reach anything else:
 #
 #     using STREAM              -> Components.Channel(...), HTC.DittusBoelter()
@@ -190,12 +167,8 @@ end
 # Note that a blanket `using .HTC, .Friction` here would not work: both define
 # RegimeDependent, and that is the point of having modules. Names arrive by explicit list.
 # ---------------------------------------------------------------------------------------
-
 export Substances, HTC, Friction, LocalLoss, Thresholds, Components, Assemblies, Utilities
 
-# Coolant properties, spelled out and in the usual notation. Substances holds the types
-# (AbstractLiquid, Liquid, LightWater, HeavyWater); the two liquids themselves are used
-# often enough to sit here.
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat

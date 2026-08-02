@@ -1,7 +1,3 @@
-# dimensionless.jl -- Dimensionless number utilities
-# Mirrors Python STREAM dimensionless.py
-# All functions are plain Julia arithmetic -- MTK traces through them symbolically.
-# None are @register_symbolic.
 
 """
     Re(ṁ, A, Dh, mu) -> Float64
@@ -62,12 +58,10 @@ Pr(liquid::AbstractLiquid, T) = Pr(cₚ(liquid, T), μ(liquid, T), κ(liquid, T)
     flow_regime_blend(Re, re_bounds, laminar, turbulent)
 
 Choose between a laminar and a turbulent value on Reynolds number, blending linearly across
-the transition band instead of stepping.
+the transition band.
 
 `re_bounds` is `(re_lo, re_hi)`: at or below `re_lo` the flow is laminar, above `re_hi` it is
-turbulent, and between them the two values are interpolated linearly in `Re`. Transition is
-gradual in reality, and a step would put a discontinuity in the residual for the solver to
-trip over. This is Python STREAM's `flow_regimes` plus `lin_interp`.
+turbulent, and between them the two values are interpolated linearly in `Re`.
 
 Both `laminar` and `turbulent` are evaluated, since `ifelse` keeps this a symbolic branch the
 solver takes per step rather than one fixed while tracing.
