@@ -7,8 +7,6 @@ using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM.Friction
-using STREAM.HTC
 using STREAM.Assemblies: _infer_n  # private to Assemblies
 using OrdinaryDiffEq: ReturnCode
 
@@ -19,8 +17,8 @@ function _mtr_pair(; n=4, nz=4, nx=2)
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                    htc=ConstantNusselt(; Nu=8.235),
-                                    darcy=RectangularLaminarFriction(geom))
+                                    htc=HTC.ConstantNusselt(; Nu=8.235),
+                                    darcy=Friction.RectangularLaminar(geom))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005,
                                  y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
                                  power_shape=ps)
@@ -216,7 +214,7 @@ end
     # plate wires fuel.thermal_left[i] <-> ch_left.thermal_right[i] and
     # fuel.thermal_right[i] <-> ch_right.thermal_left[i]. Solve a steady loop with
     # both channels live (dittus_boelter, aluminum plate, same config as the
-    # single_channel_connection both-faces-active test) and verify the wiring is real:
+    # single_channel both-faces-active test) and verify the wiring is real:
     # each fuel face actually sheds heat to its own channel, the signs are right
     # (heat leaves the powered plate), and the plate temperature sits above both
     # coolant temperatures.
@@ -282,12 +280,12 @@ end
     @test all(sol[ssys.pl.fuel.T[i, nx]] > sol[ssys.pl.ch_right.T[i]] for i in 1:nz)
 end
 
-# Section 6: one_sided_connection
-# Verify-block requires: at least 2 "@testset \"one_sided_connection" testsets
+# Section 6: one_sided
+# Verify-block requires: at least 2 "@testset \"one_sided" testsets
 # (one per side variant).
-# Shared config for the one_sided_connection physics tests: dittus_boelter +
+# Shared config for the one_sided physics tests: dittus_boelter +
 # aluminum plate (same family as the plate / single_channel tests) so the steady
-# loop converges. one_sided_connection wires exactly ONE fuel face to the channel
+# loop converges. one_sided wires exactly ONE fuel face to the channel
 # and leaves the opposite face dangling, which is adiabatic (Q ~ 0) under the
 # ThermalPort Flow rule.
 function _build_osc_loop(side::Symbol, name_suffix)
@@ -299,7 +297,7 @@ function _build_osc_loop(side::Symbol, name_suffix)
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
                                 rho_s=2700.0, cp_s=900.0, k_s=200.0,
                                 power_shape=ps, power=1e4)
-    osc = one_sided_connection(cac, fuel; side=side, name=Symbol(:osc_, name_suffix))
+    osc = one_sided(cac, fuel; side=side, name=Symbol(:osc_, name_suffix))
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     conns = [
@@ -320,7 +318,7 @@ function _build_osc_loop(side::Symbol, name_suffix)
     return ssys, sol, getproperty(ssys, Symbol(:osc_, name_suffix)), nz, nx
 end
 
-# Shared physics checks for a one_sided_connection loop, called by both side variants. The single
+# Shared physics checks for a one_sided loop, called by both side variants. The single
 # connected face sheds all the injected power into the channel, the opposite face is adiabatic, and
 # the plate runs hotter than the coolant. `conn_face`/`adia_face` are the per-cell thermal-port name
 # prefixes, and `x_conn` is the fuel x-column on the connected side.
@@ -334,8 +332,8 @@ function _assert_osc(oscsys, sol, nz, conn_face, adia_face, x_conn)
     @test all(sol[oscsys.fuel.T[i, x_conn]] > sol[oscsys.cac.T[i]] for i in 1:nz)
 end
 
-@testset "one_sided_connection — side=:left connects right face, left face adiabatic" begin
-    osc = one_sided_connection(_mtr_pair(; n=4, nz=4, nx=2)...; side=:left, name=:osc_l)
+@testset "one_sided — side=:left connects right face, left face adiabatic" begin
+    osc = one_sided(_mtr_pair(; n=4, nz=4, nx=2)...; side=:left, name=:osc_l)
     @test osc isa ModelingToolkit.AbstractSystem
     # side=:left wires cac.thermal_left <-> fuel.thermal_right, so the fuel's RIGHT
     # face carries heat and the LEFT face is left dangling (adiabatic).
@@ -343,8 +341,8 @@ end
     _assert_osc(oscsys, sol, nz, :thermal_right, :thermal_left, nx)
 end
 
-@testset "one_sided_connection — side=:right connects left face, right face adiabatic" begin
-    osc = one_sided_connection(_mtr_pair(; n=4, nz=4, nx=2)...; side=:right, name=:osc_r)
+@testset "one_sided — side=:right connects left face, right face adiabatic" begin
+    osc = one_sided(_mtr_pair(; n=4, nz=4, nx=2)...; side=:right, name=:osc_r)
     @test osc isa ModelingToolkit.AbstractSystem
     # side=:right wires cac.thermal_right <-> fuel.thermal_left, so the fuel's LEFT
     # face carries heat and the RIGHT face is left dangling (adiabatic).
@@ -352,17 +350,17 @@ end
     _assert_osc(oscsys, sol, nz, :thermal_left, :thermal_right, 1)
 end
 
-@testset "one_sided_connection — invalid side errors" begin
+@testset "one_sided — invalid side errors" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    @test_throws ArgumentError one_sided_connection(cac, fuel; side=:bogus, name=:bad)
+    @test_throws ArgumentError one_sided(cac, fuel; side=:bogus, name=:bad)
 end
 
-# Section 6b: single_channel_connection (edge-channel — plate cooled on both faces)
-# Verify-block requires: at least 2 "@testset \"single_channel_connection" testsets.
-@testset "single_channel_connection — fuel_side=:left compiles cleanly" begin
+# Section 6b: single_channel (edge-channel — plate cooled on both faces)
+# Verify-block requires: at least 2 "@testset \"single_channel" testsets.
+@testset "single_channel — fuel_side=:left compiles cleanly" begin
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    scc = single_channel_connection(cac, fuel, geom; fuel_side=:left, name=:scc_l)
+    scc = single_channel(cac, fuel, geom; fuel_side=:left, name=:scc_l)
     @test scc isa ModelingToolkit.AbstractSystem
     # One ConvectiveBoundary per axial cell on the far face (n=4).
     sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(scc)))
@@ -381,10 +379,10 @@ end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-@testset "single_channel_connection — fuel_side=:right compiles cleanly" begin
+@testset "single_channel — fuel_side=:right compiles cleanly" begin
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    scc = single_channel_connection(cac, fuel, geom; fuel_side=:right, name=:scc_r)
+    scc = single_channel(cac, fuel, geom; fuel_side=:right, name=:scc_r)
     @test scc isa ModelingToolkit.AbstractSystem
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
@@ -400,9 +398,9 @@ end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-@testset "single_channel_connection — both faces active, plate laterally symmetric" begin
+@testset "single_channel — both faces active, plate laterally symmetric" begin
     # Use the parity-proven MTR config (dittus_boelter, both faces heated) so the steady
-    # solve converges. The far face sheds heat (unlike one_sided_connection) and, cooled
+    # solve converges. The far face sheds heat (unlike one_sided) and, cooled
     # by the same h and coolant as the near face, the plate is laterally symmetric.
     geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     nz = 10
@@ -412,7 +410,7 @@ end
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
                                 rho_s=2700.0, cp_s=900.0, k_s=200.0,
                                 power_shape=ps, power=1e4)
-    scc = single_channel_connection(cac, fuel, geom; fuel_side=:left, name=:scc_s)
+    scc = single_channel(cac, fuel, geom; fuel_side=:left, name=:scc_s)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     conns = [
@@ -440,10 +438,10 @@ end
     end
 end
 
-@testset "single_channel_connection — invalid fuel_side errors" begin
+@testset "single_channel — invalid fuel_side errors" begin
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    @test_throws ArgumentError single_channel_connection(cac, fuel, geom; fuel_side=:bogus, name=:bad)
+    @test_throws ArgumentError single_channel(cac, fuel, geom; fuel_side=:bogus, name=:bad)
 end
 
 # Section 7: compose_systems cross-plate wiring
@@ -478,36 +476,36 @@ end
     @test sol.retcode == ReturnCode.Success
 end
 
-# Section 8: connect_temperature_feedback
-# Equation-counting tests for connect_temperature_feedback.
-@testset "connect_temperature_feedback — 1D (CAC) emits n equations" begin
+# Section 8: temperature_feedback
+# Equation-counting tests for temperature_feedback.
+@testset "temperature_feedback — 1D (CAC) emits n equations" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
     rho_c_fn(t) = 0.0
     rods_cac = rods.cac
     @named pk = PointKinetics(rho_c_fn; temp_worth=Dict(rods_cac => 1.0e-4))
-    eqs = connect_temperature_feedback(pk, [rods_cac])
+    eqs = temperature_feedback(pk, [rods_cac])
     @test length(eqs) == 4    # n=4 cells
 end
 
-@testset "connect_temperature_feedback — 2D (HeatDiffusion) emits nz*nx equations row-major" begin
+@testset "temperature_feedback — 2D (HeatDiffusion) emits nz*nx equations row-major" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
     rho_c_fn(t) = 0.0
     rods_fuel = rods.fuel
     @named pk = PointKinetics(rho_c_fn; temp_worth=Dict(rods_fuel => 1.0e-4))
-    eqs = connect_temperature_feedback(pk, [rods_fuel])
+    eqs = temperature_feedback(pk, [rods_fuel])
     @test length(eqs) == 4 * 2  # nz=4, nx=2
 end
 
-@testset "connect_temperature_feedback — multiple components sum" begin
+@testset "temperature_feedback — multiple components sum" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
     rho_c_fn(t) = 0.0
     rods_cac = rods.cac
     rods_fuel = rods.fuel
     @named pk = PointKinetics(rho_c_fn; temp_worth=Dict(rods_cac => 1.0e-4, rods_fuel => 1.0e-4))
-    eqs = connect_temperature_feedback(pk, [rods_cac, rods_fuel])
+    eqs = temperature_feedback(pk, [rods_cac, rods_fuel])
     @test length(eqs) == 4 + 4 * 2  # 4 cells + 4*2 grid
 end
 
@@ -523,8 +521,8 @@ end
 function _fa_cac(prefix::Symbol; n=4)
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ChannelAndContacts(; name=prefix, n=n, geometry=geom,
-                       htc=ConstantNusselt(; Nu=8.235),
-                       darcy=RectangularLaminarFriction(geom))
+                       htc=HTC.ConstantNusselt(; Nu=8.235),
+                       darcy=Friction.RectangularLaminar(geom))
 end
 
 function _fa_hd(prefix::Symbol; nz=4, nx=2)
@@ -537,7 +535,7 @@ end
 # Hand-rolled per-pair wiring (mirrors `_pair_connections`): left member's
 # thermal_right to right member's thermal_left. Builds the reference systems.
 function _fa_pair_eqs(lsys, rsys, n::Int)
-    return connect_faces((lsys, :thermal_right) => (rsys, :thermal_left))
+    return faces((lsys, :thermal_right) => (rsys, :thermal_left))
 end
 
 # Time derivative, used to build the Dt(...)=>0.0 IC guesses (see variant-1 note).

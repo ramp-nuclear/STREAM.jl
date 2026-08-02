@@ -5,11 +5,9 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
-using STREAM.HTC
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM.Friction
 using STREAM.Substances
 using STREAM.Examples
 using STREAM.HTC: _bergles_rohsenow_dT_ONB  # private to HTC, for the SCB integration block
@@ -346,14 +344,14 @@ end
     @test all(isapprox.(sol2[ssys2.ch2.q_wall_left[:]], sol[ssys.ch.q_wall_left[:]], rtol=1e-6))
 end
 
-@testset "CAC with DittusBoelter solves a transient without crashing" begin
+@testset "CAC with HTC.DittusBoelter solves a transient without crashing" begin
     n = N_DEFAULT
     geom = PipeGeometry_circular(L_DEFAULT, D_DEFAULT)
     @named pump = Pump(DP_PUMP)
     @named bc = HeatExchanger(T_INLET)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                     htc=DittusBoelter(),
-                                     darcy=BlasiusFriction())
+                                     htc=HTC.DittusBoelter(),
+                                     darcy=Friction.Blasius())
     # Pin each cell's left thermal port T to T_WALL via per-cell ConstantTemperature.
     ct_l = [ConstantTemperature(T_WALL; name=Symbol(:ct_l, i)) for i in 1:n]
     conns = Equation[
@@ -361,8 +359,8 @@ end
         connect(bc.outlet, cac.inlet),
         connect(cac.outlet, pump.inlet),
         pump.inlet.p ~ 1.0e5,
-        connect_face(ct_l, cac, :thermal_left)...,
-        connect_face(ct_l, cac, :thermal_right)...,
+        face(ct_l, cac, :thermal_left)...,
+        face(ct_l, cac, :thermal_right)...,
     ]
     @named sys = compose(System(conns, t; name=:cac_db), pump, bc, cac, ct_l...)
     ssys = mtkcompile(sys; fully_determined=false)
@@ -384,8 +382,8 @@ end
     dP_pump_iscb = 3.0e4
 
     function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
-        htc = scb_correction === nothing ? DittusBoelter() :
-              SubcooledBoilingHTC(DittusBoelter(), scb_correction)
+        htc = scb_correction === nothing ? HTC.DittusBoelter() :
+              HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_correction)
         @named pump = Pump(dP_pump_iscb)
         @named cac = ChannelAndContacts(
             n=n, geometry=PipeGeometry_circular(L_ch, D_ch), htc=htc
@@ -416,7 +414,7 @@ end
     @testset "Low T_wall -> matches single-phase exactly" begin
         # T_wall = 330K < T_sat (~393K at 2 bar) ⇒ SCB inactive, pure single-phase.
         # Both SCB and non-SCB loops solve to identical h_tc values.
-        scb_fn = regime_dependent_q_scb(pressure=2e5)
+        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
 
@@ -598,7 +596,7 @@ end
     @named pump_cac = Pump(DP_PUMP)
     @named bc_cac = HeatExchanger(T_INLET)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                     htc=ConstantNusselt(; Nu=4.0))
+                                     htc=HTC.ConstantNusselt(; Nu=4.0))
     ct_l_xeq = [ConstantTemperature(T_WALL; name=Symbol(:ct_l_xeq, i)) for i in 1:n]
     conns_cac = Equation[
         connect(pump_cac.outlet, bc_cac.inlet),
@@ -661,8 +659,8 @@ end
     # Helper: build a minimal loop with CAC + Pump + HeatExchanger + per-cell
     # ConstantTemperature BCs. Returns (compiled_sys, solution).
     function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
-        htc = scb_correction === nothing ? DittusBoelter() :
-              SubcooledBoilingHTC(DittusBoelter(), scb_correction)
+        htc = scb_correction === nothing ? HTC.DittusBoelter() :
+              HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_correction)
         @named pump = Pump(dP_pump_scb)
         @named cac = ChannelAndContacts(
             n=n_scb,
@@ -704,22 +702,22 @@ end
     end
 
     @testset "SCB ChannelAndContacts compiles" begin
-        scb_fn = regime_dependent_q_scb(pressure=2e5)
+        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
         @named cac = ChannelAndContacts(
             n=3,
             geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
-            htc=SubcooledBoilingHTC(DittusBoelter(), scb_fn),
+            htc=HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_fn),
         )
         @test cac isa ModelingToolkit.System
     end
 
     @testset "SCB ChannelAndContacts solves (sub-ONB), matches non-SCB" begin
-        # T_wall is below T_ONB at 2 bar, so SubcooledBoilingHTC returns its
+        # T_wall is below T_ONB at 2 bar, so SubcooledBoiling returns its
         # single-phase value unchanged. The "SCB present but inactive" claim
         # therefore means the SCB loop must reproduce the non-SCB loop exactly.
         # Build both, solve both, and compare h_tc and coolant T cell by cell.
         T_wall = 106.85
-        scb_fn = regime_dependent_q_scb(pressure=2e5)
+        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=T_wall)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=T_wall)
         @test sol_scb.retcode == ReturnCode.Success
@@ -763,17 +761,17 @@ end
             κ(H2O, T_bulk)
 
         h_spl =
-            dittus_boelter(Re_val, Pr_val, T_bulk, T_wall) * κ(H2O, T_bulk) /
+            HTC.dittus_boelter(Re_val, Pr_val, T_bulk, T_wall) * κ(H2O, T_bulk) /
             Dh
         q_spl = h_spl * (T_wall - T_bulk)
 
         T_sat = Tsat(H2O, P)
         T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
 
-        scb_fn = regime_dependent_q_scb(pressure=P)
+        scb_fn = HTC.regime_dependent_q_scb(pressure=P)
         q_scb = scb_fn(T_wall, T_sat, Re_val)
         q_scb_inc = scb_fn(T_ONB, T_sat, Re_val)
-        factor = partial_SCB_correction(q_spl, q_scb, q_scb_inc)
+        factor = HTC.partial_SCB_correction(q_spl, q_scb, q_scb_inc)
 
         @test T_wall > T_ONB                     # boiling is active
         @test factor > 1.0                       # correction enhances h_tc
@@ -783,7 +781,7 @@ end
     @testset "Low T_wall -> matches single-phase exactly" begin
         # T_wall = 330K < T_sat (~393K at 2 bar) -> SCB inactive, pure
         # single-phase. Both SCB and non-SCB loops solve to identical h_tc values.
-        scb_fn = regime_dependent_q_scb(pressure=2e5)
+        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
 

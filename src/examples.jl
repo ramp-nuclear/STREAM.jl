@@ -162,7 +162,7 @@ end
                             R_ext=1.0e6, dt_ramp=5.0) -> System
 
 Build a loss-of-flow validation loop with bypass topology. Heated leg uses
-`ChannelAndContacts + HeatDiffusion` plate via `one_sided_connection`
+`ChannelAndContacts + HeatDiffusion` plate via `one_sided`
 (real fuel-plate physics).
 
 Topology (4-node parallel network):
@@ -172,7 +172,7 @@ Topology (4-node parallel network):
 - D series branch: ext_res -> hx -> pump -> ine
 
 Heated leg: `ChannelAndContacts` (`heated.ch`) + `HeatDiffusion` plate
-(`heated.fuel`) wired one-sided via `one_sided_connection(ch, fuel; side=:left)`.
+(`heated.fuel`) wired one-sided via `one_sided(ch, fuel; side=:left)`.
 Sub-systems retain their `@named` symbols, so access paths inside `heated` are
 `heated.ch.*` and `heated.fuel.*` (not `heated.channel.*`). The right thermal
 side of `ch` dangles inside the `heated` subsystem; the dangling per-cell
@@ -241,16 +241,16 @@ function build_loop_lof_bypass(;
 
     # The heated channel switches regime on its own, natural convection included, so the
     # loss-of-flow transient stays physical once the pump stops driving it.
-    htc_ch = RegimeDependentHTC(;
-        laminar=ConstantNusselt(; Nu=8.235),
-        turbulent=DittusBoelter(),
-        natural=Elenbaas(geom; g=g_acc),
+    htc_ch = HTC.RegimeDependent(;
+        laminar=HTC.ConstantNusselt(; Nu=8.235),
+        turbulent=HTC.DittusBoelter(),
+        natural=HTC.Elenbaas(geom; g=g_acc),
         geom=geom,
         g=g_acc,
     )
-    friction_ch = RegimeDependentFriction(;
-        laminar=laminar_friction_rectangular(geom),
-        turbulent=blasius_friction,
+    friction_ch = Friction.RegimeDependent(;
+        laminar=Friction.rectangular_laminar(geom),
+        turbulent=Friction.blasius,
     )
 
     @named pump = Pump(dP_pump_fn)
@@ -281,7 +281,7 @@ function build_loop_lof_bypass(;
         k_s=174.0,
         power_shape=ps,
     )
-    heated = one_sided_connection(ch, fuel; side=:left, name=:heated)
+    heated = one_sided(ch, fuel; side=:left, name=:heated)
 
     connections = Equation[
         # D series branch: ext_res -> hx -> pump -> ine
@@ -389,8 +389,8 @@ function build_loop_pk(ctrl;
     @named cac = ChannelAndContacts(;
         n=n,
         geometry=geom,
-        htc=ConstantNusselt(; Nu=8.235),
-        darcy=RectangularLaminarFriction(geom),
+        htc=HTC.ConstantNusselt(; Nu=8.235),
+        darcy=Friction.RectangularLaminar(geom),
     )
     @named fuel = HeatDiffusion(;
         nz=nz,
@@ -421,7 +421,7 @@ function build_loop_pk(ctrl;
     fb_eqs = if isempty(fb_components)
         Equation[]
     else
-        connect_temperature_feedback(pk, fb_components)
+        Connect.temperature_feedback(pk, fb_components)
     end
     power_eqs = [rods_fuel.power ~ pk.P * power_scale]
 

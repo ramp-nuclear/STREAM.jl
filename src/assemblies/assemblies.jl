@@ -5,6 +5,73 @@
 # Each returns an uncompiled System wired with the primitives from connections.jl; the
 # caller adds boundary conditions and compiles.
 
+function _real_defaults(params)
+    vals = Float64[]
+    for p in params
+        ModelingToolkit.hasdefault(p) || continue
+        d = ModelingToolkit.getdefault(p)
+        d isa Real && push!(vals, Float64(d))
+    end
+    return vals
+end
+
+"""
+    check_gravity_mismatch(sys) -> Symbol
+
+Check whether gravity pressure contributions in a hydraulic loop are balanced.
+
+# Arguments
+- `sys`: compiled `AbstractSystem` to inspect
+
+# Returns
+`:ok` if balanced (or gravity disabled), `:mismatch` if channels have gravity but no
+return-leg `Gravity` component.
+"""
+function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
+    all_pars = ModelingToolkit.parameters(sys)
+
+    local_name = p -> begin
+        s = string(p)
+        idx = findlast('₊', s)
+        idx === nothing ? s : s[nextind(s, idx):end]
+    end
+
+    g_vals = _real_defaults(filter(p -> local_name(p) == "g_acc", all_pars))
+    h_vals = _real_defaults(filter(p -> local_name(p) == "H", all_pars))
+
+    if isempty(g_vals) || all(iszero, g_vals)
+        return :ok
+    end
+
+    active_g = any(v -> v > 0.0, g_vals)
+    has_return = !isempty(h_vals) && any(v -> v > 0.0, h_vals)
+
+    if active_g && !has_return
+        @warn "check_gravity_mismatch: channels have g_acc > 0 but no Gravity return component found — loop gravity terms may be unbalanced"
+        return :mismatch
+    end
+
+    return :ok
+end
+
+"""
+    compose_systems(systems...; connections, name) -> System
+
+Compose multiple MTK systems with explicit connection equations into a single system.
+
+# Arguments
+- `systems`: positional varargs of uncompiled systems
+- `connections`: vector of connection equations (`Vector{<:Equation}`)
+- `name`: system name (Symbol)
+
+# Returns
+Uncompiled `System` ready for `mtkcompile()`.
+"""
+function compose_systems(systems...; connections::Vector{<:Equation}, name::Symbol)
+    return compose(System(connections, t; name=name), systems...)
+end
+
+
 """
     symmetric_plate(cac, fuel; name) -> System
 
@@ -23,7 +90,7 @@ After calling this function, refer to sub-components exclusively via the returne
 names and should not be used in equations or connection dicts after composition.
 """
 function symmetric_plate(cac, fuel; name::Symbol)
-    connections = connect_faces(
+    connections = faces(
         (cac, :thermal_right) => (fuel, :thermal_left),
         (cac, :thermal_left) => (fuel, :thermal_right),
     )
@@ -49,7 +116,7 @@ After calling this function, refer to sub-components exclusively via the returne
 names and should not be used in equations or connection dicts after composition.
 """
 function plate(ch_left, ch_right, fuel; name::Symbol)
-    connections = connect_faces(
+    connections = faces(
         (ch_left, :thermal_right) => (fuel, :thermal_left),
         (ch_right, :thermal_left) => (fuel, :thermal_right),
     )
@@ -57,7 +124,7 @@ function plate(ch_left, ch_right, fuel; name::Symbol)
 end
 
 """
-    one_sided_connection(channel, fuel; side=:left, name) -> System
+    one_sided(channel, fuel; side=:left, name) -> System
 
 Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channel.
 
@@ -74,19 +141,19 @@ After calling this function, refer to sub-components exclusively via the returne
 (e.g. `osc.channel`, `osc.fuel`). The original component variables hold unscoped symbolic
 names and should not be used in equations or connection dicts after composition.
 """
-function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
+function one_sided(channel, fuel; side::Symbol=:left, name::Symbol)
     side in (:left, :right) ||
         throw(ArgumentError("side must be :left or :right, got :$side"))
     connections = if side == :left
-        connect_faces((channel, :thermal_left) => (fuel, :thermal_right))
+        faces((channel, :thermal_left) => (fuel, :thermal_right))
     else
-        connect_faces((channel, :thermal_right) => (fuel, :thermal_left))
+        faces((channel, :thermal_right) => (fuel, :thermal_left))
     end
     return compose(System(connections, t; name=name), channel, fuel)
 end
 
 """
-    single_channel_connection(channel, fuel, geometry; fuel_side=:left, name) -> System
+    single_channel(channel, fuel, geometry; fuel_side=:left, name) -> System
 
 Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*: the
 channel is heated on one face only, but the fuel plate is cooled on **both** faces — the
@@ -97,7 +164,7 @@ This reproduces the half-symmetric reduced unit used for the last plate in an ar
 plate sits between two channels, so it loses heat on both faces, but only one channel is
 modelled. The far face's heat flows into the unmodelled equivalent twin, so the subsystem
 does not conserve energy — that is the modelling choice, not a defect. For the truthful
-one-face-insulated coupling, use [`one_sided_connection`](@ref) instead.
+one-face-insulated coupling, use [`one_sided`](@ref) instead.
 
 # Arguments
 - `channel`: uncompiled `ChannelAndContacts` instance.
@@ -115,7 +182,7 @@ Uncompiled `System` from `compose()` holding `channel`, `fuel`, and `n` per-cell
 After composition, refer to sub-components through the returned system (e.g.
 `scc.channel`, `scc.fuel`).
 """
-function single_channel_connection(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol=:left, name::Symbol)
+function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol=:left, name::Symbol)
     fuel_side in (:left, :right) ||
         throw(ArgumentError("fuel_side must be :left or :right, got :$fuel_side"))
     n = _infer_n(channel)
@@ -159,7 +226,7 @@ end
 #
 # Wiring: each adjacent pair connects the left member's right face to the right
 # member's left face (same convention as `plate`). Outer faces left dangling
-# stay adiabatic, like `one_sided_connection`.
+# stay adiabatic, like `one_sided`.
 # ----------------------------------------------------------------
 
 # Build the alternation as an ordered Vector of (kind, sys) tuples, kind :c or :p.
@@ -182,7 +249,7 @@ end
 function _pair_connections(left::Tuple{Symbol,Any}, right::Tuple{Symbol,Any}, n::Int)
     _, lsys = left
     _, rsys = right
-    return connect_faces((lsys, :thermal_right) => (rsys, :thermal_left))
+    return faces((lsys, :thermal_right) => (rsys, :thermal_left))
 end
 
 """

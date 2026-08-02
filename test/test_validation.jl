@@ -7,7 +7,6 @@ using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM.HTC
 using STREAM.Examples
 using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
@@ -115,7 +114,7 @@ end
     geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     Dh = geom.Dh
     A = geom.A
-    htc = DittusBoelter()
+    htc = HTC.DittusBoelter()
     for i in 1:length(PARITY_MTR_ASYM_H_TC_LEFT_R)
         h_julia = htc(
             PARITY_MTR_ASYM_T_WALL_LEFT_R[i],
@@ -179,8 +178,8 @@ end
     conns = vcat(
             inseries(pump, hx, cac, pump),
             [pump.inlet.p ~ 1.0e5],
-        connect_face(ct_l, cac, :thermal_left),
-        connect_face(ct_r, cac, :thermal_right),
+        face(ct_l, cac, :thermal_left),
+        Connect.face(ct_r, cac, :thermal_right),
     )
     @named sys = compose(System(conns, t; name=:simple_loop_parity),
                           pump, hx, cac, ct_l..., ct_r...)
@@ -324,8 +323,8 @@ end
             pump_l.inlet.p ~ 1.0e5,
             inseries(pump_r, hx_r, cac_r, pump_r)...,
             pump_r.inlet.p ~ 1.0e5,
-        connect_faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
-        connect_faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
+        faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
+        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(
@@ -474,8 +473,8 @@ end
             pump_l.inlet.p ~ 1.0e5,
             inseries(pump_r, hx_r, cac_r, pump_r)...,
             pump_r.inlet.p ~ 1.0e5,
-        connect_faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
-        connect_faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
+        faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
+        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(
@@ -591,7 +590,7 @@ end
 end
 
 @testset "Python parity: MTR one-sided" begin
-    # Edge-channel coupling via single_channel_connection: the channel is heated on its
+    # Edge-channel coupling via single_channel: the channel is heated on its
     # connected (left) face only, while the fuel plate is cooled on BOTH faces — the near
     # face conjugately through the channel, the far face by a one-way ConvectiveBoundary
     # fed from the channel's connected-side h_tc and coolant T (the equivalent-twin
@@ -619,7 +618,7 @@ end
         rho_s=2700.0, cp_s=900.0, k_s=200.0,
         power_shape=ps, power=1e4,
     )
-    scc = single_channel_connection(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
+    scc = single_channel(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
     cac = scc.cac_l
     fuel = scc.hd
     conns = [

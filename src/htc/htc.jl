@@ -6,7 +6,7 @@
 #
 # Anything else a correlation needs (geometry, gravity, a transition band, a develop length)
 # it captures when constructed. Writing your own is a struct plus that one method, and
-# `FunctionHTC` covers the one-off case.
+# `FromFunction` covers the one-off case.
 #
 # Handing over an `h` rather than a Nusselt number is what lets a model choose *where* it
 # reads the coolant properties. A Nusselt correlation is dimensionless: closing it into an h
@@ -25,28 +25,28 @@ A wall heat transfer coefficient model. Subtypes are callable as
 with temperatures in °C, `ṁ` in kg/s, `Dh` and `A` the channel's hydraulic diameter and flow
 area, and `liquid` an [`AbstractLiquid`](@ref).
 
-Shipped models: [`NusseltHTC`](@ref) and the named correlations built on it
+Shipped models: [`FromNusselt`](@ref) and the named correlations built on it
 ([`DittusBoelter`](@ref), [`ConstantNusselt`](@ref), [`FullyDevelopedLaminar`](@ref),
 [`DevelopingLaminar`](@ref)), [`Elenbaas`](@ref) for natural convection,
-[`RegimeDependentHTC`](@ref) to switch between them, [`MaximalHTC`](@ref), and
-[`SubcooledBoilingHTC`](@ref) to add partial boiling on top of any of them.
+[`RegimeDependent`](@ref) to switch between them, [`Maximal`](@ref), and
+[`SubcooledBoiling`](@ref) to add partial boiling on top of any of them.
 
 To add your own, either subtype this and define the call, or wrap a closure in
-[`FunctionHTC`](@ref).
+[`FromFunction`](@ref).
 """
 abstract type AbstractHTC end
 
 """
-    FunctionHTC(f) <: AbstractHTC
+    FromFunction(f) <: AbstractHTC
 
 Lift a callable `f(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h` into an [`AbstractHTC`](@ref), for a
 correlation not worth its own type.
 """
-struct FunctionHTC{F} <: AbstractHTC
+struct FromFunction{F} <: AbstractHTC
     f::F
 end
 
-function (htc::FunctionHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid)
+function (htc::FromFunction)(T_wall, T_bulk, ṁ, Dh, A, liquid)
     return htc.f(T_wall, T_bulk, ṁ, Dh, A, liquid)
 end
 
@@ -85,7 +85,7 @@ property_temperature(::AtFilm, T_wall, T_bulk) = film_temperature(T_wall, T_bulk
 property_temperature(::AtBulk, T_wall, T_bulk) = T_bulk
 
 """
-    NusseltHTC(nusselt; basis=AtFilm()) <: AbstractHTC
+    FromNusselt(nusselt; basis=AtFilm()) <: AbstractHTC
 
 Close a Nusselt correlation into a heat transfer coefficient, `h = Nu·κ/Dh`, reading Re, Pr
 and κ at the temperature `basis` names.
@@ -97,37 +97,37 @@ and κ at the temperature `basis` names.
 - `nusselt`: the correlation to close
 - `basis`: [`AtFilm`](@ref) (default) or [`AtBulk`](@ref)
 """
-struct NusseltHTC{N,B<:PropertyBasis} <: AbstractHTC
+struct FromNusselt{N,B<:PropertyBasis} <: AbstractHTC
     nusselt::N
     basis::B
 end
 
-NusseltHTC(nusselt; basis::PropertyBasis=AtFilm()) = NusseltHTC(nusselt, basis)
+FromNusselt(nusselt; basis::PropertyBasis=AtFilm()) = FromNusselt(nusselt, basis)
 
-function (htc::NusseltHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid)
+function (htc::FromNusselt)(T_wall, T_bulk, ṁ, Dh, A, liquid)
     T_prop = property_temperature(htc.basis, T_wall, T_bulk)
     Nu = htc.nusselt(Re(liquid, T_prop, ṁ, A, Dh), Pr(liquid, T_prop), T_wall, T_bulk)
     return Nu * κ(liquid, T_prop) / Dh
 end
 
 """
-    DittusBoelter(; basis=AtFilm()) -> NusseltHTC
+    DittusBoelter(; basis=AtFilm()) -> FromNusselt
 
 Dittus-Boelter turbulent forced convection, `Nu = 0.023·Re^0.8·Pr^0.4`.
 """
-DittusBoelter(; basis::PropertyBasis=AtFilm()) = NusseltHTC(dittus_boelter, basis)
+DittusBoelter(; basis::PropertyBasis=AtFilm()) = FromNusselt(dittus_boelter, basis)
 
 """
-    ConstantNusselt(; Nu=8.235, basis=AtFilm()) -> NusseltHTC
+    ConstantNusselt(; Nu=8.235, basis=AtFilm()) -> FromNusselt
 
 A fixed Nusselt number, the fully-developed laminar value for parallel plates by default.
 """
 function ConstantNusselt(; Nu=8.235, basis::PropertyBasis=AtFilm())
-    return NusseltHTC(constant_Nusselt(; Nu=Nu), basis)
+    return FromNusselt(constant_Nusselt(; Nu=Nu), basis)
 end
 
 """
-    FullyDevelopedLaminar(geom; basis=AtBulk()) -> NusseltHTC
+    FullyDevelopedLaminar(geom; basis=AtBulk()) -> FromNusselt
 
 Fully-developed laminar flow in a rectangular channel, corrected for aspect ratio.
 
@@ -136,17 +136,17 @@ STREAM, and it is the branch that matters most: at low Reynolds number the film 
 temperatures are furthest apart.
 """
 function FullyDevelopedLaminar(geom::PipeGeometry; basis::PropertyBasis=AtBulk())
-    return NusseltHTC(fully_developed_laminar_h_spl(geom), basis)
+    return FromNusselt(fully_developed_laminar_nusselt(geom), basis)
 end
 
 """
-    DevelopingLaminar(geom; develop_length, basis=AtBulk()) -> NusseltHTC
+    DevelopingLaminar(geom; develop_length, basis=AtBulk()) -> FromNusselt
 
 Thermally developing laminar flow over `develop_length`, corrected for aspect ratio.
 """
 function DevelopingLaminar(geom::PipeGeometry; develop_length,
                            basis::PropertyBasis=AtBulk())
-    return NusseltHTC(developing_laminar_h_spl(geom; develop_length=develop_length), basis)
+    return FromNusselt(developing_laminar_nusselt(geom; develop_length=develop_length), basis)
 end
 
 """
@@ -176,7 +176,7 @@ function (htc::Elenbaas)(T_wall, T_bulk, ṁ, Dh, A, liquid)
 end
 
 """
-    RegimeDependentHTC(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
+    RegimeDependent(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
                        geom, g=G_EARTH) <: AbstractHTC
 
 Switch between laminar, turbulent and natural convection, the way Python STREAM's
@@ -196,7 +196,7 @@ Given a `natural` model, buoyancy takes over wherever `Gr/Re² > 1`.
 - `geom`: channel geometry; `geom.Dh` is the Grashof characteristic length
 - `g`: gravitational acceleration [m/s²], used only when `natural` is given
 """
-struct RegimeDependentHTC{L<:AbstractHTC,T<:AbstractHTC,N} <: AbstractHTC
+struct RegimeDependent{L<:AbstractHTC,T<:AbstractHTC,N} <: AbstractHTC
     laminar::L
     turbulent::T
     natural::N
@@ -205,7 +205,7 @@ struct RegimeDependentHTC{L<:AbstractHTC,T<:AbstractHTC,N} <: AbstractHTC
     g::Float64
 end
 
-function RegimeDependentHTC(;
+function RegimeDependent(;
     laminar::AbstractHTC,
     turbulent::AbstractHTC,
     natural::Union{AbstractHTC,Nothing}=nothing,
@@ -214,10 +214,10 @@ function RegimeDependentHTC(;
     g=G_EARTH,
 )
     bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))
-    return RegimeDependentHTC(laminar, turbulent, natural, bounds, geom.Dh, Float64(g))
+    return RegimeDependent(laminar, turbulent, natural, bounds, geom.Dh, Float64(g))
 end
 
-function (htc::RegimeDependentHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid)
+function (htc::RegimeDependent)(T_wall, T_bulk, ṁ, Dh, A, liquid)
     Re_bulk = Re(liquid, T_bulk, ṁ, A, Dh)
     h_forced = flow_regime_blend(
         Re_bulk, htc.re_bounds,
@@ -234,22 +234,22 @@ function (htc::RegimeDependentHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid)
 end
 
 """
-    MaximalHTC(models...) <: AbstractHTC
+    Maximal(models...) <: AbstractHTC
 
 The largest `h` of several models, for a wall cooled by whichever mechanism happens to win.
 """
-struct MaximalHTC{T<:Tuple} <: AbstractHTC
+struct Maximal{T<:Tuple} <: AbstractHTC
     models::T
 end
 
-MaximalHTC(models::AbstractHTC...) = MaximalHTC(models)
+Maximal(models::AbstractHTC...) = Maximal(models)
 
-function (htc::MaximalHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid)
+function (htc::Maximal)(T_wall, T_bulk, ṁ, Dh, A, liquid)
     return reduce(max, (m(T_wall, T_bulk, ṁ, Dh, A, liquid) for m in htc.models))
 end
 
 """
-    SubcooledBoilingHTC(single_phase, q_scb) <: AbstractHTC
+    SubcooledBoiling(single_phase, q_scb) <: AbstractHTC
 
 Partial subcooled boiling layered on top of a single-phase model: `single_phase` below the
 onset of nucleate boiling, and that value scaled by the Bergles-Rohsenow partial boiling
@@ -263,17 +263,17 @@ extra-argument form `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)`.
 - `q_scb`: subcooled boiling heat flux closure `(T_wall, T_sat, Re) -> q`, e.g. from
   [`regime_dependent_q_scb`](@ref)
 """
-struct SubcooledBoilingHTC{H<:AbstractHTC,Q} <: AbstractHTC
+struct SubcooledBoiling{H<:AbstractHTC,Q} <: AbstractHTC
     single_phase::H
     q_scb::Q
 end
 
 # Without a pressure there is nothing to boil against, so this degenerates to single phase.
-function (htc::SubcooledBoilingHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid)
+function (htc::SubcooledBoiling)(T_wall, T_bulk, ṁ, Dh, A, liquid)
     return htc.single_phase(T_wall, T_bulk, ṁ, Dh, A, liquid)
 end
 
-function (htc::SubcooledBoilingHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid, P)
+function (htc::SubcooledBoiling)(T_wall, T_bulk, ṁ, Dh, A, liquid, P)
     h_spl = htc.single_phase(T_wall, T_bulk, ṁ, Dh, A, liquid)
     return _scb_corrected(h_spl, htc.q_scb, T_wall, T_bulk, ṁ, Dh, A, liquid, P)
 end

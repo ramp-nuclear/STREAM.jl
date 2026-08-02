@@ -2,8 +2,6 @@ using Printf
 using DelimitedFiles
 using Test
 using STREAM
-using STREAM.Friction
-using STREAM.HTC
 
 const TIER_CLEAN = :CLEAN   # rtol ≤ gray_floor (1e-6)
 const TIER_GRAY  = :GRAY    # gray_floor < rtol < hard_ceiling (default 0.02)
@@ -168,16 +166,16 @@ end
 """
     assert_equivalence_blasius(; rtol=1e-12)
 
-Assert Julia's Blasius (0.3164 / Re^0.25) matches the formula at Re=10000.
+Assert Julia's Friction.Blasius (0.3164 / Re^0.25) matches the formula at Re=10000.
 """
 function assert_equivalence_blasius(; rtol::Float64=1e-12)
     Re_ref = 10_000.0
     f_python = 0.3164 / Re_ref^0.25
-    f_julia  = STREAM.Friction.blasius_friction(Re_ref)
+    f_julia  = STREAM.Friction.blasius(Re_ref)
     isapprox(f_julia, f_python; rtol=rtol) || error(
-        "EQUIVALENCE FAIL: Blasius at Re=$Re_ref: Julia=$f_julia, " *
+        "EQUIVALENCE FAIL: Friction.Blasius at Re=$Re_ref: Julia=$f_julia, " *
         "Python-formula=$f_python")
-    @info "Equivalence checklist: Blasius constants (0.3164, 0.25) match"
+    @info "Equivalence checklist: Friction.Blasius constants (0.3164, 0.25) match"
 end
 
 """

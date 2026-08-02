@@ -2,7 +2,7 @@
 #
 # Everything here is dimensionless: a correlation takes `(Re, Pr, T_wall, T_bulk)` and
 # returns Nu. Closing one into a heat transfer coefficient, which is where the choice of
-# film or bulk properties lives, is [`NusseltHTC`](@ref)'s job in htc.jl.
+# film or bulk properties lives, is [`FromNusselt`](@ref)'s job in htc.jl.
 #
 # Geometry-dependent factories take `geom::PipeGeometry` first and capture the scalars they
 # need (`geom.depth`, `geom.width`, `geom.L`, `geom.Dh`) at construction, so the returned
@@ -80,7 +80,7 @@ function _nusselt_coefficient_developing(x)
 end
 
 """
-    fully_developed_laminar_h_spl(geom::PipeGeometry) -> (Re, Pr, T_bulk, T_wall) -> Nu
+    fully_developed_laminar_nusselt(geom::PipeGeometry) -> (Re, Pr, T_bulk, T_wall) -> Nu
 
 Factory returning an HTC correlation for fully-developed laminar flow in a
 rectangular duct with 2-sided heating.
@@ -92,14 +92,14 @@ rectangular duct with 2-sided heating.
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 """
-function fully_developed_laminar_h_spl(geom::PipeGeometry)
+function fully_developed_laminar_nusselt(geom::PipeGeometry)
     aspect_ratio = geom.depth / geom.width
     nu = _two_sided_heating_nusselt(aspect_ratio)
     return (Re, Pr, args...) -> nu
 end
 
 """
-    developing_laminar_h_spl(geom::PipeGeometry; develop_length) -> (Re, Pr, T_bulk, T_wall) -> Nu
+    developing_laminar_nusselt(geom::PipeGeometry; develop_length) -> (Re, Pr, T_bulk, T_wall) -> Nu
 
 Factory returning an HTC correlation for thermally developing laminar flow in a
 rectangular duct with 2-sided heating.
@@ -116,7 +116,7 @@ choose the evaluation point along the channel; there is no silent substitution w
 # Returns
 Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
 """
-function developing_laminar_h_spl(geom::PipeGeometry; develop_length)
+function developing_laminar_nusselt(geom::PipeGeometry; develop_length)
     aspect_ratio = geom.depth / geom.width
     Dh_v = geom.Dh
     correction = 6 - 5 * exp(-0.75 * aspect_ratio / 0.3257)

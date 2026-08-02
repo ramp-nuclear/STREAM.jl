@@ -3,13 +3,13 @@
 # Faithful port of Python STREAM's stream/physical_models/pressure_drop/local.py. The
 # loss coefficient K depends on the area ratio and the Reynolds number through Idelchik
 # tables 4.2 (expansion) and 4.10 (contraction), with analytic closed forms above the
-# table's Reynolds range and a documented extrapolation below it. `_local_loss_factor`
+# table's Reynolds range and a documented extrapolation below it. `factor`
 # bundles the whole lookup into one `@register_symbolic` function so it can sit inside an
 # MTK pressure-drop equation.
 
 # Analytic high-Re factors (Borda-Carnot expansion; Idelchik contraction closed form).
-_expansion_factor(aratio) = (1 - aratio)^2
-_contraction_factor(aratio) = 0.5 * (1 - aratio)^0.75
+_expansion_asymptote(aratio) = (1 - aratio)^2
+_contraction_asymptote(aratio) = 0.5 * (1 - aratio)^0.75
 
 # Linear interpolation through (x1,y1)-(x2,y2), matching Python's lin_interp.
 _lin_interp(x1, x2, y1, y2, x) = (y2 - y1) / (x2 - x1) * (x - x2) + y2
@@ -39,7 +39,7 @@ const _IDELCHIK_410_F = let
         5.00 2.60 1.70 1.35 1.20 0.80 0.56 0.35 0.24 0.15 0.35 0.35 0.20
     ]
     for (i, ar) in enumerate(_IDELCHIK_ARATIOS)
-        f[i, end] = _contraction_factor(ar)
+        f[i, end] = _contraction_asymptote(ar)
     end
     f
 end
@@ -80,21 +80,21 @@ function _sudden_area_factor(
     end
 end
 
-function _sudden_expansion_factor(aratio, re)
+function sudden_expansion_factor(aratio, re)
     return _sudden_area_factor(
         _IDELCHIK_42_RE[end], _IDELCHIK_42_RE[1], _IDELCHIK_42_F[1, 1],
         _IDELCHIK_ARATIOS[end], _IDELCHIK_ARATIOS[1], 1.0,
-        _expansion_factor,
+        _expansion_asymptote,
         (ar, r) -> _table_interp(_IDELCHIK_42_RE, _IDELCHIK_ARATIOS, _IDELCHIK_42_F, ar, r),
         aratio, re,
     )
 end
 
-function _sudden_contraction_factor(aratio, re)
+function sudden_contraction_factor(aratio, re)
     return _sudden_area_factor(
         _IDELCHIK_410_RE[end], _IDELCHIK_410_RE[1], _IDELCHIK_410_F[1, 1],
         _IDELCHIK_ARATIOS[end], _IDELCHIK_ARATIOS[1], 0.5,
-        _contraction_factor,
+        _contraction_asymptote,
         (ar, r) -> _table_interp(_IDELCHIK_410_RE, _IDELCHIK_ARATIOS, _IDELCHIK_410_F, ar, r),
         aratio, re,
     )
@@ -103,21 +103,21 @@ end
 # Loss coefficient K for a sudden area change A1 -> A2 at mass flow `ṁ`, viscosity `mu`.
 # Forward flow (ṁ >= 0) goes 1 -> 2: an expansion if A2 >= A1, a contraction otherwise.
 # Reverse flow swaps the role. Returns the dimensionless K used in dp = K*ṁ|ṁ|/(2 rho A^2).
-function _local_loss_factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
+function factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
     A = min(A1, A2)
     aratio = min(A1 / A2, A2 / A1)
     Dh = sqrt(A / pi)
     re = abs(ṁ) * Dh / (A * mu)
     pos, neg = A2 >= A1 ?
-               (_sudden_expansion_factor, _sudden_contraction_factor) :
-               (_sudden_contraction_factor, _sudden_expansion_factor)
+               (sudden_expansion_factor, sudden_contraction_factor) :
+               (sudden_contraction_factor, sudden_expansion_factor)
     return ṁ >= 0 ? pos(aratio, re) : neg(aratio, re)
 end
 
-@register_symbolic _local_loss_factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
+@register_symbolic factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
 
 """
-    local_dp(ṁ, rho, f, A) -> Pa
+    dp(ṁ, rho, f, A) -> Pa
 
 Local (minor) loss pressure drop:
 
@@ -136,4 +136,4 @@ positive drop.
 # Returns
 Pressure drop [Pa].
 """
-local_dp(ṁ, rho, f, A) = f * (ṁ * abs(ṁ) / (2 * rho * A^2))
+dp(ṁ, rho, f, A) = f * (ṁ * abs(ṁ) / (2 * rho * A^2))

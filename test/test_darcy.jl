@@ -5,56 +5,55 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM.Friction
 using STREAM: Re
 
 # MTR-like channel: aspect ratio 0.01814, which is where k_R departs from 1 the most.
 const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
 
-@testset "DarcyFactor models" begin
+@testset "Friction.AbstractDarcyFactor models" begin
     A, Dh = GEOM_F.A, GEOM_F.Dh
     T_bulk, T_wall = 40.0, 90.0
     re_of(ṁ) = Re(H2O, T_bulk, ṁ, A, Dh)
     ṁ_at(target) = target * μ(H2O, T_bulk) * A / Dh
 
-    @testset "ReynoldsFactor closes a bare correlation at the bulk" begin
+    @testset "Friction.FromReynolds closes a bare correlation at the bulk" begin
         ṁ = 0.25
-        @test BlasiusFriction()(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈ blasius_friction(re_of(ṁ))
-        @test LaminarFriction()(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈ laminar_friction(re_of(ṁ))
-        @test TurbulentFriction()(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈ turbulent_friction(re_of(ṁ))
-        @test TurbulentFriction(; epsilon=0.1)(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈
-              turbulent_friction(re_of(ṁ), 0.1)
+        @test Friction.Blasius()(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈ Friction.blasius(re_of(ṁ))
+        @test Friction.Laminar()(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈ Friction.laminar(re_of(ṁ))
+        @test Friction.Turbulent()(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈ Friction.turbulent(re_of(ṁ))
+        @test Friction.Turbulent(; epsilon=0.1)(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈
+              Friction.turbulent(re_of(ṁ), 0.1)
 
         # The wall temperature is accepted and ignored by a model that has no use for it.
-        @test BlasiusFriction()(T_bulk, 500.0, ṁ, H2O, GEOM_F) ==
-              BlasiusFriction()(T_bulk, T_wall, ṁ, H2O, GEOM_F)
+        @test Friction.Blasius()(T_bulk, 500.0, ṁ, H2O, GEOM_F) ==
+              Friction.Blasius()(T_bulk, T_wall, ṁ, H2O, GEOM_F)
         # And the short form drops it entirely.
-        @test BlasiusFriction()(T_bulk, ṁ, H2O, GEOM_F) ==
-              BlasiusFriction()(T_bulk, T_bulk, ṁ, H2O, GEOM_F)
+        @test Friction.Blasius()(T_bulk, ṁ, H2O, GEOM_F) ==
+              Friction.Blasius()(T_bulk, T_bulk, ṁ, H2O, GEOM_F)
     end
 
     @testset "k_R scales the Reynolds fed to the correlation" begin
         ṁ = 0.25
-        @test LaminarFriction(; k_R=0.5)(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈
-              laminar_friction(re_of(ṁ) * 0.5)
+        @test Friction.Laminar(; k_R=0.5)(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈
+              Friction.laminar(re_of(ṁ) * 0.5)
         # The rectangular constructor is the aspect-ratio k_R spelled out.
-        k_R = rectangular_laminar_correction(GEOM_F.depth / GEOM_F.width)
-        @test RectangularLaminarFriction(GEOM_F)(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈
+        k_R = Friction.rectangular_correction(GEOM_F.depth / GEOM_F.width)
+        @test Friction.RectangularLaminar(GEOM_F)(T_bulk, T_wall, ṁ, H2O, GEOM_F) ≈
               64.0 / (re_of(ṁ) * k_R)
         @test !isapprox(k_R, 1.0; rtol=1e-3)   # or the test proves nothing
     end
 
-    @testset "RegimeDependentFriction blends and guards no-flow" begin
-        rd = RegimeDependentFriction(; re_bounds=(2000.0, 5000.0))
+    @testset "Friction.RegimeDependent blends and guards no-flow" begin
+        rd = Friction.RegimeDependent(; re_bounds=(2000.0, 5000.0))
         for target in (500.0, 8000.0)
             m = ṁ_at(target)
-            branch = target < 2000 ? laminar_friction : turbulent_friction
+            branch = target < 2000 ? Friction.laminar : Friction.turbulent
             @test rd(T_bulk, T_wall, m, H2O, GEOM_F) ≈ branch(re_of(m))
         end
         # A quarter into the band.
         m_band = ṁ_at(2750.0)
-        f_lam = laminar_friction(re_of(m_band))
-        f_turb = turbulent_friction(re_of(m_band))
+        f_lam = Friction.laminar(re_of(m_band))
+        f_turb = Friction.turbulent(re_of(m_band))
         @test rd(T_bulk, T_wall, m_band, H2O, GEOM_F) ≈ f_lam + 0.25 * (f_turb - f_lam)
 
         # The no-flow guard: the bare 64/Re would be Inf here.
@@ -65,10 +64,10 @@ const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
     end
 
     @testset "the viscosity correction reaches the wall" begin
-        # This is the whole point of the DarcyFactor signature: k_H needs the wall
+        # This is the whole point of the AbstractDarcyFactor signature: k_H needs the wall
         # temperature and the two perimeters, none of which a (Re)->f closure can see.
-        plain = RegimeDependentFriction()
-        corrected = RegimeDependentFriction(; viscosity=viscosity_correction)
+        plain = Friction.RegimeDependent()
+        corrected = Friction.RegimeDependent(; viscosity=Friction.viscosity_correction)
         ṁ = 0.25
 
         # Opt-in: without it nothing moves.
@@ -78,7 +77,7 @@ const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
         f_plain = plain(T_bulk, T_wall, ṁ, H2O, GEOM_F)
         f_corr = corrected(T_bulk, T_wall, ṁ, H2O, GEOM_F)
         ratio = μ(H2O, T_wall) / μ(H2O, T_bulk)
-        expected = f_plain * viscosity_correction(
+        expected = f_plain * Friction.viscosity_correction(
             GEOM_F.heated_perimeter / GEOM_F.wet_perimeter, ratio
         )
         @test f_corr ≈ expected
@@ -93,11 +92,11 @@ const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
     end
 
     @testset "user-defined factors" begin
-        mine = FunctionDarcy((Tb, Tw, m, liq, pipe) -> 0.042)
+        mine = Friction.FromFunction((Tb, Tw, m, liq, pipe) -> 0.042)
         @test mine(T_bulk, T_wall, 0.25, H2O, GEOM_F) == 0.042
         @test mine(T_bulk, 0.25, H2O, GEOM_F) == 0.042
-        # Any callable works as a ReynoldsFactor correlation.
-        @test ReynoldsFactor(Re -> 1 / Re)(T_bulk, T_wall, 0.25, H2O, GEOM_F) ≈
+        # Any callable works as a FromReynolds correlation.
+        @test Friction.FromReynolds(Re -> 1 / Re)(T_bulk, T_wall, 0.25, H2O, GEOM_F) ≈
               1 / re_of(0.25)
     end
 end
@@ -114,7 +113,7 @@ end
     end
 
     # A pump pushes through one resistor; the solved drop must match the closed form.
-    function solve_drop(; darcy=BlasiusFriction(), scale=1.0, dP=3.0e4)
+    function solve_drop(; darcy=Friction.Blasius(), scale=1.0, dP=3.0e4)
         geom = PipeGeometry_circular(2.0, 0.05)
         @named pump = Pump(dP)
         @named fr = FrictionResistor(; geometry=geom, darcy=darcy, scale=scale)
@@ -128,7 +127,7 @@ end
     end
 
     @testset "regime-dependent friction as a component" begin
-        rd = RegimeDependentFriction(; re_bounds=(2000.0, 5000.0))
+        rd = Friction.RegimeDependent(; re_bounds=(2000.0, 5000.0))
         ssys, sol = solve_drop(; darcy=rd)
         @test sol.retcode == ReturnCode.Success
         # The factor the component reports is the one the model gives at the solved Re.
@@ -136,7 +135,7 @@ end
         @test sol[ssys.fr.f] ≈ rd(40.0, 40.0, sol[ssys.fr.inlet.ṁ], H2O,
                                   PipeGeometry_circular(2.0, 0.05))
         @test Re_sol > 5000.0     # this operating point is turbulent
-        @test sol[ssys.fr.f] ≈ turbulent_friction(Re_sol)
+        @test sol[ssys.fr.f] ≈ Friction.turbulent(Re_sol)
     end
 
     @testset "scale multiplies the drop" begin

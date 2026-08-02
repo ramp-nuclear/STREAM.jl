@@ -171,36 +171,36 @@ expands is a first-order effect on peak fuel temperature.
 
 ### 3.1 The friction closure could not see the wall (DONE)
 
-Closed. `DarcyFactor` in `src/physical_models/pressure_drop/darcy.jl` is now the handle a
+Closed. `Friction.AbstractDarcyFactor` in `src/friction/darcy.jl` is now the handle a
 channel or a resistor is given:
 
     darcy(T_bulk, T_wall, ṁ, liquid, pipe) -> f
 
-matching Python's `GeneralDarcyFactor`. The correlations in `friction.jl` still take a
-Reynolds number and nothing else; [`ReynoldsFactor`](@ref) is the lift, and it applies `k_R`
+matching Python's `GeneralDarcyFactor`. The correlations in `friction/correlations.jl` still take a
+Reynolds number and nothing else; `Friction.FromReynolds` is the lift, and it applies `k_R`
 to the Reynolds it forms at the bulk temperature.
 
-That makes `viscosity_correction` reachable for the first time. `RegimeDependentFriction`
+That makes `viscosity_correction` reachable for the first time. `Friction.RegimeDependent`
 takes a `viscosity` keyword, defaulting to `nothing` exactly as Python's `k_H` does, so the
 correction is opt-in and no existing result moved. With it, the factor is multiplied by
 `k_H(heated_perimeter/wet_perimeter, mu(T_wall)/mu(T_bulk))`, which is the first use of the
 two perimeters `PipeGeometry` has always carried.
 
-Shipped: `ReynoldsFactor`, `FunctionDarcy`, `BlasiusFriction`, `LaminarFriction`,
-`TurbulentFriction`, `RectangularLaminarFriction`, `RegimeDependentFriction`.
+Shipped, all inside the `Friction` module: `FromReynolds`, `FromFunction`, `Blasius`,
+`Laminar`, `Turbulent`, `RectangularLaminar`, `RegimeDependent`.
 
 Channels take `darcy` where they took `friction_correlation`. The wall temperature they hand
 it is the mean of the two faces, following Python. `ChannelHeatFlux` has no wall of its own,
 so it passes the bulk, which makes any viscosity correction exactly 1.
 
 The old `regime_dependent_friction` factory is deleted rather than kept alongside
-`RegimeDependentFriction`, the same call made for `regime_dependent` on the HTC side.
+`Friction.RegimeDependent`, the same call made for `regime_dependent` on the HTC side.
 One thing this turned up that the first pass missed. Python factors out not just the friction
 correlations but the pressure-drop forms that consume them:
 `Darcy_Weisbach_pressure_by_mdot(mdot, rho, f, L, Dh, A)` and
 `local_pressure_by_mdot(mdot, rho, f, A)`. We had neither, and the Darcy-Weisbach product was
 written longhand in ten places across `src/` and `test/`. Both are now
-`darcy_weisbach_dp` (with a `PipeGeometry` form) and `local_dp`, and the source call sites use
+`Friction.darcy_weisbach_dp` (with a `PipeGeometry` form) and `LocalLoss.dp`, and the source call sites use
 them. The remaining longhand copies in tests are deliberate: a test that rebuilds an expected
 value with the same helper the source uses cannot catch a wrong helper.
 
@@ -208,7 +208,7 @@ value with the same helper the source uses cannot catch a wrong helper.
 
 | Python | What it is | Have it? |
 |---|---|---|
-| `RegimeDependentFriction` (resistor) | Standalone regime-switching friction resistor | Yes, as `Friction(; darcy=RegimeDependentFriction(...))` |
+| `RegimeDependentFriction` (resistor) | Standalone regime-switching friction resistor | Yes, as `Components.FrictionResistor(; darcy=Friction.RegimeDependent(...))` |
 | `ResistorMul` | Scale a resistor's pressure drop | Yes, the `scale` parameter |
 | `Inertia.bilinear` | Flow-dependent inertia, `L0·(ṁ/ṁ0)` below a knee | Yes, `bilinear_inertia` |
 | `ResistorSum` | Add resistors into one component | No, `inseries` covers the composition |

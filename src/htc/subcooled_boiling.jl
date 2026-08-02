@@ -111,7 +111,7 @@ transition band, via [`flow_regime_blend`](@ref). Python STREAM's `regime_depend
 partitions the same way.
 
 Captures `pressure`, `h_fg`, and `sigma` at construction time. Hand the returned closure to
-[`SubcooledBoilingHTC`](@ref) to layer partial boiling on a single-phase model.
+[`SubcooledBoiling`](@ref) to layer partial boiling on a single-phase model.
 
 # Arguments
 - `pressure`: system pressure [Pa] (default 1e5 = 1 bar)

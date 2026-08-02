@@ -53,7 +53,7 @@ end
 Build the per-cell temperature reactivity `Σⱼ αⱼ·(Tⱼ - Trefⱼ)` and the free `T_source`
 unknowns it reads. Returns `(0, Num[])` when `temp_worth` is `nothing`.
 
-The `T_source` unknowns have no equation here; `connect_temperature_feedback` binds them to
+The `T_source` unknowns have no equation here; `temperature_feedback` binds them to
 the component temperatures they stand for.
 """
 function _temperature_feedback(temp_worth, ref_temp)
@@ -210,7 +210,7 @@ Uncompiled `System` with unknowns `P`, `C[1:G]`, and one `T_source` array per fe
 component, plus the callable parameter `rho_c_fn`.
 
 **Important:** with `temp_worth` set, the `T_source` unknowns are free until
-`connect_temperature_feedback` binds them; do that and compose before `mtkcompile`.
+`temperature_feedback` binds them; do that and compose before `mtkcompile`.
 """
 function PointKinetics(
     rho_c_fn::Any;

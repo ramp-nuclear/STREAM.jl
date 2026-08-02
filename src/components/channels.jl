@@ -8,7 +8,7 @@ function Channel end
 
 """
     _channel_core(; n, T, dp, inlet, outlet, geometry, g_acc,
-                  darcy::DarcyFactor=BlasiusFriction(),
+                  darcy::AbstractDarcyFactor=Blasius(),
                   q_left_expr, q_right_expr,
                   Re, Pe, v, P, T_sat, T_ONB,
                   q_wall, q_wall_left, q_wall_right,
@@ -30,7 +30,7 @@ those symbols.
 - `inlet`, `outlet`                             : variant-created `FlowPort`s
 - `geometry::PipeGeometry`                          : pipe geometry descriptor
 - `g_acc::Real`                                     : gravitational acceleration [m/s^2]
-- `darcy`                                           : wall friction model ([`DarcyFactor`](@ref))
+- `darcy`                                           : wall friction model ([`AbstractDarcyFactor`](@ref))
 - `T_wall`                                          : length-n wall temperature, or `nothing` when the
                                                       variant has no wall of its own
 - `q_left_expr`, `q_right_expr`                     : length-n `Vector{Num}`, per-cell heat flow inputs (W) — variant builds these
@@ -54,7 +54,7 @@ function _channel_core(;
     outlet,
     geometry::PipeGeometry,
     g_acc::Real,
-    darcy::DarcyFactor=BlasiusFriction(),
+    darcy::AbstractDarcyFactor=Blasius(),
     q_left_expr, q_right_expr,
     vars,
     liquid::AbstractLiquid=H2O,
@@ -236,7 +236,7 @@ end
 
 """
     Channel(; name, n, geometry, g=0.0, h_left=0.0, h_right=0.0,
-            darcy=BlasiusFriction()) -> System
+            darcy=Blasius()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
 `Heat flux is defined by external temperature (required closure post process) and
@@ -252,9 +252,9 @@ A `WallTemperature` source can be used as a closure, for example.
   `AbstractVector{<:Real}` of length n (per-cell static profile), or `Function` (time-varying via
   MTK callable parameter pattern; user must pass `ch.h_left_fn => fn` in solve `op` dict);
   default `0.0` per-side ⇒ adiabatic.
-- `darcy`: wall friction model ([`DarcyFactor`](@ref)), default [`BlasiusFriction`](@ref).
+- `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
-  viscosity correction are [`RegimeDependentFriction`](@ref).
+  viscosity correction are [`RegimeDependent`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). Pass a [`Liquid`](@ref) to
   drive the energy balance, friction, and dimensionless observables with fixed properties.
 
@@ -289,7 +289,7 @@ function Channel(;
     g=0.0,
     h_left::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
     h_right::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
-    darcy::DarcyFactor=BlasiusFriction(),
+    darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
     pars_base, varstruct, inlet, outlet = _setup(geometry, g, n)
@@ -346,7 +346,7 @@ end
 
 """
     ChannelHeatFlux(; name, n, geometry, g=0.0,
-                    darcy=BlasiusFriction()) -> System
+                    darcy=Blasius()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
 Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource` source).
@@ -356,9 +356,9 @@ Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource
 - `n`: number of axial cells (Int)
 - `geometry`: pipe geometry descriptor (`PipeGeometry`)
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
-- `darcy`: wall friction model ([`DarcyFactor`](@ref)), default [`BlasiusFriction`](@ref).
+- `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
-  viscosity correction are [`RegimeDependentFriction`](@ref).
+  viscosity correction are [`RegimeDependent`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref).
 
 # External-input variables
@@ -390,7 +390,7 @@ function ChannelHeatFlux(;
     n::Int,
     geometry::PipeGeometry,
     g=0.0,
-    darcy::DarcyFactor=BlasiusFriction(),
+    darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
     pars, varstruct, inlet, outlet = _setup(geometry, g, n)
@@ -422,7 +422,7 @@ end
 """
     ChannelAndContacts(; name, n, geometry, g=0.0,
                        htc=DittusBoelter(),
-                       darcy::DarcyFactor=BlasiusFriction(),
+                       darcy::AbstractDarcyFactor=Blasius(),
                        liquid=H2O) -> System
 
 Convective channel with per-cell `ThermalPort` arrays on both sides for conjugate heat
@@ -437,11 +437,11 @@ is `h_tc[i] * heated_parts * dz * (T_wall - T[i])`.
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
 - `htc`: wall heat transfer model ([`HTC`](@ref)), default [`DittusBoelter`](@ref). It is
   handed `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)` per cell and returns `h`. Subcooled boiling
-  is a model like any other: wrap one in [`SubcooledBoilingHTC`](@ref). Regime switching is
-  [`RegimeDependentHTC`](@ref).
-- `darcy`: wall friction model ([`DarcyFactor`](@ref)), default [`BlasiusFriction`](@ref).
+  is a model like any other: wrap one in [`SubcooledBoiling`](@ref). Regime switching is
+  [`RegimeDependent`](@ref).
+- `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
-  viscosity correction are [`RegimeDependentFriction`](@ref).
+  viscosity correction are [`RegimeDependent`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). It drives the energy balance,
   friction, the HTC model, and the dimensionless observables.
 
@@ -455,7 +455,7 @@ function ChannelAndContacts(;
     geometry::PipeGeometry,
     g=0.0,
     htc::AbstractHTC=DittusBoelter(),
-    darcy::DarcyFactor=BlasiusFriction(),
+    darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
 

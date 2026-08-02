@@ -5,70 +5,68 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM.Friction
-using STREAM.HTC
 using STREAM: Gr, Ra
 
 @testset "Correlation Library" begin
-    @testset "rectangular_laminar_correction reference values" begin
-        @test isapprox(rectangular_laminar_correction(0.0), 0.66685; atol=1e-4)
-        @test isapprox(rectangular_laminar_correction(0.01814), 0.68544; atol=1e-4)
-        @test isapprox(rectangular_laminar_correction(0.5), 1.03639; atol=1e-4)
-        @test isapprox(rectangular_laminar_correction(1.0), 1.12462; atol=1e-4)
+    @testset "Friction.rectangular_correction reference values" begin
+        @test isapprox(Friction.rectangular_correction(0.0), 0.66685; atol=1e-4)
+        @test isapprox(Friction.rectangular_correction(0.01814), 0.68544; atol=1e-4)
+        @test isapprox(Friction.rectangular_correction(0.5), 1.03639; atol=1e-4)
+        @test isapprox(Friction.rectangular_correction(1.0), 1.12462; atol=1e-4)
     end
 
-    @testset "dittus_boelter standalone function" begin
+    @testset "HTC.dittus_boelter standalone function" begin
         # Definition check: mirrors the source formula Nu = 0.023*Re^0.8*Pr^0.4.
         expected_Nu = 0.023 * 8000.0^0.8 * 7.0^0.4
-        @test isapprox((@inferred dittus_boelter(8000.0, 7.0)), expected_Nu; rtol=1e-6)
+        @test isapprox((@inferred HTC.dittus_boelter(8000.0, 7.0)), expected_Nu; rtol=1e-6)
 
         # Anchored point computed independently at clean inputs (not a copy of the source
         # expression). At Pr=1 the Pr^0.4 factor is exactly 1, and Re=1e4 gives
         # Re^0.8 = (10^4)^0.8 = 10^3.2 = 1584.8932. The heating-mode Dittus-Boelter value is
         # then 0.023 * 1584.8932 = 36.45255, which pins both the lead coefficient 0.023 and
         # the Re exponent 0.8. rtol=1e-4 is pure float round-off on a hand value.
-        @test isapprox(dittus_boelter(1.0e4, 1.0), 36.45255; rtol=1e-4)
+        @test isapprox(HTC.dittus_boelter(1.0e4, 1.0), 36.45255; rtol=1e-4)
         # Second clean point exercises the Pr exponent: at Re=1e4 the Re factor is the same
         # 1584.8932, and Pr=32 gives Pr^0.4 = (2^5)^0.4 = 2^2 = 4 exactly, so the value is
         # 0.023 * 1584.8932 * 4 = 145.8102. A wrong Pr exponent would miss this.
-        @test isapprox(dittus_boelter(1.0e4, 32.0), 145.8102; rtol=1e-4)
+        @test isapprox(HTC.dittus_boelter(1.0e4, 32.0), 145.8102; rtol=1e-4)
     end
 
-    @testset "blasius_friction standalone function" begin
+    @testset "Friction.blasius standalone function" begin
         # Definition check: mirrors the source formula f_darcy = 0.3164*Re^(-0.25).
         expected_f = 0.3164 * 8000.0^(-0.25)
-        @test isapprox((@inferred blasius_friction(8000.0)), expected_f; rtol=1e-6)
+        @test isapprox((@inferred Friction.blasius(8000.0)), expected_f; rtol=1e-6)
 
         # Anchored reference point. The Blasius smooth-pipe Darcy factor at Re=1e5 is the
         # standard textbook value f = 0.3164/100000^0.25 = 0.01779 (e.g. White, Fluid
         # Mechanics, 7th ed., the Moody-chart smooth-wall limit). rtol=1e-3 covers the
         # 4-significant-figure rounding of the published 0.0178.
-        @test isapprox(blasius_friction(1.0e5), 0.0178; rtol=1e-3)
+        @test isapprox(Friction.blasius(1.0e5), 0.0178; rtol=1e-3)
     end
 
-    @testset "constant_Nusselt factory" begin
+    @testset "HTC.constant_Nusselt factory" begin
         # Default Nu = 8.235
-        htc_fn = constant_Nusselt()
+        htc_fn = HTC.constant_Nusselt()
         @test htc_fn(300.0, 7.0) == 8.235
         @test htc_fn(100.0, 3.0) == 8.235
         # Custom Nu
-        htc_custom = constant_Nusselt(Nu=5.0)
+        htc_custom = HTC.constant_Nusselt(Nu=5.0)
         @test htc_custom(300.0, 7.0) == 5.0
     end
 
-    @testset "laminar_friction_rectangular factory" begin
+    @testset "Friction.rectangular_laminar factory" begin
         # MTR-like rectangular geometry constructed so depth/width == 0.01814 exactly.
         # width = 0.07, depth = 0.07 * 0.01814 = 0.0012698  →  aspect_ratio = 0.01814.
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
-        f_fn = laminar_friction_rectangular(geom)
-        k_R = rectangular_laminar_correction(0.01814)
+        f_fn = Friction.rectangular_laminar(geom)
+        k_R = Friction.rectangular_correction(0.01814)
         @test isapprox(f_fn(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
         @test isapprox(f_fn(500.0), 64.0 / (500.0 * k_R); rtol=1e-6)
     end
 end
 
 @testset "Integration Tests — Pluggable Correlations in Solved Systems" begin
-    @testset "constant_Nusselt integration — Nu≈8.235 in solution" begin
+    @testset "HTC.constant_Nusselt integration — Nu≈8.235 in solution" begin
         n = 3;
         T_inlet = 40.0;
         T_wall = 100.0;
@@ -77,7 +75,7 @@ end
 
         @named pump_phy02 = Pump(dP_pump)
         @named cac_phy02 = ChannelAndContacts(
-            n=n, geometry=geom, htc=ConstantNusselt(; Nu=8.235)
+            n=n, geometry=geom, htc=HTC.ConstantNusselt(; Nu=8.235)
         )
         @named bc_phy02 = HeatExchanger(T_inlet)
         ct_l_phy02 = [
@@ -120,7 +118,7 @@ end
         @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu_left[:]], 8.235, rtol=1e-4))
     end
 
-    @testset "laminar_friction_rectangular integration — dP > 0 in solution" begin
+    @testset "Friction.rectangular_laminar integration — dP > 0 in solution" begin
         n = 3;
         T_inlet = 40.0;
         T_wall = 100.0
@@ -130,8 +128,8 @@ end
         @named cac_phy03 = ChannelAndContacts(
             n=n,
             geometry=geom,
-            htc=ConstantNusselt(; Nu=8.235),
-            darcy=RectangularLaminarFriction(geom),
+            htc=HTC.ConstantNusselt(; Nu=8.235),
+            darcy=Friction.RectangularLaminar(geom),
         )
         @named bc_phy03 = HeatExchanger(T_inlet)
         ct_l_phy03 = [
@@ -182,7 +180,7 @@ end
         # from the solved Re[i] and T[i] and the same friction closure the channel uses, so
         # a 2x-wrong friction magnitude fails. rtol=1e-6: pure arithmetic re-evaluation of
         # the same closed form on the converged state, only float round-off differs.
-        f_lam = laminar_friction_rectangular(geom)
+        f_lam = Friction.rectangular_laminar(geom)
         A = geom.A
         Dh = geom.Dh
         dz = geom.L / n
@@ -191,7 +189,7 @@ end
             let
                 Re_i = sol_phy03[ssys_phy03.cac_phy03.Re[i]]
                 T_i = sol_phy03[ssys_phy03.cac_phy03.T[i]]
-                darcy_weisbach_dp(ṁ03, ρ(H2O, T_i), f_lam(Re_i), dz, Dh, A)
+                Friction.darcy_weisbach_dp(ṁ03, ρ(H2O, T_i), f_lam(Re_i), dz, Dh, A)
             end for i in 1:n
         )
         @test isapprox(sol_phy03[ssys_phy03.cac_phy03.dP], dP_expected_03; rtol=1e-6)
@@ -202,15 +200,15 @@ end
         T_inlet = 40.0;
         T_wall = 100.0
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
-        htc_rd = RegimeDependentHTC(;
-            laminar=ConstantNusselt(; Nu=8.235),
-            turbulent=DittusBoelter(),
+        htc_rd = HTC.RegimeDependent(;
+            laminar=HTC.ConstantNusselt(; Nu=8.235),
+            turbulent=HTC.DittusBoelter(),
             re_bounds=(2000.0, 5000.0),
             geom=geom,
         )
-        friction_rd = RegimeDependentFriction(;
-            laminar=laminar_friction_rectangular(geom),
-            turbulent=blasius_friction,
+        friction_rd = Friction.RegimeDependent(;
+            laminar=Friction.rectangular_laminar(geom),
+            turbulent=Friction.blasius,
             re_bounds=(2000.0, 5000.0),
         )
         dP_lam = 30.0
@@ -269,7 +267,7 @@ end
                 Re_i = sol_lam[ssys_lam.cac_lam.Re[i]]
                 T_i = sol_lam[ssys_lam.cac_lam.T[i]]
                 @test Re_i < 2300.0   # confirm the laminar branch is the one selected
-                darcy_weisbach_dp(ṁ_lam, ρ(H2O, T_i), friction_rd(T_i, T_i, ṁ_lam, H2O, geom), dz, Dh, A)
+                Friction.darcy_weisbach_dp(ṁ_lam, ρ(H2O, T_i), friction_rd(T_i, T_i, ṁ_lam, H2O, geom), dz, Dh, A)
             end for i in 1:n
         )
         @test isapprox(sol_lam[ssys_lam.cac_lam.dP], dP_expected_lam; rtol=1e-6)
@@ -280,15 +278,15 @@ end
         T_inlet = 40.0;
         T_wall = 100.0
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
-        htc_rd = RegimeDependentHTC(;
-            laminar=ConstantNusselt(; Nu=8.235),
-            turbulent=DittusBoelter(),
+        htc_rd = HTC.RegimeDependent(;
+            laminar=HTC.ConstantNusselt(; Nu=8.235),
+            turbulent=HTC.DittusBoelter(),
             re_bounds=(2000.0, 5000.0),
             geom=geom,
         )
-        friction_rd = RegimeDependentFriction(;
-            laminar=laminar_friction_rectangular(geom),
-            turbulent=blasius_friction,
+        friction_rd = Friction.RegimeDependent(;
+            laminar=Friction.rectangular_laminar(geom),
+            turbulent=Friction.blasius,
             re_bounds=(2000.0, 5000.0),
         )
         dP_turb = 3.0e4
@@ -334,7 +332,7 @@ end
         @test sol_turb[ssys_turb.cac_turb.Re[1]] > 2300.0
 
         # Magnitude check: confirm the solved dP went through the turbulent (Blasius) branch.
-        # Above re_bounds[2] friction_rd must return blasius_friction(Re). Rebuild
+        # Above re_bounds[2] friction_rd must return blasius(Re). Rebuild
         # dP = sum_i f(Re[i]) * ṁ*|ṁ|/(2*rho(T[i])*A^2) * (dz/Dh) from friction_rd on
         # the converged Re[i]/T[i], so a wrong branch (e.g. still laminar 64/(Re*K_R)) or a
         # 2x factor fails. rtol=1e-6: same-form arithmetic on the converged state.
@@ -349,26 +347,26 @@ end
                 @test Re_i > 2300.0   # confirm the turbulent branch is the one selected
                 # friction_rd must equal Blasius here, not the laminar rectangular factor.
                 @test isapprox(friction_rd(T_i, T_i, ṁ_turb, H2O, geom),
-                               blasius_friction(Re_i); rtol=1e-12)
-                darcy_weisbach_dp(ṁ_turb, ρ(H2O, T_i), friction_rd(T_i, T_i, ṁ_turb, H2O, geom), dz, Dh, A)
+                               Friction.blasius(Re_i); rtol=1e-12)
+                Friction.darcy_weisbach_dp(ṁ_turb, ρ(H2O, T_i), friction_rd(T_i, T_i, ṁ_turb, H2O, geom), dz, Dh, A)
             end for i in 1:n
         )
         @test isapprox(sol_turb[ssys_turb.cac_turb.dP], dP_expected_turb; rtol=1e-6)
     end
 end
 
-@testset "Elenbaas Natural Convection" begin
-    @testset "elenbaas_nusselt standalone for known values" begin
+@testset "HTC.Elenbaas Natural Convection" begin
+    @testset "HTC.elenbaas_nusselt standalone for known values" begin
         @test isapprox(
-            elenbaas_nusselt(12375.512696, 0.00254, 0.6), 1.2731625848; rtol=1e-6
+            HTC.elenbaas_nusselt(12375.512696, 0.00254, 0.6), 1.2731625848; rtol=1e-6
         )
     end
 
-    @testset "elenbaas_nusselt limiting cases" begin
-        @test isapprox(elenbaas_nusselt(0.0, 0.00254, 0.6), 0.0; atol=1e-10)
-        Nu_large = elenbaas_nusselt(1e6, 0.00254, 0.6)
+    @testset "HTC.elenbaas_nusselt limiting cases" begin
+        @test isapprox(HTC.elenbaas_nusselt(0.0, 0.00254, 0.6), 0.0; atol=1e-10)
+        Nu_large = HTC.elenbaas_nusselt(1e6, 0.00254, 0.6)
         @test Nu_large > 0.0
-        @test Nu_large > elenbaas_nusselt(1e4, 0.00254, 0.6)
+        @test Nu_large > HTC.elenbaas_nusselt(1e4, 0.00254, 0.6)
     end
 
     @testset "elenbaas_nusselt Python STREAM validation" begin
@@ -407,7 +405,7 @@ end
         Ra_val = Ra(Gr_val, Pr_val)
         @test isapprox(Ra_val, 12375.512696; rtol=5e-4)
 
-        Nu_val = elenbaas_nusselt(Ra_val, b, L_h)
+        Nu_val = HTC.elenbaas_nusselt(Ra_val, b, L_h)
         # Nu tolerance matches Ra tolerance (propagated from Gr uncertainty)
         @test isapprox(Nu_val, 1.2731625848; rtol=5e-4)
     end
@@ -432,12 +430,12 @@ end
     @test flow_regime_blend(5000.0, bounds, lam, turb) ≈ turb rtol = 1e-12
 end
 
-@testset "regime_dependent_q_scb blends across the transition band" begin
+@testset "HTC.regime_dependent_q_scb blends across the transition band" begin
     pressure = 1e5
-    q_scb = regime_dependent_q_scb(; pressure=pressure, re_bounds=(2000.0, 5000.0))
+    q_scb = HTC.regime_dependent_q_scb(; pressure=pressure, re_bounds=(2000.0, 5000.0))
     T_sat, T_wall = 100.0, 130.0
-    q_lam = bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure)
-    q_turb = mcadams_scb_heat_flux(T_sat, T_wall)
+    q_lam = HTC.bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure)
+    q_turb = HTC.mcadams_scb_heat_flux(T_sat, T_wall)
     # The two correlations must actually disagree, or the blend proves nothing.
     @test !isapprox(q_lam, q_turb; rtol=1e-3)
 
@@ -446,72 +444,72 @@ end
     @test q_scb(T_wall, T_sat, 3500.0) ≈ (q_lam + q_turb) / 2
 end
 
-@testset "marco_han_nusselt" begin
+@testset "HTC.marco_han_nusselt" begin
     # Reference values from Python STREAM laminar.py doctest
-    @test marco_han_nusselt(0.0) == 8.235
-    @test isapprox(marco_han_nusselt(0.2), 5.991134842079999; rtol=1e-10)
+    @test HTC.marco_han_nusselt(0.0) == 8.235
+    @test isapprox(HTC.marco_han_nusselt(0.2), 5.991134842079999; rtol=1e-10)
 
     # ar=0 to ar=0.5: Nu decreases (thin gap to moderate aspect ratio)
-    @test marco_han_nusselt(0.0) > marco_han_nusselt(0.5)
+    @test HTC.marco_han_nusselt(0.0) > HTC.marco_han_nusselt(0.5)
 
     # ar=1.0 (square duct): positive Nu
-    @test marco_han_nusselt(1.0) > 0.0
+    @test HTC.marco_han_nusselt(1.0) > 0.0
 end
 
-@testset "turbulent_friction (Colebrook-White)" begin
+@testset "Friction.turbulent (Colebrook-White)" begin
     # Reference values from Python STREAM friction.py doctest
-    @test isapprox(turbulent_friction(4e3), 0.039804935964641644; rtol=1e-10)
-    @test isapprox(turbulent_friction(4e3, 0.1), 0.10560870441248855; rtol=1e-10)
-    @test isapprox(turbulent_friction(1e6), 0.011649393290640643; rtol=1e-10)
+    @test isapprox(Friction.turbulent(4e3), 0.039804935964641644; rtol=1e-10)
+    @test isapprox(Friction.turbulent(4e3, 0.1), 0.10560870441248855; rtol=1e-10)
+    @test isapprox(Friction.turbulent(1e6), 0.011649393290640643; rtol=1e-10)
 
     # Re <= 0 guard
-    @test turbulent_friction(5.0) == 0.0
-    @test turbulent_friction(0.0) == 0.0
-    @test turbulent_friction(-1.0) == 0.0
+    @test Friction.turbulent(5.0) == 0.0
+    @test Friction.turbulent(0.0) == 0.0
+    @test Friction.turbulent(-1.0) == 0.0
 
     # Smooth pipe (epsilon=0): friction decreases with Re
-    @test turbulent_friction(4e3) > turbulent_friction(1e6)
+    @test Friction.turbulent(4e3) > Friction.turbulent(1e6)
 end
 
-@testset "viscosity_correction" begin
+@testset "Friction.viscosity_correction" begin
     # Reference values from Python STREAM friction.py doctest
-    @test viscosity_correction(1.0, 1.0) == 1.0
-    @test viscosity_correction(1.0, 0.0) == 0.0
-    @test isapprox(viscosity_correction(1.0, 2.0), 1.4948492486349383; rtol=1e-10)
+    @test Friction.viscosity_correction(1.0, 1.0) == 1.0
+    @test Friction.viscosity_correction(1.0, 0.0) == 0.0
+    @test isapprox(Friction.viscosity_correction(1.0, 2.0), 1.4948492486349383; rtol=1e-10)
 
     # heat_wet_ratio = 0 => no correction regardless of mu_ratio
-    @test viscosity_correction(0.0, 5.0) == 1.0
+    @test Friction.viscosity_correction(0.0, 5.0) == 1.0
 end
 
-@testset "fully_developed_laminar_h_spl" begin
+@testset "HTC.fully_developed_laminar_nusselt" begin
     # is derived inside the factory. geom.Dh is NOT consumed by this factory's Nu calc
     # Helper: rectangular geom with exact aspect_ratio = ar via depth=ar, width=1.0.
     _geom_for_ar(ar) = PipeGeometry_rectangular(1.0, 1.0, ar, 1.0)
 
     # Uses _two_sided_heating_nusselt, NOT marco_han_nusselt
     # Reference: _two_sided_heating_nusselt(0.0) = 8.235
-    htc_fn = fully_developed_laminar_h_spl(_geom_for_ar(0.0))
+    htc_fn = HTC.fully_developed_laminar_nusselt(_geom_for_ar(0.0))
     @test htc_fn(1000.0, 7.0, 39.85, 59.85) == 8.235
 
     # At ar=0.2: _two_sided_heating_nusselt(0.2) != marco_han_nusselt(0.2)
     # two_sided: 8.235*(1 - 1.4122*0.2 + 2.3473*0.04 - 2.8983*0.008 + 2.0629*0.0016 - 0.6077*0.00032)
-    htc_fn_ar02 = fully_developed_laminar_h_spl(_geom_for_ar(0.2))
+    htc_fn_ar02 = HTC.fully_developed_laminar_nusselt(_geom_for_ar(0.2))
     nu_two_sided_02 =
         8.235 *
         (1.0 - 1.4122*0.2 + 2.3473*0.2^2 - 2.8983*0.2^3 + 2.0629*0.2^4 - 0.6077*0.2^5)
     @test isapprox(htc_fn_ar02(500.0, 5.0, 36.85, 76.85), nu_two_sided_02; rtol=1e-10)
     # Confirm it differs from Marco_Han
-    @test htc_fn_ar02(500.0, 5.0, 36.85, 76.85) != marco_han_nusselt(0.2)
+    @test htc_fn_ar02(500.0, 5.0, 36.85, 76.85) != HTC.marco_han_nusselt(0.2)
 
     # Closure ignores Re, Pr — same Nu for any inputs
     @test htc_fn_ar02(100.0, 3.0, 26.85, 126.85) == htc_fn_ar02(5000.0, 10.0, 16.85, 106.85)
 
     # ar=1.0 (square): _two_sided gives different value than Marco_Han
-    htc_sq = fully_developed_laminar_h_spl(_geom_for_ar(1.0))
+    htc_sq = HTC.fully_developed_laminar_nusselt(_geom_for_ar(1.0))
     @test htc_sq(100.0, 7.0, 39.85, 59.85) > 0.0
 end
 
-@testset "developing_laminar_h_spl" begin
+@testset "HTC.developing_laminar_nusselt" begin
     # and Dh = geom.Dh are derived inside the factory.
     # Helper builds a rectangular geom where geom.Dh = Dh_target AND geom.depth/geom.width = ar
     # exactly. Derivation: with depth = ar*width and Dh = 2*ar*width / (ar+1),
@@ -524,8 +522,8 @@ end
     # At very high Re (large x_star), developing flow Nu should approach
     # the fully-developed value _two_sided_heating_nusselt(ar)
     ar = 0.2
-    htc_dev = developing_laminar_h_spl(_geom_for(0.005, ar); develop_length=0.3)
-    htc_fd = fully_developed_laminar_h_spl(_geom_for(0.005, ar))
+    htc_dev = HTC.developing_laminar_nusselt(_geom_for(0.005, ar); develop_length=0.3)
+    htc_fd = HTC.fully_developed_laminar_nusselt(_geom_for(0.005, ar))
 
     # At high Re, x_star is small -> developing Nu is LARGER than fully developed
     Nu_dev_high_Re = htc_dev(2000.0, 7.0, 39.85, 59.85)
@@ -539,12 +537,12 @@ end
     @test htc_dev(500.0, 5.0, 36.85, 76.85) > 0.0
 
     # x_star correction factor test: changing aspect_ratio changes the result
-    htc_dev_ar05 = developing_laminar_h_spl(_geom_for(0.005, 0.5); develop_length=0.3)
+    htc_dev_ar05 = HTC.developing_laminar_nusselt(_geom_for(0.005, 0.5); develop_length=0.3)
     @test htc_dev(1000.0, 7.0, 39.85, 59.85) != htc_dev_ar05(1000.0, 7.0, 39.85, 59.85)
 end
 
 @testset "laminar HTC factories in compiled Channel" begin
-    @testset "fully_developed_laminar_h_spl compiles in Channel" begin
+    @testset "HTC.fully_developed_laminar_nusselt compiles in Channel" begin
         n = 5;
         T_inlet = 40.0;
         T_wall = 100.0;
@@ -552,14 +550,14 @@ end
         # Rectangular geom with aspect_ratio = depth/width = 0.1 (a circular geom would
         # give aspect_ratio = 1.0, a different correlation point).
         geom = PipeGeometry_rectangular(0.6, 1.0, 0.1, 1.0)
-        htc_fd_lam = FullyDevelopedLaminar(geom)
+        htc_fd_lam = HTC.FullyDevelopedLaminar(geom)
 
         @named pump_fd = Pump(dP_pump)
         @named cac_fd = ChannelAndContacts(
             n=n,
             geometry=geom,
             htc=htc_fd_lam,
-            darcy=RectangularLaminarFriction(geom),
+            darcy=Friction.RectangularLaminar(geom),
         )
         @named bc_fd = HeatExchanger(T_inlet)
         ct_l_fd = [ConstantTemperature(T_wall; name=Symbol(:ct_l_fd_, i)) for i in 1:n]
@@ -596,7 +594,7 @@ end
         @test sol_fd.retcode == ReturnCode.Success
     end
 
-    @testset "developing_laminar_h_spl compiles in Channel" begin
+    @testset "HTC.developing_laminar_nusselt compiles in Channel" begin
         n = 5;
         T_inlet = 40.0;
         T_wall = 100.0;
@@ -604,14 +602,14 @@ end
         # Rectangular geom with aspect_ratio = 0.1; Dh follows from the edges
         # (4 * 1.0*0.1 / (2*(1.0+0.1)) ≈ 0.1818). develop_length stays mandatory.
         geom = PipeGeometry_rectangular(0.6, 1.0, 0.1, 1.0)
-        htc_dev_lam = DevelopingLaminar(geom; develop_length=0.3)
+        htc_dev_lam = HTC.DevelopingLaminar(geom; develop_length=0.3)
 
         @named pump_dev = Pump(dP_pump)
         @named cac_dev = ChannelAndContacts(
             n=n,
             geometry=geom,
             htc=htc_dev_lam,
-            darcy=RectangularLaminarFriction(geom),
+            darcy=Friction.RectangularLaminar(geom),
         )
         @named bc_dev = HeatExchanger(T_inlet)
         ct_l_dev = [ConstantTemperature(T_wall; name=Symbol(:ct_l_dev_, i)) for i in 1:n]
@@ -652,27 +650,27 @@ end
 
 @testset "Idelchik local-loss factors — analytic high-Re limits" begin
     # Above the table's Reynolds range the closed forms apply.
-    @test isapprox(STREAM.LocalLoss._sudden_expansion_factor(0.5, 1e5), (1 - 0.5)^2; rtol=1e-12)
-    @test isapprox(STREAM.LocalLoss._sudden_contraction_factor(0.5, 1e5), 0.5 * (1 - 0.5)^0.75; rtol=1e-12)
-    @test isapprox(STREAM.LocalLoss._sudden_expansion_factor(0.0, 1e5), 1.0; rtol=1e-12)   # full expansion
+    @test isapprox(STREAM.LocalLoss.sudden_expansion_factor(0.5, 1e5), (1 - 0.5)^2; rtol=1e-12)
+    @test isapprox(STREAM.LocalLoss.sudden_contraction_factor(0.5, 1e5), 0.5 * (1 - 0.5)^0.75; rtol=1e-12)
+    @test isapprox(STREAM.LocalLoss.sudden_expansion_factor(0.0, 1e5), 1.0; rtol=1e-12)   # full expansion
 end
 
 @testset "Idelchik local-loss factors — table nodes" begin
     # At a (Re, area-ratio) grid node the interpolation returns the tabulated value.
-    @test isapprox(STREAM.LocalLoss._sudden_expansion_factor(0.3, 100.0), 1.20; rtol=1e-12)   # Table 4.2
-    @test isapprox(STREAM.LocalLoss._sudden_contraction_factor(0.3, 100.0), 1.10; rtol=1e-12) # Table 4.10
+    @test isapprox(STREAM.LocalLoss.sudden_expansion_factor(0.3, 100.0), 1.20; rtol=1e-12)   # Table 4.2
+    @test isapprox(STREAM.LocalLoss.sudden_contraction_factor(0.3, 100.0), 1.10; rtol=1e-12) # Table 4.10
 end
 
 @testset "Idelchik local-loss factor — direction dispatch (A2>A1)" begin
     # A2 > A1: forward flow expands, reverse flow contracts.
     mu = 1.0e-3
     A1, A2 = 1.0, 2.0
-    fwd = STREAM.LocalLoss._local_loss_factor(3.0, A1, A2, mu)
-    rev = STREAM.LocalLoss._local_loss_factor(-3.0, A1, A2, mu)
+    fwd = STREAM.LocalLoss.factor(3.0, A1, A2, mu)
+    rev = STREAM.LocalLoss.factor(-3.0, A1, A2, mu)
     aratio = 0.5
     A = 1.0
     Dh = sqrt(A / pi)
     re = 3.0 * Dh / (A * mu)
-    @test isapprox(fwd, STREAM.LocalLoss._sudden_expansion_factor(aratio, re); rtol=1e-12)
-    @test isapprox(rev, STREAM.LocalLoss._sudden_contraction_factor(aratio, re); rtol=1e-12)
+    @test isapprox(fwd, STREAM.LocalLoss.sudden_expansion_factor(aratio, re); rtol=1e-12)
+    @test isapprox(rev, STREAM.LocalLoss.sudden_contraction_factor(aratio, re); rtol=1e-12)
 end

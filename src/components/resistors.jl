@@ -1,13 +1,13 @@
 # resistors.jl -- Friction, Gravity, Resistor components
 
 """
-    FrictionResistor(; name, L, D, A, darcy=BlasiusFriction(), liquid=H2O, scale=1.0) -> System
-    FrictionResistor(; name, geometry, darcy=BlasiusFriction(), liquid=H2O, scale=1.0) -> System
+    FrictionResistor(; name, L, D, A, darcy=Blasius(), liquid=H2O, scale=1.0) -> System
+    FrictionResistor(; name, geometry, darcy=Blasius(), liquid=H2O, scale=1.0) -> System
 
 Frictional pressure drop element, `ΔP = scale · f · ṁ|ṁ| / (2ρA²) · (L/Dh)`.
 
-The friction factor comes from `darcy`, a [`DarcyFactor`](@ref). Passing
-[`RegimeDependentFriction`](@ref) makes this the regime-switching friction resistor, with the
+The friction factor comes from `darcy`, a [`AbstractDarcyFactor`](@ref). Passing
+[`RegimeDependent`](@ref) makes this the regime-switching friction resistor, with the
 laminar/turbulent blend and, if asked for, the heated-wall viscosity correction.
 
 Give it a [`PipeGeometry`](@ref) when the friction model needs the heated and wet perimeters,
@@ -20,7 +20,7 @@ geometry, where those two perimeters coincide.
 - `D`: hydraulic diameter [m]
 - `A`: flow area [m^2]
 - `geometry`: pipe geometry descriptor ([`PipeGeometry`](@ref)), in place of `L`/`D`/`A`
-- `darcy`: wall friction model ([`DarcyFactor`](@ref)), default [`BlasiusFriction`](@ref)
+- `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref)
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
 - `scale`: multiplies the pressure drop, default 1.0. See [`Resistor`](@ref).
 
@@ -31,7 +31,7 @@ function FrictionResistor(;
     name,
     geometry::Union{PipeGeometry,Nothing}=nothing,
     L=nothing, D=nothing, A=nothing,
-    darcy::DarcyFactor=BlasiusFriction(),
+    darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
     scale::Real=1.0,
 )
@@ -206,9 +206,9 @@ function LocalPressureDrop(; name, A1, A2, liquid::AbstractLiquid=H2O, scale::Re
     @named outlet = FlowPort()
     T_in = instream(inlet.T)
     A = min(A1, A2)
-    f = _local_loss_factor(inlet.ṁ, A1, A2, μ(liquid, T_in))
+    f = factor(inlet.ṁ, A1, A2, μ(liquid, T_in))
     rho = ρ(liquid, T_in)
     Δp₋ = inlet.p - outlet.p
-    eqs = Equation[Δp₋ ~ scale * local_dp(inlet.ṁ, rho, f, A)]
+    eqs = Equation[Δp₋ ~ scale * dp(inlet.ṁ, rho, f, A)]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end

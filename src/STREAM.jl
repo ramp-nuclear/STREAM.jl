@@ -47,12 +47,12 @@ include("htc/correlations.jl")
 include("htc/subcooled_boiling.jl")
 include("htc/htc.jl")
 export dittus_boelter, constant_Nusselt, elenbaas_nusselt, marco_han_nusselt
-export fully_developed_laminar_h_spl, developing_laminar_h_spl, film_temperature
+export fully_developed_laminar_nusselt, developing_laminar_nusselt, film_temperature
 export mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux
 export partial_SCB_correction, regime_dependent_q_scb
-export AbstractHTC, FunctionHTC, NusseltHTC, PropertyBasis, AtFilm, AtBulk, property_temperature
+export AbstractHTC, FromFunction, FromNusselt, PropertyBasis, AtFilm, AtBulk, property_temperature
 export DittusBoelter, ConstantNusselt, FullyDevelopedLaminar, DevelopingLaminar
-export Elenbaas, RegimeDependentHTC, MaximalHTC, SubcooledBoilingHTC
+export Elenbaas, RegimeDependent, Maximal, SubcooledBoiling
 end
 
 module Friction
@@ -61,17 +61,17 @@ using ..STREAM: AbstractLiquid, PipeGeometry
 using ..STREAM: μ, Re, flow_regime_blend
 include("friction/correlations.jl")
 include("friction/darcy.jl")
-export blasius_friction, laminar_friction, turbulent_friction
-export laminar_friction_rectangular, rectangular_laminar_correction, viscosity_correction
+export blasius, laminar, turbulent
+export rectangular_laminar, rectangular_correction, viscosity_correction
 export darcy_weisbach_dp
-export DarcyFactor, FunctionDarcy, ReynoldsFactor, BlasiusFriction, LaminarFriction
-export TurbulentFriction, RectangularLaminarFriction, RegimeDependentFriction
+export AbstractDarcyFactor, FromFunction, FromReynolds, Blasius, Laminar
+export Turbulent, RectangularLaminar, RegimeDependent
 end
 
 module LocalLoss
 using ModelingToolkit
 include("local_loss.jl")
-export local_dp
+export dp, factor, sudden_expansion_factor, sudden_contraction_factor
 end
 
 module Thresholds
@@ -100,7 +100,7 @@ using ..HTC
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
 using ..LocalLoss
-using ..LocalLoss: _local_loss_factor  # the Idelchik factor, private to LocalLoss
+using ..LocalLoss: factor  # the Idelchik factor, private to LocalLoss
 using ..STREAM
 include("components/connectors.jl")
 include("components/twoports.jl")
@@ -127,11 +127,28 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ..STREAM: PipeGeometry
 using ..Components
+
+# A getter, not a verb, and Connect below leans on it.
+include("assemblies/port.jl")
+
+# The wiring verbs. Reading `Connect.face(cts, cac, :thermal_left)` beats
+# `connect_face(...)`: the module already said "connect", so the name need not.
+module Connect
+using ModelingToolkit
+using ModelingToolkit: t_nounits as t, D_nounits as D
+using ...Components
+import ..port
 include("assemblies/connections.jl")
+export inseries, inparallel, face, faces, temperature_feedback
+end
+using .Connect
+using .Connect: _infer_n   # the arrangements below count ports with it
+
 include("assemblies/assemblies.jl")
-export inseries, inparallel, connect_face, connect_faces, port
-export check_gravity_mismatch, compose_systems, connect_temperature_feedback
-export symmetric_plate, plate, one_sided_connection, single_channel_connection, fuel_assembly
+export Connect
+export inseries, inparallel, face, faces, port, temperature_feedback
+export check_gravity_mismatch, compose_systems
+export symmetric_plate, plate, one_sided, single_channel, fuel_assembly
 end
 
 module Utilities

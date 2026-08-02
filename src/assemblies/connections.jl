@@ -81,23 +81,9 @@ function inparallel(upstream, branches, downstream)
     return eqs
 end
 
-"""
-    port(sys, face, i)
-
-Access an indexed thermal port array element from a compiled subsystem.
-
-# Arguments
-- `sys`: MTK system instance
-- `face`: port array name (Symbol), e.g. `:thermal_left`
-- `i`: 1-based cell index (Int)
-
-# Returns
-The namespaced connector subsystem (e.g. `sys.thermal_left3`), suitable for `connect()`.
-"""
-port(sys, face::Symbol, i::Int) = getproperty(sys, Symbol(face, i))
 
 """
-    connect_face(sources, target, face; source_port=:thermal) -> Vector{Equation}
+    face(sources, target, face; source_port=:thermal) -> Vector{Equation}
 
 Connect one per-cell source array to one thermal face of a target system.
 
@@ -110,7 +96,7 @@ Connect one per-cell source array to one thermal face of a target system.
 # Returns
 `Vector{Equation}` with one `connect(...)` equation per cell.
 """
-function connect_face(sources, target, face::Symbol; source_port::Symbol=:thermal)
+function face(sources, target, face::Symbol; source_port::Symbol=:thermal)
     return Equation[
         connect(getproperty(sources[i], source_port), port(target, face, i)) for
         i in eachindex(sources)
@@ -118,8 +104,8 @@ function connect_face(sources, target, face::Symbol; source_port::Symbol=:therma
 end
 
 """
-    connect_faces(mapping::Pair) -> Vector{Equation}
-    connect_faces(mappings::Pair...) -> Vector{Equation}
+    faces(mapping::Pair) -> Vector{Equation}
+    faces(mappings::Pair...) -> Vector{Equation}
 
 Connect indexed thermal faces cell-by-cell between systems.
 
@@ -132,21 +118,21 @@ Flattened `Vector{Equation}` with one `connect(...)` equation per cell for each 
 
 # Example
 ```julia
-eqs = connect_faces(
+eqs = faces(
     (cac, :thermal_right) => (fuel, :thermal_left),
     (cac, :thermal_left) => (fuel, :thermal_right),
 )
 ```
 """
-function connect_faces(mappings::Pair...)
+function faces(mappings::Pair...)
     eqs = Equation[]
     for mapping in mappings
-        append!(eqs, connect_faces(mapping))
+        append!(eqs, faces(mapping))
     end
     return eqs
 end
 
-function connect_faces(mapping::Pair)
+function faces(mapping::Pair)
     (left_sys, left_face) = mapping.first
     (right_sys, right_face) = mapping.second
     n_left = _infer_n(left_sys)
@@ -160,54 +146,7 @@ end
 
 # Real-valued defaults of `params`, skipping parameters with no default or a
 # non-Real default.
-function _real_defaults(params)
-    vals = Float64[]
-    for p in params
-        ModelingToolkit.hasdefault(p) || continue
-        d = ModelingToolkit.getdefault(p)
-        d isa Real && push!(vals, Float64(d))
-    end
-    return vals
-end
 
-"""
-    check_gravity_mismatch(sys) -> Symbol
-
-Check whether gravity pressure contributions in a hydraulic loop are balanced.
-
-# Arguments
-- `sys`: compiled `AbstractSystem` to inspect
-
-# Returns
-`:ok` if balanced (or gravity disabled), `:mismatch` if channels have gravity but no
-return-leg `Gravity` component.
-"""
-function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
-    all_pars = ModelingToolkit.parameters(sys)
-
-    local_name = p -> begin
-        s = string(p)
-        idx = findlast('₊', s)
-        idx === nothing ? s : s[nextind(s, idx):end]
-    end
-
-    g_vals = _real_defaults(filter(p -> local_name(p) == "g_acc", all_pars))
-    h_vals = _real_defaults(filter(p -> local_name(p) == "H", all_pars))
-
-    if isempty(g_vals) || all(iszero, g_vals)
-        return :ok
-    end
-
-    active_g = any(v -> v > 0.0, g_vals)
-    has_return = !isempty(h_vals) && any(v -> v > 0.0, h_vals)
-
-    if active_g && !has_return
-        @warn "check_gravity_mismatch: channels have g_acc > 0 but no Gravity return component found — loop gravity terms may be unbalanced"
-        return :mismatch
-    end
-
-    return :ok
-end
 
 function _infer_n(sys)
     sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
@@ -221,26 +160,10 @@ function _infer_n(sys)
 end
 
 
-"""
-    compose_systems(systems...; connections, name) -> System
-
-Compose multiple MTK systems with explicit connection equations into a single system.
-
-# Arguments
-- `systems`: positional varargs of uncompiled systems
-- `connections`: vector of connection equations (`Vector{<:Equation}`)
-- `name`: system name (Symbol)
-
-# Returns
-Uncompiled `System` ready for `mtkcompile()`.
-"""
-function compose_systems(systems...; connections::Vector{<:Equation}, name::Symbol)
-    return compose(System(connections, t; name=name), systems...)
-end
 
 
 """
-    connect_temperature_feedback(pk, components) -> Vector{Equation}
+    temperature_feedback(pk, components) -> Vector{Equation}
 
 Generate binding equations that wire each component's existing `T` symbolic to the
 corresponding `pk.T_source_<name>` unknowns inside `PointKinetics`. Used together
@@ -267,11 +190,11 @@ equations or connection dicts after composition.
 ```julia
 rods = symmetric_plate(cac, fuel; name=:rods)
 @named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => alpha))
-eqs = connect_temperature_feedback(pk, [rods.cac])
+eqs = temperature_feedback(pk, [rods.cac])
 # eqs has n equations binding pk.T_source_cac[j] ~ rods.cac.T[j]
 ```
 """
-function connect_temperature_feedback(pk, components)
+function temperature_feedback(pk, components)
     eqs = Equation[]
     for comp in components
         cname = nameof(comp)

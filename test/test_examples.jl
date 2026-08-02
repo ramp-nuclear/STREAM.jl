@@ -13,7 +13,6 @@ using Statistics
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM.Friction
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
 
@@ -387,7 +386,7 @@ end
         cs_area = pi * (BYPASS_D_CH / 2)^2
         dP_fric(md) = begin
             Re = md * BYPASS_D_CH / (cs_area * mu_loop)
-            f = blasius_friction(Re)
+            f = Friction.blasius(Re)
             2 * f * md^2 / (2 * rho_loop * cs_area^2) * (BYPASS_L_CH / BYPASS_D_CH)
         end
         lo, hi = 1.0e-6, 1.0

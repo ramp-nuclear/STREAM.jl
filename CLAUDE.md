@@ -45,60 +45,90 @@ Hard rules:
 
 This is the canonical layout. **Always follow it when editing or adding files.**
 
+### Modules
+
+The package is a stack of submodules, each reaching only downward:
+
+```
+Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
+           -> Components -> Assemblies -> {Solvers, Examples}
+```
+
+A module supplies the context a name would otherwise carry as a suffix, so
+`SubcooledBoilingHTC` is `HTC.SubcooledBoiling` and `BlasiusFriction` is `Friction.Blasius`.
+`HTC.RegimeDependent` and `Friction.RegimeDependent` coexist, which is the point.
+
+Two ways to reach anything:
+
+```julia
+using STREAM              # Components.Channel(...), HTC.DittusBoelter()
+using STREAM.Components   # Channel(...)
+```
+
+Prefer the qualified form in examples and in tests that touch more than one module: seeing
+`HTC.RegimeDependent` next to `Friction.RegimeDependent` is the point of the split. Very
+common verbs stay bare (`inseries`, `inparallel`).
+
+`Examples` is compiled with the package but never exported: the builders are documentation
+and test fixtures, reached as `STREAM.Examples.build_loop` or via `using STREAM.Examples`.
+
 ### `src/` — Source
 
 ```
 src/
-  STREAM.jl                   # Module entry point: imports, includes, exports only
+  STREAM.jl                   # Module skeleton: submodules, includes, the export list
   constants.jl                # G_EARTH and friends
   geometry.jl                 # PipeGeometry struct + PipeGeometry_rectangular, PipeGeometry_circular
-  connectors.jl               # FlowPort, ThermalPort acausal connectors
   knobs.jl                    # @design_knob, knob_defaults
-  substances/
+  dimensionless.jl            # Re, Pr, Nu, Pe, Gr, Ra, including the (liquid, T) forms
+  substances/                 # module Substances
     liquid.jl                 # AbstractLiquid interface, Liquid snapshot, unicode aliases (ρ, cₚ, μ, κ, β, Tsat)
     light_water.jl            # LightWater / H2O correlations
     heavy_water.jl            # HeavyWater / D2O correlations
-  physical_models/
-    dimensionless.jl          # Re, Pr, Nu, Pe, Gr, Ra, including the (liquid, T) forms
-    htc/
-      htc.jl                  # HTC: the wall heat transfer model a channel is handed
-      correlations.jl         # Nusselt correlations (dimensionless, no property basis)
+  htc/                        # module HTC
+    htc.jl                    # AbstractHTC: the wall heat transfer model a channel is handed
+    correlations.jl           # Nusselt correlations (dimensionless, no property basis)
     subcooled_boiling.jl      # SCB heat flux correlations and the ONB superheat
-    pressure_drop/
-      friction.jl             # Darcy friction factor correlations (Reynolds-only)
-      darcy.jl                # DarcyFactor: the wall friction model a channel or resistor gets
-      local.jl                # Idelchik expansion / contraction local losses
+  friction/                   # module Friction
+    correlations.jl           # Darcy friction factor correlations (Reynolds-only)
+    darcy.jl                  # AbstractDarcyFactor: the wall friction model a channel or resistor gets
+  local_loss.jl               # module LocalLoss: Idelchik sudden expansion / contraction
+  thresholds/                 # module Thresholds
     thresholds.jl             # CHF, OFI, OSV, ONB, wall-temperature limit correlations
-  components/
+    analysis.jl               # ChannelState + the post-solve threshold methods
+  components/                 # module Components
+    connectors.jl             # FlowPort, ThermalPort acausal connectors
     twoports.jl               # HydraulicTwoPort, shared by the two-port components
     pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
     flapper.jl                # Flapper
-    resistors.jl              # Friction, Gravity, Resistor, VolumetricFlowResistor, LocalPressureDrop
+    resistors.jl              # FrictionResistor, Gravity, Resistor, VolumetricFlowResistor, LocalPressureDrop
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
     point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM
-  composition/
-    connections.jl            # inseries, inparallel, connect_face(s), port, compose_systems,
-                              # check_gravity_mismatch, connect_temperature_feedback
-    assemblies.jl             # symmetric_plate, plate, one_sided_connection,
-                              # single_channel_connection, fuel_assembly
-  solvers.jl                  # solve_steady, solve_transient, steady_state_guess
-  analysis.jl                 # ChannelState + the post-solve threshold wrappers
-  utilities.jl                # rebin_*, cosine_power_shape, cosine_T_wall_profile
-  examples.jl                 # build_loop*, build_cube, build_loop_pk
+  assemblies/                 # module Assemblies
+    port.jl                   # port: index one element of a connector array (a getter, not a verb)
+    connections.jl            # module Assemblies.Connect: face, faces,
+                              # temperature_feedback, inseries, inparallel
+    assemblies.jl             # compose_systems, check_gravity_mismatch, symmetric_plate,
+                              # plate, one_sided, single_channel, fuel_assembly
+  solvers.jl                  # solve_steady, solve_transient
+  initial_conditions.jl       # steady_state_guess
+  utilities.jl                # module Utilities: rebin_*, cosine_power_shape, cosine_T_wall_profile
+  examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk
 ```
 
 **Where new code goes:**
 - New component (single MTK component) → `src/components/` in the most relevant file, or a new file if it's a new domain
-- New correlation → the matching `src/physical_models/` folder: Nusselt into `htc/`, friction or local loss into `pressure_drop/`, a safety limit into `thresholds.jl`
-- New composition helper → `connections.jl` for wiring primitives, `assemblies.jl` for named arrangements of components
+- New correlation → the module that owns that physics: a Nusselt number into `src/htc/correlations.jl`, a friction factor into `src/friction/correlations.jl`, a local loss into `src/local_loss.jl`, a safety limit into `src/thresholds/thresholds.jl`
+- New wiring verb → `src/assemblies/connections.jl` (inside `Connect`); a named arrangement → `src/assemblies/assemblies.jl`
+- Prefer `Connect.face(...)` over a bare `face(...)`, but leave `inseries`, `inparallel` and `port` unqualified: the first two are used constantly and `port` is a getter that reads clearly on its own
 - New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the nine `AbstractLiquid` property methods
 - Build/example helpers → `src/examples.jl` only (never add examples to core files)
 
 Placement beats file length. A long file whose contents all belong together is fine; a short
-file named `misc` or `helpers` is not. Physics goes in `physical_models/`, even when a
+file named `misc` or `helpers` is not. Physics lives in its own module, even when one
 component is its only caller: components state equations, they do not define correlations.
 
 ### `test/` — Tests
@@ -136,7 +166,7 @@ test/
                             # feedback loops (SCRAM, cold-IC, prompt-jump)
 ```
 
-**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). `physical_models/` is covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), `test_darcy.jl` (the `DarcyFactor` models), and `test_thresholds.jl`.
+**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). The physics modules are covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), `test_darcy.jl` (the `Friction` models), and `test_thresholds.jl`.
 
 ## Known gaps against Python STREAM
 
@@ -173,8 +203,18 @@ error), and the whole HTC / friction / local-loss / threshold / dimensionless in
 
 ## Exports
 
-All public exports are declared in `STREAM.jl`. Never add `export` statements inside component files.
-  *Why: A single export list in the module entry point makes the public API auditable at a glance. Scattered exports are easy to lose track of.*
+Each submodule declares its own `export` list, inside its `module` block in `src/STREAM.jl`.
+The top-level list at the bottom of that file is the package's public surface and is
+deliberately short (around 45 names): the module names, the coolant properties, the
+dimensionless numbers, the geometry, the solve entry points, the constants, and the knob
+macros. Everything else is reached through its module.
+
+Never add an `export` statement inside a component or physics file. All of them live in
+`src/STREAM.jl`, so both the per-module surface and the package surface are auditable in one
+place.
+
+A name reaches the top level only by being listed twice, once in its module and once at the
+bottom. That friction is intentional: it is what stopped the list growing to 145 again.
 
 ## MTK Patterns
 

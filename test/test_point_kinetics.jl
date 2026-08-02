@@ -380,7 +380,7 @@ import ModelingToolkit: compose
         end
     end
 
-    @testset "connect_temperature_feedback" begin
+    @testset "temperature_feedback" begin
         ctrl_zero = ReactivityController()
 
         pg5 = PipeGeometry_rectangular(1.0, 0.04, 0.01, 0.04)
@@ -400,7 +400,7 @@ import ModelingToolkit: compose
 
         @testset "1D channel generates 5 equations" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=Dict(ch => -0.001))
-            eqs = connect_temperature_feedback(pk, [ch])
+            eqs = Connect.temperature_feedback(pk, [ch])
             @test eqs isa Vector{Equation}
             @test length(eqs) == 5
         end
@@ -409,7 +409,7 @@ import ModelingToolkit: compose
             @named pk = PointKinetics(
                 ctrl_zero; temp_worth=Dict(fuel => fill(-0.002, 3, 2))
             )
-            eqs = connect_temperature_feedback(pk, [fuel])
+            eqs = Connect.temperature_feedback(pk, [fuel])
             @test eqs isa Vector{Equation}
             @test length(eqs) == 6
         end
@@ -417,7 +417,7 @@ import ModelingToolkit: compose
         @testset "multiple components generates 5+6=11 equations" begin
             tw = Dict(ch => -0.001, fuel => fill(-0.002, 3, 2))
             @named pk = PointKinetics(ctrl_zero; temp_worth=tw)
-            eqs = connect_temperature_feedback(pk, [ch, fuel])
+            eqs = Connect.temperature_feedback(pk, [ch, fuel])
             @test length(eqs) == 11
         end
     end
@@ -431,7 +431,7 @@ import ModelingToolkit: compose
             src = read(joinpath(proj_root, relpath), String)
             @test !occursin("T_source_", src)
             @test !occursin("temp_worth", src)
-            @test !occursin("connect_temperature_feedback", src)
+            @test !occursin("temperature_feedback", src)
         end
     end
 

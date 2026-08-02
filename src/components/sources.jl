@@ -117,7 +117,7 @@ to a channel's live `h_tc[i]` and coolant `T[i]`. The heat absorbed leaves throu
 element and is never returned to whatever supplies `h`/`T_fluid`, so the coupling is
 one-way.
 
-This is the far-face element of `single_channel_connection`: it cools a fuel plate's
+This is the far-face element of `single_channel`: it cools a fuel plate's
 unconnected face using an adjacent channel's conditions without modelling a second
 channel (the equivalent-twin reduction). Used per axial cell; not a standalone loop
 component.

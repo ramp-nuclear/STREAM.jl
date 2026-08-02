@@ -15,8 +15,6 @@ using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM.Friction
-using STREAM.HTC
 using STREAM.Substances
 using STREAM.Examples
 using STREAM: PipeGeometry, PipeGeometry_circular, solve_steady, solve_transient
@@ -605,7 +603,7 @@ end
     # regime friction grows with |ṁ| in the turbulent branch, so it BOUNDS the reversed flow —
     # the earlier laminar-only surrogate (64/Re, friction vanishing as Re->0) let the reversed flow
     # run away to ~21x nominal, which this model does not.
-    fric = RegimeDependentFriction(; re_bounds=(2000.0, 5000.0), k_R=1.0)
+    fric = Friction.RegimeDependent(; re_bounds=(2000.0, 5000.0), k_R=1.0)
     @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, liquid=H2O, darcy=fric)
     @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, liquid=H2O, darcy=fric)
     # Bracket each adiabatic channel with same-temperature HeatExchangers on BOTH ends so its
@@ -645,7 +643,7 @@ end
     L_ch = geom.L
     # Friction head of the two channels in series at flow m.
     loop_friction(m) = sum(
-        darcy_weisbach_dp(m, ρ(H2O, T), fric(T, T, m, H2O, geom), geom)
+        Friction.darcy_weisbach_dp(m, ρ(H2O, T), fric(T, T, m, H2O, geom), geom)
         for T in (T_cold, T_hot)
     )
     # bisection for loop_friction(m) == grav_dp, m > 0
@@ -742,10 +740,10 @@ end
     geom = PipeGeometry(1.0, 4.0, 1.0, 1.0, 1.0, (0.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
-                                    htc=ConstantNusselt(; Nu=8.235))
+                                    htc=HTC.ConstantNusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.0, Lx=Lx, y=1.0,
                                 rho_s=1.0, cp_s=1.0, k_s=k_s, power_shape=ps, T0=T0)
-    osc = one_sided_connection(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
+    osc = one_sided(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
     @named pump = Pump(; ṁ0=ṁ)
     @named bc = HeatExchanger(T0)
     conns = Equation[
@@ -799,9 +797,9 @@ end
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
     # Distinct names per channel/fuel so the shared PK gets a distinct T_source_<name> feedback
-    # group for each component (connect_temperature_feedback keys off nameof).
+    # group for each component (temperature_feedback keys off nameof).
     cacs = [ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
-                               htc=ConstantNusselt(; Nu=8.235),
+                               htc=HTC.ConstantNusselt(; Nu=8.235),
                                name=Symbol(:cac, i)) for i in 1:N]
     fuels = [HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0, rho_s=1.0, cp_s=1.0, k_s=1.0,
                            power_shape=ps, T0=T0, name=Symbol(:fuel, i)) for i in 1:N]
@@ -825,7 +823,7 @@ end
         ref_temp[rods_fuels[i]] = fill(T0, nz, nx)
     end
     @named pk = PointKinetics(ctrl; temp_worth=temp_worth, ref_temp=ref_temp)
-    fb = connect_temperature_feedback(pk, vcat(rods_cacs, rods_fuels))
+    fb = temperature_feedback(pk, vcat(rods_cacs, rods_fuels))
     power_scale = 1.0e3
     conns = Equation[]
     for i in 1:N
@@ -916,10 +914,10 @@ end
     ctrl = ReactivityController()
     @named pk = PointKinetics(ctrl; temp_worth=Dict(fuel => fill(-0.1, nz, nx)),
                               ref_temp=Dict(fuel => fill(T0, nz, nx)))
-    fb = connect_temperature_feedback(pk, [fuel])
+    fb = temperature_feedback(pk, [fuel])
     bath_conns = vcat(
-        connect_face(bathsL, fuel, :thermal_left),
-        connect_face(bathsR, fuel, :thermal_right),
+        face(bathsL, fuel, :thermal_left),
+        face(bathsR, fuel, :thermal_right),
     )
     conns = Equation[fb...; fuel.power ~ pk.P * 1.0e3; bath_conns...]
     full = compose_systems(fuel, pk, bathsL..., bathsR...; connections=conns, name=:sys8)
@@ -948,14 +946,14 @@ end
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
-                                    htc=ConstantNusselt(; Nu=8.235))
+                                    htc=HTC.ConstantNusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0,
                                 rho_s=1.0, cp_s=1.0, k_s=1.0, power_shape=ps, T0=T0)
     rods = symmetric_plate(cac, fuel; name=:rods)
     ctrl = ReactivityController()
     @named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => fill(-0.1, n)),
                               ref_temp=Dict(rods.cac => fill(T0, n)))
-    fb = connect_temperature_feedback(pk, [rods.cac])
+    fb = temperature_feedback(pk, [rods.cac])
     ṁ0 = 0.1
     @named pump = Pump(; ṁ0=ṁ0)
     @named bc = HeatExchanger(T0)
