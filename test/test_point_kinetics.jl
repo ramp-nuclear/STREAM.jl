@@ -1,5 +1,6 @@
 using Test
 using STREAM
+using STREAM.Examples
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq

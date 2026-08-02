@@ -454,7 +454,7 @@ function ChannelAndContacts(;
     n::Int,
     geometry::PipeGeometry,
     g=0.0,
-    htc::HTC=DittusBoelter(),
+    htc::AbstractHTC=DittusBoelter(),
     darcy::DarcyFactor=BlasiusFriction(),
     liquid::AbstractLiquid=H2O,
 )

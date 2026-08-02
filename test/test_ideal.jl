@@ -3,6 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
+using STREAM.Examples
 using STREAM: Inertia, HeatExchanger, WallTemperature, HeatFluxSource
 
 @testset "Inertia stub callable" begin

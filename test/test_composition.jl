@@ -4,7 +4,8 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
-using STREAM: Channel, _infer_n
+using STREAM: Channel
+using STREAM.Assemblies: _infer_n  # private to Assemblies
 using OrdinaryDiffEq: ReturnCode
 
 # Test fixtures — local helpers that build canonical CAC + HD pairs.

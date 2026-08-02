@@ -662,27 +662,27 @@ end
 
 @testset "Idelchik local-loss factors — analytic high-Re limits" begin
     # Above the table's Reynolds range the closed forms apply.
-    @test isapprox(STREAM._sudden_expansion_factor(0.5, 1e5), (1 - 0.5)^2; rtol=1e-12)
-    @test isapprox(STREAM._sudden_contraction_factor(0.5, 1e5), 0.5 * (1 - 0.5)^0.75; rtol=1e-12)
-    @test isapprox(STREAM._sudden_expansion_factor(0.0, 1e5), 1.0; rtol=1e-12)   # full expansion
+    @test isapprox(STREAM.LocalLoss._sudden_expansion_factor(0.5, 1e5), (1 - 0.5)^2; rtol=1e-12)
+    @test isapprox(STREAM.LocalLoss._sudden_contraction_factor(0.5, 1e5), 0.5 * (1 - 0.5)^0.75; rtol=1e-12)
+    @test isapprox(STREAM.LocalLoss._sudden_expansion_factor(0.0, 1e5), 1.0; rtol=1e-12)   # full expansion
 end
 
 @testset "Idelchik local-loss factors — table nodes" begin
     # At a (Re, area-ratio) grid node the interpolation returns the tabulated value.
-    @test isapprox(STREAM._sudden_expansion_factor(0.3, 100.0), 1.20; rtol=1e-12)   # Table 4.2
-    @test isapprox(STREAM._sudden_contraction_factor(0.3, 100.0), 1.10; rtol=1e-12) # Table 4.10
+    @test isapprox(STREAM.LocalLoss._sudden_expansion_factor(0.3, 100.0), 1.20; rtol=1e-12)   # Table 4.2
+    @test isapprox(STREAM.LocalLoss._sudden_contraction_factor(0.3, 100.0), 1.10; rtol=1e-12) # Table 4.10
 end
 
 @testset "Idelchik local-loss factor — direction dispatch (A2>A1)" begin
     # A2 > A1: forward flow expands, reverse flow contracts.
     mu = 1.0e-3
     A1, A2 = 1.0, 2.0
-    fwd = STREAM._local_loss_factor(3.0, A1, A2, mu)
-    rev = STREAM._local_loss_factor(-3.0, A1, A2, mu)
+    fwd = STREAM.LocalLoss._local_loss_factor(3.0, A1, A2, mu)
+    rev = STREAM.LocalLoss._local_loss_factor(-3.0, A1, A2, mu)
     aratio = 0.5
     A = 1.0
     Dh = sqrt(A / pi)
     re = 3.0 * Dh / (A * mu)
-    @test isapprox(fwd, STREAM._sudden_expansion_factor(aratio, re); rtol=1e-12)
-    @test isapprox(rev, STREAM._sudden_contraction_factor(aratio, re); rtol=1e-12)
+    @test isapprox(fwd, STREAM.LocalLoss._sudden_expansion_factor(aratio, re); rtol=1e-12)
+    @test isapprox(rev, STREAM.LocalLoss._sudden_contraction_factor(aratio, re); rtol=1e-12)
 end

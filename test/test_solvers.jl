@@ -9,6 +9,7 @@ using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 using STREAM
+using STREAM.Examples
 
 @testset "Solver wrappers" begin
     @testset "steady_state_guess monotonically increasing" begin

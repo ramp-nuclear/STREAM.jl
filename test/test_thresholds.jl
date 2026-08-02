@@ -1,5 +1,6 @@
 using Test
 using STREAM
+using STREAM.Examples
 
 @testset "Threshold Analysis" begin
 

@@ -5,11 +5,10 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using ModelingToolkit: connect    # disambiguate from Sockets.connect
 using STREAM
+using STREAM.Examples
 using STREAM: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion,
                 ConstantTemperature, Channel,
                 PipeGeometry_circular, PipeGeometry_rectangular,
-                build_loop, build_loop_vertical, build_loop_transient,
-                build_cube, build_loop_lof_bypass, build_loop_pk,
                 ReactivityController
 
 # Helper: assert determinacy contract on an UNCOMPILED system. Calls

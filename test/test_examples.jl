@@ -11,6 +11,7 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 using Statistics
 using STREAM
+using STREAM.Examples
 
 @testset "Builders smokes" begin
     @testset "build_loop compiles closed loop" begin

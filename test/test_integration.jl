@@ -12,6 +12,7 @@ using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 using STREAM
+using STREAM.Examples
 using STREAM: Channel, ChannelAndContacts, Pump, HeatExchanger, ConstantTemperature,
     PipeGeometry, PipeGeometry_circular, HeatDiffusion, Liquid, PointKinetics,
     ReactivityController, connect_temperature_feedback, compose_systems, symmetric_plate,

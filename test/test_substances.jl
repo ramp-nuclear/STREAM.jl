@@ -200,9 +200,9 @@ end
 
 @testset "_bergles_rohsenow_dT_ONB" begin
     # Zero heat flux -> zero superheat
-    @test STREAM._bergles_rohsenow_dT_ONB(1e10, 0.0) == 0.0
+    @test STREAM.HTC._bergles_rohsenow_dT_ONB(1e10, 0.0) == 0.0
     # Typical reactor conditions: positive dT
-    dT = STREAM._bergles_rohsenow_dT_ONB(1e5, 1e6)
+    dT = STREAM.HTC._bergles_rohsenow_dT_ONB(1e5, 1e6)
     @test dT > 0.0
     @test isfinite(dT)
 end

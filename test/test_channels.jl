@@ -6,7 +6,9 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
 using STREAM: Channel  # disambiguate from Base.Channel
-using STREAM: regime_dependent_q_scb, _bergles_rohsenow_dT_ONB  # for the SCB integration block
+using STREAM.Examples
+using STREAM: regime_dependent_q_scb
+using STREAM.HTC: _bergles_rohsenow_dT_ONB  # private to HTC, for the SCB integration block
 using OrdinaryDiffEq: ReturnCode
 
 const N_DEFAULT      = 4

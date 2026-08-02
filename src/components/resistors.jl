@@ -1,8 +1,8 @@
 # resistors.jl -- Friction, Gravity, Resistor components
 
 """
-    Friction(; name, L, D, A, darcy=BlasiusFriction(), liquid=H2O, scale=1.0) -> System
-    Friction(; name, geometry, darcy=BlasiusFriction(), liquid=H2O, scale=1.0) -> System
+    FrictionResistor(; name, L, D, A, darcy=BlasiusFriction(), liquid=H2O, scale=1.0) -> System
+    FrictionResistor(; name, geometry, darcy=BlasiusFriction(), liquid=H2O, scale=1.0) -> System
 
 Frictional pressure drop element, `ΔP = scale · f · ṁ|ṁ| / (2ρA²) · (L/Dh)`.
 
@@ -27,7 +27,7 @@ geometry, where those two perimeters coincide.
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
-function Friction(;
+function FrictionResistor(;
     name,
     geometry::Union{PipeGeometry,Nothing}=nothing,
     L=nothing, D=nothing, A=nothing,

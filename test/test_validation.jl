@@ -4,6 +4,7 @@ using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using DelimitedFiles
 using STREAM
+using STREAM.Examples
 using STREAM: Channel, HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
 
 

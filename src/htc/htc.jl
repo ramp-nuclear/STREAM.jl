@@ -16,7 +16,7 @@
 # if the pluggable unit is a Nusselt number.
 
 """
-    HTC
+    AbstractHTC
 
 A wall heat transfer coefficient model. Subtypes are callable as
 
@@ -34,15 +34,15 @@ Shipped models: [`NusseltHTC`](@ref) and the named correlations built on it
 To add your own, either subtype this and define the call, or wrap a closure in
 [`FunctionHTC`](@ref).
 """
-abstract type HTC end
+abstract type AbstractHTC end
 
 """
-    FunctionHTC(f) <: HTC
+    FunctionHTC(f) <: AbstractHTC
 
-Lift a callable `f(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h` into an [`HTC`](@ref), for a
+Lift a callable `f(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h` into an [`AbstractHTC`](@ref), for a
 correlation not worth its own type.
 """
-struct FunctionHTC{F} <: HTC
+struct FunctionHTC{F} <: AbstractHTC
     f::F
 end
 
@@ -85,7 +85,7 @@ property_temperature(::AtFilm, T_wall, T_bulk) = film_temperature(T_wall, T_bulk
 property_temperature(::AtBulk, T_wall, T_bulk) = T_bulk
 
 """
-    NusseltHTC(nusselt; basis=AtFilm()) <: HTC
+    NusseltHTC(nusselt; basis=AtFilm()) <: AbstractHTC
 
 Close a Nusselt correlation into a heat transfer coefficient, `h = Nu·κ/Dh`, reading Re, Pr
 and κ at the temperature `basis` names.
@@ -97,7 +97,7 @@ and κ at the temperature `basis` names.
 - `nusselt`: the correlation to close
 - `basis`: [`AtFilm`](@ref) (default) or [`AtBulk`](@ref)
 """
-struct NusseltHTC{N,B<:PropertyBasis} <: HTC
+struct NusseltHTC{N,B<:PropertyBasis} <: AbstractHTC
     nusselt::N
     basis::B
 end
@@ -150,7 +150,7 @@ function DevelopingLaminar(geom::PipeGeometry; develop_length,
 end
 
 """
-    Elenbaas(geom; g=G_EARTH) <: HTC
+    Elenbaas(geom; g=G_EARTH) <: AbstractHTC
 
 Elenbaas natural convection between parallel vertical plates.
 
@@ -158,7 +158,7 @@ Buoyancy is driven by the bulk-to-wall difference, so Gr and the properties behi
 taken at the bulk temperature, matching Python STREAM. `geom.depth` is the plate gap,
 `geom.L` the heated length, and `geom.Dh` the Grashof characteristic length.
 """
-struct Elenbaas <: HTC
+struct Elenbaas <: AbstractHTC
     gap::Float64
     heated_length::Float64
     Dh_gr::Float64
@@ -177,13 +177,13 @@ end
 
 """
     RegimeDependentHTC(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
-                       geom, g=G_EARTH) <: HTC
+                       geom, g=G_EARTH) <: AbstractHTC
 
 Switch between laminar, turbulent and natural convection, the way Python STREAM's
 `regime_dependent_h_spl` does.
 
 The regime is selected on the **bulk** Reynolds number and the two forced branches are
-blended across `re_bounds` by [`flow_regime_blend`](@ref). Each branch is a full `HTC`, so
+blended across `re_bounds` by [`flow_regime_blend`](@ref). Each branch is a full `AbstractHTC`, so
 where it reads its properties is its own business: that is how the laminar branch ends up at
 bulk and the turbulent one at film without this model having to know.
 
@@ -196,7 +196,7 @@ Given a `natural` model, buoyancy takes over wherever `Gr/Re² > 1`.
 - `geom`: channel geometry; `geom.Dh` is the Grashof characteristic length
 - `g`: gravitational acceleration [m/s²], used only when `natural` is given
 """
-struct RegimeDependentHTC{L<:HTC,T<:HTC,N} <: HTC
+struct RegimeDependentHTC{L<:AbstractHTC,T<:AbstractHTC,N} <: AbstractHTC
     laminar::L
     turbulent::T
     natural::N
@@ -206,9 +206,9 @@ struct RegimeDependentHTC{L<:HTC,T<:HTC,N} <: HTC
 end
 
 function RegimeDependentHTC(;
-    laminar::HTC,
-    turbulent::HTC,
-    natural::Union{HTC,Nothing}=nothing,
+    laminar::AbstractHTC,
+    turbulent::AbstractHTC,
+    natural::Union{AbstractHTC,Nothing}=nothing,
     re_bounds=(2000.0, 5000.0),
     geom::PipeGeometry,
     g=G_EARTH,
@@ -234,22 +234,22 @@ function (htc::RegimeDependentHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid)
 end
 
 """
-    MaximalHTC(models...) <: HTC
+    MaximalHTC(models...) <: AbstractHTC
 
 The largest `h` of several models, for a wall cooled by whichever mechanism happens to win.
 """
-struct MaximalHTC{T<:Tuple} <: HTC
+struct MaximalHTC{T<:Tuple} <: AbstractHTC
     models::T
 end
 
-MaximalHTC(models::HTC...) = MaximalHTC(models)
+MaximalHTC(models::AbstractHTC...) = MaximalHTC(models)
 
 function (htc::MaximalHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid)
     return reduce(max, (m(T_wall, T_bulk, ṁ, Dh, A, liquid) for m in htc.models))
 end
 
 """
-    SubcooledBoilingHTC(single_phase, q_scb) <: HTC
+    SubcooledBoilingHTC(single_phase, q_scb) <: AbstractHTC
 
 Partial subcooled boiling layered on top of a single-phase model: `single_phase` below the
 onset of nucleate boiling, and that value scaled by the Bergles-Rohsenow partial boiling
@@ -259,11 +259,11 @@ Needs the local pressure, which the channel supplies, so this model is called wi
 extra-argument form `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)`.
 
 # Arguments
-- `single_phase`: the underlying [`HTC`](@ref)
+- `single_phase`: the underlying [`AbstractHTC`](@ref)
 - `q_scb`: subcooled boiling heat flux closure `(T_wall, T_sat, Re) -> q`, e.g. from
   [`regime_dependent_q_scb`](@ref)
 """
-struct SubcooledBoilingHTC{H<:HTC,Q} <: HTC
+struct SubcooledBoilingHTC{H<:AbstractHTC,Q} <: AbstractHTC
     single_phase::H
     q_scb::Q
 end
@@ -280,4 +280,4 @@ end
 
 # Models that do not care about pressure ignore the extra argument, so a channel can always
 # pass it and let the model decide.
-(htc::HTC)(T_wall, T_bulk, ṁ, Dh, A, liquid, P) = htc(T_wall, T_bulk, ṁ, Dh, A, liquid)
+(htc::AbstractHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid, P) = htc(T_wall, T_bulk, ṁ, Dh, A, liquid)
