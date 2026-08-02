@@ -1,25 +1,42 @@
 # resistors.jl -- Friction, Gravity, Resistor components
 
 """
-    Friction(; name, L, D, A) -> System
+    Friction(; name, L, D, A, darcy=BlasiusFriction(), liquid=H2O, scale=1.0) -> System
+    Friction(; name, geometry, darcy=BlasiusFriction(), liquid=H2O, scale=1.0) -> System
 
-Frictional pressure drop element using Darcy-Weisbach correlation.
+Frictional pressure drop element, `ΔP = scale · f · ṁ|ṁ| / (2ρA²) · (L/Dh)`.
+
+The friction factor comes from `darcy`, a [`DarcyFactor`](@ref). Passing
+[`RegimeDependentFriction`](@ref) makes this the regime-switching friction resistor, with the
+laminar/turbulent blend and, if asked for, the heated-wall viscosity correction.
+
+Give it a [`PipeGeometry`](@ref) when the friction model needs the heated and wet perimeters,
+which the viscosity correction does. The `L`/`D`/`A` form builds an equivalent circular
+geometry, where those two perimeters coincide.
 
 # Arguments
 - `name`: system name (Symbol)
 - `L`: pipe length [m]
 - `D`: hydraulic diameter [m]
 - `A`: flow area [m^2]
+- `geometry`: pipe geometry descriptor ([`PipeGeometry`](@ref)), in place of `L`/`D`/`A`
+- `darcy`: wall friction model ([`DarcyFactor`](@ref)), default [`BlasiusFriction`](@ref)
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
+- `scale`: multiplies the pressure drop, default 1.0. See [`Resistor`](@ref).
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
-function Friction(; name, L, D, A, liquid::AbstractLiquid=H2O)
-    pars = @parameters begin
-        L = L
-        A = A
-    end
+function Friction(;
+    name,
+    geometry::Union{PipeGeometry,Nothing}=nothing,
+    L=nothing, D=nothing, A=nothing,
+    darcy::DarcyFactor=BlasiusFriction(),
+    liquid::AbstractLiquid=H2O,
+    scale::Real=1.0,
+)
+    geom = _friction_geometry(geometry, L, D, A)
+    pars = @parameters scale = scale
     vars = @variables begin
         Re(t)
         f(t)
@@ -27,15 +44,36 @@ function Friction(; name, L, D, A, liquid::AbstractLiquid=H2O)
     @named inlet = FlowPort()
     @named outlet = FlowPort()
     T_in = instream(inlet.T)
-    re = STREAM.Re(inlet.ṁ, A, D, μ(liquid, T_in))
+    Ax, Dh, Lx = geom.A, geom.Dh, geom.L
     eqs = Equation[
-        Re ~ re,
-        f ~ blasius_friction(Re),
-        inlet.p - outlet.p ~ f * (inlet.ṁ * abs(inlet.ṁ) / (2 * ρ(liquid, 
-            T_in
-        ) * A^2)) * (L / D),
+        Re ~ STREAM.Re(liquid, T_in, inlet.ṁ, Ax, Dh),
+        # The resistor has no wall of its own, so the friction model reads the stream
+        # temperature for both. A viscosity correction is then exactly 1.
+        f ~ darcy(T_in, inlet.ṁ, liquid, geom),
+        inlet.p - outlet.p ~
+            scale * darcy_weisbach_dp(inlet.ṁ, ρ(liquid, T_in), f, Lx, Dh, Ax),
     ]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)
+end
+
+_friction_geometry(geom::PipeGeometry, ::Nothing, ::Nothing, ::Nothing) = geom
+
+function _friction_geometry(::Nothing, L, D, A)
+    if L === nothing || D === nothing || A === nothing
+        throw(ArgumentError(
+            "Friction needs either `geometry`, or all three of `L`, `D` and `A`."))
+    end
+    # An equivalent circular duct: heated and wet perimeter coincide, so a viscosity
+    # correction weights them 1:1.
+    perimeter = 4 * A / D
+    return PipeGeometry(
+        Float64(L), Float64(D), Float64(A), perimeter, perimeter,
+        (perimeter / 2, perimeter / 2), Float64(D), Float64(D),
+    )
+end
+
+function _friction_geometry(::PipeGeometry, L, D, A)
+    throw(ArgumentError("Friction takes `geometry` or `L`/`D`/`A`, not both."))
 end
 
 """
@@ -69,15 +107,19 @@ Generic flow resistance with a fixed resistance coefficient.
 # Arguments
 - `R`: resistance coefficient [Pa/(kg/s)]
 - `name`: system name (Symbol)
+- `scale`: multiplies the pressure drop, default 1.0. It is the composition knob: `scale=3`
+  is three of this resistor in series, `scale=1/3` is three of it in parallel, and a
+  calibrated resistor can be trimmed without touching the coefficient it was fitted with.
+  Being a parameter, it is reachable from `remake`.
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
-function Resistor(R; name)
-    pars = @parameters R = R
+function Resistor(R; name, scale::Real=1.0)
+    pars = @parameters R = R scale = scale
     @named inlet = FlowPort()
     @named outlet = FlowPort()
-    eqs = Equation[inlet.p - outlet.p ~ R * inlet.ṁ]
+    eqs = Equation[inlet.p - outlet.p ~ scale * R * inlet.ṁ]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
@@ -100,6 +142,7 @@ same one `Channel`'s `h_left` uses).
 - `density`: overrides the coolant density [kg/m^3]; `Real` (constant) or `Function` `(T) -> rho`
   evaluated at the inlet stream temperature. Default `nothing` takes the density from `liquid`.
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
+- `scale`: multiplies the pressure drop, default 1.0. See [`Resistor`](@ref).
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
@@ -110,8 +153,9 @@ function VolumetricFlowResistor(;
     klow::Real=0.0,
     density::Union{Real,Function,Nothing}=nothing,
     liquid::AbstractLiquid=H2O,
+    scale::Real=1.0,
 )
-    pars = @parameters klow = klow
+    pars = @parameters klow = klow scale = scale
     if k isa Real
         kpars = @parameters k = k
         k_expr = kpars[1]
@@ -132,7 +176,7 @@ function VolumetricFlowResistor(;
         ρ(liquid, T_in)
     end
     q = inlet.ṁ / rho
-    eqs = Equation[inlet.p - outlet.p ~ k_expr * q * abs(q) + klow * q]
+    eqs = Equation[inlet.p - outlet.p ~ scale * (k_expr * q * abs(q) + klow * q)]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
@@ -151,11 +195,13 @@ the roles swapped under reversal. The `ṁ·|ṁ|` form keeps the drop direction
 - `A2`: downstream flow area [m^2]
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref), supplying the density and
   viscosity at the inlet stream temperature
+- `scale`: multiplies the pressure drop, default 1.0. See [`Resistor`](@ref).
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
-function LocalPressureDrop(; name, A1, A2, liquid::AbstractLiquid=H2O)
+function LocalPressureDrop(; name, A1, A2, liquid::AbstractLiquid=H2O, scale::Real=1.0)
+    pars = @parameters scale = scale
     @named inlet = FlowPort()
     @named outlet = FlowPort()
     T_in = instream(inlet.T)
@@ -163,6 +209,6 @@ function LocalPressureDrop(; name, A1, A2, liquid::AbstractLiquid=H2O)
     f = _local_loss_factor(inlet.ṁ, A1, A2, μ(liquid, T_in))
     rho = ρ(liquid, T_in)
     Δp₋ = inlet.p - outlet.p
-    eqs = Equation[Δp₋ ~ f * inlet.ṁ * abs(inlet.ṁ) / (2rho * A^2)]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs)
+    eqs = Equation[Δp₋ ~ scale * local_dp(inlet.ṁ, rho, f, A)]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end

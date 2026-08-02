@@ -15,7 +15,7 @@ function _mtr_pair(; n=4, nz=4, nx=2)
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
                                     htc=ConstantNusselt(; Nu=8.235),
-                                    friction_correlation=laminar_friction_rectangular(geom))
+                                    darcy=RectangularLaminarFriction(geom))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005,
                                  y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
                                  power_shape=ps)
@@ -519,7 +519,7 @@ function _fa_cac(prefix::Symbol; n=4)
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ChannelAndContacts(; name=prefix, n=n, geometry=geom,
                        htc=ConstantNusselt(; Nu=8.235),
-                       friction_correlation=laminar_friction_rectangular(geom))
+                       darcy=RectangularLaminarFriction(geom))
 end
 
 function _fa_hd(prefix::Symbol; nz=4, nx=2)

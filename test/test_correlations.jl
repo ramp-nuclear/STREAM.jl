@@ -141,7 +141,7 @@ end
             n=n,
             geometry=geom,
             htc=ConstantNusselt(; Nu=8.235),
-            friction_correlation=laminar_friction_rectangular(geom),
+            darcy=RectangularLaminarFriction(geom),
         )
         @named bc_phy03 = HeatExchanger(T_inlet)
         ct_l_phy03 = [
@@ -201,7 +201,7 @@ end
             let
                 Re_i = sol_phy03[ssys_phy03.cac_phy03.Re[i]]
                 T_i = sol_phy03[ssys_phy03.cac_phy03.T[i]]
-                f_lam(Re_i) * (ṁ03 * abs(ṁ03) / (2 * ρ(H2O, T_i) * A^2)) * (dz / Dh)
+                darcy_weisbach_dp(ṁ03, ρ(H2O, T_i), f_lam(Re_i), dz, Dh, A)
             end for i in 1:n
         )
         @test isapprox(sol_phy03[ssys_phy03.cac_phy03.dP], dP_expected_03; rtol=1e-6)
@@ -218,7 +218,7 @@ end
             re_bounds=(2000.0, 5000.0),
             geom=geom,
         )
-        friction_rd = regime_dependent_friction(;
+        friction_rd = RegimeDependentFriction(;
             laminar=laminar_friction_rectangular(geom),
             turbulent=blasius_friction,
             re_bounds=(2000.0, 5000.0),
@@ -227,7 +227,7 @@ end
 
         @named pump_lam = Pump(dP_lam)
         @named cac_lam = ChannelAndContacts(
-            n=n, geometry=geom, htc=htc_rd, friction_correlation=friction_rd
+            n=n, geometry=geom, htc=htc_rd, darcy=friction_rd
         )
         @named bc_lam = HeatExchanger(T_inlet)
         ct_l_lam = [ConstantTemperature(T_wall; name=Symbol(:ct_l_lam_, i)) for i in 1:n]
@@ -279,9 +279,7 @@ end
                 Re_i = sol_lam[ssys_lam.cac_lam.Re[i]]
                 T_i = sol_lam[ssys_lam.cac_lam.T[i]]
                 @test Re_i < 2300.0   # confirm the laminar branch is the one selected
-                friction_rd(Re_i) *
-                (ṁ_lam * abs(ṁ_lam) / (2 * ρ(H2O, T_i) * A^2)) *
-                (dz / Dh)
+                darcy_weisbach_dp(ṁ_lam, ρ(H2O, T_i), friction_rd(T_i, T_i, ṁ_lam, H2O, geom), dz, Dh, A)
             end for i in 1:n
         )
         @test isapprox(sol_lam[ssys_lam.cac_lam.dP], dP_expected_lam; rtol=1e-6)
@@ -298,7 +296,7 @@ end
             re_bounds=(2000.0, 5000.0),
             geom=geom,
         )
-        friction_rd = regime_dependent_friction(;
+        friction_rd = RegimeDependentFriction(;
             laminar=laminar_friction_rectangular(geom),
             turbulent=blasius_friction,
             re_bounds=(2000.0, 5000.0),
@@ -307,7 +305,7 @@ end
 
         @named pump_turb = Pump(dP_turb)
         @named cac_turb = ChannelAndContacts(
-            n=n, geometry=geom, htc=htc_rd, friction_correlation=friction_rd
+            n=n, geometry=geom, htc=htc_rd, darcy=friction_rd
         )
         @named bc_turb = HeatExchanger(T_inlet)
         ct_l_turb = [ConstantTemperature(T_wall; name=Symbol(:ct_l_turb_, i)) for i in 1:n]
@@ -360,10 +358,9 @@ end
                 T_i = sol_turb[ssys_turb.cac_turb.T[i]]
                 @test Re_i > 2300.0   # confirm the turbulent branch is the one selected
                 # friction_rd must equal Blasius here, not the laminar rectangular factor.
-                @test isapprox(friction_rd(Re_i), blasius_friction(Re_i); rtol=1e-12)
-                friction_rd(Re_i) *
-                (ṁ_turb * abs(ṁ_turb) / (2 * ρ(H2O, T_i) * A^2)) *
-                (dz / Dh)
+                @test isapprox(friction_rd(T_i, T_i, ṁ_turb, H2O, geom),
+                               blasius_friction(Re_i); rtol=1e-12)
+                darcy_weisbach_dp(ṁ_turb, ρ(H2O, T_i), friction_rd(T_i, T_i, ṁ_turb, H2O, geom), dz, Dh, A)
             end for i in 1:n
         )
         @test isapprox(sol_turb[ssys_turb.cac_turb.dP], dP_expected_turb; rtol=1e-6)
@@ -572,7 +569,7 @@ end
             n=n,
             geometry=geom,
             htc=htc_fd_lam,
-            friction_correlation=laminar_friction_rectangular(geom),
+            darcy=RectangularLaminarFriction(geom),
         )
         @named bc_fd = HeatExchanger(T_inlet)
         ct_l_fd = [ConstantTemperature(T_wall; name=Symbol(:ct_l_fd_, i)) for i in 1:n]
@@ -624,7 +621,7 @@ end
             n=n,
             geometry=geom,
             htc=htc_dev_lam,
-            friction_correlation=laminar_friction_rectangular(geom),
+            darcy=RectangularLaminarFriction(geom),
         )
         @named bc_dev = HeatExchanger(T_inlet)
         ct_l_dev = [ConstantTemperature(T_wall; name=Symbol(:ct_l_dev_, i)) for i in 1:n]

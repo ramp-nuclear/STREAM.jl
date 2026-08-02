@@ -19,6 +19,7 @@ include("physical_models/htc/correlations.jl")
 include("physical_models/htc/htc.jl")
 include("physical_models/subcooled_boiling.jl")
 include("physical_models/pressure_drop/friction.jl")
+include("physical_models/pressure_drop/darcy.jl")
 include("physical_models/pressure_drop/local.jl")
 include("physical_models/thresholds.jl")
 include("components/twoports.jl")
@@ -49,9 +50,13 @@ export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion, PipeGeometry, PipeGeometry_rectangular
 export PipeGeometry_circular
 export knob_defaults, @design_knob
+export bilinear_inertia
 export dittus_boelter, blasius_friction, constant_Nusselt, laminar_friction_rectangular
 export rectangular_laminar_correction, elenbaas_nusselt, marco_han_nusselt
-export turbulent_friction, laminar_friction, regime_dependent_friction, viscosity_correction
+export turbulent_friction, laminar_friction, viscosity_correction
+export darcy_weisbach_dp, local_dp
+export DarcyFactor, FunctionDarcy, ReynoldsFactor, BlasiusFriction, LaminarFriction
+export TurbulentFriction, RectangularLaminarFriction, RegimeDependentFriction
 export fully_developed_laminar_h_spl, developing_laminar_h_spl, film_temperature
 export HTC, FunctionHTC, NusseltHTC, PropertyBasis, AtFilm, AtBulk, property_temperature
 export DittusBoelter, ConstantNusselt, FullyDevelopedLaminar, DevelopingLaminar

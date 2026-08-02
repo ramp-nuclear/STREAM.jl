@@ -65,7 +65,8 @@ src/
       correlations.jl         # Nusselt correlations (dimensionless, no property basis)
     subcooled_boiling.jl      # SCB heat flux correlations and the ONB superheat
     pressure_drop/
-      friction.jl             # Darcy friction factor correlations
+      friction.jl             # Darcy friction factor correlations (Reynolds-only)
+      darcy.jl                # DarcyFactor: the wall friction model a channel or resistor gets
       local.jl                # Idelchik expansion / contraction local losses
     thresholds.jl             # CHF, OFI, OSV, ONB, wall-temperature limit correlations
   components/
@@ -118,6 +119,8 @@ test/
   test_correlations.jl      # Nusselt + friction correlation function unit tests
   test_htc.jl               # HTC models: property basis, named constructors, regime
                             # switching, subcooled boiling, user-defined models
+  test_darcy.jl             # DarcyFactor models + the Friction resistor, resistor `scale`,
+                            # and flow-dependent Inertia
   test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState
   test_composition.jl       # symmetric_plate, plate, one_sided_connection, compose_systems,
                             # port, check_gravity_mismatch, _infer_n, connect_temperature_feedback,
@@ -133,7 +136,7 @@ test/
                             # feedback loops (SCRAM, cold-IC, prompt-jump)
 ```
 
-**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). `physical_models/` is covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), and `test_thresholds.jl`.
+**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). `physical_models/` is covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), `test_darcy.jl` (the `DarcyFactor` models), and `test_thresholds.jl`.
 
 ## Known gaps against Python STREAM
 

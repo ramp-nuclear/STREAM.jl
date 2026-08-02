@@ -8,7 +8,7 @@ function Channel end
 
 """
     _channel_core(; n, T, dp, inlet, outlet, geometry, g_acc,
-                  friction_correlation=blasius_friction,
+                  darcy::DarcyFactor=BlasiusFriction(),
                   q_left_expr, q_right_expr,
                   Re, Pe, v, P, T_sat, T_ONB,
                   q_wall, q_wall_left, q_wall_right,
@@ -30,7 +30,9 @@ those symbols.
 - `inlet`, `outlet`                             : variant-created `FlowPort`s
 - `geometry::PipeGeometry`                          : pipe geometry descriptor
 - `g_acc::Real`                                     : gravitational acceleration [m/s^2]
-- `friction_correlation`                            : friction closure `(Re) -> f`
+- `darcy`                                           : wall friction model ([`DarcyFactor`](@ref))
+- `T_wall`                                          : length-n wall temperature, or `nothing` when the
+                                                      variant has no wall of its own
 - `q_left_expr`, `q_right_expr`                     : length-n `Vector{Num}`, per-cell heat flow inputs (W) — variant builds these
 - `Re, Pe, v, P, T_sat, T_ONB, q_wall, q_wall_left, q_wall_right` : variant-declared observable LHS symbols
 - `T_out, dP`                                       : variant-declared scalar observable LHS symbols
@@ -52,10 +54,11 @@ function _channel_core(;
     outlet,
     geometry::PipeGeometry,
     g_acc::Real,
-    friction_correlation=blasius_friction,
+    darcy::DarcyFactor=BlasiusFriction(),
     q_left_expr, q_right_expr,
     vars,
     liquid::AbstractLiquid=H2O,
+    T_wall=nothing,
 )
     Dh = geometry.Dh
     A  = geometry.A
@@ -64,6 +67,9 @@ function _channel_core(;
 
     T  = collect(vars.T)
     dp = collect(vars.dp)
+    # A variant with no wall of its own hands the friction model the bulk temperature, which
+    # makes the wall-to-bulk viscosity ratio exactly 1 and the correction a no-op.
+    T_wall_c = T_wall === nothing ? T : collect(T_wall)
 
     T_inlet_fwd = instream(inlet.T)
     T_inlet_rev = instream(outlet.T)
@@ -86,7 +92,7 @@ function _channel_core(;
         T_up = ifelse(inlet.ṁ >= 0, T_up_fwd, T_up_rev)
 
         cp_face = (cₚ(liquid, T_up) + cp_c[i]) / 2
-        f_i = friction_correlation(Re_c[i])
+        f_i = darcy(T[i], T_wall_c[i], inlet.ṁ, liquid, geometry)
 
         cell_eqs = Equation[
             # Energy balance, enthalpy form
@@ -96,7 +102,7 @@ function _channel_core(;
               + q_right_expr[i]
             ) / (ρ_c[i] * cp_c[i] * A * dz),
             # Darcy-Weisbach friction over the cell, plus its hydrostatic head
-            dp[i] ~ f_i * (inlet.ṁ * abs(inlet.ṁ) / (2 * ρ_c[i] * A^2)) * (dz / Dh)
+            dp[i] ~ darcy_weisbach_dp(inlet.ṁ, ρ_c[i], f_i, dz, Dh, A)
                   + ρ_c[i] * g_acc * dz,
         ]
         cell_obs = Equation[
@@ -133,6 +139,11 @@ function _channel_core(;
     return (; eqs, obs)
 end
 
+
+# Python's channel hands its friction model the mean of the two wall
+# temperatures; so do we.
+_face_mean_wall(vars) =
+    (collect(vars.T_wall_left) .+ collect(vars.T_wall_right)) ./ 2
 
 function _setup(geometry, g, n)
     # No geometry parameters are declared: L, Dh, and A enter the equations inline from
@@ -184,7 +195,7 @@ end
 
 
 """
-    _channel_system(; name, n, geometry, g, friction_correlation, liquid, vars, pars,
+    _channel_system(; name, n, geometry, g, darcy, liquid, vars, pars,
                     inlet, outlet, q_left_expr, q_right_expr,
                     extra_vars=(), extra_eqs=Equation[], extra_obs=Equation[],
                     extra_ports=()) -> System
@@ -194,8 +205,8 @@ expressions and whatever extra variables, equations, observables, and ports it a
 hands them here; the shared core equations and the `compose` call live in one place.
 """
 function _channel_system(;
-    name, n::Int, geometry::PipeGeometry, g, friction_correlation, liquid,
-    vars, pars, inlet, outlet, q_left_expr, q_right_expr,
+    name, n::Int, geometry::PipeGeometry, g, darcy, liquid,
+    vars, pars, inlet, outlet, q_left_expr, q_right_expr, T_wall=nothing,
     extra_vars=(), extra_eqs=Equation[], extra_obs=Equation[], extra_ports=(),
 )
     core = _channel_core(;
@@ -204,11 +215,12 @@ function _channel_system(;
         outlet=outlet,
         geometry=geometry,
         g_acc=g,
-        friction_correlation=friction_correlation,
+        darcy=darcy,
         q_left_expr=q_left_expr,
         q_right_expr=q_right_expr,
         vars=vars,
         liquid=liquid,
+        T_wall=T_wall,
     )
     all_vars = [_vcollect(vars); reduce(vcat, (collect(v) for v in extra_vars); init=Num[])]
     return compose(
@@ -224,7 +236,7 @@ end
 
 """
     Channel(; name, n, geometry, g=0.0, h_left=0.0, h_right=0.0,
-            friction_correlation=blasius_friction) -> System
+            darcy=BlasiusFriction()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
 `Heat flux is defined by external temperature (required closure post process) and
@@ -240,7 +252,9 @@ A `WallTemperature` source can be used as a closure, for example.
   `AbstractVector{<:Real}` of length n (per-cell static profile), or `Function` (time-varying via
   MTK callable parameter pattern; user must pass `ch.h_left_fn => fn` in solve `op` dict);
   default `0.0` per-side ⇒ adiabatic.
-- `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
+- `darcy`: wall friction model ([`DarcyFactor`](@ref)), default [`BlasiusFriction`](@ref).
+  Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
+  viscosity correction are [`RegimeDependentFriction`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). Pass a [`Liquid`](@ref) to
   drive the energy balance, friction, and dimensionless observables with fixed properties.
 
@@ -275,7 +289,7 @@ function Channel(;
     g=0.0,
     h_left::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
     h_right::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
-    friction_correlation=blasius_friction,
+    darcy::DarcyFactor=BlasiusFriction(),
     liquid::AbstractLiquid=H2O,
 )
     pars_base, varstruct, inlet, outlet = _setup(geometry, g, n)
@@ -322,16 +336,17 @@ function Channel(;
 
     return _channel_system(;
         name=name, n=n, geometry=geometry, g=g,
-        friction_correlation=friction_correlation, liquid=liquid,
+        darcy=darcy, liquid=liquid,
         vars=varstruct, pars=pars, inlet=inlet, outlet=outlet,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
+        T_wall=_face_mean_wall(varstruct),
     )
 end
 
 
 """
     ChannelHeatFlux(; name, n, geometry, g=0.0,
-                    friction_correlation=blasius_friction) -> System
+                    darcy=BlasiusFriction()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
 Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource` source).
@@ -341,7 +356,9 @@ Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource
 - `n`: number of axial cells (Int)
 - `geometry`: pipe geometry descriptor (`PipeGeometry`)
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
-- `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
+- `darcy`: wall friction model ([`DarcyFactor`](@ref)), default [`BlasiusFriction`](@ref).
+  Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
+  viscosity correction are [`RegimeDependentFriction`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref).
 
 # External-input variables
@@ -373,7 +390,7 @@ function ChannelHeatFlux(;
     n::Int,
     geometry::PipeGeometry,
     g=0.0,
-    friction_correlation=blasius_friction,
+    darcy::DarcyFactor=BlasiusFriction(),
     liquid::AbstractLiquid=H2O,
 )
     pars, varstruct, inlet, outlet = _setup(geometry, g, n)
@@ -393,7 +410,7 @@ function ChannelHeatFlux(;
 
     return _channel_system(;
         name=name, n=n, geometry=geometry, g=g,
-        friction_correlation=friction_correlation, liquid=liquid,
+        darcy=darcy, liquid=liquid,
         vars=varstruct, pars=pars, inlet=inlet, outlet=outlet,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
         extra_vars=exvars,
@@ -405,7 +422,7 @@ end
 """
     ChannelAndContacts(; name, n, geometry, g=0.0,
                        htc=DittusBoelter(),
-                       friction_correlation=blasius_friction,
+                       darcy::DarcyFactor=BlasiusFriction(),
                        liquid=H2O) -> System
 
 Convective channel with per-cell `ThermalPort` arrays on both sides for conjugate heat
@@ -422,7 +439,9 @@ is `h_tc[i] * heated_parts * dz * (T_wall - T[i])`.
   handed `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)` per cell and returns `h`. Subcooled boiling
   is a model like any other: wrap one in [`SubcooledBoilingHTC`](@ref). Regime switching is
   [`RegimeDependentHTC`](@ref).
-- `friction_correlation`: friction function `(Re) -> f`, default `blasius_friction`
+- `darcy`: wall friction model ([`DarcyFactor`](@ref)), default [`BlasiusFriction`](@ref).
+  Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
+  viscosity correction are [`RegimeDependentFriction`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). It drives the energy balance,
   friction, the HTC model, and the dimensionless observables.
 
@@ -436,7 +455,7 @@ function ChannelAndContacts(;
     geometry::PipeGeometry,
     g=0.0,
     htc::HTC=DittusBoelter(),
-    friction_correlation=blasius_friction,
+    darcy::DarcyFactor=BlasiusFriction(),
     liquid::AbstractLiquid=H2O,
 )
 
@@ -511,9 +530,12 @@ function ChannelAndContacts(;
 
     return _channel_system(;
         name=name, n=n, geometry=geometry, g=g,
-        friction_correlation=friction_correlation, liquid=liquid,
+        darcy=darcy, liquid=liquid,
         vars=vars, pars=pars, inlet=inlet, outlet=outlet,
         q_left_expr=q_left_expr, q_right_expr=q_right_expr,
+        # Straight off the ports, not off the T_wall observables: an observable must not
+        # appear on the RHS of the momentum equation.
+        T_wall=(wall_T(faces[1]) .+ wall_T(faces[2])) ./ 2,
         extra_vars=exvars, extra_eqs=variant_eqs, extra_obs=variant_obs,
         extra_ports=(thermal_left..., thermal_right...),
     )

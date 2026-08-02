@@ -3,30 +3,68 @@
 """
     Inertia(L_over_A; name) -> System
 
-Concentrated fluid inertia element for transient simulations. Adds `L/A * d(ṁ)/dt`
+Concentrated fluid inertia element for transient simulations. Adds `L/A * d(ṁ)/dt`
 to the momentum equation.
 
-Note: Channel, ChannelAndContacts, and ChannelHeatFlux now carry their own distributed
-inertia via a momentum ODE `(L/A)*D(ṁ)`. Use standalone Inertia only for concentrated
+`L_over_A` is either a number, or a callable `(ṁ) -> L/A` for an inertia that depends on
+the flow itself. See [`bilinear_inertia`](@ref) for the standard flow-dependent form. A
+callable is traced symbolically, so build it out of arithmetic and `ifelse` rather than a
+Julia `if`.
+
+Note: Channel, ChannelAndContacts, and ChannelHeatFlux carry their own distributed
+inertia via a momentum ODE `(L/A)*D(ṁ)`. Use standalone Inertia only for concentrated
 inertia effects (fittings, sudden area changes, valves, piping outside channels). When
 placed in series with a Channel, both momentum ODEs contribute additively through MTK
 network topology -- correct physics (distributed + concentrated).
 
 # Arguments
-- `L_over_A`: length-to-area ratio [1/m]
+- `L_over_A`: length-to-area ratio [1/m], a number or a callable `(ṁ) -> L/A`
 - `name`: system name (Symbol)
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
-
-
 """
-function Inertia(L_over_A; name)
+function Inertia(L_over_A::Real; name)
     pars = @parameters L_over_A = L_over_A
     @named inlet = FlowPort()
     @named outlet = FlowPort()
-    eqs = Equation[inlet.p - outlet.p ~ L_over_A * D(inlet.ṁ)]   # ODE pressure eq
+    eqs = Equation[inlet.p - outlet.p ~ L_over_A * D(inlet.ṁ)]   # ODE pressure eq
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+end
+
+function Inertia(L_over_A; name)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    vars = @variables L_eff(t)
+    eqs = Equation[
+        L_eff ~ L_over_A(inlet.ṁ),
+        inlet.p - outlet.p ~ L_eff * D(inlet.ṁ),
+    ]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars=vars)
+end
+
+"""
+    bilinear_inertia(L0, ṁ0) -> (ṁ) -> L/A
+
+Flow-dependent inertia that falls off linearly below a knee, for [`Inertia`](@ref):
+
+    L = L0 * (ṁ/ṁ0)   for |ṁ| < ṁ0
+    L = L0                  otherwise
+
+It models a branch that is only partly filled at low flow, so the accelerating column is
+shorter than the pipe. `ifelse` keeps the switch a symbolic branch the solver takes per step,
+and the magnitude of the flow is what selects it, so a reversal is handled the same as
+forward flow.
+
+# Arguments
+- `L0`: the inertia constant above the knee [1/m]
+- `ṁ0`: the knee mass flow rate [kg/s]
+
+# Returns
+A closure `(ṁ) -> L/A`.
+"""
+function bilinear_inertia(L0, ṁ0)
+    return (m) -> ifelse(abs(m) < ṁ0, L0 * abs(m) / ṁ0, L0)
 end
 
 """

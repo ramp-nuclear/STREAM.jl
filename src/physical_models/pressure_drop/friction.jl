@@ -30,7 +30,7 @@ the physical quantity is the pressure drop `f * ṁ*|ṁ| / (...)`, and with
 `ṁ*|ṁ| ~ Re^2` the product `~ (64/Re) * Re^2 ~ Re` vanishes smoothly as the flow
 stops (the Hagen-Poiseuille drop is linear in velocity). The no-flow case is handled by
 the caller that forms that product. For flow that reverses through `Re = 0`, use
-[`regime_dependent_friction`](@ref); it guards the no-flow point.
+[`RegimeDependentFriction`](@ref); it guards the no-flow point.
 
 # Arguments
 - `Re`: Reynolds number
@@ -86,7 +86,7 @@ this one is `64/(Re*K_R)`. Both are bare `64/Re`-style factors with no no-flow g
 is correct for a forced-flow channel where `Re > 0` always. The plain `64/(Re*K_R)` form
 keeps the residual and Jacobian for a forced-flow steady solve identical to the pre-reversal
 form, which a borderline forced-flow solve (two plates in hydraulic series) relies on to
-converge. A loop whose flow reverses through `Re = 0` should use `regime_dependent_friction`
+converge. A loop whose flow reverses through `Re = 0` should use [`RegimeDependentFriction`](@ref)
 instead, which guards the no-flow point in its returned closure.
 
 Note: For circular geometry constructed via `PipeGeometry_circular(L, D)`,
@@ -99,7 +99,7 @@ Usage:
 ```julia
 geom = PipeGeometry_rectangular(L, e1, e2, he)
 f_fn = laminar_friction_rectangular(geom)
-ChannelAndContacts(friction_correlation = f_fn, ...)
+ChannelAndContacts(darcy = ReynoldsFactor(f_fn), ...)
 ```
 """
 function laminar_friction_rectangular(geom::PipeGeometry)
@@ -152,60 +152,6 @@ function turbulent_friction(Re, epsilon=0)
 end
 
 """
-    regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0,
-                              laminar=laminar_friction, turbulent=turbulent_friction) -> (Re) -> f_darcy
-
-Flow-regime-dependent Darcy friction closure, the faithful port of Python STREAM
-`friction.py::regime_dependent_friction` (the `friction_factor("regime_dependent", ...)`
-factory). Returns a single closure `(Re) -> f` switching on the bulk Reynolds number:
-
-- `Re < re_bounds[1]`        -> laminar `laminar(Re * k_R)`
-- `Re > re_bounds[2]`        -> turbulent `turbulent(Re * k_R)`
-- in between                 -> linear interpolation between the laminar value at
-                               `re_bounds[1]` and the turbulent value at `re_bounds[2]`
-
-The geometric correction `k_R` scales the Reynolds fed to each branch (Python applies
-`re_bulk * k_R`); `k_R = 1.0` reproduces the strict circular `64/Re` laminar factor.
-
-Two properties matter for integrating through a flow reversal:
-
-- the closure guards the no-flow point. At `Re = 0` the bare laminar `64/Re` is `Inf`, so
-  the closure feeds its laminar branch a finite Reynolds there and returns 0 for the whole
-  factor. This is the symbolic-`Num` equivalent of Python's `if ṁ == 0: return 0.0` at
-  the top of `regime_dependent_friction`, written with `Base.ifelse` because a Julia `if`
-  on a `Num` does not trace. For every `Re > 0` the result is exactly the plain blend.
-- the linear interim blend makes the friction continuous across the laminar/turbulent
-  boundary. A hard single-point switch leaves a slope discontinuity at the transition Re
-  that a stiff implicit solver reads as a kink and rejects (`dt` below epsilon, `NaN`
-  error estimate); the blend removes it. The blend value in the transition band is an
-  interpolation, not a measured correlation, so it carries a small modeling error there in
-  exchange for a residual the solver can integrate across the reversal.
-
-# Arguments
-- `re_bounds`: `(re_lo, re_hi)` regime boundaries on the bulk Reynolds number.
-- `k_R`: geometric correction multiplying the Reynolds fed to each branch (default 1.0).
-- `laminar`: laminar branch closure `(Re) -> f` (default `laminar_friction`).
-- `turbulent`: turbulent branch closure `(Re) -> f` (default `turbulent_friction`).
-
-# Returns
-A closure `(Re) -> f_darcy`.
-"""
-function regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0,
-                                   laminar=laminar_friction, turbulent=turbulent_friction)
-    re_lo = Float64(re_bounds[1])
-    re_hi = Float64(re_bounds[2])
-    return (Re) -> begin
-        ReK = Re * k_R
-        # Feed the laminar branch a finite Reynolds at no-flow so the bare 64/Re never forms
-        # an Inf while the not-taken branch is traced. For every Re > 0 this is just ReK.
-        ReK_lam = Base.ifelse(Re <= 0, one(ReK), ReK)
-        f = flow_regime_blend(Re, (re_lo, re_hi), laminar(ReK_lam), turbulent(ReK))
-        # No-flow guard, the symbolic equivalent of Python's `if ṁ == 0: return 0.0`.
-        Base.ifelse(Re <= 0, zero(f), f)
-    end
-end
-
-"""
     viscosity_correction(heat_wet_ratio, mu_ratio) -> K_H
 
 Viscosity correction factor for friction in heated channels. Accounts for
@@ -224,3 +170,33 @@ Reference: `viscosity_correction(1.0, 1.0) == 1.0`,
 function viscosity_correction(heat_wet_ratio, mu_ratio)
     return 1 + heat_wet_ratio * (mu_ratio^0.58 - 1)
 end
+
+"""
+    darcy_weisbach_dp(ṁ, rho, f, L, Dh, A) -> Pa
+    darcy_weisbach_dp(ṁ, rho, f, geom::PipeGeometry) -> Pa
+
+Distributed friction pressure drop over a length of duct:
+
+    dP = f * ṁ|ṁ| / (2*rho*A^2) * (L/Dh)
+
+`ṁ|ṁ|` rather than `ṁ^2` so the drop reverses sign with the flow. Positive `ṁ`
+gives a positive drop.
+
+The `PipeGeometry` form takes `L`, `Dh` and `A` from the geometry. Pass `L` explicitly for a
+single cell of a discretised channel, where the length is `geom.L / n` rather than `geom.L`.
+
+# Arguments
+- `ṁ`: mass flow rate [kg/s]
+- `rho`: density [kg/m^3]
+- `f`: Darcy friction factor, e.g. from a [`DarcyFactor`](@ref)
+- `L`: length over which the friction acts [m]
+- `Dh`: hydraulic diameter [m]
+- `A`: flow area [m^2]
+
+# Returns
+Pressure drop [Pa].
+"""
+darcy_weisbach_dp(ṁ, rho, f, L, Dh, A) = f * (ṁ * abs(ṁ) / (2 * rho * A^2)) * (L / Dh)
+
+darcy_weisbach_dp(ṁ, rho, f, geom::PipeGeometry) =
+    darcy_weisbach_dp(ṁ, rho, f, geom.L, geom.Dh, geom.A)

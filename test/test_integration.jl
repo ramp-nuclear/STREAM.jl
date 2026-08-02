@@ -16,7 +16,7 @@ using STREAM: Channel, ChannelAndContacts, Pump, HeatExchanger, ConstantTemperat
     PipeGeometry, PipeGeometry_circular, HeatDiffusion, Liquid, PointKinetics,
     ReactivityController, connect_temperature_feedback, compose_systems, symmetric_plate,
     one_sided_connection, constant_Nusselt, point_kinetics_steady_state, port,
-    solve_steady, solve_transient, regime_dependent_friction
+    solve_steady, solve_transient
 
 # ============================================================================
 # Python `tests/test_general/test_integrations.py` 1:1 ports.
@@ -602,9 +602,9 @@ end
     # regime friction grows with |ṁ| in the turbulent branch, so it BOUNDS the reversed flow —
     # the earlier laminar-only surrogate (64/Re, friction vanishing as Re->0) let the reversed flow
     # run away to ~21x nominal, which this model does not.
-    fric = regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0)
-    @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, liquid=H2O, friction_correlation=fric)
-    @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, liquid=H2O, friction_correlation=fric)
+    fric = RegimeDependentFriction(; re_bounds=(2000.0, 5000.0), k_R=1.0)
+    @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, liquid=H2O, darcy=fric)
+    @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, liquid=H2O, darcy=fric)
     # Bracket each adiabatic channel with same-temperature HeatExchangers on BOTH ends so its
     # coolant stays pinned under reversal too (Python pins both Tin and Tin_minus per channel).
     @named HXc1 = HeatExchanger(T_cold)
@@ -640,14 +640,11 @@ end
     A = geom.A
     Dh = geom.Dh
     L_ch = geom.L
-    function loop_friction(m)
-        Re_c = abs(m) * Dh / (A * μ(H2O, T_cold))
-        Re_h = abs(m) * Dh / (A * μ(H2O, T_hot))
-        rho_c = ρ(H2O, T_cold)
-        rho_h = ρ(H2O, T_hot)
-        fric(Re_c) * m * abs(m) / (2 * rho_c * A^2) * (L_ch / Dh) +
-        fric(Re_h) * m * abs(m) / (2 * rho_h * A^2) * (L_ch / Dh)
-    end
+    # Friction head of the two channels in series at flow m.
+    loop_friction(m) = sum(
+        darcy_weisbach_dp(m, ρ(H2O, T), fric(T, T, m, H2O, geom), geom)
+        for T in (T_cold, T_hot)
+    )
     # bisection for loop_friction(m) == grav_dp, m > 0
     lo, hi = 1.0e-6, 1.0e4
     for _ in 1:200

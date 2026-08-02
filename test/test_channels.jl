@@ -347,7 +347,7 @@ end
     @named bc = HeatExchanger(T_INLET)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
                                      htc=DittusBoelter(),
-                                     friction_correlation=blasius_friction)
+                                     darcy=BlasiusFriction())
     # Pin each cell's left thermal port T to T_WALL via per-cell ConstantTemperature.
     ct_l = [ConstantTemperature(T_WALL; name=Symbol(:ct_l, i)) for i in 1:n]
     conns = Equation[

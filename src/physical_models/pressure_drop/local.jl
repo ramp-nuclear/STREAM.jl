@@ -115,3 +115,25 @@ function _local_loss_factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
 end
 
 @register_symbolic _local_loss_factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
+
+"""
+    local_dp(ṁ, rho, f, A) -> Pa
+
+Local (minor) loss pressure drop:
+
+    dP = f * ṁ|ṁ| / (2*rho*A^2)
+
+The same quadratic form as [`darcy_weisbach_dp`](@ref) without the `L/Dh` factor, because a
+local loss is tied to a fitting rather than to a length of duct. Positive `ṁ` gives a
+positive drop.
+
+# Arguments
+- `ṁ`: mass flow rate [kg/s]
+- `rho`: density [kg/m^3]
+- `f`: local loss coefficient
+- `A`: reference flow area [m^2]
+
+# Returns
+Pressure drop [Pa].
+"""
+local_dp(ṁ, rho, f, A) = f * (ṁ * abs(ṁ) / (2 * rho * A^2))

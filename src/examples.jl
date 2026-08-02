@@ -248,7 +248,7 @@ function build_loop_lof_bypass(;
         geom=geom,
         g=g_acc,
     )
-    friction_ch = regime_dependent_friction(;
+    friction_ch = RegimeDependentFriction(;
         laminar=laminar_friction_rectangular(geom),
         turbulent=blasius_friction,
     )
@@ -261,7 +261,7 @@ function build_loop_lof_bypass(;
         geometry=geom,
         g=(-g_acc),
         htc=htc_ch,
-        friction_correlation=friction_ch,
+        darcy=friction_ch,
     )
     @named ret = Channel(; n=n, geometry=geom, g=g_acc)
     # Open-state quadratic loss tuned (area, f) so the bypass conductance is comparable to the
@@ -390,7 +390,7 @@ function build_loop_pk(ctrl;
         n=n,
         geometry=geom,
         htc=ConstantNusselt(; Nu=8.235),
-        friction_correlation=laminar_friction_rectangular(geom),
+        darcy=RectangularLaminarFriction(geom),
     )
     @named fuel = HeatDiffusion(;
         nz=nz,
