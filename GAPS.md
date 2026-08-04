@@ -16,7 +16,7 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 - [1. Power and heat sources](#1-power-and-heat-sources)
 - [2. Fuel heat conduction](#2-fuel-heat-conduction)
 - [3. Wall friction and pressure drop](#3-wall-friction-and-pressure-drop)
-- [4. Two-phase flow](#4-two-phase-flow)
+- [4. LOCA: level tracking, and where it stops](#4-loca-level-tracking-and-where-it-stops)
 - [5. Thresholds and post-solve analysis](#5-thresholds-and-post-solve-analysis)
 - [6. Power shapes and meshing](#6-power-shapes-and-meshing)
 - [7. Solver robustness](#7-solver-robustness)
@@ -32,15 +32,15 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 |---|---|---|---|
 | **LOFA** (loss of flow) | Yes | Partly | Decay heat is the main one. The forced-to-natural-circulation transition works in principle but has no passing test (see [7.2](#72-the-loss-of-flow-bypass-case-does-not-converge)) |
 | **RIA** (reactivity insertion) | Mostly | Partly | Decay heat matters less here, but cylindrical fuel, gap conductance and fuel-temperature limits are all absent |
-| **LOCA** (loss of coolant) | **No** | **No** | Neither code has any two-phase model. This is not a porting job, it is new physics ([4](#4-two-phase-flow)) |
+| **LOCA**, level tracking to uncovery | **No** | Partly | Needs coolant inventory, a free surface and break flow. No two-phase model required ([4](#4-loca-level-tracking-and-where-it-stops)) |
+| **LOCA**, past uncovery | **No** | **No** | Void, steam, post-CHF heat transfer. Out of scope for both, by choice |
 
-The LOCA row is the one worth internalising. Python STREAM is a single-phase liquid code
-with subcooled-boiling *heat transfer enhancement* and a set of threshold correlations that
-tell you when you are about to leave its validity. It has no void fraction, no steam, no
-quality, no critical flow and no post-CHF heat transfer. Grepping the whole Python tree for
-`void`, `quality`, `two_phase`, `choked`, `film_boiling`, `rewet` and `radiation` returns
-nothing outside one prose sentence in a docstring. Porting Python faithfully gets us to
-feature parity and no closer to LOCA.
+The LOCA split is the one worth internalising. Both codes are single-phase liquid with
+subcooled-boiling *heat transfer enhancement* and thresholds that report margin. That is
+enough to track a level down to core uncovery and say when the model leaves its own validity,
+which is the goal here. It is not enough to say what happens after, and neither code tries:
+grepping the whole Python tree for `void`, `quality`, `two_phase`, `choked`, `film_boiling`,
+`rewet` and `radiation` returns nothing outside one prose sentence in a docstring.
 
 ---
 
@@ -248,37 +248,58 @@ research reactor model gets its form losses.
 
 ---
 
-## 4. Two-phase flow
+## 4. LOCA: level tracking, and where it stops
 
-**Neither code has any of it.** Listing what a credible LOCA needs, all of it absent from
-both:
+The goal here is narrower than "run a LOCA": predict **water level** through a drain, up to
+the point where more involved computations take over. That is a different and much smaller
+problem than two-phase thermal-hydraulics, and it is worth stating the boundary precisely,
+because the two get conflated.
+
+### What the narrow goal needs
+
+| Piece | Have it? |
+|---|---|
+| Coolant inventory as a state, and a level derived from it | No |
+| A component with a free surface (pool, plenum, standpipe) | No |
+| Break flow out of the system, as a specified rate or an orifice | No |
+| An event that fires when the level reaches a named elevation | No, but `SCRAMCondition` and the flapper callbacks are the pattern to copy |
+| Decay heat, to know the load while it drains | No, see [1.1](#11-decay-heat-is-missing-entirely) |
+| Natural circulation while still covered | Yes |
+| Margin to boiling on the way down | Yes, the CHF / OFI / OSV / ONB thresholds |
+
+None of that requires void fraction, steam properties or a two-phase momentum equation. A
+draining single-phase pool with a moving free surface is an inventory balance plus a
+geometric level, and the existing acausal connectors already carry the mass flow it needs.
+
+**Size:** medium, and mostly new components rather than new physics. The one real modelling
+decision is whether break flow is user-supplied (a boundary condition, which is enough for a
+specified-leak study) or computed from an orifice, which brings in choked flow once the
+break is large.
+
+### Where it stops
+
+The handoff is core uncovery. Once liquid level drops below the top of the heated length the
+single-phase assumption stops holding, and everything in this list starts to matter:
 
 - Void fraction and flow quality
 - Steam properties and a two-phase mixture density
 - Two-phase friction multiplier
 - Post-CHF heat transfer: transition boiling, film boiling, the boiling curve past its peak
-- Critical (choked) flow at the break
-- Coolant level tracking and core uncovery
-- Radiation heat transfer from an uncovered surface
+- Radiation from an uncovered surface
 - Rewet and quench front propagation
 - Metal-water reaction (aluminium for MTR plates, zircaloy for rods)
 
-What both codes do have is the *approach* to the boundary: `SubcooledBoilingHTC` enhances
-the single-phase coefficient in partial boiling, and the CHF / OFI / OSV / ONB thresholds in
-`thresholds.jl` say how much margin is left. That is enough to say "this transient reaches
-CHF at t = 12 s in cell 7". It is not enough to say what happens afterwards.
+**Neither STREAM.jl nor Python STREAM has any of it**, and neither should grow it casually.
+Grepping the whole Python tree for `void`, `quality`, `two_phase`, `choked`, `film_boiling`,
+`rewet` and `radiation` returns nothing outside one prose sentence.
 
-**Recommendation:** treat LOCA as a separate programme, not as a gap to close. Decide first
-whether STREAM.jl should grow a two-phase model at all, or whether LOCA is better handed to
-RELAP with STREAM.jl providing the initial conditions. That decision should be made before
-any of it is designed, because a homogeneous-equilibrium model would touch the channel's
-energy and momentum equations, the connectors, and the property interface.
+So the deliverable is a level history plus the time and elevation at which the model declares
+itself out of validity, with the thresholds reporting margin along the way. That is a useful
+answer on its own, and it is the right input to hand to a code that does the rest.
 
-If it does go ahead, the smallest useful first step is a homogeneous equilibrium model
-(HEM): one mixture momentum equation, thermodynamic equilibrium, drift flux neglected. That
-gets void and a two-phase multiplier without a second momentum equation.
-
-**Size:** large, and gated on a decision rather than on effort.
+**Recommendation:** build the level tracking, and make the uncovery point an explicit,
+tested boundary rather than something a user discovers by getting nonsense out. Do not start
+a two-phase model to reach it.
 
 ---
 
@@ -520,4 +541,4 @@ Ordered by what unblocks the most, not by size.
    initialisation.
 8. **RIA limits** (§5.2), after §2 and §4 are settled.
 9. **UQ** (§8), if it becomes a requirement, via SciMLSensitivity rather than a port.
-10. **Two-phase** (§4), gated on the scope decision, not on effort.
+10. **Level tracking to uncovery** (§4), once decay heat exists to drive it.
