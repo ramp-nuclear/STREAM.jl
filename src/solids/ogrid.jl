@@ -87,11 +87,25 @@ function _perimeter_points(g::Meshes.Ball, n::Int)
 end
 
 function _perimeter_points(b::Meshes.Box, n::Int)
+    n >= 8 || throw(ArgumentError(
+        "a box boundary needs at least 8 points so every corner can be one, got $n"))
     x0, y0 = _xy(minimum(b))
     x1, y1 = _xy(maximum(b))
     ym = (y0 + y1) / 2
     corners = [(x1, ym), (x1, y1), (x0, y1), (x0, y0), (x1, y0), (x1, ym)]
-    return _walk(corners, n)
+    pts = _walk(corners, n)
+
+    # Walking by arc length alone puts a point at a corner only when n happens to divide
+    # the perimeter that way. Any segment that straddles a corner cuts it off, so the ring
+    # is a polygon strictly inside the box and the domain quietly shrinks: at n = 20 the
+    # four sides come to 45.2 mm of a true 48. Snap the nearest point to each corner.
+    for c in corners[2:5]
+        _, k = findmin(p -> hypot(p[1] - c[1], p[2] - c[2]), pts)
+        pts[k] = c
+    end
+    length(unique(pts)) == n || throw(ArgumentError(
+        "n_angular = $n is too coarse for this box; two corners claimed the same point"))
+    return pts
 end
 
 _perimeter_points(g, ::Int) = throw(ArgumentError(

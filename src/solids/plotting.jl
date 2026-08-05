@@ -6,7 +6,9 @@
 # attributed to the wrong channel.
 #
 # `RecipesBase` carries no backend, so this adds a recipe without pulling a plotting stack
-# into the package.
+# into the package. `write_vtk` covers the third view, a real 3D one: it hands the extruded
+# mesh and a field over it to ParaView, which is where rotation, slicing and isosurfaces
+# come from.
 
 """
     fill_fraction(cs, i) -> Float64
@@ -239,4 +241,86 @@ RecipesBase.@recipe function _meshheat(h::MeshHeatmap)
             end
         end
     end
+end
+
+"""
+    write_vtk(path, mesh, values; name="T", layer_values=false) -> String
+
+Write the extruded mesh and a field over it as a legacy ASCII VTK unstructured grid, for
+opening in ParaView or any VTK viewer. That is where slicing, clipping, isosurfaces and
+rotation come from; nothing here tries to reproduce them.
+
+# Arguments
+- `path`: output file, `.vtk` appended if missing
+- `mesh`: the `SolidMesh` that was solved on
+- `values`: either one value per cross-section cell, repeated down every layer, or an
+  `(nlayers, ncross)` matrix for a genuinely three-dimensional field
+- `name`: the field's name in the file
+
+Each cell contributes one hexahedron per axial layer, built from its footprint patches. A
+merged cut cell has several patches and so several hexahedra, all carrying its one value,
+which is the same convention the mesh plots use.
+
+# Returns
+The path written.
+"""
+function write_vtk(path::AbstractString, mesh::SolidMesh, values; name::AbstractString="T")
+    file = endswith(path, ".vtk") ? path : path * ".vtk"
+    cs = mesh.cross
+    nz = nlayers(mesh)
+    field = if values isa AbstractMatrix
+        size(values) == (nz, ncross(mesh)) || throw(ArgumentError(
+            "values must be $(nz)x$(ncross(mesh)), got $(size(values))"))
+        values
+    else
+        length(values) == ncross(mesh) || throw(ArgumentError(
+            "values must have one entry per cross-section cell, got $(length(values))"))
+        [values[ic] for _ in 1:nz, ic in 1:ncross(mesh)]
+    end
+
+    z = cumsum([zero(eltype(mesh.dz)); mesh.dz])
+    pts = NTuple{3,Float64}[]
+    hexes = Vector{Int}[]
+    cellval = Float64[]
+    for ic in 1:ncross(mesh), ring in cs.patches[ic]
+        length(ring) == 4 || throw(ArgumentError(
+            "write_vtk handles four-sided cell patches; cell $ic has $(length(ring))"))
+        for iz in 1:nz
+            base = length(pts)
+            for (x, y) in ring
+                push!(pts, (Float64(x), Float64(y), Float64(z[iz])))
+            end
+            for (x, y) in ring
+                push!(pts, (Float64(x), Float64(y), Float64(z[iz + 1])))
+            end
+            push!(hexes, collect(base:(base + 7)))
+            push!(cellval, field[iz, ic])
+        end
+    end
+
+    open(file, "w") do io
+        println(io, "# vtk DataFile Version 3.0")
+        println(io, "STREAM.jl solid mesh")
+        println(io, "ASCII")
+        println(io, "DATASET UNSTRUCTURED_GRID")
+        println(io, "POINTS ", length(pts), " double")
+        for p in pts
+            println(io, p[1], " ", p[2], " ", p[3])
+        end
+        println(io, "CELLS ", length(hexes), " ", 9 * length(hexes))
+        for h in hexes
+            println(io, "8 ", join(h, " "))
+        end
+        println(io, "CELL_TYPES ", length(hexes))
+        for _ in hexes
+            println(io, 12)          # VTK_HEXAHEDRON
+        end
+        println(io, "CELL_DATA ", length(cellval))
+        println(io, "SCALARS ", name, " double 1")
+        println(io, "LOOKUP_TABLE default")
+        for v in cellval
+            println(io, v)
+        end
+    end
+    return file
 end

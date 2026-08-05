@@ -9,3 +9,4 @@ node_modules/
 # via `npx skills add <source>`). Pin lives in skills-lock.json (tracked).
 .agents/
 examples/conduction_meshes_output/
+examples/rod_3d_output/

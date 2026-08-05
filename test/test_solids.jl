@@ -732,3 +732,63 @@ end
     # The knob is still in the expression rather than folded to a number.
     @test occursin("gap", string(cell_volume(m, 1, 1)))
 end
+
+@testset "write_vtk emits a well-formed grid with the right counts" begin
+    mktempdir() do dir
+        cs = _rod(; dx=1.5e-3)
+        m = extrude(cs, [0.0, 0.3, 0.6])
+        nz, nc = nlayers(m), ncross(m)
+        npatch = sum(length(p) for p in cs.patches)
+
+        f = write_vtk(joinpath(dir, "rod"), m, collect(1.0:nc))
+        @test endswith(f, ".vtk")
+        txt = read(f, String)
+        lines = split(txt, '\n')
+
+        # One hexahedron per patch per layer, eight points each.
+        ncell = npatch * nz
+        @test occursin("CELLS $ncell $(9 * ncell)", txt)
+        @test occursin("CELL_TYPES $ncell", txt)
+        @test occursin("POINTS $(8 * ncell) double", txt)
+        @test occursin("CELL_DATA $ncell", txt)
+        @test count(==("12"), strip.(lines)) == ncell
+
+        # A 3D field is carried through per layer rather than flattened.
+        vals = [10.0 * iz + ic for iz in 1:nz, ic in 1:nc]
+        f2 = write_vtk(joinpath(dir, "rod3d.vtk"), m, vals)
+        body = read(f2, String)
+        @test occursin("SCALARS T double 1", body)
+        @test occursin("\n$(10.0 * 2 + 1)\n", body)
+
+        @test_throws ArgumentError write_vtk(joinpath(dir, "bad"), m, collect(1.0:(nc + 1)))
+        @test_throws ArgumentError write_vtk(joinpath(dir, "bad2"), m, zeros(nz + 1, nc))
+    end
+end
+
+@testset "ogrid: the outer polygon is the box, at any n_angular" begin
+    # Walking the perimeter by arc length alone only lands on a corner when n divides it
+    # that way. Every other n cuts the corners off, shrinking the domain silently: at
+    # n = 20 the four sides came to 45.2 mm of a true 48, and the four flats split
+    # 11.3/11.3/9.6/13.0 instead of 12 each.
+    for nθ in (20, 24, 30, 33, 48, 50)
+        cs = _ogrid(; nθ=nθ, nr=3)
+        @test sum(cs.area) ≈ W_ROD^2 - nθ / 2 * sin(2π / nθ) * R_BORE^2 rtol=1e-12
+        walls = sum(b.len for b in cs.boundary if b.tag != :bore)
+        @test walls ≈ 4 * W_ROD rtol=1e-12
+    end
+end
+
+@testset "ogrid: each flat gets its own share of the wall" begin
+    # With the corners pinned and n_angular a multiple of 8, the four flats are equal.
+    # This is what makes four identical channels see identical duty.
+    cs = _ogrid(; nθ=48, nr=4)
+    for side in (:north, :south, :east, :west)
+        @test sum(b.len for b in cs.boundary if b.tag == side) ≈ W_ROD rtol=1e-12
+    end
+end
+
+@testset "ogrid: eight angular points is exactly enough for a box" begin
+    # Four corners and four midpoints, the coarsest ring that still traces the box.
+    cs = _ogrid(; nθ=8, nr=2)
+    @test sum(b.len for b in cs.boundary if b.tag != :bore) ≈ 4 * W_ROD rtol=1e-12
+end

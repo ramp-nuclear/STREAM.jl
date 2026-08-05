@@ -42,7 +42,7 @@ export ncross, nlayers, ncells, cellindex, tags, cell_volume, heat_capacity
 export interior_conductance, boundary_conductance, axial_conductance
 export boundary_groups, contact_area, mesh_skew, linear_patch_error
 export fill_fraction, cell_polygons, boundary_segments, outline_rings
-export boundarynormals, meshheatmap
+export boundarynormals, meshheatmap, write_vtk
 end
 using .Solids
 

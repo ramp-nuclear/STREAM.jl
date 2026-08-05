@@ -160,7 +160,7 @@ detail: the model reports a face-averaged wall temperature per tag, because the 
 talks to carries one bulk temperature per axial cell. That bounds what the §5 threshold
 margins mean on a rod.
 
-### 2.8 What a mesh costs to compile and solve
+### 2.8 What a mesh costs, conduction alone
 
 Measured on the bored-square rod, all five faces pinned, `Rodas5P`, dense Jacobian:
 
@@ -189,6 +189,35 @@ neither has been run, so nothing here should be taken as measured.
 
 Practical sizing until that lands: 1600 cells is about 90 s end to end and fine to iterate
 on; 5760 cells is roughly 15 minutes and belongs in a production run, not a loop.
+
+### 2.9 What a coupled model costs, which is a different answer
+
+The numbers above are conduction on its own, with the walls pinned. Wire channels to it and
+the bottleneck moves. Measured on the five-channel rod, 820 equations, both cases solved
+back to back in one session:
+
+| Step | First case | Second case |
+|---|---|---|
+| mesh generation | 1.2 s | reused |
+| build components | 17.6 s | 0.4 s |
+| `mtkcompile` | 24.6 s | 1.0 s |
+| steady solve | 322 s | 305 s |
+| `write_vtk` | 0.4 s | reused |
+
+Building and compiling fall by a factor of thirty on the second pass, so that really is
+just Julia warming up. The steady solve does not, 322 s against 305 s, because it is
+numerical work rather than compilation. Between them the two solves are 93% of an
+eleven-minute run, on a system of only 820 equations.
+
+So the levers §2.8 points at, sparse Jacobians and right-hand-side code generation, are the
+wrong ones for a coupled model. Coupling makes the steady state nonlinear, and integrating
+to it through the heat transfer and friction correlations is the cost. Nothing about the
+mesh or `mtkcompile` will move it.
+
+Untried, in the order worth trying: a better initial guess than a flat temperature, since
+`steady_state_guess` already exists and was not used here; solving the channels' hydraulics
+first and handing the conduction a converged flow field; and a proper nonlinear steady
+solver rather than integrating a transient to rest, which is what `DynamicSS` does.
 
 ## 3. Wall friction and pressure drop
 
