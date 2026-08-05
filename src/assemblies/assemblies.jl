@@ -386,3 +386,67 @@ function fuel_assembly(
     return compose(System(connections, t; name=name), channels..., plates...)
 end
 
+
+"""
+    check_contact_area(mesh, tag, geometry, side; rtol=1e-3) -> Symbol
+
+Check that a solid boundary tag presents the same wall area to its channel that the channel
+believes it is heating, layer by layer.
+
+Nothing enforces this today. `faces` connects ports index by index with no area scaling, so
+a solid meshed with one wall area and a channel built with another will still solve, still
+conserve energy, and still be wrong about heat flux density and therefore about every
+threshold margin.
+
+The comparison is per layer rather than on totals, because a solid with graded `dz` and a
+channel with uniform `L/n` can agree in total while every layer disagrees.
+
+# Arguments
+- `mesh`: the `SolidMesh` the solid was built on
+- `tag`: the boundary tag being checked
+- `geometry`: the `PipeGeometry` the channel was built with
+- `side`: which `heated_parts` entry faces the solid, `1` or `2`
+- `rtol`: relative tolerance. A curved wall is meshed as a polygon, so its reported area
+  falls short of the true perimeter by about `(π/n)²/6` for `n` segments around it: 0.6% at
+  16 segments, 0.07% at 48. Either raise the resolution or set `rtol` above that figure,
+  rather than treating the gap as an error.
+
+# Returns
+`:ok`, `:mismatch` (with a warning naming the worst layer), or `:skipped` when either side
+is a design knob and so has no number to compare.
+"""
+function check_contact_area(mesh::SolidMesh, tag::Symbol, geometry::PipeGeometry,
+                            side::Int; rtol=1e-3)
+    side in (1, 2) || throw(ArgumentError("side must be 1 or 2, got $side"))
+    tag in tags(mesh) ||
+        throw(ArgumentError("mesh has no tag :$tag; it has $(tags(mesh))"))
+
+    nz = nlayers(mesh)
+    part = geometry.heated_parts[side]
+    (part isa Real && !(part isa Num) && geometry.L isa Real && !(geometry.L isa Num)) ||
+        return :skipped
+    eltype(mesh.dz) <: AbstractFloat || return :skipped
+
+    if part == 0
+        @warn "check_contact_area: channel face $side has zero heated perimeter but is " *
+              "connected to solid tag :$tag, which carries wall area"
+        return :mismatch
+    end
+
+    worst = 0.0
+    at = 0
+    for iz in 1:nz
+        want = part * geometry.L / nz
+        got = contact_area(mesh, tag, iz)
+        err = abs(got - want) / want
+        err > worst && ((worst, at) = (err, iz))
+    end
+    if worst > rtol
+        @warn "check_contact_area: tag :$tag and the channel disagree on wall area by " *
+              "$(round(100 * worst; sigdigits=3))% at layer $at " *
+              "(solid $(contact_area(mesh, tag, at)) m², channel " *
+              "$(geometry.heated_parts[side] * geometry.L / nz) m²)"
+        return :mismatch
+    end
+    return :ok
+end

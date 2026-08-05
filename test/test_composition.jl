@@ -108,6 +108,47 @@ end
     @test_throws ArgumentError _infer_n(chf)
 end
 
+@testset "_infer_n: counts a named face, and errors on a face that is absent" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4)
+    @test _infer_n(cac, :thermal_left) == 4
+    @test _infer_n(cac, :thermal_right) == 4
+    @test _infer_n(fuel, :thermal_right) == 4
+    @test_throws ArgumentError _infer_n(cac, :thermal_north)
+    # The one-argument form is the two-argument one aimed at :thermal_left.
+    @test _infer_n(cac) == _infer_n(cac, :thermal_left)
+end
+
+@testset "_infer_n: the match is anchored, so a longer face name is not folded in" begin
+    # `thermal_left` and `thermal_left_inner` share a prefix. A bare startswith test
+    # would report 5 for the first face; only digits may follow the face name.
+    inner = [ThermalPort(; name=Symbol(:thermal_left_inner, i)) for i in 1:2]
+    outer = [ThermalPort(; name=Symbol(:thermal_left, i)) for i in 1:3]
+    @named stub = ModelingToolkit.compose(
+        ModelingToolkit.System(Equation[], t; name=:stub), outer..., inner...
+    )
+    @test _infer_n(stub, :thermal_left) == 3
+    @test _infer_n(stub, :thermal_left_inner) == 2
+end
+
+# Section 3b: adiabatic_face
+@testset "adiabatic_face: one equation per cell, pinning wall T to the coolant" begin
+    @named ch = ChannelAndContacts(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
+    eqs = adiabatic_face(ch, :thermal_right)
+    @test length(eqs) == 4
+    @test all(eq -> eq isa Equation, eqs)
+    # Each equation is `port.T ~ T[i]`, matching what test_integration.jl pins by hand.
+    for i in 1:4
+        expected = port(ch, :thermal_right, i).T ~ getproperty(ch, :T)[i]
+        @test isequal(eqs[i].lhs, expected.lhs)
+        @test isequal(eqs[i].rhs, expected.rhs)
+    end
+end
+
+@testset "adiabatic_face: errors on a face the system does not have" begin
+    @named ch = ChannelAndContacts(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
+    @test_throws ArgumentError adiabatic_face(ch, :thermal_bore)
+end
+
 # Section 4: symmetric_plate compose-correctness
 # Multiple shapes; both faces wired correctly; no mtkcompile errors.
 # Verify-block requires: at least 2 distinct shape testsets (n=4 + n=10)
@@ -957,4 +998,50 @@ end
     p1 = _fa_hd(:p1); p2 = _fa_hd(:p2)
     asm = fuel_assembly([c1, c2], [p1, p2]; bookend=:mixed, start=:channel, name=:asm_smoke)
     @test asm isa ModelingToolkit.AbstractSystem
+end
+
+# Section 9: check_contact_area
+@testset "check_contact_area: agreement, mismatch and the knob skip" begin
+    using STREAM.Solids
+    L, nz, y, nx = 0.6, 4, 0.07, 3
+    mesh = extrude(slab_cross_section([(j - 1) * 0.005 / nx for j in 1:(nx + 1)], y),
+                   [(i - 1) * L / nz for i in 1:(nz + 1)])
+
+    # A channel whose heated face is exactly the plate's depth.
+    matched = PipeGeometry_rectangular(L, y, 0.0025, y)
+    @test check_contact_area(mesh, :left, matched, 1) == :ok
+    @test check_contact_area(mesh, :right, matched, 2) == :ok
+
+    # Half the heated width: the area is out by a factor of two, per layer.
+    wrong = PipeGeometry_rectangular(L, y, 0.0025, y / 2)
+    @test (@test_logs (:warn, r"disagree on wall area") check_contact_area(mesh, :left, wrong, 1)) == :mismatch
+
+    # A circular channel's second face carries no heated perimeter at all.
+    circ = PipeGeometry_circular(L, 0.01)
+    @test (@test_logs (:warn, r"zero heated perimeter") check_contact_area(mesh, :left, circ, 2)) == :mismatch
+
+    @test_throws ArgumentError check_contact_area(mesh, :bore, matched, 1)
+    @test_throws ArgumentError check_contact_area(mesh, :left, matched, 3)
+end
+
+@testset "check_contact_area: a graded axial mesh is caught layer by layer" begin
+    using STREAM.Solids
+    y, nx = 0.07, 3
+    # Same total length, but the layers are not equal, so a uniform channel matches on the
+    # total while disagreeing everywhere. This is why the check is per layer.
+    mesh = extrude(slab_cross_section([(j - 1) * 0.005 / nx for j in 1:(nx + 1)], y),
+                   [0.0, 0.05, 0.25, 0.45, 0.6])
+    geom = PipeGeometry_rectangular(0.6, y, 0.0025, y)
+    total_solid = sum(contact_area(mesh, :left, iz) for iz in 1:4)
+    @test total_solid ≈ geom.heated_parts[1] * 0.6 rtol=1e-12
+    @test (@test_logs (:warn, r"disagree on wall area") check_contact_area(mesh, :left, geom, 1)) == :mismatch
+end
+
+@testset "check_contact_area: skips a design-knob geometry" begin
+    using STREAM.Solids
+    @design_knob edge = 0.07
+    mesh = extrude(slab_cross_section([0.0, 0.0025, 0.005], edge),
+                   [0.0, 0.3, 0.6])
+    geom = PipeGeometry_rectangular(0.6, 0.07, 0.0025, 0.07)
+    @test check_contact_area(mesh, :left, geom, 1) == :skipped
 end

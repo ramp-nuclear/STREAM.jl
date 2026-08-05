@@ -93,6 +93,12 @@ src/
     correlations.jl           # Darcy friction factor correlations (Reynolds-only)
     darcy.jl                  # AbstractDarcyFactor: the wall friction model a channel or resistor gets
   local_loss.jl               # module LocalLoss: Idelchik sudden expansion / contraction
+  solids/                     # module Solids: the mesh a conduction component consumes
+    shapes.jl                 # CSG combinators over Meshes.jl geometries; inside, dist_to_edge, outline
+    mesh.jl                   # CrossSection, SolidMesh, conductances, slab generator, mesh_skew
+    cutcell.jl                # cut_cell_cross_section: any rectangle/circle composition
+    ogrid.jl                  # ogrid_cross_section: body-fitted ring around a bore
+    plotting.jl               # RecipesBase recipes and the show summary
   thresholds/                 # module Thresholds
     thresholds.jl             # CHF, OFI, OSV, ONB, wall-temperature limit correlations
     analysis.jl               # ChannelState + the post-solve threshold methods
@@ -105,18 +111,20 @@ src/
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
-    heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
+    heat_diffusion.jl         # HeatDiffusion: conduction on a SolidMesh, 3D, plus the
+                              # frozen keyword form that builds a slab mesh
     point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM
   assemblies/                 # module Assemblies
     port.jl                   # port: index one element of a connector array (a getter, not a verb)
     connections.jl            # module Assemblies.Connect: face, faces,
-                              # temperature_feedback, inseries, inparallel
-    assemblies.jl             # compose_systems, check_gravity_mismatch, symmetric_plate,
-                              # plate, one_sided, single_channel, fuel_assembly
+                              # temperature_feedback, adiabatic_face, inseries, inparallel
+    assemblies.jl             # compose_systems, check_gravity_mismatch, check_contact_area,
+                              # symmetric_plate, plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
   initial_conditions.jl       # steady_state_guess
   utilities.jl                # module Utilities: rebin_*, cosine_power_shape, cosine_T_wall_profile
-  examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk
+  examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk,
+                              # build_rod_5channel
 ```
 
 **Where new code goes:**
@@ -124,6 +132,7 @@ src/
 - New correlation → the module that owns that physics: a Nusselt number into `src/htc/correlations.jl`, a friction factor into `src/friction/correlations.jl`, a local loss into `src/local_loss.jl`, a safety limit into `src/thresholds/thresholds.jl`
 - New wiring verb → `src/assemblies/connections.jl` (inside `Connect`); a named arrangement → `src/assemblies/assemblies.jl`
 - Prefer `Connect.face(...)` over a bare `face(...)`, but leave `inseries`, `inparallel` and `port` unqualified: the first two are used constantly and `port` is a getter that reads clearly on its own
+- New mesh generator → `src/solids/`, filling the same `CrossSection`
 - New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the nine `AbstractLiquid` property methods
 - Build/example helpers → `src/examples.jl` only (never add examples to core files)
 
@@ -145,7 +154,8 @@ test/
   test_flapper.jl           # Flapper
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
   test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, WallTemperature, HeatFluxSource
-  test_heat_diffusion.jl    # HeatDiffusion
+  test_solids.jl            # Solids: shapes, mesh types, both generators, mesh quality
+  test_heat_diffusion.jl    # HeatDiffusion, both constructors, analytic profiles
   test_correlations.jl      # Nusselt + friction correlation function unit tests
   test_htc.jl               # HTC models: property basis, named constructors, regime
                             # switching, subcooled boiling, user-defined models

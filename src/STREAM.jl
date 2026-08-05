@@ -25,6 +25,27 @@ include("knobs.jl")
 include("geometry.jl")
 include("dimensionless.jl")
 
+module Solids
+using Meshes
+using RecipesBase
+using Unitful: ustrip
+include("solids/shapes.jl")
+include("solids/mesh.jl")
+include("solids/cutcell.jl")
+include("solids/ogrid.jl")
+include("solids/plotting.jl")
+export Shape, shape, inside, dist_to_edge, segment_inside, inside_length, outline
+export SolidMaterial, CrossFace, CrossBoundary, CrossSection, SolidMesh
+export slab_cross_section, cut_cell_cross_section, ogrid_cross_section
+export extrude, set_contact!
+export ncross, nlayers, ncells, cellindex, tags, cell_volume, heat_capacity
+export interior_conductance, boundary_conductance, axial_conductance
+export boundary_groups, contact_area, mesh_skew, linear_patch_error
+export fill_fraction, cell_polygons, boundary_segments, outline_rings
+export boundarynormals, meshheatmap
+end
+using .Solids
+
 module HTC
 using ModelingToolkit
 using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH
@@ -88,6 +109,7 @@ using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
 using ..LocalLoss
 using ..LocalLoss: factor  # the Idelchik factor, private to LocalLoss
+using ..Solids
 using ..STREAM
 include("components/connectors.jl")
 include("components/twoports.jl")
@@ -114,6 +136,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ..STREAM: PipeGeometry
     using ..Components
+    using ..Solids
     include("assemblies/port.jl")
 module Connect
 using ModelingToolkit
@@ -121,15 +144,15 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 using ...Components
 import ..port
 include("assemblies/connections.jl")
-export inseries, inparallel, face, faces, temperature_feedback
+export inseries, inparallel, face, faces, adiabatic_face, temperature_feedback
 end
 using .Connect
 using .Connect: _infer_n   # the arrangements below count ports with it
 
 include("assemblies/assemblies.jl")
 export Connect
-export inseries, inparallel, face, faces, port, temperature_feedback
-export check_gravity_mismatch, compose_systems
+export inseries, inparallel, face, faces, adiabatic_face, port, temperature_feedback
+export check_gravity_mismatch, check_contact_area, compose_systems
 export symmetric_plate, plate, one_sided, single_channel, fuel_assembly
 end
 
@@ -151,9 +174,11 @@ using ..Components: Channel
 using ..Assemblies
 using ..HTC
 using ..Friction
+using ..Solids
+import Meshes
 include("examples.jl")
 export build_loop, build_loop_vertical, build_loop_transient, build_cube
-export build_loop_lof_bypass, build_loop_pk
+export build_loop_lof_bypass, build_loop_pk, build_rod_5channel
 end
 
 # ---------------------------------------------------------------------------------------
@@ -167,7 +192,7 @@ end
 # Note that a blanket `using .HTC, .Friction` here would not work: both define
 # RegimeDependent, and that is the point of having modules. Names arrive by explicit list.
 # ---------------------------------------------------------------------------------------
-export Substances, HTC, Friction, LocalLoss, Thresholds, Components, Assemblies, Utilities
+export Substances, Solids, HTC, Friction, LocalLoss, Thresholds, Components, Assemblies, Utilities
 
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature

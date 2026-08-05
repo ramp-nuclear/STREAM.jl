@@ -3,6 +3,7 @@
 include("preamble.jl")
 
 include("test_geometry.jl")
+include("test_solids.jl")
 include("test_knobs.jl")
 include("test_connectors.jl")
 include("test_substances.jl")

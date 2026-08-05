@@ -31,7 +31,7 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 | Scenario | Can Python do it? | Can STREAM.jl do it? | What blocks us |
 |---|---|---|---|
 | **LOFA** (loss of flow) | Yes | Partly | Decay heat is the main one. The forced-to-natural-circulation transition works in principle but has no passing test (see [7.2](#72-the-loss-of-flow-bypass-case-does-not-converge)) |
-| **RIA** (reactivity insertion) | Mostly | Partly | Decay heat matters less here, but cylindrical fuel, gap conductance and fuel-temperature limits are all absent |
+| **RIA** (reactivity insertion) | Mostly | Partly | Decay heat matters less here. Cylindrical fuel and gap conductance are done (§2); fuel-temperature limits are still absent |
 | **LOCA**, level tracking to uncovery | **No** | Partly | Needs coolant inventory, a free surface and break flow. No two-phase model required ([4](#4-loca-level-tracking-and-where-it-stops)) |
 | **LOCA**, past uncovery | **No** | **No** | Void, steam, post-CHF heat transfer. Out of scope for both, by choice |
 
@@ -86,86 +86,109 @@ heat).
 
 ---
 
-## 2. Fuel heat conduction
+## 2. Fuel heat conduction (DONE)
 
-This is where the "cylindrical and MTR" ambition runs into the most missing code.
-`src/components/heat_diffusion.jl` is a single kernel: 2D Cartesian, uniform material,
-uniform mesh, no interface resistance, no axial conduction.
+Closed. `src/components/heat_diffusion.jl` no longer carries a stencil; it states one
+equation per cell by walking a mesh's face lists, so the geometry is data rather than code.
+The physics module is `src/solids/`.
 
-### 2.1 No cylindrical geometry
+A mesh is a 2D cross-section swept along z. The conduction is fully 3D: cells are
+`(cross-section cell, axial layer)` pairs, with in-plane faces inside a layer and axial
+faces between layers. What is 2D is only that the geometry repeats at every z-level, so it
+is meshed once.
 
-Python's `Fuel` takes a `heat_func` kwarg and ships four kernels:
+Three generators fill the same `CrossSection`:
 
-| Kernel | Geometry |
-|---|---|
-| `x_diffusion` | 1D Cartesian (plate, lateral only) |
-| `xz_diffusion` | 2D Cartesian (plate, lateral and axial) |
-| `r_diffusion` | 1D cylindrical (rod, radial only) |
-| `rz_diffusion` | 2D cylindrical (rod, radial and axial), azimuthally symmetric |
+| Generator | Shape | Exact? |
+|---|---|---|
+| `slab_cross_section` | flat plate, the pre-mesh case | yes |
+| `ogrid_cross_section` | body-fitted ring between a bore and an outer wall | exact on a concentric annulus |
+| `cut_cell_cross_section` | anything composed from rectangles and circles | exact on axis-aligned geometry |
 
-plus `generic_2d_diffusion` behind them and `cylindrical_areas_volumes` for the radial
-metric. We have the equivalent of `x_diffusion` only.
+What this closed, against the old list:
 
-**No cylindrical fuel means no rod-type core.** This is the single largest structural gap
-against the stated goal.
+- **2.1 cylindrical geometry.** `ogrid_cross_section` on a concentric annulus is exactly
+  orthogonal, so the scheme is exact there rather than approximate. This is not Python's
+  approach, which keeps a Cartesian `Δr/2k` resistance and puts the curvature in the face
+  areas; real face areas and real distances make that unnecessary.
+- **2.2 axial conduction.** `extrude(...; axial=true)` adds faces between layers. Off by
+  default on the keyword `HeatDiffusion` so no existing result moved, on by default on the
+  mesh constructor.
+- **2.3 per-cell material.** The mesh carries a material index per cell and a
+  `Vector{SolidMaterial}` alongside, so a clad plate is two materials and an index vector.
+  Face resistance uses each cell's own `k`.
+- **2.4 non-uniform mesh.** Every generator takes boundaries or fractions rather than
+  counts, so cells can be packed against a wall and a material interface placed exactly on
+  a face.
+- **2.5 contact and gap conductance.** Every face carries `r_contact` in m²K/W, defaulting
+  to zero. `set_contact!` places it by a predicate over the two cells a face separates.
+  Resistance is stored rather than conductance deliberately: perfect contact is `0`, not
+  `Inf`, and an `Inf` reaching a symbolic trace poisons the expression.
 
-**Size:** medium. The radial kernel differs from the Cartesian one by the face areas and
-cell volumes, which `cylindrical_areas_volumes` already spells out. The work is refactoring
-`_diffusion_eqs` so the metric is a parameter rather than baked in.
+### 2.6 Two-point flux is only exact on an orthogonal mesh
 
-### 2.2 No axial conduction
+Worth stating because it bounds everything above. The scheme assumes the line joining two
+cell centroids is parallel to the face normal between them. Where that holds it is exact;
+where it does not, the dropped cross-diffusion term does not vanish under refinement, so
+the error is a property of the mesh rather than of its resolution.
 
-Our bulk equation is
+Measured with `mesh_skew` and `linear_patch_error`, on a 12 mm rod with a 3 mm bore:
 
-```julia
-D(T[i, j]) ~ k_s * (T[i, j+1] - 2*T[i, j] + T[i, j-1]) / (dx^2 * rho_s * cp_s) + q_vol[i, j]
-```
+| Mesh | Skew mean | Patch p95 |
+|---|---|---|
+| Slab | 0° | 6e-16 |
+| O-grid, concentric annulus | 0° | 7e-15 |
+| Cut-cell, axis-aligned rectangle | 0° | 2e-16 |
+| Cut-cell, bored square | 1.1° | 2.3e-2 |
+| O-grid, bored square | 7.7° | 8.1e-2 |
 
-Only `j±1` appears. There is no `i±1` term anywhere in `_diffusion_eqs`, so axial slices are
-thermally independent and heat cannot spread along the plate. Python's `xz_diffusion` and
-`rz_diffusion` both carry it.
+The two shapes this project centres on, flat plates and cylindrical rods, are both exact.
+A circular bore inside a *square* is the case that carries error, on either mesh, because
+no conformal map from a circle to a square exists away from its corners. Refinement does
+not help: mean skew held at 7.7° from 128 cells to 1024.
 
-For a steady axial cosine this changes little. It matters where an axial gradient is sharp:
-the ends of the heated length, a partially inserted control rod, and the leading edge of a
-quench front if we ever get there.
+Open, if it turns out to matter: a non-orthogonal correction term on the existing face
+list, or an orthogonality-enforcing grid generator. Neither is worth building before the
+error is shown to move a peak temperature.
 
-**Size:** small. One more difference term and the `z_contacts` faces.
+### 2.7 Wall temperature is averaged per tag, by construction
 
-### 2.3 Uniform material only, so no cladding
+Boundary faces group by tag, one thermal port per `(tag, axial layer)`, and the port's heat
+flow is the sum over its group. That reduction is what lets a boundary of any shape meet a
+1D channel. It also means in-plane refinement buys interior detail and not peak-wall
+detail: the model reports a face-averaged wall temperature per tag, because the channel it
+talks to carries one bulk temperature per axial cell. That bounds what the §5 threshold
+margins mean on a rod.
 
-`HeatDiffusion` takes scalar `rho_s`, `cp_s`, `k_s`. Python's `Solid` has a `from_array`
-constructor that produces per-cell arrays of all three, and `Fuel` takes `meat_indices` to
-mark which cells are fuel and which are cladding. Together with `x_boundaries(clad_N,
-fuel_N, clad_w, meat_w)`, which builds a clad/meat/clad mesh, that is a layered plate.
+### 2.8 What a mesh costs to compile and solve
 
-We cannot represent a clad plate at all. Everything is one material.
+Measured on the bored-square rod, all five faces pinned, `Rodas5P`, dense Jacobian:
 
-**Size:** small to medium. Making the three properties per-cell arrays is mechanical; the
-knock-on is that face conductivities need a harmonic mean between neighbouring cells rather
-than a shared scalar.
+| Cells | `mtkcompile` | `ODEProblem` | first solve |
+|---|---|---|---|
+| 1600 | 2.7 s | 41 s | 48 s |
+| 2880 | 4.8 s | 93 s | 124 s |
+| 5760 | 12 s | 399 s | 496 s |
 
-### 2.4 Uniform mesh only
+The result inverts the worry that shaped the design. **`mtkcompile` is not the problem**: it
+stays under 12 s at 5760 cells and scales close to linearly, because every `T` is a
+differential state with no algebraic coupling to another `T`, so there is nothing to tear.
+The cost is in `ODEProblem` construction and the solve, both growing near quadratically.
 
-`dx = Lx / nx`, `dz = Lz / nz`. Python takes `x_boundaries` and `z_boundaries` arrays, which
-is what lets it put fine cells in the cladding and coarse ones in the meat. Needed by 2.3 to
-be useful, and needed on its own for rods, where the radial temperature profile is steepest
-at the centre.
+That points at code generation for the right-hand side and a dense N×N factorization per
+Newton step, neither of which the mesh design can fix.
 
-**Size:** small, and best done at the same time as 2.3.
+The obvious lever, a sparse symbolic Jacobian, turned out not to be one. At 960 cells,
+`ODEProblem(...; jac=true)` had not finished after twenty minutes, against 46 s to build the
+same problem without it: generating the Jacobian symbolically costs more than it saves at
+this size. Two routes are left, neither tried yet. Supply a sparsity pattern and let the
+solver form the Jacobian numerically by coloured finite differences, which needs no symbolic
+work and suits a stencil with at most six neighbours per cell. Or drop the Jacobian entirely
+and use a Krylov linear solver, which never forms the matrix. Both are cheap experiments and
+neither has been run, so nothing here should be taken as measured.
 
-### 2.5 No contact or gap conductance
-
-Python's `_resistances(dr, contacts, k)` builds each face resistance as `dr/(2k) + 1/h_contact`,
-with `x_contacts` and `z_contacts` supplied per face. That is fuel-to-clad gap conductance.
-
-We have pure conduction between cells and a bare half-cell to the boundary. For plate fuel
-with a metallurgical bond, that is defensible. For rod fuel it is not: the pellet-clad gap
-usually dominates the whole thermal resistance, and in an RIA the gap closing as the pellet
-expands is a first-order effect on peak fuel temperature.
-
-**Size:** small once 2.4 exists, and a prerequisite for taking rod RIA results seriously.
-
----
+Practical sizing until that lands: 1600 cells is about 90 s end to end and fine to iterate
+on; 5760 cells is roughly 15 minutes and belongs in a production run, not a loop.
 
 ## 3. Wall friction and pressure drop
 
@@ -532,9 +555,8 @@ Ordered by what unblocks the most, not by size.
 3. **Branch selection in the loss-of-flow steady solve** (§7.2), by continuation rather than
    by constraining anything. Retiring it restores coverage of the natural-convection path,
    which nothing else exercises in a channel.
-4. **Heat conduction rework** (§2.1 to §2.5) as one piece: non-uniform mesh, per-cell
-   material, contact conductance, axial conduction, and the cylindrical metric. Doing these
-   separately means touching `_diffusion_eqs` five times. This is what opens rod fuel.
+4. ~~**Heat conduction rework** (§2.1 to §2.5)~~ done, as one mesh-based piece. Rod fuel is
+   open now; see §2.6 for the one accuracy caveat that remains.
 5. **Power shapes** (§6). Small, and it directly affects every hot-channel margin.
 6. **Missing hydraulic components** (§3.2), `ResistorFromKnownPoint` and `Bend` first.
 7. **Debugging ergonomics** (§9). High value per line, and the pain is felt on every failed

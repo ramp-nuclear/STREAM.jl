@@ -427,3 +427,61 @@ end
         @test 231.85 < T_max_nc < 236.85    # tight around the observed 233.95 °C, below critical T
     end
 end
+
+@testset "build_rod_5channel — five coolant paths on one solid" begin
+    power = 1.2e4
+    sys, mesh = build_rod_5channel(; n=3, n_angular=12, n_radial=2, power=power)
+    ssys = mtkcompile(sys)
+    @test length(equations(ssys)) == length(unknowns(ssys))
+
+    nz, nc = nlayers(mesh), ncross(mesh)
+    @test nc == 12 * 2
+    @test sort(tags(mesh)) == [:bore, :east, :north, :south, :west]
+
+    op = vcat(
+        [ssys.rod.T[i, j] => 60.0 for i in 1:nz for j in 1:nc],
+        [getproperty(ssys, Symbol(:ch_, s)).T[i] => 45.0
+         for s in (:north, :east, :south, :west, :bore) for i in 1:nz],
+    )
+    sol = solve_steady(ssys, op)
+
+    # Every watt deposited leaves through one of the five channels.
+    total = sum(sol[getproperty(ssys, Symbol(:ch_, s)).Q_wall_total]
+                for s in (:north, :east, :south, :west, :bore))
+    @test total ≈ power rtol=1e-8
+
+    # Identical flats see identical duty; the bore has more wall area, so it takes more.
+    flats = [sol[getproperty(ssys, Symbol(:ch_, s)).Q_wall_total]
+             for s in (:north, :east, :south, :west)]
+    @test all(q -> q ≈ flats[1], flats)
+    @test sol[ssys.ch_bore.Q_wall_total] > flats[1]
+end
+
+@testset "build_rod_5channel — starving one channel pushes heat to its neighbours" begin
+    # The test that the five tags are five independent thermal paths rather than one
+    # averaged surface: cut the north channel's flow and the solid must send its share
+    # somewhere else.
+    power = 1.2e4
+    function duties(flows)
+        sys, mesh = build_rod_5channel(; n=3, n_angular=12, n_radial=2,
+                                       power=power, mdot=flows)
+        ssys = mtkcompile(sys)
+        nz, nc = nlayers(mesh), ncross(mesh)
+        op = vcat(
+            [ssys.rod.T[i, j] => 60.0 for i in 1:nz for j in 1:nc],
+            [getproperty(ssys, Symbol(:ch_, s)).T[i] => 45.0
+             for s in (:north, :east, :south, :west, :bore) for i in 1:nz],
+        )
+        sol = solve_steady(ssys, op)
+        return Dict(s => sol[getproperty(ssys, Symbol(:ch_, s)).Q_wall_total]
+                    for s in (:north, :east, :south, :west, :bore))
+    end
+
+    even = duties(0.05)
+    starved = duties((0.002, 0.05, 0.05, 0.05, 0.05))
+
+    @test starved[:north] < even[:north]
+    @test starved[:east] > even[:east]
+    @test starved[:west] > even[:west]
+    @test sum(values(starved)) ≈ power rtol=1e-8
+end

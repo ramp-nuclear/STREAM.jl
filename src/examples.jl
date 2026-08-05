@@ -476,3 +476,96 @@ function build_loop_pk(ctrl;
     end
     return (ssys, ic)
 end
+
+"""
+    build_rod_5channel(; w=12e-3, r_bore=3e-3, L=0.6, n=8, n_angular=32, n_radial=4,
+                       power=2.0e4, mdot=0.05, T_in=40.0) -> (sys, mesh)
+
+A square fuel rod with a central bore, cooled by four channels on its flats and one in the
+bore. Five independent coolant paths meeting one solid, which is what the mesh-based
+conduction was built for: each channel gets its own thermal port per axial layer, and the
+solid moves heat both between them and along itself.
+
+# Arguments
+- `w`: rod width across the flats [m]
+- `r_bore`: bore radius [m]
+- `L`: heated length [m]
+- `n`: axial cells, shared by the channels and the solid
+- `n_angular`, `n_radial`: cross-section mesh, cells around and across the ring
+- `power`: total power into the rod [W]
+- `mdot`: mass flow per channel [kg/s]. Pass a 5-tuple to starve one of them.
+- `T_in`: channel inlet temperature [°C]
+
+# Returns
+`(sys, mesh)` — an uncompiled `System`, and the `SolidMesh` so a caller can check contact
+areas or read cell volumes without rebuilding it.
+"""
+function build_rod_5channel(; w=12e-3, r_bore=3e-3, L=0.6, n=8, n_angular=32, n_radial=4,
+                            power=2.0e4, mdot=0.05, T_in=40.0)
+    flows = mdot isa Number ? ntuple(_ -> mdot, 5) : mdot
+    length(flows) == 5 || throw(ArgumentError("mdot must be a number or 5 values"))
+
+    outer = Meshes.Box((-w / 2, -w / 2), (w / 2, w / 2))
+    bore = Meshes.Ball((0.0, 0.0), r_bore)
+    # Thin boxes laid along each flat, so the nearest-tagged-shape rule splits the outer
+    # wall four ways.
+    lip = w / 60
+    flats = (
+        Meshes.Box((-w / 2, w / 2 - lip), (w / 2, w / 2 + lip)) => :north,
+        Meshes.Box((-w / 2, -w / 2 - lip), (w / 2, -w / 2 + lip)) => :south,
+        Meshes.Box((w / 2 - lip, -w / 2), (w / 2 + lip, w / 2)) => :east,
+        Meshes.Box((-w / 2 - lip, -w / 2), (-w / 2 + lip, w / 2)) => :west,
+    )
+    cross = ogrid_cross_section(bore, outer; n_angular=n_angular, n_radial=n_radial,
+                                boundaries=(bore => :bore, flats...))
+    mesh = extrude(cross, [(i - 1) * L / n for i in 1:(n + 1)])
+
+    # Axially peaked, uniform across the section.
+    shape_z = [sin(π * (i - 0.5) / n) for i in 1:n]
+    shape_z ./= sum(shape_z)
+    ps = [shape_z[i] * cross.area[j] / sum(cross.area) for i in 1:n, j in 1:ncross(cross)]
+
+    @named rod = HeatDiffusion(mesh; materials=[SolidMaterial(19300.0, 116.0, 174.0)],
+                               power_shape=ps, power=power)
+
+    # Each flat is cooled by a rectangular channel whose heated edge is the flat's width;
+    # the bore channel is the circular passage itself.
+    gap = 2.0e-3
+    side_geom = PipeGeometry_rectangular(L, w, gap, w; one_sided=:left)
+    bore_geom = PipeGeometry_circular(L, 2 * r_bore)
+    order = (:north, :east, :south, :west)
+    sides = [ChannelAndContacts(; name=Symbol(:ch_, s), n=n, geometry=side_geom,
+                                htc=HTC.DittusBoelter(),
+                                darcy=Friction.RectangularLaminar(side_geom))
+             for s in order]
+    @named ch_bore = ChannelAndContacts(; n=n, geometry=bore_geom,
+                                        htc=HTC.DittusBoelter(),
+                                        darcy=Friction.Blasius())
+    channels = [sides..., ch_bore]
+
+    conns = Equation[]
+    for (ch, tag) in zip(sides, order)
+        append!(conns, faces((ch, :thermal_left) => (rod, Symbol(:thermal_, tag))))
+        # The rectangular channels are heated on one side only, so the other face has no
+        # perimeter and no equation of its own.
+        append!(conns, adiabatic_face(ch, :thermal_right))
+    end
+    append!(conns, faces((ch_bore, :thermal_left) => (rod, :thermal_bore)))
+    append!(conns, adiabatic_face(ch_bore, :thermal_right))
+
+    # Each channel sits in its own small loop: a fixed-flow pump drives it and a heat
+    # exchanger returns the coolant to inlet temperature. Dangling FlowPorts are
+    # auto-zeroed by MTK, so a prescribed inlet flow has to come from a source component
+    # rather than an equation on the port.
+    names = (:north, :east, :south, :west, :bore)
+    pumps = [Pump(; name=Symbol(:pump_, s), ṁ0=ṁ) for (s, ṁ) in zip(names, flows)]
+    hxs = [HeatExchanger(T_in; name=Symbol(:hx_, s)) for s in names]
+    for (ch, pu, hx) in zip(channels, pumps, hxs)
+        append!(conns, inseries(pu, ch, hx, pu))
+        push!(conns, pu.inlet.p ~ ATM)
+    end
+    push!(conns, rod.power ~ power)
+
+    sys = compose(System(conns, t; name=:rod5), rod, channels..., pumps..., hxs...)
+    return sys, mesh
+end

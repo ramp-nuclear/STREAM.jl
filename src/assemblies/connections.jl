@@ -135,8 +135,8 @@ end
 function faces(mapping::Pair)
     (left_sys, left_face) = mapping.first
     (right_sys, right_face) = mapping.second
-    n_left = _infer_n(left_sys)
-    n_right = _infer_n(right_sys)
+    n_left = _infer_n(left_sys, left_face)
+    n_right = _infer_n(right_sys, right_face)
     n_left == n_right ||
         throw(ArgumentError("face sizes do not match: $n_left != $n_right"))
     return Equation[
@@ -144,20 +144,49 @@ function faces(mapping::Pair)
     ]
 end
 
-# Real-valued defaults of `params`, skipping parameters with no default or a
-# non-Real default.
+"""
+    adiabatic_face(channel, face) -> Vector{Equation}
 
+Close an unheated channel face. A face whose heated perimeter is zero carries no heat, so
+its port `Q` collapses to `0 ~ 0` and the wall temperature is left with no equation of its
+own. This pins it to the local coolant temperature, which is what an insulated wall settles
+at anyway.
 
-function _infer_n(sys)
+`PipeGeometry_circular` produces exactly this situation: `heated_parts` is `(perimeter, 0)`,
+so the right face of a circular channel always needs closing.
+
+# Arguments
+- `channel`: uncompiled system carrying an indexed thermal face and a per-cell `T`
+- `face`: face symbol, `:thermal_left` or `:thermal_right`
+
+# Returns
+`Vector{Equation}` with one equation per cell.
+"""
+function adiabatic_face(channel, face::Symbol)
+    n = _infer_n(channel, face)
+    T = getproperty(channel, :T)
+    return Equation[port(channel, face, i).T ~ T[i] for i in 1:n]
+end
+
+# Count the ports on one indexed thermal face. The match is anchored: `thermal_left` counts
+# `thermal_left1`, never `thermal_left_inner1`, which a bare prefix test would fold in.
+function _infer_n(sys, face::Symbol)
+    prefix = string(face)
     sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
-    n = count(s -> startswith(s, "thermal_left"), sub_names)
+    n = count(sub_names) do name
+        startswith(name, prefix) || return false
+        suffix = SubString(name, ncodeunits(prefix) + 1)
+        !isempty(suffix) && all(isdigit, suffix)
+    end
     n == 0 && throw(
         ArgumentError(
-            "could not detect thermal port count in system $(ModelingToolkit.getname(sys)); pass an uncompiled ChannelAndContacts instance",
+            "no `$face` ports on system $(ModelingToolkit.getname(sys)); pass an uncompiled system that carries that face",
         ),
     )
     return n
 end
+
+_infer_n(sys) = _infer_n(sys, :thermal_left)
 
 
 
