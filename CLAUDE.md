@@ -15,6 +15,9 @@ When writing or editing Julia code, follow the conventions in `JULIA.md` (repo r
 
 **MUST USE — humanizer for ALL prose.** No text anywhere in this repo should read as AI slop. Every piece of prose you write or edit — inline comments, docstrings, test/`@testset` names, commit messages, and `.md` files — must pass the `/humanizer` skill: no em dashes, no rule-of-three padding, no "AI vocabulary" or promotional/significance filler, plain and specific. Run `/humanizer` over prose before committing it, and over every GitHub comment/PR/issue body before it is shown for posting (see the no-auto-post rule: draft → humanize → show the user → they confirm → post). The whole existing codebase is also slated for a humanizer sweep; until then, at minimum leave any prose you touch cleaner than you found it.
 
+File level and module level comments should prefereably be part of docstrings (""")
+explaining the code rather than large block (#) comments.
+
 ## Units
 
 Temperatures are **Celsius** everywhere: component arguments, connector variables, solution

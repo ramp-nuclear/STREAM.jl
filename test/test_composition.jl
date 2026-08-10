@@ -7,7 +7,7 @@ using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM.Assemblies: _infer_n  # private to Assemblies
+using STREAM.Assemblies: var_length  # private to Assemblies
 using OrdinaryDiffEq: ReturnCode
 
 # Test fixtures — local helpers that build canonical CAC + HD pairs.
@@ -86,26 +86,26 @@ end
     @test check_gravity_mismatch(ssys) == :mismatch
 end
 
-# Section 3: _infer_n
+# Section 3: var_length
 # Works on CAC (ThermalPort arrays kept); errors on the new Channel/CHF.
-@testset "_infer_n: counts thermal_left* on CAC (n=4)" begin
+@testset "var_length: counts thermal_left* on CAC (n=4)" begin
     cac, _ = _mtr_pair(; n=4)
-    @test _infer_n(cac) == 4
+    @test var_length(cac, :thermal_left) == 4
 end
 
-@testset "_infer_n: counts thermal_left* on CAC (n=10)" begin
+@testset "var_length: counts thermal_left* on CAC (n=10)" begin
     cac10, _ = _mtr_pair(; n=10)
-    @test _infer_n(cac10) == 10
+    @test var_length(cac10, :thermal_left) == 10
 end
 
-@testset "_infer_n: errors on Channel (no thermal port arrays under new design)" begin
+@testset "var_length: errors on Channel (no thermal port arrays under new design)" begin
     @named ch = Channel(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
-    @test_throws ArgumentError _infer_n(ch)
+    @test_throws ArgumentError var_length(ch, :thermal_left)
 end
 
-@testset "_infer_n: errors on ChannelHeatFlux (no thermal port arrays under new design)" begin
+@testset "var_length: errors on ChannelHeatFlux (no thermal port arrays under new design)" begin
     @named chf = ChannelHeatFlux(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
-    @test_throws ArgumentError _infer_n(chf)
+    @test_throws ArgumentError var_length(chf, :thermal_left)
 end
 
 # Section 4: symmetric_plate compose-correctness

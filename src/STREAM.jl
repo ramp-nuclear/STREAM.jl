@@ -58,7 +58,7 @@ end
 module LocalLoss
 using ModelingToolkit
 include("local_loss.jl")
-export dp, factor, sudden_expansion_factor, sudden_contraction_factor
+    export dp, sudden_expansion_factor, sudden_contraction_factor
 end
 
 module Thresholds
@@ -86,8 +86,7 @@ using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..HTC
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
-using ..LocalLoss
-using ..LocalLoss: factor  # the Idelchik factor, private to LocalLoss
+    using ..LocalLoss
 using ..STREAM
 include("components/connectors.jl")
 include("components/twoports.jl")
@@ -124,7 +123,7 @@ include("assemblies/connections.jl")
 export inseries, inparallel, face, faces, temperature_feedback
 end
 using .Connect
-using .Connect: _infer_n   # the arrangements below count ports with it
+    using .Connect: var_length   # the arrangements below count ports with it
 
 include("assemblies/assemblies.jl")
 export Connect

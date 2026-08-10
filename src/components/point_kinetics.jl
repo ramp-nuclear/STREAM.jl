@@ -78,103 +78,6 @@ function _temperature_feedback(temp_worth, ref_temp)
 end
 
 """
-    _point_kinetics(; name, rho, Lambda, beta_k, lambda_k, control) -> System
-
-Shared builder behind both `PointKinetics` constructors. The number of delayed groups is
-`length(beta_k)`, so the same code serves 1 group or 20.
-
-`control` is called once and returns `(reactivity, pars, unknowns)`: an extra reactivity
-term to add to the constant `rho_val`, plus any parameters and unknowns that term needs.
-It is what separates the constant-reactivity constructor from the callable one.
-"""
-function _point_kinetics(;
-    name, rho, Lambda, beta_k, lambda_k, control=() -> (0, Any[], Num[])
-)
-    G = length(beta_k)
-    G == length(lambda_k) || throw(
-        DimensionMismatch("beta_k has $G groups but lambda_k has $(length(lambda_k))")
-    )
-
-    pars = @parameters begin
-        rho_val = rho
-        Λ = Lambda
-        β[1:G] = collect(beta_k)
-        λ[1:G] = collect(lambda_k)
-    end
-
-    @variables begin
-        P(t) = 1.0
-        (C(t))[1:G]
-        # Observed diagnostics, assigned below; never on the RHS of another equation.
-        beta_total(t)
-        dPdt(t)
-        reactivity(t)
-    end
-
-    β_k, λ_k, C_k = collect(β), collect(λ), collect(C)
-    control_reactivity, control_pars, control_unknowns = control()
-    ρ = rho_val + control_reactivity
-    β_sum = sum(β_k)
-
-    # Keepin (1965), G delayed groups. `Ṗ` is the rate expression itself, kept separate from
-    # the `dPdt` observable below so neither name shadows the other.
-    #     Ṗ  = (ρ - β)/Λ · P + Σₖ λₖ·Cₖ
-    #     Ċₖ = βₖ/Λ · P - λₖ·Cₖ
-    Ṗ = (ρ - β_sum) / Λ * P + λ_k ⋅ C_k
-
-    eqs = [
-        D(P) ~ Ṗ
-        D.(C_k) .~ β_k ./ Λ .* P .- λ_k .* C_k
-    ]
-    obs = Equation[
-        beta_total ~ β_sum,
-        dPdt ~ Ṗ,
-        reactivity ~ ρ,
-    ]
-
-    return System(
-        eqs,
-        t,
-        [P; C_k; control_unknowns],
-        [pars; control_pars];
-        observed=obs,
-        name=name,
-    )
-end
-
-"""
-    PointKinetics(; name, rho=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K) -> System
-
-Point kinetics with a constant reactivity and one precursor group per entry of `beta_k`,
-giving `1 + length(beta_k)` ODEs. The defaults are U-235 six-group data, so the default
-component carries 7 equations.
-
-At `rho=0` (default) the system is exactly critical: power holds steady when started from
-the precursor concentrations `point_kinetics_steady_state` returns.
-
-# Arguments
-- `name`: system name (Symbol, injected by `@named`)
-- `rho`: constant reactivity [-] (default 0.0 = critical). Positive `rho` drives a
-  supercritical excursion.
-- `Lambda`: neutron generation time [s] (default `U235_LAMBDA`)
-- `beta_k`: delayed neutron fraction per group [-] (default `U235_BETA_K`). Its length sets
-  the group count.
-- `lambda_k`: precursor decay constant per group [1/s] (default `U235_LAMBDA_K`). Must match
-  `beta_k` in length.
-
-# Returns
-Uncompiled `System` with unknowns `P` and `C[1:G]`, and observables `beta_total`, `dPdt`,
-`reactivity`.
-"""
-function PointKinetics(;
-    name, rho=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K
-)
-    return _point_kinetics(;
-        name=name, rho=rho, Lambda=Lambda, beta_k=beta_k, lambda_k=lambda_k
-    )
-end
-
-"""
     PointKinetics(rho_c_fn::Any; name, rho_val=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
                   lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing) -> System
 
@@ -195,7 +98,6 @@ reference, so omitting it raises `KeyError` at `solve_transient`.
 - `rho_c_fn` (positional): callable `(t) -> Float64`, or a `ReactivityController`. Its
   concrete type is captured at construction.
 - `name`: system name (Symbol, injected by `@named`)
-- `rho_val`: constant base reactivity [-] (default 0.0)
 - `Lambda`: neutron generation time [s] (default `U235_LAMBDA`)
 - `beta_k`, `lambda_k`: per-group delayed data; `length(beta_k)` sets the group count
 - `temp_worth::Union{Nothing,Dict}=nothing`: per-component feedback weights. Keys are
@@ -215,7 +117,6 @@ component, plus the callable parameter `rho_c_fn`.
 function PointKinetics(
     rho_c_fn::Any;
     name,
-    rho_val=0.0,
     Lambda=U235_LAMBDA,
     beta_k=U235_BETA_K,
     lambda_k=U235_LAMBDA_K,
@@ -228,13 +129,50 @@ function PointKinetics(
         feedback, feedback_unknowns = _temperature_feedback(temp_worth, ref_temp)
         return (control_pars[1](t) + feedback, control_pars, feedback_unknowns)
     end
-    return _point_kinetics(;
+    G = length(beta_k)
+    G == length(lambda_k) || throw(
+        DimensionMismatch("beta_k has $G groups but lambda_k has $(length(lambda_k))")
+    )
+
+    pars = @parameters begin
+        Λ = Lambda
+        β[1:G] = collect(beta_k)
+        λ[1:G] = collect(lambda_k)
+    end
+
+    @variables begin
+        P(t) = 1.0
+        (C(t))[1:G]
+        # Observed diagnostics, assigned below; never on the RHS of another equation.
+        beta_total(t)
+        dPdt(t)
+        reactivity(t)
+    end
+
+    β_k, λ_k, C_k = collect(β), collect(λ), collect(C)
+    control_reactivity, control_pars, control_unknowns = control()
+    ρ = control_reactivity
+    β_sum = sum(β_k)
+
+    # Keepin (1965), G delayed groups. `Ṗ` is the rate expression itself, kept separate from
+    # the `dPdt` observable below so neither name shadows the other.
+    #     Ṗ  = (ρ - β)/Λ · P + Σₖ λₖ·Cₖ
+    #     Ċₖ = βₖ/Λ · P - λₖ·Cₖ
+    Ṗ = (ρ - β_sum) / Λ * P + λ_k ⋅ C_k
+
+    eqs = [
+        D(P) ~ Ṗ
+        D.(C_k) .~ β_k ./ Λ .* P .- λ_k .* C_k
+    ]
+    obs = Equation[beta_total ~ β_sum, dPdt ~ Ṗ, reactivity ~ ρ]
+
+    return System(
+        eqs,
+        t,
+        [P; C_k; control_unknowns],
+        [pars; control_pars];
+        observed=obs,
         name=name,
-        rho=rho_val,
-        Lambda=Lambda,
-        beta_k=beta_k,
-        lambda_k=lambda_k,
-        control=control,
     )
 end
 

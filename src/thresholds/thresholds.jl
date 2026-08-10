@@ -301,32 +301,3 @@ CHF heat flux `q_CHF` [W/m^2].
 function q_CHF_fabrega(T_inlet, T_sat, pipe)
     return 1e7 * pipe.Dh * (0.023 * (T_sat - T_inlet) + 4.56)
 end
-
-"""
-    twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0) -> T_limit [°C]
-
-Wall temperature the face would reach if the local heat flux were worse by
-`inhomogeneity_factor`.
-
-Formula: `T_limit = T_bulk + inhomogeneity_factor * (T_wall - T_bulk)`
-
-The physical solution does not know about fuel inhomogeneity, so the measured wall
-temperature understates the hot spot. Scaling the flux by the factor and re-reading the
-wall temperature off Newton's law is what gives the limit to check against.
-
-Source: Python STREAM analysis/thresholds.py `twall_limit`, which computes
-`T_bulk + q * inhomogeneity_factor / h` per face. Since the channel components define
-`q = h * (T_wall - T_bulk)`, the `h` divides out and leaves the form above, so this needs
-no heat transfer coefficient of its own.
-
-# Arguments
-- `T_bulk`: bulk coolant temperature [°C]
-- `T_wall`: wall temperature on the face being checked [°C]
-- `inhomogeneity_factor`: dimensionless flux multiplier (default: 1.0, no correction)
-
-# Returns
-Effective wall temperature limit `T_limit` [°C].
-"""
-function twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0)
-    return T_bulk + inhomogeneity_factor * (T_wall - T_bulk)
-end

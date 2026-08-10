@@ -79,9 +79,7 @@ function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
 
     eqs = Equation[
         xi ~ relax,
-        # Closed (t ≤ T_open): ṁ = 0. Open: ṁ = xi · ṁ_open (quadratic, ramped in).
         ifelse(t <= T_open, inlet.ṁ, inlet.ṁ - relax * ṁ_open) ~ 0,
-        # ref_ṁ has no equation here — wire it with watch_flow during composition
     ]
 
     return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)

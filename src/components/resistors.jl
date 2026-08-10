@@ -1,7 +1,6 @@
 # resistors.jl -- Friction, Gravity, Resistor components
 
 """
-    FrictionResistor(; name, L, D, A, darcy=Blasius(), liquid=H2O, scale=1.0) -> System
     FrictionResistor(; name, geometry, darcy=Blasius(), liquid=H2O, scale=1.0) -> System
 
 Frictional pressure drop element, `ΔP = scale · f · ṁ|ṁ| / (2ρA²) · (L/Dh)`.
@@ -29,13 +28,12 @@ geometry, where those two perimeters coincide.
 """
 function FrictionResistor(;
     name,
-    geometry::Union{PipeGeometry,Nothing}=nothing,
-    L=nothing, D=nothing, A=nothing,
+    geometry::PipeGeometry,
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
     scale::Real=1.0,
 )
-    geom = _friction_geometry(geometry, L, D, A)
+    geom = geometry
     pars = @parameters scale = scale
     vars = @variables begin
         Re(t)
@@ -54,26 +52,6 @@ function FrictionResistor(;
             scale * darcy_weisbach_dp(inlet.ṁ, ρ(liquid, T_in), f, Lx, Dh, Ax),
     ]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)
-end
-
-_friction_geometry(geom::PipeGeometry, ::Nothing, ::Nothing, ::Nothing) = geom
-
-function _friction_geometry(::Nothing, L, D, A)
-    if L === nothing || D === nothing || A === nothing
-        throw(ArgumentError(
-            "Friction needs either `geometry`, or all three of `L`, `D` and `A`."))
-    end
-    # An equivalent circular duct: heated and wet perimeter coincide, so a viscosity
-    # correction weights them 1:1.
-    perimeter = 4 * A / D
-    return PipeGeometry(
-        Float64(L), Float64(D), Float64(A), perimeter, perimeter,
-        (perimeter / 2, perimeter / 2), Float64(D), Float64(D),
-    )
-end
-
-function _friction_geometry(::PipeGeometry, L, D, A)
-    throw(ArgumentError("Friction takes `geometry` or `L`/`D`/`A`, not both."))
 end
 
 """
@@ -151,11 +129,9 @@ function VolumetricFlowResistor(;
     name,
     k::Union{Real,Function},
     klow::Real=0.0,
-    density::Union{Real,Function,Nothing}=nothing,
-    liquid::AbstractLiquid=H2O,
-    scale::Real=1.0,
+    density::Union{Real,Function}=(T -> ρ(H2O, T)),
 )
-    pars = @parameters klow = klow scale = scale
+    pars = @parameters klow = klow
     if k isa Real
         kpars = @parameters k = k
         k_expr = kpars[1]
@@ -170,13 +146,11 @@ function VolumetricFlowResistor(;
     T_in = instream(inlet.T)
     rho = if density isa Real
         Num(density)
-    elseif density isa Function
-        density(T_in)
     else
-        ρ(liquid, T_in)
+        density(T_in)
     end
     q = inlet.ṁ / rho
-    eqs = Equation[inlet.p - outlet.p ~ scale * (k_expr * q * abs(q) + klow * q)]
+    eqs = Equation[inlet.p - outlet.p ~ (k_expr * q * abs(q) + klow * q)]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
@@ -206,9 +180,7 @@ function LocalPressureDrop(; name, A1, A2, liquid::AbstractLiquid=H2O, scale::Re
     @named outlet = FlowPort()
     T_in = instream(inlet.T)
     A = min(A1, A2)
-    f = factor(inlet.ṁ, A1, A2, μ(liquid, T_in))
-    rho = ρ(liquid, T_in)
-    Δp₋ = inlet.p - outlet.p
-    eqs = Equation[Δp₋ ~ scale * dp(inlet.ṁ, rho, f, A)]
+    f = LocalLoss.factor(inlet.ṁ, A1, A2, μ(liquid, T_in))
+    eqs = Equation[inlet.p - outlet.p ~ scale * dp(inlet.ṁ, ρ(liquid, T_in), f, A)]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end

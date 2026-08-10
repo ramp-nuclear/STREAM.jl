@@ -185,7 +185,7 @@ After composition, refer to sub-components through the returned system (e.g.
 function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol=:left, name::Symbol)
     fuel_side in (:left, :right) ||
         throw(ArgumentError("fuel_side must be :left or :right, got :$fuel_side"))
-    n = _infer_n(channel)
+    n = var_length(channel, :thermal_left)
     dz = geometry.L / n
 
     near = fuel_side
@@ -370,7 +370,7 @@ function fuel_assembly(
     end
 
     # 7. Per-cell port count (homogeneity is the caller's responsibility).
-    n = _infer_n(channels[1])
+    n = var_length(channels[1], :thermal_left)
 
     # 8. Build the alternation and wire each adjacent pair per cell. For a closed
     #    ring we also wire the wrap pair (seq[end] -> seq[1]).

@@ -102,15 +102,6 @@ const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
 end
 
 @testset "Friction resistor" begin
-    @testset "geometry and L/D/A forms agree" begin
-        geom = PipeGeometry_circular(2.0, 0.05)
-        @named f1 = FrictionResistor(; geometry=geom)
-        @named f2 = FrictionResistor(; L=2.0, D=0.05, A=geom.A)
-        @test f1 isa ModelingToolkit.System
-        @test length(equations(f1)) == length(equations(f2))
-        @test_throws ArgumentError FrictionResistor(; name=:bad)
-        @test_throws ArgumentError FrictionResistor(; name=:bad, geometry=geom, L=1.0, D=1.0, A=1.0)
-    end
 
     # A pump pushes through one resistor; the solved drop must match the closed form.
     function solve_drop(; darcy=Friction.Blasius(), scale=1.0, dP=3.0e4)

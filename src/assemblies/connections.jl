@@ -4,6 +4,11 @@
 # hydraulic chains, per-cell thermal faces, the composed System itself, and the
 # point-kinetics temperature-feedback bindings. Assemblies built out of these live in
 # assemblies.jl.
+#
+# ## Two Port Components
+# Connections such as `inseries` and `inparallel` utilize components having 
+# one inlet and one outlet FlowPort subsystems.
+#
 
 """
     inseries(systems...) -> Vector{Equation}
@@ -135,8 +140,8 @@ end
 function faces(mapping::Pair)
     (left_sys, left_face) = mapping.first
     (right_sys, right_face) = mapping.second
-    n_left = _infer_n(left_sys)
-    n_right = _infer_n(right_sys)
+    n_left = var_length(left_sys, :thermal_left)
+    n_right = var_length(right_sys, :thermal_left)
     n_left == n_right ||
         throw(ArgumentError("face sizes do not match: $n_left != $n_right"))
     return Equation[
@@ -144,16 +149,14 @@ function faces(mapping::Pair)
     ]
 end
 
-# Real-valued defaults of `params`, skipping parameters with no default or a
-# non-Real default.
-
-
-function _infer_n(sys)
+"""Infer variable count in `sys` whose name begins with `varname`. 
+Useful for variable arrays."""
+function var_length(sys, varname)
     sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
-    n = count(s -> startswith(s, "thermal_left"), sub_names)
+    n = count(s -> startswith(s, string(varname)), sub_names)
     n == 0 && throw(
         ArgumentError(
-            "could not detect thermal port count in system $(ModelingToolkit.getname(sys)); pass an uncompiled ChannelAndContacts instance",
+            "Could not detect $(varname) count in system $(ModelingToolkit.getname(sys))",
         ),
     )
     return n

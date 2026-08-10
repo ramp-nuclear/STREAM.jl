@@ -3,12 +3,6 @@
 # Bridges MTK solver output (NonlinearSolution or ODESolution) to the physics
 # correlation functions in src/physical_models/thresholds.jl.
 #
-# Public API:
-#   ChannelState       — the solution fields a threshold correlation needs; construct it
-#                        from a solution with ChannelState(sol, channel_sys; pipe, gravity)
-#   threshold_analysis — extracts a ChannelState and applies the functions you name
-#   chfr               — CHF ratio closure, with face selection and a zero-flux guard
-#
 # Each correlation in thresholds.jl also gains a ChannelState method here, so the state is
 # just another way to call it rather than a parallel set of names.
 
@@ -204,9 +198,9 @@ function chfr(chf_fn; direction=:max)
             )
         end
         # Broadcast rather than zip: a channel-level correlation such as
-# q_CHF_sudo_kaminaga gives one number for the whole channel, and it has to divide
-# into the per-cell flux just the same.
-return ifelse.(q .> 0, chf_fn(state) ./ q, Inf)
+        # q_CHF_sudo_kaminaga gives one number for the whole channel, and it has to divide
+        # into the per-cell flux just the same.
+        return ifelse.(q .> 0, chf_fn(state) ./ q, Inf)
     end
 end
 

@@ -28,11 +28,11 @@ function Inertia(L_over_A::Real; name)
     pars = @parameters L_over_A = L_over_A
     @named inlet = FlowPort()
     @named outlet = FlowPort()
-    eqs = Equation[inlet.p - outlet.p ~ L_over_A * D(inlet.ṁ)]   # ODE pressure eq
+    eqs = Equation[inlet.p - outlet.p ~ L_over_A * D(inlet.ṁ)]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
-function Inertia(L_over_A; name)
+function Inertia(L_over_A::Function; name)
     @named inlet = FlowPort()
     @named outlet = FlowPort()
     vars = @variables L_eff(t)
