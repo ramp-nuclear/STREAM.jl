@@ -1,16 +1,12 @@
-# subcooled_boiling.jl -- Subcooled boiling heat flux correlations
-#
-# Design:
-#   - Standalone named functions (mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux,
-#     partial_SCB_correction): plain Julia arithmetic, NOT @register_symbolic.
-#     MTK traces through these symbolically when T_wall/T_sat are symbolic.
-#   - Factory (regime_dependent_q_scb): returns a closure that captures construction-time
-#     scalars (pressure, h_fg, sigma); inner function receives symbolic T_wall, T_sat, Re.
-#   - ifelse() for guards — same MTK pattern as flow reversal and regime switching.
+"""
+    _bergles_rohsenow_dT_ONB(P_Pa, q_spl) -> ΔT [K]
 
-# Bergles-Rohsenow wall superheat at the onset of nucleate boiling, T_ONB - T_sat, for a
-# single-phase wall heat flux `q_spl` [W/m^2] at pressure `P_Pa`. It sets where boiling
-# starts, so it belongs with the boiling physics rather than with the HTC correlations.
+Bergles-Rohsenow wall superheat at the onset of nucleate boiling, `T_ONB - T_sat`, for a
+single-phase wall heat flux `q_spl` [W/m^2] at pressure `P_Pa` [Pa].
+
+Sets where boiling starts. Private to `HTC`; `Thresholds` and `Components` both import it by
+name.
+"""
 function _bergles_rohsenow_dT_ONB(P_Pa, q_spl)
     p = P_Pa / 1e5
     return 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
@@ -134,10 +130,15 @@ function regime_dependent_q_scb(;
     )
 end
 
-# The Bergles-Rohsenow partial boiling blend, given a single-phase h that some `HTC` has
-# already produced: below the onset of nucleate boiling nothing changes, at or above it the
-# single-phase value is scaled by the partial boiling factor. `ifelse` keeps the switch a
-# symbolic branch the solver takes per step.
+"""
+    _scb_corrected(h_spl, q_scb, T_wall, T_bulk, ṁ, Dh, A, liquid, P) -> h
+
+The Bergles-Rohsenow partial boiling blend, applied to a single-phase `h` that some
+[`AbstractHTC`](@ref) has already produced.
+
+Below the onset of nucleate boiling nothing changes. At or above it the single-phase value is
+scaled by the partial boiling factor, switched with `ifelse`.
+"""
 function _scb_corrected(h_spl, q_scb, T_wall, T_bulk, ṁ, Dh, A, liquid, P)
     q_spl = max(h_spl * (T_wall - T_bulk), 0.0)
     T_sat = Tsat(liquid, P)

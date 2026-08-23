@@ -1,30 +1,13 @@
-# src/utilities.jl
-#
-# Grid-resampling and profile helpers used by the Composer code generator.
-#
-# Two resampling operations, one for each kind of per-cell quantity:
-#
-#   rebin_extensive  — for amounts (power per cell, mass per cell). Preserves
-#                      the total. Split one cell into two and the value halves;
-#                      `rebin_extensive([10.0], 2) == [5.0, 5.0]`.
-#   rebin_intensive  — for densities / per-cell values (temperature, heat flux).
-#                      Preserves the value. Split one cell into two and the value
-#                      copies; `rebin_intensive([10.0], 2) == [10.0, 10.0]`.
-#                      Merging two cells averages them.
-#
-# Both treat the field as piecewise-constant over each source cell and integrate
-# its overlap with each target cell. The `(v, n)` forms assume the source and
-# target cells uniformly tile the same domain; the `(v, src_edges, tgt_edges)`
-# forms take explicit, possibly non-uniform, cell boundaries.
-#
-# These helpers do not validate or normalize their inputs — negatives, zeros and
-# NaNs pass straight through. Checking the data is the caller's job.
+"""
+    _rebin_1d(v, src_edges, tgt_edges, conserve) -> Vector{Float64}
 
-# Rebin a piecewise-constant 1D field from `src_edges` (length n_in+1, increasing)
-# onto `tgt_edges` (length n_out+1). `conserve=:sum` keeps the integral over each
-# target cell (extensive); `conserve=:mean` keeps the area-weighted value
-# (intensive). The only difference is whether each overlap is divided by the
-# source-cell width or the target-cell width.
+Rebin a piecewise-constant 1D field from `src_edges` (length `n_in+1`, increasing) onto
+`tgt_edges` (length `n_out+1`).
+
+The shared core behind both public rebin functions. `conserve=:sum` keeps the integral over each
+target cell (extensive); `conserve=:mean` keeps the area-weighted value (intensive). They differ
+only in whether each overlap is divided by the source-cell or the target-cell width.
+"""
 function _rebin_1d(
     v::AbstractVector{<:Real},
     src_edges::AbstractVector{<:Real},

@@ -1,8 +1,3 @@
-# solvers.jl -- solve_steady and solve_transient.
-#
-# Building the operating point these take is a separate job; that lives in
-# initial_conditions.jl.
-
 """
     solve_steady(ssys, op; solver=nothing, kwargs...) -> SciMLSolution
 

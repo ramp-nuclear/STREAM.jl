@@ -386,7 +386,8 @@ end
         f=1.0,
         area=1.0,
         open_rate=10.0,
-                             liquid=Liquid())
+        liquid=Liquid(),
+    )
     @named hx = HeatExchanger(26.85)
     conns = [
         inparallel(pump, (R, flapper), hx)...,

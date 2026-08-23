@@ -1,11 +1,15 @@
-# FlowPort and ThermalPort acausal connectors. The @connector function form lets the
-# across-variable initial values (P, ṁ, T) double as overridable keyword arguments.
-
 """
-    FlowPort(; name, P=1.0e5, ṁ=0.0, T=26.85)
+    FlowPort(; name, p=1.0e5, ṁ=0.0, T=26.85)
 
-Acausal hydraulic connector. `P` is the across (potential) variable, `ṁ` is the flow
+Acausal hydraulic connector. `p` is the across (potential) variable, `ṁ` is the flow
 variable (sums to zero at a junction), and `T` is a stream variable carried with the flow.
+
+In a connection set the pressure is equalised across every port, the mass flows sum to zero, and
+the temperature is neither: it follows the flow direction. See `HydraulicTwoPort` for how
+`instream` resolves a stream variable.
+
+The `@connector function` form lets the initial values double as keyword arguments, so a port can
+be built already seeded.
 
 # Arguments
 - `name`: connector name (Symbol; supplied by `@named`).

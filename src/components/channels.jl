@@ -1,9 +1,13 @@
-# channels.jl -- Channel, ChannelHeatFlux, ChannelAndContacts variants
-# and shared `_channel_core`.
-#
+"""
+    Channel
 
-# Declare Channel as a new generic function independent of Base.Channel{T}
-# (Base.Channel is Julia stdlib's task-communication channel; STREAM.Channel is unrelated)
+Single-phase convective channel with `n` axial finite-volume cells, heated through a given
+convective coefficient. See the constructor method below for arguments and ports.
+
+Unrelated to `Base.Channel`, Julia's task-communication channel. `using STREAM.Components`
+leaves the name ambiguous between the two, so import it explicitly with
+`using STREAM.Components: Channel` or write `Components.Channel`.
+"""
 function Channel end
 
 """

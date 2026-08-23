@@ -10,9 +10,14 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 import ModelingToolkit: compose
 
+# Zero control reactivity, i.e. an exactly critical reactor. Bound to a name rather than
+# written inline at each call site because the same object has to reach both the constructor
+# (which captures its type) and the operating point (which supplies the callable itself).
+const CRITICAL = (t) -> 0.0
+
 @testset "PointKinetics" begin
     @testset "component compiles with 7 state variables" begin
-        @named pk = PointKinetics(rho=0.0)
+        @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
         @test length(unknowns(ssys)) == 7
     end
@@ -29,12 +34,13 @@ import ModelingToolkit: compose
         @test ic.P == P0
         @test length(ic.C_k) == 6
 
-        @named pk = PointKinetics(rho=0.0)
+        @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
-        op = vcat(
-            [ssys.P => ic.P],
-            [ssys.C[k] => ic.C_k[k] for k in 1:6],
-        )
+        op = Pair{Any,Any}[
+            ssys.rho_c_fn => CRITICAL,
+            ssys.P => ic.P,
+            [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
+        ]
         prob = ODEProblem(ssys, op, (0.0, 1.0))
 
         # du = f(u, p, 0): the derivative vector the integrator would take at t=0.
@@ -58,13 +64,13 @@ import ModelingToolkit: compose
         for G in (1, 2, 3, 11)
             beta_k = fill(sum(U235_BETA_K) / G, G)
             lambda_k = G == 1 ? [0.5] : collect(range(0.1, 60.0; length=G))
-            pk_g = PointKinetics(; name=:pk_g, rho=0.0, beta_k=beta_k, lambda_k=lambda_k)
+            pk_g = PointKinetics(CRITICAL; name=:pk_g, beta_k=beta_k, lambda_k=lambda_k)
             ssys_g = mtkcompile(pk_g)
             @test length(unknowns(ssys_g)) == 1 + G
 
             ic_g = point_kinetics_steady_state(1e6; beta_k=beta_k, lambda_k=lambda_k)
             @test length(ic_g.C_k) == G
-            op_g = Pair{Any,Any}[ssys_g.P => ic_g.P]
+            op_g = Pair{Any,Any}[ssys_g.rho_c_fn => CRITICAL, ssys_g.P => ic_g.P]
             append!(op_g, [ssys_g.C[k] => ic_g.C_k[k] for k in 1:G])
             sol_g = solve(
                 ODEProblem(ssys_g, op_g, (0.0, 5.0)), Rodas5P(); abstol=1e-10, reltol=1e-10
@@ -77,19 +83,20 @@ import ModelingToolkit: compose
     end
 
     @testset "mismatched beta_k and lambda_k lengths are rejected" begin
-        @test_throws DimensionMismatch PointKinetics(;
-            name=:bad, beta_k=[1e-3, 2e-3], lambda_k=[1.0]
+        @test_throws DimensionMismatch PointKinetics(
+            CRITICAL; name=:bad, beta_k=[1e-3, 2e-3], lambda_k=[1.0]
         )
     end
 
     @testset "precursor-only decay matches analytical" begin
         lambda_k = U235_LAMBDA_K
-        @named pk = PointKinetics(rho=0.0, Lambda=1.0, beta_k=zeros(6), lambda_k=lambda_k)
+        @named pk = PointKinetics(CRITICAL; Lambda=1.0, beta_k=zeros(6), lambda_k=lambda_k)
         ssys = mtkcompile(pk)
 
         P0 = 10.0
         C_k0 = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-        op = [
+        op = Pair{Any,Any}[
+            ssys.rho_c_fn => CRITICAL,
             ssys.P => P0,
             [ssys.C[k] => C_k0[k] for k in 1:6]...,
         ]
@@ -111,9 +118,10 @@ import ModelingToolkit: compose
     end
 
     @testset "zero ICs yield trivial P=0 solution" begin
-        @named pk = PointKinetics(rho=0.0)
+        @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
-        op = [
+        op = Pair{Any,Any}[
+            ssys.rho_c_fn => CRITICAL,
             ssys.P => 0.0,
             [ssys.C[k] => 0.0 for k in 1:6]...,
         ]
@@ -124,10 +132,11 @@ import ModelingToolkit: compose
     end
 
     @testset "@observed variables accessible" begin
-        @named pk = PointKinetics(rho=0.0)
+        @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
         ic = point_kinetics_steady_state(1e6)
-        op = [
+        op = Pair{Any,Any}[
+            ssys.rho_c_fn => CRITICAL,
             ssys.P => ic.P,
             [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
@@ -211,13 +220,13 @@ import ModelingToolkit: compose
 
     @testset "Callable Control Reactivity" begin
         fn_zero = t -> 0.0
-        @named pk_a = PointKinetics(fn_zero; rho_val=0.0)
+        @named pk_a = PointKinetics(fn_zero)
         ssys_a = mtkcompile(pk_a)
         @test length(unknowns(ssys_a)) == 7
         P0 = 1e6
         ic = point_kinetics_steady_state(P0)
         ctrl_zero = ReactivityController()
-        @named pk_b = PointKinetics(ctrl_zero; rho_val=0.0)
+        @named pk_b = PointKinetics(ctrl_zero)
         ssys_b = mtkcompile(pk_b)
         op_b = Pair{Any,Any}[
             ssys_b.rho_c_fn => ctrl_zero,
@@ -235,7 +244,7 @@ import ModelingToolkit: compose
         t_step = 1.0
         fn_step = (s, ts, t) -> (t >= t_step) * delta_rho
         ctrl_step = ReactivityController(fn_step)
-        @named pk_c = PointKinetics(ctrl_step; rho_val=0.0)
+        @named pk_c = PointKinetics(ctrl_step)
         ssys_c = mtkcompile(pk_c)
         op_c = Pair{Any,Any}[
             ssys_c.rho_c_fn => ctrl_step,
@@ -259,7 +268,7 @@ import ModelingToolkit: compose
         t_ramp_end = 2.0
         fn_ramp = (s, ts, t) -> ramp_slope * t
         ctrl_ramp = ReactivityController(fn_ramp)
-        @named pk_d = PointKinetics(ctrl_ramp; rho_val=0.0)
+        @named pk_d = PointKinetics(ctrl_ramp)
         ssys_d = mtkcompile(pk_d)
         op_d = Pair{Any,Any}[
             ssys_d.rho_c_fn => ctrl_ramp,
@@ -277,7 +286,7 @@ import ModelingToolkit: compose
         end
 
         plain_fn = t -> (t >= t_step) * delta_rho
-        @named pk_e = PointKinetics(plain_fn; rho_val=0.0)
+        @named pk_e = PointKinetics(plain_fn)
         ssys_e = mtkcompile(pk_e)
         op_e = Pair{Any,Any}[
             ssys_e.rho_c_fn => plain_fn,
@@ -465,7 +474,7 @@ import ModelingToolkit: compose
             abort_states=Set([:SCRAM]),
         )
 
-        @named pk = PointKinetics(ctrl; rho_val=0.0)
+        @named pk = PointKinetics(ctrl)
         ssys = mtkcompile(pk)
         cb = scram_callback(ssys, ssys.P, ctrl)
 

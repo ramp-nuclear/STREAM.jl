@@ -1,20 +1,30 @@
-# point_kinetics.jl -- PointKinetics component and steady-state IC helper
-#
-# Keepin (1965) point kinetics with G delayed precursor groups, so 1 + G ODEs:
-#
-#     dP/dt  = (ρ - β)/Λ · P + Σₖ λₖ·Cₖ
-#     dCₖ/dt = βₖ/Λ · P - λₖ·Cₖ           k = 1..G
-#
-# G is set by the length of the `beta_k` argument, so the same component serves one group or
-# twenty. The U-235 data below is six-group, which is what the defaults give you.
-# `point_kinetics_steady_state` gives the precursor concentrations that hold power steady at
-# criticality (ρ = 0).
+"""
+    U235_LAMBDA
 
-# U-235 six-group delayed neutron data
-const U235_LAMBDA = 5.4e-5  # neutron generation time [s]
-const U235_LAMBDA_K = [55.72, 22.72, 6.22, 2.3, 0.618, 0.23]  # precursor decay constants [1/s]
-const U235_BETA_K = [0.000215, 0.001424, 0.001274, 0.002568, 0.000748, 0.000273]  # delayed neutron fractions [-]
-# beta_total = sum(U235_BETA_K) = 0.006502
+Prompt neutron generation time Λ for U-235, `5.4e-5` s. The default `Lambda` in
+[`PointKinetics`](@ref).
+"""
+const U235_LAMBDA = 5.4e-5
+
+"""
+    U235_LAMBDA_K
+
+Precursor decay constants λₖ [1/s] for the six standard U-235 delayed neutron groups, ordered
+fastest to slowest. The default `lambda_k` in [`PointKinetics`](@ref), paired group for group
+with [`U235_BETA_K`](@ref).
+"""
+const U235_LAMBDA_K = [55.72, 22.72, 6.22, 2.3, 0.618, 0.23]
+
+"""
+    U235_BETA_K
+
+Delayed neutron fractions βₖ [-] for the six standard U-235 groups, in the same order as
+[`U235_LAMBDA_K`](@ref). The default `beta_k` in [`PointKinetics`](@ref), where
+`length(beta_k)` sets the group count.
+
+They sum to β = 0.006502, reported by the `beta_total` observable.
+"""
+const U235_BETA_K = [0.000215, 0.001424, 0.001274, 0.002568, 0.000748, 0.000273]
 
 function _flatten_weights(raw, comp)
     T_sym = getproperty(comp, :T)
@@ -78,17 +88,29 @@ function _temperature_feedback(temp_worth, ref_temp)
 end
 
 """
-    PointKinetics(rho_c_fn::Any; name, rho_val=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
+    PointKinetics(rho_c_fn::Any; name, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
                   lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing) -> System
 
-Callable-mode constructor. The control reactivity comes from a callable `rho_c_fn(t)` (a
-`ReactivityController` is itself callable), and the total reactivity becomes
+Keepin (1965) point kinetics with `G` delayed precursor groups, so `1 + G` ODEs:
 
-    ρ = rho_val + rho_c_fn(t) + Σⱼ αⱼ·(Tⱼ - Trefⱼ)
+    dP/dt  = (ρ - β)/Λ · P + Σₖ λₖ·Cₖ
+    dCₖ/dt = βₖ/Λ · P - λₖ·Cₖ           k = 1..G
 
-where `rho_val` is a constant bias and the sum is the per-cell temperature feedback. Each
-weight `αⱼ` is a temperature coefficient of reactivity (dρ/dT) and enters signed: a
-stabilizing reactor has a negative coefficient, so `αⱼ` is normally negative.
+`G` is `length(beta_k)`. The defaults are the six-group U-235 data ([`U235_BETA_K`](@ref),
+[`U235_LAMBDA_K`](@ref)), giving seven equations.
+[`point_kinetics_steady_state`](@ref) gives the precursor concentrations that hold power steady
+at criticality.
+
+The control reactivity comes from a callable `rho_c_fn(t)` (a `ReactivityController` is itself
+callable), and the total reactivity becomes
+
+    ρ = rho_c_fn(t) + Σⱼ αⱼ·(Tⱼ - Trefⱼ)
+
+where the sum is the per-cell temperature feedback. Each weight `αⱼ` is a temperature
+coefficient of reactivity (dρ/dT) and enters signed: a stabilizing reactor has a negative
+coefficient, so `αⱼ` is normally negative.
+
+A critical reactor is `rho_c_fn = t -> 0.0`; a constant bias is `t -> ρ₀`.
 
 When solving, the callable must appear in the operating point:
 `op = [ssys.rho_c_fn => rho_c_fn, ssys.P => ic.P, ...]`. MTK stores callable parameters by
@@ -212,8 +234,8 @@ current state and time-of-entry, a transition log, and an `abort_states` set use
 downstream callbacks to signal early integrator termination.
 
 Instances are callable: `ctrl(t)` returns `worth(ctrl, t)`. This lets users pass a
-`ReactivityController` directly as the MTK callable parameter to
-`PointKinetics(ctrl; rho_val=0.0, ...)` without writing a wrapper closure.
+`ReactivityController` directly as the MTK callable parameter to `PointKinetics(ctrl; ...)`
+without writing a wrapper closure.
 
 # Fields
 - `input_reactivity::F` : callable `(state, t_state, t) -> Float64`

@@ -1,9 +1,3 @@
-# initial_conditions.jl -- building the operating point a solve starts from.
-#
-# Separate from solvers.jl on purpose: choosing where to start is not solving. A guess can be
-# analytic (steady_state_guess) or lifted from an earlier solution (_state_snapshot), and
-# either way it is just a `unknown => value` map handed to a problem constructor.
-
 """
     steady_state_guess(; T_inlet, Q_wall, ṁ_guess, n) -> Vector{Float64}
 
@@ -31,10 +25,16 @@ function steady_state_guess(;
 end
 
 
-# Internal helper. Capture every state of a compiled system from a solved point as a symbolic
-# initial-condition map (`unknown => value` for each entry of `unknowns(ssys)`). MTK problem
-# constructors require a symbolic map, not a raw state vector or a bare solution. `unknowns(ssys)`
-# is the complete, non-redundant state (observed variables are recomputed from it), so this seeds a
-# transient from a solved state without guessing which variables MTK kept. Used by the
-# `solve_transient(ssys, sol_ss, t; ...)` method below; not part of the public API.
+"""
+    _state_snapshot(ssys, sol) -> Vector{Pair}
+
+Capture every state of a compiled system at a solved point as a symbolic initial-condition map,
+one `unknown => value` per entry of `unknowns(ssys)`.
+
+MTK's problem constructors take a symbolic map rather than a raw state vector. `unknowns(ssys)`
+is the complete, non-redundant state, so this seeds a transient from a solved one without
+depending on which variables `mtkcompile` kept.
+
+Private. Used by `solve_transient(ssys, sol_ss, t; ...)` in `src/solvers.jl`.
+"""
 _state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]

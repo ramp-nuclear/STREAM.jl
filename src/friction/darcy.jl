@@ -1,19 +1,3 @@
-# darcy.jl -- the wall friction factor a channel or a resistor is handed.
-#
-# A `AbstractDarcyFactor` answers one question:
-#
-#     darcy(T_bulk, T_wall, ṁ, liquid, pipe) -> f  [dimensionless]
-#
-# The wall temperature and the pipe are in the signature for a reason. A friction factor
-# read purely off the Reynolds number cannot express the two corrections a heated channel
-# needs: `k_R`, the geometric correction on the Reynolds fed to each branch, and `k_H`, the
-# viscosity correction, which compares the viscosity at the wall against the one in the bulk
-# and needs the heated and wet perimeters to weight it. That is the same reason
-# [`HTC`](@ref) hands over an `h` rather than a Nusselt number.
-#
-# The correlations themselves stay in friction.jl, taking a Reynolds number and nothing
-# else. [`FromReynolds`](@ref) is the lift from one to the other.
-
 """
     AbstractDarcyFactor
 

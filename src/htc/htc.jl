@@ -1,20 +1,3 @@
-# htc.jl -- the heat transfer coefficient a channel wall sees.
-#
-# An `HTC` is the handle a channel is given. It answers exactly one question:
-#
-#     htc(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h  [W/(m²·K)]
-#
-# Anything else a correlation needs (geometry, gravity, a transition band, a develop length)
-# it captures when constructed. Writing your own is a struct plus that one method, and
-# `FromFunction` covers the one-off case.
-#
-# Handing over an `h` rather than a Nusselt number is what lets a model choose *where* it
-# reads the coolant properties. A Nusselt correlation is dimensionless: closing it into an h
-# needs Re, Pr and κ, and the temperature those are read at is part of the model, not of the
-# correlation. Forced convection is conventionally closed at the film temperature, but
-# Python STREAM evaluates its laminar branch at the bulk, and that choice is not expressible
-# if the pluggable unit is a Nusselt number.
-
 """
     AbstractHTC
 

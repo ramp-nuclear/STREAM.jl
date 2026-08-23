@@ -1,5 +1,3 @@
-# pump.jl -- Pump component
-
 """
     Pump(dP_pump::Real; name) -> System
     Pump(dP_pump::Any; name) -> System

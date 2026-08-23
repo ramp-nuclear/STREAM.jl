@@ -24,7 +24,7 @@ using STREAM.Substances
     @test (@inferred Tsat(H2O, 1e5)) isa Float64
 end
 
-@testset "unicode aliases name the same functions" begin
+@testset "aliases name the same functions" begin
     @test ρ === density
     @test ρᵥ === vapor_density
     @test cₚ === specific_heat

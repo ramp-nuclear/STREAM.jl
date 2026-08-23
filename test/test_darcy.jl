@@ -102,12 +102,17 @@ const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
 end
 
 @testset "Friction resistor" begin
+    @testset "geometry is required" begin
+        # The whole PipeGeometry is the only accepted form: the viscosity correction needs the
+        # heated and wet perimeters, which an L/D/A triple cannot supply.
+        @test_throws UndefKeywordError FrictionResistor(; name=:bad)
+    end
 
     # A pump pushes through one resistor; the solved drop must match the closed form.
-    function solve_drop(; darcy=Friction.Blasius(), scale=1.0, dP=3.0e4)
+    function solve_drop(; darcy=Friction.Blasius(), dP=3.0e4)
         geom = PipeGeometry_circular(2.0, 0.05)
         @named pump = Pump(dP)
-        @named fr = FrictionResistor(; geometry=geom, darcy=darcy, scale=scale)
+        @named fr = FrictionResistor(; geometry=geom, darcy=darcy)
         @named hx = HeatExchanger(40.0)
         conns = [connect(pump.outlet, hx.inlet), connect(hx.outlet, fr.inlet),
                  connect(fr.outlet, pump.inlet), pump.inlet.p ~ 1.0e5]
@@ -129,31 +134,30 @@ end
         @test sol[ssys.fr.f] ≈ Friction.turbulent(Re_sol)
     end
 
-    @testset "scale multiplies the drop" begin
-        # Same pump head, a resistor scaled up: less flow, and the drop still balances.
-        _, s1 = solve_drop(; scale=1.0)
-        _, s3 = solve_drop(; scale=3.0)
-        @test s1.retcode == ReturnCode.Success && s3.retcode == ReturnCode.Success
-    end
 end
 
-@testset "scale on the algebraic resistors" begin
-    # Resistor is linear, so scaling by 3 is exactly three of them in series.
-    function loop_flow(; scale)
+@testset "three resistors in series equal one of three times the coefficient" begin
+    # A resistor is scaled by composing it, not by a multiplier parameter: `inseries` of three
+    # identical linear resistors has to give the same flow as a single resistor of 3R.
+    function loop_flow(resistances)
         @named pump = Pump(1.0e4)
-        @named r = Resistor(2.0e4; scale=scale)
         @named hx = HeatExchanger(40.0)
-        conns = [connect(pump.outlet, hx.inlet), connect(hx.outlet, r.inlet),
-                 connect(r.outlet, pump.inlet), pump.inlet.p ~ 1.0e5]
-        @named sys = compose(System(conns, t; name=:sys), pump, r, hx)
+        rs = [Resistor(R; name=Symbol(:r, i)) for (i, R) in enumerate(resistances)]
+        conns = Equation[
+            inseries(pump, hx, rs..., pump)...,
+            pump.inlet.p ~ 1.0e5,
+        ]
+        @named sys = compose(System(conns, t; name=:sys), pump, hx, rs...)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.r.inlet.ṁ => 0.5])
-        return sol[ssys.r.inlet.ṁ]
+        sol = solve_steady(ssys, [ssys.pump.inlet.ṁ => 0.5])
+        return sol[ssys.pump.inlet.ṁ]
     end
-    m1 = loop_flow(; scale=1.0)
-    m3 = loop_flow(; scale=3.0)
-    @test m1 ≈ 1.0e4 / 2.0e4 rtol = 1e-8
-    @test m3 ≈ m1 / 3 rtol = 1e-8
+    m_one = loop_flow([2.0e4])
+    m_three_in_series = loop_flow(fill(2.0e4, 3))
+    m_tripled = loop_flow([6.0e4])
+    @test m_one ≈ 1.0e4 / 2.0e4 rtol = 1e-8
+    @test m_three_in_series ≈ m_tripled rtol = 1e-8
+    @test m_three_in_series ≈ m_one / 3 rtol = 1e-8
 end
 
 @testset "Inertia takes a flow-dependent L/A" begin

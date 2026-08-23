@@ -1,5 +1,3 @@
-# flapper.jl -- Flapper check-valve component
-
 """
     Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0, liquid=H2O) -> System
 

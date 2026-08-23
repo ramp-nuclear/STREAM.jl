@@ -1,12 +1,3 @@
-# local.jl -- Idelchik sudden expansion / contraction local-loss factors.
-#
-# Faithful port of Python STREAM's stream/physical_models/pressure_drop/local.py. The
-# loss coefficient K depends on the area ratio and the Reynolds number through Idelchik
-# tables 4.2 (expansion) and 4.10 (contraction), with analytic closed forms above the
-# table's Reynolds range and a documented extrapolation below it. `factor`
-# bundles the whole lookup into one `@register_symbolic` function so it can sit inside an
-# MTK pressure-drop equation.
-
 # Analytic high-Re factors (Borda-Carnot expansion; Idelchik contraction closed form).
 _expansion_asymptote(aratio) = (1 - aratio)^2
 _contraction_asymptote(aratio) = 0.5 * (1 - aratio)^0.75
@@ -80,6 +71,16 @@ function _sudden_area_factor(
     end
 end
 
+"""
+    sudden_expansion_factor(aratio, re) -> K
+
+Idelchik table 4.2 loss coefficient for a sudden expansion, as a function of the area ratio
+(smaller over larger) and the Reynolds number.
+
+Above Re = 3300 this is the Borda-Carnot result `(1 - aratio)^2`. Within the table it is a
+bilinear interpolation. Below Re = 10, or outside the tabulated area ratios, it extrapolates.
+[`factor`](@ref) is what picks between this and [`sudden_contraction_factor`](@ref).
+"""
 function sudden_expansion_factor(aratio, re)
     return _sudden_area_factor(
         _IDELCHIK_42_RE[end], _IDELCHIK_42_RE[1], _IDELCHIK_42_F[1, 1],
@@ -90,6 +91,16 @@ function sudden_expansion_factor(aratio, re)
     )
 end
 
+"""
+    sudden_contraction_factor(aratio, re) -> K
+
+Idelchik table 4.10 loss coefficient for a sudden contraction, as a function of the area ratio
+(smaller over larger) and the Reynolds number.
+
+Above Re = 1e4 this is the closed form `0.5*(1 - aratio)^0.75`, which also overwrites the table's
+last column so the two agree at the join, matching Python. Within the table it is a bilinear
+interpolation, and below Re = 10 it extrapolates.
+"""
 function sudden_contraction_factor(aratio, re)
     return _sudden_area_factor(
         _IDELCHIK_410_RE[end], _IDELCHIK_410_RE[1], _IDELCHIK_410_F[1, 1],
@@ -100,9 +111,34 @@ function sudden_contraction_factor(aratio, re)
     )
 end
 
-# Loss coefficient K for a sudden area change A1 -> A2 at mass flow `ṁ`, viscosity `mu`.
-# Forward flow (ṁ >= 0) goes 1 -> 2: an expansion if A2 >= A1, a contraction otherwise.
-# Reverse flow swaps the role. Returns the dimensionless K used in dp = K*ṁ|ṁ|/(2 rho A^2).
+"""
+    factor(ṁ, A1, A2, mu) -> K
+
+Dimensionless loss coefficient `K` for a sudden area change `A1 -> A2`, at mass flow `ṁ` and
+dynamic viscosity `mu`. Feed it to [`dp`](@ref) to get a pressure.
+
+Forward flow (`ṁ >= 0`) goes `1 -> 2`, so it sees an expansion when `A2 >= A1` and a
+contraction otherwise. Reverse flow swaps the roles, which is what keeps the loss correct through
+a flow reversal.
+
+`K` comes from the Idelchik tables, indexed by area ratio and Reynolds number: table 4.2 for
+expansion, table 4.10 for contraction. Above the tabulated Reynolds range the analytic closed
+forms apply (Borda-Carnot for expansion, Idelchik's for contraction); below it the value is
+extrapolated by velocity decay. Ported from Python STREAM's
+`stream/physical_models/pressure_drop/local.py`.
+
+`@register_symbolic`, so MTK carries the table lookup as one opaque node and it can sit inside a
+pressure-drop equation.
+
+# Arguments
+- `ṁ`: mass flow rate [kg/s]; its sign selects expansion or contraction
+- `A1`: upstream flow area [m^2]
+- `A2`: downstream flow area [m^2]
+- `mu`: dynamic viscosity [Pa·s]
+
+# Returns
+The dimensionless loss coefficient `K`.
+"""
 function factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
     A = min(A1, A2)
     aratio = min(A1 / A2, A2 / A1)

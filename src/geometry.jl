@@ -1,6 +1,3 @@
-# geometry.jl — PipeGeometry descriptor for STREAM.jl
-#
-
 """
     PipeGeometry{T}
 

@@ -15,8 +15,26 @@ When writing or editing Julia code, follow the conventions in `JULIA.md` (repo r
 
 **MUST USE — humanizer for ALL prose.** No text anywhere in this repo should read as AI slop. Every piece of prose you write or edit — inline comments, docstrings, test/`@testset` names, commit messages, and `.md` files — must pass the `/humanizer` skill: no em dashes, no rule-of-three padding, no "AI vocabulary" or promotional/significance filler, plain and specific. Run `/humanizer` over prose before committing it, and over every GitHub comment/PR/issue body before it is shown for posting (see the no-auto-post rule: draft → humanize → show the user → they confirm → post). The whole existing codebase is also slated for a humanizer sweep; until then, at minimum leave any prose you touch cleaner than you found it.
 
-File level and module level comments should prefereably be part of docstrings (""")
-explaining the code rather than large block (#) comments.
+File level and module level comments should preferably be part of docstrings (`"""`)
+explaining the code rather than large block (`#`) comments.
+**Docstrings do not describe development processes and thoughts, and do not defend coding
+choices. They are succinct descriptions of what the code does and its intended use.**
+
+- **Module-level prose lives on the module**, in `src/STREAM.jl`. Each module's docstring says
+  what kind of thing belongs there and names the main entry points.
+- **No file carries a `# filename.jl -- what it holds` banner.** What a file holds is either
+  obvious from its name or belongs in its module's docstring.
+- **Prose about one entity goes in that entity's docstring**, including private ones.
+  `_state_snapshot`, `_rebin_1d`, `_diffusion_eqs` and `_bergles_rohsenow_dT_ONB` all have
+  docstrings: a `#` block listing arguments and behaviour is a docstring in the wrong syntax.
+- **`#` comments stay for local rationale**: why this seed value, why `ifelse` here, which
+  Python line an expression mirrors. What a reader needs at that line and nowhere else. This is
+  where a justification goes when one is worth keeping at all.
+- **Do not repeat a docstring in a comment beside the code.** If both exist, delete the comment.
+
+Docstrings are reference documentation, so write them to be read rendered rather than in the
+file: give exported names `# Arguments` and `# Returns`, and cross-reference with
+`[`name`](@ref)`.
 
 ## Units
 
@@ -152,11 +170,11 @@ test/
   test_correlations.jl      # Nusselt + friction correlation function unit tests
   test_htc.jl               # HTC models: property basis, named constructors, regime
                             # switching, subcooled boiling, user-defined models
-  test_darcy.jl             # DarcyFactor models + the Friction resistor, resistor `scale`,
+  test_darcy.jl             # DarcyFactor models + the Friction resistor, resistors in series,
                             # and flow-dependent Inertia
   test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState
   test_composition.jl       # symmetric_plate, plate, one_sided_connection, compose_systems,
-                            # port, check_gravity_mismatch, _infer_n, connect_temperature_feedback,
+                            # port, check_gravity_mismatch, var_length, temperature_feedback,
                             # fuel_assembly — heavy CAC<->HD coverage
   test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
   test_solvers.jl           # steady_state_guess + solve_steady/solve_transient wrappers (src/solvers.jl)
@@ -182,9 +200,23 @@ so do not re-derive them from scratch.
   currently missing its main post-trip source term. Plan: Way-Wigner first, then user-supplied
   databases, the same shape Python takes.
 - **`test_examples.jl` loss-of-flow bypass fails** (7 failed, 2 errored). Pre-existing and
-  confirmed identical on a clean checkout of `d212321`'s parent. The steady solve lands on the
-  ṁ = 0 root instead of the forced-flow branch, which the test's own comments predict. Because
-  of it the natural-convection HTC path has no working in-channel coverage.
+  confirmed identical on a clean checkout of `d212321`'s parent.
+
+  The loop has two steady states, not one. With the pump running there is a forced-flow
+  solution, and there is also always the trivial one where nothing moves: at ṁ = 0 the friction
+  drop is zero, the buoyancy drop is zero, and every equation balances. Both are real roots of
+  the same algebraic system, so `solve_steady` returns whichever the initial guess is nearest,
+  and here it lands on ṁ = 0. The test's own comments predict this. Everything downstream then
+  measures a loop that never started, which is also why the natural-convection HTC path has no
+  working in-channel coverage: reaching it needs a run that began with flow.
+
+  The fix is not a sign constraint on ṁ. This loop's flow legitimately reverses after the pump
+  trips, so forbidding negative flow would forbid the physics. What works is arriving at the
+  forced-flow root by a path that does not pass near the trivial one: solve with the pump head
+  held at its pre-trip value to get a consistent forced-flow state, then run the transient from
+  there. `_lof_bypass_ic` in `test/test_integration.jl` does exactly that, and those tests pass.
+  Worth knowing that Python STREAM has the same two roots, so this is a property of the model
+  rather than of MTK.
 
 Not gaps, checked and matching: the developing-laminar Nusselt (Python defaults to the same
 analytic approximation, using its Shah & London table only to bound that approximation's

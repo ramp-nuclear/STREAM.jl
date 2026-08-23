@@ -1,13 +1,3 @@
-# heavy_water.jl -- saturated heavy water (D₂O) property correlations.
-#
-# Source for every coefficient below:
-#   A. Crabtree and M. Siman-Tov, "Thermophysical Properties of Saturated Light and Heavy
-#   Water for Advanced Neutron Source Applications", ORNL/TM-12322, 1993.
-#
-# Same shape as light_water.jl: saturation-line fits in Celsius and Pa, with the pressure
-# argument unused outside `sat_temperature`, and per-function reference values asserted in
-# test_substances.jl.
-
 """
     HeavyWater()
     D2O
@@ -19,6 +9,10 @@ Saturated Light and Heavy Water for Advanced Neutron Source Applications", ORNL/
 1993.
 
 [`D2O`](@ref) is the singleton instance.
+
+Same shape as [`LightWater`](@ref): saturation-line fits in Celsius and Pa, the pressure argument
+unused outside `sat_temperature`, and per-property reference values asserted in
+`test_substances.jl`.
 """
 struct HeavyWater <: AbstractLiquid end
 

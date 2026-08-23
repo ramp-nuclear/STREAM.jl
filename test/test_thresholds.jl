@@ -1,10 +1,14 @@
 using Test
 using STREAM
+using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Substances
 using STREAM.Thresholds
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
+using ModelingToolkit
+using ModelingToolkit: t_nounits as t
+using OrdinaryDiffEq: ReturnCode
 
 @testset "Threshold Analysis" begin
 
@@ -365,6 +369,41 @@ end
     # Without a geometry there is no area at all, so both faces read zero.
     bare = ChannelState(sol, ssys.ch)
     @test all(iszero, bare.q_flux)
+end
+
+@testset "ChannelState says so when the channel has no wall temperature" begin
+    # ChannelHeatFlux prescribes its flux, so nothing closes T_wall_left/T_wall_right and
+    # mtkcompile drops them. MTK's own complaint is "Symbol ... is not present in the
+    # system", which does not tell you that the channel variant is the problem.
+    n = 4
+    geo = PipeGeometry_circular(0.6, 0.01)
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(20.0)
+    @named chf = ChannelHeatFlux(; n=n, geometry=geo)
+    conns = Equation[
+        inseries(pump, bc, chf, pump)...,
+        pump.inlet.p ~ 1.0e5,
+        [chf.q_left[i] ~ 1.0e4 for i in 1:n]...,
+        [chf.q_right[i] ~ 0.0 for i in 1:n]...,
+    ]
+    @named sys = compose(System(conns, t; name=:chf_loop), pump, bc, chf)
+    ssys = mtkcompile(sys)
+    ic = Pair{Any,Any}[
+        [ssys.chf.T[i] => 20.0 for i in 1:n]...,
+        ssys.chf.inlet.ṁ => 0.5,
+    ]
+    sol = solve_steady(ssys, ic)
+    @test sol.retcode == ReturnCode.Success
+
+    err = try
+        ChannelState(sol, ssys.chf; pipe=geo)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("ChannelHeatFlux", err.msg)
+    @test occursin("chf", err.msg)
 end
 
 @testset "chfr helper" begin

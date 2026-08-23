@@ -1,3 +1,21 @@
+"""
+    _diffusion_eqs(; T, thermal_left, thermal_right, nz, nx, k_s, rho_s, cp_s,
+                   dx, dz, y, power, power_shape) -> Vector{Equation}
+
+The finite-difference stencil behind [`HeatDiffusion`](@ref), as a flat list of equations over an
+`nz × nx` grid of solid cells.
+
+Four groups, in build order. Two give the heat flow through each `ThermalPort`, over a half-cell
+conduction distance `dx/2` from port to first cell centre. Two give the boundary columns their
+energy balance, conducting to one interior neighbour and to the port. The last is the three-point
+interior stencil.
+
+Volumetric heating is `power * power_shape` spread over a cell's mass. `power_shape` is not
+normalized here.
+
+There is no axial conduction: the plate conducts across its thickness and each axial slice is
+independent.
+"""
 function _diffusion_eqs(;
     T,
     thermal_left,
@@ -47,6 +65,7 @@ function _diffusion_eqs(;
         ]...
     ]
 end
+
 """
     HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=300.0) -> System
 
@@ -64,7 +83,7 @@ end
 - `k_s`: thermal conductivity [W/(m*K)]
 - `power_shape`: axial-lateral power shape matrix of size `(nz, nx)` (not normalized internally)
 - `power`: total power into plate [W], MTK variable — must be constrained via a connection equation
-  (e.g. `fuel.power ~ 1e4` for standalone use, or `rods.fuel.power ~ pk.P * scale` for PK-coupled use)
+  (e.g. `fuel.power ~ 1e4` for standalone use, or `rods.fuel.power ~ pk.P * power_scale` for PK-coupled use)
 - `T0`: initial temperature [°C], default 300.0
 
 # Ports

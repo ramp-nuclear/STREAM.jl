@@ -1,10 +1,3 @@
-# assemblies.jl -- channel and fuel-plate assemblies.
-#
-# Named arrangements of channels and plates: a plate seen from one or both sides, a single
-# channel against one plate, and the alternating channel/plate chain a fuel assembly is.
-# Each returns an uncompiled System wired with the primitives from connections.jl; the
-# caller adds boundary conditions and compiles.
-
 function _real_defaults(params)
     vals = Float64[]
     for p in params
@@ -218,16 +211,7 @@ function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol
 end
 
 
-# ----------------------------------------------------------------
-# fuel_assembly — alternating channel <-> plate chains.
-# Builds the per-cell thermal connections for the four chain shapes
-# (channel-bookended, plate-bookended, mixed, and closed ring) and returns the
-# uncompiled System. The caller adds boundary conditions and compiles.
-#
-# Wiring: each adjacent pair connects the left member's right face to the right
-# member's left face (same convention as `plate`). Outer faces left dangling
-# stay adiabatic, like `one_sided`.
-# ----------------------------------------------------------------
+# The helpers below build the alternating chain [`fuel_assembly`](@ref) composes.
 
 # Build the alternation as an ordered Vector of (kind, sys) tuples, kind :c or :p.
 function _walk_alternation(channels, plates, effective_bookend::Symbol, start)
@@ -258,7 +242,10 @@ end
 Compose an alternating CAC↔Plate chain (fuel-assembly topology) from a vector of
 `ChannelAndContacts` instances and a vector of `HeatDiffusion` plates.
 
-Handles the four variants from the v1.2 design contract §3.12:
+Each adjacent pair connects the left member's right face to the right member's left face, as in
+[`plate`](@ref). Outer faces left dangling stay adiabatic, as in [`one_sided`](@ref).
+
+There are four chain shapes:
 
 1. **Channel-bookended** — `length(channels) == length(plates) + 1`. Both ends are CACs;
    plates sit between adjacent channels. Inferred when `bookend=:auto`.

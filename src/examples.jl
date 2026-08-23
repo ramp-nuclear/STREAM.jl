@@ -1,6 +1,3 @@
-# examples.jl -- Example system builders
-# build_loop, build_loop_vertical, build_loop_transient, build_cube
-
 """
     build_loop(; n=10, L_ch=0.6, D_ch=0.01, dP_pump=3.0e4, T_inlet=40.0,
                T_wall=100.0, h_wall=5000.0, g_acc=0.0, H_return=nothing) -> System
@@ -329,8 +326,8 @@ end
 
 """
     build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, dP_pump=3.0e4,
-                  P0=1.0, power_scale=1e4, temp_worth=nothing, ref_temp=nothing,
-                  rho_val=0.0) -> (System, Vector{Pair{Any,Any}})
+                  P0=1.0, power_scale=1e4, temp_worth=nothing,
+                  ref_temp=nothing) -> (System, Vector{Pair{Any,Any}})
 
 Build a full thermal-hydraulic loop coupled to a `PointKinetics` reactor model
 (pump + HeatExchanger + ChannelAndContacts + HeatDiffusion + PointKinetics).
@@ -363,7 +360,6 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
   references inside `symmetric_plate`. `nothing` = no temperature feedback.
 - `ref_temp`: per-component reference temperatures [°C]. Same key structure as
   `temp_worth`. `nothing` = use zero reference (full T contributes to feedback).
-- `rho_val`: constant base reactivity bias [-] (default 0.0 = critical)
 
 # Returns
 `(ssys, ic)` where:
@@ -382,7 +378,6 @@ function build_loop_pk(ctrl;
     power_scale=1e4,
     temp_worth=nothing,
     ref_temp=nothing,
-    rho_val=0.0,
 )
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ps = fill(1.0 / (nz * nx), nz, nx)  # uniform power shape, normalized
@@ -410,7 +405,7 @@ function build_loop_pk(ctrl;
     tw = _resolve_tw(temp_worth, rods_cac, rods_fuel)
     rt = _resolve_tw(ref_temp, rods_cac, rods_fuel)
 
-    @named pk = PointKinetics(ctrl; rho_val=rho_val, temp_worth=tw, ref_temp=rt)
+    @named pk = PointKinetics(ctrl; temp_worth=tw, ref_temp=rt)
 
     fb_components = if isnothing(tw)
         System[]
@@ -448,11 +443,12 @@ function build_loop_pk(ctrl;
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]
     # Consistent-IC seeding
-    # FlowPort/ThermalPort temperatures default to 300 K (src/connectors.jl). The boundary coolant
-    # cells and the channel↔fuel contact nodes are aliased to those port temperatures, and the
-    # per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT pin the port representatives under NoInit.
-    # Left unseeded, a temperature-feedback PK loop with ref_temp≠300 sees a spurious (300 − ref_temp)
-    # reactivity offset at t=0 that crashes power — a pure initialization artifact, not physics.
+    # FlowPort/ThermalPort temperatures default to 26.85 °C, which is 300 K
+    # (src/components/connectors.jl). The boundary coolant cells and the channel↔fuel contact nodes are
+    # aliased to those port temperatures, and the per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT
+    # pin the port representatives under NoInit. Left unseeded, a temperature-feedback PK loop with
+    # ref_temp ≠ 26.85 sees a spurious (26.85 − ref_temp) reactivity offset at t=0 that crashes power,
+    # which is an initialization artifact rather than physics.
     #
     # Each connected port pair (hx↔cac, cac↔pump, pump↔hx, and each cac↔fuel contact) collapses to one
     # alias-elimination representative, and WHICH member survives is not stable across MTK versions /

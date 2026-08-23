@@ -1,21 +1,14 @@
-# analysis.jl -- Post-processing framework for nuclear safety threshold analysis
-#
-# Bridges MTK solver output (NonlinearSolution or ODESolution) to the physics
-# correlation functions in src/physical_models/thresholds.jl.
-#
-# Each correlation in thresholds.jl also gains a ChannelState method here, so the state is
-# just another way to call it rather than a parallel set of names.
-
 """
     ChannelState
 
-Pre-extracted MTK solution fields for a single channel system, built with
-`ChannelState(sol, channel_sys; pipe, gravity)` and accepted by every threshold correlation
-and by `threshold_analysis`.
+One channel's solved state, in the form the threshold correlations take.
 
-For **steady-state** solutions, each vector field has length `n` (one value per axial cell).
-For **transient** solutions, each field that was `AbstractVector` becomes `AbstractMatrix`
-with shape `[n_cells, n_times]` — broadcasting in wrappers handles both uniformly.
+Construct it from a solution with [`ChannelState(sol, channel_sys)`](@ref), or by hand with
+keywords. Every correlation in `Thresholds` accepts one, as does [`threshold_analysis`](@ref).
+
+For a steady solution each vector field has length `n`, one value per axial cell. For a
+transient, every per-cell field is an `[n_cells, n_times]` matrix. The correlations broadcast,
+so the same call works on either.
 
 # Fields
 - `n::Int`                     — number of axial cells
@@ -65,6 +58,10 @@ assembled into a matrix of shape `[n_cells, n_times]`.
 
 `q_flux_left[i] = q_wall_left[i] / (pipe.heated_parts[1] * dz)`.
 When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
+
+`channel_sys` must expose a wall temperature, so `Channel` or `ChannelAndContacts`.
+`ChannelHeatFlux` prescribes its flux and leaves `T_wall_left`/`T_wall_right` unconstrained for
+`mtkcompile` to drop; passing one throws `ArgumentError`.
 """
 function ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81)
     n = length(channel_sys.T)
@@ -79,14 +76,29 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81)
     scalar(sym) = is_transient ? sol[sym, 1] : sol[sym]
 
     # `velocity` is the unsigned speed and only ChannelAndContacts declares it. The other
-    # variants expose the signed `v`, so read that and take the magnitude, which lets a plain
-    # Channel or a ChannelHeatFlux be analyzed too.
+    # variants expose the signed `v`, so read that and take the magnitude, which is what lets a
+    # plain Channel be analyzed too.
     signed_velocity = !hasproperty(channel_sys, :velocity)
     velocity = cells(signed_velocity ? channel_sys.v : channel_sys.velocity)
     signed_velocity && (velocity = abs.(velocity))
 
-    T_wall_left = cells(channel_sys.T_wall_left)
-    T_wall_right = cells(channel_sys.T_wall_right)
+    # Every variant declares T_wall_left/T_wall_right, but only the ones that also close them
+    # keep them through mtkcompile, so the read is where a wall-less channel shows up. The bare
+    # "not present in the system" that MTK raises does not say which channel or why.
+    T_wall_left, T_wall_right = try
+        cells(channel_sys.T_wall_left), cells(channel_sys.T_wall_right)
+    catch err
+        err isa ArgumentError || rethrow()
+        throw(
+            ArgumentError(
+                "no wall temperature survived compilation in $(nameof(channel_sys)), so a " *
+                "ChannelState cannot be built from it. ChannelHeatFlux prescribes its heat " *
+                "flux and leaves T_wall_left and T_wall_right with no equation, which " *
+                "mtkcompile then drops. Threshold analysis wants Channel or " *
+                "ChannelAndContacts. MTK said: $(err.msg)",
+            ),
+        )
+    end
 
     # q_wall is a heat flow [W]; dividing by the face area gives the flux the correlations
     # want. Without a geometry there is no area, so the fluxes stay zero.
@@ -248,10 +260,7 @@ function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=H2O)
     )
 end
 
-# T_sat is taken at the downstream end of the channel, where the coolant has warmed the most
-# and the pressure has dropped the furthest, so it is the cell that limits OFI. Which end is
-# downstream follows the flow direction. Matches Python STREAM's
-# `pressure[-1 if mdot >= 0 else 0]`.
+# Mirrors Python STREAM's `pressure[-1 if mdot >= 0 else 0]`.
 function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
     per_cell = s.T_sat isa AbstractMatrix ? view(s.T_sat, :, 1) : s.T_sat
     T_sat_out = s.ṁ >= 0 ? last(per_cell) : first(per_cell)

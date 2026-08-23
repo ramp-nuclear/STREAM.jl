@@ -1,21 +1,3 @@
-# light_water.jl -- saturated light water (H₂O) property correlations.
-#
-# Source for every coefficient below:
-#   A. Crabtree and M. Siman-Tov, "Thermophysical Properties of Saturated Light and Heavy
-#   Water for Advanced Neutron Source Applications", ORNL/TM-12322, 1993.
-#
-# Each function's docstring records reference values at a couple of temperatures. They are
-# asserted in test_substances.jl, so a change to the arithmetic fails a test rather than
-# drifting quietly.
-#
-# These are fits along the saturation line, so every property except the saturation
-# temperature itself is a function of temperature alone and ignores the pressure
-# argument. Temperatures are Celsius, pressures Pa.
-#
-# Several correlations wrap their argument in `abs`. That is not physics, it keeps a solver
-# iterate that wanders outside the fitted range from raising a DomainError before it
-# recovers.
-
 """
     LightWater()
     H2O
@@ -27,6 +9,15 @@ Saturated Light and Heavy Water for Advanced Neutron Source Applications", ORNL/
 1993.
 
 [`H2O`](@ref) is the singleton instance and is what components default to.
+
+Fits along the saturation line, so every property except the saturation temperature depends on
+temperature alone and ignores its pressure argument. Temperatures are Celsius, pressures Pa.
+
+Each property method's docstring records reference values at a couple of temperatures;
+`test_substances.jl` asserts them.
+
+Several correlations wrap their argument in `abs`, which keeps a solver iterate that wanders
+below the fitted range from raising a `DomainError`.
 """
 struct LightWater <: AbstractLiquid end
 

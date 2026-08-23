@@ -1,15 +1,17 @@
-# misc.jl -- Inertia, HeatExchanger, ConstantTemperature components
-
 """
-    Inertia(L_over_A; name) -> System
+    Inertia(L_over_A::Real; name) -> System
+    Inertia(L_over_A::Function; name) -> System
 
 Concentrated fluid inertia element for transient simulations. Adds `L/A * d(ṁ)/dt`
 to the momentum equation.
 
-`L_over_A` is either a number, or a callable `(ṁ) -> L/A` for an inertia that depends on
-the flow itself. See [`bilinear_inertia`](@ref) for the standard flow-dependent form. A
-callable is traced symbolically, so build it out of arithmetic and `ifelse` rather than a
-Julia `if`.
+Two forms. `Inertia(1.75e5)` holds a fixed ratio as a parameter. `Inertia(f)`, where `f` is a
+`Function` of one argument, makes the inertia depend on the flow, `f(ṁ) -> L/A`, and carries one
+extra unknown `L_eff`. [`bilinear_inertia`](@ref) is the standard flow-dependent form.
+
+The second method dispatches on `Function`, so a closure or a named function works but a struct
+with a call method does not. The function is traced symbolically: build it from arithmetic and
+`ifelse`, not a Julia `if`.
 
 Note: Channel, ChannelAndContacts, and ChannelHeatFlux carry their own distributed
 inertia via a momentum ODE `(L/A)*D(ṁ)`. Use standalone Inertia only for concentrated
@@ -18,7 +20,8 @@ placed in series with a Channel, both momentum ODEs contribute additively throug
 network topology -- correct physics (distributed + concentrated).
 
 # Arguments
-- `L_over_A`: length-to-area ratio [1/m], a number or a callable `(ṁ) -> L/A`
+- `L_over_A`: length-to-area ratio [1/m]; a `Real` for a fixed value, or a `Function`
+  `(ṁ) -> L/A`
 - `name`: system name (Symbol)
 
 # Ports
@@ -78,8 +81,6 @@ Ideal heat exchanger that resets fluid temperature to a fixed boundary condition
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
-
-
 """
 function HeatExchanger(T_bc; name)
     pars = @parameters T_bc = T_bc

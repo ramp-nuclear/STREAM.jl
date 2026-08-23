@@ -1,12 +1,3 @@
-# friction.jl -- Darcy friction factor correlations
-#
-# Design:
-#   - Standalone named functions (blasius, turbulent, viscosity_correction,
-#     rectangular_correction): plain Julia arithmetic, NOT @register_symbolic.
-#     MTK traces through these symbolically when Re is symbolic.
-#   - Factory (rectangular_laminar): returns closure capturing geom-derived state.
-#   - No @register_symbolic on any function in this file — all are plain arithmetic.
-
 """
     blasius(Re) -> f_darcy
 

@@ -1,12 +1,3 @@
-# liquid.jl -- the liquid substance interface shared by every coolant.
-#
-# A coolant is a singleton type such as `LightWater` that answers nine property
-# queries. Components take a liquid as a keyword argument and call the queries
-# while building their equations, so swapping coolants is a matter of passing a
-# different value, not editing a component.
-#
-# Temperatures are Celsius and pressures are Pa throughout.
-
 """
     AbstractLiquid
 
@@ -70,7 +61,18 @@ property expression depend on that pressure symbol, coupling the Jacobian for co
 that ignore pressure anyway. A coolant with genuinely pressure-dependent properties wants
 the three-argument form at the call site.
 
-Each unicode alias below names the same function, so `ρ === density` and either spelling
+The two-argument forms are generated over [`LIQUID_PROPERTIES`](@ref) with the signature
+`(liquid::AbstractLiquid, T)`. A coolant wanting a different default pressure defines its own,
+more specific method, which dispatch prefers:
+
+```julia
+struct MoltenSalt <: AbstractLiquid end
+density(l::MoltenSalt, T) = density(l, T, 2.0e5)   # this pressure, not ATM
+```
+
+Only the properties you override change; the rest keep falling back to the generated method.
+
+Each alias below names the same function, so `ρ === density` and either spelling
 dispatches identically.
 
 | alias | function            | alias  | function          |

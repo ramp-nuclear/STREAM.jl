@@ -1,20 +1,12 @@
-# connections.jl -- wiring primitives and the checks that go with them.
-#
-# Everything here is about joining components that already exist: series and parallel
-# hydraulic chains, per-cell thermal faces, the composed System itself, and the
-# point-kinetics temperature-feedback bindings. Assemblies built out of these live in
-# assemblies.jl.
-#
-# ## Two Port Components
-# Connections such as `inseries` and `inparallel` utilize components having 
-# one inlet and one outlet FlowPort subsystems.
-#
-
 """
     inseries(systems...) -> Vector{Equation}
 
 Build the hydraulic connection equations for a simple series chain of two-port components,
 connecting each component's `outlet` to the next component's `inlet`.
+
+A two-port component exposes exactly one `inlet` and one `outlet` [`FlowPort`](@ref); see
+`HydraulicTwoPort` for which components qualify. Channels also expose both ports and chain the
+same way.
 
 # Arguments
 - `systems`: two or more uncompiled systems exposing `inlet` and `outlet` `FlowPort`s
@@ -140,8 +132,8 @@ end
 function faces(mapping::Pair)
     (left_sys, left_face) = mapping.first
     (right_sys, right_face) = mapping.second
-    n_left = var_length(left_sys, :thermal_left)
-    n_right = var_length(right_sys, :thermal_left)
+    n_left = var_length(left_sys, left_face)
+    n_right = var_length(right_sys, right_face)
     n_left == n_right ||
         throw(ArgumentError("face sizes do not match: $n_left != $n_right"))
     return Equation[
@@ -149,21 +141,47 @@ function faces(mapping::Pair)
     ]
 end
 
-"""Infer variable count in `sys` whose name begins with `varname`. 
-Useful for variable arrays."""
-function var_length(sys, varname)
+"""
+    var_length(sys, prefix) -> Int
+
+Count the subsystems of `sys` whose name starts with `prefix`, giving the width of an indexed
+connector array.
+
+A component with `n` thermal faces per side carries `n` separate subsystems named
+`thermal_left1 … thermal_leftn` rather than one array-valued connector, so the count comes from
+the names.
+
+`ChannelAndContacts` and `HeatDiffusion` carry such arrays. `Channel` and `ChannelHeatFlux` do
+not, and raise.
+
+# Arguments
+- `sys`: an uncompiled system. Compilation flattens away the subsystem names this reads.
+- `prefix`: a `Symbol` naming the connector family, such as `:thermal_left` or `:thermal_right`
+
+# Returns
+The number of matching subsystems, at least 1.
+
+# Throws
+`ArgumentError` when nothing matches.
+
+# Example
+```julia
+@named cac = ChannelAndContacts(; n=4, geometry=geom)
+var_length(cac, :thermal_left)    # 4
+```
+"""
+function var_length(sys, prefix)
     sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
-    n = count(s -> startswith(s, string(varname)), sub_names)
+    n = count(s -> startswith(s, string(prefix)), sub_names)
     n == 0 && throw(
         ArgumentError(
-            "Could not detect $(varname) count in system $(ModelingToolkit.getname(sys))",
+            "found no subsystem named $(prefix)* in $(ModelingToolkit.getname(sys)), so its " *
+            "$(prefix) count cannot be read. Pass an uncompiled component that carries " *
+            "per-cell connector arrays, such as ChannelAndContacts or HeatDiffusion.",
         ),
     )
     return n
 end
-
-
-
 
 """
     temperature_feedback(pk, components) -> Vector{Equation}

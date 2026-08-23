@@ -1,6 +1,3 @@
-# sources.jl -- WallTemperature and HeatFluxSource value-source components
-#
-
 """
     WallTemperature(; name, n, T_wall) -> System
 

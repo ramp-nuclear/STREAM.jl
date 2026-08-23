@@ -1,19 +1,5 @@
-# thresholds.jl -- Safety threshold correlations (CHF, OFI, OSV, ONB, wall-temperature limit)
-#
-# The correlations themselves. The wrappers that read a solved channel and apply them live
-# in analysis.jl.
-#
-# Design:
-#   - All functions are plain Julia arithmetic — NOT @register_symbolic, NOT ifelse().
-#     These are post-solve analysis functions, not embedded in MTK equations.
-#   - They operate on scalar (or vector) Float64 values from solver solutions.
-#   - No MTK dependencies here.
-#
-# Functions: bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan,
-#            q_OSV_saha_zuber, q_CHF_sudo_kaminaga, q_CHF_mirshak,
-#            q_CHF_fabrega, twall_limit
-
-# #### Private sub-correlation helpers for Sudo-Kaminaga CHF
+# The Sudo-Kaminaga CHF correlation is a maximum over three branch expressions; these are the
+# branches. Kept private because only q_CHF_sudo_kaminaga has any use for them.
 
 function _SKq1(G_star)
     return 0.005 * abs(G_star)^0.611
@@ -300,4 +286,37 @@ CHF heat flux `q_CHF` [W/m^2].
 """
 function q_CHF_fabrega(T_inlet, T_sat, pipe)
     return 1e7 * pipe.Dh * (0.023 * (T_sat - T_inlet) + 4.56)
+end
+
+"""
+    twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0) -> T_limit [°C]
+
+Wall temperature the face would reach if the local heat flux were worse by
+`inhomogeneity_factor`.
+
+Formula: `T_limit = T_bulk + inhomogeneity_factor * (T_wall - T_bulk)`
+
+The solution carries no fuel inhomogeneity, so the wall temperature it reports understates the
+hot spot. Scaling the flux by `inhomogeneity_factor` and reading the wall temperature back off
+Newton's law gives the limit to check against.
+
+Python STREAM writes this as `T_bulk + q * inhomogeneity_factor / h`. The forms agree, since
+these channels state `q = h*(T_wall - T_bulk)` and the `h` cancels:
+
+    T_bulk + inhom * q / h = T_bulk + inhom * h*(T_wall - T_bulk) / h
+                           = T_bulk + inhom * (T_wall - T_bulk)
+
+Needs a channel carrying a wall temperature, so `Channel` or `ChannelAndContacts`. See
+[`ChannelState`](@ref) for `ChannelHeatFlux`.
+
+# Arguments
+- `T_bulk`: bulk coolant temperature [°C]
+- `T_wall`: wall temperature on the face being checked [°C]
+- `inhomogeneity_factor`: dimensionless flux multiplier (default 1.0, no correction)
+
+# Returns
+Effective wall temperature limit `T_limit` [°C].
+"""
+function twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0)
+    return T_bulk + inhomogeneity_factor * (T_wall - T_bulk)
 end

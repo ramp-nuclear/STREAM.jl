@@ -1,15 +1,3 @@
-# htc/correlations.jl -- Nusselt number correlations.
-#
-# Everything here is dimensionless: a correlation takes `(Re, Pr, T_wall, T_bulk)` and
-# returns Nu. Closing one into a heat transfer coefficient, which is where the choice of
-# film or bulk properties lives, is [`FromNusselt`](@ref)'s job in htc.jl.
-#
-# Geometry-dependent factories take `geom::PipeGeometry` first and capture the scalars they
-# need (`geom.depth`, `geom.width`, `geom.L`, `geom.Dh`) at construction, so the returned
-# closure sees only symbolic Re and Pr.
-#
-# Nothing here is @register_symbolic: it is all plain arithmetic that MTK traces through.
-
 """
     dittus_boelter(Re, Pr, args...) -> Nu
 
