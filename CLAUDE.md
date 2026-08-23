@@ -201,27 +201,18 @@ so do not re-derive them from scratch.
   the dominant heat source after shutdown, so every loss-of-flow and SCRAM transient here is
   currently missing its main post-trip source term. Plan: Way-Wigner first, then user-supplied
   databases, the same shape Python takes.
-- **One assertion in `test_examples.jl` fails, and it stops the suite.** The bypass
-  loss-of-flow case runs end to end now: 20 of its 21 assertions pass, including the flapper
-  event, the channel flow reversal and the natural-circulation equilibrium. The one failure is
-  `channel flow reversal (ṁ crosses zero)`, which brackets the settled recirculation at
-  4.21 g/s ± 0.05 g/s. It settles at 4.349 g/s, so the bracket misses by 3.3%. The
-  momentum-balance testset beside it derives the same equilibrium from buoyancy against
-  friction and passes, which points at the stored number as the stale side.
+- **The loss-of-flow steady solve has two roots, and reaching the right one is by hand.** The
+  pump-on steady state has a forced-flow root and a trivial one at ṁ = 0, where the friction
+  and buoyancy drops both vanish and every equation balances. `solve_steady` returns whichever
+  the guess sits nearest. `_lof_bypass_ic` in `test/test_examples.jl` reaches the forced-flow
+  one by holding the pump head at its pre-trip value with the flapper latched closed, then
+  integrating from that state, and it seeds the solve with a hand-written map naming the
+  variables `mtkcompile` happened to keep. If you change a channel equation and that case
+  starts landing on ṁ = 0, the seed list is the first thing to look at.
 
-  What this costs is out of proportion to the assertion. `runtests.jl` aborts at the first
-  failing file, so a plain `julia --project=. test/runtests.jl` stops inside `test_examples.jl`
-  and never reaches `test_validation.jl`, `test_integration.jl` or `test_point_kinetics.jl`.
-  All three pass when run directly, so run them that way rather than reading a full-suite abort
-  as a parity failure.
-
-  Background worth having before touching that case: the pump-on steady state has two roots,
-  the forced-flow one and the trivial one at ṁ = 0, where friction and buoyancy drops both
-  vanish and every equation balances. `_lof_bypass_ic` in `test/test_examples.jl` reaches the
-  forced-flow root by holding the pump head at its pre-trip value with the flapper latched
-  closed, then integrating from there. Do not "fix" any of this with a sign constraint on ṁ:
-  this loop's flow legitimately reverses after the pump trips, so forbidding negative flow
-  would forbid the physics. Python STREAM has the same two roots.
+  Do not "fix" any of this with a sign constraint on ṁ. This loop's flow legitimately reverses
+  after the pump trips, so forbidding negative flow would forbid the physics. Python STREAM has
+  the same two roots.
 
 Not gaps, checked and matching: the developing-laminar Nusselt (Python defaults to the same
 analytic approximation, using its Shah & London table only to bound that approximation's

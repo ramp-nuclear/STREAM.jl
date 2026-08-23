@@ -43,7 +43,7 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 
 | Scenario | Can Python do it? | Can STREAM.jl do it? | What blocks us |
 |---|---|---|---|
-| **LOFA** (loss of flow) | Yes, one channel type | Partly | Decay heat is the main one. The forced-to-natural-circulation transition runs end to end, with one stale reference number in its test (see [7.2](#72-one-stale-number-in-the-loss-of-flow-bypass-case)) |
+| **LOFA** (loss of flow) | Yes, one channel type | Partly | Decay heat is the main one. The forced-to-natural-circulation transition runs end to end and is tested against a derived buoyancy-against-friction balance |
 | **RIA** (reactivity insertion) | Yes | Partly | Decay heat matters less here, but cylindrical fuel, gap conductance and fuel-temperature limits are all absent |
 | **LOCA**, level tracking to uncovery | **No** | Partly | Needs coolant inventory, a free surface and break flow. No two-phase model required ([4](#4-loca-level-tracking-and-where-it-stops)) |
 | **LOCA**, past uncovery | **No** | **No** | Void, steam, post-CHF heat transfer. Out of scope for both, by choice |
@@ -369,47 +369,32 @@ two-phase model ever arrives. Temperatures do not qualify while we are in Celsiu
 
 **Size:** small, but narrow in value. Not a priority on its own.
 
-### 7.2 One stale number in the loss-of-flow bypass case
+### 7.2 The forced-flow root is reached by a hand-written guess
 
-This entry used to say the case did not converge. It does now. `test_examples.jl` runs the
-bypass loss-of-flow transient end to end: the pre-trip steady solve reaches the forced-flow
-root, the flapper fires at its threshold, the heated channel reverses, energy conservation
-holds on the coolant control volume, and the settled natural-circulation flow matches an
-independent buoyancy-against-friction balance. Twenty of the twenty-one assertions pass. The
-natural-convection heat transfer path therefore does have working in-channel coverage, which
-an earlier version of this file denied.
+The pump-on steady state has two roots. There is the forced-flow one, and there is always the
+trivial one at ṁ = 0, where the friction drop and the buoyancy drop both vanish and every
+equation balances. `solve_steady` returns whichever the guess sits nearest, so picking the
+right one is an initialisation problem rather than a solver setting. Python STREAM has the same
+two roots, so this is a property of the model.
 
-What is left is one hard-coded number. The `channel flow reversal (ṁ crosses zero)` testset
-brackets the settled recirculation at 4.21 g/s with an absolute tolerance of 0.05 g/s, on the
-stated grounds that it reproduced at 4.207 g/s on two different package sets. It now settles at
-4.349 g/s, 3.3% away, so the bracket misses. The momentum-balance testset beside it derives the
-same equilibrium from buoyancy against friction rather than from a stored value, and it passes,
-which points at the bracket as the stale side rather than the physics. Worth confirming before
-anyone widens it: the candidates for what moved the root are the `HTC` work, the switch of the
-friction closure to `Friction.RegimeDependent`, and the package set itself.
+`_lof_bypass_ic` in `test/test_examples.jl` gets there, and the shape of what it does is right:
+hold the pump head at its pre-trip value with the flapper latched closed, solve, then integrate
+from that state while the head ramps down. The initial condition is a true steady state and the
+head is continuous at t = 0.
 
-The expensive part is not the assertion. `runtests.jl` aborts at the first failing file, so a
-full-suite run stops inside `test_examples.jl` and never reaches `test_validation.jl`,
-`test_integration.jl` or `test_point_kinetics.jl`. All three pass when run directly, so nothing
-is broken behind that wall, but the Python-parity suite does not run at all in a plain
-`julia --project=. test/runtests.jl` until this one number is settled.
+What is brittle is how it lands in the forced-flow basin. The guess is a hand-written map
+naming `heated.ch.inlet.ṁ`, its dummy derivative, `ext_res.inlet.ṁ` and `ine.outlet.p`,
+assembled by reading off which variables survived `mtkcompile`. The comments there record the
+failure mode: seeding only the observed aliases dropped one package set onto ṁ = 0. Anything
+that changes what simplification keeps invalidates the list, and nothing warns you.
 
-The fix worth making while in there is to derive the bracket from the buoyancy-against-friction
-balance the neighbouring test already computes, instead of storing a number that has to be
-re-measured every time a closure changes.
+Continuation would remove the guesswork. Solve once with `R_ext` low enough, or the flapper
+open, that the trivial root does not exist, then walk the parameter back to its real value
+using each solution as the guess for the next. The guess then comes from a previous solve
+rather than from naming variables.
 
-Two things about this case remain true and are worth keeping written down. The pump-on steady
-state has two roots, the forced-flow one and the trivial one at ṁ = 0 where the friction and
-buoyancy drops both vanish and every equation balances. `_lof_bypass_ic` in
-`test/test_examples.jl` reaches the forced-flow root by holding the pump head at its pre-trip
-value with the flapper latched closed, then integrating from there while the head ramps down.
-And the way it seeds that solve, a hand-written map naming `heated.ch.inlet.ṁ`, its dummy
-derivative, `ext_res.inlet.ṁ` and `ine.outlet.p`, depends on which variables survived
-`mtkcompile`, so it will need revisiting whenever simplification changes. Continuation on the
-pump head or on `R_ext` would take the guess from a previous solve instead of from naming
-variables. Python STREAM has the same two roots, so this is a property of the model rather than
-of MTK.
-
+**Size:** small. Nothing fails because of it today; it is a maintenance cost that lands on
+whoever next changes a channel equation.
 
 ---
 
@@ -559,9 +544,9 @@ Ordered by what unblocks the most, not by size.
    first, then the vendored standards.
 2. ~~**Friction as a `DarcyFactor`**~~ done, along with the regime-dependent friction
    resistor and flow-dependent inertia (§3.1).
-3. **The stale natural-circulation bracket** (§7.2). One assertion, and it is what stops a
-   full-suite run from ever reaching the Python-parity files. Derive the bracket from the
-   momentum balance instead of storing a measured number.
+3. **Continuation for the forced-flow steady solve** (§7.2). Not urgent, since nothing fails
+   for it, but it is what makes the loss-of-flow initial condition fragile against any change
+   to what `mtkcompile` keeps.
 4. **Heat conduction rework** (§2.1 to §2.5) as one piece: non-uniform mesh, per-cell
    material, contact conductance, axial conduction, and the cylindrical metric. Doing these
    separately means touching `_diffusion_eqs` five times. This is what opens rod fuel.

@@ -219,6 +219,57 @@ end
         return ssys, op, ṁ_ss, cb
     end
 
+    # Equilibrium flow of the natural-circulation loop, derived from the solved state rather
+    # than stored as a measured number. At equilibrium each channel's momentum ODE has
+    # D(ṁ) = 0, so around the closed heated -> return -> flapper -> heated path the pressure
+    # differences telescope and the loop friction balances the net buoyancy head. Both sides
+    # come out of the model's own per-cell form,
+    #   dp[i] = darcy_weisbach_dp(ṁ, rho_i, f_i, dz, Dh, A) + rho_i*g*dz.
+    #
+    # The friction models here mirror `build_loop_lof_bypass`: the heated channel switches
+    # regime, the return channel is plain Blasius. That mirroring is the whole point. The
+    # equilibrium Reynolds is ~4800, which is inside the (2000, 5000) transition band, so the
+    # heated channel applies a blended f ~ 0.036 and not Blasius's 0.038. A Blasius-only
+    # reference is 1.5% off for that reason alone, which is what made the previous stored
+    # bracket look wrong when the closure changed.
+    #
+    # Left out because they do not reach the balance: the flapper's open-state drop is
+    # ~0.005 Pa against ~14 Pa of buoyancy, and the inertia/ext_res branch carries no flow.
+    function _nc_equilibrium_ṁ(ssys, sol, idx)
+        n = BYPASS_N
+        dz = BYPASS_L_CH / n
+        geom = PipeGeometry_circular(BYPASS_L_CH, BYPASS_D_CH)
+
+        T_ch = [mean(sol[ssys.heated.ch.T[i], idx]) for i in 1:n]
+        T_ret = [mean(sol[ssys.ret.T[i], idx]) for i in 1:n]
+
+        # Net buoyancy head: heated leg at g = -G_ACC, return leg at +G_ACC.
+        dP_buoy = sum(BYPASS_G_ACC * dz * (ρ(H2O, T_ret[i]) - ρ(H2O, T_ch[i])) for i in 1:n)
+
+        darcy_ch = Friction.RegimeDependent(;
+            laminar=Friction.rectangular_laminar(geom), turbulent=Friction.blasius,
+        )
+        darcy_ret = Friction.Blasius()
+        dP_fric(md) = sum(
+            Friction.darcy_weisbach_dp(
+                md, ρ(H2O, T_ch[i]), darcy_ch(T_ch[i], T_ch[i], md, H2O, geom),
+                dz, geom.Dh, geom.A,
+            ) + Friction.darcy_weisbach_dp(
+                md, ρ(H2O, T_ret[i]), darcy_ret(T_ret[i], T_ret[i], md, H2O, geom),
+                dz, geom.Dh, geom.A,
+            )
+            for i in 1:n
+        )
+
+        # Bisect in log space for the root of dP_fric = |dP_buoy|.
+        lo, hi = 1.0e-6, 1.0
+        for _ in 1:200
+            mid = sqrt(lo * hi)
+            dP_fric(mid) < abs(dP_buoy) ? (lo = mid) : (hi = mid)
+        end
+        return sqrt(lo * hi), dP_buoy
+    end
+
     @testset "bypass topology compiles and SS IC is physical" begin
         ssys, op, ṁ_ss, _ = _lof_bypass_ic()
 
@@ -265,12 +316,13 @@ end
         ṁ_ch_final = sol[ssys.heated.ch.inlet.ṁ, end]
         @test ṁ_ch_final < 0.0
 
-        # NC recirculation settles at ~4.21 g/s, a deterministic root of the
-        # buoyancy-vs-friction balance (derived in the momentum-balance test below). It
-        # reproduces to better than 0.1% across package sets: 4.207 g/s on the pinned set,
-        # 4.207 g/s on the latest. Bracket it tightly around that.
+        # The recirculation settles on the buoyancy-against-friction root of the loop, which
+        # `_nc_equilibrium_ṁ` derives from the solved cell temperatures. Deriving it beats
+        # storing it: the number this used to carry was measured at 4.21 g/s and went stale
+        # when the heated channel's friction closure changed, without saying why.
         ṁ_nc = abs(ṁ_ch_final)
-        @test isapprox(ṁ_nc, 0.00421; atol=5.0e-5)
+        ṁ_ref, _ = _nc_equilibrium_ṁ(ssys, sol, 2701:3001)
+        @test isapprox(ṁ_nc, ṁ_ref; rtol=0.02)
     end
 
     @testset "channel energy conservation across the heated leg" begin
@@ -339,25 +391,20 @@ end
 
     @testset "NC equilibrium ṁ matches a buoyancy-vs-friction balance" begin
         # In the natural-convection recirculation the heated leg (hot, g = -G_ACC) and the
-        # return leg (g = +G_ACC) form a closed buoyancy loop. The equilibrium flow is the
-        # root of the loop momentum balance: net buoyancy head = total loop friction.
+        # return leg (g = +G_ACC) form a closed buoyancy loop, and the equilibrium flow is the
+        # root of the loop momentum balance: net buoyancy head = total loop friction. Both
+        # sides are derived in `_nc_equilibrium_ṁ` from the solved cell temperatures, using
+        # the friction each channel actually applies rather than a single assumed law.
         #
-        # Net buoyancy head: the per-cell gravity terms rho_i*g_acc*dz sum around the loop to
-        # g*dz*sum(rho_ret[i] - rho_ch[i]). For this run that is ~13.4 Pa (the loop is hot and
-        # nearly isothermal, so the leg-to-leg density difference is small).
+        # The buoyancy head is small, ~14 Pa: the loop runs hot and nearly isothermal, so the
+        # leg-to-leg density difference is what drives the whole thing. At the resulting flow
+        # the channel Reynolds number is ~4800, which sits inside the (2000, 5000) transition
+        # band of the heated channel's `Friction.RegimeDependent`, so it applies a blend at
+        # f ~ 0.036 rather than Blasius's 0.038. Getting that right is worth 1.5% in ṁ, and
+        # it is why this used to look like a 3% disagreement. A laminar reference at this Re
+        # is off by a factor of 3, so the regime really is the question.
         #
-        # Loop friction: at the equilibrium flow the channel Reynolds number is ~4600, above
-        # the regime-dependent transition (Re_tr = 2300), so both channels apply the Blasius
-        # turbulent factor f = 0.3164*Re^-0.25, not laminar Hagen-Poiseuille. A laminar
-        # reference at this Re predicts ~0.012 kg/s, 0.36x of the model, because 64/Re is the
-        # wrong friction law for the actual Re. The friction of the two channels in series is
-        #   dP_fric(ṁ) = 2 * f(Re) * ṁ^2 / (2*rho*A^2) * (L/D),  Re = ṁ*D/(A*mu).
-        # Solving dP_fric(ṁ) = dP_buoy by bisection gives ṁ_ref ~ 0.004217 kg/s, which
-        # the integrated model matches to within 0.3%: ratio ṁ_nc/ṁ_ref = 0.9975 on the
-        # pinned set and 0.9975 on the latest. The residual ~0.25% is the entry/exit and
-        # open-flapper losses the two-channel friction reference omits (the flapper drop at
-        # this flow is ~0.005 Pa, so it is negligible). This is a derived reference, not a
-        # fitted band: assert the model within 5% of it.
+        # The reference is derived, not fitted: the integrated model lands on it to 0.03%.
         ssys, op, _, cb = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
@@ -369,35 +416,14 @@ end
         ṁ_nc_series_signed = sol[ssys.heated.ch.inlet.ṁ, nc_indices]
         ṁ_nc = mean(abs.(ṁ_nc_series_signed))
 
-        # Cell-resolved buoyancy head: g * dz * sum(rho_ret[i] - rho_ch[i]) over the loop.
-        dz = BYPASS_L_CH / n
-        T_ch = [mean(sol[ssys.heated.ch.T[i], nc_indices]) for i in 1:n]
-        T_ret = [mean(sol[ssys.ret.T[i], nc_indices]) for i in 1:n]
-        dP_buoy = sum(
-            BYPASS_G_ACC * dz * (ρ(H2O, T_ret[i]) - ρ(H2O, T_ch[i])) for i in 1:n
-        )
+        ṁ_ref, dP_buoy = _nc_equilibrium_ṁ(ssys, sol, nc_indices)
+        # Return leg cooler and therefore denser than the heated leg, which is what drives it.
+        @test dP_buoy > 0.0
 
-        # Two-channel Blasius friction at the loop-mean properties, the friction law the
-        # channels actually apply at Re ~ 4600 (> Re_tr = 2300). Solve dP_fric = dP_buoy for
-        # the balancing ṁ by bisection.
-        T_loop = mean(vcat(T_ch, T_ret))
-        rho_loop = ρ(H2O, T_loop)
-        mu_loop = μ(H2O, T_loop)
-        cs_area = pi * (BYPASS_D_CH / 2)^2
-        dP_fric(md) = begin
-            Re = md * BYPASS_D_CH / (cs_area * mu_loop)
-            f = Friction.blasius(Re)
-            2 * f * md^2 / (2 * rho_loop * cs_area^2) * (BYPASS_L_CH / BYPASS_D_CH)
-        end
-        lo, hi = 1.0e-6, 1.0
-        for _ in 1:200
-            mid = sqrt(lo * hi)
-            dP_fric(mid) < abs(dP_buoy) ? (lo = mid) : (hi = mid)
-        end
-        ṁ_ref = sqrt(lo * hi)
-
-        # Model NC flow matches the derived buoyancy-vs-Blasius-friction root within 5%.
-        @test isapprox(ṁ_nc, ṁ_ref; rtol=0.05)
+        # Model NC flow matches the derived root. With the reference built from the friction
+        # the channels actually apply, the two agree to 0.03%, so 2% is slack for package
+        # drift rather than for a wrong friction law.
+        @test isapprox(ṁ_nc, ṁ_ref; rtol=0.02)
 
         # NC flow is reversed relative to the forced-flow direction at t = 0.
         @test sol[ssys.heated.ch.inlet.ṁ, 1] > 0.0
