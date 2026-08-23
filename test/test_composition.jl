@@ -4,29 +4,28 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
-import STREAM: Channel, _infer_n
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.Assemblies: var_length  # private to Assemblies
 using OrdinaryDiffEq: ReturnCode
 
-# ───────────────────────────────────────────────────────────
 # Test fixtures — local helpers that build canonical CAC + HD pairs.
 # Mirrors Python STREAM's MTR_fuel_and_channel(z_N, fuel_N, clad_N) function
 # in tests/test_composition/conftest.py.
-# ───────────────────────────────────────────────────────────
 function _mtr_pair(; n=4, nz=4, nx=2)
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                    htc_correlation=constant_Nusselt(; Nu=8.235),
-                                    friction_correlation=laminar_friction_rectangular(geom))
+                                    htc=HTC.ConstantNusselt(; Nu=8.235),
+                                    darcy=Friction.RectangularLaminar(geom))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005,
                                  y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
                                  power_shape=ps)
     return cac, fuel
 end
 
-# ───────────────────────────────────────────────────────────
-# Section 1: port helper (D-18 first bullet)
-# ───────────────────────────────────────────────────────────
+# Section 1: port helper
 @testset "port helper — indexed thermal port access on uncompiled CAC" begin
     cac, _ = _mtr_pair()
     p1 = port(cac, :thermal_left, 1)
@@ -45,26 +44,22 @@ end
     @test endswith(name_str_2, "thermal_right2")
 end
 
-# ───────────────────────────────────────────────────────────
-# Section 2: check_gravity_mismatch (D-18 second bullet)
+# Section 2: check_gravity_mismatch
 # Existing G_M tests carry forward — these don't touch Channel architecture.
-# ───────────────────────────────────────────────────────────
 @testset "check_gravity_mismatch — :ok when no gravity" begin
     geom = PipeGeometry_circular(0.6, 0.01)
     @named ch = ChannelAndContacts(; n=4, geometry=geom)  # default g=0.0
     @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
+    @named bc = HeatExchanger(40.0)
     # CAC's per-cell thermal ports are Flow-based ThermalPort subsystems —
     # pinning `port.T` directly over-determines via the dangling Flow rule
-    # (auto-zeros Q_flow). Drive them via ConstantTemperature `connect()`s
-    # (the canonical CAC wall-T pattern; see test_channels.jl SIGN-02 testset).
-    ct_l = [ConstantTemperature(313.15; name=Symbol(:ct_l_ok_, i)) for i in 1:4]
-    ct_r = [ConstantTemperature(313.15; name=Symbol(:ct_r_ok_, i)) for i in 1:4]
+    # (auto-zeros Q). Drive them via ConstantTemperature `connect()`s
+    # (the canonical CAC wall-T pattern; see the flow-reversal testset in test_channels.jl).
+    ct_l = [ConstantTemperature(40.0; name=Symbol(:ct_l_ok_, i)) for i in 1:4]
+    ct_r = [ConstantTemperature(40.0; name=Symbol(:ct_r_ok_, i)) for i in 1:4]
     connections = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch.port_in),
-        connect(ch.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, ch, pump)...,
+        pump.inlet.p ~ 1.0e5,
         [connect(ct_l[i].thermal, port(ch, :thermal_left, i)) for i in 1:4]...,
         [connect(ct_r[i].thermal, port(ch, :thermal_right, i)) for i in 1:4]...,
     ]
@@ -75,16 +70,14 @@ end
 
 @testset "check_gravity_mismatch — :mismatch when CAC has g but no Gravity component" begin
     geom = PipeGeometry_circular(0.6, 0.01)
-    @named ch = ChannelAndContacts(; n=4, geometry=geom, g=9.80665)
+    @named ch = ChannelAndContacts(; n=4, geometry=geom, g=G_EARTH)
     @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
-    ct_l = [ConstantTemperature(313.15; name=Symbol(:ct_l_bad_, i)) for i in 1:4]
-    ct_r = [ConstantTemperature(313.15; name=Symbol(:ct_r_bad_, i)) for i in 1:4]
+    @named bc = HeatExchanger(40.0)
+    ct_l = [ConstantTemperature(40.0; name=Symbol(:ct_l_bad_, i)) for i in 1:4]
+    ct_r = [ConstantTemperature(40.0; name=Symbol(:ct_r_bad_, i)) for i in 1:4]
     connections = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch.port_in),
-        connect(ch.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, ch, pump)...,
+        pump.inlet.p ~ 1.0e5,
         [connect(ct_l[i].thermal, port(ch, :thermal_left, i)) for i in 1:4]...,
         [connect(ct_r[i].thermal, port(ch, :thermal_right, i)) for i in 1:4]...,
     ]
@@ -93,48 +86,42 @@ end
     @test check_gravity_mismatch(ssys) == :mismatch
 end
 
-# ───────────────────────────────────────────────────────────
-# Section 3: _infer_n (D-18 third bullet)
+# Section 3: var_length
 # Works on CAC (ThermalPort arrays kept); errors on the new Channel/CHF.
-# ───────────────────────────────────────────────────────────
-@testset "_infer_n: counts thermal_left* on CAC (n=4)" begin
+@testset "var_length: counts thermal_left* on CAC (n=4)" begin
     cac, _ = _mtr_pair(; n=4)
-    @test _infer_n(cac) == 4
+    @test var_length(cac, :thermal_left) == 4
 end
 
-@testset "_infer_n: counts thermal_left* on CAC (n=10)" begin
+@testset "var_length: counts thermal_left* on CAC (n=10)" begin
     cac10, _ = _mtr_pair(; n=10)
-    @test _infer_n(cac10) == 10
+    @test var_length(cac10, :thermal_left) == 10
 end
 
-@testset "_infer_n: errors on Channel (no thermal port arrays under new design)" begin
+@testset "var_length: errors on Channel (no thermal port arrays under new design)" begin
     @named ch = Channel(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
-    @test_throws ErrorException _infer_n(ch)
+    @test_throws ArgumentError var_length(ch, :thermal_left)
 end
 
-@testset "_infer_n: errors on ChannelHeatFlux (no thermal port arrays under new design)" begin
+@testset "var_length: errors on ChannelHeatFlux (no thermal port arrays under new design)" begin
     @named chf = ChannelHeatFlux(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
-    @test_throws ErrorException _infer_n(chf)
+    @test_throws ArgumentError var_length(chf, :thermal_left)
 end
 
-# ───────────────────────────────────────────────────────────
-# Section 4: symmetric_plate compose-correctness (D-18 fourth bullet)
+# Section 4: symmetric_plate compose-correctness
 # Multiple shapes; both faces wired correctly; no mtkcompile errors.
 # Verify-block requires: at least 2 distinct shape testsets (n=4 + n=10)
 # AND at least 2 asymmetric-shape testsets (nx=1, nx=3).
-# ───────────────────────────────────────────────────────────
 @testset "symmetric_plate(cac, fuel) — n=4, nz=4, nx=2 compiles cleanly" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
     @test rods isa ModelingToolkit.AbstractSystem
     # Add the missing power binding + a pump loop to make it solvable
     @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
+    @named bc = HeatExchanger(40.0)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods.cac.port_in),
-        connect(rods.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, rods.cac, pump)...,
+        pump.inlet.p ~ 1.0e5,
         rods.fuel.power ~ 1.0e3,
     ]
     full = compose_systems(rods, pump, bc; connections=conns, name=:full)
@@ -142,9 +129,9 @@ end
     @test ssys isa ModelingToolkit.AbstractSystem
     # Solve briefly to verify composition produces meaningful steady state
     ic = Pair{Any,Any}[
-        [ssys.rods.cac.T[i] => 313.15 for i in 1:4]...,
-        [ssys.rods.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:2]...,
-        ssys.rods.cac.port_in.mdot => 0.2,
+        [ssys.rods.cac.T[i] => 40.0 for i in 1:4]...,
+        [ssys.rods.fuel.T[i, j] => 40.0 for i in 1:4 for j in 1:2]...,
+        ssys.rods.cac.inlet.ṁ => 0.2,
     ]
     sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
@@ -155,21 +142,19 @@ end
     rods = symmetric_plate(cac, fuel; name=:rods)
     @test rods isa ModelingToolkit.AbstractSystem
     @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
+    @named bc = HeatExchanger(40.0)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods.cac.port_in),
-        connect(rods.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, rods.cac, pump)...,
+        pump.inlet.p ~ 1.0e5,
         rods.fuel.power ~ 1.0e3,
     ]
     full = compose_systems(rods, pump, bc; connections=conns, name=:full10)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
     ic = Pair{Any,Any}[
-        [ssys.rods.cac.T[i] => 313.15 for i in 1:10]...,
-        [ssys.rods.fuel.T[i, j] => 313.15 for i in 1:10 for j in 1:2]...,
-        ssys.rods.cac.port_in.mdot => 0.2,
+        [ssys.rods.cac.T[i] => 40.0 for i in 1:10]...,
+        [ssys.rods.fuel.T[i, j] => 40.0 for i in 1:10 for j in 1:2]...,
+        ssys.rods.cac.inlet.ṁ => 0.2,
     ]
     sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
@@ -180,21 +165,19 @@ end
     rods = symmetric_plate(cac, fuel; name=:rods)
     @test rods isa ModelingToolkit.AbstractSystem
     @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
+    @named bc = HeatExchanger(40.0)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods.cac.port_in),
-        connect(rods.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, rods.cac, pump)...,
+        pump.inlet.p ~ 1.0e5,
         rods.fuel.power ~ 1.0e3,
     ]
     full = compose_systems(rods, pump, bc; connections=conns, name=:fullx4)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
     ic = Pair{Any,Any}[
-        [ssys.rods.cac.T[i] => 313.15 for i in 1:4]...,
-        [ssys.rods.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:4]...,
-        ssys.rods.cac.port_in.mdot => 0.2,
+        [ssys.rods.cac.T[i] => 40.0 for i in 1:4]...,
+        [ssys.rods.fuel.T[i, j] => 40.0 for i in 1:4 for j in 1:4]...,
+        ssys.rods.cac.inlet.ṁ => 0.2,
     ]
     sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
@@ -205,124 +188,277 @@ end
     rods = symmetric_plate(cac, fuel; name=:rods)
     @test rods isa ModelingToolkit.AbstractSystem
     @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
+    @named bc = HeatExchanger(40.0)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods.cac.port_in),
-        connect(rods.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, rods.cac.inlet),
+        connect(rods.cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         rods.fuel.power ~ 1.0e3,
     ]
     full = compose_systems(rods, pump, bc; connections=conns, name=:fullx3)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
     ic = Pair{Any,Any}[
-        [ssys.rods.cac.T[i] => 313.15 for i in 1:4]...,
-        [ssys.rods.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:3]...,
-        ssys.rods.cac.port_in.mdot => 0.2,
+        [ssys.rods.cac.T[i] => 40.0 for i in 1:4]...,
+        [ssys.rods.fuel.T[i, j] => 40.0 for i in 1:4 for j in 1:3]...,
+        ssys.rods.cac.inlet.ṁ => 0.2,
     ]
     sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
 end
 
-# ───────────────────────────────────────────────────────────
-# Section 5: plate (dual-CAC + HD) compose-correctness (D-18 fifth bullet)
+# Section 5: plate (dual-CAC + HD) compose-correctness
 # Verify-block requires: at least 1 testset with name starting with "plate(".
-# ───────────────────────────────────────────────────────────
 @testset "plate(ch_left, ch_right, fuel) — both faces wired correctly" begin
-    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-    @named ch_left = ChannelAndContacts(; n=4, geometry=geom)
-    @named ch_right = ChannelAndContacts(; n=4, geometry=geom)
-    ps = fill(1.0 / 8, 4, 2)
-    @named fuel = HeatDiffusion(; nz=4, nx=2, Lz=0.6, Lx=0.005,
-                                 y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                                 power_shape=ps)
+    # plate wires fuel.thermal_left[i] <-> ch_left.thermal_right[i] and
+    # fuel.thermal_right[i] <-> ch_right.thermal_left[i]. Solve a steady loop with
+    # both channels live (dittus_boelter, aluminum plate, same config as the
+    # single_channel both-faces-active test) and verify the wiring is real:
+    # each fuel face actually sheds heat to its own channel, the signs are right
+    # (heat leaves the powered plate), and the plate temperature sits above both
+    # coolant temperatures.
+    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    nz = 10
+    nx = 3
+    power_val = 1.0e4
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named ch_left = ChannelAndContacts(; n=nz, geometry=geom)
+    @named ch_right = ChannelAndContacts(; n=nz, geometry=geom)
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
+                                power_shape=ps, power=power_val)
     pl = plate(ch_left, ch_right, fuel; name=:pl)
     @test pl isa ModelingToolkit.AbstractSystem
-    # Power binding + minimal closure (skip pump loop — compose-correctness only)
     @named pump_l = Pump(3.0e4)
-    @named bc_l = HeatExchanger(313.15)
+    @named bc_l = HeatExchanger(40.0)
     @named pump_r = Pump(3.0e4)
-    @named bc_r = HeatExchanger(313.15)
+    @named bc_r = HeatExchanger(40.0)
     conns = [
-        connect(pump_l.port_out, bc_l.port_in),
-        connect(bc_l.port_out, pl.ch_left.port_in),
-        connect(pl.ch_left.port_out, pump_l.port_in),
-        pump_l.port_in.P ~ 1.0e5,
-        connect(pump_r.port_out, bc_r.port_in),
-        connect(bc_r.port_out, pl.ch_right.port_in),
-        connect(pl.ch_right.port_out, pump_r.port_in),
-        pump_r.port_in.P ~ 1.0e5,
-        pl.fuel.power ~ 1.0e3,
+        inseries(pump_l, bc_l, pl.ch_left, pump_l)...,
+        pump_l.inlet.p ~ 1.0e5,
+        inseries(pump_r, bc_r, pl.ch_right, pump_r)...,
+        pump_r.inlet.p ~ 1.0e5,
+        pl.fuel.power ~ power_val,
     ]
     full = compose_systems(pl, pump_l, bc_l, pump_r, bc_r; connections=conns, name=:dualcac)
-    ssys = mtkcompile(full)
-    @test ssys isa ModelingToolkit.AbstractSystem
+    ssys = mtkcompile(full; fully_determined=true)
+    op = vcat(
+        [ssys.pl.fuel.T[i, j] => 43.85 for i in 1:nz for j in 1:nx],
+        [ssys.pl.ch_left.T[i] => 43.85 for i in 1:nz],
+        [ssys.pl.ch_right.T[i] => 43.85 for i in 1:nz],
+        [ssys.pl.ch_left.inlet.ṁ => 0.25],
+        [ssys.pl.ch_right.inlet.ṁ => 0.25],
+    )
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    # Both fuel faces exchange heat with their own channel. thermal_left[i].Q is
+    # heat INTO the fuel from ch_left; the powered plate is hotter than the coolant, so
+    # heat leaves the plate and Q is negative on every cell of both faces.
+    left_face_Q = [sol[getproperty(ssys.pl.fuel, Symbol(:thermal_left, i)).Q] for i in 1:nz]
+    right_face_Q = [
+        sol[getproperty(ssys.pl.fuel, Symbol(:thermal_right, i)).Q] for i in 1:nz
+    ]
+    @test all(left_face_Q[i] < -1e-3 for i in 1:nz)    # left face sheds heat to ch_left
+    @test all(right_face_Q[i] < -1e-3 for i in 1:nz)   # right face sheds heat to ch_right
+    # Energy balance: the heat leaving both faces accounts for the injected power.
+    @test isapprox(-(sum(left_face_Q) + sum(right_face_Q)), power_val; rtol=1e-3)
+    # The heat each face sheds lands in its channel as a coolant temperature rise:
+    # ṁ*cp*(T_out - T_in) matches the heat into that channel. T_in is the bc inlet (40.0),
+    # T_out is the last coolant cell. cp is taken at the mean coolant temperature.
+    T_in = 40.0
+    ṁ_l = sol[ssys.pl.ch_left.inlet.ṁ]
+    ṁ_r = sol[ssys.pl.ch_right.inlet.ṁ]
+    T_out_l = sol[ssys.pl.ch_left.T[nz]]
+    T_out_r = sol[ssys.pl.ch_right.T[nz]]
+    Q_into_left = ṁ_l * cₚ(H2O, (T_in + T_out_l) / 2) * (T_out_l - T_in)
+    Q_into_right = ṁ_r * cₚ(H2O, (T_in + T_out_r) / 2) * (T_out_r - T_in)
+    @test isapprox(Q_into_left, -sum(left_face_Q); rtol=2e-2)
+    @test isapprox(Q_into_right, -sum(right_face_Q); rtol=2e-2)
+    # The plate temperature sits above both coolant streams it dumps heat into.
+    @test all(sol[ssys.pl.fuel.T[i, 1]] > sol[ssys.pl.ch_left.T[i]] for i in 1:nz)
+    @test all(sol[ssys.pl.fuel.T[i, nx]] > sol[ssys.pl.ch_right.T[i]] for i in 1:nz)
 end
 
-# ───────────────────────────────────────────────────────────
-# Section 6: one_sided_connection (D-18 sixth bullet)
-# Verify-block requires: at least 2 "@testset \"one_sided_connection" testsets
+# Section 6: one_sided
+# Verify-block requires: at least 2 "@testset \"one_sided" testsets
 # (one per side variant).
-# ───────────────────────────────────────────────────────────
-@testset "one_sided_connection — side=:left compiles cleanly" begin
-    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    osc = one_sided_connection(cac, fuel; side=:left, name=:osc_l)
-    @test osc isa ModelingToolkit.AbstractSystem
+# Shared config for the one_sided physics tests: dittus_boelter +
+# aluminum plate (same family as the plate / single_channel tests) so the steady
+# loop converges. one_sided wires exactly ONE fuel face to the channel
+# and leaves the opposite face dangling, which is adiabatic (Q ~ 0) under the
+# ThermalPort Flow rule.
+function _build_osc_loop(side::Symbol, name_suffix)
+    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    nz = 10
+    nx = 3
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named cac = ChannelAndContacts(; n=nz, geometry=geom)
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
+                                power_shape=ps, power=1e4)
+    osc = one_sided(cac, fuel; side=side, name=Symbol(:osc_, name_suffix))
     @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
+    @named bc = HeatExchanger(40.0)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, osc.cac.port_in),
-        connect(osc.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
-        osc.fuel.power ~ 1.0e3,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, osc.cac.inlet),
+        connect(osc.cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
+        osc.fuel.power ~ 1e4,
     ]
-    full = compose_systems(osc, pump, bc; connections=conns, name=:osc_full_l)
-    ssys = mtkcompile(full)
+    full = compose_systems(osc, pump, bc; connections=conns, name=Symbol(:osc_full_, name_suffix))
+    ssys = mtkcompile(full; fully_determined=true)
+    op = vcat(
+        [getproperty(ssys, Symbol(:osc_, name_suffix)).fuel.T[i, j] => 43.85 for i in 1:nz for j in 1:nx],
+        [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.T[i] => 43.85 for i in 1:nz],
+        [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.inlet.ṁ => 0.25],
+    )
+    sol = solve_steady(ssys, op)
+    return ssys, sol, getproperty(ssys, Symbol(:osc_, name_suffix)), nz, nx
+end
+
+# Shared physics checks for a one_sided loop, called by both side variants. The single
+# connected face sheds all the injected power into the channel, the opposite face is adiabatic, and
+# the plate runs hotter than the coolant. `conn_face`/`adia_face` are the per-cell thermal-port name
+# prefixes, and `x_conn` is the fuel x-column on the connected side.
+function _assert_osc(oscsys, sol, nz, conn_face, adia_face, x_conn)
+    @test sol.retcode == ReturnCode.Success
+    conn_Q = [sol[getproperty(oscsys.fuel, Symbol(conn_face, i)).Q] for i in 1:nz]
+    adia_Q = [sol[getproperty(oscsys.fuel, Symbol(adia_face, i)).Q] for i in 1:nz]
+    @test all(conn_Q[i] < -1e-3 for i in 1:nz)                  # connected face sheds heat
+    @test all(isapprox(adia_Q[i], 0.0; atol=1e-9) for i in 1:nz)  # opposite face adiabatic
+    @test isapprox(-sum(conn_Q), 1e4; rtol=1e-3)                 # all power leaves the one face
+    @test all(sol[oscsys.fuel.T[i, x_conn]] > sol[oscsys.cac.T[i]] for i in 1:nz)
+end
+
+@testset "one_sided — side=:left connects right face, left face adiabatic" begin
+    osc = one_sided(_mtr_pair(; n=4, nz=4, nx=2)...; side=:left, name=:osc_l)
+    @test osc isa ModelingToolkit.AbstractSystem
+    # side=:left wires cac.thermal_left <-> fuel.thermal_right, so the fuel's RIGHT
+    # face carries heat and the LEFT face is left dangling (adiabatic).
+    ssys, sol, oscsys, nz, nx = _build_osc_loop(:left, :l)
+    _assert_osc(oscsys, sol, nz, :thermal_right, :thermal_left, nx)
+end
+
+@testset "one_sided — side=:right connects left face, right face adiabatic" begin
+    osc = one_sided(_mtr_pair(; n=4, nz=4, nx=2)...; side=:right, name=:osc_r)
+    @test osc isa ModelingToolkit.AbstractSystem
+    # side=:right wires cac.thermal_right <-> fuel.thermal_left, so the fuel's LEFT
+    # face carries heat and the RIGHT face is left dangling (adiabatic).
+    ssys, sol, oscsys, nz, nx = _build_osc_loop(:right, :r)
+    _assert_osc(oscsys, sol, nz, :thermal_left, :thermal_right, 1)
+end
+
+@testset "one_sided — invalid side errors" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    @test_throws ArgumentError one_sided(cac, fuel; side=:bogus, name=:bad)
+end
+
+# Section 6b: single_channel (edge-channel — plate cooled on both faces)
+# Verify-block requires: at least 2 "@testset \"single_channel" testsets.
+@testset "single_channel — fuel_side=:left compiles cleanly" begin
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    scc = single_channel(cac, fuel, geom; fuel_side=:left, name=:scc_l)
+    @test scc isa ModelingToolkit.AbstractSystem
+    # One ConvectiveBoundary per axial cell on the far face (n=4).
+    sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(scc)))
+    @test count(s -> startswith(s, "scc_l_far"), sub_names) == 4
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(40.0)
+    conns = [
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, scc.cac.inlet),
+        connect(scc.cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
+        scc.fuel.power ~ 1.0e3,
+    ]
+    full = compose_systems(scc, pump, bc; connections=conns, name=:scc_full_l)
+    ssys = mtkcompile(full; fully_determined=true)
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-@testset "one_sided_connection — side=:right compiles cleanly" begin
+@testset "single_channel — fuel_side=:right compiles cleanly" begin
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    osc = one_sided_connection(cac, fuel; side=:right, name=:osc_r)
-    @test osc isa ModelingToolkit.AbstractSystem
+    scc = single_channel(cac, fuel, geom; fuel_side=:right, name=:scc_r)
+    @test scc isa ModelingToolkit.AbstractSystem
     @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
+    @named bc = HeatExchanger(40.0)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, osc.cac.port_in),
-        connect(osc.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
-        osc.fuel.power ~ 1.0e3,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, scc.cac.inlet),
+        connect(scc.cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
+        scc.fuel.power ~ 1.0e3,
     ]
-    full = compose_systems(osc, pump, bc; connections=conns, name=:osc_full_r)
-    ssys = mtkcompile(full)
+    full = compose_systems(scc, pump, bc; connections=conns, name=:scc_full_r)
+    ssys = mtkcompile(full; fully_determined=true)
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-@testset "one_sided_connection — invalid side errors" begin
-    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    @test_throws ErrorException one_sided_connection(cac, fuel; side=:bogus, name=:bad)
+@testset "single_channel — both faces active, plate laterally symmetric" begin
+    # Use the parity-proven MTR config (dittus_boelter, both faces heated) so the steady
+    # solve converges. The far face sheds heat (unlike one_sided) and, cooled
+    # by the same h and coolant as the near face, the plate is laterally symmetric.
+    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    nz = 10
+    nx = 3
+    ps = fill(1.0 / (nz * nx), nz, nx)
+    @named cac = ChannelAndContacts(; n=nz, geometry=geom)
+    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
+                                power_shape=ps, power=1e4)
+    scc = single_channel(cac, fuel, geom; fuel_side=:left, name=:scc_s)
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(40.0)
+    conns = [
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, scc.cac.inlet),
+        connect(scc.cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
+        scc.fuel.power ~ 1e4,
+    ]
+    full = compose_systems(scc, pump, bc; connections=conns, name=:scc_full_s)
+    ssys = mtkcompile(full; fully_determined=true)
+    op = vcat(
+        [ssys.scc_s.fuel.T[i, j] => 43.85 for i in 1:nz for j in 1:nx],
+        [ssys.scc_s.cac.T[i] => 43.85 for i in 1:nz],
+        [ssys.scc_s.cac.inlet.ṁ => 0.25],
+    )
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    # Far face carries heat into the convective sink (one_sided would be adiabatic here).
+    far_Q = sol[getproperty(ssys.scc_s.fuel, Symbol(:thermal_right, 1)).Q]
+    @test abs(far_Q) > 1e-6
+    # Laterally symmetric plate (left col == right col).
+    for z in 1:nz
+        @test isapprox(sol[ssys.scc_s.fuel.T[z, 1]], sol[ssys.scc_s.fuel.T[z, nx]]; rtol=1e-6)
+    end
 end
 
-# ───────────────────────────────────────────────────────────
-# Section 7: compose_systems cross-plate wiring (D-18 seventh bullet)
+@testset "single_channel — invalid fuel_side errors" begin
+    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    @test_throws ArgumentError single_channel(cac, fuel, geom; fuel_side=:bogus, name=:bad)
+end
+
+# Section 7: compose_systems cross-plate wiring
 # Stitch two symmetric_plate assemblies via hydraulic-series connect equations.
-# ───────────────────────────────────────────────────────────
 @testset "compose_systems — two plates in series" begin
     cac1, fuel1 = _mtr_pair(; n=4, nz=4, nx=2)
     cac2, fuel2 = _mtr_pair(; n=4, nz=4, nx=2)
     p1 = symmetric_plate(cac1, fuel1; name=:p1)
     p2 = symmetric_plate(cac2, fuel2; name=:p2)
     @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(313.15)
+    @named bc = HeatExchanger(40.0)
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, p1.cac.port_in),
-        connect(p1.cac.port_out, p2.cac.port_in),
-        connect(p2.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, p1.cac.inlet),
+        connect(p1.cac.outlet, p2.cac.inlet),
+        connect(p2.cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         p1.fuel.power ~ 1.0e3,
         p2.fuel.power ~ 1.0e3,
     ]
@@ -330,52 +466,49 @@ end
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
     ic = Pair{Any,Any}[
-        [ssys.p1.cac.T[i] => 313.15 for i in 1:4]...,
-        [ssys.p1.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:2]...,
-        [ssys.p2.cac.T[i] => 313.15 for i in 1:4]...,
-        [ssys.p2.fuel.T[i, j] => 313.15 for i in 1:4 for j in 1:2]...,
-        ssys.p1.cac.port_in.mdot => 0.2,
+        [ssys.p1.cac.T[i] => 40.0 for i in 1:4]...,
+        [ssys.p1.fuel.T[i, j] => 40.0 for i in 1:4 for j in 1:2]...,
+        [ssys.p2.cac.T[i] => 40.0 for i in 1:4]...,
+        [ssys.p2.fuel.T[i, j] => 40.0 for i in 1:4 for j in 1:2]...,
+        ssys.p1.cac.inlet.ṁ => 0.2,
     ]
     sol = solve_transient(ssys, ic, range(0.0, 0.2, length=5))
     @test sol.retcode == ReturnCode.Success
 end
 
-# ───────────────────────────────────────────────────────────
-# Section 8: connect_temperature_feedback (D-18 eighth bullet)
-# TF-04 equation-counting tests from Phase 47.
-# ───────────────────────────────────────────────────────────
-@testset "connect_temperature_feedback — 1D (CAC) emits n equations" begin
+# Section 8: temperature_feedback
+# Equation-counting tests for temperature_feedback.
+@testset "temperature_feedback — 1D (CAC) emits n equations" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
     rho_c_fn(t) = 0.0
     rods_cac = rods.cac
     @named pk = PointKinetics(rho_c_fn; temp_worth=Dict(rods_cac => 1.0e-4))
-    eqs = connect_temperature_feedback(pk, [rods_cac])
+    eqs = temperature_feedback(pk, [rods_cac])
     @test length(eqs) == 4    # n=4 cells
 end
 
-@testset "connect_temperature_feedback — 2D (HeatDiffusion) emits nz*nx equations row-major" begin
+@testset "temperature_feedback — 2D (HeatDiffusion) emits nz*nx equations row-major" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
     rho_c_fn(t) = 0.0
     rods_fuel = rods.fuel
     @named pk = PointKinetics(rho_c_fn; temp_worth=Dict(rods_fuel => 1.0e-4))
-    eqs = connect_temperature_feedback(pk, [rods_fuel])
+    eqs = temperature_feedback(pk, [rods_fuel])
     @test length(eqs) == 4 * 2  # nz=4, nx=2
 end
 
-@testset "connect_temperature_feedback — multiple components sum" begin
+@testset "temperature_feedback — multiple components sum" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
     rho_c_fn(t) = 0.0
     rods_cac = rods.cac
     rods_fuel = rods.fuel
     @named pk = PointKinetics(rho_c_fn; temp_worth=Dict(rods_cac => 1.0e-4, rods_fuel => 1.0e-4))
-    eqs = connect_temperature_feedback(pk, [rods_cac, rods_fuel])
+    eqs = temperature_feedback(pk, [rods_cac, rods_fuel])
     @test length(eqs) == 4 + 4 * 2  # 4 cells + 4*2 grid
 end
 
-# ───────────────────────────────────────────────────────────
 # fuel_assembly — four-variant CAC <-> Plate alternation helper.
 # Each variant is checked by comparing the helper-built system against a
 # hand-rolled connect() chain pointwise (rtol=1e-10) after solve_steady, plus
@@ -388,8 +521,8 @@ end
 function _fa_cac(prefix::Symbol; n=4)
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ChannelAndContacts(; name=prefix, n=n, geometry=geom,
-                       htc_correlation=constant_Nusselt(; Nu=8.235),
-                       friction_correlation=laminar_friction_rectangular(geom))
+                       htc=HTC.ConstantNusselt(; Nu=8.235),
+                       darcy=Friction.RectangularLaminar(geom))
 end
 
 function _fa_hd(prefix::Symbol; nz=4, nx=2)
@@ -402,13 +535,13 @@ end
 # Hand-rolled per-pair wiring (mirrors `_pair_connections`): left member's
 # thermal_right to right member's thermal_left. Builds the reference systems.
 function _fa_pair_eqs(lsys, rsys, n::Int)
-    return [connect(port(lsys, :thermal_right, i), port(rsys, :thermal_left, i)) for i in 1:n]
+    return faces((lsys, :thermal_right) => (rsys, :thermal_left))
 end
 
 # Time derivative, used to build the Dt(...)=>0.0 IC guesses (see variant-1 note).
 const _fa_Dt = Differential(t)
 
-# ─── Variant 1 — channel-bookended (k=2 plates, k+1=3 channels) parity ───
+# #### Variant 1 — channel-bookended (k=2 plates, k+1=3 channels) parity
 @testset "fuel_assembly variant 1 (channel-bookended, k=2) parity" begin
     n, nz, nx = 4, 4, 2
     # Helper-built path
@@ -418,14 +551,14 @@ const _fa_Dt = Differential(t)
     @test asm_helper isa ModelingToolkit.AbstractSystem
 
     @named pump_h = Pump(3.0e4)
-    @named bc_h = HeatExchanger(313.15)
+    @named bc_h = HeatExchanger(40.0)
     conns_h = [
-        connect(pump_h.port_out, bc_h.port_in),
-        connect(bc_h.port_out, asm_helper.c1.port_in),
-        connect(asm_helper.c1.port_out, asm_helper.c2.port_in),
-        connect(asm_helper.c2.port_out, asm_helper.c3.port_in),
-        connect(asm_helper.c3.port_out, pump_h.port_in),
-        pump_h.port_in.P ~ 1.0e5,
+        connect(pump_h.outlet, bc_h.inlet),
+        connect(bc_h.outlet, asm_helper.c1.inlet),
+        connect(asm_helper.c1.outlet, asm_helper.c2.inlet),
+        connect(asm_helper.c2.outlet, asm_helper.c3.inlet),
+        connect(asm_helper.c3.outlet, pump_h.inlet),
+        pump_h.inlet.p ~ 1.0e5,
         asm_helper.p1.power ~ 1.0e3,
         asm_helper.p2.power ~ 1.0e3,
     ]
@@ -444,48 +577,48 @@ const _fa_Dt = Differential(t)
     asm_hand = compose(System(therm_eqs, t; name=:asm_hand), c1d, c2d, c3d, p1d, p2d)
 
     @named pump_d = Pump(3.0e4)
-    @named bc_d = HeatExchanger(313.15)
+    @named bc_d = HeatExchanger(40.0)
     conns_d = [
-        connect(pump_d.port_out, bc_d.port_in),
-        connect(bc_d.port_out, asm_hand.c1.port_in),
-        connect(asm_hand.c1.port_out, asm_hand.c2.port_in),
-        connect(asm_hand.c2.port_out, asm_hand.c3.port_in),
-        connect(asm_hand.c3.port_out, pump_d.port_in),
-        pump_d.port_in.P ~ 1.0e5,
+        connect(pump_d.outlet, bc_d.inlet),
+        connect(bc_d.outlet, asm_hand.c1.inlet),
+        connect(asm_hand.c1.outlet, asm_hand.c2.inlet),
+        connect(asm_hand.c2.outlet, asm_hand.c3.inlet),
+        connect(asm_hand.c3.outlet, pump_d.inlet),
+        pump_d.inlet.p ~ 1.0e5,
         asm_hand.p1.power ~ 1.0e3,
         asm_hand.p2.power ~ 1.0e3,
     ]
     full_hand = compose_systems(asm_hand, pump_d, bc_d; connections=conns_d, name=:full_hand_v1)
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
 
-    # We pass a Dt(...)=>0.0 guess for every per-CAC port_in.mdot, even though
+    # We pass a Dt(...)=>0.0 guess for every per-CAC inlet.ṁ, even though
     # mtkcompile only keeps one of them as a differential state — we can't know
     # ahead of time which one survives, and the extras are harmlessly ignored.
     ic_helper = Pair{Any,Any}[
-        [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.c3.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        ssys_helper.asm_helper.c1.port_in.mdot => 0.2,
-        ssys_helper.asm_helper.c2.port_in.mdot => 0.2,
-        ssys_helper.asm_helper.c3.port_in.mdot => 0.2,
-        _fa_Dt(ssys_helper.asm_helper.c1.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c2.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c3.port_in.mdot) => 0.0,
+        [ssys_helper.asm_helper.c1.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.c2.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.c3.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
+        ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
+        ssys_helper.asm_helper.c3.inlet.ṁ => 0.2,
+        _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c3.inlet.ṁ) => 0.0,
     ]
     ic_hand = Pair{Any,Any}[
-        [ssys_hand.asm_hand.c1.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.c2.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.c3.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        ssys_hand.asm_hand.c1.port_in.mdot => 0.2,
-        ssys_hand.asm_hand.c2.port_in.mdot => 0.2,
-        ssys_hand.asm_hand.c3.port_in.mdot => 0.2,
-        _fa_Dt(ssys_hand.asm_hand.c1.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c2.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c3.port_in.mdot) => 0.0,
+        [ssys_hand.asm_hand.c1.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.c2.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.c3.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
+        ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
+        ssys_hand.asm_hand.c3.inlet.ṁ => 0.2,
+        _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c2.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c3.inlet.ṁ) => 0.0,
     ]
     sol_helper = solve_steady(ssys_helper, ic_helper)
     sol_hand = solve_steady(ssys_hand, ic_hand)
@@ -507,7 +640,7 @@ const _fa_Dt = Differential(t)
     @test isapprox(vals_helper, vals_hand; rtol=1e-10)
 end
 
-# ─── Variant 2 — plate-bookended (k=1 channel, k+1=2 plates) parity ───
+# #### Variant 2 — plate-bookended (k=1 channel, k+1=2 plates) parity
 # The locked k=2 means the smaller variants get k≥1 channels. Variant 2
 # uses k=2 channels + k+1=3 plates so 'k' matches the variant-1 cell count.
 @testset "fuel_assembly variant 2 (plate-bookended, k=2) parity" begin
@@ -518,13 +651,13 @@ end
     @test asm_helper isa ModelingToolkit.AbstractSystem
 
     @named pump_h = Pump(3.0e4)
-    @named bc_h = HeatExchanger(313.15)
+    @named bc_h = HeatExchanger(40.0)
     conns_h = [
-        connect(pump_h.port_out, bc_h.port_in),
-        connect(bc_h.port_out, asm_helper.c1.port_in),
-        connect(asm_helper.c1.port_out, asm_helper.c2.port_in),
-        connect(asm_helper.c2.port_out, pump_h.port_in),
-        pump_h.port_in.P ~ 1.0e5,
+        connect(pump_h.outlet, bc_h.inlet),
+        connect(bc_h.outlet, asm_helper.c1.inlet),
+        connect(asm_helper.c1.outlet, asm_helper.c2.inlet),
+        connect(asm_helper.c2.outlet, pump_h.inlet),
+        pump_h.inlet.p ~ 1.0e5,
         asm_helper.p1.power ~ 1.0e3,
         asm_helper.p2.power ~ 1.0e3,
         asm_helper.p3.power ~ 1.0e3,
@@ -543,13 +676,13 @@ end
     asm_hand = compose(System(therm_eqs, t; name=:asm_hand), c1d, c2d, p1d, p2d, p3d)
 
     @named pump_d = Pump(3.0e4)
-    @named bc_d = HeatExchanger(313.15)
+    @named bc_d = HeatExchanger(40.0)
     conns_d = [
-        connect(pump_d.port_out, bc_d.port_in),
-        connect(bc_d.port_out, asm_hand.c1.port_in),
-        connect(asm_hand.c1.port_out, asm_hand.c2.port_in),
-        connect(asm_hand.c2.port_out, pump_d.port_in),
-        pump_d.port_in.P ~ 1.0e5,
+        connect(pump_d.outlet, bc_d.inlet),
+        connect(bc_d.outlet, asm_hand.c1.inlet),
+        connect(asm_hand.c1.outlet, asm_hand.c2.inlet),
+        connect(asm_hand.c2.outlet, pump_d.inlet),
+        pump_d.inlet.p ~ 1.0e5,
         asm_hand.p1.power ~ 1.0e3,
         asm_hand.p2.power ~ 1.0e3,
         asm_hand.p3.power ~ 1.0e3,
@@ -559,26 +692,26 @@ end
 
     # (See the Dt(...) IC note in the variant-1 testset.)
     ic_helper = Pair{Any,Any}[
-        [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p3.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        ssys_helper.asm_helper.c1.port_in.mdot => 0.2,
-        ssys_helper.asm_helper.c2.port_in.mdot => 0.2,
-        _fa_Dt(ssys_helper.asm_helper.c1.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c2.port_in.mdot) => 0.0,
+        [ssys_helper.asm_helper.c1.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.c2.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p3.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
+        ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
+        _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
     ]
     ic_hand = Pair{Any,Any}[
-        [ssys_hand.asm_hand.c1.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.c2.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p3.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        ssys_hand.asm_hand.c1.port_in.mdot => 0.2,
-        ssys_hand.asm_hand.c2.port_in.mdot => 0.2,
-        _fa_Dt(ssys_hand.asm_hand.c1.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c2.port_in.mdot) => 0.0,
+        [ssys_hand.asm_hand.c1.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.c2.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p3.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
+        ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
+        _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c2.inlet.ṁ) => 0.0,
     ]
     sol_helper = solve_steady(ssys_helper, ic_helper)
     sol_hand = solve_steady(ssys_hand, ic_hand)
@@ -597,7 +730,7 @@ end
     @test isapprox(vals_helper, vals_hand; rtol=1e-10)
 end
 
-# ─── Variant 3 — mixed (k=2 of each), start=:channel parity ───
+# #### Variant 3 — mixed (k=2 of each), start=:channel parity
 @testset "fuel_assembly variant 3 (mixed, k=2, start=:channel) parity" begin
     n, nz, nx = 4, 4, 2
     c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n)
@@ -606,13 +739,13 @@ end
     @test asm_helper isa ModelingToolkit.AbstractSystem
 
     @named pump_h = Pump(3.0e4)
-    @named bc_h = HeatExchanger(313.15)
+    @named bc_h = HeatExchanger(40.0)
     conns_h = [
-        connect(pump_h.port_out, bc_h.port_in),
-        connect(bc_h.port_out, asm_helper.c1.port_in),
-        connect(asm_helper.c1.port_out, asm_helper.c2.port_in),
-        connect(asm_helper.c2.port_out, pump_h.port_in),
-        pump_h.port_in.P ~ 1.0e5,
+        connect(pump_h.outlet, bc_h.inlet),
+        connect(bc_h.outlet, asm_helper.c1.inlet),
+        connect(asm_helper.c1.outlet, asm_helper.c2.inlet),
+        connect(asm_helper.c2.outlet, pump_h.inlet),
+        pump_h.inlet.p ~ 1.0e5,
         asm_helper.p1.power ~ 1.0e3,
         asm_helper.p2.power ~ 1.0e3,
     ]
@@ -630,13 +763,13 @@ end
     asm_hand = compose(System(therm_eqs, t; name=:asm_hand), c1d, c2d, p1d, p2d)
 
     @named pump_d = Pump(3.0e4)
-    @named bc_d = HeatExchanger(313.15)
+    @named bc_d = HeatExchanger(40.0)
     conns_d = [
-        connect(pump_d.port_out, bc_d.port_in),
-        connect(bc_d.port_out, asm_hand.c1.port_in),
-        connect(asm_hand.c1.port_out, asm_hand.c2.port_in),
-        connect(asm_hand.c2.port_out, pump_d.port_in),
-        pump_d.port_in.P ~ 1.0e5,
+        connect(pump_d.outlet, bc_d.inlet),
+        connect(bc_d.outlet, asm_hand.c1.inlet),
+        connect(asm_hand.c1.outlet, asm_hand.c2.inlet),
+        connect(asm_hand.c2.outlet, pump_d.inlet),
+        pump_d.inlet.p ~ 1.0e5,
         asm_hand.p1.power ~ 1.0e3,
         asm_hand.p2.power ~ 1.0e3,
     ]
@@ -645,24 +778,24 @@ end
 
     # (See the Dt(...) IC note in the variant-1 testset.)
     ic_helper = Pair{Any,Any}[
-        [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        ssys_helper.asm_helper.c1.port_in.mdot => 0.2,
-        ssys_helper.asm_helper.c2.port_in.mdot => 0.2,
-        _fa_Dt(ssys_helper.asm_helper.c1.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c2.port_in.mdot) => 0.0,
+        [ssys_helper.asm_helper.c1.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.c2.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
+        ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
+        _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
     ]
     ic_hand = Pair{Any,Any}[
-        [ssys_hand.asm_hand.c1.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.c2.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        ssys_hand.asm_hand.c1.port_in.mdot => 0.2,
-        ssys_hand.asm_hand.c2.port_in.mdot => 0.2,
-        _fa_Dt(ssys_hand.asm_hand.c1.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c2.port_in.mdot) => 0.0,
+        [ssys_hand.asm_hand.c1.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.c2.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
+        ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
+        _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c2.inlet.ṁ) => 0.0,
     ]
     sol_helper = solve_steady(ssys_helper, ic_helper)
     sol_hand = solve_steady(ssys_hand, ic_hand)
@@ -681,7 +814,7 @@ end
     @test isapprox(vals_helper, vals_hand; rtol=1e-10)
 end
 
-# ─── Variant 4 — closed annular (k=3 of each, ring) parity ───
+# #### Variant 4 — closed annular (k=3 of each, ring) parity
 @testset "fuel_assembly variant 4 (closed annular, k=3) parity" begin
     n, nz, nx = 4, 4, 2
     c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n); c3h = _fa_cac(:c3; n=n)
@@ -690,14 +823,14 @@ end
     @test asm_helper isa ModelingToolkit.AbstractSystem
 
     @named pump_h = Pump(3.0e4)
-    @named bc_h = HeatExchanger(313.15)
+    @named bc_h = HeatExchanger(40.0)
     conns_h = [
-        connect(pump_h.port_out, bc_h.port_in),
-        connect(bc_h.port_out, asm_helper.c1.port_in),
-        connect(asm_helper.c1.port_out, asm_helper.c2.port_in),
-        connect(asm_helper.c2.port_out, asm_helper.c3.port_in),
-        connect(asm_helper.c3.port_out, pump_h.port_in),
-        pump_h.port_in.P ~ 1.0e5,
+        connect(pump_h.outlet, bc_h.inlet),
+        connect(bc_h.outlet, asm_helper.c1.inlet),
+        connect(asm_helper.c1.outlet, asm_helper.c2.inlet),
+        connect(asm_helper.c2.outlet, asm_helper.c3.inlet),
+        connect(asm_helper.c3.outlet, pump_h.inlet),
+        pump_h.inlet.p ~ 1.0e5,
         asm_helper.p1.power ~ 1.0e3,
         asm_helper.p2.power ~ 1.0e3,
         asm_helper.p3.power ~ 1.0e3,
@@ -719,14 +852,14 @@ end
     asm_hand = compose(System(therm_eqs, t; name=:asm_hand), c1d, c2d, c3d, p1d, p2d, p3d)
 
     @named pump_d = Pump(3.0e4)
-    @named bc_d = HeatExchanger(313.15)
+    @named bc_d = HeatExchanger(40.0)
     conns_d = [
-        connect(pump_d.port_out, bc_d.port_in),
-        connect(bc_d.port_out, asm_hand.c1.port_in),
-        connect(asm_hand.c1.port_out, asm_hand.c2.port_in),
-        connect(asm_hand.c2.port_out, asm_hand.c3.port_in),
-        connect(asm_hand.c3.port_out, pump_d.port_in),
-        pump_d.port_in.P ~ 1.0e5,
+        connect(pump_d.outlet, bc_d.inlet),
+        connect(bc_d.outlet, asm_hand.c1.inlet),
+        connect(asm_hand.c1.outlet, asm_hand.c2.inlet),
+        connect(asm_hand.c2.outlet, asm_hand.c3.inlet),
+        connect(asm_hand.c3.outlet, pump_d.inlet),
+        pump_d.inlet.p ~ 1.0e5,
         asm_hand.p1.power ~ 1.0e3,
         asm_hand.p2.power ~ 1.0e3,
         asm_hand.p3.power ~ 1.0e3,
@@ -736,32 +869,32 @@ end
 
     # (See the Dt(...) IC note in the variant-1 testset.)
     ic_helper = Pair{Any,Any}[
-        [ssys_helper.asm_helper.c1.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.c2.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.c3.T[i] => 313.15 for i in 1:n]...,
-        [ssys_helper.asm_helper.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p3.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        ssys_helper.asm_helper.c1.port_in.mdot => 0.2,
-        ssys_helper.asm_helper.c2.port_in.mdot => 0.2,
-        ssys_helper.asm_helper.c3.port_in.mdot => 0.2,
-        _fa_Dt(ssys_helper.asm_helper.c1.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c2.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c3.port_in.mdot) => 0.0,
+        [ssys_helper.asm_helper.c1.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.c2.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.c3.T[i] => 40.0 for i in 1:n]...,
+        [ssys_helper.asm_helper.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_helper.asm_helper.p3.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
+        ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
+        ssys_helper.asm_helper.c3.inlet.ṁ => 0.2,
+        _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_helper.asm_helper.c3.inlet.ṁ) => 0.0,
     ]
     ic_hand = Pair{Any,Any}[
-        [ssys_hand.asm_hand.c1.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.c2.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.c3.T[i] => 313.15 for i in 1:n]...,
-        [ssys_hand.asm_hand.p1.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p2.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p3.T[i, j] => 313.15 for i in 1:nz for j in 1:nx]...,
-        ssys_hand.asm_hand.c1.port_in.mdot => 0.2,
-        ssys_hand.asm_hand.c2.port_in.mdot => 0.2,
-        ssys_hand.asm_hand.c3.port_in.mdot => 0.2,
-        _fa_Dt(ssys_hand.asm_hand.c1.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c2.port_in.mdot) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c3.port_in.mdot) => 0.0,
+        [ssys_hand.asm_hand.c1.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.c2.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.c3.T[i] => 40.0 for i in 1:n]...,
+        [ssys_hand.asm_hand.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        [ssys_hand.asm_hand.p3.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+        ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
+        ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
+        ssys_hand.asm_hand.c3.inlet.ṁ => 0.2,
+        _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c2.inlet.ṁ) => 0.0,
+        _fa_Dt(ssys_hand.asm_hand.c3.inlet.ṁ) => 0.0,
     ]
     sol_helper = solve_steady(ssys_helper, ic_helper)
     sol_hand = solve_steady(ssys_hand, ic_hand)
@@ -780,7 +913,7 @@ end
     @test isapprox(vals_helper, vals_hand; rtol=1e-10)
 end
 
-# ─── ArgumentError paths ───
+# #### ArgumentError paths
 
 @testset "fuel_assembly — ArgumentError on bookend-vs-length conflict" begin
     # 3 CACs + 2 HDs → auto would infer :channel; explicit bookend=:plate contradicts.
@@ -811,8 +944,8 @@ end
     @test_throws ArgumentError fuel_assembly([c1, c2, c3], [p1, p2]; closed=true, name=:bad)
 end
 
-# ─── Smoke: helper returns an uncompiled ODESystem (no premature mtkcompile) ───
-@testset "fuel_assembly — uncompiled ODESystem smoke" begin
+# #### Smoke: helper returns an uncompiled System (no premature mtkcompile)
+@testset "fuel_assembly — uncompiled System smoke" begin
     # Build the cheapest variant-3 mixed k=2 instance and confirm the helper
     # returned an UNCOMPILED system (caller is responsible for adding BCs
     # then calling mtkcompile — see helper docstring). A bare `mtkcompile`

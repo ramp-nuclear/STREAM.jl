@@ -3,9 +3,11 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
-import STREAM: HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
-@testset "HDIFF-01: HeatDiffusion callable and returns MTK System" begin
+@testset "HeatDiffusion callable and returns MTK System" begin
     ps = fill(1.0 / (5 * 3), 5, 3)
     @named hd = HeatDiffusion(
         nz=5,
@@ -21,11 +23,11 @@ import STREAM: HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
     @test hd isa ModelingToolkit.System
 end
 
-@testset "HDIFF-01: HeatDiffusion exported from STREAM" begin
-    @test isdefined(STREAM, :HeatDiffusion)
+@testset "HeatDiffusion exported from STREAM" begin
+    @test isdefined(STREAM.Components, :HeatDiffusion)
 end
 
-@testset "HDIFF-01: HeatDiffusion mtkcompile bare (no connections)" begin
+@testset "HeatDiffusion mtkcompile bare (no connections)" begin
     ps = fill(1.0 / (3 * 2), 3, 2)
     @named hd = HeatDiffusion(
         nz=3,
@@ -41,7 +43,7 @@ end
     @test_nowarn mtkcompile(hd; fully_determined=false)  # isolated component: dangling thermal ports + unset power(t) by design
 end
 
-@testset "HDIFF-01: HeatDiffusion state T[1:nz, 1:nx] present in unknowns" begin
+@testset "HeatDiffusion state T[1:nz, 1:nx] present in unknowns" begin
     nz, nx = 3, 2
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(
@@ -61,7 +63,7 @@ end
     @test count(u -> ModelingToolkit.getname(u) == :T, unknowns(hd)) == nz * nx
 end
 
-@testset "HDIFF-04: HeatDiffusion has thermal_left and thermal_right subsystems" begin
+@testset "HeatDiffusion has thermal_left and thermal_right subsystems" begin
     nz = 3
     ps = fill(1.0 / (nz * 2), nz, 2)
     @named hd = HeatDiffusion(
@@ -82,9 +84,9 @@ end
     end
 end
 
-@testset "HDIFF-02/03: Steady-state plate T > T_boundary and Q_flow signs correct" begin
+@testset "Steady-state plate T > T_boundary and Q signs correct" begin
     nz, nx = 3, 3
-    T_bc = 600.0
+    T_bc = 326.85
     pwr = 1e5
     ps = fill(1.0 / (nz * nx), nz, nx)
 
@@ -129,20 +131,23 @@ end
 
     left_syms = [getproperty(ssys.hd, Symbol(:thermal_left, i)) for i in 1:nz]
     right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
-    Q_left_total = sum(sol[left_syms[i].Q_flow] for i in 1:nz)
-    Q_right_total = sum(sol[right_syms[i].Q_flow] for i in 1:nz)
+    Q_left_total = sum(sol[left_syms[i].Q] for i in 1:nz)
+    Q_right_total = sum(sol[right_syms[i].Q] for i in 1:nz)
 
-    # Both Q_flow < 0: heat leaving the plate (symmetric, plate hotter than T_bc)
+    # Both Q < 0: heat leaving the plate (symmetric, plate hotter than T_bc)
     @test Q_left_total < 0.0
     @test Q_right_total < 0.0
 
-    # Energy balance check: |Q_left| + |Q_right| ≈ power (within 5% for FD approximation)
-    @test isapprox(abs(Q_left_total) + abs(Q_right_total), pwr; rtol=0.05)
+    # Energy balance: at steady state every watt deposited must leave through the two
+    # walls, so |Q_left| + |Q_right| == power as an exact conservation identity. It holds
+    # for any grid resolution (the finite-difference spatial error sits in the temperature
+    # profile, not in the integrated flux balance). Measured residual here is ~1e-14.
+    @test isapprox(abs(Q_left_total) + abs(Q_right_total), pwr; rtol=1e-10)
 end
 
-@testset "HDIFF-05: Unconnected thermal_right has Q_flow == 0 (adiabatic)" begin
+@testset "Unconnected thermal_right has Q == 0 (adiabatic)" begin
     nz, nx = 3, 3
-    T_bc = 600.0
+    T_bc = 326.85
     pwr = 5e4
     ps = fill(1.0 / (nz * nx), nz, nx)
 
@@ -170,16 +175,16 @@ end
     op = [ssys.hd.T[i, j] => T_bc + 10.0 for i in 1:nz for j in 1:nx]
     sol = solve_steady(ssys, op)
 
-    # Unconnected thermal_right ports must have Q_flow == 0
+    # Unconnected thermal_right ports must have Q == 0
     right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
     for i in 1:nz
-        @test isapprox(sol[right_syms[i].Q_flow], 0.0; atol=1e-8)
+        @test isapprox(sol[right_syms[i].Q], 0.0; atol=1e-8)
     end
 end
 
-@testset "HDIFF-03-gap: Non-uniform power_shape: center-only source cell is hottest" begin
+@testset "Non-uniform power_shape: center-only source cell is hottest" begin
     nz, nx = 1, 3
-    T_bc = 600.0
+    T_bc = 326.85
     pwr = 1e4
     ps = reshape([0.0, 1.0, 0.0], nz, nx)
     @test isapprox(sum(ps), 1.0; atol=1e-12)
@@ -228,13 +233,13 @@ end
     @test T_right > T_bc
 end
 
-@testset "HDIFF-06: lateral symmetry — symmetric BCs + uniform power give T[:,j]==T[:,nx+1-j]" begin
+@testset "lateral symmetry — symmetric BCs + uniform power give T[:,j]==T[:,nx+1-j]" begin
     # Regression guard for the right-boundary cell equation. With both walls at the
     # same T and a uniform volumetric source, the steady lateral profile must be
     # mirror-symmetric: T[i,j] == T[i, nx+1-j]. A wrong/duplicated boundary-cell
     # equation (right cell not evolved) breaks this symmetry.
     nz, nx = 2, 5
-    T_bc = 500.0
+    T_bc = 226.85
     pwr = 8e4
     ps = fill(1.0 / (nz * nx), nz, nx)
 

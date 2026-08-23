@@ -2,24 +2,24 @@
 """
 generate_mtr_reference.py -- Python STREAM MTR coupled plate reference values
 
-Phase 56 / Plan 03 rewrite (D-17): emits per-quantity Python references
-covering ALL D-07 tiers (a)+(b)+(c)+(d) for the 3 MTR scenarios
-(symmetric / asymmetric / one-sided) per D-02. Output is bracketed by
-"# --- begin paste ---" / "# --- end paste ---" markers per the Phase 53
-stage2_reference.py pattern; Plan 04 does the manual regenerate-and-paste
+Emits per-quantity Python references
+covering all tiers (a)+(b)+(c)+(d) for the 3 MTR scenarios
+(symmetric / asymmetric / one-sided). Output is bracketed by
+"# --- begin paste ---" / "# --- end paste ---" markers
+manually regenerated and pasted
 into test/data/python_parity_reference.jl.
 
 Run ONCE on the developer machine to obtain reference values:
   cd /home/itay/projects/Julia-STREAM/test && python generate_mtr_reference.py
 
-Per D-06 this generator is NOT in CI -- it is run on the developer machine
+This generator is NOT in CI -- it is run on the developer machine
 when Python STREAM HEAD's physics changes; output is committed to the
 Julia-side reference data file.
 
 Requires Python STREAM at ~/projects/STREAM.
 
-UNIT CONVENTION: Python STREAM = Celsius. Julia-STREAM = Kelvin.
-All temperature outputs converted to Kelvin before printing.
+UNIT CONVENTION: both Python STREAM and Julia-STREAM use Celsius, so temperatures
+are printed as they come out.
 HTC values [W/(m^2 K)] and heat-flux density [W/m^2] are unit-base
 independent; they are emitted verbatim.
 
@@ -59,16 +59,11 @@ P_ABS = 1.0e5
 # Correct MTR rectangular geometry: Dh = 4*area/wet_perimeter
 # area = 0.07 * 0.00127 = 8.89e-5 m^2, wet = 2*(0.07+0.00127) = 0.14254 m, Dh ~= 0.002495 m
 
-T_INLET_L_C = 40.0       # VAL-01/02/03 left channel inlet (Celsius)
-T_INLET_R_C = 40.0       # VAL-01/03 right channel inlet (Celsius)
-T_INLET_R_ASYM_C = 90.0  # VAL-02 right channel inlet (Celsius)
+T_INLET_L_C = 40.0       # all scenarios left channel inlet (Celsius)
+T_INLET_R_C = 40.0       # symmetric and one-sided right channel inlet (Celsius)
+T_INLET_R_ASYM_C = 90.0  # asymmetric right channel inlet (Celsius)
 
-T_INLET_L_K = T_INLET_L_C + 273.15
-T_INLET_R_K = T_INLET_R_C + 273.15
-T_INLET_R_ASYM_K = T_INLET_R_ASYM_C + 273.15
 
-assert abs(T_INLET_L_K - 313.15) < 1e-9
-assert abs(T_INLET_R_ASYM_K - 363.15) < 1e-9
 
 from stream.calculations import Pump, HeatExchanger, Kirchhoff
 from stream.calculations.channel import ChannelAndContacts
@@ -119,7 +114,7 @@ def _build_channel_and_loop(name_suffix: str, T_inlet_C: float):
     Each Kirchhoff node receives a unique name (via k_constructor) so that
     multiple FlowGraph aggregators can be combined without NonUniqueCalculationNameError.
 
-    Per Phase 56 / Plan 03 Pitfall 3 verification: plate() / symmetric_plate() /
+    Verification: plate() / symmetric_plate() /
     one_sided_connection() all auto-wire T_left/T_right via _pair_connection
     graph edges; therefore funcs={channel: dict(p_abs=P_ABS)} is sufficient and
     NO T_left/T_right augmentation is needed for tier (c) twall_left/twall_right
@@ -201,7 +196,7 @@ def _solve_scenario(agr, state_guess, jac=True):
 
 
 # ---------------------------------------------------------------
-# Julia const-block emitter helpers (D-17 -- match Phase 53 stage2 pattern)
+# Julia const-block emitter helpers
 # ---------------------------------------------------------------
 
 def _emit_julia_scalar(name: str, value: float, fmt: str = "%.10f"):
@@ -240,9 +235,9 @@ def _emit_julia_matrix(name: str, mat, fmt: str = "%.10f", row_comment: bool = T
 
 
 # ---------------------------------------------------------------
-# VAL-01 / Symmetric MTR: plate() with both channels at 40 C
+# Symmetric MTR: plate() with both channels at 40 C
 # ---------------------------------------------------------------
-print("Running VAL-01: Symmetric coupling...")
+print("Running Symmetric coupling...")
 pump_l_01, hx_l_01, ch_l_01, fg_l_01 = _build_channel_and_loop("L_01", T_INLET_L_C)
 pump_r_01, hx_r_01, ch_r_01, fg_r_01 = _build_channel_and_loop("R_01", T_INLET_R_C)
 fuel_01 = _build_fuel("Fuel_01")
@@ -261,34 +256,34 @@ guess_01 = {
 }
 sol_vec_01, state_01 = _solve_scenario(agr_01, guess_01)
 
-T_outlet_l_K_sym = state_01[ch_l_01.name]["T_cool"][-1] + 273.15
-T_outlet_r_K_sym = state_01[ch_r_01.name]["T_cool"][-1] + 273.15
+T_outlet_l_C_sym = state_01[ch_l_01.name]["T_cool"][-1]
+T_outlet_r_C_sym = state_01[ch_r_01.name]["T_cool"][-1]
 mdot_l_sym = abs(state_01[K_l_01.name][K_l_01.component_edge(pump_l_01)])
 mdot_r_sym = abs(state_01[K_r_01.name][K_r_01.component_edge(pump_r_01)])
 T_plate_sym = state_01[fuel_01.name]["T"]  # (NZ, NX) in Celsius
-T_plate_center_K_sym = T_plate_sym[NZ // 2][NX // 2] + 273.15
+T_plate_center_C_sym = T_plate_sym[NZ // 2][NX // 2]
 
 # Sanity assertions
-assert T_outlet_l_K_sym > T_INLET_L_K, f"VAL-01: T_outlet_l {T_outlet_l_K_sym:.2f} K below inlet"
-assert T_outlet_r_K_sym > T_INLET_R_K, f"VAL-01: T_outlet_r {T_outlet_r_K_sym:.2f} K below inlet"
-assert mdot_l_sym > 1e-4, f"VAL-01: mdot_l {mdot_l_sym:.4f} kg/s too small"
-assert mdot_r_sym > 1e-4, f"VAL-01: mdot_r {mdot_r_sym:.4f} kg/s too small"
-assert T_plate_center_K_sym > T_INLET_L_K, f"VAL-01: T_plate_center below inlet"
+assert T_outlet_l_C_sym > T_INLET_L_C, f"symmetric: T_outlet_l {T_outlet_l_C_sym:.2f} degC below inlet"
+assert T_outlet_r_C_sym > T_INLET_R_C, f"symmetric: T_outlet_r {T_outlet_r_C_sym:.2f} degC below inlet"
+assert mdot_l_sym > 1e-4, f"symmetric: mdot_l {mdot_l_sym:.4f} kg/s too small"
+assert mdot_r_sym > 1e-4, f"symmetric: mdot_r {mdot_r_sym:.4f} kg/s too small"
+assert T_plate_center_C_sym > T_INLET_L_C, f"symmetric: T_plate_center below inlet"
 # Symmetry: both channels should be nearly identical (<1% relative diff in T_outlet)
-assert abs(T_outlet_l_K_sym - T_outlet_r_K_sym) / T_outlet_l_K_sym < 0.01, (
-    f"VAL-01: T_outlet asymmetry = {abs(T_outlet_l_K_sym - T_outlet_r_K_sym):.4f} K -- expected symmetric"
+assert abs(T_outlet_l_C_sym - T_outlet_r_C_sym) / T_outlet_l_C_sym < 0.01, (
+    f"symmetric: T_outlet asymmetry = {abs(T_outlet_l_C_sym - T_outlet_r_C_sym):.4f} K -- expected symmetric"
 )
 
 # --- Symmetric: per-cell extraction (tier b/c/d) ---
 ch_l_01_state = state_01[ch_l_01.name]
 ch_r_01_state = state_01[ch_r_01.name]
 
-T_cells_l_K_sym = [T + 273.15 for T in ch_l_01_state["T_cool"]]
-T_cells_r_K_sym = [T + 273.15 for T in ch_r_01_state["T_cool"]]
+T_cells_l_C_sym = [T for T in ch_l_01_state["T_cool"]]
+T_cells_r_C_sym = [T for T in ch_r_01_state["T_cool"]]
 
-# tier (c) -- Pitfall-3 correction (Plan 56-04):
+# tier (c) -- correction:
 #
-# Plan 56-03 SUMMARY claimed plate() auto-wires BOTH T_left AND T_right into
+# An earlier version assumed plate() auto-wires BOTH T_left AND T_right into
 # each channel via _pair_connection graph edges. That was wrong. The actual
 # plate() topology is (stream/composition/mtr_geometry.py:38-66):
 #
@@ -314,32 +309,32 @@ T_cells_r_K_sym = [T + 273.15 for T in ch_r_01_state["T_cool"]]
 #   h_adiabatic mirrors the connected side (Python's _other_if_none, used
 #                in channel.py:691 for the calculate-time HTC, returns the
 #                same h on both sides; we keep that convention here).
-T_wall_right_l_sym = [T + 273.15 for T in ch_l_01_state[ChannelVar.twall_right]]
+T_wall_right_l_sym = [T for T in ch_l_01_state[ChannelVar.twall_right]]
 h_left_l_sym       = list(ch_l_01_state[ChannelVar.h_left])
 h_right_l_sym      = list(ch_l_01_state[ChannelVar.h_right])
 q_right_l_sym      = list(ch_l_01_state[ChannelVar.heatflux_right])
 # adiabatic LEFT wall of channel_L
-T_wall_left_l_sym  = list(T_cells_l_K_sym)        # T_wall = T_cool, in Kelvin
+T_wall_left_l_sym  = list(T_cells_l_C_sym)        # T_wall = T_cool
 q_left_l_sym       = [0.0] * NZ                   # zero heat flux
 
-T_wall_left_r_sym  = [T + 273.15 for T in ch_r_01_state[ChannelVar.twall_left]]
+T_wall_left_r_sym  = [T for T in ch_r_01_state[ChannelVar.twall_left]]
 h_left_r_sym       = list(ch_r_01_state[ChannelVar.h_left])
 h_right_r_sym      = list(ch_r_01_state[ChannelVar.h_right])
 q_left_r_sym       = list(ch_r_01_state[ChannelVar.heatflux_left])
 # adiabatic RIGHT wall of channel_R
-T_wall_right_r_sym = list(T_cells_r_K_sym)
+T_wall_right_r_sym = list(T_cells_r_C_sym)
 q_right_r_sym      = [0.0] * NZ
 
-# tier (d) -- plate-side T(z,x), Celsius -> Kelvin via numpy broadcast
-T_plate_K_sym = state_01[fuel_01.name]["T"] + 273.15  # shape (NZ, NX)
-assert not np.isnan(T_plate_K_sym).any(), "VAL-01 plate has NaN -- scipy 'success' with NaN"
+# tier (d) -- plate-side T(z,x)
+T_plate_C_sym = state_01[fuel_01.name]["T"]  # shape (NZ, NX)
+assert not np.isnan(T_plate_C_sym).any(), "symmetric plate has NaN -- scipy 'success' with NaN"
 
-print("  VAL-01 OK")
+print("  symmetric OK")
 
 # ---------------------------------------------------------------
-# VAL-02 / Asymmetric MTR: right channel HX outlet = 90 C
+# Asymmetric MTR: right channel HX outlet = 90 C
 # ---------------------------------------------------------------
-print("Running VAL-02: Asymmetric coupling (right channel 90 C)...")
+print("Running Asymmetric coupling (right channel 90 C)...")
 pump_l_02, hx_l_02, ch_l_02, fg_l_02 = _build_channel_and_loop("L_02", T_INLET_L_C)
 pump_r_02, hx_r_02, ch_r_02, fg_r_02 = _build_channel_and_loop("R_02", T_INLET_R_ASYM_C)
 fuel_02 = _build_fuel("Fuel_02")
@@ -365,18 +360,18 @@ guess_02 = {
 
 sol_vec_02, state_02 = _solve_scenario(agr_02, guess_02)
 
-T_outlet_l_K_asym = state_02[ch_l_02.name]["T_cool"][-1] + 273.15
-T_outlet_r_K_asym = state_02[ch_r_02.name]["T_cool"][-1] + 273.15
+T_outlet_l_C_asym = state_02[ch_l_02.name]["T_cool"][-1]
+T_outlet_r_C_asym = state_02[ch_r_02.name]["T_cool"][-1]
 mdot_l_asym = abs(state_02[K_l_02.name][K_l_02.component_edge(pump_l_02)])
 mdot_r_asym = abs(state_02[K_r_02.name][K_r_02.component_edge(pump_r_02)])
 
 T_plate_asym = state_02[fuel_02.name]["T"]  # (NZ, NX) in Celsius
-T_plate_center_K_asym = T_plate_asym[NZ // 2][NX // 2] + 273.15
+T_plate_center_C_asym = T_plate_asym[NZ // 2][NX // 2]
 
 # Asymmetry assertion: right side of plate (x-index NX-1=2) should be hotter than left (x-index 0)
 # because right channel is at 90 C vs 40 C on the left
 assert T_plate_asym[NZ // 2][NX - 1] > T_plate_asym[NZ // 2][0], (
-    f"VAL-02: Expected T_plate right > left; got right={T_plate_asym[NZ//2][NX-1]:.2f} C, "
+    f"asymmetric: Expected T_plate right > left; got right={T_plate_asym[NZ//2][NX-1]:.2f} C, "
     f"left={T_plate_asym[NZ//2][0]:.2f} C"
 )
 
@@ -384,35 +379,35 @@ assert T_plate_asym[NZ // 2][NX - 1] > T_plate_asym[NZ // 2][0], (
 ch_l_02_state = state_02[ch_l_02.name]
 ch_r_02_state = state_02[ch_r_02.name]
 
-T_cells_l_K_asym = [T + 273.15 for T in ch_l_02_state["T_cool"]]
-T_cells_r_K_asym = [T + 273.15 for T in ch_r_02_state["T_cool"]]
+T_cells_l_C_asym = [T for T in ch_l_02_state["T_cool"]]
+T_cells_r_C_asym = [T for T in ch_r_02_state["T_cool"]]
 
-# tier (c) -- same plate() topology as VAL-01: ch_L's RIGHT wall and
+# tier (c) -- same plate() topology as symmetric: ch_L's RIGHT wall and
 # ch_R's LEFT wall are connected to the fuel; opposite walls are adiabatic.
-# See VAL-01 block above for the API discovery / convention rationale.
-T_wall_right_l_asym = [T + 273.15 for T in ch_l_02_state[ChannelVar.twall_right]]
+# See symmetric block above for the API discovery / convention rationale.
+T_wall_right_l_asym = [T for T in ch_l_02_state[ChannelVar.twall_right]]
 h_left_l_asym       = list(ch_l_02_state[ChannelVar.h_left])
 h_right_l_asym      = list(ch_l_02_state[ChannelVar.h_right])
 q_right_l_asym      = list(ch_l_02_state[ChannelVar.heatflux_right])
-T_wall_left_l_asym  = list(T_cells_l_K_asym)
+T_wall_left_l_asym  = list(T_cells_l_C_asym)
 q_left_l_asym       = [0.0] * NZ
 
-T_wall_left_r_asym  = [T + 273.15 for T in ch_r_02_state[ChannelVar.twall_left]]
+T_wall_left_r_asym  = [T for T in ch_r_02_state[ChannelVar.twall_left]]
 h_left_r_asym       = list(ch_r_02_state[ChannelVar.h_left])
 h_right_r_asym      = list(ch_r_02_state[ChannelVar.h_right])
 q_left_r_asym       = list(ch_r_02_state[ChannelVar.heatflux_left])
-T_wall_right_r_asym = list(T_cells_r_K_asym)
+T_wall_right_r_asym = list(T_cells_r_C_asym)
 q_right_r_asym      = [0.0] * NZ
 
-T_plate_K_asym = state_02[fuel_02.name]["T"] + 273.15
-assert not np.isnan(T_plate_K_asym).any(), "VAL-02 plate has NaN"
+T_plate_C_asym = state_02[fuel_02.name]["T"]
+assert not np.isnan(T_plate_C_asym).any(), "asymmetric plate has NaN"
 
-print("  VAL-02 OK")
+print("  asymmetric OK")
 
 # ---------------------------------------------------------------
-# VAL-03 / One-sided MTR: left face only, right adiabatic
+# One-sided MTR: left face only, right adiabatic
 # ---------------------------------------------------------------
-print("Running VAL-03: One-sided coupling (left face only)...")
+print("Running One-sided coupling (left face only)...")
 pump_l_03, hx_l_03, ch_l_03, fg_l_03 = _build_channel_and_loop("L_03", T_INLET_L_C)
 fuel_03 = _build_fuel("Fuel_03")
 
@@ -429,46 +424,47 @@ guess_03 = {
 
 sol_vec_03, state_03 = _solve_scenario(agr_03, guess_03)
 
-T_outlet_l_K_onesided = state_03[ch_l_03.name]["T_cool"][-1] + 273.15
+T_outlet_l_C_onesided = state_03[ch_l_03.name]["T_cool"][-1]
 mdot_l_onesided = abs(state_03[K_l_03.name][K_l_03.component_edge(pump_l_03)])
 T_plate_onesided = state_03[fuel_03.name]["T"]  # (NZ, NX) in Celsius
-T_plate_center_K_onesided = T_plate_onesided[NZ // 2][NX // 2] + 273.15
+T_plate_center_C_onesided = T_plate_onesided[NZ // 2][NX // 2]
 
-assert T_outlet_l_K_onesided > T_INLET_L_K, (
-    f"VAL-03: T_outlet {T_outlet_l_K_onesided:.2f} K below inlet"
+assert T_outlet_l_C_onesided > T_INLET_L_C, (
+    f"one-sided: T_outlet {T_outlet_l_C_onesided:.2f} degC below inlet"
 )
-assert mdot_l_onesided > 1e-4, f"VAL-03: mdot {mdot_l_onesided:.4f} kg/s too small"
+assert mdot_l_onesided > 1e-4, f"one-sided: mdot {mdot_l_onesided:.4f} kg/s too small"
 
 # --- One-sided: only left channel exists (no right loop) ---
 ch_l_03_state = state_03[ch_l_03.name]
-T_cells_l_K_onesided = [T + 273.15 for T in ch_l_03_state["T_cool"]]
+T_cells_l_C_onesided = [T for T in ch_l_03_state["T_cool"]]
 
 # tier (c) -- one_sided_connection(fuel_side="left") wires ONLY the channel's
 # LEFT wall to the fuel (mtr_geometry.py:198: fuel_var = "T_left"). The
 # RIGHT wall is adiabatic, so state[twall_right] / state[heatflux_right] do
-# not exist. See VAL-01 block for the adiabatic-wall convention rationale.
-T_wall_left_l_os  = [T + 273.15 for T in ch_l_03_state[ChannelVar.twall_left]]
+# not exist. See symmetric block for the adiabatic-wall convention rationale.
+T_wall_left_l_os  = [T for T in ch_l_03_state[ChannelVar.twall_left]]
 h_left_l_os       = list(ch_l_03_state[ChannelVar.h_left])
 h_right_l_os      = list(ch_l_03_state[ChannelVar.h_right])
 q_left_l_os       = list(ch_l_03_state[ChannelVar.heatflux_left])
-T_wall_right_l_os = list(T_cells_l_K_onesided)
+T_wall_right_l_os = list(T_cells_l_C_onesided)
 q_right_l_os      = [0.0] * NZ
 
-# tier (d) -- plate T(z,x). KNOWN GAP per RESEARCH.md "Known-Different Master List":
-# Python's one_sided_connection distributes heat to BOTH plate faces (acknowledged
-# Python bug), so this Python plate-T differs from Julia's correct one-sided plate-T.
-# Plan 05 testset compares Julia plate-T against analytical T_max formula instead.
-T_plate_K_onesided = state_03[fuel_03.name]["T"] + 273.15
-assert not np.isnan(T_plate_K_onesided).any(), "VAL-03 plate has NaN"
+# tier (d) -- plate T(z,x). one_sided_connection is an edge-channel reduced model:
+# the channel is heated on its connected face only, but the plate is cooled on BOTH
+# faces (the far face by the channel's connected-side h via _other_if_none, into an
+# unmodelled equivalent twin). Julia reproduces this with single_channel_connection,
+# so the plate-T matches this reference at normal tolerance.
+T_plate_C_onesided = state_03[fuel_03.name]["T"]
+assert not np.isnan(T_plate_C_onesided).any(), "one-sided plate has NaN"
 
-print("  VAL-03 OK")
+print("  one-sided OK")
 
 # ---------------------------------------------------------------
-# Emit ready-to-paste Julia const blocks (D-17)
+# Emit ready-to-paste Julia const blocks
 # ---------------------------------------------------------------
 print()
 print("=" * 72)
-print("Phase 56 Python parity reference -- MTR (3 variants)")
+print("Python parity reference -- MTR (3 variants)")
 print("Generated by test/generate_mtr_reference.py -- DO NOT EDIT BY HAND")
 print("Regenerate with: cd test && python3 generate_mtr_reference.py")
 print(f"ChannelVar imported from: {_CHANNELVAR_IMPORT_PATH}")
@@ -488,15 +484,15 @@ print()
 
 # Block 1: Symmetric scenario
 print("# --- begin paste: test/data/python_parity_reference.jl MTR symmetric ---")
-print(f"# Symmetric MTR: T_inlet_l = T_inlet_r = {T_INLET_L_K} K; power = {POWER} W")
-_emit_julia_scalar("PARITY_MTR_SYM_T_OUT_L", T_outlet_l_K_sym)
-_emit_julia_scalar("PARITY_MTR_SYM_T_OUT_R", T_outlet_r_K_sym)
+print(f"# Symmetric MTR: T_inlet_l = T_inlet_r = {T_INLET_L_C} K; power = {POWER} W")
+_emit_julia_scalar("PARITY_MTR_SYM_T_OUT_L", T_outlet_l_C_sym)
+_emit_julia_scalar("PARITY_MTR_SYM_T_OUT_R", T_outlet_r_C_sym)
 _emit_julia_scalar("PARITY_MTR_SYM_MDOT_L",  mdot_l_sym)
 _emit_julia_scalar("PARITY_MTR_SYM_MDOT_R",  mdot_r_sym)
 _emit_julia_scalar("PARITY_MTR_SYM_DP",      DP_PUMP)
 print()
-_emit_julia_array("PARITY_MTR_SYM_T_CELLS_L",      T_cells_l_K_sym, comment_each=True, comment_prefix="T_l")
-_emit_julia_array("PARITY_MTR_SYM_T_CELLS_R",      T_cells_r_K_sym, comment_each=True, comment_prefix="T_r")
+_emit_julia_array("PARITY_MTR_SYM_T_CELLS_L",      T_cells_l_C_sym, comment_each=True, comment_prefix="T_l")
+_emit_julia_array("PARITY_MTR_SYM_T_CELLS_R",      T_cells_r_C_sym, comment_each=True, comment_prefix="T_r")
 _emit_julia_array("PARITY_MTR_SYM_T_WALL_LEFT_L",  T_wall_left_l_sym)
 _emit_julia_array("PARITY_MTR_SYM_T_WALL_RIGHT_L", T_wall_right_l_sym)
 _emit_julia_array("PARITY_MTR_SYM_H_TC_LEFT_L",    h_left_l_sym)
@@ -509,21 +505,21 @@ _emit_julia_array("PARITY_MTR_SYM_H_TC_LEFT_R",    h_left_r_sym)
 _emit_julia_array("PARITY_MTR_SYM_H_TC_RIGHT_R",   h_right_r_sym)
 _emit_julia_array("PARITY_MTR_SYM_Q_LEFT_R",       q_left_r_sym)
 _emit_julia_array("PARITY_MTR_SYM_Q_RIGHT_R",      q_right_r_sym)
-_emit_julia_matrix("PARITY_MTR_SYM_T_PLATE",       T_plate_K_sym)  # (NZ, NX)
+_emit_julia_matrix("PARITY_MTR_SYM_T_PLATE",       T_plate_C_sym)  # (NZ, NX)
 print("# --- end paste: MTR symmetric ---")
 print()
 
-# Block 2: Asymmetric scenario (right channel inlet 363.15 K = 90 C per D-02)
+# Block 2: Asymmetric scenario (right channel inlet 363.15 K = 90 C)
 print("# --- begin paste: test/data/python_parity_reference.jl MTR asymmetric ---")
-print(f"# Asymmetric MTR: T_inlet_l = {T_INLET_L_K} K, T_inlet_r = {T_INLET_R_ASYM_K} K")
-_emit_julia_scalar("PARITY_MTR_ASYM_T_OUT_L", T_outlet_l_K_asym)
-_emit_julia_scalar("PARITY_MTR_ASYM_T_OUT_R", T_outlet_r_K_asym)
+print(f"# Asymmetric MTR: T_inlet_l = {T_INLET_L_C} K, T_inlet_r = {T_INLET_R_ASYM_C} K")
+_emit_julia_scalar("PARITY_MTR_ASYM_T_OUT_L", T_outlet_l_C_asym)
+_emit_julia_scalar("PARITY_MTR_ASYM_T_OUT_R", T_outlet_r_C_asym)
 _emit_julia_scalar("PARITY_MTR_ASYM_MDOT_L",  mdot_l_asym)
 _emit_julia_scalar("PARITY_MTR_ASYM_MDOT_R",  mdot_r_asym)
 _emit_julia_scalar("PARITY_MTR_ASYM_DP",      DP_PUMP)
 print()
-_emit_julia_array("PARITY_MTR_ASYM_T_CELLS_L",      T_cells_l_K_asym, comment_each=True, comment_prefix="T_l")
-_emit_julia_array("PARITY_MTR_ASYM_T_CELLS_R",      T_cells_r_K_asym, comment_each=True, comment_prefix="T_r")
+_emit_julia_array("PARITY_MTR_ASYM_T_CELLS_L",      T_cells_l_C_asym, comment_each=True, comment_prefix="T_l")
+_emit_julia_array("PARITY_MTR_ASYM_T_CELLS_R",      T_cells_r_C_asym, comment_each=True, comment_prefix="T_r")
 _emit_julia_array("PARITY_MTR_ASYM_T_WALL_LEFT_L",  T_wall_left_l_asym)
 _emit_julia_array("PARITY_MTR_ASYM_T_WALL_RIGHT_L", T_wall_right_l_asym)
 _emit_julia_array("PARITY_MTR_ASYM_H_TC_LEFT_L",    h_left_l_asym)
@@ -536,34 +532,33 @@ _emit_julia_array("PARITY_MTR_ASYM_H_TC_LEFT_R",    h_left_r_asym)
 _emit_julia_array("PARITY_MTR_ASYM_H_TC_RIGHT_R",   h_right_r_asym)
 _emit_julia_array("PARITY_MTR_ASYM_Q_LEFT_R",       q_left_r_asym)
 _emit_julia_array("PARITY_MTR_ASYM_Q_RIGHT_R",      q_right_r_asym)
-_emit_julia_matrix("PARITY_MTR_ASYM_T_PLATE",       T_plate_K_asym)
+_emit_julia_matrix("PARITY_MTR_ASYM_T_PLATE",       T_plate_C_asym)
 print("# --- end paste: MTR asymmetric ---")
 print()
 
 # Block 3: One-sided scenario (left channel only)
 print("# --- begin paste: test/data/python_parity_reference.jl MTR one-sided ---")
-print(f"# One-sided MTR: only left channel; T_inlet_l = {T_INLET_L_K} K")
-print(f"# KNOWN GAP per RESEARCH.md Known-Different Master List:")
-print(f"#   Python one_sided_connection distributes heat to BOTH plate faces (acknowledged Python bug).")
-print(f"#   Plan 05 testset compares Julia plate-T against analytical T_max formula, NOT Python plate-T.")
-print(f"#   Tier (a) T_out_l is also flagged as known-gap; Plan 05 testset documents the magnitude.")
-_emit_julia_scalar("PARITY_MTR_ONESIDED_T_OUT_L", T_outlet_l_K_onesided)
+print(f"# One-sided MTR: only left channel; T_inlet_l = {T_INLET_L_C} K")
+print(f"# Edge-channel reduced model: channel heated on its connected face only, plate cooled")
+print(f"# on BOTH faces (far face via the connected-side h, into an unmodelled equivalent twin).")
+print(f"# Julia reproduces this with single_channel_connection; all rows match at normal tolerance.")
+_emit_julia_scalar("PARITY_MTR_ONESIDED_T_OUT_L", T_outlet_l_C_onesided)
 _emit_julia_scalar("PARITY_MTR_ONESIDED_MDOT_L",  mdot_l_onesided)
 _emit_julia_scalar("PARITY_MTR_ONESIDED_DP",      DP_PUMP)
 print()
-_emit_julia_array("PARITY_MTR_ONESIDED_T_CELLS_L",      T_cells_l_K_onesided, comment_each=True, comment_prefix="T_l")
+_emit_julia_array("PARITY_MTR_ONESIDED_T_CELLS_L",      T_cells_l_C_onesided, comment_each=True, comment_prefix="T_l")
 _emit_julia_array("PARITY_MTR_ONESIDED_T_WALL_LEFT_L",  T_wall_left_l_os)
 _emit_julia_array("PARITY_MTR_ONESIDED_T_WALL_RIGHT_L", T_wall_right_l_os)
 _emit_julia_array("PARITY_MTR_ONESIDED_H_TC_LEFT_L",    h_left_l_os)
 _emit_julia_array("PARITY_MTR_ONESIDED_H_TC_RIGHT_L",   h_right_l_os)
 _emit_julia_array("PARITY_MTR_ONESIDED_Q_LEFT_L",       q_left_l_os)
 _emit_julia_array("PARITY_MTR_ONESIDED_Q_RIGHT_L",      q_right_l_os)
-_emit_julia_matrix("PARITY_MTR_ONESIDED_T_PLATE",       T_plate_K_onesided)
+_emit_julia_matrix("PARITY_MTR_ONESIDED_T_PLATE",       T_plate_C_onesided)
 print("# --- end paste: MTR one-sided ---")
 print()
 print("=" * 72)
 print("Diagnostics (NOT pasted -- for human inspection only)")
 print("=" * 72)
-print(f"  SYM:      T_out_l = {T_outlet_l_K_sym:.4f} K, mdot_l = {mdot_l_sym:.6f} kg/s, T_plate_center = {T_plate_K_sym[NZ//2, NX//2]:.4f} K")
-print(f"  ASYM:     T_out_l = {T_outlet_l_K_asym:.4f} K, T_out_r = {T_outlet_r_K_asym:.4f} K, T_plate_center = {T_plate_K_asym[NZ//2, NX//2]:.4f} K")
-print(f"  ONESIDED: T_out_l = {T_outlet_l_K_onesided:.4f} K (KNOWN GAP -- Python both-faces dist), T_plate_center = {T_plate_K_onesided[NZ//2, NX//2]:.4f} K")
+print(f"  SYM:      T_out_l = {T_outlet_l_C_sym:.4f} K, mdot_l = {mdot_l_sym:.6f} kg/s, T_plate_center = {T_plate_C_sym[NZ//2, NX//2]:.4f} K")
+print(f"  ASYM:     T_out_l = {T_outlet_l_C_asym:.4f} K, T_out_r = {T_outlet_r_C_asym:.4f} K, T_plate_center = {T_plate_C_asym[NZ//2, NX//2]:.4f} K")
+print(f"  ONESIDED: T_out_l = {T_outlet_l_C_onesided:.4f} K (edge-channel, plate cooled both faces), T_plate_center = {T_plate_C_onesided[NZ//2, NX//2]:.4f} K")

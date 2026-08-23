@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """
-generate_reference.py -- Phase 56 Python STREAM cross-validation reference generator.
+generate_reference.py -- Python STREAM cross-validation reference generator.
 
-Run ONCE to obtain the simple-loop reference values for the Phase 56 parity testset:
+Run ONCE to obtain the simple-loop reference values for the parity testset:
   cd /home/itay/projects/Julia-STREAM/test && python3 generate_reference.py
 
 Requires Python STREAM at ~/projects/STREAM (override via STREAM_PYTHON_PATH).
 
-D-06 / D-17:
-  This script is NOT in CI. It is invoked by hand at reference-update time only
-  (Plan 56-04 is the manual regenerate-and-paste checkpoint).
 
-OUTPUT (D-17 / D-07 tiers a + b + c for simple loop):
+  This script is NOT in CI. It is invoked by hand at reference-update time only
+ .
+
+OUTPUT (tiers a + b + c for simple loop):
   Two pasteable const blocks, each bracketed by '# --- begin paste ---' /
-  '# --- end paste ---' markers (Phase 53 stage2_reference.py pattern).
+  '# --- end paste ---' markers.
 
   Block 1 — equivalence-checklist constants for test/parity_helpers.jl:
     PYTHON_RHO_AT_REF, PYTHON_CP_AT_REF, PYTHON_MU_AT_REF, PYTHON_K_AT_REF
-    (each a 3-tuple at REF_T_K = (313.15, 343.15, 373.15) K).
+    (each a 3-tuple at REF_T_C = (40.0, 70.0, 100.0) degC).
 
   Block 2 — simple-loop reference const block for test/data/python_parity_reference.jl:
     Tier (a) scalars:
@@ -32,21 +32,20 @@ OUTPUT (D-17 / D-07 tiers a + b + c for simple loop):
       PARITY_SIMPLE_Q_DENSITY_LEFT          (Float64[N], W/m^2)
       PARITY_SIMPLE_Q_DENSITY_RIGHT         (Float64[N], W/m^2)
 
-    Both _LEFT and _RIGHT q constants are required so Plan 56-05 can SUM them
+    Both _LEFT and _RIGHT q constants are required so the Julia side can SUM them
     (Gap #1 mitigation: Python emits q on πD-LEFT and 0-RIGHT for one-sided
     heating; Julia splits πD/2 each side; LEFT+RIGHT totals match).
 
 UNIT CONVENTION:
-  Python STREAM:  CELSIUS for temperatures, W/m^2 for heat flux density.
-  Julia-STREAM:   KELVIN. We convert *here* (T_K = T_C + 273.15) so the
-  Julia consumer pastes ready-to-use Kelvin values verbatim.
+  Both sides use CELSIUS for temperatures and W/m^2 for heat flux density,
+  so temperatures are emitted as-is with no conversion.
 
-PHYSICS / TOPOLOGY (per RESEARCH.md Pitfall 1 + Open Question 3):
+PHYSICS / TOPOLOGY:
   Pump → HeatExchanger(40°C) → ChannelAndContacts → back to Pump
 
   ChannelAndContacts (NOT plain Channel) is mandatory: tier (c) wall
   observables (twall_left/right, h_left/right, heatflux_left/right) are
-  CAC-only state-dict keys. Pitfall 3: T_left/T_right MUST be passed in
+  CAC-only state-dict keys. Note: T_left/T_right MUST be passed in
   funcs={...} so save() emits the wall-temperature keys (channel.py:628).
 
   HeatExchanger pins inlet T to 40°C (equivalent to Julia's TempBC).
@@ -77,10 +76,6 @@ sys.path.insert(0, STREAM_PATH)
 # Unit conversion checks
 T_INLET_C = 40.0
 T_WALL_C  = 100.0
-T_INLET_K = T_INLET_C + 273.15
-T_WALL_K  = T_WALL_C  + 273.15
-assert abs(T_INLET_K - 313.15) < 1e-9
-assert abs(T_WALL_K  - 373.15) < 1e-9
 
 # Parameters matching Julia-STREAM build_loop() defaults
 N       = 10
@@ -89,12 +84,10 @@ D_H     = 0.01
 DP_PUMP = 3.0e4
 P_ABS   = 1.0e5
 
-# ─────────────────────────────────────────────────────────────────────
-# Equivalence-checklist reference values (D-10 fluid-props tier).
-# parity_helpers.jl asserts these against Julia's rho_water/cp_water/etc.
-# at 1e-12 rtol. REF_T_K must match parity_helpers.jl's REF_T_K exactly.
-# ─────────────────────────────────────────────────────────────────────
-REF_T_K = (313.15, 343.15, 373.15)
+# Equivalence-checklist reference values (fluid-props tier).
+# parity_helpers.jl asserts these against Julia's rho/cp/etc.
+# at 1e-12 rtol. REF_T_C must match parity_helpers.jl's REF_T_C exactly.
+REF_T_C = (40.0, 70.0, 100.0)
 
 from stream.calculations import Pump, HeatExchanger
 from stream.calculations.channel import ChannelAndContacts
@@ -105,8 +98,8 @@ from stream.jacobians import ALG_jacobian
 from stream.physical_models.pressure_drop import pressure_diff
 
 # ChannelVar enum — the import path has moved across Python STREAM revisions.
-# Try the most-likely paths first; record which branch fired so the SUMMARY
-# can document the working path for Plan 56-04. Extend this chain if a future
+# Try the most-likely paths first; record which branch fired so this script
+# can document the working path. Extend this chain if a future
 # revision moves it again.
 _CHANNELVAR_IMPORT_PATH = None
 try:
@@ -131,9 +124,7 @@ except ImportError:
             ) from e
 
 
-# ─────────────────────────────────────────────────────────────────────
-# Julia-const printers (Phase 53 stage2_reference.py pattern, generalised)
-# ─────────────────────────────────────────────────────────────────────
+# Julia-const printers
 def _emit_julia_array(name, values, fmt="%.10f", comment_each=False, comment_prefix=""):
     """Emit a Julia const Float64[ ... ] array. One value per line if comment_each."""
     print(f"const {name} = Float64[")
@@ -152,14 +143,12 @@ def _emit_julia_scalar(name, value, fmt="%.10f"):
 
 
 def _emit_julia_tuple3(name, values, fmt="%.10f"):
-    """Emit a Julia const NTuple{3, Float64} for the 3 REF_T_K values."""
+    """Emit a Julia const NTuple{3, Float64} for the 3 REF_T_C values."""
     formatted = ", ".join(fmt % v for v in values)
     print(f"const {name} = ({formatted})")
 
 
-# ─────────────────────────────────────────────────────────────────────
 # Build topology
-# ─────────────────────────────────────────────────────────────────────
 pipe_ch = EffectivePipe.circular(length=L_CH, diameter=D_H)
 
 pump = Pump(pressure=DP_PUMP)
@@ -169,7 +158,7 @@ pump = Pump(pressure=DP_PUMP)
 # before it enters the heated channel, breaking the circular thermal dependency.
 hx = HeatExchanger(outlet=T_INLET_C, name="HX")
 
-# ChannelAndContacts (Pitfall 1: MUST be CAC for tier-(c) wall observables;
+# ChannelAndContacts (MUST be CAC for tier-(c) wall observables;
 # do NOT change to Channel). Computes Dittus-Boelter HTC self-consistently
 # from flow. Friction is included via pressure_diff (Darcy-Weisbach).
 # g=0 matches Julia build_loop() Channel default (no gravity term).
@@ -185,7 +174,7 @@ channel = ChannelAndContacts(
 
 # FlowGraph: Pump+HX on forward edge, Channel on return edge.
 # reference_node pins absolute pressure at "A" (matches Julia: pump.port_in.P ~ 1e5).
-# Pitfall 3: T_left/T_right MUST be set so save() emits ChannelVar.twall_*
+# T_left/T_right MUST be set so save() emits ChannelVar.twall_*
 # keys (channel.py:628 conditional). Both are set here.
 fg = FlowGraph(
     flow_edge(("A", "B"), pump, hx),
@@ -227,27 +216,25 @@ sol_vec   = agr.solve_steady(guess_vec, jac=ALG_jacobian(agr))
 state     = agr.save(sol_vec)
 
 
-# ─────────────────────────────────────────────────────────────────────
-# Extract ALL D-07 tiers from solver state
-# ─────────────────────────────────────────────────────────────────────
+# Extract all tiers from solver state
 ch_state = state[channel.name]
 
 # Tier (a): scalars
 T_out_C  = ch_state["T_cool"][-1]
-T_out_K  = T_out_C + 273.15
+
 mdot     = abs(state[K.name][K.component_edge(pump)])
 DP_total = DP_PUMP   # closed loop steady state: sum of dp ≡ pump dP
 
 # Sanity (preserve existing assertions on T_out + mdot)
-assert T_out_K > T_INLET_K, f"T_out {T_out_K:.2f} K below inlet"
-assert T_out_K < 450.0,     f"T_out {T_out_K:.2f} K unreasonably high"
+assert T_out_C > T_INLET_C, f"T_out {T_out_C:.2f} degC below inlet"
+assert T_out_C < 180.0,     f"T_out {T_out_C:.2f} degC unreasonably high"
 assert mdot > 1e-4,         f"mdot {mdot:.4f} kg/s too small"
 
-# Tier (b): per-cell coolant T[i] (Celsius → Kelvin)
-T_cells_K = [float(T_C) + 273.15 for T_C in ch_state["T_cool"]]
-assert len(T_cells_K) == N, f"expected {N} cells, got {len(T_cells_K)}"
+# Tier (b): per-cell coolant T[i]
+T_cells_C = [float(T_C) for T_C in ch_state["T_cool"]]
+assert len(T_cells_C) == N, f"expected {N} cells, got {len(T_cells_C)}"
 
-# Tier (c): per-cell wall observables. Pitfall-3 correction (Plan 56-04):
+# Tier (c): per-cell wall observables. correction:
 #
 # state[ChannelVar.twall_left] / twall_right echo back EXACTLY whatever was
 # passed in via funcs={channel: dict(T_left=..., T_right=...)} — see
@@ -256,33 +243,33 @@ assert len(T_cells_K) == N, f"expected {N} cells, got {len(T_cells_K)}"
 #         state[ChannelVar.get("twall", direction)] = wall_temp
 # When `wall_temp` is the SCALAR T_WALL_C=100.0 (as in the simple-loop's
 # constant-temperature BC), the state stores the scalar verbatim — NOT a
-# per-cell array. The original Plan 56-02 code `[T+273.15 for T in scalar]`
+# per-cell array. An earlier version `[T for T in scalar]`
 # crashed with `TypeError: 'float' object is not iterable`.
 #
 # Physical interpretation: the simple-loop wall is fixed at T_WALL_C on
 # every cell by construction (the funcs dict supplies a scalar BC), so
-# the per-cell array is just T_WALL_K replicated N times. h_left/h_right
+# the per-cell array is just T_WALL_C replicated N times. h_left/h_right
 # and heatflux_left/heatflux_right ARE genuine per-cell arrays — they're
 # computed from the cell-varying coolant temperature.
 twall_left_raw  = ch_state[ChannelVar.twall_left]
 twall_right_raw = ch_state[ChannelVar.twall_right]
-T_wall_left_K  = (
-    [float(twall_left_raw) + 273.15] * N
+T_wall_left_C  = (
+    [float(twall_left_raw)] * N
     if np.ndim(twall_left_raw) == 0
-    else [float(T_C) + 273.15 for T_C in twall_left_raw]
+    else [float(T_C) for T_C in twall_left_raw]
 )
-T_wall_right_K = (
-    [float(twall_right_raw) + 273.15] * N
+T_wall_right_C = (
+    [float(twall_right_raw)] * N
     if np.ndim(twall_right_raw) == 0
-    else [float(T_C) + 273.15 for T_C in twall_right_raw]
+    else [float(T_C) for T_C in twall_right_raw]
 )
 h_left  = [float(v) for v in ch_state[ChannelVar.h_left]]    # W/(m²·K)
 h_right = [float(v) for v in ch_state[ChannelVar.h_right]]
 q_density_left  = [float(v) for v in ch_state[ChannelVar.heatflux_left]]   # W/m²
 q_density_right = [float(v) for v in ch_state[ChannelVar.heatflux_right]]  # W/m²
 
-assert len(T_wall_left_K)  == N, f"expected {N} T_wall_left cells, got {len(T_wall_left_K)}"
-assert len(T_wall_right_K) == N, f"expected {N} T_wall_right cells, got {len(T_wall_right_K)}"
+assert len(T_wall_left_C)  == N, f"expected {N} T_wall_left cells, got {len(T_wall_left_C)}"
+assert len(T_wall_right_C) == N, f"expected {N} T_wall_right cells, got {len(T_wall_right_C)}"
 assert len(h_left)         == N, f"expected {N} h_left cells, got {len(h_left)}"
 assert len(h_right)        == N, f"expected {N} h_right cells, got {len(h_right)}"
 assert len(q_density_left) == N, f"expected {N} q_left cells, got {len(q_density_left)}"
@@ -290,21 +277,18 @@ assert len(q_density_right)== N, f"expected {N} q_right cells, got {len(q_densit
 
 # Tier (d): N/A for simple loop — no plate.
 
-# Equivalence-checklist values: rho/cp/mu/k at REF_T_K. light_water.* take CELSIUS,
-# so subtract 273.15 before passing.
-ref_T_C    = [T_K - 273.15 for T_K in REF_T_K]
+# Equivalence-checklist values: rho/cp/mu/k at REF_T_C. light_water.* take CELSIUS.
+ref_T_C    = list(REF_T_C)
 rho_at_ref = tuple(float(light_water.density(T))       for T in ref_T_C)
 cp_at_ref  = tuple(float(light_water.specific_heat(T)) for T in ref_T_C)
 mu_at_ref  = tuple(float(light_water.viscosity(T))     for T in ref_T_C)
 k_at_ref   = tuple(float(light_water.conductivity(T))  for T in ref_T_C)
 
 
-# ─────────────────────────────────────────────────────────────────────
 # Emit ready-to-paste Julia const blocks
-# ─────────────────────────────────────────────────────────────────────
 print()
 print("=" * 72)
-print("Phase 56 Python parity reference — SIMPLE LOOP")
+print("Python parity reference — SIMPLE LOOP")
 print("Generated by test/generate_reference.py — DO NOT EDIT BY HAND")
 print("Regenerate with: cd test && python3 generate_reference.py")
 print(f"ChannelVar import path used: {_CHANNELVAR_IMPORT_PATH}")
@@ -314,7 +298,7 @@ print()
 # Block 1: equivalence-checklist constants for test/parity_helpers.jl
 print("# --- begin paste: parity_helpers.jl REF constants ---")
 print("# Paste over the four PYTHON_*_AT_REF lines marked REGENERATE in test/parity_helpers.jl")
-print(f"# REF_T_K = {REF_T_K} (Kelvin); light_water.* called with T_K - 273.15 (Celsius).")
+print(f"# REF_T_C = {REF_T_C} (Celsius); light_water.* called directly.")
 # %.17g for full float64 round-trip precision: 1e-12 rtol equivalence checklist
 # requires 17 significant digits or values disagree at parse boundary.
 _emit_julia_tuple3("PYTHON_RHO_AT_REF", rho_at_ref, "%.17g")
@@ -326,18 +310,18 @@ print()
 
 # Block 2: simple-loop reference const block for test/data/python_parity_reference.jl
 print("# --- begin paste: test/data/python_parity_reference.jl simple-loop block ---")
-print("# Phase 56 simple-loop Python parity reference — D-07 tiers (a)+(b)+(c)")
+print("# Simple-loop Python parity reference — tiers (a)+(b)+(c)")
 print(f"# Topology: Pump → HX → ChannelAndContacts (n={N}, L={L_CH}, D={D_H}) → Pump")
-print(f"# T_inlet = {T_INLET_K:.2f} K ({T_INLET_C:.1f} C); T_wall = {T_WALL_K:.2f} K ({T_WALL_C:.1f} C)")
+print(f"# T_inlet = {T_INLET_C:.2f} K ({T_INLET_C:.1f} C); T_wall = {T_WALL_C:.2f} K ({T_WALL_C:.1f} C)")
 print(f"# Solver: scipy.optimize.root (default xtol=1.49e-8)")
 print()
-_emit_julia_scalar("PARITY_SIMPLE_T_OUT", T_out_K)
+_emit_julia_scalar("PARITY_SIMPLE_T_OUT", T_out_C)
 _emit_julia_scalar("PARITY_SIMPLE_MDOT",  mdot)
 _emit_julia_scalar("PARITY_SIMPLE_DP",    DP_total)
 print()
-_emit_julia_array("PARITY_SIMPLE_T_CELLS",         T_cells_K,       "%.10f", comment_each=True, comment_prefix="T")
-_emit_julia_array("PARITY_SIMPLE_T_WALL_LEFT",     T_wall_left_K,   "%.10f", comment_each=True, comment_prefix="T_wall_left")
-_emit_julia_array("PARITY_SIMPLE_T_WALL_RIGHT",    T_wall_right_K,  "%.10f", comment_each=True, comment_prefix="T_wall_right")
+_emit_julia_array("PARITY_SIMPLE_T_CELLS",         T_cells_C,       "%.10f", comment_each=True, comment_prefix="T")
+_emit_julia_array("PARITY_SIMPLE_T_WALL_LEFT",     T_wall_left_C,   "%.10f", comment_each=True, comment_prefix="T_wall_left")
+_emit_julia_array("PARITY_SIMPLE_T_WALL_RIGHT",    T_wall_right_C,  "%.10f", comment_each=True, comment_prefix="T_wall_right")
 _emit_julia_array("PARITY_SIMPLE_H_TC_LEFT",       h_left,          "%.10f", comment_each=True, comment_prefix="h_left")
 _emit_julia_array("PARITY_SIMPLE_H_TC_RIGHT",      h_right,         "%.10f", comment_each=True, comment_prefix="h_right")
 _emit_julia_array("PARITY_SIMPLE_Q_DENSITY_LEFT",  q_density_left,  "%.10f", comment_each=True, comment_prefix="q_density_left  # W/m^2")
@@ -349,19 +333,19 @@ print()
 print("=" * 72)
 print("Diagnostics (NOT pasted — for human inspection only)")
 print("=" * 72)
-print(f"  T_out         = {T_out_K:.6f} K  ({T_out_C:.4f} C)")
+print(f"  T_out         = {T_out_C:.6f} K  ({T_out_C:.4f} C)")
 print(f"  mdot          = {mdot:.6f} kg/s")
 print(f"  DP_total      = {DP_total:.1f} Pa  (closed loop ≡ DP_PUMP)")
 print(f"  Re (mean)     = {float(np.mean(ch_state.get('Re',  [0]))):.0f}")
 print(f"  HTC left mean = {float(np.mean(h_left)):.1f} W/m^2K")
 print(f"  HTC right mean= {float(np.mean(h_right)):.1f} W/m^2K")
-print(f"  T_cells range = {min(T_cells_K):.2f} .. {max(T_cells_K):.2f} K")
-print(f"  T_wall L mean = {float(np.mean(T_wall_left_K)):.2f} K")
-print(f"  T_wall R mean = {float(np.mean(T_wall_right_K)):.2f} K")
+print(f"  T_cells range = {min(T_cells_C):.2f} .. {max(T_cells_C):.2f} K")
+print(f"  T_wall L mean = {float(np.mean(T_wall_left_C)):.2f} K")
+print(f"  T_wall R mean = {float(np.mean(T_wall_right_C)):.2f} K")
 print(f"  q_left mean   = {float(np.mean(q_density_left)):.1f} W/m^2")
 print(f"  q_right mean  = {float(np.mean(q_density_right)):.1f} W/m^2")
 print()
-print(f"  Equivalence-checklist values (REF_T_K = {REF_T_K} K):")
-for i, T_K in enumerate(REF_T_K):
-    print(f"    [{i+1}] T={T_K:.2f}K: rho={rho_at_ref[i]:.4f} cp={cp_at_ref[i]:.4f} "
+print(f"  Equivalence-checklist values (REF_T_C = {REF_T_C} K):")
+for i, T_C in enumerate(REF_T_C):
+    print(f"    [{i+1}] T={T_C:.2f}degC: rho={rho_at_ref[i]:.4f} cp={cp_at_ref[i]:.4f} "
           f"mu={mu_at_ref[i]:.4e} k={k_at_ref[i]:.4f}")

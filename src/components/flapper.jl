@@ -1,134 +1,163 @@
-# flapper.jl — Flapper check-valve component for STREAM.jl
-
 """
-    Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0) -> System
+    Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0, liquid=H2O) -> System
 
-Flapper check-valve component. When the wired reference mass flow `ref_mdot` drops
-below a threshold (monitored externally via `flapper_callback`), the latching state
-`T_open` is set to the current solver time. After that, the valve resistance ramps
-smoothly from `R_closed` to `R_open` over `dt` seconds using a C1 Hermite cubic
-(`3*xi^2 - 2*xi^3`).
+Flapper (passive check valve). While closed it admits **no flow** (`ṁ = 0`); once open it
+is a quadratic resistor `ΔP = f·ṁ·|ṁ| / (2·ρ·area²)`. The valve opens the moment the
+wired reference flow `ref_ṁ` falls to `open_at_current`, detected by `flapper_callback`,
+which latches the opening time into the parameter `T_open`. After `T_open` the flow ramps in
+gradually through `xi = r(open_rate·(t − T_open))`, the C1 Hermite cubic `−2x³ + 3x²` rising
+0→1, so `ṁ = xi · ṁ_open`.
 
-`T_open` uses a large finite sentinel value (`1e30`) rather than `Inf` as its initial
-condition. `Inf` in the solver state vector causes Rodas5P to report instability. With
-`T_open = 1e30`, the ramp expression `clamp((t - 1e30)/dt, 0, 1)` evaluates to 0 for all
-practical `t` values, keeping the valve closed before the event fires.
+This mirrors Python STREAM's `Flapper` (closed ⇒ `ṁ` 0; open ⇒ quadratic local-pressure
+resistor relaxed in from `t_open`). Two deliberate conventions:
 
-`ref_mdot` has **no equation inside the component**. The user must wire it externally
-during system composition:
+  - **Relaxation.** STREAM.jl always uses the continuously-differentiable ramp `−2x³ + 3x²`.
+    Python *defaults* to `legacy_relaxation` and only opts into this shape per-call, so the
+    ramp *shape* differs for cases that take Python's default; the open/closed binary and the
+    latch time — what the integration tests assert — do not.
+  - **Open-state sign.** `ṁ_open = sign(P_in − P_out)·√(|ΔP|·2ρA²/f)`. Python writes
+    `−sign(dp)·√(…)` against its own `dp = P_out − P_in`; the two sign flips cancel, so the two
+    formulas are numerically identical (verified across both flow directions).
+
+`T_open` is a parameter defaulting to `Inf` (valve never opens on its own). `flapper_callback`
+sets it to the detected crossing time; to pre-open the valve at a fixed time `t0` instead
+(Python's `open(t0)`), pass `flapper.T_open => t0` in the operating point. Reset to `Inf` to
+close it again (Python's `close()`).
+
+Because a closed flapper carries no flow, it is meant to sit in **parallel** with another
+branch (a bypass that carries flow while the valve is shut); a closed flapper placed in series
+would block the whole loop.
+
+`ref_ṁ` has **no equation inside the component** — the caller wires it during composition,
+most readably with [`watch_flow`](@ref):
 ```julia
-flapper.ref_mdot ~ pump.port_in.mdot
+watch_flow(flapper, pump.inlet.ṁ)      # ≡  flapper.ref_ṁ ~ pump.inlet.ṁ
 ```
-`mtkcompile` will error if this equation is omitted (under-determined system).
-
-To detect the closing event, use `flapper_callback(ssys; threshold)` and pass the
-resulting `ContinuousCallback` to `solve_transient(...; callbacks=cb)`.
+Then build the detection event with `flapper_callback(ssys, ssys.flapper)` and hand it to
+`solve_transient(...; callbacks=cb)`.
 
 # Arguments
 - `name`: system name (Symbol), injected by `@named` macro
-- `dt`: ramp duration [s]; time for resistance to transition from closed to open (default: 5.0)
-- `R_closed`: closed-state hydraulic resistance [Pa*s/kg] (default: 1e8)
-- `R_open`: open-state hydraulic resistance [Pa*s/kg] (default: 100.0)
+- `open_at_current`: reference flow at/below which the valve opens [kg/s] (default 0.01). The
+  callback reads this off the component, so it is not passed by hand.
+- `f`: open-state quadratic loss coefficient (default 1.0)
+- `area`: flow area [m²] (default 1.0)
+- `open_rate`: relaxation rate [1/s]; the open ramp completes after `1/open_rate` s (default 1.0)
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref), supplying the density at
+  the inlet stream temperature
 
 # Ports
-- `port_in`: `FlowPort` — inlet (pressure, mass flow, temperature)
-- `port_out`: `FlowPort` — outlet (pressure, mass flow, temperature)
+- `inlet`, `outlet`: `FlowPort` (pressure, mass flow, temperature)
 
-# Returns
-Uncompiled `System`. The Flapper's `T_open(t)` state is set by an external
-`ContinuousCallback` (see `flapper_callback`), not by an MTK equation, so the system
-is intentionally structurally underdetermined. Additionally, `ref_mdot` has no
-in-component equation and must be wired by the caller. Call
-`mtkcompile(sys; fully_determined=false)` before solving a standalone Flapper, or
-compose it into a full system where `ref_mdot` is wired.
+`ref_ṁ` has no in-component equation, so a standalone Flapper is
+structurally underdetermined — call `mtkcompile(sys; fully_determined=false)`, or compose it
+into a system where `ref_ṁ` is wired.
 """
-function Flapper(; name, dt=5.0, R_closed=1e8, R_open=100.0)
+function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
+                 liquid::AbstractLiquid=H2O)
     pars = @parameters begin
-        dt = dt
-        R_closed = R_closed
-        R_open = R_open
+        open_at_current = open_at_current
+        f = f
+        area = area
+        open_rate = open_rate
+        T_open = Inf
     end
 
-    vars = @variables T_open(t) = 1e30 xi(t) ref_mdot(t)
+    vars = @variables xi(t) ref_ṁ(t)
 
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
 
-    D = Differential(t)
+    rho = ρ(liquid, instream(inlet.T))
+    dp = inlet.p - outlet.p
+    x = open_rate * (t - T_open)
+    relax = ifelse(x <= 0.0, 0.0, ifelse(x >= 1.0, 1.0, -2 * x^3 + 3 * x^2))
+    # Open-state flow: invert ΔP = f·ṁ·|ṁ|/(2ρA²) ⇒ ṁ = sign(dp)·sqrt(|dp|·2ρA²/f).
+    ṁ_open = sign(dp) * sqrt(abs(dp) * 2 * rho * area^2 / f)
 
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        D(T_open) ~ 0,
-        xi ~ clamp((t - T_open) / dt, 0.0, 1.0),
-        port_in.P - port_out.P ~ (R_closed + (R_open - R_closed) * (3 * xi ^ 2 - 2 * xi ^ 3)) * port_in.mdot,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-        # ref_mdot has no equation here — user wires it during composition
+        xi ~ relax,
+        ifelse(t <= T_open, inlet.ṁ, inlet.ṁ - relax * ṁ_open) ~ 0,
     ]
 
-    compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)
 end
 
 """
-    flapper_callback(ssys, monitored_sym; threshold=0.01) -> ContinuousCallback
+    watch_flow(flapper, sym) -> Equation
 
-Return a `DifferentialEquations.ContinuousCallback` that fires when `monitored_sym`
-drops below `threshold` (downward zero-crossing). On firing, latches `T_open` to the
-current solver time, initiating the resistance ramp from `R_closed` to `R_open` over
-`dt` seconds.
+Wire a Flapper's reference flow to the mass flow `sym` it should watch, returning the equation
+`flapper.ref_ṁ ~ sym`. Add it to the connection list during composition:
 
-`monitored_sym` must be the symbolic state variable whose value triggers the event —
-typically the variable wired to `flapper.ref_mdot` in the composed system. Accepting
-the symbol explicitly (rather than reading it from `ssys.flapper.ref_mdot`) avoids an
-issue where `mtkcompile` substitutes `ref_mdot` out as an observed variable: using
-`integrator[observed_sym]` in the callback condition reads `integrator.u` (last accepted
-step), causing both the step-start and step-end sign evaluations to return the same value
-and preventing zero-crossing detection. Using `u[variable_index(...)]` instead reads the
-interpolated state correctly.
+```julia
+conns = [
+    inparallel(pump, (bypass, flapper), hx)...,
+    watch_flow(flapper, bypass.inlet.ṁ),     # flapper opens when the bypass flow decays
+]
+```
 
-Upward crossings (flow recovers above threshold) are ignored — the valve stays latched
-open once the event fires.
+The watched flow can be any mass-flow variable in the system (a port `ṁ`, a resistor inlet,
+an inertia branch). The detection event built by [`flapper_callback`](@ref) reads the wired
+flow back through this equation, so the two must refer to the same `flapper`.
 
 # Arguments
-- `ssys`: compiled MTK system from `mtkcompile`. Must contain a Flapper subsystem
-  accessible as `ssys.flapper`.
-- `monitored_sym`: symbolic state variable to monitor (e.g. `ssys.ine.port_in.mdot`).
-  Must be a state variable (present in the ODE state vector). If algebraic (e.g. wired
-  to a pump port without inertia), `variable_index` returns `nothing` and the callback
-  falls back to `integrator[sym]` — acceptable for purely quasi-static loops where the
-  value is consistent across step boundaries and the event never needs to fire precisely.
-- `threshold` (kwarg): mass flow threshold [kg/s] below which the event fires (default: 0.01).
+- `flapper`: a `Flapper` subsystem (before compilation)
+- `sym`: the mass-flow variable to watch [kg/s]
 
 # Returns
-`ContinuousCallback` — pass to `solve_transient(...; callbacks=cb)`.
+`Equation` — `flapper.ref_ṁ ~ sym`.
+"""
+watch_flow(flapper, sym) = flapper.ref_ṁ ~ sym
+
+"""
+    flapper_callback(ssys, flappers...) -> ContinuousCallback | CallbackSet
+
+Build the opening-detection event(s) for one or more flappers in a compiled system. Each
+flapper opens when its wired `ref_ṁ` falls through its own `open_at_current`; the callback
+latches that crossing time into the flapper's `T_open` parameter.
+
+The crossing is found by root-finding the reference flow itself: the observed function for
+`flapper.ref_ṁ` is evaluated at the integrator's trial state `(u, p, t)`, so detection is
+exact and works whether `ref_ṁ` resolves to a differential state (a branch with inertia) or
+to a purely algebraic quantity (a quasi-static branch). This is the key difference from a
+per-step value check. While a flapper is closed it carries no flow and is dynamically decoupled
+from `ref_ṁ`, so an adaptive solver places no steps near the crossing and a discrete check
+can sail past it; the root-finder seeks the crossing out regardless of where the steps land.
+
+Everything the event needs (the threshold `open_at_current`, the reference `ref_ṁ`, and the
+latched `T_open`) is read off the component, so nothing is passed by hand. Pass several flappers
+to monitor them together and the result is a `CallbackSet`; with one flapper a single
+`ContinuousCallback` is returned. Only downward crossings open the valve, and once latched it
+stays open (a later upward recovery is ignored).
+
+# Arguments
+- `ssys`: compiled system from `mtkcompile`
+- `flappers`: one or more Flapper subsystems, e.g. `ssys.flapper` (or `ssys.flap1, ssys.flap2`)
+
+# Returns
+A `ContinuousCallback` (single flapper) or `CallbackSet` (several). Pass it to
+`solve_transient(...; callbacks=cb)`.
 
 # Example
 ```julia
-cb  = flapper_callback(ssys, ssys.ine.port_in.mdot)                      # default threshold
-cb2 = flapper_callback(ssys, ssys.ine.port_in.mdot; threshold=1e-4)      # custom threshold
+cb  = flapper_callback(ssys, ssys.flapper)             # one flapper
+cb2 = flapper_callback(ssys, ssys.flap1, ssys.flap2)   # several -> CallbackSet
 sol = solve_transient(ssys, op, t_arr; callbacks=cb)
 ```
 """
-function flapper_callback(ssys, monitored_sym; threshold=0.01)
-    T_open_idx = ModelingToolkit.variable_index(ssys, ssys.flapper.T_open)
-    monitored_idx = ModelingToolkit.variable_index(ssys, monitored_sym)
+function flapper_callback(ssys, flappers...)
+    cbs = map(flappers) do flap
+        ref_obs = ModelingToolkit.build_explicit_observed_function(ssys, flap.ref_ṁ)
+        get_threshold = ModelingToolkit.getp(ssys, flap.open_at_current)
+        set_T_open = ModelingToolkit.setp(ssys, flap.T_open)
 
-    # Use u[idx] (the interpolated state passed to the condition) for state variables.
-    # Fall back to integrator[sym] only for algebraic variables where the value is
-    # consistent between step boundaries and exact rootfinding is not critical.
-    condition = if monitored_idx !== nothing
-        (u, t, integrator) -> u[monitored_idx] - threshold
-    else
-        (u, t, integrator) -> integrator[monitored_sym] - threshold
+        # Condition crosses zero downward as ref_ṁ falls through the threshold; evaluating
+        # the observed function at the trial state is what makes this exact for algebraic refs.
+        condition = (u, tt, integ) -> ref_obs(u, integ.p, tt) - get_threshold(integ)
+        affect_open = integ -> set_T_open(integ, integ.t)
+        # (condition, up-crossing affect = nothing, down-crossing affect = latch T_open)
+        ContinuousCallback(condition, nothing, affect_open)
     end
 
-    # Downward crossing only: latch T_open to current solver time.
-    # Upward crossing (nothing): valve stays latched after opening.
-    affect! = (integrator) -> (integrator.u[T_open_idx] = integrator.t)
-
-    ContinuousCallback(
-        condition,
-        nothing,   # upward crossing: ignore (flow recovered — valve stays open)
-        affect!,    # downward crossing: latch T_open = t_now
-    )
+    return length(cbs) == 1 ? cbs[1] : CallbackSet(cbs...)
 end

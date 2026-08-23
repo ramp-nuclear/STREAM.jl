@@ -1,3 +1,21 @@
+"""
+    _diffusion_eqs(; T, thermal_left, thermal_right, nz, nx, k_s, rho_s, cp_s,
+                   dx, dz, y, power, power_shape) -> Vector{Equation}
+
+The finite-difference stencil behind [`HeatDiffusion`](@ref), as a flat list of equations over an
+`nz × nx` grid of solid cells.
+
+Four groups, in build order. Two give the heat flow through each `ThermalPort`, over a half-cell
+conduction distance `dx/2` from port to first cell centre. Two give the boundary columns their
+energy balance, conducting to one interior neighbour and to the port. The last is the three-point
+interior stencil.
+
+Volumetric heating is `power * power_shape` spread over a cell's mass. `power_shape` is not
+normalized here.
+
+There is no axial conduction: the plate conducts across its thickness and each axial slice is
+independent.
+"""
 function _diffusion_eqs(;
     T,
     thermal_left,
@@ -12,21 +30,20 @@ function _diffusion_eqs(;
     y,
     power,
     power_shape,
-    Dt,
 )
     q_vol = power .* power_shape / (rho_s * cp_s * y * dz * dx)
 
     return [
         [
-            thermal_left[i].Q_flow ~
+            thermal_left[i].Q ~
                 k_s * (y * dz) * (thermal_left[i].T - T[i, 1]) / (dx / 2) for i in 1:nz
-        ]...  # Left heat flux 
+        ]...  # Left heat flux
         [
-            thermal_right[i].Q_flow ~
+            thermal_right[i].Q ~
                 k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2) for i in 1:nz
         ]...  # Right heat flux
         [
-            Dt(T[i, 1]) ~
+            D(T[i, 1]) ~
                 (
                     k_s * (T[i, 2] - T[i, 1]) / dx  # Left cell temperature equation
                     -
@@ -34,7 +51,7 @@ function _diffusion_eqs(;
                 ) / (rho_s * cp_s * dx) + q_vol[i, 1] for i in 1:nz
         ]...
         [
-            Dt(T[i, nx]) ~
+            D(T[i, nx]) ~
                 (
                     k_s * (T[i, nx - 1] - T[i, nx]) / dx  # Right cell temperature equation
                     -
@@ -42,14 +59,15 @@ function _diffusion_eqs(;
                 ) / (rho_s * cp_s * dx) + q_vol[i, nx] for i in 1:nz
         ]...
         [
-            Dt(T[i, j]) ~
+            D(T[i, j]) ~
                 k_s * (T[i, j + 1] - 2 * T[i, j] + T[i, j - 1]) / (dx^2 * rho_s * cp_s) +
                 q_vol[i, j] for i in 1:nz for j in 2:(nx - 1)
         ]...
     ]
 end
+
 """
-    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=600.0) -> ODESystem
+    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=300.0) -> System
 
 2D finite-difference heat diffusion plate with axial (`nz`) and lateral (`nx`) cells.
 
@@ -65,26 +83,27 @@ end
 - `k_s`: thermal conductivity [W/(m*K)]
 - `power_shape`: axial-lateral power shape matrix of size `(nz, nx)` (not normalized internally)
 - `power`: total power into plate [W], MTK variable — must be constrained via a connection equation
-  (e.g. `fuel.power ~ 1e4` for standalone use, or `rods.fuel.power ~ pk.P * scale` for PK-coupled use)
-- `T0`: initial temperature [K], default 600.0
+  (e.g. `fuel.power ~ 1e4` for standalone use, or `rods.fuel.power ~ pk.P * power_scale` for PK-coupled use)
+- `T0`: initial temperature [°C], default 300.0
 
 # Ports
 - `thermal_left[1:nz]`, `thermal_right[1:nz]` -- `ThermalPort` arrays (no FlowPorts)
-
-# Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
 """
-#! format: off
-function HeatDiffusion(; name,
-                         nz::Int, nx::Int,
-                         Lz, Lx, y,
-                         rho_s, cp_s, k_s,
-                         power_shape,
-                         power  = 1e6,
-                         T0     = 600.0)
-#! format: on
+function HeatDiffusion(;
+    name,
+    nz::Int,
+    nx::Int,
+    Lz,
+    Lx,
+    y,
+    rho_s,
+    cp_s,
+    k_s,
+    power_shape,
+    power=1e6,
+    T0=300.0,
+)
     power_init = power
-    Dt = Differential(t)
     dx = Lx / nx
     dz = Lz / nz
 
@@ -97,24 +116,21 @@ function HeatDiffusion(; name,
     thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:nz]
 
     T_var, power_var = vars
-    #! format: off
     eqs = _diffusion_eqs(;
-        T             = T_var,
-        thermal_left  = thermal_left,
-        thermal_right = thermal_right,
-        nz            = nz, 
-        nx            = nx,
-        k_s           = k_s, 
-        rho_s         = rho_s, 
-        cp_s          = cp_s,
-        dx            = dx, 
-        dz            = dz, 
-        y             = y,
-        power         = power_var,
-        power_shape   = power_shape,
-        Dt            = Dt)
-
-    #!format: on
+        T=T_var,
+        thermal_left=thermal_left,
+        thermal_right=thermal_right,
+        nz=nz,
+        nx=nx,
+        k_s=k_s,
+        rho_s=rho_s,
+        cp_s=cp_s,
+        dx=dx,
+        dz=dz,
+        y=y,
+        power=power_var,
+        power_shape=power_shape,
+    )
     all_vars = vcat(vec(collect(T_var)), [power_var])
     return compose(
         System(eqs, t, all_vars, []; name=name), thermal_left..., thermal_right...

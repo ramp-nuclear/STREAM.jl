@@ -1,18 +1,23 @@
-# test/test_channels.jl — Phase 55 TEST-01 unified channel-family unit tests.
+# Channel-family unit tests (Channel, ChannelHeatFlux, ChannelAndContacts).
 #
 
 using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
-import STREAM: Channel  # disambiguate from Base.Channel
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.Substances
+using STREAM.Examples
+using STREAM.HTC: _bergles_rohsenow_dT_ONB  # private to HTC, for the SCB integration block
 using OrdinaryDiffEq: ReturnCode
 
 const N_DEFAULT      = 4
 const L_DEFAULT      = 0.6
 const D_DEFAULT      = 0.01
-const T_INLET        = 313.15
-const T_WALL         = 373.15
+const T_INLET        = 40.0
+const T_WALL         = 100.0
 const H_DEFAULT      = 5000.0
 const DP_PUMP        = 3.0e4
 const Q_FLUX_DEFAULT = 1.0e5
@@ -25,10 +30,8 @@ _names(sys) = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys))
     @named bc = HeatExchanger(T_INLET)
     @named ch = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT))
     connections = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch.port_in),
-        connect(ch.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, ch, pump)...,
+        pump.inlet.p ~ 1.0e5,
         [ch.T_wall_left[i]  ~ T_INLET for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_INLET for i in 1:n]...,
     ]
@@ -36,7 +39,7 @@ _names(sys) = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys))
     ssys = mtkcompile(sys)
     ic = Pair{Any,Any}[
         [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.port_in.mdot => 0.5,
+        ssys.ch.inlet.ṁ => 0.5,
     ]
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
@@ -50,10 +53,8 @@ end
     @named bc = HeatExchanger(T_INLET)
     @named chf = ChannelHeatFlux(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT))
     connections = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, chf.port_in),
-        connect(chf.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, chf, pump)...,
+        pump.inlet.p ~ 1.0e5,
         [chf.q_left[i]  ~ 0.0 for i in 1:n]...,
         [chf.q_right[i] ~ 0.0 for i in 1:n]...,
     ]
@@ -61,7 +62,7 @@ end
     ssys = mtkcompile(sys)
     ic = Pair{Any,Any}[
         [ssys.chf.T[i] => T_INLET for i in 1:n]...,
-        ssys.chf.port_in.mdot => 0.5,
+        ssys.chf.inlet.ṁ => 0.5,
     ]
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
@@ -75,10 +76,8 @@ end
     @named ch = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                           h_left=H_DEFAULT, h_right=0.0)
     connections = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch.port_in),
-        connect(ch.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, ch, pump)...,
+        pump.inlet.p ~ 1.0e5,
         [ch.T_wall_left[i]  ~ T_WALL for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_INLET for i in 1:n]...,  # decorative; h_right=0
     ]
@@ -86,7 +85,7 @@ end
     ssys = mtkcompile(sys)
     ic = Pair{Any,Any}[
         [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.port_in.mdot => 0.5,
+        ssys.ch.inlet.ṁ => 0.5,
     ]
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
@@ -107,10 +106,8 @@ end
     @named bc = HeatExchanger(T_INLET)
     @named chf = ChannelHeatFlux(; n=n, geometry=geom)
     connections = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, chf.port_in),
-        connect(chf.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, chf, pump)...,
+        pump.inlet.p ~ 1.0e5,
         [chf.q_left[i]  ~ Q_FLUX_DEFAULT for i in 1:n]...,
         [chf.q_right[i] ~ 0.0 for i in 1:n]...,
     ]
@@ -118,13 +115,48 @@ end
     ssys = mtkcompile(sys)
     ic = Pair{Any,Any}[
         [ssys.chf.T[i] => T_INLET for i in 1:n]...,
-        ssys.chf.port_in.mdot => 0.5,
+        ssys.chf.inlet.ṁ => 0.5,
     ]
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.chf.T_out] > T_INLET
     @test all(isapprox.(sol[ssys.chf.q_wall_left[:]], expected, rtol=1e-7))
     @test all(isapprox.(sol[ssys.chf.q_wall_right[:]], 0., atol=1e-9))
+end
+
+@testset "ChannelHeatFlux with a fixed-property Liquid — uniform heating gives exact linear rise" begin
+    # With a constant-cp mock fluid the steady cell-to-cell rise is exactly
+    # ΔT = q·heated_perimeter·dz / (ṁ·cp), the closed-form Python uses with mock_liquid_funcs.
+    n = 8
+    geom = PipeGeometry_circular(L_DEFAULT, D_DEFAULT)
+    dz = L_DEFAULT / n
+    cp_mock = 2000.0
+    ṁ = 0.5
+    q = Q_FLUX_DEFAULT
+    liquid = Liquid(; cₚ=cp_mock)
+    @named pump = Pump(; ṁ0=ṁ)        # fixed-flow (current source), so ṁ is exact
+    @named bc = HeatExchanger(T_INLET)
+    @named chf = ChannelHeatFlux(; n=n, geometry=geom, liquid=liquid)
+    connections = Equation[
+        inseries(pump, bc, chf, pump)...,
+        pump.inlet.p ~ 1.0e5,
+        [chf.q_left[i] ~ q for i in 1:n]...,
+        [chf.q_right[i] ~ 0.0 for i in 1:n]...,
+    ]
+    @named sys = compose(System(connections, t; name=:s1_chf_mock), pump, bc, chf)
+    ssys = mtkcompile(sys)
+    ic = Pair{Any,Any}[
+        [ssys.chf.T[i] => T_INLET for i in 1:n]...,
+        ssys.chf.inlet.ṁ => ṁ,
+    ]
+    sol = solve_steady(ssys, ic)
+    @test sol.retcode == ReturnCode.Success
+    dT = q * geom.heated_parts[1] * dz / (ṁ * cp_mock)
+    Tc = [sol[ssys.chf.T[i]] for i in 1:n]
+    @test isapprox(Tc[1] - T_INLET, dT; rtol=1e-6)
+    for i in 2:n
+        @test isapprox(Tc[i] - Tc[i - 1], dT; rtol=1e-6)
+    end
 end
 
 @testset "Channel with WallTemperature connection the same as direct equations" begin
@@ -135,10 +167,8 @@ end
     @named ch_s1 = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                             h_left=H_DEFAULT, h_right=0.0)
     conns_s1 = Equation[
-        connect(pump_s1.port_out, bc_s1.port_in),
-        connect(bc_s1.port_out, ch_s1.port_in),
-        connect(ch_s1.port_out, pump_s1.port_in),
-        pump_s1.port_in.P ~ 1.0e5,
+        inseries(pump_s1, bc_s1, ch_s1, pump_s1)...,
+        pump_s1.inlet.p ~ 1.0e5,
         [ch_s1.T_wall_left[i]  ~ T_WALL for i in 1:n]...,
         [ch_s1.T_wall_right[i] ~ T_INLET for i in 1:n]...,  # Decorative, h is 0
     ]
@@ -146,11 +176,11 @@ end
     ssys_s1 = mtkcompile(sys_s1)
     ic_s1 = Pair{Any,Any}[
         [ssys_s1.ch_s1.T[i] => T_INLET for i in 1:n]...,
-        ssys_s1.ch_s1.port_in.mdot => 0.5,
+        ssys_s1.ch_s1.inlet.ṁ => 0.5,
     ]
     sol_s1 = solve_steady(ssys_s1, ic_s1)
     @test sol_s1.retcode == ReturnCode.Success
-    mdot_s1  = sol_s1[ssys_s1.ch_s1.port_in.mdot]
+    ṁ_s1 = sol_s1[ssys_s1.ch_s1.inlet.ṁ]
 
     # Style 2 — WallTemperature component connection.
     @named pump = Pump(DP_PUMP)
@@ -159,10 +189,8 @@ end
                           h_left=H_DEFAULT, h_right=0.0)
     @named wt = WallTemperature(; n=n, T_wall=T_WALL)
     connections = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch.port_in),
-        connect(ch.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, ch, pump)...,
+        pump.inlet.p ~ 1.0e5,
         [ch.T_wall_left[i]  ~ wt.T_wall_out[i] for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_INLET for i in 1:n]...,  # Decorative, h is 0
     ]
@@ -170,11 +198,11 @@ end
     ssys = mtkcompile(sys)
     ic = Pair{Any,Any}[
         [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.port_in.mdot => 0.5,
+        ssys.ch.inlet.ṁ => 0.5,
     ]
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
-    @test isapprox(sol[ssys.ch.port_in.mdot], sol_s1[ssys_s1.ch_s1.port_in.mdot]; rtol=1e-6)
+    @test isapprox(sol[ssys.ch.inlet.ṁ], sol_s1[ssys_s1.ch_s1.inlet.ṁ]; rtol=1e-6)
     @test all(isapprox.(sol[ssys.ch.T[:]], sol_s1[ssys_s1.ch_s1.T[:]], rtol=1e-6))
     @test all(isapprox.(sol[ssys.ch.q_wall_left[:]], sol_s1[ssys_s1.ch_s1.q_wall_left[:]], rtol=1e-6))
 end
@@ -186,10 +214,8 @@ end
     @named bc_s1 = HeatExchanger(T_INLET)
     @named chf_s1 = ChannelHeatFlux(; n=n, geometry=geom)
     conns_s1 = Equation[
-        connect(pump_s1.port_out, bc_s1.port_in),
-        connect(bc_s1.port_out, chf_s1.port_in),
-        connect(chf_s1.port_out, pump_s1.port_in),
-        pump_s1.port_in.P ~ 1.0e5,
+        inseries(pump_s1, bc_s1, chf_s1, pump_s1)...,
+        pump_s1.inlet.p ~ 1.0e5,
         [chf_s1.q_left[i]  ~ Q_FLUX_DEFAULT for i in 1:n]...,
         [chf_s1.q_right[i] ~ 0.0 for i in 1:n]...,
     ]
@@ -197,7 +223,7 @@ end
     ssys_s1 = mtkcompile(sys_s1)
     ic_s1 = Pair{Any,Any}[
         [ssys_s1.chf_s1.T[i] => T_INLET for i in 1:n]...,
-        ssys_s1.chf_s1.port_in.mdot => 0.5,
+        ssys_s1.chf_s1.inlet.ṁ => 0.5,
     ]
     sol_s1 = solve_steady(ssys_s1, ic_s1)
     @test sol_s1.retcode == ReturnCode.Success
@@ -207,10 +233,8 @@ end
     @named chf = ChannelHeatFlux(; n=n, geometry=geom)
     @named hfs = HeatFluxSource(; n=n, q=Q_FLUX_DEFAULT)
     connections = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, chf.port_in),
-        connect(chf.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, chf, pump)...,
+        pump.inlet.p ~ 1.0e5,
         [chf.q_left[i]  ~ hfs.q_out[i] for i in 1:n]...,
         [chf.q_right[i] ~ 0.0 for i in 1:n]...,
     ]
@@ -218,11 +242,11 @@ end
     ssys = mtkcompile(sys)
     ic = Pair{Any,Any}[
         [ssys.chf.T[i] => T_INLET for i in 1:n]...,
-        ssys.chf.port_in.mdot => 0.5,
+        ssys.chf.inlet.ṁ => 0.5,
     ]
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
-    @test isapprox(sol[ssys.chf.port_in.mdot], sol_s1[ssys_s1.chf_s1.port_in.mdot]; rtol=1e-6)
+    @test isapprox(sol[ssys.chf.inlet.ṁ], sol_s1[ssys_s1.chf_s1.inlet.ṁ]; rtol=1e-6)
     @test all(isapprox.(sol[ssys.chf.T[:]], sol_s1[ssys_s1.chf_s1.T[:]], rtol=1e-6))
     @test all(isapprox.(sol[ssys.chf.q_wall_left[:]], sol_s1[ssys_s1.chf_s1.q_wall_left[:]], rtol=1e-6))
 end
@@ -234,10 +258,10 @@ end
     @named ch = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                           h_left=H_DEFAULT, h_right=0.0)
     conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch.port_in),
-        connect(ch.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, ch.inlet),
+        connect(ch.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         [ch.T_wall_left[i]  ~ T_WALL for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_INLET for i in 1:n]...,
     ]
@@ -245,7 +269,7 @@ end
     ssys = mtkcompile(sys)
     ic = Pair{Any,Any}[
         [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.port_in.mdot => 0.5,
+        ssys.ch.inlet.ṁ => 0.5,
     ]
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
@@ -253,10 +277,10 @@ end
     @named ch2 = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                            h_left=collect([H_DEFAULT for i in 1:n]), h_right=0.0)
     conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch2.port_in),
-        connect(ch2.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, ch2.inlet),
+        connect(ch2.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         [ch2.T_wall_left[i]  ~ T_WALL for i in 1:n]...,
         [ch2.T_wall_right[i] ~ T_INLET for i in 1:n]...,
     ]
@@ -264,7 +288,7 @@ end
     ssys2 = mtkcompile(sys2)
     ic = Pair{Any,Any}[
         [ssys2.ch2.T[i] => T_INLET for i in 1:n]...,
-        ssys2.ch2.port_in.mdot => 0.5,
+        ssys2.ch2.inlet.ṁ => 0.5,
     ]
     sol2 = solve_steady(ssys2, ic)
     @test sol2.retcode == ReturnCode.Success
@@ -281,10 +305,10 @@ end
     @named ch = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                           h_left=h_fn, h_right=0.0)
     conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch.port_in),
-        connect(ch.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, ch.inlet),
+        connect(ch.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         [ch.T_wall_left[i]  ~ T_WALL for i in 1:n]...,
         [ch.T_wall_right[i] ~ T_INLET for i in 1:n]...,
     ]
@@ -293,17 +317,17 @@ end
     # Callable parameter goes into the same op dict as ICs.
     ic = Pair{Any,Any}[
         [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.port_in.mdot => 0.5,
+        ssys.ch.inlet.ṁ => 0.5,
         ssys.ch.h_left_fn => h_fn,
     ]
     sol = solve_steady(ssys, ic)
     @named ch2 = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                            h_left=H_DEFAULT, h_right=0.0)
     conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch2.port_in),
-        connect(ch2.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, ch2.inlet),
+        connect(ch2.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         [ch2.T_wall_left[i]  ~ T_WALL for i in 1:n]...,
         [ch2.T_wall_right[i] ~ T_INLET for i in 1:n]...,
     ]
@@ -312,7 +336,7 @@ end
     # Callable parameter goes into the same op dict as ICs.
     ic = Pair{Any,Any}[
         [ssys2.ch2.T[i] => T_INLET for i in 1:n]...,
-        ssys2.ch2.port_in.mdot => 0.5,
+        ssys2.ch2.inlet.ṁ => 0.5,
     ]
     sol2 = solve_steady(ssys2, ic)
     @test sol.retcode == ReturnCode.Success
@@ -320,29 +344,29 @@ end
     @test all(isapprox.(sol2[ssys2.ch2.q_wall_left[:]], sol[ssys.ch.q_wall_left[:]], rtol=1e-6))
 end
 
-@testset "CAC htc_correlation=dittus_boelter solves transient without crash" begin
+@testset "CAC with HTC.DittusBoelter solves a transient without crashing" begin
     n = N_DEFAULT
     geom = PipeGeometry_circular(L_DEFAULT, D_DEFAULT)
     @named pump = Pump(DP_PUMP)
     @named bc = HeatExchanger(T_INLET)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                     htc_correlation=dittus_boelter,
-                                     friction_correlation=blasius_friction)
+                                     htc=HTC.DittusBoelter(),
+                                     darcy=Friction.Blasius())
     # Pin each cell's left thermal port T to T_WALL via per-cell ConstantTemperature.
     ct_l = [ConstantTemperature(T_WALL; name=Symbol(:ct_l, i)) for i in 1:n]
     conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, cac.port_in),
-        connect(cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
-        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:n]...,
-        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, cac.inlet),
+        connect(cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
+        face(ct_l, cac, :thermal_left)...,
+        face(ct_l, cac, :thermal_right)...,
     ]
     @named sys = compose(System(conns, t; name=:cac_db), pump, bc, cac, ct_l...)
     ssys = mtkcompile(sys; fully_determined=false)
     ic = Pair{Any,Any}[
         [ssys.cac.T[i] => T_INLET for i in 1:n]...,
-        ssys.cac.port_in.mdot => 0.5,
+        ssys.cac.inlet.ṁ => 0.5,
     ]
     sol = solve_transient(ssys, ic, range(0.0, 1.0, length=50))
     @test sol.retcode == ReturnCode.Success
@@ -352,43 +376,47 @@ end
 
 @testset "ISCB: In-loop SCB Correction" begin
     n = 5
-    T_inlet_iscb = 313.15
+    T_inlet_iscb = 40.0
     L_ch = 0.6
     D_ch = 0.01
     dP_pump_iscb = 3.0e4
 
-    function _build_scb_loop(; scb_correction=nothing, T_wall_bc=373.15)
+    function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
+        htc = scb_correction === nothing ? HTC.DittusBoelter() :
+              HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_correction)
         @named pump = Pump(dP_pump_iscb)
         @named cac = ChannelAndContacts(
-            n=n, geometry=PipeGeometry_circular(L_ch, D_ch), scb_correction=scb_correction
+            n=n, geometry=PipeGeometry_circular(L_ch, D_ch), htc=htc
         )
         @named bc = HeatExchanger(T_inlet_iscb)
         ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l, i)) for i in 1:n]
         ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r, i)) for i in 1:n]
         conns = [
-            connect(pump.port_out, bc.port_in),
-            connect(bc.port_out, cac.port_in),
-            connect(cac.port_out, pump.port_in),
+            connect(pump.outlet, bc.inlet),
+            connect(bc.outlet, cac.inlet),
+            connect(cac.outlet, pump.inlet),
             [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:n]...,
             [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
-            pump.port_in.P ~ 2e5,
+            pump.inlet.p ~ 2e5,
         ]
         @named sys = compose(System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...)
         ssys = mtkcompile(sys)
         Q_guess = max(1e4, 1e3 * (T_wall_bc - T_inlet_iscb))
-        T_guess = steady_state_guess(T_inlet=T_inlet_iscb, Q_wall=Q_guess, mdot_guess=0.490, n=n)
+        T_guess = steady_state_guess(;
+            T_inlet=T_inlet_iscb, Q_wall=Q_guess, ṁ_guess=0.490, n=n
+        )
         op = [ssys.cac.T[i] => T_guess[i] for i in 1:n]
-        push!(op, ssys.cac.port_in.mdot => 0.490)
+        push!(op, ssys.cac.inlet.ṁ => 0.490)
         sol = solve_steady(ssys, op)
         return ssys, sol
     end
 
-    @testset "ISCB-02: Low T_wall -> matches single-phase exactly" begin
+    @testset "Low T_wall -> matches single-phase exactly" begin
         # T_wall = 330K < T_sat (~393K at 2 bar) ⇒ SCB inactive, pure single-phase.
         # Both SCB and non-SCB loops solve to identical h_tc values.
-        scb_fn = regime_dependent_q_scb(pressure=2e5)
-        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=330.0)
-        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=330.0)
+        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
+        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
+        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
 
         htc_scb = sol_scb[ssys_scb.cac.h_tc_left[:]]
         htc_noscb = sol_noscb[ssys_noscb.cac.h_tc_left[:]]
@@ -397,33 +425,36 @@ end
 end
 
 const N_SIGN          = 5
-const T_INLET_SIGN    = 313.15
-const T_WALL_SIGN     = 373.15
-const MDOT_NEG        = -0.490
+const T_INLET_SIGN    = 40.0
+const T_WALL_SIGN     = 100.0
+const ṁ_NEG = -0.490
 const GEOM_SIGN       = PipeGeometry_circular(0.6, 0.01)
 
 const T_GUESS_FWD_SIGN = steady_state_guess(;
-    T_inlet=T_INLET_SIGN, Q_wall=1e4, mdot_guess=abs(MDOT_NEG), n=N_SIGN
+    T_inlet=T_INLET_SIGN,
+    Q_wall=1e4,
+    ṁ_guess=abs(ṁ_NEG),
+    n=N_SIGN,
 )
 const T_GUESS_REV_SIGN = reverse(T_GUESS_FWD_SIGN)
 
-@testset "flow reversal: Channel mdot < 0 " begin
-    @named pump = Pump(mdot0=MDOT_NEG)
+@testset "flow reversal: Channel ṁ < 0 " begin
+    @named pump = Pump(; ṁ0=ṁ_NEG)
     @named ch = Channel(; n=N_SIGN, geometry=GEOM_SIGN,
                           h_left=H_DEFAULT, h_right=0.0)
     @named bc = HeatExchanger(T_INLET_SIGN)
     conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, ch.port_in),
-        connect(ch.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, ch.inlet),
+        connect(ch.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         [ch.T_wall_left[i]  ~ T_WALL_SIGN for i in 1:N_SIGN]...,
         [ch.T_wall_right[i] ~ T_INLET_SIGN for i in 1:N_SIGN]...,
     ]
     @named sys = compose(System(conns, t; name=:sign_ch), pump, bc, ch)
     ssys = mtkcompile(sys)
     op = [ssys.ch.T[i] => T_GUESS_REV_SIGN[i] for i in 1:N_SIGN]
-    push!(op, ssys.ch.port_in.mdot => MDOT_NEG)
+    push!(op, ssys.ch.inlet.ṁ => ṁ_NEG)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -431,29 +462,29 @@ const T_GUESS_REV_SIGN = reverse(T_GUESS_FWD_SIGN)
     T_vals = [sol[ssys.ch.T[i]] for i in 1:N_SIGN]
     Re_vals = [sol[ssys.ch.Re[i]] for i in 1:N_SIGN]
 
-    @test sol[ssys.ch.port_in.mdot] < 0
+    @test sol[ssys.ch.inlet.ṁ] < 0
     @test all(T_vals[i] >= T_vals[i + 1] for i in 1:(N_SIGN - 1))
     @test all(Re_vals .> 0)
 end
 
-@testset "flow reversal: ChannelAndContacts mdot < 0 (SIGN-02/04)" begin
-    @named pump = Pump(mdot0=MDOT_NEG)
+@testset "flow reversal: ChannelAndContacts ṁ < 0" begin
+    @named pump = Pump(; ṁ0=ṁ_NEG)
     @named cac = ChannelAndContacts(n=N_SIGN, geometry=GEOM_SIGN)
     @named bc = HeatExchanger(T_INLET_SIGN)
     ct_l = [ConstantTemperature(T_WALL_SIGN; name=Symbol(:ct_l, i)) for i in 1:N_SIGN]
     ct_r = [ConstantTemperature(T_WALL_SIGN; name=Symbol(:ct_r, i)) for i in 1:N_SIGN]
     conns = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, cac.port_in),
-        connect(cac.port_out, pump.port_in),
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, cac.inlet),
+        connect(cac.outlet, pump.inlet),
         [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:N_SIGN]...,
         [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:N_SIGN]...,
-        pump.port_in.P ~ 1.0e5,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:sign_cac), pump, bc, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys; fully_determined=false)
     op = [ssys.cac.T[i] => T_GUESS_REV_SIGN[i] for i in 1:N_SIGN]
-    push!(op, ssys.cac.port_in.mdot => MDOT_NEG)
+    push!(op, ssys.cac.inlet.ṁ => ṁ_NEG)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -462,34 +493,34 @@ end
     Re_vals = [sol[ssys.cac.Re[i]] for i in 1:N_SIGN]
     vel_vals = [sol[ssys.cac.velocity[i]] for i in 1:N_SIGN]
 
-    @test sol[ssys.cac.port_in.mdot] < 0
+    @test sol[ssys.cac.inlet.ṁ] < 0
     @test all(T_vals[i] >= T_vals[i + 1] for i in 1:(N_SIGN - 1))
     @test all(Re_vals .> 0)
     @test all(vel_vals .> 0)
 
     T_mean = (sol[ssys.cac.T_out] + T_INLET_SIGN) / 2
-    Q_advect = abs(MDOT_NEG) * cp_water(T_mean) * (sol[ssys.cac.T_out] - T_INLET_SIGN)
+    Q_advect = abs(ṁ_NEG) * cₚ(H2O, T_mean) * (sol[ssys.cac.T_out] - T_INLET_SIGN)
     Q_wall_total = sol[ssys.cac.Q_wall_total]
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
 
-@testset "flow reversal: ChannelHeatFlux mdot < 0 (SIGN-03/04)" begin
+@testset "flow reversal: ChannelHeatFlux ṁ < 0" begin
     # CHF flux is intrinsic — q_left[i] sign is direction-independent.
-    @named pump = Pump(mdot0=MDOT_NEG)
+    @named pump = Pump(; ṁ0=ṁ_NEG)
     @named chf = ChannelHeatFlux(n=N_SIGN, geometry=GEOM_SIGN)
     @named bc = HeatExchanger(T_INLET_SIGN)
     conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, chf.port_in),
-        connect(chf.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, chf.inlet),
+        connect(chf.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         [chf.q_left[i]  ~ Q_FLUX_DEFAULT for i in 1:N_SIGN]...,
         [chf.q_right[i] ~ 0.0 for i in 1:N_SIGN]...,
     ]
     @named sys = compose(System(conns, t; name=:sign_chf), pump, bc, chf)
     ssys = mtkcompile(sys)
     op = [ssys.chf.T[i] => T_GUESS_REV_SIGN[i] for i in 1:N_SIGN]
-    push!(op, ssys.chf.port_in.mdot => MDOT_NEG)
+    push!(op, ssys.chf.inlet.ṁ => ṁ_NEG)
     sol = solve_steady(ssys, op)
 
     @test sol.retcode == ReturnCode.Success
@@ -497,7 +528,7 @@ end
     T_vals = sol[ssys.chf.T[:]]
     Re_vals = sol[ssys.chf.Re[:]]
 
-    @test sol[ssys.chf.port_in.mdot] < 0
+    @test sol[ssys.chf.inlet.ṁ] < 0
     @test all(T_vals[i] >= T_vals[i + 1] for i in 1:(N_SIGN - 1))
     @test all(Re_vals .> 0)
 
@@ -506,7 +537,7 @@ end
 
     # Energy balance: advective heat gain ≈ summed q_wall.
     T_mean = (sol[ssys.chf.T_out] + T_INLET_SIGN) / 2
-    Q_advect = abs(MDOT_NEG) * cp_water(T_mean) * (sol[ssys.chf.T_out] - T_INLET_SIGN)
+    Q_advect = abs(ṁ_NEG) * cₚ(H2O, T_mean) * (sol[ssys.chf.T_out] - T_INLET_SIGN)
     Q_wall_total = sum(sol[ssys.chf.q_wall[:]])
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
@@ -518,21 +549,21 @@ end
     Q = 800.0
     dz = 0.3 / n
     q_density_g3b = Q / (geom.heated_parts[1] * dz)
-    T_in = 320.0
+    T_in = 46.85
 
-    function _build_loop_g3b(mdot0)
-        @named pump = Pump(; mdot0=mdot0)
+    function _build_loop_g3b(ṁ0)
+        @named pump = Pump(; ṁ0=ṁ0)
         @named hex  = HeatExchanger(T_in)
         @named chf  = ChannelHeatFlux(; n=n, geometry=geom)
         eqs = Equation[
-            connect(pump.port_out, hex.port_in),
-            connect(hex.port_out,  chf.port_in),
-            connect(chf.port_out,  pump.port_in),
-            pump.port_in.P ~ 1.0e5,
+            connect(pump.outlet, hex.inlet),
+            connect(hex.outlet, chf.inlet),
+            connect(chf.outlet, pump.inlet),
+            pump.inlet.p ~ 1.0e5,
             [chf.q_left[i]  ~ q_density_g3b for i in 1:n]...,
             [chf.q_right[i] ~ 0.0 for i in 1:n]...,
         ]
-        nm = mdot0 > 0 ? :g3b_loop_fwd : :g3b_loop_rev
+        nm = ṁ0 > 0 ? :g3b_loop_fwd : :g3b_loop_rev
         @named sys = compose(System(eqs, t; name=nm), pump, hex, chf)
         ssys = mtkcompile(sys)
         op = [ssys.chf.T[i] => T_in + 1.0*i for i in 1:n]
@@ -546,18 +577,16 @@ end
     @test sol_fwd.retcode == ReturnCode.Success
     @test sol_rev.retcode == ReturnCode.Success
 
-    if sol_fwd.retcode == ReturnCode.Success && sol_rev.retcode == ReturnCode.Success
-        T_fwd = sol_fwd[ssys_fwd.chf.T[:]]
-        T_rev = sol_rev[ssys_rev.chf.T[:]]
+    T_fwd = sol_fwd[ssys_fwd.chf.T[:]]
+    T_rev = sol_rev[ssys_rev.chf.T[:]]
 
-        # Forward profile monotone increasing.
-        @test T_fwd[1] < T_fwd[2] < T_fwd[3]
-        # Reverse profile monotone decreasing.
-        @test T_rev[1] > T_rev[2] > T_rev[3]
+    # Forward profile monotone increasing.
+    @test T_fwd[1] < T_fwd[2] < T_fwd[3]
+    # Reverse profile monotone decreasing.
+    @test T_rev[1] > T_rev[2] > T_rev[3]
 
-        # Spatial mirror.
-        @test all(isapprox.(T_rev, T_fwd[end:-1:1], rtol=1e-9))
-    end
+    # Spatial mirror.
+    @test all(isapprox.(T_rev, T_fwd[end:-1:1], rtol=1e-9))
 end
 
 @testset "CAC ↔ CHF cross-equivalence" begin
@@ -567,21 +596,21 @@ end
     @named pump_cac = Pump(DP_PUMP)
     @named bc_cac = HeatExchanger(T_INLET)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
-                                     htc_correlation=constant_Nusselt(Nu=4.0))
+                                     htc=HTC.ConstantNusselt(; Nu=4.0))
     ct_l_xeq = [ConstantTemperature(T_WALL; name=Symbol(:ct_l_xeq, i)) for i in 1:n]
     conns_cac = Equation[
-        connect(pump_cac.port_out, bc_cac.port_in),
-        connect(bc_cac.port_out, cac.port_in),
-        connect(cac.port_out, pump_cac.port_in),
-        pump_cac.port_in.P ~ 1.0e5,
+        connect(pump_cac.outlet, bc_cac.inlet),
+        connect(bc_cac.outlet, cac.inlet),
+        connect(cac.outlet, pump_cac.inlet),
+        pump_cac.inlet.p ~ 1.0e5,
         [connect(ct_l_xeq[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:n]...,
         [connect(ct_l_xeq[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n]...,
     ]
     @named sys_cac = compose(System(conns_cac, t; name=:xeq_cac), pump_cac, bc_cac, cac, ct_l_xeq...)
-    ssys_cac = mtkcompile(sys_cac; fully_determined=false)  # integration test: per-cell wall-T binding (Phase 55 D-08)
+    ssys_cac = mtkcompile(sys_cac; fully_determined=false)  # integration test: per-cell wall-T binding
     ic_cac = Pair{Any,Any}[
         [ssys_cac.cac.T[i] => T_INLET for i in 1:n]...,
-        ssys_cac.cac.port_in.mdot => 0.5,
+        ssys_cac.cac.inlet.ṁ => 0.5,
     ]
     sol_cac = solve_transient(ssys_cac, ic_cac, range(0.0, 1.0, length=50))
     @test sol_cac.retcode == ReturnCode.Success
@@ -599,10 +628,10 @@ end
     @named chf = ChannelHeatFlux(; n=n, geometry=geom)
     @named hfs = HeatFluxSource(; n=n, q=q_per_cell)
     conns_chf = Equation[
-        connect(pump_chf.port_out, bc_chf.port_in),
-        connect(bc_chf.port_out, chf.port_in),
-        connect(chf.port_out, pump_chf.port_in),
-        pump_chf.port_in.P ~ 1.0e5,
+        connect(pump_chf.outlet, bc_chf.inlet),
+        connect(bc_chf.outlet, chf.inlet),
+        connect(chf.outlet, pump_chf.inlet),
+        pump_chf.inlet.p ~ 1.0e5,
         [chf.q_left[i]  ~ hfs.q_out[i] for i in 1:n]...,
         [chf.q_right[i] ~ 0.0 for i in 1:n]...,
     ]
@@ -610,10 +639,157 @@ end
     ssys_chf = mtkcompile(sys_chf)
     ic_chf = Pair{Any,Any}[
         [ssys_chf.chf.T[i] => T_INLET for i in 1:n]...,
-        ssys_chf.chf.port_in.mdot => 0.5,
+        ssys_chf.chf.inlet.ṁ => 0.5,
     ]
     sol_chf = solve_transient(ssys_chf, ic_chf, range(0.0, 1.0, length=50))
     @test sol_chf.retcode == ReturnCode.Success
     T_out_chf = sol_chf[ssys_chf.chf.T_out, end]
     @test isapprox(T_out_cac, T_out_chf; rtol=1e-3)
+end
+
+# §4 Subcooled-boiling integration (in-loop CAC + SCB).
+# Pure-correlation subcooled-boiling tests live in test_thresholds.jl.
+@testset "Subcooled-boiling integration (ISCB)" begin
+    n_scb = 5
+    T_inlet_scb = 40.0
+    L_ch_scb = 0.6
+    D_ch_scb = 0.01
+    dP_pump_scb = 3.0e4
+
+    # Helper: build a minimal loop with CAC + Pump + HeatExchanger + per-cell
+    # ConstantTemperature BCs. Returns (compiled_sys, solution).
+    function _build_scb_loop(; scb_correction=nothing, T_wall_bc=100.0)
+        htc = scb_correction === nothing ? HTC.DittusBoelter() :
+              HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_correction)
+        @named pump = Pump(dP_pump_scb)
+        @named cac = ChannelAndContacts(
+            n=n_scb,
+            geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
+            htc=htc,
+        )
+        @named bc = HeatExchanger(T_inlet_scb)
+        ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l_scb, i)) for i in 1:n_scb]
+        ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r_scb, i)) for i in 1:n_scb]
+        conns = [
+            connect(pump.outlet, bc.inlet),
+            connect(bc.outlet, cac.inlet),
+            connect(cac.outlet, pump.inlet),
+            [
+                connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i)))
+                for i in 1:n_scb
+            ]...,
+            [
+                connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i)))
+                for i in 1:n_scb
+            ]...,
+            pump.inlet.p ~ 2e5,
+        ]
+        @named sys = compose(
+            System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...,
+        )
+        ssys = mtkcompile(sys)
+        Q_guess = max(1e4, 1e3 * (T_wall_bc - T_inlet_scb))
+        T_guess = steady_state_guess(
+            T_inlet=T_inlet_scb,
+            Q_wall=Q_guess,
+            ṁ_guess=0.490,
+            n=n_scb,
+        )
+        op = [ssys.cac.T[i] => T_guess[i] for i in 1:n_scb]
+        push!(op, ssys.cac.inlet.ṁ => 0.490)
+        sol = solve_steady(ssys, op)
+        return ssys, sol
+    end
+
+    @testset "SCB ChannelAndContacts compiles" begin
+        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
+        @named cac = ChannelAndContacts(
+            n=3,
+            geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
+            htc=HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_fn),
+        )
+        @test cac isa ModelingToolkit.System
+    end
+
+    @testset "SCB ChannelAndContacts solves (sub-ONB), matches non-SCB" begin
+        # T_wall is below T_ONB at 2 bar, so SubcooledBoiling returns its
+        # single-phase value unchanged. The "SCB present but inactive" claim
+        # therefore means the SCB loop must reproduce the non-SCB loop exactly.
+        # Build both, solve both, and compare h_tc and coolant T cell by cell.
+        T_wall = 106.85
+        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
+        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=T_wall)
+        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=T_wall)
+        @test sol_scb.retcode == ReturnCode.Success
+        @test sol_noscb.retcode == ReturnCode.Success
+
+        # The wall sits below ONB in every cell: confirm the regime the claim asserts.
+        P_cell = 2e5
+        T_sat = Tsat(H2O, P_cell)
+        for i in 1:n_scb
+            T_bulk = sol_scb[ssys_scb.cac.T[i]]
+            h_spl = sol_scb[ssys_scb.cac.h_tc_left[i]]
+            q_spl = h_spl * (T_wall - T_bulk)
+            T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P_cell, q_spl)
+            @test T_wall < T_ONB
+        end
+
+        # Inactive SCB => identical to the plain single-phase channel.
+        @test all(isapprox(sol_scb[ssys_scb.cac.h_tc_left[i]], sol_noscb[ssys_noscb.cac.h_tc_left[i]]; rtol=1e-10) for i in 1:n_scb)
+        @test all(isapprox(sol_scb[ssys_scb.cac.h_tc_right[i]], sol_noscb[ssys_noscb.cac.h_tc_right[i]]; rtol=1e-10) for i in 1:n_scb)
+        @test all(isapprox(sol_scb[ssys_scb.cac.T[i]], sol_noscb[ssys_noscb.cac.T[i]]; rtol=1e-10) for i in 1:n_scb)
+    end
+
+    @testset "Default (no SCB) backward compatibility" begin
+        ssys, sol = _build_scb_loop(scb_correction=nothing, T_wall_bc=100.0)
+        @test sol.retcode == ReturnCode.Success
+    end
+
+    @testset "High T_wall -> enhanced HTC (numerical)" begin
+        # Direct numerical evaluation: at T_wall >> T_sat, the SCB correction
+        # factor > 1. Validates the physics without requiring KINSOL convergence
+        # in the boiling regime.
+        T_bulk = 46.85
+        P = 2e5
+        T_wall = 146.85
+        ṁ = 0.49
+        Dh = D_ch_scb
+        Ac = pi/4 * Dh^2
+        Re_val = abs(ṁ) * Dh / (Ac * μ(H2O, T_bulk))
+        Pr_val =
+            cₚ(H2O, T_bulk) * μ(H2O, T_bulk) /
+            κ(H2O, T_bulk)
+
+        h_spl =
+            HTC.dittus_boelter(Re_val, Pr_val, T_bulk, T_wall) * κ(H2O, T_bulk) /
+            Dh
+        q_spl = h_spl * (T_wall - T_bulk)
+
+        T_sat = Tsat(H2O, P)
+        T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
+
+        scb_fn = HTC.regime_dependent_q_scb(pressure=P)
+        q_scb = scb_fn(T_wall, T_sat, Re_val)
+        q_scb_inc = scb_fn(T_ONB, T_sat, Re_val)
+        factor = HTC.partial_SCB_correction(q_spl, q_scb, q_scb_inc)
+
+        @test T_wall > T_ONB                     # boiling is active
+        @test factor > 1.0                       # correction enhances h_tc
+        @test h_spl * factor > h_spl             # SCB h_tc > single-phase h_tc
+    end
+
+    @testset "Low T_wall -> matches single-phase exactly" begin
+        # T_wall = 330K < T_sat (~393K at 2 bar) -> SCB inactive, pure
+        # single-phase. Both SCB and non-SCB loops solve to identical h_tc values.
+        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
+        ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
+        ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
+
+        htc_scb = [sol_scb[ssys_scb.cac.h_tc_left[i]] for i in 1:n_scb]
+        htc_noscb = [sol_noscb[ssys_noscb.cac.h_tc_left[i]] for i in 1:n_scb]
+        # Should be identical (ifelse selects uncorrected branch).
+        for i in 1:n_scb
+            @test htc_scb[i] ≈ htc_noscb[i] rtol=1e-10
+        end
+    end
 end

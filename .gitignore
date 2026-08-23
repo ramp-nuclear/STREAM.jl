@@ -2,7 +2,7 @@
 .vscode/
 examples/output/
 
-# Node / GUI
+# Node (skills tooling)
 node_modules/
 
 # Vendored Claude Code skill content (re-installable from skills-lock.json

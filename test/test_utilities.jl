@@ -1,13 +1,18 @@
 using Test
+using Random
 using STREAM
-import STREAM: rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
+using STREAM.Utilities
+
+# Seed locally so the random-matrix invariants below are reproducible when this file runs on its
+# own, not only under runtests.jl (which seeds for the whole suite via preamble.jl).
+Random.seed!(20260620)
 
 # Invariants for the rebin / cosine helpers. We check that extensive rebinning
 # preserves the total and intensive rebinning preserves the value; per-cell
 # numbers can differ at ULP between separable-pass orderings, which is fine.
 # Inputs are trusted, so there are no negative / NaN / shape-mismatch tests.
 
-@testset "INT-00: split-a-cell contract (extensive halves, intensive copies)" begin
+@testset "split-a-cell contract (extensive halves, intensive copies)" begin
     # Splitting one cell in two: an amount halves, a value copies.
     @test rebin_extensive([10.0], 2) == [5.0, 5.0]
     @test rebin_intensive([10.0], 2) == [10.0, 10.0]
@@ -16,7 +21,7 @@ import STREAM: rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wa
     @test rebin_intensive([3.0, 7.0], 1) == [5.0]
 end
 
-@testset "CONS-02: rebin_extensive identity (target_shape == size(M))" begin
+@testset "rebin_extensive identity (target_shape == size(M))" begin
     # Strict equality on a random 4x6 Float64 matrix.
     M = rand(4, 6)
     out = rebin_extensive(M, size(M))
@@ -25,7 +30,7 @@ end
     @test size(out) == (4, 6)
 end
 
-@testset "CONS-01: rebin_extensive sum-conservation across all reshape regimes" begin
+@testset "rebin_extensive sum-conservation across all reshape regimes" begin
     rtol = 1e-12
 
     # (a) identity 4x4 -> 4x4
@@ -67,7 +72,7 @@ end
     @test isapprox(sum(rebin_extensive(M, (7, 5))), sum(M); rtol=rtol)
 end
 
-@testset "CONS-03: rebin_extensive uniform input scales by area ratio" begin
+@testset "rebin_extensive uniform input scales by area ratio" begin
     # rebin_extensive(ones(a,b), (c,d)) == (a*b / (c*d)) * ones(c,d)
     a, b = 3, 4
     c, d = 7, 5
@@ -77,7 +82,7 @@ end
     @test all(isapprox.(out, expected; rtol=1e-12))
 end
 
-@testset "CONS-04: cosine_power_shape shape + axial cosine + uniform-along-x" begin
+@testset "cosine_power_shape shape + axial cosine + uniform-along-x" begin
     nz, nx = 10, 5
     M = cosine_power_shape(nz, nx; amplitude=1.0)
 
@@ -101,7 +106,7 @@ end
     @test all(isapprox.(M2, 2.5 .* M; rtol=1e-12))
 end
 
-@testset "INT-01: rebin_intensive keeps a constant field constant across reshapes" begin
+@testset "rebin_intensive keeps a constant field constant across reshapes" begin
     rtol = 1e-12
     @test all(isapprox.(rebin_intensive(ones(4), 4), 1.0; rtol=rtol))   # 4 -> 4
     @test all(isapprox.(rebin_intensive(ones(3), 9), 1.0; rtol=rtol))   # up 3 -> 9
@@ -110,7 +115,7 @@ end
     @test all(isapprox.(rebin_intensive(ones(13), 7), 1.0; rtol=rtol))  # down 13 -> 7
 end
 
-@testset "INT-02: rebin_intensive preserves the average" begin
+@testset "rebin_intensive preserves the average" begin
     # Each target cell holds the area-weighted average of the source it covers,
     # so the average over the whole vector is unchanged: sum(out)/M == sum(v)/N.
     rtol = 1e-12
@@ -120,12 +125,12 @@ end
     end
 end
 
-@testset "INT-03: rebin_intensive n -> n is the identity" begin
+@testset "rebin_intensive n -> n is the identity" begin
     v = [1.0, 2.0, 3.0, 4.0]
     @test rebin_intensive(v, 4) == v
 end
 
-@testset "INT-04: rebin_intensive 2D preserves the average" begin
+@testset "rebin_intensive 2D preserves the average" begin
     rtol = 1e-12
     for (src, tgt) in (((3, 5), (9, 15)), ((9, 15), (3, 5)), ((7, 7), (13, 11)))
         M = rand(src...)
@@ -134,7 +139,7 @@ end
     end
 end
 
-@testset "INT-06: non-uniform edges (extensive sum, intensive value)" begin
+@testset "non-uniform edges (extensive sum, intensive value)" begin
     rtol = 1e-12
     src = [0.0, 0.2, 0.5, 1.0]   # 3 unequal source cells
     tgt = [0.0, 0.5, 1.0]        # 2 uniform target cells
@@ -152,7 +157,7 @@ end
     @test isapprox(rebin_intensive(v, su, tu), rebin_intensive(v, 2); rtol=rtol)
 end
 
-@testset "CT-01: cosine_T_wall_profile shape and amplitude scaling" begin
+@testset "cosine_T_wall_profile shape and amplitude scaling" begin
     rtol = 1e-12
 
     c = cosine_T_wall_profile(10; amplitude=1.0)

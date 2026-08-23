@@ -1,79 +1,69 @@
-# resistors.jl — Friction, Gravity, Resistor components for STREAM.jl
-
 """
-    Friction(; name, L, D, A) -> ODESystem
+    FrictionResistor(; name, geometry, darcy=Blasius(), liquid=H2O) -> System
 
-Frictional pressure drop element using Darcy-Weisbach correlation.
+Frictional pressure drop element, `ΔP = f · ṁ|ṁ| / (2ρA²) · (L/Dh)`.
+
+The friction factor comes from `darcy`, a [`AbstractDarcyFactor`](@ref). Passing
+[`RegimeDependent`](@ref) makes this the regime-switching friction resistor, with the
+laminar/turbulent blend and, if asked for, the heated-wall viscosity correction.
 
 # Arguments
 - `name`: system name (Symbol)
-- `L`: pipe length [m]
-- `D`: hydraulic diameter [m]
-- `A`: flow area [m^2]
+- `geometry`: pipe geometry descriptor ([`PipeGeometry`](@ref))
+- `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref)
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
-function Friction(; name, L, D, A)
-    pars = @parameters begin
-        L = L
-        D_h = D
-        A = A
-    end
+function FrictionResistor(;
+    name,
+    geometry::PipeGeometry,
+    darcy::AbstractDarcyFactor=Blasius(),
+    liquid::AbstractLiquid=H2O,
+)
+    geom = geometry
     vars = @variables begin
         Re(t)
         f(t)
     end
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    T_in = instream(port_in.T)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
+    Ax, Dh, Lx = geom.A, geom.Dh, geom.L
     eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        Re ~ abs(port_in.mdot) * D / (A * mu_water(T_in)),
-        f ~ 0.3164 * Re^(-0.25),
-        port_in.P - port_out.P ~ f * (port_in.mdot * abs(port_in.mdot) / (2 * rho_water(
-            T_in
-        ) * A^2)) * (L / D),
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
+        Re ~ STREAM.Re(liquid, T_in, inlet.ṁ, Ax, Dh),
+        f ~ darcy(T_in, inlet.ṁ, liquid, geom),
+        inlet.p - outlet.p ~ darcy_weisbach_dp(inlet.ṁ, ρ(liquid, T_in), f, Lx, Dh, Ax),
     ]
-    return compose(System(eqs, t, vars, pars; name=name), port_in, port_out)
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars)
 end
 
 """
-    Gravity(H; name) -> ODESystem
+    Gravity(H; name) -> System
 
 Hydrostatic pressure change for a vertical elevation change.
 
 # Arguments
 - `H`: elevation change [m], positive = upward
+- `g`: gravitational acceleration [m/s^2]
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
 - `name`: system name (Symbol)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
-function Gravity(H; name)
+function Gravity(H, g=G_EARTH; name, liquid::AbstractLiquid=H2O)
     pars = @parameters H = H
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    T_in = instream(port_in.T)
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ rho_water(T_in) * 9.80665 * H,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
+    eqs = Equation[inlet.p - outlet.p ~ ρ(liquid, T_in) * g * H]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
 """
-    Resistor(R; name) -> ODESystem
+    Resistor(R; name) -> System
 
 Generic flow resistance with a fixed resistance coefficient.
 
@@ -82,20 +72,93 @@ Generic flow resistance with a fixed resistance coefficient.
 - `name`: system name (Symbol)
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `ODESystem`. Call `mtkcompile(sys)` before solving.
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Resistor(R; name)
     pars = @parameters R = R
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.P - port_out.P ~ R * port_in.mdot,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[inlet.p - outlet.p ~ R * inlet.ṁ]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+end
+
+"""
+    VolumetricFlowResistor(; name, k, klow=0.0, density=(T -> ρ(H2O, T))) -> System
+
+Resistor quadratic in volumetric flow: `ΔP = k·Q·|Q| + klow·Q`, where `Q = ṁ/ρ` is the
+volumetric flow rate. The `Q·|Q|` form keeps the drop direction-correct under flow reversal.
+
+A **time-dependent** resistance (the "transistor" pattern — a branch whose resistance
+collapses or grows over time) is expressed by passing `k` as a callable `(t) -> k`; the user
+then supplies `vfr.k_fn => fn` in the solve `op` dict (the MTK callable-parameter idiom, the
+same one `Channel`'s `h_left` uses).
+
+# Arguments
+- `name`: system name (Symbol)
+- `k`: quadratic resistance coefficient [kg/m^7]; `Real` (fixed) or `Function` (time-varying
+  via `k_fn` callable parameter)
+- `klow`: linear (low-flow) coefficient [kg/(m^4·s)], default `0.0`
+- `density`: the density [kg/m^3] used to turn mass flow into volumetric flow; `Real` for a
+  constant, or `Function` `(T) -> rho` evaluated at the inlet stream temperature. Defaults to
+  light water at the inlet temperature.
+
+# Ports
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
+"""
+function VolumetricFlowResistor(;
+    name,
+    k::Union{Real,Function},
+    klow::Real=0.0,
+    density::Union{Real,Function}=(T -> ρ(H2O, T)),
+)
+    pars = @parameters klow = klow
+    if k isa Real
+        kpars = @parameters k = k
+        k_expr = kpars[1]
+    else  # Function / callable — MTK callable-parameter pattern (time-varying resistance)
+        FType = typeof(k)
+        kpars = @parameters (k_fn::FType)(..)
+        k_expr = kpars[1](t)
+    end
+    pars = Any[pars...; kpars...]
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
+    rho = if density isa Real
+        Num(density)
+    else
+        density(T_in)
+    end
+    q = inlet.ṁ / rho
+    eqs = Equation[inlet.p - outlet.p ~ (k_expr * q * abs(q) + klow * q)]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+end
+
+"""
+    LocalPressureDrop(; name, A1, A2, liquid=H2O) -> System
+
+Minor (local) pressure loss across a sudden area change `A1 -> A2`, after Idelchik tables
+4.2 (expansion) and 4.10 (contraction). The loss is `ΔP = K·ṁ·|ṁ| / (2·ρ·A_min²)`,
+where the coefficient `K` depends on the area ratio and Reynolds number and on the flow
+direction — forward flow sees an expansion when `A2 ≥ A1` and a contraction otherwise, with
+the roles swapped under reversal. The `ṁ·|ṁ|` form keeps the drop direction-correct.
+
+# Arguments
+- `name`: system name (Symbol)
+- `A1`: upstream flow area [m^2]
+- `A2`: downstream flow area [m^2]
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref), supplying the density and
+  viscosity at the inlet stream temperature
+
+# Ports
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
+"""
+function LocalPressureDrop(; name, A1, A2, liquid::AbstractLiquid=H2O)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    T_in = instream(inlet.T)
+    A = min(A1, A2)
+    f = LocalLoss.factor(inlet.ṁ, A1, A2, μ(liquid, T_in))
+    eqs = Equation[inlet.p - outlet.p ~ dp(inlet.ṁ, ρ(liquid, T_in), f, A)]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs)
 end

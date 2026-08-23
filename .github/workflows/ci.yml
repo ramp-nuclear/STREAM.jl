@@ -8,6 +8,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
+  # Reproducible gate: latest 1.x Julia against the committed Manifest.toml (exact pinned packages),
+  # so the package set is fixed while the Julia version tracks the current release.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -17,4 +19,21 @@ jobs:
           version: '1'
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+
+  # Forward-looking canary: latest Julia, and it drops the Manifest to resolve the latest compatible
+  # packages, so an upstream bump that breaks the suite shows up here instead of on a contributor's
+  # machine. Allowed to fail (continue-on-error) because a genuine upstream regression is outside our
+  # control; it surfaces as a visible red mark without blocking unrelated PRs.
+  test-latest:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v3
+      - name: Resolve latest compatible versions
+        run: julia --project=. -e 'rm("Manifest.toml"; force=true); using Pkg; Pkg.instantiate()'
       - uses: julia-actions/julia-runtest@v1
