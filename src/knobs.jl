@@ -1,5 +1,3 @@
-# knobs.jl -- design knobs for parametric model authoring
-
 """
     _design_knob(name, default) -> Num
 

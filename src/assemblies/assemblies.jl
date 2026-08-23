@@ -1,22 +1,3 @@
-# helpers.jl -- QoL and composition helpers
-
-"""
-    port(sys, face, i)
-
-Access an indexed thermal port array element from a compiled subsystem.
-
-# Arguments
-- `sys`: MTK system instance
-- `face`: port array name (Symbol), e.g. `:thermal_left`
-- `i`: 1-based cell index (Int)
-
-# Returns
-The namespaced connector subsystem (e.g. `sys.thermal_left3`), suitable for `connect()`.
-"""
-port(sys, face::Symbol, i::Int) = getproperty(sys, Symbol(face, i))
-
-# Real-valued defaults of `params`, skipping parameters with no default or a
-# non-Real default.
 function _real_defaults(params)
     vals = Float64[]
     for p in params
@@ -66,16 +47,23 @@ function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
     return :ok
 end
 
-function _infer_n(sys)
-    sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
-    n = count(s -> startswith(s, "thermal_left"), sub_names)
-    n == 0 && throw(
-        ArgumentError(
-            "could not detect thermal port count in system $(ModelingToolkit.getname(sys)); pass an uncompiled ChannelAndContacts instance",
-        ),
-    )
-    return n
+"""
+    compose_systems(systems...; connections, name) -> System
+
+Compose multiple MTK systems with explicit connection equations into a single system.
+
+# Arguments
+- `systems`: positional varargs of uncompiled systems
+- `connections`: vector of connection equations (`Vector{<:Equation}`)
+- `name`: system name (Symbol)
+
+# Returns
+Uncompiled `System` ready for `mtkcompile()`.
+"""
+function compose_systems(systems...; connections::Vector{<:Equation}, name::Symbol)
+    return compose(System(connections, t; name=name), systems...)
 end
+
 
 """
     symmetric_plate(cac, fuel; name) -> System
@@ -95,15 +83,10 @@ After calling this function, refer to sub-components exclusively via the returne
 names and should not be used in equations or connection dicts after composition.
 """
 function symmetric_plate(cac, fuel; name::Symbol)
-    n = _infer_n(cac)
-    connections = Equation[
-        [
-            connect(port(cac, :thermal_right, i), port(fuel, :thermal_left, i)) for i in 1:n
-        ]...,
-        [
-            connect(port(cac, :thermal_left, i), port(fuel, :thermal_right, i)) for i in 1:n
-        ]...,
-    ]
+    connections = faces(
+        (cac, :thermal_right) => (fuel, :thermal_left),
+        (cac, :thermal_left) => (fuel, :thermal_right),
+    )
     return compose(System(connections, t; name=name), cac, fuel)
 end
 
@@ -126,22 +109,15 @@ After calling this function, refer to sub-components exclusively via the returne
 names and should not be used in equations or connection dicts after composition.
 """
 function plate(ch_left, ch_right, fuel; name::Symbol)
-    n = _infer_n(ch_left)
-    connections = Equation[
-        [
-            connect(port(ch_left, :thermal_right, i), port(fuel, :thermal_left, i)) for
-            i in 1:n
-        ]...,
-        [
-            connect(port(ch_right, :thermal_left, i), port(fuel, :thermal_right, i)) for
-            i in 1:n
-        ]...,
-    ]
+    connections = faces(
+        (ch_left, :thermal_right) => (fuel, :thermal_left),
+        (ch_right, :thermal_left) => (fuel, :thermal_right),
+    )
     return compose(System(connections, t; name=name), ch_left, ch_right, fuel)
 end
 
 """
-    one_sided_connection(channel, fuel; side=:left, name) -> System
+    one_sided(channel, fuel; side=:left, name) -> System
 
 Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channel.
 
@@ -158,26 +134,19 @@ After calling this function, refer to sub-components exclusively via the returne
 (e.g. `osc.channel`, `osc.fuel`). The original component variables hold unscoped symbolic
 names and should not be used in equations or connection dicts after composition.
 """
-function one_sided_connection(channel, fuel; side::Symbol=:left, name::Symbol)
+function one_sided(channel, fuel; side::Symbol=:left, name::Symbol)
     side in (:left, :right) ||
         throw(ArgumentError("side must be :left or :right, got :$side"))
-    n = _infer_n(channel)
     connections = if side == :left
-        Equation[[
-            connect(port(channel, :thermal_left, i), port(fuel, :thermal_right, i)) for
-            i in 1:n
-        ]...]
+        faces((channel, :thermal_left) => (fuel, :thermal_right))
     else
-        Equation[[
-            connect(port(channel, :thermal_right, i), port(fuel, :thermal_left, i)) for
-            i in 1:n
-        ]...]
+        faces((channel, :thermal_right) => (fuel, :thermal_left))
     end
     return compose(System(connections, t; name=name), channel, fuel)
 end
 
 """
-    single_channel_connection(channel, fuel, geometry; fuel_side=:left, name) -> System
+    single_channel(channel, fuel, geometry; fuel_side=:left, name) -> System
 
 Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*: the
 channel is heated on one face only, but the fuel plate is cooled on **both** faces — the
@@ -188,7 +157,7 @@ This reproduces the half-symmetric reduced unit used for the last plate in an ar
 plate sits between two channels, so it loses heat on both faces, but only one channel is
 modelled. The far face's heat flows into the unmodelled equivalent twin, so the subsystem
 does not conserve energy — that is the modelling choice, not a defect. For the truthful
-one-face-insulated coupling, use [`one_sided_connection`](@ref) instead.
+one-face-insulated coupling, use [`one_sided`](@ref) instead.
 
 # Arguments
 - `channel`: uncompiled `ChannelAndContacts` instance.
@@ -206,10 +175,10 @@ Uncompiled `System` from `compose()` holding `channel`, `fuel`, and `n` per-cell
 After composition, refer to sub-components through the returned system (e.g.
 `scc.channel`, `scc.fuel`).
 """
-function single_channel_connection(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol=:left, name::Symbol)
+function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol=:left, name::Symbol)
     fuel_side in (:left, :right) ||
         throw(ArgumentError("fuel_side must be :left or :right, got :$fuel_side"))
-    n = _infer_n(channel)
+    n = var_length(channel, :thermal_left)
     dz = geometry.L / n
 
     near = fuel_side
@@ -241,35 +210,16 @@ function single_channel_connection(channel, fuel, geometry::PipeGeometry; fuel_s
     return compose(System(connections, t; name=name), channel, fuel, far_bcs...)
 end
 
+
 """
-    compose_systems(systems...; connections, name) -> System
+    _walk_alternation(channels, plates, effective_bookend, start) -> Vector{Tuple{Symbol,Any}}
 
-Compose multiple MTK systems with explicit connection equations into a single system.
+Order the channels and plates into the alternating chain [`fuel_assembly`](@ref) composes,
+as `(kind, sys)` tuples with `kind` either `:c` for a channel or `:p` for a plate.
 
-# Arguments
-- `systems`: positional varargs of uncompiled systems
-- `connections`: vector of connection equations (`Vector{<:Equation}`)
-- `name`: system name (Symbol)
-
-# Returns
-Uncompiled `System` ready for `mtkcompile()`.
+`effective_bookend` decides the pattern when the counts differ: `:channel` for `nc = np + 1`,
+`:plate` for `np = nc + 1`. With equal counts `start` picks which kind leads.
 """
-function compose_systems(systems...; connections::Vector{<:Equation}, name::Symbol)
-    return compose(System(connections, t; name=name), systems...)
-end
-
-# ----------------------------------------------------------------
-# fuel_assembly — alternating channel <-> plate chains.
-# Builds the per-cell thermal connections for the four chain shapes
-# (channel-bookended, plate-bookended, mixed, and closed ring) and returns the
-# uncompiled System. The caller adds boundary conditions and compiles.
-#
-# Wiring: each adjacent pair connects the left member's right face to the right
-# member's left face (same convention as `plate`). Outer faces left dangling
-# stay adiabatic, like `one_sided_connection`.
-# ----------------------------------------------------------------
-
-# Build the alternation as an ordered Vector of (kind, sys) tuples, kind :c or :p.
 function _walk_alternation(channels, plates, effective_bookend::Symbol, start)
     C = [(:c, ch) for ch in channels]
     P = [(:p, pl) for pl in plates]
@@ -284,12 +234,18 @@ function _walk_alternation(channels, plates, effective_bookend::Symbol, start)
     end
 end
 
-# Wire one adjacent pair: left member's right face to right member's left face,
-# per cell. The kind tags don't change the wiring, so they're ignored here.
+"""
+    _pair_connections(left, right, n) -> Vector{Equation}
+
+Wire one adjacent pair of the chain, the left member's right face to the right member's left
+face, one connection per cell. Both arguments are the `(kind, sys)` tuples
+[`_walk_alternation`](@ref) produces; the kind tags do not change the wiring, so they are
+ignored here, and [`Connect.faces`](@ref) reads the cell count off the ports itself.
+"""
 function _pair_connections(left::Tuple{Symbol,Any}, right::Tuple{Symbol,Any}, n::Int)
     _, lsys = left
     _, rsys = right
-    return [connect(port(lsys, :thermal_right, i), port(rsys, :thermal_left, i)) for i in 1:n]
+    return faces((lsys, :thermal_right) => (rsys, :thermal_left))
 end
 
 """
@@ -298,7 +254,10 @@ end
 Compose an alternating CAC↔Plate chain (fuel-assembly topology) from a vector of
 `ChannelAndContacts` instances and a vector of `HeatDiffusion` plates.
 
-Handles the four variants from the v1.2 design contract §3.12:
+Each adjacent pair connects the left member's right face to the right member's left face, as in
+[`plate`](@ref). Outer faces left dangling stay adiabatic, as in [`one_sided`](@ref).
+
+There are four chain shapes:
 
 1. **Channel-bookended** — `length(channels) == length(plates) + 1`. Both ends are CACs;
    plates sit between adjacent channels. Inferred when `bookend=:auto`.
@@ -410,7 +369,7 @@ function fuel_assembly(
     end
 
     # 7. Per-cell port count (homogeneity is the caller's responsibility).
-    n = _infer_n(channels[1])
+    n = var_length(channels[1], :thermal_left)
 
     # 8. Build the alternation and wire each adjacent pair per cell. For a closed
     #    ring we also wire the wrap pair (seq[end] -> seq[1]).
@@ -426,52 +385,3 @@ function fuel_assembly(
     return compose(System(connections, t; name=name), channels..., plates...)
 end
 
-"""
-    connect_temperature_feedback(pk, components) -> Vector{Equation}
-
-Generate binding equations that wire each component's existing `T` symbolic to the
-corresponding `pk.T_source_<name>` unknowns inside `PointKinetics`. Used together
-with `compose_systems` to close the neutronics<->thermal-hydraulics loop.
-
-# Arguments
-- `pk`: uncompiled `PointKinetics` system built with `temp_worth=...`
-- `components`: list of scoped component references whose temperatures feed into `pk`
-  (e.g. `[rods.cac]`, `[inter.ch_left, inter.ch_right]`). Pass scoped references
-  (post-composition), not original component variables. Alpha coefficients belong in
-  the `PointKinetics` constructor `temp_worth` dict — they are not needed here.
-
-# Returns
-`Vector{Equation}` -- one equation per cell, per component. Length equals the total
-number of cells across all components. For 1D channel T: `pk.T_source_<name>[j] ~ comp.T[j]`.
-For 2D HeatDiffusion T: `pk.T_source_<name>[(jz-1)*nx+jx] ~ comp.T[jz, jx]` (row-major).
-
-# Note
-Pass scoped references (post-composition), not original component variables. The
-original component variables hold unscoped symbolic names and should not be used in
-equations or connection dicts after composition.
-
-# Example (scoped — component wrapped inside symmetric_plate)
-```julia
-rods = symmetric_plate(cac, fuel; name=:rods)
-@named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => alpha))
-eqs = connect_temperature_feedback(pk, [rods.cac])
-# eqs has n equations binding pk.T_source_cac[j] ~ rods.cac.T[j]
-```
-"""
-function connect_temperature_feedback(pk, components)
-    eqs = Equation[]
-    for comp in components
-        cname = nameof(comp)
-        pk_T_source = getproperty(pk, Symbol(:T_source_, cname))
-        T_sym = getproperty(comp, :T)
-        comp_eqs = if ndims(T_sym) == 1
-            n = length(T_sym)
-            [pk_T_source[j] ~ T_sym[j] for j in 1:n]
-        else
-            nz, nx = size(T_sym)
-            [pk_T_source[(jz - 1) * nx + jx] ~ T_sym[jz, jx] for jz in 1:nz for jx in 1:nx]
-        end
-        append!(eqs, comp_eqs)
-    end
-    return eqs
-end

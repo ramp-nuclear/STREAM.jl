@@ -4,7 +4,11 @@ using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using DelimitedFiles
 using STREAM
-using STREAM: Channel, HeatDiffusion, PipeGeometry_rectangular, PipeGeometry_circular
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.Examples
+using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
 
 include(joinpath(@__DIR__, "parity_helpers.jl"))
@@ -96,24 +100,30 @@ _h_eff(sol, cac, i) = abs(sol[cac.q_wall_left[i]]) >= abs(sol[cac.q_wall_right[i
     # PYTHON_*_AT_REF are bit-identical to Julia at rtol=1e-12, so the native checklist passes;
     # this exercises the guard form `cond || error(...)` directly on a deliberately wrong value.
     @test_throws ErrorException (
-        isapprox(STREAM.dittus_boelter(10_000.0, 1.0), 1e10; rtol=1e-12) || error("self-test 12")
+        isapprox(STREAM.HTC.dittus_boelter(10_000.0, 1.0), 1e10; rtol=1e-12) || error("self-test 12")
     )
 end
 
 @testset "HTC formula identity vs Python STREAM (exact on shared inputs)" begin
     # PROOF that Julia's single-phase HTC — the Dittus-Boelter formula AND the water
     # property correlations (μ, k, cp) — is identical to Python STREAM's, isolated from
-    # solver convergence: feed Python's CONVERGED (T_wall, T_cool, mdot) into Julia's
-    # `_h_spl` and require it to reproduce Python's reference h_tc to machine precision.
+    # solver convergence: feed Python's CONVERGED (T_wall, T_cool, ṁ) into Julia's
+    # `DittusBoelter` and require it to reproduce Python's reference h_tc to machine precision.
     # This is why the connected-face HTC matches Python to 0.000% in the live parity:
     # the formula is exact, and `_h_eff` selects the physically-meaningful (q≠0) face.
     geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     Dh = geom.Dh
     A = geom.A
+    htc = HTC.DittusBoelter()
     for i in 1:length(PARITY_MTR_ASYM_H_TC_LEFT_R)
-        h_julia = STREAM._h_spl(PARITY_MTR_ASYM_T_WALL_LEFT_R[i],
-                                PARITY_MTR_ASYM_T_CELLS_R[i],
-                                PARITY_MTR_ASYM_MDOT_R, Dh, A, dittus_boelter)
+        h_julia = htc(
+            PARITY_MTR_ASYM_T_WALL_LEFT_R[i],
+            PARITY_MTR_ASYM_T_CELLS_R[i],
+            PARITY_MTR_ASYM_ṁ_R,
+            Dh,
+            A,
+            H2O,
+        )
         @test isapprox(h_julia, PARITY_MTR_ASYM_H_TC_LEFT_R[i]; rtol=1e-6)
     end
 end
@@ -129,7 +139,7 @@ end
 # equation pattern that bypasses MTK's connector-flow accounting (WARNING #5).
 #
 # Tiers compared:
-#   (a) scalars  — T_out, mdot, dP_loop
+    #   (a) scalars  — T_out, ṁ, dP_loop
 #   (b) per-cell — T[i] for i in 1:n
 #   (c) per-cell wall (CAC-only) — T_wall_left[i], h_tc_left[i], q_density_*[i]
 #
@@ -140,7 +150,7 @@ end
 #           the same W/m^2 value. Julia's split also yields equal L/R density,
 #           so per-side density compares cleanly.
 #   Gap #2: HTC fluid-property eval at T_film (Python) vs T_bulk (Julia) —
-#           may surface as drift on h_tc and propagate to mdot. hard_ceiling
+    #           may surface as drift on h_tc and propagate to ṁ. hard_ceiling
 #           stays at 2%; FAIL surfaces honestly.
 #   Gap #3: Sundials KINSOL vs scipy hybr solver tols — floor on CLEAN tier.
 @testset "Python parity: simple loop" begin
@@ -158,40 +168,45 @@ end
     assert_equivalence_anchors()
 
     n = 10
-    T_inlet = 313.15
-    T_wall = 373.15
+    T_inlet = 40.0
+    T_wall = 100.0
     @named pump = Pump(3.0e4)
     @named hx = HeatExchanger(T_inlet)
     @named cac = ChannelAndContacts(; n=n, geometry=geom_simple)
     ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:n]
     ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:n]
     conns = vcat(
-        [connect(pump.port_out, hx.port_in)],
-        [connect(hx.port_out, cac.port_in)],
-        [connect(cac.port_out, pump.port_in)],
-        [pump.port_in.P ~ 1.0e5],
-        [connect(ct_l[i].thermal, getproperty(cac, Symbol(:thermal_left, i))) for i in 1:n],
-        [connect(ct_r[i].thermal, getproperty(cac, Symbol(:thermal_right, i))) for i in 1:n],
+            inseries(pump, hx, cac, pump),
+            [pump.inlet.p ~ 1.0e5],
+        face(ct_l, cac, :thermal_left),
+        Connect.face(ct_r, cac, :thermal_right),
     )
     @named sys = compose(System(conns, t; name=:simple_loop_parity),
                           pump, hx, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys; fully_determined=true)
 
-    T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.5, n=n)
+        T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.5, n=n)
     op = vcat(
         [ssys.cac.T[i] => T_guess[i] for i in 1:n],
-        [ssys.cac.port_in.mdot => 0.5],
+            [ssys.cac.inlet.ṁ => 0.5],
     )
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
     @test all(isfinite, [sol[ssys.cac.T[i]] for i in 1:n])
-    @test isfinite(sol[ssys.cac.port_in.mdot])
+        @test isfinite(sol[ssys.cac.inlet.ṁ])
     rows = ParityRow[]
 
     push!(rows, parity_check("simple_loop", "T_out",
                              sol[ssys.cac.T_out], PARITY_SIMPLE_T_OUT))
-    push!(rows, parity_check("simple_loop", "mdot",
-                             abs(sol[ssys.cac.port_in.mdot]), PARITY_SIMPLE_MDOT))
+        push!(
+            rows,
+            parity_check(
+                "simple_loop",
+                "ṁ",
+                abs(sol[ssys.cac.inlet.ṁ]),
+                PARITY_SIMPLE_ṁ,
+            ),
+        )
     push!(rows, parity_check("simple_loop", "dP_loop",
                              sol[ssys.cac.dP], PARITY_SIMPLE_DP))
 
@@ -248,22 +263,22 @@ end
 
 @testset "Transient T_outlet rises after T_wall step" begin
     n = 10
-    T_inlet = 313.15
+    T_inlet = 40.0
 
-    T_wall_0 = 373.15
-    T_wall_final = 393.15
+    T_wall_0 = 100.0
+    T_wall_final = 120.0
     t_step = 10.0
     T_wall_step = t -> t < t_step ? T_wall_0 : T_wall_final
 
     ssys_ss = build_loop_transient(; T_inlet=T_inlet, T_wall_0=T_wall_0)
     ssys = build_loop_transient(; T_inlet=T_inlet, T_wall_fn=T_wall_step)
 
-    T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, mdot_guess=0.490, n=n)
+        T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.490, n=n)
     op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
-    push!(op_guess, ssys_ss.ch.port_in.mdot => 0.490)
+        push!(op_guess, ssys_ss.ch.inlet.ṁ => 0.490)
     sol_ss = solve_steady(ssys_ss, op_guess)
     op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
-    push!(op_ic, ssys.ch.port_in.mdot => sol_ss[ssys_ss.ch.port_in.mdot])
+        push!(op_ic, ssys.ch.inlet.ṁ => sol_ss[ssys_ss.ch.inlet.ṁ])
     T_wall_sym = ssys.T_wall_callable   # stable named access, immune to parameter reordering
     push!(op_ic, T_wall_sym => T_wall_step)
 
@@ -290,7 +305,7 @@ end
 
     nz = 10
     nx = 3
-    T_in = 313.15
+    T_in = 40.0
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
@@ -304,18 +319,12 @@ end
         power_shape=ps, power=1e4,
     )
     conns = [
-        connect(pump_l.port_out, hx_l.port_in),
-        connect(hx_l.port_out, cac_l.port_in),
-        connect(cac_l.port_out, pump_l.port_in),
-        pump_l.port_in.P ~ 1.0e5,
-        connect(pump_r.port_out, hx_r.port_in),
-        connect(hx_r.port_out, cac_r.port_in),
-        connect(cac_r.port_out, pump_r.port_in),
-        pump_r.port_in.P ~ 1.0e5,
-        [connect(getproperty(hd, Symbol(:thermal_left, i)),
-                 getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
-        [connect(getproperty(hd, Symbol(:thermal_right, i)),
-                 getproperty(cac_r, Symbol(:thermal_left, i))) for i in 1:nz]...,
+            inseries(pump_l, hx_l, cac_l, pump_l)...,
+            pump_l.inlet.p ~ 1.0e5,
+            inseries(pump_r, hx_r, cac_r, pump_r)...,
+            pump_r.inlet.p ~ 1.0e5,
+        faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
+        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(
@@ -323,13 +332,13 @@ end
     )
     ssys = mtkcompile(sys; fully_determined=true)
 
-    T_w = 315.0
+    T_w = 41.85
     op = vcat(
         [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
         [ssys.cac_l.T[i] => T_w for i in 1:nz],
         [ssys.cac_r.T[i] => T_w for i in 1:nz],
-        [ssys.cac_l.port_in.mdot => +0.250],
-        [ssys.cac_r.port_in.mdot => +0.250],
+            [ssys.cac_l.inlet.ṁ => +0.250],
+            [ssys.cac_r.inlet.ṁ => +0.250],
     )
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
@@ -340,10 +349,24 @@ end
                              sol[ssys.cac_l.T_out], PARITY_MTR_SYM_T_OUT_L))
     push!(rows, parity_check("mtr_symmetric", "T_out_r",
                              sol[ssys.cac_r.T_out], PARITY_MTR_SYM_T_OUT_R))
-    push!(rows, parity_check("mtr_symmetric", "mdot_l",
-                             abs(sol[ssys.cac_l.port_in.mdot]), PARITY_MTR_SYM_MDOT_L))
-    push!(rows, parity_check("mtr_symmetric", "mdot_r",
-                             abs(sol[ssys.cac_r.port_in.mdot]), PARITY_MTR_SYM_MDOT_R))
+        push!(
+            rows,
+            parity_check(
+                "mtr_symmetric",
+                "ṁ_l",
+                abs(sol[ssys.cac_l.inlet.ṁ]),
+                PARITY_MTR_SYM_ṁ_L,
+            ),
+        )
+        push!(
+            rows,
+            parity_check(
+                "mtr_symmetric",
+                "ṁ_r",
+                abs(sol[ssys.cac_r.inlet.ṁ]),
+                PARITY_MTR_SYM_ṁ_R,
+            ),
+        )
     push!(rows, parity_check("mtr_symmetric", "dP_loop",
                              sol[ssys.cac_l.dP], PARITY_MTR_SYM_DP))
 
@@ -416,7 +439,7 @@ end
     end
 end
 
-# Asymmetric MTR — right channel inlet at 90°C (363.15 K)
+# Asymmetric MTR — right channel inlet at 90°C (90.0 °C)
 # Right side of plate must be hotter than left side.
 @testset "Python parity: MTR asymmetric" begin
     assert_equivalence_fluid_props()
@@ -431,8 +454,8 @@ end
 
     nz = 10
     nx = 3
-    T_in_l = 313.15
-    T_in_r = 363.15
+    T_in_l = 40.0
+    T_in_r = 90.0
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in_l)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
@@ -446,18 +469,12 @@ end
         power_shape=ps, power=1e4,
     )
     conns = [
-        connect(pump_l.port_out, hx_l.port_in),
-        connect(hx_l.port_out, cac_l.port_in),
-        connect(cac_l.port_out, pump_l.port_in),
-        pump_l.port_in.P ~ 1.0e5,
-        connect(pump_r.port_out, hx_r.port_in),
-        connect(hx_r.port_out, cac_r.port_in),
-        connect(cac_r.port_out, pump_r.port_in),
-        pump_r.port_in.P ~ 1.0e5,
-        [connect(getproperty(hd, Symbol(:thermal_left, i)),
-                 getproperty(cac_l, Symbol(:thermal_right, i))) for i in 1:nz]...,
-        [connect(getproperty(hd, Symbol(:thermal_right, i)),
-                 getproperty(cac_r, Symbol(:thermal_left, i))) for i in 1:nz]...,
+            inseries(pump_l, hx_l, cac_l, pump_l)...,
+            pump_l.inlet.p ~ 1.0e5,
+            inseries(pump_r, hx_r, cac_r, pump_r)...,
+            pump_r.inlet.p ~ 1.0e5,
+        faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
+        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
         hd.power ~ 1e4,
     ]
     @named sys = compose(
@@ -466,12 +483,12 @@ end
     ssys = mtkcompile(sys; fully_determined=true)
 
     op = vcat(
-        [ssys.hd.T[i, j] => 318.15 for i in 1:nz for j in 1:(nx - 1)],
-        [ssys.hd.T[i, nx] => 368.15 for i in 1:nz],
-        [ssys.cac_l.T[i] => 318.15 for i in 1:nz],
-        [ssys.cac_r.T[i] => 368.15 for i in 1:nz],
-        [ssys.cac_l.port_in.mdot => +0.250],
-        [ssys.cac_r.port_in.mdot => +0.250],
+        [ssys.hd.T[i, j] => 45.0 for i in 1:nz for j in 1:(nx - 1)],
+        [ssys.hd.T[i, nx] => 95.0 for i in 1:nz],
+        [ssys.cac_l.T[i] => 45.0 for i in 1:nz],
+        [ssys.cac_r.T[i] => 95.0 for i in 1:nz],
+            [ssys.cac_l.inlet.ṁ => +0.250],
+            [ssys.cac_r.inlet.ṁ => +0.250],
     )
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
@@ -482,10 +499,24 @@ end
                              sol[ssys.cac_l.T_out], PARITY_MTR_ASYM_T_OUT_L))
     push!(rows, parity_check("mtr_asymmetric", "T_out_r",
                              sol[ssys.cac_r.T_out], PARITY_MTR_ASYM_T_OUT_R))
-    push!(rows, parity_check("mtr_asymmetric", "mdot_l",
-                             abs(sol[ssys.cac_l.port_in.mdot]), PARITY_MTR_ASYM_MDOT_L))
-    push!(rows, parity_check("mtr_asymmetric", "mdot_r",
-                             abs(sol[ssys.cac_r.port_in.mdot]), PARITY_MTR_ASYM_MDOT_R))
+        push!(
+            rows,
+            parity_check(
+                "mtr_asymmetric",
+                "ṁ_l",
+                abs(sol[ssys.cac_l.inlet.ṁ]),
+                PARITY_MTR_ASYM_ṁ_L,
+            ),
+        )
+        push!(
+            rows,
+            parity_check(
+                "mtr_asymmetric",
+                "ṁ_r",
+                abs(sol[ssys.cac_r.inlet.ṁ]),
+                PARITY_MTR_ASYM_ṁ_R,
+            ),
+        )
     push!(rows, parity_check("mtr_asymmetric", "dP_loop",
                              sol[ssys.cac_l.dP], PARITY_MTR_ASYM_DP))
 
@@ -559,7 +590,7 @@ end
 end
 
 @testset "Python parity: MTR one-sided" begin
-    # Edge-channel coupling via single_channel_connection: the channel is heated on its
+    # Edge-channel coupling via single_channel: the channel is heated on its
     # connected (left) face only, while the fuel plate is cooled on BOTH faces — the near
     # face conjugately through the channel, the far face by a one-way ConvectiveBoundary
     # fed from the channel's connected-side h_tc and coolant T (the equivalent-twin
@@ -577,7 +608,7 @@ end
 
     nz = 10
     nx = 3
-    T_in = 313.15
+    T_in = 40.0
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
@@ -587,14 +618,12 @@ end
         rho_s=2700.0, cp_s=900.0, k_s=200.0,
         power_shape=ps, power=1e4,
     )
-    scc = single_channel_connection(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
+    scc = single_channel(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
     cac = scc.cac_l
     fuel = scc.hd
     conns = [
-        connect(pump_l.port_out, hx_l.port_in),
-        connect(hx_l.port_out, cac.port_in),
-        connect(cac.port_out, pump_l.port_in),
-        pump_l.port_in.P ~ 1.0e5,
+            inseries(pump_l, hx_l, cac, pump_l)...,
+            pump_l.inlet.p ~ 1.0e5,
         fuel.power ~ 1e4,
     ]
     @named sys = compose(System(conns, t; name=:mtr_onesided_parity), pump_l, hx_l, scc)
@@ -602,11 +631,11 @@ end
 
     cac_s = ssys.scc.cac_l
     fuel_s = ssys.scc.hd
-    T_w = 317.0
+    T_w = 43.85
     op = vcat(
         [fuel_s.T[i, j] => T_w for i in 1:nz for j in 1:nx],
         [cac_s.T[i] => T_w for i in 1:nz],
-        [cac_s.port_in.mdot => +0.250],
+            [cac_s.inlet.ṁ => +0.250],
     )
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
@@ -615,8 +644,15 @@ end
 
     push!(rows, parity_check("mtr_one_sided", "T_out_l",
                              sol[cac_s.T_out], PARITY_MTR_ONESIDED_T_OUT_L))
-    push!(rows, parity_check("mtr_one_sided", "mdot_l",
-                             abs(sol[cac_s.port_in.mdot]), PARITY_MTR_ONESIDED_MDOT_L))
+        push!(
+            rows,
+            parity_check(
+                "mtr_one_sided",
+                "ṁ_l",
+                abs(sol[cac_s.inlet.ṁ]),
+                PARITY_MTR_ONESIDED_ṁ_L,
+            ),
+        )
     push!(rows, parity_check("mtr_one_sided", "dP_loop",
                              sol[cac_s.dP], PARITY_MTR_ONESIDED_DP))
 
@@ -695,8 +731,8 @@ end  # @testset "parity harness"
     Lx_v01 = 0.00127
     Lz_v01 = 0.6
     y_v01 = 0.07
-    T_wall = 300.0
-    T0 = 400.0    # 100 K step-down for clear signal
+    T_wall = 26.85
+    T0 = 126.85   # 100 K step-down for clear signal
 
     alpha_v01 = k_s_v01 / (rho_s_v01 * cp_s_v01)   # ≈ 8.23e-5 m²/s
     tau_v01 = Lx_v01^2 / (π^2 * alpha_v01)        # ≈ 0.002 s
@@ -751,7 +787,7 @@ end  # @testset "parity harness"
     tspan_v01 = (0.0, 5.0 * tau_v01 * 1.01)
     prob_v01 = ODEProblem(ssys_v01, op_ic_v01, tspan_v01; warn_initialize_determined=false)
     # All plate cells are given consistent ICs (uniform T0); the only algebraic vars
-    # (thermal-port Q_flow) are explicit in those ICs. MTK's auto-generated OverrideInit
+    # (thermal-port Q) are explicit in those ICs. MTK's auto-generated OverrideInit
     # nonlinear solve is fragile for this all-differential structure, so verify IC
     # consistency (CheckInit) instead of re-solving it.
     sol_v01 = solve(prob_v01, Rodas5P(); initializealg=CheckInit(),
@@ -760,19 +796,24 @@ end  # @testset "parity harness"
 
     T_center_sym = ssys_v01.hd_v01.T[nz_v01 ÷ 2, (nx_v01 + 1) ÷ 2]
     T_center_series = sol_v01[T_center_sym, :]
+    # Tolerances are a fraction of the imposed step, not of the temperature itself. A
+    # relative tolerance on a Celsius reading is measured against where the scale happens
+    # to put its zero, so the same 1% would mean a different physical band here than it
+    # does at, say, 300 °C. The step is the scale the problem actually sets.
+    tol_v01 = 0.01 * abs(T0 - T_wall)
     for (k, t_k) in enumerate(t_checkpoints)
         T_num = T_center_series[k]
         T_ref = fourier_T_center(t_k)
-        @test isapprox(T_num, T_ref; rtol=0.01)
+        @test isapprox(T_num, T_ref; atol=tol_v01)
     end
 
-    @test isapprox(T_center_series[end], T_wall; rtol=0.01)
+    @test isapprox(T_center_series[end], T_wall; atol=tol_v01)
 end
 
 @testset "Two-plate one-channel topology — both faces active" begin
     nz_v02 = 10
     nx_v02 = 3
-    T_in_v02 = 313.15
+    T_in_v02 = 40.0
     power_per_plate = 1e4   # W each → 20 kW total to one channel
 
     @named pump_v02 = Pump(3.0e4)
@@ -808,10 +849,8 @@ end
 
     conns_v02 = [
         # Hydraulic loop
-        connect(pump_v02.port_out, hx_v02.port_in),
-        connect(hx_v02.port_out, cac_v02.port_in),
-        connect(cac_v02.port_out, pump_v02.port_in),
-        pump_v02.port_in.P ~ 1.0e5,
+        inseries(pump_v02, hx_v02, cac_v02, pump_v02)...,
+        pump_v02.inlet.p ~ 1.0e5,
         # hd1 left face → cac thermal_left (hd1 is on the left of the channel)
         [
             connect(
@@ -834,13 +873,13 @@ end
     )
     ssys_v02 = mtkcompile(sys_v02; fully_determined=true)
 
-    # Initial guess: plate T slightly above T_in, mdot +0.250 (rectangular MTR at 30 kPa)
+    # Initial guess: plate T slightly above T_in, ṁ +0.250 (rectangular MTR at 30 kPa)
     T_guess_v02 = T_in_v02 + 10.0
     op_v02 = vcat(
         [ssys_v02.hd1.T[i, j] => T_guess_v02 for i in 1:nz_v02 for j in 1:nx_v02],
         [ssys_v02.hd2.T[i, j] => T_guess_v02 for i in 1:nz_v02 for j in 1:nx_v02],
         [ssys_v02.cac_v02.T[i] => T_guess_v02 for i in 1:nz_v02],
-        [ssys_v02.cac_v02.port_in.mdot => +0.250],
+        [ssys_v02.cac_v02.inlet.ṁ => +0.250],
     )
     sol_v02 = solve_steady(ssys_v02, op_v02)
 
@@ -848,9 +887,9 @@ end
     @test sol_v02.retcode == ReturnCode.Success
 
     # Assertion 2: energy balance — both plates heat the single channel
-    mdot_v02 = sol_v02[ssys_v02.cac_v02.port_in.mdot]
-    cp_v02 = cp_water(T_in_v02)
-    T_rise_expected_v02 = (power_per_plate + power_per_plate) / (mdot_v02 * cp_v02)
+    ṁ_v02 = sol_v02[ssys_v02.cac_v02.inlet.ṁ]
+    cp_v02 = cₚ(H2O, T_in_v02)
+    T_rise_expected_v02 = (power_per_plate + power_per_plate) / (ṁ_v02 * cp_v02)
     @test isapprox(
         sol_v02[ssys_v02.cac_v02.T_out] - T_in_v02, T_rise_expected_v02; rtol=0.05
     )
@@ -861,12 +900,12 @@ end
     @test sol_v02[ssys_v02.hd1.T[mid, lat]] > sol_v02[ssys_v02.cac_v02.T[mid]]
     @test sol_v02[ssys_v02.hd2.T[mid, lat]] > sol_v02[ssys_v02.cac_v02.T[mid]]
 
-    # Assertion 4: Q_flow < 0 on connected faces (heat flows FROM plate TO fluid, MTK convention)
-    # hd1: thermal_left[i] is connected → Q_flow < 0
-    # hd2: thermal_left[i] is connected → Q_flow < 0
+    # Assertion 4: Q < 0 on connected faces (heat flows FROM plate TO fluid, MTK convention)
+    # hd1: thermal_left[i] is connected → Q < 0
+    # hd2: thermal_left[i] is connected → Q < 0
     for i in 1:nz_v02
-        @test sol_v02[getproperty(ssys_v02.hd1, Symbol(:thermal_left, i)).Q_flow] < 0.0
-        @test sol_v02[getproperty(ssys_v02.hd2, Symbol(:thermal_left, i)).Q_flow] < 0.0
+        @test sol_v02[getproperty(ssys_v02.hd1, Symbol(:thermal_left, i)).Q] < 0.0
+        @test sol_v02[getproperty(ssys_v02.hd2, Symbol(:thermal_left, i)).Q] < 0.0
     end
 end
 
@@ -886,7 +925,7 @@ end
         # steady state (P=1, linearly rising coolant), the same as the reference coupled
         # transients in test_point_kinetics.jl.
         n = 7
-        T_inlet = 293.15
+        T_inlet = 20.0
         ctrl = ReactivityController()
         ssys, ic = build_loop_pk(ctrl; n=n, T_inlet=T_inlet, P0=1.0, power_scale=1e4)
 
@@ -918,7 +957,7 @@ end
         n = 7
         nz = 7
         nx = 2
-        T_inlet = 293.15
+        T_inlet = 20.0
         alpha_neg = -0.1    # strong negative feedback (same magnitude as Python STREAM)
 
         ctrl = ReactivityController()
@@ -953,7 +992,7 @@ end
         # feedback solve_steady is not usable in Julia (it collapses to the trivial P=0 root),
         # so the transient is the honest way to reach the feedback-balanced state.
         n = 7
-        T_inlet = 293.15
+        T_inlet = 20.0
         alpha_neg = -0.1   # strong negative feedback on coolant
 
         ctrl = ReactivityController()
@@ -981,7 +1020,7 @@ end
         # is a finite vector, and approaches zero at late time
         # (steady state requires net reactivity ≈ 0).
         n = 7
-        T_inlet = 293.15
+        T_inlet = 20.0
         alpha = -0.005   # mild negative feedback — allows some power at late time
         ctrl = ReactivityController()
 

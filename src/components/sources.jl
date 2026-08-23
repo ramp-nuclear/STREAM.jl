@@ -1,6 +1,3 @@
-# sources.jl -- WallTemperature and HeatFluxSource value-source components
-#
-
 """
     WallTemperature(; name, n, T_wall) -> System
 
@@ -11,7 +8,7 @@ external-input variables.
 # Arguments
 - `name`: system name (Symbol; keyword-only, supplied by `@named`)
 - `n`: number of output cells (Int)
-- `T_wall`: wall temperature value [K]; one of:
+- `T_wall`: wall temperature value [°C]; one of:
   - `Real`: broadcast — `T_wall_out[i] ~ T_wall` for all `i ∈ 1:n`
   - `AbstractVector{<:Real}` of length `n`: per-cell static profile —
     `T_wall_out[i] ~ T_wall[i]`
@@ -26,7 +23,7 @@ equations.
 
 # Example
 ```julia
-@named wt = WallTemperature(; n=10, T_wall=373.15)
+@named wt = WallTemperature(; n=10, T_wall=100.0)
 connections = [..., [ch.T_wall_left[i] ~ wt.T_wall_out[i] for i in 1:10]...]
 ```
 """
@@ -111,13 +108,13 @@ end
     ConvectiveBoundary(; name, area) -> System
 
 One-way convective heat sink at a single wall cell: imposes
-`thermal.Q_flow ~ h * area * (thermal.T - T_fluid)`. The conductance `h` and fluid
+`thermal.Q ~ h * area * (thermal.T - T_fluid)`. The conductance `h` and fluid
 temperature `T_fluid` are unbound input variables — supply them with binding equations
 to a channel's live `h_tc[i]` and coolant `T[i]`. The heat absorbed leaves through this
 element and is never returned to whatever supplies `h`/`T_fluid`, so the coupling is
 one-way.
 
-This is the far-face element of `single_channel_connection`: it cools a fuel plate's
+This is the far-face element of `single_channel`: it cools a fuel plate's
 unconnected face using an adjacent channel's conditions without modelling a second
 channel (the equivalent-twin reduction). Used per axial cell; not a standalone loop
 component.
@@ -131,15 +128,12 @@ component.
 
 # Input variables (bind externally)
 - `h(t)`: convective conductance [W/(m^2·K)].
-- `T_fluid(t)`: bulk fluid temperature [K].
-
-# Returns
-Uncompiled `System`. Compose it, bind `h` and `T_fluid`, then `mtkcompile()`.
+- `T_fluid(t)`: bulk fluid temperature [°C].
 """
 function ConvectiveBoundary(; name, area)
     pars = @parameters area = area
     @named thermal = ThermalPort()
     vars = @variables h(t) T_fluid(t)
-    eqs = Equation[thermal.Q_flow ~ h * area * (thermal.T - T_fluid)]
+    eqs = Equation[thermal.Q ~ h * area * (thermal.T - T_fluid)]
     return compose(System(eqs, t, collect(vars), pars; name=name), thermal)
 end

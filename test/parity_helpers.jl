@@ -2,7 +2,6 @@ using Printf
 using DelimitedFiles
 using Test
 using STREAM
-using STREAM: cp_water, rho_water, mu_water, k_water
 
 const TIER_CLEAN = :CLEAN   # rtol ≤ gray_floor (1e-6)
 const TIER_GRAY  = :GRAY    # gray_floor < rtol < hard_ceiling (default 0.02)
@@ -119,7 +118,7 @@ function append_csv(path::AbstractString, rows::Vector{ParityRow}; truncate::Boo
         end
     end
 end
-const REF_T_K = (313.15, 343.15, 373.15)
+const REF_T_C = (40.0, 70.0, 100.0)
 const PYTHON_RHO_AT_REF = (991.3511479199999, 977.57053367999993, 959.13959927999997)              # kg/m^3
 const PYTHON_CP_AT_REF  = (4178.9587971854307, 4190.8404352889875, 4217.9483186983307)             # J/(kg·K)
 const PYTHON_MU_AT_REF  = (0.00065196977487873341, 0.0004028301063116321, 0.00028224508453489637)  # Pa·s
@@ -128,24 +127,24 @@ const PYTHON_K_AT_REF   = (0.63015562705599992, 0.66106740247825002, 0.679397572
 """
     assert_equivalence_fluid_props(; rtol=1e-12)
 
-Hard-assert Julia rho/cp/mu/k at REF_T_K match Python STREAM Simantov
+Hard-assert Julia ρ/cₚ/μ/k at REF_T_C match Python STREAM Simantov
 correlations (PYTHON_*_AT_REF constants) within `rtol`. Aborts via `error()`
 if any property drifts.
 """
 function assert_equivalence_fluid_props(; rtol::Float64=1e-12)
-    for (i, T_K) in enumerate(REF_T_K)
-        isapprox(rho_water(T_K), PYTHON_RHO_AT_REF[i]; rtol=rtol) || error(
-            "EQUIVALENCE FAIL: rho_water($T_K) Julia=$(rho_water(T_K)) " *
+    for (i, T_C) in enumerate(REF_T_C)
+        isapprox(ρ(H2O, T_C), PYTHON_RHO_AT_REF[i]; rtol=rtol) || error(
+            "EQUIVALENCE FAIL: ρ(H2O, $T_C) Julia=$(ρ(H2O, T_C)) " *
             "vs Python=$(PYTHON_RHO_AT_REF[i])")
-        isapprox(cp_water(T_K),  PYTHON_CP_AT_REF[i];  rtol=rtol) || error(
-            "EQUIVALENCE FAIL: cp_water($T_K) Julia=$(cp_water(T_K)) " *
+        isapprox(cₚ(H2O, T_C),  PYTHON_CP_AT_REF[i];  rtol=rtol) || error(
+            "EQUIVALENCE FAIL: cₚ(H2O, $T_C) Julia=$(cₚ(H2O, T_C)) " *
             "vs Python=$(PYTHON_CP_AT_REF[i])")
-        isapprox(mu_water(T_K),  PYTHON_MU_AT_REF[i];  rtol=rtol) || error(
-            "EQUIVALENCE FAIL: mu_water($T_K)")
-        isapprox(k_water(T_K),   PYTHON_K_AT_REF[i];   rtol=rtol) || error(
-            "EQUIVALENCE FAIL: k_water($T_K)")
+        isapprox(μ(H2O, T_C),  PYTHON_MU_AT_REF[i];  rtol=rtol) || error(
+            "EQUIVALENCE FAIL: μ(H2O, $T_C)")
+        isapprox(κ(H2O, T_C),   PYTHON_K_AT_REF[i];   rtol=rtol) || error(
+            "EQUIVALENCE FAIL: κ(H2O, $T_C)")
     end
-    @info "Equivalence checklist: fluid props match within rtol=$rtol at T = $REF_T_K"
+    @info "Equivalence checklist: fluid props match within rtol=$rtol at T = $REF_T_C"
 end
 
 """
@@ -157,7 +156,7 @@ by direct evaluation at Re=10000, Pr=1. Self-check (no Python runtime).
 function assert_equivalence_dittus_boelter(; rtol::Float64=1e-12)
     Re_ref, Pr_ref = 10_000.0, 1.0
     Nu_python = 0.023 * Re_ref^0.8 * Pr_ref^0.4
-    Nu_julia  = STREAM.dittus_boelter(Re_ref, Pr_ref)
+    Nu_julia  = STREAM.HTC.dittus_boelter(Re_ref, Pr_ref)
     isapprox(Nu_julia, Nu_python; rtol=rtol) || error(
         "EQUIVALENCE FAIL: Dittus-Boelter at Re=$Re_ref, Pr=$Pr_ref: " *
         "Julia=$Nu_julia, Python-formula=$Nu_python")
@@ -167,16 +166,16 @@ end
 """
     assert_equivalence_blasius(; rtol=1e-12)
 
-Assert Julia's Blasius (0.3164 / Re^0.25) matches the formula at Re=10000.
+Assert Julia's Friction.Blasius (0.3164 / Re^0.25) matches the formula at Re=10000.
 """
 function assert_equivalence_blasius(; rtol::Float64=1e-12)
     Re_ref = 10_000.0
     f_python = 0.3164 / Re_ref^0.25
-    f_julia  = STREAM.blasius_friction(Re_ref)
+    f_julia  = STREAM.Friction.blasius(Re_ref)
     isapprox(f_julia, f_python; rtol=rtol) || error(
-        "EQUIVALENCE FAIL: Blasius at Re=$Re_ref: Julia=$f_julia, " *
+        "EQUIVALENCE FAIL: Friction.Blasius at Re=$Re_ref: Julia=$f_julia, " *
         "Python-formula=$f_python")
-    @info "Equivalence checklist: Blasius constants (0.3164, 0.25) match"
+    @info "Equivalence checklist: Friction.Blasius constants (0.3164, 0.25) match"
 end
 
 """
@@ -207,6 +206,6 @@ end
 
 function assert_equivalence_anchors(; expected_P_abs::Float64=1.0e5)
     @info "Equivalence checklist: pressure anchor = $expected_P_abs Pa " *
-          "(Julia: pump.port_in.P ~ $expected_P_abs; " *
+        "(Julia: pump.inlet.p ~ $expected_P_abs; " *
           "Python: reference_node=(\"A\", $expected_P_abs))"
 end

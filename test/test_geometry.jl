@@ -1,5 +1,6 @@
 using Test
 using STREAM
+using STREAM.Assemblies
 using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 using ModelingToolkit
 

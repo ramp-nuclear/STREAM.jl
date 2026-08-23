@@ -1,203 +1,87 @@
-# examples.jl -- Example system builders
-# build_loop, build_loop_vertical, build_loop_transient, build_cube
-
 """
-    build_loop(; n=10, T_inlet=313.15, T_wall=373.15, h_wall=5000.0,
-                 L_ch=0.6, D_ch=0.01, dP_pump=3.0e4) -> System
+    build_loop(; n=10, L_ch=0.6, D_ch=0.01, dP_pump=3.0e4, T_inlet=40.0,
+               T_wall=100.0, h_wall=5000.0, g_acc=0.0, H_return=nothing) -> System
 
-Build a simple steady-state horizontal flow loop (Pump + HeatExchanger + Channel).
+Closed forced-convection loop: Pump, HeatExchanger, and a single `Channel` heated on its
+left face.
+
+Two arguments change the topology. A non-zero `g_acc` makes the loop vertical and adds a
+return leg of height `H_return` (defaulting to `L_ch`, which cancels the channel's
+hydrostatic head). A callable `T_wall` makes the wall temperature time-varying through an
+MTK callable parameter, in which case the caller passes `ssys.T_wall_callable => T_wall` in
+the operating point.
 
 # Arguments
-- `n`: number of axial cells (default 10)
-- `T_inlet`: inlet temperature [K] (default 313.15)
-- `T_wall`: wall temperature [K] (default 373.15)
-- `h_wall`: convective HTC [W/(m²K)] applied on the left face (default 5000.0)
-- `L_ch`: channel length [m] (default 0.6)
-- `D_ch`: channel diameter [m] (default 0.01)
-- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
+- `n`: number of axial cells
+- `L_ch`, `D_ch`: channel length and diameter [m]
+- `dP_pump`: pump pressure rise [Pa]
+- `T_inlet`: inlet temperature [°C]
+- `T_wall`: left-face wall temperature [°C], or a callable `(t) -> °C`
+- `h_wall`: convective HTC on the left face [W/(m²K)]
+- `g_acc`: gravitational acceleration [m/s^2]; 0 gives a horizontal loop
+- `H_return`: return-leg height [m], used only when `g_acc` is non-zero
 
 # Returns
-Compiled `System` (already passed through `mtkcompile`).
+Compiled `System`, ready to solve.
 """
 function build_loop(;
     n::Int=10,
     L_ch=0.6,
     D_ch=0.01,
     dP_pump=3.0e4,
-    T_inlet=313.15,  # coolant inlet temperature (K); 40°C
-    T_wall=373.15,  # wall temperature (K); ~100°C for forced convection
-    h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
+    T_inlet=40.0,
+    T_wall=100.0,
+    h_wall=5000.0,
+    g_acc=0.0,
+    H_return=nothing,
 )
     @named pump = Pump(dP_pump)
-    @named ch = Channel(;
-        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), h_left=h_wall, h_right=0.0
-    )
-    @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
-
-    connections = Equation[
-        connect(pump.port_out, bc.port_in),       # pump -> TempBC
-        connect(bc.port_out, ch.port_in),        # TempBC -> channel
-        connect(ch.port_out, pump.port_in),      # channel -> pump (closed loop)
-        pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
-        # Per-cell binding eqns (args.funcs idiom)
-        [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
-        [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
-    ]
-
-    @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
-
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop compile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
-        n_uk
-
-    return ssys
-end
-
-"""
-    build_loop_vertical(; n=10, T_inlet=313.15, T_wall=373.15, h_wall=5000.0,
-                         L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
-                         g_acc=9.80665, H_return=nothing) -> System
-
-Build a vertical flow loop with gravity (Pump + HeatExchanger + Channel + Gravity).
-
-# Arguments
-- `n`: number of axial cells (default 10)
-- `T_inlet`: inlet temperature [K] (default 313.15)
-- `T_wall`: wall temperature [K] (default 373.15)
-- `h_wall`: convective HTC [W/(m²K)] applied on the left face (default 5000.0)
-- `L_ch`: channel length [m] (default 0.6)
-- `D_ch`: channel diameter [m] (default 0.01)
-- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
-- `g_acc`: gravitational acceleration [m/s^2] (default 9.80665)
-- `H_return`: height of return leg [m], defaults to `L_ch` for cancellation geometry
-
-# Returns
-Compiled `System`.
-"""
-function build_loop_vertical(;
-    n::Int=10,
-    L_ch=0.6,
-    D_ch=0.01,
-    dP_pump=3.0e4,
-    T_inlet=313.15,  # coolant inlet temperature (K); 40°C
-    T_wall=373.15,  # wall temperature (K); ~100°C for forced convection
-    h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
-    g_acc=9.80665,  # gravitational acceleration (m/s²)
-    H_return=nothing,  # height of return leg (m); defaults to L_ch for cancellation geometry
-)
-    H = isnothing(H_return) ? L_ch : H_return
-
-    @named pump = Pump(dP_pump)
-    @named ch = Channel(;
-        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=g_acc, h_left=h_wall, h_right=0.0
-    )
     @named bc = HeatExchanger(T_inlet)
-    @named grav = Gravity(H)
-
-    connections = Equation[
-        connect(pump.port_out, bc.port_in),       # pump -> TempBC
-        connect(bc.port_out, ch.port_in),        # TempBC -> channel (upward leg)
-        connect(ch.port_out, grav.port_out),     # channel outlet (top) = grav port_out (top)
-        connect(grav.port_in, pump.port_in),      # grav port_in (bottom) = pump inlet (bottom)
-        pump.port_in.P ~ 1.0e5,                  # pressure gauge freedom fix
-        # Per-cell binding eqns (args.funcs idiom)
-        [ch.T_wall_left[i] ~ T_wall for i in 1:n]...,
-        [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
-    ]
-
-    @named sys = compose(System(connections, t; name=:sys), pump, bc, ch, grav)
-
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_vertical compile time: $(round(t_compile; digits=2))s" n_equations =
-        n_eq n_unknowns = n_uk
-
-    return ssys
-end
-
-"""
-    build_loop_transient(; n=10, T_inlet=313.15, T_wall_0=373.15, h_wall=5000.0,
-                          L_ch=0.6, D_ch=0.01, dP_pump=3.0e4,
-                          T_wall_fn=nothing) -> System
-
-Build a transient-capable flow loop. When `T_wall_fn` is provided (a callable `t -> K`),
-wall temperature is time-varying via an MTK callable parameter at the builder level
-(the callable stays wired at the builder level; no `WallTemperature`
-source component required). When `T_wall_fn` is `nothing`, wall temperature is pinned
-to the scalar `T_wall_0`.
-
-When using a callable `T_wall_fn`, the caller must include the callable parameter in `op`:
-`ssys.T_wall_callable => T_wall_fn` (where `ssys` is the compiled system).
-
-# Arguments
-- `n`: number of axial cells (default 10)
-- `T_inlet`: inlet temperature [K] (default 313.15)
-- `T_wall_0`: wall temperature [K] (default 373.15); used when `T_wall_fn` is `nothing`
-- `h_wall`: convective HTC [W/(m²K)] applied on the left face (default 5000.0)
-- `L_ch`: channel length [m] (default 0.6)
-- `D_ch`: channel diameter [m] (default 0.01)
-- `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
-- `T_wall_fn`: optional callable `(t) -> K` for time-varying wall temperature
-
-# Returns
-Compiled `System` (already passed through `mtkcompile`).
-"""
-function build_loop_transient(;
-    n::Int=10,
-    L_ch=0.6,
-    D_ch=0.01,
-    dP_pump=3.0e4,
-    T_inlet=313.15,  # coolant inlet temperature (K); 40°C
-    T_wall_0=373.15,  # wall temperature (K); used when T_wall_fn is nothing
-    h_wall=5000.0,  # convective HTC [W/(m²K)] applied on the left face
-    T_wall_fn=nothing,  # optional callable (t) -> K for time-varying wall temperature
-)
-    @named pump = Pump(dP_pump)
     @named ch = Channel(;
-        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), h_left=h_wall, h_right=0.0
+        n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=g_acc,
+        h_left=h_wall, h_right=0.0,
     )
-    @named bc = HeatExchanger(T_inlet)   # temperature reset at pump outlet
 
-    if T_wall_fn === nothing
-        # Scalar wall temperature — same as build_loop; no parameter declaration needed.
-        # Per-cell binding replaces the legacy single-port wall pin.
-        connections = Equation[
-            connect(pump.port_out, bc.port_in),
-            connect(bc.port_out, ch.port_in),
-            connect(ch.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
-            [ch.T_wall_left[i] ~ T_wall_0 for i in 1:n]...,
-            [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
-        ]
-        @named sys = compose(System(connections, t; name=:sys), pump, bc, ch)
-    else
-        # Callable wall temperature — uses MTK callable parameter at builder level
-        # (same `ps[1](t)` value broadcast per cell).
-        # Caller must include ssys.T_wall_callable => T_wall_fn in op.
-        FType = typeof(T_wall_fn)
-        ps = @parameters (T_wall_callable::FType)(..)
-        connections = Equation[
-            connect(pump.port_out, bc.port_in),
-            connect(bc.port_out, ch.port_in),
-            connect(ch.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
-            # Style 1 binding with builder-level callable: same `ps[1](t)` value broadcast per cell.
-            [ch.T_wall_left[i] ~ ps[1](t) for i in 1:n]...,
-            [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
-        ]
-        @named sys = compose(System(connections, t, [], ps; name=:sys), pump, bc, ch)
+    parts = Any[pump, bc, ch]
+    if !iszero(g_acc)
+        @named grav = Gravity(isnothing(H_return) ? L_ch : H_return)
+        push!(parts, grav)
     end
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_transient compile time: $(round(t_compile; digits=2))s" n_equations =
-        n_eq n_unknowns = n_uk
+    pars = []
+    T_wall_expr = T_wall
+    if T_wall isa Function
+        FType = typeof(T_wall)
+        pars = @parameters (T_wall_callable::FType)(..)
+        T_wall_expr = pars[1](t)
+    end
 
-    return ssys
+    connections = Equation[
+        inseries(parts..., pump)...,
+        pump.inlet.p ~ 1.0e5,                            # fixes the pressure gauge freedom
+        [ch.T_wall_left[i] ~ T_wall_expr for i in 1:n]...,
+        [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # inert: h_right is 0
+    ]
+
+    @named sys = compose(System(connections, t, [], pars; name=:sys), parts...)
+    return mtkcompile(sys)
+end
+
+"""
+    build_loop_vertical(; g_acc=G_EARTH, kwargs...) -> System
+
+[`build_loop`](@ref) with gravity on, so the loop gets a return leg.
+"""
+build_loop_vertical(; g_acc=G_EARTH, kwargs...) = build_loop(; g_acc=g_acc, kwargs...)
+
+"""
+    build_loop_transient(; T_wall_0=100.0, T_wall_fn=nothing, kwargs...) -> System
+
+[`build_loop`](@ref) with the wall temperature named the way a transient run reads: a
+callable `T_wall_fn` when the wall varies in time, otherwise the constant `T_wall_0`.
+"""
+function build_loop_transient(; T_wall_0=100.0, T_wall_fn=nothing, kwargs...)
+    return build_loop(; T_wall=something(T_wall_fn, T_wall_0), kwargs...)
 end
 
 """
@@ -228,24 +112,24 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
     @named r67 = Resistor(R)
 
     connections = [
-        # Corner 0 (source): pump.port_out + 3 resistor inlets
-        connect(pump.port_out, r01.port_in, r02.port_in, r04.port_in),
+        # Corner 0 (source): pump.outlet + 3 resistor inlets
+        connect(pump.outlet, r01.inlet, r02.inlet, r04.inlet),
         # Corner 1: r01 out + r13 in + r15 in
-        connect(r01.port_out, r13.port_in, r15.port_in),
+        connect(r01.outlet, r13.inlet, r15.inlet),
         # Corner 2: r02 out + r23 in + r26 in
-        connect(r02.port_out, r23.port_in, r26.port_in),
+        connect(r02.outlet, r23.inlet, r26.inlet),
         # Corner 3: r13 out + r23 out + r37 in
-        connect(r13.port_out, r23.port_out, r37.port_in),
+        connect(r13.outlet, r23.outlet, r37.inlet),
         # Corner 4: r04 out + r45 in + r46 in
-        connect(r04.port_out, r45.port_in, r46.port_in),
+        connect(r04.outlet, r45.inlet, r46.inlet),
         # Corner 5: r15 out + r45 out + r57 in
-        connect(r15.port_out, r45.port_out, r57.port_in),
+        connect(r15.outlet, r45.outlet, r57.inlet),
         # Corner 6: r26 out + r46 out + r67 in
-        connect(r26.port_out, r46.port_out, r67.port_in),
-        # Corner 7 (sink): pump.port_in + 3 resistor outlets
-        connect(pump.port_in, r37.port_out, r57.port_out, r67.port_out),
+        connect(r26.outlet, r46.outlet, r67.inlet),
+        # Corner 7 (sink): pump.inlet + 3 resistor outlets
+        connect(pump.inlet, r37.outlet, r57.outlet, r67.outlet),
         # Pressure gauge anchor (absolute level is underdetermined by Kirchhoff equations)
-        pump.port_in.P ~ 1.0e5,
+        pump.inlet.p ~ 1.0e5,
     ]
 
     @named sys = compose(
@@ -264,24 +148,18 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
         r57,
         r67,
     )
-
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_cube compile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
-        n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
 """
-    build_loop_lof_bypass(; n=10, L_ch=1.0, D_ch=0.01, T_inlet=313.15,
+    build_loop_lof_bypass(; n=10, L_ch=1.0, D_ch=0.01, T_inlet=40.0,
                             power_W=1.0e3, fuel_nx=2, fuel_Lx=0.005,
-                            L_over_A=1.75e5, g_acc=9.80665,
+                            L_over_A=1.75e5, g_acc=G_EARTH,
                             R_ext=1.0e6, dt_ramp=5.0) -> System
 
 Build a loss-of-flow validation loop with bypass topology. Heated leg uses
-`ChannelAndContacts + HeatDiffusion` plate via `one_sided_connection`
+`ChannelAndContacts + HeatDiffusion` plate via `one_sided`
 (real fuel-plate physics).
 
 Topology (4-node parallel network):
@@ -291,7 +169,7 @@ Topology (4-node parallel network):
 - D series branch: ext_res -> hx -> pump -> ine
 
 Heated leg: `ChannelAndContacts` (`heated.ch`) + `HeatDiffusion` plate
-(`heated.fuel`) wired one-sided via `one_sided_connection(ch, fuel; side=:left)`.
+(`heated.fuel`) wired one-sided via `one_sided(ch, fuel; side=:left)`.
 Sub-systems retain their `@named` symbols, so access paths inside `heated` are
 `heated.ch.*` and `heated.fuel.*` (not `heated.channel.*`). The right thermal
 side of `ch` dangles inside the `heated` subsystem; the dangling per-cell
@@ -308,8 +186,8 @@ Gravity signs:
 - ret (B->C, nominally upward): g = +g_acc
 
 Physics: the pump head `dP_pump_fn(t)` trips toward 0 (loss of flow). Inertia
-carries momentum; ch flow decays. Flapper opens when pump branch mdot
-(ine.port_in.mdot) drops below threshold (provided externally via
+carries momentum; ch flow decays. Flapper opens when pump branch ṁ
+(ine.inlet.ṁ) drops below threshold (provided externally via
 `flapper_callback`). After Flapper opens, flow redistributes: heated-channel flow
 reverses (upward NC driven by buoyancy).
 
@@ -325,13 +203,13 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
 - `n`: number of axial cells (default 10)
 - `L_ch`: channel length [m] (default 1.0)
 - `D_ch`: channel hydraulic diameter [m] (default 0.01)
-- `T_inlet`: inlet/HeatExchanger boundary temperature [K] (default 313.15)
+- `T_inlet`: inlet/HeatExchanger boundary temperature [°C] (default 40.0)
 - `power_W`: total fuel-plate heat input [W], pinned via `heated.fuel.power ~ power_W`
   (default 1.0e3, an NC-equilibrium-producing baseline)
 - `fuel_nx`: lateral cells in the HeatDiffusion plate (default 2)
 - `fuel_Lx`: plate lateral thickness [m] (default 0.005)
 - `L_over_A`: Inertia length-to-area ratio [1/m] (default 1.75e5)
-- `g_acc`: gravitational acceleration magnitude [m/s^2] (default 9.80665)
+- `g_acc`: gravitational acceleration magnitude [m/s^2] (default G_EARTH)
 - `R_ext`: external hydraulic resistance [Pa·s/kg] (default 1.0e6)
 - `dt_ramp`: Flapper opening ramp duration [s] (default 5.0)
 - `dP_pump_fn`: callable `f(t) -> Float64` giving the pump head [Pa] over time, stored
@@ -346,26 +224,30 @@ function build_loop_lof_bypass(;
     n::Int=10,
     L_ch=1.0,
     D_ch=0.01,
-    T_inlet=313.15,
+    T_inlet=40.0,
     power_W=1.0e3,
     fuel_nx=2,
     fuel_Lx=0.005,
     L_over_A=1.75e5,
-    g_acc=9.80665,
+    g_acc=G_EARTH,
     R_ext=1.0e6,
     dt_ramp=5.0,
     dP_pump_fn=(_t -> 0.0),
 )
     geom = PipeGeometry_circular(L_ch, D_ch)
 
-    # NC-enabled regime switching for heated channel
-    rd_ch = regime_dependent(geom;
-        htc_laminar=constant_Nusselt(; Nu=8.235),
-        htc_turbulent=dittus_boelter,
-        friction_laminar=laminar_friction_rectangular(geom),
-        friction_turbulent=blasius_friction,
-        htc_natural=elenbaas_htc(geom; g=g_acc),
+    # The heated channel switches regime on its own, natural convection included, so the
+    # loss-of-flow transient stays physical once the pump stops driving it.
+    htc_ch = HTC.RegimeDependent(;
+        laminar=HTC.ConstantNusselt(; Nu=8.235),
+        turbulent=HTC.DittusBoelter(),
+        natural=HTC.Elenbaas(geom; g=g_acc),
+        geom=geom,
         g=g_acc,
+    )
+    friction_ch = Friction.RegimeDependent(;
+        laminar=Friction.rectangular_laminar(geom),
+        turbulent=Friction.blasius,
     )
 
     @named pump = Pump(dP_pump_fn)
@@ -375,8 +257,8 @@ function build_loop_lof_bypass(;
         n=n,
         geometry=geom,
         g=(-g_acc),
-        htc_correlation=rd_ch.htc,
-        friction_correlation=rd_ch.friction,
+        htc=htc_ch,
+        darcy=friction_ch,
     )
     @named ret = Channel(; n=n, geometry=geom, g=g_acc)
     # Open-state quadratic loss tuned (area, f) so the bypass conductance is comparable to the
@@ -396,22 +278,16 @@ function build_loop_lof_bypass(;
         k_s=174.0,
         power_shape=ps,
     )
-    heated = one_sided_connection(ch, fuel; side=:left, name=:heated)
+    heated = one_sided(ch, fuel; side=:left, name=:heated)
 
     connections = Equation[
         # D series branch: ext_res -> hx -> pump -> ine
-        connect(ext_res.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        connect(pump.port_out, ine.port_in),
-        # Node A (3-way): ine output -> heated.ch input + flapper input
-        connect(ine.port_out, heated.ch.port_in, flapper.port_in),
-        # Node B (2-way): heated.ch output -> ret input
-        connect(heated.ch.port_out, ret.port_in),
-        # Node C (3-way): ret output + flapper output -> ext_res input
-        connect(ret.port_out, flapper.port_out, ext_res.port_in),
+        inseries(ext_res, hx, pump, ine)...,
+        # Bypass split/merge: ine -> (heated.ch -> ret) in series, or flapper directly -> ext_res
+        inparallel(ine, ((heated.ch, ret), flapper), ext_res)...,
         # Boundary conditions
-        pump.port_in.P ~ 1.0e5,
-        watch_flow(flapper, ine.port_in.mdot),
+        pump.inlet.p ~ 1.0e5,
+        watch_flow(flapper, ine.inlet.ṁ),
         heated.fuel.power ~ power_W,
         [ret.T_wall_left[i] ~ T_inlet for i in 1:n]...,
         [ret.T_wall_right[i] ~ T_inlet for i in 1:n]...,
@@ -419,19 +295,14 @@ function build_loop_lof_bypass(;
         # The current MTK does not auto-zero an unconnected ThermalPort's flow, so
         # bind each right wall T to the local bulk T ⇒ q_right = h*(T-T) = 0 (adiabatic).
         # Supplies the n equations that keep the heated subsystem fully determined.
-        [getproperty(heated.ch, Symbol(:thermal_right, i)).T ~ heated.ch.T[i] for i in 1:n]...,
+        [port(heated.ch, :thermal_right, i).T ~ heated.ch.T[i] for i in 1:n]...,
     ]
 
     @named sys = compose_systems(
         heated, pump, ine, hx, ret, flapper, ext_res; connections=connections, name=:sys
     )
 
-    t_compile = @elapsed ssys = mtkcompile(sys)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_lof_bypass compile time: $(round(t_compile; digits=2))s" n_equations =
-        n_eq n_unknowns = n_uk
-
+    ssys = mtkcompile(sys)
     return ssys
 end
 
@@ -454,9 +325,9 @@ function _resolve_tw(d, rods_cac, rods_fuel)
 end
 
 """
-    build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=293.15, dP_pump=3.0e4,
-                  P0=1.0, power_scale=1e4, temp_worth=nothing, ref_temp=nothing,
-                  rho_val=0.0) -> (System, Vector{Pair{Any,Any}})
+    build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, dP_pump=3.0e4,
+                  P0=1.0, power_scale=1e4, temp_worth=nothing,
+                  ref_temp=nothing) -> (System, Vector{Pair{Any,Any}})
 
 Build a full thermal-hydraulic loop coupled to a `PointKinetics` reactor model
 (pump + HeatExchanger + ChannelAndContacts + HeatDiffusion + PointKinetics).
@@ -476,7 +347,7 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 - `n::Int`: number of axial cells in `ChannelAndContacts` (default 7)
 - `nz::Int`: number of axial slices in `HeatDiffusion` (default 7)
 - `nx::Int`: number of lateral slices in `HeatDiffusion` (default 2)
-- `T_inlet`: coolant inlet temperature [K] (default 293.15)
+- `T_inlet`: coolant inlet temperature [°C] (default 20.0)
 - `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
 - `P0`: initial reactor power [dimensionless or W] passed to
   `point_kinetics_steady_state(P0)` for IC generation (default 1.0)
@@ -487,36 +358,34 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
   1D vector (length `n` for `:cac`), or 2D matrix (shape `nz×nx` for `:fuel`)
   reactivity coefficients. Keys are internally resolved to scoped component
   references inside `symmetric_plate`. `nothing` = no temperature feedback.
-- `ref_temp`: per-component reference temperatures [K]. Same key structure as
+- `ref_temp`: per-component reference temperatures [°C]. Same key structure as
   `temp_worth`. `nothing` = use zero reference (full T contributes to feedback).
-- `rho_val`: constant base reactivity bias [-] (default 0.0 = critical)
 
 # Returns
 `(ssys, ic)` where:
 - `ssys`: compiled `System` (passed through `mtkcompile`)
 - `ic`: `Vector{Pair{Any,Any}}` initial conditions including PK state
-  (P, C_1..C_6, rho_c_fn), hydraulic IC (port_in.mdot), and thermal ICs
+  (P, C_1..C_6, rho_c_fn), hydraulic IC (inlet.ṁ), and thermal ICs
   (cac.T[i] and fuel.T[i,j]). Pass directly to `solve_transient(ssys, ic, t)`.
 """
 function build_loop_pk(ctrl;
     n::Int=7,
     nz::Int=7,
     nx::Int=2,
-    T_inlet=293.15,
+    T_inlet=20.0,
     dP_pump=3.0e4,
     P0=1.0,
     power_scale=1e4,
     temp_worth=nothing,
     ref_temp=nothing,
-    rho_val=0.0,
 )
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ps = fill(1.0 / (nz * nx), nz, nx)  # uniform power shape, normalized
     @named cac = ChannelAndContacts(;
         n=n,
         geometry=geom,
-        htc_correlation=constant_Nusselt(; Nu=8.235),
-        friction_correlation=laminar_friction_rectangular(geom),
+        htc=HTC.ConstantNusselt(; Nu=8.235),
+        darcy=Friction.RectangularLaminar(geom),
     )
     @named fuel = HeatDiffusion(;
         nz=nz,
@@ -536,7 +405,7 @@ function build_loop_pk(ctrl;
     tw = _resolve_tw(temp_worth, rods_cac, rods_fuel)
     rt = _resolve_tw(ref_temp, rods_cac, rods_fuel)
 
-    @named pk = PointKinetics(ctrl; rho_val=rho_val, temp_worth=tw, ref_temp=rt)
+    @named pk = PointKinetics(ctrl; temp_worth=tw, ref_temp=rt)
 
     fb_components = if isnothing(tw)
         System[]
@@ -547,7 +416,7 @@ function build_loop_pk(ctrl;
     fb_eqs = if isempty(fb_components)
         Equation[]
     else
-        connect_temperature_feedback(pk, fb_components)
+        Connect.temperature_feedback(pk, fb_components)
     end
     power_eqs = [rods_fuel.power ~ pk.P * power_scale]
 
@@ -555,41 +424,31 @@ function build_loop_pk(ctrl;
     @named bc = HeatExchanger(T_inlet)
 
     all_connections = [
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods_cac.port_in),
-        connect(rods_cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, bc, rods_cac, pump)...,
+        pump.inlet.p ~ 1.0e5,
         fb_eqs...,
         power_eqs...,
     ]
 
     full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
-    t_compile = @elapsed ssys = mtkcompile(full)
-    n_eq = length(equations(ssys))
-    n_uk = length(unknowns(ssys))
-    @info "build_loop_pk compile time: $(round(t_compile; digits=2))s" n_equations = n_eq n_unknowns =
-        n_uk
+    ssys = mtkcompile(full)
 
     pk_ic = point_kinetics_steady_state(P0)
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
         ssys.pk.P => pk_ic.P,
-        ssys.pk.C_1 => pk_ic.C_k[1],
-        ssys.pk.C_2 => pk_ic.C_k[2],
-        ssys.pk.C_3 => pk_ic.C_k[3],
-        ssys.pk.C_4 => pk_ic.C_k[4],
-        ssys.pk.C_5 => pk_ic.C_k[5],
-        ssys.pk.C_6 => pk_ic.C_k[6],
-        ssys.rods.cac.port_in.mdot => 0.2,
+        [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
+        ssys.rods.cac.inlet.ṁ => 0.2,
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]
     # Consistent-IC seeding
-    # FlowPort/ThermalPort temperatures default to 300 K (src/connectors.jl). The boundary coolant
-    # cells and the channel↔fuel contact nodes are aliased to those port temperatures, and the
-    # per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT pin the port representatives under NoInit.
-    # Left unseeded, a temperature-feedback PK loop with ref_temp≠300 sees a spurious (300 − ref_temp)
-    # reactivity offset at t=0 that crashes power — a pure initialization artifact, not physics.
+    # FlowPort/ThermalPort temperatures default to 26.85 °C, which is 300 K
+    # (src/components/connectors.jl). The boundary coolant cells and the channel↔fuel contact nodes are
+    # aliased to those port temperatures, and the per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT
+    # pin the port representatives under NoInit. Left unseeded, a temperature-feedback PK loop with
+    # ref_temp ≠ 26.85 sees a spurious (26.85 − ref_temp) reactivity offset at t=0 that crashes power,
+    # which is an initialization artifact rather than physics.
     #
     # Each connected port pair (hx↔cac, cac↔pump, pump↔hx, and each cac↔fuel contact) collapses to one
     # alias-elimination representative, and WHICH member survives is not stable across MTK versions /
@@ -597,12 +456,12 @@ function build_loop_pk(ctrl;
     # whichever representative survives is then always hit, and the duplicate members are harmless
     # (distinct symbolic keys, same value). The cold IC is then genuinely consistent — reactivity[0] = 0
     # when ref_temp = T_inlet, independent of the alias-elimination choice.
-    push!(ic, ssys.rods.cac.port_in.T => T_inlet)
-    push!(ic, ssys.rods.cac.port_out.T => T_inlet)
-    push!(ic, ssys.pump.port_in.T => T_inlet)
-    push!(ic, ssys.pump.port_out.T => T_inlet)
-    push!(ic, ssys.bc.port_in.T => T_inlet)
-    push!(ic, ssys.bc.port_out.T => T_inlet)
+    push!(ic, ssys.rods.cac.inlet.T => T_inlet)
+    push!(ic, ssys.rods.cac.outlet.T => T_inlet)
+    push!(ic, ssys.pump.inlet.T => T_inlet)
+    push!(ic, ssys.pump.outlet.T => T_inlet)
+    push!(ic, ssys.bc.inlet.T => T_inlet)
+    push!(ic, ssys.bc.outlet.T => T_inlet)
     for i in 1:n
         push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_left, i)).T => T_inlet)
         push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_right, i)).T => T_inlet)

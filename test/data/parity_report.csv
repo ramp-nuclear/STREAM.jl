@@ -1,527 +1,527 @@
 scenario,quantity,julia,python,abs_err,rtol,tier,hard_ceiling,note
-simple_loop,T_out,3.2778943459e+02,3.2778943428e+02,3.0989957622e-07,9.454227e-10,CLEAN,0.0200,
-simple_loop,mdot,6.0928917221e-01,6.0928917220e-01,7.7422512845e-12,1.270702e-11,CLEAN,0.0200,
+simple_loop,T_out,5.4639434591e+01,5.4639434281e+01,3.0989958333e-07,5.671720e-09,CLEAN,0.0200,
+simple_loop,ṁ,6.0928917221e-01,6.0928917220e-01,7.7421402622e-12,1.270684e-11,CLEAN,0.0200,
 simple_loop,dP_loop,3.0000000000e+04,3.0000000000e+04,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T[1],3.1477315389e+02,3.1477315411e+02,2.1942423700e-07,6.970869e-10,CLEAN,0.0200,
-simple_loop,T[2],3.1635981179e+02,3.1635981198e+02,1.8472383090e-07,5.839042e-10,CLEAN,0.0200,
-simple_loop,T[3],3.1791035364e+02,3.1791035379e+02,1.4306851881e-07,4.500279e-10,CLEAN,0.0200,
-simple_loop,T[4],3.1942518380e+02,3.1942518390e+02,9.4543167961e-08,2.959791e-10,CLEAN,0.0200,
-simple_loop,T[5],3.2090472900e+02,3.2090472904e+02,3.9121118789e-08,1.219088e-10,CLEAN,0.0200,
-simple_loop,T[6],3.2234943630e+02,3.2234943628e+02,2.2471567718e-08,6.971183e-11,CLEAN,0.0200,
-simple_loop,T[7],3.2375977121e+02,3.2375977112e+02,8.9719549123e-08,2.771177e-10,CLEAN,0.0200,
-simple_loop,T[8],3.2513621580e+02,3.2513621564e+02,1.6125852653e-07,4.959722e-10,CLEAN,0.0200,
-simple_loop,T[9],3.2647926694e+02,3.2647926671e+02,2.3542662575e-07,7.211074e-10,CLEAN,0.0200,
-simple_loop,T[10],3.2778943459e+02,3.2778943428e+02,3.0989957622e-07,9.454227e-10,CLEAN,0.0200,
-simple_loop,T_wall_left[1],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[1],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[1],3.7559980864e+04,3.7559980869e+04,5.4196643759e-06,1.442936e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[1],3.7559980864e+04,3.7559980869e+04,5.4196643759e-06,1.442936e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[1],2.1926332226e+06,2.1926332147e+06,7.9265800305e-03,3.615096e-09,CLEAN,0.0200,
-simple_loop,q_density_total[1],2.1926332226e+06,2.1926332147e+06,7.9265800305e-03,3.615096e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-simple_loop,T_wall_left[2],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[2],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T[1],4.1623153894e+01,4.1623154113e+01,2.1942423700e-07,5.271687e-09,CLEAN,0.0200,
+simple_loop,T[2],4.3209811794e+01,4.3209811979e+01,1.8472377405e-07,4.275042e-09,CLEAN,0.0200,
+simple_loop,T[3],4.4760353642e+01,4.4760353786e+01,1.4306852592e-07,3.196323e-09,CLEAN,0.0200,
+simple_loop,T[4],4.6275183804e+01,4.6275183898e+01,9.4543167961e-08,2.043064e-09,CLEAN,0.0200,
+simple_loop,T[5],4.7754728998e+01,4.7754729037e+01,3.9121111683e-08,8.192092e-10,CLEAN,0.0200,
+simple_loop,T[6],4.9199436301e+01,4.9199436278e+01,2.2471574823e-08,4.567446e-10,CLEAN,0.0200,
+simple_loop,T[7],5.0609771211e+01,5.0609771122e+01,8.9719584651e-08,1.772772e-09,CLEAN,0.0200,
+simple_loop,T[8],5.1986215803e+01,5.1986215642e+01,1.6125856916e-07,3.101949e-09,CLEAN,0.0200,
+simple_loop,T[9],5.3329266943e+01,5.3329266708e+01,2.3542663286e-07,4.414586e-09,CLEAN,0.0200,
+simple_loop,T[10],5.4639434591e+01,5.4639434281e+01,3.0989958333e-07,5.671720e-09,CLEAN,0.0200,
+simple_loop,T_wall_left[1],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[1],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,h_tc_left[1],3.7559980864e+04,3.7559980869e+04,5.4196789279e-06,1.442940e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[1],3.7559980864e+04,3.7559980869e+04,5.4196862038e-06,1.442942e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[1],2.1926332226e+06,2.1926332147e+06,7.9265795648e-03,3.615096e-09,CLEAN,0.0200,
+simple_loop,q_density_total[1],2.1926332226e+06,2.1926332147e+06,7.9265795648e-03,3.615096e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,T_wall_left[2],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[2],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[2],3.7744135437e+04,3.7744135442e+04,4.5780398068e-06,1.212914e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[2],3.7744135437e+04,3.7744135442e+04,4.5780398068e-06,1.212914e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[2],2.1434965551e+06,2.1434965484e+06,6.7133386619e-03,3.131957e-09,CLEAN,0.0200,
-simple_loop,q_density_total[2],2.1434965551e+06,2.1434965484e+06,6.7133386619e-03,3.131957e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-simple_loop,T_wall_left[3],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[3],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[3],3.7923475012e+04,3.7923475015e+04,3.5654811654e-06,9.401779e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[3],3.7923475012e+04,3.7923475015e+04,3.5654884414e-06,9.401798e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[2],2.1434965551e+06,2.1434965484e+06,6.7133381963e-03,3.131957e-09,CLEAN,0.0200,
+simple_loop,q_density_total[2],2.1434965551e+06,2.1434965484e+06,6.7133381963e-03,3.131957e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,T_wall_left[3],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[3],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,h_tc_left[3],3.7923475012e+04,3.7923475015e+04,3.5654957173e-06,9.401817e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[3],3.7923475012e+04,3.7923475015e+04,3.5654957173e-06,9.401817e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,q_density_left[3],2.0948793483e+06,2.0948793431e+06,5.2293532062e-03,2.496255e-09,CLEAN,0.0200,
 simple_loop,q_density_total[3],2.0948793483e+06,2.0948793431e+06,5.2293532062e-03,2.496255e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-simple_loop,T_wall_left[4],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[4],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[4],3.8098088972e+04,3.8098088974e+04,2.3879765649e-06,6.267969e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[4],3.8098088972e+04,3.8098088974e+04,2.3879765649e-06,6.267969e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[4],2.0468128274e+06,2.0468128240e+06,3.4719635732e-03,1.696278e-09,CLEAN,0.0200,
-simple_loop,q_density_total[4],2.0468128274e+06,2.0468128240e+06,3.4719635732e-03,1.696278e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-simple_loop,T_wall_left[5],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[5],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[5],3.8268067713e+04,3.8268067714e+04,1.0569056030e-06,2.761847e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[5],3.8268067713e+04,3.8268067714e+04,1.0569056030e-06,2.761847e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[5],1.9993255684e+06,1.9993255669e+06,1.4435341582e-03,7.220106e-10,CLEAN,0.0200,
-simple_loop,q_density_total[5],1.9993255684e+06,1.9993255669e+06,1.4435341582e-03,7.220106e-10,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-simple_loop,T_wall_left[6],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[6],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[6],3.8433502399e+04,3.8433502399e+04,4.0803570300e-07,1.061667e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[6],3.8433502399e+04,3.8433502399e+04,4.0804297896e-07,1.061686e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[6],1.9524435868e+06,1.9524435877e+06,8.4393611178e-04,4.322461e-10,CLEAN,0.0200,
-simple_loop,q_density_total[6],1.9524435868e+06,1.9524435877e+06,8.4393611178e-04,4.322461e-10,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-simple_loop,T_wall_left[7],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[7],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[7],3.8594484732e+04,3.8594484731e+04,1.9770159270e-06,5.122535e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[7],3.8594484732e+04,3.8594484731e+04,1.9770159270e-06,5.122535e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[7],1.9061904309e+06,1.9061904343e+06,3.3647178207e-03,1.765153e-09,CLEAN,0.0200,
-simple_loop,q_density_total[7],1.9061904309e+06,1.9061904343e+06,3.3647178207e-03,1.765153e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-simple_loop,T_wall_left[8],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[8],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[8],3.8751106743e+04,3.8751106739e+04,3.6080600694e-06,9.310857e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[8],3.8751106743e+04,3.8751106739e+04,3.6080600694e-06,9.310857e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[8],1.8605872765e+06,1.8605872826e+06,6.0757659376e-03,3.265510e-09,CLEAN,0.0200,
-simple_loop,q_density_total[8],1.8605872765e+06,1.8605872826e+06,6.0757659376e-03,3.265510e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-simple_loop,T_wall_left[9],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[9],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_left[4],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[4],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,h_tc_left[4],3.8098088972e+04,3.8098088974e+04,2.3880129447e-06,6.268065e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[4],3.8098088972e+04,3.8098088974e+04,2.3880129447e-06,6.268065e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[4],2.0468128274e+06,2.0468128240e+06,3.4719614778e-03,1.696277e-09,CLEAN,0.0200,
+simple_loop,q_density_total[4],2.0468128274e+06,2.0468128240e+06,3.4719614778e-03,1.696277e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,T_wall_left[5],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[5],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,h_tc_left[5],3.8268067713e+04,3.8268067714e+04,1.0569128790e-06,2.761866e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[5],3.8268067713e+04,3.8268067714e+04,1.0569128790e-06,2.761866e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[5],1.9993255684e+06,1.9993255669e+06,1.4435343910e-03,7.220107e-10,CLEAN,0.0200,
+simple_loop,q_density_total[5],1.9993255684e+06,1.9993255669e+06,1.4435343910e-03,7.220107e-10,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,T_wall_left[6],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[6],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,h_tc_left[6],3.8433502399e+04,3.8433502399e+04,4.0802115109e-07,1.061629e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[6],3.8433502399e+04,3.8433502399e+04,4.0802115109e-07,1.061629e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[6],1.9524435868e+06,1.9524435877e+06,8.4393727593e-04,4.322467e-10,CLEAN,0.0200,
+simple_loop,q_density_total[6],1.9524435868e+06,1.9524435877e+06,8.4393727593e-04,4.322467e-10,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,T_wall_left[7],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[7],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,h_tc_left[7],3.8594484732e+04,3.8594484731e+04,1.9769940991e-06,5.122478e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[7],3.8594484732e+04,3.8594484731e+04,1.9769940991e-06,5.122478e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[7],1.9061904309e+06,1.9061904343e+06,3.3647189848e-03,1.765154e-09,CLEAN,0.0200,
+simple_loop,q_density_total[7],1.9061904309e+06,1.9061904343e+06,3.3647189848e-03,1.765154e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,T_wall_left[8],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[8],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,h_tc_left[8],3.8751106743e+04,3.8751106739e+04,3.6080382415e-06,9.310801e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[8],3.8751106743e+04,3.8751106739e+04,3.6080455175e-06,9.310819e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[8],1.8605872765e+06,1.8605872826e+06,6.0757668689e-03,3.265510e-09,CLEAN,0.0200,
+simple_loop,q_density_total[8],1.8605872765e+06,1.8605872826e+06,6.0757668689e-03,3.265510e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,T_wall_left[9],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[9],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[9],3.8903460591e+04,3.8903460586e+04,5.2467221394e-06,1.348652e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[9],3.8903460591e+04,3.8903460586e+04,5.2467148635e-06,1.348650e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[9],1.8156530242e+06,1.8156530332e+06,8.9137947652e-03,4.909415e-09,CLEAN,0.0200,
-simple_loop,q_density_total[9],1.8156530242e+06,1.8156530332e+06,8.9137947652e-03,4.909415e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-simple_loop,T_wall_left[10],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,T_wall_right[10],3.7315000000e+02,3.7315000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[10],3.9051638388e+04,3.9051638381e+04,6.8266672315e-06,1.748113e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[10],3.9051638388e+04,3.9051638381e+04,6.8266672315e-06,1.748113e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[10],1.7714043974e+06,1.7714044092e+06,1.1793112382e-02,6.657493e-09,CLEAN,0.0200,
-simple_loop,q_density_total[10],1.7714043974e+06,1.7714044092e+06,1.1793112382e-02,6.657493e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
-mtr_symmetric,T_out_l,3.1788707779e+02,3.1788707780e+02,1.0410701634e-08,3.274968e-11,CLEAN,0.0200,
-mtr_symmetric,T_out_r,3.1788707779e+02,3.1788707780e+02,1.0410701634e-08,3.274968e-11,CLEAN,0.0200,
-mtr_symmetric,mdot_l,2.5254714269e-01,2.5254714270e-01,1.3660850229e-11,5.409228e-11,CLEAN,0.0200,
-mtr_symmetric,mdot_r,2.5254714269e-01,2.5254714270e-01,1.3660850229e-11,5.409228e-11,CLEAN,0.0200,
+simple_loop,h_tc_right[9],3.8903460591e+04,3.8903460586e+04,5.2467075875e-06,1.348648e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[9],1.8156530242e+06,1.8156530332e+06,8.9137945324e-03,4.909415e-09,CLEAN,0.0200,
+simple_loop,q_density_total[9],1.8156530242e+06,1.8156530332e+06,8.9137945324e-03,4.909415e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,T_wall_left[10],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,T_wall_right[10],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
+simple_loop,h_tc_left[10],3.9051638388e+04,3.9051638381e+04,6.8266599555e-06,1.748111e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[10],3.9051638388e+04,3.9051638381e+04,6.8266381277e-06,1.748105e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[10],1.7714043974e+06,1.7714044092e+06,1.1793112848e-02,6.657493e-09,CLEAN,0.0200,
+simple_loop,q_density_total[10],1.7714043974e+06,1.7714044092e+06,1.1793112848e-02,6.657493e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+mtr_symmetric,T_out_l,4.4737077786e+01,4.4737077796e+01,1.0410701634e-08,2.327086e-10,CLEAN,0.0200,
+mtr_symmetric,T_out_r,4.4737077786e+01,4.4737077796e+01,1.0410701634e-08,2.327086e-10,CLEAN,0.0200,
+mtr_symmetric,ṁ_l,2.5254714269e-01,2.5254714270e-01,1.3660905740e-11,5.409250e-11,CLEAN,0.0200,
+mtr_symmetric,ṁ_r,2.5254714269e-01,2.5254714270e-01,1.3660905740e-11,5.409250e-11,CLEAN,0.0200,
 mtr_symmetric,dP_loop,3.0000000000e+04,3.0000000000e+04,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_l[1],3.1362375632e+02,3.1362375632e+02,5.1815050028e-09,1.652140e-11,CLEAN,0.0200,
-mtr_symmetric,T_r[1],3.1362375632e+02,3.1362375632e+02,5.1815050028e-09,1.652140e-11,CLEAN,0.0200,
-mtr_symmetric,T_l[2],3.1409750279e+02,3.1409750280e+02,3.9947849473e-09,1.271830e-11,CLEAN,0.0200,
-mtr_symmetric,T_r[2],3.1409750279e+02,3.1409750280e+02,3.9947849473e-09,1.271830e-11,CLEAN,0.0200,
-mtr_symmetric,T_l[3],3.1457123906e+02,3.1457123907e+02,9.3680796454e-09,2.978047e-11,CLEAN,0.0200,
-mtr_symmetric,T_r[3],3.1457123906e+02,3.1457123907e+02,9.3680796454e-09,2.978047e-11,CLEAN,0.0200,
-mtr_symmetric,T_l[4],3.1504496477e+02,3.1504496478e+02,1.0547580587e-08,3.347960e-11,CLEAN,0.0200,
-mtr_symmetric,T_r[4],3.1504496477e+02,3.1504496478e+02,1.0547580587e-08,3.347960e-11,CLEAN,0.0200,
-mtr_symmetric,T_l[5],3.1551867959e+02,3.1551867959e+02,7.7155277722e-09,2.445347e-11,CLEAN,0.0200,
-mtr_symmetric,T_r[5],3.1551867959e+02,3.1551867959e+02,7.7155277722e-09,2.445347e-11,CLEAN,0.0200,
-mtr_symmetric,T_l[6],3.1599238314e+02,3.1599238315e+02,1.5307364265e-09,4.844219e-12,CLEAN,0.0200,
-mtr_symmetric,T_r[6],3.1599238314e+02,3.1599238315e+02,1.5307364265e-09,4.844219e-12,CLEAN,0.0200,
-mtr_symmetric,T_l[7],3.1646607510e+02,3.1646607509e+02,5.8679461290e-09,1.854210e-11,CLEAN,0.0200,
-mtr_symmetric,T_r[7],3.1646607510e+02,3.1646607509e+02,5.8679461290e-09,1.854210e-11,CLEAN,0.0200,
-mtr_symmetric,T_l[8],3.1693975509e+02,3.1693975508e+02,1.0958331131e-08,3.457544e-11,CLEAN,0.0200,
-mtr_symmetric,T_r[8],3.1693975509e+02,3.1693975508e+02,1.0958331131e-08,3.457544e-11,CLEAN,0.0200,
-mtr_symmetric,T_l[9],3.1741342277e+02,3.1741342277e+02,8.2317797023e-09,2.593394e-11,CLEAN,0.0200,
-mtr_symmetric,T_r[9],3.1741342277e+02,3.1741342277e+02,8.2317797023e-09,2.593394e-11,CLEAN,0.0200,
-mtr_symmetric,T_l[10],3.1788707779e+02,3.1788707780e+02,1.0410701634e-08,3.274968e-11,CLEAN,0.0200,
-mtr_symmetric,T_r[10],3.1788707779e+02,3.1788707780e+02,1.0410701634e-08,3.274968e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[1],3.1362375632e+02,3.1362375632e+02,5.1815050028e-09,1.652140e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[1],3.2014454411e+02,3.2014454410e+02,5.0600306167e-09,1.580546e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[1],1.8256631398e+04,1.8256631398e+04,1.9664366846e-07,1.077108e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[1],1.8256631398e+04,1.8256631398e+04,1.9664366846e-07,1.077108e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,T_l[1],4.0473756323e+01,4.0473756317e+01,5.1815618463e-09,1.280228e-10,CLEAN,0.0200,
+mtr_symmetric,T_r[1],4.0473756323e+01,4.0473756317e+01,5.1815618463e-09,1.280228e-10,CLEAN,0.0200,
+mtr_symmetric,T_l[2],4.0947502792e+01,4.0947502796e+01,3.9947281039e-09,9.755731e-11,CLEAN,0.0200,
+mtr_symmetric,T_r[2],4.0947502792e+01,4.0947502796e+01,3.9947281039e-09,9.755731e-11,CLEAN,0.0200,
+mtr_symmetric,T_l[3],4.1421239058e+01,4.1421239067e+01,9.3680654345e-09,2.261657e-10,CLEAN,0.0200,
+mtr_symmetric,T_r[3],4.1421239058e+01,4.1421239067e+01,9.3680654345e-09,2.261657e-10,CLEAN,0.0200,
+mtr_symmetric,T_l[4],4.1894964773e+01,4.1894964783e+01,1.0547537954e-08,2.517615e-10,CLEAN,0.0200,
+mtr_symmetric,T_r[4],4.1894964773e+01,4.1894964783e+01,1.0547537954e-08,2.517615e-10,CLEAN,0.0200,
+mtr_symmetric,T_l[5],4.2368679586e+01,4.2368679593e+01,7.7154709288e-09,1.821032e-10,CLEAN,0.0200,
+mtr_symmetric,T_r[5],4.2368679586e+01,4.2368679593e+01,7.7154709288e-09,1.821032e-10,CLEAN,0.0200,
+mtr_symmetric,T_l[6],4.2842383145e+01,4.2842383146e+01,1.5307080048e-09,3.572882e-11,CLEAN,0.0200,
+mtr_symmetric,T_r[6],4.2842383145e+01,4.2842383146e+01,1.5307080048e-09,3.572882e-11,CLEAN,0.0200,
+mtr_symmetric,T_l[7],4.3316075098e+01,4.3316075093e+01,5.8679390236e-09,1.354679e-10,CLEAN,0.0200,
+mtr_symmetric,T_r[7],4.3316075098e+01,4.3316075093e+01,5.8679390236e-09,1.354679e-10,CLEAN,0.0200,
+mtr_symmetric,T_l[8],4.3789755093e+01,4.3789755082e+01,1.0958366659e-08,2.502496e-10,CLEAN,0.0200,
+mtr_symmetric,T_r[8],4.3789755093e+01,4.3789755082e+01,1.0958366659e-08,2.502496e-10,CLEAN,0.0200,
+mtr_symmetric,T_l[9],4.4263422774e+01,4.4263422766e+01,8.2317797023e-09,1.859725e-10,CLEAN,0.0200,
+mtr_symmetric,T_r[9],4.4263422774e+01,4.4263422766e+01,8.2317797023e-09,1.859725e-10,CLEAN,0.0200,
+mtr_symmetric,T_l[10],4.4737077786e+01,4.4737077796e+01,1.0410701634e-08,2.327086e-10,CLEAN,0.0200,
+mtr_symmetric,T_r[10],4.4737077786e+01,4.4737077796e+01,1.0410701634e-08,2.327086e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_l[1],4.0473756323e+01,4.0473756317e+01,5.1815618463e-09,1.280228e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[1],4.6994544109e+01,4.6994544104e+01,5.0600377222e-09,1.076729e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[1],1.8256631398e+04,1.8256631398e+04,1.9663275452e-07,1.077048e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[1],1.8256631398e+04,1.8256631398e+04,1.9663275452e-07,1.077048e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[1],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[1],1.1904761905e+05,1.1904761905e+05,5.0840026233e-07,4.270562e-12,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[1],3.2014454411e+02,3.2014454410e+02,5.0600306167e-09,1.580546e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[1],3.1362375632e+02,3.1362375632e+02,5.1815050028e-09,1.652140e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[1],1.8256631398e+04,1.8256631398e+04,1.9664366846e-07,1.077108e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[1],1.8256631398e+04,1.8256631398e+04,1.9664366846e-07,1.077108e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[1],1.1904761905e+05,1.1904761905e+05,5.0838571042e-07,4.270440e-12,CLEAN,0.0200,
+mtr_symmetric,q_right_l[1],1.1904761905e+05,1.1904761905e+05,5.0771632232e-07,4.264817e-12,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[1],4.6994544109e+01,4.6994544104e+01,5.0600377222e-09,1.076729e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[1],4.0473756323e+01,4.0473756317e+01,5.1815618463e-09,1.280228e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[1],1.8256631398e+04,1.8256631398e+04,1.9663639250e-07,1.077068e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[1],1.8256631398e+04,1.8256631398e+04,1.9663639250e-07,1.077068e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[1],1.1904761905e+05,1.1904761905e+05,5.0771632232e-07,4.264817e-12,CLEAN,0.0200,
 mtr_symmetric,q_right_r[1],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[2],3.1409750279e+02,3.1409750280e+02,3.9947849473e-09,1.271830e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[2],3.2059314129e+02,3.2059314130e+02,3.4991671782e-09,1.091467e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[2],1.8327315941e+04,1.8327315941e+04,1.6832927940e-08,9.184612e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[2],1.8327315941e+04,1.8327315941e+04,1.6832927940e-08,9.184612e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,T_wall_left_l[2],4.0947502792e+01,4.0947502796e+01,3.9947281039e-09,9.755731e-11,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[2],4.7443141292e+01,4.7443141296e+01,3.4991458620e-09,7.375451e-11,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[2],1.8327315941e+04,1.8327315941e+04,1.6822014004e-08,9.178657e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[2],1.8327315941e+04,1.8327315941e+04,1.6822014004e-08,9.178657e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[2],1.1904761905e+05,1.1904761904e+05,9.5689756563e-06,8.037940e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[2],3.2059314129e+02,3.2059314130e+02,3.4991671782e-09,1.091467e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[2],3.1409750279e+02,3.1409750280e+02,3.9947849473e-09,1.271830e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[2],1.8327315941e+04,1.8327315941e+04,1.6829289962e-08,9.182627e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[2],1.8327315941e+04,1.8327315941e+04,1.6829289962e-08,9.182627e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[2],1.1904761905e+05,1.1904761904e+05,9.5689756563e-06,8.037940e-11,CLEAN,0.0200,
+mtr_symmetric,q_right_l[2],1.1904761905e+05,1.1904761904e+05,9.5683790278e-06,8.037438e-11,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[2],4.7443141292e+01,4.7443141296e+01,3.4991458620e-09,7.375451e-11,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[2],4.0947502792e+01,4.0947502796e+01,3.9947281039e-09,9.755731e-11,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[2],1.8327315941e+04,1.8327315941e+04,1.6811100068e-08,9.172702e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[2],1.8327315941e+04,1.8327315941e+04,1.6811100068e-08,9.172702e-13,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[2],1.1904761905e+05,1.1904761904e+05,9.5683208201e-06,8.037389e-11,CLEAN,0.0200,
 mtr_symmetric,q_right_r[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[3],3.1457123906e+02,3.1457123907e+02,9.3680796454e-09,2.978047e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[3],3.2104195802e+02,3.2104195803e+02,8.9722789198e-09,2.794737e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[3],1.8397896697e+04,1.8397896697e+04,2.6337875170e-07,1.431570e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[3],1.8397896697e+04,1.8397896697e+04,2.6337875170e-07,1.431570e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,T_wall_left_l[3],4.1421239058e+01,4.1421239067e+01,9.3680654345e-09,2.261657e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[3],4.7891958022e+01,4.7891958031e+01,8.9722931307e-09,1.873445e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[3],1.8397896697e+04,1.8397896697e+04,2.6338238968e-07,1.431590e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[3],1.8397896697e+04,1.8397896697e+04,2.6338238968e-07,1.431590e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[3],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[3],1.1904761905e+05,1.1904761904e+05,6.0821475927e-06,5.109004e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[3],3.2104195802e+02,3.2104195803e+02,8.9722789198e-09,2.794737e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[3],3.1457123906e+02,3.1457123907e+02,9.3680796454e-09,2.978047e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[3],1.8397896697e+04,1.8397896697e+04,2.6337875170e-07,1.431570e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[3],1.8397896697e+04,1.8397896697e+04,2.6337875170e-07,1.431570e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[3],1.1904761905e+05,1.1904761904e+05,6.0821475927e-06,5.109004e-11,CLEAN,0.0200,
+mtr_symmetric,q_right_l[3],1.1904761905e+05,1.1904761904e+05,6.0815800680e-06,5.108527e-11,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[3],4.7891958022e+01,4.7891958031e+01,8.9722931307e-09,1.873445e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[3],4.1421239058e+01,4.1421239067e+01,9.3680654345e-09,2.261657e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[3],1.8397896697e+04,1.8397896697e+04,2.6338238968e-07,1.431590e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[3],1.8397896697e+04,1.8397896697e+04,2.6338238968e-07,1.431590e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[3],1.1904761905e+05,1.1904761904e+05,6.0816091718e-06,5.108552e-11,CLEAN,0.0200,
 mtr_symmetric,q_right_r[3],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[4],3.1504496477e+02,3.1504496478e+02,1.0547580587e-08,3.347960e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[4],3.2149099113e+02,3.2149099114e+02,1.1373458619e-08,3.537722e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[4],1.8468373001e+04,1.8468373002e+04,7.4306444731e-07,4.023443e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[4],1.8468373001e+04,1.8468373002e+04,7.4306444731e-07,4.023443e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,T_wall_left_l[4],4.1894964773e+01,4.1894964783e+01,1.0547537954e-08,2.517615e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[4],4.8340991125e+01,4.8340991136e+01,1.1373430198e-08,2.352751e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[4],1.8468373001e+04,1.8468373002e+04,7.4305353337e-07,4.023384e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[4],1.8468373001e+04,1.8468373002e+04,7.4305353337e-07,4.023384e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[4],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[4],1.1904761905e+05,1.1904761907e+05,1.9221726689e-05,1.614625e-10,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[4],3.2149099113e+02,3.2149099114e+02,1.1373458619e-08,3.537722e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[4],3.1504496477e+02,3.1504496478e+02,1.0547580587e-08,3.347960e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[4],1.8468373001e+04,1.8468373002e+04,7.4306080933e-07,4.023423e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[4],1.8468373001e+04,1.8468373002e+04,7.4306080933e-07,4.023423e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[4],1.1904761905e+05,1.1904761907e+05,1.9221712137e-05,1.614624e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[4],1.1904761905e+05,1.1904761907e+05,1.9221552066e-05,1.614610e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[4],4.8340991125e+01,4.8340991136e+01,1.1373430198e-08,2.352751e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[4],4.1894964773e+01,4.1894964783e+01,1.0547537954e-08,2.517615e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[4],1.8468373001e+04,1.8468373002e+04,7.4305353337e-07,4.023384e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[4],1.8468373001e+04,1.8468373002e+04,7.4305353337e-07,4.023384e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[4],1.1904761905e+05,1.1904761907e+05,1.9221552066e-05,1.614610e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[4],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[5],3.1551867959e+02,3.1551867959e+02,7.7155277722e-09,2.445347e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[5],3.2194023747e+02,3.2194023748e+02,9.6587200460e-09,3.000159e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[5],1.8538744202e+04,1.8538744203e+04,1.0278999980e-06,5.544604e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[5],1.8538744202e+04,1.8538744203e+04,1.0278999980e-06,5.544604e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,T_wall_left_l[5],4.2368679586e+01,4.2368679593e+01,7.7154709288e-09,1.821032e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[5],4.8790237473e+01,4.8790237482e+01,9.6586916243e-09,1.979636e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[5],1.8538744202e+04,1.8538744203e+04,1.0278927220e-06,5.544565e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[5],1.8538744202e+04,1.8538744203e+04,1.0278927220e-06,5.544565e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[5],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[5],1.1904761905e+05,1.1904761909e+05,4.3238484068e-05,3.632033e-10,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[5],3.2194023747e+02,3.2194023748e+02,9.6587200460e-09,3.000159e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[5],3.1551867959e+02,3.1551867959e+02,7.7155277722e-09,2.445347e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[5],1.8538744202e+04,1.8538744203e+04,1.0278999980e-06,5.544604e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[5],1.8538744202e+04,1.8538744203e+04,1.0278999980e-06,5.544604e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[5],1.1904761905e+05,1.1904761909e+05,4.3238498620e-05,3.632034e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[5],1.1904761905e+05,1.1904761909e+05,4.3238702347e-05,3.632051e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[5],4.8790237473e+01,4.8790237482e+01,9.6586916243e-09,1.979636e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[5],4.2368679586e+01,4.2368679593e+01,7.7154709288e-09,1.821032e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[5],1.8538744202e+04,1.8538744203e+04,1.0278890841e-06,5.544545e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[5],1.8538744202e+04,1.8538744203e+04,1.0278890841e-06,5.544545e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[5],1.1904761905e+05,1.1904761909e+05,4.3238702347e-05,3.632051e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[5],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[6],3.1599238314e+02,3.1599238315e+02,1.5307364265e-09,4.844219e-12,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[6],3.2238969398e+02,3.2238969398e+02,2.4895143724e-09,7.722066e-12,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[6],1.8609009659e+04,1.8609009660e+04,4.6220884542e-07,2.483791e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[6],1.8609009659e+04,1.8609009660e+04,4.6220884542e-07,2.483791e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,T_wall_left_l[6],4.2842383145e+01,4.2842383146e+01,1.5307080048e-09,3.572882e-11,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[6],4.9239693976e+01,4.9239693978e+01,2.4894788453e-09,5.055837e-11,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[6],1.8609009659e+04,1.8609009660e+04,4.6219793148e-07,2.483732e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[6],1.8609009659e+04,1.8609009660e+04,4.6219793148e-07,2.483732e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[6],1.1904761905e+05,1.1904761907e+05,2.0257473807e-05,1.701628e-10,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[6],3.2238969398e+02,3.2238969398e+02,2.4895143724e-09,7.722066e-12,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[6],3.1599238314e+02,3.1599238315e+02,1.5307364265e-09,4.844219e-12,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[6],1.8609009659e+04,1.8609009660e+04,4.6220520744e-07,2.483771e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[6],1.8609009659e+04,1.8609009660e+04,4.6220520744e-07,2.483771e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[6],1.1904761905e+05,1.1904761907e+05,2.0257459255e-05,1.701627e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[6],1.1904761905e+05,1.1904761907e+05,2.0256848074e-05,1.701575e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[6],4.9239693976e+01,4.9239693978e+01,2.4894788453e-09,5.055837e-11,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[6],4.2842383145e+01,4.2842383146e+01,1.5307080048e-09,3.572882e-11,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[6],1.8609009659e+04,1.8609009660e+04,4.6219793148e-07,2.483732e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[6],1.8609009659e+04,1.8609009660e+04,4.6219793148e-07,2.483732e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[6],1.1904761905e+05,1.1904761907e+05,2.0256877178e-05,1.701578e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[7],3.1646607510e+02,3.1646607509e+02,5.8679461290e-09,1.854210e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[7],3.2283935759e+02,3.2283935758e+02,7.6191213338e-09,2.360035e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[7],1.8679168744e+04,1.8679168743e+04,6.4541382017e-07,3.455260e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[7],1.8679168744e+04,1.8679168743e+04,6.4541382017e-07,3.455260e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,T_wall_left_l[7],4.3316075098e+01,4.3316075093e+01,5.8679390236e-09,1.354679e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[7],4.9689357586e+01,4.9689357579e+01,7.6191213338e-09,1.533351e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[7],1.8679168744e+04,1.8679168743e+04,6.4540290623e-07,3.455201e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[7],1.8679168744e+04,1.8679168743e+04,6.4540290623e-07,3.455201e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[7],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[7],1.1904761905e+05,1.1904761901e+05,3.5885532270e-05,3.014385e-10,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[7],3.2283935759e+02,3.2283935758e+02,7.6191213338e-09,2.360035e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[7],3.1646607510e+02,3.1646607509e+02,5.8679461290e-09,1.854210e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[7],1.8679168744e+04,1.8679168743e+04,6.4541382017e-07,3.455260e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[7],1.8679168744e+04,1.8679168743e+04,6.4541382017e-07,3.455260e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[7],1.1904761905e+05,1.1904761901e+05,3.5885532270e-05,3.014385e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[7],1.1904761905e+05,1.1904761901e+05,3.5885328543e-05,3.014368e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[7],4.9689357586e+01,4.9689357579e+01,7.6191213338e-09,1.533351e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[7],4.3316075098e+01,4.3316075093e+01,5.8679390236e-09,1.354679e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[7],1.8679168744e+04,1.8679168743e+04,6.4540290623e-07,3.455201e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[7],1.8679168744e+04,1.8679168743e+04,6.4540290623e-07,3.455201e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[7],1.1904761905e+05,1.1904761901e+05,3.5885343095e-05,3.014369e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[7],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[8],3.1693975509e+02,3.1693975508e+02,1.0958331131e-08,3.457544e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[8],3.2328922530e+02,3.2328922528e+02,1.1864301541e-08,3.669872e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[8],1.8749220838e+04,1.8749220837e+04,7.0103487815e-07,3.739008e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[8],1.8749220838e+04,1.8749220837e+04,7.0103487815e-07,3.739008e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,T_wall_left_l[8],4.3789755093e+01,4.3789755082e+01,1.0958366659e-08,2.502496e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[8],5.0139225296e+01,5.0139225284e+01,1.1864372595e-08,2.366286e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[8],1.8749220838e+04,1.8749220837e+04,7.0103124017e-07,3.738989e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[8],1.8749220838e+04,1.8749220837e+04,7.0103124017e-07,3.738989e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[8],1.1904761905e+05,1.1904761903e+05,2.2210209863e-05,1.865658e-10,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[8],3.2328922530e+02,3.2328922528e+02,1.1864301541e-08,3.669872e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[8],3.1693975509e+02,3.1693975508e+02,1.0958331131e-08,3.457544e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[8],1.8749220838e+04,1.8749220837e+04,7.0103487815e-07,3.739008e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[8],1.8749220838e+04,1.8749220837e+04,7.0103487815e-07,3.739008e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[8],1.1904761905e+05,1.1904761903e+05,2.2210238967e-05,1.865660e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[8],1.1904761905e+05,1.1904761903e+05,2.2210457246e-05,1.865678e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[8],5.0139225296e+01,5.0139225284e+01,1.1864372595e-08,2.366286e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[8],4.3789755093e+01,4.3789755082e+01,1.0958366659e-08,2.502496e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[8],1.8749220838e+04,1.8749220837e+04,7.0103124017e-07,3.738989e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[8],1.8749220838e+04,1.8749220837e+04,7.0103124017e-07,3.738989e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[8],1.1904761905e+05,1.1904761903e+05,2.2210471798e-05,1.865680e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[9],3.1741342277e+02,3.1741342277e+02,8.2317797023e-09,2.593394e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[9],3.2373929414e+02,3.2373929412e+02,1.1536030797e-08,3.563371e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[9],1.8819165334e+04,1.8819165333e+04,1.2671735021e-06,6.733420e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[9],1.8819165334e+04,1.8819165333e+04,1.2671735021e-06,6.733420e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_l[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[9],1.1904761905e+05,1.1904761898e+05,7.0067500928e-05,5.885670e-10,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[9],3.2373929414e+02,3.2373929412e+02,1.1536030797e-08,3.563371e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[9],3.1741342277e+02,3.1741342277e+02,8.2317797023e-09,2.593394e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[9],1.8819165334e+04,1.8819165333e+04,1.2671735021e-06,6.733420e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[9],1.8819165334e+04,1.8819165333e+04,1.2671735021e-06,6.733420e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[9],1.1904761905e+05,1.1904761898e+05,7.0067500928e-05,5.885670e-10,CLEAN,0.0200,
-mtr_symmetric,q_right_r[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_l[10],3.1788707779e+02,3.1788707780e+02,1.0410701634e-08,3.274968e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_l[10],3.2418956117e+02,3.2418956119e+02,1.3389581000e-08,4.130170e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_l[10],1.8889001637e+04,1.8889001639e+04,1.2163509382e-06,6.439467e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_l[10],1.8889001637e+04,1.8889001639e+04,1.2163509382e-06,6.439467e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,T_wall_left_l[9],4.4263422774e+01,4.4263422766e+01,8.2317868078e-09,1.859727e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[9],5.0589294136e+01,5.0589294124e+01,1.1536045008e-08,2.280333e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[9],1.8819165334e+04,1.8819165333e+04,1.2671844161e-06,6.733478e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[9],1.8819165334e+04,1.8819165333e+04,1.2671844161e-06,6.733478e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_l[9],1.3029750581e-10,0.0000000000e+00,1.3029750581e-10,1.302975e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[9],1.1904761905e+05,1.1904761898e+05,7.0067966590e-05,5.885709e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[9],5.0589294136e+01,5.0589294124e+01,1.1536045008e-08,2.280333e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[9],4.4263422774e+01,4.4263422766e+01,8.2317868078e-09,1.859727e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[9],1.8819165334e+04,1.8819165333e+04,1.2671844161e-06,6.733478e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[9],1.8819165334e+04,1.8819165333e+04,1.2671844161e-06,6.733478e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[9],1.1904761905e+05,1.1904761898e+05,7.0067981142e-05,5.885710e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_r[9],1.3029750581e-10,0.0000000000e+00,1.3029750581e-10,1.302975e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_l[10],4.4737077786e+01,4.4737077796e+01,1.0410701634e-08,2.327086e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_l[10],5.1039561175e+01,5.1039561188e+01,1.3389524156e-08,2.623362e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_l[10],1.8889001637e+04,1.8889001639e+04,1.2163545762e-06,6.439486e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_l[10],1.8889001637e+04,1.8889001639e+04,1.2163545762e-06,6.439486e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_symmetric,q_left_l[10],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,q_right_l[10],1.1904761905e+05,1.1904761911e+05,6.3820989453e-05,5.360963e-10,CLEAN,0.0200,
-mtr_symmetric,T_wall_left_r[10],3.2418956117e+02,3.2418956119e+02,1.3389581000e-08,4.130170e-11,CLEAN,0.0200,
-mtr_symmetric,T_wall_right_r[10],3.1788707779e+02,3.1788707780e+02,1.0410701634e-08,3.274968e-11,CLEAN,0.0200,
-mtr_symmetric,h_tc_left_r[10],1.8889001637e+04,1.8889001639e+04,1.2163509382e-06,6.439467e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,h_tc_right_r[10],1.8889001637e+04,1.8889001639e+04,1.2163509382e-06,6.439467e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_symmetric,q_left_r[10],1.1904761905e+05,1.1904761911e+05,6.3821004005e-05,5.360964e-10,CLEAN,0.0200,
+mtr_symmetric,q_right_l[10],1.1904761905e+05,1.1904761911e+05,6.3820858486e-05,5.360952e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_left_r[10],5.1039561175e+01,5.1039561188e+01,1.3389524156e-08,2.623362e-10,CLEAN,0.0200,
+mtr_symmetric,T_wall_right_r[10],4.4737077786e+01,4.4737077796e+01,1.0410701634e-08,2.327086e-10,CLEAN,0.0200,
+mtr_symmetric,h_tc_left_r[10],1.8889001637e+04,1.8889001639e+04,1.2163654901e-06,6.439544e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,h_tc_right_r[10],1.8889001637e+04,1.8889001639e+04,1.2163654901e-06,6.439544e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_symmetric,q_left_r[10],1.1904761905e+05,1.1904761911e+05,6.3820960349e-05,5.360961e-10,CLEAN,0.0200,
 mtr_symmetric,q_right_r[10],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_symmetric,T_plate[1_1],3.2027053617e+02,3.2027053617e+02,5.0520725381e-09,1.577439e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[1_2],3.2035453088e+02,3.2035453088e+02,5.1467736739e-09,1.606587e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[1_3],3.2027053617e+02,3.2027053617e+02,5.0520725381e-09,1.577439e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[2_1],3.2071913336e+02,3.2071913336e+02,3.5071252569e-09,1.093519e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[2_2],3.2080312806e+02,3.2080312807e+02,3.5124116948e-09,1.094881e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[2_3],3.2071913336e+02,3.2071913336e+02,3.5071252569e-09,1.093519e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[3_1],3.2116795009e+02,3.2116795009e+02,8.9802369985e-09,2.796119e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[3_2],3.2125194479e+02,3.2125194480e+02,8.9855234364e-09,2.797033e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[3_3],3.2116795009e+02,3.2116795009e+02,8.9802369985e-09,2.796119e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[4_1],3.2161698319e+02,3.2161698320e+02,1.1381416698e-08,3.538811e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[4_2],3.2170097790e+02,3.2170097791e+02,1.1386646293e-08,3.539512e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[4_3],3.2161698319e+02,3.2161698320e+02,1.1381416698e-08,3.538811e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[5_1],3.2206622954e+02,3.2206622955e+02,9.6666781246e-09,3.001457e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[5_2],3.2215022425e+02,3.2215022425e+02,9.6719077192e-09,3.002297e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[5_3],3.2206622954e+02,3.2206622955e+02,9.6666781246e-09,3.001457e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[6_1],3.2251568604e+02,3.2251568604e+02,2.4974156076e-09,7.743548e-12,CLEAN,0.0200,
-mtr_symmetric,T_plate[6_2],3.2259968075e+02,3.2259968075e+02,2.5027588890e-09,7.758095e-12,CLEAN,0.0200,
-mtr_symmetric,T_plate[6_3],3.2251568604e+02,3.2251568604e+02,2.4974156076e-09,7.743548e-12,CLEAN,0.0200,
-mtr_symmetric,T_plate[7_1],3.2296534965e+02,3.2296534964e+02,7.6111632552e-09,2.356650e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[7_2],3.2304934436e+02,3.2304934435e+02,7.6058199738e-09,2.354383e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[7_3],3.2296534965e+02,3.2296534964e+02,7.6111632552e-09,2.356650e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[8_1],3.2341521736e+02,3.2341521735e+02,1.1856400306e-08,3.666000e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[8_2],3.2349921207e+02,3.2349921206e+02,1.1851113868e-08,3.663414e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[8_3],3.2341521736e+02,3.2341521735e+02,1.1856400306e-08,3.666000e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[9_1],3.2386528620e+02,3.2386528619e+02,1.1528072719e-08,3.559527e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[9_2],3.2394928091e+02,3.2394928090e+02,1.1522786281e-08,3.556972e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[9_3],3.2386528620e+02,3.2386528619e+02,1.1528072719e-08,3.559527e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[10_1],3.2431555324e+02,3.2431555325e+02,1.3397482235e-08,4.131002e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[10_2],3.2439954795e+02,3.2439954796e+02,1.3402768673e-08,4.131562e-11,CLEAN,0.0200,
-mtr_symmetric,T_plate[10_3],3.2431555324e+02,3.2431555325e+02,1.3397482235e-08,4.131002e-11,CLEAN,0.0200,
-mtr_asymmetric,T_out_l,3.3147521230e+02,3.3147521221e+02,9.4982624432e-08,2.865452e-10,CLEAN,0.0200,
-mtr_asymmetric,T_out_r,3.5467175951e+02,3.5467175950e+02,1.2276700545e-08,3.461426e-11,CLEAN,0.0200,
-mtr_asymmetric,mdot_l,2.5721371535e-01,2.5721371540e-01,5.1889048613e-11,2.017352e-10,CLEAN,0.0200,
-mtr_asymmetric,mdot_r,2.7246004808e-01,2.7246004800e-01,8.0883466591e-11,2.968636e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[1_1],4.7120536173e+01,4.7120536168e+01,5.0521009598e-09,1.072165e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[1_2],4.7204530882e+01,4.7204530877e+01,5.1468092011e-09,1.090321e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[1_3],4.7120536173e+01,4.7120536168e+01,5.0521009598e-09,1.072165e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[2_1],4.7569133356e+01,4.7569133359e+01,3.5070826243e-09,7.372601e-11,CLEAN,0.0200,
+mtr_symmetric,T_plate[2_2],4.7653128065e+01,4.7653128068e+01,3.5123761677e-09,7.370715e-11,CLEAN,0.0200,
+mtr_symmetric,T_plate[2_3],4.7569133356e+01,4.7569133359e+01,3.5070826243e-09,7.372601e-11,CLEAN,0.0200,
+mtr_symmetric,T_plate[3_1],4.8017950085e+01,4.8017950094e+01,8.9802298930e-09,1.870182e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[3_2],4.8101944794e+01,4.8101944803e+01,8.9855163310e-09,1.868015e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[3_3],4.8017950085e+01,4.8017950094e+01,8.9802298930e-09,1.870182e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[4_1],4.8466983189e+01,4.8466983200e+01,1.1381366960e-08,2.348272e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[4_2],4.8550977898e+01,4.8550977909e+01,1.1386660503e-08,2.345300e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[4_3],4.8466983189e+01,4.8466983200e+01,1.1381366960e-08,2.348272e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[5_1],4.8916229536e+01,4.8916229546e+01,9.6666283866e-09,1.976160e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[5_2],4.9000224245e+01,4.9000224255e+01,9.6719219300e-09,1.973853e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[5_3],4.8916229536e+01,4.8916229546e+01,9.6666283866e-09,1.976160e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[6_1],4.9365686039e+01,4.9365686042e+01,2.4974156076e-09,5.059011e-11,CLEAN,0.0200,
+mtr_symmetric,T_plate[6_2],4.9449680748e+01,4.9449680751e+01,2.5027091510e-09,5.061123e-11,CLEAN,0.0200,
+mtr_symmetric,T_plate[6_3],4.9365686039e+01,4.9365686042e+01,2.4974156076e-09,5.059011e-11,CLEAN,0.0200,
+mtr_symmetric,T_plate[7_1],4.9815349650e+01,4.9815349642e+01,7.6111845715e-09,1.527879e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[7_2],4.9899344359e+01,4.9899344351e+01,7.6058910281e-09,1.524247e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[7_3],4.9815349650e+01,4.9815349642e+01,7.6111845715e-09,1.527879e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[8_1],5.0265217360e+01,5.0265217348e+01,1.1856435833e-08,2.358775e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[8_2],5.0349212069e+01,5.0349212057e+01,1.1851142290e-08,2.353789e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[8_3],5.0265217360e+01,5.0265217348e+01,1.1856435833e-08,2.358775e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[9_1],5.0715286199e+01,5.0715286188e+01,1.1528108246e-08,2.273103e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[9_2],5.0799280908e+01,5.0799280897e+01,1.1522814702e-08,2.268303e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[9_3],5.0715286199e+01,5.0715286188e+01,1.1528108246e-08,2.273103e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[10_1],5.1165553238e+01,5.1165553252e+01,1.3397460918e-08,2.618453e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[10_2],5.1249547947e+01,5.1249547961e+01,1.3402754462e-08,2.615195e-10,CLEAN,0.0200,
+mtr_symmetric,T_plate[10_3],5.1165553238e+01,5.1165553252e+01,1.3397460918e-08,2.618453e-10,CLEAN,0.0200,
+mtr_asymmetric,T_out_l,5.8325212304e+01,5.8325212209e+01,9.4982738119e-08,1.628502e-09,CLEAN,0.0200,
+mtr_asymmetric,T_out_r,8.1521759515e+01,8.1521759502e+01,1.2276800021e-08,1.505954e-10,CLEAN,0.0200,
+mtr_asymmetric,ṁ_l,2.5721371535e-01,2.5721371540e-01,5.1889048613e-11,2.017352e-10,CLEAN,0.0200,
+mtr_asymmetric,ṁ_r,2.7246004808e-01,2.7246004800e-01,8.0883466591e-11,2.968636e-10,CLEAN,0.0200,
 mtr_asymmetric,dP_loop,3.0000000000e+04,3.0000000000e+04,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_l[1],3.1548005760e+02,3.1548005764e+02,4.5671072257e-08,1.447669e-10,CLEAN,0.0200,
-mtr_asymmetric,T_r[1],3.6183708695e+02,3.6183708698e+02,3.9006749830e-08,1.078020e-10,CLEAN,0.0200,
-mtr_asymmetric,T_l[2],3.1767885115e+02,3.1767885120e+02,4.8373124173e-08,1.522705e-10,CLEAN,0.0200,
-mtr_asymmetric,T_r[2],3.6064671620e+02,3.6064671625e+02,5.3557471347e-08,1.485040e-10,CLEAN,0.0200,
-mtr_asymmetric,T_l[3],3.1975496191e+02,3.1975496195e+02,4.4483840611e-08,1.391185e-10,CLEAN,0.0200,
-mtr_asymmetric,T_r[3],3.5957094894e+02,3.5957094900e+02,6.3335903633e-08,1.761430e-10,CLEAN,0.0200,
-mtr_asymmetric,T_l[4],3.2171648160e+02,3.2171648164e+02,3.6350115806e-08,1.129880e-10,CLEAN,0.0200,
-mtr_asymmetric,T_r[4],3.5860228882e+02,3.5860228889e+02,6.9864142915e-08,1.948235e-10,CLEAN,0.0200,
-mtr_asymmetric,T_l[5],3.2357102965e+02,3.2357102968e+02,2.8955867037e-08,8.948844e-11,CLEAN,0.0200,
-mtr_asymmetric,T_r[5],3.5773366808e+02,3.5773366816e+02,7.7303695889e-08,2.160929e-10,CLEAN,0.0200,
-mtr_asymmetric,T_l[6],3.2532577169e+02,3.2532577172e+02,2.2715823889e-08,6.982485e-11,CLEAN,0.0200,
-mtr_asymmetric,T_r[6],3.5695843210e+02,3.5695843219e+02,8.4941405021e-08,2.379588e-10,CLEAN,0.0200,
-mtr_asymmetric,T_l[7],3.2698743909e+02,3.2698743909e+02,8.5202600530e-10,2.605684e-12,CLEAN,0.0200,
-mtr_asymmetric,T_r[7],3.5627032284e+02,3.5627032292e+02,7.4481192769e-08,2.090581e-10,CLEAN,0.0200,
-mtr_asymmetric,T_l[8],3.2856234885e+02,3.2856234882e+02,3.1107504128e-08,9.467763e-11,CLEAN,0.0200,
-mtr_asymmetric,T_r[8],3.5566346161e+02,3.5566346165e+02,4.6941750043e-08,1.319836e-10,CLEAN,0.0200,
-mtr_asymmetric,T_l[9],3.3005642372e+02,3.3005642366e+02,6.1955461206e-08,1.877117e-10,CLEAN,0.0200,
-mtr_asymmetric,T_r[9],3.5513233145e+02,3.5513233147e+02,1.7682395992e-08,4.979101e-11,CLEAN,0.0200,
-mtr_asymmetric,T_l[10],3.3147521230e+02,3.3147521221e+02,9.4982624432e-08,2.865452e-10,CLEAN,0.0200,
-mtr_asymmetric,T_r[10],3.5467175951e+02,3.5467175950e+02,1.2276700545e-08,3.461426e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[1],3.1548005760e+02,3.1548005764e+02,4.5671072257e-08,1.447669e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[1],3.4454305989e+02,3.4454305996e+02,7.1270903845e-08,2.068563e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[1],2.0519296470e+04,2.0519296483e+04,1.3486423995e-05,6.572557e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[1],2.0519296470e+04,2.0519296483e+04,1.3486423995e-05,6.572557e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,T_l[1],4.2330057595e+01,4.2330057641e+01,4.5671065152e-08,1.078928e-09,CLEAN,0.0200,
+mtr_asymmetric,T_r[1],8.8687086946e+01,8.8687086985e+01,3.9006764041e-08,4.398246e-10,CLEAN,0.0200,
+mtr_asymmetric,T_l[2],4.4528851147e+01,4.4528851196e+01,4.8373109962e-08,1.086332e-09,CLEAN,0.0200,
+mtr_asymmetric,T_r[2],8.7496716196e+01,8.7496716249e+01,5.3557528190e-08,6.121090e-10,CLEAN,0.0200,
+mtr_asymmetric,T_l[3],4.6604961906e+01,4.6604961950e+01,4.4483833506e-08,9.544871e-10,CLEAN,0.0200,
+mtr_asymmetric,T_r[3],8.6420948939e+01,8.6420949002e+01,6.3335875211e-08,7.328764e-10,CLEAN,0.0200,
+mtr_asymmetric,T_l[4],4.8566481603e+01,4.8566481639e+01,3.6350115806e-08,7.484610e-10,CLEAN,0.0200,
+mtr_asymmetric,T_r[4],8.5452288821e+01,8.5452288891e+01,6.9864114494e-08,8.175804e-10,CLEAN,0.0200,
+mtr_asymmetric,T_l[5],5.0421029648e+01,5.0421029677e+01,2.8955838616e-08,5.742810e-10,CLEAN,0.0200,
+mtr_asymmetric,T_r[5],8.4583668084e+01,8.4583668161e+01,7.7303596413e-08,9.139305e-10,CLEAN,0.0200,
+mtr_asymmetric,T_l[6],5.2175771694e+01,5.2175771717e+01,2.2715767045e-08,4.353700e-10,CLEAN,0.0200,
+mtr_asymmetric,T_r[6],8.3808432104e+01,8.3808432189e+01,8.4941390810e-08,1.013518e-09,CLEAN,0.0200,
+mtr_asymmetric,T_l[7],5.3837439094e+01,5.3837439095e+01,8.5198337274e-10,1.582511e-11,CLEAN,0.0200,
+mtr_asymmetric,T_r[7],8.3120322843e+01,8.3120322917e+01,7.4481135925e-08,8.960641e-10,CLEAN,0.0200,
+mtr_asymmetric,T_l[8],5.5412348848e+01,5.5412348816e+01,3.1107525444e-08,5.613825e-10,CLEAN,0.0200,
+mtr_asymmetric,T_r[8],8.2513461606e+01,8.2513461653e+01,4.6941721621e-08,5.688977e-10,CLEAN,0.0200,
+mtr_asymmetric,T_l[9],5.6906423724e+01,5.6906423663e+01,6.1955496733e-08,1.088726e-09,CLEAN,0.0200,
+mtr_asymmetric,T_r[9],8.1982331454e+01,8.1982331471e+01,1.7682310727e-08,2.156844e-10,CLEAN,0.0200,
+mtr_asymmetric,T_l[10],5.8325212304e+01,5.8325212209e+01,9.4982738119e-08,1.628502e-09,CLEAN,0.0200,
+mtr_asymmetric,T_r[10],8.1521759515e+01,8.1521759502e+01,1.2276800021e-08,1.505954e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_l[1],4.2330057595e+01,4.2330057641e+01,4.5671065152e-08,1.078928e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[1],7.1393059891e+01,7.1393059963e+01,7.1271045954e-08,9.982910e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_l[1],2.0519296470e+04,2.0519296483e+04,1.3486413081e-05,6.572551e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[1],2.0519296470e+04,2.0519296483e+04,1.3486413081e-05,6.572551e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[1],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[1],5.9635236041e+05,5.9635236133e+05,9.1671326663e-04,1.537201e-09,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[1],3.4757394500e+02,3.4757394507e+02,7.3717046689e-08,2.120903e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[1],3.6183708695e+02,3.6183708698e+02,3.9006749830e-08,1.078020e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[1],2.5117686107e+04,2.5117686109e+04,2.3751526896e-06,9.456097e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[1],2.5117686107e+04,2.5117686109e+04,2.3751526896e-06,9.456097e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[1],-3.5825712232e+05,-3.5825712148e+05,8.3925545914e-04,2.342606e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[1],5.9635236041e+05,5.9635236133e+05,9.1671640985e-04,1.537206e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[1],7.4423944999e+01,7.4423945073e+01,7.3717174587e-08,9.905035e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[1],8.8687086946e+01,8.8687086985e+01,3.9006764041e-08,4.398246e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[1],2.5117686107e+04,2.5117686109e+04,2.3751599656e-06,9.456126e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[1],2.5117686107e+04,2.5117686109e+04,2.3751599656e-06,9.456126e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[1],-3.5825712232e+05,-3.5825712148e+05,8.3925819490e-04,2.342614e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[1],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[2],3.1767885115e+02,3.1767885120e+02,4.8373124173e-08,1.522705e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[2],3.4486161877e+02,3.4486161882e+02,5.0336325330e-08,1.459609e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[2],2.0705039507e+04,2.0705039514e+04,7.0529349614e-06,3.406386e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[2],2.0705039507e+04,2.0705039514e+04,7.0529349614e-06,3.406386e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,T_wall_left_l[2],4.4528851147e+01,4.4528851196e+01,4.8373109962e-08,1.086332e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[2],7.1711618767e+01,7.1711618818e+01,5.0336481650e-08,7.019292e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_l[2],2.0705039507e+04,2.0705039514e+04,7.0529640652e-06,3.406400e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[2],2.0705039507e+04,2.0705039514e+04,7.0529640652e-06,3.406400e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[2],5.6282027748e+05,5.6282027772e+05,2.3355567828e-04,4.149738e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[2],3.4767957515e+02,3.4767957520e+02,5.1979270665e-08,1.495034e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[2],3.6064671620e+02,3.6064671625e+02,5.3557471347e-08,1.485040e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[2],2.5042146006e+04,2.5042146003e+04,3.1990821299e-06,1.277479e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[2],2.5042146006e+04,2.5042146003e+04,3.1990821299e-06,1.277479e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[2],-3.2472503939e+05,-3.2472503938e+05,2.5571207516e-06,7.874726e-12,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[2],5.6282027748e+05,5.6282027772e+05,2.3355951998e-04,4.149806e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[2],7.4529575149e+01,7.4529575201e+01,5.1979441196e-08,6.974338e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[2],8.7496716196e+01,8.7496716249e+01,5.3557528190e-08,6.121090e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[2],2.5042146006e+04,2.5042146003e+04,3.1990457501e-06,1.277465e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[2],2.5042146006e+04,2.5042146003e+04,3.1990457501e-06,1.277465e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[2],-3.2472503939e+05,-3.2472503938e+05,2.5595654733e-06,7.882255e-12,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[3],3.1975496191e+02,3.1975496195e+02,4.4483840611e-08,1.391185e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[3],3.4520578523e+02,3.4520578524e+02,1.5633020212e-08,4.528609e-11,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[3],2.0882718384e+04,2.0882718382e+04,2.1091473172e-06,1.009997e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[3],2.0882718384e+04,2.0882718382e+04,2.1091473172e-06,1.009997e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,T_wall_left_l[3],4.6604961906e+01,4.6604961950e+01,4.4483833506e-08,9.544871e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[3],7.2055785228e+01,7.2055785244e+01,1.5633062844e-08,2.169578e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_l[3],2.0882718384e+04,2.0882718382e+04,2.1091400413e-06,1.009993e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[3],2.0882718384e+04,2.0882718382e+04,2.1091400413e-06,1.009993e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[3],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[3],5.3148237609e+05,5.3148237544e+05,6.5490952693e-04,1.232232e-09,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[3],3.4782474594e+02,3.4782474595e+02,1.5900468497e-08,4.571402e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[3],3.5957094894e+02,3.5957094900e+02,6.3335903633e-08,1.761430e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[3],2.4977189473e+04,2.4977189461e+04,1.1194413673e-05,4.481855e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[3],2.4977189473e+04,2.4977189461e+04,1.1194413673e-05,4.481855e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[3],-2.9338713800e+05,-2.9338713905e+05,1.0532296146e-03,3.589897e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[3],5.3148237609e+05,5.3148237544e+05,6.5490871202e-04,1.232230e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[3],7.4674745935e+01,7.4674745951e+01,1.5900454287e-08,2.129295e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[3],8.6420948939e+01,8.6420949002e+01,6.3335875211e-08,7.328764e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[3],2.4977189473e+04,2.4977189461e+04,1.1194435501e-05,4.481864e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[3],2.4977189473e+04,2.4977189461e+04,1.1194435501e-05,4.481864e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[3],-2.9338713800e+05,-2.9338713905e+05,1.0532286251e-03,3.589894e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[3],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[4],3.2171648160e+02,3.2171648164e+02,3.6350115806e-08,1.129880e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[4],3.4557145497e+02,3.4557145498e+02,1.3172211766e-08,3.811719e-11,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[4],2.1052727722e+04,2.1052727719e+04,3.4731965570e-06,1.649761e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[4],2.1052727722e+04,2.1052727719e+04,3.4731965570e-06,1.649761e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,T_wall_left_l[4],4.8566481603e+01,4.8566481639e+01,3.6350115806e-08,7.484610e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[4],7.2421454972e+01,7.2421454985e+01,1.3172197555e-08,1.818825e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_l[4],2.1052727722e+04,2.1052727719e+04,3.4731820051e-06,1.649754e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[4],2.1052727722e+04,2.1052727719e+04,3.4731820051e-06,1.649754e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[4],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[4],5.0221225917e+05,5.0221225860e+05,5.7063397253e-04,1.136241e-09,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[4],3.4800455044e+02,3.4800455045e+02,1.4408499283e-08,4.140319e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[4],3.5860228882e+02,3.5860228889e+02,6.9864142915e-08,1.948235e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[4],2.4922017461e+04,2.4922017449e+04,1.1963180441e-05,4.800246e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[4],2.4922017461e+04,2.4922017449e+04,1.1963180441e-05,4.800246e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[4],-2.6411702107e+05,-2.6411702233e+05,1.2552943663e-03,4.752796e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[4],5.0221225917e+05,5.0221225860e+05,5.7063356508e-04,1.136240e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[4],7.4854550436e+01,7.4854550451e+01,1.4408485072e-08,1.924864e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[4],8.5452288821e+01,8.5452288891e+01,6.9864114494e-08,8.175804e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[4],2.4922017461e+04,2.4922017449e+04,1.1963191355e-05,4.800250e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[4],2.4922017461e+04,2.4922017449e+04,1.1963191355e-05,4.800250e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[4],-2.6411702107e+05,-2.6411702233e+05,1.2552939006e-03,4.752794e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[4],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[5],3.2357102965e+02,3.2357102968e+02,2.8955867037e-08,8.948844e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[5],3.4595509854e+02,3.4595509862e+02,8.2097130871e-08,2.373057e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[5],2.1215460643e+04,2.1215460654e+04,1.1831303709e-05,5.576737e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[5],2.1215460643e+04,2.1215460654e+04,1.1831303709e-05,5.576737e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,T_wall_left_l[5],5.0421029648e+01,5.0421029677e+01,2.8955838616e-08,5.742810e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[5],7.2805098543e+01,7.2805098625e+01,8.2096534015e-08,1.127621e-09,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_l[5],2.1215460643e+04,2.1215460654e+04,1.1831267329e-05,5.576720e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[5],2.1215460643e+04,2.1215460654e+04,1.1831267329e-05,5.576720e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[5],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[5],4.7488833266e+05,4.7488833406e+05,1.3925915700e-03,2.932461e-09,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[5],3.4821468707e+02,3.4821468716e+02,8.9235982159e-08,2.562671e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[5],3.5773366808e+02,3.5773366816e+02,7.7303695889e-08,2.160929e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[5],2.4875886855e+04,2.4875886857e+04,2.4529472284e-06,9.860743e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[5],2.4875886855e+04,2.4875886857e+04,2.4529472284e-06,9.860743e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[5],-2.3679309457e+05,-2.3679309429e+05,2.7403174317e-04,1.157262e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[5],4.7488833266e+05,4.7488833406e+05,1.3925783569e-03,2.932433e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[5],7.5064687074e+01,7.5064687163e+01,8.9235356882e-08,1.188779e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[5],8.4583668084e+01,8.4583668161e+01,7.7303596413e-08,9.139305e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[5],2.4875886855e+04,2.4875886857e+04,2.4529072107e-06,9.860582e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[5],2.4875886855e+04,2.4875886857e+04,2.4529072107e-06,9.860582e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[5],-2.3679309457e+05,-2.3679309429e+05,2.7401899570e-04,1.157209e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[5],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[6],3.2532577169e+02,3.2532577172e+02,2.2715823889e-08,6.982485e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[6],3.4635369017e+02,3.4635369033e+02,1.5853652258e-07,4.577301e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[6],2.1371305190e+04,2.1371305220e+04,3.0054867239e-05,1.406319e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[6],2.1371305190e+04,2.1371305220e+04,3.0054867239e-05,1.406319e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,T_wall_left_l[6],5.2175771694e+01,5.2175771717e+01,2.2715767045e-08,4.353700e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[6],7.3203690171e+01,7.3203690330e+01,1.5853649415e-07,2.165690e-09,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_l[6],2.1371305190e+04,2.1371305220e+04,3.0054870876e-05,1.406319e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[6],2.1371305190e+04,2.1371305220e+04,3.0054870876e-05,1.406319e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[6],4.4939406328e+05,4.4939406682e+05,3.5358465975e-03,7.868031e-09,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[6],3.4845139009e+02,3.4845139026e+02,1.7233838889e-07,4.945837e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[6],3.5695843210e+02,3.5695843219e+02,8.4941405021e-08,2.379588e-10,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[6],4.4939406328e+05,4.4939406682e+05,3.5358472378e-03,7.868033e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[6],7.5301390092e+01,7.5301390264e+01,1.7233836047e-07,2.288648e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[6],8.3808432104e+01,8.3808432189e+01,8.4941390810e-08,1.013518e-09,CLEAN,0.0200,
 mtr_asymmetric,h_tc_left_r[6],2.4838107639e+04,2.4838107659e+04,1.9268958567e-05,7.757821e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,h_tc_right_r[6],2.4838107639e+04,2.4838107659e+04,1.9268958567e-05,7.757821e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[6],-2.1129882519e+05,-2.1129882318e+05,2.0059220842e-03,9.493295e-09,CLEAN,0.0200,
+mtr_asymmetric,q_left_r[6],-2.1129882519e+05,-2.1129882318e+05,2.0059220551e-03,9.493295e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[7],3.2698743909e+02,3.2698743909e+02,8.5202600530e-10,2.605684e-12,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[7],3.4676464372e+02,3.4676464370e+02,2.1368066427e-08,6.162124e-11,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[7],2.1520641458e+04,2.1520641452e+04,5.5240270740e-06,2.566851e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[7],2.1520641458e+04,2.1520641452e+04,5.5240270740e-06,2.566851e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,T_wall_left_l[7],5.3837439094e+01,5.3837439095e+01,8.5198337274e-10,1.582511e-11,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[7],7.3614643717e+01,7.3614643696e+01,2.1368137482e-08,2.902702e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_l[7],2.1520641458e+04,2.1520641452e+04,5.5240197980e-06,2.566847e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[7],2.1520641458e+04,2.1520641452e+04,5.5240197980e-06,2.566847e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[7],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[7],4.2561812973e+05,4.2561812914e+05,5.8833486401e-04,1.382307e-09,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[7],3.4871136646e+02,3.4871136644e+02,1.7221793769e-08,4.938696e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[7],3.5627032284e+02,3.5627032292e+02,7.4481192769e-08,2.090581e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[7],2.4808039911e+04,2.4808039898e+04,1.3124106772e-05,5.290263e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[7],2.4808039911e+04,2.4808039898e+04,1.3124106772e-05,5.290263e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[7],-1.8752289164e+05,-1.8752289381e+05,2.1757482318e-03,1.160257e-08,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[7],4.2561812973e+05,4.2561812914e+05,5.8833515504e-04,1.382308e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[7],7.5561366460e+01,7.5561366443e+01,1.7221836401e-08,2.279185e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[7],8.3120322843e+01,8.3120322917e+01,7.4481135925e-08,8.960641e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[7],2.4808039911e+04,2.4808039898e+04,1.3124114048e-05,5.290266e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[7],2.4808039911e+04,2.4808039898e+04,1.3124114048e-05,5.290266e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[7],-1.8752289164e+05,-1.8752289381e+05,2.1757481736e-03,1.160257e-08,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[7],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[8],3.2856234885e+02,3.2856234882e+02,3.1107504128e-08,9.467763e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[8],3.4718575542e+02,3.4718575543e+02,8.1274720287e-10,2.340958e-12,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_l[8],5.5412348848e+01,5.5412348816e+01,3.1107525444e-08,5.613825e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[8],7.4035755424e+01,7.4035755425e+01,8.1273299202e-10,1.097757e-11,CLEAN,0.0200,
 mtr_asymmetric,h_tc_left_l[8],2.1663839326e+04,2.1663839332e+04,6.0632046370e-06,2.798767e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,h_tc_right_l[8],2.1663839326e+04,2.1663839332e+04,6.0632046370e-06,2.798767e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[8],4.0345448778e+05,4.0345448858e+05,8.0348725896e-04,1.991519e-09,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[8],3.4899173904e+02,3.4899173905e+02,8.4757516561e-09,2.428640e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[8],3.5566346161e+02,3.5566346165e+02,4.6941750043e-08,1.319836e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[8],2.4785090816e+04,2.4785090781e+04,3.4724725992e-05,1.401033e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[8],2.4785090816e+04,2.4785090781e+04,3.4724725992e-05,1.401033e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[8],-1.6535924968e+05,-1.6535925040e+05,7.1965341340e-04,4.352060e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[8],4.0345448778e+05,4.0345448858e+05,8.0348772462e-04,1.991520e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[8],7.5841739041e+01,7.5841739049e+01,8.4757090235e-09,1.117552e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[8],8.2513461606e+01,8.2513461653e+01,4.6941721621e-08,5.688977e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[8],2.4785090816e+04,2.4785090781e+04,3.4724747820e-05,1.401034e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[8],2.4785090816e+04,2.4785090781e+04,3.4724747820e-05,1.401034e-09,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[8],-1.6535924968e+05,-1.6535925040e+05,7.1965329698e-04,4.352060e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[9],3.3005642372e+02,3.3005642366e+02,6.1955461206e-08,1.877117e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[9],3.4761515308e+02,3.4761515304e+02,3.3757601159e-08,9.711200e-11,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[9],2.1801256723e+04,2.1801256725e+04,1.9041144697e-06,8.733967e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[9],2.1801256723e+04,2.1801256725e+04,1.9041144697e-06,8.733967e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,T_wall_left_l[9],5.6906423724e+01,5.6906423663e+01,6.1955496733e-08,1.088726e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[9],7.4465153077e+01,7.4465153043e+01,3.3757856954e-08,4.533376e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_l[9],2.1801256723e+04,2.1801256725e+04,1.9040926418e-06,8.733866e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[9],2.1801256723e+04,2.1801256725e+04,1.9040926418e-06,8.733866e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[9],3.8280236634e+05,3.8280236699e+05,6.4919516444e-04,1.695902e-09,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[9],3.4928999572e+02,3.4928999570e+02,2.5291797101e-08,7.240917e-11,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[9],3.5513233145e+02,3.5513233147e+02,1.7682395992e-08,4.979101e-11,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[9],2.4768711507e+04,2.4768711490e+04,1.7001570086e-05,6.864132e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[9],2.4768711507e+04,2.4768711490e+04,1.7001570086e-05,6.864132e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[9],-1.4470712825e+05,-1.4470712922e+05,9.6687255427e-04,6.681582e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[9],3.8280236634e+05,3.8280236699e+05,6.4919108991e-04,1.695891e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[9],7.6139995722e+01,7.6139995697e+01,2.5292010264e-08,3.321777e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[9],8.1982331454e+01,8.1982331471e+01,1.7682310727e-08,2.156844e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[9],2.4768711507e+04,2.4768711490e+04,1.7001595552e-05,6.864142e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[9],2.4768711507e+04,2.4768711490e+04,1.7001595552e-05,6.864142e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[9],-1.4470712825e+05,-1.4470712922e+05,9.6687526093e-04,6.681601e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_l[10],3.3147521230e+02,3.3147521221e+02,9.4982624432e-08,2.865452e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_l[10],3.4805125107e+02,3.4805125101e+02,6.6800396326e-08,1.919269e-10,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_l[10],2.1933238348e+04,2.1933238349e+04,4.8271249398e-07,2.200826e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_l[10],2.1933238348e+04,2.1933238349e+04,4.8271249398e-07,2.200826e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,T_wall_left_l[10],5.8325212304e+01,5.8325212209e+01,9.4982738119e-08,1.628502e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_l[10],7.4901251073e+01,7.4901251006e+01,6.6801078447e-08,8.918553e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_l[10],2.1933238348e+04,2.1933238349e+04,4.8265064834e-07,2.200544e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_l[10],2.1933238348e+04,2.1933238349e+04,4.8265064834e-07,2.200544e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_asymmetric,q_left_l[10],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,q_right_l[10],3.6356620919e+05,3.6356620981e+05,6.2536750920e-04,1.720092e-09,CLEAN,0.0200,
-mtr_asymmetric,T_wall_left_r[10],3.4960394412e+02,3.4960394406e+02,5.7987733726e-08,1.658669e-10,CLEAN,0.0200,
-mtr_asymmetric,T_wall_right_r[10],3.5467175951e+02,3.5467175950e+02,1.2276700545e-08,3.461426e-11,CLEAN,0.0200,
-mtr_asymmetric,h_tc_left_r[10],2.4758394164e+04,2.4758394139e+04,2.4650267733e-05,9.956327e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,h_tc_right_r[10],2.4758394164e+04,2.4758394139e+04,2.4650267733e-05,9.956327e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_asymmetric,q_left_r[10],-1.2547097109e+05,-1.2547097210e+05,1.0051887512e-03,8.011325e-09,CLEAN,0.0200,
+mtr_asymmetric,q_right_l[10],3.6356620919e+05,3.6356620981e+05,6.2535429606e-04,1.720056e-09,CLEAN,0.0200,
+mtr_asymmetric,T_wall_left_r[10],7.6453944120e+01,7.6453944062e+01,5.7988415847e-08,7.584751e-10,CLEAN,0.0200,
+mtr_asymmetric,T_wall_right_r[10],8.1521759515e+01,8.1521759502e+01,1.2276800021e-08,1.505954e-10,CLEAN,0.0200,
+mtr_asymmetric,h_tc_left_r[10],2.4758394164e+04,2.4758394139e+04,2.4650333216e-05,9.956354e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,h_tc_right_r[10],2.4758394164e+04,2.4758394139e+04,2.4650333216e-05,9.956354e-10,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_asymmetric,q_left_r[10],-1.2547097109e+05,-1.2547097210e+05,1.0052032012e-03,8.011440e-09,CLEAN,0.0200,
 mtr_asymmetric,q_right_r[10],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_asymmetric,T_plate[1_1],3.4517419947e+02,3.4517419954e+02,7.1636520715e-08,2.075373e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[1_2],3.4626848922e+02,3.4626848929e+02,7.2457169153e-08,2.092514e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[1_3],3.4719478954e+02,3.4719478962e+02,7.3267301559e-08,2.110265e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[2_1],3.4545727023e+02,3.4545727028e+02,5.0601443036e-08,1.464767e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[2_2],3.4648058373e+02,3.4648058378e+02,5.1120991884e-08,1.475436e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[2_3],3.4733590782e+02,3.4733590787e+02,5.1730069117e-08,1.489338e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[3_1],3.4576827074e+02,3.4576827076e+02,1.5735565739e-08,4.550899e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[3_2],3.4672525235e+02,3.4672525237e+02,1.5729995084e-08,4.536732e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[3_3],3.4751424455e+02,3.4751424456e+02,1.5813839127e-08,4.550559e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[4_1],3.4610296295e+02,3.4610296296e+02,1.3386170394e-08,3.867684e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[4_2],3.4699798948e+02,3.4699798949e+02,1.3803571619e-08,3.977998e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[4_3],3.4772502659e+02,3.4772502660e+02,1.4210343124e-08,4.086661e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[5_1],3.4645768869e+02,3.4645768878e+02,8.3328245637e-08,2.405149e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[5_2],3.4729487958e+02,3.4729487967e+02,8.5679857875e-08,2.467064e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[5_3],3.4796408105e+02,3.4796408114e+02,8.8120827968e-08,2.532469e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[6_1],3.4682929889e+02,3.4682929905e+02,1.6086141841e-07,4.638057e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[6_2],3.4761252690e+02,3.4761252707e+02,1.6540070646e-07,4.758192e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[6_3],3.4822776550e+02,3.4822776567e+02,1.7002940922e-07,4.882707e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[7_1],3.4721508957e+02,3.4721508955e+02,2.0735797079e-08,5.972032e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[7_2],3.4794799186e+02,3.4794799184e+02,1.9281685582e-08,5.541542e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[7_3],3.4851290473e+02,3.4851290471e+02,1.7938248220e-08,5.147083e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[8_1],3.4761274476e+02,3.4761274476e+02,2.1145751816e-09,6.083135e-12,CLEAN,0.0200,
-mtr_asymmetric,T_plate[8_2],3.4829873401e+02,3.4829873401e+02,4.7074877330e-09,1.351566e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[8_3],3.4881673383e+02,3.4881673384e+02,7.1898398346e-09,2.061208e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[9_1],3.4802028558e+02,3.4802028555e+02,3.2338732581e-08,9.292198e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[9_2],3.4866256117e+02,3.4866256114e+02,2.9511511457e-08,8.464204e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[9_3],3.4913684735e+02,3.4913684732e+02,2.6694863209e-08,7.645960e-11,CLEAN,0.0200,
-mtr_asymmetric,T_plate[10_1],3.4843602531e+02,3.4843602525e+02,6.5356971390e-08,1.875724e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[10_2],3.4903758437e+02,3.4903758431e+02,6.2380820509e-08,1.787224e-10,CLEAN,0.0200,
-mtr_asymmetric,T_plate[10_3],3.4947115401e+02,3.4947115395e+02,5.9415242504e-08,1.700147e-10,CLEAN,0.0200,
-mtr_one_sided,T_out_l,3.1788707779e+02,3.1788707780e+02,1.2710700048e-08,3.998495e-11,CLEAN,0.0200,
-mtr_one_sided,mdot_l,2.5254714269e-01,2.5254714270e-01,1.3660905740e-11,5.409250e-11,CLEAN,0.0200,
+mtr_asymmetric,T_plate[1_1],7.2024199473e+01,7.2024199544e+01,7.1636677035e-08,9.946196e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[1_2],7.3118489218e+01,7.3118489290e+01,7.2457353895e-08,9.909580e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[1_3],7.4044789545e+01,7.4044789618e+01,7.3267443668e-08,9.895017e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[2_1],7.2307270228e+01,7.2307270278e+01,5.0601585144e-08,6.998132e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[2_2],7.3330583730e+01,7.3330583782e+01,5.1121190836e-08,6.971333e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[2_3],7.4185907815e+01,7.4185907867e+01,5.1730211226e-08,6.973051e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[3_1],7.2618270743e+01,7.2618270759e+01,1.5735565739e-08,2.166888e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[3_2],7.3575252354e+01,7.3575252370e+01,1.5729980873e-08,2.137945e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[3_3],7.4364244548e+01,7.4364244564e+01,1.5813824916e-08,2.126536e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[4_1],7.2952962946e+01,7.2952962959e+01,1.3386184605e-08,1.834906e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[4_2],7.3847989477e+01,7.3847989490e+01,1.3803557408e-08,1.869185e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[4_3],7.4575026589e+01,7.4575026603e+01,1.4210371546e-08,1.905513e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[5_1],7.3307688695e+01,7.3307688778e+01,8.3327620359e-08,1.136683e-09,CLEAN,0.0200,
+mtr_asymmetric,T_plate[5_2],7.4144879581e+01,7.4144879667e+01,8.5679189965e-08,1.155564e-09,CLEAN,0.0200,
+mtr_asymmetric,T_plate[5_3],7.4814081049e+01,7.4814081137e+01,8.8120174269e-08,1.177855e-09,CLEAN,0.0200,
+mtr_asymmetric,T_plate[6_1],7.3679298888e+01,7.3679299049e+01,1.6086140420e-07,2.183265e-09,CLEAN,0.0200,
+mtr_asymmetric,T_plate[6_2],7.4462526904e+01,7.4462527069e+01,1.6540064962e-07,2.221260e-09,CLEAN,0.0200,
+mtr_asymmetric,T_plate[6_3],7.5077765502e+01,7.5077765672e+01,1.7002932395e-07,2.264709e-09,CLEAN,0.0200,
+mtr_asymmetric,T_plate[7_1],7.4065089571e+01,7.4065089550e+01,2.0735825501e-08,2.799676e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[7_2],7.4797991861e+01,7.4797991841e+01,1.9281770847e-08,2.577846e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[7_3],7.5362904733e+01,7.5362904715e+01,1.7938290853e-08,2.380255e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[8_1],7.4462744757e+01,7.4462744759e+01,2.1144899165e-09,2.839662e-11,CLEAN,0.0200,
+mtr_asymmetric,T_plate[8_2],7.5148734005e+01,7.5148734010e+01,4.7074451004e-09,6.264171e-11,CLEAN,0.0200,
+mtr_asymmetric,T_plate[8_3],7.5666733835e+01,7.5666733842e+01,7.1898114129e-09,9.501945e-11,CLEAN,0.0200,
+mtr_asymmetric,T_plate[9_1],7.4870285582e+01,7.4870285549e+01,3.2338945744e-08,4.319330e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[9_2],7.5512561172e+01,7.5512561143e+01,2.9511724620e-08,3.908187e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[9_3],7.5986847345e+01,7.5986847318e+01,2.6695062161e-08,3.513116e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[10_1],7.5286025311e+01,7.5286025245e+01,6.5357710355e-08,8.681254e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[10_2],7.5887584369e+01,7.5887584306e+01,6.2381516841e-08,8.220253e-10,CLEAN,0.0200,
+mtr_asymmetric,T_plate[10_3],7.6321154009e+01,7.6321153950e+01,5.9415924625e-08,7.784988e-10,CLEAN,0.0200,
+mtr_one_sided,T_out_l,4.4737077786e+01,4.4737077799e+01,1.2710700048e-08,2.841200e-10,CLEAN,0.0200,
+mtr_one_sided,ṁ_l,2.5254714269e-01,2.5254714270e-01,1.3660850229e-11,5.409228e-11,CLEAN,0.0200,
 mtr_one_sided,dP_loop,3.0000000000e+04,3.0000000000e+04,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_l[1],3.1362375632e+02,3.1362375632e+02,4.5815227168e-09,1.460834e-11,CLEAN,0.0200,
-mtr_one_sided,T_l[2],3.1409750279e+02,3.1409750280e+02,3.6947653825e-09,1.176312e-11,CLEAN,0.0200,
-mtr_one_sided,T_l[3],3.1457123906e+02,3.1457123907e+02,8.3680902208e-09,2.660157e-11,CLEAN,0.0200,
-mtr_one_sided,T_l[4],3.1504496477e+02,3.1504496478e+02,9.1475840236e-09,2.903580e-11,CLEAN,0.0200,
-mtr_one_sided,T_l[5],3.1551867959e+02,3.1551867959e+02,6.1154992181e-09,1.938237e-11,CLEAN,0.0200,
-mtr_one_sided,T_l[6],3.1599238314e+02,3.1599238315e+02,1.3073986338e-10,4.137437e-13,CLEAN,0.0200,
-mtr_one_sided,T_l[7],3.1646607510e+02,3.1646607509e+02,6.8679355536e-09,2.170196e-11,CLEAN,0.0200,
-mtr_one_sided,T_l[8],3.1693975509e+02,3.1693975508e+02,1.0958331131e-08,3.457544e-11,CLEAN,0.0200,
-mtr_one_sided,T_l[9],3.1741342277e+02,3.1741342277e+02,7.3317778515e-09,2.309851e-11,CLEAN,0.0200,
-mtr_one_sided,T_l[10],3.1788707779e+02,3.1788707780e+02,1.2710700048e-08,3.998495e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[1],3.2014454411e+02,3.2014454410e+02,4.5600359044e-09,1.424368e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[1],3.1362375632e+02,3.1362375632e+02,4.5815227168e-09,1.460834e-11,CLEAN,0.0200,
-mtr_one_sided,h_tc_left_l[1],1.8256631398e+04,1.8256631398e+04,1.4964462025e-07,8.196727e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[1],1.8256631398e+04,1.8256631398e+04,1.4964462025e-07,8.196727e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[1],1.1904761905e+05,1.1904761905e+05,7.8949960880e-07,6.631797e-12,CLEAN,0.0200,
+mtr_one_sided,T_l[1],4.0473756323e+01,4.0473756318e+01,4.5815582439e-09,1.131982e-10,CLEAN,0.0200,
+mtr_one_sided,T_l[2],4.0947502792e+01,4.0947502795e+01,3.6947298554e-09,9.023090e-11,CLEAN,0.0200,
+mtr_one_sided,T_l[3],4.1421239058e+01,4.1421239066e+01,8.3680617990e-09,2.020235e-10,CLEAN,0.0200,
+mtr_one_sided,T_l[4],4.1894964773e+01,4.1894964782e+01,9.1475413910e-09,2.183446e-10,CLEAN,0.0200,
+mtr_one_sided,T_l[5],4.2368679586e+01,4.2368679592e+01,6.1154707964e-09,1.443394e-10,CLEAN,0.0200,
+mtr_one_sided,T_l[6],4.2842383145e+01,4.2842383145e+01,1.3070433624e-10,3.050819e-12,CLEAN,0.0200,
+mtr_one_sided,T_l[7],4.3316075098e+01,4.3316075091e+01,6.8679426590e-09,1.585541e-10,CLEAN,0.0200,
+mtr_one_sided,T_l[8],4.3789755093e+01,4.3789755082e+01,1.0958366659e-08,2.502496e-10,CLEAN,0.0200,
+mtr_one_sided,T_l[9],4.4263422774e+01,4.4263422766e+01,7.3317849569e-09,1.656398e-10,CLEAN,0.0200,
+mtr_one_sided,T_l[10],4.4737077786e+01,4.4737077799e+01,1.2710700048e-08,2.841200e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[1],4.6994544109e+01,4.6994544105e+01,4.5600359044e-09,9.703330e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[1],4.0473756323e+01,4.0473756318e+01,4.5815582439e-09,1.131982e-10,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[1],1.8256631398e+04,1.8256631398e+04,1.4964098227e-07,8.196528e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[1],1.8256631398e+04,1.8256631398e+04,1.4964098227e-07,8.196528e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[1],1.1904761905e+05,1.1904761905e+05,7.8881566878e-07,6.626052e-12,CLEAN,0.0200,
 mtr_one_sided,q_right_l[1],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[2],3.2059314129e+02,3.2059314130e+02,3.3991796045e-09,1.060278e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[2],3.1409750279e+02,3.1409750280e+02,3.6947653825e-09,1.176312e-11,CLEAN,0.0200,
-mtr_one_sided,h_tc_left_l[2],1.8327315941e+04,1.8327315942e+04,9.4569259090e-08,5.160017e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[2],1.8327315941e+04,1.8327315942e+04,9.4569259090e-08,5.160017e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[2],1.1904761905e+05,1.1904761904e+05,4.6933564590e-06,3.942419e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[2],4.7443141292e+01,4.7443141296e+01,3.3991440773e-09,7.164669e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[2],4.0947502792e+01,4.0947502795e+01,3.6947298554e-09,9.023090e-11,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[2],1.8327315941e+04,1.8327315942e+04,9.4583811006e-08,5.160811e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[2],1.8327315941e+04,1.8327315942e+04,9.4583811006e-08,5.160811e-12,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[2],1.1904761905e+05,1.1904761904e+05,4.6927598305e-06,3.941918e-11,CLEAN,0.0200,
 mtr_one_sided,q_right_l[2],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[3],3.2104195802e+02,3.2104195803e+02,8.5723286247e-09,2.670158e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[3],3.1457123906e+02,3.1457123907e+02,8.3680902208e-09,2.660157e-11,CLEAN,0.0200,
-mtr_one_sided,h_tc_left_l[3],1.8397896697e+04,1.8397896697e+04,4.8628135119e-07,2.643136e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[3],1.8397896697e+04,1.8397896697e+04,4.8628135119e-07,2.643136e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[3],1.1904761905e+05,1.1904761905e+05,6.6726934165e-06,5.605062e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[3],4.7891958022e+01,4.7891958030e+01,8.5722930976e-09,1.789923e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[3],4.1421239058e+01,4.1421239066e+01,8.3680617990e-09,2.020235e-10,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[3],1.8397896697e+04,1.8397896697e+04,4.8627771321e-07,2.643116e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[3],1.8397896697e+04,1.8397896697e+04,4.8627771321e-07,2.643116e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[3],1.1904761905e+05,1.1904761905e+05,6.6732027335e-06,5.605490e-11,CLEAN,0.0200,
 mtr_one_sided,q_right_l[3],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[4],3.2149099113e+02,3.2149099114e+02,1.0773476333e-08,3.351097e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[4],3.1504496477e+02,3.1504496478e+02,9.1475840236e-09,2.903580e-11,CLEAN,0.0200,
-mtr_one_sided,h_tc_left_l[4],1.8468373001e+04,1.8468373002e+04,1.0165676940e-06,5.504371e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[4],1.8468373001e+04,1.8468373002e+04,1.0165676940e-06,5.504371e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[4],1.1904761905e+05,1.1904761908e+05,3.5963777918e-05,3.020957e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[4],4.8340991125e+01,4.8340991136e+01,1.0773433701e-08,2.228633e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[4],4.1894964773e+01,4.1894964782e+01,9.1475413910e-09,2.183446e-10,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[4],1.8468373001e+04,1.8468373002e+04,1.0165495041e-06,5.504272e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[4],1.8468373001e+04,1.8468373002e+04,1.0165495041e-06,5.504272e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[4],1.1904761905e+05,1.1904761908e+05,3.5963530536e-05,3.020937e-10,CLEAN,0.0200,
 mtr_one_sided,q_right_l[4],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[5],3.2194023747e+02,3.2194023748e+02,8.5586862042e-09,2.658470e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[5],3.1551867959e+02,3.1551867959e+02,6.1154992181e-09,1.938237e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[5],4.8790237473e+01,4.8790237481e+01,8.5587004151e-09,1.754183e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[5],4.2368679586e+01,4.2368679592e+01,6.1154707964e-09,1.443394e-10,CLEAN,0.0200,
 mtr_one_sided,h_tc_left_l[5],1.8538744202e+04,1.8538744203e+04,1.1574011296e-06,6.243147e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_one_sided,h_tc_right_l[5],1.8538744202e+04,1.8538744203e+04,1.1574011296e-06,6.243147e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[5],1.1904761905e+05,1.1904761910e+05,5.0983202527e-05,4.282589e-10,CLEAN,0.0200,
+mtr_one_sided,q_left_l[5],1.1904761905e+05,1.1904761910e+05,5.0983580877e-05,4.282621e-10,CLEAN,0.0200,
 mtr_one_sided,q_right_l[5],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[6],3.2238969398e+02,3.2238969398e+02,4.8953552323e-10,1.518459e-12,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[6],3.1599238314e+02,3.1599238315e+02,1.3073986338e-10,4.137437e-13,CLEAN,0.0200,
-mtr_one_sided,h_tc_left_l[6],1.8609009659e+04,1.8609009660e+04,3.0401133699e-07,1.633678e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[6],1.8609009659e+04,1.8609009660e+04,3.0401133699e-07,1.633678e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[6],1.1904761905e+05,1.1904761906e+05,8.3980703494e-06,7.054379e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[6],4.9239693976e+01,4.9239693976e+01,4.8948578524e-10,9.940878e-12,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[6],4.2842383145e+01,4.2842383145e+01,1.3070433624e-10,3.050819e-12,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[6],1.8609009659e+04,1.8609009660e+04,3.0399678508e-07,1.633600e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[6],1.8609009659e+04,1.8609009660e+04,3.0399678508e-07,1.633600e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[6],1.1904761905e+05,1.1904761906e+05,8.3974300651e-06,7.053841e-11,CLEAN,0.0200,
 mtr_one_sided,q_right_l[6],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[7],3.2283935759e+02,3.2283935758e+02,9.3191374617e-09,2.886618e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[7],3.1646607510e+02,3.1646607509e+02,6.8679355536e-09,2.170196e-11,CLEAN,0.0200,
-mtr_one_sided,h_tc_left_l[7],1.8679168744e+04,1.8679168743e+04,8.5531064542e-07,4.578955e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[7],1.8679168744e+04,1.8679168743e+04,8.5531064542e-07,4.578955e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[7],1.1904761905e+05,1.1904761900e+05,5.2246527048e-05,4.388708e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[7],4.9689357586e+01,4.9689357577e+01,9.3191232509e-09,1.875477e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[7],4.3316075098e+01,4.3316075091e+01,6.8679426590e-09,1.585541e-10,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[7],1.8679168744e+04,1.8679168743e+04,8.5530700744e-07,4.578935e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[7],1.8679168744e+04,1.8679168743e+04,8.5530700744e-07,4.578935e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[7],1.1904761905e+05,1.1904761900e+05,5.2246337873e-05,4.388692e-10,CLEAN,0.0200,
 mtr_one_sided,q_right_l[7],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[8],3.2328922530e+02,3.2328922528e+02,1.1664383237e-08,3.608033e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[8],3.1693975509e+02,3.1693975508e+02,1.0958331131e-08,3.457544e-11,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[8],5.0139225296e+01,5.0139225285e+01,1.1664376132e-08,2.326397e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[8],4.3789755093e+01,4.3789755082e+01,1.0958366659e-08,2.502496e-10,CLEAN,0.0200,
 mtr_one_sided,h_tc_left_l[8],1.8749220838e+04,1.8749220837e+04,5.7083525462e-07,3.044581e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
 mtr_one_sided,h_tc_right_l[8],1.8749220838e+04,1.8749220837e+04,5.7083525462e-07,3.044581e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[8],1.1904761905e+05,1.1904761903e+05,1.6288380721e-05,1.368224e-10,CLEAN,0.0200,
+mtr_one_sided,q_left_l[8],1.1904761905e+05,1.1904761903e+05,1.6287711333e-05,1.368168e-10,CLEAN,0.0200,
 mtr_one_sided,q_right_l[8],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[9],3.2373929414e+02,3.2373929412e+02,1.2536020222e-08,3.872258e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[9],3.1741342277e+02,3.1741342277e+02,7.3317778515e-09,2.309851e-11,CLEAN,0.0200,
-mtr_one_sided,h_tc_left_l[9],1.8819165334e+04,1.8819165333e+04,1.6835729184e-06,8.946055e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[9],1.8819165334e+04,1.8819165333e+04,1.6835729184e-06,8.946055e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[9],1.1904761905e+05,1.1904761894e+05,1.0911209392e-04,9.165416e-10,CLEAN,0.0200,
-mtr_one_sided,q_right_l[9],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_wall_left_l[10],3.2418956117e+02,3.2418956119e+02,1.7189563550e-08,5.302319e-11,CLEAN,0.0200,
-mtr_one_sided,T_wall_right_l[10],3.1788707779e+02,3.1788707780e+02,1.2710700048e-08,3.998495e-11,CLEAN,0.0200,
-mtr_one_sided,h_tc_left_l[10],1.8889001637e+04,1.8889001639e+04,1.7621532606e-06,9.328991e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,h_tc_right_l[10],1.8889001637e+04,1.8889001639e+04,1.7621532606e-06,9.328991e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
-mtr_one_sided,q_left_l[10],1.1904761905e+05,1.1904761914e+05,9.4609713415e-05,7.947216e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[9],5.0589294136e+01,5.0589294123e+01,1.2536048644e-08,2.478004e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[9],4.4263422774e+01,4.4263422766e+01,7.3317920624e-09,1.656400e-10,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[9],1.8819165334e+04,1.8819165333e+04,1.6835692804e-06,8.946036e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[9],1.8819165334e+04,1.8819165333e+04,1.6835692804e-06,8.946036e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[9],1.1904761905e+05,1.1904761894e+05,1.0911263234e-04,9.165461e-10,CLEAN,0.0200,
+mtr_one_sided,q_right_l[9],1.3029750581e-10,0.0000000000e+00,1.3029750581e-10,1.302975e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_left_l[10],5.1039561175e+01,5.1039561192e+01,1.7189506707e-08,3.367879e-10,CLEAN,0.0200,
+mtr_one_sided,T_wall_right_l[10],4.4737077786e+01,4.4737077799e+01,1.2710700048e-08,2.841200e-10,CLEAN,0.0200,
+mtr_one_sided,h_tc_left_l[10],1.8889001637e+04,1.8889001639e+04,1.7621423467e-06,9.328933e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,h_tc_right_l[10],1.8889001637e+04,1.8889001639e+04,1.7621423467e-06,9.328933e-11,CLEAN,0.0200,connected-side h (heat-transferring face) — mirrors Python _other_if_none
+mtr_one_sided,q_left_l[10],1.1904761905e+05,1.1904761914e+05,9.4609247753e-05,7.947177e-10,CLEAN,0.0200,
 mtr_one_sided,q_right_l[10],0.0000000000e+00,0.0000000000e+00,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-mtr_one_sided,T_plate[1_1],3.2027053617e+02,3.2027053617e+02,4.5520778258e-09,1.421323e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[1_2],3.2035453088e+02,3.2035453088e+02,4.5467345444e-09,1.419282e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[1_3],3.2027053617e+02,3.2027053617e+02,4.5520778258e-09,1.421323e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[2_1],3.2071913336e+02,3.2071913336e+02,3.4070808397e-09,1.062325e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[2_2],3.2080312806e+02,3.2080312807e+02,3.4124241211e-09,1.063713e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[2_3],3.2071913336e+02,3.2071913336e+02,3.4070808397e-09,1.062325e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[3_1],3.2116795009e+02,3.2116795009e+02,8.5802298599e-09,2.671571e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[3_2],3.2125194479e+02,3.2125194480e+02,8.5855162979e-09,2.672518e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[3_3],3.2116795009e+02,3.2116795009e+02,8.5802298599e-09,2.671571e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[4_1],3.2161698319e+02,3.2161698320e+02,1.0781434412e-08,3.352259e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[4_2],3.2170097790e+02,3.2170097791e+02,1.0786664006e-08,3.353009e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[4_3],3.2161698319e+02,3.2161698320e+02,1.0781434412e-08,3.352259e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[5_1],3.2206622954e+02,3.2206622954e+02,8.4666567091e-09,2.628856e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[5_2],3.2215022425e+02,3.2215022425e+02,8.4719431470e-09,2.629811e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[5_3],3.2206622954e+02,3.2206622954e+02,8.4666567091e-09,2.628856e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[6_1],3.2251568604e+02,3.2251568604e+02,4.9743675845e-10,1.542365e-12,CLEAN,0.0200,
-mtr_one_sided,T_plate[6_2],3.2259968075e+02,3.2259968075e+02,5.0272319640e-10,1.558350e-12,CLEAN,0.0200,
-mtr_one_sided,T_plate[6_3],3.2251568604e+02,3.2251568604e+02,4.9743675845e-10,1.542365e-12,CLEAN,0.0200,
-mtr_one_sided,T_plate[7_1],3.2296534965e+02,3.2296534964e+02,9.3111793831e-09,2.883027e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[7_2],3.2304934436e+02,3.2304934435e+02,9.3058929451e-09,2.880641e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[7_3],3.2296534965e+02,3.2296534964e+02,9.3111793831e-09,2.883027e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[8_1],3.2341521736e+02,3.2341521735e+02,1.1656425158e-08,3.604167e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[8_2],3.2349921207e+02,3.2349921206e+02,1.1651081877e-08,3.601580e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[8_3],3.2341521736e+02,3.2341521735e+02,1.1656425158e-08,3.604167e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[9_1],3.2386528620e+02,3.2386528619e+02,1.2528062143e-08,3.868294e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[9_2],3.2394928091e+02,3.2394928090e+02,1.2522832549e-08,3.865677e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[9_3],3.2386528620e+02,3.2386528619e+02,1.2528062143e-08,3.868294e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[10_1],3.2431555324e+02,3.2431555326e+02,1.7197464786e-08,5.302695e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[10_2],3.2439954795e+02,3.2439954796e+02,1.7202751224e-08,5.302952e-11,CLEAN,0.0200,
-mtr_one_sided,T_plate[10_3],3.2431555324e+02,3.2431555326e+02,1.7197464786e-08,5.302695e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[1_1],4.7120536173e+01,4.7120536168e+01,4.5520991421e-09,9.660542e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[1_2],4.7204530882e+01,4.7204530877e+01,4.5468055987e-09,9.632138e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[1_3],4.7120536173e+01,4.7120536168e+01,4.5520991421e-09,9.660542e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[2_1],4.7569133356e+01,4.7569133359e+01,3.4070808397e-09,7.162377e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[2_2],4.7653128065e+01,4.7653128068e+01,3.4123743831e-09,7.160861e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[2_3],4.7569133356e+01,4.7569133359e+01,3.4070808397e-09,7.162377e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[3_1],4.8017950085e+01,4.8017950094e+01,8.5802298599e-09,1.786880e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[3_2],4.8101944794e+01,4.8101944803e+01,8.5855162979e-09,1.784858e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[3_3],4.8017950085e+01,4.8017950094e+01,8.5802298599e-09,1.786880e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[4_1],4.8466983189e+01,4.8466983199e+01,1.0781370463e-08,2.224477e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[4_2],4.8550977898e+01,4.8550977908e+01,1.0786656901e-08,2.221718e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[4_3],4.8466983189e+01,4.8466983199e+01,1.0781370463e-08,2.224477e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[5_1],4.8916229536e+01,4.8916229545e+01,8.4666353928e-09,1.730844e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[5_2],4.9000224245e+01,4.9000224254e+01,8.4719289362e-09,1.728957e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[5_3],4.8916229536e+01,4.8916229545e+01,8.4666353928e-09,1.730844e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[6_1],4.9365686039e+01,4.9365686040e+01,4.9742254760e-10,1.007628e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[6_2],4.9449680748e+01,4.9449680749e+01,5.0270898555e-10,1.016607e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[6_3],4.9365686039e+01,4.9365686040e+01,4.9742254760e-10,1.007628e-11,CLEAN,0.0200,
+mtr_one_sided,T_plate[7_1],4.9815349650e+01,4.9815349641e+01,9.3111864885e-09,1.869140e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[7_2],4.9899344359e+01,4.9899344350e+01,9.3058929451e-09,1.864933e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[7_3],4.9815349650e+01,4.9815349641e+01,9.3111864885e-09,1.869140e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[8_1],5.0265217360e+01,5.0265217348e+01,1.1656439369e-08,2.318987e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[8_2],5.0349212069e+01,5.0349212057e+01,1.1651145826e-08,2.314067e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[8_3],5.0265217360e+01,5.0265217348e+01,1.1656439369e-08,2.318987e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[9_1],5.0715286199e+01,5.0715286187e+01,1.2528111881e-08,2.470283e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[9_2],5.0799280908e+01,5.0799280896e+01,1.2522818338e-08,2.465157e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[9_3],5.0715286199e+01,5.0715286187e+01,1.2528111881e-08,2.470283e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[10_1],5.1165553238e+01,5.1165553255e+01,1.7197443469e-08,3.361137e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[10_2],5.1249547947e+01,5.1249547964e+01,1.7202737013e-08,3.356661e-10,CLEAN,0.0200,
+mtr_one_sided,T_plate[10_3],5.1165553238e+01,5.1165553255e+01,1.7197443469e-08,3.361137e-10,CLEAN,0.0200,

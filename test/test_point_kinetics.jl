@@ -1,15 +1,23 @@
 using Test
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.Examples
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
-using STREAM: Channel, HeatDiffusion, ChannelAndContacts
 import ModelingToolkit: compose
+
+# Zero control reactivity, i.e. an exactly critical reactor. Bound to a name rather than
+# written inline at each call site because the same object has to reach both the constructor
+# (which captures its type) and the operating point (which supplies the callable itself).
+const CRITICAL = (t) -> 0.0
 
 @testset "PointKinetics" begin
     @testset "component compiles with 7 state variables" begin
-        @named pk = PointKinetics(rho=0.0)
+        @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
         @test length(unknowns(ssys)) == 7
     end
@@ -26,12 +34,13 @@ import ModelingToolkit: compose
         @test ic.P == P0
         @test length(ic.C_k) == 6
 
-        @named pk = PointKinetics(rho=0.0)
+        @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
-        op = vcat(
-            [ssys.P => ic.P],
-            [getproperty(ssys, Symbol(:C_, k)) => ic.C_k[k] for k in 1:6],
-        )
+        op = Pair{Any,Any}[
+            ssys.rho_c_fn => CRITICAL,
+            ssys.P => ic.P,
+            [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
+        ]
         prob = ODEProblem(ssys, op, (0.0, 1.0))
 
         # du = f(u, p, 0): the derivative vector the integrator would take at t=0.
@@ -49,21 +58,47 @@ import ModelingToolkit: compose
         @test isapprox(prob[ssys.dPdt], 0.0; atol=1e-3)  # |dPdt| ~ 3e-8, scale P0 = 1e6
     end
 
+    @testset "group count follows beta_k" begin
+        # The component is not fixed at six groups: length(beta_k) sets it, and criticality
+        # has to hold for any count. A one-group model is the classic textbook reduction.
+        for G in (1, 2, 3, 11)
+            beta_k = fill(sum(U235_BETA_K) / G, G)
+            lambda_k = G == 1 ? [0.5] : collect(range(0.1, 60.0; length=G))
+            pk_g = PointKinetics(CRITICAL; name=:pk_g, beta_k=beta_k, lambda_k=lambda_k)
+            ssys_g = mtkcompile(pk_g)
+            @test length(unknowns(ssys_g)) == 1 + G
+
+            ic_g = point_kinetics_steady_state(1e6; beta_k=beta_k, lambda_k=lambda_k)
+            @test length(ic_g.C_k) == G
+            op_g = Pair{Any,Any}[ssys_g.rho_c_fn => CRITICAL, ssys_g.P => ic_g.P]
+            append!(op_g, [ssys_g.C[k] => ic_g.C_k[k] for k in 1:G])
+            sol_g = solve(
+                ODEProblem(ssys_g, op_g, (0.0, 5.0)), Rodas5P(); abstol=1e-10, reltol=1e-10
+            )
+            @test sol_g.retcode == ReturnCode.Success
+            # Critical and started at the fixed point, so power must not move.
+            @test isapprox(sol_g[ssys_g.P, end], 1e6; rtol=1e-8)
+            @test isapprox(sol_g[ssys_g.beta_total, 1], sum(beta_k); rtol=1e-10)
+        end
+    end
+
+    @testset "mismatched beta_k and lambda_k lengths are rejected" begin
+        @test_throws DimensionMismatch PointKinetics(
+            CRITICAL; name=:bad, beta_k=[1e-3, 2e-3], lambda_k=[1.0]
+        )
+    end
+
     @testset "precursor-only decay matches analytical" begin
         lambda_k = U235_LAMBDA_K
-        @named pk = PointKinetics(rho=0.0, Lambda=1.0, beta_k=zeros(6), lambda_k=lambda_k)
+        @named pk = PointKinetics(CRITICAL; Lambda=1.0, beta_k=zeros(6), lambda_k=lambda_k)
         ssys = mtkcompile(pk)
 
         P0 = 10.0
         C_k0 = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-        op = [
+        op = Pair{Any,Any}[
+            ssys.rho_c_fn => CRITICAL,
             ssys.P => P0,
-            ssys.C_1 => C_k0[1],
-            ssys.C_2 => C_k0[2],
-            ssys.C_3 => C_k0[3],
-            ssys.C_4 => C_k0[4],
-            ssys.C_5 => C_k0[5],
-            ssys.C_6 => C_k0[6],
+            [ssys.C[k] => C_k0[k] for k in 1:6]...,
         ]
 
         t_span = range(0.0, 100.0, length=500)
@@ -77,22 +112,18 @@ import ModelingToolkit: compose
 
         for (j, tj) in enumerate(t_span)
             @test isapprox(
-                sol[ssys.C_1, j], C_k0[1] * exp(-lambda_k[1] * tj), rtol=1e-3, atol=1e-6
+                sol[ssys.C[1], j], C_k0[1] * exp(-lambda_k[1] * tj), rtol=1e-3, atol=1e-6
             )
         end
     end
 
     @testset "zero ICs yield trivial P=0 solution" begin
-        @named pk = PointKinetics(rho=0.0)
+        @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
-        op = [
+        op = Pair{Any,Any}[
+            ssys.rho_c_fn => CRITICAL,
             ssys.P => 0.0,
-            ssys.C_1 => 0.0,
-            ssys.C_2 => 0.0,
-            ssys.C_3 => 0.0,
-            ssys.C_4 => 0.0,
-            ssys.C_5 => 0.0,
-            ssys.C_6 => 0.0,
+            [ssys.C[k] => 0.0 for k in 1:6]...,
         ]
         t_span = range(0.0, 10.0, length=100)
         sol = solve_transient(ssys, op, t_span)
@@ -101,17 +132,13 @@ import ModelingToolkit: compose
     end
 
     @testset "@observed variables accessible" begin
-        @named pk = PointKinetics(rho=0.0)
+        @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
         ic = point_kinetics_steady_state(1e6)
-        op = [
+        op = Pair{Any,Any}[
+            ssys.rho_c_fn => CRITICAL,
             ssys.P => ic.P,
-            ssys.C_1 => ic.C_k[1],
-            ssys.C_2 => ic.C_k[2],
-            ssys.C_3 => ic.C_k[3],
-            ssys.C_4 => ic.C_k[4],
-            ssys.C_5 => ic.C_k[5],
-            ssys.C_6 => ic.C_k[6],
+            [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_span = range(0.0, 1.0, length=10)
         sol = solve_transient(ssys, op, t_span)
@@ -193,23 +220,18 @@ import ModelingToolkit: compose
 
     @testset "Callable Control Reactivity" begin
         fn_zero = t -> 0.0
-        @named pk_a = PointKinetics(fn_zero; rho_val=0.0)
+        @named pk_a = PointKinetics(fn_zero)
         ssys_a = mtkcompile(pk_a)
         @test length(unknowns(ssys_a)) == 7
         P0 = 1e6
         ic = point_kinetics_steady_state(P0)
         ctrl_zero = ReactivityController()
-        @named pk_b = PointKinetics(ctrl_zero; rho_val=0.0)
+        @named pk_b = PointKinetics(ctrl_zero)
         ssys_b = mtkcompile(pk_b)
         op_b = Pair{Any,Any}[
             ssys_b.rho_c_fn => ctrl_zero,
             ssys_b.P => ic.P,
-            ssys_b.C_1 => ic.C_k[1],
-            ssys_b.C_2 => ic.C_k[2],
-            ssys_b.C_3 => ic.C_k[3],
-            ssys_b.C_4 => ic.C_k[4],
-            ssys_b.C_5 => ic.C_k[5],
-            ssys_b.C_6 => ic.C_k[6],
+            [ssys_b.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_arr_b = range(0.0, 2.0, length=100)
         sol_b = solve_transient(ssys_b, op_b, t_arr_b)
@@ -222,17 +244,12 @@ import ModelingToolkit: compose
         t_step = 1.0
         fn_step = (s, ts, t) -> (t >= t_step) * delta_rho
         ctrl_step = ReactivityController(fn_step)
-        @named pk_c = PointKinetics(ctrl_step; rho_val=0.0)
+        @named pk_c = PointKinetics(ctrl_step)
         ssys_c = mtkcompile(pk_c)
         op_c = Pair{Any,Any}[
             ssys_c.rho_c_fn => ctrl_step,
             ssys_c.P => ic.P,
-            ssys_c.C_1 => ic.C_k[1],
-            ssys_c.C_2 => ic.C_k[2],
-            ssys_c.C_3 => ic.C_k[3],
-            ssys_c.C_4 => ic.C_k[4],
-            ssys_c.C_5 => ic.C_k[5],
-            ssys_c.C_6 => ic.C_k[6],
+            [ssys_c.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_sample = t_step + 0.028
         t_arr_c = range(0.0, t_sample, length=500)
@@ -251,17 +268,12 @@ import ModelingToolkit: compose
         t_ramp_end = 2.0
         fn_ramp = (s, ts, t) -> ramp_slope * t
         ctrl_ramp = ReactivityController(fn_ramp)
-        @named pk_d = PointKinetics(ctrl_ramp; rho_val=0.0)
+        @named pk_d = PointKinetics(ctrl_ramp)
         ssys_d = mtkcompile(pk_d)
         op_d = Pair{Any,Any}[
             ssys_d.rho_c_fn => ctrl_ramp,
             ssys_d.P => ic.P,
-            ssys_d.C_1 => ic.C_k[1],
-            ssys_d.C_2 => ic.C_k[2],
-            ssys_d.C_3 => ic.C_k[3],
-            ssys_d.C_4 => ic.C_k[4],
-            ssys_d.C_5 => ic.C_k[5],
-            ssys_d.C_6 => ic.C_k[6],
+            [ssys_d.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_arr_d = range(0.0, t_ramp_end, length=200)
         sol_d = solve_transient(ssys_d, op_d, t_arr_d)
@@ -274,17 +286,12 @@ import ModelingToolkit: compose
         end
 
         plain_fn = t -> (t >= t_step) * delta_rho
-        @named pk_e = PointKinetics(plain_fn; rho_val=0.0)
+        @named pk_e = PointKinetics(plain_fn)
         ssys_e = mtkcompile(pk_e)
         op_e = Pair{Any,Any}[
             ssys_e.rho_c_fn => plain_fn,
             ssys_e.P => ic.P,
-            ssys_e.C_1 => ic.C_k[1],
-            ssys_e.C_2 => ic.C_k[2],
-            ssys_e.C_3 => ic.C_k[3],
-            ssys_e.C_4 => ic.C_k[4],
-            ssys_e.C_5 => ic.C_k[5],
-            ssys_e.C_6 => ic.C_k[6],
+            [ssys_e.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
         t_arr_e = range(0.0, t_sample, length=500)
         sol_e = solve_transient(ssys_e, op_e, t_arr_e; tstops=[t_step])
@@ -371,7 +378,7 @@ import ModelingToolkit: compose
                 ctrl_zero;
                 name=:pk,
                 temp_worth=Dict(ch => alpha1, fuel => alpha2),
-                ref_temp=Dict(ch => 293.0),
+                ref_temp=Dict(ch => 19.85),
             )
         end
 
@@ -382,7 +389,7 @@ import ModelingToolkit: compose
         end
     end
 
-    @testset "connect_temperature_feedback" begin
+    @testset "temperature_feedback" begin
         ctrl_zero = ReactivityController()
 
         pg5 = PipeGeometry_rectangular(1.0, 0.04, 0.01, 0.04)
@@ -402,7 +409,7 @@ import ModelingToolkit: compose
 
         @testset "1D channel generates 5 equations" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=Dict(ch => -0.001))
-            eqs = connect_temperature_feedback(pk, [ch])
+            eqs = Connect.temperature_feedback(pk, [ch])
             @test eqs isa Vector{Equation}
             @test length(eqs) == 5
         end
@@ -411,7 +418,7 @@ import ModelingToolkit: compose
             @named pk = PointKinetics(
                 ctrl_zero; temp_worth=Dict(fuel => fill(-0.002, 3, 2))
             )
-            eqs = connect_temperature_feedback(pk, [fuel])
+            eqs = Connect.temperature_feedback(pk, [fuel])
             @test eqs isa Vector{Equation}
             @test length(eqs) == 6
         end
@@ -419,7 +426,7 @@ import ModelingToolkit: compose
         @testset "multiple components generates 5+6=11 equations" begin
             tw = Dict(ch => -0.001, fuel => fill(-0.002, 3, 2))
             @named pk = PointKinetics(ctrl_zero; temp_worth=tw)
-            eqs = connect_temperature_feedback(pk, [ch, fuel])
+            eqs = Connect.temperature_feedback(pk, [ch, fuel])
             @test length(eqs) == 11
         end
     end
@@ -433,7 +440,7 @@ import ModelingToolkit: compose
             src = read(joinpath(proj_root, relpath), String)
             @test !occursin("T_source_", src)
             @test !occursin("temp_worth", src)
-            @test !occursin("connect_temperature_feedback", src)
+            @test !occursin("temperature_feedback", src)
         end
     end
 
@@ -467,7 +474,7 @@ import ModelingToolkit: compose
             abort_states=Set([:SCRAM]),
         )
 
-        @named pk = PointKinetics(ctrl; rho_val=0.0)
+        @named pk = PointKinetics(ctrl)
         ssys = mtkcompile(pk)
         cb = scram_callback(ssys, ssys.P, ctrl)
 
@@ -475,12 +482,7 @@ import ModelingToolkit: compose
         op = Pair{Any,Any}[
             ssys.rho_c_fn => ctrl,
             ssys.P => ic.P,
-            ssys.C_1 => ic.C_k[1],
-            ssys.C_2 => ic.C_k[2],
-            ssys.C_3 => ic.C_k[3],
-            ssys.C_4 => ic.C_k[4],
-            ssys.C_5 => ic.C_k[5],
-            ssys.C_6 => ic.C_k[6],
+            [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
 
         t_arr = range(0.0, 10.0; length=1000)
@@ -524,7 +526,7 @@ end
         t_step = 0.5
         delta_rho = 0.003   # 0.003 > beta/2; strong enough for visible prompt rise
         alpha = -1e-4       # weak negative feedback
-        T_inlet = 293.15
+        T_inlet = 20.0
 
         # ReactivityController.input_reactivity has signature (state, t_state, t) -> Float64.
         step_fn = (state, t_state, t) -> (t >= t_step ? delta_rho : 0.0)
@@ -559,7 +561,7 @@ end
         t_step = 0.5
         delta_rho = 0.005   # large enough to exceed plimit quickly
         alpha = -0.01
-        T_inlet = 293.15
+        T_inlet = 20.0
 
         scram_ir =
             (state, t_state, t) ->
@@ -599,13 +601,13 @@ end
 
     @testset "consistent cold IC has zero startup reactivity" begin
         # REGRESSION GUARD for the boundary-cell initialization artifact. FlowPort/
-        # ThermalPort temperatures default to 300 K; the boundary coolant cells and
+        # ThermalPort temperatures default to 26.85 °C; the boundary coolant cells and
         # the channel↔fuel contact nodes alias to those ports, so a per-cell T seed
         # alone does NOT pin them. If build_loop_pk fails to seed the port/contact
-        # temperatures, feedback sees a spurious (300 − ref_temp) offset and the loop
+        # temperatures, feedback sees a spurious (26.85 − ref_temp) offset and the loop
         # starts far from critical. With a consistent IC and ref_temp = T_inlet, the
         # loop MUST start exactly critical: net reactivity ≈ 0 at t=0.
-        Tin = 293.15
+        Tin = 20.0
         for (tw, rt) in (
             (Dict(:cac => fill(-0.01, 7)),    Dict(:cac => fill(Tin, 7))),       # coolant feedback
             (Dict(:fuel => fill(-0.1, 7, 2)), Dict(:fuel => fill(Tin, 7, 2))),   # fuel feedback
@@ -629,8 +631,8 @@ end
         # heats above the inlet reference, driving feedback negative until power
         # collapses to a low, self-consistent (net reactivity ≈ 0) equilibrium. Strong
         # negative alpha ⇒ power becomes negligible — and crucially, here that is REAL
-        # feedback physics, not the old 300 K init artifact (guarded by PK-IC-01).
-        Tin = 293.15
+        # feedback physics, not the old init artifact (guarded by PK-IC-01).
+        Tin = 20.0
         ctrl = ReactivityController()
         ssys, ic = build_loop_pk(
             ctrl; n=7, T_inlet=Tin, P0=1.0, power_scale=1e4,
@@ -659,8 +661,8 @@ end
         #   (3) power stays BOUNDED — without feedback a sustained +delta_rho diverges,
         #   (4) feedback subtracts the inserted reactivity, settling to a new critical
         #       equilibrium (late-time net reactivity pulled back below delta_rho, ≈ 0).
-        Tin = 293.15
-        beta_total = 0.006502        # = sum(STREAM.U235_BETA_K)
+        Tin = 20.0
+        beta_total = 0.006502        # = sum(STREAM.Components.U235_BETA_K)
         delta_rho = 5e-4             # < beta_total ⇒ delayed-supercritical, bounded jump
         t_step = 40.0                # insert after the loop has settled (~30 s)
         ctrl = ReactivityController((s, ts, tt) -> (tt >= t_step ? delta_rho : 0.0))

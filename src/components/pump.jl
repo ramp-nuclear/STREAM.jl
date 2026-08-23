@@ -1,9 +1,7 @@
-# pump.jl -- Pump component
-
 """
     Pump(dP_pump::Real; name) -> System
     Pump(dP_pump::Any; name) -> System
-    Pump(; name, mdot0) -> System
+    Pump(; name, ṁ0) -> System
 
 Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch methods:
 
@@ -15,7 +13,7 @@ Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch
    The callable is stored as an MTK callable parameter `dP_pump_fn`. The caller must pass
    `ssys.pump.dP_pump_fn => f` in the `op` dict to `ODEProblem` / `solve_transient`.
 
-3. `Pump(; name, mdot0)` — fixed-flow mode. `mdot0` is a fixed mass flow rate parameter
+3. `Pump(; name, ṁ0)` — fixed-flow mode. `ṁ0` is a fixed mass flow rate parameter
    [kg/s]. No pressure equation is added; the caller must anchor pressure elsewhere.
 
 # Arguments
@@ -31,50 +29,32 @@ Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch
 
 **Fixed-flow mode (method 3):**
 - `name`: system name (Symbol)
-- `mdot0`: fixed mass flow rate [kg/s]
+- `ṁ0`: fixed mass flow rate [kg/s]
 
 # Ports
-- `port_in`, `port_out` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `System`. Call `mtkcompile(sys)` before solving.
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Pump(dP_pump::Real; name)
     pars = @parameters dP_pump = dP_pump
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_out.P - port_in.P ~ dP_pump,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[outlet.p - inlet.p ~ dP_pump]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
 function Pump(dP_pump::Any; name)
     FType = typeof(dP_pump)
     pars = @parameters (dP_pump_fn::FType)(..)
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_out.P - port_in.P ~ dP_pump_fn(t),
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[outlet.p - inlet.p ~ dP_pump_fn(t)]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end
 
-function Pump(; name, mdot0)
-    pars = @parameters mdot0 = mdot0
-    @named port_in = FlowPort()
-    @named port_out = FlowPort()
-    eqs = Equation[
-        port_in.mdot + port_out.mdot ~ 0,
-        port_in.mdot ~ mdot0,
-        port_out.T ~ instream(port_in.T),
-        port_in.T ~ instream(port_out.T),
-    ]
-    return compose(System(eqs, t, [], pars; name=name), port_in, port_out)
+function Pump(; name, ṁ0)
+    pars = @parameters ṁ0 = ṁ0
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[inlet.ṁ ~ ṁ0]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
 end

@@ -1,19 +1,30 @@
-# point_kinetics.jl -- PointKinetics component and steady-state IC helper
-#
-# Implements the 6-group point kinetics equations (7 ODEs: 1 power + 6 precursor groups)
-# with a constant reactivity parameter. The companion point_kinetics_steady_state function
-# computes analytically correct initial conditions at criticality (rho=0).
-#
-# ODE formulation (Keepin 1965, same as Python STREAM):
-#   dP/dt   = (rho - beta) / Lambda * P + sum_k(lambda_k * C_k)
-#   dC_k/dt = -lambda_k * C_k + beta_k / Lambda * P    for k = 1..6
-#
+"""
+    U235_LAMBDA
 
-# U-235 6-group delayed neutron data (same as Python STREAM reference)
-const U235_LAMBDA = 5.4e-5  # neutron generation time [s]
-const U235_LAMBDA_K = [55.72, 22.72, 6.22, 2.3, 0.618, 0.23]  # precursor decay constants [1/s]
-const U235_BETA_K = [0.000215, 0.001424, 0.001274, 0.002568, 0.000748, 0.000273]  # delayed neutron fractions [-]
-# beta_total = sum(U235_BETA_K) = 0.006502
+Prompt neutron generation time Λ for U-235, `5.4e-5` s. The default `Lambda` in
+[`PointKinetics`](@ref).
+"""
+const U235_LAMBDA = 5.4e-5
+
+"""
+    U235_LAMBDA_K
+
+Precursor decay constants λₖ [1/s] for the six standard U-235 delayed neutron groups, ordered
+fastest to slowest. The default `lambda_k` in [`PointKinetics`](@ref), paired group for group
+with [`U235_BETA_K`](@ref).
+"""
+const U235_LAMBDA_K = [55.72, 22.72, 6.22, 2.3, 0.618, 0.23]
+
+"""
+    U235_BETA_K
+
+Delayed neutron fractions βₖ [-] for the six standard U-235 groups, in the same order as
+[`U235_LAMBDA_K`](@ref). The default `beta_k` in [`PointKinetics`](@ref), where
+`length(beta_k)` sets the group count.
+
+They sum to β = 0.006502, reported by the `beta_total` observable.
+"""
+const U235_BETA_K = [0.000215, 0.001424, 0.001274, 0.002568, 0.000748, 0.000273]
 
 function _flatten_weights(raw, comp)
     T_sym = getproperty(comp, :T)
@@ -47,174 +58,87 @@ function _flatten_weights(raw, comp)
 end
 
 """
-    PointKinetics(; name, rho=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K) -> System
-    PointKinetics(rho_c_fn::Any; name, rho_val=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K) -> System
+    _temperature_feedback(temp_worth, ref_temp) -> (expr, unknowns)
 
-Standalone 6-group point kinetics component implementing 7 coupled ODEs for reactor
-neutronics: 1 power equation and 6 delayed neutron precursor group equations.
+Build the per-cell temperature reactivity `Σⱼ αⱼ·(Tⱼ - Trefⱼ)` and the free `T_source`
+unknowns it reads. Returns `(0, Num[])` when `temp_worth` is `nothing`.
 
-At rho=0 (default), the system is exactly critical -- power remains constant when
-initialized with the correct precursor concentrations from `point_kinetics_steady_state`.
-
-# Arguments
-- `name`: system name (Symbol, injected by `@named` macro)
-- `rho`: constant reactivity [-] (default 0.0 = critical). Note: rho=0 is the steady-state
-  operating point; positive rho drives supercritical power excursion. (scalar mode only)
-- `Lambda`: neutron generation time [s] (default U235_LAMBDA = 5.4e-5)
-- `beta_k`: delayed neutron fractions [-] for each of 6 groups (default U235_BETA_K)
-- `lambda_k`: precursor decay constants [1/s] for each of 6 groups (default U235_LAMBDA_K)
-
-# Returns
-Uncompiled `System` with 7 state variables (P, C_1..C_6) and 3 observed variables
-(beta_total, dPdt, reactivity). Call `mtkcompile(sys)` before solving.
+The `T_source` unknowns have no equation here; `temperature_feedback` binds them to
+the component temperatures they stand for.
 """
-function PointKinetics(;
-    name, rho=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K
-)
-
-    pars = @parameters begin
-        rho_val = rho
-        Lambda_gen = Lambda
-        beta_1 = beta_k[1]
-        beta_2 = beta_k[2]
-        beta_3 = beta_k[3]
-        beta_4 = beta_k[4]
-        beta_5 = beta_k[5]
-        beta_6 = beta_k[6]
-        lambda_1 = lambda_k[1]
-        lambda_2 = lambda_k[2]
-        lambda_3 = lambda_k[3]
-        lambda_4 = lambda_k[4]
-        lambda_5 = lambda_k[5]
-        lambda_6 = lambda_k[6]
+function _temperature_feedback(temp_worth, ref_temp)
+    temp_worth === nothing && return (0, Num[])
+    ref_dict = ref_temp === nothing ? Dict() : ref_temp
+    unknown_vars = Num[]
+    expr = 0
+    for (comp, alpha_raw) in temp_worth
+        alpha, n_flat = _flatten_weights(alpha_raw, comp)
+        Tref, _ = _flatten_weights(get(ref_dict, comp, 0.0), comp)
+        length(Tref) == n_flat || throw(
+            DimensionMismatch(
+                "ref_temp for $(nameof(comp)) has length $(length(Tref)), expected $n_flat",
+            ),
+        )
+        var_sym = Symbol(:T_source_, nameof(comp))
+        T_source = only(@variables $(var_sym)(t)[1:n_flat])
+        append!(unknown_vars, collect(T_source))
+        expr = expr + sum(alpha[j] * (T_source[j] - Tref[j]) for j in 1:n_flat)
     end
-
-    @variables begin
-        P(t) = 1.0
-        C_1(t)
-        C_2(t)
-        C_3(t)
-        C_4(t)
-        C_5(t)
-        C_6(t)
-        # Observed variables (declared here, assigned in obs equations below)
-        beta_total(t)
-        dPdt(t)
-        reactivity(t)
-    end
-
-    beta_sum = beta_1 + beta_2 + beta_3 + beta_4 + beta_5 + beta_6
-
-    # Precursor source terms: sum_k(lambda_k * C_k)
-    precursor_source =
-        lambda_1 * C_1 +
-        lambda_2 * C_2 +
-        lambda_3 * C_3 +
-        lambda_4 * C_4 +
-        lambda_5 * C_5 +
-        lambda_6 * C_6
-
-    eqs = Equation[
-        D(P) ~ (rho_val - beta_sum) / Lambda_gen * P + precursor_source,
-        D(C_1) ~ -lambda_1 * C_1 + beta_1 / Lambda_gen * P,
-        D(C_2) ~ -lambda_2 * C_2 + beta_2 / Lambda_gen * P,
-        D(C_3) ~ -lambda_3 * C_3 + beta_3 / Lambda_gen * P,
-        D(C_4) ~ -lambda_4 * C_4 + beta_4 / Lambda_gen * P,
-        D(C_5) ~ -lambda_5 * C_5 + beta_5 / Lambda_gen * P,
-        D(C_6) ~ -lambda_6 * C_6 + beta_6 / Lambda_gen * P,
-    ]
-
-    # Observed variables: diagnostics computed post-solve (never on RHS of another equation).
-    # All expressions are inlined -- no observed-to-observed chains.
-    obs = Equation[
-        beta_total ~ beta_sum,
-        dPdt ~ (rho_val - beta_sum) / Lambda_gen * P + precursor_source,
-        reactivity ~ rho_val,
-    ]
-
-    return System(
-        eqs,
-        t,
-        [P, C_1, C_2, C_3, C_4, C_5, C_6],
-        [
-            rho_val,
-            Lambda_gen,
-            beta_1,
-            beta_2,
-            beta_3,
-            beta_4,
-            beta_5,
-            beta_6,
-            lambda_1,
-            lambda_2,
-            lambda_3,
-            lambda_4,
-            lambda_5,
-            lambda_6,
-        ];
-        observed=obs,
-        name=name,
-    )
+    return (expr, unknown_vars)
 end
 
 """
-    PointKinetics(rho_c_fn::Any; name, rho_val=0.0, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
+    PointKinetics(rho_c_fn::Any; name, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
                   lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing) -> System
 
-Callable-mode constructor for `PointKinetics`. The control reactivity is provided as a
-callable `rho_c_fn(t) -> Float64` (or a `ReactivityController` instance, which is itself
-callable). The power ODE becomes:
+Keepin (1965) point kinetics with `G` delayed precursor groups, so `1 + G` ODEs:
 
-    D(P) ~ (rho_val + rho_c_fn(t) + feedback_expr - beta_sum) / Lambda_gen * P + precursor_source
+    dP/dt  = (ρ - β)/Λ · P + Σₖ λₖ·Cₖ
+    dCₖ/dt = βₖ/Λ · P - λₖ·Cₖ           k = 1..G
 
-where `rho_val` is a constant base/bias reactivity, `rho_c_fn(t)` is the time-varying
-control contribution (additive composition), and `feedback_expr` is the per-cell
-temperature reactivity sum:
+`G` is `length(beta_k)`. The defaults are the six-group U-235 data ([`U235_BETA_K`](@ref),
+[`U235_LAMBDA_K`](@ref)), giving seven equations.
+[`point_kinetics_steady_state`](@ref) gives the precursor concentrations that hold power steady
+at criticality.
 
-    feedback_expr = sum_j alpha_j * (T_j - Tref_j)
+The control reactivity comes from a callable `rho_c_fn(t)` (a `ReactivityController` is itself
+callable), and the total reactivity becomes
 
-i.e. each `temp_worth` weight `alpha_j` is the temperature coefficient of reactivity
-(d_rho/d_T) for that cell and enters the reactivity additively, signed. It is used with
-its absolute sign: a stabilizing reactor has a NEGATIVE coefficient, so `alpha_j` is
-normally a negative value (hotter -> less reactive). A positive value gives destabilizing
-feedback.
+    ρ = rho_c_fn(t) + Σⱼ αⱼ·(Tⱼ - Trefⱼ)
 
-When solving, the callable must be passed in the initial conditions dict:
-    `op = [ssys.rho_c_fn => rho_c_fn, ssys.P => ic.P, ...]`
+where the sum is the per-cell temperature feedback. Each weight `αⱼ` is a temperature
+coefficient of reactivity (dρ/dT) and enters signed: a stabilizing reactor has a negative
+coefficient, so `αⱼ` is normally negative.
 
-This is required because MTK stores callable parameters by reference; omitting it
-causes `KeyError` at `solve_transient`.
+A critical reactor is `rho_c_fn = t -> 0.0`; a constant bias is `t -> ρ₀`.
+
+When solving, the callable must appear in the operating point:
+`op = [ssys.rho_c_fn => rho_c_fn, ssys.P => ic.P, ...]`. MTK stores callable parameters by
+reference, so omitting it raises `KeyError` at `solve_transient`.
 
 # Arguments
-- `rho_c_fn` (positional): callable with signature `(t) -> Float64`. May also be a
-  `ReactivityController` instance (callable via `ctrl(t)`). Concrete type is captured via
-  `FType = typeof(rho_c_fn)` at construction time.
-- `name`: system name (Symbol, injected by `@named` macro)
-- `rho_val`: constant base reactivity [-] (default 0.0 = critical bias)
-- `Lambda`: neutron generation time [s] (default U235_LAMBDA = 5.4e-5)
-- `beta_k`: delayed neutron fractions [-] for each of 6 groups (default U235_BETA_K)
-- `lambda_k`: precursor decay constants [1/s] for each of 6 groups (default U235_LAMBDA_K)
-- `temp_worth::Union{Nothing,Dict}=nothing`: per-component temperature feedback weights.
-  Keys are uncompiled MTK Systems; values are scalar (broadcast to all cells), 1D vector
-  (matches Channel n-cell structure), or 2D matrix (matches HeatDiffusion nz*nx, flattened
-  row-major: j_flat = (jz-1)*nx + jx). `nothing` (default) = no temperature
-  feedback.
-- `ref_temp::Union{Nothing,Dict}=nothing`: per-component reference temperatures [K].
-  Same key structure as `temp_worth`. Missing keys default to zero (full T contributes).
+- `rho_c_fn` (positional): callable `(t) -> Float64`, or a `ReactivityController`. Its
+  concrete type is captured at construction.
+- `name`: system name (Symbol, injected by `@named`)
+- `Lambda`: neutron generation time [s] (default `U235_LAMBDA`)
+- `beta_k`, `lambda_k`: per-group delayed data; `length(beta_k)` sets the group count
+- `temp_worth::Union{Nothing,Dict}=nothing`: per-component feedback weights. Keys are
+  uncompiled MTK Systems; values are scalar (broadcast to every cell), a length-n vector
+  (Channel), or an nz×nx matrix (HeatDiffusion, flattened row-major as
+  `j = (jz-1)*nx + jx`). `nothing` disables feedback.
+- `ref_temp::Union{Nothing,Dict}=nothing`: per-component reference temperatures [°C], same
+  key structure. Missing keys default to zero, so the full temperature contributes.
 
 # Returns
-Uncompiled `System` with 7 + sum(n_flat_per_component) state variables, 3 observed
-variables (beta_total, dPdt, reactivity), and an MTK callable parameter `rho_c_fn`.
-Call `mtkcompile(sys)` before solving.
+Uncompiled `System` with unknowns `P`, `C[1:G]`, and one `T_source` array per feedback
+component, plus the callable parameter `rho_c_fn`.
 
-**Important:** When `temp_worth` is provided, the resulting System has free T_source
-unknowns that MUST be bound by calling `connect_temperature_feedback` and wrapping in
-a composed System before `mtkcompile`.
+**Important:** with `temp_worth` set, the `T_source` unknowns are free until
+`temperature_feedback` binds them; do that and compose before `mtkcompile`.
 """
 function PointKinetics(
     rho_c_fn::Any;
     name,
-    rho_val=0.0,
     Lambda=U235_LAMBDA,
     beta_k=U235_BETA_K,
     lambda_k=U235_LAMBDA_K,
@@ -222,107 +146,53 @@ function PointKinetics(
     ref_temp=nothing,
 )
     FType = typeof(rho_c_fn)
+    control = function ()
+        control_pars = @parameters (rho_c_fn::FType)(..)
+        feedback, feedback_unknowns = _temperature_feedback(temp_worth, ref_temp)
+        return (control_pars[1](t) + feedback, control_pars, feedback_unknowns)
+    end
+    G = length(beta_k)
+    G == length(lambda_k) || throw(
+        DimensionMismatch("beta_k has $G groups but lambda_k has $(length(lambda_k))")
+    )
+
     pars = @parameters begin
-        rho_val = rho_val
-        Lambda_gen = Lambda
-        beta_1 = beta_k[1]
-        beta_2 = beta_k[2]
-        beta_3 = beta_k[3]
-        beta_4 = beta_k[4]
-        beta_5 = beta_k[5]
-        beta_6 = beta_k[6]
-        lambda_1 = lambda_k[1]
-        lambda_2 = lambda_k[2]
-        lambda_3 = lambda_k[3]
-        lambda_4 = lambda_k[4]
-        lambda_5 = lambda_k[5]
-        lambda_6 = lambda_k[6]
-        (rho_c_fn::FType)(..)
+        Λ = Lambda
+        β[1:G] = collect(beta_k)
+        λ[1:G] = collect(lambda_k)
     end
 
     @variables begin
         P(t) = 1.0
-        C_1(t)
-        C_2(t)
-        C_3(t)
-        C_4(t)
-        C_5(t)
-        C_6(t)
+        (C(t))[1:G]
+        # Observed diagnostics, assigned below; never on the RHS of another equation.
         beta_total(t)
         dPdt(t)
         reactivity(t)
     end
 
-    beta_sum = beta_1 + beta_2 + beta_3 + beta_4 + beta_5 + beta_6
-    precursor_source = (
-        lambda_1 * C_1 +
-        lambda_2 * C_2 +
-        lambda_3 * C_3 +
-        lambda_4 * C_4 +
-        lambda_5 * C_5 +
-        lambda_6 * C_6
-    )
+    β_k, λ_k, C_k = collect(β), collect(λ), collect(C)
+    control_reactivity, control_pars, control_unknowns = control()
+    ρ = control_reactivity
+    β_sum = sum(β_k)
 
-    T_source_vars = Num[]
-    feedback_expr = 0
-    if temp_worth !== nothing
-        ref_dict = ref_temp === nothing ? Dict() : ref_temp
-        for (comp, alpha_raw) in temp_worth
-            cname = nameof(comp)
-            alpha_flat, n_flat = _flatten_weights(alpha_raw, comp)
-            Tref_raw = get(ref_dict, comp, 0.0)
-            Tref_flat, _ = _flatten_weights(Tref_raw, comp)
-            length(Tref_flat) == n_flat || throw(
-                DimensionMismatch(
-                    "ref_temp for $(nameof(comp)) has length $(length(Tref_flat)), expected $n_flat",
-                ),
-            )
-            var_sym = Symbol(:T_source_, cname)
-            Tsrc = only(@variables $(var_sym)(t)[1:n_flat])
-            append!(T_source_vars, collect(Tsrc))
-            for j in 1:n_flat
-                feedback_expr = feedback_expr + alpha_flat[j] * (Tsrc[j] - Tref_flat[j])
-            end
-        end
-    end
+    # Keepin (1965), G delayed groups. `Ṗ` is the rate expression itself, kept separate from
+    # the `dPdt` observable below so neither name shadows the other.
+    #     Ṗ  = (ρ - β)/Λ · P + Σₖ λₖ·Cₖ
+    #     Ċₖ = βₖ/Λ · P - λₖ·Cₖ
+    Ṗ = (ρ - β_sum) / Λ * P + λ_k ⋅ C_k
 
-    eqs = Equation[
-        D(P) ~ (rho_val + rho_c_fn(t) + feedback_expr - beta_sum) / Lambda_gen * P + precursor_source,
-        D(C_1) ~ -lambda_1 * C_1 + beta_1 / Lambda_gen * P,
-        D(C_2) ~ -lambda_2 * C_2 + beta_2 / Lambda_gen * P,
-        D(C_3) ~ -lambda_3 * C_3 + beta_3 / Lambda_gen * P,
-        D(C_4) ~ -lambda_4 * C_4 + beta_4 / Lambda_gen * P,
-        D(C_5) ~ -lambda_5 * C_5 + beta_5 / Lambda_gen * P,
-        D(C_6) ~ -lambda_6 * C_6 + beta_6 / Lambda_gen * P,
+    eqs = [
+        D(P) ~ Ṗ
+        D.(C_k) .~ β_k ./ Λ .* P .- λ_k .* C_k
     ]
-
-    obs = Equation[
-        beta_total ~ beta_sum,
-        dPdt ~ (rho_val + rho_c_fn(t) + feedback_expr - beta_sum) / Lambda_gen * P + precursor_source,
-        reactivity ~ rho_val + rho_c_fn(t) + feedback_expr,
-    ]
+    obs = Equation[beta_total ~ β_sum, dPdt ~ Ṗ, reactivity ~ ρ]
 
     return System(
         eqs,
         t,
-        [P, C_1, C_2, C_3, C_4, C_5, C_6, T_source_vars...],
-        [
-            rho_val,
-            Lambda_gen,
-            beta_1,
-            beta_2,
-            beta_3,
-            beta_4,
-            beta_5,
-            beta_6,
-            lambda_1,
-            lambda_2,
-            lambda_3,
-            lambda_4,
-            lambda_5,
-            lambda_6,
-            rho_c_fn,
-        ];
+        [P; C_k; control_unknowns],
+        [pars; control_pars];
         observed=obs,
         name=name,
     )
@@ -364,8 +234,8 @@ current state and time-of-entry, a transition log, and an `abort_states` set use
 downstream callbacks to signal early integrator termination.
 
 Instances are callable: `ctrl(t)` returns `worth(ctrl, t)`. This lets users pass a
-`ReactivityController` directly as the MTK callable parameter to
-`PointKinetics(ctrl; rho_val=0.0, ...)` without writing a wrapper closure.
+`ReactivityController` directly as the MTK callable parameter to `PointKinetics(ctrl; ...)`
+without writing a wrapper closure.
 
 # Fields
 - `input_reactivity::F` : callable `(state, t_state, t) -> Float64`

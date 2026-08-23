@@ -12,11 +12,12 @@ using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 using STREAM
-using STREAM: Channel, ChannelAndContacts, Pump, HeatExchanger, ConstantTemperature,
-    PipeGeometry, PipeGeometry_circular, HeatDiffusion, ConstantFluid, PointKinetics,
-    ReactivityController, connect_temperature_feedback, compose_systems, symmetric_plate,
-    one_sided_connection, constant_Nusselt, point_kinetics_steady_state, port,
-    solve_steady, solve_transient, regime_dependent_friction
+using STREAM.Assemblies
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using STREAM.Substances
+using STREAM.Examples
+using STREAM: PipeGeometry, PipeGeometry_circular, solve_steady, solve_transient
 
 # ============================================================================
 # Python `tests/test_general/test_integrations.py` 1:1 ports.
@@ -29,26 +30,24 @@ using STREAM: Channel, ChannelAndContacts, Pump, HeatExchanger, ConstantTemperat
 
 @testset "pump + resistor in series follows analytic solution" begin
     # Python: test_pump_resistor_in_series_follows_analytic_solution
-    # Ideal pump (dp) and ideal resistor (r): mdot = dp/r, resistor drops dp, T uniform.
-    T = 300.0
+    # Ideal pump (dp) and ideal resistor (r): ṁ = dp/r, resistor drops dp, T uniform.
+    T = 26.85
     dp = 3.0e4
     r = 1.5e5
     @named pump = Pump(dp)
     @named hx = HeatExchanger(T)          # anchors the loop temperature (Python's Tin)
     @named R = Resistor(r)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, R.port_in),
-        connect(R.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, hx, R, pump)...,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:pr_series), pump, hx, R)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.R.port_in.mdot => dp / r])
+    sol = solve_steady(ssys, [ssys.R.inlet.ṁ => dp / r])
     @test sol.retcode == ReturnCode.Success
-    @test isapprox(sol[ssys.R.port_in.mdot], dp / r; rtol=1e-8)              # mdot = dp/r
-    @test isapprox(sol[ssys.R.port_in.P] - sol[ssys.R.port_out.P], dp; rtol=1e-8)  # ΔP_R = dp
-    @test isapprox(sol[ssys.R.port_in.T], T; rtol=1e-8)                      # Tin = T
+    @test isapprox(sol[ssys.R.inlet.ṁ], dp / r; rtol=1e-8)              # ṁ = dp/r
+    @test isapprox(sol[ssys.R.inlet.p] - sol[ssys.R.outlet.p], dp; rtol=1e-8)  # ΔP_R = dp
+    @test isapprox(sol[ssys.R.inlet.T], T; rtol=1e-8)                      # Tin = T
 end
 
 @testset "parallel resistors with pump against analytic solution" begin
@@ -58,24 +57,23 @@ end
     r1 = 1.0e5
     r2 = 3.0e5
     @named pump = Pump(p)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     @named R1 = Resistor(r1)
     @named R2 = Resistor(r2)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, R1.port_in, R2.port_in),     # node J0
-        connect(R1.port_out, R2.port_out, pump.port_in),  # node J1
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, hx)...,
+        inparallel(hx, (R1, R2), pump)...,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:par_res), pump, hx, R1, R2)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.R1.port_in.mdot => p / r1, ssys.R2.port_in.mdot => p / r2])
+    sol = solve_steady(ssys, [ssys.R1.inlet.ṁ => p / r1, ssys.R2.inlet.ṁ => p / r2])
     @test sol.retcode == ReturnCode.Success
     total_R = (r1 * r2) / (r1 + r2)
-    total_flow = sol[ssys.pump.port_out.mdot]
+    total_flow = sol[ssys.pump.outlet.ṁ]
     @test isapprox(abs(total_flow), p / total_R; rtol=1e-8)
-    @test isapprox(sol[ssys.R1.port_in.mdot], p / r1; rtol=1e-8)   # each branch drops p
-    @test isapprox(sol[ssys.R2.port_in.mdot], p / r2; rtol=1e-8)
+    @test isapprox(sol[ssys.R1.inlet.ṁ], p / r1; rtol=1e-8)   # each branch drops p
+    @test isapprox(sol[ssys.R2.inlet.ṁ], p / r2; rtol=1e-8)
 end
 
 @testset "resistors in series against analytic solution" begin
@@ -86,49 +84,47 @@ end
     total_r = 2.0e5
     r = total_r / N
     @named pump = Pump(pressure)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     Rs = [Resistor(r; name=Symbol(:R, i)) for i in 1:N]
-    series = Equation[connect(Rs[i].port_out, Rs[i + 1].port_in) for i in 1:(N - 1)]
+    series = inseries(Rs...)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, Rs[1].port_in),
+        inseries(pump, hx)...,
+        connect(hx.outlet, Rs[1].inlet),
         series...,
-        connect(Rs[N].port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(Rs[N].outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:ser_res), pump, hx, Rs...)
     ssys = mtkcompile(sys)
-    mdot_guess = pressure / total_r
-    sol = solve_steady(ssys, [getproperty(ssys, Symbol(:R, 1)).port_in.mdot => mdot_guess])
+    ṁ_guess = pressure / total_r
+    sol = solve_steady(ssys, [getproperty(ssys, Symbol(:R, 1)).inlet.ṁ => ṁ_guess])
     @test sol.retcode == ReturnCode.Success
     for i in 1:N
         Ri = getproperty(ssys, Symbol(:R, i))
-        @test isapprox(sol[Ri.port_in.mdot], pressure / total_r; rtol=1e-8)        # full flow
-        @test isapprox(sol[Ri.port_in.P] - sol[Ri.port_out.P], pressure / N; rtol=1e-8)  # each drops p/N
-        @test isapprox(sol[Ri.port_in.T], 300.0; rtol=1e-8)
+        @test isapprox(sol[Ri.inlet.ṁ], pressure / total_r; rtol=1e-8)        # full flow
+        @test isapprox(sol[Ri.inlet.p] - sol[Ri.outlet.p], pressure / N; rtol=1e-8)  # each drops p/N
+        @test isapprox(sol[Ri.inlet.T], 26.85; rtol=1e-8)
     end
 end
 
 @testset "pump and current source" begin
     # Python: test_pump_and_current_source
-    # A fixed-pressure pump and a fixed-flow pump in a loop: the current source sets mdot.
+    # A fixed-pressure pump and a fixed-flow pump in a loop: the current source sets ṁ.
     p = 1.5e4
-    mdot = 0.7
+    ṁ = 0.7
     @named P1 = Pump(p)               # fixed-pressure
-    @named P2 = Pump(; mdot0=mdot)    # fixed-flow (current source)
-    @named hx = HeatExchanger(300.0)
+    @named P2 = Pump(; ṁ0=ṁ)    # fixed-flow (current source)
+    @named hx = HeatExchanger(26.85)
     conns = [
-        connect(P1.port_out, hx.port_in),
-        connect(hx.port_out, P2.port_in),
-        connect(P2.port_out, P1.port_in),
-        P1.port_in.P ~ 1.0e5,
+        inseries(P1, hx, P2, P1)...,
+        P1.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:pump_current), P1, P2, hx)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.P2.port_in.mdot => mdot])
+    sol = solve_steady(ssys, [ssys.P2.inlet.ṁ => ṁ])
     @test sol.retcode == ReturnCode.Success
-    @test isapprox(sol[ssys.P2.port_in.mdot], mdot; rtol=1e-8)              # current source wins
-    @test isapprox(sol[ssys.P1.port_out.P] - sol[ssys.P1.port_in.P], p; rtol=1e-8)  # pump adds p
+    @test isapprox(sol[ssys.P2.inlet.ṁ], ṁ; rtol=1e-8)              # current source wins
+    @test isapprox(sol[ssys.P1.outlet.p] - sol[ssys.P1.inlet.p], p; rtol=1e-8)  # pump adds p
 end
 
 @testset "Tin jumps at resistor between two HXs at flow reversal" begin
@@ -142,125 +138,115 @@ end
         @named HX2 = HeatExchanger(T2)
         @named R = Resistor(1.0)
         conns = [
-            connect(pump.port_out, HX1.port_in),
-            connect(HX1.port_out, R.port_in),
-            connect(R.port_out, HX2.port_in),
-            connect(HX2.port_out, pump.port_in),
-            pump.port_in.P ~ 1.0e5,
+            inseries(pump, HX1, R, HX2, pump)...,
+            pump.inlet.p ~ 1.0e5,
         ]
         @named sys = compose(System(conns, t; name=:tinjump), pump, HX1, HX2, R)
         return mtkcompile(sys)
     end
     fwd = build(1.0)
-    sol_f = solve_steady(fwd, [fwd.R.port_in.mdot => 1.0])
+    sol_f = solve_steady(fwd, [fwd.R.inlet.ṁ => 1.0])
     @test sol_f.retcode == ReturnCode.Success
-    @test sol_f[fwd.R.port_in.mdot] > 0
-    @test isapprox(sol_f[fwd.R.port_out.T], T1; rtol=1e-8)   # forward: HX1 fluid through R
+    @test sol_f[fwd.R.inlet.ṁ] > 0
+    @test isapprox(sol_f[fwd.R.outlet.T], T1; rtol=1e-8)   # forward: HX1 fluid through R
 
     rev = build(-1.0)
-    sol_r = solve_steady(rev, [rev.R.port_in.mdot => -1.0])
+    sol_r = solve_steady(rev, [rev.R.inlet.ṁ => -1.0])
     @test sol_r.retcode == ReturnCode.Success
-    @test sol_r[rev.R.port_in.mdot] < 0
-    @test isapprox(sol_r[rev.R.port_in.T], T2; rtol=1e-8)    # reversed: HX2 fluid through R
+    @test sol_r[rev.R.inlet.ṁ] < 0
+    @test isapprox(sol_r[rev.R.inlet.T], T2; rtol=1e-8)    # reversed: HX2 fluid through R
 end
 
 @testset "inertia through RL circuit follows analytic solution" begin
     # Python: test_inertia_through_RL_circuit_follows_analytic_solution
-    # An inertia L and resistor r in a loop. A pump holds a steady mdot0=1, then shuts off
-    # (Python drops the pump head to 0); the flow coasts as mdot = mdot0·exp(-(r/L)·t). The
+    # An inertia L and resistor r in a loop. A pump holds a steady ṁ0=1, then shuts off
+    # (Python drops the pump head to 0); the flow coasts as ṁ = ṁ0·exp(-(r/L)·t). The
     # transient starts from the solved steady state, with every state transplanted rather than a
     # hand-picked subset, so the initial condition stays consistent no matter which variables MTK
     # keeps as states.
     L = 5.0
     r = 3.0
-    mdot0 = 1.0
-    @named pump = Pump(r * mdot0)        # linear drop r·mdot ⇒ head r·mdot0 holds mdot0 at steady
+    ṁ0 = 1.0
+    @named pump = Pump(r * ṁ0)        # linear drop r·ṁ ⇒ head r·ṁ0 holds ṁ0 at steady
     @named L_el = Inertia(L)
     @named R = Resistor(r)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     conns = [
-        connect(pump.port_out, L_el.port_in),
-        connect(L_el.port_out, R.port_in),
-        connect(R.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, L_el, R, hx, pump)...,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:rl_circuit), pump, L_el, R, hx)
     ssys = mtkcompile(sys)
-    sol_ss = solve_steady(ssys, [ssys.L_el.port_in.mdot => mdot0])
+    sol_ss = solve_steady(ssys, [ssys.L_el.inlet.ṁ => ṁ0])
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 1.0; length=5)   # exactly [0, 0.25, 0.5, 0.75, 1.0]
     sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0],
                           reltol=1e-10, abstol=1e-12)
     @test sol.retcode == ReturnCode.Success
-    mdot = sol[ssys.L_el.port_in.mdot, :]
+    ṁ = sol[ssys.L_el.inlet.ṁ, :]
     for (i, tt) in enumerate(t_arr)
-        @test isapprox(mdot[i], mdot0 * exp(-(r / L) * tt); rtol=1e-4)   # mdot = mdot0·exp(-(r/L)·t)
+        @test isapprox(ṁ[i], ṁ0 * exp(-(r / L) * tt); rtol=1e-4)   # ṁ = ṁ0·exp(-(r/L)·t)
     end
 end
 
 @testset "quadratic-friction coastdown follows hyperbolic decay" begin
     # Python: test_inertia_with_friction_in_PCS_coastdown
-    # Inertia + quadratic friction, pump shutdown: mdot = mdot0/(1 + α·mdot0·t),
-    # α = |dp_out(mdot=1)|/inertia. Python's fixed-f Friction has dp = (dp0/mdot0²)·mdot|mdot|
-    # (the density cancels), so a VolumetricFlowResistor(k=dp0/mdot0², density=1) reproduces it.
+    # Inertia + quadratic friction, pump shutdown: ṁ = ṁ0/(1 + α·ṁ0·t),
+    # α = |dp_out(ṁ=1)|/inertia. Python's fixed-f Friction has dp = (dp0/ṁ0²)·ṁ|ṁ|
+    # (the density cancels), so a VolumetricFlowResistor(k=dp0/ṁ0², density=1) reproduces it.
     inertia = 8.0e3
-    T = 293.15
+    T = 20.0
     dp0 = 1.6e5
-    rho0 = rho_water(T)
-    mdot0 = (2000.0 / 3600.0) * rho0
-    K = dp0 / mdot0^2
+    rho0 = ρ(H2O, T)
+    ṁ0 = (2000.0 / 3600.0) * rho0
+    K = dp0 / ṁ0^2
     alpha = K / inertia
-    @named pump = Pump(K * mdot0^2)      # = dp0; holds mdot0 through the quadratic resistor
+    @named pump = Pump(K * ṁ0^2)      # = dp0; holds ṁ0 through the quadratic resistor
     @named L_el = Inertia(inertia)
     @named R = VolumetricFlowResistor(; k=K, density=1.0)
     @named hx = HeatExchanger(T)
     conns = [
-        connect(pump.port_out, L_el.port_in),
-        connect(L_el.port_out, R.port_in),
-        connect(R.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, L_el, R, hx, pump)...,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:friction_coastdown), pump, L_el, R, hx)
     ssys = mtkcompile(sys)
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts from it. Mirror
     # that: solve_steady with the pump on, then start the transient from the solved state with the
     # pump head overridden to 0 (a zero-head pump is a pass-through).
-    sol_ss = solve_steady(ssys, [ssys.L_el.port_in.mdot => mdot0, ssys.R.port_in.mdot => mdot0])
+    sol_ss = solve_steady(ssys, [ssys.L_el.inlet.ṁ => ṁ0, ssys.R.inlet.ṁ => ṁ0])
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 300.0; length=7)   # includes 0, 50, 150, 300
     sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0],
                           reltol=1e-10, abstol=1e-12)
     @test sol.retcode == ReturnCode.Success
-    mdot = sol[ssys.L_el.port_in.mdot, :]
+    ṁ = sol[ssys.L_el.inlet.ṁ, :]
     for (i, tt) in enumerate(t_arr)
-        mdota = mdot0 / (1 + alpha * mdot0 * tt)
-        @test isapprox(mdot[i], mdota; rtol=1e-4)   # mdot = mdot0/(1 + α·mdot0·t)
+        ṁa = ṁ0 / (1 + alpha * ṁ0 * tt)
+        @test isapprox(ṁ[i], ṁa; rtol=1e-4)   # ṁ = ṁ0/(1 + α·ṁ0·t)
     end
 end
 
 @testset "inertia with two parallel resistors" begin
     # Python: test_inertia_with_two_parallel_resistors
     # Inertia + two parallel quadratic resistors: total_k = k1·k2/(√k1+√k2)²,
-    # coastdown mdot = mdot0/(1 + (total_k/inertia)·mdot0·t).
+    # coastdown ṁ = ṁ0/(1 + (total_k/inertia)·ṁ0·t).
     inertia = 1.0e3
-    mdot0 = 1.0
+    ṁ0 = 1.0
     k1 = 2.0
     k2 = 5.0
     total_k = k1 * k2 / (sqrt(k1) + sqrt(k2))^2
     alpha = total_k / inertia
-    @named pump = Pump(total_k * mdot0^2)   # head that holds mdot0 through the parallel block
+    @named pump = Pump(total_k * ṁ0^2)   # head that holds ṁ0 through the parallel block
     @named L_el = Inertia(inertia)
     @named R1 = VolumetricFlowResistor(; k=k1, density=1.0)
     @named R2 = VolumetricFlowResistor(; k=k2, density=1.0)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     conns = [
-        connect(pump.port_out, L_el.port_in),
-        connect(L_el.port_out, R1.port_in, R2.port_in),   # node J0
-        connect(R1.port_out, R2.port_out, hx.port_in),    # node J1
-        connect(hx.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, L_el)...,
+        inparallel(L_el, (R1, R2), hx)...,
+        inseries(hx, pump)...,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:parallel_coastdown), pump, L_el, R1, R2, hx)
     ssys = mtkcompile(sys)
@@ -268,18 +254,21 @@ end
     # with the pump on (the branch guesses seed the split m1/m2 = √(k2/k1)), then start the
     # transient from the solved state with the pump head overridden to 0.
     sol_ss = solve_steady(ssys,
-                          [ssys.L_el.port_in.mdot => mdot0,
-                           ssys.R1.port_in.mdot => mdot0 / (1 + sqrt(k1 / k2)),
-                           ssys.R2.port_in.mdot => mdot0 / (1 + sqrt(k2 / k1))])
+        [
+            ssys.L_el.inlet.ṁ => ṁ0,
+            ssys.R1.inlet.ṁ => ṁ0 / (1 + sqrt(k1 / k2)),
+            ssys.R2.inlet.ṁ => ṁ0 / (1 + sqrt(k2 / k1)),
+        ],
+    )
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 100.0; length=6)   # includes 0, 20, 60, 100
     sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0],
                           reltol=1e-8, abstol=1e-10)
     @test sol.retcode == ReturnCode.Success
-    mdot = sol[ssys.L_el.port_in.mdot, :]
+    ṁ = sol[ssys.L_el.inlet.ṁ, :]
     for (i, tt) in enumerate(t_arr)
-        mdota = mdot0 / (1 + alpha * mdot0 * tt)
-        @test isapprox(mdot[i], mdota; rtol=1e-4)   # mdot = mdot0/(1 + (total_k/inertia)·mdot0·t)
+        ṁa = ṁ0 / (1 + alpha * ṁ0 * tt)
+        @test isapprox(ṁ[i], ṁa; rtol=1e-4)   # ṁ = ṁ0/(1 + (total_k/inertia)·ṁ0·t)
     end
 end
 
@@ -294,23 +283,20 @@ end
     p = 3.0e4
     s = 2.5
     @named pump = Pump(p)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     @named R1 = Resistor(r1 / s)     # bundle resistance (s parallel copies of r1)
     @named R2 = Resistor(r2)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, R1.port_in),
-        connect(R1.port_out, R2.port_in),
-        connect(R2.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, hx, R1, R2, pump)...,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:signify_series), pump, hx, R1, R2)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.R1.port_in.mdot => p / (r1 / s + r2)])
+    sol = solve_steady(ssys, [ssys.R1.inlet.ṁ => p / (r1 / s + r2)])
     @test sol.retcode == ReturnCode.Success
-    bundle = sol[ssys.R1.port_in.mdot]      # = m2 = s·m1
+    bundle = sol[ssys.R1.inlet.ṁ]      # = m2 = s·m1
     m1 = bundle / s
-    m2 = sol[ssys.R2.port_in.mdot]
+    m2 = sol[ssys.R2.inlet.ṁ]
     @test isapprox(m1 * s, m2; rtol=1e-8)
     @test isapprox(m1, p / (r1 + s * r2); rtol=1e-8)
 end
@@ -324,102 +310,109 @@ end
     p = 3.0e4
     signify = 3
     @named pump = Pump(p)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     R1s = [Resistor(r1; name=Symbol(:R1_, i)) for i in 1:signify]
     @named R2 = Resistor(r2)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, [R1.port_in for R1 in R1s]...),     # node J0
-        connect([R1.port_out for R1 in R1s]..., R2.port_in),    # node J1
-        connect(R2.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, hx.inlet),
+        connect(hx.outlet, [R1.inlet for R1 in R1s]...),     # node J0
+        connect([R1.outlet for R1 in R1s]..., R2.inlet),    # node J1
+        connect(R2.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:signify_parallel), pump, hx, R1s..., R2)
     ssys = mtkcompile(sys)
     m1 = p / (r1 + signify * r2)
-    guess = vcat([getproperty(ssys, Symbol(:R1_, i)).port_in.mdot => m1 for i in 1:signify],
-                 [ssys.R2.port_in.mdot => signify * m1])
+    guess = vcat(
+        [getproperty(ssys, Symbol(:R1_, i)).inlet.ṁ => m1 for i in 1:signify],
+        [ssys.R2.inlet.ṁ => signify * m1],
+    )
     sol = solve_steady(ssys, guess)
     @test sol.retcode == ReturnCode.Success
     for i in 1:signify
-        @test isapprox(sol[getproperty(ssys, Symbol(:R1_, i)).port_in.mdot], m1; rtol=1e-8)
+        @test isapprox(sol[getproperty(ssys, Symbol(:R1_, i)).inlet.ṁ], m1; rtol=1e-8)
     end
-    @test isapprox(sol[ssys.R2.port_in.mdot], signify * m1; rtol=1e-8)
+    @test isapprox(sol[ssys.R2.inlet.ṁ], signify * m1; rtol=1e-8)
 end
 
 @testset "local pressure with flow reversal" begin
     # Python: test_local_pressure_with_flow_reversal
-    # A decaying current source mdot0(t) = 3 - t drives flow through a LocalPressureDrop
+    # A decaying current source ṁ0(t) = 3 - t drives flow through a LocalPressureDrop
     # (A1=1, A2=2). The flow tracks the source down through zero and reverses; the
     # direction-dependent loss stays finite across the reversal.
-    # No inertia ⇒ mdot is algebraic (the current source forces it), so the system is
-    # quasi-static: solve the steady algebraic system at each time with mdot0 = 3 - t,
-    # the MTK reading of Python's mdot0(t)=3-t current source over the transient.
+    # No inertia ⇒ ṁ is algebraic (the current source forces it), so the system is
+    # quasi-static: solve the steady algebraic system at each time with ṁ0 = 3 - t,
+    # the MTK reading of Python's ṁ0(t)=3-t current source over the transient.
     A1, A2 = 1.0, 2.0
-    Tin = 293.15
-    @named pump = Pump(; mdot0=3.0)
+    Tin = 20.0
+    @named pump = Pump(; ṁ0=3.0)
     @named hx = HeatExchanger(Tin)
     @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
     conns = [
-        connect(pump.port_out, hx.port_in),
-        connect(hx.port_out, lpd.port_in),
-        connect(lpd.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, hx, lpd, pump)...,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:lpd_reversal), pump, hx, lpd)
     ssys = mtkcompile(sys)
-    mdot = Float64[]
+    ṁ = Float64[]
     for tt in 0.0:1.0:6.0
         m = 3.0 - tt
-        sol = solve_steady(ssys, Pair{Any,Any}[ssys.pump.mdot0 => m, ssys.lpd.port_in.mdot => m])
+        sol = solve_steady(
+            ssys,
+            Pair{Any,Any}[ssys.pump.ṁ0 => m, ssys.lpd.inlet.ṁ => m],
+        )
         @test sol.retcode == ReturnCode.Success
-        push!(mdot, sol[ssys.lpd.port_in.mdot])
+        push!(ṁ, sol[ssys.lpd.inlet.ṁ])
     end
-    @test all(mdot[1:4] .>= -1e-6)      # t = 0,1,2,3: forward (≥ 0)
-    @test all(mdot[4:7] .<= 1e-5)       # t = 3,4,5,6: stopped / reversed
+    @test all(ṁ[1:4] .>= -1e-6)      # t = 0,1,2,3: forward (≥ 0)
+    @test all(ṁ[4:7] .<= 1e-5)       # t = 3,4,5,6: stopped / reversed
     for (i, tt) in enumerate(0.0:1.0:6.0)
-        @test isapprox(mdot[i], 3.0 - tt; atol=1e-5)   # tracks the current source
+        @test isapprox(ṁ[i], 3.0 - tt; atol=1e-5)   # tracks the current source
     end
 end
 
-@testset "flapper opens with ref_mdot" begin
-    # Python: test_flapper_opens_with_ref_mdot
-    # Pump(p·exp(-t)) drives a resistor in parallel with a flapper; ref_mdot = resistor flow.
-    # The resistor flow mdot_R = exp(-t) (r=p=1), so the flapper opens when it hits 0.1, i.e.
+@testset "flapper opens with ref_ṁ" begin
+    # Python: test_flapper_opens_with_ref_ṁ
+    # Pump(p·exp(-t)) drives a resistor in parallel with a flapper; ref_ṁ = resistor flow.
+    # The resistor flow ṁ_R = exp(-t) (r=p=1), so the flapper opens when it hits 0.1, i.e.
     # at t_open = log(10). The flapper carries no flow before t_open and opens after.
     p = 1.0
-    mdot0 = 1.0
+    ṁ0 = 1.0
     dp_fn = (tt) -> p * exp(-tt)   # one function object: passed to Pump AND the op (same type)
     @named pump = Pump(dp_fn)
-    @named R = Resistor(p / mdot0)
-    @named flapper = Flapper(; open_at_current=0.1 * mdot0, f=1.0, area=1.0, open_rate=10.0,
-                             fluid=ConstantFluid())
-    @named hx = HeatExchanger(300.0)
+    @named R = Resistor(p / ṁ0)
+    @named flapper = Flapper(;
+        open_at_current=0.1 * ṁ0,
+        f=1.0,
+        area=1.0,
+        open_rate=10.0,
+        liquid=Liquid(),
+    )
+    @named hx = HeatExchanger(26.85)
     conns = [
-        connect(pump.port_out, R.port_in, flapper.port_in),
-        connect(R.port_out, flapper.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        watch_flow(flapper, R.port_in.mdot),
-        pump.port_in.P ~ 1.0e5,
+        inparallel(pump, (R, flapper), hx)...,
+        inseries(hx, pump)...,
+        watch_flow(flapper, R.inlet.ṁ),
+        pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:flapper_refmdot), pump, R, flapper, hx)
+    @named sys = compose(System(conns, t; name=:flapper_refṁ), pump, R, flapper, hx)
     ssys = mtkcompile(sys; fully_determined=false)
     op = Pair{Any,Any}[
-        ssys.R.port_in.mdot => 1.0,
+        ssys.R.inlet.ṁ => 1.0,
         ssys.pump.dP_pump_fn => dp_fn,
     ]   # T_open defaults to Inf (flapper closed until the callback latches it)
     @test isinf(ModelingToolkit.getdefault(ssys.flapper.T_open))   # starts closed (Python: isinf(F.t_open))
-    # ref_mdot is the resistor flow R.mdot = pump_dP/r = p·exp(-t), which mtkcompile leaves
+    # ref_ṁ is the resistor flow R.ṁ = pump_dP/r = p·exp(-t), which mtkcompile leaves
     # purely algebraic (no inertia ⇒ no state). flapper_callback detects the crossing exactly
-    # anyway: it root-finds the observed function for ref_mdot at the solver's trial state, so
+    # anyway: it root-finds the observed function for ref_ṁ at the solver's trial state, so
     # the valve opens when the REAL wired flow reaches the threshold — no hardcoded analytic.
     cb = flapper_callback(ssys, ssys.flapper)
     t_arr = range(0.0, 5.0; length=500)
     sol = solve_transient(ssys, op, t_arr; callbacks=cb)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol.ps[ssys.flapper.T_open], log(10.0); rtol=1e-3)   # detected open time = log(10)
-    @test isapprox(sol(1.0; idxs=ssys.flapper.port_in.mdot), 0.0; atol=1e-8)  # closed before
-    @test sol(4.0; idxs=ssys.flapper.port_in.mdot) > 1e-6                     # open after
+    @test isapprox(sol(1.0; idxs=ssys.flapper.inlet.ṁ), 0.0; atol=1e-8)  # closed before
+    @test sol(4.0; idxs=ssys.flapper.inlet.ṁ) > 1e-6                     # open after
 end
 
 @testset "flapper and pump" begin
@@ -431,14 +424,12 @@ end
     dp_fn = (tt) -> exp(-tt)   # one function object for Pump + op
     @named pump = Pump(dp_fn)
     @named flapper = Flapper(; open_at_current=0.1, f=1.0, area=1.0, open_rate=10.0,
-                             fluid=ConstantFluid())
-    @named hx = HeatExchanger(300.0)
+                             liquid=Liquid())
+    @named hx = HeatExchanger(26.85)
     conns = [
-        connect(pump.port_out, flapper.port_in),
-        connect(flapper.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        watch_flow(flapper, pump.port_in.mdot),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, flapper, hx, pump)...,
+        watch_flow(flapper, pump.inlet.ṁ),
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_pump), pump, flapper, hx)
     ssys = mtkcompile(sys; fully_determined=false)
@@ -448,45 +439,44 @@ end
     ]
     sol = solve_transient(ssys, op, range(0.0, 5.0; length=500); build_initializeprob=false)
     @test sol.retcode == ReturnCode.Success
-    @test isapprox(sol(2.0; idxs=ssys.pump.port_in.mdot), 0.0; atol=1e-8)   # closed ⇒ no flow
-    @test abs(sol(4.5; idxs=ssys.pump.port_in.mdot)) > 1e-6                 # open ⇒ flow
+    @test isapprox(sol(2.0; idxs=ssys.pump.inlet.ṁ), 0.0; atol=1e-8)   # closed ⇒ no flow
+    @test abs(sol(4.5; idxs=ssys.pump.inlet.ṁ)) > 1e-6                 # open ⇒ flow
 end
 
 @testset "inertia with flapper in PCS coastdown" begin
     # Python: test_inertia_with_flapper_in_PCS_coastdown
     # Inertia coasts down through a VolumetricFlowResistor (k=1) in parallel with a flapper (f=2k)
-    # that opens at t=100. At full open both are quadratic with the same coefficient (R: dp=k·mdot²,
-    # flapper: dp=f·mdot²/(2A²)=k·mdot²), so the split is even: mdot_R = mdot_flap. A pump holds the
-    # steady mdot0=1 with the flapper still closed, then shuts off; the transient starts from that
+    # that opens at t=100. At full open both are quadratic with the same coefficient (R: dp=k·ṁ²,
+    # flapper: dp=f·ṁ²/(2A²)=k·ṁ²), so the split is even: ṁ_R = ṁ_flap. A pump holds the
+    # steady ṁ0=1 with the flapper still closed, then shuts off; the transient starts from that
     # solved state, so the coastdown initial condition is consistent across MTK versions.
     k = 1.0
-    mdot0 = 1.0
-    @named pump = Pump(k * mdot0^2)      # holds mdot0 through R while the flapper is closed
+    ṁ0 = 1.0
+    @named pump = Pump(k * ṁ0^2)      # holds ṁ0 through R while the flapper is closed
     @named ine = Inertia(1.0e3)
     @named R = VolumetricFlowResistor(; k=k, density=1.0)
     @named flapper = Flapper(; open_at_current=0.0, f=2 * k, area=1.0, open_rate=1.0,
-                             fluid=ConstantFluid())
-    @named hx = HeatExchanger(300.0)
+                             liquid=Liquid())
+    @named hx = HeatExchanger(26.85)
     conns = [
-        connect(pump.port_out, ine.port_in),
-        connect(ine.port_out, R.port_in, flapper.port_in),
-        connect(R.port_out, flapper.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        watch_flow(flapper, ine.port_in.mdot),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, ine)...,
+        inparallel(ine, (R, flapper), hx)...,
+        inseries(hx, pump)...,
+        watch_flow(flapper, ine.inlet.ṁ),
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_coastdown), pump, ine, R, flapper, hx)
     ssys = mtkcompile(sys; fully_determined=false)
     # Flapper default T_open=Inf ⇒ closed at the steady solve; override to 100 for the coast.
-    sol_ss = solve_steady(ssys, [ssys.ine.port_in.mdot => mdot0, ssys.R.port_in.mdot => mdot0])
+    sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0, ssys.R.inlet.ṁ => ṁ0])
     @test sol_ss.retcode == ReturnCode.Success
     sol = solve_transient(ssys, sol_ss, range(0.0, 150.0; length=300);
                           overrides=[ssys.pump.dP_pump => 0.0, ssys.flapper.T_open => 100.0])
     @test sol.retcode == ReturnCode.Success
-    mdot_R = sol[ssys.R.port_in.mdot, end]
-    mdot_F = sol[ssys.flapper.port_in.mdot, end]
-    @test mdot_R > 0 && mdot_F > 0
-    @test isapprox(mdot_R, mdot_F; rtol=1e-3)    # even split at full open
+    ṁ_R = sol[ssys.R.inlet.ṁ, end]
+    ṁ_F = sol[ssys.flapper.inlet.ṁ, end]
+    @test ṁ_R > 0 && ṁ_F > 0
+    @test isapprox(ṁ_R, ṁ_F; rtol=1e-3)    # even split at full open
 end
 
 @testset "inertia with transistor in PCS coastdown" begin
@@ -500,17 +490,16 @@ end
     t_final = 300.0
     kfn = (tt) -> tt <= t_open ? k2 : (k2 - k_final) * exp(-50 * (tt - t_open) / t_final) + k_final
     total_k0 = k1 * k2 / (sqrt(k1) + sqrt(k2))^2   # combined coeff at t=0 (transistor still stiff)
-    @named pump = Pump(total_k0)                    # holds mdot0=1 through the parallel block
+    @named pump = Pump(total_k0)                    # holds ṁ0=1 through the parallel block
     @named ine = Inertia(1.0e3)
     @named R = VolumetricFlowResistor(; k=k1, density=1.0)
     @named transistor = VolumetricFlowResistor(; k=kfn, density=1.0)
-    @named hx = HeatExchanger(300.0)
+    @named hx = HeatExchanger(26.85)
     conns = [
-        connect(pump.port_out, ine.port_in),
-        connect(ine.port_out, R.port_in, transistor.port_in),
-        connect(R.port_out, transistor.port_out, hx.port_in),
-        connect(hx.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, ine)...,
+        inparallel(ine, (R, transistor), hx)...,
+        inseries(hx, pump)...,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:transistor_coastdown), pump, ine, R, transistor, hx)
     ssys = mtkcompile(sys)
@@ -518,9 +507,9 @@ end
     # Python solves the driven steady state (transistor stiff, near-all flow through R), then
     # shuts the pump and coasts as the transistor collapses. Solve_steady on, then coast from it.
     sol_ss = solve_steady(ssys, [
-        ssys.ine.port_in.mdot => 1.0,
-        ssys.R.port_in.mdot => 1.0 / sr(k1, k2),
-        ssys.transistor.port_in.mdot => 1.0 / sr(k2, k1),
+            ssys.ine.inlet.ṁ => 1.0,
+            ssys.R.inlet.ṁ => 1.0 / sr(k1, k2),
+            ssys.transistor.inlet.ṁ => 1.0 / sr(k2, k1),
         ssys.transistor.k_fn => kfn,
     ])
     @test sol_ss.retcode == ReturnCode.Success
@@ -529,11 +518,11 @@ end
                           reltol=1e-6, abstol=1e-7)
     @test sol.retcode == ReturnCode.Success    # convergence is the gate
     # Two parallel quadratic resistors combine to an effective coefficient k_a·k_b/(√k_a+√k_b)².
-    # Read it off the trajectory as total_k(t) = ΔP_block(t) / mdot_total(t)². The block stays
-    # forward-flowing throughout the coastdown (mdot decays toward zero but never crosses it), so
-    # ΔP/mdot² is well-defined at every sampled time.
-    total_k_at(tt) = sol(tt; idxs=ssys.R.port_in.P - ssys.R.port_out.P) /
-                     sol(tt; idxs=ssys.ine.port_in.mdot)^2
+    # Read it off the trajectory as total_k(t) = ΔP_block(t) / ṁ_total(t)². The block stays
+    # forward-flowing throughout the coastdown (ṁ decays toward zero but never crosses it), so
+    # ΔP/ṁ² is well-defined at every sampled time.
+    total_k_at(tt) =
+        sol(tt; idxs=ssys.R.inlet.p - ssys.R.outlet.p) / sol(tt; idxs=ssys.ine.inlet.ṁ)^2
     # t=0: transistor still stiff (k2) ⇒ combined coeff is the k1‖k2 closed form ≈ 1 (Python's check).
     @test isapprox(total_k_at(0.0), k1 * k2 / (sqrt(k1) + sqrt(k2))^2; rtol=1e-3)
     # The transistor only starts collapsing after t_open, so the combined coeff must still be the
@@ -555,9 +544,9 @@ end
     # solve_steady per time-point with the pump head overridden, the MTK reading of Python's
     # decaying-pressure current source.
     p0 = 4000.0
-    high_T = 333.15   # Python 60 C
-    low_T = 293.15    # Python 20 C
-    g_acc = 9.80665
+    high_T = 60.0   # Python 60 C
+    low_T = 20.0    # Python 20 C
+    g_acc = G_EARTH
     @named pump = Pump(p0)              # fixed-pressure; dP_pump overridden per t (quasi-static)
     @named HX_hot = HeatExchanger(high_T)
     @named HX_cold = HeatExchanger(low_T)
@@ -568,31 +557,28 @@ end
     @named G2 = Gravity(1.0)            # cold leg
     @named R = Resistor(1.0e5)
     conns = [
-        connect(pump.port_out, HX_hot.port_in),
-        connect(HX_hot.port_out, G1.port_in),
-        connect(G1.port_out, HX_cold.port_in),
-        connect(HX_cold.port_out, G2.port_in),
-        connect(G2.port_out, R.port_in),
-        connect(R.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        inseries(pump, HX_hot, G1, HX_cold, G2, R, pump)...,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:decay_grav), pump, HX_hot, HX_cold, G1, G2, R)
     ssys = mtkcompile(sys)
-    delta_rho = rho_water(low_T) - rho_water(high_T)   # = ρ(low_T) - ρ(high_T) > 0
+    delta_rho = ρ(H2O, low_T) - ρ(H2O, high_T)   # = ρ(low_T) - ρ(high_T) > 0
     times = range(0.0, 10.0; length=10)
-    mdot = Float64[]
+    ṁ = Float64[]
     rdrop0 = 0.0
     for (i, tt) in enumerate(times)
         sol = solve_steady(ssys, Pair{Any,Any}[ssys.pump.dP_pump => p0 * exp(-tt),
-                                               ssys.R.port_in.mdot => p0 / 1.0e5])
+                ssys.R.inlet.ṁ => p0 / 1.0e5,
+            ],
+        )
         @test sol.retcode == ReturnCode.Success
-        push!(mdot, sol[ssys.R.port_in.mdot])
-        i == 1 && (rdrop0 = sol[ssys.R.port_in.P] - sol[ssys.R.port_out.P])
+        push!(ṁ, sol[ssys.R.inlet.ṁ])
+        i == 1 && (rdrop0 = sol[ssys.R.inlet.p] - sol[ssys.R.outlet.p])
     end
     # Python asserts r.pressure = g·Δρ - p0; its "pressure" is the negative of the Julia
-    # in→out drop R·mdot, so the Julia drop is p0 - g·Δρ (same magnitude).
+    # in→out drop R·ṁ, so the Julia drop is p0 - g·Δρ (same magnitude).
     @test isapprox(rdrop0, p0 - g_acc * delta_rho; rtol=1e-6)
-    @test mdot[end] < 0    # flow reverses once the head decays past the buoyancy head
+    @test ṁ[end] < 0    # flow reverses once the head decays past the buoyancy head
 end
 
 @testset "pump coastdown allows channels to reverse flow direction" begin
@@ -600,13 +586,13 @@ end
     # Two vertical channels (one hot, one cold, opposite g) with a pump driving flow against
     # buoyancy. As the pump coasts down the gravitational head wins and the flow reverses; the
     # zero-crossing occurs when the pump head equals the buoyancy head L·g·Δρ. Python's #16 is
-    # inertia-free (no KirchhoffWDerivatives ⇒ the channel mdot2 term is None), so the faithful
+    # inertia-free (no KirchhoffWDerivatives ⇒ the channel ṁ2 term is None), so the faithful
     # match is quasi-static: a nonlinear steady root per time-point with the head decaying.
     D_pipe = 0.10
-    mdot0 = 1.0
-    T_cold = 293.15
-    T_hot = 353.15    # Python 80 C
-    g_acc = 9.80665
+    ṁ0 = 1.0
+    T_cold = 20.0
+    T_hot = 80.0    # Python 80 C
+    g_acc = G_EARTH
     geom = PipeGeometry_circular(1.0, D_pipe)
     nz = 9            # Python z_boundaries = linspace(0, L, 10) -> 9 cells
     # Friction model: the faithful Python correlation,
@@ -615,12 +601,12 @@ end
     # guarded finite through Re=0 (laminar -> 0, turbulent -> 0 below Re 10) and the interim blend
     # makes the friction continuous across the regime boundary, so it integrates cleanly across the
     # reversal where a hard single-point switch or an unguarded 64/Re would not. Critically, this
-    # regime friction grows with |mdot| in the turbulent branch, so it BOUNDS the reversed flow —
+    # regime friction grows with |ṁ| in the turbulent branch, so it BOUNDS the reversed flow —
     # the earlier laminar-only surrogate (64/Re, friction vanishing as Re->0) let the reversed flow
     # run away to ~21x nominal, which this model does not.
-    fric = regime_dependent_friction(; re_bounds=(2000.0, 5000.0), k_R=1.0)
-    @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, fluid=Water(), friction_correlation=fric)
-    @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, fluid=Water(), friction_correlation=fric)
+    fric = Friction.RegimeDependent(; re_bounds=(2000.0, 5000.0), k_R=1.0)
+    @named cold = Channel(; n=nz, geometry=geom, g=+g_acc, liquid=H2O, darcy=fric)
+    @named hot = Channel(; n=nz, geometry=geom, g=-g_acc, liquid=H2O, darcy=fric)
     # Bracket each adiabatic channel with same-temperature HeatExchangers on BOTH ends so its
     # coolant stays pinned under reversal too (Python pins both Tin and Tin_minus per channel).
     @named HXc1 = HeatExchanger(T_cold)
@@ -629,61 +615,52 @@ end
     @named HXh2 = HeatExchanger(T_hot)
     function build_coastdown(pumpcomp)
         conns = [
-            connect(pumpcomp.port_out, HXc1.port_in),
-            connect(HXc1.port_out, cold.port_in),
-            connect(cold.port_out, HXc2.port_in),
-            connect(HXc2.port_out, HXh1.port_in),
-            connect(HXh1.port_out, hot.port_in),
-            connect(hot.port_out, HXh2.port_in),
-            connect(HXh2.port_out, pumpcomp.port_in),
-            pumpcomp.port_in.P ~ 1.0e5,
+            inseries(pumpcomp, HXc1, cold, HXc2, HXh1, hot, HXh2, pumpcomp)...,
+            pumpcomp.inlet.p ~ 1.0e5,
         ]
         return mtkcompile(compose(System(conns, t; name=:coastdown), pumpcomp,
                                   HXc1, HXc2, HXh1, HXh2, cold, hot))
     end
 
-    # Forced-flow steady at mdot0 → the pump head that holds it (Python's steady pump pressure).
-    @named pump = Pump(; mdot0=mdot0)
+    # Forced-flow steady at ṁ0 → the pump head that holds it (Python's steady pump pressure).
+    @named pump = Pump(; ṁ0=ṁ0)
     ssys = build_coastdown(pump)
-    guess = Pair{Any,Any}[ssys.cold.port_in.mdot => mdot0]
+    guess = Pair{Any,Any}[ssys.cold.inlet.ṁ => ṁ0]
     append!(guess, [ssys.cold.T[i] => T_cold for i in 1:nz])
     append!(guess, [ssys.hot.T[i] => T_hot for i in 1:nz])
     sol0 = solve_steady(ssys, guess)
     @test sol0.retcode == ReturnCode.Success
-    p_pump0 = sol0[ssys.pump.port_out.P] - sol0[ssys.pump.port_in.P]
-    delta_rho = rho_water(T_cold) - rho_water(T_hot)
+    p_pump0 = sol0[ssys.pump.outlet.p] - sol0[ssys.pump.inlet.p]
+    delta_rho = ρ(H2O, T_cold) - ρ(H2O, T_hot)
     grav_dp = 1.0 * g_acc * delta_rho   # L·g·Δρ, the buoyancy head
 
     # Reversed-flow magnitude ceiling, derived from the buoyancy-vs-friction balance. At full
     # coastdown the pump head is gone and the buoyancy head grav_dp drives the reversed flow
     # against the two channels' friction in series; the steady balance grav_dp = Σ f·|m|·m/(2ρA²)·(L/Dh)
-    # fixes a finite |mdot| ceiling. Any point in the window has driving head ≤ grav_dp, so the
+    # fixes a finite |ṁ| ceiling. Any point in the window has driving head ≤ grav_dp, so the
     # reversed flow can never exceed this ceiling. The runaway surrogate had no such ceiling.
     A = geom.A
     Dh = geom.Dh
     L_ch = geom.L
-    function loop_friction(m)
-        Re_c = abs(m) * Dh / (A * mu_water(T_cold))
-        Re_h = abs(m) * Dh / (A * mu_water(T_hot))
-        rho_c = rho_water(T_cold)
-        rho_h = rho_water(T_hot)
-        fric(Re_c) * m * abs(m) / (2 * rho_c * A^2) * (L_ch / Dh) +
-        fric(Re_h) * m * abs(m) / (2 * rho_h * A^2) * (L_ch / Dh)
-    end
+    # Friction head of the two channels in series at flow m.
+    loop_friction(m) = sum(
+        Friction.darcy_weisbach_dp(m, ρ(H2O, T), fric(T, T, m, H2O, geom), geom)
+        for T in (T_cold, T_hot)
+    )
     # bisection for loop_friction(m) == grav_dp, m > 0
     lo, hi = 1.0e-6, 1.0e4
     for _ in 1:200
         mid = (lo + hi) / 2
         (loop_friction(mid) - grav_dp) > 0 ? (hi = mid) : (lo = mid)
     end
-    mdot_ceiling = (lo + hi) / 2   # ≈ 9.98 kg/s for this geometry; well below the 21 kg/s runaway
+    ṁ_ceiling = (lo + hi) / 2   # ≈ 9.98 kg/s for this geometry; well below the 21 kg/s runaway
 
     # Coastdown: fixed-pressure pump, head = p_pump0·exp(-t) overridden per time-point.
     @named pump2 = Pump(p_pump0)
     ssys2 = build_coastdown(pump2)
     Dt = Differential(t)
     times = range(0.0, 0.05; length=150)
-    mdot = Float64[]
+    ṁ = Float64[]
     cold_cells = Float64[]   # every cell at every time (Python asserts allclose over the full T_cool array)
     hot_cells = Float64[]
     retcodes = []
@@ -691,14 +668,16 @@ end
     # solve is seeded from the previous converged full state, so it starts near-steady and converges
     # in a couple of Newton steps. The reversal emerges from the decaying head, not the seed.
     #
-    # Seed BOTH channels forward (mdot0/2): mtkcompile keeps one channel mdot as the state and which
+    # Seed BOTH channels forward (ṁ0/2): mtkcompile keeps one channel ṁ as the state and which
     # one varies by Julia version, so seeding both lands the kept state in the forward basin either
     # way (otherwise it sits at 0 and the laminar 64/Re friction divides by zero). SSRootfind is a
     # direct root-find with no time step, so it cannot underflow dt at the stiff near-reversal point.
-    carry = Pair{Any,Any}[ssys2.hot.port_in.mdot => mdot0 / 2,
-                          ssys2.cold.port_in.mdot => mdot0 / 2,
-                          Dt(ssys2.cold.port_in.mdot) => 0.0,
-                          Dt(ssys2.hot.port_in.mdot) => 0.0]
+    carry = Pair{Any,Any}[
+        ssys2.hot.inlet.ṁ => ṁ0 / 2,
+        ssys2.cold.inlet.ṁ => ṁ0 / 2,
+        Dt(ssys2.cold.inlet.ṁ) => 0.0,
+        Dt(ssys2.hot.inlet.ṁ) => 0.0,
+    ]
     append!(carry, [ssys2.cold.T[i] => T_cold for i in 1:nz])
     append!(carry, [ssys2.hot.T[i] => T_hot for i in 1:nz])
     for tt in times
@@ -706,23 +685,23 @@ end
         append!(op, carry)
         sol = solve_steady(ssys2, op; solver=SSRootfind())
         push!(retcodes, sol.retcode) 
-        push!(mdot, sol[ssys2.cold.port_in.mdot])
+        push!(ṁ, sol[ssys2.cold.inlet.ṁ])
         append!(cold_cells, sol[ssys2.cold.T])
         append!(hot_cells, sol[ssys2.hot.T])
         carry = Pair{Any,Any}[u => sol[u] for u in unknowns(ssys2)]
     end
     @test all(retcodes .== ReturnCode.Success)
-    @test mdot[1] > 0                       # starts forward
-    @test all(diff(mdot) .< 0)              # monotonically decreasing
-    @test mdot[1] > 0 > mdot[end]           # reverses
+    @test ṁ[1] > 0                       # starts forward
+    @test all(diff(ṁ) .< 0)              # monotonically decreasing
+    @test ṁ[1] > 0 > ṁ[end]           # reverses
     @test all(isapprox.(cold_cells, T_cold; rtol=1e-4))   # all cells stay pinned (HX-bracketed) under reversal
     @test all(isapprox.(hot_cells, T_hot; rtol=1e-4))
     # Crossing occurs when the pump head equals the buoyancy head L·g·Δρ.
-    p_cross = p_pump0 * exp(-times[argmin(abs.(mdot))])
+    p_cross = p_pump0 * exp(-times[argmin(abs.(ṁ))])
     @test isapprox(p_cross, grav_dp; rtol=1e-3)
     # Reversed flow stays bounded by the buoyancy-vs-friction ceiling: the regime friction caps it,
     # so the ~21x-nominal runaway the laminar-only surrogate produced can no longer pass.
-    @test all(abs.(mdot) .<= mdot_ceiling)
+    @test all(abs.(ṁ) .<= ṁ_ceiling)
 end
 
 # ----------------------------------------------------------------------------
@@ -741,18 +720,18 @@ end
 #     The "power → 0 under negative feedback" result is group-count-independent.
 #   - Julia `HeatDiffusion` needs nx ≥ 2; Python uses nx = 1. The per-axial-slice
 #     power (hence the linear coolant rise) is independent of the lateral count.
-# `ConstantFluid()` is the Julia counterpart of Python's `mock_liquid_funcs` (all
+# `Liquid()` is the Julia counterpart of Python's `mock_liquid_funcs` (all
 # properties 1.0), which gives the clean closed-form coolant temperatures.
 # ----------------------------------------------------------------------------
 
 @testset "channel stable state with uniform heating increases linearly" begin
     # Python: test_channel_stable_state_with_uniform_heating_increases_linearly
     # A channel heated on one face by a fuel plate under uniform power. With cp = 1
-    # (ConstantFluid) the coolant rises linearly, Tc[i] = T0 + i·P/(nz·mdot), and the
+    # (Liquid) the coolant rises linearly, Tc[i] = T0 + i·P/(nz·ṁ), and the
     # conjugate wall temperature is the h-weighted mean Tw = (Tc·h + Tf·h_fw)/(h + h_fw).
-    T0 = 313.15
+    T0 = 40.0
     P = 10.0
-    mdot = 1.0
+    ṁ = 1.0
     n = 10
     nz = 10
     nx = 2
@@ -761,18 +740,18 @@ end
     # Mock one-sided pipe (heated_parts = (0, 1), area 1) + mock solid (all 1).
     geom = PipeGeometry(1.0, 4.0, 1.0, 1.0, 1.0, (0.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
-    @named cac = ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
-                                    htc_correlation=constant_Nusselt(; Nu=8.235))
+    @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
+                                    htc=HTC.ConstantNusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.0, Lx=Lx, y=1.0,
                                 rho_s=1.0, cp_s=1.0, k_s=k_s, power_shape=ps, T0=T0)
-    osc = one_sided_connection(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
-    @named pump = Pump(; mdot0=mdot)
+    osc = one_sided(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
+    @named pump = Pump(; ṁ0=ṁ)
     @named bc = HeatExchanger(T0)
     conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, osc.cac.port_in),
-        connect(osc.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, osc.cac.inlet),
+        connect(osc.cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         osc.fuel.power ~ P,
         # Unheated left face (heated_parts[1]=0 ⇒ Q=0) has a floating wall T; pin it to the
         # coolant temp (an insulated wall carries no heat, so this is just a closure).
@@ -780,14 +759,14 @@ end
     ]
     full = compose_systems(osc, pump, bc; connections=conns, name=:sys4)
     ssys = mtkcompile(full)
-    ic = Pair{Any,Any}[ssys.osc.cac.port_in.mdot => mdot]
+    ic = Pair{Any,Any}[ssys.osc.cac.inlet.ṁ => ṁ]
     append!(ic, [ssys.osc.cac.T[i] => T0 for i in 1:n])
     append!(ic, [ssys.osc.fuel.T[i, j] => T0 for i in 1:nz for j in 1:nx])
     sol = solve_transient(ssys, ic, range(0.0, 200.0; length=50);
                           initializealg=BrownFullBasicInit(), maxiters=1_000_000)
     @test sol.retcode == ReturnCode.Success
     Tc = [sol[ssys.osc.cac.T[i], end] for i in 1:n]
-    Tc_analytic = [T0 + i * (P / (nz * mdot)) for i in 1:nz]   # cp = 1 (ConstantFluid)
+    Tc_analytic = [T0 + i * (P / (nz * ṁ)) for i in 1:nz]   # cp = 1 (Liquid)
     @test all(isapprox.(Tc, Tc_analytic; rtol=1e-6))           # coolant rises linearly
     # h-weighted wall temperature, reading Julia's computed h_tc (Python prescribes h).
     h_fw = 2 * k_s / (Lx / nx)
@@ -809,24 +788,24 @@ end
     # Julia's coupled solve_steady on a live feedback PointKinetics collapses to the trivial P=0
     # root, so reach the same physical steady the way the PK coupling tests do: run the coupled
     # feedback transient from a cold critical IC and let it settle at a nonzero equilibrium power.
-    T0 = 313.15
+    T0 = 40.0
     Tin = T0 - 10.0
     n = 7
     nz = 7
     nx = 2
-    mdots = [1.0, 0.7, 0.4]        # distinct mdots ⇒ distinct slopes off the shared power
-    N = length(mdots)
+    ṁs = [1.0, 0.7, 0.4]        # distinct ṁs ⇒ distinct slopes off the shared power
+    N = length(ṁs)
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
     # Distinct names per channel/fuel so the shared PK gets a distinct T_source_<name> feedback
-    # group for each component (connect_temperature_feedback keys off nameof).
-    cacs = [ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
-                               htc_correlation=constant_Nusselt(; Nu=8.235),
+    # group for each component (temperature_feedback keys off nameof).
+    cacs = [ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
+                               htc=HTC.ConstantNusselt(; Nu=8.235),
                                name=Symbol(:cac, i)) for i in 1:N]
     fuels = [HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0, rho_s=1.0, cp_s=1.0, k_s=1.0,
                            power_shape=ps, T0=T0, name=Symbol(:fuel, i)) for i in 1:N]
     rodss = [symmetric_plate(cacs[i], fuels[i]; name=Symbol(:rods, i)) for i in 1:N]
-    pumps = [Pump(; mdot0=mdots[i], name=Symbol(:pump, i)) for i in 1:N]
+    pumps = [Pump(; ṁ0=ṁs[i], name=Symbol(:pump, i)) for i in 1:N]
     bcs = [HeatExchanger(Tin; name=Symbol(:bc, i)) for i in 1:N]
     # Per-channel and per-fuel temperature worths (Python draws a random worth per component;
     # distinct fixed negative values here, uniform across cells, ref_temp = T0). Negative ⇒
@@ -845,17 +824,17 @@ end
         ref_temp[rods_fuels[i]] = fill(T0, nz, nx)
     end
     @named pk = PointKinetics(ctrl; temp_worth=temp_worth, ref_temp=ref_temp)
-    fb = connect_temperature_feedback(pk, vcat(rods_cacs, rods_fuels))
+    fb = temperature_feedback(pk, vcat(rods_cacs, rods_fuels))
     power_scale = 1.0e3
     conns = Equation[]
     for i in 1:N
         cac_i = rods_cacs[i]
         fuel_i = rods_fuels[i]
         append!(conns, Equation[
-            connect(pumps[i].port_out, bcs[i].port_in),
-            connect(bcs[i].port_out, cac_i.port_in),
-            connect(cac_i.port_out, pumps[i].port_in),
-            pumps[i].port_in.P ~ 1.0e5,
+                connect(pumps[i].outlet, bcs[i].inlet),
+                connect(bcs[i].outlet, cac_i.inlet),
+                connect(cac_i.outlet, pumps[i].inlet),
+                pumps[i].inlet.p ~ 1.0e5,
             fuel_i.power ~ pk.P * power_scale,   # the shared reactor drives every plate
         ])
     end
@@ -864,14 +843,13 @@ end
 
     # Consistent cold critical IC. ref_temp = T0, so seeding every coolant / contact / fuel
     # temperature to T0 makes the initial feedback reactivity exactly zero (the loop starts
-    # critical). Seed every member of each connection set (port temperatures default to 300 K and
+    # critical). Seed every member of each connection set (port temperatures default to 26.85 °C and
     # which alias representative survives is not stable across MTK versions), matching build_loop_pk.
     pk_ic = point_kinetics_steady_state(1.0)
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
         ssys.pk.P => pk_ic.P,
-        ssys.pk.C_1 => pk_ic.C_k[1], ssys.pk.C_2 => pk_ic.C_k[2], ssys.pk.C_3 => pk_ic.C_k[3],
-        ssys.pk.C_4 => pk_ic.C_k[4], ssys.pk.C_5 => pk_ic.C_k[5], ssys.pk.C_6 => pk_ic.C_k[6],
+        [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
     ]
     for i in 1:N
         rods = getproperty(ssys, Symbol(:rods, i))
@@ -879,15 +857,15 @@ end
         fuel = getproperty(rods, Symbol(:fuel, i))
         pump = getproperty(ssys, Symbol(:pump, i))
         bc = getproperty(ssys, Symbol(:bc, i))
-        push!(ic, cac.port_in.mdot => mdots[i])
+        push!(ic, cac.inlet.ṁ => ṁs[i])
         append!(ic, [cac.T[j] => T0 for j in 1:n])
         append!(ic, [fuel.T[j, k] => T0 for j in 1:nz for k in 1:nx])
-        push!(ic, cac.port_in.T => T0)
-        push!(ic, cac.port_out.T => T0)
-        push!(ic, pump.port_in.T => T0)
-        push!(ic, pump.port_out.T => T0)
-        push!(ic, bc.port_in.T => T0)
-        push!(ic, bc.port_out.T => T0)
+        push!(ic, cac.inlet.T => T0)
+        push!(ic, cac.outlet.T => T0)
+        push!(ic, pump.inlet.T => T0)
+        push!(ic, pump.outlet.T => T0)
+        push!(ic, bc.inlet.T => T0)
+        push!(ic, bc.outlet.T => T0)
         for j in 1:n
             push!(ic, getproperty(cac, Symbol(:thermal_left, j)).T => T0)
             push!(ic, getproperty(cac, Symbol(:thermal_right, j)).T => T0)
@@ -914,10 +892,10 @@ end
         slope = diff(Tc)
         @test all(abs.(slope .- slope[1]) .< 1e-3 * slope[1])   # constant slope (linear profile)
     end
-    # Distinct mdots ⇒ distinct slopes off the shared reactor power: the channels couple
+    # Distinct ṁs ⇒ distinct slopes off the shared reactor power: the channels couple
     # independently through the one PK.
     rise(i) = sol[cac_T(i)[2], end] - sol[cac_T(i)[1], end]
-    @test rise(1) < rise(2) < rise(3)                # smaller mdot ⇒ steeper rise
+    @test rise(1) < rise(2) < rise(3)                # smaller ṁ ⇒ steeper rise
 end
 
 @testset "power is negligible for negative Tfuel feedback (ref = boundary)" begin
@@ -926,7 +904,7 @@ end
     # reference is that same T0. Negative feedback drives the steady power to zero and every fuel
     # temperature back to T0. (Julia's stabilizing feedback uses a negative coefficient, the
     # opposite sign convention to Python's positive worth.)
-    T0 = 308.15
+    T0 = 35.0
     nz = 10
     nx = 2
     ps = fill(1.0 / (nz * nx), nz, nx)
@@ -937,10 +915,10 @@ end
     ctrl = ReactivityController()
     @named pk = PointKinetics(ctrl; temp_worth=Dict(fuel => fill(-0.1, nz, nx)),
                               ref_temp=Dict(fuel => fill(T0, nz, nx)))
-    fb = connect_temperature_feedback(pk, [fuel])
+    fb = temperature_feedback(pk, [fuel])
     bath_conns = vcat(
-        [connect(port(fuel, :thermal_left, i), bathsL[i].thermal) for i in 1:nz],
-        [connect(port(fuel, :thermal_right, i), bathsR[i].thermal) for i in 1:nz],
+        face(bathsL, fuel, :thermal_left),
+        face(bathsR, fuel, :thermal_right),
     )
     conns = Equation[fb...; fuel.power ~ pk.P * 1.0e3; bath_conns...]
     full = compose_systems(fuel, pk, bathsL..., bathsR...; connections=conns, name=:sys8)
@@ -949,8 +927,7 @@ end
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
         ssys.pk.P => 1.0e5,
-        ssys.pk.C_1 => pk_ic.C_k[1], ssys.pk.C_2 => pk_ic.C_k[2], ssys.pk.C_3 => pk_ic.C_k[3],
-        ssys.pk.C_4 => pk_ic.C_k[4], ssys.pk.C_5 => pk_ic.C_k[5], ssys.pk.C_6 => pk_ic.C_k[6],
+        [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
     ]
     append!(ic, [ssys.fuel.T[i, j] => 2 * T0 for i in 1:nz for j in 1:nx])   # start hot
     sol = solve_steady(ssys, ic)
@@ -963,29 +940,29 @@ end
     # Python: test_power_is_negligible_for_negative_Tcool_feedback_and_ref_temp_is_inlet
     # A channel + fuel plate with PointKinetics coolant-temperature feedback whose reference is
     # the inlet T0. Negative feedback drives the steady power to zero and the coolant back to T0.
-    T0 = 308.15
+    T0 = 35.0
     n = 7
     nz = 7
     nx = 2
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
     ps = fill(1.0 / (nz * nx), nz, nx)
-    @named cac = ChannelAndContacts(; n=n, geometry=geom, fluid=ConstantFluid(),
-                                    htc_correlation=constant_Nusselt(; Nu=8.235))
+    @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
+                                    htc=HTC.ConstantNusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0,
                                 rho_s=1.0, cp_s=1.0, k_s=1.0, power_shape=ps, T0=T0)
     rods = symmetric_plate(cac, fuel; name=:rods)
     ctrl = ReactivityController()
     @named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => fill(-0.1, n)),
                               ref_temp=Dict(rods.cac => fill(T0, n)))
-    fb = connect_temperature_feedback(pk, [rods.cac])
-    mdot0 = 0.1
-    @named pump = Pump(; mdot0=mdot0)
+    fb = temperature_feedback(pk, [rods.cac])
+    ṁ0 = 0.1
+    @named pump = Pump(; ṁ0=ṁ0)
     @named bc = HeatExchanger(T0)
     conns = Equation[
-        connect(pump.port_out, bc.port_in),
-        connect(bc.port_out, rods.cac.port_in),
-        connect(rods.cac.port_out, pump.port_in),
-        pump.port_in.P ~ 1.0e5,
+        connect(pump.outlet, bc.inlet),
+        connect(bc.outlet, rods.cac.inlet),
+        connect(rods.cac.outlet, pump.inlet),
+        pump.inlet.p ~ 1.0e5,
         rods.fuel.power ~ pk.P * 1.0e3,
         fb...,
     ]
@@ -995,9 +972,8 @@ end
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
         ssys.pk.P => 1.0e5,
-        ssys.pk.C_1 => pk_ic.C_k[1], ssys.pk.C_2 => pk_ic.C_k[2], ssys.pk.C_3 => pk_ic.C_k[3],
-        ssys.pk.C_4 => pk_ic.C_k[4], ssys.pk.C_5 => pk_ic.C_k[5], ssys.pk.C_6 => pk_ic.C_k[6],
-        ssys.rods.cac.port_in.mdot => mdot0,
+        [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
+        ssys.rods.cac.inlet.ṁ => ṁ0,
     ]
     append!(ic, [ssys.rods.cac.T[i] => 2 * T0 for i in 1:n])    # start hot
     append!(ic, [ssys.rods.fuel.T[i, j] => 2 * T0 for i in 1:nz for j in 1:nx])
