@@ -191,7 +191,9 @@ test/
 
 ## Known gaps against Python STREAM
 
-Deliberately open, in rough priority order. Each has been checked against the Python source,
+`GAPS.md` in the repo root holds the full comparison, section by section, with a suggested
+order of work. The two below are here because they change how you should work in this
+repository, not because they are the only ones. Both were checked against the Python source,
 so do not re-derive them from scratch.
 
 - **Decay heat is missing entirely.** Python has `physical_models/decay_heat/` (actinides,
@@ -199,24 +201,27 @@ so do not re-derive them from scratch.
   the dominant heat source after shutdown, so every loss-of-flow and SCRAM transient here is
   currently missing its main post-trip source term. Plan: Way-Wigner first, then user-supplied
   databases, the same shape Python takes.
-- **`test_examples.jl` loss-of-flow bypass fails** (7 failed, 2 errored). Pre-existing and
-  confirmed identical on a clean checkout of `d212321`'s parent.
+- **One assertion in `test_examples.jl` fails, and it stops the suite.** The bypass
+  loss-of-flow case runs end to end now: 20 of its 21 assertions pass, including the flapper
+  event, the channel flow reversal and the natural-circulation equilibrium. The one failure is
+  `channel flow reversal (ṁ crosses zero)`, which brackets the settled recirculation at
+  4.21 g/s ± 0.05 g/s. It settles at 4.349 g/s, so the bracket misses by 3.3%. The
+  momentum-balance testset beside it derives the same equilibrium from buoyancy against
+  friction and passes, which points at the stored number as the stale side.
 
-  The loop has two steady states, not one. With the pump running there is a forced-flow
-  solution, and there is also always the trivial one where nothing moves: at ṁ = 0 the friction
-  drop is zero, the buoyancy drop is zero, and every equation balances. Both are real roots of
-  the same algebraic system, so `solve_steady` returns whichever the initial guess is nearest,
-  and here it lands on ṁ = 0. The test's own comments predict this. Everything downstream then
-  measures a loop that never started, which is also why the natural-convection HTC path has no
-  working in-channel coverage: reaching it needs a run that began with flow.
+  What this costs is out of proportion to the assertion. `runtests.jl` aborts at the first
+  failing file, so a plain `julia --project=. test/runtests.jl` stops inside `test_examples.jl`
+  and never reaches `test_validation.jl`, `test_integration.jl` or `test_point_kinetics.jl`.
+  All three pass when run directly, so run them that way rather than reading a full-suite abort
+  as a parity failure.
 
-  The fix is not a sign constraint on ṁ. This loop's flow legitimately reverses after the pump
-  trips, so forbidding negative flow would forbid the physics. What works is arriving at the
-  forced-flow root by a path that does not pass near the trivial one: solve with the pump head
-  held at its pre-trip value to get a consistent forced-flow state, then run the transient from
-  there. `_lof_bypass_ic` in `test/test_integration.jl` does exactly that, and those tests pass.
-  Worth knowing that Python STREAM has the same two roots, so this is a property of the model
-  rather than of MTK.
+  Background worth having before touching that case: the pump-on steady state has two roots,
+  the forced-flow one and the trivial one at ṁ = 0, where friction and buoyancy drops both
+  vanish and every equation balances. `_lof_bypass_ic` in `test/test_examples.jl` reaches the
+  forced-flow root by holding the pump head at its pre-trip value with the flapper latched
+  closed, then integrating from there. Do not "fix" any of this with a sign constraint on ṁ:
+  this loop's flow legitimately reverses after the pump trips, so forbidding negative flow
+  would forbid the physics. Python STREAM has the same two roots.
 
 Not gaps, checked and matching: the developing-laminar Nusselt (Python defaults to the same
 analytic approximation, using its Shah & London table only to bound that approximation's

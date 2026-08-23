@@ -4,6 +4,19 @@ Where STREAM.jl stands against the Python implementation, measured against the g
 running RIA, LOFA and LOCA transients in light- and heavy-water research reactors with both
 MTR plate fuel and cylindrical rod fuel.
 
+Transients are not the whole measure. Steady-state analysis is what the code is asked for most
+days, so four questions about it are tracked here as well:
+
+- **Centerline temperature.** For plate fuel yes: `HeatDiffusion` resolves through the
+  thickness, so the mid-plane value falls out of the solution. For rod fuel no, there is no
+  cylindrical metric ([2.1](#21-no-cylindrical-geometry)).
+- **Margins.** Given the same physical model, do we get the same CHF, OFI, OSV and ONB
+  numbers? Yes for the correlations both codes carry, cross-validated. The plain Saha-Zuber
+  form and the RIA-specific limits are the ones missing ([5](#5-thresholds-and-post-solve-analysis)).
+- **Component support.** Nearly the same hydraulic inventory; four small Idelchik-style
+  elements are outstanding ([3](#3-wall-friction-and-pressure-drop)).
+- **UQ.** No ([8](#8-uncertainty-quantification)).
+
 Python source read for this: `/home/aviv/work/iaec/codes/STREAM`, 13585 lines across 62
 modules. STREAM.jl at the time of writing: 5734 lines across 31 files.
 
@@ -30,10 +43,14 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 
 | Scenario | Can Python do it? | Can STREAM.jl do it? | What blocks us |
 |---|---|---|---|
-| **LOFA** (loss of flow) | Yes | Partly | Decay heat is the main one. The forced-to-natural-circulation transition works in principle but has no passing test (see [7.2](#72-the-loss-of-flow-bypass-case-does-not-converge)) |
-| **RIA** (reactivity insertion) | Mostly | Partly | Decay heat matters less here, but cylindrical fuel, gap conductance and fuel-temperature limits are all absent |
+| **LOFA** (loss of flow) | Yes, one channel type | Partly | Decay heat is the main one. The forced-to-natural-circulation transition runs end to end, with one stale reference number in its test (see [7.2](#72-one-stale-number-in-the-loss-of-flow-bypass-case)) |
+| **RIA** (reactivity insertion) | Yes | Partly | Decay heat matters less here, but cylindrical fuel, gap conductance and fuel-temperature limits are all absent |
 | **LOCA**, level tracking to uncovery | **No** | Partly | Needs coolant inventory, a free surface and break flow. No two-phase model required ([4](#4-loca-level-tracking-and-where-it-stops)) |
 | **LOCA**, past uncovery | **No** | **No** | Void, steam, post-CHF heat transfer. Out of scope for both, by choice |
+
+The LOFA cell is qualified because that is where Python's reach ends. Loops with a single
+channel type are solid; the cases with different channels in parallel are where it got stuck.
+That limit is the implementation's, not the physics'.
 
 The LOCA split is the one worth internalising. Both codes are single-phase liquid with
 subcooled-boiling *heat transfer enhancement* and thresholds that report margin. That is
@@ -169,47 +186,12 @@ expands is a first-order effect on peak fuel temperature.
 
 ## 3. Wall friction and pressure drop
 
-### 3.1 The friction closure could not see the wall (DONE)
-
-Closed. `Friction.AbstractDarcyFactor` in `src/friction/darcy.jl` is now the handle a
-channel or a resistor is given:
-
-    darcy(T_bulk, T_wall, ṁ, liquid, pipe) -> f
-
-matching Python's `GeneralDarcyFactor`. The correlations in `friction/correlations.jl` still take a
-Reynolds number and nothing else; `Friction.FromReynolds` is the lift, and it applies `k_R`
-to the Reynolds it forms at the bulk temperature.
-
-That makes `viscosity_correction` reachable for the first time. `Friction.RegimeDependent`
-takes a `viscosity` keyword, defaulting to `nothing` exactly as Python's `k_H` does, so the
-correction is opt-in and no existing result moved. With it, the factor is multiplied by
-`k_H(heated_perimeter/wet_perimeter, mu(T_wall)/mu(T_bulk))`, which is the first use of the
-two perimeters `PipeGeometry` has always carried.
-
-Shipped, all inside the `Friction` module: `FromReynolds`, `FromFunction`, `Blasius`,
-`Laminar`, `Turbulent`, `RectangularLaminar`, `RegimeDependent`.
-
-Channels take `darcy` where they took `friction_correlation`. The wall temperature they hand
-it is the mean of the two faces, following Python. `ChannelHeatFlux` has no wall of its own,
-so it passes the bulk, which makes any viscosity correction exactly 1.
-
-The old `regime_dependent_friction` factory is deleted rather than kept alongside
-`Friction.RegimeDependent`, the same call made for `regime_dependent` on the HTC side.
-One thing this turned up that the first pass missed. Python factors out not just the friction
-correlations but the pressure-drop forms that consume them:
-`Darcy_Weisbach_pressure_by_mdot(mdot, rho, f, L, Dh, A)` and
-`local_pressure_by_mdot(mdot, rho, f, A)`. We had neither, and the Darcy-Weisbach product was
-written longhand in ten places across `src/` and `test/`. Both are now
-`Friction.darcy_weisbach_dp` (with a `PipeGeometry` form) and `LocalLoss.dp`, and the source call sites use
-them. The remaining longhand copies in tests are deliberate: a test that rebuilds an expected
-value with the same helper the source uses cannot catch a wrong helper.
-
-### 3.2 Missing hydraulic components
+### 3.1 Missing hydraulic components
 
 | Python | What it is | Have it? |
 |---|---|---|
 | `RegimeDependentFriction` (resistor) | Standalone regime-switching friction resistor | Yes, as `Components.FrictionResistor(; darcy=Friction.RegimeDependent(...))` |
-| `ResistorMul` | Scale a resistor's pressure drop | Yes, the `scale` parameter |
+| `ResistorMul` | Scale a resistor's pressure drop | No, and deliberately |
 | `Inertia.bilinear` | Flow-dependent inertia, `L0·(ṁ/ṁ0)` below a knee | Yes, `bilinear_inertia` |
 | `ResistorSum` | Add resistors into one component | No, `inseries` covers the composition |
 | `Bend` | Idelchik ch. 6 diagram 6.1 bend loss, angle and relative curvature and Re | No |
@@ -219,22 +201,23 @@ value with the same helper the source uses cannot catch a wrong helper.
 
 The Idelchik local losses we do have (`expansion`, `contraction`) match.
 
-Three notes on the ones now done.
+Three notes on the decisions behind that table.
 
-**Regime-dependent friction is a `Friction` option, not a new component type.** Python needs
-a separate class because it has no dispatch story for the friction factor. We do, so
-`Friction` takes any `DarcyFactor` and the regime-switching resistor is
-`Friction(; geometry, darcy=RegimeDependentFriction(...))`. `Friction` also gained a
-`PipeGeometry` form, since the viscosity correction needs the two perimeters that `L`/`D`/`A`
-cannot supply; the `L`/`D`/`A` form builds an equivalent circular duct where they coincide.
-It had no test coverage at all before this; it does now.
+**Regime-dependent friction is a friction model, not a new component type.** Python needs a
+separate class because it has no dispatch story for the friction factor. We do, so
+`Components.FrictionResistor` takes any `AbstractDarcyFactor` and the regime-switching
+resistor is `FrictionResistor(; geometry, darcy=Friction.RegimeDependent(...))`. The component
+takes a `PipeGeometry` rather than loose `L`/`D`/`A`, because the viscosity correction needs
+the heated and wetted perimeters that `L`/`D`/`A` cannot supply. It had no test coverage at all
+before this; it does now.
 
-**Scaling is a parameter, not an algebra.** `ResistorMul` wraps a resistor object and
-multiplies its `dp_out`. MTK components are systems, not values, so wrapping is the wrong
-shape: `scale` is a proper parameter on `Friction`, `Resistor`, `VolumetricFlowResistor` and
-`LocalPressureDrop`, which means `remake` reaches it. `scale=3` is three of the resistor in
-series, `scale=1/3` is three in parallel, and a calibrated resistor can be trimmed without
-touching the coefficient it was fitted with.
+**Scaling is composition, not a parameter.** `ResistorMul` wraps a resistor and multiplies its
+`dp_out`. A `scale` parameter on each resistor was tried here and taken back out: MTK
+components are systems rather than values, and three identical resistors through `inseries`
+already are three times the resistance, with no second knob to keep consistent with the first.
+`test/test_darcy.jl` asserts exactly that, that three 2·10⁴ resistors in series give the same
+flow as one 6·10⁴ resistor. Trimming a calibrated resistor means changing its own coefficient,
+which `remake` reaches like any other parameter: `remake(prob; p=[ssys.r1.R => 6.0e4])`.
 
 **Inertia takes a callable.** `Inertia(L)` accepts either a number or `(ṁ) -> L/A`, with
 `bilinear_inertia(L0, ṁ0)` as the standard flow-dependent form. Because it is traced
@@ -386,41 +369,47 @@ two-phase model ever arrives. Temperatures do not qualify while we are in Celsiu
 
 **Size:** small, but narrow in value. Not a priority on its own.
 
-### 7.2 The loss-of-flow bypass case does not converge
+### 7.2 One stale number in the loss-of-flow bypass case
 
-Pre-existing, confirmed identical on a clean checkout, and unchanged by the `HTC` work
-(3 passed, 7 failed, 2 errored both before and after, same assertions at the same lines).
+This entry used to say the case did not converge. It does now. `test_examples.jl` runs the
+bypass loss-of-flow transient end to end: the pre-trip steady solve reaches the forced-flow
+root, the flapper fires at its threshold, the heated channel reverses, energy conservation
+holds on the coolant control volume, and the settled natural-circulation flow matches an
+independent buoyancy-against-friction balance. Twenty of the twenty-one assertions pass. The
+natural-convection heat transfer path therefore does have working in-channel coverage, which
+an earlier version of this file denied.
 
-The failure is **branch selection in the pre-trip steady solve**, not a sign or a friction
-problem. The test's own comment states it:
+What is left is one hard-coded number. The `channel flow reversal (ṁ crosses zero)` testset
+brackets the settled recirculation at 4.21 g/s with an absolute tolerance of 0.05 g/s, on the
+stated grounds that it reproduced at 4.207 g/s on two different package sets. It now settles at
+4.349 g/s, 3.3% away, so the bracket misses. The momentum-balance testset beside it derives the
+same equilibrium from buoyancy against friction rather than from a stored value, and it passes,
+which points at the bracket as the stale side rather than the physics. Worth confirming before
+anyone widens it: the candidates for what moved the root are the `HTC` work, the switch of the
+friction closure to `Friction.RegimeDependent`, and the package set itself.
 
-> The system has a second root at ṁ = 0 (flow recirculating through the closed flapper);
-> `DynamicSS` lands on whichever root its guess sits nearest.
+The expensive part is not the assertion. `runtests.jl` aborts at the first failing file, so a
+full-suite run stops inside `test_examples.jl` and never reaches `test_validation.jl`,
+`test_integration.jl` or `test_point_kinetics.jl`. All three pass when run directly, so nothing
+is broken behind that wall, but the Python-parity suite does not run at all in a plain
+`julia --project=. test/runtests.jl` until this one number is settled.
 
-So the pump-on steady state has two roots, and `DynamicSS(Rodas5P())` relaxes into the trivial
-one from the current guess. The transient then has a single time point and every downstream
-assertion collapses with a `BoundsError`.
+The fix worth making while in there is to derive the bracket from the buoyancy-against-friction
+balance the neighbouring test already computes, instead of storing a number that has to be
+re-measured every time a closure changes.
 
-The fix belongs to initialisation, not to the solver's domain handling:
+Two things about this case remain true and are worth keeping written down. The pump-on steady
+state has two roots, the forced-flow one and the trivial one at ṁ = 0 where the friction and
+buoyancy drops both vanish and every equation balances. `_lof_bypass_ic` in
+`test/test_examples.jl` reaches the forced-flow root by holding the pump head at its pre-trip
+value with the flapper latched closed, then integrating from there while the head ramps down.
+And the way it seeds that solve, a hand-written map naming `heated.ch.inlet.ṁ`, its dummy
+derivative, `ext_res.inlet.ṁ` and `ine.outlet.p`, depends on which variables survived
+`mtkcompile`, so it will need revisiting whenever simplification changes. Continuation on the
+pump head or on `R_ext` would take the guess from a previous solve instead of from naming
+variables. Python STREAM has the same two roots, so this is a property of the model rather than
+of MTK.
 
-- Seed the guess so it sits in the forced-flow basin. The test already seeds the unknowns
-  `mtkcompile` keeps, and its comments record that seeding only the observed aliases was what
-  put the latest package set on the ṁ = 0 root. That approach is working but brittle, because
-  it depends on which variables survive simplification.
-- Better: continuation. Solve with the flapper open or `R_ext` lowered so the trivial root does
-  not exist, then walk the parameter back to its real value, using each solution as the next
-  guess. This is robust to whatever `mtkcompile` decides to keep.
-- Or skip the steady solve entirely and integrate the transient from a driven initial state
-  until it settles, which is what the physical startup does anyway.
-
-Because this case fails, the natural-convection heat transfer path has no working in-channel
-coverage, which is uncomfortable given that natural circulation is the whole point of the late
-phase of a LOFA.
-
-Note that this builder's friction closure changed in the `HTC` work: it now uses
-`regime_dependent_friction`, which has a no-flow guard the previous inline blend lacked. That
-changed nothing here, which is itself informative: the no-flow guard was not what held the case
-back.
 
 ---
 
@@ -443,6 +432,14 @@ SciMLSensitivity gives forward and adjoint sensitivities of an ODE/DAE solution 
 to parameters, at a fraction of the cost and without step-size tuning. If UQ becomes a
 requirement, that is the route, not a port.
 
+To be precise about what that buys, since it decides whether it is usable for a regulatory
+submission: those are **local, first-order** sensitivities, the derivative of a solution value
+with respect to a parameter at one operating point, obtained from AD-generated Jacobians rather
+than from a perturbation step. That is exactly the input a first-order uncertainty propagation
+needs, and it is more accurate than Python's finite differences because there is no step size
+to choose. It is not a global method: for variance attribution over a parameter range, that
+takes sampling on top, which is what `GlobalSensitivity.jl` is for.
+
 **Size:** medium, and probably a different design from Python's.
 
 ---
@@ -461,13 +458,35 @@ MTK covers part of this differently: `unknowns`, `observed`, `equations` and
 gap that remains is the ergonomics of debugging a failed initialisation, which is currently
 the hardest thing to do in this codebase.
 
+Drawing the model is the other half, and it earns its keep twice: as documentation of what a
+builder actually wired, and as the fastest way to see a miswired connection. Three routes
+exist, none of which is work from scratch. Versions below are read off the packages, not from
+an install into this project.
+
+- `ModelingToolkitDesigner.jl` (bradcarman, v1.4.0) is the direct replacement for
+  `Aggregator.draw`. It lays out an acausal MTK system as a connection diagram on a Makie
+  canvas, lets you drag the components, and saves the layout next to the model as TOML so the
+  picture survives a rebuild. Its `Project.toml` pins `ModelingToolkit = "8,9"` and the repo
+  was last touched in April 2025, so against our 11.26.8 it needs a compat bump upstream or a
+  fork. That is a version bound, not a design problem, which makes it the cheapest of the
+  three.
+- `Latexify.jl` over `equations(sys)` or `full_equations(ssys)` renders the equation system
+  itself. That covers the reporting half of `analysis/report.py` and needs nothing built.
+- `Graphs.jl` with `GraphMakie.jl` or `GraphPlot.jl`, one node per subsystem and one edge per
+  `connect`, built from the connection vectors `inseries`, `inparallel` and `Connect.face`
+  already return. Graphs is in the manifest transitively. Note that MTK 11 no longer ships the
+  `asgraph` and `eqeq_dependencies` helpers that 8 and 9 had, so the incidence-graph route
+  costs more than it used to; the component graph never needed them.
+
 **Size:** small, high value per line.
 
 ---
 
 ## Where STREAM.jl is ahead
 
-Listing these so the report is not read as one-directional.
+Everything above is what we are missing. This section is the other column: what the rewrite
+already buys that the Python code cannot, so that a decision about where to spend the next
+month has both sides of the ledger in front of it.
 
 - **Acausal composition.** Python hand-builds a flow graph, then a Kirchhoff calculation with
   explicit KVL and KCL matrices (`build_kvl_matrix`, `build_kcl_matrix`, `kirchhoffify`,
@@ -475,7 +494,14 @@ Listing these so the report is not read as one-directional.
   does this structurally. Our `inseries` / `inparallel` / `compose_systems` are thin by
   comparison because the compiler carries the weight.
 - **Symbolic Jacobians and index reduction.** Python has a hand-written `jacobians.py` and a
-  `mass_vector` per calculation. `mtkcompile` derives both.
+  `mass_vector` per calculation. `mtkcompile` derives both, and it also lowers the index, tears
+  the algebraic loops and hands the integrator a sparsity pattern. The machine therefore does
+  less work per step on the same problem, and the saving grows with the model rather than
+  staying flat.
+- **The equation system can be read at any point.** `equations`, `unknowns`, `observed` and
+  `full_equations` print what is actually being solved, before and after simplification, with
+  no instrumentation. Python's `analysis/report.py` exists because that information had to be
+  assembled by hand.
 - **Design knobs.** `@design_knob` and `knob_defaults` let a geometric dimension stay
   symbolic through the whole model so it can be changed by `remake` without rebuilding.
   Python has no equivalent.
@@ -491,6 +517,10 @@ Listing these so the report is not read as one-directional.
   `transient_threshold_analysis` wrapper.
 - **Event handling.** SciML callbacks give us SCRAM and flapper events with proper root
   finding. Python's `should_continue` / `change_state` polling is coarser.
+- **Less code for the same physics.** The two line counts at the top of this file are not a
+  fair comparison everywhere, but they are in the parts that overlap. Composition, the
+  Jacobians and the property interface are each a few hundred lines here against a few thousand
+  there, because the compiler and the type system carry them.
 
 ## Checked and equivalent
 
@@ -527,16 +557,16 @@ Ordered by what unblocks the most, not by size.
 
 1. **Decay heat** (§1.1, §1.2). Without it no LOFA or SCRAM result is meaningful. Way-Wigner
    first, then the vendored standards.
-2. ~~**Friction as a `DarcyFactor`** (§3.1)~~ done, along with resistor scaling, the
-   regime-dependent friction resistor and flow-dependent inertia (§3.2).
-3. **Branch selection in the loss-of-flow steady solve** (§7.2), by continuation rather than
-   by constraining anything. Retiring it restores coverage of the natural-convection path,
-   which nothing else exercises in a channel.
+2. ~~**Friction as a `DarcyFactor`**~~ done, along with the regime-dependent friction
+   resistor and flow-dependent inertia (§3.1).
+3. **The stale natural-circulation bracket** (§7.2). One assertion, and it is what stops a
+   full-suite run from ever reaching the Python-parity files. Derive the bracket from the
+   momentum balance instead of storing a measured number.
 4. **Heat conduction rework** (§2.1 to §2.5) as one piece: non-uniform mesh, per-cell
    material, contact conductance, axial conduction, and the cylindrical metric. Doing these
    separately means touching `_diffusion_eqs` five times. This is what opens rod fuel.
 5. **Power shapes** (§6). Small, and it directly affects every hot-channel margin.
-6. **Missing hydraulic components** (§3.2), `ResistorFromKnownPoint` and `Bend` first.
+6. **Missing hydraulic components** (§3.1), `ResistorFromKnownPoint` and `Bend` first.
 7. **Debugging ergonomics** (§9). High value per line, and the pain is felt on every failed
    initialisation.
 8. **RIA limits** (§5.2), after §2 and §4 are settled.

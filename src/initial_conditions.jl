@@ -23,18 +23,3 @@ function steady_state_guess(;
     cp = cₚ(liquid, T_inlet)
     return [T_inlet + i * Q_wall / (n * ṁ_guess * cp) for i in 1:n]
 end
-
-
-"""
-    _state_snapshot(ssys, sol) -> Vector{Pair}
-
-Capture every state of a compiled system at a solved point as a symbolic initial-condition map,
-one `unknown => value` per entry of `unknowns(ssys)`.
-
-MTK's problem constructors take a symbolic map rather than a raw state vector. `unknowns(ssys)`
-is the complete, non-redundant state, so this seeds a transient from a solved one without
-depending on which variables `mtkcompile` kept.
-
-Private. Used by `solve_transient(ssys, sol_ss, t; ...)` in `src/solvers.jl`.
-"""
-_state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]

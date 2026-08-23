@@ -211,9 +211,15 @@ function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol
 end
 
 
-# The helpers below build the alternating chain [`fuel_assembly`](@ref) composes.
+"""
+    _walk_alternation(channels, plates, effective_bookend, start) -> Vector{Tuple{Symbol,Any}}
 
-# Build the alternation as an ordered Vector of (kind, sys) tuples, kind :c or :p.
+Order the channels and plates into the alternating chain [`fuel_assembly`](@ref) composes,
+as `(kind, sys)` tuples with `kind` either `:c` for a channel or `:p` for a plate.
+
+`effective_bookend` decides the pattern when the counts differ: `:channel` for `nc = np + 1`,
+`:plate` for `np = nc + 1`. With equal counts `start` picks which kind leads.
+"""
 function _walk_alternation(channels, plates, effective_bookend::Symbol, start)
     C = [(:c, ch) for ch in channels]
     P = [(:p, pl) for pl in plates]
@@ -228,8 +234,14 @@ function _walk_alternation(channels, plates, effective_bookend::Symbol, start)
     end
 end
 
-# Wire one adjacent pair: left member's right face to right member's left face,
-# per cell. The kind tags don't change the wiring, so they're ignored here.
+"""
+    _pair_connections(left, right, n) -> Vector{Equation}
+
+Wire one adjacent pair of the chain, the left member's right face to the right member's left
+face, one connection per cell. Both arguments are the `(kind, sys)` tuples
+[`_walk_alternation`](@ref) produces; the kind tags do not change the wiring, so they are
+ignored here, and [`Connect.faces`](@ref) reads the cell count off the ports itself.
+"""
 function _pair_connections(left::Tuple{Symbol,Any}, right::Tuple{Symbol,Any}, n::Int)
     _, lsys = left
     _, rsys = right

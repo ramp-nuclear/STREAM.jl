@@ -84,6 +84,20 @@ end
 
 
 """
+    _state_snapshot(ssys, sol) -> Vector{Pair}
+
+Capture every state of a compiled system at a solved point as a symbolic initial-condition map,
+one `unknown => value` per entry of `unknowns(ssys)`.
+
+MTK's problem constructors take a symbolic map rather than a raw state vector. `unknowns(ssys)`
+is the complete, non-redundant state, so this seeds a transient from a solved one without
+depending on which variables `mtkcompile` kept.
+
+Private, and used only by the [`solve_transient`](@ref) method below.
+"""
+_state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
+
+"""
     solve_transient(ssys, sol_ss, t; overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...)
 
 Start a transient from an already-solved state.

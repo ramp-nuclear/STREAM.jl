@@ -1,4 +1,4 @@
-[![CI](https://github.com/itaybnv/STREAM.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/itaybnv/STREAM.jl/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # STREAM.jl
 
@@ -19,7 +19,7 @@ For MTR (Materials Testing Reactor) plate-fuel assemblies, STREAM.jl includes a 
 ```bash
 # Install Julia 1.10+ from https://julialang.org/downloads/
 # Clone and activate:
-git clone https://github.com/itaybnv/STREAM.jl
+git clone https://github.com/ramp-nuclear/STREAM.jl
 cd STREAM.jl
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
@@ -28,23 +28,26 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
 ```julia
 using STREAM
-using DifferentialEquations
+using STREAM.Examples: build_loop
 
-# Build a simple forced-convection loop
-# Pump -> HeatExchanger (T_inlet reset) -> Channel -> back to Pump
-ssys = build_loop(
-    T_inlet = 313.15,   # K (40 C) coolant inlet
-    T_wall  = 373.15,   # K (100 C) wall temperature
-    dP_pump = 3.0e4,    # Pa pump pressure rise
+# Pump -> HeatExchanger (resets the inlet temperature) -> Channel -> back to the pump
+ssys = build_loop(;
+    n = 10,
+    T_inlet = 40.0,     # °C, coolant inlet
+    T_wall  = 100.0,    # °C, wall temperature
+    dP_pump = 3.0e4,    # Pa, pump pressure rise
 )
 
-# Steady-state initial guess and solve
-op  = [ssys.ch.port_in.mdot => 0.490]
+# Seed the solve with an axial temperature guess and a mass flow
+T_guess = steady_state_guess(; T_inlet=40.0, Q_wall=1.0e4, ṁ_guess=0.49, n=10)
+op = Pair{Any,Any}[ssys.ch.T[i] => T_guess[i] for i in 1:10]
+push!(op, ssys.ch.inlet.ṁ => 0.49)
+
 sol = solve_steady(ssys, op)
 
-println("T_outlet = ", round(sol[ssys.ch.T_out], digits=2), " C")
-println("mdot     = ", round(abs(sol[ssys.ch.port_in.mdot]), digits=4), " kg/s")
-# T_outlet ~= 54.6 C  (validated against Python STREAM)
+println("T_outlet = ", round(sol[ssys.ch.T_out], digits=2), " °C")
+println("ṁ        = ", round(abs(sol[ssys.ch.inlet.ṁ]), digits=4), " kg/s")
+# T_outlet = 42.21 °C,  ṁ = 0.5995 kg/s
 ```
 
 ## Component Catalog
@@ -52,22 +55,27 @@ println("mdot     = ", round(abs(sol[ssys.ch.port_in.mdot]), digits=4), " kg/s")
 | Component | Models | Key Parameters |
 |-----------|--------|----------------|
 | `Channel` | Single-phase coolant channel with axial FD discretization | `n` (cells), `geometry` (PipeGeometry), `g` (gravity) |
-| `Pump` | Pressure-rise source; supports callable `dP(t)` for pump trips | `dP_pump` or `mdot_pump` |
+| `Pump` | Pressure-rise source; supports callable `dP(t)` for pump trips | `dP_pump`, or `ṁ0` for the fixed-flow form |
 | `HeatDiffusion` | 2D finite-difference solid fuel plate with lateral and axial conduction | `nz`, `nx`, `power_shape`, `k_s`, `rho_s`, `cp_s` |
-| `PointKinetics` | Six-group delayed-neutron reactor kinetics with SCRAM support | `beta_k`, `lambda_k`, callable `rho_c_fn` |
+| `PointKinetics` | Keepin delayed-neutron kinetics, any group count, with SCRAM support | `beta_k`, `lambda_k`, callable `rho_c_fn` |
 | `ChannelAndContacts` | Coolant channel with bilateral `ThermalPort` arrays for plate coupling | `n`, `geometry` |
 | `HeatExchanger` | Constant-temperature heat sink (sets coolant inlet temperature) | `T_bc` |
 
-Full API reference is available via Julia's built-in help system: `?Channel`, `?build_loop`, etc.
+Full API reference is available via Julia's built-in help system: `?Channel`, `?Components.Pump`, `?STREAM.Examples.build_loop`, etc.
 
 ## Validation
 
-STREAM.jl results are validated within 1% of Python STREAM across three benchmark categories:
+STREAM.jl results are validated against Python STREAM in `test/test_validation.jl`, which
+compares outputs case by case against reference values generated from the Python code:
 
-- **Steady-state** — T_outlet and mass flow rate in forced-convection loops (see `test/test_validation.jl` VAL-01)
-- **Transient** — Outlet temperature response to wall temperature steps (VAL-02)
-- **Point kinetics** — Prompt-jump power response and reactivity insertion scenarios (Phase 47/48 validation)
-- **HeatDiffusion** — 1D Fourier series validation of axial plate temperature decay (VAL-01 Fourier)
+- **Steady-state loops.** Outlet temperature and mass flow in a forced-convection loop, and in
+  the MTR symmetric, asymmetric and one-sided plate topologies.
+- **Transients.** Outlet temperature response to a wall temperature step.
+- **Point kinetics.** Prompt-jump power response and reactivity insertion.
+- **HeatDiffusion.** Axial plate temperature decay against a 1D Fourier series solution.
+
+`VALIDATION.md` records how the reference values were produced and which Python tests each
+case corresponds to.
 
 ## Installation
 
@@ -77,7 +85,7 @@ using Pkg
 Pkg.develop(path="/path/to/STREAM.jl")
 
 # Or clone and use directly:
-# git clone https://github.com/itaybnv/STREAM.jl
+# git clone https://github.com/ramp-nuclear/STREAM.jl
 # cd STREAM.jl
 # julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
