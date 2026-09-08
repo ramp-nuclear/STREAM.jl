@@ -43,7 +43,7 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 
 | Scenario | Can Python do it? | Can STREAM.jl do it? | What blocks us |
 |---|---|---|---|
-| **LOFA** (loss of flow) | Yes, one channel type | Partly | Decay heat is the main one. The forced-to-natural-circulation transition runs end to end and is tested against a derived buoyancy-against-friction balance |
+| **LOFA** (loss of flow) | Yes, one channel type | Partly | Decay heat is the main one, and what is missing there is now only the wiring ([1.2](#12-no-prompttotal-power-split-in-pointkinetics)). The forced-to-natural-circulation transition runs end to end and is tested against a derived buoyancy-against-friction balance |
 | **RIA** (reactivity insertion) | Yes | Partly | Decay heat matters less here, but cylindrical fuel, gap conductance and fuel-temperature limits are all absent |
 | **LOCA**, level tracking to uncovery | **No** | Partly | Needs coolant inventory, a free surface and break flow. No two-phase model required ([4](#4-loca-level-tracking-and-where-it-stops)) |
 | **LOCA**, past uncovery | **No** | **No** | Void, steam, post-CHF heat transfer. Out of scope for both, by choice |
@@ -63,43 +63,61 @@ grepping the whole Python tree for `void`, `quality`, `two_phase`, `choked`, `fi
 
 ## 1. Power and heat sources
 
-### 1.1 Decay heat is missing entirely
+### 1.1 Decay heat: physics ported, not yet wired in
 
-**Highest priority.** Python has `physical_models/decay_heat/` with four contributions:
+`src/decay_heat/` ports Python's `physical_models/decay_heat/` one file at a time. Every
+contribution answers `model(t, T)`, with `t` seconds after shutdown and `T` seconds of
+operation before it, and returns MeV per fission event, or a dimensionless profile where the
+caller supplies the energy per event:
 
-| Module | What it gives | Data |
+| Python module | STREAM.jl | Status |
 |---|---|---|
-| `fission_products.py` | Fission product decay, summed exponential fits | Vendored CSVs: ANS-5.1-1973, ANS-5.1-2014, JAERI-91, for U235, U235-beta, U235-gamma, U238, U238-gamma |
-| `actinides.py` | U-239 and Np-239 profiles, from captures per fission | Analytic |
-| `activation.py` | Single- and double-decay activation profiles of structural material | Analytic, user supplies λ |
-| `fissions.py` | Prompt fission power profile, including `profile_from_pk` driven by a point-kinetics solution | Analytic |
+| `fission_products.py` | `DecayHeat.FissionProducts` | Ported, reading the same CSV tables |
+| `actinides.py` | `DecayHeat.Actinides` | Ported |
+| `activation.py` | `DecayHeat.Activation`, `DecayHeat.DoubleDecay` | Ported |
+| `fissions.py` `profile` | `DecayHeat.Fissions` | Ported, over our `PointKinetics` |
+| `fissions.py` `profile_from_pk` | none | Not ported, see below |
 
-All four share the signature `f(t, T) -> MeV/fission`, where `t` is time after shutdown and
-`T` is irradiation time before it. They are consumed through `PointKineticsWInput`, which
-splits `pk_power` (prompt) from `power` (total) and adds `power_input` on top.
+`test/test_decay_heat.jl` reproduces the Python doctest values and both of its property
+tests, with one exception that is a data problem rather than a porting one: the doctest at
+`fission_products.py:75` expects 6.728% of 200 MeV at shutdown, and the ANS-5.1-2014 table
+we have is rounded to three significant figures and gives 6.720%. `PROVENANCE.md` beside the
+CSVs records this and says not to adjust the data, so we anchor on the table instead and the
+mismatch stays until a full-precision ANS-5.1 table turns up.
 
-STREAM.jl has none of this, and no equivalent of `PointKineticsWInput`. Every loss-of-flow
-and SCRAM transient we run is missing its dominant post-trip source term. A SCRAM from full
+Contributions add through `+`, so `sum([fp, act])` is the total of the docs' equation FDH,
+and `Q * model` weights one by an energy per event or a fission rate. Python leaves both of
+those to the caller.
+
+Two deliberate departures. The standards tables are not distributed with this package, since
+they cannot be redistributed and are headed for a package of their own; point
+`DecayHeat.standards_dir!` at a directory holding them or pass `dir=`, and the testsets that
+need one skip when `STREAM_DECAY_HEAT_STANDARDS` is unset. And `profile_from_pk` is not
+ported: it does not run in Python either, because it forwards an `input_reactivity_func`
+keyword that neither `profile` nor `PointKinetics` accepts.
+
+**What is left is the wiring**, which is §1.2 and is the whole reason none of this changes a
+result yet. Nothing here is connected to a channel or a plate, so every loss-of-flow and
+SCRAM transient still runs without its dominant post-trip source term. A SCRAM from full
 power drops prompt fission to near zero in under a second while decay heat sits at roughly
-6-7% of rated power and falls off as a power law over hours. Without it, a LOFA transient
-cools down when it should heat up.
+6-7% of rated power and falls off as a power law over hours, so a LOFA transient still cools
+down where it should heat up.
 
-**Plan** (unchanged from `CLAUDE.md`): Way-Wigner first as the analytic default, then
-user-supplied databases in the same shape Python takes. The CSV standards are vendored data
-we can read as-is.
-
-**Size:** medium. The physics is a sum of exponentials; the work is the component that adds
-it to a channel's or a plate's power, plus the split between prompt and total power in
-`PointKinetics`.
+Not ported and not planned, matching Python: neutron captures in fission products (the
+ANS-5.1 G factor), which Python's own docs mark as a TODO.
 
 ### 1.2 No prompt/total power split in `PointKinetics`
 
 Python's `PointKineticsWInput` adds one algebraic variable so that `power = pk_power +
-power_input`. Ours only has the prompt power. Needed before decay heat can be wired in, and
-useful on its own for any external heat source (gamma deposition in the reflector, pump
-heat).
+power_input`. Ours only has the prompt power. This is now the only thing standing between
+`DecayHeat` and a transient that feels it, and it is useful on its own for any external heat
+source (gamma deposition in the reflector, pump heat).
 
-**Size:** small, once 1.1 defines what `power_input` looks like.
+Python's `point_kinetics_steady_state` takes a `power_input` alongside the desired total and
+seeds the precursors from the neutronic share, `pk_power = power - power_input`. Ours will
+need the same.
+
+**Size:** small. §1.1 has settled what `power_input` looks like.
 
 ---
 
@@ -246,7 +264,7 @@ because the two get conflated.
 | A component with a free surface (pool, plenum, standpipe) | No |
 | Break flow out of the system, as a specified rate or an orifice | No |
 | An event that fires when the level reaches a named elevation | No, but `SCRAMCondition` and the flapper callbacks are the pattern to copy |
-| Decay heat, to know the load while it drains | No, see [1.1](#11-decay-heat-is-missing-entirely) |
+| Decay heat, to know the load while it drains | The physics, not the wiring, see [1.1](#11-decay-heat-physics-ported-not-yet-wired-in) |
 | Natural circulation while still covered | Yes |
 | Margin to boiling on the way down | Yes, the CHF / OFI / OSV / ONB thresholds |
 
@@ -540,8 +558,8 @@ Verified as matching, so they should not be re-investigated:
 
 Ordered by what unblocks the most, not by size.
 
-1. **Decay heat** (§1.1, §1.2). Without it no LOFA or SCRAM result is meaningful. Way-Wigner
-   first, then the vendored standards.
+1. **Decay heat wiring** (§1.2). The physics landed in §1.1; until `PointKinetics` splits
+   prompt from total power, no LOFA or SCRAM result is meaningful.
 2. ~~**Friction as a `DarcyFactor`**~~ done, along with the regime-dependent friction
    resistor and flow-dependent inertia (§3.1).
 3. **Continuation for the forced-flow steady solve** (§7.2). Not urgent, since nothing fails
@@ -556,4 +574,4 @@ Ordered by what unblocks the most, not by size.
    initialisation.
 8. **RIA limits** (§5.2), after §2 and §4 are settled.
 9. **UQ** (§8), if it becomes a requirement, via SciMLSensitivity rather than a port.
-10. **Level tracking to uncovery** (§4), once decay heat exists to drive it.
+10. **Level tracking to uncovery** (§4), once decay heat is wired in to drive it.

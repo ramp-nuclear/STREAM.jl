@@ -11,7 +11,7 @@ Each submodule reaches only downward, so the dependency order is also the readin
 
 ```
 Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
-           -> Components -> Assemblies -> {Solvers, Examples}
+           -> Components -> {DecayHeat, Assemblies} -> {Solvers, Examples}
 ```
 
 | Module | What lives there |
@@ -22,6 +22,7 @@ Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
 | [`LocalLoss`](@ref) | Idelchik minor losses for sudden area changes |
 | [`Thresholds`](@ref) | safety limits and the post-solve analysis that applies them |
 | [`Components`](@ref) | the MTK components a model is built from |
+| [`DecayHeat`](@ref) | decay heat contributions and the standards behind them |
 | [`Assemblies`](@ref) | wiring verbs and named arrangements of components |
 | [`Utilities`](@ref) | grid resampling and axial profile helpers |
 | `Examples` | worked builders, compiled with the package but never exported |
@@ -258,6 +259,48 @@ export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback, watch_f
 end
 
 """
+    STREAM.DecayHeat
+
+Sources of power that outlive the fission that caused them, and the profile of the fissions
+themselves once the reactor is shut down.
+
+Every contribution is a callable [`AbstractDecayHeat`](@ref), evaluated as
+`model(t, T)` for `t` seconds after shutdown and `T` seconds of operation before it, and
+returning MeV per fission event. [`FissionProducts`](@ref) is the largest of them,
+[`Actinides`](@ref) covers the U-239 and Np-239 left by capture in U-238,
+[`Activation`](@ref) and [`DoubleDecay`](@ref) cover activated structural material, and
+[`Fissions`](@ref) is the prompt profile from a point-kinetics solve.
+
+Contributions add, so `sum([fp, act])` is the total, and `Q * model` weights one by an
+energy per event or by a fission rate.
+
+The tables behind [`FissionProducts`](@ref) are published standards that this package does
+not distribute. Point [`standards_dir!`](@ref) at a directory holding them, or pass `dir=`
+to [`read_standard`](@ref).
+
+Nothing here is wired into a component yet. Turning a contribution into a heat source needs
+the prompt/total power split that `PointKinetics` does not have.
+"""
+module DecayHeat
+using DelimitedFiles
+using ModelingToolkit
+using OrdinaryDiffEq
+using ..Components: PointKinetics, point_kinetics_steady_state
+using ..Components: U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
+using ..STREAM
+include("decay_heat/decay_heat.jl")
+include("decay_heat/activation.jl")
+include("decay_heat/actinides.jl")
+include("decay_heat/fission_products.jl")
+include("decay_heat/fissions.jl")
+export AbstractDecayHeat, Sum, Scaled
+export Activation, DoubleDecay, Actinides, FissionProducts, Fissions
+export Standard, ANS14, ANS73, JAERI91
+export Source, U235, U235_beta, U235_gamma, U238, U238_gamma
+export STANDARDS_DIR, standards_dir, standards_dir!, read_standard
+end
+
+"""
     STREAM.Assemblies
 
 Joining components that already exist, and the named arrangements built out of those joins.
@@ -357,7 +400,8 @@ end
 # The public surface. Everything not listed here is reached through its module.
 
 # Submodules
-export Substances, HTC, Friction, LocalLoss, Thresholds, Components, Assemblies, Utilities
+export Substances, HTC, Friction, LocalLoss, Thresholds, Components, DecayHeat
+export Assemblies, Utilities
 
 # Coolant properties, their aliases, and the two coolants
 export density, vapor_density, specific_heat, viscosity, conductivity
