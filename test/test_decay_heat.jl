@@ -9,16 +9,19 @@ using STREAM.Components: ReactivityController
 const DH_STANDARDS = get(ENV, "STREAM_DECAY_HEAT_STANDARDS", "")
 const DH_HAVE_STANDARDS = !isempty(DH_STANDARDS) && isdir(DH_STANDARDS)
 
-# Sums of alpha/lamda per table, in MeV/fission, transcribed from the "Contents" table of
-# PROVENANCE.md that ships beside the CSVs. Published to four decimals, hence the atol below.
+# Sums of α/λ per table, in MeV/fission, transcribed from the "Contents" table of the
+# DecayHeatStandards README that ships beside the CSVs. Published to four decimals, hence
+# the atol below. The JAERI-91 rows come from Table 4.16 of JAERI-M 91-034 and cover thermal
+# fission of U235 and fast fission of U238.
 const DH_TABLE_SUMS = [
     (ANS14, U235, 23, 13.4395),
     (ANS73, U235, 23, 13.1823),
-    (JAERI91, U235, 33, 12.9551),
-    (JAERI91, U235_beta, 33, 6.5233),
-    (JAERI91, U235_gamma, 33, 6.4318),
+    (JAERI91, U235, 33, 12.9568),
+    (JAERI91, U235_beta, 33, 6.5183),
+    (JAERI91, U235_gamma, 33, 6.4376),
     (ANS14, U238, 23, 17.6789),
-    (JAERI91, U238_gamma, 33, 5.7556),
+    (JAERI91, U238, 33, 16.1342),
+    (JAERI91, U238_gamma, 33, 7.8191),
 ]
 
 @testset "Decay Heat" begin
@@ -75,14 +78,14 @@ const DH_TABLE_SUMS = [
         # fp_inner_(t=0., T=np.inf, lamda=np.ones(1), alpha=np.ones(1)) -> array([1.])
         @test FissionProducts([1.0], [1.0])(0.0, Inf) == 1.0
 
-        # One group of alpha/lamda is that group's Activation profile scaled.
+        # One group of α/λ is that group's Activation profile scaled.
         one_group = FissionProducts([0.1], [0.5])
         @test one_group(7.0, 100.0) ≈ 5.0 * Activation(0.1)(7.0, 100.0)
 
         # No irradiation, no inventory, whatever the groups are.
         @test FissionProducts([1.0, 2.0], [3.0, 4.0])(1.0, 0.0) == 0.0
 
-        # Negative alpha are least-squares fit coefficients, not yields, and pass through.
+        # Negative α are least-squares fit coefficients, not yields, and pass through.
         @test FissionProducts([1.0, 2.0], [1.0, -0.25])(0.0, Inf) ≈ 1.0 - 0.125
 
         @test_throws DimensionMismatch FissionProducts([1.0, 2.0], [1.0])
@@ -110,21 +113,49 @@ const DH_TABLE_SUMS = [
         @test (act * 200.0)(100.0, Inf) == scaled(100.0, Inf)
     end
 
-    @testset "Fissions" begin
-        # np.interp semantics: linear between the samples, held flat outside them.
-        fis = Fissions([0.0, 1.0, 2.0], [1.0, 0.5, 0.25])
-        @test fis(0.0) == 1.0
-        @test fis(1.0) == 0.5
-        @test fis(2.0) == 0.25
-        @test fis(0.5) ≈ 0.75
-        @test fis(1.5) ≈ 0.375
-        @test fis(-5.0) == 1.0
-        @test fis(99.0) == 0.25
+    @testset "Fissions interpolation" begin
+        times, profile = [0.0, 1.0, 2.0], [1.0, 0.5, 0.25]
 
-        # Operation time has no meaning for a prompt profile and is ignored.
-        @test fis(0.5, 0.0) == fis(0.5, Inf)
+        # Linear reproduces np.interp, which is what Python STREAM evaluates a profile with.
+        lin = Fissions(times, profile; interpolation=Linear())
+        @test lin(0.5) ≈ 0.75
+        @test lin(1.5) ≈ 0.375
+
+        # The default departs from Python: the profile is a sum of decaying exponentials,
+        # and a straight line between samples always overshoots one.
+        fis = Fissions(times, profile)
+        @test fis.interpolation isa LogLinear
+        @test fis(0.5) < lin(0.5)
+        @test fis(1.5) < lin(1.5)
+
+        # Both agree at the samples and are held flat outside the grid.
+        for f in (fis, lin)
+            @test f(0.0) == 1.0
+            @test f(1.0) == 0.5
+            @test f(2.0) == 0.25
+            @test f(-5.0) == 1.0
+            @test f(99.0) == 0.25
+
+            # Operation time has no meaning for a prompt profile and is ignored.
+            @test f(0.5, 0.0) == f(0.5, Inf)
+        end
+
+        # These samples are exp(-t·ln2), so the log form should land on it exactly and the
+        # straight line should sit above it.
+        @test fis(0.5) ≈ 0.5^0.5 rtol = 1e-14
+        @test fis(1.5) ≈ 0.5^1.5 rtol = 1e-14
 
         @test_throws DimensionMismatch Fissions([0.0, 1.0], [1.0])
+    end
+
+    @testset "Fissions interpolation over a decayed tail" begin
+        # `_PROFILE_CUTOFF` leaves exact zeros once the profile dies, and a zero has no
+        # logarithm. Those segments have to stay finite rather than going to -Inf or NaN.
+        fis = Fissions([0.0, 1.0, 2.0, 3.0], [1.0, 1e-3, 0.0, 0.0])
+        @test isfinite(fis(1.5))
+        @test 0.0 <= fis(1.5) <= 1e-3
+        @test fis(2.5) == 0.0
+        @test fis(2.0) == 0.0
     end
 
     @testset "Fissions from a point-kinetics solve" begin
@@ -142,6 +173,12 @@ const DH_TABLE_SUMS = [
 
         # A bare callable of time is as good a control as a ReactivityController.
         @test all(isapprox.(Fissions(times, t -> 0.0).(times), 1.0; rtol=1e-6))
+
+        # The interpolation mode reaches through the solving constructor, and the two modes
+        # agree at the samples they share.
+        parity = Fissions(times, ReactivityController(); interpolation=Linear())
+        @test parity.interpolation isa Linear
+        @test parity.profile == critical.profile
     end
 
     @testset "standards directory" begin
@@ -167,9 +204,9 @@ const DH_TABLE_SUMS = [
 
             # Columns are found by name, so their order in the file does not matter.
             write(joinpath(dir, "U235_ans73.csv"), "alpha,lamda\n2.0,1.0\n4.0,3.0\n")
-            lamda, alpha = read_standard(ANS73, U235; dir=dir)
-            @test lamda == [1.0, 3.0]
-            @test alpha == [2.0, 4.0]
+            λ, α = read_standard(ANS73, U235; dir=dir)
+            @test λ == [1.0, 3.0]
+            @test α == [2.0, 4.0]
             @test FissionProducts(ANS73, U235; dir=dir)(0.0, Inf) ≈ 2.0 / 1.0 + 4.0 / 3.0
 
             write(joinpath(dir, "U235_ans14.csv"), "lambda,alpha\n1.0,1.0\n")
@@ -182,15 +219,15 @@ const DH_TABLE_SUMS = [
     else
         @testset "published tables" begin
             for (standard, source, groups, table_sum) in DH_TABLE_SUMS
-                lamda, alpha = read_standard(standard, source; dir=DH_STANDARDS)
-                @test length(lamda) == groups
-                @test length(alpha) == groups
+                λ, α = read_standard(standard, source; dir=DH_STANDARDS)
+                @test length(λ) == groups
+                @test length(α) == groups
 
                 # At shutdown after an infinite irradiation every exponential is 1, so the
-                # contribution collapses to the sum PROVENANCE.md tabulates.
+                # contribution collapses to the sum the README tabulates.
                 fps = FissionProducts(standard, source; dir=DH_STANDARDS)
                 @test fps(0.0, Inf) ≈ table_sum atol = 5e-5
-                @test fps(0.0, Inf) ≈ sum(alpha ./ lamda)
+                @test fps(0.0, Inf) ≈ sum(α ./ λ)
             end
         end
 
@@ -206,8 +243,8 @@ const DH_TABLE_SUMS = [
         end
 
         @testset "contributions fall off monotonically" begin
-            # Python asserts this over logspace(-8, 8) for an Al-28 activation profile, the
-            # actinides at R = 1, and the ANS-5.1-2014 U-235 fission products.
+            # Python asserts this over logspace(-8, 8) for an Al28 activation profile, the
+            # actinides at R = 1, and the ANS-5.1-2014 U235 fission products.
             times = 10.0 .^ range(-8, 8; length=50)
             models = (
                 Activation(5.16e-3),
@@ -219,14 +256,17 @@ const DH_TABLE_SUMS = [
             end
         end
 
-        @testset "the beta and gamma splits add up to the total" begin
-            # PROVENANCE.md records that U235_jaeri91 was built as the row-wise sum of the
-            # beta and gamma tables, so this holds by construction and catches a table swap.
+        @testset "the beta and gamma splits nearly add up to the total" begin
+            # U235_jaeri91 is the report's own (B+G) column, rounded independently of its
+            # BETA and GAMMA columns, so the three tables agree only to their shared 4
+            # significant figures. The README puts that at 0.007% on the shutdown value; the
+            # gap widens with cooling time and reaches 6e-4 by a day, which is what sets the
+            # tolerance here. Loose as it is, a swapped table would be out by percents.
             beta = FissionProducts(JAERI91, U235_beta; dir=DH_STANDARDS)
             gamma = FissionProducts(JAERI91, U235_gamma; dir=DH_STANDARDS)
             total = FissionProducts(JAERI91, U235; dir=DH_STANDARDS)
             for t in (0.0, 3600.0, 86400.0)
-                @test (beta + gamma)(t, Inf) ≈ total(t, Inf) rtol = 1e-12
+                @test (beta + gamma)(t, Inf) ≈ total(t, Inf) rtol = 1e-3
             end
         end
     end

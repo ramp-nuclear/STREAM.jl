@@ -10,7 +10,7 @@ rate taken to be constant over that period. `T = Inf` is saturation, which is th
 and `T = 0` gives zero everywhere.
 
 Shipped contributions: [`FissionProducts`](@ref) for the summed exponential fits the decay
-heat standards publish, [`Actinides`](@ref) for U-239 and Np-239, [`Activation`](@ref) and
+heat standards publish, [`Actinides`](@ref) for U239 and Np239, [`Activation`](@ref) and
 [`DoubleDecay`](@ref) for activated structural material, and [`Fissions`](@ref) for the
 prompt fission profile after a reactivity insertion.
 

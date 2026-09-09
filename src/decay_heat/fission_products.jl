@@ -16,7 +16,7 @@ The fissioning nuclide a table covers, and which part of its decay: `U235`, `U23
 
 The ANS standards do not split beta from gamma. JAERI-91 does, which matters for non-fuel
 components, where the beta contribution is deposited locally and the gamma contribution may
-not be.
+not be. Its tables cover thermal fission of U235 and fast fission of U238.
 
 Member names carry the lower-case suffix rather than SCREAMING_SNAKE_CASE because they are
 the literal file name token, the same way Python STREAM spells them.
@@ -76,14 +76,15 @@ _table_path(dir, standard::Standard, source::Source) =
     joinpath(dir, "$(source)_$(_tag(standard)).csv")
 
 """
-    read_standard(standard, source; dir=standards_dir()) -> (lamda, alpha)
+    read_standard(standard, source; dir=standards_dir()) -> (λ, α)
 
 Read one decay heat table off disk.
 
-The file is `<source>_<standard>.csv`, a headed CSV with a `lamda` column of group decay
-constants in 1/s and an `alpha` column of group strengths in MeV/(fission/s). Columns are
-found by name, so their order in the file does not matter, and row order does not matter
-either since [`FissionProducts`](@ref) only sums over the groups.
+The file is `<source>_<standard>.csv`, a headed CSV whose `lamda` column holds the group
+decay constants λ in 1/s and whose `alpha` column holds the group strengths α in
+MeV/(fission/s). Those two spellings are the literal headers the standards ship with, not a
+typo to fix. Columns are found by name, so their order in the file does not matter, and row
+order does not matter either since [`FissionProducts`](@ref) only sums over the groups.
 
 Not every combination of [`Standard`](@ref) and [`Source`](@ref) has a published table.
 
@@ -95,7 +96,7 @@ Not every combination of [`Standard`](@ref) and [`Source`](@ref) has a published
 - `dir`: directory to read from, defaulting to [`standards_dir`](@ref)
 
 # Returns
-- `Tuple{Vector{Float64},Vector{Float64}}`: the `lamda` and `alpha` columns
+- `Tuple{Vector{Float64},Vector{Float64}}`: the λ and α columns
 
 # Throws
 - `ArgumentError`: if the table is absent, empty, or missing either column
@@ -110,17 +111,17 @@ function read_standard(standard::Standard, source::Source; dir=standards_dir())
 
     table, header = readdlm(path, ',', Float64; header=true)
     columns = strip.(string.(vec(header)))
-    lamda_col = findfirst(==("lamda"), columns)
-    alpha_col = findfirst(==("alpha"), columns)
-    if lamda_col === nothing || alpha_col === nothing
+    λ_col = findfirst(==("lamda"), columns)
+    α_col = findfirst(==("alpha"), columns)
+    if λ_col === nothing || α_col === nothing
         throw(ArgumentError("$path needs lamda and alpha columns, found $columns"))
     end
 
-    return table[:, lamda_col], table[:, alpha_col]
+    return table[:, λ_col], table[:, α_col]
 end
 
 """
-    FissionProducts(lamda, alpha) <: AbstractDecayHeat
+    FissionProducts(λ, α) <: AbstractDecayHeat
     FissionProducts(standard, source; dir=standards_dir()) <: AbstractDecayHeat
 
 Decay of fission products, the largest decay heat contribution, as the summed exponential
@@ -131,32 +132,31 @@ fit the standards publish,
 The second form reads the groups from a table with [`read_standard`](@ref); the first takes
 them directly, for a fit the standards here do not cover.
 
-Negative `alpha` values are expected in the JAERI-91 tables. They are least-squares fit
+Negative α values are expected in the JAERI-91 tables. They are least-squares fit
 coefficients rather than physical group yields, so only the sum means anything, and nothing
 here filters or clamps them.
 
 Source: Python STREAM decay_heat/fission_products.py `contribution` and `fp_inner_`.
 
 # Arguments
-- `lamda`: group decay constants [1/s]
-- `alpha`: group strengths [MeV/(fission/s)], in the same group order as `lamda`
+- `λ`: group decay constants [1/s]
+- `α`: group strengths [MeV/(fission/s)], in the same group order as `λ`
 
 # Returns
 An [`AbstractDecayHeat`](@ref) whose value is in MeV/fission.
 
 # Throws
-- `DimensionMismatch`: if `lamda` and `alpha` differ in length
+- `DimensionMismatch`: if `λ` and `α` differ in length
 """
 struct FissionProducts <: AbstractDecayHeat
-    lamda::Vector{Float64}
-    alpha::Vector{Float64}
+    λ::Vector{Float64}
+    α::Vector{Float64}
 
-    function FissionProducts(lamda::AbstractVector, alpha::AbstractVector)
-        if length(lamda) != length(alpha)
-            throw(DimensionMismatch("lamda has $(length(lamda)) groups, \
-                                     alpha has $(length(alpha))"))
+    function FissionProducts(λ::AbstractVector, α::AbstractVector)
+        if length(λ) != length(α)
+            throw(DimensionMismatch("λ has $(length(λ)) groups, α has $(length(α))"))
         end
-        return new(collect(Float64, lamda), collect(Float64, alpha))
+        return new(collect(Float64, λ), collect(Float64, α))
     end
 end
 
@@ -165,6 +165,5 @@ function FissionProducts(standard::Standard, source::Source; dir=standards_dir()
 end
 
 function (model::FissionProducts)(t, T=Inf)
-    groups = zip(model.lamda, model.alpha)
-    return sum(a / l * _saturated_decay(t, T, l) for (l, a) in groups)
+    return sum(α / λ * _saturated_decay(t, T, λ) for (λ, α) in zip(model.λ, model.α))
 end

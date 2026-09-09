@@ -81,20 +81,34 @@ caller supplies the energy per event:
 `test/test_decay_heat.jl` reproduces the Python doctest values and both of its property
 tests, with one exception that is a data problem rather than a porting one: the doctest at
 `fission_products.py:75` expects 6.728% of 200 MeV at shutdown, and the ANS-5.1-2014 table
-we have is rounded to three significant figures and gives 6.720%. `PROVENANCE.md` beside the
-CSVs records this and says not to adjust the data, so we anchor on the table instead and the
+we have is rounded to three significant figures and gives 6.720%. The README beside the CSVs
+records this and says not to adjust the data, so we anchor on the table instead and the
 mismatch stays until a full-precision ANS-5.1 table turns up.
 
 Contributions add through `+`, so `sum([fp, act])` is the total of the docs' equation FDH,
 and `Q * model` weights one by an energy per event or a fission rate. Python leaves both of
 those to the caller.
 
-Two deliberate departures. The standards tables are not distributed with this package, since
-they cannot be redistributed and are headed for a package of their own; point
+Three deliberate departures. The standards tables are not distributed with this package,
+since they cannot be redistributed and now live in `DecayHeatStandards`; point
 `DecayHeat.standards_dir!` at a directory holding them or pass `dir=`, and the testsets that
 need one skip when `STREAM_DECAY_HEAT_STANDARDS` is unset. And `profile_from_pk` is not
 ported: it does not run in Python either, because it forwards an `input_reactivity_func`
 keyword that neither `profile` nor `PointKinetics` accepts.
+
+The third is a physics choice rather than a packaging one, so it is the one to look at.
+`DecayHeat.Fissions` interpolates its samples **logarithmically**, where Python uses
+`numpy.interp` and joins them with a straight line. The profile is a sum of decaying
+exponentials, so a straight line always overshoots. Measured against a grid eight times
+finer, on a -0.005 step sampled over 100 s at 50 points, the straight line is off by up to
+12% past the first interval where the log form is off by 3.6%, and past the fifth interval
+3.2% against 0.29%. On a single exponential the log form is exact. `Linear()` restores the
+Python behaviour and is what a parity check should pass.
+
+Worth knowing alongside it: neither mode saves a grid too coarse for the prompt drop. Under
+that same insertion the first 2 s interval falls by a factor of about 10, and both modes are
+then wrong by over 100% inside it. That is a sampling problem, and the fix is a denser or
+log-spaced `times` near shutdown, not a better interpolant.
 
 **What is left is the wiring**, which is §1.2 and is the whole reason none of this changes a
 result yet. Nothing here is connected to a channel or a plate, so every loss-of-flow and

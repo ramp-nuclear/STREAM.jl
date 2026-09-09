@@ -131,9 +131,10 @@ src/
   decay_heat/                 # module DecayHeat
     decay_heat.jl             # AbstractDecayHeat, Sum and Scaled, the + and * that build them
     activation.jl             # Activation, DoubleDecay
-    actinides.jl              # Actinides (U-239, Np-239)
+    actinides.jl              # Actinides (U239, Np239)
     fission_products.jl       # Standard, Source, the table reader, FissionProducts
-    fissions.jl               # Fissions: the prompt profile from a point-kinetics solve
+    fissions.jl               # Fissions: the prompt profile from a point-kinetics solve,
+                              # with LogLinear/Linear sample interpolation
   assemblies/                 # module Assemblies
     port.jl                   # port: index one element of a connector array (a getter, not a verb)
     connections.jl            # module Assemblies.Connect: face, faces,

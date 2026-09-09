@@ -267,9 +267,11 @@ themselves once the reactor is shut down.
 Every contribution is a callable [`AbstractDecayHeat`](@ref), evaluated as
 `model(t, T)` for `t` seconds after shutdown and `T` seconds of operation before it, and
 returning MeV per fission event. [`FissionProducts`](@ref) is the largest of them,
-[`Actinides`](@ref) covers the U-239 and Np-239 left by capture in U-238,
+[`Actinides`](@ref) covers the U239 and Np239 left by capture in U238,
 [`Activation`](@ref) and [`DoubleDecay`](@ref) cover activated structural material, and
-[`Fissions`](@ref) is the prompt profile from a point-kinetics solve.
+[`Fissions`](@ref) is the prompt profile from a point-kinetics solve. That last one
+interpolates its samples logarithmically, unlike Python STREAM, since the quantity is a
+sum of decaying exponentials; pass [`Linear`](@ref) for the Python behaviour.
 
 Contributions add, so `sum([fp, act])` is the total, and `Q * model` weights one by an
 energy per event or by a fission rate.
@@ -295,6 +297,7 @@ include("decay_heat/fission_products.jl")
 include("decay_heat/fissions.jl")
 export AbstractDecayHeat, Sum, Scaled
 export Activation, DoubleDecay, Actinides, FissionProducts, Fissions
+export ProfileInterpolation, LogLinear, Linear
 export Standard, ANS14, ANS73, JAERI91
 export Source, U235, U235_beta, U235_gamma, U238, U238_gamma
 export STANDARDS_DIR, standards_dir, standards_dir!, read_standard
