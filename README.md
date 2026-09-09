@@ -57,7 +57,7 @@ println("ṁ        = ", round(abs(sol[ssys.ch.inlet.ṁ]), digits=4), " kg/s")
 | `Channel` | Single-phase coolant channel with axial FD discretization | `n` (cells), `geometry` (PipeGeometry), `g` (gravity) |
 | `Pump` | Pressure-rise source; supports callable `dP(t)` for pump trips | `dP_pump`, or `ṁ0` for the fixed-flow form |
 | `HeatDiffusion` | 2D finite-difference solid fuel plate with lateral and axial conduction | `nz`, `nx`, `power_shape`, `k_s`, `rho_s`, `cp_s` |
-| `PointKinetics` | Keepin delayed-neutron kinetics, any group count, with SCRAM support | `beta_k`, `lambda_k`, callable `rho_c_fn` |
+| `PointKinetics` | Keepin delayed-neutron kinetics, any group count, with SCRAM support and a prompt/total power split for decay heat | `beta_k`, `lambda_k`, callable `rho_c_fn`, `power_input` |
 | `ChannelAndContacts` | Coolant channel with bilateral `ThermalPort` arrays for plate coupling | `n`, `geometry` |
 | `HeatExchanger` | Constant-temperature heat sink (sets coolant inlet temperature) | `T_bc` |
 

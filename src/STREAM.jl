@@ -280,14 +280,16 @@ The tables behind [`FissionProducts`](@ref) are published standards that this pa
 not distribute. Point [`standards_dir!`](@ref) at a directory holding them, or pass `dir=`
 to [`read_standard`](@ref).
 
-Nothing here is wired into a component yet. Turning a contribution into a heat source needs
-the prompt/total power split that `PointKinetics` does not have.
+[`DecayHeatSource`](@ref) is how a contribution reaches a model. It converts MeV per fission
+into power with the fission rate `P0/Q`, and reads the trip time off the
+`ReactivityController` so the decay clock starts when the reactor scrams. Hand the result to
+`PointKinetics(...; power_input=source)` and couple the fuel to `P_total` rather than `P`.
 """
 module DecayHeat
 using DelimitedFiles
 using ModelingToolkit
 using OrdinaryDiffEq
-using ..Components: PointKinetics, point_kinetics_steady_state
+using ..Components: PointKinetics, point_kinetics_steady_state, ReactivityController
 using ..Components: U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 using ..STREAM
 include("decay_heat/decay_heat.jl")
@@ -295,12 +297,14 @@ include("decay_heat/activation.jl")
 include("decay_heat/actinides.jl")
 include("decay_heat/fission_products.jl")
 include("decay_heat/fissions.jl")
+include("decay_heat/source.jl")
 export AbstractDecayHeat, Sum, Scaled
 export Activation, DoubleDecay, Actinides, FissionProducts, Fissions
 export ProfileInterpolation, LogLinear, Linear
 export Standard, ANS14, ANS73, JAERI91
 export Source, U235, U235_beta, U235_gamma, U238, U238_gamma
 export STANDARDS_DIR, standards_dir, standards_dir!, read_standard
+export DecayHeatSource, decay_time
 end
 
 """

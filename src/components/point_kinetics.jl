@@ -89,7 +89,8 @@ end
 
 """
     PointKinetics(rho_c_fn::Any; name, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
-                  lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing) -> System
+                  lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing,
+                  power_input=nothing) -> System
 
 Keepin (1965) point kinetics with `G` delayed precursor groups, so `1 + G` ODEs:
 
@@ -116,6 +117,27 @@ When solving, the callable must appear in the operating point:
 `op = [ssys.rho_c_fn => rho_c_fn, ssys.P => ic.P, ...]`. MTK stores callable parameters by
 reference, so omitting it raises `KeyError` at `solve_transient`.
 
+# Prompt and total power
+
+`P` is the neutronic power the equations above integrate. `power_input` adds a source that
+fission does not produce, and the total is
+
+    P_total = P + power_input
+
+Decay heat is what this is for, through [`STREAM.DecayHeat.DecayHeatSource`](@ref), but any
+external source fits: gamma deposition in the reflector, pump heat. Couple a fuel plate to
+`P_total`, not to `P`, or the source never reaches it.
+
+`power_input` carries the same units as `P`. Those are Watts only if `P` is in Watts; a model
+running dimensionless kinetics and scaling later (as `build_loop_pk` does) needs a
+`power_input` scaled the same way.
+
+With no `power_input`, `P_total` is `P` and costs nothing: `mtkcompile` eliminates the
+equation either way, so the compiled state count is `1 + G` regardless.
+
+[`scram_callback`](@ref) trips on `P` rather than `P_total`, which is what a power-range
+monitor reading neutron flux measures.
+
 # Arguments
 - `rho_c_fn` (positional): callable `(t) -> Float64`, or a `ReactivityController`. Its
   concrete type is captured at construction.
@@ -128,10 +150,17 @@ reference, so omitting it raises `KeyError` at `solve_transient`.
   `j = (jz-1)*nx + jx`). `nothing` disables feedback.
 - `ref_temp::Union{Nothing,Dict}=nothing`: per-component reference temperatures [°C], same
   key structure. Missing keys default to zero, so the full temperature contributes.
+- `power_input=nothing`: non-fission power added to `P`. A `Real` becomes the parameter
+  `power_input`, which `solve_transient` can override. Anything else is taken as a callable
+  `(t) -> Float64` and becomes the callable parameter `power_input_fn`, which must then
+  appear in the operating point the way `rho_c_fn` does. `nothing` leaves `P_total ~ P`.
 
 # Returns
-Uncompiled `System` with unknowns `P`, `C[1:G]`, and one `T_source` array per feedback
-component, plus the callable parameter `rho_c_fn`.
+Uncompiled `System` with unknowns `P`, `C[1:G]`, `P_total`, and one `T_source` array per
+feedback component, plus the callable parameter `rho_c_fn`.
+
+`P_total` is algebraic, so `mtkcompile` moves it to `observed` and the compiled system keeps
+`1 + G` states. Read it off a solution as `sol[ssys.pk.P_total]`.
 
 **Important:** with `temp_worth` set, the `T_source` unknowns are free until
 `temperature_feedback` binds them; do that and compose before `mtkcompile`.
@@ -144,6 +173,7 @@ function PointKinetics(
     lambda_k=U235_LAMBDA_K,
     temp_worth=nothing,
     ref_temp=nothing,
+    power_input=nothing,
 )
     FType = typeof(rho_c_fn)
     control = function ()
@@ -162,9 +192,26 @@ function PointKinetics(
         λ[1:G] = collect(lambda_k)
     end
 
+    # Read the kwarg once under another name: `@parameters power_input = ...` rebinds
+    # `power_input` to the symbolic, and the branch below still needs the value.
+    input_value = power_input
+    input_expr, input_pars = if input_value === nothing
+        (0, Num[])
+    elseif input_value isa Real
+        constant_pars = @parameters power_input = input_value
+        (constant_pars[1], constant_pars)
+    else
+        PType = typeof(input_value)
+        callable_pars = @parameters (power_input_fn::PType)(..)
+        (callable_pars[1](t), callable_pars)
+    end
+
     @variables begin
         P(t) = 1.0
         (C(t))[1:G]
+        # Algebraic, and read by whatever the reactor heats, so it is an unknown here rather
+        # than an observable. `mtkcompile` tears it back out.
+        P_total(t)
         # Observed diagnostics, assigned below; never on the RHS of another equation.
         beta_total(t)
         dPdt(t)
@@ -185,42 +232,53 @@ function PointKinetics(
     eqs = [
         D(P) ~ Ṗ
         D.(C_k) .~ β_k ./ Λ .* P .- λ_k .* C_k
+        P_total ~ P + input_expr
     ]
     obs = Equation[beta_total ~ β_sum, dPdt ~ Ṗ, reactivity ~ ρ]
 
     return System(
         eqs,
         t,
-        [P; C_k; control_unknowns],
-        [pars; control_pars];
+        [P; C_k; P_total; control_unknowns],
+        [pars; control_pars; input_pars];
         observed=obs,
         name=name,
     )
 end
 
 """
-    point_kinetics_steady_state(P0; Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K) -> NamedTuple
+    point_kinetics_steady_state(P0; Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
+                                lambda_k=U235_LAMBDA_K, power_input=0.0) -> NamedTuple
 
 Compute analytically correct initial conditions for the point kinetics equations at
 criticality (rho=0). Essential because KINSOL finds the trivial P=0 solution when given
 zero or poor initial conditions.
 
-At steady state with rho=0, dC_k/dt = 0 gives: C_k = beta_k / (lambda_k * Lambda) * P0.
+At steady state with rho=0, dC_k/dt = 0 gives: C_k = beta_k / (lambda_k * Lambda) * Pn.
+
+`P0` is the total power the reactor is to sit at. When part of it comes from `power_input`,
+fission only has to make up `Pn = P0 - power_input`, and the precursors are seeded off `Pn`:
+a decaying fission product breeds no delayed neutrons. Feed the same `power_input` the
+[`PointKinetics`](@ref) system was built with, evaluated at the initial time, and the
+operating point satisfies `P_total ~ P + power_input` exactly.
 
 # Arguments
-- `P0`: initial power [W]
+- `P0`: total power at the operating point [W]
 - `Lambda`: neutron generation time [s] (default U235_LAMBDA = 5.4e-5)
 - `beta_k`: delayed neutron fractions [-] (default U235_BETA_K)
 - `lambda_k`: precursor decay constants [1/s] (default U235_LAMBDA_K)
+- `power_input`: the non-fission share of `P0` [W] (default 0.0, so `P` is all of it)
 
 # Returns
-NamedTuple `(P=P0, C_k=Vector{Float64})` where `C_k[i] = beta_k[i] / (lambda_k[i] * Lambda) * P0`.
+NamedTuple `(P=Pn, C_k=Vector{Float64})` with `Pn = P0 - power_input` the neutronic power,
+and `C_k[i] = beta_k[i] / (lambda_k[i] * Lambda) * Pn`.
 """
 function point_kinetics_steady_state(
-    P0; Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K
+    P0; Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K, power_input=0.0
 )
-    C_k = [beta_k[i] / (lambda_k[i] * Lambda) * P0 for i in eachindex(beta_k)]
-    return (P=P0, C_k=C_k)
+    Pn = P0 - power_input
+    C_k = [beta_k[i] / (lambda_k[i] * Lambda) * Pn for i in eachindex(beta_k)]
+    return (P=Pn, C_k=C_k)
 end
 
 """

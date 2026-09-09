@@ -1,7 +1,9 @@
 using Test
 using STREAM
 using STREAM.DecayHeat
-using STREAM.Components: ReactivityController
+using STREAM.Components: ReactivityController, SCRAM_at_power, change_state
+using STREAM.Examples
+using OrdinaryDiffEq: ReturnCode
 
 # The published tables are not distributed with this package, so the testsets that read one
 # run only when STREAM_DECAY_HEAT_STANDARDS points at a directory holding them. Python STREAM
@@ -181,6 +183,97 @@ const DH_TABLE_SUMS = [
         @test parity.profile == critical.profile
     end
 
+    @testset "DecayHeatSource" begin
+        # Actinides at R = 1 is 0.865 MeV/fission at saturation and needs no table, so
+        # every assertion here runs whether or not the standards package is present.
+        model = Actinides(1.0)
+        saturated = model(0.0, Inf)
+        @test saturated ≈ 0.865 rtol = 1e-12
+
+        @testset "the fission rate carries the units" begin
+            src = DecayHeatSource(model, ReactivityController(); P0=1.0, Q=200.0)
+            @test src.Φ ≈ 0.005 rtol = 1e-12
+            @test src(0.0) ≈ saturated / 200 rtol = 1e-12
+
+            # P0 sets the units, so a core rated in Watts gives Watts out.
+            watts = DecayHeatSource(model, ReactivityController(); P0=1e7, Q=200.0)
+            @test watts(0.0) ≈ 1e7 / 200 * saturated rtol = 1e-12
+            @test watts(0.0) ≈ 1e7 * src(0.0) rtol = 1e-12
+        end
+
+        @testset "an untripped controller holds the saturated value" begin
+            # A reactor at power carries a saturated inventory, so the source is flat
+            # until something trips it, however far the simulation has run.
+            src = DecayHeatSource(model, ReactivityController(); P0=1.0)
+            @test src(0.0) == src(50.0) == src(1e6)
+            @test src(0.0) ≈ saturated / 200 rtol = 1e-12
+        end
+
+        @testset "the clock starts when the controller scrams" begin
+            trip = SCRAM_at_power(0.5)
+            ctrl = ReactivityController((s, ts, t) -> 0.0; state_machine=trip)
+            src = DecayHeatSource(model, ctrl; P0=1.0)
+            @test src(20.0) ≈ saturated / 200 rtol = 1e-12   # still :NORMAL
+
+            change_state(ctrl, 10.0, 1.0, 0.0)               # over the limit, so :SCRAM
+            @test ctrl.state === :SCRAM
+            @test ctrl.t_state == 10.0
+
+            @test src(30.0) ≈ 0.005 * model(20.0, Inf) rtol = 1e-12
+            @test src(30.0) < src(20.0)
+        end
+
+        @testset "the trip is continuous in value, and trial times clamp" begin
+            # The decay curve starts at its saturated value, so switching the clock on
+            # changes the slope and not the number. A solver trialling a time behind
+            # t_state gets the same answer the untripped branch gave it.
+            trip = SCRAM_at_power(0.5)
+            ctrl = ReactivityController((s, ts, t) -> 0.0; state_machine=trip)
+            src = DecayHeatSource(model, ctrl; P0=1.0)
+            before = src(10.0)
+            change_state(ctrl, 10.0, 1.0, 0.0)
+            @test src(10.0) == before
+            @test src(9.0) == before      # trial step behind the trip
+            @test src(-1.0) == before
+            @test decay_time(src, 9.0) == 0.0
+            @test decay_time(src, 12.5) == 2.5
+        end
+
+        @testset "a known trip time needs no state machine" begin
+            # A controller built already in the shutdown state is a fixed trip.
+            fixed = ReactivityController(
+                (s, ts, t) -> 0.0; initial_state=:SCRAM, initial_time=5.0
+            )
+            src = DecayHeatSource(model, fixed; P0=1.0)
+            @test src(5.0) ≈ saturated / 200 rtol = 1e-12
+            @test src(1005.0) ≈ 0.005 * model(1000.0, Inf) rtol = 1e-12
+            @test src.([5.0, 1005.0]) == [src(5.0), src(1005.0)]
+        end
+
+        @testset "a finite irradiation leaves less behind" begin
+            fixed = ReactivityController(
+                (s, ts, t) -> 0.0; initial_state=:SCRAM, initial_time=0.0
+            )
+            brief = DecayHeatSource(model, fixed; P0=1.0, T=100.0)
+            saturating = DecayHeatSource(model, fixed; P0=1.0, T=Inf)
+            @test brief(0.0) < saturating(0.0)
+            @test brief(0.0) ≈ 0.005 * model(0.0, 100.0) rtol = 1e-12
+        end
+
+        @testset "contributions sum before they are converted" begin
+            fixed = ReactivityController(
+                (s, ts, t) -> 0.0; initial_state=:SCRAM, initial_time=0.0
+            )
+            act = Activation(5.16e-3)
+            total = DecayHeatSource(model + 0.5 * act, fixed; P0=1.0)
+            parts = (
+                DecayHeatSource(model, fixed; P0=1.0),
+                DecayHeatSource(0.5 * act, fixed; P0=1.0),
+            )
+            @test total(300.0) ≈ sum(part(300.0) for part in parts) rtol = 1e-12
+        end
+    end
+
     @testset "standards directory" begin
         saved = DecayHeat.STANDARDS_DIR[]
         try
@@ -211,6 +304,62 @@ const DH_TABLE_SUMS = [
 
             write(joinpath(dir, "U235_ans14.csv"), "lambda,alpha\n1.0,1.0\n")
             @test_throws ArgumentError read_standard(ANS14, U235; dir=dir)
+        end
+    end
+
+    @testset "A tripped loop keeps its decay heat" begin
+        # The whole point of the port. A reactor scrammed from power drops prompt fission
+        # to nothing in seconds, and what is left holding the fuel up is decay heat. Run
+        # the same trip twice, once with a source and once without, and compare.
+        #
+        # The contribution is data free, so this runs with or without the standards.
+        P0 = 1.0
+        model = Actinides(1.0) + FissionProducts([0.5, 0.01], [3.0, 0.05])
+        # A controller born in :SCRAM is a trip at t = 0, and the reactivity is deep enough
+        # that the delayed groups are the only thing holding power up.
+        scrammed() = ReactivityController(
+            (s, ts, t) -> -0.05; initial_state=:SCRAM, initial_time=0.0
+        )
+        times = range(0.0, 60.0; length=25)
+        mesh = (n=3, nz=3, nx=2)
+        hottest(sol, ssys, i) =
+            maximum(sol[ssys.rods.fuel.T[j, k], i] for j in 1:(mesh.nz), k in 1:(mesh.nx))
+
+        ctrl = scrammed()
+        source = DecayHeatSource(model, ctrl; P0=P0)
+        ssys, ic = build_loop_pk(ctrl; mesh..., P0=P0, power_input=source)
+        sol = solve_transient(ssys, ic, times)
+        @test sol.retcode == ReturnCode.Success
+
+        @testset "the operating point splits P0 between fission and decay" begin
+            @test sol[ssys.pk.P_total, 1] ≈ P0 rtol = 1e-9
+            @test sol[ssys.pk.P, 1] ≈ P0 - source(0.0) rtol = 1e-9
+            # Worth a few percent of rated power, which is the order decay heat comes in at.
+            @test 0.01 < source(0.0) / P0 < 0.15
+        end
+
+        @testset "prompt power collapses and decay heat is what remains" begin
+            @test sol[ssys.pk.P, end] < 1e-6 * P0
+            @test sol[ssys.pk.P_total, end] ≈ source(times[end]) rtol = 1e-4
+            @test sol[ssys.pk.P_total, end] > 0.01 * P0
+            # Monotone decay: nothing puts power back in after the trip.
+            totals = sol[ssys.pk.P_total, :]
+            @test all(diff(totals) .<= 0)
+        end
+
+        @testset "the fuel stays hot, where without decay heat it would not" begin
+            ctrl_bare = scrammed()
+            ssys_bare, ic_bare = build_loop_pk(ctrl_bare; mesh..., P0=P0)
+            sol_bare = solve_transient(ssys_bare, ic_bare, times)
+            @test sol_bare.retcode == ReturnCode.Success
+
+            T_inlet = 20.0
+            # With no source the plate relaxes to the coolant it sits in.
+            @test hottest(sol_bare, ssys_bare, length(times)) ≈ T_inlet atol = 0.1
+            # With one it does not.
+            last = length(times)
+            @test hottest(sol, ssys, last) > T_inlet + 1.0
+            @test hottest(sol, ssys, last) > hottest(sol_bare, ssys_bare, last)
         end
     end
 

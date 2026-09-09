@@ -135,6 +135,7 @@ src/
     fission_products.jl       # Standard, Source, the table reader, FissionProducts
     fissions.jl               # Fissions: the prompt profile from a point-kinetics solve,
                               # with LogLinear/Linear sample interpolation
+    source.jl                 # DecayHeatSource: MeV/fission to power, and the trip clock
   assemblies/                 # module Assemblies
     port.jl                   # port: index one element of a connector array (a getter, not a verb)
     connections.jl            # module Assemblies.Connect: face, faces,
@@ -207,13 +208,13 @@ order of work. The two below are here because they change how you should work in
 repository, not because they are the only ones. Both were checked against the Python source,
 so do not re-derive them from scratch.
 
-- **Decay heat is ported but not connected.** `src/decay_heat/` mirrors Python's
-  `physical_models/decay_heat/`, so the contributions exist and are tested, but nothing feeds
-  them into a channel or a plate. That needs the prompt/total power split in `PointKinetics`
-  (`GAPS.md` §1.2), which is not done, so every loss-of-flow and SCRAM transient here still
-  runs without its main post-trip source term. The standards tables are not in this repo and
-  never should be: point `DecayHeat.standards_dir!` at them, or set
-  `STREAM_DECAY_HEAT_STANDARDS`.
+- **Decay heat reaches a model through `power_input`, not through a connector.** Build a
+  `DecayHeat.DecayHeatSource` from a contribution, hand it to
+  `PointKinetics(...; power_input=source)`, and couple the fuel to `pk.P_total` rather than
+  `pk.P`, or the source never arrives. `P` stays the power the kinetics integrate. The source
+  reads its trip time off the `ReactivityController`, so it needs the same controller the
+  reactor is driven by. The standards tables are not in this repo and never should be: point
+  `DecayHeat.standards_dir!` at them, or set `STREAM_DECAY_HEAT_STANDARDS`.
 - **The loss-of-flow steady solve has two roots, and reaching the right one is by hand.** The
   pump-on steady state has a forced-flow root and a trivial one at ṁ = 0, where the friction
   and buoyancy drops both vanish and every equation balances. `solve_steady` returns whichever

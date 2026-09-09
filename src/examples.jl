@@ -352,7 +352,12 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 - `P0`: initial reactor power [dimensionless or W] passed to
   `point_kinetics_steady_state(P0)` for IC generation (default 1.0)
 - `power_scale`: conversion factor from dimensionless PK power to physical
-  heat deposition [W]; `fuel.power = pk.P * power_scale` (default 1e4)
+  heat deposition [W]; `fuel.power = pk.P_total * power_scale` (default 1e4)
+- `power_input`: non-fission power added to the kinetics, in the same dimensionless units
+  as `P0`, or `nothing` (default). A `STREAM.DecayHeat.DecayHeatSource` built with the same
+  `P0` and the same controller is what this is for. The steady state is seeded from the
+  neutronic share `P0 - power_input(0)`, so the plate still sees `P0 * power_scale` at
+  the operating point.
 - `temp_worth`: per-component temperature feedback weights, or `nothing` (default).
   Accepts `Dict{Symbol,Any}` with keys `:cac` and/or `:fuel`, mapping to scalar,
   1D vector (length `n` for `:cac`), or 2D matrix (shape `nz×nx` for `:fuel`)
@@ -378,6 +383,7 @@ function build_loop_pk(ctrl;
     power_scale=1e4,
     temp_worth=nothing,
     ref_temp=nothing,
+    power_input=nothing,
 )
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ps = fill(1.0 / (nz * nx), nz, nx)  # uniform power shape, normalized
@@ -405,7 +411,7 @@ function build_loop_pk(ctrl;
     tw = _resolve_tw(temp_worth, rods_cac, rods_fuel)
     rt = _resolve_tw(ref_temp, rods_cac, rods_fuel)
 
-    @named pk = PointKinetics(ctrl; temp_worth=tw, ref_temp=rt)
+    @named pk = PointKinetics(ctrl; temp_worth=tw, ref_temp=rt, power_input=power_input)
 
     fb_components = if isnothing(tw)
         System[]
@@ -418,7 +424,8 @@ function build_loop_pk(ctrl;
     else
         Connect.temperature_feedback(pk, fb_components)
     end
-    power_eqs = [rods_fuel.power ~ pk.P * power_scale]
+    # The total, so a `power_input` reaches the plate. With none it is `pk.P` exactly.
+    power_eqs = [rods_fuel.power ~ pk.P_total * power_scale]
 
     @named pump = Pump(dP_pump)
     @named bc = HeatExchanger(T_inlet)
@@ -433,7 +440,8 @@ function build_loop_pk(ctrl;
     full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
     ssys = mtkcompile(full)
 
-    pk_ic = point_kinetics_steady_state(P0)
+    input_at_start = power_input === nothing ? 0.0 : power_input(0.0)
+    pk_ic = point_kinetics_steady_state(P0; power_input=input_at_start)
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
         ssys.pk.P => pk_ic.P,
@@ -442,6 +450,11 @@ function build_loop_pk(ctrl;
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]
+    # MTK holds a callable parameter by reference, so it has to be in the map or the solve
+    # raises KeyError. A Real `power_input` is an ordinary parameter and carries its default.
+    if !(power_input === nothing || power_input isa Real)
+        push!(ic, ssys.pk.power_input_fn => power_input)
+    end
     # Consistent-IC seeding
     # FlowPort/ThermalPort temperatures default to 26.85 °C, which is 300 K
     # (src/components/connectors.jl). The boundary coolant cells and the channel↔fuel contact nodes are

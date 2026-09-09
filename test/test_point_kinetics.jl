@@ -22,6 +22,103 @@ const CRITICAL = (t) -> 0.0
         @test length(unknowns(ssys)) == 7
     end
 
+    @testset "Prompt and Total Power" begin
+        # `P` is the power the kinetics integrate; `P_total` adds whatever `power_input`
+        # supplies. Mirrors Python's PointKineticsWInput, which carries the same split as
+        # `pk_power` and `power`.
+
+        @testset "no power_input leaves P_total equal to P" begin
+            @named pk = PointKinetics(CRITICAL)
+            ssys = mtkcompile(pk)
+            ic = point_kinetics_steady_state(1e6)
+            op = Pair{Any,Any}[
+                ssys.rho_c_fn => CRITICAL,
+                ssys.P => ic.P,
+                [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
+            ]
+            sol = solve_transient(ssys, op, range(0.0, 1.0; length=10))
+            @test sol.retcode == ReturnCode.Success
+            @test sol[ssys.P_total, :] == sol[ssys.P, :]
+        end
+
+        @testset "constant power_input holds the offset across a transient" begin
+            # A Real becomes a plain parameter rather than a callable, so it is reachable
+            # for an override and the gap must not drift.
+            offset = 5e4
+            @named pk = PointKinetics(CRITICAL; power_input=offset)
+            ssys = mtkcompile(pk)
+            pnames = ModelingToolkit.getname.(parameters(ssys))
+            @test :power_input in pnames
+            @test !(:power_input_fn in pnames)
+
+            ic = point_kinetics_steady_state(1e6; power_input=offset)
+            @test ic.P == 1e6 - offset
+            op = Pair{Any,Any}[
+                ssys.rho_c_fn => CRITICAL,
+                ssys.P => ic.P,
+                [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
+            ]
+            sol = solve_transient(ssys, op, range(0.0, 2.0; length=20))
+            @test sol.retcode == ReturnCode.Success
+            @test all(isapprox.(sol[ssys.P_total, :] .- sol[ssys.P, :], offset; rtol=1e-12))
+            # Critical and seeded at the neutronic fixed point, so the total holds at P0.
+            @test isapprox(sol[ssys.P_total, end], 1e6; rtol=1e-6)
+        end
+
+        @testset "callable power_input matches the analytic decay of the precursors" begin
+            # Python's test_pk_with_decay, ported. With beta_k = 0 the precursors only
+            # decay, C_k(t) = C_k(0)e^(-λt), and feed power without being replenished, so
+            #     P(t) = P(0) + Σ C_k(0)(1 - e^(-λt))
+            # closes in the same form the fission product sums use. The ramp power_input
+            # is Python's, chosen because it keeps the total analytic too.
+            ramp = t -> t
+            beta_k = zeros(6)
+            lambda_k = U235_LAMBDA_K
+            P_init, C_init = 10.0, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+
+            @named pk = PointKinetics(
+                CRITICAL; Lambda=1.0, beta_k=beta_k, lambda_k=lambda_k, power_input=ramp
+            )
+            ssys = mtkcompile(pk)
+            op = Pair{Any,Any}[
+                ssys.rho_c_fn => CRITICAL,
+                ssys.power_input_fn => ramp,
+                ssys.P => P_init,
+                [ssys.C[k] => C_init[k] for k in 1:6]...,
+            ]
+            times = range(0.0, 8.0; length=100)
+            sol = solve_transient(ssys, op, times; abstol=1e-12, reltol=1e-12)
+            @test sol.retcode == ReturnCode.Success
+
+            analytic = [P_init + sum(C_init .* (-expm1.(-lambda_k .* tt))) for tt in times]
+            @test all(isapprox.(sol[ssys.P, :], analytic; rtol=1e-6))
+            @test all(isapprox.(sol[ssys.P_total, :], analytic .+ times; rtol=1e-6))
+        end
+
+        @testset "steady state with power_input is a true fixed point" begin
+            # Same argument as the criticality fixed-point test above: the neutronic share
+            # has to close on its own, with the input carried by the algebraic row only.
+            P0, offset = 1e6, 7e4
+            ic = point_kinetics_steady_state(P0; power_input=offset)
+
+            @named pk = PointKinetics(CRITICAL; power_input=offset)
+            ssys = mtkcompile(pk)
+            op = Pair{Any,Any}[
+                ssys.rho_c_fn => CRITICAL,
+                ssys.P => ic.P,
+                [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
+            ]
+            prob = ODEProblem(ssys, op, (0.0, 1.0))
+            du = similar(prob.u0)
+            prob.f(du, prob.u0, prob.p, 0.0)
+            scale = [
+                abs(prob.u0[i]) > 0 ? abs(prob.u0[i]) : 1.0 for i in eachindex(unknowns(ssys))
+            ]
+            @test all(abs(du[i]) / scale[i] < 1e-9 for i in eachindex(unknowns(ssys)))
+            @test prob[ssys.P_total] ≈ P0 rtol = 1e-12
+        end
+    end
+
     @testset "steady-state ICs are a true fixed point of the PK ODE" begin
         # Feed the returned ICs into the actual point-kinetics right-hand side and
         # require every derivative to vanish. That is the definition of steady state
@@ -317,24 +414,28 @@ const CRITICAL = (t) -> 0.0
             power_shape=ps_3x2,
         )
 
-        @testset "default no temp_worth gives 7 state vars" begin
+        @testset "default no temp_worth adds no T_source" begin
+            # Uncompiled counts are P, C[1:6] and the algebraic P_total. The last one is
+            # torn out again by mtkcompile, which is why the compiled count is still 7.
             @named pk = PointKinetics(ctrl_zero)
-            @test length(unknowns(pk)) == 7
+            @test length(unknowns(pk)) == 8
+            @test length(unknowns(mtkcompile(pk))) == 7
             unames = string.(ModelingToolkit.getname.(unknowns(pk)))
             @test !any(n -> occursin("T_source", n), unames)
         end
 
-        @testset "temp_worth=nothing gives 7 state vars" begin
+        @testset "temp_worth=nothing adds nothing" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=nothing)
-            @test length(unknowns(pk)) == 7
+            @test length(unknowns(pk)) == 8
+            @test length(unknowns(mtkcompile(pk))) == 7
         end
 
         @testset "scalar alpha broadcasts to all channel cells" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=Dict(ch => -0.001))
             unames = string.(ModelingToolkit.getname.(unknowns(pk)))
             @test any(n -> occursin("T_source_ch", n), unames)
-            # 7 original + 5 T_source_ch
-            @test length(unknowns(pk)) == 7 + 5
+            # 8 original + 5 T_source_ch
+            @test length(unknowns(pk)) == 8 + 5
         end
 
         @testset "1D vector per channel cell" begin
@@ -343,7 +444,7 @@ const CRITICAL = (t) -> 0.0
             )
             unames = string.(ModelingToolkit.getname.(unknowns(pk)))
             @test any(n -> occursin("T_source_ch", n), unames)
-            @test length(unknowns(pk)) == 7 + 5
+            @test length(unknowns(pk)) == 8 + 5
         end
 
         @testset "2D matrix for HeatDiffusion (3x2=6 cells)" begin
@@ -352,7 +453,7 @@ const CRITICAL = (t) -> 0.0
             )
             unames = string.(ModelingToolkit.getname.(unknowns(pk)))
             @test any(n -> occursin("T_source_fuel", n), unames)
-            @test length(unknowns(pk)) == 7 + 6
+            @test length(unknowns(pk)) == 8 + 6
         end
 
         @testset "shape mismatch raises ArgumentError (vector)" begin

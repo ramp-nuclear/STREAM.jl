@@ -43,7 +43,7 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 
 | Scenario | Can Python do it? | Can STREAM.jl do it? | What blocks us |
 |---|---|---|---|
-| **LOFA** (loss of flow) | Yes, one channel type | Partly | Decay heat is the main one, and what is missing there is now only the wiring ([1.2](#12-no-prompttotal-power-split-in-pointkinetics)). The forced-to-natural-circulation transition runs end to end and is tested against a derived buoyancy-against-friction balance |
+| **LOFA** (loss of flow) | Yes, one channel type | Yes | Decay heat is in, through the `power_input` split ([1.1](#11-decay-heat), [1.2](#12-prompttotal-power-split-in-pointkinetics-done)). The forced-to-natural-circulation transition runs end to end and is tested against a derived buoyancy-against-friction balance |
 | **RIA** (reactivity insertion) | Yes | Partly | Decay heat matters less here, but cylindrical fuel, gap conductance and fuel-temperature limits are all absent |
 | **LOCA**, level tracking to uncovery | **No** | Partly | Needs coolant inventory, a free surface and break flow. No two-phase model required ([4](#4-loca-level-tracking-and-where-it-stops)) |
 | **LOCA**, past uncovery | **No** | **No** | Void, steam, post-CHF heat transfer. Out of scope for both, by choice |
@@ -63,7 +63,7 @@ grepping the whole Python tree for `void`, `quality`, `two_phase`, `choked`, `fi
 
 ## 1. Power and heat sources
 
-### 1.1 Decay heat: physics ported, not yet wired in
+### 1.1 Decay heat
 
 `src/decay_heat/` ports Python's `physical_models/decay_heat/` one file at a time. Every
 contribution answers `model(t, T)`, with `t` seconds after shutdown and `T` seconds of
@@ -110,28 +110,38 @@ that same insertion the first 2 s interval falls by a factor of about 10, and bo
 then wrong by over 100% inside it. That is a sampling problem, and the fix is a denser or
 log-spaced `times` near shutdown, not a better interpolant.
 
-**What is left is the wiring**, which is §1.2 and is the whole reason none of this changes a
-result yet. Nothing here is connected to a channel or a plate, so every loss-of-flow and
-SCRAM transient still runs without its dominant post-trip source term. A SCRAM from full
-power drops prompt fission to near zero in under a second while decay heat sits at roughly
-6-7% of rated power and falls off as a power law over hours, so a LOFA transient still cools
-down where it should heat up.
+The wiring landed with §1.2. `DecayHeat.DecayHeatSource` converts a contribution into the
+`power_input` a `PointKinetics` takes, applying the fission rate `Φ = P0/Q` and reading the
+trip time off the `ReactivityController`, and `build_loop_pk` couples the plate to `P_total`.
+`test_decay_heat.jl` scrams a loop and shows the prompt power falling to 1e-9 of rated while
+the total holds at the decay level and the fuel stays above inlet, against the same trip with
+no source where it relaxes to the coolant.
 
 Not ported and not planned, matching Python: neutron captures in fission products (the
 ANS-5.1 G factor), which Python's own docs mark as a TODO.
 
-### 1.2 No prompt/total power split in `PointKinetics`
+### 1.2 Prompt/total power split in `PointKinetics`, done
 
-Python's `PointKineticsWInput` adds one algebraic variable so that `power = pk_power +
-power_input`. Ours only has the prompt power. This is now the only thing standing between
-`DecayHeat` and a transient that feels it, and it is useful on its own for any external heat
-source (gamma deposition in the reflector, pump heat).
+`PointKinetics` takes a `power_input`, a `Real` or a callable of time, and exposes
+`P_total ~ P + power_input`. `P` keeps its meaning as the power the kinetics integrate, which
+is Python's `pk_power`; `P_total` is Python's `power`. Any external source fits, not only
+decay heat: gamma deposition in the reflector, pump heat.
 
-Python's `point_kinetics_steady_state` takes a `power_input` alongside the desired total and
-seeds the precursors from the neutronic share, `pk_power = power - power_input`. Ours will
-need the same.
+Two departures from Python, both in our favour. Python makes the row a genuine algebraic
+constraint and the system a DAE, by way of a `False` in `mass_vector`. MTK tears the row out
+instead, so `P_total` becomes an observable and the compiled state count is unchanged at
+`1 + G`. And the split is optional: with no `power_input` the equation is `P_total ~ P` and
+nothing anywhere else has to change, where Python needs a separate `PointKineticsWInput`
+class.
 
-**Size:** small. §1.1 has settled what `power_input` looks like.
+`point_kinetics_steady_state(P0; power_input)` matches Python: `P0` is the total, and the
+precursors are seeded from the neutronic share `P0 - power_input`, since a decaying fission
+product breeds no delayed neutrons.
+
+`scram_callback` still trips on `P`. It resolves an index into the state vector and `P_total`
+is an observable after compilation, but that is also the right physics, since a power-range
+monitor reads neutron flux. Tripping on the total would mean rewriting the callback in the
+`flapper_callback` style.
 
 ---
 
@@ -278,7 +288,7 @@ because the two get conflated.
 | A component with a free surface (pool, plenum, standpipe) | No |
 | Break flow out of the system, as a specified rate or an orifice | No |
 | An event that fires when the level reaches a named elevation | No, but `SCRAMCondition` and the flapper callbacks are the pattern to copy |
-| Decay heat, to know the load while it drains | The physics, not the wiring, see [1.1](#11-decay-heat-physics-ported-not-yet-wired-in) |
+| Decay heat, to know the load while it drains | Yes, see [1.1](#11-decay-heat) |
 | Natural circulation while still covered | Yes |
 | Margin to boiling on the way down | Yes, the CHF / OFI / OSV / ONB thresholds |
 
@@ -572,8 +582,7 @@ Verified as matching, so they should not be re-investigated:
 
 Ordered by what unblocks the most, not by size.
 
-1. **Decay heat wiring** (§1.2). The physics landed in §1.1; until `PointKinetics` splits
-   prompt from total power, no LOFA or SCRAM result is meaningful.
+1. ~~**Decay heat**~~ done (§1.1, §1.2), physics and wiring both.
 2. ~~**Friction as a `DarcyFactor`**~~ done, along with the regime-dependent friction
    resistor and flow-dependent inertia (§3.1).
 3. **Continuation for the forced-flow steady solve** (§7.2). Not urgent, since nothing fails
@@ -588,4 +597,4 @@ Ordered by what unblocks the most, not by size.
    initialisation.
 8. **RIA limits** (§5.2), after §2 and §4 are settled.
 9. **UQ** (§8), if it becomes a requirement, via SciMLSensitivity rather than a port.
-10. **Level tracking to uncovery** (§4), once decay heat is wired in to drive it.
+10. **Level tracking to uncovery** (§4), which decay heat can now drive.
