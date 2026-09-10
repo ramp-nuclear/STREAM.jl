@@ -253,7 +253,7 @@ include("components/point_kinetics.jl")
 export FlowPort, ThermalPort
 export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFlowResistor
 export LocalPressureDrop, Inertia, HeatExchanger, bilinear_inertia
-export ResistorFromKnownPoint
+export ResistorFromKnownPoint, FlowWeight
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
@@ -346,14 +346,14 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 using ...Components
 import ..port
 include("assemblies/connections.jl")
-export inseries, inparallel, face, faces, temperature_feedback
+export inseries, inparallel, weighted, face, faces, temperature_feedback
 end
 using .Connect
 using .Connect: var_length   # the arrangements below count ports with it
 
 include("assemblies/assemblies.jl")
 export Connect
-export inseries, inparallel, face, faces, port, temperature_feedback
+export inseries, inparallel, weighted, face, faces, port, temperature_feedback
 export check_gravity_mismatch, compose_systems
 export symmetric_plate, plate, one_sided, single_channel, fuel_assembly
 end
