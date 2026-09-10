@@ -128,7 +128,8 @@ src/
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
-    point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM
+    point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM,
+                              # trip! and trip_callback for trips the state machine cannot see
   decay_heat/                 # module DecayHeat
     decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
     activation.jl             # Activation, DoubleDecay
