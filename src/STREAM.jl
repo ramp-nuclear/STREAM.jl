@@ -176,9 +176,11 @@ The correlations (`q_CHF_mirshak`, `q_CHF_sudo_kaminaga`, `q_CHF_fabrega`,
 [`twall_limit`](@ref)) run after a solve, on numbers rather than symbolics, and each takes
 either its raw arguments or a [`ChannelState`](@ref).
 
-[`ChannelState`](@ref) reads one channel's fields out of a `NonlinearSolution` or an
-`ODESolution`. [`threshold_analysis`](@ref) builds one and applies the functions you name;
-[`chfr`](@ref) builds a CHF-ratio closure with face selection and a zero-flux guard.
+[`ChannelState`](@ref) reads one channel's fields at one instant out of a
+`NonlinearSolution` or an `ODESolution`. [`threshold_analysis`](@ref) builds one, at every
+saved time for a transient, and applies the functions you name. [`chfr`](@ref) builds a
+CHF-ratio closure with face selection and a zero-flux guard, and [`worst_case`](@ref) finds
+the smallest margin and where and when it occurs.
 
 Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAndContacts`, not
 `ChannelHeatFlux`.
@@ -194,7 +196,7 @@ include("thresholds/thresholds.jl")
 include("thresholds/analysis.jl")
 export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber
 export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
-export ChannelState, threshold_analysis, chfr
+export ChannelState, threshold_analysis, chfr, worst_case
 end
 
 """

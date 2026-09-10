@@ -364,6 +364,28 @@ not. Python never reads it either, so this is bookkeeping.
 
 **Size:** trivial.
 
+### 5.4 Margins over a transient: fixed
+
+`ChannelState` used to stack a transient into `[cell, time]` matrices but read `ṁ` and
+`T_inlet` at the first saved time only, and Sudo-Kaminaga and Whittle-Forgan then took the
+first column of their matrices. Sudo-Kaminaga, Fabrega, OFI, OSV and boiling onset therefore
+reported their `t = 0` value across a whole transient, which in a loss of flow is exactly
+where they should move. Nothing called that path and nothing tested it.
+
+A `ChannelState` now describes one instant, `ChannelState(sol, ch; index=k)` for a transient,
+and `threshold_analysis` builds one at every saved time. `test_thresholds.jl` checks each
+slice against a state built at that instant and that the flow-dependent limits follow a
+coasting flow down.
+
+Bergles-Rohsenow had a second defect. After a scram the coolant rising through the core can
+run hotter than parts of the plate, the wall flux goes negative, and the correlation raised
+a negative number to a fractional power. On a `ChannelState` it now reports no onset (`Inf`)
+wherever the wall is not heating the coolant, as `chfr` already did.
+
+One approximation remains and is worth knowing in a reversal. `T_inlet` is the channel's
+`inlet.T`, which under reversed flow is the hot end, so OFI, OSV, Fabrega and boiling onset
+are only meaningful while the flow is forward.
+
 ---
 
 ## 6. Power shapes and meshing
@@ -547,10 +569,10 @@ month has both sides of the ledger in front of it.
 - **The `HTC` handle.** After the current work, our heat transfer model is a first-class
   value with an explicit property basis. Python's is a function with the basis hard-coded per
   branch.
-- **Transient threshold analysis is native.** `ChannelState` handles a transient solution by
-  turning every per-cell field into a `[cell, time]` matrix, so every threshold correlation
-  works on a transient with no extra code. Python needs a separate
-  `transient_threshold_analysis` wrapper.
+- **Transient threshold analysis, with a verdict.** `threshold_analysis` runs every correlation
+  on the channel state at each saved time and stacks the results, and `worst_case` reports the
+  smallest margin with the cell and time it occurs at. Python's `transient_threshold_analysis`
+  does the first half and leaves the ratio and the minimum to the caller.
 - **Event handling.** SciML callbacks give us SCRAM and flapper events with proper root
   finding. Python's `should_continue` / `change_state` polling is coarser.
 - **Less code for the same physics.** The two line counts at the top of this file are not a
