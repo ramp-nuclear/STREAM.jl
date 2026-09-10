@@ -797,3 +797,46 @@ end
     end
 end
 
+
+@testset "trip! and trip_callback" begin
+    @testset "trip! latches the first trip" begin
+        ctrl = ReactivityController()
+        @test trip!(ctrl, 2.0) === :SCRAM
+        @test ctrl.state === :SCRAM
+        @test ctrl.t_state == 2.0
+        # A second signal changes nothing: the first trip time is the one kept.
+        trip!(ctrl, 5.0)
+        @test ctrl.t_state == 2.0
+        @test count(entry -> entry[1] === :SCRAM, ctrl.log) == 1
+    end
+
+    @testset "trip_callback trips on a falling flow, at the crossing" begin
+        # A coasting loop gives a flow that falls through any setpoint below where it
+        # starts. The controller is not wired into the loop; the trip only has to read the
+        # flow.
+        ssys = build_loop(; n=5)
+        op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
+        push!(op, ssys.ch.inlet.ṁ => 0.5)
+        sol_ss = solve_steady(ssys, op)
+        setpoint = 0.5 * sol_ss[ssys.ch.inlet.ṁ]
+        ctrl = ReactivityController()
+        cb = trip_callback(ssys, ssys.ch.inlet.ṁ, setpoint, ctrl)
+        sol = solve_transient(
+            ssys, sol_ss, range(0.0, 0.5; length=11);
+            overrides=[ssys.pump.dP_pump => 0.0], callbacks=cb,
+        )
+        @test sol.retcode == ReturnCode.Success
+        @test ctrl.state === :SCRAM
+
+        # The trip time falls between the last saved flow above the setpoint and the first
+        # below.
+        ṁ = sol[ssys.ch.inlet.ṁ, :]
+        before = sol.t .< ctrl.t_state
+        @test all(ṁ[before] .> setpoint)
+        @test all(ṁ[.!before] .<= setpoint * (1 + 1e-6))
+
+        # A decay heat source reading the same controller starts its clock at the trip.
+        source = DecayHeat.DecayHeatSource(DecayHeat.Actinides(1.0), ctrl; P0=1.0)
+        @test DecayHeat.decay_time(source, ctrl.t_state + 3.0) ≈ 3.0
+    end
+end
