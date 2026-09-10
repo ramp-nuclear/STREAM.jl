@@ -387,6 +387,9 @@ for the lateral direction across clad and meat.
 Since the axial peaking factor sets the hot spot, and the hot spot sets every threshold
 margin, this is more load-bearing than it looks.
 
+`Utilities.cosine_shape` now ports Python's `cosine_shape` with all four of those. Still
+missing: `cosine_shape_by_zero_endpoints` and `uniform_x_power_shape`.
+
 **Size:** small. Pure functions, no MTK involvement.
 
 ---
@@ -593,7 +596,8 @@ Ordered by what unblocks the most, not by size.
 4. **Heat conduction rework** (§2.1 to §2.5) as one piece: non-uniform mesh, per-cell
    material, contact conductance, axial conduction, and the cylindrical metric. Doing these
    separately means touching `_diffusion_eqs` five times. This is what opens rod fuel.
-5. **Power shapes** (§6). Small, and it directly affects every hot-channel margin.
+5. **Power shapes** (§6). `cosine_shape` is in; the extrapolated cosine and the lateral
+   shape remain.
 6. **Missing hydraulic components** (§3.1). `ResistorFromKnownPoint` is in; `Bend` next.
 7. **Debugging ergonomics** (§9). High value per line, and the pain is felt on every failed
    initialisation.
