@@ -371,6 +371,68 @@ end
     @test all(iszero, bare.q_flux)
 end
 
+@testset "ChannelState over a transient reads each saved time" begin
+    # A coasting loop: the pump head is removed at t = 0 and the channel's own momentum
+    # carries the flow down, so every flow-dependent limit has to move with it. The reader
+    # this replaces froze ṁ and T_inlet at the first saved time.
+    geo = PipeGeometry_circular(0.6, 0.01)
+    ssys = build_loop(; n=5)
+    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
+    push!(op, ssys.ch.inlet.ṁ => 0.5)
+    sol_ss = solve_steady(ssys, op)
+    sol = solve_transient(
+        ssys, sol_ss, range(0.0, 0.5; length=6); overrides=[ssys.pump.dP_pump => 0.0]
+    )
+    @test sol.retcode == ReturnCode.Success
+    ṁ = sol[ssys.ch.inlet.ṁ, :]
+    # The flow has to fall for the rest of this to prove anything.
+    @test ṁ[end] < 0.5 * ṁ[1]
+
+    for k in (1, 3, length(sol.t))
+        s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
+        @test s.ṁ == ṁ[k]
+        @test s.T_inlet == sol[ssys.ch.inlet.T, k]
+        @test s.T_bulk == [sol[ssys.ch.T[i], k] for i in 1:5]
+    end
+    # A transient has many instants, so asking for the state without saying which is an
+    # error rather than a guess.
+    @test_throws ArgumentError ChannelState(sol, ssys.ch; pipe=geo)
+
+    # Channel-level results stack into a vector over time, per-cell ones into [cell, time].
+    result = threshold_analysis(
+        sol, ssys.ch; pipe=geo,
+        osv=q_OSV_saha_zuber, sk=q_CHF_sudo_kaminaga, onb=bergles_rohsenow_t_onb,
+    )
+    nt = length(sol.t)
+    @test size(result.osv) == (nt,)
+    @test size(result.sk) == (5, nt)
+    @test size(result.onb) == (5, nt)
+    for k in (1, nt)
+        s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
+        @test result.osv[k] == q_OSV_saha_zuber(s)
+        @test result.sk[:, k] == q_CHF_sudo_kaminaga(s)
+    end
+    # The regression: limits that depend on the flow follow it down instead of repeating
+    # their t = 0 value.
+    @test result.osv[end] != result.osv[1]
+    @test result.sk[:, end] != result.sk[:, 1]
+
+    # A steady solution still gives one value per cell.
+    steady = threshold_analysis(sol_ss, ssys.ch; pipe=geo, sk=q_CHF_sudo_kaminaga)
+    @test steady.sk == q_CHF_sudo_kaminaga(ChannelState(sol_ss, ssys.ch; pipe=geo))
+end
+
+@testset "worst_case finds the smallest margin and where it is" begin
+    margin = [3.0 2.0 5.0;
+              4.0 1.5 6.0]   # [cell, time]
+    times = [0.0, 1.0, 2.0]
+    @test worst_case(margin; times=times) == (value=1.5, cell=2, time=1.0)
+    @test worst_case(margin) == (value=1.5, cell=2, time=2)
+    # A vector with times is a channel-level result over time; without, it is per cell.
+    @test worst_case([2.0, 0.5, 1.0]; times=times) == (value=0.5, cell=nothing, time=1.0)
+    @test worst_case([2.0, 0.5, 1.0]) == (value=0.5, cell=2, time=nothing)
+end
+
 @testset "ChannelState says so when the channel has no wall temperature" begin
     # ChannelHeatFlux prescribes its flux, so nothing closes T_wall_left/T_wall_right and
     # mtkcompile drops them. MTK's own complaint is "Symbol ... is not present in the
@@ -496,4 +558,22 @@ end
     chfr_result = mirshak_chfr(state)
     @test length(chfr_result) == n
     @test all(chfr_result .> 0)
+end
+
+@testset "bergles_rohsenow_t_onb where the wall is not heating the coolant" begin
+    # After a scram the coolant can run hotter than parts of the plate and the flux turns
+    # negative. No onset is possible there, and the correlation's fractional power has no
+    # real value, so those cells report Inf rather than throwing.
+    n = 3
+    q = [5.0e4, 0.0, -3.0e3]
+    s = ChannelState(;
+        n=n, T_bulk=fill(60.0, n), T_wall=fill(62.0, n), T_wall_left=fill(62.0, n),
+        T_wall_right=fill(62.0, n), T_sat=fill(115.0, n), T_ONB=fill(120.0, n),
+        T_inlet=35.0, P=fill(1.7e5, n), q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=0.01,
+        velocity=fill(0.05, n), pipe=nothing, gravity=9.81,
+    )
+    onb = bergles_rohsenow_t_onb(s)
+    @test onb[1] ≈ bergles_rohsenow_t_onb(1.7e5, 5.0e4, 115.0)
+    @test onb[2] == Inf
+    @test onb[3] == Inf
 end
