@@ -374,6 +374,7 @@ None of these validate or normalize their inputs; negatives, zeros and NaNs pass
 module Utilities
 include("utilities.jl")
 export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
+export cosine_shape
 end
 
 include("initial_conditions.jl")
