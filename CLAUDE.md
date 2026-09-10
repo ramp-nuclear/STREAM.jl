@@ -146,7 +146,8 @@ src/
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
   initial_conditions.jl       # steady_state_guess
-  utilities.jl                # module Utilities: rebin_*, cosine_power_shape, cosine_T_wall_profile
+  utilities.jl                # module Utilities: rebin_*, cosine_shape, cosine_power_shape,
+                              # cosine_T_wall_profile
   examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk
 ```
 

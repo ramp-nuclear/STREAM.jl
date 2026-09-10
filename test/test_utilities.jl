@@ -171,3 +171,42 @@ end
     c2 = cosine_T_wall_profile(10; amplitude=2.0)
     @test isapprox(maximum(c2), 2 * maximum(c); rtol=rtol)
 end
+
+@testset "cosine_shape" begin
+    # Anchors printed by Python STREAM's stream.utilities.cosine_shape on the same inputs.
+    # Python finds the peaking angle with fsolve and this bisects for it, so the two agree
+    # to fsolve's tolerance rather than to the last bit.
+    @test cosine_shape(range(0.0, 1.0; length=6)) ≈ [
+        0.09549150281252626, 0.24999999999999997, 0.3090169943749475,
+        0.2499999999999999, 0.0954915028125262,
+    ] rtol = 1e-7
+    @test cosine_shape(range(0.0, 0.6; length=11), 1.4) ≈ [
+        0.04594463731709827, 0.07994795366670494, 0.1079641244313111, 0.1278950734825248,
+        0.1382482111023611, 0.1382482111023611, 0.1278950734825248, 0.1079641244313111,
+        0.079947953666705, 0.04594463731709821,
+    ] rtol = 1e-7
+    @test cosine_shape(range(0.0, 1.0; length=5), 1.5; xmax=0.4) ≈ [
+        0.2491934396660564, 0.3652971913139152, 0.286423540464809, 0.05467130400998441,
+    ] rtol = 1e-7
+    @test cosine_shape([0.0, 0.1, 0.35, 0.6], 1.2) ≈ [
+        0.13051168102285648, 0.46900098143315344, 0.4004873375439901,
+    ] rtol = 1e-7
+
+    # Shares of the whole, on any mesh.
+    for x in (range(0.0, 0.6; length=21), [0.0, 0.05, 0.3, 0.55, 0.6])
+        @test sum(cosine_shape(x, 1.3)) ≈ 1 rtol = 1e-12
+    end
+
+    # The peaking factor is peak over mean: on a fine mesh the hottest cell's share times
+    # the number of cells.
+    n = 2000
+    @test maximum(cosine_shape(range(0.0, 1.0; length=n + 1), 1.4)) * n ≈ 1.4 rtol = 1e-5
+
+    # Flat at 1, symmetric unless moved.
+    @test cosine_shape([0.0, 0.2, 0.6, 1.0], 1.0) ≈ [0.2, 0.4, 0.4]
+    symmetric = cosine_shape(range(0.0, 1.0; length=11), 1.5)
+    @test symmetric ≈ reverse(symmetric)
+
+    @test_throws ArgumentError cosine_shape([0.0, 1.0], 1.7)
+    @test_throws ArgumentError cosine_shape([0.0, 1.0], 0.9)
+end
