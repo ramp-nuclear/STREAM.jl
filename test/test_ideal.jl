@@ -218,3 +218,31 @@ end
     @test sol[ss.cb.thermal.Q][end] > 0.0
     @test sol[ss.wall.thermal.Q][end] < 0.0
 end
+
+using OrdinaryDiffEq: ReturnCode
+
+@testset "FlowWeight scales the flow and passes the pressure through" begin
+    # One resistor wrapped to stand for N copies. The pump sees N times the resistor's flow,
+    # and since the weights pass pressure through, the resistor sees the pump's whole head.
+    # Python STREAM's test_Kirchoff_kcl_matrix_fits_known_example_with_weights has an edge
+    # of signify=50 giving the KCL row [-50, 1]; this is the same statement read off a
+    # solved loop.
+    N, dP, R = 50, 1.0e4, 2.0e4
+    @named pump = Pump(dP)
+    @named hx = HeatExchanger(30.0)
+    @named w_in = FlowWeight(1 // N)
+    @named r = Resistor(R)
+    @named w_out = FlowWeight(N)
+    conns = [inseries(pump, hx, w_in, r, w_out, pump)..., pump.inlet.p ~ 1.0e5]
+    @named sys = compose(System(conns, t; name=:weighted_loop), pump, hx, w_in, r, w_out)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, Pair{Any,Any}[ssys.r.inlet.ṁ => 0.4])
+    @test sol.retcode == ReturnCode.Success
+    @test sol[ssys.r.inlet.ṁ] ≈ dP / R rtol = 1e-10
+    @test sol[ssys.pump.inlet.ṁ] ≈ N * dP / R rtol = 1e-10
+    @test sol[ssys.w_in.outlet.p] ≈ sol[ssys.w_in.inlet.p] rtol = 1e-12
+
+    # A Float ratio would hide the loop's free flow from mtkcompile, so it is refused.
+    @test_throws ArgumentError FlowWeight(0.5; name=:bad)
+    @test_throws ArgumentError FlowWeight(-2; name=:bad)
+end
