@@ -958,3 +958,51 @@ end
     asm = fuel_assembly([c1, c2], [p1, p2]; bookend=:mixed, start=:channel, name=:asm_smoke)
     @test asm isa ModelingToolkit.AbstractSystem
 end
+
+@testset "weighted: one channel standing for N" begin
+    # A branch wrapped by weighted(N, ...) has to behave, per channel, exactly like a lone
+    # channel under the same head. The weights pass pressure through, so the channel sees
+    # the same drop and carries the same flow, and only the junctions see N times it. N = 50
+    # mirrors Python STREAM's test_Kirchoff_kcl_matrix_fits_known_example_with_weights
+    # (signify=50).
+    N, n = 50, 4
+    geom = PipeGeometry_circular(0.6, 0.01)
+    function channel_loop(; copies)
+        @named pump = Pump(3.0e4)
+        @named hx = HeatExchanger(40.0)
+        @named ch = Channel(; n=n, geometry=geom, g=0.0, h_left=5000.0, h_right=0.0)
+        branch = copies === nothing ? (ch,) : weighted(copies, ch)
+        conns = [
+            inseries(pump, hx, branch..., pump)...,
+            pump.inlet.p ~ 1.0e5,
+            [ch.T_wall_left[i] ~ 100.0 for i in 1:n]...,
+            [ch.T_wall_right[i] ~ 40.0 for i in 1:n]...,
+        ]
+        @named sys = compose(System(conns, t; name=:loop), pump, hx, branch...)
+        ssys = mtkcompile(sys)
+        op = Pair{Any,Any}[ssys.ch.T[i] => 50.0 for i in 1:n]
+        push!(op, ssys.ch.inlet.ṁ => 0.5)
+        sol = solve_steady(ssys, op)
+        @test sol.retcode == ReturnCode.Success
+        return ssys, sol
+    end
+
+    lone, sol_lone = channel_loop(; copies=nothing)
+    wtd, sol_wtd = channel_loop(; copies=N)
+    ṁ_ch = sol_wtd[wtd.ch.inlet.ṁ]
+    @test ṁ_ch ≈ sol_lone[lone.ch.inlet.ṁ] rtol = 1e-8
+    T_wtd = [sol_wtd[wtd.ch.T[i]] for i in 1:n]
+    @test T_wtd ≈ [sol_lone[lone.ch.T[i]] for i in 1:n] rtol = 1e-8
+    @test sol_wtd[wtd.pump.inlet.ṁ] ≈ N * ṁ_ch rtol = 1e-8
+
+    @named r = Resistor(1.0)
+    path = weighted(3, r)
+    @test length(path) == 3
+    @test nameof(path[1]) == :r_weight_in
+    @test nameof(path[3]) == :r_weight_out
+    # An end reached through its parent carries the parent's namespace, so a name is given.
+    @test nameof(first(weighted(3, r; name=:hot))) == :hot_weight_in
+    @test_throws ArgumentError weighted(0, r)
+    @test_throws ArgumentError weighted(2.5, r)
+    @test_throws ArgumentError weighted(2)
+end

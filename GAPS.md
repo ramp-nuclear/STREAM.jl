@@ -50,7 +50,9 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 
 The LOFA cell is qualified because that is where Python's reach ends. Loops with a single
 channel type are solid; the cases with different channels in parallel are where it got stuck.
-That limit is the implementation's, not the physics'.
+That limit is the implementation's, not the physics'. `Components.FlowWeight` is Python's
+junction `weights` (`flow_edge(..., signify=N)`), so one representative channel can stand for
+`N` identical ones.
 
 The LOCA split is the one worth internalising. Both codes are single-phase liquid with
 subcooled-boiling *heat transfer enhancement* and thresholds that report margin. That is

@@ -124,7 +124,7 @@ src/
     flapper.jl                # Flapper
     resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
                               # VolumetricFlowResistor, LocalPressureDrop
-    ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
+    ideal.jl                  # Inertia, HeatExchanger, FlowWeight, ConstantTemperature
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
@@ -140,7 +140,7 @@ src/
   assemblies/                 # module Assemblies
     port.jl                   # port: index one element of a connector array (a getter, not a verb)
     connections.jl            # module Assemblies.Connect: face, faces,
-                              # temperature_feedback, inseries, inparallel
+                              # temperature_feedback, inseries, inparallel, weighted
     assemblies.jl             # compose_systems, check_gravity_mismatch, symmetric_plate,
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient

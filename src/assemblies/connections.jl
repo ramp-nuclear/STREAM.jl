@@ -78,6 +78,49 @@ function inparallel(upstream, branches, downstream)
     return eqs
 end
 
+"""
+    weighted(N, components...; name=nothing) -> Tuple
+
+A branch path standing for `N` identical copies of `components` in series.
+
+Returns `(w_in, components..., w_out)`, where `w_in` is a [`FlowWeight`](@ref) of `1//N` and
+`w_out` one of `N`. The junctions at either end therefore see `N` times the flow the
+components carry. The result is a path like any other: hand it to [`inparallel`](@ref) or
+[`inseries`](@ref), and compose its systems into the model. This is Python STREAM's
+`flow_edge(..., signify=N)`.
+
+The two weights are named `<name>_weight_in` and `<name>_weight_out`. Without `name` they
+take the names of what they wrap, `<first>_weight_in` and `<last>_weight_out`. Pass `name`
+when an end component is reached through its parent, as `rods.ch` is, since its name then
+carries the parent's namespace.
+
+# Arguments
+- `N`: how many identical copies the branch stands for, a positive integer
+- `components`: the branch, uncompiled systems with `inlet` and `outlet`, in flow order
+
+# Keywords
+- `name`: prefix for the two weights' names
+
+# Returns
+A tuple of systems, first to last.
+
+# Throws
+- `ArgumentError`: for no components, or `N` not a positive integer
+"""
+function weighted(N::Integer, components...; name=nothing)
+    isempty(components) && throw(ArgumentError("weighted needs at least one component"))
+    N > 0 || throw(ArgumentError("N must be positive, got $N"))
+    base_in = name === nothing ? nameof(first(components)) : name
+    base_out = name === nothing ? nameof(last(components)) : name
+    w_in = FlowWeight(1//N; name=Symbol(base_in, :_weight_in))
+    w_out = FlowWeight(N; name=Symbol(base_out, :_weight_out))
+    return (w_in, components..., w_out)
+end
+
+function weighted(N, components...; name=nothing)
+    throw(ArgumentError("N must be a positive integer, got $N"))
+end
+
 
 """
     face(sources, target, face; source_port=:thermal) -> Vector{Equation}
