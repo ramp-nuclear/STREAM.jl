@@ -256,6 +256,7 @@ export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController, worth, change_state
 export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback, watch_flow
+export trip!, trip_callback
 end
 
 """
