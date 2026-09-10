@@ -122,7 +122,8 @@ src/
     twoports.jl               # HydraulicTwoPort, shared by the two-port components
     pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
     flapper.jl                # Flapper
-    resistors.jl              # FrictionResistor, Gravity, Resistor, VolumetricFlowResistor, LocalPressureDrop
+    resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
+                              # VolumetricFlowResistor, LocalPressureDrop
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
