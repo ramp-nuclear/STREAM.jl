@@ -238,7 +238,7 @@ expands is a first-order effect on peak fuel temperature.
 | `ResistorSum` | Add resistors into one component | No, `inseries` covers the composition |
 | `Bend` | Idelchik ch. 6 diagram 6.1 bend loss, angle and relative curvature and Re | No |
 | `Screen` | Idelchik p. 598 circular wire mesh screen | No |
-| `ResistorFromKnownPoint` | Build a constant/linear/parabolic resistor from one known `(ΔP, ṁ)` point | No |
+| `ResistorFromKnownPoint` | Build a constant/linear/parabolic resistor from one known `(ΔP, ṁ)` point | Yes |
 | `bend_factor` | The bare Idelchik bend correlation | No |
 
 The Idelchik local losses we do have (`expansion`, `contraction`) match.
@@ -266,10 +266,10 @@ which `remake` reaches like any other parameter: `remake(prob; p=[ssys.r1.R => 6
 symbolically the knee is an `ifelse` on `abs(ṁ)`, so a reversal behaves like forward flow.
 The callable form carries one extra variable, `L_eff`, for the effective inertia.
 
-**Remaining:** `Bend`, `Screen`, `ResistorFromKnownPoint` and `bend_factor`, all postponed.
-Each is small and independent. `ResistorFromKnownPoint` is worth more than its size suggests:
-it is how you calibrate a loop against a measured operating point, which is the usual way a
-research reactor model gets its form losses.
+**Remaining:** `Bend`, `Screen` and `bend_factor`, all postponed. Each is small and
+independent. `ResistorFromKnownPoint` is in. It is how a loop is calibrated against a
+measured operating point, which is the usual way a research reactor model gets its form
+losses.
 
 ---
 
@@ -592,7 +592,7 @@ Ordered by what unblocks the most, not by size.
    material, contact conductance, axial conduction, and the cylindrical metric. Doing these
    separately means touching `_diffusion_eqs` five times. This is what opens rod fuel.
 5. **Power shapes** (§6). Small, and it directly affects every hot-channel margin.
-6. **Missing hydraulic components** (§3.1), `ResistorFromKnownPoint` and `Bend` first.
+6. **Missing hydraulic components** (§3.1). `ResistorFromKnownPoint` is in; `Bend` next.
 7. **Debugging ergonomics** (§9). High value per line, and the pain is felt on every failed
    initialisation.
 8. **RIA limits** (§5.2), after §2 and §4 are settled.
