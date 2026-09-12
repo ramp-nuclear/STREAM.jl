@@ -77,16 +77,16 @@ const DH_TABLE_SUMS = [
         @test DoubleDecay(λ, λ * (1 + 1.1e-6))(1000, Inf) ≈ 0.91251290318629652 rtol = 5e-10
     end
 
-    @testset "Actinides" begin
+    @testset "U238CaptureChain" begin
         # actinides.contribution(0.005)(0, inf).item() -> 0.004325
-        @test Actinides(0.005)(0, Inf) ≈ 0.004325 rtol = 1e-8
+        @test U238CaptureChain(0.005)(0, Inf) ≈ 0.004325 rtol = 1e-8
 
         # At saturation both profiles are 1, so the value is R times the two deposited
         # energies, 0.460 + 0.405 MeV.
-        @test Actinides(1.0)(0, Inf) ≈ 0.865 rtol = 1e-8
+        @test U238CaptureChain(1.0)(0, Inf) ≈ 0.865 rtol = 1e-8
 
         # Linear in captures per fission.
-        @test Actinides(0.01)(3600, Inf) ≈ 2 * Actinides(0.005)(3600, Inf)
+        @test U238CaptureChain(0.01)(3600, Inf) ≈ 2 * U238CaptureChain(0.005)(3600, Inf)
     end
 
     @testset "FissionProducts from group constants" begin
@@ -108,7 +108,7 @@ const DH_TABLE_SUMS = [
 
     @testset "Sum and scale" begin
         act = Activation(4.91e-4)
-        acs = Actinides(0.005)
+        acs = U238CaptureChain(0.005)
         fps = FissionProducts([1.0], [1.0])
 
         total = act + acs + fps
@@ -209,9 +209,9 @@ const DH_TABLE_SUMS = [
     end
 
     @testset "DecayHeatSource" begin
-        # Actinides at R = 1 is 0.865 MeV/fission at saturation and needs no table, so
-        # every assertion here runs whether or not the standards package is present.
-        model = Actinides(1.0)
+        # U238CaptureChain at R = 1 is 0.865 MeV/fission at saturation and needs no table,
+        # so every assertion here runs whether or not the standards package is present.
+        model = U238CaptureChain(1.0)
         saturated = model(0.0, Inf)
         @test saturated ≈ 0.865 rtol = 1e-12
 
@@ -339,7 +339,7 @@ const DH_TABLE_SUMS = [
         #
         # The contribution is data free, so this runs with or without the standards.
         P0 = 1.0
-        model = Actinides(1.0) + FissionProducts([0.5, 0.01], [3.0, 0.05])
+        model = U238CaptureChain(1.0) + FissionProducts([0.5, 0.01], [3.0, 0.05])
         # A controller born in :SCRAM is a trip at t = 0, and the reactivity is deep enough
         # that the delayed groups are the only thing holding power up.
         scrammed() = ReactivityController(
@@ -422,7 +422,7 @@ const DH_TABLE_SUMS = [
             times = 10.0 .^ range(-8, 8; length=50)
             models = (
                 Activation(5.16e-3),
-                Actinides(1.0),
+                U238CaptureChain(1.0),
                 FissionProducts(ANS14, U235; dir=DH_STANDARDS),
             )
             for model in models

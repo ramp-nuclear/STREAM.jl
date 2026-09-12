@@ -73,7 +73,7 @@ caller supplies the energy per event:
 | Python module | STREAM.jl | Status |
 |---|---|---|
 | `fission_products.py` | `DecayHeat.FissionProducts` | Ported, reading the same CSV tables |
-| `actinides.py` | `DecayHeat.Actinides` | Ported |
+| `actinides.py` | `DecayHeat.U238CaptureChain` | Ported |
 | `activation.py` | `DecayHeat.Activation`, `DecayHeat.DoubleDecay` | Ported |
 | `fissions.py` `profile` | `DecayHeat.Fissions` | Ported, over our `PointKinetics` |
 | `fissions.py` `profile_from_pk` | none | Not ported, see below |

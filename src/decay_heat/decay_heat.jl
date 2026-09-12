@@ -10,9 +10,10 @@ rate taken to be constant over that period. `T = Inf` is saturation, which is th
 and `T = 0` gives zero everywhere.
 
 Shipped contributions: [`FissionProducts`](@ref) for the summed exponential fits the decay
-heat standards publish, [`Actinides`](@ref) for U239 and Np239, [`Activation`](@ref) and
-[`DoubleDecay`](@ref) for activated structural material, and [`Fissions`](@ref) for the
-prompt fission profile after a reactivity insertion.
+heat standards publish, [`U238CaptureChain`](@ref) for the U239 and Np239 that capture in
+U238 leaves, [`Activation`](@ref) and [`DoubleDecay`](@ref) for activated structural
+material, and [`Fissions`](@ref) for the prompt fission profile after a reactivity
+insertion.
 
 [`Activation`](@ref), [`DoubleDecay`](@ref) and [`Fissions`](@ref) return a dimensionless
 profile normalized to 1 at `t = 0, T = Inf` rather than MeV/fission. Weighting them by the

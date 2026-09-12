@@ -131,7 +131,7 @@ src/
   decay_heat/                 # module DecayHeat
     decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
     activation.jl             # Activation, DoubleDecay
-    actinides.jl              # Actinides (U239, Np239)
+    actinides.jl              # U238CaptureChain (U239, Np239)
     fission_products.jl       # Standard, Source, the table reader, FissionProducts
     fissions.jl               # Fissions: the prompt profile from a point-kinetics solve,
                               # with LogLinear/Linear sample interpolation
