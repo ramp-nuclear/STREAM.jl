@@ -38,8 +38,10 @@ and the isotope it produces decays at `λ₂`,
 
     F(t, T) = [λ₁·e^(-λ₂t)(1 - e^(-λ₂T)) - λ₂·e^(-λ₁t)(1 - e^(-λ₁T))] / (λ₁ - λ₂)
 
-Dimensionless and normalized to 1 at `t = 0, T = Inf`. Singular at `λ₁ = λ₂`, which is not
-guarded here or in Python.
+Dimensionless and normalized to 1 at `t = 0, T = Inf`. The expression cancels as `λ₂`
+approaches `λ₁`, so within a relative `1e-6` of each other the rates are replaced by
+their mean in the equal-rate limit, [`_equal_rate_decay`](@ref). Python STREAM leaves
+that case unguarded.
 
 Source: Python STREAM decay_heat/activation.py `double_decay_profile`.
 
@@ -52,8 +54,32 @@ struct DoubleDecay <: AbstractDecayHeat
     λ₂::Float64
 end
 
+# Against a 50-digit reference the general form loses about 1e-16/(Δλ/λ) to cancellation
+# and the mean-rate limit is off by about (Δλ/λ)²(λt)², so switching at 1e-6 keeps both
+# near 1e-10 for λt up to 10.
+const _EQUAL_RATES = 1e-6
+
 function (model::DoubleDecay)(t, T=Inf)
-    charge₁ = _saturated_decay(t, T, model.λ₁)
-    charge₂ = _saturated_decay(t, T, model.λ₂)
-    return (model.λ₁ * charge₂ - model.λ₂ * charge₁) / (model.λ₁ - model.λ₂)
+    λ₁, λ₂ = model.λ₁, model.λ₂
+    λ = (λ₁ + λ₂) / 2
+    abs(λ₁ - λ₂) <= _EQUAL_RATES * λ && return _equal_rate_decay(t, T, λ)
+    charge₁ = _saturated_decay(t, T, λ₁)
+    charge₂ = _saturated_decay(t, T, λ₂)
+    return (λ₁ * charge₂ - λ₂ * charge₁) / (λ₁ - λ₂)
+end
+
+"""
+    _equal_rate_decay(t, T, λ)
+
+[`DoubleDecay`](@ref) in the limit `λ₁ = λ₂ = λ`,
+
+    F(t, T) = e^(-λt)·[(1 + λt)(1 - e^(-λT)) - λT·e^(-λT)]
+
+The function is symmetric in its two rates, so taking the limit at their mean is accurate
+to second order in their difference. The last term is dropped at `T = Inf`, where
+`λT·e^(-λT)` would otherwise evaluate to `Inf·0 = NaN`.
+"""
+function _equal_rate_decay(t, T, λ)
+    tail = isinf(T) ? 0.0 : λ * T * exp(-λ * T)
+    return exp(-λ * t) * ((1 + λ * t) * -expm1(-λ * T) - tail)
 end

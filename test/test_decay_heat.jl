@@ -62,6 +62,19 @@ const DH_TABLE_SUMS = [
         # The daughter outlives the parent, so it is still near its peak where the parent has
         # decayed away.
         @test dd(1000, Inf) > Activation(4.91e-4)(1000, Inf)
+
+        # Near equal rates the general form cancels, and the mean-rate limit takes over.
+        # References computed to 50 digits.
+        λ = 4.91e-4
+        @test DoubleDecay(λ, λ)(0, Inf) == 1.0
+        @test DoubleDecay(λ, λ)(0, 0) == 0.0
+        @test DoubleDecay(λ, λ)(1000, Inf) ≈ 0.91251298433601265 rtol = 1e-12
+        @test DoubleDecay(λ, λ)(3600, 2000) ≈ 0.23274652209990500 rtol = 1e-12
+        @test DoubleDecay(λ, λ * (1 + 1e-9))(1000, Inf) ≈ 0.91251298426224017 rtol = 1e-12
+        @test DoubleDecay(λ, λ * (1 + 1e-9))(3600, 2000) ≈ 0.23274652207492417 rtol = 1e-12
+        # Either side of the switch, each form against its own reference.
+        @test DoubleDecay(λ, λ * (1 + 0.9e-6))(1000, Inf) ≈ 0.91251291794078819 rtol = 5e-10
+        @test DoubleDecay(λ, λ * (1 + 1.1e-6))(1000, Inf) ≈ 0.91251290318629652 rtol = 5e-10
     end
 
     @testset "Actinides" begin
