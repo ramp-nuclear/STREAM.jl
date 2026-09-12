@@ -129,7 +129,7 @@ src/
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
     point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM
   decay_heat/                 # module DecayHeat
-    decay_heat.jl             # AbstractDecayHeat, Sum and Scaled, the + and * that build them
+    decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
     activation.jl             # Activation, DoubleDecay
     actinides.jl              # Actinides (U239, Np239)
     fission_products.jl       # Standard, Source, the table reader, FissionProducts
@@ -182,7 +182,7 @@ test/
   test_darcy.jl             # DarcyFactor models + the Friction resistor, resistors in series,
                             # and flow-dependent Inertia
   test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState
-  test_decay_heat.jl        # DecayHeat contributions, the standards reader, Sum/Scaled.
+  test_decay_heat.jl        # DecayHeat contributions, the standards reader, Sum.
                             # The table testsets skip unless STREAM_DECAY_HEAT_STANDARDS
                             # points at a directory holding the CSVs
   test_composition.jl       # symmetric_plate, plate, one_sided_connection, compose_systems,

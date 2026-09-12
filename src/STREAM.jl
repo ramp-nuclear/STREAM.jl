@@ -298,7 +298,7 @@ include("decay_heat/actinides.jl")
 include("decay_heat/fission_products.jl")
 include("decay_heat/fissions.jl")
 include("decay_heat/source.jl")
-export AbstractDecayHeat, Sum, Scaled
+export AbstractDecayHeat, Sum
 export Activation, DoubleDecay, Actinides, FissionProducts, Fissions
 export ProfileInterpolation, LogLinear, Linear
 export Standard, ANS14, ANS73, JAERI91

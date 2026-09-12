@@ -106,13 +106,25 @@ const DH_TABLE_SUMS = [
         @test length(total.parts) == 3
         @test length(((act + acs) + (fps + act)).parts) == 4
 
-        # sum falls out of `+`, which is the point of defining `+` and nothing else.
+        # sum falls out of `+`.
         @test sum([act, acs, fps])(100.0, Inf) == total(100.0, Inf)
 
+        # A scaled contribution is a one-term Sum; scaling it again multiplies the weight.
         scaled = 200.0 * act
-        @test scaled isa Scaled
+        @test scaled isa Sum
+        @test scaled.parts == (act,)
         @test scaled(100.0, Inf) ≈ 200.0 * act(100.0, Inf)
         @test (act * 200.0)(100.0, Inf) == scaled(100.0, Inf)
+        @test (8 * 9 * act).weights == (72.0,)
+
+        # Scaling a sum scales each weight, so the result stays one level deep.
+        both = 3.0 * (act + acs)
+        @test both.weights == (3.0, 3.0)
+        @test both.parts == (act, acs)
+        at(model) = model(100.0, Inf)
+        mixed = act + 2 * acs + 0.5 * (fps + act)
+        @test mixed.weights == (1.0, 2.0, 0.5, 0.5)
+        @test at(mixed) ≈ at(act) + 2 * at(acs) + 0.5 * (at(fps) + at(act))
     end
 
     @testset "Fissions interpolation" begin
