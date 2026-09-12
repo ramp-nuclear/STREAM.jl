@@ -154,12 +154,12 @@ function Fissions(
     ic = point_kinetics_steady_state(1.0; Lambda=Lambda, beta_k=beta_k, lambda_k=lambda_k)
     op = Pair{Any,Any}[
         ssys.rho_c_fn => rho_c_fn,
-        ssys.P => ic.P,
+        ssys.P_neutron => ic.P_neutron,
         (ssys.C[k] => ic.C_k[k] for k in eachindex(ic.C_k))...,
     ]
 
     sol = STREAM.solve_transient(ssys, op, times; kwargs...)
-    profile = sol[ssys.P, :]
+    profile = sol[ssys.P_neutron, :]
     profile[profile .< _PROFILE_CUTOFF] .= 0.0
 
     return Fissions(times, profile, interpolation)

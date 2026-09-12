@@ -344,18 +344,18 @@ const DH_TABLE_SUMS = [
         @test sol.retcode == ReturnCode.Success
 
         @testset "the operating point splits P0 between fission and decay" begin
-            @test sol[ssys.pk.P_total, 1] ≈ P0 rtol = 1e-9
-            @test sol[ssys.pk.P, 1] ≈ P0 - source(0.0) rtol = 1e-9
+            @test sol[ssys.pk.P, 1] ≈ P0 rtol = 1e-9
+            @test sol[ssys.pk.P_neutron, 1] ≈ P0 - source(0.0) rtol = 1e-9
             # Worth a few percent of rated power, which is the order decay heat comes in at.
             @test 0.01 < source(0.0) / P0 < 0.15
         end
 
         @testset "prompt power collapses and decay heat is what remains" begin
-            @test sol[ssys.pk.P, end] < 1e-6 * P0
-            @test sol[ssys.pk.P_total, end] ≈ source(times[end]) rtol = 1e-4
-            @test sol[ssys.pk.P_total, end] > 0.01 * P0
+            @test sol[ssys.pk.P_neutron, end] < 1e-6 * P0
+            @test sol[ssys.pk.P, end] ≈ source(times[end]) rtol = 1e-4
+            @test sol[ssys.pk.P, end] > 0.01 * P0
             # Monotone decay: nothing puts power back in after the trip.
-            totals = sol[ssys.pk.P_total, :]
+            totals = sol[ssys.pk.P, :]
             @test all(diff(totals) .<= 0)
         end
 

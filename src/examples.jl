@@ -352,7 +352,7 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 - `P0`: initial reactor power [dimensionless or W] passed to
   `point_kinetics_steady_state(P0)` for IC generation (default 1.0)
 - `power_scale`: conversion factor from dimensionless PK power to physical
-  heat deposition [W]; `fuel.power = pk.P_total * power_scale` (default 1e4)
+  heat deposition [W]; `fuel.power = pk.P * power_scale` (default 1e4)
 - `power_input`: non-fission power added to the kinetics, in the same dimensionless units
   as `P0`, or `nothing` (default). A `STREAM.DecayHeat.DecayHeatSource` built with the same
   `P0` and the same controller is what this is for. The steady state is seeded from the
@@ -424,8 +424,8 @@ function build_loop_pk(ctrl;
     else
         Connect.temperature_feedback(pk, fb_components)
     end
-    # The total, so a `power_input` reaches the plate. With none it is `pk.P` exactly.
-    power_eqs = [rods_fuel.power ~ pk.P_total * power_scale]
+    # The total, so a `power_input` reaches the plate. With none it equals `pk.P_neutron`.
+    power_eqs = [rods_fuel.power ~ pk.P * power_scale]
 
     @named pump = Pump(dP_pump)
     @named bc = HeatExchanger(T_inlet)
@@ -444,7 +444,7 @@ function build_loop_pk(ctrl;
     pk_ic = point_kinetics_steady_state(P0; power_input=input_at_start)
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
-        ssys.pk.P => pk_ic.P,
+        ssys.pk.P_neutron => pk_ic.P_neutron,
         [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
         ssys.rods.cac.inlet.ṁ => 0.2,
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,

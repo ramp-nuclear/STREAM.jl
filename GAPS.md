@@ -112,7 +112,7 @@ log-spaced `times` near shutdown, not a better interpolant.
 
 The wiring landed with §1.2. `DecayHeat.DecayHeatSource` converts a contribution into the
 `power_input` a `PointKinetics` takes, applying the fission rate `Φ = P0/Q` and reading the
-trip time off the `ReactivityController`, and `build_loop_pk` couples the plate to `P_total`.
+trip time off the `ReactivityController`, and `build_loop_pk` couples the plate to `P`.
 `test_decay_heat.jl` scrams a loop and shows the prompt power falling to 1e-9 of rated while
 the total holds at the decay level and the fuel stays above inlet, against the same trip with
 no source where it relaxes to the coolant.
@@ -123,14 +123,14 @@ ANS-5.1 G factor), which Python's own docs mark as a TODO.
 ### 1.2 Prompt/total power split in `PointKinetics`, done
 
 `PointKinetics` takes a `power_input`, a `Real` or a callable of time, and exposes
-`P_total ~ P + power_input`. `P` keeps its meaning as the power the kinetics integrate, which
-is Python's `pk_power`; `P_total` is Python's `power`. Any external source fits, not only
-decay heat: gamma deposition in the reflector, pump heat.
+`P ~ P_neutron + power_input`. `P` is the total, Python's `power`, and what fuel couples to.
+`P_neutron` is the power the kinetics integrate, Python's `pk_power`. Any external source
+fits, not only decay heat: gamma deposition in the reflector, pump heat.
 
 Two departures from Python, both in our favour. Python makes the row a genuine algebraic
 constraint and the system a DAE, by way of a `False` in `mass_vector`. MTK tears the row out
-instead, so `P_total` becomes an observable and the compiled state count is unchanged at
-`1 + G`. And the split is optional: with no `power_input` the equation is `P_total ~ P` and
+instead, so `P` becomes an observable and the compiled state count is unchanged at `1 + G`.
+And the split is optional: with no `power_input` the equation is `P ~ P_neutron` and
 nothing anywhere else has to change, where Python needs a separate `PointKineticsWInput`
 class.
 
@@ -138,7 +138,7 @@ class.
 precursors are seeded from the neutronic share `P0 - power_input`, since a decaying fission
 product breeds no delayed neutrons.
 
-`scram_callback` still trips on `P`. It resolves an index into the state vector and `P_total`
+`scram_callback` trips on `P_neutron`. It resolves an index into the state vector and `P`
 is an observable after compilation, but that is also the right physics, since a power-range
 monitor reads neutron flux. Tripping on the total would mean rewriting the callback in the
 `flapper_callback` style.

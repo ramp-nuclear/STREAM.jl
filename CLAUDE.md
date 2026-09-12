@@ -210,8 +210,8 @@ so do not re-derive them from scratch.
 
 - **Decay heat reaches a model through `power_input`, not through a connector.** Build a
   `DecayHeat.DecayHeatSource` from a contribution, hand it to
-  `PointKinetics(...; power_input=source)`, and couple the fuel to `pk.P_total` rather than
-  `pk.P`, or the source never arrives. `P` stays the power the kinetics integrate. The source
+  `PointKinetics(...; power_input=source)`, and couple the fuel to `pk.P`, the total power.
+  The kinetics state is `P_neutron`, which carries no source. The source
   reads its trip time off the `ReactivityController`, so it needs the same controller the
   reactor is driven by. The standards tables are not in this repo and never should be: point
   `DecayHeat.standards_dir!` at them, or set `STREAM_DECAY_HEAT_STANDARDS`.

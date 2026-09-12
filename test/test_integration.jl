@@ -848,7 +848,7 @@ end
     pk_ic = point_kinetics_steady_state(1.0)
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
-        ssys.pk.P => pk_ic.P,
+        ssys.pk.P_neutron => pk_ic.P_neutron,
         [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
     ]
     for i in 1:N
@@ -882,8 +882,10 @@ end
     # coolant/fuel heat up (a dead coupling would leave reactivity pinned at 0).
     rho = sol[ssys.pk.reactivity]
     @test abs(rho[1]) < 1e-9                         # consistent cold IC ⇒ critical at t=0
-    @test sol[ssys.pk.P][end] > 0.0                  # reactor settles at a positive equilibrium power
-    @test sol[ssys.pk.P][end] != sol[ssys.pk.P][1]   # power actually moved (feedback is solved, live)
+    # The reactor settles at a positive equilibrium power, and the power actually moved,
+    # so the feedback is solved live.
+    @test sol[ssys.pk.P_neutron][end] > 0.0
+    @test sol[ssys.pk.P_neutron][end] != sol[ssys.pk.P_neutron][1]
     # Each channel's coolant rises strictly and linearly at the settled state (Python's assertion).
     cac_T(i) = (rods = getproperty(ssys, Symbol(:rods, i)); getproperty(rods, Symbol(:cac, i)).T)
     for i in 1:N
@@ -926,13 +928,13 @@ end
     pk_ic = point_kinetics_steady_state(1.0e5)
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
-        ssys.pk.P => 1.0e5,
+        ssys.pk.P_neutron => 1.0e5,
         [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
     ]
     append!(ic, [ssys.fuel.T[i, j] => 2 * T0 for i in 1:nz for j in 1:nx])   # start hot
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
-    @test sol[ssys.pk.P] < 1e-3                                              # power → 0
+    @test sol[ssys.pk.P_neutron] < 1e-3  # power → 0
     @test all(isapprox(sol[ssys.fuel.T[i, j]], T0; atol=1e-3) for i in 1:nz for j in 1:nx)
 end
 
@@ -971,7 +973,7 @@ end
     pk_ic = point_kinetics_steady_state(1.0e5)
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
-        ssys.pk.P => 1.0e5,
+        ssys.pk.P_neutron => 1.0e5,
         [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
         ssys.rods.cac.inlet.ṁ => ṁ0,
     ]
@@ -979,6 +981,6 @@ end
     append!(ic, [ssys.rods.fuel.T[i, j] => 2 * T0 for i in 1:nz for j in 1:nx])
     sol = solve_steady(ssys, ic)
     @test sol.retcode == ReturnCode.Success
-    @test sol[ssys.pk.P] < 1e-3                                 # power → 0
+    @test sol[ssys.pk.P_neutron] < 1e-3  # power → 0
     @test all(isapprox(sol[ssys.rods.cac.T[i]], T0; atol=1e-3) for i in 1:n)
 end

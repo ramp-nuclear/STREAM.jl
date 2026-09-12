@@ -932,7 +932,8 @@ end
         t_arr = range(0.0, 50.0; length=200)
         sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
         @test sol.retcode == ReturnCode.Success
-        @test isapprox(sol[ssys.pk.P, end], 1.0; rtol=1e-3)   # critical PK holds power
+        # A critical reactor holds its power.
+        @test isapprox(sol[ssys.pk.P_neutron, end], 1.0; rtol=1e-3)
         T_cool = [sol[ssys.rods.cac.T[i], end] for i in 1:n]
 
         dT = diff(T_cool)       # first differences  (should all be > 0)
@@ -976,7 +977,7 @@ end
         t_arr = range(0.0, 200.0; length=500)
         sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
         @test sol.retcode == ReturnCode.Success
-        P = sol[ssys.pk.P]
+        P = sol[ssys.pk.P_neutron]
         @test all(isfinite, P)
         @test all(>(0.0), P)              # power positive throughout — decays, never goes negative
         @test abs(P[end]) < 1e-3          # feedback drives power negligible vs P0 = 1.0
@@ -1009,7 +1010,7 @@ end
         t_arr = range(0.0, 200.0; length=500)
         sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
         @test sol.retcode == ReturnCode.Success
-        P = sol[ssys.pk.P]
+        P = sol[ssys.pk.P_neutron]
         @test all(isfinite, P)
         @test all(>(0.0), P)              # power positive throughout — decays, never goes negative
         @test abs(P[end]) < 1e-3          # feedback drives power negligible vs P0 = 1.0

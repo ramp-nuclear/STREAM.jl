@@ -283,7 +283,7 @@ to [`read_standard`](@ref).
 [`DecayHeatSource`](@ref) is how a contribution reaches a model. It converts MeV per fission
 into power with the fission rate `P0/Q`, and reads the trip time off the
 `ReactivityController` so the decay clock starts when the reactor scrams. Hand the result to
-`PointKinetics(...; power_input=source)` and couple the fuel to `P_total` rather than `P`.
+`PointKinetics(...; power_input=source)` and couple the fuel to `P`, the total power.
 """
 module DecayHeat
 using DelimitedFiles
