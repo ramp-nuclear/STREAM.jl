@@ -845,7 +845,7 @@ end
         @test all(ṁ[.!before] .<= setpoint * (1 + 1e-6))
 
         # A decay heat source reading the same controller starts its clock at the trip.
-        source = DecayHeat.DecayHeatSource(DecayHeat.Actinides(1.0), ctrl; P0=1.0)
+        source = DecayHeat.DecayHeatSource(DecayHeat.U238CaptureChain(1.0), ctrl; P0=1.0)
         @test DecayHeat.decay_time(source, ctrl.t_state + 3.0) ≈ 3.0
     end
 end
