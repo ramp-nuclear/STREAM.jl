@@ -455,20 +455,12 @@ function build_loop_pk(ctrl;
     if !(power_input === nothing || power_input isa Real)
         push!(ic, ssys.pk.power_input_fn => power_input)
     end
-    # Consistent-IC seeding
-    # FlowPort/ThermalPort temperatures default to 26.85 °C, which is 300 K
-    # (src/components/connectors.jl). The boundary coolant cells and the channel↔fuel contact nodes are
-    # aliased to those port temperatures, and the per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT
-    # pin the port representatives under NoInit. Left unseeded, a temperature-feedback PK loop with
-    # ref_temp ≠ 26.85 sees a spurious (26.85 − ref_temp) reactivity offset at t=0 that crashes power,
-    # which is an initialization artifact rather than physics.
-    #
-    # Each connected port pair (hx↔cac, cac↔pump, pump↔hx, and each cac↔fuel contact) collapses to one
-    # alias-elimination representative, and WHICH member survives is not stable across MTK versions /
-    # runs (it differed between local and CI). So seed EVERY member of every connection set to T_inlet:
-    # whichever representative survives is then always hit, and the duplicate members are harmless
-    # (distinct symbolic keys, same value). The cold IC is then genuinely consistent — reactivity[0] = 0
-    # when ref_temp = T_inlet, independent of the alias-elimination choice.
+    # Port temperatures default to 26.85 °C (connectors.jl). The boundary coolant cells and
+    # the channel-to-fuel contacts are aliases of port temperatures, and which member of
+    # each connection set survives alias elimination changes between runs and MTK versions.
+    # So every member is seeded at T_inlet, and whichever survives starts there. Left at
+    # 26.85 °C, a feedback loop with ref_temp ≠ 26.85 would start with a false reactivity
+    # offset.
     push!(ic, ssys.rods.cac.inlet.T => T_inlet)
     push!(ic, ssys.rods.cac.outlet.T => T_inlet)
     push!(ic, ssys.pump.inlet.T => T_inlet)
