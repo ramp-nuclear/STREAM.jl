@@ -72,7 +72,7 @@ The package is a stack of submodules, each reaching only downward:
 
 ```
 Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
-           -> Components -> Assemblies -> {Solvers, Examples}
+           -> Components -> {DecayHeat, Assemblies} -> {Solvers, Examples}
 ```
 
 A module supplies the context a name would otherwise carry as a suffix, so
@@ -128,6 +128,14 @@ src/
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
     point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM
+  decay_heat/                 # module DecayHeat
+    decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
+    activation.jl             # Activation, DoubleDecay
+    actinides.jl              # U238CaptureChain (U239, Np239)
+    fission_products.jl       # Standard, Source, the table reader, FissionProducts
+    fissions.jl               # Fissions: the prompt profile from a point-kinetics solve,
+                              # with LogLinear/Linear sample interpolation
+    source.jl                 # DecayHeatSource: MeV/fission to power, and the trip clock
   assemblies/                 # module Assemblies
     port.jl                   # port: index one element of a connector array (a getter, not a verb)
     connections.jl            # module Assemblies.Connect: face, faces,
@@ -145,6 +153,7 @@ src/
 - New correlation → the module that owns that physics: a Nusselt number into `src/htc/correlations.jl`, a friction factor into `src/friction/correlations.jl`, a local loss into `src/local_loss.jl`, a safety limit into `src/thresholds/thresholds.jl`
 - New wiring verb → `src/assemblies/connections.jl` (inside `Connect`); a named arrangement → `src/assemblies/assemblies.jl`
 - Prefer `Connect.face(...)` over a bare `face(...)`, but leave `inseries`, `inparallel` and `port` unqualified: the first two are used constantly and `port` is a getter that reads clearly on its own
+- New decay heat contribution → `src/decay_heat/`, in the file matching the Python module it mirrors
 - New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the nine `AbstractLiquid` property methods
 - Build/example helpers → `src/examples.jl` only (never add examples to core files)
 
@@ -173,6 +182,9 @@ test/
   test_darcy.jl             # DarcyFactor models + the Friction resistor, resistors in series,
                             # and flow-dependent Inertia
   test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState
+  test_decay_heat.jl        # DecayHeat contributions, the standards reader, Sum.
+                            # The table testsets skip unless STREAM_DECAY_HEAT_STANDARDS
+                            # points at a directory holding the CSVs
   test_composition.jl       # symmetric_plate, plate, one_sided_connection, compose_systems,
                             # port, check_gravity_mismatch, var_length, temperature_feedback,
                             # fuel_assembly — heavy CAC<->HD coverage
@@ -196,11 +208,13 @@ order of work. The two below are here because they change how you should work in
 repository, not because they are the only ones. Both were checked against the Python source,
 so do not re-derive them from scratch.
 
-- **Decay heat is missing entirely.** Python has `physical_models/decay_heat/` (actinides,
-  activation, fission products, fissions) with ANS-5.1-1973, ANS-5.1-2014 and JAERI-91. It is
-  the dominant heat source after shutdown, so every loss-of-flow and SCRAM transient here is
-  currently missing its main post-trip source term. Plan: Way-Wigner first, then user-supplied
-  databases, the same shape Python takes.
+- **Decay heat reaches a model through `power_input`, not through a connector.** Build a
+  `DecayHeat.DecayHeatSource` from a contribution, hand it to
+  `PointKinetics(...; power_input=source)`, and couple the fuel to `pk.P`, the total power.
+  The kinetics state is `P_neutron`, which carries no source. The source
+  reads its trip time off the `ReactivityController`, so it needs the same controller the
+  reactor is driven by. The standards tables are not in this repo and never should be: point
+  `DecayHeat.standards_dir!` at them, or set `STREAM_DECAY_HEAT_STANDARDS`.
 - **The loss-of-flow steady solve has two roots, and reaching the right one is by hand.** The
   pump-on steady state has a forced-flow root and a trivial one at ṁ = 0, where the friction
   and buoyancy drops both vanish and every equation balances. `solve_steady` returns whichever

@@ -353,6 +353,11 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
   `point_kinetics_steady_state(P0)` for IC generation (default 1.0)
 - `power_scale`: conversion factor from dimensionless PK power to physical
   heat deposition [W]; `fuel.power = pk.P * power_scale` (default 1e4)
+- `power_input`: non-fission power added to the kinetics, in the same dimensionless units
+  as `P0`, or `nothing` (default). A `STREAM.DecayHeat.DecayHeatSource` built with the same
+  `P0` and the same controller is what this is for. The steady state is seeded from the
+  neutronic share `P0 - power_input(0)`, so the plate still sees `P0 * power_scale` at
+  the operating point.
 - `temp_worth`: per-component temperature feedback weights, or `nothing` (default).
   Accepts `Dict{Symbol,Any}` with keys `:cac` and/or `:fuel`, mapping to scalar,
   1D vector (length `n` for `:cac`), or 2D matrix (shape `nz×nx` for `:fuel`)
@@ -378,6 +383,7 @@ function build_loop_pk(ctrl;
     power_scale=1e4,
     temp_worth=nothing,
     ref_temp=nothing,
+    power_input=nothing,
 )
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
     ps = fill(1.0 / (nz * nx), nz, nx)  # uniform power shape, normalized
@@ -405,7 +411,7 @@ function build_loop_pk(ctrl;
     tw = _resolve_tw(temp_worth, rods_cac, rods_fuel)
     rt = _resolve_tw(ref_temp, rods_cac, rods_fuel)
 
-    @named pk = PointKinetics(ctrl; temp_worth=tw, ref_temp=rt)
+    @named pk = PointKinetics(ctrl; temp_worth=tw, ref_temp=rt, power_input=power_input)
 
     fb_components = if isnothing(tw)
         System[]
@@ -418,6 +424,7 @@ function build_loop_pk(ctrl;
     else
         Connect.temperature_feedback(pk, fb_components)
     end
+    # The total, so a `power_input` reaches the plate. With none it equals `pk.P_neutron`.
     power_eqs = [rods_fuel.power ~ pk.P * power_scale]
 
     @named pump = Pump(dP_pump)
@@ -433,29 +440,22 @@ function build_loop_pk(ctrl;
     full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
     ssys = mtkcompile(full)
 
-    pk_ic = point_kinetics_steady_state(P0)
+    input_at_start = power_input === nothing ? 0.0 : power_input(0.0)
+    pk_ic = point_kinetics_steady_state(P0; power_input=input_at_start)
     ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
-        ssys.pk.P => pk_ic.P,
+        ssys.pk.P_neutron => pk_ic.P_neutron,
         [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
         ssys.rods.cac.inlet.ṁ => 0.2,
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]
-    # Consistent-IC seeding
-    # FlowPort/ThermalPort temperatures default to 26.85 °C, which is 300 K
-    # (src/components/connectors.jl). The boundary coolant cells and the channel↔fuel contact nodes are
-    # aliased to those port temperatures, and the per-cell `cac.T[i]`/`fuel.T[i,j]` seeds above do NOT
-    # pin the port representatives under NoInit. Left unseeded, a temperature-feedback PK loop with
-    # ref_temp ≠ 26.85 sees a spurious (26.85 − ref_temp) reactivity offset at t=0 that crashes power,
-    # which is an initialization artifact rather than physics.
-    #
-    # Each connected port pair (hx↔cac, cac↔pump, pump↔hx, and each cac↔fuel contact) collapses to one
-    # alias-elimination representative, and WHICH member survives is not stable across MTK versions /
-    # runs (it differed between local and CI). So seed EVERY member of every connection set to T_inlet:
-    # whichever representative survives is then always hit, and the duplicate members are harmless
-    # (distinct symbolic keys, same value). The cold IC is then genuinely consistent — reactivity[0] = 0
-    # when ref_temp = T_inlet, independent of the alias-elimination choice.
+    # Port temperatures default to 26.85 °C (connectors.jl). The boundary coolant cells and
+    # the channel-to-fuel contacts are aliases of port temperatures, and which member of
+    # each connection set survives alias elimination changes between runs and MTK versions.
+    # So every member is seeded at T_inlet, and whichever survives starts there. Left at
+    # 26.85 °C, a feedback loop with ref_temp ≠ 26.85 would start with a false reactivity
+    # offset.
     push!(ic, ssys.rods.cac.inlet.T => T_inlet)
     push!(ic, ssys.rods.cac.outlet.T => T_inlet)
     push!(ic, ssys.pump.inlet.T => T_inlet)
