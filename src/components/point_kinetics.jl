@@ -88,6 +88,27 @@ function _temperature_feedback(temp_worth, ref_temp)
 end
 
 """
+    _power_input_term(power_input) -> (term, parameters)
+
+The term [`PointKinetics`](@ref) adds to `P_neutron` to form the total `P`, with the
+parameters it introduces: none for `nothing`, the parameter `power_input` for a number, and
+the callable parameter `power_input_fn` evaluated at `t` for a function. Each parameter
+takes the value passed in as its default.
+"""
+_power_input_term(::Nothing) = (0, Num[])
+
+function _power_input_term(value::Real)
+    pars = @parameters power_input = value
+    return (pars[1], pars)
+end
+
+function _power_input_term(f)
+    F = typeof(f)
+    pars = @parameters (power_input_fn::F)(..) = f
+    return (pars[1](t), pars)
+end
+
+"""
     PointKinetics(rho_c_fn::Any; name, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
                   lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing,
                   power_input=nothing) -> System
@@ -195,19 +216,7 @@ function PointKinetics(
         λ[1:G] = collect(lambda_k)
     end
 
-    # Read the kwarg once under another name: `@parameters power_input = ...` rebinds
-    # `power_input` to the symbolic, and the branch below still needs the value.
-    input_value = power_input
-    input_expr, input_pars = if input_value === nothing
-        (0, Num[])
-    elseif input_value isa Real
-        constant_pars = @parameters power_input = input_value
-        (constant_pars[1], constant_pars)
-    else
-        PType = typeof(input_value)
-        callable_pars = @parameters (power_input_fn::PType)(..) = input_value
-        (callable_pars[1](t), callable_pars)
-    end
+    input_power, input_pars = _power_input_term(power_input)
 
     @variables begin
         P_neutron(t) = 1.0
@@ -225,17 +234,12 @@ function PointKinetics(
     control_reactivity, control_pars, control_unknowns = control()
     ρ = control_reactivity
     β_sum = sum(β_k)
-
-    # Keepin (1965), G delayed groups. `Ṗ` is the rate expression itself, kept separate from
-    # the `dPdt` observable below so neither name shadows the other.
-    #     Ṗₙ = (ρ - β)/Λ · Pₙ + Σₖ λₖ·Cₖ
-    #     Ċₖ = βₖ/Λ · Pₙ - λₖ·Cₖ
     Ṗ = (ρ - β_sum) / Λ * P_neutron + λ_k ⋅ C_k
 
     eqs = [
         D(P_neutron) ~ Ṗ
         D.(C_k) .~ β_k ./ Λ .* P_neutron .- λ_k .* C_k
-        P ~ P_neutron + input_expr
+        P ~ P_neutron + input_power
     ]
     obs = Equation[beta_total ~ β_sum, dPdt ~ Ṗ, reactivity ~ ρ]
 
