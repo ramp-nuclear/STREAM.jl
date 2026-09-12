@@ -81,9 +81,9 @@ const CRITICAL = (t) -> 0.0
                 CRITICAL; Lambda=1.0, beta_k=beta_k, lambda_k=lambda_k, power_input=ramp
             )
             ssys = mtkcompile(pk)
+            # The ramp is power_input_fn's default, so the map leaves it out.
             op = Pair{Any,Any}[
                 ssys.rho_c_fn => CRITICAL,
-                ssys.power_input_fn => ramp,
                 ssys.P_neutron => P_init,
                 [ssys.C[k] => C_init[k] for k in 1:6]...,
             ]

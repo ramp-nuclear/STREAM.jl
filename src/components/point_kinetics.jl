@@ -115,9 +115,9 @@ coefficient, so `αⱼ` is normally negative.
 
 A critical reactor is `rho_c_fn = t -> 0.0`; a constant bias is `t -> ρ₀`.
 
-When solving, the callable must appear in the operating point,
-`op = [ssys.rho_c_fn => rho_c_fn, ssys.P_neutron => ic.P_neutron, ...]`. MTK stores
-callable parameters by reference, so omitting it raises `KeyError` at `solve_transient`.
+`rho_c_fn` has no default, so it must appear in the operating point,
+`op = [ssys.rho_c_fn => rho_c_fn, ssys.P_neutron => ic.P_neutron, ...]`. Without it,
+building the problem fails with "Could not evaluate value of parameter rho_c_fn".
 
 # Neutron and total power
 
@@ -153,10 +153,10 @@ monitor reading neutron flux measures.
 - `ref_temp::Union{Nothing,Dict}=nothing`: per-component reference temperatures [°C], same
   key structure. Missing keys default to zero, so the full temperature contributes.
 - `power_input=nothing`: non-fission power added to `P_neutron`. A `Real` becomes the
-  parameter `power_input`, which `solve_transient` can override. Anything else is taken as
-  a callable `(t) -> Float64` and becomes the callable parameter `power_input_fn`, which
-  must then appear in the operating point the way `rho_c_fn` does. `nothing` leaves
-  `P ~ P_neutron`.
+  parameter `power_input`, and anything else is taken as a callable `(t) -> Float64` and
+  becomes the callable parameter `power_input_fn`. Either carries the value given as its
+  default, so neither has to appear in the operating point, and `solve_transient` can
+  override either. `nothing` leaves `P ~ P_neutron`.
 
 # Returns
 Uncompiled `System` with unknowns `P_neutron`, `C[1:G]`, `P`, and one `T_source` array per
@@ -205,7 +205,7 @@ function PointKinetics(
         (constant_pars[1], constant_pars)
     else
         PType = typeof(input_value)
-        callable_pars = @parameters (power_input_fn::PType)(..)
+        callable_pars = @parameters (power_input_fn::PType)(..) = input_value
         (callable_pars[1](t), callable_pars)
     end
 

@@ -450,11 +450,6 @@ function build_loop_pk(ctrl;
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
     ]
-    # MTK holds a callable parameter by reference, so it has to be in the map or the solve
-    # raises KeyError. A Real `power_input` is an ordinary parameter and carries its default.
-    if !(power_input === nothing || power_input isa Real)
-        push!(ic, ssys.pk.power_input_fn => power_input)
-    end
     # Port temperatures default to 26.85 °C (connectors.jl). The boundary coolant cells and
     # the channel-to-fuel contacts are aliases of port temperatures, and which member of
     # each connection set survives alias elimination changes between runs and MTK versions.
