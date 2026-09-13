@@ -145,7 +145,7 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     end
 
     @testset "HTC.SubcooledBoiling" begin
-        q_scb = HTC.regime_dependent_q_scb(; pressure=1e5)
+        q_scb = HTC.regime_dependent_q_scb()
         scb = HTC.SubcooledBoiling(HTC.DittusBoelter(), q_scb)
         P = 1e5
 
@@ -162,6 +162,27 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         scb_lam = HTC.SubcooledBoiling(HTC.FullyDevelopedLaminar(GEOM_MTR), q_scb)
         @test scb_lam(60.0, 40.0, ṁ, Dh, A, H2O, P) ≈
               HTC.FullyDevelopedLaminar(GEOM_MTR)(60.0, 40.0, ṁ, Dh, A, H2O)
+    end
+
+    @testset "SubcooledBoiling matches Python's wall_heat_transfer_coeff" begin
+        # Python STREAM's wall_heat_transfer_coeff with regime_dependent_h_spl and
+        # regime_dependent_q_scb: a 135 °C wall over 60 °C coolant at 1.7 bar, at bulk Re
+        # 1000, 3500 and 8000. The laminar case boils on Rohsenow's flux, the turbulent one
+        # on McAdams.
+        scb_py = HTC.SubcooledBoiling(
+            HTC.RegimeDependent(;
+                laminar=HTC.ConstantNusselt(; Nu=8.235),
+                turbulent=HTC.DittusBoelter(),
+                natural=HTC.Elenbaas(GEOM_MTR),
+                geom=GEOM_MTR,
+            ),
+            HTC.regime_dependent_q_scb(),
+        )
+        for (ṁ_python, h_python) in ((0.016566504372602292, 25639.32979041299),
+                                     (0.05798276530410803, 14842.353394440743),
+                                     (0.13253203498081834, 15553.973614960662))
+            @test scb_py(135.0, 60.0, ṁ_python, Dh, A, H2O, 1.7e5) ≈ h_python rtol = 1e-8
+        end
     end
 
     @testset "partial_SCB_correction" begin
