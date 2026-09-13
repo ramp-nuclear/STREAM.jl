@@ -97,7 +97,7 @@ construction, so the closure sees only symbolic `Re` and `Pr`.
 """
 module HTC
 using ModelingToolkit
-using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH
+using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, G_EARTH
 using ..STREAM: ρ, cₚ, μ, κ, σ, β, Tsat
 using ..STREAM: Re, Pr, Gr, Ra, flow_regime_blend
 include("htc/correlations.jl")
