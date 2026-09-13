@@ -95,6 +95,7 @@ Pkg.develop(path="/path/to/STREAM.jl")
 - `examples/simple_loop.jl` — Minimal forced-convection loop: build, solve, plot T_out
 - `examples/mtr_assembly.jl` — HeatDiffusion + ChannelAndContacts thermal coupling (MTR plate-fuel)
 - `examples/lof_transient.jl` — Loss-of-flow transient: pump trip, flapper event, natural circulation establishment
+- `examples/lofa_pool/`: loss of flow in a pool-type MTR with two assembly types in parallel, from the pump trip through a low-flow SCRAM and the flapper opening to natural circulation into the pool, reporting the worst margins. Needs `STREAM_DECAY_HEAT_STANDARDS`, and every number in its input block is a placeholder.
 
 Run with: `julia --project=. examples/simple_loop.jl`
 
