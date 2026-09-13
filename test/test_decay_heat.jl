@@ -333,19 +333,23 @@ const DH_TABLE_SUMS = [
     end
 
     @testset "A tripped loop keeps its decay heat" begin
-        # The whole point of the port. A reactor scrammed from power drops prompt fission
-        # to nothing in seconds, and what is left holding the fuel up is decay heat. Run
-        # the same trip twice, once with a source and once without, and compare.
+        # The whole point of the port. A reactor scrammed from power loses its prompt fission
+        # power at once, the delayed neutrons carry the rest down over minutes, and after
+        # that decay heat is all that holds the fuel up. Run the same trip twice, once with
+        # a source and once without, and compare.
         #
-        # The contribution is data free, so this runs with or without the standards.
+        # The contribution is data free, so this runs with or without the standards. Its slow
+        # group, at 0.001/s, keeps the decay heat above 1% of P0 for the whole run.
         P0 = 1.0
-        model = U238CaptureChain(1.0) + FissionProducts([0.5, 0.01], [3.0, 0.05])
+        model = U238CaptureChain(1.0) + FissionProducts([0.5, 0.001], [3.0, 0.01])
         # A controller born in :SCRAM is a trip at t = 0, and the reactivity is deep enough
         # that the delayed groups are the only thing holding power up.
         scrammed() = ReactivityController(
             (s, ts, t) -> -0.05; initial_state=:SCRAM, initial_time=0.0
         )
-        times = range(0.0, 60.0; length=25)
+        # Twenty minutes: the slowest delayed group decays at 0.0124/s, so by then the
+        # fission power has fallen below 1e-6 of P0.
+        times = range(0.0, 1200.0; length=25)
         mesh = (n=3, nz=3, nx=2)
         hottest(sol, ssys, i) =
             maximum(sol[ssys.rods.fuel.T[j, k], i] for j in 1:(mesh.nz), k in 1:(mesh.nx))
