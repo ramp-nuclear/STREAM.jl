@@ -32,33 +32,30 @@ function mcadams_scb_heat_flux(T_sat, T_wall)
 end
 
 """
-    bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure; h_fg=2257e3, sigma=0.059) -> q [W/m^2]
+    bergles_rohsenow_scb_heat_flux(T_wall, sat; n=1.26, csf=0.011, g=G_EARTH) -> q [W/m^2]
 
-Bergles-Rohsenow (1964) subcooled boiling heat flux correlation.
-Formula: `q = 1082.0 * p^1.156 * dT^(1.0 / (0.463 * p^0.0234))` [W/m^2]
-where `p = pressure / 1e5` (pressure in bar) and `dT = T_wall - T_sat`.
+Rohsenow's nucleate boiling heat flux, which Python STREAM uses as its laminar subcooled
+boiling flux under the name `Bergles_Rohsenhow_SCB_heat_flux`:
 
-This is the inverse of the `_bergles_rohsenow_dT_ONB` formula in correlations.jl,
-using the same `1082 * p^1.156` coefficient family for consistency.
+    q = μ·h_fg·sqrt(g(ρ - ρᵥ)/σ) · [cₚ(T_wall - T_sat) / (C_sf·h_fg·Pr^n)]^(1/0.33)
 
-Returns 0.0 when `T_wall <= T_sat` (no boiling below saturation).
-Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
+Every property is read from `sat`, the coolant at saturation. Zero at or below saturation.
 
 # Arguments
 - `T_wall`: wall temperature [°C]
-- `T_sat`: saturation temperature [°C]
-- `pressure`: system pressure [Pa]
-- `h_fg`: latent heat of vaporization [J/kg] (reserved for forward compatibility; not used in current formula)
-- `sigma`: surface tension [N/m] (reserved for forward compatibility; not used in current formula)
+- `sat`: the coolant's [`Liquid`](@ref) snapshot at saturation, `liquid(Tsat(liquid, P), P)`
+- `n`: exponent on the Prandtl number
+- `csf`: the surface-fluid constant `C_sf`
+- `g`: gravitational acceleration [m/s²]
 
 # Returns
 Subcooled boiling heat flux `q` [W/m^2].
 """
-function bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure; h_fg=2257e3, sigma=0.059)
-    dT = T_wall - T_sat
-    p = pressure / 1e5  # Pa to bar
-    dT_safe = max(dT, 0.0)
-    return ifelse(dT > 0, 1082.0 * p^1.156 * dT_safe^(1.0 / (0.463 * p^0.0234)), 0.0)
+function bergles_rohsenow_scb_heat_flux(T_wall, sat::Liquid; n=1.26, csf=0.011, g=G_EARTH)
+    superheat = max(T_wall - sat.Tsat, 0.0)
+    Pr_sat = sat.cₚ * sat.μ / sat.κ
+    x = sat.cₚ * superheat / (sat.hfg * csf * Pr_sat^n)
+    return sat.μ * sat.hfg * sqrt(g * (sat.ρ - sat.ρᵥ) / sat.σ) * x^(1 / 0.33)
 end
 
 """
@@ -90,34 +87,28 @@ function partial_SCB_correction(q_spl, q_scb, q_scb_inc)
 end
 
 """
-    regime_dependent_q_scb(; pressure=1e5, h_fg=2257e3, sigma=0.059, re_bounds=(2000.0, 5000.0)) -> (T_wall, T_sat, Re) -> q [W/m^2]
+    regime_dependent_q_scb(; re_bounds=(2000.0, 5000.0)) -> (T_wall, sat, Re) -> q [W/m^2]
 
-Factory returning a regime-dependent subcooled boiling heat flux closure: Bergles-Rohsenow
-in the laminar regime, McAdams in the turbulent one, and a linear blend across the
-transition band, via [`flow_regime_blend`](@ref). Python STREAM's `regime_dependent_q_scb`
-partitions the same way.
+A subcooled boiling heat flux closure that switches on the bulk Reynolds number, as Python
+STREAM's `regime_dependent_q_scb` does: [`bergles_rohsenow_scb_heat_flux`](@ref) in laminar
+flow, [`mcadams_scb_heat_flux`](@ref) in turbulent flow, and a linear blend across
+`re_bounds` via [`flow_regime_blend`](@ref).
 
-Captures `pressure`, `h_fg`, and `sigma` at construction time. Hand the returned closure to
-[`SubcooledBoiling`](@ref) to layer partial boiling on a single-phase model.
+Hand the closure to [`SubcooledBoiling`](@ref), which calls it with `sat`, the coolant's
+[`Liquid`](@ref) snapshot at saturation at each cell's pressure.
 
 # Arguments
-- `pressure`: system pressure [Pa] (default 1e5 = 1 bar)
-- `h_fg`: latent heat of vaporization [J/kg] (default 2257e3 for water at ~100C)
-- `sigma`: surface tension [N/m] (default 0.059 for water at ~100C)
 - `re_bounds`: `(re_lo, re_hi)` transition band on the Reynolds number
-(default `(2000.0, 5000.0)`)
 
 # Returns
-Closure `(T_wall, T_sat, Re) -> q_scb [W/m^2]`.
+Closure `(T_wall, sat, Re) -> q_scb [W/m^2]`.
 """
-function regime_dependent_q_scb(;
-    pressure=1e5, h_fg=2257e3, sigma=0.059, re_bounds=(2000.0, 5000.0)
-)
+function regime_dependent_q_scb(; re_bounds=(2000.0, 5000.0))
     bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))
-    return (T_wall, T_sat, Re) -> flow_regime_blend(
+    return (T_wall, sat, Re) -> flow_regime_blend(
         Re, bounds,
-        bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure; h_fg=h_fg, sigma=sigma),
-        mcadams_scb_heat_flux(T_sat, T_wall),
+        bergles_rohsenow_scb_heat_flux(T_wall, sat),
+        mcadams_scb_heat_flux(sat.Tsat, T_wall),
     )
 end
 
@@ -128,15 +119,17 @@ The Bergles-Rohsenow partial boiling blend, applied to a single-phase `h` that s
 [`AbstractHTC`](@ref) has already produced.
 
 Below the onset of nucleate boiling nothing changes. At or above it the single-phase value is
-scaled by the partial boiling factor, switched with `ifelse`.
+scaled by the partial boiling factor, switched with `ifelse`. The flux closure `q_scb` gets the
+coolant at saturation at the local pressure `P`, and the bulk Reynolds number.
 """
 function _scb_corrected(h_spl, q_scb, T_wall, T_bulk, ṁ, Dh, A, liquid, P)
     q_spl = max(h_spl * (T_wall - T_bulk), 0.0)
     T_sat = Tsat(liquid, P)
+    sat = liquid(T_sat, P)
     Re_bulk = Re(liquid, T_bulk, ṁ, A, Dh)
     T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
     factor = partial_SCB_correction(
-        q_spl, q_scb(T_wall, T_sat, Re_bulk), q_scb(T_ONB, T_sat, Re_bulk)
+        q_spl, q_scb(T_wall, sat, Re_bulk), q_scb(T_ONB, sat, Re_bulk)
     )
     return ifelse(T_wall >= T_ONB, h_spl * factor, h_spl)
 end
