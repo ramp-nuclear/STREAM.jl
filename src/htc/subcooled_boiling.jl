@@ -68,34 +68,31 @@ function bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure; h_fg=2257e3, si
 end
 
 """
-    partial_SCB_correction(q_spl, q_scb, q_scb_inc) -> factor (dimensionless)
+    partial_SCB_correction(q_spl, q_scb, q_scb_inc) -> factor
 
-Bergles-Rohsenow partial boiling superposition correction factor.
-Formula: `factor = sqrt(1 + (q_scb^2 - q_scb_inc^2) / q_spl^2)`
+The Bergles-Rohsenow partial boiling factor, which scales the single-phase coefficient
+between the onset of nucleate boiling and fully developed boiling:
 
-This factor multiplies the single-phase HTC to produce the effective HTC
-in the partial subcooled boiling regime. The factor is >= 1.0 when boiling
-is active (`q_scb > q_scb_inc`) and exactly 1.0 otherwise.
+    factor = sqrt(1 + ((q_scb - q_scb_inc) / q_spl)²)
 
-Guards:
-- Returns 1.0 when `q_spl <= 0` (division-by-zero safety)
-- Returns 1.0 when `q_scb^2 <= q_scb_inc^2` (outside boiling regime)
+It is 1 at the onset, where `q_scb = q_scb_inc`, and grows with the wall superheat. Below
+the onset, and when `q_spl` is not positive, it is 1.
 
-Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
+Source: Python STREAM heat_transfer_coefficient/subcooled_boiling.py
+`Bergles_Rohsenhow_partial_SCB`.
 
 # Arguments
-- `q_spl`: single-phase convective heat flux [W/m^2]
-- `q_scb`: subcooled boiling heat flux at wall temperature [W/m^2]
-- `q_scb_inc`: subcooled boiling heat flux at onset of nucleate boiling temperature [W/m^2]
+- `q_spl`: single-phase convective heat flux [W/m²]
+- `q_scb`: subcooled boiling heat flux at the wall temperature [W/m²]
+- `q_scb_inc`: subcooled boiling heat flux at the onset temperature [W/m²]
 
 # Returns
-Dimensionless correction factor (>= 1.0).
+The dimensionless factor, at least 1.
 """
 function partial_SCB_correction(q_spl, q_scb, q_scb_inc)
-    q_spl_sq = max(q_spl^2, 1e-20)
-    ratio = (q_scb^2 - q_scb_inc^2) / q_spl_sq
-    safe_arg = max(1 + ratio, 1.0)
-    return ifelse(q_spl > 0, ifelse(ratio > 0, sqrt(safe_arg), 1.0), 1.0)
+    # The guards go through ifelse so the branch stays symbolic inside a compiled channel.
+    ratio = (q_scb - q_scb_inc) / max(q_spl, 1e-20)
+    return ifelse(q_spl > 0, ifelse(ratio > 0, sqrt(1 + ratio^2), 1.0), 1.0)
 end
 
 """
