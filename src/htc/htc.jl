@@ -272,8 +272,9 @@ extra-argument form `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)`.
 
 # Arguments
 - `single_phase`: the underlying [`AbstractHTC`](@ref)
-- `q_scb`: subcooled boiling heat flux closure `(T_wall, T_sat, Re) -> q`, e.g. from
-  [`regime_dependent_q_scb`](@ref)
+- `q_scb`: subcooled boiling heat flux closure `(T_wall, sat, Re) -> q`, e.g. from
+  [`regime_dependent_q_scb`](@ref). `sat` is the coolant's [`Liquid`](@ref) snapshot at
+  saturation at the local pressure, and `Re` the bulk Reynolds number.
 """
 struct SubcooledBoiling{H<:AbstractHTC,Q} <: AbstractHTC
     single_phase::H
