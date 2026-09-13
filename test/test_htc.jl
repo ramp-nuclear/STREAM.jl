@@ -156,6 +156,17 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         @test scb_lam(60.0, 40.0, ṁ, Dh, A, H2O, P) ≈
               HTC.FullyDevelopedLaminar(GEOM_MTR)(60.0, 40.0, ṁ, Dh, A, H2O)
     end
+
+    @testset "partial_SCB_correction" begin
+        factor = HTC.partial_SCB_correction
+        # Python STREAM's Bergles_Rohsenhow_partial_SCB on the same fluxes.
+        @test factor(1.0e5, 2.0e5, 5.0e4) ≈ 1.8027756377319946 rtol = 1e-12
+        @test factor(1.0e5, 1.5e5, 1.0e5) ≈ 1.118033988749895 rtol = 1e-12
+        @test factor(3.0e4, 9.0e4, 3.0e4) ≈ 2.23606797749979 rtol = 1e-12
+        # No correction below the onset, or without a single-phase flux.
+        @test factor(1.0e5, 5.0e4, 1.0e5) == 1.0
+        @test factor(0.0, 2.0e5, 5.0e4) == 1.0
+    end
 end
 
 @testset "a user-defined HTC drives a compiled channel" begin
