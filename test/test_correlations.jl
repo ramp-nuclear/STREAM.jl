@@ -430,6 +430,14 @@ end
     @test flow_regime_blend(5000.0, bounds, lam, turb) ≈ turb rtol = 1e-12
 end
 
+@testset "HTC.mcadams_scb_heat_flux" begin
+    # Python STREAM's McAdams_SCB_heat_flux.
+    @test HTC.mcadams_scb_heat_flux(100.0, 120.0) ≈ 237730.12702161702 rtol = 1e-12
+    @test HTC.mcadams_scb_heat_flux(100.0, 130.0) ≈ 1137094.2996038366 rtol = 1e-12
+    @test HTC.mcadams_scb_heat_flux(100.0, 100.0) == 0.0
+    @test HTC.mcadams_scb_heat_flux(100.0, 90.0) == 0.0
+end
+
 @testset "HTC.regime_dependent_q_scb blends across the transition band" begin
     pressure = 1e5
     q_scb = HTC.regime_dependent_q_scb(; pressure=pressure, re_bounds=(2000.0, 5000.0))
