@@ -15,14 +15,8 @@ end
 """
     mcadams_scb_heat_flux(T_sat, T_wall) -> q [W/m^2]
 
-McAdams (1949) subcooled boiling heat flux correlation for water.
-Formula: `q = 740.0 * (T_wall - T_sat)^3.86` [W/m^2].
-
-The coefficient 740 corresponds to McAdams' original `0.074 W/cm^2/K^3.86`
-converted to SI units (0.074 * 1e4 = 740).
-
-Returns 0.0 when `T_wall <= T_sat` (no boiling below saturation).
-Uses `ifelse()` for MTK-compatible symbolic conditional evaluation.
+McAdams subcooled boiling heat flux for water, `q = 2.26·(T_wall - T_sat)^3.86`, with the
+coefficient Python STREAM takes from IAEA-TECDOC-233. Zero at or below saturation.
 
 # Arguments
 - `T_sat`: saturation temperature [°C]
@@ -34,7 +28,7 @@ Subcooled boiling heat flux `q` [W/m^2].
 function mcadams_scb_heat_flux(T_sat, T_wall)
     dT = T_wall - T_sat
     dT_safe = max(dT, 0.0)
-    return ifelse(dT > 0, 740.0 * dT_safe^3.86, 0.0)
+    return ifelse(dT > 0, 2.26 * dT_safe^3.86, 0.0)
 end
 
 """

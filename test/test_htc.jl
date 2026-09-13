@@ -4,7 +4,7 @@ using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Components
-using STREAM: Re, Pr, Gr, Ra
+using STREAM: Re, Pr
 
 const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
 
@@ -80,10 +80,10 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         @test el(60.0, 40.0, 0.0, Dh, A, H2O) > 0.0
         # No wall-to-bulk difference means no buoyancy and no heat transfer.
         @test el(40.0, 40.0, 0.0, Dh, A, H2O) ≈ 0.0 atol = 1e-10
-        # Properties come from the bulk, so the value has to match the hand computation there.
-        Ra_hand = Ra(Gr(H2O, 40.0, 60.0, GEOM_MTR.Dh, G_EARTH), Pr(H2O, 40.0))
-        Nu_hand = HTC.elenbaas_nusselt(Ra_hand, GEOM_MTR.depth, GEOM_MTR.L)
-        @test el(60.0, 40.0, 0.0, Dh, A, H2O) ≈ Nu_hand * κ(H2O, 40.0) / Dh
+        # Python STREAM's Elenbaas_h_spl on the 1.27 mm gap, handed film and bulk properties.
+        @test el(60.0, 40.0, 0.0, Dh, A, H2O) ≈ 91.55185723551294 rtol = 1e-8
+        el_bulk = HTC.Elenbaas(GEOM_MTR; basis=HTC.AtBulk())
+        @test el_bulk(60.0, 40.0, 0.0, Dh, A, H2O) ≈ 67.6941463465902 rtol = 1e-8
     end
 
     @testset "HTC.RegimeDependent" begin
@@ -107,20 +107,27 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         @test Re_bulk < 2000.0 < Re_film
         @test rd(T_wall, T_bulk, ṁ_at(1900.0), Dh, A, H2O) == 4.0
 
-        @testset "branches keep their own property basis" begin
-            # The laminar branch reading bulk and the turbulent one reading film is the
-            # whole reason each branch is a full HTC rather than a Nusselt number.
-            rd_real = HTC.RegimeDependent(;
-                laminar=HTC.FullyDevelopedLaminar(GEOM_MTR),
+        @testset "matches Python's regime_dependent_h_spl" begin
+            # ConstantNusselt and Elenbaas default to the film. Python hands its laminar and
+            # natural branches bulk properties, so both are rebased to the bulk.
+            rd_py = HTC.RegimeDependent(;
+                laminar=HTC.ConstantNusselt(; Nu=8.235),
                 turbulent=HTC.DittusBoelter(),
+                natural=HTC.Elenbaas(GEOM_MTR),
                 geom=GEOM_MTR,
             )
-            m_lam = ṁ_at(1000.0)
-            @test rd_real(T_wall, T_bulk, m_lam, Dh, A, H2O) ≈
-                  HTC.FullyDevelopedLaminar(GEOM_MTR)(T_wall, T_bulk, m_lam, Dh, A, H2O)
-            m_turb = ṁ_at(8000.0)
-            @test rd_real(T_wall, T_bulk, m_turb, Dh, A, H2O) ≈
-                  HTC.DittusBoelter()(T_wall, T_bulk, m_turb, Dh, A, H2O)
+            @test rd_py.laminar.basis isa HTC.AtBulk
+            @test rd_py.natural.basis isa HTC.AtBulk
+            @test rd_py.turbulent.basis isa HTC.AtFilm
+            for (Re_target, h_python) in ((1000.0, 2080.1105868066074),
+                                          (2750.0, 3340.7410324505618),
+                                          (8000.0, 16735.795621478403))
+                @test rd_py(T_wall, T_bulk, ṁ_at(Re_target), Dh, A, H2O) ≈ h_python rtol = 1e-8
+            end
+            # Gr/Re² crosses 1 at 2.096 g/s on bulk properties and at 2.467 g/s on film ones.
+            # Python reads the switch at the film, so buoyancy already wins at 2.274 g/s.
+            @test rd_py(100.0, 40.0, 0.0022739555958189747, Dh, A, H2O) ≈
+                  198.75194104185218 rtol = 1e-8
         end
 
         @testset "natural convection takes over at Gr/Re² > 1" begin
