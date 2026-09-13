@@ -1,6 +1,7 @@
 .claude/
 .vscode/
 examples/output/
+__pycache__/
 
 # Node (skills tooling)
 node_modules/

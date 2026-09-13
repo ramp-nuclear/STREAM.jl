@@ -43,7 +43,7 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 
 | Scenario | Can Python do it? | Can STREAM.jl do it? | What blocks us |
 |---|---|---|---|
-| **LOFA** (loss of flow) | Yes, one channel type | Yes | Decay heat is in, through the `power_input` split ([1.1](#11-decay-heat), [1.2](#12-prompttotal-power-split-in-pointkinetics-done)). The forced-to-natural-circulation transition runs end to end and is tested against a derived buoyancy-against-friction balance |
+| **LOFA** (loss of flow) | Yes, one channel type | Yes, several assembly types in parallel | The standalone model in `examples/lofa_pool/` runs two assembly types behind a flapper, with the pool as heat sink, a low-flow SCRAM and decay heat, end to end. Decay heat is in, through the `power_input` split ([1.1](#11-decay-heat), [1.2](#12-prompttotal-power-split-in-pointkinetics-done)). The forced-to-natural-circulation transition runs end to end and is tested against a derived buoyancy-against-friction balance |
 | **RIA** (reactivity insertion) | Yes | Partly | Decay heat matters less here, but cylindrical fuel, gap conductance and fuel-temperature limits are all absent |
 | **LOCA**, level tracking to uncovery | **No** | Partly | Needs coolant inventory, a free surface and break flow. No two-phase model required ([4](#4-loca-level-tracking-and-where-it-stops)) |
 | **LOCA**, past uncovery | **No** | **No** | Void, steam, post-CHF heat transfer. Out of scope for both, by choice |
@@ -52,7 +52,8 @@ The LOFA cell is qualified because that is where Python's reach ends. Loops with
 channel type are solid; the cases with different channels in parallel are where it got stuck.
 That limit is the implementation's, not the physics'. `Components.FlowWeight` is Python's
 junction `weights` (`flow_edge(..., signify=N)`), so one representative channel can stand for
-`N` identical ones.
+`N` identical ones. The model in `examples/lofa_pool/` runs the parallel case with two
+assembly types.
 
 The LOCA split is the one worth internalising. Both codes are single-phase liquid with
 subcooled-boiling *heat transfer enhancement* and thresholds that report margin. That is
@@ -271,7 +272,8 @@ The callable form carries one extra variable, `L_eff`, for the effective inertia
 **Remaining:** `Bend`, `Screen` and `bend_factor`, all postponed. Each is small and
 independent. `ResistorFromKnownPoint` is in. It is how a loop is calibrated against a
 measured operating point, which is the usual way a research reactor model gets its form
-losses.
+losses. `build_pool_lofa` calibrates each assembly type's inlet orifice to its design flow
+with one.
 
 ---
 
@@ -384,7 +386,8 @@ wherever the wall is not heating the coolant, as `chfr` already did.
 
 One approximation remains and is worth knowing in a reversal. `T_inlet` is the channel's
 `inlet.T`, which under reversed flow is the hot end, so OFI, OSV, Fabrega and boiling onset
-are only meaningful while the flow is forward.
+are only meaningful while the flow is forward. `examples/lofa_pool/run.jl` leaves the
+reversed and near-zero-flow window out of the OFI and OSV minima for that reason.
 
 ---
 
