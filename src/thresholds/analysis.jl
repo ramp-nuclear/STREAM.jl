@@ -18,7 +18,8 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 - `T_wall_right::AbstractArray`: right face wall temperature per cell [°C]
 - `T_sat::AbstractArray`: saturation temperature per cell [°C]
 - `T_ONB::AbstractArray`: onset of nucleate boiling temperature per cell [°C]
-- `T_inlet::Float64`: inlet temperature from `inlet.T` [°C]
+- `T_inlet::Float64`: temperature of the coolant entering the channel, at whichever end is
+  upstream, from the channel's `T_in` [°C]
 - `P::AbstractArray`: absolute pressure per cell [Pa]
 - `q_flux::AbstractArray`: the larger face flux, `max(q_flux_left, q_flux_right)` [W/m²]
 - `q_flux_left::AbstractArray`: left face heat flux per cell [W/m²]
@@ -69,7 +70,7 @@ function _instant(sol, index)
 end
 
 """
-    ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81, index=nothing)
+    ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=nothing)
 
 Read one channel's state at one instant out of a solution.
 
@@ -98,7 +99,7 @@ A `ChannelState` for that instant.
 - `ArgumentError`: for a transient with several saved times and no `index`, or a channel
   whose wall temperature did not survive compilation
 """
-function ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81, index=nothing)
+function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=nothing)
     n = length(channel_sys.T)
     k = _instant(sol, index)
     value(sym) = k === nothing ? sol[sym] : sol[sym, k]
@@ -152,7 +153,7 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81, index=nothin
         T_wall_right=T_wall_right,
         T_sat=cells(channel_sys.T_sat),
         T_ONB=cells(channel_sys.T_ONB),
-        T_inlet=value(channel_sys.inlet.T),
+        T_inlet=value(channel_sys.T_in),
         P=cells(channel_sys.P),
         q_flux=max.(q_flux_left, q_flux_right),
         q_flux_left=q_flux_left,
@@ -165,7 +166,7 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81, index=nothin
 end
 
 """
-    threshold_analysis(sol, channel_sys; pipe=nothing, gravity=9.81, kwargs...) -> NamedTuple
+    threshold_analysis(sol, channel_sys; pipe=nothing, gravity=G_EARTH, kwargs...) -> NamedTuple
 
 Apply named threshold functions to one channel of a solution.
 
@@ -180,7 +181,7 @@ flow at that time, and the results stack along a last axis: a per-cell result be
 - `sol`: a `NonlinearSolution` (steady) or an `ODESolution` (transient)
 - `channel_sys`: the compiled MTK subsystem with `T`, `T_wall_left`, `T_wall_right`, etc.
 - `pipe`: optional `PipeGeometry`, needed for `q_flux_*` and any correlation that uses geometry
-- `gravity`: gravitational acceleration [m/s²] (default 9.81)
+- `gravity`: gravitational acceleration [m/s²] (default `G_EARTH`)
 - `kwargs...`: named analysis functions
 
 # Returns
@@ -189,7 +190,7 @@ flow at that time, and the results stack along a last axis: a per-cell result be
 # Example
 ```julia
 result = threshold_analysis(sol, ssys.cac;
-    pipe=pipe, gravity=9.81,
+    pipe=pipe, gravity=G_EARTH,
     chfr_mirshak = chfr(q_CHF_mirshak),
     onb          = bergles_rohsenow_t_onb,
 )
@@ -197,7 +198,7 @@ result.chfr_mirshak                           # CHF ratio per cell, and per time
 worst_case(result.chfr_mirshak; times=sol.t)  # the smallest, and where and when
 ```
 """
-function threshold_analysis(sol, channel_sys; pipe=nothing, gravity=9.81, kwargs...)
+function threshold_analysis(sol, channel_sys; pipe=nothing, gravity=G_EARTH, kwargs...)
     state_at(k) = ChannelState(sol, channel_sys; pipe=pipe, gravity=gravity, index=k)
     fns = Base.values(kwargs)
     results = if hasproperty(sol, :t) && length(sol.t) > 1
@@ -265,19 +266,7 @@ with `q[i] <= 0 → Inf` (no boiling risk when wall is not being heated).
 """
 function chfr(chf_fn; direction=:max)
     return function (state::ChannelState)
-        q = if direction == :left
-            state.q_flux_left
-        elseif direction == :right
-            state.q_flux_right
-        elseif direction == :max
-            max.(state.q_flux_left, state.q_flux_right)
-        elseif direction == :total
-            state.q_flux
-        else
-            throw(
-                ArgumentError("direction must be :left, :right, :max, or :total, got :$direction"),
-            )
-        end
+        q = _face_flux(state, direction)
         # Broadcast rather than zip: a channel-level correlation such as
         # q_CHF_sudo_kaminaga gives one number for the whole channel, and it has to divide
         # into the per-cell flux just the same.
@@ -286,43 +275,72 @@ function chfr(chf_fn; direction=:max)
 end
 
 """
-    bergles_rohsenow_t_onb(state::ChannelState)
+    _face_flux(s::ChannelState, direction) -> AbstractArray
+
+The heat flux per cell that `direction` names: `:left` or `:right` for one face, and `:max`
+or `:total` for the larger of the two.
+
+# Throws
+- `ArgumentError`: for any other `direction`
+"""
+function _face_flux(s::ChannelState, direction)
+    direction == :left && return s.q_flux_left
+    direction == :right && return s.q_flux_right
+    direction == :max && return max.(s.q_flux_left, s.q_flux_right)
+    direction == :total && return s.q_flux
+    throw(ArgumentError("direction must be :left, :right, :max, or :total, got :$direction"))
+end
+
+"""
+    bergles_rohsenow_t_onb(state::ChannelState; direction=:max, onb_factor=1.0,
+                           inhomogeneity_factor=1.0)
     q_boiling_onset(state::ChannelState; liquid=H2O)
     q_CHF_mirshak(state::ChannelState)
     q_CHF_fabrega(state::ChannelState)
-    q_CHF_sudo_kaminaga(state::ChannelState)
-    q_OFI_whittle_forgan(state::ChannelState)
-    q_OSV_saha_zuber(state::ChannelState)
+    q_CHF_sudo_kaminaga(state::ChannelState; liquid=H2O)
+    q_OFI_whittle_forgan(state::ChannelState; liquid=H2O)
+    q_OSV_saha_zuber(state::ChannelState; direction=:max, inhomogeneity_factor=1.0, liquid=H2O)
     twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
 
 Every threshold correlation also accepts a solved channel, taking its arguments out of the
-`ChannelState`. These are methods on the correlations themselves, not a second set of names
-for them. Results come back per cell; [`threshold_analysis`](@ref) stacks them over time.
+`ChannelState` the way Python STREAM's analysis wrapper of the same name does. These are
+methods on the correlations themselves, not a second set of names for them. Results come back
+per cell, except `q_OFI_whittle_forgan`, which is one power for the channel.
+[`threshold_analysis`](@ref) stacks them over time. `q_OFI_whittle_forgan`,
+`q_OSV_saha_zuber` and the two geometry-dependent CHF correlations need `state.pipe`.
 
-`q_OFI_whittle_forgan` and `q_OSV_saha_zuber` return one number for the whole channel: the
-first is a channel power, the second reports the most conservative cell. Those two and the
-two geometry-dependent CHF correlations need `state.pipe`.
-
-`q_OFI_whittle_forgan` reads its saturation temperature from the downstream cell, since
-pressure falls along the channel and the outlet is what limits the margin. Under reversed
-flow the downstream end is the other one, and it follows.
+- `direction` picks the face flux, as in [`chfr`](@ref): `:left`, `:right`, or `:max` for
+  the larger of the two.
+- `inhomogeneity_factor` makes the local flux worse, for fuel inhomogeneity. In
+  `bergles_rohsenow_t_onb` it scales the flux the onset superheat is taken at, so compare
+  the result with [`twall_limit`](@ref) at the same factor. In `q_OSV_saha_zuber` it is the
+  correlation's `flux_enworse`.
+- `onb_factor` scales the Bergles-Rohsenow superheat, to cover the correlation's uncertainty.
+- `q_boiling_onset` takes `cₚ` at the inlet temperature.
+- `q_CHF_mirshak` takes the signed velocity, so reversed flow lowers the limit.
+- `q_OFI_whittle_forgan` reads its saturation temperature from the downstream cell, since
+  pressure falls along the channel and the outlet is what limits the margin. Under reversed
+  flow the downstream end is the other one, and it follows.
 
 What each correlation computes is in its own docstring.
 """
 # A wall that is not heating the coolant cannot boil it, and the correlation's fractional
 # power has no real value for a negative flux, so those cells report no onset, as chfr does.
 # After a scram the coolant rising through the core can run hotter than parts of the plate.
-function bergles_rohsenow_t_onb(s::ChannelState)
-    heating = s.q_flux .> 0
-    T_ONB = bergles_rohsenow_t_onb.(s.P, max.(s.q_flux, 0.0), s.T_sat)
-    return ifelse.(heating, T_ONB, Inf)
+function bergles_rohsenow_t_onb(
+    s::ChannelState; direction=:max, onb_factor=1.0, inhomogeneity_factor=1.0
+)
+    q = inhomogeneity_factor .* _face_flux(s, direction)
+    T_ONB = s.T_sat .+ onb_factor .* _bergles_rohsenow_dT_ONB.(s.P, max.(q, 0.0))
+    return ifelse.(q .> 0, T_ONB, Inf)
 end
 
 function q_boiling_onset(s::ChannelState; liquid::AbstractLiquid=H2O)
-    return q_boiling_onset.(s.ṁ, s.T_sat, s.T_inlet, cₚ.(liquid, s.T_bulk))
+    return q_boiling_onset.(s.ṁ, s.T_sat, s.T_inlet, cₚ(liquid, s.T_inlet))
 end
 
-q_CHF_mirshak(s::ChannelState) = q_CHF_mirshak.(s.T_bulk, s.T_sat, s.P, s.velocity)
+q_CHF_mirshak(s::ChannelState) =
+    q_CHF_mirshak.(s.T_bulk, s.T_sat, s.P, copysign.(s.velocity, s.ṁ))
 
 q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, Ref(s.pipe))
 
@@ -339,7 +357,16 @@ function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
     return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.pipe; liquid=liquid)
 end
 
-q_OSV_saha_zuber(s::ChannelState) = q_OSV_saha_zuber(s.T_inlet, s.ṁ, s.pipe)
+function q_OSV_saha_zuber(
+    s::ChannelState; direction=:max, inhomogeneity_factor=1.0, liquid::AbstractLiquid=H2O
+)
+    coolant = liquid(collect(s.T_bulk), collect(s.P))
+    return q_OSV_saha_zuber(
+        s.T_inlet, s.ṁ, s.pipe, coolant;
+        flux_shape=_face_flux(s, direction), dz=fill(s.pipe.L / s.n, s.n),
+        flux_enworse=inhomogeneity_factor,
+    )
+end
 
 function twall_limit(s::ChannelState; inhomogeneity_factor=1.0)
     limit(T_wall) = twall_limit.(s.T_bulk, T_wall, inhomogeneity_factor)
