@@ -230,7 +230,7 @@ using ModelingToolkit
 using OrdinaryDiffEq
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkit: ⋅
-using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM
+using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..HTC
@@ -428,7 +428,7 @@ export PipeGeometry, PipeGeometry_rectangular, PipeGeometry_circular
 export solve_steady, solve_transient, steady_state_guess
 
 # Physical constants
-export G_EARTH, ATM
+export G_EARTH, ATM, T_ROOM
 
 # Design knobs
 export knob_defaults, @design_knob
