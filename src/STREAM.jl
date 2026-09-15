@@ -425,7 +425,7 @@ export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend
 export PipeGeometry, PipeGeometry_rectangular, PipeGeometry_circular
 
 # Solve entry points and the operating-point guess
-export solve_steady, solve_transient, steady_state_guess
+export solve_steady, solve_transient, steady_state_guess, uniform
 
 # Physical constants
 export G_EARTH, ATM, T_ROOM
