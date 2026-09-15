@@ -112,7 +112,7 @@ end
 """
     PointKinetics(rho_c_fn::Any; name, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
                   lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing,
-                  power_input=nothing) -> System
+                  power_input=nothing, P0=1.0) -> System
 
 Keepin (1965) point kinetics with `G` delayed precursor groups, so `1 + G` ODEs:
 
@@ -137,9 +137,10 @@ coefficient, so `αⱼ` is normally negative.
 
 A critical reactor is `rho_c_fn = t -> 0.0`; a constant bias is `t -> ρ₀`.
 
-`rho_c_fn` has no default, so it must appear in the operating point,
-`op = [ssys.rho_c_fn => rho_c_fn, ssys.P_neutron => ic.P_neutron, ...]`. Without it,
-building the problem fails with "Could not evaluate value of parameter rho_c_fn".
+The system starts where it was built to: `rho_c_fn` defaults to the callable given, and
+`P_neutron` and `C` to the critical steady state holding a total power `P0`, with
+`power_input` taken at `t = 0`, as [`point_kinetics_steady_state`](@ref) computes it. Put any
+of them in the operating point to start elsewhere.
 
 # Neutron and total power
 
@@ -179,6 +180,7 @@ monitor reading neutron flux measures.
   becomes the callable parameter `power_input_fn`. Either carries the value given as its
   default, so neither has to appear in the operating point, and `solve_transient` can
   override either. `nothing` leaves `P ~ P_neutron`.
+- `P0=1.0`: the total power `P` the default initial state holds, in the units of `P_neutron`
 
 # Returns
 Uncompiled `System` with unknowns `P_neutron`, `C[1:G]`, `P`, and one `T_source` array per
@@ -199,10 +201,12 @@ function PointKinetics(
     temp_worth=nothing,
     ref_temp=nothing,
     power_input=nothing,
+    P0=1.0,
 )
     FType = typeof(rho_c_fn)
+    rho_c_default = rho_c_fn
     control = function ()
-        control_pars = @parameters (rho_c_fn::FType)(..)
+        control_pars = @parameters (rho_c_fn::FType)(..) = rho_c_default
         feedback, feedback_unknowns = _temperature_feedback(temp_worth, ref_temp)
         return (control_pars[1](t) + feedback, control_pars, feedback_unknowns)
     end
@@ -218,10 +222,12 @@ function PointKinetics(
     end
 
     input_power, input_pars = _power_input_term(power_input)
+    input_0 = power_input isa Union{Nothing,Real} ? something(power_input, 0.0) : power_input(0.0)
+    ic = point_kinetics_steady_state(P0; Lambda, beta_k, lambda_k, power_input=input_0)
 
     @variables begin
-        P_neutron(t) = 1.0
-        (C(t))[1:G]
+        P_neutron(t) = ic.P_neutron
+        (C(t))[1:G] = ic.C_k
         # Algebraic, and read by whatever the reactor heats, so it is an unknown here rather
         # than an observable. `mtkcompile` tears it back out.
         P(t)
