@@ -21,6 +21,17 @@ using STREAM.Examples
         @test all(diff(T_guess) .> 0)    # monotonically increasing
     end
 
+    @testset "uniform gives every named variable one value" begin
+        ssys = build_loop()
+        op = uniform([ssys.ch], 40.0, :T, :dP, :nope)
+        @test length(op) == 2
+        @test isequal(first(op[1]), ssys.ch.T) && last(op[1]) == fill(40.0, 10)
+        @test isequal(first(op[2]), ssys.ch.dP) && last(op[2]) == 40.0
+        @test isempty(uniform([ssys.ch], 40.0, :nope))
+        sol = solve_steady(ssys, [uniform([ssys.ch], 40.0, :T)...; ssys.ch.inlet.ṁ => 0.49])
+        @test sol.retcode == ReturnCode.Success
+    end
+
     @testset "solve_steady returns physical solution" begin
         n = 10
         T_inlet = 40.0
