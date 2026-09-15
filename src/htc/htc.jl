@@ -60,7 +60,8 @@ struct AtFilm <: PropertyBasis end
 """
     AtBulk <: PropertyBasis
 
-Read properties at the bulk temperature. Python STREAM closes its laminar branch this way.
+Read properties at the bulk temperature. Python STREAM closes its laminar and natural
+branches this way.
 """
 struct AtBulk <: PropertyBasis end
 
@@ -133,30 +134,50 @@ function DevelopingLaminar(geom::PipeGeometry; develop_length,
 end
 
 """
-    Elenbaas(geom; g=G_EARTH) <: AbstractHTC
+    Elenbaas(geom; g=G_EARTH, basis=AtFilm()) <: AbstractHTC
 
-Elenbaas natural convection between parallel vertical plates.
+Elenbaas natural convection between symmetrically heated parallel vertical plates.
 
-Buoyancy is driven by the bulk-to-wall difference, so Gr and the properties behind it are
-taken at the bulk temperature, matching Python STREAM. `geom.depth` is the plate gap,
-`geom.L` the heated length, and `geom.Dh` the Grashof characteristic length.
+The plate gap `S = geom.depth` is the length scale throughout: Ra is taken on `S` and
+`h = Nu·κ/S`. [`RegimeDependent`](@ref) reads a natural branch at the bulk instead of the
+film, as Python STREAM does.
+
+# Arguments
+- `geom`: channel geometry; `geom.depth` is the gap and `geom.L` the heated length
+- `g`: gravitational acceleration [m/s²]
+- `basis`: where the coolant properties are read, [`AtFilm`](@ref) (default) or [`AtBulk`](@ref)
+
+# Returns
+An `Elenbaas` model, callable like any [`AbstractHTC`](@ref).
 """
-struct Elenbaas <: AbstractHTC
+struct Elenbaas{B<:PropertyBasis} <: AbstractHTC
     gap::Float64
     heated_length::Float64
-    Dh_gr::Float64
     g::Float64
+    basis::B
 end
 
-function Elenbaas(geom::PipeGeometry; g=G_EARTH)
-    return Elenbaas(geom.depth, geom.L, geom.Dh, Float64(g))
+function Elenbaas(geom::PipeGeometry; g=G_EARTH, basis::PropertyBasis=AtFilm())
+    return Elenbaas(geom.depth, geom.L, Float64(g), basis)
 end
 
 function (htc::Elenbaas)(T_wall, T_bulk, ṁ, Dh, A, liquid)
-    Ra_val = Ra(Gr(liquid, T_bulk, T_wall, htc.Dh_gr, htc.g), Pr(liquid, T_bulk))
-    Nu = elenbaas_nusselt(Ra_val, htc.gap, htc.heated_length)
-    return Nu * κ(liquid, T_bulk) / Dh
+    T_prop = property_temperature(htc.basis, T_wall, T_bulk)
+    Gr_val = Gr(ρ(liquid, T_prop), μ(liquid, T_prop), β(liquid, T_prop),
+                T_wall, T_bulk, htc.gap, htc.g)
+    Nu = elenbaas_nusselt(Ra(Gr_val, Pr(liquid, T_prop)), htc.gap, htc.heated_length)
+    return Nu * κ(liquid, T_prop) / htc.gap
 end
+
+"""
+    _at_bulk(model) -> AbstractHTC
+
+`model` with its property basis moved to [`AtBulk`](@ref), for the branches
+[`RegimeDependent`](@ref) reads at the bulk. A model without a basis comes back unchanged.
+"""
+_at_bulk(m::FromNusselt) = FromNusselt(m.nusselt, AtBulk())
+_at_bulk(m::Elenbaas) = Elenbaas(m.gap, m.heated_length, m.g, AtBulk())
+_at_bulk(m) = m
 
 """
     RegimeDependent(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
@@ -165,12 +186,14 @@ end
 Switch between laminar, turbulent and natural convection, the way Python STREAM's
 `regime_dependent_h_spl` does.
 
-The regime is selected on the **bulk** Reynolds number and the two forced branches are
-blended across `re_bounds` by [`flow_regime_blend`](@ref). Each branch is a full `AbstractHTC`, so
-where it reads its properties is its own business: that is how the laminar branch ends up at
-bulk and the turbulent one at film without this model having to know.
+The two forced branches are blended across `re_bounds` on the **bulk** Reynolds number by
+[`flow_regime_blend`](@ref). Given a `natural` model, it takes over wherever `Gr/Re² > 1`,
+with Gr and Re both read at the film temperature on `geom.Dh`.
 
-Given a `natural` model, buoyancy takes over wherever `Gr/Re² > 1`.
+As in Python, the laminar and natural branches read their properties at the bulk: a
+[`FromNusselt`](@ref) or [`Elenbaas`](@ref) handed in for either is rebased to
+[`AtBulk`](@ref). The turbulent branch keeps its own basis, and other models are used as
+given.
 
 # Arguments
 - `laminar`, `turbulent`: the two forced-convection models
@@ -197,7 +220,9 @@ function RegimeDependent(;
     g=G_EARTH,
 )
     bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))
-    return RegimeDependent(laminar, turbulent, natural, bounds, geom.Dh, Float64(g))
+    return RegimeDependent(
+        _at_bulk(laminar), turbulent, _at_bulk(natural), bounds, geom.Dh, Float64(g)
+    )
 end
 
 function (htc::RegimeDependent)(T_wall, T_bulk, ṁ, Dh, A, liquid)
@@ -208,9 +233,13 @@ function (htc::RegimeDependent)(T_wall, T_bulk, ṁ, Dh, A, liquid)
         htc.turbulent(T_wall, T_bulk, ṁ, Dh, A, liquid),
     )
     htc.natural === nothing && return h_forced
-    Gr_val = Gr(liquid, T_bulk, T_wall, htc.Dh_gr, htc.g)
+    # Python's switch reads Gr and Re at the film, though the blend above uses the bulk Re.
+    T_film = film_temperature(T_wall, T_bulk)
+    Gr_film = Gr(ρ(liquid, T_film), μ(liquid, T_film), β(liquid, T_film),
+                 T_wall, T_bulk, htc.Dh_gr, htc.g)
+    Re_film = Re(liquid, T_film, ṁ, A, Dh)
     return ifelse(
-        Gr_val / Re_bulk^2 > 1,
+        Gr_film / Re_film^2 > 1,
         htc.natural(T_wall, T_bulk, ṁ, Dh, A, liquid),
         h_forced,
     )
@@ -243,8 +272,9 @@ extra-argument form `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)`.
 
 # Arguments
 - `single_phase`: the underlying [`AbstractHTC`](@ref)
-- `q_scb`: subcooled boiling heat flux closure `(T_wall, T_sat, Re) -> q`, e.g. from
-  [`regime_dependent_q_scb`](@ref)
+- `q_scb`: subcooled boiling heat flux closure `(T_wall, sat, Re) -> q`, e.g. from
+  [`regime_dependent_q_scb`](@ref). `sat` is the coolant's [`Liquid`](@ref) snapshot at
+  saturation at the local pressure, and `Re` the bulk Reynolds number.
 """
 struct SubcooledBoiling{H<:AbstractHTC,Q} <: AbstractHTC
     single_phase::H

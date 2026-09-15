@@ -39,7 +39,9 @@ those symbols.
                                                       variant has no wall of its own
 - `q_left_expr`, `q_right_expr`                     : length-n `Vector{Num}`, per-cell heat flow inputs (W) — variant builds these
 - `Re, Pe, v, P, T_sat, T_ONB, q_wall, q_wall_left, q_wall_right` : variant-declared observable LHS symbols
-- `T_out, dP`                                       : variant-declared scalar observable LHS symbols
+- `T_in, T_out, dP`                                 : variant-declared scalar observable LHS symbols.
+                                                      `T_in` is the coolant entering at whichever
+                                                      end is upstream, `T_out` the coolant leaving
 
 # Returns
 NamedTuple `(; eqs::Vector{Equation}, obs::Vector{Equation})` — the variant
@@ -130,6 +132,9 @@ function _channel_core(;
             (L / A) * D(inlet.ṁ) ~ (inlet.p - outlet.p) - sum(dp),
             outlet.T ~ T[n],
             inlet.T ~ T[1],
+            # An equation rather than an observable, so connection expansion resolves the
+            # instream reads.
+            vars.T_in ~ ifelse(inlet.ṁ >= 0, T_inlet_fwd, T_inlet_rev),
         ],
     )
     obs = vcat(
@@ -171,6 +176,7 @@ function _setup(geometry, g, n)
         (q_wall(t))[1:n]
         (q_wall_left(t))[1:n]
         (q_wall_right(t))[1:n]
+        T_in(t)
         T_out(t)
         dP(t)
     end
@@ -180,7 +186,7 @@ function _setup(geometry, g, n)
 
     varstruct = (;
         T, dp, T_wall_left, T_wall_right, Re, Pe, v, P, T_sat, T_ONB,
-        q_wall, q_wall_left, q_wall_right, T_out, dP,
+        q_wall, q_wall_left, q_wall_right, T_in, T_out, dP,
     )
 
     return pars, varstruct, inlet, outlet
@@ -193,7 +199,7 @@ function _vcollect(vars)
         collect(vars.Re); collect(vars.Pe); collect(vars.v);
         collect(vars.P); collect(vars.T_sat); collect(vars.T_ONB);
         collect(vars.q_wall); collect(vars.q_wall_left); collect(vars.q_wall_right);
-        vars.T_out; vars.dP
+        vars.T_in; vars.T_out; vars.dP
     ]
 end
 

@@ -430,18 +430,36 @@ end
     @test flow_regime_blend(5000.0, bounds, lam, turb) ≈ turb rtol = 1e-12
 end
 
-@testset "HTC.regime_dependent_q_scb blends across the transition band" begin
-    pressure = 1e5
-    q_scb = HTC.regime_dependent_q_scb(; pressure=pressure, re_bounds=(2000.0, 5000.0))
-    T_sat, T_wall = 100.0, 130.0
-    q_lam = HTC.bergles_rohsenow_scb_heat_flux(T_wall, T_sat, pressure)
-    q_turb = HTC.mcadams_scb_heat_flux(T_sat, T_wall)
-    # The two correlations must actually disagree, or the blend proves nothing.
-    @test !isapprox(q_lam, q_turb; rtol=1e-3)
+@testset "HTC.mcadams_scb_heat_flux" begin
+    # Python STREAM's McAdams_SCB_heat_flux.
+    @test HTC.mcadams_scb_heat_flux(100.0, 120.0) ≈ 237730.12702161702 rtol = 1e-12
+    @test HTC.mcadams_scb_heat_flux(100.0, 130.0) ≈ 1137094.2996038366 rtol = 1e-12
+    @test HTC.mcadams_scb_heat_flux(100.0, 100.0) == 0.0
+    @test HTC.mcadams_scb_heat_flux(100.0, 90.0) == 0.0
+end
 
-    @test q_scb(T_wall, T_sat, 1000.0) ≈ q_lam
-    @test q_scb(T_wall, T_sat, 8000.0) ≈ q_turb
-    @test q_scb(T_wall, T_sat, 3500.0) ≈ (q_lam + q_turb) / 2
+@testset "HTC.bergles_rohsenow_scb_heat_flux" begin
+    # Python STREAM's Bergles_Rohsenhow_SCB_heat_flux on saturated water.
+    sat17 = H2O(Tsat(H2O, 1.7e5), 1.7e5)
+    @test HTC.bergles_rohsenow_scb_heat_flux(120.0, sat17) ≈ 26177.759451978258 rtol = 1e-8
+    @test HTC.bergles_rohsenow_scb_heat_flux(125.0, sat17) ≈ 229086.82394250282 rtol = 1e-8
+    sat20 = H2O(Tsat(H2O, 2e5), 2e5)
+    @test HTC.bergles_rohsenow_scb_heat_flux(130.0, sat20) ≈ 260672.44841443186 rtol = 1e-8
+    # No boiling at or below saturation.
+    @test HTC.bergles_rohsenow_scb_heat_flux(sat17.Tsat, sat17) == 0.0
+    @test HTC.bergles_rohsenow_scb_heat_flux(100.0, sat17) == 0.0
+end
+
+@testset "HTC.regime_dependent_q_scb blends across the transition band" begin
+    q_scb = HTC.regime_dependent_q_scb(; re_bounds=(2000.0, 5000.0))
+    sat = H2O(Tsat(H2O, 1.7e5), 1.7e5)
+    # Python STREAM's regime_dependent_q_scb at a 125 °C wall.
+    @test q_scb(125.0, sat, 1000.0) ≈ 229086.82394250282 rtol = 1e-8
+    @test q_scb(125.0, sat, 3500.0) ≈ 122057.77385754562 rtol = 1e-8
+    @test q_scb(125.0, sat, 8000.0) ≈ 15028.723772588424 rtol = 1e-8
+    # The two ends are the two correlations.
+    @test q_scb(125.0, sat, 1000.0) == HTC.bergles_rohsenow_scb_heat_flux(125.0, sat)
+    @test q_scb(125.0, sat, 8000.0) == HTC.mcadams_scb_heat_flux(sat.Tsat, 125.0)
 end
 
 @testset "HTC.marco_han_nusselt" begin

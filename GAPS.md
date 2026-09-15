@@ -362,6 +362,48 @@ not. Python never reads it either, so this is bookkeeping.
 
 **Size:** trivial.
 
+### 5.4 Margins over a transient: fixed
+
+`ChannelState` used to stack a transient into `[cell, time]` matrices but read `ṁ` and
+`T_inlet` at the first saved time only, and Sudo-Kaminaga and Whittle-Forgan then took the
+first column of their matrices. Sudo-Kaminaga, Fabrega, OFI, OSV and boiling onset therefore
+reported their `t = 0` value across a whole transient, which in a loss of flow is exactly
+where they should move. Nothing called that path and nothing tested it.
+
+A `ChannelState` now describes one instant, `ChannelState(sol, ch; index=k)` for a transient,
+and `threshold_analysis` builds one at every saved time. `test_thresholds.jl` checks each
+slice against a state built at that instant and that the flow-dependent limits follow a
+coasting flow down.
+
+Bergles-Rohsenow had a second defect. After a scram the coolant rising through the core can
+run hotter than parts of the plate, the wall flux goes negative, and the correlation raised
+a negative number to a fractional power. On a `ChannelState` it now reports no onset (`Inf`)
+wherever the wall is not heating the coolant, as `chfr` already did.
+
+### 5.5 Reading a channel the way Python's analysis wrappers do: fixed
+
+Python's `stream.analysis.thresholds` wrappers and our `ChannelState` methods were fed the
+same channel state and compared. Six correlations agreed to rounding. These did not, and now
+match Python:
+
+- `T_inlet` was the channel's `inlet.T`, which the channel sets to its first cell. That is
+  one cell's heating too warm in forward flow and the hot end under reversal, where OFI and
+  boiling power went negative. Channels now carry `T_in`, the coolant entering at whichever
+  end is upstream, and `ChannelState` reads it, as Python reads its `T_in`.
+- OSV took saturation at a fixed 1 bar, a uniform flux and properties at the inlet, and
+  returned one number. It now takes each cell's saturation and properties and the face flux,
+  accumulates from the upstream end, and returns a value per cell. On an MTR channel at
+  1.7 bar the old form overstated the limit by about 11%.
+- Boiling power took `cₚ` per cell instead of at the inlet.
+- Mirshak took the speed. Python takes the signed velocity, which lowers the limit under
+  reversed flow, and so do we now.
+- Bergles-Rohsenow lacked Python's `onb_factor`, `inhomogeneity_factor` and face choice.
+- `ChannelState` and `threshold_analysis` defaulted gravity to 9.81 rather than `G_EARTH`.
+
+One difference remains. Python takes saturation at the static pressure, the cell-end
+pressure less `ρv²/2`, where we use the cell-centre pressure. In an MTR channel at 2 m/s that
+puts Python's saturation temperature about 0.4 K lower.
+
 ---
 
 ## 6. Power shapes and meshing
@@ -538,10 +580,10 @@ month has both sides of the ledger in front of it.
 - **The `HTC` handle.** After the current work, our heat transfer model is a first-class
   value with an explicit property basis. Python's is a function with the basis hard-coded per
   branch.
-- **Transient threshold analysis is native.** `ChannelState` handles a transient solution by
-  turning every per-cell field into a `[cell, time]` matrix, so every threshold correlation
-  works on a transient with no extra code. Python needs a separate
-  `transient_threshold_analysis` wrapper.
+- **Transient threshold analysis, with a verdict.** `threshold_analysis` runs every correlation
+  on the channel state at each saved time and stacks the results, and `worst_case` reports the
+  smallest margin with the cell and time it occurs at. Python's `transient_threshold_analysis`
+  does the first half and leaves the ratio and the minimum to the caller.
 - **Event handling.** SciML callbacks give us SCRAM and flapper events with proper root
   finding. Python's `should_continue` / `change_state` polling is coarser.
 - **Less code for the same physics.** The two line counts at the top of this file are not a
