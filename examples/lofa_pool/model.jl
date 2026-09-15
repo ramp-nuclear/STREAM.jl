@@ -107,7 +107,6 @@ function build_pool_lofa(ctrl, source; case)
     guess = [
         ssys.primary.inlet.ṁ => ṁ_design,
         (channels[k].inlet.ṁ => case.types[k].design_ṁ for k in types)...,
-        uniform([ssys.riser, channels...], T_pool, :T)...,
     ]
     trip = [ssys.pump.dP_pump => 0.0]
     callbacks = CallbackSet(
