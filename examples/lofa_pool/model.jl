@@ -94,8 +94,6 @@ function build_pool_lofa(ctrl, source; case)
         inseries(riser, primary, pump, flywheel)...,
         flywheel.outlet.p ~ case.p_pool,
         watch_flow(flapper, flywheel.inlet.ṁ),
-        (collect(riser.T_wall_left) .~ T_pool)...,
-        (collect(riser.T_wall_right) .~ T_pool)...,
         power_eqs...,
     ]
     full = compose_systems(
