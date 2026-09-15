@@ -144,7 +144,7 @@ src/
     assemblies.jl             # compose_systems, check_gravity_mismatch, symmetric_plate,
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
-  initial_conditions.jl       # steady_state_guess
+  initial_conditions.jl       # steady_state_guess, uniform
   utilities.jl                # module Utilities: rebin_*, cosine_shape, cosine_power_shape,
                               # cosine_T_wall_profile
   examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk
@@ -191,7 +191,7 @@ test/
                             # port, check_gravity_mismatch, var_length, temperature_feedback,
                             # fuel_assembly — heavy CAC<->HD coverage
   test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
-  test_solvers.jl           # steady_state_guess + solve_steady/solve_transient wrappers (src/solvers.jl)
+  test_solvers.jl           # steady_state_guess, uniform + solve_steady/solve_transient wrappers
   test_examples.jl          # build_loop* / build_cube builders + loss-of-flow transient (src/examples.jl)
   test_determinacy.jl       # equation/unknown balance (fully_determined) for builders + scenarios
   test_validation.jl        # Quantitative cross-validation against Python STREAM
