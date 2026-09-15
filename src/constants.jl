@@ -11,3 +11,11 @@ const G_EARTH = 9.80665
 Standard atmospheric pressure [Pa]. Used as the default pressure
 """
 const ATM = 101325.0
+
+"""
+    T_ROOM
+
+Room temperature, 300 K, in °C. Ports and channel coolant start here unless an operating point
+says otherwise.
+"""
+const T_ROOM = 26.85
