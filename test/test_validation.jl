@@ -1007,7 +1007,9 @@ end
             ref_temp=Dict(:cac => fill(T_inlet, n)),
         )
 
-        t_arr = range(0.0, 200.0; length=500)
+        # The slowest precursor group sets the pace once the feedback weakens, and the power
+        # crosses 1e-3 only near 850 s.
+        t_arr = range(0.0, 1500.0; length=500)
         sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
         @test sol.retcode == ReturnCode.Success
         P = sol[ssys.pk.P_neutron]
