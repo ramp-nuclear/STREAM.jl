@@ -351,14 +351,21 @@ const CRITICAL = (t) -> 0.0
             ssys_c.P_neutron => ic.P_neutron,
             [ssys_c.C[k] => ic.C_k[k] for k in 1:6]...,
         ]
-        t_sample = t_step + 0.028
+        # The prompt jump: a few Λ/(β - ρ) after the step the prompt transient has died away
+        # and P follows the precursors, P ≈ Λ·Σλₖ·Cₖ/(β - ρ). 0.1 s is eight of those time
+        # constants.
+        t_sample = t_step + 0.1
         t_arr_c = range(0.0, t_sample, length=500)
         sol_c = solve_transient(ssys_c, op_c, t_arr_c; tstops=[t_step])
 
         beta_total = sum(U235_BETA_K)
-        P_jump_expected = beta_total / (beta_total - delta_rho) * P0
         P_jump_numerical = sol_c[ssys_c.P_neutron, end]
+        C_end = [sol_c[ssys_c.C[k], end] for k in 1:6]
+        P_jump_expected = U235_LAMBDA * sum(U235_LAMBDA_K .* C_end) / (beta_total - delta_rho)
         @test isapprox(P_jump_numerical, P_jump_expected; rtol=1e-2)
+        # The precursors have hardly moved, so P is still near the textbook jump β/(β - ρ)·P0,
+        # about 2% above it once the delayed groups start to follow.
+        @test isapprox(P_jump_numerical, beta_total / (beta_total - delta_rho) * P0; rtol=3e-2)
         # Before the step, P should be ≈ P0 (steady state)
         idx_pre = findfirst(tv -> tv >= 0.5, t_arr_c)
         @test isapprox(sol_c[ssys_c.P_neutron, idx_pre], P0; rtol=1e-2)
@@ -627,7 +634,8 @@ end
 
     @testset "step reactivity with temperature feedback" begin
         # After step insertion: power rises (P_max > P0) then feedback damps
-        # the excursion (P[end] < P_max).
+        # the excursion (P[end] < P_max). The weak feedback turns the power over about
+        # 25 s after the step, so the run is a minute.
         P0 = 1.0
         t_step = 0.5
         delta_rho = 0.003   # 0.003 > beta/2; strong enough for visible prompt rise
@@ -646,7 +654,7 @@ end
             ref_temp=Dict(:cac => fill(T_inlet, 7)),
         )
 
-        t_arr = range(0.0, 5.0; length=500)
+        t_arr = range(0.0, 60.0; length=600)
         sol = solve_transient(ssys, ic, t_arr; tstops=[t_step], maxiters=1_000_000)
         @test sol.retcode == ReturnCode.Success
 
@@ -737,14 +745,15 @@ end
         # heats above the inlet reference, driving feedback negative until power
         # collapses to a low, self-consistent (net reactivity ≈ 0) equilibrium. Strong
         # negative alpha ⇒ power becomes negligible — and crucially, here that is REAL
-        # feedback physics, not the old init artifact (guarded by PK-IC-01).
+        # feedback physics, not the old init artifact (guarded by PK-IC-01). The approach
+        # runs at the pace of the slowest delayed group, so the run is ten minutes.
         Tin = 20.0
         ctrl = ReactivityController()
         ssys, ic = build_loop_pk(
             ctrl; n=7, T_inlet=Tin, P0=1.0, power_scale=1e4,
             temp_worth=Dict(:cac => fill(-0.1, 7)), ref_temp=Dict(:cac => fill(Tin, 7)),
         )
-        sol = solve_transient(ssys, ic, range(0.0, 100.0; length=300); maxiters=1_000_000)
+        sol = solve_transient(ssys, ic, range(0.0, 600.0; length=600); maxiters=1_000_000)
         @test sol.retcode == ReturnCode.Success
         P = sol[ssys.pk.P_neutron]
         rho = sol[ssys.pk.reactivity]
@@ -797,3 +806,46 @@ end
     end
 end
 
+
+@testset "trip! and trip_callback" begin
+    @testset "trip! latches the first trip" begin
+        ctrl = ReactivityController()
+        @test trip!(ctrl, 2.0) === :SCRAM
+        @test ctrl.state === :SCRAM
+        @test ctrl.t_state == 2.0
+        # A second signal changes nothing: the first trip time is the one kept.
+        trip!(ctrl, 5.0)
+        @test ctrl.t_state == 2.0
+        @test count(entry -> entry[1] === :SCRAM, ctrl.log) == 1
+    end
+
+    @testset "trip_callback trips on a falling flow, at the crossing" begin
+        # A coasting loop gives a flow that falls through any setpoint below where it
+        # starts. The controller is not wired into the loop; the trip only has to read the
+        # flow.
+        ssys = build_loop(; n=5)
+        op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
+        push!(op, ssys.ch.inlet.ṁ => 0.5)
+        sol_ss = solve_steady(ssys, op)
+        setpoint = 0.5 * sol_ss[ssys.ch.inlet.ṁ]
+        ctrl = ReactivityController()
+        cb = trip_callback(ssys, ssys.ch.inlet.ṁ, setpoint, ctrl)
+        sol = solve_transient(
+            ssys, sol_ss, range(0.0, 0.5; length=11);
+            overrides=[ssys.pump.dP_pump => 0.0], callbacks=cb,
+        )
+        @test sol.retcode == ReturnCode.Success
+        @test ctrl.state === :SCRAM
+
+        # The trip time falls between the last saved flow above the setpoint and the first
+        # below.
+        ṁ = sol[ssys.ch.inlet.ṁ, :]
+        before = sol.t .< ctrl.t_state
+        @test all(ṁ[before] .> setpoint)
+        @test all(ṁ[.!before] .<= setpoint * (1 + 1e-6))
+
+        # A decay heat source reading the same controller starts its clock at the trip.
+        source = DecayHeat.DecayHeatSource(DecayHeat.U238CaptureChain(1.0), ctrl; P0=1.0)
+        @test DecayHeat.decay_time(source, ctrl.t_state + 3.0) ≈ 3.0
+    end
+end

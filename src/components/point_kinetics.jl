@@ -9,11 +9,12 @@ const U235_LAMBDA = 5.4e-5
 """
     U235_LAMBDA_K
 
-Precursor decay constants λₖ [1/s] for the six standard U-235 delayed neutron groups, ordered
-fastest to slowest. The default `lambda_k` in [`PointKinetics`](@ref), paired group for group
-with [`U235_BETA_K`](@ref).
+Precursor decay constants λₖ [1/s] for Keepin's six U-235 thermal-fission delayed neutron
+groups (Physics of Nuclear Kinetics, 1965), ordered slowest to fastest: half-lives of 55.72,
+22.72, 6.22, 2.30, 0.61 and 0.23 s. The default `lambda_k` in [`PointKinetics`](@ref), paired
+group for group with [`U235_BETA_K`](@ref).
 """
-const U235_LAMBDA_K = [55.72, 22.72, 6.22, 2.3, 0.618, 0.23]
+const U235_LAMBDA_K = [0.0124, 0.0305, 0.111, 0.301, 1.14, 3.01]
 
 """
     U235_BETA_K
@@ -111,7 +112,7 @@ end
 """
     PointKinetics(rho_c_fn::Any; name, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
                   lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing,
-                  power_input=nothing) -> System
+                  power_input=nothing, P0=1.0) -> System
 
 Keepin (1965) point kinetics with `G` delayed precursor groups, so `1 + G` ODEs:
 
@@ -136,9 +137,10 @@ coefficient, so `αⱼ` is normally negative.
 
 A critical reactor is `rho_c_fn = t -> 0.0`; a constant bias is `t -> ρ₀`.
 
-`rho_c_fn` has no default, so it must appear in the operating point,
-`op = [ssys.rho_c_fn => rho_c_fn, ssys.P_neutron => ic.P_neutron, ...]`. Without it,
-building the problem fails with "Could not evaluate value of parameter rho_c_fn".
+The system starts where it was built to: `rho_c_fn` defaults to the callable given, and
+`P_neutron` and `C` to the critical steady state holding a total power `P0`, with
+`power_input` taken at `t = 0`, as [`point_kinetics_steady_state`](@ref) computes it. Put any
+of them in the operating point to start elsewhere.
 
 # Neutron and total power
 
@@ -178,6 +180,7 @@ monitor reading neutron flux measures.
   becomes the callable parameter `power_input_fn`. Either carries the value given as its
   default, so neither has to appear in the operating point, and `solve_transient` can
   override either. `nothing` leaves `P ~ P_neutron`.
+- `P0=1.0`: the total power `P` the default initial state holds, in the units of `P_neutron`
 
 # Returns
 Uncompiled `System` with unknowns `P_neutron`, `C[1:G]`, `P`, and one `T_source` array per
@@ -198,10 +201,12 @@ function PointKinetics(
     temp_worth=nothing,
     ref_temp=nothing,
     power_input=nothing,
+    P0=1.0,
 )
     FType = typeof(rho_c_fn)
+    rho_c_default = rho_c_fn
     control = function ()
-        control_pars = @parameters (rho_c_fn::FType)(..)
+        control_pars = @parameters (rho_c_fn::FType)(..) = rho_c_default
         feedback, feedback_unknowns = _temperature_feedback(temp_worth, ref_temp)
         return (control_pars[1](t) + feedback, control_pars, feedback_unknowns)
     end
@@ -217,10 +222,12 @@ function PointKinetics(
     end
 
     input_power, input_pars = _power_input_term(power_input)
+    input_0 = power_input isa Union{Nothing,Real} ? something(power_input, 0.0) : power_input(0.0)
+    ic = point_kinetics_steady_state(P0; Lambda, beta_k, lambda_k, power_input=input_0)
 
     @variables begin
-        P_neutron(t) = 1.0
-        (C(t))[1:G]
+        P_neutron(t) = ic.P_neutron
+        (C(t))[1:G] = ic.C_k
         # Algebraic, and read by whatever the reactor heats, so it is an unknown here rather
         # than an observable. `mtkcompile` tears it back out.
         P(t)
@@ -497,4 +504,67 @@ function scram_callback(ssys, p_sym::Num, ctrl; terminate=true)
     end
 
     return ContinuousCallback(condition, affect!)  # upward crossing only (P - plimit: neg -> pos)
+end
+
+"""
+    trip!(ctrl, t; state=:SCRAM) -> state
+
+Put `ctrl` into `state` at time `t`, whatever its state machine says.
+
+This is for trips the state machine cannot see, such as a low-flow signal, since the machine
+is only handed power and its rate. It stamps `t_state` and logs the entry the way
+[`change_state`](@ref) does, so a reactivity schedule and a `DecayHeatSource` read the trip
+time off `ctrl` the same way either way.
+
+A trip latches. Calling it again while `ctrl` is already in `state` changes nothing, so the
+time of the first trip is the one that stays.
+
+# Arguments
+- `ctrl`: the `ReactivityController` to trip
+- `t`: time of the trip [s]
+
+# Keywords
+- `state`: the state to enter (default `:SCRAM`)
+
+# Returns
+The state `ctrl` is in afterwards.
+"""
+function trip!(ctrl::ReactivityController, t_now; state=:SCRAM)
+    ctrl.state == state && return ctrl.state
+    ctrl.state = state
+    ctrl.t_state = Float64(t_now)
+    push!(ctrl.log, (state, Float64(t_now)))
+    return ctrl.state
+end
+
+"""
+    trip_callback(ssys, sym, threshold, ctrl; state=:SCRAM) -> ContinuousCallback
+
+Trip `ctrl` when `sym` falls through `threshold`.
+
+This is the low-flow trip a loss-of-flow case needs, which [`scram_callback`](@ref) cannot
+give because it watches power rising. `sym` is any variable of the compiled system, a flow
+or a temperature. The crossing is found by root-finding `sym` at the solver's trial states,
+the way [`flapper_callback`](@ref) finds a flapper opening, so the trip time is exact
+whether `sym` is a state or computed from one. Only a downward crossing trips, and
+[`trip!`](@ref) latches it.
+
+# Arguments
+- `ssys`: compiled system from `mtkcompile`
+- `sym`: the watched variable, such as `ssys.ine.inlet.ṁ`
+- `threshold`: the trip setpoint, in `sym`'s units
+- `ctrl`: the `ReactivityController` to trip
+
+# Keywords
+- `state`: the state to trip into (default `:SCRAM`)
+
+# Returns
+A `ContinuousCallback`, for `solve_transient(...; callbacks=cb)`.
+"""
+function trip_callback(ssys, sym, threshold, ctrl::ReactivityController; state=:SCRAM)
+    watched = ModelingToolkit.build_explicit_observed_function(ssys, sym)
+    condition = (u, tt, integ) -> watched(u, integ.p, tt) - threshold
+    affect_trip! = integ -> trip!(ctrl, integ.t; state=state)
+    # (condition, up-crossing affect = nothing, down-crossing affect = trip)
+    return ContinuousCallback(condition, nothing, affect_trip!)
 end
