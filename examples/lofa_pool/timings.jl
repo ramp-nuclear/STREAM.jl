@@ -39,18 +39,18 @@ passes = Pair{String,Vector{Any}}[]
 ctrl, source = controls()
 build = @timed build_pool_lofa(ctrl, source; case=case)
 model = build.value
-steady = @timed solve_pool_lofa_steady(model, case)
+steady = @timed solve_pool_lofa_steady(model)
 trans = @timed transient(model, steady.value)
 push!(passes, "cold" => Any[build, steady, trans])
 
 untrip!(ctrl)
-steady = @timed solve_pool_lofa_steady(model, case)
+steady = @timed solve_pool_lofa_steady(model)
 trans = @timed transient(model, steady.value)
 push!(passes, "same model" => Any[nothing, steady, trans])
 
 ctrl, source = controls()
 build = @timed build_pool_lofa(ctrl, source; case=case)
-steady = @timed solve_pool_lofa_steady(build.value, case)
+steady = @timed solve_pool_lofa_steady(build.value)
 trans = @timed transient(build.value, steady.value)
 push!(passes, "rebuilt model" => Any[build, steady, trans])
 

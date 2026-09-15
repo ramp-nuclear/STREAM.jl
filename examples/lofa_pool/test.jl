@@ -26,7 +26,7 @@ end
     source = DecayHeat.DecayHeatSource(heat, ctrl; P0=1.0)
     model = build_pool_lofa(ctrl, source; case=case)
     ssys = model.ssys
-    sol_ss = solve_pool_lofa_steady(model, case)
+    sol_ss = solve_pool_lofa_steady(model)
 
     @testset "the steady state is the design point" begin
         for key in keys(case.types)
@@ -36,7 +36,7 @@ end
         @test sol_ss[ssys.pk.P_neutron] ≈ 1.0 - source(0.0) rtol = 1e-9
     end
 
-    times = range(0.0, 600.0; length=121)
+    times = range(0.0, 1200.0; length=241)
     sol = solve_transient(
         ssys, sol_ss, times; overrides=model.trip, callbacks=model.callbacks
     )
@@ -70,7 +70,7 @@ end
         for key in keys(case.types)
             ch = model.channels[key]
             T_hot(k) = maximum(sol[ch.T[i], k] for i in 1:case.n)
-            @test T_hot(121) < T_hot(61)   # t = 600 s against t = 300 s
+            @test T_hot(241) < T_hot(121)   # t = 1200 s against t = 600 s
         end
         # Upward flow leaves each channel through its top cell into the pool and enters from
         # the riser at pool temperature, so the pool takes out N·|ṁ|·cp·(T[1] - T_pool) per
