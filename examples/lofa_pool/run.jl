@@ -48,7 +48,7 @@ end
 ssys = model.ssys
 @printf "  %d unknowns, %d observed\n" length(unknowns(ssys)) length(observed(ssys))
 println("Settling the steady state...")
-sol_ss = timed(() -> solve_pool_lofa_steady(model, case), "steady state")
+sol_ss = timed(() -> solve_pool_lofa_steady(model), "steady state")
 
 println("\nSTEADY STATE")
 @printf "  %-6s %14s %14s %10s\n" "type" "design ṁ" "achieved ṁ" "T_out"
@@ -169,7 +169,7 @@ series = Pair{String,Vector{Float64}}[
 ]
 for key in keys(case.types)
     ch = model.channels[key]
-    fuel = getproperty(getproperty(ssys, Symbol(:rods_, key)), Symbol(:fuel_, key))
+    fuel = getproperty(ssys, key).fuel
     plate = vec([fuel.T[i, j] for i in 1:(case.n), j in 1:(case.nx)])
     # Each cell's dp is friction plus the hydrostatic ρ·g_acc·dz, with g_acc = -g in the
     # downward core, so adding ρ·g·dz back leaves the friction.
@@ -321,7 +321,7 @@ timed("plots") do
     p_temp = plot(; xlabel="t [s]", ylabel="T [°C]", title="Hottest coolant and fuel")
     for key in keys(case.types)
         ch = model.channels[key]
-        fuel = getproperty(getproperty(ssys, Symbol(:rods_, key)), Symbol(:fuel_, key))
+        fuel = getproperty(ssys, key).fuel
         coolant = [maximum(sol[ch.T[i], k] for i in 1:(case.n)) for k in eachindex(sol.t)]
         fuel_cells = [fuel.T[i, j] for i in 1:(case.n), j in 1:(case.nx)]
         plate = [maximum(sol[c, k] for c in fuel_cells) for k in eachindex(sol.t)]

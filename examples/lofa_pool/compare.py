@@ -701,8 +701,8 @@ def numbers_page(pdf, inp, run_py):
         f"{jl.get('observed', '-')} from them afterwards. {jl.get('algebraic', '-')} of those "
         f"stay algebraic: the plate surface temperatures, one per face and cell, where "
         f"h(T_wall)·(T_wall − T) meets conduction in the plate and h itself depends on T_wall, "
-        f"and the pressures at the two junctions where branches meet, the lower plenum "
-        f"(high_weight_out.outlet.p) and the flapper node (riser.outlet.p).",
+        f"and the pressures at the two junctions where branches meet, the lower plenum and the "
+        f"flapper node.",
         "Rodas5P integrates M·u' = f(u) with a zero on each algebraic row of M. It is a "
         "Rosenbrock method built for index-1 systems in that form, so a step costs a few linear "
         "solves and no Newton iterations.",
