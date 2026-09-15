@@ -380,9 +380,29 @@ run hotter than parts of the plate, the wall flux goes negative, and the correla
 a negative number to a fractional power. On a `ChannelState` it now reports no onset (`Inf`)
 wherever the wall is not heating the coolant, as `chfr` already did.
 
-One approximation remains and is worth knowing in a reversal. `T_inlet` is the channel's
-`inlet.T`, which under reversed flow is the hot end, so OFI, OSV, Fabrega and boiling onset
-are only meaningful while the flow is forward.
+### 5.5 Reading a channel the way Python's analysis wrappers do: fixed
+
+Python's `stream.analysis.thresholds` wrappers and our `ChannelState` methods were fed the
+same channel state and compared. Six correlations agreed to rounding. These did not, and now
+match Python:
+
+- `T_inlet` was the channel's `inlet.T`, which the channel sets to its first cell. That is
+  one cell's heating too warm in forward flow and the hot end under reversal, where OFI and
+  boiling power went negative. Channels now carry `T_in`, the coolant entering at whichever
+  end is upstream, and `ChannelState` reads it, as Python reads its `T_in`.
+- OSV took saturation at a fixed 1 bar, a uniform flux and properties at the inlet, and
+  returned one number. It now takes each cell's saturation and properties and the face flux,
+  accumulates from the upstream end, and returns a value per cell. On an MTR channel at
+  1.7 bar the old form overstated the limit by about 11%.
+- Boiling power took `cₚ` per cell instead of at the inlet.
+- Mirshak took the speed. Python takes the signed velocity, which lowers the limit under
+  reversed flow, and so do we now.
+- Bergles-Rohsenow lacked Python's `onb_factor`, `inhomogeneity_factor` and face choice.
+- `ChannelState` and `threshold_analysis` defaulted gravity to 9.81 rather than `G_EARTH`.
+
+One difference remains. Python takes saturation at the static pressure, the cell-end
+pressure less `ρv²/2`, where we use the cell-centre pressure. In an MTR channel at 2 m/s that
+puts Python's saturation temperature about 0.4 K lower.
 
 ---
 

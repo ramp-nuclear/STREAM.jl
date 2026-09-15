@@ -188,7 +188,7 @@ Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAn
 module Thresholds
 using ModelingToolkit
 using QuadGK
-using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, H2O
+using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, H2O, G_EARTH
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Pe
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
