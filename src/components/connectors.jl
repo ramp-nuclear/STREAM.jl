@@ -1,5 +1,5 @@
 """
-    FlowPort(; name, p=1.0e5, ṁ=0.0, T=26.85)
+    FlowPort(; name, p=1.0e5, ṁ=0.0, T=T_ROOM)
 
 Acausal hydraulic connector. `p` is the across (potential) variable, `ṁ` is the flow
 variable (sums to zero at a junction), and `T` is a stream variable carried with the flow.
@@ -17,7 +17,7 @@ be built already seeded.
 - `ṁ`: mass flow rate [kg/s]; positive points into the port.
 - `T`: temperature [°C].
 """
-@connector function FlowPort(; name, p=1.0e5, ṁ=0.0, T=26.85)
+@connector function FlowPort(; name, p=1.0e5, ṁ=0.0, T=T_ROOM)
     sts = @variables begin
         p(t) = p, [description = "Pressure (Pa), across variable"]
         ṁ(t) = ṁ,
@@ -28,7 +28,7 @@ be built already seeded.
 end
 
 """
-    ThermalPort(; name, T=26.85, Q=0.0)
+    ThermalPort(; name, T=T_ROOM, Q=0.0)
 
 Acausal thermal connector. `T` is the across (potential) variable and `Q` is the flow
 variable (sums to zero at a junction); positive `Q` flows into the component.
@@ -38,7 +38,7 @@ variable (sums to zero at a junction); positive `Q` flows into the component.
 - `T`: temperature [°C].
 - `Q`: heat flow rate [W].
 """
-@connector function ThermalPort(; name, T=26.85, Q=0.0)
+@connector function ThermalPort(; name, T=T_ROOM, Q=0.0)
     sts = @variables begin
         T(t) = T, [description = "Temperature (°C), across variable"]
         Q(t) = Q,

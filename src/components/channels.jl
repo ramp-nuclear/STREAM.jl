@@ -158,7 +158,7 @@ function _setup(geometry, g, n)
     pars = @parameters g_acc = g
 
     @variables begin
-        (T(t))[1:n]
+        (T(t))[1:n] = fill(T_ROOM, n)
         (dp(t))[1:n]
         (T_wall_left(t))[1:n]
         (T_wall_right(t))[1:n]
