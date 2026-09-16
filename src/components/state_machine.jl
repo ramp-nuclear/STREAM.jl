@@ -17,9 +17,14 @@ function Transition(edge::Pair, condition)
 end
 
 """
-    StateMachine(edges...)
+    StateMachine(edges...; initial_state=:NORMAL, initial_time=0.0, abort_states=())
 
-The transitions a [`ReactivityController`](@ref) may take, and what fires each one.
+A control system: the state it is in, when it entered it, how it got there, and the
+transitions it may still take.
+
+Nothing about it is particular to neutronics. [`ReactivityController`](@ref) is one user,
+which reads the state to schedule rod worth, and a `DecayHeatSource` is another, which reads
+the time of the trip.
 
 Each edge pairs `from => to` with the condition that takes it:
 
@@ -28,7 +33,7 @@ machine = StateMachine(
     (:NORMAL => :SCRAM,            ssys.pk.P_neutron > 1.2e6),
     (:NORMAL => :SCRAM,            ssys.pump.inlet.ṁ < 0.85 * ṁ_design),
     ((:NORMAL, :DERATED) => :TRIP, ssys.ch.T[5] ~ 95.0),
-    (:SCRAM => :ABORT,             (ctrl, t) -> t - ctrl.t_state > 2.0),
+    (:SCRAM => :ABORT,             (machine, t) -> t - machine.t_state > 2.0),
 )
 ```
 
@@ -43,45 +48,107 @@ written the way ModelingToolkit writes a continuous event:
   ModelingToolkit's own `continuous_events`. It is edge-triggered only: it has no truth value
   at an instant, so a machine built from equations alone cannot tell you it should already
   have fired.
-- A predicate `(ctrl, t) -> Bool` is for conditions about the controller rather than the
+- A predicate `(machine, t) -> Bool` is for conditions about the machine rather than the
   system, such as time spent in the current state. It is checked once per accepted step, so
   it resolves to the step size rather than exactly.
 
-[`machine_callbacks`](@ref) turns the machine into solver events. Edges are tried in the
-order given, which is what decides the outcome when two fire at the same instant.
+A condition names quantities of components, written the same way before or after
+`mtkcompile`: `pump.inlet.ṁ` on the component you built is the symbol the compiled system
+carries. Edges therefore go in wherever the components are, either here or through `push!`,
+which is what a trip watching the very kinetics the machine's own controller drives needs,
+since that component cannot be built until the controller is. Entering a state in
+`abort_states` stops the integration. [`machine_callbacks`](@ref) turns the machine into
+solver events, and edges are tried in the order given, which is what decides the outcome when
+two fire at the same instant.
 
 # Arguments
 - `edges`: the transitions, each `(from => to, condition)`
 
-# Returns
-A `StateMachine` to hand to [`machine_callbacks`](@ref).
+# Keywords
+- `initial_state`: the state it starts in (default `:NORMAL`)
+- `initial_time`: when it entered that state [s] (default `0.0`)
+- `abort_states`: states whose entry stops the integration (default none)
+
+# Fields
+- `transitions::Vector{Transition}`: the edges
+- `state`: the state it is in now
+- `t_state::Float64`: when it entered that state [s]
+- `log::Vector{Tuple{Any,Float64}}`: every state entered, with its time, oldest first
+- `abort_states::Set`: the states that stop the integration
 """
-struct StateMachine
+mutable struct StateMachine
     transitions::Vector{Transition}
-    # Typed rather than left to the default constructor, which would take a single
-    # `(from => to, condition)` edge and try to read it as the whole list.
-    StateMachine(transitions::Vector{Transition}) = new(transitions)
+    state::Any
+    t_state::Float64
+    log::Vector{Tuple{Any,Float64}}
+    abort_states::Set
+
+    # An inner constructor, so no default one competes with this signature.
+    function StateMachine(edges...; initial_state=:NORMAL, initial_time=0.0, abort_states=())
+        t0 = Float64(initial_time)
+        machine = new(
+            Transition[], initial_state, t0,
+            Tuple{Any,Float64}[(initial_state, t0)], Set{Any}(abort_states),
+        )
+        foreach(edge -> push!(machine, edge), edges)
+        return machine
+    end
 end
 
-StateMachine(edges...) = StateMachine([e isa Transition ? e : Transition(e...) for e in edges])
+"""
+    push!(machine::StateMachine, edge) -> StateMachine
+
+Add one edge, either a [`Transition`](@ref) or the `(from => to, condition)` it is built
+from. This is how a machine gets a condition on a component that could not exist when the
+machine was built, such as the kinetics driven by the controller holding it.
+"""
+Base.push!(machine::StateMachine, edge) =
+    (push!(machine.transitions, edge isa Transition ? edge : Transition(edge...)); machine)
 
 """
-    _armed(ctrl, tr) -> Bool
+    trip!(machine::StateMachine, t_now; state=:SCRAM) -> state
 
-Whether `tr` leaves the state `ctrl` is in. An edge with no `from` leaves any state.
+Put `machine` into `state` at time `t_now`, stamping `t_state` and appending to `log`.
+
+This is how a transition is taken, and the way to trip a machine by hand. It latches: calling
+it again while the machine is already in `state` changes nothing, so the first time stands.
+
+# Arguments
+- `machine`: the [`StateMachine`](@ref) to move
+- `t_now`: the time of the transition [s]
+
+# Keywords
+- `state`: the state to enter (default `:SCRAM`)
+
+# Returns
+The state the machine is in afterwards.
 """
-_armed(ctrl, tr::Transition) = tr.from === nothing || ctrl.state in tr.from
+function trip!(machine::StateMachine, t_now; state=:SCRAM)
+    machine.state == state && return machine.state
+    machine.state = state
+    machine.t_state = Float64(t_now)
+    push!(machine.log, (state, Float64(t_now)))
+    return machine.state
+end
 
 """
-    _take!(ctrl, tr, integrator) -> Nothing
+    _armed(machine, tr) -> Bool
 
-Take `tr` if it is armed, stamping and logging through [`trip!`](@ref), and stop the
-integration if the state entered is one of `ctrl.abort_states`.
+Whether `tr` leaves the state `machine` is in. An edge with no `from` leaves any state.
 """
-function _take!(ctrl, tr::Transition, integrator)
-    _armed(ctrl, tr) || return nothing
-    trip!(ctrl, integrator.t; state=tr.to)
-    ctrl.state in ctrl.abort_states && terminate!(integrator)
+_armed(machine::StateMachine, tr::Transition) =
+    tr.from === nothing || machine.state in tr.from
+
+"""
+    _take!(machine, tr, integrator) -> Nothing
+
+Take `tr` if it is armed, and stop the integration if the state entered is one of
+`machine.abort_states`.
+"""
+function _take!(machine::StateMachine, tr::Transition, integrator)
+    _armed(machine, tr) || return nothing
+    trip!(machine, integrator.t; state=tr.to)
+    machine.state in machine.abort_states && terminate!(integrator)
     return nothing
 end
 
@@ -105,7 +172,7 @@ function _crossing(ssys, condition::Num)
     op in (<, <=, >, >=) || throw(
         ArgumentError(
             "a transition condition must be a relation such as `x > 1.0`, `x < 1.0` or " *
-            "`x ~ 1.0`, or a predicate (ctrl, t) -> Bool; got $condition",
+            "`x ~ 1.0`, or a predicate (machine, t) -> Bool; got $condition",
         ),
     )
     a, b = SymbolicUtils.arguments(expr)
@@ -115,35 +182,34 @@ function _crossing(ssys, condition::Num)
 end
 
 """
-    machine_callbacks(ssys, ctrl, machine) -> ContinuousCallback | CallbackSet
+    machine_callbacks(ssys, machine) -> ContinuousCallback | CallbackSet
 
 Build the solver events a [`StateMachine`](@ref) describes.
 
 Each symbolic transition becomes a `ContinuousCallback` root-finding its own condition, so it
 fires at the exact crossing. Predicate transitions become `DiscreteCallback`s, checked after
-each accepted step. Taking a transition stamps `ctrl.state` and `ctrl.t_state` and appends to
-`ctrl.log`, so a reactivity schedule and a `DecayHeatSource` read the time off `ctrl` as they
-always have.
+each accepted step. Taking a transition stamps the machine through [`trip!`](@ref), so
+anything reading its state or `t_state`, such as a [`ReactivityController`](@ref) schedule or
+a `DecayHeatSource` clock, follows from the same event.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
-- `ctrl`: the [`ReactivityController`](@ref) the transitions move
-- `machine`: the [`StateMachine`](@ref)
+- `machine`: the [`StateMachine`](@ref) the events move
 
 # Returns
 One callback, or a `CallbackSet` of them, for `solve_transient(...; callbacks=...)`.
 
 # Example
 ```julia
-machine = StateMachine((:NORMAL => :SCRAM, ssys.flywheel.inlet.ṁ < 0.85 * ṁ_design))
-sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, ctrl, machine))
+machine = StateMachine((:NORMAL => :SCRAM, flywheel.inlet.ṁ < 0.85 * ṁ_design))
+sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
 ```
 """
-function machine_callbacks(ssys, ctrl::ReactivityController, machine::StateMachine)
+function machine_callbacks(ssys, machine::StateMachine)
     cbs = map(machine.transitions) do tr
-        fire!(integ) = _take!(ctrl, tr, integ)
+        fire!(integ) = _take!(machine, tr, integ)
         tr.condition isa Function && return DiscreteCallback(
-            (u, t, integ) -> _armed(ctrl, tr) && tr.condition(ctrl, t), fire!
+            (u, t, integ) -> _armed(machine, tr) && tr.condition(machine, t), fire!
         )
         gap, both_edges = _crossing(ssys, tr.condition)
         # The gap is positive where the relation holds, so its rising edge is where the

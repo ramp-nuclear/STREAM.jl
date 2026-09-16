@@ -248,8 +248,8 @@ include("components/ideal.jl")
 include("components/sources.jl")
 include("components/channels.jl")
 include("components/heat_diffusion.jl")
-include("components/point_kinetics.jl")
 include("components/state_machine.jl")
+include("components/point_kinetics.jl")
 export FlowPort, ThermalPort
 export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFlowResistor
 export LocalPressureDrop, Inertia, HeatExchanger, bilinear_inertia
@@ -257,9 +257,8 @@ export ResistorFromKnownPoint
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
-export ReactivityController, worth, change_state
-export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback, watch_flow
-export trip!, StateMachine, machine_callbacks
+export ReactivityController, worth, flapper_callback, watch_flow
+export StateMachine, trip!, machine_callbacks
 end
 
 """
@@ -294,6 +293,7 @@ using DelimitedFiles
 using ModelingToolkit
 using OrdinaryDiffEq
 using ..Components: PointKinetics, point_kinetics_steady_state, ReactivityController
+using ..Components: StateMachine
 using ..Components: U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 using ..STREAM
 include("decay_heat/decay_heat.jl")
