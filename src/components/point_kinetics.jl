@@ -499,11 +499,16 @@ function scram_callback(ssys, p_sym::Num, ctrl; terminate=true)
 
     condition = (u, t, integrator) -> u[p_idx] - plimit
     affect! = function (integrator)
+        # Root-finding lands just short of the crossing, where the power is a hair under the
+        # limit and SCRAMCondition would refuse, so the state machine is handed a power just
+        # past it. The crossing itself is what decides, and it has already happened.
         change_state(ctrl, integrator.t, plimit + 1.0, 0.0)
         return terminate && terminate!(integrator)
     end
 
-    return ContinuousCallback(condition, affect!)  # upward crossing only (P - plimit: neg -> pos)
+    # (condition, rising-edge affect = scram, falling-edge affect = nothing). Passing only
+    # the one affect would default the falling edge to it too, scramming on the way down.
+    return ContinuousCallback(condition, affect!, nothing)
 end
 
 """
@@ -511,10 +516,10 @@ end
 
 Put `ctrl` into `state` at time `t`, whatever its state machine says.
 
-This is for trips the state machine cannot see, such as a low-flow signal, since the machine
-is only handed power and its rate. It stamps `t_state` and logs the entry the way
-[`change_state`](@ref) does, so a reactivity schedule and a `DecayHeatSource` read the trip
-time off `ctrl` the same way either way.
+This is how a [`StateMachine`](@ref) transition is applied, and the manual way to trip a
+controller. It stamps `t_state` and logs the entry the way [`change_state`](@ref) does, so a
+reactivity schedule and a `DecayHeatSource` read the trip time off `ctrl` whichever put it
+there.
 
 A trip latches. Calling it again while `ctrl` is already in `state` changes nothing, so the
 time of the first trip is the one that stays.
@@ -537,34 +542,3 @@ function trip!(ctrl::ReactivityController, t_now; state=:SCRAM)
     return ctrl.state
 end
 
-"""
-    trip_callback(ssys, sym, threshold, ctrl; state=:SCRAM) -> ContinuousCallback
-
-Trip `ctrl` when `sym` falls through `threshold`.
-
-This is the low-flow trip a loss-of-flow case needs, which [`scram_callback`](@ref) cannot
-give because it watches power rising. `sym` is any variable of the compiled system, a flow
-or a temperature. The crossing is found by root-finding `sym` at the solver's trial states,
-the way [`flapper_callback`](@ref) finds a flapper opening, so the trip time is exact
-whether `sym` is a state or computed from one. Only a downward crossing trips, and
-[`trip!`](@ref) latches it.
-
-# Arguments
-- `ssys`: compiled system from `mtkcompile`
-- `sym`: the watched variable, such as `ssys.ine.inlet.ṁ`
-- `threshold`: the trip setpoint, in `sym`'s units
-- `ctrl`: the `ReactivityController` to trip
-
-# Keywords
-- `state`: the state to trip into (default `:SCRAM`)
-
-# Returns
-A `ContinuousCallback`, for `solve_transient(...; callbacks=cb)`.
-"""
-function trip_callback(ssys, sym, threshold, ctrl::ReactivityController; state=:SCRAM)
-    watched = ModelingToolkit.build_explicit_observed_function(ssys, sym)
-    condition = (u, tt, integ) -> watched(u, integ.p, tt) - threshold
-    affect_trip! = integ -> trip!(ctrl, integ.t; state=state)
-    # (condition, up-crossing affect = nothing, down-crossing affect = trip)
-    return ContinuousCallback(condition, nothing, affect_trip!)
-end

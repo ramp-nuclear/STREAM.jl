@@ -129,7 +129,9 @@ src/
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
     point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM,
-                              # trip! and trip_callback for trips the state machine cannot see
+                              # trip! for a trip applied by hand
+    state_machine.jl          # StateMachine, Transition, machine_callbacks: the protection
+                              # logic, and the solver events derived from it
   decay_heat/                 # module DecayHeat
     decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
     activation.jl             # Activation, DoubleDecay

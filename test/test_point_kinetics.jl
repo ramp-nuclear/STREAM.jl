@@ -807,7 +807,7 @@ end
 end
 
 
-@testset "trip! and trip_callback" begin
+@testset "trip! and the state machine" begin
     @testset "trip! latches the first trip" begin
         ctrl = ReactivityController()
         @test trip!(ctrl, 2.0) === :SCRAM
@@ -819,21 +819,25 @@ end
         @test count(entry -> entry[1] === :SCRAM, ctrl.log) == 1
     end
 
-    @testset "trip_callback trips on a falling flow, at the crossing" begin
-        # A coasting loop gives a flow that falls through any setpoint below where it
-        # starts. The controller is not wired into the loop; the trip only has to read the
-        # flow.
-        ssys = build_loop(; n=5)
-        op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
-        push!(op, ssys.ch.inlet.ṁ => 0.5)
-        sol_ss = solve_steady(ssys, op)
-        setpoint = 0.5 * sol_ss[ssys.ch.inlet.ṁ]
+    # A coasting loop: the pump head is removed and the flow falls through any setpoint
+    # below where it starts, while the coolant runs hotter for want of flow. One solved
+    # steady state feeds every case below.
+    ssys = build_loop(; n=5)
+    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
+    push!(op, ssys.ch.inlet.ṁ => 0.5)
+    sol_ss = solve_steady(ssys, op)
+    setpoint = 0.5 * sol_ss[ssys.ch.inlet.ṁ]
+    T_setpoint = sol_ss[ssys.ch.T[5]] + 1.0
+    times = range(0.0, 0.5; length=11)
+    coast(ctrl, machine) = solve_transient(
+        ssys, sol_ss, times;
+        overrides=[ssys.pump.dP_pump => 0.0],
+        callbacks=machine_callbacks(ssys, ctrl, machine),
+    )
+
+    @testset "a falling inequality fires where it becomes true" begin
         ctrl = ReactivityController()
-        cb = trip_callback(ssys, ssys.ch.inlet.ṁ, setpoint, ctrl)
-        sol = solve_transient(
-            ssys, sol_ss, range(0.0, 0.5; length=11);
-            overrides=[ssys.pump.dP_pump => 0.0], callbacks=cb,
-        )
+        sol = coast(ctrl, StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ < setpoint)))
         @test sol.retcode == ReturnCode.Success
         @test ctrl.state === :SCRAM
 
@@ -847,5 +851,75 @@ end
         # A decay heat source reading the same controller starts its clock at the trip.
         source = DecayHeat.DecayHeatSource(DecayHeat.U238CaptureChain(1.0), ctrl; P0=1.0)
         @test DecayHeat.decay_time(source, ctrl.t_state + 3.0) ≈ 3.0
+    end
+
+    @testset "a rising inequality fires on its own edge" begin
+        # Less flow over the same wall means a hotter outlet, so this one rises into its
+        # setpoint while the flow falls away from its own.
+        ctrl = ReactivityController()
+        sol = coast(ctrl, StateMachine((:NORMAL => :SCRAM, ssys.ch.T[5] > T_setpoint)))
+        @test sol.retcode == ReturnCode.Success
+        @test ctrl.state === :SCRAM
+        T = sol[ssys.ch.T[5], :]
+        before = sol.t .< ctrl.t_state
+        @test all(T[before] .< T_setpoint)
+        @test all(T[.!before] .>= T_setpoint * (1 - 1e-6))
+    end
+
+    @testset "an equation fires at the same crossing, from either side" begin
+        # The flow crosses this setpoint once and downwards, so the equation form has to
+        # land where the inequality does. What it buys beyond that is the other direction.
+        falling = ReactivityController()
+        coast(falling, StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ < setpoint)))
+        either = ReactivityController()
+        coast(either, StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ ~ setpoint)))
+        @test either.state === :SCRAM
+        @test either.t_state ≈ falling.t_state rtol = 1e-9
+    end
+
+    @testset "from names the states a transition leaves" begin
+        # Same condition, three controllers. The guard is what decides.
+        machine = StateMachine(((:NORMAL, :DERATED) => :SCRAM, ssys.ch.inlet.ṁ < setpoint))
+        from_normal = ReactivityController()
+        from_derated = ReactivityController(; initial_state=:DERATED)
+        from_other = ReactivityController(; initial_state=:OFF)
+        for ctrl in (from_normal, from_derated, from_other)
+            coast(ctrl, machine)
+        end
+        @test from_normal.state === :SCRAM
+        @test from_derated.state === :SCRAM     # a collection of states, not just one
+        @test from_other.state === :OFF         # not armed here
+
+        # A vector and a set say the same thing as the tuple above.
+        @test Transition([:NORMAL, :DERATED] => :SCRAM, ssys.ch.inlet.ṁ < setpoint).from ==
+            Set([:NORMAL, :DERATED])
+        @test Transition(Set([:NORMAL]) => :SCRAM, ssys.ch.inlet.ṁ < setpoint).from ==
+            Set([:NORMAL])
+        # No `from` at all leaves any state.
+        @test Transition(nothing => :SCRAM, ssys.ch.inlet.ṁ < setpoint).from === nothing
+    end
+
+    @testset "a predicate transition follows one the solver found" begin
+        # Dwell time is about the controller, not the system, so it is the predicate form:
+        # abort a set time after the scram it follows. Entering an abort state stops the run.
+        ctrl = ReactivityController(; abort_states=[:ABORT])
+        machine = StateMachine(
+            (:NORMAL => :SCRAM, ssys.ch.inlet.ṁ < setpoint),
+            (:SCRAM => :ABORT, (c, t) -> t - c.t_state > 0.05),
+        )
+        sol = coast(ctrl, machine)
+        @test ctrl.state === :ABORT
+        @test sol.t[end] < last(times)                    # terminated early
+        @test map(first, ctrl.log) == [:NORMAL, :SCRAM, :ABORT]
+        scram_at = ctrl.log[2][2]
+        @test ctrl.t_state - scram_at >= 0.05
+    end
+
+    @testset "a condition that is not a relation says so" begin
+        ctrl = ReactivityController()
+        machine = StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ))
+        @test_throws ArgumentError machine_callbacks(ssys, ctrl, machine)
+        # And a controller with no StateMachine cannot have events derived from it.
+        @test_throws ArgumentError machine_callbacks(ssys, ReactivityController())
     end
 end
