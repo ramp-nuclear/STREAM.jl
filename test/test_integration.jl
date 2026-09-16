@@ -390,16 +390,15 @@ end
         machine=machine,
         liquid=Liquid(),
     )
-    push!(machine, flapper_opens(flapper))
+    push!(machine, flapper_opens(flapper, R.inlet.ṁ))
     @named hx = HeatExchanger(26.85)
     conns = [
         inparallel(pump, (R, flapper), hx)...,
         inseries(hx, pump)...,
-        watch_flow(flapper, R.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_refṁ), pump, R, flapper, hx)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys)
     op = Pair{Any,Any}[
         ssys.R.inlet.ṁ => 1.0,
         ssys.pump.dP_pump_fn => dp_fn,
@@ -407,7 +406,7 @@ end
     @test machine.state === :CLOSED   # starts closed (Python: isinf(F.t_open))
     # ref_ṁ is the resistor flow R.ṁ = pump_dP/r = p·exp(-t), which mtkcompile leaves
     # purely algebraic (no inertia ⇒ no state). The transition detects the crossing exactly
-    # anyway: it root-finds the observed function for ref_ṁ at the solver's trial state, so
+    # anyway: it root-finds the observed function for the watched flow at the trial state, so
     # the valve opens when the REAL wired flow reaches the threshold — no hardcoded analytic.
     cb = machine_callbacks(ssys, machine)
     t_arr = range(0.0, 5.0; length=500)
@@ -433,11 +432,10 @@ end
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, flapper, hx, pump)...,
-        watch_flow(flapper, pump.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_pump), pump, flapper, hx)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys)
     op = Pair{Any,Any}[ssys.pump.dP_pump_fn => dp_fn]
     sol = solve_transient(ssys, op, range(0.0, 5.0; length=500); build_initializeprob=false)
     @test sol.retcode == ReturnCode.Success
@@ -465,11 +463,10 @@ end
         inseries(pump, ine)...,
         inparallel(ine, (R, flapper), hx)...,
         inseries(hx, pump)...,
-        watch_flow(flapper, ine.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_coastdown), pump, ine, R, flapper, hx)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys)
     # The machine is :CLOSED for the steady solve; opening it at a time you already know is a
     # trip, the same idiom a fixed scram uses.
     sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0, ssys.R.inlet.ṁ => ṁ0])

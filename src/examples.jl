@@ -270,7 +270,7 @@ function build_loop_lof_bypass(;
     @named flapper = Flapper(;
         machine=machine, open_at_current=0.01, f=50.0, area=0.01, open_rate=1.0 / dt_ramp
     )
-    push!(machine, flapper_opens(flapper))
+    push!(machine, flapper_opens(flapper, ine.inlet.ṁ))
     @named ext_res = Resistor(R_ext)
 
     ps = fill(1.0 / (n * fuel_nx), n, fuel_nx)
@@ -294,7 +294,6 @@ function build_loop_lof_bypass(;
         inparallel(ine, ((heated.ch, ret), flapper), ext_res)...,
         # Boundary conditions
         pump.inlet.p ~ 1.0e5,
-        watch_flow(flapper, ine.inlet.ṁ),
         heated.fuel.power ~ power_W,
         [ret.T_wall_left[i] ~ T_inlet for i in 1:n]...,
         [ret.T_wall_right[i] ~ T_inlet for i in 1:n]...,
