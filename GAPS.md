@@ -138,10 +138,9 @@ class.
 precursors are seeded from the neutronic share `P0 - power_input`, since a decaying fission
 product breeds no delayed neutrons.
 
-`scram_callback` trips on `P_neutron`. It resolves an index into the state vector and `P`
-is an observable after compilation, but that is also the right physics, since a power-range
-monitor reads neutron flux. Tripping on the total would mean rewriting the callback in the
-`flapper_callback` style.
+A power trip is a `StateMachine` transition, so it watches `P_neutron` or the total `P`
+alike: the condition is compiled like any other expression of the system. `P_neutron` is
+usually the physics wanted, since a power-range monitor reads neutron flux.
 
 ---
 
@@ -287,7 +286,7 @@ because the two get conflated.
 | Coolant inventory as a state, and a level derived from it | No |
 | A component with a free surface (pool, plenum, standpipe) | No |
 | Break flow out of the system, as a specified rate or an orifice | No |
-| An event that fires when the level reaches a named elevation | No, but `SCRAMCondition` and the flapper callbacks are the pattern to copy |
+| An event that fires when the level reaches a named elevation | No, but a `StateMachine` transition on the level is the pattern to copy |
 | Decay heat, to know the load while it drains | Yes, see [1.1](#11-decay-heat) |
 | Natural circulation while still covered | Yes |
 | Margin to boiling on the way down | Yes, the CHF / OFI / OSV / ONB thresholds |
