@@ -230,6 +230,7 @@ using ModelingToolkit
 using OrdinaryDiffEq
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkit: ⋅
+using ModelingToolkit: Symbolics, SymbolicUtils
 using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
@@ -258,7 +259,7 @@ export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController, worth, change_state
 export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback, watch_flow
-export trip!, StateMachine, Transition, machine_callbacks
+export trip!, StateMachine, machine_callbacks
 end
 
 """
