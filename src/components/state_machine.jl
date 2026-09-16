@@ -132,6 +132,45 @@ function trip!(machine::StateMachine, t_now; state=:SCRAM)
 end
 
 """
+    StateSchedule(f=nothing; machine=StateMachine())
+
+A quantity scheduled off a [`StateMachine`](@ref): `f(state, t_state, t)`, called as `s(t)`.
+
+Control equipment tends to act on which state it is in and how long it has been there, so
+this is the shape both a rod bank and a valve take. [`ReactivityController`](@ref) is this
+under the name the kinetics use, and a [`Flapper`](@ref) opening ramp is another. Without an
+`f` the schedule is zero, which reads as no rod worth and as a valve that stays shut.
+
+# Arguments
+- `f`: callable `(state, t_state, t) -> Float64`
+
+# Keywords
+- `machine`: the machine whose state is read, a fresh one by default
+
+# Fields
+- `f`: the schedule
+- `machine::StateMachine`: the machine it follows
+
+# Example
+```julia
+machine = StateMachine(; initial_state=:CLOSED)
+opening = StateSchedule(; machine=machine) do state, t_state, t
+    state === :OPEN ? clamp(2.0 * (t - t_state), 0.0, 1.0) : 0.0
+end
+```
+"""
+struct StateSchedule{F}
+    f::F
+    machine::StateMachine
+end
+
+function StateSchedule(f=nothing; machine::StateMachine=StateMachine())
+    return StateSchedule(f === nothing ? ((state, t_state, t) -> 0.0) : f, machine)
+end
+
+(schedule::StateSchedule)(t) = schedule.f(schedule.machine.state, schedule.machine.t_state, t)
+
+"""
     _armed(machine, tr) -> Bool
 
 Whether `tr` leaves the state `machine` is in. An edge with no `from` leaves any state.
@@ -182,9 +221,12 @@ function _crossing(ssys, condition::Num)
 end
 
 """
-    machine_callbacks(ssys, machine) -> ContinuousCallback | CallbackSet
+    machine_callbacks(ssys, machines...) -> ContinuousCallback | CallbackSet
 
-Build the solver events a [`StateMachine`](@ref) describes.
+Build the solver events one or more [`StateMachine`](@ref)s describe.
+
+Whether a model runs on one machine or on one per piece of equipment is the caller's choice:
+pass them all here and their events are collected together.
 
 Each symbolic transition becomes a `ContinuousCallback` root-finding its own condition, so it
 fires at the exact crossing. Predicate transitions become `DiscreteCallback`s, checked after
@@ -194,7 +236,7 @@ a `DecayHeatSource` clock, follows from the same event.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
-- `machine`: the [`StateMachine`](@ref) the events move
+- `machines`: the [`StateMachine`](@ref)s the events move
 
 # Returns
 One callback, or a `CallbackSet` of them, for `solve_transient(...; callbacks=...)`.
@@ -205,8 +247,13 @@ machine = StateMachine((:NORMAL => :SCRAM, flywheel.inlet.ṁ < 0.85 * ṁ_desig
 sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
 ```
 """
-function machine_callbacks(ssys, machine::StateMachine)
-    cbs = map(machine.transitions) do tr
+function machine_callbacks(ssys, machines::StateMachine...)
+    cbs = reduce(vcat, map(machine -> _callbacks(ssys, machine), machines))
+    return length(cbs) == 1 ? only(cbs) : CallbackSet(cbs...)
+end
+
+function _callbacks(ssys, machine::StateMachine)
+    return map(machine.transitions) do tr
         fire!(integ) = _take!(machine, tr, integ)
         tr.condition isa Function && return DiscreteCallback(
             (u, t, integ) -> _armed(machine, tr) && tr.condition(machine, t), fire!
@@ -218,5 +265,4 @@ function machine_callbacks(ssys, machine::StateMachine)
             (u, t, integ) -> gap(u, integ.p, t), fire!, both_edges ? fire! : nothing
         )
     end
-    return length(cbs) == 1 ? only(cbs) : CallbackSet(cbs...)
 end

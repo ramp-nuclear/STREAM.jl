@@ -317,9 +317,8 @@ Instances are callable, `ctrl(t)`, which is what lets one be handed straight to
   default, reachable as `ctrl.machine`, so a controller needs no machine built ahead of it.
   Pass one when the machine is the object you keep, or when something else drives it too.
 
-# Fields
-- `input_reactivity`: the schedule
-- `machine::StateMachine`: the control system it follows
+This is a [`StateSchedule`](@ref) under the name the kinetics use, so a valve opening and a
+rod bank are the same kind of object. Its fields are `f`, the schedule, and `machine`.
 
 # Example
 ```julia
@@ -330,21 +329,13 @@ push!(ctrl.machine, (:NORMAL => :SCRAM, pk.P_neutron > 1.2e6))
 sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
 ```
 """
-struct ReactivityController{F}
-    input_reactivity::F
-    machine::StateMachine
-end
-
-function ReactivityController(input_reactivity=nothing; machine=StateMachine())
-    schedule = input_reactivity === nothing ? ((state, t_state, t) -> 0.0) : input_reactivity
-    return ReactivityController(schedule, machine)
-end
+const ReactivityController = StateSchedule
 
 """
-    worth(ctrl::ReactivityController, t_now) -> Float64
+    worth(ctrl, t_now) -> Float64
 
-The control reactivity now: the schedule read at the machine\'s state and the time it entered
-that state. This is what the MTK callable parameter invokes.
+The control reactivity now: the schedule read at the machine's state and the time it entered
+that state. The same thing as calling `ctrl(t_now)`, under the name Python uses.
 
 # Arguments
 - `ctrl`: the [`ReactivityController`](@ref)
@@ -353,7 +344,4 @@ that state. This is what the MTK callable parameter invokes.
 # Returns
 Control reactivity, dimensionless.
 """
-worth(ctrl::ReactivityController, t_now) =
-    ctrl.input_reactivity(ctrl.machine.state, ctrl.machine.t_state, t_now)
-
-(ctrl::ReactivityController)(t_now) = worth(ctrl, t_now)
+worth(ctrl::StateSchedule, t_now) = ctrl(t_now)
