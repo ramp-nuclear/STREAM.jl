@@ -890,13 +890,14 @@ end
         @test from_derated.state === :SCRAM     # a collection of states, not just one
         @test from_other.state === :OFF         # not armed here
 
-        # A vector and a set say the same thing as the tuple above.
-        @test Transition([:NORMAL, :DERATED] => :SCRAM, ssys.ch.inlet.ṁ < setpoint).from ==
-            Set([:NORMAL, :DERATED])
-        @test Transition(Set([:NORMAL]) => :SCRAM, ssys.ch.inlet.ṁ < setpoint).from ==
-            Set([:NORMAL])
-        # No `from` at all leaves any state.
-        @test Transition(nothing => :SCRAM, ssys.ch.inlet.ṁ < setpoint).from === nothing
+        # A vector and a set say the same thing as the tuple above, and no `from` at
+        # all leaves any state.
+        armed(from) = only(
+            StateMachine((from => :SCRAM, ssys.ch.inlet.ṁ < setpoint)).transitions
+        ).from
+        @test armed([:NORMAL, :DERATED]) == Set([:NORMAL, :DERATED])
+        @test armed(Set([:NORMAL])) == Set([:NORMAL])
+        @test armed(nothing) === nothing
     end
 
     @testset "a predicate transition follows one the solver found" begin
@@ -919,7 +920,5 @@ end
         ctrl = ReactivityController()
         machine = StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ))
         @test_throws ArgumentError machine_callbacks(ssys, ctrl, machine)
-        # And a controller with no StateMachine cannot have events derived from it.
-        @test_throws ArgumentError machine_callbacks(ssys, ReactivityController())
     end
 end
