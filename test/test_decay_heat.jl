@@ -16,12 +16,12 @@ const DH_HAVE_STANDARDS = !isempty(DH_STANDARDS) && isdir(DH_STANDARDS)
 # the atol below. The JAERI-91 rows come from Table 4.16 of JAERI-M 91-034 and cover thermal
 # fission of U235 and fast fission of U238.
 const DH_TABLE_SUMS = [
-    (ANS14, U235, 23, 13.4395),
-    (ANS73, U235, 23, 13.1823),
+    (ANS14, U235, 23, 13.4560),
+    (ANS73, U235, 23, 13.1826),
     (JAERI91, U235, 33, 12.9568),
     (JAERI91, U235_beta, 33, 6.5183),
     (JAERI91, U235_gamma, 33, 6.4376),
-    (ANS14, U238, 23, 17.6789),
+    (ANS14, U238, 23, 17.6753),
     (JAERI91, U238, 33, 16.1342),
     (JAERI91, U238_gamma, 33, 7.8191),
 ]
