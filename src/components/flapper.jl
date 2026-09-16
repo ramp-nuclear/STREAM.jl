@@ -1,12 +1,15 @@
 """
     Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0, liquid=H2O) -> System
 
-Flapper (passive check valve). While closed it admits **no flow** (`ṁ = 0`); once open it
-is a quadratic resistor `ΔP = f·ṁ·|ṁ| / (2·ρ·area²)`. The valve opens the moment the
-wired reference flow `ref_ṁ` falls to `open_at_current`, detected by `flapper_callback`,
-which latches the opening time into the parameter `T_open`. After `T_open` the flow ramps in
-gradually through `xi = r(open_rate·(t − T_open))`, the C1 Hermite cubic `−2x³ + 3x²` rising
-0→1, so `ṁ = xi · ṁ_open`.
+Flapper (passive check valve). While closed it admits **no flow** (`ṁ = 0`); once open it
+is a quadratic resistor `ΔP = f·ṁ·|ṁ| / (2·ρ·area²)`. How far it is open is a
+[`StateSchedule`](@ref): the valve reads which state its machine is in and how long it has
+been there, exactly as a rod bank reads its own. In the `open_state` the flow ramps in through
+`xi = r(open_rate·(t − t_state))`, the C1 Hermite cubic `−2x³ + 3x²` rising 0→1, so
+`ṁ = xi · ṁ_open`; in any other state `xi` is zero and the valve is shut.
+
+The opening itself is a [`StateMachine`](@ref) transition, which [`flapper_opens`](@ref)
+writes for you: the valve opens when the wired `ref_ṁ` falls through `open_at_current`.
 
 This mirrors Python STREAM's `Flapper` (closed ⇒ `ṁ` 0; open ⇒ quadratic local-pressure
 resistor relaxed in from `t_open`). Two deliberate conventions:
@@ -19,10 +22,10 @@ resistor relaxed in from `t_open`). Two deliberate conventions:
     `−sign(dp)·√(…)` against its own `dp = P_out − P_in`; the two sign flips cancel, so the two
     formulas are numerically identical (verified across both flow directions).
 
-`T_open` is a parameter defaulting to `Inf` (valve never opens on its own). `flapper_callback`
-sets it to the detected crossing time; to pre-open the valve at a fixed time `t0` instead
-(Python's `open(t0)`), pass `flapper.T_open => t0` in the operating point. Reset to `Inf` to
-close it again (Python's `close()`).
+A flapper built with its own fresh machine never opens, since nothing transitions it. To
+pre-open the valve at a known time (Python's `open(t0)`), hand it a machine that starts open:
+`StateMachine(; initial_state=:OPEN, initial_time=t0)`. A machine back in `:CLOSED` is
+Python's `close()`.
 
 Because a closed flapper carries no flow, it is meant to sit in **parallel** with another
 branch (a bypass that carries flow while the valve is shut); a closed flapper placed in series
@@ -33,16 +36,26 @@ most readably with [`watch_flow`](@ref):
 ```julia
 watch_flow(flapper, pump.inlet.ṁ)      # ≡  flapper.ref_ṁ ~ pump.inlet.ṁ
 ```
-Then build the detection event with `flapper_callback(ssys, ssys.flapper)` and hand it to
-`solve_transient(...; callbacks=cb)`.
+Then give the machine the opening edge and hand its events to the solver:
+```julia
+machine = StateMachine(; initial_state=:CLOSED)
+@named flap = Flapper(; machine=machine)
+push!(machine, flapper_opens(flap))
+sol = solve_transient(ssys, op, times; callbacks=machine_callbacks(ssys, machine))
+```
 
 # Arguments
 - `name`: system name (Symbol), injected by `@named` macro
-- `open_at_current`: reference flow at/below which the valve opens [kg/s] (default 0.01). The
-  callback reads this off the component, so it is not passed by hand.
+- `open_at_current`: reference flow at/below which the valve opens [kg/s] (default 0.01).
+  [`flapper_opens`](@ref) reads it off the component, so it is not passed by hand, and it
+  stays a parameter, so `remake` can move the setpoint.
 - `f`: open-state quadratic loss coefficient (default 1.0)
 - `area`: flow area [m²] (default 1.0)
 - `open_rate`: relaxation rate [1/s]; the open ramp completes after `1/open_rate` s (default 1.0)
+- `machine`: the [`StateMachine`](@ref) the valve follows (default a fresh one in `:CLOSED`)
+- `open_state`: the state in which the valve is open (default `:OPEN`)
+- `opening`: a callable `(t) -> xi` replacing the default ramp outright, for a valve whose
+  profile is not a Hermite ramp
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref), supplying the density at
   the inlet stream temperature
 
@@ -54,33 +67,44 @@ structurally underdetermined — call `mtkcompile(sys; fully_determined=false)`,
 into a system where `ref_ṁ` is wired.
 """
 function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
-                 liquid::AbstractLiquid=H2O)
+                 machine::StateMachine=StateMachine(; initial_state=:CLOSED),
+                 open_state=:OPEN, opening=nothing, liquid::AbstractLiquid=H2O)
+    # The C1 Hermite ramp, in the state that opens the valve and nowhere else.
+    ramp(state, t_state, t) =
+        state === open_state ?
+        (x = clamp(open_rate * (t - t_state), 0.0, 1.0); x * x * (3 - 2x)) : 0.0
+    schedule = opening === nothing ? StateSchedule(ramp; machine=machine) : opening
+    FType = typeof(schedule)
+
     pars = @parameters begin
         open_at_current = open_at_current
         f = f
         area = area
-        open_rate = open_rate
-        T_open = Inf
     end
+    open_pars = @parameters (opening::FType)(..) = schedule
 
-    vars = @variables xi(t) ref_ṁ(t)
+    vars = @variables xi(t) ref_ṁ(t)
 
     @named inlet = FlowPort()
     @named outlet = FlowPort()
 
     rho = ρ(liquid, instream(inlet.T))
     dp = inlet.p - outlet.p
-    x = open_rate * (t - T_open)
-    relax = ifelse(x <= 0.0, 0.0, ifelse(x >= 1.0, 1.0, -2 * x^3 + 3 * x^2))
-    # Open-state flow: invert ΔP = f·ṁ·|ṁ|/(2ρA²) ⇒ ṁ = sign(dp)·sqrt(|dp|·2ρA²/f).
-    ṁ_open = sign(dp) * sqrt(abs(dp) * 2 * rho * area^2 / f)
+    # Open-state flow: invert ΔP = f·ṁ·|ṁ|/(2ρA²) ⇒ ṁ = sign(dp)·sqrt(|dp|·2ρA²/f).
+    ṁ_open = sign(dp) * sqrt(abs(dp) * 2 * rho * area^2 / f)
+
+    # The opening is read from the schedule rather than from `xi`, so the branch below turns
+    # on time and a parameter, as it did when the valve latched a `T_open`. Branching on the
+    # unknown instead leaves the residual non-smooth in it, and a steady solve stalls.
+    open_fraction = open_pars[1](t)
 
     eqs = Equation[
-        xi ~ relax,
-        ifelse(t <= T_open, inlet.ṁ, inlet.ṁ - relax * ṁ_open) ~ 0,
+        xi ~ open_fraction,
+        # A shut valve must not reach the square root, whose slope is unbounded at dp = 0.
+        ifelse(open_fraction <= 0.0, inlet.ṁ, inlet.ṁ - open_fraction * ṁ_open) ~ 0,
     ]
 
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars=[pars; open_pars])
 end
 
 """
@@ -97,8 +121,8 @@ conns = [
 ```
 
 The watched flow can be any mass-flow variable in the system (a port `ṁ`, a resistor inlet,
-an inertia branch). The detection event built by [`flapper_callback`](@ref) reads the wired
-flow back through this equation, so the two must refer to the same `flapper`.
+an inertia branch). The edge [`flapper_opens`](@ref) writes reads the wired flow back through
+this equation, so the two must refer to the same `flapper`.
 
 # Arguments
 - `flapper`: a `Flapper` subsystem (before compilation)
@@ -110,54 +134,34 @@ flow back through this equation, so the two must refer to the same `flapper`.
 watch_flow(flapper, sym) = flapper.ref_ṁ ~ sym
 
 """
-    flapper_callback(ssys, flappers...) -> ContinuousCallback | CallbackSet
+    flapper_opens(flapper; from=:CLOSED, to=:OPEN) -> edge
 
-Build the opening-detection event(s) for one or more flappers in a compiled system. Each
-flapper opens when its wired `ref_ṁ` falls through its own `open_at_current`; the callback
-latches that crossing time into the flapper's `T_open` parameter.
+The [`StateMachine`](@ref) edge that opens `flapper`: its wired `ref_ṁ` falling through its
+own `open_at_current`. Push it onto the machine the valve follows.
 
-The crossing is found by root-finding the reference flow itself: the observed function for
-`flapper.ref_ṁ` is evaluated at the integrator's trial state `(u, p, t)`, so detection is
-exact and works whether `ref_ṁ` resolves to a differential state (a branch with inertia) or
-to a purely algebraic quantity (a quasi-static branch). This is the key difference from a
-per-step value check. While a flapper is closed it carries no flow and is dynamically decoupled
-from `ref_ṁ`, so an adaptive solver places no steps near the crossing and a discrete check
-can sail past it; the root-finder seeks the crossing out regardless of where the steps land.
-
-Everything the event needs (the threshold `open_at_current`, the reference `ref_ṁ`, and the
-latched `T_open`) is read off the component, so nothing is passed by hand. Pass several flappers
-to monitor them together and the result is a `CallbackSet`; with one flapper a single
-`ContinuousCallback` is returned. Only downward crossings open the valve, and once latched it
-stays open (a later upward recovery is ignored).
+Both the watched flow and the setpoint are read off the component, so neither is passed by
+hand, and the crossing is root-found like any other transition. That is what makes the opening
+time exact: a closed flapper carries no flow and is dynamically decoupled from `ref_ṁ`, so an
+adaptive solver places no steps near the crossing and a per-step check can sail straight past
+it. It also works whether `ref_ṁ` resolves to a differential state, on a branch with inertia,
+or to a purely algebraic quantity on a quasi-static one.
 
 # Arguments
-- `ssys`: compiled system from `mtkcompile`
-- `flappers`: one or more Flapper subsystems, e.g. `ssys.flapper` (or `ssys.flap1, ssys.flap2`)
+- `flapper`: a Flapper subsystem, before compilation or after
+
+# Keywords
+- `from`: the state the valve leaves (default `:CLOSED`)
+- `to`: the state in which it is open (default `:OPEN`), which is the valve's `open_state`
 
 # Returns
-A `ContinuousCallback` (single flapper) or `CallbackSet` (several). Pass it to
-`solve_transient(...; callbacks=cb)`.
+An edge, `(from => to, condition)`, for `push!(machine, edge)` or `StateMachine(edge)`.
 
 # Example
 ```julia
-cb  = flapper_callback(ssys, ssys.flapper)             # one flapper
-cb2 = flapper_callback(ssys, ssys.flap1, ssys.flap2)   # several -> CallbackSet
-sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+machine = StateMachine(; initial_state=:CLOSED)
+@named flap = Flapper(; machine=machine)
+push!(machine, flapper_opens(flap))
 ```
 """
-function flapper_callback(ssys, flappers...)
-    cbs = map(flappers) do flap
-        ref_obs = ModelingToolkit.build_explicit_observed_function(ssys, flap.ref_ṁ)
-        get_threshold = ModelingToolkit.getp(ssys, flap.open_at_current)
-        set_T_open = ModelingToolkit.setp(ssys, flap.T_open)
-
-        # Condition crosses zero downward as ref_ṁ falls through the threshold; evaluating
-        # the observed function at the trial state is what makes this exact for algebraic refs.
-        condition = (u, tt, integ) -> ref_obs(u, integ.p, tt) - get_threshold(integ)
-        affect_open = integ -> set_T_open(integ, integ.t)
-        # (condition, up-crossing affect = nothing, down-crossing affect = latch T_open)
-        ContinuousCallback(condition, nothing, affect_open)
-    end
-
-    return length(cbs) == 1 ? cbs[1] : CallbackSet(cbs...)
-end
+flapper_opens(flapper; from=:CLOSED, to=:OPEN) =
+    (from => to, flapper.ref_ṁ < flapper.open_at_current)

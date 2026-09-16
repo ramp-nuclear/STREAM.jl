@@ -239,6 +239,7 @@ using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
 using ..LocalLoss
 using ..STREAM
+include("components/state_machine.jl")
 include("components/connectors.jl")
 include("components/twoports.jl")
 include("components/pump.jl")
@@ -248,7 +249,6 @@ include("components/ideal.jl")
 include("components/sources.jl")
 include("components/channels.jl")
 include("components/heat_diffusion.jl")
-include("components/state_machine.jl")
 include("components/point_kinetics.jl")
 export FlowPort, ThermalPort
 export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFlowResistor
@@ -257,8 +257,8 @@ export ResistorFromKnownPoint
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
-export ReactivityController, worth, flapper_callback, watch_flow
-export StateMachine, trip!, machine_callbacks
+export ReactivityController, worth, flapper_opens, watch_flow
+export StateMachine, StateSchedule, trip!, machine_callbacks
 end
 
 """

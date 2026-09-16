@@ -33,7 +33,7 @@ end
                              liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_closed)
     ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[]   # T_open defaults to Inf ⇒ never opens
+    op = Pair{Any,Any}[]   # a fresh machine stays :CLOSED ⇒ never opens
     sol = solve_transient(ssys, op, range(0.0, 5.0; length=20))
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.flapper.inlet.ṁ, end], 0.0; atol=1e-8)   # closed ⇒ no flow
@@ -45,10 +45,10 @@ end
     f, area, rho = 1.0, 1.0, 1.0
     @named pump = Pump(3.0e4)
     @named flapper = Flapper(; open_at_current=0.01, f=f, area=area, open_rate=10.0,
-                             liquid=Liquid())
+                             machine=StateMachine(; initial_state=:OPEN), liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_open)
     ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[ssys.flapper.T_open => 0.0]   # pre-open from t=0 (Python's open(0.0))
+    op = Pair{Any,Any}[]   # the machine starts :OPEN at t = 0 (Python's open(0.0))
     sol = solve_transient(ssys, op, range(0.0, 1.0; length=20))           # past the 1/open_rate ramp
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)             # fully open
@@ -60,9 +60,9 @@ end
 
 @testset "Flapper opens when ref_ṁ crosses threshold" begin
     # A weak (large-f) flapper sits in parallel with a resistor branch. A pump holds the loop flow
-    # at ṁ0, then shuts off and the flow coasts down past the threshold; the callback latches
-    # T_open and the ramp completes. Detection is end-to-end (no pre-set open time), so this
-    # exercises flapper_callback. The transient starts from the full solved steady state, which
+    # at ṁ0, then shuts off and the flow coasts down past the threshold; the transition fires
+    # and the ramp completes. Detection is end-to-end (no pre-set open state), so this
+    # exercises flapper_opens. The transient starts from the full solved steady state, which
     # keeps the coastdown IC consistent across MTK versions. A hand-seeded partial IC left the flow
     # frozen at ṁ=0 on newer MTK, so it never crossed the threshold and the valve never opened.
     threshold = 0.01
@@ -72,8 +72,10 @@ end
     @named pump = Pump(R * ṁ0)   # head holds ṁ0 through the resistor while the flapper is shut
     @named ine = Inertia(L_over_A)
     @named res = Resistor(R)
+    machine = StateMachine(; initial_state=:CLOSED)
     @named flapper = Flapper(; open_at_current=threshold, f=1.0e6, area=1.0, open_rate=1.0 / 3.0,
-                             liquid=Liquid())
+                             machine=machine, liquid=Liquid())
+    push!(machine, flapper_opens(flapper))
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, ine)...,
@@ -84,16 +86,17 @@ end
     ]
     @named sys = compose(System(conns, t; name=:flap_decay), pump, ine, res, flapper, hx)
     ssys = mtkcompile(sys; fully_determined=false)
-    # Flapper default T_open=Inf ⇒ shut at the steady solve, so all flow goes through the resistor.
+    # The machine is :CLOSED at the steady solve, so all flow goes through the resistor.
     sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0, ssys.res.inlet.ṁ => ṁ0])
     @test sol_ss.retcode == ReturnCode.Success
-    # Shut the pump (head ⇒ 0) and coast; the callback detects the threshold crossing and latches
-    # T_open. T_open stays at its Inf default through the steady solve, so the callback owns it.
+    # Shut the pump (head ⇒ 0) and coast; the transition fires at the threshold crossing and
+    # stamps the machine, which the steady solve leaves untouched.
     sol = solve_transient(ssys, sol_ss, range(0.0, 60.0; length=600);
                           overrides=[ssys.pump.dP_pump => 0.0],
-                          callbacks=flapper_callback(ssys, ssys.flapper))
+                          callbacks=machine_callbacks(ssys, machine))
     @test sol.retcode == ReturnCode.Success
-    T_open = sol.ps[ssys.flapper.T_open]
+    @test machine.state === :OPEN
+    T_open = machine.t_state
     @test 0.0 < T_open < 1e10                                   # event fired at a positive time
     @test isapprox(T_open, -5.0 * log(threshold); rtol=0.1)     # tau·ln(ṁ0/threshold), ṁ0=1
     @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)   # ramp completed by t_end
@@ -104,7 +107,7 @@ end
     @named flapper = Flapper(; liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_cb)
     ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[]   # T_open defaults to Inf
+    op = Pair{Any,Any}[]   # a fresh machine stays shut
     fired = Ref(false)
     user_cb = ContinuousCallback((u, t_val, integ) -> t_val - 5.0, integ -> (fired[] = true))
     sol = solve_transient(ssys, op, range(0.0, 20.0; length=200); callbacks=CallbackSet(user_cb))

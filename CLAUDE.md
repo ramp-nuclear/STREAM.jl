@@ -121,17 +121,18 @@ src/
     connectors.jl             # FlowPort, ThermalPort acausal connectors
     twoports.jl               # HydraulicTwoPort, shared by the two-port components
     pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
-    flapper.jl                # Flapper
+    flapper.jl                # Flapper (opening scheduled off a StateMachine), flapper_opens
     resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
                               # VolumetricFlowResistor, LocalPressureDrop
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
-    point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM,
-                              # trip! for a trip applied by hand
-    state_machine.jl          # StateMachine and machine_callbacks: the protection
-                              # logic, and the solver events derived from it
+    point_kinetics.jl         # PointKinetics (any group count), ReactivityController: the
+                              # control reactivity, scheduled off a machine's state
+    state_machine.jl          # StateMachine, StateSchedule, trip!, machine_callbacks: a
+                              # control system, what its state schedules, and the solver
+                              # events its transitions make
   decay_heat/                 # module DecayHeat
     decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
     activation.jl             # Activation, DoubleDecay
