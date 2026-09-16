@@ -21,7 +21,6 @@ function _flapper_parallel_loop(; flapper, pump, name)
     conns = [
         inparallel(pump, (bypass, flapper), hx)...,
         inseries(hx, pump)...,
-        watch_flow(flapper, bypass.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
     return compose(System(conns, t; name=name), pump, bypass, flapper, hx), bypass
@@ -32,7 +31,7 @@ end
     @named flapper = Flapper(; open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
                              liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_closed)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys)
     op = Pair{Any,Any}[]   # a fresh machine stays :CLOSED ⇒ never opens
     sol = solve_transient(ssys, op, range(0.0, 5.0; length=20))
     @test sol.retcode == ReturnCode.Success
@@ -47,7 +46,7 @@ end
     @named flapper = Flapper(; open_at_current=0.01, f=f, area=area, open_rate=10.0,
                              machine=StateMachine(; initial_state=:OPEN), liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_open)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys)
     op = Pair{Any,Any}[]   # the machine starts :OPEN at t = 0 (Python's open(0.0))
     sol = solve_transient(ssys, op, range(0.0, 1.0; length=20))           # past the 1/open_rate ramp
     @test sol.retcode == ReturnCode.Success
@@ -75,17 +74,16 @@ end
     machine = StateMachine(; initial_state=:CLOSED)
     @named flapper = Flapper(; open_at_current=threshold, f=1.0e6, area=1.0, open_rate=1.0 / 3.0,
                              machine=machine, liquid=Liquid())
-    push!(machine, flapper_opens(flapper))
+    push!(machine, flapper_opens(flapper, ine.inlet.ṁ))
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, ine)...,
         inparallel(ine, (res, flapper), hx)...,
         inseries(hx, pump)...,
-        watch_flow(flapper, ine.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flap_decay), pump, ine, res, flapper, hx)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys)
     # The machine is :CLOSED at the steady solve, so all flow goes through the resistor.
     sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0, ssys.res.inlet.ṁ => ṁ0])
     @test sol_ss.retcode == ReturnCode.Success
@@ -106,7 +104,7 @@ end
     @named pump = Pump(1.0e5)
     @named flapper = Flapper(; liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_cb)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys)
     op = Pair{Any,Any}[]   # a fresh machine stays shut
     fired = Ref(false)
     user_cb = ContinuousCallback((u, t_val, integ) -> t_val - 5.0, integ -> (fired[] = true))

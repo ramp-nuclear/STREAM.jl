@@ -9,7 +9,7 @@ been there, exactly as a rod bank reads its own. In the `open_state` the flow ra
 `ṁ = xi · ṁ_open`; in any other state `xi` is zero and the valve is shut.
 
 The opening itself is a [`StateMachine`](@ref) transition, which [`flapper_opens`](@ref)
-writes for you: the valve opens when the wired `ref_ṁ` falls through `open_at_current`.
+writes for you: the valve opens when the flow you name falls through `open_at_current`.
 
 This mirrors Python STREAM's `Flapper` (closed ⇒ `ṁ` 0; open ⇒ quadratic local-pressure
 resistor relaxed in from `t_open`). Two deliberate conventions:
@@ -31,24 +31,20 @@ Because a closed flapper carries no flow, it is meant to sit in **parallel** wit
 branch (a bypass that carries flow while the valve is shut); a closed flapper placed in series
 would block the whole loop.
 
-`ref_ṁ` has **no equation inside the component** — the caller wires it during composition,
-most readably with [`watch_flow`](@ref):
-```julia
-watch_flow(flapper, pump.inlet.ṁ)      # ≡  flapper.ref_ṁ ~ pump.inlet.ṁ
-```
-Then give the machine the opening edge and hand its events to the solver:
+Give the machine the opening edge, naming the flow the valve watches, and hand its events to
+the solver:
 ```julia
 machine = StateMachine(; initial_state=:CLOSED)
 @named flap = Flapper(; machine=machine)
-push!(machine, flapper_opens(flap))
+push!(machine, flapper_opens(flap, bypass.inlet.ṁ))
 sol = solve_transient(ssys, op, times; callbacks=machine_callbacks(ssys, machine))
 ```
 
 # Arguments
 - `name`: system name (Symbol), injected by `@named` macro
-- `open_at_current`: reference flow at/below which the valve opens [kg/s] (default 0.01).
-  [`flapper_opens`](@ref) reads it off the component, so it is not passed by hand, and it
-  stays a parameter, so `remake` can move the setpoint.
+- `open_at_current`: the watched flow at or below which the valve opens [kg/s] (default
+  0.01). [`flapper_opens`](@ref) reads it off the component, so only the flow is named at the
+  call site, and it stays a parameter, so `remake` can move the setpoint without a rebuild.
 - `f`: open-state quadratic loss coefficient (default 1.0)
 - `area`: flow area [m²] (default 1.0)
 - `open_rate`: relaxation rate [1/s]; the open ramp completes after `1/open_rate` s (default 1.0)
@@ -61,10 +57,6 @@ sol = solve_transient(ssys, op, times; callbacks=machine_callbacks(ssys, machine
 
 # Ports
 - `inlet`, `outlet`: `FlowPort` (pressure, mass flow, temperature)
-
-`ref_ṁ` has no in-component equation, so a standalone Flapper is
-structurally underdetermined — call `mtkcompile(sys; fully_determined=false)`, or compose it
-into a system where `ref_ṁ` is wired.
 """
 function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
                  machine::StateMachine=StateMachine(; initial_state=:CLOSED),
@@ -83,7 +75,7 @@ function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
     end
     open_pars = @parameters (opening::FType)(..) = schedule
 
-    vars = @variables xi(t) ref_ṁ(t)
+    vars = @variables xi(t)
 
     @named inlet = FlowPort()
     @named outlet = FlowPort()
@@ -108,46 +100,22 @@ function Flapper(; name, open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
 end
 
 """
-    watch_flow(flapper, sym) -> Equation
+    flapper_opens(flapper, flow; from=:CLOSED, to=:OPEN) -> edge
 
-Wire a Flapper's reference flow to the mass flow `sym` it should watch, returning the equation
-`flapper.ref_ṁ ~ sym`. Add it to the connection list during composition:
+The [`StateMachine`](@ref) edge that opens `flapper`: `flow` falling through the valve's own
+`open_at_current`. Push it onto the machine the valve follows.
 
-```julia
-conns = [
-    inparallel(pump, (bypass, flapper), hx)...,
-    watch_flow(flapper, bypass.inlet.ṁ),     # flapper opens when the bypass flow decays
-]
-```
-
-The watched flow can be any mass-flow variable in the system (a port `ṁ`, a resistor inlet,
-an inertia branch). The edge [`flapper_opens`](@ref) writes reads the wired flow back through
-this equation, so the two must refer to the same `flapper`.
-
-# Arguments
-- `flapper`: a `Flapper` subsystem (before compilation)
-- `sym`: the mass-flow variable to watch [kg/s]
-
-# Returns
-`Equation` — `flapper.ref_ṁ ~ sym`.
-"""
-watch_flow(flapper, sym) = flapper.ref_ṁ ~ sym
-
-"""
-    flapper_opens(flapper; from=:CLOSED, to=:OPEN) -> edge
-
-The [`StateMachine`](@ref) edge that opens `flapper`: its wired `ref_ṁ` falling through its
-own `open_at_current`. Push it onto the machine the valve follows.
-
-Both the watched flow and the setpoint are read off the component, so neither is passed by
-hand, and the crossing is root-found like any other transition. That is what makes the opening
-time exact: a closed flapper carries no flow and is dynamically decoupled from `ref_ṁ`, so an
+The setpoint is read off the component, so only the flow is named here, and the crossing is
+root-found like any other transition. That is what makes the opening
+time exact: a closed flapper carries no flow and is dynamically decoupled from the flow it
+watches, so an
 adaptive solver places no steps near the crossing and a per-step check can sail straight past
-it. It also works whether `ref_ṁ` resolves to a differential state, on a branch with inertia,
-or to a purely algebraic quantity on a quasi-static one.
+it. It also works whether the flow resolves to a differential state, on a branch with
+inertia, or to a purely algebraic quantity on a quasi-static one.
 
 # Arguments
 - `flapper`: a Flapper subsystem, before compilation or after
+- `flow`: the mass flow the valve watches, any flow variable of the system
 
 # Keywords
 - `from`: the state the valve leaves (default `:CLOSED`)
@@ -160,8 +128,8 @@ An edge, `(from => to, condition)`, for `push!(machine, edge)` or `StateMachine(
 ```julia
 machine = StateMachine(; initial_state=:CLOSED)
 @named flap = Flapper(; machine=machine)
-push!(machine, flapper_opens(flap))
+push!(machine, flapper_opens(flap, bypass.inlet.ṁ))
 ```
 """
-flapper_opens(flapper; from=:CLOSED, to=:OPEN) =
-    (from => to, flapper.ref_ṁ < flapper.open_at_current)
+flapper_opens(flapper, flow; from=:CLOSED, to=:OPEN) =
+    (from => to, flow < flapper.open_at_current)
