@@ -267,10 +267,8 @@ function build_loop_lof_bypass(;
     @named ret = Channel(; n=n, geometry=geom, g=g_acc)
     # Open-state quadratic loss tuned (area, f) so the bypass conductance is comparable to the
     # legacy linear open resistance, keeping the loss-of-flow transient well-behaved.
-    @named flapper = Flapper(;
-        machine=machine, open_at_current=0.01, f=50.0, area=0.01, open_rate=1.0 / dt_ramp
-    )
-    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < flapper.open_at_current))
+    @named flapper = Flapper(; machine=machine, f=50.0, area=0.01, open_rate=1.0 / dt_ramp)
+    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < 0.01))
     @named ext_res = Resistor(R_ext)
 
     ps = fill(1.0 / (n * fuel_nx), n, fuel_nx)

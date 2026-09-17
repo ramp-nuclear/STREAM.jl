@@ -28,8 +28,7 @@ end
 
 @testset "Flapper closed admits no flow" begin
     @named pump = Pump(3.0e4)
-    @named flapper = Flapper(; open_at_current=0.01, f=1.0, area=1.0, open_rate=1.0,
-                             liquid=Liquid())
+    @named flapper = Flapper(; f=1.0, area=1.0, open_rate=1.0, liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_closed)
     ssys = mtkcompile(sys)
     op = Pair{Any,Any}[]   # a fresh machine stays :CLOSED ⇒ never opens
@@ -43,7 +42,7 @@ end
 @testset "Flapper open is a quadratic resistor" begin
     f, area, rho = 1.0, 1.0, 1.0
     @named pump = Pump(3.0e4)
-    @named flapper = Flapper(; open_at_current=0.01, f=f, area=area, open_rate=10.0,
+    @named flapper = Flapper(; f=f, area=area, open_rate=10.0,
                              machine=StateMachine(; initial_state=:OPEN), liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_open)
     ssys = mtkcompile(sys)
@@ -72,9 +71,9 @@ end
     @named ine = Inertia(L_over_A)
     @named res = Resistor(R)
     machine = StateMachine(; initial_state=:CLOSED)
-    @named flapper = Flapper(; open_at_current=threshold, f=1.0e6, area=1.0, open_rate=1.0 / 3.0,
-                             machine=machine, liquid=Liquid())
-    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < flapper.open_at_current))
+    @named flapper = Flapper(; f=1.0e6, area=1.0, open_rate=1.0 / 3.0, machine=machine,
+                             liquid=Liquid())
+    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < threshold))
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, ine)...,

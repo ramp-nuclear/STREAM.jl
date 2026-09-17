@@ -382,15 +382,9 @@ end
     @named pump = Pump(dp_fn)
     @named R = Resistor(p / ṁ0)
     machine = StateMachine(; initial_state=:CLOSED)
-    @named flapper = Flapper(;
-        open_at_current=0.1 * ṁ0,
-        f=1.0,
-        area=1.0,
-        open_rate=10.0,
-        machine=machine,
-        liquid=Liquid(),
-    )
-    push!(machine, (:CLOSED => :OPEN, R.inlet.ṁ < flapper.open_at_current))
+    @named flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0, machine=machine,
+                             liquid=Liquid())
+    push!(machine, (:CLOSED => :OPEN, R.inlet.ṁ < 0.1 * ṁ0))
     @named hx = HeatExchanger(26.85)
     conns = [
         inparallel(pump, (R, flapper), hx)...,
@@ -426,7 +420,7 @@ end
     dp_fn = (tt) -> exp(-tt)   # one function object for Pump + op
     @named pump = Pump(dp_fn)
     # A machine already open at t_open is Python's F.open(2.5).
-    @named flapper = Flapper(; open_at_current=0.1, f=1.0, area=1.0, open_rate=10.0,
+    @named flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0,
                              machine=StateMachine(; initial_state=:OPEN, initial_time=t_open),
                              liquid=Liquid())
     @named hx = HeatExchanger(26.85)
@@ -456,8 +450,8 @@ end
     @named ine = Inertia(1.0e3)
     @named R = VolumetricFlowResistor(; k=k, density=1.0)
     machine = StateMachine(; initial_state=:CLOSED)
-    @named flapper = Flapper(; open_at_current=0.0, f=2 * k, area=1.0, open_rate=1.0,
-                             machine=machine, liquid=Liquid())
+    @named flapper = Flapper(; f=2 * k, area=1.0, open_rate=1.0, machine=machine,
+                             liquid=Liquid())
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, ine)...,
