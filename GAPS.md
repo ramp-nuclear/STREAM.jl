@@ -112,7 +112,7 @@ log-spaced `times` near shutdown, not a better interpolant.
 
 The wiring landed with §1.2. `DecayHeat.DecayHeatSource` converts a contribution into the
 `power_input` a `PointKinetics` takes, applying the fission rate `Φ = P0/Q` and reading the
-trip time off the `ReactivityController`, and `build_loop_pk` couples the plate to `P`.
+trip time off the `StateMachine`, and `build_loop_pk` couples the plate to `P`.
 `test_decay_heat.jl` scrams a loop and shows the prompt power falling to 1e-9 of rated while
 the total holds at the decay level and the fuel stays above inlet, against the same trip with
 no source where it relaxes to the coolant.
@@ -465,6 +465,29 @@ than from a perturbation step. That is exactly the input a first-order uncertain
 needs, and it is more accurate than Python's finite differences because there is no step size
 to choose. It is not a global method: for variance attribution over a parameter range, that
 takes sampling on top, which is what `GlobalSensitivity.jl` is for.
+
+### 8.1 The control state sits outside the problem
+
+`StateMachine` keeps the state, the time it was entered and the log in a plain Julia object,
+and `machine_callbacks` writes to it from an event. That is what makes a trip time exact and
+the machine readable, and it costs two things as soon as UQ arrives.
+
+Sampling works, with care. A sweep over a setpoint is a `remake` on a problem already built,
+since a transition reads parameters at solve time and nothing is recompiled. But a machine
+latches, so every sample has to reset it, and an `EnsembleProblem` running trajectories in
+parallel would share one machine and race on it. Each trajectory needs its own, built in
+`prob_func`.
+
+Derivatives do not work at all, and they fail quietly. `t_state` is a `Float64`, so a dual
+number loses its derivative the instant a transition fires, and the affect mutates a Julia
+object rather than `u` or `p`, so neither forward nor adjoint sensitivity has a path through
+it. A derivative with respect to a trip setpoint comes back as though the trip time were
+pinned where it landed, which is wrong rather than an error.
+
+The fix, when someone needs it, is to keep the state in the problem: `t_state` as a parameter
+the event writes with `setp`, and the schedule reading it back from `p`. Then `remake`,
+ensembles and AD all see it. It costs the plain Julia object you can read and trip by hand, so
+it is not worth paying before the requirement is real.
 
 **Size:** medium, and probably a different design from Python's.
 
