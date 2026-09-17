@@ -57,7 +57,7 @@ end
     @test isapprox(dp, f * mf * abs(mf) / (2 * rho * area^2); rtol=1e-6)  # quadratic law
 end
 
-@testset "Flapper opens when ref_ṁ crosses threshold" begin
+@testset "Flapper opens when the flow it watches crosses the threshold" begin
     # A weak (large-f) flapper sits in parallel with a resistor branch. A pump holds the loop flow
     # at ṁ0, then shuts off and the flow coasts down past the threshold; the transition fires
     # and the ramp completes. Detection is end-to-end (no pre-set open state), so this
