@@ -1,8 +1,8 @@
 """
     Transition(from => to, condition)
 
-One edge of a [`StateMachine`](@ref), which is where the forms `from` and `condition` take
-are described. `from` is kept as a set of states, or `nothing` for any state.
+One edge of a [`StateMachine`](@ref), which documents the forms `from` and `condition` may
+take. `from` is kept as a set of states, or `nothing` for any state.
 """
 struct Transition
     from::Union{Nothing,Set}
@@ -52,14 +52,14 @@ written the way ModelingToolkit writes a continuous event:
   system, such as time spent in the current state. It is checked once per accepted step, so
   it resolves to the step size rather than exactly.
 
-A condition names quantities of components, written the same way before or after
-`mtkcompile`: `pump.inlet.ṁ` on the component you built is the symbol the compiled system
-carries. Edges therefore go in wherever the components are, either here or through `push!`,
-which is what a trip watching the very kinetics the machine's own controller drives needs,
-since that component cannot be built until the controller is. Entering a state in
-`abort_states` stops the integration. [`machine_callbacks`](@ref) turns the machine into
-solver events, and edges are tried in the order given, which is what decides the outcome when
-two fire at the same instant.
+A condition reads the same before or after `mtkcompile`, since `pump.inlet.ṁ` on the
+component you built is the symbol the compiled system carries. Edges therefore go in wherever
+the components are, here or later through `push!`, which is what a trip on the kinetics the
+machine's own controller drives needs.
+
+Entering a state in `abort_states` stops the integration. Edges are tried in the order given,
+which decides the outcome when two fire at the same instant, and [`machine_callbacks`](@ref)
+turns them into solver events.
 
 # Arguments
 - `edges`: the transitions, each `(from => to, condition)`
@@ -83,7 +83,7 @@ mutable struct StateMachine
     log::Vector{Tuple{Any,Float64}}
     abort_states::Set
 
-    # An inner constructor, so no default one competes with this signature.
+    # Inner, so no default constructor competes with it.
     function StateMachine(edges...; initial_state=:NORMAL, initial_time=0.0, abort_states=())
         t0 = Float64(initial_time)
         machine = new(
@@ -153,7 +153,6 @@ under the name the kinetics use, and a [`Flapper`](@ref) opening ramp is another
 
 # Example
 ```julia
-machine = StateMachine(; initial_state=:CLOSED)
 opening = StateSchedule(; machine=machine) do state, t_state, t
     state === :OPEN ? clamp(2.0 * (t - t_state), 0.0, 1.0) : 0.0
 end
@@ -195,9 +194,8 @@ end
     _crossing(ssys, condition) -> (gap, both_edges)
 
 The function behind a symbolic condition, and whether both edges fire. `gap(u, p, t)` is
-positive exactly where the condition holds, so the edge that fires it is `gap` rising through
-zero. Symbolics normalizes `a > b` into `b < a`, so only the argument order tells the two
-apart.
+positive exactly where the condition holds, so the transition fires as `gap` rises through
+zero.
 
 # Throws
 - `ArgumentError`: for a symbolic expression that is not a relation
@@ -259,8 +257,7 @@ function _callbacks(ssys, machine::StateMachine)
             (u, t, integ) -> _armed(machine, tr) && tr.condition(machine, t), fire!
         )
         gap, both_edges = _crossing(ssys, tr.condition)
-        # The gap is positive where the relation holds, so its rising edge is where the
-        # transition becomes true. An equation has no side to become true and fires both ways.
+        # An equation has no side to become true, so it fires on both edges.
         ContinuousCallback(
             (u, t, integ) -> gap(u, integ.p, t), fire!, both_edges ? fire! : nothing
         )
