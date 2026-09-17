@@ -79,48 +79,97 @@ function inparallel(upstream, branches, downstream)
 end
 
 """
-    weighted(N, components...; name=nothing) -> Tuple
+    _FlowWeight(k; name) -> System
 
-A branch path standing for `N` identical copies of `components` in series.
+Scale the mass flow between two ports. [`weighted`](@ref) is the only caller, and places one
+of these at each end of a branch.
 
-Returns `(w_in, components..., w_out)`, where `w_in` is a [`FlowWeight`](@ref) of `1//N` and
-`w_out` one of `N`. The junctions at either end therefore see `N` times the flow the
-components carry. The result is a path like any other: hand it to [`inparallel`](@ref) or
-[`inseries`](@ref), and compose its systems into the model. This is Python STREAM's
-`flow_edge(..., signify=N)`.
+    outlet.ṁ = -k·inlet.ṁ,    outlet.p = inlet.p
 
-The two weights are named `<name>_weight_in` and `<name>_weight_out`. Without `name` they
-take the names of what they wrap, `<first>_weight_in` and `<last>_weight_out`. Pass `name`
-when an end component is reached through its parent, as `rods.ch` is, since its name then
-carries the parent's namespace.
+Pressure and temperature pass through unchanged. Mass does not: the component holds no fluid
+and adds no heat, and the imbalance is the whole point. That is also why it stays private.
+
+`k` has to be an `Integer` or a `Rational`, and it enters the equations as a fixed number
+rather than a parameter, so that `mtkcompile` can find the loop's free flow by exact linear
+elimination over integer coefficients.
+
+# Arguments
+- `k`: flow ratio, outlet to inlet, such as `1//N`
+- `name`: system name (Symbol)
+
+# Ports
+- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
+
+# Returns
+Uncompiled `System`.
+"""
+function _FlowWeight(k::Union{Integer,Rational}; name)
+    q = Rational(k)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    eqs = Equation[
+        # Written as a cross-multiplied integer ratio rather than as k*inlet.ṁ. A Float or a
+        # symbolic k hides the loop's free flow from mtkcompile's exact elimination, and the
+        # loop then fails to compile as over-determined.
+        denominator(q) * outlet.ṁ ~ -numerator(q) * inlet.ṁ,
+        outlet.p ~ inlet.p,
+        outlet.T ~ instream(inlet.T),
+        inlet.T ~ instream(outlet.T),
+    ]
+    return compose(System(eqs, t, [], []; name=name), inlet, outlet)
+end
+
+"""
+    weighted(N, components...; name) -> Tuple
+
+One branch standing for `N` identical copies of itself.
+
+A core with fifty identical assemblies is fifty copies of the same equations. Model one and
+tell the junctions at either end that it counts fifty times, and the solve carries a single
+channel's unknowns:
+
+```julia
+branch = weighted(50, pool, orifice, ch; name=:hot)
+conns = [inparallel(flywheel, [branch], riser)..., flywheel.outlet.p ~ ATM]
+sys = compose_systems(flywheel, riser, branch...; connections=conns, name=:core)
+```
+
+The returned tuple is both the path to wire and the systems to compose, so it splats into
+[`inseries`](@ref), [`inparallel`](@ref) and `compose_systems` alike. It holds `components`
+in flow order between two private flow weights, one of `1//N` and one of `N`, named
+`<name>_weight_in` and `<name>_weight_out`.
+
+`ch` carries one assembly's flow and reaches one assembly's wall temperature. The junctions
+see `N` times that flow, and since a junction mixes temperatures weighted by the flow
+through it, the branch also counts `N` times in the energy balance.
 
 # Arguments
 - `N`: how many identical copies the branch stands for, a positive integer
 - `components`: the branch, uncompiled systems with `inlet` and `outlet`, in flow order
 
 # Keywords
-- `name`: prefix for the two weights' names
+- `name`: required, the prefix the two weights are named from
 
 # Returns
 A tuple of systems, first to last.
 
 # Throws
 - `ArgumentError`: for no components, or `N` not a positive integer
+- `UndefKeywordError`: when `name` is left out
 """
-function weighted(N::Integer, components...; name=nothing)
+function weighted(N::Integer, components...; name::Symbol)
     isempty(components) && throw(ArgumentError("weighted needs at least one component"))
     N > 0 || throw(ArgumentError("N must be positive, got $N"))
-    base_in = name === nothing ? nameof(first(components)) : name
-    base_out = name === nothing ? nameof(last(components)) : name
-    w_in = FlowWeight(1//N; name=Symbol(base_in, :_weight_in))
-    w_out = FlowWeight(N; name=Symbol(base_out, :_weight_out))
-    return (w_in, components..., w_out)
+    return (
+        _FlowWeight(1//N; name=Symbol(name, :_weight_in)),
+        components...,
+        _FlowWeight(N; name=Symbol(name, :_weight_out)),
+    )
 end
 
-function weighted(N, components...; name=nothing)
+function weighted(N, components...; name::Symbol)
     throw(ArgumentError("N must be a positive integer, got $N"))
 end
-
 
 """
     face(sources, target, face; source_port=:thermal) -> Vector{Equation}

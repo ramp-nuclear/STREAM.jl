@@ -96,61 +96,6 @@ function HeatExchanger(T_bc; name)
 end
 
 """
-    FlowWeight(k; name) -> System
-
-Scale the mass flow between two ports, so one channel can stand for several identical ones.
-
-The flow leaving through `outlet` is `k` times the flow entering through `inlet`, while
-pressure and temperature pass through unchanged:
-
-    outlet.ṁ = -k·inlet.ṁ,    outlet.p = inlet.p
-
-Put one with `k = 1//N` between a junction and the first component of a branch, and one with
-`k = N` after its last. The junctions then see `N` times the flow the branch carries, while
-the branch itself carries one channel's worth. Temperatures mix at a junction weighted by
-the flow there, so the branch counts `N` times in the energy balance as well. This is Python
-STREAM's junction `weights`, which `flow_edge(..., signify=N)` sets. [`weighted`](@ref)
-places both ends.
-
-`k` has to be an integer or a `Rational`, and it enters the equations as a fixed number
-rather than a parameter. `mtkcompile` finds that the flow around a closed loop is a free
-unknown by exact linear elimination over integer coefficients. A weight written with a
-`Float` or a symbolic `k` hides that, and the loop then fails to compile as over-determined.
-
-Mass is not conserved across it, by design. It holds no fluid and adds no heat.
-
-# Arguments
-- `k`: flow ratio, outlet to inlet, a positive `Integer` or `Rational` such as `1//N`
-- `name`: system name (Symbol)
-
-# Ports
-- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
-
-# Returns
-Uncompiled `System`.
-
-# Throws
-- `ArgumentError`: for a `k` that is not a positive integer or rational
-"""
-function FlowWeight(k::Union{Integer,Rational}; name)
-    k > 0 || throw(ArgumentError("k must be positive, got $k"))
-    q = Rational(k)
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    eqs = Equation[
-        denominator(q) * outlet.ṁ ~ -numerator(q) * inlet.ṁ,
-        outlet.p ~ inlet.p,
-        outlet.T ~ instream(inlet.T),
-        inlet.T ~ instream(outlet.T),
-    ]
-    return compose(System(eqs, t, [], []; name=name), inlet, outlet)
-end
-
-function FlowWeight(k::Real; name)
-    throw(ArgumentError("k must be an integer or a rational such as 1//N, got $k"))
-end
-
-"""
     ConstantTemperature(T; name) -> System
 
 Constant-temperature thermal boundary condition.

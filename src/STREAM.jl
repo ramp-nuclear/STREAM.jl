@@ -251,7 +251,7 @@ include("components/point_kinetics.jl")
 export FlowPort, ThermalPort
 export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFlowResistor
 export LocalPressureDrop, Inertia, HeatExchanger, bilinear_inertia
-export ResistorFromKnownPoint, FlowWeight
+export ResistorFromKnownPoint
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
