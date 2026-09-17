@@ -20,21 +20,12 @@ sol = solve_transient(ssys, op, times; callbacks=machine_callbacks(ssys, machine
 Write the threshold against a parameter when it should move under `remake`; a literal is
 compiled into the condition.
 
-A valve whose machine never transitions never opens. One that starts open,
-`StateMachine(; initial_state=:OPEN, initial_time=t0)`, is Python's `open(t0)`, and a machine
-back in `:CLOSED` is its `close()`.
+A valve whose machine never transitions never opens. One built on a machine that starts open,
+`StateMachine(; initial_state=:OPEN, initial_time=t0)`, is open from `t0` with no transition at
+all, and a machine back in `:CLOSED` shuts it.
 
 A shut valve carries no flow, so it belongs in **parallel** with a branch that carries flow
 meanwhile. In series it would block the loop.
-
-Two deliberate differences from Python STREAM's `Flapper`:
-
-  - **Relaxation.** We always use the differentiable ramp `−2x³ + 3x²`, where Python defaults
-    to `legacy_relaxation` and opts into this shape per call. The ramp shape differs for cases
-    taking Python's default; the open/closed binary and the opening time do not.
-  - **Open-state sign.** `ṁ_open = sign(P_in − P_out)·√(|ΔP|·2ρA²/f)` against Python's
-    `−sign(dp)·√(…)` with `dp = P_out − P_in`. The two flips cancel, checked in both flow
-    directions.
 
 # Arguments
 - `name`: system name (Symbol), injected by `@named`
