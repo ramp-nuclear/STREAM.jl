@@ -14,7 +14,7 @@ using STREAM.Substances
 end
 
 # A closed flapper blocks all flow, so it sits in PARALLEL with a bypass resistor that
-# carries the loop flow while the valve is shut (Python STREAM's usage).
+# carries the loop flow while the valve is shut.
 function _flapper_parallel_loop(; flapper, pump, name)
     @named bypass = Resistor(1.0e5)
     @named hx = HeatExchanger(26.85)
@@ -46,7 +46,7 @@ end
                              machine=StateMachine(; initial_state=:OPEN), liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_open)
     ssys = mtkcompile(sys)
-    op = Pair{Any,Any}[]   # the machine starts :OPEN at t = 0 (Python's open(0.0))
+    op = Pair{Any,Any}[]   # the machine starts :OPEN at t = 0
     sol = solve_transient(ssys, op, range(0.0, 1.0; length=20))           # past the 1/open_rate ramp
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)             # fully open

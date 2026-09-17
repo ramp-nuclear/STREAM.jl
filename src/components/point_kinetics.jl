@@ -335,7 +335,7 @@ const ReactivityController = StateSchedule
     worth(ctrl, t_now) -> Float64
 
 The control reactivity now: the schedule read at the machine's state and the time it entered
-that state. The same thing as calling `ctrl(t_now)`, under the name Python uses.
+that state, which is the same thing as calling `ctrl(t_now)`.
 
 # Arguments
 - `ctrl`: the [`ReactivityController`](@ref)

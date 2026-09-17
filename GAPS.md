@@ -599,6 +599,12 @@ Verified as matching, so they should not be re-investigated:
 - **Threshold correlations.** Listed in [5](#5-thresholds-and-post-solve-analysis).
 - **Geometry.** `PipeGeometry` matches `EffectivePipe` field for field except
   `heated_diameter`, which Python computes and never uses.
+- **Flapper.** The open-state quadratic resistor matches: our
+  `ṁ_open = sign(P_in − P_out)·√(|ΔP|·2ρA²/f)` and Python's `−sign(dp)·√(…)` against its own
+  `dp = P_out − P_in` are the same formula, checked in both flow directions. One deliberate
+  difference: we always relax the opening through the C1 ramp `−2x³ + 3x²`, where Python
+  defaults to `legacy_relaxation` and opts into that shape per call. The open/closed binary and
+  the opening time are the same either way.
 
 ## Suggested order of work
 
