@@ -6,27 +6,28 @@ One channel's solved state, in the form the threshold correlations take.
 Construct it from a solution with [`ChannelState(sol, channel_sys)`](@ref), or by hand with
 keywords. Every correlation in `Thresholds` accepts one, as does [`threshold_analysis`](@ref).
 
-For a steady solution each vector field has length `n`, one value per axial cell. For a
-transient, every per-cell field is an `[n_cells, n_times]` matrix. The correlations broadcast,
-so the same call works on either.
+It describes one instant, so each per-cell field has length `n`, one value per axial cell.
+For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the saved time
+`sol.t[k]`, and [`threshold_analysis`](@ref) runs the correlations at every saved time.
 
 # Fields
-- `n::Int`                     — number of axial cells
-- `T_bulk::AbstractArray`     — bulk coolant temperature per cell [°C]
-- `T_wall::AbstractArray`     — conservative wall temperature: `max(T_wall_left, T_wall_right)` per cell [°C]
-- `T_wall_left::AbstractArray`  — left face wall temperature per cell [°C]
-- `T_wall_right::AbstractArray` — right face wall temperature per cell [°C]
-- `T_sat::AbstractArray`      — saturation temperature per cell [°C]
-- `T_ONB::AbstractArray`      — onset of nucleate boiling temperature per cell [°C]
-- `T_inlet::Float64`           — inlet temperature from `inlet.T` [°C]
-- `P::AbstractArray`          — absolute pressure per cell [Pa]
-- `q_flux::AbstractArray`     — conservative heat flux: `max(q_flux_left, q_flux_right)` per cell [W/m²]
-- `q_flux_left::AbstractArray`  — left face heat flux per cell [W/m²]
-- `q_flux_right::AbstractArray` — right face heat flux per cell [W/m²]
-- `ṁ::Float64`              — mass flow rate from `inlet.ṁ` [kg/s]
-- `velocity::AbstractArray`   — absolute fluid velocity per cell [m/s]
-- `pipe::Union{PipeGeometry, Nothing}` — channel geometry, or `nothing` if unavailable
-- `gravity::Float64`           — gravitational acceleration [m/s²]
+- `n::Int`: number of axial cells
+- `T_bulk::AbstractArray`: bulk coolant temperature per cell [°C]
+- `T_wall::AbstractArray`: the hotter face, `max(T_wall_left, T_wall_right)`, per cell [°C]
+- `T_wall_left::AbstractArray`: left face wall temperature per cell [°C]
+- `T_wall_right::AbstractArray`: right face wall temperature per cell [°C]
+- `T_sat::AbstractArray`: saturation temperature per cell [°C]
+- `T_ONB::AbstractArray`: onset of nucleate boiling temperature per cell [°C]
+- `T_inlet::Float64`: temperature of the coolant entering the channel, at whichever end is
+  upstream, from the channel's `T_in` [°C]
+- `P::AbstractArray`: absolute pressure per cell [Pa]
+- `q_flux::AbstractArray`: the larger face flux, `max(q_flux_left, q_flux_right)` [W/m²]
+- `q_flux_left::AbstractArray`: left face heat flux per cell [W/m²]
+- `q_flux_right::AbstractArray`: right face heat flux per cell [W/m²]
+- `ṁ::Float64`: mass flow rate from `inlet.ṁ` [kg/s]
+- `velocity::AbstractArray`: absolute fluid velocity per cell [m/s]
+- `pipe::Union{PipeGeometry, Nothing}`: channel geometry, or `nothing` if unavailable
+- `gravity::Float64`: gravitational acceleration [m/s²]
 """
 @kwdef struct ChannelState
     n::Int
@@ -48,32 +49,61 @@ so the same call works on either.
 end
 
 """
-    ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81) -> ChannelState
+    _instant(sol, index) -> Union{Int,Nothing}
 
-Extract MTK solution data from `sol` for `channel_sys` into a `ChannelState` bundle.
+The saved-time index a [`ChannelState`](@ref) reads `sol` at: `nothing` for a solution with
+no time axis, `index` for a transient, and `1` for a transient that saved a single point.
 
-For steady-state solutions (`NonlinearSolution` or single-timestep `ODESolution`),
-all vector fields have length `n`. For transient solutions, each per-cell field is
-assembled into a matrix of shape `[n_cells, n_times]`.
+# Throws
+- `ArgumentError`: for a transient with several saved times and no `index`
+"""
+function _instant(sol, index)
+    hasproperty(sol, :t) || return nothing
+    index === nothing || return index
+    length(sol.t) == 1 && return 1
+    throw(
+        ArgumentError(
+            "sol is a transient with $(length(sol.t)) saved times, so a ChannelState " *
+            "needs the index of one; threshold_analysis reads every saved time",
+        ),
+    )
+end
+
+"""
+    ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=nothing)
+
+Read one channel's state at one instant out of a solution.
+
+A steady solution has a single instant, so `index` is not needed. A transient needs `index`,
+the position of a saved time in `sol.t`. To run the correlations over a whole transient, use
+[`threshold_analysis`](@ref), which builds a `ChannelState` at every saved time.
 
 `q_flux_left[i] = q_wall_left[i] / (pipe.heated_parts[1] * dz)`.
 When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 
 `channel_sys` must expose a wall temperature, so `Channel` or `ChannelAndContacts`.
 `ChannelHeatFlux` prescribes its flux and leaves `T_wall_left`/`T_wall_right` unconstrained for
-`mtkcompile` to drop; passing one throws `ArgumentError`.
-"""
-function ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81)
-    n = length(channel_sys.T)
-    # A NonlinearSolution has no time axis; a single-step ODESolution is steady too.
-    is_transient = hasproperty(sol, :t) && length(sol.t) > 1
+`mtkcompile` to drop.
 
-    # One reader for both layouts, so the field list is written once: steady gives a value
-    # per cell, transient a [cell, time] matrix.
-    cells(sym) = is_transient ?
-        permutedims(reduce(hcat, (sol[sym[i], :] for i in 1:n))) :
-        [sol[sym[i]] for i in 1:n]
-    scalar(sym) = is_transient ? sol[sym, 1] : sol[sym]
+# Arguments
+- `sol`: a `NonlinearSolution` or an `ODESolution`
+- `channel_sys`: the compiled channel subsystem, such as `ssys.ch`
+- `pipe`: the channel's `PipeGeometry`, needed for the fluxes and geometric correlations
+- `gravity`: gravitational acceleration [m/s²]
+- `index`: which saved time of a transient to read
+
+# Returns
+A `ChannelState` for that instant.
+
+# Throws
+- `ArgumentError`: for a transient with several saved times and no `index`, or a channel
+  whose wall temperature did not survive compilation
+"""
+function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=nothing)
+    n = length(channel_sys.T)
+    k = _instant(sol, index)
+    value(sym) = k === nothing ? sol[sym] : sol[sym, k]
+    cells(sym) = [value(sym[i]) for i in 1:n]
 
     # `velocity` is the unsigned speed and only ChannelAndContacts declares it. The other
     # variants expose the signed `v`, so read that and take the magnitude, which is what lets a
@@ -123,12 +153,12 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81)
         T_wall_right=T_wall_right,
         T_sat=cells(channel_sys.T_sat),
         T_ONB=cells(channel_sys.T_ONB),
-        T_inlet=scalar(channel_sys.inlet.T),
+        T_inlet=value(channel_sys.T_in),
         P=cells(channel_sys.P),
         q_flux=max.(q_flux_left, q_flux_right),
         q_flux_left=q_flux_left,
         q_flux_right=q_flux_right,
-        ṁ=scalar(channel_sys.inlet.ṁ),
+        ṁ=value(channel_sys.inlet.ṁ),
         velocity=velocity,
         pipe=pipe,
         gravity=gravity,
@@ -136,20 +166,22 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=9.81)
 end
 
 """
-    threshold_analysis(sol, channel_sys; pipe=nothing, gravity=9.81, kwargs...) -> NamedTuple
+    threshold_analysis(sol, channel_sys; pipe=nothing, gravity=G_EARTH, kwargs...) -> NamedTuple
 
-Post-process an MTK solution by extracting channel state and applying user-specified
-analysis functions.
+Apply named threshold functions to one channel of a solution.
 
-Each keyword argument must be a callable `fn(state::ChannelState) -> AbstractArray`.
-The function builds the `ChannelState` from the solution, then dispatches
-each function and collects results into a `NamedTuple`.
+Each keyword argument is a callable `fn(state::ChannelState)` returning a value per cell or
+one for the whole channel. For a steady solution each runs once. For a transient each runs
+on the [`ChannelState`](@ref) at every saved time, so a flow-dependent correlation sees the
+flow at that time, and the results stack along a last axis: a per-cell result becomes an
+`[n_cells, n_times]` matrix and a channel-level one a vector over time, both against
+`sol.t`.
 
 # Arguments
-- `sol`: solver output — `NonlinearSolution` (steady) or `ODESolution` (transient)
+- `sol`: a `NonlinearSolution` (steady) or an `ODESolution` (transient)
 - `channel_sys`: the compiled MTK subsystem with `T`, `T_wall_left`, `T_wall_right`, etc.
 - `pipe`: optional `PipeGeometry`, needed for `q_flux_*` and any correlation that uses geometry
-- `gravity`: gravitational acceleration [m/s²] (default 9.81)
+- `gravity`: gravitational acceleration [m/s²] (default `G_EARTH`)
 - `kwargs...`: named analysis functions
 
 # Returns
@@ -158,19 +190,57 @@ each function and collects results into a `NamedTuple`.
 # Example
 ```julia
 result = threshold_analysis(sol, ssys.cac;
-    pipe=pipe, gravity=9.81,
+    pipe=pipe, gravity=G_EARTH,
     chfr_mirshak = chfr(q_CHF_mirshak),
     onb          = bergles_rohsenow_t_onb,
 )
-result.chfr_mirshak  # CHF ratio per cell
-result.onb           # ONB wall temperature per cell
+result.chfr_mirshak                           # CHF ratio per cell, and per time
+worst_case(result.chfr_mirshak; times=sol.t)  # the smallest, and where and when
 ```
 """
-function threshold_analysis(sol, channel_sys; pipe=nothing, gravity=9.81, kwargs...)
-    state = ChannelState(sol, channel_sys; pipe=pipe, gravity=gravity)
-    names = keys(kwargs)
-    values = [fn(state) for fn in Base.values(kwargs)]
-    return NamedTuple{names}(Tuple(values))
+function threshold_analysis(sol, channel_sys; pipe=nothing, gravity=G_EARTH, kwargs...)
+    state_at(k) = ChannelState(sol, channel_sys; pipe=pipe, gravity=gravity, index=k)
+    fns = Base.values(kwargs)
+    results = if hasproperty(sol, :t) && length(sol.t) > 1
+        states = [state_at(k) for k in eachindex(sol.t)]
+        [stack(fn(s) for s in states) for fn in fns]
+    else
+        state = state_at(nothing)
+        [fn(state) for fn in fns]
+    end
+    return NamedTuple{keys(kwargs)}(Tuple(results))
+end
+
+"""
+    worst_case(margin; times=nothing) -> NamedTuple
+
+The smallest value of a margin field, and where it sits.
+
+Pass a quantity arranged so that larger is safer, such as a CHF ratio or `T_ONB - T_wall`,
+in the shape [`threshold_analysis`](@ref) returns: a per-cell vector for a steady solution,
+an `[n_cells, n_times]` matrix for a transient, or a vector over time for a channel-level
+correlation. A vector is read as per-time when `times` is given and per-cell when it is not.
+
+# Arguments
+- `margin`: the field to search
+
+# Keywords
+- `times`: the saved times, `sol.t`
+
+# Returns
+`(value, cell, time)`: the minimum, the cell holding it (`nothing` for a per-time field),
+and the time it occurs (its index when `times` is not given, `nothing` for a steady field).
+"""
+function worst_case(margin::AbstractMatrix; times=nothing)
+    value, idx = findmin(margin)
+    cell, k = Tuple(idx)
+    return (value=value, cell=cell, time=times === nothing ? k : times[k])
+end
+
+function worst_case(margin::AbstractVector; times=nothing)
+    value, i = findmin(margin)
+    times === nothing && return (value=value, cell=i, time=nothing)
+    return (value=value, cell=nothing, time=times[i])
 end
 
 """
@@ -196,19 +266,7 @@ with `q[i] <= 0 → Inf` (no boiling risk when wall is not being heated).
 """
 function chfr(chf_fn; direction=:max)
     return function (state::ChannelState)
-        q = if direction == :left
-            state.q_flux_left
-        elseif direction == :right
-            state.q_flux_right
-        elseif direction == :max
-            max.(state.q_flux_left, state.q_flux_right)
-        elseif direction == :total
-            state.q_flux
-        else
-            throw(
-                ArgumentError("direction must be :left, :right, :max, or :total, got :$direction"),
-            )
-        end
+        q = _face_flux(state, direction)
         # Broadcast rather than zip: a channel-level correlation such as
         # q_CHF_sudo_kaminaga gives one number for the whole channel, and it has to divide
         # into the per-cell flux just the same.
@@ -217,57 +275,98 @@ function chfr(chf_fn; direction=:max)
 end
 
 """
-    bergles_rohsenow_t_onb(state::ChannelState)
+    _face_flux(s::ChannelState, direction) -> AbstractArray
+
+The heat flux per cell that `direction` names: `:left` or `:right` for one face, and `:max`
+or `:total` for the larger of the two.
+
+# Throws
+- `ArgumentError`: for any other `direction`
+"""
+function _face_flux(s::ChannelState, direction)
+    direction == :left && return s.q_flux_left
+    direction == :right && return s.q_flux_right
+    direction == :max && return max.(s.q_flux_left, s.q_flux_right)
+    direction == :total && return s.q_flux
+    throw(ArgumentError("direction must be :left, :right, :max, or :total, got :$direction"))
+end
+
+"""
+    bergles_rohsenow_t_onb(state::ChannelState; direction=:max, onb_factor=1.0,
+                           inhomogeneity_factor=1.0)
     q_boiling_onset(state::ChannelState; liquid=H2O)
     q_CHF_mirshak(state::ChannelState)
     q_CHF_fabrega(state::ChannelState)
-    q_CHF_sudo_kaminaga(state::ChannelState)
-    q_OFI_whittle_forgan(state::ChannelState)
-    q_OSV_saha_zuber(state::ChannelState)
+    q_CHF_sudo_kaminaga(state::ChannelState; liquid=H2O)
+    q_OFI_whittle_forgan(state::ChannelState; liquid=H2O)
+    q_OSV_saha_zuber(state::ChannelState; direction=:max, inhomogeneity_factor=1.0, liquid=H2O)
     twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
 
 Every threshold correlation also accepts a solved channel, taking its arguments out of the
-`ChannelState`. These are methods on the correlations themselves, not a second set of names
-for them. Results come back per cell, or as `[cell, time]` for a transient.
+`ChannelState` the way Python STREAM's analysis wrapper of the same name does. These are
+methods on the correlations themselves, not a second set of names for them. Results come back
+per cell, except `q_OFI_whittle_forgan`, which is one power for the channel.
+[`threshold_analysis`](@ref) stacks them over time. `q_OFI_whittle_forgan`,
+`q_OSV_saha_zuber` and the two geometry-dependent CHF correlations need `state.pipe`.
 
-`q_OFI_whittle_forgan` and `q_OSV_saha_zuber` return one number for the whole channel: the
-first is a channel power, the second reports the most conservative cell. Those two and the
-two geometry-dependent CHF correlations need `state.pipe`.
-
-`q_OFI_whittle_forgan` reads its saturation temperature from the downstream cell, since
-pressure falls along the channel and the outlet is what limits the margin. Under reversed
-flow the downstream end is the other one, and it follows.
+- `direction` picks the face flux, as in [`chfr`](@ref): `:left`, `:right`, or `:max` for
+  the larger of the two.
+- `inhomogeneity_factor` makes the local flux worse, for fuel inhomogeneity. In
+  `bergles_rohsenow_t_onb` it scales the flux the onset superheat is taken at, so compare
+  the result with [`twall_limit`](@ref) at the same factor. In `q_OSV_saha_zuber` it is the
+  correlation's `flux_enworse`.
+- `onb_factor` scales the Bergles-Rohsenow superheat, to cover the correlation's uncertainty.
+- `q_boiling_onset` takes `cₚ` at the inlet temperature.
+- `q_CHF_mirshak` takes the signed velocity, so reversed flow lowers the limit.
+- `q_OFI_whittle_forgan` reads its saturation temperature from the downstream cell, since
+  pressure falls along the channel and the outlet is what limits the margin. Under reversed
+  flow the downstream end is the other one, and it follows.
 
 What each correlation computes is in its own docstring.
 """
-bergles_rohsenow_t_onb(s::ChannelState) = bergles_rohsenow_t_onb.(s.P, s.q_flux, s.T_sat)
-
-function q_boiling_onset(s::ChannelState; liquid::AbstractLiquid=H2O)
-    return q_boiling_onset.(s.ṁ, s.T_sat, s.T_inlet, cₚ.(liquid, s.T_bulk))
+# A wall that is not heating the coolant cannot boil it, and the correlation's fractional
+# power has no real value for a negative flux, so those cells report no onset, as chfr does.
+# After a scram the coolant rising through the core can run hotter than parts of the plate.
+function bergles_rohsenow_t_onb(
+    s::ChannelState; direction=:max, onb_factor=1.0, inhomogeneity_factor=1.0
+)
+    q = inhomogeneity_factor .* _face_flux(s, direction)
+    T_ONB = s.T_sat .+ onb_factor .* _bergles_rohsenow_dT_ONB.(s.P, max.(q, 0.0))
+    return ifelse.(q .> 0, T_ONB, Inf)
 end
 
-q_CHF_mirshak(s::ChannelState) = q_CHF_mirshak.(s.T_bulk, s.T_sat, s.P, s.velocity)
+function q_boiling_onset(s::ChannelState; liquid::AbstractLiquid=H2O)
+    return q_boiling_onset.(s.ṁ, s.T_sat, s.T_inlet, cₚ(liquid, s.T_inlet))
+end
+
+q_CHF_mirshak(s::ChannelState) =
+    q_CHF_mirshak.(s.T_bulk, s.T_sat, s.P, copysign.(s.velocity, s.ṁ))
 
 q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, Ref(s.pipe))
 
 # The correlation needs saturated-coolant properties, and this is where the coolant is
 # known, so the snapshot is built here: one entry per cell at that cell's saturation state.
 function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=H2O)
-    per_cell(v) = v isa AbstractMatrix ? collect(view(v, :, 1)) : collect(v)
-    T_sat, P = per_cell(s.T_sat), per_cell(s.P)
-    return q_CHF_sudo_kaminaga(
-        per_cell(s.T_bulk), s.ṁ, s.pipe, s.gravity, liquid(T_sat, P)
-    )
+    T_sat, P = collect(s.T_sat), collect(s.P)
+    return q_CHF_sudo_kaminaga(collect(s.T_bulk), s.ṁ, s.pipe, s.gravity, liquid(T_sat, P))
 end
 
 # Mirrors Python STREAM's `pressure[-1 if mdot >= 0 else 0]`.
 function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
-    per_cell = s.T_sat isa AbstractMatrix ? view(s.T_sat, :, 1) : s.T_sat
-    T_sat_out = s.ṁ >= 0 ? last(per_cell) : first(per_cell)
+    T_sat_out = s.ṁ >= 0 ? last(s.T_sat) : first(s.T_sat)
     return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.pipe; liquid=liquid)
 end
 
-q_OSV_saha_zuber(s::ChannelState) = q_OSV_saha_zuber(s.T_inlet, s.ṁ, s.pipe)
+function q_OSV_saha_zuber(
+    s::ChannelState; direction=:max, inhomogeneity_factor=1.0, liquid::AbstractLiquid=H2O
+)
+    coolant = liquid(collect(s.T_bulk), collect(s.P))
+    return q_OSV_saha_zuber(
+        s.T_inlet, s.ṁ, s.pipe, coolant;
+        flux_shape=_face_flux(s, direction), dz=fill(s.pipe.L / s.n, s.n),
+        flux_enworse=inhomogeneity_factor,
+    )
+end
 
 function twall_limit(s::ChannelState; inhomogeneity_factor=1.0)
     limit(T_wall) = twall_limit.(s.T_bulk, T_wall, inhomogeneity_factor)
@@ -275,9 +374,8 @@ function twall_limit(s::ChannelState; inhomogeneity_factor=1.0)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", s::ChannelState)
-    kind = s.T_bulk isa AbstractMatrix ? "transient, $(size(s.T_bulk, 2)) time points" : "steady"
     rng(v) = "$(round(minimum(v); sigdigits=5))..$(round(maximum(v); sigdigits=5))"
-    print(io, "ChannelState: ", s.n, " cells, ", kind)
+    print(io, "ChannelState: ", s.n, " cells")
     print(io, "\n  ṁ        ", round(s.ṁ; sigdigits=5), " kg/s")
     print(io, "\n  T_bulk   ", rng(s.T_bulk), " °C")
     print(io, "\n  T_wall   ", rng(s.T_wall), " °C")

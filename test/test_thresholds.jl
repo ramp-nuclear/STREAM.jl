@@ -71,10 +71,10 @@ using OrdinaryDiffEq: ReturnCode
 
     @testset "q_OSV_saha_zuber" begin
         # Anchor: Python physical_models.thresholds.Saha_Zuber_OSV_computed_bulk, fed a
-        # Liquid carrying STREAM's own ρ/cₚ/k at T_inlet=26.85 and
-        # Tsat(H2O, 1e5) = 99.63 (so the Python coolant matches Julia bit-for-bit).
-        # Pipe and 10-cell uniform flux match the Julia inputs. Reported value is the
-        # minimum cell. (Python's numba `directed` was monkeypatched to its plain-numpy
+        # Liquid carrying STREAM's own ρ/cₚ/k at 26.85 °C and Tsat(H2O, 1e5) = 99.63 in all
+        # ten cells, so the Python coolant matches Julia bit-for-bit. Pipe and uniform flux
+        # match the Julia inputs. The value checked is the last cell, which has the most heat
+        # picked up upstream. (Python's numba `directed` was monkeypatched to its plain-numpy
         # equivalent so the function would run; the formula is untouched.)
         #
         # The two branches of the Pe<>70000 switch are still exercised. ṁ=0.5 hits the
@@ -88,19 +88,29 @@ using OrdinaryDiffEq: ReturnCode
             return G * pipe.Dh * cₚ(H2O, 26.85) / κ(H2O, 26.85)
         end
 
-        # High-Pe (convective) branch: Saha_Zuber_OSV_computed_bulk(ṁ=0.5) -> 1443852.2363455354
-        @test pe_at(0.5) >= 7e4  # guard: must be the convective St_c branch
-        @test q_OSV_saha_zuber(26.85, 0.5, pipe) ≈ 1443852.2363455354 rtol = 1e-9
+        coolant = H2O(fill(26.85, 10), fill(1e5, 10))
 
-        # Low-Pe (conductive) branch: Saha_Zuber_OSV_computed_bulk(ṁ=0.3) -> 899904.7329676608
+        # High-Pe (convective) branch: Saha_Zuber_OSV_computed_bulk(ṁ=0.5) -> 1443852.2363455354
+        @test pe_at(0.5) >= 7e4  # guard: must be the convective St_c branch
+        osv = q_OSV_saha_zuber(26.85, 0.5, pipe, coolant)
+        @test length(osv) == 10
+        @test last(osv) ≈ 1443852.2363455354 rtol = 1e-9
+
+        # Low-Pe (conductive) branch: Saha_Zuber_OSV_computed_bulk(ṁ=0.3) -> 899904.7329676608
         @test pe_at(0.3) < 7e4  # guard: must be the conductive Nu_c branch
-        @test q_OSV_saha_zuber(26.85, 0.3, pipe) ≈ 899904.7329676608 rtol = 1e-9
+        @test last(q_OSV_saha_zuber(26.85, 0.3, pipe, coolant)) ≈ 899904.7329676608 rtol = 1e-9
 
         # Explicit flux_shape + dz path (dz = 0.06 each, uniform shape). Same total length
         # as the uniform default, so Python returns the same value:
-        # Saha_Zuber_OSV_computed_bulk(ṁ=0.5, dz=0.06) -> 1443852.2363455354
-        @test q_OSV_saha_zuber(26.85, 0.5, pipe; flux_shape=ones(10), dz=0.06 * ones(10)) ≈
-            1443852.2363455354 rtol = 1e-9
+        # Saha_Zuber_OSV_computed_bulk(ṁ=0.5, dz=0.06) -> 1443852.2363455354
+        explicit = q_OSV_saha_zuber(
+            26.85, 0.5, pipe, coolant; flux_shape=ones(10), dz=0.06 * ones(10)
+        )
+        @test last(explicit) ≈ 1443852.2363455354 rtol = 1e-9
+
+        # Reversed flow picks up its heat from the other end, so a uniform channel gives the
+        # same profile mirrored.
+        @test q_OSV_saha_zuber(26.85, -0.5, pipe, coolant) ≈ reverse(osv) rtol = 1e-12
     end
 
     # The saturated coolant the Sudo-Kaminaga anchors were generated against: the rounded
@@ -295,7 +305,8 @@ end
         result = q_boiling_onset(state)
         @test length(result) == n
         @test all(result .> 0)
-        expected_val = abs(0.5) * cₚ(H2O, 46.85) * (100.0 - 26.85)
+        # cₚ at the inlet temperature, as Python takes it
+        expected_val = abs(0.5) * cₚ(H2O, 26.85) * (100.0 - 26.85)
         @test result[1] ≈ expected_val rtol = 1e-8
     end
 
@@ -356,6 +367,11 @@ end
     @test state.n == 5
     @test length(state.T_bulk) == 5
     @test all(state.velocity .>= 0)
+    # T_inlet is the coolant arriving from the heat exchanger, not the first cell, which
+    # has already taken up some heat.
+    @test state.T_inlet ≈ sol[ssys.bc.outlet.T]
+    @test state.T_inlet < first(state.T_bulk)
+    @test state.gravity == G_EARTH
     @test state.ṁ > 0
 
     # A circular pipe puts the whole heated perimeter on one face, so the other has zero
@@ -369,6 +385,82 @@ end
     # Without a geometry there is no area at all, so both faces read zero.
     bare = ChannelState(sol, ssys.ch)
     @test all(iszero, bare.q_flux)
+
+    # Run the loop backwards and the coolant enters at the last cell. The heat exchanger
+    # sets both of its ports, so what reaches the channel is still its 40 °C, while the
+    # first cell is now the hot end.
+    back = build_loop(; n=5, dP_pump=-3.0e4)
+    op_back = Pair{Any,Any}[back.ch.T[i] => 40.0 for i in 1:5]
+    push!(op_back, back.ch.inlet.ṁ => -0.5)
+    reversed = ChannelState(solve_steady(back, op_back), back.ch; pipe=geo)
+    @test reversed.ṁ < 0
+    @test reversed.T_inlet ≈ 40.0
+    @test reversed.T_inlet < last(reversed.T_bulk) < first(reversed.T_bulk)
+end
+
+@testset "ChannelState over a transient reads each saved time" begin
+    # A coasting loop: the pump head is removed at t = 0 and the channel's own momentum
+    # carries the flow down, so every flow-dependent limit has to move with it. The reader
+    # this replaces froze ṁ and T_inlet at the first saved time.
+    geo = PipeGeometry_circular(0.6, 0.01)
+    ssys = build_loop(; n=5)
+    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
+    push!(op, ssys.ch.inlet.ṁ => 0.5)
+    sol_ss = solve_steady(ssys, op)
+    sol = solve_transient(
+        ssys, sol_ss, range(0.0, 0.5; length=6); overrides=[ssys.pump.dP_pump => 0.0]
+    )
+    @test sol.retcode == ReturnCode.Success
+    ṁ = sol[ssys.ch.inlet.ṁ, :]
+    # The flow has to fall for the rest of this to prove anything.
+    @test ṁ[end] < 0.5 * ṁ[1]
+
+    for k in (1, 3, length(sol.t))
+        s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
+        @test s.ṁ == ṁ[k]
+        @test s.T_inlet == sol[ssys.ch.T_in, k]
+        @test s.T_bulk == [sol[ssys.ch.T[i], k] for i in 1:5]
+    end
+    # A transient has many instants, so asking for the state without saying which is an
+    # error rather than a guess.
+    @test_throws ArgumentError ChannelState(sol, ssys.ch; pipe=geo)
+
+    # Channel-level results stack into a vector over time, per-cell ones into [cell, time].
+    result = threshold_analysis(
+        sol, ssys.ch; pipe=geo,
+        osv=q_OSV_saha_zuber, ofi=q_OFI_whittle_forgan, sk=q_CHF_sudo_kaminaga,
+        onb=bergles_rohsenow_t_onb,
+    )
+    nt = length(sol.t)
+    @test size(result.ofi) == (nt,)
+    @test size(result.osv) == (5, nt)
+    @test size(result.sk) == (5, nt)
+    @test size(result.onb) == (5, nt)
+    for k in (1, nt)
+        s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
+        @test result.osv[:, k] == q_OSV_saha_zuber(s)
+        @test result.ofi[k] == q_OFI_whittle_forgan(s)
+        @test result.sk[:, k] == q_CHF_sudo_kaminaga(s)
+    end
+    # The regression: limits that depend on the flow follow it down instead of repeating
+    # their t = 0 value.
+    @test result.osv[:, end] != result.osv[:, 1]
+    @test result.sk[:, end] != result.sk[:, 1]
+
+    # A steady solution still gives one value per cell.
+    steady = threshold_analysis(sol_ss, ssys.ch; pipe=geo, sk=q_CHF_sudo_kaminaga)
+    @test steady.sk == q_CHF_sudo_kaminaga(ChannelState(sol_ss, ssys.ch; pipe=geo))
+end
+
+@testset "worst_case finds the smallest margin and where it is" begin
+    margin = [3.0 2.0 5.0;
+              4.0 1.5 6.0]   # [cell, time]
+    times = [0.0, 1.0, 2.0]
+    @test worst_case(margin; times=times) == (value=1.5, cell=2, time=1.0)
+    @test worst_case(margin) == (value=1.5, cell=2, time=2)
+    # A vector with times is a channel-level result over time; without, it is per cell.
+    @test worst_case([2.0, 0.5, 1.0]; times=times) == (value=0.5, cell=nothing, time=1.0)
+    @test worst_case([2.0, 0.5, 1.0]) == (value=0.5, cell=2, time=nothing)
 end
 
 @testset "ChannelState says so when the channel has no wall temperature" begin
@@ -496,4 +588,74 @@ end
     chfr_result = mirshak_chfr(state)
     @test length(chfr_result) == n
     @test all(chfr_result .> 0)
+end
+
+@testset "bergles_rohsenow_t_onb where the wall is not heating the coolant" begin
+    # After a scram the coolant can run hotter than parts of the plate and the flux turns
+    # negative. No onset is possible there, and the correlation's fractional power has no
+    # real value, so those cells report Inf rather than throwing.
+    n = 3
+    q = [5.0e4, 0.0, -3.0e3]
+    s = ChannelState(;
+        n=n, T_bulk=fill(60.0, n), T_wall=fill(62.0, n), T_wall_left=fill(62.0, n),
+        T_wall_right=fill(62.0, n), T_sat=fill(115.0, n), T_ONB=fill(120.0, n),
+        T_inlet=35.0, P=fill(1.7e5, n), q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=0.01,
+        velocity=fill(0.05, n), pipe=nothing, gravity=9.81,
+    )
+    onb = bergles_rohsenow_t_onb(s)
+    @test onb[1] ≈ bergles_rohsenow_t_onb(1.7e5, 5.0e4, 115.0)
+    @test onb[2] == Inf
+    @test onb[3] == Inf
+end
+
+@testset "ChannelState methods match Python's analysis wrappers" begin
+    # One MTR channel state, handed to stream.analysis.thresholds and to these methods: ten
+    # cells, 35 °C entering, the same peaked flux on both faces, h = 20 kW/(m²·K), and the
+    # bulk temperature from the energy balance, in forward and in reversed flow. The anchors
+    # are Python's values in the first and last cell (OFI is one number for the channel).
+    # Python's numba `directed` was swapped for its plain-numpy equivalent so it would run.
+    n = 10
+    pipe = PipeGeometry_rectangular(0.6, 0.066, 0.0027, 0.063)
+    dz = pipe.L / n
+    q = 6e5 .* (0.6 .+ 0.8 .* sin.(π .* ((1:n) .- 0.5) ./ n))
+    P = collect(range(1.75e5, 1.70e5; length=n))
+    function state(mdot)
+        Q = 2 .* q .* 0.063 .* dz
+        rise = cumsum(mdot >= 0 ? Q : reverse(Q)) ./ (abs(mdot) * 4180.0)
+        T = 35.0 .+ (mdot >= 0 ? rise : reverse(rise))
+        T_wall = T .+ q ./ 2e4
+        return ChannelState(; n=n, T_bulk=T, T_wall=T_wall, T_wall_left=T_wall,
+            T_wall_right=T_wall, T_sat=Tsat.(H2O, P), T_ONB=zeros(n), T_inlet=35.0, P=P,
+            q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=mdot,
+            velocity=abs.(mdot ./ (ρ.(H2O, T) .* pipe.A)), pipe=pipe, gravity=G_EARTH)
+    end
+
+    python = (
+        fwd=(sk=(1575471.0316344758, 1574952.2515598466), mirshak=(4298321.690663347, 3539713.6901751636), fabrega=(333346.31419618346, 332279.23286491574), ofi=(106174.83495312576,), osv=(3484558.9884553887, 844883.2366385899), osv_inhom=(3616141.236466625, 978269.1429811876), bp=(120652.9254573937, 119322.67811411698), onb_margin=(-63.98777757353153, -31.522506478884353), onb_margin_factors=(-62.482424247888034, -30.05672162179306), twall=(63.315724255662005, 94.9831513183468)),
+        rev=(sk=(971670.8135107204, 968000.8153377083), mirshak=(1191100.746008034, 3093477.0998318987), fabrega=(333346.31419618346, 332279.23286491574), ofi=(31263.625506709213,), osv=(284995.9638613336, 2223314.46786654), osv_inhom=(338031.07959110854, 2426017.02511434), bp=(33891.27119589711, 33517.606211830614), onb_margin=(54.406916625634935, -57.53127968556058), onb_margin_factors=(55.91226995127843, -56.06549482846927), twall=(181.71041845482847, 68.97437811167059)),
+    )
+
+    ends(v) = length(v) == 1 ? (only(v),) : (first(v), last(v))
+    for (label, mdot) in ((:fwd, 0.356), (:rev, -0.1))
+        s = state(mdot)
+        wall = twall_limit.(s.T_bulk, s.T_wall_left, 1.2)
+        onb = bergles_rohsenow_t_onb(s; direction=:left, onb_factor=1.3, inhomogeneity_factor=1.2)
+        julia = (
+            sk=q_CHF_sudo_kaminaga(s),
+            mirshak=q_CHF_mirshak(s),
+            fabrega=q_CHF_fabrega(s),
+            ofi=[q_OFI_whittle_forgan(s)],
+            osv=q_OSV_saha_zuber(s; direction=:left),
+            osv_inhom=q_OSV_saha_zuber(s; direction=:left, inhomogeneity_factor=1.2),
+            bp=q_boiling_onset(s),
+            # Python reports the margin T_wall - T_ONB.
+            onb_margin=s.T_wall_left .- bergles_rohsenow_t_onb(s; direction=:left),
+            onb_margin_factors=wall .- onb,
+            twall=twall_limit(s; inhomogeneity_factor=1.2),
+        )
+        @testset "$label $k" for k in keys(python[label])
+            rtol = k === :ofi ? 1e-7 : 1e-9  # two adaptive quadratures for OFI
+            @test all(isapprox.(ends(julia[k]), python[label][k]; rtol=rtol))
+        end
+    end
 end
