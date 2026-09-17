@@ -270,7 +270,7 @@ function build_loop_lof_bypass(;
     @named flapper = Flapper(;
         machine=machine, open_at_current=0.01, f=50.0, area=0.01, open_rate=1.0 / dt_ramp
     )
-    push!(machine, flapper_opens(flapper, ine.inlet.ṁ))
+    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < flapper.open_at_current))
     @named ext_res = Resistor(R_ext)
 
     ps = fill(1.0 / (n * fuel_nx), n, fuel_nx)

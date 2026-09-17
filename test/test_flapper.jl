@@ -61,7 +61,7 @@ end
     # A weak (large-f) flapper sits in parallel with a resistor branch. A pump holds the loop flow
     # at ṁ0, then shuts off and the flow coasts down past the threshold; the transition fires
     # and the ramp completes. Detection is end-to-end (no pre-set open state), so this
-    # exercises flapper_opens. The transient starts from the full solved steady state, which
+    # exercises the opening transition. The transient starts from the solved steady state, which
     # keeps the coastdown IC consistent across MTK versions. A hand-seeded partial IC left the flow
     # frozen at ṁ=0 on newer MTK, so it never crossed the threshold and the valve never opened.
     threshold = 0.01
@@ -74,7 +74,7 @@ end
     machine = StateMachine(; initial_state=:CLOSED)
     @named flapper = Flapper(; open_at_current=threshold, f=1.0e6, area=1.0, open_rate=1.0 / 3.0,
                              machine=machine, liquid=Liquid())
-    push!(machine, flapper_opens(flapper, ine.inlet.ṁ))
+    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < flapper.open_at_current))
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, ine)...,

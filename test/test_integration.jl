@@ -390,7 +390,7 @@ end
         machine=machine,
         liquid=Liquid(),
     )
-    push!(machine, flapper_opens(flapper, R.inlet.ṁ))
+    push!(machine, (:CLOSED => :OPEN, R.inlet.ṁ < flapper.open_at_current))
     @named hx = HeatExchanger(26.85)
     conns = [
         inparallel(pump, (R, flapper), hx)...,
