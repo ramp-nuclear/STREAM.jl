@@ -124,7 +124,7 @@ src/
     flapper.jl                # Flapper
     resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
                               # VolumetricFlowResistor, LocalPressureDrop
-    ideal.jl                  # Inertia, HeatExchanger, FlowWeight, ConstantTemperature
+    ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
@@ -141,6 +141,7 @@ src/
     port.jl                   # port: index one element of a connector array (a getter, not a verb)
     connections.jl            # module Assemblies.Connect: face, faces,
                               # temperature_feedback, inseries, inparallel, weighted
+                              # (and _FlowWeight, the private component weighted places)
     assemblies.jl             # compose_systems, check_gravity_mismatch, symmetric_plate,
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
@@ -191,7 +192,8 @@ test/
                             # port, check_gravity_mismatch, var_length, temperature_feedback,
                             # fuel_assembly — heavy CAC<->HD coverage
   test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
-  test_solvers.jl           # steady_state_guess, uniform + solve_steady/solve_transient wrappers
+  test_initial_conditions.jl # steady_state_guess, uniform (src/initial_conditions.jl)
+  test_solvers.jl           # solve_steady/solve_transient wrappers (src/solvers.jl)
   test_examples.jl          # build_loop* / build_cube builders + loss-of-flow transient (src/examples.jl)
   test_determinacy.jl       # equation/unknown balance (fully_determined) for builders + scenarios
   test_validation.jl        # Quantitative cross-validation against Python STREAM
