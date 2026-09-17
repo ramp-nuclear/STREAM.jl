@@ -138,3 +138,63 @@ Not normalized.
 """
 cosine_T_wall_profile(n::Integer; amplitude::Real = 1.0) =
     cosine_power_shape(n, 1; amplitude = amplitude)[:, 1]
+
+"""
+    _peaking_angle(ppf) -> Float64
+
+The angle `h` with `h/sin(h) = ppf`, found by bisection on `[0, π/2]`.
+
+`sin(h)/h` falls monotonically from 1 to `2/π` over that interval, so any `ppf` the caller is
+allowed to pass is bracketed by construction and bisection cannot miss it. It is solved once
+per profile, which does not pay for a root-finding dependency.
+"""
+function _peaking_angle(ppf)
+    ppf == 1 && return 0.0
+    lo, hi = 0.0, π / 2
+    while hi - lo > eps(hi)
+        mid = (lo + hi) / 2
+        sin(mid) / mid > 1 / ppf ? (lo = mid) : (hi = mid)
+    end
+    return (lo + hi) / 2
+end
+
+"""
+    cosine_shape(x, ppf=π/2; xmax=nothing) -> Vector{Float64}
+
+A cosine power profile over cells with boundaries `x`, integrated over each cell and
+normalised so the shares sum to 1.
+
+The profile is `cos(π(x - xmax)/L)`. The extrapolated length `L` is set by the power peaking
+factor `ppf`, the ratio of the profile's peak to its mean over `x`: with `ℓ` the span of `x`
+and `h = πℓ/(2L)`, that ratio is `h/sin(h)`, solved here for `h`. The peak sits in the
+middle of `x` unless `xmax` moves it, as for a partially inserted control rod.
+
+Integrating each cell rather than sampling its centre keeps the total right on a coarse or
+graded mesh. [`cosine_power_shape`](@ref) samples instead, and its peak is always twice its
+mean.
+
+# Arguments
+- `x`: increasing cell boundaries, `length(x) = ncells + 1` [m]
+- `ppf`: power peaking factor in `[1, π/2]`. `1` is flat, and `π/2` is a cosine reaching
+  zero exactly at the ends.
+
+# Keywords
+- `xmax`: where the cosine peaks, the middle of `x` by default
+
+# Returns
+`Vector{Float64}` of length `length(x) - 1`, one share per cell.
+
+# Throws
+- `ArgumentError`: if `ppf` is outside `[1, π/2]`
+"""
+function cosine_shape(x, ppf=π / 2; xmax=nothing)
+    1 <= ppf <= π / 2 || throw(ArgumentError("ppf must be in [1, π/2], got $ppf"))
+    span = last(x) - first(x)
+    mid = xmax === nothing ? (first(x) + last(x)) / 2 : xmax
+    h = _peaking_angle(ppf)
+    # Flat is the h -> 0 limit of the expression below, which divides by zero there.
+    iszero(h) && return diff(collect(Float64, x)) ./ span
+    a = 2h / span
+    b = ppf / span
+    return (b / a) .* diff(sin.(a .* (x .- mid)))
+end

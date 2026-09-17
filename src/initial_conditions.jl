@@ -1,4 +1,34 @@
 """
+    uniform(systems, value, variables...) -> Vector{Pair}
+
+Give each of `variables` the same `value` in every one of `systems`, for an operating point.
+An array variable gets `value` in every element, and a system without one of the variables is
+skipped for it.
+
+# Arguments
+- `systems`: subsystems of a compiled system, such as `ssys.riser`
+- `value`: the value to give
+- `variables`: `Symbol`s naming the variables
+
+# Returns
+A vector of `variable => value` pairs to splice into an operating point.
+
+# Example
+```julia
+op = [ssys.pump.inlet.ṁ => 16.2, uniform([ssys.riser, ssys.core.ch], 35.0, :T)...]
+```
+"""
+function uniform(systems, value, variables::Symbol...)
+    pairs = Pair[]
+    for sys in systems, var in variables
+        hasproperty(sys, var) || continue
+        x = getproperty(sys, var)
+        push!(pairs, x => (x isa AbstractArray ? fill(value, size(x)) : value))
+    end
+    return pairs
+end
+
+"""
     steady_state_guess(; T_inlet, Q_wall, ṁ_guess, n) -> Vector{Float64}
 
 Generate a linear temperature guess for steady-state initialization.

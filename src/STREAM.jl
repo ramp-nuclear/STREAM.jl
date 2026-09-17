@@ -230,7 +230,7 @@ using ModelingToolkit
 using OrdinaryDiffEq
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkit: ⋅
-using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM
+using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..HTC
@@ -251,6 +251,7 @@ include("components/point_kinetics.jl")
 export FlowPort, ThermalPort
 export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFlowResistor
 export LocalPressureDrop, Inertia, HeatExchanger, bilinear_inertia
+export ResistorFromKnownPoint
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
@@ -343,14 +344,14 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 using ...Components
 import ..port
 include("assemblies/connections.jl")
-export inseries, inparallel, face, faces, temperature_feedback
+export inseries, inparallel, weighted, face, faces, temperature_feedback
 end
 using .Connect
 using .Connect: var_length   # the arrangements below count ports with it
 
 include("assemblies/assemblies.jl")
 export Connect
-export inseries, inparallel, face, faces, port, temperature_feedback
+export inseries, inparallel, weighted, face, faces, port, temperature_feedback
 export check_gravity_mismatch, compose_systems
 export symmetric_plate, plate, one_sided, single_channel, fuel_assembly
 end
@@ -373,6 +374,7 @@ None of these validate or normalize their inputs; negatives, zeros and NaNs pass
 module Utilities
 include("utilities.jl")
 export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
+export cosine_shape
 end
 
 include("initial_conditions.jl")
@@ -423,10 +425,10 @@ export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend
 export PipeGeometry, PipeGeometry_rectangular, PipeGeometry_circular
 
 # Solve entry points and the operating-point guess
-export solve_steady, solve_transient, steady_state_guess
+export solve_steady, solve_transient, steady_state_guess, uniform
 
 # Physical constants
-export G_EARTH, ATM
+export G_EARTH, ATM, T_ROOM
 
 # Design knobs
 export knob_defaults, @design_knob

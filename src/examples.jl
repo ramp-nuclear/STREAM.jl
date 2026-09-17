@@ -289,8 +289,6 @@ function build_loop_lof_bypass(;
         pump.inlet.p ~ 1.0e5,
         watch_flow(flapper, ine.inlet.ṁ),
         heated.fuel.power ~ power_W,
-        [ret.T_wall_left[i] ~ T_inlet for i in 1:n]...,
-        [ret.T_wall_right[i] ~ T_inlet for i in 1:n]...,
         # Close the dangling right face of the one-sided CAC (fuel is on the left).
         # The current MTK does not auto-zero an unconnected ThermalPort's flow, so
         # bind each right wall T to the local bulk T ⇒ q_right = h*(T-T) = 0 (adiabatic).

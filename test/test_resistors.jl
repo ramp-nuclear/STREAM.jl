@@ -183,3 +183,51 @@ end
     @test isapprox(sol[ssys.lpd.inlet.p] - sol[ssys.lpd.outlet.p], dp_expected; rtol=1e-6)
     @test dp_expected > 0.0   # forward flow drops pressure
 end
+
+@testset "ResistorFromKnownPoint reproduces its known point" begin
+    # Apply a head across the resistor at a fixed coolant temperature and read the flow it
+    # passes. A head of -dp has to drive exactly the known ṁ.
+    function flow_through(make_resistor; head, T, guess)
+        @named pump = Pump(head)
+        @named hx = HeatExchanger(T)
+        r = make_resistor(:r)
+        conns = [inseries(pump, hx, r, pump)..., pump.inlet.p ~ 1.0e5]
+        @named sys = compose(System(conns, t; name=:known_point), pump, hx, r)
+        ssys = mtkcompile(sys)
+        sol = solve_steady(ssys, Pair{Any,Any}[ssys.r.inlet.ṁ => guess])
+        @test sol.retcode == ReturnCode.Success
+        return sol[ssys.r.inlet.ṁ]
+    end
+
+    dp, ṁ, T = -2.0e4, 0.3, 40.0
+    parabolic(name) = ResistorFromKnownPoint(; name=name, dp=dp, ṁ=ṁ, T=T)
+    @test flow_through(parabolic; head=-dp, T=T, guess=0.1) ≈ ṁ rtol = 1e-8
+
+    # Away from the known temperature the drop scales with 1/ρ, so the flow with √ρ.
+    T_hot = 80.0
+    @test flow_through(parabolic; head=-dp, T=T_hot, guess=0.1) ≈
+        ṁ * sqrt(ρ(H2O, T_hot) / ρ(H2O, T)) rtol = 1e-8
+
+    # Direction-correct: a reversed head drives the known flow backwards.
+    @test flow_through(parabolic; head=dp, T=T, guess=-0.1) ≈ -ṁ rtol = 1e-8
+
+    # Python's doctest: linear through (-1 Pa, 1 kg/s) gives -3 Pa at 3 kg/s. Read the other
+    # way, a 3 Pa head drives 3 kg/s.
+    linear(name) = ResistorFromKnownPoint(; name=name, dp=-1.0, ṁ=1.0, behavior=:linear)
+    @test flow_through(linear; head=3.0, T=T, guess=1.0) ≈ 3.0 rtol = 1e-10
+
+    @testset "arguments it cannot use are rejected" begin
+        @test_throws ArgumentError ResistorFromKnownPoint(; name=:r)
+        @test_throws ArgumentError ResistorFromKnownPoint(; name=:r, dp=1.0, ṁ=1.0, T=40.0)
+        @test_throws ArgumentError ResistorFromKnownPoint(; name=:r, dp=-1.0, ṁ=1.0)
+        @test_throws ArgumentError ResistorFromKnownPoint(;
+            name=:r, dp=-1.0, behavior=:linear
+        )
+        @test_throws ArgumentError ResistorFromKnownPoint(;
+            name=:r, dp=-1.0, ṁ=1.0, behavior=:cubic
+        )
+        # Constant is a source rather than a resistor.
+        @test ResistorFromKnownPoint(; name=:c, dp=-1.0, behavior=:constant) isa
+            ModelingToolkit.System
+    end
+end

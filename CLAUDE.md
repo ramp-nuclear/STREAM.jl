@@ -122,7 +122,8 @@ src/
     twoports.jl               # HydraulicTwoPort, shared by the two-port components
     pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
     flapper.jl                # Flapper
-    resistors.jl              # FrictionResistor, Gravity, Resistor, VolumetricFlowResistor, LocalPressureDrop
+    resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
+                              # VolumetricFlowResistor, LocalPressureDrop
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
@@ -139,12 +140,14 @@ src/
   assemblies/                 # module Assemblies
     port.jl                   # port: index one element of a connector array (a getter, not a verb)
     connections.jl            # module Assemblies.Connect: face, faces,
-                              # temperature_feedback, inseries, inparallel
+                              # temperature_feedback, inseries, inparallel, weighted
+                              # (and _FlowWeight, the private component weighted places)
     assemblies.jl             # compose_systems, check_gravity_mismatch, symmetric_plate,
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
-  initial_conditions.jl       # steady_state_guess
-  utilities.jl                # module Utilities: rebin_*, cosine_power_shape, cosine_T_wall_profile
+  initial_conditions.jl       # steady_state_guess, uniform
+  utilities.jl                # module Utilities: rebin_*, cosine_shape, cosine_power_shape,
+                              # cosine_T_wall_profile
   examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk
 ```
 
@@ -189,7 +192,8 @@ test/
                             # port, check_gravity_mismatch, var_length, temperature_feedback,
                             # fuel_assembly — heavy CAC<->HD coverage
   test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
-  test_solvers.jl           # steady_state_guess + solve_steady/solve_transient wrappers (src/solvers.jl)
+  test_initial_conditions.jl # steady_state_guess, uniform (src/initial_conditions.jl)
+  test_solvers.jl           # solve_steady/solve_transient wrappers (src/solvers.jl)
   test_examples.jl          # build_loop* / build_cube builders + loss-of-flow transient (src/examples.jl)
   test_determinacy.jl       # equation/unknown balance (fully_determined) for builders + scenarios
   test_validation.jl        # Quantitative cross-validation against Python STREAM

@@ -83,6 +83,71 @@ function Resistor(R; name)
 end
 
 """
+    ResistorFromKnownPoint(; name, dp=nothing, ṁ=nothing, behavior=:parabolic, T=nothing,
+                           liquid=H2O) -> System
+
+A resistor built to pass through one known operating point `(dp, ṁ)`.
+
+`dp` is `outlet.p - inlet.p` at the flow `ṁ`, so a resistor's is negative. There are three
+behaviours:
+
+- `:parabolic`, the default: `ΔP = K·ṁ·|ṁ|/(2ρ)` with `K = 2|dp|·ρ(T)/ṁ²`. It reproduces
+  `dp` exactly at temperature `T` and scales with `1/ρ` away from it, which is how a form
+  loss or an orifice behaves. Needs `T`.
+- `:linear`: a [`Resistor`](@ref) with `R = -dp/ṁ`.
+- `:constant`: a [`Pump`](@ref) holding `dp` whatever the flow, or holding `ṁ` when `dp` is
+  not given.
+
+This is how a loop gets calibrated against a measured operating point. Read `dp` and `ṁ` off
+the plant for a component nobody has a correlation for, and the resistor reproduces them.
+
+# Arguments
+- `name`: system name (Symbol)
+- `dp`: pressure difference `outlet.p - inlet.p` at the known point [Pa]
+- `ṁ`: mass flow at the known point [kg/s]
+- `behavior`: `:parabolic`, `:linear` or `:constant`
+- `T`: coolant temperature at the known point [°C], for `:parabolic`
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
+
+# Returns
+Uncompiled `System` with `inlet` and `outlet` ports.
+
+# Throws
+- `ArgumentError`: when a value the behaviour needs is missing, when a parabolic `dp` is
+  positive, or for an unknown behaviour
+"""
+function ResistorFromKnownPoint(;
+    name, dp=nothing, ṁ=nothing, behavior::Symbol=:parabolic, T=nothing,
+    liquid::AbstractLiquid=H2O,
+)
+    dp === nothing && ṁ === nothing && throw(ArgumentError("give at least one of dp and ṁ"))
+    if behavior === :constant
+        return dp === nothing ? Pump(; name=name, ṁ0=ṁ) : Pump(dp; name=name)
+    end
+    if dp === nothing || ṁ === nothing
+        throw(ArgumentError("a $behavior resistor needs both dp and ṁ"))
+    end
+    behavior === :linear && return Resistor(-dp / ṁ; name=name)
+    if behavior !== :parabolic
+        throw(ArgumentError("behavior :$behavior is not :constant, :linear or :parabolic"))
+    end
+    if dp > 0
+        throw(ArgumentError("a parabolic resistor only drops pressure, so dp ≤ 0, got $dp"))
+    end
+    if T === nothing
+        throw(ArgumentError("a parabolic resistor needs T, the known point's temperature"))
+    end
+
+    K = 2 * abs(dp) * ρ(liquid, T) / ṁ^2
+    pars = @parameters K = K
+    @named inlet = FlowPort()
+    @named outlet = FlowPort()
+    rho = ρ(liquid, instream(inlet.T))
+    eqs = Equation[inlet.p - outlet.p ~ K * inlet.ṁ * abs(inlet.ṁ) / (2 * rho)]
+    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+end
+
+"""
     VolumetricFlowResistor(; name, k, klow=0.0, density=(T -> ρ(H2O, T))) -> System
 
 Resistor quadratic in volumetric flow: `ΔP = k·Q·|Q| + klow·Q`, where `Q = ṁ/ρ` is the

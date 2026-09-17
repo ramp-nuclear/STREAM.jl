@@ -50,7 +50,9 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 
 The LOFA cell is qualified because that is where Python's reach ends. Loops with a single
 channel type are solid; the cases with different channels in parallel are where it got stuck.
-That limit is the implementation's, not the physics'.
+That limit is the implementation's, not the physics'. `Connect.weighted` is Python's junction
+`weights` (`flow_edge(..., signify=N)`), so one representative channel can stand for `N`
+identical ones.
 
 The LOCA split is the one worth internalising. Both codes are single-phase liquid with
 subcooled-boiling *heat transfer enhancement* and thresholds that report margin. That is
@@ -238,7 +240,7 @@ expands is a first-order effect on peak fuel temperature.
 | `ResistorSum` | Add resistors into one component | No, `inseries` covers the composition |
 | `Bend` | Idelchik ch. 6 diagram 6.1 bend loss, angle and relative curvature and Re | No |
 | `Screen` | Idelchik p. 598 circular wire mesh screen | No |
-| `ResistorFromKnownPoint` | Build a constant/linear/parabolic resistor from one known `(ΔP, ṁ)` point | No |
+| `ResistorFromKnownPoint` | Build a constant/linear/parabolic resistor from one known `(ΔP, ṁ)` point | Yes |
 | `bend_factor` | The bare Idelchik bend correlation | No |
 
 The Idelchik local losses we do have (`expansion`, `contraction`) match.
@@ -266,10 +268,10 @@ which `remake` reaches like any other parameter: `remake(prob; p=[ssys.r1.R => 6
 symbolically the knee is an `ifelse` on `abs(ṁ)`, so a reversal behaves like forward flow.
 The callable form carries one extra variable, `L_eff`, for the effective inertia.
 
-**Remaining:** `Bend`, `Screen`, `ResistorFromKnownPoint` and `bend_factor`, all postponed.
-Each is small and independent. `ResistorFromKnownPoint` is worth more than its size suggests:
-it is how you calibrate a loop against a measured operating point, which is the usual way a
-research reactor model gets its form losses.
+**Remaining:** `Bend`, `Screen` and `bend_factor`, all postponed. Each is small and
+independent. `ResistorFromKnownPoint` is in. It is how a loop is calibrated against a
+measured operating point, which is the usual way a research reactor model gets its form
+losses.
 
 ---
 
@@ -385,6 +387,9 @@ for the lateral direction across clad and meat.
 Since the axial peaking factor sets the hot spot, and the hot spot sets every threshold
 margin, this is more load-bearing than it looks.
 
+`Utilities.cosine_shape` now ports Python's `cosine_shape` with all four of those. Still
+missing: `cosine_shape_by_zero_endpoints` and `uniform_x_power_shape`.
+
 **Size:** small. Pure functions, no MTK involvement.
 
 ---
@@ -434,6 +439,10 @@ Continuation would remove the guesswork. Solve once with `R_ext` low enough, or 
 open, that the trivial root does not exist, then walk the parameter back to its real value
 using each solution as the guess for the next. The guess then comes from a previous solve
 rather than from naming variables.
+
+`uniform(systems, value, variables...)` covers Python's `State.uniform`: one value for the
+same variable across many subsystems, spliced into an operating point. It shortens a guess,
+it does not decide which root you land on.
 
 **Size:** small. Nothing fails because of it today; it is a maintenance cost that lands on
 whoever next changes a channel equation.
@@ -591,8 +600,9 @@ Ordered by what unblocks the most, not by size.
 4. **Heat conduction rework** (§2.1 to §2.5) as one piece: non-uniform mesh, per-cell
    material, contact conductance, axial conduction, and the cylindrical metric. Doing these
    separately means touching `_diffusion_eqs` five times. This is what opens rod fuel.
-5. **Power shapes** (§6). Small, and it directly affects every hot-channel margin.
-6. **Missing hydraulic components** (§3.1), `ResistorFromKnownPoint` and `Bend` first.
+5. **Power shapes** (§6). `cosine_shape` is in; the extrapolated cosine and the lateral
+   shape remain.
+6. **Missing hydraulic components** (§3.1). `ResistorFromKnownPoint` is in; `Bend` next.
 7. **Debugging ergonomics** (§9). High value per line, and the pain is felt on every failed
    initialisation.
 8. **RIA limits** (§5.2), after §2 and §4 are settled.

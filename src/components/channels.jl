@@ -158,7 +158,7 @@ function _setup(geometry, g, n)
     pars = @parameters g_acc = g
 
     @variables begin
-        (T(t))[1:n]
+        (T(t))[1:n] = fill(T_ROOM, n)
         (dp(t))[1:n]
         (T_wall_left(t))[1:n]
         (T_wall_right(t))[1:n]
@@ -266,7 +266,10 @@ A `WallTemperature` source can be used as a closure, for example.
 - `T_wall_left(t)[1:n]`: per-cell left-face wall temperature [°C]
 - `T_wall_right(t)[1:n]`: per-cell right-face wall temperature [°C]
 
-These have no internal equation. Close them via either of:
+These have no internal equation. A side with a nonzero `h` needs its wall closed, and so does
+any wall a friction model reads, such as [`RegimeDependent`](@ref) with a `viscosity`
+correction. A side with `h = 0` under a friction model that ignores the wall, the default,
+needs nothing: its wall temperature appears in no equation. Close a wall via either of:
 ```julia
 # Style 1 — direct binding eqns at compose time (args.funcs idiom):
 connections = [
