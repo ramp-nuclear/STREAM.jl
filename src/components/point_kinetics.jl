@@ -9,11 +9,12 @@ const U235_LAMBDA = 5.4e-5
 """
     U235_LAMBDA_K
 
-Precursor decay constants λₖ [1/s] for the six standard U-235 delayed neutron groups, ordered
-fastest to slowest. The default `lambda_k` in [`PointKinetics`](@ref), paired group for group
-with [`U235_BETA_K`](@ref).
+Precursor decay constants λₖ [1/s] for Keepin's six U-235 thermal-fission delayed neutron
+groups (Physics of Nuclear Kinetics, 1965), ordered slowest to fastest: half-lives of 55.72,
+22.72, 6.22, 2.30, 0.61 and 0.23 s. The default `lambda_k` in [`PointKinetics`](@ref), paired
+group for group with [`U235_BETA_K`](@ref).
 """
-const U235_LAMBDA_K = [55.72, 22.72, 6.22, 2.3, 0.618, 0.23]
+const U235_LAMBDA_K = [0.0124, 0.0305, 0.111, 0.301, 1.14, 3.01]
 
 """
     U235_BETA_K
