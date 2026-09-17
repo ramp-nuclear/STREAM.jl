@@ -142,13 +142,16 @@ cosine_T_wall_profile(n::Integer; amplitude::Real = 1.0) =
 """
     _peaking_angle(ppf) -> Float64
 
-The angle `h` with `h/sin(h) = ppf`, by bisection on `[0, π/2]`, where `sin(h)/h` falls
-monotonically from 1 to `2/π`. Python STREAM finds the same root with `fsolve`.
+The angle `h` with `h/sin(h) = ppf`, found by bisection on `[0, π/2]`.
+
+`sin(h)/h` falls monotonically from 1 to `2/π` over that interval, so any `ppf` the caller is
+allowed to pass is bracketed by construction and bisection cannot miss it. It is solved once
+per profile, which does not pay for a root-finding dependency.
 """
 function _peaking_angle(ppf)
     ppf == 1 && return 0.0
     lo, hi = 0.0, π / 2
-    for _ in 1:100
+    while hi - lo > eps(hi)
         mid = (lo + hi) / 2
         sin(mid) / mid > 1 / ppf ? (lo = mid) : (hi = mid)
     end
@@ -169,8 +172,6 @@ middle of `x` unless `xmax` moves it, as for a partially inserted control rod.
 Integrating each cell rather than sampling its centre keeps the total right on a coarse or
 graded mesh. [`cosine_power_shape`](@ref) samples instead, and its peak is always twice its
 mean.
-
-Source: Python STREAM utilities.py `cosine_shape`.
 
 # Arguments
 - `x`: increasing cell boundaries, `length(x) = ncells + 1` [m]

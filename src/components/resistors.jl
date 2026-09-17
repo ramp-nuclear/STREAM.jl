@@ -88,8 +88,8 @@ end
 
 A resistor built to pass through one known operating point `(dp, ṁ)`.
 
-`dp` is `outlet.p - inlet.p` at the flow `ṁ`, so it is negative for a resistor, as in Python
-STREAM. There are three behaviours:
+`dp` is `outlet.p - inlet.p` at the flow `ṁ`, so a resistor's is negative. There are three
+behaviours:
 
 - `:parabolic`, the default: `ΔP = K·ṁ·|ṁ|/(2ρ)` with `K = 2|dp|·ρ(T)/ṁ²`. It reproduces
   `dp` exactly at temperature `T` and scales with `1/ρ` away from it, which is how a form
@@ -100,8 +100,6 @@ STREAM. There are three behaviours:
 
 This is how a loop gets calibrated against a measured operating point. Read `dp` and `ṁ` off
 the plant for a component nobody has a correlation for, and the resistor reproduces them.
-
-Source: Python STREAM composition/constructors.py `ResistorFromKnownPoint`.
 
 # Arguments
 - `name`: system name (Symbol)

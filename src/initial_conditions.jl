@@ -1,9 +1,9 @@
 """
     uniform(systems, value, variables...) -> Vector{Pair}
 
-Give each of `variables` the same `value` in every one of `systems`, for an operating point:
-Python STREAM's `State.uniform`. An array variable gets `value` in every element, and a
-system without one of the variables is skipped for it.
+Give each of `variables` the same `value` in every one of `systems`, for an operating point.
+An array variable gets `value` in every element, and a system without one of the variables is
+skipped for it.
 
 # Arguments
 - `systems`: subsystems of a compiled system, such as `ssys.riser`

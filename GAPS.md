@@ -50,9 +50,9 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 
 The LOFA cell is qualified because that is where Python's reach ends. Loops with a single
 channel type are solid; the cases with different channels in parallel are where it got stuck.
-That limit is the implementation's, not the physics'. `Components.FlowWeight` is Python's
-junction `weights` (`flow_edge(..., signify=N)`), so one representative channel can stand for
-`N` identical ones.
+That limit is the implementation's, not the physics'. `Connect.weighted` is Python's junction
+`weights` (`flow_edge(..., signify=N)`), so one representative channel can stand for `N`
+identical ones.
 
 The LOCA split is the one worth internalising. Both codes are single-phase liquid with
 subcooled-boiling *heat transfer enhancement* and thresholds that report margin. That is
@@ -439,6 +439,10 @@ Continuation would remove the guesswork. Solve once with `R_ext` low enough, or 
 open, that the trivial root does not exist, then walk the parameter back to its real value
 using each solution as the guess for the next. The guess then comes from a previous solve
 rather than from naming variables.
+
+`uniform(systems, value, variables...)` covers Python's `State.uniform`: one value for the
+same variable across many subsystems, spliced into an operating point. It shortens a guess,
+it does not decide which root you land on.
 
 **Size:** small. Nothing fails because of it today; it is a maintenance cost that lands on
 whoever next changes a channel equation.

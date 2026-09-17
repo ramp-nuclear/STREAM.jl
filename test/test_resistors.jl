@@ -184,8 +184,6 @@ end
     @test dp_expected > 0.0   # forward flow drops pressure
 end
 
-using OrdinaryDiffEq: ReturnCode
-
 @testset "ResistorFromKnownPoint reproduces its known point" begin
     # Apply a head across the resistor at a fixed coolant temperature and read the flow it
     # passes. A head of -dp has to drive exactly the known ṁ.
@@ -228,7 +226,7 @@ using OrdinaryDiffEq: ReturnCode
         @test_throws ArgumentError ResistorFromKnownPoint(;
             name=:r, dp=-1.0, ṁ=1.0, behavior=:cubic
         )
-        # Constant is a source rather than a resistor, as in Python.
+        # Constant is a source rather than a resistor.
         @test ResistorFromKnownPoint(; name=:c, dp=-1.0, behavior=:constant) isa
             ModelingToolkit.System
     end
