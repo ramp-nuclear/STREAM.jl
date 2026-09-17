@@ -230,6 +230,7 @@ using ModelingToolkit
 using OrdinaryDiffEq
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkit: ⋅
+using ModelingToolkit: Symbolics, SymbolicUtils
 using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
@@ -238,6 +239,7 @@ using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
 using ..LocalLoss
 using ..STREAM
+include("components/state_machine.jl")
 include("components/connectors.jl")
 include("components/twoports.jl")
 include("components/pump.jl")
@@ -254,8 +256,8 @@ export LocalPressureDrop, Inertia, HeatExchanger, bilinear_inertia
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
-export ReactivityController, worth, change_state
-export SCRAMCondition, SCRAM_at_power, scram_callback, flapper_callback, watch_flow
+export ReactivityController, worth
+export StateMachine, StateSchedule, trip!, machine_callbacks
 end
 
 """
@@ -290,6 +292,7 @@ using DelimitedFiles
 using ModelingToolkit
 using OrdinaryDiffEq
 using ..Components: PointKinetics, point_kinetics_steady_state, ReactivityController
+using ..Components: StateMachine
 using ..Components: U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 using ..STREAM
 include("decay_heat/decay_heat.jl")

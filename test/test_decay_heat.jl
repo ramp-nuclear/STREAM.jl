@@ -1,7 +1,7 @@
 using Test
 using STREAM
 using STREAM.DecayHeat
-using STREAM.Components: ReactivityController, SCRAM_at_power, change_state
+using STREAM.Components: ReactivityController, StateMachine, trip!
 using STREAM.Examples
 using OrdinaryDiffEq: ReturnCode
 
@@ -229,20 +229,25 @@ const DH_TABLE_SUMS = [
         @testset "an untripped controller holds the saturated value" begin
             # A reactor at power carries a saturated inventory, so the source is flat
             # until something trips it, however far the simulation has run.
-            src = DecayHeatSource(model, ReactivityController(); P0=1.0)
+            src = DecayHeatSource(model, StateMachine(); P0=1.0)
             @test src(0.0) == src(50.0) == src(1e6)
             @test src(0.0) ≈ saturated / 200 rtol = 1e-12
         end
 
-        @testset "the clock starts when the controller scrams" begin
-            trip = SCRAM_at_power(0.5)
-            ctrl = ReactivityController((s, ts, t) -> 0.0; state_machine=trip)
-            src = DecayHeatSource(model, ctrl; P0=1.0)
+        @testset "the clock starts when the machine trips" begin
+            machine = StateMachine()
+            src = DecayHeatSource(model, machine; P0=1.0)
             @test src(20.0) ≈ saturated / 200 rtol = 1e-12   # still :NORMAL
 
-            change_state(ctrl, 10.0, 1.0, 0.0)               # over the limit, so :SCRAM
-            @test ctrl.state === :SCRAM
-            @test ctrl.t_state == 10.0
+            trip!(machine, 10.0)
+            @test machine.state === :SCRAM
+            @test machine.t_state == 10.0
+
+            # A controller may be handed over in place of its machine.
+            through_ctrl = DecayHeatSource(
+                model, ReactivityController(; machine=machine); P0=1.0
+            )
+            @test through_ctrl(30.0) == src(30.0)
 
             @test src(30.0) ≈ 0.005 * model(20.0, Inf) rtol = 1e-12
             @test src(30.0) < src(20.0)
@@ -252,11 +257,10 @@ const DH_TABLE_SUMS = [
             # The decay curve starts at its saturated value, so switching the clock on
             # changes the slope and not the number. A solver trialling a time behind
             # t_state gets the same answer the untripped branch gave it.
-            trip = SCRAM_at_power(0.5)
-            ctrl = ReactivityController((s, ts, t) -> 0.0; state_machine=trip)
-            src = DecayHeatSource(model, ctrl; P0=1.0)
+            machine = StateMachine()
+            src = DecayHeatSource(model, machine; P0=1.0)
             before = src(10.0)
-            change_state(ctrl, 10.0, 1.0, 0.0)
+            trip!(machine, 10.0)
             @test src(10.0) == before
             @test src(9.0) == before      # trial step behind the trip
             @test src(-1.0) == before
@@ -264,11 +268,9 @@ const DH_TABLE_SUMS = [
             @test decay_time(src, 12.5) == 2.5
         end
 
-        @testset "a known trip time needs no state machine" begin
-            # A controller built already in the shutdown state is a fixed trip.
-            fixed = ReactivityController(
-                (s, ts, t) -> 0.0; initial_state=:SCRAM, initial_time=5.0
-            )
+        @testset "a known trip time needs no transitions" begin
+            # A machine built already in the shutdown state is a fixed trip.
+            fixed = StateMachine(; initial_state=:SCRAM, initial_time=5.0)
             src = DecayHeatSource(model, fixed; P0=1.0)
             @test src(5.0) ≈ saturated / 200 rtol = 1e-12
             @test src(1005.0) ≈ 0.005 * model(1000.0, Inf) rtol = 1e-12
@@ -276,9 +278,7 @@ const DH_TABLE_SUMS = [
         end
 
         @testset "a finite irradiation leaves less behind" begin
-            fixed = ReactivityController(
-                (s, ts, t) -> 0.0; initial_state=:SCRAM, initial_time=0.0
-            )
+            fixed = StateMachine(; initial_state=:SCRAM, initial_time=0.0)
             brief = DecayHeatSource(model, fixed; P0=1.0, T=100.0)
             saturating = DecayHeatSource(model, fixed; P0=1.0, T=Inf)
             @test brief(0.0) < saturating(0.0)
@@ -286,9 +286,7 @@ const DH_TABLE_SUMS = [
         end
 
         @testset "contributions sum before they are converted" begin
-            fixed = ReactivityController(
-                (s, ts, t) -> 0.0; initial_state=:SCRAM, initial_time=0.0
-            )
+            fixed = StateMachine(; initial_state=:SCRAM, initial_time=0.0)
             act = Activation(5.16e-3)
             total = DecayHeatSource(model + 0.5 * act, fixed; P0=1.0)
             parts = (
@@ -342,10 +340,10 @@ const DH_TABLE_SUMS = [
         # group, at 0.001/s, keeps the decay heat above 1% of P0 for the whole run.
         P0 = 1.0
         model = U238CaptureChain(1.0) + FissionProducts([0.5, 0.001], [3.0, 0.01])
-        # A controller born in :SCRAM is a trip at t = 0, and the reactivity is deep enough
+        # A machine born in :SCRAM is a trip at t = 0, and the reactivity is deep enough
         # that the delayed groups are the only thing holding power up.
         scrammed() = ReactivityController(
-            (s, ts, t) -> -0.05; initial_state=:SCRAM, initial_time=0.0
+            (s, ts, t) -> -0.05; machine=StateMachine(; initial_state=:SCRAM)
         )
         # Twenty minutes: the slowest delayed group decays at 0.0124/s, so by then the
         # fission power has fallen below 1e-6 of P0.

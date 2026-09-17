@@ -112,7 +112,7 @@ end
 """
     PointKinetics(rho_c_fn::Any; name, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
                   lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing,
-                  power_input=nothing) -> System
+                  power_input=nothing, P0=1.0) -> System
 
 Keepin (1965) point kinetics with `G` delayed precursor groups, so `1 + G` ODEs:
 
@@ -137,9 +137,10 @@ coefficient, so `αⱼ` is normally negative.
 
 A critical reactor is `rho_c_fn = t -> 0.0`; a constant bias is `t -> ρ₀`.
 
-`rho_c_fn` has no default, so it must appear in the operating point,
-`op = [ssys.rho_c_fn => rho_c_fn, ssys.P_neutron => ic.P_neutron, ...]`. Without it,
-building the problem fails with "Could not evaluate value of parameter rho_c_fn".
+The system starts where it was built to: `rho_c_fn` defaults to the callable given, and
+`P_neutron` and `C` to the critical steady state holding a total power `P0`, with
+`power_input` taken at `t = 0`, as [`point_kinetics_steady_state`](@ref) computes it. Put any
+of them in the operating point to start elsewhere.
 
 # Neutron and total power
 
@@ -159,8 +160,9 @@ does) needs a `power_input` scaled the same way.
 With no `power_input`, `P` is `P_neutron` and costs nothing: `mtkcompile` eliminates the
 equation either way, so the compiled state count is `1 + G` regardless.
 
-[`scram_callback`](@ref) trips on `P_neutron` rather than `P`, which is what a power-range
-monitor reading neutron flux measures.
+A power trip is a [`StateMachine`](@ref) transition, and may watch either one. `P_neutron`
+is what a power-range monitor reading neutron flux measures; `P` is the total the fuel sees.
+A condition compiles the same way for both, state or observable.
 
 # Arguments
 - `rho_c_fn` (positional): callable `(t) -> Float64`, or a `ReactivityController`. Its
@@ -179,6 +181,7 @@ monitor reading neutron flux measures.
   becomes the callable parameter `power_input_fn`. Either carries the value given as its
   default, so neither has to appear in the operating point, and `solve_transient` can
   override either. `nothing` leaves `P ~ P_neutron`.
+- `P0=1.0`: the total power `P` the default initial state holds, in the units of `P_neutron`
 
 # Returns
 Uncompiled `System` with unknowns `P_neutron`, `C[1:G]`, `P`, and one `T_source` array per
@@ -199,10 +202,12 @@ function PointKinetics(
     temp_worth=nothing,
     ref_temp=nothing,
     power_input=nothing,
+    P0=1.0,
 )
     FType = typeof(rho_c_fn)
+    rho_c_default = rho_c_fn
     control = function ()
-        control_pars = @parameters (rho_c_fn::FType)(..)
+        control_pars = @parameters (rho_c_fn::FType)(..) = rho_c_default
         feedback, feedback_unknowns = _temperature_feedback(temp_worth, ref_temp)
         return (control_pars[1](t) + feedback, control_pars, feedback_unknowns)
     end
@@ -218,10 +223,12 @@ function PointKinetics(
     end
 
     input_power, input_pars = _power_input_term(power_input)
+    input_0 = power_input isa Union{Nothing,Real} ? something(power_input, 0.0) : power_input(0.0)
+    ic = point_kinetics_steady_state(P0; Lambda, beta_k, lambda_k, power_input=input_0)
 
     @variables begin
-        P_neutron(t) = 1.0
-        (C(t))[1:G]
+        P_neutron(t) = ic.P_neutron
+        (C(t))[1:G] = ic.C_k
         # Algebraic, and read by whatever the reactor heats, so it is an unknown here rather
         # than an observable. `mtkcompile` tears it back out.
         P(t)
@@ -290,212 +297,51 @@ function point_kinetics_steady_state(
 end
 
 """
-    ReactivityController{S, F, M}
+    ReactivityController(input_reactivity=nothing; machine=StateMachine())
 
-Pure-Julia state-machine controller that provides time-varying control reactivity
-for `PointKinetics` in callable mode. Mirrors the Python STREAM `ReactivityController`
-API: stores an `input_reactivity` callable with signature `(state, t_state, t) -> Float64`,
-a `state_machine` callable with signature `(state, t, power, dPdt) -> new_state`, the
-current state and time-of-entry, a transition log, and an `abort_states` set used by
-downstream callbacks to signal early integrator termination.
+The control reactivity a [`PointKinetics`](@ref) sees, scheduled off a [`StateMachine`](@ref).
 
-Instances are callable: `ctrl(t)` returns `worth(ctrl, t)`. This lets users pass a
-`ReactivityController` directly as the MTK callable parameter to `PointKinetics(ctrl; ...)`
-without writing a wrapper closure.
+`input_reactivity(state, t_state, t)` is asked for a worth at each step, given the state the
+machine is in and the time it entered it, so rod insertion after a scram is a function of the
+time since the trip. Everything that moves the state lives in the machine.
 
-# Fields
-- `input_reactivity::F` : callable `(state, t_state, t) -> Float64`
-- `state_machine::M`    : callable `(state, t, power, dPdt) -> new_state`
-- `state::S`            : current controller state (typically a Symbol)
-- `t_state::Float64`    : simulation time when the current state was entered
-- `log::Vector{Tuple{S, Float64}}` : state transition history (state, entry-time) pairs
-- `abort_states::Set{S}` : states that signal downstream callbacks to stop integration
-"""
-mutable struct ReactivityController{S,F,M}
-    input_reactivity::F
-    state_machine::M
-    state::S
-    t_state::Float64
-    log::Vector{Tuple{S,Float64}}
-    abort_states::Set{S}
-end
-
-"""
-    ReactivityController(input_reactivity=nothing; initial_state=:NORMAL, initial_time=0.0,
-                         state_machine=nothing, abort_states=nothing) -> ReactivityController
-
-Construct a `ReactivityController` with sensible defaults.
+Instances are callable, `ctrl(t)`, which is what lets one be handed straight to
+`PointKinetics(ctrl; ...)` as the MTK callable parameter.
 
 # Arguments
-- `input_reactivity` (positional, optional): callable `(state, t_state, t) -> Float64`.
-  If `nothing`, defaults to `(s, ts, t) -> 0.0`.
-- `initial_state` (kwarg): initial controller state (default `:NORMAL`).
-- `initial_time` (kwarg): time stamp for the initial state entry (default `0.0`).
-- `state_machine` (kwarg): callable `(state, t, power, dPdt) -> new_state`.
-  If `nothing`, defaults to identity `(s, t, p, dp) -> s` (state never auto-transitions).
-- `abort_states` (kwarg): `Set` of states that signal integrator termination.
-  If `nothing`, defaults to an empty `Set()`.
+- `input_reactivity`: callable `(state, t_state, t) -> Float64`. Without one there is no
+  control worth at all.
 
-# Returns
-A `ReactivityController{S,F,M}` where `S = typeof(initial_state)`,
-`F = typeof(input_reactivity)`, and `M = typeof(state_machine)`. The `log` field
-starts with `[(initial_state, initial_time)]`.
-"""
-function ReactivityController(
-    input_reactivity=nothing;
-    initial_state=:NORMAL,
-    initial_time=0.0,
-    state_machine=nothing,
-    abort_states=nothing,
-)
-    ir = input_reactivity === nothing ? ((s, ts, t) -> 0.0) : input_reactivity
-    sm = state_machine === nothing ? ((s, t, p, dp) -> s) : state_machine
-    S_t = typeof(initial_state)
-    F_t = typeof(ir)
-    M_t = typeof(sm)
-    ab = abort_states === nothing ? Set{S_t}() : Set{S_t}(abort_states)
-    t0 = Float64(initial_time)
-    return ReactivityController{S_t,F_t,M_t}(
-        ir, sm, initial_state, t0, Tuple{S_t,Float64}[(initial_state, t0)], ab
-    )
-end
+# Keywords
+- `machine`: the [`StateMachine`](@ref) whose state is read. A fresh one in `:NORMAL` by
+  default, reachable as `ctrl.machine`, so a controller needs no machine built ahead of it.
+  Pass one when the machine is the object you keep, or when something else drives it too.
 
-"""
-    worth(ctrl::ReactivityController, t_now) -> Float64
-
-Evaluate the controller's `input_reactivity` callable at the current state,
-state-entry time, and simulation time `t_now`. This is the primary output method
-invoked by the MTK callable parameter when `ctrl` is passed to
-`PointKinetics(ctrl; ...)`.
-
-# Arguments
-- `ctrl`: the `ReactivityController` instance
-- `t_now`: current simulation time [s]
-
-# Returns
-`Float64` control reactivity value [-].
-"""
-function worth(ctrl::ReactivityController, t_now)
-    return ctrl.input_reactivity(ctrl.state, ctrl.t_state, t_now)
-end
-
-"""
-    change_state(ctrl::ReactivityController, t_now, power, dPdt) -> new_state
-
-Invoke the controller's `state_machine` and update `ctrl` if the state changes.
-If `state_machine(state, t_now, power, dPdt)` returns a value different from the
-current state, `ctrl.state` is updated, `ctrl.t_state` is set to `t_now`, and
-`(new_state, t_now)` is appended to `ctrl.log`. If the state is unchanged, no
-mutation occurs.
-
-# Arguments
-- `ctrl`: the `ReactivityController` instance
-- `t_now`: current simulation time [s]
-- `power`: current reactor power [W]
-- `dPdt`: current dP/dt [W/s]
-
-# Returns
-The (possibly new) state after the state_machine call.
-"""
-function change_state(ctrl::ReactivityController, t_now, power, dPdt)
-    new_state = ctrl.state_machine(ctrl.state, t_now, power, dPdt)
-    if new_state != ctrl.state
-        ctrl.state = new_state
-        ctrl.t_state = Float64(t_now)
-        push!(ctrl.log, (new_state, Float64(t_now)))
-    end
-    return new_state
-end
-
-(ctrl::ReactivityController)(t_now) = worth(ctrl, t_now)
-
-"""
-    SCRAMCondition
-
-State-machine condition struct for power-triggered SCRAM. Constructed via
-`SCRAM_at_power(power_limit)`. When called as a state machine by
-`ReactivityController.change_state`, returns `:SCRAM` if current power exceeds
-`power_limit`, otherwise returns the current state unchanged.
-
-# Fields
-- `power_limit::Float64`: reactor power threshold above which SCRAM triggers
-"""
-struct SCRAMCondition
-    power_limit::Float64
-end
-
-"""
-    SCRAM_at_power(power_limit) -> SCRAMCondition
-
-Construct a `SCRAMCondition` for use as the `state_machine` kwarg of
-`ReactivityController`. The returned struct triggers SCRAM when reactor power
-exceeds `power_limit`.
-
-# Arguments
-- `power_limit`: threshold power value (coerced to Float64)
-
-# Returns
-`SCRAMCondition` instance.
-"""
-SCRAM_at_power(power_limit) = SCRAMCondition(Float64(power_limit))
-(s::SCRAMCondition)(state, t, P, dPdt) = P > s.power_limit ? :SCRAM : state
-
-"""
-    scram_callback(ssys, p_sym, ctrl; terminate=true) -> ContinuousCallback
-
-Return a `DifferentialEquations.ContinuousCallback` that fires when the neutron power
-crosses `ctrl.state_machine.power_limit` from below (upward zero-crossing of
-`P - power_limit`). On firing:
-1. Calls `change_state(ctrl, t, P, dPdt)` to transition `ctrl.state` to `:SCRAM`.
-2. If `terminate=true` (default), calls `terminate!(integrator)` to stop the solver early.
-
-`ctrl.state_machine` must be a `SCRAMCondition` (constructed via `SCRAM_at_power`).
-
-# Arguments
-- `ssys`: compiled MTK system from `mtkcompile`. Used to eagerly resolve the integer index
-  of `p_sym` in the ODE state vector at callback construction time.
-- `p_sym`: the neutron power, a state of the compiled system: `ssys.P_neutron` when the
-  kinetics are the root system, or `ssys.pk.P_neutron` inside a subsystem named `:pk`. The
-  total `P` is computed from the states rather than being one, so it cannot be watched here.
-- `ctrl`: `ReactivityController` whose `state_machine` is a `SCRAMCondition`.
-- `terminate` (kwarg): `true` (default) stops solver early at SCRAM. Pass `false` to
-  simulate the full post-SCRAM shutdown transient driven by negative control reactivity.
-
-# Returns
-`ContinuousCallback`, to pass as `solve_transient(...; callbacks=cb)`.
-
-# Throws
-- `ArgumentError`: if `p_sym` is not a state of `ssys`, such as the total `P`
+This is a [`StateSchedule`](@ref) under the name the kinetics use, so a valve opening and a
+rod bank are the same kind of object. Its fields are `f`, the schedule, and `machine`.
 
 # Example
 ```julia
-# Standalone PK (PK is root system):
-cb = scram_callback(ssys, ssys.P_neutron, ctrl)
-sol = solve_transient(ssys, op, t_arr; callbacks=cb)
-
-# Full loop (PK nested as :pk subsystem):
-cb = scram_callback(ssys, ssys.pk.P_neutron, ctrl)
-
-# Simulate full post-SCRAM shutdown (no early termination):
-cb = scram_callback(ssys, ssys.pk.P_neutron, ctrl; terminate=false)
-sol = solve_transient(ssys, op, t_arr; callbacks=cb)
+ctrl = ReactivityController((state, t_state, t) -> state === :SCRAM ? -0.06 : 0.0)
+@named pk = PointKinetics(ctrl)
+# the kinetics exist only once the controller does, so their own trip goes in here
+push!(ctrl.machine, (:NORMAL => :SCRAM, pk.P_neutron > 1.2e6))
+sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
 ```
 """
-function scram_callback(ssys, p_sym::Num, ctrl; terminate=true)
-    plimit = ctrl.state_machine.power_limit
-    p_idx = ModelingToolkit.variable_index(ssys, p_sym)
-    p_idx === nothing && throw(
-        ArgumentError(
-            "$p_sym is not a state of the compiled system, so scram_callback cannot " *
-            "watch it; pass the neutron power P_neutron",
-        ),
-    )
+const ReactivityController = StateSchedule
 
-    condition = (u, t, integrator) -> u[p_idx] - plimit
-    affect! = function (integrator)
-        change_state(ctrl, integrator.t, plimit + 1.0, 0.0)
-        return terminate && terminate!(integrator)
-    end
+"""
+    worth(ctrl, t_now) -> Float64
 
-    return ContinuousCallback(condition, affect!)  # upward crossing only (P - plimit: neg -> pos)
-end
+The control reactivity now: the schedule read at the machine's state and the time it entered
+that state, which is the same thing as calling `ctrl(t_now)`.
+
+# Arguments
+- `ctrl`: the [`ReactivityController`](@ref)
+- `t_now`: current simulation time [s]
+
+# Returns
+Control reactivity, dimensionless.
+"""
+worth(ctrl::StateSchedule, t_now) = ctrl(t_now)

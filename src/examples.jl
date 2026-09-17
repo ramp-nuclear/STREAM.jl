@@ -188,7 +188,7 @@ Gravity signs:
 Physics: the pump head `dP_pump_fn(t)` trips toward 0 (loss of flow). Inertia
 carries momentum; ch flow decays. Flapper opens when pump branch ṁ
 (ine.inlet.ṁ) drops below threshold (provided externally via
-`flapper_callback`). After Flapper opens, flow redistributes: heated-channel flow
+`machine_callbacks`). After Flapper opens, flow redistributes: heated-channel flow
 reverses (upward NC driven by buoyancy).
 
 Recommended IC idiom (canonical steady-then-transient): build with a `dP_pump_fn`
@@ -212,6 +212,9 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
 - `g_acc`: gravitational acceleration magnitude [m/s^2] (default G_EARTH)
 - `R_ext`: external hydraulic resistance [Pa·s/kg] (default 1.0e6)
 - `dt_ramp`: Flapper opening ramp duration [s] (default 5.0)
+- `machine`: the `StateMachine` the flapper follows. The opening edge is pushed onto it here,
+  so `machine_callbacks(ssys, machine)` is all a caller needs (default a fresh one in
+  `:CLOSED`, which never opens)
 - `dP_pump_fn`: callable `f(t) -> Float64` giving the pump head [Pa] over time, stored
   as the MTK callable parameter `pump.dP_pump_fn` (pass `ssys.pump.dP_pump_fn => f` in
   the solve `op`). Default `t -> 0.0` (pump off — NC only). For a loss-of-flow run,
@@ -232,6 +235,7 @@ function build_loop_lof_bypass(;
     g_acc=G_EARTH,
     R_ext=1.0e6,
     dt_ramp=5.0,
+    machine::StateMachine=StateMachine(; initial_state=:CLOSED),
     dP_pump_fn=(_t -> 0.0),
 )
     geom = PipeGeometry_circular(L_ch, D_ch)
@@ -263,7 +267,8 @@ function build_loop_lof_bypass(;
     @named ret = Channel(; n=n, geometry=geom, g=g_acc)
     # Open-state quadratic loss tuned (area, f) so the bypass conductance is comparable to the
     # legacy linear open resistance, keeping the loss-of-flow transient well-behaved.
-    @named flapper = Flapper(; open_at_current=0.01, f=50.0, area=0.01, open_rate=1.0 / dt_ramp)
+    @named flapper = Flapper(; machine=machine, f=50.0, area=0.01, open_rate=1.0 / dt_ramp)
+    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < 0.01))
     @named ext_res = Resistor(R_ext)
 
     ps = fill(1.0 / (n * fuel_nx), n, fuel_nx)
@@ -287,7 +292,6 @@ function build_loop_lof_bypass(;
         inparallel(ine, ((heated.ch, ret), flapper), ext_res)...,
         # Boundary conditions
         pump.inlet.p ~ 1.0e5,
-        watch_flow(flapper, ine.inlet.ṁ),
         heated.fuel.power ~ power_W,
         [ret.T_wall_left[i] ~ T_inlet for i in 1:n]...,
         [ret.T_wall_right[i] ~ T_inlet for i in 1:n]...,

@@ -121,13 +121,17 @@ src/
     connectors.jl             # FlowPort, ThermalPort acausal connectors
     twoports.jl               # HydraulicTwoPort, shared by the two-port components
     pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
-    flapper.jl                # Flapper
+    flapper.jl                # Flapper: how far open is scheduled off a StateMachine
     resistors.jl              # FrictionResistor, Gravity, Resistor, VolumetricFlowResistor, LocalPressureDrop
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
-    point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM
+    point_kinetics.jl         # PointKinetics (any group count), ReactivityController: the
+                              # control reactivity, scheduled off a machine's state
+    state_machine.jl          # StateMachine, StateSchedule, trip!, machine_callbacks: a
+                              # control system, what its state schedules, and the solver
+                              # events its transitions make
   decay_heat/                 # module DecayHeat
     decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
     activation.jl             # Activation, DoubleDecay
@@ -212,8 +216,8 @@ so do not re-derive them from scratch.
   `DecayHeat.DecayHeatSource` from a contribution, hand it to
   `PointKinetics(...; power_input=source)`, and couple the fuel to `pk.P`, the total power.
   The kinetics state is `P_neutron`, which carries no source. The source
-  reads its trip time off the `ReactivityController`, so it needs the same controller the
-  reactor is driven by. The standards tables are not in this repo and never should be: point
+  reads its trip time off the `StateMachine`, so it needs the machine the reactor is
+  controlled by, or the controller holding it. The standards tables are not in this repo and never should be: point
   `DecayHeat.standards_dir!` at them, or set `STREAM_DECAY_HEAT_STANDARDS`.
 - **The loss-of-flow steady solve has two roots, and reaching the right one is by hand.** The
   pump-on steady state has a forced-flow root and a trivial one at ṁ = 0, where the friction
