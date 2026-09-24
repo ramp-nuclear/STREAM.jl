@@ -190,9 +190,10 @@ Reynolds number, `turbulent` at high, a linear blend of the two across `re_bound
 
 Two Reynolds numbers are involved, for different questions. Whether the flow is laminar or
 turbulent is a property of the flow as a whole, so the blend reads the Reynolds number at the
-bulk temperature. Whether natural convection takes over is decided by `Gr/Re² > 1`: buoyancy
-acts in the film next to the wall, and the ratio only compares like with like when Gr and Re
-are both read there, at the film temperature, with `geom.Dh` as the length.
+bulk temperature. Whether natural convection takes over is decided by `Gr/Re² > 1`, tested
+as `Gr > Re²` so that it holds at zero flow too: buoyancy acts in the film next to the wall,
+and the comparison only sets like against like when Gr and Re are both read there, at the
+film temperature, with `geom.Dh` as the length.
 
 Each branch reads its coolant properties at one fixed temperature, whatever basis its model
 was built with: laminar and natural convection at the bulk, turbulent at the film. A model
@@ -242,7 +243,8 @@ function (htc::RegimeDependent)(T_wall, T_bulk, ṁ, Dh, A, liquid)
                  T_wall, T_bulk, htc.Dh_gr, htc.g)
     Re_film = Re(liquid, T_film, ṁ, A, Dh)
     return ifelse(
-        Gr_film / Re_film^2 > 1,
+        # Not Gr / Re² > 1, which divides by zero when the flow stops.
+        Gr_film > Re_film^2,
         htc.natural(T_wall, T_bulk, ṁ, Dh, A, liquid),
         h_forced,
     )

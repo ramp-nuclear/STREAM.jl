@@ -130,12 +130,18 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
                   198.75194104185218 rtol = 1e-8
         end
 
-        @testset "natural convection takes over at Gr/Re² > 1" begin
+        @testset "natural convection takes over where Gr > Re²" begin
             nc = HTC.FromFunction((args...) -> 999.0)
             rd_nc = HTC.RegimeDependent(; laminar=lam, turbulent=turb, natural=nc,
                                        geom=GEOM_MTR, g=G_EARTH)
             # Barely any flow, a hot wall: buoyancy wins.
             @test rd_nc(100.0, 40.0, 1e-6, Dh, A, H2O) == 999.0
+            # No flow at all, and flow just reversed through it, where Re is zero or tiny:
+            # a hot wall still gives buoyancy, and a wall at the bulk temperature gives
+            # neither buoyancy nor flow, so the forced branch stands.
+            @test rd_nc(100.0, 40.0, 0.0, Dh, A, H2O) == 999.0
+            @test rd_nc(100.0, 40.0, -1e-6, Dh, A, H2O) == 999.0
+            @test rd_nc(40.0, 40.0, 0.0, Dh, A, H2O) == 4.0
             # Fast flow: forced convection wins, and the natural branch changes nothing.
             m_fast = ṁ_at(8000.0)
             @test rd_nc(100.0, 40.0, m_fast, Dh, A, H2O) == 100.0
