@@ -131,9 +131,8 @@ end
 end
 
 @testset "Flapper shuts when its machine leaves the open state" begin
-    # Closing on time written as an inequality, which the solver finds exactly. This loop has
-    # no dynamics, so the solver takes the whole run in one step and a predicate would only
-    # be checked at the end of it.
+    # This loop has no dynamics, so the solver takes the whole run in one step and the close
+    # at 0.5 s is found by looking back inside it.
     machine = StateMachine(; initial_state=:OPEN)
     push!(machine, (:OPEN => :CLOSED, t > 0.5, "close at 0.5 s"))
     @named pump = Pump(3.0e4)

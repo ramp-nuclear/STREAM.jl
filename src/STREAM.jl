@@ -231,6 +231,7 @@ using OrdinaryDiffEq
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkit: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
+using SymbolicIndexingInterface: getsym, ProblemState
 using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra

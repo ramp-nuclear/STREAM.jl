@@ -54,7 +54,7 @@ end
 
 const _BAD_CONDITION =
     "a transition condition must be an inequality such as `x > 1.0`, an equation such as " *
-    "`x ~ 1.0`, or a predicate `(machine, sys, t) -> Bool`; "
+    "`x ~ 1.0`, or a predicate `(machine, sys, t) -> Real`; "
 
 """
     _check_condition(condition) -> Nothing
@@ -99,7 +99,7 @@ rods = ReactivityController((state, t_state, t) -> state === :SCRAM ? -0.05 : 0.
 
 push!(machine, (:NORMAL => :SCRAM, pk.P_neutron > 1.2e6, "high power"))
 push!(machine, (:NORMAL => :SCRAM, pump.inlet.ṁ < 0.85 * ṁ_design, "low flow"))
-push!(machine, (:SCRAM => :ABORT, (m, sys, t) -> t - m.t_state > 2.0, "2 s after scram"))
+push!(machine, (:SCRAM => :ABORT, (m, sys, t) -> t - m.t_state - 2.0, "2 s after scram"))
 
 # compose the model, mtkcompile it into ssys, and solve for sol_ss, then:
 sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
@@ -118,14 +118,22 @@ The condition is one of three things:
   finds exactly.
 - **An equation** such as `ch.T[5] ~ 95.0`. It fires whenever the two sides cross, in either
   direction, as an equation does in ModelingToolkit's own `continuous_events`.
-- **A predicate** `(machine, sys, t) -> Bool`, for whatever the first two cannot say, such as
-  time spent in the current state. `sys[pump.inlet.ṁ]` reads any variable of the model, so
-  one predicate can combine the machine and the system:
-  `(m, sys, t) -> t - m.t_state > 2.0 && sys[ch.T[5]] > 95.0`. It is checked after each solver
-  step, so it fires at the end of the first step where it holds rather than at the exact
-  instant. A model that changes slowly takes long steps, so pass `dtmax` to
-  `solve_transient` when a predicate has to be on time. A time on its own is better written
-  as an inequality, `t > 5.0`, which is found exactly.
+- **A predicate** `(machine, sys, t) -> Real`, for whatever the first two cannot say, such as
+  time spent in the current state. It returns a number that is positive where its condition
+  holds, the way `t - m.t_state - 2.0` is positive two seconds after the last transition.
+  `sys[pump.inlet.ṁ]` reads any variable of the model, so one predicate can combine the
+  machine and the system, with `min` for "and" and `max` for "or":
+  `(m, sys, t) -> min(t - m.t_state - 2.0, sys[ch.T[5]] - 95.0)`.
+
+All three fire at the exact instant the condition becomes true, which the solver finds by
+looking back inside its last step. So it calls a condition at times between its steps, and
+more than once per step: a predicate has to be a plain function of `(machine, sys, t)`, with
+no counters and no side effects.
+
+A transition also fires if its condition already holds when the machine enters a state it
+can be taken from, and at the start of the run. A scram with the temperature already past an
+abort limit therefore aborts at once rather than waiting for a crossing that will not come.
+An equation is the exception: it has no side that holds, so it only ever fires on a crossing.
 
 Write conditions on the variables of the components you built, such as `pump.inlet.ṁ`, as
 soon as those components exist. They are the same variables in the system `mtkcompile`
@@ -287,40 +295,108 @@ end
     _applicable(machine, tr) -> Bool
 
 Whether `tr` can be taken from the state `machine` is in now. An edge with no `from` can be
-taken from any state.
+taken from any state, but no edge is taken into the state the machine is already in.
 """
 _applicable(machine::StateMachine, tr::Transition) =
-    tr.from === nothing || machine.state in tr.from
+    machine.state != tr.to && (tr.from === nothing || machine.state in tr.from)
 
 """
-    _take!(machine, tr, integrator) -> Nothing
+    _ModelState(ssys, u, p, t, getters)
 
-Take `tr` if it applies, logging its description as the cause, and stop the integration if
-the state entered is one of `machine.abort_states`.
+The model as a predicate sees it, the `sys` in `(machine, sys, t)`. `sys[var]` reads any
+variable of `ssys`, computed ones included, at state `u` and time `t`. While the solver looks
+for the instant a predicate turned positive, `u` is a state it estimated inside a step, which
+is why the predicate is handed this rather than the integrator. `getters` keeps one reader per
+variable across calls.
 """
-function _take!(machine::StateMachine, tr::Transition, integrator)
-    _applicable(machine, tr) || return nothing
-    trip!(machine, integrator.t; state=tr.to, cause=tr.description)
-    machine.state in machine.abort_states && terminate!(integrator)
-    return nothing
+struct _ModelState{S,U,P,T}
+    ssys::S
+    u::U
+    p::P
+    t::T
+    getters::Dict{Any,Any}
 end
 
-"""
-    _crossing(ssys, condition) -> (gap, both_edges)
+Base.getindex(sys::_ModelState, var) =
+    get!(() -> getsym(sys.ssys, var), sys.getters, var)(ProblemState(; u=sys.u, p=sys.p, t=sys.t))
 
-The function a `ContinuousCallback` root-finds for an inequality or an equation, and whether
-it fires on both edges. `gap(u, p, t)` is positive exactly where the condition holds, so the
-transition fires as `gap` rises through zero. Predicates never reach here: they become
-`DiscreteCallback`s in `_callbacks`.
 """
-_crossing(ssys, condition::Equation) =
+    _gap(ssys, machine, condition) -> (gap, both_edges)
+
+The function a transition's `ContinuousCallback` root-finds, and whether it fires on both
+edges. `gap(u, p, t)` is positive exactly where the condition holds, so the transition fires as
+`gap` rises through zero. For an inequality it is the difference of the two sides, taken the
+way round that makes it positive where the inequality holds. For an equation it is the
+difference either way, which has no side that holds, so it fires on both edges. A predicate
+already returns one.
+"""
+_gap(ssys, machine, condition::Equation) =
     ModelingToolkit.build_explicit_observed_function(ssys, condition.lhs - condition.rhs), true
 
-function _crossing(ssys, condition::Num)
+function _gap(ssys, machine, condition::Num)
     op, lhs, rhs = _relation(condition)
     # `lhs < rhs` holds where `rhs - lhs` is positive, `lhs >= rhs` where `lhs - rhs` is.
     gap = op in (<, <=) ? rhs - lhs : lhs - rhs
     return ModelingToolkit.build_explicit_observed_function(ssys, gap), false
+end
+
+function _gap(ssys, machine, condition::Function)
+    getters = Dict{Any,Any}()
+    gap(u, p, t) = _signed(condition(machine, _ModelState(ssys, u, p, t, getters), t))
+    return gap, false
+end
+
+"""
+    _signed(value) -> Float64
+
+A predicate's result as the number the solver root-finds.
+
+# Throws
+- `ArgumentError`: for `true` or `false`, which give the solver no crossing to find
+"""
+_signed(value::Real) = Float64(value)
+_signed(value::Bool) = throw(ArgumentError(
+    "a predicate returns a number that is positive where its condition holds, not true or " *
+    "false: write `t - m.t_state - 2.0` rather than `t - m.t_state > 2.0`, and combine " *
+    "conditions with `min` for and, `max` for or"
+))
+
+"""
+    _enter!(machine, tr, integrator) -> Bool
+
+Take `tr`, logging its description as the cause. If the state entered is one of
+`machine.abort_states`, stop the integration and return `false`.
+"""
+function _enter!(machine::StateMachine, tr::Transition, integrator)
+    trip!(machine, integrator.t; state=tr.to, cause=tr.description)
+    machine.state in machine.abort_states || return true
+    terminate!(integrator)
+    return false
+end
+
+"""
+    _settle!(machine, edges, integrator) -> Nothing
+
+Take, in order, every transition whose condition already holds in the state the machine has
+just entered, and keep going until none does. A crossing only counts while its transition can
+be taken, so without this a condition that became true under an earlier state would never
+fire. Equations are left out, since they have no side that holds.
+
+# Throws
+- `ErrorException`: when transitions go on firing at one instant, which only a cycle of states
+  whose conditions all hold can do
+"""
+function _settle!(machine::StateMachine, edges, integrator)
+    u, p, t = integrator.u, integrator.p, integrator.t
+    holds(edge) =
+        !edge.both_edges && _applicable(machine, edge.transition) && edge.gap(u, p, t) > 0
+    for _ in 0:length(edges)
+        i = findfirst(holds, edges)
+        i === nothing && return nothing
+        _enter!(machine, edges[i].transition, integrator) || return nothing
+    end
+    error("the transitions of this machine keep firing at t = $t, around a cycle of states " *
+          "whose conditions all hold")
 end
 
 """
@@ -331,10 +407,10 @@ Build the solver events one or more [`StateMachine`](@ref)s describe.
 Whether a model runs on one machine or on one per piece of equipment is the caller's choice:
 pass them all here and their events are collected together.
 
-Each inequality or equation becomes a `ContinuousCallback` root-finding its own condition, so
-it fires at the exact crossing. Predicates become `DiscreteCallback`s, checked after each
-solver step and handed the integrator as `sys`. Taking a transition goes through
-[`trip!`](@ref), so anything reading the machine's state or `t_state`, such as a
+Every transition becomes a `ContinuousCallback` root-finding its condition, so it fires at the
+exact instant the condition becomes true. After each transition, and once at the start of the
+run, the machine also takes any transition whose condition already holds. Taking a transition
+goes through [`trip!`](@ref), so anything reading the machine's state or `t_state`, such as a
 [`ReactivityController`](@ref) or a `DecayHeatSource` clock, sees the change at the same
 event.
 
@@ -344,6 +420,10 @@ event.
 
 # Returns
 One callback, or a `CallbackSet` of them, for `solve_transient(...; callbacks=...)`.
+
+# Throws
+- `ArgumentError`, during the solve: from a predicate that returns `true` or `false`
+- `ErrorException`, during the solve: when transitions keep firing around a cycle
 
 # Example
 ```julia
@@ -357,15 +437,25 @@ function machine_callbacks(ssys, machines::StateMachine...)
 end
 
 function _callbacks(ssys, machine::StateMachine)
-    return map(machine.transitions) do tr
-        fire!(integ) = _take!(machine, tr, integ)
-        tr.condition isa Function && return DiscreteCallback(
-            (u, t, integ) -> _applicable(machine, tr) && tr.condition(machine, integ, t), fire!
-        )
-        gap, both_edges = _crossing(ssys, tr.condition)
-        # An equation has no side to become true, so it fires on both edges.
+    edges = map(machine.transitions) do tr
+        gap, both_edges = _gap(ssys, machine, tr.condition)
+        (transition=tr, gap=gap, both_edges=both_edges)
+    end
+    function fire!(integrator, i)
+        _applicable(machine, edges[i].transition) || return nothing
+        _enter!(machine, edges[i].transition, integrator) && _settle!(machine, edges, integrator)
+        return nothing
+    end
+    # The machine settles once at the start; the other callbacks only keep the default.
+    settle(cb, u, t, integrator) =
+        (_settle!(machine, edges, integrator); u_modified!(integrator, false))
+    keep(cb, u, t, integrator) = u_modified!(integrator, false)
+    return map(eachindex(edges)) do i
+        affect!(integrator) = fire!(integrator, i)
         ContinuousCallback(
-            (u, t, integ) -> gap(u, integ.p, t), fire!, both_edges ? fire! : nothing
+            (u, t, integrator) -> edges[i].gap(u, integrator.p, t),
+            affect!, edges[i].both_edges ? affect! : nothing;
+            initialize=i == firstindex(edges) ? settle : keep,
         )
     end
 end

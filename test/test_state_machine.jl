@@ -61,7 +61,7 @@ end
     edges = StateMachine(
         (:NORMAL => :SCRAM, x > 1.0),
         (:NORMAL => :SCRAM, x > 1.0, "too much x"),
-        (:SCRAM => :ABORT, (m, sys, t) -> true),
+        (:SCRAM => :ABORT, (m, sys, t) -> 1.0),
     ).transitions
     @test edges[1].description == string(x > 1.0)
     @test edges[2].description == "too much x"
@@ -168,29 +168,71 @@ end
         @test undescribed.log[end].cause == string(low_flow)
     end
 
-    @testset "a predicate fires once its dwell time has passed" begin
+    @testset "a predicate fires the instant its dwell time has passed" begin
         dwell = 0.05
         machine = StateMachine(
             (:NORMAL => :SCRAM, low_flow),
-            (:SCRAM => :HOLD, (m, sys, t) -> t - m.t_state > dwell, "dwell"),
+            (:SCRAM => :HOLD, (m, sys, t) -> t - m.t_state - dwell, "dwell"),
         )
         sol = coast(machine)
         @test sol.t[end] == last(times)     # :HOLD is not an abort state
         @test states(machine) == [:NORMAL, :SCRAM, :HOLD]
-        @test machine.log[3].t - machine.log[2].t > dwell
+        @test machine.log[3].t - machine.log[2].t ≈ dwell rtol = 1e-6
         @test machine.log[3].cause == "dwell"
     end
 
-    @testset "a predicate reads the model through sys" begin
-        # The same trip as the falling inequality, written as a predicate. It is checked at
-        # the end of each step, so it fires at or after the exact crossing, never before.
-        exact = StateMachine((:NORMAL => :SCRAM, low_flow))
-        stepped = StateMachine(
-            (:NORMAL => :SCRAM, (m, sys, t) -> sys[ssys.ch.inlet.ṁ] < setpoint)
+    @testset "a predicate reading the model fires where the inequality does" begin
+        # The same trip written both ways. The predicate reads the flow through sys, at the
+        # states the solver estimates inside a step while it looks for the crossing.
+        inequality = StateMachine((:NORMAL => :SCRAM, low_flow))
+        predicate = StateMachine(
+            (:NORMAL => :SCRAM, (m, sys, t) -> setpoint - sys[ssys.ch.inlet.ṁ])
         )
-        foreach(coast, (exact, stepped))
-        @test stepped.state === :SCRAM
-        @test stepped.t_state >= exact.t_state
+        foreach(coast, (inequality, predicate))
+        @test predicate.state === :SCRAM
+        @test predicate.t_state ≈ inequality.t_state rtol = 1e-6
+    end
+
+    @testset "a condition already true when its transition can be taken fires at once" begin
+        # The outlet is past this limit from the start, while the machine is still :NORMAL
+        # and the abort edge cannot be taken. Entering :SCRAM makes it takeable, and since it
+        # will never cross again it has to fire then or not at all.
+        hot = sol_ss[ssys.ch.T[5]] - 1.0
+        machine = StateMachine(
+            (:NORMAL => :SCRAM, low_flow),
+            (:SCRAM => :ABORT, ssys.ch.T[5] > hot, "hot");
+            abort_states=(:ABORT,),
+        )
+        coast(machine)
+        @test states(machine) == [:NORMAL, :SCRAM, :ABORT]
+        @test machine.log[3].t == machine.log[2].t
+        @test machine.log[3].cause == "hot"
+    end
+
+    @testset "a condition already true at the start fires at the start" begin
+        machine = StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ > setpoint))
+        coast(machine)
+        @test states(machine) == [:NORMAL, :SCRAM]
+        @test machine.t_state == first(times)
+    end
+
+    @testset "an edge from any state is not taken into the state it leads to" begin
+        machine = StateMachine((nothing => :SCRAM, low_flow))
+        coast(machine)
+        @test states(machine) == [:NORMAL, :SCRAM]
+    end
+
+    @testset "a predicate that returns true or false stops the solve" begin
+        machine = StateMachine((:NORMAL => :SCRAM, (m, sys, t) -> t > 0.1))
+        @test_throws ArgumentError coast(machine)
+    end
+
+    @testset "a cycle whose conditions all hold stops the solve" begin
+        machine = StateMachine(
+            (:NORMAL => :SCRAM, ssys.ch.inlet.ṁ > 0.0),
+            (:SCRAM => :NORMAL, ssys.ch.inlet.ṁ > 0.0),
+        )
+        @test_throws ErrorException coast(machine)
     end
 
     @testset "entering an abort state stops the integration" begin
