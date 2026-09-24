@@ -87,7 +87,7 @@ A control system, such as a reactor protection system. It holds the state it is 
 entered that state, a log of every state it entered and why, and the transitions it can take.
 
 Build the machine first and hand it to whatever acts on its state: a
-[`ReactivityController`](@ref) for the rods, a [`Flapper`](@ref), a `DecayHeatSource`. Then add
+[`ReactivityController`](@ref) for the rods, a [`Flapper`](@ref), a `DecayHeatSource`. Then set
 its transitions, and [`machine_callbacks`](@ref) turns them into events for the solver:
 
 ```julia
@@ -97,9 +97,11 @@ rods = ReactivityController((state, t_state, t) -> state === :SCRAM ? -0.05 : 0.
 @named pk = PointKinetics(rods)
 @named pump = Pump(dP_design)
 
-push!(machine, (:NORMAL => :SCRAM, pk.P_neutron > 1.2e6, "high power"))
-push!(machine, (:NORMAL => :SCRAM, pump.inlet.ṁ < 0.85 * ṁ_design, "low flow"))
-push!(machine, (:SCRAM => :ABORT, (m, sys, t) -> t - m.t_state - 2.0, "2 s after scram"))
+machine.transitions = [
+    (:NORMAL => :SCRAM, pk.P_neutron > 1.2e6, "high power"),
+    (:NORMAL => :SCRAM, pump.inlet.ṁ < 0.85 * ṁ_design, "low flow"),
+    (:SCRAM => :ABORT, (m, sys, t) -> t - m.t_state - 2.0, "2 s after scram"),
+]
 
 # compose the model, mtkcompile it into ssys, and solve for sol_ss, then:
 sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
@@ -135,11 +137,14 @@ can be taken from, and at the start of the run. A scram with the temperature alr
 abort limit therefore aborts at once rather than waiting for a crossing that will not come.
 An equation is the exception: it has no side that holds, so it only ever fires on a crossing.
 
-Write conditions on the variables of the components you built, such as `pump.inlet.ṁ`, as
-soon as those components exist. They are the same variables in the system `mtkcompile`
-returns, so a machine does not wait for the compiled model. A trip on the kinetics is the
-one edge that has to come after `PointKinetics` is built, since the kinetics need the
-controller and the controller needs the machine.
+Set the transitions once the components they mention exist. That is after `PointKinetics`
+for a trip on the kinetics, since the kinetics need the controller and the controller needs
+the machine. There is no need to wait for `mtkcompile`: a variable of a component you built,
+such as `pump.inlet.ṁ`, is the same variable in the compiled system.
+
+Assigning `machine.transitions` replaces the whole list, including any edges given to the
+constructor. `push!(machine, edge)` adds one to the end. Either way, do it before
+`machine_callbacks`, which reads the list once.
 
 When two transitions fire at the same instant, the one added first is taken. Entering a state
 in `abort_states` stops the integration.
@@ -187,15 +192,18 @@ end
 """
     push!(machine::StateMachine, edge) -> StateMachine
 
-Add one edge, either a [`Transition`](@ref) or the `(from => to, condition)` or
-`(from => to, condition, description)` it is built from.
+Add one edge to the end of `machine.transitions`, either a [`Transition`](@ref) or the
+`(from => to, condition)` or `(from => to, condition, description)` it is built from.
 
 # Throws
 - `ArgumentError`: for a condition that is not an inequality, an equation or a
   `(machine, sys, t)` predicate
 """
-Base.push!(machine::StateMachine, edge) =
-    (push!(machine.transitions, edge isa Transition ? edge : Transition(edge...)); machine)
+Base.push!(machine::StateMachine, edge) = (push!(machine.transitions, edge); machine)
+
+# Builds a Transition from its tuple, checks included, wherever one is stored: `push!`, and
+# `machine.transitions = [(from => to, condition), ...]`.
+Base.convert(::Type{Transition}, edge::Tuple) = Transition(edge...)
 
 """
     trip!(machine::StateMachine, t_now; state=:SCRAM, cause="manual") -> state
@@ -250,25 +258,30 @@ end
 
 A signal read off a [`StateMachine`](@ref): `f(state, t_state, t)`, called as `s(t)`.
 
-`f` gets the state the machine is in, the time it entered it, and the current time, so a
-signal can follow how long the machine has been in a state: rods driving in after a scram,
-or a valve opening. [`ReactivityController`](@ref) is this under the name the kinetics use.
-Without an `f` the signal is zero.
+`f` gets the state the machine was in at `t`, the time it entered that state, and `t`, so a
+signal can follow how long the machine has been in a state: rods driving in after a scram, or
+a pump coasting down after a trip. [`ReactivityController`](@ref) is this under the name the
+kinetics use. Without an `f` the signal is zero.
 
-One machine can drive any number of schedules, and that is how a control system with several
-output signals is written: the machine holds the logic once, and each signal is a schedule
-reading it, handed to the component it drives.
+`f` returns whatever the component reading the schedule expects. [`PointKinetics`](@ref) takes
+one number, its control reactivity, and a [`Flapper`](@ref) one open fraction. A component
+that takes several signals at once declares an array-valued callable parameter, and the
+schedule returns a vector:
 
 ```julia
 machine = StateMachine()
-rods = ReactivityController((state, t_state, t) -> state === :SCRAM ? -0.05 : 0.0;
-                            machine=machine)
-@named pk = PointKinetics(rods)
-@named bypass = Flapper(; machine=machine, open_state=:SCRAM)   # opens on the same scram
+signals = StateSchedule(machine=machine) do state, t_state, t
+    state === :SCRAM ? [-0.05, exp(-(t - t_state))] : [0.0, 1.0]   # rod worth, pump head
+end
+@parameters (sig::typeof(signals))(..)[1:2] = signals   # read as sig(t)[1] and sig(t)[2]
 ```
 
+The state is looked up in the machine's log, so `s(t)` is right for any `t` after the solve
+as well as during it. That is what makes a quantity computed from a schedule, such as
+`sol[pk.reactivity]`, show the rods out before a scram and in after it.
+
 # Arguments
-- `f`: callable `(state, t_state, t) -> Float64`
+- `f`: callable `(state, t_state, t)`, returning what the component reading it expects
 
 # Keywords
 - `machine`: the machine whose state is read, a fresh one by default
@@ -278,7 +291,7 @@ rods = ReactivityController((state, t_state, t) -> state === :SCRAM ? -0.05 : 0.
 - `machine::StateMachine`: the machine it follows
 
 # Returns
-A callable `s(t) -> Float64`.
+A callable `s(t)`.
 """
 struct StateSchedule{F}
     f::F
@@ -289,7 +302,22 @@ function StateSchedule(f=nothing; machine::StateMachine=StateMachine())
     return StateSchedule(f === nothing ? ((state, t_state, t) -> 0.0) : f, machine)
 end
 
-(schedule::StateSchedule)(t) = schedule.f(schedule.machine.state, schedule.machine.t_state, t)
+function (schedule::StateSchedule)(t)
+    entry = _entry_at(schedule.machine, t)
+    return schedule.f(entry.state, entry.t, t)
+end
+
+"""
+    _entry_at(machine, t) -> NamedTuple
+
+The log entry in force at time `t`: the last one entered at or before `t`, or the first if `t`
+comes before them all. During a run that is the state the machine is in; after it, the state
+it was in at `t`.
+"""
+function _entry_at(machine::StateMachine, t)
+    i = findlast(entry -> entry.t <= t, machine.log)
+    return machine.log[something(i, firstindex(machine.log))]
+end
 
 """
     _applicable(machine, tr) -> Bool
@@ -427,7 +455,8 @@ One callback, or a `CallbackSet` of them, for `solve_transient(...; callbacks=..
 
 # Example
 ```julia
-machine = StateMachine((:NORMAL => :SCRAM, flywheel.inlet.ṁ < 0.85 * ṁ_design, "low flow"))
+machine = StateMachine()
+machine.transitions = [(:NORMAL => :SCRAM, flywheel.inlet.ṁ < 0.85 * ṁ_design, "low flow")]
 sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
 ```
 """

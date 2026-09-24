@@ -4,7 +4,7 @@ using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Examples
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
+using ModelingToolkit: t_nounits as t, D_nounits as D
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 
@@ -88,6 +88,75 @@ end
     trip!(machine, 2.0)
     @test rods(3.0) == -0.05
     @test pump_head(3.0) ≈ exp(-1.0)
+end
+
+@testset "transitions can be set as one list of tuples" begin
+    @variables x(t)
+    machine = StateMachine((:NORMAL => :OFF, x > 0.0))
+    machine.transitions = [
+        (:NORMAL => :SCRAM, x > 1.0, "high x"),
+        (:SCRAM => :ABORT, (m, sys, t) -> t - m.t_state - 2.0),
+    ]
+    @test length(machine.transitions) == 2      # the constructor's edge is replaced
+    @test machine.transitions[1].description == "high x"
+    @test machine.transitions[2].from == Set([:SCRAM])
+    # Each tuple goes through the same checks as push!.
+    @test_throws ArgumentError (machine.transitions = [(:NORMAL => :SCRAM, x + 1.0)])
+end
+
+@testset "a schedule reads the state the machine was in at the time asked" begin
+    machine = StateMachine()
+    rods = ReactivityController((s, ts, t) -> s === :SCRAM ? -0.05 * (t - ts) : 0.0;
+                                machine=machine)
+    trip!(machine, 1.5)
+    trip!(machine, 4.0; state=:ABORT)
+    @test rods(1.0) == 0.0                  # before the scram
+    @test rods(3.0) == -0.05 * 1.5          # during it, timed from when it began
+    @test rods(5.0) == 0.0                  # after it, in :ABORT
+
+    # The decay heat clock reads the same log, so it runs during the scram even though the
+    # machine has since left it.
+    source = DecayHeat.DecayHeatSource(DecayHeat.U238CaptureChain(1.0), machine; P0=1.0)
+    @test DecayHeat.decay_time(source, 1.0) == 0.0
+    @test DecayHeat.decay_time(source, 3.0) ≈ 1.5
+end
+
+@testset "a quantity computed from a schedule reads the state at its own time" begin
+    # reactivity is computed after the solve. Before the scram it has to show the rods out,
+    # not the rods as the machine left them at the end of the run.
+    machine = StateMachine()
+    rods = ReactivityController((s, ts, t) -> s === :SCRAM ? -0.05 : 0.0; machine=machine)
+    @named pk = PointKinetics(rods)
+    ssys = mtkcompile(compose(System(Equation[], t; name=:reactor), pk))
+    machine.transitions = [(:NORMAL => :SCRAM, t > 1.0, "at 1 s")]
+    sol = solve_transient(ssys, Pair{Any,Any}[], range(0.0, 3.0; length=31);
+                          callbacks=machine_callbacks(ssys, machine))
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.5; idxs=ssys.pk.reactivity) == 0.0
+    @test sol(2.0; idxs=ssys.pk.reactivity) == -0.05
+    @test sol(0.5; idxs=ssys.pk.P_neutron) ≈ 1.0
+end
+
+@testset "a schedule can return a vector for an array-valued callable parameter" begin
+    machine = StateMachine()
+    signals = StateSchedule(machine=machine) do state, t_state, t
+        state === :SCRAM ? [-0.05, 0.0] : [0.0, 1.0]
+    end
+    FT = typeof(signals)
+    @parameters (sig::FT)(..)[1:2] = signals
+    @variables rho(t) y(t) = 1.0
+    @named signal_reader = System([rho ~ sig(t)[1], D(y) ~ sig(t)[2] - y], t)
+    ssys = mtkcompile(signal_reader)
+    machine.transitions = [(:NORMAL => :SCRAM, t > 1.0, "at 1 s")]
+    sol = solve_transient(ssys, Pair{Any,Any}[], range(0.0, 3.0; length=31);
+                          callbacks=machine_callbacks(ssys, machine))
+    @test sol.retcode == ReturnCode.Success
+    # The second signal holds y at 1 until the scram, then lets it decay.
+    @test sol(1.0; idxs=ssys.y) ≈ 1.0
+    @test sol(3.0; idxs=ssys.y) ≈ exp(-2.0) rtol = 1e-4
+    # The first is read after the solve, at the state of its own time.
+    @test sol(0.5; idxs=ssys.rho) == 0.0
+    @test sol(2.0; idxs=ssys.rho) == -0.05
 end
 
 @testset "transitions on a coasting loop" begin

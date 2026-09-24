@@ -15,9 +15,10 @@ MeV/fission into the units `P0` was given in.
 
 # The clock
 
-`t_shutdown` is read off the [`StateMachine`](@ref), which stamps `t_state` whenever it
-enters a state. Until it reaches one of `shutdown_states` the decay time is zero, and after
-that it is `t - machine.t_state`, floored at zero.
+`t_shutdown` is read off the [`StateMachine`](@ref)'s log: while the machine is in one of
+`shutdown_states` the decay time is `t` minus the time it entered that state, floored at zero,
+and in any other state it is zero. Reading the log rather than the machine's current state
+makes the source right at any `t` after the solve, not only during it.
 
 Flooring at zero is the physics rather than a guard. A reactor at power holds a saturated
 decay heat inventory, and `model(0, T)` is exactly that saturated value, so the source sits
@@ -26,10 +27,6 @@ The source is continuous in value across the trip, with only its slope jumping, 
 instant the machine's own transition fires. And the operating point closes
 exactly, since `point_kinetics_steady_state(P0; power_input=source(0.0))` is seeded with the
 same number the source returns before the trip.
-
-The floor also covers the trial times a solver evaluates at inside a Newton iteration, which
-can sit below a `t_state` that only advances on accepted steps. Those clamp to zero and
-return the untripped value, so nothing moves under the error controller.
 
 A trip at a time you already know needs nothing extra: a machine built in the shutdown
 state, `StateMachine(; initial_state=:SCRAM, initial_time=5.0)`, is a fixed trip at `t = 5`.
@@ -88,9 +85,9 @@ Zero is the saturated end of the decay curve, so it is the right answer both bef
 and at a trial time that has fallen back behind it.
 """
 function decay_time(source::DecayHeatSource, t)
-    machine = source.machine
-    machine.state in source.shutdown_states || return zero(float(t))
-    return max(t - machine.t_state, zero(float(t)))
+    entry = _entry_at(source.machine, t)
+    entry.state in source.shutdown_states || return zero(float(t))
+    return max(t - entry.t, zero(float(t)))
 end
 
 (source::DecayHeatSource)(t) = source.Φ * source.model(decay_time(source, t), source.T)
