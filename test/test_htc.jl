@@ -194,6 +194,12 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         # No correction below the onset, or without a single-phase flux.
         @test factor(1.0e5, 5.0e4, 1.0e5) == 1.0
         @test factor(0.0, 2.0e5, 5.0e4) == 1.0
+        @test factor(-1.0e3, 2.0e5, 5.0e4) == 1.0
+        # A single-phase flux that is positive but vanishingly small is the case the floor on
+        # the divisor exists for. Without it the ratio overflows and the factor is Inf, which
+        # the heat transfer coefficient would inherit.
+        @test isfinite(factor(1.0e-300, 2.0e5, 5.0e4))
+        @test factor(1.0e-300, 2.0e5, 5.0e4) >= 1.0
     end
 end
 

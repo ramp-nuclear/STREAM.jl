@@ -60,8 +60,8 @@ struct AtFilm <: PropertyBasis end
 """
     AtBulk <: PropertyBasis
 
-Read properties at the bulk temperature. Python STREAM closes its laminar and natural
-branches this way.
+Read properties at the bulk temperature. [`RegimeDependent`](@ref) reads its laminar and
+natural branches this way.
 """
 struct AtBulk <: PropertyBasis end
 
@@ -140,7 +140,7 @@ Elenbaas natural convection between symmetrically heated parallel vertical plate
 
 The plate gap `S = geom.depth` is the length scale throughout: Ra is taken on `S` and
 `h = Nu·κ/S`. [`RegimeDependent`](@ref) reads a natural branch at the bulk instead of the
-film, as Python STREAM does.
+film.
 
 # Arguments
 - `geom`: channel geometry; `geom.depth` is the gap and `geom.L` the heated length
@@ -170,30 +170,33 @@ function (htc::Elenbaas)(T_wall, T_bulk, ṁ, Dh, A, liquid)
 end
 
 """
-    _at_bulk(model) -> AbstractHTC
+    _with_basis(model, basis) -> AbstractHTC
 
-`model` with its property basis moved to [`AtBulk`](@ref), for the branches
-[`RegimeDependent`](@ref) reads at the bulk. A model without a basis comes back unchanged.
+The same correlation as `model`, reading its coolant properties at `basis` rather than at its
+own: at the bulk temperature for [`AtBulk`](@ref), at the film for [`AtFilm`](@ref). A model
+with no property basis, such as a user-defined one or `nothing`, comes back as it is.
 """
-_at_bulk(m::FromNusselt) = FromNusselt(m.nusselt, AtBulk())
-_at_bulk(m::Elenbaas) = Elenbaas(m.gap, m.heated_length, m.g, AtBulk())
-_at_bulk(m) = m
+_with_basis(m::FromNusselt, basis) = FromNusselt(m.nusselt, basis)
+_with_basis(m::Elenbaas, basis) = Elenbaas(m.gap, m.heated_length, m.g, basis)
+_with_basis(m, basis) = m
 
 """
     RegimeDependent(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
                        geom, g=G_EARTH) <: AbstractHTC
 
-Switch between laminar, turbulent and natural convection, the way Python STREAM's
-`regime_dependent_h_spl` does.
+A heat transfer coefficient that picks its correlation by flow regime: `laminar` at low
+Reynolds number, `turbulent` at high, a linear blend of the two across `re_bounds`, and
+`natural` convection wherever buoyancy outweighs the forced flow.
 
-The two forced branches are blended across `re_bounds` on the **bulk** Reynolds number by
-[`flow_regime_blend`](@ref). Given a `natural` model, it takes over wherever `Gr/Re² > 1`,
-with Gr and Re both read at the film temperature on `geom.Dh`.
+Two Reynolds numbers are involved, for different questions. Whether the flow is laminar or
+turbulent is a property of the flow as a whole, so the blend reads the Reynolds number at the
+bulk temperature. Whether natural convection takes over is decided by `Gr/Re² > 1`: buoyancy
+acts in the film next to the wall, and the ratio only compares like with like when Gr and Re
+are both read there, at the film temperature, with `geom.Dh` as the length.
 
-As in Python, the laminar and natural branches read their properties at the bulk: a
-[`FromNusselt`](@ref) or [`Elenbaas`](@ref) handed in for either is rebased to
-[`AtBulk`](@ref). The turbulent branch keeps its own basis, and other models are used as
-given.
+Each branch reads its coolant properties at one fixed temperature, whatever basis its model
+was built with: laminar and natural convection at the bulk, turbulent at the film. A model
+with no property basis of its own is used as given.
 
 # Arguments
 - `laminar`, `turbulent`: the two forced-convection models
@@ -221,7 +224,8 @@ function RegimeDependent(;
 )
     bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))
     return RegimeDependent(
-        _at_bulk(laminar), turbulent, _at_bulk(natural), bounds, geom.Dh, Float64(g)
+        _with_basis(laminar, AtBulk()), _with_basis(turbulent, AtFilm()),
+        _with_basis(natural, AtBulk()), bounds, geom.Dh, Float64(g),
     )
 end
 
@@ -233,7 +237,6 @@ function (htc::RegimeDependent)(T_wall, T_bulk, ṁ, Dh, A, liquid)
         htc.turbulent(T_wall, T_bulk, ṁ, Dh, A, liquid),
     )
     htc.natural === nothing && return h_forced
-    # Python's switch reads Gr and Re at the film, though the blend above uses the bulk Re.
     T_film = film_temperature(T_wall, T_bulk)
     Gr_film = Gr(ρ(liquid, T_film), μ(liquid, T_film), β(liquid, T_film),
                  T_wall, T_bulk, htc.Dh_gr, htc.g)

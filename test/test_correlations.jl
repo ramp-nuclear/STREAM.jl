@@ -438,16 +438,16 @@ end
     @test HTC.mcadams_scb_heat_flux(100.0, 90.0) == 0.0
 end
 
-@testset "HTC.bergles_rohsenow_scb_heat_flux" begin
+@testset "HTC.rohsenow_scb_heat_flux" begin
     # Python STREAM's Bergles_Rohsenhow_SCB_heat_flux on saturated water.
     sat17 = H2O(Tsat(H2O, 1.7e5), 1.7e5)
-    @test HTC.bergles_rohsenow_scb_heat_flux(120.0, sat17) ≈ 26177.759451978258 rtol = 1e-8
-    @test HTC.bergles_rohsenow_scb_heat_flux(125.0, sat17) ≈ 229086.82394250282 rtol = 1e-8
+    @test HTC.rohsenow_scb_heat_flux(120.0, sat17) ≈ 26177.759451978258 rtol = 1e-8
+    @test HTC.rohsenow_scb_heat_flux(125.0, sat17) ≈ 229086.82394250282 rtol = 1e-8
     sat20 = H2O(Tsat(H2O, 2e5), 2e5)
-    @test HTC.bergles_rohsenow_scb_heat_flux(130.0, sat20) ≈ 260672.44841443186 rtol = 1e-8
+    @test HTC.rohsenow_scb_heat_flux(130.0, sat20) ≈ 260672.44841443186 rtol = 1e-8
     # No boiling at or below saturation.
-    @test HTC.bergles_rohsenow_scb_heat_flux(sat17.Tsat, sat17) == 0.0
-    @test HTC.bergles_rohsenow_scb_heat_flux(100.0, sat17) == 0.0
+    @test HTC.rohsenow_scb_heat_flux(sat17.Tsat, sat17) == 0.0
+    @test HTC.rohsenow_scb_heat_flux(100.0, sat17) == 0.0
 end
 
 @testset "HTC.regime_dependent_q_scb blends across the transition band" begin
@@ -458,7 +458,7 @@ end
     @test q_scb(125.0, sat, 3500.0) ≈ 122057.77385754562 rtol = 1e-8
     @test q_scb(125.0, sat, 8000.0) ≈ 15028.723772588424 rtol = 1e-8
     # The two ends are the two correlations.
-    @test q_scb(125.0, sat, 1000.0) == HTC.bergles_rohsenow_scb_heat_flux(125.0, sat)
+    @test q_scb(125.0, sat, 1000.0) == HTC.rohsenow_scb_heat_flux(125.0, sat)
     @test q_scb(125.0, sat, 8000.0) == HTC.mcadams_scb_heat_flux(sat.Tsat, 125.0)
 end
 

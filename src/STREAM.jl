@@ -105,7 +105,7 @@ include("htc/subcooled_boiling.jl")
 include("htc/htc.jl")
 export dittus_boelter, constant_Nusselt, elenbaas_nusselt, marco_han_nusselt
 export fully_developed_laminar_nusselt, developing_laminar_nusselt, film_temperature
-export mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux
+export mcadams_scb_heat_flux, rohsenow_scb_heat_flux
 export partial_SCB_correction, regime_dependent_q_scb
 export AbstractHTC, FromFunction, FromNusselt, PropertyBasis, AtFilm, AtBulk, property_temperature
 export DittusBoelter, ConstantNusselt, FullyDevelopedLaminar, DevelopingLaminar

@@ -138,7 +138,9 @@ function q_OSV_saha_zuber(
     Pe_c = G * pipe.Dh .* cp_c ./ κ_c
     X = ifelse.(Pe_c .<= 7e4, κ_c ./ pipe.Dh .* 455.0, 0.0065 .* G .* cp_c)
 
-    # Python's `directed`: accumulate from the upstream end, then return to cell order.
+    # The coolant reaching a cell has been heated by every cell before it in the flow, so
+    # the running sum starts at whichever end the flow enters. Reversing twice does that
+    # under reversed flow and hands the result back in cell order.
     upstream(a) = ṁ >= 0 ? a : reverse(a)
     heated = upstream(cumsum(upstream(shape .* dz_c)))
     power_factor = pipe.heated_perimeter ./ (abs(ṁ) .* cp_c)

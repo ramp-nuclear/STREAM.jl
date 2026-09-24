@@ -49,15 +49,19 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 end
 
 """
-    _instant(sol, index) -> Union{Int,Nothing}
+    _time_index(sol, index) -> Union{Int,Nothing}
 
-The saved-time index a [`ChannelState`](@ref) reads `sol` at: `nothing` for a solution with
-no time axis, `index` for a transient, and `1` for a transient that saved a single point.
+Which saved time a [`ChannelState`](@ref) reads out of `sol`.
+
+A steady solution is a single state with no time axis, so there is nothing to choose and this
+returns `nothing`. A transient holds one state per saved time, and the caller picks one with
+`index`. A transient that saved only one time needs no `index`, and gets `1`.
 
 # Throws
-- `ArgumentError`: for a transient with several saved times and no `index`
+- `ArgumentError`: for a transient with several saved times and no `index`, rather than
+  guessing which one was meant
 """
-function _instant(sol, index)
+function _time_index(sol, index)
     hasproperty(sol, :t) || return nothing
     index === nothing || return index
     length(sol.t) == 1 && return 1
@@ -101,7 +105,7 @@ A `ChannelState` for that instant.
 """
 function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=nothing)
     n = length(channel_sys.T)
-    k = _instant(sol, index)
+    k = _time_index(sol, index)
     value(sym) = k === nothing ? sol[sym] : sol[sym, k]
     cells(sym) = [value(sym[i]) for i in 1:n]
 
@@ -351,7 +355,8 @@ function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=H2O)
     return q_CHF_sudo_kaminaga(collect(s.T_bulk), s.ṁ, s.pipe, s.gravity, liquid(T_sat, P))
 end
 
-# Mirrors Python STREAM's `pressure[-1 if mdot >= 0 else 0]`.
+# Flow instability is judged at the outlet, where the coolant is hottest and nearest boiling:
+# the last cell in forward flow and the first in reversed flow.
 function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
     T_sat_out = s.ṁ >= 0 ? last(s.T_sat) : first(s.T_sat)
     return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.pipe; liquid=liquid)

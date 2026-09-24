@@ -36,6 +36,7 @@ marked **not a gap** were checked and found equivalent, so nobody has to re-deri
 - [8. Uncertainty quantification](#8-uncertainty-quantification)
 - [9. Reporting and debugging](#9-reporting-and-debugging)
 - [Where STREAM.jl is ahead](#where-streamjl-is-ahead)
+- [Following Python where the physics is open](#following-python-where-the-physics-is-open)
 - [Checked and equivalent](#checked-and-equivalent)
 - [Suggested order of work](#suggested-order-of-work)
 
@@ -402,9 +403,14 @@ match Python:
 - Bergles-Rohsenow lacked Python's `onb_factor`, `inhomogeneity_factor` and face choice.
 - `ChannelState` and `threshold_analysis` defaulted gravity to 9.81 rather than `G_EARTH`.
 
-One difference remains. Python takes saturation at the static pressure, the cell-end
-pressure less `ρv²/2`, where we use the cell-centre pressure. In an MTR channel at 2 m/s that
-puts Python's saturation temperature about 0.4 K lower.
+Saturation was the last difference, and there Python was right. The pressure a port carries
+is the total pressure, static plus the dynamic head `ρv²/2`: that is what makes equal
+pressures at a junction lose the velocity head into a narrower part, and what the Idelchik
+losses are losses of. Saturation depends on the static pressure, so the head has to come off
+first. Python did that and we did not, which put our saturation temperature about 0.4 K high
+in an MTR channel at 2 m/s. A channel's `P` is now the static pressure, and both its `T_sat`
+and the subcooled-boiling heat transfer inside the solve read it. Where along the cell to read
+it has no single right answer, so we take each cell's outlet-side face, as Python does.
 
 ---
 
@@ -589,16 +595,41 @@ month has both sides of the ledger in front of it.
 - **The `HTC` handle.** After the current work, our heat transfer model is a first-class
   value with an explicit property basis. Python's is a function with the basis hard-coded per
   branch.
-- **Transient threshold analysis, with a verdict.** `threshold_analysis` runs every correlation
-  on the channel state at each saved time and stacks the results, and `worst_case` reports the
-  smallest margin with the cell and time it occurs at. Python's `transient_threshold_analysis`
-  does the first half and leaves the ratio and the minimum to the caller.
+- **Transient threshold analysis.** `threshold_analysis` runs every correlation on the
+  channel state at each saved time and returns the whole `[cell, time]` result, as Python's
+  `transient_threshold_analysis` does. `worst_case` finds the smallest margin in one such
+  result, which is a convenience for a single run and nothing more: under uncertainty
+  quantification the worst cell and time move from sample to sample, so the reduction belongs
+  after the sampling, on the full results.
 - **Event handling.** SciML callbacks give us SCRAM and flapper events with proper root
   finding. Python's `should_continue` / `change_state` polling is coarser.
 - **Less code for the same physics.** The two line counts at the top of this file are not a
   fair comparison everywhere, but they are in the parts that overlap. Composition, the
   Jacobians and the property interface are each a few hundred lines here against a few thousand
   there, because the compiler and the type system carry them.
+
+## Following Python where the physics is open
+
+Where the physics has one right answer we use it, whether or not Python does. Where it does
+not, we follow Python, so the two codes compare like for like and a model moves from one to
+the other without its results shifting. These are the places we follow Python on purpose.
+Revisit them once STREAM.jl stands on its own.
+
+- **Property temperatures in `HTC.RegimeDependent`.** Laminar and natural convection are read
+  at the bulk temperature and turbulent at the film, as Python's `regime_dependent_h_spl`
+  does. Textbooks put Dittus-Boelter at the bulk and natural convection at the film. Used on
+  its own, outside `RegimeDependent`, each model reads its properties where its own basis
+  says, which by default is the film, as Python's standalone functions do.
+- **Rohsenow's constants.** `HTC.rohsenow_scb_heat_flux` takes Python's `n = 1.26` and
+  `C_sf = 0.011`, and the exponent `1/0.33`. Textbooks give `n = 1.0` for water and pick
+  `C_sf` by surface. We could not trace Python's value to a source.
+- **Where along a cell saturation is read.** Each cell's outlet-side face, not its centre.
+  See [5.5](#55-reading-a-channel-the-way-pythons-analysis-wrappers-do-fixed).
+
+Names that differ from Python's: `HTC.rohsenow_scb_heat_flux` is Python's
+`Bergles_Rohsenhow_SCB_heat_flux`. The correlation is Rohsenow's (1952) pool boiling flux;
+Bergles and Rohsenow's (1964) contribution is the partial boiling factor,
+`HTC.partial_SCB_correction`, which matches Python's `Bergles_Rohsenhow_partial_SCB`.
 
 ## Checked and equivalent
 

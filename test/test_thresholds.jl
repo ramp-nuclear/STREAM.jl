@@ -402,9 +402,10 @@ end
     # A coasting loop: the pump head is removed at t = 0 and the channel's own momentum
     # carries the flow down, so every flow-dependent limit has to move with it. The reader
     # this replaces froze ṁ and T_inlet at the first saved time.
+    n = 5
     geo = PipeGeometry_circular(0.6, 0.01)
-    ssys = build_loop(; n=5)
-    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
+    ssys = build_loop(; n=n)
+    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:n]
     push!(op, ssys.ch.inlet.ṁ => 0.5)
     sol_ss = solve_steady(ssys, op)
     sol = solve_transient(
@@ -415,11 +416,11 @@ end
     # The flow has to fall for the rest of this to prove anything.
     @test ṁ[end] < 0.5 * ṁ[1]
 
-    for k in (1, 3, length(sol.t))
+    @testset "at saved time $k" for k in (1, 3, length(sol.t))
         s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
         @test s.ṁ == ṁ[k]
         @test s.T_inlet == sol[ssys.ch.T_in, k]
-        @test s.T_bulk == [sol[ssys.ch.T[i], k] for i in 1:5]
+        @test s.T_bulk == [sol[ssys.ch.T[i], k] for i in 1:n]
     end
     # A transient has many instants, so asking for the state without saying which is an
     # error rather than a guess.
@@ -433,10 +434,12 @@ end
     )
     nt = length(sol.t)
     @test size(result.ofi) == (nt,)
-    @test size(result.osv) == (5, nt)
-    @test size(result.sk) == (5, nt)
-    @test size(result.onb) == (5, nt)
-    for k in (1, nt)
+    @test size(result.osv) == (n, nt)
+    @test size(result.sk) == (n, nt)
+    @test size(result.onb) == (n, nt)
+    # Stacking loses nothing: column k of each result is exactly what the correlation gives
+    # for the state at saved time k on its own.
+    @testset "column $k is the state at saved time $k" for k in (1, nt)
         s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
         @test result.osv[:, k] == q_OSV_saha_zuber(s)
         @test result.ofi[k] == q_OFI_whittle_forgan(s)
