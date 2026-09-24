@@ -24,14 +24,9 @@ function transient(model, sol_ss)
     return sol
 end
 
-# The transient trips the controller, and the model's overrides, callbacks and decay heat
-# source all hold that same controller, so re-solving the model needs it back in its initial
-# state.
-function untrip!(ctrl)
-    ctrl.state, ctrl.t_state = :NORMAL, 0.0
-    empty!(ctrl.log)
-    return ctrl
-end
+# The transient scrams the reactor and opens the flapper, and both machines remember it, so
+# re-solving the same model needs them back where they started.
+untrip!(model) = (reset!(model.protection); reset!(model.valve); model)
 
 phases = ("build and compile", "steady state", "transient")
 passes = Pair{String,Vector{Any}}[]
@@ -43,7 +38,7 @@ steady = @timed solve_pool_lofa_steady(model)
 trans = @timed transient(model, steady.value)
 push!(passes, "cold" => Any[build, steady, trans])
 
-untrip!(ctrl)
+untrip!(model)
 steady = @timed solve_pool_lofa_steady(model)
 trans = @timed transient(model, steady.value)
 push!(passes, "same model" => Any[nothing, steady, trans])

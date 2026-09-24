@@ -19,7 +19,8 @@ end
     case = POOL_LOFA_TEST_CASE
     # Rods enter 0.1 s after the trip signal and are fully in 0.5 s later.
     rod(τ) = -0.06 * clamp((τ - 0.1) / 0.5, 0.0, 1.0)
-    ctrl = ReactivityController((s, ts, tt) -> s === :SCRAM ? rod(tt - ts) : 0.0)
+    ctrl = ReactivityController((s, ts, tt) -> s === :SCRAM ? rod(tt - ts) : 0.0;
+                                machine=StateMachine())
     # Data free, so this runs without the standards package. About 6% of rated at shutdown.
     heat = DecayHeat.U238CaptureChain(0.5) +
         DecayHeat.FissionProducts([1.0, 0.05, 1e-3, 1e-5], [3.0, 0.15, 3e-3, 3e-5])
@@ -43,19 +44,20 @@ end
     @test sol.retcode == ReturnCode.Success
 
     @testset "the reactor trips on low flow and decay heat is what remains" begin
-        @test ctrl.state === :SCRAM
+        protection = model.protection
+        @test protection.state === :SCRAM
+        @test protection.log[end].cause == "low primary flow"
         # It trips when the primary flow falls through its setpoint, not before.
         primary = sol[ssys.flywheel.inlet.ṁ, :]
-        @test all(primary[sol.t .< ctrl.t_state] .> case.trip_fraction * model.design_ṁ)
+        @test all(primary[sol.t .< protection.t_state] .> case.trip_fraction * model.design_ṁ)
         @test sol[ssys.pk.P_neutron, end] < 1e-6
         @test sol[ssys.pk.P, end] ≈ source(times[end]) rtol = 1e-4
     end
 
     @testset "the flapper opens and both types turn around" begin
-        T_open = sol.ps[ssys.flapper.T_open]
-        @test isfinite(T_open)
+        @test model.valve.state === :OPEN
         # The flywheel keeps the flow up well past the trip before the flapper can open.
-        @test T_open > ctrl.t_state
+        @test model.valve.t_state > model.protection.t_state
         for key in keys(case.types)
             ṁ = sol[model.channels[key].inlet.ṁ, :]
             @test ṁ[1] > 0     # downward forced flow

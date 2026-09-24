@@ -70,8 +70,8 @@ scram_worth(state, t_state, t) = state === :SCRAM ? rod(t - t_state) : 0.0
 """
     controls() -> (ctrl, source)
 
-A fresh `ReactivityController` for the scram, and the decay heat source that reads its trip
-time. The source holds fission products and U238 capture only: after the scram the kinetics
+A fresh `ReactivityController` for the scram, on a machine of its own, and the decay heat
+source that reads its trip time. The source holds fission products and U238 capture only: after the scram the kinetics
 already carry the fission tail from the delayed neutrons, so adding `DecayHeat.Fissions`
 would count it twice.
 """
@@ -80,7 +80,7 @@ function controls()
         "set STREAM_DECAY_HEAT_STANDARDS to the directory holding the decay heat " *
         "tables: the fission product term, the largest contribution, is read from them",
     )
-    ctrl = ReactivityController(scram_worth)
+    ctrl = ReactivityController(scram_worth; machine=StateMachine())
     heat = DH.FissionProducts(DH.ANS14, DH.U235) + DH.U238CaptureChain(captures_per_fission)
     return ctrl, DH.DecayHeatSource(heat, ctrl; P0=1.0)
 end

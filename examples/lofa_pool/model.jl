@@ -5,7 +5,7 @@ using STREAM.Components: Channel
 using STREAM.Assemblies
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit
-using OrdinaryDiffEq: CallbackSet, ReturnCode, Rodas5P
+using OrdinaryDiffEq: ReturnCode, Rodas5P
 using SteadyStateDiffEq: DynamicSS
 
 """
@@ -22,8 +22,12 @@ Each type is one representative channel between two half plates, standing for `N
 channels through [`weighted`](@ref), behind an inlet orifice. One `PointKinetics` drives every
 plate through `pk.P`, the total power, with `source` as its `power_input`.
 
+Two state machines run the transient. Reactor protection is `ctrl`'s own machine, which gets
+a low-flow scram added to whatever transitions it already had. The flapper follows a machine
+of its own that opens it when the primary flow falls through its setpoint.
+
 # Arguments
-- `ctrl`: the `ReactivityController` driving the kinetics
+- `ctrl`: the `ReactivityController` driving the kinetics, whose machine takes the scram
 - `source`: the kinetics' `power_input`, built with `P0 = 1`
 
 # Keywords
@@ -32,8 +36,9 @@ plate through `pk.P`, the total power, with `source` as its `power_input`.
 # Returns
 A `NamedTuple` with the compiled system `ssys`, the operating point `guess` for
 [`solve_pool_lofa_steady`](@ref), the `trip` overrides and `callbacks` of the transient, the
-total `design_ṁ`, each type's `channels` and `pipes`, and `n_before`, the number of unknowns
-before `mtkcompile`.
+`protection` and `valve` machines, whose logs say when and why each moved, the total
+`design_ṁ`, each type's `channels` and `pipes`, and `n_before`, the number of unknowns before
+`mtkcompile`.
 """
 function build_pool_lofa(ctrl, source; case)
     n, nx, L, T_pool = case.n, case.nx, case.L, case.T_pool
@@ -83,17 +88,26 @@ function build_pool_lofa(ctrl, source; case)
     @named primary = ResistorFromKnownPoint(; dp=-case.primary_dp, ṁ=ṁ_design, T=T_pool)
     @named riser = Channel(; n, geometry=PipeGeometry_circular(case.riser_L, case.riser_D), g=G_EARTH)
     @named pool_flapper = HeatExchanger(T_pool)
+    valve = StateMachine(; initial_state=:CLOSED)
     @named flapper = Flapper(;
-        open_at_current=case.flapper_open_at, f=case.flapper_f, area=case.flapper_area,
+        machine=valve, f=case.flapper_f, area=case.flapper_area,
         open_rate=1 / case.flapper_open_time,
     )
+    valve.transitions = [(
+        :CLOSED => :OPEN, flywheel.inlet.ṁ < case.flapper_open_at,
+        "primary flow below the flapper setpoint",
+    )]
+    # ctrl's machine belongs to the caller, so the scram goes on the end of its transitions
+    # rather than replacing them.
+    push!(ctrl.machine, (
+        :NORMAL => :SCRAM, flywheel.inlet.ṁ < case.trip_fraction * ṁ_design, "low primary flow",
+    ))
 
     connections = [
         inparallel(flywheel, paths, riser)...,
         inparallel(flywheel, [(pool_flapper, flapper)], primary)...,
         inseries(riser, primary, pump, flywheel)...,
         flywheel.outlet.p ~ case.p_pool,
-        watch_flow(flapper, flywheel.inlet.ṁ),
         power_eqs...,
     ]
     full = compose_systems(
@@ -109,13 +123,10 @@ function build_pool_lofa(ctrl, source; case)
         (channels[k].inlet.ṁ => case.types[k].design_ṁ for k in types)...,
     ]
     trip = [ssys.pump.dP_pump => 0.0]
-    callbacks = CallbackSet(
-        flapper_callback(ssys, ssys.flapper),
-        trip_callback(ssys, ssys.flywheel.inlet.ṁ, case.trip_fraction * ṁ_design, ctrl),
-    )
+    callbacks = machine_callbacks(ssys, ctrl.machine, valve)
     return (;
-        ssys, guess, trip, callbacks, design_ṁ=ṁ_design, channels, pipes,
-        n_before=length(unknowns(full)),
+        ssys, guess, trip, callbacks, protection=ctrl.machine, valve, design_ṁ=ṁ_design,
+        channels, pipes, n_before=length(unknowns(full)),
     )
 end
 

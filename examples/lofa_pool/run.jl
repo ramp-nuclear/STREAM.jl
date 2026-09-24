@@ -74,8 +74,9 @@ end
 sol.retcode == ReturnCode.Success ||
     error("the transient failed with retcode $(sol.retcode)")
 
-t_trip = ctrl.t_state
-t_flapper = sol.ps[ssys.flapper.T_open]
+# Inf for an event that never happened, which the plots below leave out.
+t_trip = model.protection.state === :SCRAM ? model.protection.t_state : Inf
+t_flapper = model.valve.state === :OPEN ? model.valve.t_state : Inf
 flow(key) = sol[model.channels[key].inlet.ṁ, :]
 function reversal_time(key)
     k = findfirst(<(0.0), flow(key))
