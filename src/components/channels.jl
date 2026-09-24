@@ -11,6 +11,19 @@ leaves the name ambiguous between the two, so import it explicitly with
 function Channel end
 
 """
+    _static_pressure(p_inlet, dp, ṁ, ρ, A) -> Vector
+
+The static pressure at each cell's outlet-side face, the pressure saturation depends on.
+
+The pressure a `FlowPort` carries is the total pressure, static plus the dynamic head
+`ρv²/2`. So the static pressure at a face is the inlet's pressure, less the drop `dp` through
+every cell up to that face, less the head at the local density:
+
+    p_static[i] = p_inlet - (dp[1] + ... + dp[i]) - ṁ² / (2ρ[i]A²)
+"""
+_static_pressure(p_inlet, dp, ṁ, ρ, A) = p_inlet .- cumsum(dp) .- ṁ^2 ./ (2 .* ρ .* A^2)
+
+"""
     _channel_core(; n, T, dp, inlet, outlet, geometry, g_acc,
                   darcy::AbstractDarcyFactor=Blasius(),
                   q_left_expr, q_right_expr,
@@ -87,9 +100,7 @@ function _channel_core(;
 
     Re_c = Re.(liquid, T, inlet.ṁ, A, Dh)
     Pr_c = Pr.(liquid, T)
-    # Cell-centre pressure: inlet minus the drop accumulated up to this cell, plus back
-    # half a cell to land at the centre rather than the outlet face.
-    P_c = inlet.p .- cumsum(dp) .+ dp ./ 2
+    P_c = _static_pressure(inlet.p, dp, inlet.ṁ, ρ_c, A)
     q_density_c = (q_left_expr .+ q_right_expr) ./ (sum(geometry.heated_parts) * dz)
 
     cells = map(1:n) do i
@@ -132,8 +143,8 @@ function _channel_core(;
             (L / A) * D(inlet.ṁ) ~ (inlet.p - outlet.p) - sum(dp),
             outlet.T ~ T[n],
             inlet.T ~ T[1],
-            # An equation rather than an observable, so connection expansion resolves the
-            # instream reads.
+            # An equation, not an observable: it reads instream, which ModelingToolkit only
+            # resolves inside equations.
             vars.T_in ~ ifelse(inlet.ṁ >= 0, T_inlet_fwd, T_inlet_rev),
         ],
     )
@@ -506,9 +517,8 @@ function ChannelAndContacts(;
     )
 
     T = collect(vars.T)
-    # Cell-centre pressure, which the subcooled-boiling HTC needs for T_sat and the ONB
-    # superheat. Same expression `_channel_core` uses for its P observable.
-    P_cell = inlet.p .- cumsum(collect(vars.dp)) .+ collect(vars.dp) ./ 2
+    # The pressure subcooled boiling reads saturation at, the same as the P observable.
+    P_cell = _static_pressure(inlet.p, collect(vars.dp), inlet.ṁ, ρ.(liquid, T), A)
     wall_T(face) = [port.T for port in face.port]
     q_wall(face) = collect(face.h) .* face.perimeter .* dz .* (wall_T(face) .- T)
 

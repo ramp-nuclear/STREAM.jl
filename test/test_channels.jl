@@ -794,3 +794,22 @@ end
         end
     end
 end
+
+@testset "a channel's pressure is the static pressure, the total less the dynamic head" begin
+    # Ports carry the total pressure. Saturation depends on the static pressure, which sits
+    # ρv²/2 below it, so that is what the channel reports as P and reads T_sat and T_ONB at.
+    n = 5
+    ssys = build_loop(; n=n)
+    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:n]
+    push!(op, ssys.ch.inlet.ṁ => 0.5)
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    ch = ssys.ch
+
+    # Total pressure at each cell's outlet-side face, and the dynamic head there.
+    p_total = sol[ch.inlet.p] .- cumsum([sol[ch.dp[i]] for i in 1:n])
+    head = [ρ(H2O, sol[ch.T[i]]) * sol[ch.v[i]]^2 / 2 for i in 1:n]
+    @test all(head .> 0)
+    @test [sol[ch.P[i]] for i in 1:n] ≈ p_total .- head rtol = 1e-12
+    @test [sol[ch.T_sat[i]] for i in 1:n] ≈ [Tsat(H2O, sol[ch.P[i]]) for i in 1:n] rtol = 1e-12
+end
