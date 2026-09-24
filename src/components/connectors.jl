@@ -13,7 +13,10 @@ be built already seeded.
 
 # Arguments
 - `name`: connector name (Symbol; supplied by `@named`).
-- `p`: pressure [Pa].
+- `p`: total pressure [Pa], the static pressure plus the dynamic head `ρv²/2`. Equal
+  pressures at a junction therefore carry Bernoulli's drop into a narrower part, and a local
+  loss is a loss of total pressure. Saturation depends on the static pressure, which a
+  channel works out for itself.
 - `ṁ`: mass flow rate [kg/s]; positive points into the port.
 - `T`: temperature [°C].
 """

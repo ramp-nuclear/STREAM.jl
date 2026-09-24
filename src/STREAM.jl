@@ -97,7 +97,7 @@ construction, so the closure sees only symbolic `Re` and `Pr`.
 """
 module HTC
 using ModelingToolkit
-using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH
+using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, G_EARTH
 using ..STREAM: ρ, cₚ, μ, κ, σ, β, Tsat
 using ..STREAM: Re, Pr, Gr, Ra, flow_regime_blend
 include("htc/correlations.jl")
@@ -105,7 +105,7 @@ include("htc/subcooled_boiling.jl")
 include("htc/htc.jl")
 export dittus_boelter, constant_Nusselt, elenbaas_nusselt, marco_han_nusselt
 export fully_developed_laminar_nusselt, developing_laminar_nusselt, film_temperature
-export mcadams_scb_heat_flux, bergles_rohsenow_scb_heat_flux
+export mcadams_scb_heat_flux, rohsenow_scb_heat_flux
 export partial_SCB_correction, regime_dependent_q_scb
 export AbstractHTC, FromFunction, FromNusselt, PropertyBasis, AtFilm, AtBulk, property_temperature
 export DittusBoelter, ConstantNusselt, FullyDevelopedLaminar, DevelopingLaminar
@@ -176,9 +176,11 @@ The correlations (`q_CHF_mirshak`, `q_CHF_sudo_kaminaga`, `q_CHF_fabrega`,
 [`twall_limit`](@ref)) run after a solve, on numbers rather than symbolics, and each takes
 either its raw arguments or a [`ChannelState`](@ref).
 
-[`ChannelState`](@ref) reads one channel's fields out of a `NonlinearSolution` or an
-`ODESolution`. [`threshold_analysis`](@ref) builds one and applies the functions you name;
-[`chfr`](@ref) builds a CHF-ratio closure with face selection and a zero-flux guard.
+[`ChannelState`](@ref) reads one channel's fields at one instant out of a
+`NonlinearSolution` or an `ODESolution`. [`threshold_analysis`](@ref) builds one, at every
+saved time for a transient, and applies the functions you name. [`chfr`](@ref) builds a
+CHF-ratio closure with face selection and a zero-flux guard, and [`worst_case`](@ref) finds
+the smallest margin and where and when it occurs.
 
 Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAndContacts`, not
 `ChannelHeatFlux`.
@@ -186,7 +188,7 @@ Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAn
 module Thresholds
 using ModelingToolkit
 using QuadGK
-using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, H2O
+using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, H2O, G_EARTH
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Pe
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
@@ -194,7 +196,7 @@ include("thresholds/thresholds.jl")
 include("thresholds/analysis.jl")
 export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber
 export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
-export ChannelState, threshold_analysis, chfr
+export ChannelState, threshold_analysis, chfr, worst_case
 end
 
 """

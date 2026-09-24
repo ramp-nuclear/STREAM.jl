@@ -96,82 +96,56 @@ function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=
 end
 
 """
-    q_OSV_saha_zuber(T_inlet, ṁ, pipe; flux_shape=nothing, dz=nothing, flux_enworse=1.0) -> q_OSV [W/m^2]
+    q_OSV_saha_zuber(T_inlet, ṁ, pipe, coolant; flux_shape=nothing, dz=nothing, flux_enworse=1.0) -> q_OSV [W/m^2]
 
-Onset of Significant Void (OSV) heat flux using self-consistent Saha-Zuber (1974) formulation.
+Onset of Significant Void (OSV) heat flux per cell, from Saha and Zuber (1974), with the
+bulk temperature computed as though the channel ran at the OSV flux.
 
-Uses the computed-bulk variant: the bulk temperature is computed as though the channel
-operates exactly at q_OSV, yielding a self-consistent result.
+Saha and Zuber give `T_sat - T_bulk = q_OSV / X`, with `X = κ/Dh · Nu_c` (`Nu_c = 455`) for
+`Pe ≤ 70000` and `X = St_c · G · cₚ` (`St_c = 0.0065`) above. Scaling the flux shape until
+the bulk temperature the energy balance gives meets that condition yields
 
-Pe threshold: Pe < 70000 → `X = k/Dh * Nu_c` (Nu_c = 455);
-              Pe >= 70000 → `X = St_c * G * cp` (St_c = 0.0065).
+    q_OSV = X (T_sat - T_inlet) / (1 + X Hp / (|ṁ| cₚ) · ∫q dz / (q · flux_enworse))
 
-Formula: `q_OSV = X * (T_sat - T_inlet) / (1 + X * Hp/(|ṁ|*cp) * cumsum(q_shape*dz) / (q_shape*flux_enworse))`
-
-When `flux_shape` is `nothing`, uniform flux is assumed (all flux values equal; shape factor = 1 at each cell).
+which does not depend on how `flux_shape` is normalized. The integral runs from the upstream
+end, so under reversed flow it starts at the last cell.
 
 Source: Python STREAM thresholds.py `Saha_Zuber_OSV_computed_bulk`.
 
 # Arguments
-- `T_inlet`: coolant inlet temperature [°C]
-- `ṁ`: mass flow rate [kg/s]
+- `T_inlet`: temperature of the coolant entering the channel [°C]
+- `ṁ`: mass flow rate [kg/s]; its sign says which end is upstream
 - `pipe`: channel geometry [`PipeGeometry`]
-- `flux_shape`: optional axial heat flux distribution vector (freely normalized); default: uniform
-- `dz`: optional axial cell lengths [m]; default: `pipe.L / n_cells` per cell
-- `flux_enworse`: multiplicative factor for local flux disturbance effects (default 1.0)
+- `coolant`: coolant properties per cell as a [`Liquid`](@ref), at the bulk temperature and
+  pressure, e.g. `H2O(T_bulk, P)`. Supplies cₚ, κ and Tsat.
+- `flux_shape`: axial heat flux per cell, in any normalization; default uniform
+- `dz`: axial cell lengths [m]; default `pipe.L / n`
+- `flux_enworse`: factor the local flux is made worse by, for fuel inhomogeneity (default 1.0)
 
 # Returns
-OSV heat flux `q_OSV` [W/m^2]. Returns the minimum (most conservative) value along the channel.
+OSV heat flux per cell [W/m^2].
 """
 function q_OSV_saha_zuber(
-    T_inlet,
-    ṁ,
-    pipe;
-    flux_shape=nothing,
-    dz=nothing,
-    flux_enworse=1.0,
-    liquid::AbstractLiquid=H2O,
+    T_inlet, ṁ, pipe, coolant::Liquid; flux_shape=nothing, dz=nothing, flux_enworse=1.0
 )
-    # Coolant properties at inlet temperature
-    rho = ρ(liquid, T_inlet)
-    cp = cₚ(liquid, T_inlet)
-    k_l = κ(liquid, T_inlet)
-    G = abs(ṁ) / pipe.A
-    u = G / rho
-    # Peclet number
-    pe = rho * u * pipe.Dh * cp / k_l
+    n = flux_shape === nothing ? length(coolant.ρ) : length(flux_shape)
+    cells(x) = x isa AbstractArray ? collect(x) : fill(x, n)
+    shape = flux_shape === nothing ? ones(n) : collect(float.(flux_shape))
+    dz_c = dz === nothing ? fill(pipe.L / n, n) : cells(dz)
+    cp_c, κ_c, T_sat = cells(coolant.cₚ), cells(coolant.κ), cells(coolant.Tsat)
 
-    # Saha-Zuber coefficient X
-    Nu_c = 455.0
-    St_c = 0.0065
-    if pe <= 7e4
-        X = k_l / pipe.Dh * Nu_c
-    else
-        X = St_c * G * cp
-    end
+    G = abs(ṁ) / pipe.A
+    Pe_c = G * pipe.Dh .* cp_c ./ κ_c
+    X = ifelse.(Pe_c .<= 7e4, κ_c ./ pipe.Dh .* 455.0, 0.0065 .* G .* cp_c)
 
-    T_sat_est = Tsat(liquid, 1e5)  # use 1 atm default for self-consistent bulk
-
-    # Handle uniform vs provided flux shape
-    n_cells = flux_shape === nothing ? 10 : length(flux_shape)
-    if flux_shape === nothing
-        # Uniform flux: cumsum(dz) / (1 * flux_enworse)
-        dz_local = fill(pipe.L / n_cells, n_cells)
-        shape = ones(n_cells)
-    else
-        dz_local = dz === nothing ? fill(pipe.L / n_cells, n_cells) : dz
-        shape = Float64.(flux_shape)
-    end
-
-    dT = T_sat_est - T_inlet
-    Hp = pipe.heated_perimeter
-    power_factor = Hp / (abs(ṁ) * cp)
-    cumulative = cumsum(shape .* dz_local)
-    shape_factor = cumulative ./ (shape .* flux_enworse)
-    denominator = 1.0 .+ X .* power_factor .* shape_factor
-    q_osv_cells = X .* dT ./ denominator
-    # Return minimum (most conservative cell — first cell where void first onset)
-    return minimum(q_osv_cells)
+    # The coolant reaching a cell has been heated by every cell before it in the flow, so
+    # the running sum starts at whichever end the flow enters. Reversing twice does that
+    # under reversed flow and hands the result back in cell order.
+    upstream(a) = ṁ >= 0 ? a : reverse(a)
+    heated = upstream(cumsum(upstream(shape .* dz_c)))
+    power_factor = pipe.heated_perimeter ./ (abs(ṁ) .* cp_c)
+    denominator = 1 .+ X .* power_factor .* heated ./ (shape .* flux_enworse)
+    return X .* (T_sat .- T_inlet) ./ denominator
 end
 
 """
@@ -203,8 +177,8 @@ Source: Python STREAM thresholds.py `Sudo_Kaminaga_CHF`.
 - `T_bulk`: bulk coolant temperature, per cell [°C]
 - `ṁ`: mass flow rate [kg/s]
 - `pipe`: channel geometry [`PipeGeometry`]
-- `gravity`: gravitational acceleration [m/s^2] (sign: positive = upward-to-downward,
-  negative = upward flow)
+- `gravity`: gravitational acceleration [m/s^2]. Only its size is used. The branch
+  follows the sign of the flow, positive taken as downward, as in Python STREAM
 - `sat_coolant`: saturated-coolant properties as a [`Liquid`](@ref), supplying ρ, ρᵥ, cₚ,
   hfg, σ and Tsat. Build it by calling a coolant at the channel's saturation state, e.g.
   `H2O(T_sat, P)`. There is no default: which coolant, and at which state, is the caller's

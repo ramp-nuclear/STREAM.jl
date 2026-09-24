@@ -414,7 +414,7 @@ end
     @testset "Low T_wall -> matches single-phase exactly" begin
         # T_wall = 330K < T_sat (~393K at 2 bar) ⇒ SCB inactive, pure single-phase.
         # Both SCB and non-SCB loops solve to identical h_tc values.
-        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
+        scb_fn = HTC.regime_dependent_q_scb()
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
 
@@ -702,7 +702,7 @@ end
     end
 
     @testset "SCB ChannelAndContacts compiles" begin
-        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
+        scb_fn = HTC.regime_dependent_q_scb()
         @named cac = ChannelAndContacts(
             n=3,
             geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
@@ -717,7 +717,7 @@ end
         # therefore means the SCB loop must reproduce the non-SCB loop exactly.
         # Build both, solve both, and compare h_tc and coolant T cell by cell.
         T_wall = 106.85
-        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
+        scb_fn = HTC.regime_dependent_q_scb()
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=T_wall)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=T_wall)
         @test sol_scb.retcode == ReturnCode.Success
@@ -768,9 +768,10 @@ end
         T_sat = Tsat(H2O, P)
         T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
 
-        scb_fn = HTC.regime_dependent_q_scb(pressure=P)
-        q_scb = scb_fn(T_wall, T_sat, Re_val)
-        q_scb_inc = scb_fn(T_ONB, T_sat, Re_val)
+        scb_fn = HTC.regime_dependent_q_scb()
+        sat = H2O(T_sat, P)
+        q_scb = scb_fn(T_wall, sat, Re_val)
+        q_scb_inc = scb_fn(T_ONB, sat, Re_val)
         factor = HTC.partial_SCB_correction(q_spl, q_scb, q_scb_inc)
 
         @test T_wall > T_ONB                     # boiling is active
@@ -781,7 +782,7 @@ end
     @testset "Low T_wall -> matches single-phase exactly" begin
         # T_wall = 330K < T_sat (~393K at 2 bar) -> SCB inactive, pure
         # single-phase. Both SCB and non-SCB loops solve to identical h_tc values.
-        scb_fn = HTC.regime_dependent_q_scb(pressure=2e5)
+        scb_fn = HTC.regime_dependent_q_scb()
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
 
@@ -792,4 +793,23 @@ end
             @test htc_scb[i] ≈ htc_noscb[i] rtol=1e-10
         end
     end
+end
+
+@testset "a channel's pressure is the static pressure, the total less the dynamic head" begin
+    # Ports carry the total pressure. Saturation depends on the static pressure, which sits
+    # ρv²/2 below it, so that is what the channel reports as P and reads T_sat and T_ONB at.
+    n = 5
+    ssys = build_loop(; n=n)
+    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:n]
+    push!(op, ssys.ch.inlet.ṁ => 0.5)
+    sol = solve_steady(ssys, op)
+    @test sol.retcode == ReturnCode.Success
+    ch = ssys.ch
+
+    # Total pressure at each cell's outlet-side face, and the dynamic head there.
+    p_total = sol[ch.inlet.p] .- cumsum([sol[ch.dp[i]] for i in 1:n])
+    head = [ρ(H2O, sol[ch.T[i]]) * sol[ch.v[i]]^2 / 2 for i in 1:n]
+    @test all(head .> 0)
+    @test [sol[ch.P[i]] for i in 1:n] ≈ p_total .- head rtol = 1e-12
+    @test [sol[ch.T_sat[i]] for i in 1:n] ≈ [Tsat(H2O, sol[ch.P[i]]) for i in 1:n] rtol = 1e-12
 end
