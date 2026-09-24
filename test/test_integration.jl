@@ -381,36 +381,32 @@ end
     dp_fn = (tt) -> p * exp(-tt)   # one function object: passed to Pump AND the op (same type)
     @named pump = Pump(dp_fn)
     @named R = Resistor(p / ṁ0)
-    @named flapper = Flapper(;
-        open_at_current=0.1 * ṁ0,
-        f=1.0,
-        area=1.0,
-        open_rate=10.0,
-        liquid=Liquid(),
-    )
+    machine = StateMachine(; initial_state=:CLOSED)
+    @named flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0, machine=machine,
+                             liquid=Liquid())
+    push!(machine, (:CLOSED => :OPEN, R.inlet.ṁ < 0.1 * ṁ0))
     @named hx = HeatExchanger(26.85)
     conns = [
         inparallel(pump, (R, flapper), hx)...,
         inseries(hx, pump)...,
-        watch_flow(flapper, R.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_refṁ), pump, R, flapper, hx)
-    ssys = mtkcompile(sys; fully_determined=false)
+    ssys = mtkcompile(sys)
     op = Pair{Any,Any}[
         ssys.R.inlet.ṁ => 1.0,
         ssys.pump.dP_pump_fn => dp_fn,
-    ]   # T_open defaults to Inf (flapper closed until the callback latches it)
-    @test isinf(ModelingToolkit.getdefault(ssys.flapper.T_open))   # starts closed (Python: isinf(F.t_open))
+    ]   # the machine starts :CLOSED (flapper shut until the transition fires)
+    @test machine.state === :CLOSED   # starts closed (Python: isinf(F.t_open))
     # ref_ṁ is the resistor flow R.ṁ = pump_dP/r = p·exp(-t), which mtkcompile leaves
-    # purely algebraic (no inertia ⇒ no state). flapper_callback detects the crossing exactly
-    # anyway: it root-finds the observed function for ref_ṁ at the solver's trial state, so
+    # purely algebraic (no inertia ⇒ no state). The transition detects the crossing exactly
+    # anyway: it root-finds the observed function for the watched flow at the trial state, so
     # the valve opens when the REAL wired flow reaches the threshold — no hardcoded analytic.
-    cb = flapper_callback(ssys, ssys.flapper)
+    cb = machine_callbacks(ssys, machine)
     t_arr = range(0.0, 5.0; length=500)
     sol = solve_transient(ssys, op, t_arr; callbacks=cb)
     @test sol.retcode == ReturnCode.Success
-    @test isapprox(sol.ps[ssys.flapper.T_open], log(10.0); rtol=1e-3)   # detected open time = log(10)
+    @test isapprox(machine.t_state, log(10.0); rtol=1e-3)   # detected open time = log(10)
     @test isapprox(sol(1.0; idxs=ssys.flapper.inlet.ṁ), 0.0; atol=1e-8)  # closed before
     @test sol(4.0; idxs=ssys.flapper.inlet.ṁ) > 1e-6                     # open after
 end
@@ -423,20 +419,18 @@ end
     t_open = 2.5
     dp_fn = (tt) -> exp(-tt)   # one function object for Pump + op
     @named pump = Pump(dp_fn)
-    @named flapper = Flapper(; open_at_current=0.1, f=1.0, area=1.0, open_rate=10.0,
+    # A machine already open at t_open is Python's F.open(2.5).
+    @named flapper = Flapper(; f=1.0, area=1.0, open_rate=10.0,
+                             machine=StateMachine(; initial_state=:OPEN, initial_time=t_open),
                              liquid=Liquid())
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, flapper, hx, pump)...,
-        watch_flow(flapper, pump.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_pump), pump, flapper, hx)
-    ssys = mtkcompile(sys; fully_determined=false)
-    op = Pair{Any,Any}[
-        ssys.flapper.T_open => t_open,            # pre-set open time (Python's F.open(2.5))
-        ssys.pump.dP_pump_fn => dp_fn,
-    ]
+    ssys = mtkcompile(sys)
+    op = Pair{Any,Any}[ssys.pump.dP_pump_fn => dp_fn]
     sol = solve_transient(ssys, op, range(0.0, 5.0; length=500); build_initializeprob=false)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(2.0; idxs=ssys.pump.inlet.ṁ), 0.0; atol=1e-8)   # closed ⇒ no flow
@@ -455,23 +449,25 @@ end
     @named pump = Pump(k * ṁ0^2)      # holds ṁ0 through R while the flapper is closed
     @named ine = Inertia(1.0e3)
     @named R = VolumetricFlowResistor(; k=k, density=1.0)
-    @named flapper = Flapper(; open_at_current=0.0, f=2 * k, area=1.0, open_rate=1.0,
+    machine = StateMachine(; initial_state=:CLOSED)
+    @named flapper = Flapper(; f=2 * k, area=1.0, open_rate=1.0, machine=machine,
                              liquid=Liquid())
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(pump, ine)...,
         inparallel(ine, (R, flapper), hx)...,
         inseries(hx, pump)...,
-        watch_flow(flapper, ine.inlet.ṁ),
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = compose(System(conns, t; name=:flapper_coastdown), pump, ine, R, flapper, hx)
-    ssys = mtkcompile(sys; fully_determined=false)
-    # Flapper default T_open=Inf ⇒ closed at the steady solve; override to 100 for the coast.
+    ssys = mtkcompile(sys)
+    # The machine is :CLOSED for the steady solve; opening it at a time you already know is a
+    # trip, the same idiom a fixed scram uses.
     sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0, ssys.R.inlet.ṁ => ṁ0])
     @test sol_ss.retcode == ReturnCode.Success
+    trip!(machine, 100.0; state=:OPEN)
     sol = solve_transient(ssys, sol_ss, range(0.0, 150.0; length=300);
-                          overrides=[ssys.pump.dP_pump => 0.0, ssys.flapper.T_open => 100.0])
+                          overrides=[ssys.pump.dP_pump => 0.0])
     @test sol.retcode == ReturnCode.Success
     ṁ_R = sol[ssys.R.inlet.ṁ, end]
     ṁ_F = sol[ssys.flapper.inlet.ṁ, end]

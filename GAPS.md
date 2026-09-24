@@ -114,7 +114,7 @@ log-spaced `times` near shutdown, not a better interpolant.
 
 The wiring landed with §1.2. `DecayHeat.DecayHeatSource` converts a contribution into the
 `power_input` a `PointKinetics` takes, applying the fission rate `Φ = P0/Q` and reading the
-trip time off the `ReactivityController`, and `build_loop_pk` couples the plate to `P`.
+trip time off the `StateMachine`, and `build_loop_pk` couples the plate to `P`.
 `test_decay_heat.jl` scrams a loop and shows the prompt power falling to 1e-9 of rated while
 the total holds at the decay level and the fuel stays above inlet, against the same trip with
 no source where it relaxes to the coolant.
@@ -140,10 +140,9 @@ class.
 precursors are seeded from the neutronic share `P0 - power_input`, since a decaying fission
 product breeds no delayed neutrons.
 
-`scram_callback` trips on `P_neutron`. It resolves an index into the state vector and `P`
-is an observable after compilation, but that is also the right physics, since a power-range
-monitor reads neutron flux. Tripping on the total would mean rewriting the callback in the
-`flapper_callback` style.
+A power trip is a `StateMachine` transition, so it watches `P_neutron` or the total `P`
+alike: the condition is compiled like any other expression of the system. `P_neutron` is
+usually the physics wanted, since a power-range monitor reads neutron flux.
 
 ---
 
@@ -289,7 +288,7 @@ because the two get conflated.
 | Coolant inventory as a state, and a level derived from it | No |
 | A component with a free surface (pool, plenum, standpipe) | No |
 | Break flow out of the system, as a specified rate or an orifice | No |
-| An event that fires when the level reaches a named elevation | No, but `SCRAMCondition` and the flapper callbacks are the pattern to copy |
+| An event that fires when the level reaches a named elevation | No, but a `StateMachine` transition on the level is the pattern to copy |
 | Decay heat, to know the load while it drains | Yes, see [1.1](#11-decay-heat) |
 | Natural circulation while still covered | Yes |
 | Margin to boiling on the way down | Yes, the CHF / OFI / OSV / ONB thresholds |
@@ -476,6 +475,32 @@ needs, and it is more accurate than Python's finite differences because there is
 to choose. It is not a global method: for variance attribution over a parameter range, that
 takes sampling on top, which is what `GlobalSensitivity.jl` is for.
 
+### 8.1 The control state sits outside the problem
+
+A `StateMachine` is an ordinary Julia object: its state, the time it entered it, and its log
+live in the machine, not in the ODE problem, and a transition updates them from an event.
+That is what makes a trip time exact and lets you read or trip a machine by hand. It costs
+two things once we run many cases or ask for sensitivities.
+
+**Many runs need a machine each, or a reset between them.** A machine remembers the last
+run: after a scram it stays scrammed. Running the same model again, for instance with a
+different setpoint through `remake`, needs `reset!(machine)` first, or the second run starts
+already tripped. Runs in parallel, as an `EnsembleProblem` would do them, cannot share one
+machine at all, since they would all write to it at once. Each needs its own machine,
+built fresh for each trajectory.
+
+**Sensitivities come out wrong, with no error.** Automatic differentiation, which is how we
+would ask "how much does peak fuel temperature move if the trip setpoint moves by 1%?",
+follows numbers through the calculation. The trip time is stored in the machine as a plain
+number, outside anything the differentiation follows, so the answer comes back as if the
+trip always happened at the same moment. That is wrong rather than an error, which makes it
+the dangerous half.
+
+Both go away if the state moves into the problem: the trip time becomes a parameter of the
+model that the event writes, and the signals read it back from there. Then `remake`,
+parallel runs and differentiation all see it. We lose the plain object you can read and trip
+by hand, so it is not worth doing before someone needs sensitivities.
+
 **Size:** medium, and probably a different design from Python's.
 
 ---
@@ -586,6 +611,12 @@ Verified as matching, so they should not be re-investigated:
 - **Threshold correlations.** Listed in [5](#5-thresholds-and-post-solve-analysis).
 - **Geometry.** `PipeGeometry` matches `EffectivePipe` field for field except
   `heated_diameter`, which Python computes and never uses.
+- **Flapper.** The open-state quadratic resistor matches: our
+  `ṁ_open = sign(P_in − P_out)·√(|ΔP|·2ρA²/f)` and Python's `−sign(dp)·√(…)` against its own
+  `dp = P_out − P_in` are the same formula, checked in both flow directions. One deliberate
+  difference: we always relax the opening through the C1 ramp `−2x³ + 3x²`, where Python
+  defaults to `legacy_relaxation` and opts into that shape per call. The open/closed binary and
+  the opening time are the same either way.
 
 ## Suggested order of work
 
