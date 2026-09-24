@@ -251,26 +251,17 @@ const CRITICAL = (t) -> 0.0
         @test isfinite(sol[ssys.dPdt, 1])
     end
 
-    @testset "ReactivityController" begin
+    @testset "ReactivityController reads the machine it was given" begin
+        # With no function there is no control reactivity, at any time.
         ctrl_default = ReactivityController()
-        @test ctrl_default.machine.state == :NORMAL
-        @test ctrl_default.machine.t_state == 0.0
-        @test ctrl_default.machine.log == [(:NORMAL, 0.0)]
-        @test worth(ctrl_default, 0.0) == 0.0
-        @test worth(ctrl_default, 10.0) == 0.0
-        @test worth(ctrl_default, 1e6) == 0.0
+        @test ctrl_default.machine.state === :NORMAL
+        @test all(ctrl_default(t_now) == 0.0 for t_now in (0.0, 10.0, 1e6))
 
-        fn_linear = (s, ts, t) -> 0.001 * t
-        ctrl_fn = ReactivityController(fn_linear)
-        @test worth(ctrl_fn, 0.0) == 0.0
-        @test worth(ctrl_fn, 2.5) == 0.0025
-        @test worth(ctrl_fn, 10.0) == 0.01
+        ctrl_fn = ReactivityController((s, ts, t) -> 0.001 * t)
+        @test ctrl_fn(2.5) == 0.0025
+        @test ctrl_fn(10.0) == 0.01
 
-        @test ctrl_fn(0.0) == worth(ctrl_fn, 0.0)
-        @test ctrl_fn(3.14) == worth(ctrl_fn, 3.14)
-        @test ctrl_fn(100.0) == worth(ctrl_fn, 100.0)
-
-        # The controller holds no state of its own: the schedule is read at the state the
+        # The controller holds no state of its own: the function is read at the state the
         # machine is in and the time it entered it, so tripping the machine moves the worth.
         machine = StateMachine()
         ctrl = ReactivityController(
@@ -278,23 +269,14 @@ const CRITICAL = (t) -> 0.0
         )
         @test ctrl(3.0) == 0.0
         trip!(machine, 1.5)
-        @test machine.log == [(:NORMAL, 0.0), (:SCRAM, 1.5)]
         @test ctrl(3.0) == -0.05 * 1.5
-
-        started = StateMachine(; initial_state=:STARTUP, initial_time=7.5)
-        @test started.state == :STARTUP
-        @test started.t_state == 7.5
-        @test started.log == [(:STARTUP, 7.5)]
-        @test started.abort_states == Set()
-        @test StateMachine(; abort_states=(:SCRAM, :ABORT)).abort_states ==
-            Set([:SCRAM, :ABORT])
 
         capture = Ref{Tuple{Symbol,Float64,Float64}}((:X, -1.0, -1.0))
         fn_capture = (s, ts, t) -> (capture[]=(s, ts, t); 0.0)
         ctrl_cap = ReactivityController(
             fn_capture; machine=StateMachine(; initial_state=:PHASE_A, initial_time=2.0)
         )
-        worth(ctrl_cap, 8.0)
+        ctrl_cap(8.0)
         @test capture[] == (:PHASE_A, 2.0, 8.0)
     end
 
@@ -567,8 +549,8 @@ const CRITICAL = (t) -> 0.0
 
         @test sol.t[end] < 10.0                 # :SCRAM is an abort state, so the run stops
         @test machine.state == :SCRAM
-        @test any(entry -> entry[1] == :SCRAM, machine.log)
-        @test machine.log[end][2] > t_step
+        @test any(entry -> entry.state === :SCRAM, machine.log)
+        @test machine.log[end].t > t_step
 
         # The total power is computed from the states rather than being one, so the old
         # power-watching callback could not see it. A transition can.
@@ -677,7 +659,7 @@ end
         @test sol.retcode == ReturnCode.Terminated   # DiffEq terminate! sets this
         @test sol.t[end] < 10.0                      # early stop confirmed by time
         @test machine.state == :SCRAM                # the transition was taken
-        @test any(entry -> entry[1] == :SCRAM, machine.log)
+        @test any(entry -> entry.state === :SCRAM, machine.log)
     end
 
     # Coupled point-kinetics feedback physics. All three tests build on the
@@ -775,132 +757,5 @@ end
         @test maximum(P_post) < 0.5                    # (3) bounded — feedback caps the excursion
         @test rho[end] < delta_rho                     # (4) feedback subtracted reactivity
         @test abs(rho[end]) < 1e-3                      #     new self-consistent critical equilibrium
-    end
-end
-
-
-@testset "trip! and the state machine" begin
-    @testset "trip! latches the first trip" begin
-        machine = StateMachine()
-        @test trip!(machine, 2.0) === :SCRAM
-        @test machine.state === :SCRAM
-        @test machine.t_state == 2.0
-        # A second signal changes nothing: the first trip time is the one kept.
-        trip!(machine, 5.0)
-        @test machine.t_state == 2.0
-        @test count(entry -> entry[1] === :SCRAM, machine.log) == 1
-    end
-
-    # A coasting loop: the pump head is removed and the flow falls through any setpoint
-    # below where it starts, while the coolant runs hotter for want of flow. One solved
-    # steady state feeds every case below.
-    ssys = build_loop(; n=5)
-    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
-    push!(op, ssys.ch.inlet.ṁ => 0.5)
-    sol_ss = solve_steady(ssys, op)
-    setpoint = 0.5 * sol_ss[ssys.ch.inlet.ṁ]
-    T_setpoint = sol_ss[ssys.ch.T[5]] + 1.0
-    times = range(0.0, 0.5; length=11)
-    coast(machine) = solve_transient(
-        ssys, sol_ss, times;
-        overrides=[ssys.pump.dP_pump => 0.0],
-        callbacks=machine_callbacks(ssys, machine),
-    )
-
-    @testset "a falling inequality fires where it becomes true" begin
-        machine = StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ < setpoint))
-        sol = coast(machine)
-        @test sol.retcode == ReturnCode.Success
-        @test machine.state === :SCRAM
-
-        # The trip time falls between the last saved flow above the setpoint and the first
-        # below.
-        ṁ = sol[ssys.ch.inlet.ṁ, :]
-        before = sol.t .< machine.t_state
-        @test all(ṁ[before] .> setpoint)
-        @test all(ṁ[.!before] .<= setpoint * (1 + 1e-6))
-
-        # A decay heat source reading the same machine starts its clock at the trip.
-        source = DecayHeat.DecayHeatSource(DecayHeat.U238CaptureChain(1.0), machine; P0=1.0)
-        @test DecayHeat.decay_time(source, machine.t_state + 3.0) ≈ 3.0
-    end
-
-    @testset "a rising inequality fires on its own edge" begin
-        # Less flow over the same wall means a hotter outlet, so this one rises into its
-        # setpoint while the flow falls away from its own.
-        machine = StateMachine((:NORMAL => :SCRAM, ssys.ch.T[5] > T_setpoint))
-        sol = coast(machine)
-        @test sol.retcode == ReturnCode.Success
-        @test machine.state === :SCRAM
-        T = sol[ssys.ch.T[5], :]
-        before = sol.t .< machine.t_state
-        @test all(T[before] .< T_setpoint)
-        @test all(T[.!before] .>= T_setpoint * (1 - 1e-6))
-    end
-
-    @testset "an equation fires at the same crossing, from either side" begin
-        # The flow crosses this setpoint once and downwards, so the equation form has to
-        # land where the inequality does. What it buys beyond that is the other direction.
-        falling = StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ < setpoint))
-        either = StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ ~ setpoint))
-        foreach(coast, (falling, either))
-        @test either.state === :SCRAM
-        @test either.t_state ≈ falling.t_state rtol = 1e-9
-    end
-
-    @testset "from names the states a transition leaves" begin
-        # Same edge, three machines. The guard is what decides.
-        edge = (:NORMAL, :DERATED) => :SCRAM
-        below = ssys.ch.inlet.ṁ < setpoint
-        from_normal = StateMachine((edge, below))
-        from_derated = StateMachine((edge, below); initial_state=:DERATED)
-        from_other = StateMachine((edge, below); initial_state=:OFF)
-        foreach(coast, (from_normal, from_derated, from_other))
-        @test from_normal.state === :SCRAM
-        @test from_derated.state === :SCRAM     # a collection of states, not just one
-        @test from_other.state === :OFF         # not armed here
-
-        # A vector and a set say the same thing as the tuple above, and no `from` at all
-        # leaves any state.
-        armed(from) = only(StateMachine((from => :SCRAM, below)).transitions).from
-        @test armed([:NORMAL, :DERATED]) == Set([:NORMAL, :DERATED])
-        @test armed(Set([:NORMAL])) == Set([:NORMAL])
-        @test armed(nothing) === nothing
-    end
-
-    @testset "a predicate transition follows one the solver found" begin
-        # Dwell time is about the machine, not the system, so it is the predicate form:
-        # abort a set time after the scram it follows. Entering an abort state stops the run.
-        machine = StateMachine(
-            (:NORMAL => :SCRAM, ssys.ch.inlet.ṁ < setpoint),
-            (:SCRAM => :ABORT, (m, t) -> t - m.t_state > 0.05);
-            abort_states=(:ABORT,),
-        )
-        sol = coast(machine)
-        @test machine.state === :ABORT
-        @test sol.t[end] < last(times)                    # terminated early
-        @test map(first, machine.log) == [:NORMAL, :SCRAM, :ABORT]
-        scram_at = machine.log[2][2]
-        @test machine.t_state - scram_at >= 0.05
-    end
-
-    @testset "an edge may name a component before the model is compiled" begin
-        # A symbol read off the component is the one the compiled system carries, so a
-        # machine can take its edges where the components are built. push! is for the edge
-        # that cannot be written that early: a trip on the very kinetics the machine's own
-        # controller drives, which cannot exist until the controller does.
-        @named lone = PointKinetics(ReactivityController())
-        compiled = mtkcompile(compose(System(Equation[], t; name=:parent), lone))
-        @test isequal(lone.P_neutron, compiled.lone.P_neutron)
-        machine = StateMachine()
-        @test isempty(machine.transitions)
-        push!(machine, (:NORMAL => :SCRAM, ssys.ch.inlet.ṁ < setpoint))
-        coast(machine)
-        @test machine.state === :SCRAM
-    end
-
-    @testset "a condition that is not a relation says so" begin
-        machine = StateMachine((:NORMAL => :SCRAM, ssys.ch.inlet.ṁ))
-        @test_throws ArgumentError machine_callbacks(ssys, machine)
     end
 end

@@ -257,8 +257,8 @@ export ResistorFromKnownPoint
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
 export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
-export ReactivityController, worth
-export StateMachine, StateSchedule, trip!, machine_callbacks
+export ReactivityController
+export StateMachine, StateSchedule, trip!, reset!, machine_callbacks
 end
 
 """

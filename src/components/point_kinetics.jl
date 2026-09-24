@@ -299,49 +299,42 @@ end
 """
     ReactivityController(input_reactivity=nothing; machine=StateMachine())
 
-The control reactivity a [`PointKinetics`](@ref) sees, scheduled off a [`StateMachine`](@ref).
+The control reactivity a [`PointKinetics`](@ref) sees, read off a [`StateMachine`](@ref).
 
-`input_reactivity(state, t_state, t)` is asked for a worth at each step, given the state the
-machine is in and the time it entered it, so rod insertion after a scram is a function of the
-time since the trip. Everything that moves the state lives in the machine.
+`input_reactivity(state, t_state, t)` is every reactivity the control system inserts, given
+the state the machine is in, when it entered it, and the time now. That covers a postulated
+accident as well as the shutdown that answers it, so one function usually holds both:
 
-Instances are callable, `ctrl(t)`, which is what lets one be handed straight to
-`PointKinetics(ctrl; ...)` as the MTK callable parameter.
+```julia
+machine = StateMachine()
+insertion(t) = t < 1.0 ? 0.002 * t : 0.002              # a rod withdrawal accident
+scram(dt) = -0.06 * clamp(dt / 0.5, 0.0, 1.0)            # rods in over 0.5 s
+rods = ReactivityController(machine=machine) do state, t_state, t
+    state === :SCRAM ? insertion(t) + scram(t - t_state) : insertion(t)
+end
+@named pk = PointKinetics(rods)
+push!(machine, (:NORMAL => :SCRAM, pk.P_neutron > 1.2e6, "high power"))
+# compose and compile into ssys, then:
+sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
+```
+
+Build the machine yourself and pass it, as above, whenever anything will move it. The trip on
+the kinetics is added with `push!` after `PointKinetics` is built, because `pk` needs the
+controller and the controller needs the machine. Leave `machine` out only for a controller
+whose state never changes, such as a fixed insertion with no protection system.
+
+A controller is a [`StateSchedule`](@ref) under the name the kinetics use, so it is called as
+`rods(t)`, and the machine can drive other schedules beside it.
 
 # Arguments
-- `input_reactivity`: callable `(state, t_state, t) -> Float64`. Without one there is no
-  control worth at all.
+- `input_reactivity`: callable `(state, t_state, t) -> Float64`, the inserted reactivity.
+  Without one there is none.
 
 # Keywords
 - `machine`: the [`StateMachine`](@ref) whose state is read. A fresh one in `:NORMAL` by
-  default, reachable as `ctrl.machine`, so a controller needs no machine built ahead of it.
-  Pass one when the machine is the object you keep, or when something else drives it too.
-
-This is a [`StateSchedule`](@ref) under the name the kinetics use, so a valve opening and a
-rod bank are the same kind of object. Its fields are `f`, the schedule, and `machine`.
-
-# Example
-```julia
-ctrl = ReactivityController((state, t_state, t) -> state === :SCRAM ? -0.06 : 0.0)
-@named pk = PointKinetics(ctrl)
-# the kinetics exist only once the controller does, so their own trip goes in here
-push!(ctrl.machine, (:NORMAL => :SCRAM, pk.P_neutron > 1.2e6))
-sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
-```
-"""
-const ReactivityController = StateSchedule
-
-"""
-    worth(ctrl, t_now) -> Float64
-
-The control reactivity now: the schedule read at the machine's state and the time it entered
-that state, which is the same thing as calling `ctrl(t_now)`.
-
-# Arguments
-- `ctrl`: the [`ReactivityController`](@ref)
-- `t_now`: current simulation time [s]
+  default, reachable afterwards as `rods.machine`.
 
 # Returns
-Control reactivity, dimensionless.
+A callable `rods(t) -> Float64`, dimensionless.
 """
-worth(ctrl::StateSchedule, t_now) = ctrl(t_now)
+const ReactivityController = StateSchedule

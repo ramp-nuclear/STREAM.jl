@@ -477,26 +477,29 @@ takes sampling on top, which is what `GlobalSensitivity.jl` is for.
 
 ### 8.1 The control state sits outside the problem
 
-`StateMachine` keeps the state, the time it was entered and the log in a plain Julia object,
-and `machine_callbacks` writes to it from an event. That is what makes a trip time exact and
-the machine readable, and it costs two things as soon as UQ arrives.
+A `StateMachine` is an ordinary Julia object: its state, the time it entered it, and its log
+live in the machine, not in the ODE problem, and a transition updates them from an event.
+That is what makes a trip time exact and lets you read or trip a machine by hand. It costs
+two things once we run many cases or ask for sensitivities.
 
-Sampling works, with care. A sweep over a setpoint is a `remake` on a problem already built,
-since a transition reads parameters at solve time and nothing is recompiled. But a machine
-latches, so every sample has to reset it, and an `EnsembleProblem` running trajectories in
-parallel would share one machine and race on it. Each trajectory needs its own, built in
-`prob_func`.
+**Many runs need a machine each, or a reset between them.** A machine remembers the last
+run: after a scram it stays scrammed. Running the same model again, for instance with a
+different setpoint through `remake`, needs `reset!(machine)` first, or the second run starts
+already tripped. Runs in parallel, as an `EnsembleProblem` would do them, cannot share one
+machine at all, since they would all write to it at once. Each needs its own machine,
+built fresh for each trajectory.
 
-Derivatives do not work at all, and they fail quietly. `t_state` is a `Float64`, so a dual
-number loses its derivative the instant a transition fires, and the affect mutates a Julia
-object rather than `u` or `p`, so neither forward nor adjoint sensitivity has a path through
-it. A derivative with respect to a trip setpoint comes back as though the trip time were
-pinned where it landed, which is wrong rather than an error.
+**Sensitivities come out wrong, with no error.** Automatic differentiation, which is how we
+would ask "how much does peak fuel temperature move if the trip setpoint moves by 1%?",
+follows numbers through the calculation. The trip time is stored in the machine as a plain
+number, outside anything the differentiation follows, so the answer comes back as if the
+trip always happened at the same moment. That is wrong rather than an error, which makes it
+the dangerous half.
 
-The fix, when someone needs it, is to keep the state in the problem: `t_state` as a parameter
-the event writes with `setp`, and the schedule reading it back from `p`. Then `remake`,
-ensembles and AD all see it. It costs the plain Julia object you can read and trip by hand, so
-it is not worth paying before the requirement is real.
+Both go away if the state moves into the problem: the trip time becomes a parameter of the
+model that the event writes, and the signals read it back from there. Then `remake`,
+parallel runs and differentiation all see it. We lose the plain object you can read and trip
+by hand, so it is not worth doing before someone needs sensitivities.
 
 **Size:** medium, and probably a different design from Python's.
 
