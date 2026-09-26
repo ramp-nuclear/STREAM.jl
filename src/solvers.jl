@@ -19,6 +19,9 @@ If a particular solve does not converge, pass an explicit solver; the coastdown 
 
 # Returns
 `SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
+
+# Throws
+- `ErrorException`: if the solver does not report success
 """
 function solve_steady(
     ssys, op; solver=nothing, abstol=1e-8, reltol=1e-6, build_initializeprob=false
@@ -30,7 +33,7 @@ function solve_steady(
         build_initializeprob=build_initializeprob,
     )
     sol = solve(prob, solver; abstol=abstol, reltol=reltol)
-    return sol
+    return _successful(sol, "steady")
 end
 
 """
@@ -61,6 +64,10 @@ Solve a transient simulation over a time array.
 
 # Returns
 `SciMLBase.ODESolution`. Access time-dependent results via `sol[ssys.component.variable, :]`.
+A run a state machine stopped on purpose comes back `Terminated`, which counts as success.
+
+# Throws
+- `ErrorException`: if the integrator gives up before `t[end]`
 """
 function solve_transient(
     ssys, op, t; solver=Rodas5P(), callbacks=nothing,
@@ -79,7 +86,20 @@ function solve_transient(
         initializealg=initializealg,
         kwargs...,
     )
-    return sol
+    return _successful(sol, "transient")
+end
+
+"""
+    _successful(sol, what) -> sol
+
+`sol` if its return code counts as success, and an error naming the code otherwise. A failed
+transient still holds the trajectory up to where it stopped, which reads like a finished run
+unless something checks.
+"""
+function _successful(sol, what)
+    SciMLBase.successful_retcode(sol) && return sol
+    stopped = hasproperty(sol, :t) && !isempty(sol.t) ? " at t = $(sol.t[end])" : ""
+    return error("the $(what) solve failed with retcode $(sol.retcode)$(stopped)")
 end
 
 

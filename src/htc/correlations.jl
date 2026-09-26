@@ -26,10 +26,8 @@ end
 Elenbaas natural convection correlation for parallel vertical plates.
 Formula: Nu = (1/24) * Ra * (b/L) * (1 - exp(-35 * L / (Ra * b)))^0.75
 
-Natural convection has no driving force for non-positive Rayleigh (wall not
-hotter than bulk), so Nu = 0 for Ra <= 0. The shape term's base is clamped so
-the fractional power never sees a negative argument, even when the expression is
-eagerly constant-folded.
+The correlation takes `|Ra|`: a wall colder than the bulk drives natural convection just as a
+hotter one does, only downward. At `Ra = 0` there is no buoyancy and `Nu` is zero.
 
 Source: Elenbaas (1942), as implemented in Python STREAM `_Elenbaas`.
 
@@ -39,17 +37,14 @@ Source: Elenbaas (1942), as implemented in Python STREAM `_Elenbaas`.
 - `L`: heated length [m]
 
 # Returns
-Nusselt number (dimensionless). Zero for Ra <= 0.
+Nusselt number (dimensionless), zero only at `Ra = 0`.
 """
 function elenbaas_nusselt(Ra, b, L)
-    # The return below already zeroes Nu for Ra <= 0, so this clamp only has to keep the shape
-    # term finite while that not-taken branch is traced. A symbolic Num cannot take an early
-    # `return`, hence the ifelse rather than a guard clause. The clamp value is arbitrary as long
-    # as it is finite and positive; one(Ra) is the simplest. An epsilon would be worse, it blows
-    # the 35*L/(Ra*b) exponent up toward Inf.
-    Ra_pos = ifelse(Ra > 0, Ra, one(Ra))
-    shape = (1 - exp(-35 * L / (Ra_pos * b)))^0.75
-    return ifelse(Ra > 0, (1 / 24) * Ra * (b / L) * shape, zero(Ra))
+    # The 1e-30 keeps the exponent finite at Ra = 0, where exp(-Inf) = 0 would still work but
+    # its derivative would not. It is Python's floor, far below any Ra that means anything.
+    Ra_abs = abs(Ra) + 1e-30
+    shape = (1 - exp(-35 * L / (Ra_abs * b)))^0.75
+    return (1 / 24) * Ra_abs * (b / L) * shape
 end
 
 
@@ -60,12 +55,52 @@ function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     )
 end
 
-function _nusselt_coefficient_developing(x)
-    nu_low = 1.49 * x^(-1 / 3)
-    nu_mid = 1.49 * x^(-1 / 3) - 0.4
-    nu_high = 8.235 + 8.68 * exp(-164 * x) * (1e3 * x)^(-0.506)
-    return ifelse(x <= 2e-4, nu_low, ifelse(x <= 1e-3, nu_mid, nu_high))
+const _XSTAR_TABLE34 = vcat(
+    [j * 10.0^(-i) for i in 6:-1:2 for j in (1, 1.5, 2, 3, 4, 5, 6, 7, 8, 9)],
+    [0.1, 0.15, 0.2],
+)
+const _NU_TABLE34 = vcat(
+    [148.773, 129.944, 118.049, 103.110, 93.673, 86.954, 81.824, 77.724, 74.339, 71.477,
+     69.011, 60.292, 54.787, 47.880, 43.521, 40.419, 38.054, 36.165, 34.607, 33.290,
+     32.153, 28.154, 25.636, 22.488, 20.512, 19.133, 18.050, 17.205, 16.511, 15.928,
+     15.427, 13.681, 12.604, 11.299, 10.516, 9.9878, 9.6085, 9.3249, 9.1073, 8.9374,
+     8.8031, 8.4393, 8.3107, 8.2458, 8.2368, 8.2355],
+    fill(8.2353, 7),
+)
+
+"""
+    _leveque_nusselt(x) -> Nu
+
+Worsøe-Schmidt's Lévêque-type solution for the local Nusselt number between parallel plates
+at very small dimensionless length `x`, Shah and London (1978) eq. 316. It is what their
+table 34 was computed from below `x = 1e-4`.
+"""
+function _leveque_nusselt(x)
+    xt = x^(1 / 3)
+    return 1 / (0.670960978 * xt + 0.159064137 * xt^2 + 0.12012 * x + 0.12495 * xt^4 +
+                0.15602 * xt^5 + 0.22176 * x^2 + 0.34932 * xt^7 - 4 * x)
 end
+
+"""
+    _nusselt_coefficient_developing(x) -> Nu
+
+Local Nusselt number for thermally developing, hydrodynamically developed laminar flow
+between parallel plates at dimensionless length `x = L/(Dh·Re·Pr)`. Interpolated linearly in
+Shah and London (1978) table 34 over `1e-6 <= x <= 0.2`, with [`_leveque_nusselt`](@ref)
+below it and the fully developed 8.2353 above it. Continuous in `x`, unlike the three-piece
+fit from the same book, which jumps at `x = 2e-4` and `1e-3`.
+
+`@register_symbolic`, so a channel equation carries the lookup as one opaque node.
+"""
+function _nusselt_coefficient_developing(x::Real)
+    x < first(_XSTAR_TABLE34) && return _leveque_nusselt(x)
+    x >= last(_XSTAR_TABLE34) && return last(_NU_TABLE34)
+    k = searchsortedlast(_XSTAR_TABLE34, x)
+    x1, x2 = _XSTAR_TABLE34[k], _XSTAR_TABLE34[k + 1]
+    return _NU_TABLE34[k] + (_NU_TABLE34[k + 1] - _NU_TABLE34[k]) * (x - x1) / (x2 - x1)
+end
+
+@register_symbolic _nusselt_coefficient_developing(x::Real)
 
 """
     fully_developed_laminar_nusselt(geom::PipeGeometry) -> (Re, Pr, T_bulk, T_wall) -> Nu

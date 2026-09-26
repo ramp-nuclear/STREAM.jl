@@ -163,7 +163,9 @@ end
 @testset "Inertia takes a flow-dependent L/A" begin
     @testset "bilinear_inertia shape" begin
         L = bilinear_inertia(1.75e5, 0.2)
-        @test L(0.0) == 0.0
+        # Floored at a thousandth of the knee, so the inertia never reaches zero.
+        @test L(0.0) == 1.75e5 * 1e-3
+        @test L(1e-6) == L(0.0)
         @test L(0.1) ≈ 1.75e5 * 0.5
         @test L(0.2) == 1.75e5           # at and above the knee it is flat
         @test L(5.0) == 1.75e5
@@ -234,5 +236,15 @@ end
         # And it is genuinely not the exponential the constant form would give.
         @test !isapprox(sol(300.0; idxs=ssys.L_comp.inlet.ṁ), exp(-300.0 / (L0 / R_val));
                         rtol=0.05)
+    end
+
+    @testset "the coastdown runs through zero flow" begin
+        # The straight-line coastdown above reaches zero at 500 s. With L falling to zero
+        # there, D(ṁ) = Δp/L divided by zero and the integrator stopped at 500 s. The floor
+        # lets it settle at rest instead.
+        L0, R_val, ṁ0, knee = 1.0e3, 1.0, 1.0, 2.0
+        ssys, sol = coast(bilinear_inertia(L0, knee); R_val=R_val, ṁ0=ṁ0, tmax=800.0)
+        @test sol.t[end] == 800.0
+        @test abs(sol(800.0; idxs=ssys.L_comp.inlet.ṁ)) < 1e-6
     end
 end

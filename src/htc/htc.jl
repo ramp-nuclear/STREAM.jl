@@ -182,18 +182,33 @@ _with_basis(m, basis) = m
 
 """
     RegimeDependent(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
-                       geom, g=G_EARTH) <: AbstractHTC
+                       geom, gz_band=(0.01, 0.1)) <: AbstractHTC
 
-A heat transfer coefficient that picks its correlation by flow regime: `laminar` at low
-Reynolds number, `turbulent` at high, a linear blend of the two across `re_bounds`, and
-`natural` convection wherever buoyancy outweighs the forced flow.
+A heat transfer coefficient that picks its forced-convection correlation by flow regime and
+adds buoyancy on top: `laminar` at low Reynolds number, `turbulent` at high, a linear blend
+of the two across `re_bounds` on the bulk Reynolds number, and `natural` convection
+combined with that forced value.
 
-Two Reynolds numbers are involved, for different questions. Whether the flow is laminar or
-turbulent is a property of the flow as a whole, so the blend reads the Reynolds number at the
-bulk temperature. Whether natural convection takes over is decided by `Gr/Re² > 1`, tested
-as `Gr > Re²` so that it holds at zero flow too: buoyancy acts in the film next to the wall,
-and the comparison only sets like against like when Gr and Re are both read there, at the
-film temperature, with `geom.Dh` as the length.
+With a `natural` model, forced and natural convection combine by Churchill's rule,
+`h³ = h_f³ ± h_n³`. The sign depends on whether buoyancy helps the flow or works against it:
+
+- **Aiding**, buoyancy along the flow: `h = (h_f³ + h_n³)^(1/3)`. Heated upflow, or cooled
+  downflow.
+- **Opposing**, buoyancy against the flow: `h = max((h_f³ - h_n³)^(1/3), h_n)`. Heated
+  downflow, or cooled upflow. Past the point where `h_n` reaches `2^(-1/3)·h_f` the near-wall
+  flow separates and natural convection governs, so the value is floored at `h_n`.
+
+Both keep the wall balance `h·(T_wall - T_bulk)` rising with the wall temperature, so every
+cell's balance has one solution. The signs follow laminar mixed convection. In turbulent flow
+buoyancy acts the other way round, but there `h_n` is too small beside `h_f` to matter.
+
+Which way the flow runs is the channel's to say, and a [`ChannelAndContacts`](@ref) sets it
+from its own `g`. A model that was never handed to a channel treats buoyancy as aiding.
+
+As the through-flow dies, the value hands over to the pure `natural` model. The handover
+reads the Graetz number `Gz = Re·Pr·Dh/L` on the bulk and is a smooth step across `gz_band`,
+taken on log10. The band is a choice, not a correlation: well below any circulating flow,
+and wide enough that `h` stays continuous where the flow reverses.
 
 Each branch reads its coolant properties at one fixed temperature, whatever basis its model
 was built with: laminar and natural convection at the bulk, turbulent at the film. A model
@@ -203,16 +218,21 @@ with no property basis of its own is used as given.
 - `laminar`, `turbulent`: the two forced-convection models
 - `natural`: optional natural-convection model
 - `re_bounds`: `(re_lo, re_hi)` transition band on the bulk Reynolds number
-- `geom`: channel geometry; `geom.Dh` is the Grashof characteristic length
-- `g`: gravitational acceleration [m/s²], used only when `natural` is given
+- `geom`: channel geometry; `geom.L` is the heated length in the Graetz number
+- `gz_band`: `(gz_lo, gz_hi)` over which the value hands over to pure natural convection
+
+# Returns
+A `RegimeDependent` model, callable like any [`AbstractHTC`](@ref).
 """
 struct RegimeDependent{L<:AbstractHTC,T<:AbstractHTC,N} <: AbstractHTC
     laminar::L
     turbulent::T
     natural::N
     re_bounds::Tuple{Float64,Float64}
-    Dh_gr::Float64
-    g::Float64
+    heated_length::Float64
+    gz_band::Tuple{Float64,Float64}
+    # +1 when positive ṁ runs upward, -1 when downward, 0 when not known or horizontal.
+    flow_up::Float64
 end
 
 function RegimeDependent(;
@@ -221,13 +241,25 @@ function RegimeDependent(;
     natural::Union{AbstractHTC,Nothing}=nothing,
     re_bounds=(2000.0, 5000.0),
     geom::PipeGeometry,
-    g=G_EARTH,
+    gz_band=(0.01, 0.1),
 )
     bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))
+    gz = (Float64(gz_band[1]), Float64(gz_band[2]))
     return RegimeDependent(
         _with_basis(laminar, AtBulk()), _with_basis(turbulent, AtFilm()),
-        _with_basis(natural, AtBulk()), bounds, geom.Dh, Float64(g),
+        _with_basis(natural, AtBulk()), bounds, Float64(geom.L), gz, 0.0,
     )
+end
+
+"""
+    _smooth_step(x, x0, x1) -> [0, 1]
+
+The C1 cubic step `3s² - 2s³` with `s = (x - x0)/(x1 - x0)` clamped to `[0, 1]`: zero below
+`x0`, one above `x1`, with zero slope at both ends.
+"""
+function _smooth_step(x, x0, x1)
+    s = min(max((x - x0) / (x1 - x0), zero(x)), one(x))
+    return s * s * (3 - 2 * s)
 end
 
 function (htc::RegimeDependent)(T_wall, T_bulk, ṁ, Dh, A, liquid)
@@ -238,17 +270,31 @@ function (htc::RegimeDependent)(T_wall, T_bulk, ṁ, Dh, A, liquid)
         htc.turbulent(T_wall, T_bulk, ṁ, Dh, A, liquid),
     )
     htc.natural === nothing && return h_forced
-    T_film = film_temperature(T_wall, T_bulk)
-    Gr_film = Gr(ρ(liquid, T_film), μ(liquid, T_film), β(liquid, T_film),
-                 T_wall, T_bulk, htc.Dh_gr, htc.g)
-    Re_film = Re(liquid, T_film, ṁ, A, Dh)
-    return ifelse(
-        # Not Gr / Re² > 1, which divides by zero when the flow stops.
-        Gr_film > Re_film^2,
-        htc.natural(T_wall, T_bulk, ṁ, Dh, A, liquid),
-        h_forced,
-    )
+    h_nat = htc.natural(T_wall, T_bulk, ṁ, Dh, A, liquid)
+    aiding = (h_forced^3 + h_nat^3)^(1 / 3)
+    opposing = max(max(h_forced^3 - h_nat^3, zero(h_nat))^(1 / 3), h_nat)
+    # A wall hotter than the bulk pushes the fluid beside it up.
+    opposed = htc.flow_up * ṁ * (T_wall - T_bulk) < 0
+    h_mixed = ifelse(opposed, opposing, aiding)
+    Gz = Re_bulk * Pr(liquid, T_bulk) * Dh / htc.heated_length
+    # The flip between aiding and opposing happens at ṁ = 0, where Gz = 0 and the weight is
+    # already zero, so h has no jump there.
+    w = _smooth_step(log10(Gz), log10(htc.gz_band[1]), log10(htc.gz_band[2]))
+    return w * h_mixed + (1 - w) * h_nat
 end
+
+"""
+    _oriented(model, flow_up) -> AbstractHTC
+
+`model` told which way its channel's flow runs: `flow_up` is +1 when positive `ṁ` runs
+upward, -1 when downward, 0 when horizontal. Only a [`RegimeDependent`](@ref) uses it, and
+the models that wrap one pass it through. Anything else comes back unchanged.
+"""
+function _oriented(m::RegimeDependent, flow_up)
+    return RegimeDependent(m.laminar, m.turbulent, m.natural, m.re_bounds, m.heated_length,
+                           m.gz_band, Float64(flow_up))
+end
+_oriented(m, flow_up) = m
 
 """
     Maximal(models...) <: AbstractHTC
@@ -264,6 +310,8 @@ Maximal(models::AbstractHTC...) = Maximal(models)
 function (htc::Maximal)(T_wall, T_bulk, ṁ, Dh, A, liquid)
     return reduce(max, (m(T_wall, T_bulk, ṁ, Dh, A, liquid) for m in htc.models))
 end
+
+_oriented(m::Maximal, flow_up) = Maximal(map(x -> _oriented(x, flow_up), m.models))
 
 """
     SubcooledBoiling(single_phase, q_scb) <: AbstractHTC
@@ -284,6 +332,10 @@ extra-argument form `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)`.
 struct SubcooledBoiling{H<:AbstractHTC,Q} <: AbstractHTC
     single_phase::H
     q_scb::Q
+end
+
+function _oriented(m::SubcooledBoiling, flow_up)
+    return SubcooledBoiling(_oriented(m.single_phase, flow_up), m.q_scb)
 end
 
 # Without a pressure there is nothing to boil against, so this degenerates to single phase.

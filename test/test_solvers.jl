@@ -142,4 +142,13 @@ using STREAM.Examples
             (i, tt) in enumerate(t_arr)
         )
     end
+
+    @testset "a failed solve throws instead of returning part of a run" begin
+        # x' = x² from x = 1 blows up at t = 1, so the integrator gives up there. Before the
+        # check, the truncated run came back looking like a finished one.
+        @variables x(t) = 1.0
+        @named blowup = System([Differential(t)(x) ~ x^2], t)
+        ssys = mtkcompile(blowup)
+        @test_throws ErrorException solve_transient(ssys, [x => 1.0], range(0.0, 2.0; length=5))
+    end
 end

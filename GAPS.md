@@ -626,6 +626,18 @@ Revisit them once STREAM.jl stands on its own.
 - **Where along a cell saturation is read.** Each cell's outlet-side face, not its centre.
   See [5.5](#55-reading-a-channel-the-way-pythons-analysis-wrappers-do-fixed).
 
+One place goes the other way, because the physics has an answer and Python's does not give it:
+
+- **Mixed convection under opposing flow.** Python's `stream-next` combines forced and
+  natural convection as `h = (h_f³ + h_n³)^(1/3)` everywhere. That is Churchill's rule for
+  buoyancy along the flow. Against the flow, as in the downward core of a pool reactor
+  before the flow reverses, buoyancy slows the fluid at the wall and the rule takes the
+  minus sign. `HTC.RegimeDependent` does, floored at `h_n` where the wall flow separates,
+  and a `ChannelAndContacts` tells it which way its flow runs from the sign of `g`. Called
+  outside a channel it adds, as Python does. In the pool LOFA example the minus sign lowers
+  the hot cell's `h` by about 4% late in the coastdown, while the flow is laminar and still
+  downward.
+
 Names that differ from Python's: `HTC.rohsenow_scb_heat_flux` is Python's
 `Bergles_Rohsenhow_SCB_heat_flux`. The correlation is Rohsenow's (1952) pool boiling flux;
 Bergles and Rohsenow's (1964) contribution is the partial boiling factor,
@@ -637,12 +649,14 @@ Verified as matching, so they should not be re-investigated:
 
 - **Dimensionless numbers.** Re, Re_mdot, Pr, Nu, Pe, Gr, Ra, and the regime blend all match.
 - **Nusselt correlations.** Dittus-Boelter, Marco-Han, two-sided heating, Elenbaas, the
-  fully-developed and developing laminar forms, and the maximal combinator all match. Python
-  defaults to the same analytic developing-laminar approximation and uses its Shah and London
-  table only to bound that approximation's error.
+  fully-developed and developing laminar forms, and the maximal combinator all match
+  Python's `stream-next`. The developing form reads Shah and London's table 34, and Elenbaas
+  takes `|Ra|`, so a cooled wall convects too.
 - **Friction correlations.** Laminar, turbulent (Colebrook-White), Blasius, the rectangular
-  laminar correction and the regime blend all match.
-- **Idelchik expansion and contraction losses.** Table nodes and high-Re limits match.
+  laminar correction and the regime blend all match. Turbulent is floored by the laminar
+  `64/Re`, as in `stream-next`.
+- **Idelchik expansion and contraction losses.** Table nodes and high-Re limits match, with
+  Re read on the diameter of the circle with the smaller area, as in `stream-next`.
 - **The liquid property correlations.** H2O and D2O, all nine properties, cross-validated
   against Python to the tolerances in `test_validation.jl`.
 - **The wall temperature interface.** Python computes it explicitly as
