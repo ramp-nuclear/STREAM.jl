@@ -155,6 +155,16 @@ using OrdinaryDiffEq: ReturnCode
         @test q_CHF_sudo_kaminaga(46.85, -0.5, pipe, 9.81, sat_water) >
             q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat_water)
 
+        # Reversed flow enters at the last cell, so that is where the inlet subcooling is
+        # read. Five cells warming from 40 to 70 °C, against Python's stream-next
+        # Sudo_Kaminaga_CHF: forward flow is unchanged, and at -5 kg/s, where q4 binds, the
+        # limit is 10.48 MW/m², not the 10.84 that reading the ends the wrong way round gave.
+        warming = collect(range(40.0, 70.0; length=5))
+        @test all(q_CHF_sudo_kaminaga(warming, 5.0, pipe, 9.81, sat_water) .≈
+                  10839384.886841433)
+        @test all(q_CHF_sudo_kaminaga(warming, -5.0, pipe, 9.81, sat_water) .≈
+                  10484273.038525093)
+
         # Gravity enters Julia only as |g| (Julia takes abs(gravity) for the capillary
         # length), so flipping the gravity sign leaves the result unchanged for positive
         # ṁ. This is a Julia-internal choice: Python does NOT abs g and returns NaN for

@@ -270,10 +270,13 @@ Verified as matching, so they need not be re-investigated:
 
 - **Dimensionless numbers**, and the laminar-turbulent blend.
 - **Nusselt correlations**: Dittus-Boelter, Marco-Han, two-sided heating, Elenbaas, the fully
-  developed and developing laminar forms, the maximal combinator.
+  developed and developing laminar forms, the maximal combinator, as `stream-next` has them.
+  The developing form reads Shah and London's table 34, and Elenbaas takes `|Ra|`.
 - **Friction correlations**: laminar, Colebrook-White, Blasius, the rectangular laminar
-  correction, the regime blend.
-- **Idelchik expansion and contraction losses.**
+  correction, the regime blend. Turbulent is floored by the laminar `64/Re`, as in
+  `stream-next`.
+- **Idelchik expansion and contraction losses**, with Re read on the diameter of the circle
+  with the smaller area, as in `stream-next`.
 - **Liquid properties**, H₂O and D₂O, all nine, to the tolerances in `test_validation.jl`.
 - **Decay heat contributions**: fission products, the U-238 capture chain and activation,
   against Python's doctests. The ANS-5.1 tables are now full precision, so the U-235

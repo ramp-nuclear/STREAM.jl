@@ -118,6 +118,18 @@ end
     @test isapprox(Tsat(D2O, ATM), 101.4; atol=0.5)
 end
 
+@testset "fits are held short of their poles" begin
+    # Python stream-next clamps these two fits the same way.
+    # H2O cₚ has a pole near 366 °C, so it holds its 350 °C value above that.
+    @test cₚ(H2O, 360.0) == cₚ(H2O, 350.0)
+    @test cₚ(H2O, 349.0) < cₚ(H2O, 350.0)
+    # D2O μ has a pole at 0 °F and goes negative before it, so it holds its value at the
+    # 3.8 °C melting point below that.
+    @test μ(D2O, -17.0) == μ(D2O, 3.8)
+    @test μ(D2O, -17.0) > 0
+    @test μ(D2O, 3.9) < μ(D2O, 3.8)
+end
+
 @testset "properties trace symbolically" begin
     # Nothing is @register_symbolic, so a symbolic argument has to come back as an expression
     # rather than dispatching to a numeric method or erroring.
