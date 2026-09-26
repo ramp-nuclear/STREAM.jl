@@ -462,7 +462,8 @@ is `h_tc[i] * heated_parts * dz * (T_wall - T[i])`.
 - `htc`: wall heat transfer model ([`HTC`](@ref)), default [`DittusBoelter`](@ref). It is
   handed `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)` per cell and returns `h`. Subcooled boiling
   is a model like any other: wrap one in [`SubcooledBoiling`](@ref). Regime switching is
-  [`RegimeDependent`](@ref).
+  [`RegimeDependent`](@ref), which the channel tells which way its flow runs, from the sign
+  of `g`, so buoyancy aids or opposes the flow as it should.
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
   viscosity correction are [`RegimeDependent`](@ref).
@@ -522,8 +523,10 @@ function ChannelAndContacts(;
     wall_T(face) = [port.T for port in face.port]
     q_wall(face) = collect(face.h) .* face.perimeter .* dz .* (wall_T(face) .- T)
 
+    # A positive g means positive flow climbs against gravity.
+    oriented_htc = _oriented(htc, sign(g))
     # Every model takes the local pressure; only one that boils looks at it.
-    wall_htc(face, i) = htc(face.port[i].T, T[i], inlet.ṁ, Dh, A, liquid, P_cell[i])
+    wall_htc(face, i) = oriented_htc(face.port[i].T, T[i], inlet.ṁ, Dh, A, liquid, P_cell[i])
 
     q_left_expr, q_right_expr = q_wall.(faces)
 

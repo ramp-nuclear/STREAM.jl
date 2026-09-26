@@ -243,7 +243,6 @@ function build_loop_lof_bypass(;
         turbulent=HTC.DittusBoelter(),
         natural=HTC.Elenbaas(geom; g=g_acc),
         geom=geom,
-        g=g_acc,
     )
     friction_ch = Friction.RegimeDependent(;
         laminar=Friction.rectangular_laminar(geom),

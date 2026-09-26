@@ -119,34 +119,87 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
             @test rd_py.laminar.basis isa HTC.AtBulk
             @test rd_py.natural.basis isa HTC.AtBulk
             @test rd_py.turbulent.basis isa HTC.AtFilm
-            for (Re_target, h_python) in ((1000.0, 2080.1105868066074),
-                                          (2750.0, 3340.7410324505618),
-                                          (8000.0, 16735.795621478403))
+            # Python's stream-next regime_dependent_h_spl, which always treats buoyancy as
+            # aiding. A model no channel has oriented does the same.
+            @test rd_py.flow_up == 0.0
+            for (Re_target, h_python) in ((1000.0, 2080.4723673553563),
+                                          (2750.0, 3340.8813105054483),
+                                          (8000.0, 16735.80121133571))
                 @test rd_py(T_wall, T_bulk, ṁ_at(Re_target), Dh, A, H2O) ≈ h_python rtol = 1e-8
             end
-            # Gr/Re² crosses 1 at 2.096 g/s on bulk properties and at 2.467 g/s on film ones.
-            # Python reads the switch at the film, so buoyancy already wins at 2.274 g/s.
+            # At 2.3 g/s buoyancy outweighs the flow (Gr > Re²), but the flow still renews
+            # the channel, so forced convection stays and buoyancy adds to it.
             @test rd_py(100.0, 40.0, 0.0022739555958189747, Dh, A, H2O) ≈
-                  198.75194104185218 rtol = 1e-8
+                  2080.7152503637144 rtol = 1e-8
         end
 
-        @testset "natural convection takes over where Gr > Re²" begin
-            nc = HTC.FromFunction((args...) -> 999.0)
+        @testset "buoyancy combines with forced convection" begin
+            h_f, h_n = 4.0, 3.0   # the laminar value at Re 1000, and a natural one
+            nc = HTC.FromFunction((args...) -> h_n)
             rd_nc = HTC.RegimeDependent(; laminar=lam, turbulent=turb, natural=nc,
-                                       geom=GEOM_MTR, g=G_EARTH)
-            # Barely any flow, a hot wall: buoyancy wins.
-            @test rd_nc(100.0, 40.0, 1e-6, Dh, A, H2O) == 999.0
-            # No flow at all, and flow just reversed through it, where Re is zero or tiny:
-            # a hot wall still gives buoyancy, and a wall at the bulk temperature gives
-            # neither buoyancy nor flow, so the forced branch stands.
-            @test rd_nc(100.0, 40.0, 0.0, Dh, A, H2O) == 999.0
-            @test rd_nc(100.0, 40.0, -1e-6, Dh, A, H2O) == 999.0
-            @test rd_nc(40.0, 40.0, 0.0, Dh, A, H2O) == 4.0
-            # Fast flow: forced convection wins, and the natural branch changes nothing.
-            m_fast = ṁ_at(8000.0)
-            @test rd_nc(100.0, 40.0, m_fast, Dh, A, H2O) == 100.0
-            @test rd_nc(100.0, 40.0, m_fast, Dh, A, H2O) ==
-                  rd(100.0, 40.0, m_fast, Dh, A, H2O)
+                                       geom=GEOM_MTR)
+            up, down = HTC._oriented(rd_nc, 1), HTC._oriented(rd_nc, -1)
+            m = ṁ_at(1000.0)
+            aiding = cbrt(h_f^3 + h_n^3)
+            opposing = cbrt(h_f^3 - h_n^3)
+
+            # A hot wall pushes the fluid beside it up.
+            @test up(100.0, 40.0, m, Dh, A, H2O) ≈ aiding
+            @test down(100.0, 40.0, m, Dh, A, H2O) ≈ opposing
+            @test opposing < h_f < aiding
+            # Reversing the flow, or cooling the wall instead, swaps the two.
+            @test up(100.0, 40.0, -m, Dh, A, H2O) ≈ opposing
+            @test down(100.0, 40.0, -m, Dh, A, H2O) ≈ aiding
+            @test down(20.0, 40.0, m, Dh, A, H2O) ≈ aiding
+            # A model no channel has oriented takes buoyancy as aiding, as Python does.
+            @test rd_nc(100.0, 40.0, m, Dh, A, H2O) ≈ aiding
+
+            # Past h_n = 2^(-1/3)·h_f, opposed flow separates at the wall and natural
+            # convection sets h.
+            strong = HTC._oriented(HTC.RegimeDependent(; laminar=lam, turbulent=turb,
+                natural=HTC.FromFunction((args...) -> 3.5), geom=GEOM_MTR), -1)
+            @test 3.5 > 2^(-1 / 3) * h_f
+            @test strong(100.0, 40.0, m, Dh, A, H2O) == 3.5
+
+            # With no flow through the channel, only natural convection is left.
+            @test up(100.0, 40.0, 0.0, Dh, A, H2O) == h_n
+            @test down(100.0, 40.0, 0.0, Dh, A, H2O) == h_n
+            # Inside the Graetz band the value lies between the two, whichever way the flow
+            # runs, so it has no jump where the flow reverses.
+            Gz_per_Re = Pr(H2O, 40.0) * Dh / GEOM_MTR.L
+            m_band = ṁ_at(0.03 / Gz_per_Re)
+            for h in (up(100.0, 40.0, m_band, Dh, A, H2O), up(100.0, 40.0, -m_band, Dh, A, H2O))
+                @test min(h_n, opposing) < h < aiding
+            end
+            @test up(100.0, 40.0, 1e-12, Dh, A, H2O) ≈ h_n rtol = 1e-9
+            @test up(100.0, 40.0, -1e-12, Dh, A, H2O) ≈ h_n rtol = 1e-9
+        end
+
+        @testset "each cell's wall balance has one solution" begin
+            # h·(T_wall - T_bulk) must rise with the wall temperature at any fixed flow, or
+            # a cell has more than one wall temperature for its heat flux.
+            rd_real = HTC.RegimeDependent(;
+                laminar=HTC.ConstantNusselt(; Nu=8.235), turbulent=HTC.DittusBoelter(),
+                natural=HTC.Elenbaas(GEOM_MTR), geom=GEOM_MTR,
+            )
+            T_walls = range(40.01, 190.0; length=600)
+            for flow_up in (-1, 0, 1), Re_target in (-1000.0, -50.0, 1.0, 20.0, 300.0, 3000.0)
+                model = HTC._oriented(rd_real, flow_up)
+                m = sign(Re_target) * ṁ_at(abs(Re_target))
+                flux = [model(Tw, 40.0, m, Dh, A, H2O) * (Tw - 40.0) for Tw in T_walls]
+                @test all(diff(flux) .>= -1e-9 * maximum(flux))
+            end
+        end
+
+        @testset "a channel's flow direction reaches the model" begin
+            rd_nat = HTC.RegimeDependent(; laminar=lam, turbulent=turb,
+                natural=HTC.FromFunction((args...) -> 3.0), geom=GEOM_MTR)
+            @test HTC._oriented(rd_nat, -1).flow_up == -1.0
+            wrapped = HTC._oriented(HTC.SubcooledBoiling(rd_nat, HTC.regime_dependent_q_scb()), -1)
+            @test wrapped.single_phase.flow_up == -1.0
+            @test HTC._oriented(HTC.Maximal(rd_nat, lam), 1).models[1].flow_up == 1.0
+            # Models with no buoyancy term come back as they were.
+            @test HTC._oriented(lam, 1) === lam
         end
     end
 
@@ -171,7 +224,7 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     end
 
     @testset "SubcooledBoiling matches Python's wall_heat_transfer_coeff" begin
-        # Python STREAM's wall_heat_transfer_coeff with regime_dependent_h_spl and
+        # Python STREAM's (stream-next) wall_heat_transfer_coeff with regime_dependent_h_spl and
         # regime_dependent_q_scb: a 135 °C wall over 60 °C coolant at 1.7 bar, at bulk Re
         # 1000, 3500 and 8000. The laminar case boils on Rohsenow's flux, the turbulent one
         # on McAdams.
@@ -184,9 +237,9 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
             ),
             HTC.regime_dependent_q_scb(),
         )
-        for (ṁ_python, h_python) in ((0.016566504372602292, 25639.32979041299),
-                                     (0.05798276530410803, 14842.353394440743),
-                                     (0.13253203498081834, 15553.973614960662))
+        for (ṁ_python, h_python) in ((0.016566504372602292, 25638.966882980738),
+                                     (0.05798276530410803, 14842.513704589586),
+                                     (0.13253203498081834, 15554.052288550205))
             @test scb_py(135.0, 60.0, ṁ_python, Dh, A, H2O, 1.7e5) ≈ h_python rtol = 1e-8
         end
     end
