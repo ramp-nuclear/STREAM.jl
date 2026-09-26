@@ -51,13 +51,17 @@ end
 
 Flow-dependent inertia that falls off linearly below a knee, for [`Inertia`](@ref):
 
-    L = L0 * (ṁ/ṁ0)   for |ṁ| < ṁ0
-    L = L0                  otherwise
+    L = L0 * max(|ṁ|, 1e-3·ṁ0) / ṁ0   for |ṁ| < ṁ0
+    L = L0                              otherwise
 
 It models a branch that is only partly filled at low flow, so the accelerating column is
 shorter than the pipe. `ifelse` keeps the switch a symbolic branch the solver takes per step,
 and the magnitude of the flow is what selects it, so a reversal is handled the same as
 forward flow.
+
+The floor at a thousandth of the knee keeps `L` positive through `ṁ = 0`. Without it
+`D(ṁ) = Δp/L` divides by zero there, and a coastdown or a reversal that reaches zero flow
+stops the integrator.
 
 # Arguments
 - `L0`: the inertia constant above the knee [1/m]
@@ -67,7 +71,8 @@ forward flow.
 A closure `(ṁ) -> L/A`.
 """
 function bilinear_inertia(L0, ṁ0)
-    return (m) -> ifelse(abs(m) < ṁ0, L0 * abs(m) / ṁ0, L0)
+    floor = 1e-3 * ṁ0
+    return (m) -> ifelse(abs(m) < ṁ0, L0 * max(abs(m), floor) / ṁ0, L0)
 end
 
 """
