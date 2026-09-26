@@ -89,7 +89,8 @@ end
 """
     viscosity(D2O, T, p) -> Pa·s
 
-Dynamic viscosity of the saturated liquid.
+Dynamic viscosity of the saturated liquid. Below the 3.8 °C melting point it is held at its
+melting-point value, since the fit has a pole at 0 °F and turns negative before it.
 
 # Examples
 ```jldoctest
@@ -101,7 +102,7 @@ julia> viscosity(D2O, 100.0)
 ```
 """
 function viscosity(::HeavyWater, T, p)
-    TF = 1.8T + 32
+    TF = 1.8 * max(T, 3.8) + 32
     A = -1.111606e-4
     B = 9.46e-8
     C = 0.0873655375

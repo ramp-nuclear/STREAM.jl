@@ -71,7 +71,8 @@ end
     specific_heat(H2O, T, p) -> J/(kg·K)
 
 Specific heat of the saturated liquid. The fit is even in temperature, so the argument is
-folded through `abs` first and `T` and `-T` give the same answer.
+folded through `abs` first and `T` and `-T` give the same answer. It is held at its 350 °C
+value above that, short of the fit's pole near 366 °C.
 
 # Examples
 ```jldoctest
@@ -83,7 +84,7 @@ julia> specific_heat(H2O, 50.0)
 ```
 """
 function specific_heat(::LightWater, T, p)
-    T = abs(T)
+    T = min(abs(T), 350.0)
     A = 17.48908904
     B = -1.67507e-3
     C = -0.03189591
