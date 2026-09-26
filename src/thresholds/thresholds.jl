@@ -167,7 +167,8 @@ The subcooling is the exception, and it is what makes this a channel correlation
 a per-cell one. It was fitted to experiments that characterised a whole test section, so q2
 and q3 are driven by the temperature difference at the **inlet** and q4 by the one at the
 **outlet**. Only those two differences come from the channel ends; the `cp/hfg` factor
-multiplying them stays per cell, as in Python STREAM.
+multiplying them stays per cell, as in Python STREAM. The inlet is the first cell while `ṁ`
+is non-negative and the last cell once it reverses, since reversed flow enters at the far end.
 
 Uses `pipe.width` (NOT `heated_perimeter/2`) for q3 per Mishima's experiments.
 
@@ -199,8 +200,9 @@ function q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant::Liquid)
 
     # The driving temperature differences are the channel's, taken at its two ends. The
     # cp/hfg factor in front of them is local.
-    dT_inlet = (cp ./ hfg) .* (first(T_sat) - first(T_bulk))
-    dT_outlet = (cp ./ hfg) .* (last(T_sat) - last(T_bulk))
+    inlet, outlet = all(>=(0), ṁ) ? (first, last) : (last, first)
+    dT_inlet = (cp ./ hfg) .* (inlet(T_sat) - inlet(T_bulk))
+    dT_outlet = (cp ./ hfg) .* (outlet(T_sat) - outlet(T_bulk))
 
     q1 = _SKq1.(G_star)
     q2 = _SKq2.(A_ratio, G_star, dT_inlet)

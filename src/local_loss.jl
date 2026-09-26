@@ -142,7 +142,7 @@ The dimensionless loss coefficient `K`.
 function factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
     A = min(A1, A2)
     aratio = min(A1 / A2, A2 / A1)
-    Dh = sqrt(A / pi)
+    Dh = 2 * sqrt(A / pi)   # the diameter of the circle with area A
     re = abs(ṁ) * Dh / (A * mu)
     pos, neg = A2 >= A1 ?
                (sudden_expansion_factor, sudden_contraction_factor) :

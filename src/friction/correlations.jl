@@ -106,10 +106,9 @@ Colebrook-White approximation for turbulent Darcy friction factor, as written in
 in KAERI/RR-3818/2014 page 3 chapter 2.1.2 (full reference below). `epsilon` is relative
 roughness (roughness height / Dh), defaults to smooth pipe.
 
-Returns 0.0 when `Re < 10`: the correlation is only valid for turbulent flow, and below
-that threshold the `log10` terms diverge. Python guards the same way with
-`np.nan_to_num` (its docstring quotes "approx <7"); the `Re < 10` floor here is a touch
-more conservative and matches the published `turbulent(5.0) == 0.0` reference.
+The result is never below the laminar `64/Re`. Below about Re 7 the correlation's inner
+logarithm goes negative and it stops meaning anything, and the laminar value takes over
+well before that, so the floor also keeps the factor from vanishing at low flow.
 
 `Base.ifelse`, not a Julia `if`/`&&`: MTK traces this function symbolically to build the
 equations and Jacobian, so `Re` is a symbolic value at trace time and a normal `if` errors
@@ -127,19 +126,21 @@ Darcy friction factor (dimensionless).
 Known values: `turbulent(4e3) == 0.039804935964641644`,
 `turbulent(1e6) == 0.011649393290640643`,
 `turbulent(4e3, 0.1) == 0.10560870441248855`,
-`turbulent(5.0) == 0.0`.
+`turbulent(5.0) == 12.8`.
 
 Reference: KAERI, "Development of Research Reactor Technology", Korea Atomic Energy
 Research Institute, KAERI/RR-3818/2014, 2014.
 """
 function turbulent(Re, epsilon=0)
     # Clamp the Re feeding the log10 terms so they are evaluated at a turbulent Re even
-    # while tracing the not-taken branch; the ifelse zeroes the result below Re 10.
+    # while tracing the not-taken branch. Below Re 10 only the laminar floor is used.
     Re_safe = max(Re, 10)
     inlog = log10(epsilon + 21.25 / Re_safe^0.9)
     outlog = log10(epsilon / 3.7 + (2.51 / Re_safe) * (1.14 - 2 * inlog))
     f = (-2 * outlog)^(-2)
-    return Base.ifelse(Re < 10, zero(f), f)
+    # The Re floor keeps 64/Re finite at zero flow, where the pressure drop multiplies it by
+    # ṁ|ṁ| = 0 and an Inf would turn that into NaN.
+    return max(Base.ifelse(Re < 10, zero(f), f), 64 / max(Re, 1e-12))
 end
 
 """

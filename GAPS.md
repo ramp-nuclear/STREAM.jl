@@ -637,12 +637,14 @@ Verified as matching, so they should not be re-investigated:
 
 - **Dimensionless numbers.** Re, Re_mdot, Pr, Nu, Pe, Gr, Ra, and the regime blend all match.
 - **Nusselt correlations.** Dittus-Boelter, Marco-Han, two-sided heating, Elenbaas, the
-  fully-developed and developing laminar forms, and the maximal combinator all match. Python
-  defaults to the same analytic developing-laminar approximation and uses its Shah and London
-  table only to bound that approximation's error.
+  fully-developed and developing laminar forms, and the maximal combinator all match
+  Python's `stream-next`. The developing form reads Shah and London's table 34, and Elenbaas
+  takes `|Ra|`, so a cooled wall convects too.
 - **Friction correlations.** Laminar, turbulent (Colebrook-White), Blasius, the rectangular
-  laminar correction and the regime blend all match.
-- **Idelchik expansion and contraction losses.** Table nodes and high-Re limits match.
+  laminar correction and the regime blend all match. Turbulent is floored by the laminar
+  `64/Re`, as in `stream-next`.
+- **Idelchik expansion and contraction losses.** Table nodes and high-Re limits match, with
+  Re read on the diameter of the circle with the smaller area, as in `stream-next`.
 - **The liquid property correlations.** H2O and D2O, all nine properties, cross-validated
   against Python to the tolerances in `test_validation.jl`.
 - **The wall temperature interface.** Python computes it explicitly as

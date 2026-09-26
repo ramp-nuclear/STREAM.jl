@@ -364,6 +364,9 @@ end
 
     @testset "HTC.elenbaas_nusselt limiting cases" begin
         @test isapprox(HTC.elenbaas_nusselt(0.0, 0.00254, 0.6), 0.0; atol=1e-10)
+        # A wall colder than the bulk drives the same convection, downward.
+        @test HTC.elenbaas_nusselt(-12375.512696, 0.00254, 0.6) ≈
+              HTC.elenbaas_nusselt(12375.512696, 0.00254, 0.6) rtol = 1e-12
         Nu_large = HTC.elenbaas_nusselt(1e6, 0.00254, 0.6)
         @test Nu_large > 0.0
         @test Nu_large > HTC.elenbaas_nusselt(1e4, 0.00254, 0.6)
@@ -480,10 +483,11 @@ end
     @test isapprox(Friction.turbulent(4e3, 0.1), 0.10560870441248855; rtol=1e-10)
     @test isapprox(Friction.turbulent(1e6), 0.011649393290640643; rtol=1e-10)
 
-    # Re <= 0 guard
-    @test Friction.turbulent(5.0) == 0.0
-    @test Friction.turbulent(0.0) == 0.0
-    @test Friction.turbulent(-1.0) == 0.0
+    # Floored by the laminar 64/Re, as in Python's stream-next friction.py doctest, so the
+    # factor never vanishes at low flow and stays finite at none.
+    @test Friction.turbulent(5.0) ≈ 12.8 rtol = 1e-12
+    @test Friction.turbulent(100.0) == 0.64
+    @test isfinite(Friction.turbulent(0.0))
 
     # Smooth pipe (epsilon=0): friction decreases with Re
     @test Friction.turbulent(4e3) > Friction.turbulent(1e6)
@@ -553,6 +557,19 @@ end
     Nu_dev_low_Re = htc_dev(1.0, 7.0, 39.85, 59.85)
     @test isapprox(Nu_dev_low_Re, Nu_fd; rtol=0.05)  # within 5% of fully developed
     @test htc_dev(500.0, 5.0, 36.85, 76.85) > 0.0
+
+    # The local Nusselt number is Shah and London's table 34, as Python's stream-next
+    # _nusselt_coefficient_interp_developing reads it: the Leveque-type solution below the
+    # table, linear interpolation inside it, and the fully developed value past it.
+    for (x, nu_python) in ((5e-7, 187.49407805485293), (1e-6, 148.773), (2.5e-5, 51.3335),
+                           (3e-4, 22.488), (1.2e-3, 14.7286), (0.05, 8.2355), (0.3, 8.2353))
+        @test HTC._nusselt_coefficient_developing(x) ≈ nu_python rtol = 1e-12
+    end
+    # No jump where the old three-piece fit had one.
+    for x in (2e-4, 1e-3)
+        @test HTC._nusselt_coefficient_developing(prevfloat(x)) ≈
+              HTC._nusselt_coefficient_developing(nextfloat(x)) rtol = 1e-9
+    end
 
     # x_star correction factor test: changing aspect_ratio changes the result
     htc_dev_ar05 = HTC.developing_laminar_nusselt(_geom_for(0.005, 0.5); develop_length=0.3)
@@ -679,6 +696,19 @@ end
     @test isapprox(STREAM.LocalLoss.sudden_contraction_factor(0.3, 100.0), 1.10; rtol=1e-12) # Table 4.10
 end
 
+@testset "Idelchik local-loss factor — Reynolds number on the diameter" begin
+    # Python stream-next LocalPressureDrop(light_water, 1.0, 2.0).dp_out(mdot, Tin=20.0),
+    # which reads Re on the diameter of the circle with the smaller area. At 3 kg/s that Re
+    # is past the table, where the analytic Borda-Carnot factor holds; on the radius it was
+    # read in the table and the drop came out 2.9 times too large.
+    rho, mu = ρ(H2O, 20.0), μ(H2O, 20.0)
+    for (m, dp_python) in ((0.05, 1.40202331532597e-06), (-0.05, -1.5668539062689241e-06),
+                           (3.0, 0.00112730566375438))
+        f = STREAM.LocalLoss.factor(m, 1.0, 2.0, mu)
+        @test STREAM.LocalLoss.dp(m, rho, f, 1.0) ≈ dp_python rtol = 1e-8
+    end
+end
+
 @testset "Idelchik local-loss factor — direction dispatch (A2>A1)" begin
     # A2 > A1: forward flow expands, reverse flow contracts.
     mu = 1.0e-3
@@ -687,7 +717,7 @@ end
     rev = STREAM.LocalLoss.factor(-3.0, A1, A2, mu)
     aratio = 0.5
     A = 1.0
-    Dh = sqrt(A / pi)
+    Dh = 2 * sqrt(A / pi)
     re = 3.0 * Dh / (A * mu)
     @test isapprox(fwd, STREAM.LocalLoss.sudden_expansion_factor(aratio, re); rtol=1e-12)
     @test isapprox(rev, STREAM.LocalLoss.sudden_contraction_factor(aratio, re); rtol=1e-12)
