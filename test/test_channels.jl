@@ -37,11 +37,7 @@ _names(sys) = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys))
     ]
     @named sys = compose(System(connections, t; name=:adiab), pump, bc, ch)
     ssys = mtkcompile(sys)
-    ic = Pair{Any,Any}[
-        [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.inlet.ṁ => 0.5,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
     # T_out ≈ T_inlet — no heating
     @test isapprox(sol[ssys.ch.T_out], T_INLET; rtol=1e-5)
@@ -60,11 +56,7 @@ end
     ]
     @named sys = compose(System(connections, t; name=:adiab_chf), pump, bc, chf)
     ssys = mtkcompile(sys)
-    ic = Pair{Any,Any}[
-        [ssys.chf.T[i] => T_INLET for i in 1:n]...,
-        ssys.chf.inlet.ṁ => 0.5,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.chf.T_out], T_INLET; rtol=1e-5)
 end
@@ -83,11 +75,7 @@ end
     ]
     @named sys = compose(System(connections, t; name=:s1), pump, bc, ch)
     ssys = mtkcompile(sys)
-    ic = Pair{Any,Any}[
-        [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.inlet.ṁ => 0.5,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_INLET
     # q_wall_left[i] finite + signed correctly (positive for T_wall > T)
@@ -113,11 +101,7 @@ end
     ]
     @named sys = compose(System(connections, t; name=:s1_chf), pump, bc, chf)
     ssys = mtkcompile(sys)
-    ic = Pair{Any,Any}[
-        [ssys.chf.T[i] => T_INLET for i in 1:n]...,
-        ssys.chf.inlet.ṁ => 0.5,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.chf.T_out] > T_INLET
     @test all(isapprox.(sol[ssys.chf.q_wall_left[:]], expected, rtol=1e-7))
@@ -145,11 +129,7 @@ end
     ]
     @named sys = compose(System(connections, t; name=:s1_chf_mock), pump, bc, chf)
     ssys = mtkcompile(sys)
-    ic = Pair{Any,Any}[
-        [ssys.chf.T[i] => T_INLET for i in 1:n]...,
-        ssys.chf.inlet.ṁ => ṁ,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => ṁ])
     @test sol.retcode == ReturnCode.Success
     dT = q * geom.heated_parts[1] * dz / (ṁ * cp_mock)
     Tc = [sol[ssys.chf.T[i]] for i in 1:n]
@@ -174,8 +154,7 @@ end
     ]
     @named sys_s1 = compose(System(conns_s1, t; name=:baseline_s1), pump_s1, bc_s1, ch_s1)
     ssys_s1 = mtkcompile(sys_s1)
-    ic_s1 = Pair{Any,Any}[
-        [ssys_s1.ch_s1.T[i] => T_INLET for i in 1:n]...,
+    ic_s1 = [
         ssys_s1.ch_s1.inlet.ṁ => 0.5,
     ]
     sol_s1 = solve_steady(ssys_s1, ic_s1)
@@ -196,11 +175,7 @@ end
     ]
     @named sys = compose(System(connections, t; name=:s2), pump, bc, ch, wt)
     ssys = mtkcompile(sys)
-    ic = Pair{Any,Any}[
-        [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.inlet.ṁ => 0.5,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.ch.inlet.ṁ], sol_s1[ssys_s1.ch_s1.inlet.ṁ]; rtol=1e-6)
     @test all(isapprox.(sol[ssys.ch.T[:]], sol_s1[ssys_s1.ch_s1.T[:]], rtol=1e-6))
@@ -221,11 +196,7 @@ end
     ]
     @named sys_s1 = compose(System(conns_s1, t; name=:chf_baseline_s1), pump_s1, bc_s1, chf_s1)
     ssys_s1 = mtkcompile(sys_s1)
-    ic_s1 = Pair{Any,Any}[
-        [ssys_s1.chf_s1.T[i] => T_INLET for i in 1:n]...,
-        ssys_s1.chf_s1.inlet.ṁ => 0.5,
-    ]
-    sol_s1 = solve_steady(ssys_s1, ic_s1)
+    sol_s1 = solve_steady(ssys_s1, [ssys_s1.chf_s1.inlet.ṁ => 0.5])
     @test sol_s1.retcode == ReturnCode.Success
 
     @named pump = Pump(DP_PUMP)
@@ -240,11 +211,7 @@ end
     ]
     @named sys = compose(System(connections, t; name=:chf_s2), pump, bc, chf, hfs)
     ssys = mtkcompile(sys)
-    ic = Pair{Any,Any}[
-        [ssys.chf.T[i] => T_INLET for i in 1:n]...,
-        ssys.chf.inlet.ṁ => 0.5,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.chf.inlet.ṁ], sol_s1[ssys_s1.chf_s1.inlet.ṁ]; rtol=1e-6)
     @test all(isapprox.(sol[ssys.chf.T[:]], sol_s1[ssys_s1.chf_s1.T[:]], rtol=1e-6))
@@ -267,11 +234,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:hreal), pump, bc, ch)
     ssys = mtkcompile(sys)
-    ic = Pair{Any,Any}[
-        [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.inlet.ṁ => 0.5,
-    ]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
 
     @named ch2 = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
@@ -286,11 +249,7 @@ end
     ]
     @named sys2 = compose(System(conns, t; name=:hreal), pump, bc, ch2)
     ssys2 = mtkcompile(sys2)
-    ic = Pair{Any,Any}[
-        [ssys2.ch2.T[i] => T_INLET for i in 1:n]...,
-        ssys2.ch2.inlet.ṁ => 0.5,
-    ]
-    sol2 = solve_steady(ssys2, ic)
+    sol2 = solve_steady(ssys2, [ssys2.ch2.inlet.ṁ => 0.5])
     @test sol2.retcode == ReturnCode.Success
     @test all(isapprox.(sol2[ssys2.ch2.T[:]], sol[ssys.ch.T[:]], rtol=1e-6))
     @test all(isapprox.(sol2[ssys2.ch2.q_wall_left[:]], sol[ssys.ch.q_wall_left[:]], rtol=1e-6))
@@ -315,11 +274,7 @@ end
     @named sys = compose(System(conns, t; name=:hfn), pump, bc, ch)
     ssys = mtkcompile(sys)
     # Callable parameter goes into the same op dict as ICs.
-    ic = Pair{Any,Any}[
-        [ssys.ch.T[i] => T_INLET for i in 1:n]...,
-        ssys.ch.inlet.ṁ => 0.5,
-        ssys.ch.h_left_fn => h_fn,
-    ]
+    ic = [ssys.ch.inlet.ṁ => 0.5, ssys.ch.h_left_fn => h_fn]
     sol = solve_steady(ssys, ic)
     @named ch2 = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                            h_left=H_DEFAULT, h_right=0.0)
@@ -334,11 +289,7 @@ end
     @named sys2 = compose(System(conns, t; name=:hfn), pump, bc, ch2)
     ssys2 = mtkcompile(sys2)
     # Callable parameter goes into the same op dict as ICs.
-    ic = Pair{Any,Any}[
-        [ssys2.ch2.T[i] => T_INLET for i in 1:n]...,
-        ssys2.ch2.inlet.ṁ => 0.5,
-    ]
-    sol2 = solve_steady(ssys2, ic)
+    sol2 = solve_steady(ssys2, [ssys2.ch2.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
     @test all(isapprox.(sol2[ssys2.ch2.T[:]], sol[ssys.ch.T[:]], rtol=1e-6))
     @test all(isapprox.(sol2[ssys2.ch2.q_wall_left[:]], sol[ssys.ch.q_wall_left[:]], rtol=1e-6))
@@ -364,11 +315,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:cac_db), pump, bc, cac, ct_l...)
     ssys = mtkcompile(sys; fully_determined=false)
-    ic = Pair{Any,Any}[
-        [ssys.cac.T[i] => T_INLET for i in 1:n]...,
-        ssys.cac.inlet.ṁ => 0.5,
-    ]
-    sol = solve_transient(ssys, ic, range(0.0, 1.0, length=50))
+    sol = solve_transient(ssys, [ssys.cac.inlet.ṁ => 0.5], range(0.0, 1.0, length=50))
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.cac.T_out, end] > T_INLET
     @test all(>(0), sol[ssys.cac.h_tc_left[:], end])
@@ -401,13 +348,7 @@ end
         ]
         @named sys = compose(System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...)
         ssys = mtkcompile(sys)
-        Q_guess = max(1e4, 1e3 * (T_wall_bc - T_inlet_iscb))
-        T_guess = steady_state_guess(;
-            T_inlet=T_inlet_iscb, Q_wall=Q_guess, ṁ_guess=0.490, n=n
-        )
-        op = [ssys.cac.T[i] => T_guess[i] for i in 1:n]
-        push!(op, ssys.cac.inlet.ṁ => 0.490)
-        sol = solve_steady(ssys, op)
+        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.490])
         return ssys, sol
     end
 
@@ -430,14 +371,6 @@ const T_WALL_SIGN     = 100.0
 const ṁ_NEG = -0.490
 const GEOM_SIGN       = PipeGeometry_circular(0.6, 0.01)
 
-const T_GUESS_FWD_SIGN = steady_state_guess(;
-    T_inlet=T_INLET_SIGN,
-    Q_wall=1e4,
-    ṁ_guess=abs(ṁ_NEG),
-    n=N_SIGN,
-)
-const T_GUESS_REV_SIGN = reverse(T_GUESS_FWD_SIGN)
-
 @testset "flow reversal: Channel ṁ < 0 " begin
     @named pump = Pump(; ṁ0=ṁ_NEG)
     @named ch = Channel(; n=N_SIGN, geometry=GEOM_SIGN,
@@ -453,9 +386,7 @@ const T_GUESS_REV_SIGN = reverse(T_GUESS_FWD_SIGN)
     ]
     @named sys = compose(System(conns, t; name=:sign_ch), pump, bc, ch)
     ssys = mtkcompile(sys)
-    op = [ssys.ch.T[i] => T_GUESS_REV_SIGN[i] for i in 1:N_SIGN]
-    push!(op, ssys.ch.inlet.ṁ => ṁ_NEG)
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => ṁ_NEG])
 
     @test sol.retcode == ReturnCode.Success
 
@@ -483,9 +414,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:sign_cac), pump, bc, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys; fully_determined=false)
-    op = [ssys.cac.T[i] => T_GUESS_REV_SIGN[i] for i in 1:N_SIGN]
-    push!(op, ssys.cac.inlet.ṁ => ṁ_NEG)
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => ṁ_NEG])
 
     @test sol.retcode == ReturnCode.Success
 
@@ -519,9 +448,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:sign_chf), pump, bc, chf)
     ssys = mtkcompile(sys)
-    op = [ssys.chf.T[i] => T_GUESS_REV_SIGN[i] for i in 1:N_SIGN]
-    push!(op, ssys.chf.inlet.ṁ => ṁ_NEG)
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => ṁ_NEG])
 
     @test sol.retcode == ReturnCode.Success
 
@@ -566,8 +493,7 @@ end
         nm = ṁ0 > 0 ? :g3b_loop_fwd : :g3b_loop_rev
         @named sys = compose(System(eqs, t; name=nm), pump, hex, chf)
         ssys = mtkcompile(sys)
-        op = [ssys.chf.T[i] => T_in + 1.0*i for i in 1:n]
-        sol = solve_steady(ssys, op; abstol=1e-12, reltol=1e-12)
+        sol = solve_steady(ssys; abstol=1e-12, reltol=1e-12)
         return ssys, sol
     end
 
@@ -608,7 +534,7 @@ end
     ]
     @named sys_cac = compose(System(conns_cac, t; name=:xeq_cac), pump_cac, bc_cac, cac, ct_l_xeq...)
     ssys_cac = mtkcompile(sys_cac; fully_determined=false)  # integration test: per-cell wall-T binding
-    ic_cac = Pair{Any,Any}[
+    ic_cac = [
         [ssys_cac.cac.T[i] => T_INLET for i in 1:n]...,
         ssys_cac.cac.inlet.ṁ => 0.5,
     ]
@@ -637,7 +563,7 @@ end
     ]
     @named sys_chf = compose(System(conns_chf, t; name=:xeq_chf), pump_chf, bc_chf, chf, hfs)
     ssys_chf = mtkcompile(sys_chf)
-    ic_chf = Pair{Any,Any}[
+    ic_chf = [
         [ssys_chf.chf.T[i] => T_INLET for i in 1:n]...,
         ssys_chf.chf.inlet.ṁ => 0.5,
     ]
@@ -688,16 +614,7 @@ end
             System(conns, t; name=:sys), pump, bc, cac, ct_l..., ct_r...,
         )
         ssys = mtkcompile(sys)
-        Q_guess = max(1e4, 1e3 * (T_wall_bc - T_inlet_scb))
-        T_guess = steady_state_guess(
-            T_inlet=T_inlet_scb,
-            Q_wall=Q_guess,
-            ṁ_guess=0.490,
-            n=n_scb,
-        )
-        op = [ssys.cac.T[i] => T_guess[i] for i in 1:n_scb]
-        push!(op, ssys.cac.inlet.ṁ => 0.490)
-        sol = solve_steady(ssys, op)
+        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.490])
         return ssys, sol
     end
 
@@ -800,9 +717,7 @@ end
     # ρv²/2 below it, so that is what the channel reports as P and reads T_sat and T_ONB at.
     n = 5
     ssys = build_loop(; n=n)
-    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:n]
-    push!(op, ssys.ch.inlet.ṁ => 0.5)
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
     ch = ssys.ch
 

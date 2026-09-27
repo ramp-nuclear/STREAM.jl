@@ -43,7 +43,7 @@ using STREAM: PipeGeometry, PipeGeometry_circular, solve_steady, solve_transient
     ]
     @named sys = compose(System(conns, t; name=:pr_series), pump, hx, R)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.R.inlet.ṁ => dp / r])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.R.inlet.ṁ], dp / r; rtol=1e-8)              # ṁ = dp/r
     @test isapprox(sol[ssys.R.inlet.p] - sol[ssys.R.outlet.p], dp; rtol=1e-8)  # ΔP_R = dp
@@ -67,7 +67,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:par_res), pump, hx, R1, R2)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.R1.inlet.ṁ => p / r1, ssys.R2.inlet.ṁ => p / r2])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     total_R = (r1 * r2) / (r1 + r2)
     total_flow = sol[ssys.pump.outlet.ṁ]
@@ -96,8 +96,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:ser_res), pump, hx, Rs...)
     ssys = mtkcompile(sys)
-    ṁ_guess = pressure / total_r
-    sol = solve_steady(ssys, [getproperty(ssys, Symbol(:R, 1)).inlet.ṁ => ṁ_guess])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     for i in 1:N
         Ri = getproperty(ssys, Symbol(:R, i))
@@ -121,7 +120,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:pump_current), P1, P2, hx)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.P2.inlet.ṁ => ṁ])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.P2.inlet.ṁ], ṁ; rtol=1e-8)              # current source wins
     @test isapprox(sol[ssys.P1.outlet.p] - sol[ssys.P1.inlet.p], p; rtol=1e-8)  # pump adds p
@@ -145,13 +144,13 @@ end
         return mtkcompile(sys)
     end
     fwd = build(1.0)
-    sol_f = solve_steady(fwd, [fwd.R.inlet.ṁ => 1.0])
+    sol_f = solve_steady(fwd)
     @test sol_f.retcode == ReturnCode.Success
     @test sol_f[fwd.R.inlet.ṁ] > 0
     @test isapprox(sol_f[fwd.R.outlet.T], T1; rtol=1e-8)   # forward: HX1 fluid through R
 
     rev = build(-1.0)
-    sol_r = solve_steady(rev, [rev.R.inlet.ṁ => -1.0])
+    sol_r = solve_steady(rev)
     @test sol_r.retcode == ReturnCode.Success
     @test sol_r[rev.R.inlet.ṁ] < 0
     @test isapprox(sol_r[rev.R.inlet.T], T2; rtol=1e-8)    # reversed: HX2 fluid through R
@@ -177,7 +176,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:rl_circuit), pump, L_el, R, hx)
     ssys = mtkcompile(sys)
-    sol_ss = solve_steady(ssys, [ssys.L_el.inlet.ṁ => ṁ0])
+    sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 1.0; length=5)   # exactly [0, 0.25, 0.5, 0.75, 1.0]
     sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0],
@@ -292,7 +291,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:signify_series), pump, hx, R1, R2)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.R1.inlet.ṁ => p / (r1 / s + r2)])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     bundle = sol[ssys.R1.inlet.ṁ]      # = m2 = s·m1
     m1 = bundle / s
@@ -323,11 +322,7 @@ end
     @named sys = compose(System(conns, t; name=:signify_parallel), pump, hx, R1s..., R2)
     ssys = mtkcompile(sys)
     m1 = p / (r1 + signify * r2)
-    guess = vcat(
-        [getproperty(ssys, Symbol(:R1_, i)).inlet.ṁ => m1 for i in 1:signify],
-        [ssys.R2.inlet.ṁ => signify * m1],
-    )
-    sol = solve_steady(ssys, guess)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     for i in 1:signify
         @test isapprox(sol[getproperty(ssys, Symbol(:R1_, i)).inlet.ṁ], m1; rtol=1e-8)
@@ -359,7 +354,7 @@ end
         m = 3.0 - tt
         sol = solve_steady(
             ssys,
-            Pair{Any,Any}[ssys.pump.ṁ0 => m, ssys.lpd.inlet.ṁ => m],
+            [ssys.pump.ṁ0 => m, ssys.lpd.inlet.ṁ => m],
         )
         @test sol.retcode == ReturnCode.Success
         push!(ṁ, sol[ssys.lpd.inlet.ṁ])
@@ -393,7 +388,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:flapper_refṁ), pump, R, flapper, hx)
     ssys = mtkcompile(sys)
-    op = Pair{Any,Any}[
+    op = [
         ssys.R.inlet.ṁ => 1.0,
         ssys.pump.dP_pump_fn => dp_fn,
     ]   # the machine starts :CLOSED (flapper shut until the transition fires)
@@ -430,7 +425,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:flapper_pump), pump, flapper, hx)
     ssys = mtkcompile(sys)
-    op = Pair{Any,Any}[ssys.pump.dP_pump_fn => dp_fn]
+    op = [ssys.pump.dP_pump_fn => dp_fn]
     sol = solve_transient(ssys, op, range(0.0, 5.0; length=500); build_initializeprob=false)
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(2.0; idxs=ssys.pump.inlet.ṁ), 0.0; atol=1e-8)   # closed ⇒ no flow
@@ -563,10 +558,7 @@ end
     ṁ = Float64[]
     rdrop0 = 0.0
     for (i, tt) in enumerate(times)
-        sol = solve_steady(ssys, Pair{Any,Any}[ssys.pump.dP_pump => p0 * exp(-tt),
-                ssys.R.inlet.ṁ => p0 / 1.0e5,
-            ],
-        )
+        sol = solve_steady(ssys, [ssys.pump.dP_pump => p0 * exp(-tt)])
         @test sol.retcode == ReturnCode.Success
         push!(ṁ, sol[ssys.R.inlet.ṁ])
         i == 1 && (rdrop0 = sol[ssys.R.inlet.p] - sol[ssys.R.outlet.p])
@@ -621,7 +613,7 @@ end
     # Forced-flow steady at ṁ0 → the pump head that holds it (Python's steady pump pressure).
     @named pump = Pump(; ṁ0=ṁ0)
     ssys = build_coastdown(pump)
-    guess = Pair{Any,Any}[ssys.cold.inlet.ṁ => ṁ0]
+    guess = [ssys.cold.inlet.ṁ => ṁ0]
     append!(guess, [ssys.cold.T[i] => T_cold for i in 1:nz])
     append!(guess, [ssys.hot.T[i] => T_hot for i in 1:nz])
     sol0 = solve_steady(ssys, guess)
@@ -668,7 +660,7 @@ end
     # one varies by Julia version, so seeding both lands the kept state in the forward basin either
     # way (otherwise it sits at 0 and the laminar 64/Re friction divides by zero). SSRootfind is a
     # direct root-find with no time step, so it cannot underflow dt at the stiff near-reversal point.
-    carry = Pair{Any,Any}[
+    carry = [
         ssys2.hot.inlet.ṁ => ṁ0 / 2,
         ssys2.cold.inlet.ṁ => ṁ0 / 2,
         Dt(ssys2.cold.inlet.ṁ) => 0.0,
@@ -677,14 +669,14 @@ end
     append!(carry, [ssys2.cold.T[i] => T_cold for i in 1:nz])
     append!(carry, [ssys2.hot.T[i] => T_hot for i in 1:nz])
     for tt in times
-        op = Pair{Any,Any}[ssys2.pump2.dP_pump => p_pump0 * exp(-tt)]
+        op = [ssys2.pump2.dP_pump => p_pump0 * exp(-tt)]
         append!(op, carry)
         sol = solve_steady(ssys2, op; solver=SSRootfind())
         push!(retcodes, sol.retcode) 
         push!(ṁ, sol[ssys2.cold.inlet.ṁ])
         append!(cold_cells, sol[ssys2.cold.T])
         append!(hot_cells, sol[ssys2.hot.T])
-        carry = Pair{Any,Any}[u => sol[u] for u in unknowns(ssys2)]
+        carry = [u => sol[u] for u in unknowns(ssys2)]
     end
     @test all(retcodes .== ReturnCode.Success)
     @test ṁ[1] > 0                       # starts forward
@@ -755,7 +747,7 @@ end
     ]
     full = compose_systems(osc, pump, bc; connections=conns, name=:sys4)
     ssys = mtkcompile(full)
-    ic = Pair{Any,Any}[ssys.osc.cac.inlet.ṁ => ṁ]
+    ic = [ssys.osc.cac.inlet.ṁ => ṁ]
     append!(ic, [ssys.osc.cac.T[i] => T0 for i in 1:n])
     append!(ic, [ssys.osc.fuel.T[i, j] => T0 for i in 1:nz for j in 1:nx])
     sol = solve_transient(ssys, ic, range(0.0, 200.0; length=50);
@@ -842,7 +834,7 @@ end
     # critical). Seed every member of each connection set (port temperatures default to 26.85 °C and
     # which alias representative survives is not stable across MTK versions), matching build_loop_pk.
     pk_ic = point_kinetics_steady_state(1.0)
-    ic = Pair{Any,Any}[
+    ic = [
         ssys.pk.rho_c_fn => ctrl,
         ssys.pk.P_neutron => pk_ic.P_neutron,
         [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
@@ -921,14 +913,7 @@ end
     conns = Equation[fb...; fuel.power ~ pk.P * 1.0e3; bath_conns...]
     full = compose_systems(fuel, pk, bathsL..., bathsR...; connections=conns, name=:sys8)
     ssys = mtkcompile(full)
-    pk_ic = point_kinetics_steady_state(1.0e5)
-    ic = Pair{Any,Any}[
-        ssys.pk.rho_c_fn => ctrl,
-        ssys.pk.P_neutron => 1.0e5,
-        [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
-    ]
-    append!(ic, [ssys.fuel.T[i, j] => 2 * T0 for i in 1:nz for j in 1:nx])   # start hot
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.pk.P_neutron] < 1e-3  # power → 0
     @test all(isapprox(sol[ssys.fuel.T[i, j]], T0; atol=1e-3) for i in 1:nz for j in 1:nx)
@@ -966,16 +951,7 @@ end
     ]
     full = compose_systems(rods, pk, pump, bc; connections=conns, name=:sys9)
     ssys = mtkcompile(full)
-    pk_ic = point_kinetics_steady_state(1.0e5)
-    ic = Pair{Any,Any}[
-        ssys.pk.rho_c_fn => ctrl,
-        ssys.pk.P_neutron => 1.0e5,
-        [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
-        ssys.rods.cac.inlet.ṁ => ṁ0,
-    ]
-    append!(ic, [ssys.rods.cac.T[i] => 2 * T0 for i in 1:n])    # start hot
-    append!(ic, [ssys.rods.fuel.T[i, j] => 2 * T0 for i in 1:nz for j in 1:nx])
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.pk.P_neutron] < 1e-3  # power → 0
     @test all(isapprox(sol[ssys.rods.cac.T[i]], T0; atol=1e-3) for i in 1:n)

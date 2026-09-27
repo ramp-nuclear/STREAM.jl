@@ -120,9 +120,7 @@ end
     @named sys = compose(System(conns, t; name=:sys), hd, ct_l..., ct_r...)
     ssys = mtkcompile(sys)
 
-    # Initial guess: slightly above T_bc to break symmetry
-    op = [ssys.hd.T[i, j] => T_bc + 10.0 for i in 1:nz for j in 1:nx]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
 
     # All plate temperatures should be >= T_bc (heat source raises interior)
     for i in 1:nz, j in 1:nx
@@ -171,9 +169,7 @@ end
     )
     @named sys = compose(System(conns, t; name=:sys), hd, ct_l...)
     ssys = mtkcompile(sys; fully_determined=true)
-
-    op = [ssys.hd.T[i, j] => T_bc + 10.0 for i in 1:nz for j in 1:nx]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
 
     # Unconnected thermal_right ports must have Q == 0
     right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
@@ -218,9 +214,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:sys12gap), hd, ct_l..., ct_r...)
     ssys = mtkcompile(sys)
-
-    op = [ssys.hd.T[i, j] => T_bc + 5.0 for i in 1:nz for j in 1:nx]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
 
     T_left = sol[ssys.hd.T[1, 1]]
     T_center = sol[ssys.hd.T[1, 2]]
@@ -257,8 +251,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:sys6), hd, ct_l..., ct_r...)
     ssys = mtkcompile(sys)
-    op = [ssys.hd.T[i, j] => T_bc + 5.0 for i in 1:nz for j in 1:nx]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
 
     for i in 1:nz, j in 1:nx
         @test isapprox(sol[ssys.hd.T[i, j]], sol[ssys.hd.T[i, nx + 1 - j]]; rtol=1e-6)

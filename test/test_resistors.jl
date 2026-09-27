@@ -132,7 +132,7 @@ end
     # cleanly (same choice as the callable-pump ramp test).
     sol_ss = solve_steady(
         ssys,
-        Pair{Any,Any}[ssys.vfr.inlet.ṁ => q0, ssys.vfr.k_fn => k_hold];
+        [ssys.vfr.inlet.ṁ => q0, ssys.vfr.k_fn => k_hold];
         solver=DynamicSS(Rodas5P()),
     )
     @test sol_ss.retcode == ReturnCode.Success
@@ -194,7 +194,7 @@ end
         conns = [inseries(pump, hx, r, pump)..., pump.inlet.p ~ 1.0e5]
         @named sys = compose(System(conns, t; name=:known_point), pump, hx, r)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, Pair{Any,Any}[ssys.r.inlet.ṁ => guess])
+        sol = solve_steady(ssys, [ssys.r.inlet.ṁ => guess])
         @test sol.retcode == ReturnCode.Success
         return sol[ssys.r.inlet.ṁ]
     end

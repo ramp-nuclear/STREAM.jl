@@ -185,9 +185,7 @@ end
                           pump, hx, cac, ct_l..., ct_r...)
     ssys = mtkcompile(sys; fully_determined=true)
 
-        T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.5, n=n)
     op = vcat(
-        [ssys.cac.T[i] => T_guess[i] for i in 1:n],
             [ssys.cac.inlet.ṁ => 0.5],
     )
     sol = solve_steady(ssys, op)
@@ -273,9 +271,7 @@ end
     ssys_ss = build_loop_transient(; T_inlet=T_inlet, T_wall_0=T_wall_0)
     ssys = build_loop_transient(; T_inlet=T_inlet, T_wall_fn=T_wall_step)
 
-        T_guess = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.490, n=n)
-    op_guess = [ssys_ss.ch.T[i] => T_guess[i] for i in 1:n]
-        push!(op_guess, ssys_ss.ch.inlet.ṁ => 0.490)
+    op_guess = [ssys_ss.ch.inlet.ṁ => 0.490]
     sol_ss = solve_steady(ssys_ss, op_guess)
     op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
         push!(op_ic, ssys.ch.inlet.ṁ => sol_ss[ssys_ss.ch.inlet.ṁ])
@@ -332,11 +328,7 @@ end
     )
     ssys = mtkcompile(sys; fully_determined=true)
 
-    T_w = 41.85
     op = vcat(
-        [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
-        [ssys.cac_l.T[i] => T_w for i in 1:nz],
-        [ssys.cac_r.T[i] => T_w for i in 1:nz],
             [ssys.cac_l.inlet.ṁ => +0.250],
             [ssys.cac_r.inlet.ṁ => +0.250],
     )
@@ -483,10 +475,7 @@ end
     ssys = mtkcompile(sys; fully_determined=true)
 
     op = vcat(
-        [ssys.hd.T[i, j] => 45.0 for i in 1:nz for j in 1:(nx - 1)],
         [ssys.hd.T[i, nx] => 95.0 for i in 1:nz],
-        [ssys.cac_l.T[i] => 45.0 for i in 1:nz],
-        [ssys.cac_r.T[i] => 95.0 for i in 1:nz],
             [ssys.cac_l.inlet.ṁ => +0.250],
             [ssys.cac_r.inlet.ṁ => +0.250],
     )
@@ -631,10 +620,7 @@ end
 
     cac_s = ssys.scc.cac_l
     fuel_s = ssys.scc.hd
-    T_w = 43.85
     op = vcat(
-        [fuel_s.T[i, j] => T_w for i in 1:nz for j in 1:nx],
-        [cac_s.T[i] => T_w for i in 1:nz],
             [cac_s.inlet.ṁ => +0.250],
     )
     rows = ParityRow[]
@@ -873,14 +859,8 @@ end
     )
     ssys_v02 = mtkcompile(sys_v02; fully_determined=true)
 
-    # Initial guess: plate T slightly above T_in, ṁ +0.250 (rectangular MTR at 30 kPa)
-    T_guess_v02 = T_in_v02 + 10.0
-    op_v02 = vcat(
-        [ssys_v02.hd1.T[i, j] => T_guess_v02 for i in 1:nz_v02 for j in 1:nx_v02],
-        [ssys_v02.hd2.T[i, j] => T_guess_v02 for i in 1:nz_v02 for j in 1:nx_v02],
-        [ssys_v02.cac_v02.T[i] => T_guess_v02 for i in 1:nz_v02],
-        [ssys_v02.cac_v02.inlet.ṁ => +0.250],
-    )
+    # Initial guess: ṁ +0.250 (rectangular MTR at 30 kPa)
+    op_v02 = [ssys_v02.cac_v02.inlet.ṁ => +0.250]
     sol_v02 = solve_steady(ssys_v02, op_v02)
 
     # Assertion 1: solver converged

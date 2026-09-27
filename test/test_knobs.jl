@@ -110,14 +110,9 @@ end
     # the gap is one shared knob across both channels and the plate
     @test count(p -> occursin("gap", string(p)), parameters(ssys)) == 1
 
-    T_w = 41.85
-    baseop(gv) = vcat(
-        Pair[gap => gv],
-        [ssys.hd.T[i, j] => T_w for i in 1:nz for j in 1:nx],
-        [ssys.cac_l.T[i] => T_w for i in 1:nz],
-        [ssys.cac_r.T[i] => T_w for i in 1:nz],
-        Pair[ssys.cac_l.inlet.ṁ => +0.250, ssys.cac_r.inlet.ṁ => +0.250],
-    )
+    baseop(gv) = [
+        gap => gv, ssys.cac_l.inlet.ṁ => +0.250, ssys.cac_r.inlet.ṁ => +0.250,
+    ]
 
     s0 = solve_steady(ssys, baseop(0.00127))   # default gap
     s1 = solve_steady(ssys, baseop(0.00090))   # narrower gap, no rebuild

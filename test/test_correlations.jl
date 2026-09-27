@@ -109,9 +109,7 @@ end
             ct_r_phy02...,
         )
         ssys_phy02 = mtkcompile(sys_phy02)
-        T_g = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.490, n=n)
-        op_phy02 = [ssys_phy02.cac_phy02.T[i] => T_g[i] for i in 1:n]
-        push!(op_phy02, ssys_phy02.cac_phy02.inlet.ṁ => 0.490)
+        op_phy02 = [ssys_phy02.cac_phy02.inlet.ṁ => 0.490]
         sol_phy02 = solve_steady(ssys_phy02, op_phy02)
 
         @test sol_phy02.retcode == ReturnCode.Success
@@ -163,8 +161,7 @@ end
             ct_r_phy03...,
         )
         ssys_phy03 = mtkcompile(sys_phy03)
-        op_phy03 = [ssys_phy03.cac_phy03.T[i] => T_inlet for i in 1:n]
-        push!(op_phy03, ssys_phy03.cac_phy03.inlet.ṁ => 8.8e-4)
+        op_phy03 = [ssys_phy03.cac_phy03.inlet.ṁ => 8.8e-4]
         sol_phy03 = solve_steady(ssys_phy03, op_phy03)
 
         @test sol_phy03.retcode == ReturnCode.Success
@@ -245,8 +242,7 @@ end
             ct_r_lam...,
         )
         ssys_lam = mtkcompile(sys_lam)
-        op_lam = [ssys_lam.cac_lam.T[i] => T_inlet for i in 1:n]
-        push!(op_lam, ssys_lam.cac_lam.inlet.ṁ => 1e-4)
+        op_lam = [ssys_lam.cac_lam.inlet.ṁ => 1e-4]
         sol_lam = solve_steady(ssys_lam, op_lam)
 
         @test sol_lam.retcode == ReturnCode.Success
@@ -323,9 +319,7 @@ end
             ct_r_turb...,
         )
         ssys_turb = mtkcompile(sys_turb)
-        T_g_turb = steady_state_guess(; T_inlet=T_inlet, Q_wall=1e4, ṁ_guess=0.250, n=n)
-        op_turb = [ssys_turb.cac_turb.T[i] => T_g_turb[i] for i in 1:n]
-        push!(op_turb, ssys_turb.cac_turb.inlet.ṁ => 0.250)
+        op_turb = [ssys_turb.cac_turb.inlet.ṁ => 0.250]
         sol_turb = solve_steady(ssys_turb, op_turb)
 
         @test sol_turb.retcode == ReturnCode.Success
@@ -606,8 +600,7 @@ end
         ssys_fd = @test_nowarn mtkcompile(sys_fd)
         @test ssys_fd !== nothing
 
-        op_fd = [ssys_fd.cac_fd.T[i] => T_inlet for i in 1:n]
-        push!(op_fd, ssys_fd.cac_fd.inlet.ṁ => 1e-3)
+        op_fd = [ssys_fd.cac_fd.inlet.ṁ => 1e-3]
         sol_fd = solve_steady(ssys_fd, op_fd)
         @test sol_fd.retcode == ReturnCode.Success
     end
@@ -659,8 +652,7 @@ end
         ssys_dev = @test_nowarn mtkcompile(sys_dev)
         @test ssys_dev !== nothing
 
-        op_dev = [ssys_dev.cac_dev.T[i] => T_inlet for i in 1:n]
-        push!(op_dev, ssys_dev.cac_dev.inlet.ṁ => 1e-3)
+        op_dev = [ssys_dev.cac_dev.inlet.ṁ => 1e-3]
         sol_dev = solve_steady(ssys_dev, op_dev)
         @test sol_dev.retcode == ReturnCode.Success
     end

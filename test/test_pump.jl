@@ -19,8 +19,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
     ]
     @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
     ssys5 = mtkcompile(sys5; fully_determined=false)
-    op5 = Pair{Any,Any}[ssys5.ch5.inlet.ṁ => 0.6]
-    append!(op5, [ssys5.ch5.T[i] => 40.0 for i in 1:5])
+    op5 = [ssys5.ch5.inlet.ṁ => 0.6]
     sol5 = solve_steady(ssys5, op5)
     @test sol5.retcode == ReturnCode.Success
     @test isapprox(sol5[ssys5.pump5.inlet.ṁ], 0.6; rtol=1e-4)
@@ -44,7 +43,7 @@ end
     ]
     @named sys_real = compose(System(conns_real, t; name=:disp_real), p_real, hx_real, res_real)
     ssys_real = mtkcompile(sys_real)
-    sol_real = solve_steady(ssys_real, Pair{Any,Any}[ssys_real.res_real.inlet.ṁ => 1.0])
+    sol_real = solve_steady(ssys_real, [ssys_real.res_real.inlet.ṁ => 1.0])
     @test sol_real.retcode == ReturnCode.Success
     # Defining relation of scalar mode: the head equals the prescribed dP (rtol=1e-8, the
     # head is an exact algebraic equation, only float round-off separates them).
@@ -72,7 +71,7 @@ end
     ssys_fn = mtkcompile(sys_fn)
     sol_fn = solve_steady(
         ssys_fn,
-        Pair{Any,Any}[
+        [
             ssys_fn.res_fn.inlet.ṁ => 1.0,
             ssys_fn.p_fn.dP_pump_fn => dP_call,
         ],
@@ -98,7 +97,7 @@ end
     ]
     @named sys_m = compose(System(conns_m, t; name=:disp_m), p_ṁ, hx_m, res_m)
     ssys_m = mtkcompile(sys_m; fully_determined=false)
-    sol_m = solve_steady(ssys_m, Pair{Any,Any}[ssys_m.res_m.inlet.ṁ => ṁ_set])
+    sol_m = solve_steady(ssys_m, [ssys_m.res_m.inlet.ṁ => ṁ_set])
     @test sol_m.retcode == ReturnCode.Success
     # Defining relation of fixed-flow mode: the flow is pinned to ṁ0 (rtol=1e-8, exact
     # algebraic constraint inlet.ṁ ~ ṁ0).
@@ -118,8 +117,7 @@ end
     ]
     @named sys_r = compose(System(conns_r, t; name=:pump02_loop), pump_r, bc_r, ch_r)
     ssys_r = mtkcompile(sys_r; fully_determined=false)
-    op_r = [ssys_r.ch_r.T[i] => 40.0 for i in 1:5]
-    push!(op_r, ssys_r.ch_r.inlet.ṁ => 0.490)
+    op_r = [ssys_r.ch_r.inlet.ṁ => 0.490]
     sol_r = solve_steady(ssys_r, op_r)
     @test sol_r.retcode == ReturnCode.Success
     @test sol_r[ssys_r.ch_r.inlet.ṁ] > 0
@@ -171,7 +169,7 @@ end
     # Solver choice: this loop has a time-varying head, so the steady solve needs the stiff
     # DynamicSS(Rodas5P) solver. The default steady solver goes unstable here.
     sol_ss = solve_steady(ssys,
-        Pair{Any,Any}[ssys.ine.inlet.ṁ => ṁ_0, ssys.pump.dP_pump_fn => dP_hold];
+        [ssys.ine.inlet.ṁ => ṁ_0, ssys.pump.dP_pump_fn => dP_hold];
         solver=DynamicSS(Rodas5P()))
     @test sol_ss.retcode == ReturnCode.Success
     @test isapprox(sol_ss[ssys.ine.inlet.ṁ], ṁ_0; rtol=1e-3)   # relaxation endpoint, loose

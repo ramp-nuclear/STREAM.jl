@@ -128,7 +128,7 @@ end
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
     # Solve briefly to verify composition produces meaningful steady state
-    ic = Pair{Any,Any}[
+    ic = [
         [ssys.rods.cac.T[i] => 40.0 for i in 1:4]...,
         [ssys.rods.fuel.T[i, j] => 40.0 for i in 1:4 for j in 1:2]...,
         ssys.rods.cac.inlet.ṁ => 0.2,
@@ -151,7 +151,7 @@ end
     full = compose_systems(rods, pump, bc; connections=conns, name=:full10)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
-    ic = Pair{Any,Any}[
+    ic = [
         [ssys.rods.cac.T[i] => 40.0 for i in 1:10]...,
         [ssys.rods.fuel.T[i, j] => 40.0 for i in 1:10 for j in 1:2]...,
         ssys.rods.cac.inlet.ṁ => 0.2,
@@ -174,7 +174,7 @@ end
     full = compose_systems(rods, pump, bc; connections=conns, name=:fullx4)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
-    ic = Pair{Any,Any}[
+    ic = [
         [ssys.rods.cac.T[i] => 40.0 for i in 1:4]...,
         [ssys.rods.fuel.T[i, j] => 40.0 for i in 1:4 for j in 1:4]...,
         ssys.rods.cac.inlet.ṁ => 0.2,
@@ -199,7 +199,7 @@ end
     full = compose_systems(rods, pump, bc; connections=conns, name=:fullx3)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
-    ic = Pair{Any,Any}[
+    ic = [
         [ssys.rods.cac.T[i] => 40.0 for i in 1:4]...,
         [ssys.rods.fuel.T[i, j] => 40.0 for i in 1:4 for j in 1:3]...,
         ssys.rods.cac.inlet.ṁ => 0.2,
@@ -244,9 +244,6 @@ end
     full = compose_systems(pl, pump_l, bc_l, pump_r, bc_r; connections=conns, name=:dualcac)
     ssys = mtkcompile(full; fully_determined=true)
     op = vcat(
-        [ssys.pl.fuel.T[i, j] => 43.85 for i in 1:nz for j in 1:nx],
-        [ssys.pl.ch_left.T[i] => 43.85 for i in 1:nz],
-        [ssys.pl.ch_right.T[i] => 43.85 for i in 1:nz],
         [ssys.pl.ch_left.inlet.ṁ => 0.25],
         [ssys.pl.ch_right.inlet.ṁ => 0.25],
     )
@@ -310,8 +307,6 @@ function _build_osc_loop(side::Symbol, name_suffix)
     full = compose_systems(osc, pump, bc; connections=conns, name=Symbol(:osc_full_, name_suffix))
     ssys = mtkcompile(full; fully_determined=true)
     op = vcat(
-        [getproperty(ssys, Symbol(:osc_, name_suffix)).fuel.T[i, j] => 43.85 for i in 1:nz for j in 1:nx],
-        [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.T[i] => 43.85 for i in 1:nz],
         [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.inlet.ṁ => 0.25],
     )
     sol = solve_steady(ssys, op)
@@ -423,8 +418,6 @@ end
     full = compose_systems(scc, pump, bc; connections=conns, name=:scc_full_s)
     ssys = mtkcompile(full; fully_determined=true)
     op = vcat(
-        [ssys.scc_s.fuel.T[i, j] => 43.85 for i in 1:nz for j in 1:nx],
-        [ssys.scc_s.cac.T[i] => 43.85 for i in 1:nz],
         [ssys.scc_s.cac.inlet.ṁ => 0.25],
     )
     sol = solve_steady(ssys, op)
@@ -465,7 +458,7 @@ end
     full = compose_systems(p1, p2, pump, bc; connections=conns, name=:two_plates)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
-    ic = Pair{Any,Any}[
+    ic = [
         [ssys.p1.cac.T[i] => 40.0 for i in 1:4]...,
         [ssys.p1.fuel.T[i, j] => 40.0 for i in 1:4 for j in 1:2]...,
         [ssys.p2.cac.T[i] => 40.0 for i in 1:4]...,
@@ -594,12 +587,7 @@ const _fa_Dt = Differential(t)
     # We pass a Dt(...)=>0.0 guess for every per-CAC inlet.ṁ, even though
     # mtkcompile only keeps one of them as a differential state — we can't know
     # ahead of time which one survives, and the extras are harmlessly ignored.
-    ic_helper = Pair{Any,Any}[
-        [ssys_helper.asm_helper.c1.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.c2.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.c3.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+    ic_helper = [
         ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
         ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
         ssys_helper.asm_helper.c3.inlet.ṁ => 0.2,
@@ -607,12 +595,7 @@ const _fa_Dt = Differential(t)
         _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
         _fa_Dt(ssys_helper.asm_helper.c3.inlet.ṁ) => 0.0,
     ]
-    ic_hand = Pair{Any,Any}[
-        [ssys_hand.asm_hand.c1.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.c2.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.c3.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+    ic_hand = [
         ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
         ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
         ssys_hand.asm_hand.c3.inlet.ṁ => 0.2,
@@ -691,23 +674,13 @@ end
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
 
     # (See the Dt(...) IC note in the variant-1 testset.)
-    ic_helper = Pair{Any,Any}[
-        [ssys_helper.asm_helper.c1.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.c2.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p3.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+    ic_helper = [
         ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
         ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
         _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
         _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
     ]
-    ic_hand = Pair{Any,Any}[
-        [ssys_hand.asm_hand.c1.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.c2.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p3.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+    ic_hand = [
         ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
         ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
         _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
@@ -777,21 +750,13 @@ end
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
 
     # (See the Dt(...) IC note in the variant-1 testset.)
-    ic_helper = Pair{Any,Any}[
-        [ssys_helper.asm_helper.c1.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.c2.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+    ic_helper = [
         ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
         ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
         _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
         _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
     ]
-    ic_hand = Pair{Any,Any}[
-        [ssys_hand.asm_hand.c1.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.c2.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+    ic_hand = [
         ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
         ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
         _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
@@ -868,13 +833,7 @@ end
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
 
     # (See the Dt(...) IC note in the variant-1 testset.)
-    ic_helper = Pair{Any,Any}[
-        [ssys_helper.asm_helper.c1.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.c2.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.c3.T[i] => 40.0 for i in 1:n]...,
-        [ssys_helper.asm_helper.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_helper.asm_helper.p3.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+    ic_helper = [
         ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
         ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
         ssys_helper.asm_helper.c3.inlet.ṁ => 0.2,
@@ -882,13 +841,7 @@ end
         _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
         _fa_Dt(ssys_helper.asm_helper.c3.inlet.ṁ) => 0.0,
     ]
-    ic_hand = Pair{Any,Any}[
-        [ssys_hand.asm_hand.c1.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.c2.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.c3.T[i] => 40.0 for i in 1:n]...,
-        [ssys_hand.asm_hand.p1.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p2.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
-        [ssys_hand.asm_hand.p3.T[i, j] => 40.0 for i in 1:nz for j in 1:nx]...,
+    ic_hand = [
         ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
         ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
         ssys_hand.asm_hand.c3.inlet.ṁ => 0.2,
@@ -981,8 +934,7 @@ end
         # The tuple weighted returns is both the path to wire and the systems to compose.
         @named sys = compose(System(conns, t; name=:loop), pump, hx, branch...)
         ssys = mtkcompile(sys)
-        op = Pair{Any,Any}[ssys.ch.T[i] => 50.0 for i in 1:n]
-        push!(op, ssys.ch.inlet.ṁ => 0.5)
+        op = [ssys.ch.inlet.ṁ => 0.5]
         sol = solve_steady(ssys, op)
         @test sol.retcode == ReturnCode.Success
         return ssys, sol

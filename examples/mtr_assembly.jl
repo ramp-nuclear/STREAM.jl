@@ -92,11 +92,7 @@ conns = [
 @named sys = compose(System(conns, t; name=:mtr_example), pump_l, hx_l, pump_r, hx_r, rods)
 ssys = mtkcompile(sys)
 
-T_w = 41.85
 op = vcat(
-    [ssys.rods.hd.T[i, j] => T_w for i in 1:NZ for j in 1:NX],
-    [ssys.rods.cac_l.T[i] => T_w for i in 1:NZ],
-    [ssys.rods.cac_r.T[i] => T_w for i in 1:NZ],
     [ssys.rods.cac_l.inlet.ṁ => +0.250],
     [ssys.rods.cac_r.inlet.ṁ => +0.250],
 )

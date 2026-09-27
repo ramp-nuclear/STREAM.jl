@@ -26,7 +26,7 @@ using STREAM.Examples
     @testset "build_loop compiles + briefly solves" begin
         # Smoke: demonstrate the full `build_loop` API produces a working transient.
         ssys = build_loop()
-        ic = Pair{Any,Any}[
+        ic = [
             [ssys.ch.T[i] => 40.0 for i in 1:10]...,
             ssys.ch.inlet.ṁ => 0.5,
         ]
@@ -37,7 +37,7 @@ using STREAM.Examples
 
     @testset "build_loop_vertical compiles + briefly solves" begin
         ssys = build_loop_vertical()
-        ic = Pair{Any,Any}[
+        ic = [
             [ssys.ch.T[i] => 40.0 for i in 1:10]...,
             ssys.ch.inlet.ṁ => 0.5,
         ]
@@ -48,7 +48,7 @@ using STREAM.Examples
 
     @testset "build_loop_transient compiles + briefly solves" begin
         ssys = build_loop_transient()
-        ic = Pair{Any,Any}[
+        ic = [
             [ssys.ch.T[i] => 40.0 for i in 1:10]...,
             ssys.ch.inlet.ṁ => 0.5,
         ]
@@ -60,7 +60,7 @@ using STREAM.Examples
         ssys = build_cube()
         @test ssys isa ModelingToolkit.AbstractSystem
 
-        ss = solve_steady(ssys, Pair{Any,Any}[ssys.r01.inlet.ṁ => 0.1])
+        ss = solve_steady(ssys, [ssys.r01.inlet.ṁ => 0.1])
         @test ss.retcode == ReturnCode.Success
 
         # The cube graph between opposite corners has effective resistance (5/6)*R per
@@ -157,48 +157,18 @@ end
             dP_pump_fn=dP_fn,
         )
 
-        Dt = Differential(t)
-        # Forced-flow guess from the dominant linear branch: the pump head drives flow
-        # through ext_res (R_ext), so ṁ ~ dP_pre / R_ext, and the coolant warms by
-        # power_W / (ṁ * cp) across the channel.
-        ṁ_guess = BYPASS_DP_PRE / BYPASS_R_EXT
-        cp = cₚ(H2O, BYPASS_T_INLET)
-        dT_guess = BYPASS_POWER_W / (ṁ_guess * cp)
-        P_top = 1.0e5 + BYPASS_DP_PRE   # pump-out / node-A pressure (anchor + head)
-
         # Forced-flow steady state (pump on, flapper closed), integrated to steady by
-        # DynamicSS(Rodas5P()). The system has a second root at ṁ = 0 (flow
-        # recirculating through the closed flapper); DynamicSS lands on whichever root
-        # its guess sits nearest. Seed the variables mtkcompile keeps as unknowns
-        # (heated.ch.inlet.ṁ + its dummy derivative, ext_res.inlet.ṁ,
-        # ine.outlet.p) so the guess lands in the forced-flow basin and DynamicSS
-        # converges to ṁ_ss ~ 0.187 kg/s on both package sets. Seeding only the
-        # observed aliases (ine.inlet.ṁ, ret.inlet.ṁ) let the latest set fall
-        # into ṁ = 0. The aliases are seeded too so the guess is unambiguous either way.
-        op_steady = Pair{Any,Any}[
+        # DynamicSS(Rodas5P()). Started with the flow unknowns mtkcompile keeps at zero, the
+        # solve stays at ṁ = 0 and fails, so they start at the flow the pump head drives
+        # through ext_res, dP_pre / R_ext. The dummy derivative has no default and needs a
+        # value too. Nothing else needs seeding.
+        ṁ_guess = BYPASS_DP_PRE / BYPASS_R_EXT
+        op_steady = [
             ssys.pump.dP_pump_fn => dP_fn_steady,
-            ssys.heated.ch.inlet.ṁ => ṁ_guess,
-            Dt(ssys.heated.ch.inlet.ṁ) => 0.0,
-            ssys.ext_res.inlet.ṁ => ṁ_guess,
-            ssys.ine.outlet.p => P_top,
-            ssys.ine.inlet.ṁ => ṁ_guess,
-            ssys.ret.inlet.ṁ => ṁ_guess,
+            ssys.heated.ch.inlet.ṁ => ṁ_guess,
+            ssys.ext_res.inlet.ṁ => ṁ_guess,
+            Differential(t)(ssys.heated.ch.inlet.ṁ) => 0.0,
         ]
-        for i in 1:n
-            push!(op_steady, ssys.heated.ch.T[i] => BYPASS_T_INLET + (i / n) * dT_guess)
-            push!(op_steady, ssys.ret.T[i] => BYPASS_T_INLET + dT_guess)
-            push!(
-                op_steady,
-                getproperty(ssys.heated.ch, Symbol(:thermal_left, i)).T =>
-                    BYPASS_T_INLET + (i / n) * dT_guess + 5.0,
-            )
-        end
-        for i in 1:n, j in 1:BYPASS_FUEL_NX
-            push!(
-                op_steady,
-                ssys.heated.fuel.T[i, j] => BYPASS_T_INLET + (i / n) * dT_guess + 5.0,
-            )
-        end
         ss = solve_steady(ssys, op_steady; solver=DynamicSS(Rodas5P()))
         ṁ_ss = ss[ssys.ine.inlet.ṁ]
 

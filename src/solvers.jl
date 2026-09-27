@@ -21,7 +21,7 @@ If a particular solve does not converge, pass an explicit solver; the coastdown 
 `SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
 """
 function solve_steady(
-    ssys, op; solver=nothing, abstol=1e-8, reltol=1e-6, build_initializeprob=false
+    ssys, op=Pair[]; solver=nothing, abstol=1e-8, reltol=1e-6, build_initializeprob=false
 )
     prob = SteadyStateProblem(
         ssys,

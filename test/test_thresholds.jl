@@ -357,8 +357,7 @@ end
     # Built from a solution rather than by hand, which is what exercises the extraction.
     geo = PipeGeometry_circular(0.6, 0.01)
     ssys = build_loop(; n=5)
-    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
-    push!(op, ssys.ch.inlet.ṁ => 0.5)
+    op = [ssys.ch.inlet.ṁ => 0.5]
     sol = solve_steady(ssys, op)
 
     # A plain Channel has no `velocity` variable (only ChannelAndContacts declares it), so
@@ -390,8 +389,7 @@ end
     # sets both of its ports, so what reaches the channel is still its 40 °C, while the
     # first cell is now the hot end.
     back = build_loop(; n=5, dP_pump=-3.0e4)
-    op_back = Pair{Any,Any}[back.ch.T[i] => 40.0 for i in 1:5]
-    push!(op_back, back.ch.inlet.ṁ => -0.5)
+    op_back = [back.ch.inlet.ṁ => -0.5]
     reversed = ChannelState(solve_steady(back, op_back), back.ch; pipe=geo)
     @test reversed.ṁ < 0
     @test reversed.T_inlet ≈ 40.0
@@ -405,8 +403,7 @@ end
     n = 5
     geo = PipeGeometry_circular(0.6, 0.01)
     ssys = build_loop(; n=n)
-    op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:n]
-    push!(op, ssys.ch.inlet.ṁ => 0.5)
+    op = [ssys.ch.inlet.ṁ => 0.5]
     sol_ss = solve_steady(ssys, op)
     sol = solve_transient(
         ssys, sol_ss, range(0.0, 0.5; length=6); overrides=[ssys.pump.dP_pump => 0.0]
@@ -483,8 +480,7 @@ end
     ]
     @named sys = compose(System(conns, t; name=:chf_loop), pump, bc, chf)
     ssys = mtkcompile(sys)
-    ic = Pair{Any,Any}[
-        [ssys.chf.T[i] => 20.0 for i in 1:n]...,
+    ic = [
         ssys.chf.inlet.ṁ => 0.5,
     ]
     sol = solve_steady(ssys, ic)
