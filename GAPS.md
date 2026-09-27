@@ -399,7 +399,7 @@ match Python:
 - Boiling power took `cₚ` per cell instead of at the inlet.
 - Mirshak took the speed. Python takes the signed velocity, which lowers the limit under
   reversed flow, and so do we now.
-- Bergles-Rohsenow lacked Python's `onb_factor`, `inhomogeneity_factor` and face choice.
+- Bergles-Rohsenow lacked Python's face choice.
 - `ChannelState` and `threshold_analysis` defaulted gravity to 9.81 rather than `G_EARTH`.
 
 Saturation was the last difference, and there Python was right. The pressure a port carries
@@ -505,6 +505,8 @@ Python has `analysis/UQ/` with:
 - `DASKUQModel`, the same thing distributed
 - `Uncertainty`, propagation and combination of uncertainties
 - `local_power_shift`, a purpose-built power-shape perturbation
+- uncertainty factors on the threshold wrappers: `onb_factor` on the Bergles-Rohsenow
+  superheat, and `inhomogeneity_factor` on the local flux for ONB and OSV
 
 We have nothing. Our `@design_knob` machinery is the closest thing, and it solves the
 adjacent problem of re-solving under a changed design parameter rather than propagating an

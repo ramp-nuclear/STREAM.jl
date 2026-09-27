@@ -96,7 +96,7 @@ function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=
 end
 
 """
-    q_OSV_saha_zuber(T_inlet, ṁ, pipe, coolant; flux_shape=nothing, dz=nothing, flux_enworse=1.0) -> q_OSV [W/m^2]
+    q_OSV_saha_zuber(T_inlet, ṁ, pipe, coolant; flux_shape=nothing, dz=nothing) -> q_OSV [W/m^2]
 
 Onset of Significant Void (OSV) heat flux per cell, from Saha and Zuber (1974), with the
 bulk temperature computed as though the channel ran at the OSV flux.
@@ -105,7 +105,7 @@ Saha and Zuber give `T_sat - T_bulk = q_OSV / X`, with `X = κ/Dh · Nu_c` (`Nu_
 `Pe ≤ 70000` and `X = St_c · G · cₚ` (`St_c = 0.0065`) above. Scaling the flux shape until
 the bulk temperature the energy balance gives meets that condition yields
 
-    q_OSV = X (T_sat - T_inlet) / (1 + X Hp / (|ṁ| cₚ) · ∫q dz / (q · flux_enworse))
+    q_OSV = X (T_sat - T_inlet) / (1 + X Hp / (|ṁ| cₚ) · ∫q dz / q)
 
 which does not depend on how `flux_shape` is normalized. The integral runs from the upstream
 end, so under reversed flow it starts at the last cell.
@@ -120,13 +120,12 @@ Source: Python STREAM thresholds.py `Saha_Zuber_OSV_computed_bulk`.
   pressure, e.g. `H2O(T_bulk, P)`. Supplies cₚ, κ and Tsat.
 - `flux_shape`: axial heat flux per cell, in any normalization; default uniform
 - `dz`: axial cell lengths [m]; default `pipe.L / n`
-- `flux_enworse`: factor the local flux is made worse by, for fuel inhomogeneity (default 1.0)
 
 # Returns
 OSV heat flux per cell [W/m^2].
 """
 function q_OSV_saha_zuber(
-    T_inlet, ṁ, pipe, coolant::Liquid; flux_shape=nothing, dz=nothing, flux_enworse=1.0
+    T_inlet, ṁ, pipe, coolant::Liquid; flux_shape=nothing, dz=nothing
 )
     n = flux_shape === nothing ? length(coolant.ρ) : length(flux_shape)
     cells(x) = x isa AbstractArray ? collect(x) : fill(x, n)
@@ -144,7 +143,7 @@ function q_OSV_saha_zuber(
     upstream(a) = ṁ >= 0 ? a : reverse(a)
     heated = upstream(cumsum(upstream(shape .* dz_c)))
     power_factor = pipe.heated_perimeter ./ (abs(ṁ) .* cp_c)
-    denominator = 1 .+ X .* power_factor .* heated ./ (shape .* flux_enworse)
+    denominator = 1 .+ X .* power_factor .* heated ./ shape
     return X .* (T_sat .- T_inlet) ./ denominator
 end
 

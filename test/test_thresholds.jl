@@ -634,26 +634,22 @@ end
     end
 
     python = (
-        fwd=(sk=(1575471.0316344758, 1574952.2515598466), mirshak=(4298321.690663347, 3539713.6901751636), fabrega=(333346.31419618346, 332279.23286491574), ofi=(106174.83495312576,), osv=(3484558.9884553887, 844883.2366385899), osv_inhom=(3616141.236466625, 978269.1429811876), bp=(120652.9254573937, 119322.67811411698), onb_margin=(-63.98777757353153, -31.522506478884353), onb_margin_factors=(-62.482424247888034, -30.05672162179306), twall=(63.315724255662005, 94.9831513183468)),
-        rev=(sk=(971670.8135107204, 968000.8153377083), mirshak=(1191100.746008034, 3093477.0998318987), fabrega=(333346.31419618346, 332279.23286491574), ofi=(31263.625506709213,), osv=(284995.9638613336, 2223314.46786654), osv_inhom=(338031.07959110854, 2426017.02511434), bp=(33891.27119589711, 33517.606211830614), onb_margin=(54.406916625634935, -57.53127968556058), onb_margin_factors=(55.91226995127843, -56.06549482846927), twall=(181.71041845482847, 68.97437811167059)),
+        fwd=(sk=(1575471.0316344758, 1574952.2515598466), mirshak=(4298321.690663347, 3539713.6901751636), fabrega=(333346.31419618346, 332279.23286491574), ofi=(106174.83495312576,), osv=(3484558.9884553887, 844883.2366385899), bp=(120652.9254573937, 119322.67811411698), onb_margin=(-63.98777757353153, -31.522506478884353), twall=(63.315724255662005, 94.9831513183468)),
+        rev=(sk=(971670.8135107204, 968000.8153377083), mirshak=(1191100.746008034, 3093477.0998318987), fabrega=(333346.31419618346, 332279.23286491574), ofi=(31263.625506709213,), osv=(284995.9638613336, 2223314.46786654), bp=(33891.27119589711, 33517.606211830614), onb_margin=(54.406916625634935, -57.53127968556058), twall=(181.71041845482847, 68.97437811167059)),
     )
 
     ends(v) = length(v) == 1 ? (only(v),) : (first(v), last(v))
     for (label, mdot) in ((:fwd, 0.356), (:rev, -0.1))
         s = state(mdot)
-        wall = twall_limit.(s.T_bulk, s.T_wall_left, 1.2)
-        onb = bergles_rohsenow_t_onb(s; direction=:left, onb_factor=1.3, inhomogeneity_factor=1.2)
         julia = (
             sk=q_CHF_sudo_kaminaga(s),
             mirshak=q_CHF_mirshak(s),
             fabrega=q_CHF_fabrega(s),
             ofi=[q_OFI_whittle_forgan(s)],
             osv=q_OSV_saha_zuber(s; direction=:left),
-            osv_inhom=q_OSV_saha_zuber(s; direction=:left, inhomogeneity_factor=1.2),
             bp=q_boiling_onset(s),
             # Python reports the margin T_wall - T_ONB.
             onb_margin=s.T_wall_left .- bergles_rohsenow_t_onb(s; direction=:left),
-            onb_margin_factors=wall .- onb,
             twall=twall_limit(s; inhomogeneity_factor=1.2),
         )
         @testset "$label $k" for k in keys(python[label])

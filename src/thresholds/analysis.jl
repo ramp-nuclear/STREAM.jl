@@ -296,14 +296,13 @@ function _face_flux(s::ChannelState, direction)
 end
 
 """
-    bergles_rohsenow_t_onb(state::ChannelState; direction=:max, onb_factor=1.0,
-                           inhomogeneity_factor=1.0)
+    bergles_rohsenow_t_onb(state::ChannelState; direction=:max)
     q_boiling_onset(state::ChannelState; liquid=H2O)
     q_CHF_mirshak(state::ChannelState)
     q_CHF_fabrega(state::ChannelState)
     q_CHF_sudo_kaminaga(state::ChannelState; liquid=H2O)
     q_OFI_whittle_forgan(state::ChannelState; liquid=H2O)
-    q_OSV_saha_zuber(state::ChannelState; direction=:max, inhomogeneity_factor=1.0, liquid=H2O)
+    q_OSV_saha_zuber(state::ChannelState; direction=:max, liquid=H2O)
     twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
 
 Every threshold correlation also accepts a solved channel, taking its arguments out of the
@@ -315,11 +314,8 @@ per cell, except `q_OFI_whittle_forgan`, which is one power for the channel.
 
 - `direction` picks the face flux, as in [`chfr`](@ref): `:left`, `:right`, or `:max` for
   the larger of the two.
-- `inhomogeneity_factor` makes the local flux worse, for fuel inhomogeneity. In
-  `bergles_rohsenow_t_onb` it scales the flux the onset superheat is taken at, so compare
-  the result with [`twall_limit`](@ref) at the same factor. In `q_OSV_saha_zuber` it is the
-  correlation's `flux_enworse`.
-- `onb_factor` scales the Bergles-Rohsenow superheat, to cover the correlation's uncertainty.
+- `inhomogeneity_factor` makes the local flux worse, for fuel inhomogeneity, as the scalar
+  [`twall_limit`](@ref) does.
 - `q_boiling_onset` takes `cₚ` at the inlet temperature.
 - `q_CHF_mirshak` takes the signed velocity, so reversed flow lowers the limit.
 - `q_OFI_whittle_forgan` reads its saturation temperature from the downstream cell, since
@@ -331,11 +327,9 @@ What each correlation computes is in its own docstring.
 # A wall that is not heating the coolant cannot boil it, and the correlation's fractional
 # power has no real value for a negative flux, so those cells report no onset, as chfr does.
 # After a scram the coolant rising through the core can run hotter than parts of the plate.
-function bergles_rohsenow_t_onb(
-    s::ChannelState; direction=:max, onb_factor=1.0, inhomogeneity_factor=1.0
-)
-    q = inhomogeneity_factor .* _face_flux(s, direction)
-    T_ONB = s.T_sat .+ onb_factor .* _bergles_rohsenow_dT_ONB.(s.P, max.(q, 0.0))
+function bergles_rohsenow_t_onb(s::ChannelState; direction=:max)
+    q = _face_flux(s, direction)
+    T_ONB = s.T_sat .+ _bergles_rohsenow_dT_ONB.(s.P, max.(q, 0.0))
     return ifelse.(q .> 0, T_ONB, Inf)
 end
 
@@ -362,14 +356,11 @@ function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
     return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.pipe; liquid=liquid)
 end
 
-function q_OSV_saha_zuber(
-    s::ChannelState; direction=:max, inhomogeneity_factor=1.0, liquid::AbstractLiquid=H2O
-)
+function q_OSV_saha_zuber(s::ChannelState; direction=:max, liquid::AbstractLiquid=H2O)
     coolant = liquid(collect(s.T_bulk), collect(s.P))
     return q_OSV_saha_zuber(
         s.T_inlet, s.ṁ, s.pipe, coolant;
         flux_shape=_face_flux(s, direction), dz=fill(s.pipe.L / s.n, s.n),
-        flux_enworse=inhomogeneity_factor,
     )
 end
 
