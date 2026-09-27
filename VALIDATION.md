@@ -136,5 +136,5 @@ closed-form analytic relation that holds across the parameter range, a single we
 exercises the same physics (no meaningful coverage lost).
 
 One genuinely missing physically-meaningful assertion was found and added: `#14
-flapper_opens_with_ref_mdot` now asserts the flapper starts closed (`isinf(T_open)` default),
-mirroring Python's `assert np.isinf(F.t_open)`.
+flapper_opens_with_ref_mdot` now asserts the flapper starts closed (its machine starts in
+`:CLOSED`), mirroring Python's `assert np.isinf(F.t_open)`.

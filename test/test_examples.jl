@@ -140,8 +140,10 @@ end
         dP_fn_steady = _bypass_pump_fn(Inf)            # constant pre-trip head
         dP_fn        = _bypass_pump_fn(BYPASS_T_TRIP)  # trips at t_trip
 
+        machine = StateMachine(; initial_state=:CLOSED)
         ssys = build_loop_lof_bypass(;
             n=n,
+            machine=machine,
             L_ch=BYPASS_L_CH,
             D_ch=BYPASS_D_CH,
             T_inlet=BYPASS_T_INLET,
@@ -175,7 +177,6 @@ end
         # into ṁ = 0. The aliases are seeded too so the guess is unambiguous either way.
         op_steady = Pair{Any,Any}[
             ssys.pump.dP_pump_fn => dP_fn_steady,
-            ssys.flapper.T_open => Inf,
             ssys.heated.ch.inlet.ṁ => ṁ_guess,
             Dt(ssys.heated.ch.inlet.ṁ) => 0.0,
             ssys.ext_res.inlet.ṁ => ṁ_guess,
@@ -210,13 +211,8 @@ end
         # ss[u] for every unknown sets it directly.
         op = Pair{Any,Any}[u => ss[u] for u in unknowns(ssys)]
         push!(op, ssys.pump.dP_pump_fn => dP_fn)
-        # T_open is the time the flapper opens. Start it at Inf (never opens); the
-        # callback below latches it to the real opening time once flow drops past the
-        # threshold.
-        push!(op, ssys.flapper.T_open => Inf)
-
-        cb = flapper_callback(ssys, ssys.flapper)
-        return ssys, op, ṁ_ss, cb
+        cb = machine_callbacks(ssys, machine)
+        return ssys, op, ṁ_ss, cb, machine
     end
 
     # Equilibrium flow of the natural-circulation loop, derived from the solved state rather
@@ -271,21 +267,20 @@ end
     end
 
     @testset "bypass topology compiles and SS IC is physical" begin
-        ssys, op, ṁ_ss, _ = _lof_bypass_ic()
+        ssys, op, ṁ_ss, _, machine = _lof_bypass_ic()
 
         @test length(equations(ssys)) == length(unknowns(ssys))
         # Forced-flow steady lands on the pump-driven branch at ṁ_ss ~ 0.187 kg/s, which
         # reproduces across package sets to well under 1%, so bracket it at 0.005.
         @test isapprox(ṁ_ss, 0.187; atol=0.005)
 
-        T_open_init = op[findfirst(p -> isequal(p.first, ssys.flapper.T_open), op)].second
-        @test T_open_init == Inf
+        @test machine.state === :CLOSED     # the valve is shut for the steady solve
     end
 
     @testset "Flapper fires at correct threshold" begin
-        # After the pump trips, the inertia branch flow decays through the threshold and
-        # the callback latches T_open ~ 14.5 s; the open ramp then drives xi to 1.
-        ssys, op, _, cb = _lof_bypass_ic()
+        # After the pump trips, the inertia branch flow decays through the threshold and the
+        # transition fires at ~14.5 s; the open ramp then drives xi to 1.
+        ssys, op, _, cb, machine = _lof_bypass_ic()
 
         t_arr = range(0.0, 300.0; length=3001)
         sol = solve_transient(ssys, op, t_arr; callbacks=cb)
@@ -294,8 +289,8 @@ end
 
         # The valve opens after the trip (t > T_TRIP = 10 s) and within the simulated
         # window, then fully ramps open.
-        T_open_end = sol.ps[ssys.flapper.T_open]
-        @test BYPASS_T_TRIP < T_open_end < 300.0
+        @test machine.state === :OPEN
+        @test BYPASS_T_TRIP < machine.t_state < 300.0
         @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-4)
     end
 
