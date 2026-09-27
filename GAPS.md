@@ -1,704 +1,312 @@
-# Feature gaps against Python STREAM
+# Gaps against Python STREAM
 
-Where STREAM.jl stands against the Python implementation, measured against the goal of
-running RIA, LOFA and LOCA transients in light- and heavy-water research reactors with both
-MTR plate fuel and cylindrical rod fuel.
+What is left before STREAM.jl can replace Python STREAM: RIA, LOFA and LOCA transients in
+light- and heavy-water research reactors with MTR plate fuel and cylindrical rod fuel, and the
+steady-state margins asked for most days.
 
-Transients are not the whole measure. Steady-state analysis is what the code is asked for most
-days, so four questions about it are tracked here as well:
+There are two Python references. `main` is 13,585 lines across 62 modules. The `stream-next`
+branch, 20,787 lines across 79 and not yet merged, fixes a set of correlations and adds loss of
+coolant, a steady-state guess toolkit and plotting. STREAM.jl is 7,620 lines across 40 files.
 
-- **Centerline temperature.** For plate fuel yes: `HeatDiffusion` resolves through the
-  thickness, so the mid-plane value falls out of the solution. For rod fuel no, there is no
-  cylindrical metric ([2.1](#21-no-cylindrical-geometry)).
-- **Margins.** Given the same physical model, do we get the same CHF, OFI, OSV and ONB
-  numbers? Yes for the correlations both codes carry, cross-validated. The plain Saha-Zuber
-  form and the RIA-specific limits are the ones missing ([5](#5-thresholds-and-post-solve-analysis)).
-- **Component support.** Nearly the same hydraulic inventory; four small Idelchik-style
-  elements are outstanding ([3](#3-wall-friction-and-pressure-drop)).
-- **UQ.** No ([8](#8-uncertainty-quantification)).
-
-Python source read for this: `/home/aviv/work/iaec/codes/STREAM`, 13585 lines across 62
-modules. STREAM.jl at the time of writing: 5734 lines across 31 files.
-
-Everything below was checked against both sources rather than inferred from names. Items
-marked **not a gap** were checked and found equivalent, so nobody has to re-derive them.
+Everything here was checked against both sources rather than inferred from names. What was
+checked and found equivalent is listed at the end, so nobody has to re-derive it.
 
 ## Contents
 
-- [Scenario readiness](#scenario-readiness)
-- [1. Power and heat sources](#1-power-and-heat-sources)
-- [2. Fuel heat conduction](#2-fuel-heat-conduction)
-- [3. Wall friction and pressure drop](#3-wall-friction-and-pressure-drop)
-- [4. LOCA: level tracking, and where it stops](#4-loca-level-tracking-and-where-it-stops)
-- [5. Thresholds and post-solve analysis](#5-thresholds-and-post-solve-analysis)
-- [6. Power shapes and meshing](#6-power-shapes-and-meshing)
-- [7. Solver robustness](#7-solver-robustness)
-- [8. Uncertainty quantification](#8-uncertainty-quantification)
-- [9. Reporting and debugging](#9-reporting-and-debugging)
-- [Where STREAM.jl is ahead](#where-streamjl-is-ahead)
+- [Where things stand](#where-things-stand)
+- [In review](#in-review)
+- [What remains](#what-remains)
+  1. [Loss of coolant to core uncovery](#1-loss-of-coolant-to-core-uncovery)
+  2. [Fuel heat conduction](#2-fuel-heat-conduction)
+  3. [Saturation stop and range checks](#3-saturation-stop-and-range-checks)
+  4. [Thresholds](#4-thresholds)
+  5. [Power shapes](#5-power-shapes)
+  6. [Hydraulic components](#6-hydraulic-components)
+  7. [Debugging and drawing a model](#7-debugging-and-drawing-a-model)
+  8. [Uncertainty quantification](#8-uncertainty-quantification)
+- [Not planned](#not-planned)
+- [Deliberate departures from Python](#deliberate-departures-from-python)
 - [Following Python where the physics is open](#following-python-where-the-physics-is-open)
 - [Checked and equivalent](#checked-and-equivalent)
-- [Suggested order of work](#suggested-order-of-work)
+- [Where STREAM.jl is ahead](#where-streamjl-is-ahead)
 
-## Scenario readiness
+## Where things stand
 
-| Scenario | Can Python do it? | Can STREAM.jl do it? | What blocks us |
+| Case | Python | STREAM.jl | What is missing |
 |---|---|---|---|
-| **LOFA** (loss of flow) | Yes, one channel type | Yes | Decay heat is in, through the `power_input` split ([1.1](#11-decay-heat), [1.2](#12-prompttotal-power-split-in-pointkinetics-done)). The forced-to-natural-circulation transition runs end to end and is tested against a derived buoyancy-against-friction balance |
-| **RIA** (reactivity insertion) | Yes | Partly | Decay heat matters less here, but cylindrical fuel, gap conductance and fuel-temperature limits are all absent |
-| **LOCA**, level tracking to uncovery | **No** | Partly | Needs coolant inventory, a free surface and break flow. No two-phase model required ([4](#4-loca-level-tracking-and-where-it-stops)) |
-| **LOCA**, past uncovery | **No** | **No** | Void, steam, post-CHF heat transfer. Out of scope for both, by choice |
+| Steady margins, plate fuel | Yes | Yes | Only the plain Saha-Zuber form ([4](#4-thresholds)) |
+| LOFA | Partly, see below | Yes | Nothing |
+| RIA, plate fuel | Yes | Partly | Axial conduction and a clad plate ([2](#2-fuel-heat-conduction)), the blister limit ([4](#4-thresholds)) |
+| RIA, rod fuel | Yes | No | Cylindrical conduction and gap conductance ([2](#2-fuel-heat-conduction)), fuel enthalpy ([4](#4-thresholds)) |
+| LOCA to core uncovery | On `stream-next` | No | Tanks, breaks and the level they set ([1](#1-loss-of-coolant-to-core-uncovery)) |
+| LOCA past uncovery | No | No | Out of scope for both, by choice |
 
-The LOFA cell is qualified because that is where Python's reach ends. Loops with a single
-channel type are solid; the cases with different channels in parallel are where it got stuck.
-That limit is the implementation's, not the physics'. `Connect.weighted` is Python's junction
-`weights` (`flow_edge(..., signify=N)`), so one representative channel can stand for `N`
-identical ones.
+LOFA is where Python `main` runs short. Its own benchmark on `stream-next`, run against
+v1.1.2, needed hand workarounds throughout: a ballpark steady guess crashed the solver, the
+flapper opened at whichever output time first saw the crossing, a tight tolerance stalled for
+over 20 minutes, a realistic power with a scram died at 15.9 s, and a four-channel case died at
+89.6 s. One channel type with a careful guess was what worked. `stream-next` fixes those.
 
-The LOCA split is the one worth internalising. Both codes are single-phase liquid with
-subcooled-boiling *heat transfer enhancement* and thresholds that report margin. That is
-enough to track a level down to core uncovery and say when the model leaves its own validity,
-which is the goal here. It is not enough to say what happens after, and neither code tries:
-grepping the whole Python tree for `void`, `quality`, `two_phase`, `choked`, `film_boiling`,
-`rewet` and `radiation` returns nothing outside one prose sentence in a docstring.
+Here several assembly types in parallel run on `Connect.weighted`, Python's junction
+`signify=N`, and the pool LOFA example on the `lofa` branch takes two of them through the
+pump trip, the scram, the flapper opening and flow reversal into natural circulation, with
+every event at its exact instant.
+
+Both codes are single-phase liquid with subcooled-boiling heat transfer and thresholds that
+report margin. That is enough to follow a pool level down to core uncovery and say when the
+model leaves its own validity. It is not enough for what comes after: void, steam properties,
+two-phase friction, post-CHF heat transfer, radiation, rewet and metal-water reaction. Neither
+code has any of those, and neither should grow them casually.
+
+## In review
+
+**#34** ports `stream-next`'s correlation fixes and a mixed-convection change. When it merges,
+delete this section and move its items to the lists below:
+
+- Local-loss Reynolds number on the diameter, not the radius
+- Sudo-Kaminaga reading the inlet at the end the flow enters
+- Bilinear inertia floored above zero, so a coastdown can reach zero flow
+- `solve_steady` and `solve_transient` throwing on a failed return code
+- Elenbaas on `|Ra|`, turbulent friction floored by `64/Re`, Shah and London's table for the
+  developing-laminar Nusselt number, and the H₂O cₚ and D₂O μ fits held short of their poles
+- Forced and natural convection combined by Churchill's rule, with the minus sign where
+  buoyancy opposes the flow, which Python does not take. That becomes a deliberate departure.
 
 ---
 
-## 1. Power and heat sources
+## What remains
 
-### 1.1 Decay heat
+In order of what it unblocks.
 
-`src/decay_heat/` ports Python's `physical_models/decay_heat/` one file at a time. Every
-contribution answers `model(t, T)`, with `t` seconds after shutdown and `T` seconds of
-operation before it, and returns MeV per fission event, or a dimensionless profile where the
-caller supplies the energy per event:
+### 1. Loss of coolant to core uncovery
 
-| Python module | STREAM.jl | Status |
+The goal is the pool level through a drain, up to core uncovery, with the thresholds reporting
+margin on the way and the run stopping where the model leaves its validity. Python has this on
+`stream-next`: a free-surface network, `Tank`, `Environment`, an `Orifice` break with opening
+ramps and a latching closure for siphon breakers, level-fed heads, single-phase discharge
+coefficients with closed-form drain time and level, and a post-run cavitation check.
+
+MTK makes most of Python's machinery unnecessary. Python had to teach its network solver about
+free-surface nodes, since every node there conserved mass. Here a component whose volume is a
+state simply is one. What to build:
+
+| Piece | What it does | Lines |
 |---|---|---|
-| `fission_products.py` | `DecayHeat.FissionProducts` | Ported, reading the same CSV tables |
-| `actinides.py` | `DecayHeat.U238CaptureChain` | Ported |
-| `activation.py` | `DecayHeat.Activation`, `DecayHeat.DoubleDecay` | Ported |
-| `fissions.py` `profile` | `DecayHeat.Fissions` | Ported, over our `PointKinetics` |
-| `fissions.py` `profile_from_pk` | none | Not ported, see below |
+| `Tank` | Ports at given elevations, volume and mixed temperature as states. Each port's pressure is the surface pressure plus the head above it, which also covers Python's `LevelHead` | 60–80 |
+| `Environment` | One port at a fixed pressure and temperature, the sink a break drains into | 15–20 |
+| `Orifice` | A discharge law scaled by an opening read from a `StateSchedule`, as `Flapper` is. The law needs `sign(Δp)·sqrt(abs(Δp))` smoothed near zero, as Python's `mdot_by_local_pressure_smooth` does | 40–50 |
+| Discharge correlations | `discharge_cd`, `lichtarowicz_cd`, stub discharge, `drain_time`, `drain_level`, in `LocalLoss` | 50–70 |
+| Cavitation check | Where a port or a break throat falls below saturation pressure, after the run | 30–40 |
+| Pool example | The network as a builder in `Examples` | 50–80 |
 
-`test/test_decay_heat.jl` reproduces the Python doctest values and both of its property
-tests, with one exception that is a data problem rather than a porting one: the doctest at
-`fission_products.py:75` expects 6.728% of 200 MeV at shutdown, and the ANS-5.1-2014 table
-we have is rounded to three significant figures and gives 6.720%. The README beside the CSVs
-records this and says not to adjust the data, so we anchor on the table instead and the
-mismatch stays until a full-precision ANS-5.1 table turns up.
+The events are `StateMachine` transitions: the break opening, a siphon breaker closing, and the
+level reaching the top of the core as an abort state.
 
-Contributions add through `+`, so `sum([fp, act])` is the total of the docs' equation FDH,
-and `Q * model` weights one by an energy per event or a fission rate. Python leaves both of
-those to the caller.
+Two design points. A tank's level is the integral of its net flow, so a steady state is
+singular unless the level is pinned, as Python pins it; `Tank(; fixed_level=true)` makes the
+volume a parameter for the steady solve. And the tank surface becomes the loop's absolute
+pressure, replacing the hand-written `pump.inlet.p ~ 1.0e5` every example carries today.
 
-Three deliberate departures. The standards tables are not distributed with this package,
-since they cannot be redistributed and now live in `DecayHeatStandards`; point
-`DecayHeat.standards_dir!` at a directory holding them or pass `dir=`, and the testsets that
-need one skip when `STREAM_DECAY_HEAT_STANDARDS` is unset. And `profile_from_pk` is not
-ported: it does not run in Python either, because it forwards an `input_reactivity_func`
-keyword that neither `profile` nor `PointKinetics` accepts.
+Python's own checks make good targets: a gravity drain matched to 7.6e-5 m over 3000 s, the
+closed-form drain time to 0.001%, and its benchmark pool draining 5948 kg to uncovery at
+2740.6 s with mass closure of 6e-7.
 
-The third is a physics choice rather than a packaging one, so it is the one to look at.
-`DecayHeat.Fissions` interpolates its samples **logarithmically**, where Python uses
-`numpy.interp` and joins them with a straight line. The profile is a sum of decaying
-exponentials, so a straight line always overshoots. Measured against a grid eight times
-finer, on a -0.005 step sampled over 100 s at 50 points, the straight line is off by up to
-12% past the first interval where the log form is off by 3.6%, and past the fifth interval
-3.2% against 0.29%. On a single exponential the log form is exact. `Linear()` restores the
-Python behaviour and is what a parity check should pass.
+**Size:** about 250 to 350 source lines and a week, plus up to three days matching Python's
+benchmark timings.
 
-Worth knowing alongside it: neither mode saves a grid too coarse for the prompt drop. Under
-that same insertion the first 2 s interval falls by a factor of about 10, and both modes are
-then wrong by over 100% inside it. That is a sampling problem, and the fix is a denser or
-log-spaced `times` near shutdown, not a better interpolant.
+### 2. Fuel heat conduction
 
-The wiring landed with §1.2. `DecayHeat.DecayHeatSource` converts a contribution into the
-`power_input` a `PointKinetics` takes, applying the fission rate `Φ = P0/Q` and reading the
-trip time off the `StateMachine`, and `build_loop_pk` couples the plate to `P`.
-`test_decay_heat.jl` scrams a loop and shows the prompt power falling to 1e-9 of rated while
-the total holds at the decay level and the fuel stays above inlet, against the same trip with
-no source where it relaxes to the coolant.
+`HeatDiffusion` is one kernel: 2D Cartesian, one material, a uniform mesh, no interface
+resistance and no axial conduction. Python's `Fuel` has all of these:
 
-Not ported and not planned, matching Python: neutron captures in fission products (the
-ANS-5.1 G factor), which Python's own docs mark as a TODO.
-
-### 1.2 Prompt/total power split in `PointKinetics`, done
-
-`PointKinetics` takes a `power_input`, a `Real` or a callable of time, and exposes
-`P ~ P_neutron + power_input`. `P` is the total, Python's `power`, and what fuel couples to.
-`P_neutron` is the power the kinetics integrate, Python's `pk_power`. Any external source
-fits, not only decay heat: gamma deposition in the reflector, pump heat.
-
-Two departures from Python, both in our favour. Python makes the row a genuine algebraic
-constraint and the system a DAE, by way of a `False` in `mass_vector`. MTK tears the row out
-instead, so `P` becomes an observable and the compiled state count is unchanged at `1 + G`.
-And the split is optional: with no `power_input` the equation is `P ~ P_neutron` and
-nothing anywhere else has to change, where Python needs a separate `PointKineticsWInput`
-class.
-
-`point_kinetics_steady_state(P0; power_input)` matches Python: `P0` is the total, and the
-precursors are seeded from the neutronic share `P0 - power_input`, since a decaying fission
-product breeds no delayed neutrons.
-
-A power trip is a `StateMachine` transition, so it watches `P_neutron` or the total `P`
-alike: the condition is compiled like any other expression of the system. `P_neutron` is
-usually the physics wanted, since a power-range monitor reads neutron flux.
-
----
-
-## 2. Fuel heat conduction
-
-This is where the "cylindrical and MTR" ambition runs into the most missing code.
-`src/components/heat_diffusion.jl` is a single kernel: 2D Cartesian, uniform material,
-uniform mesh, no interface resistance, no axial conduction.
-
-### 2.1 No cylindrical geometry
-
-Python's `Fuel` takes a `heat_func` kwarg and ships four kernels:
-
-| Kernel | Geometry |
-|---|---|
-| `x_diffusion` | 1D Cartesian (plate, lateral only) |
-| `xz_diffusion` | 2D Cartesian (plate, lateral and axial) |
-| `r_diffusion` | 1D cylindrical (rod, radial only) |
-| `rz_diffusion` | 2D cylindrical (rod, radial and axial), azimuthally symmetric |
-
-plus `generic_2d_diffusion` behind them and `cylindrical_areas_volumes` for the radial
-metric. We have the equivalent of `x_diffusion` only.
-
-**No cylindrical fuel means no rod-type core.** This is the single largest structural gap
-against the stated goal.
-
-**Size:** medium. The radial kernel differs from the Cartesian one by the face areas and
-cell volumes, which `cylindrical_areas_volumes` already spells out. The work is refactoring
-`_diffusion_eqs` so the metric is a parameter rather than baked in.
-
-### 2.2 No axial conduction
-
-Our bulk equation is
-
-```julia
-D(T[i, j]) ~ k_s * (T[i, j+1] - 2*T[i, j] + T[i, j-1]) / (dx^2 * rho_s * cp_s) + q_vol[i, j]
-```
-
-Only `j±1` appears. There is no `i±1` term anywhere in `_diffusion_eqs`, so axial slices are
-thermally independent and heat cannot spread along the plate. Python's `xz_diffusion` and
-`rz_diffusion` both carry it.
-
-For a steady axial cosine this changes little. It matters where an axial gradient is sharp:
-the ends of the heated length, a partially inserted control rod, and the leading edge of a
-quench front if we ever get there.
-
-**Size:** small. One more difference term and the `z_contacts` faces.
-
-### 2.3 Uniform material only, so no cladding
-
-`HeatDiffusion` takes scalar `rho_s`, `cp_s`, `k_s`. Python's `Solid` has a `from_array`
-constructor that produces per-cell arrays of all three, and `Fuel` takes `meat_indices` to
-mark which cells are fuel and which are cladding. Together with `x_boundaries(clad_N,
-fuel_N, clad_w, meat_w)`, which builds a clad/meat/clad mesh, that is a layered plate.
-
-We cannot represent a clad plate at all. Everything is one material.
-
-**Size:** small to medium. Making the three properties per-cell arrays is mechanical; the
-knock-on is that face conductivities need a harmonic mean between neighbouring cells rather
-than a shared scalar.
-
-### 2.4 Uniform mesh only
-
-`dx = Lx / nx`, `dz = Lz / nz`. Python takes `x_boundaries` and `z_boundaries` arrays, which
-is what lets it put fine cells in the cladding and coarse ones in the meat. Needed by 2.3 to
-be useful, and needed on its own for rods, where the radial temperature profile is steepest
-at the centre.
-
-**Size:** small, and best done at the same time as 2.3.
-
-### 2.5 No contact or gap conductance
-
-Python's `_resistances(dr, contacts, k)` builds each face resistance as `dr/(2k) + 1/h_contact`,
-with `x_contacts` and `z_contacts` supplied per face. That is fuel-to-clad gap conductance.
-
-We have pure conduction between cells and a bare half-cell to the boundary. For plate fuel
-with a metallurgical bond, that is defensible. For rod fuel it is not: the pellet-clad gap
-usually dominates the whole thermal resistance, and in an RIA the gap closing as the pellet
-expands is a first-order effect on peak fuel temperature.
-
-**Size:** small once 2.4 exists, and a prerequisite for taking rod RIA results seriously.
-
----
-
-## 3. Wall friction and pressure drop
-
-### 3.1 Missing hydraulic components
-
-| Python | What it is | Have it? |
+| Missing | Python | Why it matters |
 |---|---|---|
-| `RegimeDependentFriction` (resistor) | Standalone regime-switching friction resistor | Yes, as `Components.FrictionResistor(; darcy=Friction.RegimeDependent(...))` |
-| `ResistorMul` | Scale a resistor's pressure drop | No, and deliberately |
-| `Inertia.bilinear` | Flow-dependent inertia, `L0·(ṁ/ṁ0)` below a knee | Yes, `bilinear_inertia` |
-| `ResistorSum` | Add resistors into one component | No, `inseries` covers the composition |
-| `Bend` | Idelchik ch. 6 diagram 6.1 bend loss, angle and relative curvature and Re | No |
-| `Screen` | Idelchik p. 598 circular wire mesh screen | No |
-| `ResistorFromKnownPoint` | Build a constant/linear/parabolic resistor from one known `(ΔP, ṁ)` point | Yes |
-| `bend_factor` | The bare Idelchik bend correlation | No |
+| Cylindrical geometry | `r_diffusion`, `rz_diffusion`, `cylindrical_areas_volumes` | No rod fuel at all without it, the largest gap against the stated goal |
+| Axial conduction | `xz_diffusion`, `rz_diffusion` | Our slices are thermally independent. It matters at the ends of the heated length and near a partly inserted rod |
+| Per-cell material | `Solid.from_array`, `meat_indices`, `x_boundaries(clad_N, fuel_N, ...)` | A clad plate cannot be represented. Face conductivities need a harmonic mean |
+| Non-uniform mesh | `x_boundaries`, `z_boundaries` | Fine cells in the cladding, and at a rod's centre where the radial profile is steepest |
+| Contact conductance | `_resistances(dr, contacts, k)` | The pellet-clad gap dominates a rod's thermal resistance, and its closing is first-order in an RIA |
 
-The Idelchik local losses we do have (`expansion`, `contraction`) match.
+Do them as one rework of `_diffusion_eqs`, with the metric, material and mesh as parameters,
+rather than touching it five times.
 
-Three notes on the decisions behind that table.
+**Size:** medium. The radial metric is spelled out in `cylindrical_areas_volumes`, and the rest
+is mechanical once the kernel takes arrays.
 
-**Regime-dependent friction is a friction model, not a new component type.** Python needs a
-separate class because it has no dispatch story for the friction factor. We do, so
-`Components.FrictionResistor` takes any `AbstractDarcyFactor` and the regime-switching
-resistor is `FrictionResistor(; geometry, darcy=Friction.RegimeDependent(...))`. The component
-takes a `PipeGeometry` rather than loose `L`/`D`/`A`, because the viscosity correction needs
-the heated and wetted perimeters that `L`/`D`/`A` cannot supply. It had no test coverage at all
-before this; it does now.
+### 3. Saturation stop and range checks
 
-**Scaling is composition, not a parameter.** `ResistorMul` wraps a resistor and multiplies its
-`dp_out`. A `scale` parameter on each resistor was tried here and taken back out: MTK
-components are systems rather than values, and three identical resistors through `inseries`
-already are three times the resistance, with no second knob to keep consistent with the first.
-`test/test_darcy.jl` asserts exactly that, that three 2·10⁴ resistors in series give the same
-flow as one 6·10⁴ resistor. Trimming a calibrated resistor means changing its own coefficient,
-which `remake` reaches like any other parameter: `remake(prob; p=[ssys.r1.R => 6.0e4])`.
+The channel model ends at bulk saturation, and nothing says so during a run. `stream-next` adds:
 
-**Inertia takes a callable.** `Inertia(L)` accepts either a number or `(ṁ) -> L/A`, with
-`bilinear_inertia(L0, ṁ0)` as the standard flow-dependent form. Because it is traced
-symbolically the knee is an `ifelse` on `abs(ṁ)`, so a reversal behaves like forward flow.
-The callable form carries one extra variable, `L_eff`, for the effective inertia.
+- An opt-in stop at bulk saturation. Here that is one abort transition per channel on
+  `T_sat − T_bulk`, with `T_sat` already at the static pressure.
+- Post-run saturation crossings, first crossing, and raise-on-crossing.
+- Declared validity ranges per coolant, 0.1 to 350 °C for H₂O and 3.8 to 300 °C for D₂O,
+  and a report of any state outside them. This matters more here than in Python, because our
+  property fits fold their argument through `abs`, which hides a value out of range instead of
+  producing NaN.
 
-**Remaining:** `Bend`, `Screen` and `bend_factor`, all postponed. Each is small and
-independent. `ResistorFromKnownPoint` is in. It is how a loop is calibrated against a
-measured operating point, which is the usual way a research reactor model gets its form
-losses.
+**Size:** 100 to 130 lines, in `src/thresholds/analysis.jl` beside `threshold_analysis`.
 
----
+### 4. Thresholds
 
-## 4. LOCA: level tracking, and where it stops
+- **The plain Saha-Zuber form.** We have only the computed-bulk one. Python puts a
+  `.. danger::` on the plain form and says you probably want the other, so this is for
+  completeness. Trivial.
+- **RIA limits.** Peak cladding temperature and DNBR are there, through `twall_limit` and
+  `chfr`. The blister temperature for aluminide and silicide plates is not, nor is a fuel
+  enthalpy accumulator, the standard rod-fuel criterion, which needs the cylindrical kernel
+  first. Python has neither. Small, after §2.
+- **`heated_diameter`**, `4·area/heated_perimeter` on the geometry. Python computes it and
+  never reads it. Trivial.
 
-The goal here is narrower than "run a LOCA": predict **water level** through a drain, up to
-the point where more involved computations take over. That is a different and much smaller
-problem than two-phase thermal-hydraulics, and it is worth stating the boundary precisely,
-because the two get conflated.
+### 5. Power shapes
 
-### What the narrow goal needs
+`Utilities.cosine_shape` ports Python's, with a non-uniform mesh, cell integration, a peaking
+factor and an off-centre peak. Still missing: `cosine_shape_by_zero_endpoints`, the
+extrapolated cosine with non-zero flux at the ends that a reflected core has, and
+`uniform_x_power_shape` for the lateral direction across clad and meat. Small, pure functions.
 
-| Piece | Have it? |
-|---|---|
-| Coolant inventory as a state, and a level derived from it | No |
-| A component with a free surface (pool, plenum, standpipe) | No |
-| Break flow out of the system, as a specified rate or an orifice | No |
-| An event that fires when the level reaches a named elevation | No, but a `StateMachine` transition on the level is the pattern to copy |
-| Decay heat, to know the load while it drains | Yes, see [1.1](#11-decay-heat) |
-| Natural circulation while still covered | Yes |
-| Margin to boiling on the way down | Yes, the CHF / OFI / OSV / ONB thresholds |
+### 6. Hydraulic components
 
-None of that requires void fraction, steam properties or a two-phase momentum equation. A
-draining single-phase pool with a moving free surface is an inventory balance plus a
-geometric level, and the existing acausal connectors already carry the mass flow it needs.
+`Bend`, `Screen` and `bend_factor`, the Idelchik bend and wire-mesh screen losses. Each is
+small and independent.
 
-**Size:** medium, and mostly new components rather than new physics. The one real modelling
-decision is whether break flow is user-supplied (a boundary condition, which is enough for a
-specified-leak study) or computed from an orifice, which brings in choked flow once the
-break is large.
-
-### Where it stops
-
-The handoff is core uncovery. Once liquid level drops below the top of the heated length the
-single-phase assumption stops holding, and everything in this list starts to matter:
-
-- Void fraction and flow quality
-- Steam properties and a two-phase mixture density
-- Two-phase friction multiplier
-- Post-CHF heat transfer: transition boiling, film boiling, the boiling curve past its peak
-- Radiation from an uncovered surface
-- Rewet and quench front propagation
-- Metal-water reaction (aluminium for MTR plates, zircaloy for rods)
-
-**Neither STREAM.jl nor Python STREAM has any of it**, and neither should grow it casually.
-Grepping the whole Python tree for `void`, `quality`, `two_phase`, `choked`, `film_boiling`,
-`rewet` and `radiation` returns nothing outside one prose sentence.
-
-So the deliverable is a level history plus the time and elevation at which the model declares
-itself out of validity, with the thresholds reporting margin along the way. That is a useful
-answer on its own, and it is the right input to hand to a code that does the rest.
-
-**Recommendation:** build the level tracking, and make the uncovery point an explicit,
-tested boundary rather than something a user discovers by getting nonsense out. Do not start
-a two-phase model to reach it.
-
----
-
-## 5. Thresholds and post-solve analysis
-
-The correlation inventory matches: CHF (Sudo-Kaminaga, Mirshak, Fabrega), OFI
-(Whittle-Forgan), OSV (Saha-Zuber), ONB (Bergles-Rohsenow), boiling power, and the wall
-temperature limit are all present and cross-validated.
-
-### 5.1 Missing the plain Saha-Zuber form
-
-Python has both `Saha_Zuber_OSV(T_bulk, coolant, u, Dh)` and
-`Saha_Zuber_OSV_computed_bulk(...)`. We have only the computed-bulk one. Python's own
-docstring puts a `.. danger::` on the plain form and says you probably want the other, so
-this is a completeness item rather than a correctness one.
-
-**Size:** trivial.
-
-### 5.2 No RIA-specific limits
-
-For an MTR plate, the acceptance criteria in an RIA are usually peak cladding temperature,
-DNBR, and the fuel blister threshold for aluminide or silicide fuel. We have the first two
-through `twall_limit` and `chfr`. Blister temperature is absent, as is any fuel enthalpy
-accumulator, and Python has neither.
-
-Fuel enthalpy in cal/g is the standard rod-fuel RIA criterion and would need the cylindrical
-kernel from [2.1](#21-no-cylindrical-geometry) to be meaningful.
-
-**Size:** small in itself, but only useful after §2.
-
-### 5.3 `heated_diameter` not carried on the geometry
-
-Python's `EffectivePipe` computes `heated_diameter = 4·area/heated_perimeter`. Ours does
-not. Python never reads it either, so this is bookkeeping.
-
-**Size:** trivial.
-
-### 5.4 Margins over a transient: fixed
-
-`ChannelState` used to stack a transient into `[cell, time]` matrices but read `ṁ` and
-`T_inlet` at the first saved time only, and Sudo-Kaminaga and Whittle-Forgan then took the
-first column of their matrices. Sudo-Kaminaga, Fabrega, OFI, OSV and boiling onset therefore
-reported their `t = 0` value across a whole transient, which in a loss of flow is exactly
-where they should move. Nothing called that path and nothing tested it.
-
-A `ChannelState` now describes one instant, `ChannelState(sol, ch; index=k)` for a transient,
-and `threshold_analysis` builds one at every saved time. `test_thresholds.jl` checks each
-slice against a state built at that instant and that the flow-dependent limits follow a
-coasting flow down.
-
-Bergles-Rohsenow had a second defect. After a scram the coolant rising through the core can
-run hotter than parts of the plate, the wall flux goes negative, and the correlation raised
-a negative number to a fractional power. On a `ChannelState` it now reports no onset (`Inf`)
-wherever the wall is not heating the coolant, as `chfr` already did.
-
-### 5.5 Reading a channel the way Python's analysis wrappers do: fixed
-
-Python's `stream.analysis.thresholds` wrappers and our `ChannelState` methods were fed the
-same channel state and compared. Six correlations agreed to rounding. These did not, and now
-match Python:
-
-- `T_inlet` was the channel's `inlet.T`, which the channel sets to its first cell. That is
-  one cell's heating too warm in forward flow and the hot end under reversal, where OFI and
-  boiling power went negative. Channels now carry `T_in`, the coolant entering at whichever
-  end is upstream, and `ChannelState` reads it, as Python reads its `T_in`.
-- OSV took saturation at a fixed 1 bar, a uniform flux and properties at the inlet, and
-  returned one number. It now takes each cell's saturation and properties and the face flux,
-  accumulates from the upstream end, and returns a value per cell. On an MTR channel at
-  1.7 bar the old form overstated the limit by about 11%.
-- Boiling power took `cₚ` per cell instead of at the inlet.
-- Mirshak took the speed. Python takes the signed velocity, which lowers the limit under
-  reversed flow, and so do we now.
-- Bergles-Rohsenow lacked Python's face choice.
-- `ChannelState` and `threshold_analysis` defaulted gravity to 9.81 rather than `G_EARTH`.
-
-Saturation was the last difference, and there Python was right. The pressure a port carries
-is the total pressure, static plus the dynamic head `ρv²/2`: that is what makes equal
-pressures at a junction lose the velocity head into a narrower part, and what the Idelchik
-losses are losses of. Saturation depends on the static pressure, so the head has to come off
-first. Python did that and we did not, which put our saturation temperature about 0.4 K high
-in an MTR channel at 2 m/s. A channel's `P` is now the static pressure, and both its `T_sat`
-and the subcooled-boiling heat transfer inside the solve read it. Where along the cell to read
-it has no single right answer, so we take each cell's outlet-side face, as Python does.
-
----
-
-## 6. Power shapes and meshing
-
-Our `cosine_power_shape(nz, nx; amplitude)` samples `cos²` at cell centres, zero at both
-ends, uniform mesh, not normalised.
-
-Python's `cosine_shape(x, ppf, xmax)` is more general in four ways that all matter for a hot
-channel calculation:
-
-1. Takes arbitrary cell **boundaries**, so it works on a non-uniform mesh
-2. **Integrates** the profile over each cell instead of sampling the centre, which conserves
-   total power as the mesh coarsens
-3. Takes a **power peaking factor**, defaulting to π/2
-4. Lets the peak sit **off centre**, for a partially inserted control rod
-
-Plus `cosine_shape_by_zero_endpoints(xi, xe, x)`, the extrapolated cosine with non-zero flux
-at the ends, which is what a reflected core actually looks like, and `uniform_x_power_shape`
-for the lateral direction across clad and meat.
-
-Since the axial peaking factor sets the hot spot, and the hot spot sets every threshold
-margin, this is more load-bearing than it looks.
-
-`Utilities.cosine_shape` now ports Python's `cosine_shape` with all four of those. Still
-missing: `cosine_shape_by_zero_endpoints` and `uniform_x_power_shape`.
-
-**Size:** small. Pure functions, no MTK involvement.
-
----
-
-## 7. Solver robustness
-
-### 7.1 No sign constraints on the solve
-
-Python passes IDA a constraint array built by `create_constraints(agr, default_sign, ...)`,
-which can mark any variable `positive`, `non_negative`, `non_positive` or `negative`. It
-defaults every variable to `CONSTRAINT.none` and makes each constraint an explicit per-variable
-opt-in. The Julia equivalent is `isoutofdomain` on the OrdinaryDiffEq solve, which rejects a
-step whose state leaves a user-defined domain. We do not use it anywhere.
-
-**This must never be applied to the mass flow rate.** In a reactor whose normal flow is
-downward, a LOFA reverses the heated channel: once the pump stops, buoyancy carries the flow
-upward and ṁ genuinely changes sign. That reversal is the result we are trying to compute,
-not a numerical artifact, and `test_examples.jl` asserts it directly in the testset named
-"channel flow reversal (ṁ crosses zero)". Constraining ṁ would forbid the physics.
-
-The quantities worth constraining are the ones with no physical negative branch: absolute
-pressure, heat transfer coefficients, densities, and void fraction bounded to `[0, 1]` if a
-two-phase model ever arrives. Temperatures do not qualify while we are in Celsius.
-
-**Size:** small, but narrow in value. Not a priority on its own.
-
-### 7.2 The forced-flow root is reached by a hand-written guess
-
-The pump-on steady state has two roots. There is the forced-flow one, and there is always the
-trivial one at ṁ = 0, where the friction drop and the buoyancy drop both vanish and every
-equation balances. `solve_steady` returns whichever the guess sits nearest, so picking the
-right one is an initialisation problem rather than a solver setting. Python STREAM has the same
-two roots, so this is a property of the model.
-
-`_lof_bypass_ic` in `test/test_examples.jl` gets there, and the shape of what it does is right:
-hold the pump head at its pre-trip value with the flapper latched closed, solve, then integrate
-from that state while the head ramps down. The initial condition is a true steady state and the
-head is continuous at t = 0.
-
-What is brittle is how it lands in the forced-flow basin. The guess is a hand-written map
-naming `heated.ch.inlet.ṁ`, its dummy derivative, `ext_res.inlet.ṁ` and `ine.outlet.p`,
-assembled by reading off which variables survived `mtkcompile`. The comments there record the
-failure mode: seeding only the observed aliases dropped one package set onto ṁ = 0. Anything
-that changes what simplification keeps invalidates the list, and nothing warns you.
-
-Continuation would remove the guesswork. Solve once with `R_ext` low enough, or the flapper
-open, that the trivial root does not exist, then walk the parameter back to its real value
-using each solution as the guess for the next. The guess then comes from a previous solve
-rather than from naming variables.
-
-`uniform(systems, value, variables...)` covers Python's `State.uniform`: one value for the
-same variable across many subsystems, spliced into an operating point. It shortens a guess,
-it does not decide which root you land on.
-
-**Size:** small. Nothing fails because of it today; it is a maintenance cost that lands on
-whoever next changes a channel equation.
-
----
-
-## 8. Uncertainty quantification
-
-Python has `analysis/UQ/` with:
-
-- `UQModel`, finite-difference Jacobians of solution values against input parameters, with a
-  configurable perturbation step strategy
-- `DASKUQModel`, the same thing distributed
-- `Uncertainty`, propagation and combination of uncertainties
-- `local_power_shift`, a purpose-built power-shape perturbation
-- uncertainty factors on the threshold wrappers: `onb_factor` on the Bergles-Rohsenow
-  superheat, and `inhomogeneity_factor` on the local flux for ONB and OSV
-
-We have nothing. Our `@design_knob` machinery is the closest thing, and it solves the
-adjacent problem of re-solving under a changed design parameter rather than propagating an
-uncertainty.
-
-Worth noting that Julia has a better answer available than finite differences:
-SciMLSensitivity gives forward and adjoint sensitivities of an ODE/DAE solution with respect
-to parameters, at a fraction of the cost and without step-size tuning. If UQ becomes a
-requirement, that is the route, not a port.
-
-To be precise about what that buys, since it decides whether it is usable for a regulatory
-submission: those are **local, first-order** sensitivities, the derivative of a solution value
-with respect to a parameter at one operating point, obtained from AD-generated Jacobians rather
-than from a perturbation step. That is exactly the input a first-order uncertainty propagation
-needs, and it is more accurate than Python's finite differences because there is no step size
-to choose. It is not a global method: for variance attribution over a parameter range, that
-takes sampling on top, which is what `GlobalSensitivity.jl` is for.
-
-**Size:** medium, and probably a different design from Python's.
-
-### 8.1 The control state sits outside the problem
-
-A `StateMachine` keeps its state, entry time and log in a Julia object rather than in the ODE
-problem. That makes trip times exact and lets you read or trip a machine by hand, at two costs:
-
-- **A machine remembers the last run.** Another run through `remake` needs `reset!(machine)`
-  first, and runs in parallel, as an `EnsembleProblem` would do them, need a machine each.
-- **Sensitivities come out wrong, with no error.** The trip time is a plain number the event
-  writes, outside anything automatic differentiation follows, so a derivative with respect
-  to a trip setpoint comes back as if the trip never moved.
-
-Both go away if the trip time becomes a parameter of the problem that the event writes. That
-gives up the plain object, so it waits until someone needs sensitivities.
-
----
-
-## 9. Reporting and debugging
+### 7. Debugging and drawing a model
 
 | Python | What it does | Have it? |
 |---|---|---|
-| `analysis/report.py` | Markdown and `rich` tables of every calculation's variables, flagging unset, missing and externally-set parameters | No |
-| `analysis/debugging.py` | `debug_derivatives`, `debug_guess_variables`, `debug_guess_flows` for inspecting a bad initial guess | No |
+| `analysis/report.py` | Tables of every calculation's variables, flagging unset and externally-set ones | No |
+| `analysis/debugging.py` | Inspecting a bad initial guess | No |
 | `Aggregator.draw` | Draws the calculation graph | No |
 
-MTK covers part of this differently: `unknowns`, `observed`, `equations` and
-`ModelingToolkit.check_consistency` give a lot of the same information, and our
-`test_determinacy.jl` already asserts equation and unknown balance for every builder. The
-gap that remains is the ergonomics of debugging a failed initialisation, which is currently
-the hardest thing to do in this codebase.
+MTK covers some of it: `unknowns`, `observed` and `equations` show what is being solved, and
+`test_determinacy.jl` checks every builder balances. What remains is making a failed
+initialisation easy to read, which is the hardest thing to debug in this codebase today, and
+drawing a model. For the drawing, `ModelingToolkitDesigner.jl` is the direct replacement for
+`Aggregator.draw` but pins MTK 8 and 9, so it needs a compat bump; `Latexify.jl` renders the
+equations; and a component graph from the connection vectors `inseries`, `inparallel` and
+`Connect.face` return needs nothing but `Graphs.jl`.
 
-Drawing the model is the other half, and it earns its keep twice: as documentation of what a
-builder actually wired, and as the fastest way to see a miswired connection. Three routes
-exist, none of which is work from scratch. Versions below are read off the packages, not from
-an install into this project.
+**Size:** small, and high value per line.
 
-- `ModelingToolkitDesigner.jl` (bradcarman, v1.4.0) is the direct replacement for
-  `Aggregator.draw`. It lays out an acausal MTK system as a connection diagram on a Makie
-  canvas, lets you drag the components, and saves the layout next to the model as TOML so the
-  picture survives a rebuild. Its `Project.toml` pins `ModelingToolkit = "8,9"` and the repo
-  was last touched in April 2025, so against our 11.26.8 it needs a compat bump upstream or a
-  fork. That is a version bound, not a design problem, which makes it the cheapest of the
-  three.
-- `Latexify.jl` over `equations(sys)` or `full_equations(ssys)` renders the equation system
-  itself. That covers the reporting half of `analysis/report.py` and needs nothing built.
-- `Graphs.jl` with `GraphMakie.jl` or `GraphPlot.jl`, one node per subsystem and one edge per
-  `connect`, built from the connection vectors `inseries`, `inparallel` and `Connect.face`
-  already return. Graphs is in the manifest transitively. Note that MTK 11 no longer ships the
-  `asgraph` and `eqeq_dependencies` helpers that 8 and 9 had, so the incidence-graph route
-  costs more than it used to; the component graph never needed them.
+### 8. Uncertainty quantification
 
-**Size:** small, high value per line.
+Python has `analysis/UQ/`: finite-difference Jacobians of solution values against input
+parameters, a distributed version, uncertainty propagation, a power-shape perturbation, and
+uncertainty factors on the threshold wrappers (`onb_factor` on the Bergles-Rohsenow superheat,
+`inhomogeneity_factor` on the local flux for ONB and OSV). We have none of it, apart from
+`twall_limit`'s `inhomogeneity_factor`.
+
+The Julia route is SciMLSensitivity rather than a port: forward and adjoint sensitivities from
+the AD Jacobians, with no step size to tune. Those are local, first-order derivatives at one
+operating point, which is what a first-order propagation needs; variance over a parameter range
+takes sampling on top, through `GlobalSensitivity.jl`.
+
+One thing stands in the way. A `StateMachine` keeps its state and trip time in a Julia object,
+outside the problem. So a second run with `remake` needs `reset!(machine)`, parallel runs need
+a machine each, and a derivative with respect to a trip setpoint comes back as if the trip
+never moved, with no error. Moving the trip time into the problem's parameters fixes all three.
+
+**Size:** medium, and a different design from Python's.
 
 ---
 
-## Where STREAM.jl is ahead
+## Not planned
 
-Everything above is what we are missing. This section is the other column: what the rewrite
-already buys that the Python code cannot, so that a decision about where to spend the next
-month has both sides of the ledger in front of it.
+- **`stream-next`'s solver-stability work**: residual smoothing, the globalised steady solve,
+  translated error codes, construction-time wiring checks. MTK root-finds events, NonlinearSolve
+  escalates from Newton to trust region to Levenberg-Marquardt, and `mtkcompile` rejects an
+  unbalanced system. Revisit the smoothing only if a tight-tolerance run stalls at a flow
+  reversal.
+- **`stream-next`'s steady-state guess toolkit.** Python built it because scipy's root finder
+  stalls from a poor guess. `solve_steady(...; solver=DynamicSS(Rodas5P()))` integrates to
+  where the model settles instead of jumping to the nearest root, so seeding the flows reaches
+  the forced-flow state of a LOFA model. The one trap: the flow unknowns `mtkcompile` keeps
+  must start away from zero. Started at zero, the solve stays there and fails.
+- **`stream.viz`**, plots of steady-state sweeps. Worth doing when parameter studies move here,
+  starting with its inverse query, the parameter value at which a quantity meets a limit.
+- **Sign constraints on the solve**, Python's `create_constraints`, as `isoutofdomain` here.
+  Low value, and never on ṁ: a LOFA reverses the heated channel, which is the result being
+  computed.
+- **`profile_from_pk`**, which does not run in Python either.
+- **Neutron capture in fission products**, the ANS-5.1 G factor, a TODO in Python too.
 
-- **Acausal composition.** Python hand-builds a flow graph, then a Kirchhoff calculation with
-  explicit KVL and KCL matrices (`build_kvl_matrix`, `build_kcl_matrix`, `kirchhoffify`,
-  `Junction`, `maximally_coupled`), roughly 800 lines of graph machinery. MTK's `connect`
-  does this structurally. Our `inseries` / `inparallel` / `compose_systems` are thin by
-  comparison because the compiler carries the weight.
-- **Symbolic Jacobians and index reduction.** Python has a hand-written `jacobians.py` and a
-  `mass_vector` per calculation. `mtkcompile` derives both, and it also lowers the index, tears
-  the algebraic loops and hands the integrator a sparsity pattern. The machine therefore does
-  less work per step on the same problem, and the saving grows with the model rather than
-  staying flat.
-- **The equation system can be read at any point.** `equations`, `unknowns`, `observed` and
-  `full_equations` print what is actually being solved, before and after simplification, with
-  no instrumentation. Python's `analysis/report.py` exists because that information had to be
-  assembled by hand.
-- **Design knobs.** `@design_knob` and `knob_defaults` let a geometric dimension stay
-  symbolic through the whole model so it can be changed by `remake` without rebuilding.
-  Python has no equivalent.
-- **The liquid interface.** `AbstractLiquid` with the nine properties, the `Liquid` snapshot,
-  the unicode aliases and the call-operator form `H2O(T, p)` is more ergonomic than Python's
-  `LiquidFuncs` dataclass of callables, and dispatches on coolant type.
-- **The `HTC` handle.** After the current work, our heat transfer model is a first-class
-  value with an explicit property basis. Python's is a function with the basis hard-coded per
-  branch.
-- **Transient threshold analysis.** `threshold_analysis` runs every correlation on the
-  channel state at each saved time and returns the whole `[cell, time]` result, as Python's
-  `transient_threshold_analysis` does. `worst_case` finds the smallest margin in one such
-  result, which is a convenience for a single run and nothing more: under uncertainty
-  quantification the worst cell and time move from sample to sample, so the reduction belongs
-  after the sampling, on the full results.
-- **Event handling.** SciML callbacks give us SCRAM and flapper events with proper root
-  finding. Python's `should_continue` / `change_state` polling is coarser.
-- **Less code for the same physics.** The two line counts at the top of this file are not a
-  fair comparison everywhere, but they are in the parts that overlap. Composition, the
-  Jacobians and the property interface are each a few hundred lines here against a few thousand
-  there, because the compiler and the type system carry them.
+## Deliberate departures from Python
+
+- **`DecayHeat.Fissions` interpolates logarithmically.** Python joins the samples with a
+  straight line, which always overshoots a sum of decaying exponentials: up to 12% past the
+  first interval of a coarse sampling, against 3.6% for the log form. `Linear()` restores
+  Python's behaviour for a parity check. Neither saves a grid too coarse for the prompt drop.
+- **The standards tables are not distributed.** They live in `DecayHeatStandards`, reached
+  through `DecayHeat.standards_dir!` or `STREAM_DECAY_HEAT_STANDARDS`.
+- **The power split is optional.** `PointKinetics(...; power_input)` gives `P ~ P_neutron +
+  power_input`, and MTK tears the row out, so the state count stays `1 + G`. Python needs a
+  separate `PointKineticsWInput` and a DAE row.
+- **Scaling a resistor is composition.** No `ResistorMul` or `ResistorSum`: three resistors in
+  `inseries` are three times the resistance, and a calibrated resistor's own coefficient is
+  reached through `remake`.
+- **The flapper always opens along the C1 ramp `3y² − 2y³`**, where Python defaults to its
+  legacy relaxation. The opening time is the same.
 
 ## Following Python where the physics is open
 
 Where the physics has one right answer we use it, whether or not Python does. Where it does
-not, we follow Python, so the two codes compare like for like and a model moves from one to
-the other without its results shifting. These are the places we follow Python on purpose.
-Revisit them once STREAM.jl stands on its own.
+not, we follow Python, so the two codes compare like for like. Revisit these once STREAM.jl
+stands on its own.
 
-- **Property temperatures in `HTC.RegimeDependent`.** Laminar and natural convection are read
-  at the bulk temperature and turbulent at the film, as Python's `regime_dependent_h_spl`
-  does. Textbooks put Dittus-Boelter at the bulk and natural convection at the film. Used on
-  its own, outside `RegimeDependent`, each model reads its properties where its own basis
-  says, which by default is the film, as Python's standalone functions do.
-- **Rohsenow's constants.** `HTC.rohsenow_scb_heat_flux` takes Python's `n = 1.26` and
-  `C_sf = 0.011`, and the exponent `1/0.33`. Textbooks give `n = 1.0` for water and pick
-  `C_sf` by surface. We could not trace Python's value to a source.
-- **Where along a cell saturation is read.** Each cell's outlet-side face, not its centre.
-  See [5.5](#55-reading-a-channel-the-way-pythons-analysis-wrappers-do-fixed).
+- **Property temperatures in `HTC.RegimeDependent`.** Laminar and natural convection at the
+  bulk, turbulent at the film, as Python's `regime_dependent_h_spl` does.
+- **Rohsenow's constants.** Python's `n = 1.26`, `C_sf = 0.011` and exponent `1/0.33`, which
+  we could not trace to a source. Textbooks give `n = 1.0` for water.
+- **Where along a cell saturation is read.** Each cell's outlet-side face.
 
-Names that differ from Python's: `HTC.rohsenow_scb_heat_flux` is Python's
-`Bergles_Rohsenhow_SCB_heat_flux`. The correlation is Rohsenow's (1952) pool boiling flux;
-Bergles and Rohsenow's (1964) contribution is the partial boiling factor,
-`HTC.partial_SCB_correction`, which matches Python's `Bergles_Rohsenhow_partial_SCB`.
+Names that differ: `HTC.rohsenow_scb_heat_flux` is Python's `Bergles_Rohsenhow_SCB_heat_flux`.
+The flux is Rohsenow's (1952); Bergles and Rohsenow's (1964) part is the partial boiling
+factor, `HTC.partial_SCB_correction`.
 
 ## Checked and equivalent
 
-Verified as matching, so they should not be re-investigated:
+Verified as matching, so they need not be re-investigated:
 
-- **Dimensionless numbers.** Re, Re_mdot, Pr, Nu, Pe, Gr, Ra, and the regime blend all match.
-- **Nusselt correlations.** Dittus-Boelter, Marco-Han, two-sided heating, Elenbaas, the
-  fully-developed and developing laminar forms, and the maximal combinator all match. Python
-  defaults to the same analytic developing-laminar approximation and uses its Shah and London
-  table only to bound that approximation's error.
-- **Friction correlations.** Laminar, turbulent (Colebrook-White), Blasius, the rectangular
-  laminar correction and the regime blend all match.
-- **Idelchik expansion and contraction losses.** Table nodes and high-Re limits match.
-- **The liquid property correlations.** H2O and D2O, all nine properties, cross-validated
-  against Python to the tolerances in `test_validation.jl`.
-- **The wall temperature interface.** Python computes it explicitly as
-  `wall_temperature(T_cool, T_clad, h_cool, h_clad)`. Our acausal `ThermalPort` connection
-  gives `h_cool·(T_w − T_cool) = k/(dx/2)·(T₁ − T_w)`, whose solution is the same expression
-  with `h_clad = k/(dx/2)`. Equivalent, derived rather than coded.
-- **Buoyancy-driven natural circulation.** Our per-cell momentum equation carries
-  `ρ(T[i])·g·dz` with the local density, so a density difference around a loop drives flow.
-  No separate model is needed.
-- **Channel variants.** `Channel`, `ChannelHeatFlux` and `ChannelAndContacts` map one to one
-  onto Python's.
-- **Pump modes.** Both constrain either Δp or ṁ, both accept a time-dependent value, neither
-  has a pump curve or a torque balance.
-- **Threshold correlations.** Listed in [5](#5-thresholds-and-post-solve-analysis).
-- **Geometry.** `PipeGeometry` matches `EffectivePipe` field for field except
-  `heated_diameter`, which Python computes and never uses.
-- **Flapper.** The open-state quadratic resistor matches: our
-  `ṁ_open = sign(P_in − P_out)·√(|ΔP|·2ρA²/f)` and Python's `−sign(dp)·√(…)` against its own
-  `dp = P_out − P_in` are the same formula, checked in both flow directions. One deliberate
-  difference: we always relax the opening through the C1 ramp `−2x³ + 3x²`, where Python
-  defaults to `legacy_relaxation` and opts into that shape per call. The open/closed binary and
-  the opening time are the same either way.
+- **Dimensionless numbers**, and the laminar-turbulent blend.
+- **Nusselt correlations**: Dittus-Boelter, Marco-Han, two-sided heating, Elenbaas, the fully
+  developed and developing laminar forms, the maximal combinator.
+- **Friction correlations**: laminar, Colebrook-White, Blasius, the rectangular laminar
+  correction, the regime blend.
+- **Idelchik expansion and contraction losses.**
+- **Liquid properties**, H₂O and D₂O, all nine, to the tolerances in `test_validation.jl`.
+- **Decay heat contributions**: fission products, the U-238 capture chain and activation,
+  against Python's doctests. The ANS-5.1 tables are now full precision, so the U-235
+  ANS-5.1-2014 sum at shutdown is 6.728% of 200 MeV, as Python's doctest expects.
+- **Threshold correlations and their channel-state wrappers**: CHF (Sudo-Kaminaga, Mirshak,
+  Fabrega), OFI, OSV, ONB, boiling power and the wall temperature limit, compared with Python's
+  `stream.analysis.thresholds` to 1e-9 in forward and reversed flow, and read at every saved
+  time of a transient.
+- **Saturation at the static pressure.** A port carries the total pressure; a channel's `P` is
+  static, and both `T_sat` and the subcooled boiling in the solve read it.
+- **The wall temperature interface.** Python's explicit `wall_temperature(T_cool, T_clad,
+  h_cool, h_clad)` is what our acausal `ThermalPort` connection solves to, with
+  `h_clad = k/(dx/2)`.
+- **Natural circulation.** Each cell's momentum equation carries `ρ(T[i])·g·dz`, so no
+  separate model is needed.
+- **Channel variants**, pump modes, geometry (bar `heated_diameter`), and the flapper's open
+  resistance in both flow directions.
+- **Several channel types in parallel**, through `Connect.weighted`, against Python's
+  `signify=50` junction.
 
-## Suggested order of work
+## Where STREAM.jl is ahead
 
-Ordered by what unblocks the most, not by size.
-
-1. ~~**Decay heat**~~ done (§1.1, §1.2), physics and wiring both.
-2. ~~**Friction as a `DarcyFactor`**~~ done, along with the regime-dependent friction
-   resistor and flow-dependent inertia (§3.1).
-3. **Continuation for the forced-flow steady solve** (§7.2). Not urgent, since nothing fails
-   for it, but it is what makes the loss-of-flow initial condition fragile against any change
-   to what `mtkcompile` keeps.
-4. **Heat conduction rework** (§2.1 to §2.5) as one piece: non-uniform mesh, per-cell
-   material, contact conductance, axial conduction, and the cylindrical metric. Doing these
-   separately means touching `_diffusion_eqs` five times. This is what opens rod fuel.
-5. **Power shapes** (§6). `cosine_shape` is in; the extrapolated cosine and the lateral
-   shape remain.
-6. **Missing hydraulic components** (§3.1). `ResistorFromKnownPoint` is in; `Bend` next.
-7. **Debugging ergonomics** (§9). High value per line, and the pain is felt on every failed
-   initialisation.
-8. **RIA limits** (§5.2), after §2 and §4 are settled.
-9. **UQ** (§8), if it becomes a requirement, via SciMLSensitivity rather than a port.
-10. **Level tracking to uncovery** (§4), which decay heat can now drive.
+- **Acausal composition.** Python builds a flow graph and then Kirchhoff matrices, about 800
+  lines of graph machinery. `connect` does it structurally.
+- **Symbolic Jacobians and index reduction.** Python hand-writes `jacobians.py` and a mass
+  vector per calculation. `mtkcompile` derives both, tears the algebraic loops and supplies a
+  sparsity pattern.
+- **The equations are readable**, before and after simplification, with `equations`,
+  `unknowns` and `observed`.
+- **Design knobs.** `@design_knob` keeps a dimension symbolic, so `remake` changes it without
+  a rebuild.
+- **Heat transfer and friction models are values** a channel is handed, and the heat transfer
+  ones carry an explicit property basis, where Python hard-codes the basis per branch.
+- **One state machine drives every control action**, with each transition root-found at its
+  exact instant. Python's `main` polls at output times; `stream-next` adds root-finding for the
+  trips that supply a margin function.

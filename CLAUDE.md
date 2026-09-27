@@ -209,8 +209,9 @@ test/
 
 ## Known gaps against Python STREAM
 
-`GAPS.md` in the repo root holds the full comparison, section by section, with a suggested
-order of work. The two below are here because they change how you should work in this
+`GAPS.md` in the repo root holds what remains against Python, in order, and what was checked
+and found equivalent. Python's `stream-next` branch is a reference too: it fixes several
+correlations and adds loss of coolant, and GAPS.md says which parts we take. The two below are here because they change how you should work in this
 repository, not because they are the only ones. Both were checked against the Python source,
 so do not re-derive them from scratch.
 
@@ -221,18 +222,16 @@ so do not re-derive them from scratch.
   reads its trip time off the `StateMachine`, so it needs the machine the reactor is
   controlled by, or the controller holding it. The standards tables are not in this repo and never should be: point
   `DecayHeat.standards_dir!` at them, or set `STREAM_DECAY_HEAT_STANDARDS`.
-- **The loss-of-flow steady solve has two roots, and reaching the right one is by hand.** The
-  pump-on steady state has a forced-flow root and a trivial one at ṁ = 0, where the friction
-  and buoyancy drops both vanish and every equation balances. `solve_steady` returns whichever
-  the guess sits nearest. `_lof_bypass_ic` in `test/test_examples.jl` reaches the forced-flow
-  one by holding the pump head at its pre-trip value with the flapper latched closed, then
-  integrating from that state, and it seeds the solve with a hand-written map naming the
-  variables `mtkcompile` happened to keep. If you change a channel equation and that case
-  starts landing on ṁ = 0, the seed list is the first thing to look at.
+- **Seed a loss-of-flow steady solve with its flows.** Solve the pump-on state with
+  `solve_steady(...; solver=DynamicSS(Rodas5P()))`, which integrates to where the model
+  settles, and start the flow unknowns `mtkcompile` keeps away from zero: started at zero, the
+  solve stays at ṁ = 0 and fails. `_lof_bypass_ic` in `test/test_examples.jl` seeds the pump
+  head, its two kept flows at `dP_pre / R_ext` and the dummy derivative, and nothing else. If
+  a change to a channel equation changes which flows `mtkcompile` keeps, that list is the
+  first thing to look at.
 
-  Do not "fix" any of this with a sign constraint on ṁ. This loop's flow legitimately reverses
-  after the pump trips, so forbidding negative flow would forbid the physics. Python STREAM has
-  the same two roots.
+  Do not "fix" a failed solve with a sign constraint on ṁ. This loop's flow legitimately
+  reverses after the pump trips, so forbidding negative flow would forbid the physics.
 
 Not gaps, checked and matching: the developing-laminar Nusselt (Python defaults to the same
 analytic approximation, using its Shah & London table only to bound that approximation's
