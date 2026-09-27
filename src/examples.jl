@@ -329,7 +329,7 @@ end
 """
     build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, dP_pump=3.0e4,
                   P0=1.0, power_scale=1e4, temp_worth=nothing,
-                  ref_temp=nothing) -> (System, Vector{Pair{Any,Any}})
+                  ref_temp=nothing) -> (System, Vector{Pair})
 
 Build a full thermal-hydraulic loop coupled to a `PointKinetics` reactor model
 (pump + HeatExchanger + ChannelAndContacts + HeatDiffusion + PointKinetics).
@@ -338,9 +338,8 @@ PK+T-H coupling compiles, solves stably, responds to reactivity insertion with
 negative temperature feedback, and terminates correctly on SCRAM.
 
 Unlike other `build_loop_*` builders which return only a compiled `System`,
-`build_loop_pk` returns `(ssys, ic)` — the compiled system AND a ready-to-use
-initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
-`solve_transient`.
+`build_loop_pk` returns `(ssys, ic)`: the compiled system and the initial conditions to
+pass to `solve_transient`.
 
 # Arguments
 - `ctrl`: `ReactivityController` instance (or any callable `(t) -> Float64`)
@@ -351,8 +350,8 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 - `nx::Int`: number of lateral slices in `HeatDiffusion` (default 2)
 - `T_inlet`: coolant inlet temperature [°C] (default 20.0)
 - `dP_pump`: pump pressure rise [Pa] (default 3.0e4)
-- `P0`: initial reactor power [dimensionless or W] passed to
-  `point_kinetics_steady_state(P0)` for IC generation (default 1.0)
+- `P0`: initial reactor power [dimensionless or W], where `PointKinetics` starts critical
+  (default 1.0)
 - `power_scale`: conversion factor from dimensionless PK power to physical
   heat deposition [W]; `fuel.power = pk.P * power_scale` (default 1e4)
 - `power_input`: non-fission power added to the kinetics, in the same dimensionless units
@@ -371,9 +370,8 @@ initial conditions `Pair{Any,Any}[]` vector suitable for passing directly to
 # Returns
 `(ssys, ic)` where:
 - `ssys`: compiled `System` (passed through `mtkcompile`)
-- `ic`: `Vector{Pair{Any,Any}}` initial conditions including PK state
-  (P, C_1..C_6, rho_c_fn), hydraulic IC (inlet.ṁ), and thermal ICs
-  (cac.T[i] and fuel.T[i,j]). Pass directly to `solve_transient(ssys, ic, t)`.
+- `ic`: the loop's starting flow and its temperatures, all at `T_inlet`. The kinetics start
+  critical at `P0` on their own. Pass it to `solve_transient(ssys, ic, t)`.
 """
 function build_loop_pk(ctrl;
     n::Int=7,
@@ -413,7 +411,9 @@ function build_loop_pk(ctrl;
     tw = _resolve_tw(temp_worth, rods_cac, rods_fuel)
     rt = _resolve_tw(ref_temp, rods_cac, rods_fuel)
 
-    @named pk = PointKinetics(ctrl; temp_worth=tw, ref_temp=rt, power_input=power_input)
+    @named pk = PointKinetics(
+        ctrl; temp_worth=tw, ref_temp=rt, power_input=power_input, P0=P0
+    )
 
     fb_components = if isnothing(tw)
         System[]
@@ -442,12 +442,7 @@ function build_loop_pk(ctrl;
     full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
     ssys = mtkcompile(full)
 
-    input_at_start = power_input === nothing ? 0.0 : power_input(0.0)
-    pk_ic = point_kinetics_steady_state(P0; power_input=input_at_start)
-    ic = Pair{Any,Any}[
-        ssys.pk.rho_c_fn => ctrl,
-        ssys.pk.P_neutron => pk_ic.P_neutron,
-        [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
+    ic = [
         ssys.rods.cac.inlet.ṁ => 0.2,
         [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
         [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,

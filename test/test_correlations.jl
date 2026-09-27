@@ -109,8 +109,7 @@ end
             ct_r_phy02...,
         )
         ssys_phy02 = mtkcompile(sys_phy02)
-        op_phy02 = [ssys_phy02.cac_phy02.inlet.ṁ => 0.490]
-        sol_phy02 = solve_steady(ssys_phy02, op_phy02)
+        sol_phy02 = solve_steady(ssys_phy02, [ssys_phy02.cac_phy02.inlet.ṁ => 0.490])
 
         @test sol_phy02.retcode == ReturnCode.Success
         @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu_left[:]], 8.235, rtol=1e-4))
@@ -161,8 +160,7 @@ end
             ct_r_phy03...,
         )
         ssys_phy03 = mtkcompile(sys_phy03)
-        op_phy03 = [ssys_phy03.cac_phy03.inlet.ṁ => 8.8e-4]
-        sol_phy03 = solve_steady(ssys_phy03, op_phy03)
+        sol_phy03 = solve_steady(ssys_phy03, [ssys_phy03.cac_phy03.inlet.ṁ => 8.8e-4])
 
         @test sol_phy03.retcode == ReturnCode.Success
         @test sol_phy03[ssys_phy03.cac_phy03.dP] > 0.0
@@ -242,8 +240,7 @@ end
             ct_r_lam...,
         )
         ssys_lam = mtkcompile(sys_lam)
-        op_lam = [ssys_lam.cac_lam.inlet.ṁ => 1e-4]
-        sol_lam = solve_steady(ssys_lam, op_lam)
+        sol_lam = solve_steady(ssys_lam, [ssys_lam.cac_lam.inlet.ṁ => 1e-4])
 
         @test sol_lam.retcode == ReturnCode.Success
         @test sol_lam[ssys_lam.cac_lam.Re[1]] < 2300.0
@@ -319,8 +316,7 @@ end
             ct_r_turb...,
         )
         ssys_turb = mtkcompile(sys_turb)
-        op_turb = [ssys_turb.cac_turb.inlet.ṁ => 0.250]
-        sol_turb = solve_steady(ssys_turb, op_turb)
+        sol_turb = solve_steady(ssys_turb, [ssys_turb.cac_turb.inlet.ṁ => 0.250])
 
         @test sol_turb.retcode == ReturnCode.Success
         @test sol_turb[ssys_turb.cac_turb.Re[1]] > 2300.0
@@ -600,8 +596,7 @@ end
         ssys_fd = @test_nowarn mtkcompile(sys_fd)
         @test ssys_fd !== nothing
 
-        op_fd = [ssys_fd.cac_fd.inlet.ṁ => 1e-3]
-        sol_fd = solve_steady(ssys_fd, op_fd)
+        sol_fd = solve_steady(ssys_fd, [ssys_fd.cac_fd.inlet.ṁ => 1e-3])
         @test sol_fd.retcode == ReturnCode.Success
     end
 
@@ -652,8 +647,7 @@ end
         ssys_dev = @test_nowarn mtkcompile(sys_dev)
         @test ssys_dev !== nothing
 
-        op_dev = [ssys_dev.cac_dev.inlet.ṁ => 1e-3]
-        sol_dev = solve_steady(ssys_dev, op_dev)
+        sol_dev = solve_steady(ssys_dev, [ssys_dev.cac_dev.inlet.ṁ => 1e-3])
         @test sol_dev.retcode == ReturnCode.Success
     end
 end

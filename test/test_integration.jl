@@ -200,7 +200,7 @@ end
     ṁ0 = (2000.0 / 3600.0) * rho0
     K = dp0 / ṁ0^2
     alpha = K / inertia
-    @named pump = Pump(K * ṁ0^2)      # = dp0; holds ṁ0 through the quadratic resistor
+    @named pump = Pump(dp0)
     @named L_el = Inertia(inertia)
     @named R = VolumetricFlowResistor(; k=K, density=1.0)
     @named hx = HeatExchanger(T)

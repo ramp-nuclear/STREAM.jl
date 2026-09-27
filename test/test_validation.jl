@@ -271,8 +271,7 @@ end
     ssys_ss = build_loop_transient(; T_inlet=T_inlet, T_wall_0=T_wall_0)
     ssys = build_loop_transient(; T_inlet=T_inlet, T_wall_fn=T_wall_step)
 
-    op_guess = [ssys_ss.ch.inlet.ṁ => 0.490]
-    sol_ss = solve_steady(ssys_ss, op_guess)
+    sol_ss = solve_steady(ssys_ss, [ssys_ss.ch.inlet.ṁ => 0.490])
     op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
         push!(op_ic, ssys.ch.inlet.ṁ => sol_ss[ssys_ss.ch.inlet.ṁ])
     T_wall_sym = ssys.T_wall_callable   # stable named access, immune to parameter reordering
@@ -860,8 +859,7 @@ end
     ssys_v02 = mtkcompile(sys_v02; fully_determined=true)
 
     # Initial guess: ṁ +0.250 (rectangular MTR at 30 kPa)
-    op_v02 = [ssys_v02.cac_v02.inlet.ṁ => +0.250]
-    sol_v02 = solve_steady(ssys_v02, op_v02)
+    sol_v02 = solve_steady(ssys_v02, [ssys_v02.cac_v02.inlet.ṁ => +0.250])
 
     # Assertion 1: solver converged
     @test sol_v02.retcode == ReturnCode.Success

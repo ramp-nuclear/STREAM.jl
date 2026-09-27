@@ -122,7 +122,7 @@ end
     @named pk = PointKinetics(rods)
     ssys = mtkcompile(compose(System(Equation[], t; name=:reactor), pk))
     machine.transitions = [(:NORMAL => :SCRAM, t > 1.0, "at 1 s")]
-    sol = solve_transient(ssys, [], range(0.0, 3.0; length=31);
+    sol = solve_transient(ssys, range(0.0, 3.0; length=31);
                           callbacks=machine_callbacks(ssys, machine))
     @test sol.retcode == ReturnCode.Success
     @test sol(0.5; idxs=ssys.pk.reactivity) == 0.0
@@ -136,8 +136,7 @@ end
     # the coolant runs hotter for want of flow. Some cases, such as the cycle guard, only
     # need a solve and do not depend on the coasting.
     ssys = build_loop(; n=5)
-    op = [ssys.ch.inlet.ṁ => 0.5]
-    sol_ss = solve_steady(ssys, op)
+    sol_ss = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
     setpoint = 0.5 * sol_ss[ssys.ch.inlet.ṁ]
     T_setpoint = sol_ss[ssys.ch.T[5]] + 1.0
     times = range(0.0, 0.5; length=11)

@@ -19,8 +19,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
     ]
     @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
     ssys5 = mtkcompile(sys5; fully_determined=false)
-    op5 = [ssys5.ch5.inlet.ṁ => 0.6]
-    sol5 = solve_steady(ssys5, op5)
+    sol5 = solve_steady(ssys5, [ssys5.ch5.inlet.ṁ => 0.6])
     @test sol5.retcode == ReturnCode.Success
     @test isapprox(sol5[ssys5.pump5.inlet.ṁ], 0.6; rtol=1e-4)
 end
@@ -117,8 +116,7 @@ end
     ]
     @named sys_r = compose(System(conns_r, t; name=:pump02_loop), pump_r, bc_r, ch_r)
     ssys_r = mtkcompile(sys_r; fully_determined=false)
-    op_r = [ssys_r.ch_r.inlet.ṁ => 0.490]
-    sol_r = solve_steady(ssys_r, op_r)
+    sol_r = solve_steady(ssys_r, [ssys_r.ch_r.inlet.ṁ => 0.490])
     @test sol_r.retcode == ReturnCode.Success
     @test sol_r[ssys_r.ch_r.inlet.ṁ] > 0
 end

@@ -35,8 +35,13 @@ end
 
 """
     solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...) -> SciMLSolution
+    solve_transient(ssys, t; kwargs...) -> SciMLSolution
 
 Solve a transient simulation over a time array.
+
+Without `op` the run starts from the values the model declares. That suits a system with no
+differential states, whose equations fix every value at every instant, and one whose defaults
+are the start wanted, such as a `PointKinetics` starting critical.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
@@ -82,6 +87,7 @@ function solve_transient(
     return sol
 end
 
+solve_transient(ssys, t::AbstractVector; kwargs...) = solve_transient(ssys, Pair[], t; kwargs...)
 
 """
     _state_snapshot(ssys, sol) -> Vector{Pair}

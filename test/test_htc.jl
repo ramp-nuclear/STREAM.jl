@@ -233,8 +233,7 @@ end
         System(conns, t; name=:sys_u), pump_u, bc_u, cac_u, ct_l..., ct_r...
     )
     ssys_u = mtkcompile(sys_u)
-    op = [ssys_u.cac_u.inlet.ṁ => 0.49]
-    sol_u = solve_steady(ssys_u, op)
+    sol_u = solve_steady(ssys_u, [ssys_u.cac_u.inlet.ṁ => 0.49])
 
     @test sol_u.retcode == ReturnCode.Success
     @test all(isapprox.(sol_u[ssys_u.cac_u.h_tc_left[:]], h_fixed; rtol=1e-8))

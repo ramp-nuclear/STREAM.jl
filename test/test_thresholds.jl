@@ -357,8 +357,7 @@ end
     # Built from a solution rather than by hand, which is what exercises the extraction.
     geo = PipeGeometry_circular(0.6, 0.01)
     ssys = build_loop(; n=5)
-    op = [ssys.ch.inlet.ṁ => 0.5]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
 
     # A plain Channel has no `velocity` variable (only ChannelAndContacts declares it), so
     # the extraction has to fall back to the signed `v` and take its magnitude.
@@ -403,8 +402,7 @@ end
     n = 5
     geo = PipeGeometry_circular(0.6, 0.01)
     ssys = build_loop(; n=n)
-    op = [ssys.ch.inlet.ṁ => 0.5]
-    sol_ss = solve_steady(ssys, op)
+    sol_ss = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
     sol = solve_transient(
         ssys, sol_ss, range(0.0, 0.5; length=6); overrides=[ssys.pump.dP_pump => 0.0]
     )

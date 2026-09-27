@@ -274,8 +274,7 @@ end
     @named sys = compose(System(conns, t; name=:hfn), pump, bc, ch)
     ssys = mtkcompile(sys)
     # Callable parameter goes into the same op dict as ICs.
-    ic = [ssys.ch.inlet.ṁ => 0.5, ssys.ch.h_left_fn => h_fn]
-    sol = solve_steady(ssys, ic)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5, ssys.ch.h_left_fn => h_fn])
     @named ch2 = Channel(; n=n, geometry=PipeGeometry_circular(L_DEFAULT, D_DEFAULT),
                            h_left=H_DEFAULT, h_right=0.0)
     conns = Equation[

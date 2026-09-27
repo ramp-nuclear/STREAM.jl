@@ -23,9 +23,8 @@ using STREAM.Examples
 
         ssys = build_loop(T_inlet=T_inlet)
 
-        op = [ssys.ch.inlet.ṁ => ṁ_guess]
 
-        sol = solve_steady(ssys, op)
+        sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => ṁ_guess])
         @test sol.retcode == ReturnCode.Success
         @test sol[ssys.ch.T_out] > T_inlet      # outlet > inlet (fluid heated)
         @test sol[ssys.ch.T_out] < 126.85       # physically reasonable
@@ -50,9 +49,8 @@ using STREAM.Examples
         ssys = build_loop_transient(T_inlet=T_inlet, T_wall_fn=T_wall_step)
 
 
-        op_guess = [ssys_ss.ch.inlet.ṁ => ṁ_guess]
 
-        sol_ss = solve_steady(ssys_ss, op_guess)
+        sol_ss = solve_steady(ssys_ss, [ssys_ss.ch.inlet.ṁ => ṁ_guess])
         op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
         push!(op_ic, ssys.ch.inlet.ṁ => sol_ss[ssys_ss.ch.inlet.ṁ])
         # Include callable parameter in op for the transient system.
@@ -73,8 +71,7 @@ using STREAM.Examples
         # 20s after the t=10s step; that is many flow-through + thermal times for this 10-cell
         # loop, so the end value should sit essentially on the new steady outlet.
         ssys_final = build_loop_transient(T_inlet=T_inlet, T_wall_0=T_wall_final)
-        op_final = [ssys_final.ch.inlet.ṁ => ṁ_guess]
-        sol_final = solve_steady(ssys_final, op_final)
+        sol_final = solve_steady(ssys_final, [ssys_final.ch.inlet.ṁ => ṁ_guess])
         @test sol_final.retcode == ReturnCode.Success
         T_out_final_steady = sol_final[ssys_final.ch.T_out]
 

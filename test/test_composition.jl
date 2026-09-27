@@ -934,8 +934,7 @@ end
         # The tuple weighted returns is both the path to wire and the systems to compose.
         @named sys = compose(System(conns, t; name=:loop), pump, hx, branch...)
         ssys = mtkcompile(sys)
-        op = [ssys.ch.inlet.ṁ => 0.5]
-        sol = solve_steady(ssys, op)
+        sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
         @test sol.retcode == ReturnCode.Success
         return ssys, sol
     end

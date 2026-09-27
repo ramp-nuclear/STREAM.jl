@@ -28,15 +28,9 @@ const CRITICAL = (t) -> 0.0
         # `pk_power` and `power`.
 
         @testset "no power_input leaves P equal to P_neutron" begin
-            @named pk = PointKinetics(CRITICAL)
+            @named pk = PointKinetics(CRITICAL; P0=1e6)
             ssys = mtkcompile(pk)
-            ic = point_kinetics_steady_state(1e6)
-            op = Pair{Any,Any}[
-                ssys.rho_c_fn => CRITICAL,
-                ssys.P_neutron => ic.P_neutron,
-                [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
-            ]
-            sol = solve_transient(ssys, op, range(0.0, 1.0; length=10))
+            sol = solve_transient(ssys, range(0.0, 1.0; length=10))
             @test sol.retcode == ReturnCode.Success
             @test sol[ssys.P, :] == sol[ssys.P_neutron, :]
         end
@@ -45,7 +39,7 @@ const CRITICAL = (t) -> 0.0
             # A Real becomes a plain parameter rather than a callable, so it is reachable
             # for an override and the gap must not drift.
             offset = 5e4
-            @named pk = PointKinetics(CRITICAL; power_input=offset)
+            @named pk = PointKinetics(CRITICAL; P0=1e6, power_input=offset)
             ssys = mtkcompile(pk)
             pnames = ModelingToolkit.getname.(parameters(ssys))
             @test :power_input in pnames
@@ -53,16 +47,11 @@ const CRITICAL = (t) -> 0.0
 
             ic = point_kinetics_steady_state(1e6; power_input=offset)
             @test ic.P_neutron == 1e6 - offset
-            op = Pair{Any,Any}[
-                ssys.rho_c_fn => CRITICAL,
-                ssys.P_neutron => ic.P_neutron,
-                [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
-            ]
-            sol = solve_transient(ssys, op, range(0.0, 2.0; length=20))
+            sol = solve_transient(ssys, range(0.0, 2.0; length=20))
             @test sol.retcode == ReturnCode.Success
             gap = sol[ssys.P, :] .- sol[ssys.P_neutron, :]
             @test all(isapprox.(gap, offset; rtol=1e-12))
-            # Critical and seeded at the neutronic fixed point, so the total holds at P0.
+            # Critical and started at the neutronic fixed point, so the total holds at P0.
             @test isapprox(sol[ssys.P, end], 1e6; rtol=1e-6)
         end
 
@@ -82,8 +71,7 @@ const CRITICAL = (t) -> 0.0
             )
             ssys = mtkcompile(pk)
             # The ramp is power_input_fn's default, so the map leaves it out.
-            op = Pair{Any,Any}[
-                ssys.rho_c_fn => CRITICAL,
+            op = [
                 ssys.P_neutron => P_init,
                 [ssys.C[k] => C_init[k] for k in 1:6]...,
             ]
@@ -104,11 +92,7 @@ const CRITICAL = (t) -> 0.0
 
             @named pk = PointKinetics(CRITICAL; power_input=offset)
             ssys = mtkcompile(pk)
-            op = Pair{Any,Any}[
-                ssys.rho_c_fn => CRITICAL,
-                ssys.P_neutron => ic.P_neutron,
-                [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
-            ]
+            op = [ssys.P_neutron => ic.P_neutron, [ssys.C[k] => ic.C_k[k] for k in 1:6]...]
             prob = ODEProblem(ssys, op, (0.0, 1.0))
             du = similar(prob.u0)
             prob.f(du, prob.u0, prob.p, 0.0)
@@ -134,11 +118,7 @@ const CRITICAL = (t) -> 0.0
 
         @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
-        op = Pair{Any,Any}[
-            ssys.rho_c_fn => CRITICAL,
-            ssys.P_neutron => ic.P_neutron,
-            [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
-        ]
+        op = [ssys.P_neutron => ic.P_neutron, [ssys.C[k] => ic.C_k[k] for k in 1:6]...]
         prob = ODEProblem(ssys, op, (0.0, 1.0))
 
         # du = f(u, p, 0): the derivative vector the integrator would take at t=0.
@@ -168,10 +148,10 @@ const CRITICAL = (t) -> 0.0
 
             ic_g = point_kinetics_steady_state(1e6; beta_k=beta_k, lambda_k=lambda_k)
             @test length(ic_g.C_k) == G
-            op_g = Pair{Any,Any}[
-                ssys_g.rho_c_fn => CRITICAL, ssys_g.P_neutron => ic_g.P_neutron
+            op_g = [
+                ssys_g.P_neutron => ic_g.P_neutron,
+                [ssys_g.C[k] => ic_g.C_k[k] for k in 1:G]...,
             ]
-            append!(op_g, [ssys_g.C[k] => ic_g.C_k[k] for k in 1:G])
             sol_g = solve(
                 ODEProblem(ssys_g, op_g, (0.0, 5.0)), Rodas5P(); abstol=1e-10, reltol=1e-10
             )
@@ -196,7 +176,6 @@ const CRITICAL = (t) -> 0.0
         P0 = 10.0
         C_k0 = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
         op = [
-            ssys.rho_c_fn => CRITICAL,
             ssys.P_neutron => P0,
             [ssys.C[k] => C_k0[k] for k in 1:6]...,
         ]
@@ -221,7 +200,6 @@ const CRITICAL = (t) -> 0.0
         @named pk = PointKinetics(CRITICAL)
         ssys = mtkcompile(pk)
         op = [
-            ssys.rho_c_fn => CRITICAL,
             ssys.P_neutron => 0.0,
             [ssys.C[k] => 0.0 for k in 1:6]...,
         ]
@@ -232,16 +210,10 @@ const CRITICAL = (t) -> 0.0
     end
 
     @testset "@observed variables accessible" begin
-        @named pk = PointKinetics(CRITICAL)
+        @named pk = PointKinetics(CRITICAL; P0=1e6)
         ssys = mtkcompile(pk)
-        ic = point_kinetics_steady_state(1e6)
-        op = [
-            ssys.rho_c_fn => CRITICAL,
-            ssys.P_neutron => ic.P_neutron,
-            [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
-        ]
         t_span = range(0.0, 1.0, length=10)
-        sol = solve_transient(ssys, op, t_span)
+        sol = solve_transient(ssys, t_span)
 
         # beta_total should equal sum of default beta_k
         @test isapprox(sol[ssys.beta_total, 1], sum(U235_BETA_K), rtol=1e-10)
@@ -286,18 +258,12 @@ const CRITICAL = (t) -> 0.0
         ssys_a = mtkcompile(pk_a)
         @test length(unknowns(ssys_a)) == 7
         P0 = 1e6
-        ic = point_kinetics_steady_state(P0)
         ctrl_zero = ReactivityController()
-        @named pk_b = PointKinetics(ctrl_zero)
+        @named pk_b = PointKinetics(ctrl_zero; P0=P0)
         ssys_b = mtkcompile(pk_b)
-        op_b = [
-            ssys_b.rho_c_fn => ctrl_zero,
-            ssys_b.P_neutron => ic.P_neutron,
-            [ssys_b.C[k] => ic.C_k[k] for k in 1:6]...,
-        ]
         t_arr_b = range(0.0, 2.0, length=100)
-        sol_b = solve_transient(ssys_b, op_b, t_arr_b)
-        # At criticality with correct ICs, P stays within 1% of P0
+        sol_b = solve_transient(ssys_b, t_arr_b)
+        # Critical and started at its steady state, P stays within 1% of P0
         for j in 1:length(t_arr_b)
             @test isapprox(sol_b[ssys_b.P_neutron, j], P0; rtol=1e-2)
         end
@@ -306,19 +272,14 @@ const CRITICAL = (t) -> 0.0
         t_step = 1.0
         fn_step = (s, ts, t) -> (t >= t_step) * delta_rho
         ctrl_step = ReactivityController(fn_step)
-        @named pk_c = PointKinetics(ctrl_step)
+        @named pk_c = PointKinetics(ctrl_step; P0=P0)
         ssys_c = mtkcompile(pk_c)
-        op_c = [
-            ssys_c.rho_c_fn => ctrl_step,
-            ssys_c.P_neutron => ic.P_neutron,
-            [ssys_c.C[k] => ic.C_k[k] for k in 1:6]...,
-        ]
         # The prompt jump: a few Λ/(β - ρ) after the step the prompt transient has died away
         # and P follows the precursors, P ≈ Λ·Σλₖ·Cₖ/(β - ρ). 0.1 s is eight of those time
         # constants.
         t_sample = t_step + 0.1
         t_arr_c = range(0.0, t_sample, length=500)
-        sol_c = solve_transient(ssys_c, op_c, t_arr_c; tstops=[t_step])
+        sol_c = solve_transient(ssys_c, t_arr_c; tstops=[t_step])
 
         beta_total = sum(U235_BETA_K)
         P_jump_numerical = sol_c[ssys_c.P_neutron, end]
@@ -337,15 +298,10 @@ const CRITICAL = (t) -> 0.0
         t_ramp_end = 2.0
         fn_ramp = (s, ts, t) -> ramp_slope * t
         ctrl_ramp = ReactivityController(fn_ramp)
-        @named pk_d = PointKinetics(ctrl_ramp)
+        @named pk_d = PointKinetics(ctrl_ramp; P0=P0)
         ssys_d = mtkcompile(pk_d)
-        op_d = [
-            ssys_d.rho_c_fn => ctrl_ramp,
-            ssys_d.P_neutron => ic.P_neutron,
-            [ssys_d.C[k] => ic.C_k[k] for k in 1:6]...,
-        ]
         t_arr_d = range(0.0, t_ramp_end, length=200)
-        sol_d = solve_transient(ssys_d, op_d, t_arr_d)
+        sol_d = solve_transient(ssys_d, t_arr_d)
         P_traj = sol_d[ssys_d.P_neutron, :]
         @test P_traj[end] > P_traj[1]
         @test P_traj[end] > P0  # positive ramp -> super-critical -> P grows above P0
@@ -355,15 +311,10 @@ const CRITICAL = (t) -> 0.0
         end
 
         plain_fn = t -> (t >= t_step) * delta_rho
-        @named pk_e = PointKinetics(plain_fn)
+        @named pk_e = PointKinetics(plain_fn; P0=P0)
         ssys_e = mtkcompile(pk_e)
-        op_e = [
-            ssys_e.rho_c_fn => plain_fn,
-            ssys_e.P_neutron => ic.P_neutron,
-            [ssys_e.C[k] => ic.C_k[k] for k in 1:6]...,
-        ]
         t_arr_e = range(0.0, t_sample, length=500)
-        sol_e = solve_transient(ssys_e, op_e, t_arr_e; tstops=[t_step])
+        sol_e = solve_transient(ssys_e, t_arr_e; tstops=[t_step])
         @test sol_e[ssys_e.P_neutron, end] ≈ sol_c[ssys_c.P_neutron, end] rtol = 1e-3
     end
 
@@ -518,7 +469,6 @@ const CRITICAL = (t) -> 0.0
     end
 
     @testset "a power transition scrams and stops the run" begin
-        P0 = 1.0
         plimit = 1.5
         t_step = 0.5
         # delta_rho = 0.005 > beta_total/3 (~0.0022): fast prompt-jump above plimit
@@ -535,16 +485,11 @@ const CRITICAL = (t) -> 0.0
         # handed to PointKinetics.
         push!(machine, (:NORMAL => :SCRAM, ssys.P_neutron > plimit))
 
-        ic = point_kinetics_steady_state(P0)
-        op = [
-            ssys.rho_c_fn => ctrl,
-            ssys.P_neutron => ic.P_neutron,
-            [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
-        ]
-
+        # PointKinetics starts critical at its default P0 = 1, so the run needs no initial
+        # condition.
         t_arr = range(0.0, 10.0; length=1000)
         sol = solve_transient(
-            ssys, op, t_arr; tstops=[t_step], callbacks=machine_callbacks(ssys, machine)
+            ssys, t_arr; tstops=[t_step], callbacks=machine_callbacks(ssys, machine)
         )
 
         @test sol.t[end] < 10.0                 # :SCRAM is an abort state, so the run stops
@@ -557,13 +502,10 @@ const CRITICAL = (t) -> 0.0
         on_total = StateMachine(; abort_states=(:SCRAM,))
         ctrl_total = ReactivityController(scram_ir; machine=on_total)
         push!(on_total, (:NORMAL => :SCRAM, ssys.P > plimit))
-        op_total = [
-            ssys.rho_c_fn => ctrl_total,
-            ssys.P_neutron => ic.P_neutron,
-            [ssys.C[k] => ic.C_k[k] for k in 1:6]...,
-        ]
+        # The same compiled system, driven by the second controller.
         solve_transient(
-            ssys, op_total, t_arr; tstops=[t_step], callbacks=machine_callbacks(ssys, on_total)
+            ssys, [ssys.rho_c_fn => ctrl_total], t_arr;
+            tstops=[t_step], callbacks=machine_callbacks(ssys, on_total),
         )
         @test on_total.state == :SCRAM
         @test on_total.t_state ≈ machine.t_state rtol = 1e-6

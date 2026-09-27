@@ -25,8 +25,8 @@ end
     @named flapper = Flapper(; f=1.0, area=1.0, open_rate=1.0, liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_closed)
     ssys = mtkcompile(sys)
-    op = Pair{Any,Any}[]   # a fresh machine stays :CLOSED ⇒ never opens
-    sol = solve_transient(ssys, op, range(0.0, 5.0; length=20))
+    # A fresh machine stays :CLOSED, so the valve never opens.
+    sol = solve_transient(ssys, range(0.0, 5.0; length=20))
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.flapper.inlet.ṁ, end], 0.0; atol=1e-8)   # closed ⇒ no flow
     @test isapprox(sol[ssys.flapper.xi, end], 0.0; atol=1e-8)
@@ -40,8 +40,8 @@ end
                              machine=StateMachine(; initial_state=:OPEN), liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_open)
     ssys = mtkcompile(sys)
-    op = []   # the machine starts :OPEN at t = 0
-    sol = solve_transient(ssys, op, range(0.0, 1.0; length=20))           # past the 1/open_rate ramp
+    # The machine starts :OPEN at t = 0, and the run goes past the 1/open_rate ramp.
+    sol = solve_transient(ssys, range(0.0, 1.0; length=20))
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol[ssys.flapper.xi, end], 1.0; atol=1e-6)             # fully open
     mf = sol[ssys.flapper.inlet.ṁ, end]
@@ -89,7 +89,7 @@ end
     @named flapper = Flapper(; open_rate=10.0, machine=machine, liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_shuts)
     ssys = mtkcompile(sys)
-    sol = solve_transient(ssys, [], range(0.0, 1.0; length=101);
+    sol = solve_transient(ssys, range(0.0, 1.0; length=101);
                           callbacks=machine_callbacks(ssys, machine))
     @test sol.retcode == ReturnCode.Success
     @test machine.log[end].cause == "close at 0.5 s"
@@ -147,10 +147,9 @@ end
     @named flapper = Flapper(; liquid=Liquid())
     sys, _ = _flapper_parallel_loop(; flapper=flapper, pump=pump, name=:flap_cb)
     ssys = mtkcompile(sys)
-    op = []   # a fresh machine stays shut
     fired = Ref(false)
     user_cb = ContinuousCallback((u, t_val, integ) -> t_val - 5.0, integ -> (fired[] = true))
-    sol = solve_transient(ssys, op, range(0.0, 20.0; length=200); callbacks=CallbackSet(user_cb))
+    sol = solve_transient(ssys, range(0.0, 20.0; length=200); callbacks=CallbackSet(user_cb))
     @test sol.retcode == ReturnCode.Success
     @test fired[]
 end
