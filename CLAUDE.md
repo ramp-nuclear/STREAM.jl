@@ -121,18 +121,15 @@ src/
     connectors.jl             # FlowPort, ThermalPort acausal connectors
     twoports.jl               # HydraulicTwoPort, shared by the two-port components
     pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
-    flapper.jl                # Flapper: how far open is scheduled off a StateMachine
+    flapper.jl                # Flapper
     resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
                               # VolumetricFlowResistor, LocalPressureDrop
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
-    point_kinetics.jl         # PointKinetics (any group count), ReactivityController: the
-                              # control reactivity, scheduled off a machine's state
-    state_machine.jl          # StateMachine, StateSchedule, trip!, reset!, machine_callbacks: a
-                              # control system, what its state schedules, and the solver
-                              # events its transitions make
+    point_kinetics.jl         # PointKinetics (any group count), ReactivityController
+    state_machine.jl          # StateMachine, StateSchedule, trip!, reset!, machine_callbacks
   decay_heat/                 # module DecayHeat
     decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
     activation.jl             # Activation, DoubleDecay
@@ -205,8 +202,7 @@ test/
                             # exactly the 21 Python integration tests, nothing else
   test_point_kinetics.jl    # PointKinetics component-unit tests + coupled neutronics/T-H
                             # feedback loops (SCRAM, cold-IC, prompt-jump)
-  test_state_machine.jl     # StateMachine, transitions and their causes, trip!, reset!,
-                            # StateSchedule, machine_callbacks
+  test_state_machine.jl     # StateMachine, StateSchedule, machine_callbacks
 ```
 
 **Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). The physics modules are covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), `test_darcy.jl` (the `Friction` models), and `test_thresholds.jl`.

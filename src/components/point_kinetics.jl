@@ -314,17 +314,11 @@ rods = ReactivityController(machine=machine) do state, t_state, t
 end
 @named pk = PointKinetics(rods)
 machine.transitions = [(:NORMAL => :SCRAM, pk.P_neutron > 1.2e6, "high power")]
-# compose and compile into ssys, then:
-sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
 ```
 
-Build the machine yourself and pass it, as above, whenever anything will move it. Its
-transitions are set after `PointKinetics` is built, because the trip reads `pk`, `pk` needs
-the controller, and the controller needs the machine. Leave `machine` out only for a controller
-whose state never changes, such as a fixed insertion with no protection system.
-
-A controller is a [`StateSchedule`](@ref) under the name the kinetics use, so it is called as
-`rods(t)`, and the machine can drive other schedules beside it.
+A trip on the kinetics is set after `PointKinetics` is built, since it reads `pk`. Leave
+`machine` out only for a controller whose state never changes. A controller is a
+[`StateSchedule`](@ref) under the name the kinetics use.
 
 # Arguments
 - `input_reactivity`: callable `(state, t_state, t) -> Float64`, the inserted reactivity.

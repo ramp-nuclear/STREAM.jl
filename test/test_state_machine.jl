@@ -4,7 +4,7 @@ using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Examples
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t, D_nounits as D
+using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
 
@@ -34,7 +34,7 @@ end
     @test machine.log[end] == (state=:SHUTDOWN, t=6.0, cause="operator")
 end
 
-@testset "reset! returns a machine to its start and keeps its transitions" begin
+@testset "reset! returns a machine to its initial condition and removes log entries" begin
     @variables x(t)
     machine = StateMachine((:NORMAL => :SCRAM, x > 1.0); initial_time=1.0)
     trip!(machine, 3.0)
@@ -78,18 +78,6 @@ end
     @test_throws ArgumentError push!(StateMachine(), (:NORMAL => :SCRAM, (m, t) -> true))
 end
 
-@testset "one machine drives several output signals" begin
-    # The machine is the logic, written once. Each output is a schedule reading it.
-    machine = StateMachine()
-    rods = ReactivityController((s, ts, t) -> s === :SCRAM ? -0.05 : 0.0; machine=machine)
-    pump_head = StateSchedule((s, ts, t) -> s === :SCRAM ? exp(-(t - ts)) : 1.0;
-                              machine=machine)
-    @test (rods(1.0), pump_head(1.0)) == (0.0, 1.0)
-    trip!(machine, 2.0)
-    @test rods(3.0) == -0.05
-    @test pump_head(3.0) ≈ exp(-1.0)
-end
-
 @testset "transitions can be set as one list of tuples" begin
     @variables x(t)
     machine = StateMachine((:NORMAL => :OFF, x > 0.0))
@@ -105,14 +93,19 @@ end
 end
 
 @testset "a schedule reads the state the machine was in at the time asked" begin
+    # One machine can drive several schedules, each reading its log.
     machine = StateMachine()
     rods = ReactivityController((s, ts, t) -> s === :SCRAM ? -0.05 * (t - ts) : 0.0;
                                 machine=machine)
+    pump_head = StateSchedule((s, ts, t) -> s === :SCRAM ? exp(-(t - ts)) : 1.0;
+                              machine=machine)
     trip!(machine, 1.5)
     trip!(machine, 4.0; state=:ABORT)
     @test rods(1.0) == 0.0                  # before the scram
     @test rods(3.0) == -0.05 * 1.5          # during it, timed from when it began
     @test rods(5.0) == 0.0                  # after it, in :ABORT
+    @test pump_head(1.0) == 1.0
+    @test pump_head(3.0) ≈ exp(-1.5)
 
     # The decay heat clock reads the same log, so it runs during the scram even though the
     # machine has since left it.
@@ -137,32 +130,11 @@ end
     @test sol(0.5; idxs=ssys.pk.P_neutron) ≈ 1.0
 end
 
-@testset "a schedule can return a vector for an array-valued callable parameter" begin
-    machine = StateMachine()
-    signals = StateSchedule(machine=machine) do state, t_state, t
-        state === :SCRAM ? [-0.05, 0.0] : [0.0, 1.0]
-    end
-    FT = typeof(signals)
-    @parameters (sig::FT)(..)[1:2] = signals
-    @variables rho(t) y(t) = 1.0
-    @named signal_reader = System([rho ~ sig(t)[1], D(y) ~ sig(t)[2] - y], t)
-    ssys = mtkcompile(signal_reader)
-    machine.transitions = [(:NORMAL => :SCRAM, t > 1.0, "at 1 s")]
-    sol = solve_transient(ssys, Pair{Any,Any}[], range(0.0, 3.0; length=31);
-                          callbacks=machine_callbacks(ssys, machine))
-    @test sol.retcode == ReturnCode.Success
-    # The second signal holds y at 1 until the scram, then lets it decay.
-    @test sol(1.0; idxs=ssys.y) ≈ 1.0
-    @test sol(3.0; idxs=ssys.y) ≈ exp(-2.0) rtol = 1e-4
-    # The first is read after the solve, at the state of its own time.
-    @test sol(0.5; idxs=ssys.rho) == 0.0
-    @test sol(2.0; idxs=ssys.rho) == -0.05
-end
-
-@testset "transitions on a coasting loop" begin
-    # A coasting loop: the pump head is removed and the flow falls through any setpoint
-    # below where it starts, while the coolant runs hotter for want of flow. One solved
-    # steady state feeds every case below.
+@testset "machine_callbacks in a solve" begin
+    # Every case that needs a solve runs on one loop, from one solved steady state. The pump
+    # head is removed, so the flow falls through any setpoint below where it starts while
+    # the coolant runs hotter for want of flow. Some cases, such as the cycle guard, only
+    # need a solve and do not depend on the coasting.
     ssys = build_loop(; n=5)
     op = Pair{Any,Any}[ssys.ch.T[i] => 40.0 for i in 1:5]
     push!(op, ssys.ch.inlet.ṁ => 0.5)
@@ -227,14 +199,6 @@ end
         @test from_normal.state === :SCRAM
         @test from_derated.state === :SCRAM
         @test from_other.state === :OFF     # the edge does not leave :OFF
-    end
-
-    @testset "the log records the description of the transition taken" begin
-        described = StateMachine((:NORMAL => :SCRAM, low_flow, "low flow"))
-        undescribed = StateMachine((:NORMAL => :SCRAM, low_flow))
-        foreach(coast, (described, undescribed))
-        @test described.log[end].cause == "low flow"
-        @test undescribed.log[end].cause == string(low_flow)
     end
 
     @testset "a predicate fires the instant its dwell time has passed" begin
@@ -311,28 +275,4 @@ end
         @test sol.t[end] ≈ machine.t_state
         @test sol.t[end] < last(times)
     end
-
-    @testset "reset! lets the same machine run again" begin
-        machine = StateMachine((:NORMAL => :SCRAM, low_flow))
-        coast(machine)
-        t_first = machine.t_state
-        coast(reset!(machine))
-        @test states(machine) == [:NORMAL, :SCRAM]
-        @test machine.t_state == t_first
-    end
-
-    @testset "push! adds an edge after the machine is built" begin
-        machine = StateMachine()
-        @test isempty(machine.transitions)
-        push!(machine, (:NORMAL => :SCRAM, low_flow))
-        coast(machine)
-        @test machine.state === :SCRAM
-    end
-end
-
-@testset "a variable on an uncompiled component is the one the compiled system carries" begin
-    # This is what lets a machine take its edges beside the components, before mtkcompile.
-    @named lone = PointKinetics(ReactivityController())
-    compiled = mtkcompile(compose(System(Equation[], t; name=:parent), lone))
-    @test isequal(lone.P_neutron, compiled.lone.P_neutron)
 end

@@ -49,8 +49,8 @@ meanwhile. In series it would block the loop.
 - `machine`: the [`StateMachine`](@ref) the valve follows (default a fresh one in `:CLOSED`)
 - `open_state`: the state in which the valve is open (default `:OPEN`)
 - `open_fraction`: a function of time `t -> xi` in `[0, 1]` to use instead of the ramp above,
-  for instance a measured opening curve. It may read the machine but not the model's
-  variables: a fraction that depends on the flow it controls makes the equations
+  such as an interpolation of a measured opening curve. It may read the machine but not the
+  model's variables: a fraction that depends on the flow it controls makes the equations
   non-smooth, and a steady solve stalls. Zero or less means shut.
 - `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`H2O`](@ref), whose density at the
   inlet temperature sets the open valve's pressure drop

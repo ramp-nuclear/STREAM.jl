@@ -475,33 +475,21 @@ needs, and it is more accurate than Python's finite differences because there is
 to choose. It is not a global method: for variance attribution over a parameter range, that
 takes sampling on top, which is what `GlobalSensitivity.jl` is for.
 
+**Size:** medium, and probably a different design from Python's.
+
 ### 8.1 The control state sits outside the problem
 
-A `StateMachine` is an ordinary Julia object: its state, the time it entered it, and its log
-live in the machine, not in the ODE problem, and a transition updates them from an event.
-That is what makes a trip time exact and lets you read or trip a machine by hand. It costs
-two things once we run many cases or ask for sensitivities.
+A `StateMachine` keeps its state, entry time and log in a Julia object rather than in the ODE
+problem. That makes trip times exact and lets you read or trip a machine by hand, at two costs:
 
-**Many runs need a machine each, or a reset between them.** A machine remembers the last
-run: after a scram it stays scrammed. Running the same model again, for instance with a
-different setpoint through `remake`, needs `reset!(machine)` first, or the second run starts
-already tripped. Runs in parallel, as an `EnsembleProblem` would do them, cannot share one
-machine at all, since they would all write to it at once. Each needs its own machine,
-built fresh for each trajectory.
+- **A machine remembers the last run.** Another run through `remake` needs `reset!(machine)`
+  first, and runs in parallel, as an `EnsembleProblem` would do them, need a machine each.
+- **Sensitivities come out wrong, with no error.** The trip time is a plain number the event
+  writes, outside anything automatic differentiation follows, so a derivative with respect
+  to a trip setpoint comes back as if the trip never moved.
 
-**Sensitivities come out wrong, with no error.** Automatic differentiation, which is how we
-would ask "how much does peak fuel temperature move if the trip setpoint moves by 1%?",
-follows numbers through the calculation. The trip time is stored in the machine as a plain
-number, outside anything the differentiation follows, so the answer comes back as if the
-trip always happened at the same moment. That is wrong rather than an error, which makes it
-the dangerous half.
-
-Both go away if the state moves into the problem: the trip time becomes a parameter of the
-model that the event writes, and the signals read it back from there. Then `remake`,
-parallel runs and differentiation all see it. We lose the plain object you can read and trip
-by hand, so it is not worth doing before someone needs sensitivities.
-
-**Size:** medium, and probably a different design from Python's.
+Both go away if the trip time becomes a parameter of the problem that the event writes. That
+gives up the plain object, so it waits until someone needs sensitivities.
 
 ---
 

@@ -23,18 +23,11 @@ function Transition(edge::Pair, condition, description=nothing)
     from, to = edge
     _check_condition(condition)
     states = from isa Union{Tuple,AbstractVector,AbstractSet} ? from : (from,)
-    cause = description === nothing ? _describe(condition) : String(description)
+    # A function prints as its type, which says nothing to a reader of the log.
+    cause = description !== nothing ? String(description) :
+            condition isa Function ? "predicate" : string(condition)
     return Transition(from === nothing ? nothing : Set(states), to, condition, cause)
 end
-
-"""
-    _describe(condition) -> String
-
-The cause a transition without a description records: the condition written out, or
-`"predicate"` for a function, whose printed form says nothing.
-"""
-_describe(condition::Function) = "predicate"
-_describe(condition) = string(condition)
 
 """
     _relation(condition::Num) -> (op, lhs, rhs)
@@ -83,12 +76,12 @@ end
 """
     StateMachine(edges...; initial_state=:NORMAL, initial_time=0.0, abort_states=())
 
-A control system, such as a reactor protection system. It holds the state it is in, when it
-entered that state, a log of every state it entered and why, and the transitions it can take.
+A control system, such as a reactor protection system: the state it is in, when it entered
+that state, a log of every state it entered and why, and the transitions it can take.
 
-Build the machine first and hand it to whatever acts on its state: a
-[`ReactivityController`](@ref) for the rods, a [`Flapper`](@ref), a `DecayHeatSource`. Then set
-its transitions, and [`machine_callbacks`](@ref) turns them into events for the solver:
+Hand the machine to whatever acts on its state, such as a [`ReactivityController`](@ref), a
+[`Flapper`](@ref) or a `DecayHeatSource`. Then set its transitions, and
+[`machine_callbacks`](@ref) turns them into events for the solver:
 
 ```julia
 machine = StateMachine(; abort_states=(:ABORT,))
@@ -108,46 +101,30 @@ sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, mac
 machine.log   # each state entered, when, and which transition caused it
 ```
 
-A transition is `(from => to, condition)`, or `(from => to, condition, description)`. The
-description is what the log records as the cause, so name anything a reader of the log will
-ask about. `from` is one state, a collection of states, or `nothing` to leave from any state.
-`nothing` rather than an empty collection, since an empty one would read as "from no state".
+A transition is `(from => to, condition, description)`. `from`
+is one state, a collection of states, or `nothing` for any state. The description is what the
+log records as the cause; without one, the condition is written out.
 
-The condition is one of three things:
+The condition is one of:
 
-- **An inequality** between two expressions of the model, such as `pump.inlet.ṁ < 0.01` or
-  `ch.T_wall_left[3] > ch.T_ONB[3]`. It fires at the instant it becomes true, which the solver
-  finds exactly.
-- **An equation** such as `ch.T[5] ~ 95.0`. It fires whenever the two sides cross, in either
-  direction, as an equation does in ModelingToolkit's own `continuous_events`.
-- **A predicate** `(machine, sys, t) -> Real`, for whatever the first two cannot say, such as
-  time spent in the current state. It returns a number that is positive where its condition
-  holds, the way `t - m.t_state - 2.0` is positive two seconds after the last transition.
-  `sys[pump.inlet.ṁ]` reads any variable of the model, so one predicate can combine the
-  machine and the system, with `min` for "and" and `max` for "or":
-  `(m, sys, t) -> min(t - m.t_state - 2.0, sys[ch.T[5]] - 95.0)`.
+- **An inequality** between two expressions of the model, such as `pump.inlet.ṁ < 0.01`. It
+  fires when it becomes true.
+- **An equation** such as `ch.T[5] ~ 95.0`. It fires when the two sides cross, either way.
+- **A predicate** `(machine, sys, t) -> Real`, positive where its condition holds, for what
+  the other two cannot say, such as time in the current state: `t - m.t_state - 2.0`.
+  `sys[var]` reads any variable of the model, and `min` and `max` combine conditions as
+  "and" and "or". The solver calls it between its steps as well as at them, so it must have
+  no side effects.
 
-All three fire at the exact instant the condition becomes true, which the solver finds by
-looking back inside its last step. So it calls a condition at times between its steps, and
-more than once per step: a predicate has to be a plain function of `(machine, sys, t)`, with
-no counters and no side effects.
+Each fires at the exact instant its condition becomes true. A condition that already holds
+fires when the machine enters a state its transition leaves from, and at the start of the run,
+so a limit already passed is not missed. An equation has no side that holds, so it only fires
+on a crossing. When two transitions fire at once, the one added first is taken. Entering a
+state in `abort_states` stops the integration.
 
-A transition also fires if its condition already holds when the machine enters a state it
-can be taken from, and at the start of the run. A scram with the temperature already past an
-abort limit therefore aborts at once rather than waiting for a crossing that will not come.
-An equation is the exception: it has no side that holds, so it only ever fires on a crossing.
-
-Set the transitions once the components they mention exist. That is after `PointKinetics`
-for a trip on the kinetics, since the kinetics need the controller and the controller needs
-the machine. There is no need to wait for `mtkcompile`: a variable of a component you built,
-such as `pump.inlet.ṁ`, is the same variable in the compiled system.
-
-Assigning `machine.transitions` replaces the whole list, including any edges given to the
-constructor. `push!(machine, edge)` adds one to the end. Either way, do it before
-`machine_callbacks`, which reads the list once.
-
-When two transitions fire at the same instant, the one added first is taken. Entering a state
-in `abort_states` stops the integration.
+Transitions can be set as soon as the components they mention exist: `pump.inlet.ṁ` is the
+same variable after `mtkcompile`. Assigning `machine.transitions` replaces the list and
+`push!(machine, edge)` adds to it, either before [`machine_callbacks`](@ref) reads it.
 
 # Arguments
 - `edges`: the transitions, each `(from => to, condition)` or
@@ -262,19 +239,6 @@ A signal read off a [`StateMachine`](@ref): `f(state, t_state, t)`, called as `s
 signal can follow how long the machine has been in a state: rods driving in after a scram, or
 a pump coasting down after a trip. [`ReactivityController`](@ref) is this under the name the
 kinetics use. Without an `f` the signal is zero.
-
-`f` returns whatever the component reading the schedule expects. [`PointKinetics`](@ref) takes
-one number, its control reactivity, and a [`Flapper`](@ref) one open fraction. A component
-that takes several signals at once declares an array-valued callable parameter, and the
-schedule returns a vector:
-
-```julia
-machine = StateMachine()
-signals = StateSchedule(machine=machine) do state, t_state, t
-    state === :SCRAM ? [-0.05, exp(-(t - t_state))] : [0.0, 1.0]   # rod worth, pump head
-end
-@parameters (sig::typeof(signals))(..)[1:2] = signals   # read as sig(t)[1] and sig(t)[2]
-```
 
 The state is looked up in the machine's log, so `s(t)` is right for any `t` after the solve
 as well as during it. That is what makes a quantity computed from a schedule, such as
@@ -430,17 +394,10 @@ end
 """
     machine_callbacks(ssys, machines...) -> ContinuousCallback | CallbackSet
 
-Build the solver events one or more [`StateMachine`](@ref)s describe.
-
-Whether a model runs on one machine or on one per piece of equipment is the caller's choice:
-pass them all here and their events are collected together.
-
-Every transition becomes a `ContinuousCallback` root-finding its condition, so it fires at the
-exact instant the condition becomes true. After each transition, and once at the start of the
-run, the machine also takes any transition whose condition already holds. Taking a transition
-goes through [`trip!`](@ref), so anything reading the machine's state or `t_state`, such as a
-[`ReactivityController`](@ref) or a `DecayHeatSource` clock, sees the change at the same
-event.
+Build the solver events one or more [`StateMachine`](@ref)s describe, one
+`ContinuousCallback` per transition. A model may run on one machine or on one per piece of
+equipment. Taking a transition goes through [`trip!`](@ref), so whatever reads the machine
+sees the change at the same event.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
@@ -452,13 +409,6 @@ One callback, or a `CallbackSet` of them, for `solve_transient(...; callbacks=..
 # Throws
 - `ArgumentError`, during the solve: from a predicate that returns `true` or `false`
 - `ErrorException`, during the solve: when transitions keep firing around a cycle
-
-# Example
-```julia
-machine = StateMachine()
-machine.transitions = [(:NORMAL => :SCRAM, flywheel.inlet.ṁ < 0.85 * ṁ_design, "low flow")]
-sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
-```
 """
 function machine_callbacks(ssys, machines::StateMachine...)
     cbs = reduce(vcat, map(machine -> _callbacks(ssys, machine), machines))
