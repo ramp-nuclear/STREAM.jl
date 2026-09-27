@@ -128,7 +128,8 @@ src/
     sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
-    point_kinetics.jl         # PointKinetics (any group count), ReactivityController, SCRAM
+    point_kinetics.jl         # PointKinetics (any group count), ReactivityController
+    state_machine.jl          # StateMachine, StateSchedule, trip!, reset!, machine_callbacks
   decay_heat/                 # module DecayHeat
     decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
     activation.jl             # Activation, DoubleDecay
@@ -201,6 +202,7 @@ test/
                             # exactly the 21 Python integration tests, nothing else
   test_point_kinetics.jl    # PointKinetics component-unit tests + coupled neutronics/T-H
                             # feedback loops (SCRAM, cold-IC, prompt-jump)
+  test_state_machine.jl     # StateMachine, StateSchedule, machine_callbacks
 ```
 
 **Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). The physics modules are covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), `test_darcy.jl` (the `Friction` models), and `test_thresholds.jl`.
@@ -216,8 +218,8 @@ so do not re-derive them from scratch.
   `DecayHeat.DecayHeatSource` from a contribution, hand it to
   `PointKinetics(...; power_input=source)`, and couple the fuel to `pk.P`, the total power.
   The kinetics state is `P_neutron`, which carries no source. The source
-  reads its trip time off the `ReactivityController`, so it needs the same controller the
-  reactor is driven by. The standards tables are not in this repo and never should be: point
+  reads its trip time off the `StateMachine`, so it needs the machine the reactor is
+  controlled by, or the controller holding it. The standards tables are not in this repo and never should be: point
   `DecayHeat.standards_dir!` at them, or set `STREAM_DECAY_HEAT_STANDARDS`.
 - **The loss-of-flow steady solve has two roots, and reaching the right one is by hand.** The
   pump-on steady state has a forced-flow root and a trivial one at ṁ = 0, where the friction
