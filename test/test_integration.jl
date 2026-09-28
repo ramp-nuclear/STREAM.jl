@@ -38,10 +38,10 @@ using STREAM: PipeGeometry, PipeGeometry_circular, solve_steady, solve_transient
     @named hx = HeatExchanger(T)          # anchors the loop temperature (Python's Tin)
     @named R = Resistor(r)
     conns = [
-        inseries(pump, hx, R, pump)...,
+        inseries(pump, hx, R, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:pr_series), pump, hx, R)
+    @named sys = assembly(conns, pump, hx, R)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
@@ -61,11 +61,11 @@ end
     @named R1 = Resistor(r1)
     @named R2 = Resistor(r2)
     conns = [
-        inseries(pump, hx)...,
-        inparallel(hx, (R1, R2), pump)...,
+        inseries(pump, hx),
+        inparallel(hx, (R1, R2), pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:par_res), pump, hx, R1, R2)
+    @named sys = assembly(conns, pump, hx, R1, R2)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
@@ -86,15 +86,14 @@ end
     @named pump = Pump(pressure)
     @named hx = HeatExchanger(26.85)
     Rs = [Resistor(r; name=Symbol(:R, i)) for i in 1:N]
-    series = inseries(Rs...)
     conns = [
-        inseries(pump, hx)...,
+        inseries(pump, hx),
         connect(hx.outlet, Rs[1].inlet),
-        series...,
+        inseries(Rs...),
         connect(Rs[N].outlet, pump.inlet),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:ser_res), pump, hx, Rs...)
+    @named sys = assembly(conns, pump, hx, Rs...)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
@@ -115,10 +114,10 @@ end
     @named P2 = Pump(; ṁ0=ṁ)    # fixed-flow (current source)
     @named hx = HeatExchanger(26.85)
     conns = [
-        inseries(P1, hx, P2, P1)...,
+        inseries(P1, hx, P2, P1),
         P1.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:pump_current), P1, P2, hx)
+    @named sys = assembly(conns, P1, P2, hx)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
@@ -137,10 +136,10 @@ end
         @named HX2 = HeatExchanger(T2)
         @named R = Resistor(1.0)
         conns = [
-            inseries(pump, HX1, R, HX2, pump)...,
+            inseries(pump, HX1, R, HX2, pump),
             pump.inlet.p ~ 1.0e5,
         ]
-        @named sys = compose(System(conns, t; name=:tinjump), pump, HX1, HX2, R)
+        @named sys = assembly(conns, pump, HX1, HX2, R)
         return mtkcompile(sys)
     end
     fwd = build(1.0)
@@ -171,10 +170,10 @@ end
     @named R = Resistor(r)
     @named hx = HeatExchanger(26.85)
     conns = [
-        inseries(pump, L_el, R, hx, pump)...,
+        inseries(pump, L_el, R, hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:rl_circuit), pump, L_el, R, hx)
+    @named sys = assembly(conns, pump, L_el, R, hx)
     ssys = mtkcompile(sys)
     sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
@@ -205,10 +204,10 @@ end
     @named R = VolumetricFlowResistor(; k=K, density=1.0)
     @named hx = HeatExchanger(T)
     conns = [
-        inseries(pump, L_el, R, hx, pump)...,
+        inseries(pump, L_el, R, hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:friction_coastdown), pump, L_el, R, hx)
+    @named sys = assembly(conns, pump, L_el, R, hx)
     ssys = mtkcompile(sys)
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts from it. Mirror
     # that: solve_steady with the pump on, then start the transient from the solved state with the
@@ -242,12 +241,12 @@ end
     @named R2 = VolumetricFlowResistor(; k=k2, density=1.0)
     @named hx = HeatExchanger(26.85)
     conns = [
-        inseries(pump, L_el)...,
-        inparallel(L_el, (R1, R2), hx)...,
-        inseries(hx, pump)...,
+        inseries(pump, L_el),
+        inparallel(L_el, (R1, R2), hx),
+        inseries(hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:parallel_coastdown), pump, L_el, R1, R2, hx)
+    @named sys = assembly(conns, pump, L_el, R1, R2, hx)
     ssys = mtkcompile(sys)
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts. Solve_steady
     # with the pump on (the branch guesses seed the split m1/m2 = √(k2/k1)), then start the
@@ -286,10 +285,10 @@ end
     @named R1 = Resistor(r1 / s)     # bundle resistance (s parallel copies of r1)
     @named R2 = Resistor(r2)
     conns = [
-        inseries(pump, hx, R1, R2, pump)...,
+        inseries(pump, hx, R1, R2, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:signify_series), pump, hx, R1, R2)
+    @named sys = assembly(conns, pump, hx, R1, R2)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
@@ -313,13 +312,11 @@ end
     R1s = [Resistor(r1; name=Symbol(:R1_, i)) for i in 1:signify]
     @named R2 = Resistor(r2)
     conns = [
-        connect(pump.outlet, hx.inlet),
-        connect(hx.outlet, [R1.inlet for R1 in R1s]...),     # node J0
-        connect([R1.outlet for R1 in R1s]..., R2.inlet),    # node J1
-        connect(R2.outlet, pump.inlet),
+        inseries(R2, pump, hx),
+        inparallel(hx, R1s, R2),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:signify_parallel), pump, hx, R1s..., R2)
+    @named sys = assembly(conns, pump, hx, R1s..., R2)
     ssys = mtkcompile(sys)
     m1 = p / (r1 + signify * r2)
     sol = solve_steady(ssys)
@@ -344,10 +341,10 @@ end
     @named hx = HeatExchanger(Tin)
     @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
     conns = [
-        inseries(pump, hx, lpd, pump)...,
+        inseries(pump, hx, lpd, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:lpd_reversal), pump, hx, lpd)
+    @named sys = assembly(conns, pump, hx, lpd)
     ssys = mtkcompile(sys)
     ṁ = Float64[]
     for tt in 0.0:1.0:6.0
@@ -382,11 +379,11 @@ end
     push!(machine, (:CLOSED => :OPEN, R.inlet.ṁ < 0.1 * ṁ0))
     @named hx = HeatExchanger(26.85)
     conns = [
-        inparallel(pump, (R, flapper), hx)...,
-        inseries(hx, pump)...,
+        inparallel(pump, (R, flapper), hx),
+        inseries(hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:flapper_refṁ), pump, R, flapper, hx)
+    @named sys = assembly(conns, pump, R, flapper, hx)
     ssys = mtkcompile(sys)
     op = [
         ssys.R.inlet.ṁ => 1.0,
@@ -420,10 +417,10 @@ end
                              liquid=Liquid())
     @named hx = HeatExchanger(26.85)
     conns = [
-        inseries(pump, flapper, hx, pump)...,
+        inseries(pump, flapper, hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:flapper_pump), pump, flapper, hx)
+    @named sys = assembly(conns, pump, flapper, hx)
     ssys = mtkcompile(sys)
     op = [ssys.pump.dP_pump_fn => dp_fn]
     sol = solve_transient(ssys, op, range(0.0, 5.0; length=500); build_initializeprob=false)
@@ -449,12 +446,11 @@ end
                              liquid=Liquid())
     @named hx = HeatExchanger(26.85)
     conns = [
-        inseries(pump, ine)...,
-        inparallel(ine, (R, flapper), hx)...,
-        inseries(hx, pump)...,
+        inseries(hx, pump, ine),
+        inparallel(ine, (R, flapper), hx),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:flapper_coastdown), pump, ine, R, flapper, hx)
+    @named sys = assembly(conns, pump, ine, R, flapper, hx)
     ssys = mtkcompile(sys)
     # The machine is :CLOSED for the steady solve; opening it at a time you already know is a
     # trip, the same idiom a fixed scram uses.
@@ -487,12 +483,11 @@ end
     @named transistor = VolumetricFlowResistor(; k=kfn, density=1.0)
     @named hx = HeatExchanger(26.85)
     conns = [
-        inseries(pump, ine)...,
-        inparallel(ine, (R, transistor), hx)...,
-        inseries(hx, pump)...,
+        inseries(hx, pump, ine),
+        inparallel(ine, (R, transistor), hx),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:transistor_coastdown), pump, ine, R, transistor, hx)
+    @named sys = assembly(conns, pump, ine, R, transistor, hx)
     ssys = mtkcompile(sys)
     sr(a, b) = 1 + sqrt(a / b)
     # Python solves the driven steady state (transistor stiff, near-all flow through R), then
@@ -548,10 +543,10 @@ end
     @named G2 = Gravity(1.0)            # cold leg
     @named R = Resistor(1.0e5)
     conns = [
-        inseries(pump, HX_hot, G1, HX_cold, G2, R, pump)...,
+        inseries(pump, HX_hot, G1, HX_cold, G2, R, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:decay_grav), pump, HX_hot, HX_cold, G1, G2, R)
+    @named sys = assembly(conns, pump, HX_hot, HX_cold, G1, G2, R)
     ssys = mtkcompile(sys)
     delta_rho = ρ(H2O, low_T) - ρ(H2O, high_T)   # = ρ(low_T) - ρ(high_T) > 0
     times = range(0.0, 10.0; length=10)
@@ -606,8 +601,8 @@ end
             inseries(pumpcomp, HXc1, cold, HXc2, HXh1, hot, HXh2, pumpcomp)...,
             pumpcomp.inlet.p ~ 1.0e5,
         ]
-        return mtkcompile(compose(System(conns, t; name=:coastdown), pumpcomp,
-                                  HXc1, HXc2, HXh1, HXh2, cold, hot))
+        return mtkcompile(
+            assembly(conns, pumpcomp, HXc1, HXc2, HXh1, HXh2, cold, hot, name=:coastdown))
     end
 
     # Forced-flow steady at ṁ0 → the pump head that holds it (Python's steady pump pressure).
@@ -941,15 +936,13 @@ end
     ṁ0 = 0.1
     @named pump = Pump(; ṁ0=ṁ0)
     @named bc = HeatExchanger(T0)
-    conns = Equation[
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, rods.cac.inlet),
-        connect(rods.cac.outlet, pump.inlet),
+    conns = [
+        inseries(pump, bc, rods.cac, pump),
         pump.inlet.p ~ 1.0e5,
         rods.fuel.power ~ pk.P * 1.0e3,
-        fb...,
+        fb,
     ]
-    full = compose_systems(rods, pk, pump, bc; connections=conns, name=:sys9)
+    full = assembly(conns, rods, pk, pump, bc; name=:sys9)
     ssys = mtkcompile(full)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
