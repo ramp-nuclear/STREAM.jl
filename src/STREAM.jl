@@ -356,10 +356,12 @@ using .Connect
 using .Connect: var_length   # the arrangements below count ports with it
 
 include("assemblies/assemblies.jl")
+include("assemblies/assembly.jl")
 export Connect
 export inseries, inparallel, weighted, face, faces, port, temperature_feedback
 export check_gravity_mismatch, compose_systems
 export symmetric_plate, plate, one_sided, single_channel, fuel_assembly
+export assembly
 end
 
 """
@@ -439,4 +441,6 @@ export G_EARTH, ATM, T_ROOM
 # Design knobs
 export knob_defaults, @design_knob
 
+include("assemblies/assembly.jl")
+export assembly
 end  # module STREAM
