@@ -28,6 +28,8 @@
 #     Plate center temperature > fluid outlet (plate is the heat source)
 
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
@@ -79,17 +81,13 @@ ps = fill(1.0 / (NZ * NX), NZ, NX)
 @named hx_r = HeatExchanger(T_INLET)
 
 conns = [
-    connect(pump_l.outlet, hx_l.inlet),
-    connect(hx_l.outlet, rods.cac_l.inlet),
-    connect(rods.cac_l.outlet, pump_l.inlet),
+    inseries(pump_l, hx_l, rods.cac_l, pump_l),
     pump_l.inlet.p ~ 1.0e5,
-    connect(pump_r.outlet, hx_r.inlet),
-    connect(hx_r.outlet, rods.cac_r.inlet),
-    connect(rods.cac_r.outlet, pump_r.inlet),
+    inseries(pump_r, hx_r, rods.cac_r, pump_r),
     pump_r.inlet.p ~ 1.0e5,
     rods.hd.power ~ POWER,
 ]
-@named sys = compose(System(conns, t; name=:mtr_example), pump_l, hx_l, pump_r, hx_r, rods)
+@named sys = assembly(conns, pump_l, hx_l, pump_r, hx_r, rods)
 ssys = mtkcompile(sys)
 
 op = vcat(

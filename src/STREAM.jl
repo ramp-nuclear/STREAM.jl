@@ -322,13 +322,14 @@ Joining components that already exist, and the named arrangements built out of t
 [`Connect`](@ref) holds the wiring verbs: [`inseries`](@ref) and [`inparallel`](@ref) for
 hydraulic chains, [`face`](@ref) and [`faces`](@ref) for per-cell thermal contact,
 [`temperature_feedback`](@ref) for the point-kinetics bindings. Each returns a
-`Vector{Equation}` to splice into a connection list.
+`Vector{Equation}` that goes into a connection list as is.
 
 `Assemblies` holds the arrangements: [`symmetric_plate`](@ref), [`plate`](@ref),
 [`one_sided`](@ref), [`single_channel`](@ref) and [`fuel_assembly`](@ref) return an uncompiled
 `System` already wired, leaving the caller to add boundary conditions and compile.
-[`compose_systems`](@ref) is the general form. [`check_gravity_mismatch`](@ref) reports whether a
-loop's channels agree about which way is up.
+[`assembly`](@ref) is the general form: it composes any components with any list of
+connections. [`check_gravity_mismatch`](@ref) reports whether a loop's channels agree about
+which way is up.
 
 [`port`](@ref) indexes one element of an indexed connector array.
 """
@@ -355,11 +356,11 @@ end
 using .Connect
 using .Connect: var_length   # the arrangements below count ports with it
 
-include("assemblies/assemblies.jl")
 include("assemblies/assembly.jl")
+include("assemblies/assemblies.jl")
 export Connect
 export inseries, inparallel, weighted, face, faces, port, temperature_feedback
-export check_gravity_mismatch, compose_systems
+export check_gravity_mismatch
 export symmetric_plate, plate, one_sided, single_channel, fuel_assembly
 export assembly
 end
@@ -441,6 +442,7 @@ export G_EARTH, ATM, T_ROOM
 # Design knobs
 export knob_defaults, @design_knob
 
-include("assemblies/assembly.jl")
+# Composing components
+using .Assemblies: assembly
 export assembly
 end  # module STREAM

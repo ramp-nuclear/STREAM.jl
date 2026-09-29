@@ -8,7 +8,6 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using OrdinaryDiffEq: ReturnCode
-import ModelingToolkit: compose
 
 # Zero control reactivity, i.e. an exactly critical reactor. Bound to a name rather than
 # written inline at each call site because the same object has to reach both the constructor

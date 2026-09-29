@@ -288,17 +288,17 @@ any wall a friction model reads, such as [`RegimeDependent`](@ref) with a `visco
 correction. A side with `h = 0` under a friction model that ignores the wall, the default,
 needs nothing: its wall temperature appears in no equation. Close a wall via either of:
 ```julia
-# Style 1 — direct binding eqns at compose time (args.funcs idiom):
+# Style 1: bind the wall directly in the connection list
 connections = [
     ...,
-    [ch.T_wall_left[i] ~ T_wall_value for i in 1:n]...,
+    ch.T_wall_left .~ T_wall_value,
 ]
 
-# Style 2 — value-source component:
+# Style 2: a value-source component
 @named wt = WallTemperature(; n=n, T_wall=T_wall_value)
 connections = [
     ...,
-    [ch.T_wall_left[i] ~ wt.T_wall_out[i] for i in 1:n]...,
+    ch.T_wall_left .~ wt.T_wall_out,
 ]
 ```
 
@@ -391,17 +391,17 @@ Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource
 
 These have no internal equation. Close them via either of:
 ```julia
-# Style 1 — direct binding eqns at compose time:
+# Style 1: bind the flux directly in the connection list
 connections = [
     ...,
-    [chf.q_left[i] ~ q_value for i in 1:n]...,
+    chf.q_left .~ q_value,
 ]
 
-# Style 2 — value-source component:
+# Style 2: a value-source component
 @named hfs = HeatFluxSource(; n=n, q=q_value)
 connections = [
     ...,
-    [chf.q_left[i] ~ hfs.q_out[i] for i in 1:n]...,
+    chf.q_left .~ hfs.q_out,
 ]
 ```
 

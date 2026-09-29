@@ -14,10 +14,10 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
     @named bc5 = HeatExchanger(40.0)
     @named ch5 = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns5 = [
-        inseries(pump5, bc5, ch5, pump5)...,
+        inseries(pump5, bc5, ch5, pump5),
         pump5.inlet.p ~ 1e5,
     ]
-    @named sys5 = compose(System(conns5, t; name=:phy05_loop), pump5, bc5, ch5)
+    @named sys5 = assembly(conns5, pump5, bc5, ch5)
     ssys5 = mtkcompile(sys5; fully_determined=false)
     sol5 = solve_steady(ssys5, [ssys5.ch5.inlet.ṁ => 0.6])
     @test sol5.retcode == ReturnCode.Success
@@ -37,10 +37,10 @@ end
     @named res_real = Resistor(R_val)
     @named hx_real = HeatExchanger(40.0)
     conns_real = [
-        inseries(p_real, hx_real, res_real, p_real)...,
+        inseries(p_real, hx_real, res_real, p_real),
         p_real.inlet.p ~ 1.0e5,
     ]
-    @named sys_real = compose(System(conns_real, t; name=:disp_real), p_real, hx_real, res_real)
+    @named sys_real = assembly(conns_real, p_real, hx_real, res_real)
     ssys_real = mtkcompile(sys_real)
     sol_real = solve_steady(ssys_real, [ssys_real.res_real.inlet.ṁ => 1.0])
     @test sol_real.retcode == ReturnCode.Success
@@ -63,10 +63,10 @@ end
     @named res_fn = Resistor(R_val)
     @named hx_fn = HeatExchanger(40.0)
     conns_fn = [
-        inseries(p_fn, hx_fn, res_fn, p_fn)...,
+        inseries(p_fn, hx_fn, res_fn, p_fn),
         p_fn.inlet.p ~ 1.0e5,
     ]
-    @named sys_fn = compose(System(conns_fn, t; name=:disp_fn), p_fn, hx_fn, res_fn)
+    @named sys_fn = assembly(conns_fn, p_fn, hx_fn, res_fn)
     ssys_fn = mtkcompile(sys_fn)
     sol_fn = solve_steady(
         ssys_fn,
@@ -91,10 +91,10 @@ end
     @named res_m = Resistor(R_val)
     @named hx_m = HeatExchanger(40.0)
     conns_m = [
-        inseries(p_ṁ, hx_m, res_m, p_ṁ)...,
+        inseries(p_ṁ, hx_m, res_m, p_ṁ),
         p_ṁ.inlet.p ~ 1.0e5,
     ]
-    @named sys_m = compose(System(conns_m, t; name=:disp_m), p_ṁ, hx_m, res_m)
+    @named sys_m = assembly(conns_m, p_ṁ, hx_m, res_m)
     ssys_m = mtkcompile(sys_m; fully_determined=false)
     sol_m = solve_steady(ssys_m, [ssys_m.res_m.inlet.ṁ => ṁ_set])
     @test sol_m.retcode == ReturnCode.Success
@@ -111,10 +111,10 @@ end
     @named bc_r = HeatExchanger(40.0)
     @named ch_r = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
     conns_r = [
-        inseries(pump_r, bc_r, ch_r, pump_r)...,
+        inseries(pump_r, bc_r, ch_r, pump_r),
         pump_r.inlet.p ~ 1e5,
     ]
-    @named sys_r = compose(System(conns_r, t; name=:pump02_loop), pump_r, bc_r, ch_r)
+    @named sys_r = assembly(conns_r, pump_r, bc_r, ch_r)
     ssys_r = mtkcompile(sys_r; fully_determined=false)
     sol_r = solve_steady(ssys_r, [ssys_r.ch_r.inlet.ṁ => 0.490])
     @test sol_r.retcode == ReturnCode.Success
@@ -151,10 +151,10 @@ end
     # the loop temperature (a bare hydraulics-only loop has degenerate circular instream temps) and
     # gives solve_steady the same well-posed topology the integration coastdowns use.
     conns = [
-        inseries(pump, ine, res, hx, pump)...,
+        inseries(pump, ine, res, hx, pump),
         pump.inlet.p ~ 1e5,       # pressure anchor
     ]
-    @named sys = compose(System(conns, t; name=:pump03), pump, ine, res, hx)
+    @named sys = assembly(conns, pump, ine, res, hx)
     ssys = mtkcompile(sys)
 
     ṁ_0 = dP0 / R_val

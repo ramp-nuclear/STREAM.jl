@@ -3,6 +3,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
+using STREAM.Assemblies
 using STREAM.Components
 using STREAM: Re, Pr
 
@@ -222,16 +223,12 @@ end
     ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l_u_, i)) for i in 1:n]
     ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r_u_, i)) for i in 1:n]
     conns = [
-        connect(pump_u.outlet, bc_u.inlet),
-        connect(bc_u.outlet, cac_u.inlet),
-        connect(cac_u.outlet, pump_u.inlet),
-        [connect(ct_l[i].thermal, getproperty(cac_u, Symbol(:thermal_left, i))) for i in 1:n]...,
-        [connect(ct_r[i].thermal, getproperty(cac_u, Symbol(:thermal_right, i))) for i in 1:n]...,
+        inseries(pump_u, bc_u, cac_u, pump_u),
+        face(ct_l, cac_u, :thermal_left),
+        face(ct_r, cac_u, :thermal_right),
         pump_u.inlet.p ~ 1.0e5,
     ]
-    @named sys_u = compose(
-        System(conns, t; name=:sys_u), pump_u, bc_u, cac_u, ct_l..., ct_r...
-    )
+    @named sys_u = assembly(conns, pump_u, bc_u, cac_u, ct_l..., ct_r...)
     ssys_u = mtkcompile(sys_u)
     sol_u = solve_steady(ssys_u, [ssys_u.cac_u.inlet.ṁ => 0.49])
 

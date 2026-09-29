@@ -107,17 +107,11 @@ end
     ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct_r, i)) for i in 1:nz]
 
     conns = [
-        [
-            connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for
-            i in 1:nz
-        ]...,
-        [
-            connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for
-            i in 1:nz
-        ]...,
+        face(ct_l, hd, :thermal_left),
+        face(ct_r, hd, :thermal_right),
         hd.power ~ pwr,
     ]
-    @named sys = compose(System(conns, t; name=:sys), hd, ct_l..., ct_r...)
+    @named sys = assembly(conns, hd, ct_l..., ct_r...)
     ssys = mtkcompile(sys)
 
     sol = solve_steady(ssys)
@@ -127,8 +121,8 @@ end
         @test sol[ssys.hd.T[i, j]] >= T_bc - 1e-6
     end
 
-    left_syms = [getproperty(ssys.hd, Symbol(:thermal_left, i)) for i in 1:nz]
-    right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
+    left_syms = [port(ssys.hd, :thermal_left, i) for i in 1:nz]
+    right_syms = [port(ssys.hd, :thermal_right, i) for i in 1:nz]
     Q_left_total = sum(sol[left_syms[i].Q] for i in 1:nz)
     Q_right_total = sum(sol[right_syms[i].Q] for i in 1:nz)
 
@@ -163,16 +157,13 @@ end
     )
 
     ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct5_l, i)) for i in 1:nz]
-    conns = vcat(
-        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for i in 1:nz],
-        [hd.power ~ pwr],
-    )
-    @named sys = compose(System(conns, t; name=:sys), hd, ct_l...)
+    conns = [face(ct_l, hd, :thermal_left), hd.power ~ pwr]
+    @named sys = assembly(conns, hd, ct_l...)
     ssys = mtkcompile(sys; fully_determined=true)
     sol = solve_steady(ssys)
 
     # Unconnected thermal_right ports must have Q == 0
-    right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
+    right_syms = [port(ssys.hd, :thermal_right, i) for i in 1:nz]
     for i in 1:nz
         @test isapprox(sol[right_syms[i].Q], 0.0; atol=1e-8)
     end
@@ -202,17 +193,11 @@ end
     ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct12_r, i)) for i in 1:nz]
 
     conns = [
-        [
-            connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for
-            i in 1:nz
-        ]...,
-        [
-            connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for
-            i in 1:nz
-        ]...,
+        face(ct_l, hd, :thermal_left),
+        face(ct_r, hd, :thermal_right),
         hd.power ~ pwr,
     ]
-    @named sys = compose(System(conns, t; name=:sys12gap), hd, ct_l..., ct_r...)
+    @named sys = assembly(conns, hd, ct_l..., ct_r...)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
 
@@ -245,11 +230,11 @@ end
     ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct6_l, i)) for i in 1:nz]
     ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct6_r, i)) for i in 1:nz]
     conns = [
-        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for i in 1:nz]...,
-        [connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for i in 1:nz]...,
+        face(ct_l, hd, :thermal_left),
+        face(ct_r, hd, :thermal_right),
         hd.power ~ pwr,
     ]
-    @named sys = compose(System(conns, t; name=:sys6), hd, ct_l..., ct_r...)
+    @named sys = assembly(conns, hd, ct_l..., ct_r...)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
 

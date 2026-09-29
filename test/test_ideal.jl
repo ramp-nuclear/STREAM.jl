@@ -33,10 +33,10 @@ end
     @named R_comp = Resistor(R_val)
     @named hx = HeatExchanger(26.85)
     connections = [
-        inseries(pump, L_comp, R_comp, hx, pump)...,
+        inseries(pump, L_comp, R_comp, hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(connections, t; name=:rl_sys), pump, L_comp, R_comp, hx)
+    @named sys = assembly(connections, pump, L_comp, R_comp, hx)
     ssys = mtkcompile(sys)
 
     sol_ss = solve_steady(ssys, [ssys.L_comp.inlet.ṁ => ṁ0])
@@ -198,7 +198,7 @@ end
         cb.h ~ h_val,
         cb.T_fluid ~ T_fluid,
     ]
-    @named s = compose(System(conns, t; name=:cbtest), cb, wall)
+    @named s = assembly(conns, cb, wall)
     ss = mtkcompile(s; fully_determined=true)
     prob = ODEProblem(ss, Pair[], (0.0, 1.0))
     sol = solve(prob, Rodas5P())
@@ -212,7 +212,7 @@ end
     @named cb = ConvectiveBoundary(; area=area)
     @named wall = ConstantTemperature(46.85)
     conns = [connect(cb.thermal, wall.thermal), cb.h ~ 4000.0, cb.T_fluid ~ 26.85]
-    @named s = compose(System(conns, t; name=:cbsign), cb, wall)
+    @named s = assembly(conns, cb, wall)
     ss = mtkcompile(s; fully_determined=true)
     sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())
     @test sol[ss.cb.thermal.Q][end] > 0.0

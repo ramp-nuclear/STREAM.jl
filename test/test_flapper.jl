@@ -13,11 +13,11 @@ function _flapper_parallel_loop(; flapper, pump, name)
     @named bypass = Resistor(1.0e5)
     @named hx = HeatExchanger(26.85)
     conns = [
-        inparallel(pump, (bypass, flapper), hx)...,
-        inseries(hx, pump)...,
+        inparallel(pump, (bypass, flapper), hx),
+        inseries(hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    return compose(System(conns, t; name=name), pump, bypass, flapper, hx), bypass
+    return assembly(conns, pump, bypass, flapper, hx; name=name), bypass
 end
 
 @testset "Flapper closed admits no flow" begin
@@ -117,13 +117,13 @@ end
     push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < ṁ_open_at))
     @named hx = HeatExchanger(26.85)
     conns = [
-        inseries(pump, ine)...,
-        inparallel(ine, (res, flapper), hx)...,
-        inseries(hx, pump)...,
+        inseries(pump, ine),
+        inparallel(ine, (res, flapper), hx),
+        inseries(hx, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    sys = compose(System(conns, t, [], [ṁ_open_at]; name=:flap_param), pump, ine, res,
-                  flapper, hx)
+    sys = assembly(conns, pump, ine, res, flapper, hx;
+                   parameters=[ṁ_open_at], name=:flap_param)
     ssys = mtkcompile(sys)
     sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => 1.0, ssys.res.inlet.ṁ => 1.0])
     coast(threshold) = solve_transient(

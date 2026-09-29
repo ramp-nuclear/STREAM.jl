@@ -48,24 +48,6 @@ function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
 end
 
 """
-    compose_systems(systems...; connections, name) -> System
-
-Compose multiple MTK systems with explicit connection equations into a single system.
-
-# Arguments
-- `systems`: positional varargs of uncompiled systems
-- `connections`: vector of connection equations (`Vector{<:Equation}`)
-- `name`: system name (Symbol)
-
-# Returns
-Uncompiled `System` ready for `mtkcompile()`.
-"""
-function compose_systems(systems...; connections::Vector{<:Equation}, name::Symbol)
-    return compose(System(connections, t; name=name), systems...)
-end
-
-
-"""
     symmetric_plate(cac, fuel; name) -> System
 
 Wire one `HeatDiffusion` fuel plate symmetrically to one `ChannelAndContacts` channel.
@@ -76,7 +58,7 @@ Wire one `HeatDiffusion` fuel plate symmetrically to one `ChannelAndContacts` ch
 - `name`: system name (Symbol)
 
 # Returns
-Uncompiled `System` from `compose()`. Add boundary conditions, then `mtkcompile()`.
+Uncompiled `System` from [`assembly`](@ref). Add boundary conditions, then `mtkcompile()`.
 
 After calling this function, refer to sub-components exclusively via the returned system
 (e.g. `rods.cac`, `rods.fuel`). The original component variables hold unscoped symbolic
@@ -87,7 +69,7 @@ function symmetric_plate(cac, fuel; name::Symbol)
         (cac, :thermal_right) => (fuel, :thermal_left),
         (cac, :thermal_left) => (fuel, :thermal_right),
     )
-    return compose(System(connections, t; name=name), cac, fuel)
+    return assembly(connections, cac, fuel; name=name)
 end
 
 """
@@ -102,7 +84,7 @@ Wire a `HeatDiffusion` fuel plate between two `ChannelAndContacts` channels (lef
 - `name`: system name (Symbol)
 
 # Returns
-Uncompiled `System` from `compose()`.
+Uncompiled `System` from [`assembly`](@ref).
 
 After calling this function, refer to sub-components exclusively via the returned system
 (e.g. `rods.ch_left`, `rods.fuel`). The original component variables hold unscoped symbolic
@@ -113,7 +95,7 @@ function plate(ch_left, ch_right, fuel; name::Symbol)
         (ch_left, :thermal_right) => (fuel, :thermal_left),
         (ch_right, :thermal_left) => (fuel, :thermal_right),
     )
-    return compose(System(connections, t; name=name), ch_left, ch_right, fuel)
+    return assembly(connections, ch_left, ch_right, fuel; name=name)
 end
 
 """
@@ -128,7 +110,7 @@ Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channe
 - `name`: system name (Symbol)
 
 # Returns
-Uncompiled `System` from `compose()`.
+Uncompiled `System` from [`assembly`](@ref).
 
 After calling this function, refer to sub-components exclusively via the returned system
 (e.g. `osc.channel`, `osc.fuel`). The original component variables hold unscoped symbolic
@@ -142,7 +124,7 @@ function one_sided(channel, fuel; side::Symbol=:left, name::Symbol)
     else
         faces((channel, :thermal_right) => (fuel, :thermal_left))
     end
-    return compose(System(connections, t; name=name), channel, fuel)
+    return assembly(connections, channel, fuel; name=name)
 end
 
 """
@@ -169,7 +151,7 @@ one-face-insulated coupling, use [`one_sided`](@ref) instead.
 - `name`: system name (Symbol).
 
 # Returns
-Uncompiled `System` from `compose()` holding `channel`, `fuel`, and `n` per-cell
+Uncompiled `System` from [`assembly`](@ref) holding `channel`, `fuel`, and `n` per-cell
 `ConvectiveBoundary` elements. Add boundary conditions, then `mtkcompile()`.
 
 After composition, refer to sub-components through the returned system (e.g.
@@ -197,17 +179,13 @@ function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol
         for i in 1:n
     ]
 
-    near_conns = [connect(port(channel, near_port, i), port(fuel, near_port, i)) for i in 1:n]
-    far_conns = [connect(far_bcs[i].thermal, port(fuel, far_port, i)) for i in 1:n]
-    h_channel = getproperty(channel, h_near)
-    T_channel = getproperty(channel, :T)
-    bindings = Equation[
-        [far_bcs[i].h ~ h_channel[i] for i in 1:n]...,
-        [far_bcs[i].T_fluid ~ T_channel[i] for i in 1:n]...,
+    connections = [
+        faces((channel, near_port) => (fuel, near_port)),
+        face(far_bcs, fuel, far_port),
+        [bc.h for bc in far_bcs] .~ collect(getproperty(channel, h_near)),
+        [bc.T_fluid for bc in far_bcs] .~ collect(channel.T),
     ]
-
-    connections = Equation[near_conns...; far_conns...; bindings...]
-    return compose(System(connections, t; name=name), channel, fuel, far_bcs...)
+    return assembly(connections, channel, fuel, far_bcs...; name=name)
 end
 
 
@@ -290,7 +268,7 @@ is taken from `channels[1]`; a mismatch across the vector is caught by MTK at
 `mtkcompile()` time.
 
 # Returns
-Uncompiled `System` from `compose()`. Add boundary conditions (pump loop, pressure
+Uncompiled `System` from [`assembly`](@ref). Add boundary conditions (pump loop, pressure
 anchor, power binding), then `mtkcompile(...; build_initializeprob=false)`.
 
 After composition, sub-components are reachable through their original `@named` names
@@ -376,12 +354,7 @@ function fuel_assembly(
     seq = _walk_alternation(channels, plates, effective_bookend, start)
     pair_range = closed ? (1:length(seq)) : (1:length(seq)-1)
     next_idx = m -> m == length(seq) ? 1 : m + 1
-    connections = Equation[
-        eq
-        for m in pair_range
-        for eq in _pair_connections(seq[m], seq[next_idx(m)], n)
-    ]
-
-    return compose(System(connections, t; name=name), channels..., plates...)
+    connections = [_pair_connections(seq[m], seq[next_idx(m)], n) for m in pair_range]
+    return assembly(connections, channels..., plates...; name=name)
 end
 

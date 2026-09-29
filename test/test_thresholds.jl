@@ -470,13 +470,13 @@ end
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(20.0)
     @named chf = ChannelHeatFlux(; n=n, geometry=geo)
-    conns = Equation[
-        inseries(pump, bc, chf, pump)...,
+    conns = [
+        inseries(pump, bc, chf, pump),
         pump.inlet.p ~ 1.0e5,
-        [chf.q_left[i] ~ 1.0e4 for i in 1:n]...,
-        [chf.q_right[i] ~ 0.0 for i in 1:n]...,
+        chf.q_left .~ 1.0e4,
+        chf.q_right .~ 0.0,
     ]
-    @named sys = compose(System(conns, t; name=:chf_loop), pump, bc, chf)
+    @named sys = assembly(conns, pump, bc, chf)
     ssys = mtkcompile(sys)
     ic = [
         ssys.chf.inlet.ṁ => 0.5,

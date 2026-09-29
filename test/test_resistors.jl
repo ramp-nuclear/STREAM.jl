@@ -52,10 +52,10 @@ end
     @named hx = HeatExchanger(26.85)
     @named vfr = VolumetricFlowResistor(; k=k, density=1.0)
     conns = [
-        inseries(pump, hx, vfr, pump)...,
+        inseries(pump, hx, vfr, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:vfr_loop), pump, hx, vfr)
+    @named sys = assembly(conns, pump, hx, vfr)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys, [ssys.vfr.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
@@ -75,10 +75,10 @@ end
     @named hx = HeatExchanger(26.85)
     @named vfr = VolumetricFlowResistor(; k=k, klow=klow, density=1.0)
     conns = [
-        inseries(pump, hx, vfr, pump)...,
+        inseries(pump, hx, vfr, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:vfr_klow), pump, hx, vfr)
+    @named sys = assembly(conns, pump, hx, vfr)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys, [ssys.vfr.inlet.ṁ => 0.4])
     @test sol.retcode == ReturnCode.Success
@@ -117,10 +117,10 @@ end
     @named hx = HeatExchanger(26.85)
     @named vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
     conns = [
-        inseries(pump, hx, vfr, pump)...,
+        inseries(pump, hx, vfr, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:vfr_kfn_loop), pump, hx, vfr)
+    @named sys = assembly(conns, pump, hx, vfr)
     ssys = mtkcompile(sys)
 
     # The loop is purely algebraic in flow (no inertia), so the flow tracks the instantaneous
@@ -170,10 +170,10 @@ end
     @named hx = HeatExchanger(Tin)
     @named lpd = LocalPressureDrop(; A1=A1, A2=A2)
     conns = [
-        inseries(pump, hx, lpd, pump)...,
+        inseries(pump, hx, lpd, pump),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:lpd_loop), pump, hx, lpd)
+    @named sys = assembly(conns, pump, hx, lpd)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys, [ssys.lpd.inlet.ṁ => ṁ])
     @test sol.retcode == ReturnCode.Success
@@ -191,8 +191,8 @@ end
         @named pump = Pump(head)
         @named hx = HeatExchanger(T)
         r = make_resistor(:r)
-        conns = [inseries(pump, hx, r, pump)..., pump.inlet.p ~ 1.0e5]
-        @named sys = compose(System(conns, t; name=:known_point), pump, hx, r)
+        conns = [inseries(pump, hx, r, pump), pump.inlet.p ~ 1.0e5]
+        @named sys = assembly(conns, pump, hx, r)
         ssys = mtkcompile(sys)
         sol = solve_steady(ssys, [ssys.r.inlet.ṁ => guess])
         @test sol.retcode == ReturnCode.Success

@@ -48,17 +48,18 @@ function _build_mtr_sym()
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
         rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
-    conns = Equation[
-        inseries(pump_l, hx_l, cac_l, pump_l)...,
+    conns = [
+        inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, hx_r, cac_r, pump_r)...,
+        inseries(pump_r, hx_r, cac_r, pump_r),
         pump_r.inlet.p ~ 1.0e5,
-        Connect.faces((hd, :thermal_left) => (cac_l, :thermal_left))...,
-        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
+        Connect.faces(
+            (hd, :thermal_left) => (cac_l, :thermal_left),
+            (hd, :thermal_right) => (cac_r, :thermal_left),
+        ),
         hd.power ~ 1e4,
     ]
-    @named sys = compose(System(conns, t; name=:mtr_sym_det),
-                         pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     return sys
 end
 
@@ -75,17 +76,18 @@ function _build_mtr_asym()
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
         rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
-    conns = Equation[
-        inseries(pump_l, hx_l, cac_l, pump_l)...,
+    conns = [
+        inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, hx_r, cac_r, pump_r)...,
+        inseries(pump_r, hx_r, cac_r, pump_r),
         pump_r.inlet.p ~ 1.0e5,
-        Connect.faces((hd, :thermal_left) => (cac_l, :thermal_left))...,
-        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
+        Connect.faces(
+            (hd, :thermal_left) => (cac_l, :thermal_left),
+            (hd, :thermal_right) => (cac_r, :thermal_left),
+        ),
         hd.power ~ 1e4,
     ]
-    @named sys = compose(System(conns, t; name=:mtr_asym_det),
-                         pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     return sys
 end
 
@@ -99,14 +101,13 @@ function _build_mtr_onesided()
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
         rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
-    conns = Equation[
-        inseries(pump_l, hx_l, cac_l, pump_l)...,
+    conns = [
+        inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
-        Connect.faces((hd, :thermal_left) => (cac_l, :thermal_left))...,
+        Connect.faces((hd, :thermal_left) => (cac_l, :thermal_left)),
         hd.power ~ 1e4,
     ]
-    @named sys = compose(System(conns, t; name=:mtr_onesided_det),
-                         pump_l, hx_l, cac_l, hd)
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, hd)
     return sys
 end
 
@@ -121,13 +122,12 @@ function _build_val01_fourier()
         power_shape=ps_v01, power=0.0)
     ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:nz_v01]
     ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:nz_v01]
-    conns_v01 = Equation[
-        [connect(ct_l[i].thermal, getproperty(hd_v01, Symbol(:thermal_left,  i))) for i in 1:nz_v01]...,
-        [connect(ct_r[i].thermal, getproperty(hd_v01, Symbol(:thermal_right, i))) for i in 1:nz_v01]...,
+    conns_v01 = [
+        face(ct_l, hd_v01, :thermal_left),
+        face(ct_r, hd_v01, :thermal_right),
         hd_v01.power ~ 0.0,
     ]
-    @named sys_v01 = compose(System(conns_v01, t; name=:val01_det),
-                             ct_l..., ct_r..., hd_v01)
+    @named sys_v01 = assembly(conns_v01, ct_l..., ct_r..., hd_v01)
     return sys_v01
 end
 
@@ -148,17 +148,18 @@ function _build_val02_twoplate()
         Lz=0.6, Lx=0.00127, y=0.07,
         rho_s=2700.0, cp_s=900.0, k_s=200.0,
         power_shape=ps_v02, power=power_per_plate)
-    conns_v02 = Equation[
-        inseries(pump_v02, hx_v02, cac_v02, pump_v02)...,
+    conns_v02 = [
+        inseries(pump_v02, hx_v02, cac_v02, pump_v02),
         pump_v02.inlet.p ~ 1.0e5,
-        Connect.faces((hd1, :thermal_left) => (cac_v02, :thermal_left))...,
-        Connect.faces((hd2, :thermal_left) => (cac_v02, :thermal_right))...,
+        Connect.faces(
+            (hd1, :thermal_left) => (cac_v02, :thermal_left),
+            (hd2, :thermal_left) => (cac_v02, :thermal_right),
+        ),
         # Close the Δ=−2 deficit (two HD instances → two `power(t)` pins).
         hd1.power ~ power_per_plate,
         hd2.power ~ power_per_plate,
     ]
-    @named sys_v02 = compose(System(conns_v02, t; name=:val02_det),
-                             pump_v02, hx_v02, cac_v02, hd1, hd2)
+    @named sys_v02 = assembly(conns_v02, pump_v02, hx_v02, cac_v02, hd1, hd2)
     return sys_v02
 end
 

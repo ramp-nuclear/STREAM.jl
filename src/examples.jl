@@ -56,14 +56,14 @@ function build_loop(;
         T_wall_expr = pars[1](t)
     end
 
-    connections = Equation[
-        inseries(parts..., pump)...,
-        pump.inlet.p ~ 1.0e5,                            # fixes the pressure gauge freedom
-        [ch.T_wall_left[i] ~ T_wall_expr for i in 1:n]...,
-        [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # inert: h_right is 0
+    connections = [
+        inseries(parts..., pump),
+        pump.inlet.p ~ 1.0e5,                # fixes the pressure gauge freedom
+        ch.T_wall_left .~ T_wall_expr,
+        ch.T_wall_right .~ T_inlet,          # inert: h_right is 0
     ]
 
-    @named sys = compose(System(connections, t, [], pars; name=:sys), parts...)
+    @named sys = assembly(connections, parts...; parameters=pars)
     return mtkcompile(sys)
 end
 
@@ -132,21 +132,8 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
         pump.inlet.p ~ 1.0e5,
     ]
 
-    @named sys = compose(
-        System(connections, t; name=:sys),
-        pump,
-        r01,
-        r02,
-        r04,
-        r13,
-        r15,
-        r23,
-        r26,
-        r37,
-        r45,
-        r46,
-        r57,
-        r67,
+    @named sys = assembly(
+        connections, pump, r01, r02, r04, r13, r15, r23, r26, r37, r45, r46, r57, r67
     )
     ssys = mtkcompile(sys)
     return ssys
@@ -285,11 +272,11 @@ function build_loop_lof_bypass(;
     )
     heated = one_sided(ch, fuel; side=:left, name=:heated)
 
-    connections = Equation[
+    connections = [
         # D series branch: ext_res -> hx -> pump -> ine
-        inseries(ext_res, hx, pump, ine)...,
+        inseries(ext_res, hx, pump, ine),
         # Bypass split/merge: ine -> (heated.ch -> ret) in series, or flapper directly -> ext_res
-        inparallel(ine, ((heated.ch, ret), flapper), ext_res)...,
+        inparallel(ine, ((heated.ch, ret), flapper), ext_res),
         # Boundary conditions
         pump.inlet.p ~ 1.0e5,
         heated.fuel.power ~ power_W,
@@ -297,12 +284,10 @@ function build_loop_lof_bypass(;
         # The current MTK does not auto-zero an unconnected ThermalPort's flow, so
         # bind each right wall T to the local bulk T ⇒ q_right = h*(T-T) = 0 (adiabatic).
         # Supplies the n equations that keep the heated subsystem fully determined.
-        [port(heated.ch, :thermal_right, i).T ~ heated.ch.T[i] for i in 1:n]...,
+        port(heated.ch, :thermal_right, :T) .~ heated.ch.T,
     ]
 
-    @named sys = compose_systems(
-        heated, pump, ine, hx, ret, flapper, ext_res; connections=connections, name=:sys
-    )
+    @named sys = assembly(connections, heated, pump, ine, hx, ret, flapper, ext_res)
 
     ssys = mtkcompile(sys)
     return ssys
@@ -421,26 +406,20 @@ function build_loop_pk(ctrl;
         tw_names = Set(nameof(k) for k in keys(tw))
         filter(c -> nameof(c) in tw_names, [rods_cac, rods_fuel])
     end
-    fb_eqs = if isempty(fb_components)
-        Equation[]
-    else
-        Connect.temperature_feedback(pk, fb_components)
-    end
-    # The total, so a `power_input` reaches the plate. With none it equals `pk.P_neutron`.
-    power_eqs = [rods_fuel.power ~ pk.P * power_scale]
 
     @named pump = Pump(dP_pump)
     @named bc = HeatExchanger(T_inlet)
 
-    all_connections = [
-        inseries(pump, bc, rods_cac, pump)...,
+    connections = [
+        inseries(pump, bc, rods_cac, pump),
         pump.inlet.p ~ 1.0e5,
-        fb_eqs...,
-        power_eqs...,
+        Connect.temperature_feedback(pk, fb_components),
+        # The total, so a `power_input` reaches the plate. With none it equals `pk.P_neutron`.
+        rods_fuel.power ~ pk.P * power_scale,
     ]
 
-    full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
-    ssys = mtkcompile(full)
+    @named sys = assembly(connections, rods, pk, pump, bc)
+    ssys = mtkcompile(sys)
 
     ic = [
         ssys.rods.cac.inlet.ṁ => 0.2,
@@ -460,12 +439,12 @@ function build_loop_pk(ctrl;
     push!(ic, ssys.bc.inlet.T => T_inlet)
     push!(ic, ssys.bc.outlet.T => T_inlet)
     for i in 1:n
-        push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_left, i)).T => T_inlet)
-        push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_right, i)).T => T_inlet)
+        push!(ic, port(ssys.rods.cac, :thermal_left, i).T => T_inlet)
+        push!(ic, port(ssys.rods.cac, :thermal_right, i).T => T_inlet)
     end
     for i in 1:nz
-        push!(ic, getproperty(ssys.rods.fuel, Symbol(:thermal_left, i)).T => T_inlet)
-        push!(ic, getproperty(ssys.rods.fuel, Symbol(:thermal_right, i)).T => T_inlet)
+        push!(ic, port(ssys.rods.fuel, :thermal_left, i).T => T_inlet)
+        push!(ic, port(ssys.rods.fuel, :thermal_right, i).T => T_inlet)
     end
     return (ssys, ic)
 end

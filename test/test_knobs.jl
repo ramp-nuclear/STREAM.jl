@@ -95,16 +95,17 @@ end
                               rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
 
     conns = [
-        inseries(pump_l, hx_l, cac_l, pump_l)...,
+        inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, hx_r, cac_r, pump_r)...,
+        inseries(pump_r, hx_r, cac_r, pump_r),
         pump_r.inlet.p ~ 1.0e5,
-        Connect.faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
-        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
+        Connect.faces(
+            (hd, :thermal_left) => (cac_l, :thermal_right),
+            (hd, :thermal_right) => (cac_r, :thermal_left),
+        ),
         hd.power ~ 1e4,
     ]
-    @named sys = compose(System(conns, t; name=:knob_mtr),
-                         pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     ssys = mtkcompile(sys; fully_determined=true)
 
     # the gap is one shared knob across both channels and the plate

@@ -87,10 +87,7 @@ end
     @named hx = HeatExchanger(26.85)
     Rs = [Resistor(r; name=Symbol(:R, i)) for i in 1:N]
     conns = [
-        inseries(pump, hx),
-        connect(hx.outlet, Rs[1].inlet),
-        inseries(Rs...),
-        connect(Rs[N].outlet, pump.inlet),
+        inseries(pump, hx, Rs..., pump),
         pump.inlet.p ~ 1.0e5,
     ]
     @named sys = assembly(conns, pump, hx, Rs...)
@@ -598,7 +595,7 @@ end
     @named HXh2 = HeatExchanger(T_hot)
     function build_coastdown(pumpcomp)
         conns = [
-            inseries(pumpcomp, HXc1, cold, HXc2, HXh1, hot, HXh2, pumpcomp)...,
+            inseries(pumpcomp, HXc1, cold, HXc2, HXh1, hot, HXh2, pumpcomp),
             pumpcomp.inlet.p ~ 1.0e5,
         ]
         return mtkcompile(
@@ -730,21 +727,17 @@ end
     osc = one_sided(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
     @named pump = Pump(; ṁ0=ṁ)
     @named bc = HeatExchanger(T0)
-    conns = Equation[
-        connect(pump.outlet, bc.inlet),
-        connect(bc.outlet, osc.cac.inlet),
-        connect(osc.cac.outlet, pump.inlet),
+    conns = [
+        inseries(pump, bc, osc.cac, pump),
         pump.inlet.p ~ 1.0e5,
         osc.fuel.power ~ P,
         # Unheated left face (heated_parts[1]=0 ⇒ Q=0) has a floating wall T; pin it to the
         # coolant temp (an insulated wall carries no heat, so this is just a closure).
-        [port(osc.cac, :thermal_left, i).T ~ osc.cac.T[i] for i in 1:n]...,
+        port(osc.cac, :thermal_left, :T) .~ osc.cac.T,
     ]
-    full = compose_systems(osc, pump, bc; connections=conns, name=:sys4)
+    full = assembly(conns, osc, pump, bc; name=:sys4)
     ssys = mtkcompile(full)
     ic = [ssys.osc.cac.inlet.ṁ => ṁ]
-    append!(ic, [ssys.osc.cac.T[i] => T0 for i in 1:n])
-    append!(ic, [ssys.osc.fuel.T[i, j] => T0 for i in 1:nz for j in 1:nx])
     sol = solve_transient(ssys, ic, range(0.0, 200.0; length=50);
                           initializealg=BrownFullBasicInit(), maxiters=1_000_000)
     @test sol.retcode == ReturnCode.Success
@@ -753,7 +746,7 @@ end
     @test all(isapprox.(Tc, Tc_analytic; rtol=1e-6))           # coolant rises linearly
     # h-weighted wall temperature, reading Julia's computed h_tc (Python prescribes h).
     h_fw = 2 * k_s / (Lx / nx)
-    Tw = [sol[port(ssys.osc.cac, :thermal_right, i).T, end] for i in 1:n]
+    Tw = sol[port(ssys.osc.cac, :thermal_right, :T), end]
     Tf = [sol[ssys.osc.fuel.T[i, 1], end] for i in 1:nz]
     h = [sol[ssys.osc.cac.h_tc_right[i], end] for i in 1:n]
     Tw_pred = (Tc .* h .+ Tf .* h_fw) ./ (h .+ h_fw)
@@ -809,20 +802,17 @@ end
     @named pk = PointKinetics(ctrl; temp_worth=temp_worth, ref_temp=ref_temp)
     fb = temperature_feedback(pk, vcat(rods_cacs, rods_fuels))
     power_scale = 1.0e3
-    conns = Equation[]
-    for i in 1:N
-        cac_i = rods_cacs[i]
-        fuel_i = rods_fuels[i]
-        append!(conns, Equation[
-                connect(pumps[i].outlet, bcs[i].inlet),
-                connect(bcs[i].outlet, cac_i.inlet),
-                connect(cac_i.outlet, pumps[i].inlet),
+    conns = [
+        [
+            [
+                inseries(pumps[i], bcs[i], rods_cacs[i], pumps[i]),
                 pumps[i].inlet.p ~ 1.0e5,
-            fuel_i.power ~ pk.P * power_scale,   # the shared reactor drives every plate
-        ])
-    end
-    append!(conns, fb)
-    ssys = mtkcompile(compose_systems(rodss..., pk, pumps..., bcs...; connections=conns, name=:sys5))
+                rods_fuels[i].power ~ pk.P * power_scale,  # the shared reactor drives every plate
+            ] for i in 1:N
+        ],
+        fb,
+    ]
+    ssys = mtkcompile(assembly(conns, rodss..., pk, pumps..., bcs...; name=:sys5))
 
     # Consistent cold critical IC. ref_temp = T0, so seeding every coolant / contact / fuel
     # temperature to T0 makes the initial feedback reactivity exactly zero (the loop starts
@@ -850,12 +840,12 @@ end
         push!(ic, bc.inlet.T => T0)
         push!(ic, bc.outlet.T => T0)
         for j in 1:n
-            push!(ic, getproperty(cac, Symbol(:thermal_left, j)).T => T0)
-            push!(ic, getproperty(cac, Symbol(:thermal_right, j)).T => T0)
+            push!(ic, port(cac, :thermal_left, j).T => T0)
+            push!(ic, port(cac, :thermal_right, j).T => T0)
         end
         for j in 1:nz
-            push!(ic, getproperty(fuel, Symbol(:thermal_left, j)).T => T0)
-            push!(ic, getproperty(fuel, Symbol(:thermal_right, j)).T => T0)
+            push!(ic, port(fuel, :thermal_left, j).T => T0)
+            push!(ic, port(fuel, :thermal_right, j).T => T0)
         end
     end
 
@@ -901,12 +891,13 @@ end
     @named pk = PointKinetics(ctrl; temp_worth=Dict(fuel => fill(-0.1, nz, nx)),
                               ref_temp=Dict(fuel => fill(T0, nz, nx)))
     fb = temperature_feedback(pk, [fuel])
-    bath_conns = vcat(
+    conns = [
+        fb,
+        fuel.power ~ pk.P * 1.0e3,
         face(bathsL, fuel, :thermal_left),
         face(bathsR, fuel, :thermal_right),
-    )
-    conns = Equation[fb...; fuel.power ~ pk.P * 1.0e3; bath_conns...]
-    full = compose_systems(fuel, pk, bathsL..., bathsR...; connections=conns, name=:sys8)
+    ]
+    full = assembly(conns, fuel, pk, bathsL..., bathsR...; name=:sys8)
     ssys = mtkcompile(full)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success

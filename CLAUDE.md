@@ -140,10 +140,11 @@ src/
     source.jl                 # DecayHeatSource: MeV/fission to power, and the trip clock
   assemblies/                 # module Assemblies
     port.jl                   # port: index one element of a connector array (a getter, not a verb)
+    assembly.jl               # assembly: compose components with a nested connection list
     connections.jl            # module Assemblies.Connect: face, faces,
                               # temperature_feedback, inseries, inparallel, weighted
                               # (and _FlowWeight, the private component weighted places)
-    assemblies.jl             # compose_systems, check_gravity_mismatch, symmetric_plate,
+    assemblies.jl             # check_gravity_mismatch, symmetric_plate,
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
   initial_conditions.jl       # steady_state_guess, uniform
@@ -189,7 +190,7 @@ test/
   test_decay_heat.jl        # DecayHeat contributions, the standards reader, Sum.
                             # The table testsets skip unless STREAM_DECAY_HEAT_STANDARDS
                             # points at a directory holding the CSVs
-  test_composition.jl       # symmetric_plate, plate, one_sided_connection, compose_systems,
+  test_composition.jl       # symmetric_plate, plate, one_sided_connection, assembly,
                             # port, check_gravity_mismatch, var_length, temperature_feedback,
                             # fuel_assembly — heavy CAC<->HD coverage
   test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
