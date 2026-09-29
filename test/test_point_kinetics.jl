@@ -15,10 +15,12 @@ using OrdinaryDiffEq: ReturnCode
 const CRITICAL = (t) -> 0.0
 
 @testset "PointKinetics" begin
+    # The two plain critical systems several testsets below read, compiled once.
+    critical = mtkcompile(PointKinetics(CRITICAL; name=:pk))
+    critical_1e6 = mtkcompile(PointKinetics(CRITICAL; name=:pk, P0=1e6))
+
     @testset "component compiles with 7 state variables" begin
-        @named pk = PointKinetics(CRITICAL)
-        ssys = mtkcompile(pk)
-        @test length(unknowns(ssys)) == 7
+        @test length(unknowns(critical)) == 7
     end
 
     @testset "Prompt and Total Power" begin
@@ -27,8 +29,7 @@ const CRITICAL = (t) -> 0.0
         # `pk_power` and `power`.
 
         @testset "no power_input leaves P equal to P_neutron" begin
-            @named pk = PointKinetics(CRITICAL; P0=1e6)
-            ssys = mtkcompile(pk)
+            ssys = critical_1e6
             sol = solve_transient(ssys, range(0.0, 1.0; length=10))
             @test sol.retcode == ReturnCode.Success
             @test sol[ssys.P, :] == sol[ssys.P_neutron, :]
@@ -115,8 +116,7 @@ const CRITICAL = (t) -> 0.0
         @test ic.P_neutron == P0
         @test length(ic.C_k) == 6
 
-        @named pk = PointKinetics(CRITICAL)
-        ssys = mtkcompile(pk)
+        ssys = critical
         op = [ssys.P_neutron => ic.P_neutron, [ssys.C[k] => ic.C_k[k] for k in 1:6]...]
         prob = ODEProblem(ssys, op, (0.0, 1.0))
 
@@ -196,8 +196,7 @@ const CRITICAL = (t) -> 0.0
     end
 
     @testset "zero ICs yield trivial P=0 solution" begin
-        @named pk = PointKinetics(CRITICAL)
-        ssys = mtkcompile(pk)
+        ssys = critical
         op = [
             ssys.P_neutron => 0.0,
             [ssys.C[k] => 0.0 for k in 1:6]...,
@@ -209,8 +208,7 @@ const CRITICAL = (t) -> 0.0
     end
 
     @testset "@observed variables accessible" begin
-        @named pk = PointKinetics(CRITICAL; P0=1e6)
-        ssys = mtkcompile(pk)
+        ssys = critical_1e6
         t_span = range(0.0, 1.0, length=10)
         sol = solve_transient(ssys, t_span)
 

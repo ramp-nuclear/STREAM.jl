@@ -33,30 +33,31 @@ using STREAM.Examples
 
     @testset "solve_transient returns time-series (callable T_wall step)" begin
         # Step-change: T_wall jumps from 100.0 to 120.0 at t=10s via callable.
-        n = 10
         T_inlet = 40.0
-        Q_wall_0 = 1.0e4
-        ṁ_guess = 0.490
-
+        ṁ_guess = 0.490
         T_wall_0 = 100.0
         T_wall_final = 120.0
         t_step = 10.0
-        T_wall_step = t -> t < t_step ? T_wall_0 : T_wall_final
 
-        # Use a scalar-T_wall system for the steady-state solve (consistent ICs at T_wall_0)
-        # then switch to the callable system for the transient.
-        ssys_ss = build_loop_transient(T_inlet=T_inlet, T_wall_0=T_wall_0)
-        ssys = build_loop_transient(T_inlet=T_inlet, T_wall_fn=T_wall_step)
+        # The wall is a callable parameter typed to the function the loop is built with, so
+        # every wall this test uses comes from one factory: closures from one definition share
+        # a type. A constant wall is a step that never happens, and one compiled system gives
+        # both steady states and the transient.
+        wall(T_before, T_after, t_switch) = t -> t < t_switch ? T_before : T_after
+        ssys = build_loop_transient(T_inlet=T_inlet, T_wall_fn=wall(T_wall_0, T_wall_final, t_step))
+        steady_at(T_wall) = solve_steady(
+            ssys, [ssys.ch.inlet.ṁ => ṁ_guess, ssys.T_wall_callable => wall(T_wall, T_wall, Inf)]
+        )
+        sol_ss = steady_at(T_wall_0)
+        sol_final = steady_at(T_wall_final)
+        @test sol_ss.retcode == ReturnCode.Success
+        @test sol_final.retcode == ReturnCode.Success
 
-
-
-        sol_ss = solve_steady(ssys_ss, [ssys_ss.ch.inlet.ṁ => ṁ_guess])
-        op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
-        push!(op_ic, ssys.ch.inlet.ṁ => sol_ss[ssys_ss.ch.inlet.ṁ])
-        # Include callable parameter in op for the transient system.
-        T_wall_sym = last(parameters(ssys))   # T_wall_callable is the last parameter
-        push!(op_ic, T_wall_sym => T_wall_step)
-
+        op_ic = Pair{Any,Any}[
+            ssys.ch.T => sol_ss[ssys.ch.T],
+            ssys.ch.inlet.ṁ => sol_ss[ssys.ch.inlet.ṁ],
+            ssys.T_wall_callable => wall(T_wall_0, T_wall_final, t_step),
+        ]
         t_arr = range(0.0, 30.0, length=300)
         sol = solve_transient(ssys, op_ic, t_arr)
         @test sol.retcode == ReturnCode.Success
@@ -65,17 +66,12 @@ using STREAM.Examples
         @test !any(isnan, T_ts)
         @test T_ts[end] > T_ts[1]   # T_outlet rises after T_wall step
 
-        # Magnitude check: the outlet must approach the NEW steady state set by T_wall_final,
-        # not just rise. Solve the same loop pinned at T_wall_final to get the target outlet,
-        # and the loop pinned at T_wall_0 to confirm the pre-step outlet. The transient runs
-        # 20s after the t=10s step; that is many flow-through + thermal times for this 10-cell
-        # loop, so the end value should sit essentially on the new steady outlet.
-        ssys_final = build_loop_transient(T_inlet=T_inlet, T_wall_0=T_wall_final)
-        sol_final = solve_steady(ssys_final, [ssys_final.ch.inlet.ṁ => ṁ_guess])
-        @test sol_final.retcode == ReturnCode.Success
-        T_out_final_steady = sol_final[ssys_final.ch.T_out]
-
-        T_out_initial_steady = sol_ss[ssys_ss.ch.T_out]   # steady outlet at T_wall_0
+        # Magnitude check: the outlet must approach the new steady state set by T_wall_final,
+        # not just rise. The transient runs 20s after the t=10s step; that is many
+        # flow-through and thermal times for this 10-cell loop, so the end value should sit
+        # essentially on the new steady outlet.
+        T_out_initial_steady = sol_ss[ssys.ch.T_out]
+        T_out_final_steady = sol_final[ssys.ch.T_out]
         # Sanity: raising the wall by 20 K must raise the steady outlet (positive step).
         @test T_out_final_steady > T_out_initial_steady
 
