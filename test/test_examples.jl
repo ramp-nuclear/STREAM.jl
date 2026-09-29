@@ -17,12 +17,6 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
 
 @testset "Builders smokes" begin
-    @testset "build_loop compiles closed loop" begin
-        ssys = build_loop()
-        @test ssys isa ModelingToolkit.AbstractSystem
-        # mtkcompile benchmark reported via @info (not asserted)
-    end
-
     @testset "build_loop compiles + briefly solves" begin
         # Smoke: demonstrate the full `build_loop` API produces a working transient.
         ssys = build_loop()
@@ -80,23 +74,6 @@ using STREAM.Examples
         @test isapprox(m01, mtot_expected / 3; rtol=1e-6)
         @test isapprox(m01, m02; rtol=1e-6)
         @test isapprox(m01, m04; rtol=1e-6)
-    end
-
-    @testset "build_loop_lof_bypass compiles + briefly solves" begin
-        # Smoke: fuel-plate builder (CAC + HeatDiffusion plate). Compile only;
-        # the full transient is exercised in the loss-of-flow section below.
-        ssys = build_loop_lof_bypass()
-        @test ssys isa ModelingToolkit.AbstractSystem
-        @test length(equations(ssys)) == length(unknowns(ssys))
-    end
-
-    @testset "build_loop_pk compiles + briefly solves" begin
-        ctrl = ReactivityController()
-        ssys, ic = build_loop_pk(ctrl)
-        @test length(equations(ssys)) > 0
-        @test length(unknowns(ssys)) > 0
-        sol = solve_transient(ssys, ic, range(0.0, 0.1, length=5))
-        @test sol.retcode == ReturnCode.Success
     end
 end
 

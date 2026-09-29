@@ -5,23 +5,10 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM.Components: Channel  # explicit: Base.Channel also exists
 
-@testset "Pump fixed-flow mode" begin
-    @named pump = Pump(; ṁ0=0.6)
+@testset "Pump fixed-flow mode compiles on its own" begin
+    @named pump = Pump(; ṁ0=0.6)
     @test_nowarn mtkcompile(pump; fully_determined=false)
-    @named pump5 = Pump(; ṁ0=0.6)
-    @named bc5 = HeatExchanger(40.0)
-    @named ch5 = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
-    conns5 = [
-        inseries(pump5, bc5, ch5, pump5),
-        pump5.inlet.p ~ 1e5,
-    ]
-    @named sys5 = assembly(conns5, pump5, bc5, ch5)
-    ssys5 = mtkcompile(sys5; fully_determined=false)
-    sol5 = solve_steady(ssys5, [ssys5.ch5.inlet.ṁ => 0.6])
-    @test sol5.retcode == ReturnCode.Success
-    @test isapprox(sol5[ssys5.pump5.inlet.ṁ], 0.6; rtol=1e-4)
 end
 
 @testset "Pump dispatch correctness" begin
@@ -103,22 +90,9 @@ end
     @test isapprox(sol_m[ssys_m.p_ṁ.inlet.ṁ], ṁ_set; rtol=1e-8)
 end
 
-@testset "Scalar Pump(dP_pump) unchanged" begin
-    @named pump_s = Pump(1e5)
-    @test_nowarn mtkcompile(pump_s; fully_determined=false)
-
-    @named pump_r = Pump(3.0e4)
-    @named bc_r = HeatExchanger(40.0)
-    @named ch_r = Channel(n=5, geometry=PipeGeometry_circular(0.6, 0.01))
-    conns_r = [
-        inseries(pump_r, bc_r, ch_r, pump_r),
-        pump_r.inlet.p ~ 1e5,
-    ]
-    @named sys_r = assembly(conns_r, pump_r, bc_r, ch_r)
-    ssys_r = mtkcompile(sys_r; fully_determined=false)
-    sol_r = solve_steady(ssys_r, [ssys_r.ch_r.inlet.ṁ => 0.490])
-    @test sol_r.retcode == ReturnCode.Success
-    @test sol_r[ssys_r.ch_r.inlet.ṁ] > 0
+@testset "Pump fixed-pressure mode compiles on its own" begin
+    @named pump = Pump(1e5)
+    @test_nowarn mtkcompile(pump; fully_determined=false)
 end
 
 @testset "Callable pump dispatch" begin

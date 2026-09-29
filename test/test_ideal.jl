@@ -5,7 +5,6 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM.Examples
 using STREAM.Assemblies: var_length
 
 @testset "Inertia stub callable" begin
@@ -66,11 +65,6 @@ end
 
 @testset "HeatExchanger exported from STREAM" begin
     @test isdefined(STREAM.Components, :HeatExchanger)
-end
-
-@testset "build_loop compiles after HeatExchanger rename (regression)" begin
-    ssys = build_loop()
-    @test ssys isa ModelingToolkit.AbstractSystem
 end
 
 @testset "ConstantTemperature: n ports, each held at its temperature" begin

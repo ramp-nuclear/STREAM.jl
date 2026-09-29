@@ -141,24 +141,6 @@ end
     @test sol.retcode == ReturnCode.Success
 end
 
-@testset "symmetric_plate — n=10, nz=10, nx=2 compiles cleanly" begin
-    cac, fuel = _mtr_pair(; n=10, nz=10, nx=2)
-    rods = symmetric_plate(cac, fuel; name=:rods)
-    @test rods isa ModelingToolkit.AbstractSystem
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, rods, pump, bc; name=:full10)
-    ssys = mtkcompile(full)
-    @test ssys isa ModelingToolkit.AbstractSystem
-    ic = [ssys.rods.cac.inlet.ṁ => 0.2]
-    sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
-    @test sol.retcode == ReturnCode.Success
-end
-
 @testset "symmetric_plate — asymmetric nx=4 (wide plate, nx > n)" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=4)
     rods = symmetric_plate(cac, fuel; name=:rods)

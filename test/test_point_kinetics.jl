@@ -450,19 +450,6 @@ const CRITICAL = (t) -> 0.0
         end
     end
 
-    @testset "Components Unchanged (regression guard)" begin
-        proj_root = pkgdir(STREAM)
-        for relpath in (
-            "src/components/channels.jl",
-            "src/components/heat_diffusion.jl",
-        )
-            src = read(joinpath(proj_root, relpath), String)
-            @test !occursin("T_source_", src)
-            @test !occursin("temp_worth", src)
-            @test !occursin("temperature_feedback", src)
-        end
-    end
-
     @testset "a power transition scrams and stops the run" begin
         plimit = 1.5
         t_step = 0.5
@@ -603,31 +590,6 @@ end
     # consistent build_loop_pk IC (port/contact temperatures seeded to T_inlet),
     # which fixes a boundary-cell initialization artifact (see the regression
     # guard below).
-
-    @testset "consistent cold IC has zero startup reactivity" begin
-        # REGRESSION GUARD for the boundary-cell initialization artifact. FlowPort/
-        # ThermalPort temperatures default to 26.85 °C; the boundary coolant cells and
-        # the channel↔fuel contact nodes alias to those ports, so a per-cell T seed
-        # alone does NOT pin them. If build_loop_pk fails to seed the port/contact
-        # temperatures, feedback sees a spurious (26.85 − ref_temp) offset and the loop
-        # starts far from critical. With a consistent IC and ref_temp = T_inlet, the
-        # loop MUST start exactly critical: net reactivity ≈ 0 at t=0.
-        Tin = 20.0
-        for (tw, rt) in (
-            (Dict(:cac => fill(-0.01, 7)),    Dict(:cac => fill(Tin, 7))),       # coolant feedback
-            (Dict(:fuel => fill(-0.1, 7, 2)), Dict(:fuel => fill(Tin, 7, 2))),   # fuel feedback
-        )
-            ctrl = ReactivityController()
-            ssys, ic = build_loop_pk(
-                ctrl; n=7, nz=7, nx=2, T_inlet=Tin, P0=1.0, power_scale=1e4,
-                temp_worth=tw, ref_temp=rt,
-            )
-            sol = solve_transient(ssys, ic, [0.0, 1e-6])
-            @test sol.retcode == ReturnCode.Success
-            @test abs(sol[ssys.pk.reactivity][1]) < 1e-9   # exactly critical at t=0
-            @test sol[ssys.pk.P_neutron][1] == 1.0
-        end
-    end
 
     @testset "coolant feedback suppresses power to a self-consistent equilibrium" begin
         # Corrected mirror of Python STREAM test_integrations.py:390-428

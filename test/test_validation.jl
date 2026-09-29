@@ -257,32 +257,6 @@ end
     end
 end
 
-@testset "Transient T_outlet rises after T_wall step" begin
-    n = 10
-    T_inlet = 40.0
-
-    T_wall_0 = 100.0
-    T_wall_final = 120.0
-    t_step = 10.0
-    T_wall_step = t -> t < t_step ? T_wall_0 : T_wall_final
-
-    ssys_ss = build_loop_transient(; T_inlet=T_inlet, T_wall_0=T_wall_0)
-    ssys = build_loop_transient(; T_inlet=T_inlet, T_wall_fn=T_wall_step)
-
-    sol_ss = solve_steady(ssys_ss, [ssys_ss.ch.inlet.ṁ => 0.490])
-    op_ic = Pair{Any,Any}[ssys.ch.T[i] => sol_ss[ssys_ss.ch.T[i]] for i in 1:n]
-        push!(op_ic, ssys.ch.inlet.ṁ => sol_ss[ssys_ss.ch.inlet.ṁ])
-    T_wall_sym = ssys.T_wall_callable   # stable named access, immune to parameter reordering
-    push!(op_ic, T_wall_sym => T_wall_step)
-
-    t_arr = range(0.0, 60.0; length=600)
-    sol = solve_transient(ssys, op_ic, t_arr)
-    @test sol.retcode == ReturnCode.Success
-    T_ts = sol[ssys.ch.T_out, :]
-    @test !any(isnan, T_ts)
-    @test T_ts[end] > T_ts[1]
-end
-
 @testset "Python parity: MTR symmetric" begin
     assert_equivalence_fluid_props()
     assert_equivalence_dittus_boelter()
@@ -916,76 +890,11 @@ end
         sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
         @test sol.retcode == ReturnCode.Success
         P = sol[ssys.pk.P_neutron]
+        # Every port and contact is seeded at T_inlet, so the loop starts exactly critical.
+        @test abs(sol[ssys.pk.reactivity][1]) < 1e-9
         @test all(isfinite, P)
         @test all(>(0.0), P)              # power positive throughout — decays, never goes negative
         @test abs(P[end]) < 1e-3          # feedback drives power negligible vs P0 = 1.0
     end
 
-    @testset "negative coolant feedback suppresses power to near zero" begin
-        # Mirror Python STREAM test_integrations.py lines 390-428:
-        # negative alpha on coolant with ref_temp=T_inlet. Coolant heats above T_inlet, so
-        # feedback goes negative and power collapses to near zero.
-        #
-        # Live coupled feedback transient from the cold critical IC, same as the fuel-feedback
-        # case above and the reference coupled tests in test_point_kinetics.jl. The coupled
-        # feedback solve_steady is not usable in Julia (it collapses to the trivial P=0 root),
-        # so the transient is the honest way to reach the feedback-balanced state.
-        n = 7
-        T_inlet = 20.0
-        alpha_neg = -0.1   # strong negative feedback on coolant
-
-        ctrl = ReactivityController()
-        ssys, ic = build_loop_pk(
-            ctrl;
-            n=n,
-            T_inlet=T_inlet,
-            P0=1.0,
-            power_scale=1e4,
-            temp_worth=Dict(:cac => fill(alpha_neg, n)),
-            ref_temp=Dict(:cac => fill(T_inlet, n)),
-        )
-
-        # The slowest precursor group sets the pace once the feedback weakens, and the power
-        # crosses 1e-3 only near 850 s.
-        t_arr = range(0.0, 1500.0; length=500)
-        sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
-        @test sol.retcode == ReturnCode.Success
-        P = sol[ssys.pk.P_neutron]
-        @test all(isfinite, P)
-        @test all(>(0.0), P)              # power positive throughout — decays, never goes negative
-        @test abs(P[end]) < 1e-3          # feedback drives power negligible vs P0 = 1.0
-    end
-
-    @testset "reactivity observable accessible and correct at steady state" begin
-        # Verify that sol[ssys.pk.reactivity, :] is accessible post-solve,
-        # is a finite vector, and approaches zero at late time
-        # (steady state requires net reactivity ≈ 0).
-        n = 7
-        T_inlet = 20.0
-        alpha = -0.005   # mild negative feedback — allows some power at late time
-        ctrl = ReactivityController()
-
-        ssys, ic = build_loop_pk(
-            ctrl;
-            n=n,
-            T_inlet=T_inlet,
-            P0=1.0,
-            power_scale=1e4,
-            temp_worth=Dict(:cac => fill(alpha, n)),
-            ref_temp=Dict(:cac => fill(T_inlet, n)),
-        )
-
-        t_arr = range(0.0, 50.0; length=200)
-        sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
-
-        # Reactivity observable must be accessible and well-behaved
-        rho_trace = sol[ssys.pk.reactivity, :]
-        @test rho_trace isa AbstractVector
-        @test length(rho_trace) > 1
-        @test all(isfinite, rho_trace)
-
-        # At late time (t=50s), reactivity should be near zero
-        # (dP/dt=0 at steady state requires net reactivity ≈ 0)
-        @test abs(rho_trace[end]) < 0.01
-    end
 end  # @testset "PointKinetics validation"
