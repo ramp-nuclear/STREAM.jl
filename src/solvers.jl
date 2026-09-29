@@ -17,6 +17,9 @@ If a particular solve does not converge, pass an explicit solver; the coastdown 
 - `reltol`: relative tolerance (default 1e-6)
 - `build_initializeprob`: passed to `SteadyStateProblem` (default `false`)
 
+A `DynamicSS` solver integrates to steady state and keeps only where it ends, so its inner
+integration runs without dense output.
+
 # Returns
 `SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
 """
@@ -29,7 +32,10 @@ function solve_steady(
         warn_initialize_determined=false,
         build_initializeprob=build_initializeprob,
     )
-    sol = solve(prob, solver; abstol=abstol, reltol=reltol)
+    # Dense output would only feed interpolation, which DynamicSS never reads, and with it
+    # on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
+    inner = solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
+    sol = solve(prob, solver; abstol=abstol, reltol=reltol, inner...)
     return sol
 end
 
@@ -64,6 +70,10 @@ are the start wanted, such as a `PointKinetics` starting critical.
   skipping it is correct.
 - `kwargs...`: additional keyword arguments forwarded to `solve`
 
+A system with no differential states, such as a pump, resistors and a flapper with no
+inertia, steps onto every time in `t`, so each saved value is a step's own result rather
+than an interpolation between steps.
+
 # Returns
 `SciMLBase.ODESolution`. Access time-dependent results via `sol[ssys.component.variable, :]`.
 """
@@ -82,9 +92,35 @@ function solve_transient(
         saveat=t,
         callback=callbacks,
         initializealg=initializealg,
-        kwargs...,
+        merge(values(kwargs), _stateless_steps(prob, t, kwargs))...,
     )
     return sol
+end
+
+"""
+    _stateless_steps(prob, t, kwargs) -> NamedTuple
+
+Extra `solve` keywords for a problem whose every unknown is algebraic, and none for any
+other problem.
+
+Such a problem has an all-zero mass matrix, and the error a solver controls says nothing
+about values between its steps, so a saved time that falls inside a step can be off. Adding
+the saved times to `tstops` puts a step end on each one. OrdinaryDiffEq warns about
+interpolation on these problems whenever `saveat` is given, and with no saved value
+interpolated that warning no longer applies, so it is silenced unless the caller passed
+their own `verbose`.
+"""
+function _stateless_steps(prob, t, kwargs)
+    M = prob.f.mass_matrix
+    (M isa AbstractMatrix && all(iszero, M)) || return (;)
+    user_stops = collect(Float64, get(kwargs, :tstops, Float64[]))
+    tstops = sort!(unique!(vcat(collect(Float64, t), user_stops)))
+    haskey(kwargs, :verbose) && return (; tstops)
+    # DEVerbosity and SciMLLogging are reached through OrdinaryDiffEqCore, which already
+    # loads them, rather than taken on as dependencies of their own.
+    core = OrdinaryDiffEq.OrdinaryDiffEqCore
+    quiet = core.DEVerbosity(; rosenbrock_no_differential_states=core.SciMLLogging.Silent())
+    return (; tstops, verbose=quiet)
 end
 
 solve_transient(ssys, t::AbstractVector; kwargs...) = solve_transient(ssys, Pair[], t; kwargs...)

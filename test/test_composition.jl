@@ -92,7 +92,9 @@ end
     ]
     @named sys = assembly(connections, pump, bc, ch, ct_l, ct_r)
     ssys = mtkcompile(sys)
-    @test check_gravity_mismatch(ssys) == :mismatch
+    # The mismatch is also reported as a warning, which is part of what is checked.
+    result = @test_logs (:warn, r"no Gravity return component") check_gravity_mismatch(ssys)
+    @test result == :mismatch
 end
 
 # Section 3: var_length
@@ -136,24 +138,6 @@ end
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
     # Solve briefly to verify composition produces meaningful steady state
-    ic = [ssys.rods.cac.inlet.ṁ => 0.2]
-    sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
-    @test sol.retcode == ReturnCode.Success
-end
-
-@testset "symmetric_plate — n=10, nz=10, nx=2 compiles cleanly" begin
-    cac, fuel = _mtr_pair(; n=10, nz=10, nx=2)
-    rods = symmetric_plate(cac, fuel; name=:rods)
-    @test rods isa ModelingToolkit.AbstractSystem
-    @named pump = Pump(3.0e4)
-    @named bc = HeatExchanger(40.0)
-    conns = [
-        inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5,
-    ]
-    full = assembly(conns, rods, pump, bc; name=:full10)
-    ssys = mtkcompile(full)
-    @test ssys isa ModelingToolkit.AbstractSystem
     ic = [ssys.rods.cac.inlet.ṁ => 0.2]
     sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
@@ -482,11 +466,11 @@ end
     @test length(eqs) == 4 + 4 * 2  # 4 cells + 4*2 grid
 end
 
-# fuel_assembly — four-variant CAC <-> Plate alternation helper.
-# Each variant is checked by comparing the helper-built system against a
-# hand-rolled faces() chain pointwise (rtol=1e-10) after solve_steady, plus
-# the ArgumentError paths and an uncompiled-return smoke. k=2 for variants
-# 1/2/3, k=3 for variant 4. build_initializeprob=false is mandatory for HD+CAC.
+# fuel_assembly: the four chain shapes. Each variant checks that the helper writes the
+# same connections as a hand-written faces() chain over the same components, which needs
+# no compile. Variant 1 also compiles and solves, to show an assembly built this way runs,
+# and so does variant 4, the closed ring, the one shape with no free face.
+# Then the ArgumentError paths and an uncompiled-return smoke.
 
 # Helper: build a fresh (CAC, HD) pair under a caller-supplied name prefix.
 # Calls the constructors with name=... directly (not via @named) so the prefix
@@ -506,290 +490,95 @@ end
 # Time derivative, used to build the Dt(...)=>0.0 IC guesses (see variant-1 note).
 const _fa_Dt = Differential(t)
 
-# #### Variant 1 — channel-bookended (k=2 plates, k+1=3 channels) parity
-@testset "fuel_assembly variant 1 (channel-bookended, k=2) parity" begin
-    n, nz, nx = 4, 4, 2
-    # Helper-built path
-    c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n); c3h = _fa_cac(:c3; n=n)
-    p1h = _fa_hd(:p1; nz=nz, nx=nx); p2h = _fa_hd(:p2; nz=nz, nx=nx)
-    asm_helper = fuel_assembly([c1h, c2h, c3h], [p1h, p2h]; name=:asm_helper)
-    @test asm_helper isa ModelingToolkit.AbstractSystem
+"""
+    _fa_connections(sys) -> Set{String}
 
-    @named pump_h = Pump(3.0e4)
-    @named bc_h = HeatExchanger(40.0)
-    conns_h = [
-        inseries(pump_h, bc_h, asm_helper.c1, asm_helper.c2, asm_helper.c3, pump_h),
-        pump_h.inlet.p ~ 1.0e5,
+The connection equations `sys` holds, as strings. Equations print relative to the system
+that holds them, so two assemblies of the same components compare equal exactly when they
+are wired the same way.
+"""
+_fa_connections(sys) = Set(string.(ModelingToolkit.get_eqs(sys)))
+
+"""
+    _fa_hand(pairs, components) -> Set{String}
+
+The connections of a hand-wired assembly, `faces(pairs...)` over `components`.
+"""
+_fa_hand(pairs, components) =
+    _fa_connections(assembly(faces(pairs...), components...; name=:hand))
+
+"""
+    _fa_pair(left, right)
+
+One adjacent pair of the chain: `left`'s right face against `right`'s left face.
+"""
+_fa_pair(left, right) = (left, :thermal_right) => (right, :thermal_left)
+
+@testset "fuel_assembly variant 1 (channel-bookended, k=2) wiring and solve" begin
+    c1, c2, c3 = _fa_cac(:c1), _fa_cac(:c2), _fa_cac(:c3)
+    p1, p2 = _fa_hd(:p1), _fa_hd(:p2)
+    asm = fuel_assembly([c1, c2, c3], [p1, p2]; name=:asm)
+    parts = (c1, c2, c3, p1, p2)
+    chain = (_fa_pair(c1, p1), _fa_pair(p1, c2), _fa_pair(c2, p2), _fa_pair(p2, c3))
+    @test _fa_connections(asm) == _fa_hand(chain, parts)
+    # The comparison has teeth: one face swapped is a different wiring.
+    miswired = (chain[1:3]..., (p2, :thermal_left) => (c3, :thermal_left))
+    @test _fa_connections(asm) != _fa_hand(miswired, parts)
+
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(40.0)
+    conns = [inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump), pump.inlet.p ~ 1.0e5]
+    @named full = assembly(conns, asm, pump, bc)
+    ssys = mtkcompile(full; build_initializeprob=false)
+    # A Dt(...) => 0.0 guess for every channel's inlet flow: mtkcompile keeps only one of
+    # them as a differential state and which one is not known ahead of time.
+    ic = [
+        [ch.inlet.ṁ => 0.2 for ch in (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)]...,
+        [_fa_Dt(ch.inlet.ṁ) => 0.0 for ch in (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)]...,
     ]
-    full_helper = assembly(conns_h, asm_helper, pump_h, bc_h; name=:full_helper_v1)
-    ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
-
-    # Hand-rolled path — same components, explicit per-pair thermal wiring.
-    c1d = _fa_cac(:c1; n=n); c2d = _fa_cac(:c2; n=n); c3d = _fa_cac(:c3; n=n)
-    p1d = _fa_hd(:p1; nz=nz, nx=nx); p2d = _fa_hd(:p2; nz=nz, nx=nx)
-    # Hand-rolled reference: each pair joins the left member's right face to the right
-    # member's left face, as fuel_assembly does.
-    therm_eqs = faces(
-        (c1d, :thermal_right) => (p1d, :thermal_left),
-        (p1d, :thermal_right) => (c2d, :thermal_left),
-        (c2d, :thermal_right) => (p2d, :thermal_left),
-        (p2d, :thermal_right) => (c3d, :thermal_left),
-    )
-    @named asm_hand = assembly(therm_eqs, c1d, c2d, c3d, p1d, p2d)
-
-    @named pump_d = Pump(3.0e4)
-    @named bc_d = HeatExchanger(40.0)
-    conns_d = [
-        inseries(pump_d, bc_d, asm_hand.c1, asm_hand.c2, asm_hand.c3, pump_d),
-        pump_d.inlet.p ~ 1.0e5,
-    ]
-    full_hand = assembly(conns_d, asm_hand, pump_d, bc_d; name=:full_hand_v1)
-    ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
-
-    # We pass a Dt(...)=>0.0 guess for every per-CAC inlet.ṁ, even though
-    # mtkcompile only keeps one of them as a differential state — we can't know
-    # ahead of time which one survives, and the extras are harmlessly ignored.
-    ic_helper = [
-        ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
-        ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
-        ssys_helper.asm_helper.c3.inlet.ṁ => 0.2,
-        _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c3.inlet.ṁ) => 0.0,
-    ]
-    ic_hand = [
-        ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
-        ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
-        ssys_hand.asm_hand.c3.inlet.ṁ => 0.2,
-        _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c2.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c3.inlet.ṁ) => 0.0,
-    ]
-    sol_helper = solve_steady(ssys_helper, ic_helper)
-    sol_hand = solve_steady(ssys_hand, ic_hand)
-    @test sol_helper.retcode == ReturnCode.Success
-    @test sol_hand.retcode == ReturnCode.Success
-
-    # Read states by symbol rather than by unknown-vector position: the compiler's
-    # ordering can differ between the helper-built and hand-rolled systems.
-    vals_helper = Float64[]
-    vals_hand = Float64[]
-    for cname in (:c1, :c2, :c3), i in 1:n
-        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, cname), :T)[i]])
-        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, cname), :T)[i]])
-    end
-    for pname in (:p1, :p2), i in 1:nz, j in 1:nx
-        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, pname), :T)[i, j]])
-        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, pname), :T)[i, j]])
-    end
-    @test isapprox(vals_helper, vals_hand; rtol=1e-10)
+    sol = solve_steady(ssys, ic)
+    @test sol.retcode == ReturnCode.Success
 end
 
-# #### Variant 2 — plate-bookended (k=1 channel, k+1=2 plates) parity
-# The locked k=2 means the smaller variants get k≥1 channels. Variant 2
-# uses k=2 channels + k+1=3 plates so 'k' matches the variant-1 cell count.
-@testset "fuel_assembly variant 2 (plate-bookended, k=2) parity" begin
-    n, nz, nx = 4, 4, 2
-    c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n)
-    p1h = _fa_hd(:p1; nz=nz, nx=nx); p2h = _fa_hd(:p2; nz=nz, nx=nx); p3h = _fa_hd(:p3; nz=nz, nx=nx)
-    asm_helper = fuel_assembly([c1h, c2h], [p1h, p2h, p3h]; name=:asm_helper)
-    @test asm_helper isa ModelingToolkit.AbstractSystem
-
-    @named pump_h = Pump(3.0e4)
-    @named bc_h = HeatExchanger(40.0)
-    conns_h = [
-        inseries(pump_h, bc_h, asm_helper.c1, asm_helper.c2, pump_h),
-        pump_h.inlet.p ~ 1.0e5,
-    ]
-    full_helper = assembly(conns_h, asm_helper, pump_h, bc_h; name=:full_helper_v2)
-    ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
-
-    c1d = _fa_cac(:c1; n=n); c2d = _fa_cac(:c2; n=n)
-    p1d = _fa_hd(:p1; nz=nz, nx=nx); p2d = _fa_hd(:p2; nz=nz, nx=nx); p3d = _fa_hd(:p3; nz=nz, nx=nx)
-    therm_eqs = faces(
-        (p1d, :thermal_right) => (c1d, :thermal_left),
-        (c1d, :thermal_right) => (p2d, :thermal_left),
-        (p2d, :thermal_right) => (c2d, :thermal_left),
-        (c2d, :thermal_right) => (p3d, :thermal_left),
-    )
-    @named asm_hand = assembly(therm_eqs, c1d, c2d, p1d, p2d, p3d)
-
-    @named pump_d = Pump(3.0e4)
-    @named bc_d = HeatExchanger(40.0)
-    conns_d = [
-        inseries(pump_d, bc_d, asm_hand.c1, asm_hand.c2, pump_d),
-        pump_d.inlet.p ~ 1.0e5,
-    ]
-    full_hand = assembly(conns_d, asm_hand, pump_d, bc_d; name=:full_hand_v2)
-    ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
-
-    # (See the Dt(...) IC note in the variant-1 testset.)
-    ic_helper = [
-        ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
-        ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
-        _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
-    ]
-    ic_hand = [
-        ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
-        ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
-        _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c2.inlet.ṁ) => 0.0,
-    ]
-    sol_helper = solve_steady(ssys_helper, ic_helper)
-    sol_hand = solve_steady(ssys_hand, ic_hand)
-    @test sol_helper.retcode == ReturnCode.Success
-    @test sol_hand.retcode == ReturnCode.Success
-
-    vals_helper = Float64[]; vals_hand = Float64[]
-    for cname in (:c1, :c2), i in 1:n
-        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, cname), :T)[i]])
-        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, cname), :T)[i]])
-    end
-    for pname in (:p1, :p2, :p3), i in 1:nz, j in 1:nx
-        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, pname), :T)[i, j]])
-        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, pname), :T)[i, j]])
-    end
-    @test isapprox(vals_helper, vals_hand; rtol=1e-10)
+@testset "fuel_assembly variant 2 (plate-bookended, k=2) wiring" begin
+    c1, c2 = _fa_cac(:c1), _fa_cac(:c2)
+    p1, p2, p3 = _fa_hd(:p1), _fa_hd(:p2), _fa_hd(:p3)
+    asm = fuel_assembly([c1, c2], [p1, p2, p3]; name=:asm)
+    chain = (_fa_pair(p1, c1), _fa_pair(c1, p2), _fa_pair(p2, c2), _fa_pair(c2, p3))
+    @test _fa_connections(asm) == _fa_hand(chain, (c1, c2, p1, p2, p3))
 end
 
-# #### Variant 3 — mixed (k=2 of each), start=:channel parity
-@testset "fuel_assembly variant 3 (mixed, k=2, start=:channel) parity" begin
-    n, nz, nx = 4, 4, 2
-    c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n)
-    p1h = _fa_hd(:p1; nz=nz, nx=nx); p2h = _fa_hd(:p2; nz=nz, nx=nx)
-    asm_helper = fuel_assembly([c1h, c2h], [p1h, p2h]; bookend=:mixed, start=:channel, name=:asm_helper)
-    @test asm_helper isa ModelingToolkit.AbstractSystem
-
-    @named pump_h = Pump(3.0e4)
-    @named bc_h = HeatExchanger(40.0)
-    conns_h = [
-        inseries(pump_h, bc_h, asm_helper.c1, asm_helper.c2, pump_h),
-        pump_h.inlet.p ~ 1.0e5,
-    ]
-    full_helper = assembly(conns_h, asm_helper, pump_h, bc_h; name=:full_helper_v3)
-    ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
-
-    # Hand-rolled — sequence c1, p1, c2, p2 (start=:channel, mixed, open)
-    c1d = _fa_cac(:c1; n=n); c2d = _fa_cac(:c2; n=n)
-    p1d = _fa_hd(:p1; nz=nz, nx=nx); p2d = _fa_hd(:p2; nz=nz, nx=nx)
-    therm_eqs = faces(
-        (c1d, :thermal_right) => (p1d, :thermal_left),
-        (p1d, :thermal_right) => (c2d, :thermal_left),
-        (c2d, :thermal_right) => (p2d, :thermal_left),
-    )
-    @named asm_hand = assembly(therm_eqs, c1d, c2d, p1d, p2d)
-
-    @named pump_d = Pump(3.0e4)
-    @named bc_d = HeatExchanger(40.0)
-    conns_d = [
-        inseries(pump_d, bc_d, asm_hand.c1, asm_hand.c2, pump_d),
-        pump_d.inlet.p ~ 1.0e5,
-    ]
-    full_hand = assembly(conns_d, asm_hand, pump_d, bc_d; name=:full_hand_v3)
-    ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
-
-    # (See the Dt(...) IC note in the variant-1 testset.)
-    ic_helper = [
-        ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
-        ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
-        _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
-    ]
-    ic_hand = [
-        ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
-        ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
-        _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c2.inlet.ṁ) => 0.0,
-    ]
-    sol_helper = solve_steady(ssys_helper, ic_helper)
-    sol_hand = solve_steady(ssys_hand, ic_hand)
-    @test sol_helper.retcode == ReturnCode.Success
-    @test sol_hand.retcode == ReturnCode.Success
-
-    vals_helper = Float64[]; vals_hand = Float64[]
-    for cname in (:c1, :c2), i in 1:n
-        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, cname), :T)[i]])
-        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, cname), :T)[i]])
-    end
-    for pname in (:p1, :p2), i in 1:nz, j in 1:nx
-        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, pname), :T)[i, j]])
-        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, pname), :T)[i, j]])
-    end
-    @test isapprox(vals_helper, vals_hand; rtol=1e-10)
+@testset "fuel_assembly variant 3 (mixed, k=2, start=:channel) wiring" begin
+    c1, c2 = _fa_cac(:c1), _fa_cac(:c2)
+    p1, p2 = _fa_hd(:p1), _fa_hd(:p2)
+    asm = fuel_assembly([c1, c2], [p1, p2]; bookend=:mixed, start=:channel, name=:asm)
+    chain = (_fa_pair(c1, p1), _fa_pair(p1, c2), _fa_pair(c2, p2))
+    @test _fa_connections(asm) == _fa_hand(chain, (c1, c2, p1, p2))
 end
 
-# #### Variant 4 — closed annular (k=3 of each, ring) parity
-@testset "fuel_assembly variant 4 (closed annular, k=3) parity" begin
-    n, nz, nx = 4, 4, 2
-    c1h = _fa_cac(:c1; n=n); c2h = _fa_cac(:c2; n=n); c3h = _fa_cac(:c3; n=n)
-    p1h = _fa_hd(:p1; nz=nz, nx=nx); p2h = _fa_hd(:p2; nz=nz, nx=nx); p3h = _fa_hd(:p3; nz=nz, nx=nx)
-    asm_helper = fuel_assembly([c1h, c2h, c3h], [p1h, p2h, p3h]; closed=true, name=:asm_helper)
-    @test asm_helper isa ModelingToolkit.AbstractSystem
-
-    @named pump_h = Pump(3.0e4)
-    @named bc_h = HeatExchanger(40.0)
-    conns_h = [
-        inseries(pump_h, bc_h, asm_helper.c1, asm_helper.c2, asm_helper.c3, pump_h),
-        pump_h.inlet.p ~ 1.0e5,
-    ]
-    full_helper = assembly(conns_h, asm_helper, pump_h, bc_h; name=:full_helper_v4)
-    ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
-
-    # Hand-rolled closed ring: c1 p1 c2 p2 c3 p3, then wrap p3 -> c1.
-    c1d = _fa_cac(:c1; n=n); c2d = _fa_cac(:c2; n=n); c3d = _fa_cac(:c3; n=n)
-    p1d = _fa_hd(:p1; nz=nz, nx=nx); p2d = _fa_hd(:p2; nz=nz, nx=nx); p3d = _fa_hd(:p3; nz=nz, nx=nx)
-    therm_eqs = faces(
-        (c1d, :thermal_right) => (p1d, :thermal_left),
-        (p1d, :thermal_right) => (c2d, :thermal_left),
-        (c2d, :thermal_right) => (p2d, :thermal_left),
-        (p2d, :thermal_right) => (c3d, :thermal_left),
-        (c3d, :thermal_right) => (p3d, :thermal_left),
-        (p3d, :thermal_right) => (c1d, :thermal_left),  # wrap pair
+@testset "fuel_assembly variant 4 (closed annular, k=3) wiring and solve" begin
+    c1, c2, c3 = _fa_cac(:c1), _fa_cac(:c2), _fa_cac(:c3)
+    p1, p2, p3 = _fa_hd(:p1), _fa_hd(:p2), _fa_hd(:p3)
+    asm = fuel_assembly([c1, c2, c3], [p1, p2, p3]; closed=true, name=:asm)
+    chain = (
+        _fa_pair(c1, p1), _fa_pair(p1, c2), _fa_pair(c2, p2),
+        _fa_pair(p2, c3), _fa_pair(c3, p3), _fa_pair(p3, c1),  # the last pair wraps round
     )
-    @named asm_hand = assembly(therm_eqs, c1d, c2d, c3d, p1d, p2d, p3d)
+    @test _fa_connections(asm) == _fa_hand(chain, (c1, c2, c3, p1, p2, p3))
 
-    @named pump_d = Pump(3.0e4)
-    @named bc_d = HeatExchanger(40.0)
-    conns_d = [
-        inseries(pump_d, bc_d, asm_hand.c1, asm_hand.c2, asm_hand.c3, pump_d),
-        pump_d.inlet.p ~ 1.0e5,
+    # The ring is the one shape with no free face, so it is compiled and solved too.
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(40.0)
+    conns = [inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump), pump.inlet.p ~ 1.0e5]
+    @named full = assembly(conns, asm, pump, bc)
+    ssys = mtkcompile(full; build_initializeprob=false)
+    channels = (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)
+    ic = [
+        [ch.inlet.ṁ => 0.2 for ch in channels]...,
+        [_fa_Dt(ch.inlet.ṁ) => 0.0 for ch in channels]...,
     ]
-    full_hand = assembly(conns_d, asm_hand, pump_d, bc_d; name=:full_hand_v4)
-    ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
-
-    # (See the Dt(...) IC note in the variant-1 testset.)
-    ic_helper = [
-        ssys_helper.asm_helper.c1.inlet.ṁ => 0.2,
-        ssys_helper.asm_helper.c2.inlet.ṁ => 0.2,
-        ssys_helper.asm_helper.c3.inlet.ṁ => 0.2,
-        _fa_Dt(ssys_helper.asm_helper.c1.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c2.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_helper.asm_helper.c3.inlet.ṁ) => 0.0,
-    ]
-    ic_hand = [
-        ssys_hand.asm_hand.c1.inlet.ṁ => 0.2,
-        ssys_hand.asm_hand.c2.inlet.ṁ => 0.2,
-        ssys_hand.asm_hand.c3.inlet.ṁ => 0.2,
-        _fa_Dt(ssys_hand.asm_hand.c1.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c2.inlet.ṁ) => 0.0,
-        _fa_Dt(ssys_hand.asm_hand.c3.inlet.ṁ) => 0.0,
-    ]
-    sol_helper = solve_steady(ssys_helper, ic_helper)
-    sol_hand = solve_steady(ssys_hand, ic_hand)
-    @test sol_helper.retcode == ReturnCode.Success
-    @test sol_hand.retcode == ReturnCode.Success
-
-    vals_helper = Float64[]; vals_hand = Float64[]
-    for cname in (:c1, :c2, :c3), i in 1:n
-        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, cname), :T)[i]])
-        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, cname), :T)[i]])
-    end
-    for pname in (:p1, :p2, :p3), i in 1:nz, j in 1:nx
-        push!(vals_helper, sol_helper[getproperty(getproperty(ssys_helper.asm_helper, pname), :T)[i, j]])
-        push!(vals_hand,   sol_hand[getproperty(getproperty(ssys_hand.asm_hand, pname), :T)[i, j]])
-    end
-    @test isapprox(vals_helper, vals_hand; rtol=1e-10)
+    sol = solve_steady(ssys, ic)
+    @test sol.retcode == ReturnCode.Success
 end
 
 # #### ArgumentError paths

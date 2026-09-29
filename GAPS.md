@@ -180,7 +180,7 @@ small and independent.
 | `Aggregator.draw` | Draws the calculation graph | No |
 
 MTK covers some of it: `unknowns`, `observed` and `equations` show what is being solved, and
-`test_determinacy.jl` checks every builder balances. What remains is making a failed
+`mtkcompile` refuses a model whose equations and unknowns do not balance. What remains is making a failed
 initialisation easy to read, which is the hardest thing to debug in this codebase today, and
 drawing a model. For the drawing, `ModelingToolkitDesigner.jl` is the direct replacement for
 `Aggregator.draw` but pins MTK 8 and 9, so it needs a compat bump; `Latexify.jl` renders the

@@ -155,9 +155,12 @@ end
         @test isapprox(sol_phy03[ssys_phy03.cac_phy03.dP], dP_expected_03; rtol=1e-6)
     end
 
-    @testset "regime switching in a solved loop — laminar branch (Re < 2300)" begin
-        n = 3;
-        T_inlet = 40.0;
+    @testset "regime switching in a solved loop — laminar and turbulent branches" begin
+        # One loop, solved at a low pump head that keeps every cell laminar and again at a
+        # high head that makes every cell turbulent. The head is a parameter of the pump,
+        # so both solves share one compiled system.
+        n = 3
+        T_inlet = 40.0
         T_wall = 100.0
         geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         htc_rd = HTC.RegimeDependent(;
@@ -172,115 +175,54 @@ end
             re_bounds=(2000.0, 5000.0),
         )
         dP_lam = 30.0
-
-        @named pump_lam = Pump(dP_lam)
-        @named cac_lam = ChannelAndContacts(
-            n=n, geometry=geom, htc=htc_rd, darcy=friction_rd
-        )
-        @named bc_lam = HeatExchanger(T_inlet)
-        @named ct_l_lam = ConstantTemperature(T_wall; n=n)
-        @named ct_r_lam = ConstantTemperature(T_wall; n=n)
-        conns_lam = [
-            inseries(pump_lam, bc_lam, cac_lam, pump_lam),
-            faces(
-                (ct_l_lam, :thermal) => (cac_lam, :thermal_left),
-                (ct_r_lam, :thermal) => (cac_lam, :thermal_right),
-            ),
-            pump_lam.inlet.p ~ 1.0e5,
-        ]
-        @named sys_lam = assembly(
-            conns_lam, pump_lam, bc_lam, cac_lam, ct_l_lam, ct_r_lam
-        )
-        ssys_lam = mtkcompile(sys_lam)
-        sol_lam = solve_steady(ssys_lam, [ssys_lam.cac_lam.inlet.ṁ => 1e-4])
-
-        @test sol_lam.retcode == ReturnCode.Success
-        @test sol_lam[ssys_lam.cac_lam.Re[1]] < 2300.0
-
-        # Magnitude check: confirm the regime_dependent closure actually drove the solved dP
-        # through its laminar branch. friction_rd blends over re_bounds; every cell
-        # here is below 2300, so it must return the laminar rectangular factor. Rebuild
-        # dP = sum_i f(Re[i]) * ṁ*|ṁ|/(2*rho(T[i])*A^2) * (dz/Dh) using friction_rd
-        # itself (same closure the channel evaluates) so a wrong-branch or 2x-wrong factor
-        # fails. rtol=1e-6: arithmetic re-evaluation of the same form on the converged state.
-        A = geom.A
-        Dh = geom.Dh
-        dz = geom.L / n
-        ṁ_lam = sol_lam[ssys_lam.cac_lam.inlet.ṁ]
-        dP_expected_lam = sum(
-            let
-                Re_i = sol_lam[ssys_lam.cac_lam.Re[i]]
-                T_i = sol_lam[ssys_lam.cac_lam.T[i]]
-                @test Re_i < 2300.0   # confirm the laminar branch is the one selected
-                Friction.darcy_weisbach_dp(ṁ_lam, ρ(H2O, T_i), friction_rd(T_i, T_i, ṁ_lam, H2O, geom), dz, Dh, A)
-            end for i in 1:n
-        )
-        @test isapprox(sol_lam[ssys_lam.cac_lam.dP], dP_expected_lam; rtol=1e-6)
-    end
-
-    @testset "regime switching in a solved loop — turbulent branch (Re > 2300)" begin
-        n = 3;
-        T_inlet = 40.0;
-        T_wall = 100.0
-        geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
-        htc_rd = HTC.RegimeDependent(;
-            laminar=HTC.ConstantNusselt(; Nu=8.235),
-            turbulent=HTC.DittusBoelter(),
-            re_bounds=(2000.0, 5000.0),
-            geom=geom,
-        )
-        friction_rd = Friction.RegimeDependent(;
-            laminar=Friction.rectangular_laminar(geom),
-            turbulent=Friction.blasius,
-            re_bounds=(2000.0, 5000.0),
-        )
         dP_turb = 3.0e4
 
-        @named pump_turb = Pump(dP_turb)
-        @named cac_turb = ChannelAndContacts(
-            n=n, geometry=geom, htc=htc_rd, darcy=friction_rd
-        )
-        @named bc_turb = HeatExchanger(T_inlet)
-        @named ct_l_turb = ConstantTemperature(T_wall; n=n)
-        @named ct_r_turb = ConstantTemperature(T_wall; n=n)
-        conns_turb = [
-            inseries(pump_turb, bc_turb, cac_turb, pump_turb),
-            faces(
-                (ct_l_turb, :thermal) => (cac_turb, :thermal_left),
-                (ct_r_turb, :thermal) => (cac_turb, :thermal_right),
-            ),
-            pump_turb.inlet.p ~ 1.0e5,
+        @named pump = Pump(dP_lam)
+        @named cac = ChannelAndContacts(n=n, geometry=geom, htc=htc_rd, darcy=friction_rd)
+        @named bc = HeatExchanger(T_inlet)
+        @named ct_l = ConstantTemperature(T_wall; n=n)
+        @named ct_r = ConstantTemperature(T_wall; n=n)
+        conns = [
+            inseries(pump, bc, cac, pump),
+            faces((ct_l, :thermal) => (cac, :thermal_left), (ct_r, :thermal) => (cac, :thermal_right)),
+            pump.inlet.p ~ 1.0e5,
         ]
-        @named sys_turb = assembly(
-            conns_turb, pump_turb, bc_turb, cac_turb, ct_l_turb, ct_r_turb
-        )
-        ssys_turb = mtkcompile(sys_turb)
-        sol_turb = solve_steady(ssys_turb, [ssys_turb.cac_turb.inlet.ṁ => 0.250])
-
+        @named sys = assembly(conns, pump, bc, cac, ct_l, ct_r)
+        ssys = mtkcompile(sys)
+        sol_lam = solve_steady(ssys, [ssys.cac.inlet.ṁ => 1e-4])
+        sol_turb = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.250, ssys.pump.dP_pump => dP_turb])
+        @test sol_lam.retcode == ReturnCode.Success
         @test sol_turb.retcode == ReturnCode.Success
-        @test sol_turb[ssys_turb.cac_turb.Re[1]] > 2300.0
+        @test sol_lam[ssys.cac.Re[1]] < 2300.0
+        @test sol_turb[ssys.cac.Re[1]] > 2300.0
 
-        # Magnitude check: confirm the solved dP went through the turbulent (Blasius) branch.
-        # Above re_bounds[2] friction_rd must return blasius(Re). Rebuild
-        # dP = sum_i f(Re[i]) * ṁ*|ṁ|/(2*rho(T[i])*A^2) * (dz/Dh) from friction_rd on
-        # the converged Re[i]/T[i], so a wrong branch (e.g. still laminar 64/(Re*K_R)) or a
-        # 2x factor fails. rtol=1e-6: same-form arithmetic on the converged state.
+        # Magnitude check: confirm the regime_dependent closure drove the solved dP through
+        # the branch each Reynolds number selects. Rebuild
+        # dP = sum_i f(Re[i]) * ṁ*|ṁ|/(2*rho(T[i])*A^2) * (dz/Dh) with friction_rd itself (the
+        # closure the channel evaluates), so a wrong branch or a 2x factor fails. rtol=1e-6:
+        # same-form arithmetic on the converged state.
         A = geom.A
         Dh = geom.Dh
         dz = geom.L / n
-        ṁ_turb = sol_turb[ssys_turb.cac_turb.inlet.ṁ]
-        dP_expected_turb = sum(
-            let
-                Re_i = sol_turb[ssys_turb.cac_turb.Re[i]]
-                T_i = sol_turb[ssys_turb.cac_turb.T[i]]
-                @test Re_i > 2300.0   # confirm the turbulent branch is the one selected
-                # friction_rd must equal Blasius here, not the laminar rectangular factor.
-                @test isapprox(friction_rd(T_i, T_i, ṁ_turb, H2O, geom),
-                               Friction.blasius(Re_i); rtol=1e-12)
-                Friction.darcy_weisbach_dp(ṁ_turb, ρ(H2O, T_i), friction_rd(T_i, T_i, ṁ_turb, H2O, geom), dz, Dh, A)
-            end for i in 1:n
-        )
-        @test isapprox(sol_turb[ssys_turb.cac_turb.dP], dP_expected_turb; rtol=1e-6)
+        function dP_rebuilt(sol)
+            ṁ = sol[ssys.cac.inlet.ṁ]
+            return sum(1:n) do i
+                T_i = sol[ssys.cac.T[i]]
+                f = friction_rd(T_i, T_i, ṁ, H2O, geom)
+                Friction.darcy_weisbach_dp(ṁ, ρ(H2O, T_i), f, dz, Dh, A)
+            end
+        end
+        # Every cell sits in the branch its solve is meant to exercise.
+        @test all(<(2300.0), sol_lam[ssys.cac.Re])
+        @test all(>(2300.0), sol_turb[ssys.cac.Re])
+        @test isapprox(sol_lam[ssys.cac.dP], dP_rebuilt(sol_lam); rtol=1e-6)
+        @test isapprox(sol_turb[ssys.cac.dP], dP_rebuilt(sol_turb); rtol=1e-6)
+        # Above the band friction_rd must equal Blasius, not the laminar rectangular factor.
+        ṁ_turb = sol_turb[ssys.cac.inlet.ṁ]
+        for i in 1:n
+            T_i, Re_i = sol_turb[ssys.cac.T[i]], sol_turb[ssys.cac.Re[i]]
+            @test isapprox(friction_rd(T_i, T_i, ṁ_turb, H2O, geom), Friction.blasius(Re_i); rtol=1e-12)
+        end
     end
 end
 

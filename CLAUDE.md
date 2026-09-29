@@ -197,7 +197,6 @@ test/
   test_initial_conditions.jl # steady_state_guess, uniform (src/initial_conditions.jl)
   test_solvers.jl           # solve_steady/solve_transient wrappers (src/solvers.jl)
   test_examples.jl          # build_loop* / build_cube builders + loss-of-flow transient (src/examples.jl)
-  test_determinacy.jl       # equation/unknown balance (fully_determined) for builders + scenarios
   test_validation.jl        # Quantitative cross-validation against Python STREAM
   test_integration.jl       # STRICT 1:1 port of Python tests/test_general/test_integrations.py —
                             # exactly the 21 Python integration tests, nothing else
