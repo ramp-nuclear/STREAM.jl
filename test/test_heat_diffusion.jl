@@ -5,7 +5,6 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
 @testset "HeatDiffusion callable and returns MTK System" begin
     @named hd = HeatDiffusion(

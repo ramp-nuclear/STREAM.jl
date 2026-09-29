@@ -8,7 +8,6 @@ using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
-using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
 
 include(joinpath(@__DIR__, "parity_helpers.jl"))
@@ -186,9 +185,7 @@ end
     @named sys = assembly(conns, pump, hx, cac, ct_l, ct_r)
     ssys = mtkcompile(sys)
 
-    op = vcat(
-            [ssys.cac.inlet.ṁ => 0.5],
-    )
+    op = [ssys.cac.inlet.ṁ => 0.5]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
     @test all(isfinite, sol[ssys.cac.T])
@@ -325,10 +322,7 @@ end
     @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     ssys = mtkcompile(sys)
 
-    op = vcat(
-            [ssys.cac_l.inlet.ṁ => +0.250],
-            [ssys.cac_r.inlet.ṁ => +0.250],
-    )
+    op = [ssys.cac_l.inlet.ṁ => +0.250, ssys.cac_r.inlet.ṁ => +0.250]
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
@@ -468,11 +462,11 @@ end
     @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     ssys = mtkcompile(sys)
 
-    op = vcat(
-        [ssys.hd.T[i, nx] => 95.0 for i in 1:nz],
-            [ssys.cac_l.inlet.ṁ => +0.250],
-            [ssys.cac_r.inlet.ṁ => +0.250],
-    )
+    op = [
+        [ssys.hd.T[i, nx] => 95.0 for i in 1:nz]...,
+        ssys.cac_l.inlet.ṁ => +0.250,
+        ssys.cac_r.inlet.ṁ => +0.250,
+    ]
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
@@ -611,9 +605,7 @@ end
 
     cac_s = ssys.scc.cac_l
     fuel_s = ssys.scc.hd
-    op = vcat(
-            [cac_s.inlet.ṁ => +0.250],
-    )
+    op = [cac_s.inlet.ṁ => +0.250]
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
@@ -749,7 +741,7 @@ end  # @testset "parity harness"
     @named sys_v01 = assembly(conns_v01, ct_l, ct_r, hd_v01)
     ssys_v01 = mtkcompile(sys_v01)
 
-    op_ic_v01 = [ssys_v01.hd_v01.T[i, j] => T0 for i in 1:nz_v01 for j in 1:nx_v01]
+    op_ic_v01 = [ssys_v01.hd_v01.T => fill(T0, nz_v01, nx_v01)]
 
     t_checkpoints = [0.5 * tau_v01, tau_v01, 2 * tau_v01, 5 * tau_v01]
     tspan_v01 = (0.0, 5.0 * tau_v01 * 1.01)

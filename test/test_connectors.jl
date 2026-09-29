@@ -6,7 +6,6 @@ using ModelingToolkit
 using STREAM
 using STREAM.Components
 const ModelingToolkitBase = ModelingToolkit.ModelingToolkitBase
-using ModelingToolkit: t_nounits as t
 
 @testset "ṁ is a Flow variable" begin
     @named fp = FlowPort()

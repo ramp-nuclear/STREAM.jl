@@ -31,7 +31,6 @@ using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 
 using Plots
@@ -87,10 +86,7 @@ conns = [
 @named sys = assembly(conns, pump_l, hx_l, pump_r, hx_r, rods)
 ssys = mtkcompile(sys)
 
-op = vcat(
-    [ssys.rods.cac_l.inlet.ṁ => +0.250],
-    [ssys.rods.cac_r.inlet.ṁ => +0.250],
-)
+op = [ssys.rods.cac_l.inlet.ṁ => +0.250, ssys.rods.cac_r.inlet.ṁ => +0.250]
 
 println("Solving steady state...")
 sol = solve_steady(ssys, op)

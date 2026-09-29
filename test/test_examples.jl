@@ -27,7 +27,7 @@ using STREAM.Examples
         # Smoke: demonstrate the full `build_loop` API produces a working transient.
         ssys = build_loop()
         ic = [
-            [ssys.ch.T[i] => 40.0 for i in 1:10]...,
+            ssys.ch.T => fill(40.0, 10),
             ssys.ch.inlet.ṁ => 0.5,
         ]
         sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
@@ -38,7 +38,7 @@ using STREAM.Examples
     @testset "build_loop_vertical compiles + briefly solves" begin
         ssys = build_loop_vertical()
         ic = [
-            [ssys.ch.T[i] => 40.0 for i in 1:10]...,
+            ssys.ch.T => fill(40.0, 10),
             ssys.ch.inlet.ṁ => 0.5,
         ]
         sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
@@ -49,7 +49,7 @@ using STREAM.Examples
     @testset "build_loop_transient compiles + briefly solves" begin
         ssys = build_loop_transient()
         ic = [
-            [ssys.ch.T[i] => 40.0 for i in 1:10]...,
+            ssys.ch.T => fill(40.0, 10),
             ssys.ch.inlet.ṁ => 0.5,
         ]
         sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))

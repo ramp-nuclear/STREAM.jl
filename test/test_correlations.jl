@@ -1,12 +1,10 @@
 using Test
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM: Gr, Ra
 
 @testset "Correlation Library" begin
     @testset "Friction.rectangular_correction reference values" begin

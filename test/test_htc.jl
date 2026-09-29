@@ -1,11 +1,9 @@
 using Test
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM: Re, Pr
 
 const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
 

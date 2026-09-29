@@ -415,10 +415,10 @@ function build_loop_pk(ctrl;
     @named sys = assembly(connections, rods, pk, pump, bc)
     ssys = mtkcompile(sys)
 
-    ic = [
+    ic = Pair{Any,Any}[
         ssys.rods.cac.inlet.ṁ => 0.2,
-        [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
-        [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
+        ssys.rods.cac.T => fill(T_inlet, n),
+        ssys.rods.fuel.T => fill(T_inlet, nz, nx),
     ]
     # Port temperatures default to 26.85 °C (connectors.jl). The boundary coolant cells and
     # the channel-to-fuel contacts are aliases of port temperatures, and which member of
@@ -432,13 +432,8 @@ function build_loop_pk(ctrl;
     push!(ic, ssys.pump.outlet.T => T_inlet)
     push!(ic, ssys.bc.inlet.T => T_inlet)
     push!(ic, ssys.bc.outlet.T => T_inlet)
-    for i in 1:n
-        push!(ic, port(ssys.rods.cac, :thermal_left, i).T => T_inlet)
-        push!(ic, port(ssys.rods.cac, :thermal_right, i).T => T_inlet)
-    end
-    for i in 1:nz
-        push!(ic, port(ssys.rods.fuel, :thermal_left, i).T => T_inlet)
-        push!(ic, port(ssys.rods.fuel, :thermal_right, i).T => T_inlet)
+    for part in (ssys.rods.cac, ssys.rods.fuel), face in (:thermal_left, :thermal_right)
+        append!(ic, port(part, face, :T) .=> T_inlet)
     end
     return (ssys, ic)
 end

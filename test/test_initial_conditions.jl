@@ -5,7 +5,6 @@
 
 using Test
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Components

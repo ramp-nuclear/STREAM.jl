@@ -454,7 +454,7 @@ end
     @named sys_cac = assembly(conns_cac, pump_cac, bc_cac, cac, ct_l_xeq)
     ssys_cac = mtkcompile(sys_cac; fully_determined=false)  # integration test: per-cell wall-T binding
     ic_cac = [
-        [ssys_cac.cac.T[i] => T_INLET for i in 1:n]...,
+        ssys_cac.cac.T => fill(T_INLET, n),
         ssys_cac.cac.inlet.ṁ => 0.5,
     ]
     sol_cac = solve_transient(ssys_cac, ic_cac, range(0.0, 1.0, length=50))
@@ -478,7 +478,7 @@ end
     @named sys_chf = assembly(conns_chf, pump_chf, bc_chf, chf)
     ssys_chf = mtkcompile(sys_chf)
     ic_chf = [
-        [ssys_chf.chf.T[i] => T_INLET for i in 1:n]...,
+        ssys_chf.chf.T => fill(T_INLET, n),
         ssys_chf.chf.inlet.ṁ => 0.5,
     ]
     sol_chf = solve_transient(ssys_chf, ic_chf, range(0.0, 1.0, length=50))

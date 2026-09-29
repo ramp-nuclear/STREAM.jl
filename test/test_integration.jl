@@ -17,7 +17,6 @@ using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Substances
 using STREAM.Examples
-using STREAM: PipeGeometry, PipeGeometry_circular, solve_steady, solve_transient
 
 # ============================================================================
 # Python `tests/test_general/test_integrations.py` 1:1 ports.
@@ -605,9 +604,11 @@ end
     # Forced-flow steady at ṁ0 → the pump head that holds it (Python's steady pump pressure).
     @named pump = Pump(; ṁ0=ṁ0)
     ssys = build_coastdown(pump)
-    guess = [ssys.cold.inlet.ṁ => ṁ0]
-    append!(guess, [ssys.cold.T[i] => T_cold for i in 1:nz])
-    append!(guess, [ssys.hot.T[i] => T_hot for i in 1:nz])
+    guess = [
+        ssys.cold.inlet.ṁ => ṁ0,
+        ssys.cold.T => fill(T_cold, nz),
+        ssys.hot.T => fill(T_hot, nz),
+    ]
     sol0 = solve_steady(ssys, guess)
     @test sol0.retcode == ReturnCode.Success
     p_pump0 = sol0[ssys.pump.outlet.p] - sol0[ssys.pump.inlet.p]
@@ -657,12 +658,11 @@ end
         ssys2.cold.inlet.ṁ => ṁ0 / 2,
         Dt(ssys2.cold.inlet.ṁ) => 0.0,
         Dt(ssys2.hot.inlet.ṁ) => 0.0,
+        ssys2.cold.T => fill(T_cold, nz),
+        ssys2.hot.T => fill(T_hot, nz),
     ]
-    append!(carry, [ssys2.cold.T[i] => T_cold for i in 1:nz])
-    append!(carry, [ssys2.hot.T[i] => T_hot for i in 1:nz])
     for tt in times
-        op = [ssys2.pump2.dP_pump => p_pump0 * exp(-tt)]
-        append!(op, carry)
+        op = [ssys2.pump2.dP_pump => p_pump0 * exp(-tt); carry]
         sol = solve_steady(ssys2, op; solver=SSRootfind())
         push!(retcodes, sol.retcode) 
         push!(ṁ, sol[ssys2.cold.inlet.ṁ])
@@ -815,10 +815,10 @@ end
     # critical). Seed every member of each connection set (port temperatures default to 26.85 °C and
     # which alias representative survives is not stable across MTK versions), matching build_loop_pk.
     pk_ic = point_kinetics_steady_state(1.0)
-    ic = [
+    ic = Pair{Any,Any}[
         ssys.pk.rho_c_fn => ctrl,
         ssys.pk.P_neutron => pk_ic.P_neutron,
-        [ssys.pk.C[k] => pk_ic.C_k[k] for k in eachindex(pk_ic.C_k)]...,
+        ssys.pk.C => pk_ic.C_k,
     ]
     for i in 1:N
         rods = getproperty(ssys, Symbol(:rods, i))
@@ -827,21 +827,16 @@ end
         pump = getproperty(ssys, Symbol(:pump, i))
         bc = getproperty(ssys, Symbol(:bc, i))
         push!(ic, cac.inlet.ṁ => ṁs[i])
-        append!(ic, [cac.T[j] => T0 for j in 1:n])
-        append!(ic, [fuel.T[j, k] => T0 for j in 1:nz for k in 1:nx])
+        push!(ic, cac.T => fill(T0, n))
+        push!(ic, fuel.T => fill(T0, nz, nx))
         push!(ic, cac.inlet.T => T0)
         push!(ic, cac.outlet.T => T0)
         push!(ic, pump.inlet.T => T0)
         push!(ic, pump.outlet.T => T0)
         push!(ic, bc.inlet.T => T0)
         push!(ic, bc.outlet.T => T0)
-        for j in 1:n
-            push!(ic, port(cac, :thermal_left, j).T => T0)
-            push!(ic, port(cac, :thermal_right, j).T => T0)
-        end
-        for j in 1:nz
-            push!(ic, port(fuel, :thermal_left, j).T => T0)
-            push!(ic, port(fuel, :thermal_right, j).T => T0)
+        for part in (cac, fuel), face in (:thermal_left, :thermal_right)
+            append!(ic, port(part, face, :T) .=> T0)
         end
     end
 

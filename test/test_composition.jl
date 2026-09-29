@@ -285,9 +285,7 @@ function _build_osc_loop(side::Symbol, name_suffix)
     ]
     full = assembly(conns, osc, pump, bc; name=Symbol(:osc_full_, name_suffix))
     ssys = mtkcompile(full)
-    op = vcat(
-        [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.inlet.ṁ => 0.25],
-    )
+    op = [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.inlet.ṁ => 0.25]
     sol = solve_steady(ssys, op)
     return ssys, sol, getproperty(ssys, Symbol(:osc_, name_suffix)), nz, nx
 end

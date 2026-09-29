@@ -2,14 +2,12 @@
 
 using Test
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using ModelingToolkit: connect    # disambiguate from Sockets.connect
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
-using STREAM: PipeGeometry_circular, PipeGeometry_rectangular
 
 """
     assert_determined(label, sys) -> System
