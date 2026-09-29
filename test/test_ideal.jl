@@ -84,7 +84,7 @@ end
     ]
     @named s = assembly(conns, prof, sinks...)
     ss = mtkcompile(s)
-    sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())
+    sol = solve_transient(ss, [0.0, 1.0])
     @test sol[port(ss.prof, :thermal, :T)][end] == profile
     @test sol[port(ss.prof, :thermal, :Q)][end] ≈ -10.0 .* (profile .- 20.0)
 end
@@ -111,8 +111,7 @@ end
     ]
     @named s = assembly(conns, cb, wall)
     ss = mtkcompile(s)
-    prob = ODEProblem(ss, Pair[], (0.0, 1.0))
-    sol = solve(prob, Rodas5P())
+    sol = solve_transient(ss, [0.0, 1.0])
     @test sol[ss.cb.thermal.Q][end] ≈ h_val * area * (T_wall - T_fluid)
 end
 
@@ -125,7 +124,7 @@ end
     conns = [connect(cb.thermal, wall.thermal1), cb.h ~ 4000.0, cb.T_fluid ~ 26.85]
     @named s = assembly(conns, cb, wall)
     ss = mtkcompile(s)
-    sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())
+    sol = solve_transient(ss, [0.0, 1.0])
     @test sol[ss.cb.thermal.Q][end] > 0.0
     @test sol[ss.wall.thermal1.Q][end] < 0.0
 end

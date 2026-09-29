@@ -92,7 +92,9 @@ end
     ]
     @named sys = assembly(connections, pump, bc, ch, ct_l, ct_r)
     ssys = mtkcompile(sys)
-    @test check_gravity_mismatch(ssys) == :mismatch
+    # The mismatch is also reported as a warning, which is part of what is checked.
+    result = @test_logs (:warn, r"no Gravity return component") check_gravity_mismatch(ssys)
+    @test result == :mismatch
 end
 
 # Section 3: var_length
