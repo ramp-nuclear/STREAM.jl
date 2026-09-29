@@ -158,10 +158,9 @@ Topology (4-node parallel network):
 Heated leg: `ChannelAndContacts` (`heated.ch`) + `HeatDiffusion` plate
 (`heated.fuel`) wired one-sided via `one_sided(ch, fuel; side=:left)`.
 Sub-systems retain their `@named` symbols, so access paths inside `heated` are
-`heated.ch.*` and `heated.fuel.*` (not `heated.channel.*`). The right thermal
-side of `ch` dangles inside the `heated` subsystem; the dangling per-cell
-`ThermalPort` Flow rule produces zero net heat flow there, so no extra binding
-is needed — the right face is adiabatic.
+`heated.ch.*` and `heated.fuel.*` (not `heated.channel.*`). The right face of `ch`
+is left unconnected, so MTK sets its heat flow to zero, and its wall temperature is
+pinned to the coolant.
 
 Return leg: `ret` is an external-input `Channel`. Default
 `h_left=h_right=0.0` makes it adiabatic regardless of `T_wall_*[i]` values; the
@@ -191,7 +190,7 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
 - `L_ch`: channel length [m] (default 1.0)
 - `D_ch`: channel hydraulic diameter [m] (default 0.01)
 - `T_inlet`: inlet/HeatExchanger boundary temperature [°C] (default 40.0)
-- `power_W`: total fuel-plate heat input [W], pinned via `heated.fuel.power ~ power_W`
+- `power_W`: total fuel-plate heat input [W]
   (default 1.0e3, an NC-equilibrium-producing baseline)
 - `fuel_nx`: lateral cells in the HeatDiffusion plate (default 2)
 - `fuel_Lx`: plate lateral thickness [m] (default 0.005)
@@ -258,7 +257,6 @@ function build_loop_lof_bypass(;
     push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < 0.01))
     @named ext_res = Resistor(R_ext)
 
-    ps = fill(1.0 / (n * fuel_nx), n, fuel_nx)
     @named fuel = HeatDiffusion(;
         nz=n,
         nx=fuel_nx,
@@ -268,7 +266,7 @@ function build_loop_lof_bypass(;
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
+        power=power_W,
     )
     heated = one_sided(ch, fuel; side=:left, name=:heated)
 
@@ -279,11 +277,9 @@ function build_loop_lof_bypass(;
         inparallel(ine, ((heated.ch, ret), flapper), ext_res),
         # Boundary conditions
         pump.inlet.p ~ 1.0e5,
-        heated.fuel.power ~ power_W,
-        # Close the dangling right face of the one-sided CAC (fuel is on the left).
-        # The current MTK does not auto-zero an unconnected ThermalPort's flow, so
-        # bind each right wall T to the local bulk T ⇒ q_right = h*(T-T) = 0 (adiabatic).
-        # Supplies the n equations that keep the heated subsystem fully determined.
+        # A circular channel's right face has no heated perimeter, so its heat is zero
+        # whatever its wall temperature. Pin that temperature to the coolant so it is
+        # determined.
         port(heated.ch, :thermal_right, :T) .~ heated.ch.T,
     ]
 
@@ -371,7 +367,6 @@ function build_loop_pk(ctrl;
     power_input=nothing,
 )
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-    ps = fill(1.0 / (nz * nx), nz, nx)  # uniform power shape, normalized
     @named cac = ChannelAndContacts(;
         n=n,
         geometry=geom,
@@ -387,7 +382,6 @@ function build_loop_pk(ctrl;
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
     )
     rods = symmetric_plate(cac, fuel; name=:rods)
     rods_cac = rods.cac

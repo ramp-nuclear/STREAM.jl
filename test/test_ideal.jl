@@ -89,7 +89,7 @@ end
         [s.T_fluid for s in sinks] .~ 20.0,
     ]
     @named s = assembly(conns, prof, sinks...)
-    ss = mtkcompile(s; fully_determined=true)
+    ss = mtkcompile(s)
     sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())
     @test sol[port(ss.prof, :thermal, :T)][end] == profile
     @test sol[port(ss.prof, :thermal, :Q)][end] ≈ -10.0 .* (profile .- 20.0)
@@ -116,7 +116,7 @@ end
         cb.T_fluid ~ T_fluid,
     ]
     @named s = assembly(conns, cb, wall)
-    ss = mtkcompile(s; fully_determined=true)
+    ss = mtkcompile(s)
     prob = ODEProblem(ss, Pair[], (0.0, 1.0))
     sol = solve(prob, Rodas5P())
     @test sol[ss.cb.thermal.Q][end] ≈ h_val * area * (T_wall - T_fluid)
@@ -130,7 +130,7 @@ end
     @named wall = ConstantTemperature(46.85)
     conns = [connect(cb.thermal, wall.thermal1), cb.h ~ 4000.0, cb.T_fluid ~ 26.85]
     @named s = assembly(conns, cb, wall)
-    ss = mtkcompile(s; fully_determined=true)
+    ss = mtkcompile(s)
     sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())
     @test sol[ss.cb.thermal.Q][end] > 0.0
     @test sol[ss.wall.thermal1.Q][end] < 0.0

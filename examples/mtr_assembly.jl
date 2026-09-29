@@ -57,7 +57,6 @@ const K_AL      = 200.0     # W/(m*K)
 println("Building MTR assembly...")
 
 geom = PipeGeometry_rectangular(L_PLATE, Y_PLATE, LX_PLATE, Y_PLATE)
-ps = fill(1.0 / (NZ * NX), NZ, NX)
 @named hd = HeatDiffusion(;
     nz=NZ,
     nx=NX,
@@ -67,7 +66,6 @@ ps = fill(1.0 / (NZ * NX), NZ, NX)
     rho_s=RHO_AL,
     cp_s=CP_AL,
     k_s=K_AL,
-    power_shape=ps,
     power=POWER,
 )
 
@@ -85,7 +83,6 @@ conns = [
     pump_l.inlet.p ~ 1.0e5,
     inseries(pump_r, hx_r, rods.cac_r, pump_r),
     pump_r.inlet.p ~ 1.0e5,
-    rods.hd.power ~ POWER,
 ]
 @named sys = assembly(conns, pump_l, hx_l, pump_r, hx_r, rods)
 ssys = mtkcompile(sys)
@@ -113,8 +110,8 @@ println("  Plate center T      = $(round(T_center, digits=2)) degC")
 println("  T_plate_center > T_fluid: $(T_center > T_out_l)")
 
 T_plate_center_col = [sol[ssys.rods.hd.T[i, (NX + 1) ÷ 2]] for i in 1:NZ]
-T_fluid_l = [sol[ssys.rods.cac_l.T[i]] for i in 1:NZ]
-T_fluid_r = [sol[ssys.rods.cac_r.T[i]] for i in 1:NZ]
+T_fluid_l = sol[ssys.rods.cac_l.T]
+T_fluid_r = sol[ssys.rods.cac_r.T]
 z = range(0.0, L_PLATE; length=NZ)
 
 p = plot(z, T_plate_center_col; label="Plate center", linewidth=2, color=:red)

@@ -719,18 +719,16 @@ end
     Lx = 1.0
     # Mock one-sided pipe (heated_parts = (0, 1), area 1) + mock solid (all 1).
     geom = PipeGeometry(1.0, 4.0, 1.0, 1.0, 1.0, (0.0, 1.0), 1.0, 1.0)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.0, Lx=Lx, y=1.0,
-                                rho_s=1.0, cp_s=1.0, k_s=k_s, power_shape=ps, T0=T0)
+                                rho_s=1.0, cp_s=1.0, k_s=k_s, power=P, T0=T0)
     osc = one_sided(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
     @named pump = Pump(; ṁ0=ṁ)
     @named bc = HeatExchanger(T0)
     conns = [
         inseries(pump, bc, osc.cac, pump),
         pump.inlet.p ~ 1.0e5,
-        osc.fuel.power ~ P,
         # Unheated left face (heated_parts[1]=0 ⇒ Q=0) has a floating wall T; pin it to the
         # coolant temp (an insulated wall carries no heat, so this is just a closure).
         port(osc.cac, :thermal_left, :T) .~ osc.cac.T,
@@ -741,14 +739,14 @@ end
     sol = solve_transient(ssys, ic, range(0.0, 200.0; length=50);
                           initializealg=BrownFullBasicInit(), maxiters=1_000_000)
     @test sol.retcode == ReturnCode.Success
-    Tc = [sol[ssys.osc.cac.T[i], end] for i in 1:n]
+    Tc = sol[ssys.osc.cac.T, end]
     Tc_analytic = [T0 + i * (P / (nz * ṁ)) for i in 1:nz]   # cp = 1 (Liquid)
     @test all(isapprox.(Tc, Tc_analytic; rtol=1e-6))           # coolant rises linearly
     # h-weighted wall temperature, reading Julia's computed h_tc (Python prescribes h).
     h_fw = 2 * k_s / (Lx / nx)
     Tw = sol[port(ssys.osc.cac, :thermal_right, :T), end]
-    Tf = [sol[ssys.osc.fuel.T[i, 1], end] for i in 1:nz]
-    h = [sol[ssys.osc.cac.h_tc_right[i], end] for i in 1:n]
+    Tf = sol[ssys.osc.fuel.T, end][:, 1]
+    h = sol[ssys.osc.cac.h_tc_right, end]
     Tw_pred = (Tc .* h .+ Tf .* h_fw) ./ (h .+ h_fw)
     @test all(isapprox.(Tw, Tw_pred; rtol=1e-6))               # conjugate wall-temp balance
 end
@@ -772,14 +770,12 @@ end
     ṁs = [1.0, 0.7, 0.4]        # distinct ṁs ⇒ distinct slopes off the shared power
     N = length(ṁs)
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     # Distinct names per channel/fuel so the shared PK gets a distinct T_source_<name> feedback
     # group for each component (temperature_feedback keys off nameof).
     cacs = [ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                htc=HTC.ConstantNusselt(; Nu=8.235),
                                name=Symbol(:cac, i)) for i in 1:N]
-    fuels = [HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0, rho_s=1.0, cp_s=1.0, k_s=1.0,
-                           power_shape=ps, T0=T0, name=Symbol(:fuel, i)) for i in 1:N]
+    fuels = [HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0, rho_s=1.0, cp_s=1.0, k_s=1.0, T0=T0, name=Symbol(:fuel, i)) for i in 1:N]
     rodss = [symmetric_plate(cacs[i], fuels[i]; name=Symbol(:rods, i)) for i in 1:N]
     pumps = [Pump(; ṁ0=ṁs[i], name=Symbol(:pump, i)) for i in 1:N]
     bcs = [HeatExchanger(Tin; name=Symbol(:bc, i)) for i in 1:N]
@@ -862,7 +858,7 @@ end
     # Each channel's coolant rises strictly and linearly at the settled state (Python's assertion).
     cac_T(i) = (rods = getproperty(ssys, Symbol(:rods, i)); getproperty(rods, Symbol(:cac, i)).T)
     for i in 1:N
-        Tc = [sol[cac_T(i)[j], end] for j in 1:n]
+        Tc = sol[cac_T(i), end]
         @test all(diff(Tc) .> 0)                     # strictly increasing
         slope = diff(Tc)
         @test all(abs.(slope .- slope[1]) .< 1e-3 * slope[1])   # constant slope (linear profile)
@@ -882,9 +878,8 @@ end
     T0 = 35.0
     nz = 10
     nx = 2
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
-                                rho_s=3000.0, cp_s=800.0, k_s=100.0, power_shape=ps, T0=T0)
+                                rho_s=3000.0, cp_s=800.0, k_s=100.0, T0=T0)
     @named bathsL = ConstantTemperature(T0; n=nz)
     @named bathsR = ConstantTemperature(T0; n=nz)
     ctrl = ReactivityController()
@@ -916,11 +911,10 @@ end
     nz = 7
     nx = 2
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0,
-                                rho_s=1.0, cp_s=1.0, k_s=1.0, power_shape=ps, T0=T0)
+                                rho_s=1.0, cp_s=1.0, k_s=1.0, T0=T0)
     rods = symmetric_plate(cac, fuel; name=:rods)
     ctrl = ReactivityController()
     @named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => fill(-0.1, n)),

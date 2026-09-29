@@ -79,8 +79,8 @@ end
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.ch.T_out] > T_INLET
     # q_wall_left[i] finite + signed correctly (positive for T_wall > T)
-    ql = sol[ssys.ch.q_wall_left[:]]
-    qr = sol[ssys.ch.q_wall_right[:]]
+    ql = sol[ssys.ch.q_wall_left]
+    qr = sol[ssys.ch.q_wall_right]
     @test all(>(0), ql)
     @test all(isapprox.(qr, 0.0, atol=1e-9))
 end
@@ -103,8 +103,8 @@ end
     sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
     @test sol[ssys.chf.T_out] > T_INLET
-    @test all(isapprox.(sol[ssys.chf.q_wall_left[:]], expected, rtol=1e-7))
-    @test all(isapprox.(sol[ssys.chf.q_wall_right[:]], 0., atol=1e-9))
+    @test all(isapprox.(sol[ssys.chf.q_wall_left], expected, rtol=1e-7))
+    @test all(isapprox.(sol[ssys.chf.q_wall_right], 0., atol=1e-9))
 end
 
 @testset "ChannelHeatFlux with a fixed-property Liquid — uniform heating gives exact linear rise" begin
@@ -128,7 +128,7 @@ end
     sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => ṁ])
     @test sol.retcode == ReturnCode.Success
     dT = q * geom.heated_parts[1] * dz / (ṁ * cp_mock)
-    Tc = [sol[ssys.chf.T[i]] for i in 1:n]
+    Tc = sol[ssys.chf.T]
     @test isapprox(Tc[1] - T_INLET, dT; rtol=1e-6)
     for i in 2:n
         @test isapprox(Tc[i] - Tc[i - 1], dT; rtol=1e-6)
@@ -186,8 +186,8 @@ end
     ssys2 = mtkcompile(sys2)
     sol2 = solve_steady(ssys2, [ssys2.ch2.inlet.ṁ => 0.5])
     @test sol2.retcode == ReturnCode.Success
-    @test all(isapprox.(sol2[ssys2.ch2.T[:]], sol[ssys.ch.T[:]], rtol=1e-6))
-    @test all(isapprox.(sol2[ssys2.ch2.q_wall_left[:]], sol[ssys.ch.q_wall_left[:]], rtol=1e-6))
+    @test all(isapprox.(sol2[ssys2.ch2.T], sol[ssys.ch.T], rtol=1e-6))
+    @test all(isapprox.(sol2[ssys2.ch2.q_wall_left], sol[ssys.ch.q_wall_left], rtol=1e-6))
 
 end
 
@@ -221,8 +221,8 @@ end
     # Callable parameter goes into the same op dict as ICs.
     sol2 = solve_steady(ssys2, [ssys2.ch2.inlet.ṁ => 0.5])
     @test sol.retcode == ReturnCode.Success
-    @test all(isapprox.(sol2[ssys2.ch2.T[:]], sol[ssys.ch.T[:]], rtol=1e-6))
-    @test all(isapprox.(sol2[ssys2.ch2.q_wall_left[:]], sol[ssys.ch.q_wall_left[:]], rtol=1e-6))
+    @test all(isapprox.(sol2[ssys2.ch2.T], sol[ssys.ch.T], rtol=1e-6))
+    @test all(isapprox.(sol2[ssys2.ch2.q_wall_left], sol[ssys.ch.q_wall_left], rtol=1e-6))
 end
 
 @testset "CAC with HTC.DittusBoelter solves a transient without crashing" begin
@@ -288,8 +288,8 @@ end
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
 
-        htc_scb = sol_scb[ssys_scb.cac.h_tc_left[:]]
-        htc_noscb = sol_noscb[ssys_noscb.cac.h_tc_left[:]]
+        htc_scb = sol_scb[ssys_scb.cac.h_tc_left]
+        htc_noscb = sol_noscb[ssys_noscb.cac.h_tc_left]
         @test all(isapprox.(htc_noscb, htc_scb, rtol=1e-10))
     end
 end
@@ -317,8 +317,8 @@ const GEOM_SIGN       = PipeGeometry_circular(0.6, 0.01)
 
     @test sol.retcode == ReturnCode.Success
 
-    T_vals = [sol[ssys.ch.T[i]] for i in 1:N_SIGN]
-    Re_vals = [sol[ssys.ch.Re[i]] for i in 1:N_SIGN]
+    T_vals = sol[ssys.ch.T]
+    Re_vals = sol[ssys.ch.Re]
 
     @test sol[ssys.ch.inlet.ṁ] < 0
     @test all(T_vals[i] >= T_vals[i + 1] for i in 1:(N_SIGN - 1))
@@ -345,9 +345,9 @@ end
 
     @test sol.retcode == ReturnCode.Success
 
-    T_vals = [sol[ssys.cac.T[i]] for i in 1:N_SIGN]
-    Re_vals = [sol[ssys.cac.Re[i]] for i in 1:N_SIGN]
-    vel_vals = [sol[ssys.cac.velocity[i]] for i in 1:N_SIGN]
+    T_vals = sol[ssys.cac.T]
+    Re_vals = sol[ssys.cac.Re]
+    vel_vals = sol[ssys.cac.velocity]
 
     @test sol[ssys.cac.inlet.ṁ] < 0
     @test all(T_vals[i] >= T_vals[i + 1] for i in 1:(N_SIGN - 1))
@@ -377,20 +377,20 @@ end
 
     @test sol.retcode == ReturnCode.Success
 
-    T_vals = sol[ssys.chf.T[:]]
-    Re_vals = sol[ssys.chf.Re[:]]
+    T_vals = sol[ssys.chf.T]
+    Re_vals = sol[ssys.chf.Re]
 
     @test sol[ssys.chf.inlet.ṁ] < 0
     @test all(T_vals[i] >= T_vals[i + 1] for i in 1:(N_SIGN - 1))
     @test all(Re_vals .> 0)
 
     # CHF q_wall stays positive — q is intrinsic / sign-independent of flow.
-    @test all(>(0), sol[ssys.chf.q_wall_left[:]])
+    @test all(>(0), sol[ssys.chf.q_wall_left])
 
     # Energy balance: advective heat gain ≈ summed q_wall.
     T_mean = (sol[ssys.chf.T_out] + T_INLET_SIGN) / 2
     Q_advect = abs(ṁ_NEG) * cₚ(H2O, T_mean) * (sol[ssys.chf.T_out] - T_INLET_SIGN)
-    Q_wall_total = sum(sol[ssys.chf.q_wall[:]])
+    Q_wall_total = sum(sol[ssys.chf.q_wall])
     @test isapprox(Q_wall_total, Q_advect; rtol=0.01)
 end
 
@@ -423,8 +423,8 @@ end
     @test sol_fwd.retcode == ReturnCode.Success
     @test sol_rev.retcode == ReturnCode.Success
 
-    T_fwd = sol_fwd[ssys_fwd.chf.T[:]]
-    T_rev = sol_rev[ssys_rev.chf.T[:]]
+    T_fwd = sol_fwd[ssys_fwd.chf.T]
+    T_rev = sol_rev[ssys_rev.chf.T]
 
     # Forward profile monotone increasing.
     @test T_fwd[1] < T_fwd[2] < T_fwd[3]
@@ -609,8 +609,8 @@ end
         ssys_scb, sol_scb = _build_scb_loop(scb_correction=scb_fn, T_wall_bc=56.85)
         ssys_noscb, sol_noscb = _build_scb_loop(scb_correction=nothing, T_wall_bc=56.85)
 
-        htc_scb = [sol_scb[ssys_scb.cac.h_tc_left[i]] for i in 1:n_scb]
-        htc_noscb = [sol_noscb[ssys_noscb.cac.h_tc_left[i]] for i in 1:n_scb]
+        htc_scb = sol_scb[ssys_scb.cac.h_tc_left]
+        htc_noscb = sol_noscb[ssys_noscb.cac.h_tc_left]
         # Should be identical (ifelse selects uncorrected branch).
         for i in 1:n_scb
             @test htc_scb[i] ≈ htc_noscb[i] rtol=1e-10
@@ -628,9 +628,9 @@ end
     ch = ssys.ch
 
     # Total pressure at each cell's outlet-side face, and the dynamic head there.
-    p_total = sol[ch.inlet.p] .- cumsum([sol[ch.dp[i]] for i in 1:n])
+    p_total = sol[ch.inlet.p] .- cumsum(sol[ch.dp])
     head = [ρ(H2O, sol[ch.T[i]]) * sol[ch.v[i]]^2 / 2 for i in 1:n]
     @test all(head .> 0)
-    @test [sol[ch.P[i]] for i in 1:n] ≈ p_total .- head rtol = 1e-12
-    @test [sol[ch.T_sat[i]] for i in 1:n] ≈ [Tsat(H2O, sol[ch.P[i]]) for i in 1:n] rtol = 1e-12
+    @test sol[ch.P] ≈ p_total .- head rtol = 1e-12
+    @test sol[ch.T_sat] ≈ [Tsat(H2O, sol[ch.P[i]]) for i in 1:n] rtol = 1e-12
 end

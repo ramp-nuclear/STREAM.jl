@@ -184,14 +184,14 @@ end
         ),
     ]
     @named sys = assembly(conns, pump, hx, cac, ct_l, ct_r)
-    ssys = mtkcompile(sys; fully_determined=true)
+    ssys = mtkcompile(sys)
 
     op = vcat(
             [ssys.cac.inlet.ṁ => 0.5],
     )
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
-    @test all(isfinite, [sol[ssys.cac.T[i]] for i in 1:n])
+    @test all(isfinite, sol[ssys.cac.T])
         @test isfinite(sol[ssys.cac.inlet.ṁ])
     rows = ParityRow[]
 
@@ -308,11 +308,9 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(;
         nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps, power=1e4,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
     )
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),
@@ -323,10 +321,9 @@ end
             (hd, :thermal_left) => (cac_l, :thermal_right),
             (hd, :thermal_right) => (cac_r, :thermal_left),
         ),
-        hd.power ~ 1e4,
     ]
     @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
-    ssys = mtkcompile(sys; fully_determined=true)
+    ssys = mtkcompile(sys)
 
     op = vcat(
             [ssys.cac_l.inlet.ṁ => +0.250],
@@ -335,7 +332,7 @@ end
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
-    @test all(isfinite, [sol[ssys.hd.T[i, j]] for i in 1:nz for j in 1:nx])
+    @test all(isfinite, sol[ssys.hd.T])
 
     push!(rows, parity_check("mtr_symmetric", "T_out_l",
                              sol[ssys.cac_l.T_out], PARITY_MTR_SYM_T_OUT_L))
@@ -454,11 +451,9 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in_r)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(;
         nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps, power=1e4,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
     )
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),
@@ -469,10 +464,9 @@ end
             (hd, :thermal_left) => (cac_l, :thermal_right),
             (hd, :thermal_right) => (cac_r, :thermal_left),
         ),
-        hd.power ~ 1e4,
     ]
     @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
-    ssys = mtkcompile(sys; fully_determined=true)
+    ssys = mtkcompile(sys)
 
     op = vcat(
         [ssys.hd.T[i, nx] => 95.0 for i in 1:nz],
@@ -482,7 +476,7 @@ end
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
-    @test all(isfinite, [sol[ssys.hd.T[i, j]] for i in 1:nz for j in 1:nx])
+    @test all(isfinite, sol[ssys.hd.T])
 
     push!(rows, parity_check("mtr_asymmetric", "T_out_l",
                              sol[ssys.cac_l.T_out], PARITY_MTR_ASYM_T_OUT_L))
@@ -601,11 +595,9 @@ end
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(;
         nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps, power=1e4,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
     )
     scc = single_channel(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
     cac = scc.cac_l
@@ -613,10 +605,9 @@ end
     conns = [
         inseries(pump_l, hx_l, cac, pump_l),
         pump_l.inlet.p ~ 1.0e5,
-        fuel.power ~ 1e4,
     ]
     @named sys = assembly(conns, pump_l, hx_l, scc)
-    ssys = mtkcompile(sys; fully_determined=true)
+    ssys = mtkcompile(sys)
 
     cac_s = ssys.scc.cac_l
     fuel_s = ssys.scc.hd
@@ -626,7 +617,7 @@ end
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
-    @test all(isfinite, [sol[fuel_s.T[i, j]] for i in 1:nz for j in 1:nx])
+    @test all(isfinite, sol[fuel_s.T])
 
     push!(rows, parity_check("mtr_one_sided", "T_out_l",
                              sol[cac_s.T_out], PARITY_MTR_ONESIDED_T_OUT_L))
@@ -736,7 +727,6 @@ end  # @testset "parity harness"
         return result
     end
 
-    ps_v01 = fill(1.0 / (nz_v01 * nx_v01), nz_v01, nx_v01)
     @named hd_v01 = HeatDiffusion(;
         nz=nz_v01,
         nx=nx_v01,
@@ -746,7 +736,6 @@ end  # @testset "parity harness"
         rho_s=rho_s_v01,
         cp_s=cp_s_v01,
         k_s=k_s_v01,
-        power_shape=ps_v01,
         power=0.0,
     )
     @named ct_l = ConstantTemperature(T_wall; n=nz_v01)
@@ -756,10 +745,9 @@ end  # @testset "parity harness"
             (ct_l, :thermal) => (hd_v01, :thermal_left),
             (ct_r, :thermal) => (hd_v01, :thermal_right),
         ),
-        hd_v01.power ~ 0.0,
     ]
     @named sys_v01 = assembly(conns_v01, ct_l, ct_r, hd_v01)
-    ssys_v01 = mtkcompile(sys_v01; fully_determined=true)
+    ssys_v01 = mtkcompile(sys_v01)
 
     op_ic_v01 = [ssys_v01.hd_v01.T[i, j] => T0 for i in 1:nz_v01 for j in 1:nx_v01]
 
@@ -801,7 +789,6 @@ end
     @named cac_v02 = ChannelAndContacts(;
         n=nz_v02, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     )
-    ps_v02 = fill(1.0 / (nz_v02 * nx_v02), nz_v02, nx_v02)
     @named hd1 = HeatDiffusion(;
         nz=nz_v02,
         nx=nx_v02,
@@ -811,7 +798,6 @@ end
         rho_s=2700.0,
         cp_s=900.0,
         k_s=200.0,
-        power_shape=ps_v02,
         power=power_per_plate,
     )
     @named hd2 = HeatDiffusion(;
@@ -823,7 +809,6 @@ end
         rho_s=2700.0,
         cp_s=900.0,
         k_s=200.0,
-        power_shape=ps_v02,
         power=power_per_plate,
     )
 
@@ -837,11 +822,9 @@ end
             # hd2 left face → cac thermal_right (hd2 is on the right of the channel, facing inward)
             (hd2, :thermal_left) => (cac_v02, :thermal_right),
         ),
-        hd1.power ~ power_per_plate,
-        hd2.power ~ power_per_plate,
     ]
     @named sys_v02 = assembly(conns_v02, pump_v02, hx_v02, cac_v02, hd1, hd2)
-    ssys_v02 = mtkcompile(sys_v02; fully_determined=true)
+    ssys_v02 = mtkcompile(sys_v02)
 
     # Initial guess: ṁ +0.250 (rectangular MTR at 30 kPa)
     sol_v02 = solve_steady(ssys_v02, [ssys_v02.cac_v02.inlet.ṁ => +0.250])
@@ -897,7 +880,7 @@ end
         @test sol.retcode == ReturnCode.Success
         # A critical reactor holds its power.
         @test isapprox(sol[ssys.pk.P_neutron, end], 1.0; rtol=1e-3)
-        T_cool = [sol[ssys.rods.cac.T[i], end] for i in 1:n]
+        T_cool = sol[ssys.rods.cac.T, end]
 
         dT = diff(T_cool)       # first differences  (should all be > 0)
         ddT = diff(dT)           # second differences (should be near zero for linear rise)

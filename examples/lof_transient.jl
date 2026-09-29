@@ -97,7 +97,7 @@ end
 
 ss_sol = solve_steady(ref_ssys, op_ref)
 ṁ_ss = ss_sol[ref_ssys.ch_ref.inlet.ṁ]
-T_ss = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
+T_ss = ss_sol[ref_ssys.ch_ref.T]
 
 println("Steady-state solved:")
 println("  ṁ_ss   = $(round(ṁ_ss; digits=6)) kg/s")

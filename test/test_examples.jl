@@ -412,7 +412,7 @@ end
         # latest 233.97), well below water's critical temperature (373.95 °C). The band is the
         # measured cross-env spread, not a loose runaway window.
         T_max_nc = mean([
-            maximum([sol[ssys.heated.ch.T[i], idx] for i in 1:n]) for idx in nc_indices
+            maximum(sol[ssys.heated.ch.T, idx]) for idx in nc_indices
         ])
         @test T_max_nc > BYPASS_T_INLET   # heating did happen
         @test 231.85 < T_max_nc < 236.85    # tight around the observed 233.95 °C, below critical T

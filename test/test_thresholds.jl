@@ -415,7 +415,7 @@ end
         s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
         @test s.ṁ == ṁ[k]
         @test s.T_inlet == sol[ssys.ch.T_in, k]
-        @test s.T_bulk == [sol[ssys.ch.T[i], k] for i in 1:n]
+        @test s.T_bulk == sol[ssys.ch.T, k]
     end
     # A transient has many instants, so asking for the state without saying which is an
     # error rather than a guess.

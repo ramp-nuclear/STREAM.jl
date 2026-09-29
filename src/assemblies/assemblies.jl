@@ -268,8 +268,9 @@ is taken from `channels[1]`; a mismatch across the vector is caught by MTK at
 `mtkcompile()` time.
 
 # Returns
-Uncompiled `System` from [`assembly`](@ref). Add boundary conditions (pump loop, pressure
-anchor, power binding), then `mtkcompile(...; build_initializeprob=false)`.
+Uncompiled `System` from [`assembly`](@ref). Add boundary conditions (a pump loop, a
+pressure anchor, and a power binding for any plate built with `power=nothing`), then
+`mtkcompile(...; build_initializeprob=false)`.
 
 After composition, sub-components are reachable through their original `@named` names
 (`assembly.c1`, `assembly.p1`, …). The helper does NOT synthesize index-based names.

@@ -235,10 +235,10 @@ end
     sol_u = solve_steady(ssys_u, [ssys_u.cac_u.inlet.ṁ => 0.49])
 
     @test sol_u.retcode == ReturnCode.Success
-    @test all(isapprox.(sol_u[ssys_u.cac_u.h_tc_left[:]], h_fixed; rtol=1e-8))
+    @test all(isapprox.(sol_u[ssys_u.cac_u.h_tc_left], h_fixed; rtol=1e-8))
     # The reported Nusselt number is the one implied by the h in use.
-    T_cells = sol_u[ssys_u.cac_u.T[:]]
+    T_cells = sol_u[ssys_u.cac_u.T]
     Nu_expected = [h_fixed * geom.Dh / κ(H2O, HTC.film_temperature(T_wall_bc, T_c))
                    for T_c in T_cells]
-    @test all(isapprox.(sol_u[ssys_u.cac_u.Nu_left[:]], Nu_expected; rtol=1e-6))
+    @test all(isapprox.(sol_u[ssys_u.cac_u.Nu_left], Nu_expected; rtol=1e-6))
 end

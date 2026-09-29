@@ -67,7 +67,8 @@ function _diffusion_eqs(;
 end
 
 """
-    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s, power_shape, power=1e6, T0=300.0) -> System
+    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s,
+                  power_shape=uniform, power=nothing, T0=T_ROOM) -> System
 
 2D finite-difference heat diffusion plate with axial (`nz`) and lateral (`nx`) cells.
 
@@ -81,13 +82,18 @@ end
 - `rho_s`: solid density [kg/m^3]
 - `cp_s`: solid specific heat [J/(kg*K)]
 - `k_s`: thermal conductivity [W/(m*K)]
-- `power_shape`: axial-lateral power shape matrix of size `(nz, nx)` (not normalized internally)
-- `power`: total power into plate [W], MTK variable — must be constrained via a connection equation
-  (e.g. `fuel.power ~ 1e4` for standalone use, or `rods.fuel.power ~ pk.P * power_scale` for PK-coupled use)
-- `T0`: initial temperature [°C], default 300.0
+- `power_shape`: fraction of the power in each cell, an `(nz, nx)` matrix used as given
+  (default uniform, `1/(nz*nx)` everywhere)
+- `power`: total power into the plate [W]. A number makes it the parameter `power`, which
+  `remake` can change. `nothing` (the default) makes it an unknown the caller binds, such as
+  `rods.fuel.power ~ pk.P * power_scale` for a plate driven by point kinetics.
+- `T0`: initial temperature of every cell [°C]
 
 # Ports
 - `thermal_left[1:nz]`, `thermal_right[1:nz]` -- `ThermalPort` arrays (no FlowPorts)
+
+# Returns
+Uncompiled `System`.
 """
 function HeatDiffusion(;
     name,
@@ -99,25 +105,31 @@ function HeatDiffusion(;
     rho_s,
     cp_s,
     k_s,
-    power_shape,
-    power=1e6,
-    T0=300.0,
+    power_shape=fill(1.0 / (nz * nx), nz, nx),
+    power=nothing,
+    T0=T_ROOM,
 )
-    power_init = power
     dx = Lx / nx
     dz = Lz / nz
 
-    vars = @variables begin
-        (T(t))[1:nz, 1:nx] = fill(T0, nz, nx)
-        power(t) = power_init
+    @variables (T(t))[1:nz, 1:nx] = fill(T0, nz, nx)
+    # The @variables / @parameters below rebind `power` to the symbol of that name.
+    power_given = power
+    power_given isa Union{Real,Nothing} ||
+        throw(ArgumentError("power must be a number or nothing, got $(typeof(power_given))"))
+    if power_given === nothing
+        @variables power(t)
+        vars, pars = [vec(collect(T)); power], []
+    else
+        @parameters power = power_given
+        vars, pars = vec(collect(T)), [power]
     end
 
     thermal_left = [ThermalPort(; name=Symbol(:thermal_left, i)) for i in 1:nz]
     thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:nz]
 
-    T_var, power_var = vars
     eqs = _diffusion_eqs(;
-        T=T_var,
+        T=T,
         thermal_left=thermal_left,
         thermal_right=thermal_right,
         nz=nz,
@@ -128,11 +140,10 @@ function HeatDiffusion(;
         dx=dx,
         dz=dz,
         y=y,
-        power=power_var,
+        power=power,
         power_shape=power_shape,
     )
-    all_vars = vcat(vec(collect(T_var)), [power_var])
     return compose(
-        System(eqs, t, all_vars, []; name=name), thermal_left..., thermal_right...
+        System(eqs, t, vars, pars; name=name), thermal_left..., thermal_right...
     )
 end

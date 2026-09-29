@@ -13,15 +13,13 @@ using OrdinaryDiffEq: ReturnCode
 # Test fixtures — local helpers that build canonical CAC + HD pairs.
 # Mirrors Python STREAM's MTR_fuel_and_channel(z_N, fuel_N, clad_N) function
 # in tests/test_composition/conftest.py.
-function _mtr_pair(; n=4, nz=4, nx=2)
+function _mtr_pair(; n=4, nz=4, nx=2, power=1.0e3)
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
                                     htc=HTC.ConstantNusselt(; Nu=8.235),
                                     darcy=Friction.RectangularLaminar(geom))
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005,
-                                 y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                                 power_shape=ps)
+                                 y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0, power=power)
     return cac, fuel
 end
 
@@ -127,12 +125,12 @@ end
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
     @test rods isa ModelingToolkit.AbstractSystem
-    # Add the missing power binding + a pump loop to make it solvable
+    # Add a pump loop to make it solvable
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     conns = [
         inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5, rods.fuel.power ~ 1.0e3,
+        pump.inlet.p ~ 1.0e5,
     ]
     @named full = assembly(conns, rods, pump, bc)
     ssys = mtkcompile(full)
@@ -151,7 +149,7 @@ end
     @named bc = HeatExchanger(40.0)
     conns = [
         inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5, rods.fuel.power ~ 1.0e3,
+        pump.inlet.p ~ 1.0e5,
     ]
     full = assembly(conns, rods, pump, bc; name=:full10)
     ssys = mtkcompile(full)
@@ -169,7 +167,7 @@ end
     @named bc = HeatExchanger(40.0)
     conns = [
         inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5, rods.fuel.power ~ 1.0e3,
+        pump.inlet.p ~ 1.0e5,
     ]
     full = assembly(conns, rods, pump, bc; name=:fullx4)
     ssys = mtkcompile(full)
@@ -187,7 +185,7 @@ end
     @named bc = HeatExchanger(40.0)
     conns = [
         inseries(pump, bc, rods.cac, pump),
-        pump.inlet.p ~ 1.0e5, rods.fuel.power ~ 1.0e3,
+        pump.inlet.p ~ 1.0e5,
     ]
     full = assembly(conns, rods, pump, bc; name=:fullx3)
     ssys = mtkcompile(full)
@@ -211,12 +209,10 @@ end
     nz = 10
     nx = 3
     power_val = 1.0e4
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named ch_left = ChannelAndContacts(; n=nz, geometry=geom)
     @named ch_right = ChannelAndContacts(; n=nz, geometry=geom)
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
-                                power_shape=ps, power=power_val)
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0, power=power_val)
     pl = plate(ch_left, ch_right, fuel; name=:pl)
     @test pl isa ModelingToolkit.AbstractSystem
     @named pump_l = Pump(3.0e4)
@@ -228,10 +224,9 @@ end
         pump_l.inlet.p ~ 1.0e5,
         inseries(pump_r, bc_r, pl.ch_right, pump_r),
         pump_r.inlet.p ~ 1.0e5,
-        pl.fuel.power ~ power_val,
     ]
     full = assembly(conns, pl, pump_l, bc_l, pump_r, bc_r; name=:dualcac)
-    ssys = mtkcompile(full; fully_determined=true)
+    ssys = mtkcompile(full)
     op = [
         ssys.pl.ch_left.inlet.ṁ => 0.25,
         ssys.pl.ch_right.inlet.ṁ => 0.25,
@@ -241,7 +236,7 @@ end
     # Both fuel faces exchange heat with their own channel. thermal_left[i].Q is
     # heat INTO the fuel from ch_left; the powered plate is hotter than the coolant, so
     # heat leaves the plate and Q is negative on every cell of both faces.
-    left_face_Q = [sol[port(ssys.pl.fuel, :thermal_left, i).Q] for i in 1:nz]
+    left_face_Q = sol[port(ssys.pl.fuel, :thermal_left, :Q)]
     right_face_Q = [
         sol[port(ssys.pl.fuel, :thermal_right, i).Q] for i in 1:nz
     ]
@@ -278,20 +273,18 @@ function _build_osc_loop(side::Symbol, name_suffix)
     geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     nz = 10
     nx = 3
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=nz, geometry=geom)
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
-                                power_shape=ps, power=1e4)
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4)
     osc = one_sided(cac, fuel; side=side, name=Symbol(:osc_, name_suffix))
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     conns = [
         inseries(pump, bc, osc.cac, pump),
-        pump.inlet.p ~ 1.0e5, osc.fuel.power ~ 1e4,
+        pump.inlet.p ~ 1.0e5,
     ]
     full = assembly(conns, osc, pump, bc; name=Symbol(:osc_full_, name_suffix))
-    ssys = mtkcompile(full; fully_determined=true)
+    ssys = mtkcompile(full)
     op = vcat(
         [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.inlet.ṁ => 0.25],
     )
@@ -305,8 +298,8 @@ end
 # prefixes, and `x_conn` is the fuel x-column on the connected side.
 function _assert_osc(oscsys, sol, nz, conn_face, adia_face, x_conn)
     @test sol.retcode == ReturnCode.Success
-    conn_Q = [sol[port(oscsys.fuel, conn_face, i).Q] for i in 1:nz]
-    adia_Q = [sol[port(oscsys.fuel, adia_face, i).Q] for i in 1:nz]
+    conn_Q = sol[port(oscsys.fuel, conn_face, :Q)]
+    adia_Q = sol[port(oscsys.fuel, adia_face, :Q)]
     @test all(conn_Q[i] < -1e-3 for i in 1:nz)                  # connected face sheds heat
     @test all(isapprox(adia_Q[i], 0.0; atol=1e-9) for i in 1:nz)  # opposite face adiabatic
     @test isapprox(-sum(conn_Q), 1e4; rtol=1e-3)                 # all power leaves the one face
@@ -350,10 +343,10 @@ end
     @named bc = HeatExchanger(40.0)
     conns = [
         inseries(pump, bc, scc.cac, pump),
-        pump.inlet.p ~ 1.0e5, scc.fuel.power ~ 1.0e3,
+        pump.inlet.p ~ 1.0e5,
     ]
     full = assembly(conns, scc, pump, bc; name=:scc_full_l)
-    ssys = mtkcompile(full; fully_determined=true)
+    ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
@@ -367,10 +360,9 @@ end
     conns = [
         inseries(pump, bc, scc.cac, pump),
         pump.inlet.p ~ 1.0e5,
-        scc.fuel.power ~ 1.0e3,
     ]
     full = assembly(conns, scc, pump, bc; name=:scc_full_r)
-    ssys = mtkcompile(full; fully_determined=true)
+    ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
@@ -381,21 +373,18 @@ end
     geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     nz = 10
     nx = 3
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named cac = ChannelAndContacts(; n=nz, geometry=geom)
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-                                rho_s=2700.0, cp_s=900.0, k_s=200.0,
-                                power_shape=ps, power=1e4)
+                                rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4)
     scc = single_channel(cac, fuel, geom; fuel_side=:left, name=:scc_s)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     conns = [
         inseries(pump, bc, scc.cac, pump),
         pump.inlet.p ~ 1.0e5,
-        scc.fuel.power ~ 1e4,
     ]
     full = assembly(conns, scc, pump, bc; name=:scc_full_s)
-    ssys = mtkcompile(full; fully_determined=true)
+    ssys = mtkcompile(full)
     op = [ssys.scc_s.cac.inlet.ṁ => 0.25]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
@@ -426,8 +415,6 @@ end
     conns = [
         inseries(pump, bc, p1.cac, p2.cac, pump),
         pump.inlet.p ~ 1.0e5,
-        p1.fuel.power ~ 1.0e3,
-        p2.fuel.power ~ 1.0e3,
     ]
     full = assembly(conns, p1, p2, pump, bc; name=:two_plates)
     ssys = mtkcompile(full)
@@ -438,7 +425,7 @@ end
 end
 
 @testset "assembly: connections nest without splatting" begin
-    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2, power=nothing)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     conns = [
@@ -513,11 +500,9 @@ function _fa_cac(prefix::Symbol; n=4)
                        darcy=Friction.RectangularLaminar(geom))
 end
 
-function _fa_hd(prefix::Symbol; nz=4, nx=2)
-    ps = fill(1.0 / (nz * nx), nz, nx)
+function _fa_hd(prefix::Symbol; nz=4, nx=2, power=1.0e3)
     HeatDiffusion(; name=prefix, nz=nz, nx=nx, Lz=0.6, Lx=0.005,
-                   y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0,
-                   power_shape=ps)
+                   y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0, power=power)
 end
 
 # Time derivative, used to build the Dt(...)=>0.0 IC guesses (see variant-1 note).
@@ -537,8 +522,6 @@ const _fa_Dt = Differential(t)
     conns_h = [
         inseries(pump_h, bc_h, asm_helper.c1, asm_helper.c2, asm_helper.c3, pump_h),
         pump_h.inlet.p ~ 1.0e5,
-        asm_helper.p1.power ~ 1.0e3,
-        asm_helper.p2.power ~ 1.0e3,
     ]
     full_helper = assembly(conns_h, asm_helper, pump_h, bc_h; name=:full_helper_v1)
     ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
@@ -561,8 +544,6 @@ const _fa_Dt = Differential(t)
     conns_d = [
         inseries(pump_d, bc_d, asm_hand.c1, asm_hand.c2, asm_hand.c3, pump_d),
         pump_d.inlet.p ~ 1.0e5,
-        asm_hand.p1.power ~ 1.0e3,
-        asm_hand.p2.power ~ 1.0e3,
     ]
     full_hand = assembly(conns_d, asm_hand, pump_d, bc_d; name=:full_hand_v1)
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
@@ -621,9 +602,6 @@ end
     conns_h = [
         inseries(pump_h, bc_h, asm_helper.c1, asm_helper.c2, pump_h),
         pump_h.inlet.p ~ 1.0e5,
-        asm_helper.p1.power ~ 1.0e3,
-        asm_helper.p2.power ~ 1.0e3,
-        asm_helper.p3.power ~ 1.0e3,
     ]
     full_helper = assembly(conns_h, asm_helper, pump_h, bc_h; name=:full_helper_v2)
     ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
@@ -643,9 +621,6 @@ end
     conns_d = [
         inseries(pump_d, bc_d, asm_hand.c1, asm_hand.c2, pump_d),
         pump_d.inlet.p ~ 1.0e5,
-        asm_hand.p1.power ~ 1.0e3,
-        asm_hand.p2.power ~ 1.0e3,
-        asm_hand.p3.power ~ 1.0e3,
     ]
     full_hand = assembly(conns_d, asm_hand, pump_d, bc_d; name=:full_hand_v2)
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
@@ -693,8 +668,6 @@ end
     conns_h = [
         inseries(pump_h, bc_h, asm_helper.c1, asm_helper.c2, pump_h),
         pump_h.inlet.p ~ 1.0e5,
-        asm_helper.p1.power ~ 1.0e3,
-        asm_helper.p2.power ~ 1.0e3,
     ]
     full_helper = assembly(conns_h, asm_helper, pump_h, bc_h; name=:full_helper_v3)
     ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
@@ -714,8 +687,6 @@ end
     conns_d = [
         inseries(pump_d, bc_d, asm_hand.c1, asm_hand.c2, pump_d),
         pump_d.inlet.p ~ 1.0e5,
-        asm_hand.p1.power ~ 1.0e3,
-        asm_hand.p2.power ~ 1.0e3,
     ]
     full_hand = assembly(conns_d, asm_hand, pump_d, bc_d; name=:full_hand_v3)
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
@@ -763,9 +734,6 @@ end
     conns_h = [
         inseries(pump_h, bc_h, asm_helper.c1, asm_helper.c2, asm_helper.c3, pump_h),
         pump_h.inlet.p ~ 1.0e5,
-        asm_helper.p1.power ~ 1.0e3,
-        asm_helper.p2.power ~ 1.0e3,
-        asm_helper.p3.power ~ 1.0e3,
     ]
     full_helper = assembly(conns_h, asm_helper, pump_h, bc_h; name=:full_helper_v4)
     ssys_helper = mtkcompile(full_helper; build_initializeprob=false)
@@ -788,9 +756,6 @@ end
     conns_d = [
         inseries(pump_d, bc_d, asm_hand.c1, asm_hand.c2, asm_hand.c3, pump_d),
         pump_d.inlet.p ~ 1.0e5,
-        asm_hand.p1.power ~ 1.0e3,
-        asm_hand.p2.power ~ 1.0e3,
-        asm_hand.p3.power ~ 1.0e3,
     ]
     full_hand = assembly(conns_d, asm_hand, pump_d, bc_d; name=:full_hand_v4)
     ssys_hand = mtkcompile(full_hand; build_initializeprob=false)
@@ -862,13 +827,8 @@ end
 
 # #### Smoke: helper returns an uncompiled System (no premature mtkcompile)
 @testset "fuel_assembly — uncompiled System smoke" begin
-    # Build the cheapest variant-3 mixed k=2 instance and confirm the helper
-    # returned an UNCOMPILED system (caller is responsible for adding BCs
-    # then calling mtkcompile — see helper docstring). A bare `mtkcompile`
-    # on the raw assembly is intentionally NOT attempted: without a pump
-    # loop + power binding the system has more unknowns than equations and
-    # mtkcompile fails consistency. The smoke is "did the helper return a
-    # System, not numeric output?"
+    # The helper returns an uncompiled system. It is not compiled here: without a pump
+    # loop around the channels it has more unknowns than equations.
     c1 = _fa_cac(:c1); c2 = _fa_cac(:c2)
     p1 = _fa_hd(:p1); p2 = _fa_hd(:p2)
     asm = fuel_assembly([c1, c2], [p1, p2]; bookend=:mixed, start=:channel, name=:asm_smoke)
@@ -906,8 +866,8 @@ end
     wtd, sol_wtd = channel_loop(; copies=N)
     ṁ_ch = sol_wtd[wtd.ch.inlet.ṁ]
     @test ṁ_ch ≈ sol_lone[lone.ch.inlet.ṁ] rtol = 1e-8
-    T_wtd = [sol_wtd[wtd.ch.T[i]] for i in 1:n]
-    @test T_wtd ≈ [sol_lone[lone.ch.T[i]] for i in 1:n] rtol = 1e-8
+    T_wtd = sol_wtd[wtd.ch.T]
+    @test T_wtd ≈ sol_lone[lone.ch.T] rtol = 1e-8
     @test sol_wtd[wtd.pump.inlet.ṁ] ≈ N * ṁ_ch rtol = 1e-8
     # Pressure passes through the weights, which is why the channel sees the whole head.
     @test sol_wtd[wtd.core_weight_in.outlet.p] ≈ sol_wtd[wtd.core_weight_in.inlet.p] rtol = 1e-12

@@ -282,7 +282,7 @@ const CRITICAL = (t) -> 0.0
 
         beta_total = sum(U235_BETA_K)
         P_jump_numerical = sol_c[ssys_c.P_neutron, end]
-        C_end = [sol_c[ssys_c.C[k], end] for k in 1:6]
+        C_end = sol_c[ssys_c.C, end]
         P_jump_expected = U235_LAMBDA * sum(U235_LAMBDA_K .* C_end) / (beta_total - delta_rho)
         @test isapprox(P_jump_numerical, P_jump_expected; rtol=1e-2)
         # The precursors have hardly moved, so P is still near the textbook jump β/(β - ρ)·P0,
@@ -323,7 +323,6 @@ const CRITICAL = (t) -> 0.0
 
         pg5 = PipeGeometry_rectangular(1.0, 0.04, 0.01, 0.04)
         @named ch = Channel(; name=:ch, n=5, geometry=pg5)
-        ps_3x2 = fill(1.0/(3*2), 3, 2)
         @named fuel = HeatDiffusion(
             nz=3,
             nx=2,
@@ -333,7 +332,6 @@ const CRITICAL = (t) -> 0.0
             rho_s=19300.0,
             cp_s=116.0,
             k_s=174.0,
-            power_shape=ps_3x2,
         )
 
         @testset "default no temp_worth adds no T_source" begin
@@ -417,7 +415,6 @@ const CRITICAL = (t) -> 0.0
 
         pg5 = PipeGeometry_rectangular(1.0, 0.04, 0.01, 0.04)
         @named ch = Channel(; name=:ch, n=5, geometry=pg5)
-        ps_3x2 = fill(1.0/(3*2), 3, 2)
         @named fuel = HeatDiffusion(
             nz=3,
             nx=2,
@@ -427,7 +424,6 @@ const CRITICAL = (t) -> 0.0
             rho_s=19300.0,
             cp_s=116.0,
             k_s=174.0,
-            power_shape=ps_3x2,
         )
 
         @testset "1D channel generates 5 equations" begin
