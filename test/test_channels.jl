@@ -135,79 +135,26 @@ end
     end
 end
 
-@testset "Channel with WallTemperature connection the same as direct equations" begin
+@testset "Channel wall bound to a parameter changes without recompiling" begin
     n = N_DEFAULT
-    # Style 1 (binding eqn).
-    @named pump_s1 = Pump(DP_PUMP)
-    @named bc_s1 = HeatExchanger(T_INLET)
-    @named ch_s1 = Channel(; n=n, geometry=geom,
-                            h_left=H_DEFAULT, h_right=0.0)
-    conns_s1 = [
-        inseries(pump_s1, bc_s1, ch_s1, pump_s1),
-        pump_s1.inlet.p ~ 1.0e5,
-        ch_s1.T_wall_left .~ T_WALL,
-        ch_s1.T_wall_right .~ T_INLET,  # Decorative, h is 0
-    ]
-    @named sys_s1 = assembly(conns_s1, pump_s1, bc_s1, ch_s1)
-    ssys_s1 = mtkcompile(sys_s1)
-    sol_s1 = solve_steady(ssys_s1, [ssys_s1.ch_s1.inlet.ṁ => 0.5])
-    @test sol_s1.retcode == ReturnCode.Success
-    ṁ_s1 = sol_s1[ssys_s1.ch_s1.inlet.ṁ]
-
-    # Style 2 — WallTemperature component connection.
+    @parameters T_w = T_WALL
     @named pump = Pump(DP_PUMP)
     @named bc = HeatExchanger(T_INLET)
-    @named ch = Channel(; n=n, geometry=geom,
-                          h_left=H_DEFAULT, h_right=0.0)
-    @named wt = WallTemperature(; n=n, T_wall=T_WALL)
+    @named ch = Channel(; n=n, geometry=geom, h_left=H_DEFAULT, h_right=0.0)
     connections = [
         inseries(pump, bc, ch, pump),
         pump.inlet.p ~ 1.0e5,
-        ch.T_wall_left .~ wt.T_wall_out,
-        ch.T_wall_right .~ T_INLET,  # Decorative, h is 0
+        ch.T_wall_left .~ T_w,
     ]
-    @named sys = assembly(connections, pump, bc, ch, wt)
+    @named sys = assembly(connections, pump, bc, ch)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    hot = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5, T_w => T_WALL + 50.0])
     @test sol.retcode == ReturnCode.Success
-    @test isapprox(sol[ssys.ch.inlet.ṁ], sol_s1[ssys_s1.ch_s1.inlet.ṁ]; rtol=1e-6)
-    @test all(isapprox.(sol[ssys.ch.T[:]], sol_s1[ssys_s1.ch_s1.T[:]], rtol=1e-6))
-    @test all(isapprox.(sol[ssys.ch.q_wall_left[:]], sol_s1[ssys_s1.ch_s1.q_wall_left[:]], rtol=1e-6))
-end
-
-@testset "ChannelHeatFlux with HeatFluxSource connection the same as direct equations" begin
-    n = N_DEFAULT
-    @named pump_s1 = Pump(DP_PUMP)
-    @named bc_s1 = HeatExchanger(T_INLET)
-    @named chf_s1 = ChannelHeatFlux(; n=n, geometry=geom)
-    conns_s1 = [
-        inseries(pump_s1, bc_s1, chf_s1, pump_s1),
-        pump_s1.inlet.p ~ 1.0e5,
-        chf_s1.q_left .~ Q_FLUX_DEFAULT,
-        chf_s1.q_right .~ 0.0,
-    ]
-    @named sys_s1 = assembly(conns_s1, pump_s1, bc_s1, chf_s1)
-    ssys_s1 = mtkcompile(sys_s1)
-    sol_s1 = solve_steady(ssys_s1, [ssys_s1.chf_s1.inlet.ṁ => 0.5])
-    @test sol_s1.retcode == ReturnCode.Success
-
-    @named pump = Pump(DP_PUMP)
-    @named bc = HeatExchanger(T_INLET)
-    @named chf = ChannelHeatFlux(; n=n, geometry=geom)
-    @named hfs = HeatFluxSource(; n=n, q=Q_FLUX_DEFAULT)
-    connections = [
-        inseries(pump, bc, chf, pump),
-        pump.inlet.p ~ 1.0e5,
-        chf.q_left .~ hfs.q_out,
-        chf.q_right .~ 0.0,
-    ]
-    @named sys = assembly(connections, pump, bc, chf, hfs)
-    ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => 0.5])
-    @test sol.retcode == ReturnCode.Success
-    @test isapprox(sol[ssys.chf.inlet.ṁ], sol_s1[ssys_s1.chf_s1.inlet.ṁ]; rtol=1e-6)
-    @test all(isapprox.(sol[ssys.chf.T[:]], sol_s1[ssys_s1.chf_s1.T[:]], rtol=1e-6))
-    @test all(isapprox.(sol[ssys.chf.q_wall_left[:]], sol_s1[ssys_s1.chf_s1.q_wall_left[:]], rtol=1e-6))
+    @test hot.retcode == ReturnCode.Success
+    @test all(sol[ssys.ch.T_wall_left[i]] == T_WALL for i in 1:n)
+    @test all(hot[ssys.ch.T_wall_left[i]] == T_WALL + 50.0 for i in 1:n)
+    @test sol[ssys.ch.T_out] < hot[ssys.ch.T_out]
 end
 
 @testset "Channel h_left::Real (broadcast) same as constant vector" begin
@@ -286,14 +233,16 @@ end
                                      htc=HTC.DittusBoelter(),
                                      darcy=Friction.Blasius())
     # Pin each cell's left thermal port T to T_WALL via per-cell ConstantTemperature.
-    ct_l = [ConstantTemperature(T_WALL; name=Symbol(:ct_l, i)) for i in 1:n]
+    @named ct_l = ConstantTemperature(T_WALL; n=n)
     conns = [
         inseries(pump, bc, cac, pump),
         pump.inlet.p ~ 1.0e5,
-        face(ct_l, cac, :thermal_left),
-        face(ct_l, cac, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (cac, :thermal_left),
+            (ct_l, :thermal) => (cac, :thermal_right),
+        ),
     ]
-    @named sys = assembly(conns, pump, bc, cac, ct_l...)
+    @named sys = assembly(conns, pump, bc, cac, ct_l)
     ssys = mtkcompile(sys; fully_determined=false)
     sol = solve_transient(ssys, [ssys.cac.inlet.ṁ => 0.5], range(0.0, 1.0, length=50))
     @test sol.retcode == ReturnCode.Success
@@ -316,14 +265,17 @@ end
             n=n, geometry=PipeGeometry_circular(L_ch, D_ch), htc=htc
         )
         @named bc = HeatExchanger(T_inlet_iscb)
-        ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l, i)) for i in 1:n]
-        ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r, i)) for i in 1:n]
+        @named ct_l = ConstantTemperature(T_wall_bc; n=n)
+        @named ct_r = ConstantTemperature(T_wall_bc; n=n)
         conns = [
             inseries(pump, bc, cac, pump),
-            face(ct_l, cac, :thermal_left), face(ct_r, cac, :thermal_right),
+            faces(
+                (ct_l, :thermal) => (cac, :thermal_left),
+                (ct_r, :thermal) => (cac, :thermal_right),
+            ),
             pump.inlet.p ~ 2e5,
         ]
-        @named sys = assembly(conns, pump, bc, cac, ct_l..., ct_r...)
+        @named sys = assembly(conns, pump, bc, cac, ct_l, ct_r)
         ssys = mtkcompile(sys)
         sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.490])
         return ssys, sol
@@ -377,15 +329,17 @@ end
     @named pump = Pump(; ṁ0=ṁ_NEG)
     @named cac = ChannelAndContacts(n=N_SIGN, geometry=GEOM_SIGN)
     @named bc = HeatExchanger(T_INLET_SIGN)
-    ct_l = [ConstantTemperature(T_WALL_SIGN; name=Symbol(:ct_l, i)) for i in 1:N_SIGN]
-    ct_r = [ConstantTemperature(T_WALL_SIGN; name=Symbol(:ct_r, i)) for i in 1:N_SIGN]
+    @named ct_l = ConstantTemperature(T_WALL_SIGN; n=N_SIGN)
+    @named ct_r = ConstantTemperature(T_WALL_SIGN; n=N_SIGN)
     conns = [
         inseries(pump, bc, cac, pump),
-        face(ct_l, cac, :thermal_left),
-        face(ct_r, cac, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (cac, :thermal_left),
+            (ct_r, :thermal) => (cac, :thermal_right),
+        ),
         pump.inlet.p ~ 1.0e5,
     ]
-    @named sys = assembly(conns, pump, bc, cac, ct_l..., ct_r...)
+    @named sys = assembly(conns, pump, bc, cac, ct_l, ct_r)
     ssys = mtkcompile(sys; fully_determined=false)
     sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => ṁ_NEG])
 
@@ -488,14 +442,16 @@ end
     @named bc_cac = HeatExchanger(T_INLET)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
                                      htc=HTC.ConstantNusselt(; Nu=4.0))
-    ct_l_xeq = [ConstantTemperature(T_WALL; name=Symbol(:ct_l_xeq, i)) for i in 1:n]
+    @named ct_l_xeq = ConstantTemperature(T_WALL; n=n)
     conns_cac = [
         inseries(pump_cac, bc_cac, cac, pump_cac),
         pump_cac.inlet.p ~ 1.0e5,
-        face(ct_l_xeq, cac, :thermal_left),
-        face(ct_l_xeq, cac, :thermal_right),
+        faces(
+            (ct_l_xeq, :thermal) => (cac, :thermal_left),
+            (ct_l_xeq, :thermal) => (cac, :thermal_right),
+        ),
     ]
-    @named sys_cac = assembly(conns_cac, pump_cac, bc_cac, cac, ct_l_xeq...)
+    @named sys_cac = assembly(conns_cac, pump_cac, bc_cac, cac, ct_l_xeq)
     ssys_cac = mtkcompile(sys_cac; fully_determined=false)  # integration test: per-cell wall-T binding
     ic_cac = [
         [ssys_cac.cac.T[i] => T_INLET for i in 1:n]...,
@@ -511,16 +467,15 @@ end
         for i in 1:n
     ]
 
-    # CHF side: HeatFluxSource pinned to per-cell q_per_cell.
+    # CHF side: the flux pinned to per-cell q_per_cell.
     @named pump_chf = Pump(DP_PUMP)
     @named bc_chf = HeatExchanger(T_INLET)
     @named chf = ChannelHeatFlux(; n=n, geometry=geom)
-    @named hfs = HeatFluxSource(; n=n, q=q_per_cell)
     conns_chf = [
         inseries(pump_chf, bc_chf, chf, pump_chf),
-        pump_chf.inlet.p ~ 1.0e5, chf.q_left .~ hfs.q_out, chf.q_right .~ 0.0,
+        pump_chf.inlet.p ~ 1.0e5, chf.q_left .~ q_per_cell, chf.q_right .~ 0.0,
     ]
-    @named sys_chf = assembly(conns_chf, pump_chf, bc_chf, chf, hfs)
+    @named sys_chf = assembly(conns_chf, pump_chf, bc_chf, chf)
     ssys_chf = mtkcompile(sys_chf)
     ic_chf = [
         [ssys_chf.chf.T[i] => T_INLET for i in 1:n]...,
@@ -553,15 +508,17 @@ end
             htc=htc,
         )
         @named bc = HeatExchanger(T_inlet_scb)
-        ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l_scb, i)) for i in 1:n_scb]
-        ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r_scb, i)) for i in 1:n_scb]
+        @named ct_l = ConstantTemperature(T_wall_bc; n=n_scb)
+        @named ct_r = ConstantTemperature(T_wall_bc; n=n_scb)
         conns = [
             inseries(pump, bc, cac, pump),
-            face(ct_l, cac, :thermal_left),
-            face(ct_r, cac, :thermal_right),
+            faces(
+                (ct_l, :thermal) => (cac, :thermal_left),
+                (ct_r, :thermal) => (cac, :thermal_right),
+            ),
             pump.inlet.p ~ 2e5,
         ]
-        @named sys = assembly(conns, pump, bc, cac, ct_l..., ct_r...)
+        @named sys = assembly(conns, pump, bc, cac, ct_l, ct_r)
         ssys = mtkcompile(sys)
         sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.490])
         return ssys, sol

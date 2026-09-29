@@ -885,8 +885,8 @@ end
     ps = fill(1.0 / (nz * nx), nz, nx)
     @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
                                 rho_s=3000.0, cp_s=800.0, k_s=100.0, power_shape=ps, T0=T0)
-    bathsL = [ConstantTemperature(T0; name=Symbol(:bathL, i)) for i in 1:nz]
-    bathsR = [ConstantTemperature(T0; name=Symbol(:bathR, i)) for i in 1:nz]
+    @named bathsL = ConstantTemperature(T0; n=nz)
+    @named bathsR = ConstantTemperature(T0; n=nz)
     ctrl = ReactivityController()
     @named pk = PointKinetics(ctrl; temp_worth=Dict(fuel => fill(-0.1, nz, nx)),
                               ref_temp=Dict(fuel => fill(T0, nz, nx)))
@@ -894,10 +894,12 @@ end
     conns = [
         fb,
         fuel.power ~ pk.P * 1.0e3,
-        face(bathsL, fuel, :thermal_left),
-        face(bathsR, fuel, :thermal_right),
+        faces(
+            (bathsL, :thermal) => (fuel, :thermal_left),
+            (bathsR, :thermal) => (fuel, :thermal_right),
+        ),
     ]
-    full = assembly(conns, fuel, pk, bathsL..., bathsR...; name=:sys8)
+    full = assembly(conns, fuel, pk, bathsL, bathsR; name=:sys8)
     ssys = mtkcompile(full)
     sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success

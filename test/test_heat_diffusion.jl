@@ -103,15 +103,17 @@ end
         power=pwr,
     )
 
-    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct_l, i)) for i in 1:nz]
-    ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct_r, i)) for i in 1:nz]
+    @named ct_l = ConstantTemperature(T_bc; n=nz)
+    @named ct_r = ConstantTemperature(T_bc; n=nz)
 
     conns = [
-        face(ct_l, hd, :thermal_left),
-        face(ct_r, hd, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (hd, :thermal_left),
+            (ct_r, :thermal) => (hd, :thermal_right),
+        ),
         hd.power ~ pwr,
     ]
-    @named sys = assembly(conns, hd, ct_l..., ct_r...)
+    @named sys = assembly(conns, hd, ct_l, ct_r)
     ssys = mtkcompile(sys)
 
     sol = solve_steady(ssys)
@@ -156,9 +158,9 @@ end
         power=pwr,
     )
 
-    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct5_l, i)) for i in 1:nz]
-    conns = [face(ct_l, hd, :thermal_left), hd.power ~ pwr]
-    @named sys = assembly(conns, hd, ct_l...)
+    @named ct_l = ConstantTemperature(T_bc; n=nz)
+    conns = [faces((ct_l, :thermal) => (hd, :thermal_left)), hd.power ~ pwr]
+    @named sys = assembly(conns, hd, ct_l)
     ssys = mtkcompile(sys; fully_determined=true)
     sol = solve_steady(ssys)
 
@@ -189,15 +191,17 @@ end
         power=pwr,
     )
 
-    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct12_l, i)) for i in 1:nz]
-    ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct12_r, i)) for i in 1:nz]
+    @named ct_l = ConstantTemperature(T_bc; n=nz)
+    @named ct_r = ConstantTemperature(T_bc; n=nz)
 
     conns = [
-        face(ct_l, hd, :thermal_left),
-        face(ct_r, hd, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (hd, :thermal_left),
+            (ct_r, :thermal) => (hd, :thermal_right),
+        ),
         hd.power ~ pwr,
     ]
-    @named sys = assembly(conns, hd, ct_l..., ct_r...)
+    @named sys = assembly(conns, hd, ct_l, ct_r)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
 
@@ -227,14 +231,16 @@ end
         rho_s=2700.0, cp_s=900.0, k_s=200.0,
         power_shape=ps, power=pwr,
     )
-    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct6_l, i)) for i in 1:nz]
-    ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct6_r, i)) for i in 1:nz]
+    @named ct_l = ConstantTemperature(T_bc; n=nz)
+    @named ct_r = ConstantTemperature(T_bc; n=nz)
     conns = [
-        face(ct_l, hd, :thermal_left),
-        face(ct_r, hd, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (hd, :thermal_left),
+            (ct_r, :thermal) => (hd, :thermal_right),
+        ),
         hd.power ~ pwr,
     ]
-    @named sys = assembly(conns, hd, ct_l..., ct_r...)
+    @named sys = assembly(conns, hd, ct_l, ct_r)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
 

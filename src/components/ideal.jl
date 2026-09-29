@@ -96,19 +96,47 @@ function HeatExchanger(T_bc; name)
 end
 
 """
-    ConstantTemperature(T; name) -> System
+    ConstantTemperature(T; n, name) -> System
 
-Constant-temperature thermal boundary condition.
+Fixed-temperature thermal boundary with `n` ports, one per cell. It absorbs or supplies
+whatever heat keeps each port at its temperature.
+
+A port has to be connected to something that can carry its heat flow `Q`: MTK sets the flow of
+a port no `connect` touches to zero, so binding `port.T` directly on a heated wall would
+over-determine it. This component is that something.
 
 # Arguments
-- `T`: fixed surface temperature [°C]
+- `T`: fixed temperature [°C], a number for every port or a length-`n` vector, one per port.
+  Held as the parameter `T_bc` (a scalar or a vector), so `remake` can change it.
+- `n`: number of ports (default `length(T)` for a vector, 1 for a number)
 - `name`: system name (Symbol)
 
 # Ports
-- `thermal` -- `ThermalPort` (single port, used as a wall BC)
+- `thermal1 … thermaln` -- `ThermalPort`s, named like a channel's per-cell faces so
+  [`face`](@ref), [`faces`](@ref) and [`port`](@ref) reach them as `:thermal`
+
+# Returns
+Uncompiled `System`.
+
+# Example
+```julia
+@named wall = ConstantTemperature(100.0; n=4)
+conns = [..., faces((wall, :thermal) => (cac, :thermal_left))]
+```
+
+# Throws
+`DimensionMismatch` when a vector `T` does not have length `n`.
 """
-function ConstantTemperature(T; name)
-    pars = @parameters T_bc = T
-    @named thermal = ThermalPort()
-    return compose(System([thermal.T ~ T_bc], t; name=name), thermal)
+function ConstantTemperature(T; n::Int=(T isa AbstractVector ? length(T) : 1), name)
+    thermal = [ThermalPort(; name=Symbol(:thermal, i)) for i in 1:n]
+    if T isa AbstractVector
+        length(T) == n ||
+            throw(DimensionMismatch("T has length $(length(T)), expected n=$n"))
+        @parameters T_bc[1:n] = T
+        eqs = [thermal[i].T ~ T_bc[i] for i in 1:n]
+    else
+        @parameters T_bc = T
+        eqs = [thermal[i].T ~ T_bc for i in 1:n]
+    end
+    return compose(System(eqs, t, [], [T_bc]; name=name), thermal...)
 end

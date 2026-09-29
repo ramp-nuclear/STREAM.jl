@@ -62,15 +62,17 @@ end
     # pinning `port.T` directly over-determines via the dangling Flow rule
     # (auto-zeros Q). Drive them via ConstantTemperature `connect()`s
     # (the canonical CAC wall-T pattern; see the flow-reversal testset in test_channels.jl).
-    ct_l = [ConstantTemperature(40.0; name=Symbol(:ct_l_ok_, i)) for i in 1:4]
-    ct_r = [ConstantTemperature(40.0; name=Symbol(:ct_r_ok_, i)) for i in 1:4]
+    @named ct_l = ConstantTemperature(40.0; n=4)
+    @named ct_r = ConstantTemperature(40.0; n=4)
     connections = [
         inseries(pump, bc, ch, pump),
         pump.inlet.p ~ 1.0e5,
-        face(ct_l, ch, :thermal_left),
-        face(ct_r, ch, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (ch, :thermal_left),
+            (ct_r, :thermal) => (ch, :thermal_right),
+        ),
     ]
-    @named sys = assembly(connections, pump, bc, ch, ct_l..., ct_r...)
+    @named sys = assembly(connections, pump, bc, ch, ct_l, ct_r)
     ssys = mtkcompile(sys)
     @test check_gravity_mismatch(ssys) == :ok
 end
@@ -80,15 +82,17 @@ end
     @named ch = ChannelAndContacts(; n=4, geometry=geom, g=G_EARTH)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
-    ct_l = [ConstantTemperature(40.0; name=Symbol(:ct_l_bad_, i)) for i in 1:4]
-    ct_r = [ConstantTemperature(40.0; name=Symbol(:ct_r_bad_, i)) for i in 1:4]
+    @named ct_l = ConstantTemperature(40.0; n=4)
+    @named ct_r = ConstantTemperature(40.0; n=4)
     connections = [
         inseries(pump, bc, ch, pump),
         pump.inlet.p ~ 1.0e5,
-        face(ct_l, ch, :thermal_left),
-        face(ct_r, ch, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (ch, :thermal_left),
+            (ct_r, :thermal) => (ch, :thermal_right),
+        ),
     ]
-    @named sys = assembly(connections, pump, bc, ch, ct_l..., ct_r...)
+    @named sys = assembly(connections, pump, bc, ch, ct_l, ct_r)
     ssys = mtkcompile(sys)
     @test check_gravity_mismatch(ssys) == :mismatch
 end

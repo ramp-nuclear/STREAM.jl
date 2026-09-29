@@ -5,8 +5,8 @@ simple_loop,dP_loop,3.0000000000e+04,3.0000000000e+04,0.0000000000e+00,0.000000e
 simple_loop,T[1],4.1623153894e+01,4.1623154113e+01,2.1940699924e-07,5.271273e-09,CLEAN,0.0200,
 simple_loop,T[2],4.3209811794e+01,4.3209811979e+01,1.8470407781e-07,4.274586e-09,CLEAN,0.0200,
 simple_loop,T[3],4.4760353642e+01,4.4760353786e+01,1.4304616514e-07,3.195823e-09,CLEAN,0.0200,
-simple_loop,T[4],4.6275183804e+01,4.6275183898e+01,9.4517908167e-08,2.042518e-09,CLEAN,0.0200,
-simple_loop,T[5],4.7754728998e+01,4.7754729037e+01,3.9092689974e-08,8.186140e-10,CLEAN,0.0200,
+simple_loop,T[4],4.6275183804e+01,4.6275183898e+01,9.4517901061e-08,2.042518e-09,CLEAN,0.0200,
+simple_loop,T[5],4.7754728998e+01,4.7754729037e+01,3.9092682869e-08,8.186139e-10,CLEAN,0.0200,
 simple_loop,T[6],4.9199436301e+01,4.9199436278e+01,2.2503463981e-08,4.573927e-10,CLEAN,0.0200,
 simple_loop,T[7],5.0609771211e+01,5.0609771122e+01,8.9755268107e-08,1.773477e-09,CLEAN,0.0200,
 simple_loop,T[8],5.1986215803e+01,5.1986215642e+01,1.6129843061e-07,3.102715e-09,CLEAN,0.0200,
@@ -15,51 +15,51 @@ simple_loop,T[10],5.4639434591e+01,5.4639434281e+01,3.0994914368e-07,5.672627e-0
 simple_loop,T_wall_left[1],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[1],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[1],3.7559980864e+04,3.7559980869e+04,5.4133852245e-06,1.441264e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[1],3.7559980864e+04,3.7559980869e+04,5.4133852245e-06,1.441264e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[1],2.1926332226e+06,2.1926332147e+06,7.9262992367e-03,3.614968e-09,CLEAN,0.0200,
-simple_loop,q_density_total[1],2.1926332226e+06,2.1926332147e+06,7.9262992367e-03,3.614968e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,h_tc_right[1],3.7559980864e+04,3.7559980869e+04,5.4133925005e-06,1.441266e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[1],2.1926332226e+06,2.1926332147e+06,7.9262997024e-03,3.614968e-09,CLEAN,0.0200,
+simple_loop,q_density_total[1],2.1926332226e+06,2.1926332147e+06,7.9262997024e-03,3.614968e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[2],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[2],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[2],3.7744135437e+04,3.7744135442e+04,4.5714841690e-06,1.211177e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_left[2],3.7744135437e+04,3.7744135442e+04,4.5714696171e-06,1.211173e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[2],3.7744135437e+04,3.7744135442e+04,4.5714841690e-06,1.211177e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[2],2.1434965551e+06,2.1434965484e+06,6.7129665986e-03,3.131783e-09,CLEAN,0.0200,
-simple_loop,q_density_total[2],2.1434965551e+06,2.1434965484e+06,6.7129665986e-03,3.131783e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,q_density_left[2],2.1434965551e+06,2.1434965484e+06,6.7129675299e-03,3.131784e-09,CLEAN,0.0200,
+simple_loop,q_density_total[2],2.1434965551e+06,2.1434965484e+06,6.7129675299e-03,3.131784e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[3],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[3],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[3],3.7923475012e+04,3.7923475015e+04,3.5585835576e-06,9.383590e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_left[3],3.7923475012e+04,3.7923475015e+04,3.5585762816e-06,9.383571e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[3],3.7923475012e+04,3.7923475015e+04,3.5585762816e-06,9.383571e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[3],2.0948793483e+06,2.0948793431e+06,5.2288866136e-03,2.496032e-09,CLEAN,0.0200,
-simple_loop,q_density_total[3],2.0948793483e+06,2.0948793431e+06,5.2288866136e-03,2.496032e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,q_density_left[3],2.0948793483e+06,2.0948793431e+06,5.2288870793e-03,2.496033e-09,CLEAN,0.0200,
+simple_loop,q_density_total[3],2.0948793483e+06,2.0948793431e+06,5.2288870793e-03,2.496033e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[4],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[4],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[4],3.8098088972e+04,3.8098088974e+04,2.3807660909e-06,6.249043e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_left[4],3.8098088972e+04,3.8098088974e+04,2.3807442631e-06,6.248986e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[4],3.8098088972e+04,3.8098088974e+04,2.3807442631e-06,6.248986e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[4],2.0468128274e+06,2.0468128240e+06,3.4713882487e-03,1.695997e-09,CLEAN,0.0200,
-simple_loop,q_density_total[4],2.0468128274e+06,2.0468128240e+06,3.4713882487e-03,1.695997e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,q_density_left[4],2.0468128274e+06,2.0468128240e+06,3.4713889472e-03,1.695997e-09,CLEAN,0.0200,
+simple_loop,q_density_total[4],2.0468128274e+06,2.0468128240e+06,3.4713889472e-03,1.695997e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[5],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[5],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[5],3.8268067713e+04,3.8268067714e+04,1.0492949514e-06,2.741960e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[5],3.8268067713e+04,3.8268067714e+04,1.0492876754e-06,2.741941e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[5],3.8268067713e+04,3.8268067714e+04,1.0492949514e-06,2.741960e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,q_density_left[5],1.9993255684e+06,1.9993255669e+06,1.4428452123e-03,7.216660e-10,CLEAN,0.0200,
 simple_loop,q_density_total[5],1.9993255684e+06,1.9993255669e+06,1.4428452123e-03,7.216660e-10,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[6],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[6],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[6],3.8433502399e+04,3.8433502399e+04,4.1606108425e-07,1.082548e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,h_tc_right[6],3.8433502399e+04,3.8433502399e+04,4.1604653234e-07,1.082510e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[6],1.9524435868e+06,1.9524435877e+06,8.4475497715e-04,4.326655e-10,CLEAN,0.0200,
-simple_loop,q_density_total[6],1.9524435868e+06,1.9524435877e+06,8.4475497715e-04,4.326655e-10,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,h_tc_left[6],3.8433502399e+04,3.8433502399e+04,4.1605380829e-07,1.082529e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_right[6],3.8433502399e+04,3.8433502399e+04,4.1606108425e-07,1.082548e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,q_density_left[6],1.9524435868e+06,1.9524435877e+06,8.4475474432e-04,4.326654e-10,CLEAN,0.0200,
+simple_loop,q_density_total[6],1.9524435868e+06,1.9524435877e+06,8.4475474432e-04,4.326654e-10,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[7],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[7],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[7],3.8594484732e+04,3.8594484731e+04,1.9854633138e-06,5.144422e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[7],3.8594484732e+04,3.8594484731e+04,1.9854633138e-06,5.144422e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[7],1.9061904309e+06,1.9061904343e+06,3.3656782471e-03,1.765657e-09,CLEAN,0.0200,
-simple_loop,q_density_total[7],1.9061904309e+06,1.9061904343e+06,3.3656782471e-03,1.765657e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,q_density_left[7],1.9061904309e+06,1.9061904343e+06,3.3656780142e-03,1.765657e-09,CLEAN,0.0200,
+simple_loop,q_density_total[7],1.9061904309e+06,1.9061904343e+06,3.3656780142e-03,1.765657e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[8],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[8],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[8],3.8751106743e+04,3.8751106739e+04,3.6169658415e-06,9.333839e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[8],3.8751106743e+04,3.8751106739e+04,3.6169658415e-06,9.333839e-11,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[8],1.8605872765e+06,1.8605872826e+06,6.0768825933e-03,3.266110e-09,CLEAN,0.0200,
-simple_loop,q_density_total[8],1.8605872765e+06,1.8605872826e+06,6.0768825933e-03,3.266110e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,q_density_left[8],1.8605872765e+06,1.8605872826e+06,6.0768830590e-03,3.266110e-09,CLEAN,0.0200,
+simple_loop,q_density_total[8],1.8605872765e+06,1.8605872826e+06,6.0768830590e-03,3.266110e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[9],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[9],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,h_tc_left[9],3.8903460591e+04,3.8903460586e+04,5.2561517805e-06,1.351076e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
@@ -68,10 +68,10 @@ simple_loop,q_density_left[9],1.8156530242e+06,1.8156530332e+06,8.9150841814e-03
 simple_loop,q_density_total[9],1.8156530242e+06,1.8156530332e+06,8.9150841814e-03,4.910125e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 simple_loop,T_wall_left[10],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
 simple_loop,T_wall_right[10],1.0000000000e+02,1.0000000000e+02,0.0000000000e+00,0.000000e+00,CLEAN,0.0200,
-simple_loop,h_tc_left[10],3.9051638388e+04,3.9051638381e+04,6.8366862251e-06,1.750678e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
+simple_loop,h_tc_left[10],3.9051638388e+04,3.9051638381e+04,6.8366789492e-06,1.750677e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
 simple_loop,h_tc_right[10],3.9051638388e+04,3.9051638381e+04,6.8366789492e-06,1.750677e-10,CLEAN,0.0200,Gap #2 candidate (HTC film-T vs bulk-T)
-simple_loop,q_density_left[10],1.7714043974e+06,1.7714044092e+06,1.1794593884e-02,6.658329e-09,CLEAN,0.0200,
-simple_loop,q_density_total[10],1.7714043974e+06,1.7714044092e+06,1.1794593884e-02,6.658329e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
+simple_loop,q_density_left[10],1.7714043974e+06,1.7714044092e+06,1.1794594117e-02,6.658329e-09,CLEAN,0.0200,
+simple_loop,q_density_total[10],1.7714043974e+06,1.7714044092e+06,1.1794594117e-02,6.658329e-09,CLEAN,0.0200,Gap #1 mitigated: total q (left+right) cancels partition difference
 mtr_symmetric,T_out_l,4.4737077786e+01,4.4737077796e+01,1.0410701634e-08,2.327086e-10,CLEAN,0.0200,
 mtr_symmetric,T_out_r,4.4737077786e+01,4.4737077796e+01,1.0410701634e-08,2.327086e-10,CLEAN,0.0200,
 mtr_symmetric,ṁ_l,2.5254714269e-01,2.5254714270e-01,1.3660905740e-11,5.409250e-11,CLEAN,0.0200,

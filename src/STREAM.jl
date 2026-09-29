@@ -220,9 +220,9 @@ Components state equations and consume their physics from [`HTC`](@ref), [`Frict
 - **Solid heat.** [`HeatDiffusion`](@ref), a 2D finite-difference plate.
 - **Neutronics.** [`PointKinetics`](@ref) with any delayed group count, plus
   [`ReactivityController`](@ref) and the SCRAM callbacks.
-- **Boundary conditions and value sources.** [`HeatExchanger`](@ref),
-  [`ConstantTemperature`](@ref), [`WallTemperature`](@ref), [`HeatFluxSource`](@ref),
-  [`ConvectiveBoundary`](@ref).
+- **Boundary conditions.** [`HeatExchanger`](@ref), [`ConstantTemperature`](@ref),
+  [`ConvectiveBoundary`](@ref). A `Channel` wall or a `ChannelHeatFlux` flux needs no
+  component: bind it in the connection list, `ch.T_wall_left .~ T`.
 
 `Base.Channel` also exists, so `using STREAM.Components` leaves `Channel` ambiguous. Import it
 explicitly with `using STREAM.Components: Channel`, or qualify it.
@@ -257,8 +257,8 @@ export FlowPort, ThermalPort
 export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFlowResistor
 export LocalPressureDrop, Inertia, HeatExchanger, bilinear_inertia
 export ResistorFromKnownPoint
-export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
-export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
+export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature
+export ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController
 export StateMachine, StateSchedule, trip!, reset!, machine_callbacks

@@ -125,7 +125,7 @@ src/
     resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
                               # VolumetricFlowResistor, LocalPressureDrop
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
-    sources.jl                # WallTemperature, HeatFluxSource, ConvectiveBoundary (external inputs)
+    sources.jl                # ConvectiveBoundary
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
     point_kinetics.jl         # PointKinetics (any group count), ReactivityController
@@ -179,7 +179,7 @@ test/
   test_pump.jl              # Pump
   test_flapper.jl           # Flapper
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
-  test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, WallTemperature, HeatFluxSource
+  test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, ConvectiveBoundary
   test_heat_diffusion.jl    # HeatDiffusion
   test_correlations.jl      # Nusselt + friction correlation function unit tests
   test_htc.jl               # HTC models: property basis, named constructors, regime
@@ -206,7 +206,7 @@ test/
   test_state_machine.jl     # StateMachine, StateSchedule, machine_callbacks
 ```
 
-**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. The value-source family (`WallTemperature`, `HeatFluxSource` in `src/components/sources.jl`) is a documented exception — its unit tests live in `test_ideal.jl` alongside `ConstantTemperature` (same value-source family). The physics modules are covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), `test_darcy.jl` (the `Friction` models), and `test_thresholds.jl`.
+**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. `ConvectiveBoundary` (`src/components/sources.jl`) is a documented exception: its unit tests live in `test_ideal.jl` alongside `ConstantTemperature`, the thermal boundary it is tested against. The physics modules are covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), `test_darcy.jl` (the `Friction` models), and `test_thresholds.jl`.
 
 ## Known gaps against Python STREAM
 

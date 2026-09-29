@@ -79,20 +79,18 @@ end
             n=n, geometry=geom, htc=HTC.ConstantNusselt(; Nu=8.235)
         )
         @named bc_phy02 = HeatExchanger(T_inlet)
-        ct_l_phy02 = [
-            ConstantTemperature(T_wall; name=Symbol(:ct_l_phy02_, i)) for i in 1:n
-        ]
-        ct_r_phy02 = [
-            ConstantTemperature(T_wall; name=Symbol(:ct_r_phy02_, i)) for i in 1:n
-        ]
+        @named ct_l_phy02 = ConstantTemperature(T_wall; n=n)
+        @named ct_r_phy02 = ConstantTemperature(T_wall; n=n)
         conns_phy02 = [
             inseries(pump_phy02, bc_phy02, cac_phy02, pump_phy02),
-            face(ct_l_phy02, cac_phy02, :thermal_left),
-            face(ct_r_phy02, cac_phy02, :thermal_right),
+            faces(
+                (ct_l_phy02, :thermal) => (cac_phy02, :thermal_left),
+                (ct_r_phy02, :thermal) => (cac_phy02, :thermal_right),
+            ),
             pump_phy02.inlet.p ~ 1.0e5,
         ]
         @named sys_phy02 = assembly(
-            conns_phy02, pump_phy02, bc_phy02, cac_phy02, ct_l_phy02..., ct_r_phy02...
+            conns_phy02, pump_phy02, bc_phy02, cac_phy02, ct_l_phy02, ct_r_phy02
         )
         ssys_phy02 = mtkcompile(sys_phy02)
         sol_phy02 = solve_steady(ssys_phy02, [ssys_phy02.cac_phy02.inlet.ṁ => 0.490])
@@ -115,20 +113,18 @@ end
             darcy=Friction.RectangularLaminar(geom),
         )
         @named bc_phy03 = HeatExchanger(T_inlet)
-        ct_l_phy03 = [
-            ConstantTemperature(T_wall; name=Symbol(:ct_l_phy03_, i)) for i in 1:n
-        ]
-        ct_r_phy03 = [
-            ConstantTemperature(T_wall; name=Symbol(:ct_r_phy03_, i)) for i in 1:n
-        ]
+        @named ct_l_phy03 = ConstantTemperature(T_wall; n=n)
+        @named ct_r_phy03 = ConstantTemperature(T_wall; n=n)
         conns_phy03 = [
             inseries(pump_phy03, bc_phy03, cac_phy03, pump_phy03),
-            face(ct_l_phy03, cac_phy03, :thermal_left),
-            face(ct_r_phy03, cac_phy03, :thermal_right),
+            faces(
+                (ct_l_phy03, :thermal) => (cac_phy03, :thermal_left),
+                (ct_r_phy03, :thermal) => (cac_phy03, :thermal_right),
+            ),
             pump_phy03.inlet.p ~ 1.0e5,
         ]
         @named sys_phy03 = assembly(
-            conns_phy03, pump_phy03, bc_phy03, cac_phy03, ct_l_phy03..., ct_r_phy03...
+            conns_phy03, pump_phy03, bc_phy03, cac_phy03, ct_l_phy03, ct_r_phy03
         )
         ssys_phy03 = mtkcompile(sys_phy03)
         sol_phy03 = solve_steady(ssys_phy03, [ssys_phy03.cac_phy03.inlet.ṁ => 8.8e-4])
@@ -184,16 +180,18 @@ end
             n=n, geometry=geom, htc=htc_rd, darcy=friction_rd
         )
         @named bc_lam = HeatExchanger(T_inlet)
-        ct_l_lam = [ConstantTemperature(T_wall; name=Symbol(:ct_l_lam_, i)) for i in 1:n]
-        ct_r_lam = [ConstantTemperature(T_wall; name=Symbol(:ct_r_lam_, i)) for i in 1:n]
+        @named ct_l_lam = ConstantTemperature(T_wall; n=n)
+        @named ct_r_lam = ConstantTemperature(T_wall; n=n)
         conns_lam = [
             inseries(pump_lam, bc_lam, cac_lam, pump_lam),
-            face(ct_l_lam, cac_lam, :thermal_left),
-            face(ct_r_lam, cac_lam, :thermal_right),
+            faces(
+                (ct_l_lam, :thermal) => (cac_lam, :thermal_left),
+                (ct_r_lam, :thermal) => (cac_lam, :thermal_right),
+            ),
             pump_lam.inlet.p ~ 1.0e5,
         ]
         @named sys_lam = assembly(
-            conns_lam, pump_lam, bc_lam, cac_lam, ct_l_lam..., ct_r_lam...
+            conns_lam, pump_lam, bc_lam, cac_lam, ct_l_lam, ct_r_lam
         )
         ssys_lam = mtkcompile(sys_lam)
         sol_lam = solve_steady(ssys_lam, [ssys_lam.cac_lam.inlet.ṁ => 1e-4])
@@ -245,16 +243,18 @@ end
             n=n, geometry=geom, htc=htc_rd, darcy=friction_rd
         )
         @named bc_turb = HeatExchanger(T_inlet)
-        ct_l_turb = [ConstantTemperature(T_wall; name=Symbol(:ct_l_turb_, i)) for i in 1:n]
-        ct_r_turb = [ConstantTemperature(T_wall; name=Symbol(:ct_r_turb_, i)) for i in 1:n]
+        @named ct_l_turb = ConstantTemperature(T_wall; n=n)
+        @named ct_r_turb = ConstantTemperature(T_wall; n=n)
         conns_turb = [
             inseries(pump_turb, bc_turb, cac_turb, pump_turb),
-            face(ct_l_turb, cac_turb, :thermal_left),
-            face(ct_r_turb, cac_turb, :thermal_right),
+            faces(
+                (ct_l_turb, :thermal) => (cac_turb, :thermal_left),
+                (ct_r_turb, :thermal) => (cac_turb, :thermal_right),
+            ),
             pump_turb.inlet.p ~ 1.0e5,
         ]
         @named sys_turb = assembly(
-            conns_turb, pump_turb, bc_turb, cac_turb, ct_l_turb..., ct_r_turb...
+            conns_turb, pump_turb, bc_turb, cac_turb, ct_l_turb, ct_r_turb
         )
         ssys_turb = mtkcompile(sys_turb)
         sol_turb = solve_steady(ssys_turb, [ssys_turb.cac_turb.inlet.ṁ => 0.250])
@@ -509,15 +509,17 @@ end
             darcy=Friction.RectangularLaminar(geom),
         )
         @named bc_fd = HeatExchanger(T_inlet)
-        ct_l_fd = [ConstantTemperature(T_wall; name=Symbol(:ct_l_fd_, i)) for i in 1:n]
-        ct_r_fd = [ConstantTemperature(T_wall; name=Symbol(:ct_r_fd_, i)) for i in 1:n]
+        @named ct_l_fd = ConstantTemperature(T_wall; n=n)
+        @named ct_r_fd = ConstantTemperature(T_wall; n=n)
         conns_fd = [
             inseries(pump_fd, bc_fd, cac_fd, pump_fd),
-            face(ct_l_fd, cac_fd, :thermal_left),
-            face(ct_r_fd, cac_fd, :thermal_right),
+            faces(
+                (ct_l_fd, :thermal) => (cac_fd, :thermal_left),
+                (ct_r_fd, :thermal) => (cac_fd, :thermal_right),
+            ),
             pump_fd.inlet.p ~ 1.0e5,
         ]
-        @named sys_fd = assembly(conns_fd, pump_fd, bc_fd, cac_fd, ct_l_fd..., ct_r_fd...)
+        @named sys_fd = assembly(conns_fd, pump_fd, bc_fd, cac_fd, ct_l_fd, ct_r_fd)
         # Critical assertion: mtkcompile must succeed without symbolic tracing error
         ssys_fd = @test_nowarn mtkcompile(sys_fd)
         @test ssys_fd !== nothing
@@ -544,16 +546,18 @@ end
             darcy=Friction.RectangularLaminar(geom),
         )
         @named bc_dev = HeatExchanger(T_inlet)
-        ct_l_dev = [ConstantTemperature(T_wall; name=Symbol(:ct_l_dev_, i)) for i in 1:n]
-        ct_r_dev = [ConstantTemperature(T_wall; name=Symbol(:ct_r_dev_, i)) for i in 1:n]
+        @named ct_l_dev = ConstantTemperature(T_wall; n=n)
+        @named ct_r_dev = ConstantTemperature(T_wall; n=n)
         conns_dev = [
             inseries(pump_dev, bc_dev, cac_dev, pump_dev),
-            face(ct_l_dev, cac_dev, :thermal_left),
-            face(ct_r_dev, cac_dev, :thermal_right),
+            faces(
+                (ct_l_dev, :thermal) => (cac_dev, :thermal_left),
+                (ct_r_dev, :thermal) => (cac_dev, :thermal_right),
+            ),
             pump_dev.inlet.p ~ 1.0e5,
         ]
         @named sys_dev = assembly(
-            conns_dev, pump_dev, bc_dev, cac_dev, ct_l_dev..., ct_r_dev...
+            conns_dev, pump_dev, bc_dev, cac_dev, ct_l_dev, ct_r_dev
         )
         ssys_dev = @test_nowarn mtkcompile(sys_dev)
         @test ssys_dev !== nothing

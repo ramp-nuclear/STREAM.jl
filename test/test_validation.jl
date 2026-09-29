@@ -173,15 +173,17 @@ end
     @named pump = Pump(3.0e4)
     @named hx = HeatExchanger(T_inlet)
     @named cac = ChannelAndContacts(; n=n, geometry=geom_simple)
-    ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:n]
-    ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:n]
+    @named ct_l = ConstantTemperature(T_wall; n=n)
+    @named ct_r = ConstantTemperature(T_wall; n=n)
     conns = [
         inseries(pump, hx, cac, pump),
         pump.inlet.p ~ 1.0e5,
-        face(ct_l, cac, :thermal_left),
-        face(ct_r, cac, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (cac, :thermal_left),
+            (ct_r, :thermal) => (cac, :thermal_right),
+        ),
     ]
-    @named sys = assembly(conns, pump, hx, cac, ct_l..., ct_r...)
+    @named sys = assembly(conns, pump, hx, cac, ct_l, ct_r)
     ssys = mtkcompile(sys; fully_determined=true)
 
     op = vcat(
@@ -747,14 +749,16 @@ end  # @testset "parity harness"
         power_shape=ps_v01,
         power=0.0,
     )
-    ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:nz_v01]
-    ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:nz_v01]
+    @named ct_l = ConstantTemperature(T_wall; n=nz_v01)
+    @named ct_r = ConstantTemperature(T_wall; n=nz_v01)
     conns_v01 = [
-        face(ct_l, hd_v01, :thermal_left),
-        face(ct_r, hd_v01, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (hd_v01, :thermal_left),
+            (ct_r, :thermal) => (hd_v01, :thermal_right),
+        ),
         hd_v01.power ~ 0.0,
     ]
-    @named sys_v01 = assembly(conns_v01, ct_l..., ct_r..., hd_v01)
+    @named sys_v01 = assembly(conns_v01, ct_l, ct_r, hd_v01)
     ssys_v01 = mtkcompile(sys_v01; fully_determined=true)
 
     op_ic_v01 = [ssys_v01.hd_v01.T[i, j] => T0 for i in 1:nz_v01 for j in 1:nx_v01]

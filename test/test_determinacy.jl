@@ -120,14 +120,16 @@ function _build_val01_fourier()
         nz=nz_v01, nx=nx_v01, Lz=0.6, Lx=Lx_v01, y=0.07,
         rho_s=2700.0, cp_s=900.0, k_s=200.0,
         power_shape=ps_v01, power=0.0)
-    ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:nz_v01]
-    ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:nz_v01]
+    @named ct_l = ConstantTemperature(T_wall; n=nz_v01)
+    @named ct_r = ConstantTemperature(T_wall; n=nz_v01)
     conns_v01 = [
-        face(ct_l, hd_v01, :thermal_left),
-        face(ct_r, hd_v01, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (hd_v01, :thermal_left),
+            (ct_r, :thermal) => (hd_v01, :thermal_right),
+        ),
         hd_v01.power ~ 0.0,
     ]
-    @named sys_v01 = assembly(conns_v01, ct_l..., ct_r..., hd_v01)
+    @named sys_v01 = assembly(conns_v01, ct_l, ct_r, hd_v01)
     return sys_v01
 end
 

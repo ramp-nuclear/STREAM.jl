@@ -6,6 +6,7 @@ using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Examples
+using STREAM.Assemblies: var_length
 
 @testset "Inertia stub callable" begin
     @named L = Inertia(1e3)
@@ -72,110 +73,26 @@ end
     @test ssys isa ModelingToolkit.AbstractSystem
 end
 
-# Helper: solve a portless value source in isolation and read back the per-cell
-# output it emits. The compiled system has no unknowns (every output is a pure
-# algebraic RHS that mtkcompile lifts into observed), so a trivial solve just
-# evaluates those observed quantities. Returns the n emitted values at the final
-# saved point.
-function _emitted(ssys, out, n; op=Pair[], tspan=(0.0, 1.0))
-    sol = solve(ODEProblem(ssys, op, tspan), Rodas5P())
-    return [sol[out[i]][end] for i in 1:n]
-end
+@testset "ConstantTemperature: n ports, each held at its temperature" begin
+    @named wall = ConstantTemperature(40.0; n=3)
+    @test var_length(wall, :thermal) == 3
+    profile = [30.0, 55.0, 42.0]    # asymmetric, so a reversal or shift would show
+    @named prof = ConstantTemperature(profile)
+    @test var_length(prof, :thermal) == 3
+    @test_throws DimensionMismatch ConstantTemperature(profile; n=4, name=:bad)
 
-@testset "WallTemperature Real broadcast emits the scalar to every cell" begin
-    n = 4
-    @named wt = WallTemperature(; n=n, T_wall=76.85)
-    @test wt isa ModelingToolkit.System
-    var_names = string.(unknowns(wt))
-    twl_count = count(s -> occursin("T_wall_out", s), var_names)
-    @test twl_count == n
-    @test length(equations(wt)) == n
-
-    ssys = mtkcompile(wt; fully_determined=false)
-    emitted = _emitted(ssys, ssys.T_wall_out, n)
-    @test emitted == fill(76.85, n)
-end
-
-@testset "WallTemperature Vector emits the i-th element at cell i" begin
-    n = 4
-    # An asymmetric, non-monotone profile so a transpose, a reversal, or an
-    # off-by-one would shift at least one cell and fail the exact match.
-    profile = [27.85, 148.85, 59.85, 140.85]
-    @named wt = WallTemperature(; n=n, T_wall=profile)
-    @test wt isa ModelingToolkit.System
-    @test length(equations(wt)) == n
-
-    ssys = mtkcompile(wt; fully_determined=false)
-    emitted = _emitted(ssys, ssys.T_wall_out, n)
-    @test emitted == profile
-    @test all(emitted[i] == profile[i] for i in 1:n)
-end
-
-@testset "WallTemperature Vector length mismatch errors" begin
-    n = 4
-    @test_throws DimensionMismatch WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:3.0))
-    @test_throws DimensionMismatch WallTemperature(; name=:bad, n=n, T_wall=collect(1.0:5.0))
-end
-
-@testset "WallTemperature Function emits f(t) at every cell" begin
-    n = 4
-    fn = (tt) -> 76.85 + 10.0 * tt   # linear so the read-back value is exact
-    @named wt = WallTemperature(; n=n, T_wall=fn)
-    @test wt isa ModelingToolkit.System
-    @test length(equations(wt)) == n
-    par_strs = string.(parameters(wt))
-    @test any(s -> occursin("T_wall_fn", s), par_strs)
-
-    ssys = mtkcompile(wt; fully_determined=false)
-    t_eval = 2.0
-    sol = solve(ODEProblem(ssys, [ssys.T_wall_fn => fn], (0.0, 3.0)), Rodas5P())
-    @test all(sol(t_eval; idxs=ssys.T_wall_out[i]) == fn(t_eval) for i in 1:n)   # 96.85
-    # Read at a second time to confirm the cells track the callable, not a frozen value.
-    @test sol(0.5; idxs=ssys.T_wall_out[1]) == fn(0.5)             # 81.85
-end
-
-@testset "HeatFluxSource Real broadcast emits the scalar to every cell" begin
-    n = 4
-    @named hfs = HeatFluxSource(; n=n, q=1.0e5)
-    @test hfs isa ModelingToolkit.System
-    var_names = string.(unknowns(hfs))
-    q_count = count(s -> occursin("q_out", s), var_names)
-    @test q_count == n
-    @test length(equations(hfs)) == n
-
-    ssys = mtkcompile(hfs; fully_determined=false)
-    emitted = _emitted(ssys, ssys.q_out, n)
-    @test emitted == fill(1.0e5, n)
-end
-
-@testset "HeatFluxSource Vector emits the i-th element at cell i" begin
-    n = 4
-    # Asymmetric, non-monotone so a transpose / reversal / off-by-one is caught.
-    profile = [1.0e4, 7.0e4, 3.0e4, 9.0e4]
-    @named hfs = HeatFluxSource(; n=n, q=profile)
-    @test hfs isa ModelingToolkit.System
-    @test length(equations(hfs)) == n
-
-    ssys = mtkcompile(hfs; fully_determined=false)
-    emitted = _emitted(ssys, ssys.q_out, n)
-    @test emitted == profile
-    @test all(emitted[i] == profile[i] for i in 1:n)
-end
-
-@testset "HeatFluxSource Function emits f(t) at every cell" begin
-    n = 4
-    fn = (tt) -> 1.0e5 * (1.0 + 0.1 * tt)   # linear so the read-back is exact
-    @named hfs = HeatFluxSource(; n=n, q=fn)
-    @test hfs isa ModelingToolkit.System
-    @test length(equations(hfs)) == n
-    par_strs = string.(parameters(hfs))
-    @test any(s -> occursin("q_fn", s), par_strs)
-
-    ssys = mtkcompile(hfs; fully_determined=false)
-    t_eval = 3.0
-    sol = solve(ODEProblem(ssys, [ssys.q_fn => fn], (0.0, 4.0)), Rodas5P())
-    @test all(sol(t_eval; idxs=ssys.q_out[i]) == fn(t_eval) for i in 1:n)   # 1.3e5
-    @test sol(1.0; idxs=ssys.q_out[1]) == fn(1.0)             # 1.1e5
+    # Tie each port of the profile to its own sink so every port carries heat.
+    sinks = [ConvectiveBoundary(; area=1.0, name=Symbol(:sink, i)) for i in 1:3]
+    conns = [
+        face(sinks, prof, :thermal),
+        [s.h for s in sinks] .~ 10.0,
+        [s.T_fluid for s in sinks] .~ 20.0,
+    ]
+    @named s = assembly(conns, prof, sinks...)
+    ss = mtkcompile(s; fully_determined=true)
+    sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())
+    @test sol[port(ss.prof, :thermal, :T)][end] == profile
+    @test sol[port(ss.prof, :thermal, :Q)][end] ≈ -10.0 .* (profile .- 20.0)
 end
 
 @testset "ConvectiveBoundary: construction + single Q equation" begin
@@ -194,7 +111,7 @@ end
     @named cb = ConvectiveBoundary(; area=area)
     @named wall = ConstantTemperature(T_wall)
     conns = [
-        connect(cb.thermal, wall.thermal),
+        connect(cb.thermal, wall.thermal1),
         cb.h ~ h_val,
         cb.T_fluid ~ T_fluid,
     ]
@@ -211,10 +128,10 @@ end
     area = 0.02
     @named cb = ConvectiveBoundary(; area=area)
     @named wall = ConstantTemperature(46.85)
-    conns = [connect(cb.thermal, wall.thermal), cb.h ~ 4000.0, cb.T_fluid ~ 26.85]
+    conns = [connect(cb.thermal, wall.thermal1), cb.h ~ 4000.0, cb.T_fluid ~ 26.85]
     @named s = assembly(conns, cb, wall)
     ss = mtkcompile(s; fully_determined=true)
     sol = solve(ODEProblem(ss, Pair[], (0.0, 1.0)), Rodas5P())
     @test sol[ss.cb.thermal.Q][end] > 0.0
-    @test sol[ss.wall.thermal.Q][end] < 0.0
+    @test sol[ss.wall.thermal1.Q][end] < 0.0
 end

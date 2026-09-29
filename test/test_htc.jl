@@ -220,15 +220,17 @@ end
         n=n, geometry=geom, htc=HTC.FromFunction((Tw, Tb, m, dh, a, liq) -> h_fixed)
     )
     @named bc_u = HeatExchanger(T_inlet)
-    ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l_u_, i)) for i in 1:n]
-    ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r_u_, i)) for i in 1:n]
+    @named ct_l = ConstantTemperature(T_wall_bc; n=n)
+    @named ct_r = ConstantTemperature(T_wall_bc; n=n)
     conns = [
         inseries(pump_u, bc_u, cac_u, pump_u),
-        face(ct_l, cac_u, :thermal_left),
-        face(ct_r, cac_u, :thermal_right),
+        faces(
+            (ct_l, :thermal) => (cac_u, :thermal_left),
+            (ct_r, :thermal) => (cac_u, :thermal_right),
+        ),
         pump_u.inlet.p ~ 1.0e5,
     ]
-    @named sys_u = assembly(conns, pump_u, bc_u, cac_u, ct_l..., ct_r...)
+    @named sys_u = assembly(conns, pump_u, bc_u, cac_u, ct_l, ct_r)
     ssys_u = mtkcompile(sys_u)
     sol_u = solve_steady(ssys_u, [ssys_u.cac_u.inlet.ṁ => 0.49])
 
