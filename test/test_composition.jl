@@ -466,7 +466,8 @@ end
 
 # fuel_assembly: the four chain shapes. Each variant checks that the helper writes the
 # same connections as a hand-written faces() chain over the same components, which needs
-# no compile. Variant 1 also compiles and solves, to show an assembly built this way runs.
+# no compile. Variant 1 also compiles and solves, to show an assembly built this way runs,
+# and so does variant 4, the closed ring, the one shape with no free face.
 # Then the ArgumentError paths and an uncompiled-return smoke.
 
 # Helper: build a fresh (CAC, HD) pair under a caller-supplied name prefix.
@@ -553,7 +554,7 @@ end
     @test _fa_connections(asm) == _fa_hand(chain, (c1, c2, p1, p2))
 end
 
-@testset "fuel_assembly variant 4 (closed annular, k=3) wiring" begin
+@testset "fuel_assembly variant 4 (closed annular, k=3) wiring and solve" begin
     c1, c2, c3 = _fa_cac(:c1), _fa_cac(:c2), _fa_cac(:c3)
     p1, p2, p3 = _fa_hd(:p1), _fa_hd(:p2), _fa_hd(:p3)
     asm = fuel_assembly([c1, c2, c3], [p1, p2, p3]; closed=true, name=:asm)
@@ -562,6 +563,20 @@ end
         _fa_pair(p2, c3), _fa_pair(c3, p3), _fa_pair(p3, c1),  # the last pair wraps round
     )
     @test _fa_connections(asm) == _fa_hand(chain, (c1, c2, c3, p1, p2, p3))
+
+    # The ring is the one shape with no free face, so it is compiled and solved too.
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(40.0)
+    conns = [inseries(pump, bc, asm.c1, asm.c2, asm.c3, pump), pump.inlet.p ~ 1.0e5]
+    @named full = assembly(conns, asm, pump, bc)
+    ssys = mtkcompile(full; build_initializeprob=false)
+    channels = (ssys.asm.c1, ssys.asm.c2, ssys.asm.c3)
+    ic = [
+        [ch.inlet.ṁ => 0.2 for ch in channels]...,
+        [_fa_Dt(ch.inlet.ṁ) => 0.0 for ch in channels]...,
+    ]
+    sol = solve_steady(ssys, ic)
+    @test sol.retcode == ReturnCode.Success
 end
 
 # #### ArgumentError paths
