@@ -5,10 +5,8 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
 @testset "HeatDiffusion callable and returns MTK System" begin
-    ps = fill(1.0 / (5 * 3), 5, 3)
     @named hd = HeatDiffusion(
         nz=5,
         nx=3,
@@ -18,7 +16,6 @@ using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
     )
     @test hd isa ModelingToolkit.System
 end
@@ -28,7 +25,6 @@ end
 end
 
 @testset "HeatDiffusion mtkcompile bare (no connections)" begin
-    ps = fill(1.0 / (3 * 2), 3, 2)
     @named hd = HeatDiffusion(
         nz=3,
         nx=2,
@@ -38,14 +34,12 @@ end
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
     )
     @test_nowarn mtkcompile(hd; fully_determined=false)  # isolated component: dangling thermal ports + unset power(t) by design
 end
 
 @testset "HeatDiffusion state T[1:nz, 1:nx] present in unknowns" begin
     nz, nx = 3, 2
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(
         nz=nz,
         nx=nx,
@@ -55,7 +49,6 @@ end
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
     )
     unames = Symbol.(ModelingToolkit.getname.(unknowns(hd)))
     @test :T in unames
@@ -63,9 +56,30 @@ end
     @test count(u -> ModelingToolkit.getname(u) == :T, unknowns(hd)) == nz * nx
 end
 
+@testset "HeatDiffusion power: a number is a parameter, nothing an unknown" begin
+    kw = (nz=2, nx=2, Lz=0.6, Lx=0.005, y=0.07, rho_s=2700.0, cp_s=900.0, k_s=200.0)
+    named(xs) = ModelingToolkit.getname.(xs)
+    @named fixed = HeatDiffusion(; kw..., power=1e3)
+    @named free = HeatDiffusion(; kw...)
+    @test :power in named(parameters(fixed))
+    @test :power ∉ named(unknowns(fixed))
+    @test :power in named(unknowns(free))
+    @test_throws ArgumentError HeatDiffusion(; kw..., power="1e3", name=:bad)
+
+    # A parameter power changes between solves of one compiled system, and with fixed
+    # boundary temperatures the heat leaving the plate follows it.
+    @named bath = ConstantTemperature(40.0; n=2)
+    @named sys = assembly(
+        faces((bath, :thermal) => (fixed, :thermal_left)), fixed, bath
+    )
+    ssys = mtkcompile(sys)
+    Q_out(P) = -sum(solve_steady(ssys, [ssys.fixed.power => P])[port(ssys.fixed, :thermal_left, :Q)])
+    @test Q_out(1e3) ≈ 1e3 rtol = 1e-6
+    @test Q_out(2e3) ≈ 2e3 rtol = 1e-6
+end
+
 @testset "HeatDiffusion has thermal_left and thermal_right subsystems" begin
     nz = 3
-    ps = fill(1.0 / (nz * 2), nz, 2)
     @named hd = HeatDiffusion(
         nz=nz,
         nx=2,
@@ -75,7 +89,6 @@ end
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
     )
     sub_names = Symbol.(ModelingToolkit.getname.(ModelingToolkit.get_systems(hd)))
     for i in 1:nz
@@ -88,7 +101,6 @@ end
     nz, nx = 3, 3
     T_bc = 326.85
     pwr = 1e5
-    ps = fill(1.0 / (nz * nx), nz, nx)
 
     @named hd = HeatDiffusion(
         nz=nz,
@@ -99,25 +111,19 @@ end
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
         power=pwr,
     )
 
-    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct_l, i)) for i in 1:nz]
-    ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct_r, i)) for i in 1:nz]
+    @named ct_l = ConstantTemperature(T_bc; n=nz)
+    @named ct_r = ConstantTemperature(T_bc; n=nz)
 
     conns = [
-        [
-            connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for
-            i in 1:nz
-        ]...,
-        [
-            connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for
-            i in 1:nz
-        ]...,
-        hd.power ~ pwr,
+        faces(
+            (ct_l, :thermal) => (hd, :thermal_left),
+            (ct_r, :thermal) => (hd, :thermal_right),
+        ),
     ]
-    @named sys = compose(System(conns, t; name=:sys), hd, ct_l..., ct_r...)
+    @named sys = assembly(conns, hd, ct_l, ct_r)
     ssys = mtkcompile(sys)
 
     sol = solve_steady(ssys)
@@ -127,8 +133,8 @@ end
         @test sol[ssys.hd.T[i, j]] >= T_bc - 1e-6
     end
 
-    left_syms = [getproperty(ssys.hd, Symbol(:thermal_left, i)) for i in 1:nz]
-    right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
+    left_syms = [port(ssys.hd, :thermal_left, i) for i in 1:nz]
+    right_syms = [port(ssys.hd, :thermal_right, i) for i in 1:nz]
     Q_left_total = sum(sol[left_syms[i].Q] for i in 1:nz)
     Q_right_total = sum(sol[right_syms[i].Q] for i in 1:nz)
 
@@ -147,7 +153,6 @@ end
     nz, nx = 3, 3
     T_bc = 326.85
     pwr = 5e4
-    ps = fill(1.0 / (nz * nx), nz, nx)
 
     @named hd = HeatDiffusion(
         nz=nz,
@@ -158,21 +163,17 @@ end
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
         power=pwr,
     )
 
-    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct5_l, i)) for i in 1:nz]
-    conns = vcat(
-        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for i in 1:nz],
-        [hd.power ~ pwr],
-    )
-    @named sys = compose(System(conns, t; name=:sys), hd, ct_l...)
-    ssys = mtkcompile(sys; fully_determined=true)
+    @named ct_l = ConstantTemperature(T_bc; n=nz)
+    conns = faces((ct_l, :thermal) => (hd, :thermal_left))
+    @named sys = assembly(conns, hd, ct_l)
+    ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
 
     # Unconnected thermal_right ports must have Q == 0
-    right_syms = [getproperty(ssys.hd, Symbol(:thermal_right, i)) for i in 1:nz]
+    right_syms = [port(ssys.hd, :thermal_right, i) for i in 1:nz]
     for i in 1:nz
         @test isapprox(sol[right_syms[i].Q], 0.0; atol=1e-8)
     end
@@ -198,21 +199,16 @@ end
         power=pwr,
     )
 
-    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct12_l, i)) for i in 1:nz]
-    ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct12_r, i)) for i in 1:nz]
+    @named ct_l = ConstantTemperature(T_bc; n=nz)
+    @named ct_r = ConstantTemperature(T_bc; n=nz)
 
     conns = [
-        [
-            connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for
-            i in 1:nz
-        ]...,
-        [
-            connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for
-            i in 1:nz
-        ]...,
-        hd.power ~ pwr,
+        faces(
+            (ct_l, :thermal) => (hd, :thermal_left),
+            (ct_r, :thermal) => (hd, :thermal_right),
+        ),
     ]
-    @named sys = compose(System(conns, t; name=:sys12gap), hd, ct_l..., ct_r...)
+    @named sys = assembly(conns, hd, ct_l, ct_r)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
 
@@ -235,21 +231,20 @@ end
     nz, nx = 2, 5
     T_bc = 226.85
     pwr = 8e4
-    ps = fill(1.0 / (nz * nx), nz, nx)
 
     @named hd = HeatDiffusion(
         nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps, power=pwr,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=pwr,
     )
-    ct_l = [ConstantTemperature(T_bc; name=Symbol(:ct6_l, i)) for i in 1:nz]
-    ct_r = [ConstantTemperature(T_bc; name=Symbol(:ct6_r, i)) for i in 1:nz]
+    @named ct_l = ConstantTemperature(T_bc; n=nz)
+    @named ct_r = ConstantTemperature(T_bc; n=nz)
     conns = [
-        [connect(ct_l[i].thermal, getproperty(hd, Symbol(:thermal_left, i))) for i in 1:nz]...,
-        [connect(ct_r[i].thermal, getproperty(hd, Symbol(:thermal_right, i))) for i in 1:nz]...,
-        hd.power ~ pwr,
+        faces(
+            (ct_l, :thermal) => (hd, :thermal_left),
+            (ct_r, :thermal) => (hd, :thermal_right),
+        ),
     ]
-    @named sys = compose(System(conns, t; name=:sys6), hd, ct_l..., ct_r...)
+    @named sys = assembly(conns, hd, ct_l, ct_r)
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys)
 

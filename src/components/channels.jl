@@ -260,9 +260,8 @@ end
             darcy=Blasius()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
-`Heat flux is defined by external temperature (required closure post process) and
-`prescribed heat transfer coefficient.
-A `WallTemperature` source can be used as a closure, for example.
+Heat flux comes from a prescribed heat transfer coefficient and an external wall temperature,
+which the caller binds (see below).
 
 # Arguments
 - `name`: system name (Symbol)
@@ -286,21 +285,16 @@ A `WallTemperature` source can be used as a closure, for example.
 These have no internal equation. A side with a nonzero `h` needs its wall closed, and so does
 any wall a friction model reads, such as [`RegimeDependent`](@ref) with a `viscosity`
 correction. A side with `h = 0` under a friction model that ignores the wall, the default,
-needs nothing: its wall temperature appears in no equation. Close a wall via either of:
+needs nothing: its wall temperature appears in no equation. Close a wall in the connection
+list, with a number, a length-`n` profile, or any expression in `t`:
 ```julia
-# Style 1 — direct binding eqns at compose time (args.funcs idiom):
 connections = [
     ...,
-    [ch.T_wall_left[i] ~ T_wall_value for i in 1:n]...,
-]
-
-# Style 2 — value-source component:
-@named wt = WallTemperature(; n=n, T_wall=T_wall_value)
-connections = [
-    ...,
-    [ch.T_wall_left[i] ~ wt.T_wall_out[i] for i in 1:n]...,
+    ch.T_wall_left .~ T_wall_value,
+    ch.T_wall_right .~ profile,
 ]
 ```
+For a wall to change without recompiling, bind it to a parameter declared with `@parameters`.
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (mass + momentum + stream T)
@@ -373,7 +367,7 @@ end
                     darcy=Blasius()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
-Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource` source).
+Heat flux is prescribed per cell by the caller (see below).
 
 # Arguments
 - `name`: system name (Symbol)
@@ -389,19 +383,12 @@ Heat flux is either a user prescribed closure or bindings with a `HeatFluxSource
 - `q_left(t)[1:n]`: per-cell left-face heat flux density [W/m^2]
 - `q_right(t)[1:n]`: per-cell right-face heat flux density [W/m^2]
 
-These have no internal equation. Close them via either of:
+These have no internal equation. Close them in the connection list:
 ```julia
-# Style 1 — direct binding eqns at compose time:
 connections = [
     ...,
-    [chf.q_left[i] ~ q_value for i in 1:n]...,
-]
-
-# Style 2 — value-source component:
-@named hfs = HeatFluxSource(; n=n, q=q_value)
-connections = [
-    ...,
-    [chf.q_left[i] ~ hfs.q_out[i] for i in 1:n]...,
+    chf.q_left .~ q_value,
+    chf.q_right .~ 0.0,
 ]
 ```
 

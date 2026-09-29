@@ -25,7 +25,7 @@ runs without recompiling, write it as a parameter of the model and change it wit
 ```julia
 @parameters ṁ_open_at = 0.01
 machine.transitions = [(:CLOSED => :OPEN, bypass.inlet.ṁ < ṁ_open_at, "bypass flow low")]
-model = compose(System(connections, t, [], [ṁ_open_at]; name=:loop), flap, bypass, ...)
+@named loop = assembly(connections, flap, bypass, ...; parameters=[ṁ_open_at])
 # later, for another threshold. The machine remembers opening last time, so reset it.
 reset!(machine)
 prob2 = remake(prob; p=[ṁ_open_at => 0.02])

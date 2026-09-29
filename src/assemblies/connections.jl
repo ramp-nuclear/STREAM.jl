@@ -12,13 +12,12 @@ same way.
 - `systems`: two or more uncompiled systems exposing `inlet` and `outlet` `FlowPort`s
 
 # Returns
-`Vector{Equation}` suitable for splicing into a `conns = [...]` list or passing to
-`System(conns, t; name=...)`.
+`Vector{Equation}`, which goes into an [`assembly`](@ref) connection list as is.
 
 # Example
 ```julia
 conns = [
-    inseries(pump, hx, resistor, pump)...,
+    inseries(pump, hx, resistor, pump),
     pump.inlet.p ~ 1.0e5,
 ]
 ```
@@ -50,14 +49,13 @@ connected in series internally, and all branch outlets merge into `downstream.in
 - `downstream`: uncompiled system exposing an `inlet` `FlowPort`
 
 # Returns
-`Vector{Equation}` suitable for splicing into a `conns = [...]` list or passing to
-`System(conns, t; name=...)`.
+`Vector{Equation}`, which goes into an [`assembly`](@ref) connection list as is.
 
 # Example
 ```julia
 conns = [
-    inseries(pump, hx)...,
-    inparallel(hx, ((R1, G1), R2), pump)...,
+    inseries(pump, hx),
+    inparallel(hx, ((R1, G1), R2), pump),
     pump.inlet.p ~ 1.0e5,
 ]
 ```
@@ -130,12 +128,12 @@ channel's unknowns:
 
 ```julia
 branch = weighted(50, pool, orifice, ch; name=:hot)
-conns = [inparallel(flywheel, [branch], riser)..., flywheel.outlet.p ~ ATM]
-sys = compose_systems(flywheel, riser, branch...; connections=conns, name=:core)
+conns = [inparallel(flywheel, [branch], riser), flywheel.outlet.p ~ ATM]
+@named core = assembly(conns, flywheel, riser, branch...)
 ```
 
 The returned tuple is both the path to wire and the systems to compose, so it splats into
-[`inseries`](@ref), [`inparallel`](@ref) and `compose_systems` alike. It holds `components`
+[`inseries`](@ref), [`inparallel`](@ref) and [`assembly`](@ref) alike. It holds `components`
 in flow order between two private flow weights, one of `1//N` and one of `N`, named
 `<name>_weight_in` and `<name>_weight_out`.
 
@@ -280,7 +278,7 @@ end
 
 Generate binding equations that wire each component's existing `T` symbolic to the
 corresponding `pk.T_source_<name>` unknowns inside `PointKinetics`. Used together
-with `compose_systems` to close the neutronics<->thermal-hydraulics loop.
+with [`assembly`](@ref) to close the neutronics<->thermal-hydraulics loop.
 
 # Arguments
 - `pk`: uncompiled `PointKinetics` system built with `temp_worth=...`

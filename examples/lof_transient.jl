@@ -32,6 +32,8 @@
 #     ~270-300s NC equilibrium: ch.inlet.ṁ < 0 (upward), ret.inlet.ṁ > 0 (downward).
 
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
@@ -74,19 +76,17 @@ println("Building steady-state reference loop...")
 @named pump_ref = Pump(dP_ref)
 @named hx_ref = HeatExchanger(T_inlet)
 
-@named ch_ref = STREAM.Channel(;
+@named ch_ref = Components.Channel(;
     n=n, geometry=PipeGeometry_circular(L_ch, D_ch), g=(-g_acc), h_left=h_wall, h_right=0.0
 )
 
-conns_ref = Equation[
-    connect(pump_ref.outlet, hx_ref.inlet),
-    connect(hx_ref.outlet, ch_ref.inlet),
-    connect(ch_ref.outlet, pump_ref.inlet),
+conns_ref = [
+    inseries(pump_ref, hx_ref, ch_ref, pump_ref),
     pump_ref.inlet.p ~ 1.0e5,
-    [ch_ref.T_wall_left[i] ~ T_wall for i in 1:n]...,
-    [ch_ref.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # decorative; h_right=0
+    ch_ref.T_wall_left .~ T_wall,
+    ch_ref.T_wall_right .~ T_inlet,  # decorative; h_right=0
 ]
-@named ref_sys = compose(System(conns_ref, t; name=:ref), pump_ref, hx_ref, ch_ref)
+@named ref_sys = assembly(conns_ref, pump_ref, hx_ref, ch_ref)
 ref_ssys = mtkcompile(ref_sys)
 
 # Initial guess for SS: linear temperature ramp from T_inlet to T_wall
@@ -97,7 +97,7 @@ end
 
 ss_sol = solve_steady(ref_ssys, op_ref)
 ṁ_ss = ss_sol[ref_ssys.ch_ref.inlet.ṁ]
-T_ss = [ss_sol[ref_ssys.ch_ref.T[i]] for i in 1:n]
+T_ss = ss_sol[ref_ssys.ch_ref.T]
 
 println("Steady-state solved:")
 println("  ṁ_ss   = $(round(ṁ_ss; digits=6)) kg/s")

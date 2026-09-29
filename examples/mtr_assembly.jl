@@ -28,8 +28,9 @@
 #     Plate center temperature > fluid outlet (plate is the heat source)
 
 using STREAM
+using STREAM.Assemblies
+using STREAM.Components
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 
 using Plots
@@ -55,7 +56,6 @@ const K_AL      = 200.0     # W/(m*K)
 println("Building MTR assembly...")
 
 geom = PipeGeometry_rectangular(L_PLATE, Y_PLATE, LX_PLATE, Y_PLATE)
-ps = fill(1.0 / (NZ * NX), NZ, NX)
 @named hd = HeatDiffusion(;
     nz=NZ,
     nx=NX,
@@ -65,7 +65,6 @@ ps = fill(1.0 / (NZ * NX), NZ, NX)
     rho_s=RHO_AL,
     cp_s=CP_AL,
     k_s=K_AL,
-    power_shape=ps,
     power=POWER,
 )
 
@@ -79,23 +78,15 @@ ps = fill(1.0 / (NZ * NX), NZ, NX)
 @named hx_r = HeatExchanger(T_INLET)
 
 conns = [
-    connect(pump_l.outlet, hx_l.inlet),
-    connect(hx_l.outlet, rods.cac_l.inlet),
-    connect(rods.cac_l.outlet, pump_l.inlet),
+    inseries(pump_l, hx_l, rods.cac_l, pump_l),
     pump_l.inlet.p ~ 1.0e5,
-    connect(pump_r.outlet, hx_r.inlet),
-    connect(hx_r.outlet, rods.cac_r.inlet),
-    connect(rods.cac_r.outlet, pump_r.inlet),
+    inseries(pump_r, hx_r, rods.cac_r, pump_r),
     pump_r.inlet.p ~ 1.0e5,
-    rods.hd.power ~ POWER,
 ]
-@named sys = compose(System(conns, t; name=:mtr_example), pump_l, hx_l, pump_r, hx_r, rods)
+@named sys = assembly(conns, pump_l, hx_l, pump_r, hx_r, rods)
 ssys = mtkcompile(sys)
 
-op = vcat(
-    [ssys.rods.cac_l.inlet.ṁ => +0.250],
-    [ssys.rods.cac_r.inlet.ṁ => +0.250],
-)
+op = [ssys.rods.cac_l.inlet.ṁ => +0.250, ssys.rods.cac_r.inlet.ṁ => +0.250]
 
 println("Solving steady state...")
 sol = solve_steady(ssys, op)
@@ -115,8 +106,8 @@ println("  Plate center T      = $(round(T_center, digits=2)) degC")
 println("  T_plate_center > T_fluid: $(T_center > T_out_l)")
 
 T_plate_center_col = [sol[ssys.rods.hd.T[i, (NX + 1) ÷ 2]] for i in 1:NZ]
-T_fluid_l = [sol[ssys.rods.cac_l.T[i]] for i in 1:NZ]
-T_fluid_r = [sol[ssys.rods.cac_r.T[i]] for i in 1:NZ]
+T_fluid_l = sol[ssys.rods.cac_l.T]
+T_fluid_r = sol[ssys.rods.cac_r.T]
 z = range(0.0, L_PLATE; length=NZ)
 
 p = plot(z, T_plate_center_col; label="Plate center", linewidth=2, color=:red)

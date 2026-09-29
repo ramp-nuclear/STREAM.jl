@@ -220,9 +220,9 @@ Components state equations and consume their physics from [`HTC`](@ref), [`Frict
 - **Solid heat.** [`HeatDiffusion`](@ref), a 2D finite-difference plate.
 - **Neutronics.** [`PointKinetics`](@ref) with any delayed group count, plus
   [`ReactivityController`](@ref) and the SCRAM callbacks.
-- **Boundary conditions and value sources.** [`HeatExchanger`](@ref),
-  [`ConstantTemperature`](@ref), [`WallTemperature`](@ref), [`HeatFluxSource`](@ref),
-  [`ConvectiveBoundary`](@ref).
+- **Boundary conditions.** [`HeatExchanger`](@ref), [`ConstantTemperature`](@ref),
+  [`ConvectiveBoundary`](@ref). A `Channel` wall or a `ChannelHeatFlux` flux needs no
+  component: bind it in the connection list, `ch.T_wall_left .~ T`.
 
 `Base.Channel` also exists, so `using STREAM.Components` leaves `Channel` ambiguous. Import it
 explicitly with `using STREAM.Components: Channel`, or qualify it.
@@ -257,8 +257,8 @@ export FlowPort, ThermalPort
 export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFlowResistor
 export LocalPressureDrop, Inertia, HeatExchanger, bilinear_inertia
 export ResistorFromKnownPoint
-export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature, WallTemperature
-export HeatFluxSource, ConvectiveBoundary, HeatDiffusion
+export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature
+export ConvectiveBoundary, HeatDiffusion
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController
 export StateMachine, StateSchedule, trip!, reset!, machine_callbacks
@@ -322,13 +322,14 @@ Joining components that already exist, and the named arrangements built out of t
 [`Connect`](@ref) holds the wiring verbs: [`inseries`](@ref) and [`inparallel`](@ref) for
 hydraulic chains, [`face`](@ref) and [`faces`](@ref) for per-cell thermal contact,
 [`temperature_feedback`](@ref) for the point-kinetics bindings. Each returns a
-`Vector{Equation}` to splice into a connection list.
+`Vector{Equation}` that goes into a connection list as is.
 
 `Assemblies` holds the arrangements: [`symmetric_plate`](@ref), [`plate`](@ref),
 [`one_sided`](@ref), [`single_channel`](@ref) and [`fuel_assembly`](@ref) return an uncompiled
 `System` already wired, leaving the caller to add boundary conditions and compile.
-[`compose_systems`](@ref) is the general form. [`check_gravity_mismatch`](@ref) reports whether a
-loop's channels agree about which way is up.
+[`assembly`](@ref) is the general form: it composes any components with any list of
+connections. [`check_gravity_mismatch`](@ref) reports whether a loop's channels agree about
+which way is up.
 
 [`port`](@ref) indexes one element of an indexed connector array.
 """
@@ -355,11 +356,13 @@ end
 using .Connect
 using .Connect: var_length   # the arrangements below count ports with it
 
+include("assemblies/assembly.jl")
 include("assemblies/assemblies.jl")
 export Connect
 export inseries, inparallel, weighted, face, faces, port, temperature_feedback
-export check_gravity_mismatch, compose_systems
+export check_gravity_mismatch
 export symmetric_plate, plate, one_sided, single_channel, fuel_assembly
+export assembly
 end
 
 """
@@ -439,4 +442,7 @@ export G_EARTH, ATM, T_ROOM
 # Design knobs
 export knob_defaults, @design_knob
 
+# Composing components
+using .Assemblies: assembly
+export assembly
 end  # module STREAM

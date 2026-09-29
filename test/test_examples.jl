@@ -27,7 +27,7 @@ using STREAM.Examples
         # Smoke: demonstrate the full `build_loop` API produces a working transient.
         ssys = build_loop()
         ic = [
-            [ssys.ch.T[i] => 40.0 for i in 1:10]...,
+            ssys.ch.T => fill(40.0, 10),
             ssys.ch.inlet.ṁ => 0.5,
         ]
         sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
@@ -38,7 +38,7 @@ using STREAM.Examples
     @testset "build_loop_vertical compiles + briefly solves" begin
         ssys = build_loop_vertical()
         ic = [
-            [ssys.ch.T[i] => 40.0 for i in 1:10]...,
+            ssys.ch.T => fill(40.0, 10),
             ssys.ch.inlet.ṁ => 0.5,
         ]
         sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
@@ -49,7 +49,7 @@ using STREAM.Examples
     @testset "build_loop_transient compiles + briefly solves" begin
         ssys = build_loop_transient()
         ic = [
-            [ssys.ch.T[i] => 40.0 for i in 1:10]...,
+            ssys.ch.T => fill(40.0, 10),
             ssys.ch.inlet.ṁ => 0.5,
         ]
         sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
@@ -412,7 +412,7 @@ end
         # latest 233.97), well below water's critical temperature (373.95 °C). The band is the
         # measured cross-env spread, not a loose runaway window.
         T_max_nc = mean([
-            maximum([sol[ssys.heated.ch.T[i], idx] for i in 1:n]) for idx in nc_indices
+            maximum(sol[ssys.heated.ch.T, idx]) for idx in nc_indices
         ])
         @test T_max_nc > BYPASS_T_INLET   # heating did happen
         @test 231.85 < T_max_nc < 236.85    # tight around the observed 233.95 °C, below critical T

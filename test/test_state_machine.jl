@@ -120,7 +120,7 @@ end
     machine = StateMachine()
     rods = ReactivityController((s, ts, t) -> s === :SCRAM ? -0.05 : 0.0; machine=machine)
     @named pk = PointKinetics(rods)
-    ssys = mtkcompile(compose(System(Equation[], t; name=:reactor), pk))
+    ssys = mtkcompile(assembly([], pk; name=:reactor))
     machine.transitions = [(:NORMAL => :SCRAM, t > 1.0, "at 1 s")]
     sol = solve_transient(ssys, range(0.0, 3.0; length=31);
                           callbacks=machine_callbacks(ssys, machine))

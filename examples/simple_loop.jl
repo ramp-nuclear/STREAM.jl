@@ -20,7 +20,6 @@
 
 using STREAM
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 
 using Plots
@@ -61,7 +60,7 @@ end
 
 T_out = sol[ssys.ch.T_out]
 ṁ = abs(sol[ssys.ch.inlet.ṁ])
-T_axial = [sol[ssys.ch.T[i]] for i in 1:N_CELLS]
+T_axial = sol[ssys.ch.T]
 
 println("Steady-state results:")
 println("  T_outlet = $(round(T_out, digits=2)) °C")

@@ -8,7 +8,6 @@ using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
-using STREAM: PipeGeometry_rectangular, PipeGeometry_circular
 
 
 include(joinpath(@__DIR__, "parity_helpers.jl"))
@@ -173,24 +172,23 @@ end
     @named pump = Pump(3.0e4)
     @named hx = HeatExchanger(T_inlet)
     @named cac = ChannelAndContacts(; n=n, geometry=geom_simple)
-    ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:n]
-    ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:n]
-    conns = vcat(
-            inseries(pump, hx, cac, pump),
-            [pump.inlet.p ~ 1.0e5],
-        face(ct_l, cac, :thermal_left),
-        Connect.face(ct_r, cac, :thermal_right),
-    )
-    @named sys = compose(System(conns, t; name=:simple_loop_parity),
-                          pump, hx, cac, ct_l..., ct_r...)
-    ssys = mtkcompile(sys; fully_determined=true)
+    @named ct_l = ConstantTemperature(T_wall; n=n)
+    @named ct_r = ConstantTemperature(T_wall; n=n)
+    conns = [
+        inseries(pump, hx, cac, pump),
+        pump.inlet.p ~ 1.0e5,
+        faces(
+            (ct_l, :thermal) => (cac, :thermal_left),
+            (ct_r, :thermal) => (cac, :thermal_right),
+        ),
+    ]
+    @named sys = assembly(conns, pump, hx, cac, ct_l, ct_r)
+    ssys = mtkcompile(sys)
 
-    op = vcat(
-            [ssys.cac.inlet.ṁ => 0.5],
-    )
+    op = [ssys.cac.inlet.ṁ => 0.5]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
-    @test all(isfinite, [sol[ssys.cac.T[i]] for i in 1:n])
+    @test all(isfinite, sol[ssys.cac.T])
         @test isfinite(sol[ssys.cac.inlet.ṁ])
     rows = ParityRow[]
 
@@ -219,10 +217,10 @@ end
     full_perim = heated_l + heated_r          # πD
     for i in 1:n
         push!(rows, parity_check("simple_loop", "T_wall_left[$i]",
-                                 sol[getproperty(ssys.cac, Symbol(:thermal_left, i)).T],
+                                 sol[port(ssys.cac, :thermal_left, i).T],
                                  PARITY_SIMPLE_T_WALL_LEFT[i]))
         push!(rows, parity_check("simple_loop", "T_wall_right[$i]",
-                                 sol[getproperty(ssys.cac, Symbol(:thermal_right, i)).T],
+                                 sol[port(ssys.cac, :thermal_right, i).T],
                                  PARITY_SIMPLE_T_WALL_RIGHT[i]))
         push!(rows, parity_check("simple_loop", "h_tc_left[$i]",
                                  sol[ssys.cac.h_tc_left[i]],
@@ -307,34 +305,28 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(;
         nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps, power=1e4,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
     )
     conns = [
-            inseries(pump_l, hx_l, cac_l, pump_l)...,
-            pump_l.inlet.p ~ 1.0e5,
-            inseries(pump_r, hx_r, cac_r, pump_r)...,
-            pump_r.inlet.p ~ 1.0e5,
-        faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
-        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
-        hd.power ~ 1e4,
+        inseries(pump_l, hx_l, cac_l, pump_l),
+        pump_l.inlet.p ~ 1.0e5,
+        inseries(pump_r, hx_r, cac_r, pump_r),
+        pump_r.inlet.p ~ 1.0e5,
+        faces(
+            (hd, :thermal_left) => (cac_l, :thermal_right),
+            (hd, :thermal_right) => (cac_r, :thermal_left),
+        ),
     ]
-    @named sys = compose(
-        System(conns, t; name=:mtr_sym_parity), pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd
-    )
-    ssys = mtkcompile(sys; fully_determined=true)
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    ssys = mtkcompile(sys)
 
-    op = vcat(
-            [ssys.cac_l.inlet.ṁ => +0.250],
-            [ssys.cac_r.inlet.ṁ => +0.250],
-    )
+    op = [ssys.cac_l.inlet.ṁ => +0.250, ssys.cac_r.inlet.ṁ => +0.250]
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
-    @test all(isfinite, [sol[ssys.hd.T[i, j]] for i in 1:nz for j in 1:nx])
+    @test all(isfinite, sol[ssys.hd.T])
 
     push!(rows, parity_check("mtr_symmetric", "T_out_l",
                              sol[ssys.cac_l.T_out], PARITY_MTR_SYM_T_OUT_L))
@@ -372,10 +364,10 @@ end
     for i in 1:nz
         # Left channel
         push!(rows, parity_check("mtr_symmetric", "T_wall_left_l[$i]",
-                                 sol[getproperty(ssys.cac_l, Symbol(:thermal_left, i)).T],
+                                 sol[port(ssys.cac_l, :thermal_left, i).T],
                                  PARITY_MTR_SYM_T_WALL_LEFT_L[i]))
         push!(rows, parity_check("mtr_symmetric", "T_wall_right_l[$i]",
-                                 sol[getproperty(ssys.cac_l, Symbol(:thermal_right, i)).T],
+                                 sol[port(ssys.cac_l, :thermal_right, i).T],
                                  PARITY_MTR_SYM_T_WALL_RIGHT_L[i]))
         h_eff_cac_l = _h_eff(sol, ssys.cac_l, i)
         push!(rows, parity_check("mtr_symmetric", "h_tc_left_l[$i]",
@@ -394,10 +386,10 @@ end
                                  PARITY_MTR_SYM_Q_RIGHT_L[i]))
         # Right channel mirror
         push!(rows, parity_check("mtr_symmetric", "T_wall_left_r[$i]",
-                                 sol[getproperty(ssys.cac_r, Symbol(:thermal_left, i)).T],
+                                 sol[port(ssys.cac_r, :thermal_left, i).T],
                                  PARITY_MTR_SYM_T_WALL_LEFT_R[i]))
         push!(rows, parity_check("mtr_symmetric", "T_wall_right_r[$i]",
-                                 sol[getproperty(ssys.cac_r, Symbol(:thermal_right, i)).T],
+                                 sol[port(ssys.cac_r, :thermal_right, i).T],
                                  PARITY_MTR_SYM_T_WALL_RIGHT_R[i]))
         h_eff_cac_r = _h_eff(sol, ssys.cac_r, i)
         push!(rows, parity_check("mtr_symmetric", "h_tc_left_r[$i]",
@@ -453,35 +445,32 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in_r)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(;
         nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps, power=1e4,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
     )
     conns = [
-            inseries(pump_l, hx_l, cac_l, pump_l)...,
-            pump_l.inlet.p ~ 1.0e5,
-            inseries(pump_r, hx_r, cac_r, pump_r)...,
-            pump_r.inlet.p ~ 1.0e5,
-        faces((hd, :thermal_left) => (cac_l, :thermal_right))...,
-        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
-        hd.power ~ 1e4,
+        inseries(pump_l, hx_l, cac_l, pump_l),
+        pump_l.inlet.p ~ 1.0e5,
+        inseries(pump_r, hx_r, cac_r, pump_r),
+        pump_r.inlet.p ~ 1.0e5,
+        faces(
+            (hd, :thermal_left) => (cac_l, :thermal_right),
+            (hd, :thermal_right) => (cac_r, :thermal_left),
+        ),
     ]
-    @named sys = compose(
-        System(conns, t; name=:mtr_asym_parity), pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd
-    )
-    ssys = mtkcompile(sys; fully_determined=true)
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    ssys = mtkcompile(sys)
 
-    op = vcat(
-        [ssys.hd.T[i, nx] => 95.0 for i in 1:nz],
-            [ssys.cac_l.inlet.ṁ => +0.250],
-            [ssys.cac_r.inlet.ṁ => +0.250],
-    )
+    op = [
+        [ssys.hd.T[i, nx] => 95.0 for i in 1:nz]...,
+        ssys.cac_l.inlet.ṁ => +0.250,
+        ssys.cac_r.inlet.ṁ => +0.250,
+    ]
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
-    @test all(isfinite, [sol[ssys.hd.T[i, j]] for i in 1:nz for j in 1:nx])
+    @test all(isfinite, sol[ssys.hd.T])
 
     push!(rows, parity_check("mtr_asymmetric", "T_out_l",
                              sol[ssys.cac_l.T_out], PARITY_MTR_ASYM_T_OUT_L))
@@ -520,10 +509,10 @@ end
     for i in 1:nz
         # Left channel
         push!(rows, parity_check("mtr_asymmetric", "T_wall_left_l[$i]",
-                                 sol[getproperty(ssys.cac_l, Symbol(:thermal_left, i)).T],
+                                 sol[port(ssys.cac_l, :thermal_left, i).T],
                                  PARITY_MTR_ASYM_T_WALL_LEFT_L[i]))
         push!(rows, parity_check("mtr_asymmetric", "T_wall_right_l[$i]",
-                                 sol[getproperty(ssys.cac_l, Symbol(:thermal_right, i)).T],
+                                 sol[port(ssys.cac_l, :thermal_right, i).T],
                                  PARITY_MTR_ASYM_T_WALL_RIGHT_L[i]))
         h_eff_cac_l = _h_eff(sol, ssys.cac_l, i)
         push!(rows, parity_check("mtr_asymmetric", "h_tc_left_l[$i]",
@@ -541,10 +530,10 @@ end
                                  sol[ssys.cac_l.q_wall_right[i]] / (heated_part * dz),
                                  PARITY_MTR_ASYM_Q_RIGHT_L[i]))
         push!(rows, parity_check("mtr_asymmetric", "T_wall_left_r[$i]",
-                                 sol[getproperty(ssys.cac_r, Symbol(:thermal_left, i)).T],
+                                 sol[port(ssys.cac_r, :thermal_left, i).T],
                                  PARITY_MTR_ASYM_T_WALL_LEFT_R[i]))
         push!(rows, parity_check("mtr_asymmetric", "T_wall_right_r[$i]",
-                                 sol[getproperty(ssys.cac_r, Symbol(:thermal_right, i)).T],
+                                 sol[port(ssys.cac_r, :thermal_right, i).T],
                                  PARITY_MTR_ASYM_T_WALL_RIGHT_R[i]))
         h_eff_cac_r = _h_eff(sol, ssys.cac_r, i)
         push!(rows, parity_check("mtr_asymmetric", "h_tc_left_r[$i]",
@@ -600,32 +589,27 @@ end
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(;
         nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps, power=1e4,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
     )
     scc = single_channel(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
     cac = scc.cac_l
     fuel = scc.hd
     conns = [
-            inseries(pump_l, hx_l, cac, pump_l)...,
-            pump_l.inlet.p ~ 1.0e5,
-        fuel.power ~ 1e4,
+        inseries(pump_l, hx_l, cac, pump_l),
+        pump_l.inlet.p ~ 1.0e5,
     ]
-    @named sys = compose(System(conns, t; name=:mtr_onesided_parity), pump_l, hx_l, scc)
-    ssys = mtkcompile(sys; fully_determined=true)
+    @named sys = assembly(conns, pump_l, hx_l, scc)
+    ssys = mtkcompile(sys)
 
     cac_s = ssys.scc.cac_l
     fuel_s = ssys.scc.hd
-    op = vcat(
-            [cac_s.inlet.ṁ => +0.250],
-    )
+    op = [cac_s.inlet.ṁ => +0.250]
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
-    @test all(isfinite, [sol[fuel_s.T[i, j]] for i in 1:nz for j in 1:nx])
+    @test all(isfinite, sol[fuel_s.T])
 
     push!(rows, parity_check("mtr_one_sided", "T_out_l",
                              sol[cac_s.T_out], PARITY_MTR_ONESIDED_T_OUT_L))
@@ -650,10 +634,10 @@ end
     heated_part = geom_mtr.heated_parts[1]
     for i in 1:nz
         push!(rows, parity_check("mtr_one_sided", "T_wall_left_l[$i]",
-                                 sol[getproperty(cac_s, Symbol(:thermal_left, i)).T],
+                                 sol[port(cac_s, :thermal_left, i).T],
                                  PARITY_MTR_ONESIDED_T_WALL_LEFT_L[i]))
         push!(rows, parity_check("mtr_one_sided", "T_wall_right_l[$i]",
-                                 sol[getproperty(cac_s, Symbol(:thermal_right, i)).T],
+                                 sol[port(cac_s, :thermal_right, i).T],
                                  PARITY_MTR_ONESIDED_T_WALL_RIGHT_L[i]))
         h_eff_cac_l = _h_eff(sol, cac_s, i)
         push!(rows, parity_check("mtr_one_sided", "h_tc_left_l[$i]",
@@ -691,7 +675,7 @@ end
     mid = nz ÷ 2
     centre = nx ÷ 2 + 1
     T_centre_numerical = sol[fuel_s.T[mid, centre]]
-    T_wall_mid = sol[getproperty(cac_s, Symbol(:thermal_left, mid)).T]
+    T_wall_mid = sol[port(cac_s, :thermal_left, mid).T]
     T_centre_analytical = T_wall_mid + 1e4 * 0.00127 / (8 * 200.0 * A_plate)
     @test isapprox(T_centre_numerical, T_centre_analytical; atol=0.05)
 
@@ -735,7 +719,6 @@ end  # @testset "parity harness"
         return result
     end
 
-    ps_v01 = fill(1.0 / (nz_v01 * nx_v01), nz_v01, nx_v01)
     @named hd_v01 = HeatDiffusion(;
         nz=nz_v01,
         nx=nx_v01,
@@ -745,28 +728,20 @@ end  # @testset "parity harness"
         rho_s=rho_s_v01,
         cp_s=cp_s_v01,
         k_s=k_s_v01,
-        power_shape=ps_v01,
         power=0.0,
     )
-    ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:nz_v01]
-    ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:nz_v01]
+    @named ct_l = ConstantTemperature(T_wall; n=nz_v01)
+    @named ct_r = ConstantTemperature(T_wall; n=nz_v01)
     conns_v01 = [
-        [
-            connect(ct_l[i].thermal, getproperty(hd_v01, Symbol(:thermal_left, i))) for
-            i in 1:nz_v01
-        ]...,
-        [
-            connect(ct_r[i].thermal, getproperty(hd_v01, Symbol(:thermal_right, i))) for
-            i in 1:nz_v01
-        ]...,
-        hd_v01.power ~ 0.0,
+        faces(
+            (ct_l, :thermal) => (hd_v01, :thermal_left),
+            (ct_r, :thermal) => (hd_v01, :thermal_right),
+        ),
     ]
-    @named sys_v01 = compose(
-        System(conns_v01, t; name=:val01_sys), ct_l..., ct_r..., hd_v01
-    )
-    ssys_v01 = mtkcompile(sys_v01; fully_determined=true)
+    @named sys_v01 = assembly(conns_v01, ct_l, ct_r, hd_v01)
+    ssys_v01 = mtkcompile(sys_v01)
 
-    op_ic_v01 = [ssys_v01.hd_v01.T[i, j] => T0 for i in 1:nz_v01 for j in 1:nx_v01]
+    op_ic_v01 = [ssys_v01.hd_v01.T => fill(T0, nz_v01, nx_v01)]
 
     t_checkpoints = [0.5 * tau_v01, tau_v01, 2 * tau_v01, 5 * tau_v01]
     tspan_v01 = (0.0, 5.0 * tau_v01 * 1.01)
@@ -806,7 +781,6 @@ end
     @named cac_v02 = ChannelAndContacts(;
         n=nz_v02, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     )
-    ps_v02 = fill(1.0 / (nz_v02 * nx_v02), nz_v02, nx_v02)
     @named hd1 = HeatDiffusion(;
         nz=nz_v02,
         nx=nx_v02,
@@ -816,7 +790,6 @@ end
         rho_s=2700.0,
         cp_s=900.0,
         k_s=200.0,
-        power_shape=ps_v02,
         power=power_per_plate,
     )
     @named hd2 = HeatDiffusion(;
@@ -828,35 +801,22 @@ end
         rho_s=2700.0,
         cp_s=900.0,
         k_s=200.0,
-        power_shape=ps_v02,
         power=power_per_plate,
     )
 
     conns_v02 = [
         # Hydraulic loop
-        inseries(pump_v02, hx_v02, cac_v02, pump_v02)...,
+        inseries(pump_v02, hx_v02, cac_v02, pump_v02),
         pump_v02.inlet.p ~ 1.0e5,
-        # hd1 left face → cac thermal_left (hd1 is on the left of the channel)
-        [
-            connect(
-                getproperty(hd1, Symbol(:thermal_left, i)),
-                getproperty(cac_v02, Symbol(:thermal_left, i)),
-            ) for i in 1:nz_v02
-        ]...,
-        # hd2 left face → cac thermal_right (hd2 is on the right of the channel, facing inward)
-        [
-            connect(
-                getproperty(hd2, Symbol(:thermal_left, i)),
-                getproperty(cac_v02, Symbol(:thermal_right, i)),
-            ) for i in 1:nz_v02
-        ]...,
-        hd1.power ~ power_per_plate,
-        hd2.power ~ power_per_plate,
+        faces(
+            # hd1 left face → cac thermal_left (hd1 is on the left of the channel)
+            (hd1, :thermal_left) => (cac_v02, :thermal_left),
+            # hd2 left face → cac thermal_right (hd2 is on the right of the channel, facing inward)
+            (hd2, :thermal_left) => (cac_v02, :thermal_right),
+        ),
     ]
-    @named sys_v02 = compose(
-        System(conns_v02, t; name=:val02_sys), pump_v02, hx_v02, cac_v02, hd1, hd2
-    )
-    ssys_v02 = mtkcompile(sys_v02; fully_determined=true)
+    @named sys_v02 = assembly(conns_v02, pump_v02, hx_v02, cac_v02, hd1, hd2)
+    ssys_v02 = mtkcompile(sys_v02)
 
     # Initial guess: ṁ +0.250 (rectangular MTR at 30 kPa)
     sol_v02 = solve_steady(ssys_v02, [ssys_v02.cac_v02.inlet.ṁ => +0.250])
@@ -882,8 +842,8 @@ end
     # hd1: thermal_left[i] is connected → Q < 0
     # hd2: thermal_left[i] is connected → Q < 0
     for i in 1:nz_v02
-        @test sol_v02[getproperty(ssys_v02.hd1, Symbol(:thermal_left, i)).Q] < 0.0
-        @test sol_v02[getproperty(ssys_v02.hd2, Symbol(:thermal_left, i)).Q] < 0.0
+        @test sol_v02[port(ssys_v02.hd1, :thermal_left, i).Q] < 0.0
+        @test sol_v02[port(ssys_v02.hd2, :thermal_left, i).Q] < 0.0
     end
 end
 
@@ -912,7 +872,7 @@ end
         @test sol.retcode == ReturnCode.Success
         # A critical reactor holds its power.
         @test isapprox(sol[ssys.pk.P_neutron, end], 1.0; rtol=1e-3)
-        T_cool = [sol[ssys.rods.cac.T[i], end] for i in 1:n]
+        T_cool = sol[ssys.rods.cac.T, end]
 
         dT = diff(T_cool)       # first differences  (should all be > 0)
         ddT = diff(dT)           # second differences (should be near zero for linear rise)

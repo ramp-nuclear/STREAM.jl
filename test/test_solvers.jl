@@ -106,10 +106,10 @@ using STREAM.Examples
         @named res = Resistor(r)
         @named hx = HeatExchanger(26.85)
         conns = [
-            inseries(pump, ine, res, hx, pump)...,
+            inseries(pump, ine, res, hx, pump),
             pump.inlet.p ~ 1.0e5,
         ]
-        @named sys = compose(System(conns, t; name=:coast), pump, ine, res, hx)
+        @named sys = assembly(conns, pump, ine, res, hx)
         ssys = mtkcompile(sys)
         sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0])
         @test sol_ss.retcode == ReturnCode.Success

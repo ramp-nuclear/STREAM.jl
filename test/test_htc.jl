@@ -1,10 +1,9 @@
 using Test
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
+using STREAM.Assemblies
 using STREAM.Components
-using STREAM: Re, Pr
 
 const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
 
@@ -219,27 +218,25 @@ end
         n=n, geometry=geom, htc=HTC.FromFunction((Tw, Tb, m, dh, a, liq) -> h_fixed)
     )
     @named bc_u = HeatExchanger(T_inlet)
-    ct_l = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_l_u_, i)) for i in 1:n]
-    ct_r = [ConstantTemperature(T_wall_bc; name=Symbol(:ct_r_u_, i)) for i in 1:n]
+    @named ct_l = ConstantTemperature(T_wall_bc; n=n)
+    @named ct_r = ConstantTemperature(T_wall_bc; n=n)
     conns = [
-        connect(pump_u.outlet, bc_u.inlet),
-        connect(bc_u.outlet, cac_u.inlet),
-        connect(cac_u.outlet, pump_u.inlet),
-        [connect(ct_l[i].thermal, getproperty(cac_u, Symbol(:thermal_left, i))) for i in 1:n]...,
-        [connect(ct_r[i].thermal, getproperty(cac_u, Symbol(:thermal_right, i))) for i in 1:n]...,
+        inseries(pump_u, bc_u, cac_u, pump_u),
+        faces(
+            (ct_l, :thermal) => (cac_u, :thermal_left),
+            (ct_r, :thermal) => (cac_u, :thermal_right),
+        ),
         pump_u.inlet.p ~ 1.0e5,
     ]
-    @named sys_u = compose(
-        System(conns, t; name=:sys_u), pump_u, bc_u, cac_u, ct_l..., ct_r...
-    )
+    @named sys_u = assembly(conns, pump_u, bc_u, cac_u, ct_l, ct_r)
     ssys_u = mtkcompile(sys_u)
     sol_u = solve_steady(ssys_u, [ssys_u.cac_u.inlet.ṁ => 0.49])
 
     @test sol_u.retcode == ReturnCode.Success
-    @test all(isapprox.(sol_u[ssys_u.cac_u.h_tc_left[:]], h_fixed; rtol=1e-8))
+    @test all(isapprox.(sol_u[ssys_u.cac_u.h_tc_left], h_fixed; rtol=1e-8))
     # The reported Nusselt number is the one implied by the h in use.
-    T_cells = sol_u[ssys_u.cac_u.T[:]]
+    T_cells = sol_u[ssys_u.cac_u.T]
     Nu_expected = [h_fixed * geom.Dh / κ(H2O, HTC.film_temperature(T_wall_bc, T_c))
                    for T_c in T_cells]
-    @test all(isapprox.(sol_u[ssys_u.cac_u.Nu_left[:]], Nu_expected; rtol=1e-6))
+    @test all(isapprox.(sol_u[ssys_u.cac_u.Nu_left], Nu_expected; rtol=1e-6))
 end

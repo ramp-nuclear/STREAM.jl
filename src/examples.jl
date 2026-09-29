@@ -56,14 +56,14 @@ function build_loop(;
         T_wall_expr = pars[1](t)
     end
 
-    connections = Equation[
-        inseries(parts..., pump)...,
-        pump.inlet.p ~ 1.0e5,                            # fixes the pressure gauge freedom
-        [ch.T_wall_left[i] ~ T_wall_expr for i in 1:n]...,
-        [ch.T_wall_right[i] ~ T_inlet for i in 1:n]...,  # inert: h_right is 0
+    connections = [
+        inseries(parts..., pump),
+        pump.inlet.p ~ 1.0e5,                # fixes the pressure gauge freedom
+        ch.T_wall_left .~ T_wall_expr,
+        ch.T_wall_right .~ T_inlet,          # inert: h_right is 0
     ]
 
-    @named sys = compose(System(connections, t, [], pars; name=:sys), parts...)
+    @named sys = assembly(connections, parts...; parameters=pars)
     return mtkcompile(sys)
 end
 
@@ -132,21 +132,8 @@ function build_cube(; dP_pump=3.0e4, R=1.0e4)
         pump.inlet.p ~ 1.0e5,
     ]
 
-    @named sys = compose(
-        System(connections, t; name=:sys),
-        pump,
-        r01,
-        r02,
-        r04,
-        r13,
-        r15,
-        r23,
-        r26,
-        r37,
-        r45,
-        r46,
-        r57,
-        r67,
+    @named sys = assembly(
+        connections, pump, r01, r02, r04, r13, r15, r23, r26, r37, r45, r46, r57, r67
     )
     ssys = mtkcompile(sys)
     return ssys
@@ -171,10 +158,9 @@ Topology (4-node parallel network):
 Heated leg: `ChannelAndContacts` (`heated.ch`) + `HeatDiffusion` plate
 (`heated.fuel`) wired one-sided via `one_sided(ch, fuel; side=:left)`.
 Sub-systems retain their `@named` symbols, so access paths inside `heated` are
-`heated.ch.*` and `heated.fuel.*` (not `heated.channel.*`). The right thermal
-side of `ch` dangles inside the `heated` subsystem; the dangling per-cell
-`ThermalPort` Flow rule produces zero net heat flow there, so no extra binding
-is needed — the right face is adiabatic.
+`heated.ch.*` and `heated.fuel.*` (not `heated.channel.*`). The right face of `ch`
+is left unconnected, so MTK sets its heat flow to zero, and its wall temperature is
+pinned to the coolant.
 
 Return leg: `ret` is an external-input `Channel`. Default
 `h_left=h_right=0.0` makes it adiabatic regardless of `T_wall_*[i]` values; the
@@ -204,7 +190,7 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
 - `L_ch`: channel length [m] (default 1.0)
 - `D_ch`: channel hydraulic diameter [m] (default 0.01)
 - `T_inlet`: inlet/HeatExchanger boundary temperature [°C] (default 40.0)
-- `power_W`: total fuel-plate heat input [W], pinned via `heated.fuel.power ~ power_W`
+- `power_W`: total fuel-plate heat input [W]
   (default 1.0e3, an NC-equilibrium-producing baseline)
 - `fuel_nx`: lateral cells in the HeatDiffusion plate (default 2)
 - `fuel_Lx`: plate lateral thickness [m] (default 0.005)
@@ -271,7 +257,6 @@ function build_loop_lof_bypass(;
     push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < 0.01))
     @named ext_res = Resistor(R_ext)
 
-    ps = fill(1.0 / (n * fuel_nx), n, fuel_nx)
     @named fuel = HeatDiffusion(;
         nz=n,
         nx=fuel_nx,
@@ -281,28 +266,24 @@ function build_loop_lof_bypass(;
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
+        power=power_W,
     )
     heated = one_sided(ch, fuel; side=:left, name=:heated)
 
-    connections = Equation[
+    connections = [
         # D series branch: ext_res -> hx -> pump -> ine
-        inseries(ext_res, hx, pump, ine)...,
+        inseries(ext_res, hx, pump, ine),
         # Bypass split/merge: ine -> (heated.ch -> ret) in series, or flapper directly -> ext_res
-        inparallel(ine, ((heated.ch, ret), flapper), ext_res)...,
+        inparallel(ine, ((heated.ch, ret), flapper), ext_res),
         # Boundary conditions
         pump.inlet.p ~ 1.0e5,
-        heated.fuel.power ~ power_W,
-        # Close the dangling right face of the one-sided CAC (fuel is on the left).
-        # The current MTK does not auto-zero an unconnected ThermalPort's flow, so
-        # bind each right wall T to the local bulk T ⇒ q_right = h*(T-T) = 0 (adiabatic).
-        # Supplies the n equations that keep the heated subsystem fully determined.
-        [port(heated.ch, :thermal_right, i).T ~ heated.ch.T[i] for i in 1:n]...,
+        # A circular channel's right face has no heated perimeter, so its heat is zero
+        # whatever its wall temperature. Pin that temperature to the coolant so it is
+        # determined.
+        port(heated.ch, :thermal_right, :T) .~ heated.ch.T,
     ]
 
-    @named sys = compose_systems(
-        heated, pump, ine, hx, ret, flapper, ext_res; connections=connections, name=:sys
-    )
+    @named sys = assembly(connections, heated, pump, ine, hx, ret, flapper, ext_res)
 
     ssys = mtkcompile(sys)
     return ssys
@@ -386,7 +367,6 @@ function build_loop_pk(ctrl;
     power_input=nothing,
 )
     geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
-    ps = fill(1.0 / (nz * nx), nz, nx)  # uniform power shape, normalized
     @named cac = ChannelAndContacts(;
         n=n,
         geometry=geom,
@@ -402,7 +382,6 @@ function build_loop_pk(ctrl;
         rho_s=19300.0,
         cp_s=116.0,
         k_s=174.0,
-        power_shape=ps,
     )
     rods = symmetric_plate(cac, fuel; name=:rods)
     rods_cac = rods.cac
@@ -421,31 +400,25 @@ function build_loop_pk(ctrl;
         tw_names = Set(nameof(k) for k in keys(tw))
         filter(c -> nameof(c) in tw_names, [rods_cac, rods_fuel])
     end
-    fb_eqs = if isempty(fb_components)
-        Equation[]
-    else
-        Connect.temperature_feedback(pk, fb_components)
-    end
-    # The total, so a `power_input` reaches the plate. With none it equals `pk.P_neutron`.
-    power_eqs = [rods_fuel.power ~ pk.P * power_scale]
 
     @named pump = Pump(dP_pump)
     @named bc = HeatExchanger(T_inlet)
 
-    all_connections = [
-        inseries(pump, bc, rods_cac, pump)...,
+    connections = [
+        inseries(pump, bc, rods_cac, pump),
         pump.inlet.p ~ 1.0e5,
-        fb_eqs...,
-        power_eqs...,
+        Connect.temperature_feedback(pk, fb_components),
+        # The total, so a `power_input` reaches the plate. With none it equals `pk.P_neutron`.
+        rods_fuel.power ~ pk.P * power_scale,
     ]
 
-    full = compose_systems(rods, pk, pump, bc; connections=all_connections, name=:sys)
-    ssys = mtkcompile(full)
+    @named sys = assembly(connections, rods, pk, pump, bc)
+    ssys = mtkcompile(sys)
 
-    ic = [
+    ic = Pair{Any,Any}[
         ssys.rods.cac.inlet.ṁ => 0.2,
-        [ssys.rods.cac.T[i] => T_inlet for i in 1:n]...,
-        [ssys.rods.fuel.T[i, j] => T_inlet for i in 1:nz for j in 1:nx]...,
+        ssys.rods.cac.T => fill(T_inlet, n),
+        ssys.rods.fuel.T => fill(T_inlet, nz, nx),
     ]
     # Port temperatures default to 26.85 °C (connectors.jl). The boundary coolant cells and
     # the channel-to-fuel contacts are aliases of port temperatures, and which member of
@@ -459,13 +432,8 @@ function build_loop_pk(ctrl;
     push!(ic, ssys.pump.outlet.T => T_inlet)
     push!(ic, ssys.bc.inlet.T => T_inlet)
     push!(ic, ssys.bc.outlet.T => T_inlet)
-    for i in 1:n
-        push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_left, i)).T => T_inlet)
-        push!(ic, getproperty(ssys.rods.cac, Symbol(:thermal_right, i)).T => T_inlet)
-    end
-    for i in 1:nz
-        push!(ic, getproperty(ssys.rods.fuel, Symbol(:thermal_left, i)).T => T_inlet)
-        push!(ic, getproperty(ssys.rods.fuel, Symbol(:thermal_right, i)).T => T_inlet)
+    for part in (ssys.rods.cac, ssys.rods.fuel), face in (:thermal_left, :thermal_right)
+        append!(ic, port(part, face, :T) .=> T_inlet)
     end
     return (ssys, ic)
 end

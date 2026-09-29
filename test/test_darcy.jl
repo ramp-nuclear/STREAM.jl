@@ -5,7 +5,6 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM: Re
 
 # MTR-like channel: aspect ratio 0.01814, which is where k_R departs from 1 the most.
 const GEOM_F = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
@@ -114,9 +113,8 @@ end
         @named pump = Pump(dP)
         @named fr = FrictionResistor(; geometry=geom, darcy=darcy)
         @named hx = HeatExchanger(40.0)
-        conns = [connect(pump.outlet, hx.inlet), connect(hx.outlet, fr.inlet),
-                 connect(fr.outlet, pump.inlet), pump.inlet.p ~ 1.0e5]
-        @named sys = compose(System(conns, t; name=:sys), pump, fr, hx)
+        conns = [inseries(pump, hx, fr, pump), pump.inlet.p ~ 1.0e5]
+        @named sys = assembly(conns, pump, fr, hx)
         ssys = mtkcompile(sys)
         sol = solve_steady(ssys, [ssys.fr.inlet.ṁ => 1.0])
         return ssys, sol
@@ -143,11 +141,11 @@ end
         @named pump = Pump(1.0e4)
         @named hx = HeatExchanger(40.0)
         rs = [Resistor(R; name=Symbol(:r, i)) for (i, R) in enumerate(resistances)]
-        conns = Equation[
-            inseries(pump, hx, rs..., pump)...,
+        conns = [
+            inseries(pump, hx, rs..., pump),
             pump.inlet.p ~ 1.0e5,
         ]
-        @named sys = compose(System(conns, t; name=:sys), pump, hx, rs...)
+        @named sys = assembly(conns, pump, hx, rs...)
         ssys = mtkcompile(sys)
         sol = solve_steady(ssys, [ssys.pump.inlet.ṁ => 0.5])
         return sol[ssys.pump.inlet.ṁ]
@@ -189,8 +187,8 @@ end
         @named L_comp = Inertia(L_arg)
         @named R_comp = Resistor(R_val)
         @named hx = HeatExchanger(26.85)
-        conns = [inseries(pump, L_comp, R_comp, hx, pump)..., pump.inlet.p ~ 1.0e5]
-        @named sys = compose(System(conns, t; name=:sys), pump, L_comp, R_comp, hx)
+        conns = [inseries(pump, L_comp, R_comp, hx, pump), pump.inlet.p ~ 1.0e5]
+        @named sys = assembly(conns, pump, L_comp, R_comp, hx)
         ssys = mtkcompile(sys)
         # The callable form's extra L_eff variable changes what MTK tears, which surfaces
         # the dummy derivative; seed it so both forms initialise the same way.

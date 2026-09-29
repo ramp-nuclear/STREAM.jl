@@ -2,33 +2,31 @@
 
 using Test
 using ModelingToolkit
-using ModelingToolkit: t_nounits as t
 using ModelingToolkit: connect    # disambiguate from Sockets.connect
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Examples
-using STREAM: PipeGeometry_circular, PipeGeometry_rectangular
 
-# Helper: assert determinacy contract on an UNCOMPILED system. Calls
-# `mtkcompile(...; fully_determined=true)` which raises on imbalance,
-# then re-checks Δ=0 against the compiled system.
+"""
+    assert_determined(label, sys) -> System
+
+Compile `sys` and check it has as many equations as unknowns. `mtkcompile` already raises
+on an imbalance by default, so the count is a second check on the compiled result.
+"""
 function assert_determined(label::String, sys)
-    ssys = mtkcompile(sys; fully_determined=true)   # raises on imbalance
+    ssys = mtkcompile(sys)
     @test length(equations(ssys)) == length(unknowns(ssys))
     return ssys
 end
 
-# Helper: assert determinacy contract on an ALREADY-COMPILED system.
-# All `build_*` builders in src/examples.jl call `mtkcompile` internally
-# and return the compiled `ssys` — re-running `mtkcompile` would error
-# with "Double simplification is not allowed". So for canonical builders
-# we verify the length-equality contract directly: if Δ ≠ 0, the
-# internal `mtkcompile` would have either thrown ExtraVariablesSystemException
-# (under fully_determined=true) or silently returned an imbalanced
-# compiled system that downstream `process_SciMLProblem.check_eqs_u0`
-# would reject. The check below catches both regression classes.
+"""
+    assert_determined_compiled(label, ssys) -> System
+
+The same equation-unknown count for a system a builder has already compiled, which cannot
+be compiled a second time.
+"""
 function assert_determined_compiled(label::String, ssys)
     @test length(equations(ssys)) == length(unknowns(ssys))
     return ssys
@@ -45,20 +43,19 @@ function _build_mtr_sym()
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
-    conns = Equation[
-        inseries(pump_l, hx_l, cac_l, pump_l)...,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4)
+    conns = [
+        inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, hx_r, cac_r, pump_r)...,
+        inseries(pump_r, hx_r, cac_r, pump_r),
         pump_r.inlet.p ~ 1.0e5,
-        Connect.faces((hd, :thermal_left) => (cac_l, :thermal_left))...,
-        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
-        hd.power ~ 1e4,
+        Connect.faces(
+            (hd, :thermal_left) => (cac_l, :thermal_left),
+            (hd, :thermal_right) => (cac_r, :thermal_left),
+        ),
     ]
-    @named sys = compose(System(conns, t; name=:mtr_sym_det),
-                         pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     return sys
 end
 
@@ -72,20 +69,19 @@ function _build_mtr_asym()
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in_r)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
-    conns = Equation[
-        inseries(pump_l, hx_l, cac_l, pump_l)...,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4)
+    conns = [
+        inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
-        inseries(pump_r, hx_r, cac_r, pump_r)...,
+        inseries(pump_r, hx_r, cac_r, pump_r),
         pump_r.inlet.p ~ 1.0e5,
-        Connect.faces((hd, :thermal_left) => (cac_l, :thermal_left))...,
-        Connect.faces((hd, :thermal_right) => (cac_r, :thermal_left))...,
-        hd.power ~ 1e4,
+        Connect.faces(
+            (hd, :thermal_left) => (cac_l, :thermal_left),
+            (hd, :thermal_right) => (cac_r, :thermal_left),
+        ),
     ]
-    @named sys = compose(System(conns, t; name=:mtr_asym_det),
-                         pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     return sys
 end
 
@@ -96,17 +92,14 @@ function _build_mtr_onesided()
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    ps = fill(1.0 / (nz * nx), nz, nx)
     @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0, power_shape=ps, power=1e4)
-    conns = Equation[
-        inseries(pump_l, hx_l, cac_l, pump_l)...,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4)
+    conns = [
+        inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
-        Connect.faces((hd, :thermal_left) => (cac_l, :thermal_left))...,
-        hd.power ~ 1e4,
+        Connect.faces((hd, :thermal_left) => (cac_l, :thermal_left)),
     ]
-    @named sys = compose(System(conns, t; name=:mtr_onesided_det),
-                         pump_l, hx_l, cac_l, hd)
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, hd)
     return sys
 end
 
@@ -114,20 +107,18 @@ function _build_val01_fourier()
     nz_v01 = 10; nx_v01 = 5
     Lx_v01 = 0.00127
     T_wall = 26.85
-    ps_v01 = fill(1.0 / (nz_v01 * nx_v01), nz_v01, nx_v01)
     @named hd_v01 = HeatDiffusion(;
         nz=nz_v01, nx=nx_v01, Lz=0.6, Lx=Lx_v01, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps_v01, power=0.0)
-    ct_l = [ConstantTemperature(T_wall; name=Symbol(:ct_l_, i)) for i in 1:nz_v01]
-    ct_r = [ConstantTemperature(T_wall; name=Symbol(:ct_r_, i)) for i in 1:nz_v01]
-    conns_v01 = Equation[
-        [connect(ct_l[i].thermal, getproperty(hd_v01, Symbol(:thermal_left,  i))) for i in 1:nz_v01]...,
-        [connect(ct_r[i].thermal, getproperty(hd_v01, Symbol(:thermal_right, i))) for i in 1:nz_v01]...,
-        hd_v01.power ~ 0.0,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=0.0)
+    @named ct_l = ConstantTemperature(T_wall; n=nz_v01)
+    @named ct_r = ConstantTemperature(T_wall; n=nz_v01)
+    conns_v01 = [
+        faces(
+            (ct_l, :thermal) => (hd_v01, :thermal_left),
+            (ct_r, :thermal) => (hd_v01, :thermal_right),
+        ),
     ]
-    @named sys_v01 = compose(System(conns_v01, t; name=:val01_det),
-                             ct_l..., ct_r..., hd_v01)
+    @named sys_v01 = assembly(conns_v01, ct_l, ct_r, hd_v01)
     return sys_v01
 end
 
@@ -139,26 +130,21 @@ function _build_val02_twoplate()
     @named hx_v02 = HeatExchanger(T_in_v02)
     @named cac_v02 = ChannelAndContacts(;
         n=nz_v02, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07))
-    ps_v02 = fill(1.0 / (nz_v02 * nx_v02), nz_v02, nx_v02)
     @named hd1 = HeatDiffusion(; nz=nz_v02, nx=nx_v02,
         Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps_v02, power=power_per_plate)
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=power_per_plate)
     @named hd2 = HeatDiffusion(; nz=nz_v02, nx=nx_v02,
         Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0,
-        power_shape=ps_v02, power=power_per_plate)
-    conns_v02 = Equation[
-        inseries(pump_v02, hx_v02, cac_v02, pump_v02)...,
+        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=power_per_plate)
+    conns_v02 = [
+        inseries(pump_v02, hx_v02, cac_v02, pump_v02),
         pump_v02.inlet.p ~ 1.0e5,
-        Connect.faces((hd1, :thermal_left) => (cac_v02, :thermal_left))...,
-        Connect.faces((hd2, :thermal_left) => (cac_v02, :thermal_right))...,
-        # Close the Δ=−2 deficit (two HD instances → two `power(t)` pins).
-        hd1.power ~ power_per_plate,
-        hd2.power ~ power_per_plate,
+        Connect.faces(
+            (hd1, :thermal_left) => (cac_v02, :thermal_left),
+            (hd2, :thermal_left) => (cac_v02, :thermal_right),
+        ),
     ]
-    @named sys_v02 = compose(System(conns_v02, t; name=:val02_det),
-                             pump_v02, hx_v02, cac_v02, hd1, hd2)
+    @named sys_v02 = assembly(conns_v02, pump_v02, hx_v02, cac_v02, hd1, hd2)
     return sys_v02
 end
 
