@@ -6,7 +6,7 @@ steady-state margins asked for most days.
 
 There are two Python references. `main` is 13,585 lines across 62 modules. The `stream-next`
 branch, 20,787 lines across 79 and not yet merged, fixes a set of correlations and adds loss of
-coolant, a steady-state guess toolkit and plotting. STREAM.jl is 7,620 lines across 40 files.
+coolant, a steady-state guess toolkit and plotting. STREAM.jl is 8,221 lines across 42 files.
 
 Everything here was checked against both sources rather than inferred from names. What was
 checked and found equivalent is listed at the end, so nobody has to re-derive it.
@@ -16,7 +16,7 @@ checked and found equivalent is listed at the end, so nobody has to re-derive it
 - [Where things stand](#where-things-stand)
 - [In review](#in-review)
 - [What remains](#what-remains)
-  1. [Loss of coolant to core uncovery](#1-loss-of-coolant-to-core-uncovery)
+  1. [Loss of coolant: the benchmark and the pressure anchor](#1-loss-of-coolant-the-benchmark-and-the-pressure-anchor)
   2. [Fuel heat conduction](#2-fuel-heat-conduction)
   3. [Saturation stop and range checks](#3-saturation-stop-and-range-checks)
   4. [Thresholds](#4-thresholds)
@@ -38,7 +38,7 @@ checked and found equivalent is listed at the end, so nobody has to re-derive it
 | LOFA | Partly, see below | Yes | Nothing |
 | RIA, plate fuel | Yes | Partly | Axial conduction and a clad plate ([2](#2-fuel-heat-conduction)), the blister limit ([4](#4-thresholds)) |
 | RIA, rod fuel | Yes | No | Cylindrical conduction and gap conductance ([2](#2-fuel-heat-conduction)), fuel enthalpy ([4](#4-thresholds)) |
-| LOCA to core uncovery | On `stream-next` | No | Tanks, breaks and the level they set ([1](#1-loss-of-coolant-to-core-uncovery)) |
+| LOCA to core uncovery | On `stream-next` | Yes | Python's multichannel benchmark ([1](#1-loss-of-coolant-the-benchmark-and-the-pressure-anchor)) |
 | LOCA past uncovery | No | No | Out of scope for both, by choice |
 
 LOFA is where Python `main` runs short. Its own benchmark on `stream-next`, run against
@@ -78,41 +78,23 @@ delete this section and move its items to the lists below:
 
 In order of what it unblocks.
 
-### 1. Loss of coolant to core uncovery
+### 1. Loss of coolant: the benchmark and the pressure anchor
 
-The goal is the pool level through a drain, up to core uncovery, with the thresholds reporting
-margin on the way and the run stopping where the model leaves its validity. Python has this on
-`stream-next`: a free-surface network, `Tank`, `Environment`, an `Orifice` break with opening
-ramps and a latching closure for siphon breakers, level-fed heads, single-phase discharge
-coefficients with closed-form drain time and level, and a post-run cavitation check.
+A pool drains to core uncovery: `Components.Tank` and `Environment`, an `Orifice` break that
+opens, and latches shut for a siphon breaker, on its `StateMachine`, the discharge correlations
+in `LocalLoss`, `Thresholds.cavitation`, and `Examples.build_pool_break`. The tests port
+Python's drain, siphon, two-hole, heated-pool and pool-break scenarios, and the Torricelli
+drain matches the closed form to 8e-5 m. Two pieces remain:
 
-MTK makes most of Python's machinery unnecessary. Python had to teach its network solver about
-free-surface nodes, since every node there conserved mass. Here a component whose volume is a
-state simply is one. What to build:
+- **Python's multichannel benchmark**, `benchmarks/lofa/loc_extension.py`: its pool drains
+  5948 kg to uncovery at 2740.6 s, with the flapper opening at 58.4 s and mass closure of
+  6e-7. It builds on the pool LOFA example, which is not on `main` yet.
+- **The tank surface as the loop's pressure anchor.** A loop with a `Tank` or an
+  `Environment` has its absolute pressure, so the hand-written `pump.inlet.p ~ 1.0e5` every
+  other example carries could go.
 
-| Piece | What it does | Lines |
-|---|---|---|
-| `Tank` | Ports at given elevations, volume and mixed temperature as states. Each port's pressure is the surface pressure plus the head above it, which also covers Python's `LevelHead` | 60–80 |
-| `Environment` | One port at a fixed pressure and temperature, the sink a break drains into | 15–20 |
-| `Orifice` | A discharge law scaled by an opening read from a `StateSchedule`, as `Flapper` is. The law needs `sign(Δp)·sqrt(abs(Δp))` smoothed near zero, as Python's `mdot_by_local_pressure_smooth` does | 40–50 |
-| Discharge correlations | `discharge_cd`, `lichtarowicz_cd`, stub discharge, `drain_time`, `drain_level`, in `LocalLoss` | 50–70 |
-| Cavitation check | Where a port or a break throat falls below saturation pressure, after the run | 30–40 |
-| Pool example | The network as a builder in `Examples` | 50–80 |
-
-The events are `StateMachine` transitions: the break opening, a siphon breaker closing, and the
-level reaching the top of the core as an abort state.
-
-Two design points. A tank's level is the integral of its net flow, so a steady state is
-singular unless the level is pinned, as Python pins it; `Tank(; fixed_level=true)` makes the
-volume a parameter for the steady solve. And the tank surface becomes the loop's absolute
-pressure, replacing the hand-written `pump.inlet.p ~ 1.0e5` every example carries today.
-
-Python's own checks make good targets: a gravity drain matched to 7.6e-5 m over 3000 s, the
-closed-form drain time to 0.001%, and its benchmark pool draining 5948 kg to uncovery at
-2740.6 s with mass closure of 6e-7.
-
-**Size:** about 250 to 350 source lines and a week, plus up to three days matching Python's
-benchmark timings.
+**Size:** a few days for the benchmark, most of it matching Python's timings. The anchor is a
+sweep through the examples and tests.
 
 ### 2. Fuel heat conduction
 
@@ -247,6 +229,14 @@ never moved, with no error. Moving the trip time into the problem's parameters f
   reached through `remake`.
 - **The flapper always opens along the C1 ramp `3y² − 2y³`**, where Python defaults to its
   legacy relaxation. The opening time is the same.
+- **A latching break closes by ramping its opening back to zero** along the same curve.
+  Python freezes the flow at the moment of closure and ramps that down instead.
+- **A tank counts only the ports flowing in** in its energy balance, switching with `ifelse`.
+  Python smooths that switch with `soft_pos`.
+- **A transient steps onto every saved time.** Python's solver reads the saved values off its
+  interpolant, which strays inside a long implicit step: 0.5 m on a draining pool level.
+  `solve_transient` passes the saved times as `tstops`, so every saved value is one the solver
+  computed.
 
 ## Following Python where the physics is open
 
