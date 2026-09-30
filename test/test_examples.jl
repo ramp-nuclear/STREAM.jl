@@ -361,3 +361,67 @@ end
         @test 231.85 < T_max_nc < 236.85    # tight around the observed 233.95 °C, below critical T
     end
 end
+
+"""
+A pump head that holds at `dp0` and, from `t = 0`, decays with time constant `τ`. With
+`τ = Inf` it holds for good, which is what a steady solve needs: it reads the head at
+`t = Inf`, where `exp(-t/τ)` is not a number.
+"""
+struct _Coastdown
+    dp0::Float64
+    τ::Float64
+end
+(c::_Coastdown)(t) = isinf(c.τ) ? c.dp0 : c.dp0 * exp(-t / c.τ)
+
+"""
+Saved times from 0: fine over the break's opening ramp from `t_break`, then spread to `t_end`.
+"""
+_break_grid(t_end; t_break=0.0) = unique!(vcat(
+    0.0, range(t_break, t_break + 4.0; length=21), range(t_break + 4.0, t_end; length=400)[2:end],
+))
+
+"""Run a pool break to uncovery from its pinned steady state."""
+function _drain_pool(ssys, watch, times; op=Pair[], overrides=Pair[])
+    sol_ss = solve_steady(ssys, op)
+    return solve_transient(ssys, sol_ss, times; overrides=[ssys.pool.pinned => false; overrides],
+                           callbacks=machine_callbacks(ssys, watch))
+end
+
+@testset "build_pool_break" begin
+    cd, area, rho = STREAM.LocalLoss.discharge_cd(:sharp), 5e-4, ρ(H2O, 30.0)
+
+    @testset "a bottom break leaves the circulation alone and carries what the pool loses" begin
+        ssys, watch = build_pool_break()
+        sol = _drain_pool(ssys, watch, _break_grid(4000.0))
+        m_core, m_break = sol[ssys.core.inlet.ṁ], sol[ssys.breach.inlet.ṁ]
+        level, inventory = sol[ssys.pool.L], sol[ssys.pool.M]
+        @test watch.state === :UNCOVERED
+        @test level[end] ≈ 1.0 atol = 1e-3
+        @test m_core ≈ ones(length(m_core)) rtol = 1e-4
+        # Non-strict: the run saves the instant it stops twice.
+        @test all(diff(m_break[sol.t .> 5.0]) .<= 0.0)
+        driving = rho * G_EARTH * level[end] - 5e3
+        @test m_break[end] ≈ cd * area * sqrt(2 * rho * driving) rtol = 1e-3
+        discharged = sum((m_break[i] + m_break[i + 1]) / 2 * (sol.t[i + 1] - sol.t[i])
+                         for i in 1:(length(sol.t) - 1))
+        @test discharged ≈ inventory[1] - inventory[end] rtol = 1e-3
+    end
+
+    @testset "a suction break reverses the core and uncovers sooner than a bottom break" begin
+        t_break, dp0 = 20.0, 7e3
+        ssys, watch = build_pool_break(; break_at=:suction, t_break=t_break,
+                                       dP_pump=_Coastdown(dp0, 3.0))
+        sol = _drain_pool(ssys, watch, _break_grid(4000.0; t_break=t_break);
+                          op=[ssys.pump.dP_pump_fn => _Coastdown(dp0, Inf)],
+                          overrides=[ssys.pump.dP_pump_fn => _Coastdown(dp0, 3.0)])
+        m_core = sol[ssys.core.inlet.ṁ]
+        @test m_core[1] ≈ 1.0 rtol = 1e-6
+        @test minimum(m_core) < 0.0
+        @test sol.t[findfirst(<(0.0), m_core)] > t_break
+        @test watch.state === :UNCOVERED
+
+        ssys, watch = build_pool_break(; t_break=t_break)
+        bottom = _drain_pool(ssys, watch, _break_grid(4000.0; t_break=t_break))
+        @test sol.t[end] < bottom.t[end]
+    end
+end

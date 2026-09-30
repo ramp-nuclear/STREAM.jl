@@ -437,3 +437,99 @@ function build_loop_pk(ctrl;
     end
     return (ssys, ic)
 end
+
+"""
+    build_pool_break(; break_at=:bottom, dP_pump=..., R_core=5e3, R_suction=2e3,
+                     break_area=5e-4, cd=discharge_cd(:sharp), t_break=0.0, open_rate=1.0,
+                     area=2.0, L0=4.0, z_uncovery=1.0, T0=30.0) -> (System, StateMachine)
+
+A pool that circulates through a core and loses its water through a break, run to core
+uncovery. The pump draws from the pool's bottom and returns there; both connections sit at
+elevation 0. The break is an [`Orifice`](@ref) to an [`Environment`](@ref), shut until
+`t_break`, and the pool is held at a fixed temperature.
+
+- `break_at=:bottom`: pool → core → pump → pool, with the break between core and pump. The
+  pump keeps the core flow whatever the level, and the break drains the pool on its own.
+- `break_at=:suction`: pool → suction line → pump → core → pool, with the break at the pump
+  suction. The break draws from the same node the pump does.
+
+Solve the intact loop with the pool pinned, then release it:
+
+```julia
+ssys, watch = build_pool_break()
+sol_ss = solve_steady(ssys)
+sol = solve_transient(ssys, sol_ss, times; overrides=[ssys.pool.pinned => false],
+                      callbacks=machine_callbacks(ssys, watch))
+```
+
+The run stops when `watch` reaches `:UNCOVERED`, the level falling below `z_uncovery`.
+
+# Arguments
+- `break_at`: `:bottom` or `:suction`
+- `dP_pump`: pump head [Pa], a number or a function of time. The default drives 1 kg/s
+  through the intact loop's resistors.
+- `R_core`, `R_suction`: linear resistances of the core and of the suction line [Pa·s/kg].
+  The suction line exists only with `break_at=:suction`.
+- `break_area`, `cd`: the break's area [m²] and discharge coefficient
+- `t_break`: when the break opens [s]
+- `open_rate`: how fast it opens [1/s]
+- `area`, `L0`: the pool's surface area [m²] and starting level [m]
+- `z_uncovery`: the level at which the core uncovers [m]
+- `T0`: pool temperature [°C]
+
+# Returns
+`(ssys, watch)`: the compiled `System`, with the pool as `ssys.pool`, the core as
+`ssys.core`, the pump as `ssys.pump` and the break as `ssys.breach`, and the
+[`StateMachine`](@ref) that stops the run at uncovery.
+"""
+function build_pool_break(;
+    break_at::Symbol=:bottom,
+    R_core=5e3,
+    R_suction=2e3,
+    dP_pump=(break_at === :suction ? R_core + R_suction : R_core),
+    break_area=5e-4,
+    cd=discharge_cd(:sharp),
+    t_break=0.0,
+    open_rate=1.0,
+    area=2.0,
+    L0=4.0,
+    z_uncovery=1.0,
+    T0=30.0,
+)
+    break_at in (:bottom, :suction) ||
+        throw(ArgumentError("break_at is :bottom or :suction, not :$break_at"))
+    @named pool = Tank(;
+        area=area, L0=L0, ports=(suction=0.0, inflow=0.0), fixed_temperature=true, T0=T0,
+    )
+    @named core = Resistor(R_core)
+    @named pump = Pump(dP_pump)
+    @named breach = Orifice(;
+        area=break_area, cd=cd, dp_eps=1e-3, open_rate=open_rate,
+        machine=StateMachine(; initial_state=:OPEN, initial_time=t_break),
+    )
+    @named ambient = Environment(; T=T0)
+    parts = Any[pool, core, pump, breach, ambient]
+
+    connections = if break_at === :bottom
+        [
+            connect(pool.suction, core.inlet),
+            connect(core.outlet, pump.inlet, breach.inlet),
+            connect(pump.outlet, pool.inflow),
+        ]
+    else
+        @named suction_line = Resistor(R_suction)
+        push!(parts, suction_line)
+        [
+            connect(pool.suction, suction_line.inlet),
+            connect(suction_line.outlet, pump.inlet, breach.inlet),
+            inseries(pump, core),
+            connect(core.outlet, pool.inflow),
+        ]
+    end
+    push!(connections, connect(breach.outlet, ambient.port))
+
+    @named sys = assembly(connections, parts...)
+    watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))
+    push!(watch, (:INTACT => :UNCOVERED, pool.L < z_uncovery, "core uncovered"))
+    return mtkcompile(sys), watch
+end
