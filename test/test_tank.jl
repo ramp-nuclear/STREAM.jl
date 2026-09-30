@@ -71,6 +71,32 @@ _trapezoid(y, ts) = sum((y[i] + y[i + 1]) / 2 * (ts[i + 1] - ts[i]) for i in 1:(
         @test level[end] ≈ z_uncovery atol = 1e-3
     end
 
+    @testset "two tanks joined at the bottom settle at one level" begin
+        # Through a linear resistor the level difference decays as exp(-t/τ), with
+        # 1/τ = g·(1/A₁ + 1/A₂)/R: the head ρgΔL drives ṁ = ρgΔL/R, and ρ cancels.
+        A_wide, A_narrow, L_wide, L_narrow, R = 2.0, 1.0, 4.0, 1.0, 1500.0
+        @named wide = Tank(; area=A_wide, L0=L_wide, ports=(bottom=0.0,),
+                           fixed_temperature=true, T0=T_POOL)
+        @named narrow = Tank(; area=A_narrow, L0=L_narrow, ports=(bottom=0.0,),
+                             fixed_temperature=true, T0=T_POOL)
+        @named pipe = Resistor(R)
+        @named sys = assembly([connect(wide.bottom, pipe.inlet),
+                               connect(pipe.outlet, narrow.bottom)],
+                              wide, pipe, narrow)
+        ssys = mtkcompile(sys)
+        sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 1000.0; length=201);
+                              overrides=[ssys.wide.pinned => false, ssys.narrow.pinned => false])
+
+        τ = R / (G_EARTH * (1 / A_wide + 1 / A_narrow))
+        gap = sol[ssys.wide.L] .- sol[ssys.narrow.L]
+        @test maximum(abs.(gap .- (L_wide - L_narrow) .* exp.(-sol.t ./ τ))) < 1e-4
+        L_settled = (A_wide * L_wide + A_narrow * L_narrow) / (A_wide + A_narrow)
+        @test sol[ssys.wide.L][end] ≈ L_settled atol = 1e-3
+        @test sol[ssys.narrow.L][end] ≈ L_settled atol = 1e-3
+        inventory = sol[ssys.wide.M] .+ sol[ssys.narrow.M]
+        @test inventory ≈ fill(inventory[1], length(inventory)) rtol = 1e-9
+    end
+
     @testset "a heated pool follows its own energy balance" begin
         m_in, T_hot, t_end = 2.0, 40.0, 3000.0
         @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(bottom=0.0, feed=0.0), T0=T_POOL)
