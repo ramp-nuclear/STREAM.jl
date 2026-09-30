@@ -145,8 +145,9 @@ Start a transient from an already-solved state.
 
 Takes the full state of `ssys` from `sol_ss`, applies `overrides` (parameter or forcing changes,
 such as shutting a pump with `ssys.pump.dP_pump => 0.0` or stepping a reactivity), and integrates
-from there. An override may also name a state, which then starts at the given value instead. This expresses the settle-then-perturb pipeline: solve a steady state, change one thing,
-watch the transient.
+from there. An override may also name a state, which then starts at the given value instead.
+This expresses the settle-then-perturb pipeline: solve a steady state, change one thing, watch
+the transient.
 
 The default `BrownFullBasicInit` re-solves the algebraic constraints for the overridden parameters
 while holding the differential states at their snapshotted values, so the start point stays

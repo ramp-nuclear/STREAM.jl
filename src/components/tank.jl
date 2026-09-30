@@ -1,6 +1,6 @@
 """
     Tank(; name, area, L0, ports, liquid=H2O, p_surface=ATM, T0=T_ROOM,
-         fixed_temperature=false, volume=nothing, Q_ext=0.0, g=G_EARTH) -> System
+         fixed_temperature=false) -> System
 
 A body of liquid with a free surface: a pool, or a tank with a cover gas. It holds an inventory
 whose level `L` and mixed temperature `T` are states, and it sits in a loop as a node with any
@@ -14,10 +14,10 @@ so a leg's driving head falls as the tank drains, reaches zero when the surface 
 the connection, and goes negative once it is above the surface. Liquid leaves through every
 port at the tank's temperature.
 
-The level follows the net inflow, `ρ·A(L)·dL/dt = Σ ṁ`, with each port's `ṁ` positive into the
+The level follows the net inflow, `ρ·A·dL/dt = Σ ṁ`, with each port's `ṁ` positive into the
 tank. The temperature follows the enthalpy the inflows bring,
 
-    ρ·V(L)·cₚ·dT/dt = Σ max(ṁ, 0)·cₚ·(T_in − T) + Q_ext
+    ρ·A·L·cₚ·dT/dt = Σ max(ṁ, 0)·cₚ·(T_in − T)
 
 Outflow leaves at `T`, so it adds nothing. A port's `instream` temperature is what arrives if
 liquid flows in, whichever way it is flowing, so the balance picks the inflowing ports itself.
@@ -44,60 +44,39 @@ machine's `abort_states` to stop the run there.
 
 # Arguments
 - `name`: system name (Symbol), injected by `@named`
-- `area`: free-surface area [m²], a number or a function of level. A function needs `volume`.
+- `area`: free-surface area [m²], the same at every level
 - `L0`: initial level, and the level held while pinned [m]
 - `ports`: connection elevations [m], in the datum of `L`, as a `NamedTuple` such as
   `(suction=0.0, return=0.5)`. Each becomes a `FlowPort` of that name.
 - `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`H2O`](@ref)
-- `p_surface`: pressure above the liquid [Pa], a number or a function of time (default
-  [`ATM`](@ref))
+- `p_surface`: pressure above the liquid [Pa] (default [`ATM`](@ref))
 - `T0`: initial temperature, and the held temperature with `fixed_temperature` [°C]
 - `fixed_temperature`: hold `T` at `T0` instead of following the energy balance (default
   `false`)
-- `volume`: liquid volume as a function of level [m³]. Required with a level-dependent `area`;
-  a constant area gives `area·L`.
-- `Q_ext`: heat into the liquid from outside the loop [W] (default 0)
-- `g`: gravitational acceleration [m/s²] (default [`G_EARTH`](@ref))
 
 # Ports
 One `FlowPort` per entry of `ports`, named as in it.
 
 # Returns
-Uncompiled `System` with the level `L`, the temperature `T`, the inventory `M = ρ·V(L)` [kg],
+Uncompiled `System` with the level `L`, the temperature `T`, the inventory `M = ρ·A·L` [kg],
 and the parameter `pinned`.
 
 # Throws
-- `ArgumentError`: for a level-dependent `area` with no `volume`, or no ports
+- `ArgumentError`: for a tank with no ports
 """
 function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=H2O, p_surface=ATM,
-              T0=T_ROOM, fixed_temperature::Bool=false, volume=nothing, Q_ext=0.0,
-              g=G_EARTH)
+              T0=T_ROOM, fixed_temperature::Bool=false)
     isempty(ports) && throw(ArgumentError("a Tank needs at least one port"))
-    area isa Function && volume === nothing && throw(ArgumentError(
-        "a level-dependent area needs `volume`, the liquid volume as a function of level, " *
-        "for the energy balance",
-    ))
-    A_of(L) = area isa Function ? area(L) : area
-    V_of(L) = volume === nothing ? area * L : volume(L)
     # Numbers, not the parameters below: a state whose default names a parameter is bound
     # to it, and a transient that starts the state elsewhere then conflicts with the binding.
     L_start, T_start = Float64(L0), Float64(T0)
 
     pars = @parameters begin
         pinned::Bool = true
+        area = area
         L0 = L0
         T0 = T0
-        Q_ext = Q_ext
-    end
-    p_s = if p_surface isa Real
-        ps = @parameters p_surface = p_surface
-        append!(pars, ps)
-        ps[1]
-    else
-        FType = typeof(p_surface)
-        ps = @parameters (p_surface_fn::FType)(..) = p_surface
-        append!(pars, ps)
-        ps[1](t)
+        p_surface = p_surface
     end
     vars = @variables L(t) = L_start T(t) = T_start M(t)
 
@@ -108,11 +87,11 @@ function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=H2O, p
     eqs = Equation[
         # Pinned, the steady condition is L = L0. The rate only matters to a transient run
         # with the tank still pinned, which holds the level there.
-        D(L) ~ ifelse(pinned, (L0 - L) / _TANK_PIN_TIME, net_inflow / (rho * A_of(L))),
-        M ~ rho * V_of(L),
+        D(L) ~ ifelse(pinned, (L0 - L) / _TANK_PIN_TIME, net_inflow / (rho * area)),
+        M ~ rho * area * L,
     ]
     for (port, z) in zip(port_sys, values(ports))
-        push!(eqs, port.p ~ p_s + rho * g * (L - z))
+        push!(eqs, port.p ~ p_surface + rho * G_EARTH * (L - z))
         push!(eqs, port.T ~ T)
     end
     if fixed_temperature
@@ -124,7 +103,7 @@ function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=H2O, p
         )
         # Solved for D(T): left multiplying it, the T-dependent ρ·cₚ makes MTK carry D(T) as
         # an extra unknown that needs a start value.
-        push!(eqs, D(T) ~ (inflow_heat + Q_ext) / (rho * V_of(L) * cp))
+        push!(eqs, D(T) ~ inflow_heat / (rho * area * L * cp))
     end
     return compose(System(eqs, t, vars, pars; name=name), port_sys...)
 end
