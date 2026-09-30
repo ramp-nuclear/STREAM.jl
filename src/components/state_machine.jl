@@ -143,6 +143,10 @@ same variable after `mtkcompile`. Assigning `machine.transitions` replaces the l
   the description of the transition taken, `"initial"` for the first entry, or whatever
   [`trip!`](@ref) was given.
 - `abort_states::Set`: the states that stop the integration
+- `ramp_times::Vector{Float64}`: how long [s] whatever follows the machine takes to settle
+  after it changes state, such as a valve's opening time. Each change puts a solver stop that
+  long after it, so no step reaches past the ramp. [`Flapper`](@ref) and [`Orifice`](@ref) add
+  theirs.
 
 # Throws
 - `ArgumentError`: for an edge whose condition is not one of the three forms
@@ -153,6 +157,7 @@ mutable struct StateMachine
     t_state::Float64
     log::Vector{@NamedTuple{state::Any, t::Float64, cause::String}}
     abort_states::Set
+    ramp_times::Vector{Float64}
 
     # Inner, so no default constructor competes with it.
     function StateMachine(edges...; initial_state=:NORMAL, initial_time=0.0, abort_states=())
@@ -160,6 +165,7 @@ mutable struct StateMachine
         machine = new(
             Transition[], initial_state, t0,
             [(state=initial_state, t=t0, cause="initial")], Set{Any}(abort_states),
+            Float64[],
         )
         foreach(edge -> push!(machine, edge), edges)
         return machine
@@ -356,11 +362,13 @@ _signed(value::Bool) = throw(ArgumentError(
 """
     _enter!(machine, tr, integrator) -> Bool
 
-Take `tr`, logging its description as the cause. If the state entered is one of
-`machine.abort_states`, stop the integration and return `false`.
+Take `tr`, logging its description as the cause, and put a solver stop at the end of each of
+`machine.ramp_times`. If the state entered is one of `machine.abort_states`, stop the
+integration and return `false`.
 """
 function _enter!(machine::StateMachine, tr::Transition, integrator)
     trip!(machine, integrator.t; state=tr.to, cause=tr.description)
+    foreach(ramp -> add_tstop!(integrator, integrator.t + ramp), machine.ramp_times)
     machine.state in machine.abort_states || return true
     terminate!(integrator)
     return false

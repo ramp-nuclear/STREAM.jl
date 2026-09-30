@@ -248,6 +248,63 @@ function worst_case(margin::AbstractVector; times=nothing)
 end
 
 """
+    cavitation(sol, sites...) -> Vector{NamedTuple}
+
+The sites that reached saturation during a run, with when and how far.
+
+A site is a component that reports how far its liquid sits below saturation: an `Orifice`
+built with a contraction coefficient `cc`, checked at its throat, or a channel, checked cell by
+cell as `T_sat − T` at the local static pressure. A siphon crest is checked by putting an
+orifice there.
+
+# Arguments
+- `sol`: a steady (`NonlinearSolution`) or transient (`ODESolution`) solution
+- `sites`: the components to check, as subsystems of the compiled model, such as
+  `ssys.breach` or `ssys.core`
+
+# Returns
+One `(site, time, margin)` per site whose subcooling fell to zero or below: its name, the first
+saved time it did (`nothing` for a steady solution), and the smallest subcooling [K]. Sites
+that stayed subcooled are left out, so an empty vector means no cavitation.
+
+# Throws
+- `ArgumentError`: for a site that reports no subcooling
+"""
+function cavitation(sol, sites...)
+    crossings = @NamedTuple{site::Symbol, time::Union{Float64,Nothing}, margin::Float64}[]
+    transient = hasproperty(sol, :t)
+    for site in sites
+        margins = _subcooling(sol, site, transient)
+        worst = minimum(margins)
+        worst <= 0 || continue
+        time = transient ? Float64(sol.t[findfirst(<=(0), margins)]) : nothing
+        push!(crossings, (site=nameof(site), time=time, margin=Float64(worst)))
+    end
+    return crossings
+end
+
+"""
+    _subcooling(sol, site, transient) -> Vector{Float64}
+
+The smallest subcooling of `site` [K] at each saved time of a transient, or a one-element
+vector for a steady solution: an orifice's throat `subcooling`, or the smallest `T_sat − T`
+over a channel's cells.
+"""
+function _subcooling(sol, site, transient)
+    if hasproperty(site, :subcooling)
+        return transient ? sol[site.subcooling] : [sol[site.subcooling]]
+    elseif hasproperty(site, :T_sat)
+        T_sat, T = sol[site.T_sat], sol[site.T]
+        # A transient gives one vector of cells per saved time, a steady solve just the one.
+        return transient ? [minimum(a .- b) for (a, b) in zip(T_sat, T)] : [minimum(T_sat .- T)]
+    end
+    throw(ArgumentError(
+        "$(nameof(site)) reports no subcooling: give an Orifice a contraction coefficient " *
+        "`cc`, or pass a channel",
+    ))
+end
+
+"""
     chfr(chf_fn; direction=:max) -> Function
 
 Factory that returns a CHF ratio (CHFR) closure with directional heat flux selection

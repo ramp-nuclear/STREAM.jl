@@ -173,3 +173,169 @@ positive drop.
 Pressure drop [Pa].
 """
 dp(ṁ, rho, f, A) = f * (ṁ * abs(ṁ) / (2 * rho * A^2))
+
+"""
+    DISCHARGE_CD
+
+Fully turbulent discharge coefficients `C_d = C_c·C_v` by hole geometry, the values
+[`discharge_cd`](@ref) looks up. They hold above a throat Reynolds number of about 1e4; below
+that use [`lichtarowicz_cd`](@ref).
+
+| Key | `C_d` | Geometry |
+|:---|:---|:---|
+| `:sharp` | 0.61 | Sharp-edged thin plate, set by the vena contracta |
+| `:rounded` | 0.98 | Rounded, bellmouth or nozzle inlet: no contraction, friction only |
+| `:short_tube` | 0.81 | Thick hole with `L/d` of 2 to 4, where the jet reattaches |
+| `:borda` | 0.51 | Re-entrant tube protruding into the vessel |
+| `:pipe_stub` | 0.6 | Clean severed pipe end, a sharp entrance into the stub |
+"""
+const DISCHARGE_CD = Dict(
+    :sharp => 0.61,
+    :rounded => 0.98,
+    :short_tube => 0.81,
+    :borda => 0.51,
+    :pipe_stub => 0.6,
+)
+
+"""
+    discharge_cd(geometry::Symbol) -> Float64
+
+The fully turbulent discharge coefficient of a hole of the given geometry, one of the keys of
+[`DISCHARGE_CD`](@ref).
+
+# Arguments
+- `geometry`: `:sharp`, `:rounded`, `:short_tube`, `:borda` or `:pipe_stub`
+
+# Returns
+The discharge coefficient.
+
+# Throws
+`ArgumentError` for a geometry not in [`DISCHARGE_CD`](@ref).
+"""
+function discharge_cd(geometry::Symbol)
+    haskey(DISCHARGE_CD, geometry) || throw(ArgumentError(
+        "no discharge coefficient for :$geometry; known geometries are " *
+        join(sort!(collect(keys(DISCHARGE_CD))), ", "),
+    ))
+    return DISCHARGE_CD[geometry]
+end
+
+"""
+    lichtarowicz_cd(Re, L_over_d) -> Float64
+
+The discharge coefficient of a parallel-bore orifice at finite Reynolds number, after
+Lichtarowicz, Duggins and Markland (1965):
+
+    C_du = 0.827 − 0.0085·L/d
+    1/C_d = 1/C_du + (20/Re)·(1 + 2.25·L/d) − 0.005·(L/d) / (1 + 7.5·log10(1.5e-4·Re)²)
+
+`C_du` is the high Reynolds limit, which `C_d` approaches from below as the viscous term dies
+out. Fitted for `10 ≤ Re ≤ 2e4` and `L/d ≤ 10`; outside that it extrapolates. For a thin
+plate rather than a bore, use `discharge_cd(:sharp)`.
+
+# Arguments
+- `Re`: Reynolds number at the throat, on the bore diameter
+- `L_over_d`: bore length over bore diameter
+
+# Returns
+The discharge coefficient.
+"""
+function lichtarowicz_cd(Re, L_over_d)
+    cdu = 0.827 - 0.0085 * L_over_d
+    inverse = 1 / cdu + (20 / Re) * (1 + 2.25 * L_over_d) -
+        0.005 * L_over_d / (1 + 7.5 * log10(0.00015 * Re)^2)
+    return 1 / inverse
+end
+
+"""
+    stub_discharge_mdot(dp, rho, area, k_total) -> kg/s
+
+Mass flow discharged through a sum of losses, such as a broken pipe stub:
+
+    ṁ = area·sqrt(2·rho·dp / k_total)
+
+`k_total` collects every loss between the intact system and the break: entrance, the stub's
+own friction `f·L/d`, and exit. For a bare hole `k_total = 1/C_d²` gives the Torricelli form.
+Undefined for `dp < 0`; a model that hands it to a solver needs [`smooth_signed_sqrt`](@ref).
+
+# Arguments
+- `dp`: driving pressure difference, upstream minus back pressure [Pa]
+- `rho`: liquid density [kg/m³]
+- `area`: break flow area [m²]
+- `k_total`: sum of the loss coefficients along the discharge path
+
+# Returns
+The discharged mass flow rate [kg/s].
+"""
+stub_discharge_mdot(dp, rho, area, k_total) = area * sqrt(2 * rho * dp / k_total)
+
+"""
+    drain_time(h0, h1, area_tank, area_hole, cd) -> s
+
+Time for a tank of constant cross-section to drain by gravity from `h0` to `h1`, both
+measured above the hole:
+
+    t = (area_tank / (cd·area_hole))·sqrt(2/g)·(sqrt(h0) − sqrt(h1))
+
+The discharge is quasi-steady and not submerged. A tank whose cross-section changes with
+level needs `A(h)·dh/dt = −cd·area_hole·sqrt(2gh)` integrated instead.
+
+# Arguments
+- `h0`, `h1`: initial and final level above the hole [m]
+- `area_tank`: tank free-surface area [m²]
+- `area_hole`: hole area [m²]
+- `cd`: discharge coefficient
+
+# Returns
+The draining time [s]. [`drain_level`](@ref) is its inverse.
+"""
+function drain_time(h0, h1, area_tank, area_hole, cd)
+    return (area_tank / (cd * area_hole)) * sqrt(2 / G_EARTH) * (sqrt(h0) - sqrt(h1))
+end
+
+"""
+    drain_level(t, h0, area_tank, area_hole, cd) -> m
+
+Level above the hole after a tank has drained by gravity for `t` seconds from `h0`, the
+inverse of [`drain_time`](@ref):
+
+    h(t) = (sqrt(h0) − (cd·area_hole/area_tank)·sqrt(g/2)·t)²
+
+The root is floored at zero, so an emptied tank stays empty instead of following the parabola
+back up.
+
+# Arguments
+- `t`: time since the level was `h0` [s]
+- `h0`: initial level above the hole [m]
+- `area_tank`: tank free-surface area [m²]
+- `area_hole`: hole area [m²]
+- `cd`: discharge coefficient
+
+# Returns
+The level above the hole [m].
+"""
+function drain_level(t, h0, area_tank, area_hole, cd)
+    root = sqrt(h0) - (cd * area_hole / area_tank) * sqrt(G_EARTH / 2) * t
+    return max(root, 0.0)^2
+end
+
+"""
+    smooth_signed_sqrt(x, eps) -> Float64
+
+`sign(x)·sqrt(|x|)` with the corner at zero rounded off:
+
+    x / (x² + eps²)^(1/4)
+
+The exact form has an infinite slope at `x = 0`, which a flow driven by a pressure difference
+crosses whenever a break seals or its flow reverses. Here the slope stays finite, about
+`1/sqrt(eps)`, and for `|x| ≫ eps` the result matches the exact form to a relative error of
+`eps²/(4x²)`. Odd in `x`, and defined for negative `x`.
+
+# Arguments
+- `x`: the signed quantity, usually a pressure difference [Pa]
+- `eps`: half-width of the rounded band, in the units of `x`
+
+# Returns
+The regularised signed square root.
+"""
+smooth_signed_sqrt(x, eps) = x / (x^2 + eps^2)^(1 / 4)
