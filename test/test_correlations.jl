@@ -540,14 +540,4 @@ end
     @test_throws ArgumentError LocalLoss.discharge_cd(:jagged)
     @test LocalLoss.lichtarowicz_cd(2e4, 2.0) ≈ 0.8088165976866 rtol = 1e-12
     @test LocalLoss.lichtarowicz_cd(100.0, 2.0) ≈ 0.4284155081876958 rtol = 1e-12
-    @test LocalLoss.stub_discharge_mdot(1e5, 1000.0, 1e-4, 1.0) ≈ sqrt(2) rtol = 1e-14
-    @test LocalLoss.stub_discharge_mdot(0.0, 1000.0, 1e-4, 2.5) == 0.0
-    @test LocalLoss.drain_time(4.0, 1.0, 2.0, 5e-4, 0.61) ≈ 2961.3164311592627 rtol = 1e-12
-    @test LocalLoss.drain_time(4.0, 4.0, 2.0, 5e-4, 0.61) == 0.0
-    @test LocalLoss.drain_level(0.0, 4.0, 2.0, 5e-4, 0.61) == 4.0
-    @test LocalLoss.drain_level(2961.3164311592627, 4.0, 2.0, 5e-4, 0.61) ≈ 1.0 rtol = 1e-12
-    @test LocalLoss.drain_level(1e5, 4.0, 2.0, 5e-4, 0.61) == 0.0
-    # Away from zero the regularised root is the signed square root.
-    @test LocalLoss.smooth_signed_sqrt(-1e4, 1.0) ≈ -100.0 rtol = 1e-8
-    @test LocalLoss.smooth_signed_sqrt(0.0, 1.0) == 0.0
 end

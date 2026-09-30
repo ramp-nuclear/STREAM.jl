@@ -13,6 +13,17 @@ const CD_SHARP = discharge_cd(:sharp)
 _opening_grid(t_end; points=400) =
     vcat(range(0.0, 4.0; length=21), range(4.0, t_end; length=points)[2:end])
 
+"""
+Time for a tank of surface `area_tank` to drain through a hole from `h0` to `h1` above it,
+quasi-steady Torricelli.
+"""
+_drain_time(h0, h1, area_tank, area_hole, cd) =
+    (area_tank / (cd * area_hole)) * sqrt(2 / G_EARTH) * (sqrt(h0) - sqrt(h1))
+
+"""Level above the hole after draining for `t` from `h0`, the inverse of `_drain_time`."""
+_drain_level(t, h0, area_tank, area_hole, cd) =
+    max(sqrt(h0) - (cd * area_hole / area_tank) * sqrt(G_EARTH / 2) * t, 0.0)^2
+
 """Trapezoid integral of `y` over the saved times `ts`."""
 _trapezoid(y, ts) = sum((y[i] + y[i + 1]) / 2 * (ts[i + 1] - ts[i]) for i in 1:(length(ts) - 1))
 
@@ -53,8 +64,10 @@ _trapezoid(y, ts) = sum((y[i] + y[i + 1]) / 2 * (ts[i + 1] - ts[i]) for i in 1:(
                               callbacks=machine_callbacks(ssys, watch))
         level = sol[ssys.pool.L]
         @test watch.state === :UNCOVERED
-        @test sol.t[end] ≈ drain_time(L_POOL, z_uncovery, A_TANK, A_HOLE, CD_SHARP) atol = 0.5
-        @test maximum(abs.(level .- drain_level.(sol.t, L_POOL, A_TANK, A_HOLE, CD_SHARP))) < 1e-3
+        # Python's doctest value for these numbers.
+        @test _drain_time(L_POOL, z_uncovery, A_TANK, A_HOLE, CD_SHARP) ≈ 2961.3164311592627
+        @test sol.t[end] ≈ _drain_time(L_POOL, z_uncovery, A_TANK, A_HOLE, CD_SHARP) atol = 0.5
+        @test maximum(abs.(level .- _drain_level.(sol.t, L_POOL, A_TANK, A_HOLE, CD_SHARP))) < 1e-3
         @test level[end] ≈ z_uncovery atol = 1e-3
     end
 

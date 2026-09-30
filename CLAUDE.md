@@ -113,7 +113,8 @@ src/
   friction/                   # module Friction
     correlations.jl           # Darcy friction factor correlations (Reynolds-only)
     darcy.jl                  # AbstractDarcyFactor: the wall friction model a channel or resistor gets
-  local_loss.jl               # module LocalLoss: Idelchik sudden expansion / contraction
+  local_loss.jl               # module LocalLoss: Idelchik sudden expansion / contraction,
+                              # discharge coefficients
   thresholds/                 # module Thresholds
     thresholds.jl             # CHF, OFI, OSV, ONB, wall-temperature limit correlations
     analysis.jl               # ChannelState + the post-solve threshold methods

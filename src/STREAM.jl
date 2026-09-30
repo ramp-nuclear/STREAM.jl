@@ -19,7 +19,7 @@ Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
 | [`Substances`](@ref) | coolants and their property correlations |
 | [`HTC`](@ref) | wall heat transfer models and Nusselt correlations |
 | [`Friction`](@ref) | Darcy friction factor models and correlations |
-| [`LocalLoss`](@ref) | Idelchik minor losses for sudden area changes |
+| [`LocalLoss`](@ref) | Idelchik minor losses for sudden area changes, and discharge coefficients |
 | [`Thresholds`](@ref) | safety limits and the post-solve analysis that applies them |
 | [`Components`](@ref) | the MTK components a model is built from |
 | [`DecayHeat`](@ref) | decay heat contributions and the standards behind them |
@@ -160,19 +160,14 @@ inside an MTK equation.
 The drop has the same quadratic form as `Friction.darcy_weisbach_dp` without the `L/Dh` factor.
 [`LocalPressureDrop`](@ref) is the component wrapping it.
 
-Discharge through a hole or a broken pipe lives here too: [`discharge_cd`](@ref) and
-[`lichtarowicz_cd`](@ref) for the coefficient, [`stub_discharge_mdot`](@ref) for a loss sum,
-and [`drain_time`](@ref) and [`drain_level`](@ref) for a tank draining by gravity, the closed
-forms a drain model is checked against. [`smooth_signed_sqrt`](@ref) is the regularised law
-[`Orifice`](@ref) uses.
+The discharge coefficient of a hole, which an [`Orifice`](@ref) is given, lives here too:
+[`discharge_cd`](@ref) by geometry, and [`lichtarowicz_cd`](@ref) at finite Reynolds number.
 """
 module LocalLoss
 using ModelingToolkit
-using ..STREAM: G_EARTH
 include("local_loss.jl")
 export dp, sudden_expansion_factor, sudden_contraction_factor
-export DISCHARGE_CD, discharge_cd, lichtarowicz_cd, stub_discharge_mdot
-export drain_time, drain_level, smooth_signed_sqrt
+export discharge_cd, lichtarowicz_cd
 end
 
 """
@@ -190,7 +185,7 @@ either its raw arguments or a [`ChannelState`](@ref).
 saved time for a transient, and applies the functions you name. [`chfr`](@ref) builds a
 CHF-ratio closure with face selection and a zero-flux guard, and [`worst_case`](@ref) finds
 the smallest margin and where and when it occurs. [`cavitation`](@ref) names the orifice
-throats and channels that reached saturation during a run.
+throats that reached saturation during a run.
 
 Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAndContacts`, not
 `ChannelHeatFlux`.

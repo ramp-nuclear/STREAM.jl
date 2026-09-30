@@ -88,8 +88,8 @@ pipe end. Open, it passes
 
     ṁ = cd·area·sqrt(2·ρ·Δp)
 
-with `Δp` the pressure across it, written with [`smooth_signed_sqrt`](@ref) so the flow passes
-smoothly through zero and reverses when `Δp` does. What kind of break it is depends on where it
+with `Δp` the pressure across it. The square root is rounded off within `dp_eps` of zero, so
+the flow passes smoothly through zero and reverses when `Δp` does. What kind of break it is depends on where it
 sits in the loop, not on what it computes: discharge into an [`Environment`](@ref) to lose the
 inventory.
 
@@ -153,7 +153,7 @@ end
 The component behind [`Flapper`](@ref) and [`Orifice`](@ref): a hole of area `area` whose open
 fraction `xi` follows `fraction(t)`, passing
 
-    ṁ = xi·cd·area·sqrt(2ρ)·smooth_signed_sqrt(Δp, dp_eps)
+    ṁ = xi·cd·area·sqrt(2ρ)·_smooth_signed_sqrt(Δp, dp_eps)
 
 and nothing while `xi` is zero or less. `cd_of_Re` gives the discharge coefficient from the
 throat Reynolds number, on the diameter of a round hole of that area and floored at 1; the two
@@ -181,7 +181,7 @@ function _Valve(; name, area, fraction, cd_of_Re, dp_eps, cc, liquid, extra_pars
     rho = ρ(liquid, T_up)
     Re_throat = max(abs(ṁ) * sqrt(4 * area / π) / (area * μ(liquid, T_up)), 1.0)
     ṁ_open = cd_of_Re(Re_throat) * area * sqrt(2 * rho) *
-        smooth_signed_sqrt(inlet.p - outlet.p, dp_eps)
+        _smooth_signed_sqrt(inlet.p - outlet.p, dp_eps)
     opened = xi_fn(t)
 
     eqs = Equation[
@@ -202,6 +202,16 @@ function _Valve(; name, area, fraction, cd_of_Re, dp_eps, cc, liquid, extra_pars
     end
     return HydraulicTwoPort(; name, inlet, outlet, eqs, vars, pars)
 end
+
+"""
+    _smooth_signed_sqrt(x, eps)
+
+`sign(x)·sqrt(|x|)` with the corner at zero rounded off, `x / (x² + eps²)^(1/4)`. The exact
+form has an infinite slope at zero, which a valve's flow crosses whenever it seals or reverses;
+this one's slope stays near `1/sqrt(eps)`, and for `|x| ≫ eps` it is within `eps²/(4x²)` of
+the exact form.
+"""
+_smooth_signed_sqrt(x, eps) = x / (x^2 + eps^2)^(1 / 4)
 
 """
     _SATURATION_PRESSURE_FLOOR
