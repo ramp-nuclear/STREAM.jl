@@ -44,7 +44,7 @@ import os
 from functools import partial
 import numpy as np
 
-STREAM_PATH = os.path.expanduser("~/projects/STREAM")
+STREAM_PATH = os.environ.get("STREAM_PATH", os.path.expanduser("~/projects/STREAM"))
 sys.path.insert(0, STREAM_PATH)
 
 # ---------------------------------------------------------------
@@ -69,7 +69,7 @@ from stream.calculations import Pump, HeatExchanger, Kirchhoff
 from stream.calculations.channel import ChannelAndContacts
 from stream.calculations.heat_diffusion import Fuel, Solid
 from stream.composition.cycle import FlowGraph, flow_edge
-from stream.composition.mtr_geometry import plate, one_sided_connection
+from stream.composition.mtr_geometry import plate, one_sided_connection, x_boundaries
 from stream.aggregator import CalculationGraph
 from stream.pipe_geometry import EffectivePipe
 from stream.substances import light_water
@@ -556,6 +556,63 @@ _emit_julia_array("PARITY_MTR_ONESIDED_Q_RIGHT_L",      q_right_l_os)
 _emit_julia_matrix("PARITY_MTR_ONESIDED_T_PLATE",       T_plate_C_onesided)
 print("# --- end paste: MTR one-sided ---")
 print()
+# ---------------------------------------------------------------
+# Clad MTR: plate() as in the symmetric scenario, but the plate is aluminium cladding around
+# a meat layer, with the power in the meat only. Python's tests/test_general/conftest.py
+# MTR_fuel_and_channel materials, scaled to the 1.27 mm gap plate used above.
+# ---------------------------------------------------------------
+print("Running Clad coupling...")
+CLAD_N, MEAT_N, CLAD_W, MEAT_W = 2, 3, 0.4e-3, 0.47e-3
+x_clad = x_boundaries(CLAD_N, MEAT_N, CLAD_W, MEAT_W)
+NX_CLAD = len(x_clad) - 1
+meat_clad = np.zeros((NZ, NX_CLAD), dtype=bool)
+meat_clad[:, CLAD_N:-CLAD_N] = True
+mat_clad = np.empty((NZ, NX_CLAD), dtype=object)
+mat_clad[meat_clad] = Solid(density=3000.0, specific_heat=800.0, conductivity=100.0)
+mat_clad[~meat_clad] = Solid(density=2700.0, specific_heat=900.0, conductivity=250.0)
+
+pump_l_04, hx_l_04, ch_l_04, fg_l_04 = _build_channel_and_loop("L_04", T_INLET_L_C)
+pump_r_04, hx_r_04, ch_r_04, fg_r_04 = _build_channel_and_loop("R_04", T_INLET_R_C)
+fuel_04 = Fuel(
+    z_boundaries=z_bounds,
+    x_boundaries=x_clad,
+    material=Solid.from_array(mat_clad),
+    y_length=Y_LEN,
+    power_shape=np.ones((NZ, MEAT_N)) / (NZ * MEAT_N),
+    meat_indices=meat_clad.astype(int),
+    name="Fuel_04",
+)
+agr_04 = (fg_l_04.aggregator + fg_r_04.aggregator + plate(ch_l_04, ch_r_04, fuel_04)
+          + CalculationGraph.from_decoupled(fuel_04, funcs={fuel_04: dict(power=POWER)}))
+guess_04 = {
+    **_hydraulic_guess(fg_l_04, pump_l_04, hx_l_04, ch_l_04, T_INLET_L_C),
+    **_hydraulic_guess(fg_r_04, pump_r_04, hx_r_04, ch_r_04, T_INLET_R_C),
+    fuel_04.name: {
+        "T": np.full((NZ, NX_CLAD), T_INLET_L_C + 5.0),
+        "T_wall_left": np.full(NZ, T_INLET_L_C + 3.0),
+        "T_wall_right": np.full(NZ, T_INLET_L_C + 3.0),
+    },
+}
+_, state_04 = _solve_scenario(agr_04, guess_04)
+K_l_04 = fg_l_04.kirchhoff
+T_plate_C_clad = state_04[fuel_04.name]["T"]
+assert not np.isnan(T_plate_C_clad).any(), "clad plate has NaN"
+assert T_plate_C_clad[NZ // 2, NX_CLAD // 2] > T_plate_C_clad[NZ // 2, 0], "clad: meat not hotter than clad"
+print("  clad OK")
+
+print("# --- begin paste: test/data/python_parity_reference.jl MTR clad ---")
+print(f"# Clad MTR: plate() with {CLAD_N} clad cells ({CLAD_W} m, k=250) either side of {MEAT_N} meat")
+print(f"# cells ({MEAT_W} m, k=100), power in the meat only; both inlets {T_INLET_L_C} C.")
+_emit_julia_scalar("PARITY_MTR_CLAD_T_OUT_L", state_04[ch_l_04.name]["T_cool"][-1])
+_emit_julia_scalar("PARITY_MTR_CLAD_MDOT_L", abs(state_04[K_l_04.name][K_l_04.component_edge(pump_l_04)]))
+print()
+_emit_julia_array("PARITY_MTR_CLAD_T_CELLS_L", state_04[ch_l_04.name]["T_cool"])
+_emit_julia_array("PARITY_MTR_CLAD_T_WALL_RIGHT_L", state_04[ch_l_04.name][ChannelVar.twall_right])
+_emit_julia_array("PARITY_MTR_CLAD_Q_RIGHT_L", state_04[ch_l_04.name][ChannelVar.heatflux_right])
+_emit_julia_matrix("PARITY_MTR_CLAD_T_PLATE", T_plate_C_clad)
+print("# --- end paste: MTR clad ---")
+print()
+
 print("=" * 72)
 print("Diagnostics (NOT pasted -- for human inspection only)")
 print("=" * 72)

@@ -27,6 +27,9 @@ Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
 | [`Utilities`](@ref) | grid resampling and axial profile helpers |
 | `Examples` | worked builders, compiled with the package but never exported |
 
+[`assembly`](@ref) composes components with a list of connections, and [`port`](@ref) reaches
+one cell of a per-cell connector array. Every submodule can use both.
+
 # Units
 
 We use SI units everywhere, but for temperetures we use Celsius.
@@ -53,6 +56,9 @@ passing a different value. [`Liquid`](@ref) holds fixed property values and is i
 
 Each property has an alias naming the same function, so `ρ === density`.
 
+[`Solid`](@ref) holds the constant density, specific heat and conductivity of a solid, read
+through the same `density`, `specific_heat` and `conductivity` functions.
+
 A new coolant implements the nine [`AbstractLiquid`](@ref) methods. 
 """
 module Substances
@@ -61,7 +67,8 @@ using ..STREAM: ATM
 include("substances/liquid.jl")
 include("substances/light_water.jl")
 include("substances/heavy_water.jl")
-export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O
+include("substances/solid.jl")
+export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O, Solid
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
@@ -71,6 +78,7 @@ using .Substances
 include("knobs.jl")
 include("geometry.jl")
 include("dimensionless.jl")
+include("assembly.jl")
 
 """
     STREAM.HTC
@@ -217,7 +225,9 @@ Components state equations and consume their physics from [`HTC`](@ref), [`Frict
 - **Hydraulics.** [`Pump`](@ref), [`Flapper`](@ref), [`FrictionResistor`](@ref),
   [`Resistor`](@ref), [`VolumetricFlowResistor`](@ref), [`LocalPressureDrop`](@ref),
   [`Gravity`](@ref), [`Inertia`](@ref).
-- **Solid heat.** [`HeatDiffusion`](@ref), a 2D finite-difference plate.
+- **Solid heat.** [`HeatDiffusion`](@ref), a 2D finite-volume plate ([`Slab`](@ref)) or rod
+  ([`Cylinder`](@ref)) with per-cell materials, contact conductances and optional axial
+  conduction.
 - **Neutronics.** [`PointKinetics`](@ref) with any delayed group count, plus
   [`ReactivityController`](@ref) and the SCRAM callbacks.
 - **Boundary conditions.** [`HeatExchanger`](@ref), [`ConstantTemperature`](@ref),
@@ -258,7 +268,7 @@ export Channel, Pump, Flapper, FrictionResistor, Gravity, Resistor, VolumetricFl
 export LocalPressureDrop, Inertia, HeatExchanger, bilinear_inertia
 export ResistorFromKnownPoint
 export ChannelAndContacts, ChannelHeatFlux, ConstantTemperature
-export ConvectiveBoundary, HeatDiffusion
+export ConvectiveBoundary, HeatDiffusion, Slab, Cylinder
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController
 export StateMachine, StateSchedule, trip!, reset!, machine_callbacks
@@ -331,14 +341,15 @@ hydraulic chains, [`face`](@ref) and [`faces`](@ref) for per-cell thermal contac
 connections. [`check_gravity_mismatch`](@ref) reports whether a loop's channels agree about
 which way is up.
 
-[`port`](@ref) indexes one element of an indexed connector array.
+[`assembly`](@ref), [`port`](@ref) and [`var_length`](@ref) are defined at the top level,
+since components use them too, and re-exported here.
 """
 module Assemblies
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ..STREAM: PipeGeometry
-    using ..Components
-include("assemblies/port.jl")
+using ..Components
+using ..STREAM: assembly, port, var_length
     """
         STREAM.Assemblies.Connect
 
@@ -349,14 +360,12 @@ module Connect
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ...Components
-import ..port
+using ...STREAM: port, var_length
 include("assemblies/connections.jl")
 export inseries, inparallel, weighted, face, faces, temperature_feedback
 end
 using .Connect
-using .Connect: var_length   # the arrangements below count ports with it
 
-include("assemblies/assembly.jl")
 include("assemblies/assemblies.jl")
 export Connect
 export inseries, inparallel, weighted, face, faces, port, temperature_feedback
@@ -377,13 +386,14 @@ the value. Both treat the field as piecewise-constant over each source cell and 
 overlap with each target cell.
 
 [`cosine_power_shape`](@ref) and [`cosine_T_wall_profile`](@ref) build axial input shapes.
+[`x_boundaries`](@ref) builds the cell boundaries across a clad plate.
 
 None of these validate or normalize their inputs; negatives, zeros and NaNs pass through.
 """
 module Utilities
 include("utilities.jl")
 export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
-export cosine_shape
+export cosine_shape, x_boundaries
 end
 
 include("initial_conditions.jl")
@@ -421,11 +431,11 @@ end
 export Substances, HTC, Friction, LocalLoss, Thresholds, Components, DecayHeat
 export Assemblies, Utilities
 
-# Coolant properties, their aliases, and the two coolants
+# Coolant and solid properties, their aliases, the two coolants, and Solid
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
-export H2O, D2O
+export H2O, D2O, Solid
 
 # Dimensionless numbers
 export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend
@@ -443,6 +453,5 @@ export G_EARTH, ATM, T_ROOM
 export knob_defaults, @design_knob
 
 # Composing components
-using .Assemblies: assembly
-export assembly
+export assembly, port, var_length
 end  # module STREAM

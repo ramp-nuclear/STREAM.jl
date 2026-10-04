@@ -280,8 +280,11 @@ end
     @named hx_r = HeatExchanger(T_in)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
     @named hd = HeatDiffusion(;
-        nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
+        x=range(0, 0.00127, nx + 1),
+        z=range(0, 0.6, nz + 1),
+        geometry=Slab(0.07),
+        material=Solid(2700.0, 900.0, 200.0),
+        power=1e4,
     )
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),
@@ -396,6 +399,64 @@ end
     end
 end
 
+# Clad MTR: the symmetric loop with a clad plate, 2 aluminium cells either side of 3 meat
+# cells, power in the meat only.
+@testset "Python parity: MTR clad" begin
+    geom_mtr = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    nz = 10
+    x = Utilities.x_boundaries(2, 3, 0.4e-3, 0.47e-3)
+    meat = repeat(permutedims(1:7 .∈ Ref(3:5)), nz)
+    @named pump_l = Pump(3.0e4)
+    @named hx_l = HeatExchanger(40.0)
+    @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
+    @named pump_r = Pump(3.0e4)
+    @named hx_r = HeatExchanger(40.0)
+    @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
+    @named hd = HeatDiffusion(; x, z=range(0, 0.6, nz + 1), geometry=Slab(0.07),
+                              material=ifelse.(meat, Solid(3000.0, 800.0, 100.0), Solid(2700.0, 900.0, 250.0)),
+                              power_shape=meat ./ sum(meat), power=1e4)
+    conns = [
+        inseries(pump_l, hx_l, cac_l, pump_l),
+        pump_l.inlet.p ~ 1.0e5,
+        inseries(pump_r, hx_r, cac_r, pump_r),
+        pump_r.inlet.p ~ 1.0e5,
+        faces(
+            (hd, :thermal_left) => (cac_l, :thermal_right),
+            (hd, :thermal_right) => (cac_r, :thermal_left),
+        ),
+    ]
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.cac_l.inlet.ṁ => 0.25, ssys.cac_r.inlet.ṁ => 0.25])
+    @test sol.retcode == ReturnCode.Success
+
+    dz = 0.6 / nz
+    rows = ParityRow[
+        parity_check("mtr_clad", "T_out_l", sol[ssys.cac_l.T_out], PARITY_MTR_CLAD_T_OUT_L),
+        parity_check("mtr_clad", "ṁ_l", abs(sol[ssys.cac_l.inlet.ṁ]), PARITY_MTR_CLAD_MDOT_L),
+    ]
+    for i in 1:nz
+        push!(rows, parity_check("mtr_clad", "T_l[$i]", sol[ssys.cac_l.T[i]],
+                                 PARITY_MTR_CLAD_T_CELLS_L[i]))
+        push!(rows, parity_check("mtr_clad", "T_wall_right_l[$i]",
+                                 sol[port(ssys.cac_l, :thermal_right, i).T],
+                                 PARITY_MTR_CLAD_T_WALL_RIGHT_L[i]))
+        push!(rows, parity_check("mtr_clad", "q_right_l[$i]",
+                                 sol[ssys.cac_l.q_wall_right[i]] / (geom_mtr.heated_parts[2] * dz),
+                                 PARITY_MTR_CLAD_Q_RIGHT_L[i]))
+    end
+    for z in 1:nz, j in 1:7
+        push!(rows, parity_check("mtr_clad", "T_plate[$(z)_$(j)]", sol[ssys.hd.T[z, j]],
+                                 PARITY_MTR_CLAD_T_PLATE[z, j]))
+    end
+
+    print_drift_table(rows)
+    append_csv(PARITY_CSV, rows; truncate=false)
+    for r in rows
+        @test r.tier != TIER_FAIL
+    end
+end
+
 # Asymmetric MTR — right channel inlet at 90°C (90.0 °C)
 # Right side of plate must be hotter than left side.
 @testset "Python parity: MTR asymmetric" begin
@@ -420,8 +481,11 @@ end
     @named hx_r = HeatExchanger(T_in_r)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
     @named hd = HeatDiffusion(;
-        nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
+        x=range(0, 0.00127, nx + 1),
+        z=range(0, 0.6, nz + 1),
+        geometry=Slab(0.07),
+        material=Solid(2700.0, 900.0, 200.0),
+        power=1e4,
     )
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),
@@ -564,8 +628,11 @@ end
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
     @named hd = HeatDiffusion(;
-        nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
+        x=range(0, 0.00127, nx + 1),
+        z=range(0, 0.6, nz + 1),
+        geometry=Slab(0.07),
+        material=Solid(2700.0, 900.0, 200.0),
+        power=1e4,
     )
     scc = single_channel(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
     cac = scc.cac_l
@@ -694,14 +761,10 @@ end  # @testset "parity harness"
     end
 
     @named hd_v01 = HeatDiffusion(;
-        nz=nz_v01,
-        nx=nx_v01,
-        Lz=Lz_v01,
-        Lx=Lx_v01,
-        y=y_v01,
-        rho_s=rho_s_v01,
-        cp_s=cp_s_v01,
-        k_s=k_s_v01,
+        x=range(0, Lx_v01, nx_v01 + 1),
+        z=range(0, Lz_v01, nz_v01 + 1),
+        geometry=Slab(y_v01),
+        material=Solid(rho_s_v01, cp_s_v01, k_s_v01),
         power=0.0,
     )
     @named ct_l = ConstantTemperature(T_wall; n=nz_v01)
@@ -756,25 +819,17 @@ end
         n=nz_v02, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     )
     @named hd1 = HeatDiffusion(;
-        nz=nz_v02,
-        nx=nx_v02,
-        Lz=0.6,
-        Lx=0.00127,
-        y=0.07,
-        rho_s=2700.0,
-        cp_s=900.0,
-        k_s=200.0,
+        x=range(0, 0.00127, nx_v02 + 1),
+        z=range(0, 0.6, nz_v02 + 1),
+        geometry=Slab(0.07),
+        material=Solid(2700.0, 900.0, 200.0),
         power=power_per_plate,
     )
     @named hd2 = HeatDiffusion(;
-        nz=nz_v02,
-        nx=nx_v02,
-        Lz=0.6,
-        Lx=0.00127,
-        y=0.07,
-        rho_s=2700.0,
-        cp_s=900.0,
-        k_s=200.0,
+        x=range(0, 0.00127, nx_v02 + 1),
+        z=range(0, 0.6, nz_v02 + 1),
+        geometry=Slab(0.07),
+        material=Solid(2700.0, 900.0, 200.0),
         power=power_per_plate,
     )
 

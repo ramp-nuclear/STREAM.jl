@@ -232,48 +232,6 @@ function faces(mapping::Pair)
 end
 
 """
-    var_length(sys, prefix) -> Int
-
-Count the subsystems of `sys` whose name starts with `prefix`, giving the width of an indexed
-connector array.
-
-A component with `n` thermal faces per side carries `n` separate subsystems named
-`thermal_left1 … thermal_leftn` rather than one array-valued connector, so the count comes from
-the names.
-
-`ChannelAndContacts` and `HeatDiffusion` carry such arrays. `Channel` and `ChannelHeatFlux` do
-not, and raise.
-
-# Arguments
-- `sys`: an uncompiled system. Compilation flattens away the subsystem names this reads.
-- `prefix`: a `Symbol` naming the connector family, such as `:thermal_left` or `:thermal_right`
-
-# Returns
-The number of matching subsystems, at least 1.
-
-# Throws
-`ArgumentError` when nothing matches.
-
-# Example
-```julia
-@named cac = ChannelAndContacts(; n=4, geometry=geom)
-var_length(cac, :thermal_left)    # 4
-```
-"""
-function var_length(sys, prefix)
-    sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
-    n = count(s -> startswith(s, string(prefix)), sub_names)
-    n == 0 && throw(
-        ArgumentError(
-            "found no subsystem named $(prefix)* in $(ModelingToolkit.getname(sys)), so its " *
-            "$(prefix) count cannot be read. Pass an uncompiled component that carries " *
-            "per-cell connector arrays, such as ChannelAndContacts or HeatDiffusion.",
-        ),
-    )
-    return n
-end
-
-"""
     temperature_feedback(pk, components) -> Vector{Equation}
 
 Generate binding equations that wire each component's existing `T` symbolic to the

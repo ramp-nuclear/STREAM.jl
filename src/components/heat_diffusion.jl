@@ -1,116 +1,136 @@
 """
-    _diffusion_eqs(; T, thermal_left, thermal_right, nz, nx, k_s, rho_s, cp_s,
-                   dx, dz, y, power, power_shape) -> Vector{Equation}
+    Slab(depth)
 
-The finite-difference stencil behind [`HeatDiffusion`](@ref), as a flat list of equations over an
-`nz × nx` grid of solid cells.
+Cartesian geometry for [`HeatDiffusion`](@ref): `x` crosses the plate, `z` runs along it, and
+the plate is uniform over `depth` [m] in the third direction.
 
-Four groups, in build order. Two give the heat flow through each `ThermalPort`, over a half-cell
-conduction distance `dx/2` from port to first cell centre. Two give the boundary columns their
-energy balance, conducting to one interior neighbour and to the port. The last is the three-point
-interior stencil.
+# Arguments
+- `depth`: extent of the plate in the direction neither mesh axis covers [m]
 
-Volumetric heating is `power * power_shape` spread over a cell's mass. `power_shape` is not
-normalized here.
-
-There is no axial conduction: the plate conducts across its thickness and each axial slice is
-independent.
+# Returns
+A `Slab`, passed as `HeatDiffusion(; geometry=Slab(depth), ...)`.
 """
-function _diffusion_eqs(;
-    T,
-    thermal_left,
-    thermal_right,
-    nz,
-    nx,
-    k_s,
-    rho_s,
-    cp_s,
-    dx,
-    dz,
-    y,
-    power,
-    power_shape,
-)
-    q_vol = power .* power_shape / (rho_s * cp_s * y * dz * dx)
-
-    return [
-        [
-            thermal_left[i].Q ~
-                k_s * (y * dz) * (thermal_left[i].T - T[i, 1]) / (dx / 2) for i in 1:nz
-        ]...  # Left heat flux
-        [
-            thermal_right[i].Q ~
-                k_s * (y * dz) * (thermal_right[i].T - T[i, nx]) / (dx / 2) for i in 1:nz
-        ]...  # Right heat flux
-        [
-            D(T[i, 1]) ~
-                (
-                    k_s * (T[i, 2] - T[i, 1]) / dx  # Left cell temperature equation
-                    -
-                    k_s * (T[i, 1] - thermal_left[i].T) / (dx / 2)
-                ) / (rho_s * cp_s * dx) + q_vol[i, 1] for i in 1:nz
-        ]...
-        [
-            D(T[i, nx]) ~
-                (
-                    k_s * (T[i, nx - 1] - T[i, nx]) / dx  # Right cell temperature equation
-                    -
-                    k_s * (T[i, nx] - thermal_right[i].T) / (dx / 2)
-                ) / (rho_s * cp_s * dx) + q_vol[i, nx] for i in 1:nz
-        ]...
-        [
-            D(T[i, j]) ~
-                k_s * (T[i, j + 1] - 2 * T[i, j] + T[i, j - 1]) / (dx^2 * rho_s * cp_s) +
-                q_vol[i, j] for i in 1:nz for j in 2:(nx - 1)
-        ]...
-    ]
+struct Slab{T}
+    depth::T
 end
 
 """
-    HeatDiffusion(; name, nz, nx, Lz, Lx, y, rho_s, cp_s, k_s,
-                  power_shape=uniform, power=nothing, T0=T_ROOM) -> System
+    Cylinder()
 
-2D finite-difference heat diffusion plate with axial (`nz`) and lateral (`nx`) cells.
+Cylindrical geometry for [`HeatDiffusion`](@ref) with azimuthal symmetry: `x` is the radius and
+`z` the axial position. Boundaries starting at `x = 0` make a solid rod, anything else an
+annulus.
+
+# Returns
+A `Cylinder`, passed as `HeatDiffusion(; geometry=Cylinder(), ...)`.
+"""
+struct Cylinder end
+
+"""
+    _areas_volumes(geometry, x, z) -> (Ax, Az, V)
+
+Face areas and cell volumes for the mesh with boundaries `x` and `z`: `Ax` is `nz × (nx+1)`,
+one per face normal to `x`, `Az` is `(nz+1) × nx`, and `V` is `nz × nx`. These are Python's
+`x_diffusion` and `cylindrical_areas_volumes`.
+"""
+function _areas_volumes(g::Slab, x, z)
+    dx = permutedims(diff(x))
+    return g.depth .* diff(z) .* one.(permutedims(x)), g.depth .* one.(z) .* dx,
+           g.depth .* diff(z) .* dx
+end
+
+function _areas_volumes(::Cylinder, r, z)
+    ring = π .* permutedims(diff(r .^ 2))
+    return 2π .* diff(z) .* permutedims(r), one.(z) .* ring, diff(z) .* ring
+end
+
+"""
+    _has_inner_wall(geometry, x) -> Bool
+
+Whether the `x[1]` side is a surface. The axis of a solid rod is not: it has no area, so a port
+there would carry no heat and leave its temperature undetermined.
+"""
+_has_inner_wall(::Slab, x) = true
+_has_inner_wall(::Cylinder, r) = !isequal(first(r), 0)
+
+"""
+    _face_resistances(half, contacts, dims) -> Matrix
+
+Thermal resistance per unit area [m²K/W] across every face along dimension `dims`, the outer
+two included. `half` holds each cell's half-width over its conductivity. An inner face sums
+the halves of the cells either side, an outer face takes one, and every face adds
+`1 ./ contacts`, so an infinite contact conductance adds nothing. This is Python's
+`_resistances`.
+"""
+function _face_resistances(half, contacts, dims)
+    pad = zero(selectdim(half, dims, 1:1))
+    padded = cat(pad, half, pad; dims=dims)
+    n = size(padded, dims)
+    return selectdim(padded, dims, 1:(n - 1)) .+ selectdim(padded, dims, 2:n) .+ inv.(contacts)
+end
+
+"""
+    HeatDiffusion(; name, x, z, material, geometry=Slab(1.0), axial=false,
+                  x_contacts=Inf, z_contacts=Inf, power_shape=nothing, power=nothing,
+                  T0=T_ROOM) -> System
+
+Heat conduction in a solid on a 2D finite-volume mesh: a plate or a rod, uniform in the third
+direction. This is Python STREAM's `Fuel`.
+
+Each cell's energy balance is
+
+    ρ cₚ V dT/dt = Σ A (T_neighbour - T) / R + power * power_shape
+
+over its faces, where `R` is the resistance between the two cell centres: half of each cell's
+width over its conductivity, plus the contact resistance `1/h` of the face between them. An
+outer face conducts to the temperature on its port in the same way, over half a cell. Lateral
+conduction across `x` is always on; axial conduction along `z` is on with `axial=true`.
 
 # Arguments
 - `name`: system name (Symbol)
-- `nz`: number of axial cells (Int)
-- `nx`: number of lateral cells (Int)
-- `Lz`: axial length [m]
-- `Lx`: lateral thickness [m]
-- `y`: plate depth [m] (into-page dimension)
-- `rho_s`: solid density [kg/m^3]
-- `cp_s`: solid specific heat [J/(kg*K)]
-- `k_s`: thermal conductivity [W/(m*K)]
-- `power_shape`: fraction of the power in each cell, an `(nz, nx)` matrix used as given
-  (default uniform, `1/(nz*nx)` everywhere)
-- `power`: total power into the plate [W]. A number makes it the parameter `power`, which
-  `remake` can change. `nothing` (the default) makes it an unknown the caller binds, such as
+- `x`: the `nx + 1` cell boundaries across the plate, or the radii for a [`Cylinder`](@ref)
+  [m]. A uniform mesh is `Lx .* (0:nx) ./ nx`, which stays symbolic for a design knob.
+- `z`: the `nz + 1` cell boundaries along the plate [m]
+- `material`: a [`Solid`](@ref), or an `nz × nx` matrix of them for a clad plate
+- `geometry`: [`Slab`](@ref) (default, depth 1 m) or [`Cylinder`](@ref)
+- `axial`: conduct along `z` as well (default `false`, each axial slice independent)
+- `x_contacts`: contact conductance [W/(m²K)] on the faces normal to `x`, anything that
+  broadcasts to `nz × (nx+1)`. The default `Inf` is perfect contact. A row such as
+  `[Inf 5e3 Inf Inf]` puts a gap on one interface along the whole length.
+- `z_contacts`: the same for faces normal to `z`, broadcasting to `(nz+1) × nx`
+- `power_shape`: fraction of `power` in each cell, an `nz × nx` matrix used as given, so
+  cladding cells hold zero. The default `nothing` spreads it evenly over every cell.
+- `power`: total power [W]. A number makes it the parameter `power`, which `remake` can
+  change. `nothing` (the default) makes it an unknown the caller binds, such as
   `rods.fuel.power ~ pk.P * power_scale` for a plate driven by point kinetics.
 - `T0`: initial temperature of every cell [°C]
 
 # Ports
-- `thermal_left[1:nz]`, `thermal_right[1:nz]` -- `ThermalPort` arrays (no FlowPorts)
+- `thermal_left[1:nz]` at `x[1]`, absent for a solid rod, and `thermal_right[1:nz]` at `x[end]`
+- with `axial=true`, `thermal_top[1:nx]` at `z[1]` and `thermal_bottom[1:nx]` at `z[end]`
+
+A port left unconnected is adiabatic.
 
 # Returns
-Uncompiled `System`.
+Uncompiled `System` with the cell temperatures `T[1:nz, 1:nx]`.
 """
 function HeatDiffusion(;
     name,
-    nz::Int,
-    nx::Int,
-    Lz,
-    Lx,
-    y,
-    rho_s,
-    cp_s,
-    k_s,
-    power_shape=fill(1.0 / (nz * nx), nz, nx),
+    x,
+    z,
+    material,
+    geometry=Slab(1.0),
+    axial::Bool=false,
+    x_contacts=Inf,
+    z_contacts=Inf,
+    power_shape=nothing,
     power=nothing,
     T0=T_ROOM,
 )
-    dx = Lx / nx
-    dz = Lz / nz
+    nx, nz = length(x) - 1, length(z) - 1
+    Ax, Az, V = _areas_volumes(geometry, x, z)
+    material isa Solid && (material = fill(material, nz, nx))
+    power_shape === nothing && (power_shape = fill(1 / (nz * nx), nz, nx))
 
     @variables (T(t))[1:nz, 1:nx] = fill(T0, nz, nx)
     # The @variables / @parameters below rebind `power` to the symbol of that name.
@@ -119,31 +139,38 @@ function HeatDiffusion(;
         throw(ArgumentError("power must be a number or nothing, got $(typeof(power_given))"))
     if power_given === nothing
         @variables power(t)
-        vars, pars = [vec(collect(T)); power], []
     else
         @parameters power = power_given
-        vars, pars = vec(collect(T)), [power]
     end
 
-    thermal_left = [ThermalPort(; name=Symbol(:thermal_left, i)) for i in 1:nz]
-    thermal_right = [ThermalPort(; name=Symbol(:thermal_right, i)) for i in 1:nz]
+    ports(side, n) = [ThermalPort(; name=Symbol(:thermal_, side, i)) for i in 1:n]
+    thermal_left = _has_inner_wall(geometry, x) ? ports(:left, nz) : nothing
+    thermal_right = ports(:right, nz)
+    walls = thermal_left === nothing ? thermal_right : [thermal_left; thermal_right]
+    T = collect(T)
+    κs = κ.(material)
 
-    eqs = _diffusion_eqs(;
-        T=T,
-        thermal_left=thermal_left,
-        thermal_right=thermal_right,
-        nz=nz,
-        nx=nx,
-        k_s=k_s,
-        rho_s=rho_s,
-        cp_s=cp_s,
-        dx=dx,
-        dz=dz,
-        y=y,
-        power=power,
-        power_shape=power_shape,
-    )
-    return compose(
-        System(eqs, t, vars, pars; name=name), thermal_left..., thermal_right...
-    )
+    # Python's flux sign: positive where heat runs toward the lower index.
+    T_left = thermal_left === nothing ? T[:, 1] : port(thermal_left, :T)
+    qx = Ax .* diff(hcat(T_left, T, port(thermal_right, :T)); dims=2) ./
+         _face_resistances(permutedims(diff(x)) ./ 2κs, x_contacts, 2)
+    eqs = [
+        port(thermal_right, :Q) .~ qx[:, end]
+        thermal_left === nothing ? Equation[] : port(thermal_left, :Q) .~ -qx[:, 1]
+    ]
+    net = diff(qx; dims=2)
+
+    if axial
+        thermal_top, thermal_bottom = ports(:top, nx), ports(:bottom, nx)
+        T_ends = permutedims.((port(thermal_top, :T), port(thermal_bottom, :T)))
+        qz = Az .* diff(vcat(T_ends[1], T, T_ends[2]); dims=1) ./
+             _face_resistances(diff(z) ./ 2κs, z_contacts, 1)
+        append!(eqs, [port(thermal_top, :Q) .~ -qz[1, :]; port(thermal_bottom, :Q) .~ qz[end, :]])
+        walls = [walls; thermal_top; thermal_bottom]
+        net = net .+ diff(qz; dims=1)
+    end
+
+    C = ρ.(material) .* cₚ.(material) .* V
+    append!(eqs, vec(D.(T) .~ (net .+ power .* power_shape) ./ C))
+    return assembly(eqs, walls...; name=name)
 end

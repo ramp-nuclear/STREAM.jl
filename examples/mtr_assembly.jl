@@ -57,14 +57,10 @@ println("Building MTR assembly...")
 
 geom = PipeGeometry_rectangular(L_PLATE, Y_PLATE, LX_PLATE, Y_PLATE)
 @named hd = HeatDiffusion(;
-    nz=NZ,
-    nx=NX,
-    Lz=L_PLATE,
-    Lx=LX_PLATE,
-    y=Y_PLATE,
-    rho_s=RHO_AL,
-    cp_s=CP_AL,
-    k_s=K_AL,
+    x=range(0, LX_PLATE, NX + 1),
+    z=range(0, L_PLATE, NZ + 1),
+    geometry=Slab(Y_PLATE),
+    material=Solid(RHO_AL, CP_AL, K_AL),
     power=POWER,
 )
 

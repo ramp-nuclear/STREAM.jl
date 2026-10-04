@@ -258,14 +258,10 @@ function build_loop_lof_bypass(;
     @named ext_res = Resistor(R_ext)
 
     @named fuel = HeatDiffusion(;
-        nz=n,
-        nx=fuel_nx,
-        Lz=L_ch,
-        Lx=fuel_Lx,
-        y=0.07,
-        rho_s=19300.0,
-        cp_s=116.0,
-        k_s=174.0,
+        x=range(0, fuel_Lx, fuel_nx + 1),
+        z=range(0, L_ch, n + 1),
+        geometry=Slab(0.07),
+        material=Solid(19300.0, 116.0, 174.0),
         power=power_W,
     )
     heated = one_sided(ch, fuel; side=:left, name=:heated)
@@ -374,14 +370,10 @@ function build_loop_pk(ctrl;
         darcy=Friction.RectangularLaminar(geom),
     )
     @named fuel = HeatDiffusion(;
-        nz=nz,
-        nx=nx,
-        Lz=0.6,
-        Lx=0.005,
-        y=0.07,
-        rho_s=19300.0,
-        cp_s=116.0,
-        k_s=174.0,
+        x=range(0, 0.005, nx + 1),
+        z=range(0, 0.6, nz + 1),
+        geometry=Slab(0.07),
+        material=Solid(19300.0, 116.0, 174.0),
     )
     rods = symmetric_plate(cac, fuel; name=:rods)
     rods_cac = rods.cac

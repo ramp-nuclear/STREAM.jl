@@ -90,8 +90,8 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom)
-    @named hd = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=gap, y=0.07,   # plate thickness = SAME knob
-                              rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4)
+    @named hd = HeatDiffusion(; x=gap .* (0:nx) ./ nx, z=range(0, 0.6, nz + 1),   # plate thickness = SAME knob
+                              geometry=Slab(0.07), material=Solid(2700.0, 900.0, 200.0), power=1e4)
 
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),

@@ -198,3 +198,31 @@ function cosine_shape(x, ppf=π / 2; xmax=nothing)
     b = ppf / span
     return (b / a) .* diff(sin.(a .* (x .- mid)))
 end
+
+"""
+    x_boundaries(clad_N, fuel_N, clad_w, meat_w) -> Vector
+
+Cell boundaries across a clad plate, starting at zero: `clad_N` equal cells over each cladding
+layer of width `clad_w`, and `fuel_N` equal cells over the meat of width `meat_w` between them.
+With `clad_N = 0` the plate is meat alone and `clad_w` is not used.
+
+# Arguments
+- `clad_N`: cells in each cladding layer
+- `fuel_N`: cells in the meat
+- `clad_w`: width of each cladding layer [m]
+- `meat_w`: width of the meat [m]
+
+# Returns
+The `2clad_N + fuel_N + 1` boundaries, ready for `HeatDiffusion(; x=...)`.
+
+# Example
+```julia
+x = x_boundaries(2, 3, 0.4e-3, 0.5e-3)            # 7 cells
+meat = (1:7)' .∈ Ref(3:5)                          # 1×7 mask of the meat cells
+materials = ifelse.(repeat(meat, nz), Solid(3000, 800, 100), Solid(2700, 900, 250))
+```
+"""
+function x_boundaries(clad_N, fuel_N, clad_w, meat_w)
+    clad = fill(clad_w / max(clad_N, 1), clad_N)
+    return [0; cumsum([clad; fill(meat_w / fuel_N, fuel_N); clad])]
+end
