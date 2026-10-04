@@ -19,7 +19,7 @@ const TUTORIALS = joinpath(@__DIR__, "src", "tutorials")
 
 # Each tutorial is written once, as a script, and becomes a page, a script and a notebook.
 # The script and notebook land next to the page, so the page links to them by file name.
-tutorials = String[]
+tutorials = Any["Overview" => "tutorials/index.md"]
 for file in sort(readdir(LITERATE))
     endswith(file, ".jl") || continue
     src = joinpath(LITERATE, file)
@@ -27,6 +27,18 @@ for file in sort(readdir(LITERATE))
     Literate.script(src, TUTORIALS; credit=false)
     Literate.notebook(src, TUTORIALS; execute=false, credit=false)
     push!(tutorials, joinpath("tutorials", replace(file, ".jl" => ".md")))
+end
+
+# DocumenterMermaid loads the newest Mermaid 11, whose current release fails next to the
+# RequireJS that Documenter loads and leaves every diagram as plain text. Pin one that works.
+const MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.esm.min.mjs"
+function Documenter.HTMLWriter.domify(::Documenter.HTMLWriter.DCtx, ::Documenter.Node,
+                                      ::DocumenterMermaid.MermaidScriptBlock)
+    Documenter.DOM.@tags script
+    return script[:type => "module"]("""
+    import mermaid from '$MERMAID';
+    mermaid.initialize({ startOnLoad: true, theme: "neutral" });
+    """)
 end
 
 DocMeta.setdocmeta!(STREAM, :DocTestSetup, :(using STREAM); recursive=true)
@@ -39,6 +51,7 @@ links = InterLinks(
 )
 
 reference = [
+    "Overview" => "reference/index.md",
     "Top level" => "reference/stream.md",
     "Substances" => "reference/substances.md",
     "HTC" => "reference/htc.md",
@@ -59,6 +72,7 @@ exists(page) = isfile(joinpath(@__DIR__, "src", page))
 keep(pages) = Any[p for p in pages if exists(last(p))]
 
 howto = keep([
+    "Overview" => "howto/index.md",
     "Bind a wall temperature or heat flux" => "howto/wall_boundary.md",
     "Choose heat transfer and friction models" => "howto/models.md",
     "Change the coolant" => "howto/coolant.md",
@@ -84,6 +98,7 @@ limits = keep([
 ])
 
 explanation = keep([
+    "Overview" => "explanation/index.md",
     "How a model is built" => "explanation/modelling.md",
     "The coolant channel" => "explanation/channel.md",
     "Wall heat transfer" => "explanation/heat_transfer.md",
@@ -97,7 +112,7 @@ explanation = keep([
 isempty(limits) || push!(explanation, "Thermal-hydraulic limits" => limits)
 
 pages = Any["Home" => "index.md"]
-isempty(tutorials) || push!(pages, "Tutorials" => tutorials)
+push!(pages, "Tutorials" => tutorials)
 isempty(howto) || push!(pages, "How-to guides" => howto)
 isempty(explanation) || push!(pages, "Explanation" => explanation)
 push!(pages, "Reference" => reference, "Bibliography" => "bibliography.md")

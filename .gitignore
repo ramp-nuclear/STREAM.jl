@@ -13,4 +13,5 @@ node_modules/
 
 # Documentation build output, and the tutorial pages Literate generates from docs/literate
 docs/build/
-docs/src/tutorials/
+docs/src/tutorials/*
+!docs/src/tutorials/index.md

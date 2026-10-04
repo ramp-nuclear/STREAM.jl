@@ -52,12 +52,14 @@ temperature is where the heat taken from the wall balances what the flow carries
 
 ## Where to look
 
+The documentation has four parts, each written for a different need:
+
 | You want to | Read |
 |:---|:---|
-| learn the package from scratch | the **Tutorials**, in order |
-| get a specific job done | the **How-to guides** |
-| understand the physics and the choices behind it | the **Explanation** pages |
-| look up a function, its arguments and units | the **Reference** |
+| learn the package from scratch | the [Tutorials](tutorials/index.md), in order |
+| get a specific job done | the [How-to guides](howto/index.md) |
+| understand the physics and the choices behind it | the [Explanation](explanation/index.md) pages |
+| look up a function, its arguments and units | the [Reference](reference/index.md) |
 
 ## Conventions
 
