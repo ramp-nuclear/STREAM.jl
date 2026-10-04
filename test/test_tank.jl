@@ -29,8 +29,9 @@ _trapezoid(y, ts) = sum((y[i] + y[i + 1]) / 2 * (ts[i + 1] - ts[i]) for i in 1:(
 
 @testset "Tank" begin
     @testset "a pinned tank holds its level and each port's head" begin
+        g_mars = 3.71
         @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(bottom=0.0, side=1.5),
-                           fixed_temperature=true, T0=T_POOL)
+                           fixed_temperature=true, T0=T_POOL, g=g_mars)
         @named breach = Orifice(; area=A_HOLE, cd=CD_SHARP)
         @named ambient = Environment()
         @named sys = assembly([connect(pool.bottom, breach.inlet),
@@ -38,7 +39,7 @@ _trapezoid(y, ts) = sum((y[i] + y[i + 1]) / 2 * (ts[i + 1] - ts[i]) for i in 1:(
                               pool, breach, ambient)
         ssys = mtkcompile(sys)
         sol = solve_steady(ssys)
-        rho_g = ρ(H2O, T_POOL) * G_EARTH
+        rho_g = ρ(H2O, T_POOL) * g_mars
         @test sol[ssys.pool.L] ≈ L_POOL
         @test sol[ssys.pool.bottom.p] ≈ ATM + rho_g * L_POOL
         @test sol[ssys.pool.side.p] ≈ ATM + rho_g * (L_POOL - 1.5)
@@ -69,6 +70,59 @@ _trapezoid(y, ts) = sum((y[i] + y[i + 1]) / 2 * (ts[i + 1] - ts[i]) for i in 1:(
         @test sol.t[end] ≈ _drain_time(L_POOL, z_uncovery, A_TANK, A_HOLE, CD_SHARP) atol = 0.5
         @test maximum(abs.(level .- _drain_level.(sol.t, L_POOL, A_TANK, A_HOLE, CD_SHARP))) < 1e-3
         @test level[end] ≈ z_uncovery atol = 1e-3
+    end
+
+    @testset "a tank that widens with height drains on its own curve" begin
+        A_bottom, flare, z_uncovery = 1.0, 0.5, 1.0
+        area(L) = A_bottom + flare * L
+        volume(L) = A_bottom * L + flare * L^2 / 2
+        @test_throws ArgumentError Tank(; name=:no_volume, area=area, L0=L_POOL, ports=(b=0.0,))
+        @named pool = Tank(; area=area, volume=volume, L0=L_POOL, ports=(bottom=0.0,),
+                           fixed_temperature=true, T0=T_POOL)
+        @named breach = Orifice(; area=A_HOLE, cd=CD_SHARP, dp_eps=1e-3,
+                                machine=StateMachine(; initial_state=:OPEN, initial_time=0.0))
+        @named ambient = Environment()
+        @named sys = assembly([connect(pool.bottom, breach.inlet),
+                               connect(breach.outlet, ambient.port)],
+                              pool, breach, ambient)
+        ssys = mtkcompile(sys)
+        watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))
+        push!(watch, (:INTACT => :UNCOVERED, pool.L < z_uncovery, "uncovered"))
+        sol = solve_transient(ssys, solve_steady(ssys), _opening_grid(6000.0; points=600);
+                              overrides=[ssys.pool.pinned => false],
+                              callbacks=machine_callbacks(ssys, watch))
+        @test watch.state === :UNCOVERED
+
+        # A(h)·dh/dt = −cd·a·sqrt(2gh), the drain with the opening ramp left out.
+        drain!(dh, h, _, _) = (dh[1] = -CD_SHARP * A_HOLE * sqrt(2 * G_EARTH * max(h[1], 0.0)) / area(h[1]))
+        ref = solve(ODEProblem(drain!, [L_POOL], (0.0, sol.t[end])), Vern9();
+                    reltol=1e-10, abstol=1e-12, saveat=sol.t)
+        @test maximum(abs.(sol[ssys.pool.L] .- ref[1, :])) < 1e-3
+
+        m_break, inventory = sol[ssys.breach.inlet.ṁ], sol[ssys.pool.M]
+        @test inventory[1] ≈ ρ(H2O, T_POOL) * volume(L_POOL)
+        @test _trapezoid(m_break, sol.t) ≈ inventory[1] - inventory[end] rtol = 1e-3
+    end
+
+    @testset "external heat warms a sealed pool" begin
+        Q, t_end = 1e5, 600.0
+        @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(bottom=0.0,), T0=T_POOL, Q_ext=Q)
+        @named breach = Orifice(; area=A_HOLE, cd=CD_SHARP)   # never opens
+        @named ambient = Environment()
+        @named sys = assembly([connect(pool.bottom, breach.inlet),
+                               connect(breach.outlet, ambient.port)],
+                              pool, breach, ambient)
+        ssys = mtkcompile(sys)
+        # Pinned with no flow, the steady energy balance would ask for dT/dt = 0, which the
+        # heat forbids, so start the transient from the declared state.
+        sol = solve_transient(ssys, [ssys.pool.pinned => false], range(0.0, t_end; length=61))
+        @test sol[ssys.pool.L] ≈ fill(L_POOL, length(sol.t))
+
+        V = A_TANK * L_POOL
+        warm!(dT, T, _, _) = (dT[1] = Q / (ρ(H2O, T[1]) * V * cₚ(H2O, T[1])))
+        ref = solve(ODEProblem(warm!, [T_POOL], (0.0, t_end)), Vern9();
+                    reltol=1e-10, abstol=1e-12, saveat=sol.t)
+        @test sol[ssys.pool.T] ≈ ref[1, :] rtol = 1e-6
     end
 
     @testset "two tanks joined at the bottom settle at one level" begin
