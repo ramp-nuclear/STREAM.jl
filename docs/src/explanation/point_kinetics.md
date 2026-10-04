@@ -32,7 +32,7 @@ computes. `PointKinetics` starts there by default.
 ## The prompt jump
 
 A step of reactivity ``\rho < \beta`` makes the power jump almost at once, on the time scale
-``\Lambda/(\beta - \rho)``, a fraction of a millisecond. The precursors cannot change that
+``\Lambda/(\beta - \rho)``, about 12 ms in the example below. The precursors cannot change that
 fast, so they stay at their old values, and setting ``dP_n/dt \approx 0`` across the jump
 gives the prompt jump approximation:
 

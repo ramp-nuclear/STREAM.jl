@@ -45,7 +45,7 @@ geometry = PipeGeometry_circular(0.6, 0.01)
 #
 # ## Connections
 #
-# The components are joined by a list of equations. [`inseries`](@ref) connects outlets to
+# The components are joined by a list of equations. [`inseries`](@ref STREAM.Assemblies.Connect.inseries) connects outlets to
 # inlets in the order given, and naming the pump again at the end closes the loop.
 
 connections = [
