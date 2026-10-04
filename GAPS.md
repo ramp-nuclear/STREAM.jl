@@ -14,7 +14,6 @@ checked and found equivalent is listed at the end, so nobody has to re-derive it
 ## Contents
 
 - [Where things stand](#where-things-stand)
-- [In review](#in-review)
 - [What remains](#what-remains)
   1. [Loss of coolant to core uncovery](#1-loss-of-coolant-to-core-uncovery)
   2. [Fuel heat conduction](#2-fuel-heat-conduction)
@@ -57,22 +56,6 @@ report margin. That is enough to follow a pool level down to core uncovery and s
 model leaves its own validity. It is not enough for what comes after: void, steam properties,
 two-phase friction, post-CHF heat transfer, radiation, rewet and metal-water reaction. Neither
 code has any of those, and neither should grow them casually.
-
-## In review
-
-**#34** ports `stream-next`'s correlation fixes and a mixed-convection change. When it merges,
-delete this section and move its items to the lists below:
-
-- Local-loss Reynolds number on the diameter, not the radius
-- Sudo-Kaminaga reading the inlet at the end the flow enters
-- Bilinear inertia floored above zero, so a coastdown can reach zero flow
-- `solve_steady` and `solve_transient` throwing on a failed return code
-- Elenbaas on `|Ra|`, turbulent friction floored by `64/Re`, Shah and London's table for the
-  developing-laminar Nusselt number, and the H₂O cₚ and D₂O μ fits held short of their poles
-- Forced and natural convection combined by Churchill's rule, with the minus sign where
-  buoyancy opposes the flow, which Python does not take. That becomes a deliberate departure.
-
----
 
 ## What remains
 
@@ -247,6 +230,13 @@ never moved, with no error. Moving the trip time into the problem's parameters f
   reached through `remake`.
 - **The flapper always opens along the C1 ramp `3y² − 2y³`**, where Python defaults to its
   legacy relaxation. The opening time is the same.
+- **Mixed convection under opposing flow.** `stream-next` combines forced and natural
+  convection as `h³ = h_f³ + h_n³` everywhere, which is Churchill's rule for buoyancy along
+  the flow. Against the flow, as in the downward core of a pool reactor before it reverses,
+  the rule takes the minus sign, and `HTC.RegimeDependent` does, floored at `h_n` where the
+  wall flow separates. A `ChannelAndContacts` gives the direction from the sign of `g`;
+  called outside a channel the model adds, as Python does. In the pool LOFA example the minus
+  sign lowers the hot cell's `h` by about 4% late in the coastdown.
 
 ## Following Python where the physics is open
 
@@ -270,18 +260,24 @@ Verified as matching, so they need not be re-investigated:
 
 - **Dimensionless numbers**, and the laminar-turbulent blend.
 - **Nusselt correlations**: Dittus-Boelter, Marco-Han, two-sided heating, Elenbaas, the fully
-  developed and developing laminar forms, the maximal combinator.
+  developed and developing laminar forms, the maximal combinator, as `stream-next` has them.
+  The developing form reads Shah and London's table 34, and Elenbaas takes `|Ra|`.
 - **Friction correlations**: laminar, Colebrook-White, Blasius, the rectangular laminar
-  correction, the regime blend.
-- **Idelchik expansion and contraction losses.**
+  correction, the regime blend. Turbulent is floored by the laminar `64/Re`, as in
+  `stream-next`.
+- **Idelchik expansion and contraction losses**, with Re read on the diameter of the circle
+  with the smaller area, as in `stream-next`.
 - **Liquid properties**, H₂O and D₂O, all nine, to the tolerances in `test_validation.jl`.
+  The H₂O cₚ fit is held at its 350 °C value and the D₂O μ fit at 3.8 °C, short of their
+  poles, as in `stream-next`.
 - **Decay heat contributions**: fission products, the U-238 capture chain and activation,
   against Python's doctests. The ANS-5.1 tables are now full precision, so the U-235
   ANS-5.1-2014 sum at shutdown is 6.728% of 200 MeV, as Python's doctest expects.
 - **Threshold correlations and their channel-state wrappers**: CHF (Sudo-Kaminaga, Mirshak,
   Fabrega), OFI, OSV, ONB, boiling power and the wall temperature limit, compared with Python's
   `stream.analysis.thresholds` to 1e-9 in forward and reversed flow, and read at every saved
-  time of a transient.
+  time of a transient. Sudo-Kaminaga reads the inlet subcooling at the end the flow enters,
+  as in `stream-next`.
 - **Saturation at the static pressure.** A port carries the total pressure; a channel's `P` is
   static, and both `T_sat` and the subcooled boiling in the solve read it.
 - **The wall temperature interface.** Python's explicit `wall_temperature(T_cool, T_clad,
@@ -291,6 +287,8 @@ Verified as matching, so they need not be re-investigated:
   separate model is needed.
 - **Channel variants**, pump modes, geometry (bar `heated_diameter`), and the flapper's open
   resistance in both flow directions.
+- **The bilinear inertia**, floored at a thousandth of the knee so a coastdown can reach zero
+  flow, as in `stream-next`.
 - **Several channel types in parallel**, through `Connect.weighted`, against Python's
   `signify=50` junction.
 

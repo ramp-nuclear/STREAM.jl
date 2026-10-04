@@ -233,9 +233,11 @@ so do not re-derive them from scratch.
   Do not "fix" a failed solve with a sign constraint on ṁ. This loop's flow legitimately
   reverses after the pump trips, so forbidding negative flow would forbid the physics.
 
-Not gaps, checked and matching: the developing-laminar Nusselt (Python defaults to the same
-analytic approximation, using its Shah & London table only to bound that approximation's
-error), and the whole HTC / friction / local-loss / threshold / dimensionless inventory.
+Not gaps, checked and matching: the whole HTC / friction / local-loss / threshold /
+dimensionless inventory, against Python's `stream-next` branch where it changed a value.
+One deliberate difference: `HTC.RegimeDependent` combines forced and natural convection
+with Churchill's `h³ = h_f³ ± h_n³`, taking the minus sign where buoyancy opposes the flow.
+Python always adds. `GAPS.md` says why.
 
 ## Component authoring conventions
 
