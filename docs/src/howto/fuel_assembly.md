@@ -64,6 +64,8 @@ using STREAM
 using STREAM.Components: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion
 using STREAM.Assemblies: inseries, inparallel, fuel_assembly
 using ModelingToolkit: @named, mtkcompile
+using OrdinaryDiffEq: Rodas5P
+using SteadyStateDiffEq: DynamicSS
 
 n, P_plate = 8, 1.0e4
 geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
@@ -83,12 +85,24 @@ connections = [
 ]
 @named loop = assembly(connections, pump, hx, asm)
 sys = mtkcompile(loop)
-sol = solve_steady(sys, [sys.asm.c1.inlet.ṁ => 0.4, sys.asm.c2.inlet.ṁ => 0.4])
+guess = [sys.asm.c2.inlet.ṁ => 0.4, sys.asm.c3.inlet.ṁ => 0.4]
+sol = solve_steady(sys, guess; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
 [sol[getproperty(sys.asm, c).T_out] for c in (:c1, :c2, :c3)]
 ```
 
+Parallel channels sharing a flow are the case [Get a steady solve to converge](steady_solve.md)
+recommends integrating to steady state for, with a guess for each flow the compiled system
+keeps (here those of `c2` and `c3`).
+
 The middle channel is heated by both plates and runs hotter than the outer two, each heated
-by one. All of the plates' power reaches the coolant:
+by one. Each plate sends more of its heat to its outer, cooler channel than to the middle one:
+
+```@example fa
+[(sol[getproperty(sys.asm, c).q_wall_left] |> sum, sol[getproperty(sys.asm, c).q_wall_right] |> sum)
+ for c in (:c1, :c2, :c3)]
+```
+
+All of the plates' power reaches the coolant:
 
 ```@example fa
 Q = sum(sol[getproperty(sys.asm, c).Q_wall_total] for c in (:c1, :c2, :c3))

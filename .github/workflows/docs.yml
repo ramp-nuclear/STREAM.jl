@@ -9,9 +9,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
-  # Builds the site on every pull request, running every tutorial and example, and deploys it
-  # to the gh-pages branch from main. A pull request only builds: deploydocs pushes nothing for
-  # one.
+  # Builds the site, running every tutorial and example, and deploys it to the gh-pages
+  # branch: main to dev/, and each pull request from this repository to previews/PR<number>/.
   docs:
     runs-on: ubuntu-latest
     permissions:

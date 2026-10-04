@@ -25,10 +25,11 @@ length `n`, or any expression:
 @named pump = Pump(3.0e4)
 @named hx = HeatExchanger(40.0)
 @named ch = Channel(; n, geometry, h_left=5000.0)
+T_profile = 60.0 .+ 40.0 .* cosine_T_wall_profile(n)    # 60 °C at the ends, 100 °C mid
 connections = [
     inseries(pump, hx, ch, pump),
     pump.inlet.p ~ 1.0e5,
-    ch.T_wall_left .~ 60.0 .+ 40.0 .* cosine_T_wall_profile(n),   # 60 °C at the ends, 100 °C mid
+    ch.T_wall_left .~ T_profile,
 ]
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)

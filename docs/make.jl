@@ -134,4 +134,5 @@ makedocs(;
     warnonly=PREVIEW,
 )
 
-PREVIEW || deploydocs(; repo="github.com/ramp-nuclear/STREAM.jl", devbranch="main", push_preview=false)
+# A pull request from this repository gets its build deployed to previews/PR<number>/.
+PREVIEW || deploydocs(; repo="github.com/ramp-nuclear/STREAM.jl", devbranch="main", push_preview=true)
