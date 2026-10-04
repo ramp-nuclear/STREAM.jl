@@ -158,7 +158,7 @@ Reynolds range and extrapolation below it. `factor` is `@register_symbolic`, so 
 inside an MTK equation.
 
 The drop has the same quadratic form as `Friction.darcy_weisbach_dp` without the `L/Dh` factor.
-[`LocalPressureDrop`](@ref) is the component wrapping it.
+[`LocalPressureDrop`](@ref STREAM.Components.LocalPressureDrop) is the component wrapping it.
 """
 module LocalLoss
 using ModelingToolkit

@@ -274,8 +274,8 @@ which the caller binds (see below).
   default `0.0` per-side ⇒ adiabatic.
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
-  viscosity correction are [`RegimeDependent`](@ref).
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). Pass a [`Liquid`](@ref) to
+  viscosity correction are [`Friction.RegimeDependent`](@ref).
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). Pass a [`Liquid`](@ref STREAM.Substances.Liquid) to
   drive the energy balance, friction, and dimensionless observables with fixed properties.
 
 # External-input variables
@@ -283,7 +283,7 @@ which the caller binds (see below).
 - `T_wall_right(t)[1:n]`: per-cell right-face wall temperature [°C]
 
 These have no internal equation. A side with a nonzero `h` needs its wall closed, and so does
-any wall a friction model reads, such as [`RegimeDependent`](@ref) with a `viscosity`
+any wall a friction model reads, such as [`Friction.RegimeDependent`](@ref) with a `viscosity`
 correction. A side with `h = 0` under a friction model that ignores the wall, the default,
 needs nothing: its wall temperature appears in no equation. Close a wall in the connection
 list, with a number, a length-`n` profile, or any expression in `t`:
@@ -376,7 +376,7 @@ Heat flux is prescribed per cell by the caller (see below).
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
-  viscosity correction are [`RegimeDependent`](@ref).
+  viscosity correction are [`Friction.RegimeDependent`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref).
 
 # External-input variables
@@ -449,10 +449,10 @@ is `h_tc[i] * heated_parts * dz * (T_wall - T[i])`.
 - `htc`: wall heat transfer model ([`HTC`](@ref)), default [`DittusBoelter`](@ref). It is
   handed `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)` per cell and returns `h`. Subcooled boiling
   is a model like any other: wrap one in [`SubcooledBoiling`](@ref). Regime switching is
-  [`RegimeDependent`](@ref).
+  [`HTC.RegimeDependent`](@ref).
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
-  viscosity correction are [`RegimeDependent`](@ref).
+  viscosity correction are [`Friction.RegimeDependent`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). It drives the energy balance,
   friction, the HTC model, and the dimensionless observables.
 

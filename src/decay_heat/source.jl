@@ -47,7 +47,7 @@ scaling to Watts downstream, as `build_loop_pk` does, wants `P0 = 1.0` here too.
 - `Q`: recoverable energy per fission [MeV] (default 200.0)
 - `T`: irradiation time before shutdown [s] (default `Inf`, a saturated inventory)
 - `shutdown_states`: machine states that count as shut down (default `(:SCRAM,)`, the state
-  [`trip!`](@ref) enters)
+  [`trip!`](@ref STREAM.Components.trip!) enters)
 
 # Returns
 A callable `source(t) -> power`, ready to pass as `PointKinetics(...; power_input=source)`.

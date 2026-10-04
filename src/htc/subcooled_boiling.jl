@@ -15,23 +15,36 @@ end
 """
     mcadams_scb_heat_flux(T_sat, T_wall) -> q [W/m^2]
 
-McAdams subcooled boiling heat flux for water, `q = 2.26·(T_wall - T_sat)^3.86` with the
-superheat in K and `q` in W/m², the SI form given in IAEA-TECDOC-233. Zero at or below
-saturation.
+McAdams' subcooled boiling heat flux for water [McAdams1949](@cite), in the SI form given in
+[IAEA1980](@cite):
+
+    q = 2.26 · (T_wall - T_sat)^3.86
+
+with the superheat in K and `q` in W/m². Zero at or below saturation.
 
 # Arguments
 - `T_sat`: saturation temperature [°C]
 - `T_wall`: wall temperature [°C]
 
 # Returns
-Subcooled boiling heat flux `q` [W/m^2].
+Subcooled boiling heat flux `q` [W/m²].
+
+# Examples
+```jldoctest
+julia> HTC.mcadams_scb_heat_flux(100.0, 120.0)
+237730.12702161702
+
+julia> HTC.mcadams_scb_heat_flux(100.0, 90.0)
+0.0
+```
 """
 mcadams_scb_heat_flux(T_sat, T_wall) = 2.26 * max(T_wall - T_sat, 0.0)^3.86
 
 """
     rohsenow_scb_heat_flux(T_wall, sat; n=1.26, csf=0.011, g=G_EARTH) -> q [W/m^2]
 
-Rohsenow's (1952) nucleate boiling heat flux, used for subcooled boiling in laminar flow:
+Rohsenow's nucleate boiling heat flux [Rohsenow1952](@cite), used for subcooled boiling in
+laminar flow:
 
     q = μ·h_fg·sqrt(g(ρ - ρᵥ)/σ) · [cₚ(T_wall - T_sat) / (C_sf·h_fg·Pr^n)]^(1/0.33)
 
@@ -46,7 +59,15 @@ where the superheat is clamped at zero so the fractional power never sees a nega
 - `g`: gravitational acceleration [m/s²]
 
 # Returns
-Subcooled boiling heat flux `q` [W/m^2].
+Subcooled boiling heat flux `q` [W/m²].
+
+# Examples
+```jldoctest
+julia> sat = H2O(Tsat(H2O, 1.7e5), 1.7e5);  # water at saturation at 1.7 bar
+
+julia> round(HTC.rohsenow_scb_heat_flux(125.0, sat); sigdigits=8)
+229086.82
+```
 """
 function rohsenow_scb_heat_flux(T_wall, sat::Liquid; n=1.26, csf=0.011, g=G_EARTH)
     superheat = max(T_wall - sat.Tsat, 0.0)
@@ -58,7 +79,7 @@ end
 """
     partial_SCB_correction(q_spl, q_scb, q_scb_inc) -> factor
 
-The partial boiling factor of Bergles and Rohsenow (1964), which scales the single-phase
+The partial boiling factor of Bergles and Rohsenow [BerglesRohsenow1964](@cite), which scales the single-phase
 coefficient between the onset of nucleate boiling and fully developed boiling:
 
     factor = sqrt(1 + ((q_scb - q_scb_inc) / q_spl)²)
@@ -95,7 +116,19 @@ Hand the closure to [`SubcooledBoiling`](@ref), which calls it with `sat`, the c
 - `re_bounds`: `(re_lo, re_hi)` transition band on the Reynolds number
 
 # Returns
-Closure `(T_wall, sat, Re) -> q_scb [W/m^2]`.
+Closure `(T_wall, sat, Re) -> q_scb [W/m²]`.
+
+# Examples
+At a 125 °C wall in water at 1.7 bar, laminar, mid-band and turbulent:
+```jldoctest
+julia> q = HTC.regime_dependent_q_scb(); sat = H2O(Tsat(H2O, 1.7e5), 1.7e5);
+
+julia> round.([q(125.0, sat, Re) for Re in (1000.0, 3500.0, 8000.0)]; sigdigits=8)
+3-element Vector{Float64}:
+ 229086.82
+ 122057.77
+  15028.724
+```
 """
 function regime_dependent_q_scb(; re_bounds=(2000.0, 5000.0))
     bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))

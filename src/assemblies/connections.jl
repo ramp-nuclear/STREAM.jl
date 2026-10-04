@@ -12,7 +12,7 @@ same way.
 - `systems`: two or more uncompiled systems exposing `inlet` and `outlet` `FlowPort`s
 
 # Returns
-`Vector{Equation}`, which goes into an [`assembly`](@ref) connection list as is.
+`Vector{Equation}`, which goes into an [`assembly`](@ref STREAM.Assemblies.assembly) connection list as is.
 
 # Example
 ```julia
@@ -49,7 +49,7 @@ connected in series internally, and all branch outlets merge into `downstream.in
 - `downstream`: uncompiled system exposing an `inlet` `FlowPort`
 
 # Returns
-`Vector{Equation}`, which goes into an [`assembly`](@ref) connection list as is.
+`Vector{Equation}`, which goes into an [`assembly`](@ref STREAM.Assemblies.assembly) connection list as is.
 
 # Example
 ```julia
@@ -133,7 +133,7 @@ conns = [inparallel(flywheel, [branch], riser), flywheel.outlet.p ~ ATM]
 ```
 
 The returned tuple is both the path to wire and the systems to compose, so it splats into
-[`inseries`](@ref), [`inparallel`](@ref) and [`assembly`](@ref) alike. It holds `components`
+[`inseries`](@ref), [`inparallel`](@ref) and [`assembly`](@ref STREAM.Assemblies.assembly) alike. It holds `components`
 in flow order between two private flow weights, one of `1//N` and one of `N`, named
 `<name>_weight_in` and `<name>_weight_out`.
 
@@ -278,7 +278,7 @@ end
 
 Generate binding equations that wire each component's existing `T` symbolic to the
 corresponding `pk.T_source_<name>` unknowns inside `PointKinetics`. Used together
-with [`assembly`](@ref) to close the neutronics<->thermal-hydraulics loop.
+with [`assembly`](@ref STREAM.Assemblies.assembly) to close the neutronics<->thermal-hydraulics loop.
 
 # Arguments
 - `pk`: uncompiled `PointKinetics` system built with `temp_worth=...`

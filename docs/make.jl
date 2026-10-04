@@ -1,0 +1,116 @@
+# Build the documentation:
+#   julia --project=docs docs/make.jl            # full build, runs every example
+#   DRAFT=1 julia --project=docs docs/make.jl    # prose only, skips running code
+using Documenter
+using DocumenterCitations
+using DocumenterInterLinks
+using DocumenterMermaid
+using Literate
+using STREAM
+
+const DRAFT = get(ENV, "DRAFT", "") == "1"
+const LITERATE = joinpath(@__DIR__, "literate")
+const TUTORIALS = joinpath(@__DIR__, "src", "tutorials")
+
+# Each tutorial is written once, as a script, and becomes a page, a script and a notebook.
+# The script and notebook land next to the page, so the page links to them by file name.
+tutorials = String[]
+for file in sort(readdir(LITERATE))
+    endswith(file, ".jl") || continue
+    src = joinpath(LITERATE, file)
+    Literate.markdown(src, TUTORIALS; documenter=true, credit=false)
+    Literate.script(src, TUTORIALS; credit=false)
+    Literate.notebook(src, TUTORIALS; execute=false, credit=false)
+    push!(tutorials, joinpath("tutorials", replace(file, ".jl" => ".md")))
+end
+
+DocMeta.setdocmeta!(STREAM, :DocTestSetup, :(using STREAM); recursive=true)
+
+bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style=:authoryear)
+
+links = InterLinks(
+    "ModelingToolkit" => "https://docs.sciml.ai/ModelingToolkit/stable/",
+    "DiffEq" => "https://docs.sciml.ai/DiffEqDocs/stable/",
+)
+
+reference = [
+    "Top level" => "reference/stream.md",
+    "Substances" => "reference/substances.md",
+    "HTC" => "reference/htc.md",
+    "Friction" => "reference/friction.md",
+    "LocalLoss" => "reference/local_loss.md",
+    "Thresholds" => "reference/thresholds.md",
+    "Components" => "reference/components.md",
+    "DecayHeat" => "reference/decay_heat.md",
+    "Assemblies" => "reference/assemblies.md",
+    "Solvers" => "reference/solvers.md",
+    "Utilities" => "reference/utilities.md",
+    "Examples" => "reference/examples.md",
+]
+
+# A page listed here that does not exist yet is skipped, so the navigation can be written
+# ahead of the pages.
+exists(page) = isfile(joinpath(@__DIR__, "src", page))
+keep(pages) = filter(p -> exists(last(p)), pages)
+
+howto = keep([
+    "Bind a wall temperature or heat flux" => "howto/wall_boundary.md",
+    "Choose heat transfer and friction models" => "howto/models.md",
+    "Change the coolant" => "howto/coolant.md",
+    "Wire components together" => "howto/wiring.md",
+    "Build a fuel assembly" => "howto/fuel_assembly.md",
+    "Get a steady solve to converge" => "howto/steady_solve.md",
+    "Trip a reactor or open a valve" => "howto/events.md",
+    "Add decay heat to a transient" => "howto/decay_heat.md",
+    "Compute safety margins" => "howto/margins.md",
+    "Scan a design parameter" => "howto/design_knobs.md",
+    "Drive an input from a function of time" => "howto/time_inputs.md",
+    "Move a profile between meshes" => "howto/rebin.md",
+])
+
+limits = keep([
+    "Overview" => "explanation/limits/overview.md",
+    "Onset of nucleate boiling" => "explanation/limits/onb.md",
+    "Onset of significant void" => "explanation/limits/osv.md",
+    "Onset of flow instability" => "explanation/limits/ofi.md",
+    "Critical heat flux" => "explanation/limits/chf.md",
+    "Wall temperature limit" => "explanation/limits/twall.md",
+    "Margins" => "explanation/limits/margins.md",
+])
+
+explanation = keep([
+    "How a model is built" => "explanation/modelling.md",
+    "The coolant channel" => "explanation/channel.md",
+    "Wall heat transfer" => "explanation/heat_transfer.md",
+    "Pressure drop" => "explanation/pressure_drop.md",
+    "Heat conduction in a fuel plate" => "explanation/conduction.md",
+    "Point kinetics and feedback" => "explanation/point_kinetics.md",
+    "Decay heat" => "explanation/decay_heat.md",
+    "Events and control" => "explanation/events.md",
+    "Relation to Python STREAM" => "explanation/python.md",
+])
+isempty(limits) || push!(explanation, "Thermal-hydraulic limits" => limits)
+
+pages = Any["Home" => "index.md"]
+isempty(tutorials) || push!(pages, "Tutorials" => tutorials)
+isempty(howto) || push!(pages, "How-to guides" => howto)
+isempty(explanation) || push!(pages, "Explanation" => explanation)
+push!(pages, "Reference" => reference, "Bibliography" => "bibliography.md")
+
+makedocs(;
+    sitename="STREAM.jl",
+    modules=[STREAM],
+    format=Documenter.HTML(;
+        prettyurls=get(ENV, "CI", nothing) == "true",
+        canonical="https://ramp-nuclear.github.io/STREAM.jl",
+        edit_link="main",
+        size_threshold_warn=400 * 2^10,
+        size_threshold=800 * 2^10,
+    ),
+    pages,
+    plugins=[bib, links],
+    checkdocs=:exports,
+    draft=DRAFT,
+)
+
+deploydocs(; repo="github.com/ramp-nuclear/STREAM.jl", devbranch="main", push_preview=false)

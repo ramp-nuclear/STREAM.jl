@@ -129,14 +129,13 @@ fit the standards publish,
 
     F(t, T) = Σᵢ (αᵢ/λᵢ)·e^(-λᵢt)·(1 - e^(-λᵢT))    [MeV/fission]
 
-The second form reads the groups from a table with [`read_standard`](@ref); the first takes
+The second form reads the groups from a table with [`read_standard`](@ref), from the
+ANS-5.1 [ANS1973, ANS2014](@cite) or JAERI [Tasaka1991](@cite) standards. The first takes
 them directly, for a fit the standards here do not cover.
 
 Negative α values are expected in the JAERI-91 tables. They are least-squares fit
 coefficients rather than physical group yields, so only the sum means anything, and nothing
 here filters or clamps them.
-
-Source: Python STREAM decay_heat/fission_products.py `contribution` and `fp_inner_`.
 
 # Arguments
 - `λ`: group decay constants [1/s]
@@ -147,6 +146,15 @@ An [`AbstractDecayHeat`](@ref) whose value is in MeV/fission.
 
 # Throws
 - `DimensionMismatch`: if `λ` and `α` differ in length
+
+# Examples
+Two made-up groups, at shutdown and an hour later:
+```jldoctest
+julia> fp = DecayHeat.FissionProducts([1e-2, 1e-4], [0.05, 1e-4]);
+
+julia> fp(0.0), round(fp(3600.0); sigdigits=6)
+(6.0, 0.697676)
+```
 """
 struct FissionProducts <: AbstractDecayHeat
     λ::Vector{Float64}

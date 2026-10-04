@@ -4,7 +4,7 @@
 Frictional pressure drop element, `ΔP = f · ṁ|ṁ| / (2ρA²) · (L/Dh)`.
 
 The friction factor comes from `darcy`, a [`AbstractDarcyFactor`](@ref). Passing
-[`RegimeDependent`](@ref) makes this the regime-switching friction resistor, with the
+[`Friction.RegimeDependent`](@ref) makes this the regime-switching friction resistor, with the
 laminar/turbulent blend and, if asked for, the heated-wall viscosity correction.
 
 # Arguments

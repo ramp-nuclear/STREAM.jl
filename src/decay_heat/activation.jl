@@ -19,10 +19,20 @@ Decay of a material activated at a constant rate through the irradiation,
 Dimensionless and normalized to 1 at `t = 0, T = Inf`. Multiply by the energy deposited per
 decay event to get MeV/fission, as in `E_d * Activation(λ)`.
 
-Source: Python STREAM decay_heat/activation.py `profile`.
+This is Python STREAM's `activation.profile`.
 
 # Arguments
 - `λ`: decay rate of the activated isotope [1/s]
+
+# Returns
+A callable `model(t, T=Inf)`, with `t` the time since shutdown and `T` the irradiation time [s].
+
+# Examples
+U239, 1000 s after shutdown from a saturated inventory:
+```jldoctest
+julia> round(DecayHeat.Activation(4.91e-4)(1000, Inf); digits=8)
+0.61201407
+```
 """
 struct Activation <: AbstractDecayHeat
     λ::Float64
@@ -40,14 +50,24 @@ and the isotope it produces decays at `λ₂`,
 
 Dimensionless and normalized to 1 at `t = 0, T = Inf`. The expression cancels as `λ₂`
 approaches `λ₁`, so within a relative `1e-6` of each other the rates are replaced by
-their mean in the equal-rate limit, [`_equal_rate_decay`](@ref). Python STREAM leaves
+their mean in the equal-rate limit, `_equal_rate_decay`. Python STREAM leaves
 that case unguarded.
 
-Source: Python STREAM decay_heat/activation.py `double_decay_profile`.
+This is Python STREAM's `activation.double_decay_profile`.
 
 # Arguments
 - `λ₁`: decay rate of the activated isotope [1/s]
 - `λ₂`: decay rate of the isotope it decays into [1/s]
+
+# Returns
+A callable `model(t, T=Inf)`, as for [`Activation`](@ref).
+
+# Examples
+Np239 from U239: the daughter has barely started to decay after 1000 s.
+```jldoctest
+julia> round(DecayHeat.DoubleDecay(4.91e-4, 3.41e-6)(1000, Inf); digits=8)
+0.99928541
+```
 """
 struct DoubleDecay <: AbstractDecayHeat
     λ₁::Float64

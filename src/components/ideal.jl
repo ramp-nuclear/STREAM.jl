@@ -113,7 +113,7 @@ over-determine it. This component is that something.
 
 # Ports
 - `thermal1 … thermaln` -- `ThermalPort`s, named like a channel's per-cell faces so
-  [`face`](@ref), [`faces`](@ref) and [`port`](@ref) reach them as `:thermal`
+  [`face`](@ref STREAM.Assemblies.Connect.face), [`faces`](@ref STREAM.Assemblies.Connect.faces) and [`port`](@ref STREAM.Assemblies.port) reach them as `:thermal`
 
 # Returns
 Uncompiled `System`.
