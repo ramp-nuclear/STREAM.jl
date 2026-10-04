@@ -36,6 +36,21 @@ Docstrings are reference documentation, so write them to be read rendered rather
 file: give exported names `# Arguments` and `# Returns`, and cross-reference with
 `[`name`](@ref)`.
 
+- **Equations are math blocks in plain TeX**, `T_{ONB} = T_{sat} + 0.556 (q / (1082 p^{1.156}))`:
+  KaTeX renders them in the docs, and they still read as source in the REPL. Prefer `/` to
+  `\frac`, Unicode Greek to `\alpha`, and `T_{sat}` to `T_\text{sat}`. A docstring holding
+  TeX is a raw string, `@doc raw"""`, since `\` is an escape in a plain one.
+- **Cite sources with `[Key](@cite)`**, keys in `docs/src/refs.bib`. Every correlation names
+  the paper or report it comes from.
+- **Pure functions carry a `jldoctest`** showing a call and its value. `test/test_doctests.jl`
+  runs them, so a doctest replaces a unit test of the same value. Qualify names that are not
+  exported at the top level (`Thresholds.q_CHF_mirshak`). Never accept Documenter's
+  `fix=true` output without reading the diff: it writes an error into the expected output as
+  happily as a number.
+- **Narrative goes to the docs pages, not the docstring.** A docstring says what a name
+  accepts, computes and returns. A worked example goes to a tutorial or how-to, and the physics
+  and the reasoning behind a choice to an explanation page; the docstring links to them.
+
 ## Units
 
 Temperatures are **Celsius** everywhere: component arguments, connector variables, solution
@@ -166,11 +181,38 @@ Placement beats file length. A long file whose contents all belong together is f
 file named `misc` or `helpers` is not. Physics lives in its own module, even when one
 component is its only caller: components state equations, they do not define correlations.
 
+### `docs/` — Documentation
+
+```
+docs/
+  make.jl          # Documenter build: Literate conversion, makedocs, deploydocs
+  Project.toml     # Documenter, DocumenterCitations, DocumenterInterLinks, DocumenterMermaid,
+                   # Literate, CairoMakie; STREAM through [sources]
+  literate/        # the tutorials, as runnable scripts Literate turns into pages
+  src/
+    index.md       # home: what STREAM is, a first model, conventions
+    tutorials/     # index.md only; the tutorial pages are generated, and git-ignored
+    howto/         # task recipes, one page per task
+    explanation/   # the physics and the reasoning behind the models; limits/ for the
+                   # thermal-hydraulic limits
+    reference/     # one @autodocs page per module
+    refs.bib       # every citation
+    assets/        # hand-drawn SVG schematics
+```
+
+The site follows the four kinds of documentation: tutorials teach by building a model,
+how-to guides solve one task, explanation pages give the physics, and the reference lists the
+API. Put a new page in the kind it is, and list it in `make.jl`. Code on a page runs when the
+docs build, so tutorials and how-tos end with an `@assert` against physics where one exists.
+Plots use CairoMakie.
+
 ### `test/` — Tests
 
 ```
 test/
   runtests.jl               # Thin orchestrator: one include() per test file, nothing else
+  test_doctests.jl          # the jldoctest examples in the docstrings; skips with a warning
+                            # when Documenter is not installed
   test_geometry.jl          # PipeGeometry
   test_connectors.jl        # FlowPort, ThermalPort
   test_substances.jl        # AbstractLiquid interface, H2O/D2O correlations, Liquid snapshot
@@ -295,8 +337,13 @@ MTK's symbolic IR requires structural analysis (index reduction from DAE to ODE)
 ```bash
 julia --project=. test/runtests.jl        # full suite
 julia --project=. test/test_channels.jl   # a single file
-julia --project=. examples/simple_loop.jl
+julia --project=docs docs/make.jl         # the docs, running every example
 ```
+
+The docs build takes several minutes. `DRAFT=1` skips running code, for editing prose, and
+`PREVIEW=1` runs it but reports links to unwritten pages as warnings. Serve the result with
+`python3 -m http.server -d docs/build 8000`. The first build needs
+`julia --project=docs -e 'using Pkg; Pkg.instantiate()'`.
 
 Each invocation pays full cold-start (~30–90s `using STREAM` plus first `mtkcompile` ~10–30s). That is the accepted dev loop.
 
