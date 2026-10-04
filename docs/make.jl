@@ -1,6 +1,8 @@
 # Build the documentation:
 #   julia --project=docs docs/make.jl            # full build, runs every example
-#   DRAFT=1 julia --project=docs docs/make.jl    # prose only, skips running code
+#   DRAFT=1 julia --project=docs docs/make.jl    # prose only, skips running code, and reports
+#                                                # broken links as warnings rather than errors
+# Preview the result with `python3 -m http.server -d docs/build 8000`.
 using Documenter
 using DocumenterCitations
 using DocumenterInterLinks
@@ -51,7 +53,7 @@ reference = [
 # A page listed here that does not exist yet is skipped, so the navigation can be written
 # ahead of the pages.
 exists(page) = isfile(joinpath(@__DIR__, "src", page))
-keep(pages) = filter(p -> exists(last(p)), pages)
+keep(pages) = Any[p for p in pages if exists(last(p))]
 
 howto = keep([
     "Bind a wall temperature or heat flux" => "howto/wall_boundary.md",
@@ -111,6 +113,7 @@ makedocs(;
     plugins=[bib, links],
     checkdocs=:exports,
     draft=DRAFT,
+    warnonly=DRAFT,
 )
 
-deploydocs(; repo="github.com/ramp-nuclear/STREAM.jl", devbranch="main", push_preview=false)
+DRAFT || deploydocs(; repo="github.com/ramp-nuclear/STREAM.jl", devbranch="main", push_preview=false)
