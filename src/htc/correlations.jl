@@ -93,6 +93,9 @@ fit from the same book, which jumps at `x = 2e-4` and `1e-3`.
 `@register_symbolic`, so a channel equation carries the lookup as one opaque node.
 """
 function _nusselt_coefficient_developing(x::Real)
+    # A solver iterate can make x NaN. It fails both range checks, and searchsortedlast puts
+    # it past the table's end, so it is passed on for the solver to reject the step.
+    isnan(x) && return x
     x < first(_XSTAR_TABLE34) && return _leveque_nusselt(x)
     x >= last(_XSTAR_TABLE34) && return last(_NU_TABLE34)
     k = searchsortedlast(_XSTAR_TABLE34, x)

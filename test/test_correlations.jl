@@ -441,6 +441,8 @@ end
         @test HTC._nusselt_coefficient_developing(prevfloat(x)) ≈
               HTC._nusselt_coefficient_developing(nextfloat(x)) rtol = 1e-9
     end
+    # A NaN from a solver iterate comes back NaN instead of indexing past the table.
+    @test isnan(HTC._nusselt_coefficient_developing(NaN))
 
     # x_star correction factor test: changing aspect_ratio changes the result
     htc_dev_ar05 = HTC.developing_laminar_nusselt(_geom_for(0.005, 0.5); develop_length=0.3)
