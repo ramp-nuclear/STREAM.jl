@@ -1,7 +1,9 @@
 # Build the documentation:
 #   julia --project=docs docs/make.jl            # full build, runs every example
-#   DRAFT=1 julia --project=docs docs/make.jl    # prose only, skips running code, and reports
-#                                                # broken links as warnings rather than errors
+#   DRAFT=1 julia --project=docs docs/make.jl    # prose only, skips running code
+#   PREVIEW=1 julia --project=docs docs/make.jl  # runs the code, but reports broken links as
+#                                                # warnings, for previewing unfinished pages
+# A draft build also reports broken links as warnings.
 # Preview the result with `python3 -m http.server -d docs/build 8000`.
 using Documenter
 using DocumenterCitations
@@ -11,6 +13,7 @@ using Literate
 using STREAM
 
 const DRAFT = get(ENV, "DRAFT", "") == "1"
+const PREVIEW = DRAFT || get(ENV, "PREVIEW", "") == "1"
 const LITERATE = joinpath(@__DIR__, "literate")
 const TUTORIALS = joinpath(@__DIR__, "src", "tutorials")
 
@@ -113,7 +116,7 @@ makedocs(;
     plugins=[bib, links],
     checkdocs=:exports,
     draft=DRAFT,
-    warnonly=DRAFT,
+    warnonly=PREVIEW,
 )
 
-DRAFT || deploydocs(; repo="github.com/ramp-nuclear/STREAM.jl", devbranch="main", push_preview=false)
+PREVIEW || deploydocs(; repo="github.com/ramp-nuclear/STREAM.jl", devbranch="main", push_preview=false)
