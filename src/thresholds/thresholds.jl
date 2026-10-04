@@ -39,12 +39,8 @@ Wall temperature at onset of nucleate boiling `T_ONB` [°C].
 
 # Examples
 ```jldoctest
-julia> bergles_rohsenow_t_onb(1e5, 1e5, 100.0)
-ERROR: UndefVarError: `bergles_rohsenow_t_onb` not defined in `Main`
-Suggestion: check for spelling errors or missing imports.
-Stacktrace:
- [1] top-level scope
-   @ none:1
+julia> Thresholds.bergles_rohsenow_t_onb(1e5, 1e5, 100.0)
+104.52092778452801
 ```
 """
 function bergles_rohsenow_t_onb(pressure, q_wall, T_sat)
@@ -71,12 +67,8 @@ Channel power limit for boiling onset `Q` [W].
 
 # Examples
 ```jldoctest
-julia> q_boiling_onset(0.5, 100.0, 40.0, 4180.0)
-ERROR: UndefVarError: `q_boiling_onset` not defined in `Main`
-Suggestion: check for spelling errors or missing imports.
-Stacktrace:
- [1] top-level scope
-   @ none:1
+julia> Thresholds.q_boiling_onset(0.5, 100.0, 40.0, 4180.0)
+125400.0
 ```
 """
 function q_boiling_onset(ṁ, T_sat, T_inlet, cp)
@@ -109,12 +101,8 @@ OFI limit power `Q_OFI` [W].
 ```jldoctest
 julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
 
-julia> round(q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe); sigdigits=7)
-ERROR: UndefVarError: `q_OFI_whittle_forgan` not defined in `Main`
-Suggestion: check for spelling errors or missing imports.
-Stacktrace:
- [1] top-level scope
-   @ none:1
+julia> round(Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe); sigdigits=7)
+135474.3
 ```
 """
 function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=H2O)
@@ -159,12 +147,8 @@ julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm M
 
 julia> coolant = H2O(fill(26.85, 10), fill(1e5, 10));  # 10 cells at 26.85 °C and 1 bar
 
-julia> round(last(q_OSV_saha_zuber(26.85, 0.5, pipe, coolant)); sigdigits=9)
-ERROR: UndefVarError: `q_OSV_saha_zuber` not defined in `Main`
-Suggestion: check for spelling errors or missing imports.
-Stacktrace:
- [1] top-level scope
-   @ none:1
+julia> round(last(Thresholds.q_OSV_saha_zuber(26.85, 0.5, pipe, coolant)); sigdigits=9)
+1.44385224e6
 ```
 """
 function q_OSV_saha_zuber(
@@ -235,19 +219,10 @@ Downward flow at 0.5 kg/s with the bulk at 46.85 °C, against book values for wa
 ```jldoctest
 julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
 
-julia> sat = Liquid(; ρ=958.4, ρᵥ=0.598, cₚ=4217.0, hfg=2257e3, σ=0.059, Tsat=100.0);
-ERROR: UndefVarError: `Liquid` not defined in `Main`
-Suggestion: check for spelling errors or missing imports.
-Stacktrace:
- [1] top-level scope
-   @ none:1
+julia> sat = Substances.Liquid(; ρ=958.4, ρᵥ=0.598, cₚ=4217.0, hfg=2257e3, σ=0.059, Tsat=100.0);
 
-julia> round(q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat); sigdigits=9)
-ERROR: UndefVarError: `q_CHF_sudo_kaminaga` not defined in `Main`
-Suggestion: check for spelling errors or missing imports.
-Stacktrace:
- [1] top-level scope
-   @ none:1
+julia> round(Thresholds.q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat); sigdigits=9)
+1.39178807e6
 ```
 """
 function q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant::Liquid)
@@ -298,12 +273,8 @@ CHF heat flux `q_CHF` [W/m²].
 
 # Examples
 ```jldoctest
-julia> q_CHF_mirshak(46.85, 100.0, 1e5, 2.0)
-ERROR: UndefVarError: `q_CHF_mirshak` not defined in `Main`
-Suggestion: check for spelling errors or missing imports.
-Stacktrace:
- [1] top-level scope
-   @ none:1
+julia> Thresholds.q_CHF_mirshak(46.85, 100.0, 1e5, 2.0)
+3.30950620425684e6
 ```
 """
 function q_CHF_mirshak(T_bulk, T_sat, pressure, v)
@@ -335,12 +306,8 @@ CHF heat flux `q_CHF` [W/m²].
 ```jldoctest
 julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
 
-julia> q_CHF_fabrega(26.85, 100.0, pipe)
-ERROR: UndefVarError: `q_CHF_fabrega` not defined in `Main`
-Suggestion: check for spelling errors or missing imports.
-Stacktrace:
- [1] top-level scope
-   @ none:1
+julia> Thresholds.q_CHF_fabrega(26.85, 100.0, pipe)
+289290.40230215824
 ```
 """
 function q_CHF_fabrega(T_inlet, T_sat, pipe)
@@ -374,12 +341,8 @@ Effective wall temperature limit `T_limit` [°C].
 # Examples
 A 100 K rise worsened by 20%:
 ```jldoctest
-julia> twall_limit(26.85, 126.85, 1.2)
-ERROR: UndefVarError: `twall_limit` not defined in `Main`
-Suggestion: check for spelling errors or missing imports.
-Stacktrace:
- [1] top-level scope
-   @ none:1
+julia> Thresholds.twall_limit(26.85, 126.85, 1.2)
+146.85
 ```
 """
 function twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0)
