@@ -205,7 +205,7 @@ end
 The acausal MTK components a model is built from.
 
 Every component is a function returning an uncompiled `System` and taking `name` as a keyword.
-Components state equations and consume their physics from [`HTC`](@ref), [`Friction`](@ref) and
+Components state equations and consume their physics from [`HTC`](@ref STREAM.HTC), [`Friction`](@ref STREAM.Friction) and
 [`LocalLoss`](@ref).
 
 - **Connectors.** [`FlowPort`](@ref) carries pressure, mass flow and stream temperature;

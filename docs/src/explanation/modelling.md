@@ -61,7 +61,7 @@ temperature from the other end.
 
 ## Wiring
 
-Connections are written as equations in a list. [`inseries`](@ref) and [`inparallel`](@ref)
+Connections are written as equations in a list. [`inseries`](@ref STREAM.Assemblies.Connect.inseries) and [`inparallel`](@ref STREAM.Assemblies.Connect.inparallel)
 generate the connections of a chain and of parallel branches, [`face`](@ref STREAM.Assemblies.Connect.face)
 and [`faces`](@ref STREAM.Assemblies.Connect.faces) the per-cell thermal connections between a
 channel and a plate, and any other equation can sit in the same list, such as a boundary
