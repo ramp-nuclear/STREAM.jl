@@ -140,7 +140,7 @@ q_fabrega = fill(q_CHF_fabrega(T_b, T_sat, pipe), length(ṁ))
 
 fig = Figure(size=(760, 440))
 ax = Axis(fig[1, 1]; xlabel=L"coolant velocity $v$ [m/s], positive downward",
-          ylabel=L"q''_\mathrm{CHF} [MW/m²]")
+          ylabel=L"$q''_\mathrm{CHF}$ [MW/m²]")
 vspan!(ax, 1.5, maximum(v); color=(:steelblue, 0.08))
 vspan!(ax, -0.5, 0.5; color=(:darkorange, 0.08))
 lines!(ax, v, q_sk ./ 1e6; label="Sudo-Kaminaga", linewidth=2)
