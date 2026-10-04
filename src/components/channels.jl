@@ -36,7 +36,7 @@ for energy balance (enthalpy form with face-averaged cp), mass conservation,
 momentum ODE `(L/A)*D(ṁ)`, per-cell friction (algebraic dp[i]), port wiring,
 and observables.
 
-Returns `(; eqs, obs)` — variant splices `eqs = [variant_specific_eqs; core.eqs]`,
+Returns `(; eqs, obs)`: the variant splices `eqs = [variant_specific_eqs; core.eqs]`,
 `obs = [core.obs; variant_specific_obs]`. Variant declares all `@variables`
 (unknowns AND observables that core references); core builds equations referencing
 those symbols.
@@ -50,14 +50,14 @@ those symbols.
 - `darcy`                                           : wall friction model ([`AbstractDarcyFactor`](@ref))
 - `T_wall`                                          : length-n wall temperature, or `nothing` when the
                                                       variant has no wall of its own
-- `q_left_expr`, `q_right_expr`                     : length-n `Vector{Num}`, per-cell heat flow inputs (W) — variant builds these
+- `q_left_expr`, `q_right_expr`                     : length-n `Vector{Num}`, per-cell heat flow inputs (W), built by the variant
 - `Re, Pe, v, P, T_sat, T_ONB, q_wall, q_wall_left, q_wall_right` : variant-declared observable LHS symbols
 - `T_in, T_out, dP`                                 : variant-declared scalar observable LHS symbols.
                                                       `T_in` is the coolant entering at whichever
                                                       end is upstream, `T_out` the coolant leaving
 
 # Returns
-NamedTuple `(; eqs::Vector{Equation}, obs::Vector{Equation})` — the variant
+NamedTuple `(; eqs::Vector{Equation}, obs::Vector{Equation})`. The variant
 splices these into its own equation lists before building the `System`.
 
 # Energy balance per cell (enthalpy form, face-averaged cp)
@@ -286,19 +286,12 @@ These have no internal equation. A side with a nonzero `h` needs its wall closed
 any wall a friction model reads, such as [`Friction.RegimeDependent`](@ref) with a `viscosity`
 correction. A side with `h = 0` under a friction model that ignores the wall, the default,
 needs nothing: its wall temperature appears in no equation. Close a wall in the connection
-list, with a number, a length-`n` profile, or any expression in `t`:
-```julia
-connections = [
-    ...,
-    ch.T_wall_left .~ T_wall_value,
-    ch.T_wall_right .~ profile,
-]
-```
-For a wall to change without recompiling, bind it to a parameter declared with `@parameters`.
+list, as in `ch.T_wall_left .~ 100.0`, with a number, a length-`n` profile, a parameter or any
+expression in `t`. See [Bind a wall temperature or heat flux](@ref).
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (mass + momentum + stream T)
-  *No thermal ports — see external-input variables above.*
+  *No thermal ports: see the external-input variables above.*
 """
 function Channel(;
     name,
@@ -319,7 +312,7 @@ function Channel(;
         length(h_left) == n ||
             throw(DimensionMismatch("h_left has length $(length(h_left)), expected n=$n"))
         hL_per_cell = Num.(h_left)
-    else  # Function / callable — MTK callable-parameter pattern
+    else  # a function or other callable: the MTK callable-parameter pattern
         FType_L = typeof(h_left)
         pL = @parameters (h_left_fn::FType_L)(..)
         hL_call = pL[1](t)
@@ -394,7 +387,7 @@ connections = [
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (mass + momentum + stream T)
-  *No heat-flux ports — see external-input variables above.*
+  *No heat-flux ports: see the external-input variables above.*
 """
 function ChannelHeatFlux(;
     name,

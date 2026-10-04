@@ -29,7 +29,7 @@ Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
 
 # Units
 
-We use SI units everywhere, but for temperetures we use Celsius.
+SI units everywhere, except temperatures, which are in °C.
 """
 module STREAM
 
@@ -286,10 +286,8 @@ The tables behind [`FissionProducts`](@ref) are published standards that this pa
 not distribute. Point [`standards_dir!`](@ref) at a directory holding them, or pass `dir=`
 to [`read_standard`](@ref).
 
-[`DecayHeatSource`](@ref) is how a contribution reaches a model. It converts MeV per fission
-into power with the fission rate `P0/Q`, and reads the trip time off the
-`ReactivityController` so the decay clock starts when the reactor scrams. Hand the result to
-`PointKinetics(...; power_input=source)` and couple the fuel to `P`, the total power.
+[`DecayHeatSource`](@ref) is how a contribution reaches a model, as the `power_input` of a
+`PointKinetics`. See [Add decay heat to a transient](@ref).
 """
 module DecayHeat
 using DelimitedFiles

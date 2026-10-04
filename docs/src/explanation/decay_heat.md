@@ -63,10 +63,13 @@ where ``P(t)`` is the power from a point-kinetics solve normalised to 1 before s
 Because a shut-down fission rate is a sum of decaying exponentials, STREAM interpolates the
 logarithm of the profile by default ([`DecayHeat.LogLinear`](@ref)), which is exact for one
 exponential. Python STREAM interpolates linearly, which overshoots between samples; pass
-[`DecayHeat.Linear`](@ref) to match it. On a step insertion of -0.005 sampled every 2 s,
-linear interpolation is off by up to 12% after the first interval, against 3.6% for the
-logarithmic form. Neither rescues a grid too coarse across the prompt drop, where the power
-falls by an order of magnitude in the first seconds: sample densely there.
+[`DecayHeat.Linear`](@ref) to match it. On a step insertion of -0.005 sampled every 2 s over
+100 s, compared with a grid eight times finer, linear interpolation is off by up to 12% after
+the first interval, against 3.6% for the logarithmic form, and after the fifth interval by
+3.2% against 0.29%. Neither rescues a grid too coarse across the prompt drop: under the same
+insertion the power falls tenfold in the first 2 s interval, and both are wrong by more than
+100% inside it. Sample densely near shutdown, or on a logarithmic grid, if the first seconds
+matter.
 
 **Do not add it to a model that already runs point kinetics.** In a model whose fuel is
 heated by a [`PointKinetics`](@ref STREAM.Components.PointKinetics), the kinetics already

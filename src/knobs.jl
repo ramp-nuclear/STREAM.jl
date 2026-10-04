@@ -27,12 +27,11 @@ caller supplying a value.
 
 # Example
 ```julia
-outer_d = @design_knob outer_d = 0.02      # annulus outer / channel inner [m]
-@named ch = CoolantChannel(outer_d)         # same knob into both components
-@named hd = FuelAnnulus(outer_d)
-# ... compose, mtkcompile, build a SteadyStateProblem ...
-remake(prob; p = [outer_d => 0.025])        # scan one knob, no rebuild
+gap = @design_knob gap = 0.0024
+geometry = PipeGeometry_rectangular(0.6, 0.067, gap, 0.063)   # build with it, then:
+solve_steady(sys, [gap => 0.0027, ...])                       # a new gap, no rebuild
 ```
+See [Scan a design parameter](@ref).
 
 # Returns
 Binds `name` in the caller's scope to the knob and returns it.

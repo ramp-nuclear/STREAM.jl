@@ -285,7 +285,7 @@ with [`assembly`](@ref STREAM.Assemblies.assembly) to close the neutronics<->the
 - `components`: list of scoped component references whose temperatures feed into `pk`
   (e.g. `[rods.cac]`, `[inter.ch_left, inter.ch_right]`). Pass scoped references
   (post-composition), not original component variables. Alpha coefficients belong in
-  the `PointKinetics` constructor `temp_worth` dict — they are not needed here.
+  the `PointKinetics` constructor `temp_worth` dict; they are not needed here.
 
 # Returns
 `Vector{Equation}` -- one equation per cell, per component. Length equals the total
@@ -297,7 +297,7 @@ Pass scoped references (post-composition), not original component variables. The
 original component variables hold unscoped symbolic names and should not be used in
 equations or connection dicts after composition.
 
-# Example (scoped — component wrapped inside symmetric_plate)
+# Example: a component wrapped inside `symmetric_plate`
 ```julia
 rods = symmetric_plate(cac, fuel; name=:rods)
 @named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => alpha))

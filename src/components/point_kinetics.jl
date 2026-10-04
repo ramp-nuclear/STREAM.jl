@@ -148,29 +148,16 @@ The system starts where it was built to: `rho_c_fn` defaults to the callable giv
 `power_input` taken at `t = 0`, as [`point_kinetics_steady_state`](@ref) computes it. Put any
 of them in the operating point to start elsewhere.
 
-# Neutron and total power
-
-`P_neutron` is the power the equations above integrate. `power_input` adds a source that
-fission does not produce, and the total is
+The total power is
 
 ```math
 P = P_{neutron} + P_{input}(t)
 ```
 
-Decay heat is what this is for, through [`STREAM.DecayHeat.DecayHeatSource`](@ref), but any
-external source fits: gamma deposition in the reflector, pump heat, and so on. Couple a fuel
-plate to `P`, the power it actually receives.
-
-`power_input` carries the same units as `P_neutron`. Those are Watts only if the kinetics
-run in Watts; a model running dimensionless kinetics and scaling later (as `build_loop_pk`
-does) needs a `power_input` scaled the same way.
-
-With no `power_input`, `P` is `P_neutron` and costs nothing: `mtkcompile` eliminates the
-equation either way, so the compiled state count is `1 + G` regardless.
-
-A power trip is a [`StateMachine`](@ref) transition, and may watch either one. `P_neutron`
-is what a power-range monitor reading neutron flux measures; `P` is the total the fuel sees.
-A condition compiles the same way for both, state or observable.
+where `power_input` is power fission does not produce, such as decay heat from a
+[`STREAM.DecayHeat.DecayHeatSource`](@ref). Heat the fuel with `P`. A power trip may watch
+either: `P_neutron` is what a neutron flux monitor measures, `P` what the fuel receives. See
+[Point kinetics and feedback](@ref) for the physics.
 
 # Arguments
 - `rho_c_fn` (positional): callable `(t) -> Float64`, or a `ReactivityController`. Its

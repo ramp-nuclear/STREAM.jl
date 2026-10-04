@@ -11,33 +11,13 @@ This closes both gaps:
 \mathrm{source}(t) = Φ \, \mathrm{model}(t - t_{shutdown}, T), \qquad Φ = P_0 / Q
 ```
 
-`Φ` is the fission rate of equation FR: at `P0` power and `Q` recoverable MeV per fission,
-the core runs `P0/Q` fissions worth of energy per second, so multiplying by it converts
-MeV/fission into the units `P0` was given in.
+with `Φ` the fission rate and `t_shutdown` the time the machine entered one of
+`shutdown_states`, read off its log. Before the trip the decay time is zero, so the source holds
+the saturated value a reactor at power carries, and the operating point closes exactly. See
+[Decay heat](@ref) for the physics and [Add decay heat to a transient](@ref) for how to use it.
 
-# The clock
-
-`t_shutdown` is read off the [`StateMachine`](@ref)'s log: while the machine is in one of
-`shutdown_states` the decay time is `t` minus the time it entered that state, floored at zero,
-and in any other state it is zero. Reading the log rather than the machine's current state
-makes the source right at any `t` after the solve, not only during it.
-
-Flooring at zero is the physics rather than a guard. A reactor at power holds a saturated
-decay heat inventory, and `model(0, T)` is exactly that saturated value, so the source sits
-there while the reactor runs and decays away from there once tripped. Two things follow.
-The source is continuous in value across the trip, with only its slope jumping, at the
-instant the machine's own transition fires. And the operating point closes
-exactly, since `point_kinetics_steady_state(P0; power_input=source(0.0))` is seeded with the
-same number the source returns before the trip.
-
-A trip at a time you already know needs nothing extra: a machine built in the shutdown
-state, `StateMachine(; initial_state=:SCRAM, initial_time=5.0)`, is a fixed trip at `t = 5`.
-
-# Units
-
-`P0` sets them. Pass the power the reactor runs at in whatever units the kinetics use, which
-is Watts only if `P` is in Watts. A model running dimensionless kinetics at `P0 = 1.0` and
-scaling to Watts downstream, as `build_loop_pk` does, wants `P0 = 1.0` here too.
+`P0` sets the units: those of the kinetics, so `P0 = 1` for kinetics run in units of the
+rated power.
 
 # Arguments
 - `model`: the contribution, any [`AbstractDecayHeat`](@ref). Sum several with `+`.

@@ -153,7 +153,7 @@ end
 Resistor quadratic in volumetric flow: `ΔP = k·Q·|Q| + klow·Q`, where `Q = ṁ/ρ` is the
 volumetric flow rate. The `Q·|Q|` form keeps the drop direction-correct under flow reversal.
 
-A **time-dependent** resistance (the "transistor" pattern — a branch whose resistance
+A **time-dependent** resistance (the "transistor" pattern: a branch whose resistance
 collapses or grows over time) is expressed by passing `k` as a callable `(t) -> k`; the user
 then supplies `vfr.k_fn => fn` in the solve `op` dict (the MTK callable-parameter idiom, the
 same one `Channel`'s `h_left` uses).
@@ -180,7 +180,7 @@ function VolumetricFlowResistor(;
     if k isa Real
         kpars = @parameters k = k
         k_expr = kpars[1]
-    else  # Function / callable — MTK callable-parameter pattern (time-varying resistance)
+    else  # a function or other callable: a time-varying resistance as a callable parameter
         FType = typeof(k)
         kpars = @parameters (k_fn::FType)(..)
         k_expr = kpars[1](t)
@@ -205,7 +205,7 @@ end
 Minor (local) pressure loss across a sudden area change `A1 -> A2`, after Idelchik tables
 4.2 (expansion) and 4.10 (contraction). The loss is `ΔP = K·ṁ·|ṁ| / (2·ρ·A_min²)`,
 where the coefficient `K` depends on the area ratio and Reynolds number and on the flow
-direction — forward flow sees an expansion when `A2 ≥ A1` and a contraction otherwise, with
+direction: forward flow sees an expansion when `A2 ≥ A1` and a contraction otherwise, with
 the roles swapped under reversal. The `ṁ·|ṁ|` form keeps the drop direction-correct.
 
 # Arguments

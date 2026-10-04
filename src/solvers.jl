@@ -60,7 +60,7 @@ are the start wanted, such as a `PointKinetics` starting critical.
 - `initializealg`: DAE initialization algorithm (default `SciMLBase.NoInit()`, which trusts the
   supplied `op` as a fully consistent initial condition). Pass `SciMLBase.BrownFullBasicInit()`
   to have the solver solve the algebraic constraints for consistency at `t[1]` (holding the
-  differential states fixed) before stepping — needed when `op` is an approximate / transplanted
+  differential states fixed) before stepping. It is needed when `op` is an approximate or transplanted
   IC that does not exactly satisfy the algebraic equations, where `NoInit` + a stiff solver can
   abort at `t=0` (`dt` driven below floating-point epsilon, `NaN` error estimate).
 - `build_initializeprob`: leave at the default `nothing` for almost everything (MTK chooses). Pass

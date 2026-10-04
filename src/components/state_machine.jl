@@ -80,26 +80,10 @@ A control system, such as a reactor protection system: the state it is in, when 
 that state, a log of every state it entered and why, and the transitions it can take.
 
 Hand the machine to whatever acts on its state, such as a [`ReactivityController`](@ref), a
-[`Flapper`](@ref) or a `DecayHeatSource`. Then set its transitions, and
-[`machine_callbacks`](@ref) turns them into events for the solver:
-
-```julia
-machine = StateMachine(; abort_states=(:ABORT,))
-rods = ReactivityController((state, t_state, t) -> state === :SCRAM ? -0.05 : 0.0;
-                            machine=machine)
-@named pk = PointKinetics(rods)
-@named pump = Pump(dP_design)
-
-machine.transitions = [
-    (:NORMAL => :SCRAM, pk.P_neutron > 1.2e6, "high power"),
-    (:NORMAL => :SCRAM, pump.inlet.ṁ < 0.85 * ṁ_design, "low flow"),
-    (:SCRAM => :ABORT, (m, sys, t) -> t - m.t_state - 2.0, "2 s after scram"),
-]
-
-# compose the model, mtkcompile it into ssys, and solve for sol_ss, then:
-sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
-machine.log   # each state entered, when, and which transition caused it
-```
+[`Flapper`](@ref) or a `DecayHeatSource`, then set its transitions, and
+[`machine_callbacks`](@ref) turns them into events for the solver. See
+[Trip a reactor or open a valve](@ref) for worked recipes, and [Events and control](@ref) for
+how the solver finds an event.
 
 A transition is `(from => to, condition, description)`. `from`
 is one state, a collection of states, or `nothing` for any state. The description is what the
@@ -116,11 +100,10 @@ The condition is one of:
   "and" and "or". The solver calls it between its steps as well as at them, so it must have
   no side effects.
 
-Each fires at the exact instant its condition becomes true. A condition that already holds
-fires when the machine enters a state its transition leaves from, and at the start of the run,
-so a limit already passed is not missed. An equation has no side that holds, so it only fires
-on a crossing. When two transitions fire at once, the one added first is taken. Entering a
-state in `abort_states` stops the integration.
+Each fires at the instant its condition becomes true. A condition that already holds fires
+when the machine enters a state its transition leaves from, and at the start of the run. When
+two fire at once, the one added first is taken. Entering a state in `abort_states` stops the
+integration.
 
 Transitions can be set as soon as the components they mention exist: `pump.inlet.ṁ` is the
 same variable after `mtkcompile`. Assigning `machine.transitions` replaces the list and

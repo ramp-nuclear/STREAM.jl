@@ -259,10 +259,11 @@ The returned closure has signature `(state::ChannelState) -> AbstractArray`.
 - `chf_fn`: a callable `(state::ChannelState) -> AbstractArray`, i.e. any of
   `q_CHF_mirshak`, `q_CHF_sudo_kaminaga`, `q_CHF_fabrega`
 - `direction`: which face's heat flux to use as denominator:
-  - `:max` (default) — `max.(q_flux_left, q_flux_right)` (most conservative)
-  - `:left`  — `state.q_flux_left`
-  - `:right` — `state.q_flux_right`
-  - `:total` — `state.q_flux` (same as `:max`, but named separately for clarity)
+  - `:max` (default): the larger face flux, `max.(q_flux_left, q_flux_right)`, the
+    conservative choice
+  - `:left`: `state.q_flux_left`
+  - `:right`: `state.q_flux_right`
+  - `:total`: `state.q_flux`, the same as `:max` under another name
 
 # Returns
 Closure `(state::ChannelState) -> Vector{Float64}` where each entry is `CHF[i] / q[i]`,
