@@ -12,13 +12,15 @@ function _bergles_rohsenow_dT_ONB(P_Pa, q_spl)
     return 0.556 * (q_spl / (1082 * p^1.156))^(0.463 * p^0.0234)
 end
 
-"""
+@doc raw"""
     mcadams_scb_heat_flux(T_sat, T_wall) -> q [W/m^2]
 
 McAdams' subcooled boiling heat flux for water [McAdams1949](@cite), in the SI form given in
 [IAEA1980](@cite):
 
-    q = 2.26 · (T_wall - T_sat)^3.86
+```math
+q = 2.26 \, (T_{wall} - T_{sat})^{3.86}
+```
 
 with the superheat in K and `q` in W/m². Zero at or below saturation.
 
@@ -40,13 +42,15 @@ julia> HTC.mcadams_scb_heat_flux(100.0, 90.0)
 """
 mcadams_scb_heat_flux(T_sat, T_wall) = 2.26 * max(T_wall - T_sat, 0.0)^3.86
 
-"""
+@doc raw"""
     rohsenow_scb_heat_flux(T_wall, sat; n=1.26, csf=0.011, g=G_EARTH) -> q [W/m^2]
 
 Rohsenow's nucleate boiling heat flux [Rohsenow1952](@cite), used for subcooled boiling in
 laminar flow:
 
-    q = μ·h_fg·sqrt(g(ρ - ρᵥ)/σ) · [cₚ(T_wall - T_sat) / (C_sf·h_fg·Pr^n)]^(1/0.33)
+```math
+q = μ \, h_{fg} \sqrt{g (ρ - ρ_v) / σ} \; [c_p (T_{wall} - T_{sat}) / (C_{sf} h_{fg} Pr^n)]^{1/0.33}
+```
 
 Every property is read from `sat`, the coolant at saturation. Zero at or below saturation,
 where the superheat is clamped at zero so the fractional power never sees a negative base.
@@ -76,13 +80,15 @@ function rohsenow_scb_heat_flux(T_wall, sat::Liquid; n=1.26, csf=0.011, g=G_EART
     return sat.μ * sat.hfg * sqrt(g * (sat.ρ - sat.ρᵥ) / sat.σ) * x^(1 / 0.33)
 end
 
-"""
+@doc raw"""
     partial_SCB_correction(q_spl, q_scb, q_scb_inc) -> factor
 
 The partial boiling factor of Bergles and Rohsenow [BerglesRohsenow1964](@cite), which scales the single-phase
 coefficient between the onset of nucleate boiling and fully developed boiling:
 
-    factor = sqrt(1 + ((q_scb - q_scb_inc) / q_spl)²)
+```math
+\mathrm{factor} = \sqrt{1 + ((q_{scb} - q_{scb,inc}) / q_{spl})^2}
+```
 
 It is 1 at the onset, where `q_scb = q_scb_inc`, and grows with the wall superheat. Below
 the onset, and when `q_spl` is not positive, it is 1.

@@ -109,15 +109,19 @@ function _power_input_term(f)
     return (pars[1](t), pars)
 end
 
-"""
+@doc raw"""
     PointKinetics(rho_c_fn::Any; name, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
                   lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing,
                   power_input=nothing, P0=1.0) -> System
 
 Keepin (1965) point kinetics with `G` delayed precursor groups, so `1 + G` ODEs:
 
-    dPₙ/dt = (ρ - β)/Λ · Pₙ + Σₖ λₖ·Cₖ
-    dCₖ/dt = βₖ/Λ · Pₙ - λₖ·Cₖ           k = 1..G
+```math
+\begin{aligned}
+dP_n/dt &= (ρ - β)/Λ \, P_n + \sum_k λ_k C_k \\
+dC_k/dt &= (β_k/Λ) \, P_n - λ_k C_k, \qquad k = 1, …, G
+\end{aligned}
+```
 
 with `Pₙ` the neutron power, the unknown `P_neutron`.
 
@@ -129,7 +133,9 @@ at criticality.
 The control reactivity comes from a callable `rho_c_fn(t)` (a `ReactivityController` is itself
 callable), and the total reactivity becomes
 
-    ρ = rho_c_fn(t) + Σⱼ αⱼ·(Tⱼ - Trefⱼ)
+```math
+ρ = ρ_c(t) + \sum_j α_j (T_j - T_{ref,j})
+```
 
 where the sum is the per-cell temperature feedback. Each weight `αⱼ` is a temperature
 coefficient of reactivity (dρ/dT) and enters signed: a stabilizing reactor has a negative
@@ -147,7 +153,9 @@ of them in the operating point to start elsewhere.
 `P_neutron` is the power the equations above integrate. `power_input` adds a source that
 fission does not produce, and the total is
 
-    P = P_neutron + power_input
+```math
+P = P_{neutron} + P_{input}(t)
+```
 
 Decay heat is what this is for, through [`STREAM.DecayHeat.DecayHeatSource`](@ref), but any
 external source fits: gamma deposition in the reflector, pump heat, and so on. Couple a fuel

@@ -1,8 +1,8 @@
 
-"""
+@doc raw"""
     Re(ṁ, A, Dh, mu) -> Float64
 
-Reynolds number from mass flow rate, `Re = |ṁ| Dh / (A μ)`.
+Reynolds number from mass flow rate, ``Re = |\dot{m}| D_h / (A μ)``.
 
 # Arguments
 - `ṁ`: mass flow rate [kg/s] (absolute value taken internally)
@@ -18,7 +18,7 @@ Re(ṁ, A, Dh, mu) = abs(ṁ) * Dh / (A * mu)
 """
     Re_vel(rho, u, L, mu) -> Float64
 
-Reynolds number from velocity, `Re = ρ |u| L / μ`.
+Reynolds number from velocity, ``Re = ρ |u| L / μ``.
 
 # Arguments
 - `rho`: density [kg/m^3]
@@ -34,7 +34,7 @@ Re_vel(rho, u, L, mu) = rho * abs(u) * L / mu
 """
     Pr(cp, mu, k) -> Float64
 
-Prandtl number, `Pr = cₚ μ / k`.
+Prandtl number, ``Pr = c_p μ / k``.
 
 # Arguments
 - `cp`: specific heat [J/(kg*K)]
@@ -98,7 +98,7 @@ end
 """
     Nu(h, Dh, k) -> Float64
 
-Nusselt number, `Nu = h Dh / k`.
+Nusselt number, ``Nu = h D_h / k``.
 
 # Arguments
 - `h`: heat transfer coefficient [W/(m^2*K)]
@@ -127,7 +127,7 @@ Pe(Re_val, Pr_val) = Re_val * Pr_val
 """
     Gr(rho, mu, beta, T_wall, T, L, g) -> Float64
 
-Grashof number, `Gr = ρ² β g (T_wall - T) L³ / μ²`.
+Grashof number, ``Gr = ρ^2 β g (T_{wall} - T) L^3 / μ^2``.
 
 # Arguments
 - `rho`: density [kg/m^3]

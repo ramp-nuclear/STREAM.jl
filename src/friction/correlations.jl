@@ -1,9 +1,11 @@
-"""
+@doc raw"""
     blasius(Re) -> f_darcy
 
 Blasius' Darcy friction factor for turbulent flow in a smooth pipe [Blasius1913](@cite):
 
-    f = 0.3164 · Re^(-1/4)
+```math
+f = 0.3164 \, Re^{-1/4}
+```
 
 Fitted for `4000 < Re < 10⁵`.
 
@@ -105,13 +107,15 @@ function rectangular_laminar(geom::PipeGeometry)
     return (Re) -> 64.0 / (Re * k_R)
 end
 
-"""
+@doc raw"""
     turbulent(Re, epsilon=0) -> f_darcy
 
 Explicit approximation to the Colebrook-White turbulent Darcy friction factor, in the form
 used by RELAP and by [KAERI2014](@cite) (chapter 2.1.2):
 
-    f = [-2 log₁₀( ε/3.7 + (2.51/Re)·(1.14 - 2 log₁₀(ε + 21.25/Re^0.9)) )]^(-2)
+```math
+f = [-2 \log_{10}(ε/3.7 + (2.51/Re)(1.14 - 2 \log_{10}(ε + 21.25/Re^{0.9})))]^{-2}
+```
 
 Returns 0 below `Re = 10`, where the logarithms diverge. Python STREAM zeroes the same region.
 
@@ -151,7 +155,9 @@ end
 Correction ``K_H`` to the friction factor of a heated channel, for the wall viscosity
 differing from the bulk:
 
-    K_H = 1 + (P_heated / P_wet) · ((μ_wall / μ_bulk)^0.58 - 1)
+```math
+K_H = 1 + (P_{heated} / P_{wet}) ((μ_{wall} / μ_{bulk})^{0.58} - 1)
+```
 
 # Arguments
 - `heat_wet_ratio`: heated perimeter over wetted perimeter
@@ -173,13 +179,15 @@ function viscosity_correction(heat_wet_ratio, mu_ratio)
     return 1 + heat_wet_ratio * (mu_ratio^0.58 - 1)
 end
 
-"""
+@doc raw"""
     darcy_weisbach_dp(ṁ, rho, f, L, Dh, A) -> Pa
     darcy_weisbach_dp(ṁ, rho, f, geom::PipeGeometry) -> Pa
 
 Distributed friction pressure drop over a length of duct:
 
-    dP = f * ṁ|ṁ| / (2*rho*A^2) * (L/Dh)
+```math
+Δp = f \, (L/D_h) \, \dot{m}|\dot{m}| / (2ρA^2)
+```
 
 `ṁ|ṁ|` rather than `ṁ^2` so the drop reverses sign with the flow. Positive `ṁ`
 gives a positive drop.

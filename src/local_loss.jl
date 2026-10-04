@@ -175,12 +175,14 @@ end
 
 @register_symbolic factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
 
-"""
+@doc raw"""
     dp(ṁ, rho, f, A) -> Pa
 
 Local (minor) loss pressure drop:
 
-    dP = f * ṁ|ṁ| / (2*rho*A^2)
+```math
+Δp = f \, \dot{m}|\dot{m}| / (2ρA^2)
+```
 
 The same quadratic form as [`darcy_weisbach_dp`](@ref STREAM.Friction.darcy_weisbach_dp) without the `L/Dh` factor, because a
 local loss is tied to a fitting rather than to a length of duct. Positive `ṁ` gives a

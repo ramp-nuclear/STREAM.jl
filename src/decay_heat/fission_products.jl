@@ -120,14 +120,16 @@ function read_standard(standard::Standard, source::Source; dir=standards_dir())
     return table[:, λ_col], table[:, α_col]
 end
 
-"""
+@doc raw"""
     FissionProducts(λ, α) <: AbstractDecayHeat
     FissionProducts(standard, source; dir=standards_dir()) <: AbstractDecayHeat
 
 Decay of fission products, the largest decay heat contribution, as the summed exponential
 fit the standards publish,
 
-    F(t, T) = Σᵢ (αᵢ/λᵢ)·e^(-λᵢt)·(1 - e^(-λᵢT))    [MeV/fission]
+```math
+F(t, T) = \sum_i (α_i/λ_i) \, e^{-λ_i t} (1 - e^{-λ_i T})
+```
 
 The second form reads the groups from a table with [`read_standard`](@ref), from the
 ANS-5.1 [ANS1973, ANS2014](@cite) or JAERI [Tasaka1991](@cite) standards. The first takes

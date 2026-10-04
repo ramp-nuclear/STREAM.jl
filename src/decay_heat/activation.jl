@@ -14,7 +14,9 @@ _saturated_decay(t, T, λ) = -expm1(-λ * T) * exp(-λ * t)
 
 Decay of a material activated at a constant rate through the irradiation,
 
-    F(t, T) = e^(-λt)·(1 - e^(-λT))
+```math
+F(t, T) = e^{-λt} (1 - e^{-λT})
+```
 
 Dimensionless and normalized to 1 at `t = 0, T = Inf`. Multiply by the energy deposited per
 decay event to get MeV/fission, as in `E_d * Activation(λ)`.
@@ -46,7 +48,9 @@ end
 Decay of the daughter of an activated isotope, where the activated isotope decays at `λ₁`
 and the isotope it produces decays at `λ₂`,
 
-    F(t, T) = [λ₁·e^(-λ₂t)(1 - e^(-λ₂T)) - λ₂·e^(-λ₁t)(1 - e^(-λ₁T))] / (λ₁ - λ₂)
+```math
+F(t, T) = [λ_1 e^{-λ_2 t} (1 - e^{-λ_2 T}) - λ_2 e^{-λ_1 t} (1 - e^{-λ_1 T})] / (λ_1 - λ_2)
+```
 
 Dimensionless and normalized to 1 at `t = 0, T = Inf`. The expression cancels as `λ₂`
 approaches `λ₁`, so within a relative `1e-6` of each other the rates are replaced by

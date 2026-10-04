@@ -30,7 +30,7 @@ Energy deposited per Np239 decay, `0.405` MeV, from ANSI/ANS-5.1-2014. Used by
 """
 const E_NP239 = 0.405
 
-"""
+@doc raw"""
     U238CaptureChain(R) <: AbstractDecayHeat
 
 Decay heat from the U239 and Np239 that neutron capture in U238 leaves behind,
@@ -39,7 +39,9 @@ Decay heat from the U239 and Np239 that neutron capture in U238 leaves behind,
 
 evaluated as
 
-    F(t, T) = R·[E_U239·A(t, T; λ₁) + E_NP239·D(t, T; λ₁, λ₂)]
+```math
+F(t, T) = R \, [E_{U239} A(t, T; λ_1) + E_{Np239} D(t, T; λ_1, λ_2)]
+```
 
 with `A` an [`Activation`](@ref) profile at the U239 decay rate and `D` a
 [`DoubleDecay`](@ref) profile through Np239.

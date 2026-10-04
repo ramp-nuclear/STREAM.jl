@@ -34,12 +34,14 @@ end
 _lenparam(x::Num) = x
 _lenparam(x::Real) = Float64(x)
 
-"""
+@doc raw"""
     PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
 
 A rectangular channel, such as the gap between two fuel plates:
 
-    A = edge1 · edge2,    P_wet = 2 (edge1 + edge2),    Dh = 4A / P_wet
+```math
+A = e_1 e_2, \qquad P_{wet} = 2 (e_1 + e_2), \qquad D_h = 4A / P_{wet}
+```
 
 Any length may be a design knob.
 

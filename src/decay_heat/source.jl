@@ -1,4 +1,4 @@
-"""
+@doc raw"""
     DecayHeatSource(model, machine; P0, Q=200.0, T=Inf, shutdown_states=(:SCRAM,))
 
 Turn a decay heat contribution into the `power_input` a [`PointKinetics`](@ref) takes.
@@ -7,7 +7,9 @@ An [`AbstractDecayHeat`](@ref) answers `model(t, T)` in MeV per fission, with `t
 from shutdown. A component wants one number in power units at the simulation's own time.
 This closes both gaps:
 
-    source(t) = Φ · model(t - t_shutdown, T)      Φ = P0 / Q
+```math
+\mathrm{source}(t) = Φ \, \mathrm{model}(t - t_{shutdown}, T), \qquad Φ = P_0 / Q
+```
 
 `Φ` is the fission rate of equation FR: at `P0` power and `Q` recoverable MeV per fission,
 the core runs `P0/Q` fissions worth of energy per second, so multiplying by it converts

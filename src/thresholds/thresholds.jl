@@ -19,13 +19,15 @@ end
 
 # #### Public API
 
-"""
+@doc raw"""
     bergles_rohsenow_t_onb(pressure, q_wall, T_sat) -> T_ONB [°C]
 
 Wall temperature at the onset of nucleate boiling, from Bergles and Rohsenow
 [BerglesRohsenow1964](@cite):
 
-    T_ONB = T_sat + 0.556 · (q_wall / (1082 p^1.156))^(0.463 p^0.0234)
+```math
+T_{ONB} = T_{sat} + 0.556 \, (q_{wall} / (1082 \, p^{1.156}))^{0.463 \, p^{0.0234}}
+```
 
 with `p` in bar and `q_wall` in W/m². See [Onset of nucleate boiling](@ref) for the physics.
 
@@ -47,12 +49,14 @@ function bergles_rohsenow_t_onb(pressure, q_wall, T_sat)
     return T_sat + _bergles_rohsenow_dT_ONB(pressure, q_wall)
 end
 
-"""
+@doc raw"""
     q_boiling_onset(ṁ, T_sat, T_inlet, cp) -> Q [W]
 
 The boiling power: the channel power that brings the outlet to saturation,
 
-    Q = |ṁ| · cₚ · (T_sat - T_inlet)
+```math
+Q = |\dot{m}| \, c_p \, (T_{sat} - T_{inlet})
+```
 
 Python STREAM calls it `boiling_power`, and TERMIC and CONVEC the boiling power limit.
 
@@ -75,13 +79,15 @@ function q_boiling_onset(ṁ, T_sat, T_inlet, cp)
     return abs(ṁ) * cp * (T_sat - T_inlet)
 end
 
-"""
+@doc raw"""
     q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe) -> Q [W]
 
 Channel power at the onset of flow instability, from the Whittle-Forgan correlation
 [WhittleForgan1967](@cite) with Fabrèga's flow-dependent `η` [Fabrega1971](@cite):
 
-    Q_OFI = |ṁ| ∫ cₚ dT / (1 + η Dh/L),    η = 3.15 (1.08 G)^0.29
+```math
+Q_{OFI} = |\dot{m}| \int c_p \, dT / (1 + η D_h / L), \qquad η = 3.15 \, (1.08 \, G)^{0.29}
+```
 
 with the integral from `T_inlet` to `T_sat` and the mass flux `G` in g/(cm²·s), as the
 correlation was fitted. See [Onset of flow instability](@ref) for the physics.
@@ -112,7 +118,7 @@ function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=
     return abs(ṁ) * integral_cp / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
 end
 
-"""
+@doc raw"""
     q_OSV_saha_zuber(T_inlet, ṁ, pipe, coolant; flux_shape=nothing, dz=nothing) -> q_OSV [W/m^2]
 
 Onset of significant void (OSV) heat flux per cell, from Saha and Zuber
@@ -123,7 +129,9 @@ Saha and Zuber give `T_sat - T_bulk = q_OSV / X`, with `X = κ/Dh · Nu_c` (`Nu_
 `Pe ≤ 70000` and `X = St_c · G · cₚ` (`St_c = 0.0065`) above. Scaling the flux shape until
 the bulk temperature the energy balance gives meets that condition yields
 
-    q_OSV = X (T_sat - T_inlet) / (1 + X Hp / (|ṁ| cₚ) · ∫q dz / q)
+```math
+q_{OSV} = X (T_{sat} - T_{inlet}) / (1 + (X H_p / (|\dot{m}| c_p)) \int q \, dz / q)
+```
 
 which does not depend on how `flux_shape` is normalized. The integral runs from the upstream
 end, so under reversed flow it starts at the last cell. This is Python STREAM's
@@ -252,13 +260,15 @@ function q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant::Liquid)
     return q_star .* hfg .* sqrt.(lamda .* drho .* rho_v .* g_abs)
 end
 
-"""
+@doc raw"""
     q_CHF_mirshak(T_bulk, T_sat, pressure, v) -> q_CHF [W/m^2]
 
 Critical heat flux from the Mirshak correlation [Mirshak1959](@cite), for fast flows
 (`v > 1.5` m/s):
 
-    q_CHF = 1.51·10⁶ (1 + 0.1198 v)(1 + 0.00914 (T_sat - T_bulk))(1 + 1.9·10⁻⁶ p)
+```math
+q_{CHF} = 1.51 \cdot 10^6 \, (1 + 0.1198 \, v)(1 + 0.00914 \, (T_{sat} - T_{bulk}))(1 + 1.9 \cdot 10^{-6} p)
+```
 
 in W/m², with `v` in m/s and `p` in Pa. See [Critical heat flux](@ref).
 
@@ -284,13 +294,15 @@ function q_CHF_mirshak(T_bulk, T_sat, pressure, v)
            (1 + 1.9e-6 * pressure)
 end
 
-"""
+@doc raw"""
     q_CHF_fabrega(T_inlet, T_sat, pipe) -> q_CHF [W/m^2]
 
 Critical heat flux from Fabrèga's low-flow correlation [Fabrega1971](@cite), for slow flows
 (`v < 0.5` m/s):
 
-    q_CHF = 10⁷ · Dh · (0.023 (T_sat - T_inlet) + 4.56)
+```math
+q_{CHF} = 10^7 \, D_h \, (0.023 \, (T_{sat} - T_{inlet}) + 4.56)
+```
 
 in W/m², with `Dh` in m. See [Critical heat flux](@ref).
 
@@ -314,13 +326,15 @@ function q_CHF_fabrega(T_inlet, T_sat, pipe)
     return 1e7 * pipe.Dh * (0.023 * (T_sat - T_inlet) + 4.56)
 end
 
-"""
+@doc raw"""
     twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0) -> T_limit [°C]
 
 Wall temperature the face would reach if the local heat flux were worse by
 `inhomogeneity_factor`.
 
-    T_limit = T_bulk + f · (T_wall - T_bulk)
+```math
+T_{limit} = T_{bulk} + f \, (T_{wall} - T_{bulk})
+```
 
 The solution carries no fuel inhomogeneity, so the wall temperature it reports understates the
 hot spot. Scaling the flux by `f` and reading the wall temperature back off Newton's law gives

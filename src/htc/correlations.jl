@@ -1,9 +1,11 @@
-"""
+@doc raw"""
     dittus_boelter(Re, Pr, args...) -> Nu
 
 Dittus-Boelter turbulent forced convection, in its heating form [DittusBoelter1930](@cite):
 
-    Nu = 0.023 · Re^0.8 · Pr^0.4
+```math
+Nu = 0.023 \, Re^{0.8} Pr^{0.4}
+```
 
 Valid for `Re > 10⁴`, `0.6 ≤ Pr ≤ 160` and `L/D > 10`. Trailing arguments are ignored, so
 the correlation fits the `(Re, Pr, T_wall, T_bulk)` signature of the others.
@@ -46,12 +48,14 @@ function constant_Nusselt(; Nu=8.235)
     return (Re, Pr, args...) -> Nu
 end
 
-"""
+@doc raw"""
     elenbaas_nusselt(Ra, b, L) -> Nu
 
 Natural convection between parallel vertical plates [Elenbaas1942](@cite):
 
-    Nu = (1/24) · Ra · (b/L) · (1 - exp(-35 L / (Ra b)))^0.75
+```math
+Nu = (1/24) \, Ra \, (b/L) \, (1 - e^{-35 L / (Ra \, b)})^{0.75}
+```
 
 With no buoyancy to drive it (`Ra ≤ 0`, a wall no hotter than the coolant) `Nu` is 0.
 
@@ -95,13 +99,15 @@ function _nusselt_coefficient_developing(x)
     return ifelse(x <= 2e-4, nu_low, ifelse(x <= 1e-3, nu_mid, nu_high))
 end
 
-"""
+@doc raw"""
     fully_developed_laminar_nusselt(geom::PipeGeometry) -> (Re, Pr, T_bulk, T_wall) -> Nu
 
 Fully developed laminar Nusselt number in a rectangular duct heated on its two long sides,
 a fifth-order polynomial in the aspect ratio `α = depth / width` [ShahLondon1978](@cite):
 
-    Nu = 8.235 (1 - 1.4122α + 2.3473α² - 2.8983α³ + 2.0629α⁴ - 0.6077α⁵)
+```math
+Nu = 8.235 \, (1 - 1.4122 α + 2.3473 α^2 - 2.8983 α^3 + 2.0629 α^4 - 0.6077 α^5)
+```
 
 # Arguments
 - `geom`: the duct; only `depth / width` is used
@@ -115,14 +121,16 @@ function fully_developed_laminar_nusselt(geom::PipeGeometry)
     return (Re, Pr, args...) -> nu
 end
 
-"""
+@doc raw"""
     developing_laminar_nusselt(geom::PipeGeometry; develop_length) -> (Re, Pr, T_bulk, T_wall) -> Nu
 
 Laminar Nusselt number in a rectangular duct heated on its two long sides, while the
 temperature profile is still developing. It is the parallel-plate developing value at the
 dimensionless distance
 
-    x* = x / (Dh · Re · Pr · c),    c = 6 - 5 exp(-0.75 α / 0.3257)
+```math
+x^* = x / (D_h \, Re \, Pr \, c), \qquad c = 6 - 5 e^{-0.75 α / 0.3257}
+```
 
 scaled to the aspect ratio `α` as in [`fully_developed_laminar_nusselt`](@ref)
 [ShahLondon1978](@cite). Far enough downstream it falls to the fully developed value.
@@ -146,13 +154,15 @@ function developing_laminar_nusselt(geom::PipeGeometry; develop_length)
     end
 end
 
-"""
+@doc raw"""
     marco_han_nusselt(aspect_ratio) -> Nu
 
 Marco and Han's fit for the fully developed laminar Nusselt number in a rectangular duct
 heated on all four sides [ShahLondon1978](@cite):
 
-    Nu = 8.235 (1 - 2.0421α + 3.853α² - 2.4765α³ + 1.0578α⁴ - 0.1861α⁵)
+```math
+Nu = 8.235 \, (1 - 2.0421 α + 3.853 α^2 - 2.4765 α^3 + 1.0578 α^4 - 0.1861 α^5)
+```
 
 # Arguments
 - `aspect_ratio`: `α`, depth over width, in [0, 1]
