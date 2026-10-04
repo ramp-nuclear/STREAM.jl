@@ -1,17 +1,22 @@
 """
-    Slab(depth)
+    Slab(y)
 
-Cartesian geometry for [`HeatDiffusion`](@ref): `x` crosses the plate, `z` runs along it, and
-the plate is uniform over `depth` [m] in the third direction.
+Cartesian geometry for [`HeatDiffusion`](@ref). `x` runs into the plate, through its
+thickness, and `z` runs along it, in the direction of the flow. `y` is the third direction,
+across which nothing is told apart: temperature, power and the coolant beside the plate are
+all single valued along it.
+
+For an MTR plate with 1D flow, `y` is the plate width spanning the channel, not the plate
+thickness, which is the extent of the `x` mesh.
 
 # Arguments
-- `depth`: extent of the plate in the direction neither mesh axis covers [m]
+- `y`: length of the plate along `y` [m], Python's `y_length`
 
 # Returns
-A `Slab`, passed as `HeatDiffusion(; geometry=Slab(depth), ...)`.
+A `Slab`, passed as `HeatDiffusion(; geometry=Slab(y), ...)`.
 """
 struct Slab{T}
-    depth::T
+    y::T
 end
 
 """
@@ -35,8 +40,7 @@ one per face normal to `x`, `Az` is `(nz+1) × nx`, and `V` is `nz × nx`. These
 """
 function _areas_volumes(g::Slab, x, z)
     dx = permutedims(diff(x))
-    return g.depth .* diff(z) .* one.(permutedims(x)), g.depth .* one.(z) .* dx,
-           g.depth .* diff(z) .* dx
+    return g.y .* diff(z) .* one.(permutedims(x)), g.y .* one.(z) .* dx, g.y .* diff(z) .* dx
 end
 
 function _areas_volumes(::Cylinder, r, z)
@@ -74,8 +78,9 @@ end
                   x_contacts=Inf, z_contacts=Inf, power_shape=nothing, power=nothing,
                   T0=T_ROOM) -> System
 
-Heat conduction in a solid on a 2D finite-volume mesh: a plate or a rod, uniform in the third
-direction. This is Python STREAM's `Fuel`.
+Heat conduction in a solid on a 2D finite-volume mesh over `x` and `z`: a plate, single valued
+along its third direction `y` (see [`Slab`](@ref)), or a rod with azimuthal symmetry. This is
+Python STREAM's `Fuel`.
 
 Each cell's energy balance is
 
@@ -88,11 +93,11 @@ conduction across `x` is always on; axial conduction along `z` is on with `axial
 
 # Arguments
 - `name`: system name (Symbol)
-- `x`: the `nx + 1` cell boundaries across the plate, or the radii for a [`Cylinder`](@ref)
-  [m]. A uniform mesh is `Lx .* (0:nx) ./ nx`, which stays symbolic for a design knob.
-- `z`: the `nz + 1` cell boundaries along the plate [m]
+- `x`: the `nx + 1` cell boundaries into the plate, through its thickness, or the radii for a
+  [`Cylinder`](@ref) [m]. A uniform mesh is `Lx .* (0:nx) ./ nx`, which stays symbolic for a design knob.
+- `z`: the `nz + 1` cell boundaries along the plate, in the direction of the flow [m]
 - `material`: a [`Solid`](@ref), or an `nz × nx` matrix of them for a clad plate
-- `geometry`: [`Slab`](@ref) (default, depth 1 m) or [`Cylinder`](@ref)
+- `geometry`: [`Slab`](@ref) (default, `y` = 1 m) or [`Cylinder`](@ref)
 - `axial`: conduct along `z` as well (default `false`, each axial slice independent)
 - `x_contacts`: contact conductance [W/(m²K)] on the faces normal to `x`, anything that
   broadcasts to `nz × (nx+1)`. The default `Inf` is perfect contact. A row such as
