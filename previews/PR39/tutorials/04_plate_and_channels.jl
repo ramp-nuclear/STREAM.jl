@@ -51,6 +51,15 @@ lines!(ax, zc, sol[sys.cell.ch.T_sat]; label="saturation", linestyle=:dash)
 axislegend(ax; position=:lt)
 fig
 
+T_plate = [sol[sys.cell.fuel.T[i, j]] for i in 1:n, j in 1:nx]
+fig_map = Figure(size=(450, 500))
+ax_map = Axis(fig_map[1, 1]; xlabel="across the plate [mm]",
+              ylabel="distance from the inlet [m]")
+hm = heatmap!(ax_map, range(0, 1000 * thickness; length=nx + 1), z_edges, T_plate';
+              colormap=:jet)
+Colorbar(fig_map[1, 2], hm; label="temperature [°C]")
+fig_map
+
 margins = threshold_analysis(sol, sys.cell.ch; pipe=geometry,
     onb = s -> bergles_rohsenow_t_onb(s) .- s.T_wall,
     osv = s -> q_OSV_saha_zuber(s) ./ s.q_flux,

@@ -37,6 +37,22 @@ lines!(ax, sol.t, ṁ_sim; label="STREAM")
 axislegend(ax)
 fig
 
+dp_loss = sol[sys.loss.inlet.p - sys.loss.outlet.p, :]
+dp_flywheel = sol[sys.flywheel.outlet.p - sys.flywheel.inlet.p, :]
+@assert maximum(abs.(dp_loss .- dp_flywheel)) < 1e-6 * dp0
+
+fig_dp = Figure(size=(650, 560))
+ax_dp = Axis(fig_dp[1, 1]; ylabel="pressure difference [bar]")
+lines!(ax_dp, sol.t, dp_loss ./ 1e5; label="drop across the loss", linewidth=4,
+       color=(:gray, 0.5))
+lines!(ax_dp, sol.t, dp_flywheel ./ 1e5; label="rise across the flywheel")
+axislegend(ax_dp)
+ax_err = Axis(fig_dp[2, 1]; xlabel="time after the trip [s]",
+              ylabel="error in the flow [%]")
+lines!(ax_err, sol.t, 100 .* (ṁ_sim .- ṁ_exact.(sol.t)) ./ ṁ_exact.(sol.t))
+linkxaxes!(ax_dp, ax_err)
+fig_dp
+
 τ = 5.0
 head(t) = dp0 * exp(-t / τ)
 @named pump2 = Pump(head)
