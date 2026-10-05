@@ -187,14 +187,14 @@ component is its only caller: components state equations, they do not define cor
 docs/
   make.jl          # Documenter build: Literate conversion, makedocs, deploydocs
   Project.toml     # Documenter, DocumenterCitations, DocumenterInterLinks, DocumenterMermaid,
-                   # Literate, CairoMakie; STREAM through [sources]
+                   # DocumenterCodeBlocks, Literate, CairoMakie, Latexify; STREAM through [sources]
   literate/        # the tutorials, as runnable scripts Literate turns into pages
   src/
     index.md       # home: what STREAM is, a first model, conventions
     tutorials/     # index.md only; the tutorial pages are generated, and git-ignored
     howto/         # task recipes, one page per task
     explanation/   # the physics and the reasoning behind the models; limits/ for the
-                   # thermal-hydraulic limits
+                   # thermal-hydraulic limits, mtk/ for ModelingToolkit's vocabulary
     reference/     # one @autodocs page per module
     refs.bib       # every citation
     assets/        # hand-drawn SVG schematics
@@ -202,7 +202,8 @@ docs/
 
 The site follows the four kinds of documentation: tutorials teach by building a model,
 how-to guides solve one task, explanation pages give the physics, and the reference lists the
-API. Put a new page in the kind it is, and list it in `make.jl`. Code on a page runs when the
+API. Put a new page in the kind it is, and list it in `make.jl`. To show a system's equations
+on a page, print them as TeX with `latexify(equations(sys); env=:aligned)`. Code on a page runs when the
 docs build, so tutorials and how-tos end with an `@assert` against physics where one exists.
 Plots use CairoMakie.
 

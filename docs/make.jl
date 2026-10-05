@@ -106,6 +106,13 @@ limits = keep([
     "Margins" => "explanation/limits/margins.md",
 ])
 
+mtk = keep([
+    "Overview" => "explanation/mtk/index.md",
+    "A series RLC circuit" => "explanation/mtk/rlc.md",
+    "Masses on springs" => "explanation/mtk/springs.md",
+    "A planar pendulum" => "explanation/mtk/pendulum.md",
+])
+
 explanation = keep([
     "Overview" => "explanation/index.md",
     "How a model is built" => "explanation/modelling.md",
@@ -118,6 +125,7 @@ explanation = keep([
     "Events and control" => "explanation/events.md",
     "Relation to Python STREAM" => "explanation/python.md",
 ])
+isempty(mtk) || insert!(explanation, 3, "ModelingToolkit in brief" => mtk)
 isempty(limits) || push!(explanation, "Thermal-hydraulic limits" => limits)
 
 pages = Any["Home" => "index.md"]

@@ -14,6 +14,8 @@ each calculation supplies its own Jacobian and mass vector. STREAM.jl builds the
 from acausal components joined by connections (see [How a model is built](@ref)). The
 assembly, the Jacobian, its sparsity pattern and the reduction of the differential-algebraic
 system are derived symbolically by ModelingToolkit rather than written by hand.
+[In Python STREAM's terms](@ref) maps each part of an aggregator to its ModelingToolkit
+counterpart.
 
 In practice this means:
 

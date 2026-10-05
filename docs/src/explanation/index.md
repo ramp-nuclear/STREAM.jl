@@ -8,6 +8,8 @@ choosing them implies for a result. They are for reading, not for following step
 
 - [How a model is built](modelling.md): acausal components, connectors, and what compiling a
   model does
+- [ModelingToolkit in brief](mtk/index.md): unknowns, parameters, observed variables and the
+  rest of MTK's vocabulary, on an electric circuit, masses on springs and a pendulum
 - [Relation to Python STREAM](python.md): where STREAM.jl departs from it, and how the two are
   checked against each other
 

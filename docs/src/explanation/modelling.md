@@ -59,6 +59,18 @@ what arrives at the outlet leaves at the inlet. The solver uses whichever matche
 the flow. A channel whose flow reverses during a transient simply starts taking its inlet
 temperature from the other end.
 
+A component's equations can be printed. A `Resistor` states the conservation of mass across
+it, its law, and one temperature equation per direction, where `instream` reads the
+temperature arriving at a port:
+
+```@example modelling
+using STREAM, Latexify
+using STREAM.Components: Resistor
+using ModelingToolkit: @named, equations
+@named r = Resistor(2.0)
+latexify(equations(r); env=:aligned)
+```
+
 ## Wiring
 
 Connections are written as equations in a list. [`inseries`](@ref STREAM.Assemblies.Connect.inseries) and [`inparallel`](@ref STREAM.Assemblies.Connect.inparallel)
@@ -90,6 +102,9 @@ still be read from a solution, observed or not, as `sol[sys.ch.T_out]`.
 
 This is also why the initial guess you give matters only for the variables the compiled
 system keeps. A guess for an eliminated variable has nothing to act on.
+
+[ModelingToolkit in brief](mtk/index.md) goes through each of these steps on small systems,
+printing their equations before and after compiling.
 
 ## Steady state and transient
 
