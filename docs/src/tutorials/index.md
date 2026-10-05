@@ -11,8 +11,9 @@ Read them in order: each assumes what the ones before it taught.
 | 2 | [Hydraulic networks](02_hydraulic_networks.md) | parallel branches, junctions, gravity and buoyancy-driven flow |
 | 3 | [Pump coastdown](03_pump_coastdown.md) | inertia, inputs that change in time, transients |
 | 4 | [A fuel plate between two channels](04_plate_and_channels.md) | solid conduction, thermal coupling, axial power shapes, safety margins |
-| 5 | [Reactivity insertion with feedback](05_reactivity_insertion.md) | point kinetics, temperature feedback, the prompt jump |
-| 6 | [Loss of flow in a pool reactor](06_pool_lofa.md) | everything together: trips, a check valve, decay heat, flow reversal, margins over time |
+| 5 | [A fuel assembly of many plates](05_fuel_assembly.md) | a chain of plates and channels, parallel flow, the cross-section of an assembly |
+| 6 | [Reactivity insertion with feedback](06_reactivity_insertion.md) | point kinetics, temperature feedback, the prompt jump |
+| 7 | [Loss of flow in a pool reactor](07_pool_lofa.md) | everything together: trips, a check valve, decay heat, flow reversal, margins over time |
 
 Every tutorial can be downloaded as a Julia script or a Jupyter notebook from the link at its
 top, and run as it is.

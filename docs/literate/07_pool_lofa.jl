@@ -1,9 +1,9 @@
 # # Loss of flow in a pool reactor
 #
-#md # *Download this tutorial as a [Julia script](06_pool_lofa.jl) or a
-#md # [Jupyter notebook](06_pool_lofa.ipynb).*
+#md # *Download this tutorial as a [Julia script](07_pool_lofa.jl) or a
+#md # [Jupyter notebook](07_pool_lofa.ipynb).*
 #
-# This tutorial puts the previous five together into the transient a research reactor's
+# This tutorial puts the earlier tutorials together into the transient a research reactor's
 # safety analysis is most often about: a loss of flow. In a pool-type reactor the primary
 # pump draws water down through the core and back to the pool. When the pump trips:
 #

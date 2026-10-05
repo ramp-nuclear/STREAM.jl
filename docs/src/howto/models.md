@@ -17,7 +17,7 @@ nothing # hide
 ## A model for every regime
 
 For a transient that reaches low flow, switch models by regime. This is the combination the
-[pool loss-of-flow tutorial](../tutorials/06_pool_lofa.md) uses: laminar, turbulent and natural
+[pool loss-of-flow tutorial](../tutorials/07_pool_lofa.md) uses: laminar, turbulent and natural
 convection, with subcooled boiling on top, and friction that blends from laminar to turbulent
 with the rectangular-duct correction.
 

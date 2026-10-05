@@ -1,7 +1,7 @@
 # # Reactivity insertion with feedback
 #
-#md # *Download this tutorial as a [Julia script](05_reactivity_insertion.jl) or a
-#md # [Jupyter notebook](05_reactivity_insertion.ipynb).*
+#md # *Download this tutorial as a [Julia script](06_reactivity_insertion.jl) or a
+#md # [Jupyter notebook](06_reactivity_insertion.ipynb).*
 #
 # A reactor's power is not an input: it follows the reactivity, and the reactivity follows
 # the temperatures of the fuel and coolant. This tutorial couples the fuel plate of
@@ -13,8 +13,9 @@
 #
 # ## The thermal-hydraulic model
 #
-# The unit cell is the one from the previous tutorial: a plate cooled on both faces by one
-# channel, with the flow held fixed. A function builds it, so it can be built twice.
+# The unit cell is the one from [A fuel plate between two channels](04_plate_and_channels.md):
+# a plate cooled on both faces by one channel, with the flow held fixed. A function builds it,
+# so it can be built twice.
 
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, ChannelAndContacts, PointKinetics
@@ -146,6 +147,6 @@ fig
 
 # ## What next
 #
-# [Loss of flow in a pool reactor](06_pool_lofa.md) puts it all together: a trip on low flow
+# [Loss of flow in a pool reactor](07_pool_lofa.md) puts it all together: a trip on low flow
 # scrams the reactor, decay heat keeps the fuel warm, and the coolant turns around into
 # natural circulation.

@@ -74,7 +74,7 @@ sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5]; solver=DynamicSS(Rodas5P()))
 ```
 
 It is slower, but it is the robust choice for a loop with parallel branches, natural
-circulation, or a check valve: the [pool loss-of-flow tutorial](../tutorials/06_pool_lofa.md)
+circulation, or a check valve: the [pool loss-of-flow tutorial](../tutorials/07_pool_lofa.md)
 uses it. Give it a guess with the flows in each branch, as above.
 
 ## Do not constrain the sign of the flow

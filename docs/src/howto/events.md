@@ -113,7 +113,7 @@ valve.transitions = [(:CLOSED => :OPEN, flywheel.inlet.ṁ < 1.5, "low primary f
 callbacks = machine_callbacks(sys, ctrl.machine, valve)
 ```
 
-The [pool loss-of-flow tutorial](../tutorials/06_pool_lofa.md) runs exactly this.
+The [pool loss-of-flow tutorial](../tutorials/07_pool_lofa.md) runs exactly this.
 
 ## A trip at a known time
 

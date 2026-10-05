@@ -117,6 +117,22 @@ fig
 # the flux falls, but the coolant has picked up more heat. The hottest wall is where these
 # two balance.
 #
+# The whole plate at once, as a map of its cells. The plate is 1.27 mm thick and 60 cm long,
+# so the map stretches its thickness across the width of the figure:
+
+T_plate = [sol[sys.cell.fuel.T[i, j]] for i in 1:n, j in 1:nx]
+fig_map = Figure(size=(450, 500))
+ax_map = Axis(fig_map[1, 1]; xlabel="across the plate [mm]",
+              ylabel="distance from the inlet [m]")
+hm = heatmap!(ax_map, range(0, 1000 * thickness; length=nx + 1), z_edges, T_plate';
+              colormap=:jet)
+Colorbar(fig_map[1, 2], hm; label="temperature [°C]")
+fig_map
+
+# The plate is cooled equally on both faces, so it is hottest along its middle plane. Across
+# the plate the temperature changes by less than a kelvin, along it by tens: the plate is
+# thin and conducts well, and the coolant warms as it goes.
+#
 # ## Safety margins
 #
 # How far is this plate from the limits? [`threshold_analysis`](@ref STREAM.Thresholds.threshold_analysis)
@@ -157,5 +173,5 @@ end
 #
 # ## What next
 #
-# [Reactivity insertion with feedback](05_reactivity_insertion.md) drives the plate's power
-# from the reactor's kinetics, and lets the plate's temperature act back on the power.
+# [A fuel assembly of many plates](05_fuel_assembly.md) puts seven plates and eight channels
+# side by side, and shows where the repeating unit cell stops describing them.
