@@ -159,17 +159,17 @@ end
 
 Base.show(io::IO, d::FromFunction) = print(io, "Friction.FromFunction(", _correlation_name(d.f), ")")
 Base.show(io::IO, d::FromReynolds) =
-    print(io, _correlation_name(d.correlation), d.k_R == 1 ? "" : ", Re scaled by k_R = $(d.k_R)")
+    print(io, _correlation_name(d.correlation), d.k_R == 1 ? "" : ", Re scaled by k_R = $(round(d.k_R; sigdigits=4))")
 
 function Base.show(io::IO, d::RegimeDependent)
     lo, hi = d.re_bounds
     print(io, "Friction.RegimeDependent(", _correlation_name(d.laminar), " | ",
           _correlation_name(d.turbulent), ", blending across Re = ", lo, " to ", hi)
-    d.k_R == 1 || print(io, ", k_R = ", d.k_R)
+    d.k_R == 1 || print(io, ", k_R = ", round(d.k_R; sigdigits=4))
     d.viscosity === nothing || print(io, ", with the heated-wall viscosity correction")
     print(io, ")")
 end
 
 Base.show(io::IO, ::MIME"text/plain", d::FromReynolds) =
     print(io, "Friction.FromReynolds(", _correlation_name(d.correlation), ")",
-          d.k_R == 1 ? "" : ", Re scaled by k_R = $(d.k_R)")
+          d.k_R == 1 ? "" : ", Re scaled by k_R = $(round(d.k_R; sigdigits=4))")
