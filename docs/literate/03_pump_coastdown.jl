@@ -38,7 +38,7 @@ dp0, ṁ0, L_over_A = 3.0e4, 50.0, 2.0e4      # Pa, kg/s, 1/m
 
 connections = [inseries(pump, flywheel, loss, hx, pump), pump.inlet.p ~ 1.5e5]
 @named loop = assembly(connections, pump, flywheel, loss, hx)
-sys = mtkcompile(loop)
+sys = mtkcompile(loop);
 
 # The heat exchanger holds the water at 40 °C, the temperature the resistance was
 # calibrated at, so its coefficient does not drift with the density.
@@ -47,7 +47,7 @@ sys = mtkcompile(loop)
 #
 # The four components share one flow, and the compiled system keeps just one copy of it:
 
-unknowns(sys)
+foreach(println, unknowns(sys))
 
 # A guess has to name that variable. A guess for `flywheel.inlet.ṁ`, the same flow under
 # another name, would have nothing to act on, since `mtkcompile` eliminated it. At steady
@@ -109,7 +109,7 @@ head(t) = dp0 * exp(-t / τ)
 @named hx2 = HeatExchanger(40.0)
 connections2 = [inseries(pump2, flywheel2, loss2, hx2, pump2), pump2.inlet.p ~ 1.5e5]
 @named loop2 = assembly(connections2, pump2, flywheel2, loss2, hx2)
-sys2 = mtkcompile(loop2)
+sys2 = mtkcompile(loop2);
 
 # The function becomes a parameter of the model, `dP_pump_fn`, which the operating point
 # gives a value like any other. At ``t = 0`` the head is still the full 0.3 bar, so the loop

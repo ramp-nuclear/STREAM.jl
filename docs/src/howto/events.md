@@ -93,7 +93,7 @@ trip_times = map((1.2, 1.5, 2.0)) do setpoint
     Components.reset!(machine)
     solve_transient(sys, [trip_at => setpoint], 0.0:0.05:30.0;
                     callbacks=machine_callbacks(sys, machine))
-    machine.t_state
+    round(machine.t_state; digits=2)
 end
 ```
 

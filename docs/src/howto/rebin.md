@@ -36,7 +36,7 @@ Give the cell boundaries for meshes that are not uniform:
 ```@example rb
 src_edges = [0.0, 0.1, 0.3, 0.6]
 tgt_edges = [0.0, 0.2, 0.4, 0.6]
-rebin_extensive([1.0, 2.0, 3.0], src_edges, tgt_edges)
+round.(rebin_extensive([1.0, 2.0, 3.0], src_edges, tgt_edges); digits=10)
 ```
 
 A matrix is rebinned along both directions, axial first, which suits a plate's

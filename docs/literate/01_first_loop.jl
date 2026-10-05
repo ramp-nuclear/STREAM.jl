@@ -24,19 +24,19 @@ using STREAM.Components: Pump, HeatExchanger, Channel
 using STREAM.Assemblies: inseries
 using ModelingToolkit: @named, mtkcompile, unknowns, equations
 
-@named pump = Pump(3.0e4)
+@named pump = Pump(3.0e4);
 
 # A [`Pump`](@ref STREAM.Components.Pump) given a number raises the pressure by that many
 # pascals, whatever the flow. Here it is 0.3 bar.
 
-@named hx = HeatExchanger(40.0)
+@named hx = HeatExchanger(40.0);
 
 # A [`HeatExchanger`](@ref STREAM.Components.HeatExchanger) sets the temperature of the water
 # leaving it, here to 40 °C, and takes away whatever heat that needs. It stands in for the
 # secondary side of a real heat exchanger, so the loop reaches a steady state.
 
 geometry = PipeGeometry_circular(0.6, 0.01)
-@named ch = Channel(; n=10, geometry, h_left=5000.0)
+@named ch = Channel(; n=10, geometry, h_left=5000.0);
 
 # A [`Channel`](@ref STREAM.Components.Channel) is the heated pipe: 0.6 m long and 10 mm
 # across, cut into 10 cells along its length. It has a left and a right face. Only the left
@@ -70,7 +70,7 @@ length(equations(loop))
 # and generates the code a solver runs.
 
 sys = mtkcompile(loop)
-unknowns(sys)
+foreach(println, unknowns(sys))
 
 # Of all the variables in the model, the solver only has to find these: the coolant
 # temperature in each cell and the mass flow. Everything else, the pressures, the friction,
@@ -81,7 +81,7 @@ unknowns(sys)
 # [`solve_steady`](@ref) finds the state where nothing changes in time. A loop has a trivial
 # solution with no flow at all, so the solver needs a guess of the flow to start from.
 
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
+sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5]);
 
 # Every variable of the model can be read by its name:
 

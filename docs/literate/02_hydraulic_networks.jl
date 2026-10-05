@@ -56,7 +56,7 @@ end
 connections = [corner.(0:7); pump.inlet.p ~ 1.0e5]
 @named cube = assembly(connections, pump, resistors...)
 sys = mtkcompile(cube)
-sol = solve_steady(sys)
+sol = solve_steady(sys);
 
 # The pump's head over its flow is the cube's resistance:
 
@@ -115,7 +115,7 @@ connections = [
 ]
 @named syphon = assembly(connections, hxs..., rises..., rs...)
 sys = mtkcompile(syphon)
-sol = solve_steady(sys)
+sol = solve_steady(sys);
 
 # The flows STREAM finds, hot, mean and cold:
 

@@ -36,7 +36,7 @@ function unit_cell(; power)
     @named pump = Pump(; ṁ0=0.4)
     @named hx = HeatExchanger(40.0)
     return cell, pump, hx, [inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ 1.7e5]
-end
+end;
 
 # First, the plate at its rated power with no kinetics, to find the temperatures the
 # reactor runs at:
@@ -55,7 +55,7 @@ extrema(T_fuel0)
 # U-235 delayed neutron data:
 
 ρ_step = 0.001
-insertion(t) = t < 1.0 ? 0.0 : ρ_step
+insertion(t) = t < 1.0 ? 0.0 : ρ_step;
 
 # The feedback has a coefficient per cell. Here every fuel cell carries the same share of a
 # fuel temperature coefficient of ``-1.5\times10^{-4}`` per kelvin of mean fuel temperature,
@@ -72,7 +72,7 @@ fuel, ch = cell.fuel, cell.ch
 α_cool = fill(-1.0e-4 / n, n)
 @named pk = PointKinetics(insertion;
     temp_worth=Dict(fuel => α_fuel, ch => α_cool),
-    ref_temp=Dict(fuel => T_fuel0, ch => T_cool0))
+    ref_temp=Dict(fuel => T_fuel0, ch => T_cool0));
 
 # The components are read out of `cell` once and used as keys in both dictionaries. Each
 # `cell.fuel` makes a new object, and a dictionary looks its keys up by identity, so two
@@ -89,7 +89,7 @@ connections = [
     temperature_feedback(pk, [fuel, ch]),
 ]
 @named reactor = assembly(connections, cell, pump, hx, pk)
-sys = mtkcompile(reactor)
+sys = mtkcompile(reactor);
 
 # ## The transient
 #

@@ -65,7 +65,7 @@ case = (
         low=(N=10, width=0.066, gap=0.0027, heated_width=0.063, plate_thickness=0.00127,
              ppf=1.3, power_fraction=0.1, orifice_dp=7.9e3, design_ṁ=0.1),
     ),
-)
+);
 
 # The riser is as tall as the core, so the hydrostatic heads cancel around the loop at
 # uniform temperature, and the pump head matches the loop's drop at design flow.
@@ -80,7 +80,7 @@ case = (
 
 rod(τ) = -0.06 * clamp((τ - 0.1) / 0.5, 0.0, 1.0)
 ctrl = ReactivityController((state, t_state, t) -> state === :SCRAM ? rod(t - t_state) : 0.0;
-                            machine=StateMachine())
+                            machine=StateMachine());
 
 # Decay heat enters the kinetics as a [`DecayHeatSource`](@ref STREAM.DecayHeat.DecayHeatSource),
 # which reads the time of the scram off the same machine. A real analysis takes the fission
@@ -100,7 +100,7 @@ source(0.0)
 # The kinetics run in units of the rated power, so `P0 = 1`, and the source is in the same
 # units: the share of the rated power that is decay heat.
 
-@named pk = PointKinetics(ctrl; power_input=source)
+@named pk = PointKinetics(ctrl; power_input=source);
 
 # ## The core
 #
@@ -195,7 +195,7 @@ connections = [
 @named plant = assembly(connections, pk, pump, flywheel, primary, riser, pool_flapper, flapper,
                         core_parts...)
 sys = mtkcompile(plant)
-ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types))
+ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types));
 
 # ## The steady state at full power
 #

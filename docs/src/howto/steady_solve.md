@@ -26,7 +26,7 @@ nothing # hide
 only acts on a kept one. List them:
 
 ```@example ss
-unknowns(sys)
+foreach(println, unknowns(sys))
 ```
 
 Here the flow is kept as `ch.inlet.ṁ`. The same flow is also `pump.inlet.ṁ` and

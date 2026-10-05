@@ -59,7 +59,7 @@ geometry = PipeGeometry_rectangular(L, width, gap, heated_width)
 z_edges = range(0.0, L; length=n + 1)
 shape = repeat(cosine_shape(z_edges, 1.4) ./ nx, 1, nx)
 @named fuel = HeatDiffusion(; nz=n, nx, Lz=L, Lx=thickness, y=heated_width,
-                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P, power_shape=shape)
+                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P, power_shape=shape);
 
 # ## The channel
 #
@@ -68,13 +68,13 @@ shape = repeat(cosine_shape(z_edges, 1.4) ./ nx, 1, nx)
 # joined to, and its heat transfer coefficient from a model, Dittus-Boelter by default. The
 # flow goes down, so gravity is negative along it.
 
-@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
+@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH);
 
 # [`symmetric_plate`](@ref STREAM.Assemblies.symmetric_plate) makes the unit cell: it joins the
 # channel's right face to the plate's left face and the channel's left face to the plate's
 # right face, cell by cell.
 
-@named cell = symmetric_plate(ch, fuel)
+@named cell = symmetric_plate(ch, fuel);
 
 # A pump holding the flow fixed and a heat exchanger setting the inlet temperature close the
 # loop. With the flow fixed, the loop has no zero-flow solution to fall into, and the solver

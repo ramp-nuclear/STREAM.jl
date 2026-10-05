@@ -60,7 +60,7 @@ holds its value at shutdown, the decay heat of a reactor at power. After, it dec
 ```@example dh
 machine = StateMachine(; initial_state=:SCRAM, initial_time=10.0)   # a scram at t = 10 s
 source = DecayHeat.DecayHeatSource(heat, machine; P0=1.0)
-[source(t) for t in (0.0, 10.0, 70.0, 610.0)]
+[round(source(t); sigdigits=4) for t in (0.0, 10.0, 70.0, 610.0)]
 ```
 
 The source is flat until the scram and decays after. Here the machine is built already

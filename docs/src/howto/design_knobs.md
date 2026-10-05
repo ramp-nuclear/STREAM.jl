@@ -55,7 +55,7 @@ and a scan sets it explicitly, compiling nothing:
 gaps = [0.0018, 0.0021, 0.0024, 0.0027, 0.0030]
 results = map(gaps) do g
     s = solve_steady(sys, [gap => g, sys.cell.ch.inlet.ṁ => 0.4])
-    (gap_mm=1e3g, ṁ=s[sys.cell.ch.inlet.ṁ], T_out=s[sys.cell.ch.T_out])
+    (gap_mm=1e3g, ṁ=round(s[sys.cell.ch.inlet.ṁ]; digits=3), T_out=round(s[sys.cell.ch.T_out]; digits=2))
 end
 ```
 
