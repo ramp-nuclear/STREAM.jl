@@ -22,11 +22,33 @@ one end leaves the other at the same instant.
 
 ## Energy
 
-Each cell balances the heat the flow brings in and carries out with the heat from its walls:
+Each cell is a control volume of length ``\Delta z`` and area ``A``. The first law of
+thermodynamics for it says the energy it holds changes by what the flow brings in, less what
+the flow carries out, plus the heat from its walls:
+
+```math
+\frac{d}{dt}\big(\rho_i\,u_i\,A\,\Delta z\big) = |\dot m|\,h_\text{in} - |\dot m|\,h_\text{out}
++ Q_{L,i} + Q_{R,i},
+```
+
+with ``u`` the internal energy and ``h = u + p/\rho`` the enthalpy, the energy a unit of mass
+carries across a boundary including the work the flow does to push it there. The kinetic
+energy of the coolant and the work of friction are negligible next to these, and the coolant
+leaving a cell is at the cell's temperature. For a liquid, ``du = dh = c_p\,dT``, and the
+small change of density with temperature can be left out of the storage term. The cell's
+temperature then obeys
 
 ```math
 \rho_i\,c_{p,i}\,A\,\Delta z\,\frac{dT_i}{dt}
-= |\dot m|\;\bar c_p\,(T_{\text{up},i} - T_i) + Q_{L,i} + Q_{R,i},
+= |\dot m|\,\big(h(T_{\text{up},i}) - h(T_i)\big) + Q_{L,i} + Q_{R,i},
+```
+
+and STREAM evaluates the enthalpy difference with the specific heat averaged over the face
+the coolant crosses:
+
+```math
+h(T_\text{up}) - h(T_i) = \int_{T_i}^{T_\text{up}} c_p\,dT
+\approx \bar c_p\,(T_{\text{up},i} - T_i),
 \qquad \bar c_p = \tfrac12\big(c_p(T_{\text{up},i}) + c_p(T_i)\big).
 ```
 
@@ -52,7 +74,8 @@ conduction in the coolant, which at the Péclet numbers of forced flow is neglig
 
 ## Momentum
 
-The flow is one variable for the whole channel. Its momentum balance is
+The flow is one variable for the whole channel. Applying the loop equation of
+[Pressure drop](@ref) over the channel's length, cell by cell, gives its momentum balance:
 
 ```math
 \frac{L}{A}\,\frac{d\dot m}{dt} = p_\text{in} - p_\text{out} - \sum_i \Delta p_i,

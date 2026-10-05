@@ -24,6 +24,32 @@ it captures when it is built. This page describes the models STREAM ships and th
 behind them, using Python STREAM's names for the regimes: single-phase liquid (SPL),
 incipience of boiling (INC) and subcooled boiling (SCB).
 
+## What the coefficient is
+
+The coolant touching the wall does not move: viscosity holds it at rest. Heat crosses that
+layer by conduction alone, so Fourier's law at the wall gives the flux exactly,
+
+```math
+q'' = -k\,\frac{\partial T}{\partial y}\bigg|_{y=0},
+```
+
+with ``y`` the distance from the wall into the coolant. All of convection is in how steep that
+gradient is: the flow sweeps cool liquid towards the wall and keeps the layer thin. Newton's
+law of cooling, ``q'' = h\,(T_w - T_b)``, does not add physics. It defines ``h`` as the flux per
+degree of difference between the wall and the mixed bulk, and the Nusselt number is the same
+wall gradient made dimensionless with the hydraulic diameter:
+
+```math
+\text{Nu} = \frac{h\,D_h}{k} = \frac{-\,\partial T/\partial y|_{0}}{(T_w - T_b)/D_h}.
+```
+
+The equations of motion and energy, made dimensionless, contain only three groups for a
+forced flow: the Reynolds number ``\text{Re} = \rho v D_h/\mu``, the ratio of inertia to
+viscous forces; the Prandtl number ``\text{Pr} = c_p\mu/k``, the ratio of momentum to heat
+diffusivity; and the geometry. So in forced convection ``\text{Nu} = f(\text{Re}, \text{Pr})``
+for a given shape of duct, and every correlation below is such a function, fitted to
+experiments or found by solving the equations.
+
 ## Single-phase forced convection
 
 **Turbulent flow.** [`HTC.DittusBoelter`](@ref) uses the Dittus-Boelter correlation in its
@@ -34,15 +60,33 @@ heating form [DittusBoelter1930](@cite),
 ```
 
 fitted for ``\text{Re} > 10^4``, ``0.6 \le \text{Pr} \le 160`` and fully developed flow,
-``L/D_h > 10``. It is the standard choice in research reactor analysis. Its scatter against
+``L/D_h > 10``.
+
+Its form follows from the analogy between momentum and heat transfer. In turbulent flow the
+same eddies carry momentum to the wall and heat away from it, so the wall heat flux and the
+wall shear stress are proportional. Colburn's form of the analogy, for ``\text{Pr}`` near 1
+and above, is
+
+```math
+\text{St}\,\text{Pr}^{2/3} = \frac{f}{8},
+\qquad \text{St} = \frac{\text{Nu}}{\text{Re}\,\text{Pr}},
+```
+
+and with Blasius' ``f = 0.3164\,\text{Re}^{-1/4}`` it gives
+``\text{Nu} = 0.040\,\text{Re}^{3/4}\,\text{Pr}^{1/3}``, close to the fitted exponents of
+Dittus and Boelter. It is the standard choice in research reactor analysis. Its scatter against
 data is commonly quoted as ±25%, it was fitted to circular tubes, and it is used for narrow
 rectangular channels through the hydraulic diameter, so its uncertainty belongs in the hot
 channel factors (see [Margins](@ref)). Below ``\text{Re} = 10^4`` it overpredicts, which is
 why it should not be used alone near the laminar transition.
 
-**Laminar flow.** In fully developed laminar flow the Nusselt number is a constant that
-depends only on the duct shape and the heating. For parallel plates both heated at a uniform
-flux it is 8.235 [ShahLondon1978](@cite), the default of [`HTC.ConstantNusselt`](@ref). A
+**Laminar flow** can be solved exactly. Far enough from the entrance, the velocity and the
+shape of the temperature profile stop changing along the duct, and the energy equation
+reduces to conduction across a known parabolic velocity profile. For parallel plates both
+heated at a uniform flux, solving it gives ``\text{Nu} = 140/17 = 8.235`` on the hydraulic
+diameter, twice the gap [ShahLondon1978](@cite). It is a constant: in laminar flow nothing
+carries heat across the flow except conduction, so a faster flow does not thin the wall
+layer. This is the default of [`HTC.ConstantNusselt`](@ref). A
 rectangular duct of aspect ratio ``\alpha = \text{depth}/\text{width}`` heated on its two long
 sides has a lower value, which [`HTC.FullyDevelopedLaminar`](@ref) takes from Shah and
 London's polynomial fit. Near the entrance of a heated channel the thermal boundary layer is
@@ -58,7 +102,17 @@ laminar ones. Every model takes a `basis` keyword.
 ## Natural convection
 
 With little or no forced flow, as after a pump trip, the coolant next to a hot wall rises
-because it is lighter. Elenbaas measured natural convection between parallel vertical plates
+because it is lighter. The buoyancy force per unit volume is ``\rho g \beta\,(T_w - T_b)``,
+with ``\beta`` the thermal expansion coefficient, and its ratio to the viscous force that
+resists the motion it starts is the Grashof number,
+
+```math
+\text{Gr} = \frac{g\,\beta\,(T_w - T_b)\,L^3}{\nu^2},
+\qquad \text{Ra} = \text{Gr}\,\text{Pr},
+```
+
+which takes the place of the Reynolds number: in natural convection
+``\text{Nu} = f(\text{Ra}, \text{Pr})``. Elenbaas measured natural convection between parallel vertical plates
 [Elenbaas1942](@cite), and his correlation, [`HTC.Elenbaas`](@ref), uses the plate gap ``b``
 as the length scale:
 

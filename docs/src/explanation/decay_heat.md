@@ -47,6 +47,30 @@ receives the beta and most of the gamma energy of its fission products, a reflec
 of the gamma energy. Choosing them is the analyst's job. STREAM supplies the contributions,
 which add and scale like numbers, so `fp + 0.3 * act` is a valid total.
 
+## The decay law
+
+Every contribution below rests on one equation. A nuclide made at a rate ``R`` and decaying
+with constant ``\lambda`` changes in number as
+
+```math
+\frac{dN}{dt} = R - \lambda N.
+```
+
+During an operating period ``T`` at constant power, ``R`` is constant, and starting from
+none the inventory builds up towards its saturated value ``R/\lambda``:
+``N(T) = (R/\lambda)\,(1 - e^{-\lambda T})``. After shutdown ``R = 0``, and it decays:
+``N(T + t) = N(T)\,e^{-\lambda t}``. Each decay releases an energy ``E``, so the heat it gives
+off is ``\lambda N E``:
+
+```math
+P(t) = R\,E\,\left(1 - e^{-\lambda T}\right)e^{-\lambda t}.
+```
+
+A nuclide with a half-life short next to ``T`` is saturated and starts its decay at its
+full production rate. One with a half-life long next to ``T`` never built up, and contributes
+little. This is why a reactor that ran for a short time has less decay heat than one that ran
+for months at the same power.
+
 ## Fissions
 
 After shutdown the fission rate itself falls with the delayed neutron precursors, and the
@@ -79,8 +103,10 @@ than compute it.
 
 ## Fission products
 
-The largest contribution is the beta and gamma decay of fission products. Published standards
-fit it as a sum of exponentials, one per group ``i``:
+The largest contribution is the beta and gamma decay of fission products. There are hundreds
+of them, each following the decay law with its own yield, decay constant and energy, many in
+chains where one decays into the next. Summed up, the result is a smooth function of time,
+which the standards fit as a sum of the decay law's exponentials, one per group ``i``:
 
 ```math
 F_\text{fission products}(t, T)
@@ -117,11 +143,14 @@ A material activated at a constant rate during operation decays as
 F_\text{activation}(t, T) = e^{-\lambda t}\left(1 - e^{-\lambda T}\right),
 ```
 
-normalised to 1 at saturation and shutdown: multiply by the energy per decay and the
-activation rate per fission. [`DecayHeat.Activation`](@ref) is this profile. When the
-activated isotope decays into another radioactive one,
-[`DecayHeat.DoubleDecay`](@ref) follows the daughter, with the parent's and daughter's decay
-constants ``\lambda_1`` and ``\lambda_2``:
+the decay law per unit of ``R E``, normalised to 1 at saturation and shutdown: multiply by
+the energy per decay and the activation rate per fission. [`DecayHeat.Activation`](@ref) is
+this profile.
+
+When the activated isotope decays into another radioactive one, the daughter is made by the
+parent's decay, ``dN_2/dt = \lambda_1 N_1 - \lambda_2 N_2``. Solving this Bateman equation
+along with the parent's gives [`DecayHeat.DoubleDecay`](@ref), with the parent's and
+daughter's decay constants ``\lambda_1`` and ``\lambda_2``:
 
 ```math
 F(t, T) = \frac{\lambda_1\,e^{-\lambda_2 t}(1 - e^{-\lambda_2 T})

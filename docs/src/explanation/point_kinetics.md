@@ -4,11 +4,37 @@ The power of a reactor changes with its reactivity ``\rho``, the fractional exce
 produced over those lost. STREAM models this with the point kinetics equations, which treat
 the neutron population as one number with a fixed spatial shape.
 
-## The equations
+## From a neutron balance
 
-Most fission neutrons are prompt, but a fraction ``\beta`` (0.65% for U-235) appears later,
-from the decay of fission products called delayed neutron precursors. Grouping the precursors
-by half-life into ``G`` groups gives Keepin's form [Keepin1965](@cite):
+Count the neutrons in the core, ``n``. Each lives on average a time ``\ell`` before it is
+absorbed or leaks out, and each generation produces ``k`` neutrons for every one lost, the
+multiplication factor. Without delayed neutrons the balance would be
+
+```math
+\frac{dn}{dt} = \frac{k\,n}{\ell} - \frac{n}{\ell} = \frac{k - 1}{\ell}\,n,
+```
+
+and with a lifetime of tens of microseconds a reactor a tenth of a percent supercritical
+would multiply its power by ``e`` every few hundredths of a second: too fast for any control
+system.
+
+What makes a reactor controllable is that a fraction ``\beta`` of the fission neutrons, 0.65%
+for U-235, is not emitted at fission. Some fission products, the delayed neutron precursors,
+emit a neutron when they decay, seconds to a minute later. Group them by half-life into
+``G`` groups, each with a concentration ``C_k``, a share ``\beta_k`` of the neutrons and a
+decay constant ``\lambda_k``. The prompt neutrons now make up only ``1 - \beta`` of
+production, and the precursors add theirs as they decay:
+
+```math
+\begin{aligned}
+\frac{dn}{dt} &= (1 - \beta)\,\frac{k\,n}{\ell} - \frac{n}{\ell} + \sum_k \lambda_k C_k, \\
+\frac{dC_k}{dt} &= \beta_k\,\frac{k\,n}{\ell} - \lambda_k C_k.
+\end{aligned}
+```
+
+Writing them with the reactivity ``\rho = (k - 1)/k`` and the generation time
+``\Lambda = \ell/k``, and with the fission power ``P_n`` in place of ``n``, to which it is
+proportional, gives the point kinetics equations in Keepin's form [Keepin1965](@cite):
 
 ```math
 \begin{aligned}
@@ -17,9 +43,11 @@ by half-life into ``G`` groups gives Keepin's form [Keepin1965](@cite):
 \end{aligned}
 ```
 
-with ``P_n`` the fission power, ``C_k`` the precursor concentration of group ``k`` in the same
-units, ``\beta_k`` and ``\lambda_k`` the fraction and decay constant of the group,
-``\beta = \sum_k \beta_k``, and ``\Lambda`` the prompt neutron generation time.
+with the precursor concentrations in the same units as the power, and
+``\beta = \sum_k \beta_k``. The delayed neutrons arrive on average
+``\sum_k \beta_k/\lambda_k \approx 0.085`` s after their fission, more than a thousand times
+the prompt generation time, and below prompt criticality it is their pace that sets the pace
+of the power.
 [`PointKinetics`](@ref STREAM.Components.PointKinetics) takes any number of groups. The
 defaults are Keepin's six U-235 groups and ``\Lambda = 54\ \mu\text{s}``, which belong to a
 particular core: a real analysis supplies its own.

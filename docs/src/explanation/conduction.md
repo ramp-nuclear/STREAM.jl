@@ -5,11 +5,34 @@ The heat a fuel plate generates has to conduct to its surfaces before the coolan
 thickness ``L_x``, height ``L_z`` along the flow and depth ``y`` into the page, cut into
 ``n_z \times n_x`` cells.
 
-## Equations
+## The heat equation
 
-Each axial slice conducts across the plate's thickness. In the interior, the cell at axial
-position ``i`` and lateral position ``j`` balances conduction from its two neighbours with its
-heat source:
+Heat in a solid flows down the temperature gradient, at a rate set by the conductivity
+``k``: Fourier's law, ``\mathbf{q}'' = -k\,\nabla T``. Energy conservation in a small volume
+says its stored heat changes by what conducts in, less what conducts out, plus what it
+generates at the volumetric rate ``q'''``:
+
+```math
+\rho\,c_p\,\frac{\partial T}{\partial t} = -\nabla\cdot\mathbf{q}'' + q'''
+= \nabla\cdot(k\,\nabla T) + q'''.
+```
+
+A fuel plate is thin: about a millimetre thick and hundreds of millimetres long. A temperature
+difference across its thickness drives heat through a path a few hundred times shorter, and a
+few hundred times wider, than the same difference along its length, so conduction across the
+plate outweighs conduction along it by the square of that ratio. STREAM keeps only the
+conduction across the thickness ``x``, and each axial slice of the plate solves
+
+```math
+\rho\,c_p\,\frac{\partial T}{\partial t} = k\,\frac{\partial^2 T}{\partial x^2} + q'''.
+```
+
+## Finite volumes
+
+Cut the slice into ``n_x`` cells of width ``\Delta x`` and integrate the equation over each.
+The divergence becomes the difference of the conduction through the cell's two faces, each
+from Fourier's law between the neighbouring cell centres. In the interior, the cell at axial
+position ``i`` and lateral position ``j`` obeys
 
 ```math
 \rho\,c_p\,\frac{dT_{i,j}}{dt}
@@ -28,7 +51,16 @@ through a surface port at temperature ``T_s`` is
 Q = k\,y\,\Delta z\,\frac{T_s - T_{i,1}}{\Delta x/2},
 ```
 
-and the same on the other face with ``T_{i,n_x}``. The surface temperature is not a variable of
+and the same on the other face with ``T_{i,n_x}``.
+
+The half-cell difference at each face is first-order accurate, and the interior stencil
+second-order. The check below shows how small the error is at a typical resolution.
+
+Two time scales follow from these equations. Heat crosses half the plate's thickness in about
+``(L_x/2)^2/\alpha``, with ``\alpha = k/(\rho c_p)`` the diffusivity: a few milliseconds for an
+aluminium plate a millimetre thick. Draining the plate's stored heat through the coolant film
+takes about ``\rho c_p (L_x/2)/h``, a few tenths of a second at a forced-convection ``h``. The
+second, slower one is what sets how quickly a plate follows its power in a transient. The surface temperature is not a variable of
 the plate: it is the temperature of the [`ThermalPort`](@ref STREAM.Components.ThermalPort)
 the plate shares with a channel cell. The channel states the convective heat flow through the
 same port, ``h\,P_h\,\Delta z\,(T_s - T_b)``, and the connection makes the two heat flows
@@ -84,7 +116,7 @@ axislegend(ax; position=:cb)
 fig
 ```
 
-The cell temperatures fall on the exact parabola. The largest difference is
+The cell temperatures lie close to the exact parabola. The largest difference is
 
 ```@example conduction
 maximum(abs, [sol[sys.fuel.T[1, j]] - T_exact(x[j]) for j in 1:nx])
