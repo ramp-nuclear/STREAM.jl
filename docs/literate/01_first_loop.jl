@@ -52,7 +52,7 @@ connections = [
     inseries(pump, hx, ch, pump),
     pump.inlet.p ~ 1.0e5,
     ch.T_wall_left .~ 100.0,
-]
+];
 
 # The second line fixes the pressure at one point. A closed loop determines only pressure
 # differences, so one absolute value is needed, here 1 bar at the pump inlet. The third holds
@@ -82,7 +82,6 @@ unknowns(sys)
 # solution with no flow at all, so the solver needs a guess of the flow to start from.
 
 sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
-sol.retcode
 
 # Every variable of the model can be read by its name:
 
@@ -115,8 +114,7 @@ Q_wall = sum(sol[sys.ch.q_wall])
 
 T_in = 40.0
 Q_flow = ṁ * cₚ(H2O, (T_in + T_out) / 2) * (T_out - T_in)
-@assert isapprox(Q_wall, Q_flow; rtol=1e-3)
-Q_flow
+@assert isapprox(Q_wall, Q_flow; rtol=1e-6);
 
 # They agree, to the small difference between ``c_p`` at the mean temperature and its
 # average over the range.

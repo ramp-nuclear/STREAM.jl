@@ -153,7 +153,7 @@ end
 @named primary = ResistorFromKnownPoint(; dp=-case.primary_dp, ṁ=ṁ_design, T=case.T_pool)
 @named riser = Channel(; n=case.n, geometry=PipeGeometry_circular(case.riser_L, case.riser_D),
                        g=G_EARTH)
-@named pool_flapper = HeatExchanger(case.T_pool)
+@named pool_flapper = HeatExchanger(case.T_pool);
 
 # The flapper follows a machine of its own, separate from the reactor protection: it opens
 # when the primary flow falls through its setpoint.
@@ -162,7 +162,7 @@ valve = StateMachine(; initial_state=:CLOSED)
 @named flapper = Flapper(; machine=valve, f=case.flapper_f, area=case.flapper_area,
                          open_rate=1 / case.flapper_open_time)
 valve.transitions = [(:CLOSED => :OPEN, flywheel.inlet.ṁ < case.flapper_open_at,
-                      "primary flow below the flapper setpoint")]
+                      "primary flow below the flapper setpoint")];
 
 # The protection system scrams the reactor on low primary flow:
 
@@ -225,7 +225,7 @@ sol_ss.retcode
 # its condition is met. Saving onto every output time with `tstops` keeps saved values off
 # the solver's interpolation, which strays for this model between widely spaced steps.
 
-times = range(0.0, 1200.0; length=241)
+times = range(0.0, 1200.0; length=601)
 sol = solve_transient(sys, sol_ss, times; overrides=[sys.pump.dP_pump => 0.0],
                       callbacks=machine_callbacks(sys, ctrl.machine, valve), tstops=times)
 sol.retcode

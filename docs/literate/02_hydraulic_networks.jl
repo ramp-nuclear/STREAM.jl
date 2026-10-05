@@ -35,7 +35,7 @@ R = 1.0e4                                   # Pa per kg/s
 @named pump = Pump(3.0e4)
 edges = [(0, 1), (0, 2), (0, 4), (1, 3), (1, 5), (2, 3), (2, 6), (3, 7), (4, 5), (4, 6),
          (5, 7), (6, 7)]
-resistors = [Resistor(R; name=Symbol(:r, a, b)) for (a, b) in edges]
+resistors = [Resistor(R; name=Symbol(:r, a, b)) for (a, b) in edges];
 
 # Each corner is a junction where several ports meet. `connect` with more than two ports
 # makes one: the pressure is the same at all of them and the flows sum to zero. Corner ``c``
@@ -43,7 +43,7 @@ resistors = [Resistor(R; name=Symbol(:r, a, b)) for (a, b) in edges]
 # there, and the pump closes the loop from corner 7 back to corner 0.
 
 function corner(c)
-    ports = Any[]
+    ports = []
     c == 0 && push!(ports, pump.outlet)
     c == 7 && push!(ports, pump.inlet)
     for ((a, b), r) in zip(edges, resistors)
@@ -53,7 +53,7 @@ function corner(c)
     return connect(ports...)
 end
 
-connections = [[corner(c) for c in 0:7]; pump.inlet.p ~ 1.0e5]
+connections = [corner.(0:7); pump.inlet.p ~ 1.0e5]
 @named cube = assembly(connections, pump, resistors...)
 sys = mtkcompile(cube)
 sol = solve_steady(sys)
@@ -69,9 +69,7 @@ R_cube / R
 
 flows = [sol[getproperty(sys, nameof(r)).inlet.ṁ] / I for r in resistors]
 @assert all(isapprox.(flows, [1/3, 1/3, 1/3, 1/6, 1/6, 1/6, 1/6, 1/3, 1/6, 1/6, 1/3, 1/3];
-                      rtol=1e-8))
-round.(flows; digits=4)
-
+                      rtol=1e-8));
 # ## Flow driven by temperature
 #
 # Three vertical branches of height ``H`` join a common plenum at the top and another at the
