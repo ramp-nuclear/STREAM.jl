@@ -73,3 +73,11 @@ function decay_time(source::DecayHeatSource, t)
 end
 
 (source::DecayHeatSource)(t) = source.Φ * source.model(decay_time(source, t), source.T)
+
+function Base.show(io::IO, ::MIME"text/plain", s::DecayHeatSource)
+    print(io, "DecayHeatSource at fission rate P0/Q = ", s.Φ, ", ",
+          isinf(s.T) ? "saturated" : "after $(s.T) s of operation",
+          ", shut down in ", join(string.(s.shutdown_states), " or "), " of ", s.machine)
+    inner = sprint(show, MIME("text/plain"), s.model)
+    print(io, "\n  ", replace(inner, "\n" => "\n  "))
+end

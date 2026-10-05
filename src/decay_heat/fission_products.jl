@@ -177,3 +177,8 @@ end
 function (model::FissionProducts)(t, T=Inf)
     return sum(α / λ * _saturated_decay(t, T, λ) for (λ, α) in zip(model.λ, model.α))
 end
+
+Base.show(io::IO, ::MIME"text/plain", fp::FissionProducts) =
+    print(io, "DecayHeat.FissionProducts with ", length(fp.λ), length(fp.λ) == 1 ? " group" : " groups")
+Base.show(io::IO, fp::FissionProducts) =
+    print(io, "FissionProducts(", length(fp.λ), length(fp.λ) == 1 ? " group)" : " groups)")

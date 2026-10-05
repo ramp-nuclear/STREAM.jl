@@ -153,3 +153,7 @@ function Fissions(
 end
 
 (model::Fissions)(t, T=Inf) = _interp(model.interpolation, t, model.times, model.profile)
+
+Base.show(io::IO, f::Fissions) =
+    print(io, "Fissions(", length(f.times), " samples over ", first(f.times), " to ",
+          last(f.times), " s, ", nameof(typeof(f.interpolation)), ")")

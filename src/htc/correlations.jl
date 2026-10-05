@@ -44,9 +44,14 @@ julia> HTC.constant_Nusselt()(300.0, 7.0)
 8.235
 ```
 """
-function constant_Nusselt(; Nu=8.235)
-    return (Re, Pr, args...) -> Nu
+constant_Nusselt(; Nu=8.235) = _ConstantNu(Nu)
+
+# A struct rather than a closure, so the value can be printed.
+struct _ConstantNu{T}
+    Nu::T
 end
+(c::_ConstantNu)(Re, Pr, args...) = c.Nu
+Base.show(io::IO, c::_ConstantNu) = print(io, "constant Nu = ", c.Nu)
 
 @doc raw"""
     elenbaas_nusselt(Ra, b, L) -> Nu
