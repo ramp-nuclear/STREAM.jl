@@ -6,9 +6,11 @@ components, connect them as the plant is connected, and solve it for a steady st
 transient. Afterwards you check the solution against the thermal-hydraulic safety limits:
 onset of boiling, flow instability and critical heat flux.
 
-It is a Julia port of the Python STREAM package and is checked against it. Models are written
-with [ModelingToolkit](https://docs.sciml.ai/ModelingToolkit/stable/), which compiles the
-equations symbolically before handing them to a numerical solver.
+It is a Julia port of the Python STREAM package
+([source](https://github.com/ramp-nuclear/STREAM), [documentation](https://ramp-nuclear.github.io/STREAM/))
+and is checked against it; [Relation to Python STREAM](@ref) says where the two differ.
+Models are written with [ModelingToolkit](https://docs.sciml.ai/ModelingToolkit/stable/),
+which compiles the equations symbolically before handing them to a numerical solver.
 
 ## Installation
 

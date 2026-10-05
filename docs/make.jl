@@ -7,10 +7,15 @@
 # Preview the result with `python3 -m http.server -d docs/build 8000`.
 using Documenter
 using DocumenterCitations
+using DocumenterCodeBlocks
 using DocumenterInterLinks
 using DocumenterMermaid
 using Literate
 using STREAM
+# DocumenterCodeBlocks links names in code blocks by resolving them in Main, so bring in the
+# submodules the pages import from. Channel is named explicitly: Base has one too.
+using STREAM.Components, STREAM.Assemblies, STREAM.Thresholds, STREAM.Utilities
+using STREAM.Components: Channel
 
 const DRAFT = get(ENV, "DRAFT", "") == "1"
 const PREVIEW = DRAFT || get(ENV, "PREVIEW", "") == "1"
@@ -128,7 +133,7 @@ makedocs(;
         size_threshold=800 * 2^10,
     ),
     pages,
-    plugins=[bib, links],
+    plugins=[bib, links, CodeBlocks()],
     checkdocs=:exports,
     draft=DRAFT,
     warnonly=PREVIEW,

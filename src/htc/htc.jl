@@ -184,9 +184,10 @@ _with_basis(m, basis) = m
     RegimeDependent(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
                        geom, g=G_EARTH) <: AbstractHTC
 
-A heat transfer coefficient that picks its correlation by flow regime: `laminar` at low
-Reynolds number, `turbulent` at high, a linear blend of the two across `re_bounds`, and
-`natural` convection wherever buoyancy outweighs the forced flow.
+A heat transfer coefficient that picks its correlation by flow regime.
+
+It uses `laminar` at low Reynolds number, `turbulent` at high, a linear blend of the two
+across `re_bounds`, and `natural` convection wherever buoyancy outweighs the forced flow.
 
 Two Reynolds numbers are involved, for different questions. Whether the flow is laminar or
 turbulent is a property of the flow as a whole, so the blend reads the Reynolds number at the

@@ -145,10 +145,11 @@ end
                             L_over_A=1.75e5, g_acc=G_EARTH,
                             R_ext=1.0e6, dt_ramp=5.0) -> System
 
-A loss-of-flow loop with a bypass: a heated plate-fuel leg (`heated`, a
-`ChannelAndContacts` cooling one face of a `HeatDiffusion` plate), an unheated return leg
-(`ret`), and a [`Flapper`](@ref) in parallel with the external branch that holds the pump,
-heat exchanger and inertia. The heated leg runs downward and the return leg upward, so when
+A loss-of-flow loop with a bypass, compiled.
+
+It has a heated plate-fuel leg (`heated`, a `ChannelAndContacts` cooling one face of a
+`HeatDiffusion` plate), an unheated return leg (`ret`), and a [`Flapper`](@ref) in parallel
+with the external branch that holds the pump, heat exchanger and inertia. The heated leg runs downward and the return leg upward, so when
 the pump head falls the flapper opens and the flow turns around into natural circulation.
 The test suite uses it as a fixture.
 

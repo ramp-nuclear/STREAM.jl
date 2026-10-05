@@ -1,8 +1,9 @@
 # Relation to Python STREAM
 
-STREAM.jl is a port of [Python STREAM](https://github.com/ramp-nuclear/STREAM), and is meant
-to replace it. The physics is the same: the same correlations, the same channel and plate
-equations, the same point kinetics and decay heat. What changed is how a model is assembled
+STREAM.jl is a port of [Python STREAM](https://github.com/ramp-nuclear/STREAM), whose
+documentation is at <https://ramp-nuclear.github.io/STREAM/>, and is meant to replace it.
+The physics is the same: the same correlations, the same channel and plate equations, the
+same point kinetics and decay heat. What changed is how a model is assembled
 and solved.
 
 ## What is different in how models are built

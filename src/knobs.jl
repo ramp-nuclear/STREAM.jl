@@ -15,9 +15,10 @@ end
 """
     @design_knob name = default
 
-Declare a design knob: a named scalar input that drives geometry (or any other parameter)
-across one or more components and can be varied at solve time with `remake`, without
-rebuilding or recompiling the model.
+Declare a design knob, a parameter that can change between solves without recompiling.
+
+A knob is a named scalar input that drives geometry, or any other parameter, across one or
+more components, and is varied at solve time through the operating point or `remake`.
 
 The knob is a `GlobalScope` parameter, so the same knob passed into several composed
 components stays one un-namespaced parameter at the root system. `remake(name => x)` sets

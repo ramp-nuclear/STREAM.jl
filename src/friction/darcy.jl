@@ -92,10 +92,11 @@ end
                             re_bounds=(2000.0, 5000.0), k_R=1.0,
                             viscosity=nothing) <: AbstractDarcyFactor
 
-Switch between a laminar and a turbulent friction branch on the bulk Reynolds number, the way
-Python STREAM's `regime_dependent_friction` does: laminar at or below `re_bounds[1]`,
-turbulent above `re_bounds[2]`, and a linear blend in between via
-[`flow_regime_blend`](@ref).
+Switch between a laminar and a turbulent friction branch on the bulk Reynolds number.
+
+It is laminar at or below `re_bounds[1]`, turbulent above `re_bounds[2]`, and a linear blend
+in between via [`flow_regime_blend`](@ref), as Python STREAM's `regime_dependent_friction`
+does.
 
 Two things make this the model to reach for when the flow reverses. It guards the no-flow
 point, where the bare `64/Re` would otherwise be infinite, and the blend keeps the factor

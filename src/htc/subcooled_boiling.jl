@@ -111,9 +111,10 @@ end
 """
     regime_dependent_q_scb(; re_bounds=(2000.0, 5000.0)) -> (T_wall, sat, Re) -> q [W/m^2]
 
-A subcooled boiling heat flux closure that switches on the bulk Reynolds number:
-[`rohsenow_scb_heat_flux`](@ref) in laminar flow, [`mcadams_scb_heat_flux`](@ref) in turbulent flow, and a linear blend across
-`re_bounds` via [`flow_regime_blend`](@ref).
+A subcooled boiling heat flux closure that switches on the bulk Reynolds number.
+
+It is [`rohsenow_scb_heat_flux`](@ref) in laminar flow, [`mcadams_scb_heat_flux`](@ref) in
+turbulent flow, and a linear blend across `re_bounds` via [`flow_regime_blend`](@ref).
 
 Hand the closure to [`SubcooledBoiling`](@ref), which calls it with `sat`, the coolant's
 [`Liquid`](@ref) snapshot at saturation at each cell's pressure.

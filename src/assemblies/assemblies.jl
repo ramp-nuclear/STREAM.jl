@@ -130,8 +130,9 @@ end
 """
     single_channel(channel, fuel, geometry; fuel_side=:left, name) -> System
 
-Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*: the
-channel is heated on one face only, but the fuel plate is cooled on **both** faces: the
+Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*.
+
+The channel is heated on one face only, but the fuel plate is cooled on **both** faces: the
 near face by conjugate coupling to the channel, the far face by a one-way convective sink
 (`ConvectiveBoundary`) fed from the channel's far-side `h_tc` and coolant `T`.
 

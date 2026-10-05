@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "1690ebe8cec0f1520ed3e433f2ffc1822b4033a7"
+project_hash = "c720b40059dd5c41e84baef0630ade18bb691932"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -772,6 +772,13 @@ registries = "General"
 uuid = "daee34ce-89f3-4625-b898-19384cb65244"
 version = "1.5.0"
 
+[[deps.DocumenterCodeBlocks]]
+deps = ["CRC32c", "Documenter", "JuliaSyntax"]
+git-tree-sha1 = "3f53afc051c811265b8749b854484cfacd4bac17"
+registries = "General"
+uuid = "b6400b83-267f-4b55-9fd8-bffc853bdfd8"
+version = "1.5.1"
+
 [[deps.DocumenterInterLinks]]
 deps = ["CodecZlib", "DocInventories", "Documenter", "Markdown", "MarkdownAST", "TOML"]
 git-tree-sha1 = "d8a8cb2d5b0181fbbd41861016b221b0202c9bc5"
@@ -1484,6 +1491,12 @@ git-tree-sha1 = "037babc10853eeb8e585418922246cb97b8e5b74"
 registries = "General"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "3.2.0+1"
+
+[[deps.JuliaSyntax]]
+git-tree-sha1 = "0d4b3dab95018bcf3925204475693d9f09dc45b8"
+registries = "General"
+uuid = "70703baa-626e-46a2-a12c-08ffd08c73b4"
+version = "1.0.2"
 
 [[deps.JuliaSyntaxHighlighting]]
 deps = ["StyledStrings"]
