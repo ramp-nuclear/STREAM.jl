@@ -18,7 +18,7 @@ function unit_cell(; power)
     @named pump = Pump(; ṁ0=0.4)
     @named hx = HeatExchanger(40.0)
     return cell, pump, hx, [inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ 1.7e5]
-end
+end;
 
 cell, pump, hx, connections = unit_cell(; power=P_rated)
 @named loop = assembly(connections, cell, pump, hx)
@@ -29,7 +29,7 @@ T_cool0 = sol0[sys0.cell.ch.T]
 extrema(T_fuel0)
 
 ρ_step = 0.001
-insertion(t) = t < 1.0 ? 0.0 : ρ_step
+insertion(t) = t < 1.0 ? 0.0 : ρ_step;
 
 cell, pump, hx, connections = unit_cell(; power=nothing)
 fuel, ch = cell.fuel, cell.ch
@@ -37,7 +37,7 @@ fuel, ch = cell.fuel, cell.ch
 α_cool = fill(-1.0e-4 / n, n)
 @named pk = PointKinetics(insertion;
     temp_worth=Dict(fuel => α_fuel, ch => α_cool),
-    ref_temp=Dict(fuel => T_fuel0, ch => T_cool0))
+    ref_temp=Dict(fuel => T_fuel0, ch => T_cool0));
 
 connections = [
     connections,
@@ -45,7 +45,7 @@ connections = [
     temperature_feedback(pk, [fuel, ch]),
 ]
 @named reactor = assembly(connections, cell, pump, hx, pk)
-sys = mtkcompile(reactor)
+sys = mtkcompile(reactor);
 
 op = [sys.cell.ch.T => T_cool0, sys.cell.fuel.T => T_fuel0]
 times = [0.0; 0.01:0.02:4.99; 5.0:1.0:600.0]

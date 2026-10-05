@@ -28,18 +28,18 @@ case = (
         low=(N=10, width=0.066, gap=0.0027, heated_width=0.063, plate_thickness=0.00127,
              ppf=1.3, power_fraction=0.1, orifice_dp=7.9e3, design_ṁ=0.1),
     ),
-)
+);
 
 rod(τ) = -0.06 * clamp((τ - 0.1) / 0.5, 0.0, 1.0)
 ctrl = ReactivityController((state, t_state, t) -> state === :SCRAM ? rod(t - t_state) : 0.0;
-                            machine=StateMachine())
+                            machine=StateMachine());
 
 heat = DecayHeat.U238CaptureChain(0.5) +
        DecayHeat.FissionProducts([1.0, 0.05, 1e-3, 1e-5], [3.0, 0.15, 3e-3, 3e-5])
 source = DecayHeat.DecayHeatSource(heat, ctrl; P0=1.0)
 source(0.0)
 
-@named pk = PointKinetics(ctrl; power_input=source)
+@named pk = PointKinetics(ctrl; power_input=source);
 
 z_edges = range(0.0, case.L; length=case.n + 1)
 core_parts = []
@@ -77,13 +77,13 @@ end
 @named primary = ResistorFromKnownPoint(; dp=-case.primary_dp, ṁ=ṁ_design, T=case.T_pool)
 @named riser = Channel(; n=case.n, geometry=PipeGeometry_circular(case.riser_L, case.riser_D),
                        g=G_EARTH)
-@named pool_flapper = HeatExchanger(case.T_pool)
+@named pool_flapper = HeatExchanger(case.T_pool);
 
 valve = StateMachine(; initial_state=:CLOSED)
 @named flapper = Flapper(; machine=valve, f=case.flapper_f, area=case.flapper_area,
                          open_rate=1 / case.flapper_open_time)
 valve.transitions = [(:CLOSED => :OPEN, flywheel.inlet.ṁ < case.flapper_open_at,
-                      "primary flow below the flapper setpoint")]
+                      "primary flow below the flapper setpoint")];
 
 push!(ctrl.machine, (:NORMAL => :SCRAM, flywheel.inlet.ṁ < case.trip_fraction * ṁ_design,
                      "low primary flow"))
@@ -98,7 +98,7 @@ connections = [
 @named plant = assembly(connections, pk, pump, flywheel, primary, riser, pool_flapper, flapper,
                         core_parts...)
 sys = mtkcompile(plant)
-ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types))
+ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types));
 
 guess = [sys.primary.inlet.ṁ => ṁ_design,
          ch_high.inlet.ṁ => case.types.high.design_ṁ,
@@ -112,7 +112,7 @@ sol_ss.retcode
 @assert isapprox(sol_ss[sys.pk.P_neutron], 1.0 - source(0.0); rtol=1e-9)
 (high=sol_ss[ch_high.inlet.ṁ], low=sol_ss[ch_low.inlet.ṁ])
 
-times = range(0.0, 1200.0; length=241)
+times = range(0.0, 1200.0; length=601)
 sol = solve_transient(sys, sol_ss, times; overrides=[sys.pump.dP_pump => 0.0],
                       callbacks=machine_callbacks(sys, ctrl.machine, valve), tstops=times)
 sol.retcode

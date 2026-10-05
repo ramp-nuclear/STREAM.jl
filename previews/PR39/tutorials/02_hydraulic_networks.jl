@@ -7,10 +7,10 @@ R = 1.0e4                                   # Pa per kg/s
 @named pump = Pump(3.0e4)
 edges = [(0, 1), (0, 2), (0, 4), (1, 3), (1, 5), (2, 3), (2, 6), (3, 7), (4, 5), (4, 6),
          (5, 7), (6, 7)]
-resistors = [Resistor(R; name=Symbol(:r, a, b)) for (a, b) in edges]
+resistors = [Resistor(R; name=Symbol(:r, a, b)) for (a, b) in edges];
 
 function corner(c)
-    ports = Any[]
+    ports = []
     c == 0 && push!(ports, pump.outlet)
     c == 7 && push!(ports, pump.inlet)
     for ((a, b), r) in zip(edges, resistors)
@@ -20,10 +20,10 @@ function corner(c)
     return connect(ports...)
 end
 
-connections = [[corner(c) for c in 0:7]; pump.inlet.p ~ 1.0e5]
+connections = [corner.(0:7); pump.inlet.p ~ 1.0e5]
 @named cube = assembly(connections, pump, resistors...)
 sys = mtkcompile(cube)
-sol = solve_steady(sys)
+sol = solve_steady(sys);
 
 I = sol[sys.pump.inlet.ṁ]
 R_cube = 3.0e4 / I
@@ -32,8 +32,7 @@ R_cube / R
 
 flows = [sol[getproperty(sys, nameof(r)).inlet.ṁ] / I for r in resistors]
 @assert all(isapprox.(flows, [1/3, 1/3, 1/3, 1/6, 1/6, 1/6, 1/6, 1/3, 1/6, 1/6, 1/3, 1/3];
-                      rtol=1e-8))
-round.(flows; digits=4)
+                      rtol=1e-8));
 
 H = 2.0                                     # m
 names = [:hot, :mean, :cold]
@@ -51,7 +50,7 @@ connections = [
 ]
 @named syphon = assembly(connections, hxs..., rises..., rs...)
 sys = mtkcompile(syphon)
-sol = solve_steady(sys)
+sol = solve_steady(sys);
 
 ṁ = [sol[getproperty(sys, nameof(r)).inlet.ṁ] for r in rs]
 

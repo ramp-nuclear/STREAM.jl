@@ -8,188 +8,8 @@ R = 1.0e4                                   # Pa per kg/s
 @named pump = Pump(3.0e4)
 edges = [(0, 1), (0, 2), (0, 4), (1, 3), (1, 5), (2, 3), (2, 6), (3, 7), (4, 5), (4, 6),
          (5, 7), (6, 7)]
-resistors = [Resistor(R; name=Symbol(:r, a, b)) for (a, b) in edges]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{ModelingToolkitBase.System}:
- <span class="sgr1">Model r01:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r01)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r01)
-  2 connecting: see equations(expand_connections(r01))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r01)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r01)
-  R
- <span class="sgr1">Model r02:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r02)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r02)
-  2 connecting: see equations(expand_connections(r02))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r02)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r02)
-  R
- <span class="sgr1">Model r04:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r04)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r04)
-  2 connecting: see equations(expand_connections(r04))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r04)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r04)
-  R
- <span class="sgr1">Model r13:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r13)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r13)
-  2 connecting: see equations(expand_connections(r13))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r13)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r13)
-  R
- <span class="sgr1">Model r15:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r15)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r15)
-  2 connecting: see equations(expand_connections(r15))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r15)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r15)
-  R
- <span class="sgr1">Model r23:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r23)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r23)
-  2 connecting: see equations(expand_connections(r23))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r23)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r23)
-  R
- <span class="sgr1">Model r26:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r26)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r26)
-  2 connecting: see equations(expand_connections(r26))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r26)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r26)
-  R
- <span class="sgr1">Model r37:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r37)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r37)
-  2 connecting: see equations(expand_connections(r37))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r37)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r37)
-  R
- <span class="sgr1">Model r45:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r45)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r45)
-  2 connecting: see equations(expand_connections(r45))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r45)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r45)
-  R
- <span class="sgr1">Model r46:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r46)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r46)
-  2 connecting: see equations(expand_connections(r46))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r46)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r46)
-  R
- <span class="sgr1">Model r57:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r57)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r57)
-  2 connecting: see equations(expand_connections(r57))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r57)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r57)
-  R
- <span class="sgr1">Model r67:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(r67)
-  inlet
-  outlet
-<span class="sgr1">Equations (6):</span>
-  4 standard: see equations(r67)
-  2 connecting: see equations(expand_connections(r67))
-<span class="sgr1">Unknowns (6):</span> see unknowns(r67)
-  inlet₊p(t): Pressure (Pa), across variable
-  inlet₊ṁ(t): Mass flow rate (kg/s), positive = into port
-  inlet₊T(t): Temperature (°C), stream variable
-  outlet₊p(t): Pressure (Pa), across variable
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(r67)
-  R</code></pre><p>Each corner is a junction where several ports meet. <code>connect</code> with more than two ports makes one: the pressure is the same at all of them and the flows sum to zero. Corner <span>$c$</span> joins the outlets of the edges that end there and the inlets of the edges that start there, and the pump closes the loop from corner 7 back to corner 0.</p><pre><code class="language-julia hljs">function corner(c)
-    ports = Any[]
+resistors = [Resistor(R; name=Symbol(:r, a, b)) for (a, b) in edges];</code></pre><p>Each corner is a junction where several ports meet. <code>connect</code> with more than two ports makes one: the pressure is the same at all of them and the flows sum to zero. Corner <span>$c$</span> joins the outlets of the edges that end there and the inlets of the edges that start there, and the pump closes the loop from corner 7 back to corner 0.</p><pre><code class="language-julia hljs">function corner(c)
+    ports = []
     c == 0 &amp;&amp; push!(ports, pump.outlet)
     c == 7 &amp;&amp; push!(ports, pump.inlet)
     for ((a, b), r) in zip(edges, resistors)
@@ -199,41 +19,15 @@ resistors = [Resistor(R; name=Symbol(:r, a, b)) for (a, b) in edges]</code></pre
     return connect(ports...)
 end
 
-connections = [[corner(c) for c in 0:7]; pump.inlet.p ~ 1.0e5]
+connections = [corner.(0:7); pump.inlet.p ~ 1.0e5]
 @named cube = assembly(connections, pump, resistors...)
 sys = mtkcompile(cube)
-sol = solve_steady(sys)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
-u: 12-element Vector{Float64}:
-    148.18303571428572
-    148.18303571428572
-    148.18303571428572
-    148.18303571428572
-    148.18303571428572
-    148.18303571428572
- 118000.0
-    148.18303571428572
-      0.6
-    148.18303571428572
-    148.18303571428572
-    148.18303571428572</code></pre><p>The pump&#39;s head over its flow is the cube&#39;s resistance:</p><pre><code class="language-julia hljs">I = sol[sys.pump.inlet.ṁ]
+sol = solve_steady(sys);</code></pre><p>The pump&#39;s head over its flow is the cube&#39;s resistance:</p><pre><code class="language-julia hljs">I = sol[sys.pump.inlet.ṁ]
 R_cube = 3.0e4 / I
 @assert isapprox(R_cube, 5 / 6 * R; rtol=1e-8)
 R_cube / R</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.8333333333333334</code></pre><p>and each edge carries the share the symmetry argument gave it:</p><pre><code class="language-julia hljs">flows = [sol[getproperty(sys, nameof(r)).inlet.ṁ] / I for r in resistors]
 @assert all(isapprox.(flows, [1/3, 1/3, 1/3, 1/6, 1/6, 1/6, 1/6, 1/3, 1/6, 1/6, 1/3, 1/3];
-                      rtol=1e-8))
-round.(flows; digits=4)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">12-element Vector{Float64}:
- 0.3333
- 0.3333
- 0.3333
- 0.1667
- 0.1667
- 0.1667
- 0.1667
- 0.3333
- 0.1667
- 0.1667
- 0.3333
- 0.3333</code></pre><h2 id="Flow-driven-by-temperature"><a class="docs-heading-anchor" href="#Flow-driven-by-temperature">Flow driven by temperature</a><a id="Flow-driven-by-temperature-1"></a><a class="docs-heading-anchor-permalink" href="#Flow-driven-by-temperature" title="Permalink"></a></h2><p>Three vertical branches of height <span>$H$</span> join a common plenum at the top and another at the bottom, with no pump. Each branch holds water at its own temperature, so each column has a different weight. The heavier, colder column sinks and pushes water up through the lighter ones: a thermosyphon. Python STREAM uses this case to check how a loop circulates when its channels run at different temperatures.</p><p>Take each branch&#39;s flow <span>$\dot m_k$</span> positive upward, from the bottom plenum to the top. Every branch sees the same pressure difference between the plenums,</p><p class="math-container">\[p_\text{bottom} - p_\text{top} = R_k\,\dot m_k + \rho_k\,g\,H,\]</p><p>and no mass is lost, <span>$\sum_k \dot m_k = 0$</span>. Solving the two together gives</p><p class="math-container">\[p_\text{bottom} - p_\text{top} = g\,H\,\frac{\sum_k \rho_k/R_k}{\sum_k 1/R_k},
+                      rtol=1e-8));</code></pre><h2 id="Flow-driven-by-temperature"><a class="docs-heading-anchor" href="#Flow-driven-by-temperature">Flow driven by temperature</a><a id="Flow-driven-by-temperature-1"></a><a class="docs-heading-anchor-permalink" href="#Flow-driven-by-temperature" title="Permalink"></a></h2><p>Three vertical branches of height <span>$H$</span> join a common plenum at the top and another at the bottom, with no pump. Each branch holds water at its own temperature, so each column has a different weight. The heavier, colder column sinks and pushes water up through the lighter ones: a thermosyphon. Python STREAM uses this case to check how a loop circulates when its channels run at different temperatures.</p><p>Take each branch&#39;s flow <span>$\dot m_k$</span> positive upward, from the bottom plenum to the top. Every branch sees the same pressure difference between the plenums,</p><p class="math-container">\[p_\text{bottom} - p_\text{top} = R_k\,\dot m_k + \rho_k\,g\,H,\]</p><p>and no mass is lost, <span>$\sum_k \dot m_k = 0$</span>. Solving the two together gives</p><p class="math-container">\[p_\text{bottom} - p_\text{top} = g\,H\,\frac{\sum_k \rho_k/R_k}{\sum_k 1/R_k},
 \qquad
 \dot m_k = \frac{(p_\text{bottom} - p_\text{top}) - \rho_k\,g\,H}{R_k}.\]</p><p>Each branch is a <a href="../../reference/components/#STREAM.Components.HeatExchanger-Tuple{Any}"><code>HeatExchanger</code></a> that holds its water at the branch temperature, a <a href="../../reference/components/#STREAM.Components.Gravity"><code>Gravity</code></a> element for the weight of its column, and its resistance. <code>Gravity</code> reads the density of the water entering it, and with the heat exchanger next to it, that is the branch temperature whichever way the water flows.</p><pre><code class="language-julia hljs">H = 2.0                                     # m
 names = [:hot, :mean, :cold]
@@ -251,9 +45,7 @@ connections = [
 ]
 @named syphon = assembly(connections, hxs..., rises..., rs...)
 sys = mtkcompile(syphon)
-sol = solve_steady(sys)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">retcode: Success
-u: 1-element Vector{Float64}:
- 180710.61616229566</code></pre><p>The flows STREAM finds, hot, mean and cold:</p><pre><code class="language-julia hljs">ṁ = [sol[getproperty(sys, nameof(r)).inlet.ṁ] for r in rs]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element Vector{Float64}:
+sol = solve_steady(sys);</code></pre><p>The flows STREAM finds, hot, mean and cold:</p><pre><code class="language-julia hljs">ṁ = [sol[getproperty(sys, nameof(r)).inlet.ṁ] for r in rs]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element Vector{Float64}:
   0.22636260199044772
  -0.03716171370715892
  -0.1892008882832888</code></pre><p>and the closed form:</p><pre><code class="language-julia hljs">ρ_k = ρ.(H2O, T_k)
@@ -265,4 +57,4 @@ u: 1-element Vector{Float64}:
 @assert isapprox(sum(ṁ), 0.0; atol=1e-12)</code></pre><p>The closed form says which way each branch goes. Write the pressure difference as <span>$g H \bar\rho$</span>, with <span>$\bar\rho = \sum_k (\rho_k/R_k) / \sum_k (1/R_k)$</span> the resistance-weighted mean density. Then <span>$\dot m_k$</span> has the sign of <span>$\bar\rho - \rho_k$</span>: a branch rises when it is lighter than the weighted mean and sinks when it is heavier.</p><pre><code class="language-julia hljs">ρ_mean = Δp / (G_EARTH * H)
 (ρ_mean, ρ_k)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(983.4848718830768, [971.9435911200001, 987.27431208, 997.95471288])</code></pre><p>The hot branch rises and the cold one sinks, as expected. The middle one, at 50 °C, sinks too: it is heavier than the weighted mean, because the hot branch, with the lowest resistance, pulls the mean towards its own density. In a reactor core this is how a cooler channel next to hot ones can see its flow fall, or reverse, once natural circulation sets in.</p><h2 id="What-next"><a class="docs-heading-anchor" href="#What-next">What next</a><a id="What-next-1"></a><a class="docs-heading-anchor-permalink" href="#What-next" title="Permalink"></a></h2><p>Both networks here have no inertia, so they settle instantly. <a href="../03_pump_coastdown/">Pump coastdown</a> adds the inertia of the water, and follows a loop in time as its pump stops.</p><script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.esm.min.mjs';
 mermaid.initialize({ startOnLoad: true, theme: "neutral" });
-</script></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../01_first_loop/">« A first loop</a><a class="docs-footer-nextpage" href="../03_pump_coastdown/">Pump coastdown »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Sunday 4 October 2026 17:43">Sunday 4 October 2026</span>. Using Julia version 1.13.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+</script></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../01_first_loop/">« A first loop</a><a class="docs-footer-nextpage" href="../03_pump_coastdown/">Pump coastdown »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Monday 5 October 2026 02:32">Monday 5 October 2026</span>. Using Julia version 1.13.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

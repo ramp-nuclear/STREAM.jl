@@ -21,11 +21,11 @@ geometry = PipeGeometry_rectangular(L, width, gap, heated_width)
 z_edges = range(0.0, L; length=n + 1)
 shape = repeat(cosine_shape(z_edges, 1.4) ./ nx, 1, nx)
 @named fuel = HeatDiffusion(; nz=n, nx, Lz=L, Lx=thickness, y=heated_width,
-                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P, power_shape=shape)
+                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P, power_shape=shape);
 
-@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
+@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH);
 
-@named cell = symmetric_plate(ch, fuel)
+@named cell = symmetric_plate(ch, fuel);
 
 @named pump = Pump(; ṁ0=ṁ)
 @named hx = HeatExchanger(T_in)

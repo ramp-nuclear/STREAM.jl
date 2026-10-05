@@ -29,58 +29,7 @@ geometry = PipeGeometry_rectangular(L, width, gap, heated_width)</code></pre><pr
   heated_parts  (0.063, 0.063) m</code></pre><h2 id="The-plate"><a class="docs-heading-anchor" href="#The-plate">The plate</a><a id="The-plate-1"></a><a class="docs-heading-anchor-permalink" href="#The-plate" title="Permalink"></a></h2><p><a href="../../reference/components/#STREAM.Components.HeatDiffusion-Tuple{}"><code>HeatDiffusion</code></a> conducts heat across the plate in each of <span>$n$</span> axial slices. Its depth <code>y</code> is the heated width, so that each slice&#39;s surface is the heated area of one channel cell. The material here is aluminium throughout, the simplification described in <a href="../../explanation/conduction/">Heat conduction in a fuel plate</a>.</p><p>The power is shaped as a cosine along the plate, with a peak 1.4 times the average. <a href="../../reference/utilities/#STREAM.Utilities.cosine_shape"><code>cosine_shape</code></a> gives each axial cell its share, and each share is split evenly across the plate&#39;s thickness.</p><pre><code class="language-julia hljs">z_edges = range(0.0, L; length=n + 1)
 shape = repeat(cosine_shape(z_edges, 1.4) ./ nx, 1, nx)
 @named fuel = HeatDiffusion(; nz=n, nx, Lz=L, Lx=thickness, y=heated_width,
-                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P, power_shape=shape)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr1">Model fuel:</span>
-<span class="sgr1">Subsystems (40):</span> see hierarchy(fuel)
-  thermal_left1
-  thermal_left2
-  thermal_left3
-  thermal_left4
-  ⋮
-<span class="sgr1">Equations (160):</span>
-  120 standard: see equations(fuel)
-  40 connecting: see equations(expand_connections(fuel))
-<span class="sgr1">Unknowns (160):</span> see unknowns(fuel)
-  (T(t))[<span class="sgr34">1</span>, <span class="sgr34">1</span>]
-  (T(t))[<span class="sgr34">2</span>, <span class="sgr34">1</span>]
-  (T(t))[<span class="sgr34">3</span>, <span class="sgr34">1</span>]
-  (T(t))[<span class="sgr34">4</span>, <span class="sgr34">1</span>]
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(fuel)
-  power</code></pre><h2 id="The-channel"><a class="docs-heading-anchor" href="#The-channel">The channel</a><a id="The-channel-1"></a><a class="docs-heading-anchor-permalink" href="#The-channel" title="Permalink"></a></h2><p><a href="../../reference/components/#STREAM.Components.ChannelAndContacts-Tuple{}"><code>ChannelAndContacts</code></a> is a channel with a thermal port on each face of each cell. Its wall temperatures come from whatever the ports are joined to, and its heat transfer coefficient from a model, Dittus-Boelter by default. The flow goes down, so gravity is negative along it.</p><pre><code class="language-julia hljs">@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr1">Model ch:</span>
-<span class="sgr1">Subsystems (42):</span> see hierarchy(ch)
-  inlet
-  outlet
-  thermal_left1
-  thermal_left2
-  ⋮
-<span class="sgr1">Equations (167):</span>
-  125 standard: see equations(ch)
-  42 connecting: see equations(expand_connections(ch))
-<span class="sgr1">Unknowns (490):</span> see unknowns(ch)
-  (T(t))[<span class="sgr34">1</span>]
-  (T(t))[<span class="sgr34">2</span>]
-  (T(t))[<span class="sgr34">3</span>]
-  (T(t))[<span class="sgr34">4</span>]
-  ⋮
-<span class="sgr1">Parameters (1):</span> see parameters(ch)
-  g_acc
-<span class="sgr1">Observed (323):</span> see observed(ch)</code></pre><p><a href="../../reference/assemblies/#STREAM.Assemblies.symmetric_plate-Tuple{Any, Any}"><code>symmetric_plate</code></a> makes the unit cell: it joins the channel&#39;s right face to the plate&#39;s left face and the channel&#39;s left face to the plate&#39;s right face, cell by cell.</p><pre><code class="language-julia hljs">@named cell = symmetric_plate(ch, fuel)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr1">Model cell:</span>
-<span class="sgr1">Subsystems (2):</span> see hierarchy(cell)
-  ch
-  fuel
-<span class="sgr1">Equations (367):</span>
-  285 standard: see equations(cell)
-  82 connecting: see equations(expand_connections(cell))
-<span class="sgr1">Unknowns (650):</span> see unknowns(cell)
-  (ch₊T(t))[<span class="sgr34">1</span>]
-  (ch₊T(t))[<span class="sgr34">2</span>]
-  (ch₊T(t))[<span class="sgr34">3</span>]
-  (ch₊T(t))[<span class="sgr34">4</span>]
-  ⋮
-<span class="sgr1">Parameters (2):</span> see parameters(cell)
-  ch₊g_acc
-  fuel₊power
-<span class="sgr1">Observed (323):</span> see observed(cell)</code></pre><p>A pump holding the flow fixed and a heat exchanger setting the inlet temperature close the loop. With the flow fixed, the loop has no zero-flow solution to fall into, and the solver needs no guess.</p><pre><code class="language-julia hljs">@named pump = Pump(; ṁ0=ṁ)
+                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P, power_shape=shape);</code></pre><h2 id="The-channel"><a class="docs-heading-anchor" href="#The-channel">The channel</a><a id="The-channel-1"></a><a class="docs-heading-anchor-permalink" href="#The-channel" title="Permalink"></a></h2><p><a href="../../reference/components/#STREAM.Components.ChannelAndContacts-Tuple{}"><code>ChannelAndContacts</code></a> is a channel with a thermal port on each face of each cell. Its wall temperatures come from whatever the ports are joined to, and its heat transfer coefficient from a model, Dittus-Boelter by default. The flow goes down, so gravity is negative along it.</p><pre><code class="language-julia hljs">@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH);</code></pre><p><a href="../../reference/assemblies/#STREAM.Assemblies.symmetric_plate-Tuple{Any, Any}"><code>symmetric_plate</code></a> makes the unit cell: it joins the channel&#39;s right face to the plate&#39;s left face and the channel&#39;s left face to the plate&#39;s right face, cell by cell.</p><pre><code class="language-julia hljs">@named cell = symmetric_plate(ch, fuel);</code></pre><p>A pump holding the flow fixed and a heat exchanger setting the inlet temperature close the loop. With the flow fixed, the loop has no zero-flow solution to fall into, and the solver needs no guess.</p><pre><code class="language-julia hljs">@named pump = Pump(; ṁ0=ṁ)
 @named hx = HeatExchanger(T_in)
 connections = [inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ p_in]
 @named loop = assembly(connections, pump, hx, cell)
@@ -113,4 +62,4 @@ osv               4.1 at cell 16
 chf_mirshak       8.94 at cell 11
 chf_sudo_kaminaga 3.61 at cell 11</code></pre><p>Reading them:</p><ul><li><strong>ONB</strong>: the wall stays below the onset of nucleate boiling by this many kelvin at its closest, near the hottest wall.</li><li><strong>OSV</strong> and <strong>OFI</strong>: the power could rise about fourfold before significant void or flow instability. The two are close, as they should be: OSV is where the void that bends the pressure drop curve begins.</li><li><strong>CHF</strong>: the critical heat flux is several times the local flux, and far beyond the other limits, as is usual at forced flow and low pressure. Sudo-Kaminaga is the more conservative of the two correlations here.</li></ul><p>None of these numbers carries uncertainty factors yet; <a href="../../explanation/limits/margins/">Margins</a> explains how a safety analysis adds them.</p><h2 id="What-next"><a class="docs-heading-anchor" href="#What-next">What next</a><a id="What-next-1"></a><a class="docs-heading-anchor-permalink" href="#What-next" title="Permalink"></a></h2><p><a href="../05_reactivity_insertion/">Reactivity insertion with feedback</a> drives the plate&#39;s power from the reactor&#39;s kinetics, and lets the plate&#39;s temperature act back on the power.</p><script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.esm.min.mjs';
 mermaid.initialize({ startOnLoad: true, theme: "neutral" });
-</script></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../03_pump_coastdown/">« Pump coastdown</a><a class="docs-footer-nextpage" href="../05_reactivity_insertion/">Reactivity insertion with feedback »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Sunday 4 October 2026 17:43">Sunday 4 October 2026</span>. Using Julia version 1.13.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+</script></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../03_pump_coastdown/">« Pump coastdown</a><a class="docs-footer-nextpage" href="../05_reactivity_insertion/">Reactivity insertion with feedback »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Monday 5 October 2026 02:32">Monday 5 October 2026</span>. Using Julia version 1.13.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

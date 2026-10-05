@@ -11,9 +11,9 @@ dp0, ṁ0, L_over_A = 3.0e4, 50.0, 2.0e4      # Pa, kg/s, 1/m
 
 connections = [inseries(pump, flywheel, loss, hx, pump), pump.inlet.p ~ 1.5e5]
 @named loop = assembly(connections, pump, flywheel, loss, hx)
-sys = mtkcompile(loop)
+sys = mtkcompile(loop);
 
-unknowns(sys)
+foreach(println, unknowns(sys))
 
 sol_ss = solve_steady(sys, [sys.loss.inlet.ṁ => 40.0])
 sol_ss[sys.flywheel.inlet.ṁ]
@@ -45,7 +45,7 @@ head(t) = dp0 * exp(-t / τ)
 @named hx2 = HeatExchanger(40.0)
 connections2 = [inseries(pump2, flywheel2, loss2, hx2, pump2), pump2.inlet.p ~ 1.5e5]
 @named loop2 = assembly(connections2, pump2, flywheel2, loss2, hx2)
-sys2 = mtkcompile(loop2)
+sys2 = mtkcompile(loop2);
 
 sol2 = solve_transient(sys2, [sys2.loss2.inlet.ṁ => ṁ0, sys2.pump2.dP_pump_fn => head], times)
 sol2.retcode
