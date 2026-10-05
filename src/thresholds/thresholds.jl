@@ -19,16 +19,17 @@ end
 
 # #### Public API
 
-"""
+@doc raw"""
     bergles_rohsenow_t_onb(pressure, q_wall, T_sat) -> T_ONB [°C]
 
-Onset of Nucleate Boiling wall temperature using Bergles-Rohsenow (1964) correlation.
-Thin wrapper around the private `_bergles_rohsenow_dT_ONB` helper in correlations.jl.
+Wall temperature at the onset of nucleate boiling, from Bergles and Rohsenow
+[BerglesRohsenow1964](@cite):
 
-Formula: `T_ONB = T_sat + 0.556 * (q_wall / (1082 * p^1.156))^(0.463 * p^0.0234)`
-where `p = pressure / 1e5` (pressure in bar).
+```math
+T_{ONB} = T_{sat} + 0.556 \, (q_{wall} / (1082 \, p^{1.156}))^{0.463 \, p^{0.0234}}
+```
 
-Source: Python STREAM temperatures.py `bergles_rohsenow_t_onb`.
+with `p` in bar and `q_wall` in W/m². See [Onset of nucleate boiling](@ref) for the physics.
 
 # Arguments
 - `pressure`: absolute system pressure [Pa]
@@ -37,20 +38,27 @@ Source: Python STREAM temperatures.py `bergles_rohsenow_t_onb`.
 
 # Returns
 Wall temperature at onset of nucleate boiling `T_ONB` [°C].
+
+# Examples
+```jldoctest
+julia> Thresholds.bergles_rohsenow_t_onb(1e5, 1e5, 100.0)
+104.52092778452801
+```
 """
 function bergles_rohsenow_t_onb(pressure, q_wall, T_sat)
     return T_sat + _bergles_rohsenow_dT_ONB(pressure, q_wall)
 end
 
-"""
+@doc raw"""
     q_boiling_onset(ṁ, T_sat, T_inlet, cp) -> Q [W]
 
-Channel power required to reach the saturation temperature at the outlet (Boiling Power / BP).
-Also known as the "boiling power limit" per TERMIC/CONVEC.
+The boiling power: the channel power that brings the outlet to saturation,
 
-Formula: `Q = |ṁ| * cp * (T_sat - T_inlet)`
+```math
+Q = |\dot{m}| \, c_p \, (T_{sat} - T_{inlet})
+```
 
-Source: Python STREAM thresholds.py `boiling_power`.
+Python STREAM calls it `boiling_power`, and TERMIC and CONVEC the boiling power limit.
 
 # Arguments
 - `ṁ`: mass flow rate [kg/s] (sign-insensitive; uses `abs(ṁ)`)
@@ -60,24 +68,29 @@ Source: Python STREAM thresholds.py `boiling_power`.
 
 # Returns
 Channel power limit for boiling onset `Q` [W].
+
+# Examples
+```jldoctest
+julia> Thresholds.q_boiling_onset(0.5, 100.0, 40.0, 4180.0)
+125400.0
+```
 """
 function q_boiling_onset(ṁ, T_sat, T_inlet, cp)
     return abs(ṁ) * cp * (T_sat - T_inlet)
 end
 
-"""
+@doc raw"""
     q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe) -> Q [W]
 
-Channel power at Onset of Flow Instability (OFI) per Whittle-Forgan (1967)
-with Fabréga correction.
+Channel power at the onset of flow instability, from the Whittle-Forgan correlation
+[WhittleForgan1967](@cite) with Fabrèga's flow-dependent `η` [Fabrega1971](@cite):
 
-Formula:
-    Q_OFI = |ṁ| * ∫cp(T)dT / (1 + 3.15*(Dh/L)*(1.08*G_cgs)^0.29)
+```math
+Q_{OFI} = |\dot{m}| \int c_p \, dT / (1 + η D_h / L), \qquad η = 3.15 \, (1.08 \, G)^{0.29}
+```
 
-where G_cgs = |ṁ|/A / 10 (mass flux converted from SI to CGS).
-The cp integral ∫cp(T)dT is evaluated from T_inlet to T_sat using `quadgk`.
-
-Source: Python STREAM thresholds.py `Whittle_Forgan_OFI`.
+with the integral from `T_inlet` to `T_sat` and the mass flux `G` in g/(cm²·s), as the
+correlation was fitted. See [Onset of flow instability](@ref) for the physics.
 
 # Arguments
 - `ṁ`: mass flow rate [kg/s] (sign-insensitive; uses `abs(ṁ)`)
@@ -85,8 +98,18 @@ Source: Python STREAM thresholds.py `Whittle_Forgan_OFI`.
 - `T_inlet`: coolant inlet temperature [°C]
 - `pipe`: channel geometry [`PipeGeometry`]
 
+- `liquid`: the coolant whose `cₚ` is integrated (default [`H2O`](@ref))
+
 # Returns
 OFI limit power `Q_OFI` [W].
+
+# Examples
+```jldoctest
+julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
+
+julia> round(Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe); sigdigits=7)
+135474.3
+```
 """
 function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=H2O)
     G = abs(ṁ) / pipe.A
@@ -95,22 +118,24 @@ function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=
     return abs(ṁ) * integral_cp / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
 end
 
-"""
+@doc raw"""
     q_OSV_saha_zuber(T_inlet, ṁ, pipe, coolant; flux_shape=nothing, dz=nothing) -> q_OSV [W/m^2]
 
-Onset of Significant Void (OSV) heat flux per cell, from Saha and Zuber (1974), with the
-bulk temperature computed as though the channel ran at the OSV flux.
+Onset of significant void (OSV) heat flux per cell, from Saha and Zuber
+[SahaZuber1974](@cite), with the bulk temperature computed as though the channel ran at the
+OSV flux. See [Onset of significant void](@ref) for the physics.
 
 Saha and Zuber give `T_sat - T_bulk = q_OSV / X`, with `X = κ/Dh · Nu_c` (`Nu_c = 455`) for
 `Pe ≤ 70000` and `X = St_c · G · cₚ` (`St_c = 0.0065`) above. Scaling the flux shape until
 the bulk temperature the energy balance gives meets that condition yields
 
-    q_OSV = X (T_sat - T_inlet) / (1 + X Hp / (|ṁ| cₚ) · ∫q dz / q)
+```math
+q_{OSV} = X (T_{sat} - T_{inlet}) / (1 + (X H_p / (|\dot{m}| c_p)) \int q \, dz / q)
+```
 
 which does not depend on how `flux_shape` is normalized. The integral runs from the upstream
-end, so under reversed flow it starts at the last cell.
-
-Source: Python STREAM thresholds.py `Saha_Zuber_OSV_computed_bulk`.
+end, so under reversed flow it starts at the last cell. This is Python STREAM's
+`Saha_Zuber_OSV_computed_bulk`.
 
 # Arguments
 - `T_inlet`: temperature of the coolant entering the channel [°C]
@@ -122,7 +147,17 @@ Source: Python STREAM thresholds.py `Saha_Zuber_OSV_computed_bulk`.
 - `dz`: axial cell lengths [m]; default `pipe.L / n`
 
 # Returns
-OSV heat flux per cell [W/m^2].
+OSV heat flux per cell [W/m²].
+
+# Examples
+```jldoctest
+julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
+
+julia> coolant = H2O(fill(26.85, 10), fill(1e5, 10));  # 10 cells at 26.85 °C and 1 bar
+
+julia> round(last(Thresholds.q_OSV_saha_zuber(26.85, 0.5, pipe, coolant)); sigdigits=9)
+1.44385224e6
+```
 """
 function q_OSV_saha_zuber(
     T_inlet, ṁ, pipe, coolant::Liquid; flux_shape=nothing, dz=nothing
@@ -150,7 +185,9 @@ end
 """
     q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant) -> q_CHF [W/m^2]
 
-Critical Heat Flux (CHF) per Sudo-Kaminaga (1998) correlation for plate-type fuel.
+Critical heat flux from the Sudo-Kaminaga correlation for plate-type fuel
+[SudoKaminaga1993, Kaminaga1998](@cite). See [Critical heat flux](@ref) for the physics and
+the ranges it was fitted over.
 
 Four sub-correlations (`_SKq1..4`) with direction-dependent selection:
 - `G_star >= 0` (downward/horizontal flow): `q_star = max(min(q2, q4), q3)`
@@ -168,9 +205,8 @@ and q3 are driven by the temperature difference at the **inlet** and q4 by the o
 **outlet**. Only those two differences come from the channel ends; the `cp/hfg` factor
 multiplying them stays per cell, as in Python STREAM.
 
-Uses `pipe.width` (NOT `heated_perimeter/2`) for q3 per Mishima's experiments.
-
-Source: Python STREAM thresholds.py `Sudo_Kaminaga_CHF`.
+`q3` reads the channel width `pipe.width`, not half the heated perimeter, following the
+experiments it was fitted to. This is Python STREAM's `Sudo_Kaminaga_CHF`.
 
 # Arguments
 - `T_bulk`: bulk coolant temperature, per cell [°C]
@@ -184,7 +220,18 @@ Source: Python STREAM thresholds.py `Sudo_Kaminaga_CHF`.
   to state.
 
 # Returns
-CHF heat flux `q_CHF` [W/m^2], shaped like the inputs.
+CHF heat flux `q_CHF` [W/m²], shaped like the inputs.
+
+# Examples
+Downward flow at 0.5 kg/s with the bulk at 46.85 °C, against book values for water at 1 atm:
+```jldoctest
+julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
+
+julia> sat = Substances.Liquid(; ρ=958.4, ρᵥ=0.598, cₚ=4217.0, hfg=2257e3, σ=0.059, Tsat=100.0);
+
+julia> round(Thresholds.q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat); sigdigits=9)
+1.39178807e6
+```
 """
 function q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant::Liquid)
     g_abs = abs(gravity)
@@ -213,15 +260,17 @@ function q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant::Liquid)
     return q_star .* hfg .* sqrt.(lamda .* drho .* rho_v .* g_abs)
 end
 
-"""
+@doc raw"""
     q_CHF_mirshak(T_bulk, T_sat, pressure, v) -> q_CHF [W/m^2]
 
-Critical Heat Flux (CHF) per Mirshak et al. (1959) correlation.
-Valid for rapid flows (v > 1.5 m/s).
+Critical heat flux from the Mirshak correlation [Mirshak1959](@cite), for fast flows
+(`v > 1.5` m/s):
 
-Formula: `q_CHF = 1.51e6 * (1 + 0.1198*v) * (1 + 0.00914*(T_sat - T_bulk)) * (1 + 1.9e-6*pressure)`
+```math
+q_{CHF} = 1.51 \cdot 10^6 \, (1 + 0.1198 \, v)(1 + 0.00914 \, (T_{sat} - T_{bulk}))(1 + 1.9 \cdot 10^{-6} p)
+```
 
-Source: Python STREAM thresholds.py `mirshak_chf`.
+in W/m², with `v` in m/s and `p` in Pa. See [Critical heat flux](@ref).
 
 # Arguments
 - `T_bulk`: bulk coolant temperature [°C]
@@ -230,7 +279,13 @@ Source: Python STREAM thresholds.py `mirshak_chf`.
 - `v`: coolant flow velocity [m/s]
 
 # Returns
-CHF heat flux `q_CHF` [W/m^2].
+CHF heat flux `q_CHF` [W/m²].
+
+# Examples
+```jldoctest
+julia> Thresholds.q_CHF_mirshak(46.85, 100.0, 1e5, 2.0)
+3.30950620425684e6
+```
 """
 function q_CHF_mirshak(T_bulk, T_sat, pressure, v)
     return 1.51e6 *
@@ -239,15 +294,17 @@ function q_CHF_mirshak(T_bulk, T_sat, pressure, v)
            (1 + 1.9e-6 * pressure)
 end
 
-"""
+@doc raw"""
     q_CHF_fabrega(T_inlet, T_sat, pipe) -> q_CHF [W/m^2]
 
-Critical Heat Flux (CHF) per Fabréga (1971) correlation.
-Valid for slow flows (v < 0.5 m/s).
+Critical heat flux from Fabrèga's low-flow correlation [Fabrega1971](@cite), for slow flows
+(`v < 0.5` m/s):
 
-Formula: `q_CHF = 1e7 * Dh * (0.023*(T_sat - T_inlet) + 4.56)`
+```math
+q_{CHF} = 10^7 \, D_h \, (0.023 \, (T_{sat} - T_{inlet}) + 4.56)
+```
 
-Source: Python STREAM thresholds.py `fabrega_chf`.
+in W/m², with `Dh` in m. See [Critical heat flux](@ref).
 
 # Arguments
 - `T_inlet`: coolant bulk temperature at inlet [°C]
@@ -255,29 +312,34 @@ Source: Python STREAM thresholds.py `fabrega_chf`.
 - `pipe`: channel geometry [`PipeGeometry`] (uses `pipe.Dh`)
 
 # Returns
-CHF heat flux `q_CHF` [W/m^2].
+CHF heat flux `q_CHF` [W/m²].
+
+# Examples
+```jldoctest
+julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
+
+julia> Thresholds.q_CHF_fabrega(26.85, 100.0, pipe)
+289290.40230215824
+```
 """
 function q_CHF_fabrega(T_inlet, T_sat, pipe)
     return 1e7 * pipe.Dh * (0.023 * (T_sat - T_inlet) + 4.56)
 end
 
-"""
+@doc raw"""
     twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0) -> T_limit [°C]
 
 Wall temperature the face would reach if the local heat flux were worse by
 `inhomogeneity_factor`.
 
-Formula: `T_limit = T_bulk + inhomogeneity_factor * (T_wall - T_bulk)`
+```math
+T_{limit} = T_{bulk} + f \, (T_{wall} - T_{bulk})
+```
 
 The solution carries no fuel inhomogeneity, so the wall temperature it reports understates the
-hot spot. Scaling the flux by `inhomogeneity_factor` and reading the wall temperature back off
-Newton's law gives the limit to check against.
-
-Python STREAM writes this as `T_bulk + q * inhomogeneity_factor / h`. The forms agree, since
-these channels state `q = h*(T_wall - T_bulk)` and the `h` cancels:
-
-    T_bulk + inhom * q / h = T_bulk + inhom * h*(T_wall - T_bulk) / h
-                           = T_bulk + inhom * (T_wall - T_bulk)
+hot spot. Scaling the flux by `f` and reading the wall temperature back off Newton's law gives
+the temperature to check against. Python STREAM writes the same thing as `T_bulk + q f / h`,
+since `q = h (T_wall - T_bulk)`. See [Wall temperature limit](@ref).
 
 Needs a channel carrying a wall temperature, so `Channel` or `ChannelAndContacts`. See
 [`ChannelState`](@ref) for `ChannelHeatFlux`.
@@ -289,6 +351,13 @@ Needs a channel carrying a wall temperature, so `Channel` or `ChannelAndContacts
 
 # Returns
 Effective wall temperature limit `T_limit` [°C].
+
+# Examples
+A 100 K rise worsened by 20%:
+```jldoctest
+julia> Thresholds.twall_limit(26.85, 126.85, 1.2)
+146.85
+```
 """
 function twall_limit(T_bulk, T_wall, inhomogeneity_factor=1.0)
     return T_bulk + inhomogeneity_factor * (T_wall - T_bulk)

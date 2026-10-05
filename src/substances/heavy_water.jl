@@ -4,15 +4,12 @@
 
 Saturated heavy water (D₂O).
 
-Correlations come from A. Crabtree and M. Siman-Tov, "Thermophysical Properties of
-Saturated Light and Heavy Water for Advanced Neutron Source Applications", ORNL/TM-12322,
-1993.
+The correlations are those of Crabtree and Siman-Tov [CrabtreeSimantov1993](@cite).
 
 [`D2O`](@ref) is the singleton instance.
 
-Same shape as [`LightWater`](@ref): saturation-line fits in Celsius and Pa, the pressure argument
-unused outside `sat_temperature`, and per-property reference values asserted in
-`test_substances.jl`.
+Same shape as [`LightWater`](@ref): saturation-line fits in Celsius and Pa, with the pressure
+argument unused outside `sat_temperature`.
 """
 struct HeavyWater <: AbstractLiquid end
 
@@ -28,7 +25,14 @@ const D2O = HeavyWater()
 
 Saturated liquid density. As with light water the ORNL fit is stated in Fahrenheit.
 
-Reference values: 1095.7419670000002 at 50 °C, 1063.4244970000002 at 100 °C.
+# Examples
+```jldoctest
+julia> density(D2O, 50.0)
+1095.7419670000002
+
+julia> density(D2O, 100.0)
+1063.4244970000002
+```
 """
 function density(::HeavyWater, T, p)
     A = 1117.772605
@@ -43,7 +47,14 @@ end
 
 Isobaric thermal expansion coefficient taken analytically from the density fit above.
 
-Reference values: 312.34463951465654e-6 at 20 °C, 736.0686181371651e-6 at 100 °C.
+# Examples
+```jldoctest
+julia> thermal_expansion(D2O, 20.0)
+0.00031234463951465655
+
+julia> thermal_expansion(D2O, 100.0)
+0.0007360686181371651
+```
 """
 function thermal_expansion(l::HeavyWater, T, p)
     B = -0.077855
@@ -57,7 +68,14 @@ end
 
 Specific heat of the saturated liquid, a cubic in scaled Rankine temperature.
 
-Reference values: 4220.658975628751 at 50 °C, 4162.210117465748 at 100 °C.
+# Examples
+```jldoctest
+julia> specific_heat(D2O, 50.0)
+4220.658975628751
+
+julia> specific_heat(D2O, 100.0)
+4162.210117465748
+```
 """
 function specific_heat(::HeavyWater, T, p)
     Tl = (1.8T + 491.67) * 1e-4
@@ -73,7 +91,14 @@ end
 
 Dynamic viscosity of the saturated liquid.
 
-Reference values: 6.441125212510078e-4 at 50 °C, 3.301433604774831e-4 at 100 °C.
+# Examples
+```jldoctest
+julia> viscosity(D2O, 50.0)
+0.0006441125212510078
+
+julia> viscosity(D2O, 100.0)
+0.0003301433604774831
+```
 """
 function viscosity(::HeavyWater, T, p)
     TF = 1.8T + 32
@@ -89,7 +114,14 @@ end
 
 Thermal conductivity of the saturated liquid.
 
-Reference values: 0.6167873183429435 at 50 °C, 0.6357784886396809 at 100 °C.
+# Examples
+```jldoctest
+julia> conductivity(D2O, 50.0)
+0.6167873183429435
+
+julia> conductivity(D2O, 100.0)
+0.6357784886396809
+```
 """
 function conductivity(::HeavyWater, T, p)
     Tl = (1.8T + 491.67) * 1e-4
@@ -106,8 +138,17 @@ end
 Saturation temperature at pressure `p`. The temperature argument is unused; the two-argument
 short form `sat_temperature(D2O, p)` takes the pressure directly.
 
-Reference values: 100.98975482398993 at 1e5 Pa, 82.7830309880722 at 0.5e5 Pa,
-121.5058319422803 at 2e5 Pa.
+# Examples
+```jldoctest
+julia> sat_temperature(D2O, 1e5)
+100.98975482398993
+
+julia> sat_temperature(D2O, 0.5e5)
+82.7830309880722
+
+julia> sat_temperature(D2O, 2e5)
+121.5058319422803
+```
 """
 function sat_temperature(::HeavyWater, T, p)
     X = log(abs(p) * 1e-6)
@@ -123,7 +164,14 @@ end
 
 Latent heat of vaporization, correlated against distance from the critical temperature.
 
-Reference values: 2199499.183881408 at 50 °C, 2076983.0825663893 at 100 °C.
+# Examples
+```jldoctest
+julia> latent_heat(D2O, 50.0)
+2.199499183881408e6
+
+julia> latent_heat(D2O, 100.0)
+2.0769830825663893e6
+```
 """
 function latent_heat(::HeavyWater, T, p)
     X = abs(371.49 - T)
@@ -138,7 +186,14 @@ end
 
 Liquid-vapor surface tension, correlated against reduced distance from the critical point.
 
-Reference values: 0.06809951822968323 at 50 °C, 0.059250184550697166 at 100 °C.
+# Examples
+```jldoctest
+julia> surface_tension(D2O, 50.0)
+0.06809951822968323
+
+julia> surface_tension(D2O, 100.0)
+0.059250184550697166
+```
 """
 function surface_tension(::HeavyWater, T, p)
     X = abs(373.99 - T) / 647.15
@@ -153,7 +208,14 @@ end
 
 Saturated vapor density.
 
-Reference values: 0.08342446145018677 at 50 °C, 0.6309356177290303 at 100 °C.
+# Examples
+```jldoctest
+julia> vapor_density(D2O, 50.0)
+0.08342446145018677
+
+julia> vapor_density(D2O, 100.0)
+0.6309356177290303
+```
 """
 function vapor_density(::HeavyWater, T, p)
     A = -5.456208705

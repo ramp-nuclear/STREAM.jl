@@ -15,6 +15,7 @@ SymbolicIndexingInterface = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
 
 [compat]
 DelimitedFiles = "1.9.1"
+Documenter = "1"
 ModelingToolkit = "11"
 OrdinaryDiffEq = "6.109.0"
 QuadGK = "2.11.2"
@@ -24,10 +25,11 @@ SymbolicIndexingInterface = "0.3.54"
 julia = "1.12"
 
 [extras]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["LinearAlgebra", "Printf", "Random", "Test"]
+test = ["Documenter", "LinearAlgebra", "Printf", "Random", "Test"]

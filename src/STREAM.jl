@@ -29,7 +29,7 @@ Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
 
 # Units
 
-We use SI units everywhere, but for temperetures we use Celsius.
+SI units everywhere, except temperatures, which are in °C.
 """
 module STREAM
 
@@ -158,7 +158,7 @@ Reynolds range and extrapolation below it. `factor` is `@register_symbolic`, so 
 inside an MTK equation.
 
 The drop has the same quadratic form as `Friction.darcy_weisbach_dp` without the `L/Dh` factor.
-[`LocalPressureDrop`](@ref) is the component wrapping it.
+[`LocalPressureDrop`](@ref STREAM.Components.LocalPressureDrop) is the component wrapping it.
 """
 module LocalLoss
 using ModelingToolkit
@@ -205,7 +205,7 @@ end
 The acausal MTK components a model is built from.
 
 Every component is a function returning an uncompiled `System` and taking `name` as a keyword.
-Components state equations and consume their physics from [`HTC`](@ref), [`Friction`](@ref) and
+Components state equations and consume their physics from [`HTC`](@ref STREAM.HTC), [`Friction`](@ref STREAM.Friction) and
 [`LocalLoss`](@ref).
 
 - **Connectors.** [`FlowPort`](@ref) carries pressure, mass flow and stream temperature;
@@ -286,10 +286,8 @@ The tables behind [`FissionProducts`](@ref) are published standards that this pa
 not distribute. Point [`standards_dir!`](@ref) at a directory holding them, or pass `dir=`
 to [`read_standard`](@ref).
 
-[`DecayHeatSource`](@ref) is how a contribution reaches a model. It converts MeV per fission
-into power with the fission rate `P0/Q`, and reads the trip time off the
-`ReactivityController` so the decay clock starts when the reactor scrams. Hand the result to
-`PointKinetics(...; power_input=source)` and couple the fuel to `P`, the total power.
+[`DecayHeatSource`](@ref) is how a contribution reaches a model, as the `power_input` of a
+`PointKinetics`. See [Add decay heat to a transient](@ref).
 """
 module DecayHeat
 using DelimitedFiles

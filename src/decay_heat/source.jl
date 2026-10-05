@@ -1,4 +1,4 @@
-"""
+@doc raw"""
     DecayHeatSource(model, machine; P0, Q=200.0, T=Inf, shutdown_states=(:SCRAM,))
 
 Turn a decay heat contribution into the `power_input` a [`PointKinetics`](@ref) takes.
@@ -7,35 +7,17 @@ An [`AbstractDecayHeat`](@ref) answers `model(t, T)` in MeV per fission, with `t
 from shutdown. A component wants one number in power units at the simulation's own time.
 This closes both gaps:
 
-    source(t) = Φ · model(t - t_shutdown, T)      Φ = P0 / Q
+```math
+\mathrm{source}(t) = Φ \, \mathrm{model}(t - t_{shutdown}, T), \qquad Φ = P_0 / Q
+```
 
-`Φ` is the fission rate of equation FR: at `P0` power and `Q` recoverable MeV per fission,
-the core runs `P0/Q` fissions worth of energy per second, so multiplying by it converts
-MeV/fission into the units `P0` was given in.
+with `Φ` the fission rate and `t_shutdown` the time the machine entered one of
+`shutdown_states`, read off its log. Before the trip the decay time is zero, so the source holds
+the saturated value a reactor at power carries, and the operating point closes exactly. See
+[Decay heat](@ref) for the physics and [Add decay heat to a transient](@ref) for how to use it.
 
-# The clock
-
-`t_shutdown` is read off the [`StateMachine`](@ref)'s log: while the machine is in one of
-`shutdown_states` the decay time is `t` minus the time it entered that state, floored at zero,
-and in any other state it is zero. Reading the log rather than the machine's current state
-makes the source right at any `t` after the solve, not only during it.
-
-Flooring at zero is the physics rather than a guard. A reactor at power holds a saturated
-decay heat inventory, and `model(0, T)` is exactly that saturated value, so the source sits
-there while the reactor runs and decays away from there once tripped. Two things follow.
-The source is continuous in value across the trip, with only its slope jumping, at the
-instant the machine's own transition fires. And the operating point closes
-exactly, since `point_kinetics_steady_state(P0; power_input=source(0.0))` is seeded with the
-same number the source returns before the trip.
-
-A trip at a time you already know needs nothing extra: a machine built in the shutdown
-state, `StateMachine(; initial_state=:SCRAM, initial_time=5.0)`, is a fixed trip at `t = 5`.
-
-# Units
-
-`P0` sets them. Pass the power the reactor runs at in whatever units the kinetics use, which
-is Watts only if `P` is in Watts. A model running dimensionless kinetics at `P0 = 1.0` and
-scaling to Watts downstream, as `build_loop_pk` does, wants `P0 = 1.0` here too.
+`P0` sets the units: those of the kinetics, so `P0 = 1` for kinetics run in units of the
+rated power.
 
 # Arguments
 - `model`: the contribution, any [`AbstractDecayHeat`](@ref). Sum several with `+`.
@@ -47,7 +29,7 @@ scaling to Watts downstream, as `build_loop_pk` does, wants `P0 = 1.0` here too.
 - `Q`: recoverable energy per fission [MeV] (default 200.0)
 - `T`: irradiation time before shutdown [s] (default `Inf`, a saturated inventory)
 - `shutdown_states`: machine states that count as shut down (default `(:SCRAM,)`, the state
-  [`trip!`](@ref) enters)
+  [`trip!`](@ref STREAM.Components.trip!) enters)
 
 # Returns
 A callable `source(t) -> power`, ready to pass as `PointKinetics(...; power_input=source)`.
@@ -91,3 +73,11 @@ function decay_time(source::DecayHeatSource, t)
 end
 
 (source::DecayHeatSource)(t) = source.Φ * source.model(decay_time(source, t), source.T)
+
+function Base.show(io::IO, ::MIME"text/plain", s::DecayHeatSource)
+    print(io, "DecayHeatSource at fission rate P0/Q = ", s.Φ, ", ",
+          isinf(s.T) ? "saturated" : "after $(s.T) s of operation",
+          ", shut down in ", join(string.(s.shutdown_states), " or "), " of ", s.machine)
+    inner = sprint(show, MIME("text/plain"), s.model)
+    print(io, "\n  ", replace(inner, "\n" => "\n  "))
+end

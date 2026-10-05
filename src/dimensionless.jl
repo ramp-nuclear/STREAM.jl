@@ -1,8 +1,8 @@
 
-"""
+@doc raw"""
     Re(ṁ, A, Dh, mu) -> Float64
 
-Reynolds number from mass flow rate.
+Reynolds number from mass flow rate, ``Re = |\dot{m}| D_h / (A μ)``.
 
 # Arguments
 - `ṁ`: mass flow rate [kg/s] (absolute value taken internally)
@@ -18,7 +18,7 @@ Re(ṁ, A, Dh, mu) = abs(ṁ) * Dh / (A * mu)
 """
     Re_vel(rho, u, L, mu) -> Float64
 
-Reynolds number from velocity.
+Reynolds number from velocity, ``Re = ρ |u| L / μ``.
 
 # Arguments
 - `rho`: density [kg/m^3]
@@ -34,7 +34,7 @@ Re_vel(rho, u, L, mu) = rho * abs(u) * L / mu
 """
     Pr(cp, mu, k) -> Float64
 
-Prandtl number.
+Prandtl number, ``Pr = c_p μ / k``.
 
 # Arguments
 - `cp`: specific heat [J/(kg*K)]
@@ -50,6 +50,14 @@ Pr(cp, mu, k) = cp * mu / k
     Re(liquid, T, ṁ, A, Dh) -> Float64
     Pr(liquid, T) -> Float64
     Gr(liquid, T, T_wall, L, g) -> Float64
+
+The same numbers with the properties read off a coolant at the bulk temperature `T` [°C].
+
+# Examples
+```jldoctest
+julia> round(Pr(H2O, 40.0); sigdigits=7)
+4.323622
+```
 """
 Re(liquid::AbstractLiquid, T, ṁ, A, Dh) = Re(ṁ, A, Dh, μ(liquid, T))
 Pr(liquid::AbstractLiquid, T) = Pr(cₚ(liquid, T), μ(liquid, T), κ(liquid, T))
@@ -61,10 +69,8 @@ Choose between a laminar and a turbulent value on Reynolds number, blending line
 the transition band.
 
 `re_bounds` is `(re_lo, re_hi)`: at or below `re_lo` the flow is laminar, above `re_hi` it is
-turbulent, and between them the two values are interpolated linearly in `Re`.
-
-Both `laminar` and `turbulent` are evaluated, since `ifelse` keeps this a symbolic branch the
-solver takes per step rather than one fixed while tracing.
+turbulent, and between them the two values are interpolated linearly in `Re`. Both values are
+evaluated whichever is returned, so each must be finite everywhere.
 
 # Arguments
 - `Re`: Reynolds number to classify
@@ -73,6 +79,15 @@ solver takes per step rather than one fixed while tracing.
 
 # Returns
 The laminar value, the turbulent value, or their linear blend.
+
+# Examples
+```jldoctest
+julia> [flow_regime_blend(Re, (2000.0, 5000.0), 4.0, 100.0) for Re in (1000.0, 3500.0, 8000.0)]
+3-element Vector{Float64}:
+   4.0
+  52.0
+ 100.0
+```
 """
 function flow_regime_blend(Re, re_bounds, laminar, turbulent)
     re_lo, re_hi = re_bounds
@@ -83,7 +98,7 @@ end
 """
     Nu(h, Dh, k) -> Float64
 
-Nusselt number.
+Nusselt number, ``Nu = h D_h / k``.
 
 # Arguments
 - `h`: heat transfer coefficient [W/(m^2*K)]
@@ -112,7 +127,7 @@ Pe(Re_val, Pr_val) = Re_val * Pr_val
 """
     Gr(rho, mu, beta, T_wall, T, L, g) -> Float64
 
-Grashof number.
+Grashof number, ``Gr = ρ^2 β g (T_{wall} - T) L^3 / μ^2``.
 
 # Arguments
 - `rho`: density [kg/m^3]

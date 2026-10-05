@@ -92,10 +92,11 @@ end
                             re_bounds=(2000.0, 5000.0), k_R=1.0,
                             viscosity=nothing) <: AbstractDarcyFactor
 
-Switch between a laminar and a turbulent friction branch on the bulk Reynolds number, the way
-Python STREAM's `regime_dependent_friction` does: laminar at or below `re_bounds[1]`,
-turbulent above `re_bounds[2]`, and a linear blend in between via
-[`flow_regime_blend`](@ref).
+Switch between a laminar and a turbulent friction branch on the bulk Reynolds number.
+
+It is laminar at or below `re_bounds[1]`, turbulent above `re_bounds[2]`, and a linear blend
+in between via [`flow_regime_blend`](@ref), as Python STREAM's `regime_dependent_friction`
+does.
 
 Two things make this the model to reach for when the flow reverses. It guards the no-flow
 point, where the bare `64/Re` would otherwise be infinite, and the blend keeps the factor
@@ -148,3 +149,28 @@ end
 # A model that does not read the wall temperature can be handed the bulk in its place, which
 # is what a channel with no wall of its own does.
 (d::AbstractDarcyFactor)(T_bulk, ṁ, liquid, pipe) = d(T_bulk, T_bulk, ṁ, liquid, pipe)
+
+# #### Printing
+
+function _correlation_name(f)
+    f isa Function || return sprint(show, f)
+    name = string(nameof(f))
+    return startswith(name, "#") ? "a correlation" : name
+end
+
+Base.show(io::IO, d::FromFunction) = print(io, "Friction.FromFunction(", _correlation_name(d.f), ")")
+Base.show(io::IO, d::FromReynolds) =
+    print(io, _correlation_name(d.correlation), d.k_R == 1 ? "" : ", Re scaled by k_R = $(round(d.k_R; sigdigits=4))")
+
+function Base.show(io::IO, d::RegimeDependent)
+    lo, hi = d.re_bounds
+    print(io, "Friction.RegimeDependent(", _correlation_name(d.laminar), " | ",
+          _correlation_name(d.turbulent), ", blending across Re = ", lo, " to ", hi)
+    d.k_R == 1 || print(io, ", k_R = ", round(d.k_R; sigdigits=4))
+    d.viscosity === nothing || print(io, ", with the heated-wall viscosity correction")
+    print(io, ")")
+end
+
+Base.show(io::IO, ::MIME"text/plain", d::FromReynolds) =
+    print(io, "Friction.FromReynolds(", _correlation_name(d.correlation), ")",
+          d.k_R == 1 ? "" : ", Re scaled by k_R = $(round(d.k_R; sigdigits=4))")

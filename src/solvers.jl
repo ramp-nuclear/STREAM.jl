@@ -41,13 +41,8 @@ end
 
 """
     solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...) -> SciMLSolution
-    solve_transient(ssys, t; kwargs...) -> SciMLSolution
 
-Solve a transient simulation over a time array.
-
-Without `op` the run starts from the values the model declares. That suits a system with no
-differential states, whose equations fix every value at every instant, and one whose defaults
-are the start wanted, such as a `PointKinetics` starting critical.
+Solve a transient simulation over a time array, starting from the operating point `op`.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
@@ -60,7 +55,7 @@ are the start wanted, such as a `PointKinetics` starting critical.
 - `initializealg`: DAE initialization algorithm (default `SciMLBase.NoInit()`, which trusts the
   supplied `op` as a fully consistent initial condition). Pass `SciMLBase.BrownFullBasicInit()`
   to have the solver solve the algebraic constraints for consistency at `t[1]` (holding the
-  differential states fixed) before stepping — needed when `op` is an approximate / transplanted
+  differential states fixed) before stepping. It is needed when `op` is an approximate or transplanted
   IC that does not exactly satisfy the algebraic equations, where `NoInit` + a stiff solver can
   abort at `t=0` (`dt` driven below floating-point epsilon, `NaN` error estimate).
 - `build_initializeprob`: leave at the default `nothing` for almost everything (MTK chooses). Pass
@@ -123,6 +118,23 @@ function _stateless_steps(prob, t, kwargs)
     return (; tstops, verbose=quiet)
 end
 
+"""
+    solve_transient(ssys, t; kwargs...) -> SciMLSolution
+
+Solve a transient from the values the model declares, with no operating point.
+
+This suits a system whose defaults are the start wanted, such as a `PointKinetics` starting
+critical, or one with no differential states, whose equations fix every value at every
+instant. The keywords are those of the form that takes
+an operating point.
+
+# Arguments
+- `ssys`: compiled system from `mtkcompile`
+- `t`: the times to save at
+
+# Returns
+`SciMLBase.ODESolution`.
+"""
 solve_transient(ssys, t::AbstractVector; kwargs...) = solve_transient(ssys, Pair[], t; kwargs...)
 
 """

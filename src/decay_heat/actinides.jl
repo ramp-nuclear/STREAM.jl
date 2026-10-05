@@ -30,7 +30,7 @@ Energy deposited per Np239 decay, `0.405` MeV, from ANSI/ANS-5.1-2014. Used by
 """
 const E_NP239 = 0.405
 
-"""
+@doc raw"""
     U238CaptureChain(R) <: AbstractDecayHeat
 
 Decay heat from the U239 and Np239 that neutron capture in U238 leaves behind,
@@ -39,22 +39,29 @@ Decay heat from the U239 and Np239 that neutron capture in U238 leaves behind,
 
 evaluated as
 
-    F(t, T) = R·[E_U239·A(t, T; λ₁) + E_NP239·D(t, T; λ₁, λ₂)]
+```math
+F(t, T) = R \, [E_{U239} A(t, T; λ_1) + E_{Np239} D(t, T; λ_1, λ_2)]
+```
 
 with `A` an [`Activation`](@ref) profile at the U239 decay rate and `D` a
 [`DoubleDecay`](@ref) profile through Np239.
 
-ANSI/ANS-5.1-2014 requires this term alongside the fission products and gives the decay
-rates and energies used here. It is this one capture chain, not the decay heat of all
-actinides, although Python STREAM calls it `actinides`.
-
-Source: Python STREAM decay_heat/actinides.py `contribution`.
+ANSI/ANS-5.1-2014 [ANS2014](@cite) requires this term alongside the fission products and gives
+the decay rates and energies used here. It is this one capture chain, not the decay heat of
+all actinides, although Python STREAM calls it `actinides`.
 
 # Arguments
 - `R`: neutron captures in U238 per fission event at operation time [1/fission]
 
 # Returns
 An [`AbstractDecayHeat`](@ref) whose value is in MeV/fission.
+
+# Examples
+At shutdown from saturation both profiles are 1, so the value is `R (0.460 + 0.405)` MeV:
+```jldoctest
+julia> DecayHeat.U238CaptureChain(0.005)(0, Inf)
+0.004325
+```
 """
 struct U238CaptureChain <: AbstractDecayHeat
     R::Float64

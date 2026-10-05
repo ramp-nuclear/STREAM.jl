@@ -36,7 +36,7 @@ for energy balance (enthalpy form with face-averaged cp), mass conservation,
 momentum ODE `(L/A)*D(ṁ)`, per-cell friction (algebraic dp[i]), port wiring,
 and observables.
 
-Returns `(; eqs, obs)` — variant splices `eqs = [variant_specific_eqs; core.eqs]`,
+Returns `(; eqs, obs)`: the variant splices `eqs = [variant_specific_eqs; core.eqs]`,
 `obs = [core.obs; variant_specific_obs]`. Variant declares all `@variables`
 (unknowns AND observables that core references); core builds equations referencing
 those symbols.
@@ -50,14 +50,14 @@ those symbols.
 - `darcy`                                           : wall friction model ([`AbstractDarcyFactor`](@ref))
 - `T_wall`                                          : length-n wall temperature, or `nothing` when the
                                                       variant has no wall of its own
-- `q_left_expr`, `q_right_expr`                     : length-n `Vector{Num}`, per-cell heat flow inputs (W) — variant builds these
+- `q_left_expr`, `q_right_expr`                     : length-n `Vector{Num}`, per-cell heat flow inputs (W), built by the variant
 - `Re, Pe, v, P, T_sat, T_ONB, q_wall, q_wall_left, q_wall_right` : variant-declared observable LHS symbols
 - `T_in, T_out, dP`                                 : variant-declared scalar observable LHS symbols.
                                                       `T_in` is the coolant entering at whichever
                                                       end is upstream, `T_out` the coolant leaving
 
 # Returns
-NamedTuple `(; eqs::Vector{Equation}, obs::Vector{Equation})` — the variant
+NamedTuple `(; eqs::Vector{Equation}, obs::Vector{Equation})`. The variant
 splices these into its own equation lists before building the `System`.
 
 # Energy balance per cell (enthalpy form, face-averaged cp)
@@ -128,7 +128,10 @@ function _channel_core(;
             vars.v[i] ~ inlet.ṁ / (ρ_c[i] * A),
             vars.P[i]     ~ P_c[i],
             vars.T_sat[i] ~ Tsat(liquid, P_c[i]),
-            vars.T_ONB[i] ~ Tsat(liquid, P_c[i]) + _bergles_rohsenow_dT_ONB(P_c[i], q_density_c[i]),
+            # A wall cooler than the coolant has no onset to reach, and the correlation's
+            # fractional power is NaN for a negative flux, so such a cell reports saturation.
+            vars.T_ONB[i] ~ Tsat(liquid, P_c[i]) +
+                            _bergles_rohsenow_dT_ONB(P_c[i], max(q_density_c[i], 0.0)),
             vars.q_wall_left[i]  ~ q_left_expr[i],
             vars.q_wall_right[i] ~ q_right_expr[i],
             vars.q_wall[i]       ~ q_left_expr[i] + q_right_expr[i],
@@ -274,8 +277,8 @@ which the caller binds (see below).
   default `0.0` per-side ⇒ adiabatic.
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
-  viscosity correction are [`RegimeDependent`](@ref).
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). Pass a [`Liquid`](@ref) to
+  viscosity correction are [`Friction.RegimeDependent`](@ref).
+- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). Pass a [`Liquid`](@ref STREAM.Substances.Liquid) to
   drive the energy balance, friction, and dimensionless observables with fixed properties.
 
 # External-input variables
@@ -283,22 +286,15 @@ which the caller binds (see below).
 - `T_wall_right(t)[1:n]`: per-cell right-face wall temperature [°C]
 
 These have no internal equation. A side with a nonzero `h` needs its wall closed, and so does
-any wall a friction model reads, such as [`RegimeDependent`](@ref) with a `viscosity`
+any wall a friction model reads, such as [`Friction.RegimeDependent`](@ref) with a `viscosity`
 correction. A side with `h = 0` under a friction model that ignores the wall, the default,
 needs nothing: its wall temperature appears in no equation. Close a wall in the connection
-list, with a number, a length-`n` profile, or any expression in `t`:
-```julia
-connections = [
-    ...,
-    ch.T_wall_left .~ T_wall_value,
-    ch.T_wall_right .~ profile,
-]
-```
-For a wall to change without recompiling, bind it to a parameter declared with `@parameters`.
+list, as in `ch.T_wall_left .~ 100.0`, with a number, a length-`n` profile, a parameter or any
+expression in `t`. See [Bind a wall temperature or heat flux](@ref).
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (mass + momentum + stream T)
-  *No thermal ports — see external-input variables above.*
+  *No thermal ports: see the external-input variables above.*
 """
 function Channel(;
     name,
@@ -319,7 +315,7 @@ function Channel(;
         length(h_left) == n ||
             throw(DimensionMismatch("h_left has length $(length(h_left)), expected n=$n"))
         hL_per_cell = Num.(h_left)
-    else  # Function / callable — MTK callable-parameter pattern
+    else  # a function or other callable: the MTK callable-parameter pattern
         FType_L = typeof(h_left)
         pL = @parameters (h_left_fn::FType_L)(..)
         hL_call = pL[1](t)
@@ -376,7 +372,7 @@ Heat flux is prescribed per cell by the caller (see below).
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
-  viscosity correction are [`RegimeDependent`](@ref).
+  viscosity correction are [`Friction.RegimeDependent`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref).
 
 # External-input variables
@@ -394,7 +390,7 @@ connections = [
 
 # Ports
 - `inlet`, `outlet` -- `FlowPort` (mass + momentum + stream T)
-  *No heat-flux ports — see external-input variables above.*
+  *No heat-flux ports: see the external-input variables above.*
 """
 function ChannelHeatFlux(;
     name,
@@ -449,10 +445,10 @@ is `h_tc[i] * heated_parts * dz * (T_wall - T[i])`.
 - `htc`: wall heat transfer model ([`HTC`](@ref)), default [`DittusBoelter`](@ref). It is
   handed `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)` per cell and returns `h`. Subcooled boiling
   is a model like any other: wrap one in [`SubcooledBoiling`](@ref). Regime switching is
-  [`RegimeDependent`](@ref).
+  [`HTC.RegimeDependent`](@ref).
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
-  viscosity correction are [`RegimeDependent`](@ref).
+  viscosity correction are [`Friction.RegimeDependent`](@ref).
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). It drives the energy balance,
   friction, the HTC model, and the dimensionless observables.
 

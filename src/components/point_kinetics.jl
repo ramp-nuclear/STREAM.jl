@@ -9,9 +9,10 @@ const U235_LAMBDA = 5.4e-5
 """
     U235_LAMBDA_K
 
-Precursor decay constants λₖ [1/s] for Keepin's six U-235 thermal-fission delayed neutron
-groups (Physics of Nuclear Kinetics, 1965), ordered slowest to fastest: half-lives of 55.72,
-22.72, 6.22, 2.30, 0.61 and 0.23 s. The default `lambda_k` in [`PointKinetics`](@ref), paired
+Precursor decay constants λₖ [1/s] for Keepin's six U-235 delayed neutron groups.
+
+They are for thermal fission [Keepin1965](@cite), ordered slowest to fastest: half-lives of
+55.72, 22.72, 6.22, 2.30, 0.61 and 0.23 s. The default `lambda_k` in [`PointKinetics`](@ref), paired
 group for group with [`U235_BETA_K`](@ref).
 """
 const U235_LAMBDA_K = [0.0124, 0.0305, 0.111, 0.301, 1.14, 3.01]
@@ -109,15 +110,19 @@ function _power_input_term(f)
     return (pars[1](t), pars)
 end
 
-"""
+@doc raw"""
     PointKinetics(rho_c_fn::Any; name, Lambda=U235_LAMBDA, beta_k=U235_BETA_K,
                   lambda_k=U235_LAMBDA_K, temp_worth=nothing, ref_temp=nothing,
                   power_input=nothing, P0=1.0) -> System
 
 Keepin (1965) point kinetics with `G` delayed precursor groups, so `1 + G` ODEs:
 
-    dPₙ/dt = (ρ - β)/Λ · Pₙ + Σₖ λₖ·Cₖ
-    dCₖ/dt = βₖ/Λ · Pₙ - λₖ·Cₖ           k = 1..G
+```math
+\begin{aligned}
+dP_n/dt &= (ρ - β)/Λ \, P_n + \sum_k λ_k C_k \\
+dC_k/dt &= (β_k/Λ) \, P_n - λ_k C_k, \qquad k = 1, …, G
+\end{aligned}
+```
 
 with `Pₙ` the neutron power, the unknown `P_neutron`.
 
@@ -129,7 +134,9 @@ at criticality.
 The control reactivity comes from a callable `rho_c_fn(t)` (a `ReactivityController` is itself
 callable), and the total reactivity becomes
 
-    ρ = rho_c_fn(t) + Σⱼ αⱼ·(Tⱼ - Trefⱼ)
+```math
+ρ = ρ_c(t) + \sum_j α_j (T_j - T_{ref,j})
+```
 
 where the sum is the per-cell temperature feedback. Each weight `αⱼ` is a temperature
 coefficient of reactivity (dρ/dT) and enters signed: a stabilizing reactor has a negative
@@ -142,27 +149,16 @@ The system starts where it was built to: `rho_c_fn` defaults to the callable giv
 `power_input` taken at `t = 0`, as [`point_kinetics_steady_state`](@ref) computes it. Put any
 of them in the operating point to start elsewhere.
 
-# Neutron and total power
+The total power is
 
-`P_neutron` is the power the equations above integrate. `power_input` adds a source that
-fission does not produce, and the total is
+```math
+P = P_{neutron} + P_{input}(t)
+```
 
-    P = P_neutron + power_input
-
-Decay heat is what this is for, through [`STREAM.DecayHeat.DecayHeatSource`](@ref), but any
-external source fits: gamma deposition in the reflector, pump heat, and so on. Couple a fuel
-plate to `P`, the power it actually receives.
-
-`power_input` carries the same units as `P_neutron`. Those are Watts only if the kinetics
-run in Watts; a model running dimensionless kinetics and scaling later (as `build_loop_pk`
-does) needs a `power_input` scaled the same way.
-
-With no `power_input`, `P` is `P_neutron` and costs nothing: `mtkcompile` eliminates the
-equation either way, so the compiled state count is `1 + G` regardless.
-
-A power trip is a [`StateMachine`](@ref) transition, and may watch either one. `P_neutron`
-is what a power-range monitor reading neutron flux measures; `P` is the total the fuel sees.
-A condition compiles the same way for both, state or observable.
+where `power_input` is power fission does not produce, such as decay heat from a
+[`STREAM.DecayHeat.DecayHeatSource`](@ref). Heat the fuel with `P`. A power trip may watch
+either: `P_neutron` is what a neutron flux monitor measures, `P` what the fuel receives. See
+[Point kinetics and feedback](@ref) for the physics.
 
 # Arguments
 - `rho_c_fn` (positional): callable `(t) -> Float64`, or a `ReactivityController`. Its

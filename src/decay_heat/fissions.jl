@@ -83,22 +83,9 @@ Python STREAM makes. The first form takes an already-sampled profile.
 `T`, the operation time, is accepted for the [`AbstractDecayHeat`](@ref) contract and
 ignored, as in Python.
 
-# Interpolation, and how far to trust it
-
-The default is [`LogLinear`](@ref), which departs from Python STREAM. Python evaluates the
-profile with `numpy.interp`, a straight line between samples, but the quantity being
-interpolated is a sum of decaying exponentials, where a straight line always overshoots. On
-a step insertion of -0.005 sampled over 100 s at 50 points, the straight line is off by up
-to 12% past the first interval against a grid eight times finer, where interpolating the
-logarithm is off by 3.6%; past the fifth interval it is 3.2% against 0.29%. For one
-exponential the log form is exact. Pass [`Linear`](@ref) to reproduce Python.
-
-Neither mode rescues a grid that is too coarse across the prompt drop. Under that same
-insertion the first 2 s interval falls by a factor of about 10, and both modes are then
-wrong by more than 100% inside it. Sample `times` densely near shutdown, or on a log grid,
-if the first seconds matter.
-
-Source: Python STREAM decay_heat/fissions.py `profile`.
+The default [`LogLinear`](@ref) interpolation departs from Python STREAM, which draws
+straight lines between samples. Pass [`Linear`](@ref) to reproduce Python. Sample densely
+across the prompt drop: see [Decay heat](@ref) for how far either can be trusted.
 
 # Arguments
 - `times`: the increasing grid the profile is sampled on [s]
@@ -166,3 +153,7 @@ function Fissions(
 end
 
 (model::Fissions)(t, T=Inf) = _interp(model.interpolation, t, model.times, model.profile)
+
+Base.show(io::IO, f::Fissions) =
+    print(io, "Fissions(", length(f.times), " samples over ", first(f.times), " to ",
+          last(f.times), " s, ", nameof(typeof(f.interpolation)), ")")

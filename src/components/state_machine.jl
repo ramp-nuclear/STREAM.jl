@@ -74,32 +74,57 @@ function _check_condition(condition)
 end
 
 """
+    MachineLog
+
+The record a [`StateMachine`](@ref) keeps: every state it entered, oldest first, as
+`(state, t, cause)` named tuples. It is a vector of them, so `log[end].cause` reads the last
+cause, and it prints as a table.
+"""
+struct MachineLog <: AbstractVector{@NamedTuple{state::Any, t::Float64, cause::String}}
+    entries::Vector{@NamedTuple{state::Any, t::Float64, cause::String}}
+end
+
+Base.size(log::MachineLog) = size(log.entries)
+Base.IndexStyle(::Type{MachineLog}) = IndexLinear()
+Base.getindex(log::MachineLog, i::Int) = log.entries[i]
+Base.push!(log::MachineLog, entry) = (push!(log.entries, entry); log)
+Base.resize!(log::MachineLog, n::Integer) = (resize!(log.entries, n); log)
+
+_format_time(t) = string(round(t; sigdigits=6))
+
+"""
+    _show_entries(io, log, indent)
+
+Print each entry of `log` on its own line, as `t = <time> s  <state>  <cause>`, with the
+columns aligned.
+"""
+function _show_entries(io::IO, log, indent)
+    times = [_format_time(entry.t) for entry in log]
+    states = [string(entry.state) for entry in log]
+    wt, ws = maximum(length, times), maximum(length, states)
+    for (time, state, entry) in zip(times, states, log)
+        print(io, "\n", indent, "t = ", lpad(time, wt), " s   ", rpad(state, ws), "   ",
+              entry.cause)
+    end
+end
+
+function Base.show(io::IO, ::MIME"text/plain", log::MachineLog)
+    n = length(log)
+    print(io, n, n == 1 ? " state entered:" : " states entered:")
+    _show_entries(io, log, "  ")
+end
+
+"""
     StateMachine(edges...; initial_state=:NORMAL, initial_time=0.0, abort_states=())
 
 A control system, such as a reactor protection system: the state it is in, when it entered
 that state, a log of every state it entered and why, and the transitions it can take.
 
 Hand the machine to whatever acts on its state, such as a [`ReactivityController`](@ref), a
-[`Flapper`](@ref) or a `DecayHeatSource`. Then set its transitions, and
-[`machine_callbacks`](@ref) turns them into events for the solver:
-
-```julia
-machine = StateMachine(; abort_states=(:ABORT,))
-rods = ReactivityController((state, t_state, t) -> state === :SCRAM ? -0.05 : 0.0;
-                            machine=machine)
-@named pk = PointKinetics(rods)
-@named pump = Pump(dP_design)
-
-machine.transitions = [
-    (:NORMAL => :SCRAM, pk.P_neutron > 1.2e6, "high power"),
-    (:NORMAL => :SCRAM, pump.inlet.ṁ < 0.85 * ṁ_design, "low flow"),
-    (:SCRAM => :ABORT, (m, sys, t) -> t - m.t_state - 2.0, "2 s after scram"),
-]
-
-# compose the model, mtkcompile it into ssys, and solve for sol_ss, then:
-sol = solve_transient(ssys, sol_ss, times; callbacks=machine_callbacks(ssys, machine))
-machine.log   # each state entered, when, and which transition caused it
-```
+[`Flapper`](@ref) or a `DecayHeatSource`, then set its transitions, and
+[`machine_callbacks`](@ref) turns them into events for the solver. See
+[Trip a reactor or open a valve](@ref) for worked recipes, and [Events and control](@ref) for
+how the solver finds an event.
 
 A transition is `(from => to, condition, description)`. `from`
 is one state, a collection of states, or `nothing` for any state. The description is what the
@@ -116,11 +141,10 @@ The condition is one of:
   "and" and "or". The solver calls it between its steps as well as at them, so it must have
   no side effects.
 
-Each fires at the exact instant its condition becomes true. A condition that already holds
-fires when the machine enters a state its transition leaves from, and at the start of the run,
-so a limit already passed is not missed. An equation has no side that holds, so it only fires
-on a crossing. When two transitions fire at once, the one added first is taken. Entering a
-state in `abort_states` stops the integration.
+Each fires at the instant its condition becomes true. A condition that already holds fires
+when the machine enters a state its transition leaves from, and at the start of the run. When
+two fire at once, the one added first is taken. Entering a state in `abort_states` stops the
+integration.
 
 Transitions can be set as soon as the components they mention exist: `pump.inlet.ṁ` is the
 same variable after `mtkcompile`. Assigning `machine.transitions` replaces the list and
@@ -139,7 +163,8 @@ same variable after `mtkcompile`. Assigning `machine.transitions` replaces the l
 - `transitions::Vector{Transition}`: the edges
 - `state`: the state it is in now
 - `t_state::Float64`: when it entered that state [s]
-- `log`: every state entered, oldest first, as `(state, t, cause)` named tuples. `cause` is
+- `log`: every state entered, oldest first, as `(state, t, cause)` named tuples in a
+  `MachineLog`, which prints as a table. `cause` is
   the description of the transition taken, `"initial"` for the first entry, or whatever
   [`trip!`](@ref) was given.
 - `abort_states::Set`: the states that stop the integration
@@ -151,7 +176,7 @@ mutable struct StateMachine
     transitions::Vector{Transition}
     state::Any
     t_state::Float64
-    log::Vector{@NamedTuple{state::Any, t::Float64, cause::String}}
+    log::MachineLog
     abort_states::Set
 
     # Inner, so no default constructor competes with it.
@@ -159,7 +184,7 @@ mutable struct StateMachine
         t0 = Float64(initial_time)
         machine = new(
             Transition[], initial_state, t0,
-            [(state=initial_state, t=t0, cause="initial")], Set{Any}(abort_states),
+            MachineLog([(state=initial_state, t=t0, cause="initial")]), Set{Any}(abort_states),
         )
         foreach(edge -> push!(machine, edge), edges)
         return machine
@@ -181,6 +206,32 @@ Base.push!(machine::StateMachine, edge) = (push!(machine.transitions, edge); mac
 # Builds a Transition from its tuple, checks included, wherever one is stored: `push!`, and
 # `machine.transitions = [(from => to, condition), ...]`.
 Base.convert(::Type{Transition}, edge::Tuple) = Transition(edge...)
+
+function Base.show(io::IO, tr::Transition)
+    from = tr.from === nothing ? "any state" : join(sort!(string.(collect(tr.from))), " or ")
+    condition = tr.condition isa Function ? "a predicate holds" : string(tr.condition)
+    print(io, from, " → ", tr.to, " when ", condition)
+    # The description defaults to the condition itself, which would print twice.
+    tr.description in (condition, "predicate") || print(io, ": ", tr.description)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", machine::StateMachine)
+    print(io, "StateMachine in ", machine.state, " since t = ", _format_time(machine.t_state),
+          " s")
+    if isempty(machine.transitions)
+        print(io, "\n  no transitions")
+    else
+        print(io, "\n  transitions:")
+        foreach(tr -> print(io, "\n    ", tr), machine.transitions)
+    end
+    isempty(machine.abort_states) ||
+        print(io, "\n  stops on entering ", join(sort!(string.(collect(machine.abort_states))), " or "))
+    print(io, "\n  log:")
+    _show_entries(io, machine.log, "    ")
+end
+
+Base.show(io::IO, machine::StateMachine) =
+    print(io, "StateMachine(", machine.state, " since t = ", _format_time(machine.t_state), " s)")
 
 """
     trip!(machine::StateMachine, t_now; state=:SCRAM, cause="manual") -> state
@@ -270,6 +321,8 @@ function (schedule::StateSchedule)(t)
     entry = _entry_at(schedule.machine, t)
     return schedule.f(entry.state, entry.t, t)
 end
+
+Base.show(io::IO, schedule::StateSchedule) = print(io, "StateSchedule on ", schedule.machine)
 
 """
     _entry_at(machine, t) -> NamedTuple

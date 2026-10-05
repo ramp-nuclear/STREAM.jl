@@ -46,13 +46,14 @@ function Inertia(L_over_A::Function; name)
     return HydraulicTwoPort(; name, inlet, outlet, eqs, vars=vars)
 end
 
-"""
+@doc raw"""
     bilinear_inertia(L0, ṁ0) -> (ṁ) -> L/A
 
 Flow-dependent inertia that falls off linearly below a knee, for [`Inertia`](@ref):
 
-    L = L0 * (ṁ/ṁ0)   for |ṁ| < ṁ0
-    L = L0                  otherwise
+```math
+L = L_0 |\dot{m}| / \dot{m}_0 \quad \mathrm{for}\ |\dot{m}| < \dot{m}_0, \qquad L = L_0 \quad \mathrm{otherwise}
+```
 
 It models a branch that is only partly filled at low flow, so the accelerating column is
 shorter than the pipe. `ifelse` keeps the switch a symbolic branch the solver takes per step,
@@ -113,7 +114,7 @@ over-determine it. This component is that something.
 
 # Ports
 - `thermal1 … thermaln` -- `ThermalPort`s, named like a channel's per-cell faces so
-  [`face`](@ref), [`faces`](@ref) and [`port`](@ref) reach them as `:thermal`
+  [`face`](@ref STREAM.Assemblies.Connect.face), [`faces`](@ref STREAM.Assemblies.Connect.faces) and [`port`](@ref STREAM.Assemblies.port) reach them as `:thermal`
 
 # Returns
 Uncompiled `System`.

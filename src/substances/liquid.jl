@@ -2,7 +2,7 @@
     AbstractLiquid
 
 Supertype for coolants. A concrete liquid implements the nine three-argument methods
-listed in [`LIQUID_PROPERTIES`](@ref), each taking `(liquid, T, p)` with `T` in Celsius
+listed in `LIQUID_PROPERTIES`, each taking `(liquid, T, p)` with `T` in Celsius
 and `p` in Pa.
 
 The correlations are plain arithmetic, so MTK traces straight through them and a component
@@ -61,7 +61,7 @@ property expression depend on that pressure symbol, coupling the Jacobian for co
 that ignore pressure anyway. A coolant with genuinely pressure-dependent properties wants
 the three-argument form at the call site.
 
-The two-argument forms are generated over [`LIQUID_PROPERTIES`](@ref) with the signature
+The two-argument forms are generated over `LIQUID_PROPERTIES` with the signature
 `(liquid::AbstractLiquid, T)`. A coolant wanting a different default pressure defines its own,
 more specific method, which dispatch prefers:
 

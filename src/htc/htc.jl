@@ -184,9 +184,10 @@ _with_basis(m, basis) = m
     RegimeDependent(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
                        geom, g=G_EARTH) <: AbstractHTC
 
-A heat transfer coefficient that picks its correlation by flow regime: `laminar` at low
-Reynolds number, `turbulent` at high, a linear blend of the two across `re_bounds`, and
-`natural` convection wherever buoyancy outweighs the forced flow.
+A heat transfer coefficient that picks its correlation by flow regime.
+
+It uses `laminar` at low Reynolds number, `turbulent` at high, a linear blend of the two
+across `re_bounds`, and `natural` convection wherever buoyancy outweighs the forced flow.
 
 Two Reynolds numbers are involved, for different questions. Whether the flow is laminar or
 turbulent is a property of the flow as a whole, so the blend reads the Reynolds number at the
@@ -299,3 +300,45 @@ end
 # Models that do not care about pressure ignore the extra argument, so a channel can always
 # pass it and let the model decide.
 (htc::AbstractHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid, P) = htc(T_wall, T_bulk, ṁ, Dh, A, liquid)
+
+# #### Printing
+
+_basis_words(::AtFilm) = "at the film temperature"
+_basis_words(::AtBulk) = "at the bulk temperature"
+
+# A named function prints as its name; a closure or a callable struct as itself, if it says
+# more than its type.
+function _correlation_name(f)
+    f isa Function || return sprint(show, f)
+    name = string(nameof(f))
+    return startswith(name, "#") ? "a correlation" : name
+end
+
+Base.show(io::IO, m::FromFunction) = print(io, "HTC.FromFunction(", _correlation_name(m.f), ")")
+Base.show(io::IO, m::FromNusselt) =
+    print(io, _correlation_name(m.nusselt), ", ", _basis_words(m.basis))
+Base.show(io::IO, m::Elenbaas) =
+    print(io, "Elenbaas natural convection, gap ", round(1e3 * m.gap; sigdigits=4), " mm, ",
+          _basis_words(m.basis))
+Base.show(io::IO, m::Maximal) = print(io, "the largest of ", join(m.models, "; "))
+Base.show(io::IO, m::RegimeDependent) =
+    print(io, "HTC.RegimeDependent(", m.laminar, " | ", m.turbulent,
+          m.natural === nothing ? "" : " | $(m.natural)", ")")
+Base.show(io::IO, m::SubcooledBoiling) = print(io, "subcooled boiling on ", m.single_phase)
+
+function Base.show(io::IO, ::MIME"text/plain", m::RegimeDependent)
+    lo, hi = m.re_bounds
+    print(io, "HTC.RegimeDependent, blending across Re = ", lo, " to ", hi)
+    print(io, "\n  laminar:   ", m.laminar)
+    print(io, "\n  turbulent: ", m.turbulent)
+    m.natural === nothing || print(io, "\n  natural:   ", m.natural, ", where Gr > Re²")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", m::SubcooledBoiling)
+    print(io, "HTC.SubcooledBoiling, partial boiling above the onset of nucleate boiling, on")
+    inner = sprint(show, MIME("text/plain"), m.single_phase)
+    print(io, "\n  ", replace(inner, "\n" => "\n  "))
+end
+
+Base.show(io::IO, ::MIME"text/plain", m::FromNusselt) =
+    print(io, "HTC.FromNusselt(", _correlation_name(m.nusselt), "), ", _basis_words(m.basis))

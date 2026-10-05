@@ -69,3 +69,20 @@ function Base.:*(factor::Real, model::AbstractDecayHeat)
     return Sum(Float64(factor) .* weights, parts)
 end
 Base.:*(model::AbstractDecayHeat, factor::Real) = factor * model
+
+function Base.show(io::IO, ::MIME"text/plain", s::Sum)
+    print(io, "DecayHeat.Sum of ", length(s.parts), length(s.parts) == 1 ? " contribution:" : " contributions:")
+    for (w, part) in zip(s.weights, s.parts)
+        print(io, "\n  ", isone(w) ? "" : "$(w) × ", part)
+    end
+end
+
+# Contributions print as their constructor calls, without the module path.
+function Base.show(io::IO, m::AbstractDecayHeat)
+    fields = (getfield(m, f) for f in fieldnames(typeof(m)))
+    print(io, nameof(typeof(m)), "(", join(fields, ", "), ")")
+end
+
+Base.show(io::IO, s::Sum) =
+    print(io, join((isone(w) ? sprint(show, p) : "$(w) × $(sprint(show, p))"
+                    for (w, p) in zip(s.weights, s.parts)), " + "))

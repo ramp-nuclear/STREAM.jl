@@ -57,19 +57,34 @@ end
     rebin_extensive(v, src_edges, tgt_edges) -> Vector{Float64}
     rebin_extensive(M, (nz_out, nx_out)) -> Matrix{Float64}
 
-Resample an **extensive** quantity (an amount per cell — power, mass, ...) onto a
-new grid, preserving the total: `sum(out) == sum(v)`.
+Resample an **extensive** quantity (an amount per cell, such as power or mass) onto a new
+grid, preserving the total: `sum(out) == sum(v)`.
 
-Extensive means the value scales with cell size, so splitting one cell into two
-halves the value and merging two cells adds them. `rebin_extensive([10.0], 2)`
-gives `[5.0, 5.0]`.
+Extensive means the value scales with cell size, so splitting one cell into two halves the
+value and merging two cells adds them.
 
-The `(v, n_out)` and `(M, target_shape)` forms assume source and target cells
-uniformly tile the same domain. The `(v, src_edges, tgt_edges)` form takes
-explicit cell boundaries (`length(v)+1` and `n_out+1` increasing values), which
-may be non-uniform. The 2D form is separable (rebin along z, then x).
+The `(v, n_out)` and `(M, target_shape)` forms assume source and target cells uniformly tile
+the same domain. The `(v, src_edges, tgt_edges)` form takes explicit cell boundaries
+(`length(v)+1` and `n_out+1` increasing values), which may be non-uniform. The 2D form is
+separable: it rebins along z, then x.
 
-Inputs are trusted: no checks on sign, finiteness, normalization, or shape.
+Inputs are trusted: nothing checks their sign, finiteness, normalization or shape.
+
+# Arguments
+- `v`, `M`: the per-cell amounts
+- `n_out`, `(nz_out, nx_out)`: the target cell counts
+- `src_edges`, `tgt_edges`: source and target cell boundaries
+
+# Returns
+The amounts on the target grid.
+
+# Examples
+```jldoctest
+julia> Utilities.rebin_extensive([10.0], 2)
+2-element Vector{Float64}:
+ 5.0
+ 5.0
+```
 """
 rebin_extensive(v::AbstractVector{<:Real}, n_out::Integer) =
     _rebin_1d(v, _uniform_edges(length(v)), _uniform_edges(n_out), :sum)
@@ -88,18 +103,30 @@ rebin_extensive(M::AbstractMatrix{<:Real}, target_shape::Tuple{Integer,Integer})
     rebin_intensive(v, src_edges, tgt_edges) -> Vector{Float64}
     rebin_intensive(M, (nz_out, nx_out)) -> Matrix{Float64}
 
-Resample an **intensive** quantity (a per-cell value — temperature, heat flux,
-...) onto a new grid, preserving the value rather than the total.
+Resample an **intensive** quantity (a per-cell value, such as temperature or heat flux) onto
+a new grid, preserving the value rather than the total.
 
-Intensive means the value does not depend on cell size, so splitting one cell
-into two copies the value and merging two cells averages them.
-`rebin_intensive([10.0], 2)` gives `[10.0, 10.0]`; `rebin_intensive([3.0, 7.0], 1)`
-gives `[5.0]`. A constant field stays constant under any regrid. Each target cell
-ends up holding the area-weighted average of the source values it covers.
+Intensive means the value does not depend on cell size, so splitting one cell into two copies
+the value and merging two cells averages them. A constant field stays constant under any
+regrid. Each target cell ends up holding the area-weighted average of the source values it
+covers.
 
-Forms and trust posture mirror [`rebin_extensive`](@ref): `(v, n_target)` /
-`(M, target_shape)` are uniform; `(v, src_edges, tgt_edges)` takes explicit,
-possibly non-uniform, boundaries; inputs are not validated.
+The forms are those of [`rebin_extensive`](@ref), and inputs are not validated either.
+
+# Arguments
+- `v`, `M`: the per-cell values
+- `n_target`, `(nz_out, nx_out)`: the target cell counts
+- `src_edges`, `tgt_edges`: source and target cell boundaries
+
+# Returns
+The values on the target grid.
+
+# Examples
+```jldoctest
+julia> Utilities.rebin_intensive([3.0, 7.0], 1)
+1-element Vector{Float64}:
+ 5.0
+```
 """
 rebin_intensive(v::AbstractVector{<:Real}, n_target::Integer) =
     _rebin_1d(v, _uniform_edges(length(v)), _uniform_edges(n_target), :mean)
@@ -116,13 +143,19 @@ rebin_intensive(M::AbstractMatrix{<:Real}, target_shape::Tuple{Integer,Integer})
 """
     cosine_power_shape(nz, nx; amplitude=1.0) -> Matrix{Float64}
 
-Build an `(nz, nx)` matrix whose every column is the same cell-centered
-cosine-squared profile along z — zero at the two axial ends, peaking at the
-mid-plane — scaled by `amplitude` and repeated across the `nx` columns.
+Build an `(nz, nx)` matrix whose every column is the same cell-centred cosine-squared
+profile along z, zero at the two axial ends and peaking at the mid-plane, scaled by
+`amplitude`.
 
-The axial profile is `sin(pi*(i-0.5)/nz)^2` at cell centers (written as
-`cos(pi*(i-0.5)/nz - pi/2)^2`). It is not normalized; scale it yourself if you
-need a particular integral.
+The axial profile is `sin(π(i - 1/2)/nz)²` at cell centres. It is not normalized; scale it
+yourself if you need a particular integral.
+
+# Arguments
+- `nz`, `nx`: axial and lateral cell counts
+- `amplitude`: the peak value
+
+# Returns
+An `nz × nx` `Matrix{Float64}`.
 """
 function cosine_power_shape(nz::Integer, nx::Integer; amplitude::Real = 1.0)
     zaxis = [cos(pi * (i - 0.5) / nz - pi / 2)^2 for i in 1:nz]
@@ -132,9 +165,16 @@ end
 """
     cosine_T_wall_profile(n; amplitude=1.0) -> Vector{Float64}
 
-Length-`n` cell-centered cosine-squared profile — the single-column form of
-[`cosine_power_shape`](@ref), for axial wall-temperature / heat-flux profiles.
-Not normalized.
+Length-`n` cell-centred cosine-squared profile, the single-column form of
+[`cosine_power_shape`](@ref), for axial wall-temperature or heat-flux profiles. Not
+normalized.
+
+# Arguments
+- `n`: number of cells
+- `amplitude`: the peak value
+
+# Returns
+A `Vector{Float64}` of length `n`.
 """
 cosine_T_wall_profile(n::Integer; amplitude::Real = 1.0) =
     cosine_power_shape(n, 1; amplitude = amplitude)[:, 1]
@@ -186,6 +226,16 @@ mean.
 
 # Throws
 - `ArgumentError`: if `ppf` is outside `[1, π/2]`
+
+# Examples
+Four equal cells with a peaking factor of 1.4: the middle cells take the larger shares, and
+the shares sum to 1.
+```jldoctest
+julia> s = Utilities.cosine_shape(range(0.0, 0.6; length=5), 1.4);
+
+julia> round.(s; digits=4), sum(s) ≈ 1
+([0.1768, 0.3232, 0.3232, 0.1768], true)
+```
 """
 function cosine_shape(x, ppf=π / 2; xmax=nothing)
     1 <= ppf <= π / 2 || throw(ArgumentError("ppf must be in [1, π/2], got $ppf"))

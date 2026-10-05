@@ -45,65 +45,9 @@ end
     @test Tsat(H2O, 1e5) == sat_temperature(H2O, 0.0, 1e5)
 end
 
-@testset "light water matches its documented reference values" begin
-    @test ρ(H2O, 50.0) ≈ 987.27431208 rtol = 1e-12
-    @test ρ(H2O, 100.0) ≈ 959.13959928 rtol = 1e-12
-
-    @test β(H2O, 20.0) ≈ 279.0788203166585e-6 rtol = 1e-12
-    @test β(H2O, 100.0) ≈ 721.3442303074213e-6 rtol = 1e-12
-
-    @test cₚ(H2O, 8.0) ≈ 4179.863745234987 rtol = 1e-12
-    @test cₚ(H2O, 50.0) ≈ 4181.4264285644285 rtol = 1e-12
-    @test cₚ(H2O, 8.0) == cₚ(H2O, -8.0)          # the fit is even in temperature
-
-    @test μ(H2O, 90.0) ≈ 3.1444961652895464e-4 rtol = 1e-12
-    @test κ(H2O, 50.0) ≈ 0.6419141378687501 rtol = 1e-12
-
-    @test Tsat(H2O, 1e5) ≈ 99.63072810857243 rtol = 1e-12
-    @test Tsat(H2O, 0.5e5) ≈ 81.28047959788387 rtol = 1e-12
-    @test Tsat(H2O, 2e5) ≈ 120.29401952865119 rtol = 1e-12
-
-    @test hfg(H2O, 50.0) ≈ 2382729.243923866 rtol = 1e-12
-    @test hfg(H2O, 100.0) ≈ 2257149.1343506747 rtol = 1e-12
-
-    @test σ(H2O, 50.0) ≈ 0.06794675477982745 rtol = 1e-12
-    @test σ(H2O, 100.0) ≈ 0.05891594230703328 rtol = 1e-12
-
-    @test ρᵥ(H2O, 50.0) ≈ 0.08307666133931553 rtol = 1e-12
-    @test ρᵥ(H2O, 100.0) ≈ 0.5978051373615001 rtol = 1e-12
-end
-
-@testset "heavy water matches its documented reference values" begin
-    @test ρ(D2O, 50.0) ≈ 1095.7419670000002 rtol = 1e-12
-    @test ρ(D2O, 100.0) ≈ 1063.4244970000002 rtol = 1e-12
-
-    @test β(D2O, 20.0) ≈ 312.34463951465654e-6 rtol = 1e-12
-    @test β(D2O, 100.0) ≈ 736.0686181371651e-6 rtol = 1e-12
-
-    @test cₚ(D2O, 50.0) ≈ 4220.658975628751 rtol = 1e-12
-    @test cₚ(D2O, 100.0) ≈ 4162.210117465748 rtol = 1e-12
-
-    @test μ(D2O, 50.0) ≈ 6.441125212510078e-4 rtol = 1e-12
-    @test μ(D2O, 100.0) ≈ 3.301433604774831e-4 rtol = 1e-12
-
-    @test κ(D2O, 50.0) ≈ 0.6167873183429435 rtol = 1e-12
-    @test κ(D2O, 100.0) ≈ 0.6357784886396809 rtol = 1e-12
-
-    @test Tsat(D2O, 1e5) ≈ 100.98975482398993 rtol = 1e-12
-    @test Tsat(D2O, 0.5e5) ≈ 82.7830309880722 rtol = 1e-12
-    @test Tsat(D2O, 2e5) ≈ 121.5058319422803 rtol = 1e-12
-
-    @test hfg(D2O, 50.0) ≈ 2199499.183881408 rtol = 1e-12
-    @test hfg(D2O, 100.0) ≈ 2076983.0825663893 rtol = 1e-12
-
-    @test σ(D2O, 50.0) ≈ 0.06809951822968323 rtol = 1e-12
-    @test σ(D2O, 100.0) ≈ 0.059250184550697166 rtol = 1e-12
-
-    @test ρᵥ(D2O, 50.0) ≈ 0.08342446145018677 rtol = 1e-12
-    @test ρᵥ(D2O, 100.0) ≈ 0.6309356177290303 rtol = 1e-12
-end
-
 @testset "physical anchors independent of the fits" begin
+    # The light water specific heat fit is even in temperature.
+    @test cₚ(H2O, 8.0) == cₚ(H2O, -8.0)
     # Water boils at 100 °C at 1 atm.
     @test isapprox(Tsat(H2O, ATM), 100.0; rtol=1e-3)
     # Liquid water near room temperature is close to 1000 kg/m^3.

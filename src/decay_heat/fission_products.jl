@@ -120,23 +120,24 @@ function read_standard(standard::Standard, source::Source; dir=standards_dir())
     return table[:, λ_col], table[:, α_col]
 end
 
-"""
+@doc raw"""
     FissionProducts(λ, α) <: AbstractDecayHeat
     FissionProducts(standard, source; dir=standards_dir()) <: AbstractDecayHeat
 
 Decay of fission products, the largest decay heat contribution, as the summed exponential
 fit the standards publish,
 
-    F(t, T) = Σᵢ (αᵢ/λᵢ)·e^(-λᵢt)·(1 - e^(-λᵢT))    [MeV/fission]
+```math
+F(t, T) = \sum_i (α_i/λ_i) \, e^{-λ_i t} (1 - e^{-λ_i T})
+```
 
-The second form reads the groups from a table with [`read_standard`](@ref); the first takes
+The second form reads the groups from a table with [`read_standard`](@ref), from the
+ANS-5.1 [ANS1973, ANS2014](@cite) or JAERI [Tasaka1991](@cite) standards. The first takes
 them directly, for a fit the standards here do not cover.
 
 Negative α values are expected in the JAERI-91 tables. They are least-squares fit
 coefficients rather than physical group yields, so only the sum means anything, and nothing
 here filters or clamps them.
-
-Source: Python STREAM decay_heat/fission_products.py `contribution` and `fp_inner_`.
 
 # Arguments
 - `λ`: group decay constants [1/s]
@@ -147,6 +148,15 @@ An [`AbstractDecayHeat`](@ref) whose value is in MeV/fission.
 
 # Throws
 - `DimensionMismatch`: if `λ` and `α` differ in length
+
+# Examples
+Two made-up groups, at shutdown and an hour later:
+```jldoctest
+julia> fp = DecayHeat.FissionProducts([1e-2, 1e-4], [0.05, 1e-4]);
+
+julia> fp(0.0), round(fp(3600.0); sigdigits=6)
+(6.0, 0.697676)
+```
 """
 struct FissionProducts <: AbstractDecayHeat
     λ::Vector{Float64}
@@ -167,3 +177,8 @@ end
 function (model::FissionProducts)(t, T=Inf)
     return sum(α / λ * _saturated_decay(t, T, λ) for (λ, α) in zip(model.λ, model.α))
 end
+
+Base.show(io::IO, ::MIME"text/plain", fp::FissionProducts) =
+    print(io, "DecayHeat.FissionProducts with ", length(fp.λ), length(fp.λ) == 1 ? " group" : " groups")
+Base.show(io::IO, fp::FissionProducts) =
+    print(io, "FissionProducts(", length(fp.λ), length(fp.λ) == 1 ? " group)" : " groups)")

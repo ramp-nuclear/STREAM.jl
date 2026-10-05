@@ -7,29 +7,9 @@ Passive check valve. Shut, it passes no flow. Open, it is a quadratic resistor
 the open fraction, 0 shut and 1 fully open.
 
 The valve holds no setpoint. It is open while its [`StateMachine`](@ref) is in `open_state`
-and shut otherwise, and transitions on the machine decide when:
-
-```julia
-machine = StateMachine(; initial_state=:CLOSED)
-@named flap = Flapper(; machine=machine)
-machine.transitions = [
-    (:CLOSED => :OPEN, bypass.inlet.ṁ < 0.01, "bypass flow low"),
-    (:OPEN => :CLOSED, bypass.inlet.ṁ > 0.05, "bypass flow restored"),
-]
-sol = solve_transient(ssys, op, times; callbacks=machine_callbacks(ssys, machine))
-```
-
-A number in a condition, like `0.01` above, is compiled into the event. To vary it between
-runs without recompiling, write it as a parameter of the model and change it with `remake`:
-
-```julia
-@parameters ṁ_open_at = 0.01
-machine.transitions = [(:CLOSED => :OPEN, bypass.inlet.ṁ < ṁ_open_at, "bypass flow low")]
-@named loop = assembly(connections, flap, bypass, ...; parameters=[ṁ_open_at])
-# later, for another threshold. The machine remembers opening last time, so reset it.
-reset!(machine)
-prob2 = remake(prob; p=[ṁ_open_at => 0.02])
-```
+and shut otherwise, and the machine's transitions decide when. See
+[Trip a reactor or open a valve](@ref) for how to set them, and to change a setpoint between
+runs.
 
 Opening and closing both take `1/open_rate` seconds, along the same curve: `xi = r(y)`, with
 `r(y) = 3y² − 2y³` rising smoothly from 0 to 1. `y` climbs at `open_rate` while the machine is

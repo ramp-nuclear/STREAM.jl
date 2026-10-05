@@ -1,45 +1,82 @@
-"""
+@doc raw"""
     dittus_boelter(Re, Pr, args...) -> Nu
 
-Dittus-Boelter turbulent forced convection, `Nu = 0.023·Re^0.8·Pr^0.4`. Trailing arguments
-are accepted and ignored so the correlation fits the `(Re, Pr, T_wall, T_bulk)` signature.
+Dittus-Boelter turbulent forced convection, in its heating form [DittusBoelter1930](@cite):
 
-Valid for Re > 10,000, 0.6 <= Pr <= 160, L/D > 10.
+```math
+Nu = 0.023 \, Re^{0.8} Pr^{0.4}
+```
+
+Valid for `Re > 10⁴`, `0.6 ≤ Pr ≤ 160` and `L/D > 10`. Trailing arguments are ignored, so
+the correlation fits the `(Re, Pr, T_wall, T_bulk)` signature of the others.
+
+# Arguments
+- `Re`, `Pr`: Reynolds and Prandtl numbers
+
+# Returns
+Nusselt number (dimensionless).
+
+# Examples
+```jldoctest
+julia> HTC.dittus_boelter(1.0e4, 32.0)
+145.8101737064225
+```
 """
 dittus_boelter(Re, Pr, args...) = 0.023 * Re^0.8 * Pr^0.4
 
 """
     constant_Nusselt(; Nu=8.235) -> (Re, Pr, args...) -> Nu
 
-A fixed Nusselt number. The default is the Shah and London fully-developed value for
-parallel plates under uniform heat flux.
+A fixed Nusselt number. The default is the fully developed laminar value for parallel
+plates under uniform heat flux [ShahLondon1978](@cite).
 
 Wrap it in [`ConstantNusselt`](@ref) to hand it to a channel.
-"""
-function constant_Nusselt(; Nu=8.235)
-    return (Re, Pr, args...) -> Nu
-end
-
-"""
-    elenbaas_nusselt(Ra, b, L) -> Nu
-
-Elenbaas natural convection correlation for parallel vertical plates.
-Formula: Nu = (1/24) * Ra * (b/L) * (1 - exp(-35 * L / (Ra * b)))^0.75
-
-Natural convection has no driving force for non-positive Rayleigh (wall not
-hotter than bulk), so Nu = 0 for Ra <= 0. The shape term's base is clamped so
-the fractional power never sees a negative argument, even when the expression is
-eagerly constant-folded.
-
-Source: Elenbaas (1942), as implemented in Python STREAM `_Elenbaas`.
 
 # Arguments
-- `Ra`: Rayleigh number (based on gap width b)
-- `b`: gap between plates [m] (channel depth)
+- `Nu`: the Nusselt number to return
+
+# Returns
+A function `(Re, Pr, args...) -> Nu` that ignores its arguments.
+
+# Examples
+```jldoctest
+julia> HTC.constant_Nusselt()(300.0, 7.0)
+8.235
+```
+"""
+constant_Nusselt(; Nu=8.235) = _ConstantNu(Nu)
+
+# A struct rather than a closure, so the value can be printed.
+struct _ConstantNu{T}
+    Nu::T
+end
+(c::_ConstantNu)(Re, Pr, args...) = c.Nu
+Base.show(io::IO, c::_ConstantNu) = print(io, "constant Nu = ", c.Nu)
+
+@doc raw"""
+    elenbaas_nusselt(Ra, b, L) -> Nu
+
+Natural convection between parallel vertical plates [Elenbaas1942](@cite):
+
+```math
+Nu = (1/24) \, Ra \, (b/L) \, (1 - e^{-35 L / (Ra \, b)})^{0.75}
+```
+
+With no buoyancy to drive it (`Ra ≤ 0`, a wall no hotter than the coolant) `Nu` is 0.
+
+# Arguments
+- `Ra`: Rayleigh number, based on the gap `b`
+- `b`: gap between the plates [m], the channel depth
 - `L`: heated length [m]
 
 # Returns
-Nusselt number (dimensionless). Zero for Ra <= 0.
+Nusselt number (dimensionless).
+
+# Examples
+```jldoctest
+julia> round(HTC.elenbaas_nusselt(12375.512696, 0.00254, 0.6); digits=10)
+1.2731625848
+```
 """
 function elenbaas_nusselt(Ra, b, L)
     # The return below already zeroes Nu for Ra <= 0, so this clamp only has to keep the shape
@@ -67,18 +104,21 @@ function _nusselt_coefficient_developing(x)
     return ifelse(x <= 2e-4, nu_low, ifelse(x <= 1e-3, nu_mid, nu_high))
 end
 
-"""
+@doc raw"""
     fully_developed_laminar_nusselt(geom::PipeGeometry) -> (Re, Pr, T_bulk, T_wall) -> Nu
 
-Factory returning an HTC correlation for fully-developed laminar flow in a
-rectangular duct with 2-sided heating.
+Fully developed laminar Nusselt number in a rectangular duct heated on its two long sides,
+a fifth-order polynomial in the aspect ratio `α = depth / width` [ShahLondon1978](@cite):
+
+```math
+Nu = 8.235 \, (1 - 1.4122 α + 2.3473 α^2 - 2.8983 α^3 + 2.0629 α^4 - 0.6077 α^5)
+```
 
 # Arguments
-- `geom`: `PipeGeometry`; the factory reads `geom.depth` and `geom.width` to
-  derive `aspect_ratio = depth / width`. `geom.Dh` is not used by the Nu calculation.
+- `geom`: the duct; only `depth / width` is used
 
 # Returns
-Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+A function `(Re, Pr, T_bulk, T_wall) -> Nu`, constant in its arguments.
 """
 function fully_developed_laminar_nusselt(geom::PipeGeometry)
     aspect_ratio = geom.depth / geom.width
@@ -86,23 +126,27 @@ function fully_developed_laminar_nusselt(geom::PipeGeometry)
     return (Re, Pr, args...) -> nu
 end
 
-"""
+@doc raw"""
     developing_laminar_nusselt(geom::PipeGeometry; develop_length) -> (Re, Pr, T_bulk, T_wall) -> Nu
 
-Factory returning an HTC correlation for thermally developing laminar flow in a
-rectangular duct with 2-sided heating.
+Laminar Nusselt number in a rectangular duct heated on its two long sides, while the
+temperature profile is still developing. It is the parallel-plate developing value at the
+dimensionless distance
 
-`develop_length` is a **mandatory** kwarg with no default. The caller must explicitly
-choose the evaluation point along the channel; there is no silent substitution with
-`geom.L`.
+```math
+x^* = x / (D_h \, Re \, Pr \, c), \qquad c = 6 - 5 e^{-0.75 α / 0.3257}
+```
+
+scaled to the aspect ratio `α` as in [`fully_developed_laminar_nusselt`](@ref)
+[ShahLondon1978](@cite). Far enough downstream it falls to the fully developed value.
 
 # Arguments
-- `geom`: `PipeGeometry`; the factory reads `geom.Dh`, `geom.depth`, and `geom.width`,
-  deriving `aspect_ratio = depth / width`.
-- `develop_length`: distance from channel entrance [m] (mandatory, no default).
+- `geom`: the duct
+- `develop_length`: distance from the heated entrance [m]. Required, since the result depends
+  on where along the channel it is evaluated.
 
 # Returns
-Closure `(Re, Pr, T_bulk, T_wall) -> Nu`.
+A function `(Re, Pr, T_bulk, T_wall) -> Nu`.
 """
 function developing_laminar_nusselt(geom::PipeGeometry; develop_length)
     aspect_ratio = geom.depth / geom.width
@@ -115,17 +159,27 @@ function developing_laminar_nusselt(geom::PipeGeometry; develop_length)
     end
 end
 
-"""
+@doc raw"""
     marco_han_nusselt(aspect_ratio) -> Nu
 
-Marco and Han approximation for Nusselt number in fully-developed laminar flow
-through rectangular ducts with uniform wall temperature (4-sided heating).
+Marco and Han's fit for the fully developed laminar Nusselt number in a rectangular duct
+heated on all four sides [ShahLondon1978](@cite):
+
+```math
+Nu = 8.235 \, (1 - 2.0421 α + 3.853 α^2 - 2.4765 α^3 + 1.0578 α^4 - 0.1861 α^5)
+```
 
 # Arguments
-- `aspect_ratio`: channel depth / channel width (0 to 1)
+- `aspect_ratio`: `α`, depth over width, in [0, 1]
 
 # Returns
 Nusselt number (dimensionless).
+
+# Examples
+```jldoctest
+julia> HTC.marco_han_nusselt(0.2)
+5.991134842079999
+```
 """
 function marco_han_nusselt(aspect_ratio)
     return 8.235 * (
