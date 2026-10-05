@@ -92,7 +92,6 @@ using STREAM, CairoMakie
 using STREAM.Components: HeatDiffusion, ConstantTemperature
 using STREAM.Assemblies: faces
 using ModelingToolkit: @named, mtkcompile
-CairoMakie.activate!(type="svg")
 
 Lx, Lz, y, k, nx = 1.27e-3, 0.6, 0.063, 180.0, 10
 P = 2.0e4                                 # plate power [W]

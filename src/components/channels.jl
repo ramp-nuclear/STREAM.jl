@@ -128,7 +128,10 @@ function _channel_core(;
             vars.v[i] ~ inlet.ṁ / (ρ_c[i] * A),
             vars.P[i]     ~ P_c[i],
             vars.T_sat[i] ~ Tsat(liquid, P_c[i]),
-            vars.T_ONB[i] ~ Tsat(liquid, P_c[i]) + _bergles_rohsenow_dT_ONB(P_c[i], q_density_c[i]),
+            # A wall cooler than the coolant has no onset to reach, and the correlation's
+            # fractional power is NaN for a negative flux, so such a cell reports saturation.
+            vars.T_ONB[i] ~ Tsat(liquid, P_c[i]) +
+                            _bergles_rohsenow_dT_ONB(P_c[i], max(q_density_c[i], 0.0)),
             vars.q_wall_left[i]  ~ q_left_expr[i],
             vars.q_wall_right[i] ~ q_right_expr[i],
             vars.q_wall[i]       ~ q_left_expr[i] + q_right_expr[i],

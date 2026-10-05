@@ -145,7 +145,6 @@ with the bulk at 40 °C and the wall at 60 °C.
 
 ```@example htc
 using STREAM, CairoMakie
-CairoMakie.activate!(type="svg")
 
 geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
 T_wall, T_bulk = 60.0, 40.0

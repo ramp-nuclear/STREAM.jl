@@ -106,7 +106,6 @@ the pressure drop itself, ``\propto f\,\text{Re}^2``, goes smoothly to zero.
 
 ```@example dp
 using STREAM, CairoMakie
-CairoMakie.activate!(type="svg")
 
 geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
 Re = 10 .^ range(2, 5; length=300)

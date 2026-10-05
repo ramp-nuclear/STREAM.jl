@@ -103,7 +103,6 @@ saturation, and the OFI power from the Whittle-Forgan correlation.
 
 ```@example limits_overview
 using STREAM, STREAM.Thresholds, CairoMakie
-CairoMakie.activate!(type="svg")
 
 pipe = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
 T_in, p = 40.0, 1.7e5

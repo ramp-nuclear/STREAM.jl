@@ -11,6 +11,7 @@ using DocumenterCodeBlocks
 using DocumenterInterLinks
 using DocumenterMermaid
 using Literate
+using CairoMakie
 using STREAM
 # DocumenterCodeBlocks links names in code blocks by resolving them in Main, so bring in the
 # submodules the pages import from. Channel is named explicitly: Base has one too.
@@ -18,6 +19,9 @@ using STREAM.Components, STREAM.Assemblies, STREAM.Thresholds, STREAM.Utilities
 using STREAM.Components: Channel
 
 const DRAFT = get(ENV, "DRAFT", "") == "1"
+# Makie's settings are global, so they hold in every page's example module: plots are SVG.
+CairoMakie.activate!(type="svg")
+
 const PREVIEW = DRAFT || get(ENV, "PREVIEW", "") == "1"
 const LITERATE = joinpath(@__DIR__, "literate")
 const TUTORIALS = joinpath(@__DIR__, "src", "tutorials")

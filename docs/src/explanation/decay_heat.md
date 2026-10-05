@@ -175,7 +175,6 @@ terms have very different time scales, U-239 with a half-life of 23.5 minutes an
 
 ```@example dh
 using STREAM, CairoMakie
-CairoMakie.activate!(type="svg")
 
 R, Q = 0.5, 200.0                          # captures per fission, MeV per fission
 chain = DecayHeat.U238CaptureChain(R)

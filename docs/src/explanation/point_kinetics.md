@@ -79,7 +79,6 @@ A step of 0.2% reactivity, about 31 cents, at ``t = 0.1`` s:
 using STREAM, CairoMakie
 using STREAM.Components: PointKinetics, U235_BETA_K
 using ModelingToolkit: @named, mtkcompile
-CairoMakie.activate!(type="svg")
 
 ρ_step = 0.002
 @named pk = PointKinetics(t -> t < 0.1 ? 0.0 : ρ_step)

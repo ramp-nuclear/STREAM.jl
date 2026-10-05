@@ -60,7 +60,6 @@ STREAM's water properties.
 
 ```@example onb
 using STREAM, STREAM.Thresholds, CairoMakie
-CairoMakie.activate!(type="svg")
 
 q = range(1e4, 2e6; length=100)          # wall heat flux [W/m²]
 fig = Figure(size=(700, 420))
@@ -88,7 +87,9 @@ ONB appears in three places:
 
 - **As an observable of every channel.** Each cell carries `T_ONB`, evaluated at the cell's
   static pressure `P` and its total wall heat flux (both faces over the heated perimeter).
-  `T_wall - T_ONB` is then a margin you can read off any solution.
+  `T_ONB - T_wall` is then a margin you can read off any solution. A cell whose wall is
+  cooler than its coolant, so that the flux is negative, reports the saturation temperature,
+  the correlation's zero-flux limit.
 - **As a heat transfer switch.** [`HTC.SubcooledBoiling`](@ref) compares the wall with the
   ONB temperature computed from the single-phase flux, and above it scales the single-phase
   coefficient by the partial boiling factor. See [Wall heat transfer](@ref).

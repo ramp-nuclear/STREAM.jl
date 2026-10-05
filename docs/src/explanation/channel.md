@@ -128,7 +128,6 @@ using STREAM.Components: Pump, HeatExchanger, Channel
 using STREAM.Assemblies: inseries
 using STREAM.Utilities: cosine_T_wall_profile
 using ModelingToolkit: @named, mtkcompile
-CairoMakie.activate!(type="svg")
 
 n = 20
 geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
