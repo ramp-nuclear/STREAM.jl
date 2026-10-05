@@ -30,6 +30,9 @@ conduction across the thickness ``x``, and each axial slice of the plate solves
 ## Finite volumes
 
 Cut the slice into ``n_x`` cells of width ``\Delta x`` and integrate the equation over each.
+
+![One axial slice of the plate: four cells across its thickness, each with a temperature at its centre, and a surface port half a cell from each outer centre](../assets/plate_stencil.svg)
+
 The divergence becomes the difference of the conduction through the cell's two faces, each
 from Fourier's law between the neighbouring cell centres. In the interior, the cell at axial
 position ``i`` and lateral position ``j`` obeys

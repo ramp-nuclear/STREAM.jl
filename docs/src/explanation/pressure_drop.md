@@ -151,6 +151,9 @@ written in units of the dynamic pressure, with a loss coefficient ``K`` for the 
 ```
 
 For a **sudden expansion** from area ``A_1`` to ``A_2``, ``K`` follows from first principles.
+
+![A sudden expansion: the jet leaving the narrow pipe spreads across the wide one, and a control volume runs from the step to where it has spread](../assets/sudden_expansion.svg)
+
 Take a control volume from just past the step to where the jet has spread across the wider
 pipe. The pressure on the step face is still about ``p_1``, since the jet leaving the narrow
 pipe has not yet felt the expansion. The momentum balance on the control volume is then

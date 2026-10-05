@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 300" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+    <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="#ddd"/>
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#aaa" stroke-width="3"/>
+    </pattern>
+  </defs>
+  <rect width="680" height="300" fill="white"/>
+  <!-- upper plate: cladding with fuel meat -->
+  <rect x="80" y="40" width="440" height="60" fill="url(#hatch)" stroke="#555"/>
+  <rect x="100" y="58" width="400" height="24" fill="#f4a261" stroke="#b5651d"/>
+  <text x="300" y="75" text-anchor="middle" font-size="12">fuel meat</text>
+  <text x="530" y="60" font-size="12" fill="#555">fuel plate</text>
+  <!-- side walls (frame) -->
+  <rect x="60" y="100" width="20" height="70" fill="#999"/>
+  <rect x="520" y="100" width="20" height="70" fill="#999"/>
+  <!-- coolant gap -->
+  <rect x="80" y="100" width="440" height="70" fill="#e8f1fb" stroke="#1f6fb4"/>
+  <text x="300" y="140" text-anchor="middle" fill="#1f6fb4">coolant, flowing into the page</text>
+  <!-- lower plate -->
+  <rect x="80" y="170" width="440" height="60" fill="url(#hatch)" stroke="#555"/>
+  <rect x="100" y="188" width="400" height="24" fill="#f4a261" stroke="#b5651d"/>
+  <!-- width -->
+  <line x1="80" y1="258" x2="520" y2="258" stroke="#333" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="300" y="278" text-anchor="middle">width W (edge 1)</text>
+  <!-- heated width -->
+  <line x1="100" y1="22" x2="500" y2="22" stroke="#b5651d" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="300" y="16" text-anchor="middle" fill="#b5651d" font-size="12">heated width, the heated part of each face</text>
+  <!-- gap -->
+  <line x1="580" y1="100" x2="580" y2="170" stroke="#333" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text x="590" y="132">gap δ</text>
+  <text x="590" y="150" font-size="12">(edge 2)</text>
+  <!-- formulas -->
+  <text x="560" y="210" font-size="13">A = W δ</text>
+  <text x="560" y="230" font-size="13">P<tspan baseline-shift="sub" font-size="9">wet</tspan> = 2 (W + δ)</text>
+  <text x="560" y="250" font-size="13">D<tspan baseline-shift="sub" font-size="9">h</tspan> = 4A / P<tspan baseline-shift="sub" font-size="9">wet</tspan> ≈ 2δ</text>
+</svg>

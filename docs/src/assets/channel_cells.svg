@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#333"/>
+    </marker>
+    <marker id="arrq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d9480f"/>
+    </marker>
+    <marker id="arrb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1f6fb4"/>
+    </marker>
+  </defs>
+  <rect width="720" height="300" fill="white"/>
+  <!-- walls -->
+  <rect x="80" y="70" width="560" height="14" fill="#bbb"/>
+  <rect x="80" y="196" width="560" height="14" fill="#bbb"/>
+  <text x="82" y="64" font-size="12" fill="#555">left wall, T_wall_left</text>
+  <text x="82" y="226" font-size="12" fill="#555">right wall, T_wall_right</text>
+  <!-- cells -->
+  <g stroke="#333" stroke-width="1.5" fill="none">
+    <rect x="120" y="84" width="160" height="112"/>
+    <rect x="280" y="84" width="160" height="112" fill="#e8f1fb"/>
+    <rect x="440" y="84" width="160" height="112"/>
+  </g>
+  <text x="200" y="146" text-anchor="middle" font-size="16">T<tspan baseline-shift="sub" font-size="11">i−1</tspan></text>
+  <text x="360" y="136" text-anchor="middle" font-size="16">T<tspan baseline-shift="sub" font-size="11">i</tspan></text>
+  <text x="360" y="158" text-anchor="middle" font-size="12" fill="#555">ρ c<tspan baseline-shift="sub" font-size="9">p</tspan> A Δz dT<tspan baseline-shift="sub" font-size="9">i</tspan>/dt</text>
+  <text x="520" y="146" text-anchor="middle" font-size="16">T<tspan baseline-shift="sub" font-size="11">i+1</tspan></text>
+  <!-- flow -->
+  <line x1="40" y1="140" x2="112" y2="140" stroke="#1f6fb4" stroke-width="2.5" marker-end="url(#arrb)"/>
+  <text x="40" y="128" fill="#1f6fb4">ṁ ≥ 0</text>
+  <line x1="245" y1="178" x2="315" y2="178" stroke="#1f6fb4" stroke-width="2" marker-end="url(#arrb)"/>
+  <text x="280" y="192" text-anchor="middle" font-size="11" fill="#1f6fb4">carries T<tspan baseline-shift="sub" font-size="8">i−1</tspan> in</text>
+  <line x1="405" y1="178" x2="475" y2="178" stroke="#1f6fb4" stroke-width="2" marker-end="url(#arrb)"/>
+  <text x="440" y="192" text-anchor="middle" font-size="11" fill="#1f6fb4">carries T<tspan baseline-shift="sub" font-size="8">i</tspan> out</text>
+  <line x1="608" y1="140" x2="690" y2="140" stroke="#1f6fb4" stroke-width="2.5" marker-end="url(#arrb)"/>
+  <!-- wall heat -->
+  <line x1="360" y1="40" x2="360" y2="80" stroke="#d9480f" stroke-width="2.5" marker-end="url(#arrq)"/>
+  <text x="370" y="52" fill="#d9480f">Q<tspan baseline-shift="sub" font-size="10">L,i</tspan> = h P Δz (T<tspan baseline-shift="sub" font-size="10">w</tspan> − T<tspan baseline-shift="sub" font-size="10">i</tspan>)</text>
+  <line x1="360" y1="250" x2="360" y2="212" stroke="#d9480f" stroke-width="2.5" marker-end="url(#arrq)"/>
+  <text x="370" y="250" fill="#d9480f">Q<tspan baseline-shift="sub" font-size="10">R,i</tspan></text>
+  <!-- dz -->
+  <line x1="280" y1="270" x2="440" y2="270" stroke="#333" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="360" y="290" text-anchor="middle">Δz = L / n</text>
+</svg>

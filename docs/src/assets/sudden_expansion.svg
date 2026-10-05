@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 280" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1f6fb4"/>
+    </marker>
+    <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d9480f"/>
+    </marker>
+  </defs>
+  <rect width="720" height="280" fill="white"/>
+  <!-- pipe walls -->
+  <g stroke="#333" stroke-width="3" fill="none">
+    <polyline points="30,100 260,100 260,50 690,50"/>
+    <polyline points="30,180 260,180 260,230 690,230"/>
+  </g>
+  <!-- jet spreading -->
+  <path d="M 260 100 C 360 100, 430 70, 560 52" fill="none" stroke="#1f6fb4" stroke-dasharray="5 4"/>
+  <path d="M 260 180 C 360 180, 430 210, 560 228" fill="none" stroke="#1f6fb4" stroke-dasharray="5 4"/>
+  <!-- eddies -->
+  <path d="M 285 75 a 16 14 0 1 1 1 0" fill="none" stroke="#999"/>
+  <path d="M 285 205 a 16 14 0 1 0 1 0" fill="none" stroke="#999"/>
+  <text x="320" y="72" font-size="11" fill="#777">eddies</text>
+  <!-- velocities -->
+  <line x1="60" y1="140" x2="150" y2="140" stroke="#1f6fb4" stroke-width="3" marker-end="url(#b)"/>
+  <text x="60" y="128" fill="#1f6fb4">v<tspan baseline-shift="sub" font-size="10">1</tspan>, A<tspan baseline-shift="sub" font-size="10">1</tspan></text>
+  <line x1="590" y1="140" x2="650" y2="140" stroke="#1f6fb4" stroke-width="2" marker-end="url(#b)"/>
+  <text x="590" y="128" fill="#1f6fb4">v<tspan baseline-shift="sub" font-size="10">2</tspan>, A<tspan baseline-shift="sub" font-size="10">2</tspan></text>
+  <!-- control volume -->
+  <rect x="266" y="56" width="304" height="168" fill="none" stroke="#2b8a3e" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="418" y="250" text-anchor="middle" fill="#2b8a3e">control volume</text>
+  <!-- pressure on the step face -->
+  <line x1="240" y1="75" x2="264" y2="75" stroke="#d9480f" stroke-width="2.5" marker-end="url(#p)"/>
+  <line x1="240" y1="205" x2="264" y2="205" stroke="#d9480f" stroke-width="2.5" marker-end="url(#p)"/>
+  <text x="200" y="40" fill="#d9480f" font-size="12">p ≈ p<tspan baseline-shift="sub" font-size="9">1</tspan> on the step face</text>
+  <line x1="566" y1="160" x2="545" y2="160" stroke="#d9480f" stroke-width="2.5" marker-end="url(#p)"/>
+  <text x="578" y="178" fill="#d9480f" font-size="12">p<tspan baseline-shift="sub" font-size="9">2</tspan></text>
+  <text x="270" y="270" font-size="12">(p<tspan baseline-shift="sub" font-size="9">1</tspan> − p<tspan baseline-shift="sub" font-size="9">2</tspan>) A<tspan baseline-shift="sub" font-size="9">2</tspan> = ṁ (v<tspan baseline-shift="sub" font-size="9">2</tspan> − v<tspan baseline-shift="sub" font-size="9">1</tspan>)</text>
+</svg>

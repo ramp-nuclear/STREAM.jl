@@ -11,7 +11,11 @@ share one set of equations. They differ only in how heat reaches the coolant:
 | [`ChannelAndContacts`](@ref STREAM.Components.ChannelAndContacts) | ``h\,P\,\Delta z\,(T_w - T)``, with ``h`` from a heat transfer model and ``T_w`` from a thermal port | the channel cools a fuel plate |
 
 Here ``P`` is the heated perimeter of one face and ``\Delta z = L/n``. Each has a left and a
-right face, so a channel between two plates is heated from both sides.
+right face, so a channel between two plates is heated from both sides. For a plate-fuel
+channel, [`PipeGeometry_rectangular`](@ref) takes the two edges of the cross-section and the
+heated width of each face:
+
+![Cross-section of a plate-fuel coolant channel: the gap between two fuel plates, with the width, gap and heated width marked](../assets/rect_channel.svg)
 
 ## Discretisation
 
@@ -19,6 +23,8 @@ The channel is cut into ``n`` cells of equal length along the flow. Each cell ho
 temperature ``T_i``, the mixed-mean temperature of the coolant in it. All cells carry the same
 mass flow ``\dot m``: the coolant is a liquid, so the channel stores no mass, and what enters
 one end leaves the other at the same instant.
+
+![Three cells of a channel: the coolant carries the upstream cell's temperature into each cell, and each wall adds heat](../assets/channel_cells.svg)
 
 ## Energy
 
