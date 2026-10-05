@@ -109,9 +109,9 @@ STREAM has them:
   40 mm width, and the correlation was fitted with the channel width.
 - **``1 + \Delta T^*`` rather than ``1 + 3\Delta T^*``.** The 1998 revision gives the
   subcooling factor of ``q^*_3`` as ``1 + 3\Delta T^*``, for counter-current flow in vertical
-  rectangular channels. An earlier presentation of the scheme has ``1 + \Delta T^*``, which is
-  smaller and so more conservative. Python STREAM takes the conservative one, and so does
-  STREAM.jl.
+  rectangular channels. An earlier presentation of the scheme [KaminagaIGORR1995](@cite) has
+  ``1 + \Delta T^*``, which is smaller and so more conservative. Python STREAM takes the
+  conservative one, and so does STREAM.jl.
 - **Positive flow is downward.** The branch is chosen from the sign of ``\dot m``, positive
   taken as downward, as in Python STREAM. Only the size of ``g`` is used. For a core with
   upward forced flow, mind which way your channel's `inlet` faces.

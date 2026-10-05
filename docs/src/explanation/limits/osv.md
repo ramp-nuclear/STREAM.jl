@@ -14,7 +14,8 @@ STREAM's included, no longer describes the channel.
 
 ## The Saha-Zuber correlation
 
-Saha and Zuber [SahaZuber1974](@cite) argued that bubble departure is set by one of two
+Saha and Zuber [SahaZuber1974](@cite), as presented in Collier and Thome
+[CollierThome1994](@cite) (pp. 226–227), argued that bubble departure is set by one of two
 mechanisms, depending on the Péclet number ``\text{Pe} = G D_h c_p / k``:
 
 - At **low Péclet number** the process is *thermally controlled*: bubbles leave when the
