@@ -45,7 +45,13 @@ using ModelingToolkit: @named
 
 fp = DecayHeat.FissionProducts([1.0, 0.05, 1e-3, 1e-5], [3.0, 0.15, 3e-3, 3e-5])
 heat = fp + DecayHeat.U238CaptureChain(0.5)
-heat(0.0) / 200          # share of the operating power at shutdown, for 200 MeV per fission
+```
+
+The total is a sum of its parts, and is called like any of them. At shutdown it is, as a share
+of the operating power for 200 MeV per fission:
+
+```@example dh
+heat(0.0) / 200
 ```
 
 Do not add `DecayHeat.Fissions` to a model whose power comes from `PointKinetics`: after a
@@ -60,6 +66,9 @@ holds its value at shutdown, the decay heat of a reactor at power. After, it dec
 ```@example dh
 machine = StateMachine(; initial_state=:SCRAM, initial_time=10.0)   # a scram at t = 10 s
 source = DecayHeat.DecayHeatSource(heat, machine; P0=1.0)
+```
+
+```@example dh
 [round(source(t); sigdigits=4) for t in (0.0, 10.0, 70.0, 610.0)]
 ```
 

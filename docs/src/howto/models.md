@@ -28,8 +28,14 @@ htc = HTC.SubcooledBoiling(
     HTC.regime_dependent_q_scb(),
 )
 darcy = Friction.RegimeDependent(; k_R=Friction.rectangular_correction(geom.depth / geom.width))
-@named ch = ChannelAndContacts(; n=10, geometry=geom, htc, darcy)
-nothing # hide
+@named ch = ChannelAndContacts(; n=10, geometry=geom, htc, darcy);
+htc
+```
+
+A model prints the branches it chooses between, and the friction model its own:
+
+```@example models
+darcy
 ```
 
 A model can be called directly, which is a quick way to see what it gives. A heat transfer
