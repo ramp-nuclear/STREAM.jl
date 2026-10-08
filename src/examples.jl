@@ -257,13 +257,9 @@ function build_loop_lof_bypass(;
     push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < 0.01))
     @named ext_res = Resistor(R_ext)
 
-    @named fuel = HeatDiffusion(;
-        x=range(0, fuel_Lx, fuel_nx + 1),
-        z=range(0, L_ch, n + 1),
-        geometry=Slab(0.07),
-        material=Solid(19300.0, 116.0, 174.0),
-        power=power_W,
-    )
+    slab = Slab(; x=range(0, fuel_Lx, fuel_nx + 1), z=range(0, L_ch, n + 1), y=0.07,
+                  material=Solid(19300.0, 116.0, 174.0))
+    @named fuel = HeatDiffusion(slab; power=power_W)
     heated = one_sided(ch, fuel; side=:left, name=:heated)
 
     connections = [
@@ -369,12 +365,9 @@ function build_loop_pk(ctrl;
         htc=HTC.ConstantNusselt(; Nu=8.235),
         darcy=Friction.RectangularLaminar(geom),
     )
-    @named fuel = HeatDiffusion(;
-        x=range(0, 0.005, nx + 1),
-        z=range(0, 0.6, nz + 1),
-        geometry=Slab(0.07),
-        material=Solid(19300.0, 116.0, 174.0),
-    )
+    slab = Slab(; x=range(0, 0.005, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(19300.0, 116.0, 174.0))
+    @named fuel = HeatDiffusion(slab)
     rods = symmetric_plate(cac, fuel; name=:rods)
     rods_cac = rods.cac
     rods_fuel = rods.fuel

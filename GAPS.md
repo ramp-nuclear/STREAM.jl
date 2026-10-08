@@ -274,10 +274,9 @@ Verified as matching, so they need not be re-investigated:
   separate model is needed.
 - **Channel variants**, pump modes, geometry (bar `heated_diameter`), and the flapper's open
   resistance in both flow directions.
-- **Heat conduction.** `HeatDiffusion` against Python's `Fuel` in all four of its kernels
-  (x, xz, r, rz), with per-cell materials, contact conductances and non-uniform meshes: the
-  cell temperature derivatives match to 1e-10, and a clad plate between two channels matches
-  Python's steady state. `test_heat_diffusion.jl` also ports Python's own heat tests.
+- **Heat conduction.** `HeatDiffusion` reproduces the closed-form steady states of a slab, a
+  clad slab with contacts, an annulus, a solid rod and a rod with a pellet-clad gap, on uniform
+  and graded meshes, and a clad plate between two channels matches Python's steady state.
 - **Several channel types in parallel**, through `Connect.weighted`, against Python's
   `signify=50` junction.
 

@@ -181,9 +181,8 @@ test/
   test_flapper.jl           # Flapper
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
   test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, ConvectiveBoundary
-  test_heat_diffusion.jl    # HeatDiffusion: ports of Python's test_heat.py, closed forms,
-                            # and dT/dt against Python's Fuel (test/data/heat_diffusion_reference.jl,
-                            # written by test/generate_heat_reference.py)
+  test_heat_diffusion.jl    # HeatDiffusion, Slab, Cylinder: ports, power, and closed-form
+                            # steady states on uniform and graded meshes
   test_correlations.jl      # Nusselt + friction correlation function unit tests
   test_htc.jl               # HTC models: property basis, named constructors, regime
                             # switching, subcooled boiling, user-defined models

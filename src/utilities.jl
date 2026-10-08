@@ -213,7 +213,7 @@ With `clad_N = 0` the plate is meat alone and `clad_w` is not used.
 - `meat_w`: width of the meat [m]
 
 # Returns
-The `2clad_N + fuel_N + 1` boundaries, ready for `HeatDiffusion(; x=...)`.
+The `2clad_N + fuel_N + 1` boundaries, ready for `Slab(; x=...)`.
 
 # Example
 ```julia

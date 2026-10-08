@@ -279,13 +279,9 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    @named hd = HeatDiffusion(;
-        x=range(0, 0.00127, nx + 1),
-        z=range(0, 0.6, nz + 1),
-        geometry=Slab(0.07),
-        material=Solid(2700.0, 900.0, 200.0),
-        power=1e4,
-    )
+    slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named hd = HeatDiffusion(slab; power=1e4)
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
@@ -412,9 +408,9 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(40.0)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    @named hd = HeatDiffusion(; x, z=range(0, 0.6, nz + 1), geometry=Slab(0.07),
-                              material=ifelse.(meat, Solid(3000.0, 800.0, 100.0), Solid(2700.0, 900.0, 250.0)),
-                              power_shape=meat ./ sum(meat), power=1e4)
+    slab = Slab(; x, z=range(0, 0.6, nz + 1), y=0.07,
+                  material=ifelse.(meat, Solid(3000.0, 800.0, 100.0), Solid(2700.0, 900.0, 250.0)))
+    @named hd = HeatDiffusion(slab; power_shape=meat ./ sum(meat), power=1e4)
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
@@ -480,13 +476,9 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in_r)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    @named hd = HeatDiffusion(;
-        x=range(0, 0.00127, nx + 1),
-        z=range(0, 0.6, nz + 1),
-        geometry=Slab(0.07),
-        material=Solid(2700.0, 900.0, 200.0),
-        power=1e4,
-    )
+    slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named hd = HeatDiffusion(slab; power=1e4)
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
@@ -627,13 +619,9 @@ end
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    @named hd = HeatDiffusion(;
-        x=range(0, 0.00127, nx + 1),
-        z=range(0, 0.6, nz + 1),
-        geometry=Slab(0.07),
-        material=Solid(2700.0, 900.0, 200.0),
-        power=1e4,
-    )
+    slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named hd = HeatDiffusion(slab; power=1e4)
     scc = single_channel(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
     cac = scc.cac_l
     fuel = scc.hd
@@ -760,13 +748,9 @@ end  # @testset "parity harness"
         return result
     end
 
-    @named hd_v01 = HeatDiffusion(;
-        x=range(0, Lx_v01, nx_v01 + 1),
-        z=range(0, Lz_v01, nz_v01 + 1),
-        geometry=Slab(y_v01),
-        material=Solid(rho_s_v01, cp_s_v01, k_s_v01),
-        power=0.0,
-    )
+    slab = Slab(; x=range(0, Lx_v01, nx_v01 + 1), z=range(0, Lz_v01, nz_v01 + 1), y=y_v01,
+                  material=Solid(rho_s_v01, cp_s_v01, k_s_v01))
+    @named hd_v01 = HeatDiffusion(slab; power=0.0)
     @named ct_l = ConstantTemperature(T_wall; n=nz_v01)
     @named ct_r = ConstantTemperature(T_wall; n=nz_v01)
     conns_v01 = [
@@ -818,20 +802,10 @@ end
     @named cac_v02 = ChannelAndContacts(;
         n=nz_v02, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     )
-    @named hd1 = HeatDiffusion(;
-        x=range(0, 0.00127, nx_v02 + 1),
-        z=range(0, 0.6, nz_v02 + 1),
-        geometry=Slab(0.07),
-        material=Solid(2700.0, 900.0, 200.0),
-        power=power_per_plate,
-    )
-    @named hd2 = HeatDiffusion(;
-        x=range(0, 0.00127, nx_v02 + 1),
-        z=range(0, 0.6, nz_v02 + 1),
-        geometry=Slab(0.07),
-        material=Solid(2700.0, 900.0, 200.0),
-        power=power_per_plate,
-    )
+    slab = Slab(; x=range(0, 0.00127, nx_v02 + 1), z=range(0, 0.6, nz_v02 + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named hd1 = HeatDiffusion(slab; power=power_per_plate)
+    @named hd2 = HeatDiffusion(slab; power=power_per_plate)
 
     conns_v02 = [
         # Hydraulic loop

@@ -321,12 +321,9 @@ const CRITICAL = (t) -> 0.0
 
         pg5 = PipeGeometry_rectangular(1.0, 0.04, 0.01, 0.04)
         @named ch = Channel(; name=:ch, n=5, geometry=pg5)
-        @named fuel = HeatDiffusion(
-            x=range(0, 0.005, 3),
-            z=range(0, 0.6, 4),
-            geometry=Slab(0.07),
-            material=Solid(19300.0, 116.0, 174.0),
-        )
+        slab = Slab(; x=range(0, 0.005, 3), z=range(0, 0.6, 4), y=0.07,
+                      material=Solid(19300.0, 116.0, 174.0))
+        @named fuel = HeatDiffusion(slab)
 
         @testset "default no temp_worth adds no T_source" begin
             # Uncompiled counts are P_neutron, C[1:6] and the algebraic P. The last one is
@@ -409,12 +406,9 @@ const CRITICAL = (t) -> 0.0
 
         pg5 = PipeGeometry_rectangular(1.0, 0.04, 0.01, 0.04)
         @named ch = Channel(; name=:ch, n=5, geometry=pg5)
-        @named fuel = HeatDiffusion(
-            x=range(0, 0.005, 3),
-            z=range(0, 0.6, 4),
-            geometry=Slab(0.07),
-            material=Solid(19300.0, 116.0, 174.0),
-        )
+        slab = Slab(; x=range(0, 0.005, 3), z=range(0, 0.6, 4), y=0.07,
+                      material=Solid(19300.0, 116.0, 174.0))
+        @named fuel = HeatDiffusion(slab)
 
         @testset "1D channel generates 5 equations" begin
             @named pk = PointKinetics(ctrl_zero; temp_worth=Dict(ch => -0.001))

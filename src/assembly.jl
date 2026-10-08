@@ -84,7 +84,8 @@ sol[port(cac, :thermal_right, :T), end]    # wall temperatures at the last time
 ```
 """
 port(sys, face::Symbol, i::Int) = getproperty(sys, Symbol(face, i))
-port(sys, face::Symbol, var::Symbol) = port(port.(Ref(sys), face, 1:var_length(sys, face)), var)
+port(sys, face::Symbol, var::Symbol) =
+    [getproperty(port(sys, face, i), var) for i in 1:var_length(sys, face)]
 port(ports::AbstractVector, var::Symbol) = getproperty.(ports, var)
 
 """
