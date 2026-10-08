@@ -2,7 +2,6 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-using DelimitedFiles
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
@@ -12,18 +11,6 @@ using STREAM.Examples
 
 include(joinpath(@__DIR__, "parity_helpers.jl"))
 include(joinpath(@__DIR__, "data", "python_parity_reference.jl"))
-
-# CSV path + truncate-and-rewrite at file load: one fresh CSV per
-# `julia --project=. test/test_validation.jl` run; the CSV in git represents the
-# LAST run. Each parity testset thereafter calls append_csv(...; truncate=false).
-# The 3 KEPT testsets do NOT touch the CSV.
-const PARITY_CSV = joinpath(@__DIR__, "data", "parity_report.csv")
-function __init_parity_csv()
-    open(PARITY_CSV, "w") do io
-        write(io, "scenario,quantity,julia,python,abs_err,rtol,tier,hard_ceiling,note\n")
-    end
-end
-__init_parity_csv()  # called once at file load
 
 # Effective channel HTC for parity, mirroring Python STREAM's `_other_if_none`:
 # report the HTC of the HEAT-TRANSFERRING (connected) face — the side with nonzero
@@ -62,35 +49,7 @@ _h_eff(sol, cac, i) = abs(sol[cac.q_wall_left[i]]) >= abs(sol[cac.q_wall_right[i
     # Self-test 8: sign-safety
     r8 = parity_check("st", "q", -300.0, -300.0001)
     @test r8.tier == TIER_CLEAN
-    # Self-test 9: CSV roundtrip preserves rtol within %.6e precision (~6 sig figs)
-    tmp_csv = tempname() * ".csv"
-    rows_test = [r, r3, r4]
-    append_csv(tmp_csv, rows_test; truncate=true)
-    @test isfile(tmp_csv)
-    @test filesize(tmp_csv) > 100
-    readback = readdlm(tmp_csv, ',', skipstart=1)
-    @test size(readback, 1) == 3
-    for (i, original) in enumerate(rows_test)
-        recovered_rtol = readback[i, 6]
-        if original.rtol == 0.0
-            @test recovered_rtol == 0.0
-        else
-            @test isapprox(recovered_rtol, original.rtol; rtol=1e-5)
-        end
-    end
-    rm(tmp_csv; force=true)
-    # Self-test 10: append_csv truncate semantics
-    tmp_csv2 = tempname() * ".csv"
-    append_csv(tmp_csv2, rows_test; truncate=true)   # 1 header + 3 rows = 4 lines
-    n1 = countlines(tmp_csv2)
-    append_csv(tmp_csv2, rows_test; truncate=false)  # +3 rows = 7 lines
-    n2 = countlines(tmp_csv2)
-    @test n2 == n1 + 3
-    append_csv(tmp_csv2, rows_test; truncate=true)   # reset to 1 header + 3 rows = 4 lines
-    n3 = countlines(tmp_csv2)
-    @test n3 == n1
-    rm(tmp_csv2; force=true)
-    # Self-test 11: print_drift_table on empty rows doesn't crash
+    # Self-test 9: print_drift_table on empty rows doesn't crash
     empty_rows = ParityRow[]
     buf = IOBuffer()
     print_drift_table(empty_rows; io=buf)   # a throw here would fail the testset on its own
@@ -250,7 +209,6 @@ end
     end
 
     print_drift_table(rows)
-    append_csv(PARITY_CSV, rows; truncate=false)
 
     for r in rows
         @test r.tier != TIER_FAIL
@@ -388,7 +346,6 @@ end
     end
 
     print_drift_table(rows)
-    append_csv(PARITY_CSV, rows; truncate=false)
 
     for r in rows
         @test r.tier != TIER_FAIL
@@ -447,7 +404,6 @@ end
     end
 
     print_drift_table(rows)
-    append_csv(PARITY_CSV, rows; truncate=false)
     for r in rows
         @test r.tier != TIER_FAIL
     end
@@ -589,7 +545,6 @@ end
     end
 
     print_drift_table(rows)
-    append_csv(PARITY_CSV, rows; truncate=false)
 
     for r in rows
         @test r.tier != TIER_FAIL
@@ -692,7 +647,6 @@ end
     end
 
     print_drift_table(rows)
-    append_csv(PARITY_CSV, rows; truncate=false)
     for r in rows
         @test r.tier != TIER_FAIL
     end
