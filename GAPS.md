@@ -17,13 +17,12 @@ checked and found equivalent is listed at the end, so nobody has to re-derive it
 - [In review](#in-review)
 - [What remains](#what-remains)
   1. [Loss of coolant to core uncovery](#1-loss-of-coolant-to-core-uncovery)
-  2. [Fuel heat conduction](#2-fuel-heat-conduction)
-  3. [Saturation stop and range checks](#3-saturation-stop-and-range-checks)
-  4. [Thresholds](#4-thresholds)
-  5. [Power shapes](#5-power-shapes)
-  6. [Hydraulic components](#6-hydraulic-components)
-  7. [Debugging and drawing a model](#7-debugging-and-drawing-a-model)
-  8. [Uncertainty quantification](#8-uncertainty-quantification)
+  2. [Saturation stop and range checks](#2-saturation-stop-and-range-checks)
+  3. [Thresholds](#3-thresholds)
+  4. [Power shapes](#4-power-shapes)
+  5. [Hydraulic components](#5-hydraulic-components)
+  6. [Debugging and drawing a model](#6-debugging-and-drawing-a-model)
+  7. [Uncertainty quantification](#7-uncertainty-quantification)
 - [Not planned](#not-planned)
 - [Deliberate departures from Python](#deliberate-departures-from-python)
 - [Following Python where the physics is open](#following-python-where-the-physics-is-open)
@@ -34,10 +33,10 @@ checked and found equivalent is listed at the end, so nobody has to re-derive it
 
 | Case | Python | STREAM.jl | What is missing |
 |---|---|---|---|
-| Steady margins, plate fuel | Yes | Yes | Only the plain Saha-Zuber form ([4](#4-thresholds)) |
+| Steady margins, plate fuel | Yes | Yes | Only the plain Saha-Zuber form ([3](#3-thresholds)) |
 | LOFA | Partly, see below | Yes | Nothing |
-| RIA, plate fuel | Yes | Partly | Axial conduction and a clad plate ([2](#2-fuel-heat-conduction)), the blister limit ([4](#4-thresholds)) |
-| RIA, rod fuel | Yes | No | Cylindrical conduction and gap conductance ([2](#2-fuel-heat-conduction)), fuel enthalpy ([4](#4-thresholds)) |
+| RIA, plate fuel | Yes | Yes | The blister limit, which Python lacks too ([3](#3-thresholds)) |
+| RIA, rod fuel | Yes | Yes | Fuel enthalpy, which Python lacks too ([3](#3-thresholds)) |
 | LOCA to core uncovery | On `stream-next` | No | Tanks, breaks and the level they set ([1](#1-loss-of-coolant-to-core-uncovery)) |
 | LOCA past uncovery | No | No | Out of scope for both, by choice |
 
@@ -114,26 +113,7 @@ closed-form drain time to 0.001%, and its benchmark pool draining 5948 kg to unc
 **Size:** about 250 to 350 source lines and a week, plus up to three days matching Python's
 benchmark timings.
 
-### 2. Fuel heat conduction
-
-`HeatDiffusion` is one kernel: 2D Cartesian, one material, a uniform mesh, no interface
-resistance and no axial conduction. Python's `Fuel` has all of these:
-
-| Missing | Python | Why it matters |
-|---|---|---|
-| Cylindrical geometry | `r_diffusion`, `rz_diffusion`, `cylindrical_areas_volumes` | No rod fuel at all without it, the largest gap against the stated goal |
-| Axial conduction | `xz_diffusion`, `rz_diffusion` | Our slices are thermally independent. It matters at the ends of the heated length and near a partly inserted rod |
-| Per-cell material | `Solid.from_array`, `meat_indices`, `x_boundaries(clad_N, fuel_N, ...)` | A clad plate cannot be represented. Face conductivities need a harmonic mean |
-| Non-uniform mesh | `x_boundaries`, `z_boundaries` | Fine cells in the cladding, and at a rod's centre where the radial profile is steepest |
-| Contact conductance | `_resistances(dr, contacts, k)` | The pellet-clad gap dominates a rod's thermal resistance, and its closing is first-order in an RIA |
-
-Do them as one rework of `_diffusion_eqs`, with the metric, material and mesh as parameters,
-rather than touching it five times.
-
-**Size:** medium. The radial metric is spelled out in `cylindrical_areas_volumes`, and the rest
-is mechanical once the kernel takes arrays.
-
-### 3. Saturation stop and range checks
+### 2. Saturation stop and range checks
 
 The channel model ends at bulk saturation, and nothing says so during a run. `stream-next` adds:
 
@@ -147,31 +127,30 @@ The channel model ends at bulk saturation, and nothing says so during a run. `st
 
 **Size:** 100 to 130 lines, in `src/thresholds/analysis.jl` beside `threshold_analysis`.
 
-### 4. Thresholds
+### 3. Thresholds
 
 - **The plain Saha-Zuber form.** We have only the computed-bulk one. Python puts a
   `.. danger::` on the plain form and says you probably want the other, so this is for
   completeness. Trivial.
 - **RIA limits.** Peak cladding temperature and DNBR are there, through `twall_limit` and
   `chfr`. The blister temperature for aluminide and silicide plates is not, nor is a fuel
-  enthalpy accumulator, the standard rod-fuel criterion, which needs the cylindrical kernel
-  first. Python has neither. Small, after §2.
+  enthalpy accumulator, the standard rod-fuel criterion. Python has neither. Small.
 - **`heated_diameter`**, `4·area/heated_perimeter` on the geometry. Python computes it and
   never reads it. Trivial.
 
-### 5. Power shapes
+### 4. Power shapes
 
 `Utilities.cosine_shape` ports Python's, with a non-uniform mesh, cell integration, a peaking
 factor and an off-centre peak. Still missing: `cosine_shape_by_zero_endpoints`, the
 extrapolated cosine with non-zero flux at the ends that a reflected core has, and
 `uniform_x_power_shape` for the lateral direction across clad and meat. Small, pure functions.
 
-### 6. Hydraulic components
+### 5. Hydraulic components
 
 `Bend`, `Screen` and `bend_factor`, the Idelchik bend and wire-mesh screen losses. Each is
 small and independent.
 
-### 7. Debugging and drawing a model
+### 6. Debugging and drawing a model
 
 | Python | What it does | Have it? |
 |---|---|---|
@@ -189,7 +168,7 @@ equations; and a component graph from the connection vectors `inseries`, `inpara
 
 **Size:** small, and high value per line.
 
-### 8. Uncertainty quantification
+### 7. Uncertainty quantification
 
 Python has `analysis/UQ/`: finite-difference Jacobians of solution values against input
 parameters, a distributed version, uncertainty propagation, a power-shape perturbation, and
@@ -264,6 +243,10 @@ Names that differ: `HTC.rohsenow_scb_heat_flux` is Python's `Bergles_Rohsenhow_S
 The flux is Rohsenow's (1952); Bergles and Rohsenow's (1964) part is the partial boiling
 factor, `HTC.partial_SCB_correction`.
 
+`HeatDiffusion`'s `power_shape` covers every cell, with zeros in the cladding, where Python's
+`Fuel` spreads it over the cells its `meat_indices` mark. Point-kinetics feedback likewise reads
+every cell, so give the cladding zero worth to match Python, which feeds back the meat only.
+
 ## Checked and equivalent
 
 Verified as matching, so they need not be re-investigated:
@@ -291,6 +274,9 @@ Verified as matching, so they need not be re-investigated:
   separate model is needed.
 - **Channel variants**, pump modes, geometry (bar `heated_diameter`), and the flapper's open
   resistance in both flow directions.
+- **Heat conduction.** `HeatDiffusion` reproduces the closed-form steady states of a slab, a
+  clad slab with contacts, an annulus, a solid rod and a rod with a pellet-clad gap, on uniform
+  and graded meshes, and a clad plate between two channels matches Python's steady state.
 - **Several channel types in parallel**, through `Connect.weighted`, against Python's
   `signify=50` junction.
 

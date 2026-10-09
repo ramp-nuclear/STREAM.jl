@@ -1,5 +1,4 @@
 using Printf
-using DelimitedFiles
 using Test
 using STREAM
 
@@ -11,7 +10,7 @@ const TIER_FAIL  = :FAIL    # rtol ≥ hard_ceiling
     ParityRow
 
 One row of the drift report. Built by `parity_check`. Aggregated into a
-Vector{ParityRow} per testset and emitted via `print_drift_table` + `append_csv`.
+Vector{ParityRow} per testset and printed with `print_drift_table`.
 
 Fields (9 total):
   scenario     :: String   — e.g. "simple_loop" | "mtr_symmetric" | "mtr_asymmetric" | "mtr_one_sided"
@@ -22,7 +21,7 @@ Fields (9 total):
   rtol         :: Float64  — abs_err / max(|python_ref|, 1e-300); fallback to abs_err if python_ref==0
   tier         :: Symbol   — TIER_CLEAN / TIER_GRAY / TIER_FAIL
   hard_ceiling :: Float64  — per-quantity threshold (default 0.02)
-  note         :: String   — short rationale; MUST be comma-free (CSV writer doesn't escape)
+  note         :: String   — short rationale
 """
 struct ParityRow
     scenario     :: String
@@ -90,33 +89,6 @@ function print_drift_table(rows::Vector{ParityRow}; io::IO=stdout)
     @printf(io, "%s\n", repeat("-", 130))
     @printf(io, "summary: %d quantities — %d CLEAN, %d GRAY, %d FAIL\n",
             length(rows), n_clean, n_gray, n_fail)
-end
-
-"""
-    append_csv(path::AbstractString, rows::Vector{ParityRow}; truncate::Bool=false)
-
-Write rows to `path` in long format (one row per (scenario, quantity)).
-Header is emitted if `truncate=true` or the file doesn't exist.
-Numeric columns use %.10e (10 sig figs — well above KINSOL's reltol=1e-6
-so re-runs on the same machine produce bit-identical CSV).
-
-Schema: scenario,quantity,julia,python,abs_err,rtol,tier,hard_ceiling,note
-"""
-function append_csv(path::AbstractString, rows::Vector{ParityRow}; truncate::Bool=false)
-    write_header = truncate || !isfile(path)
-    mode = truncate ? "w" : "a"
-    open(path, mode) do io
-        if write_header
-            write(io, "scenario,quantity,julia,python,abs_err,rtol,tier,hard_ceiling,note\n")
-        end
-        for r in rows
-            line = @sprintf("%s,%s,%.10e,%.10e,%.10e,%.6e,%s,%.4f,%s\n",
-                            r.scenario, r.qid, r.julia_val, r.python_ref,
-                            r.abs_err, r.rtol, String(r.tier),
-                            r.hard_ceiling, r.note)
-            write(io, line)
-        end
-    end
 end
 const REF_T_C = (40.0, 70.0, 100.0)
 const PYTHON_RHO_AT_REF = (991.3511479199999, 977.57053367999993, 959.13959927999997)              # kg/m^3

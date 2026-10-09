@@ -56,17 +56,9 @@ const K_AL      = 200.0     # W/(m*K)
 println("Building MTR assembly...")
 
 geom = PipeGeometry_rectangular(L_PLATE, Y_PLATE, LX_PLATE, Y_PLATE)
-@named hd = HeatDiffusion(;
-    nz=NZ,
-    nx=NX,
-    Lz=L_PLATE,
-    Lx=LX_PLATE,
-    y=Y_PLATE,
-    rho_s=RHO_AL,
-    cp_s=CP_AL,
-    k_s=K_AL,
-    power=POWER,
-)
+slab = Slab(; x=range(0, LX_PLATE, NX + 1), z=range(0, L_PLATE, NZ + 1), y=Y_PLATE,
+              material=Solid(RHO_AL, CP_AL, K_AL))
+@named hd = HeatDiffusion(slab; power=POWER)
 
 @named cac_l = ChannelAndContacts(; n=NZ, geometry=geom)
 @named cac_r = ChannelAndContacts(; n=NZ, geometry=geom)

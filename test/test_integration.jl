@@ -691,15 +691,11 @@ end
 # h-weighted wall temperature, power driven negligible by negative feedback), not
 # byte-identical numbers — Julia's models differ from Python's mocks in ways that
 # are immaterial to those results:
-#   - Julia `HeatDiffusion` is single-material; Python's MTR fuel is multi-material
-#     (meat + clad). Used here with mock single-material solid (k_s=cp_s=rho_s=1).
 #   - Julia `ChannelAndContacts` computes its HTC from a correlation (water-based);
 #     Python prescribes a mock h. #4 reads Julia's computed `h_tc` into the same
 #     wall-temperature balance Python checks against its prescribed h.
 #   - Julia `PointKinetics` is fixed 6-group U-235; Python #8 uses a single group.
 #     The "power → 0 under negative feedback" result is group-count-independent.
-#   - Julia `HeatDiffusion` needs nx ≥ 2; Python uses nx = 1. The per-axial-slice
-#     power (hence the linear coolant rise) is independent of the lateral count.
 # `Liquid()` is the Julia counterpart of Python's `mock_liquid_funcs` (all
 # properties 1.0), which gives the clean closed-form coolant temperatures.
 # ----------------------------------------------------------------------------
@@ -714,15 +710,15 @@ end
     ṁ = 1.0
     n = 10
     nz = 10
-    nx = 2
+    nx = 1
     k_s = 1.0
     Lx = 1.0
     # Mock one-sided pipe (heated_parts = (0, 1), area 1) + mock solid (all 1).
     geom = PipeGeometry(1.0, 4.0, 1.0, 1.0, 1.0, (0.0, 1.0), 1.0, 1.0)
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
-    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.0, Lx=Lx, y=1.0,
-                                rho_s=1.0, cp_s=1.0, k_s=k_s, power=P, T0=T0)
+    slab = Slab(; x=[0.0, Lx], z=range(0, 1.0, nz + 1), y=1.0, material=Solid(1.0, 1.0, k_s))
+    @named fuel = HeatDiffusion(slab; power=P, T0=T0)
     osc = one_sided(cac, fuel; side=:right, name=:osc)   # fuel heats the right face only
     @named pump = Pump(; ṁ0=ṁ)
     @named bc = HeatExchanger(T0)
@@ -766,7 +762,7 @@ end
     Tin = T0 - 10.0
     n = 7
     nz = 7
-    nx = 2
+    nx = 1
     ṁs = [1.0, 0.7, 0.4]        # distinct ṁs ⇒ distinct slopes off the shared power
     N = length(ṁs)
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
@@ -775,7 +771,8 @@ end
     cacs = [ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                htc=HTC.ConstantNusselt(; Nu=8.235),
                                name=Symbol(:cac, i)) for i in 1:N]
-    fuels = [HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0, rho_s=1.0, cp_s=1.0, k_s=1.0, T0=T0, name=Symbol(:fuel, i)) for i in 1:N]
+    slab = Slab(; x=[0.0, 1.0], z=range(0, 1.2, nz + 1), y=1.0, material=Solid(1.0, 1.0, 1.0))
+    fuels = [HeatDiffusion(slab; T0=T0, name=Symbol(:fuel, i)) for i in 1:N]
     rodss = [symmetric_plate(cacs[i], fuels[i]; name=Symbol(:rods, i)) for i in 1:N]
     pumps = [Pump(; ṁ0=ṁs[i], name=Symbol(:pump, i)) for i in 1:N]
     bcs = [HeatExchanger(Tin; name=Symbol(:bc, i)) for i in 1:N]
@@ -873,8 +870,9 @@ end
     T0 = 35.0
     nz = 10
     nx = 2
-    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005, y=0.07,
-                                rho_s=3000.0, cp_s=800.0, k_s=100.0, T0=T0)
+    slab = Slab(; x=range(0, 0.005, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(3000.0, 800.0, 100.0))
+    @named fuel = HeatDiffusion(slab; T0=T0)
     @named bathsL = ConstantTemperature(T0; n=nz)
     @named bathsR = ConstantTemperature(T0; n=nz)
     ctrl = ReactivityController()
@@ -904,12 +902,12 @@ end
     T0 = 35.0
     n = 7
     nz = 7
-    nx = 2
+    nx = 1
     geom = PipeGeometry(1.2, 4.0, 1.0, 2.0, 1.0, (1.0, 1.0), 1.0, 1.0)
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
-    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=1.2, Lx=1.0, y=1.0,
-                                rho_s=1.0, cp_s=1.0, k_s=1.0, T0=T0)
+    slab = Slab(; x=[0.0, 1.0], z=range(0, 1.2, nz + 1), y=1.0, material=Solid(1.0, 1.0, 1.0))
+    @named fuel = HeatDiffusion(slab; T0=T0)
     rods = symmetric_plate(cac, fuel; name=:rods)
     ctrl = ReactivityController()
     @named pk = PointKinetics(ctrl; temp_worth=Dict(rods.cac => fill(-0.1, n)),

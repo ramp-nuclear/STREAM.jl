@@ -207,3 +207,17 @@ end
     @test dT > 0.0
     @test isfinite(dT)
 end
+
+@testset "Solid" begin
+    s = Solid(; ρ=2700, cₚ=900.0, κ=250)
+    @test s === Solid(2700.0, 900.0, 250.0)
+    @test Solid(; density=2700, specific_heat=900.0, conductivity=250) === s
+    @test Solid(; ρ=2700, specific_heat=900.0, κ=250) === s
+    @test_throws ArgumentError Solid(; density=2700, specific_heat=900.0)
+    @test (ρ(s), cₚ(s), κ(s)) == (2700.0, 900.0, 250.0)
+    # Python's Solid.from_array doctest: a matrix of solids gives property matrices.
+    materials = [Solid(1, 2, 3) Solid(4, 5, 6)]
+    @test density.(materials) == [1 4]
+    @test conductivity.(materials) == [3 6]
+    @test κ.(ifelse.([true false], Solid(1, 1, 7), Solid(1, 1, 9))) == [7 9]
+end

@@ -18,8 +18,9 @@ function _mtr_pair(; n=4, nz=4, nx=2, power=1.0e3)
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
                                     htc=HTC.ConstantNusselt(; Nu=8.235),
                                     darcy=Friction.RectangularLaminar(geom))
-    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.005,
-                                 y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0, power=power)
+    slab = Slab(; x=range(0, 0.005, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(19300.0, 116.0, 174.0))
+    @named fuel = HeatDiffusion(slab; power=power)
     return cac, fuel
 end
 
@@ -195,8 +196,9 @@ end
     power_val = 1.0e4
     @named ch_left = ChannelAndContacts(; n=nz, geometry=geom)
     @named ch_right = ChannelAndContacts(; n=nz, geometry=geom)
-    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-                                rho_s=2700.0, cp_s=900.0, k_s=200.0, power=power_val)
+    slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named fuel = HeatDiffusion(slab; power=power_val)
     pl = plate(ch_left, ch_right, fuel; name=:pl)
     @test pl isa ModelingToolkit.AbstractSystem
     @named pump_l = Pump(3.0e4)
@@ -258,8 +260,9 @@ function _build_osc_loop(side::Symbol, name_suffix)
     nz = 10
     nx = 3
     @named cac = ChannelAndContacts(; n=nz, geometry=geom)
-    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-                                rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4)
+    slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named fuel = HeatDiffusion(slab; power=1e4)
     osc = one_sided(cac, fuel; side=side, name=Symbol(:osc_, name_suffix))
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
@@ -356,8 +359,9 @@ end
     nz = 10
     nx = 3
     @named cac = ChannelAndContacts(; n=nz, geometry=geom)
-    @named fuel = HeatDiffusion(; nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-                                rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4)
+    slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named fuel = HeatDiffusion(slab; power=1e4)
     scc = single_channel(cac, fuel, geom; fuel_side=:left, name=:scc_s)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
@@ -483,8 +487,9 @@ function _fa_cac(prefix::Symbol; n=4)
 end
 
 function _fa_hd(prefix::Symbol; nz=4, nx=2, power=1.0e3)
-    HeatDiffusion(; name=prefix, nz=nz, nx=nx, Lz=0.6, Lx=0.005,
-                   y=0.07, rho_s=19300.0, cp_s=116.0, k_s=174.0, power=power)
+    slab = Slab(; x=range(0, 0.005, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(19300.0, 116.0, 174.0))
+    return HeatDiffusion(slab; name=prefix, power=power)
 end
 
 # Time derivative, used to build the Dt(...)=>0.0 IC guesses (see variant-1 note).

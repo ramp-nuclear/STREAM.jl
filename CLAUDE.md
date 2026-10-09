@@ -106,6 +106,7 @@ src/
     liquid.jl                 # AbstractLiquid interface, Liquid snapshot, unicode aliases (ρ, cₚ, μ, κ, β, Tsat)
     light_water.jl            # LightWater / H2O correlations
     heavy_water.jl            # HeavyWater / D2O correlations
+    solid.jl                  # Solid: constant density, specific heat, conductivity
   htc/                        # module HTC
     htc.jl                    # AbstractHTC: the wall heat transfer model a channel is handed
     correlations.jl           # Nusselt correlations (dimensionless, no property basis)
@@ -127,7 +128,7 @@ src/
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
     sources.jl                # ConvectiveBoundary
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
-    heat_diffusion.jl         # HeatDiffusion (2D FD solid plate)
+    heat_diffusion.jl         # HeatDiffusion (2D finite-volume plate or rod), Slab, Cylinder
     point_kinetics.jl         # PointKinetics (any group count), ReactivityController
     state_machine.jl          # StateMachine, StateSchedule, trip!, reset!, machine_callbacks
   decay_heat/                 # module DecayHeat
@@ -139,24 +140,26 @@ src/
                               # with LogLinear/Linear sample interpolation
     source.jl                 # DecayHeatSource: MeV/fission to power, and the trip clock
   assemblies/                 # module Assemblies
-    port.jl                   # port: index one element of a connector array (a getter, not a verb)
-    assembly.jl               # assembly: compose components with a nested connection list
+    port.jl                   # port, var_length: reach per-cell connectors. Loaded by
+                              # STREAM before Components, so every module can use it
+    assembly.jl               # assembly: compose components with a nested connection list,
+                              # loaded the same way
     connections.jl            # module Assemblies.Connect: face, faces,
                               # temperature_feedback, inseries, inparallel, weighted
                               # (and _FlowWeight, the private component weighted places)
-    assemblies.jl             # check_gravity_mismatch, symmetric_plate,
+    concrete_assemblies.jl    # check_gravity_mismatch, symmetric_plate,
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
   initial_conditions.jl       # steady_state_guess, uniform
   utilities.jl                # module Utilities: rebin_*, cosine_shape, cosine_power_shape,
-                              # cosine_T_wall_profile
+                              # cosine_T_wall_profile, x_boundaries
   examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk
 ```
 
 **Where new code goes:**
 - New component (single MTK component) → `src/components/` in the most relevant file, or a new file if it's a new domain
 - New correlation → the module that owns that physics: a Nusselt number into `src/htc/correlations.jl`, a friction factor into `src/friction/correlations.jl`, a local loss into `src/local_loss.jl`, a safety limit into `src/thresholds/thresholds.jl`
-- New wiring verb → `src/assemblies/connections.jl` (inside `Connect`); a named arrangement → `src/assemblies/assemblies.jl`
+- New wiring verb → `src/assemblies/connections.jl` (inside `Connect`); a named arrangement → `src/assemblies/concrete_assemblies.jl`
 - Prefer `Connect.face(...)` over a bare `face(...)`, but leave `inseries`, `inparallel` and `port` unqualified: the first two are used constantly and `port` is a getter that reads clearly on its own
 - New decay heat contribution → `src/decay_heat/`, in the file matching the Python module it mirrors
 - New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the nine `AbstractLiquid` property methods
@@ -180,7 +183,8 @@ test/
   test_flapper.jl           # Flapper
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
   test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, ConvectiveBoundary
-  test_heat_diffusion.jl    # HeatDiffusion
+  test_heat_diffusion.jl    # HeatDiffusion, Slab, Cylinder: ports, power, and closed-form
+                            # steady states on uniform and graded meshes
   test_correlations.jl      # Nusselt + friction correlation function unit tests
   test_htc.jl               # HTC models: property basis, named constructors, regime
                             # switching, subcooled boiling, user-defined models
