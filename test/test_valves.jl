@@ -175,9 +175,10 @@ _opening_grid(t_end; points=300) =
 A pool emptying over a crest: the line leaves at 1.5 m, climbs to 5 m, where the break sits,
 and falls to an outlet at -3 m. `breaker` is a level at which the break latches shut.
 Returns the compiled model, the solution, the break's machine, the machine that stops the run
-at uncovery, and one that moves to `:FLASHING` when the crest reaches saturation.
+at uncovery, and one that moves to `:FLASHING` when the crest reaches saturation. `kwargs` go
+to `solve_transient`.
 """
-function _siphon(; T0=T_POOL, breaker=nothing, open_rate=10.0)
+function _siphon(; T0=T_POOL, breaker=nothing, open_rate=10.0, kwargs...)
     z_intake, z_crest, z_outlet = 1.5, 5.0, -3.0
     @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(intake=z_intake,), T0=T0)
     line = StateMachine(; initial_state=:OPEN, initial_time=0.0)
@@ -197,7 +198,7 @@ function _siphon(; T0=T_POOL, breaker=nothing, open_rate=10.0)
     ssys = mtkcompile(sys)
     sol = solve_transient(ssys, solve_steady(ssys), _opening_grid(3500.0);
                           overrides=[ssys.pool.pinned => false],
-                          callbacks=machine_callbacks(ssys, line, watch, throat))
+                          callbacks=machine_callbacks(ssys, line, watch, throat), kwargs...)
     return ssys, sol, line, watch, throat
 end
 
@@ -267,12 +268,13 @@ end
             ṁ = CD_SHARP * A_HOLE * sqrt(2 * rho * rho * G_EARTH * (2.0 + 3.0))
             return 3 * ṁ / (rho * A_TANK) / rate
         end
-        ssys, quick, line, watch = _siphon(; breaker=2.0, open_rate=5.0)
+        # The allowance is under a millimetre of a 2 m level, finer than the default reltol.
+        ssys, quick, line, watch = _siphon(; breaker=2.0, open_rate=5.0, reltol=1e-6)
         @test line.state === :SHUT
         @test watch.state === :INTACT
         @test quick[ssys.pool.L][end] ≈ 2.0 atol = allowance(5.0)
         @test quick[ssys.breach.inlet.ṁ][end] ≈ 0.0 atol = 1e-9
-        ssys, lazy, _, _ = _siphon(; breaker=2.0, open_rate=0.05)
+        ssys, lazy, _, _ = _siphon(; breaker=2.0, open_rate=0.05, reltol=1e-6)
         @test lazy[ssys.pool.L][end] < quick[ssys.pool.L][end] - 1e-3
     end
 

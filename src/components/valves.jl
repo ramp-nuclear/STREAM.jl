@@ -245,20 +245,11 @@ It walks `machine.log`. Along each entry the ramp coordinate `y` rises at `open_
 state is `open_state` and falls at `open_rate` otherwise, clamped to `[0, 1]` as it goes, and
 the fraction is `3y² − 2y³`. A valve that only ever opens reduces to
 `r(clamp(open_rate·(t − t_open), 0, 1))`.
-
-Building one adds the ramp time `1/open_rate` to the machine's `ramp_times`, so the solver
-stops where each ramp ends.
 """
 struct _Opening
     machine::StateMachine
     open_state::Any
     open_rate::Float64
-
-    function _Opening(machine::StateMachine, open_state, open_rate)
-        rate = Float64(open_rate)
-        union!(machine.ramp_times, 1 / rate)
-        return new(machine, open_state, rate)
-    end
 end
 
 function (o::_Opening)(t)
