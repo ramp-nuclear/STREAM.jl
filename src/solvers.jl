@@ -20,10 +20,6 @@ If a particular solve does not converge, pass an explicit solver; the coastdown 
 A `DynamicSS` solver integrates to steady state and keeps only where it ends, so its inner
 integration runs without dense output.
 
-# Throws
-- `ArgumentError`: for a pinned [`Tank`](@ref) with its energy balance on and no inflow,
-  whose temperature nothing in the steady state sets
-
 # Returns
 `SciMLBase.NonlinearSolution`. Access results via `sol[ssys.component.variable]`.
 """
@@ -40,51 +36,7 @@ function solve_steady(
     # on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
     inner = solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
     sol = solve(prob, solver; abstol=abstol, reltol=reltol, inner...)
-    _check_tank_temperatures(ssys, sol, abstol)
     return sol
-end
-
-"""
-    _pinned_parameters(ssys) -> Vector
-
-The `pinned` parameter of every [`Tank`](@ref) in `ssys`, found by name.
-"""
-_pinned_parameters(ssys) =
-    filter(p -> occursin(r"(^|₊)pinned$", string(ModelingToolkit.getname(p))), parameters(ssys))
-
-"""
-    _tank_path(pinned) -> String
-
-The tank a `pinned` parameter belongs to, as it is reached from the compiled system:
-`"pool"` for `pool₊pinned`.
-"""
-_tank_path(pinned) = replace(chop(string(ModelingToolkit.getname(pinned)); tail=7), "₊" => ".")
-
-"""
-    _check_tank_temperatures(ssys, sol, tol)
-
-Throw an `ArgumentError` for the first pinned [`Tank`](@ref) in `ssys` whose energy balance
-is on and whose `inflow` in the steady solution `sol` is `tol` or less. The steady energy
-balance of such a tank holds at any temperature, or at none with `Q_ext`, so the solver
-returns whatever `T` it ends on.
-"""
-function _check_tank_temperatures(ssys, sol, tol)
-    pinned = filter(p -> sol.ps[p], _pinned_parameters(ssys))
-    isempty(pinned) && return nothing
-    variables = [unknowns(ssys); [eq.lhs for eq in observed(ssys)]]
-    named = Dict(string(ModelingToolkit.getname(v)) => v for v in variables)
-    for p in pinned
-        prefix = chop(string(ModelingToolkit.getname(p)); tail=length("pinned"))
-        inflow = get(named, prefix * "inflow", nothing)
-        (inflow === nothing || sol[inflow] > tol) && continue
-        tank = _tank_path(p)
-        throw(ArgumentError(
-            "$tank has no inflow in the steady state, so nothing sets its temperature. " *
-            "Build it with `fixed_temperature=true`, or start the transient from its " *
-            "declared state: `solve_transient(ssys, [ssys.$tank.pinned => false], t)`",
-        ))
-    end
-    return nothing
 end
 
 """
@@ -135,7 +87,6 @@ function solve_transient(
         ODEProblem(ssys, op, tspan; warn_initialize_determined=false) :
         ODEProblem(ssys, op, tspan; warn_initialize_determined=false,
                    build_initializeprob=build_initializeprob)
-    _warn_pinned(prob, op)
     sol = solve(
         prob,
         solver;
@@ -172,23 +123,6 @@ function _saved_steps(prob, t, kwargs)
 end
 
 solve_transient(ssys, t::AbstractVector; kwargs...) = solve_transient(ssys, Pair[], t; kwargs...)
-
-"""
-    _warn_pinned(prob, op)
-
-Warn about each [`Tank`](@ref) still pinned in `prob` whose `pinned` the operating point `op`
-does not name. Naming it, even as `true`, says the pinned run is meant.
-"""
-function _warn_pinned(prob, op)
-    named(p) = any(o -> isequal(ModelingToolkit.unwrap(first(o)), p), op)
-    for p in _pinned_parameters(prob.f.sys)
-        (prob.ps[p] && !named(p)) || continue
-        tank = _tank_path(p)
-        @warn "$tank is still pinned, so its level stays at L0. Release it with " *
-              "`overrides=[ssys.$tank.pinned => false]`."
-    end
-    return nothing
-end
 
 """
     _state_snapshot(ssys, sol) -> Vector{Pair}

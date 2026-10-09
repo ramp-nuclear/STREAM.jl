@@ -41,12 +41,9 @@ sol_ss = solve_steady(ssys, guess)
 sol = solve_transient(ssys, sol_ss, times; overrides=[ssys.pool.pinned => false])
 ```
 
-[`solve_transient`](@ref) warns about a tank left pinned.
-
 With the energy balance on, the steady temperature is the mix of the inflows, so a tank with
-no inflow in the steady state has nothing to set it, and [`solve_steady`](@ref) throws. Start
-such a run from the declared state instead,
-`solve_transient(ssys, [ssys.pool.pinned => false], times)`.
+no inflow in the steady state has nothing to set it. Start such a run from the declared state
+instead, `solve_transient(ssys, [ssys.pool.pinned => false], times)`.
 
 # Events
 
@@ -77,8 +74,7 @@ One `FlowPort` per entry of `ports`, named as in it.
 
 # Returns
 Uncompiled `System` with the level `L`, the temperature `T`, the inventory `M = ρ·V(L)` [kg],
-and the parameter `pinned`. With `fixed_temperature=false` it also has `inflow` [kg/s], the
-sum of the flows coming in.
+and the parameter `pinned`.
 
 # Throws
 - `ArgumentError`: for a tank with no ports, or a level-dependent `area` with no `volume`
@@ -133,9 +129,6 @@ function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=H2O, p
         inflow_heat = sum(
             ifelse(port.ṁ > 0, port.ṁ, 0.0) * cp * (instream(port.T) - T) for port in port_sys
         )
-        inflow_vars = @variables inflow(t)
-        append!(vars, inflow_vars)
-        push!(eqs, inflow_vars[1] ~ sum(ifelse(port.ṁ > 0, port.ṁ, 0.0) for port in port_sys))
         # Solved for D(T): left multiplying it, the T-dependent ρ·cₚ makes MTK carry D(T) as
         # an extra unknown that needs a start value.
         push!(eqs, D(T) ~ (inflow_heat + Q_ext) / (rho * V_of(L) * cp))

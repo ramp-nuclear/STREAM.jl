@@ -63,31 +63,6 @@ end
         @test sol[ssys.breach.inlet.ṁ] == 0.0
     end
 
-    @testset "a steady solve names a tank whose temperature nothing sets" begin
-        @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(bottom=0.0,), T0=T_POOL,
-                           fixed_temperature=false, Q_ext=1e5)
-        @named breach = Orifice(; area=A_HOLE, cd=CD_SHARP)
-        ssys = mtkcompile(_tank_with_break(pool, breach))
-        @test_throws r"pool has no inflow" solve_steady(ssys)
-    end
-
-    @testset "a transient warns about a tank left pinned" begin
-        @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(bottom=0.0,), T0=T_POOL)
-        @named breach = Orifice(; area=A_HOLE, cd=CD_SHARP)
-        ssys = mtkcompile(_tank_with_break(pool, breach))
-        sol_ss = solve_steady(ssys)
-        times = range(0.0, 1.0; length=3)
-        @test_logs (:warn, r"pool is still pinned") match_mode = :any solve_transient(
-            ssys, sol_ss, times
-        )
-        for pinned in (true, false)
-            logs, _ = Test.collect_test_logs() do
-                solve_transient(ssys, sol_ss, times; overrides=[ssys.pool.pinned => pinned])
-            end
-            @test !any(log -> occursin("still pinned", string(log.message)), logs)
-        end
-    end
-
     @testset "the closed-form drain time matches Python's doctest" begin
         @test _drain_time(L_POOL, 1.0, A_TANK, A_HOLE, CD_SHARP) ≈ 2961.3164311592627
     end
