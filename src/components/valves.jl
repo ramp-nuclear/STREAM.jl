@@ -1,6 +1,6 @@
 """
     Flapper(; name, f=1.0, area=1.0, open_rate=1.0, machine, open_state=:OPEN,
-            open_fraction=nothing, dp_eps=1.0, liquid=H2O) -> System
+            open_fraction=nothing, dp_linear=1.0, liquid=H2O) -> System
 
 Passive check valve. Shut, it passes no flow. Open, it is a quadratic resistor
 `ΔP = f·ṁ·|ṁ| / (2·ρ·area²)`, and part way open it passes `xi` times that flow, where `xi` is
@@ -56,8 +56,10 @@ moves flow between its paths; an orifice is where the loop loses its coolant.
   such as an interpolation of a measured opening curve. It may read the machine but not the
   model's variables: a fraction that depends on the flow it controls makes the equations
   non-smooth, and a steady solve stalls. Zero or less means shut.
-- `dp_eps`: half-width of the band around `ΔP = 0` over which the square root of the law is
-  rounded off [Pa] (default 1)
+- `dp_linear`: pressure drop [Pa] below which the open valve's flow goes as `ΔP` instead of
+  its square root (default 1). The open valve passes
+  `ṁ = xi·area·sqrt(2ρ/f)·ΔP / (ΔP² + dp_linear²)^{1/4}`, which crosses zero with a finite
+  slope. Well above `dp_linear` this is the quadratic law above.
 - `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`H2O`](@ref), whose density on the
   side the flow enters sets the open valve's pressure drop
 
@@ -69,18 +71,18 @@ Uncompiled `System`, with the open fraction as the variable `xi`.
 """
 function Flapper(; name, f=1.0, area=1.0, open_rate=1.0,
                  machine::StateMachine=StateMachine(; initial_state=:CLOSED),
-                 open_state=:OPEN, open_fraction=nothing, dp_eps=1.0,
+                 open_state=:OPEN, open_fraction=nothing, dp_linear=1.0,
                  liquid::AbstractLiquid=H2O)
     fraction = open_fraction === nothing ?
         _Opening(machine, open_state, open_rate) : open_fraction
     fs = @parameters f = f
     # ΔP = f·ṁ|ṁ|/(2ρA²) is the orifice law with cd = 1/√f.
-    return _Valve(; name, area, fraction, dp_eps, liquid, cc=nothing,
+    return _Valve(; name, area, fraction, dp_linear, liquid, cc=nothing,
                   cd_of_Re=_ -> 1 / sqrt(fs[1]), extra_pars=fs)
 end
 
 """
-    Orifice(; name, area, cd, machine, open_state=:OPEN, open_rate=10.0, dp_eps=1.0,
+    Orifice(; name, area, cd, machine, open_state=:OPEN, open_rate=10.0, dp_linear=1.0,
             cc=nothing, liquid=H2O) -> System
 
 A hole a liquid discharges through: a break in a pool wall, a breach in a pipe, or a severed
@@ -88,10 +90,10 @@ pipe end. Open, it passes
 
     ṁ = cd·area·sqrt(2·ρ·Δp)
 
-with `Δp` the pressure across it. The square root is rounded off within `dp_eps` of zero, so
-the flow passes smoothly through zero and reverses when `Δp` does. What kind of break it is depends on where it
-sits in the loop, not on what it computes: discharge into an [`Environment`](@ref) to lose the
-inventory.
+with `Δp` the pressure across it. Close to `Δp = 0` the flow goes as `Δp` instead (see
+`dp_linear`), so it passes through zero smoothly and reverses when `Δp` does. What kind of
+break it is depends on where it sits in the loop, not on what it computes: discharge into an
+[`Environment`](@ref) to lose the inventory.
 
 Shut, it passes no flow and leaves the pressure across it free, so the intact loop solves with
 the break already in place. It opens and shuts with its [`StateMachine`](@ref) exactly as a
@@ -108,23 +110,34 @@ line = StateMachine(; initial_state=:OPEN)
 line.transitions = [(:OPEN => :SHUT, pool.L < z_breaker, "siphon breaker")]
 ```
 
-The single-phase law holds only while the throat stays liquid. With a contraction coefficient
-`cc`, the orifice also reports the static pressure at its vena contracta and how far the liquid
-there is below saturation, which [`cavitation`](@ref) reads after a run.
+The orifice applies the single-phase law throughout and does not check, during the run,
+whether the liquid at its throat flashes. With a contraction coefficient `cc` it reports the
+static pressure at its vena contracta and how far the liquid there is below saturation.
+[`cavitation`](@ref) reads those after the run, at the saved times only, so a dip below
+saturation between two saved times goes unseen. To catch one as it happens, put a transition
+on the subcooling in a [`StateMachine`](@ref):
+
+```julia
+flash = StateMachine(; initial_state=:LIQUID)
+push!(flash, (:LIQUID => :FLASHING, breach.subcooling < 0, "throat at saturation"))
+```
 
 # Arguments
 - `name`: system name (Symbol), injected by `@named`
 - `area`: geometric area of the hole [m²]
 - `cd`: discharge coefficient, a number such as `discharge_cd(:sharp)`, or a function of the
   throat Reynolds number such as `Re -> lichtarowicz_cd(Re, 2.0)`. The Reynolds number is taken
-  on the diameter of a round hole of that area and floored at 1, so a stagnant break still
-  evaluates.
+  on the diameter of a round hole of that area and floored at 1. At zero flow, through a shut
+  break or one just opening, the floor keeps such a `cd` positive, so a break opening from
+  rest starts to flow.
 - `machine`: the [`StateMachine`](@ref) the break follows (default a fresh one in `:SHUT`,
   which never opens)
 - `open_state`: the state in which the break is open (default `:OPEN`)
 - `open_rate`: how fast it opens and shuts [1/s] (default 10)
-- `dp_eps`: half-width of the band around `Δp = 0` over which the square root is rounded off
-  [Pa] (default 1)
+- `dp_linear`: pressure difference [Pa] below which the flow goes as `Δp` instead of its
+  square root (default 1). The open orifice passes
+  `ṁ = xi·cd·area·sqrt(2ρ)·Δp / (Δp² + dp_linear²)^{1/4}`, which crosses zero with a finite
+  slope. Well above `dp_linear` this is the square-root law above.
 - `cc`: contraction coefficient of the vena contracta, or `nothing` (default) to skip the
   throat report
 - `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`H2O`](@ref)
@@ -138,22 +151,22 @@ throat pressure `p_throat` [Pa] and the throat `subcooling` [K], the saturation 
 `p_throat` less the liquid temperature.
 """
 function Orifice(; name, area, cd, machine::StateMachine=StateMachine(; initial_state=:SHUT),
-                 open_state=:OPEN, open_rate=10.0, dp_eps=1.0, cc=nothing,
+                 open_state=:OPEN, open_rate=10.0, dp_linear=1.0, cc=nothing,
                  liquid::AbstractLiquid=H2O)
     fraction = _Opening(machine, open_state, open_rate)
-    cd isa Function && return _Valve(; name, area, fraction, dp_eps, cc, liquid, cd_of_Re=cd)
+    cd isa Function && return _Valve(; name, area, fraction, dp_linear, cc, liquid, cd_of_Re=cd)
     cds = @parameters cd = cd
-    return _Valve(; name, area, fraction, dp_eps, cc, liquid,
+    return _Valve(; name, area, fraction, dp_linear, cc, liquid,
                   cd_of_Re=_ -> cds[1], extra_pars=cds)
 end
 
 """
-    _Valve(; name, area, fraction, cd_of_Re, dp_eps, cc, liquid, extra_pars=[]) -> System
+    _Valve(; name, area, fraction, cd_of_Re, dp_linear, cc, liquid, extra_pars=[]) -> System
 
 The component behind [`Flapper`](@ref) and [`Orifice`](@ref): a hole of area `area` whose open
 fraction `xi` follows `fraction(t)`, passing
 
-    ṁ = xi·cd·area·sqrt(2ρ)·_smooth_signed_sqrt(Δp, dp_eps)
+    ṁ = xi·cd·area·sqrt(2ρ)·_smooth_signed_sqrt(Δp, dp_linear)
 
 and nothing while `xi` is zero or less. `cd_of_Re` gives the discharge coefficient from the
 throat Reynolds number, on the diameter of a round hole of that area and floored at 1; the two
@@ -163,11 +176,11 @@ is taken on the side the flow enters. With `cc`, it also carries the vena contra
 
 `extra_pars` are parameters `cd_of_Re` refers to, such as a flapper's `f`.
 """
-function _Valve(; name, area, fraction, cd_of_Re, dp_eps, cc, liquid, extra_pars=[])
+function _Valve(; name, area, fraction, cd_of_Re, dp_linear, cc, liquid, extra_pars=[])
     FType = typeof(fraction)
     pars = @parameters begin
         area = area
-        dp_eps = dp_eps
+        dp_linear = dp_linear
         (xi_fn::FType)(..) = fraction
     end
     append!(pars, extra_pars)
@@ -181,7 +194,7 @@ function _Valve(; name, area, fraction, cd_of_Re, dp_eps, cc, liquid, extra_pars
     rho = ρ(liquid, T_up)
     Re_throat = max(abs(ṁ) * sqrt(4 * area / π) / (area * μ(liquid, T_up)), 1.0)
     ṁ_open = cd_of_Re(Re_throat) * area * sqrt(2 * rho) *
-        _smooth_signed_sqrt(inlet.p - outlet.p, dp_eps)
+        _smooth_signed_sqrt(inlet.p - outlet.p, dp_linear)
     opened = xi_fn(t)
 
     eqs = Equation[

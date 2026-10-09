@@ -484,12 +484,12 @@ function build_pool_break(;
     break_at in (:bottom, :suction) ||
         throw(ArgumentError("break_at is :bottom or :suction, not :$break_at"))
     @named pool = Tank(;
-        area=area, L0=L0, ports=(suction=0.0, inflow=0.0), fixed_temperature=true, T0=T0,
+        area=area, L0=L0, ports=(suction=0.0, inflow=0.0), T0=T0,
     )
     @named core = Resistor(R_core)
     @named pump = Pump(dP_pump)
     @named breach = Orifice(;
-        area=break_area, cd=cd, dp_eps=1e-3, open_rate=open_rate,
+        area=break_area, cd=cd, dp_linear=1e-3, open_rate=open_rate,
         machine=StateMachine(; initial_state=:OPEN, initial_time=t_break),
     )
     @named ambient = Environment(; T=T0)

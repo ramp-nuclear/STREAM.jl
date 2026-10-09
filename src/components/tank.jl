@@ -1,10 +1,10 @@
 """
     Tank(; name, area, L0, ports, liquid=H2O, p_surface=ATM, T0=T_ROOM,
-         fixed_temperature=false, volume=nothing, Q_ext=0.0, g=G_EARTH) -> System
+         fixed_temperature=true, volume=nothing, Q_ext=0.0, g=G_EARTH) -> System
 
 A body of liquid with a free surface: a pool, or a tank with a cover gas. It holds an inventory
-whose level `L` and mixed temperature `T` are states, and it sits in a loop as a node with any
-number of connections, each at its own elevation.
+whose level `L` is a state, and it sits in a loop as a node with any number of connections,
+each at its own elevation.
 
 Each connection's pressure is the surface pressure plus the head of liquid above it,
 
@@ -12,10 +12,18 @@ Each connection's pressure is the surface pressure plus the head of liquid above
 
 so a leg's driving head falls as the tank drains, reaches zero when the surface comes down to
 the connection, and goes negative once it is above the surface. Liquid leaves through every
-port at the tank's temperature.
+port at the tank's temperature. A port the surface has fallen below keeps passing liquid
+under that negative head: the tank does not shut it. To stop the flow there, put an
+[`Orifice`](@ref) on the line with a transition that shuts it when `L` passes the port.
 
 The level follows the net inflow, `ρ·A(L)·dL/dt = Σ ṁ`, with each port's `ṁ` positive into the
-tank. The temperature follows the enthalpy the inflows bring,
+tank.
+
+# Temperature
+
+By default the temperature is held at `T0`, before and during the transient. The tank then
+takes in whatever heat the loop brings it without warming, which suits a pool whose heat-up is
+of no interest. With `fixed_temperature=false`, `T` follows the enthalpy the inflows bring,
 
     ρ·V(L)·cₚ·dT/dt = Σ max(ṁ, 0)·cₚ·(T_in − T) + Q_ext
 
@@ -33,14 +41,18 @@ sol_ss = solve_steady(ssys, guess)
 sol = solve_transient(ssys, sol_ss, times; overrides=[ssys.pool.pinned => false])
 ```
 
-A pinned tank still sets a temperature from its inflows, so a tank that only drains has nothing
-to set `T` in the steady solve. Give it `fixed_temperature=true`.
+[`solve_transient`](@ref) warns about a tank left pinned.
+
+With the energy balance on, the steady temperature is the mix of the inflows, so a tank with
+no inflow in the steady state has nothing to set it, and [`solve_steady`](@ref) throws. Start
+such a run from the declared state instead,
+`solve_transient(ssys, [ssys.pool.pinned => false], times)`.
 
 # Events
 
 Reaching a level is a [`StateMachine`](@ref) transition on `L`, such as
-`(:INTACT => :UNCOVERED, pool.L < z_core_top, "core uncovered")` with `:UNCOVERED` among the
-machine's `abort_states` to stop the run there.
+`(:INTACT => :CORE_UNCOVERED, pool.L < z_core_top, "core uncovered")` with `:CORE_UNCOVERED`
+among the machine's `abort_states` to stop the run there.
 
 # Arguments
 - `name`: system name (Symbol), injected by `@named`
@@ -51,12 +63,13 @@ machine's `abort_states` to stop the run there.
   `(suction=0.0, return=0.5)`. Each becomes a `FlowPort` of that name.
 - `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`H2O`](@ref)
 - `p_surface`: pressure above the liquid [Pa] (default [`ATM`](@ref))
-- `T0`: initial temperature, and the held temperature with `fixed_temperature` [°C]
-- `fixed_temperature`: hold `T` at `T0` instead of following the energy balance (default
-  `false`)
+- `T0`: the held temperature, or the initial one with `fixed_temperature=false` [°C]
+- `fixed_temperature`: hold `T` at `T0` (default `true`). `false` makes `T` follow the energy
+  balance.
 - `volume`: liquid volume as a function of level `L -> V` [m³], consistent with `area`
   (`dV/dL = A`). Required with a level-dependent `area`; a constant area gives `area·L`.
-- `Q_ext`: heat into the liquid from outside the loop [W] (default 0)
+- `Q_ext`: heat into the liquid from outside the loop [W] (default 0). It only acts with
+  `fixed_temperature=false`.
 - `g`: gravitational acceleration [m/s²] (default [`G_EARTH`](@ref))
 
 # Ports
@@ -64,13 +77,14 @@ One `FlowPort` per entry of `ports`, named as in it.
 
 # Returns
 Uncompiled `System` with the level `L`, the temperature `T`, the inventory `M = ρ·V(L)` [kg],
-and the parameter `pinned`.
+and the parameter `pinned`. With `fixed_temperature=false` it also has `inflow` [kg/s], the
+sum of the flows coming in.
 
 # Throws
 - `ArgumentError`: for a tank with no ports, or a level-dependent `area` with no `volume`
 """
 function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=H2O, p_surface=ATM,
-              T0=T_ROOM, fixed_temperature::Bool=false, volume=nothing, Q_ext=0.0,
+              T0=T_ROOM, fixed_temperature::Bool=true, volume=nothing, Q_ext=0.0,
               g=G_EARTH)
     isempty(ports) && throw(ArgumentError("a Tank needs at least one port"))
     area isa Function && volume === nothing && throw(ArgumentError(
@@ -119,6 +133,9 @@ function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=H2O, p
         inflow_heat = sum(
             ifelse(port.ṁ > 0, port.ṁ, 0.0) * cp * (instream(port.T) - T) for port in port_sys
         )
+        inflow_vars = @variables inflow(t)
+        append!(vars, inflow_vars)
+        push!(eqs, inflow_vars[1] ~ sum(ifelse(port.ṁ > 0, port.ṁ, 0.0) for port in port_sys))
         # Solved for D(T): left multiplying it, the T-dependent ρ·cₚ makes MTK carry D(T) as
         # an extra unknown that needs a start value.
         push!(eqs, D(T) ~ (inflow_heat + Q_ext) / (rho * V_of(L) * cp))
