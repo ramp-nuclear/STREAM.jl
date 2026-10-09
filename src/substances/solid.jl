@@ -1,6 +1,7 @@
 """
     Solid(ρ, cₚ, κ)
     Solid(; ρ, cₚ, κ)
+    Solid(; density, specific_heat, conductivity)
 
 Bulk thermal properties of a solid, constant in temperature.
 
@@ -8,12 +9,17 @@ A plate or rod made of several materials is a `Matrix{Solid}` with one entry per
 `κ.(materials)` gives the matching conductivity matrix.
 
 # Arguments
-- `ρ`: density [kg/m^3]
-- `cₚ`: specific heat [J/(kg·K)]
-- `κ`: thermal conductivity [W/(m·K)]
+- `ρ`, or `density` in ASCII: density [kg/m^3]
+- `cₚ`, or `specific_heat`: specific heat [J/(kg·K)]
+- `κ`, or `conductivity`: thermal conductivity [W/(m·K)]
+
+Each property takes either spelling.
 
 # Returns
 A `Solid`. `density`, `specific_heat` and `conductivity` (or `ρ`, `cₚ`, `κ`) read its fields.
+
+# Throws
+`ArgumentError` when a property is missing.
 
 # Example
 ```julia
@@ -29,7 +35,12 @@ struct Solid{T}
 end
 
 Solid(ρ, cₚ, κ) = Solid(promote(ρ, cₚ, κ)...)
-Solid(; ρ, cₚ, κ) = Solid(ρ, cₚ, κ)
+# Julia does not dispatch on keywords, so one method takes both spellings.
+function Solid(; ρ=nothing, cₚ=nothing, κ=nothing, density=ρ, specific_heat=cₚ, conductivity=κ)
+    props = (density, specific_heat, conductivity)
+    any(isnothing, props) && throw(ArgumentError("Solid needs a density, specific heat and conductivity"))
+    return Solid(props...)
+end
 
 density(s::Solid) = s.ρ
 specific_heat(s::Solid) = s.cₚ

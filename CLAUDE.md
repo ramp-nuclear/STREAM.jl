@@ -102,8 +102,6 @@ src/
   geometry.jl                 # PipeGeometry struct + PipeGeometry_rectangular, PipeGeometry_circular
   knobs.jl                    # @design_knob, knob_defaults
   dimensionless.jl            # Re, Pr, Nu, Pe, Gr, Ra, including the (liquid, T) forms
-  assembly.jl                 # assembly, port, var_length: composing systems and reaching
-                              # per-cell ports, usable from every submodule
   substances/                 # module Substances
     liquid.jl                 # AbstractLiquid interface, Liquid snapshot, unicode aliases (ρ, cₚ, μ, κ, β, Tsat)
     light_water.jl            # LightWater / H2O correlations
@@ -142,6 +140,10 @@ src/
                               # with LogLinear/Linear sample interpolation
     source.jl                 # DecayHeatSource: MeV/fission to power, and the trip clock
   assemblies/                 # module Assemblies
+    port.jl                   # port, var_length: reach per-cell connectors. Loaded by
+                              # STREAM before Components, so every module can use it
+    assembly.jl               # assembly: compose components with a nested connection list,
+                              # loaded the same way
     connections.jl            # module Assemblies.Connect: face, faces,
                               # temperature_feedback, inseries, inparallel, weighted
                               # (and _FlowWeight, the private component weighted places)

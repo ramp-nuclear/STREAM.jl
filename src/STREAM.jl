@@ -78,7 +78,10 @@ using .Substances
 include("knobs.jl")
 include("geometry.jl")
 include("dimensionless.jl")
-include("assembly.jl")
+# Composition helpers every module uses. The files sit with Assemblies, the module that
+# builds on them, but load here, before Components needs them.
+include("assemblies/port.jl")
+include("assemblies/assembly.jl")
 
 """
     STREAM.HTC
