@@ -19,7 +19,7 @@ Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
 | [`Substances`](@ref) | coolants and their property correlations |
 | [`HTC`](@ref) | wall heat transfer models and Nusselt correlations |
 | [`Friction`](@ref) | Darcy friction factor models and correlations |
-| [`LocalLoss`](@ref) | Idelchik minor losses for sudden area changes |
+| [`LocalLoss`](@ref) | Idelchik minor losses for sudden area changes, and discharge coefficients |
 | [`Thresholds`](@ref) | safety limits and the post-solve analysis that applies them |
 | [`Components`](@ref) | the MTK components a model is built from |
 | [`DecayHeat`](@ref) | decay heat contributions and the standards behind them |
@@ -170,11 +170,15 @@ inside an MTK equation.
 
 The drop has the same quadratic form as `Friction.darcy_weisbach_dp` without the `L/Dh` factor.
 [`LocalPressureDrop`](@ref) is the component wrapping it.
+
+The discharge coefficient of a hole, which an [`Orifice`](@ref) is given, lives here too:
+[`discharge_cd`](@ref) by geometry, and [`lichtarowicz_cd`](@ref) at finite Reynolds number.
 """
 module LocalLoss
 using ModelingToolkit
 include("local_loss.jl")
 export dp, sudden_expansion_factor, sudden_contraction_factor
+export discharge_cd, lichtarowicz_cd
 end
 
 """
@@ -191,7 +195,8 @@ either its raw arguments or a [`ChannelState`](@ref).
 `NonlinearSolution` or an `ODESolution`. [`threshold_analysis`](@ref) builds one, at every
 saved time for a transient, and applies the functions you name. [`chfr`](@ref) builds a
 CHF-ratio closure with face selection and a zero-flux guard, and [`worst_case`](@ref) finds
-the smallest margin and where and when it occurs.
+the smallest margin and where and when it occurs. [`cavitation`](@ref) names the orifice
+throats that reached saturation during a run.
 
 Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAndContacts`, not
 `ChannelHeatFlux`.
@@ -207,7 +212,7 @@ include("thresholds/thresholds.jl")
 include("thresholds/analysis.jl")
 export bergles_rohsenow_t_onb, q_boiling_onset, q_OFI_whittle_forgan, q_OSV_saha_zuber
 export q_CHF_sudo_kaminaga, q_CHF_mirshak, q_CHF_fabrega, twall_limit
-export ChannelState, threshold_analysis, chfr, worst_case
+export ChannelState, threshold_analysis, chfr, worst_case, cavitation
 end
 
 """
@@ -236,6 +241,9 @@ Components state equations and consume their physics from [`HTC`](@ref), [`Frict
 - **Boundary conditions.** [`HeatExchanger`](@ref), [`ConstantTemperature`](@ref),
   [`ConvectiveBoundary`](@ref). A `Channel` wall or a `ChannelHeatFlux` flux needs no
   component: bind it in the connection list, `ch.T_wall_left .~ T`.
+- **Loss of coolant.** [`Tank`](@ref), a free-surface inventory whose level sets the pressure
+  at each connection; [`Environment`](@ref), the ambient a break discharges into; and
+  [`Orifice`](@ref), the break itself, sealed until its machine opens it.
 
 `Base.Channel` also exists, so `using STREAM.Components` leaves `Channel` ambiguous. Import it
 explicitly with `using STREAM.Components: Channel`, or qualify it.
@@ -260,7 +268,8 @@ include("components/state_machine.jl")
 include("components/connectors.jl")
 include("components/twoports.jl")
 include("components/pump.jl")
-include("components/flapper.jl")
+include("components/valves.jl")
+include("components/tank.jl")
 include("components/resistors.jl")
 include("components/ideal.jl")
 include("components/sources.jl")
@@ -276,6 +285,7 @@ export ConvectiveBoundary, HeatDiffusion, Slab, Cylinder
 export PointKinetics, point_kinetics_steady_state, U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 export ReactivityController
 export StateMachine, StateSchedule, trip!, reset!, machine_callbacks
+export Tank, Environment, Orifice
 end
 
 """
@@ -412,7 +422,8 @@ The module is not exported. Reach a builder as `STREAM.Examples.build_loop`, or 
 with `using STREAM.Examples`.
 
 Most builders return a compiled `System`. `build_loop_pk` returns `(ssys, ic)`, the compiled
-system together with a matching operating point ready for `solve_transient`.
+system together with a matching operating point ready for `solve_transient`, and
+`build_pool_break` returns the compiled system with the machine that stops it at core uncovery.
 """
 module Examples
 using ModelingToolkit
@@ -424,9 +435,10 @@ using ..Components: Channel
 using ..Assemblies
 using ..HTC
 using ..Friction
+using ..LocalLoss: discharge_cd
 include("examples.jl")
 export build_loop, build_loop_vertical, build_loop_transient, build_cube
-export build_loop_lof_bypass, build_loop_pk
+export build_loop_lof_bypass, build_loop_pk, build_pool_break
 end
 
 # The public surface. Everything not listed here is reached through its module.

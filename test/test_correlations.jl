@@ -533,3 +533,11 @@ end
     @test isapprox(fwd, STREAM.LocalLoss.sudden_expansion_factor(aratio, re); rtol=1e-12)
     @test isapprox(rev, STREAM.LocalLoss.sudden_contraction_factor(aratio, re); rtol=1e-12)
 end
+
+@testset "Discharge through a hole: Python's doctest values" begin
+    @test LocalLoss.discharge_cd(:sharp) == 0.61
+    @test LocalLoss.discharge_cd(:borda) == 0.51
+    @test_throws ArgumentError LocalLoss.discharge_cd(:jagged)
+    @test LocalLoss.lichtarowicz_cd(2e4, 2.0) ≈ 0.8088165976866 rtol = 1e-12
+    @test LocalLoss.lichtarowicz_cd(100.0, 2.0) ≈ 0.4284155081876958 rtol = 1e-12
+end

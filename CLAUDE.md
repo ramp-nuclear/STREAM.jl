@@ -114,7 +114,8 @@ src/
   friction/                   # module Friction
     correlations.jl           # Darcy friction factor correlations (Reynolds-only)
     darcy.jl                  # AbstractDarcyFactor: the wall friction model a channel or resistor gets
-  local_loss.jl               # module LocalLoss: Idelchik sudden expansion / contraction
+  local_loss.jl               # module LocalLoss: Idelchik sudden expansion / contraction,
+                              # discharge coefficients
   thresholds/                 # module Thresholds
     thresholds.jl             # CHF, OFI, OSV, ONB, wall-temperature limit correlations
     analysis.jl               # ChannelState + the post-solve threshold methods
@@ -122,7 +123,8 @@ src/
     connectors.jl             # FlowPort, ThermalPort acausal connectors
     twoports.jl               # HydraulicTwoPort, shared by the two-port components
     pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
-    flapper.jl                # Flapper
+    valves.jl                 # Flapper, Orifice, and the valve core they share
+    tank.jl                   # Tank, Environment (free-surface nodes)
     resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
                               # VolumetricFlowResistor, LocalPressureDrop
     ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
@@ -153,7 +155,8 @@ src/
   initial_conditions.jl       # steady_state_guess, uniform
   utilities.jl                # module Utilities: rebin_*, cosine_shape, cosine_power_shape,
                               # cosine_T_wall_profile, x_boundaries
-  examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk
+  examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk,
+                              # build_pool_break
 ```
 
 **Where new code goes:**
@@ -180,7 +183,8 @@ test/
   test_channels.jl          # Channel/CHF/CAC variants + _channel_core enthalpy-form physics
                             # + flow-reversal sign safety + subcooled-boiling integration (ISCB)
   test_pump.jl              # Pump
-  test_flapper.jl           # Flapper
+  test_valves.jl            # Flapper, Orifice
+  test_tank.jl              # Tank, Environment
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
   test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, ConvectiveBoundary
   test_heat_diffusion.jl    # HeatDiffusion, Slab, Cylinder: ports, power, and closed-form
@@ -200,7 +204,8 @@ test/
   test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
   test_initial_conditions.jl # steady_state_guess, uniform (src/initial_conditions.jl)
   test_solvers.jl           # solve_steady/solve_transient wrappers (src/solvers.jl)
-  test_examples.jl          # build_loop* / build_cube builders + loss-of-flow transient (src/examples.jl)
+  test_examples.jl          # build_loop* / build_cube / build_pool_break builders
+                            # + loss-of-flow transient (src/examples.jl)
   test_validation.jl        # Quantitative cross-validation against Python STREAM
   test_integration.jl       # STRICT 1:1 port of Python tests/test_general/test_integrations.py —
                             # exactly the 21 Python integration tests, nothing else

@@ -248,6 +248,44 @@ function worst_case(margin::AbstractVector; times=nothing)
 end
 
 """
+    cavitation(sol, orifices...) -> Vector{NamedTuple}
+
+The orifices whose throat reached saturation during a run, with when and how far.
+
+Only an `Orifice` built with a contraction coefficient `cc` reports its throat subcooling, the
+saturation temperature at the vena contracta pressure less the liquid temperature. A siphon
+crest is checked by putting the orifice there.
+
+# Arguments
+- `sol`: a steady (`NonlinearSolution`) or transient (`ODESolution`) solution
+- `orifices`: the orifices to check, as subsystems of the compiled model, such as `ssys.breach`
+
+# Returns
+One `(site, time, margin)` per orifice whose subcooling fell to zero or below: its name, the
+first saved time it did (`nothing` for a steady solution), and the smallest subcooling [K].
+Orifices that stayed subcooled are left out, so an empty vector means no cavitation.
+
+# Throws
+- `ArgumentError`: for an orifice built without `cc`, or another component
+"""
+function cavitation(sol, orifices...)
+    crossings = @NamedTuple{site::Symbol, time::Union{Float64,Nothing}, margin::Float64}[]
+    transient = hasproperty(sol, :t)
+    for orifice in orifices
+        hasproperty(orifice, :subcooling) || throw(ArgumentError(
+            "$(nameof(orifice)) reports no subcooling: build the Orifice with a contraction " *
+            "coefficient `cc`",
+        ))
+        margins = transient ? sol[orifice.subcooling] : [sol[orifice.subcooling]]
+        worst = minimum(margins)
+        worst <= 0 || continue
+        time = transient ? Float64(sol.t[findfirst(<=(0), margins)]) : nothing
+        push!(crossings, (site=nameof(orifice), time=time, margin=Float64(worst)))
+    end
+    return crossings
+end
+
+"""
     chfr(chf_fn; direction=:max) -> Function
 
 Factory that returns a CHF ratio (CHFR) closure with directional heat flux selection
