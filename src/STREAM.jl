@@ -250,6 +250,7 @@ using SymbolicIndexingInterface: getsym, ProblemState
 using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
+using ..STREAM: assembly, port
 using ..HTC
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
