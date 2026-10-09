@@ -162,8 +162,8 @@ const CD_SHARP = discharge_cd(:sharp)
 function _orifice_between_ambients(orifice; dp=2e4)
     @named upstream = Environment(; p=ATM + dp, T=T_POOL)
     @named downstream = Environment()
-    conns = [connect(upstream.port, orifice.inlet), connect(orifice.outlet, downstream.port)]
-    @named sys = assembly(conns, upstream, orifice, downstream)
+    @named sys = assembly(inseries(upstream.port, orifice, downstream.port),
+                          upstream, orifice, downstream)
     return mtkcompile(sys)
 end
 
@@ -188,12 +188,8 @@ function _siphon(; T0=T_POOL, breaker=nothing, open_rate=10.0)
     @named climb = Gravity(z_crest - z_intake)
     @named fall = Gravity(z_outlet - z_crest)
     @named ambient = Environment(; T=T0)
-    conns = [
-        connect(pool.intake, climb.inlet),
-        inseries(climb, breach, fall),
-        connect(fall.outlet, ambient.port),
-    ]
-    @named sys = assembly(conns, pool, climb, breach, fall, ambient)
+    @named sys = assembly(inseries(pool.intake, climb, breach, fall, ambient.port),
+                          pool, climb, breach, fall, ambient)
     watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))
     push!(watch, (:INTACT => :UNCOVERED, pool.L < 0.2, "uncovered"))
     throat = StateMachine(; initial_state=:LIQUID)
@@ -238,8 +234,8 @@ end
         @named ambient_high = Environment()
         @named ambient_low = Environment()
         conns = [
-            connect(pool.high, high.inlet), connect(high.outlet, ambient_high.port),
-            connect(pool.low, low.inlet), connect(low.outlet, ambient_low.port),
+            inseries(pool.high, high, ambient_high.port),
+            inseries(pool.low, low, ambient_low.port),
         ]
         @named sys = assembly(conns, pool, high, low, ambient_high, ambient_low)
         ssys = mtkcompile(sys)

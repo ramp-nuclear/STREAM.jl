@@ -496,22 +496,21 @@ function build_pool_break(;
     parts = Any[pool, core, pump, breach, ambient]
 
     connections = if break_at === :bottom
-        [
-            connect(pool.suction, core.inlet),
+        Any[
+            inseries(pool.suction, core),
             connect(core.outlet, pump.inlet, breach.inlet),
-            connect(pump.outlet, pool.inflow),
+            inseries(pump, pool.inflow),
         ]
     else
         @named suction_line = Resistor(R_suction)
         push!(parts, suction_line)
-        [
-            connect(pool.suction, suction_line.inlet),
+        Any[
+            inseries(pool.suction, suction_line),
             connect(suction_line.outlet, pump.inlet, breach.inlet),
-            inseries(pump, core),
-            connect(core.outlet, pool.inflow),
+            inseries(pump, core, pool.inflow),
         ]
     end
-    push!(connections, connect(breach.outlet, ambient.port))
+    push!(connections, inseries(breach, ambient.port))
 
     @named sys = assembly(connections, parts...)
     watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))

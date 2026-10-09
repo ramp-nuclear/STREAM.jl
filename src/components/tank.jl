@@ -70,7 +70,8 @@ among the machine's `abort_states` to stop the run there.
 - `g`: gravitational acceleration [m/s²] (default [`G_EARTH`](@ref))
 
 # Ports
-One `FlowPort` per entry of `ports`, named as in it.
+One `FlowPort` per entry of `ports`, named as in it. A port can start or end an
+[`inseries`](@ref) chain, `inseries(pool.bottom, breach, ambient.port)`.
 
 # Returns
 Uncompiled `System` with the level `L`, the temperature `T`, the inventory `M = ρ·V(L)` [kg],
@@ -150,7 +151,11 @@ const _TANK_PIN_TIME = 1.0
 The ambient a loop discharges into: a dead end held at a known pressure. Liquid leaving through
 it is gone. Liquid drawn back in arrives at temperature `T`.
 
-A break discharges into one of these through an [`Orifice`](@ref).
+A break discharges into one of these through an [`Orifice`](@ref):
+
+```julia
+inseries(pool.bottom, breach, ambient.port)
+```
 
 # Arguments
 - `name`: system name (Symbol), injected by `@named`

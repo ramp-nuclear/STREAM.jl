@@ -30,9 +30,7 @@ _cumulative_trapezoid(y, ts) = [0.0; cumsum((y[1:(end - 1)] .+ y[2:end]) ./ 2 .*
 """A tank with a hole in its bottom that discharges to the atmosphere, uncompiled."""
 function _tank_with_break(pool, breach)
     @named ambient = Environment()
-    @named sys = assembly([connect(pool.bottom, breach.inlet),
-                           connect(breach.outlet, ambient.port)],
-                          pool, breach, ambient)
+    @named sys = assembly(inseries(pool.bottom, breach, ambient.port), pool, breach, ambient)
     return sys
 end
 
@@ -49,11 +47,7 @@ end
         @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(bottom=0.0, side=1.5), T0=T_POOL,
                            g=g_mars)
         @named breach = Orifice(; area=A_HOLE, cd=CD_SHARP)
-        @named ambient = Environment()
-        @named sys = assembly([connect(pool.bottom, breach.inlet),
-                               connect(breach.outlet, ambient.port)],
-                              pool, breach, ambient)
-        ssys = mtkcompile(sys)
+        ssys = mtkcompile(_tank_with_break(pool, breach))
         sol = solve_steady(ssys)
         rho_g = ρ(H2O, T_POOL) * g_mars
         @test sol[ssys.pool.L] ≈ L_POOL
@@ -148,9 +142,7 @@ end
         @named wide = Tank(; area=A_wide, L0=L_wide, ports=(bottom=0.0,), T0=T_POOL)
         @named narrow = Tank(; area=A_narrow, L0=L_narrow, ports=(bottom=0.0,), T0=T_POOL)
         @named pipe = Resistor(R)
-        @named sys = assembly([connect(wide.bottom, pipe.inlet),
-                               connect(pipe.outlet, narrow.bottom)],
-                              wide, pipe, narrow)
+        @named sys = assembly(inseries(wide.bottom, pipe, narrow.bottom), wide, pipe, narrow)
         ssys = mtkcompile(sys)
         sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 1000.0; length=201);
                               overrides=[ssys.wide.pinned => false, ssys.narrow.pinned => false])
@@ -181,11 +173,8 @@ end
                                machine=StateMachine(; initial_state=:OPEN, initial_time=0.0))
         @named ambient = Environment()
         conns = [
-            connect(supply.port, feed.inlet),
-            inseries(feed, heater),
-            connect(heater.outlet, pool.feed),
-            connect(pool.bottom, drain.inlet),
-            connect(drain.outlet, ambient.port),
+            inseries(supply.port, feed, heater, pool.feed),
+            inseries(pool.bottom, drain, ambient.port),
         ]
         @named sys = assembly(conns, pool, supply, feed, heater, drain, ambient)
         ssys = mtkcompile(sys)
