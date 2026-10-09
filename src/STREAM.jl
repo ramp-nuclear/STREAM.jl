@@ -370,7 +370,7 @@ export inseries, inparallel, weighted, face, faces, temperature_feedback
 end
 using .Connect
 
-include("assemblies/assemblies.jl")
+include("assemblies/concrete_assemblies.jl")
 export Connect
 export inseries, inparallel, weighted, face, faces, port, temperature_feedback
 export check_gravity_mismatch

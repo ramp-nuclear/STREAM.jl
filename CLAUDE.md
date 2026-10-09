@@ -147,7 +147,7 @@ src/
     connections.jl            # module Assemblies.Connect: face, faces,
                               # temperature_feedback, inseries, inparallel, weighted
                               # (and _FlowWeight, the private component weighted places)
-    assemblies.jl             # check_gravity_mismatch, symmetric_plate,
+    concrete_assemblies.jl    # check_gravity_mismatch, symmetric_plate,
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
   initial_conditions.jl       # steady_state_guess, uniform
@@ -159,7 +159,7 @@ src/
 **Where new code goes:**
 - New component (single MTK component) → `src/components/` in the most relevant file, or a new file if it's a new domain
 - New correlation → the module that owns that physics: a Nusselt number into `src/htc/correlations.jl`, a friction factor into `src/friction/correlations.jl`, a local loss into `src/local_loss.jl`, a safety limit into `src/thresholds/thresholds.jl`
-- New wiring verb → `src/assemblies/connections.jl` (inside `Connect`); a named arrangement → `src/assemblies/assemblies.jl`
+- New wiring verb → `src/assemblies/connections.jl` (inside `Connect`); a named arrangement → `src/assemblies/concrete_assemblies.jl`
 - Prefer `Connect.face(...)` over a bare `face(...)`, but leave `inseries`, `inparallel` and `port` unqualified: the first two are used constantly and `port` is a getter that reads clearly on its own
 - New decay heat contribution → `src/decay_heat/`, in the file matching the Python module it mirrors
 - New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the nine `AbstractLiquid` property methods
