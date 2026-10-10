@@ -6,7 +6,8 @@
 Reach one element of an indexed connector array, or one variable across all of its elements.
 
 Per-cell thermal faces are separate subsystems named `thermal_left1 … thermal_leftn`, so
-reaching cell `i` means building the name. [`face`](@ref) and [`faces`](@ref) are built on this.
+reaching cell `i` means building the name. [`face`](@ref STREAM.Assemblies.Connect.face)
+and [`faces`](@ref STREAM.Assemblies.Connect.faces) are built on this.
 
 # Arguments
 - `sys`: MTK system instance

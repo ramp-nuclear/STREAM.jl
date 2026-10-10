@@ -6,16 +6,16 @@ reaches only the ones above it in this list:
 | Module | What lives there |
 |:---|:---|
 | [Top level](stream.md) | geometry, dimensionless numbers, constants, design knobs |
-| [`Substances`](substances.md) | coolants and their property correlations |
+| [`Substances`](substances.md) | coolants and their property correlations, and the solids fuel is made of |
 | [`HTC`](htc.md) | wall heat transfer models and Nusselt correlations |
 | [`Friction`](friction.md) | Darcy friction factor models and correlations |
-| [`LocalLoss`](local_loss.md) | minor losses at sudden area changes |
+| [`LocalLoss`](local_loss.md) | minor losses at sudden area changes, and the discharge coefficients of holes |
 | [`Thresholds`](thresholds.md) | safety limits, and the analysis that applies them to a solution |
 | [`Components`](components.md) | the components a model is built from |
 | [`DecayHeat`](decay_heat.md) | decay heat contributions, and the source that feeds them to a model |
 | [`Assemblies`](assemblies.md) | wiring verbs and ready-made arrangements of components |
 | [Solvers](solvers.md) | steady and transient solves, and initial guesses |
-| [`Utilities`](utilities.md) | resampling between meshes and axial profiles |
+| [`Utilities`](utilities.md) | resampling between meshes, axial profiles, and the mesh of a clad plate |
 | [`Examples`](examples.md) | complete models built in one call |
 
 `using STREAM` brings in the module names and the most common functions, so a name is written

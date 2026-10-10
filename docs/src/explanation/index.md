@@ -18,9 +18,11 @@ choosing them implies for a result. They are for reading, not for following step
 - [The coolant channel](channel.md): the energy and momentum balances of a cooled channel
 - [Wall heat transfer](heat_transfer.md): single-phase convection and subcooled boiling
 - [Pressure drop](pressure_drop.md): friction, local losses, gravity and inertia
-- [Heat conduction in a fuel plate](conduction.md): the finite-difference plate
+- [Heat conduction in fuel](conduction.md): plates and rods, clad and with contact
+  resistances, on a finite-volume mesh
 - [Point kinetics and feedback](point_kinetics.md): reactor power and its temperature feedback
 - [Decay heat](decay_heat.md): the power that remains after shutdown
+- [Loss of coolant](loca.md): tanks, breaks and the steady state of a free surface
 - [Events and control](events.md): trips and state machines
 
 **Thermal-hydraulic limits**

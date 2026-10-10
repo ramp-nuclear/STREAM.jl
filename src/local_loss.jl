@@ -230,6 +230,12 @@ The discharge coefficient.
 
 # Throws
 `ArgumentError` for a geometry not in the table.
+
+# Examples
+```jldoctest
+julia> LocalLoss.discharge_cd(:sharp)
+0.61
+```
 """
 function discharge_cd(geometry::Symbol)
     haskey(_DISCHARGE_CD, geometry) || throw(ArgumentError(
@@ -239,14 +245,19 @@ function discharge_cd(geometry::Symbol)
     return _DISCHARGE_CD[geometry]
 end
 
-"""
+@doc raw"""
     lichtarowicz_cd(Re, L_over_d) -> Float64
 
 The discharge coefficient of a parallel-bore orifice at finite Reynolds number, after
-Lichtarowicz, Duggins and Markland (1965):
+[Lichtarowicz1965](@cite):
 
-    C_du = 0.827 − 0.0085·L/d
-    1/C_d = 1/C_du + (20/Re)·(1 + 2.25·L/d) − 0.005·(L/d) / (1 + 7.5·log10(1.5e-4·Re)²)
+```math
+\begin{aligned}
+C_{du} &= 0.827 - 0.0085 L/d \\
+1/C_d &= 1/C_{du} + (20/Re) (1 + 2.25 L/d)
+         - 0.005 (L/d) / (1 + 7.5 (\log_{10}(1.5 \times 10^{-4} Re))^2)
+\end{aligned}
+```
 
 `C_du` is the high Reynolds limit, which `C_d` approaches from below as the viscous term dies
 out. Fitted for `10 ≤ Re ≤ 2e4` and `L/d ≤ 10`; outside that it extrapolates. For a thin
@@ -258,6 +269,16 @@ plate rather than a bore, use `discharge_cd(:sharp)`.
 
 # Returns
 The discharge coefficient.
+
+# Examples
+A bore twice as long as it is wide, at three Reynolds numbers:
+```jldoctest
+julia> round.(LocalLoss.lichtarowicz_cd.([100.0, 1e3, 1e4], 2.0); digits=4)
+3-element Vector{Float64}:
+ 0.4284
+ 0.7446
+ 0.8081
+```
 """
 function lichtarowicz_cd(Re, L_over_d)
     cdu = 0.827 - 0.0085 * L_over_d

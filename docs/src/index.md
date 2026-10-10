@@ -1,10 +1,11 @@
 # STREAM.jl
 
-STREAM.jl simulates the cooling systems of research reactors: pumps, pipes, valves, coolant
-channels, fuel plates, and the reactor kinetics that set the power. You build a model out of
-components, connect them as the plant is connected, and solve it for a steady state or a
-transient. Afterwards you check the solution against the thermal-hydraulic safety limits:
-onset of boiling, flow instability and critical heat flux.
+STREAM.jl simulates the cooling systems of research reactors: pumps, pipes, valves, pools and
+tanks, coolant channels, fuel plates and rods, and the reactor kinetics that set the power.
+You build a model out of components, connect them as the plant is connected, and solve it for
+a steady state or a transient, such as a loss of flow or a loss of coolant. Afterwards you
+check the solution against the thermal-hydraulic safety limits: onset of boiling, flow
+instability and critical heat flux.
 
 It is a Julia port of the Python STREAM package
 ([source](https://github.com/ramp-nuclear/STREAM), [documentation](https://ramp-nuclear.github.io/STREAM/))

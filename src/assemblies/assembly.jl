@@ -4,8 +4,11 @@
 Compose `components` into one system joined by `connections`.
 
 `connections` may nest freely: a list can hold single equations next to the vectors
-[`inseries`](@ref), [`inparallel`](@ref), [`face`](@ref) and [`faces`](@ref) return, and
-broadcast equations such as `ch.T_wall_left .~ T_wall`, with no splatting.
+[`inseries`](@ref STREAM.Assemblies.Connect.inseries),
+[`inparallel`](@ref STREAM.Assemblies.Connect.inparallel),
+[`face`](@ref STREAM.Assemblies.Connect.face) and
+[`faces`](@ref STREAM.Assemblies.Connect.faces) return, and broadcast equations such as
+`ch.T_wall_left .~ T_wall`, with no splatting.
 
 # Arguments
 - `connections`: an `Equation`, or any vector or tuple of equations and nested collections

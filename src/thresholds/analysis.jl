@@ -254,7 +254,7 @@ The orifices whose throat reached saturation during a run, with when and how far
 
 Only an `Orifice` built with a contraction coefficient `cc` reports its throat subcooling, the
 saturation temperature at the vena contracta pressure less the liquid temperature. A siphon
-crest is checked by putting the orifice there.
+crest is checked by putting the orifice there. [Model a break](@ref) shows it on a siphon.
 
 # Arguments
 - `sol`: a steady (`NonlinearSolution`) or transient (`ODESolution`) solution

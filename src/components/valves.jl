@@ -1,10 +1,15 @@
-"""
+@doc raw"""
     Flapper(; name, f=1.0, area=1.0, open_rate=1.0, machine, open_state=:OPEN,
             open_fraction=nothing, dp_linear=1.0, liquid=H2O) -> System
 
-Passive check valve. Shut, it passes no flow. Open, it is a quadratic resistor
-`ΔP = f·ṁ·|ṁ| / (2·ρ·area²)`, and part way open it passes `xi` times that flow, where `xi` is
-the open fraction, 0 shut and 1 fully open.
+Passive check valve. Shut, it passes no flow. Open, it is a quadratic resistor,
+
+```math
+Δp = f \dot m |\dot m| / (2 ρ A^2),
+```
+
+and part way open it passes `xi` times that flow, where `xi` is the open fraction, 0 shut and 1
+fully open.
 
 The valve holds no setpoint. It is open while its [`StateMachine`](@ref) is in `open_state`
 and shut otherwise, and the machine's transitions decide when. See
@@ -61,19 +66,22 @@ function Flapper(; name, f=1.0, area=1.0, open_rate=1.0,
                   cd_of_Re=_ -> 1 / sqrt(fs[1]), extra_pars=fs)
 end
 
-"""
+@doc raw"""
     Orifice(; name, area, cd, machine, open_state=:OPEN, open_rate=10.0, dp_linear=1.0,
             cc=nothing, liquid=H2O) -> System
 
 A hole a liquid discharges through: a break in a pool wall, a breach in a pipe, or a severed
 pipe end. Open, it passes
 
-    ṁ = cd·area·sqrt(2·ρ·Δp)
+```math
+\dot m = C_d A \sqrt{2 ρ Δp}
+```
 
-with `Δp` the pressure across it. Close to `Δp = 0` the flow goes as `Δp` instead (see
-`dp_linear`), so it passes through zero smoothly and reverses when `Δp` does. What kind of
-break it is depends on where it sits in the loop, not on what it computes: discharge into an
-[`Environment`](@ref) to lose the inventory.
+with `Δp` the pressure across it. [Loss of coolant](@ref) derives it, and [Model a break](@ref)
+shows a break, a siphon breaker and the cavitation check in use. Close to `Δp = 0` the flow
+goes as `Δp` instead (see `dp_linear`), so it passes through zero smoothly and reverses when
+`Δp` does. What kind of break it is depends on where it sits in the loop, not on what it
+computes: discharge into an [`Environment`](@ref) to lose the inventory.
 
 Shut, it passes no flow and leaves the pressure across it free, so the intact loop solves with
 the break already in place. It opens and shuts with its [`StateMachine`](@ref) exactly as a
@@ -93,9 +101,9 @@ line.transitions = [(:OPEN => :SHUT, pool.L < z_breaker, "siphon breaker")]
 The orifice applies the single-phase law throughout and does not check, during the run,
 whether the liquid at its throat flashes. With a contraction coefficient `cc` it reports the
 static pressure at its vena contracta and how far the liquid there is below saturation.
-[`cavitation`](@ref) reads those after the run, at the saved times only, so a dip below
-saturation between two saved times goes unseen. To catch one as it happens, put a transition
-on the subcooling in a [`StateMachine`](@ref):
+[`cavitation`](@ref STREAM.Thresholds.cavitation) reads those after the run, at the saved
+times only, so a dip below saturation between two saved times goes unseen. To catch one as it
+happens, put a transition on the subcooling in a [`StateMachine`](@ref):
 
 ```julia
 flash = StateMachine(; initial_state=:LIQUID)

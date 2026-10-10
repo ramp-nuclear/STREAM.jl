@@ -10,6 +10,9 @@ as the [Tutorials](../tutorials/index.md) teach, and shows the shortest route to
 - [Change the coolant](coolant.md)
 - [Wire components together](wiring.md)
 - [Build a fuel assembly](fuel_assembly.md)
+- [Model a clad plate or a fuel rod](heat_structures.md)
+- [Set up a tank for the steady solve](tanks.md)
+- [Model a break](breaks.md)
 - [Drive an input from a function of time](time_inputs.md)
 - [Move a profile between meshes](rebin.md)
 
