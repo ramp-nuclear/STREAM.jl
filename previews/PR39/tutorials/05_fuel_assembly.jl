@@ -1,7 +1,7 @@
 using STREAM
-using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, ChannelAndContacts
+using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
 using STREAM.Assemblies: inseries, inparallel, fuel_assembly
-using STREAM.Utilities: cosine_shape
+using STREAM.Utilities: cosine_shape, x_boundaries
 using ModelingToolkit: @named, mtkcompile, unknowns
 using OrdinaryDiffEq: Rodas5P
 using SteadyStateDiffEq: DynamicSS
@@ -12,7 +12,6 @@ n = 12                         # axial cells
 L = 0.604                      # heated length [m]
 gap = 0.0021                   # channel gap [m]
 heated_width = 0.063           # width of the fuel meat [m]
-thickness = 0.00127            # plate thickness [m]
 P_plate = 15.0e6 / (24 * 7)    # 15 MW over a core of 24 assemblies of 7 plates [W]
 T_in = 35.0                    # inlet temperature [°C]
 p_out = 1.67e5                 # pressure at the channel outlets, under the pool [Pa]
@@ -22,12 +21,14 @@ geometry = PipeGeometry_rectangular(L, 0.0666, gap, heated_width)
 
 n_clad, n_meat = 1, 3
 nx = n_meat + 2n_clad
+clad, meat = Solid(2700.0, 900.0, 250.0), Solid(3000.0, 800.0, 100.0)
+in_meat = permutedims(n_clad .< (1:nx) .<= n_clad + n_meat)      # 1 × nx
+x_edges = x_boundaries(n_clad, n_meat, 0.38e-3, 0.51e-3)
 z_edges = range(0.0, L; length=n + 1)
-shape = zeros(n, nx)
-shape[:, n_clad+1:n_clad+n_meat] .= cosine_shape(z_edges, π / 2) ./ n_meat
-plates = [HeatDiffusion(; name=Symbol(:p, j), nz=n, nx, Lz=L, Lx=thickness, y=heated_width,
-                        rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P_plate,
-                        power_shape=shape)
+plate = Slab(; x=x_edges, z=z_edges, y=heated_width,
+             material=repeat(ifelse.(in_meat, meat, clad), n, 1))
+shape = (cosine_shape(z_edges, π / 2) ./ n_meat) .* in_meat
+plates = [HeatDiffusion(plate; name=Symbol(:p, j), power=P_plate, power_shape=shape)
           for j in 1:n_plates];
 
 channels = [ChannelAndContacts(; name=Symbol(:c, i), n, geometry, g=-G_EARTH)
@@ -84,20 +85,20 @@ end
 axislegend(ax; position=:lt)
 fig
 
-x_edges = [0.0]
+across = [0.0]
 columns = Vector{Vector{Float64}}()
 for i in 1:n_channels
-    push!(x_edges, x_edges[end] + gap)
+    push!(across, across[end] + gap)
     push!(columns, sol[C(i).T])
     i <= n_plates || continue
     for m in 1:nx
-        push!(x_edges, x_edges[end] + thickness / nx)
+        push!(across, across[end] + diff(x_edges)[m])
         push!(columns, [sol[Pl(i).T[k, m]] for k in 1:n])
     end
 end
 fig = Figure(size=(650, 500))
 ax = Axis(fig[1, 1]; xlabel="across the assembly [mm]", ylabel="distance from the inlet [m]")
-hm = heatmap!(ax, 1000 .* x_edges, collect(z_edges), reduce(hcat, columns)'; colormap=:hot)
+hm = heatmap!(ax, 1000 .* across, collect(z_edges), reduce(hcat, columns)'; colormap=:hot)
 Colorbar(fig[1, 2], hm; label="temperature [°C]")
 fig
 

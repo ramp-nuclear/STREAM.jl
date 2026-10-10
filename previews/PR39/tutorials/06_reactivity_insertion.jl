@@ -1,5 +1,6 @@
 using STREAM
-using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, ChannelAndContacts, PointKinetics
+using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts,
+                         PointKinetics
 using STREAM.Assemblies: inseries, symmetric_plate, temperature_feedback
 using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile
@@ -11,8 +12,9 @@ geometry = PipeGeometry_rectangular(L, 0.067, 0.0024, 0.063)
 shape = repeat(cosine_shape(range(0.0, L; length=n + 1), 1.4) ./ nx, 1, nx)
 
 function unit_cell(; power)
-    @named fuel = HeatDiffusion(; nz=n, nx, Lz=L, Lx=0.00127, y=0.063, rho_s=2700.0,
-                                cp_s=900.0, k_s=180.0, power, power_shape=shape)
+    plate = Slab(; x=range(0.0, 0.00127; length=nx + 1), z=range(0.0, L; length=n + 1),
+                 y=0.063, material=Solid(2700.0, 900.0, 180.0))
+    @named fuel = HeatDiffusion(plate; power, power_shape=shape)
     @named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
     @named cell = symmetric_plate(ch, fuel)
     @named pump = Pump(; ṁ0=0.4)

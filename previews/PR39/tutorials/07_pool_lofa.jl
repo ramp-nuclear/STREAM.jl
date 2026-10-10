@@ -1,6 +1,6 @@
 using STREAM
 using STREAM.Components: Pump, Inertia, ResistorFromKnownPoint, HeatExchanger, Channel,
-                         ChannelAndContacts, HeatDiffusion, Flapper, PointKinetics,
+                         ChannelAndContacts, HeatDiffusion, Slab, Flapper, PointKinetics,
                          ReactivityController, StateMachine, machine_callbacks,
                          U235_LAMBDA, U235_BETA_K, U235_LAMBDA_K
 using STREAM.Assemblies: inseries, inparallel, weighted, symmetric_plate
@@ -56,10 +56,10 @@ for (key, ty) in pairs(case.types)
     darcy = Friction.RegimeDependent(; turbulent=Friction.blasius,
                                      k_R=Friction.rectangular_correction(geom.depth / geom.width))
     @named ch = ChannelAndContacts(; n=case.n, geometry=geom, g=-G_EARTH, htc, darcy)
-    @named fuel = HeatDiffusion(; nz=case.n, nx=case.nx, Lz=case.L, Lx=ty.plate_thickness,
-                                y=ty.heated_width, rho_s=case.rho_s, cp_s=case.cp_s, k_s=case.k_s,
-                                power_shape=repeat(cosine_shape(z_edges, ty.ppf) ./ case.nx, 1, case.nx),
-                                T0=case.T_pool)
+    plate = Slab(; x=range(0.0, ty.plate_thickness; length=case.nx + 1), z=z_edges,
+                 y=ty.heated_width, material=Solid(case.rho_s, case.cp_s, case.k_s))
+    @named fuel = HeatDiffusion(plate; T0=case.T_pool,
+                                power_shape=repeat(cosine_shape(z_edges, ty.ppf) ./ case.nx, 1, case.nx))
     rods = symmetric_plate(ch, fuel; name=key)
     pool = HeatExchanger(case.T_pool; name=Symbol(:pool_, key))
     orifice = ResistorFromKnownPoint(; name=Symbol(:orifice_, key), dp=-ty.orifice_dp,

@@ -1,5 +1,5 @@
 using STREAM
-using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, ChannelAndContacts
+using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
 using STREAM.Assemblies: inseries, symmetric_plate
 using STREAM.Thresholds
 using STREAM.Utilities: cosine_shape
@@ -19,9 +19,11 @@ T_in, p_in = 40.0, 1.7e5 # inlet temperature [°C] and pressure [Pa]
 geometry = PipeGeometry_rectangular(L, width, gap, heated_width)
 
 z_edges = range(0.0, L; length=n + 1)
+aluminium = Solid(2700.0, 900.0, 180.0)      # density, specific heat, conductivity
+plate = Slab(; x=range(0.0, thickness; length=nx + 1), z=z_edges, y=heated_width,
+             material=aluminium)
 shape = repeat(cosine_shape(z_edges, 1.4) ./ nx, 1, nx)
-@named fuel = HeatDiffusion(; nz=n, nx, Lz=L, Lx=thickness, y=heated_width,
-                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P, power_shape=shape);
+@named fuel = HeatDiffusion(plate; power=P, power_shape=shape);
 
 @named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH);
 
