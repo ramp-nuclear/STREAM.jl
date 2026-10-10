@@ -6,7 +6,7 @@ steady-state margins asked for most days.
 
 There are two Python references. `main` is 13,585 lines across 62 modules. The `stream-next`
 branch, 20,787 lines across 79 and not yet merged, fixes a set of correlations and adds loss of
-coolant, a steady-state guess toolkit and plotting. STREAM.jl is 7,620 lines across 40 files.
+coolant, a steady-state guess toolkit and plotting. STREAM.jl is 8,221 lines across 42 files.
 
 Everything here was checked against both sources rather than inferred from names. What was
 checked and found equivalent is listed at the end, so nobody has to re-derive it.
@@ -16,14 +16,13 @@ checked and found equivalent is listed at the end, so nobody has to re-derive it
 - [Where things stand](#where-things-stand)
 - [In review](#in-review)
 - [What remains](#what-remains)
-  1. [Loss of coolant to core uncovery](#1-loss-of-coolant-to-core-uncovery)
-  2. [Fuel heat conduction](#2-fuel-heat-conduction)
-  3. [Saturation stop and range checks](#3-saturation-stop-and-range-checks)
-  4. [Thresholds](#4-thresholds)
-  5. [Power shapes](#5-power-shapes)
-  6. [Hydraulic components](#6-hydraulic-components)
-  7. [Debugging and drawing a model](#7-debugging-and-drawing-a-model)
-  8. [Uncertainty quantification](#8-uncertainty-quantification)
+  1. [Loss of coolant: the benchmark and the pressure anchor](#1-loss-of-coolant-the-benchmark-and-the-pressure-anchor)
+  2. [Saturation stop and range checks](#2-saturation-stop-and-range-checks)
+  3. [Thresholds](#3-thresholds)
+  4. [Power shapes](#4-power-shapes)
+  5. [Hydraulic components](#5-hydraulic-components)
+  6. [Debugging and drawing a model](#6-debugging-and-drawing-a-model)
+  7. [Uncertainty quantification](#7-uncertainty-quantification)
 - [Not planned](#not-planned)
 - [Deliberate departures from Python](#deliberate-departures-from-python)
 - [Following Python where the physics is open](#following-python-where-the-physics-is-open)
@@ -34,11 +33,11 @@ checked and found equivalent is listed at the end, so nobody has to re-derive it
 
 | Case | Python | STREAM.jl | What is missing |
 |---|---|---|---|
-| Steady margins, plate fuel | Yes | Yes | Only the plain Saha-Zuber form ([4](#4-thresholds)) |
+| Steady margins, plate fuel | Yes | Yes | Only the plain Saha-Zuber form ([3](#3-thresholds)) |
 | LOFA | Partly, see below | Yes | Nothing |
-| RIA, plate fuel | Yes | Partly | Axial conduction and a clad plate ([2](#2-fuel-heat-conduction)), the blister limit ([4](#4-thresholds)) |
-| RIA, rod fuel | Yes | No | Cylindrical conduction and gap conductance ([2](#2-fuel-heat-conduction)), fuel enthalpy ([4](#4-thresholds)) |
-| LOCA to core uncovery | On `stream-next` | No | Tanks, breaks and the level they set ([1](#1-loss-of-coolant-to-core-uncovery)) |
+| RIA, plate fuel | Yes | Yes | The blister limit, which Python lacks too ([3](#3-thresholds)) |
+| RIA, rod fuel | Yes | Yes | Fuel enthalpy, which Python lacks too ([3](#3-thresholds)) |
+| LOCA to core uncovery | On `stream-next` | Yes | Python's multichannel benchmark ([1](#1-loss-of-coolant-the-benchmark-and-the-pressure-anchor)) |
 | LOCA past uncovery | No | No | Out of scope for both, by choice |
 
 LOFA is where Python `main` runs short. Its own benchmark on `stream-next`, run against
@@ -78,62 +77,25 @@ delete this section and move its items to the lists below:
 
 In order of what it unblocks.
 
-### 1. Loss of coolant to core uncovery
+### 1. Loss of coolant: the benchmark and the pressure anchor
 
-The goal is the pool level through a drain, up to core uncovery, with the thresholds reporting
-margin on the way and the run stopping where the model leaves its validity. Python has this on
-`stream-next`: a free-surface network, `Tank`, `Environment`, an `Orifice` break with opening
-ramps and a latching closure for siphon breakers, level-fed heads, single-phase discharge
-coefficients with closed-form drain time and level, and a post-run cavitation check.
+A pool drains to core uncovery: `Components.Tank` and `Environment`, an `Orifice` break that
+opens, and latches shut for a siphon breaker, on its `StateMachine`, the discharge correlations
+in `LocalLoss`, `Thresholds.cavitation`, and `Examples.build_pool_break`. The tests port
+Python's drain, siphon, two-hole, heated-pool and pool-break scenarios, and the Torricelli
+drain matches the closed form to 8e-5 m. Two pieces remain:
 
-MTK makes most of Python's machinery unnecessary. Python had to teach its network solver about
-free-surface nodes, since every node there conserved mass. Here a component whose volume is a
-state simply is one. What to build:
+- **Python's multichannel benchmark**, `benchmarks/lofa/loc_extension.py`: its pool drains
+  5948 kg to uncovery at 2740.6 s, with the flapper opening at 58.4 s and mass closure of
+  6e-7. It builds on the pool LOFA example, which is not on `main` yet.
+- **The tank surface as the loop's pressure anchor.** A loop with a `Tank` or an
+  `Environment` has its absolute pressure, so the hand-written `pump.inlet.p ~ 1.0e5` every
+  other example carries could go.
 
-| Piece | What it does | Lines |
-|---|---|---|
-| `Tank` | Ports at given elevations, volume and mixed temperature as states. Each port's pressure is the surface pressure plus the head above it, which also covers Python's `LevelHead` | 60–80 |
-| `Environment` | One port at a fixed pressure and temperature, the sink a break drains into | 15–20 |
-| `Orifice` | A discharge law scaled by an opening read from a `StateSchedule`, as `Flapper` is. The law needs `sign(Δp)·sqrt(abs(Δp))` smoothed near zero, as Python's `mdot_by_local_pressure_smooth` does | 40–50 |
-| Discharge correlations | `discharge_cd`, `lichtarowicz_cd`, stub discharge, `drain_time`, `drain_level`, in `LocalLoss` | 50–70 |
-| Cavitation check | Where a port or a break throat falls below saturation pressure, after the run | 30–40 |
-| Pool example | The network as a builder in `Examples` | 50–80 |
+**Size:** a few days for the benchmark, most of it matching Python's timings. The anchor is a
+sweep through the examples and tests.
 
-The events are `StateMachine` transitions: the break opening, a siphon breaker closing, and the
-level reaching the top of the core as an abort state.
-
-Two design points. A tank's level is the integral of its net flow, so a steady state is
-singular unless the level is pinned, as Python pins it; `Tank(; fixed_level=true)` makes the
-volume a parameter for the steady solve. And the tank surface becomes the loop's absolute
-pressure, replacing the hand-written `pump.inlet.p ~ 1.0e5` every example carries today.
-
-Python's own checks make good targets: a gravity drain matched to 7.6e-5 m over 3000 s, the
-closed-form drain time to 0.001%, and its benchmark pool draining 5948 kg to uncovery at
-2740.6 s with mass closure of 6e-7.
-
-**Size:** about 250 to 350 source lines and a week, plus up to three days matching Python's
-benchmark timings.
-
-### 2. Fuel heat conduction
-
-`HeatDiffusion` is one kernel: 2D Cartesian, one material, a uniform mesh, no interface
-resistance and no axial conduction. Python's `Fuel` has all of these:
-
-| Missing | Python | Why it matters |
-|---|---|---|
-| Cylindrical geometry | `r_diffusion`, `rz_diffusion`, `cylindrical_areas_volumes` | No rod fuel at all without it, the largest gap against the stated goal |
-| Axial conduction | `xz_diffusion`, `rz_diffusion` | Our slices are thermally independent. It matters at the ends of the heated length and near a partly inserted rod |
-| Per-cell material | `Solid.from_array`, `meat_indices`, `x_boundaries(clad_N, fuel_N, ...)` | A clad plate cannot be represented. Face conductivities need a harmonic mean |
-| Non-uniform mesh | `x_boundaries`, `z_boundaries` | Fine cells in the cladding, and at a rod's centre where the radial profile is steepest |
-| Contact conductance | `_resistances(dr, contacts, k)` | The pellet-clad gap dominates a rod's thermal resistance, and its closing is first-order in an RIA |
-
-Do them as one rework of `_diffusion_eqs`, with the metric, material and mesh as parameters,
-rather than touching it five times.
-
-**Size:** medium. The radial metric is spelled out in `cylindrical_areas_volumes`, and the rest
-is mechanical once the kernel takes arrays.
-
-### 3. Saturation stop and range checks
+### 2. Saturation stop and range checks
 
 The channel model ends at bulk saturation, and nothing says so during a run. `stream-next` adds:
 
@@ -147,31 +109,30 @@ The channel model ends at bulk saturation, and nothing says so during a run. `st
 
 **Size:** 100 to 130 lines, in `src/thresholds/analysis.jl` beside `threshold_analysis`.
 
-### 4. Thresholds
+### 3. Thresholds
 
 - **The plain Saha-Zuber form.** We have only the computed-bulk one. Python puts a
   `.. danger::` on the plain form and says you probably want the other, so this is for
   completeness. Trivial.
 - **RIA limits.** Peak cladding temperature and DNBR are there, through `twall_limit` and
   `chfr`. The blister temperature for aluminide and silicide plates is not, nor is a fuel
-  enthalpy accumulator, the standard rod-fuel criterion, which needs the cylindrical kernel
-  first. Python has neither. Small, after §2.
+  enthalpy accumulator, the standard rod-fuel criterion. Python has neither. Small.
 - **`heated_diameter`**, `4·area/heated_perimeter` on the geometry. Python computes it and
   never reads it. Trivial.
 
-### 5. Power shapes
+### 4. Power shapes
 
 `Utilities.cosine_shape` ports Python's, with a non-uniform mesh, cell integration, a peaking
 factor and an off-centre peak. Still missing: `cosine_shape_by_zero_endpoints`, the
 extrapolated cosine with non-zero flux at the ends that a reflected core has, and
 `uniform_x_power_shape` for the lateral direction across clad and meat. Small, pure functions.
 
-### 6. Hydraulic components
+### 5. Hydraulic components
 
 `Bend`, `Screen` and `bend_factor`, the Idelchik bend and wire-mesh screen losses. Each is
 small and independent.
 
-### 7. Debugging and drawing a model
+### 6. Debugging and drawing a model
 
 | Python | What it does | Have it? |
 |---|---|---|
@@ -189,7 +150,7 @@ equations; and a component graph from the connection vectors `inseries`, `inpara
 
 **Size:** small, and high value per line.
 
-### 8. Uncertainty quantification
+### 7. Uncertainty quantification
 
 Python has `analysis/UQ/`: finite-difference Jacobians of solution values against input
 parameters, a distributed version, uncertainty propagation, a power-shape perturbation, and
@@ -247,6 +208,14 @@ never moved, with no error. Moving the trip time into the problem's parameters f
   reached through `remake`.
 - **The flapper always opens along the C1 ramp `3y² − 2y³`**, where Python defaults to its
   legacy relaxation. The opening time is the same.
+- **A latching break closes by ramping its opening back to zero** along the same curve.
+  Python freezes the flow at the moment of closure and ramps that down instead.
+- **A tank counts only the ports flowing in** in its energy balance, switching with `ifelse`.
+  Python smooths that switch with `soft_pos`.
+- **A transient steps onto every saved time.** Python's solver reads the saved values off its
+  interpolant, which strays inside a long implicit step: 0.5 m on a draining pool level.
+  `solve_transient` passes the saved times as `tstops`, so every saved value is one the solver
+  computed.
 
 ## Following Python where the physics is open
 
@@ -263,6 +232,10 @@ stands on its own.
 Names that differ: `HTC.rohsenow_scb_heat_flux` is Python's `Bergles_Rohsenhow_SCB_heat_flux`.
 The flux is Rohsenow's (1952); Bergles and Rohsenow's (1964) part is the partial boiling
 factor, `HTC.partial_SCB_correction`.
+
+`HeatDiffusion`'s `power_shape` covers every cell, with zeros in the cladding, where Python's
+`Fuel` spreads it over the cells its `meat_indices` mark. Point-kinetics feedback likewise reads
+every cell, so give the cladding zero worth to match Python, which feeds back the meat only.
 
 ## Checked and equivalent
 
@@ -291,6 +264,9 @@ Verified as matching, so they need not be re-investigated:
   separate model is needed.
 - **Channel variants**, pump modes, geometry (bar `heated_diameter`), and the flapper's open
   resistance in both flow directions.
+- **Heat conduction.** `HeatDiffusion` reproduces the closed-form steady states of a slab, a
+  clad slab with contacts, an annulus, a solid rod and a rod with a pellet-clad gap, on uniform
+  and graded meshes, and a clad plate between two channels matches Python's steady state.
 - **Several channel types in parallel**, through `Connect.weighted`, against Python's
   `signify=50` junction.
 

@@ -210,3 +210,10 @@ end
     @test_throws ArgumentError cosine_shape([0.0, 1.0], 1.7)
     @test_throws ArgumentError cosine_shape([0.0, 1.0], 0.9)
 end
+
+@testset "x_boundaries" begin
+    # Python's mtr_geometry.x_boundaries for the same arguments.
+    @test x_boundaries(2, 3, 0.4e-3, 0.5e-3) ≈
+          [0.0, 0.0002, 0.0004, 0.0005666666666666667, 0.0007333333333333333, 0.0009, 0.0011, 0.0013]
+    @test x_boundaries(0, 4, 1.0, 2.0) ≈ 0:0.5:2
+end

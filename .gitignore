@@ -15,3 +15,6 @@ node_modules/
 docs/build/
 docs/src/tutorials/*
 !docs/src/tutorials/index.md
+
+# Drift report from older test runs; the tests no longer write it
+test/data/parity_report.csv

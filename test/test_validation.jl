@@ -2,7 +2,6 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
-using DelimitedFiles
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
@@ -12,18 +11,6 @@ using STREAM.Examples
 
 include(joinpath(@__DIR__, "parity_helpers.jl"))
 include(joinpath(@__DIR__, "data", "python_parity_reference.jl"))
-
-# CSV path + truncate-and-rewrite at file load: one fresh CSV per
-# `julia --project=. test/test_validation.jl` run; the CSV in git represents the
-# LAST run. Each parity testset thereafter calls append_csv(...; truncate=false).
-# The 3 KEPT testsets do NOT touch the CSV.
-const PARITY_CSV = joinpath(@__DIR__, "data", "parity_report.csv")
-function __init_parity_csv()
-    open(PARITY_CSV, "w") do io
-        write(io, "scenario,quantity,julia,python,abs_err,rtol,tier,hard_ceiling,note\n")
-    end
-end
-__init_parity_csv()  # called once at file load
 
 # Effective channel HTC for parity, mirroring Python STREAM's `_other_if_none`:
 # report the HTC of the HEAT-TRANSFERRING (connected) face — the side with nonzero
@@ -62,35 +49,7 @@ _h_eff(sol, cac, i) = abs(sol[cac.q_wall_left[i]]) >= abs(sol[cac.q_wall_right[i
     # Self-test 8: sign-safety
     r8 = parity_check("st", "q", -300.0, -300.0001)
     @test r8.tier == TIER_CLEAN
-    # Self-test 9: CSV roundtrip preserves rtol within %.6e precision (~6 sig figs)
-    tmp_csv = tempname() * ".csv"
-    rows_test = [r, r3, r4]
-    append_csv(tmp_csv, rows_test; truncate=true)
-    @test isfile(tmp_csv)
-    @test filesize(tmp_csv) > 100
-    readback = readdlm(tmp_csv, ',', skipstart=1)
-    @test size(readback, 1) == 3
-    for (i, original) in enumerate(rows_test)
-        recovered_rtol = readback[i, 6]
-        if original.rtol == 0.0
-            @test recovered_rtol == 0.0
-        else
-            @test isapprox(recovered_rtol, original.rtol; rtol=1e-5)
-        end
-    end
-    rm(tmp_csv; force=true)
-    # Self-test 10: append_csv truncate semantics
-    tmp_csv2 = tempname() * ".csv"
-    append_csv(tmp_csv2, rows_test; truncate=true)   # 1 header + 3 rows = 4 lines
-    n1 = countlines(tmp_csv2)
-    append_csv(tmp_csv2, rows_test; truncate=false)  # +3 rows = 7 lines
-    n2 = countlines(tmp_csv2)
-    @test n2 == n1 + 3
-    append_csv(tmp_csv2, rows_test; truncate=true)   # reset to 1 header + 3 rows = 4 lines
-    n3 = countlines(tmp_csv2)
-    @test n3 == n1
-    rm(tmp_csv2; force=true)
-    # Self-test 11: print_drift_table on empty rows doesn't crash
+    # Self-test 9: print_drift_table on empty rows doesn't crash
     empty_rows = ParityRow[]
     buf = IOBuffer()
     print_drift_table(empty_rows; io=buf)   # a throw here would fail the testset on its own
@@ -250,7 +209,6 @@ end
     end
 
     print_drift_table(rows)
-    append_csv(PARITY_CSV, rows; truncate=false)
 
     for r in rows
         @test r.tier != TIER_FAIL
@@ -279,10 +237,9 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    @named hd = HeatDiffusion(;
-        nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
-    )
+    slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named hd = HeatDiffusion(slab; power=1e4)
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
@@ -389,8 +346,64 @@ end
     end
 
     print_drift_table(rows)
-    append_csv(PARITY_CSV, rows; truncate=false)
 
+    for r in rows
+        @test r.tier != TIER_FAIL
+    end
+end
+
+# Clad MTR: the symmetric loop with a clad plate, 2 aluminium cells either side of 3 meat
+# cells, power in the meat only.
+@testset "Python parity: MTR clad" begin
+    geom_mtr = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    nz = 10
+    x = Utilities.x_boundaries(2, 3, 0.4e-3, 0.47e-3)
+    meat = repeat(permutedims(1:7 .∈ Ref(3:5)), nz)
+    @named pump_l = Pump(3.0e4)
+    @named hx_l = HeatExchanger(40.0)
+    @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
+    @named pump_r = Pump(3.0e4)
+    @named hx_r = HeatExchanger(40.0)
+    @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
+    slab = Slab(; x, z=range(0, 0.6, nz + 1), y=0.07,
+                  material=ifelse.(meat, Solid(3000.0, 800.0, 100.0), Solid(2700.0, 900.0, 250.0)))
+    @named hd = HeatDiffusion(slab; power_shape=meat ./ sum(meat), power=1e4)
+    conns = [
+        inseries(pump_l, hx_l, cac_l, pump_l),
+        pump_l.inlet.p ~ 1.0e5,
+        inseries(pump_r, hx_r, cac_r, pump_r),
+        pump_r.inlet.p ~ 1.0e5,
+        faces(
+            (hd, :thermal_left) => (cac_l, :thermal_right),
+            (hd, :thermal_right) => (cac_r, :thermal_left),
+        ),
+    ]
+    @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.cac_l.inlet.ṁ => 0.25, ssys.cac_r.inlet.ṁ => 0.25])
+    @test sol.retcode == ReturnCode.Success
+
+    dz = 0.6 / nz
+    rows = ParityRow[
+        parity_check("mtr_clad", "T_out_l", sol[ssys.cac_l.T_out], PARITY_MTR_CLAD_T_OUT_L),
+        parity_check("mtr_clad", "ṁ_l", abs(sol[ssys.cac_l.inlet.ṁ]), PARITY_MTR_CLAD_MDOT_L),
+    ]
+    for i in 1:nz
+        push!(rows, parity_check("mtr_clad", "T_l[$i]", sol[ssys.cac_l.T[i]],
+                                 PARITY_MTR_CLAD_T_CELLS_L[i]))
+        push!(rows, parity_check("mtr_clad", "T_wall_right_l[$i]",
+                                 sol[port(ssys.cac_l, :thermal_right, i).T],
+                                 PARITY_MTR_CLAD_T_WALL_RIGHT_L[i]))
+        push!(rows, parity_check("mtr_clad", "q_right_l[$i]",
+                                 sol[ssys.cac_l.q_wall_right[i]] / (geom_mtr.heated_parts[2] * dz),
+                                 PARITY_MTR_CLAD_Q_RIGHT_L[i]))
+    end
+    for z in 1:nz, j in 1:7
+        push!(rows, parity_check("mtr_clad", "T_plate[$(z)_$(j)]", sol[ssys.hd.T[z, j]],
+                                 PARITY_MTR_CLAD_T_PLATE[z, j]))
+    end
+
+    print_drift_table(rows)
     for r in rows
         @test r.tier != TIER_FAIL
     end
@@ -419,10 +432,9 @@ end
     @named pump_r = Pump(3.0e4)
     @named hx_r = HeatExchanger(T_in_r)
     @named cac_r = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    @named hd = HeatDiffusion(;
-        nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
-    )
+    slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named hd = HeatDiffusion(slab; power=1e4)
     conns = [
         inseries(pump_l, hx_l, cac_l, pump_l),
         pump_l.inlet.p ~ 1.0e5,
@@ -533,7 +545,6 @@ end
     end
 
     print_drift_table(rows)
-    append_csv(PARITY_CSV, rows; truncate=false)
 
     for r in rows
         @test r.tier != TIER_FAIL
@@ -563,10 +574,9 @@ end
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)
     @named cac_l = ChannelAndContacts(; n=nz, geometry=geom_mtr)
-    @named hd = HeatDiffusion(;
-        nz=nz, nx=nx, Lz=0.6, Lx=0.00127, y=0.07,
-        rho_s=2700.0, cp_s=900.0, k_s=200.0, power=1e4,
-    )
+    slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named hd = HeatDiffusion(slab; power=1e4)
     scc = single_channel(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
     cac = scc.cac_l
     fuel = scc.hd
@@ -637,7 +647,6 @@ end
     end
 
     print_drift_table(rows)
-    append_csv(PARITY_CSV, rows; truncate=false)
     for r in rows
         @test r.tier != TIER_FAIL
     end
@@ -693,17 +702,9 @@ end  # @testset "parity harness"
         return result
     end
 
-    @named hd_v01 = HeatDiffusion(;
-        nz=nz_v01,
-        nx=nx_v01,
-        Lz=Lz_v01,
-        Lx=Lx_v01,
-        y=y_v01,
-        rho_s=rho_s_v01,
-        cp_s=cp_s_v01,
-        k_s=k_s_v01,
-        power=0.0,
-    )
+    slab = Slab(; x=range(0, Lx_v01, nx_v01 + 1), z=range(0, Lz_v01, nz_v01 + 1), y=y_v01,
+                  material=Solid(rho_s_v01, cp_s_v01, k_s_v01))
+    @named hd_v01 = HeatDiffusion(slab; power=0.0)
     @named ct_l = ConstantTemperature(T_wall; n=nz_v01)
     @named ct_r = ConstantTemperature(T_wall; n=nz_v01)
     conns_v01 = [
@@ -755,28 +756,10 @@ end
     @named cac_v02 = ChannelAndContacts(;
         n=nz_v02, geometry=PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
     )
-    @named hd1 = HeatDiffusion(;
-        nz=nz_v02,
-        nx=nx_v02,
-        Lz=0.6,
-        Lx=0.00127,
-        y=0.07,
-        rho_s=2700.0,
-        cp_s=900.0,
-        k_s=200.0,
-        power=power_per_plate,
-    )
-    @named hd2 = HeatDiffusion(;
-        nz=nz_v02,
-        nx=nx_v02,
-        Lz=0.6,
-        Lx=0.00127,
-        y=0.07,
-        rho_s=2700.0,
-        cp_s=900.0,
-        k_s=200.0,
-        power=power_per_plate,
-    )
+    slab = Slab(; x=range(0, 0.00127, nx_v02 + 1), z=range(0, 0.6, nz_v02 + 1), y=0.07,
+                  material=Solid(2700.0, 900.0, 200.0))
+    @named hd1 = HeatDiffusion(slab; power=power_per_plate)
+    @named hd2 = HeatDiffusion(slab; power=power_per_plate)
 
     conns_v02 = [
         # Hydraulic loop

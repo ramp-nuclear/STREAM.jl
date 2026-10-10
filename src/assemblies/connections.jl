@@ -8,11 +8,19 @@ A two-port component exposes exactly one `inlet` and one `outlet` [`FlowPort`](@
 `HydraulicTwoPort` for which components qualify. Channels also expose both ports and chain the
 same way.
 
+The chain may also start or end at a `FlowPort` of its own, such as a [`Tank`](@ref) nozzle
+or an [`Environment`](@ref)'s `port`, which then connects to the first component's `inlet`
+or the last one's `outlet`.
+
 # Arguments
-- `systems`: two or more uncompiled systems exposing `inlet` and `outlet` `FlowPort`s
+- `systems`: two or more uncompiled systems exposing `inlet` and `outlet` `FlowPort`s, the
+  first and the last of which may be `FlowPort`s instead
 
 # Returns
 `Vector{Equation}`, which goes into an [`assembly`](@ref STREAM.Assemblies.assembly) connection list as is.
+
+# Throws
+- `ArgumentError`: for fewer than two systems, or a `FlowPort` anywhere but at an end
 
 # Example
 ```julia
@@ -20,15 +28,41 @@ conns = [
     inseries(pump, hx, resistor, pump),
     pump.inlet.p ~ 1.0e5,
 ]
+inseries(pool.bottom, breach, ambient.port)   # a pool drains through a break
 ```
 """
 function inseries(systems...)
     length(systems) >= 2 ||
         throw(ArgumentError("inseries requires at least two systems"))
+    for sys in systems[2:(end - 1)]
+        _check_not_port(sys, "inside an inseries chain")
+    end
     return Equation[
-        connect(getproperty(systems[i], :outlet), getproperty(systems[i + 1], :inlet)) for
-        i in 1:(length(systems) - 1)
+        connect(_outlet(systems[i]), _inlet(systems[i + 1])) for i in 1:(length(systems) - 1)
     ]
+end
+
+"""
+    _inlet(x), _outlet(x)
+
+The `inlet` or `outlet` of a component, or `x` itself when it is a connector such as a
+`FlowPort`.
+"""
+_inlet(x) = ModelingToolkit.isconnector(x) ? x : getproperty(x, :inlet)
+_outlet(x) = ModelingToolkit.isconnector(x) ? x : getproperty(x, :outlet)
+
+"""
+    _check_not_port(x, place)
+
+Throw an `ArgumentError` when `x` is a connector. Between two components, a port would join
+them both to whatever else it belongs to, making a tee where the call reads as a pipe.
+"""
+function _check_not_port(x, place)
+    ModelingToolkit.isconnector(x) || return nothing
+    throw(ArgumentError(
+        "$(nameof(x)) is a port, and a port can only start or end the flow path, not sit " *
+        "$place. Connect a junction with `connect` instead.",
+    ))
 end
 
 _branch_systems(branch::Tuple) = collect(branch)
@@ -41,15 +75,19 @@ _branch_systems(branch) = Any[branch]
 Build the hydraulic connection equations for a parallel block. `upstream.outlet` feeds every
 branch inlet, each branch may be a single two-port component or a tuple/vector of components
 connected in series internally, and all branch outlets merge into `downstream.inlet`.
+`upstream` and `downstream` may be `FlowPort`s themselves, such as a [`Tank`](@ref) nozzle.
 
 # Arguments
-- `upstream`: uncompiled system exposing an `outlet` `FlowPort`
+- `upstream`: uncompiled system exposing an `outlet` `FlowPort`, or a `FlowPort`
 - `branches`: collection of branch paths; each branch is either one uncompiled two-port system
   or a tuple/vector of such systems
-- `downstream`: uncompiled system exposing an `inlet` `FlowPort`
+- `downstream`: uncompiled system exposing an `inlet` `FlowPort`, or a `FlowPort`
 
 # Returns
 `Vector{Equation}`, which goes into an [`assembly`](@ref STREAM.Assemblies.assembly) connection list as is.
+
+# Throws
+- `ArgumentError`: for no branches, or a `FlowPort` inside a branch
 
 # Example
 ```julia
@@ -64,11 +102,14 @@ function inparallel(upstream, branches, downstream)
     length(branches) >= 1 ||
         throw(ArgumentError("inparallel requires at least one branch"))
     branch_paths = [_branch_systems(branch) for branch in branches]
+    for path in branch_paths, sys in path
+        _check_not_port(sys, "inside an inparallel branch")
+    end
     branch_inlets = [getproperty(path[1], :inlet) for path in branch_paths]
     branch_outlets = [getproperty(path[end], :outlet) for path in branch_paths]
     eqs = Equation[
-        connect(getproperty(upstream, :outlet), branch_inlets...),
-        connect(branch_outlets..., getproperty(downstream, :inlet)),
+        connect(_outlet(upstream), branch_inlets...),
+        connect(branch_outlets..., _inlet(downstream)),
     ]
     for path in branch_paths
         length(path) > 1 && append!(eqs, inseries(path...))
@@ -229,48 +270,6 @@ function faces(mapping::Pair)
     return Equation[
         connect(port(left_sys, left_face, i), port(right_sys, right_face, i)) for i in 1:n_left
     ]
-end
-
-"""
-    var_length(sys, prefix) -> Int
-
-Count the subsystems of `sys` whose name starts with `prefix`, giving the width of an indexed
-connector array.
-
-A component with `n` thermal faces per side carries `n` separate subsystems named
-`thermal_left1 … thermal_leftn` rather than one array-valued connector, so the count comes from
-the names.
-
-`ChannelAndContacts` and `HeatDiffusion` carry such arrays. `Channel` and `ChannelHeatFlux` do
-not, and raise.
-
-# Arguments
-- `sys`: an uncompiled system. Compilation flattens away the subsystem names this reads.
-- `prefix`: a `Symbol` naming the connector family, such as `:thermal_left` or `:thermal_right`
-
-# Returns
-The number of matching subsystems, at least 1.
-
-# Throws
-`ArgumentError` when nothing matches.
-
-# Example
-```julia
-@named cac = ChannelAndContacts(; n=4, geometry=geom)
-var_length(cac, :thermal_left)    # 4
-```
-"""
-function var_length(sys, prefix)
-    sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
-    n = count(s -> startswith(s, string(prefix)), sub_names)
-    n == 0 && throw(
-        ArgumentError(
-            "found no subsystem named $(prefix)* in $(ModelingToolkit.getname(sys)), so its " *
-            "$(prefix) count cannot be read. Pass an uncompiled component that carries " *
-            "per-cell connector arrays, such as ChannelAndContacts or HeatDiffusion.",
-        ),
-    )
-    return n
 end
 
 """
