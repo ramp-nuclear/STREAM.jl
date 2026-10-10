@@ -6,7 +6,7 @@ geometry and the equations, so each solve can give it a new value without rebuil
 
 ```@example knob
 using STREAM
-using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, ChannelAndContacts
+using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
 using STREAM.Assemblies: inseries, symmetric_plate
 using ModelingToolkit: @named, mtkcompile
 nothing # hide
@@ -22,8 +22,9 @@ gap = @design_knob gap = 0.0024
 geometry = PipeGeometry_rectangular(0.6, 0.067, gap, 0.063)
 
 n = 10
-@named fuel = HeatDiffusion(; nz=n, nx=2, Lz=0.6, Lx=0.00127, y=0.063,
-                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=2.5e4)
+plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
+             material=Solid(2700.0, 900.0, 180.0))
+@named fuel = HeatDiffusion(plate; power=2.5e4)
 @named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
 @named cell = symmetric_plate(ch, fuel)
 @named pump = Pump(2.0e4)

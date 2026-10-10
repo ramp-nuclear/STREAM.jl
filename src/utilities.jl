@@ -265,12 +265,19 @@ With `clad_N = 0` the plate is meat alone and `clad_w` is not used.
 # Returns
 The `2clad_N + fuel_N + 1` boundaries, ready for `Slab(; x=...)`.
 
-# Example
-```julia
-x = x_boundaries(2, 3, 0.4e-3, 0.5e-3)            # 7 cells
-meat = (1:7)' .∈ Ref(3:5)                          # 1×7 mask of the meat cells
-materials = ifelse.(repeat(meat, nz), Solid(3000, 800, 100), Solid(2700, 900, 250))
+# Examples
+One cell in each 0.38 mm cladding layer and three across 0.51 mm of meat, in millimetres:
+```jldoctest
+julia> round.(1e3 .* Utilities.x_boundaries(1, 3, 0.38e-3, 0.51e-3); digits=3)
+6-element Vector{Float64}:
+ 0.0
+ 0.38
+ 0.55
+ 0.72
+ 0.89
+ 1.27
 ```
+[Model a clad plate or a fuel rod](@ref) builds the matching material matrix and power shape.
 """
 function x_boundaries(clad_N, fuel_N, clad_w, meat_w)
     clad = fill(clad_w / max(clad_N, 1), clad_N)

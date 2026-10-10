@@ -14,8 +14,9 @@ made, and leaves the hydraulics to you.
 | [`single_channel`](@ref STREAM.Assemblies.single_channel) | one channel with a plate on one side |
 | [`fuel_assembly`](@ref STREAM.Assemblies.fuel_assembly) | any alternating chain of channels and plates |
 
-In all of them, each plate needs as many axial cells, `nz`, as the channels it touches have,
-`n`, and its depth `y` should be the heated width of the channel faces.
+In all of them, each plate needs as many axial cells as the channels it touches have, `n`,
+and its [`Slab`](@ref STREAM.Components.Slab)'s width `y` should be the heated width of the
+channel faces.
 
 ## The four shapes of a chain
 
@@ -61,7 +62,7 @@ Two plates between three channels, all three fed from one pump:
 
 ```@example fa
 using STREAM
-using STREAM.Components: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion
+using STREAM.Components: Pump, HeatExchanger, ChannelAndContacts, HeatDiffusion, Slab
 using STREAM.Assemblies: inseries, inparallel, fuel_assembly
 using ModelingToolkit: @named, mtkcompile
 using OrdinaryDiffEq: Rodas5P
@@ -69,8 +70,9 @@ using SteadyStateDiffEq: DynamicSS
 
 n, P_plate = 8, 1.0e4
 geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
-fuel_plate(name) = HeatDiffusion(; name, nz=n, nx=2, Lz=0.6, Lx=0.00127, y=0.063,
-                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P_plate)
+slab = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
+            material=Solid(2700.0, 900.0, 180.0))
+fuel_plate(name) = HeatDiffusion(slab; name, power=P_plate)
 coolant_channel(name) = ChannelAndContacts(; name, n, geometry)
 
 asm = fuel_assembly([coolant_channel(:c1), coolant_channel(:c2), coolant_channel(:c3)],

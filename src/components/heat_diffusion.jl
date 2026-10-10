@@ -130,7 +130,8 @@ _has_inner_wall(b::Cylinder) = !isequal(first(b.r), 0)
                   T0=T_ROOM) -> System
 
 Heat conduction in a [`Slab`](@ref) or a [`Cylinder`](@ref) on its 2D finite-volume mesh. This
-is Python STREAM's `Fuel`.
+is Python STREAM's `Fuel`. [Heat conduction in fuel](@ref) derives the equations, and
+[Model a clad plate or a fuel rod](@ref) shows how to build either.
 
 Each cell balances its heat content against conduction through its faces and its share of
 the power:

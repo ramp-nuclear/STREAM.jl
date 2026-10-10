@@ -26,7 +26,7 @@
 # particular one.
 
 using STREAM
-using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, ChannelAndContacts
+using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
 using STREAM.Assemblies: inseries, symmetric_plate
 using STREAM.Thresholds
 using STREAM.Utilities: cosine_shape
@@ -47,19 +47,25 @@ geometry = PipeGeometry_rectangular(L, width, gap, heated_width)
 
 # ## The plate
 #
-# [`HeatDiffusion`](@ref STREAM.Components.HeatDiffusion) conducts heat across the plate in
-# each of ``n`` axial slices. Its depth `y` is the heated width, so that each slice's surface
-# is the heated area of one channel cell. The material here is aluminium throughout, the
-# simplification described in [Heat conduction in a fuel plate](../explanation/conduction.md).
+# A [`Slab`](@ref STREAM.Components.Slab) describes the plate: its cell boundaries through its
+# thickness, `x`, and along the flow, `z`, its width `y`, and what it is made of. The width is
+# the heated width, so that each axial slice's surface is the heated area of one channel cell.
+# The plate here is aluminium throughout, a [`Solid`](@ref) of constant properties; [Model a
+# clad plate or a fuel rod](../howto/heat_structures.md) gives the meat and the cladding
+# their own.
 #
 # The power is shaped as a cosine along the plate, with a peak 1.4 times the average.
 # [`cosine_shape`](@ref STREAM.Utilities.cosine_shape) gives each axial cell its share, and
 # each share is split evenly across the plate's thickness.
+# [`HeatDiffusion`](@ref STREAM.Components.HeatDiffusion) conducts the heat across the plate
+# in each axial slice.
 
 z_edges = range(0.0, L; length=n + 1)
+aluminium = Solid(2700.0, 900.0, 180.0)      # density, specific heat, conductivity
+plate = Slab(; x=range(0.0, thickness; length=nx + 1), z=z_edges, y=heated_width,
+             material=aluminium)
 shape = repeat(cosine_shape(z_edges, 1.4) ./ nx, 1, nx)
-@named fuel = HeatDiffusion(; nz=n, nx, Lz=L, Lx=thickness, y=heated_width,
-                            rho_s=2700.0, cp_s=900.0, k_s=180.0, power=P, power_shape=shape);
+@named fuel = HeatDiffusion(plate; power=P, power_shape=shape);
 
 # ## The channel
 #
