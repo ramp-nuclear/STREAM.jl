@@ -173,3 +173,70 @@ positive drop.
 Pressure drop [Pa].
 """
 dp(ṁ, rho, f, A) = f * (ṁ * abs(ṁ) / (2 * rho * A^2))
+
+const _DISCHARGE_CD = Dict(
+    :sharp => 0.61,
+    :rounded => 0.98,
+    :short_tube => 0.81,
+    :borda => 0.51,
+    :pipe_stub => 0.6,
+)
+
+"""
+    discharge_cd(geometry::Symbol) -> Float64
+
+The fully turbulent discharge coefficient `C_d = C_c·C_v` of a hole of the given geometry. The
+values hold above a throat Reynolds number of about 1e4; below that use
+[`lichtarowicz_cd`](@ref).
+
+| `geometry` | `C_d` | Hole |
+|:---|:---|:---|
+| `:sharp` | 0.61 | Sharp-edged thin plate, set by the vena contracta |
+| `:rounded` | 0.98 | Rounded, bellmouth or nozzle inlet: no contraction, friction only |
+| `:short_tube` | 0.81 | Thick hole with `L/d` of 2 to 4, where the jet reattaches |
+| `:borda` | 0.51 | Re-entrant tube protruding into the vessel |
+| `:pipe_stub` | 0.6 | Clean severed pipe end, a sharp entrance into the stub |
+
+# Arguments
+- `geometry`: one of the keys above
+
+# Returns
+The discharge coefficient.
+
+# Throws
+`ArgumentError` for a geometry not in the table.
+"""
+function discharge_cd(geometry::Symbol)
+    haskey(_DISCHARGE_CD, geometry) || throw(ArgumentError(
+        "no discharge coefficient for :$geometry; known geometries are " *
+        join(sort!(collect(keys(_DISCHARGE_CD))), ", "),
+    ))
+    return _DISCHARGE_CD[geometry]
+end
+
+"""
+    lichtarowicz_cd(Re, L_over_d) -> Float64
+
+The discharge coefficient of a parallel-bore orifice at finite Reynolds number, after
+Lichtarowicz, Duggins and Markland (1965):
+
+    C_du = 0.827 − 0.0085·L/d
+    1/C_d = 1/C_du + (20/Re)·(1 + 2.25·L/d) − 0.005·(L/d) / (1 + 7.5·log10(1.5e-4·Re)²)
+
+`C_du` is the high Reynolds limit, which `C_d` approaches from below as the viscous term dies
+out. Fitted for `10 ≤ Re ≤ 2e4` and `L/d ≤ 10`; outside that it extrapolates. For a thin
+plate rather than a bore, use `discharge_cd(:sharp)`.
+
+# Arguments
+- `Re`: Reynolds number at the throat, on the bore diameter
+- `L_over_d`: bore length over bore diameter
+
+# Returns
+The discharge coefficient.
+"""
+function lichtarowicz_cd(Re, L_over_d)
+    cdu = 0.827 - 0.0085 * L_over_d
+    inverse = 1 / cdu + (20 / Re) * (1 + 2.25 * L_over_d) -
+        0.005 * L_over_d / (1 + 7.5 * log10(0.00015 * Re)^2)
+    return 1 / inverse
+end

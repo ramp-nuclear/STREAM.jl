@@ -70,9 +70,10 @@ are the start wanted, such as a `PointKinetics` starting critical.
   skipping it is correct.
 - `kwargs...`: additional keyword arguments forwarded to `solve`
 
-A system with no differential states, such as a pump, resistors and a flapper with no
-inertia, steps onto every time in `t`, so each saved value is a step's own result rather
-than an interpolation between steps.
+The solver steps onto every time in `t`, so each saved value is a step's own result rather
+than an interpolation inside a step. A smooth run takes long steps, and values read off the
+interpolant between them can stray well past the tolerance: a draining pool's level was off by
+0.5 m that way. `tstops` passed by the caller are kept alongside.
 
 # Returns
 `SciMLBase.ODESolution`. Access time-dependent results via `sol[ssys.component.variable, :]`.
@@ -92,30 +93,28 @@ function solve_transient(
         saveat=t,
         callback=callbacks,
         initializealg=initializealg,
-        merge(values(kwargs), _stateless_steps(prob, t, kwargs))...,
+        merge(values(kwargs), _saved_steps(prob, t, kwargs))...,
     )
     return sol
 end
 
 """
-    _stateless_steps(prob, t, kwargs) -> NamedTuple
+    _saved_steps(prob, t, kwargs) -> NamedTuple
 
-Extra `solve` keywords for a problem whose every unknown is algebraic, and none for any
-other problem.
+The `solve` keywords that put a step end on every saved time: `tstops` holding `t` and any
+`tstops` the caller passed.
 
-Such a problem has an all-zero mass matrix, and the error a solver controls says nothing
-about values between its steps, so a saved time that falls inside a step can be off. Adding
-the saved times to `tstops` puts a step end on each one. OrdinaryDiffEq warns about
-interpolation on these problems whenever `saveat` is given, and with no saved value
-interpolated that warning no longer applies, so it is silenced unless the caller passed
-their own `verbose`.
+A problem whose every unknown is algebraic has an all-zero mass matrix, and OrdinaryDiffEq
+warns that its interpolation is not error controlled whenever `saveat` is given. With no saved
+value interpolated that warning no longer applies, so for such a problem it is silenced unless
+the caller passed their own `verbose`.
 """
-function _stateless_steps(prob, t, kwargs)
-    M = prob.f.mass_matrix
-    (M isa AbstractMatrix && all(iszero, M)) || return (;)
+function _saved_steps(prob, t, kwargs)
     user_stops = collect(Float64, get(kwargs, :tstops, Float64[]))
     tstops = sort!(unique!(vcat(collect(Float64, t), user_stops)))
-    haskey(kwargs, :verbose) && return (; tstops)
+    M = prob.f.mass_matrix
+    stateless = M isa AbstractMatrix && all(iszero, M)
+    (stateless && !haskey(kwargs, :verbose)) || return (; tstops)
     # DEVerbosity and SciMLLogging are reached through OrdinaryDiffEqCore, which already
     # loads them, rather than taken on as dependencies of their own.
     core = OrdinaryDiffEq.OrdinaryDiffEqCore
@@ -146,8 +145,8 @@ Start a transient from an already-solved state.
 
 Takes the full state of `ssys` from `sol_ss`, applies `overrides` (parameter or forcing changes,
 such as shutting a pump with `ssys.pump.dP_pump => 0.0` or stepping a reactivity), and integrates
-from there. This expresses the settle-then-perturb pipeline: solve a steady state, change one thing,
-watch the transient.
+from there. This expresses the settle-then-perturb pipeline: solve a steady state, change one
+thing, watch the transient.
 
 The default `BrownFullBasicInit` re-solves the algebraic constraints for the overridden parameters
 while holding the differential states at their snapshotted values, so the start point stays

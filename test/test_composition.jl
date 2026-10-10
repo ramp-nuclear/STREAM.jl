@@ -671,3 +671,14 @@ end
     @test_throws ArgumentError weighted(2; name=:hot)
     @test_throws UndefKeywordError weighted(2, r)
 end
+
+@testset "inseries and inparallel take a port only at an end" begin
+    @named pool = Tank(; area=2.0, L0=4.0, ports=(bottom=0.0, side=1.0))
+    @named r1 = Resistor(1.0)
+    @named r2 = Resistor(1.0)
+    @named ambient = Environment()
+    @test length(inseries(pool.bottom, r1, r2, ambient.port)) == 3
+    @test length(inparallel(pool.bottom, (r1, r2), ambient.port)) == 2
+    @test_throws r"side is a port" inseries(r1, pool.side, r2)
+    @test_throws r"side is a port" inparallel(r1, ((r2, pool.side),), ambient.port)
+end

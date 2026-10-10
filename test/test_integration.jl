@@ -438,8 +438,10 @@ end
     @named ine = Inertia(1.0e3)
     @named R = VolumetricFlowResistor(; k=k, density=1.0)
     machine = StateMachine(; initial_state=:CLOSED)
+    # The loop settles at |Δp| ≈ 0.3 Pa across the flapper, inside the default 1 Pa band where
+    # the flow law is rounded off, so the band is narrowed as Python's test narrows it.
     @named flapper = Flapper(; f=2 * k, area=1.0, open_rate=1.0, machine=machine,
-                             liquid=Liquid())
+                             dp_linear=1e-3, liquid=Liquid())
     @named hx = HeatExchanger(26.85)
     conns = [
         inseries(hx, pump, ine),
