@@ -634,3 +634,12 @@ end
     @test sol[ch.P] ≈ p_total .- head rtol = 1e-12
     @test sol[ch.T_sat] ≈ [Tsat(H2O, sol[ch.P[i]]) for i in 1:n] rtol = 1e-12
 end
+
+@testset "a wall cooler than the coolant reports saturation as its ONB temperature" begin
+    # The coolant enters at 40 °C over a 30 °C wall, so heat flows into the wall in every cell.
+    ssys = build_loop(; n=5, T_wall=30.0)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    @test sol.retcode == ReturnCode.Success
+    @test all(sol[ssys.ch.q_wall] .< 0)
+    @test sol[ssys.ch.T_ONB] == sol[ssys.ch.T_sat]
+end
