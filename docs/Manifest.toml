@@ -2842,7 +2842,7 @@ version = "0.1.0"
 deps = ["DelimitedFiles", "ModelingToolkit", "OrdinaryDiffEq", "QuadGK", "Statistics", "SteadyStateDiffEq", "SymbolicIndexingInterface"]
 path = ".."
 uuid = "49562357-9609-405b-b96f-716d2939d241"
-version = "1.0.0"
+version = "0.1.0"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Moshi", "PreallocationTools", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLLogging", "SciMLOperators", "SciMLPublic", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface"]
