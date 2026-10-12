@@ -33,6 +33,23 @@ rated power.
 
 # Returns
 A callable `source(t) -> power`, ready to pass as `PointKinetics(...; power_input=source)`.
+
+# Examples
+The fission products of [`FissionProducts`](@ref)'s example, 6 MeV/fission at shutdown, in a
+reactor scrammed at 100 s. The source holds its saturated value up to the trip, and an hour
+after it has decayed to 0.697676 MeV/fission:
+```jldoctest
+julia> machine = Components.StateMachine();
+
+julia> source = DecayHeat.DecayHeatSource(DecayHeat.FissionProducts([1e-2, 1e-4], [0.05, 1e-4]), machine; P0=1.0)
+DecayHeatSource at fission rate P0/Q = 0.005, saturated, shut down in SCRAM of StateMachine(NORMAL since t = 0.0 s)
+  DecayHeat.FissionProducts with 2 groups
+
+julia> Components.trip!(machine, 100.0);
+
+julia> source(50.0), round(source(3700.0); sigdigits=6)
+(0.03, 0.00348838)
+```
 """
 struct DecayHeatSource{M<:AbstractDecayHeat,S<:Tuple}
     model::M

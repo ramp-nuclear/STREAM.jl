@@ -156,6 +156,9 @@ julia> fp = DecayHeat.FissionProducts([1e-2, 1e-4], [0.05, 1e-4]);
 
 julia> fp(0.0), round(fp(3600.0); sigdigits=6)
 (6.0, 0.697676)
+
+julia> fp
+DecayHeat.FissionProducts with 2 groups
 ```
 """
 struct FissionProducts <: AbstractDecayHeat

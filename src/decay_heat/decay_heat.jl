@@ -42,6 +42,16 @@ parts `a` and `b`, each weighted `k`, and a single scaled contribution is a one-
 # Arguments
 - `weights`: a tuple of `Float64` multipliers, one per part
 - `parts`: a tuple of [`AbstractDecayHeat`](@ref), in the same order
+
+# Examples
+```jldoctest
+julia> fp = DecayHeat.FissionProducts([1e-2, 1e-4], [0.05, 1e-4]);
+
+julia> heat = fp + 0.5 * DecayHeat.U238CaptureChain(0.5)
+DecayHeat.Sum of 2 contributions:
+  FissionProducts(2 groups)
+  0.5 × U238CaptureChain(0.5)
+```
 """
 struct Sum{N,P<:NTuple{N,AbstractDecayHeat}} <: AbstractDecayHeat
     weights::NTuple{N,Float64}

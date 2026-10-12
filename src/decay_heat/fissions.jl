@@ -103,6 +103,17 @@ An [`AbstractDecayHeat`](@ref) whose value is dimensionless.
 
 # Throws
 - `DimensionMismatch`: if `times` and `profile` differ in length
+
+# Examples
+A profile sampled three times, read between two samples on the log-linear line,
+`0.5·(0.05/0.5)^(4/9)`:
+```jldoctest
+julia> fis = DecayHeat.Fissions([0.0, 1.0, 10.0], [1.0, 0.5, 0.05])
+Fissions(3 samples over 0.0 to 10.0 s, LogLinear)
+
+julia> round(fis(5.0); sigdigits=6)
+0.179691
+```
 """
 struct Fissions{I<:ProfileInterpolation} <: AbstractDecayHeat
     times::Vector{Float64}

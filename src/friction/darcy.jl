@@ -40,6 +40,12 @@ is how Python STREAM applies its geometric correction.
 # Arguments
 - `correlation`: the correlation to close, called as `(Re) -> f`
 - `k_R`: geometric correction on the Reynolds number, default 1.0 (a circular duct)
+
+# Examples
+```jldoctest
+julia> Friction.Blasius(; k_R=0.7)
+Friction.FromReynolds(blasius), Re scaled by k_R = 0.7
+```
 """
 struct FromReynolds{C} <: AbstractDarcyFactor
     correlation::C
@@ -113,6 +119,14 @@ Python's `k_H=None`, so the correction is opt-in and no existing result moves.
 - `re_bounds`: `(re_lo, re_hi)` transition band on the bulk Reynolds number
 - `k_R`: geometric correction on the Reynolds fed to each branch
 - `viscosity`: optional `(heat_wet_ratio, mu_ratio) -> K_H`
+
+# Examples
+For a plate channel 2.4 mm deep and 63 mm wide, with the heated-wall correction:
+```jldoctest
+julia> Friction.RegimeDependent(; k_R=Friction.rectangular_correction(0.0024 / 0.063),
+                                  viscosity=Friction.viscosity_correction)
+Friction.RegimeDependent(laminar | turbulent, blending across Re = 2000.0 to 5000.0, k_R = 0.7056, with the heated-wall viscosity correction)
+```
 """
 struct RegimeDependent{L,T,V} <: AbstractDarcyFactor
     laminar::L

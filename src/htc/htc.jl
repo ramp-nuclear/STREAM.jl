@@ -98,6 +98,12 @@ end
     DittusBoelter(; basis=AtFilm()) -> FromNusselt
 
 Dittus-Boelter turbulent forced convection, `Nu = 0.023·Re^0.8·Pr^0.4`.
+
+# Examples
+```jldoctest
+julia> HTC.DittusBoelter()
+HTC.FromNusselt(dittus_boelter), at the film temperature
+```
 """
 DittusBoelter(; basis::PropertyBasis=AtFilm()) = FromNusselt(dittus_boelter, basis)
 
@@ -206,6 +212,17 @@ with no property basis of its own is used as given.
 - `re_bounds`: `(re_lo, re_hi)` transition band on the bulk Reynolds number
 - `geom`: channel geometry; `geom.Dh` is the Grashof characteristic length
 - `g`: gravitational acceleration [m/s²], used only when `natural` is given
+
+# Examples
+It prints each branch with the temperature its properties are read at:
+```jldoctest
+julia> geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063);
+
+julia> HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(), geom)
+HTC.RegimeDependent, blending across Re = 2000.0 to 5000.0
+  laminar:   constant Nu = 8.235, at the bulk temperature
+  turbulent: dittus_boelter, at the film temperature
+```
 """
 struct RegimeDependent{L<:AbstractHTC,T<:AbstractHTC,N} <: AbstractHTC
     laminar::L
@@ -281,6 +298,19 @@ extra-argument form `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)`.
 - `q_scb`: subcooled boiling heat flux closure `(T_wall, sat, Re) -> q`, e.g. from
   [`regime_dependent_q_scb`](@ref). `sat` is the coolant's [`Liquid`](@ref) snapshot at
   saturation at the local pressure, and `Re` the bulk Reynolds number.
+
+# Examples
+```jldoctest
+julia> geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063);
+
+julia> spl = HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(), geom);
+
+julia> HTC.SubcooledBoiling(spl, HTC.regime_dependent_q_scb())
+HTC.SubcooledBoiling, partial boiling above the onset of nucleate boiling, on
+  HTC.RegimeDependent, blending across Re = 2000.0 to 5000.0
+    laminar:   constant Nu = 8.235, at the bulk temperature
+    turbulent: dittus_boelter, at the film temperature
+```
 """
 struct SubcooledBoiling{H<:AbstractHTC,Q} <: AbstractHTC
     single_phase::H

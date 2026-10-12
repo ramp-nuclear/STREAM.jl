@@ -171,6 +171,28 @@ same variable after `mtkcompile`. Assigning `machine.transitions` replaces the l
 
 # Throws
 - `ArgumentError`: for an edge whose condition is not one of the three forms
+
+# Examples
+A machine set to scram ten seconds into a run, tripped by hand before then. It prints its
+state, its transitions and its log:
+```jldoctest
+julia> machine = Components.StateMachine((:NORMAL => :SCRAM, (m, sys, t) -> t - 10.0, "ten seconds at power"));
+
+julia> Components.trip!(machine, 2.5; cause="low flow");
+
+julia> machine
+StateMachine in SCRAM since t = 2.5 s
+  transitions:
+    NORMAL → SCRAM when a predicate holds: ten seconds at power
+  log:
+    t = 0.0 s   NORMAL   initial
+    t = 2.5 s   SCRAM    low flow
+
+julia> machine.log
+2 states entered:
+  t = 0.0 s   NORMAL   initial
+  t = 2.5 s   SCRAM    low flow
+```
 """
 mutable struct StateMachine
     transitions::Vector{Transition}

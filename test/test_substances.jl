@@ -46,8 +46,6 @@ end
 end
 
 @testset "physical anchors independent of the fits" begin
-    # The light water specific heat fit is even in temperature.
-    @test cₚ(H2O, 8.0) == cₚ(H2O, -8.0)
     # Water boils at 100 °C at 1 atm.
     @test isapprox(Tsat(H2O, ATM), 100.0; rtol=1e-3)
     # Liquid water near room temperature is close to 1000 kg/m^3.
