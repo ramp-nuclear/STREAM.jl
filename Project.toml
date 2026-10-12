@@ -1,8 +1,12 @@
 name = "STREAM"
 uuid = "49562357-9609-405b-b96f-716d2939d241"
-version = "1.0.0"
-authors = ["Itay Benvenisti <itaybnv@github.com>"]
-repo = "https://github.com/itaybnv/STREAM.jl"
+version = "0.1.0"
+authors = [
+    "Itay Benvenisti <itaybnv@gmail.com>",
+    "Aviv Barnea <aviv.barnea606@gmail.com>",
+    "Eshed Magali <esheder@gmail.com>",
+]
+repo = "https://github.com/ramp-nuclear/STREAM.jl"
 
 [deps]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
