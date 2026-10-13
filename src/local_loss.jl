@@ -74,12 +74,28 @@ end
 """
     sudden_expansion_factor(aratio, re) -> K
 
-Idelchik table 4.2 loss coefficient for a sudden expansion, as a function of the area ratio
-(smaller over larger) and the Reynolds number.
+Loss coefficient for a sudden expansion from Idelchik's table 4.2 [Idelchik1996](@cite), as a
+function of the area ratio (smaller over larger) and the Reynolds number.
 
 Above Re = 3300 this is the Borda-Carnot result `(1 - aratio)^2`. Within the table it is a
 bilinear interpolation. Below Re = 10, or outside the tabulated area ratios, it extrapolates.
 [`factor`](@ref) is what picks between this and [`sudden_contraction_factor`](@ref).
+
+# Arguments
+- `aratio`: smaller area over larger, in [0, 1]
+- `re`: Reynolds number in the smaller section
+
+# Returns
+The loss coefficient `K`, referred to the smaller section.
+
+# Examples
+```jldoctest
+julia> LocalLoss.sudden_expansion_factor(0.5, 1e5)  # Borda-Carnot, (1 - 0.5)²
+0.25
+
+julia> LocalLoss.sudden_expansion_factor(0.3, 100.0)  # a table node
+1.2
+```
 """
 function sudden_expansion_factor(aratio, re)
     return _sudden_area_factor(
@@ -94,12 +110,25 @@ end
 """
     sudden_contraction_factor(aratio, re) -> K
 
-Idelchik table 4.10 loss coefficient for a sudden contraction, as a function of the area ratio
-(smaller over larger) and the Reynolds number.
+Loss coefficient for a sudden contraction from Idelchik's table 4.10 [Idelchik1996](@cite), as
+a function of the area ratio (smaller over larger) and the Reynolds number.
 
-Above Re = 1e4 this is the closed form `0.5*(1 - aratio)^0.75`, which also overwrites the table's
-last column so the two agree at the join, matching Python. Within the table it is a bilinear
-interpolation, and below Re = 10 it extrapolates.
+Above Re = 10⁴ this is the closed form `0.5·(1 - aratio)^0.75`, which also replaces the table's
+last column so the two agree at the join, as in Python STREAM. Within the table it is a
+bilinear interpolation, and below Re = 10 it extrapolates.
+
+# Arguments
+- `aratio`: smaller area over larger, in [0, 1]
+- `re`: Reynolds number in the smaller section
+
+# Returns
+The loss coefficient `K`, referred to the smaller section.
+
+# Examples
+```jldoctest
+julia> LocalLoss.sudden_contraction_factor(0.3, 100.0)  # a table node
+1.1
+```
 """
 function sudden_contraction_factor(aratio, re)
     return _sudden_area_factor(
@@ -121,14 +150,8 @@ Forward flow (`ṁ >= 0`) goes `1 -> 2`, so it sees an expansion when `A2 >= A1`
 contraction otherwise. Reverse flow swaps the roles, which is what keeps the loss correct through
 a flow reversal.
 
-`K` comes from the Idelchik tables, indexed by area ratio and Reynolds number: table 4.2 for
-expansion, table 4.10 for contraction. Above the tabulated Reynolds range the analytic closed
-forms apply (Borda-Carnot for expansion, Idelchik's for contraction); below it the value is
-extrapolated by velocity decay. Ported from Python STREAM's
-`stream/physical_models/pressure_drop/local.py`.
-
-`@register_symbolic`, so MTK carries the table lookup as one opaque node and it can sit inside a
-pressure-drop equation.
+`K` comes from [`sudden_expansion_factor`](@ref) or [`sudden_contraction_factor`](@ref). It is
+registered with `@register_symbolic`, so it can sit inside a pressure-drop equation.
 
 # Arguments
 - `ṁ`: mass flow rate [kg/s]; its sign selects expansion or contraction
@@ -152,14 +175,16 @@ end
 
 @register_symbolic factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
 
-"""
+@doc raw"""
     dp(ṁ, rho, f, A) -> Pa
 
 Local (minor) loss pressure drop:
 
-    dP = f * ṁ|ṁ| / (2*rho*A^2)
+```math
+Δp = f \, \dot{m}|\dot{m}| / (2ρA^2)
+```
 
-The same quadratic form as [`darcy_weisbach_dp`](@ref) without the `L/Dh` factor, because a
+The same quadratic form as [`darcy_weisbach_dp`](@ref STREAM.Friction.darcy_weisbach_dp) without the `L/Dh` factor, because a
 local loss is tied to a fitting rather than to a length of duct. Positive `ṁ` gives a
 positive drop.
 
@@ -205,6 +230,12 @@ The discharge coefficient.
 
 # Throws
 `ArgumentError` for a geometry not in the table.
+
+# Examples
+```jldoctest
+julia> LocalLoss.discharge_cd(:sharp)
+0.61
+```
 """
 function discharge_cd(geometry::Symbol)
     haskey(_DISCHARGE_CD, geometry) || throw(ArgumentError(
@@ -214,14 +245,19 @@ function discharge_cd(geometry::Symbol)
     return _DISCHARGE_CD[geometry]
 end
 
-"""
+@doc raw"""
     lichtarowicz_cd(Re, L_over_d) -> Float64
 
 The discharge coefficient of a parallel-bore orifice at finite Reynolds number, after
-Lichtarowicz, Duggins and Markland (1965):
+[Lichtarowicz1965](@cite):
 
-    C_du = 0.827 − 0.0085·L/d
-    1/C_d = 1/C_du + (20/Re)·(1 + 2.25·L/d) − 0.005·(L/d) / (1 + 7.5·log10(1.5e-4·Re)²)
+```math
+\begin{aligned}
+C_{du} &= 0.827 - 0.0085 L/d \\
+1/C_d &= 1/C_{du} + (20/Re) (1 + 2.25 L/d)
+         - 0.005 (L/d) / (1 + 7.5 (\log_{10}(1.5 \times 10^{-4} Re))^2)
+\end{aligned}
+```
 
 `C_du` is the high Reynolds limit, which `C_d` approaches from below as the viscous term dies
 out. Fitted for `10 ≤ Re ≤ 2e4` and `L/d ≤ 10`; outside that it extrapolates. For a thin
@@ -233,6 +269,16 @@ plate rather than a bore, use `discharge_cd(:sharp)`.
 
 # Returns
 The discharge coefficient.
+
+# Examples
+A bore twice as long as it is wide, at three Reynolds numbers:
+```jldoctest
+julia> round.(LocalLoss.lichtarowicz_cd.([100.0, 1e3, 1e4], 2.0); digits=4)
+3-element Vector{Float64}:
+ 0.4284
+ 0.7446
+ 0.8081
+```
 """
 function lichtarowicz_cd(Re, L_over_d)
     cdu = 0.827 - 0.0085 * L_over_d

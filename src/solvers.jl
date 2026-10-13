@@ -9,9 +9,16 @@ near-reversal channel loop will not converge the purely algebraic resistor cube,
 If a particular solve does not converge, pass an explicit solver; the coastdown reversal test in
 `test_integration.jl` passes `SSRootfind()`.
 
+An operating point is ModelingToolkit's single map over both unknowns and parameters, such as
+`[ssys.pump.dP_pump => 6.0e4, ssys.ch.inlet.ṁ => 0.5]`. What an entry means depends on the
+solve, so each solver here says what it does with one. The full rules are in
+[ModelingToolkit's initialization tutorial](https://docs.sciml.ai/ModelingToolkit/stable/tutorials/initialization/).
+
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
-- `op`: operating point as `Vector{Pair}` of initial guesses
+- `op`: operating point, a `Vector{Pair}`. A parameter in it takes that value. An unknown in it
+  is where the solver starts: the first guess of a root finder, or the state `DynamicSS`
+  integrates from. Anything left out takes the value the model declares.
 - `solver`: steady-state solver to use, or `nothing` to let the stack choose (default `nothing`)
 - `abstol`: absolute tolerance (default 1e-8)
 - `reltol`: relative tolerance (default 1e-6)
@@ -41,18 +48,15 @@ end
 
 """
     solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...) -> SciMLSolution
-    solve_transient(ssys, t; kwargs...) -> SciMLSolution
 
-Solve a transient simulation over a time array.
-
-Without `op` the run starts from the values the model declares. That suits a system with no
-differential states, whose equations fix every value at every instant, and one whose defaults
-are the start wanted, such as a `PointKinetics` starting critical.
+Solve a transient simulation over a time array, starting from the operating point `op`.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
-- `op`: operating point / initial conditions as `Vector{Pair}` (states and parameters,
-  including callable parameters such as `ssys.pump.dP_pump_fn => f`)
+- `op`: operating point, a `Vector{Pair}` (see [`solve_steady`](@ref)). A parameter in it
+  takes that value for the whole run, including a callable one such as
+  `ssys.pump.dP_pump_fn => f`. An unknown in it is its value at `t[1]`, used as given under
+  the default `NoInit`. Anything left out takes the value the model declares.
 - `t`: time array (e.g. `range(0, 100, length=1000)`); `tspan` derived as `(t[1], t[end])`
 - `solver`: ODE solver (default `Rodas5P()`)
 - `callbacks`: optional `CallbackSet` for user-supplied events (passed to DifferentialEquations
@@ -60,7 +64,7 @@ are the start wanted, such as a `PointKinetics` starting critical.
 - `initializealg`: DAE initialization algorithm (default `SciMLBase.NoInit()`, which trusts the
   supplied `op` as a fully consistent initial condition). Pass `SciMLBase.BrownFullBasicInit()`
   to have the solver solve the algebraic constraints for consistency at `t[1]` (holding the
-  differential states fixed) before stepping — needed when `op` is an approximate / transplanted
+  differential states fixed) before stepping. It is needed when `op` is an approximate or transplanted
   IC that does not exactly satisfy the algebraic equations, where `NoInit` + a stiff solver can
   abort at `t=0` (`dt` driven below floating-point epsilon, `NaN` error estimate).
 - `build_initializeprob`: leave at the default `nothing` for almost everything (MTK chooses). Pass
@@ -122,6 +126,23 @@ function _saved_steps(prob, t, kwargs)
     return (; tstops, verbose=quiet)
 end
 
+"""
+    solve_transient(ssys, t; kwargs...) -> SciMLSolution
+
+Solve a transient from the values the model declares, with no operating point.
+
+This suits a system whose defaults are the start wanted, such as a `PointKinetics` starting
+critical, or one with no differential states, whose equations fix every value at every
+instant. The keywords are those of the form that takes
+an operating point.
+
+# Arguments
+- `ssys`: compiled system from `mtkcompile`
+- `t`: the times to save at
+
+# Returns
+`SciMLBase.ODESolution`.
+"""
 solve_transient(ssys, t::AbstractVector; kwargs...) = solve_transient(ssys, Pair[], t; kwargs...)
 
 """
@@ -147,6 +168,11 @@ Takes the full state of `ssys` from `sol_ss`, applies `overrides` (parameter or 
 such as shutting a pump with `ssys.pump.dP_pump => 0.0` or stepping a reactivity), and integrates
 from there. This expresses the settle-then-perturb pipeline: solve a steady state, change one
 thing, watch the transient.
+
+Only the unknowns come from `sol_ss`. Every parameter takes the value the model declares
+unless `overrides` sets it, so a parameter the steady solve's operating point changed has to
+be changed again here. Otherwise the run starts from the steady state with that parameter back
+at its declared value, and drifts away from it.
 
 The default `BrownFullBasicInit` re-solves the algebraic constraints for the overridden parameters
 while holding the differential states at their snapshotted values, so the start point stays

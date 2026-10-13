@@ -145,45 +145,19 @@ end
                             L_over_A=1.75e5, g_acc=G_EARTH,
                             R_ext=1.0e6, dt_ramp=5.0) -> System
 
-Build a loss-of-flow validation loop with bypass topology. Heated leg uses
-`ChannelAndContacts + HeatDiffusion` plate via `one_sided`
-(real fuel-plate physics).
+A loss-of-flow loop with a bypass, compiled.
 
-Topology (4-node parallel network):
-- Node A (top): ine output, heated channel input, flapper input (3-way junction)
-- Node B (bottom): heated channel output, ret input (2-way)
-- Node C (top): ret output, flapper output, ext_res input (3-way junction)
-- D series branch: ext_res -> hx -> pump -> ine
+It has a heated plate-fuel leg (`heated`, a `ChannelAndContacts` cooling one face of a
+`HeatDiffusion` plate), an unheated return leg (`ret`), and a [`Flapper`](@ref) in parallel
+with the external branch that holds the pump, heat exchanger and inertia. The heated leg runs downward and the return leg upward, so when
+the pump head falls the flapper opens and the flow turns around into natural circulation.
+The test suite uses it as a fixture.
 
-Heated leg: `ChannelAndContacts` (`heated.ch`) + `HeatDiffusion` plate
-(`heated.fuel`) wired one-sided via `one_sided(ch, fuel; side=:left)`.
-Sub-systems retain their `@named` symbols, so access paths inside `heated` are
-`heated.ch.*` and `heated.fuel.*` (not `heated.channel.*`). The right face of `ch`
-is left unconnected, so MTK sets its heat flow to zero, and its wall temperature is
-pinned to the coolant.
-
-Return leg: `ret` is an external-input `Channel`. Default
-`h_left=h_right=0.0` makes it adiabatic regardless of `T_wall_*[i]` values; the
-per-cell `T_wall_left[i] / T_wall_right[i]` `~`-bindings to `T_inlet` are
-decorative and required to keep MTK fully determined.
-
-Gravity signs:
-- heated channel (`heated.ch`, A->B, nominally downward): g = -g_acc
-- ret (B->C, nominally upward): g = +g_acc
-
-Physics: the pump head `dP_pump_fn(t)` trips toward 0 (loss of flow). Inertia
-carries momentum; ch flow decays. Flapper opens when pump branch ṁ
-(ine.inlet.ṁ) drops below threshold (provided externally via
-`machine_callbacks`). After Flapper opens, flow redistributes: heated-channel flow
-reverses (upward NC driven by buoyancy).
-
-Recommended IC idiom (canonical steady-then-transient): build with a `dP_pump_fn`
-that trips at some `t_trip > 0`, `solve_steady` the system with the pump head held
-at its pre-trip value (a constant-valued `dP_pump_fn`, passed via
-`ssys.pump.dP_pump_fn => fn`) to obtain a consistent forced-flow IC, then
-`solve_transient` from that steady state with the tripping `dP_pump_fn`. Because the
-IC is a true steady state of this system and the head is continuous at `t=0`, the
-transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integration.jl`.
+To run a loss of flow, pass a `dP_pump_fn` that holds the pre-trip head and then falls, solve
+the steady state with the head held, and start the transient from it. The steady solve needs
+its flows seeded, as [Get a steady solve to converge](@ref) explains; `_lof_bypass_ic` in
+`test/test_examples.jl` shows which. A similar plant is built by hand, step by step, in
+[Loss of flow in a pool reactor](@ref).
 
 # Arguments
 - `n`: number of axial cells (default 10)
@@ -203,7 +177,7 @@ transient starts fully consistent. See `_lof_bypass_ic` in `test/test_integratio
   `:CLOSED`, which never opens)
 - `dP_pump_fn`: callable `f(t) -> Float64` giving the pump head [Pa] over time, stored
   as the MTK callable parameter `pump.dP_pump_fn` (pass `ssys.pump.dP_pump_fn => f` in
-  the solve `op`). Default `t -> 0.0` (pump off — NC only). For a loss-of-flow run,
+  the solve `op`). Default `t -> 0.0`, the pump off and natural circulation only. For a loss-of-flow run,
   supply a function that holds the pre-trip head then ramps to 0 (see the IC idiom above).
 
 # Returns

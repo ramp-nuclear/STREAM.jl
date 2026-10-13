@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" font-family="Lato, Helvetica, Arial, sans-serif" font-size="14">
+  <rect width="640" height="400" fill="white"/>
+  <!-- axes -->
+  <line x1="70" y1="340" x2="610" y2="340" stroke="#333" stroke-width="1.5"/>
+  <line x1="70" y1="340" x2="70" y2="30" stroke="#333" stroke-width="1.5"/>
+  <text x="600" y="362" text-anchor="end">mass flow ṁ</text>
+  <text x="30" y="40" transform="rotate(-90 30 40)" text-anchor="end">pressure drop Δp</text>
+  <!-- single-phase liquid curve, Δp ∝ ṁ² -->
+  <path d="M 70 335 Q 330 320 600 70" fill="none" stroke="#9aa" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="606" y="165" text-anchor="end" fill="#699">all liquid</text>
+  <!-- heated channel demand curve at fixed power -->
+  <path d="M 78 300 C 110 130, 140 70, 175 72 C 215 74, 235 150, 262 195 C 290 240, 320 252, 352 249 C 420 243, 520 160, 600 70"
+        fill="none" stroke="#1f6fb4" stroke-width="3"/>
+  <text x="185" y="56" text-anchor="middle" fill="#1f6fb4">heated channel, fixed power</text>
+  <!-- flat supply curve -->
+  <line x1="70" y1="190" x2="610" y2="190" stroke="#2b8a3e" stroke-width="2"/>
+  <text x="608" y="208" text-anchor="end" fill="#2b8a3e">supply: fixed Δp</text>
+  <!-- operating points where demand meets supply -->
+  <circle cx="102.4" cy="190" r="5" fill="#2b8a3e"/>
+  <circle cx="259.1" cy="190" r="5" fill="white" stroke="#2b8a3e" stroke-width="2"/>
+  <circle cx="472.9" cy="190" r="5" fill="#2b8a3e"/>
+  <text x="112" y="182" font-size="12">stable, low flow</text>
+  <text x="268" y="182" font-size="12">unstable</text>
+  <text x="472.9" y="176" text-anchor="middle" font-size="12">stable</text>
+  <!-- minimum of the demand curve -->
+  <circle cx="350" cy="249" r="6" fill="#d9480f"/>
+  <text x="362" y="280" fill="#d9480f">OFI: the minimum</text>
+  <text x="300" y="320" text-anchor="middle" font-size="12" fill="#555">between the low-flow peak and OFI, Δp rises as ṁ falls</text>
+  <text x="630" y="392" text-anchor="end" font-size="11" fill="#888">schematic, not to scale</text>
+</svg>

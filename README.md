@@ -1,113 +1,128 @@
-[![CI](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/ramp-nuclear/STREAM.jl/graph/badge.svg)](https://codecov.io/gh/ramp-nuclear/STREAM.jl) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/ramp-nuclear/STREAM.jl/graph/badge.svg)](https://codecov.io/gh/ramp-nuclear/STREAM.jl) [![Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://ramp-nuclear.github.io/STREAM.jl/stable/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # STREAM.jl
 
-A Julia library for thermal-hydraulics simulation of research reactor cooling systems, built on ModelingToolkit.jl.
+Thermal-hydraulics and reactor kinetics for research reactor cooling systems, in Julia.
 
-## What STREAM.jl Models
+STREAM.jl builds a model of a cooling system out of components (pumps, pipes, valves, coolant
+channels, fuel plates, point kinetics) connected as the plant is, and solves it for a steady
+state or a transient: a pump trip, a reactivity insertion, a loss of flow into natural
+circulation. It then checks the solution against the thermal-hydraulic limits: onset of
+boiling, flow instability and critical heat flux.
 
-STREAM.jl models pressurized light-water research reactor cooling loops under forced convection, natural convection, and flow reversal conditions. Given a loop topology (pump, channels, heat sources), it builds and solves the governing thermal-hydraulics equations: energy balance along each coolant channel, Dittus-Boelter heat transfer, Darcy-Weisbach friction with Blasius/Colebrook-White factors, and hydrostatic pressure contributions from vertical legs.
+It is a Julia port of [Python STREAM](https://github.com/ramp-nuclear/STREAM), checked against
+it, and built on [ModelingToolkit](https://docs.sciml.ai/ModelingToolkit/stable/).
 
-Beyond steady-state operation, STREAM.jl supports transient analysis: pump trip, loss-of-flow with Flapper check-valve opening, and natural circulation establishment. Each scenario is formulated as a differential-algebraic system — the same model that converges to steady-state under Newton iteration runs as a transient under Sundials IDA without modification.
+**[Read the documentation](https://ramp-nuclear.github.io/STREAM.jl/stable/)**: tutorials,
+how-to guides, the physics behind the models, and the API reference.
 
-For MTR (Materials Testing Reactor) plate-fuel assemblies, STREAM.jl includes a 2D finite-difference fuel plate (`HeatDiffusion`) that couples to coolant channels on both sides via `ThermalPort` arrays. Coupled to `PointKinetics` — a six-group delayed-neutron reactor kinetics model with temperature feedback — the library covers the full plate-fuel safety analysis workflow: heat generation, heat diffusion, coolant heating, subcooled boiling onset, and SCRAM transients. The underlying engine is Julia's ModelingToolkit.jl, which compiles the equation system symbolically before solving it numerically.
+## Installation
 
-## Quick Start
+STREAM.jl needs Julia 1.12 or later.
 
-### Installation
+```julia
+using Pkg
+Pkg.add(url="https://github.com/ramp-nuclear/STREAM.jl")
+```
+
+## A first model
+
+A pump pushes water through a heat exchanger, which sets it to 40 °C, and then through a pipe
+whose wall is held at 100 °C:
+
+```julia
+using STREAM
+using STREAM.Components: Pump, HeatExchanger, Channel
+using STREAM.Assemblies: inseries
+using ModelingToolkit: @named, mtkcompile
+
+@named pump = Pump(3.0e4)                 # pressure rise [Pa]
+@named hx = HeatExchanger(40.0)           # outlet temperature [°C]
+@named ch = Channel(; n=10, geometry=PipeGeometry_circular(0.6, 0.01), h_left=5000.0)
+
+connections = [
+    inseries(pump, hx, ch, pump),         # a closed loop
+    pump.inlet.p ~ 1.0e5,                 # one absolute pressure fixes the level [Pa]
+    ch.T_wall_left .~ 100.0,              # wall temperature [°C]
+]
+@named loop = assembly(connections, pump, hx, ch)
+sys = mtkcompile(loop)
+
+sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
+sol[sys.ch.inlet.ṁ], sol[sys.ch.T_out]    # about 0.6 kg/s, leaving at about 42 °C
+```
+
+[A first loop](https://ramp-nuclear.github.io/STREAM.jl/stable/tutorials/01_first_loop/) walks
+through it step by step.
+
+## Development
+
+Clone the repository and install what it depends on:
 
 ```bash
-# Install Julia 1.10+ from https://julialang.org/downloads/
-# Clone and activate:
 git clone https://github.com/ramp-nuclear/STREAM.jl
 cd STREAM.jl
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-### Steady-State Loop
+Loading STREAM takes about a minute in a fresh session, and the first `mtkcompile` of a model
+adds a little more. Later calls in the same session are fast, so work in one REPL rather
+than rerunning scripts, with [Revise](https://timholy.github.io/Revise.jl/stable/) to pick up
+changes to `src/` without restarting.
 
-```julia
-using STREAM
-using STREAM.Examples: build_loop
+### Where things are
 
-# Pump -> HeatExchanger (resets the inlet temperature) -> Channel -> back to the pump
-ssys = build_loop(;
-    n = 10,
-    T_inlet = 40.0,     # °C, coolant inlet
-    T_wall  = 100.0,    # °C, wall temperature
-    dP_pump = 3.0e4,    # Pa, pump pressure rise
-)
+The package is a stack of submodules, each using only the ones below it:
 
-# Seed the solve with an axial temperature guess and a mass flow
-T_guess = steady_state_guess(; T_inlet=40.0, Q_wall=1.0e4, ṁ_guess=0.49, n=10)
-op = Pair{Any,Any}[ssys.ch.T[i] => T_guess[i] for i in 1:10]
-push!(op, ssys.ch.inlet.ṁ => 0.49)
+| Module | Holds |
+|:--|:--|
+| `Substances` | coolant properties (light and heavy water) and solid materials |
+| `HTC`, `Friction`, `LocalLoss` | wall heat transfer, wall friction, and local pressure losses |
+| `Thresholds` | the thermal-hydraulic limits: boiling onset, flow instability, critical heat flux |
+| `Components` | pumps, valves, pipes, tanks, coolant channels, fuel, point kinetics, state machines |
+| `DecayHeat` | decay heat after shutdown |
+| `Assemblies` | wiring components together: `inseries`, `inparallel`, fuel assemblies |
 
-sol = solve_steady(ssys, op)
+`src/STREAM.jl` declares them and everything they export, and the
+[reference](https://ramp-nuclear.github.io/STREAM.jl/stable/reference/) lists each one. Code
+style is in `JULIA.md`. `VALIDATION.md` tracks the comparison with Python STREAM, and
+`GAPS.md` what STREAM.jl does not have yet.
 
-println("T_outlet = ", round(sol[ssys.ch.T_out], digits=2), " °C")
-println("ṁ        = ", round(abs(sol[ssys.ch.inlet.ṁ]), digits=4), " kg/s")
-# T_outlet = 42.21 °C,  ṁ = 0.5995 kg/s
+### Tests
+
+Each source file has a test file of the same name, so `src/components/tank.jl` is tested in
+`test/test_tank.jl`. Run one file while you work, and the whole suite before a pull request:
+
+```bash
+julia --project=. test/test_tank.jl       # one file
+julia --project=. test/runtests.jl        # everything, about twenty minutes
 ```
 
-## Component Catalog
+Short examples in docstrings are doctests, checked by `test/test_doctests.jl`.
 
-| Component | Models | Key Parameters |
-|-----------|--------|----------------|
-| `Channel` | Single-phase coolant channel with axial FD discretization | `n` (cells), `geometry` (PipeGeometry), `g` (gravity) |
-| `Pump` | Pressure-rise source; supports callable `dP(t)` for pump trips | `dP_pump`, or `ṁ0` for the fixed-flow form |
-| `HeatDiffusion` | 2D finite-difference solid fuel plate with lateral and axial conduction | `nz`, `nx`, `k_s`, `rho_s`, `cp_s`, `power`, `power_shape` |
-| `PointKinetics` | Keepin delayed-neutron kinetics, any group count, with SCRAM support and a prompt/total power split for decay heat | `beta_k`, `lambda_k`, callable `rho_c_fn`, `power_input` |
-| `ChannelAndContacts` | Coolant channel with bilateral `ThermalPort` arrays for plate coupling | `n`, `geometry` |
-| `HeatExchanger` | Constant-temperature heat sink (sets coolant inlet temperature) | `T_bc` |
+### Documentation
 
-Full API reference is available via Julia's built-in help system: `?Channel`, `?Components.Pump`, `?STREAM.Examples.build_loop`, etc.
+The site lives in `docs/`: tutorials as runnable scripts in `docs/literate/`, and the how-to
+guides, explanation pages and reference in `docs/src/`. Building it runs every example, so a
+tutorial whose numbers go wrong fails the build. The built site loads nothing from the
+internet, so it can be viewed offline or served from any web server: its scripts and fonts are
+downloaded once, to `docs/vendor` or the directory `STREAM_DOCS_VENDOR` names, and copied into
+every build.
 
-## Validation
-
-STREAM.jl results are validated against Python STREAM in `test/test_validation.jl`, which
-compares outputs case by case against reference values generated from the Python code:
-
-- **Steady-state loops.** Outlet temperature and mass flow in a forced-convection loop, and in
-  the MTR symmetric, asymmetric and one-sided plate topologies.
-- **Transients.** Outlet temperature response to a wall temperature step.
-- **Point kinetics.** Prompt-jump power response and reactivity insertion.
-- **HeatDiffusion.** Axial plate temperature decay against a 1D Fourier series solution.
-
-`VALIDATION.md` records how the reference values were produced and which Python tests each
-case corresponds to.
-
-## Installation
-
-```julia
-# From the Julia REPL:
-using Pkg
-Pkg.develop(path="/path/to/STREAM.jl")
-
-# Or clone and use directly:
-# git clone https://github.com/ramp-nuclear/STREAM.jl
-# cd STREAM.jl
-# julia --project=. -e 'using Pkg; Pkg.instantiate()'
+```bash
+julia --project=docs -e 'using Pkg; Pkg.instantiate()'   # once
+julia docs/vendor.jl                                      # once: the scripts and fonts
+julia --project=docs docs/make.jl                         # full build, several minutes
+DRAFT=1 julia --project=docs docs/make.jl                 # skip running code, for prose
+python3 -m http.server -d docs/build 8000                 # view at localhost:8000
 ```
 
-## Examples
+### Pull requests
 
-- `examples/simple_loop.jl` — Minimal forced-convection loop: build, solve, plot T_out
-- `examples/mtr_assembly.jl` — HeatDiffusion + ChannelAndContacts thermal coupling (MTR plate-fuel)
-- `examples/lof_transient.jl` — Loss-of-flow transient: pump trip, flapper event, natural circulation establishment
-
-Run with: `julia --project=. examples/simple_loop.jl`
-
-## Relationship to Python STREAM
-
-STREAM.jl is a Julia reimplementation of the Python STREAM thermal-hydraulics library, an internal research tool developed for nuclear safety analysis of plate-fuel research reactors.
-
-The motivation for a Julia reimplementation was architectural: Python STREAM uses a manually assembled ODE system (Aggregator pattern) that becomes unwieldy as the model grows. Julia's ModelingToolkit.jl enables symbolic-numeric DAE compilation, automatic Jacobian sparsity detection, and equation-level composition via `connect()`/`compose()` — making it practical to model full MTR assemblies (hundreds of equations) without hand-coding the system matrix. The sparser Jacobian from symbolic analysis also improves solver convergence for stiff transients.
-
-The physics models match Python STREAM exactly: Dittus-Boelter heat transfer coefficient, Blasius friction factor, MTR rectangular plate-channel geometry with correct hydraulic diameter (Dh = 4A/wet_perimeter), six-group delayed-neutron point kinetics with U-235 parameters, and Bergles-Rohsenow subcooled boiling onset.
-
-Validation shows less than 1% deviation from Python STREAM across all benchmark cases (steady-state loop, wall temperature step transient, prompt-jump point kinetics). Python STREAM is an internal tool; STREAM.jl is the open-source implementation.
+Open a pull request into `main`. CI runs the tests and builds the documentation, and both
+must pass. Pull requests are squash-merged, so the pull request's title and description
+become the commit on `main`.
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT. See [LICENSE](LICENSE).

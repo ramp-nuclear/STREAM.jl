@@ -3,7 +3,7 @@
 
 One-way convective heat sink at a single wall cell: imposes
 `thermal.Q ~ h * area * (thermal.T - T_fluid)`. The conductance `h` and fluid
-temperature `T_fluid` are unbound input variables — supply them with binding equations
+temperature `T_fluid` are unbound input variables: supply them with binding equations
 to a channel's live `h_tc[i]` and coolant `T[i]`. The heat absorbed leaves through this
 element and is never returned to whatever supplies `h`/`T_fluid`, so the coupling is
 one-way.

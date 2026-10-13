@@ -42,6 +42,19 @@ parts `a` and `b`, each weighted `k`, and a single scaled contribution is a one-
 # Arguments
 - `weights`: a tuple of `Float64` multipliers, one per part
 - `parts`: a tuple of [`AbstractDecayHeat`](@ref), in the same order
+
+# Examples
+```jldoctest
+julia> fp = DecayHeat.FissionProducts([1e-2, 1e-4], [0.05, 1e-4]);
+
+julia> heat = fp + 0.5 * DecayHeat.U238CaptureChain(0.5)
+DecayHeat.Sum of 2 contributions:
+  FissionProducts(2 groups)
+  0.5 × U238CaptureChain(0.5)
+
+julia> print(heat)   # the one-line form, as inside another printout
+FissionProducts(2 groups) + 0.5 × U238CaptureChain(0.5)
+```
 """
 struct Sum{N,P<:NTuple{N,AbstractDecayHeat}} <: AbstractDecayHeat
     weights::NTuple{N,Float64}
@@ -69,3 +82,20 @@ function Base.:*(factor::Real, model::AbstractDecayHeat)
     return Sum(Float64(factor) .* weights, parts)
 end
 Base.:*(model::AbstractDecayHeat, factor::Real) = factor * model
+
+function Base.show(io::IO, ::MIME"text/plain", s::Sum)
+    print(io, "DecayHeat.Sum of ", length(s.parts), length(s.parts) == 1 ? " contribution:" : " contributions:")
+    for (w, part) in zip(s.weights, s.parts)
+        print(io, "\n  ", isone(w) ? "" : "$(w) × ", part)
+    end
+end
+
+# Contributions print as their constructor calls, without the module path.
+function Base.show(io::IO, m::AbstractDecayHeat)
+    fields = (getfield(m, f) for f in fieldnames(typeof(m)))
+    print(io, nameof(typeof(m)), "(", join(fields, ", "), ")")
+end
+
+Base.show(io::IO, s::Sum) =
+    print(io, join((isone(w) ? sprint(show, p) : "$(w) × $(sprint(show, p))"
+                    for (w, p) in zip(s.weights, s.parts)), " + "))

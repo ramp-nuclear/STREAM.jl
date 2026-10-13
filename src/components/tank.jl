@@ -1,4 +1,4 @@
-"""
+@doc raw"""
     Tank(; name, area, L0, ports, liquid=H2O, p_surface=ATM, T0=T_ROOM,
          fixed_temperature=true, volume=nothing, Q_ext=0.0, g=G_EARTH) -> System
 
@@ -8,7 +8,9 @@ each at its own elevation.
 
 Each connection's pressure is the surface pressure plus the head of liquid above it,
 
-    port.p = p_surface + ρ(T)·g·(L − z)
+```math
+p_{port} = p_{surface} + ρ(T) g (L - z)
+```
 
 so a leg's driving head falls as the tank drains, reaches zero when the surface comes down to
 the connection, and goes negative once it is above the surface. Liquid leaves through every
@@ -16,8 +18,11 @@ port at the tank's temperature. A port the surface has fallen below keeps passin
 under that negative head: the tank does not shut it. To stop the flow there, put an
 [`Orifice`](@ref) on the line with a transition that shuts it when `L` passes the port.
 
-The level follows the net inflow, `ρ·A(L)·dL/dt = Σ ṁ`, with each port's `ṁ` positive into the
-tank.
+The level follows the net inflow, with each port's `ṁ` positive into the tank:
+
+```math
+ρ A(L) dL/dt = \sum \dot m
+```
 
 # Temperature
 
@@ -25,7 +30,9 @@ By default the temperature is held at `T0`, before and during the transient. The
 takes in whatever heat the loop brings it without warming, which suits a pool whose heat-up is
 of no interest. With `fixed_temperature=false`, `T` follows the enthalpy the inflows bring,
 
-    ρ·V(L)·cₚ·dT/dt = Σ max(ṁ, 0)·cₚ·(T_in − T) + Q_ext
+```math
+ρ V(L) c_p dT/dt = \sum \max(\dot m, 0) c_p (T_{in} - T) + Q_{ext}
+```
 
 Outflow leaves at `T`, so it adds nothing. A port's `instream` temperature is what arrives if
 liquid flows in, whichever way it is flowing, so the balance picks the inflowing ports itself.
@@ -44,6 +51,8 @@ sol = solve_transient(ssys, sol_ss, times; overrides=[ssys.pool.pinned => false]
 With the energy balance on, the steady temperature is the mix of the inflows, so a tank with
 no inflow in the steady state has nothing to set it. Start such a run from the declared state
 instead, `solve_transient(ssys, [ssys.pool.pinned => false], times)`.
+[Set up a tank for the steady solve](@ref) shows each case, and [Loss of coolant](@ref) why
+they differ.
 
 # Events
 
@@ -71,7 +80,8 @@ among the machine's `abort_states` to stop the run there.
 
 # Ports
 One `FlowPort` per entry of `ports`, named as in it. A port can start or end an
-[`inseries`](@ref) chain, `inseries(pool.bottom, breach, ambient.port)`.
+[`inseries`](@ref STREAM.Assemblies.Connect.inseries) chain,
+`inseries(pool.bottom, breach, ambient.port)`.
 
 # Returns
 Uncompiled `System` with the level `L`, the temperature `T`, the inventory `M = ρ·V(L)` [kg],

@@ -1,38 +1,30 @@
 """
     Pump(dP_pump::Real; name) -> System
     Pump(dP_pump::Any; name) -> System
-    Pump(; name, ṁ0) -> System
+    Pump(; name, ṁ0) -> System
 
-Fixed-pressure-drop (scalar or callable) or fixed-mass-flow pump. Three dispatch methods:
+A pump, in one of three modes:
 
-1. `Pump(dP_pump::Real; name)` — scalar fixed-pressure mode. `dP_pump` is a constant
-   pressure rise parameter [Pa]. Mass flow is determined by the loop resistance.
-
-2. `Pump(dP_pump::Any; name)` — callable fixed-pressure mode. `dP_pump` is any callable
-   `f(t) -> Float64` (anonymous function, closure, DataInterpolations interpolant, etc.).
-   The callable is stored as an MTK callable parameter `dP_pump_fn`. The caller must pass
-   `ssys.pump.dP_pump_fn => f` in the `op` dict to `ODEProblem` / `solve_transient`.
-
-3. `Pump(; name, ṁ0)` — fixed-flow mode. `ṁ0` is a fixed mass flow rate parameter
-   [kg/s]. No pressure equation is added; the caller must anchor pressure elsewhere.
+- **Fixed head**, `Pump(dP)` with a number: the outlet pressure is `dP` above the inlet,
+  whatever the flow. The loop's resistance sets the flow. `dP` becomes the parameter
+  `dP_pump`, which an operating point or `overrides` can change.
+- **Head in time**, `Pump(f)` with a function `f(t)`, such as a coastdown: the same, with the
+  head `f(t)`. `f` becomes the callable parameter `dP_pump_fn`, which must also be given in the
+  operating point of the solve, as `sys.pump.dP_pump_fn => f`. See
+  [Drive an input from a function of time](@ref).
+- **Fixed flow**, `Pump(; ṁ0)`: the flow is `ṁ0` and the head is whatever it takes. The
+  pump states no pressure, so fix one elsewhere in the loop.
 
 # Arguments
-**Scalar mode (method 1):**
-- `dP_pump::Real`: fixed pressure rise [Pa]
-- `name`: system name (Symbol)
-
-**Callable mode (method 2):**
-- `dP_pump::Any`: callable `f(t) -> Float64` giving pump pressure rise [Pa]
-- `name`: system name (Symbol)
-- The callable is stored as MTK parameter `dP_pump_fn`. Pass it in `op`:
-  `ssys.pump.dP_pump_fn => f` when constructing `ODEProblem` or calling `solve_transient`.
-
-**Fixed-flow mode (method 3):**
-- `name`: system name (Symbol)
-- `ṁ0`: fixed mass flow rate [kg/s]
+- `dP_pump`: the pressure rise [Pa], a number or a function of time
+- `ṁ0`: the mass flow [kg/s], for the fixed-flow mode
+- `name`: system name, supplied by `@named`
 
 # Ports
-- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
+- `inlet`, `outlet`: `FlowPort`
+
+# Returns
+Uncompiled `System`.
 """
 function Pump(dP_pump::Real; name)
     pars = @parameters dP_pump = dP_pump

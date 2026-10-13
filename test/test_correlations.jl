@@ -6,64 +6,6 @@ using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 
-@testset "Correlation Library" begin
-    @testset "Friction.rectangular_correction reference values" begin
-        @test isapprox(Friction.rectangular_correction(0.0), 0.66685; atol=1e-4)
-        @test isapprox(Friction.rectangular_correction(0.01814), 0.68544; atol=1e-4)
-        @test isapprox(Friction.rectangular_correction(0.5), 1.03639; atol=1e-4)
-        @test isapprox(Friction.rectangular_correction(1.0), 1.12462; atol=1e-4)
-    end
-
-    @testset "HTC.dittus_boelter standalone function" begin
-        # Definition check: mirrors the source formula Nu = 0.023*Re^0.8*Pr^0.4.
-        expected_Nu = 0.023 * 8000.0^0.8 * 7.0^0.4
-        @test isapprox((@inferred HTC.dittus_boelter(8000.0, 7.0)), expected_Nu; rtol=1e-6)
-
-        # Anchored point computed independently at clean inputs (not a copy of the source
-        # expression). At Pr=1 the Pr^0.4 factor is exactly 1, and Re=1e4 gives
-        # Re^0.8 = (10^4)^0.8 = 10^3.2 = 1584.8932. The heating-mode Dittus-Boelter value is
-        # then 0.023 * 1584.8932 = 36.45255, which pins both the lead coefficient 0.023 and
-        # the Re exponent 0.8. rtol=1e-4 is pure float round-off on a hand value.
-        @test isapprox(HTC.dittus_boelter(1.0e4, 1.0), 36.45255; rtol=1e-4)
-        # Second clean point exercises the Pr exponent: at Re=1e4 the Re factor is the same
-        # 1584.8932, and Pr=32 gives Pr^0.4 = (2^5)^0.4 = 2^2 = 4 exactly, so the value is
-        # 0.023 * 1584.8932 * 4 = 145.8102. A wrong Pr exponent would miss this.
-        @test isapprox(HTC.dittus_boelter(1.0e4, 32.0), 145.8102; rtol=1e-4)
-    end
-
-    @testset "Friction.blasius standalone function" begin
-        # Definition check: mirrors the source formula f_darcy = 0.3164*Re^(-0.25).
-        expected_f = 0.3164 * 8000.0^(-0.25)
-        @test isapprox((@inferred Friction.blasius(8000.0)), expected_f; rtol=1e-6)
-
-        # Anchored reference point. The Blasius smooth-pipe Darcy factor at Re=1e5 is the
-        # standard textbook value f = 0.3164/100000^0.25 = 0.01779 (e.g. White, Fluid
-        # Mechanics, 7th ed., the Moody-chart smooth-wall limit). rtol=1e-3 covers the
-        # 4-significant-figure rounding of the published 0.0178.
-        @test isapprox(Friction.blasius(1.0e5), 0.0178; rtol=1e-3)
-    end
-
-    @testset "HTC.constant_Nusselt factory" begin
-        # Default Nu = 8.235
-        htc_fn = HTC.constant_Nusselt()
-        @test htc_fn(300.0, 7.0) == 8.235
-        @test htc_fn(100.0, 3.0) == 8.235
-        # Custom Nu
-        htc_custom = HTC.constant_Nusselt(Nu=5.0)
-        @test htc_custom(300.0, 7.0) == 5.0
-    end
-
-    @testset "Friction.rectangular_laminar factory" begin
-        # MTR-like rectangular geometry constructed so depth/width == 0.01814 exactly.
-        # width = 0.07, depth = 0.07 * 0.01814 = 0.0012698  →  aspect_ratio = 0.01814.
-        geom = PipeGeometry_rectangular(0.6, 0.07, 0.07 * 0.01814, 0.07)
-        f_fn = Friction.rectangular_laminar(geom)
-        k_R = Friction.rectangular_correction(0.01814)
-        @test isapprox(f_fn(100.0), 64.0 / (100.0 * k_R); rtol=1e-6)
-        @test isapprox(f_fn(500.0), 64.0 / (500.0 * k_R); rtol=1e-6)
-    end
-end
-
 @testset "Integration Tests — Pluggable Correlations in Solved Systems" begin
     @testset "HTC.constant_Nusselt integration — Nu≈8.235 in solution" begin
         n = 3;
@@ -227,12 +169,6 @@ end
 end
 
 @testset "HTC.Elenbaas Natural Convection" begin
-    @testset "HTC.elenbaas_nusselt standalone for known values" begin
-        @test isapprox(
-            HTC.elenbaas_nusselt(12375.512696, 0.00254, 0.6), 1.2731625848; rtol=1e-6
-        )
-    end
-
     @testset "HTC.elenbaas_nusselt limiting cases" begin
         @test isapprox(HTC.elenbaas_nusselt(0.0, 0.00254, 0.6), 0.0; atol=1e-10)
         Nu_large = HTC.elenbaas_nusselt(1e6, 0.00254, 0.6)
@@ -358,16 +294,6 @@ end
 
     # Smooth pipe (epsilon=0): friction decreases with Re
     @test Friction.turbulent(4e3) > Friction.turbulent(1e6)
-end
-
-@testset "Friction.viscosity_correction" begin
-    # Reference values from Python STREAM friction.py doctest
-    @test Friction.viscosity_correction(1.0, 1.0) == 1.0
-    @test Friction.viscosity_correction(1.0, 0.0) == 0.0
-    @test isapprox(Friction.viscosity_correction(1.0, 2.0), 1.4948492486349383; rtol=1e-10)
-
-    # heat_wet_ratio = 0 => no correction regardless of mu_ratio
-    @test Friction.viscosity_correction(0.0, 5.0) == 1.0
 end
 
 @testset "HTC.fully_developed_laminar_nusselt" begin
@@ -512,12 +438,6 @@ end
     @test isapprox(STREAM.LocalLoss.sudden_expansion_factor(0.5, 1e5), (1 - 0.5)^2; rtol=1e-12)
     @test isapprox(STREAM.LocalLoss.sudden_contraction_factor(0.5, 1e5), 0.5 * (1 - 0.5)^0.75; rtol=1e-12)
     @test isapprox(STREAM.LocalLoss.sudden_expansion_factor(0.0, 1e5), 1.0; rtol=1e-12)   # full expansion
-end
-
-@testset "Idelchik local-loss factors — table nodes" begin
-    # At a (Re, area-ratio) grid node the interpolation returns the tabulated value.
-    @test isapprox(STREAM.LocalLoss.sudden_expansion_factor(0.3, 100.0), 1.20; rtol=1e-12)   # Table 4.2
-    @test isapprox(STREAM.LocalLoss.sudden_contraction_factor(0.3, 100.0), 1.10; rtol=1e-12) # Table 4.10
 end
 
 @testset "Idelchik local-loss factor — direction dispatch (A2>A1)" begin

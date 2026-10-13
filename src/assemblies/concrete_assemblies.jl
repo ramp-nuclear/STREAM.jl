@@ -40,7 +40,7 @@ function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
     has_return = !isempty(h_vals) && any(v -> v > 0.0, h_vals)
 
     if active_g && !has_return
-        @warn "check_gravity_mismatch: channels have g_acc > 0 but no Gravity return component found — loop gravity terms may be unbalanced"
+        @warn "check_gravity_mismatch: channels have g_acc > 0 but no Gravity return component found; loop gravity terms may be unbalanced"
         return :mismatch
     end
 
@@ -130,15 +130,16 @@ end
 """
     single_channel(channel, fuel, geometry; fuel_side=:left, name) -> System
 
-Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*: the
-channel is heated on one face only, but the fuel plate is cooled on **both** faces — the
+Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*.
+
+The channel is heated on one face only, but the fuel plate is cooled on **both** faces: the
 near face by conjugate coupling to the channel, the far face by a one-way convective sink
 (`ConvectiveBoundary`) fed from the channel's far-side `h_tc` and coolant `T`.
 
 This reproduces the half-symmetric reduced unit used for the last plate in an array: the
 plate sits between two channels, so it loses heat on both faces, but only one channel is
 modelled. The far face's heat flows into the unmodelled equivalent twin, so the subsystem
-does not conserve energy — that is the modelling choice, not a defect. For the truthful
+does not conserve energy, by design. For the truthful
 one-face-insulated coupling, use [`one_sided`](@ref) instead.
 
 # Arguments
@@ -146,7 +147,7 @@ one-face-insulated coupling, use [`one_sided`](@ref) instead.
 - `fuel`: uncompiled `HeatDiffusion` instance (`nz` must equal `channel.n`).
 - `geometry`: the `PipeGeometry` the channel was built with (supplies `L` and
   `heated_parts` for the far-face areas).
-- `fuel_side`: `:left` or `:right` — which fuel face is the near (conjugate) face
+- `fuel_side`: `:left` or `:right`, which fuel face is the near (conjugate) face
   (default `:left`). The opposite face gets the convective sink.
 - `name`: system name (Symbol).
 
@@ -171,7 +172,7 @@ function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol
     far_port = Symbol(:thermal_, far)
     # The channel's far face is never connected, so its conductance is undefined; Python's
     # `_other_if_none` copies the connected (near) face's h to it. Cool the fuel's far face
-    # with that same near-side h_tc and the channel's coolant T — the equivalent-twin proxy.
+    # with that same near-side h_tc and the channel's coolant T: the equivalent-twin proxy.
     h_near = near == :left ? :h_tc_left : :h_tc_right
 
     far_bcs = [
@@ -229,66 +230,48 @@ end
 """
     fuel_assembly(channels, plates; bookend=:auto, start=nothing, closed=false, name) -> System
 
-Compose an alternating CAC↔Plate chain (fuel-assembly topology) from a vector of
-`ChannelAndContacts` instances and a vector of `HeatDiffusion` plates.
+Join `ChannelAndContacts` channels and `HeatDiffusion` plates into an alternating chain, the
+layout of a plate-fuel assembly. Each element's right face is joined to the next one's left
+face, cell by cell, as in [`plate`](@ref). Faces at the ends of an open chain stay unconnected,
+which makes them adiabatic, as in [`one_sided`](@ref).
 
-Each adjacent pair connects the left member's right face to the right member's left face, as in
-[`plate`](@ref). Outer faces left dangling stay adiabatic, as in [`one_sided`](@ref).
+The chain has one of four shapes, inferred from the counts when `bookend=:auto`:
 
-There are four chain shapes:
+1. **Channel-bookended**: one more channel than plates, so both ends are channels.
+2. **Plate-bookended**: one more plate than channels, so both ends are plates.
+3. **Mixed**: equal counts, one end of each. Needs `bookend=:mixed` (or `:auto`) and
+   `start=:channel` or `start=:plate` to say which comes first.
+4. **Closed**: equal counts with `closed=true`. The last element wraps around to the first,
+   as in an annular assembly. `start` defaults to `:channel`.
 
-1. **Channel-bookended** — `length(channels) == length(plates) + 1`. Both ends are CACs;
-   plates sit between adjacent channels. Inferred when `bookend=:auto`.
-2. **Plate-bookended** — `length(plates) == length(channels) + 1`. Both ends are plates.
-   Inferred when `bookend=:auto`.
-3. **Mixed** — equal counts. One end is a channel, the other a plate; orientation pinned
-   by `start=:channel` or `start=:plate`. Requires `bookend=:mixed` (or `:auto` with equal
-   counts) plus an explicit `start`.
-4. **Closed annular ring** — equal counts with `closed=true`. Last element wraps to the
-   first; `start` defaults to `:channel` (canonical orientation for the wrap pair).
+Each plate's `nz` must equal the `n` of the channels it touches. The components keep the
+names they were built with, so the chain built from `c1` and `p1` is reached as `asm.c1` and
+`asm.p1`. See [Build a fuel assembly](@ref).
 
 # Arguments
-- `channels::Vector{<:AbstractSystem}`: uncompiled `ChannelAndContacts` instances.
-- `plates::Vector{<:AbstractSystem}`: uncompiled `HeatDiffusion` instances.
-- `bookend::Symbol = :auto`: one of `:auto | :channel | :plate | :mixed`. `:auto` infers
-  from `(length(channels), length(plates))`. An explicit value that contradicts the
-  inferred value raises `ArgumentError`.
-- `start::Union{Symbol,Nothing} = nothing`: required when `bookend=:mixed`. Values
-  `:channel` (chain starts with `channels[1]`) or `:plate` (chain starts with `plates[1]`).
-  Must be `nothing` for non-mixed bookends. Defaults to `:channel` when `closed=true`
-  and no explicit value is provided (the ring is rotationally symmetric — the choice
-  only picks which neighbour the wrap pair attaches to first).
-- `closed::Bool = false`: when true, wrap the chain into a ring (variant 4). Requires
-  equal lengths; raises `ArgumentError` otherwise.
-- `name::Symbol`: system name (kwarg-only; supplied by `@named` macro).
+- `channels`: uncompiled `ChannelAndContacts`, in chain order
+- `plates`: uncompiled `HeatDiffusion`, in chain order
 
-Per-pair `n` matching (`cac.n == plate.nz` for every adjacent pair) is the caller's
-responsibility (same contract as `symmetric_plate` / `plate`). The per-cell port count
-is taken from `channels[1]`; a mismatch across the vector is caught by MTK at
-`mtkcompile()` time.
+# Keywords
+- `bookend`: `:auto` (default), `:channel`, `:plate` or `:mixed`. An explicit value that
+  contradicts the counts raises.
+- `start`: `:channel` or `:plate` for a mixed or closed chain, `nothing` otherwise
+- `closed`: wrap the chain into a ring
+- `name`: system name, supplied by `@named`
 
 # Returns
-Uncompiled `System` from [`assembly`](@ref). Add boundary conditions (a pump loop, a
-pressure anchor, and a power binding for any plate built with `power=nothing`), then
-`mtkcompile(...; build_initializeprob=false)`.
+Uncompiled `System` from [`assembly`](@ref). Add the hydraulics, a pressure anchor and, for a
+plate built with `power=nothing`, its power, then `mtkcompile`.
 
-After composition, sub-components are reachable through their original `@named` names
-(`assembly.c1`, `assembly.p1`, …). The helper does NOT synthesize index-based names.
+# Throws
+- `ArgumentError`: for counts that fit no shape, or keywords that contradict them
 
 # Examples
 ```julia
-# Variant 1 — channel-bookended (k=2 plates, k+1=3 channels)
-assembly = fuel_assembly([c1, c2, c3], [p1, p2]; name=:asm)
-# bookend defaults to :auto → resolves to :channel
-
-# Variant 2 — plate-bookended (k=1 channel, k+1=2 plates)
-assembly = fuel_assembly([c1], [p1, p2]; name=:asm)
-
-# Variant 3 — mixed (k=2 of each), channel-first
-assembly = fuel_assembly([c1, c2], [p1, p2]; bookend=:mixed, start=:channel, name=:asm)
-
-# Variant 4 — closed annular ring (k=3 of each)
-assembly = fuel_assembly([c1, c2, c3], [p1, p2, p3]; closed=true, name=:asm)
+fuel_assembly([c1, c2, c3], [p1, p2]; name=:asm)                       # channel-bookended
+fuel_assembly([c1], [p1, p2]; name=:asm)                               # plate-bookended
+fuel_assembly([c1, c2], [p1, p2]; bookend=:mixed, start=:channel, name=:asm)
+fuel_assembly([c1, c2, c3], [p1, p2, p3]; closed=true, name=:asm)      # a ring
 ```
 """
 function fuel_assembly(
@@ -320,7 +303,7 @@ function fuel_assembly(
     elseif nc == np
         :mixed
     else
-        throw(ArgumentError("fuel_assembly: cannot infer bookend from lengths channels=$nc, plates=$np — must be equal, or differ by exactly 1"))
+        throw(ArgumentError("fuel_assembly: cannot infer bookend from lengths channels=$nc, plates=$np; they must be equal, or differ by exactly 1"))
     end
     effective_bookend = if bookend == :auto
         inferred

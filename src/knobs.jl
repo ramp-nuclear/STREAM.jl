@@ -15,9 +15,10 @@ end
 """
     @design_knob name = default
 
-Declare a design knob: a named scalar input that drives geometry (or any other parameter)
-across one or more components and can be varied at solve time with `remake`, without
-rebuilding or recompiling the model.
+Declare a design knob, a parameter that can change between solves without recompiling.
+
+A knob is a named scalar input that drives geometry, or any other parameter, across one or
+more components, and is varied at solve time through the operating point or `remake`.
 
 The knob is a `GlobalScope` parameter, so the same knob passed into several composed
 components stays one un-namespaced parameter at the root system. `remake(name => x)` sets
@@ -27,12 +28,11 @@ caller supplying a value.
 
 # Example
 ```julia
-outer_d = @design_knob outer_d = 0.02      # annulus outer / channel inner [m]
-@named ch = CoolantChannel(outer_d)         # same knob into both components
-@named hd = FuelAnnulus(outer_d)
-# ... compose, mtkcompile, build a SteadyStateProblem ...
-remake(prob; p = [outer_d => 0.025])        # scan one knob, no rebuild
+gap = @design_knob gap = 0.0024
+geometry = PipeGeometry_rectangular(0.6, 0.067, gap, 0.063)   # build with it, then:
+solve_steady(sys, [gap => 0.0027, ...])                       # a new gap, no rebuild
 ```
+See [Scan a design parameter](@ref).
 
 # Returns
 Binds `name` in the caller's scope to the knob and returns it.

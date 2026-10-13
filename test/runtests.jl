@@ -2,6 +2,7 @@
 
 include("preamble.jl")
 
+include("test_doctests.jl")
 include("test_geometry.jl")
 include("test_knobs.jl")
 include("test_connectors.jl")

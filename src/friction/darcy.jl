@@ -23,6 +23,13 @@ abstract type AbstractDarcyFactor end
 
 Lift a callable `f(T_bulk, T_wall, ṁ, liquid, pipe) -> f_darcy` into a [`AbstractDarcyFactor`](@ref),
 for a correlation not worth its own type.
+
+# Examples
+A named function prints as its name, and an anonymous one as "a correlation":
+```jldoctest
+julia> Friction.FromFunction((T_bulk, T_wall, ṁ, liquid, pipe) -> 0.02)
+Friction.FromFunction(a correlation)
+```
 """
 struct FromFunction{F} <: AbstractDarcyFactor
     f::F
@@ -40,6 +47,15 @@ is how Python STREAM applies its geometric correction.
 # Arguments
 - `correlation`: the correlation to close, called as `(Re) -> f`
 - `k_R`: geometric correction on the Reynolds number, default 1.0 (a circular duct)
+
+# Examples
+```jldoctest
+julia> Friction.Blasius(; k_R=0.7)
+Friction.FromReynolds(blasius), Re scaled by k_R = 0.7
+
+julia> print(Friction.Blasius(; k_R=0.7))   # the one-line form, as inside another printout
+blasius, Re scaled by k_R = 0.7
+```
 """
 struct FromReynolds{C} <: AbstractDarcyFactor
     correlation::C
@@ -92,10 +108,11 @@ end
                             re_bounds=(2000.0, 5000.0), k_R=1.0,
                             viscosity=nothing) <: AbstractDarcyFactor
 
-Switch between a laminar and a turbulent friction branch on the bulk Reynolds number, the way
-Python STREAM's `regime_dependent_friction` does: laminar at or below `re_bounds[1]`,
-turbulent above `re_bounds[2]`, and a linear blend in between via
-[`flow_regime_blend`](@ref).
+Switch between a laminar and a turbulent friction branch on the bulk Reynolds number.
+
+It is laminar at or below `re_bounds[1]`, turbulent above `re_bounds[2]`, and a linear blend
+in between via [`flow_regime_blend`](@ref), as Python STREAM's `regime_dependent_friction`
+does.
 
 Two things make this the model to reach for when the flow reverses. It guards the no-flow
 point, where the bare `64/Re` would otherwise be infinite, and the blend keeps the factor
@@ -112,6 +129,14 @@ Python's `k_H=None`, so the correction is opt-in and no existing result moves.
 - `re_bounds`: `(re_lo, re_hi)` transition band on the bulk Reynolds number
 - `k_R`: geometric correction on the Reynolds fed to each branch
 - `viscosity`: optional `(heat_wet_ratio, mu_ratio) -> K_H`
+
+# Examples
+For a plate channel 2.4 mm deep and 63 mm wide, with the heated-wall correction:
+```jldoctest
+julia> Friction.RegimeDependent(; k_R=Friction.rectangular_correction(0.0024 / 0.063),
+                                  viscosity=Friction.viscosity_correction)
+Friction.RegimeDependent(laminar | turbulent, blending across Re = 2000.0 to 5000.0, k_R = 0.7056, with the heated-wall viscosity correction)
+```
 """
 struct RegimeDependent{L,T,V} <: AbstractDarcyFactor
     laminar::L
@@ -148,3 +173,28 @@ end
 # A model that does not read the wall temperature can be handed the bulk in its place, which
 # is what a channel with no wall of its own does.
 (d::AbstractDarcyFactor)(T_bulk, ṁ, liquid, pipe) = d(T_bulk, T_bulk, ṁ, liquid, pipe)
+
+# #### Printing
+
+function _correlation_name(f)
+    f isa Function || return sprint(show, f)
+    name = string(nameof(f))
+    return startswith(name, "#") ? "a correlation" : name
+end
+
+Base.show(io::IO, d::FromFunction) = print(io, "Friction.FromFunction(", _correlation_name(d.f), ")")
+Base.show(io::IO, d::FromReynolds) =
+    print(io, _correlation_name(d.correlation), d.k_R == 1 ? "" : ", Re scaled by k_R = $(round(d.k_R; sigdigits=4))")
+
+function Base.show(io::IO, d::RegimeDependent)
+    lo, hi = d.re_bounds
+    print(io, "Friction.RegimeDependent(", _correlation_name(d.laminar), " | ",
+          _correlation_name(d.turbulent), ", blending across Re = ", lo, " to ", hi)
+    d.k_R == 1 || print(io, ", k_R = ", round(d.k_R; sigdigits=4))
+    d.viscosity === nothing || print(io, ", with the heated-wall viscosity correction")
+    print(io, ")")
+end
+
+Base.show(io::IO, ::MIME"text/plain", d::FromReynolds) =
+    print(io, "Friction.FromReynolds(", _correlation_name(d.correlation), ")",
+          d.k_R == 1 ? "" : ", Re scaled by k_R = $(round(d.k_R; sigdigits=4))")

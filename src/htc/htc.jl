@@ -24,6 +24,13 @@ abstract type AbstractHTC end
 
 Lift a callable `f(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h` into an [`AbstractHTC`](@ref), for a
 correlation not worth its own type.
+
+# Examples
+A named function prints as its name, and an anonymous one as "a correlation":
+```jldoctest
+julia> HTC.FromFunction((T_wall, T_bulk, ṁ, Dh, A, liquid) -> 5000.0)
+HTC.FromFunction(a correlation)
+```
 """
 struct FromFunction{F} <: AbstractHTC
     f::F
@@ -98,6 +105,12 @@ end
     DittusBoelter(; basis=AtFilm()) -> FromNusselt
 
 Dittus-Boelter turbulent forced convection, `Nu = 0.023·Re^0.8·Pr^0.4`.
+
+# Examples
+```jldoctest
+julia> HTC.DittusBoelter()
+HTC.FromNusselt(dittus_boelter), at the film temperature
+```
 """
 DittusBoelter(; basis::PropertyBasis=AtFilm()) = FromNusselt(dittus_boelter, basis)
 
@@ -184,9 +197,10 @@ _with_basis(m, basis) = m
     RegimeDependent(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
                        geom, g=G_EARTH) <: AbstractHTC
 
-A heat transfer coefficient that picks its correlation by flow regime: `laminar` at low
-Reynolds number, `turbulent` at high, a linear blend of the two across `re_bounds`, and
-`natural` convection wherever buoyancy outweighs the forced flow.
+A heat transfer coefficient that picks its correlation by flow regime.
+
+It uses `laminar` at low Reynolds number, `turbulent` at high, a linear blend of the two
+across `re_bounds`, and `natural` convection wherever buoyancy outweighs the forced flow.
 
 Two Reynolds numbers are involved, for different questions. Whether the flow is laminar or
 turbulent is a property of the flow as a whole, so the blend reads the Reynolds number at the
@@ -205,6 +219,17 @@ with no property basis of its own is used as given.
 - `re_bounds`: `(re_lo, re_hi)` transition band on the bulk Reynolds number
 - `geom`: channel geometry; `geom.Dh` is the Grashof characteristic length
 - `g`: gravitational acceleration [m/s²], used only when `natural` is given
+
+# Examples
+It prints each branch with the temperature its properties are read at:
+```jldoctest
+julia> geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063);
+
+julia> HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(), geom)
+HTC.RegimeDependent, blending across Re = 2000.0 to 5000.0
+  laminar:   constant Nu = 8.235, at the bulk temperature
+  turbulent: dittus_boelter, at the film temperature
+```
 """
 struct RegimeDependent{L<:AbstractHTC,T<:AbstractHTC,N} <: AbstractHTC
     laminar::L
@@ -254,6 +279,15 @@ end
     Maximal(models...) <: AbstractHTC
 
 The largest `h` of several models, for a wall cooled by whichever mechanism happens to win.
+
+# Examples
+Forced convection or natural convection in a 2.4 mm gap, whichever is larger:
+```jldoctest
+julia> geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063);
+
+julia> HTC.Maximal(HTC.DittusBoelter(), HTC.Elenbaas(geom))
+the largest of dittus_boelter, at the film temperature; Elenbaas natural convection, gap 2.4 mm, at the film temperature
+```
 """
 struct Maximal{T<:Tuple} <: AbstractHTC
     models::T
@@ -280,6 +314,22 @@ extra-argument form `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)`.
 - `q_scb`: subcooled boiling heat flux closure `(T_wall, sat, Re) -> q`, e.g. from
   [`regime_dependent_q_scb`](@ref). `sat` is the coolant's [`Liquid`](@ref) snapshot at
   saturation at the local pressure, and `Re` the bulk Reynolds number.
+
+# Examples
+```jldoctest
+julia> geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063);
+
+julia> spl = HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(), geom);
+
+julia> scb = HTC.SubcooledBoiling(spl, HTC.regime_dependent_q_scb())
+HTC.SubcooledBoiling, partial boiling above the onset of nucleate boiling, on
+  HTC.RegimeDependent, blending across Re = 2000.0 to 5000.0
+    laminar:   constant Nu = 8.235, at the bulk temperature
+    turbulent: dittus_boelter, at the film temperature
+
+julia> print(scb)   # the one-line form, as inside another model's printout
+subcooled boiling on HTC.RegimeDependent(constant Nu = 8.235, at the bulk temperature | dittus_boelter, at the film temperature)
+```
 """
 struct SubcooledBoiling{H<:AbstractHTC,Q} <: AbstractHTC
     single_phase::H
@@ -299,3 +349,45 @@ end
 # Models that do not care about pressure ignore the extra argument, so a channel can always
 # pass it and let the model decide.
 (htc::AbstractHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid, P) = htc(T_wall, T_bulk, ṁ, Dh, A, liquid)
+
+# #### Printing
+
+_basis_words(::AtFilm) = "at the film temperature"
+_basis_words(::AtBulk) = "at the bulk temperature"
+
+# A named function prints as its name; a closure or a callable struct as itself, if it says
+# more than its type.
+function _correlation_name(f)
+    f isa Function || return sprint(show, f)
+    name = string(nameof(f))
+    return startswith(name, "#") ? "a correlation" : name
+end
+
+Base.show(io::IO, m::FromFunction) = print(io, "HTC.FromFunction(", _correlation_name(m.f), ")")
+Base.show(io::IO, m::FromNusselt) =
+    print(io, _correlation_name(m.nusselt), ", ", _basis_words(m.basis))
+Base.show(io::IO, m::Elenbaas) =
+    print(io, "Elenbaas natural convection, gap ", round(1e3 * m.gap; sigdigits=4), " mm, ",
+          _basis_words(m.basis))
+Base.show(io::IO, m::Maximal) = print(io, "the largest of ", join(m.models, "; "))
+Base.show(io::IO, m::RegimeDependent) =
+    print(io, "HTC.RegimeDependent(", m.laminar, " | ", m.turbulent,
+          m.natural === nothing ? "" : " | $(m.natural)", ")")
+Base.show(io::IO, m::SubcooledBoiling) = print(io, "subcooled boiling on ", m.single_phase)
+
+function Base.show(io::IO, ::MIME"text/plain", m::RegimeDependent)
+    lo, hi = m.re_bounds
+    print(io, "HTC.RegimeDependent, blending across Re = ", lo, " to ", hi)
+    print(io, "\n  laminar:   ", m.laminar)
+    print(io, "\n  turbulent: ", m.turbulent)
+    m.natural === nothing || print(io, "\n  natural:   ", m.natural, ", where Gr > Re²")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", m::SubcooledBoiling)
+    print(io, "HTC.SubcooledBoiling, partial boiling above the onset of nucleate boiling, on")
+    inner = sprint(show, MIME("text/plain"), m.single_phase)
+    print(io, "\n  ", replace(inner, "\n" => "\n  "))
+end
+
+Base.show(io::IO, ::MIME"text/plain", m::FromNusselt) =
+    print(io, "HTC.FromNusselt(", _correlation_name(m.nusselt), "), ", _basis_words(m.basis))
