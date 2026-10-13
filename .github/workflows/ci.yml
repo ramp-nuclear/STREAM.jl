@@ -4,6 +4,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+# Nothing here writes to the repository. The coverage upload authenticates with its own token.
+permissions:
+  contents: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -20,6 +23,15 @@ jobs:
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+      # julia-runtest already runs with coverage on. These turn its .cov files into lcov.info and
+      # upload it. Pull requests from forks get no secrets and upload without the token, which
+      # Codecov accepts for a public repository.
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   # Forward-looking canary: latest Julia, and it drops the Manifest to resolve the latest compatible
   # packages, so an upstream bump that breaks the suite shows up here instead of on a contributor's
