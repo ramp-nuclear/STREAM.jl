@@ -104,10 +104,14 @@ Short examples in docstrings are doctests, checked by `test/test_doctests.jl`.
 
 The site lives in `docs/`: tutorials as runnable scripts in `docs/literate/`, and the how-to
 guides, explanation pages and reference in `docs/src/`. Building it runs every example, so a
-tutorial whose numbers go wrong fails the build.
+tutorial whose numbers go wrong fails the build. The built site loads nothing from the
+internet, so it can be viewed offline or served from any web server: its scripts and fonts are
+downloaded once, to `docs/vendor` or the directory `STREAM_DOCS_VENDOR` names, and copied into
+every build.
 
 ```bash
 julia --project=docs -e 'using Pkg; Pkg.instantiate()'   # once
+julia docs/vendor.jl                                      # once: the scripts and fonts
 julia --project=docs docs/make.jl                         # full build, several minutes
 DRAFT=1 julia --project=docs docs/make.jl                 # skip running code, for prose
 python3 -m http.server -d docs/build 8000                 # view at localhost:8000

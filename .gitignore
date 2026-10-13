@@ -14,6 +14,8 @@ node_modules/
 # Documentation build output, and the numbered tutorial pages Literate generates from
 # docs/literate
 docs/build/
+# The scripts and fonts docs/vendor.jl downloads, unless STREAM_DOCS_VENDOR points elsewhere
+docs/vendor/
 docs/src/tutorials/[0-9][0-9]_*
 
 # Drift report from older test runs; the tests no longer write it

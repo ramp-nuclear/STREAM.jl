@@ -25,6 +25,14 @@ jobs:
       - uses: julia-actions/cache@v3
       - name: Install the docs environment
         run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+      # The scripts and fonts the pages load. The cache is keyed on the list in vendor.jl, so
+      # they are downloaded again only when it changes.
+      - uses: actions/cache@v4
+        with:
+          path: docs/vendor
+          key: docs-vendor-${{ hashFiles('docs/vendor.jl') }}
+      - name: Download the scripts and fonts the pages load
+        run: julia docs/vendor.jl
       - name: Build
         run: julia --project=docs docs/make.jl
       - uses: actions/upload-artifact@v4
