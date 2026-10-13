@@ -15,12 +15,13 @@ number) and, for natural convection, buoyancy (Grashof or Rayleigh number).
 In STREAM, a heat transfer model is an [`AbstractHTC`](@ref HTC.AbstractHTC), a callable
 
 ```julia
-htc(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h
+htc(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g) -> h
 ```
 
 that a [`ChannelAndContacts`](@ref STREAM.Components.ChannelAndContacts) evaluates per cell and
-per face. Anything a correlation needs beyond these (the geometry, gravity, a transition band)
-it captures when it is built. This page describes the models STREAM ships and the physics
+per face, handing it the cell's static pressure `P` and the channel's gravity `g`. A model that
+needs neither can be called without them. Anything else a correlation needs (the geometry, a
+transition band) it captures when it is built. This page describes the models STREAM ships and the physics
 behind them, using Python STREAM's names for the regimes: single-phase liquid (SPL),
 incipience of boiling (INC) and subcooled boiling (SCB).
 
@@ -91,7 +92,8 @@ rectangular duct of aspect ratio ``\alpha = \text{depth}/\text{width}`` heated o
 sides has a lower value, which [`HTC.FullyDevelopedLaminar`](@ref) takes from Shah and
 London's polynomial fit. Near the entrance of a heated channel the thermal boundary layer is
 still thin and the Nusselt number higher, which [`HTC.DevelopingLaminar`](@ref) follows as a
-function of the dimensionless distance ``x^* = x/(D_h\,\text{Re}\,\text{Pr})``.
+function of the dimensionless distance ``x^* = x/(D_h\,\text{Re}\,\text{Pr})``, interpolating
+Shah and London's table of the parallel-plate solution.
 
 **Property basis.** A correlation is evaluated with the coolant properties at some
 temperature, and the choice changes ``h`` because viscosity falls steeply with temperature.
@@ -129,39 +131,83 @@ an isolated vertical plate.
 ## Choosing by regime
 
 A channel that coasts down from forced flow to natural circulation passes through every
-regime. [`HTC.RegimeDependent`](@ref) chooses:
+regime. [`HTC.RegimeDependent`](@ref) blends its `laminar` and `turbulent` models linearly
+across a band of the **bulk Reynolds number**, 2000 to 5000 by default, so that ``h`` stays
+continuous. It adds its `natural` model to that forced value as described next.
 
-- by the **bulk Reynolds number**, between its `laminar` and `turbulent` models, blending
-  linearly across a transition band, 2000 to 5000 by default, so that ``h`` stays continuous;
-- by **buoyancy**, switching to its `natural` model where ``\text{Gr} > \text{Re}^2``, the
-  usual criterion for buoyancy outweighing the forced flow. Gr and Re are both taken at the
-  film temperature, with ``D_h`` as the length, so that like is compared with like.
+## Mixed convection
 
-The switch to natural convection is a step, not a blend. A solver integrating through it
-sees ``h`` jump, which it handles by taking smaller steps there.
+At low flow, buoyancy and the forced flow act together. [`HTC.RegimeDependent`](@ref) combines
+its forced value ``h_f`` with its natural one ``h_n`` by Churchill's rule
+[Churchill1977](@cite),
+
+```math
+h^3 = h_f^3 \pm h_n^3.
+```
+
+The sign depends on which way buoyancy pushes the fluid at the wall, relative to the flow. A
+wall hotter than the coolant lifts the fluid next to it, so in heated upflow buoyancy
+**aids** the flow and the two add. In heated downflow, as in the core of a pool reactor before
+its flow reverses, buoyancy **opposes** the flow and slows the fluid at the wall, and the rule
+takes the minus sign. Once ``h_n`` reaches ``2^{-1/3} h_f`` the flow next to the wall
+separates and natural convection alone sets the coefficient, so the opposing value is floored
+at ``h_n``:
+
+```math
+h = \max\big((h_f^3 - h_n^3)^{1/3},\ h_n\big).
+```
+
+Both forms keep the wall balance ``h\,(T_w - T_b)`` rising with the wall temperature, so a
+cell has one wall temperature for each heat flux. The signs are those of laminar mixed
+convection. In turbulent flow buoyancy acts the other way round, but there ``h_n`` is too
+small beside ``h_f`` to matter. In a horizontal channel buoyancy acts across the flow,
+stirring it rather than slowing it, and the two add.
+
+The direction comes from gravity. The channel passes its `g` on every call, positive when
+positive flow climbs against gravity, so `g` is stated once, on the channel.
+[`HTC.Elenbaas`](@ref) takes the size of the same `g` for its Grashof number. Called without
+`g`, a model with a natural branch throws rather than guess a direction.
+
+**As the flow stops.** A laminar correlation gives the same ``h`` at any flow, zero included,
+so a stagnant channel would keep a share of forced convection it no longer has. The model
+hands over to ``h_n`` alone along a smooth step in the Graetz number
+
+```math
+\text{Gz} = \text{Re}\,\text{Pr}\,D_h / L,
+```
+
+the time heat takes to cross the channel over the time the coolant spends in the heated
+length. Below ``\text{Gz} \approx 0.01`` the coolant stays long enough to heat through, and
+the flow no longer renews it. The step runs across `gz_band`, 0.01 to 0.1 by default, on
+``\log_{10} \text{Gz}``. The band is a modelling choice, the same one Python STREAM makes on
+its `stream-next` branch, not a correlation. It lies well below any circulating flow. The
+aiding and opposing forms meet at zero flow, where the step has already handed over, so
+``h`` has no jump where the flow reverses.
 
 The figure shows ``h`` against flow for a plate-fuel channel, 2.4 mm by 67 mm and 0.6 m long,
-with the bulk at 40 °C and the wall at 60 °C.
+with the bulk at 40 °C and the wall at 60 °C, in heated upflow and heated downflow.
 
 ```@example htc
 using STREAM, CairoMakie
 
 geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
-T_wall, T_bulk = 60.0, 40.0
+T_wall, T_bulk, P = 60.0, 40.0, 1.7e5
+rd = HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(),
+                         natural=HTC.Elenbaas(geom), geom)
 models = [
-    "Dittus-Boelter" => HTC.DittusBoelter(),
-    "constant Nu = 8.235" => HTC.ConstantNusselt(),
-    "regime dependent, with Elenbaas" => HTC.RegimeDependent(;
-        laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(),
-        natural=HTC.Elenbaas(geom), geom),
+    "Dittus-Boelter" => (HTC.DittusBoelter(), G_EARTH),
+    "constant Nu = 8.235" => (HTC.ConstantNusselt(), G_EARTH),
+    "regime dependent, heated upflow" => (rd, G_EARTH),
+    "regime dependent, heated downflow" => (rd, -G_EARTH),
 ]
-ṁ = range(1e-4, 0.15; length=600)
+ṁ = exp10.(range(-7, log10(0.15); length=600))
 Re_bulk = [Re(H2O, T_bulk, m, geom.A, geom.Dh) for m in ṁ]
 
 fig = Figure(size=(700, 420))
-ax = Axis(fig[1, 1]; xlabel="bulk Reynolds number", ylabel=L"$h$ [kW/(m²·K)]")
-for (label, model) in models
-    h = [model(T_wall, T_bulk, m, geom.Dh, geom.A, H2O) for m in ṁ]
+ax = Axis(fig[1, 1]; xlabel="bulk Reynolds number", ylabel=L"$h$ [kW/(m²·K)]",
+          xscale=log10)
+for (label, (model, g)) in models
+    h = [model(T_wall, T_bulk, m, geom.Dh, geom.A, H2O, P, g) for m in ṁ]
     lines!(ax, Re_bulk, h ./ 1e3; label)
 end
 vspan!(ax, 2000, 5000; color=(:gray, 0.12))
@@ -169,11 +215,13 @@ axislegend(ax; position=:lt)
 fig
 ```
 
-The shaded band is the laminar-turbulent blend. At the lowest flows, where buoyancy outweighs
-the forced flow, the regime-dependent model switches to natural convection. Here that gives a
-lower ``h`` than the laminar constant: the switch is a choice of regime, not of the larger
-value, and it is the conservative one. [`HTC.Maximal`](@ref) takes the larger of several
-models instead, for a wall cooled by whichever mechanism wins.
+The shaded band is the laminar-turbulent blend. In this narrow gap buoyancy is weak beside the
+laminar value: upflow and downflow differ by about 1%. Both sit just below the plotted
+constant because the regime-dependent model reads its laminar branch at the bulk, where the
+plotted one reads the film. Below a Reynolds number of about 1 both hand over to natural
+convection, about a quarter of the laminar value.
+[`HTC.Maximal`](@ref) takes the larger of several models instead, for a wall cooled by
+whichever mechanism wins.
 
 ## Subcooled boiling
 

@@ -45,6 +45,12 @@ A few behaviours differ from Python on purpose:
   the same.
 - **Equal decay rates.** [`DecayHeat.DoubleDecay`](@ref) switches to the equal-rate limit when
   its two rates nearly coincide, a case Python leaves unguarded.
+- **Mixed convection against the flow.** [`HTC.RegimeDependent`](@ref) combines forced and
+  natural convection by Churchill's rule, taking the minus sign where buoyancy opposes the flow,
+  as in heated downflow. Python's `stream-next` always adds. See [Mixed convection](@ref).
+- **Sudo-Kaminaga's inlet subcooling.** On a solved channel it is read on the coolant entering,
+  the channel's `T_in`. Python reads it on the first cell, which has already taken up half a
+  cell of heat, so Python's limit is slightly lower.
 
 ## Where the physics is open
 

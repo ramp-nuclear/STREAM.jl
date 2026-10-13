@@ -119,58 +119,45 @@ using OrdinaryDiffEq: ReturnCode
 
     @testset "q_CHF_sudo_kaminaga" begin
         # Anchor: Python physical_models.thresholds.Sudo_Kaminaga_CHF, fed a sat_coolant
-        # Liquid carrying exactly the Julia defaults (rho_l=958.4, rho_v=0.598, hfg=2257e3,
-        # sigma=0.059, cp_sat=4217.0, T_sat=100.0) and the same pipe. The Julia function is
-        # scalar (one cell); Python is vectorized over the cell axis, so each Python anchor
-        # was taken from a single-element T_bulk array, which is the exact per-cell
-        # restriction of the Python function (T_bulk[0] == T_bulk[-1]).
-        #
-        # q4 outlet term: Python sets dT_outlet = (cp/hfg)*(Tsat[-1] - T_bulk[-1]), the
-        # outlet cell's subcooling, NOT zero, so the Julia scalar function uses the cell's
-        # own subcooling to match Python per cell. The two q4-binding cases below pin this
-        # down: with a zero outlet term q4 collapses to q1 and they give a different number,
-        # so they fail unless the outlet subcooling is carried through.
+        # Liquid carrying exactly the values above and the same pipe. Each anchor was taken
+        # from a one-cell T_bulk, so the inlet and the outlet are that one cell, and both
+        # subcoolings are 100 - T_bulk.
+        sk(T_bulk, ṁ; g=9.81) = q_CHF_sudo_kaminaga(100.0 - T_bulk, 100.0 - T_bulk, ṁ, pipe, g,
+                                                    sat_water)
 
         # Downward branch, q2 selected (subcooling term dominates):
-        # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=0.5, g=9.81) -> 1391788.0650769984
-        @test q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat_water) ≈ 1391788.0650769984 rtol = 1e-9
+        # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=0.5, g=9.81) -> 1391788.0650769984
+        @test sk(46.85, 0.5) ≈ 1391788.0650769984 rtol = 1e-9
         # Colder bulk -> larger subcooling -> higher CHF.
-        # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=0.5, g=9.81) -> 1915508.8797814196
-        @test q_CHF_sudo_kaminaga(26.85, 0.5, pipe, 9.81, sat_water) ≈ 1915508.8797814196 rtol = 1e-9
-        @test q_CHF_sudo_kaminaga(26.85, 0.5, pipe, 9.81, sat_water) >
-            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat_water)
+        # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=0.5, g=9.81) -> 1915508.8797814196
+        @test sk(26.85, 0.5) ≈ 1915508.8797814196 rtol = 1e-9
+        @test sk(26.85, 0.5) > sk(46.85, 0.5)
 
-        # q4-binding cases (NONZERO outlet subcooling). Large ṁ grows q2 past q4, so q4
-        # is the selected (most limiting) sub-correlation. These exercise the corrected
-        # outlet term: q4 = q1*(1 + 5000*dT_outlet/|G*|) with dT_outlet > 0.
-        # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=5.0, g=9.81) -> 11350154.095336435
-        @test q_CHF_sudo_kaminaga(26.85, 5.0, pipe, 9.81, sat_water) ≈ 11350154.095336435 rtol = 1e-9
-        # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=8.0, g=9.81) -> 14693105.002503937
-        @test q_CHF_sudo_kaminaga(26.85, 8.0, pipe, 9.81, sat_water) ≈ 14693105.002503937 rtol = 1e-9
+        # Large ṁ grows q2 past q4, so q4, the outlet term, is the one selected:
+        # q4 = q1*(1 + 5000*dT_outlet/|G*|) with dT_outlet > 0.
+        # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=5.0, g=9.81) -> 11350154.095336435
+        @test sk(26.85, 5.0) ≈ 11350154.095336435 rtol = 1e-9
+        # Sudo_Kaminaga_CHF(T_bulk=[300], ṁ=8.0, g=9.81) -> 14693105.002503937
+        @test sk(26.85, 8.0) ≈ 14693105.002503937 rtol = 1e-9
 
-        # Upward branch: negative ṁ flips G* < 0, folding q1 into the max, so the
-        # selection genuinely differs from the downward branch and yields a higher CHF.
-        # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=-0.5, g=9.81) -> 2567664.771611573
-        @test q_CHF_sudo_kaminaga(46.85, -0.5, pipe, 9.81, sat_water) ≈ 2567664.771611573 rtol = 1e-9
-        @test q_CHF_sudo_kaminaga(46.85, -0.5, pipe, 9.81, sat_water) >
-            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat_water)
+        # Upward branch: negative ṁ flips G* < 0, folding q1 into the max, so the
+        # selection differs from the downward branch and yields a higher CHF.
+        # Sudo_Kaminaga_CHF(T_bulk=[320], ṁ=-0.5, g=9.81) -> 2567664.771611573
+        @test sk(46.85, -0.5) ≈ 2567664.771611573 rtol = 1e-9
+        @test sk(46.85, -0.5) > sk(46.85, 0.5)
 
-        # Reversed flow enters at the last cell, so that is where the inlet subcooling is
-        # read. Five cells warming from 40 to 70 °C, against Python's stream-next
-        # Sudo_Kaminaga_CHF: forward flow is unchanged, and at -5 kg/s, where q4 binds, the
-        # limit is 10.48 MW/m², not the 10.84 that reading the ends the wrong way round gave.
-        warming = collect(range(40.0, 70.0; length=5))
-        @test all(q_CHF_sudo_kaminaga(warming, 5.0, pipe, 9.81, sat_water) .≈
-                  10839384.886841433)
-        @test all(q_CHF_sudo_kaminaga(warming, -5.0, pipe, 9.81, sat_water) .≈
-                  10484273.038525093)
+        # Five cells warming from 40 to 70 °C, against Python's stream-next
+        # Sudo_Kaminaga_CHF. Forward flow enters at 40 °C and leaves at 70 °C. Reversed flow
+        # enters at the 70 °C end, and at -5 kg/s, where q4 binds, the limit is 10.48 MW/m²,
+        # not the 10.84 that swapping the ends gives.
+        @test q_CHF_sudo_kaminaga(60.0, 30.0, 5.0, pipe, 9.81, sat_water) ≈
+              10839384.886841433 rtol = 1e-9
+        @test q_CHF_sudo_kaminaga(30.0, 60.0, -5.0, pipe, 9.81, sat_water) ≈
+              10484273.038525093 rtol = 1e-9
 
-        # Gravity enters Julia only as |g| (Julia takes abs(gravity) for the capillary
-        # length), so flipping the gravity sign leaves the result unchanged for positive
-        # ṁ. This is a Julia-internal choice: Python does NOT abs g and returns NaN for
-        # negative g, so this assertion is a Julia self-check, not a Python anchor.
-        @test q_CHF_sudo_kaminaga(46.85, 0.5, pipe, -9.81, sat_water) ≈
-            q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat_water) rtol = 1e-10
+        # Only the size of g enters, through the capillary length. Python returns NaN for a
+        # negative g, so this is a check on our own choice, not a Python anchor.
+        @test sk(46.85, 0.5; g=-9.81) ≈ sk(46.85, 0.5) rtol = 1e-10
     end
 
     @testset "q_CHF_mirshak" begin
@@ -219,6 +206,9 @@ end
         T_sat=fill(100.0, n),
         T_ONB=fill(106.85, n),
         T_inlet=26.85,
+        T_outlet=46.85,
+        T_sat_inlet=100.0,
+        T_sat_outlet=100.0,
         P=fill(1e5, n),
         q_flux=fill(5e5, n),
         q_flux_left=fill(5e5, n),
@@ -233,6 +223,7 @@ end
         @test state.n == n
         @test length(state.T_bulk) == n
         @test state.T_inlet == 26.85
+        @test state.T_outlet == 46.85
         @test state.ṁ == 0.5
         @test state.gravity == 9.81
         @test state.pipe === pipe
@@ -272,13 +263,13 @@ end
         @test length(result) == n
         @test all(result .> 0)
 
-        # q2/q3 read the inlet subcooling and q4 the outlet, so a channel that heats along
-        # its length is not the same as a uniform one at either end temperature. The fixture
-        # is uniform in T_bulk, so build a sloped one to tell them apart.
+        # The state carries the channel's ends, so the method reads the subcooling of the
+        # coolant entering (40 °C) and of the coolant leaving (70 °C) off them.
         warming = collect(range(40.0, 70.0; length=n))
         sloped = ChannelState(; n=n, T_bulk=warming, T_wall=fill(90.0, n),
             T_wall_left=fill(90.0, n), T_wall_right=fill(85.0, n),
-            T_sat=fill(100.0, n), T_ONB=fill(106.85, n), T_inlet=40.0, P=fill(1e5, n),
+            T_sat=fill(100.0, n), T_ONB=fill(106.85, n), T_inlet=40.0, T_outlet=70.0,
+            T_sat_inlet=100.0, T_sat_outlet=100.0, P=fill(1e5, n),
             q_flux=fill(5e5, n), q_flux_left=fill(5e5, n), q_flux_right=fill(4e5, n),
             ṁ=0.5, velocity=fill(3.0, n), pipe=pipe, gravity=9.81)
 
@@ -286,29 +277,25 @@ end
         # own saturation state, so the explicit call needs the same snapshot to agree.
         sat = H2O(fill(100.0, n), fill(1e5, n))
         @test q_CHF_sudo_kaminaga(sloped) ≈
-              q_CHF_sudo_kaminaga(warming, 0.5, pipe, 9.81, sat) rtol = 1e-12
+              q_CHF_sudo_kaminaga(60.0, 30.0, 0.5, pipe, 9.81, sat) rtol = 1e-12
 
         # The inlet always matters: q2 and q3 both read it.
         @test !isapprox(q_CHF_sudo_kaminaga(sloped),
-                        q_CHF_sudo_kaminaga(fill(last(warming), n), 0.5, pipe, 9.81, sat);
-                        rtol=1e-6)
+                        q_CHF_sudo_kaminaga(30.0, 30.0, 0.5, pipe, 9.81, sat); rtol=1e-6)
 
         # The outlet only shows up when q4 is the selected sub-correlation, which needs a
-        # high enough flow for q2 to grow past it. At ṁ = 0.5 both ends give the same answer,
-        # so a test there would pass no matter which end q4 was fed.
-        flat = q_CHF_sudo_kaminaga(fill(40.0, n), 0.5, pipe, 9.81, sat)
-        warm = q_CHF_sudo_kaminaga([fill(40.0, n - 1); 70.0], 0.5, pipe, 9.81, sat)
-        @test flat ≈ warm rtol = 1e-12
-        fast_flat = q_CHF_sudo_kaminaga(fill(40.0, n), 5.0, pipe, 9.81, sat)
-        fast_warm = q_CHF_sudo_kaminaga([fill(40.0, n - 1); 70.0], 5.0, pipe, 9.81, sat)
-        @test !isapprox(fast_flat, fast_warm; rtol=1e-6)
-        # Hotter outlet means less subcooling to absorb, so a lower limit.
+        # high enough flow for q2 to grow past it. At ṁ = 0.5 both give the same answer, so a
+        # test there would pass no matter what q4 was fed.
+        @test q_CHF_sudo_kaminaga(60.0, 60.0, 0.5, pipe, 9.81, sat) ≈
+              q_CHF_sudo_kaminaga(60.0, 30.0, 0.5, pipe, 9.81, sat) rtol = 1e-12
+        fast_flat = q_CHF_sudo_kaminaga(60.0, 60.0, 5.0, pipe, 9.81, sat)
+        fast_warm = q_CHF_sudo_kaminaga(60.0, 30.0, 5.0, pipe, 9.81, sat)
+        # A hotter outlet has less subcooling to absorb, so a lower limit.
         @test all(fast_warm .< fast_flat)
 
         # A one-cell profile and a scalar call are the same thing.
-        one_cell = H2O(100.0, 1e5)
-        @test only(q_CHF_sudo_kaminaga([46.85], 0.5, pipe, 9.81, H2O([100.0], [1e5]))) ≈
-              q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, one_cell)
+        @test only(q_CHF_sudo_kaminaga(53.15, 53.15, 0.5, pipe, 9.81, H2O([100.0], [1e5]))) ≈
+              q_CHF_sudo_kaminaga(53.15, 53.15, 0.5, pipe, 9.81, H2O(100.0, 1e5))
     end
 
     @testset "q_boiling_onset on a ChannelState" begin
@@ -327,19 +314,21 @@ end
         q_onset = q_boiling_onset(0.5, 100.0, 26.85, cₚ(H2O, 26.85))
         @test result < q_onset
 
-        # Pressure falls along the channel, so T_sat does too, and OFI has to read the
-        # downstream cell. The fixture above is uniform in T_sat and cannot tell the ends
-        # apart, so use a sloped profile and check both flow directions pick their own
-        # outlet. Reading the wrong end silently overstates the margin.
+        # Pressure falls along the channel, so T_sat does too, and OFI has to read it where
+        # the coolant leaves. The fixture above is uniform in T_sat and cannot tell the ends
+        # apart, so use a sloped profile in both flow directions. Reading the wrong end
+        # silently overstates the margin.
         sloped = collect(range(110.0, 90.0; length=n))   # hot inlet, cooler outlet
         fwd = ChannelState(; n=n, T_bulk=fill(46.85, n), T_wall=fill(66.85, n),
             T_wall_left=fill(66.85, n), T_wall_right=fill(61.85, n),
-            T_sat=sloped, T_ONB=fill(106.85, n), T_inlet=26.85, P=fill(1e5, n),
+            T_sat=sloped, T_ONB=fill(106.85, n), T_inlet=26.85, T_outlet=46.85,
+            T_sat_inlet=first(sloped), T_sat_outlet=last(sloped), P=fill(1e5, n),
             q_flux=fill(5e5, n), q_flux_left=fill(5e5, n), q_flux_right=fill(4e5, n),
             ṁ=0.5, velocity=fill(3.0, n), pipe=pipe, gravity=9.81)
         rev = ChannelState(; n=n, T_bulk=fwd.T_bulk, T_wall=fwd.T_wall,
             T_wall_left=fwd.T_wall_left, T_wall_right=fwd.T_wall_right,
-            T_sat=sloped, T_ONB=fwd.T_ONB, T_inlet=fwd.T_inlet, P=fwd.P,
+            T_sat=sloped, T_ONB=fwd.T_ONB, T_inlet=fwd.T_inlet, T_outlet=fwd.T_outlet,
+            T_sat_inlet=last(sloped), T_sat_outlet=first(sloped), P=fwd.P,
             q_flux=fwd.q_flux, q_flux_left=fwd.q_flux_left, q_flux_right=fwd.q_flux_right,
             ṁ=-0.5, velocity=fwd.velocity, pipe=pipe, gravity=9.81)
 
@@ -379,6 +368,10 @@ end
     # has already taken up some heat.
     @test state.T_inlet ≈ sol[ssys.bc.outlet.T]
     @test state.T_inlet < first(state.T_bulk)
+    # The coolant leaves through the last cell, and the saturation ends are its end cells.
+    @test state.T_outlet == last(state.T_bulk)
+    @test state.T_sat_inlet == first(state.T_sat)
+    @test state.T_sat_outlet == last(state.T_sat)
     @test state.gravity == G_EARTH
     @test state.ṁ > 0
 
@@ -403,6 +396,10 @@ end
     @test reversed.ṁ < 0
     @test reversed.T_inlet ≈ 40.0
     @test reversed.T_inlet < last(reversed.T_bulk) < first(reversed.T_bulk)
+    # Reversed, it leaves through the first cell, and the saturation ends swap too.
+    @test reversed.T_outlet == first(reversed.T_bulk)
+    @test reversed.T_sat_inlet == last(reversed.T_sat)
+    @test reversed.T_sat_outlet == first(reversed.T_sat)
 end
 
 @testset "ChannelState over a transient reads each saved time" begin
@@ -425,6 +422,7 @@ end
         s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
         @test s.ṁ == ṁ[k]
         @test s.T_inlet == sol[ssys.ch.T_in, k]
+        @test s.T_outlet == sol[ssys.ch.T_out, k]
         @test s.T_bulk == sol[ssys.ch.T, k]
     end
     # A transient has many instants, so asking for the state without saying which is an
@@ -517,6 +515,9 @@ end
         T_sat=fill(100.0, n),
         T_ONB=fill(106.85, n),
         T_inlet=26.85,
+        T_outlet=46.85,
+        T_sat_inlet=100.0,
+        T_sat_outlet=100.0,
         P=fill(1e5, n),
         q_flux=fill(5e5, n),
         q_flux_left=fill(5e5, n),
@@ -549,6 +550,9 @@ end
         T_sat=fill(100.0, n),
         T_ONB=fill(106.85, n),
         T_inlet=26.85,
+        T_outlet=46.85,
+        T_sat_inlet=100.0,
+        T_sat_outlet=100.0,
         P=fill(1e5, n),
         q_flux=fill(0.0, n),
         q_flux_left=fill(0.0, n),
@@ -575,6 +579,9 @@ end
         T_sat=fill(100.0, n),
         T_ONB=fill(106.85, n),
         T_inlet=26.85,
+        T_outlet=46.85,
+        T_sat_inlet=100.0,
+        T_sat_outlet=100.0,
         P=fill(1e5, n),
         q_flux=fill(5e5, n),
         q_flux_left=fill(5e5, n),
@@ -606,7 +613,8 @@ end
     s = ChannelState(;
         n=n, T_bulk=fill(60.0, n), T_wall=fill(62.0, n), T_wall_left=fill(62.0, n),
         T_wall_right=fill(62.0, n), T_sat=fill(115.0, n), T_ONB=fill(120.0, n),
-        T_inlet=35.0, P=fill(1.7e5, n), q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=0.01,
+        T_inlet=35.0, T_outlet=60.0, T_sat_inlet=115.0, T_sat_outlet=115.0, P=fill(1.7e5, n),
+        q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=0.01,
         velocity=fill(0.05, n), pipe=nothing, gravity=9.81,
     )
     onb = bergles_rohsenow_t_onb(s)
@@ -631,8 +639,11 @@ end
         rise = cumsum(mdot >= 0 ? Q : reverse(Q)) ./ (abs(mdot) * 4180.0)
         T = 35.0 .+ (mdot >= 0 ? rise : reverse(rise))
         T_wall = T .+ q ./ 2e4
+        T_sat = Tsat.(H2O, P)
+        up, down = mdot >= 0 ? (1, n) : (n, 1)
         return ChannelState(; n=n, T_bulk=T, T_wall=T_wall, T_wall_left=T_wall,
-            T_wall_right=T_wall, T_sat=Tsat.(H2O, P), T_ONB=zeros(n), T_inlet=35.0, P=P,
+            T_wall_right=T_wall, T_sat=T_sat, T_ONB=zeros(n), T_inlet=35.0, T_outlet=T[down],
+            T_sat_inlet=T_sat[up], T_sat_outlet=T_sat[down], P=P,
             q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=mdot,
             velocity=abs.(mdot ./ (ρ.(H2O, T) .* pipe.A)), pipe=pipe, gravity=G_EARTH)
     end
@@ -645,8 +656,16 @@ end
     ends(v) = length(v) == 1 ? (only(v),) : (first(v), last(v))
     for (label, mdot) in ((:fwd, 0.356), (:rev, -0.1))
         s = state(mdot)
+        # Python reads Sudo-Kaminaga's inlet subcooling on the bulk of the cell the coolant
+        # enters, where the ChannelState method reads it on the coolant entering, T_inlet.
+        # Fed that cell, the correlation matches Python; the method's colder inlet gives a
+        # limit at least as high.
+        up = mdot >= 0 ? 1 : n
+        sk_cell = q_CHF_sudo_kaminaga(s.T_sat_inlet - s.T_bulk[up], s.T_sat_outlet - s.T_outlet,
+                                      mdot, pipe, G_EARTH, H2O(collect(s.T_sat), collect(s.P)))
+        @test all(q_CHF_sudo_kaminaga(s) .>= sk_cell)
         julia = (
-            sk=q_CHF_sudo_kaminaga(s),
+            sk=sk_cell,
             mirshak=q_CHF_mirshak(s),
             fabrega=q_CHF_fabrega(s),
             ofi=[q_OFI_whittle_forgan(s)],

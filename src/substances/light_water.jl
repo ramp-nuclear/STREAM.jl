@@ -81,6 +81,9 @@ julia> specific_heat(H2O, 8.0)
 
 julia> specific_heat(H2O, 50.0)
 4181.4264285644285
+
+julia> specific_heat(H2O, 360.0) == specific_heat(H2O, 350.0)  # held short of the pole
+true
 ```
 """
 function specific_heat(::LightWater, T, p)

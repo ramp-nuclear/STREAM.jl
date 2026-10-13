@@ -205,7 +205,7 @@ function build_loop_lof_bypass(;
     htc_ch = HTC.RegimeDependent(;
         laminar=HTC.ConstantNusselt(; Nu=8.235),
         turbulent=HTC.DittusBoelter(),
-        natural=HTC.Elenbaas(geom; g=g_acc),
+        natural=HTC.Elenbaas(geom),
         geom=geom,
     )
     friction_ch = Friction.RegimeDependent(;

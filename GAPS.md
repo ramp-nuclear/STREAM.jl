@@ -85,10 +85,13 @@ The channel model ends at bulk saturation, and nothing says so during a run. `st
 - An opt-in stop at bulk saturation. Here that is one abort transition per channel on
   `T_sat − T_bulk`, with `T_sat` already at the static pressure.
 - Post-run saturation crossings, first crossing, and raise-on-crossing.
-- Declared validity ranges per coolant, 0.1 to 350 °C for H₂O and 3.8 to 300 °C for D₂O,
-  and a report of any state outside them. This matters more here than in Python, because our
-  property fits fold their argument through `abs`, which hides a value out of range instead of
-  producing NaN.
+- Declared validity ranges per coolant and a report of any state outside them. `stream-next`
+  declares 0.1 to 350 °C for H₂O and 3.8 to 300 °C for D₂O, but Crabtree and Siman-Tov's
+  report (ORNL/TM-12322, 1993, p. 16), where the fits come from, claims only 20 to 300 °C for
+  H₂O and 50 to 250 °C for D₂O. Take the report's. This matters more here than in Python,
+  because our property fits fold their argument through `abs`, which hides a value out of
+  range instead of producing NaN. The holds on H₂O's cₚ above 350 °C and D₂O's μ below
+  3.8 °C only keep the fits away from their poles; they are not a validity range.
 
 **Size:** 100 to 130 lines, in `src/thresholds/analysis.jl` beside `threshold_analysis`.
 
@@ -203,9 +206,12 @@ never moved, with no error. Moving the trip time into the problem's parameters f
   convection as `h³ = h_f³ + h_n³` everywhere, which is Churchill's rule for buoyancy along
   the flow. Against the flow, as in the downward core of a pool reactor before it reverses,
   the rule takes the minus sign, and `HTC.RegimeDependent` does, floored at `h_n` where the
-  wall flow separates. A `ChannelAndContacts` gives the direction from the sign of `g`;
-  called outside a channel the model adds, as Python does. In the pool LOFA example the minus
-  sign lowers the hot cell's `h` by about 4% late in the coastdown.
+  wall flow separates. The direction comes from the sign of the channel's `g`, which the
+  channel passes to the model on each call; called without it, the model throws. In the pool
+  LOFA example the minus sign lowers the hot cell's `h` by about 4% late in the coastdown.
+- **Sudo-Kaminaga's inlet subcooling on a solved channel** is read on the coolant entering,
+  the channel's `T_in`. Python reads it on the first cell's bulk, half a cell of heating
+  later, so its limit is slightly lower. Fed the same cell, the correlation matches Python.
 
 ## Following Python where the physics is open
 
@@ -249,8 +255,8 @@ Verified as matching, so they need not be re-investigated:
 - **Threshold correlations and their channel-state wrappers**: CHF (Sudo-Kaminaga, Mirshak,
   Fabrega), OFI, OSV, ONB, boiling power and the wall temperature limit, compared with Python's
   `stream.analysis.thresholds` to 1e-9 in forward and reversed flow, and read at every saved
-  time of a transient. Sudo-Kaminaga reads the inlet subcooling at the end the flow enters,
-  as in `stream-next`.
+  time of a transient. Sudo-Kaminaga reads the subcooling at the end the flow enters, as in
+  `stream-next`, which the channel supplies through `ChannelState`.
 - **Saturation at the static pressure.** A port carries the total pressure; a channel's `P` is
   static, and both `T_sat` and the subcooled boiling in the solve read it.
 - **The wall temperature interface.** Python's explicit `wall_temperature(T_cool, T_clad,

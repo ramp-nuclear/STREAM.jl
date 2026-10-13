@@ -99,6 +99,9 @@ julia> viscosity(D2O, 50.0)
 
 julia> viscosity(D2O, 100.0)
 0.0003301433604774831
+
+julia> viscosity(D2O, -17.0) == viscosity(D2O, 3.8)  # held at the melting point
+true
 ```
 """
 function viscosity(::HeavyWater, T, p)

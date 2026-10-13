@@ -61,13 +61,9 @@ end
 end
 
 @testset "fits are held short of their poles" begin
-    # Python stream-next clamps these two fits the same way.
-    # H2O cₚ has a pole near 366 °C, so it holds its 350 °C value above that.
-    @test cₚ(H2O, 360.0) == cₚ(H2O, 350.0)
+    # The doctests show each fit held at its limit. These check that the hold starts there
+    # and not earlier, and that D2O's viscosity stays positive below it.
     @test cₚ(H2O, 349.0) < cₚ(H2O, 350.0)
-    # D2O μ has a pole at 0 °F and goes negative before it, so it holds its value at the
-    # 3.8 °C melting point below that.
-    @test μ(D2O, -17.0) == μ(D2O, 3.8)
     @test μ(D2O, -17.0) > 0
     @test μ(D2O, 3.9) < μ(D2O, 3.8)
 end

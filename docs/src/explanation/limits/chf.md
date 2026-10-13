@@ -98,6 +98,12 @@ q^* = \max\big(\min(q^*_2, q^*_4),\; q^*_3\big)\quad\text{for downward flow},\qq
 q^* = \max\big(\min(q^*_2, q^*_4),\; q^*_3,\; q^*_1\big)\quad\text{for upward flow}.
 ```
 
+The subcoolings are the channel's, at its two ends: ``\Delta T_\text{in}`` of the coolant
+entering and ``\Delta T_\text{out}`` of the coolant leaving. In reversed flow the coolant
+enters at the far end, so the ends swap. [`q_CHF_sudo_kaminaga`](@ref
+STREAM.Thresholds.q_CHF_sudo_kaminaga) takes the two subcoolings, and on a solved channel
+reads them off the channel's `T_in`, `T_out`, `T_sat_in` and `T_sat_out`.
+
 Several details follow the experiments rather than intuition, and STREAM keeps them as Python
 STREAM has them:
 
@@ -133,7 +139,8 @@ sat = H2O(T_sat, p)                        # coolant at saturation
 ṁ = range(-0.4, 0.6; length=401)
 v = ṁ ./ (ρ(H2O, T_b) * pipe.A)
 
-q_sk = [q_CHF_sudo_kaminaga(T_b, m, pipe, G_EARTH, sat) for m in ṁ]
+ΔT_sub = T_sat - T_b                       # the same at both ends here
+q_sk = [q_CHF_sudo_kaminaga(ΔT_sub, ΔT_sub, m, pipe, G_EARTH, sat) for m in ṁ]
 q_mirshak = [q_CHF_mirshak(T_b, T_sat, p, vi) for vi in v]
 q_fabrega = fill(q_CHF_fabrega(T_b, T_sat, pipe), length(ṁ))
 

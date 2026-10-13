@@ -262,7 +262,6 @@ using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..STREAM: assembly, port
 using ..HTC
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
-using ..HTC: _oriented                  # tells an HTC model which way its channel runs
 using ..Friction
 using ..LocalLoss
 using ..STREAM
