@@ -24,6 +24,13 @@ abstract type AbstractHTC end
 
 Lift a callable `f(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h` into an [`AbstractHTC`](@ref), for a
 correlation not worth its own type.
+
+# Examples
+A named function prints as its name, and an anonymous one as "a correlation":
+```jldoctest
+julia> HTC.FromFunction((T_wall, T_bulk, ṁ, Dh, A, liquid) -> 5000.0)
+HTC.FromFunction(a correlation)
+```
 """
 struct FromFunction{F} <: AbstractHTC
     f::F
@@ -272,6 +279,15 @@ end
     Maximal(models...) <: AbstractHTC
 
 The largest `h` of several models, for a wall cooled by whichever mechanism happens to win.
+
+# Examples
+Forced convection or natural convection in a 2.4 mm gap, whichever is larger:
+```jldoctest
+julia> geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063);
+
+julia> HTC.Maximal(HTC.DittusBoelter(), HTC.Elenbaas(geom))
+the largest of dittus_boelter, at the film temperature; Elenbaas natural convection, gap 2.4 mm, at the film temperature
+```
 """
 struct Maximal{T<:Tuple} <: AbstractHTC
     models::T
@@ -305,11 +321,14 @@ julia> geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063);
 
 julia> spl = HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(), geom);
 
-julia> HTC.SubcooledBoiling(spl, HTC.regime_dependent_q_scb())
+julia> scb = HTC.SubcooledBoiling(spl, HTC.regime_dependent_q_scb())
 HTC.SubcooledBoiling, partial boiling above the onset of nucleate boiling, on
   HTC.RegimeDependent, blending across Re = 2000.0 to 5000.0
     laminar:   constant Nu = 8.235, at the bulk temperature
     turbulent: dittus_boelter, at the film temperature
+
+julia> print(scb)   # the one-line form, as inside another model's printout
+subcooled boiling on HTC.RegimeDependent(constant Nu = 8.235, at the bulk temperature | dittus_boelter, at the film temperature)
 ```
 """
 struct SubcooledBoiling{H<:AbstractHTC,Q} <: AbstractHTC

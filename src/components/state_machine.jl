@@ -193,6 +193,16 @@ julia> machine.log
   t = 0.0 s   NORMAL   initial
   t = 2.5 s   SCRAM    low flow
 ```
+
+A machine with no transitions yet, which stops the run when it enters `:UNCOVERED`:
+```jldoctest
+julia> Components.StateMachine(; initial_state=:OPEN, abort_states=(:UNCOVERED,))
+StateMachine in OPEN since t = 0.0 s
+  no transitions
+  stops on entering UNCOVERED
+  log:
+    t = 0.0 s   OPEN   initial
+```
 """
 mutable struct StateMachine
     transitions::Vector{Transition}
@@ -329,6 +339,20 @@ as well as during it. That is what makes a quantity computed from a schedule, su
 
 # Returns
 A callable `s(t)`.
+
+# Examples
+Rods worth 0.05 that drive in over 2 s after a scram at 10 s:
+```jldoctest
+julia> machine = Components.StateMachine();
+
+julia> rods = Components.StateSchedule((state, t_state, t) -> state === :SCRAM ? -0.05 * min(t - t_state, 2.0) / 2.0 : 0.0; machine)
+StateSchedule on StateMachine(NORMAL since t = 0.0 s)
+
+julia> Components.trip!(machine, 10.0);
+
+julia> rods(5.0), rods(11.0), rods(20.0)
+(0.0, -0.025, -0.05)
+```
 """
 struct StateSchedule{F}
     f::F

@@ -23,6 +23,13 @@ abstract type AbstractDarcyFactor end
 
 Lift a callable `f(T_bulk, T_wall, ṁ, liquid, pipe) -> f_darcy` into a [`AbstractDarcyFactor`](@ref),
 for a correlation not worth its own type.
+
+# Examples
+A named function prints as its name, and an anonymous one as "a correlation":
+```jldoctest
+julia> Friction.FromFunction((T_bulk, T_wall, ṁ, liquid, pipe) -> 0.02)
+Friction.FromFunction(a correlation)
+```
 """
 struct FromFunction{F} <: AbstractDarcyFactor
     f::F
@@ -45,6 +52,9 @@ is how Python STREAM applies its geometric correction.
 ```jldoctest
 julia> Friction.Blasius(; k_R=0.7)
 Friction.FromReynolds(blasius), Re scaled by k_R = 0.7
+
+julia> print(Friction.Blasius(; k_R=0.7))   # the one-line form, as inside another printout
+blasius, Re scaled by k_R = 0.7
 ```
 """
 struct FromReynolds{C} <: AbstractDarcyFactor

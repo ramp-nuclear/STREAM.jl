@@ -51,6 +51,9 @@ julia> heat = fp + 0.5 * DecayHeat.U238CaptureChain(0.5)
 DecayHeat.Sum of 2 contributions:
   FissionProducts(2 groups)
   0.5 × U238CaptureChain(0.5)
+
+julia> print(heat)   # the one-line form, as inside another printout
+FissionProducts(2 groups) + 0.5 × U238CaptureChain(0.5)
 ```
 """
 struct Sum{N,P<:NTuple{N,AbstractDecayHeat}} <: AbstractDecayHeat
