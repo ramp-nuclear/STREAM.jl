@@ -1,0 +1,17 @@
+# CI security, left to Eshed
+/.github/workflows/ @esheder
+/.github/CODEOWNERS @esheder
+# Legal license, left to Eshed
+/LICENSE @esheder
+# Dependencies, need careful attention
+/Project.toml @esheder @AvivBarnea @itaybnv
+/Manifest.toml @esheder @AvivBarnea @itaybnv
+# Script that runs with write permissions on deploy steps, left to Eshed for security
+/docs/deploy.jl @esheder
+# Doc dependencies, also need careful attention
+/docs/Project.toml @esheder @AvivBarnea @itaybnv
+/docs/Manifest.toml @esheder @AvivBarnea @itaybnv
+# Doc scripts, don't have write permissions but very tightly coupled with proper CI
+/docs/make.jl @esheder @AvivBarnea @itaybnv
+/docs/vendor.jl @esheder @AvivBarnea @itaybnv
+
