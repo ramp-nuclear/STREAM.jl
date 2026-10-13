@@ -193,6 +193,8 @@ component is its only caller: components state equations, they do not define cor
 docs/
   make.jl          # Documenter build: Literate conversion, makedocs. It never deploys
   deploy.jl        # deploydocs: publishes docs/build to gh-pages, run only by CI's deploy job
+  vendor.jl        # the scripts and fonts the pages load: downloads them, and make.jl copies
+                   # them into the build so the site works offline
   Project.toml     # Documenter, DocumenterCitations, DocumenterMermaid,
                    # DocumenterCodeBlocks, Literate, CairoMakie, Latexify; STREAM through [sources]
   literate/        # the tutorials, as runnable scripts Literate turns into pages
@@ -354,7 +356,10 @@ julia --project=docs docs/make.jl         # the docs, running every example
 The docs build takes several minutes. `DRAFT=1` skips running code, for editing prose, and
 `PREVIEW=1` runs it but reports links to unwritten pages as warnings. Serve the result with
 `python3 -m http.server -d docs/build 8000`. The first build needs
-`julia --project=docs -e 'using Pkg; Pkg.instantiate()'`.
+`julia --project=docs -e 'using Pkg; Pkg.instantiate()'` and `julia docs/vendor.jl`, which
+downloads the scripts and fonts the pages use to `docs/vendor`, or to the directory
+`STREAM_DOCS_VENDOR` names. The built site loads nothing from the internet: `make.jl` fails if
+a file is missing, or if a page would still load something from a CDN.
 
 Each invocation pays full cold-start (~30–90s `using STREAM` plus first `mtkcompile` ~10–30s). That is the accepted dev loop.
 

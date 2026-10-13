@@ -6,6 +6,10 @@
 # A draft build also reports broken links as warnings.
 # Preview the result with `python3 -m http.server -d docs/build 8000`. This only builds:
 # docs/deploy.jl publishes a finished build, and only CI runs it.
+#
+# The pages load their scripts, stylesheets and fonts from the build itself, never from the
+# internet. Download those once with `julia docs/vendor.jl`; STREAM_DOCS_VENDOR names where
+# they are kept, docs/vendor by default.
 using Documenter
 using DocumenterCitations
 using DocumenterCodeBlocks
@@ -17,6 +21,9 @@ using STREAM
 # submodules the pages import from. Channel is named explicitly: Base has one too.
 using STREAM.Components, STREAM.Assemblies, STREAM.Thresholds, STREAM.Utilities
 using STREAM.Components: Channel
+
+include("vendor.jl")
+Vendor.check_vendor()
 
 const DRAFT = get(ENV, "DRAFT", "") == "1"
 # Makie's settings are global, so they hold in every page's example module: plots are SVG.
@@ -38,15 +45,14 @@ for file in sort(readdir(LITERATE))
     push!(tutorials, joinpath("tutorials", replace(file, ".jl" => ".md")))
 end
 
-# DocumenterMermaid loads the newest Mermaid 11, whose current release fails next to the
-# RequireJS that Documenter loads and leaves every diagram as plain text. Pin one that works.
-const MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@11.6.0/dist/mermaid.esm.min.mjs"
+# DocumenterMermaid ends every page with a script that loads Mermaid from a CDN. Here it only
+# starts Mermaid: install_vendor puts the local copy in the head of each page with a diagram,
+# and a page without one has no Mermaid to start.
 function Documenter.HTMLWriter.domify(::Documenter.HTMLWriter.DCtx, ::Documenter.Node,
                                       ::DocumenterMermaid.MermaidScriptBlock)
     Documenter.DOM.@tags script
-    return script[:type => "module"]("""
-    import mermaid from '$MERMAID';
-    mermaid.initialize({ startOnLoad: true, theme: "neutral" });
+    return script("""
+    if (window.mermaid) { mermaid.initialize({ startOnLoad: true, theme: "neutral" }); }
     """)
 end
 
@@ -151,3 +157,5 @@ makedocs(;
     draft=DRAFT,
     warnonly=PREVIEW,
 )
+
+Vendor.install_vendor(joinpath(@__DIR__, "build"))
