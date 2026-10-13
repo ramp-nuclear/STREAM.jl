@@ -40,6 +40,8 @@ jobs:
           name: docs-build
           path: docs/build
           retention-days: 7
+          # Documenter writes .documenter-siteinfo.json there, which deploydocs needs.
+          include-hidden-files: true
 
   # Publishes the build to the gh-pages branch with docs/deploy.jl: main to dev/, a tag to its
   # version, and a pull request from a branch of this repository to previews/PR<number>/.
