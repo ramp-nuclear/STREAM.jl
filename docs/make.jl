@@ -4,11 +4,11 @@
 #   PREVIEW=1 julia --project=docs docs/make.jl  # runs the code, but reports broken links as
 #                                                # warnings, for previewing unfinished pages
 # A draft build also reports broken links as warnings.
-# Preview the result with `python3 -m http.server -d docs/build 8000`.
+# Preview the result with `python3 -m http.server -d docs/build 8000`. This only builds:
+# docs/deploy.jl publishes a finished build, and only CI runs it.
 using Documenter
 using DocumenterCitations
 using DocumenterCodeBlocks
-using DocumenterInterLinks
 using DocumenterMermaid
 using Literate
 using CairoMakie
@@ -53,11 +53,6 @@ end
 DocMeta.setdocmeta!(STREAM, :DocTestSetup, :(using STREAM); recursive=true)
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style=:authoryear)
-
-links = InterLinks(
-    "ModelingToolkit" => "https://docs.sciml.ai/ModelingToolkit/stable/",
-    "DiffEq" => "https://docs.sciml.ai/DiffEqDocs/stable/",
-)
 
 reference = [
     "Overview" => "reference/index.md",
@@ -151,11 +146,8 @@ makedocs(;
         search_size_threshold_warn=1024 * 2^10,
     ),
     pages,
-    plugins=[bib, links, CodeBlocks()],
+    plugins=[bib, CodeBlocks()],
     checkdocs=:exports,
     draft=DRAFT,
     warnonly=PREVIEW,
 )
-
-# A pull request from this repository gets its build deployed to previews/PR<number>/.
-PREVIEW || deploydocs(; repo="github.com/ramp-nuclear/STREAM.jl", devbranch="main", push_preview=true)

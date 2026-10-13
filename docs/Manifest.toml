@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "313ebb373b46108e9291105862c5afb02e1dcac0"
+project_hash = "b3661c9984fe5a3eb672502739ccf56292b9cb78"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -745,13 +745,6 @@ version = "0.25.131"
     SparseConnectivityTracer = "9f842d2f-2579-4b1d-911e-f412cf18a3f5"
     Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-[[deps.DocInventories]]
-deps = ["CodecZlib", "Downloads", "TOML"]
-git-tree-sha1 = "e97cfa8680a39396924dcdca4b7ff1014ed5c499"
-registries = "General"
-uuid = "43dc2714-ed3b-44b5-b226-857eda1aa7de"
-version = "1.0.0"
-
 [[deps.DocStringExtensions]]
 git-tree-sha1 = "7442a5dfe1ebb773c29cc2962a8980f47221d76c"
 registries = "General"
@@ -778,13 +771,6 @@ git-tree-sha1 = "3f53afc051c811265b8749b854484cfacd4bac17"
 registries = "General"
 uuid = "b6400b83-267f-4b55-9fd8-bffc853bdfd8"
 version = "1.5.1"
-
-[[deps.DocumenterInterLinks]]
-deps = ["CodecZlib", "DocInventories", "Documenter", "Markdown", "MarkdownAST", "TOML"]
-git-tree-sha1 = "d8a8cb2d5b0181fbbd41861016b221b0202c9bc5"
-registries = "General"
-uuid = "d12716ef-a0f6-4df4-a9f1-a5a34e75c656"
-version = "1.1.0"
 
 [[deps.DocumenterMermaid]]
 deps = ["Documenter", "MarkdownAST"]

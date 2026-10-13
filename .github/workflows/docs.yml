@@ -8,10 +8,36 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+# The build runs whatever code a pull request brings, so it gets a read-only token and no
+# secrets. Only the deploy job can write, and it never runs for a pull request from a fork.
+permissions:
+  contents: read
 jobs:
-  # Builds the site, running every tutorial and example, and deploys it to the gh-pages
-  # branch: main to dev/, and each pull request from this repository to previews/PR<number>/.
-  docs:
+  # Builds the site with docs/make.jl, running every tutorial and example. This is also the
+  # check that a pull request does not break the documentation.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v3
+      - name: Install the docs environment
+        run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+      - name: Build
+        run: julia --project=docs docs/make.jl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs-build
+          path: docs/build
+          retention-days: 7
+
+  # Publishes the build to the gh-pages branch with docs/deploy.jl: main to dev/, a tag to its
+  # version, and a pull request from a branch of this repository to previews/PR<number>/.
+  deploy:
+    needs: build
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: write   # deploydocs pushes to gh-pages
@@ -22,10 +48,17 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v3
+      - uses: actions/download-artifact@v4
+        with:
+          name: docs-build
+          path: docs/build
+      # Deploying needs Documenter alone, so nothing else is precompiled.
       - name: Install the docs environment
         run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
-      - name: Build and deploy
-        run: julia --project=docs docs/make.jl
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: 0
+      - name: Deploy
+        run: julia --project=docs docs/deploy.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}

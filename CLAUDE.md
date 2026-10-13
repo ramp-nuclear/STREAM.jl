@@ -191,8 +191,9 @@ component is its only caller: components state equations, they do not define cor
 
 ```
 docs/
-  make.jl          # Documenter build: Literate conversion, makedocs, deploydocs
-  Project.toml     # Documenter, DocumenterCitations, DocumenterInterLinks, DocumenterMermaid,
+  make.jl          # Documenter build: Literate conversion, makedocs. It never deploys
+  deploy.jl        # deploydocs: publishes docs/build to gh-pages, run only by CI's deploy job
+  Project.toml     # Documenter, DocumenterCitations, DocumenterMermaid,
                    # DocumenterCodeBlocks, Literate, CairoMakie, Latexify; STREAM through [sources]
   literate/        # the tutorials, as runnable scripts Literate turns into pages
   src/
