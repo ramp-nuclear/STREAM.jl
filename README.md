@@ -1,4 +1,4 @@
-[![CI](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/ramp-nuclear/STREAM.jl/graph/badge.svg)](https://codecov.io/gh/ramp-nuclear/STREAM.jl) [![Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://ramp-nuclear.github.io/STREAM.jl/stable/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/ramp-nuclear/STREAM.jl/actions/workflows/ci.yml) [![Coverage](https://codecov.io/gh/ramp-nuclear/STREAM.jl/graph/badge.svg)](https://codecov.io/gh/ramp-nuclear/STREAM.jl) [![Docs: stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://ramp-nuclear.github.io/STREAM.jl/stable/) [![Docs: dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://ramp-nuclear.github.io/STREAM.jl/dev/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # STREAM.jl
 
