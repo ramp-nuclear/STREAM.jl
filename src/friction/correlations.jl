@@ -117,7 +117,9 @@ used by RELAP and by [KAERI2014](@cite) (chapter 2.1.2):
 f = [-2 \log_{10}(ε/3.7 + (2.51/Re)(1.14 - 2 \log_{10}(ε + 21.25/Re^{0.9})))]^{-2}
 ```
 
-Returns 0 below `Re = 10`, where the logarithms diverge. Python STREAM zeroes the same region.
+The result is never below the laminar `64/Re`. Below about Re 7 the correlation's inner
+logarithm goes negative, and the laminar value has taken over well before that, so the floor
+also keeps the factor from vanishing at low flow.
 
 # Arguments
 - `Re`: Reynolds number
@@ -136,17 +138,22 @@ julia> Friction.turbulent(1e6)
 
 julia> Friction.turbulent(4e3, 0.1)
 0.1056087044124885
+
+julia> Friction.turbulent(5.0)  # the laminar floor, 64/Re
+12.8
 ```
 """
 function turbulent(Re, epsilon=0)
     # Clamp the Re feeding the log10 terms so they are evaluated at a turbulent Re even
-    # while tracing the not-taken branch; the ifelse zeroes the result below Re 10. It is
-    # ifelse rather than if because MTK traces this with a symbolic Re.
+    # while tracing the not-taken branch, where only the laminar floor is used. It is ifelse
+    # rather than if because MTK traces this with a symbolic Re.
     Re_safe = max(Re, 10)
     inlog = log10(epsilon + 21.25 / Re_safe^0.9)
     outlog = log10(epsilon / 3.7 + (2.51 / Re_safe) * (1.14 - 2 * inlog))
     f = (-2 * outlog)^(-2)
-    return Base.ifelse(Re < 10, zero(f), f)
+    # The Re floor keeps 64/Re finite at zero flow, where the pressure drop multiplies it by
+    # ṁ|ṁ| = 0 and an Inf would turn that into NaN.
+    return max(Base.ifelse(Re < 10, zero(f), f), 64 / max(Re, 1e-12))
 end
 
 """

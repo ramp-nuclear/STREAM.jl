@@ -150,7 +150,8 @@ Forward flow (`ṁ >= 0`) goes `1 -> 2`, so it sees an expansion when `A2 >= A1`
 contraction otherwise. Reverse flow swaps the roles, which is what keeps the loss correct through
 a flow reversal.
 
-`K` comes from [`sudden_expansion_factor`](@ref) or [`sudden_contraction_factor`](@ref). It is
+`K` comes from [`sudden_expansion_factor`](@ref) or [`sudden_contraction_factor`](@ref), at
+the Reynolds number on the diameter of the circle with the smaller of the two areas. It is
 registered with `@register_symbolic`, so it can sit inside a pressure-drop equation.
 
 # Arguments
@@ -161,11 +162,19 @@ registered with `@register_symbolic`, so it can sit inside a pressure-drop equat
 
 # Returns
 The dimensionless loss coefficient `K`.
+
+# Examples
+Water at 20 °C through a 1:2 expansion. At 3 kg/s the Reynolds number is past Idelchik's
+table and `K` is the Borda-Carnot value ``(1 - 0.5)^2``:
+```jldoctest
+julia> LocalLoss.factor(3.0, 1.0, 2.0, μ(H2O, 20.0))
+0.25
+```
 """
 function factor(ṁ::Real, A1::Real, A2::Real, mu::Real)
     A = min(A1, A2)
     aratio = min(A1 / A2, A2 / A1)
-    Dh = sqrt(A / pi)
+    Dh = 2 * sqrt(A / pi)
     re = abs(ṁ) * Dh / (A * mu)
     pos, neg = A2 >= A1 ?
                (sudden_expansion_factor, sudden_contraction_factor) :

@@ -107,8 +107,10 @@ source(0.0)
 # Each assembly type is one representative channel between two half plates, the unit cell of
 # [A fuel plate between two channels](04_plate_and_channels.md), behind an inlet orifice. The
 # heat transfer model covers every regime the transient passes through: Dittus-Boelter in
-# forced flow, the laminar constant at low flow, Elenbaas natural convection when buoyancy
-# wins, and subcooled boiling on top. The friction switches between laminar and turbulent.
+# forced flow, the laminar constant at low flow, Elenbaas natural convection combined with
+# either, and subcooled boiling on top. The channel hands the model its `g`, so buoyancy
+# works against the downward flow before the reversal and with the upward flow after it. The
+# friction switches between laminar and turbulent.
 #
 # [`weighted`](@ref STREAM.Assemblies.Connect.weighted) makes one channel stand for `N`: it
 # divides the flow entering the path by `N` and multiplies the flow leaving it by `N`.

@@ -29,7 +29,7 @@ _static_pressure(p_inlet, dp, ṁ, ρ, A) = p_inlet .- cumsum(dp) .- ṁ^2 ./ (2
                   q_left_expr, q_right_expr,
                   Re, Pe, v, P, T_sat, T_ONB,
                   q_wall, q_wall_left, q_wall_right,
-                  T_out, dP)::NamedTuple
+                  T_out, T_sat_in, T_sat_out, dP)::NamedTuple
 
 Shared private helper for STREAM channel-family components. Single source of truth
 for energy balance (enthalpy form with face-averaged cp), mass conservation,
@@ -52,9 +52,11 @@ those symbols.
                                                       variant has no wall of its own
 - `q_left_expr`, `q_right_expr`                     : length-n `Vector{Num}`, per-cell heat flow inputs (W), built by the variant
 - `Re, Pe, v, P, T_sat, T_ONB, q_wall, q_wall_left, q_wall_right` : variant-declared observable LHS symbols
-- `T_in, T_out, dP`                                 : variant-declared scalar observable LHS symbols.
+- `T_in, T_out, T_sat_in, T_sat_out, dP`            : variant-declared scalar observable LHS symbols.
                                                       `T_in` is the coolant entering at whichever
-                                                      end is upstream, `T_out` the coolant leaving
+                                                      end is upstream, `T_out` the coolant leaving,
+                                                      and `T_sat_in`, `T_sat_out` the saturation
+                                                      temperature in the cell at each of those ends
 
 # Returns
 NamedTuple `(; eqs::Vector{Equation}, obs::Vector{Equation})`. The variant
@@ -155,6 +157,8 @@ function _channel_core(;
         reduce(vcat, (c.obs for c in cells)),
         Equation[
             vars.T_out ~ ifelse(inlet.ṁ >= 0, T[n], T[1]),
+            vars.T_sat_in ~ ifelse(inlet.ṁ >= 0, Tsat(liquid, P_c[1]), Tsat(liquid, P_c[n])),
+            vars.T_sat_out ~ ifelse(inlet.ṁ >= 0, Tsat(liquid, P_c[n]), Tsat(liquid, P_c[1])),
             vars.dP ~ inlet.p - outlet.p,
         ],
     )
@@ -192,6 +196,8 @@ function _setup(geometry, g, n)
         (q_wall_right(t))[1:n]
         T_in(t)
         T_out(t)
+        T_sat_in(t)
+        T_sat_out(t)
         dP(t)
     end
 
@@ -200,7 +206,7 @@ function _setup(geometry, g, n)
 
     varstruct = (;
         T, dp, T_wall_left, T_wall_right, Re, Pe, v, P, T_sat, T_ONB,
-        q_wall, q_wall_left, q_wall_right, T_in, T_out, dP,
+        q_wall, q_wall_left, q_wall_right, T_in, T_out, T_sat_in, T_sat_out, dP,
     )
 
     return pars, varstruct, inlet, outlet
@@ -213,7 +219,7 @@ function _vcollect(vars)
         collect(vars.Re); collect(vars.Pe); collect(vars.v);
         collect(vars.P); collect(vars.T_sat); collect(vars.T_ONB);
         collect(vars.q_wall); collect(vars.q_wall_left); collect(vars.q_wall_right);
-        vars.T_in; vars.T_out; vars.dP
+        vars.T_in; vars.T_out; vars.T_sat_in; vars.T_sat_out; vars.dP
     ]
 end
 
@@ -443,9 +449,10 @@ is `h_tc[i] * heated_parts * dz * (T_wall - T[i])`.
 - `geometry`: pipe geometry descriptor (PipeGeometry)
 - `g`: gravitational acceleration [m/s^2], 0.0 for horizontal (default 0.0)
 - `htc`: wall heat transfer model ([`HTC`](@ref)), default [`DittusBoelter`](@ref). It is
-  handed `(T_wall, T_bulk, ṁ, Dh, A, liquid, P)` per cell and returns `h`. Subcooled boiling
-  is a model like any other: wrap one in [`SubcooledBoiling`](@ref). Regime switching is
-  [`HTC.RegimeDependent`](@ref).
+  handed `(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)` per cell, with the cell's static pressure
+  and this channel's `g`, and returns `h`. Subcooled boiling is a model like any other: wrap
+  one in [`SubcooledBoiling`](@ref). Regime switching, with natural convection aiding or
+  opposing the flow by the sign of `g`, is [`HTC.RegimeDependent`](@ref).
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
   viscosity correction are [`Friction.RegimeDependent`](@ref).
@@ -505,8 +512,9 @@ function ChannelAndContacts(;
     wall_T(face) = [port.T for port in face.port]
     q_wall(face) = collect(face.h) .* face.perimeter .* dz .* (wall_T(face) .- T)
 
-    # Every model takes the local pressure; only one that boils looks at it.
-    wall_htc(face, i) = htc(face.port[i].T, T[i], inlet.ṁ, Dh, A, liquid, P_cell[i])
+    # Every model takes the local pressure and the channel's gravity; only one that boils looks
+    # at the first, and only one with natural convection at the second.
+    wall_htc(face, i) = htc(face.port[i].T, T[i], inlet.ṁ, Dh, A, liquid, P_cell[i], g)
 
     q_left_expr, q_right_expr = q_wall.(faces)
 

@@ -60,6 +60,14 @@ end
     @test isapprox(Tsat(D2O, ATM), 101.4; atol=0.5)
 end
 
+@testset "fits are held short of their poles" begin
+    # The doctests show each fit held at its limit. These check that the hold starts there
+    # and not earlier, and that D2O's viscosity stays positive below it.
+    @test cₚ(H2O, 349.0) < cₚ(H2O, 350.0)
+    @test μ(D2O, -17.0) > 0
+    @test μ(D2O, 3.9) < μ(D2O, 3.8)
+end
+
 @testset "properties trace symbolically" begin
     # Nothing is @register_symbolic, so a symbolic argument has to come back as an expression
     # rather than dispatching to a numeric method or erroring.

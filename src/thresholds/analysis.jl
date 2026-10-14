@@ -20,6 +20,10 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 - `T_ONB::AbstractArray`: onset of nucleate boiling temperature per cell [°C]
 - `T_inlet::Float64`: temperature of the coolant entering the channel, at whichever end is
   upstream, from the channel's `T_in` [°C]
+- `T_outlet::Float64`: temperature of the coolant leaving it, the bulk of the downstream end
+  cell, from the channel's `T_out` [°C]
+- `T_sat_inlet::Float64`, `T_sat_outlet::Float64`: saturation temperature in the end cell the
+  coolant enters by and in the one it leaves by, from `T_sat_in` and `T_sat_out` [°C]
 - `P::AbstractArray`: absolute pressure per cell [Pa]
 - `q_flux::AbstractArray`: the larger face flux, `max(q_flux_left, q_flux_right)` [W/m²]
 - `q_flux_left::AbstractArray`: left face heat flux per cell [W/m²]
@@ -38,6 +42,9 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
     T_sat::AbstractArray
     T_ONB::AbstractArray
     T_inlet::Float64
+    T_outlet::Float64
+    T_sat_inlet::Float64
+    T_sat_outlet::Float64
     P::AbstractArray
     q_flux::AbstractArray
     q_flux_left::AbstractArray
@@ -158,6 +165,9 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=not
         T_sat=cells(channel_sys.T_sat),
         T_ONB=cells(channel_sys.T_ONB),
         T_inlet=value(channel_sys.T_in),
+        T_outlet=value(channel_sys.T_out),
+        T_sat_inlet=value(channel_sys.T_sat_in),
+        T_sat_outlet=value(channel_sys.T_sat_out),
         P=cells(channel_sys.P),
         q_flux=max.(q_flux_left, q_flux_right),
         q_flux_left=q_flux_left,
@@ -385,14 +395,13 @@ q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, Ref(s.pipe))
 # known, so the snapshot is built here: one entry per cell at that cell's saturation state.
 function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=H2O)
     T_sat, P = collect(s.T_sat), collect(s.P)
-    return q_CHF_sudo_kaminaga(collect(s.T_bulk), s.ṁ, s.pipe, s.gravity, liquid(T_sat, P))
+    return q_CHF_sudo_kaminaga(s.T_sat_inlet - s.T_inlet, s.T_sat_outlet - s.T_outlet, s.ṁ,
+                               s.pipe, s.gravity, liquid(T_sat, P))
 end
 
-# Flow instability is judged at the outlet, where the coolant is hottest and nearest boiling:
-# the last cell in forward flow and the first in reversed flow.
+# Flow instability is judged at the outlet, where the coolant is hottest and nearest boiling.
 function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
-    T_sat_out = s.ṁ >= 0 ? last(s.T_sat) : first(s.T_sat)
-    return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.pipe; liquid=liquid)
+    return q_OFI_whittle_forgan(s.ṁ, s.T_sat_outlet, s.T_inlet, s.pipe; liquid=liquid)
 end
 
 function q_OSV_saha_zuber(s::ChannelState; direction=:max, liquid::AbstractLiquid=H2O)

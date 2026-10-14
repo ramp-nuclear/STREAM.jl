@@ -183,7 +183,7 @@ function q_OSV_saha_zuber(
 end
 
 """
-    q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant) -> q_CHF [W/m^2]
+    q_CHF_sudo_kaminaga(dT_sub_inlet, dT_sub_outlet, ṁ, pipe, gravity, sat_coolant) -> q_CHF [W/m^2]
 
 Critical heat flux from the Sudo-Kaminaga correlation for plate-type fuel
 [SudoKaminaga1993, Kaminaga1998](@cite). See [Critical heat flux](@ref) for the physics and
@@ -196,20 +196,19 @@ Four sub-correlations (`_SKq1..4`) with direction-dependent selection:
 Final result: `q_CHF = q_star * hfg * sqrt(lamda * drho * rho_v * gravity)` where
 `lamda = sqrt(sigma / drho / |gravity|)` is the capillary length.
 
-Everything is elementwise, so passing per-cell `T_bulk` and a per-cell `sat_coolant` gives a
-per-cell CHF, and passing scalars gives a scalar.
-
-The subcooling is the exception, and it is what makes this a channel correlation rather than
-a per-cell one. It was fitted to experiments that characterised a whole test section, so q2
-and q3 are driven by the temperature difference at the **inlet** and q4 by the one at the
-**outlet**. Only those two differences come from the channel ends; the `cp/hfg` factor
-multiplying them stays per cell, as in Python STREAM.
+It is a channel correlation. It was fitted to experiments that characterised a whole test
+section, so q2 and q3 are driven by the subcooling `T_sat - T_bulk` where the coolant
+**enters** and q4 by the one where it **leaves**. The caller supplies both, and the
+[`ChannelState`](@ref) method takes them from the channel, which knows which end is upstream.
+The `cp/hfg` factor that scales them is per cell, as in Python STREAM, so a per-cell
+`sat_coolant` gives a per-cell CHF and a scalar one gives a scalar.
 
 `q3` reads the channel width `pipe.width`, not half the heated perimeter, following the
 experiments it was fitted to. This is Python STREAM's `Sudo_Kaminaga_CHF`.
 
 # Arguments
-- `T_bulk`: bulk coolant temperature, per cell [°C]
+- `dT_sub_inlet`: subcooling of the coolant entering the channel [K]
+- `dT_sub_outlet`: subcooling of the coolant leaving it [K]
 - `ṁ`: mass flow rate [kg/s]
 - `pipe`: channel geometry [`PipeGeometry`]
 - `gravity`: gravitational acceleration [m/s^2]. Only its size is used. The branch
@@ -220,33 +219,34 @@ experiments it was fitted to. This is Python STREAM's `Sudo_Kaminaga_CHF`.
   to state.
 
 # Returns
-CHF heat flux `q_CHF` [W/m²], shaped like the inputs.
+CHF heat flux `q_CHF` [W/m²], shaped like `sat_coolant`.
 
 # Examples
-Downward flow at 0.5 kg/s with the bulk at 46.85 °C, against book values for water at 1 atm:
+Downward flow at 0.5 kg/s with the bulk at 46.85 °C at both ends, against book values for
+water at 1 atm:
 ```jldoctest
 julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
 
 julia> sat = Substances.Liquid(; ρ=958.4, ρᵥ=0.598, cₚ=4217.0, hfg=2257e3, σ=0.059, Tsat=100.0);
 
-julia> round(Thresholds.q_CHF_sudo_kaminaga(46.85, 0.5, pipe, 9.81, sat); sigdigits=9)
+julia> round(Thresholds.q_CHF_sudo_kaminaga(100.0 - 46.85, 100.0 - 46.85, 0.5, pipe, 9.81, sat);
+             sigdigits=9)
 1.39178807e6
 ```
 """
-function q_CHF_sudo_kaminaga(T_bulk, ṁ, pipe, gravity, sat_coolant::Liquid)
+function q_CHF_sudo_kaminaga(dT_sub_inlet, dT_sub_outlet, ṁ, pipe, gravity,
+                             sat_coolant::Liquid)
     g_abs = abs(gravity)
     rho_l, rho_v = sat_coolant.ρ, sat_coolant.ρᵥ
-    hfg, cp, T_sat = sat_coolant.hfg, sat_coolant.cₚ, sat_coolant.Tsat
+    hfg, cp = sat_coolant.hfg, sat_coolant.cₚ
 
     drho = rho_l .- rho_v
     lamda = sqrt.(sat_coolant.σ ./ drho ./ g_abs)
     G_star = ṁ ./ pipe.A ./ sqrt.(lamda .* drho .* rho_v .* g_abs)
     A_ratio = pipe.A / (sum(pipe.heated_parts) * pipe.L)
 
-    # The driving temperature differences are the channel's, taken at its two ends. The
-    # cp/hfg factor in front of them is local.
-    dT_inlet = (cp ./ hfg) .* (first(T_sat) - first(T_bulk))
-    dT_outlet = (cp ./ hfg) .* (last(T_sat) - last(T_bulk))
+    dT_inlet = (cp ./ hfg) .* dT_sub_inlet
+    dT_outlet = (cp ./ hfg) .* dT_sub_outlet
 
     q1 = _SKq1.(G_star)
     q2 = _SKq2.(A_ratio, G_star, dT_inlet)

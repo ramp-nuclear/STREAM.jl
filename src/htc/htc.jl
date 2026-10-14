@@ -4,9 +4,14 @@
 A wall heat transfer coefficient model. Subtypes are callable as
 
     htc(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h [W/(m²·K)]
+    htc(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g) -> h [W/(m²·K)]
 
 with temperatures in °C, `ṁ` in kg/s, `Dh` and `A` the channel's hydraulic diameter and flow
-area, and `liquid` an [`AbstractLiquid`](@ref).
+area, and `liquid` an [`AbstractLiquid`](@ref). A channel uses the second form, adding the
+local static pressure `P` [Pa] and its gravity `g` [m/s²], positive when positive flow climbs
+against gravity. A model that needs neither defines only the first form and the second falls
+back to it. [`SubcooledBoiling`](@ref) reads `P`, and [`Elenbaas`](@ref) and
+[`RegimeDependent`](@ref) read `g`.
 
 Shipped models: [`FromNusselt`](@ref) and the named correlations built on it
 ([`DittusBoelter`](@ref), [`ConstantNusselt`](@ref), [`FullyDevelopedLaminar`](@ref),
@@ -147,17 +152,17 @@ function DevelopingLaminar(geom::PipeGeometry; develop_length,
 end
 
 """
-    Elenbaas(geom; g=G_EARTH, basis=AtFilm()) <: AbstractHTC
+    Elenbaas(geom; basis=AtFilm()) <: AbstractHTC
 
 Elenbaas natural convection between symmetrically heated parallel vertical plates.
 
 The plate gap `S = geom.depth` is the length scale throughout: Ra is taken on `S` and
-`h = Nu·κ/S`. [`RegimeDependent`](@ref) reads a natural branch at the bulk instead of the
-film.
+`h = Nu·κ/S`. Gravity comes with the call, from the channel, and only its size is used, so
+it is called as `(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)`. Called without `g` it throws.
+[`RegimeDependent`](@ref) reads a natural branch at the bulk instead of the film.
 
 # Arguments
 - `geom`: channel geometry; `geom.depth` is the gap and `geom.L` the heated length
-- `g`: gravitational acceleration [m/s²]
 - `basis`: where the coolant properties are read, [`AtFilm`](@ref) (default) or [`AtBulk`](@ref)
 
 # Returns
@@ -166,18 +171,20 @@ An `Elenbaas` model, callable like any [`AbstractHTC`](@ref).
 struct Elenbaas{B<:PropertyBasis} <: AbstractHTC
     gap::Float64
     heated_length::Float64
-    g::Float64
     basis::B
 end
 
-function Elenbaas(geom::PipeGeometry; g=G_EARTH, basis::PropertyBasis=AtFilm())
-    return Elenbaas(geom.depth, geom.L, Float64(g), basis)
-end
+Elenbaas(geom::PipeGeometry; basis::PropertyBasis=AtFilm()) = Elenbaas(geom.depth, geom.L, basis)
 
 function (htc::Elenbaas)(T_wall, T_bulk, ṁ, Dh, A, liquid)
+    throw(ArgumentError("Elenbaas needs gravity: call it as (T_wall, T_bulk, ṁ, Dh, A, " *
+                        "liquid, P, g), as a channel does"))
+end
+
+function (htc::Elenbaas)(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)
     T_prop = property_temperature(htc.basis, T_wall, T_bulk)
     Gr_val = Gr(ρ(liquid, T_prop), μ(liquid, T_prop), β(liquid, T_prop),
-                T_wall, T_bulk, htc.gap, htc.g)
+                T_wall, T_bulk, htc.gap, abs(g))
     Nu = elenbaas_nusselt(Ra(Gr_val, Pr(liquid, T_prop)), htc.gap, htc.heated_length)
     return Nu * κ(liquid, T_prop) / htc.gap
 end
@@ -190,24 +197,30 @@ own: at the bulk temperature for [`AtBulk`](@ref), at the film for [`AtFilm`](@r
 with no property basis, such as a user-defined one or `nothing`, comes back as it is.
 """
 _with_basis(m::FromNusselt, basis) = FromNusselt(m.nusselt, basis)
-_with_basis(m::Elenbaas, basis) = Elenbaas(m.gap, m.heated_length, m.g, basis)
+_with_basis(m::Elenbaas, basis) = Elenbaas(m.gap, m.heated_length, basis)
 _with_basis(m, basis) = m
 
-"""
+@doc raw"""
     RegimeDependent(; laminar, turbulent, natural=nothing, re_bounds=(2000.0, 5000.0),
-                       geom, g=G_EARTH) <: AbstractHTC
+                       geom, gz_band=(0.01, 0.1)) <: AbstractHTC
 
-A heat transfer coefficient that picks its correlation by flow regime.
+A heat transfer coefficient that picks its forced-convection correlation by flow regime and
+adds buoyancy to it.
 
-It uses `laminar` at low Reynolds number, `turbulent` at high, a linear blend of the two
-across `re_bounds`, and `natural` convection wherever buoyancy outweighs the forced flow.
+The forced value ``h_f`` is `laminar` at low Reynolds number, `turbulent` at high, and a
+linear blend of the two across `re_bounds` on the bulk Reynolds number. A `natural` model's
+value ``h_n`` combines with it by Churchill's rule [Churchill1977](@cite):
 
-Two Reynolds numbers are involved, for different questions. Whether the flow is laminar or
-turbulent is a property of the flow as a whole, so the blend reads the Reynolds number at the
-bulk temperature. Whether natural convection takes over is decided by `Gr/Re² > 1`, tested
-as `Gr > Re²` so that it holds at zero flow too: buoyancy acts in the film next to the wall,
-and the comparison only sets like against like when Gr and Re are both read there, at the
-film temperature, with `geom.Dh` as the length.
+```math
+h = (h_f^3 + h_n^3)^{1/3} \; \text{(aiding)}, \qquad h = \max((h_f^3 - h_n^3)^{1/3}, h_n) \; \text{(opposing)}
+```
+
+Buoyancy aids the flow when it pushes the same way, as in heated upflow, and opposes it
+otherwise. The direction comes from the sign of `g`, so a model with a `natural` branch is
+called as `(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)`, which is how a channel calls it.
+Called without `g` it throws. As the through-flow dies, ``h`` hands over to ``h_n`` along a
+smooth step in the Graetz number ``Gz = Re \, Pr \, D_h / L`` across `gz_band`.
+[Mixed convection](@ref) explains each of these choices.
 
 Each branch reads its coolant properties at one fixed temperature, whatever basis its model
 was built with: laminar and natural convection at the bulk, turbulent at the film. A model
@@ -217,8 +230,11 @@ with no property basis of its own is used as given.
 - `laminar`, `turbulent`: the two forced-convection models
 - `natural`: optional natural-convection model
 - `re_bounds`: `(re_lo, re_hi)` transition band on the bulk Reynolds number
-- `geom`: channel geometry; `geom.Dh` is the Grashof characteristic length
-- `g`: gravitational acceleration [m/s²], used only when `natural` is given
+- `geom`: channel geometry; `geom.L` is the heated length in the Graetz number
+- `gz_band`: `(gz_lo, gz_hi)` over which the value hands over to pure natural convection
+
+# Returns
+A `RegimeDependent` model, callable like any [`AbstractHTC`](@ref).
 
 # Examples
 It prints each branch with the temperature its properties are read at:
@@ -236,8 +252,8 @@ struct RegimeDependent{L<:AbstractHTC,T<:AbstractHTC,N} <: AbstractHTC
     turbulent::T
     natural::N
     re_bounds::Tuple{Float64,Float64}
-    Dh_gr::Float64
-    g::Float64
+    heated_length::Float64
+    gz_band::Tuple{Float64,Float64}
 end
 
 function RegimeDependent(;
@@ -246,33 +262,58 @@ function RegimeDependent(;
     natural::Union{AbstractHTC,Nothing}=nothing,
     re_bounds=(2000.0, 5000.0),
     geom::PipeGeometry,
-    g=G_EARTH,
+    gz_band=(0.01, 0.1),
 )
-    bounds = (Float64(re_bounds[1]), Float64(re_bounds[2]))
     return RegimeDependent(
         _with_basis(laminar, AtBulk()), _with_basis(turbulent, AtFilm()),
-        _with_basis(natural, AtBulk()), bounds, geom.Dh, Float64(g),
+        _with_basis(natural, AtBulk()), re_bounds, geom.L, gz_band,
     )
 end
 
+"""
+    _smooth_step(x, x0, x1) -> [0, 1]
+
+The C1 cubic step `3s² - 2s³` with `s = (x - x0)/(x1 - x0)` clamped to `[0, 1]`: zero below
+`x0`, one above `x1`, with zero slope at both ends.
+"""
+function _smooth_step(x, x0, x1)
+    s = min(max((x - x0) / (x1 - x0), zero(x)), one(x))
+    return s * s * (3 - 2 * s)
+end
+
+"""
+    _forced(htc::RegimeDependent, Re_bulk, args...) -> h
+
+The forced-convection value: `laminar` and `turbulent`, each called with `args`, blended
+across `re_bounds` on `Re_bulk`.
+"""
+function _forced(htc::RegimeDependent, Re_bulk, args...)
+    return flow_regime_blend(Re_bulk, htc.re_bounds, htc.laminar(args...), htc.turbulent(args...))
+end
+
 function (htc::RegimeDependent)(T_wall, T_bulk, ṁ, Dh, A, liquid)
+    htc.natural === nothing || throw(ArgumentError(
+        "a RegimeDependent with a natural branch needs gravity for the direction of " *
+        "buoyancy: call it as (T_wall, T_bulk, ṁ, Dh, A, liquid, P, g), as a channel does"))
+    return _forced(htc, Re(liquid, T_bulk, ṁ, A, Dh), T_wall, T_bulk, ṁ, Dh, A, liquid)
+end
+
+function (htc::RegimeDependent)(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)
     Re_bulk = Re(liquid, T_bulk, ṁ, A, Dh)
-    h_forced = flow_regime_blend(
-        Re_bulk, htc.re_bounds,
-        htc.laminar(T_wall, T_bulk, ṁ, Dh, A, liquid),
-        htc.turbulent(T_wall, T_bulk, ṁ, Dh, A, liquid),
-    )
+    h_forced = _forced(htc, Re_bulk, T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)
     htc.natural === nothing && return h_forced
-    T_film = film_temperature(T_wall, T_bulk)
-    Gr_film = Gr(ρ(liquid, T_film), μ(liquid, T_film), β(liquid, T_film),
-                 T_wall, T_bulk, htc.Dh_gr, htc.g)
-    Re_film = Re(liquid, T_film, ṁ, A, Dh)
-    return ifelse(
-        # Not Gr / Re² > 1, which divides by zero when the flow stops.
-        Gr_film > Re_film^2,
-        htc.natural(T_wall, T_bulk, ṁ, Dh, A, liquid),
-        h_forced,
-    )
+    h_nat = htc.natural(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)
+    aiding = (h_forced^3 + h_nat^3)^(1 / 3)
+    opposing = max(max(h_forced^3 - h_nat^3, zero(h_nat))^(1 / 3), h_nat)
+    # A wall hotter than the bulk pushes the fluid beside it up, and a positive g means
+    # positive flow runs up.
+    opposed = sign(g) * ṁ * (T_wall - T_bulk) < 0
+    h_mixed = ifelse(opposed, opposing, aiding)
+    Gz = Re_bulk * Pr(liquid, T_bulk) * Dh / htc.heated_length
+    # The flip between aiding and opposing happens at ṁ = 0, where Gz = 0 and the weight is
+    # already zero, so h has no jump there.
+    w = _smooth_step(log10(Gz), log10(htc.gz_band[1]), log10(htc.gz_band[2]))
+    return w * h_mixed + (1 - w) * h_nat
 end
 
 """
@@ -297,6 +338,10 @@ Maximal(models::AbstractHTC...) = Maximal(models)
 
 function (htc::Maximal)(T_wall, T_bulk, ṁ, Dh, A, liquid)
     return reduce(max, (m(T_wall, T_bulk, ṁ, Dh, A, liquid) for m in htc.models))
+end
+
+function (htc::Maximal)(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)
+    return reduce(max, (m(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g) for m in htc.models))
 end
 
 """
@@ -346,9 +391,16 @@ function (htc::SubcooledBoiling)(T_wall, T_bulk, ṁ, Dh, A, liquid, P)
     return _scb_corrected(h_spl, htc.q_scb, T_wall, T_bulk, ṁ, Dh, A, liquid, P)
 end
 
-# Models that do not care about pressure ignore the extra argument, so a channel can always
-# pass it and let the model decide.
+function (htc::SubcooledBoiling)(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)
+    h_spl = htc.single_phase(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g)
+    return _scb_corrected(h_spl, htc.q_scb, T_wall, T_bulk, ṁ, Dh, A, liquid, P)
+end
+
+# Models that do not care about pressure or gravity ignore the extra arguments, so a channel
+# can always pass them and let the model decide.
 (htc::AbstractHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid, P) = htc(T_wall, T_bulk, ṁ, Dh, A, liquid)
+(htc::AbstractHTC)(T_wall, T_bulk, ṁ, Dh, A, liquid, P, g) =
+    htc(T_wall, T_bulk, ṁ, Dh, A, liquid, P)
 
 # #### Printing
 
@@ -380,7 +432,8 @@ function Base.show(io::IO, ::MIME"text/plain", m::RegimeDependent)
     print(io, "HTC.RegimeDependent, blending across Re = ", lo, " to ", hi)
     print(io, "\n  laminar:   ", m.laminar)
     print(io, "\n  turbulent: ", m.turbulent)
-    m.natural === nothing || print(io, "\n  natural:   ", m.natural, ", where Gr > Re²")
+    m.natural === nothing ||
+        print(io, "\n  natural:   ", m.natural, ", combined by Churchill's rule")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", m::SubcooledBoiling)

@@ -28,7 +28,7 @@ htc = HTC.SubcooledBoiling(
     HTC.regime_dependent_q_scb(),
 )
 darcy = Friction.RegimeDependent(; k_R=Friction.rectangular_correction(geom.depth / geom.width))
-@named ch = ChannelAndContacts(; n=10, geometry=geom, htc, darcy);
+@named ch = ChannelAndContacts(; n=10, geometry=geom, g=-G_EARTH, htc, darcy);
 htc
 ```
 
@@ -40,10 +40,12 @@ darcy
 
 A model can be called directly, which is a quick way to see what it gives. A heat transfer
 model takes the wall and bulk temperatures, the flow, the hydraulic diameter, the flow area
-and the coolant:
+and the coolant, then the local pressure and the channel's gravity. The channel above runs
+downward, so its `g` is negative, and natural convection needs that sign to know whether it
+helps the flow:
 
 ```@example models
-htc(60.0, 40.0, 0.3, geom.Dh, geom.A, H2O)
+htc(60.0, 40.0, 0.3, geom.Dh, geom.A, H2O, 1.7e5, -G_EARTH)
 ```
 
 A friction model takes the bulk and wall temperatures, the flow, the coolant and the geometry:
