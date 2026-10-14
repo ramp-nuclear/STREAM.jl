@@ -87,7 +87,7 @@ The package is a stack of submodules, each reaching only downward:
 
 ```
 Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
-           -> Components -> {DecayHeat, Assemblies} -> {Solvers, Examples}
+           -> Components -> {DecayHeat, Assemblies} -> Solvers
 ```
 
 A module supplies the context a name would otherwise carry as a suffix, so
@@ -104,9 +104,6 @@ using STREAM.Components   # Channel(...)
 Prefer the qualified form in examples and in tests that touch more than one module: seeing
 `HTC.RegimeDependent` next to `Friction.RegimeDependent` is the point of the split. Very
 common verbs stay bare (`inseries`, `inparallel`).
-
-`Examples` is compiled with the package but never exported: the builders are documentation
-and test fixtures, reached as `STREAM.Examples.build_loop` or via `using STREAM.Examples`.
 
 ### `src/` — Source
 
@@ -168,10 +165,7 @@ src/
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
   initial_conditions.jl       # steady_state_guess, uniform
-  utilities.jl                # module Utilities: rebin_*, cosine_shape, cosine_power_shape,
-                              # cosine_T_wall_profile, x_boundaries
-  examples.jl                 # module Examples: build_loop*, build_cube, build_loop_pk,
-                              # build_pool_break
+  utilities.jl                # module Utilities: rebin_*, cosine_shape, x_boundaries
 ```
 
 **Where new code goes:**
@@ -181,7 +175,7 @@ src/
 - Prefer `Connect.face(...)` over a bare `face(...)`, but leave `inseries`, `inparallel` and `port` unqualified: the first two are used constantly and `port` is a getter that reads clearly on its own
 - New decay heat contribution → `src/decay_heat/`, in the file matching the Python module it mirrors
 - New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the nine `AbstractLiquid` property methods
-- Build/example helpers → `src/examples.jl` only (never add examples to core files)
+- A worked model → the docs, as a tutorial or how-to. `src/` holds no example builders; a model several test files solve goes in `test/fixtures.jl`
 
 Placement beats file length. A long file whose contents all belong together is fine; a short
 file named `misc` or `helpers` is not. Physics lives in its own module, even when one
@@ -221,6 +215,8 @@ exists. Plots use CairoMakie.
 ```
 test/
   runtests.jl               # Thin orchestrator: one include() per test file, nothing else
+  fixtures.jl               # build_loop, build_loop_pk: the loops several test files solve.
+                            # A file that needs them includes it behind @isdefined(build_loop)
   test_doctests.jl          # the jldoctest examples in the docstrings; skips with a warning
                             # when Documenter is not installed
   test_geometry.jl          # PipeGeometry
@@ -229,7 +225,8 @@ test/
   test_channels.jl          # Channel/CHF/CAC variants + _channel_core enthalpy-form physics
                             # + flow-reversal sign safety + subcooled-boiling integration (ISCB)
   test_pump.jl              # Pump
-  test_valves.jl            # Flapper, Orifice
+  test_valves.jl            # Flapper, Orifice, a break in a pumped pool, and a loss of flow
+                            # that opens a bypass flapper into natural circulation
   test_tank.jl              # Tank, Environment
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
   test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, ConvectiveBoundary
@@ -247,11 +244,9 @@ test/
   test_composition.jl       # symmetric_plate, plate, one_sided_connection, assembly,
                             # port, check_gravity_mismatch, var_length, temperature_feedback,
                             # fuel_assembly — heavy CAC<->HD coverage
-  test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
+  test_utilities.jl         # rebin_extensive/intensive, cosine_shape, x_boundaries
   test_initial_conditions.jl # steady_state_guess, uniform (src/initial_conditions.jl)
   test_solvers.jl           # solve_steady/solve_transient wrappers (src/solvers.jl)
-  test_examples.jl          # build_loop* / build_cube / build_pool_break builders
-                            # + loss-of-flow transient (src/examples.jl)
   test_validation.jl        # Quantitative cross-validation against Python STREAM
   test_integration.jl       # STRICT 1:1 port of Python tests/test_general/test_integrations.py —
                             # exactly the 21 Python integration tests, nothing else
@@ -280,8 +275,8 @@ so do not re-derive them from scratch.
 - **Seed a loss-of-flow steady solve with its flows.** Solve the pump-on state with
   `solve_steady(...; solver=DynamicSS(Rodas5P()))`, which integrates to where the model
   settles, and start the flow unknowns `mtkcompile` keeps away from zero: started at zero, the
-  solve stays at ṁ = 0 and fails. `_lof_bypass_ic` in `test/test_examples.jl` seeds the pump
-  head, its two kept flows at `dP_pre / R_ext` and the dummy derivative, and nothing else. If
+  solve stays at ṁ = 0 and fails. The bypass loss-of-flow testset in `test/test_valves.jl` seeds
+  the pump head, its two kept flows at the head over `ext_res` and the dummy derivative, and nothing else. If
   a change to a channel equation changes which flows `mtkcompile` keeps, that list is the
   first thing to look at.
 

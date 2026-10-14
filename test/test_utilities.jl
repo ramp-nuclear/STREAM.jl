@@ -82,30 +82,6 @@ end
     @test all(isapprox.(out, expected; rtol=1e-12))
 end
 
-@testset "cosine_power_shape shape + axial cosine + uniform-along-x" begin
-    nz, nx = 10, 5
-    M = cosine_power_shape(nz, nx; amplitude=1.0)
-
-    # shape + element type
-    @test size(M) == (nz, nx)
-    @test eltype(M) === Float64
-
-    # uniform along x: every column equals column 1.
-    for j in 1:nx
-        @test M[:, j] == M[:, 1]
-    end
-
-    # peak near axial center (cell-centered cos^2 peaks at i = nz/2).
-    @test M[5, 1] > M[1, 1]
-    @test M[5, 1] > M[10, 1]
-    @test M[6, 1] > M[1, 1]
-    @test M[6, 1] > M[10, 1]
-
-    # amplitude scaling is linear.
-    M2 = cosine_power_shape(nz, nx; amplitude=2.5)
-    @test all(isapprox.(M2, 2.5 .* M; rtol=1e-12))
-end
-
 @testset "rebin_intensive keeps a constant field constant across reshapes" begin
     rtol = 1e-12
     @test all(isapprox.(rebin_intensive(ones(4), 4), 1.0; rtol=rtol))   # 4 -> 4
@@ -155,21 +131,6 @@ end
     tu = collect(range(0.0, 1.0; length=3))
     @test isapprox(rebin_extensive(v, su, tu), rebin_extensive(v, 2); rtol=rtol)
     @test isapprox(rebin_intensive(v, su, tu), rebin_intensive(v, 2); rtol=rtol)
-end
-
-@testset "cosine_T_wall_profile shape and amplitude scaling" begin
-    rtol = 1e-12
-
-    c = cosine_T_wall_profile(10; amplitude=1.0)
-    @test length(c) == 10
-    @test all(c .>= 0)
-
-    # mirror-symmetric about midplane (cell-centered cos^2)
-    @test isapprox(c, reverse(c); rtol=rtol)
-
-    # amplitude scales the peak linearly
-    c2 = cosine_T_wall_profile(10; amplitude=2.0)
-    @test isapprox(maximum(c2), 2 * maximum(c); rtol=rtol)
 end
 
 @testset "cosine_shape" begin

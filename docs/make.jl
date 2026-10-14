@@ -73,7 +73,6 @@ reference = [
     "Assemblies" => "reference/assemblies.md",
     "Solvers" => "reference/solvers.md",
     "Utilities" => "reference/utilities.md",
-    "Examples" => "reference/examples.md",
 ]
 
 # A page listed here that does not exist yet is skipped, so the navigation can be written

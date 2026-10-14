@@ -6,7 +6,7 @@ as constant over each source cell and integrating its overlap with each target c
 
 ```@example rb
 using STREAM
-using STREAM.Utilities: rebin_extensive, rebin_intensive, cosine_shape, cosine_power_shape
+using STREAM.Utilities: rebin_extensive, rebin_intensive, cosine_shape
 ```
 
 ## Amounts: keep the total
@@ -63,5 +63,4 @@ power_shape = repeat(shares ./ nx, 1, nx)
 ```
 
 The second number is the peak cell's share over the average, a little under 1.4 because a
-cell averages over the peak. [`cosine_power_shape`](@ref STREAM.Utilities.cosine_power_shape)
-gives an unnormalised cosine-squared shape sampled at cell centres instead.
+cell averages over the peak.

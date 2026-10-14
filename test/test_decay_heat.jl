@@ -2,7 +2,7 @@ using Test
 using STREAM
 using STREAM.DecayHeat
 using STREAM.Components: ReactivityController, StateMachine, trip!
-using STREAM.Examples
+@isdefined(build_loop) || include("fixtures.jl")
 using OrdinaryDiffEq: ReturnCode
 
 # The published tables are not distributed with this package, so the testsets that read one

@@ -126,12 +126,13 @@ A rectangular channel 2.4 mm by 67 mm and 0.6 m long, with water entering at the
 using STREAM, CairoMakie
 using STREAM.Components: Pump, HeatExchanger, Channel
 using STREAM.Assemblies: inseries
-using STREAM.Utilities: cosine_T_wall_profile
+using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile
 
 n = 20
 geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
-T_wall = 60.0 .+ 60.0 .* cosine_T_wall_profile(n)      # 60 °C at the ends, 120 °C mid-height
+shape = cosine_shape(range(0.0, geometry.L; length=n + 1))
+T_wall = 60.0 .+ 60.0 .* shape ./ maximum(shape)   # 60 °C at the ends, 120 °C mid-height
 
 @named pump = Pump(2.0e4)
 @named hx = HeatExchanger(40.0)

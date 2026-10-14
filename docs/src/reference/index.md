@@ -16,7 +16,6 @@ reaches only the ones above it in this list:
 | [`Assemblies`](assemblies.md) | wiring verbs and ready-made arrangements of components |
 | [Solvers](solvers.md) | steady and transient solves, and initial guesses |
 | [`Utilities`](utilities.md) | resampling between meshes, axial profiles, and the mesh of a clad plate |
-| [`Examples`](examples.md) | complete models built in one call |
 
 `using STREAM` brings in the module names and the most common functions, so a name is written
 either qualified, `Components.Channel` and `HTC.DittusBoelter()`, or bare after

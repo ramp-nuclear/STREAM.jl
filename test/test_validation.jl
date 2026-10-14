@@ -6,7 +6,7 @@ using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM.Examples
+@isdefined(build_loop) || include("fixtures.jl")
 
 
 include(joinpath(@__DIR__, "parity_helpers.jl"))
@@ -822,7 +822,7 @@ end
         n = 7
         T_inlet = 20.0
         ctrl = ReactivityController()
-        ssys, ic = build_loop_pk(ctrl; n=n, T_inlet=T_inlet, P0=1.0, power_scale=1e4)
+        ssys, ic = build_loop_pk(ctrl; n=n, T_inlet=T_inlet, P0=1.0)
 
         t_arr = range(0.0, 50.0; length=200)
         sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
@@ -858,15 +858,8 @@ end
 
         ctrl = ReactivityController()
         ssys, ic = build_loop_pk(
-            ctrl;
-            n=n,
-            nz=nz,
-            nx=nx,
-            T_inlet=T_inlet,
-            P0=1.0,
-            power_scale=1e4,
-            temp_worth=Dict(:fuel => fill(alpha_neg, nz, nx)),     # nz×nx matrix for HeatDiffusion
-            ref_temp=Dict(:fuel => fill(T_inlet, nz, nx)),       # ref = initial T; feedback negative as fuel heats up
+            ctrl; n=n, nz=nz, nx=nx, T_inlet=T_inlet, P0=1.0,
+            feedback=:fuel => alpha_neg,   # ref = initial T, so feedback is negative as the fuel heats
         )
 
         t_arr = range(0.0, 200.0; length=500)

@@ -4,7 +4,7 @@
 # Every testset below mirrors exactly one Python integration test (same system, same
 # parameters, same analytic assertion) and nothing else lives here: Julia-only builder,
 # solver, channel, and point-kinetics tests live in the files that mirror their source
-# (test_examples.jl, test_solvers.jl, test_channels.jl, test_point_kinetics.jl).
+# (test_valves.jl, test_solvers.jl, test_channels.jl, test_point_kinetics.jl).
 
 using Test
 using ModelingToolkit
@@ -16,7 +16,6 @@ using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Substances
-using STREAM.Examples
 
 # ============================================================================
 # Python `tests/test_general/test_integrations.py` 1:1 ports.

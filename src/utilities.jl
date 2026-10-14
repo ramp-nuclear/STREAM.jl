@@ -141,45 +141,6 @@ rebin_intensive(M::AbstractMatrix{<:Real}, target_shape::Tuple{Integer,Integer})
     _rebin_2d(M, target_shape, :mean)
 
 """
-    cosine_power_shape(nz, nx; amplitude=1.0) -> Matrix{Float64}
-
-Build an `(nz, nx)` matrix whose every column is the same cell-centred cosine-squared
-profile along z, zero at the two axial ends and peaking at the mid-plane, scaled by
-`amplitude`.
-
-The axial profile is `sin(π(i - 1/2)/nz)²` at cell centres. It is not normalized; scale it
-yourself if you need a particular integral.
-
-# Arguments
-- `nz`, `nx`: axial and lateral cell counts
-- `amplitude`: the peak value
-
-# Returns
-An `nz × nx` `Matrix{Float64}`.
-"""
-function cosine_power_shape(nz::Integer, nx::Integer; amplitude::Real = 1.0)
-    zaxis = [cos(pi * (i - 0.5) / nz - pi / 2)^2 for i in 1:nz]
-    return repeat(amplitude .* zaxis, 1, nx)
-end
-
-"""
-    cosine_T_wall_profile(n; amplitude=1.0) -> Vector{Float64}
-
-Length-`n` cell-centred cosine-squared profile, the single-column form of
-[`cosine_power_shape`](@ref), for axial wall-temperature or heat-flux profiles. Not
-normalized.
-
-# Arguments
-- `n`: number of cells
-- `amplitude`: the peak value
-
-# Returns
-A `Vector{Float64}` of length `n`.
-"""
-cosine_T_wall_profile(n::Integer; amplitude::Real = 1.0) =
-    cosine_power_shape(n, 1; amplitude = amplitude)[:, 1]
-
-"""
     _peaking_angle(ppf) -> Float64
 
 The angle `h` with `h/sin(h) = ppf`, found by bisection on `[0, π/2]`.
@@ -210,8 +171,7 @@ and `h = πℓ/(2L)`, that ratio is `h/sin(h)`, solved here for `h`. The peak si
 middle of `x` unless `xmax` moves it, as for a partially inserted control rod.
 
 Integrating each cell rather than sampling its centre keeps the total right on a coarse or
-graded mesh. [`cosine_power_shape`](@ref) samples instead, and its peak is always twice its
-mean.
+graded mesh.
 
 # Arguments
 - `x`: increasing cell boundaries, `length(x) = ncells + 1` [m]

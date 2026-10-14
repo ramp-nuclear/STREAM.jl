@@ -3,7 +3,7 @@ using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM.Examples
+@isdefined(build_loop) || include("fixtures.jl")
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
@@ -480,15 +480,14 @@ end
 
 # Point-kinetics + thermal-feedback loops (moved from test_integration.jl: these exercise
 # the coupled neutronics<->thermal-hydraulics physics, not a Python test_integrations.py
-# mirror). The build_loop_pk return-shape smoke that lived here was dropped — it is
-# subsumed by "build_loop_pk compiles + briefly solves" in test_examples.jl.
+# mirror).
 @testset "Point-kinetics + thermal-feedback loops" begin
     @testset "quiescent stability P within 1% of P0 over 10s" begin
         # ReactivityController() returns 0.0 always; no temp feedback. At
         # criticality (rho=0) with correct PK ICs, power must be stable.
         P0 = 1.0
         ctrl = ReactivityController()
-        ssys, ic = build_loop_pk(ctrl; P0=P0, power_scale=1e4)
+        ssys, ic = build_loop_pk(ctrl; P0=P0)
 
         t_arr = range(0.0, 10.0; length=200)
         sol = solve_transient(ssys, ic, t_arr; maxiters=1_000_000)
@@ -507,19 +506,12 @@ end
         t_step = 0.5
         delta_rho = 0.003   # 0.003 > beta/2; strong enough for visible prompt rise
         alpha = -1e-4       # weak negative feedback
-        T_inlet = 20.0
 
         # ReactivityController.input_reactivity has signature (state, t_state, t) -> Float64.
         step_fn = (state, t_state, t) -> (t >= t_step ? delta_rho : 0.0)
         ctrl = ReactivityController(step_fn)
 
-        ssys, ic = build_loop_pk(
-            ctrl;
-            P0=P0,
-            power_scale=1e4,
-            temp_worth=Dict(:cac => fill(alpha, 7)),
-            ref_temp=Dict(:cac => fill(T_inlet, 7)),
-        )
+        ssys, ic = build_loop_pk(ctrl; P0=P0, feedback=:cac => alpha)
 
         t_arr = range(0.0, 60.0; length=600)
         sol = solve_transient(ssys, ic, t_arr; tstops=[t_step], maxiters=1_000_000)
@@ -541,7 +533,6 @@ end
         t_step = 0.5
         delta_rho = 0.005   # large enough to exceed plimit quickly
         alpha = -0.01
-        T_inlet = 20.0
 
         scram_ir =
             (state, t_state, t) ->
@@ -549,13 +540,7 @@ end
         machine = StateMachine(; abort_states=(:SCRAM,))
         ctrl = ReactivityController(scram_ir; machine=machine)
 
-        ssys, ic = build_loop_pk(
-            ctrl;
-            P0=P0,
-            power_scale=1e4,
-            temp_worth=Dict(:cac => fill(alpha, 7)),
-            ref_temp=Dict(:cac => fill(T_inlet, 7)),
-        )
+        ssys, ic = build_loop_pk(ctrl; P0=P0, feedback=:cac => alpha)
         push!(machine, (:NORMAL => :SCRAM, ssys.pk.P_neutron > plimit))
 
         t_arr = range(0.0, 10.0; length=1000)
@@ -586,10 +571,7 @@ end
         # runs at the pace of the slowest delayed group, so the run is ten minutes.
         Tin = 20.0
         ctrl = ReactivityController()
-        ssys, ic = build_loop_pk(
-            ctrl; n=7, T_inlet=Tin, P0=1.0, power_scale=1e4,
-            temp_worth=Dict(:cac => fill(-0.1, 7)), ref_temp=Dict(:cac => fill(Tin, 7)),
-        )
+        ssys, ic = build_loop_pk(ctrl; n=7, T_inlet=Tin, P0=1.0, feedback=:cac => -0.1)
         sol = solve_transient(ssys, ic, range(0.0, 600.0; length=600); maxiters=1_000_000)
         @test sol.retcode == ReturnCode.Success
         P = sol[ssys.pk.P_neutron]
@@ -618,10 +600,7 @@ end
         delta_rho = 5e-4             # < beta_total ⇒ delayed-supercritical, bounded jump
         t_step = 40.0                # insert after the loop has settled (~30 s)
         ctrl = ReactivityController((s, ts, tt) -> (tt >= t_step ? delta_rho : 0.0))
-        ssys, ic = build_loop_pk(
-            ctrl; n=7, T_inlet=Tin, P0=1.0, power_scale=1e4,
-            temp_worth=Dict(:cac => fill(-0.002, 7)), ref_temp=Dict(:cac => fill(Tin, 7)),
-        )
+        ssys, ic = build_loop_pk(ctrl; n=7, T_inlet=Tin, P0=1.0, feedback=:cac => -0.002)
         t_arr = sort(unique(vcat(collect(range(0.0, 80.0; length=300)), [t_step, t_step + 0.03])))
         sol = solve_transient(ssys, ic, t_arr; tstops=[t_step], maxiters=1_000_000)
         @test sol.retcode == ReturnCode.Success

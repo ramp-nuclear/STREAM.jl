@@ -5,7 +5,7 @@ using STREAM.Components
 using STREAM.Substances
 using STREAM.Thresholds
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
-using STREAM.Examples
+@isdefined(build_loop) || include("fixtures.jl")
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq: ReturnCode
