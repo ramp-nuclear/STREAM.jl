@@ -11,7 +11,7 @@ Each submodule reaches only downward, so the dependency order is also the readin
 
 ```
 Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
-           -> Components -> {DecayHeat, Assemblies} -> {Solvers, Examples}
+           -> Components -> {DecayHeat, Assemblies} -> Solvers
 ```
 
 | Module | What lives there |
@@ -25,7 +25,6 @@ Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
 | [`DecayHeat`](@ref) | decay heat contributions and the standards behind them |
 | [`Assemblies`](@ref) | wiring verbs and named arrangements of components |
 | [`Utilities`](@ref) | grid resampling and axial profile helpers |
-| `Examples` | worked builders, compiled with the package but never exported |
 
 [`assembly`](@ref) composes components with a list of connections, and [`port`](@ref) reaches
 one cell of a per-cell connector array. Every submodule can use both.
@@ -411,34 +410,6 @@ end
 
 include("initial_conditions.jl")
 include("solvers.jl")
-
-"""
-    STREAM.Examples
-
-Worked builders that assemble a complete, solvable model in one call.
-
-The module is not exported. Reach a builder as `STREAM.Examples.build_loop`, or bring them in
-with `using STREAM.Examples`.
-
-Most builders return a compiled `System`. `build_loop_pk` returns `(ssys, ic)`, the compiled
-system together with a matching operating point ready for `solve_transient`, and
-`build_pool_break` returns the compiled system with the machine that stops it at core uncovery.
-"""
-module Examples
-using ModelingToolkit
-using ModelingToolkit: t_nounits as t, D_nounits as D
-using ..STREAM
-using ..Components
-# Explicit, because an implicit `using` cannot resolve Channel against Base.Channel.
-using ..Components: Channel
-using ..Assemblies
-using ..HTC
-using ..Friction
-using ..LocalLoss: discharge_cd
-include("examples.jl")
-export build_loop, build_loop_vertical, build_loop_transient, build_cube
-export build_loop_lof_bypass, build_loop_pk, build_pool_break
-end
 
 # The public surface. Everything not listed here is reached through its module.
 

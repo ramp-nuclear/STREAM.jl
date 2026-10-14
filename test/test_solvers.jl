@@ -1,6 +1,6 @@
 # Solver API tests (src/solvers.jl).
 #
-# The solve_steady / solve_transient wrappers, driven through the `build_loop` example so
+# The solve_steady / solve_transient wrappers, driven through the `build_loop` fixture so
 # they are exercised on a real compiled system. steady_state_guess and uniform live in
 # test_initial_conditions.jl, next to the file they come from.
 
@@ -12,7 +12,7 @@ using OrdinaryDiffEq: ReturnCode
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM.Examples
+@isdefined(build_loop) || include("fixtures.jl")
 
 @testset "Solver wrappers" begin
     @testset "solve_steady returns physical solution" begin
@@ -44,7 +44,7 @@ using STREAM.Examples
         # a type. A constant wall is a step that never happens, and one compiled system gives
         # both steady states and the transient.
         wall(T_before, T_after, t_switch) = t -> t < t_switch ? T_before : T_after
-        ssys = build_loop_transient(T_inlet=T_inlet, T_wall_fn=wall(T_wall_0, T_wall_final, t_step))
+        ssys = build_loop(T_inlet=T_inlet, T_wall=wall(T_wall_0, T_wall_final, t_step))
         steady_at(T_wall) = solve_steady(
             ssys, [ssys.ch.inlet.ṁ => ṁ_guess, ssys.T_wall_callable => wall(T_wall, T_wall, Inf)]
         )

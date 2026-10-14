@@ -1,6 +1,6 @@
 # Operating-point helpers (src/initial_conditions.jl).
 #
-# steady_state_guess and uniform. Driven through the `build_loop` example so the pairs
+# steady_state_guess and uniform. Driven through the `build_loop` fixture so the pairs
 # uniform builds are checked against a real compiled system.
 
 using Test
@@ -8,7 +8,7 @@ using ModelingToolkit
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Components
-using STREAM.Examples
+@isdefined(build_loop) || include("fixtures.jl")
 
 @testset "Operating-point helpers" begin
     @testset "steady_state_guess monotonically increasing" begin

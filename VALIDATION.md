@@ -107,10 +107,10 @@ Julia-only testset moved to the file mirroring its source; the full suite stayed
 
 | Julia testset(s) | Disposition |
 |---|---|
-| `Builders smokes` (build_loop/vertical/transient/cube/lof/pk) | MOVED → `test_examples.jl` |
+| `Builders smokes` (build_loop/vertical/transient/cube/lof/pk) | MOVED → `test_examples.jl`, later folded into the tests using `test/fixtures.jl` |
 | `steady_state_guess monotonically increasing` | MOVED → `test_solvers.jl` |
 | `Solver wrappers` (solve_steady / solve_transient) | MOVED → `test_solvers.jl` |
-| `Loss-of-flow transient` | MOVED → `test_examples.jl` |
+| `Loss-of-flow transient` | MOVED → `test_valves.jl` |
 | `Subcooled-boiling integration (ISCB)` | MOVED → `test_channels.jl` |
 | `Point-kinetics + thermal-feedback loops` | MOVED → `test_point_kinetics.jl` |
 | `COMPAT: Pkg.test()` smoke | DELETED (vacuous; `runtests.jl` already orchestrates every file) |

@@ -81,7 +81,7 @@ In order of what it unblocks.
 
 A pool drains to core uncovery: `Components.Tank` and `Environment`, an `Orifice` break that
 opens, and latches shut for a siphon breaker, on its `StateMachine`, the discharge correlations
-in `LocalLoss`, `Thresholds.cavitation`, and `Examples.build_pool_break`. The tests port
+in `LocalLoss`, and `Thresholds.cavitation`. The tests port
 Python's drain, siphon, two-hole, heated-pool and pool-break scenarios, and the Torricelli
 drain matches the closed form to 8e-5 m. Two pieces remain:
 

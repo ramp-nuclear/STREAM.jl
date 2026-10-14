@@ -2,7 +2,7 @@ using Test
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM.Examples
+@isdefined(build_loop) || include("fixtures.jl")
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq

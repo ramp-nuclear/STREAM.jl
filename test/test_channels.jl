@@ -9,7 +9,7 @@ using STREAM.Assemblies
 using STREAM.Components
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Substances
-using STREAM.Examples
+@isdefined(build_loop) || include("fixtures.jl")
 using STREAM.HTC: _bergles_rohsenow_dT_ONB  # private to HTC, for the SCB integration block
 using OrdinaryDiffEq: ReturnCode
 
@@ -633,6 +633,19 @@ end
     @test all(head .> 0)
     @test sol[ch.P] ≈ p_total .- head rtol = 1e-12
     @test sol[ch.T_sat] ≈ [Tsat(H2O, sol[ch.P[i]]) for i in 1:n] rtol = 1e-12
+end
+
+@testset "a closed vertical loop gives back the head its upward channel loses" begin
+    # The channel runs up and the return leg falls the same height, so the hydrostatic heads
+    # cancel around the loop, apart from a few kelvin of buoyancy. The flow is the flat loop's,
+    # and the channel's own drop grows by ρgL.
+    flat, upright = build_loop(), build_loop(; g_acc=G_EARTH)
+    sol_flat = solve_steady(flat, [flat.ch.inlet.ṁ => 0.5])
+    sol = solve_steady(upright, [upright.ch.inlet.ṁ => 0.5])
+    @test sol.retcode == ReturnCode.Success
+    @test sol[upright.ch.inlet.ṁ] ≈ sol_flat[flat.ch.inlet.ṁ] rtol = 1e-3
+    head = sum(ρ(H2O, T) for T in sol[upright.ch.T]) / 10 * G_EARTH * 0.6
+    @test sol[upright.ch.dP] - sol_flat[flat.ch.dP] ≈ head rtol = 1e-2
 end
 
 @testset "a wall cooler than the coolant reports saturation as its ONB temperature" begin

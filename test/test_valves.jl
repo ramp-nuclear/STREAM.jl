@@ -2,9 +2,11 @@ using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using OrdinaryDiffEq, SteadyStateDiffEq
+using Statistics
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Substances
 using STREAM.LocalLoss
 
@@ -292,5 +294,222 @@ end
         @test isempty(Thresholds.cavitation(sol, ssys.breach))
         @test throat.state === :LIQUID
         @test_throws ArgumentError Thresholds.cavitation(sol, ssys.pool)
+    end
+end
+
+"""
+A pump head that holds at `dp0` and, from `t = 0`, decays with time constant `τ`. With
+`τ = Inf` it holds for good, which is what a steady solve needs: it reads the head at
+`t = Inf`, where `exp(-t/τ)` is not a number.
+"""
+struct _Coastdown
+    dp0::Float64
+    τ::Float64
+end
+(c::_Coastdown)(t) = isinf(c.τ) ? c.dp0 : c.dp0 * exp(-t / c.τ)
+
+"""
+    _drain_pool(; break_at=:bottom, t_break=0.0, coast=Inf) -> (ssys, sol, watch)
+
+A pool circulating through a core (`core`) and a pump, both connections at its floor, with a
+break (`breach`) to the room that opens at `t_break`. With `break_at=:bottom` the break sits
+between the core and the pump. With `:suction` the pool feeds the pump through a suction line
+and the break draws from the pump inlet, so the core is downstream of the pump. The pump
+drives 1 kg/s through the intact loop and, from `t = 0`, its head decays with time constant
+`coast`. Solves the intact loop with the level pinned, then drains it to core uncovery at 1 m.
+"""
+function _drain_pool(; break_at=:bottom, t_break=0.0, coast=Inf)
+    R_core, R_suction = 5e3, 2e3
+    dp0 = break_at === :suction ? R_core + R_suction : R_core
+    @named pool = Tank(; area=A_TANK, L0=L_POOL, ports=(suction=0.0, inflow=0.0), T0=T_POOL)
+    @named core = Resistor(R_core)
+    @named pump = Pump(_Coastdown(dp0, coast))
+    @named breach = Orifice(; area=A_HOLE, cd=CD_SHARP, dp_linear=1e-3,
+                            machine=StateMachine(; initial_state=:OPEN, initial_time=t_break))
+    @named ambient = Environment(; T=T_POOL)
+    parts = Any[pool, core, pump, breach, ambient]
+    connections = if break_at === :bottom
+        [inseries(pool.suction, core), connect(core.outlet, pump.inlet, breach.inlet),
+         inseries(pump, pool.inflow)]
+    else
+        @named suction_line = Resistor(R_suction)
+        push!(parts, suction_line)
+        [inseries(pool.suction, suction_line),
+         connect(suction_line.outlet, pump.inlet, breach.inlet), inseries(pump, core, pool.inflow)]
+    end
+    @named sys = assembly([connections; inseries(breach, ambient.port)], parts...)
+    watch = StateMachine(; initial_state=:INTACT, abort_states=(:UNCOVERED,))
+    push!(watch, (:INTACT => :UNCOVERED, pool.L < 1.0, "core uncovered"))
+    ssys = mtkcompile(sys)
+
+    sol_ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => _Coastdown(dp0, Inf)])
+    # Fine over the break's opening ramp, then spread to the end.
+    times = unique!(vcat(0.0, range(t_break, t_break + 4.0; length=21),
+                         range(t_break + 4.0, 4000.0; length=400)[2:end]))
+    sol = solve_transient(ssys, sol_ss, times;
+                          overrides=[ssys.pool.pinned => false,
+                                     ssys.pump.dP_pump_fn => _Coastdown(dp0, coast)],
+                          callbacks=machine_callbacks(ssys, watch))
+    return ssys, sol, watch
+end
+
+@testset "A break in a pumped pool" begin
+    rho = ρ(H2O, T_POOL)
+
+    @testset "a bottom break leaves the circulation alone and carries what the pool loses" begin
+        ssys, sol, watch = _drain_pool()
+        m_core, m_break = sol[ssys.core.inlet.ṁ], sol[ssys.breach.inlet.ṁ]
+        level, inventory = sol[ssys.pool.L], sol[ssys.pool.M]
+        @test watch.state === :UNCOVERED
+        @test level[end] ≈ 1.0 atol = 1e-3
+        @test m_core ≈ ones(length(m_core)) rtol = 1e-4
+        # Non-strict: the run saves the instant it stops twice.
+        @test all(diff(m_break[sol.t .> 5.0]) .<= 0.0)
+        driving = rho * G_EARTH * level[end] - 5e3
+        @test m_break[end] ≈ CD_SHARP * A_HOLE * sqrt(2 * rho * driving) rtol = 1e-3
+        discharged = sum((m_break[i] + m_break[i + 1]) / 2 * (sol.t[i + 1] - sol.t[i])
+                         for i in 1:(length(sol.t) - 1))
+        @test discharged ≈ inventory[1] - inventory[end] rtol = 1e-3
+    end
+
+    @testset "a suction break reverses the core and uncovers sooner than a bottom break" begin
+        t_break = 20.0
+        ssys, sol, watch = _drain_pool(; break_at=:suction, t_break, coast=3.0)
+        m_core = sol[ssys.core.inlet.ṁ]
+        @test m_core[1] ≈ 1.0 rtol = 1e-6
+        @test minimum(m_core) < 0.0
+        @test sol.t[findfirst(<(0.0), m_core)] > t_break
+        @test watch.state === :UNCOVERED
+
+        _, bottom, _ = _drain_pool(; t_break)
+        @test sol.t[end] < bottom.t[end]
+    end
+end
+
+@testset "A loss of flow opens a bypass flapper into natural circulation" begin
+    # A plate-heated leg running down (`heated`) and an unheated one running up (`ret`), fed
+    # by a branch holding the pump, the heat exchanger and an inertia, with a flapper in
+    # parallel. When the pump head falls the flapper opens and the two legs circulate alone.
+    n, L, D, T_in, power, t_trip = 10, 1.0, 0.01, 40.0, 1.0e3, 10.0
+    geom = PipeGeometry_circular(L, D)
+    # 200 kPa, falling to zero over 5 s from `t_trip` on a C1 cubic. A trip at Inf holds for
+    # good and is the same closure type, so one callable parameter takes both.
+    head(t_trip) = tt -> (ξ = clamp((tt - t_trip) / 5.0, 0.0, 1.0); 2.0e5 * (1 - (3ξ^2 - 2ξ^3)))
+    # The heated leg switches regime on its own, natural convection included, so the run
+    # stays physical once the pump stops.
+    htc = HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(; Nu=8.235),
+                              turbulent=HTC.DittusBoelter(),
+                              natural=HTC.Elenbaas(geom; g=G_EARTH), geom, g=G_EARTH)
+    darcy = Friction.RegimeDependent(; laminar=Friction.rectangular_laminar(geom),
+                                     turbulent=Friction.blasius)
+    machine = StateMachine(; initial_state=:CLOSED)
+
+    @named pump = Pump(head(t_trip))
+    @named ine = Inertia(1.75e5)
+    @named hx = HeatExchanger(T_in)
+    @named ext_res = Resistor(1.0e6)
+    @named ch = ChannelAndContacts(; n, geometry=geom, g=-G_EARTH, htc, darcy)
+    @named ret = Channel(; n, geometry=geom, g=G_EARTH)
+    @named flapper = Flapper(; machine, f=50.0, area=0.01, open_rate=1 / 5.0)
+    push!(machine, (:CLOSED => :OPEN, ine.inlet.ṁ < 0.01))
+    slab = Slab(; x=range(0, 0.005, 3), z=range(0, L, n + 1), y=0.07,
+                material=Solid(19300.0, 116.0, 174.0))
+    @named fuel = HeatDiffusion(slab; power)
+    heated = one_sided(ch, fuel; side=:left, name=:heated)
+    connections = [
+        inseries(ext_res, hx, pump, ine),
+        inparallel(ine, ((heated.ch, ret), flapper), ext_res),
+        pump.inlet.p ~ 1.0e5,
+        # A circular channel's right face has no heated perimeter, so it passes no heat
+        # whatever its wall temperature. Pinning that to the coolant determines it.
+        port(heated.ch, :thermal_right, :T) .~ heated.ch.T,
+    ]
+    @named sys = assembly(connections, heated, pump, ine, hx, ret, flapper, ext_res)
+    ssys = mtkcompile(sys)
+    C = ssys.heated.ch
+
+    # Pump on, flapper shut, integrated to steady. Started at zero, the flows mtkcompile keeps
+    # stay at ṁ = 0 and the solve fails, so they start at the flow the head drives through
+    # ext_res. The dummy derivative has no default and needs a value too.
+    ṁ0 = 2.0e5 / 1.0e6
+    ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => head(Inf), C.inlet.ṁ => ṁ0,
+                             ssys.ext_res.inlet.ṁ => ṁ0, Differential(t)(C.inlet.ṁ) => 0.0];
+                      solver=DynamicSS(Rodas5P()))
+    valve_at_steady = machine.state
+    # Every unknown, not a subset: a `Dt(ṁ) => 0` guess does not reach the dummy-derivative
+    # state, which the latest packages would otherwise start at NaN.
+    op = Pair{Any,Any}[u => ss[u] for u in unknowns(ssys)]
+    push!(op, ssys.pump.dP_pump_fn => head(t_trip))
+    t_arr = range(0.0, 300.0; length=3001)
+    sol = solve_transient(ssys, op, t_arr; callbacks=machine_callbacks(ssys, machine))
+    Q_wall(idx) = sum(sol[C.q_wall[i], idx] for i in 1:n)
+
+    @testset "the forced-flow steady state is physical, with the flapper shut" begin
+        # Reproduces across package sets to well under 1%.
+        @test ss[ssys.ine.inlet.ṁ] ≈ 0.187 atol = 0.005
+        @test valve_at_steady === :CLOSED
+    end
+
+    @testset "the flapper opens after the trip and ramps fully open" begin
+        # The inertia branch flow decays through the threshold at about 14.5 s.
+        @test sol.retcode == ReturnCode.Success
+        @test machine.state === :OPEN
+        @test t_trip < machine.t_state < 300.0
+        @test sol[ssys.flapper.xi, end] ≈ 1.0 atol = 1e-4
+    end
+
+    @testset "the coolant stores part of the wall heat and carries the rest away" begin
+        # Once the flapper opens, the only heat sink is bypassed, so the coolant keeps warming
+        # and there is no thermal steady state to compare with. The coolant stores enthalpy at
+        # a positive rate below the wall heat it absorbs, which is what conservation leaves.
+        # From t = 100 s, past the startup swing, the wall passes no more than the plate makes.
+        @test maximum(abs(Q_wall(idx)) for idx in 1001:3001) <= power
+        nc = 2001:3000   # t = 200..300 s, natural circulation established
+        @test minimum(Q_wall(idx) for idx in nc) > 0
+        v_cell = π * (D / 2)^2 * L / n
+        store(idx) = sum(ρ(H2O, sol[C.T[i], idx]) * cₚ(H2O, sol[C.T[i], idx]) * v_cell *
+                         (sol[C.T[i], idx + 1] - sol[C.T[i], idx - 1]) /
+                         (t_arr[idx + 1] - t_arr[idx - 1]) for i in 1:n)
+        ratio = mean(store, nc) / mean(abs ∘ Q_wall, nc)
+        # Not analytically forced: a regression value, 0.499 on both package sets, the band
+        # its per-sample spread.
+        @test 0.49 < ratio < 0.51
+    end
+
+    @testset "the natural-circulation flow balances buoyancy against friction" begin
+        # Around heated -> ret -> flapper -> heated the pressure differences telescope, so at
+        # equilibrium friction balances the buoyancy head, with both read off the solved cell
+        # temperatures and the friction each leg applies. The flapper's open drop (~0.005 Pa
+        # against ~14 Pa) and the idle pump branch do not reach the balance. At Re ~ 4800 the
+        # heated leg blends laminar and turbulent at f ~ 0.036, against Blasius's 0.038, which
+        # is worth 1.5% in ṁ. The model lands on the root to 0.03%.
+        nc = 2701:3001
+        dz = L / n
+        T_ch = [mean(sol[C.T[i], nc]) for i in 1:n]
+        T_ret = [mean(sol[ssys.ret.T[i], nc]) for i in 1:n]
+        dP_buoy = sum(G_EARTH * dz * (ρ(H2O, T_ret[i]) - ρ(H2O, T_ch[i])) for i in 1:n)
+        leg(T, f, md) = Friction.darcy_weisbach_dp(md, ρ(H2O, T), f(T, T, md, H2O, geom), dz,
+                                                   geom.Dh, geom.A)
+        dP_fric(md) = sum(leg(T_ch[i], darcy, md) + leg(T_ret[i], Friction.Blasius(), md)
+                          for i in 1:n)
+        lo, hi = 1.0e-6, 1.0   # bisect in log space
+        for _ in 1:200
+            mid = sqrt(lo * hi)
+            dP_fric(mid) < dP_buoy ? (lo = mid) : (hi = mid)
+        end
+        ṁ_nc = sol[C.inlet.ṁ, nc]
+
+        @test dP_buoy > 0.0   # the cooler return leg is the denser one
+        @test mean(abs, ṁ_nc) ≈ sqrt(lo * hi) rtol = 0.02
+        # Reversed against the forced flow.
+        @test sol[C.inlet.ṁ, 1] > 0.0
+        @test mean(ṁ_nc) < 0.0
+        @test 0.0 < mean(abs ∘ Q_wall, nc) <= power
+        # Single phase only, with the sink bypassed, so the coolant creeps up past saturation.
+        # No thermal runaway: a regression value of 233.95 °C, the band the spread between
+        # package sets, and well below the critical 373.95 °C.
+        T_max = mean(maximum(sol[C.T, idx]) for idx in nc)
+        @test T_max > T_in
+        @test 231.85 < T_max < 236.85
     end
 end

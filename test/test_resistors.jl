@@ -5,44 +5,28 @@ using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
 using STREAM.Components
-using STREAM.Examples
 
-@testset "Cube flow matches 5/6 R analytical within 1%" begin
-    R_val = 1.0e4
-    dP_val = 3.0e4
-    ssys = build_cube(dP_pump=dP_val, R=R_val)
-
-    ṁ_analytical = dP_val / (5.0 / 6.0 * R_val)
-
-    # Symmetric cube: 3 source branches from corner 0, 3 sink branches to corner 7
-    # Body-diagonal paths: each of 3 "short" 1-resistor paths carries ṁ/3
-    # Each of 6 "long" 2-resistor paths carries ṁ/6 (edge contribution)
-    # For initial guess: pump.outlet = full ṁ; each direct branch ~ ṁ/3
-    ṁ_full = ṁ_analytical
-
-    op = [
-        ssys.pump.outlet.ṁ => ṁ_full,
-        # Three source edges from corner 0
-        ssys.r01.inlet.ṁ => ṁ_full / 3.0,
-        ssys.r02.inlet.ṁ => ṁ_full / 3.0,
-        ssys.r04.inlet.ṁ => ṁ_full / 3.0,
-        # Internal edges (rough equal split)
-        ssys.r13.inlet.ṁ => ṁ_full / 6.0,
-        ssys.r15.inlet.ṁ => ṁ_full / 6.0,
-        ssys.r23.inlet.ṁ => ṁ_full / 6.0,
-        ssys.r26.inlet.ṁ => ṁ_full / 6.0,
-        ssys.r45.inlet.ṁ => ṁ_full / 6.0,
-        ssys.r46.inlet.ṁ => ṁ_full / 6.0,
-        # Three sink edges to corner 7
-        ssys.r37.inlet.ṁ => ṁ_full / 3.0,
-        ssys.r57.inlet.ṁ => ṁ_full / 3.0,
-        ssys.r67.inlet.ṁ => ṁ_full / 3.0,
-    ]
-    sol = solve_steady(ssys, op)
-
+@testset "a cube of equal resistors is 5/6 R between opposite corners" begin
+    # Corners 0 to 7, an edge wherever two corner numbers differ in one bit, and flow from
+    # corner 0 to corner 7. By symmetry the flow splits in three leaving corner 0, in two at
+    # the next corners, and joins in threes at corner 7.
+    R, dP = 1.0e4, 3.0e4
+    @named pump = Pump(dP)
+    edges = [(i, j) for i in 0:7 for j in (i + 1):7 if count_ones(i ⊻ j) == 1]
+    r = Dict(e => Resistor(R; name=Symbol(:r, e...)) for e in edges)
+    corner(k) = connect(
+        (k == 0 ? [pump.outlet] : [])..., (k == 7 ? [pump.inlet] : [])...,
+        (r[e].outlet for e in edges if e[2] == k)..., (r[e].inlet for e in edges if e[1] == k)...,
+    )
+    @named sys = assembly([corner.(0:7); pump.inlet.p ~ 1.0e5], pump, values(r)...)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.r01.inlet.ṁ => 0.1])
     @test sol.retcode == ReturnCode.Success
-    ṁ_numerical = abs(sol[ssys.pump.outlet.ṁ])
-    @test isapprox(ṁ_numerical, ṁ_analytical; rtol=0.01)
+
+    ṁ = dP / (5 / 6 * R)
+    @test sol[ssys.pump.inlet.ṁ] ≈ ṁ rtol = 1e-6
+    share(e) = 0 in e || 7 in e ? 1 / 3 : 1 / 6
+    @test [sol[getproperty(ssys, Symbol(:r, e...)).inlet.ṁ] for e in edges] ≈ ṁ .* share.(edges) rtol = 1e-6
 end
 
 @testset "VolumetricFlowResistor — quadratic drop dP = k*ṁ^2 (rho=1)" begin
