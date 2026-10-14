@@ -8,6 +8,7 @@ leaves the heat flux instead. Either way the value is an equation in the connect
 using STREAM
 using STREAM.Components: Pump, HeatExchanger, Channel, ChannelHeatFlux
 using STREAM.Assemblies: inseries
+using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile, @parameters, t_nounits as t
 
 n = 10
@@ -24,7 +25,8 @@ length `n`, or any expression:
 @named pump = Pump(3.0e4)
 @named hx = HeatExchanger(40.0)
 @named ch = Channel(; n, geometry, h_left=5000.0)
-T_profile = 60.0 .+ 40.0 .* sin.(π .* ((1:n) .- 0.5) ./ n) .^ 2   # 60 °C at the ends, 100 °C mid
+shape = cosine_shape(range(0.0, geometry.L; length=n + 1))
+T_profile = 60.0 .+ 40.0 .* shape ./ maximum(shape)   # 60 °C at the ends, 100 °C mid
 connections = [
     inseries(pump, hx, ch, pump),
     pump.inlet.p ~ 1.0e5,
