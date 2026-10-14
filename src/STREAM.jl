@@ -397,15 +397,14 @@ total. [`rebin_intensive`](@ref) resamples per-cell values (temperature, heat fl
 the value. Both treat the field as piecewise-constant over each source cell and integrate its
 overlap with each target cell.
 
-[`cosine_power_shape`](@ref) and [`cosine_T_wall_profile`](@ref) build axial input shapes.
+[`cosine_shape`](@ref) builds an axial power shape.
 [`x_boundaries`](@ref) builds the cell boundaries across a clad plate.
 
 None of these validate or normalize their inputs; negatives, zeros and NaNs pass through.
 """
 module Utilities
 include("utilities.jl")
-export rebin_extensive, rebin_intensive, cosine_power_shape, cosine_T_wall_profile
-export cosine_shape, x_boundaries
+export rebin_extensive, rebin_intensive, cosine_shape, x_boundaries
 end
 
 include("initial_conditions.jl")

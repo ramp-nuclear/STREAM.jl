@@ -28,6 +28,13 @@ Reynolds number from velocity, ``Re = ρ |u| L / μ``.
 
 # Returns
 Reynolds number (dimensionless).
+
+# Examples
+Water flowing backwards at 1.5 m/s through a 1 cm pipe:
+```jldoctest
+julia> Re_vel(998.0, -1.5, 0.01, 1.0e-3)
+14970.0
+```
 """
 Re_vel(rho, u, L, mu) = rho * abs(u) * L / mu
 

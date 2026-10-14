@@ -165,8 +165,7 @@ src/
                               # plate, one_sided, single_channel, fuel_assembly
   solvers.jl                  # solve_steady, solve_transient
   initial_conditions.jl       # steady_state_guess, uniform
-  utilities.jl                # module Utilities: rebin_*, cosine_shape, cosine_power_shape,
-                              # cosine_T_wall_profile, x_boundaries
+  utilities.jl                # module Utilities: rebin_*, cosine_shape, x_boundaries
 ```
 
 **Where new code goes:**
@@ -245,7 +244,7 @@ test/
   test_composition.jl       # symmetric_plate, plate, one_sided_connection, assembly,
                             # port, check_gravity_mismatch, var_length, temperature_feedback,
                             # fuel_assembly — heavy CAC<->HD coverage
-  test_utilities.jl         # rebin_extensive/intensive, cosine_power_shape, cosine_T_wall_profile
+  test_utilities.jl         # rebin_extensive/intensive, cosine_shape, x_boundaries
   test_initial_conditions.jl # steady_state_guess, uniform (src/initial_conditions.jl)
   test_solvers.jl           # solve_steady/solve_transient wrappers (src/solvers.jl)
   test_validation.jl        # Quantitative cross-validation against Python STREAM
