@@ -123,6 +123,8 @@ src/
     htc.jl                    # AbstractHTC: the wall heat transfer model a channel is handed
     correlations.jl           # Nusselt correlations (dimensionless, no property basis)
     subcooled_boiling.jl      # SCB heat flux correlations and the ONB superheat
+    exchangers.jl             # heat exchanger effectiveness (Counterflow, ParallelFlow),
+                              # flow_scaled_UA
   friction/                   # module Friction
     correlations.jl           # Darcy friction factor correlations (Reynolds-only)
     darcy.jl                  # AbstractDarcyFactor: the wall friction model a channel or resistor gets
@@ -139,7 +141,8 @@ src/
     tank.jl                   # Tank, Environment (free-surface nodes)
     resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
                               # VolumetricFlowResistor, LocalPressureDrop
-    ideal.jl                  # Inertia, HeatExchanger, ConstantTemperature
+    ideal.jl                  # Inertia, ConstantTemperature
+    heat_exchanger.jl         # HeatExchanger: ideal, to a fixed sink, and two-stream (ε-NTU)
     sources.jl                # ConvectiveBoundary
     channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
     heat_diffusion.jl         # HeatDiffusion (2D finite-volume plate or rod), Slab, Cylinder
@@ -229,7 +232,9 @@ test/
                             # that opens a bypass flapper into natural circulation
   test_tank.jl              # Tank, Environment
   test_resistors.jl         # Friction, Gravity, Resistor, network tests
-  test_ideal.jl             # Inertia, HeatExchanger, ConstantTemperature, ConvectiveBoundary
+  test_ideal.jl             # Inertia, ConstantTemperature, ConvectiveBoundary
+  test_heat_exchanger.jl    # HeatExchanger: ideal, fixed sink, two-stream against ε-NTU and
+                            # LMTD, zero flow, flow reversal, flow-dependent UA
   test_heat_diffusion.jl    # HeatDiffusion, Slab, Cylinder: ports, power, and closed-form
                             # steady states on uniform and graded meshes
   test_correlations.jl      # Nusselt + friction correlation function unit tests

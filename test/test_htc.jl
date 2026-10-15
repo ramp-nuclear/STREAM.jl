@@ -240,3 +240,20 @@ end
                    for T_c in T_cells]
     @test all(isapprox.(sol_u[ssys_u.cac_u.Nu_left], Nu_expected; rtol=1e-6))
 end
+
+@testset "heat exchanger effectiveness" begin
+    # Cr = 1 is a 0/0 in the general counterflow form; the limit has to join it smoothly.
+    for N in (0.1, 1.0, 5.0)
+        @test HTC.effectiveness(HTC.Counterflow(), N, 1 - 1e-5) ≈
+              HTC.effectiveness(HTC.Counterflow(), N, 1.0) rtol = 1e-4
+        # One stream of unbounded capacity: both arrangements are 1 - e^{-N}.
+        for arr in (HTC.Counterflow(), HTC.ParallelFlow())
+            @test HTC.effectiveness(arr, N, 0.0) ≈ 1 - exp(-N)
+        end
+        @test HTC.effectiveness(HTC.Counterflow(), N, 0.5) >
+              HTC.effectiveness(HTC.ParallelFlow(), N, 0.5)
+    end
+    @test HTC.effectiveness(HTC.ParallelFlow(), 1.0e3, 1.0) ≈ 0.5
+    @test HTC._reversed(HTC.Counterflow()) == HTC.ParallelFlow()
+    @test_throws ArgumentError HTC.flow_scaled_UA(1.0, 1.0, 1.0; primary_share=1.0)
+end

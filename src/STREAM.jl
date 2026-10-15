@@ -104,6 +104,10 @@ temperature a model reads coolant properties at, film or bulk.
 Every correlation is plain arithmetic that MTK traces through, and guards use `ifelse`.
 Geometry-dependent factories take a `PipeGeometry` first and capture what they need at
 construction, so the closure sees only symbolic `Re` and `Pr`.
+
+The heat exchanger relations live here too: [`effectiveness`](@ref) for a
+[`Counterflow`](@ref) or [`ParallelFlow`](@ref) arrangement, and [`flow_scaled_UA`](@ref), a UA
+that follows the flows on both sides.
 """
 module HTC
 using ModelingToolkit
@@ -113,6 +117,7 @@ using ..STREAM: Re, Pr, Gr, Ra, flow_regime_blend
 include("htc/correlations.jl")
 include("htc/subcooled_boiling.jl")
 include("htc/htc.jl")
+include("htc/exchangers.jl")
 export dittus_boelter, constant_Nusselt, elenbaas_nusselt, marco_han_nusselt
 export fully_developed_laminar_nusselt, developing_laminar_nusselt, film_temperature
 export mcadams_scb_heat_flux, rohsenow_scb_heat_flux
@@ -120,6 +125,7 @@ export partial_SCB_correction, regime_dependent_q_scb
 export AbstractHTC, FromFunction, FromNusselt, PropertyBasis, AtFilm, AtBulk, property_temperature
 export DittusBoelter, ConstantNusselt, FullyDevelopedLaminar, DevelopingLaminar
 export Elenbaas, RegimeDependent, Maximal, SubcooledBoiling
+export AbstractArrangement, Counterflow, ParallelFlow, effectiveness, flow_scaled_UA
 end
 
 """
@@ -239,8 +245,10 @@ Components state equations and consume their physics from [`HTC`](@ref STREAM.HT
 - **Neutronics.** [`PointKinetics`](@ref) with any delayed group count, plus
   [`ReactivityController`](@ref) and the SCRAM callbacks.
 - **Boundary conditions.** [`HeatExchanger`](@ref), [`ConstantTemperature`](@ref),
-  [`ConvectiveBoundary`](@ref). A `Channel` wall or a `ChannelHeatFlux` flux needs no
-  component: bind it in the connection list, `ch.T_wall_left .~ T`.
+  [`ConvectiveBoundary`](@ref). `HeatExchanger(T)` holds a loop at `T`; given a `UA` it
+  exchanges a finite amount of heat with a sink at `T`, and with a `UA` alone it couples two
+  loops. A `Channel` wall or a `ChannelHeatFlux` flux needs no component: bind it in the
+  connection list, `ch.T_wall_left .~ T`.
 - **Loss of coolant.** [`Tank`](@ref), a free-surface inventory whose level sets the pressure
   at each connection; [`Environment`](@ref), the ambient a break discharges into; and
   [`Orifice`](@ref), the break itself, sealed until its machine opens it.
@@ -272,6 +280,7 @@ include("components/valves.jl")
 include("components/tank.jl")
 include("components/resistors.jl")
 include("components/ideal.jl")
+include("components/heat_exchanger.jl")
 include("components/sources.jl")
 include("components/channels.jl")
 include("components/heat_diffusion.jl")

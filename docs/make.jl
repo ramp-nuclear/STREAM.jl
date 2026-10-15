@@ -121,6 +121,7 @@ explanation = keep([
     "How a model is built" => "explanation/modelling.md",
     "The coolant channel" => "explanation/channel.md",
     "Wall heat transfer" => "explanation/heat_transfer.md",
+    "Heat exchangers and the heat sink" => "explanation/heat_exchanger.md",
     "Pressure drop" => "explanation/pressure_drop.md",
     "Heat conduction in fuel" => "explanation/conduction.md",
     "Point kinetics and feedback" => "explanation/point_kinetics.md",
