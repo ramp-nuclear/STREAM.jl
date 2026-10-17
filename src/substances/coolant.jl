@@ -48,6 +48,10 @@ An explicit keyword wins over the block, the block over `H2O`. A block nested in
 another shadows it until it ends, and the outer coolant is back once the block returns or
 throws.
 
+The default is read when a function is called, not when a model is solved. A call made after
+the block, such as a threshold method on a `ChannelState` or [`steady_state_guess`](@ref),
+takes `H2O` unless it is made inside a block or given `liquid=`.
+
 # Arguments
 - `f`: the code to run, a function of no arguments
 - `liquid`: the coolant ([`AbstractLiquid`](@ref)) for the block

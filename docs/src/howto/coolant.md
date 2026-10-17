@@ -48,6 +48,10 @@ Substances.coolant()
 The block returns its last expression, here the model, and `Substances.coolant()` is back to
 `H2O` outside it.
 
+The default is read when a function is called. A threshold method on a `ChannelState`, or
+`steady_state_guess`, called after the block takes `H2O` unless it is called inside a block or
+given `liquid=`.
+
 ## Properties frozen at one state
 
 Calling a coolant at a temperature and pressure gives its properties there, as a

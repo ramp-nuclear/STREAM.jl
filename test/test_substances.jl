@@ -4,6 +4,9 @@ using ModelingToolkit: t_nounits as t
 using STREAM
 using STREAM.Substances
 using STREAM.Components
+using OrdinaryDiffEq: ReturnCode
+using SteadyStateDiffEq
+using STREAM.Assemblies
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 
 """Every component that reads a coolant, with `kw` forwarded to each constructor."""
@@ -89,6 +92,29 @@ end
           Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe; liquid=D2O)
     guess(; kw...) = steady_state_guess(; T_inlet=40.0, Q_wall=1.0e4, ṁ_guess=0.1, n=5, kw...)
     @test with_coolant(guess, D2O) == guess(; liquid=D2O)
+end
+
+@testset "a loop built inside a with_coolant block solves as the loop named per component" begin
+    function loop(; kw...)
+        geom = PipeGeometry_circular(0.6, 0.01)
+        @named pump = Pump(3.0e4)
+        @named bc = HeatExchanger(40.0)
+        @named ch = Channel(; n=6, geometry=geom, h_left=5000.0, kw...)
+        @named rise = Gravity(0.3; kw...)
+        @named friction = FrictionResistor(; geometry=geom, kw...)
+        connections = [
+            inseries(pump, bc, ch, rise, friction, pump),
+            pump.inlet.p ~ ATM,
+            ch.T_wall_left .~ 100.0,
+            ch.T_wall_right .~ 40.0,
+        ]
+        @named sys = assembly(connections, pump, bc, ch, rise, friction)
+        ssys = mtkcompile(sys)
+        return solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.3])
+    end
+    scoped = with_coolant(loop, D2O)
+    @test scoped.retcode == ReturnCode.Success
+    @test scoped.u == loop(; liquid=D2O).u
 end
 
 @testset "two-argument form fills the pressure with ATM" begin
