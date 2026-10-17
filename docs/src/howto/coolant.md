@@ -1,9 +1,10 @@
 # Change the coolant
 
-Every component that reads coolant properties takes a `liquid` keyword, light water ([`H2O`](@ref))
-by default.
+A component takes its coolant as the `liquid` keyword, light water ([`H2O`](@ref)) by
+default. A model can instead name its coolant once with [`with_coolant`](@ref) and leave the
+keyword out. An explicit keyword wins over the block, and the block wins over the default.
 
-## Heavy water
+## Per component
 
 Pass [`D2O`](@ref) to each component that carries coolant:
 
@@ -25,6 +26,27 @@ passes them, so they need no change. The property functions take any liquid:
 ```@example coolant
 (ρ(H2O, 50.0), ρ(D2O, 50.0), Tsat(H2O, 1.0e5), Tsat(D2O, 1.0e5))
 ```
+
+## Once for a whole model
+
+Build the components inside a `with_coolant` block, and every `liquid` keyword left out
+takes the block's coolant:
+
+```@example coolant
+using STREAM.Components: HeatExchanger, Pump
+using STREAM.Assemblies: inseries
+
+model = with_coolant(D2O) do
+    @named pump = Pump(3.0e4)
+    @named hx = HeatExchanger(40.0)
+    @named core = ChannelAndContacts(; n=10, geometry=geom)
+    assembly([inseries(pump, hx, core, pump), pump.inlet.p ~ ATM], pump, hx, core; name=:model)
+end
+Substances.coolant()
+```
+
+The block returns its last expression, here the model, and `Substances.coolant()` is back to
+`H2O` outside it.
 
 ## Properties frozen at one state
 
