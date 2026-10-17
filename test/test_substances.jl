@@ -3,6 +3,26 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t
 using STREAM
 using STREAM.Substances
+using STREAM.Components
+using STREAM.Components: Channel  # explicit: Base.Channel also exists
+
+"""Every component that reads a coolant, with `kw` forwarded to each constructor."""
+function _coolant_readers(; kw...)
+    geom = PipeGeometry_circular(0.6, 0.01)
+    opened = StateMachine(; initial_state=:OPEN)
+    return [
+        Channel(; name=:ch, n=4, geometry=geom, kw...),
+        ChannelHeatFlux(; name=:chf, n=4, geometry=geom, kw...),
+        ChannelAndContacts(; name=:cac, n=4, geometry=geom, kw...),
+        FrictionResistor(; name=:friction, geometry=geom, kw...),
+        Gravity(1.0; name=:rise, kw...),
+        ResistorFromKnownPoint(; name=:known, dp=-1.0e3, ṁ=0.5, T=40.0, kw...),
+        LocalPressureDrop(; name=:loss, A1=1.0e-4, A2=2.0e-4, kw...),
+        Flapper(; name=:flap, machine=opened, kw...),
+        Orifice(; name=:hole, area=1.0e-4, cd=0.6, machine=opened, kw...),
+        Tank(; name=:pool, area=1.0, L0=1.0, ports=(bottom=0.0,), kw...),
+    ]
+end
 
 # Property values below are the reference values recorded in each correlation's docstring in
 # src/substances/. They come from the ORNL/TM-12322 fits (Crabtree and Siman-Tov, 1993) that
@@ -34,6 +54,41 @@ end
     @test hfg === latent_heat
     @test β === thermal_expansion
     @test Tsat === sat_temperature
+end
+
+@testset "the coolant default" begin
+    mock = Liquid()
+    with_coolant(D2O) do
+        @test coolant() === D2O
+        @test with_coolant(coolant, mock) === mock
+        @test coolant() === D2O
+    end
+    @test_throws ErrorException with_coolant(() -> error("inside"), D2O)
+    @test coolant() === H2O
+end
+
+@testset "with_coolant names the coolant for every component that reads one" begin
+    scoped = with_coolant(_coolant_readers, D2O)
+    explicit = _coolant_readers(; liquid=D2O)
+    light = _coolant_readers()
+    @test all(isequal(equations(a), equations(b)) for (a, b) in zip(scoped, explicit))
+    @test !any(isequal(equations(a), equations(c)) for (a, c) in zip(scoped, light))
+
+    # The one component that takes a density function rather than a liquid.
+    volumetric = with_coolant(() -> VolumetricFlowResistor(; name=:v, k=1.0), D2O)
+    @test isequal(equations(volumetric),
+                  equations(VolumetricFlowResistor(; name=:v, k=1.0, density=T -> ρ(D2O, T))))
+
+    # An explicit coolant inside the block wins over it.
+    frozen = with_coolant(() -> Gravity(1.0; name=:rise, liquid=Liquid()), D2O)
+    @test isequal(equations(frozen), equations(Gravity(1.0; name=:rise, liquid=Liquid())))
+
+    # The correlation and the initial guess read the same default.
+    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    @test with_coolant(() -> Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe), D2O) ==
+          Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe; liquid=D2O)
+    guess(; kw...) = steady_state_guess(; T_inlet=40.0, Q_wall=1.0e4, ṁ_guess=0.1, n=5, kw...)
+    @test with_coolant(guess, D2O) == guess(; liquid=D2O)
 end
 
 @testset "two-argument form fills the pressure with ATM" begin

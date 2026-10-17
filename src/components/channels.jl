@@ -76,7 +76,7 @@ function _channel_core(;
     darcy::AbstractDarcyFactor=Blasius(),
     q_left_expr, q_right_expr,
     vars,
-    liquid::AbstractLiquid=H2O,
+    liquid::AbstractLiquid=coolant(),
     T_wall=nothing,
 )
     Dh = geometry.Dh
@@ -260,7 +260,7 @@ end
 
 """
     Channel(; name, n, geometry, g=0.0, h_left=0.0, h_right=0.0,
-            darcy=Blasius()) -> System
+            darcy=Blasius(), liquid=coolant()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
 Heat flux comes from a prescribed heat transfer coefficient and an external wall temperature,
@@ -278,7 +278,8 @@ which the caller binds (see below).
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
   viscosity correction are [`Friction.RegimeDependent`](@ref).
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). Pass a [`Liquid`](@ref STREAM.Substances.Liquid) to
+- `liquid`: coolant (`AbstractLiquid`), default [`coolant()`](@ref
+  STREAM.Substances.coolant). Pass a [`Liquid`](@ref STREAM.Substances.Liquid) to
   drive the energy balance, friction, and dimensionless observables with fixed properties.
 
 # External-input variables
@@ -304,7 +305,7 @@ function Channel(;
     h_left::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
     h_right::Union{Real, AbstractVector{<:Real}, Function} = 0.0,
     darcy::AbstractDarcyFactor=Blasius(),
-    liquid::AbstractLiquid=H2O,
+    liquid::AbstractLiquid=coolant(),
 )
     pars_base, varstruct, inlet, outlet = _setup(geometry, g, n)
 
@@ -360,7 +361,7 @@ end
 
 """
     ChannelHeatFlux(; name, n, geometry, g=0.0,
-                    darcy=Blasius()) -> System
+                    darcy=Blasius(), liquid=coolant()) -> System
 
 Single-phase convective channel with `n` axial finite-volume cells.
 Heat flux is prescribed per cell by the caller (see below).
@@ -373,7 +374,7 @@ Heat flux is prescribed per cell by the caller (see below).
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
   viscosity correction are [`Friction.RegimeDependent`](@ref).
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref).
+- `liquid`: coolant (`AbstractLiquid`), default [`coolant()`](@ref STREAM.Substances.coolant).
 
 # External-input variables
 - `q_left(t)[1:n]`: per-cell left-face heat flux density [W/m^2]
@@ -398,7 +399,7 @@ function ChannelHeatFlux(;
     geometry::PipeGeometry,
     g=0.0,
     darcy::AbstractDarcyFactor=Blasius(),
-    liquid::AbstractLiquid=H2O,
+    liquid::AbstractLiquid=coolant(),
 )
     pars, varstruct, inlet, outlet = _setup(geometry, g, n)
     dz = geometry.L / n
@@ -430,7 +431,7 @@ end
     ChannelAndContacts(; name, n, geometry, g=0.0,
                        htc=DittusBoelter(),
                        darcy::AbstractDarcyFactor=Blasius(),
-                       liquid=H2O) -> System
+                       liquid=coolant()) -> System
 
 Convective channel with per-cell `ThermalPort` arrays on both sides for conjugate heat
 transfer (the variant that connects to `HeatDiffusion`). The `htc` model gives each cell its
@@ -449,7 +450,8 @@ is `h_tc[i] * heated_parts * dz * (T_wall - T[i])`.
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref).
   Handed `(T_bulk, T_wall, ṁ, liquid, geometry)` per cell. Regime switching and the heated-wall
   viscosity correction are [`Friction.RegimeDependent`](@ref).
-- `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref). It drives the energy balance,
+- `liquid`: coolant (`AbstractLiquid`), default [`coolant()`](@ref
+  STREAM.Substances.coolant). It drives the energy balance,
   friction, the HTC model, and the dimensionless observables.
 
 # Ports
@@ -463,7 +465,7 @@ function ChannelAndContacts(;
     g=0.0,
     htc::AbstractHTC=DittusBoelter(),
     darcy::AbstractDarcyFactor=Blasius(),
-    liquid::AbstractLiquid=H2O,
+    liquid::AbstractLiquid=coolant(),
 )
 
     pars, vars, inlet, outlet = _setup(geometry, g, n)

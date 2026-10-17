@@ -121,6 +121,7 @@ src/
     liquid.jl               # AbstractLiquid, Liquid, the property aliases (ρ, cₚ, Tsat, ...)
     light_water.jl
     heavy_water.jl
+    coolant.jl              # coolant(), with_coolant: the scoped default for `liquid`
     solid.jl
   htc/
     htc.jl                  # AbstractHTC, the model a channel is handed
