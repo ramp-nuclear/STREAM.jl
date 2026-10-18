@@ -181,12 +181,9 @@ pipe, or `nothing`, passes through.
 _evaluate(pipe, value) = pipe
 
 function _evaluate(pipe::PipeGeometry{Num}, value)
-    L, Dh, A, heated, wet, left, right, width, depth = promote(
-        value(pipe.L), value(pipe.Dh), value(pipe.A), value(pipe.heated_perimeter),
-        value(pipe.wet_perimeter), value.(pipe.heated_parts)..., value(pipe.width),
-        value(pipe.depth),
-    )
-    return PipeGeometry(L, Dh, A, heated, wet, (left, right), width, depth)
+    fields = map(f -> value.(getfield(pipe, f)), fieldnames(PipeGeometry))
+    T = mapreduce(eltype, promote_type, fields)
+    return PipeGeometry((T.(f) for f in fields)...)
 end
 
 """

@@ -184,7 +184,7 @@ function UQModel(
         throw(ArgumentError("start must be :op or :steady, got $(repr(start))"))
     _check_parameters(ssys, parameters)
     readout = _readout(output)
-    tspan = (Float64(first(t)), Float64(last(t)))
+    tspan = float.((first(t), last(t)))
     states = unknowns(ssys)
     function integrate(prob, u0, p, init)
         foreach(reset!, machines)
@@ -230,7 +230,7 @@ function UQModel(
     steady = _steady_state(ssys, op, parameters; solver=steady_solver)
     held = [e for e in op if is_parameter(ssys, first(e))]
     prob = ODEProblem(
-        ssys, _merge(held, [u => steady.sol[u] for u in states], overrides), tspan;
+        ssys, _merge(held, states .=> steady.sol[states], overrides), tspan;
         warn_initialize_determined=false, build_initializeprob=false,
     )
     init = initializealg === nothing ? OrdinaryDiffEq.BrownFullBasicInit() : initializealg
@@ -238,8 +238,7 @@ function UQModel(
     set = setsym_oop(prob, [states; parameters[kept]])
     function evaluate_steady(x)
         vals = _unflatten(x, steady.values, steady.slices)
-        settled = _dual_solution(steady, vals, eltype(x))
-        start = [settled[u] for u in states]
+        start = _dual_solution(steady, vals, eltype(x))[states]
         dual = set(prob, Any[start; vals[kept]])
         plain = set(prob, Any[ForwardDiff.value.(start); _values(vals[kept])])
         return _outputs(readout(integrate_dual(prob, dual, plain, init)))
@@ -248,7 +247,7 @@ function UQModel(
         vals = _unflatten(x, steady.values, steady.slices)
         settled = _resolve(steady, vals)
         settled === nothing && return nothing
-        u0, p = set(prob, Any[[settled[u] for u in states]; vals[kept]])
+        u0, p = set(prob, Any[settled[states]; vals[kept]])
         sol = integrate(prob, u0, p, init)
         return SciMLBase.successful_retcode(sol) ? _outputs(readout(sol)) : nothing
     end
@@ -536,15 +535,12 @@ function _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, relto
     isempty(algebraic) && return u0
     integrator = SciMLBase.init(remake(prob; u0=u0_plain, p=p_plain), solver;
                                 initializealg=OrdinaryDiffEq.BrownFullBasicInit(), abstol, reltol)
-    plain = copy(integrator.u)
-    D = eltype(u0)
-    N = ForwardDiff.npartials(D)
+    plain = integrator.u
     t0 = first(prob.tspan)
     u = copy(u0)
-    u[algebraic] .= D.(plain[algebraic])
+    u[algebraic] .= plain[algebraic]
     r = similar(u)
     prob.f(r, u, p, t0)
-    ∂g = [ForwardDiff.partials(r[i], j) for i in algebraic, j in 1:N]
     function g(u_a)
         v = convert(Vector{eltype(u_a)}, plain)
         v[algebraic] = u_a
@@ -552,10 +548,8 @@ function _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, relto
         prob.f(out, v, p_plain, t0)
         return out[algebraic]
     end
-    du = -(ForwardDiff.jacobian(g, plain[algebraic]) \ ∂g)
-    for (k, i) in enumerate(algebraic)
-        u[i] = D(plain[i], ForwardDiff.Partials(ntuple(j -> du[k, j], Val(N))))
-    end
+    du = -(ForwardDiff.jacobian(g, plain[algebraic]) \ _partials(r[algebraic]))
+    u[algebraic] = _with_partials(plain[algebraic], du, eltype(u0))
     return u
 end
 
@@ -565,6 +559,21 @@ end
 The plain values of parameter values that may carry ForwardDiff duals.
 """
 _values(vals) = [ForwardDiff.value.(v) for v in vals]
+
+"""
+    _partials(x) -> Matrix
+
+The partials of the ForwardDiff duals `x`, a row per entry and a column per direction.
+"""
+_partials(x) = stack(ForwardDiff.partials.(x); dims=1)
+
+"""
+    _with_partials(x, du, D) -> Vector{D}
+
+The values `x` as duals of type `D`, entry `i` carrying the partials in row `i` of `du`.
+"""
+_with_partials(x, du, ::Type{D}) where {D} =
+    map((xi, row) -> D(xi, ForwardDiff.Partials(Tuple(row))), x, eachrow(du))
 
 """
     _merge(ops...) -> Vector{Pair{Any,Any}}
@@ -585,7 +594,7 @@ end
 
 The inputs' values as the one flat vector ForwardDiff differentiates over.
 """
-_flat(values) = reduce(vcat, [Float64.(vec(collect(v))) for v in values])
+_flat(values) = collect(Float64, Iterators.flatten(values))
 
 @doc raw"""
     _dual_solution(steady, vals, D) -> NonlinearSolution
@@ -600,13 +609,9 @@ observed variable, a parameter) carries its derivative.
 """
 function _dual_solution(steady, vals, ::Type{D}) where {D<:ForwardDiff.Dual}
     (; prob, sol, ∂F∂u) = steady
-    u = sol.u
     p = steady.setter(prob, vals)
-    N = ForwardDiff.npartials(D)
-    r = _residual(prob, u, p, D)
-    ∂F∂p = [ForwardDiff.partials(r[i], j) for i in eachindex(r), j in 1:N]
-    du = -(∂F∂u \ ∂F∂p)
-    u_dual = [D(u[i], ForwardDiff.Partials(ntuple(j -> du[i, j], Val(N)))) for i in eachindex(u)]
+    du = -(∂F∂u \ _partials(_residual(prob, sol.u, p, D)))
+    u_dual = _with_partials(sol.u, du, D)
     dual_prob = remake(prob; u0=u_dual, p=p)
     resid = _residual(dual_prob, u_dual, p, D)
     return SciMLBase.build_solution(dual_prob, nothing, u_dual, resid; retcode=ReturnCode.Success)

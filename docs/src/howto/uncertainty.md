@@ -109,8 +109,8 @@ along the channel:
 ```@example uq
 using CairoMakie
 
-coolant, wall = collect(sys.cell.ch.T), collect(sys.cell.ch.T_wall_left)
-profiles = UQModel(sys, knob_defaults([gap]), inputs; output=[coolant; wall])
+profiles = UQModel(sys, knob_defaults([gap]), inputs;
+                   output=[sys.cell.ch.T; sys.cell.ch.T_wall_left])
 r = uq(profiles, uncertainties...)
 
 z = ((1:n) .- 0.5) .* 0.6 ./ n
@@ -143,8 +143,7 @@ too, so an input counts both through where the run starts and through what follo
 
 ```@example uq
 times = 0.0:0.05:2.0
-peak_wall(sol) = [maximum(sol[sys.cell.ch.T_wall_left[i], k] for i in 1:n)
-                  for k in eachindex(sol.t)]
+peak_wall(sol) = maximum.(sol[sys.cell.ch.T_wall_left])   # the hottest cell at each time
 cut = UQModel(sys, knob_defaults([gap]), [sys.cell.fuel.power, sys.hx.T_bc, gap], times;
               output=peak_wall, start=:steady, overrides=[sys.pump.ṁ0 => 0.2])
 r = uq(cut, uncertainties[1], uncertainties[3], uncertainties[4])
@@ -187,7 +186,7 @@ shift = J[:, 1] .* (0.05 * 3.0e4)   # the power bias, through the power's column
 fig = Figure(size=(760, 340))
 for (k, label) in enumerate(("smallest CHF ratio", "K to the onset of boiling"))
     ax = Axis(fig[1, k]; xlabel=label, ylabel=k == 1 ? "probability density" : "")
-    hist!(ax, filter(!isnan, sampled.samples[k, :]); bins=40, normalization=:pdf,
+    hist!(ax, sampled.samples[k, :]; bins=40, normalization=:pdf,
           color=("#eb6834", 0.6), strokewidth=1, strokecolor=:white, label="sampled")
     μ, σ = result.nominal[k] + shift[k], result.stat[k]
     xs = range(μ - 4σ, μ + 4σ; length=200)
@@ -242,7 +241,7 @@ runs = monte_carlo(trip, trip_at => Uncertainty(statistical_relative=0.03); n=40
 fig = Figure(size=(760, 340))
 for (k, label) in enumerate(("time of the trip [s]", "peak power [relative to nominal]"))
     ax = Axis(fig[1, k]; xlabel=label, ylabel=k == 1 ? "probability density" : "")
-    hist!(ax, filter(!isnan, runs.samples[k, :]); bins=30, normalization=:pdf,
+    hist!(ax, runs.samples[k, :]; bins=30, normalization=:pdf,
           color=("#eb6834", 0.6), strokewidth=1, strokecolor=:white, label="sampled")
     vlines!(ax, trip.nominal[k]; color="#2a78d6", linewidth=2, linestyle=:dash,
             label="nominal")

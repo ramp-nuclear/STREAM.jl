@@ -279,7 +279,7 @@ julia> round.(Utilities.local_power_shift([1.0, 2.0, 3.0, 2.0], 1.1, 100); digit
 function local_power_shift(power::AbstractMatrix, relative_shift=1.0, percentile=90.0)
     rows = vec(sum(power; dims=2))
     hottest = rows .>= quantile(rows, percentile / 100)
-    all(hottest[i] for i in eachindex(rows) if !iszero(rows[i])) && return copy(power)
+    all(hottest[.!iszero.(rows)]) && return copy(power)
     total, raised = sum(power), sum(rows[hottest])
     shifted = power .* ((total - raised * relative_shift) / (total - raised))
     shifted[hottest, :] .= relative_shift .* power[hottest, :]

@@ -114,7 +114,7 @@ end
     model = UQModel(ssys, op, parameters; output=outputs)
 
     sol = solve_steady(ssys, op; abstol=1e-10, reltol=1e-10)
-    @test model.nominal ≈ [sol[v] for v in outputs] rtol=1e-12
+    @test model.nominal ≈ sol[outputs] rtol=1e-12
     @test model.values == [40.0, 3.0e4]
 
     J = jacobian(model)
@@ -129,8 +129,7 @@ end
     # each leaves only a second-order remainder against full re-solves.
     for (i, p) in enumerate(parameters)
         x0 = model.values[i]
-        resolve(x) = (s = solve_steady(ssys, with(op, p => x); abstol=1e-12, reltol=1e-12);
-                      [s[v] for v in outputs])
+        resolve(x) = solve_steady(ssys, with(op, p => x); abstol=1e-12, reltol=1e-12)[outputs]
         r_h, r_half = second_order_remainders(resolve, x0, 0.02x0, model.nominal, J[:, i])
         @test r_half < r_h / 3
     end
@@ -141,7 +140,7 @@ end
     @test jacobian(by_integration) ≈ J rtol=1e-5
 
     # An output given as a function reads the same solution.
-    as_function = UQModel(ssys, op, parameters; output=s -> [s[v] for v in outputs])
+    as_function = UQModel(ssys, op, parameters; output=s -> s[outputs])
     @test jacobian(as_function) ≈ J rtol=1e-12
 
     @test_throws ArgumentError UQModel(ssys, op, [ssys.ch.T_out]; output=outputs)
@@ -223,7 +222,7 @@ end
     ssys = build_loop(; n=5)
     settled = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
     # The loop settled at a 40 °C inlet, then the inlet steps to 60 °C.
-    op = [[u => settled[u] for u in unknowns(ssys)]; ssys.bc.T_bc => 60.0]
+    op = [unknowns(ssys) .=> settled[unknowns(ssys)]; ssys.bc.T_bc => 60.0]
     times = 0.0:2.0:20.0
     parameters = [ssys.bc.T_bc, ssys.pump.dP_pump]
     model = UQModel(ssys, op, parameters, times; output=[ssys.ch.T_out],
@@ -312,7 +311,7 @@ end
     for (i, p) in enumerate(parameters)
         function resolve(x)
             settled = solve_steady(ssys, with(op, p => x); abstol=1e-12, reltol=1e-12)
-            start = [[u => settled[u] for u in unknowns(ssys)]; overrides; p => x]
+            start = [unknowns(ssys) .=> settled[unknowns(ssys)]; overrides; p => x]
             prob = ODEProblem(ssys, start, (0.0, last(times)); build_initializeprob=false,
                               warn_initialize_determined=false)
             run = solve(prob, Rodas5P(); saveat=times, tstops=times, abstol=1e-10,

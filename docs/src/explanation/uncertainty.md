@@ -112,7 +112,7 @@ plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1),
 @named loop = assembly([inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ 1.7e5],
                        pump, hx, cell)
 sys = mtkcompile(loop)
-model = UQModel(sys, [], [sys.pump.ṁ0]; output=collect(sys.cell.ch.T_wall_left))
+model = UQModel(sys, [], [sys.pump.ṁ0]; output=sys.cell.ch.T_wall_left)
 
 z = ((1:n) .- 0.5) .* 0.6 ./ n
 fig = Figure(size=(760, 380))
@@ -121,9 +121,8 @@ for (k, σ) in enumerate((0.05, 0.25))
     flow = sys.pump.ṁ0 => Uncertainty(statistical_relative=σ)
     y, stat = model.nominal, uq(model, flow).stat
     sampled = monte_carlo(model, flow; n=500, rng=Xoshiro(1))
-    solved = sampled.samples[:, .!isnan.(sampled.samples[1, :])]
-    low = [quantile(row, 0.025) for row in eachrow(solved)]
-    high = [quantile(row, 0.975) for row in eachrow(solved)]
+    low = quantile.(eachrow(sampled.samples), 0.025)
+    high = quantile.(eachrow(sampled.samples), 0.975)
     push!(upper_gap, maximum(high .- (y .+ 2stat)))
 
     ax = Axis(fig[1, k]; title="flow known to $(round(Int, 100σ))%",
@@ -154,7 +153,7 @@ flow, and the normal distribution of first order, symmetric by construction, has
 using Statistics: mean
 
 flow = sys.pump.ṁ0 => Uncertainty(statistical_relative=0.25)
-outlet = filter(!isnan, monte_carlo(model, flow; n=4000, rng=Xoshiro(2)).samples[end, :])
+outlet = monte_carlo(model, flow; n=4000, rng=Xoshiro(2)).samples[end, :]
 μ, σ = model.nominal[end], uq(model, flow).stat[end]
 
 # The axis ends at the 99.5th percentile: the few draws with the flow cut by more than half

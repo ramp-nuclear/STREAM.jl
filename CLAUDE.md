@@ -298,6 +298,40 @@ General MTK v11 usage is in the skill. Two choices specific to this codebase:
   nothing else reads (`Re`, `Nu`, `htc`). A quantity another equation references must be a
   plain unknown.
 
+### Whole arrays, not their elements
+
+A symbolic array such as `ssys.ch.T` is already an `AbstractVector`, so pass it as it is
+where a vector of variables is wanted: no `collect`, and no `[ssys.ch.T[i] for i in 1:n]`.
+`[ssys.ch.T; ssys.ch.T_wall_left]` is a plain vector of variables.
+
+A solution reads a whole vector at once. On a steady solution `sol[vars]` is a vector of
+values; on a transient `sol[ssys.ch.T]` is a vector over the saved times of per-cell
+vectors, so `maximum.(sol[ssys.ch.T_wall_left])` is the hottest cell at each time. An
+operating point from a solution is `unknowns(ssys) .=> sol[unknowns(ssys)]`.
+
+A design knob is a bare symbolic value, not a `Num`, so broadcasting over it fails:
+`T_low .+ offsets` iterates the knob. Write `[T_low + o for o in offsets]`.
+
+### Setting `u0` yourself
+
+A problem built with MTK's initialization data, the default, recomputes `u0` at solve time
+from the values it was built with. A `u0` set afterwards, through `remake` or `setsym_oop`,
+is dropped, and so are any dual-number derivatives it carried. Build such a problem with
+`build_initializeprob=false` and let the integrator's `initializealg` make the start
+consistent. `src/uq/model.jl` does this, and `GAPS.md` §8 records a related case in
+`solve_transient`.
+
+OrdinaryDiffEq's `BrownFullBasicInit` drops the derivatives of the algebraic states it
+solves for when `u0` holds duals; `_consistent_start` in the same file works around it.
+
+### `jac=true` and stream junctions
+
+MTK's symbolic Jacobian (`jac=true`) fails on a model with a multi-way stream junction, as
+`inparallel` makes: it errors while scalarizing `instream`. Without it, `sparse=true` alone
+gives the structural pattern, and a sparse Jacobian can be filled by colored AD. On the
+fuel assembly at up to 1,400 unknowns sparse solves were slower than dense, so dense is the
+default.
+
 ## Running the code
 
 ```bash

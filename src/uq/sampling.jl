@@ -26,9 +26,9 @@ solve, so the result does not depend on the number of threads.
 - `rng`: the random number generator, for a reproducible set of draws
 
 # Returns
-`(; samples, mean, std, failed)`: the outputs of every sample, a column each, with `NaN` for
-a sample that failed to solve; the mean and the standard deviation of each output over the
-samples that solved; and how many did not.
+`(; samples, mean, std, failed)`: the outputs of every sample that solved, a column each;
+the mean and the standard deviation of each output over them; and how many samples failed
+to solve.
 
 # Examples
 ```jldoctest
@@ -66,8 +66,8 @@ function monte_carlo(model::UQModel, uncertainties::Pair...; n=1000, rng::Abstra
     else
         foreach(sample, 1:n)
     end
-    good = samples[:, solved]
-    return (; samples, mean=vec(mean(good; dims=2)), std=vec(std(good; dims=2)),
+    samples = samples[:, solved]
+    return (; samples, mean=vec(mean(samples; dims=2)), std=vec(std(samples; dims=2)),
             failed=n - count(solved))
 end
 
