@@ -152,31 +152,30 @@ equations; and a component graph from the connection vectors `inseries`, `inpara
 
 ### 7. Uncertainty quantification
 
-The first-order part is in, as the `UQ` module: `Uncertainty` with Python's four parts,
-`UQModel` over a plain function or a steady state, `uq` with Python's propagation, `jacobian`,
-and `measurements` through a Measurements.jl extension. `Utilities.local_power_shift` ports
-the power-shape perturbation, and the threshold factors are there: `onb_factor` and
-`inhomogeneity_factor` on `bergles_rohsenow_t_onb`, `inhomogeneity_factor` on
-`q_OSV_saha_zuber`. `test_validation.jl` checks `uq` against Python's numbers on two threshold
-correlations. The Jacobian comes from ForwardDiff, and a steady state is differentiated by the
-implicit function theorem, so there is no step size and no solver path in the result. Python's
-`DASKUQModel` has no counterpart, since one ForwardDiff pass covers every input.
+The first-order part and sampling are in, as the `UQ` module: `Uncertainty` with Python's four
+parts, `UQModel` over a plain function, a steady state or a transient, `uq` with Python's
+propagation, `jacobian`, `monte_carlo`, and `measurements` through a Measurements.jl
+extension. `Utilities.local_power_shift` ports the power-shape perturbation, and the threshold
+factors are there: `onb_factor` and `inhomogeneity_factor` on `bergles_rohsenow_t_onb`,
+`inhomogeneity_factor` on `q_OSV_saha_zuber`. `test_validation.jl` checks `uq` against Python's
+numbers on two threshold correlations. The Jacobian comes from ForwardDiff, and a steady state
+is differentiated by the implicit function theorem, so there is no step size and no solver path
+in the result. Python's `DASKUQModel` has no counterpart, since one ForwardDiff pass covers
+every input.
 
 What remains:
 
-- **Transients.** Duals go through `Rodas5P` as they are, but a `StateMachine` keeps its state
-  and trip time in a Julia object outside the problem. A derivative with respect to a trip
-  setpoint then comes back as if the trip never moved, with no error, and a second run needs
-  `reset!`. Moving the trip time into the problem's parameters fixes it, and is a design change
-  of its own.
-- **Sampling.** Monte Carlo over the same `Uncertainty` inputs, through an `EnsembleProblem`,
-  for responses that curve or switch regime inside the uncertainty. Variance-based indices
-  (Sobol, Morris) through `GlobalSensitivity.jl` as an extension.
+- **Transients with a `StateMachine`.** The machine keeps its state and trip time in a Julia
+  object outside the problem. A derivative with respect to a trip setpoint would come back as
+  if the trip never moved, and a second run needs `reset!`. Moving the trip time into the
+  problem's parameters fixes it, and is a design change of its own.
+- **Variance-based indices** (Sobol, Morris) through `GlobalSensitivity.jl` as an extension, on
+  top of the sampling `monte_carlo` already does.
 - **The power shape as an input.** `HeatDiffusion` bakes `power_shape` into its equations, so
   `local_power_shift` cannot be differentiated through. Making it a parameter array fixes that.
   With a shape entry per cell, an adjoint (SciMLSensitivity) beats forward mode.
 
-**Size:** medium for transients, once the state machine change is in; small for sampling.
+**Size:** medium for the state machine change; small for the indices.
 
 ---
 

@@ -1,5 +1,6 @@
 using Test
 using ModelingToolkit
+using Random: Xoshiro
 using OrdinaryDiffEq, SteadyStateDiffEq
 using STREAM
 using STREAM.Assemblies
@@ -216,6 +217,140 @@ end
         minimum(result.nominal .- result.stat)
     end
     @test all(diff(worst) .>= 0)
+end
+
+@testset "UQModel of a transient from its operating point" begin
+    ssys = build_loop(; n=5)
+    settled = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
+    # The loop settled at a 40 °C inlet, then the inlet steps to 60 °C.
+    op = [[u => settled[u] for u in unknowns(ssys)]; ssys.bc.T_bc => 60.0]
+    times = 0.0:2.0:20.0
+    parameters = [ssys.bc.T_bc, ssys.pump.dP_pump]
+    model = UQModel(ssys, op, parameters, times; output=[ssys.ch.T_out],
+                    abstol=1e-10, reltol=1e-10)
+    @test length(model.nominal) == length(times)
+    run_at(p, x) = solve_transient(ssys, with(op, p => x), times; abstol=1e-10, reltol=1e-10)
+    @test model.nominal ≈ run_at(ssys.bc.T_bc, 60.0)[ssys.ch.T_out] rtol=1e-8
+
+    J = jacobian(model)
+    # The outlet starts where the steady state left it, whatever the new inlet temperature.
+    # The water crosses the pipe in under a tenth of a second, so from the first saved step
+    # on the outlet follows the inlet, by less than a degree per degree past the fixed wall.
+    @test J[1, 1] ≈ 0 atol=1e-8
+    @test all(J[2:end, 1] .≈ J[end, 1])
+    @test 0 < J[end, 1] < 1
+    for (i, p) in enumerate(parameters)
+        x0 = model.values[i]
+        resolve(x) = run_at(p, x)[ssys.ch.T_out]
+        r_h, r_half = second_order_remainders(resolve, x0, 0.02x0, model.nominal, J[:, i])
+        @test r_half < r_h / 3
+    end
+    @test_throws ArgumentError UQModel(ssys, op, parameters, times; output=[ssys.ch.T_out],
+                                       start=:somewhere)
+end
+
+@testset "UQModel of a transient from its steady state" begin
+    ssys = build_loop(; n=5)
+    op = [ssys.ch.inlet.ṁ => 0.5]
+    overrides = [ssys.bc.T_bc => 60.0]
+    times = 0.0:2.0:20.0
+    parameters = [ssys.bc.T_bc, ssys.pump.dP_pump]
+    model = UQModel(ssys, op, parameters, times; output=[ssys.ch.T_out], start=:steady,
+                    overrides, abstol=1e-10, reltol=1e-10)
+    J = jacobian(model)
+
+    # The inlet temperature is overridden, so it acts only through where the run starts: at
+    # t = 0 as it does on the steady state, and less as the run forgets its start.
+    steady = UQModel(ssys, op, parameters; output=[ssys.ch.T_out])
+    @test J[1, :] ≈ vec(jacobian(steady)) rtol=1e-6
+    @test abs(J[end, 1]) < abs(J[1, 1]) / 2
+
+    # The pump head acts on both, and its derivative matches full re-solves, settling at
+    # each head and running from there with that head held.
+    head = ssys.pump.dP_pump
+    function resolve(x)
+        settled = solve_steady(ssys, with(op, head => x); abstol=1e-10, reltol=1e-10)
+        run = solve_transient(ssys, settled, times; overrides=[overrides; head => x],
+                              abstol=1e-10, reltol=1e-10)
+        return run[ssys.ch.T_out]
+    end
+    @test model.nominal ≈ resolve(model.values[2]) rtol=1e-8
+    r_h, r_half = second_order_remainders(resolve, model.values[2], 0.02model.values[2],
+                                          model.nominal, J[:, 2])
+    @test r_half < r_h / 3
+end
+
+@testset "UQModel of a DAE transient whose start is re-initialized" begin
+    # A plate between two channels: the wall temperatures are algebraic, and halving the pump
+    # head at the start moves them at once, so the start is solved again. Its derivatives
+    # have to come through that, at t = 0 as well as after.
+    n = 5
+    geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+    slab = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
+                material=Solid(2700.0, 900.0, 180.0))
+    @named fuel = HeatDiffusion(slab; power=2.5e4)
+    @named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
+    @named cell = symmetric_plate(ch, fuel)
+    @named pump = Pump(2.0e4)
+    @named hx = HeatExchanger(40.0)
+    @named loop = assembly([inseries(pump, hx, cell.ch, pump), pump.inlet.p ~ 1.7e5],
+                           pump, hx, cell)
+    ssys = mtkcompile(loop)
+    op = [ssys.cell.ch.inlet.ṁ => 0.4]
+    overrides = [ssys.pump.dP_pump => 1.0e4]
+    times = [0.0, 0.05, 0.5]
+    outputs = [ssys.cell.ch.T_wall_left[n], ssys.cell.fuel.T[n, 1]]
+    parameters = [ssys.cell.fuel.power, ssys.hx.T_bc]
+    model = UQModel(ssys, op, parameters, times; output=outputs, start=:steady, overrides,
+                    abstol=1e-10, reltol=1e-10)
+    J = jacobian(model)
+    @test all(!iszero, J)
+
+    # The reference re-solves in plain numbers and holds the differential states at the
+    # start, as UQModel does. MTK's own initialization moves a plate temperature here when
+    # the head is overridden, which a temperature cannot do in an instant.
+    for (i, p) in enumerate(parameters)
+        function resolve(x)
+            settled = solve_steady(ssys, with(op, p => x); abstol=1e-12, reltol=1e-12)
+            start = [[u => settled[u] for u in unknowns(ssys)]; overrides; p => x]
+            prob = ODEProblem(ssys, start, (0.0, last(times)); build_initializeprob=false,
+                              warn_initialize_determined=false)
+            run = solve(prob, Rodas5P(); saveat=times, tstops=times, abstol=1e-10,
+                        reltol=1e-10, initializealg=OrdinaryDiffEq.BrownFullBasicInit())
+            return reduce(vcat, [run[v] for v in outputs])
+        end
+        x0 = model.values[i]
+        r_h, r_half = second_order_remainders(resolve, x0, 0.02x0, model.nominal, J[:, i])
+        @test r_half < r_h / 3
+    end
+end
+
+@testset "monte_carlo" begin
+    n = 20_000
+    # A linear model: the bias shifts the mean by exactly J s, and the spread is J σ.
+    linear = UQModel(x -> 2x.a + 3x.b, (a=1.0, b=2.0))
+    r = monte_carlo(linear, :a => Uncertainty(systematic_absolute=0.5),
+                    :b => Uncertainty(statistical_absolute=0.2); n, rng=Xoshiro(7))
+    @test size(r.samples) == (1, n) && r.failed == 0
+    @test r.mean[1] ≈ linear.nominal[1] + 1.0 atol=4 * 0.6 / sqrt(n)
+    @test r.std[1] ≈ 0.6 rtol=0.03
+    @test r.std ≈ uq(linear, :b => Uncertainty(statistical_absolute=0.2)).stat rtol=0.03
+
+    # exp(a) for a normal a has mean exp(σ²/2), which first order, at exp(0) = 1, misses.
+    curved = UQModel(x -> exp(x.a), (a=0.0,))
+    r = monte_carlo(curved, :a => Uncertainty(statistical_absolute=0.5); n, rng=Xoshiro(7))
+    @test r.mean[1] ≈ exp(0.5^2 / 2) atol=0.02
+    @test curved.nominal[1] == 1.0
+
+    # A steady state, sampled by re-solving: for a small uncertainty the spread is the
+    # first-order one.
+    ssys = build_loop(; n=5)
+    steady = UQModel(ssys, [ssys.ch.inlet.ṁ => 0.5], [ssys.bc.T_bc];
+                     output=[ssys.ch.T_out, ssys.ch.inlet.ṁ])
+    u = ssys.bc.T_bc => Uncertainty(statistical_absolute=0.5)
+    r = monte_carlo(steady, u; n=400, rng=Xoshiro(3))
+    @test r.failed == 0
+    @test r.std ≈ uq(steady, u).stat rtol=0.15
 end
 
 @testset "measurements" begin

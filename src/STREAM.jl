@@ -429,24 +429,30 @@ include("solvers.jl")
 How uncertain inputs make a model's outputs uncertain.
 
 An [`Uncertainty`](@ref) describes one input, with a systematic and a statistical part. A
-[`UQModel`](@ref) wraps a plain function or a compiled system at steady state, and [`uq`](@ref)
-propagates uncertainties through it to first order. The derivatives behind that, from
-[`jacobian`](@ref), come from forward-mode automatic differentiation, and a steady state is
-differentiated through the implicit function theorem rather than through its solver.
+[`UQModel`](@ref) wraps a plain function, a compiled system at steady state, or a transient of
+one, and [`uq`](@ref) propagates uncertainties through it to first order. The derivatives
+behind that, from [`jacobian`](@ref), come from forward-mode automatic differentiation, and a
+steady state is differentiated through the implicit function theorem rather than through its
+solver. [`monte_carlo`](@ref) samples the full model instead, for where first order is not
+enough.
 
 This is Python STREAM's `stream.analysis.UQ`, with automatic differentiation in place of its
 finite differences. See [Propagate input uncertainties](@ref).
 """
 module UQ
 using ForwardDiff
-using LinearAlgebra: issuccess, lu
-using ModelingToolkit: setp_oop
-using OrdinaryDiffEq: ReturnCode, SciMLBase, remake
-using SymbolicIndexingInterface: is_parameter
-using ..STREAM: solve_steady
+using LinearAlgebra: diag, issuccess, lu
+using ModelingToolkit: ODEProblem, setp_oop, unknowns
+using OrdinaryDiffEq: OrdinaryDiffEq, ReturnCode, Rodas5P, SciMLBase, remake, solve
+using Random: AbstractRNG, default_rng
+using Statistics: mean, std
+using SteadyStateDiffEq: DynamicSS
+using SymbolicIndexingInterface: getsym, is_parameter, setsym_oop
+using ..STREAM: _saved_steps, solve_steady
 include("uq/uncertainty.jl")
 include("uq/model.jl")
-export Uncertainty, as_absolute, UQModel, jacobian, uq, measurements
+include("uq/sampling.jl")
+export Uncertainty, as_absolute, UQModel, jacobian, uq, measurements, monte_carlo
 end
 
 # The public surface. Everything not listed here is reached through its module.

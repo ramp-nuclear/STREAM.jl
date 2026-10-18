@@ -80,13 +80,81 @@ that.
   its tangent, in one direction or the other.
 
 Sampling handles all three: solve the model at inputs drawn from their distributions, and read
-the spread of the outputs. A first-order result is the place to start, because it costs one
-solve and shows which inputs matter.
+the spread of the outputs. [`monte_carlo`](@ref STREAM.UQ.monte_carlo) does that. A
+first-order result is the place to start, because it costs one solve and shows which inputs
+matter.
 
-## What is not covered yet
+The third case is easy to see on a heated channel, whose wall rises above the coolant roughly
+as ``1/ṁ``. That is curved, and more so the further the flow strays. Below, the same plate as
+in [Propagate input uncertainties](../howto/uncertainty.md), with the flow known to 5% and to
+25%. The first-order band is ``±2σ`` around the nominal profile. The dashed lines bound the
+middle 95% of 500 samples.
 
-The models are steady states and plain functions. A transient goes through the same machinery,
-with the derivatives carried through the integration, but a model with a
-[`StateMachine`](@ref STREAM.Components.StateMachine) keeps its trip time outside the problem,
-so a derivative with respect to a setpoint would come back as if the trip never moved.
-`GAPS.md` in the repository tracks this.
+```@example fo
+using STREAM
+using STREAM.UQ
+using STREAM.Components: Pump, HeatExchanger, HeatDiffusion, Slab, ChannelAndContacts
+using STREAM.Assemblies: inseries, symmetric_plate
+using ModelingToolkit: @named, mtkcompile
+using CairoMakie
+using Random: Xoshiro
+using Statistics: quantile
+
+n = 10
+geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
+plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1), y=0.063,
+             material=Solid(2700.0, 900.0, 180.0))
+@named fuel = HeatDiffusion(plate; power=3.0e4)
+@named ch = ChannelAndContacts(; n, geometry, g=-G_EARTH)
+@named cell = symmetric_plate(ch, fuel)
+@named pump = Pump(; ṁ0=0.4)
+@named hx = HeatExchanger(40.0)
+@named loop = assembly([inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ 1.7e5],
+                       pump, hx, cell)
+sys = mtkcompile(loop)
+model = UQModel(sys, [], [sys.pump.ṁ0]; output=collect(sys.cell.ch.T_wall_left))
+
+z = ((1:n) .- 0.5) .* 0.6 ./ n
+fig = Figure(size=(760, 380))
+upper_gap = Float64[]
+for (k, σ) in enumerate((0.05, 0.25))
+    flow = sys.pump.ṁ0 => Uncertainty(statistical_relative=σ)
+    y, stat = model.nominal, uq(model, flow).stat
+    sampled = monte_carlo(model, flow; n=500, rng=Xoshiro(1))
+    solved = sampled.samples[:, .!isnan.(sampled.samples[1, :])]
+    low = [quantile(row, 0.025) for row in eachrow(solved)]
+    high = [quantile(row, 0.975) for row in eachrow(solved)]
+    push!(upper_gap, maximum(high .- (y .+ 2stat)))
+
+    ax = Axis(fig[1, k]; title="flow known to $(round(Int, 100σ))%",
+              xlabel="distance from the inlet [m]", ylabel="wall temperature [°C]")
+    band!(ax, z, y .- 2stat, y .+ 2stat; color=("#2a78d6", 0.3), label="first order, ±2σ")
+    lines!(ax, z, y; color="#2a78d6", linewidth=2, label="nominal")
+    lines!(ax, z, low; color="#eb6834", linewidth=2, linestyle=:dash,
+           label="sampled, middle 95%")
+    lines!(ax, z, high; color="#eb6834", linewidth=2, linestyle=:dash)
+    k == 1 && axislegend(ax; position=:lt)
+end
+fig
+```
+
+At 5% the two agree. At 25% the samples reach further above the nominal profile than below
+it, since a low flow heats the wall by more than a high flow of the same distance cools it,
+and the symmetric first-order band understates the hot side:
+
+```@example fo
+@assert upper_gap[2] > 0 && upper_gap[2] > 10 * abs(upper_gap[1])
+```
+
+## Transients
+
+A transient is differentiated by carrying the dual numbers through the integration, so the
+solver controls the error of the derivatives along with that of the values. A run that starts
+from a steady state takes that state's derivatives with it. Where an override at the start,
+such as a cut in the pump head, moves the algebraic states, they are solved again from the
+differential states, which hold their values, and their derivatives come from the same
+implicit function theorem applied to the algebraic equations alone.
+
+A model with a [`StateMachine`](@ref STREAM.Components.StateMachine) is not covered yet: it
+keeps its trip time outside the problem, so a derivative with respect to a setpoint would
+come back as if the trip never moved. `GAPS.md` in the repository tracks this.

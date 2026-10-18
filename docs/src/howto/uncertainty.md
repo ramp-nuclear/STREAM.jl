@@ -61,12 +61,13 @@ and a statistical part, a standard deviation. Either can be relative to the nomi
 absolute:
 
 ```@example uq
-result = uq(model,
+uncertainties = (
     sys.cell.fuel.power => Uncertainty(systematic_relative=0.05),  # power calibration
     sys.pump.ṁ0 => Uncertainty(statistical_relative=0.03),         # flow measurement
     sys.hx.T_bc => Uncertainty(statistical_absolute=1.0),          # inlet temperature, K
     gap => Uncertainty(statistical_absolute=1.0e-4),               # gap tolerance, m
 )
+result = uq(model, uncertainties...)
 ```
 
 An input left out has no uncertainty. The systematic parts add up linearly and the
@@ -98,6 +99,86 @@ More power takes margin away from both limits, and more flow gives it back:
 @assert J[1, 1] < 0 && J[2, 1] < 0
 @assert J[1, 2] > 0 && J[2, 2] > 0
 ```
+
+## Plot an uncertainty band
+
+Any quantity the solution holds can be an output, such as the temperature in every cell.
+With the coolant and the wall temperatures as the outputs, the same uncertainties give a band
+along the channel:
+
+```@example uq
+using CairoMakie
+
+coolant, wall = collect(sys.cell.ch.T), collect(sys.cell.ch.T_wall_left)
+profiles = UQModel(sys, knob_defaults([gap]), inputs; output=[coolant; wall])
+r = uq(profiles, uncertainties...)
+
+z = ((1:n) .- 0.5) .* 0.6 ./ n
+fig = Figure(size=(700, 420))
+ax = Axis(fig[1, 1]; xlabel="distance from the inlet [m]", ylabel="temperature [°C]")
+for (cells, color, label) in ((n+1:2n, "#eb6834", "wall"), (1:n, "#2a78d6", "bulk coolant"))
+    y, s, σ = r.nominal[cells], r.sys[cells], r.stat[cells]
+    band!(ax, z, y .- s .- 2σ, y .+ s .+ 2σ; color=(color, 0.15))
+    band!(ax, z, y .- 2σ, y .+ 2σ; color=(color, 0.35))
+    lines!(ax, z, y; color, linewidth=2, label)
+end
+axislegend(ax; position=:lt)
+fig
+```
+
+The darker band is ``±2σ``, the statistical part alone, and the lighter one adds the
+systematic part on either side. The coolant enters with only the inlet temperature's
+uncertainty, and gathers the power's and the flow's as it heats up along the channel:
+
+```@example uq
+@assert r.stat[n] > r.stat[1] && r.sys[n] > r.sys[1]
+```
+
+## Over a transient
+
+Give the saved times as a fourth argument and the model is a transient. With
+`start=:steady` it settles first at the operating point and then runs with `overrides`
+applied, here the flow cut to half. The steady state it starts from carries the derivatives
+too, so an input counts both through where the run starts and through what follows:
+
+```@example uq
+times = 0.0:0.05:2.0
+peak_wall(sol) = [maximum(sol[sys.cell.ch.T_wall_left[i], k] for i in 1:n)
+                  for k in eachindex(sol.t)]
+cut = UQModel(sys, knob_defaults([gap]), [sys.cell.fuel.power, sys.hx.T_bc, gap], times;
+              output=peak_wall, start=:steady, overrides=[sys.pump.ṁ0 => 0.2])
+r = uq(cut, uncertainties[1], uncertainties[3], uncertainties[4])
+
+fig = Figure(size=(700, 380))
+ax = Axis(fig[1, 1]; xlabel="time after the flow cut [s]",
+          ylabel="peak wall temperature [°C]")
+band!(ax, times, r.nominal .- r.sys .- 2r.stat, r.nominal .+ r.sys .+ 2r.stat;
+      color=("#eb6834", 0.15))
+band!(ax, times, r.nominal .- 2r.stat, r.nominal .+ 2r.stat; color=("#eb6834", 0.35))
+lines!(ax, times, r.nominal; color="#eb6834", linewidth=2)
+fig
+```
+
+The flow is an override here, so it carries no uncertainty of its own. A model with a
+`StateMachine`, such as a pump trip or a scram, is not supported yet: the trip time lives
+outside the problem, where the derivatives cannot follow it.
+
+```@example uq
+@assert r.nominal[end] > r.nominal[1]
+```
+
+## Check first order by sampling
+
+[`monte_carlo`](@ref STREAM.UQ.monte_carlo) solves the full model at inputs drawn from their
+uncertainties. Its standard deviations match the first-order ones where the response is close
+to linear over the spread, and part from them where it curves:
+
+```@example uq
+sampled = monte_carlo(model, uncertainties...; n=200)
+(first_order=result.stat, sampled=sampled.std)
+```
+
+[Uncertainty quantification](../explanation/uncertainty.md) shows both on one profile.
 
 ## Propagate through a function
 

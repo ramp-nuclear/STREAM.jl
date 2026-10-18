@@ -1,22 +1,25 @@
 """
     UQModel
 
-A model's outputs as a function of some of its inputs, for first-order uncertainty
-propagation. The derivatives come from forward-mode automatic differentiation (ForwardDiff),
-not from finite differences, so there is no step size to choose.
+A model's outputs as a function of some of its inputs, for uncertainty propagation. The
+derivatives come from forward-mode automatic differentiation (ForwardDiff), not from finite
+differences, so there is no step size to choose.
 
-Build one with [`UQModel(f, parameters)`](@ref) for any function, or with
-[`UQModel(ssys, op, parameters; output)`](@ref) for a compiled system at steady state. Then
-[`uq`](@ref) propagates [`Uncertainty`](@ref)s to the outputs, and [`jacobian`](@ref) gives
-the derivatives themselves. See [Propagate input uncertainties](@ref).
+Build one with [`UQModel(f, parameters)`](@ref) for any function, with
+[`UQModel(ssys, op, parameters; output)`](@ref) for a compiled system at steady state, or with
+[`UQModel(ssys, op, parameters, t; output)`](@ref) for a transient. Then [`uq`](@ref)
+propagates [`Uncertainty`](@ref)s to the outputs to first order, [`jacobian`](@ref) gives the
+derivatives themselves, and [`monte_carlo`](@ref) samples the full model instead. See
+[Propagate input uncertainties](@ref).
 
 # Fields
 - `parameters`: the inputs, in the order given
 - `values`: the nominal value of each input
 - `nominal`: the outputs at the nominal inputs, as one flat vector
 """
-struct UQModel{F}
+struct UQModel{F,G}
     evaluate::F
+    resolve::G
     parameters::Vector{Any}
     values::Vector{Any}
     slices::Vector{UnitRange{Int}}
@@ -25,13 +28,17 @@ struct UQModel{F}
 end
 
 """
-    _uqmodel(evaluate, parameters, values, nominal) -> UQModel
+    _uqmodel(evaluate, resolve, parameters, values, nominal) -> UQModel
 
-A `UQModel` with its slices worked out from `values` and nothing cached yet.
+A `UQModel` with its slices worked out from `values` and nothing cached yet. `evaluate` maps
+inputs carrying ForwardDiff duals to the outputs, for [`jacobian`](@ref). `resolve` maps plain
+inputs to the outputs of the full model, or to `nothing` when it fails to solve, for
+[`monte_carlo`](@ref).
 """
-function _uqmodel(evaluate, parameters, values, nominal)
+function _uqmodel(evaluate, resolve, parameters, values, nominal)
     cache = Ref{Union{Nothing,Matrix{Float64}}}(nothing)
-    return UQModel(evaluate, collect(Any, parameters), values, _slices(values), nominal, cache)
+    return UQModel(evaluate, resolve, collect(Any, parameters), values, _slices(values),
+                   nominal, cache)
 end
 
 """
@@ -64,7 +71,7 @@ function UQModel(f, parameters::NamedTuple)
     values = collect(Any, Base.values(parameters))
     slices = _slices(values)
     evaluate(x) = _outputs(f(NamedTuple{names}(Tuple(_unflatten(x, values, slices)))))
-    return _uqmodel(evaluate, names, values, Float64.(_outputs(f(parameters))))
+    return _uqmodel(evaluate, evaluate, names, values, Float64.(_outputs(f(parameters))))
 end
 
 @doc raw"""
@@ -104,28 +111,132 @@ A `UQModel` keyed by `parameters`.
 function UQModel(
     ssys, op, parameters::AbstractVector; output, solver=nothing, abstol=1e-10, reltol=1e-10
 )
-    for p in parameters
-        is_parameter(ssys, p) || throw(ArgumentError("$p is not a parameter of $(nameof(ssys))"))
-    end
-    sol = solve_steady(ssys, op; solver, abstol, reltol)
-    SciMLBase.successful_retcode(sol) ||
-        error("the steady solve failed with retcode $(sol.retcode), so there is nothing to " *
-              "differentiate")
-    prob = sol.prob
-    ∂F∂u = lu(_state_jacobian(prob, sol.u); check=false)
-    issuccess(∂F∂u) ||
-        error("∂F/∂u is singular at the steady state, so the state does not depend smoothly " *
-              "on the parameters")
-
-    readout = output isa AbstractVector ? (s -> [s[v] for v in output]) : output
-    values = Any[prob.ps[p] for p in parameters]
-    slices = _slices(values)
-    setter = setp_oop(prob, parameters)
+    steady = _steady_state(ssys, op, parameters; solver, abstol, reltol)
+    readout = _readout(output)
     function evaluate(x)
-        p = setter(prob, _unflatten(x, values, slices))
-        return _outputs(readout(_dual_solution(prob, sol.u, ∂F∂u, p, eltype(x))))
+        vals = _unflatten(x, steady.values, steady.slices)
+        return _outputs(readout(_dual_solution(steady, vals, eltype(x))))
     end
-    return _uqmodel(evaluate, parameters, values, Float64.(_outputs(readout(sol))))
+    function resolve(x)
+        sol = _resolve(steady, _unflatten(x, steady.values, steady.slices))
+        return sol === nothing ? nothing : _outputs(readout(sol))
+    end
+    nominal = Float64.(_outputs(readout(steady.sol)))
+    return _uqmodel(evaluate, resolve, parameters, steady.values, nominal)
+end
+
+@doc raw"""
+    UQModel(ssys, op, parameters, t; output, start=:op, overrides=Pair[], solver=Rodas5P(),
+            abstol=1e-8, reltol=1e-8, initializealg=nothing, steady_solver=nothing) -> UQModel
+
+A model of a transient of a compiled system, saved at the times `t`.
+
+The derivatives are carried through the integration as dual numbers, and the solver controls
+their error along with the values'. Where the run starts depends on `start`:
+
+- `:op` starts from the operating point `op`, as [`solve_transient(ssys, op, t)`](@ref
+  STREAM.solve_transient) does.
+- `:steady` solves the steady state at `op` first and starts from it with `overrides`
+  applied, as [`solve_transient(ssys, sol, t; overrides)`](@ref STREAM.solve_transient)
+  does. The starting state is differentiated as in the steady [`UQModel`](@ref), so an
+  input moves the run both through where it starts and through what follows. An input that
+  `overrides` sets acts on the steady state only.
+
+A model with a `StateMachine` is not supported: its state and trip time live outside the
+problem, where the duals do not reach, so pass no callbacks.
+
+# Arguments
+- `ssys`: compiled system from `mtkcompile`
+- `op`: operating point: the start for `start=:op`, the steady solve's for `start=:steady`
+- `parameters`: the inputs, each a parameter of `ssys`
+- `t`: the times to save at
+- `output`: a function of the solution, `sol -> number or array`, such as
+  `sol -> sol[ssys.ch.T_out]`, or a vector of variables, each read as its time series
+- `start`: `:op` or `:steady`
+- `overrides`: parameter changes at `t[1]` for `start=:steady`
+- `solver`, `abstol`, `reltol`: for the integration
+- `initializealg`: DAE initialization; `nothing` takes `NoInit()` for `start=:op`, as
+  `solve_transient` does, and `BrownFullBasicInit()` for `start=:steady`
+- `steady_solver`: the steady solver for `start=:steady`
+
+# Returns
+A `UQModel` keyed by `parameters`.
+
+# Throws
+- `ArgumentError`: for an entry of `parameters` that is not a parameter of `ssys`, or a
+  `start` other than `:op` and `:steady`
+- `ErrorException`: when the nominal run fails
+"""
+function UQModel(
+    ssys, op, parameters::AbstractVector, t::AbstractVector; output, start=:op,
+    overrides=Pair[], solver=Rodas5P(), abstol=1e-8, reltol=1e-8, initializealg=nothing,
+    steady_solver=nothing,
+)
+    start in (:op, :steady) ||
+        throw(ArgumentError("start must be :op or :steady, got $(repr(start))"))
+    _check_parameters(ssys, parameters)
+    readout = _readout(output)
+    tspan = (Float64(first(t)), Float64(last(t)))
+    states = unknowns(ssys)
+    integrate(prob, u0, p, init) = _integrate(prob, u0, p, t, solver, init, abstol, reltol)
+    integrate_dual(prob, dual, plain, init) =
+        _integrate_dual(prob, dual, plain, t, solver, init, abstol, reltol)
+
+    # MTK's initialization data would set u0 at solve time from the initial values the problem
+    # was built with, dropping the state's derivatives and any new start, so the problems
+    # here go without it and the integrator's own `initializealg` makes the start consistent.
+    if start === :op
+        prob = ODEProblem(ssys, op, tspan; warn_initialize_determined=false,
+                          build_initializeprob=false)
+        init = initializealg === nothing ? SciMLBase.NoInit() : initializealg
+        values = Any[prob.ps[p] for p in parameters]
+        slices = _slices(values)
+        u_start = getsym(prob, states)(prob)
+        set = setsym_oop(prob, [states; parameters])
+        function evaluate_op(x)
+            vals = _unflatten(x, values, slices)
+            dual = set(prob, Any[convert.(eltype(x), u_start); vals])
+            plain = set(prob, Any[u_start; _values(vals)])
+            return _outputs(readout(integrate_dual(prob, dual, plain, init)))
+        end
+        function resolve_op(x)
+            u0, p = set(prob, Any[u_start; _unflatten(x, values, slices)])
+            sol = integrate(prob, u0, p, init)
+            return SciMLBase.successful_retcode(sol) ? _outputs(readout(sol)) : nothing
+        end
+        nominal = resolve_op(_flat(values))
+        nominal === nothing && error("the nominal transient failed")
+        return _uqmodel(evaluate_op, resolve_op, parameters, values, Float64.(nominal))
+    end
+
+    steady = _steady_state(ssys, op, parameters; solver=steady_solver)
+    held = [e for e in op if is_parameter(ssys, first(e))]
+    prob = ODEProblem(
+        ssys, _merge(held, [u => steady.sol[u] for u in states], overrides), tspan;
+        warn_initialize_determined=false, build_initializeprob=false,
+    )
+    init = initializealg === nothing ? OrdinaryDiffEq.BrownFullBasicInit() : initializealg
+    kept = findall(p -> !any(o -> isequal(first(o), p), overrides), parameters)
+    set = setsym_oop(prob, [states; parameters[kept]])
+    function evaluate_steady(x)
+        vals = _unflatten(x, steady.values, steady.slices)
+        settled = _dual_solution(steady, vals, eltype(x))
+        start = [settled[u] for u in states]
+        dual = set(prob, Any[start; vals[kept]])
+        plain = set(prob, Any[ForwardDiff.value.(start); _values(vals[kept])])
+        return _outputs(readout(integrate_dual(prob, dual, plain, init)))
+    end
+    function resolve_steady(x)
+        vals = _unflatten(x, steady.values, steady.slices)
+        settled = _resolve(steady, vals)
+        settled === nothing && return nothing
+        u0, p = set(prob, Any[[settled[u] for u in states]; vals[kept]])
+        sol = integrate(prob, u0, p, init)
+        return SciMLBase.successful_retcode(sol) ? _outputs(readout(sol)) : nothing
+    end
+    nominal = resolve_steady(_flat(steady.values))
+    nominal === nothing && error("the nominal transient failed")
+    return _uqmodel(evaluate_steady, resolve_steady, parameters, steady.values, Float64.(nominal))
 end
 
 """
@@ -150,8 +261,7 @@ A `Matrix{Float64}` with a row per output.
 function jacobian(model::UQModel)
     cached = model.cache[]
     cached === nothing || return cached
-    x0 = reduce(vcat, [Float64.(vec(collect(v))) for v in model.values])
-    return model.cache[] = ForwardDiff.jacobian(model.evaluate, x0)
+    return model.cache[] = ForwardDiff.jacobian(model.evaluate, _flat(model.values))
 end
 
 jacobian(model::UQModel, parameter) = jacobian(model)[:, model.slices[_position(model, parameter)]]
@@ -291,18 +401,188 @@ time, and root finders call it at `t = Inf`. A root finder hands back its soluti
 _f!(du, prob::SciMLBase.SteadyStateProblem, u, p) = prob.f(du, u, p, Inf)
 _f!(du, prob::SciMLBase.NonlinearProblem, u, p) = prob.f(du, u, p)
 
+"""
+    _check_parameters(ssys, parameters)
+
+Check that every entry of `parameters` is a parameter of `ssys`.
+
+# Throws
+- `ArgumentError`: for an entry of `parameters` that is not a parameter of `ssys`
+"""
+function _check_parameters(ssys, parameters)
+    for p in parameters
+        is_parameter(ssys, p) || throw(ArgumentError("$p is not a parameter of $(nameof(ssys))"))
+    end
+end
+
+"""
+    _readout(output) -> Function
+
+`output` as a function of a solution: a function as it is, and a vector of variables as the
+function reading each of them.
+"""
+_readout(output::AbstractVector) = sol -> reduce(vcat, [sol[v] for v in output])
+_readout(output) = output
+
+"""
+    _steady_state(ssys, op, parameters; solver=nothing, abstol=1e-10, reltol=1e-10) -> NamedTuple
+
+Solve the steady state of `ssys` at `op` and prepare it for differentiation in `parameters`:
+the solution and its problem, ``∂F/∂u`` factorized there, the out-of-place parameter setter,
+the solver settings, and each parameter's value and slice.
+
+# Throws
+- `ArgumentError`: for an entry of `parameters` that is not a parameter of `ssys`
+- `ErrorException`: when the solve fails, or when ``∂F/∂u`` is singular at its root
+"""
+function _steady_state(ssys, op, parameters; solver=nothing, abstol=1e-10, reltol=1e-10)
+    _check_parameters(ssys, parameters)
+    sol = solve_steady(ssys, op; solver, abstol, reltol)
+    SciMLBase.successful_retcode(sol) ||
+        error("the steady solve failed with retcode $(sol.retcode), so there is nothing to " *
+              "differentiate")
+    prob = sol.prob
+    ∂F∂u = lu(_state_jacobian(prob, sol.u); check=false)
+    issuccess(∂F∂u) ||
+        error("∂F/∂u is singular at the steady state, so the state does not depend smoothly " *
+              "on the parameters")
+    values = Any[prob.ps[p] for p in parameters]
+    return (; sol, prob, ∂F∂u, setter=setp_oop(prob, parameters), solver, abstol, reltol,
+            values, slices=_slices(values))
+end
+
+"""
+    _resolve(steady, vals) -> Union{SciMLSolution,Nothing}
+
+The steady state at the parameter values `vals`, solved again from the nominal one with the
+same solver and tolerances, or `nothing` when that solve fails.
+"""
+function _resolve(steady, vals)
+    prob = remake(steady.prob; p=steady.setter(steady.prob, vals), u0=steady.sol.u)
+    inner = steady.solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
+    sol = solve(prob, steady.solver; steady.abstol, steady.reltol, inner...)
+    return SciMLBase.successful_retcode(sol) ? sol : nothing
+end
+
+"""
+    _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol) -> ODESolution
+
+`prob` from `u0` with parameters `p`, stepping onto every saved time as
+[`solve_transient`](@ref) does.
+"""
+function _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol)
+    prob = remake(prob; u0, p)
+    return solve(prob, solver; saveat=t, initializealg, abstol, reltol,
+                 _saved_steps(prob, t, (;))...)
+end
+
+"""
+    _integrate_dual(prob, (u0, p), (u0_plain, p_plain), t, solver, initializealg, abstol, reltol)
+
+[`_integrate`](@ref) from a start whose `u0` and `p` carry ForwardDiff duals, with
+`u0_plain` and `p_plain` the same start in plain numbers.
+
+`BrownFullBasicInit` solves for the algebraic states with their derivatives dropped, so under
+it the start is made consistent here instead, by [`_consistent_start`](@ref), and the run goes
+on from there without initializing again.
+"""
+function _integrate_dual(prob, (u0, p), (u0_plain, p_plain), t, solver, initializealg,
+                         abstol, reltol)
+    if initializealg isa OrdinaryDiffEq.BrownFullBasicInit
+        u0 = _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, reltol)
+        initializealg = SciMLBase.NoInit()
+    end
+    return _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol)
+end
+
 @doc raw"""
-    _dual_solution(prob, u, ∂F∂u, p, D) -> NonlinearSolution
+    _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, reltol) -> Vector
 
-The steady state `u` of `prob`, with its derivatives along the directions seeded in `p`
-attached, for parameters `p` holding ForwardDiff duals of type `D`.
+`u0` with its algebraic states solved for, holding its differential states, and with the
+derivatives of both.
 
-The partials of the residual ``F(u, p)`` are ``∂F/∂p`` along those directions, and
-``du/dp = -(∂F/∂u)^{-1} ∂F/∂p``, with `∂F∂u` the factorized ``∂F/∂u``. The solution holds `u`
-as duals carrying ``du/dp``, and `p` as given, so anything read off it (an unknown, an
+The values come from `BrownFullBasicInit` on the plain problem. With ``g`` the algebraic rows
+at the first time, ``u_d`` the differential states and ``u_a`` the algebraic ones, the
+derivatives of the algebraic states follow from ``g = 0`` as
+
+```math
+du_a = -(∂g/∂u_a)^{-1} (∂g/∂u_d \, du_d + ∂g/∂p \, dp)
+```
+
+the bracket being the partials of ``g`` at the new values, with ``du_a`` set to zero.
+"""
+function _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, reltol)
+    M = prob.f.mass_matrix
+    algebraic = M isa AbstractMatrix ? findall(iszero, diag(M)) : Int[]
+    isempty(algebraic) && return u0
+    integrator = SciMLBase.init(remake(prob; u0=u0_plain, p=p_plain), solver;
+                                initializealg=OrdinaryDiffEq.BrownFullBasicInit(), abstol, reltol)
+    plain = copy(integrator.u)
+    D = eltype(u0)
+    N = ForwardDiff.npartials(D)
+    t0 = first(prob.tspan)
+    u = copy(u0)
+    u[algebraic] .= D.(plain[algebraic])
+    r = similar(u)
+    prob.f(r, u, p, t0)
+    ∂g = [ForwardDiff.partials(r[i], j) for i in algebraic, j in 1:N]
+    function g(u_a)
+        v = convert(Vector{eltype(u_a)}, plain)
+        v[algebraic] = u_a
+        out = similar(v)
+        prob.f(out, v, p_plain, t0)
+        return out[algebraic]
+    end
+    du = -(ForwardDiff.jacobian(g, plain[algebraic]) \ ∂g)
+    for (k, i) in enumerate(algebraic)
+        u[i] = D(plain[i], ForwardDiff.Partials(ntuple(j -> du[k, j], Val(N))))
+    end
+    return u
+end
+
+"""
+    _values(vals) -> Vector
+
+The plain values of parameter values that may carry ForwardDiff duals.
+"""
+_values(vals) = [ForwardDiff.value.(v) for v in vals]
+
+"""
+    _merge(ops...) -> Vector{Pair{Any,Any}}
+
+The operating points `ops` as one, a later entry for a symbol replacing an earlier one.
+"""
+function _merge(ops...)
+    merged = Pair{Any,Any}[]
+    for entry in Iterators.flatten(ops)
+        filter!(e -> !isequal(first(e), first(entry)), merged)
+        push!(merged, entry)
+    end
+    return merged
+end
+
+"""
+    _flat(values) -> Vector{Float64}
+
+The inputs' values as the one flat vector ForwardDiff differentiates over.
+"""
+_flat(values) = reduce(vcat, [Float64.(vec(collect(v))) for v in values])
+
+@doc raw"""
+    _dual_solution(steady, vals, D) -> NonlinearSolution
+
+The steady state of [`_steady_state`](@ref) with its derivatives attached, for parameter
+values `vals` holding ForwardDiff duals of type `D`.
+
+With `p` the parameters set to `vals`, the partials of the residual ``F(u, p)`` are
+``∂F/∂p`` along the seeded directions, and ``du/dp = -(∂F/∂u)^{-1} ∂F/∂p``. The solution holds
+`u` as duals carrying ``du/dp``, and `p` as given, so anything read off it (an unknown, an
 observed variable, a parameter) carries its derivative.
 """
-function _dual_solution(prob, u, ∂F∂u, p, ::Type{D}) where {D<:ForwardDiff.Dual}
+function _dual_solution(steady, vals, ::Type{D}) where {D<:ForwardDiff.Dual}
+    (; prob, sol, ∂F∂u) = steady
+    u = sol.u
+    p = steady.setter(prob, vals)
     N = ForwardDiff.npartials(D)
     r = _residual(prob, u, p, D)
     ∂F∂p = [ForwardDiff.partials(r[i], j) for i in eachindex(r), j in 1:N]

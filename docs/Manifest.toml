@@ -2855,7 +2855,7 @@ uuid = "94e857df-77ce-4151-89e5-788b33177be4"
 version = "0.1.0"
 
 [[deps.STREAM]]
-deps = ["DelimitedFiles", "ForwardDiff", "LinearAlgebra", "ModelingToolkit", "OrdinaryDiffEq", "QuadGK", "Statistics", "SteadyStateDiffEq", "SymbolicIndexingInterface"]
+deps = ["DelimitedFiles", "ForwardDiff", "LinearAlgebra", "ModelingToolkit", "OrdinaryDiffEq", "QuadGK", "Random", "Statistics", "SteadyStateDiffEq", "SymbolicIndexingInterface"]
 path = ".."
 uuid = "49562357-9609-405b-b96f-716d2939d241"
 version = "0.1.0"
