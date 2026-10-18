@@ -14,13 +14,15 @@ reads high, or a tolerance that every plate in a batch shares. The statistical p
 standard deviation: scatter between measurements, independent from one to the next. Both can
 be given relative to the nominal value or in the input's units.
 
-They propagate differently. Near the nominal inputs ``x_0`` an output moves as
+They propagate differently. When the inputs move from their nominal values ``x_0`` by
+``Δx``, the outputs move as
 
 ```math
-y(x) ≈ y(x_0) + J (x - x_0)
+y(x_0 + Δx) ≈ y(x_0) + J \, Δx
 ```
 
-with ``J`` the Jacobian, ``J_{ij} = ∂y_i/∂x_j``. A bias ``s`` moves an output by ``J s``, and
+with ``J`` the Jacobian at ``x_0``, ``J_{ij} = ∂y_i/∂x_j``, so that ``J_{ij} Δx_j`` is in the
+units of ``y_i``. A bias ``s`` moves an output by ``J \, s``, and
 for a vector input, such as a temperature per cell, all of its entries move together. A
 standard deviation ``σ`` gives an output the standard deviation ``(∑_j (J_{ij} σ_j)^2)^{1/2}``
 when the entries are independent. [`uq`](@ref STREAM.UQ.uq) returns both. Different inputs are
