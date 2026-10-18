@@ -243,3 +243,49 @@ function x_boundaries(clad_N, fuel_N, clad_w, meat_w)
     clad = fill(clad_w / max(clad_N, 1), clad_N)
     return [0; cumsum([clad; fill(meat_w / fuel_N, fuel_N); clad])]
 end
+
+"""
+    local_power_shift(power, relative_shift=1.0, percentile=90.0) -> Array
+
+A power shape with its hottest rows raised by `relative_shift` and the rest lowered to keep
+the total, for a local power uncertainty. This is Python STREAM's `local_power_shift`.
+
+`power` is `nz × nx`, with `z` along the first axis, or a vector over `z`. The rows whose sum
+is at or above the `percentile`-th percentile of the row sums are multiplied by
+`relative_shift`, and every other row by the one factor that keeps the total. When every
+nonzero row is at or above that percentile there is nothing to take the power from, and the
+shape comes back unchanged; `percentile = 0` always does this.
+
+# Arguments
+- `power`: the power per cell
+- `relative_shift`: the factor on the hottest rows (default 1.0, no shift)
+- `percentile`: which rows count as the hottest, from 0 to 100; 100 is the hottest row alone
+  (default 90)
+
+# Returns
+The shifted power, shaped like `power`.
+
+# Examples
+The peak raised by 10%, the other cells lowered to make up for it:
+```jldoctest
+julia> round.(Utilities.local_power_shift([1.0, 2.0, 3.0, 2.0], 1.1, 100); digits=6)
+4-element Vector{Float64}:
+ 0.94
+ 1.88
+ 3.3
+ 1.88
+```
+"""
+function local_power_shift(power::AbstractMatrix, relative_shift=1.0, percentile=90.0)
+    rows = vec(sum(power; dims=2))
+    hottest = rows .>= quantile(rows, percentile / 100)
+    all(hottest[i] for i in eachindex(rows) if !iszero(rows[i])) && return copy(power)
+    total, raised = sum(power), sum(rows[hottest])
+    shifted = power .* ((total - raised * relative_shift) / (total - raised))
+    shifted[hottest, :] .= relative_shift .* power[hottest, :]
+    return shifted
+end
+
+function local_power_shift(power::AbstractVector, relative_shift=1.0, percentile=90.0)
+    return vec(local_power_shift(reshape(power, :, 1), relative_shift, percentile))
+end

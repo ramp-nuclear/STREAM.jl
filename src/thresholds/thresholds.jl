@@ -114,12 +114,28 @@ julia> round(Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe); sigdigits
 function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=H2O)
     G = abs(ṁ) / pipe.A
     G_cgs = G / 10  # SI to CGS conversion (G must be in CGS per Whittle-Forgan)
-    integral_cp, _ = quadgk(T -> cₚ(liquid, T), T_inlet, T_sat)
+    integral_cp = _cp_integral(liquid, T_inlet, T_sat)
     return abs(ṁ) * integral_cp / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
 end
 
+"""
+    _cp_integral(liquid, T_a, T_b) -> Real
+
+The integral of `cₚ(liquid, T)` from `T_a` to `T_b` [J/kg]. The endpoints may be ForwardDiff
+duals.
+
+`quadgk` runs on the endpoint values. The endpoints' derivatives are added back as the
+integrand at each end, `cₚ(T_b) dT_b - cₚ(T_a) dT_a`, and for plain numbers that term is zero.
+"""
+function _cp_integral(liquid, T_a, T_b)
+    a, b = ForwardDiff.value(T_a), ForwardDiff.value(T_b)
+    integral, _ = quadgk(T -> cₚ(liquid, T), a, b)
+    return integral + cₚ(liquid, T_b) * (T_b - b) - cₚ(liquid, T_a) * (T_a - a)
+end
+
 @doc raw"""
-    q_OSV_saha_zuber(T_inlet, ṁ, pipe, coolant; flux_shape=nothing, dz=nothing) -> q_OSV [W/m^2]
+    q_OSV_saha_zuber(T_inlet, ṁ, pipe, coolant; flux_shape=nothing, dz=nothing,
+                     inhomogeneity_factor=1.0) -> q_OSV [W/m^2]
 
 Onset of significant void (OSV) heat flux per cell, from Saha and Zuber
 [SahaZuber1974](@cite), with the bulk temperature computed as though the channel ran at the
@@ -145,6 +161,11 @@ end, so under reversed flow it starts at the last cell. This is Python STREAM's
   pressure, e.g. `H2O(T_bulk, P)`. Supplies cₚ, κ and Tsat.
 - `flux_shape`: axial heat flux per cell, in any normalization; default uniform
 - `dz`: axial cell lengths [m]; default `pipe.L / n`
+- `inhomogeneity_factor`: how much worse the local flux is than `flux_shape` says, for fuel
+  inhomogeneity, as Python STREAM's `flux_enworse`. It divides the `∫ q dz / q` term: the
+  cell's own flux rises, and the heat the coolant took up before reaching it does not. The
+  result is then the worsened local flux at onset, so compare it with the local flux times
+  the same factor (default 1.0)
 
 # Returns
 OSV heat flux per cell [W/m²].
@@ -160,7 +181,7 @@ julia> round(last(Thresholds.q_OSV_saha_zuber(26.85, 0.5, pipe, coolant)); sigdi
 ```
 """
 function q_OSV_saha_zuber(
-    T_inlet, ṁ, pipe, coolant::Liquid; flux_shape=nothing, dz=nothing
+    T_inlet, ṁ, pipe, coolant::Liquid; flux_shape=nothing, dz=nothing, inhomogeneity_factor=1.0
 )
     n = flux_shape === nothing ? length(coolant.ρ) : length(flux_shape)
     cells(x) = x isa AbstractArray ? collect(x) : fill(x, n)
@@ -178,7 +199,7 @@ function q_OSV_saha_zuber(
     upstream(a) = ṁ >= 0 ? a : reverse(a)
     heated = upstream(cumsum(upstream(shape .* dz_c)))
     power_factor = pipe.heated_perimeter ./ (abs(ṁ) .* cp_c)
-    denominator = 1 .+ X .* power_factor .* heated ./ shape
+    denominator = 1 .+ X .* power_factor .* heated ./ (shape .* inhomogeneity_factor)
     return X .* (T_sat .- T_inlet) ./ denominator
 end
 

@@ -11,7 +11,7 @@ Each submodule reaches only downward, so the dependency order is also the readin
 
 ```
 Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
-           -> Components -> {DecayHeat, Assemblies} -> Solvers
+           -> Components -> {DecayHeat, Assemblies} -> Solvers -> UQ
 ```
 
 | Module | What lives there |
@@ -25,6 +25,7 @@ Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
 | [`DecayHeat`](@ref) | decay heat contributions and the standards behind them |
 | [`Assemblies`](@ref) | wiring verbs and named arrangements of components |
 | [`Utilities`](@ref) | grid resampling and axial profile helpers |
+| [`UQ`](@ref) | how uncertain inputs make a model's outputs uncertain |
 
 [`assembly`](@ref) composes components with a list of connections, and [`port`](@ref) reaches
 one cell of a per-cell connector array. Every submodule can use both.
@@ -210,6 +211,7 @@ Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAn
 module Thresholds
 using ModelingToolkit
 using QuadGK
+using ForwardDiff: ForwardDiff
 using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, H2O, G_EARTH
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Pe
@@ -408,22 +410,50 @@ overlap with each target cell.
 
 [`cosine_shape`](@ref) builds an axial power shape.
 [`x_boundaries`](@ref) builds the cell boundaries across a clad plate.
+[`local_power_shift`](@ref) raises the hottest rows of a power shape and keeps its total.
 
 None of these validate or normalize their inputs; negatives, zeros and NaNs pass through.
 """
 module Utilities
+using Statistics: quantile
 include("utilities.jl")
-export rebin_extensive, rebin_intensive, cosine_shape, x_boundaries
+export rebin_extensive, rebin_intensive, cosine_shape, x_boundaries, local_power_shift
 end
 
 include("initial_conditions.jl")
 include("solvers.jl")
 
+"""
+    STREAM.UQ
+
+How uncertain inputs make a model's outputs uncertain.
+
+An [`Uncertainty`](@ref) describes one input, with a systematic and a statistical part. A
+[`UQModel`](@ref) wraps a plain function or a compiled system at steady state, and [`uq`](@ref)
+propagates uncertainties through it to first order. The derivatives behind that, from
+[`jacobian`](@ref), come from forward-mode automatic differentiation, and a steady state is
+differentiated through the implicit function theorem rather than through its solver.
+
+This is Python STREAM's `stream.analysis.UQ`, with automatic differentiation in place of its
+finite differences. See [Propagate input uncertainties](@ref).
+"""
+module UQ
+using ForwardDiff
+using LinearAlgebra: issuccess, lu
+using ModelingToolkit: setp_oop
+using OrdinaryDiffEq: ReturnCode, SciMLBase, remake
+using SymbolicIndexingInterface: is_parameter
+using ..STREAM: solve_steady
+include("uq/uncertainty.jl")
+include("uq/model.jl")
+export Uncertainty, as_absolute, UQModel, jacobian, uq, measurements
+end
+
 # The public surface. Everything not listed here is reached through its module.
 
 # Submodules
 export Substances, HTC, Friction, LocalLoss, Thresholds, Components, DecayHeat
-export Assemblies, Utilities
+export Assemblies, Utilities, UQ
 
 # Coolant and solid properties, their aliases, the two coolants, and Solid
 export density, vapor_density, specific_heat, viscosity, conductivity

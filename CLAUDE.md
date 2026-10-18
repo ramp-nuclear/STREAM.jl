@@ -81,7 +81,7 @@ The package is a stack of submodules, each reaching only downward:
 
 ```
 Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
-           -> Components -> {DecayHeat, Assemblies}
+           -> Components -> {DecayHeat, Assemblies} -> Solvers -> UQ
 ```
 
 `solve_steady`, `solve_transient` and the operating-point guesses sit at the top level.
@@ -161,6 +161,11 @@ src/
     connections.jl          # module Connect: face, inseries, inparallel, weighted, ...
     concrete_assemblies.jl  # plate, symmetric_plate, one_sided, single_channel,
                             # fuel_assembly, check_gravity_mismatch
+  uq/
+    uncertainty.jl          # Uncertainty, as_absolute
+    model.jl                # UQModel, jacobian, uq, the measurements stub
+ext/
+  STREAMMeasurementsExt.jl  # UQ.measurements, loaded with Measurements.jl
 ```
 
 **Where new code goes:**
@@ -170,6 +175,9 @@ src/
 - Prefer `Connect.face(...)` over a bare `face(...)`, but leave `inseries`, `inparallel` and `port` unqualified: the first two are used constantly and `port` is a getter that reads clearly on its own
 - New decay heat contribution → `src/decay_heat/`, in the file matching the Python module it mirrors
 - New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the `AbstractLiquid` property methods
+- Uncertainty propagation → `src/uq/`; anything that needs a heavy package (Measurements,
+  GlobalSensitivity, SciMLSensitivity) goes in `ext/` as a package extension, so `using STREAM`
+  does not pay for it
 - A worked model → the docs, as a tutorial or how-to. `src/` holds no example builders; a model several test files solve goes in `test/fixtures.jl`
 
 Placement beats file length. A long file whose contents all belong together is fine; a short
