@@ -250,7 +250,7 @@ function _channel_system(;
     return compose(
         System(
             [core.eqs; extra_eqs], t, all_vars, pars;
-            observed=[core.obs; extra_obs], name=name,
+            observed=[core.obs; extra_obs], name=name, metadata=_coolant_metadata(liquid),
         ),
         inlet,
         outlet,

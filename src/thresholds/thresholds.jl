@@ -119,7 +119,7 @@ function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe; liquid::AbstractLiquid=
 end
 
 @doc raw"""
-    q_OSV_saha_zuber(T_inlet, ṁ, pipe, coolant; flux_shape=nothing, dz=nothing) -> q_OSV [W/m^2]
+    q_OSV_saha_zuber(T_inlet, ṁ, pipe, props; flux_shape=nothing, dz=nothing) -> q_OSV [W/m^2]
 
 Onset of significant void (OSV) heat flux per cell, from Saha and Zuber
 [SahaZuber1974](@cite), with the bulk temperature computed as though the channel ran at the
@@ -141,7 +141,7 @@ end, so under reversed flow it starts at the last cell. This is Python STREAM's
 - `T_inlet`: temperature of the coolant entering the channel [°C]
 - `ṁ`: mass flow rate [kg/s]; its sign says which end is upstream
 - `pipe`: channel geometry [`PipeGeometry`]
-- `coolant`: coolant properties per cell as a [`Liquid`](@ref), at the bulk temperature and
+- `props`: coolant properties per cell as a [`Liquid`](@ref), at the bulk temperature and
   pressure, e.g. `H2O(T_bulk, P)`. Supplies cₚ, κ and Tsat.
 - `flux_shape`: axial heat flux per cell, in any normalization; default uniform
 - `dz`: axial cell lengths [m]; default `pipe.L / n`
@@ -153,20 +153,20 @@ OSV heat flux per cell [W/m²].
 ```jldoctest
 julia> pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671);  # 2.4 mm MTR gap
 
-julia> coolant = H2O(fill(26.85, 10), fill(1e5, 10));  # 10 cells at 26.85 °C and 1 bar
+julia> props = H2O(fill(26.85, 10), fill(1e5, 10));  # 10 cells at 26.85 °C and 1 bar
 
-julia> round(last(Thresholds.q_OSV_saha_zuber(26.85, 0.5, pipe, coolant)); sigdigits=9)
+julia> round(last(Thresholds.q_OSV_saha_zuber(26.85, 0.5, pipe, props)); sigdigits=9)
 1.44385224e6
 ```
 """
 function q_OSV_saha_zuber(
-    T_inlet, ṁ, pipe, coolant::Liquid; flux_shape=nothing, dz=nothing
+    T_inlet, ṁ, pipe, props::Liquid; flux_shape=nothing, dz=nothing
 )
-    n = flux_shape === nothing ? length(coolant.ρ) : length(flux_shape)
+    n = flux_shape === nothing ? length(props.ρ) : length(flux_shape)
     cells(x) = x isa AbstractArray ? collect(x) : fill(x, n)
     shape = flux_shape === nothing ? ones(n) : collect(float.(flux_shape))
     dz_c = dz === nothing ? fill(pipe.L / n, n) : cells(dz)
-    cp_c, κ_c, T_sat = cells(coolant.cₚ), cells(coolant.κ), cells(coolant.Tsat)
+    cp_c, κ_c, T_sat = cells(props.cₚ), cells(props.κ), cells(props.Tsat)
 
     G = abs(ṁ) / pipe.A
     Pe_c = G * pipe.Dh .* cp_c ./ κ_c

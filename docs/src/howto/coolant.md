@@ -42,15 +42,16 @@ model = with_coolant(D2O) do
     @named core = ChannelAndContacts(; n=10, geometry=geom)
     assembly([inseries(pump, hx, core, pump), pump.inlet.p ~ ATM], pump, hx, core; name=:model)
 end
+@assert Substances.coolant(model.core) === D2O   # the channel keeps the block's coolant
 Substances.coolant()
 ```
 
 The block returns its last expression, here the model, and `Substances.coolant()` is back to
 `H2O` outside it.
 
-The default is read when a function is called. A threshold method on a `ChannelState`, or
-`steady_state_guess`, called after the block takes `H2O` unless it is called inside a block or
-given `liquid=`.
+Every channel records the coolant it was built with, so a `ChannelState` reads the right one
+after the block ends. `steady_state_guess` runs before any model exists, so it reads the default
+when it is called: call it inside the block, or pass `liquid=`.
 
 ## Properties frozen at one state
 

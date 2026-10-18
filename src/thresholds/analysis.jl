@@ -28,6 +28,9 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 - `velocity::AbstractArray`: absolute fluid velocity per cell [m/s]
 - `pipe::Union{PipeGeometry, Nothing}`: channel geometry, or `nothing` if unavailable
 - `gravity::Float64`: gravitational acceleration [m/s²]
+- `liquid::AbstractLiquid`: the channel's coolant, which the correlations on a `ChannelState`
+  read by default. Built by hand it is [`coolant()`](@ref STREAM.Substances.coolant) unless
+  given.
 """
 @kwdef struct ChannelState
     n::Int
@@ -46,6 +49,7 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
     velocity::AbstractArray
     pipe::Union{PipeGeometry,Nothing}
     gravity::Float64
+    liquid::AbstractLiquid = coolant()
 end
 
 """
@@ -83,7 +87,8 @@ the position of a saved time in `sol.t`. To run the correlations over a whole tr
 [`threshold_analysis`](@ref), which builds a `ChannelState` at every saved time.
 
 `q_flux_left[i] = q_wall_left[i] / (pipe.heated_parts[1] * dz)`.
-When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
+When `pipe` is `nothing`, all `q_flux_*` fields are zeros. `liquid` is the coolant the channel
+was built with.
 
 `channel_sys` must expose a wall temperature, so `Channel` or `ChannelAndContacts`.
 `ChannelHeatFlux` prescribes its flux and leaves `T_wall_left`/`T_wall_right` unconstrained for
@@ -100,8 +105,8 @@ When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 A `ChannelState` for that instant.
 
 # Throws
-- `ArgumentError`: for a transient with several saved times and no `index`, or a channel
-  whose wall temperature did not survive compilation
+- `ArgumentError`: for a transient with several saved times and no `index`, a channel
+  whose wall temperature did not survive compilation, or a system that records no coolant
 """
 function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=nothing)
     n = length(channel_sys.T)
@@ -166,6 +171,7 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=not
         velocity=velocity,
         pipe=pipe,
         gravity=gravity,
+        liquid=coolant(channel_sys),
     )
 end
 
@@ -336,12 +342,12 @@ end
 
 """
     bergles_rohsenow_t_onb(state::ChannelState; direction=:max)
-    q_boiling_onset(state::ChannelState; liquid=coolant())
+    q_boiling_onset(state::ChannelState; liquid=state.liquid)
     q_CHF_mirshak(state::ChannelState)
     q_CHF_fabrega(state::ChannelState)
-    q_CHF_sudo_kaminaga(state::ChannelState; liquid=coolant())
-    q_OFI_whittle_forgan(state::ChannelState; liquid=coolant())
-    q_OSV_saha_zuber(state::ChannelState; direction=:max, liquid=coolant())
+    q_CHF_sudo_kaminaga(state::ChannelState; liquid=state.liquid)
+    q_OFI_whittle_forgan(state::ChannelState; liquid=state.liquid)
+    q_OSV_saha_zuber(state::ChannelState; direction=:max, liquid=state.liquid)
     twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
 
 Every threshold correlation also accepts a solved channel, taking its arguments out of the
@@ -372,7 +378,7 @@ function bergles_rohsenow_t_onb(s::ChannelState; direction=:max)
     return ifelse.(q .> 0, T_ONB, Inf)
 end
 
-function q_boiling_onset(s::ChannelState; liquid::AbstractLiquid=coolant())
+function q_boiling_onset(s::ChannelState; liquid::AbstractLiquid=s.liquid)
     return q_boiling_onset.(s.ṁ, s.T_sat, s.T_inlet, cₚ(liquid, s.T_inlet))
 end
 
@@ -383,19 +389,19 @@ q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, Ref(s.pipe))
 
 # The correlation needs saturated-coolant properties, and this is where the coolant is
 # known, so the snapshot is built here: one entry per cell at that cell's saturation state.
-function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=coolant())
+function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=s.liquid)
     T_sat, P = collect(s.T_sat), collect(s.P)
     return q_CHF_sudo_kaminaga(collect(s.T_bulk), s.ṁ, s.pipe, s.gravity, liquid(T_sat, P))
 end
 
 # Flow instability is judged at the outlet, where the coolant is hottest and nearest boiling:
 # the last cell in forward flow and the first in reversed flow.
-function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=coolant())
+function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=s.liquid)
     T_sat_out = s.ṁ >= 0 ? last(s.T_sat) : first(s.T_sat)
     return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.pipe; liquid=liquid)
 end
 
-function q_OSV_saha_zuber(s::ChannelState; direction=:max, liquid::AbstractLiquid=coolant())
+function q_OSV_saha_zuber(s::ChannelState; direction=:max, liquid::AbstractLiquid=s.liquid)
     props = liquid(collect(s.T_bulk), collect(s.P))
     return q_OSV_saha_zuber(
         s.T_inlet, s.ṁ, s.pipe, props;

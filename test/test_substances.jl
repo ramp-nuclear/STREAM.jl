@@ -117,6 +117,22 @@ end
     @test scoped.u == loop(; liquid=D2O).u
 end
 
+@testset "a channel records its coolant, and coolant(sys) returns it after compilation" begin
+    geom = PipeGeometry_circular(0.6, 0.01)
+    @named pump = Pump(3.0e4)
+    @named bc = HeatExchanger(40.0)
+    @named ch = Channel(; n=3, geometry=geom, liquid=D2O)
+    @named sys = assembly([inseries(pump, bc, ch, pump), pump.inlet.p ~ ATM], pump, bc, ch)
+    ssys = mtkcompile(sys)
+    @test coolant(ch) === D2O
+    @test coolant(ssys.ch) === D2O
+    @test with_coolant(() -> coolant(Channel(; name=:scoped, n=3, geometry=geom)), D2O) === D2O
+    # An explicit coolant inside the block is the one recorded.
+    @test with_coolant(() -> coolant(Channel(; name=:kept, n=3, geometry=geom, liquid=H2O)),
+                       D2O) === H2O
+    @test_throws ArgumentError coolant(ssys.pump)
+end
+
 @testset "two-argument form fills the pressure with ATM" begin
     for T in (20.0, 50.0, 100.0)
         @test ρ(H2O, T) == ρ(H2O, T, ATM)

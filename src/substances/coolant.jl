@@ -7,13 +7,31 @@ block.
 const _COOLANT = ScopedValues.ScopedValue{AbstractLiquid}(H2O)
 
 """
-    coolant() -> AbstractLiquid
+    CoolantKey
 
-The coolant a component takes when its `liquid` keyword is left out: [`H2O`](@ref) outside
-any [`with_coolant`](@ref) block, and the block's coolant inside one.
+The metadata key under which a channel's `System` holds the coolant it was built with.
+[`coolant`](@ref) reads it back.
+"""
+struct CoolantKey end
+
+"""
+    coolant() -> AbstractLiquid
+    coolant(sys) -> AbstractLiquid
+
+`coolant()` is the coolant a component takes when its `liquid` keyword is left out:
+[`H2O`](@ref) outside any [`with_coolant`](@ref) block, and the block's coolant inside one.
+
+`coolant(sys)` is the coolant the channel `sys` was built with, read from the metadata
+`CoolantKey` names, which `compose` and `mtkcompile` keep.
+
+# Arguments
+- `sys`: a channel's `System`, before or after compilation
 
 # Returns
-The current coolant.
+The current coolant, or the one `sys` was built with.
+
+# Throws
+- `ArgumentError`: when `sys` records no coolant, which only a channel does
 
 # Examples
 ```jldoctest
@@ -25,6 +43,21 @@ D2O
 ```
 """
 coolant() = _COOLANT[]
+
+function coolant(sys::ModelingToolkit.AbstractSystem)
+    liquid = ModelingToolkit.getmetadata(sys, CoolantKey, nothing)
+    liquid === nothing && throw(ArgumentError(
+        "$(nameof(sys)) was built without a coolant; only a channel records one",
+    ))
+    return liquid
+end
+
+"""
+    _coolant_metadata(liquid) -> Tuple
+
+The `metadata` a channel's `System` is built with so [`coolant`](@ref) returns `liquid`.
+"""
+_coolant_metadata(liquid::AbstractLiquid) = (CoolantKey => liquid,)
 
 """
     with_coolant(f, liquid)
@@ -48,9 +81,9 @@ An explicit keyword wins over the block, the block over `H2O`. A block nested in
 another shadows it until it ends, and the outer coolant is back once the block returns or
 throws.
 
-The default is read when a function is called, not when a model is solved. A call made after
-the block, such as a threshold method on a `ChannelState` or [`steady_state_guess`](@ref),
-takes `H2O` unless it is made inside a block or given `liquid=`.
+Every channel records the coolant it was built with, and a `ChannelState` reads it from there,
+so threshold analysis needs no block. [`steady_state_guess`](@ref STREAM.steady_state_guess)
+runs before any model exists and reads the default when it is called.
 
 # Arguments
 - `f`: the code to run, a function of no arguments

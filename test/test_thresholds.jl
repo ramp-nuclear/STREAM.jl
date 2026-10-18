@@ -353,6 +353,21 @@ end
     end
 end
 
+@testset "a ChannelState carries its channel's coolant, and the correlations read it" begin
+    geo = PipeGeometry_circular(0.6, 0.01)
+    d2o = with_coolant(() -> build_loop(; n=5), D2O)
+    state = ChannelState(solve_steady(d2o, [d2o.ch.inlet.ṁ => 0.5]), d2o.ch; pipe=geo)
+    @test state.liquid === D2O
+    # Built by hand, a state takes the coolant in effect where it is built.
+    fields = (f => getfield(state, f) for f in fieldnames(ChannelState) if f !== :liquid)
+    @test with_coolant(() -> ChannelState(; fields...), D2O).liquid === D2O
+    @test ChannelState(; fields...).liquid === H2O
+    for f in (q_boiling_onset, q_CHF_sudo_kaminaga, q_OFI_whittle_forgan, q_OSV_saha_zuber)
+        @test f(state) == f(state; liquid=D2O)
+        @test f(state) != f(state; liquid=H2O)
+    end
+end
+
 @testset "ChannelState from a solved channel" begin
     # Built from a solution rather than by hand, which is what exercises the extraction.
     geo = PipeGeometry_circular(0.6, 0.01)

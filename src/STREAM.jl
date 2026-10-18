@@ -271,6 +271,7 @@ using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM, coolant
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..STREAM: assembly, port
+using ..Substances: _coolant_metadata
 using ..HTC
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
