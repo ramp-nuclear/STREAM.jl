@@ -12,7 +12,8 @@ X = x_0 (1 + μ_{sys,rel}) (1 + σ_{stat,rel} ε_1) + μ_{sys,abs} + σ_{stat,ab
 ```
 
 with ``ε_1`` and ``ε_2`` independent standard normal draws, so the systematic part shifts every
-sample by the same signed amount and the statistical part scatters them. The other inputs stay
+sample by the same signed amount and the statistical part scatters them. An input given a
+`Distribution` instead, with Distributions.jl loaded, is drawn from it. The other inputs stay
 at their nominal values. Each sample is a full solve: of the function, of the steady state
 from the nominal one, or of the transient. The samples are solved on all of Julia's threads,
 so start Julia with `--threads=auto` to use them, except for a model driving a `StateMachine`,
@@ -21,7 +22,7 @@ solve, so the result does not depend on the number of threads.
 
 # Arguments
 - `model`: the model
-- `uncertainties`: `parameter => Uncertainty` pairs
+- `uncertainties`: `parameter => Uncertainty` or `parameter => Distribution` pairs
 - `n`: the number of samples
 - `rng`: the random number generator, for a reproducible set of draws
 

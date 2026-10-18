@@ -12,6 +12,9 @@ using STREAM.UQ
 if Base.find_package("Measurements") !== nothing
     using Measurements: Measurements
 end
+if Base.find_package("Distributions") !== nothing
+    using Distributions: Distributions
+end
 
 """
     second_order_remainders(resolve, x0, h, y0, dydx) -> (r_h, r_half)
@@ -386,6 +389,37 @@ end
     r = monte_carlo(steady, u; n=400, rng=Xoshiro(3))
     @test r.failed == 0
     @test r.std ≈ uq(steady, u).stat rtol=0.15
+end
+
+@testset "Distribution inputs" begin
+    if !@isdefined(Distributions)
+        @warn "Distributions is not installed in this environment, so Distribution inputs " *
+              "are not tested. Pkg.test() installs it."
+    else
+        (; Normal, MvNormal, Uniform) = Distributions
+        model = UQModel(simple, simple_parameters)
+
+        # A normal distribution around the nominal value is a statistical uncertainty, and
+        # one around a shifted mean adds the shift as the systematic part.
+        as_normal = uq(model, :v1 => Normal(2.0, 0.3))
+        @test as_normal.stat ≈ uq(model, :v1 => Uncertainty(statistical_absolute=0.3)).stat
+        @test all(iszero, as_normal.sys)
+        shifted = uq(model, :v1 => Normal(2.5, 0.3))
+        @test shifted.sys ≈ abs.(vec(jacobian(model, :v1)) .* 0.5)
+
+        # Correlated entries: the sum of the vector has the variance sum(C).
+        C = [0.04 0.03 0.0; 0.03 0.09 0.0; 0.0 0.0 0.01]
+        correlated = uq(model, :vec => MvNormal([1.0, 2.0, 3.0], C))
+        @test correlated.stat[4] ≈ sqrt(sum(C))
+
+        # A uniform spread of width w has the standard deviation w / sqrt(12).
+        linear = UQModel(x -> 2x.a, (a=2.0,))
+        r = monte_carlo(linear, :a => Uniform(1.9, 2.1); n=20_000, rng=Xoshiro(5))
+        @test r.std[1] ≈ 2 * 0.2 / sqrt(12) rtol=0.03
+        @test r.mean[1] ≈ 4.0 atol=0.01
+
+        @test_throws ArgumentError uq(model, :vec => Normal(2.0, 0.1))
+    end
 end
 
 @testset "measurements" begin

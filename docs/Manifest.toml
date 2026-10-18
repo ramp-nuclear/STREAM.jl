@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "77b8c7a22a6ea3ec4d2636e2833e609cb6023781"
+project_hash = "3dc10cdcacfffc5b43b72078ee215b0718910331"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -2859,9 +2859,10 @@ deps = ["DelimitedFiles", "ForwardDiff", "LinearAlgebra", "ModelingToolkit", "Or
 path = ".."
 uuid = "49562357-9609-405b-b96f-716d2939d241"
 version = "0.1.0"
-weakdeps = ["Measurements"]
+weakdeps = ["Distributions", "Measurements"]
 
     [deps.STREAM.extensions]
+    STREAMDistributionsExt = "Distributions"
     STREAMMeasurementsExt = "Measurements"
 
 [[deps.SciMLBase]]

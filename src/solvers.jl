@@ -160,7 +160,8 @@ Private, and used only by the [`solve_transient`](@ref) method below.
 _state_snapshot(ssys, sol) = [u => sol[u] for u in unknowns(ssys)]
 
 """
-    solve_transient(ssys, sol_ss, t; overrides=Pair[], initializealg=BrownFullBasicInit(), kwargs...)
+    solve_transient(ssys, sol_ss, t; overrides=Pair[], initializealg=BrownFullBasicInit(),
+                    build_initializeprob=false, kwargs...)
 
 Start a transient from an already-solved state.
 
@@ -185,6 +186,8 @@ symbol means the result does not depend on which variables MTK chose as states.
 - `t`: time array; `tspan` derived as `(t[1], t[end])`
 - `overrides`: `Vector{Pair}` of parameter/forcing changes applied at `t[1]`
 - `initializealg`: DAE initialization (default `BrownFullBasicInit()`)
+- `build_initializeprob`: build MTK's initialization problem (default `false`, so the run starts
+  from the state of `sol_ss` and `initializealg` alone makes it consistent)
 - `kwargs...`: forwarded to the lower-level `solve_transient`
 
 # Returns
@@ -192,8 +195,11 @@ symbol means the result does not depend on which variables MTK chose as states.
 """
 function solve_transient(
     ssys, sol_ss::SciMLBase.AbstractSciMLSolution, t;
-    overrides=Pair[], initializealg=OrdinaryDiffEq.BrownFullBasicInit(), kwargs...,
+    overrides=Pair[], initializealg=OrdinaryDiffEq.BrownFullBasicInit(),
+    build_initializeprob=false, kwargs...,
 )
+    # MTK's initialization, solved when the problem is built, can move a differential state off
+    # the solution: on a plate loop it shifted one plate temperature by 0.46 K.
     op = Pair{Any,Any}[_state_snapshot(ssys, sol_ss); overrides]
-    return solve_transient(ssys, op, t; initializealg=initializealg, kwargs...)
+    return solve_transient(ssys, op, t; initializealg, build_initializeprob, kwargs...)
 end

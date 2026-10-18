@@ -300,9 +300,15 @@ s_i = ∑_p |∑_j J^{(p)}_{ij} s^{(p)}_j|,   σ_i = (∑_p ∑_j (J^{(p)}_{ij} 
 
 Different inputs are taken as independent.
 
+With Distributions.jl loaded, an input can take a `Distribution` of its value instead: a
+univariate one for a number, a multivariate one of the same length for a vector. Its mean less
+the nominal value is then the systematic part, and its covariance ``C`` the statistical part,
+which adds ``J^{(p)} C (J^{(p)})^T`` to the output variance, so a multivariate distribution
+carries correlations between the entries.
+
 # Arguments
 - `model`: the model
-- `uncertainties`: `parameter => Uncertainty` pairs
+- `uncertainties`: `parameter => Uncertainty` or `parameter => Distribution` pairs
 
 # Returns
 `(; nominal, sys, stat)`: the nominal outputs, and their systematic and statistical
@@ -320,11 +326,11 @@ julia> UQ.uq(m, :a => UQ.Uncertainty(systematic_absolute=1.0),
 function uq(model::UQModel, uncertainties::Pair...)
     n = length(model.nominal)
     sys, variance = zeros(n), zeros(n)
-    for (parameter, uncertainty) in uncertainties
+    for (parameter, input) in uncertainties
         J = jacobian(model, parameter)
-        s, σ = as_absolute(uncertainty, model.values[_position(model, parameter)])
-        sys .+= abs.(J * _entries(s, size(J, 2)))
-        variance .+= J .^ 2 * _entries(σ, size(J, 2)) .^ 2
+        bias, spread = _moments(input, model.values[_position(model, parameter)])
+        sys .+= abs.(J * bias)
+        variance .+= _variance(J, spread)
     end
     return (; nominal=model.nominal, sys, stat=sqrt.(variance))
 end
@@ -390,6 +396,15 @@ array flattened.
 """
 _entries(x::Number, n) = fill(float(x), n)
 _entries(x::AbstractArray, n) = vec(x)
+
+"""
+    _variance(J, spread) -> Vector
+
+The output variance an input adds through its Jacobian columns `J`: from independent entries
+with variances `spread`, or from a covariance matrix `spread`, the diagonal of ``J C J^T``.
+"""
+_variance(J, spread::AbstractVector) = J .^ 2 * spread
+_variance(J, spread::AbstractMatrix) = vec(sum((J * spread) .* J; dims=2))
 
 """
     _state_jacobian(prob, u) -> Matrix{Float64}

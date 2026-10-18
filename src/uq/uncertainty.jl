@@ -81,3 +81,15 @@ function Base.show(io::IO, u::Uncertainty)
     given = [f for f in fieldnames(Uncertainty) if !all(iszero, getfield(u, f))]
     print(io, "Uncertainty(", join(("$f=$(getfield(u, f))" for f in given), ", "), ")")
 end
+
+"""
+    _moments(input, nominal) -> (bias, spread)
+
+What [`uq`](@ref) propagates for one input at its nominal value: the systematic part, one
+value per entry, and the statistical part, as a variance per entry or a covariance matrix.
+"""
+function _moments(u::Uncertainty, nominal)
+    systematic, statistical = as_absolute(u, nominal)
+    n = length(nominal)
+    return _entries(systematic, n), _entries(statistical, n) .^ 2
+end

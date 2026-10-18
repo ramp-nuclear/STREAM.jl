@@ -272,6 +272,31 @@ uq(ofi, :ṁ => Uncertainty(statistical_relative=0.03),
         :T_in => Uncertainty(statistical_absolute=1.0))
 ```
 
+## Use a distribution
+
+With Distributions.jl loaded, an input can take any `Distribution` of its value in place of an
+[`Uncertainty`](@ref STREAM.UQ.Uncertainty). For [`uq`](@ref STREAM.UQ.uq), its mean less the
+nominal value is the systematic part and its variance the statistical part, so these two
+normals give what `Uncertainty(statistical_relative=0.03)` and
+`Uncertainty(statistical_absolute=1.0)` do:
+
+```@example uq
+using Distributions: Normal, Uniform
+
+uq(ofi, :ṁ => Normal(0.4, 0.012), :T_in => Normal(40.0, 1.0))
+```
+
+[`monte_carlo`](@ref STREAM.UQ.monte_carlo) draws from the distribution itself, so it can be
+any shape, here an inlet temperature anywhere between 38 and 42 °C:
+
+```@example uq
+r = monte_carlo(ofi, :T_in => Uniform(38.0, 42.0); n=2000)
+(r.mean, r.std)
+```
+
+A vector input takes a multivariate distribution of its length, and an `MvNormal` with a full
+covariance carries correlations between its entries, which an `Uncertainty` cannot.
+
 ## Get the outputs as Measurements
 
 With Measurements.jl loaded, [`measurements`](@ref STREAM.UQ.measurements) returns the outputs
