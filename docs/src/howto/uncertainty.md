@@ -159,9 +159,9 @@ lines!(ax, times, r.nominal; color="#eb6834", linewidth=2)
 fig
 ```
 
-The flow is an override here, so it carries no uncertainty of its own. A model with a
-`StateMachine`, such as a pump trip or a scram, is not supported yet: the trip time lives
-outside the problem, where the derivatives cannot follow it.
+The flow is an override here, so it carries no uncertainty of its own. A trip or a scram
+cannot be differentiated this way, since its time lives outside the problem; the next section
+samples one instead.
 
 ```@example uq
 @assert r.nominal[end] > r.nominal[1]
@@ -174,11 +174,91 @@ uncertainties. Its standard deviations match the first-order ones where the resp
 to linear over the spread, and part from them where it curves:
 
 ```@example uq
-sampled = monte_carlo(model, uncertainties...; n=200)
+sampled = monte_carlo(model, uncertainties...; n=1000)
 (first_order=result.stat, sampled=sampled.std)
 ```
 
-[Uncertainty quantification](../explanation/uncertainty.md) shows both on one profile.
+The samples are the distribution of each output. The systematic part moves every sample the
+same way, so the first-order normal to set beside them sits at the nominal value plus
+``J s``, with its sign, and has the width of the statistical part:
+
+```@example uq
+shift = J[:, 1] .* (0.05 * 3.0e4)   # the power bias, through the power's column of J
+fig = Figure(size=(760, 340))
+for (k, label) in enumerate(("smallest CHF ratio", "K to the onset of boiling"))
+    ax = Axis(fig[1, k]; xlabel=label, ylabel=k == 1 ? "probability density" : "")
+    hist!(ax, filter(!isnan, sampled.samples[k, :]); bins=40, normalization=:pdf,
+          color=("#eb6834", 0.6), strokewidth=1, strokecolor=:white, label="sampled")
+    μ, σ = result.nominal[k] + shift[k], result.stat[k]
+    xs = range(μ - 4σ, μ + 4σ; length=200)
+    lines!(ax, xs, @. exp(-(xs - μ)^2 / (2σ^2)) / (σ * sqrt(2π)); color="#2a78d6",
+           linewidth=2, label="first order")
+    k == 1 && axislegend(ax; position=:lt)
+end
+fig
+```
+
+With uncertainties of a few percent the two agree. [Uncertainty
+quantification](../explanation/uncertainty.md) shows where they part.
+
+## A trip the uncertainty moves
+
+A reactor protection trips when a measured power passes its setpoint, and the measurement is
+itself uncertain: where the channel reads 120%, the true power may be a few percent either
+side. That makes the trip setpoint, in true power, an uncertain input, and the time of the
+trip an uncertain output. The reactor here is the one of [Trip a reactor or open a
+valve](events.md), its rods withdrawing slowly until the trip:
+
+```@example uq
+using STREAM.Components: PointKinetics, ReactivityController, StateMachine, machine_callbacks
+using ModelingToolkit: @parameters
+using Statistics: cor
+
+@parameters trip_at = 1.2
+machine = StateMachine()
+withdrawal(t) = 2.0e-4 * t                                  # reactivity rising 20 pcm/s
+scram(τ) = -0.05 * clamp(τ / 0.5, 0.0, 1.0)
+rods = ReactivityController(machine=machine) do state, t_state, t
+    state === :SCRAM ? withdrawal(t) + scram(t - t_state) : withdrawal(t)
+end
+@named pk = PointKinetics(rods)
+machine.transitions = [(:NORMAL => :SCRAM, pk.P_neutron > trip_at, "power above setpoint")]
+@named reactor = assembly([], pk; parameters=[trip_at])
+ria = mtkcompile(reactor)
+
+tripped(sol) = [machine.t_state, maximum(sol[ria.pk.P_neutron])]   # trip time, peak power
+trip = UQModel(ria, Pair[], [trip_at], 0.0:0.05:30.0; output=tripped,
+               callbacks=machine_callbacks(ria, machine), machines=(machine,))
+trip.nominal
+```
+
+Pass the run's `callbacks` and the `machines` they drive. Every sample is then a full run,
+with each machine reset first, so the trip falls wherever that sample's power takes it. The
+runs share the machine, so they are solved one at a time:
+
+```@example uq
+runs = monte_carlo(trip, trip_at => Uncertainty(statistical_relative=0.03); n=400)
+
+fig = Figure(size=(760, 340))
+for (k, label) in enumerate(("time of the trip [s]", "peak power [relative to nominal]"))
+    ax = Axis(fig[1, k]; xlabel=label, ylabel=k == 1 ? "probability density" : "")
+    hist!(ax, filter(!isnan, runs.samples[k, :]); bins=30, normalization=:pdf,
+          color=("#eb6834", 0.6), strokewidth=1, strokecolor=:white, label="sampled")
+    vlines!(ax, trip.nominal[k]; color="#2a78d6", linewidth=2, linestyle=:dash,
+            label="nominal")
+    k == 1 && axislegend(ax; position=:rt)
+end
+fig
+```
+
+A run whose setpoint lies high trips later, at a higher power:
+
+```@example uq
+@assert runs.failed == 0 && cor(runs.samples[1, :], runs.samples[2, :]) > 0.9
+```
+
+Derivatives cannot be taken through the trip, so `jacobian` and `uq` refuse a model with
+callbacks and point here.
 
 ## Propagate through a function
 

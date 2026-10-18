@@ -448,6 +448,7 @@ using Random: AbstractRNG, default_rng
 using Statistics: mean, std
 using SteadyStateDiffEq: DynamicSS
 using SymbolicIndexingInterface: getsym, is_parameter, setsym_oop
+using ..Components: reset!
 using ..STREAM: _saved_steps, solve_steady
 include("uq/uncertainty.jl")
 include("uq/model.jl")

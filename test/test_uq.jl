@@ -325,6 +325,42 @@ end
     end
 end
 
+@testset "monte_carlo of a transient that trips a StateMachine" begin
+    # Rods withdraw until the power passes trip_at, then fall in. The trip time is the
+    # machine's, outside the problem, so derivatives cannot follow it and sampling has to.
+    @parameters trip_at = 1.2
+    machine = StateMachine()
+    withdrawal(t) = 2.0e-4 * t
+    scram(τ) = -0.05 * clamp(τ / 0.5, 0.0, 1.0)
+    rods = ReactivityController(machine=machine) do state, t_state, t
+        state === :SCRAM ? withdrawal(t) + scram(t - t_state) : withdrawal(t)
+    end
+    @named pk = PointKinetics(rods)
+    machine.transitions = [(:NORMAL => :SCRAM, pk.P_neutron > trip_at, "high power")]
+    @named reactor = assembly([], pk; parameters=[trip_at])
+    ssys = mtkcompile(reactor)
+    times = 0.0:0.1:30.0
+    tripped(sol) = [machine.t_state, maximum(sol[ssys.pk.P_neutron])]
+    model = UQModel(ssys, Pair[], [trip_at], times; output=tripped,
+                    callbacks=machine_callbacks(ssys, machine), machines=(machine,))
+
+    Components.reset!(machine)
+    direct = solve_transient(ssys, times; callbacks=machine_callbacks(ssys, machine))
+    @test machine.state === :SCRAM
+    @test model.nominal ≈ [machine.t_state, maximum(direct[ssys.pk.P_neutron])]
+
+    # A setpoint read 10% high trips every run later, and higher.
+    late = monte_carlo(model, trip_at => Uncertainty(systematic_relative=0.1); n=3)
+    @test all(late.samples[1, :] .> model.nominal[1])
+    @test all(late.samples[2, :] .> model.nominal[2])
+
+    scattered = monte_carlo(model, trip_at => Uncertainty(statistical_relative=0.05);
+                            n=50, rng=Xoshiro(2))
+    @test scattered.failed == 0 && scattered.std[1] > 0
+
+    @test_throws ArgumentError jacobian(model)
+end
+
 @testset "monte_carlo" begin
     n = 20_000
     # A linear model: the bias shifts the mean by exactly J s, and the spread is J σ.

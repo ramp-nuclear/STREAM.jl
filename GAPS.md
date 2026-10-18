@@ -23,6 +23,7 @@ checked and found equivalent is listed at the end, so nobody has to re-derive it
   5. [Hydraulic components](#5-hydraulic-components)
   6. [Debugging and drawing a model](#6-debugging-and-drawing-a-model)
   7. [Uncertainty quantification](#7-uncertainty-quantification)
+  8. [A transient restarted from a steady state does not start on it](#8-a-transient-restarted-from-a-steady-state-does-not-start-on-it)
 - [Not planned](#not-planned)
 - [Deliberate departures from Python](#deliberate-departures-from-python)
 - [Following Python where the physics is open](#following-python-where-the-physics-is-open)
@@ -165,10 +166,11 @@ every input.
 
 What remains:
 
-- **Transients with a `StateMachine`.** The machine keeps its state and trip time in a Julia
-  object outside the problem. A derivative with respect to a trip setpoint would come back as
-  if the trip never moved, and a second run needs `reset!`. Moving the trip time into the
-  problem's parameters fixes it, and is a design change of its own.
+- **Derivatives through a `StateMachine`.** The machine keeps its state and trip time in a
+  Julia object outside the problem, so `jacobian` and `uq` refuse a model with callbacks.
+  `monte_carlo` samples one already, resetting the machines before each run and running them
+  one at a time. Moving the trip time into the problem's parameters would let derivatives
+  through and the runs go in parallel, and is a design change of its own.
 - **Variance-based indices** (Sobol, Morris) through `GlobalSensitivity.jl` as an extension, on
   top of the sampling `monte_carlo` already does.
 - **The power shape as an input.** `HeatDiffusion` bakes `power_shape` into its equations, so
@@ -176,6 +178,31 @@ What remains:
   With a shape entry per cell, an adjoint (SciMLSensitivity) beats forward mode.
 
 **Size:** medium for the state machine change; small for the indices.
+
+### 8. A transient restarted from a steady state does not start on it
+
+Found while checking transient UQ against re-solves. On a `symmetric_plate` loop
+(`ChannelAndContacts` and a 5 × 2 `HeatDiffusion` plate, pumped at a fixed head), with the
+steady state solved to a tolerance of 1e-12, `solve_transient(ssys, sol, t)` builds a problem
+whose `u0` has the plate temperature `fuel.T[2, 1]` at 58.245 °C where the steady state has
+58.701 °C. That is a 0.46 K step in one cell at `t = 0`. It is the only differential state
+that moves, the same with `overrides` or without, and the value it takes is not any state of
+the solution. The snapshot passed in is right, and the same problem built with
+`build_initializeprob=false` keeps 58.701 °C, so the move comes from the initialization
+problem MTK builds and solves when it constructs the `ODEProblem`.
+
+So a transient "from the steady state" starts a little off it, and every transient started
+this way on a plate model carries the step. The docstring of that `solve_transient` method
+says the differential states are held, which is the intended behaviour.
+
+`UQ.UQModel` builds its transient problems without MTK's initialization data for this reason,
+and because that data also resets `u0` at solve time. The likely fix here is the same:
+`build_initializeprob=false` in the method that starts from a solution, leaving
+`BrownFullBasicInit` to make the algebraic states consistent. Which tests move when it
+changes is the thing to check, and why MTK's initialization picks that one state is worth
+knowing before relying on it elsewhere.
+
+**Size:** small, and a correctness fix, so take it before the items above it.
 
 ---
 

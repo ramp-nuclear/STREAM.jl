@@ -146,6 +146,40 @@ and the symmetric first-order band understates the hot side:
 @assert upper_gap[2] > 0 && upper_gap[2] > 10 * abs(upper_gap[1])
 ```
 
+The distribution of one output shows the same thing. At the outlet, with the flow known to
+25%, the samples have a long tail towards high temperatures, from the draws with the least
+flow, and the normal distribution of first order, symmetric by construction, has none:
+
+```@example fo
+using Statistics: mean
+
+flow = sys.pump.ṁ0 => Uncertainty(statistical_relative=0.25)
+outlet = filter(!isnan, monte_carlo(model, flow; n=4000, rng=Xoshiro(2)).samples[end, :])
+μ, σ = model.nominal[end], uq(model, flow).stat[end]
+
+# The axis ends at the 99.5th percentile: the few draws with the flow cut by more than half
+# reach far past it.
+low, high = minimum(outlet), quantile(outlet, 0.995)
+fig = Figure(size=(700, 380))
+ax = Axis(fig[1, 1]; xlabel="wall temperature at the outlet [°C]",
+          ylabel="probability density [1/K]")
+hist!(ax, outlet; bins=range(low, maximum(outlet) + 1; step=(high - low) / 50),
+      normalization=:pdf, color=("#eb6834", 0.6), strokewidth=1, strokecolor=:white,
+      label="sampled")
+xs = range(low, high; length=300)
+lines!(ax, xs, @. exp(-(xs - μ)^2 / (2σ^2)) / (σ * sqrt(2π)); color="#2a78d6", linewidth=2,
+       label="first order")
+xlims!(ax, low, high)
+axislegend(ax; position=:rt)
+fig
+```
+
+The mean of the samples sits above the nominal value, which first order cannot show:
+
+```@example fo
+@assert mean(outlet) > μ
+```
+
 ## Transients
 
 A transient is differentiated by carrying the dual numbers through the integration, so the
@@ -155,6 +189,9 @@ such as a cut in the pump head, moves the algebraic states, they are solved agai
 differential states, which hold their values, and their derivatives come from the same
 implicit function theorem applied to the algebraic equations alone.
 
-A model with a [`StateMachine`](@ref STREAM.Components.StateMachine) is not covered yet: it
-keeps its trip time outside the problem, so a derivative with respect to a setpoint would
-come back as if the trip never moved. `GAPS.md` in the repository tracks this.
+A model with a [`StateMachine`](@ref STREAM.Components.StateMachine) cannot be
+differentiated: the machine keeps its trip time outside the problem, so a derivative with
+respect to a setpoint would come back as if the trip never moved. It can be sampled, each run
+tripping where it trips, and [Propagate input uncertainties](../howto/uncertainty.md) shows
+the distribution of a trip time that way. Moving the trip time into the problem would let
+the derivatives through too; `GAPS.md` in the repository tracks it.

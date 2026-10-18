@@ -20,6 +20,7 @@ derivatives themselves, and [`monte_carlo`](@ref) samples the full model instead
 struct UQModel{F,G}
     evaluate::F
     resolve::G
+    threaded::Bool
     parameters::Vector{Any}
     values::Vector{Any}
     slices::Vector{UnitRange{Int}}
@@ -28,17 +29,17 @@ struct UQModel{F,G}
 end
 
 """
-    _uqmodel(evaluate, resolve, parameters, values, nominal) -> UQModel
+    _uqmodel(evaluate, resolve, parameters, values, nominal; threaded=true) -> UQModel
 
 A `UQModel` with its slices worked out from `values` and nothing cached yet. `evaluate` maps
 inputs carrying ForwardDiff duals to the outputs, for [`jacobian`](@ref). `resolve` maps plain
 inputs to the outputs of the full model, or to `nothing` when it fails to solve, for
-[`monte_carlo`](@ref).
+[`monte_carlo`](@ref), which calls it from several threads at once unless `threaded` is false.
 """
-function _uqmodel(evaluate, resolve, parameters, values, nominal)
+function _uqmodel(evaluate, resolve, parameters, values, nominal; threaded=true)
     cache = Ref{Union{Nothing,Matrix{Float64}}}(nothing)
-    return UQModel(evaluate, resolve, collect(Any, parameters), values, _slices(values),
-                   nominal, cache)
+    return UQModel(evaluate, resolve, threaded, collect(Any, parameters), values,
+                   _slices(values), nominal, cache)
 end
 
 """
@@ -127,7 +128,8 @@ end
 
 @doc raw"""
     UQModel(ssys, op, parameters, t; output, start=:op, overrides=Pair[], solver=Rodas5P(),
-            abstol=1e-8, reltol=1e-8, initializealg=nothing, steady_solver=nothing) -> UQModel
+            abstol=1e-8, reltol=1e-8, initializealg=nothing, steady_solver=nothing,
+            callbacks=nothing, machines=()) -> UQModel
 
 A model of a transient of a compiled system, saved at the times `t`.
 
@@ -142,8 +144,12 @@ their error along with the values'. Where the run starts depends on `start`:
   input moves the run both through where it starts and through what follows. An input that
   `overrides` sets acts on the steady state only.
 
-A model with a `StateMachine` is not supported: its state and trip time live outside the
-problem, where the duals do not reach, so pass no callbacks.
+A model driven by a [`StateMachine`](@ref STREAM.Components.StateMachine) takes its
+`callbacks`, and the `machines` they drive. [`monte_carlo`](@ref) then samples it, resetting
+each machine before every run and solving the runs one at a time, since they share the
+machines: a trip falls wherever each sample takes it. Its derivatives cannot be taken, since
+the machine's state and trip time live outside the problem, where the duals do not reach, so
+[`jacobian`](@ref) and [`uq`](@ref) throw.
 
 # Arguments
 - `ssys`: compiled system from `mtkcompile`
@@ -158,6 +164,8 @@ problem, where the duals do not reach, so pass no callbacks.
 - `initializealg`: DAE initialization; `nothing` takes `NoInit()` for `start=:op`, as
   `solve_transient` does, and `BrownFullBasicInit()` for `start=:steady`
 - `steady_solver`: the steady solver for `start=:steady`
+- `callbacks`: the callbacks of the run, such as `machine_callbacks(ssys, machine)`
+- `machines`: the `StateMachine`s the callbacks drive, reset before every run
 
 # Returns
 A `UQModel` keyed by `parameters`.
@@ -170,7 +178,7 @@ A `UQModel` keyed by `parameters`.
 function UQModel(
     ssys, op, parameters::AbstractVector, t::AbstractVector; output, start=:op,
     overrides=Pair[], solver=Rodas5P(), abstol=1e-8, reltol=1e-8, initializealg=nothing,
-    steady_solver=nothing,
+    steady_solver=nothing, callbacks=nothing, machines=(),
 )
     start in (:op, :steady) ||
         throw(ArgumentError("start must be :op or :steady, got $(repr(start))"))
@@ -178,9 +186,18 @@ function UQModel(
     readout = _readout(output)
     tspan = (Float64(first(t)), Float64(last(t)))
     states = unknowns(ssys)
-    integrate(prob, u0, p, init) = _integrate(prob, u0, p, t, solver, init, abstol, reltol)
-    integrate_dual(prob, dual, plain, init) =
-        _integrate_dual(prob, dual, plain, t, solver, init, abstol, reltol)
+    function integrate(prob, u0, p, init)
+        foreach(reset!, machines)
+        return _integrate(prob, u0, p, t, solver, init, abstol, reltol, callbacks)
+    end
+    function integrate_dual(prob, dual, plain, init)
+        callbacks === nothing || throw(ArgumentError(
+            "derivatives cannot follow a StateMachine, whose trip time lives outside the " *
+            "problem; sample the model with monte_carlo instead",
+        ))
+        return _integrate_dual(prob, dual, plain, t, solver, init, abstol, reltol)
+    end
+    threaded = isempty(machines)
 
     # MTK's initialization data would set u0 at solve time from the initial values the problem
     # was built with, dropping the state's derivatives and any new start, so the problems
@@ -206,7 +223,8 @@ function UQModel(
         end
         nominal = resolve_op(_flat(values))
         nominal === nothing && error("the nominal transient failed")
-        return _uqmodel(evaluate_op, resolve_op, parameters, values, Float64.(nominal))
+        return _uqmodel(evaluate_op, resolve_op, parameters, values, Float64.(nominal);
+                        threaded)
     end
 
     steady = _steady_state(ssys, op, parameters; solver=steady_solver)
@@ -236,7 +254,8 @@ function UQModel(
     end
     nominal = resolve_steady(_flat(steady.values))
     nominal === nothing && error("the nominal transient failed")
-    return _uqmodel(evaluate_steady, resolve_steady, parameters, steady.values, Float64.(nominal))
+    return _uqmodel(evaluate_steady, resolve_steady, parameters, steady.values,
+                    Float64.(nominal); threaded)
 end
 
 """
@@ -465,14 +484,14 @@ function _resolve(steady, vals)
 end
 
 """
-    _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol) -> ODESolution
+    _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol, callbacks=nothing)
 
 `prob` from `u0` with parameters `p`, stepping onto every saved time as
 [`solve_transient`](@ref) does.
 """
-function _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol)
+function _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol, callbacks=nothing)
     prob = remake(prob; u0, p)
-    return solve(prob, solver; saveat=t, initializealg, abstol, reltol,
+    return solve(prob, solver; saveat=t, initializealg, abstol, reltol, callback=callbacks,
                  _saved_steps(prob, t, (;))...)
 end
 

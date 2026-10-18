@@ -15,7 +15,8 @@ with ``ε_1`` and ``ε_2`` independent standard normal draws, so the systematic 
 sample by the same signed amount and the statistical part scatters them. The other inputs stay
 at their nominal values. Each sample is a full solve: of the function, of the steady state
 from the nominal one, or of the transient. The samples are solved on all of Julia's threads,
-so start Julia with `--threads=auto` to use them. The inputs are drawn from `rng` before any
+so start Julia with `--threads=auto` to use them, except for a model driving a `StateMachine`,
+whose runs share the machine and go one at a time. The inputs are drawn from `rng` before any
 solve, so the result does not depend on the number of threads.
 
 # Arguments
@@ -52,11 +53,18 @@ function monte_carlo(model::UQModel, uncertainties::Pair...; n=1000, rng::Abstra
     end
     samples = fill(NaN, length(model.nominal), n)
     solved = fill(false, n)
-    Threads.@threads for k in 1:n
+    function sample(k)
         y = model.resolve(inputs[:, k])
-        y === nothing && continue
+        y === nothing && return
         samples[:, k] = y
         solved[k] = true
+    end
+    if model.threaded
+        Threads.@threads for k in 1:n
+            sample(k)
+        end
+    else
+        foreach(sample, 1:n)
     end
     good = samples[:, solved]
     return (; samples, mean=vec(mean(good; dims=2)), std=vec(std(good; dims=2)),
