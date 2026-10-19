@@ -199,7 +199,7 @@ ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types));
 #
 # The solve integrates to where the model settles, the robust way to find a loop's operating
 # point (see [Get a steady solve to converge](../howto/steady_solve.md)). The core is at full
-# power, so it starts from the design flows: from the small flow every port guesses, the
+# power, so it starts from the design flows: from the flow every port defaults to, the
 # coolant would heat far past what the correlations cover before the flow built up.
 
 design = [sys.primary.inlet.ṁ => ṁ_design,
