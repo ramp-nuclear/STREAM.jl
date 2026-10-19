@@ -23,8 +23,10 @@ A **two-port component** takes flow in at one port and passes it out at one othe
 fluid, and adds no heat. [`Pump`](@ref), [`Flapper`](@ref), [`Resistor`](@ref),
 [`FrictionResistor`](@ref), [`VolumetricFlowResistor`](@ref), [`LocalPressureDrop`](@ref),
 [`Gravity`](@ref) and [`Inertia`](@ref) are built on it. Channels are not two-ports: they hold
-fluid and exchange heat, and state their own energy balance. [`inseries`](@ref) and
-[`inparallel`](@ref) accept either, needing only an `inlet` and an `outlet`.
+fluid and exchange heat, and state their own energy balance.
+[`inseries`](@ref STREAM.Assemblies.Connect.inseries) and
+[`inparallel`](@ref STREAM.Assemblies.Connect.inparallel) accept either, needing only an
+`inlet` and an `outlet`.
 
 The component's law is usually one equation for `Δp`. Besides defining `Δp` and `ṁ`, the
 shell holds three more:
