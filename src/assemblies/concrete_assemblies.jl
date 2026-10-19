@@ -1,55 +1,64 @@
 """
-    _real_defaults(params) -> Vector{Float64}
+    _carried(sys, key) -> Vector
 
-The numeric defaults of `params`, skipping any without one.
+The `key` metadata of `sys` and of every system nested in it, skipping those that carry none.
+A compiled system is read through the system it was compiled from, which keeps the nesting.
 """
-function _real_defaults(params)
-    vals = Float64[]
-    for p in params
-        ModelingToolkit.hasdefault(p) || continue
-        d = ModelingToolkit.getdefault(p)
-        d isa Real && push!(vals, Float64(d))
+function _carried(sys, key)
+    while ModelingToolkit.has_parent(sys) && ModelingToolkit.get_parent(sys) !== nothing
+        sys = ModelingToolkit.get_parent(sys)
     end
-    return vals
+    own = ModelingToolkit.getmetadata(sys, key, nothing)
+    found = own === nothing ? Any[] : Any[own]
+    for sub in ModelingToolkit.get_systems(sys)
+        append!(found, _carried(sub, key))
+    end
+    return found
 end
 
 """
     check_gravity_mismatch(sys) -> Symbol
 
-Check whether gravity pressure contributions in a hydraulic loop are balanced.
+Check whether the gravity terms of a hydraulic loop are balanced: when a channel runs with
+`g > 0`, the loop needs a [`Gravity`](@ref) component with `H > 0` for the return leg.
 
 # Arguments
-- `sys`: compiled `AbstractSystem` to inspect
+- `sys`: the loop, compiled or not
 
 # Returns
-`:ok` if balanced (or gravity disabled), `:mismatch` if channels have gravity but no
-return-leg `Gravity` component.
+`:ok` if balanced, or if no channel carries gravity, and `:mismatch`, with a warning, if
+channels carry gravity but there is no return-leg `Gravity` component.
 """
 function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
-    all_pars = ModelingToolkit.parameters(sys)
+    any(g -> g isa Real && g > 0, _carried(sys, _GravityKey)) || return :ok
+    any(H -> H isa Real && H > 0, _carried(sys, _ElevationKey)) && return :ok
+    @warn "check_gravity_mismatch: channels have g > 0 but no Gravity return component " *
+          "found; loop gravity terms may be unbalanced"
+    return :mismatch
+end
 
-    local_name = p -> begin
-        s = string(p)
-        idx = findlast('₊', s)
-        idx === nothing ? s : s[nextind(s, idx):end]
-    end
+"""
+    _sole_face(channel) -> Symbol
 
-    g_vals = _real_defaults(filter(p -> local_name(p) == "g_acc", all_pars))
-    h_vals = _real_defaults(filter(p -> local_name(p) == "H", all_pars))
+The face of a channel whose duct is heated on one wall, or `:left` for one with more.
+"""
+function _sole_face(channel)
+    faces = keys(duct(channel).heated)
+    return length(faces) == 1 ? only(faces) : :left
+end
 
-    if isempty(g_vals) || all(iszero, g_vals)
-        return :ok
-    end
+"""
+    _check_side(channel, side)
 
-    active_g = any(v -> v > 0.0, g_vals)
-    has_return = !isempty(h_vals) && any(v -> v > 0.0, h_vals)
-
-    if active_g && !has_return
-        @warn "check_gravity_mismatch: channels have g_acc > 0 but no Gravity return component found; loop gravity terms may be unbalanced"
-        return :mismatch
-    end
-
-    return :ok
+Throw an `ArgumentError` unless `side` is `:left` or `:right` and the channel has a face there.
+"""
+function _check_side(channel, side)
+    side in (:left, :right) ||
+        throw(ArgumentError("side must be :left or :right, got :$side"))
+    faces = keys(duct(channel).heated)
+    side in faces || throw(ArgumentError(
+        "$(nameof(channel)) has no :$side face; its faces are $(join(repr.(faces), ", "))"))
+    return nothing
 end
 
 """
@@ -104,15 +113,24 @@ function plate(ch_left, ch_right, fuel; name::Symbol)
 end
 
 """
-    one_sided(channel, fuel; side=:left, name) -> System
+    one_sided(channel, fuel; side, name) -> System
 
-Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channel.
+Wire one face of a `HeatDiffusion` plate to a single `ChannelAndContacts` channel. The
+channel's face `side` meets the plate's opposite face, so `side=:left` joins the channel's
+`thermal_left` to the plate's `thermal_right`, and the plate's other face is adiabatic.
+
+A channel built on a duct heated on one wall, such as `heated=(left=0.063,)`, has that one
+face and nothing left dangling.
 
 # Arguments
 - `channel`: uncompiled `ChannelAndContacts` instance
 - `fuel`: uncompiled `HeatDiffusion` instance
-- `side`: `:left` or `:right`, which face of the fuel plate connects to the channel (default `:left`)
+- `side`: the channel's face, `:left` or `:right`. Defaults to the channel's only face when
+  its duct is heated on one wall, and to `:left` otherwise.
 - `name`: system name (Symbol)
+
+# Throws
+- `ArgumentError`: for a side other than `:left` or `:right`, or one the channel has no face on
 
 # Returns
 Uncompiled `System` from [`assembly`](@ref).
@@ -121,9 +139,8 @@ After calling this function, refer to sub-components exclusively via the returne
 (e.g. `osc.channel`, `osc.fuel`). The original component variables hold unscoped symbolic
 names and should not be used in equations or connection dicts after composition.
 """
-function one_sided(channel, fuel; side::Symbol=:left, name::Symbol)
-    side in (:left, :right) ||
-        throw(ArgumentError("side must be :left or :right, got :$side"))
+function one_sided(channel, fuel; side::Symbol=_sole_face(channel), name::Symbol)
+    _check_side(channel, side)
     connections = if side == :left
         faces((channel, :thermal_left) => (fuel, :thermal_right))
     else
@@ -133,7 +150,7 @@ function one_sided(channel, fuel; side::Symbol=:left, name::Symbol)
 end
 
 """
-    single_channel(channel, fuel; fuel_side=:left, name) -> System
+    single_channel(channel, fuel; fuel_side, name) -> System
 
 Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*.
 
@@ -150,8 +167,9 @@ one-face-insulated coupling, use [`one_sided`](@ref) instead.
 # Arguments
 - `channel`: uncompiled `ChannelAndContacts` instance.
 - `fuel`: uncompiled `HeatDiffusion` instance (`nz` must equal `channel.n`).
-- `fuel_side`: `:left` or `:right`, which fuel face is the near (conjugate) face
-  (default `:left`). The opposite face gets the convective sink.
+- `fuel_side`: `:left` or `:right`, the near (conjugate) face, of the channel and the fuel
+  alike. The fuel's opposite face gets the convective sink. Defaults to the channel's only
+  face when its duct is heated on one wall, and to `:left` otherwise.
 - `name`: system name (Symbol).
 
 # Returns
@@ -161,9 +179,8 @@ Uncompiled `System` from [`assembly`](@ref) holding `channel`, `fuel`, and `n` p
 After composition, refer to sub-components through the returned system (e.g.
 `scc.channel`, `scc.fuel`).
 """
-function single_channel(channel, fuel; fuel_side::Symbol=:left, name::Symbol)
-    fuel_side in (:left, :right) ||
-        throw(ArgumentError("fuel_side must be :left or :right, got :$fuel_side"))
+function single_channel(channel, fuel; fuel_side::Symbol=_sole_face(channel), name::Symbol)
+    _check_side(channel, fuel_side)
     near = fuel_side
     far = fuel_side == :left ? :right : :left
     near_port = Symbol(:thermal_, near)

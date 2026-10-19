@@ -24,6 +24,14 @@ every cell up to that face, less the head at the local density:
 _static_pressure(p_inlet, dp, ṁ, ρ, A) = p_inlet .- cumsum(dp) .- ṁ^2 ./ (2 .* ρ .* A^2)
 
 """
+    _GravityKey
+
+The metadata key a channel stores its gravitational acceleration along the flow under [m/s²],
+for `check_gravity_mismatch` to read.
+"""
+struct _GravityKey end
+
+"""
     _faces(geometry) -> Tuple{Vararg{Symbol}}
 
 The faces of a channel on `geometry`: one per heated wall of its duct, named after the wall.
@@ -177,18 +185,16 @@ _mean_wall(walls::NamedTuple) =
     isempty(walls) ? nothing : reduce(.+, map(collect, values(walls))) ./ length(walls)
 
 """
-    _setup(geometry, g, n) -> (pars, vars, inlet, outlet)
+    _setup(geometry, n) -> (pars, vars, inlet, outlet)
 
 The parameters, variables and ports every channel declares. Each face of the duct gets its
 own `T_wall_<face>` and `q_wall_<face>`, gathered under `vars.T_wall` and `vars.q_face`.
 """
-function _setup(geometry, g, n)
+function _setup(geometry, n)
     # No geometry parameters are declared: L, Dh, and A enter the equations inline from
     # `geometry` (see `_channel_core` and the variants). When a dimension is a design knob,
-    # that inline value is the knob expression, so `remake` scans it. g_acc is declared as
-    # a parameter only so `check_gravity_mismatch` can find which channels carry gravity;
-    # the equations use the inline `g` value, not this symbol.
-    pars = @parameters g_acc = g
+    # that inline value is the knob expression, so `remake` scans it.
+    pars = []
 
     @variables begin
         (T(t))[1:n] = fill(T_ROOM, n)
@@ -234,7 +240,7 @@ end
 Build the composed `System` for a channel variant. Every variant states the heat flow into
 each face and whatever extra variables, equations, observables, and ports it adds, then hands
 them here; the shared core equations and the `compose` call live in one place. The system
-carries `geometry`, for [`duct`](@ref) to read back.
+carries `geometry`, for [`duct`](@ref) to read back, and `g`, for `check_gravity_mismatch`.
 """
 function _channel_system(;
     name, n::Int, geometry::Duct, g, darcy, liquid,
@@ -254,7 +260,7 @@ function _channel_system(;
         outlet,
         extra_ports...,
     )
-    return _with_duct(sys, geometry)
+    return ModelingToolkit.setmetadata(_with_duct(sys, geometry), _GravityKey, g)
 end
 
 """
@@ -327,7 +333,7 @@ function Channel(;
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
-    pars, vars, inlet, outlet = _setup(geometry, g, n)
+    pars, vars, inlet, outlet = _setup(geometry, n)
     faces = _faces(geometry)
     dz = geometry.L / n
 
@@ -402,7 +408,7 @@ function ChannelHeatFlux(;
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
-    pars, vars, inlet, outlet = _setup(geometry, g, n)
+    pars, vars, inlet, outlet = _setup(geometry, n)
     faces = _faces(geometry)
     dz = geometry.L / n
 
@@ -458,7 +464,7 @@ function ChannelAndContacts(;
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
-    pars, vars, inlet, outlet = _setup(geometry, g, n)
+    pars, vars, inlet, outlet = _setup(geometry, n)
     faces = _faces(geometry)
     Dh = hydraulic_diameter(geometry)
     A  = flow_area(geometry)

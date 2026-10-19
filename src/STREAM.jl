@@ -378,6 +378,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ..STREAM: Duct, duct
 using ..Components
+using ..Components: _GravityKey, _ElevationKey   # what the gravity check reads, private
 using ..STREAM: assembly, port, var_length
     """
         STREAM.Assemblies.Connect

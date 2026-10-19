@@ -14,23 +14,23 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         dP_pump = 3.0e4
         geom = Duct(0.6, Circular(0.01))
 
-        @named pump_phy02 = Pump(dP_pump)
-        @named cac_phy02 = ChannelAndContacts(
+        @named pump = Pump(dP_pump)
+        @named cac = ChannelAndContacts(
             n=n, geometry=geom, htc=HTC.ConstantNusselt(; Nu=8.235)
         )
-        @named bc_phy02 = HeatExchanger(T_inlet)
-        @named wall_phy02 = ConstantTemperature(T_wall; n=n)
-        conns_phy02 = [
-            inseries(pump_phy02, bc_phy02, cac_phy02, pump_phy02),
-            faces((wall_phy02, :thermal) => (cac_phy02, :thermal_outer)),
-            pump_phy02.inlet.p ~ 1.0e5,
+        @named bc = HeatExchanger(T_inlet)
+        @named wall = ConstantTemperature(T_wall; n=n)
+        conns = [
+            inseries(pump, bc, cac, pump),
+            faces((wall, :thermal) => (cac, :thermal_outer)),
+            pump.inlet.p ~ 1.0e5,
         ]
-        @named sys_phy02 = assembly(conns_phy02, pump_phy02, bc_phy02, cac_phy02, wall_phy02)
-        ssys_phy02 = mtkcompile(sys_phy02)
-        sol_phy02 = solve_steady(ssys_phy02, [ssys_phy02.cac_phy02.inlet.ṁ => 0.490])
+        @named sys = assembly(conns, pump, bc, cac, wall)
+        ssys = mtkcompile(sys)
+        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.490])
 
-        @test sol_phy02.retcode == ReturnCode.Success
-        @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu_outer], 8.235, rtol=1e-4))
+        @test sol.retcode == ReturnCode.Success
+        @test all(isapprox.(sol[ssys.cac.Nu_outer], 8.235, rtol=1e-4))
     end
 
     @testset "Friction.rectangular_laminar integration — dP > 0 in solution" begin
@@ -39,34 +39,34 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         T_wall = 100.0
         geom = Duct(0.6, Rectangular(0.07, 0.00127))
 
-        @named pump_phy03 = Pump(30.0)
-        @named cac_phy03 = ChannelAndContacts(
+        @named pump = Pump(30.0)
+        @named cac = ChannelAndContacts(
             n=n,
             geometry=geom,
             htc=HTC.ConstantNusselt(; Nu=8.235),
             darcy=Friction.RectangularLaminar(),
         )
-        @named bc_phy03 = HeatExchanger(T_inlet)
-        @named ct_l_phy03 = ConstantTemperature(T_wall; n=n)
-        @named ct_r_phy03 = ConstantTemperature(T_wall; n=n)
-        conns_phy03 = [
-            inseries(pump_phy03, bc_phy03, cac_phy03, pump_phy03),
+        @named bc = HeatExchanger(T_inlet)
+        @named ct_l = ConstantTemperature(T_wall; n=n)
+        @named ct_r = ConstantTemperature(T_wall; n=n)
+        conns = [
+            inseries(pump, bc, cac, pump),
             faces(
-                (ct_l_phy03, :thermal) => (cac_phy03, :thermal_left),
-                (ct_r_phy03, :thermal) => (cac_phy03, :thermal_right),
+                (ct_l, :thermal) => (cac, :thermal_left),
+                (ct_r, :thermal) => (cac, :thermal_right),
             ),
-            pump_phy03.inlet.p ~ 1.0e5,
+            pump.inlet.p ~ 1.0e5,
         ]
-        @named sys_phy03 = assembly(
-            conns_phy03, pump_phy03, bc_phy03, cac_phy03, ct_l_phy03, ct_r_phy03
+        @named sys = assembly(
+            conns, pump, bc, cac, ct_l, ct_r
         )
-        ssys_phy03 = mtkcompile(sys_phy03)
-        sol_phy03 = solve_steady(ssys_phy03, [ssys_phy03.cac_phy03.inlet.ṁ => 8.8e-4])
+        ssys = mtkcompile(sys)
+        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 8.8e-4])
 
-        @test sol_phy03.retcode == ReturnCode.Success
-        @test sol_phy03[ssys_phy03.cac_phy03.dP] > 0.0
+        @test sol.retcode == ReturnCode.Success
+        @test sol[ssys.cac.dP] > 0.0
         # Re should be in laminar regime
-        @test sol_phy03[ssys_phy03.cac_phy03.Re[1]] < 2300.0
+        @test sol[ssys.cac.Re[1]] < 2300.0
 
         # Magnitude check: the solved dP must equal the friction correlation evaluated at
         # the solved state, not just be positive. The channel sets dP = sum_i dp[i] (steady
@@ -80,15 +80,15 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         A = flow_area(geom)
         Dh = hydraulic_diameter(geom)
         dz = geom.L / n
-        ṁ03 = sol_phy03[ssys_phy03.cac_phy03.inlet.ṁ]
-        dP_expected_03 = sum(
+        ṁ_sol = sol[ssys.cac.inlet.ṁ]
+        dP_expected = sum(
             let
-                Re_i = sol_phy03[ssys_phy03.cac_phy03.Re[i]]
-                T_i = sol_phy03[ssys_phy03.cac_phy03.T[i]]
-                Friction.darcy_weisbach_dp(ṁ03, ρ(H2O, T_i), f_lam(Re_i), dz, Dh, A)
+                Re_i = sol[ssys.cac.Re[i]]
+                T_i = sol[ssys.cac.T[i]]
+                Friction.darcy_weisbach_dp(ṁ_sol, ρ(H2O, T_i), f_lam(Re_i), dz, Dh, A)
             end for i in 1:n
         )
-        @test isapprox(sol_phy03[ssys_phy03.cac_phy03.dP], dP_expected_03; rtol=1e-6)
+        @test isapprox(sol[ssys.cac.dP], dP_expected; rtol=1e-6)
     end
 
     @testset "regime switching in a solved loop — laminar and turbulent branches" begin

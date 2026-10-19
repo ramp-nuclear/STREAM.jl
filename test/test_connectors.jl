@@ -1,6 +1,3 @@
-# Acausal connector tests (FlowPort, ThermalPort).
-# Connector unit tests: FlowPort + ThermalPort — the v1.1 connector roster.
-
 using Test
 using ModelingToolkit
 using STREAM

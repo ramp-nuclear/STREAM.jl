@@ -52,13 +52,23 @@ Hydrostatic pressure change for a vertical elevation change, `ΔP = ρ g H`.
 - `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
 """
 function Gravity(H, g=G_EARTH; name, liquid::AbstractLiquid=H2O)
+    elevation = H   # @parameters rebinds H to the symbol
     pars = @parameters H = H
     @named inlet = FlowPort()
     @named outlet = FlowPort()
     T_in = instream(inlet.T)
     eqs = Equation[inlet.p - outlet.p ~ ρ(liquid, T_in) * g * H]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    sys = HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    return ModelingToolkit.setmetadata(sys, _ElevationKey, elevation)
 end
+
+"""
+    _ElevationKey
+
+The metadata key a [`Gravity`](@ref) component stores its elevation change `H` [m] under, for
+`check_gravity_mismatch` to read.
+"""
+struct _ElevationKey end
 
 """
     Resistor(R; name) -> System

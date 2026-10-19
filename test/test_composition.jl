@@ -1,5 +1,3 @@
-# test/test_composition.jl
-
 using Test
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t
@@ -10,9 +8,8 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
 using STREAM.Assemblies: var_length  # private to Assemblies
 using OrdinaryDiffEq: ReturnCode
 
-# Test fixtures — local helpers that build canonical CAC + HD pairs.
-# Mirrors Python STREAM's MTR_fuel_and_channel(z_N, fuel_N, clad_N) function
-# in tests/test_composition/conftest.py.
+# A channel and fuel plate pair, Python STREAM's MTR_fuel_and_channel in
+# tests/test_composition/conftest.py.
 function _mtr_pair(; n=4, nz=4, nx=2, power=1.0e3)
     geom = Duct(0.6, Rectangular(0.070, 0.0025))
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
@@ -24,7 +21,7 @@ function _mtr_pair(; n=4, nz=4, nx=2, power=1.0e3)
     return cac, fuel
 end
 
-# Section 1: port helper
+# port helper
 @testset "port helper — indexed thermal port access on uncompiled CAC" begin
     cac, _ = _mtr_pair()
     p1 = port(cac, :thermal_left, 1)
@@ -50,8 +47,7 @@ end
     @test all(isequal(Ts[i], port(cac, :thermal_left, i).T) for i in 1:4)
 end
 
-# Section 2: check_gravity_mismatch
-# Existing G_M tests carry forward — these don't touch Channel architecture.
+# check_gravity_mismatch
 @testset "check_gravity_mismatch — :ok when no gravity" begin
     geom = Duct(0.6, Circular(0.01))
     @named ch = ChannelAndContacts(; n=4, geometry=geom)  # default g=0.0
@@ -90,8 +86,19 @@ end
     @test result == :mismatch
 end
 
-# Section 3: var_length
-# Works on CAC (ThermalPort arrays kept); errors on the new Channel/CHF.
+@testset "check_gravity_mismatch — :ok with a Gravity return leg, compiled or not" begin
+    @named ch = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)), g=G_EARTH)
+    @named pump = Pump(3.0e4)
+    @named ret = Gravity(0.6)
+    @named sys = assembly([inseries(pump, ch, ret, pump), pump.inlet.p ~ 1.0e5], pump, ch, ret)
+    @test check_gravity_mismatch(sys) == :ok
+    # The channel carries its g and the Gravity its H, so nothing needs compiling to check.
+    @named bare = assembly([inseries(pump, ch, pump), pump.inlet.p ~ 1.0e5], pump, ch)
+    @test (@test_logs (:warn, r"no Gravity") check_gravity_mismatch(bare)) == :mismatch
+end
+
+# var_length
+# Counts a ChannelAndContacts' thermal ports; a Channel or ChannelHeatFlux has none.
 @testset "var_length: counts thermal_left* on CAC (n=4)" begin
     cac, _ = _mtr_pair(; n=4)
     @test var_length(cac, :thermal_left) == 4
@@ -102,20 +109,18 @@ end
     @test var_length(cac10, :thermal_left) == 10
 end
 
-@testset "var_length: errors on Channel (no thermal port arrays under new design)" begin
+@testset "var_length: errors on a Channel, which has no thermal ports" begin
     @named ch = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)))
     @test_throws ArgumentError var_length(ch, :thermal_outer)
 end
 
-@testset "var_length: errors on ChannelHeatFlux (no thermal port arrays under new design)" begin
+@testset "var_length: errors on a ChannelHeatFlux, which has no thermal ports" begin
     @named chf = ChannelHeatFlux(; n=4, geometry=Duct(0.6, Circular(0.01)))
     @test_throws ArgumentError var_length(chf, :thermal_outer)
 end
 
-# Section 4: symmetric_plate compose-correctness
+# symmetric_plate compose-correctness
 # Multiple shapes; both faces wired correctly; no mtkcompile errors.
-# Verify-block requires: at least 2 distinct shape testsets (n=4 + n=10)
-# AND at least 2 asymmetric-shape testsets (nx=1, nx=3).
 @testset "symmetric_plate(cac, fuel) — n=4, nz=4, nx=2 compiles cleanly" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     rods = symmetric_plate(cac, fuel; name=:rods)
@@ -172,8 +177,7 @@ end
     @test sol.retcode == ReturnCode.Success
 end
 
-# Section 5: plate (dual-CAC + HD) compose-correctness
-# Verify-block requires: at least 1 testset with name starting with "plate(".
+# plate (dual-CAC + HD) compose-correctness
 @testset "plate(ch_left, ch_right, fuel) — both faces wired correctly" begin
     # plate wires fuel.thermal_left[i] <-> ch_left.thermal_right[i] and
     # fuel.thermal_right[i] <-> ch_right.thermal_left[i]. Solve a steady loop with
@@ -239,9 +243,7 @@ end
     @test all(sol[ssys.pl.fuel.T[i, nx]] > sol[ssys.pl.ch_right.T[i]] for i in 1:nz)
 end
 
-# Section 6: one_sided
-# Verify-block requires: at least 2 "@testset \"one_sided" testsets
-# (one per side variant).
+# one_sided
 # Shared config for the one_sided physics tests: dittus_boelter +
 # aluminum plate (same family as the plate / single_channel tests) so the steady
 # loop converges. one_sided wires exactly ONE fuel face to the channel
@@ -306,8 +308,17 @@ end
     @test_throws ArgumentError one_sided(cac, fuel; side=:bogus, name=:bad)
 end
 
-# Section 6b: single_channel (edge-channel — plate cooled on both faces)
-# Verify-block requires: at least 2 "@testset \"single_channel" testsets.
+@testset "one_sided — a channel heated on one wall uses that face" begin
+    geom = Duct(0.6, Rectangular(0.070, 0.0025); heated=(right=0.070,))
+    @named cac = ChannelAndContacts(; n=4, geometry=geom)
+    _, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    @test string.(equations(one_sided(cac, fuel; name=:osc))) ==
+          string.(equations(one_sided(cac, fuel; side=:right, name=:osc)))
+    @test_throws ArgumentError one_sided(cac, fuel; side=:left, name=:bad)
+    @test_throws ArgumentError single_channel(cac, fuel; fuel_side=:left, name=:bad)
+end
+
+# single_channel (edge-channel — plate cooled on both faces)
 @testset "single_channel — fuel_side=:left compiles cleanly" begin
     geom = Duct(0.6, Rectangular(0.070, 0.0025))
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
@@ -381,7 +392,7 @@ end
     @test_throws ArgumentError single_channel(cac, fuel; fuel_side=:bogus, name=:bad)
 end
 
-# Section 7: assembly
+# assembly
 # Stitch two symmetric_plate assemblies into one hydraulic series.
 @testset "assembly: two plates in series" begin
     cac1, fuel1 = _mtr_pair(; n=4, nz=4, nx=2)
@@ -429,7 +440,7 @@ end
     @test_throws ArgumentError assembly([pump.inlet.p], pump; name=:bad)
 end
 
-# Section 8: temperature_feedback
+# temperature_feedback
 # Equation-counting tests for temperature_feedback.
 @testset "temperature_feedback — 1D (CAC) emits n equations" begin
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
