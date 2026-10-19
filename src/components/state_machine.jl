@@ -514,6 +514,12 @@ function machine_callbacks(ssys, machines::StateMachine...)
     return length(cbs) == 1 ? only(cbs) : CallbackSet(cbs...)
 end
 
+"""
+    _callbacks(ssys, machine) -> Vector{ContinuousCallback}
+
+One callback per transition of `machine`, for [`machine_callbacks`](@ref). The first also
+settles the machine at the start of the run.
+"""
 function _callbacks(ssys, machine::StateMachine)
     edges = map(machine.transitions) do tr
         gap, both_edges = _gap(ssys, machine, tr.condition)

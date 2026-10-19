@@ -199,6 +199,15 @@ function Duct(L::Real, shape::AbstractShape; heated=_default_heated(shape))
     return Duct(L, shape, NamedTuple{keys(faces)}(widths))
 end
 
+"""
+    _default_heated(shape) -> NamedTuple
+
+The heated widths a [`Duct`](@ref) gets when given none: every wall of the shape at its full
+width, except an annulus, heated on its inner wall only.
+
+# Throws
+- `ArgumentError`: for an [`Effective`](@ref) shape, which has no walls to default to
+"""
 _default_heated(s::AbstractShape) = walls(s)
 _default_heated(s::Annular) = (inner=π * s.D_in,)
 _default_heated(s::Effective) =
@@ -278,6 +287,13 @@ aspect_ratio(s::Rectangular) = s.depth / s.width
 aspect_ratio(d::Duct) = aspect_ratio(d.shape)
 
 """
+    _DuctKey
+
+The metadata key a channel stores its [`Duct`](@ref) under, read back by [`duct`](@ref).
+"""
+struct _DuctKey end
+
+"""
     duct(channel) -> Duct
 
 The [`Duct`](@ref) a channel was built with. Every STREAM channel carries its own, compiled
@@ -306,12 +322,10 @@ function duct(sys::ModelingToolkit.AbstractSystem)
 end
 
 """
-    _DuctKey
+    _with_duct(sys, d::Duct) -> System
 
-The metadata key a channel stores its [`Duct`](@ref) under, read back by [`duct`](@ref).
+`sys` carrying `d`, for [`duct`](@ref) to read back.
 """
-struct _DuctKey end
-
 _with_duct(sys, d::Duct) = ModelingToolkit.setmetadata(sys, _DuctKey, d)
 
 # A duct is one value in a broadcast, as a coolant is.

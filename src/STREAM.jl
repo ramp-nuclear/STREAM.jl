@@ -115,7 +115,7 @@ using ModelingToolkit
 using ..STREAM: AbstractLiquid, Liquid, G_EARTH
 using ..STREAM: Duct, Rectangular, flow_area, hydraulic_diameter, aspect_ratio
 using ..STREAM: ρ, cₚ, μ, κ, σ, β, Tsat
-using ..STREAM: Re, Pr, Gr, Ra, flow_regime_blend
+using ..STREAM: Re, Pr, Gr, Ra, flow_regime_blend, _correlation_name
 include("htc/correlations.jl")
 include("htc/subcooled_boiling.jl")
 include("htc/htc.jl")
@@ -157,7 +157,7 @@ using ModelingToolkit
 using ..STREAM: AbstractLiquid
 using ..STREAM: Duct, Rectangular, Circular, flow_area, hydraulic_diameter, aspect_ratio
 using ..STREAM: heated_perimeter, wetted_perimeter
-using ..STREAM: μ, Re, flow_regime_blend
+using ..STREAM: μ, Re, flow_regime_blend, _correlation_name
 include("friction/correlations.jl")
 include("friction/darcy.jl")
 export blasius, laminar, turbulent
@@ -389,6 +389,7 @@ module Connect
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ...Components
+using ...Components: _row_major   # a feedback group's cell order, private to Components
 using ...STREAM: port, var_length
 include("assemblies/connections.jl")
 export inseries, inparallel, weighted, face, faces, temperature_feedback

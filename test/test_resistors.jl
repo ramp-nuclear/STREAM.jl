@@ -34,7 +34,7 @@ end
     k = 1.0e5
     @named pump = Pump(dP)
     @named hx = HeatExchanger(26.85)
-    @named vfr = VolumetricFlowResistor(; k=k, density=1.0)
+    @named vfr = VolumetricFlowResistor(; k=k, liquid=Substances.Liquid())
     conns = [
         inseries(pump, hx, vfr, pump),
         pump.inlet.p ~ 1.0e5,
@@ -57,7 +57,7 @@ end
     klow = 2.0e3
     @named pump = Pump(dP)
     @named hx = HeatExchanger(26.85)
-    @named vfr = VolumetricFlowResistor(; k=k, klow=klow, density=1.0)
+    @named vfr = VolumetricFlowResistor(; k=k, klow=klow, liquid=Substances.Liquid())
     conns = [
         inseries(pump, hx, vfr, pump),
         pump.inlet.p ~ 1.0e5,
@@ -75,7 +75,7 @@ end
 
 @testset "VolumetricFlowResistor — callable k (transistor pattern) compiles with k_fn" begin
     kfn = (t) -> 1.0e5 * (1.0 + t)
-    @named vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
+    @named vfr = VolumetricFlowResistor(; k=kfn, liquid=Substances.Liquid())
     @test vfr isa ModelingToolkit.System
     par_strs = string.(parameters(vfr))
     @test any(s -> occursin("k_fn", s), par_strs)
@@ -88,7 +88,7 @@ end
     # dP = k_fn(t)*q*|q| holds at two distinct times AND that the flow actually fell, so the
     # time-varying behavior the name evokes is exercised, not just compiled.
     dP_head = 3.0e4   # Pa, fixed pump head
-    k0 = 1.0e5        # Pa*s^2/kg^2 at t=0 (density=1 -> Q = ṁ)
+    k0 = 1.0e5        # Pa*s^2/kg^2 at t=0 (unit density, so Q = ṁ)
     # Build the ramp and the constant seed from one factory so they share a closure type.
     # The resistor stores k as an MTK callable parameter typed to the function it was built
     # with, so the steady-solve seed and the transient override must be the same type to be
@@ -99,7 +99,7 @@ end
 
     @named pump = Pump(dP_head)
     @named hx = HeatExchanger(26.85)
-    @named vfr = VolumetricFlowResistor(; k=kfn, density=1.0)
+    @named vfr = VolumetricFlowResistor(; k=kfn, liquid=Substances.Liquid())
     conns = [
         inseries(pump, hx, vfr, pump),
         pump.inlet.p ~ 1.0e5,

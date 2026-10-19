@@ -146,7 +146,7 @@ function turbulent(Re, epsilon=0)
     inlog = log10(epsilon + 21.25 / Re_safe^0.9)
     outlog = log10(epsilon / 3.7 + (2.51 / Re_safe) * (1.14 - 2 * inlog))
     f = (-2 * outlog)^(-2)
-    return Base.ifelse(Re < 10, zero(f), f)
+    return ifelse(Re < 10, zero(f), f)
 end
 
 """

@@ -1,3 +1,8 @@
+"""
+    _real_defaults(params) -> Vector{Float64}
+
+The numeric defaults of `params`, skipping any without one.
+"""
 function _real_defaults(params)
     vals = Float64[]
     for p in params

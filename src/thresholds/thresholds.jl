@@ -1,6 +1,10 @@
-# The Sudo-Kaminaga CHF correlation is a maximum over three branch expressions; these are the
-# branches. Kept private because only q_CHF_sudo_kaminaga has any use for them.
+"""
+    _SKq1(G_star), _SKq2(A_ratio, G_star, dT_inlet),
+    _SKq3(A_ratio, w, lamda, dT_inlet, rho_v, rho_l), _SKq4(G_star, dT_outlet)
 
+The four dimensionless branches [`q_CHF_sudo_kaminaga`](@ref) selects between. `_SKq4` is
+infinite at no flow, where it would divide by zero.
+"""
 function _SKq1(G_star)
     return 0.005 * abs(G_star)^0.611
 end
@@ -13,14 +17,18 @@ function _SKq3(A_ratio, w, lamda, dT_inlet, rho_v, rho_l)
     return 0.7 * A_ratio * sqrt(w / lamda) * (1 + dT_inlet) / (1 + (rho_v / rho_l)^0.25)^2
 end
 
-# The width q3 reads. Python STREAM gives a circular or annular channel its hydraulic
-# diameter.
-_width(s::Rectangular) = s.width
-_width(s::Union{Circular,Annular}) = hydraulic_diameter(s)
-
 function _SKq4(G_star, dT_outlet)
     return iszero(G_star) ? Inf : _SKq1(G_star) * (1 + 5000 * dT_outlet / abs(G_star))
 end
+
+"""
+    _width(shape) -> m
+
+The channel width `_SKq3` reads: a rectangle's long edge, and, as in Python STREAM, the
+hydraulic diameter of a circular or annular channel.
+"""
+_width(s::Rectangular) = s.width
+_width(s::Union{Circular,Annular}) = hydraulic_diameter(s)
 
 # #### Public API
 

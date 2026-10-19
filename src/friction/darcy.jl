@@ -176,9 +176,9 @@ function (d::RegimeDependent)(T_wall, T_bulk, ṁ, liquid, duct)
     ReK = Re_bulk * _k_R(d.k_R, duct)
     # Feed the laminar branch a finite Reynolds at no-flow so the bare 64/Re never forms an
     # Inf while the not-taken branch is traced. For every Re > 0 this is just ReK.
-    ReK_lam = Base.ifelse(Re_bulk <= 0, one(ReK), ReK)
+    ReK_lam = ifelse(Re_bulk <= 0, one(ReK), ReK)
     f = flow_regime_blend(Re_bulk, d.re_bounds, d.laminar(ReK_lam), d.turbulent(ReK))
-    f = Base.ifelse(Re_bulk <= 0, zero(f), f)
+    f = ifelse(Re_bulk <= 0, zero(f), f)
     d.viscosity === nothing && return f
     mu_ratio = μ(liquid, T_wall) / μ(liquid, T_bulk)
     return f * d.viscosity(heated_perimeter(duct) / wetted_perimeter(duct), mu_ratio)
@@ -189,12 +189,6 @@ end
 (d::AbstractDarcyFactor)(T_bulk, ṁ, liquid, duct) = d(T_bulk, T_bulk, ṁ, liquid, duct)
 
 # #### Printing
-
-function _correlation_name(f)
-    f isa Function || return sprint(show, f)
-    name = string(nameof(f))
-    return startswith(name, "#") ? "a correlation" : name
-end
 
 Base.show(io::IO, d::FromFunction) = print(io, "Friction.FromFunction(", _correlation_name(d.f), ")")
 # How a model's k_R reads in its printout, and nothing for the uncorrected 1.

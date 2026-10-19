@@ -90,6 +90,12 @@ function elenbaas_nusselt(Ra, b, L)
 end
 
 
+"""
+    _two_sided_heating_nusselt(aspect_ratio, nu0=8.235) -> Nu
+
+The parallel-plate Nusselt number `nu0` scaled to a rectangular duct heated on its two long
+sides, by Shah and London's polynomial in the aspect ratio.
+"""
 function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     return nu0 * (
         1.0 - 1.4122 * aspect_ratio + 2.3473 * aspect_ratio^2 - 2.8983 * aspect_ratio^3 +
@@ -97,6 +103,12 @@ function _two_sided_heating_nusselt(aspect_ratio, nu0=8.235)
     )
 end
 
+"""
+    _nusselt_coefficient_developing(x_star) -> Nu
+
+The thermally developing laminar Nusselt number between parallel plates at the dimensionless
+distance `x_star` from the heated entrance, in Shah and London's three ranges.
+"""
 function _nusselt_coefficient_developing(x)
     nu_low = 1.49 * x^(-1 / 3)
     nu_mid = 1.49 * x^(-1 / 3) - 0.4

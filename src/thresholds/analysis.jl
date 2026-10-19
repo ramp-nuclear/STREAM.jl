@@ -12,36 +12,36 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 
 # Fields
 - `n::Int`: number of axial cells
-- `T_bulk::AbstractArray`: bulk coolant temperature per cell [°C]
-- `T_wall::AbstractArray`: the hottest face's wall temperature per cell [°C]
+- `T_bulk::Vector{Float64}`: bulk coolant temperature per cell [°C]
+- `T_wall::Vector{Float64}`: the hottest face's wall temperature per cell [°C]
 - `T_walls::NamedTuple`: each face's wall temperature per cell, by face name [°C]
-- `T_sat::AbstractArray`: saturation temperature per cell [°C]
-- `T_ONB::AbstractArray`: onset of nucleate boiling temperature per cell [°C]
+- `T_sat::Vector{Float64}`: saturation temperature per cell [°C]
+- `T_ONB::Vector{Float64}`: onset of nucleate boiling temperature per cell [°C]
 - `T_inlet::Float64`: temperature of the coolant entering the channel, at whichever end is
   upstream, from the channel's `T_in` [°C]
-- `P::AbstractArray`: absolute pressure per cell [Pa]
-- `q_flux::AbstractArray`: the largest face heat flux per cell [W/m²]
+- `P::Vector{Float64}`: absolute pressure per cell [Pa]
+- `q_flux::Vector{Float64}`: the largest face heat flux per cell [W/m²]
 - `q_fluxes::NamedTuple`: each face's heat flux per cell, by face name [W/m²]
 - `ṁ::Float64`: mass flow rate from `inlet.ṁ` [kg/s]
-- `velocity::AbstractArray`: absolute fluid velocity per cell [m/s]
+- `velocity::Vector{Float64}`: absolute fluid velocity per cell [m/s]
 - `duct::Union{Duct, Nothing}`: the channel's [`Duct`](@ref), or `nothing` for a state built
   by hand without one
 - `gravity::Float64`: gravitational acceleration [m/s²]
 """
-@kwdef struct ChannelState
+@kwdef struct ChannelState{W<:NamedTuple,Q<:NamedTuple,G<:Union{Duct,Nothing}}
     n::Int
-    T_bulk::AbstractArray
-    T_wall::AbstractArray
-    T_walls::NamedTuple = (;)
-    T_sat::AbstractArray
-    T_ONB::AbstractArray
+    T_bulk::Vector{Float64}
+    T_wall::Vector{Float64}
+    T_walls::W = (;)
+    T_sat::Vector{Float64}
+    T_ONB::Vector{Float64}
     T_inlet::Float64
-    P::AbstractArray
-    q_flux::AbstractArray
-    q_fluxes::NamedTuple = (;)
-    ṁ::Float64
-    velocity::AbstractArray
-    duct::Union{Duct,Nothing} = nothing
+    P::Vector{Float64}
+    q_flux::Vector{Float64}
+    q_fluxes::Q = (;)
+    ṁ::Float64
+    velocity::Vector{Float64}
+    duct::G = nothing
     gravity::Float64
 end
 

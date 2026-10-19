@@ -72,6 +72,18 @@ Re(liquid::AbstractLiquid, T, ṁ, d::Duct) = Re(liquid, T, ṁ, flow_area(d), h
 Pr(liquid::AbstractLiquid, T) = Pr(cₚ(liquid, T), μ(liquid, T), κ(liquid, T))
 
 """
+    _correlation_name(f) -> String
+
+How a model prints the correlation it closes: a named function as its name, an anonymous one
+as "a correlation", and a callable struct as itself.
+"""
+function _correlation_name(f)
+    f isa Function || return sprint(show, f)
+    name = string(nameof(f))
+    return startswith(name, "#") ? "a correlation" : name
+end
+
+"""
     flow_regime_blend(Re, re_bounds, laminar, turbulent)
 
 Choose between a laminar and a turbulent value on Reynolds number, blending linearly across

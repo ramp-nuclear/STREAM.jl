@@ -42,8 +42,8 @@ end
 """
     film_temperature(T_wall, T_bulk) -> °C
 
-Midway between the wall and the bulk, `(T_wall + T_bulk)/2`. Named rather than inlined so
-the convention is one place to find and to change.
+Midway between the wall and the bulk, `(T_wall + T_bulk)/2`, where [`AtFilm`](@ref) reads the
+coolant's properties.
 """
 film_temperature(T_wall, T_bulk) = (T_wall + T_bulk) / 2
 
@@ -71,6 +71,24 @@ natural branches this way.
 """
 struct AtBulk <: PropertyBasis end
 
+"""
+    property_temperature(basis::PropertyBasis, T_wall, T_bulk) -> °C
+
+The temperature a model with this [`PropertyBasis`](@ref) reads the coolant's properties at.
+
+# Arguments
+- `basis`: [`AtFilm`](@ref) or [`AtBulk`](@ref)
+- `T_wall`, `T_bulk`: the wall and bulk temperatures [°C]
+
+# Returns
+The film temperature for `AtFilm`, the bulk temperature for `AtBulk`.
+
+# Examples
+```jldoctest
+julia> HTC.property_temperature(HTC.AtFilm(), 90.0, 40.0)
+65.0
+```
+"""
 property_temperature(::AtFilm, T_wall, T_bulk) = film_temperature(T_wall, T_bulk)
 property_temperature(::AtBulk, T_wall, T_bulk) = T_bulk
 
@@ -340,14 +358,6 @@ end
 
 _basis_words(::AtFilm) = "at the film temperature"
 _basis_words(::AtBulk) = "at the bulk temperature"
-
-# A named function prints as its name; a closure or a callable struct as itself, if it says
-# more than its type.
-function _correlation_name(f)
-    f isa Function || return sprint(show, f)
-    name = string(nameof(f))
-    return startswith(name, "#") ? "a correlation" : name
-end
 
 Base.show(io::IO, m::FromFunction) = print(io, "HTC.FromFunction(", _correlation_name(m.f), ")")
 Base.show(io::IO, m::FromNusselt) =
