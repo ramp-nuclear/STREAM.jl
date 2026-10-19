@@ -47,6 +47,9 @@ const GEOM_F = Duct(0.6, Rectangular(0.07, 0.07 * 0.01814))
         # The same k_R, as a function of the duct, reaches a regime-dependent model.
         rd = Friction.RegimeDependent(; k_R=Friction.rectangular_correction)
         @test rd(T_wall, T_bulk, ṁ_at(500.0), H2O, GEOM_F) ≈ 64.0 / (500.0 * k_R)
+        # A function k_R prints as the function it is.
+        @test sprint(show, MIME("text/plain"), Friction.RectangularLaminar()) ==
+              "Friction.FromReynolds(laminar), Re scaled by k_R from rectangular_correction"
     end
 
     @testset "Friction.RegimeDependent blends and guards no-flow" begin

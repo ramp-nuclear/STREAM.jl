@@ -282,6 +282,45 @@ end
     end
 end
 
+@testset "a channel's faces are the heated walls of its duct" begin
+    # A plate gap heated on its left wall only has one face, and h is given for it by name.
+    rect = Duct(0.6, Rectangular(0.07, 0.0025); heated=(left=0.07,))
+    @named ch = Channel(; n=3, geometry=rect, h=(left=H_DEFAULT,))
+    @test hasproperty(ch, :T_wall_left)
+    @test !hasproperty(ch, :T_wall_right)
+    @test_throws ArgumentError Channel(; name=:bad, n=3, geometry=rect, h=(right=H_DEFAULT,))
+
+    @named pump = Pump(DP_PUMP)
+    @named bc = HeatExchanger(T_INLET)
+    conns = [inseries(pump, bc, ch, pump), pump.inlet.p ~ 1.0e5, ch.T_wall_left .~ T_WALL]
+    @named sys = assembly(conns, pump, bc, ch)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.1])
+    @test sol.retcode == ReturnCode.Success
+    @test sol[ssys.ch.T_out] > T_INLET
+    @test sol[ssys.ch.q_wall] == sol[ssys.ch.q_wall_left]
+
+    # A function of time given for one face becomes that face's callable parameter.
+    h_fn = t -> H_DEFAULT
+    @named ch_fn = Channel(; n=3, geometry=rect, h=(left=h_fn,))
+    @test any(p -> occursin("h_left_fn", string(p)), parameters(ch_fn))
+end
+
+@testset "an unheated duct gives a channel with no faces" begin
+    plain = Duct(L_DEFAULT, Circular(D_DEFAULT); heated=(;))
+    @named riser = Channel(; n=3, geometry=plain)
+    @test !hasproperty(riser, :T_wall_outer)
+    @named pump = Pump(DP_PUMP)
+    @named bc = HeatExchanger(T_INLET)
+    @named sys = assembly([inseries(pump, bc, riser, pump), pump.inlet.p ~ 1.0e5],
+                          pump, bc, riser)
+    ssys = mtkcompile(sys)
+    sol = solve_steady(ssys, [ssys.riser.inlet.ṁ => 0.5])
+    @test sol.retcode == ReturnCode.Success
+    @test sol[ssys.riser.T_out] ≈ T_INLET
+    @test all(iszero, sol[ssys.riser.q_wall])
+end
+
 const N_SIGN          = 5
 const T_INLET_SIGN    = 40.0
 const T_WALL_SIGN     = 100.0

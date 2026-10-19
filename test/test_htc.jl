@@ -52,6 +52,8 @@ const GEOM_MTR = Duct(0.6, Rectangular(0.07, 0.00127))
         # Python STREAM evaluates its laminar branches at the bulk, so ours default there.
         @test HTC.FullyDevelopedLaminar().basis isa HTC.AtBulk
         @test HTC.DevelopingLaminar(; develop_length=0.3).basis isa HTC.AtBulk
+        @test sprint(show, HTC.DevelopingLaminar(; develop_length=0.3)) ==
+              "developing laminar, 0.3 m from the entrance, at the bulk temperature"
         @test HTC.DittusBoelter().basis isa HTC.AtFilm
         # A develop length that matters: it must not give the fully-developed answer.
         @test HTC.DevelopingLaminar(; develop_length=0.05)(T_wall, T_bulk, ṁ, H2O, GEOM_MTR) !=

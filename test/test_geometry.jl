@@ -56,6 +56,8 @@ end
     @test Duct(1.2, shape; heated=(rod=0.5, can=0.5)).heated == (rod=0.5, can=0.5)
     # There is no sensible default heated perimeter for a shape known only by its area.
     @test_throws ArgumentError Duct(1.2, shape)
+    @test_throws ArgumentError Duct(1.2, shape; heated=(0.5, 0.5))   # not named
+    @test sprint(show, shape) == "Effective(; area=1.0, wetted_perimeter=1.0)"
 end
 
 @testset "annular duct" begin
@@ -69,6 +71,11 @@ end
     @test duct.heated == (inner=π * 0.010,)
     both = Duct(1.0, Annular(0.010, 0.016); heated=(inner=π * 0.010, outer=π * 0.016))
     @test heated_perimeter(both) ≈ π * 0.026
+    shown = sprint(show, MIME("text/plain"), duct)
+    @test occursin("Annular(0.01, 0.016)", shown)
+    @test occursin("m inner", shown)
+    @test occursin("heated              nowhere",
+                   sprint(show, MIME("text/plain"), Duct(1.0, Circular(0.01); heated=(;))))
 end
 
 @testset "knob-driven duct" begin

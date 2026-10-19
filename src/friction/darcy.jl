@@ -6,7 +6,7 @@ A wall friction model. Subtypes are callable as
     darcy(T_wall, T_bulk, ṁ, liquid, duct) -> f
 
 with temperatures in °C, `ṁ` in kg/s, `liquid` an [`AbstractLiquid`](@ref) and `duct` a
-[`Duct`](@ref), the same arguments an [`AbstractHTC`](@ref) takes. The Reynolds number is
+[`Duct`](@ref), the same arguments an [`AbstractHTC`](@ref STREAM.HTC.AbstractHTC) takes. The Reynolds number is
 formed internally at the bulk temperature. A model that ignores the wall can also be called as
 `darcy(T_bulk, ṁ, liquid, duct)`.
 
