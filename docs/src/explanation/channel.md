@@ -147,7 +147,7 @@ connections = [
 ]
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
+sol = solve_steady(sys)
 
 z = ((1:n) .- 0.5) .* geometry.L ./ n
 fig = Figure(size=(700, 420))

@@ -27,26 +27,23 @@ A pump, in one of three modes:
 Uncompiled `System`.
 """
 function Pump(dP_pump::Real; name)
-    pars = @parameters dP_pump = dP_pump
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    eqs = Equation[outlet.p - inlet.p ~ dP_pump]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    two = HydraulicTwoPort(; name)
+    @unpack Δp, ṁ = two
+    @parameters dP_pump = dP_pump
+    return extend(System([Δp ~ dP_pump], t; name), two)
 end
 
 function Pump(dP_pump::Any; name)
+    two = HydraulicTwoPort(; name)
+    @unpack Δp, ṁ = two
     FType = typeof(dP_pump)
-    pars = @parameters (dP_pump_fn::FType)(..)
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    eqs = Equation[outlet.p - inlet.p ~ dP_pump_fn(t)]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    @parameters (dP_pump_fn::FType)(..)
+    return extend(System([Δp ~ dP_pump_fn(t)], t; name), two)
 end
 
 function Pump(; name, ṁ0)
-    pars = @parameters ṁ0 = ṁ0
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    eqs = Equation[inlet.ṁ ~ ṁ0]
-    return HydraulicTwoPort(; name, inlet, outlet, eqs, pars=pars)
+    two = HydraulicTwoPort(; name)
+    @unpack ṁ = two
+    @parameters ṁ0 = ṁ0
+    return extend(System([ṁ ~ ṁ0], t; name), two)
 end

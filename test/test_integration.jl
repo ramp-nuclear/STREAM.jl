@@ -207,7 +207,7 @@ end
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts from it. Mirror
     # that: solve_steady with the pump on, then start the transient from the solved state with the
     # pump head overridden to 0 (a zero-head pump is a pass-through).
-    sol_ss = solve_steady(ssys, [ssys.L_el.inlet.ṁ => ṁ0, ssys.R.inlet.ṁ => ṁ0])
+    sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 300.0; length=7)   # includes 0, 50, 150, 300
     sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0],
@@ -451,7 +451,7 @@ end
     ssys = mtkcompile(sys)
     # The machine is :CLOSED for the steady solve; opening it at a time you already know is a
     # trip, the same idiom a fixed scram uses.
-    sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => ṁ0, ssys.R.inlet.ṁ => ṁ0])
+    sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     trip!(machine, 100.0; state=:OPEN)
     sol = solve_transient(ssys, sol_ss, range(0.0, 150.0; length=300);

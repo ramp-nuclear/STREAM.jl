@@ -20,30 +20,30 @@ sys = mtkcompile(loop)
 nothing # hide
 ```
 
+## Flows start away from zero by themselves
+
+A closed loop has a solution with no flow at all, and a quadratic pressure law has no slope
+there, so a solver started at zero flow stays put. Every port's flow carries a guess, a small
+flow in the port's usual direction, and `solve_steady` starts any flow the operating point
+does not give from it. A loop needs no flow in its operating point:
+
+```@example ss
+sol = solve_steady(sys)
+(sol.retcode, sol[sys.ch.inlet.ṁ])
+```
+
 ## Guess the variables the solver keeps
 
-`mtkcompile` removes most variables, keeping only those the rest can be computed from. A guess
-only acts on a kept one. List them:
+`mtkcompile` removes most variables, keeping only those the rest can be computed from. A value
+in an operating point only acts on a kept one. List them:
 
 ```@example ss
 foreach(println, unknowns(sys))
 ```
 
 Here the flow is kept as `ch.inlet.ṁ`. The same flow is also `pump.inlet.ṁ` and
-`hx.outlet.ṁ`, but those names were eliminated, and a guess for them would do nothing. Which
+`hx.outlet.ṁ`, but those names were eliminated, and a value for them would do nothing. Which
 copy of a variable survives can change when the model changes, so after an edit, look again.
-
-## Give every loop a flow
-
-A closed loop has a solution with no flow at all. Started from zero flow, the solver can land
-there, or stall next to it. Guess a flow of the right size and sign for each loop:
-
-```@example ss
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
-(sol.retcode, sol[sys.ch.inlet.ṁ])
-```
-
-A pump in fixed-flow mode, `Pump(; ṁ0)`, removes the question, since the flow is then given.
 
 ## Guess the temperatures
 
@@ -54,8 +54,7 @@ components at once:
 
 ```@example ss
 T_guess = steady_state_guess(; T_inlet=40.0, Q_wall=1.0e4, ṁ_guess=0.5, n=10)
-op = [sys.ch.inlet.ṁ => 0.5, sys.ch.T => T_guess]
-solve_steady(sys, op).retcode
+solve_steady(sys, [sys.ch.T => T_guess]).retcode
 ```
 
 ```julia
@@ -69,20 +68,20 @@ not. `DynamicSS` integrates the model in time from the guess until it stops chan
 finds the operating point a real plant would settle into:
 
 ```@example ss
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5]; solver=DynamicSS(Rodas5P()))
+sol = solve_steady(sys; solver=DynamicSS(Rodas5P()))
 (sol.retcode, sol[sys.ch.inlet.ṁ])
 ```
 
 It is slower, but it is the robust choice for a loop with parallel branches, natural
 circulation, or a check valve: the [pool loss-of-flow tutorial](../tutorials/07_pool_lofa.md)
-uses it. Give it a guess with the flows in each branch, as above.
+uses it.
 
 ## Do not constrain the sign of the flow
 
 When a loop lands on zero or reversed flow, it is tempting to forbid negative flow. Do not.
 Flows legitimately reverse: after a pump trip, natural circulation runs the other way through
-the core. A model that forbids it forbids the physics. Fix the guess, or integrate to steady
-state, instead.
+the core. A model that forbids it forbids the physics. Give the flow a value of the expected
+sign in the operating point, or integrate to steady state, instead.
 
 ## A transient that starts from a steady state
 
@@ -90,7 +89,7 @@ Solve the steady state first, then hand the solution to
 [`solve_transient`](@ref), changing what starts the transient through `overrides`:
 
 ```@example ss
-sol_ss = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
+sol_ss = solve_steady(sys)
 sol_tr = solve_transient(sys, sol_ss, 0.0:0.5:10.0; overrides=[sys.pump.dP_pump => 1.5e4])
 sol_tr[sys.ch.inlet.ṁ, end]
 ```

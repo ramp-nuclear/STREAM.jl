@@ -39,7 +39,7 @@ end
     @named sys = assembly(connections, pump, L_comp, R_comp, hx)
     ssys = mtkcompile(sys)
 
-    sol_ss = solve_steady(ssys, [ssys.L_comp.inlet.ṁ => ṁ0])
+    sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     sol = solve_transient(ssys, sol_ss, range(0.0, 5000.0; length=200);
                           overrides=[ssys.pump.dP_pump => 0.0])

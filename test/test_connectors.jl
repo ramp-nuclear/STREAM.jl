@@ -15,6 +15,16 @@ const ModelingToolkitBase = ModelingToolkit.ModelingToolkitBase
     @test connect_type == ModelingToolkit.Flow
 end
 
+@testset "a port's flow carries a guess in its usual direction" begin
+    @named fp = FlowPort()
+    @named out = FlowPort(; ṁ_guess=-Components.FLOW_GUESS)
+    flow(p) = only(filter(v -> ModelingToolkit.getname(v) == :ṁ, unknowns(p)))
+    @test ModelingToolkit.getguess(flow(fp)) == Components.FLOW_GUESS > 0
+    @test ModelingToolkit.getguess(flow(out)) == -Components.FLOW_GUESS
+    # The default stays zero: a transient that names no flow still starts at rest.
+    @test ModelingToolkit.getdefault(flow(fp)) == 0.0
+end
+
 @testset "T is a Stream variable" begin
     @named fp = FlowPort()
     T_var = only(filter(v -> ModelingToolkit.getname(v) == :T, unknowns(fp)))

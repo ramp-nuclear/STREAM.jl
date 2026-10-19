@@ -126,7 +126,7 @@ end
         conns = [inseries(pump, hx, fr, pump), pump.inlet.p ~ 1.0e5]
         @named sys = assembly(conns, pump, fr, hx)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.fr.inlet.ṁ => 1.0])
+        sol = solve_steady(ssys)
         return ssys, sol
     end
 
@@ -157,7 +157,7 @@ end
         ]
         @named sys = assembly(conns, pump, hx, rs...)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.pump.inlet.ṁ => 0.5])
+        sol = solve_steady(ssys)
         return sol[ssys.pump.inlet.ṁ]
     end
     m_one = loop_flow([2.0e4])

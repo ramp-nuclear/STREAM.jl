@@ -45,7 +45,7 @@ Give the knob's value in the operating point. [`knob_defaults`](@ref) collects t
 for a solve at the declared design:
 
 ```@example knob
-base = [knob_defaults([gap]); sys.cell.ch.inlet.ṁ => 0.4]
+base = knob_defaults([gap])
 sol = solve_steady(sys, base)
 sol[sys.cell.ch.inlet.ṁ]
 ```
@@ -55,7 +55,7 @@ and a scan sets it explicitly, compiling nothing:
 ```@example knob
 gaps = [0.0018, 0.0021, 0.0024, 0.0027, 0.0030]
 results = map(gaps) do g
-    s = solve_steady(sys, [gap => g, sys.cell.ch.inlet.ṁ => 0.4])
+    s = solve_steady(sys, [gap => g])
     (gap_mm=1e3g, ṁ=round(s[sys.cell.ch.inlet.ṁ]; digits=3), T_out=round(s[sys.cell.ch.T_out]; digits=2))
 end
 ```

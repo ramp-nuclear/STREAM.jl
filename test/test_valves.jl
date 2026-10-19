@@ -128,7 +128,7 @@ end
     sys = assembly(conns, pump, ine, res, flapper, hx;
                    parameters=[ṁ_open_at], name=:flap_param)
     ssys = mtkcompile(sys)
-    sol_ss = solve_steady(ssys, [ssys.ine.inlet.ṁ => 1.0, ssys.res.inlet.ṁ => 1.0])
+    sol_ss = solve_steady(ssys)
     coast(threshold) = solve_transient(
         ssys, sol_ss, range(0.0, 30.0; length=301);
         overrides=[ssys.pump.dP_pump => 0.0, ṁ_open_at => threshold],
@@ -423,12 +423,9 @@ end
     ssys = mtkcompile(sys)
     C = ssys.heated.ch
 
-    # Pump on, flapper shut, integrated to steady. Started at zero, the flows mtkcompile keeps
-    # stay at ṁ = 0 and the solve fails, so they start at the flow the head drives through
-    # ext_res. The dummy derivative has no default and needs a value too.
-    ṁ0 = 2.0e5 / 1.0e6
-    ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => head(Inf), C.inlet.ṁ => ṁ0,
-                             ssys.ext_res.inlet.ṁ => ṁ0, Differential(t)(C.inlet.ṁ) => 0.0];
+    # Pump on, flapper shut, integrated to steady. The flows start from their guesses; the
+    # dummy derivative has no default and needs a value.
+    ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => head(Inf), Differential(t)(C.inlet.ṁ) => 0.0];
                       solver=DynamicSS(Rodas5P()))
     valve_at_steady = machine.state
     # Every unknown, not a subset: a `Dt(ṁ) => 0` guess does not reach the dummy-derivative

@@ -1,9 +1,23 @@
 """
-    HydraulicTwoPort(; name, inlet, outlet, eqs, vars=[], pars=[]) -> System
+    HydraulicTwoPort(; name) -> System
 
 Shared shell for a hydraulic two-port component: one `inlet` and one `outlet`
-[`FlowPort`](@ref), with mass conservation and temperature pass-through supplied here so each
-component only has to state its own pressure relation.
+[`FlowPort`](@ref), with mass conservation and temperature pass-through, so each component
+only has to state its own law. The shell names the two quantities a law relates: `Δp`, the
+pressure rise `outlet.p - inlet.p`, as Python STREAM's `dp_out`, and `ṁ`, the flow in at the
+inlet. A component `extend`s it:
+
+```julia
+function Resistor(R; name)
+    two = HydraulicTwoPort(; name)
+    @unpack Δp, ṁ = two
+    @parameters R = R
+    return extend(System([Δp ~ -R * ṁ], t; name), two)
+end
+```
+
+Every flow carries a guess, the inlet's positive and the outlet's negative, so a steady solve
+starts the component flowing forward whichever of its equal flows `mtkcompile` keeps.
 
 A **two-port component** takes flow in at one port and passes it out at one other, holds no
 fluid, and adds no heat. [`Pump`](@ref), [`Flapper`](@ref), [`Resistor`](@ref),
@@ -12,8 +26,8 @@ fluid, and adds no heat. [`Pump`](@ref), [`Flapper`](@ref), [`Resistor`](@ref),
 fluid and exchange heat, and state their own energy balance. [`inseries`](@ref) and
 [`inparallel`](@ref) accept either, needing only an `inlet` and an `outlet`.
 
-`eqs` holds the component's pressure relation, usually one equation of the form
-`inlet.p - outlet.p ~ <something>`. This adds three more:
+The component's law is usually one equation for `Δp`. Besides defining `Δp` and `ṁ`, the
+shell holds three more:
 
 ```julia
 inlet.ṁ + outlet.ṁ ~ 0        # what goes in comes out
@@ -38,25 +52,21 @@ Connectors: An Extension of Modelica for Device-Oriented Modeling of Convective 
 Phenomena", Modelica Conference 2009.
 
 # Arguments
-- `name`: system name (Symbol, injected by `@named`)
-- `inlet`, `outlet`: `FlowPort` connectors, already `@named` by the caller
-- `eqs`: the component's own equations, usually a single pressure relation
-- `vars`: extra unknowns the component introduces (default none)
-- `pars`: parameters the component introduces (default none)
+- `name`: the component's name, the same one it builds its own `System` under
 
 # Returns
-An uncompiled `System` with `inlet` and `outlet` composed in. It also observes `Δp`, the
-pressure rise `outlet.p - inlet.p` as Python STREAM's `dp_out`, and `ṁ`, the flow in at the
-inlet, so `sol[ssys.r.Δp]` reads any two-port's pressure change.
+An uncompiled `System` holding `inlet`, `outlet`, `Δp` and `ṁ`, to `extend`.
 """
-function HydraulicTwoPort(; name, inlet, outlet, eqs, vars=[], pars=[])
-    full_eqs = Equation[
+function HydraulicTwoPort(; name)
+    @named inlet = FlowPort()
+    @named outlet = FlowPort(; ṁ_guess=-FLOW_GUESS)
+    @variables Δp(t) [guess = 0.0] ṁ(t) [guess = FLOW_GUESS]
+    eqs = [
+        Δp ~ outlet.p - inlet.p,
+        ṁ ~ inlet.ṁ,
         inlet.ṁ + outlet.ṁ ~ 0,
-        eqs...,
         outlet.T ~ instream(inlet.T),
         inlet.T ~ instream(outlet.T),
     ]
-    @variables Δp(t) ṁ(t)
-    obs = [Δp ~ outlet.p - inlet.p, ṁ ~ inlet.ṁ]
-    return compose(System(full_eqs, t, [vars; Δp; ṁ], pars; observed=obs, name), inlet, outlet)
+    return compose(System(eqs, t; name), inlet, outlet)
 end

@@ -1,5 +1,14 @@
 """
-    FlowPort(; name, p=1.0e5, ṁ=0.0, T=T_ROOM)
+    FLOW_GUESS
+
+The flow [kg/s] a steady solve starts a port from when the operating point does not give one.
+Small and nonzero: a quadratic pressure law has no slope at zero flow, so a solve started
+there cannot leave.
+"""
+const FLOW_GUESS = 0.1
+
+"""
+    FlowPort(; name, p=1.0e5, ṁ=0.0, T=T_ROOM, ṁ_guess=FLOW_GUESS)
 
 Acausal hydraulic connector. `p` is the across (potential) variable, `ṁ` is the flow
 variable (sums to zero at a junction), and `T` is a stream variable carried with the flow.
@@ -19,12 +28,15 @@ be built already seeded.
   channel works out for itself.
 - `ṁ`: mass flow rate [kg/s]; positive points into the port.
 - `T`: temperature [°C].
+- `ṁ_guess`: where a steady solve starts the flow when nothing else says [kg/s]. A component
+  passes `-FLOW_GUESS` for a port its flow normally leaves by.
 """
-@connector function FlowPort(; name, p=1.0e5, ṁ=0.0, T=T_ROOM)
+@connector function FlowPort(; name, p=1.0e5, ṁ=0.0, T=T_ROOM, ṁ_guess=FLOW_GUESS)
     sts = @variables begin
         p(t) = p, [description = "Pressure (Pa), across variable"]
         ṁ(t) = ṁ,
-        [connect = Flow, description = "Mass flow rate (kg/s), positive = into port"]
+        [connect = Flow, guess = ṁ_guess,
+         description = "Mass flow rate (kg/s), positive = into port"]
         T(t) = T, [connect = Stream, description = "Temperature (°C), stream variable"]
     end
     System(Equation[], t, sts, []; name=name)

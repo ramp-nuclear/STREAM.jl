@@ -27,7 +27,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         ]
         @named sys = assembly(conns, pump, bc, cac, wall)
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.490])
+        sol = solve_steady(ssys)
 
         @test sol.retcode == ReturnCode.Success
         @test all(isapprox.(sol[ssys.cac.Nu_outer], 8.235, rtol=1e-4))
@@ -61,7 +61,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
             conns, pump, bc, cac, ct_l, ct_r
         )
         ssys = mtkcompile(sys)
-        sol = solve_steady(ssys, [ssys.cac.inlet.ṁ => 8.8e-4])
+        sol = solve_steady(ssys)
 
         @test sol.retcode == ReturnCode.Success
         @test sol[ssys.cac.dP] > 0.0
@@ -124,8 +124,8 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         ]
         @named sys = assembly(conns, pump, bc, cac, ct_l, ct_r)
         ssys = mtkcompile(sys)
-        sol_lam = solve_steady(ssys, [ssys.cac.inlet.ṁ => 1e-4])
-        sol_turb = solve_steady(ssys, [ssys.cac.inlet.ṁ => 0.250, ssys.pump.dP_pump => dP_turb])
+        sol_lam = solve_steady(ssys)
+        sol_turb = solve_steady(ssys, [ssys.pump.dP_pump => dP_turb])
         @test sol_lam.retcode == ReturnCode.Success
         @test sol_turb.retcode == ReturnCode.Success
         @test sol_lam[ssys.cac.Re[1]] < 2300.0
@@ -360,7 +360,7 @@ end
         ssys_fd = @test_nowarn mtkcompile(sys_fd)
         @test ssys_fd !== nothing
 
-        sol_fd = solve_steady(ssys_fd, [ssys_fd.cac_fd.inlet.ṁ => 1e-3])
+        sol_fd = solve_steady(ssys_fd)
         @test sol_fd.retcode == ReturnCode.Success
     end
 
@@ -398,7 +398,7 @@ end
         ssys_dev = @test_nowarn mtkcompile(sys_dev)
         @test ssys_dev !== nothing
 
-        sol_dev = solve_steady(ssys_dev, [ssys_dev.cac_dev.inlet.ṁ => 1e-3])
+        sol_dev = solve_steady(ssys_dev)
         @test sol_dev.retcode == ReturnCode.Success
     end
 end

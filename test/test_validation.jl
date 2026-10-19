@@ -358,7 +358,7 @@ end
     ]
     @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     ssys = mtkcompile(sys)
-    sol = solve_steady(ssys, [ssys.cac_l.inlet.ṁ => 0.25, ssys.cac_r.inlet.ṁ => 0.25])
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
 
     dz = 0.6 / nz
@@ -754,7 +754,7 @@ end
     ssys_v02 = mtkcompile(sys_v02)
 
     # Initial guess: ṁ +0.250 (rectangular MTR at 30 kPa)
-    sol_v02 = solve_steady(ssys_v02, [ssys_v02.cac_v02.inlet.ṁ => +0.250])
+    sol_v02 = solve_steady(ssys_v02)
 
     # Assertion 1: solver converged
     @test sol_v02.retcode == ReturnCode.Success

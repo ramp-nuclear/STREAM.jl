@@ -29,7 +29,7 @@ end
     ]
     @named sys_real = assembly(conns_real, p_real, hx_real, res_real)
     ssys_real = mtkcompile(sys_real)
-    sol_real = solve_steady(ssys_real, [ssys_real.res_real.inlet.ṁ => 1.0])
+    sol_real = solve_steady(ssys_real)
     @test sol_real.retcode == ReturnCode.Success
     # Defining relation of scalar mode: the head equals the prescribed dP (rtol=1e-8, the
     # head is an exact algebraic equation, only float round-off separates them).
@@ -39,6 +39,11 @@ end
     )
     # The same head also fixes the loop flow: ṁ = dP/R through the single resistor.
     @test isapprox(sol_real[ssys_real.res_real.inlet.ṁ], dP_scalar / R_val; rtol=1e-6)
+    # Every two-port reports its pressure rise and flow: the pump rises by its head, and the
+    # resistor drops by as much, carrying the same flow.
+    @test sol_real[ssys_real.p_real.Δp] ≈ dP_scalar
+    @test sol_real[ssys_real.res_real.Δp] ≈ -dP_scalar
+    @test sol_real[ssys_real.res_real.ṁ] ≈ sol_real[ssys_real.res_real.inlet.ṁ]
 
     # --- Callable fixed-pressure mode: the head follows the callable at the solve time. ---
     # A steady solve relaxes in real time to t where dP_pump_fn(t) is read; with a constant
@@ -83,7 +88,7 @@ end
     ]
     @named sys_m = assembly(conns_m, p_ṁ, hx_m, res_m)
     ssys_m = mtkcompile(sys_m; fully_determined=false)
-    sol_m = solve_steady(ssys_m, [ssys_m.res_m.inlet.ṁ => ṁ_set])
+    sol_m = solve_steady(ssys_m)
     @test sol_m.retcode == ReturnCode.Success
     # Defining relation of fixed-flow mode: the flow is pinned to ṁ0 (rtol=1e-8, exact
     # algebraic constraint inlet.ṁ ~ ṁ0).

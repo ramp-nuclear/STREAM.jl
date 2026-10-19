@@ -197,14 +197,10 @@ ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types));
 
 # ## The steady state at full power
 #
-# A loop has a solution with no flow at all, so the solve starts from the design flows and
-# integrates to where the model settles, the robust way to find a loop's operating point
-# (see [Get a steady solve to converge](../howto/steady_solve.md)).
+# The solve integrates to where the model settles, the robust way to find a loop's operating
+# point (see [Get a steady solve to converge](../howto/steady_solve.md)).
 
-guess = [sys.primary.inlet.ṁ => ṁ_design,
-         ch_high.inlet.ṁ => case.types.high.design_ṁ,
-         ch_low.inlet.ṁ => case.types.low.design_ṁ]
-sol_ss = solve_steady(sys, guess; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
+sol_ss = solve_steady(sys; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
 sol_ss.retcode
 
 # Each type gets its design flow, and the kinetics sit at rated power, of which the decay heat

@@ -225,7 +225,7 @@ end
     ]
     @named sys_u = assembly(conns, pump_u, bc_u, cac_u, wall)
     ssys_u = mtkcompile(sys_u)
-    sol_u = solve_steady(ssys_u, [ssys_u.cac_u.inlet.ṁ => 0.49])
+    sol_u = solve_steady(ssys_u)
 
     @test sol_u.retcode == ReturnCode.Success
     @test all(isapprox.(sol_u[ssys_u.cac_u.h_tc_outer], h_fixed; rtol=1e-8))
