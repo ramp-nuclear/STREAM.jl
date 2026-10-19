@@ -8,7 +8,7 @@ Nu = 0.023 \, Re^{0.8} Pr^{0.4}
 ```
 
 Valid for `Re > 10⁴`, `0.6 ≤ Pr ≤ 160` and `L/D > 10`. Trailing arguments are ignored, so
-the correlation fits the `(Re, Pr, T_wall, T_bulk)` signature of the others.
+the correlation fits the `(Re, Pr, T_wall, T_bulk, duct)` call [`FromNusselt`](@ref) makes.
 
 # Arguments
 - `Re`, `Pr`: Reynolds and Prandtl numbers
@@ -105,7 +105,8 @@ function _nusselt_coefficient_developing(x)
 end
 
 @doc raw"""
-    fully_developed_laminar_nusselt(geom::PipeGeometry) -> (Re, Pr, T_bulk, T_wall) -> Nu
+    fully_developed_laminar_nusselt(aspect_ratio) -> Nu
+    fully_developed_laminar_nusselt(Re, Pr, T_wall, T_bulk, duct::Duct{<:Rectangular}) -> Nu
 
 Fully developed laminar Nusselt number in a rectangular duct heated on its two long sides,
 a fifth-order polynomial in the aspect ratio `α = depth / width` [ShahLondon1978](@cite):
@@ -114,50 +115,76 @@ a fifth-order polynomial in the aspect ratio `α = depth / width` [ShahLondon197
 Nu = 8.235 \, (1 - 1.4122 α + 2.3473 α^2 - 2.8983 α^3 + 2.0629 α^4 - 0.6077 α^5)
 ```
 
+The second form is the one [`FromNusselt`](@ref) calls, and reads `α` off the duct.
+
 # Arguments
-- `geom`: the duct; only `depth / width` is used
+- `aspect_ratio`: `α`, in [0, 1]
 
 # Returns
-A function `(Re, Pr, T_bulk, T_wall) -> Nu`, constant in its arguments.
+Nusselt number (dimensionless).
+
+# Examples
+```jldoctest
+julia> HTC.fully_developed_laminar_nusselt(0.0)
+8.235
+```
 """
-function fully_developed_laminar_nusselt(geom::PipeGeometry)
-    aspect_ratio = geom.depth / geom.width
-    nu = _two_sided_heating_nusselt(aspect_ratio)
-    return (Re, Pr, args...) -> nu
+fully_developed_laminar_nusselt(aspect_ratio) = _two_sided_heating_nusselt(aspect_ratio)
+
+function fully_developed_laminar_nusselt(Re, Pr, T_wall, T_bulk, duct::Duct{<:Rectangular})
+    return fully_developed_laminar_nusselt(aspect_ratio(duct))
 end
 
 @doc raw"""
-    developing_laminar_nusselt(geom::PipeGeometry; develop_length) -> (Re, Pr, T_bulk, T_wall) -> Nu
+    developing_laminar_nusselt(Re, Pr, aspect_ratio, x_over_Dh) -> Nu
 
 Laminar Nusselt number in a rectangular duct heated on its two long sides, while the
 temperature profile is still developing. It is the parallel-plate developing value at the
 dimensionless distance
 
 ```math
-x^* = x / (D_h \, Re \, Pr \, c), \qquad c = 6 - 5 e^{-0.75 α / 0.3257}
+x^* = (x / D_h) / (Re \, Pr \, c), \qquad c = 6 - 5 e^{-0.75 α / 0.3257}
 ```
 
 scaled to the aspect ratio `α` as in [`fully_developed_laminar_nusselt`](@ref)
 [ShahLondon1978](@cite). Far enough downstream it falls to the fully developed value.
+[`DevelopingLaminar`](@ref) is the model built on it.
 
 # Arguments
-- `geom`: the duct
-- `develop_length`: distance from the heated entrance [m]. Required, since the result depends
-  on where along the channel it is evaluated.
+- `Re`, `Pr`: Reynolds and Prandtl numbers
+- `aspect_ratio`: `α`, depth over width, in [0, 1]
+- `x_over_Dh`: distance from the heated entrance, in hydraulic diameters
 
 # Returns
-A function `(Re, Pr, T_bulk, T_wall) -> Nu`.
+Nusselt number (dimensionless).
+
+# Examples
+```jldoctest
+julia> round(HTC.developing_laminar_nusselt(500.0, 4.0, 0.02, 10.0); sigdigits=6)
+10.1318
+```
 """
-function developing_laminar_nusselt(geom::PipeGeometry; develop_length)
-    aspect_ratio = geom.depth / geom.width
-    Dh_v = geom.Dh
+function developing_laminar_nusselt(Re, Pr, aspect_ratio, x_over_Dh)
     correction = 6 - 5 * exp(-0.75 * aspect_ratio / 0.3257)
-    return (Re, Pr, args...) -> begin
-        x_star = develop_length / Dh_v / Re / Pr / correction
-        nudev = _nusselt_coefficient_developing(x_star)
-        _two_sided_heating_nusselt(aspect_ratio, nudev)
-    end
+    x_star = x_over_Dh / Re / Pr / correction
+    return _two_sided_heating_nusselt(aspect_ratio, _nusselt_coefficient_developing(x_star))
 end
+
+"""
+    _DevelopingNu(x)
+
+[`developing_laminar_nusselt`](@ref) at `x` metres from the heated entrance, called as
+`(Re, Pr, T_wall, T_bulk, duct) -> Nu`. A struct rather than a closure, so it prints.
+"""
+struct _DevelopingNu{T}
+    x::T
+end
+
+function (c::_DevelopingNu)(Re, Pr, T_wall, T_bulk, duct::Duct{<:Rectangular})
+    return developing_laminar_nusselt(Re, Pr, aspect_ratio(duct), c.x / hydraulic_diameter(duct))
+end
+
+Base.show(io::IO, c::_DevelopingNu) = print(io, "developing laminar, ", c.x, " m from the entrance")
 
 @doc raw"""
     marco_han_nusselt(aspect_ratio) -> Nu

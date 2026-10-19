@@ -145,8 +145,7 @@ one-face-insulated coupling, use [`one_sided`](@ref) instead.
 # Arguments
 - `channel`: uncompiled `ChannelAndContacts` instance.
 - `fuel`: uncompiled `HeatDiffusion` instance (`nz` must equal `channel.n`).
-- `geometry`: the `PipeGeometry` the channel was built with (supplies `L` and
-  `heated_parts` for the far-face areas).
+- `geometry`: the [`Duct`](@ref) the channel was built with, which gives the far-face areas
 - `fuel_side`: `:left` or `:right`, which fuel face is the near (conjugate) face
   (default `:left`). The opposite face gets the convective sink.
 - `name`: system name (Symbol).
@@ -158,7 +157,7 @@ Uncompiled `System` from [`assembly`](@ref) holding `channel`, `fuel`, and `n` p
 After composition, refer to sub-components through the returned system (e.g.
 `scc.channel`, `scc.fuel`).
 """
-function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol=:left, name::Symbol)
+function single_channel(channel, fuel, geometry::Duct; fuel_side::Symbol=:left, name::Symbol)
     fuel_side in (:left, :right) ||
         throw(ArgumentError("fuel_side must be :left or :right, got :$fuel_side"))
     n = var_length(channel, :thermal_left)
@@ -176,7 +175,7 @@ function single_channel(channel, fuel, geometry::PipeGeometry; fuel_side::Symbol
     h_near = near == :left ? :h_tc_left : :h_tc_right
 
     far_bcs = [
-        ConvectiveBoundary(; name=Symbol(name, :_far, i), area=geometry.heated_parts[far_idx] * dz)
+        ConvectiveBoundary(; name=Symbol(name, :_far, i), area=geometry.heated[far_idx] * dz)
         for i in 1:n
     ]
 

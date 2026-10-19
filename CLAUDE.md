@@ -259,7 +259,8 @@ error), and the whole HTC / friction / local-loss / threshold / dimensionless in
   parameter and its role is clear from the name (`Resistor(R; name)`, `Gravity(H; name)`).
 - **Keyword arguments** when several arguments share a type and order would be a bug waiting
   to happen (`Channel(; name, L, Dh, ...)`), or when a constructor has many parameters.
-- `PipeGeometry_rectangular` and `PipeGeometry_circular` take positional arguments.
+- A `Duct` takes its length and shape positionally, `Duct(0.6, Rectangular(0.067, 0.0024))`,
+  since each has one obvious role.
 - `name` is always keyword-only, since `@named` injects it as a keyword.
 
 ## Exports

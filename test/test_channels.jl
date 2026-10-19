@@ -22,7 +22,7 @@ const H_DEFAULT      = 5000.0
 const DP_PUMP        = 3.0e4
 const Q_FLUX_DEFAULT = 1.0e5
 
-geom = PipeGeometry_circular(L_DEFAULT, D_DEFAULT)
+geom = Duct(L_DEFAULT, Circular(D_DEFAULT))
 
 _names(sys) = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(sys)))
 
@@ -88,7 +88,7 @@ end
 @testset "ChannelHeatFlux heated with q>0 increases temperature" begin
     n = N_DEFAULT
     dz = L_DEFAULT / n
-    expected = Q_FLUX_DEFAULT * geom.heated_parts[1] * dz
+    expected = Q_FLUX_DEFAULT * geom.heated[1] * dz
     @named pump = Pump(DP_PUMP)
     @named bc = HeatExchanger(T_INLET)
     @named chf = ChannelHeatFlux(; n=n, geometry=geom)
@@ -127,7 +127,7 @@ end
     ssys = mtkcompile(sys)
     sol = solve_steady(ssys, [ssys.chf.inlet.ṁ => ṁ])
     @test sol.retcode == ReturnCode.Success
-    dT = q * geom.heated_parts[1] * dz / (ṁ * cp_mock)
+    dT = q * geom.heated[1] * dz / (ṁ * cp_mock)
     Tc = sol[ssys.chf.T]
     @test isapprox(Tc[1] - T_INLET, dT; rtol=1e-6)
     for i in 2:n
@@ -262,7 +262,7 @@ end
               HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_correction)
         @named pump = Pump(dP_pump_iscb)
         @named cac = ChannelAndContacts(
-            n=n, geometry=PipeGeometry_circular(L_ch, D_ch), htc=htc
+            n=n, geometry=Duct(L_ch, Circular(D_ch)), htc=htc
         )
         @named bc = HeatExchanger(T_inlet_iscb)
         @named ct_l = ConstantTemperature(T_wall_bc; n=n)
@@ -298,7 +298,7 @@ const N_SIGN          = 5
 const T_INLET_SIGN    = 40.0
 const T_WALL_SIGN     = 100.0
 const ṁ_NEG = -0.490
-const GEOM_SIGN       = PipeGeometry_circular(0.6, 0.01)
+const GEOM_SIGN       = Duct(0.6, Circular(0.01))
 
 @testset "flow reversal: Channel ṁ < 0 " begin
     @named pump = Pump(; ṁ0=ṁ_NEG)
@@ -397,10 +397,10 @@ end
 
 @testset "Direction of flow does not matter for temperature profile" begin
     n = 3
-    geom = PipeGeometry_circular(0.3, 0.01)
+    geom = Duct(0.3, Circular(0.01))
     Q = 800.0
     dz = 0.3 / n
-    q_density_g3b = Q / (geom.heated_parts[1] * dz)
+    q_density_g3b = Q / (geom.heated[1] * dz)
     T_in = 46.85
 
     function _build_loop_g3b(ṁ0)
@@ -463,7 +463,7 @@ end
     # Read CAC's converged per-cell q_density from q_wall_left.
     dz = L_DEFAULT / n
     q_per_cell = [
-        sol_cac[ssys_cac.cac.q_wall_left[i], end] / (geom.heated_parts[1] * dz)
+        sol_cac[ssys_cac.cac.q_wall_left[i], end] / (geom.heated[1] * dz)
         for i in 1:n
     ]
 
@@ -504,7 +504,7 @@ end
         @named pump = Pump(dP_pump_scb)
         @named cac = ChannelAndContacts(
             n=n_scb,
-            geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
+            geometry=Duct(L_ch_scb, Circular(D_ch_scb)),
             htc=htc,
         )
         @named bc = HeatExchanger(T_inlet_scb)
@@ -528,7 +528,7 @@ end
         scb_fn = HTC.regime_dependent_q_scb()
         @named cac = ChannelAndContacts(
             n=3,
-            geometry=PipeGeometry_circular(L_ch_scb, D_ch_scb),
+            geometry=Duct(L_ch_scb, Circular(D_ch_scb)),
             htc=HTC.SubcooledBoiling(HTC.DittusBoelter(), scb_fn),
         )
         @test cac isa ModelingToolkit.System

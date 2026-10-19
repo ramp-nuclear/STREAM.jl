@@ -55,6 +55,7 @@ Pr(cp, mu, k) = cp * mu / k
 
 """
     Re(liquid, T, ṁ, A, Dh) -> Float64
+    Re(liquid, T, ṁ, duct::Duct) -> Float64
     Pr(liquid, T) -> Float64
     Gr(liquid, T, T_wall, L, g) -> Float64
 
@@ -67,6 +68,7 @@ julia> round(Pr(H2O, 40.0); sigdigits=7)
 ```
 """
 Re(liquid::AbstractLiquid, T, ṁ, A, Dh) = Re(ṁ, A, Dh, μ(liquid, T))
+Re(liquid::AbstractLiquid, T, ṁ, d::Duct) = Re(liquid, T, ṁ, flow_area(d), hydraulic_diameter(d))
 Pr(liquid::AbstractLiquid, T) = Pr(cₚ(liquid, T), μ(liquid, T), κ(liquid, T))
 
 """

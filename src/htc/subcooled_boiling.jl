@@ -147,7 +147,7 @@ function regime_dependent_q_scb(; re_bounds=(2000.0, 5000.0))
 end
 
 """
-    _scb_corrected(h_spl, q_scb, T_wall, T_bulk, ṁ, Dh, A, liquid, P) -> h
+    _scb_corrected(h_spl, q_scb, T_wall, T_bulk, ṁ, liquid, duct, P) -> h
 
 The Bergles-Rohsenow partial boiling blend, applied to a single-phase `h` that some
 [`AbstractHTC`](@ref) has already produced.
@@ -156,11 +156,11 @@ Below the onset of nucleate boiling nothing changes. At or above it the single-p
 scaled by the partial boiling factor, switched with `ifelse`. The flux closure `q_scb` gets the
 coolant at saturation at the local pressure `P`, and the bulk Reynolds number.
 """
-function _scb_corrected(h_spl, q_scb, T_wall, T_bulk, ṁ, Dh, A, liquid, P)
+function _scb_corrected(h_spl, q_scb, T_wall, T_bulk, ṁ, liquid, duct, P)
     q_spl = max(h_spl * (T_wall - T_bulk), 0.0)
     T_sat = Tsat(liquid, P)
     sat = liquid(T_sat, P)
-    Re_bulk = Re(liquid, T_bulk, ṁ, A, Dh)
+    Re_bulk = Re(liquid, T_bulk, ṁ, duct)
     T_ONB = T_sat + _bergles_rohsenow_dT_ONB(P, q_spl)
     factor = partial_SCB_correction(
         q_spl, q_scb(T_wall, sat, Re_bulk), q_scb(T_ONB, sat, Re_bulk)

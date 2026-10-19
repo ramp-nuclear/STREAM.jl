@@ -12,8 +12,8 @@ share one set of equations. They differ only in how heat reaches the coolant:
 
 Here ``P`` is the heated perimeter of one face and ``\Delta z = L/n``. Each has a left and a
 right face, so a channel between two plates is heated from both sides. For a plate-fuel
-channel, [`PipeGeometry_rectangular`](@ref) takes the two edges of the cross-section and the
-heated width of each face:
+channel, a [`Duct`](@ref) with a [`Rectangular`](@ref) cross-section takes the two edges and
+the heated width of each face:
 
 ![Cross-section of a plate-fuel coolant channel: the gap between two fuel plates, with the width, gap and heated width marked](../assets/rect_channel.svg)
 
@@ -130,7 +130,7 @@ using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile
 
 n = 20
-geometry = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
+geometry = Duct(0.6, Rectangular(0.067, 0.0024))
 shape = cosine_shape(range(0.0, geometry.L; length=n + 1))
 T_wall = 60.0 .+ 60.0 .* shape ./ maximum(shape)   # 60 °C at the ends, 120 °C mid-height
 

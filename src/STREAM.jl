@@ -89,10 +89,11 @@ The heat transfer coefficient a channel wall sees.
 
 An [`AbstractHTC`](@ref) is the handle a channel is handed, and it answers one question:
 
-    htc(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h  [W/(m²·K)]
+    htc(T_wall, T_bulk, ṁ, liquid, duct) -> h  [W/(m²·K)]
 
-Anything else a correlation needs (geometry, gravity, a transition band, a development
-length) it captures when constructed. A user-defined model is a struct plus that one method;
+The duct is handed over on every call, so one model serves channels of any geometry. Anything
+else a correlation needs (gravity, a transition band, a development length) it captures when
+constructed. A user-defined model is a struct plus that one method;
 [`FromFunction`](@ref) covers the one-off case.
 
 Two layers. The Nusselt correlations (`dittus_boelter`, `elenbaas_nusselt`, the laminar forms)
@@ -101,9 +102,9 @@ are dimensionless, taking `(Re, Pr, T_wall, T_bulk)` and returning Nu. The model
 and [`FromNusselt`](@ref) lifts a correlation into a model. [`PropertyBasis`](@ref) selects the
 temperature a model reads coolant properties at, film or bulk.
 
-Every correlation is plain arithmetic that MTK traces through, and guards use `ifelse`.
-Geometry-dependent factories take a `PipeGeometry` first and capture what they need at
-construction, so the closure sees only symbolic `Re` and `Pr`.
+Every correlation is plain arithmetic that MTK traces through, and guards use `ifelse`. A
+correlation that only holds for one shape, such as the laminar plate Nusselt numbers or
+Elenbaas, dispatches on `Duct{<:Rectangular}`.
 
 The heat exchanger relations live here too: [`effectiveness`](@ref) for a
 [`Counterflow`](@ref) or [`ParallelFlow`](@ref) arrangement, and [`flow_scaled_UA`](@ref), a UA
@@ -111,7 +112,8 @@ that follows the flows on both sides.
 """
 module HTC
 using ModelingToolkit
-using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, G_EARTH
+using ..STREAM: AbstractLiquid, Liquid, G_EARTH
+using ..STREAM: Duct, Rectangular, flow_area, hydraulic_diameter, aspect_ratio
 using ..STREAM: ρ, cₚ, μ, κ, σ, β, Tsat
 using ..STREAM: Re, Pr, Gr, Ra, flow_regime_blend
 include("htc/correlations.jl")
@@ -135,14 +137,15 @@ The wall friction factor a channel or a resistor is handed.
 
 An [`AbstractDarcyFactor`](@ref) answers one question:
 
-    darcy(T_bulk, T_wall, ṁ, liquid, pipe) -> f  [dimensionless]
+    darcy(T_wall, T_bulk, ṁ, liquid, duct) -> f  [dimensionless]
 
-The wall temperature and the pipe carry the two corrections a heated channel needs: `k_R`, the
-geometric correction on the Reynolds fed to each branch, and `k_H`, the viscosity correction,
-which compares wall against bulk viscosity weighted by the heated and wet perimeters.
+The same arguments, in the same order, as an [`HTC`](@ref) model takes. The wall temperature
+and the duct carry the two corrections a heated channel needs: `k_R`, the geometric correction
+on the Reynolds fed to each branch, and `k_H`, the viscosity correction, which compares wall
+against bulk viscosity weighted by the heated and wet perimeters.
 
-Two layers, as in [`HTC`](@ref). The correlations (`laminar`, `turbulent`, `blasius`,
-`rectangular_laminar`) take a Reynolds number and nothing else. The models
+Two layers, as in [`HTC`](@ref). The correlations (`laminar`, `turbulent`, `blasius`) take a
+Reynolds number and nothing else, and `rectangular_laminar` the aspect ratio too. The models
 ([`Blasius`](@ref), [`RegimeDependent`](@ref)) add the property reads and the corrections, and
 [`FromReynolds`](@ref) lifts a correlation into a model.
 
@@ -151,7 +154,9 @@ which has no length, use [`LocalLoss`](@ref).
 """
 module Friction
 using ModelingToolkit
-using ..STREAM: AbstractLiquid, PipeGeometry
+using ..STREAM: AbstractLiquid
+using ..STREAM: Duct, Rectangular, Circular, flow_area, hydraulic_diameter, aspect_ratio
+using ..STREAM: heated_perimeter, wetted_perimeter
 using ..STREAM: μ, Re, flow_regime_blend
 include("friction/correlations.jl")
 include("friction/darcy.jl")
@@ -210,7 +215,8 @@ Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAn
 module Thresholds
 using ModelingToolkit
 using QuadGK
-using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, H2O, G_EARTH
+using ..STREAM: AbstractLiquid, Liquid, H2O, G_EARTH
+using ..STREAM: Duct, Rectangular, Circular, flow_area, hydraulic_diameter, heated_perimeter
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Pe
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
@@ -263,7 +269,8 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkit: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
 using SymbolicIndexingInterface: getsym, ProblemState
-using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM
+using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM
+using ..STREAM: flow_area, hydraulic_diameter, heated_perimeter
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..STREAM: assembly, port
@@ -368,7 +375,7 @@ since components use them too, and re-exported here.
 module Assemblies
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
-using ..STREAM: PipeGeometry
+using ..STREAM: Duct
 using ..Components
 using ..STREAM: assembly, port, var_length
     """
@@ -435,7 +442,8 @@ export H2O, D2O, Solid
 export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend
 
 # Geometry
-export PipeGeometry, PipeGeometry_rectangular, PipeGeometry_circular
+export Duct, Rectangular, Circular, Effective, AbstractShape
+export flow_area, hydraulic_diameter, wetted_perimeter, heated_perimeter, aspect_ratio
 
 # Solve entry points and the operating-point guess
 export solve_steady, solve_transient, steady_state_guess, uniform

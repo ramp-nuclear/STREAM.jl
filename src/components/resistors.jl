@@ -9,7 +9,7 @@ laminar/turbulent blend and, if asked for, the heated-wall viscosity correction.
 
 # Arguments
 - `name`: system name (Symbol)
-- `geometry`: pipe geometry descriptor ([`PipeGeometry`](@ref))
+- `geometry`: the [`Duct`](@ref)
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref)), default [`Blasius`](@ref)
 - `liquid`: coolant (`AbstractLiquid`), default [`H2O`](@ref)
 
@@ -18,11 +18,10 @@ laminar/turbulent blend and, if asked for, the heated-wall viscosity correction.
 """
 function FrictionResistor(;
     name,
-    geometry::PipeGeometry,
+    geometry::Duct,
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
-    geom = geometry
     vars = @variables begin
         Re(t)
         f(t)
@@ -30,11 +29,10 @@ function FrictionResistor(;
     @named inlet = FlowPort()
     @named outlet = FlowPort()
     T_in = instream(inlet.T)
-    Ax, Dh, Lx = geom.A, geom.Dh, geom.L
     eqs = Equation[
-        Re ~ STREAM.Re(liquid, T_in, inlet.ṁ, Ax, Dh),
-        f ~ darcy(T_in, inlet.ṁ, liquid, geom),
-        inlet.p - outlet.p ~ darcy_weisbach_dp(inlet.ṁ, ρ(liquid, T_in), f, Lx, Dh, Ax),
+        Re ~ STREAM.Re(liquid, T_in, inlet.ṁ, geometry),
+        f ~ darcy(T_in, inlet.ṁ, liquid, geometry),
+        inlet.p - outlet.p ~ darcy_weisbach_dp(inlet.ṁ, ρ(liquid, T_in), f, geometry),
     ]
     return HydraulicTwoPort(; name, inlet, outlet, eqs, vars)
 end

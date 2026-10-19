@@ -35,7 +35,7 @@ using ModelingToolkit: @named, mtkcompile, unknowns, equations
 # leaving it, here to 40 °C, and takes away whatever heat that needs. It stands in for the
 # secondary side of a real heat exchanger, so the loop reaches a steady state.
 
-geometry = PipeGeometry_circular(0.6, 0.01)
+geometry = Duct(0.6, Circular(0.01))
 @named ch = Channel(; n=10, geometry, h_left=5000.0);
 
 # A [`Channel`](@ref STREAM.Components.Channel) is the heated pipe: 0.6 m long and 10 mm

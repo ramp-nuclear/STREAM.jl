@@ -43,7 +43,7 @@ P = 2.5e4                # plate power [W]
 ṁ = 0.4                  # channel flow [kg/s]
 T_in, p_in = 40.0, 1.7e5 # inlet temperature [°C] and pressure [Pa]
 
-geometry = PipeGeometry_rectangular(L, width, gap, heated_width)
+geometry = Duct(L, Rectangular(width, gap); heated=heated_width)
 
 # ## The plate
 #

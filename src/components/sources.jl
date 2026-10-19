@@ -15,7 +15,7 @@ component.
 
 # Arguments
 - `name`: system name (Symbol; supplied by `@named`).
-- `area`: heat-transfer area for the cell [m^2], e.g. `heated_parts[side] * dz`.
+- `area`: heat-transfer area for the cell [m^2], e.g. `geometry.heated[side] * dz`.
 
 # Ports
 - `thermal` -- `ThermalPort`; connect to the fuel cell's far-face port.

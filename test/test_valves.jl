@@ -391,7 +391,7 @@ end
     # by a branch holding the pump, the heat exchanger and an inertia, with a flapper in
     # parallel. When the pump head falls the flapper opens and the two legs circulate alone.
     n, L, D, T_in, power, t_trip = 10, 1.0, 0.01, 40.0, 1.0e3, 10.0
-    geom = PipeGeometry_circular(L, D)
+    geom = Duct(L, Circular(D))
     # 200 kPa, falling to zero over 5 s from `t_trip` on a C1 cubic. A trip at Inf holds for
     # good and is the same closure type, so one callable parameter takes both.
     head(t_trip) = tt -> (ξ = clamp((tt - t_trip) / 5.0, 0.0, 1.0); 2.0e5 * (1 - (3ξ^2 - 2ξ^3)))
@@ -399,8 +399,9 @@ end
     # stays physical once the pump stops.
     htc = HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(; Nu=8.235),
                               turbulent=HTC.DittusBoelter(),
-                              natural=HTC.Elenbaas(geom; g=G_EARTH), geom, g=G_EARTH)
-    darcy = Friction.RegimeDependent(; laminar=Friction.rectangular_laminar(geom),
+                              natural=HTC.Elenbaas(; g=G_EARTH), g=G_EARTH)
+    α = aspect_ratio(geom)
+    darcy = Friction.RegimeDependent(; laminar=Re -> Friction.rectangular_laminar(Re, α),
                                      turbulent=Friction.blasius)
     machine = StateMachine(; initial_state=:CLOSED)
 
@@ -489,7 +490,7 @@ end
         T_ret = [mean(sol[ssys.ret.T[i], nc]) for i in 1:n]
         dP_buoy = sum(G_EARTH * dz * (ρ(H2O, T_ret[i]) - ρ(H2O, T_ch[i])) for i in 1:n)
         leg(T, f, md) = Friction.darcy_weisbach_dp(md, ρ(H2O, T), f(T, T, md, H2O, geom), dz,
-                                                   geom.Dh, geom.A)
+                                                   hydraulic_diameter(geom), flow_area(geom))
         dP_fric(md) = sum(leg(T_ch[i], darcy, md) + leg(T_ret[i], Friction.Blasius(), md)
                           for i in 1:n)
         lo, hi = 1.0e-6, 1.0   # bisect in log space

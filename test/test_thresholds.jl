@@ -14,7 +14,7 @@ using OrdinaryDiffEq: ReturnCode
 
     # Shared test pipe: 0.6m long, 67.1mm x 2.4mm rectangular channel
     # Matches typical MTR fuel assembly geometry used in Python STREAM tests
-    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    pipe = Duct(0.6, Rectangular(0.0671, 0.0024))
 
     # Anchors below come from Python STREAM run under conda env stream-env
     # (the project at ~/projects/STREAM, imported as `stream`). Each expected number
@@ -84,8 +84,8 @@ using OrdinaryDiffEq: ReturnCode
         Nu_c = 455.0
         St_c = 0.0065
         function pe_at(ṁ)
-            G = abs(ṁ) / pipe.A
-            return G * pipe.Dh * cₚ(H2O, 26.85) / κ(H2O, 26.85)
+            G = abs(ṁ) / flow_area(pipe)
+            return G * hydraulic_diameter(pipe) * cₚ(H2O, 26.85) / κ(H2O, 26.85)
         end
 
         coolant = H2O(fill(26.85, 10), fill(1e5, 10))
@@ -197,7 +197,7 @@ using OrdinaryDiffEq: ReturnCode
 end
 
 @testset "ChannelState and wrappers" begin
-    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    pipe = Duct(0.6, Rectangular(0.0671, 0.0024))
     n = 5
 
     state = ChannelState(;
@@ -251,7 +251,7 @@ end
         result = q_CHF_fabrega(state)
         @test length(result) == n
         @test all(result .> 0)
-        expected_val = 1e7 * pipe.Dh * (0.023 * (100.0 - 26.85) + 4.56)
+        expected_val = 1e7 * hydraulic_diameter(pipe) * (0.023 * (100.0 - 26.85) + 4.56)
         @test result[1] ≈ expected_val rtol = 1e-10
     end
 
@@ -355,7 +355,7 @@ end
 
 @testset "ChannelState from a solved channel" begin
     # Built from a solution rather than by hand, which is what exercises the extraction.
-    geo = PipeGeometry_circular(0.6, 0.01)
+    geo = Duct(0.6, Circular(0.01))
     ssys = build_loop(; n=5)
     sol = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
 
@@ -400,7 +400,7 @@ end
     # carries the flow down, so every flow-dependent limit has to move with it. The reader
     # this replaces froze ṁ and T_inlet at the first saved time.
     n = 5
-    geo = PipeGeometry_circular(0.6, 0.01)
+    geo = Duct(0.6, Circular(0.01))
     ssys = build_loop(; n=n)
     sol_ss = solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.5])
     sol = solve_transient(
@@ -466,7 +466,7 @@ end
     # mtkcompile drops them. MTK's own complaint is "Symbol ... is not present in the
     # system", which does not tell you that the channel variant is the problem.
     n = 4
-    geo = PipeGeometry_circular(0.6, 0.01)
+    geo = Duct(0.6, Circular(0.01))
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(20.0)
     @named chf = ChannelHeatFlux(; n=n, geometry=geo)
@@ -496,7 +496,7 @@ end
 end
 
 @testset "chfr helper" begin
-    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    pipe = Duct(0.6, Rectangular(0.0671, 0.0024))
     n = 3
     state = ChannelState(;
         n=n,
@@ -554,7 +554,7 @@ end
 end
 
 @testset "threshold_analysis dispatch" begin
-    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    pipe = Duct(0.6, Rectangular(0.0671, 0.0024))
     n = 3
     state = ChannelState(;
         n=n,
@@ -612,7 +612,7 @@ end
     # are Python's values in the first and last cell (OFI is one number for the channel).
     # Python's numba `directed` was swapped for its plain-numpy equivalent so it would run.
     n = 10
-    pipe = PipeGeometry_rectangular(0.6, 0.066, 0.0027, 0.063)
+    pipe = Duct(0.6, Rectangular(0.066, 0.0027); heated=0.063)
     dz = pipe.L / n
     q = 6e5 .* (0.6 .+ 0.8 .* sin.(π .* ((1:n) .- 0.5) ./ n))
     P = collect(range(1.75e5, 1.70e5; length=n))
@@ -624,7 +624,7 @@ end
         return ChannelState(; n=n, T_bulk=T, T_wall=T_wall, T_wall_left=T_wall,
             T_wall_right=T_wall, T_sat=Tsat.(H2O, P), T_ONB=zeros(n), T_inlet=35.0, P=P,
             q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=mdot,
-            velocity=abs.(mdot ./ (ρ.(H2O, T) .* pipe.A)), pipe=pipe, gravity=G_EARTH)
+            velocity=abs.(mdot ./ (ρ.(H2O, T) .* flow_area(pipe))), pipe=pipe, gravity=G_EARTH)
     end
 
     python = (

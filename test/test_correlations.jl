@@ -12,7 +12,7 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         T_inlet = 40.0;
         T_wall = 100.0;
         dP_pump = 3.0e4
-        geom = PipeGeometry_circular(0.6, 0.01)
+        geom = Duct(0.6, Circular(0.01))
 
         @named pump_phy02 = Pump(dP_pump)
         @named cac_phy02 = ChannelAndContacts(
@@ -43,14 +43,14 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         n = 3;
         T_inlet = 40.0;
         T_wall = 100.0
-        geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+        geom = Duct(0.6, Rectangular(0.07, 0.00127))
 
         @named pump_phy03 = Pump(30.0)
         @named cac_phy03 = ChannelAndContacts(
             n=n,
             geometry=geom,
             htc=HTC.ConstantNusselt(; Nu=8.235),
-            darcy=Friction.RectangularLaminar(geom),
+            darcy=Friction.RectangularLaminar(),
         )
         @named bc_phy03 = HeatExchanger(T_inlet)
         @named ct_l_phy03 = ConstantTemperature(T_wall; n=n)
@@ -82,9 +82,9 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         # from the solved Re[i] and T[i] and the same friction closure the channel uses, so
         # a 2x-wrong friction magnitude fails. rtol=1e-6: pure arithmetic re-evaluation of
         # the same closed form on the converged state, only float round-off differs.
-        f_lam = Friction.rectangular_laminar(geom)
-        A = geom.A
-        Dh = geom.Dh
+        f_lam(Re) = Friction.rectangular_laminar(Re, aspect_ratio(geom))
+        A = flow_area(geom)
+        Dh = hydraulic_diameter(geom)
         dz = geom.L / n
         ṁ03 = sol_phy03[ssys_phy03.cac_phy03.inlet.ṁ]
         dP_expected_03 = sum(
@@ -104,15 +104,14 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         n = 3
         T_inlet = 40.0
         T_wall = 100.0
-        geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+        geom = Duct(0.6, Rectangular(0.07, 0.00127))
         htc_rd = HTC.RegimeDependent(;
             laminar=HTC.ConstantNusselt(; Nu=8.235),
             turbulent=HTC.DittusBoelter(),
             re_bounds=(2000.0, 5000.0),
-            geom=geom,
         )
         friction_rd = Friction.RegimeDependent(;
-            laminar=Friction.rectangular_laminar(geom),
+            laminar=Re -> Friction.rectangular_laminar(Re, aspect_ratio(geom)),
             turbulent=Friction.blasius,
             re_bounds=(2000.0, 5000.0),
         )
@@ -143,8 +142,8 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
         # dP = sum_i f(Re[i]) * ṁ*|ṁ|/(2*rho(T[i])*A^2) * (dz/Dh) with friction_rd itself (the
         # closure the channel evaluates), so a wrong branch or a 2x factor fails. rtol=1e-6:
         # same-form arithmetic on the converged state.
-        A = geom.A
-        Dh = geom.Dh
+        A = flow_area(geom)
+        Dh = hydraulic_diameter(geom)
         dz = geom.L / n
         function dP_rebuilt(sol)
             ṁ = sol[ssys.cac.inlet.ṁ]
@@ -297,63 +296,40 @@ end
 end
 
 @testset "HTC.fully_developed_laminar_nusselt" begin
-    # is derived inside the factory. geom.Dh is NOT consumed by this factory's Nu calc
-    # Helper: rectangular geom with exact aspect_ratio = ar via depth=ar, width=1.0.
-    _geom_for_ar(ar) = PipeGeometry_rectangular(1.0, 1.0, ar, 1.0)
+    # The two-sided heating polynomial, not Marco and Han's four-sided one.
+    @test HTC.fully_developed_laminar_nusselt(0.0) == 8.235
+    nu_02 = 8.235 * (1.0 - 1.4122*0.2 + 2.3473*0.2^2 - 2.8983*0.2^3 + 2.0629*0.2^4 - 0.6077*0.2^5)
+    @test isapprox(HTC.fully_developed_laminar_nusselt(0.2), nu_02; rtol=1e-10)
+    @test HTC.fully_developed_laminar_nusselt(0.2) != HTC.marco_han_nusselt(0.2)
 
-    # Uses _two_sided_heating_nusselt, NOT marco_han_nusselt
-    # Reference: _two_sided_heating_nusselt(0.0) = 8.235
-    htc_fn = HTC.fully_developed_laminar_nusselt(_geom_for_ar(0.0))
-    @test htc_fn(1000.0, 7.0, 39.85, 59.85) == 8.235
-
-    # At ar=0.2: _two_sided_heating_nusselt(0.2) != marco_han_nusselt(0.2)
-    # two_sided: 8.235*(1 - 1.4122*0.2 + 2.3473*0.04 - 2.8983*0.008 + 2.0629*0.0016 - 0.6077*0.00032)
-    htc_fn_ar02 = HTC.fully_developed_laminar_nusselt(_geom_for_ar(0.2))
-    nu_two_sided_02 =
-        8.235 *
-        (1.0 - 1.4122*0.2 + 2.3473*0.2^2 - 2.8983*0.2^3 + 2.0629*0.2^4 - 0.6077*0.2^5)
-    @test isapprox(htc_fn_ar02(500.0, 5.0, 36.85, 76.85), nu_two_sided_02; rtol=1e-10)
-    # Confirm it differs from Marco_Han
-    @test htc_fn_ar02(500.0, 5.0, 36.85, 76.85) != HTC.marco_han_nusselt(0.2)
-
-    # Closure ignores Re, Pr — same Nu for any inputs
-    @test htc_fn_ar02(100.0, 3.0, 26.85, 126.85) == htc_fn_ar02(5000.0, 10.0, 16.85, 106.85)
-
-    # ar=1.0 (square): _two_sided gives different value than Marco_Han
-    htc_sq = HTC.fully_developed_laminar_nusselt(_geom_for_ar(1.0))
-    @test htc_sq(100.0, 7.0, 39.85, 59.85) > 0.0
+    # The duct form reads the aspect ratio and ignores everything else.
+    duct = Duct(1.0, Rectangular(1.0, 0.2))
+    @test HTC.fully_developed_laminar_nusselt(100.0, 3.0, 126.85, 26.85, duct) ==
+          HTC.fully_developed_laminar_nusselt(5000.0, 10.0, 106.85, 16.85, duct) ==
+          HTC.fully_developed_laminar_nusselt(aspect_ratio(duct))
+    # A circle has no aspect ratio, and the polynomial is not its answer.
+    @test_throws MethodError HTC.fully_developed_laminar_nusselt(100.0, 3.0, 60.0, 40.0,
+                                                                 Duct(1.0, Circular(0.01)))
 end
 
 @testset "HTC.developing_laminar_nusselt" begin
-    # and Dh = geom.Dh are derived inside the factory.
-    # Helper builds a rectangular geom where geom.Dh = Dh_target AND geom.depth/geom.width = ar
-    # exactly. Derivation: with depth = ar*width and Dh = 2*ar*width / (ar+1),
-    # solving for width: width = Dh*(ar+1)/(2*ar); depth = ar*width = Dh*(ar+1)/2.
-    # (Only valid for 0 < ar <= 1.)
-    _geom_for(Dh, ar) = PipeGeometry_rectangular(
-        1.0, Dh*(ar+1)/(2*ar), ar*Dh*(ar+1)/(2*ar), 1.0
-    )
+    ar, x_over_Dh = 0.2, 0.3 / 0.005
+    Nu_fd = HTC.fully_developed_laminar_nusselt(ar)
 
-    # At very high Re (large x_star), developing flow Nu should approach
-    # the fully-developed value _two_sided_heating_nusselt(ar)
-    ar = 0.2
-    htc_dev = HTC.developing_laminar_nusselt(_geom_for(0.005, ar); develop_length=0.3)
-    htc_fd = HTC.fully_developed_laminar_nusselt(_geom_for(0.005, ar))
+    # Near the entrance (high Re, so small x*), developing flow transfers more heat.
+    @test HTC.developing_laminar_nusselt(2000.0, 7.0, ar, x_over_Dh) > Nu_fd
+    # Far downstream (x* large) it settles to within 5% of the fully developed value.
+    @test isapprox(HTC.developing_laminar_nusselt(1.0, 7.0, ar, x_over_Dh), Nu_fd; rtol=0.05)
+    # The aspect ratio enters x* too, not only the final scaling.
+    @test HTC.developing_laminar_nusselt(1000.0, 7.0, ar, x_over_Dh) !=
+          HTC.developing_laminar_nusselt(1000.0, 7.0, 0.5, x_over_Dh)
 
-    # At high Re, x_star is small -> developing Nu is LARGER than fully developed
-    Nu_dev_high_Re = htc_dev(2000.0, 7.0, 39.85, 59.85)
-    Nu_fd = htc_fd(2000.0, 7.0, 39.85, 59.85)
-    @test Nu_dev_high_Re > Nu_fd  # developing flow enhances heat transfer
-
-    # At very low Re (large x_star -> fully developed), should converge toward fd value
-    # Re=1 with develop_length=0.3 -> x_star is large -> _nusselt_coefficient_developing ~ 8.235
-    Nu_dev_low_Re = htc_dev(1.0, 7.0, 39.85, 59.85)
-    @test isapprox(Nu_dev_low_Re, Nu_fd; rtol=0.05)  # within 5% of fully developed
-    @test htc_dev(500.0, 5.0, 36.85, 76.85) > 0.0
-
-    # x_star correction factor test: changing aspect_ratio changes the result
-    htc_dev_ar05 = HTC.developing_laminar_nusselt(_geom_for(0.005, 0.5); develop_length=0.3)
-    @test htc_dev(1000.0, 7.0, 39.85, 59.85) != htc_dev_ar05(1000.0, 7.0, 39.85, 59.85)
+    # The model reads x/Dh and the aspect ratio off the duct.
+    duct = Duct(1.0, Rectangular(0.07, 0.0014))
+    model = HTC.DevelopingLaminar(; develop_length=0.3)
+    Re_, Pr_ = Re(H2O, 40.0, 0.01, duct), Pr(H2O, 40.0)
+    @test model.nusselt(Re_, Pr_, 40.0, 40.0, duct) ≈ HTC.developing_laminar_nusselt(
+        Re_, Pr_, aspect_ratio(duct), 0.3 / hydraulic_diameter(duct))
 end
 
 @testset "laminar HTC factories in compiled Channel" begin
@@ -364,15 +340,15 @@ end
         dP_pump = 30.0
         # Rectangular geom with aspect_ratio = depth/width = 0.1 (a circular geom would
         # give aspect_ratio = 1.0, a different correlation point).
-        geom = PipeGeometry_rectangular(0.6, 1.0, 0.1, 1.0)
-        htc_fd_lam = HTC.FullyDevelopedLaminar(geom)
+        geom = Duct(0.6, Rectangular(1.0, 0.1))
+        htc_fd_lam = HTC.FullyDevelopedLaminar()
 
         @named pump_fd = Pump(dP_pump)
         @named cac_fd = ChannelAndContacts(
             n=n,
             geometry=geom,
             htc=htc_fd_lam,
-            darcy=Friction.RectangularLaminar(geom),
+            darcy=Friction.RectangularLaminar(),
         )
         @named bc_fd = HeatExchanger(T_inlet)
         @named ct_l_fd = ConstantTemperature(T_wall; n=n)
@@ -401,15 +377,15 @@ end
         dP_pump = 30.0
         # Rectangular geom with aspect_ratio = 0.1; Dh follows from the edges
         # (4 * 1.0*0.1 / (2*(1.0+0.1)) ≈ 0.1818). develop_length stays mandatory.
-        geom = PipeGeometry_rectangular(0.6, 1.0, 0.1, 1.0)
-        htc_dev_lam = HTC.DevelopingLaminar(geom; develop_length=0.3)
+        geom = Duct(0.6, Rectangular(1.0, 0.1))
+        htc_dev_lam = HTC.DevelopingLaminar(; develop_length=0.3)
 
         @named pump_dev = Pump(dP_pump)
         @named cac_dev = ChannelAndContacts(
             n=n,
             geometry=geom,
             htc=htc_dev_lam,
-            darcy=Friction.RectangularLaminar(geom),
+            darcy=Friction.RectangularLaminar(),
         )
         @named bc_dev = HeatExchanger(T_inlet)
         @named ct_l_dev = ConstantTemperature(T_wall; n=n)

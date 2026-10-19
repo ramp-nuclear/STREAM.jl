@@ -14,10 +14,10 @@ using OrdinaryDiffEq: ReturnCode
 # Mirrors Python STREAM's MTR_fuel_and_channel(z_N, fuel_N, clad_N) function
 # in tests/test_composition/conftest.py.
 function _mtr_pair(; n=4, nz=4, nx=2, power=1.0e3)
-    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    geom = Duct(0.6, Rectangular(0.070, 0.0025))
     @named cac = ChannelAndContacts(; n=n, geometry=geom,
                                     htc=HTC.ConstantNusselt(; Nu=8.235),
-                                    darcy=Friction.RectangularLaminar(geom))
+                                    darcy=Friction.RectangularLaminar())
     slab = Slab(; x=range(0, 0.005, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
                   material=Solid(19300.0, 116.0, 174.0))
     @named fuel = HeatDiffusion(slab; power=power)
@@ -53,7 +53,7 @@ end
 # Section 2: check_gravity_mismatch
 # Existing G_M tests carry forward — these don't touch Channel architecture.
 @testset "check_gravity_mismatch — :ok when no gravity" begin
-    geom = PipeGeometry_circular(0.6, 0.01)
+    geom = Duct(0.6, Circular(0.01))
     @named ch = ChannelAndContacts(; n=4, geometry=geom)  # default g=0.0
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
@@ -77,7 +77,7 @@ end
 end
 
 @testset "check_gravity_mismatch — :mismatch when CAC has g but no Gravity component" begin
-    geom = PipeGeometry_circular(0.6, 0.01)
+    geom = Duct(0.6, Circular(0.01))
     @named ch = ChannelAndContacts(; n=4, geometry=geom, g=G_EARTH)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
@@ -111,12 +111,12 @@ end
 end
 
 @testset "var_length: errors on Channel (no thermal port arrays under new design)" begin
-    @named ch = Channel(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
+    @named ch = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)))
     @test_throws ArgumentError var_length(ch, :thermal_left)
 end
 
 @testset "var_length: errors on ChannelHeatFlux (no thermal port arrays under new design)" begin
-    @named chf = ChannelHeatFlux(; n=4, geometry=PipeGeometry_circular(0.6, 0.01))
+    @named chf = ChannelHeatFlux(; n=4, geometry=Duct(0.6, Circular(0.01)))
     @test_throws ArgumentError var_length(chf, :thermal_left)
 end
 
@@ -190,7 +190,7 @@ end
     # each fuel face actually sheds heat to its own channel, the signs are right
     # (heat leaves the powered plate), and the plate temperature sits above both
     # coolant temperatures.
-    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    geom = Duct(0.6, Rectangular(0.07, 0.00127))
     nz = 10
     nx = 3
     power_val = 1.0e4
@@ -256,7 +256,7 @@ end
 # and leaves the opposite face dangling, which is adiabatic (Q ~ 0) under the
 # ThermalPort Flow rule.
 function _build_osc_loop(side::Symbol, name_suffix)
-    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    geom = Duct(0.6, Rectangular(0.07, 0.00127))
     nz = 10
     nx = 3
     @named cac = ChannelAndContacts(; n=nz, geometry=geom)
@@ -317,7 +317,7 @@ end
 # Section 6b: single_channel (edge-channel — plate cooled on both faces)
 # Verify-block requires: at least 2 "@testset \"single_channel" testsets.
 @testset "single_channel — fuel_side=:left compiles cleanly" begin
-    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    geom = Duct(0.6, Rectangular(0.070, 0.0025))
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     scc = single_channel(cac, fuel, geom; fuel_side=:left, name=:scc_l)
     @test scc isa ModelingToolkit.AbstractSystem
@@ -336,7 +336,7 @@ end
 end
 
 @testset "single_channel — fuel_side=:right compiles cleanly" begin
-    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    geom = Duct(0.6, Rectangular(0.070, 0.0025))
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     scc = single_channel(cac, fuel, geom; fuel_side=:right, name=:scc_r)
     @test scc isa ModelingToolkit.AbstractSystem
@@ -355,7 +355,7 @@ end
     # Use the parity-proven MTR config (dittus_boelter, both faces heated) so the steady
     # solve converges. The far face sheds heat (unlike one_sided) and, cooled
     # by the same h and coolant as the near face, the plate is laterally symmetric.
-    geom = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+    geom = Duct(0.6, Rectangular(0.07, 0.00127))
     nz = 10
     nx = 3
     @named cac = ChannelAndContacts(; n=nz, geometry=geom)
@@ -384,7 +384,7 @@ end
 end
 
 @testset "single_channel — invalid fuel_side errors" begin
-    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    geom = Duct(0.6, Rectangular(0.070, 0.0025))
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
     @test_throws ArgumentError single_channel(cac, fuel, geom; fuel_side=:bogus, name=:bad)
 end
@@ -480,10 +480,10 @@ end
 # Calls the constructors with name=... directly (not via @named) so the prefix
 # can be a runtime Symbol.
 function _fa_cac(prefix::Symbol; n=4)
-    geom = PipeGeometry_rectangular(0.6, 0.070, 0.0025, 0.070)
+    geom = Duct(0.6, Rectangular(0.070, 0.0025))
     ChannelAndContacts(; name=prefix, n=n, geometry=geom,
                        htc=HTC.ConstantNusselt(; Nu=8.235),
-                       darcy=Friction.RectangularLaminar(geom))
+                       darcy=Friction.RectangularLaminar())
 end
 
 function _fa_hd(prefix::Symbol; nz=4, nx=2, power=1.0e3)
@@ -634,7 +634,7 @@ end
     # mirrors Python STREAM's test_Kirchoff_kcl_matrix_fits_known_example_with_weights
     # (signify=50).
     N, n = 50, 4
-    geom = PipeGeometry_circular(0.6, 0.01)
+    geom = Duct(0.6, Circular(0.01))
     function channel_loop(; copies)
         @named pump = Pump(3.0e4)
         @named hx = HeatExchanger(40.0)

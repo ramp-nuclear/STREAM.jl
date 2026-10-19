@@ -319,7 +319,7 @@ const CRITICAL = (t) -> 0.0
         # Shared fixtures
         ctrl_zero = ReactivityController()  # always returns 0.0
 
-        pg5 = PipeGeometry_rectangular(1.0, 0.04, 0.01, 0.04)
+        pg5 = Duct(1.0, Rectangular(0.04, 0.01))
         @named ch = Channel(; name=:ch, n=5, geometry=pg5)
         slab = Slab(; x=range(0, 0.005, 3), z=range(0, 0.6, 4), y=0.07,
                       material=Solid(19300.0, 116.0, 174.0))
@@ -404,7 +404,7 @@ const CRITICAL = (t) -> 0.0
     @testset "temperature_feedback" begin
         ctrl_zero = ReactivityController()
 
-        pg5 = PipeGeometry_rectangular(1.0, 0.04, 0.01, 0.04)
+        pg5 = Duct(1.0, Rectangular(0.04, 0.01))
         @named ch = Channel(; name=:ch, n=5, geometry=pg5)
         slab = Slab(; x=range(0, 0.005, 3), z=range(0, 0.6, 4), y=0.07,
                       material=Solid(19300.0, 116.0, 174.0))

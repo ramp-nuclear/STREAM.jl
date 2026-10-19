@@ -82,7 +82,7 @@ end
     nz, nx = 10, 3
     T_in = 40.0
     gap = @design_knob gap = 0.00127
-    geom = PipeGeometry_rectangular(0.6, 0.07, gap, 0.07)   # channel gap = knob
+    geom = Duct(0.6, Rectangular(0.07, gap))   # channel gap = knob
 
     @named pump_l = Pump(3.0e4)
     @named hx_l = HeatExchanger(T_in)

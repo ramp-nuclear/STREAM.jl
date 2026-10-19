@@ -26,7 +26,7 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 - `q_flux_right::AbstractArray`: right face heat flux per cell [W/m²]
 - `ṁ::Float64`: mass flow rate from `inlet.ṁ` [kg/s]
 - `velocity::AbstractArray`: absolute fluid velocity per cell [m/s]
-- `pipe::Union{PipeGeometry, Nothing}`: channel geometry, or `nothing` if unavailable
+- `pipe::Union{Duct, Nothing}`: the channel's duct, or `nothing` if unavailable
 - `gravity::Float64`: gravitational acceleration [m/s²]
 """
 @kwdef struct ChannelState
@@ -44,7 +44,7 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
     q_flux_right::AbstractArray
     ṁ::Float64
     velocity::AbstractArray
-    pipe::Union{PipeGeometry,Nothing}
+    pipe::Union{Duct,Nothing}
     gravity::Float64
 end
 
@@ -82,7 +82,7 @@ A steady solution has a single instant, so `index` is not needed. A transient ne
 the position of a saved time in `sol.t`. To run the correlations over a whole transient, use
 [`threshold_analysis`](@ref), which builds a `ChannelState` at every saved time.
 
-`q_flux_left[i] = q_wall_left[i] / (pipe.heated_parts[1] * dz)`.
+`q_flux_left[i] = q_wall_left[i] / (pipe.heated[1] * dz)`.
 When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 
 `channel_sys` must expose a wall temperature, so `Channel` or `ChannelAndContacts`.
@@ -92,7 +92,7 @@ When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 # Arguments
 - `sol`: a `NonlinearSolution` or an `ODESolution`
 - `channel_sys`: the compiled channel subsystem, such as `ssys.ch`
-- `pipe`: the channel's `PipeGeometry`, needed for the fluxes and geometric correlations
+- `pipe`: the channel's [`Duct`](@ref), needed for the fluxes and geometric correlations
 - `gravity`: gravitational acceleration [m/s²]
 - `index`: which saved time of a transient to read
 
@@ -145,8 +145,8 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=not
         (pipe === nothing || iszero(perimeter)) && return zero(q_wall)
         return q_wall ./ (perimeter * (pipe.L / n))
     end
-    q_flux_left = face_flux(q_wall_left, pipe === nothing ? 0 : pipe.heated_parts[1])
-    q_flux_right = face_flux(q_wall_right, pipe === nothing ? 0 : pipe.heated_parts[2])
+    q_flux_left = face_flux(q_wall_left, pipe === nothing ? 0 : pipe.heated[1])
+    q_flux_right = face_flux(q_wall_right, pipe === nothing ? 0 : pipe.heated[2])
 
     return ChannelState(;
         n=n,
@@ -184,7 +184,7 @@ flow at that time, and the results stack along a last axis: a per-cell result be
 # Arguments
 - `sol`: a `NonlinearSolution` (steady) or an `ODESolution` (transient)
 - `channel_sys`: the compiled MTK subsystem with `T`, `T_wall_left`, `T_wall_right`, etc.
-- `pipe`: optional `PipeGeometry`, needed for `q_flux_*` and any correlation that uses geometry
+- `pipe`: optional [`Duct`](@ref), needed for `q_flux_*` and any correlation that uses geometry
 - `gravity`: gravitational acceleration [m/s²] (default `G_EARTH`)
 - `kwargs...`: named analysis functions
 
@@ -379,7 +379,7 @@ end
 q_CHF_mirshak(s::ChannelState) =
     q_CHF_mirshak.(s.T_bulk, s.T_sat, s.P, copysign.(s.velocity, s.ṁ))
 
-q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, Ref(s.pipe))
+q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, s.pipe)
 
 # The correlation needs saturated-coolant properties, and this is where the coolant is
 # known, so the snapshot is built here: one entry per cell at that cell's saturation state.

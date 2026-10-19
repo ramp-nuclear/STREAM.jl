@@ -5,10 +5,10 @@ using STREAM
 using STREAM.Assemblies
 using STREAM.Components
 
-const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
+const GEOM_MTR = Duct(0.6, Rectangular(0.07, 0.00127))
 
 @testset "HTC models" begin
-    Dh, A = GEOM_MTR.Dh, GEOM_MTR.A
+    Dh, A = hydraulic_diameter(GEOM_MTR), flow_area(GEOM_MTR)
     T_wall, T_bulk, ṁ = 90.0, 40.0, 0.25
 
     @testset "property basis picks the evaluation temperature" begin
@@ -18,8 +18,8 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         # The basis is not cosmetic: over a 50 °C wall-to-bulk span it moves h by a
         # double-digit percentage, which is exactly the discrepancy the handle exists to
         # let a user control.
-        h_film = HTC.DittusBoelter()(T_wall, T_bulk, ṁ, Dh, A, H2O)
-        h_bulk = HTC.DittusBoelter(; basis=HTC.AtBulk())(T_wall, T_bulk, ṁ, Dh, A, H2O)
+        h_film = HTC.DittusBoelter()(T_wall, T_bulk, ṁ, H2O, GEOM_MTR)
+        h_bulk = HTC.DittusBoelter(; basis=HTC.AtBulk())(T_wall, T_bulk, ṁ, H2O, GEOM_MTR)
         @test !isapprox(h_film, h_bulk; rtol=1e-3)
         @test abs(h_film - h_bulk) / h_bulk > 0.1
 
@@ -27,84 +27,84 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         for (basis, T_prop) in ((HTC.AtFilm(), 65.0), (HTC.AtBulk(), 40.0))
             Nu_hand = HTC.dittus_boelter(Re(H2O, T_prop, ṁ, A, Dh), Pr(H2O, T_prop))
             h_hand = Nu_hand * κ(H2O, T_prop) / Dh
-            @test HTC.DittusBoelter(; basis=basis)(T_wall, T_bulk, ṁ, Dh, A, H2O) ≈ h_hand
+            @test HTC.DittusBoelter(; basis=basis)(T_wall, T_bulk, ṁ, H2O, GEOM_MTR) ≈ h_hand
         end
 
         # With no wall-to-bulk difference the two bases have to agree.
-        @test HTC.DittusBoelter()(50.0, 50.0, ṁ, Dh, A, H2O) ≈
-              HTC.DittusBoelter(; basis=HTC.AtBulk())(50.0, 50.0, ṁ, Dh, A, H2O)
+        @test HTC.DittusBoelter()(50.0, 50.0, ṁ, H2O, GEOM_MTR) ≈
+              HTC.DittusBoelter(; basis=HTC.AtBulk())(50.0, 50.0, ṁ, H2O, GEOM_MTR)
     end
 
     @testset "HTC.FromNusselt closes any correlation" begin
         # A bare (Re, Pr) correlation works: the trailing temperatures are absorbed.
-        @test HTC.FromNusselt(HTC.constant_Nusselt(; Nu=10.0))(T_wall, T_bulk, ṁ, Dh, A, H2O) ≈
+        @test HTC.FromNusselt(HTC.constant_Nusselt(; Nu=10.0))(T_wall, T_bulk, ṁ, H2O, GEOM_MTR) ≈
               10.0 * κ(H2O, HTC.film_temperature(T_wall, T_bulk)) / Dh
-        # A four-argument one sees the temperatures it asked for.
-        seen = Float64[]
-        record = (Re_v, Pr_v, Tw, Tb) -> (push!(seen, Tw, Tb); 5.0)
-        HTC.FromNusselt(record)(T_wall, T_bulk, ṁ, Dh, A, H2O)
-        @test seen == [T_wall, T_bulk]
+        # A full one sees the temperatures and the duct.
+        seen = Any[]
+        record = (Re_v, Pr_v, Tw, Tb, duct) -> (push!(seen, Tw, Tb, duct); 5.0)
+        HTC.FromNusselt(record)(T_wall, T_bulk, ṁ, H2O, GEOM_MTR)
+        @test seen == [T_wall, T_bulk, GEOM_MTR]
     end
 
     @testset "named constructors" begin
-        @test HTC.ConstantNusselt(; Nu=8.235)(T_wall, T_bulk, ṁ, Dh, A, H2O) ≈
+        @test HTC.ConstantNusselt(; Nu=8.235)(T_wall, T_bulk, ṁ, H2O, GEOM_MTR) ≈
               8.235 * κ(H2O, 65.0) / Dh
         # Python STREAM evaluates its laminar branches at the bulk, so ours default there.
-        @test HTC.FullyDevelopedLaminar(GEOM_MTR).basis isa HTC.AtBulk
-        @test HTC.DevelopingLaminar(GEOM_MTR; develop_length=0.3).basis isa HTC.AtBulk
+        @test HTC.FullyDevelopedLaminar().basis isa HTC.AtBulk
+        @test HTC.DevelopingLaminar(; develop_length=0.3).basis isa HTC.AtBulk
         @test HTC.DittusBoelter().basis isa HTC.AtFilm
         # A develop length that matters: it must not give the fully-developed answer.
-        @test HTC.DevelopingLaminar(GEOM_MTR; develop_length=0.05)(T_wall, T_bulk, ṁ, Dh, A, H2O) !=
-              HTC.FullyDevelopedLaminar(GEOM_MTR)(T_wall, T_bulk, ṁ, Dh, A, H2O)
+        @test HTC.DevelopingLaminar(; develop_length=0.05)(T_wall, T_bulk, ṁ, H2O, GEOM_MTR) !=
+              HTC.FullyDevelopedLaminar()(T_wall, T_bulk, ṁ, H2O, GEOM_MTR)
     end
 
     @testset "user-defined models" begin
-        mine = HTC.FromFunction((Tw, Tb, m, dh, a, liq) -> 1234.0)
-        @test mine(T_wall, T_bulk, ṁ, Dh, A, H2O) == 1234.0
+        mine = HTC.FromFunction((Tw, Tb, m, liq, duct) -> 1234.0)
+        @test mine(T_wall, T_bulk, ṁ, H2O, GEOM_MTR) == 1234.0
         # A channel hands every model a pressure; one that does not want it ignores it.
-        @test mine(T_wall, T_bulk, ṁ, Dh, A, H2O, 2e5) == 1234.0
-        @test HTC.DittusBoelter()(T_wall, T_bulk, ṁ, Dh, A, H2O, 2e5) ==
-              HTC.DittusBoelter()(T_wall, T_bulk, ṁ, Dh, A, H2O)
+        @test mine(T_wall, T_bulk, ṁ, H2O, GEOM_MTR, 2e5) == 1234.0
+        @test HTC.DittusBoelter()(T_wall, T_bulk, ṁ, H2O, GEOM_MTR, 2e5) ==
+              HTC.DittusBoelter()(T_wall, T_bulk, ṁ, H2O, GEOM_MTR)
 
         # Subtyping HTC directly is the other way in.
-        @test HTC.Maximal(mine, HTC.DittusBoelter())(T_wall, T_bulk, ṁ, Dh, A, H2O) ==
-              max(1234.0, HTC.DittusBoelter()(T_wall, T_bulk, ṁ, Dh, A, H2O))
+        @test HTC.Maximal(mine, HTC.DittusBoelter())(T_wall, T_bulk, ṁ, H2O, GEOM_MTR) ==
+              max(1234.0, HTC.DittusBoelter()(T_wall, T_bulk, ṁ, H2O, GEOM_MTR))
         @test HTC.Maximal(HTC.FromFunction((args...) -> 1.0),
                          HTC.FromFunction((args...) -> 7.0),
-                         HTC.FromFunction((args...) -> 3.0))(T_wall, T_bulk, ṁ, Dh, A, H2O) == 7.0
+                         HTC.FromFunction((args...) -> 3.0))(T_wall, T_bulk, ṁ, H2O, GEOM_MTR) == 7.0
     end
 
     @testset "HTC.Elenbaas natural convection" begin
-        el = HTC.Elenbaas(GEOM_MTR)
-        @test el(60.0, 40.0, 0.0, Dh, A, H2O) > 0.0
+        el = HTC.Elenbaas()
+        @test el(60.0, 40.0, 0.0, H2O, GEOM_MTR) > 0.0
         # No wall-to-bulk difference means no buoyancy and no heat transfer.
-        @test el(40.0, 40.0, 0.0, Dh, A, H2O) ≈ 0.0 atol = 1e-10
+        @test el(40.0, 40.0, 0.0, H2O, GEOM_MTR) ≈ 0.0 atol = 1e-10
         # Python STREAM's Elenbaas_h_spl on the 1.27 mm gap, handed film and bulk properties.
-        @test el(60.0, 40.0, 0.0, Dh, A, H2O) ≈ 91.55185723551294 rtol = 1e-8
-        el_bulk = HTC.Elenbaas(GEOM_MTR; basis=HTC.AtBulk())
-        @test el_bulk(60.0, 40.0, 0.0, Dh, A, H2O) ≈ 67.6941463465902 rtol = 1e-8
+        @test el(60.0, 40.0, 0.0, H2O, GEOM_MTR) ≈ 91.55185723551294 rtol = 1e-8
+        el_bulk = HTC.Elenbaas(; basis=HTC.AtBulk())
+        @test el_bulk(60.0, 40.0, 0.0, H2O, GEOM_MTR) ≈ 67.6941463465902 rtol = 1e-8
     end
 
     @testset "HTC.RegimeDependent" begin
         lam = HTC.FromFunction((args...) -> 4.0)
         turb = HTC.FromFunction((args...) -> 100.0)
         rd = HTC.RegimeDependent(; laminar=lam, turbulent=turb,
-                                re_bounds=(2000.0, 5000.0), geom=GEOM_MTR)
+                                re_bounds=(2000.0, 5000.0))
 
         # The regime is picked on the bulk Reynolds number, so solve for the flows that put
         # it where each test wants it.
         ṁ_at(Re_target) = Re_target * μ(H2O, T_bulk) * A / Dh
-        @test rd(T_wall, T_bulk, ṁ_at(1000.0), Dh, A, H2O) == 4.0
-        @test rd(T_wall, T_bulk, ṁ_at(8000.0), Dh, A, H2O) == 100.0
+        @test rd(T_wall, T_bulk, ṁ_at(1000.0), H2O, GEOM_MTR) == 4.0
+        @test rd(T_wall, T_bulk, ṁ_at(8000.0), H2O, GEOM_MTR) == 100.0
         # A quarter of the way through the band.
-        @test rd(T_wall, T_bulk, ṁ_at(2750.0), Dh, A, H2O) ≈ 4.0 + 0.25 * 96.0
+        @test rd(T_wall, T_bulk, ṁ_at(2750.0), H2O, GEOM_MTR) ≈ 4.0 + 0.25 * 96.0
 
         # Selection on bulk Re rather than film Re is observable: at this flow the two
         # differ enough to land on opposite sides of the lower bound.
         Re_bulk = Re(H2O, T_bulk, ṁ_at(1900.0), A, Dh)
         Re_film = Re(H2O, HTC.film_temperature(T_wall, T_bulk), ṁ_at(1900.0), A, Dh)
         @test Re_bulk < 2000.0 < Re_film
-        @test rd(T_wall, T_bulk, ṁ_at(1900.0), Dh, A, H2O) == 4.0
+        @test rd(T_wall, T_bulk, ṁ_at(1900.0), H2O, GEOM_MTR) == 4.0
 
         @testset "matches Python's regime_dependent_h_spl" begin
             # ConstantNusselt and Elenbaas default to the film. Python hands its laminar and
@@ -112,8 +112,7 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
             rd_py = HTC.RegimeDependent(;
                 laminar=HTC.ConstantNusselt(; Nu=8.235),
                 turbulent=HTC.DittusBoelter(),
-                natural=HTC.Elenbaas(GEOM_MTR),
-                geom=GEOM_MTR,
+                natural=HTC.Elenbaas(),
             )
             @test rd_py.laminar.basis isa HTC.AtBulk
             @test rd_py.natural.basis isa HTC.AtBulk
@@ -121,31 +120,30 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
             for (Re_target, h_python) in ((1000.0, 2080.1105868066074),
                                           (2750.0, 3340.7410324505618),
                                           (8000.0, 16735.795621478403))
-                @test rd_py(T_wall, T_bulk, ṁ_at(Re_target), Dh, A, H2O) ≈ h_python rtol = 1e-8
+                @test rd_py(T_wall, T_bulk, ṁ_at(Re_target), H2O, GEOM_MTR) ≈ h_python rtol = 1e-8
             end
             # Gr/Re² crosses 1 at 2.096 g/s on bulk properties and at 2.467 g/s on film ones.
             # Python reads the switch at the film, so buoyancy already wins at 2.274 g/s.
-            @test rd_py(100.0, 40.0, 0.0022739555958189747, Dh, A, H2O) ≈
+            @test rd_py(100.0, 40.0, 0.0022739555958189747, H2O, GEOM_MTR) ≈
                   198.75194104185218 rtol = 1e-8
         end
 
         @testset "natural convection takes over where Gr > Re²" begin
             nc = HTC.FromFunction((args...) -> 999.0)
-            rd_nc = HTC.RegimeDependent(; laminar=lam, turbulent=turb, natural=nc,
-                                       geom=GEOM_MTR, g=G_EARTH)
+            rd_nc = HTC.RegimeDependent(; laminar=lam, turbulent=turb, natural=nc, g=G_EARTH)
             # Barely any flow, a hot wall: buoyancy wins.
-            @test rd_nc(100.0, 40.0, 1e-6, Dh, A, H2O) == 999.0
+            @test rd_nc(100.0, 40.0, 1e-6, H2O, GEOM_MTR) == 999.0
             # No flow at all, and flow just reversed through it, where Re is zero or tiny:
             # a hot wall still gives buoyancy, and a wall at the bulk temperature gives
             # neither buoyancy nor flow, so the forced branch stands.
-            @test rd_nc(100.0, 40.0, 0.0, Dh, A, H2O) == 999.0
-            @test rd_nc(100.0, 40.0, -1e-6, Dh, A, H2O) == 999.0
-            @test rd_nc(40.0, 40.0, 0.0, Dh, A, H2O) == 4.0
+            @test rd_nc(100.0, 40.0, 0.0, H2O, GEOM_MTR) == 999.0
+            @test rd_nc(100.0, 40.0, -1e-6, H2O, GEOM_MTR) == 999.0
+            @test rd_nc(40.0, 40.0, 0.0, H2O, GEOM_MTR) == 4.0
             # Fast flow: forced convection wins, and the natural branch changes nothing.
             m_fast = ṁ_at(8000.0)
-            @test rd_nc(100.0, 40.0, m_fast, Dh, A, H2O) == 100.0
-            @test rd_nc(100.0, 40.0, m_fast, Dh, A, H2O) ==
-                  rd(100.0, 40.0, m_fast, Dh, A, H2O)
+            @test rd_nc(100.0, 40.0, m_fast, H2O, GEOM_MTR) == 100.0
+            @test rd_nc(100.0, 40.0, m_fast, H2O, GEOM_MTR) ==
+                  rd(100.0, 40.0, m_fast, H2O, GEOM_MTR)
         end
     end
 
@@ -155,18 +153,18 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
         P = 1e5
 
         # Below the onset of nucleate boiling the wrapper is its single-phase model.
-        h_spl = HTC.DittusBoelter()(60.0, 40.0, ṁ, Dh, A, H2O)
-        @test scb(60.0, 40.0, ṁ, Dh, A, H2O, P) ≈ h_spl
+        h_spl = HTC.DittusBoelter()(60.0, 40.0, ṁ, H2O, GEOM_MTR)
+        @test scb(60.0, 40.0, ṁ, H2O, GEOM_MTR, P) ≈ h_spl
         # Well above it, boiling enhances the coefficient.
-        @test scb(150.0, 40.0, ṁ, Dh, A, H2O, P) >
-              HTC.DittusBoelter()(150.0, 40.0, ṁ, Dh, A, H2O)
+        @test scb(150.0, 40.0, ṁ, H2O, GEOM_MTR, P) >
+              HTC.DittusBoelter()(150.0, 40.0, ṁ, H2O, GEOM_MTR)
         # With no pressure there is nothing to boil against.
-        @test scb(150.0, 40.0, ṁ, Dh, A, H2O) ≈
-              HTC.DittusBoelter()(150.0, 40.0, ṁ, Dh, A, H2O)
+        @test scb(150.0, 40.0, ṁ, H2O, GEOM_MTR) ≈
+              HTC.DittusBoelter()(150.0, 40.0, ṁ, H2O, GEOM_MTR)
         # It wraps any model, not just the default.
-        scb_lam = HTC.SubcooledBoiling(HTC.FullyDevelopedLaminar(GEOM_MTR), q_scb)
-        @test scb_lam(60.0, 40.0, ṁ, Dh, A, H2O, P) ≈
-              HTC.FullyDevelopedLaminar(GEOM_MTR)(60.0, 40.0, ṁ, Dh, A, H2O)
+        scb_lam = HTC.SubcooledBoiling(HTC.FullyDevelopedLaminar(), q_scb)
+        @test scb_lam(60.0, 40.0, ṁ, H2O, GEOM_MTR, P) ≈
+              HTC.FullyDevelopedLaminar()(60.0, 40.0, ṁ, H2O, GEOM_MTR)
     end
 
     @testset "SubcooledBoiling matches Python's wall_heat_transfer_coeff" begin
@@ -178,15 +176,14 @@ const GEOM_MTR = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
             HTC.RegimeDependent(;
                 laminar=HTC.ConstantNusselt(; Nu=8.235),
                 turbulent=HTC.DittusBoelter(),
-                natural=HTC.Elenbaas(GEOM_MTR),
-                geom=GEOM_MTR,
+                natural=HTC.Elenbaas(),
             ),
             HTC.regime_dependent_q_scb(),
         )
         for (ṁ_python, h_python) in ((0.016566504372602292, 25639.32979041299),
                                      (0.05798276530410803, 14842.353394440743),
                                      (0.13253203498081834, 15553.973614960662))
-            @test scb_py(135.0, 60.0, ṁ_python, Dh, A, H2O, 1.7e5) ≈ h_python rtol = 1e-8
+            @test scb_py(135.0, 60.0, ṁ_python, H2O, GEOM_MTR, 1.7e5) ≈ h_python rtol = 1e-8
         end
     end
 
@@ -211,11 +208,11 @@ end
 @testset "a user-defined HTC drives a compiled channel" begin
     n = 3
     T_inlet, T_wall_bc, h_fixed = 40.0, 100.0, 7500.0
-    geom = PipeGeometry_circular(0.6, 0.01)
+    geom = Duct(0.6, Circular(0.01))
 
     @named pump_u = Pump(3.0e4)
     @named cac_u = ChannelAndContacts(;
-        n=n, geometry=geom, htc=HTC.FromFunction((Tw, Tb, m, dh, a, liq) -> h_fixed)
+        n=n, geometry=geom, htc=HTC.FromFunction((Tw, Tb, m, liq, duct) -> h_fixed)
     )
     @named bc_u = HeatExchanger(T_inlet)
     @named ct_l = ConstantTemperature(T_wall_bc; n=n)
@@ -236,7 +233,7 @@ end
     @test all(isapprox.(sol_u[ssys_u.cac_u.h_tc_left], h_fixed; rtol=1e-8))
     # The reported Nusselt number is the one implied by the h in use.
     T_cells = sol_u[ssys_u.cac_u.T]
-    Nu_expected = [h_fixed * geom.Dh / κ(H2O, HTC.film_temperature(T_wall_bc, T_c))
+    Nu_expected = [h_fixed * hydraulic_diameter(geom) / κ(H2O, HTC.film_temperature(T_wall_bc, T_c))
                    for T_c in T_cells]
     @test all(isapprox.(sol_u[ssys_u.cac_u.Nu_left], Nu_expected; rtol=1e-6))
 end

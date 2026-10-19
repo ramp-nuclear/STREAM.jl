@@ -12,7 +12,7 @@ using STREAM.Utilities: cosine_shape
 using ModelingToolkit: @named, mtkcompile, @parameters, t_nounits as t
 
 n = 10
-geometry = PipeGeometry_circular(0.6, 0.01)
+geometry = Duct(0.6, Circular(0.01))
 nothing # hide
 ```
 

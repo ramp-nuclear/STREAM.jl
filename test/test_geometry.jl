@@ -3,89 +3,79 @@ using STREAM
 using STREAM.Assemblies
 using ModelingToolkit
 
-@testset "PipeGeometry_rectangular geometry" begin
-    geo = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07)
-    @test isapprox(geo.A, 0.07 * 0.00127; rtol=1e-4)
-    @test isapprox(geo.wet_perimeter, 2.0 * (0.07 + 0.00127); rtol=1e-4)
-    @test isapprox(geo.Dh, 4.0 * (0.07 * 0.00127) / (2.0 * (0.07 + 0.00127)); rtol=1e-4)
-    # Independent hand-computed anchor for a 70 mm by 1.27 mm duct, Dh = 4 * A / wetted_perimeter.
-    #   A  = 0.07 * 0.00127       = 8.89e-5 m^2
-    #   Pw = 2 * (0.07 + 0.00127) = 0.14254 m
+@testset "rectangular duct" begin
+    duct = Duct(0.6, Rectangular(0.07, 0.00127))
+    # Hand-computed for a 70 mm by 1.27 mm duct, Dh = 4A / P_wet:
+    #   A  = 0.07 * 0.00127        = 8.89e-5 m^2
+    #   Pw = 2 * (0.07 + 0.00127)  = 0.14254 m
     #   Dh = 4 * 8.89e-5 / 0.14254 = 0.0024947383190683323 m
-    # The number below was worked out by hand from these dimensions, not copied from the source.
-    @test isapprox(geo.A, 8.89e-5; rtol=1e-12)
-    @test isapprox(geo.Dh, 0.0024947383190683323; rtol=1e-12)
-    @test geo.width == 0.07
-    @test geo.depth == 0.00127
-    @test geo.heated_parts == (0.07, 0.07)
-    geo_l = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07, one_sided=:left)
-    @test geo_l.heated_parts == (0.07, 0.0)
-    geo_r = PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07, one_sided=:right)
-    @test geo_r.heated_parts == (0.0, 0.07)
-    @test_throws Exception PipeGeometry_rectangular(
-        0.6, 0.07, 0.00127, 0.07, one_sided=:bad_value
-    )
+    @test isapprox(flow_area(duct), 8.89e-5; rtol=1e-12)
+    @test isapprox(wetted_perimeter(duct), 0.14254; rtol=1e-12)
+    @test isapprox(hydraulic_diameter(duct), 0.0024947383190683323; rtol=1e-12)
+    @test aspect_ratio(duct) ≈ 0.00127 / 0.07
+
+    # The edges go in either order; width is the longer.
+    @test Rectangular(0.00127, 0.07) == Rectangular(0.07, 0.00127)
+    @test duct.shape.width == 0.07
+    @test duct.shape.depth == 0.00127
+
+    # Both long faces are heated across the width unless told otherwise.
+    @test duct.heated == (0.07, 0.07)
+    @test heated_perimeter(duct) == 0.14
+    @test Duct(0.6, Rectangular(0.07, 0.00127); heated=0.063).heated == (0.063, 0.063)
+    @test Duct(0.6, Rectangular(0.07, 0.00127); heated=(0.07, 0)).heated == (0.07, 0.0)
+    @test Duct(0.6, Rectangular(0.07, 0.00127); heated=(0, 0.07)).heated == (0.0, 0.07)
 end
 
-@testset "PipeGeometry_circular geometry" begin
-    geo = PipeGeometry_circular(1.0, 0.01)
-    @test isapprox(geo.Dh, 0.01; rtol=1e-10)
-    @test isapprox(geo.wet_perimeter, π * 0.01; rtol=1e-10)
-    @test isapprox(geo.heated_parts[1], π * 0.01; rtol=1e-10)
-    @test isapprox(geo.heated_parts[2], 0; atol=1e-10)
-    @test isapprox(geo.A, π * 0.01^2 / 4; rtol=1e-10)
-    # Independent hand-computed anchor for a 10 mm circular pipe. Dh = D exactly for a circle, and
-    #   A = pi * D^2 / 4 = pi * (0.01)^2 / 4 = 7.853981633974483e-5 m^2
-    # worked out by hand, not copied from the source formula.
-    @test isapprox(geo.Dh, 0.01; rtol=1e-12)
-    @test isapprox(geo.A, 7.853981633974483e-5; rtol=1e-12)
-    @test geo.width == 0.01
-    @test geo.depth == 0.01
+@testset "circular duct" begin
+    duct = Duct(1.0, Circular(0.01))
+    # Dh = D exactly for a circle, and A = π D² / 4 = 7.853981633974483e-5 m^2.
+    @test hydraulic_diameter(duct) == 0.01
+    @test isapprox(flow_area(duct), 7.853981633974483e-5; rtol=1e-12)
+    @test isapprox(wetted_perimeter(duct), π * 0.01; rtol=1e-12)
+    # The whole perimeter is heated, and counted as the left face, as in Python STREAM.
+    @test duct.heated == (π * 0.01, 0.0)
+    # A circle has no aspect ratio to give.
+    @test_throws MethodError aspect_ratio(duct)
 end
 
-@testset "PipeGeometry symbolic (knob-driven)" begin
-    # evaluate a symbolic geometry field at a knob value (compiles the expression,
-    # so irrationals like pi fold to a number)
+@testset "effective duct" begin
+    shape = Effective(; area=1.0, wetted_perimeter=1.0)
+    duct = Duct(1.2, shape; heated=(0, 1.0))
+    @test hydraulic_diameter(duct) == 4.0
+    @test flow_area(duct) == 1.0
+    @test heated_perimeter(duct) == 1.0
+    # There is no sensible default heated perimeter for a shape known only by its area.
+    @test_throws ArgumentError Duct(1.2, shape)
+end
+
+@testset "knob-driven duct" begin
+    # Evaluate a symbolic expression at a knob value. Compiling it folds irrationals like π.
     at(expr, knob, val) = Symbolics.build_function(expr, knob; expression=Val{false})(val)
 
-    # circular pipe whose diameter is a design knob
     d = @design_knob d = 0.02
-    geo = PipeGeometry_circular(0.6, d)
-    @test geo isa PipeGeometry{Num}
-    @test geo.Dh isa Num
-    @test geo.A isa Num
-    @test geo.heated_parts[1] isa Num
-    # width/depth are symbolic too (circular: both equal the diameter knob)
-    @test geo.width isa Num
-    @test geo.depth isa Num
-    @test isapprox(at(geo.width, d, 0.02), 0.02; rtol=1e-12)
-    @test isapprox(at(geo.depth, d, 0.03), 0.03; rtol=1e-12)   # scans with the knob
-    # evaluated at the knob default, the symbolic geometry matches the fixed geometry
-    num = PipeGeometry_circular(0.6, 0.02)
-    @test isapprox(at(geo.A, d, 0.02), num.A; rtol=1e-12)
-    @test isapprox(at(geo.Dh, d, 0.02), num.Dh; rtol=1e-12)
+    pipe = Duct(0.6, Circular(d))
+    @test pipe.shape isa Circular{Num}
+    @test hydraulic_diameter(pipe) isa Num
+    @test flow_area(pipe) isa Num
+    @test pipe.heated[1] isa Num
+    fixed = Duct(0.6, Circular(0.02))
+    @test isapprox(at(flow_area(pipe), d, 0.02), flow_area(fixed); rtol=1e-12)
+    @test isapprox(at(hydraulic_diameter(pipe), d, 0.03), 0.03; rtol=1e-12)
 
-    # rectangular channel with a knob gap: all flow fields promote to Num,
-    # width/depth order by nominal values
+    # A knob gap orders against the plate edge at whatever value the knob takes.
     gap = @design_knob gap = 0.0025
-    rect = PipeGeometry_rectangular(0.6, 0.0665, gap, 0.0665)
-    @test rect isa PipeGeometry{Num}
-    @test rect.A isa Num
-    # depth is the gap knob and scans; width is the fixed plate edge
-    @test rect.depth isa Num
-    @test isapprox(at(rect.width, gap, 0.0025), 0.0665; rtol=1e-12)
-    @test isapprox(at(rect.depth, gap, 0.0025), 0.0025; rtol=1e-12)
-    @test isapprox(at(rect.depth, gap, 0.0010), 0.0010; rtol=1e-12)   # gap knob scans depth
-    rnum = PipeGeometry_rectangular(0.6, 0.0665, 0.0025, 0.0665)
-    @test isapprox(at(rect.Dh, gap, 0.0025), rnum.Dh; rtol=1e-12)
-
-    # one-sided promotion keeps a symbolic heated_parts tuple
-    one = PipeGeometry_rectangular(0.6, 0.0665, gap, 0.0665; one_sided=:left)
-    @test one.heated_parts[1] isa Num
-    @test isapprox(at(one.heated_parts[2], gap, 0.0025), 0.0; atol=1e-12)
+    rect = Duct(0.6, Rectangular(0.0665, gap))
+    @test rect.shape isa Rectangular{Num}
+    @test isapprox(at(rect.shape.width, gap, 0.0025), 0.0665; rtol=1e-12)
+    @test isapprox(at(rect.shape.depth, gap, 0.0010), 0.0010; rtol=1e-12)
+    @test isapprox(at(hydraulic_diameter(rect), gap, 0.0025),
+                   hydraulic_diameter(Duct(0.6, Rectangular(0.0665, 0.0025))); rtol=1e-12)
+    # The default heated width follows the width, so it is symbolic too.
+    @test isapprox(at(rect.heated[1], gap, 0.0025), 0.0665; rtol=1e-12)
 end
 
-@testset "fixed PipeGeometry stays Float64" begin
-    @test PipeGeometry_circular(1.0, 0.01) isa PipeGeometry{Float64}
-    @test PipeGeometry_rectangular(0.6, 0.07, 0.00127, 0.07) isa PipeGeometry{Float64}
+@testset "a fixed duct stays Float64" begin
+    @test Duct(1.0, Circular(1 // 100)) isa Duct{Circular{Float64},Float64}
+    @test Duct(1, Rectangular(0.07, 0.00127)) isa Duct{Rectangular{Float64},Float64}
 end

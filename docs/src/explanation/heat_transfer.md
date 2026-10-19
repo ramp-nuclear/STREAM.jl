@@ -15,12 +15,13 @@ number) and, for natural convection, buoyancy (Grashof or Rayleigh number).
 In STREAM, a heat transfer model is an [`AbstractHTC`](@ref HTC.AbstractHTC), a callable
 
 ```julia
-htc(T_wall, T_bulk, ṁ, Dh, A, liquid) -> h
+htc(T_wall, T_bulk, ṁ, liquid, duct) -> h
 ```
 
 that a [`ChannelAndContacts`](@ref STREAM.Components.ChannelAndContacts) evaluates per cell and
-per face. Anything a correlation needs beyond these (the geometry, gravity, a transition band)
-it captures when it is built. This page describes the models STREAM ships and the physics
+per face, handing it the channel's [`Duct`](@ref). Anything else a correlation needs (gravity,
+a transition band) it captures when it is built. A correlation that only holds for one shape,
+such as the laminar plate values or Elenbaas, accepts only a rectangular duct. This page describes the models STREAM ships and the physics
 behind them, using Python STREAM's names for the regimes: single-phase liquid (SPL),
 incipience of boiling (INC) and subcooled boiling (SCB).
 
@@ -146,22 +147,22 @@ with the bulk at 40 °C and the wall at 60 °C.
 ```@example htc
 using STREAM, CairoMakie
 
-geom = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.067)
+geom = Duct(0.6, Rectangular(0.067, 0.0024))
 T_wall, T_bulk = 60.0, 40.0
 models = [
     "Dittus-Boelter" => HTC.DittusBoelter(),
     "constant Nu = 8.235" => HTC.ConstantNusselt(),
     "regime dependent, with Elenbaas" => HTC.RegimeDependent(;
         laminar=HTC.ConstantNusselt(), turbulent=HTC.DittusBoelter(),
-        natural=HTC.Elenbaas(geom), geom),
+        natural=HTC.Elenbaas()),
 ]
 ṁ = range(1e-4, 0.15; length=600)
-Re_bulk = [Re(H2O, T_bulk, m, geom.A, geom.Dh) for m in ṁ]
+Re_bulk = [Re(H2O, T_bulk, m, geom) for m in ṁ]
 
 fig = Figure(size=(700, 420))
 ax = Axis(fig[1, 1]; xlabel="bulk Reynolds number", ylabel=L"$h$ [kW/(m²·K)]")
 for (label, model) in models
-    h = [model(T_wall, T_bulk, m, geom.Dh, geom.A, H2O) for m in ṁ]
+    h = [model(T_wall, T_bulk, m, H2O, geom) for m in ṁ]
     lines!(ax, Re_bulk, h ./ 1e3; label)
 end
 vspan!(ax, 2000, 5000; color=(:gray, 0.12))
@@ -203,8 +204,8 @@ T_sat = Tsat(H2O, p)
 spl = HTC.DittusBoelter()
 scb = HTC.SubcooledBoiling(spl, HTC.regime_dependent_q_scb())
 T_w = range(T_bulk + 1, T_sat + 30; length=300)
-q_spl = [spl(Tw, T_bulk, ṁ0, geom.Dh, geom.A, H2O) * (Tw - T_bulk) for Tw in T_w]
-q_scb = [scb(Tw, T_bulk, ṁ0, geom.Dh, geom.A, H2O, p) * (Tw - T_bulk) for Tw in T_w]
+q_spl = [spl(Tw, T_bulk, ṁ0, H2O, geom) * (Tw - T_bulk) for Tw in T_w]
+q_scb = [scb(Tw, T_bulk, ṁ0, H2O, geom, p) * (Tw - T_bulk) for Tw in T_w]
 
 fig = Figure(size=(700, 420))
 ax = Axis(fig[1, 1]; xlabel=L"wall superheat $T_w - T_\mathrm{sat}$ [K]",

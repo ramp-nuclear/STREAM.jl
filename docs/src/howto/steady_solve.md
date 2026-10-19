@@ -13,7 +13,7 @@ using SteadyStateDiffEq: DynamicSS
 
 @named pump = Pump(3.0e4)
 @named hx = HeatExchanger(40.0)
-@named ch = Channel(; n=10, geometry=PipeGeometry_circular(0.6, 0.01), h_left=5000.0)
+@named ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h_left=5000.0)
 connections = [inseries(pump, hx, ch, pump), pump.inlet.p ~ 1.0e5, ch.T_wall_left .~ 100.0]
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)
