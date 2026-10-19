@@ -31,14 +31,14 @@ function Inertia(L_over_A::Real; name)
     two = HydraulicTwoPort(; name)
     @unpack Δp, ṁ = two
     @parameters L_over_A = L_over_A
-    return extend(System([Δp ~ -L_over_A * D(ṁ)], t; name), two)
+    return flow_relation(two, [Δp ~ -L_over_A * D(ṁ)])
 end
 
 function Inertia(L_over_A::Function; name)
     two = HydraulicTwoPort(; name)
     @unpack Δp, ṁ = two
     @variables L_eff(t)
-    return extend(System([L_eff ~ L_over_A(ṁ), Δp ~ -L_eff * D(ṁ)], t; name), two)
+    return flow_relation(two, [L_eff ~ L_over_A(ṁ), Δp ~ -L_eff * D(ṁ)])
 end
 
 @doc raw"""

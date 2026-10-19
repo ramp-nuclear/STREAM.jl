@@ -198,9 +198,14 @@ ch_high, ch_low = (getproperty(sys, key).ch for key in keys(case.types));
 # ## The steady state at full power
 #
 # The solve integrates to where the model settles, the robust way to find a loop's operating
-# point (see [Get a steady solve to converge](../howto/steady_solve.md)).
+# point (see [Get a steady solve to converge](../howto/steady_solve.md)). The core is at full
+# power, so it starts from the design flows: from the small flow every port guesses, the
+# coolant would heat far past what the correlations cover before the flow built up.
 
-sol_ss = solve_steady(sys; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
+design = [sys.primary.inlet.ṁ => ṁ_design,
+          ch_high.inlet.ṁ => case.types.high.design_ṁ,
+          ch_low.inlet.ṁ => case.types.low.design_ṁ]
+sol_ss = solve_steady(sys, design; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
 sol_ss.retcode
 
 # Each type gets its design flow, and the kinetics sit at rated power, of which the decay heat

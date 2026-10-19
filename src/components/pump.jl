@@ -30,7 +30,7 @@ function Pump(dP_pump::Real; name)
     two = HydraulicTwoPort(; name)
     @unpack Δp, ṁ = two
     @parameters dP_pump = dP_pump
-    return extend(System([Δp ~ dP_pump], t; name), two)
+    return flow_relation(two, [Δp ~ dP_pump])
 end
 
 function Pump(dP_pump::Any; name)
@@ -38,12 +38,12 @@ function Pump(dP_pump::Any; name)
     @unpack Δp, ṁ = two
     FType = typeof(dP_pump)
     @parameters (dP_pump_fn::FType)(..)
-    return extend(System([Δp ~ dP_pump_fn(t)], t; name), two)
+    return flow_relation(two, [Δp ~ dP_pump_fn(t)])
 end
 
 function Pump(; name, ṁ0)
     two = HydraulicTwoPort(; name)
     @unpack ṁ = two
     @parameters ṁ0 = ṁ0
-    return extend(System([ṁ ~ ṁ0], t; name), two)
+    return flow_relation(two, [ṁ ~ ṁ0])
 end

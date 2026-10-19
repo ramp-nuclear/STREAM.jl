@@ -193,7 +193,7 @@ function _Valve(; name, area, fraction, cd_of_Re, dp_linear, cc, liquid)
         # the pressure at the same value.
         push!(eqs, subcooling ~ Tsat(liquid, max(p_throat, _SATURATION_PRESSURE_FLOOR)) - T_up)
     end
-    return extend(System(eqs, t; name), two)
+    return flow_relation(two, eqs)
 end
 
 """

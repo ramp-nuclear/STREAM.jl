@@ -74,7 +74,9 @@ sol = solve_steady(sys; solver=DynamicSS(Rodas5P()))
 
 It is slower, but it is the robust choice for a loop with parallel branches, natural
 circulation, or a check valve: the [pool loss-of-flow tutorial](../tutorials/07_pool_lofa.md)
-uses it.
+uses it. That tutorial also gives its design flows, since a core at full power started from
+the small guessed flow would heat its coolant past what the correlations cover before the
+flow built up. Give flows wherever the guess is that far from the operating point.
 
 ## Do not constrain the sign of the flow
 

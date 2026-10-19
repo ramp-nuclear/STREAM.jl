@@ -31,7 +31,7 @@ function FrictionResistor(;
         f ~ darcy(T_in, ṁ, liquid, geometry),
         Δp ~ -darcy_weisbach_dp(ṁ, ρ(liquid, T_in), f, geometry),
     ]
-    return extend(System(eqs, t; name), two)
+    return flow_relation(two, eqs)
 end
 
 """
@@ -53,7 +53,7 @@ function Gravity(H, g=G_EARTH; name, liquid::AbstractLiquid=H2O)
     @unpack inlet, Δp = two
     elevation = H   # @parameters rebinds H to the symbol
     @parameters H = H
-    sys = extend(System([Δp ~ -ρ(liquid, instream(inlet.T)) * g * H], t; name), two)
+    sys = flow_relation(two, [Δp ~ -ρ(liquid, instream(inlet.T)) * g * H])
     return ModelingToolkit.setmetadata(sys, _ElevationKey, elevation)
 end
 
@@ -81,7 +81,7 @@ function Resistor(R; name)
     two = HydraulicTwoPort(; name)
     @unpack Δp, ṁ = two
     @parameters R = R
-    return extend(System([Δp ~ -R * ṁ], t; name), two)
+    return flow_relation(two, [Δp ~ -R * ṁ])
 end
 
 """
@@ -144,7 +144,7 @@ function ResistorFromKnownPoint(;
     two = HydraulicTwoPort(; name)
     @unpack inlet, Δp, ṁ = two
     @parameters K = K
-    return extend(System([Δp ~ -K * ṁ * abs(ṁ) / (2 * ρ(liquid, instream(inlet.T)))], t; name), two)
+    return flow_relation(two, [Δp ~ -K * ṁ * abs(ṁ) / (2 * ρ(liquid, instream(inlet.T)))])
 end
 
 """
@@ -186,7 +186,7 @@ function VolumetricFlowResistor(;
         only(@parameters (k_fn::FType)(..))(t)
     end
     q = ṁ / ρ(liquid, instream(inlet.T))
-    return extend(System([Δp ~ -(k_now * q * abs(q) + klow * q)], t; name), two)
+    return flow_relation(two, [Δp ~ -(k_now * q * abs(q) + klow * q)])
 end
 
 """
@@ -213,5 +213,5 @@ function LocalPressureDrop(; name, A1, A2, liquid::AbstractLiquid=H2O)
     @unpack inlet, Δp, ṁ = two
     T_in = instream(inlet.T)
     K = LocalLoss.factor(ṁ, A1, A2, μ(liquid, T_in))
-    return extend(System([Δp ~ -dp(ṁ, ρ(liquid, T_in), K, min(A1, A2))], t; name), two)
+    return flow_relation(two, [Δp ~ -dp(ṁ, ρ(liquid, T_in), K, min(A1, A2))])
 end
