@@ -189,6 +189,43 @@ julia> round(aspect_ratio(Rectangular(0.07, 0.0014)); digits=6)
 aspect_ratio(s::Rectangular) = s.depth / s.width
 aspect_ratio(d::Duct) = aspect_ratio(d.shape)
 
+"""
+    duct(channel) -> Duct
+
+The [`Duct`](@ref) a channel was built with. Every STREAM channel carries its own, compiled
+or not, so analysis reads the geometry off the channel rather than being handed it again.
+
+# Arguments
+- `channel`: a channel system, such as `ssys.cell.ch`
+
+# Returns
+The channel's `Duct`.
+
+# Throws
+- `ArgumentError`: for a system that is not a STREAM channel
+
+# Example
+```julia
+@named ch = Components.Channel(; n=10, geometry=Duct(0.6, Circular(0.01)))
+duct(ch)   # Duct, 0.6 m long, Circular(0.01)
+```
+"""
+function duct(sys::ModelingToolkit.AbstractSystem)
+    d = ModelingToolkit.getmetadata(sys, _DuctKey, nothing)
+    d === nothing && throw(ArgumentError(
+        "$(nameof(sys)) carries no duct: only a channel built by STREAM does"))
+    return d
+end
+
+"""
+    _DuctKey
+
+The metadata key a channel stores its [`Duct`](@ref) under, read back by [`duct`](@ref).
+"""
+struct _DuctKey end
+
+_with_duct(sys, d::Duct) = ModelingToolkit.setmetadata(sys, _DuctKey, d)
+
 # A duct is one value in a broadcast, as a coolant is.
 Base.broadcastable(d::Duct) = Ref(d)
 

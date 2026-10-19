@@ -70,17 +70,14 @@ end
     # This is why the connected-face HTC matches Python to 0.000% in the live parity:
     # the formula is exact, and `_h_eff` selects the physically-meaningful (q≠0) face.
     geom = Duct(0.6, Rectangular(0.07, 0.00127))
-    Dh = hydraulic_diameter(geom)
-    A = flow_area(geom)
     htc = HTC.DittusBoelter()
     for i in 1:length(PARITY_MTR_ASYM_H_TC_LEFT_R)
         h_julia = htc(
             PARITY_MTR_ASYM_T_WALL_LEFT_R[i],
             PARITY_MTR_ASYM_T_CELLS_R[i],
             PARITY_MTR_ASYM_ṁ_R,
-            Dh,
-            A,
             H2O,
+            geom,
         )
         @test isapprox(h_julia, PARITY_MTR_ASYM_H_TC_LEFT_R[i]; rtol=1e-6)
     end
@@ -577,7 +574,7 @@ end
     slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
                   material=Solid(2700.0, 900.0, 200.0))
     @named hd = HeatDiffusion(slab; power=1e4)
-    scc = single_channel(cac_l, hd, geom_mtr; fuel_side=:left, name=:scc)
+    scc = single_channel(cac_l, hd; fuel_side=:left, name=:scc)
     cac = scc.cac_l
     fuel = scc.hd
     conns = [

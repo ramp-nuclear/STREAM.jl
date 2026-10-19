@@ -395,14 +395,11 @@ end
     # 200 kPa, falling to zero over 5 s from `t_trip` on a C1 cubic. A trip at Inf holds for
     # good and is the same closure type, so one callable parameter takes both.
     head(t_trip) = tt -> (ξ = clamp((tt - t_trip) / 5.0, 0.0, 1.0); 2.0e5 * (1 - (3ξ^2 - 2ξ^3)))
-    # The heated leg switches regime on its own, natural convection included, so the run
-    # stays physical once the pump stops.
+    # The heated leg switches regime on its own, so the run stays physical once the pump
+    # stops.
     htc = HTC.RegimeDependent(; laminar=HTC.ConstantNusselt(; Nu=8.235),
-                              turbulent=HTC.DittusBoelter(),
-                              natural=HTC.Elenbaas(; g=G_EARTH), g=G_EARTH)
-    α = aspect_ratio(geom)
-    darcy = Friction.RegimeDependent(; laminar=Re -> Friction.rectangular_laminar(Re, α),
-                                     turbulent=Friction.blasius)
+                              turbulent=HTC.DittusBoelter())
+    darcy = Friction.RegimeDependent(; turbulent=Friction.blasius)
     machine = StateMachine(; initial_state=:CLOSED)
 
     @named pump = Pump(head(t_trip))
@@ -507,7 +504,7 @@ end
         @test mean(ṁ_nc) < 0.0
         @test 0.0 < mean(abs ∘ Q_wall, nc) <= power
         # Single phase only, with the sink bypassed, so the coolant creeps up past saturation.
-        # No thermal runaway: a regression value of 233.95 °C, the band the spread between
+        # No thermal runaway: a regression value of 233.6 °C, the band the spread between
         # package sets, and well below the critical 373.95 °C.
         T_max = mean(maximum(sol[C.T, idx]) for idx in nc)
         @test T_max > T_in

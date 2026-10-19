@@ -116,7 +116,6 @@ source(0.0)
 z_edges = range(0.0, case.L; length=case.n + 1)
 core_parts = []
 paths = []
-channels = Dict{Symbol,Any}()
 power_eqs = []
 for (key, ty) in pairs(case.types)
     geom = Duct(case.L, Rectangular(ty.width, ty.gap); heated=ty.heated_width)
@@ -139,7 +138,6 @@ for (key, ty) in pairs(case.types)
     path = weighted(ty.N, pool, orifice, rods.ch; name=key)
     append!(core_parts, [first(path), pool, orifice, rods, last(path)])
     push!(paths, path)
-    channels[key] = (rods.ch, geom)
     push!(power_eqs, rods.fuel.power ~ pk.P * case.P_rated * ty.power_fraction / ty.N)
 end
 
@@ -325,9 +323,9 @@ fig = Figure(size=(760, 600))
 ax1 = Axis(fig[1, 1]; xscale=log10, ylabel=L"min $T_\mathrm{ONB} - T_w$ [K]")
 ax2 = Axis(fig[2, 1]; xscale=log10, yscale=log10, xlabel="time after the pump trip [s]",
            ylabel="min CHF ratio, Sudo-Kaminaga")
-for (key, (ch, geom)) in channels
+for key in keys(case.types)
     chsys = getproperty(sys, key).ch
-    m = threshold_analysis(sol, chsys; pipe=geom,
+    m = threshold_analysis(sol, chsys;
                            onb = s -> bergles_rohsenow_t_onb(s) .- s.T_wall,
                            chfr = chfr(q_CHF_sudo_kaminaga))
     lines!(ax1, sol.t[later], vec(minimum(m.onb; dims=1))[later]; label=string(key))

@@ -217,6 +217,7 @@ using ModelingToolkit
 using QuadGK
 using ..STREAM: AbstractLiquid, Liquid, H2O, G_EARTH
 using ..STREAM: Duct, Rectangular, Circular, flow_area, hydraulic_diameter, heated_perimeter
+using ..STREAM: duct
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Pe
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
@@ -270,7 +271,7 @@ using ModelingToolkit: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
 using SymbolicIndexingInterface: getsym, ProblemState
 using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM
-using ..STREAM: flow_area, hydraulic_diameter, heated_perimeter
+using ..STREAM: flow_area, hydraulic_diameter, heated_perimeter, _with_duct
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..STREAM: assembly, port
@@ -375,7 +376,7 @@ since components use them too, and re-exported here.
 module Assemblies
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
-using ..STREAM: Duct
+using ..STREAM: Duct, duct
 using ..Components
 using ..STREAM: assembly, port, var_length
     """
@@ -443,7 +444,7 @@ export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend
 
 # Geometry
 export Duct, Rectangular, Circular, Effective, AbstractShape
-export flow_area, hydraulic_diameter, wetted_perimeter, heated_perimeter, aspect_ratio
+export flow_area, hydraulic_diameter, wetted_perimeter, heated_perimeter, aspect_ratio, duct
 
 # Solve entry points and the operating-point guess
 export solve_steady, solve_transient, steady_state_guess, uniform

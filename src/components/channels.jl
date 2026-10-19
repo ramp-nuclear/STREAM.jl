@@ -226,7 +226,8 @@ end
 
 Build the composed `System` for a channel variant. Every variant states its own heat-input
 expressions and whatever extra variables, equations, observables, and ports it adds, then
-hands them here; the shared core equations and the `compose` call live in one place.
+hands them here; the shared core equations and the `compose` call live in one place. The
+system carries `geometry`, for [`duct`](@ref) to read back.
 """
 function _channel_system(;
     name, n::Int, geometry::Duct, g, darcy, liquid,
@@ -247,7 +248,7 @@ function _channel_system(;
         T_wall=T_wall,
     )
     all_vars = [_vcollect(vars); reduce(vcat, (collect(v) for v in extra_vars); init=Num[])]
-    return compose(
+    sys = compose(
         System(
             [core.eqs; extra_eqs], t, all_vars, pars;
             observed=[core.obs; extra_obs], name=name,
@@ -256,6 +257,7 @@ function _channel_system(;
         outlet,
         extra_ports...,
     )
+    return _with_duct(sys, geometry)
 end
 
 """

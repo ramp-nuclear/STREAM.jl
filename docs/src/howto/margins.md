@@ -38,7 +38,7 @@ Name each margin you want and give the function that computes it from a
 correlations take one directly. Arrange each so that larger is safer:
 
 ```@example mg
-m = threshold_analysis(sol, sys.cell.ch; pipe=geometry,
+m = threshold_analysis(sol, sys.cell.ch;
     onb = s -> bergles_rohsenow_t_onb(s) .- s.T_wall,      # K to the onset of boiling
     chfr = chfr(q_CHF_sudo_kaminaga),                     # CHF over the local flux
     ofi = s -> q_OFI_whittle_forgan(s) / 3.0e4,           # OFI power over channel power
@@ -47,7 +47,7 @@ m = threshold_analysis(sol, sys.cell.ch; pipe=geometry,
 worst_case(m.chfr)
 ```
 
-Pass `pipe`, the channel's geometry: the heat fluxes and the geometric correlations need it.
+The heat fluxes and the geometric correlations read the channel's own [`duct`](@ref).
 Per-cell margins come back as vectors and channel-wide ones, like the OFI ratio, as numbers.
 [`worst_case`](@ref STREAM.Thresholds.worst_case) gives the smallest value and its cell.
 
@@ -58,7 +58,7 @@ and the flux-based correlations take a `direction`: `:left`, `:right`, or `:max`
 the two and the default. Face-by-face margins:
 
 ```@example mg
-m = threshold_analysis(sol, sys.cell.ch; pipe=geometry,
+m = threshold_analysis(sol, sys.cell.ch;
     left = chfr(q_CHF_mirshak; direction=:left),
     right = chfr(q_CHF_mirshak; direction=:right))
 (minimum(m.left), minimum(m.right))
@@ -71,7 +71,7 @@ margin becomes a matrix, cells by times, and `worst_case` with the times finds w
 
 ```@example mg
 sol_tr = solve_transient(sys, sol, 0.0:0.1:5.0; overrides=[sys.cell.fuel.power => 4.5e4])
-m = threshold_analysis(sol_tr, sys.cell.ch; pipe=geometry, chfr=chfr(q_CHF_sudo_kaminaga))
+m = threshold_analysis(sol_tr, sys.cell.ch; chfr=chfr(q_CHF_sudo_kaminaga))
 size(m.chfr), worst_case(m.chfr; times=sol_tr.t)
 ```
 

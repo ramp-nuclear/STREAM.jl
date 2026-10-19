@@ -75,6 +75,13 @@ end
     @test isapprox(at(rect.heated[1], gap, 0.0025), 0.0665; rtol=1e-12)
 end
 
+@testset "a channel carries its duct" begin
+    geom = Duct(0.6, Circular(0.01))
+    @test duct(Components.Channel(; name=:ch, n=3, geometry=geom)) === geom
+    @test duct(Components.ChannelAndContacts(; name=:cac, n=3, geometry=geom)) === geom
+    @test_throws ArgumentError duct(Components.Pump(1.0; name=:pump))
+end
+
 @testset "a fixed duct stays Float64" begin
     @test Duct(1.0, Circular(1 // 100)) isa Duct{Circular{Float64},Float64}
     @test Duct(1, Rectangular(0.07, 0.00127)) isa Duct{Rectangular{Float64},Float64}

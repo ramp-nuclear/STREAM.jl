@@ -215,7 +215,7 @@ end
         q_flux_right=fill(4e5, n),
         ṁ=0.5,
         velocity=fill(3.0, n),
-        pipe=pipe,
+        duct=pipe,
         gravity=9.81,
     )
 
@@ -225,7 +225,7 @@ end
         @test state.T_inlet == 26.85
         @test state.ṁ == 0.5
         @test state.gravity == 9.81
-        @test state.pipe === pipe
+        @test state.duct === pipe
     end
 
     @testset "bergles_rohsenow_t_onb on a ChannelState" begin
@@ -270,7 +270,7 @@ end
             T_wall_left=fill(90.0, n), T_wall_right=fill(85.0, n),
             T_sat=fill(100.0, n), T_ONB=fill(106.85, n), T_inlet=40.0, P=fill(1e5, n),
             q_flux=fill(5e5, n), q_flux_left=fill(5e5, n), q_flux_right=fill(4e5, n),
-            ṁ=0.5, velocity=fill(3.0, n), pipe=pipe, gravity=9.81)
+            ṁ=0.5, velocity=fill(3.0, n), duct=pipe, gravity=9.81)
 
         # The state method takes its saturated properties from the coolant at the channel's
         # own saturation state, so the explicit call needs the same snapshot to agree.
@@ -326,12 +326,12 @@ end
             T_wall_left=fill(66.85, n), T_wall_right=fill(61.85, n),
             T_sat=sloped, T_ONB=fill(106.85, n), T_inlet=26.85, P=fill(1e5, n),
             q_flux=fill(5e5, n), q_flux_left=fill(5e5, n), q_flux_right=fill(4e5, n),
-            ṁ=0.5, velocity=fill(3.0, n), pipe=pipe, gravity=9.81)
+            ṁ=0.5, velocity=fill(3.0, n), duct=pipe, gravity=9.81)
         rev = ChannelState(; n=n, T_bulk=fwd.T_bulk, T_wall=fwd.T_wall,
             T_wall_left=fwd.T_wall_left, T_wall_right=fwd.T_wall_right,
             T_sat=sloped, T_ONB=fwd.T_ONB, T_inlet=fwd.T_inlet, P=fwd.P,
             q_flux=fwd.q_flux, q_flux_left=fwd.q_flux_left, q_flux_right=fwd.q_flux_right,
-            ṁ=-0.5, velocity=fwd.velocity, pipe=pipe, gravity=9.81)
+            ṁ=-0.5, velocity=fwd.velocity, duct=pipe, gravity=9.81)
 
         @test q_OFI_whittle_forgan(fwd) ≈
               q_OFI_whittle_forgan(0.5, last(sloped), 26.85, pipe) rtol = 1e-12
@@ -361,7 +361,10 @@ end
 
     # A plain Channel has no `velocity` variable (only ChannelAndContacts declares it), so
     # the extraction has to fall back to the signed `v` and take its magnitude.
-    state = ChannelState(sol, ssys.ch; pipe=geo)
+    state = ChannelState(sol, ssys.ch)
+    # The duct comes off the compiled channel itself, not from the caller.
+    @test duct(ssys.ch) == geo
+    @test state.duct == geo
     @test state.n == 5
     @test length(state.T_bulk) == 5
     @test all(state.velocity .>= 0)
@@ -380,16 +383,12 @@ end
     @test all(state.q_flux .> 0)
     @test all(isfinite, chfr(q_CHF_mirshak)(state))
 
-    # Without a geometry there is no area at all, so both faces read zero.
-    bare = ChannelState(sol, ssys.ch)
-    @test all(iszero, bare.q_flux)
-
     # Run the loop backwards and the coolant enters at the last cell. The heat exchanger
     # sets both of its ports, so what reaches the channel is still its 40 °C, while the
     # first cell is now the hot end.
     back = build_loop(; n=5, dP_pump=-3.0e4)
     op_back = [back.ch.inlet.ṁ => -0.5]
-    reversed = ChannelState(solve_steady(back, op_back), back.ch; pipe=geo)
+    reversed = ChannelState(solve_steady(back, op_back), back.ch)
     @test reversed.ṁ < 0
     @test reversed.T_inlet ≈ 40.0
     @test reversed.T_inlet < last(reversed.T_bulk) < first(reversed.T_bulk)
@@ -412,19 +411,18 @@ end
     @test ṁ[end] < 0.5 * ṁ[1]
 
     @testset "at saved time $k" for k in (1, 3, length(sol.t))
-        s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
+        s = ChannelState(sol, ssys.ch; index=k)
         @test s.ṁ == ṁ[k]
         @test s.T_inlet == sol[ssys.ch.T_in, k]
         @test s.T_bulk == sol[ssys.ch.T, k]
     end
     # A transient has many instants, so asking for the state without saying which is an
     # error rather than a guess.
-    @test_throws ArgumentError ChannelState(sol, ssys.ch; pipe=geo)
+    @test_throws ArgumentError ChannelState(sol, ssys.ch)
 
     # Channel-level results stack into a vector over time, per-cell ones into [cell, time].
     result = threshold_analysis(
-        sol, ssys.ch; pipe=geo,
-        osv=q_OSV_saha_zuber, ofi=q_OFI_whittle_forgan, sk=q_CHF_sudo_kaminaga,
+        sol, ssys.ch; osv=q_OSV_saha_zuber, ofi=q_OFI_whittle_forgan, sk=q_CHF_sudo_kaminaga,
         onb=bergles_rohsenow_t_onb,
     )
     nt = length(sol.t)
@@ -435,7 +433,7 @@ end
     # Stacking loses nothing: column k of each result is exactly what the correlation gives
     # for the state at saved time k on its own.
     @testset "column $k is the state at saved time $k" for k in (1, nt)
-        s = ChannelState(sol, ssys.ch; pipe=geo, index=k)
+        s = ChannelState(sol, ssys.ch; index=k)
         @test result.osv[:, k] == q_OSV_saha_zuber(s)
         @test result.ofi[k] == q_OFI_whittle_forgan(s)
         @test result.sk[:, k] == q_CHF_sudo_kaminaga(s)
@@ -446,8 +444,8 @@ end
     @test result.sk[:, end] != result.sk[:, 1]
 
     # A steady solution still gives one value per cell.
-    steady = threshold_analysis(sol_ss, ssys.ch; pipe=geo, sk=q_CHF_sudo_kaminaga)
-    @test steady.sk == q_CHF_sudo_kaminaga(ChannelState(sol_ss, ssys.ch; pipe=geo))
+    steady = threshold_analysis(sol_ss, ssys.ch; sk=q_CHF_sudo_kaminaga)
+    @test steady.sk == q_CHF_sudo_kaminaga(ChannelState(sol_ss, ssys.ch))
 end
 
 @testset "worst_case finds the smallest margin and where it is" begin
@@ -485,7 +483,7 @@ end
     @test sol.retcode == ReturnCode.Success
 
     err = try
-        ChannelState(sol, ssys.chf; pipe=geo)
+        ChannelState(sol, ssys.chf)
         nothing
     catch e
         e
@@ -513,7 +511,7 @@ end
         q_flux_right=fill(4e5, n),
         ṁ=0.5,
         velocity=fill(3.0, n),
-        pipe=pipe,
+        duct=pipe,
         gravity=9.81,
     )
 
@@ -545,7 +543,7 @@ end
         q_flux_right=fill(0.0, n),
         ṁ=0.5,
         velocity=fill(3.0, n),
-        pipe=pipe,
+        duct=pipe,
         gravity=9.81,
     )
     ratios_zero = ratio_fn(state_zero)
@@ -571,7 +569,7 @@ end
         q_flux_right=fill(4e5, n),
         ṁ=0.5,
         velocity=fill(3.0, n),
-        pipe=pipe,
+        duct=pipe,
         gravity=9.81,
     )
 
@@ -597,7 +595,7 @@ end
         n=n, T_bulk=fill(60.0, n), T_wall=fill(62.0, n), T_wall_left=fill(62.0, n),
         T_wall_right=fill(62.0, n), T_sat=fill(115.0, n), T_ONB=fill(120.0, n),
         T_inlet=35.0, P=fill(1.7e5, n), q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=0.01,
-        velocity=fill(0.05, n), pipe=nothing, gravity=9.81,
+        velocity=fill(0.05, n), duct=nothing, gravity=9.81,
     )
     onb = bergles_rohsenow_t_onb(s)
     @test onb[1] ≈ bergles_rohsenow_t_onb(1.7e5, 5.0e4, 115.0)
@@ -624,7 +622,7 @@ end
         return ChannelState(; n=n, T_bulk=T, T_wall=T_wall, T_wall_left=T_wall,
             T_wall_right=T_wall, T_sat=Tsat.(H2O, P), T_ONB=zeros(n), T_inlet=35.0, P=P,
             q_flux=q, q_flux_left=q, q_flux_right=q, ṁ=mdot,
-            velocity=abs.(mdot ./ (ρ.(H2O, T) .* flow_area(pipe))), pipe=pipe, gravity=G_EARTH)
+            velocity=abs.(mdot ./ (ρ.(H2O, T) .* flow_area(pipe))), duct=pipe, gravity=G_EARTH)
     end
 
     python = (

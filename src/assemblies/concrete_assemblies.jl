@@ -128,7 +128,7 @@ function one_sided(channel, fuel; side::Symbol=:left, name::Symbol)
 end
 
 """
-    single_channel(channel, fuel, geometry; fuel_side=:left, name) -> System
+    single_channel(channel, fuel; fuel_side=:left, name) -> System
 
 Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channel*.
 
@@ -145,7 +145,6 @@ one-face-insulated coupling, use [`one_sided`](@ref) instead.
 # Arguments
 - `channel`: uncompiled `ChannelAndContacts` instance.
 - `fuel`: uncompiled `HeatDiffusion` instance (`nz` must equal `channel.n`).
-- `geometry`: the [`Duct`](@ref) the channel was built with, which gives the far-face areas
 - `fuel_side`: `:left` or `:right`, which fuel face is the near (conjugate) face
   (default `:left`). The opposite face gets the convective sink.
 - `name`: system name (Symbol).
@@ -157,9 +156,10 @@ Uncompiled `System` from [`assembly`](@ref) holding `channel`, `fuel`, and `n` p
 After composition, refer to sub-components through the returned system (e.g.
 `scc.channel`, `scc.fuel`).
 """
-function single_channel(channel, fuel, geometry::Duct; fuel_side::Symbol=:left, name::Symbol)
+function single_channel(channel, fuel; fuel_side::Symbol=:left, name::Symbol)
     fuel_side in (:left, :right) ||
         throw(ArgumentError("fuel_side must be :left or :right, got :$fuel_side"))
+    geometry = duct(channel)
     n = var_length(channel, :thermal_left)
     dz = geometry.L / n
 

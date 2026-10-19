@@ -26,7 +26,8 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 - `q_flux_right::AbstractArray`: right face heat flux per cell [W/m²]
 - `ṁ::Float64`: mass flow rate from `inlet.ṁ` [kg/s]
 - `velocity::AbstractArray`: absolute fluid velocity per cell [m/s]
-- `pipe::Union{Duct, Nothing}`: the channel's duct, or `nothing` if unavailable
+- `duct::Union{Duct, Nothing}`: the channel's [`Duct`](@ref), or `nothing` for a state built
+  by hand without one
 - `gravity::Float64`: gravitational acceleration [m/s²]
 """
 @kwdef struct ChannelState
@@ -44,7 +45,7 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
     q_flux_right::AbstractArray
     ṁ::Float64
     velocity::AbstractArray
-    pipe::Union{Duct,Nothing}
+    duct::Union{Duct,Nothing} = nothing
     gravity::Float64
 end
 
@@ -74,7 +75,7 @@ function _time_index(sol, index)
 end
 
 """
-    ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=nothing)
+    ChannelState(sol, channel_sys; gravity=G_EARTH, index=nothing)
 
 Read one channel's state at one instant out of a solution.
 
@@ -82,8 +83,8 @@ A steady solution has a single instant, so `index` is not needed. A transient ne
 the position of a saved time in `sol.t`. To run the correlations over a whole transient, use
 [`threshold_analysis`](@ref), which builds a `ChannelState` at every saved time.
 
-`q_flux_left[i] = q_wall_left[i] / (pipe.heated[1] * dz)`.
-When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
+The face fluxes divide each face's heat flow by its area, read off the channel's own
+[`duct`](@ref): `q_flux_left[i] = q_wall_left[i] / (heated[1] * dz)`.
 
 `channel_sys` must expose a wall temperature, so `Channel` or `ChannelAndContacts`.
 `ChannelHeatFlux` prescribes its flux and leaves `T_wall_left`/`T_wall_right` unconstrained for
@@ -92,7 +93,6 @@ When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 # Arguments
 - `sol`: a `NonlinearSolution` or an `ODESolution`
 - `channel_sys`: the compiled channel subsystem, such as `ssys.ch`
-- `pipe`: the channel's [`Duct`](@ref), needed for the fluxes and geometric correlations
 - `gravity`: gravitational acceleration [m/s²]
 - `index`: which saved time of a transient to read
 
@@ -100,10 +100,11 @@ When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 A `ChannelState` for that instant.
 
 # Throws
-- `ArgumentError`: for a transient with several saved times and no `index`, or a channel
-  whose wall temperature did not survive compilation
+- `ArgumentError`: for a transient with several saved times and no `index`, a system that is
+  not a STREAM channel, or a channel whose wall temperature did not survive compilation
 """
-function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=nothing)
+function ChannelState(sol, channel_sys; gravity=G_EARTH, index=nothing)
+    geometry = duct(channel_sys)
     n = length(channel_sys.T)
     k = _time_index(sol, index)
     value(sym) = k === nothing ? sol[sym] : sol[sym, k]
@@ -135,18 +136,18 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=not
     end
 
     # q_wall is a heat flow [W]; dividing by the face area gives the flux the correlations
-    # want. Without a geometry there is no area, so the fluxes stay zero.
+    # want.
     q_wall_left = cells(channel_sys.q_wall_left)
     q_wall_right = cells(channel_sys.q_wall_right)
     # A face with no heated perimeter (the second face of a circular pipe, or the dangling
     # side of a one-sided channel) has no area to divide by, and its flux is zero rather than
     # 0/0. Leaving that as NaN would propagate through max() into every CHF ratio.
     function face_flux(q_wall, perimeter)
-        (pipe === nothing || iszero(perimeter)) && return zero(q_wall)
-        return q_wall ./ (perimeter * (pipe.L / n))
+        iszero(perimeter) && return zero(q_wall)
+        return q_wall ./ (perimeter * (geometry.L / n))
     end
-    q_flux_left = face_flux(q_wall_left, pipe === nothing ? 0 : pipe.heated[1])
-    q_flux_right = face_flux(q_wall_right, pipe === nothing ? 0 : pipe.heated[2])
+    q_flux_left = face_flux(q_wall_left, geometry.heated[1])
+    q_flux_right = face_flux(q_wall_right, geometry.heated[2])
 
     return ChannelState(;
         n=n,
@@ -164,13 +165,13 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=not
         q_flux_right=q_flux_right,
         ṁ=value(channel_sys.inlet.ṁ),
         velocity=velocity,
-        pipe=pipe,
+        duct=geometry,
         gravity=gravity,
     )
 end
 
 """
-    threshold_analysis(sol, channel_sys; pipe=nothing, gravity=G_EARTH, kwargs...) -> NamedTuple
+    threshold_analysis(sol, channel_sys; gravity=G_EARTH, kwargs...) -> NamedTuple
 
 Apply named threshold functions to one channel of a solution.
 
@@ -184,7 +185,6 @@ flow at that time, and the results stack along a last axis: a per-cell result be
 # Arguments
 - `sol`: a `NonlinearSolution` (steady) or an `ODESolution` (transient)
 - `channel_sys`: the compiled MTK subsystem with `T`, `T_wall_left`, `T_wall_right`, etc.
-- `pipe`: optional [`Duct`](@ref), needed for `q_flux_*` and any correlation that uses geometry
 - `gravity`: gravitational acceleration [m/s²] (default `G_EARTH`)
 - `kwargs...`: named analysis functions
 
@@ -194,7 +194,7 @@ flow at that time, and the results stack along a last axis: a per-cell result be
 # Example
 ```julia
 result = threshold_analysis(sol, ssys.cac;
-    pipe=pipe, gravity=G_EARTH,
+    gravity=G_EARTH,
     chfr_mirshak = chfr(q_CHF_mirshak),
     onb          = bergles_rohsenow_t_onb,
 )
@@ -202,8 +202,8 @@ result.chfr_mirshak                           # CHF ratio per cell, and per time
 worst_case(result.chfr_mirshak; times=sol.t)  # the smallest, and where and when
 ```
 """
-function threshold_analysis(sol, channel_sys; pipe=nothing, gravity=G_EARTH, kwargs...)
-    state_at(k) = ChannelState(sol, channel_sys; pipe=pipe, gravity=gravity, index=k)
+function threshold_analysis(sol, channel_sys; gravity=G_EARTH, kwargs...)
+    state_at(k) = ChannelState(sol, channel_sys; gravity=gravity, index=k)
     fns = Base.values(kwargs)
     results = if hasproperty(sol, :t) && length(sol.t) > 1
         states = [state_at(k) for k in eachindex(sol.t)]
@@ -349,7 +349,7 @@ Every threshold correlation also accepts a solved channel, taking its arguments 
 methods on the correlations themselves, not a second set of names for them. Results come back
 per cell, except `q_OFI_whittle_forgan`, which is one power for the channel.
 [`threshold_analysis`](@ref) stacks them over time. `q_OFI_whittle_forgan`,
-`q_OSV_saha_zuber` and the two geometry-dependent CHF correlations need `state.pipe`.
+`q_OSV_saha_zuber` and the two geometry-dependent CHF correlations need `state.duct`.
 
 - `direction` picks the face flux, as in [`chfr`](@ref): `:left`, `:right`, or `:max` for
   the larger of the two.
@@ -379,27 +379,27 @@ end
 q_CHF_mirshak(s::ChannelState) =
     q_CHF_mirshak.(s.T_bulk, s.T_sat, s.P, copysign.(s.velocity, s.ṁ))
 
-q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, s.pipe)
+q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, s.duct)
 
 # The correlation needs saturated-coolant properties, and this is where the coolant is
 # known, so the snapshot is built here: one entry per cell at that cell's saturation state.
 function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=H2O)
     T_sat, P = collect(s.T_sat), collect(s.P)
-    return q_CHF_sudo_kaminaga(collect(s.T_bulk), s.ṁ, s.pipe, s.gravity, liquid(T_sat, P))
+    return q_CHF_sudo_kaminaga(collect(s.T_bulk), s.ṁ, s.duct, s.gravity, liquid(T_sat, P))
 end
 
 # Flow instability is judged at the outlet, where the coolant is hottest and nearest boiling:
 # the last cell in forward flow and the first in reversed flow.
 function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
     T_sat_out = s.ṁ >= 0 ? last(s.T_sat) : first(s.T_sat)
-    return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.pipe; liquid=liquid)
+    return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.duct; liquid=liquid)
 end
 
 function q_OSV_saha_zuber(s::ChannelState; direction=:max, liquid::AbstractLiquid=H2O)
     coolant = liquid(collect(s.T_bulk), collect(s.P))
     return q_OSV_saha_zuber(
-        s.T_inlet, s.ṁ, s.pipe, coolant;
-        flux_shape=_face_flux(s, direction), dz=fill(s.pipe.L / s.n, s.n),
+        s.T_inlet, s.ṁ, s.duct, coolant;
+        flux_shape=_face_flux(s, direction), dz=fill(s.duct.L / s.n, s.n),
     )
 end
 
@@ -416,5 +416,5 @@ function Base.show(io::IO, ::MIME"text/plain", s::ChannelState)
     print(io, "\n  T_wall   ", rng(s.T_wall), " °C")
     print(io, "\n  T_sat    ", rng(s.T_sat), " °C")
     print(io, "\n  q_flux   ", rng(s.q_flux), " W/m^2")
-    print(io, "\n  pipe     ", s.pipe === nothing ? "not given (q_flux is zero)" : "given")
+    s.duct === nothing || print(io, "\n  duct     ", s.duct.shape, ", ", s.duct.L, " m")
 end

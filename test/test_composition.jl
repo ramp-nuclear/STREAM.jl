@@ -319,7 +319,7 @@ end
 @testset "single_channel — fuel_side=:left compiles cleanly" begin
     geom = Duct(0.6, Rectangular(0.070, 0.0025))
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    scc = single_channel(cac, fuel, geom; fuel_side=:left, name=:scc_l)
+    scc = single_channel(cac, fuel; fuel_side=:left, name=:scc_l)
     @test scc isa ModelingToolkit.AbstractSystem
     # One ConvectiveBoundary per axial cell on the far face (n=4).
     sub_names = string.(ModelingToolkit.getname.(ModelingToolkit.get_systems(scc)))
@@ -338,7 +338,7 @@ end
 @testset "single_channel — fuel_side=:right compiles cleanly" begin
     geom = Duct(0.6, Rectangular(0.070, 0.0025))
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    scc = single_channel(cac, fuel, geom; fuel_side=:right, name=:scc_r)
+    scc = single_channel(cac, fuel; fuel_side=:right, name=:scc_r)
     @test scc isa ModelingToolkit.AbstractSystem
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
@@ -362,7 +362,7 @@ end
     slab = Slab(; x=range(0, 0.00127, nx + 1), z=range(0, 0.6, nz + 1), y=0.07,
                   material=Solid(2700.0, 900.0, 200.0))
     @named fuel = HeatDiffusion(slab; power=1e4)
-    scc = single_channel(cac, fuel, geom; fuel_side=:left, name=:scc_s)
+    scc = single_channel(cac, fuel; fuel_side=:left, name=:scc_s)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
     conns = [
@@ -386,7 +386,7 @@ end
 @testset "single_channel — invalid fuel_side errors" begin
     geom = Duct(0.6, Rectangular(0.070, 0.0025))
     cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
-    @test_throws ArgumentError single_channel(cac, fuel, geom; fuel_side=:bogus, name=:bad)
+    @test_throws ArgumentError single_channel(cac, fuel; fuel_side=:bogus, name=:bad)
 end
 
 # Section 7: assembly
