@@ -413,14 +413,11 @@ end
     slab = Slab(; x=range(0, 0.005, 3), z=range(0, L, n + 1), y=0.07,
                 material=Solid(19300.0, 116.0, 174.0))
     @named fuel = HeatDiffusion(slab; power)
-    heated = one_sided(ch, fuel; side=:left, name=:heated)
+    @named heated = assembly(faces((ch, :thermal_outer) => (fuel, :thermal_right)), ch, fuel)
     connections = [
         inseries(ext_res, hx, pump, ine),
         inparallel(ine, ((heated.ch, ret), flapper), ext_res),
         pump.inlet.p ~ 1.0e5,
-        # A circular channel's right face has no heated perimeter, so it passes no heat
-        # whatever its wall temperature. Pinning that to the coolant determines it.
-        port(heated.ch, :thermal_right, :T) .~ heated.ch.T,
     ]
     @named sys = assembly(connections, heated, pump, ine, hx, ret, flapper, ext_res)
     ssys = mtkcompile(sys)

@@ -13,17 +13,15 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 # Fields
 - `n::Int`: number of axial cells
 - `T_bulk::AbstractArray`: bulk coolant temperature per cell [°C]
-- `T_wall::AbstractArray`: the hotter face, `max(T_wall_left, T_wall_right)`, per cell [°C]
-- `T_wall_left::AbstractArray`: left face wall temperature per cell [°C]
-- `T_wall_right::AbstractArray`: right face wall temperature per cell [°C]
+- `T_wall::AbstractArray`: the hottest face's wall temperature per cell [°C]
+- `T_walls::NamedTuple`: each face's wall temperature per cell, by face name [°C]
 - `T_sat::AbstractArray`: saturation temperature per cell [°C]
 - `T_ONB::AbstractArray`: onset of nucleate boiling temperature per cell [°C]
 - `T_inlet::Float64`: temperature of the coolant entering the channel, at whichever end is
   upstream, from the channel's `T_in` [°C]
 - `P::AbstractArray`: absolute pressure per cell [Pa]
-- `q_flux::AbstractArray`: the larger face flux, `max(q_flux_left, q_flux_right)` [W/m²]
-- `q_flux_left::AbstractArray`: left face heat flux per cell [W/m²]
-- `q_flux_right::AbstractArray`: right face heat flux per cell [W/m²]
+- `q_flux::AbstractArray`: the largest face heat flux per cell [W/m²]
+- `q_fluxes::NamedTuple`: each face's heat flux per cell, by face name [W/m²]
 - `ṁ::Float64`: mass flow rate from `inlet.ṁ` [kg/s]
 - `velocity::AbstractArray`: absolute fluid velocity per cell [m/s]
 - `duct::Union{Duct, Nothing}`: the channel's [`Duct`](@ref), or `nothing` for a state built
@@ -34,15 +32,13 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
     n::Int
     T_bulk::AbstractArray
     T_wall::AbstractArray
-    T_wall_left::AbstractArray
-    T_wall_right::AbstractArray
+    T_walls::NamedTuple = (;)
     T_sat::AbstractArray
     T_ONB::AbstractArray
     T_inlet::Float64
     P::AbstractArray
     q_flux::AbstractArray
-    q_flux_left::AbstractArray
-    q_flux_right::AbstractArray
+    q_fluxes::NamedTuple = (;)
     ṁ::Float64
     velocity::AbstractArray
     duct::Union{Duct,Nothing} = nothing
@@ -84,10 +80,10 @@ the position of a saved time in `sol.t`. To run the correlations over a whole tr
 [`threshold_analysis`](@ref), which builds a `ChannelState` at every saved time.
 
 The face fluxes divide each face's heat flow by its area, read off the channel's own
-[`duct`](@ref): `q_flux_left[i] = q_wall_left[i] / (heated[1] * dz)`.
+[`duct`](@ref): `q_fluxes.left[i] = q_wall_left[i] / (heated.left * dz)`.
 
 `channel_sys` must expose a wall temperature, so `Channel` or `ChannelAndContacts`.
-`ChannelHeatFlux` prescribes its flux and leaves `T_wall_left`/`T_wall_right` unconstrained for
+`ChannelHeatFlux` prescribes its flux and leaves its wall temperatures unconstrained for
 `mtkcompile` to drop.
 
 # Arguments
@@ -117,52 +113,46 @@ function ChannelState(sol, channel_sys; gravity=G_EARTH, index=nothing)
     velocity = cells(signed_velocity ? channel_sys.v : channel_sys.velocity)
     signed_velocity && (velocity = abs.(velocity))
 
-    # Every variant declares T_wall_left/T_wall_right, but only the ones that also close them
-    # keep them through mtkcompile, so the read is where a wall-less channel shows up. The bare
-    # "not present in the system" that MTK raises does not say which channel or why.
-    T_wall_left, T_wall_right = try
-        cells(channel_sys.T_wall_left), cells(channel_sys.T_wall_right)
+    # Every variant declares a wall temperature per face, but only the ones that also close
+    # it keep it through mtkcompile, so the read is where a wall-less channel shows up. The
+    # bare "not present in the system" that MTK raises does not say which channel or why.
+    faces = keys(geometry.heated)
+    T_walls = try
+        NamedTuple{faces}(map(f -> cells(getproperty(channel_sys, Symbol(:T_wall_, f))), faces))
     catch err
         err isa ArgumentError || rethrow()
         throw(
             ArgumentError(
                 "no wall temperature survived compilation in $(nameof(channel_sys)), so a " *
                 "ChannelState cannot be built from it. ChannelHeatFlux prescribes its heat " *
-                "flux and leaves T_wall_left and T_wall_right with no equation, which " *
-                "mtkcompile then drops. Threshold analysis wants Channel or " *
-                "ChannelAndContacts. MTK said: $(err.msg)",
+                "flux and leaves its wall temperatures with no equation, which mtkcompile " *
+                "then drops. Threshold analysis wants Channel or ChannelAndContacts. " *
+                "MTK said: $(err.msg)",
             ),
         )
     end
 
-    # q_wall is a heat flow [W]; dividing by the face area gives the flux the correlations
+    # q_wall is a heat flow [W]; dividing by the face's area gives the flux the correlations
     # want.
-    q_wall_left = cells(channel_sys.q_wall_left)
-    q_wall_right = cells(channel_sys.q_wall_right)
-    # A face with no heated perimeter (the second face of a circular pipe, or the dangling
-    # side of a one-sided channel) has no area to divide by, and its flux is zero rather than
-    # 0/0. Leaving that as NaN would propagate through max() into every CHF ratio.
-    function face_flux(q_wall, perimeter)
-        iszero(perimeter) && return zero(q_wall)
-        return q_wall ./ (perimeter * (geometry.L / n))
-    end
-    q_flux_left = face_flux(q_wall_left, geometry.heated[1])
-    q_flux_right = face_flux(q_wall_right, geometry.heated[2])
+    dz = geometry.L / n
+    q_fluxes = NamedTuple{faces}(map(faces) do f
+        cells(getproperty(channel_sys, Symbol(:q_wall_, f))) ./ (geometry.heated[f] * dz)
+    end)
+    # The conservative face: whichever is hotter, and whichever carries more flux.
+    hottest(per_face, none) = isempty(per_face) ? fill(none, n) :
+                                                  reduce((a, b) -> max.(a, b), per_face)
 
     return ChannelState(;
         n=n,
         T_bulk=cells(channel_sys.T),
-        # The conservative face: whichever is hotter, and whichever carries more flux.
-        T_wall=max.(T_wall_left, T_wall_right),
-        T_wall_left=T_wall_left,
-        T_wall_right=T_wall_right,
+        T_wall=hottest(T_walls, NaN),
+        T_walls=T_walls,
         T_sat=cells(channel_sys.T_sat),
         T_ONB=cells(channel_sys.T_ONB),
         T_inlet=value(channel_sys.T_in),
         P=cells(channel_sys.P),
-        q_flux=max.(q_flux_left, q_flux_right),
-        q_flux_left=q_flux_left,
-        q_flux_right=q_flux_right,
+        q_flux=hottest(q_fluxes, 0.0),
+        q_fluxes=q_fluxes,
         ṁ=value(channel_sys.inlet.ṁ),
         velocity=velocity,
         duct=geometry,
@@ -184,7 +174,7 @@ flow at that time, and the results stack along a last axis: a per-cell result be
 
 # Arguments
 - `sol`: a `NonlinearSolution` (steady) or an `ODESolution` (transient)
-- `channel_sys`: the compiled MTK subsystem with `T`, `T_wall_left`, `T_wall_right`, etc.
+- `channel_sys`: the compiled channel subsystem, such as `ssys.ch`
 - `gravity`: gravitational acceleration [m/s²] (default `G_EARTH`)
 - `kwargs...`: named analysis functions
 
@@ -286,30 +276,26 @@ function cavitation(sol, orifices...)
 end
 
 """
-    chfr(chf_fn; direction=:max) -> Function
+    chfr(chf_fn; face=:max) -> Function
 
-Factory that returns a CHF ratio (CHFR) closure with directional heat flux selection
-and a guard for zero/negative flux.
+Factory that returns a CHF ratio (CHFR) closure, dividing by the heat flux on one face or the
+largest, with a guard for zero or negative flux.
 
 The returned closure has signature `(state::ChannelState) -> AbstractArray`.
 
 # Arguments
 - `chf_fn`: a callable `(state::ChannelState) -> AbstractArray`, i.e. any of
   `q_CHF_mirshak`, `q_CHF_sudo_kaminaga`, `q_CHF_fabrega`
-- `direction`: which face's heat flux to use as denominator:
-  - `:max` (default): the larger face flux, `max.(q_flux_left, q_flux_right)`, the
-    conservative choice
-  - `:left`: `state.q_flux_left`
-  - `:right`: `state.q_flux_right`
-  - `:total`: `state.q_flux`, the same as `:max` under another name
+- `face`: whose heat flux to divide by: a face of the channel, such as `:left`, or `:max`
+  (default) for the largest face flux, the conservative choice
 
 # Returns
 Closure `(state::ChannelState) -> Vector{Float64}` where each entry is `CHF[i] / q[i]`,
 with `q[i] <= 0 → Inf` (no boiling risk when wall is not being heated).
 """
-function chfr(chf_fn; direction=:max)
+function chfr(chf_fn; face=:max)
     return function (state::ChannelState)
-        q = _face_flux(state, direction)
+        q = _face_flux(state, face)
         # Broadcast rather than zip: a channel-level correlation such as
         # q_CHF_sudo_kaminaga gives one number for the whole channel, and it has to divide
         # into the per-cell flux just the same.
@@ -318,30 +304,28 @@ function chfr(chf_fn; direction=:max)
 end
 
 """
-    _face_flux(s::ChannelState, direction) -> AbstractArray
+    _face_flux(s::ChannelState, face) -> AbstractArray
 
-The heat flux per cell that `direction` names: `:left` or `:right` for one face, and `:max`
-or `:total` for the larger of the two.
+The heat flux per cell on `face`, or the largest face flux for `:max`.
 
 # Throws
-- `ArgumentError`: for any other `direction`
+- `ArgumentError`: for a face the channel does not have
 """
-function _face_flux(s::ChannelState, direction)
-    direction == :left && return s.q_flux_left
-    direction == :right && return s.q_flux_right
-    direction == :max && return max.(s.q_flux_left, s.q_flux_right)
-    direction == :total && return s.q_flux
-    throw(ArgumentError("direction must be :left, :right, :max, or :total, got :$direction"))
+function _face_flux(s::ChannelState, face::Symbol)
+    face === :max && return s.q_flux
+    haskey(s.q_fluxes, face) && return s.q_fluxes[face]
+    throw(ArgumentError("face must be :max or one of the channel's faces, " *
+                        "$(join(repr.(keys(s.q_fluxes)), ", ")); got :$face"))
 end
 
 """
-    bergles_rohsenow_t_onb(state::ChannelState; direction=:max)
+    bergles_rohsenow_t_onb(state::ChannelState; face=:max)
     q_boiling_onset(state::ChannelState; liquid=H2O)
     q_CHF_mirshak(state::ChannelState)
     q_CHF_fabrega(state::ChannelState)
     q_CHF_sudo_kaminaga(state::ChannelState; liquid=H2O)
     q_OFI_whittle_forgan(state::ChannelState; liquid=H2O)
-    q_OSV_saha_zuber(state::ChannelState; direction=:max, liquid=H2O)
+    q_OSV_saha_zuber(state::ChannelState; face=:max, liquid=H2O)
     twall_limit(state::ChannelState; inhomogeneity_factor=1.0)
 
 Every threshold correlation also accepts a solved channel, taking its arguments out of the
@@ -351,8 +335,8 @@ per cell, except `q_OFI_whittle_forgan`, which is one power for the channel.
 [`threshold_analysis`](@ref) stacks them over time. `q_OFI_whittle_forgan`,
 `q_OSV_saha_zuber` and the two geometry-dependent CHF correlations need `state.duct`.
 
-- `direction` picks the face flux, as in [`chfr`](@ref): `:left`, `:right`, or `:max` for
-  the larger of the two.
+- `face` picks the face flux, as in [`chfr`](@ref): a face of the channel, or `:max` for
+  the largest.
 - `inhomogeneity_factor` makes the local flux worse, for fuel inhomogeneity, as the scalar
   [`twall_limit`](@ref) does.
 - `q_boiling_onset` takes `cₚ` at the inlet temperature.
@@ -366,8 +350,8 @@ What each correlation computes is in its own docstring.
 # A wall that is not heating the coolant cannot boil it, and the correlation's fractional
 # power has no real value for a negative flux, so those cells report no onset, as chfr does.
 # After a scram the coolant rising through the core can run hotter than parts of the plate.
-function bergles_rohsenow_t_onb(s::ChannelState; direction=:max)
-    q = _face_flux(s, direction)
+function bergles_rohsenow_t_onb(s::ChannelState; face=:max)
+    q = _face_flux(s, face)
     T_ONB = s.T_sat .+ _bergles_rohsenow_dT_ONB.(s.P, max.(q, 0.0))
     return ifelse.(q .> 0, T_ONB, Inf)
 end
@@ -395,18 +379,17 @@ function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
     return q_OFI_whittle_forgan(s.ṁ, T_sat_out, s.T_inlet, s.duct; liquid=liquid)
 end
 
-function q_OSV_saha_zuber(s::ChannelState; direction=:max, liquid::AbstractLiquid=H2O)
+function q_OSV_saha_zuber(s::ChannelState; face=:max, liquid::AbstractLiquid=H2O)
     coolant = liquid(collect(s.T_bulk), collect(s.P))
     return q_OSV_saha_zuber(
         s.T_inlet, s.ṁ, s.duct, coolant;
-        flux_shape=_face_flux(s, direction), dz=fill(s.duct.L / s.n, s.n),
+        flux_shape=_face_flux(s, face), dz=fill(s.duct.L / s.n, s.n),
     )
 end
 
-function twall_limit(s::ChannelState; inhomogeneity_factor=1.0)
-    limit(T_wall) = twall_limit.(s.T_bulk, T_wall, inhomogeneity_factor)
-    return max.(limit(s.T_wall_left), limit(s.T_wall_right))
-end
+# The limit rises with the wall temperature, so the hottest face sets it.
+twall_limit(s::ChannelState; inhomogeneity_factor=1.0) =
+    twall_limit.(s.T_bulk, s.T_wall, inhomogeneity_factor)
 
 function Base.show(io::IO, ::MIME"text/plain", s::ChannelState)
     rng(v) = "$(round(minimum(v); sigdigits=5))..$(round(maximum(v); sigdigits=5))"

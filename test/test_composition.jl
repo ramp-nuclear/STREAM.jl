@@ -61,17 +61,13 @@ end
     # pinning `port.T` directly over-determines via the dangling Flow rule
     # (auto-zeros Q). Drive them via ConstantTemperature `connect()`s
     # (the canonical CAC wall-T pattern; see the flow-reversal testset in test_channels.jl).
-    @named ct_l = ConstantTemperature(40.0; n=4)
-    @named ct_r = ConstantTemperature(40.0; n=4)
+    @named wall = ConstantTemperature(40.0; n=4)
     connections = [
         inseries(pump, bc, ch, pump),
         pump.inlet.p ~ 1.0e5,
-        faces(
-            (ct_l, :thermal) => (ch, :thermal_left),
-            (ct_r, :thermal) => (ch, :thermal_right),
-        ),
+        faces((wall, :thermal) => (ch, :thermal_outer)),
     ]
-    @named sys = assembly(connections, pump, bc, ch, ct_l, ct_r)
+    @named sys = assembly(connections, pump, bc, ch, wall)
     ssys = mtkcompile(sys)
     @test check_gravity_mismatch(ssys) == :ok
 end
@@ -81,17 +77,13 @@ end
     @named ch = ChannelAndContacts(; n=4, geometry=geom, g=G_EARTH)
     @named pump = Pump(3.0e4)
     @named bc = HeatExchanger(40.0)
-    @named ct_l = ConstantTemperature(40.0; n=4)
-    @named ct_r = ConstantTemperature(40.0; n=4)
+    @named wall = ConstantTemperature(40.0; n=4)
     connections = [
         inseries(pump, bc, ch, pump),
         pump.inlet.p ~ 1.0e5,
-        faces(
-            (ct_l, :thermal) => (ch, :thermal_left),
-            (ct_r, :thermal) => (ch, :thermal_right),
-        ),
+        faces((wall, :thermal) => (ch, :thermal_outer)),
     ]
-    @named sys = assembly(connections, pump, bc, ch, ct_l, ct_r)
+    @named sys = assembly(connections, pump, bc, ch, wall)
     ssys = mtkcompile(sys)
     # The mismatch is also reported as a warning, which is part of what is checked.
     result = @test_logs (:warn, r"no Gravity return component") check_gravity_mismatch(ssys)
@@ -112,12 +104,12 @@ end
 
 @testset "var_length: errors on Channel (no thermal port arrays under new design)" begin
     @named ch = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)))
-    @test_throws ArgumentError var_length(ch, :thermal_left)
+    @test_throws ArgumentError var_length(ch, :thermal_outer)
 end
 
 @testset "var_length: errors on ChannelHeatFlux (no thermal port arrays under new design)" begin
     @named chf = ChannelHeatFlux(; n=4, geometry=Duct(0.6, Circular(0.01)))
-    @test_throws ArgumentError var_length(chf, :thermal_left)
+    @test_throws ArgumentError var_length(chf, :thermal_outer)
 end
 
 # Section 4: symmetric_plate compose-correctness
@@ -638,13 +630,12 @@ end
     function channel_loop(; copies)
         @named pump = Pump(3.0e4)
         @named hx = HeatExchanger(40.0)
-        @named ch = Channel(; n=n, geometry=geom, g=0.0, h_left=5000.0, h_right=0.0)
+        @named ch = Channel(; n=n, geometry=geom, g=0.0, h=5000.0)
         branch = copies === nothing ? (ch,) : weighted(copies, ch; name=:core)
         conns = [
             inseries(pump, hx, branch..., pump),
             pump.inlet.p ~ 1.0e5,
-            ch.T_wall_left .~ 100.0,
-            ch.T_wall_right .~ 40.0,
+            ch.T_wall_outer .~ 100.0,
         ]
         # The tuple weighted returns is both the path to wire and the systems to compose.
         @named sys = assembly(conns, pump, hx, branch...)

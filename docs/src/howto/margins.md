@@ -54,13 +54,13 @@ Per-cell margins come back as vectors and channel-wide ones, like the OFI ratio,
 ## Choose the face
 
 A channel between two plates has a heat flux on each face. [`chfr`](@ref STREAM.Thresholds.chfr)
-and the flux-based correlations take a `direction`: `:left`, `:right`, or `:max`, the larger of
-the two and the default. Face-by-face margins:
+and the flux-based correlations take a `face`: one of the channel's faces, `:left` or
+`:right` here, or `:max`, the larger flux and the default. Face-by-face margins:
 
 ```@example mg
 m = threshold_analysis(sol, sys.cell.ch;
-    left = chfr(q_CHF_mirshak; direction=:left),
-    right = chfr(q_CHF_mirshak; direction=:right))
+    left = chfr(q_CHF_mirshak; face=:left),
+    right = chfr(q_CHF_mirshak; face=:right))
 (minimum(m.left), minimum(m.right))
 ```
 

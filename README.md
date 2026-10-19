@@ -38,12 +38,12 @@ using ModelingToolkit: @named, mtkcompile
 
 @named pump = Pump(3.0e4)                 # pressure rise [Pa]
 @named hx = HeatExchanger(40.0)           # outlet temperature [°C]
-@named ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h_left=5000.0)
+@named ch = Channel(; n=10, geometry=Duct(0.6, Circular(0.01)), h=5000.0)
 
 connections = [
     inseries(pump, hx, ch, pump),         # a closed loop
     pump.inlet.p ~ 1.0e5,                 # one absolute pressure fixes the level [Pa]
-    ch.T_wall_left .~ 100.0,              # wall temperature [°C]
+    ch.T_wall_outer .~ 100.0,             # wall temperature [°C]
 ]
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)

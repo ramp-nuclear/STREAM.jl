@@ -19,24 +19,18 @@ using STREAM.Components: Channel  # explicit: Base.Channel also exists
             n=n, geometry=geom, htc=HTC.ConstantNusselt(; Nu=8.235)
         )
         @named bc_phy02 = HeatExchanger(T_inlet)
-        @named ct_l_phy02 = ConstantTemperature(T_wall; n=n)
-        @named ct_r_phy02 = ConstantTemperature(T_wall; n=n)
+        @named wall_phy02 = ConstantTemperature(T_wall; n=n)
         conns_phy02 = [
             inseries(pump_phy02, bc_phy02, cac_phy02, pump_phy02),
-            faces(
-                (ct_l_phy02, :thermal) => (cac_phy02, :thermal_left),
-                (ct_r_phy02, :thermal) => (cac_phy02, :thermal_right),
-            ),
+            faces((wall_phy02, :thermal) => (cac_phy02, :thermal_outer)),
             pump_phy02.inlet.p ~ 1.0e5,
         ]
-        @named sys_phy02 = assembly(
-            conns_phy02, pump_phy02, bc_phy02, cac_phy02, ct_l_phy02, ct_r_phy02
-        )
+        @named sys_phy02 = assembly(conns_phy02, pump_phy02, bc_phy02, cac_phy02, wall_phy02)
         ssys_phy02 = mtkcompile(sys_phy02)
         sol_phy02 = solve_steady(ssys_phy02, [ssys_phy02.cac_phy02.inlet.ṁ => 0.490])
 
         @test sol_phy02.retcode == ReturnCode.Success
-        @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu_left], 8.235, rtol=1e-4))
+        @test all(isapprox.(sol_phy02[ssys_phy02.cac_phy02.Nu_outer], 8.235, rtol=1e-4))
     end
 
     @testset "Friction.rectangular_laminar integration — dP > 0 in solution" begin

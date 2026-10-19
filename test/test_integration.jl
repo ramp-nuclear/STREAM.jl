@@ -715,7 +715,7 @@ end
     k_s = 1.0
     Lx = 1.0
     # Mock one-sided pipe (heated only on the right, area 1) + mock solid (all 1).
-    geom = Duct(1.0, Effective(; area=1.0, wetted_perimeter=1.0); heated=(0, 1.0))
+    geom = Duct(1.0, Effective(; area=1.0, wetted_perimeter=1.0); heated=(right=1.0,))
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
     slab = Slab(; x=[0.0, Lx], z=range(0, 1.0, nz + 1), y=1.0, material=Solid(1.0, 1.0, k_s))
@@ -726,9 +726,6 @@ end
     conns = [
         inseries(pump, bc, osc.cac, pump),
         pump.inlet.p ~ 1.0e5,
-        # Unheated left face (heated[1]=0 ⇒ Q=0) has a floating wall T; pin it to the
-        # coolant temp (an insulated wall carries no heat, so this is just a closure).
-        port(osc.cac, :thermal_left, :T) .~ osc.cac.T,
     ]
     full = assembly(conns, osc, pump, bc; name=:sys4)
     ssys = mtkcompile(full)
@@ -766,7 +763,7 @@ end
     nx = 1
     ṁs = [1.0, 0.7, 0.4]        # distinct ṁs ⇒ distinct slopes off the shared power
     N = length(ṁs)
-    geom = Duct(1.2, Effective(; area=1.0, wetted_perimeter=1.0); heated=1.0)
+    geom = Duct(1.2, Effective(; area=1.0, wetted_perimeter=1.0); heated=(left=1.0, right=1.0))
     # Distinct names per channel/fuel so the shared PK gets a distinct T_source_<name> feedback
     # group for each component (temperature_feedback keys off nameof).
     cacs = [ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
@@ -904,7 +901,7 @@ end
     n = 7
     nz = 7
     nx = 1
-    geom = Duct(1.2, Effective(; area=1.0, wetted_perimeter=1.0); heated=1.0)
+    geom = Duct(1.2, Effective(; area=1.0, wetted_perimeter=1.0); heated=(left=1.0, right=1.0))
     @named cac = ChannelAndContacts(; n=n, geometry=geom, liquid=Liquid(),
                                     htc=HTC.ConstantNusselt(; Nu=8.235))
     slab = Slab(; x=[0.0, 1.0], z=range(0, 1.2, nz + 1), y=1.0, material=Solid(1.0, 1.0, 1.0))

@@ -216,8 +216,8 @@ module Thresholds
 using ModelingToolkit
 using QuadGK
 using ..STREAM: AbstractLiquid, Liquid, H2O, G_EARTH
-using ..STREAM: Duct, Rectangular, Circular, flow_area, hydraulic_diameter, heated_perimeter
-using ..STREAM: duct
+using ..STREAM: Duct, Rectangular, Circular, Annular, flow_area, hydraulic_diameter
+using ..STREAM: heated_perimeter, duct
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Pe
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
@@ -443,7 +443,7 @@ export H2O, D2O, Solid
 export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend
 
 # Geometry
-export Duct, Rectangular, Circular, Effective, AbstractShape
+export Duct, Rectangular, Circular, Annular, Effective, AbstractShape, walls
 export flow_area, hydraulic_diameter, wetted_perimeter, heated_perimeter, aspect_ratio, duct
 
 # Solve entry points and the operating-point guess

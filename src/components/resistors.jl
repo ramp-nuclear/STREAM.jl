@@ -154,7 +154,7 @@ volumetric flow rate. The `Q·|Q|` form keeps the drop direction-correct under f
 A **time-dependent** resistance (the "transistor" pattern: a branch whose resistance
 collapses or grows over time) is expressed by passing `k` as a callable `(t) -> k`; the user
 then supplies `vfr.k_fn => fn` in the solve `op` dict (the MTK callable-parameter idiom, the
-same one `Channel`'s `h_left` uses).
+same one `Channel`'s `h` uses).
 
 # Arguments
 - `name`: system name (Symbol)

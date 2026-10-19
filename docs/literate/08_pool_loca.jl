@@ -99,7 +99,7 @@ P_rated = 2.0e6                           # [W]
 geometry = Duct(0.6, Rectangular(0.067, 0.0024); heated=0.063)
 n = 10
 @parameters P_core = P_rated
-q_wall = P_core / N / (2 * geometry.heated[1] * geometry.L)   # each face [W/m²]
+q_wall = P_core / N / (2 * geometry.heated.left * geometry.L)   # each face [W/m²]
 @named ch = ChannelHeatFlux(; n, geometry, g=-G_EARTH)
 core = weighted(N, ch; name=:core)
 nothing #hide

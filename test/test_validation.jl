@@ -118,7 +118,7 @@ end
         0.01,                    # Dh
         π * 0.01^2 / 4,          # A
         π * 0.01,                # wet_perimeter
-        (π * 0.01, 0.0);         # circular: full perimeter on one face, (πD, 0) — not annular
+        (π * 0.01, 0.0);         # Python's circular parts, (πD, 0): one heated face
         rtol=1e-12)
     assert_equivalence_anchors()
 
@@ -128,17 +128,13 @@ end
     @named pump = Pump(3.0e4)
     @named hx = HeatExchanger(T_inlet)
     @named cac = ChannelAndContacts(; n=n, geometry=geom_simple)
-    @named ct_l = ConstantTemperature(T_wall; n=n)
-    @named ct_r = ConstantTemperature(T_wall; n=n)
+    @named wall = ConstantTemperature(T_wall; n=n)
     conns = [
         inseries(pump, hx, cac, pump),
         pump.inlet.p ~ 1.0e5,
-        faces(
-            (ct_l, :thermal) => (cac, :thermal_left),
-            (ct_r, :thermal) => (cac, :thermal_right),
-        ),
+        faces((wall, :thermal) => (cac, :thermal_outer)),
     ]
-    @named sys = assembly(conns, pump, hx, cac, ct_l, ct_r)
+    @named sys = assembly(conns, pump, hx, cac, wall)
     ssys = mtkcompile(sys)
 
     op = [ssys.cac.inlet.ṁ => 0.5]
@@ -168,37 +164,22 @@ end
     end
 
     dz = 0.6 / n
-    heated_l = geom_simple.heated[1]   # circular: full perimeter πD on one face
-    heated_r = geom_simple.heated[2]   # circular: 0 (no second heated face)
-    full_perim = heated_l + heated_r          # πD
+    # Python's circular pipe puts its whole perimeter on its left face and carries a second,
+    # zero-width one. Julia's has the one face, `outer`, so it is compared with Python's
+    # left, and Python's empty right face has nothing to match.
+    heated = geom_simple.heated.outer
     for i in 1:n
-        push!(rows, parity_check("simple_loop", "T_wall_left[$i]",
-                                 sol[port(ssys.cac, :thermal_left, i).T],
+        push!(rows, parity_check("simple_loop", "T_wall_outer[$i]",
+                                 sol[port(ssys.cac, :thermal_outer, i).T],
                                  PARITY_SIMPLE_T_WALL_LEFT[i]))
-        push!(rows, parity_check("simple_loop", "T_wall_right[$i]",
-                                 sol[port(ssys.cac, :thermal_right, i).T],
-                                 PARITY_SIMPLE_T_WALL_RIGHT[i]))
-        push!(rows, parity_check("simple_loop", "h_tc_left[$i]",
-                                 sol[ssys.cac.h_tc_left[i]],
+        push!(rows, parity_check("simple_loop", "h_tc_outer[$i]",
+                                 sol[ssys.cac.h_tc_outer[i]],
                                  PARITY_SIMPLE_H_TC_LEFT[i];
                                  note="Gap #2 candidate (HTC film-T vs bulk-T)"))
-        push!(rows, parity_check("simple_loop", "h_tc_right[$i]",
-                                 sol[ssys.cac.h_tc_right[i]],
-                                 PARITY_SIMPLE_H_TC_RIGHT[i];
-                                 note="Gap #2 candidate (HTC film-T vs bulk-T)"))
-        push!(rows, parity_check("simple_loop", "q_density_left[$i]",
-                                 sol[ssys.cac.q_wall_left[i]] / (heated_l * dz),
+        push!(rows, parity_check("simple_loop", "q_density_outer[$i]",
+                                 sol[ssys.cac.q_wall_outer[i]] / (heated * dz),
                                  PARITY_SIMPLE_Q_DENSITY_LEFT[i]))
-        # Circular geometry has no second heated face (heated[2]=0), so a
-        # per-face q_density_right is undefined (0/0). q_wall_right is identically 0;
-        # the comparison is carried by q_density_left and q_density_total below.
-        if heated_r > 0
-            push!(rows, parity_check("simple_loop", "q_density_right[$i]",
-                                     sol[ssys.cac.q_wall_right[i]] / (heated_r * dz),
-                                     PARITY_SIMPLE_Q_DENSITY_RIGHT[i]))
-        end
-        q_total_julia = (sol[ssys.cac.q_wall_left[i]] + sol[ssys.cac.q_wall_right[i]]) /
-                        (full_perim * dz)
+        q_total_julia = sol[ssys.cac.q_wall_outer[i]] / (heated * dz)
         q_total_python = (PARITY_SIMPLE_Q_DENSITY_LEFT[i] + PARITY_SIMPLE_Q_DENSITY_RIGHT[i]) / 2
         push!(rows, parity_check("simple_loop", "q_density_total[$i]",
                                  q_total_julia, q_total_python;
@@ -288,7 +269,7 @@ end
                                  sol[ssys.cac_r.T[i]], PARITY_MTR_SYM_T_CELLS_R[i]))
     end
     dz = 0.6 / nz
-    heated_part = geom_mtr.heated[1]   # 0.07 m
+    heated_part = geom_mtr.heated.left   # 0.07 m
     for i in 1:nz
         # Left channel
         push!(rows, parity_check("mtr_symmetric", "T_wall_left_l[$i]",
@@ -392,7 +373,7 @@ end
                                  sol[port(ssys.cac_l, :thermal_right, i).T],
                                  PARITY_MTR_CLAD_T_WALL_RIGHT_L[i]))
         push!(rows, parity_check("mtr_clad", "q_right_l[$i]",
-                                 sol[ssys.cac_l.q_wall_right[i]] / (geom_mtr.heated[2] * dz),
+                                 sol[ssys.cac_l.q_wall_right[i]] / (geom_mtr.heated.right * dz),
                                  PARITY_MTR_CLAD_Q_RIGHT_L[i]))
     end
     for z in 1:nz, j in 1:7
@@ -488,7 +469,7 @@ end
     end
 
     dz = 0.6 / nz
-    heated_part = geom_mtr.heated[1]
+    heated_part = geom_mtr.heated.left
     for i in 1:nz
         # Left channel
         push!(rows, parity_check("mtr_asymmetric", "T_wall_left_l[$i]",
@@ -612,7 +593,7 @@ end
     end
 
     dz = 0.6 / nz
-    heated_part = geom_mtr.heated[1]
+    heated_part = geom_mtr.heated.left
     for i in 1:nz
         push!(rows, parity_check("mtr_one_sided", "T_wall_left_l[$i]",
                                  sol[port(cac_s, :thermal_left, i).T],

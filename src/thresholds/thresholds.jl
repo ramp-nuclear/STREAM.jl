@@ -13,9 +13,10 @@ function _SKq3(A_ratio, w, lamda, dT_inlet, rho_v, rho_l)
     return 0.7 * A_ratio * sqrt(w / lamda) * (1 + dT_inlet) / (1 + (rho_v / rho_l)^0.25)^2
 end
 
-# The width q3 reads. Python STREAM gives a circular pipe its diameter.
+# The width q3 reads. Python STREAM gives a circular or annular channel its hydraulic
+# diameter.
 _width(s::Rectangular) = s.width
-_width(s::Circular) = s.D
+_width(s::Union{Circular,Annular}) = hydraulic_diameter(s)
 
 function _SKq4(G_star, dT_outlet)
     return iszero(G_star) ? Inf : _SKq1(G_star) * (1 + 5000 * dT_outlet / abs(G_star))

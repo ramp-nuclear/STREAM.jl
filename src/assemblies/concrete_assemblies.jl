@@ -134,7 +134,7 @@ Wire a `HeatDiffusion` plate to a single `ChannelAndContacts` as an *edge channe
 
 The channel is heated on one face only, but the fuel plate is cooled on **both** faces: the
 near face by conjugate coupling to the channel, the far face by a one-way convective sink
-(`ConvectiveBoundary`) fed from the channel's far-side `h_tc` and coolant `T`.
+(`ConvectiveBoundary`) fed from the channel's near-face `h_tc` and coolant `T`.
 
 This reproduces the half-symmetric reduced unit used for the last plate in an array: the
 plate sits between two channels, so it loses heat on both faces, but only one channel is
@@ -159,30 +159,27 @@ After composition, refer to sub-components through the returned system (e.g.
 function single_channel(channel, fuel; fuel_side::Symbol=:left, name::Symbol)
     fuel_side in (:left, :right) ||
         throw(ArgumentError("fuel_side must be :left or :right, got :$fuel_side"))
-    geometry = duct(channel)
-    n = var_length(channel, :thermal_left)
-    dz = geometry.L / n
-
     near = fuel_side
     far = fuel_side == :left ? :right : :left
-    far_idx = far == :left ? 1 : 2
-
     near_port = Symbol(:thermal_, near)
     far_port = Symbol(:thermal_, far)
-    # The channel's far face is never connected, so its conductance is undefined; Python's
-    # `_other_if_none` copies the connected (near) face's h to it. Cool the fuel's far face
-    # with that same near-side h_tc and the channel's coolant T: the equivalent-twin proxy.
-    h_near = near == :left ? :h_tc_left : :h_tc_right
+    geometry = duct(channel)
+    n = var_length(channel, near_port)
+    dz = geometry.L / n
 
+    # The channel's far face, if it has one, is never connected, so its conductance is
+    # undefined; Python's `_other_if_none` copies the connected (near) face's h to it. Cool
+    # the fuel's far face with that same near-side h_tc and the channel's coolant T, over the
+    # near face's area: the face of the equivalent twin.
     far_bcs = [
-        ConvectiveBoundary(; name=Symbol(name, :_far, i), area=geometry.heated[far_idx] * dz)
+        ConvectiveBoundary(; name=Symbol(name, :_far, i), area=geometry.heated[near] * dz)
         for i in 1:n
     ]
 
     connections = [
         faces((channel, near_port) => (fuel, near_port)),
         face(far_bcs, fuel, far_port),
-        [bc.h for bc in far_bcs] .~ collect(getproperty(channel, h_near)),
+        [bc.h for bc in far_bcs] .~ collect(getproperty(channel, Symbol(:h_tc_, near))),
         [bc.T_fluid for bc in far_bcs] .~ collect(channel.T),
     ]
     return assembly(connections, channel, fuel, far_bcs...; name=name)
