@@ -331,10 +331,10 @@ end
         n = 5;
         T_inlet = 40.0;
         T_wall = 100.0;
-        dP_pump = 30.0
-        # Rectangular geom with aspect_ratio = depth/width = 0.1 (a circular geom would
-        # give aspect_ratio = 1.0, a different correlation point).
-        geom = Duct(0.6, Rectangular(1.0, 0.1))
+        dP_pump = 10.0
+        # Aspect ratio depth/width = 0.1 (a circular geom would give 1.0, a different
+        # correlation point). The head keeps the flow laminar, Re ≈ 900.
+        geom = Duct(0.6, Rectangular(0.05, 0.005))
         htc_fd_lam = HTC.FullyDevelopedLaminar()
 
         @named pump_fd = Pump(dP_pump)
@@ -368,10 +368,10 @@ end
         n = 5;
         T_inlet = 40.0;
         T_wall = 100.0;
-        dP_pump = 30.0
-        # Rectangular geom with aspect_ratio = 0.1; Dh follows from the edges
-        # (4 * 1.0*0.1 / (2*(1.0+0.1)) ≈ 0.1818). develop_length stays mandatory.
-        geom = Duct(0.6, Rectangular(1.0, 0.1))
+        dP_pump = 10.0
+        # Aspect ratio depth/width = 0.1, and the head keeps the flow laminar, Re ≈ 900.
+        # develop_length stays mandatory.
+        geom = Duct(0.6, Rectangular(0.05, 0.005))
         htc_dev_lam = HTC.DevelopingLaminar(; develop_length=0.3)
 
         @named pump_dev = Pump(dP_pump)

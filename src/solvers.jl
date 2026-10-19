@@ -18,8 +18,7 @@ solve, so each solver here says what it does with one. The full rules are in
 - `ssys`: compiled system from `mtkcompile`
 - `op`: operating point, a `Vector{Pair}`. A parameter in it takes that value. An unknown in it
   is where the solver starts: the first guess of a root finder, or the state `DynamicSS`
-  integrates from. An unknown left out starts from its guess if it has one, as every port
-  flow does, and otherwise from the value the model declares.
+  integrates from. An unknown left out starts from the value the model declares.
 - `solver`: steady-state solver to use, or `nothing` to let the stack choose (default `nothing`)
 - `abstol`: absolute tolerance (default 1e-8)
 - `reltol`: relative tolerance (default 1e-6)
@@ -34,23 +33,12 @@ integration runs without dense output.
 function solve_steady(
     ssys, op=Pair[]; solver=nothing, abstol=1e-8, reltol=1e-6, build_initializeprob=false
 )
-    prob = SteadyStateProblem(ssys, [_guesses(ssys, op); op]; warn_initialize_determined=false,
-                              build_initializeprob)
+    prob = SteadyStateProblem(ssys, op; warn_initialize_determined=false, build_initializeprob)
     # Dense output would only feed interpolation, which DynamicSS never reads, and with it
     # on OrdinaryDiffEq warns about interpolation on a loop with no differential states.
     inner = solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
     return solve(prob, solver; abstol, reltol, inner...)
 end
-
-"""
-    _guesses(ssys, op) -> Vector{Pair}
-
-A start for each unknown of `ssys` that `op` does not set and that carries a guess, such as a
-port's flow. MTK starts a steady problem from defaults, and a flow's default of zero is where
-a quadratic pressure law has no slope to follow.
-"""
-_guesses(ssys, op) = Pair{Any,Any}[u => ModelingToolkit.getguess(u) for u in unknowns(ssys)
-                                   if ModelingToolkit.hasguess(u) && !any(isequal(u) ∘ first, op)]
 
 """
     solve_transient(ssys, op, t; solver=Rodas5P(), callbacks=nothing, kwargs...) -> SciMLSolution

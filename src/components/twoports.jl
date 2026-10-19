@@ -16,8 +16,8 @@ function Resistor(R; name)
 end
 ```
 
-`sol[ssys.r.Δp]` then reads the pressure change of any two-port. The outlet's flow guess is
-negative, the inlet's positive, so a steady solve starts the component flowing forward.
+`sol[ssys.r.Δp]` then reads the pressure change of any two-port. The outlet's flow starts
+negative and the inlet's positive, so a steady solve starts the component flowing forward.
 
 A **two-port component** takes flow in at one port and passes it out at one other, holds no
 fluid, and adds no heat. [`Pump`](@ref), [`Flapper`](@ref), [`Resistor`](@ref),
@@ -61,7 +61,7 @@ An uncompiled `System` holding `inlet` and `outlet` and observing `Δp` and `ṁ
 """
 function HydraulicTwoPort(; name)
     @named inlet = FlowPort()
-    @named outlet = FlowPort(; ṁ_guess=-FLOW_GUESS)
+    @named outlet = FlowPort(; ṁ=-FLOW_START)
     @variables Δp(t) ṁ(t)
     eqs = [inlet.ṁ + outlet.ṁ ~ 0, outlet.T ~ instream(inlet.T), inlet.T ~ instream(outlet.T)]
     obs = [Δp ~ outlet.p - inlet.p, ṁ ~ inlet.ṁ]

@@ -208,7 +208,7 @@ end
     @testset "a shut break holds back a pressure difference" begin
         @named sealed = Orifice(; area=A_HOLE, cd=CD_SHARP)
         ssys = _orifice_between_ambients(sealed; dp=2e4)
-        sol = solve_transient(ssys, range(0.0, 1.0; length=11))
+        sol = solve_transient(ssys, solve_steady(ssys), range(0.0, 1.0; length=11))
         @test all(iszero, sol[ssys.sealed.inlet.ṁ])
     end
 

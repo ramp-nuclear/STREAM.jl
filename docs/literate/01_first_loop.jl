@@ -79,8 +79,8 @@ foreach(println, unknowns(sys))
 # ## Solving
 #
 # [`solve_steady`](@ref) finds the state where nothing changes in time. A loop also has a
-# trivial solution with no flow at all; every port's flow starts from a small guess, which
-# keeps the solver away from it.
+# trivial solution with no flow at all; every port's flow starts at 1 kg/s, which keeps
+# the solver away from it.
 
 sol = solve_steady(sys);
 
@@ -123,7 +123,7 @@ Q_flow = ṁ * cₚ(H2O, (T_in + T_out) / 2) * (T_out - T_in)
 # ## Changing the pump head
 #
 # The pump head is a parameter of the compiled model, so a different value needs no rebuild.
-# Pass it with the guess:
+# Pass it in the operating point:
 
 sol2 = solve_steady(sys, [sys.pump.dP_pump => 4.0e4])
 ṁ2 = sol2[sys.ch.inlet.ṁ]

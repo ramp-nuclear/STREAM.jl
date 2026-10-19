@@ -23,9 +23,9 @@ nothing # hide
 ## Flows start away from zero by themselves
 
 A closed loop has a solution with no flow at all, and a quadratic pressure law has no slope
-there, so a solver started at zero flow stays put. Every port's flow carries a guess, a small
-flow in the port's usual direction, and `solve_steady` starts any flow the operating point
-does not give from it. A loop needs no flow in its operating point:
+there, so a solver started at zero flow stays put. Every port's flow starts at 1 kg/s in the
+port's usual direction unless the operating point says otherwise, so a loop needs no flow in
+its operating point:
 
 ```@example ss
 sol = solve_steady(sys)
