@@ -1,11 +1,11 @@
 """
     FLOW_START
 
-The flow [kg/s] a port starts from when the operating point does not give one. Nonzero, since
-a quadratic pressure law has no slope at zero flow and a steady solve started there cannot
-leave. Large enough that a heated channel's coolant starts near its inlet temperature.
+The flow [kg/s] a port starts from when the operating point does not give one. Small and
+nonzero, since a quadratic pressure law has no slope at zero flow and a steady solve started
+there cannot leave.
 """
-const FLOW_START = 1.0
+const FLOW_START = 0.1
 
 """
     FlowPort(; name, p=1.0e5, ṁ=FLOW_START, T=T_ROOM)

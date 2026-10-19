@@ -79,8 +79,8 @@ foreach(println, unknowns(sys))
 # ## Solving
 #
 # [`solve_steady`](@ref) finds the state where nothing changes in time. A loop also has a
-# trivial solution with no flow at all; every port's flow starts at 1 kg/s, which keeps
-# the solver away from it.
+# trivial solution with no flow at all; every port's flow starts at 0.1 kg/s, which
+# keeps the solver away from it.
 
 sol = solve_steady(sys);
 
