@@ -104,7 +104,7 @@ function ChannelState(sol, channel_sys; gravity=G_EARTH, index=nothing)
     n = length(channel_sys.T)
     k = _time_index(sol, index)
     value(sym) = k === nothing ? sol[sym] : sol[sym, k]
-    cells(sym) = [value(sym[i]) for i in 1:n]
+    cells(sym) = value(scalarize(sym))
 
     # `velocity` is the unsigned speed and only ChannelAndContacts declares it. The other
     # variants expose the signed `v`, so read that and take the magnitude, which is what lets a
@@ -194,15 +194,14 @@ worst_case(result.chfr_mirshak; times=sol.t)  # the smallest, and where and when
 """
 function threshold_analysis(sol, channel_sys; gravity=G_EARTH, kwargs...)
     state_at(k) = ChannelState(sol, channel_sys; gravity=gravity, index=k)
-    fns = Base.values(kwargs)
     results = if hasproperty(sol, :t) && length(sol.t) > 1
-        states = [state_at(k) for k in eachindex(sol.t)]
-        [stack(fn(s) for s in states) for fn in fns]
+        states = state_at.(eachindex(sol.t))
+        map(fn -> stack(fn.(states)), values(kwargs))
     else
         state = state_at(nothing)
-        [fn(state) for fn in fns]
+        map(fn -> fn(state), values(kwargs))
     end
-    return NamedTuple{keys(kwargs)}(Tuple(results))
+    return NamedTuple{keys(kwargs)}(results)
 end
 
 """
@@ -368,8 +367,7 @@ q_CHF_fabrega(s::ChannelState) = q_CHF_fabrega.(s.T_inlet, s.T_sat, s.duct)
 # The correlation needs saturated-coolant properties, and this is where the coolant is
 # known, so the snapshot is built here: one entry per cell at that cell's saturation state.
 function q_CHF_sudo_kaminaga(s::ChannelState; liquid::AbstractLiquid=H2O)
-    T_sat, P = collect(s.T_sat), collect(s.P)
-    return q_CHF_sudo_kaminaga(collect(s.T_bulk), s.ṁ, s.duct, s.gravity, liquid(T_sat, P))
+    return q_CHF_sudo_kaminaga(s.T_bulk, s.ṁ, s.duct, s.gravity, liquid(s.T_sat, s.P))
 end
 
 # Flow instability is judged at the outlet, where the coolant is hottest and nearest boiling:
@@ -380,7 +378,7 @@ function q_OFI_whittle_forgan(s::ChannelState; liquid::AbstractLiquid=H2O)
 end
 
 function q_OSV_saha_zuber(s::ChannelState; face=:max, liquid::AbstractLiquid=H2O)
-    coolant = liquid(collect(s.T_bulk), collect(s.P))
+    coolant = liquid(s.T_bulk, s.P)
     return q_OSV_saha_zuber(
         s.T_inlet, s.ṁ, s.duct, coolant;
         flux_shape=_face_flux(s, face), dz=fill(s.duct.L / s.n, s.n),

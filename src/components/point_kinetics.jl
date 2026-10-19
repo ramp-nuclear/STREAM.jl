@@ -35,8 +35,8 @@ The cells of `x` in one vector, a row at a time: `x[jz, jx]` lands at `(jz-1)*nx
 vector is unchanged. This is the order a [`PointKinetics`](@ref) feedback group holds a
 component's cells in.
 """
-_row_major(x::AbstractVector) = collect(x)
-_row_major(x::AbstractMatrix) = vec(permutedims(collect(x)))
+_row_major(x::AbstractVector) = scalarize(x)
+_row_major(x::AbstractMatrix) = vec(permutedims(scalarize(x)))
 
 """
     _flatten_weights(raw, comp) -> Vector{Float64}
@@ -67,19 +67,17 @@ the component temperatures they stand for.
 """
 function _temperature_feedback(temp_worth, ref_temp)
     temp_worth === nothing && return (0, Num[])
-    ref_dict = ref_temp === nothing ? Dict() : ref_temp
-    unknown_vars = Num[]
-    expr = 0
+    refs = something(ref_temp, Dict())
+    expr, unknowns = 0, Num[]
     for (comp, alpha_raw) in temp_worth
         alpha = _flatten_weights(alpha_raw, comp)
-        Tref = _flatten_weights(get(ref_dict, comp, 0.0), comp)
-        n_flat = length(alpha)
-        var_sym = Symbol(:T_source_, nameof(comp))
-        T_source = only(@variables $(var_sym)(t)[1:n_flat])
-        append!(unknown_vars, collect(T_source))
-        expr = expr + sum(alpha[j] * (T_source[j] - Tref[j]) for j in 1:n_flat)
+        Tref = _flatten_weights(get(refs, comp, 0.0), comp)
+        name = Symbol(:T_source_, nameof(comp))
+        T_source = scalarize(only(@variables $name(t)[1:length(alpha)]))
+        expr += sum(alpha .* (T_source .- Tref))
+        append!(unknowns, T_source)
     end
-    return (expr, unknown_vars)
+    return (expr, unknowns)
 end
 
 """
@@ -227,7 +225,7 @@ function PointKinetics(
         reactivity(t)
     end
 
-    β_k, λ_k, C_k = collect(β), collect(λ), collect(C)
+    β_k, λ_k, C_k = scalarize(β), scalarize(λ), scalarize(C)
     control_reactivity, control_pars, control_unknowns = control()
     ρ = control_reactivity
     β_sum = sum(β_k)
@@ -281,7 +279,7 @@ function point_kinetics_steady_state(
     P0; Lambda=U235_LAMBDA, beta_k=U235_BETA_K, lambda_k=U235_LAMBDA_K, power_input=0.0
 )
     Pn = P0 - power_input
-    C_k = [beta_k[i] / (lambda_k[i] * Lambda) * Pn for i in eachindex(beta_k)]
+    C_k = beta_k ./ (lambda_k .* Lambda) .* Pn
     return (P_neutron=Pn, C_k=C_k)
 end
 

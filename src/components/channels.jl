@@ -39,21 +39,28 @@ The faces of a channel on `geometry`: one per heated wall of its duct, named aft
 _faces(geometry::Duct) = keys(geometry.heated)
 
 """
+    _by_face(f, faces) -> NamedTuple
+
+`f` applied to each face, keyed by face name.
+"""
+_by_face(f, faces) = NamedTuple{faces}(map(f, faces))
+
+"""
     _per_face(prefix, faces, n; default=nothing) -> NamedTuple
 
-One length-`n` array variable per face, named `<prefix><face>`, such as `T_wall_left`.
+One length-`n` array variable per face, named `<prefix><face>`, such as `T_wall_left`, each
+as a `Vector{Num}` of its cells.
 """
 function _per_face(prefix, faces, n; default=nothing)
-    vars = map(faces) do f
+    return _by_face(faces) do f
         name = Symbol(prefix, f)
-        default === nothing ? only(@variables $name(t)[1:n]) :
-                              only(@variables $name(t)[1:n] = fill(default, n))
+        scalarize(default === nothing ? only(@variables $name(t)[1:n]) :
+                                        only(@variables $name(t)[1:n] = fill(default, n)))
     end
-    return NamedTuple{faces}(vars)
 end
 
 """
-    _channel_core(; n, inlet, outlet, geometry, g_acc, darcy, q_face, vars, liquid,
+    _channel_core(; n, inlet, outlet, geometry, g, darcy, q_face, vars, liquid,
                   T_wall=nothing) -> NamedTuple
 
 The equations every channel shares: the energy balance in enthalpy form with a face-averaged
@@ -65,7 +72,7 @@ each face, and splices what this returns into its own lists.
 - `n`: number of axial cells
 - `inlet`, `outlet`: the variant's `FlowPort`s
 - `geometry`: the channel's [`Duct`](@ref)
-- `g_acc`: gravitational acceleration [m/s²]
+- `g`: gravitational acceleration along the flow [m/s²]
 - `darcy`: wall friction model ([`AbstractDarcyFactor`](@ref))
 - `q_face`: per face, the heat flow into each cell [W], a length-`n` vector
 - `vars`: the variables from `_setup`
@@ -86,11 +93,11 @@ function _channel_core(;
     inlet,
     outlet,
     geometry::Duct,
-    g_acc::Real,
-    darcy::AbstractDarcyFactor=Blasius(),
+    g::Real,
+    darcy::AbstractDarcyFactor,
     q_face::NamedTuple,
     vars,
-    liquid::AbstractLiquid=H2O,
+    liquid::AbstractLiquid,
     T_wall=nothing,
 )
     Dh = hydraulic_diameter(geometry)
@@ -98,12 +105,12 @@ function _channel_core(;
     L  = geometry.L
     dz = L / n
 
-    T  = collect(vars.T)
-    dp = collect(vars.dp)
+    T, dp = vars.T, vars.dp
     # A variant with no wall of its own hands the friction model the bulk temperature, which
     # makes the wall-to-bulk viscosity ratio exactly 1 and the correction a no-op.
-    T_wall_c = T_wall === nothing ? T : collect(T_wall)
+    T_wall_c = something(T_wall, T)
 
+    ṁ = inlet.ṁ
     T_inlet_fwd = instream(inlet.T)
     T_inlet_rev = instream(outlet.T)
 
@@ -112,65 +119,45 @@ function _channel_core(;
     ρ_c  = ρ.(liquid, T)
     cp_c = cₚ.(liquid, T)
 
-    Re_c = Re.(liquid, T, inlet.ṁ, A, Dh)
+    Re_c = Re.(liquid, T, ṁ, A, Dh)
     Pr_c = Pr.(liquid, T)
-    P_c = _static_pressure(inlet.p, dp, inlet.ṁ, ρ_c, A)
-    q_c = isempty(q_face) ? zeros(Num, n) : reduce(.+, values(q_face))
+    P_c = _static_pressure(inlet.p, dp, ṁ, ρ_c, A)
+    q_c = sum(values(q_face); init=zeros(Num, n))
     # An unheated duct has no heated perimeter to divide by, and no flux.
     q_density_c = isempty(q_face) ? q_c : q_c ./ (heated_perimeter(geometry) * dz)
 
-    cells = map(1:n) do i
-        T_up_fwd = (i == 1) ? T_inlet_fwd : T[i - 1]
-        T_up_rev = (i == n) ? T_inlet_rev : T[i + 1]
-        T_up = ifelse(inlet.ṁ >= 0, T_up_fwd, T_up_rev)
+    T_up = ifelse.(ṁ >= 0, [T_inlet_fwd; T[1:(end - 1)]], [T[2:end]; T_inlet_rev])
+    cp_face = (cₚ.(liquid, T_up) .+ cp_c) ./ 2
+    f_c = darcy.(T_wall_c, T, ṁ, liquid, geometry)
+    T_sat_c = Tsat.(liquid, P_c)
 
-        cp_face = (cₚ(liquid, T_up) + cp_c[i]) / 2
-        f_i = darcy(T_wall_c[i], T[i], inlet.ṁ, liquid, geometry)
-
-        cell_eqs = Equation[
-            # Energy balance, enthalpy form
-            D(T[i]) ~ (abs(inlet.ṁ) * cp_face * (T_up - T[i]) + q_c[i]) /
-                      (ρ_c[i] * cp_c[i] * A * dz),
-            # Darcy-Weisbach friction over the cell, plus its hydrostatic head
-            dp[i] ~ darcy_weisbach_dp(inlet.ṁ, ρ_c[i], f_i, dz, Dh, A)
-                  + ρ_c[i] * g_acc * dz,
-        ]
-        cell_obs = Equation[
-            vars.Re[i] ~ Re_c[i],
-            vars.Pe[i] ~ Re_c[i] * Pr_c[i],
-            vars.v[i] ~ inlet.ṁ / (ρ_c[i] * A),
-            vars.P[i]     ~ P_c[i],
-            vars.T_sat[i] ~ Tsat(liquid, P_c[i]),
-            # A wall cooler than the coolant has no onset to reach, and the correlation's
-            # fractional power is NaN for a negative flux, so such a cell reports saturation.
-            vars.T_ONB[i] ~ Tsat(liquid, P_c[i]) +
-                            _bergles_rohsenow_dT_ONB(P_c[i], max(q_density_c[i], 0.0)),
-            (vars.q_face[f][i] ~ q_face[f][i] for f in keys(q_face))...,
-            vars.q_wall[i] ~ q_c[i],
-        ]
-        (eqs=cell_eqs, obs=cell_obs)
-    end
-
-    eqs = vcat(
-        reduce(vcat, (c.eqs for c in cells)),
-        Equation[
-            inlet.ṁ + outlet.ṁ ~ 0,
-            (L / A) * D(inlet.ṁ) ~ (inlet.p - outlet.p) - sum(dp),
-            outlet.T ~ T[n],
-            inlet.T ~ T[1],
-            # An equation, not an observable: it reads instream, which ModelingToolkit only
-            # resolves inside equations.
-            vars.T_in ~ ifelse(inlet.ṁ >= 0, T_inlet_fwd, T_inlet_rev),
-        ],
+    eqs = _flat(
+        # Energy balance, enthalpy form
+        D.(T) .~ (abs(ṁ) .* cp_face .* (T_up .- T) .+ q_c) ./ (ρ_c .* cp_c .* A .* dz),
+        # Darcy-Weisbach friction over the cell, plus its hydrostatic head
+        dp .~ darcy_weisbach_dp.(ṁ, ρ_c, f_c, dz, Dh, A) .+ ρ_c .* g .* dz,
+        ṁ + outlet.ṁ ~ 0,
+        (L / A) * D(ṁ) ~ (inlet.p - outlet.p) - sum(dp),
+        outlet.T ~ T[n],
+        inlet.T ~ T[1],
+        # An equation, not an observable: it reads instream, which ModelingToolkit only
+        # resolves inside equations.
+        vars.T_in ~ ifelse(ṁ >= 0, T_inlet_fwd, T_inlet_rev),
     )
-    obs = vcat(
-        reduce(vcat, (c.obs for c in cells)),
-        Equation[
-            vars.T_out ~ ifelse(inlet.ṁ >= 0, T[n], T[1]),
-            vars.dP ~ inlet.p - outlet.p,
-        ],
+    obs = _flat(
+        vars.Re .~ Re_c,
+        vars.Pe .~ Re_c .* Pr_c,
+        vars.v .~ ṁ ./ (ρ_c .* A),
+        vars.P .~ P_c,
+        vars.T_sat .~ T_sat_c,
+        # A wall cooler than the coolant has no onset to reach, and the correlation's
+        # fractional power is NaN for a negative flux, so such a cell reports saturation.
+        vars.T_ONB .~ T_sat_c .+ _bergles_rohsenow_dT_ONB.(P_c, max.(q_density_c, 0.0)),
+        map(f -> vars.q_face[f] .~ q_face[f], keys(q_face)),
+        vars.q_wall .~ q_c,
+        vars.T_out ~ ifelse(ṁ >= 0, T[n], T[1]),
+        vars.dP ~ inlet.p - outlet.p,
     )
-
     return (; eqs, obs)
 end
 
@@ -182,20 +169,20 @@ The per-cell mean of the faces' wall temperatures, which the friction model read
 its two walls.
 """
 _mean_wall(walls::NamedTuple) =
-    isempty(walls) ? nothing : reduce(.+, map(collect, values(walls))) ./ length(walls)
+    isempty(walls) ? nothing : reduce(.+, values(walls)) ./ length(walls)
 
 """
-    _setup(geometry, n) -> (pars, vars, inlet, outlet)
+    _setup(geometry, n) -> (vars, inlet, outlet)
 
-The parameters, variables and ports every channel declares. Each face of the duct gets its
-own `T_wall_<face>` and `q_wall_<face>`, gathered under `vars.T_wall` and `vars.q_face`.
+The variables and ports every channel declares. Each array variable comes
+scalarized, as a `Vector{Num}` of its cells, since a broadcast over a symbolic array stays one
+array expression where the equations want one per cell. Each face of the duct gets its own
+`T_wall_<face>` and `q_wall_<face>`, gathered under `vars.T_wall` and `vars.q_face`.
 """
 function _setup(geometry, n)
     # No geometry parameters are declared: L, Dh, and A enter the equations inline from
     # `geometry` (see `_channel_core` and the variants). When a dimension is a design knob,
     # that inline value is the knob expression, so `remake` scans it.
-    pars = []
-
     @variables begin
         (T(t))[1:n] = fill(T_ROOM, n)
         (dp(t))[1:n]
@@ -217,24 +204,23 @@ function _setup(geometry, n)
     @named inlet = FlowPort()
     @named outlet = FlowPort()
 
-    vars = (; T, dp, Re, Pe, v, P, T_sat, T_ONB, q_wall, T_in, T_out, dP, T_wall, q_face)
-    return pars, vars, inlet, outlet
+    cells = map(scalarize, (; T, dp, Re, Pe, v, P, T_sat, T_ONB, q_wall))
+    vars = (; cells..., T_in, T_out, dP, T_wall, q_face)
+    return vars, inlet, outlet
 end
 
 """
-    _vcollect(vars) -> Vector
+    _all_variables(vars) -> Vector{Num}
 
-Every variable `_setup` declared, flattened into one list for the `System`.
+Every variable `_setup` declared, in one list for the `System`.
 """
-function _vcollect(vars)
-    arrays = (vars.T, vars.dp, values(vars.T_wall)..., vars.Re, vars.Pe, vars.v, vars.P,
-              vars.T_sat, vars.T_ONB, vars.q_wall, values(vars.q_face)...)
-    return [reduce(vcat, map(collect, arrays)); vars.T_in; vars.T_out; vars.dP]
-end
+_all_variables(vars) =
+    vcat(vars.T, vars.dp, values(vars.T_wall)..., vars.Re, vars.Pe, vars.v, vars.P, vars.T_sat,
+         vars.T_ONB, vars.q_wall, values(vars.q_face)..., vars.T_in, vars.T_out, vars.dP)
 
 """
-    _channel_system(; name, n, geometry, g, darcy, liquid, vars, pars, inlet, outlet,
-                    q_face, T_wall=nothing, extra_vars=(), extra_eqs=Equation[],
+    _channel_system(; name, n, geometry, g, darcy, liquid, vars, inlet, outlet, q_face,
+                    pars=[], T_wall=nothing, extra_vars=(), extra_eqs=Equation[],
                     extra_obs=Equation[], extra_ports=()) -> System
 
 Build the composed `System` for a channel variant. Every variant states the heat flow into
@@ -244,18 +230,16 @@ carries `geometry`, for [`duct`](@ref) to read back, and `g`, for `check_gravity
 """
 function _channel_system(;
     name, n::Int, geometry::Duct, g, darcy, liquid,
-    vars, pars, inlet, outlet, q_face, T_wall=nothing,
+    vars, inlet, outlet, q_face, pars=[], T_wall=nothing,
     extra_vars=(), extra_eqs=Equation[], extra_obs=Equation[], extra_ports=(),
 )
     core = _channel_core(;
-        n, inlet, outlet, geometry, g_acc=g, darcy, q_face, vars, liquid, T_wall,
+        n, inlet, outlet, geometry, g, darcy, q_face, vars, liquid, T_wall,
     )
-    all_vars = [_vcollect(vars); reduce(vcat, (collect(v) for v in extra_vars); init=Num[])]
+    all_vars = vcat(_all_variables(vars), extra_vars...)
     sys = compose(
-        System(
-            [core.eqs; extra_eqs], t, all_vars, pars;
-            observed=[core.obs; extra_obs], name=name,
-        ),
+        System(_flat(core.eqs, extra_eqs), t, all_vars, pars;
+               observed=_flat(core.obs, extra_obs), name),
         inlet,
         outlet,
         extra_ports...,
@@ -333,34 +317,30 @@ function Channel(;
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
-    pars, vars, inlet, outlet = _setup(geometry, n)
+    vars, inlet, outlet = _setup(geometry, n)
     faces = _faces(geometry)
     dz = geometry.L / n
 
-    pars = Any[pars...]
-    h_face = if h isa NamedTuple
-        for f in keys(h)
-            f in faces || throw(ArgumentError(
-                "h names face :$f, but the channel's faces are $(join(repr.(faces), ", "))"))
-        end
-        map(faces) do f
-            cells, p = _h_cells(get(h, f, 0.0), n, Symbol(:h_, f, :_fn))
-            append!(pars, p)
-            cells
-        end
-    else
-        cells, p = _h_cells(h, n, :h_fn)
+    pars = []
+    function cells(value, fn_name)
+        h_cells, p = _h_cells(value, n, fn_name)
         append!(pars, p)
-        map(_ -> cells, faces)
+        return h_cells
     end
-
-    q_face = map(faces, h_face) do f, h_cells
-        h_cells .* geometry.heated[f] .* dz .* (collect(vars.T_wall[f]) .- collect(vars.T))
+    h_face = if h isa NamedTuple
+        issubset(keys(h), faces) ||
+            throw(ArgumentError("h names faces $(keys(h)), but the channel's faces are $faces"))
+        _by_face(f -> cells(get(h, f, 0.0), Symbol(:h_, f, :_fn)), faces)
+    else
+        shared = cells(h, :h_fn)
+        _by_face(_ -> shared, faces)
     end
+    q_face = _by_face(f -> h_face[f] .* geometry.heated[f] .* dz .* (vars.T_wall[f] .- vars.T),
+                      faces)
 
     return _channel_system(;
-        name, n, geometry, g, darcy, liquid, vars, pars, inlet, outlet,
-        q_face=NamedTuple{faces}(q_face), T_wall=_mean_wall(vars.T_wall),
+        name, n, geometry, g, darcy, liquid, vars, pars, inlet, outlet, q_face,
+        T_wall=_mean_wall(vars.T_wall),
     )
 end
 
@@ -408,16 +388,14 @@ function ChannelHeatFlux(;
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
-    pars, vars, inlet, outlet = _setup(geometry, n)
+    vars, inlet, outlet = _setup(geometry, n)
     faces = _faces(geometry)
-    dz = geometry.L / n
-
     flux = _per_face(:q_, faces, n)
-    q_face = map(f -> collect(flux[f]) .* geometry.heated[f] .* dz, faces)
+    q_face = _by_face(f -> flux[f] .* geometry.heated[f] .* (geometry.L / n), faces)
 
     return _channel_system(;
-        name, n, geometry, g, darcy, liquid, vars, pars, inlet, outlet,
-        q_face=NamedTuple{faces}(q_face), extra_vars=values(flux),
+        name, n, geometry, g, darcy, liquid, vars, inlet, outlet, q_face,
+        extra_vars=values(flux),
     )
 end
 
@@ -464,63 +442,55 @@ function ChannelAndContacts(;
     darcy::AbstractDarcyFactor=Blasius(),
     liquid::AbstractLiquid=H2O,
 )
-    pars, vars, inlet, outlet = _setup(geometry, n)
+    vars, inlet, outlet = _setup(geometry, n)
     faces = _faces(geometry)
     Dh = hydraulic_diameter(geometry)
     A  = flow_area(geometry)
     dz = geometry.L / n
 
-    ports = NamedTuple{faces}(map(faces) do f
-        [ThermalPort(; name=Symbol(:thermal_, f, i)) for i in 1:n]
-    end)
+    ports = _by_face(f -> [ThermalPort(; name=Symbol(:thermal_, f, i)) for i in 1:n], faces)
     # Default 5000.0 seeds the nonlinear initialization solve. h_tc[i] ~ Nu*k/Dh with Nu
     # evaluated at T_film makes h_tc a tearing variable whose init guess-map is
     # self-referential without a numeric seed (MTK "Cyclic guesses").
     h_tc = _per_face(:h_tc_, faces, n; default=5000.0)
     Nu_face = _per_face(:Nu_, faces, n)
     Gr_over_Re2 = _per_face(:Gr_over_Re2_, faces, n)
-    exvars = @variables begin
-        (velocity(t))[1:n]
-        Q_wall_total(t)
-    end
+    velocity = scalarize(only(@variables velocity(t)[1:n]))
+    @variables Q_wall_total(t)
 
-    T = collect(vars.T)
+    T = vars.T
     # The pressure subcooled boiling reads saturation at, the same as the P observable.
-    P_cell = _static_pressure(inlet.p, collect(vars.dp), inlet.ṁ, ρ.(liquid, T), A)
+    P_cell = _static_pressure(inlet.p, vars.dp, inlet.ṁ, ρ.(liquid, T), A)
     # Straight off the ports, not off the T_wall observables: an observable must not appear
     # on the RHS of another equation.
-    wall_T = NamedTuple{faces}(map(f -> [port.T for port in ports[f]], faces))
-    q_face = NamedTuple{faces}(map(faces) do f
-        collect(h_tc[f]) .* geometry.heated[f] .* dz .* (wall_T[f] .- T)
-    end)
-
-    # Every model takes the local pressure; only one that boils looks at it.
-    variant_eqs = Equation[
-        [h_tc[f][i] ~ htc(wall_T[f][i], T[i], inlet.ṁ, liquid, geometry, P_cell[i])
-         for f in faces for i in 1:n];
-        [ports[f][i].Q ~ q_face[f][i] for f in faces for i in 1:n]
-    ]
+    wall_T = _by_face(f -> port(ports[f], :T), faces)
+    q_face = _by_face(f -> h_tc[f] .* geometry.heated[f] .* dz .* (wall_T[f] .- T), faces)
 
     Re_bulk = Re.(liquid, T, inlet.ṁ, geometry)
-    variant_obs = Equation[]
-    for f in faces
-        Gr_face = Gr.(liquid, T, wall_T[f], Dh, g)
+    # Every model takes the local pressure; only one that boils looks at it.
+    face_eqs(f) = (
+        h_tc[f] .~ htc.(wall_T[f], T, inlet.ṁ, liquid, geometry, P_cell),
+        port(ports[f], :Q) .~ q_face[f],
+    )
+    face_obs(f) = (
         # Nu implied by the h in use, rather than by re-running a correlation the model
         # may not have: Nu = h·Dh/κ at the film temperature.
-        append!(variant_obs, collect(Nu_face[f]) .~
-            Nu.(collect(h_tc[f]), Dh, κ.(liquid, film_temperature.(wall_T[f], T))))
-        append!(variant_obs, collect(vars.T_wall[f]) .~ wall_T[f])
-        append!(variant_obs, collect(Gr_over_Re2[f]) .~ Gr_face ./ Re_bulk .^ 2)
-    end
-    append!(variant_obs, collect(velocity) .~ abs.(collect(vars.v)))
-    q_total = isempty(faces) ? 0.0 : sum(sum, values(q_face))
-    push!(variant_obs, Q_wall_total ~ q_total)
+        Nu_face[f] .~ Nu.(h_tc[f], Dh, κ.(liquid, film_temperature.(wall_T[f], T))),
+        vars.T_wall[f] .~ wall_T[f],
+        Gr_over_Re2[f] .~ Gr.(liquid, T, wall_T[f], Dh, g) ./ Re_bulk .^ 2,
+    )
+    variant_eqs = _flat(map(face_eqs, faces))
+    variant_obs = _flat(
+        map(face_obs, faces),
+        velocity .~ abs.(vars.v),
+        Q_wall_total ~ sum(sum, values(q_face); init=0.0),
+    )
 
     return _channel_system(;
-        name, n, geometry, g, darcy, liquid, vars, pars, inlet, outlet, q_face,
+        name, n, geometry, g, darcy, liquid, vars, inlet, outlet, q_face,
         T_wall=_mean_wall(wall_T),
-        extra_vars=(values(h_tc)..., values(Nu_face)..., exvars[1], values(Gr_over_Re2)...,
-                    exvars[2]),
+        extra_vars=(values(h_tc)..., values(Nu_face)..., velocity, values(Gr_over_Re2)...,
+                    Q_wall_total),
         extra_eqs=variant_eqs, extra_obs=variant_obs,
         extra_ports=Iterators.flatten(values(ports)),
     )

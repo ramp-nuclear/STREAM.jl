@@ -201,8 +201,8 @@ function single_channel(channel, fuel; fuel_side::Symbol=_sole_face(channel), na
     connections = [
         faces((channel, near_port) => (fuel, near_port)),
         face(far_bcs, fuel, far_port),
-        [bc.h for bc in far_bcs] .~ collect(getproperty(channel, Symbol(:h_tc_, near))),
-        [bc.T_fluid for bc in far_bcs] .~ collect(channel.T),
+        getproperty.(far_bcs, :h) .~ scalarize(getproperty(channel, Symbol(:h_tc_, near))),
+        getproperty.(far_bcs, :T_fluid) .~ scalarize(channel.T),
     ]
     return assembly(connections, channel, fuel, far_bcs...; name=name)
 end
@@ -218,8 +218,8 @@ as `(kind, sys)` tuples with `kind` either `:c` for a channel or `:p` for a plat
 `:plate` for `np = nc + 1`. With equal counts `start` picks which kind leads.
 """
 function _walk_alternation(channels, plates, effective_bookend::Symbol, start)
-    C = [(:c, ch) for ch in channels]
-    P = [(:p, pl) for pl in plates]
+    C = tuple.(:c, channels)
+    P = tuple.(:p, plates)
     if effective_bookend == :channel        # nc = np + 1  ->  c p c p ... c
         return [collect(Iterators.flatten(zip(C, P))); C[end]]
     elseif effective_bookend == :plate       # np = nc + 1  ->  p c p c ... p

@@ -52,5 +52,5 @@ function steady_state_guess(;
     liquid::AbstractLiquid=H2O,
 )
     cp = cₚ(liquid, T_inlet)
-    return [Float64(T_inlet + i * Q_wall / (n * ṁ_guess * cp)) for i in 1:n]
+    return collect(T_inlet .+ (1:n) .* Q_wall ./ (n * ṁ_guess * cp))
 end

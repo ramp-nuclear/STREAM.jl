@@ -1,9 +1,11 @@
 """
     port(sys, face, i::Int)
+    port(sys, face)
     port(sys, face, var::Symbol)
     port(ports::AbstractVector, var::Symbol)
 
-Reach one element of an indexed connector array, or one variable across all of its elements.
+Reach one element of an indexed connector array, all of them, or one variable across all of
+them.
 
 Per-cell thermal faces are separate subsystems named `thermal_left1 … thermal_leftn`, so
 reaching cell `i` means building the name. [`face`](@ref STREAM.Assemblies.Connect.face)
@@ -19,19 +21,21 @@ and [`faces`](@ref STREAM.Assemblies.Connect.faces) are built on this.
 
 # Returns
 With `i`, the namespaced connector subsystem (for example `sys.thermal_left3`), ready to pass
-to `connect`. With `var`, a vector holding that variable of every cell, in cell order, ready
-for broadcast equations and for indexing a solution.
+to `connect`. Without it, every such subsystem in cell order. With `var`, a vector holding that
+variable of every cell, in cell order, ready for broadcast equations and for indexing a
+solution.
 
 # Example
 ```julia
 connect(port(cac, :thermal_right, 3), port(fuel, :thermal_left, 3))
+connect.(port(cac, :thermal_right), port(fuel, :thermal_left))   # every cell
 port(cac, :thermal_left, :T) .~ cac.T      # pin every left wall to the coolant
 sol[port(cac, :thermal_right, :T), end]    # wall temperatures at the last time
 ```
 """
 port(sys, face::Symbol, i::Int) = getproperty(sys, Symbol(face, i))
-port(sys, face::Symbol, var::Symbol) =
-    [getproperty(port(sys, face, i), var) for i in 1:var_length(sys, face)]
+port(sys, face::Symbol) = [port(sys, face, i) for i in 1:var_length(sys, face)]
+port(sys, face::Symbol, var::Symbol) = port(port(sys, face), var)
 port(ports::AbstractVector, var::Symbol) = getproperty.(ports, var)
 
 """

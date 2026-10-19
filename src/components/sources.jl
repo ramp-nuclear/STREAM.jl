@@ -25,9 +25,8 @@ component.
 - `T_fluid(t)`: bulk fluid temperature [°C].
 """
 function ConvectiveBoundary(; name, area)
-    pars = @parameters area = area
+    @parameters area = area
     @named thermal = ThermalPort()
-    vars = @variables h(t) T_fluid(t)
-    eqs = Equation[thermal.Q ~ h * area * (thermal.T - T_fluid)]
-    return compose(System(eqs, t, collect(vars), pars; name=name), thermal)
+    @variables h(t) T_fluid(t)
+    return assembly(thermal.Q ~ h * area * (thermal.T - T_fluid), thermal; name)
 end

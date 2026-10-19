@@ -17,39 +17,33 @@ function _rebin_1d(
     # Identical grids are the identity; return the values unchanged (also avoids
     # a 1-ULP drift from overlap/width not being bit-exactly 1).
     src_edges == tgt_edges && return Float64.(v)
-    n_out = length(tgt_edges) - 1
-    out = zeros(Float64, n_out)
-    for i in eachindex(v)
-        src_lo, src_hi = src_edges[i], src_edges[i + 1]
-        for j in 1:n_out
-            tgt_lo, tgt_hi = tgt_edges[j], tgt_edges[j + 1]
-            overlap = min(src_hi, tgt_hi) - max(src_lo, tgt_lo)
-            overlap > 0.0 || continue
-            width = conserve === :sum ? (src_hi - src_lo) : (tgt_hi - tgt_lo)
-            out[j] += v[i] * overlap / width
-        end
-    end
-    return out
+    # Rows are source cells and columns target cells.
+    tgt_lo, tgt_hi = permutedims(tgt_edges[1:(end - 1)]), permutedims(tgt_edges[2:end])
+    overlap = min.(src_edges[2:end], tgt_hi) .- max.(src_edges[1:(end - 1)], tgt_lo)
+    width = conserve === :sum ? diff(src_edges) : tgt_hi .- tgt_lo
+    # Cells that do not overlap add nothing, not even a NaN from v.
+    share = ifelse.(overlap .> 0, v .* overlap ./ width, 0.0)
+    return vec(sum(share; dims=1))
 end
 
-# Uniform cell edges 0, 1/n, ..., 1.
+"""
+    _uniform_edges(n) -> Vector{Float64}
+
+The edges of `n` equal cells tiling `[0, 1]`.
+"""
 _uniform_edges(n::Integer) = collect(range(0.0, 1.0; length = n + 1))
 
-# Separable 2D rebin: pass over z (columns) then x (rows), reusing the 1D core.
+"""
+    _rebin_2d(M, (nz_out, nx_out), conserve) -> Matrix{Float64}
+
+Rebin `M` along z, its columns, then along x, its rows, each pass the 1D core on uniform
+edges.
+"""
 function _rebin_2d(M::AbstractMatrix{<:Real}, target_shape::Tuple{Integer,Integer}, conserve::Symbol)
-    nz_out, nx_out = target_shape
-    nz_in, nx_in = size(M)
-    z_src, z_tgt = _uniform_edges(nz_in), _uniform_edges(nz_out)
-    x_src, x_tgt = _uniform_edges(nx_in), _uniform_edges(nx_out)
-    intermediate = Matrix{Float64}(undef, nz_out, nx_in)
-    for j in 1:nx_in
-        intermediate[:, j] = _rebin_1d(view(M, :, j), z_src, z_tgt, conserve)
-    end
-    out = Matrix{Float64}(undef, nz_out, nx_out)
-    for i in 1:nz_out
-        out[i, :] = _rebin_1d(view(intermediate, i, :), x_src, x_tgt, conserve)
-    end
-    return out
+    (nz_in, nx_in), (nz_out, nx_out) = size(M), target_shape
+    rebin(v, n_in, n_out) = _rebin_1d(v, _uniform_edges(n_in), _uniform_edges(n_out), conserve)
+    along_z = mapslices(c -> rebin(c, nz_in, nz_out), M; dims=1)
+    return mapslices(r -> rebin(r, nx_in, nx_out), along_z; dims=2)
 end
 
 """

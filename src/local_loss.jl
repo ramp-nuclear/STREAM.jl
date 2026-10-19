@@ -39,9 +39,7 @@ const _IDELCHIK_410_F = let
         5.00 2.70 1.80 1.46 1.30 0.90 0.65 0.42 0.30 0.20 0.40 0.42 0.25
         5.00 2.60 1.70 1.35 1.20 0.80 0.56 0.35 0.24 0.15 0.35 0.35 0.20
     ]
-    for (i, ar) in enumerate(_IDELCHIK_ARATIOS)
-        f[i, end] = _contraction_asymptote(ar)
-    end
+    f[:, end] .= _contraction_asymptote.(_IDELCHIK_ARATIOS)
     f
 end
 

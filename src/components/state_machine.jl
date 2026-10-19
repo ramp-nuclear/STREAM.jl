@@ -99,8 +99,8 @@ Print each entry of `log` on its own line, as `t = <time> s  <state>  <cause>`, 
 columns aligned.
 """
 function _show_entries(io::IO, log, indent)
-    times = [_format_time(entry.t) for entry in log]
-    states = [string(entry.state) for entry in log]
+    times = _format_time.(getproperty.(log, :t))
+    states = string.(getproperty.(log, :state))
     wt, ws = maximum(length, times), maximum(length, states)
     for (time, state, entry) in zip(times, states, log)
         print(io, "\n", indent, "t = ", lpad(time, wt), " s   ", rpad(state, ws), "   ",

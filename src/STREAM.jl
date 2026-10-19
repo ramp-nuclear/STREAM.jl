@@ -274,7 +274,7 @@ using ..STREAM: AbstractLiquid, Duct, G_EARTH, ATM, T_ROOM
 using ..STREAM: flow_area, hydraulic_diameter, heated_perimeter, _with_duct
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
-using ..STREAM: assembly, port
+using ..STREAM: assembly, port, _flat
 using ..HTC
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
@@ -391,7 +391,7 @@ using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 using ...Components
 using ...Components: _row_major   # a feedback group's cell order, private to Components
-using ...STREAM: port, var_length
+using ...STREAM: port, var_length, _flat
 include("assemblies/connections.jl")
 export inseries, inparallel, weighted, face, faces, temperature_feedback
 end

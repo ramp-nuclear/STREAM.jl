@@ -176,8 +176,8 @@ function q_OSV_saha_zuber(
     T_inlet, ṁ, duct, coolant::Liquid; flux_shape=nothing, dz=nothing
 )
     n = flux_shape === nothing ? length(coolant.ρ) : length(flux_shape)
-    cells(x) = x isa AbstractArray ? collect(x) : fill(x, n)
-    shape = flux_shape === nothing ? ones(n) : collect(float.(flux_shape))
+    cells(x) = x isa AbstractArray ? x : fill(x, n)
+    shape = flux_shape === nothing ? ones(n) : float.(flux_shape)
     dz_c = dz === nothing ? fill(duct.L / n, n) : cells(dz)
     cp_c, κ_c, T_sat = cells(coolant.cₚ), cells(coolant.κ), cells(coolant.Tsat)
 

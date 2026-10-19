@@ -153,7 +153,7 @@ function Fissions(
     op = Pair{Any,Any}[
         ssys.rho_c_fn => rho_c_fn,
         ssys.P_neutron => ic.P_neutron,
-        (ssys.C[k] => ic.C_k[k] for k in eachindex(ic.C_k))...,
+        (scalarize(ssys.C) .=> ic.C_k)...,
     ]
 
     sol = STREAM.solve_transient(ssys, op, times; kwargs...)

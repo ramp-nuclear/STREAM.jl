@@ -37,9 +37,8 @@ function inseries(systems...)
     for sys in systems[2:(end - 1)]
         _check_not_port(sys, "inside an inseries chain")
     end
-    return Equation[
-        connect(_outlet(systems[i]), _inlet(systems[i + 1])) for i in 1:(length(systems) - 1)
-    ]
+    chain = collect(systems)
+    return connect.(_outlet.(chain[1:(end - 1)]), _inlet.(chain[2:end]))
 end
 
 """
@@ -71,8 +70,7 @@ end
 The components along one branch of [`inparallel`](@ref): a tuple or vector of them in series,
 or a single component.
 """
-_branch_systems(branch::Tuple) = collect(branch)
-_branch_systems(branch::AbstractVector) = collect(branch)
+_branch_systems(branch::Union{Tuple,AbstractVector}) = collect(branch)
 _branch_systems(branch) = Any[branch]
 
 """
@@ -231,10 +229,7 @@ Connect one per-cell source array to one thermal face of a target system.
 `Vector{Equation}` with one `connect(...)` equation per cell.
 """
 function face(sources, target, face::Symbol; source_port::Symbol=:thermal)
-    return Equation[
-        connect(getproperty(sources[i], source_port), port(target, face, i)) for
-        i in eachindex(sources)
-    ]
+    return connect.(getproperty.(sources, source_port), port(target, face))
 end
 
 """
@@ -258,24 +253,13 @@ eqs = faces(
 )
 ```
 """
-function faces(mappings::Pair...)
-    eqs = Equation[]
-    for mapping in mappings
-        append!(eqs, faces(mapping))
-    end
-    return eqs
-end
+faces(mappings::Pair...) = _flat(map(faces, mappings))
 
 function faces(mapping::Pair)
-    (left_sys, left_face) = mapping.first
-    (right_sys, right_face) = mapping.second
-    n_left = var_length(left_sys, left_face)
-    n_right = var_length(right_sys, right_face)
-    n_left == n_right ||
-        throw(ArgumentError("face sizes do not match: $n_left != $n_right"))
-    return Equation[
-        connect(port(left_sys, left_face, i), port(right_sys, right_face, i)) for i in 1:n_left
-    ]
+    left, right = port(mapping.first...), port(mapping.second...)
+    length(left) == length(right) ||
+        throw(ArgumentError("face sizes do not match: $(length(left)) != $(length(right))"))
+    return connect.(left, right)
 end
 
 """
@@ -305,10 +289,6 @@ eqs = temperature_feedback(pk, [rods.cac])
 ```
 """
 function temperature_feedback(pk, components)
-    eqs = Equation[]
-    for comp in components
-        T_source = getproperty(pk, Symbol(:T_source_, nameof(comp)))
-        append!(eqs, collect(T_source) .~ _row_major(getproperty(comp, :T)))
-    end
-    return eqs
+    bind(comp) = getproperty(pk, Symbol(:T_source_, nameof(comp))) .~ _row_major(comp.T)
+    return _flat(map(bind, components))
 end
