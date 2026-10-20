@@ -12,6 +12,18 @@ propagates [`Uncertainty`](@ref)s to the outputs to first order, [`jacobian`](@r
 derivatives themselves, and [`monte_carlo`](@ref) samples the full model instead. See
 [Propagate input uncertainties](@ref).
 
+Building a model solves its nominal state once: the steady state for
+`UQModel(ssys, op, parameters; output)`, the transient saved at `t` for
+`UQModel(ssys, op, parameters, t; output)`. The saved times are what make a model a transient,
+as they make [`solve_transient`](@ref) one rather than [`solve_steady`](@ref).
+
+The derivatives are taken on the first call that needs them ([`jacobian`](@ref), [`uq`](@ref)
+or [`measurements`](@ref)) in one ForwardDiff pass over every input, and the model keeps them.
+That pass is a solve of the whole model in dual numbers, a full integration for a transient,
+and keeping its result lets [`uq`](@ref) be called with any number of different uncertainties
+without repeating it. The kept Jacobian never goes stale: nothing in a model changes after it
+is built, and a different operating point, list of inputs or output is a new model.
+
 # Fields
 - `parameters`: the inputs, in the order given
 - `values`: the nominal value of each input
@@ -26,20 +38,6 @@ struct UQModel{F,G}
     slices::Vector{UnitRange{Int}}
     nominal::Vector{Float64}
     cache::Base.RefValue{Union{Nothing,Matrix{Float64}}}
-end
-
-"""
-    _uqmodel(evaluate, resolve, parameters, values, nominal; threaded=true) -> UQModel
-
-A `UQModel` with its slices worked out from `values` and nothing cached yet. `evaluate` maps
-inputs carrying ForwardDiff duals to the outputs, for [`jacobian`](@ref). `resolve` maps plain
-inputs to the outputs of the full model, or to `nothing` when it fails to solve, for
-[`monte_carlo`](@ref), which calls it from several threads at once unless `threaded` is false.
-"""
-function _uqmodel(evaluate, resolve, parameters, values, nominal; threaded=true)
-    cache = Ref{Union{Nothing,Matrix{Float64}}}(nothing)
-    return UQModel(evaluate, resolve, threaded, collect(Any, parameters), values,
-                   _slices(values), nominal, cache)
 end
 
 """
@@ -190,12 +188,18 @@ function UQModel(
         foreach(reset!, machines)
         return _integrate(prob, u0, p, t, solver, init, abstol, reltol, callbacks)
     end
-    function integrate_dual(prob, dual, plain, init)
+    function integrate_dual(prob, (u0, p), (u0_plain, p_plain), init)
         callbacks === nothing || throw(ArgumentError(
             "derivatives cannot follow a StateMachine, whose trip time lives outside the " *
             "problem; sample the model with monte_carlo instead",
         ))
-        return _integrate_dual(prob, dual, plain, t, solver, init, abstol, reltol)
+        # BrownFullBasicInit drops the derivatives of the algebraic states it solves for, so the
+        # start is made consistent here instead, and the run goes on without initializing again.
+        if init isa OrdinaryDiffEq.BrownFullBasicInit
+            u0 = _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, reltol)
+            init = SciMLBase.NoInit()
+        end
+        return _integrate(prob, u0, p, t, solver, init, abstol, reltol)
     end
     threaded = isempty(machines)
 
@@ -228,13 +232,14 @@ function UQModel(
     end
 
     steady = _steady_state(ssys, op, parameters; solver=steady_solver)
-    held = [e for e in op if is_parameter(ssys, first(e))]
+    overridden(x) = any(o -> isequal(first(o), x), overrides)
+    held = [e for e in op if is_parameter(ssys, first(e)) && !overridden(first(e))]
     prob = ODEProblem(
-        ssys, _merge(held, states .=> steady.sol[states], overrides), tspan;
+        ssys, Pair{Any,Any}[held; states .=> steady.sol[states]; overrides], tspan;
         warn_initialize_determined=false, build_initializeprob=false,
     )
     init = initializealg === nothing ? OrdinaryDiffEq.BrownFullBasicInit() : initializealg
-    kept = findall(p -> !any(o -> isequal(first(o), p), overrides), parameters)
+    kept = findall(!overridden, parameters)
     set = setsym_oop(prob, [states; parameters[kept]])
     function evaluate_steady(x)
         vals = _unflatten(x, steady.values, steady.slices)
@@ -267,7 +272,7 @@ input. With `parameter`, only that input's columns, which is Python STREAM's
 `UQModel.subjacobian`.
 
 The full matrix is computed on the first call, in one ForwardDiff pass over every input, and
-kept.
+kept for every later call; [`UQModel`](@ref) says why it never goes stale.
 
 # Arguments
 - `model`: the model
@@ -284,374 +289,21 @@ end
 
 jacobian(model::UQModel, parameter) = jacobian(model)[:, model.slices[_position(model, parameter)]]
 
-@doc raw"""
-    uq(model::UQModel, uncertainties::Pair...) -> NamedTuple
-
-Propagate input uncertainties to the outputs of `model`, to first order, the way Python
-STREAM's `UQModel.uq` does.
-
-Each pair is `parameter => Uncertainty(...)`, with `parameter` one of `model.parameters`, and
-an input left out has no uncertainty. With ``J^{(p)}`` the Jacobian columns of input ``p``, and
-``s^{(p)}`` and ``σ^{(p)}`` its systematic and statistical parts from [`as_absolute`](@ref),
-
-```math
-s_i = ∑_p |∑_j J^{(p)}_{ij} s^{(p)}_j|,   σ_i = (∑_p ∑_j (J^{(p)}_{ij} σ^{(p)}_j)^2)^{1/2}
-```
-
-Different inputs are taken as independent.
-
-With Distributions.jl loaded, an input can take a `Distribution` of its value instead: a
-univariate one for a number, a multivariate one of the same length for a vector. Its mean less
-the nominal value is then the systematic part, and its covariance ``C`` the statistical part,
-which adds ``J^{(p)} C (J^{(p)})^T`` to the output variance, so a multivariate distribution
-carries correlations between the entries.
-
-# Arguments
-- `model`: the model
-- `uncertainties`: `parameter => Uncertainty` or `parameter => Distribution` pairs
-
-# Returns
-`(; nominal, sys, stat)`: the nominal outputs, and their systematic and statistical
-uncertainties, each a vector the length of `model.nominal`.
-
-# Examples
-```jldoctest
-julia> m = UQ.UQModel(x -> x.a + x.b, (a=2.0, b=3.0));
-
-julia> UQ.uq(m, :a => UQ.Uncertainty(systematic_absolute=1.0),
-                :b => UQ.Uncertainty(statistical_absolute=2.0))
-(nominal = [5.0], sys = [1.0], stat = [2.0])
-```
-"""
-function uq(model::UQModel, uncertainties::Pair...)
-    n = length(model.nominal)
-    sys, variance = zeros(n), zeros(n)
-    for (parameter, input) in uncertainties
-        J = jacobian(model, parameter)
-        bias, spread = _moments(input, model.values[_position(model, parameter)])
-        sys .+= abs.(J * bias)
-        variance .+= _variance(J, spread)
-    end
-    return (; nominal=model.nominal, sys, stat=sqrt.(variance))
-end
-
 function Base.show(io::IO, ::MIME"text/plain", model::UQModel)
     print(io, "UQModel: ", length(model.nominal), " outputs of ", length(model.parameters),
           " parameters (", join(model.parameters, ", "), ")")
 end
 
 """
-    _position(model, parameter) -> Int
+    _uqmodel(evaluate, resolve, parameters, values, nominal; threaded=true) -> UQModel
 
-Where `parameter` sits in `model.parameters`.
-
-# Throws
-- `ArgumentError`: when it is not one of them
+A `UQModel` with its slices worked out from `values` and nothing cached yet. `evaluate` maps
+inputs carrying ForwardDiff duals to the outputs, for [`jacobian`](@ref). `resolve` maps plain
+inputs to the outputs of the full model, or to `nothing` when it fails to solve, for
+[`monte_carlo`](@ref), which calls it from several threads at once unless `threaded` is false.
 """
-function _position(model::UQModel, parameter)
-    i = findfirst(p -> isequal(p, parameter), model.parameters)
-    i === nothing && throw(ArgumentError(
-        "$parameter is not a parameter of this model, which has $(join(model.parameters, ", "))"
-    ))
-    return i
+function _uqmodel(evaluate, resolve, parameters, values, nominal; threaded=true)
+    cache = Ref{Union{Nothing,Matrix{Float64}}}(nothing)
+    return UQModel(evaluate, resolve, threaded, collect(Any, parameters), values,
+                   _slices(values), nominal, cache)
 end
-
-"""
-    _slices(values) -> Vector{UnitRange{Int}}
-
-The positions each input takes in the flat vector ForwardDiff differentiates over, one entry
-for a number and one per element for an array.
-"""
-function _slices(values)
-    stops = cumsum(length.(values))
-    return [(stop - length(v) + 1):stop for (v, stop) in zip(values, stops)]
-end
-
-"""
-    _unflatten(x, values, slices) -> Vector
-
-The inputs held in the flat vector `x`, each shaped like its nominal value in `values`.
-"""
-function _unflatten(x, values, slices)
-    return [v isa Number ? x[only(s)] : reshape(x[s], size(v)) for (v, s) in zip(values, slices)]
-end
-
-"""
-    _outputs(y) -> AbstractVector
-
-A model's result as the flat vector of outputs ForwardDiff differentiates.
-
-# Throws
-- `ArgumentError`: for anything but a number or an array
-"""
-_outputs(y::Number) = [y]
-_outputs(y::AbstractArray) = vec(y)
-_outputs(y) = throw(ArgumentError("a model returns a number or an array, not a $(typeof(y))"))
-
-"""
-    _entries(x, n) -> AbstractVector
-
-An uncertainty part as one value per Jacobian column: a number repeated `n` times, or an
-array flattened.
-"""
-_entries(x::Number, n) = fill(float(x), n)
-_entries(x::AbstractArray, n) = vec(x)
-
-"""
-    _variance(J, spread) -> Vector
-
-The output variance an input adds through its Jacobian columns `J`: from independent entries
-with variances `spread`, or from a covariance matrix `spread`, the diagonal of ``J C J^T``.
-"""
-_variance(J, spread::AbstractVector) = J .^ 2 * spread
-_variance(J, spread::AbstractMatrix) = vec(sum((J * spread) .* J; dims=2))
-
-"""
-    _state_jacobian(prob, u) -> Matrix{Float64}
-
-``∂F/∂u``, the Jacobian of the steady residual of `prob` at `u`, by ForwardDiff.
-"""
-_state_jacobian(prob, u) = ForwardDiff.jacobian((du, v) -> _f!(du, prob, v, prob.p), similar(u), u)
-
-"""
-    _residual(prob, u, p, T) -> Vector{T}
-
-The steady residual ``F(u, p)`` of `prob`, in element type `T`.
-"""
-function _residual(prob, u, p, T)
-    du = similar(u, T)
-    _f!(du, prob, u, p)
-    return du
-end
-
-"""
-    _f!(du, prob, u, p)
-
-Evaluate the steady residual of `prob` into `du`. A `SteadyStateProblem`'s function takes a
-time, and root finders call it at `t = Inf`. A root finder hands back its solution on the
-`NonlinearProblem` it converted that to, whose function takes none.
-"""
-_f!(du, prob::SciMLBase.SteadyStateProblem, u, p) = prob.f(du, u, p, Inf)
-_f!(du, prob::SciMLBase.NonlinearProblem, u, p) = prob.f(du, u, p)
-
-"""
-    _check_parameters(ssys, parameters)
-
-Check that every entry of `parameters` is a parameter of `ssys`.
-
-# Throws
-- `ArgumentError`: for an entry of `parameters` that is not a parameter of `ssys`
-"""
-function _check_parameters(ssys, parameters)
-    for p in parameters
-        is_parameter(ssys, p) || throw(ArgumentError("$p is not a parameter of $(nameof(ssys))"))
-    end
-end
-
-"""
-    _readout(output) -> Function
-
-`output` as a function of a solution: a function as it is, and a vector of variables as the
-function reading each of them.
-"""
-_readout(output::AbstractVector) = sol -> reduce(vcat, [sol[v] for v in output])
-_readout(output) = output
-
-"""
-    _steady_state(ssys, op, parameters; solver=nothing, abstol=1e-10, reltol=1e-10) -> NamedTuple
-
-Solve the steady state of `ssys` at `op` and prepare it for differentiation in `parameters`:
-the solution and its problem, ``∂F/∂u`` factorized there, the out-of-place parameter setter,
-the solver settings, and each parameter's value and slice.
-
-# Throws
-- `ArgumentError`: for an entry of `parameters` that is not a parameter of `ssys`
-- `ErrorException`: when the solve fails, or when ``∂F/∂u`` is singular at its root
-"""
-function _steady_state(ssys, op, parameters; solver=nothing, abstol=1e-10, reltol=1e-10)
-    _check_parameters(ssys, parameters)
-    sol = solve_steady(ssys, op; solver, abstol, reltol)
-    SciMLBase.successful_retcode(sol) ||
-        error("the steady solve failed with retcode $(sol.retcode), so there is nothing to " *
-              "differentiate")
-    prob = sol.prob
-    ∂F∂u = lu(_state_jacobian(prob, sol.u); check=false)
-    issuccess(∂F∂u) ||
-        error("∂F/∂u is singular at the steady state, so the state does not depend smoothly " *
-              "on the parameters")
-    values = Any[prob.ps[p] for p in parameters]
-    return (; sol, prob, ∂F∂u, setter=setp_oop(prob, parameters), solver, abstol, reltol,
-            values, slices=_slices(values))
-end
-
-"""
-    _resolve(steady, vals) -> Union{SciMLSolution,Nothing}
-
-The steady state at the parameter values `vals`, solved again from the nominal one with the
-same solver and tolerances, or `nothing` when that solve fails.
-"""
-function _resolve(steady, vals)
-    prob = remake(steady.prob; p=steady.setter(steady.prob, vals), u0=steady.sol.u)
-    inner = steady.solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
-    sol = solve(prob, steady.solver; steady.abstol, steady.reltol, inner...)
-    return SciMLBase.successful_retcode(sol) ? sol : nothing
-end
-
-"""
-    _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol, callbacks=nothing)
-
-`prob` from `u0` with parameters `p`, stepping onto every saved time as
-[`solve_transient`](@ref) does.
-"""
-function _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol, callbacks=nothing)
-    prob = remake(prob; u0, p)
-    return solve(prob, solver; saveat=t, initializealg, abstol, reltol, callback=callbacks,
-                 _saved_steps(prob, t, (;))...)
-end
-
-"""
-    _integrate_dual(prob, (u0, p), (u0_plain, p_plain), t, solver, initializealg, abstol, reltol)
-
-[`_integrate`](@ref) from a start whose `u0` and `p` carry ForwardDiff duals, with
-`u0_plain` and `p_plain` the same start in plain numbers.
-
-`BrownFullBasicInit` solves for the algebraic states with their derivatives dropped, so under
-it the start is made consistent here instead, by [`_consistent_start`](@ref), and the run goes
-on from there without initializing again.
-"""
-function _integrate_dual(prob, (u0, p), (u0_plain, p_plain), t, solver, initializealg,
-                         abstol, reltol)
-    if initializealg isa OrdinaryDiffEq.BrownFullBasicInit
-        u0 = _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, reltol)
-        initializealg = SciMLBase.NoInit()
-    end
-    return _integrate(prob, u0, p, t, solver, initializealg, abstol, reltol)
-end
-
-@doc raw"""
-    _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, reltol) -> Vector
-
-`u0` with its algebraic states solved for, holding its differential states, and with the
-derivatives of both.
-
-The values come from `BrownFullBasicInit` on the plain problem. With ``g`` the algebraic rows
-at the first time, ``u_d`` the differential states and ``u_a`` the algebraic ones, the
-derivatives of the algebraic states follow from ``g = 0`` as
-
-```math
-du_a = -(∂g/∂u_a)^{-1} (∂g/∂u_d \, du_d + ∂g/∂p \, dp)
-```
-
-the bracket being the partials of ``g`` at the new values, with ``du_a`` set to zero.
-"""
-function _consistent_start(prob, u0, p, u0_plain, p_plain, solver, abstol, reltol)
-    M = prob.f.mass_matrix
-    algebraic = M isa AbstractMatrix ? findall(iszero, diag(M)) : Int[]
-    isempty(algebraic) && return u0
-    integrator = SciMLBase.init(remake(prob; u0=u0_plain, p=p_plain), solver;
-                                initializealg=OrdinaryDiffEq.BrownFullBasicInit(), abstol, reltol)
-    plain = integrator.u
-    t0 = first(prob.tspan)
-    u = copy(u0)
-    u[algebraic] .= plain[algebraic]
-    r = similar(u)
-    prob.f(r, u, p, t0)
-    function g(u_a)
-        v = convert(Vector{eltype(u_a)}, plain)
-        v[algebraic] = u_a
-        out = similar(v)
-        prob.f(out, v, p_plain, t0)
-        return out[algebraic]
-    end
-    du = -(ForwardDiff.jacobian(g, plain[algebraic]) \ _partials(r[algebraic]))
-    u[algebraic] = _with_partials(plain[algebraic], du, eltype(u0))
-    return u
-end
-
-"""
-    _values(vals) -> Vector
-
-The plain values of parameter values that may carry ForwardDiff duals.
-"""
-_values(vals) = [ForwardDiff.value.(v) for v in vals]
-
-"""
-    _partials(x) -> Matrix
-
-The partials of the ForwardDiff duals `x`, a row per entry and a column per direction.
-"""
-_partials(x) = stack(ForwardDiff.partials.(x); dims=1)
-
-"""
-    _with_partials(x, du, D) -> Vector{D}
-
-The values `x` as duals of type `D`, entry `i` carrying the partials in row `i` of `du`.
-"""
-_with_partials(x, du, ::Type{D}) where {D} =
-    map((xi, row) -> D(xi, ForwardDiff.Partials(Tuple(row))), x, eachrow(du))
-
-"""
-    _merge(ops...) -> Vector{Pair{Any,Any}}
-
-The operating points `ops` as one, a later entry for a symbol replacing an earlier one.
-"""
-function _merge(ops...)
-    merged = Pair{Any,Any}[]
-    for entry in Iterators.flatten(ops)
-        filter!(e -> !isequal(first(e), first(entry)), merged)
-        push!(merged, entry)
-    end
-    return merged
-end
-
-"""
-    _flat(values) -> Vector{Float64}
-
-The inputs' values as the one flat vector ForwardDiff differentiates over.
-"""
-_flat(values) = collect(Float64, Iterators.flatten(values))
-
-@doc raw"""
-    _dual_solution(steady, vals, D) -> NonlinearSolution
-
-The steady state of [`_steady_state`](@ref) with its derivatives attached, for parameter
-values `vals` holding ForwardDiff duals of type `D`.
-
-With `p` the parameters set to `vals`, the partials of the residual ``F(u, p)`` are
-``∂F/∂p`` along the seeded directions, and ``du/dp = -(∂F/∂u)^{-1} ∂F/∂p``. The solution holds
-`u` as duals carrying ``du/dp``, and `p` as given, so anything read off it (an unknown, an
-observed variable, a parameter) carries its derivative.
-"""
-function _dual_solution(steady, vals, ::Type{D}) where {D<:ForwardDiff.Dual}
-    (; prob, sol, ∂F∂u) = steady
-    p = steady.setter(prob, vals)
-    du = -(∂F∂u \ _partials(_residual(prob, sol.u, p, D)))
-    u_dual = _with_partials(sol.u, du, D)
-    dual_prob = remake(prob; u0=u_dual, p=p)
-    resid = _residual(dual_prob, u_dual, p, D)
-    return SciMLBase.build_solution(dual_prob, nothing, u_dual, resid; retcode=ReturnCode.Success)
-end
-
-@doc raw"""
-    measurements(model::UQModel, uncertainties::Pair...) -> Vector{Measurement{Float64}}
-
-The outputs of `model` as Measurements.jl values, `nominal ± σ`, with the statistical parts of
-`uncertainties` propagated to first order. Needs `using Measurements`.
-
-Each input entry becomes an independent `0 ± σ_j` deviation, and output `i` is
-``y_i + ∑_j J_{ij} δ_j``. The standard deviations are those [`uq`](@ref) gives as `stat`, but
-the outputs also remember which inputs they came from, so arithmetic between them keeps
-their correlation: the uncertainty of `y[1] - y[2]` is that of the difference, not the
-quadrature sum of the two.
-
-# Arguments
-- `model`: the model
-- `uncertainties`: `parameter => Uncertainty` pairs, with no systematic part
-
-# Returns
-A `Vector{Measurement{Float64}}`, one per output.
-
-# Throws
-- `ArgumentError`: for an uncertainty with a systematic part, which a Measurement cannot hold
-"""
-function measurements end

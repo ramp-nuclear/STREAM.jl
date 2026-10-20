@@ -438,6 +438,12 @@ enough.
 
 This is Python STREAM's `stream.analysis.UQ`, with automatic differentiation in place of its
 finite differences. See [Propagate input uncertainties](@ref).
+
+The code reads in this order. `model.jl` builds a model and takes its derivatives.
+`implicit.jl` holds the two steps that differentiate a solved state: `_dual_solution` for a
+steady state, and `_consistent_start` for the start of a DAE transient. `inputs.jl` turns
+named inputs and outputs into the flat vectors ForwardDiff works on, and back.
+`uncertainty.jl` propagates uncertainties to first order, and `sampling.jl` samples them.
 """
 module UQ
 using ForwardDiff
@@ -450,8 +456,10 @@ using SteadyStateDiffEq: DynamicSS
 using SymbolicIndexingInterface: getsym, is_parameter, setsym_oop
 using ..Components: reset!
 using ..STREAM: _saved_steps, solve_steady
-include("uq/uncertainty.jl")
 include("uq/model.jl")
+include("uq/implicit.jl")
+include("uq/inputs.jl")
+include("uq/uncertainty.jl")
 include("uq/sampling.jl")
 export Uncertainty, as_absolute, UQModel, jacobian, uq, measurements, monte_carlo
 end

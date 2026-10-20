@@ -82,6 +82,81 @@ function Base.show(io::IO, u::Uncertainty)
     print(io, "Uncertainty(", join(("$f=$(getfield(u, f))" for f in given), ", "), ")")
 end
 
+@doc raw"""
+    uq(model::UQModel, uncertainties::Pair...) -> NamedTuple
+
+Propagate input uncertainties to the outputs of `model`, to first order, the way Python
+STREAM's `UQModel.uq` does.
+
+Each pair is `parameter => Uncertainty(...)`, with `parameter` one of `model.parameters`, and
+an input left out has no uncertainty. With ``J^{(p)}`` the Jacobian columns of input ``p``, and
+``s^{(p)}`` and ``σ^{(p)}`` its systematic and statistical parts from [`as_absolute`](@ref),
+
+```math
+s_i = ∑_p |∑_j J^{(p)}_{ij} s^{(p)}_j|,   σ_i = (∑_p ∑_j (J^{(p)}_{ij} σ^{(p)}_j)^2)^{1/2}
+```
+
+Different inputs are taken as independent.
+
+With Distributions.jl loaded, an input can take a `Distribution` of its value instead: a
+univariate one for a number, a multivariate one of the same length for a vector. Its mean less
+the nominal value is then the systematic part, and its covariance ``C`` the statistical part,
+which adds ``J^{(p)} C (J^{(p)})^T`` to the output variance, so a multivariate distribution
+carries correlations between the entries.
+
+# Arguments
+- `model`: the model
+- `uncertainties`: `parameter => Uncertainty` or `parameter => Distribution` pairs
+
+# Returns
+`(; nominal, sys, stat)`: the nominal outputs, and their systematic and statistical
+uncertainties, each a vector the length of `model.nominal`.
+
+# Examples
+```jldoctest
+julia> m = UQ.UQModel(x -> x.a + x.b, (a=2.0, b=3.0));
+
+julia> UQ.uq(m, :a => UQ.Uncertainty(systematic_absolute=1.0),
+                :b => UQ.Uncertainty(statistical_absolute=2.0))
+(nominal = [5.0], sys = [1.0], stat = [2.0])
+```
+"""
+function uq(model::UQModel, uncertainties::Pair...)
+    n = length(model.nominal)
+    sys, variance = zeros(n), zeros(n)
+    for (parameter, input) in uncertainties
+        J = jacobian(model, parameter)
+        bias, spread = _moments(input, model.values[_position(model, parameter)])
+        sys .+= abs.(J * bias)
+        variance .+= _variance(J, spread)
+    end
+    return (; nominal=model.nominal, sys, stat=sqrt.(variance))
+end
+
+@doc raw"""
+    measurements(model::UQModel, uncertainties::Pair...) -> Vector{Measurement{Float64}}
+
+The outputs of `model` as Measurements.jl values, `nominal ± σ`, with the statistical parts of
+`uncertainties` propagated to first order. Needs `using Measurements`.
+
+Each input entry becomes an independent `0 ± σ_j` deviation, and output `i` is
+``y_i + ∑_j J_{ij} δ_j``. The standard deviations are those [`uq`](@ref) gives as `stat`, but
+the outputs also remember which inputs they came from, so arithmetic between them keeps
+their correlation: the uncertainty of `y[1] - y[2]` is that of the difference, not the
+quadrature sum of the two.
+
+# Arguments
+- `model`: the model
+- `uncertainties`: `parameter => Uncertainty` pairs, with no systematic part
+
+# Returns
+A `Vector{Measurement{Float64}}`, one per output.
+
+# Throws
+- `ArgumentError`: for an uncertainty with a systematic part, which a Measurement cannot hold
+"""
+function measurements end
+
 """
     _moments(input, nominal) -> (bias, spread)
 
@@ -93,3 +168,21 @@ function _moments(u::Uncertainty, nominal)
     n = length(nominal)
     return _entries(systematic, n), _entries(statistical, n) .^ 2
 end
+
+"""
+    _entries(x, n) -> AbstractVector
+
+An uncertainty part as one value per Jacobian column: a number repeated `n` times, or an
+array flattened.
+"""
+_entries(x::Number, n) = fill(float(x), n)
+_entries(x::AbstractArray, n) = vec(x)
+
+"""
+    _variance(J, spread) -> Vector
+
+The output variance an input adds through its Jacobian columns `J`: from independent entries
+with variances `spread`, or from a covariance matrix `spread`, the diagonal of ``J C J^T``.
+"""
+_variance(J, spread::AbstractVector) = J .^ 2 * spread
+_variance(J, spread::AbstractMatrix) = vec(sum((J * spread) .* J; dims=2))

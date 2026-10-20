@@ -172,16 +172,21 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=not
 end
 
 """
-    _evaluate(pipe, value) -> Union{PipeGeometry,Nothing}
+    _evaluate(pipe, read) -> Union{PipeGeometry,Nothing}
 
-`pipe` as numbers. A pipe built from design knobs holds expressions in them, and `value`
-reads each one off the solution, so the geometry follows a knob set at solve time. A numeric
-pipe, or `nothing`, passes through.
+`pipe` with numbers in place of expressions. A pipe built from design knobs holds each length
+as an expression in them: `A = width * gap` holds two knobs, `L` none. `read` looks an
+expression up on the solution, as `sol[expr]` does, so every knob in every field takes the
+value the solution was solved with, however many knobs there are. Under
+[`UQ.UQModel`](@ref STREAM.UQ.UQModel) those values are dual numbers, and the derivatives come
+along. A numeric pipe, or `nothing`, passes through.
 """
-_evaluate(pipe, value) = pipe
+_evaluate(pipe, read) = pipe
 
-function _evaluate(pipe::PipeGeometry{Num}, value)
-    fields = map(f -> value.(getfield(pipe, f)), fieldnames(PipeGeometry))
+function _evaluate(pipe::PipeGeometry{Num}, read)
+    fields = map(f -> read.(getfield(pipe, f)), fieldnames(PipeGeometry))
+    # A field with no knob reads back as a Float64 and one with a knob as whatever the knob
+    # holds, a dual under UQModel; PipeGeometry takes one type for every field.
     T = mapreduce(eltype, promote_type, fields)
     return PipeGeometry((T.(f) for f in fields)...)
 end
