@@ -428,18 +428,20 @@ include("solvers.jl")
 
 How uncertain inputs make a model's outputs uncertain.
 
-An [`Uncertainty`](@ref) describes one input, with a systematic and a statistical part. A
-[`UQModel`](@ref) wraps a plain function, a compiled system at steady state, or a transient of
-one, and [`uq`](@ref) propagates uncertainties through it to first order. The derivatives
-behind that, from [`jacobian`](@ref), come from forward-mode automatic differentiation, and a
-steady state is differentiated through the implicit function theorem rather than through its
-solver. [`monte_carlo`](@ref) samples the full model instead, for where first order is not
-enough.
+A problem says what to solve and which inputs are uncertain, and computes nothing:
+[`FunctionUQ`](@ref) for a plain function, [`SteadyUQ`](@ref) for the steady state of a compiled
+system, [`TransientUQ`](@ref) for a transient of one. Two calls compute.
+[`local_sensitivities`](@ref) solves the nominal state and differentiates the outputs there,
+and [`uq`](@ref) propagates [`Uncertainty`](@ref)s through those derivatives to first order.
+[`monte_carlo`](@ref) samples the problem instead, for where first order is not enough. The
+derivatives come from forward-mode automatic differentiation, and a steady state is
+differentiated through the implicit function theorem rather than through its solver.
 
 This is Python STREAM's `stream.analysis.UQ`, with automatic differentiation in place of its
 finite differences. See [Propagate input uncertainties](@ref).
 
-The code reads in this order. `model.jl` builds a model and takes its derivatives.
+The code reads in this order. `problems.jl` defines the problems and takes their
+derivatives.
 `implicit.jl` holds the two steps that differentiate a solved state: `_dual_solution` for a
 steady state, and `_consistent_start` for the start of a DAE transient. `inputs.jl` turns
 named inputs and outputs into the flat vectors ForwardDiff works on, and back.
@@ -448,20 +450,21 @@ named inputs and outputs into the flat vectors ForwardDiff works on, and back.
 module UQ
 using ForwardDiff
 using LinearAlgebra: diag, issuccess, lu
-using ModelingToolkit: ODEProblem, setp_oop, unknowns
+using ModelingToolkit: ODEProblem, System, setp_oop, unknowns
 using OrdinaryDiffEq: OrdinaryDiffEq, ReturnCode, Rodas5P, SciMLBase, remake, solve
 using Random: AbstractRNG, default_rng
 using Statistics: mean, std
 using SteadyStateDiffEq: DynamicSS
 using SymbolicIndexingInterface: getsym, is_parameter, setsym_oop
-using ..Components: reset!
+using ..Components: StateMachine, reset!
 using ..STREAM: _saved_steps, solve_steady
-include("uq/model.jl")
+include("uq/problems.jl")
 include("uq/implicit.jl")
 include("uq/inputs.jl")
 include("uq/uncertainty.jl")
 include("uq/sampling.jl")
-export Uncertainty, as_absolute, UQModel, jacobian, uq, measurements, monte_carlo
+export FunctionUQ, SteadyUQ, TransientUQ, LocalSensitivities, local_sensitivities, jacobian
+export Uncertainty, as_absolute, uq, measurements, monte_carlo
 end
 
 # The public surface. Everything not listed here is reached through its module.

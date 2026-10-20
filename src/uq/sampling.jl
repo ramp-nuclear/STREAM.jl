@@ -1,8 +1,8 @@
 @doc raw"""
-    monte_carlo(model::UQModel, uncertainties::Pair...; n=1000, rng=default_rng()) -> NamedTuple
+    monte_carlo(prob::AbstractUQ, uncertainties::Pair...; n=1000, rng=default_rng()) -> NamedTuple
 
-Sample the full model at inputs drawn from their uncertainties, for a check of what
-[`uq`](@ref) gives to first order.
+Solve `prob` at inputs drawn from their uncertainties, for a check of what [`uq`](@ref) gives
+to first order. It solves the nominal state first, then every sample.
 
 Each entry of an uncertain input is drawn from the distribution [`Uncertainty`](@ref)
 describes,
@@ -21,23 +21,23 @@ whose runs share the machine and go one at a time. The inputs are drawn from `rn
 solve, so the result does not depend on the number of threads.
 
 # Arguments
-- `model`: the model
+- `prob`: the problem
 - `uncertainties`: `parameter => Uncertainty` or `parameter => Distribution` pairs
 - `n`: the number of samples
 - `rng`: the random number generator, for a reproducible set of draws
 
 # Returns
-`(; samples, mean, std, failed)`: the outputs of every sample that solved, a column each;
-the mean and the standard deviation of each output over them; and how many samples failed
-to solve.
+`(; nominal, samples, mean, std, failed)`: the outputs at the nominal inputs; the outputs of
+every sample that solved, a column each; the mean and the standard deviation of each output
+over them; and how many samples failed to solve.
 
 # Examples
 ```jldoctest
 julia> using Random
 
-julia> m = UQ.UQModel(x -> 2x.a, (a=1.0,));
+julia> prob = UQ.FunctionUQ(x -> 2x.a, (a=1.0,));
 
-julia> r = UQ.monte_carlo(m, :a => UQ.Uncertainty(statistical_absolute=0.1);
+julia> r = UQ.monte_carlo(prob, :a => UQ.Uncertainty(statistical_absolute=0.1);
                           n=10_000, rng=Xoshiro(1));
 
 julia> round.(r.std; digits=2)
@@ -45,31 +45,28 @@ julia> round.(r.std; digits=2)
  0.2
 ```
 """
-function monte_carlo(model::UQModel, uncertainties::Pair...; n=1000, rng::AbstractRNG=default_rng())
-    x0 = _flat(model.values)
-    drawn = [model.slices[_position(model, p)] => u for (p, u) in uncertainties]
+function monte_carlo(prob::AbstractUQ, uncertainties::Pair...; n=1000,
+                     rng::AbstractRNG=default_rng())
+    prepared = _prepare(prob)
+    x0 = _flat(prepared.values)
+    drawn = [prepared.slices[_position(prepared.parameters, p)] => u for (p, u) in uncertainties]
     inputs = repeat(x0, 1, n)
     for k in 1:n, (slice, uncertainty) in drawn
         inputs[slice, k] = _draw(rng, uncertainty, x0[slice])
     end
-    samples = fill(NaN, length(model.nominal), n)
-    solved = fill(false, n)
-    function sample(k)
-        y = model.resolve(inputs[:, k])
-        y === nothing && return
-        samples[:, k] = y
-        solved[k] = true
-    end
-    if model.threaded
+    results = Vector{Union{Nothing,Vector{Float64}}}(nothing, n)
+    sample(k) = results[k] = prepared.resolve(inputs[:, k])
+    if prepared.threaded
         Threads.@threads for k in 1:n
             sample(k)
         end
     else
         foreach(sample, 1:n)
     end
-    samples = samples[:, solved]
-    return (; samples, mean=vec(mean(samples; dims=2)), std=vec(std(samples; dims=2)),
-            failed=n - count(solved))
+    solved = filter(!isnothing, results)
+    samples = reduce(hcat, solved; init=zeros(length(prepared.nominal), 0))
+    return (; prepared.nominal, samples, mean=vec(mean(samples; dims=2)),
+            std=vec(std(samples; dims=2)), failed=n - length(solved))
 end
 
 """

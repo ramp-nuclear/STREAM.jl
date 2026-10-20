@@ -54,8 +54,9 @@ parameters ``p``, then differentiating that identity gives
 ∂F/∂u \; du/dp + ∂F/∂p = 0, \quad\text{so}\quad du/dp = -(∂F/∂u)^{-1} ∂F/∂p
 ```
 
-This is the implicit function theorem. [`UQModel`](@ref STREAM.UQ.UQModel) solves the steady
-state in ordinary floating point, with whatever solver converges it, then forms both partial
+This is the implicit function theorem.
+[`local_sensitivities`](@ref STREAM.UQ.local_sensitivities) solves the steady state in
+ordinary floating point, with whatever solver converges it, then forms both partial
 derivatives of ``F`` at the root by ForwardDiff and solves the one linear system. The
 derivatives are those of the steady state itself, so they do not depend on how the solver got
 there: a Newton iteration and a `DynamicSS` integration give the same ``J``. The solution
@@ -112,15 +113,16 @@ plate = Slab(; x=range(0.0, 0.00127; length=3), z=range(0.0, 0.6; length=n + 1),
 @named loop = assembly([inseries(pump, hx, cell.ch, pump), pump.outlet.p ~ 1.7e5],
                        pump, hx, cell)
 sys = mtkcompile(loop)
-model = UQModel(sys, [], [sys.pump.ṁ0]; output=sys.cell.ch.T_wall_left)
+prob = SteadyUQ(sys, [], [sys.pump.ṁ0]; output=sys.cell.ch.T_wall_left)
+s = local_sensitivities(prob)
 
 z = ((1:n) .- 0.5) .* 0.6 ./ n
 fig = Figure(size=(760, 380))
 upper_gap = Float64[]
 for (k, σ) in enumerate((0.05, 0.25))
     flow = sys.pump.ṁ0 => Uncertainty(statistical_relative=σ)
-    y, stat = model.nominal, uq(model, flow).stat
-    sampled = monte_carlo(model, flow; n=500, rng=Xoshiro(1))
+    y, stat = s.nominal, uq(s, flow).stat
+    sampled = monte_carlo(prob, flow; n=500, rng=Xoshiro(1))
     low = quantile.(eachrow(sampled.samples), 0.025)
     high = quantile.(eachrow(sampled.samples), 0.975)
     push!(upper_gap, maximum(high .- (y .+ 2stat)))
@@ -153,8 +155,8 @@ flow, and the normal distribution of first order, symmetric by construction, has
 using Statistics: mean
 
 flow = sys.pump.ṁ0 => Uncertainty(statistical_relative=0.25)
-outlet = monte_carlo(model, flow; n=4000, rng=Xoshiro(2)).samples[end, :]
-μ, σ = model.nominal[end], uq(model, flow).stat[end]
+outlet = monte_carlo(prob, flow; n=4000, rng=Xoshiro(2)).samples[end, :]
+μ, σ = s.nominal[end], uq(s, flow).stat[end]
 
 # The axis ends at the 99.5th percentile: the few draws with the flow cut by more than half
 # reach far past it.

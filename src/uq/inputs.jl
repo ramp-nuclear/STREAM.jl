@@ -35,17 +35,17 @@ _outputs(y::AbstractArray) = vec(y)
 _outputs(y) = throw(ArgumentError("a model returns a number or an array, not a $(typeof(y))"))
 
 """
-    _position(model, parameter) -> Int
+    _position(parameters, parameter) -> Int
 
-Where `parameter` sits in `model.parameters`.
+Where `parameter` sits in the list of inputs `parameters`.
 
 # Throws
 - `ArgumentError`: when it is not one of them
 """
-function _position(model::UQModel, parameter)
-    i = findfirst(p -> isequal(p, parameter), model.parameters)
+function _position(parameters, parameter)
+    i = findfirst(p -> isequal(p, parameter), parameters)
     i === nothing && throw(ArgumentError(
-        "$parameter is not a parameter of this model, which has $(join(model.parameters, ", "))"
+        "$parameter is not one of the inputs, which are $(join(parameters, ", "))"
     ))
     return i
 end
@@ -57,8 +57,9 @@ The positions each input takes in the flat vector ForwardDiff differentiates ove
 for a number and one per element for an array.
 """
 function _slices(values)
-    stops = cumsum(length.(values))
-    return [(stop - length(v) + 1):stop for (v, stop) in zip(values, stops)]
+    lengths = length.(values)
+    stops = cumsum(lengths)
+    return range.(stops .- lengths .+ 1, stops)
 end
 
 """

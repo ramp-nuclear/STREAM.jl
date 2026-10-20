@@ -10,7 +10,8 @@ With `p` the parameters set to `vals`, the partials of the residual ``F(u, p)`` 
 observed variable, a parameter) carries its derivative.
 """
 function _dual_solution(steady, vals, ::Type{D}) where {D<:ForwardDiff.Dual}
-    (; prob, sol, ∂F∂u) = steady
+    (; sol, ∂F∂u) = steady
+    prob = sol.prob
     p = steady.setter(prob, vals)
     du = -(∂F∂u \ _partials(_residual(prob, sol.u, p, D)))
     u_dual = _with_partials(sol.u, du, D)
@@ -63,15 +64,13 @@ end
     _steady_state(ssys, op, parameters; solver=nothing, abstol=1e-10, reltol=1e-10) -> NamedTuple
 
 Solve the steady state of `ssys` at `op` and prepare it for differentiation in `parameters`:
-the solution and its problem, ``∂F/∂u`` factorized there, the out-of-place parameter setter,
-the solver settings, and each parameter's value and slice.
+the solution, ``∂F/∂u`` factorized there, the out-of-place parameter setter, the solver
+settings, and each parameter's value.
 
 # Throws
-- `ArgumentError`: for an entry of `parameters` that is not a parameter of `ssys`
 - `ErrorException`: when the solve fails, or when ``∂F/∂u`` is singular at its root
 """
 function _steady_state(ssys, op, parameters; solver=nothing, abstol=1e-10, reltol=1e-10)
-    _check_parameters(ssys, parameters)
     sol = solve_steady(ssys, op; solver, abstol, reltol)
     SciMLBase.successful_retcode(sol) ||
         error("the steady solve failed with retcode $(sol.retcode), so there is nothing to " *
@@ -82,8 +81,7 @@ function _steady_state(ssys, op, parameters; solver=nothing, abstol=1e-10, relto
         error("∂F/∂u is singular at the steady state, so the state does not depend smoothly " *
               "on the parameters")
     values = Any[prob.ps[p] for p in parameters]
-    return (; sol, prob, ∂F∂u, setter=setp_oop(prob, parameters), solver, abstol, reltol,
-            values, slices=_slices(values))
+    return (; sol, ∂F∂u, setter=setp_oop(prob, parameters), solver, abstol, reltol, values)
 end
 
 """
@@ -112,7 +110,8 @@ The steady state at the parameter values `vals`, solved again from the nominal o
 same solver and tolerances, or `nothing` when that solve fails.
 """
 function _resolve(steady, vals)
-    prob = remake(steady.prob; p=steady.setter(steady.prob, vals), u0=steady.sol.u)
+    (; sol, setter) = steady
+    prob = remake(sol.prob; p=setter(sol.prob, vals), u0=sol.u)
     inner = steady.solver isa DynamicSS ? (; odesolve_kwargs=(; dense=false)) : (;)
     sol = solve(prob, steady.solver; steady.abstol, steady.reltol, inner...)
     return SciMLBase.successful_retcode(sol) ? sol : nothing

@@ -1,7 +1,7 @@
 """
     STREAMDistributionsExt
 
-A `Distribution` as the uncertainty of a [`UQ.UQModel`](@ref STREAM.UQ.UQModel) input, for
+A `Distribution` as the uncertainty of an input of a UQ problem, for
 [`UQ.uq`](@ref STREAM.UQ.uq) and [`UQ.monte_carlo`](@ref STREAM.UQ.monte_carlo), loaded with
 Distributions.jl.
 """

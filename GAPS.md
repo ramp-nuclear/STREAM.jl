@@ -153,10 +153,11 @@ equations; and a component graph from the connection vectors `inseries`, `inpara
 ### 7. Uncertainty quantification
 
 The first-order part and sampling are in, as the `UQ` module: `Uncertainty` with Python's four
-parts, `UQModel` over a plain function, a steady state or a transient, `uq` with Python's
-propagation, `jacobian`, `monte_carlo`, `measurements` through a Measurements.jl
-extension, and any `Distribution` as an input through a Distributions.jl one. `Utilities.local_power_shift` ports the power-shape perturbation, and the threshold
-factors are there: `onb_factor` and `inhomogeneity_factor` on `bergles_rohsenow_t_onb`,
+parts, the problems `FunctionUQ`, `SteadyUQ` and `TransientUQ`, `local_sensitivities`, `uq`
+with Python's propagation, `jacobian`, `monte_carlo`, `measurements` through a Measurements.jl
+extension, and any `Distribution` as an input through a Distributions.jl one.
+`Utilities.local_power_shift` ports the power-shape perturbation, and the threshold factors are
+there: `onb_factor` and `inhomogeneity_factor` on `bergles_rohsenow_t_onb`,
 `inhomogeneity_factor` on `q_OSV_saha_zuber`. `test_validation.jl` checks `uq` against Python's
 numbers on two threshold correlations. The Jacobian comes from ForwardDiff, and a steady state
 is differentiated by the implicit function theorem, so there is no step size and no solver path
@@ -222,8 +223,14 @@ What remains:
   Python smooths that switch with `soft_pos`.
 - **Uncertainty derivatives are exact.** Python's `UQModel` takes forward differences with a
   relative step of 1e-6, so its Jacobian carries the truncation and the solver tolerance over
-  the step. `UQ.UQModel` uses automatic differentiation, and the implicit function theorem at a
-  steady state. Python's propagation formulas are unchanged.
+  the step. `UQ.local_sensitivities` uses automatic differentiation, and the implicit function
+  theorem at a steady state. Python's propagation formulas are unchanged.
+- **An uncertainty problem computes nothing until asked.** Python's `UQModel` solves its
+  nominal state when it is built and keeps a Jacobian cache. `SteadyUQ`, `TransientUQ` and
+  `FunctionUQ` only hold their arguments, as an `ODEProblem` does; `local_sensitivities` and
+  `monte_carlo` do the solving, and the derivatives are a value the caller keeps rather than a
+  cache. A steady problem and a transient are separate types, not one constructor told apart
+  by its arguments.
 - **A transient steps onto every saved time.** Python's solver reads the saved values off its
   interpolant, which strays inside a long implicit step: 0.5 m on a draining pool level.
   `solve_transient` passes the saved times as `tstops`, so every saved value is one the solver

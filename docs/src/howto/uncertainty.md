@@ -32,12 +32,14 @@ sys = mtkcompile(loop)
 nothing # hide
 ```
 
-## Wrap the model
+## Define the problem
 
-A [`UQModel`](@ref STREAM.UQ.UQModel) needs the inputs that carry an uncertainty, and the
+A [`SteadyUQ`](@ref STREAM.UQ.SteadyUQ) names the inputs that carry an uncertainty, and the
 outputs to carry it to. The inputs are parameters of the compiled system, here the knob and
 three component parameters. The outputs come from a function of the solution, written as for
-[`threshold_analysis`](@ref STREAM.Thresholds.threshold_analysis):
+[`threshold_analysis`](@ref STREAM.Thresholds.threshold_analysis). Defining the problem
+computes nothing; [`local_sensitivities`](@ref STREAM.UQ.local_sensitivities) does, solving
+the steady state once and differentiating the outputs there:
 
 ```@example uq
 function margins(sol)
@@ -47,12 +49,13 @@ function margins(sol)
 end
 
 inputs = [sys.cell.fuel.power, sys.pump.ṁ0, sys.hx.T_bc, gap]
-model = UQModel(sys, knob_defaults([gap]), inputs; output=margins)
-model.nominal
+prob = SteadyUQ(sys, knob_defaults([gap]), inputs; output=margins)
+s = local_sensitivities(prob)
+s.nominal
 ```
 
-Building the model solves the steady state once and takes its derivatives there. A pipe built
-from a knob can go to `ChannelState` as it is, and is evaluated at the knob's value.
+A pipe built from a knob can go to `ChannelState` as it is, and is evaluated at the knob's
+value.
 
 ## Give each input its uncertainty
 
@@ -67,10 +70,12 @@ uncertainties = (
     sys.hx.T_bc => Uncertainty(statistical_absolute=1.0),          # inlet temperature, K
     gap => Uncertainty(statistical_absolute=1.0e-4),               # gap tolerance, m
 )
-result = uq(model, uncertainties...)
+result = uq(s, uncertainties...)
 ```
 
-An input left out has no uncertainty. The systematic parts add up linearly and the
+An input left out has no uncertainty, and nothing is solved again, so `uq` can be called on
+the same `s` with as many sets of uncertainties as needed. The systematic parts add up
+linearly and the
 statistical ones in quadrature, so a margin with both is commonly checked as
 `nominal - sys - k * stat` for a coverage factor `k`:
 
@@ -84,7 +89,7 @@ result.nominal .- result.sys .- 2 .* result.stat
 and a column per input:
 
 ```@example uq
-J = jacobian(model)
+J = jacobian(s)
 ```
 
 Multiplied by each input's uncertainty, a column shows what that input contributes:
@@ -109,8 +114,8 @@ along the channel:
 ```@example uq
 using CairoMakie
 
-profiles = UQModel(sys, knob_defaults([gap]), inputs;
-                   output=[sys.cell.ch.T; sys.cell.ch.T_wall_left])
+profiles = local_sensitivities(SteadyUQ(sys, knob_defaults([gap]), inputs;
+                                        output=[sys.cell.ch.T; sys.cell.ch.T_wall_left]))
 r = uq(profiles, uncertainties...)
 
 z = ((1:n) .- 0.5) .* 0.6 ./ n
@@ -136,16 +141,18 @@ uncertainty, and gathers the power's and the flow's as it heats up along the cha
 
 ## Over a transient
 
-Give the saved times as a fourth argument and the model is a transient. With
-`start=:steady` it settles first at the operating point and then runs with `overrides`
-applied, here the flow cut to half. The steady state it starts from carries the derivatives
+A [`TransientUQ`](@ref STREAM.UQ.TransientUQ) is the same for a transient, saved at the
+times given. With `start=:steady` it settles first at the operating point and then runs with
+`overrides` applied, here the flow cut to half. The steady state it starts from carries the derivatives
 too, so an input counts both through where the run starts and through what follows:
 
 ```@example uq
 times = 0.0:0.05:2.0
 peak_wall(sol) = maximum.(sol[sys.cell.ch.T_wall_left])   # the hottest cell at each time
-cut = UQModel(sys, knob_defaults([gap]), [sys.cell.fuel.power, sys.hx.T_bc, gap], times;
-              output=peak_wall, start=:steady, overrides=[sys.pump.ṁ0 => 0.2])
+cut = local_sensitivities(TransientUQ(sys, knob_defaults([gap]),
+                                      [sys.cell.fuel.power, sys.hx.T_bc, gap], times;
+                                      output=peak_wall, start=:steady,
+                                      overrides=[sys.pump.ṁ0 => 0.2]))
 r = uq(cut, uncertainties[1], uncertainties[3], uncertainties[4])
 
 fig = Figure(size=(700, 380))
@@ -168,12 +175,12 @@ samples one instead.
 
 ## Check first order by sampling
 
-[`monte_carlo`](@ref STREAM.UQ.monte_carlo) solves the full model at inputs drawn from their
+[`monte_carlo`](@ref STREAM.UQ.monte_carlo) solves the problem at inputs drawn from their
 uncertainties. Its standard deviations match the first-order ones where the response is close
 to linear over the spread, and part from them where it curves:
 
 ```@example uq
-sampled = monte_carlo(model, uncertainties...; n=1000)
+sampled = monte_carlo(prob, uncertainties...; n=1000)
 (first_order=result.stat, sampled=sampled.std)
 ```
 
@@ -226,9 +233,8 @@ machine.transitions = [(:NORMAL => :SCRAM, pk.P_neutron > trip_at, "power above 
 ria = mtkcompile(reactor)
 
 tripped(sol) = [machine.t_state, maximum(sol[ria.pk.P_neutron])]   # trip time, peak power
-trip = UQModel(ria, Pair[], [trip_at], 0.0:0.05:30.0; output=tripped,
-               callbacks=machine_callbacks(ria, machine), machines=(machine,))
-trip.nominal
+trip = TransientUQ(ria, Pair[], [trip_at], 0.0:0.05:30.0; output=tripped,
+                   callbacks=machine_callbacks(ria, machine), machines=(machine,))
 ```
 
 Pass the run's `callbacks` and the `machines` they drive. Every sample is then a full run,
@@ -243,7 +249,7 @@ for (k, label) in enumerate(("time of the trip [s]", "peak power [relative to no
     ax = Axis(fig[1, k]; xlabel=label, ylabel=k == 1 ? "probability density" : "")
     hist!(ax, runs.samples[k, :]; bins=30, normalization=:pdf,
           color=("#eb6834", 0.6), strokewidth=1, strokecolor=:white, label="sampled")
-    vlines!(ax, trip.nominal[k]; color="#2a78d6", linewidth=2, linestyle=:dash,
+    vlines!(ax, runs.nominal[k]; color="#2a78d6", linewidth=2, linestyle=:dash,
             label="nominal")
     k == 1 && axislegend(ax; position=:rt)
 end
@@ -256,20 +262,22 @@ A run whose setpoint lies high trips later, at a higher power:
 @assert runs.failed == 0 && cor(runs.samples[1, :], runs.samples[2, :]) > 0.9
 ```
 
-Derivatives cannot be taken through the trip, so `jacobian` and `uq` refuse a model with
-callbacks and point here.
+Derivatives cannot be taken through the trip, so `local_sensitivities` refuses a problem
+with callbacks and points here.
 
 ## Propagate through a function
 
-For a correlation on its own, or any calculation that is not one steady solve, wrap a function
-of named inputs. It is called with dual numbers, so keep it free of `Float64` conversions:
+For a correlation on its own, or any calculation that is not one steady solve, a
+[`FunctionUQ`](@ref STREAM.UQ.FunctionUQ) takes a function of named inputs. It is called with
+dual numbers, so keep it free of `Float64` conversions:
 
 ```@example uq
 pipe = PipeGeometry_rectangular(0.6, 0.067, 0.0024, 0.063)
-ofi = UQModel(x -> q_OFI_whittle_forgan(x.ṁ, x.T_sat, x.T_in, pipe),
-              (ṁ=0.4, T_sat=115.0, T_in=40.0))
-uq(ofi, :ṁ => Uncertainty(statistical_relative=0.03),
-        :T_in => Uncertainty(statistical_absolute=1.0))
+ofi = FunctionUQ(x -> q_OFI_whittle_forgan(x.ṁ, x.T_sat, x.T_in, pipe),
+                 (ṁ=0.4, T_sat=115.0, T_in=40.0))
+s_ofi = local_sensitivities(ofi)
+uq(s_ofi, :ṁ => Uncertainty(statistical_relative=0.03),
+          :T_in => Uncertainty(statistical_absolute=1.0))
 ```
 
 ## Use a distribution
@@ -283,7 +291,7 @@ normals give what `Uncertainty(statistical_relative=0.03)` and
 ```@example uq
 using Distributions: Normal, Uniform
 
-uq(ofi, :ṁ => Normal(0.4, 0.012), :T_in => Normal(40.0, 1.0))
+uq(s_ofi, :ṁ => Normal(0.4, 0.012), :T_in => Normal(40.0, 1.0))
 ```
 
 [`monte_carlo`](@ref STREAM.UQ.monte_carlo) draws from the distribution itself, so it can be
@@ -305,8 +313,8 @@ even where outputs are correlated:
 
 ```@example uq
 using Measurements
-y = measurements(model, sys.pump.ṁ0 => Uncertainty(statistical_relative=0.03),
-                        gap => Uncertainty(statistical_absolute=1.0e-4))
+y = measurements(s, sys.pump.ṁ0 => Uncertainty(statistical_relative=0.03),
+                    gap => Uncertainty(statistical_absolute=1.0e-4))
 ```
 
 A Measurement holds a standard deviation only, so this takes statistical parts alone.

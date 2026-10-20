@@ -885,8 +885,8 @@ end  # @testset "PointKinetics validation"
         chf = Thresholds.q_CHF_mirshak.(x.T_bulk, T_sat, x.P, v)
         return [chf; Thresholds.q_OFI_whittle_forgan(x.ṁ, T_sat, x.T_in, pipe)]
     end
-    model = UQ.UQModel(chf_and_ofi, (ṁ=0.5, T_in=35.0, T_bulk=[40.0, 50.0, 60.0], P=1.7e5))
-    result = UQ.uq(model,
+    prob = UQ.FunctionUQ(chf_and_ofi, (ṁ=0.5, T_in=35.0, T_bulk=[40.0, 50.0, 60.0], P=1.7e5))
+    result = UQ.uq(UQ.local_sensitivities(prob),
         :ṁ => UQ.Uncertainty(statistical_relative=0.05),
         :T_in => UQ.Uncertainty(systematic_absolute=1.0, statistical_absolute=0.5),
         :T_bulk => UQ.Uncertainty(systematic_relative=0.02, statistical_absolute=[0.5, 1.0, 1.5]),

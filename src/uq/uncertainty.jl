@@ -83,12 +83,13 @@ function Base.show(io::IO, u::Uncertainty)
 end
 
 @doc raw"""
-    uq(model::UQModel, uncertainties::Pair...) -> NamedTuple
+    uq(s::LocalSensitivities, uncertainties::Pair...) -> NamedTuple
 
-Propagate input uncertainties to the outputs of `model`, to first order, the way Python
-STREAM's `UQModel.uq` does.
+Propagate input uncertainties to the outputs, to first order, through the derivatives
+[`local_sensitivities`](@ref) computed, the way Python STREAM's `UQModel.uq` does. Nothing is
+solved, so `uq` can be called with any number of uncertainty sets on the same `s`.
 
-Each pair is `parameter => Uncertainty(...)`, with `parameter` one of `model.parameters`, and
+Each pair is `parameter => Uncertainty(...)`, with `parameter` one of `s.parameters`, and
 an input left out has no uncertainty. With ``J^{(p)}`` the Jacobian columns of input ``p``, and
 ``s^{(p)}`` and ``σ^{(p)}`` its systematic and statistical parts from [`as_absolute`](@ref),
 
@@ -105,39 +106,40 @@ which adds ``J^{(p)} C (J^{(p)})^T`` to the output variance, so a multivariate d
 carries correlations between the entries.
 
 # Arguments
-- `model`: the model
+- `s`: the result of [`local_sensitivities`](@ref)
 - `uncertainties`: `parameter => Uncertainty` or `parameter => Distribution` pairs
 
 # Returns
 `(; nominal, sys, stat)`: the nominal outputs, and their systematic and statistical
-uncertainties, each a vector the length of `model.nominal`.
+uncertainties, each a vector the length of `s.nominal`.
 
 # Examples
 ```jldoctest
-julia> m = UQ.UQModel(x -> x.a + x.b, (a=2.0, b=3.0));
+julia> s = UQ.local_sensitivities(UQ.FunctionUQ(x -> x.a + x.b, (a=2.0, b=3.0)));
 
-julia> UQ.uq(m, :a => UQ.Uncertainty(systematic_absolute=1.0),
+julia> UQ.uq(s, :a => UQ.Uncertainty(systematic_absolute=1.0),
                 :b => UQ.Uncertainty(statistical_absolute=2.0))
 (nominal = [5.0], sys = [1.0], stat = [2.0])
 ```
 """
-function uq(model::UQModel, uncertainties::Pair...)
-    n = length(model.nominal)
+function uq(s::LocalSensitivities, uncertainties::Pair...)
+    n = length(s.nominal)
     sys, variance = zeros(n), zeros(n)
     for (parameter, input) in uncertainties
-        J = jacobian(model, parameter)
-        bias, spread = _moments(input, model.values[_position(model, parameter)])
+        J = jacobian(s, parameter)
+        bias, spread = _moments(input, s.values[_position(s.parameters, parameter)])
         sys .+= abs.(J * bias)
         variance .+= _variance(J, spread)
     end
-    return (; nominal=model.nominal, sys, stat=sqrt.(variance))
+    return (; nominal=s.nominal, sys, stat=sqrt.(variance))
 end
 
 @doc raw"""
-    measurements(model::UQModel, uncertainties::Pair...) -> Vector{Measurement{Float64}}
+    measurements(s::LocalSensitivities, uncertainties::Pair...) -> Vector{Measurement{Float64}}
 
-The outputs of `model` as Measurements.jl values, `nominal ± σ`, with the statistical parts of
-`uncertainties` propagated to first order. Needs `using Measurements`.
+The outputs as Measurements.jl values, `nominal ± σ`, with the statistical parts of
+`uncertainties` propagated to first order through the derivatives in `s`. Needs
+`using Measurements`.
 
 Each input entry becomes an independent `0 ± σ_j` deviation, and output `i` is
 ``y_i + ∑_j J_{ij} δ_j``. The standard deviations are those [`uq`](@ref) gives as `stat`, but
@@ -146,7 +148,7 @@ their correlation: the uncertainty of `y[1] - y[2]` is that of the difference, n
 quadrature sum of the two.
 
 # Arguments
-- `model`: the model
+- `s`: the result of [`local_sensitivities`](@ref)
 - `uncertainties`: `parameter => Uncertainty` pairs, with no systematic part
 
 # Returns
