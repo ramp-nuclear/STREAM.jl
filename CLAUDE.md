@@ -162,9 +162,15 @@ src/
     concrete_assemblies.jl  # plate, symmetric_plate, one_sided, single_channel,
                             # fuel_assembly, check_gravity_mismatch
   uq/
-    uncertainty.jl          # Uncertainty, as_absolute
-    model.jl                # UQModel, jacobian, uq, the measurements stub
+    problems.jl             # FunctionUQ, SteadyUQ, TransientUQ, local_sensitivities,
+                            # LocalSensitivities, jacobian
+    implicit.jl             # the implicit derivatives of a steady state and of a DAE start,
+                            # and the solves they rest on
+    inputs.jl               # named inputs and outputs to flat vectors and back
+    uncertainty.jl          # Uncertainty, as_absolute, uq, the measurements stub
+    sampling.jl             # monte_carlo
 ext/
+  STREAMDistributionsExt.jl # a Distribution as a UQ input, loaded with Distributions.jl
   STREAMMeasurementsExt.jl  # UQ.measurements, loaded with Measurements.jl
 ```
 
@@ -318,8 +324,9 @@ A problem built with MTK's initialization data, the default, recomputes `u0` at 
 from the values it was built with. A `u0` set afterwards, through `remake` or `setsym_oop`,
 is dropped, and so are any dual-number derivatives it carried. Build such a problem with
 `build_initializeprob=false` and let the integrator's `initializealg` make the start
-consistent. `src/uq/model.jl` does this, and `GAPS.md` §8 records a related case in
-`solve_transient`.
+consistent. `src/uq/problems.jl` does this, and so does `solve_transient` when it starts from a
+solution: built with that data, the problem once moved a plate temperature 0.46 K off the
+steady state it was given.
 
 OrdinaryDiffEq's `BrownFullBasicInit` drops the derivatives of the algebraic states it
 solves for when `u0` holds duals; `_consistent_start` in the same file works around it.
