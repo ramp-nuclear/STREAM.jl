@@ -305,6 +305,12 @@ end
         @test_throws ArgumentError TransientUQ(ssys, op, parameters, times;
                                                output=[ssys.ch.T_out], start=:somewhere)
     end
+
+    @testset "a nominal run that fails is reported" begin
+        broken = TransientUQ(ssys, with(op, ssys.ch.inlet.ṁ => NaN), parameters, times;
+                             output=[ssys.ch.T_out])
+        @test_throws ErrorException local_sensitivities(broken)
+    end
 end
 
 @testset "TransientUQ from its steady state" begin

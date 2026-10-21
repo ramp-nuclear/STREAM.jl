@@ -25,7 +25,11 @@ A `FunctionUQ`, whose inputs are the keys of `parameters`.
 
 # Examples
 ```jldoctest
-julia> s = UQ.local_sensitivities(UQ.FunctionUQ(x -> x.a * x.b, (a=2.0, b=3.0)));
+julia> prob = UQ.FunctionUQ(x -> x.a * x.b, (a=2.0, b=3.0))
+FunctionUQ in 2 inputs (a, b)
+
+julia> s = UQ.local_sensitivities(prob)
+LocalSensitivities of 1 output in 2 inputs (a, b)
 
 julia> UQ.jacobian(s)
 1×2 Matrix{Float64}:
@@ -246,13 +250,21 @@ jacobian(s::LocalSensitivities, parameter) = s.jacobian[:, s.slices[_position(s.
 
 function Base.show(io::IO, ::MIME"text/plain", prob::AbstractUQ)
     inputs = prob isa FunctionUQ ? keys(prob.parameters) : prob.parameters
-    print(io, nameof(typeof(prob)), " in ", length(inputs), " inputs (", join(inputs, ", "), ")")
+    print(io, nameof(typeof(prob)), " in ", _count(length(inputs), "input"), " (",
+          join(inputs, ", "), ")")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", s::LocalSensitivities)
-    print(io, "LocalSensitivities: ", length(s.nominal), " outputs of ", length(s.parameters),
-          " inputs (", join(s.parameters, ", "), ")")
+    print(io, "LocalSensitivities of ", _count(length(s.nominal), "output"), " in ",
+          _count(length(s.parameters), "input"), " (", join(s.parameters, ", "), ")")
 end
+
+"""
+    _count(n, noun) -> String
+
+`n` and `noun`, plural unless `n` is 1: `"1 input"`, `"3 inputs"`.
+"""
+_count(n, noun) = n == 1 ? "$n $noun" : "$n $(noun)s"
 
 """
     _prepare(prob::AbstractUQ) -> NamedTuple
