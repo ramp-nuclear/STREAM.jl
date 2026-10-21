@@ -237,13 +237,12 @@ only ones. Both were checked against the Python source, so do not re-derive them
   controlled by, or the controller holding it. The standards tables are not in this repo and
   never should be: point `DecayHeat.standards_dir!` at them, or set
   `STREAM_DECAY_HEAT_STANDARDS`.
-- **Seed a loss-of-flow steady solve with its flows.** Solve the pump-on state with
-  `solve_steady(...; solver=DynamicSS(Rodas5P()))`, which integrates to where the model
-  settles, and start the flow unknowns `mtkcompile` keeps away from zero: started at zero, the
-  solve stays at ṁ = 0 and fails. The bypass loss-of-flow testset in `test/test_valves.jl`
-  seeds the pump head, its two kept flows at the head over `ext_res` and the dummy derivative,
-  and nothing else. If a change to a channel equation changes which flows `mtkcompile` keeps,
-  that list is the first thing to look at.
+- **A loss-of-flow steady solve integrates to where the model settles.** Solve the pump-on
+  state with `solve_steady(...; solver=DynamicSS(Rodas5P()))`. Its flows need no values: every
+  `FlowPort` flow defaults to `FLOW_START`, 0.1 kg/s, in the port's usual direction, so none
+  starts at the ṁ = 0 a quadratic law stalls at. The bypass loss-of-flow testset in
+  `test/test_valves.jl` gives the pump head and the dummy derivative `mtkcompile` introduces,
+  and nothing else.
 
   Do not "fix" a failed solve with a sign constraint on ṁ. This loop's flow legitimately
   reverses after the pump trips, so forbidding negative flow would forbid the physics.

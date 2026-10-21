@@ -41,7 +41,7 @@ negative when the sink cools it.
 function HeatExchanger(T_bc; UA=nothing, liquid::AbstractLiquid=H2O, name)
     pars = @parameters T_bc = T_bc
     @named inlet = FlowPort()
-    @named outlet = FlowPort()
+    @named outlet = FlowPort(; ṁ=-FLOW_START)
     if UA === nothing
         eqs = [inlet.ṁ + outlet.ṁ ~ 0, inlet.p ~ outlet.p, outlet.T ~ T_bc, inlet.T ~ T_bc]
         return assembly(eqs, inlet, outlet; name)
@@ -134,7 +134,7 @@ with no pressure drop and raises its temperature by the unknown `ΔT`, which the
 """
 function _ExchangerSide(; liquid, name)
     @named inlet = FlowPort()
-    @named outlet = FlowPort()
+    @named outlet = FlowPort(; ṁ=-FLOW_START)
     vars = @variables T_in(t) C(t) ΔT(t)
     eqs = _side_equations(inlet, outlet, vars..., liquid)
     return compose(System(eqs, t, collect(vars), []; name=name), inlet, outlet)
