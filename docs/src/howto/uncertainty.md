@@ -43,7 +43,8 @@ the steady state once and differentiating the outputs there:
 
 ```@example uq
 function margins(sol)
-    state = ChannelState(sol, sys.cell.ch; pipe=geometry)
+    pipe = PipeGeometry_rectangular(0.6, 0.067, sol.ps[gap], 0.063)
+    state = ChannelState(sol, sys.cell.ch; pipe)
     return [minimum(chfr(q_CHF_sudo_kaminaga)(state)),            # smallest CHF ratio
             minimum(bergles_rohsenow_t_onb(state) .- state.T_wall)] # K to the onset of boiling
 end
@@ -54,8 +55,9 @@ s = local_sensitivities(prob)
 s.nominal
 ```
 
-A pipe built from a knob can go to `ChannelState` as it is, and is evaluated at the knob's
-value.
+`ChannelState` wants the pipe in numbers, so `margins` builds it again from the gap the
+solution was solved at. Under `local_sensitivities` that value carries its derivative, and the
+geometry passes it on to the correlations.
 
 ## Give each input its uncertainty
 

@@ -92,8 +92,9 @@ When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 # Arguments
 - `sol`: a `NonlinearSolution` or an `ODESolution`
 - `channel_sys`: the compiled channel subsystem, such as `ssys.ch`
-- `pipe`: the channel's `PipeGeometry`, needed for the fluxes and geometric correlations
-  (one built from design knobs is evaluated at the solution's parameter values)
+- `pipe`: the channel's `PipeGeometry`, needed for the fluxes and geometric correlations.
+  Its lengths are numbers: for a channel built from design knobs, build it again from their
+  solved values, `sol.ps[gap]`
 - `gravity`: gravitational acceleration [m/s²]
 - `index`: which saved time of a transient to read
 
@@ -101,15 +102,20 @@ When `pipe` is `nothing`, all `q_flux_*` fields are zeros.
 A `ChannelState` for that instant.
 
 # Throws
-- `ArgumentError`: for a transient with several saved times and no `index`, or a channel
-  whose wall temperature did not survive compilation
+- `ArgumentError`: for a transient with several saved times and no `index`, a pipe built
+  from design knobs, or a channel whose wall temperature did not survive compilation
 """
 function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=nothing)
     n = length(channel_sys.T)
     k = _time_index(sol, index)
     value(sym) = k === nothing ? sol[sym] : sol[sym, k]
     cells(sym) = [value(sym[i]) for i in 1:n]
-    pipe = _evaluate(pipe, value)
+    pipe isa PipeGeometry{Num} && throw(
+        ArgumentError(
+            "the pipe holds design knobs. Build it from their solved values instead, " *
+            "as PipeGeometry_rectangular(L, sol.ps[width], sol.ps[gap], heated_width)",
+        ),
+    )
 
     # `velocity` is the unsigned speed and only ChannelAndContacts declares it. The other
     # variants expose the signed `v`, so read that and take the magnitude, which is what lets a
@@ -169,26 +175,6 @@ function ChannelState(sol, channel_sys; pipe=nothing, gravity=G_EARTH, index=not
         pipe=pipe,
         gravity=gravity,
     )
-end
-
-"""
-    _evaluate(pipe, read) -> Union{PipeGeometry,Nothing}
-
-`pipe` with numbers in place of expressions. A pipe built from design knobs holds each length
-as an expression in them: `A = width * gap` holds two knobs, `L` none. `read` looks an
-expression up on the solution, as `sol[expr]` does, so every knob in every field takes the
-value the solution was solved with, however many knobs there are. Under
-[`UQ.local_sensitivities`](@ref STREAM.UQ.local_sensitivities) those values are dual numbers,
-and the derivatives come along. A numeric pipe, or `nothing`, passes through.
-"""
-_evaluate(pipe, read) = pipe
-
-function _evaluate(pipe::PipeGeometry{Num}, read)
-    fields = map(f -> read.(getfield(pipe, f)), fieldnames(PipeGeometry))
-    # A field with no knob reads back as a Float64 and one with a knob as whatever the knob
-    # holds, a dual under local_sensitivities; PipeGeometry takes one type for every field.
-    T = mapreduce(eltype, promote_type, fields)
-    return PipeGeometry((T.(f) for f in fields)...)
 end
 
 """

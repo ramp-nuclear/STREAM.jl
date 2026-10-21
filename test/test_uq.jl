@@ -205,7 +205,8 @@ end
     op = [knob_defaults([gap, width]); ssys.cell.ch.inlet.ṁ => 0.4]
 
     function margins(sol)
-        state = ChannelState(sol, ssys.cell.ch; pipe=geometry)
+        pipe = PipeGeometry_rectangular(0.6, sol.ps[width], sol.ps[gap], 0.063)
+        state = ChannelState(sol, ssys.cell.ch; pipe)
         return [minimum(chfr(q_CHF_sudo_kaminaga)(state));
                 minimum(bergles_rohsenow_t_onb(state) .- state.T_wall);
                 q_OFI_whittle_forgan(state)]
@@ -220,9 +221,13 @@ end
         plain = threshold_analysis(sol, ssys.cell.ch; pipe=numeric_pipe,
                                    chfr=chfr(q_CHF_sudo_kaminaga), onb=bergles_rohsenow_t_onb,
                                    ofi=q_OFI_whittle_forgan)
-        state = ChannelState(sol, ssys.cell.ch; pipe=geometry)
-        @test state.pipe == numeric_pipe
+        state = ChannelState(sol, ssys.cell.ch; pipe=numeric_pipe)
         @test s.nominal ≈ [minimum(plain.chfr); minimum(plain.onb .- state.T_wall); plain.ofi]
+    end
+
+    @testset "a pipe that still holds the knobs is refused" begin
+        sol = solve_steady(ssys, op)
+        @test_throws ArgumentError ChannelState(sol, ssys.cell.ch; pipe=geometry)
     end
 
     @testset "more power, less margin to CHF and to ONB" begin

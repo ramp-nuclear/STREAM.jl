@@ -29,10 +29,13 @@ struct PipeGeometry{T<:Real}
     depth            ::T
 end
 
-# Coerce a length input: plain numbers become Float64 (the fixed-geometry behavior); a
-# design knob or any other Num passes through so geometry derives symbolically.
-_lenparam(x::Num) = x
-_lenparam(x::Real) = Float64(x)
+"""
+    _lengths(xs...) -> Tuple
+
+The lengths in one element type, at least `Float64`: all `Float64` for a fixed geometry,
+all symbolic when one of them is a design knob, and dual numbers when one is a dual.
+"""
+_lengths(xs...) = promote(map(x -> convert(promote_type(typeof(x), Float64), x), xs)...)
 
 @doc raw"""
     PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
@@ -73,15 +76,7 @@ julia> g.Dh
 ```
 """
 function PipeGeometry_rectangular(L, edge1, edge2, heated_edge; one_sided=nothing)
-    _L = _lenparam(L)
-    _e1 = _lenparam(edge1)
-    _e2 = _lenparam(edge2)
-    _he = _lenparam(heated_edge)
-    # If any length is symbolic, promote all flow lengths to Num so the struct fields share
-    # one element type. A fixed (all-numeric) geometry never enters this branch.
-    if any(x -> x isa Num, (_L, _e1, _e2, _he))
-        _L, _e1, _e2, _he = Num(_L), Num(_e1), Num(_e2), Num(_he)
-    end
+    _L, _e1, _e2, _he = _lengths(L, edge1, edge2, heated_edge)
     area = _e1 * _e2
     wet_perimeter = 2.0 * (_e1 + _e2)
     Dh = 4.0 * area / wet_perimeter
@@ -127,11 +122,7 @@ julia> PipeGeometry_circular(1.0, 0.01).A
 ```
 """
 function PipeGeometry_circular(L, D)
-    _L = _lenparam(L)
-    _D = _lenparam(D)
-    if _L isa Num || _D isa Num
-        _L, _D = Num(_L), Num(_D)
-    end
+    _L, _D = _lengths(L, D)
     area = π * _D^2 / 4
     perimeter = π * _D
     heated_parts = (perimeter, zero(perimeter))
