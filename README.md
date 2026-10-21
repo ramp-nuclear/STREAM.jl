@@ -85,8 +85,8 @@ The package is a stack of submodules, each using only the ones below it:
 
 `src/STREAM.jl` declares them and everything they export, and the
 [reference](https://ramp-nuclear.github.io/STREAM.jl/stable/reference/) lists each one. Code
-style is in `JULIA.md`. `VALIDATION.md` tracks the comparison with Python STREAM, and
-`GAPS.md` what STREAM.jl does not have yet.
+style is in `JULIA.md`, and `GAPS.md` lists what STREAM.jl does not have yet compared with
+Python STREAM.
 
 ### Tests
 
