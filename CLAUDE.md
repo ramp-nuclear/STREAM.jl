@@ -1,4 +1,4 @@
-# STREAM.jl — Claude Code Instructions
+# STREAM.jl: Claude Code Instructions
 
 ## Purpose
 
@@ -9,11 +9,20 @@ or locally in a nearby folder.
 
 ## Coding Rules
 
-When writing or editing Julia code, follow the conventions in `JULIA.md` (repo root). `JULIA.md` governs general Julia.
+When writing or editing Julia code, follow the conventions in `JULIA.md`:
 
-**MUST USE — MTK skill.** Before writing or editing ANY ModelingToolkit code (anything touching `System`, `@mtkmodel`/`@mtkcompile`/`mtkcompile`, `@variables`/`@parameters`/`@connector`, `connect`, problem/solution construction, `unknowns`/`observed`, initialization, `GlobalScope`, callbacks, `@register_symbolic`, or any SciML solve), you MUST invoke the `modelingtoolkit-jl` skill (`.claude/skills/modelingtoolkit-jl/`) first and follow it — do not rely on auto-trigger or prior knowledge, since training data for MTK is stale and emits removed APIs (`ODESystem`, `structural_simplify`, `states`, 4-arg problems, integer indexing). The skill takes precedence on MTK-specific API; `JULIA.md` governs general Julia. Read the relevant `references/*.md` before writing in that area.
+@JULIA.md
 
-**MUST USE — humanizer for ALL prose.** No text anywhere in this repo should read as AI slop. Every piece of prose you write or edit — inline comments, docstrings, test/`@testset` names, commit messages, and `.md` files — must pass the `/humanizer` skill: no em dashes, no rule-of-three padding, no "AI vocabulary" or promotional/significance filler, plain and specific. Run `/humanizer` over prose before committing it, and over every GitHub comment/PR/issue body before it is shown for posting (see the no-auto-post rule: draft → humanize → show the user → they confirm → post). The whole existing codebase is also slated for a humanizer sweep; until then, at minimum leave any prose you touch cleaner than you found it.
+**Use the MTK skill.** Before writing or editing any ModelingToolkit code (`System`,
+`mtkcompile`, `@variables`/`@parameters`/`@connector`, `connect`, problem and solution
+construction, initialization, callbacks, or any SciML solve), invoke the `modelingtoolkit-jl`
+skill if it is installed and read the relevant `references/*.md`. Training data for MTK
+predates v11 and emits removed APIs, so without the skill, check a name against the installed
+version before using it. The skill takes precedence on MTK API; `JULIA.md` governs general
+Julia.
+
+Prose (comments, docstrings, test names, commit messages, `.md` files) is plain and specific:
+no filler, no promotional tone, no em dashes.
 
 File level and module level comments should preferably be part of docstrings (`"""`)
 explaining the code rather than large block (`#`) comments.
@@ -25,7 +34,7 @@ choices. They are succinct descriptions of what the code does and its intended u
 - **No file carries a `# filename.jl -- what it holds` banner.** What a file holds is either
   obvious from its name or belongs in its module's docstring.
 - **Prose about one entity goes in that entity's docstring**, including private ones.
-  `_state_snapshot`, `_rebin_1d`, `_diffusion_eqs` and `_bergles_rohsenow_dT_ONB` all have
+  `_state_snapshot`, `_rebin_1d`, `_conduction` and `_bergles_rohsenow_dT_ONB` all have
   docstrings: a `#` block listing arguments and behaviour is a docstring in the wrong syntax.
 - **`#` comments stay for local rationale**: why this seed value, why `ifelse` here, which
   Python line an expression mirrors. What a reader needs at that line and nowhere else. This is
@@ -58,28 +67,13 @@ values, and correlation inputs. This matches Python STREAM, which is the referen
 implementation. Pressures are Pa, and the per-degree units (`J/(kg·K)`, `W/(m·K)`, `1/K`) are
 unchanged since a degree Celsius and a kelvin are the same size.
 
-## Project Conventions
+## Git
 
-- **No GSD jargon in code.** Source, comments, docstrings, and test names never reference GSD phases, plans, or milestone IDs (no `# Phase 55 D-17`, no `test_phase_NN`). Name things for what they are. Test files mirror their source file (see File Structure Standard).
-- **Docstrings have a purpose and read like a human wrote them.** Every exported name carries a docstring (description, `# Arguments`, `# Returns`). Run `/humanizer` over docstring prose; do not pad with AI-tone filler. General comment discipline lives in `JULIA.md` §0.
-- **Delete, don't archive.** When a milestone or phase completes, delete its planning `.md` files instead of moving them to an archive. Keep only currently-in-work planning docs.
-- **Merge is squash-only.** The repo ruleset permits only squash merges into `main` (linear history, PR required, review threads resolved). No rebase/FF or merge commits.
+- The user owns branch creation. Never run `git switch`, `git checkout -b` or
+  `git branch <new>` unless asked in the current message. Worktree-isolated agents are exempt.
+- Merges into `main` are squash-only, through a PR with review threads resolved.
 
-## Branching Policy
-
-**The user owns branch creation. GSD must never create its own branches.**
-
-The user creates one working branch per milestone (e.g. `channels-redesign` for v1.1) off `main`, and Claude works only on that branch for the duration of the milestone. When the milestone is complete and archived through GSD, the user opens a single PR from the working branch into `main`.
-
-Hard rules:
-- `.planning/config.json` `git.branching_strategy` MUST stay `"none"`. Do not "fix" it back to `"milestone"` or `"phase"` — those values cause GSD's `handle_branching` step to auto-create a `gsd/<...>` branch off the working branch, which has happened before and required manual consolidation.
-- Never run `git switch`, `git checkout -b`, or `git branch <new>` without an explicit instruction from the user in the current message.
-- At session start, before any commit, verify the current branch matches the user's intended working branch (read `.planning/STATE.md` "Working branch" line and confirm `git rev-parse --abbrev-ref HEAD` matches). If it does not, stop and ask before committing.
-- Worktree-isolated executor agents (Claude Code's `isolation="worktree"`) are exempt — they create temporary `worktree-agent-*` branches that exist only inside the worktree and are deleted after merge. That is not a violation of this policy.
-
-## File Structure Standard
-
-This is the canonical layout. **Always follow it when editing or adding files.**
+## File Structure
 
 ### Modules
 
@@ -87,8 +81,10 @@ The package is a stack of submodules, each reaching only downward:
 
 ```
 Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
-           -> Components -> {DecayHeat, Assemblies} -> Solvers
+           -> Components -> {DecayHeat, Assemblies}
 ```
+
+`solve_steady`, `solve_transient` and the operating-point guesses sit at the top level.
 
 A module supplies the context a name would otherwise carry as a suffix, so
 `SubcooledBoilingHTC` is `HTC.SubcooledBoiling` and `BlasiusFriction` is `Friction.Blasius`.
@@ -105,70 +101,66 @@ Prefer the qualified form in examples and in tests that touch more than one modu
 `HTC.RegimeDependent` next to `Friction.RegimeDependent` is the point of the split. Very
 common verbs stay bare (`inseries`, `inparallel`).
 
-### `src/` — Source
+### `src/`
+
+Each subdirectory is one module, and `src/STREAM.jl` declares them all with their docstrings
+and exports. A comment marks a file whose contents its name does not give away.
 
 ```
 src/
-  STREAM.jl                   # Module skeleton: submodules, includes, the export list
-  constants.jl                # G_EARTH and friends
-  geometry.jl                 # PipeGeometry struct + PipeGeometry_rectangular, PipeGeometry_circular
-  knobs.jl                    # @design_knob, knob_defaults
-  dimensionless.jl            # Re, Pr, Nu, Pe, Gr, Ra, including the (liquid, T) forms
-  substances/                 # module Substances
-    liquid.jl                 # AbstractLiquid interface, Liquid snapshot, unicode aliases (ρ, cₚ, μ, κ, β, Tsat)
-    light_water.jl            # LightWater / H2O correlations
-    heavy_water.jl            # HeavyWater / D2O correlations
-    solid.jl                  # Solid: constant density, specific heat, conductivity
-  htc/                        # module HTC
-    htc.jl                    # AbstractHTC: the wall heat transfer model a channel is handed
-    correlations.jl           # Nusselt correlations (dimensionless, no property basis)
-    subcooled_boiling.jl      # SCB heat flux correlations and the ONB superheat
-    exchangers.jl             # heat exchanger effectiveness (Counterflow, ParallelFlow),
-                              # flow_scaled_UA
-  friction/                   # module Friction
-    correlations.jl           # Darcy friction factor correlations (Reynolds-only)
-    darcy.jl                  # AbstractDarcyFactor: the wall friction model a channel or resistor gets
-  local_loss.jl               # module LocalLoss: Idelchik sudden expansion / contraction,
-                              # discharge coefficients
-  thresholds/                 # module Thresholds
-    thresholds.jl             # CHF, OFI, OSV, ONB, wall-temperature limit correlations
-    analysis.jl               # ChannelState + the post-solve threshold methods
-  components/                 # module Components
-    connectors.jl             # FlowPort, ThermalPort acausal connectors
-    twoports.jl               # HydraulicTwoPort, shared by the two-port components
-    pump.jl                   # Pump (fixed-dP and fixed-mdot modes)
-    valves.jl                 # Flapper, Orifice, and the valve core they share
-    tank.jl                   # Tank, Environment (free-surface nodes)
-    resistors.jl              # FrictionResistor, Gravity, Resistor, ResistorFromKnownPoint,
-                              # VolumetricFlowResistor, LocalPressureDrop
-    ideal.jl                  # Inertia, ConstantTemperature
-    heat_exchanger.jl         # HeatExchanger: ideal, to a fixed sink, and two-stream (ε-NTU)
-    sources.jl                # ConvectiveBoundary
-    channels.jl               # Channel, ChannelHeatFlux, ChannelAndContacts + shared private core
-    heat_diffusion.jl         # HeatDiffusion (2D finite-volume plate or rod), Slab, Cylinder
-    point_kinetics.jl         # PointKinetics (any group count), ReactivityController
-    state_machine.jl          # StateMachine, StateSchedule, trip!, reset!, machine_callbacks
-  decay_heat/                 # module DecayHeat
-    decay_heat.jl             # AbstractDecayHeat, the weighted Sum, and + and *
-    activation.jl             # Activation, DoubleDecay
-    actinides.jl              # U238CaptureChain (U239, Np239)
-    fission_products.jl       # Standard, Source, the table reader, FissionProducts
-    fissions.jl               # Fissions: the prompt profile from a point-kinetics solve,
-                              # with LogLinear/Linear sample interpolation
-    source.jl                 # DecayHeatSource: MeV/fission to power, and the trip clock
-  assemblies/                 # module Assemblies
-    port.jl                   # port, var_length: reach per-cell connectors. Loaded by
-                              # STREAM before Components, so every module can use it
-    assembly.jl               # assembly: compose components with a nested connection list,
-                              # loaded the same way
-    connections.jl            # module Assemblies.Connect: face, faces,
-                              # temperature_feedback, inseries, inparallel, weighted
-                              # (and _FlowWeight, the private component weighted places)
-    concrete_assemblies.jl    # check_gravity_mismatch, symmetric_plate,
-                              # plate, one_sided, single_channel, fuel_assembly
-  solvers.jl                  # solve_steady, solve_transient
-  initial_conditions.jl       # steady_state_guess, uniform
-  utilities.jl                # module Utilities: rebin_*, cosine_shape, x_boundaries
+  STREAM.jl                 # every module block, its docstring and its exports
+  constants.jl
+  geometry.jl
+  knobs.jl                  # @design_knob, knob_defaults
+  dimensionless.jl
+  local_loss.jl             # module LocalLoss
+  utilities.jl              # module Utilities: rebinning, cosine_shape, x_boundaries
+  initial_conditions.jl     # steady_state_guess, uniform
+  solvers.jl
+  substances/
+    liquid.jl               # AbstractLiquid, Liquid, the property aliases (ρ, cₚ, Tsat, ...)
+    light_water.jl
+    heavy_water.jl
+    solid.jl
+  htc/
+    htc.jl                  # AbstractHTC, the model a channel is handed
+    correlations.jl         # Nusselt correlations
+    subcooled_boiling.jl
+    exchangers.jl           # Counterflow, ParallelFlow effectiveness; flow_scaled_UA
+  friction/
+    correlations.jl         # Darcy factor correlations
+    darcy.jl                # AbstractDarcyFactor, the model a channel or resistor is handed
+  thresholds/
+    thresholds.jl           # CHF, OFI, OSV, ONB and wall-temperature correlations
+    analysis.jl             # ChannelState and the methods that apply them after a solve
+  components/
+    connectors.jl           # FlowPort, ThermalPort
+    twoports.jl             # HydraulicTwoPort, the core every two-port component shares
+    pump.jl
+    valves.jl               # Flapper, Orifice
+    tank.jl                 # Tank, Environment
+    resistors.jl            # Resistor, FrictionResistor, Gravity, ResistorFromKnownPoint,
+                            # VolumetricFlowResistor, LocalPressureDrop
+    ideal.jl                # Inertia, ConstantTemperature
+    heat_exchanger.jl
+    sources.jl              # ConvectiveBoundary
+    channels.jl             # Channel, ChannelHeatFlux, ChannelAndContacts
+    heat_diffusion.jl       # HeatDiffusion, Slab, Cylinder
+    point_kinetics.jl       # PointKinetics, ReactivityController
+    state_machine.jl        # StateMachine, StateSchedule, trip!, reset!, machine_callbacks
+  decay_heat/
+    decay_heat.jl           # AbstractDecayHeat, Sum
+    activation.jl           # Activation, DoubleDecay
+    actinides.jl            # U238CaptureChain
+    fission_products.jl     # FissionProducts, the standards tables and standards_dir!
+    fissions.jl             # Fissions: the prompt profile from a point-kinetics solve
+    source.jl               # DecayHeatSource: MeV/fission to power, and the trip clock
+  assemblies/
+    port.jl                 # port, var_length; loaded before Components
+    assembly.jl             # assembly; loaded before Components
+    connections.jl          # module Connect: face, inseries, inparallel, weighted, ...
+    concrete_assemblies.jl  # plate, symmetric_plate, one_sided, single_channel,
+                            # fuel_assembly, check_gravity_mismatch
 ```
 
 **Where new code goes:**
@@ -177,30 +169,26 @@ src/
 - New wiring verb → `src/assemblies/connections.jl` (inside `Connect`); a named arrangement → `src/assemblies/concrete_assemblies.jl`
 - Prefer `Connect.face(...)` over a bare `face(...)`, but leave `inseries`, `inparallel` and `port` unqualified: the first two are used constantly and `port` is a getter that reads clearly on its own
 - New decay heat contribution → `src/decay_heat/`, in the file matching the Python module it mirrors
-- New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the nine `AbstractLiquid` property methods
+- New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the `AbstractLiquid` property methods
 - A worked model → the docs, as a tutorial or how-to. `src/` holds no example builders; a model several test files solve goes in `test/fixtures.jl`
 
 Placement beats file length. A long file whose contents all belong together is fine; a short
 file named `misc` or `helpers` is not. Physics lives in its own module, even when one
 component is its only caller: components state equations, they do not define correlations.
 
-### `docs/` — Documentation
+### `docs/`
 
 ```
 docs/
   make.jl          # Documenter build: Literate conversion, makedocs. It never deploys
-  deploy.jl        # deploydocs: publishes docs/build to gh-pages, run only by CI's deploy job
-  vendor.jl        # the scripts and fonts the pages load: downloads them, and make.jl copies
-                   # them into the build so the site works offline
-  Project.toml     # Documenter, DocumenterCitations, DocumenterMermaid,
-                   # DocumenterCodeBlocks, Literate, CairoMakie, Latexify; STREAM through [sources]
+  deploy.jl        # deploydocs, run only by CI's deploy job
+  vendor.jl        # downloads the scripts and fonts the pages load, so the site works offline
   literate/        # the tutorials, as runnable scripts Literate turns into pages
   src/
     index.md       # home: what STREAM is, a first model, conventions
     tutorials/     # index.md only; the tutorial pages are generated, and git-ignored
     howto/         # task recipes, one page per task
-    explanation/   # the physics and the reasoning behind the models; limits/ for the
-                   # thermal-hydraulic limits, mtk/ for ModelingToolkit's vocabulary
+    explanation/   # the physics and the reasoning behind the models
     reference/     # one @autodocs page per module
     refs.bib       # every citation
     assets/        # hand-drawn SVG schematics
@@ -213,77 +201,49 @@ on a page, print them as TeX with `latexify(equations(sys); env=:aligned)`. Code
 when the docs build, so tutorials and how-tos end with an `@assert` against physics where one
 exists. Plots use CairoMakie.
 
-### `test/` — Tests
+### `test/`
 
-```
-test/
-  runtests.jl               # Thin orchestrator: one include() per test file, nothing else
-  fixtures.jl               # build_loop, build_loop_pk: the loops several test files solve.
-                            # A file that needs them includes it behind @isdefined(build_loop)
-  test_doctests.jl          # the jldoctest examples in the docstrings; skips with a warning
-                            # when Documenter is not installed
-  test_geometry.jl          # PipeGeometry
-  test_connectors.jl        # FlowPort, ThermalPort
-  test_substances.jl        # AbstractLiquid interface, H2O/D2O correlations, Liquid snapshot
-  test_channels.jl          # Channel/CHF/CAC variants + _channel_core enthalpy-form physics
-                            # + flow-reversal sign safety + subcooled-boiling integration (ISCB)
-  test_pump.jl              # Pump
-  test_valves.jl            # Flapper, Orifice, a break in a pumped pool, and a loss of flow
-                            # that opens a bypass flapper into natural circulation
-  test_tank.jl              # Tank, Environment
-  test_resistors.jl         # Friction, Gravity, Resistor, network tests
-  test_ideal.jl             # Inertia, ConstantTemperature, ConvectiveBoundary
-  test_heat_exchanger.jl    # HeatExchanger: ideal, fixed sink, two-stream against ε-NTU and
-                            # LMTD, zero flow, flow reversal, flow-dependent UA
-  test_heat_diffusion.jl    # HeatDiffusion, Slab, Cylinder: ports, power, and closed-form
-                            # steady states on uniform and graded meshes
-  test_correlations.jl      # Nusselt + friction correlation function unit tests
-  test_htc.jl               # HTC models: property basis, named constructors, regime
-                            # switching, subcooled boiling, user-defined models
-  test_darcy.jl             # DarcyFactor models + the Friction resistor, resistors in series,
-                            # and flow-dependent Inertia
-  test_thresholds.jl        # CHF/OFI/OSV/ONB/twall + ChannelState
-  test_decay_heat.jl        # DecayHeat contributions, the standards reader, Sum.
-                            # The table testsets skip unless STREAM_DECAY_HEAT_STANDARDS
-                            # points at a directory holding the CSVs
-  test_composition.jl       # symmetric_plate, plate, one_sided_connection, assembly,
-                            # port, check_gravity_mismatch, var_length, temperature_feedback,
-                            # fuel_assembly — heavy CAC<->HD coverage
-  test_utilities.jl         # rebin_extensive/intensive, cosine_shape, x_boundaries
-  test_initial_conditions.jl # steady_state_guess, uniform (src/initial_conditions.jl)
-  test_solvers.jl           # solve_steady/solve_transient wrappers (src/solvers.jl)
-  test_validation.jl        # Quantitative cross-validation against Python STREAM
-  test_integration.jl       # STRICT 1:1 port of Python tests/test_general/test_integrations.py —
-                            # exactly the 21 Python integration tests, nothing else
-  test_point_kinetics.jl    # PointKinetics component-unit tests + coupled neutronics/T-H
-                            # feedback loops (SCRAM, cold-IC, prompt-jump)
-  test_state_machine.jl     # StateMachine, StateSchedule, machine_callbacks
-```
+A test file mirrors its source file: `components/channels.jl` → `test_channels.jl`, and a new
+component file gets a new test file. `ConvectiveBoundary` (`src/components/sources.jl`) is the
+exception: its tests live in `test_ideal.jl` beside `ConstantTemperature`. The physics modules
+are covered by `test_correlations.jl`, `test_htc.jl`, `test_darcy.jl` and `test_thresholds.jl`.
 
-**Test placement rule:** test file mirrors src file. `components/channels.jl` → `test_channels.jl`. New component file → new test file. `ConvectiveBoundary` (`src/components/sources.jl`) is a documented exception: its unit tests live in `test_ideal.jl` alongside `ConstantTemperature`, the thermal boundary it is tested against. The physics modules are covered by `test_correlations.jl` (Nusselt and friction correlations), `test_htc.jl` (the `HTC` models), `test_darcy.jl` (the `Friction` models), and `test_thresholds.jl`.
+Files that don't mirror a source file:
+
+- `runtests.jl` includes `preamble.jl` (fixed BLAS threads and RNG seed), then one file per
+  line, nothing else.
+- `fixtures.jl` holds `build_loop` and `build_loop_pk`, the loops several files solve. A file
+  that needs them includes it behind `@isdefined(build_loop)`.
+- `test_doctests.jl` runs the `jldoctest` blocks, and skips when Documenter is missing.
+- `test_validation.jl` compares whole models against values generated by Python STREAM
+  (`data/python_parity_reference.jl`, with `parity_helpers.jl`).
+- `test_integration.jl` is a strict 1:1 port of Python's
+  `tests/test_general/test_integrations.py`: exactly its 21 tests, nothing else.
+- The decay heat table testsets skip unless `STREAM_DECAY_HEAT_STANDARDS` points at the CSVs.
 
 ## Known gaps against Python STREAM
 
 `GAPS.md` in the repo root holds what remains against Python, in order, and what was checked
 and found equivalent. Python's `stream-next` branch is a reference too: it fixes several
-correlations and adds loss of coolant, and GAPS.md says which parts we take. The two below are here because they change how you should work in this
-repository, not because they are the only ones. Both were checked against the Python source,
-so do not re-derive them from scratch.
+correlations and adds loss of coolant, and GAPS.md says which parts we take. The two below are
+here because they change how you should work in this repository, not because they are the
+only ones. Both were checked against the Python source, so do not re-derive them from scratch.
 
 - **Decay heat reaches a model through `power_input`, not through a connector.** Build a
   `DecayHeat.DecayHeatSource` from a contribution, hand it to
   `PointKinetics(...; power_input=source)`, and couple the fuel to `pk.P`, the total power.
   The kinetics state is `P_neutron`, which carries no source. The source
   reads its trip time off the `StateMachine`, so it needs the machine the reactor is
-  controlled by, or the controller holding it. The standards tables are not in this repo and never should be: point
-  `DecayHeat.standards_dir!` at them, or set `STREAM_DECAY_HEAT_STANDARDS`.
+  controlled by, or the controller holding it. The standards tables are not in this repo and
+  never should be: point `DecayHeat.standards_dir!` at them, or set
+  `STREAM_DECAY_HEAT_STANDARDS`.
 - **Seed a loss-of-flow steady solve with its flows.** Solve the pump-on state with
   `solve_steady(...; solver=DynamicSS(Rodas5P()))`, which integrates to where the model
   settles, and start the flow unknowns `mtkcompile` keeps away from zero: started at zero, the
-  solve stays at ṁ = 0 and fails. The bypass loss-of-flow testset in `test/test_valves.jl` seeds
-  the pump head, its two kept flows at the head over `ext_res` and the dummy derivative, and nothing else. If
-  a change to a channel equation changes which flows `mtkcompile` keeps, that list is the
-  first thing to look at.
+  solve stays at ṁ = 0 and fails. The bypass loss-of-flow testset in `test/test_valves.jl`
+  seeds the pump head, its two kept flows at the head over `ext_res` and the dummy derivative,
+  and nothing else. If a change to a channel equation changes which flows `mtkcompile` keeps,
+  that list is the first thing to look at.
 
   Do not "fix" a failed solve with a sign constraint on ṁ. This loop's flow legitimately
   reverses after the pump trips, so forbidding negative flow would forbid the physics.
@@ -294,25 +254,21 @@ error), and the whole HTC / friction / local-loss / threshold / dimensionless in
 
 ## Component authoring conventions
 
-- **Positional arguments** when: (a) the argument type determines behavior, enabling multiple dispatch (e.g., `Pump(dP::Real; name)` vs `Pump(dP::Any; name)`); OR (b) the constructor/function has 1 or fewer physics parameters and its role is unambiguous from the function name (e.g., `Resistor(R; name)`, `Gravity(H; name)`, `HeatExchanger(T_bc; name)`).
-  *Why: Positional args with type annotations enable Julia's multiple dispatch and keep call sites concise when the meaning is obvious.*
-- **Keyword arguments** when: multiple arguments of the same type where labeling prevents order bugs (e.g., `Channel(; name, L, Dh, ...)` has many Float64 params); OR complex constructors with many parameters where self-documentation outweighs brevity.
-  *Why: Keyword-only prevents argument-order bugs for multi-parameter constructors where positional would be ambiguous.*
-- Factory functions (`PipeGeometry_rectangular`, `PipeGeometry_circular`) use positional arguments (established in v0.4).
-- The `name` kwarg is **always keyword-only** (provided by `@named` macro, never positional).
-  *Why: The `@named` macro injects `name=:varname` as a keyword argument. Making it positional would break `@named`.*
-- Internal helpers are prefixed with `_` and not exported.
-  *Why: Keeps the public API surface small and signals that these functions may change without notice. The `_` prefix is a Julia community convention.*
-- Every exported name has a docstring with at minimum: description, `# Arguments`, `# Returns`.
-  *Why: The REPL `?name` lookup is the primary discovery mechanism for Julia packages. Structured sections make docstrings scannable.*
+- **Positional arguments** when the argument's type selects the method
+  (`Pump(dP::Real; name)` vs `Pump(dP::Any; name)`), or when there is at most one physics
+  parameter and its role is clear from the name (`Resistor(R; name)`, `Gravity(H; name)`).
+- **Keyword arguments** when several arguments share a type and order would be a bug waiting
+  to happen (`Channel(; name, L, Dh, ...)`), or when a constructor has many parameters.
+- `PipeGeometry_rectangular` and `PipeGeometry_circular` take positional arguments.
+- `name` is always keyword-only, since `@named` injects it as a keyword.
 
 ## Exports
 
 Each submodule declares its own `export` list, inside its `module` block in `src/STREAM.jl`.
-The top-level list at the bottom of that file is the package's public surface and is
-deliberately short (around 45 names): the module names, the coolant properties, the
-dimensionless numbers, the geometry, the solve entry points, the constants, and the knob
-macros. Everything else is reached through its module.
+The top-level list at the bottom of that file is the package's public surface and is kept
+short (under 60 names): the module names, the coolant properties, the dimensionless numbers,
+the geometry, the solve entry points, the constants, the knob macros, and `assembly`/`port`.
+Everything else is reached through its module.
 
 Never add an `export` statement inside a component or physics file. All of them live in
 `src/STREAM.jl`, so both the per-module surface and the package surface are auditable in one
@@ -321,29 +277,18 @@ place.
 A name reaches the top level only by being listed twice, once in its module and once at the
 bottom. That friction is intentional: it is what stopped the list growing to 145 again.
 
-## MTK Patterns
+## MTK in this repo
 
-Non-obvious ModelingToolkit conventions used throughout the codebase.
+General MTK v11 usage is in the skill. Two choices specific to this codebase:
 
-### `@register_symbolic` for fluid properties
-
-Plain Julia functions cannot accept MTK's `Num` type (symbolic variables). `@register_symbolic` wraps them as opaque nodes in the symbolic expression graph, allowing them to appear in MTK equations without being traced or differentiated symbolically by Symbolics.jl.
-
-### `ifelse()` for flow reversal and regime switching
-
-Julia's `if`/`else` on a symbolic `Num` expression would evaluate the branch condition at trace time (equation construction), collapsing to a single branch permanently. `ifelse()` emits a symbolic conditional node that the solver evaluates at each timestep, enabling correct flow-reversal and laminar/turbulent regime switching.
-
-### `vars=[]` for Inertia
-
-When `Dt(port_in.mdot)` appears in an equation, MTK automatically promotes `port_in.mdot` to a differential state variable. Explicitly listing it in `vars` would be redundant. Passing `vars=[]` makes clear that the component introduces no *additional* state variables beyond what MTK infers.
-
-### `@observed` vs plain unknowns
-
-`@observed` variables are computed post-solve from the solution trajectory -- they are not part of the DAE system. Use `@observed` for diagnostic quantities (e.g., `Re`, `Nu`, `htc`) that are never referenced on the RHS of another equation. If a variable appears in another equation, it must be a plain unknown so the solver can see it.
-
-### `mtkcompile` before solve
-
-MTK's symbolic IR requires structural analysis (index reduction from DAE to ODE), Jacobian sparsity detection, and code generation before a numerical solver can use it. Always call `mtkcompile(sys)` to produce a compiled system. Passing an uncompiled `System` to `solve` will error or produce wrong results.
+- **Coolant properties are plain arithmetic, not `@register_symbolic`.** MTK traces through
+  them, so dispatch on the liquid happens once while equations are built and the solver gets
+  differentiable expressions. The only registered function is `LocalLoss.factor`. Do not
+  register a method that dispatches on its first argument: the shims of `density(::LightWater, T)`
+  and `density(::HeavyWater, T)` collide and precompilation fails.
+- **Diagnostics go in `observed`.** Components pass `observed=[...]` to `System` for quantities
+  nothing else reads (`Re`, `Nu`, `htc`). A quantity another equation references must be a
+  plain unknown.
 
 ## Running the code
 
@@ -361,11 +306,7 @@ downloads the scripts and fonts the pages use to `docs/vendor`, or to the direct
 `STREAM_DOCS_VENDOR` names. The built site loads nothing from the internet: `make.jl` fails if
 a file is missing, or if a page would still load something from a CDN.
 
-Each invocation pays full cold-start (~30–90s `using STREAM` plus first `mtkcompile` ~10–30s). That is the accepted dev loop.
-
-### Abandoned approaches — do not re-introduce
-
-Two attempts to beat cold-start were tried and abandoned. Do not bring either back:
-
-- **Daemon dev loop** (`Revise` + `DaemonMode`, `bin/jl*` scripts, tmux session `stream-jl`). A Claude-Code-specific speedup that did not pay off; fully removed from this branch (scripts, the `DaemonMode`/`Revise` deps, and `time_startup.jl`).
-- **PackageCompiler sysimage** (`stream.so`). PackageCompiler's incremental link step is killed by SIGTERM at ~7 min on Julia 1.12 + WSL2 regardless of package set. Tooling was removed in v1.0. Historical `--sysimage` references under `.planning/` are archive only — do not act on them.
+Each invocation pays full cold start (~30–90s `using STREAM` plus first `mtkcompile`
+~10–30s). That is the accepted dev loop. A Revise/DaemonMode dev loop and a PackageCompiler
+sysimage were both tried and dropped (the sysimage link step is killed on Julia 1.12 + WSL2);
+do not reintroduce them.
