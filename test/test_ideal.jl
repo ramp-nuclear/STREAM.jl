@@ -53,20 +53,6 @@ end
     end
 end
 
-@testset "HeatExchanger stub callable" begin
-    @named hx = HeatExchanger(40.0)
-    @test hx isa ModelingToolkit.System
-end
-
-@testset "HeatExchanger mtkcompile" begin
-    @named hx = HeatExchanger(40.0)
-    @test_nowarn mtkcompile(hx; fully_determined=false)  # isolated component: HX is value-source, no port closure needed
-end
-
-@testset "HeatExchanger exported from STREAM" begin
-    @test isdefined(STREAM.Components, :HeatExchanger)
-end
-
 @testset "ConstantTemperature: n ports, each held at its temperature" begin
     @named wall = ConstantTemperature(40.0; n=3)
     @test var_length(wall, :thermal) == 3

@@ -72,31 +72,6 @@ function bilinear_inertia(L0, ṁ0)
 end
 
 """
-    HeatExchanger(T_bc; name) -> System
-
-Ideal heat exchanger that resets fluid temperature to a fixed boundary condition.
-
-# Arguments
-- `T_bc`: boundary condition temperature [°C]
-- `name`: system name (Symbol)
-
-# Ports
-- `inlet`, `outlet` -- `FlowPort` (pressure, mass flow, temperature)
-"""
-function HeatExchanger(T_bc; name)
-    pars = @parameters T_bc = T_bc
-    @named inlet = FlowPort()
-    @named outlet = FlowPort()
-    eqs = Equation[
-        inlet.ṁ + outlet.ṁ ~ 0,
-        inlet.p - outlet.p ~ 0,
-        outlet.T ~ T_bc,
-        inlet.T ~ T_bc,
-    ]
-    return compose(System(eqs, t, [], pars; name=name), inlet, outlet)
-end
-
-"""
     ConstantTemperature(T; n, name) -> System
 
 Fixed-temperature thermal boundary with `n` ports, one per cell. It absorbs or supplies

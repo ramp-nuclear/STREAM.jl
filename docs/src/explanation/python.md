@@ -45,6 +45,9 @@ A few behaviours differ from Python on purpose:
   the same.
 - **Equal decay rates.** [`DecayHeat.DoubleDecay`](@ref) switches to the equal-rate limit when
   its two rates nearly coincide, a case Python leaves unguarded.
+- **Heat exchangers.** Python's heat exchanger only fixes its outlet temperature, and
+  `HeatExchanger(T)` is the same. The exchanger to a fixed sink and the two-stream exchanger
+  have no Python counterpart; see [Heat exchangers and the heat sink](@ref).
 
 ## Where the physics is open
 

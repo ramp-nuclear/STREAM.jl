@@ -17,6 +17,8 @@ choosing them implies for a result. They are for reading, not for following step
 
 - [The coolant channel](channel.md): the energy and momentum balances of a cooled channel
 - [Wall heat transfer](heat_transfer.md): single-phase convection and subcooled boiling
+- [Heat exchangers and the heat sink](heat_exchanger.md): the ideal exchanger, the
+  effectiveness-NTU model behind the finite ones, and how a heat sink is lost
 - [Pressure drop](pressure_drop.md): friction, local losses, gravity and inertia
 - [Heat conduction in fuel](conduction.md): plates and rods, clad and with contact
   resistances, on a finite-volume mesh

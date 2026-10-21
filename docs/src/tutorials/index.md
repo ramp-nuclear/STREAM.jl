@@ -1,9 +1,9 @@
 # Tutorials
 
 The tutorials teach STREAM.jl by building models, one step at a time, from a single loop to a
-loss of flow and a loss of coolant in a pool reactor. Each builds its model by hand, so you see
-every component and connection, and each ends by checking the result against physics you can
-work out on paper.
+loss of flow, a loss of coolant and a loss of heat sink in a pool reactor. Each builds its
+model by hand, so you see every component and connection, and each ends by checking the result
+against physics you can work out on paper.
 Read them in order: each assumes what the ones before it taught.
 
 | | Tutorial | What you learn |
@@ -16,6 +16,7 @@ Read them in order: each assumes what the ones before it taught.
 | 6 | [Reactivity insertion with feedback](06_reactivity_insertion.md) | point kinetics, temperature feedback, the prompt jump |
 | 7 | [Loss of flow in a pool reactor](07_pool_lofa.md) | everything together: trips, a check valve, decay heat, flow reversal, margins over time |
 | 8 | [Loss of coolant from a pool and its decay tank](08_pool_loca.md) | tanks and their steady states, a break, isolation valves, two tanks draining through one hole |
+| 9 | [Loss of heat sink in a pool reactor](09_loss_of_heat_sink.md) | a two-stream heat exchanger, a pool that heats up, counterflow and parallel flow, a UA that follows the flow |
 
 Every tutorial can be downloaded as a Julia script or a Jupyter notebook from the link at its
 top, and run as it is.
