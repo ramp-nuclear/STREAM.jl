@@ -10,15 +10,17 @@ model, such as a cooling tower, a pond or the air.
 With no `UA`, the default, the exchanger is ideal. Liquid leaves at `T_bc` whatever arrives,
 in either flow direction, so the sink takes any heat the loop brings it.
 
-With a `UA`, the sink is still at a fixed temperature but the exchange is finite. A sink whose
-temperature the loop cannot move has an unbounded capacity rate, so the effectiveness is
-``1 - e^{-UA/C}`` and
+With a `UA`, the sink is still at a fixed temperature but the exchange is finite. The
+liquid's capacity rate ``C = |\dot m| c_p(T_{in})`` [W/K] is the heat it carries per kelvin
+of temperature change. The sink's capacity rate is unbounded, since it stays at `T_bc`
+however much heat it takes, so `C` is the smaller of the two and the effectiveness is
+``1 - e^{-UA/C}``:
 
 ```math
-T_{out} = T_{in} + (1 - e^{-UA / C}) (T_{bc} - T_{in}), \qquad C = |\dot m| c_p(T_{in})
+T_{out} = T_{in} + (1 - e^{-UA / C}) (T_{bc} - T_{in})
 ```
 
-As the flow stops, `C` goes to zero and so does the heat removed, `Q = C (T_out - T_in)`.
+As `UA` grows this tends to the ideal exchanger, `T_out = T_bc`. As the flow stops, `C` goes to zero and so does the heat removed, `Q = C (T_out - T_in)`.
 Use the two-stream method to model the sink's own flow. Both forms have no pressure drop: put
 a resistor in series for one. See [Heat exchangers and the heat sink](@ref).
 
@@ -71,7 +73,7 @@ effectiveness-NTU method. Each side is a two-port with no pressure drop, reached
 `inseries(pump, hx.primary, core)`.
 
 The exchanger stores no heat: the outlets follow the inlets at once. With capacity rates
-``C = |\dot m| c_p(T_{in})`` on each side,
+``C = |\dot m| c_p(T_{in})`` on each side, the heat each stream carries per kelvin,
 
 ```math
 Q = ε C_{min} (T_{s,in} - T_{p,in}), \qquad ε = ε(NTU, C_r), \quad NTU = UA / C_{min}, \quad C_r = C_{min} / C_{max}
