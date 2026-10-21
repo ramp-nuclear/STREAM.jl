@@ -81,7 +81,7 @@ The package is a stack of submodules, each reaching only downward:
 
 ```
 Substances -> Dimensionless -> {HTC, Friction, LocalLoss, Thresholds}
-           -> Components -> {DecayHeat, Assemblies}
+           -> Components -> {DecayHeat, Assemblies} -> Solvers -> UQ
 ```
 
 `solve_steady`, `solve_transient` and the operating-point guesses sit at the top level.
@@ -161,6 +161,17 @@ src/
     connections.jl          # module Connect: face, inseries, inparallel, weighted, ...
     concrete_assemblies.jl  # plate, symmetric_plate, one_sided, single_channel,
                             # fuel_assembly, check_gravity_mismatch
+  uq/
+    problems.jl             # FunctionUQ, SteadyUQ, TransientUQ, local_sensitivities,
+                            # LocalSensitivities, jacobian
+    implicit.jl             # the implicit derivatives of a steady state and of a DAE start,
+                            # and the solves they rest on
+    inputs.jl               # named inputs and outputs to flat vectors and back
+    uncertainty.jl          # Uncertainty, as_absolute, uq, the measurements stub
+    sampling.jl             # monte_carlo
+ext/
+  STREAMDistributionsExt.jl # a Distribution as a UQ input, loaded with Distributions.jl
+  STREAMMeasurementsExt.jl  # UQ.measurements, loaded with Measurements.jl
 ```
 
 **Where new code goes:**
@@ -170,6 +181,9 @@ src/
 - Prefer `Connect.face(...)` over a bare `face(...)`, but leave `inseries`, `inparallel` and `port` unqualified: the first two are used constantly and `port` is a getter that reads clearly on its own
 - New decay heat contribution → `src/decay_heat/`, in the file matching the Python module it mirrors
 - New coolant → `src/substances/` (e.g. `src/substances/molten_salt.jl`), implementing the `AbstractLiquid` property methods
+- Uncertainty propagation → `src/uq/`; anything that needs a heavy package (Measurements,
+  GlobalSensitivity, SciMLSensitivity) goes in `ext/` as a package extension, so `using STREAM`
+  does not pay for it
 - A worked model → the docs, as a tutorial or how-to. `src/` holds no example builders; a model several test files solve goes in `test/fixtures.jl`
 
 Placement beats file length. A long file whose contents all belong together is fine; a short
@@ -289,6 +303,41 @@ General MTK v11 usage is in the skill. Two choices specific to this codebase:
 - **Diagnostics go in `observed`.** Components pass `observed=[...]` to `System` for quantities
   nothing else reads (`Re`, `Nu`, `htc`). A quantity another equation references must be a
   plain unknown.
+
+### Whole arrays, not their elements
+
+A symbolic array such as `ssys.ch.T` is already an `AbstractVector`, so pass it as it is
+where a vector of variables is wanted: no `collect`, and no `[ssys.ch.T[i] for i in 1:n]`.
+`[ssys.ch.T; ssys.ch.T_wall_left]` is a plain vector of variables.
+
+A solution reads a whole vector at once. On a steady solution `sol[vars]` is a vector of
+values; on a transient `sol[ssys.ch.T]` is a vector over the saved times of per-cell
+vectors, so `maximum.(sol[ssys.ch.T_wall_left])` is the hottest cell at each time. An
+operating point from a solution is `unknowns(ssys) .=> sol[unknowns(ssys)]`.
+
+A design knob is a bare symbolic value, not a `Num`, so broadcasting over it fails:
+`T_low .+ offsets` iterates the knob. Write `[T_low + o for o in offsets]`.
+
+### Setting `u0` yourself
+
+A problem built with MTK's initialization data, the default, recomputes `u0` at solve time
+from the values it was built with. A `u0` set afterwards, through `remake` or `setsym_oop`,
+is dropped, and so are any dual-number derivatives it carried. Build such a problem with
+`build_initializeprob=false` and let the integrator's `initializealg` make the start
+consistent. `src/uq/problems.jl` does this, and so does `solve_transient` when it starts from a
+solution: built with that data, the problem once moved a plate temperature 0.46 K off the
+steady state it was given.
+
+OrdinaryDiffEq's `BrownFullBasicInit` drops the derivatives of the algebraic states it
+solves for when `u0` holds duals; `_consistent_start` in the same file works around it.
+
+### `jac=true` and stream junctions
+
+MTK's symbolic Jacobian (`jac=true`) fails on a model with a multi-way stream junction, as
+`inparallel` makes: it errors while scalarizing `instream`. Without it, `sparse=true` alone
+gives the structural pattern, and a sparse Jacobian can be filled by colored AD. On the
+fuel assembly at up to 1,400 unknowns sparse solves were slower than dense, so dense is the
+default.
 
 ## Running the code
 

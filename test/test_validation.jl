@@ -874,3 +874,25 @@ end
     end
 
 end  # @testset "PointKinetics validation"
+
+@testset "Python parity: first-order UQ of two threshold correlations" begin
+    # Python takes its Jacobian by forward differences with a relative step of 1e-6, so its
+    # numbers carry a truncation error of about that size, and AD here has none.
+    pipe = PipeGeometry_rectangular(0.6, 0.0671, 0.0024, 0.0671)
+    function chf_and_ofi(x)
+        T_sat = sat_temperature(H2O, x.P)
+        v = x.ṁ ./ (density.(H2O, x.T_bulk) .* pipe.A)
+        chf = Thresholds.q_CHF_mirshak.(x.T_bulk, T_sat, x.P, v)
+        return [chf; Thresholds.q_OFI_whittle_forgan(x.ṁ, T_sat, x.T_in, pipe)]
+    end
+    prob = UQ.FunctionUQ(chf_and_ofi, (ṁ=0.5, T_in=35.0, T_bulk=[40.0, 50.0, 60.0], P=1.7e5))
+    result = UQ.uq(UQ.local_sensitivities(prob),
+        :ṁ => UQ.Uncertainty(statistical_relative=0.05),
+        :T_in => UQ.Uncertainty(systematic_absolute=1.0, statistical_absolute=0.5),
+        :T_bulk => UQ.Uncertainty(systematic_relative=0.02, statistical_absolute=[0.5, 1.0, 1.5]),
+        :P => UQ.Uncertainty(statistical_relative=0.01),
+    )
+    @test result.nominal ≈ PARITY_UQ_NOMINAL rtol=1e-12
+    @test result.sys ≈ PARITY_UQ_SYS rtol=1e-6
+    @test result.stat ≈ PARITY_UQ_STAT rtol=1e-6
+end

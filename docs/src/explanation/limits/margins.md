@@ -75,9 +75,14 @@ them either multiplicatively or statistically [IAEA1980](@cite). The acceptance 
 then a minimum value of the margin after the factors are applied.
 
 STREAM does not apply such factors for you. Apply them through the inputs (raise the channel
-power, lower its flow), or through the analysis: [`twall_limit`](@ref Thresholds.twall_limit) takes an inhomogeneity
-factor on the local flux, and a CHF ratio can be divided by the uncertainty of the
-correlation behind it.
+power, lower its flow), or through the analysis: [`twall_limit`](@ref Thresholds.twall_limit),
+`bergles_rohsenow_t_onb` and `q_OSV_saha_zuber` take an inhomogeneity factor on the local
+flux, `bergles_rohsenow_t_onb` an `onb_factor` on its superheat, and a CHF ratio can be divided
+by the uncertainty of the correlation behind it.
+
+The statistical route can also be computed rather than assumed. [`UQ.uq`](@ref STREAM.UQ.uq)
+propagates the uncertainty of each input to the margins themselves, to first order; see
+[Uncertainty quantification](../uncertainty.md).
 
 ## References
 

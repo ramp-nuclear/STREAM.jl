@@ -152,23 +152,32 @@ equations; and a component graph from the connection vectors `inseries`, `inpara
 
 ### 7. Uncertainty quantification
 
-Python has `analysis/UQ/`: finite-difference Jacobians of solution values against input
-parameters, a distributed version, uncertainty propagation, a power-shape perturbation, and
-uncertainty factors on the threshold wrappers (`onb_factor` on the Bergles-Rohsenow superheat,
-`inhomogeneity_factor` on the local flux for ONB and OSV). We have none of it, apart from
-`twall_limit`'s `inhomogeneity_factor`.
+The first-order part and sampling are in, as the `UQ` module: `Uncertainty` with Python's four
+parts, the problems `FunctionUQ`, `SteadyUQ` and `TransientUQ`, `local_sensitivities`, `uq`
+with Python's propagation, `jacobian`, `monte_carlo`, `measurements` through a Measurements.jl
+extension, and any `Distribution` as an input through a Distributions.jl one.
+`Utilities.local_power_shift` ports the power-shape perturbation, and the threshold factors are
+there: `onb_factor` and `inhomogeneity_factor` on `bergles_rohsenow_t_onb`,
+`inhomogeneity_factor` on `q_OSV_saha_zuber`. `test_validation.jl` checks `uq` against Python's
+numbers on two threshold correlations. The Jacobian comes from ForwardDiff, and a steady state
+is differentiated by the implicit function theorem, so there is no step size and no solver path
+in the result. Python's `DASKUQModel` has no counterpart, since one ForwardDiff pass covers
+every input.
 
-The Julia route is SciMLSensitivity rather than a port: forward and adjoint sensitivities from
-the AD Jacobians, with no step size to tune. Those are local, first-order derivatives at one
-operating point, which is what a first-order propagation needs; variance over a parameter range
-takes sampling on top, through `GlobalSensitivity.jl`.
+What remains:
 
-One thing stands in the way. A `StateMachine` keeps its state and trip time in a Julia object,
-outside the problem. So a second run with `remake` needs `reset!(machine)`, parallel runs need
-a machine each, and a derivative with respect to a trip setpoint comes back as if the trip
-never moved, with no error. Moving the trip time into the problem's parameters fixes all three.
+- **Derivatives through a `StateMachine`.** The machine keeps its state and trip time in a
+  Julia object outside the problem, so `jacobian` and `uq` refuse a model with callbacks.
+  `monte_carlo` samples one already, resetting the machines before each run and running them
+  one at a time. Moving the trip time into the problem's parameters would let derivatives
+  through and the runs go in parallel, and is a design change of its own.
+- **Variance-based indices** (Sobol, Morris) through `GlobalSensitivity.jl` as an extension, on
+  top of the sampling `monte_carlo` already does.
+- **The power shape as an input.** `HeatDiffusion` bakes `power_shape` into its equations, so
+  `local_power_shift` cannot be differentiated through. Making it a parameter array fixes that.
+  With a shape entry per cell, an adjoint (SciMLSensitivity) beats forward mode.
 
-**Size:** medium, and a different design from Python's.
+**Size:** medium for the state machine change; small for the indices.
 
 ---
 
@@ -212,6 +221,16 @@ never moved, with no error. Moving the trip time into the problem's parameters f
   Python freezes the flow at the moment of closure and ramps that down instead.
 - **A tank counts only the ports flowing in** in its energy balance, switching with `ifelse`.
   Python smooths that switch with `soft_pos`.
+- **Uncertainty derivatives are exact.** Python's `UQModel` takes forward differences with a
+  relative step of 1e-6, so its Jacobian carries the truncation and the solver tolerance over
+  the step. `UQ.local_sensitivities` uses automatic differentiation, and the implicit function
+  theorem at a steady state. Python's propagation formulas are unchanged.
+- **An uncertainty problem computes nothing until asked.** Python's `UQModel` solves its
+  nominal state when it is built and keeps a Jacobian cache. `SteadyUQ`, `TransientUQ` and
+  `FunctionUQ` only hold their arguments, as an `ODEProblem` does; `local_sensitivities` and
+  `monte_carlo` do the solving, and the derivatives are a value the caller keeps rather than a
+  cache. A steady problem and a transient are separate types, not one constructor told apart
+  by its arguments.
 - **A transient steps onto every saved time.** Python's solver reads the saved values off its
   interpolant, which strays inside a long implicit step: 0.5 m on a draining pool level.
   `solve_transient` passes the saved times as `tstops`, so every saved value is one the solver
