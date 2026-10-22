@@ -49,7 +49,8 @@ include("constants.jl")
 Coolants and the property correlations behind them.
 
 A coolant is a singleton type such as `LightWater` (aliased [`H2O`](@ref)) answering nine
-property queries. Components take one as a keyword argument, or a model names its coolant
+property queries, from which the enthalpy, its inverse and the saturated vapor enthalpy are
+derived. Components take one as a keyword argument, or a model names its coolant
 once with [`with_coolant`](@ref) and leaves the keyword out.
 [`Liquid`](@ref) holds fixed property values and is itself an `AbstractLiquid`, for a coolant
 frozen at one state point.
@@ -64,6 +65,7 @@ A new coolant implements the nine [`AbstractLiquid`](@ref) methods.
 module Substances
 using ModelingToolkit
 using Base: ScopedValues
+using QuadGK: gauss
 using ..STREAM: ATM
 include("substances/liquid.jl")
 include("substances/light_water.jl")
@@ -72,6 +74,7 @@ include("substances/coolant.jl")
 include("substances/solid.jl")
 export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O, Solid
 export coolant, default_coolant, with_coolant
+export enthalpy, temperature, vapor_enthalpy, hₗ, hᵥ
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
@@ -213,9 +216,8 @@ Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAn
 """
 module Thresholds
 using ModelingToolkit
-using QuadGK
 using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, G_EARTH, coolant, default_coolant
-using ..STREAM: ρ, cₚ, μ, κ, Tsat
+using ..STREAM: ρ, cₚ, μ, κ, Tsat, enthalpy
 using ..STREAM: Re, Pr, Pe
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 include("thresholds/thresholds.jl")
@@ -434,6 +436,7 @@ export Assemblies, Utilities
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
+export enthalpy, temperature, vapor_enthalpy, hₗ, hᵥ
 export H2O, D2O, Solid, with_coolant
 
 # Dimensionless numbers

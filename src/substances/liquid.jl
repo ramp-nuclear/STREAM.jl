@@ -81,7 +81,12 @@ dispatches identically.
 | `ρᵥ`  | `vapor_density`     | `hfg`  | `latent_heat`     |
 | `cₚ`  | `specific_heat`     | `β`    | `thermal_expansion` |
 | `μ`   | `viscosity`         | `Tsat` | `sat_temperature` |
-| `κ`   | `conductivity`      |        |                   |
+| `κ`   | `conductivity`      | `hₗ`   | `enthalpy`        |
+|       |                     | `hᵥ`   | `vapor_enthalpy`  |
+
+Three more come from these nine and need no method of their own: [`enthalpy`](@ref) integrates
+the specific heat, [`temperature`](@ref) inverts it, and [`vapor_enthalpy`](@ref) adds the
+latent heat at saturation.
 """
 density, vapor_density, specific_heat, viscosity, conductivity,
 surface_tension, latent_heat, thermal_expansion, sat_temperature
@@ -104,6 +109,152 @@ end
 # Saturation temperature is driven by pressure, so its short form takes the pressure.
 # The temperature slot is unused and gets a placeholder.
 sat_temperature(liquid::AbstractLiquid, p) = sat_temperature(liquid, 0.0, p)
+
+"""
+    _GAUSS_LEGENDRE
+
+Nodes and weights of the 16-point Gauss-Legendre rule on `[-1, 1]`, which [`enthalpy`](@ref)
+integrates the specific heat with.
+"""
+const _GAUSS_LEGENDRE = gauss(16)
+
+@doc raw"""
+    enthalpy(liquid, T, p) -> J/kg
+    enthalpy(liquid, T)
+
+Specific enthalpy of the liquid at temperature `T` [°C] and pressure `p` [Pa], zero at 0 °C:
+
+```math
+h(T) = ∫_0^T c_p(T') \, dT'
+```
+
+The integral is a 16-point Gauss-Legendre quadrature of [`specific_heat`](@ref), exact for a
+polynomial `cₚ` of degree 31 or less, and within 1e-12 of adaptive quadrature for the water
+fits. A coolant may define its own method. The two-argument form fills the pressure with
+[`ATM`](@ref).
+
+# Examples
+```jldoctest
+julia> enthalpy(H2O, 50.0)
+208954.9069972446
+
+julia> enthalpy(D2O, 50.0)
+212827.30382156605
+```
+"""
+function enthalpy(liquid::AbstractLiquid, T, p)
+    x, w = _GAUSS_LEGENDRE
+    T_nodes = (T / 2) .* (x .+ 1)   # the rule's [-1, 1] mapped onto [0, T]
+    return (T / 2) * sum(w .* specific_heat.(liquid, T_nodes, p))
+end
+enthalpy(liquid::AbstractLiquid, T) = enthalpy(liquid, T, ATM)
+
+"""
+    _invert_enthalpy(liquid, h, p) -> °C
+
+The temperature at which the liquid's [`enthalpy`](@ref) is `h`, by Newton's method with `cₚ`
+as the slope, starting from `h / cₚ(liquid, 0 °C)`. [`temperature`](@ref) interpolates it.
+"""
+function _invert_enthalpy(liquid, h, p)
+    T = h / specific_heat(liquid, 0.0, p)
+    for _ in 1:20
+        ΔT = (enthalpy(liquid, T, p) - h) / specific_heat(liquid, T, p)
+        T -= ΔT
+        # Quadratic convergence: a step this small leaves the next error at rounding.
+        abs(ΔT) < 1e-9 && break
+    end
+    return T
+end
+
+"""
+    _T_FIT
+
+The temperature range [°C] that [`temperature`](@ref) is fitted over.
+"""
+const _T_FIT = (0.0, 300.0)
+
+"""
+    _CHEBYSHEV_ANGLES
+
+The angles `θⱼ = π (j + 1/2) / 21`, `j = 0, …, 20`, whose cosines are the nodes
+[`temperature`](@ref) interpolates through.
+"""
+const _CHEBYSHEV_ANGLES = [π * (j + 0.5) / 21 for j in 0:20]
+
+"""
+    _temperature_polynomial(liquid, p) -> (; h_lo, h_hi, powers)
+
+The enthalpies at the ends of `_T_FIT` and the coefficients, in powers of
+`x = 2 (h - h_lo) / (h_hi - h_lo) - 1`, of the degree 20 Chebyshev interpolant of the inverse
+of [`enthalpy`](@ref) through its exact values at 21 nodes. [`temperature`](@ref) evaluates it.
+"""
+function _temperature_polynomial(liquid, p)
+    h_lo, h_hi = enthalpy(liquid, first(_T_FIT), p), enthalpy(liquid, last(_T_FIT), p)
+    nodes = cos.(_CHEBYSHEV_ANGLES)
+    T_nodes = [_invert_enthalpy(liquid, h_lo + (x + 1) / 2 * (h_hi - h_lo), p) for x in nodes]
+    N = length(nodes)
+    c = [2 / N * sum(T_nodes .* cos.(k .* _CHEBYSHEV_ANGLES)) for k in 0:(N - 1)]
+    c[1] /= 2
+    # Σ cₖ Tₖ(x) rewritten in powers of x through T₀ = 1, T₁ = x and Tₖ₊₁ = 2x Tₖ - Tₖ₋₁, so
+    # that `temperature` is one Horner chain.
+    powers = zeros(N)
+    T_prev, T_k = [1.0; zeros(N - 1)], [0.0; 1.0; zeros(N - 2)]
+    powers .+= c[1] .* T_prev .+ c[2] .* T_k
+    for k in 3:N
+        T_prev, T_k = T_k, [0.0; 2 .* T_k[1:(end - 1)]] .- T_prev
+        powers .+= c[k] .* T_k
+    end
+    return (; h_lo, h_hi, powers)
+end
+
+"""
+    temperature(liquid, h, p) -> °C
+    temperature(liquid, h)
+
+The temperature at which the liquid's [`enthalpy`](@ref) is `h` [J/kg], at pressure `p` [Pa].
+
+Between 0 and 300 °C it is the degree 20 Chebyshev interpolant of the exact inverse, within
+1e-10 K of it for both waters, evaluated as a polynomial in `h` so that it traces into a
+model's equations. Beyond either end it continues linearly, with the specific heat at that end
+as the slope, so a solver iterate outside the range gets a finite temperature with a finite
+slope. A coolant used well outside 0 to 300 °C should define its own method. The two-argument
+form fills the pressure with [`ATM`](@ref).
+
+# Examples
+```jldoctest
+julia> round(Substances.temperature(H2O, enthalpy(H2O, 50.0)); digits=9)
+50.0
+```
+"""
+function temperature(liquid::AbstractLiquid, h, p)
+    (; h_lo, h_hi, powers) = _temperature_polynomial(liquid, p)
+    T_lo, T_hi = _T_FIT
+    inside = evalpoly(2 * (h - h_lo) / (h_hi - h_lo) - 1, powers)
+    below = T_lo + (h - h_lo) / specific_heat(liquid, T_lo, p)
+    above = T_hi + (h - h_hi) / specific_heat(liquid, T_hi, p)
+    return ifelse(h < h_lo, below, ifelse(h > h_hi, above, inside))
+end
+temperature(liquid::AbstractLiquid, h) = temperature(liquid, h, ATM)
+
+"""
+    vapor_enthalpy(liquid, p) -> J/kg
+
+Specific enthalpy of the saturated vapor at pressure `p` [Pa]: the liquid's
+[`enthalpy`](@ref) at the saturation temperature plus the [`latent_heat`](@ref) there.
+
+# Examples
+```jldoctest
+julia> vapor_enthalpy(H2O, 1.0e5)
+2.675325263993639e6
+```
+"""
+function vapor_enthalpy(liquid::AbstractLiquid, p)
+    T_sat = sat_temperature(liquid, p)
+    return enthalpy(liquid, T_sat, p) + latent_heat(liquid, T_sat, p)
+end
+
+const hₗ = enthalpy
+const hᵥ = vapor_enthalpy
 
 """
     Liquid(; ρ=1.0, ρᵥ=1.0, cₚ=1.0, μ=1.0, Tsat=1.0, σ=1.0, hfg=1.0, κ=1.0, β=1.0)
@@ -130,6 +281,10 @@ closed-form answers out of a channel. The all-ones default is the usual choice: 
 - `hfg`: latent heat of vaporization [J/kg]
 - `κ`: thermal conductivity [W/(m·K)]
 - `β`: thermal expansion coefficient [1/K]
+
+The enthalpies follow from these: [`enthalpy`](@ref) of a `Liquid` is `cₚ T`, and
+[`vapor_enthalpy`](@ref) is `cₚ Tsat + hfg`. So a snapshot such as `H2O(50.0)` has the
+enthalpy of a liquid with the specific heat at 50 °C throughout, not light water's.
 """
 struct Liquid{T} <: AbstractLiquid
     ρ::T
@@ -158,8 +313,12 @@ surface_tension(l::Liquid, T, p) = l.σ
 latent_heat(l::Liquid, T, p) = l.hfg
 thermal_expansion(l::Liquid, T, p) = l.β
 sat_temperature(l::Liquid, T, p) = l.Tsat
+enthalpy(l::Liquid, T, p) = l.cₚ * T
+temperature(l::Liquid, h, p) = h / l.cₚ
+vapor_enthalpy(l::Liquid, p) = l.cₚ * l.Tsat + l.hfg
 
-# A `Liquid` returns stored numbers, so a symbolic temperature folds away to a constant.
+# A `Liquid` returns stored numbers, so a symbolic temperature folds away to a constant,
+# except in the enthalpy, which keeps it as `cₚ T`.
 
 (liquid::AbstractLiquid)(T, p=ATM) = Liquid(
     density(liquid, T, p),

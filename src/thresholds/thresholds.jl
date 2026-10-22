@@ -97,7 +97,7 @@ correlation was fitted. See [Onset of flow instability](@ref) for the physics.
 - `T_sat`: saturation temperature [°C]
 - `T_inlet`: coolant inlet temperature [°C]
 - `pipe`: channel geometry [`PipeGeometry`]
-- `liquid`: the coolant whose `cₚ` is integrated (default [`default_coolant()`](@ref
+- `liquid`: the coolant whose enthalpy rise sets the power (default [`default_coolant()`](@ref
   STREAM.Substances.default_coolant))
 
 # Returns
@@ -115,8 +115,8 @@ function q_OFI_whittle_forgan(ṁ, T_sat, T_inlet, pipe;
                               liquid::AbstractLiquid=default_coolant())
     G = abs(ṁ) / pipe.A
     G_cgs = G / 10  # SI to CGS conversion (G must be in CGS per Whittle-Forgan)
-    integral_cp, _ = quadgk(T -> cₚ(liquid, T), T_inlet, T_sat)
-    return abs(ṁ) * integral_cp / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
+    Δh = enthalpy(liquid, T_sat) - enthalpy(liquid, T_inlet)
+    return abs(ṁ) * Δh / (1.0 + 3.15 * (pipe.Dh / pipe.L) * (1.08 * G_cgs)^0.29)
 end
 
 @doc raw"""
