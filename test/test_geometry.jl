@@ -5,77 +5,110 @@ using ModelingToolkit
 
 @testset "rectangular duct" begin
     duct = Duct(0.6, Rectangular(0.07, 0.00127))
-    # Hand-computed for a 70 mm by 1.27 mm duct, Dh = 4A / P_wet:
-    #   A  = 0.07 * 0.00127        = 8.89e-5 m^2
-    #   Pw = 2 * (0.07 + 0.00127)  = 0.14254 m
-    #   Dh = 4 * 8.89e-5 / 0.14254 = 0.0024947383190683323 m
-    @test isapprox(flow_area(duct), 8.89e-5; rtol=1e-12)
-    @test isapprox(wetted_perimeter(duct), 0.14254; rtol=1e-12)
-    @test isapprox(hydraulic_diameter(duct), 0.0024947383190683323; rtol=1e-12)
-    @test aspect_ratio(duct) ≈ 0.00127 / 0.07
+    @testset "area, perimeter, diameter and aspect ratio" begin
+        # Hand-computed for a 70 mm by 1.27 mm duct, Dh = 4A / P_wet:
+        #   A  = 0.07 * 0.00127        = 8.89e-5 m^2
+        #   Pw = 2 * (0.07 + 0.00127)  = 0.14254 m
+        #   Dh = 4 * 8.89e-5 / 0.14254 = 0.0024947383190683323 m
+        @test isapprox(flow_area(duct), 8.89e-5; rtol=1e-12)
+        @test isapprox(wetted_perimeter(duct), 0.14254; rtol=1e-12)
+        @test isapprox(hydraulic_diameter(duct), 0.0024947383190683323; rtol=1e-12)
+        @test aspect_ratio(duct) ≈ 0.00127 / 0.07
+    end
 
-    # The edges go in either order; width is the longer.
-    @test Rectangular(0.00127, 0.07) == Rectangular(0.07, 0.00127)
-    @test duct.shape.width == 0.07
-    @test duct.shape.depth == 0.00127
+    @testset "the edges go in either order, width the longer" begin
+        @test Rectangular(0.00127, 0.07) == Rectangular(0.07, 0.00127)
+        @test duct.shape.width == 0.07
+        @test duct.shape.depth == 0.00127
+    end
 
-    # Both long faces are heated across the width unless told otherwise.
-    @test duct.heated == (left=0.07, right=0.07)
-    @test heated_perimeter(duct) == 0.14
-    @test Duct(0.6, Rectangular(0.07, 0.00127); heated=0.063).heated == (left=0.063, right=0.063)
-    @test Duct(0.6, Rectangular(0.07, 0.00127); heated=(left=0.07,)).heated == (left=0.07,)
-    @test Duct(0.6, Rectangular(0.07, 0.00127); heated=(right=0.07,)).heated == (right=0.07,)
-    # An unheated duct has no faces at all.
-    @test heated_perimeter(Duct(0.6, Rectangular(0.07, 0.00127); heated=(;))) == 0.0
-    # Only the long walls can be heated, and no wider than they are.
-    @test_throws ArgumentError Duct(0.6, Rectangular(0.07, 0.00127); heated=(top=0.07,))
-    @test_throws ArgumentError Duct(0.6, Rectangular(0.07, 0.00127); heated=(left=0.08,))
-    @test_throws ArgumentError Duct(0.6, Rectangular(0.07, 0.00127); heated=(left=0.0,))
+    @testset "both long faces are heated across the width by default" begin
+        @test duct.heated == (left=0.07, right=0.07)
+        @test heated_perimeter(duct) == 0.14
+    end
+
+    @testset "a heated width, or one face" begin
+        @test Duct(0.6, Rectangular(0.07, 0.00127); heated=0.063).heated ==
+              (left=0.063, right=0.063)
+        @test Duct(0.6, Rectangular(0.07, 0.00127); heated=(left=0.07,)).heated == (left=0.07,)
+        @test Duct(0.6, Rectangular(0.07, 0.00127); heated=(right=0.07,)).heated ==
+              (right=0.07,)
+    end
+
+    @testset "an unheated duct has no faces" begin
+        @test heated_perimeter(Duct(0.6, Rectangular(0.07, 0.00127); heated=(;))) == 0.0
+    end
+
+    @testset "only the long walls heat, no wider than they are" begin
+        @test_throws ArgumentError Duct(0.6, Rectangular(0.07, 0.00127); heated=(top=0.07,))
+        @test_throws ArgumentError Duct(0.6, Rectangular(0.07, 0.00127); heated=(left=0.08,))
+        @test_throws ArgumentError Duct(0.6, Rectangular(0.07, 0.00127); heated=(left=0.0,))
+    end
 end
 
 @testset "circular duct" begin
     duct = Duct(1.0, Circular(0.01))
-    # Dh = D exactly for a circle, and A = π D² / 4 = 7.853981633974483e-5 m^2.
-    @test hydraulic_diameter(duct) == 0.01
-    @test isapprox(flow_area(duct), 7.853981633974483e-5; rtol=1e-12)
-    @test isapprox(wetted_perimeter(duct), π * 0.01; rtol=1e-12)
-    # Its one wall is heated all round.
-    @test duct.heated == (outer=π * 0.01,)
-    @test_throws ArgumentError Duct(1.0, Circular(0.01); heated=(left=0.01,))
-    # A circle has no aspect ratio to give.
-    @test_throws MethodError aspect_ratio(duct)
+    @testset "Dh = D, and A = π D² / 4" begin
+        @test hydraulic_diameter(duct) == 0.01
+        @test isapprox(flow_area(duct), 7.853981633974483e-5; rtol=1e-12)
+        @test isapprox(wetted_perimeter(duct), π * 0.01; rtol=1e-12)
+    end
+
+    @testset "its one wall is heated all round" begin
+        @test duct.heated == (outer=π * 0.01,)
+        @test_throws ArgumentError Duct(1.0, Circular(0.01); heated=(left=0.01,))
+    end
+
+    @testset "it has no aspect ratio" begin
+        @test_throws MethodError aspect_ratio(duct)
+    end
 end
 
 @testset "effective duct" begin
     shape = Effective(; area=1.0, wetted_perimeter=1.0)
     duct = Duct(1.2, shape; heated=(right=1.0,))
-    @test hydraulic_diameter(duct) == 4.0
-    @test flow_area(duct) == 1.0
-    @test heated_perimeter(duct) == 1.0
-    # Any wall names go, since the shape has no walls of its own.
-    @test Duct(1.2, shape; heated=(rod=0.5, can=0.5)).heated == (rod=0.5, can=0.5)
-    # There is no sensible default heated perimeter for a shape known only by its area.
-    @test_throws ArgumentError Duct(1.2, shape)
-    @test_throws ArgumentError Duct(1.2, shape; heated=(0.5, 0.5))   # not named
-    @test sprint(show, shape) == "Effective(; area=1.0, wetted_perimeter=1.0)"
+    @testset "dimensions" begin
+        @test hydraulic_diameter(duct) == 4.0
+        @test flow_area(duct) == 1.0
+        @test heated_perimeter(duct) == 1.0
+    end
+
+    @testset "any wall names go, since the shape has none of its own" begin
+        @test Duct(1.2, shape; heated=(rod=0.5, can=0.5)).heated == (rod=0.5, can=0.5)
+    end
+
+    @testset "the heated walls must be named, with no default" begin
+        @test_throws ArgumentError Duct(1.2, shape)
+        @test_throws ArgumentError Duct(1.2, shape; heated=(0.5, 0.5))
+    end
+
+    @testset "show" begin
+        @test sprint(show, shape) == "Effective(; area=1.0, wetted_perimeter=1.0)"
+    end
 end
 
 @testset "annular duct" begin
-    # A 10 mm rod in a 16 mm tube, in either order.
     duct = Duct(1.0, Annular(0.016, 0.010))
-    @test duct.shape == Annular(0.010, 0.016)
-    @test hydraulic_diameter(duct) ≈ 0.006
-    @test flow_area(duct) ≈ π * (0.016^2 - 0.010^2) / 4
-    @test wetted_perimeter(duct) ≈ π * 0.026
-    # The rod is heated by default; the tube can be too.
-    @test duct.heated == (inner=π * 0.010,)
-    both = Duct(1.0, Annular(0.010, 0.016); heated=(inner=π * 0.010, outer=π * 0.016))
-    @test heated_perimeter(both) ≈ π * 0.026
-    shown = sprint(show, MIME("text/plain"), duct)
-    @test occursin("Annular(0.01, 0.016)", shown)
-    @test occursin("m inner", shown)
-    @test occursin("heated              nowhere",
-                   sprint(show, MIME("text/plain"), Duct(1.0, Circular(0.01); heated=(;))))
+    @testset "a 10 mm rod in a 16 mm tube, in either order" begin
+        @test duct.shape == Annular(0.010, 0.016)
+        @test hydraulic_diameter(duct) ≈ 0.006
+        @test flow_area(duct) ≈ π * (0.016^2 - 0.010^2) / 4
+        @test wetted_perimeter(duct) ≈ π * 0.026
+    end
+
+    @testset "the rod is heated by default; the tube can be too" begin
+        @test duct.heated == (inner=π * 0.010,)
+        both = Duct(1.0, Annular(0.010, 0.016); heated=(inner=π * 0.010, outer=π * 0.016))
+        @test heated_perimeter(both) ≈ π * 0.026
+    end
+
+    @testset "show" begin
+        shown = sprint(show, MIME("text/plain"), duct)
+        @test occursin("Annular(0.01, 0.016)", shown)
+        @test occursin("m inner", shown)
+        @test occursin("heated              nowhere",
+                       sprint(show, MIME("text/plain"), Duct(1.0, Circular(0.01); heated=(;))))
+    end
 end
 
 @testset "knob-driven duct" begin

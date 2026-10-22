@@ -308,6 +308,12 @@ end
     @test_throws ArgumentError one_sided(cac, fuel; side=:bogus, name=:bad)
 end
 
+@testset "one_sided — a channel with two faces needs its side named" begin
+    cac, fuel = _mtr_pair(; n=4, nz=4, nx=2)
+    @test_throws ArgumentError one_sided(cac, fuel; name=:bad)
+    @test_throws ArgumentError single_channel(cac, fuel; name=:bad)
+end
+
 @testset "one_sided — a channel heated on one wall uses that face" begin
     geom = Duct(0.6, Rectangular(0.070, 0.0025); heated=(right=0.070,))
     @named cac = ChannelAndContacts(; n=4, geometry=geom)

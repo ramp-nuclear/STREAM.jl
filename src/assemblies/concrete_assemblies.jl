@@ -40,11 +40,16 @@ end
 """
     _sole_face(channel) -> Symbol
 
-The face of a channel whose duct is heated on one wall, or `:left` for one with more.
+The face of a channel whose duct is heated on one wall.
+
+# Throws
+- `ArgumentError`: for a channel with more than one face, which needs its side named
 """
 function _sole_face(channel)
     faces = keys(duct(channel).heated)
-    return length(faces) == 1 ? only(faces) : :left
+    length(faces) == 1 || throw(ArgumentError(
+        "$(nameof(channel)) has faces $(join(repr.(faces), ", ")); name the one to wire"))
+    return only(faces)
 end
 
 """
@@ -126,11 +131,12 @@ face and nothing left dangling.
 - `channel`: uncompiled `ChannelAndContacts` instance
 - `fuel`: uncompiled `HeatDiffusion` instance
 - `side`: the channel's face, `:left` or `:right`. Defaults to the channel's only face when
-  its duct is heated on one wall, and to `:left` otherwise.
+  its duct is heated on one wall, and must be given otherwise.
 - `name`: system name (Symbol)
 
 # Throws
-- `ArgumentError`: for a side other than `:left` or `:right`, or one the channel has no face on
+- `ArgumentError`: for a side other than `:left` or `:right`, one the channel has no face on,
+  or no side for a channel with two faces
 
 # Returns
 Uncompiled `System` from [`assembly`](@ref).
@@ -169,7 +175,7 @@ one-face-insulated coupling, use [`one_sided`](@ref) instead.
 - `fuel`: uncompiled `HeatDiffusion` instance (`nz` must equal `channel.n`).
 - `fuel_side`: `:left` or `:right`, the near (conjugate) face, of the channel and the fuel
   alike. The fuel's opposite face gets the convective sink. Defaults to the channel's only
-  face when its duct is heated on one wall, and to `:left` otherwise.
+  face when its duct is heated on one wall, and must be given otherwise.
 - `name`: system name (Symbol).
 
 # Returns

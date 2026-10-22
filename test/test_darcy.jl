@@ -33,23 +33,34 @@ const GEOM_F = Duct(0.6, Rectangular(0.07, 0.07 * 0.01814))
 
     @testset "k_R scales the Reynolds fed to the correlation" begin
         ṁ = 0.25
-        @test Friction.Laminar(; k_R=0.5)(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈
-              Friction.laminar(re_of(ṁ) * 0.5)
-        # The rectangular constructor is the aspect-ratio k_R spelled out.
         k_R = Friction.rectangular_correction(aspect_ratio(GEOM_F))
-        @test Friction.RectangularLaminar()(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈
-              64.0 / (re_of(ṁ) * k_R)
-        @test !isapprox(k_R, 1.0; rtol=1e-3)   # or the test proves nothing
-        # A circular duct needs no correction: it gets the Hagen-Poiseuille 64/Re.
-        pipe = Duct(0.6, Circular(0.01))
-        @test Friction.RectangularLaminar()(T_wall, T_bulk, ṁ, H2O, pipe) ≈
-              Friction.Laminar()(T_wall, T_bulk, ṁ, H2O, pipe)
-        # The same k_R, as a function of the duct, reaches a regime-dependent model.
-        rd = Friction.RegimeDependent(; k_R=Friction.rectangular_correction)
-        @test rd(T_wall, T_bulk, ṁ_at(500.0), H2O, GEOM_F) ≈ 64.0 / (500.0 * k_R)
-        # A function k_R prints as the function it is.
-        @test sprint(show, MIME("text/plain"), Friction.RectangularLaminar()) ==
-              "Friction.FromReynolds(laminar), Re scaled by k_R from rectangular_correction"
+        @test !isapprox(k_R, 1.0; rtol=1e-3)   # or the tests below prove nothing
+
+        @testset "a number k_R" begin
+            @test Friction.Laminar(; k_R=0.5)(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈
+                  Friction.laminar(re_of(ṁ) * 0.5)
+        end
+
+        @testset "RectangularLaminar is the aspect-ratio k_R spelled out" begin
+            @test Friction.RectangularLaminar()(T_wall, T_bulk, ṁ, H2O, GEOM_F) ≈
+                  64.0 / (re_of(ṁ) * k_R)
+        end
+
+        @testset "a circular duct gets the Hagen-Poiseuille 64/Re" begin
+            pipe = Duct(0.6, Circular(0.01))
+            @test Friction.RectangularLaminar()(T_wall, T_bulk, ṁ, H2O, pipe) ≈
+                  Friction.Laminar()(T_wall, T_bulk, ṁ, H2O, pipe)
+        end
+
+        @testset "a k_R function of the duct reaches a regime-dependent model" begin
+            rd = Friction.RegimeDependent(; k_R=Friction.rectangular_correction)
+            @test rd(T_wall, T_bulk, ṁ_at(500.0), H2O, GEOM_F) ≈ 64.0 / (500.0 * k_R)
+        end
+
+        @testset "a k_R function prints as the function it is" begin
+            @test sprint(show, MIME("text/plain"), Friction.RectangularLaminar()) ==
+                  "Friction.FromReynolds(laminar), Re scaled by k_R from rectangular_correction"
+        end
     end
 
     @testset "Friction.RegimeDependent blends and guards no-flow" begin
