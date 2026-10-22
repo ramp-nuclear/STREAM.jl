@@ -49,9 +49,10 @@ include("constants.jl")
 Coolants and the property correlations behind them.
 
 A coolant is a singleton type such as `LightWater` (aliased [`H2O`](@ref)) answering nine
-property queries. Components take one as a keyword argument, so swapping coolants is a matter of
-passing a different value. [`Liquid`](@ref) holds fixed property values and is itself an
-`AbstractLiquid`, for a coolant frozen at one state point.
+property queries. Components take one as a keyword argument, or a model names its coolant
+once with [`with_coolant`](@ref) and leaves the keyword out.
+[`Liquid`](@ref) holds fixed property values and is itself an `AbstractLiquid`, for a coolant
+frozen at one state point.
 
 Each property has an alias naming the same function, so `ρ === density`.
 
@@ -62,12 +63,15 @@ A new coolant implements the nine [`AbstractLiquid`](@ref) methods.
 """
 module Substances
 using ModelingToolkit
+using Base: ScopedValues
 using ..STREAM: ATM
 include("substances/liquid.jl")
 include("substances/light_water.jl")
 include("substances/heavy_water.jl")
+include("substances/coolant.jl")
 include("substances/solid.jl")
 export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O, Solid
+export coolant, default_coolant, with_coolant
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
@@ -210,7 +214,7 @@ Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAn
 module Thresholds
 using ModelingToolkit
 using QuadGK
-using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, H2O, G_EARTH
+using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, G_EARTH, coolant, default_coolant
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Pe
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
@@ -263,10 +267,11 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkit: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
 using SymbolicIndexingInterface: getsym, ProblemState
-using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM
+using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM, default_coolant
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..STREAM: assembly, port
+using ..Substances: _CoolantKey
 using ..HTC
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
@@ -429,7 +434,7 @@ export Assemblies, Utilities
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
-export H2O, D2O, Solid
+export H2O, D2O, Solid, with_coolant
 
 # Dimensionless numbers
 export Re, Re_vel, Pr, Nu, Pe, Gr, Ra, flow_regime_blend

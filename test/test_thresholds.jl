@@ -218,6 +218,7 @@ end
         pipe=pipe,
         gravity=9.81,
     )
+    @test state.liquid === H2O   # built by hand, outside any with_coolant block
 
     @testset "ChannelState construction" begin
         @test state.n == n
@@ -351,6 +352,16 @@ end
         result_default = twall_limit(state)
         @test all(result_default .≈ 66.85)
     end
+end
+
+@testset "a ChannelState carries its channel's coolant, and the correlations read it" begin
+    geo = PipeGeometry_circular(0.6, 0.01)
+    d2o = with_coolant(() -> build_loop(; n=5), D2O)
+    state = ChannelState(solve_steady(d2o, [d2o.ch.inlet.ṁ => 0.5]), d2o.ch; pipe=geo)
+    @test state.liquid === D2O
+    correlations = (q_boiling_onset, q_CHF_sudo_kaminaga, q_OFI_whittle_forgan, q_OSV_saha_zuber)
+    @test all(f(state) == f(state; liquid=D2O) for f in correlations)
+    @test all(f(state) != f(state; liquid=H2O) for f in correlations)
 end
 
 @testset "ChannelState from a solved channel" begin
