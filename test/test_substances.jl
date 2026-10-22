@@ -6,6 +6,7 @@ using STREAM.Substances
 using STREAM.Components
 using STREAM.Assemblies
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
+using QuadGK: quadgk
 
 """
     _coolant_readers(; kw...) -> Vector{System}
@@ -48,6 +49,8 @@ end
     @test (@inferred κ(H2O, 50.0)) isa Float64
     @test (@inferred β(H2O, 20.0)) isa Float64
     @test (@inferred Tsat(H2O, 1e5)) isa Float64
+    @test (@inferred enthalpy(H2O, 50.0)) isa Float64
+    @test (@inferred temperature(H2O, 2.0e5)) isa Float64
 end
 
 @testset "aliases name the same functions" begin
@@ -60,6 +63,8 @@ end
     @test hfg === latent_heat
     @test β === thermal_expansion
     @test Tsat === sat_temperature
+    @test hₗ === enthalpy
+    @test hᵥ === vapor_enthalpy
 end
 
 @testset "the coolant default" begin
@@ -101,6 +106,40 @@ end
     @test with_coolant(guess, D2O) == guess(; liquid=D2O)
 end
 
+@testset "enthalpy is the integral of the specific heat from 0 °C" for liquid in (H2O, D2O)
+    Ts = 0.0:5.0:300.0
+    refs = [first(quadgk(x -> cₚ(liquid, x), 0.0, T; rtol=1e-13)) for T in Ts]
+    @test enthalpy.(liquid, Ts) ≈ refs rtol = 1e-12
+    @test enthalpy(liquid, 0.0) == 0.0
+end
+
+@testset "temperature inverts enthalpy to 1e-10 K between 0 and 300 °C" for liquid in (H2O, D2O)
+    Ts = 0.0:10.0:300.0
+    @test maximum(abs, temperature.(liquid, enthalpy.(liquid, Ts)) .- Ts) < 1e-10
+end
+
+@testset "temperature continues linearly beyond the fitted range" for liquid in (H2O, D2O)
+    h_hi, h_lo = enthalpy(liquid, 300.0), enthalpy(liquid, 0.0)
+    @test temperature(liquid, h_hi + 1.0e5) ≈ 300.0 + 1.0e5 / cₚ(liquid, 300.0)
+    @test temperature(liquid, h_lo - 1.0e4) ≈ -1.0e4 / cₚ(liquid, 0.0)
+    @test isfinite(temperature(liquid, 1.0e9))
+end
+
+@testset "the shipped enthalpies sit near IAPWS-IF97 saturation values" begin
+    # IF97 h_f in kJ/kg with h = 0 for the liquid at the triple point, and h_g at 1 atm. The
+    # fits are within 0.5 %; the datum differs by 0.01 °C of liquid, which is 0.04 kJ/kg.
+    Ts = [25.0, 50.0, 100.0, 200.0]
+    @test enthalpy.(H2O, Ts) ./ 1e3 ≈ [104.83, 209.34, 419.17, 852.39] rtol = 5e-3
+    @test vapor_enthalpy(H2O, ATM) / 1e3 ≈ 2675.6 rtol = 5e-3
+end
+
+@testset "a Liquid's enthalpies are the closed forms of its constants" begin
+    mock = Liquid(; cₚ=2000.0, Tsat=100.0, hfg=2.0e6)
+    @test enthalpy(mock, 40.0) == 8.0e4
+    @test temperature(mock, 8.0e4) == 40.0
+    @test vapor_enthalpy(mock, ATM) == 2000.0 * 100.0 + 2.0e6
+end
+
 @testset "a channel records its coolant, and coolant(sys) returns it after compilation" begin
     geom = PipeGeometry_circular(0.6, 0.01)
     @named pump = Pump(3.0e4)
@@ -124,6 +163,7 @@ end
     end
     # Tsat's short form takes the pressure, not a temperature.
     @test Tsat(H2O, 1e5) == sat_temperature(H2O, 0.0, 1e5)
+    @test enthalpy(H2O, 50.0) == enthalpy(H2O, 50.0, ATM)
 end
 
 @testset "physical anchors independent of the fits" begin
@@ -150,14 +190,26 @@ end
     @test β(H2O, T_sym) isa Symbolics.Num
     @test Tsat(H2O, P_sym) isa Symbolics.Num
     @test ρ(D2O, T_sym) isa Symbolics.Num
+    @test enthalpy(H2O, T_sym) isa Symbolics.Num
+    @variables h_sym(t)
+    for liquid in (H2O, D2O)
+        T_of_h = temperature(liquid, h_sym)
+        @test T_of_h isa Symbolics.Num
+        T_of = Symbolics.build_function(T_of_h, h_sym; expression=Val(false))
+        @test T_of(enthalpy(liquid, 50.0)) ≈ 50.0 atol = 1e-10
+        # The traced expression stays one Horner chain.
+        @test length(string(T_of_h)) < 5_000
+    end
 end
 
 @testset "every liquid answers every property" begin
     for liquid in (H2O, D2O, Liquid())
-        for f in (ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β)
+        for f in (ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, enthalpy)
             @test f(liquid, 50.0) isa Real
         end
         @test Tsat(liquid, ATM) isa Real
+        @test vapor_enthalpy(liquid, ATM) isa Real
+        @test temperature(liquid, 1.0e5) isa Real
     end
 end
 
