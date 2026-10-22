@@ -144,7 +144,8 @@ function Tank(; name, area, L0, ports::NamedTuple, liquid::AbstractLiquid=H2O, p
         # an extra unknown that needs a start value.
         push!(eqs, D(T) ~ (inflow_heat + Q_ext) / (rho * V_of(L) * cp))
     end
-    return compose(System(eqs, t, vars, pars; name=name), port_sys...)
+    sys = compose(System(eqs, t, vars, pars; name=name), port_sys...)
+    return ModelingToolkit.setmetadata(sys, _PortHeightsKey, map(z -> g * z, ports))
 end
 
 """

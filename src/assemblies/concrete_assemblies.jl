@@ -1,40 +1,96 @@
-"""
-    _carried(sys, key) -> Vector
+@doc raw"""
+    check_gravity_mismatch(sys; tol=1e-6) -> Symbol
 
-The `key` metadata of `sys` and of every system nested in it, skipping those that carry none.
-A compiled system is read through the system it was compiled from, which keeps the nesting.
+Check that the elevations around every hydraulic loop of `sys` close. With the coolant at rest
+at one temperature and the pumps off, the pressure changes around a loop must sum to zero.
+Per unit density, a channel changes the pressure by ``g L``, a [`Gravity`](@ref) component
+by ``g H``, a [`Tank`](@ref) by ``g Δz`` between two of its ports, and every other component
+by nothing, so a loop that does not close has a missing return leg, a height that differs
+from the legs it returns, or a wrong sign. This is Python
+STREAM's `check_gravity_mismatch`.
+
+Each component joins its first port to each other one by an edge ``i`` with
+``p_{in} - p_{out} = r_i``, where ``r_i`` is the rise between them per unit density, and each
+`connect` joins its ports by edges with ``r_i = 0``. With ``B`` the edges' incidence matrix, the loops close when
+``B p = r`` has a solution, and the least-squares residual ``r - B p`` is nonzero only on the
+edges of loops that do not.
+
+# Arguments
+- `sys`: the model, compiled or not
+- `tol`: the largest residual accepted on any component [m]
+
+# Returns
+`:ok` when every loop closes. `:mismatch` when one does not, with a warning naming the
+components on such loops.
 """
-function _carried(sys, key)
-    while ModelingToolkit.has_parent(sys) && ModelingToolkit.get_parent(sys) !== nothing
-        sys = ModelingToolkit.get_parent(sys)
-    end
-    own = ModelingToolkit.getmetadata(sys, key, nothing)
-    found = own === nothing ? Any[] : Any[own]
-    for sub in ModelingToolkit.get_systems(sys)
-        append!(found, _carried(sub, key))
-    end
-    return found
+function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem; tol=1e-6)
+    edges = _flow_edges(_as_built(sys))
+    ports = unique(Iterators.flatten((e.inlet, e.outlet) for e in edges))
+    B = [(p === e.inlet) - (p === e.outlet) for e in edges, p in ports]
+    rise = [e.rise for e in edges]
+    residual = rise - B * (pinv(B) * rise)
+    off = [e.name for (e, r) in zip(edges, residual)
+           if !isempty(e.name) && abs(r) > tol * G_EARTH]
+    isempty(off) && return :ok
+    @warn "check_gravity_mismatch: the elevations around the loops through " *
+          "$(join(off, ", ")) do not close"
+    return :mismatch
 end
 
 """
-    check_gravity_mismatch(sys) -> Symbol
+    _as_built(sys) -> System
 
-Check whether the gravity terms of a hydraulic loop are balanced: when a channel runs with
-`g > 0`, the loop needs a [`Gravity`](@ref) component with `H > 0` for the return leg.
-
-# Arguments
-- `sys`: the loop, compiled or not
-
-# Returns
-`:ok` if balanced, or if no channel carries gravity, and `:mismatch`, with a warning, if
-channels carry gravity but there is no return-leg `Gravity` component.
+The system `sys` was compiled from, as composed, or `sys` itself if it was not compiled.
+Compiling flattens a system twice over: its parent has no subsystems or connections left,
+and the parent's parent is the system as built.
 """
-function check_gravity_mismatch(sys::ModelingToolkit.AbstractSystem)
-    any(g -> g isa Real && g > 0, _carried(sys, _GravityKey)) || return :ok
-    any(H -> H isa Real && H > 0, _carried(sys, _ElevationKey)) && return :ok
-    @warn "check_gravity_mismatch: channels have g > 0 but no Gravity return component " *
-          "found; loop gravity terms may be unbalanced"
-    return :mismatch
+function _as_built(sys)
+    while ModelingToolkit.has_parent(sys) && ModelingToolkit.get_parent(sys) !== nothing
+        sys = ModelingToolkit.get_parent(sys)
+    end
+    return sys
+end
+
+"""
+    _flow_edges(sys, prefix=Symbol[]) -> Vector{NamedTuple}
+
+The hydraulic network of `sys` and everything nested in it, as edges `(; name, inlet, outlet,
+rise)` between the full names of ports. A `connect` is an unnamed edge of no rise from its
+first port to each other one. A component with port heights, by its
+[`_PortHeightsKey`](@ref STREAM.Components._PortHeightsKey) or by having an `inlet` and an
+`outlet`, is an edge named after it from its first port to each other one, rising as they do.
+"""
+function _flow_edges(sys, prefix=Symbol[])
+    full(name) = Symbol(join([prefix; name], ModelingToolkit.NAMESPACE_SEPARATOR))
+    rhs = [ModelingToolkit.value(eq.rhs) for eq in ModelingToolkit.get_eqs(sys)]
+    links = [c.systems for c in rhs if c isa ModelingToolkit.Connection]
+    edges = NamedTuple[
+        (; name="", inlet=full(nameof(first(l))), outlet=full(nameof(p)), rise=0.0)
+        for l in links for p in l[2:end]
+    ]
+    subs = ModelingToolkit.get_systems(sys)
+    level = all(in(nameof.(subs)), (:inlet, :outlet)) ? (inlet=0.0, outlet=0.0) : nothing
+    heights = ModelingToolkit.getmetadata(sys, _PortHeightsKey, level)
+    if heights !== nothing
+        φ = map(h -> float(_numeric(h)), heights)
+        base = first(keys(φ))
+        append!(edges, [(; name=join(prefix, "."), inlet=full(base), outlet=full(k),
+                           rise=φ[k] - φ[base]) for k in keys(φ)[2:end]])
+    end
+    return mapreduce(s -> _flow_edges(s, [prefix; nameof(s)]), vcat, subs; init=edges)
+end
+
+"""
+    _numeric(x) -> Real
+
+`x` as a number, with any design knob in it at its default.
+"""
+function _numeric(x)
+    v = ModelingToolkit.value(x)
+    v isa Real && return v
+    defaults = Dict(k => ModelingToolkit.getdefault(k)
+                    for k in ModelingToolkit.Symbolics.get_variables(v))
+    return ModelingToolkit.SymbolicUtils.unwrap_const(ModelingToolkit.substitute(v, defaults))
 end
 
 """

@@ -68,7 +68,7 @@ end
     @test check_gravity_mismatch(ssys) == :ok
 end
 
-@testset "check_gravity_mismatch — :mismatch when CAC has g but no Gravity component" begin
+@testset "check_gravity_mismatch — :mismatch when a rising channel has no return leg" begin
     geom = Duct(0.6, Circular(0.01))
     @named ch = ChannelAndContacts(; n=4, geometry=geom, g=G_EARTH)
     @named pump = Pump(3.0e4)
@@ -82,19 +82,72 @@ end
     @named sys = assembly(connections, pump, bc, ch, wall)
     ssys = mtkcompile(sys)
     # The mismatch is also reported as a warning, which is part of what is checked.
-    result = @test_logs (:warn, r"no Gravity return component") check_gravity_mismatch(ssys)
+    result = @test_logs (:warn, r"through pump, bc, ch do not close") check_gravity_mismatch(ssys)
     @test result == :mismatch
 end
 
 @testset "check_gravity_mismatch — :ok with a Gravity return leg, compiled or not" begin
     @named ch = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)), g=G_EARTH)
     @named pump = Pump(3.0e4)
-    @named ret = Gravity(0.6)
+    @named ret = Gravity(-0.6)
     @named sys = assembly([inseries(pump, ch, ret, pump), pump.inlet.p ~ 1.0e5], pump, ch, ret)
     @test check_gravity_mismatch(sys) == :ok
-    # The channel carries its g and the Gravity its H, so nothing needs compiling to check.
-    @named bare = assembly([inseries(pump, ch, pump), pump.inlet.p ~ 1.0e5], pump, ch)
-    @test (@test_logs (:warn, r"no Gravity") check_gravity_mismatch(bare)) == :mismatch
+    @test check_gravity_mismatch(mtkcompile(sys)) == :ok
+end
+
+@testset "check_gravity_mismatch — a riser and a downcomer close without a Gravity" begin
+    @named up = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)), g=G_EARTH)
+    @named down = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)), g=-G_EARTH)
+    @named pump = Pump(3.0e4)
+    @named sys = assembly([inseries(pump, up, down, pump), pump.inlet.p ~ 1.0e5],
+                          pump, up, down)
+    @test check_gravity_mismatch(sys) == :ok
+end
+
+@testset "check_gravity_mismatch — a return leg of the wrong height or sign" begin
+    @named ch = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)), g=G_EARTH)
+    @named pump = Pump(3.0e4)
+    @testset "H = $H" for H in (-0.3, 0.6)
+        @named ret = Gravity(H)
+        @named sys = assembly([inseries(pump, ch, ret, pump), pump.inlet.p ~ 1.0e5],
+                              pump, ch, ret)
+        @test (@test_logs (:warn, r"through pump, ch, ret do not close") check_gravity_mismatch(sys)) == :mismatch
+    end
+end
+
+@testset "check_gravity_mismatch — parallel branches of different heights" begin
+    @named tall = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)), g=G_EARTH)
+    @named short = Channel(; n=4, geometry=Duct(0.3, Circular(0.01)), g=G_EARTH)
+    @named pump = Pump(3.0e4)
+    @named ret = Gravity(-0.6)
+    @named sys = assembly([inparallel(pump, (tall, short), ret), inseries(ret, pump),
+                           pump.inlet.p ~ 1.0e5], pump, tall, short, ret)
+    result = @test_logs (:warn, r"through pump, tall, short, ret do not close") check_gravity_mismatch(sys)
+    @test result == :mismatch
+end
+
+@testset "check_gravity_mismatch — a loop through a tank" begin
+    # The pool takes from 0.0 m and returns at 0.5 m, so the loop must climb 0.5 m.
+    @named pool = Tank(; area=1.0, L0=2.0, ports=(low=0.0, high=0.5))
+    @named pump = Pump(3.0e4)
+    @named ch = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)), g=G_EARTH)
+    loop(ret) = assembly(inseries(pool.low, pump, ch, ret, pool.high), pool, pump, ch, ret;
+                         name=:sys)
+    @test check_gravity_mismatch(loop(Gravity(-0.1; name=:ret))) == :ok
+    mismatch = r"through pool, pump, ch, ret do not close"
+    @test (@test_logs (:warn, mismatch) check_gravity_mismatch(loop(Gravity(-0.6; name=:ret)))) ==
+          :mismatch
+end
+
+@testset "check_gravity_mismatch — a nested channel and a knob height" begin
+    @design_knob H = -0.6
+    @named ch = Channel(; n=4, geometry=Duct(0.6, Circular(0.01)), g=G_EARTH)
+    @named heated = assembly(Equation[], ch)
+    @named pump = Pump(3.0e4)
+    @named ret = Gravity(H)
+    @named sys = assembly([inseries(pump, heated.ch, ret, pump), pump.inlet.p ~ 1.0e5],
+                          pump, heated, ret)
+    @test check_gravity_mismatch(sys) == :ok
 end
 
 # var_length

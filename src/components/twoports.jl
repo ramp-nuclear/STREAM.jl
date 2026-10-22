@@ -60,3 +60,14 @@ function HydraulicTwoPort(; name, inlet, outlet, eqs, vars=[], pars=[])
     obs = [Δp ~ outlet.p - inlet.p, ṁ ~ inlet.ṁ]
     return compose(System(full_eqs, t, [vars; Δp; ṁ], pars; observed=obs, name), inlet, outlet)
 end
+
+"""
+    _PortHeightsKey
+
+The metadata key a flow component stores the heights of its ports under, each times ``g``
+[m²/s²], as a `NamedTuple` by port name and from any datum of the component's own. A channel
+stores `(inlet=0, outlet=g L)`, a [`Gravity`](@ref) `(inlet=0, outlet=g H)` and a
+[`Tank`](@ref) ``g z`` for each port. A two-port without it has its ports level.
+`check_gravity_mismatch` reads it.
+"""
+struct _PortHeightsKey end

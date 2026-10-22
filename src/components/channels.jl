@@ -24,14 +24,6 @@ every cell up to that face, less the head at the local density:
 _static_pressure(p_inlet, dp, ṁ, ρ, A) = p_inlet .- cumsum(dp) .- ṁ^2 ./ (2 .* ρ .* A^2)
 
 """
-    _GravityKey
-
-The metadata key a channel stores its gravitational acceleration along the flow under [m/s²],
-for `check_gravity_mismatch` to read.
-"""
-struct _GravityKey end
-
-"""
     _faces(geometry) -> Tuple{Vararg{Symbol}}
 
 The faces of a channel on `geometry`: one per heated wall of its duct, named after the wall.
@@ -226,7 +218,8 @@ _all_variables(vars) =
 Build the composed `System` for a channel variant. Every variant states the heat flow into
 each face and whatever extra variables, equations, observables, and ports it adds, then hands
 them here; the shared core equations and the `compose` call live in one place. The system
-carries `geometry`, for [`duct`](@ref) to read back, and `g`, for `check_gravity_mismatch`.
+carries `geometry`, for [`duct`](@ref) to read back, and the heights of its ports, for
+`check_gravity_mismatch`.
 """
 function _channel_system(;
     name, n::Int, geometry::Duct, g, darcy, liquid,
@@ -244,7 +237,8 @@ function _channel_system(;
         outlet,
         extra_ports...,
     )
-    return ModelingToolkit.setmetadata(_with_duct(sys, geometry), _GravityKey, g)
+    heights = (inlet=0.0, outlet=g * geometry.L)
+    return ModelingToolkit.setmetadata(_with_duct(sys, geometry), _PortHeightsKey, heights)
 end
 
 """

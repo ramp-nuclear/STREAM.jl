@@ -2,7 +2,7 @@
 
 julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "ad3af9f969edec87121b5707fdf9f6cb8ea9baf4"
+project_hash = "f4ccc04829afae38ea1fec807340920e6f2dbe7d"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -1753,7 +1753,7 @@ uuid = "94e857df-77ce-4151-89e5-788b33177be4"
 version = "0.1.0"
 
 [[deps.STREAM]]
-deps = ["DelimitedFiles", "ModelingToolkit", "OrdinaryDiffEq", "QuadGK", "Statistics", "SteadyStateDiffEq", "SymbolicIndexingInterface"]
+deps = ["DelimitedFiles", "LinearAlgebra", "ModelingToolkit", "OrdinaryDiffEq", "QuadGK", "Statistics", "SteadyStateDiffEq", "SymbolicIndexingInterface"]
 path = "."
 uuid = "49562357-9609-405b-b96f-716d2939d241"
 version = "0.1.0"
