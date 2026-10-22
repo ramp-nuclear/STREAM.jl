@@ -218,8 +218,7 @@ _all_variables(vars) =
 Build the composed `System` for a channel variant. Every variant states the heat flow into
 each face and whatever extra variables, equations, observables, and ports it adds, then hands
 them here; the shared core equations and the `compose` call live in one place. The system
-carries `geometry`, for [`duct`](@ref) to read back, and the heights of its ports, for
-`check_gravity_mismatch`.
+carries `geometry`, for [`duct`](@ref) to read back.
 """
 function _channel_system(;
     name, n::Int, geometry::Duct, g, darcy, liquid,
@@ -237,8 +236,7 @@ function _channel_system(;
         outlet,
         extra_ports...,
     )
-    heights = (inlet=0.0, outlet=g * geometry.L)
-    return ModelingToolkit.setmetadata(_with_duct(sys, geometry), _PortHeightsKey, heights)
+    return _with_duct(sys, geometry)
 end
 
 """

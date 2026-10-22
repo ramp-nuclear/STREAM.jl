@@ -201,8 +201,7 @@ than its falling leg has a net buoyancy head
 ```
 
 which drives natural circulation. This is why the sign of ``g`` on every channel and gravity
-element matters, and [`check_gravity_mismatch`](@ref STREAM.Assemblies.check_gravity_mismatch)
-checks that the heights around every loop sum to zero.
+element matters.
 
 ## Inertia
 
