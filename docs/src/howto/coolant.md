@@ -43,11 +43,11 @@ model = with_coolant(D2O) do
     assembly([inseries(pump, hx, core, pump), pump.inlet.p ~ ATM], pump, hx, core; name=:model)
 end
 @assert Substances.coolant(model.core) === D2O   # the channel keeps the block's coolant
-Substances.coolant()
+Substances.default_coolant()
 ```
 
-The block returns its last expression, here the model, and `Substances.coolant()` is back to
-`H2O` outside it.
+The block returns its last expression, here the model, and `Substances.default_coolant()` is
+back to `H2O` outside it.
 
 Every channel records the coolant it was built with, so a `ChannelState` reads the right one
 after the block ends. `steady_state_guess` runs before any model exists, so it reads the default

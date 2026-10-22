@@ -1,6 +1,6 @@
 @doc raw"""
     Flapper(; name, f=1.0, area=1.0, open_rate=1.0, machine, open_state=:OPEN,
-            open_fraction=nothing, dp_linear=1.0, liquid=coolant()) -> System
+            open_fraction=nothing, dp_linear=1.0, liquid=default_coolant()) -> System
 
 Passive check valve. Shut, it passes no flow. Open, it is a quadratic resistor,
 
@@ -45,8 +45,8 @@ moves flow between its paths; an orifice is where the loop loses its coolant.
   its square root (default 1). The open valve passes
   `ṁ = xi·area·sqrt(2ρ/f)·ΔP / (ΔP² + dp_linear²)^{1/4}`, which crosses zero with a finite
   slope. Well above `dp_linear` this is the quadratic law above.
-- `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`coolant()`](@ref
-  STREAM.Substances.coolant), whose density on the
+- `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`default_coolant()`](@ref
+  STREAM.Substances.default_coolant), whose density on the
   side the flow enters sets the open valve's pressure drop
 
 # Ports
@@ -58,7 +58,7 @@ Uncompiled `System`, with the open fraction as the variable `xi`.
 function Flapper(; name, f=1.0, area=1.0, open_rate=1.0,
                  machine::StateMachine=StateMachine(; initial_state=:CLOSED),
                  open_state=:OPEN, open_fraction=nothing, dp_linear=1.0,
-                 liquid::AbstractLiquid=coolant())
+                 liquid::AbstractLiquid=default_coolant())
     fraction = open_fraction === nothing ?
         _Opening(machine, open_state, open_rate) : open_fraction
     fs = @parameters f = f
@@ -69,7 +69,7 @@ end
 
 @doc raw"""
     Orifice(; name, area, cd, machine, open_state=:OPEN, open_rate=10.0, dp_linear=1.0,
-            cc=nothing, liquid=coolant()) -> System
+            cc=nothing, liquid=default_coolant()) -> System
 
 A hole a liquid discharges through: a break in a pool wall, a breach in a pipe, or a severed
 pipe end. Open, it passes
@@ -129,8 +129,8 @@ push!(flash, (:LIQUID => :FLASHING, breach.subcooling < 0, "throat at saturation
   slope. Well above `dp_linear` this is the square-root law above.
 - `cc`: contraction coefficient of the vena contracta, or `nothing` (default) to skip the
   throat report
-- `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`coolant()`](@ref
-  STREAM.Substances.coolant)
+- `liquid`: coolant ([`AbstractLiquid`](@ref)), default [`default_coolant()`](@ref
+  STREAM.Substances.default_coolant)
 
 # Ports
 - `inlet`, `outlet`: `FlowPort`
@@ -142,7 +142,7 @@ throat pressure `p_throat` [Pa] and the throat `subcooling` [K], the saturation 
 """
 function Orifice(; name, area, cd, machine::StateMachine=StateMachine(; initial_state=:SHUT),
                  open_state=:OPEN, open_rate=10.0, dp_linear=1.0, cc=nothing,
-                 liquid::AbstractLiquid=coolant())
+                 liquid::AbstractLiquid=default_coolant())
     fraction = _Opening(machine, open_state, open_rate)
     cd isa Function && return _Valve(; name, area, fraction, dp_linear, cc, liquid, cd_of_Re=cd)
     cds = @parameters cd = cd

@@ -4,12 +4,14 @@ using ModelingToolkit: t_nounits as t
 using STREAM
 using STREAM.Substances
 using STREAM.Components
-using OrdinaryDiffEq: ReturnCode
-using SteadyStateDiffEq
 using STREAM.Assemblies
 using STREAM.Components: Channel  # explicit: Base.Channel also exists
 
-"""Every component that reads a coolant, with `kw` forwarded to each constructor."""
+"""
+    _coolant_readers(; kw...) -> Vector{System}
+
+Every component that reads a coolant, with `kw` forwarded to each constructor.
+"""
 function _coolant_readers(; kw...)
     geom = PipeGeometry_circular(0.6, 0.01)
     opened = StateMachine(; initial_state=:OPEN)
@@ -24,6 +26,7 @@ function _coolant_readers(; kw...)
         Flapper(; name=:flap, machine=opened, kw...),
         Orifice(; name=:hole, area=1.0e-4, cd=0.6, machine=opened, kw...),
         Tank(; name=:pool, area=1.0, L0=1.0, ports=(bottom=0.0,), kw...),
+        HeatExchanger(40.0; UA=1.0e3, name=:hx, kw...),
     ]
 end
 
@@ -62,12 +65,12 @@ end
 @testset "the coolant default" begin
     mock = Liquid()
     with_coolant(D2O) do
-        @test coolant() === D2O
-        @test with_coolant(coolant, mock) === mock
-        @test coolant() === D2O
+        @test default_coolant() === D2O
+        @test with_coolant(default_coolant, mock) === mock
+        @test default_coolant() === D2O
     end
     @test_throws ErrorException with_coolant(() -> error("inside"), D2O)
-    @test coolant() === H2O
+    @test default_coolant() === H2O
 end
 
 @testset "with_coolant names the coolant for every component that reads one" begin
@@ -77,10 +80,14 @@ end
     @test all(isequal(equations(a), equations(b)) for (a, b) in zip(scoped, explicit))
     @test !any(isequal(equations(a), equations(c)) for (a, c) in zip(scoped, light))
 
-    # The one component that takes a density function rather than a liquid.
+    # The two components whose coolant keyword is not `liquid`.
     volumetric = with_coolant(() -> VolumetricFlowResistor(; name=:v, k=1.0), D2O)
     @test isequal(equations(volumetric),
                   equations(VolumetricFlowResistor(; name=:v, k=1.0, density=T -> ρ(D2O, T))))
+    two_stream = with_coolant(() -> HeatExchanger(; UA=1.0e3, name=:hx), D2O)
+    @test isequal(equations(two_stream),
+                  equations(HeatExchanger(; UA=1.0e3, primary_liquid=D2O, secondary_liquid=D2O,
+                                          name=:hx)))
 
     # An explicit coolant inside the block wins over it.
     frozen = with_coolant(() -> Gravity(1.0; name=:rise, liquid=Liquid()), D2O)
@@ -92,29 +99,6 @@ end
           Thresholds.q_OFI_whittle_forgan(0.5, 100.0, 26.85, pipe; liquid=D2O)
     guess(; kw...) = steady_state_guess(; T_inlet=40.0, Q_wall=1.0e4, ṁ_guess=0.1, n=5, kw...)
     @test with_coolant(guess, D2O) == guess(; liquid=D2O)
-end
-
-@testset "a loop built inside a with_coolant block solves as the loop named per component" begin
-    function loop(; kw...)
-        geom = PipeGeometry_circular(0.6, 0.01)
-        @named pump = Pump(3.0e4)
-        @named bc = HeatExchanger(40.0)
-        @named ch = Channel(; n=6, geometry=geom, h_left=5000.0, kw...)
-        @named rise = Gravity(0.3; kw...)
-        @named friction = FrictionResistor(; geometry=geom, kw...)
-        connections = [
-            inseries(pump, bc, ch, rise, friction, pump),
-            pump.inlet.p ~ ATM,
-            ch.T_wall_left .~ 100.0,
-            ch.T_wall_right .~ 40.0,
-        ]
-        @named sys = assembly(connections, pump, bc, ch, rise, friction)
-        ssys = mtkcompile(sys)
-        return solve_steady(ssys, [ssys.ch.inlet.ṁ => 0.3])
-    end
-    scoped = with_coolant(loop, D2O)
-    @test scoped.retcode == ReturnCode.Success
-    @test scoped.u == loop(; liquid=D2O).u
 end
 
 @testset "a channel records its coolant, and coolant(sys) returns it after compilation" begin

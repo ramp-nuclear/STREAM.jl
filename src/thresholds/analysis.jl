@@ -29,8 +29,8 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
 - `pipe::Union{PipeGeometry, Nothing}`: channel geometry, or `nothing` if unavailable
 - `gravity::Float64`: gravitational acceleration [m/s²]
 - `liquid::AbstractLiquid`: the channel's coolant, which the correlations on a `ChannelState`
-  read by default. Built by hand it is [`coolant()`](@ref STREAM.Substances.coolant) unless
-  given.
+  read by default. Built by hand it is
+  [`default_coolant()`](@ref STREAM.Substances.default_coolant) unless given.
 """
 @kwdef struct ChannelState
     n::Int
@@ -49,7 +49,7 @@ For a transient, [`ChannelState(sol, channel_sys; index=k)`](@ref) reads the sav
     velocity::AbstractArray
     pipe::Union{PipeGeometry,Nothing}
     gravity::Float64
-    liquid::AbstractLiquid = coolant()
+    liquid::AbstractLiquid = default_coolant()
 end
 
 """

@@ -71,7 +71,7 @@ include("substances/heavy_water.jl")
 include("substances/coolant.jl")
 include("substances/solid.jl")
 export AbstractLiquid, Liquid, LightWater, HeavyWater, H2O, D2O, Solid
-export coolant, with_coolant
+export coolant, default_coolant, with_coolant
 export density, vapor_density, specific_heat, viscosity, conductivity
 export surface_tension, latent_heat, thermal_expansion, sat_temperature
 export ρ, ρᵥ, cₚ, μ, κ, σ, hfg, β, Tsat
@@ -214,7 +214,7 @@ Analysis needs a channel carrying a wall temperature, so `Channel` or `ChannelAn
 module Thresholds
 using ModelingToolkit
 using QuadGK
-using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, G_EARTH, coolant
+using ..STREAM: AbstractLiquid, Liquid, PipeGeometry, G_EARTH, coolant, default_coolant
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Pe
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
@@ -267,11 +267,11 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
 using ModelingToolkit: ⋅
 using ModelingToolkit: Symbolics, SymbolicUtils
 using SymbolicIndexingInterface: getsym, ProblemState
-using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM, coolant
+using ..STREAM: AbstractLiquid, PipeGeometry, G_EARTH, ATM, T_ROOM, default_coolant
 using ..STREAM: ρ, cₚ, μ, κ, Tsat
 using ..STREAM: Re, Pr, Nu, Gr, Ra
 using ..STREAM: assembly, port
-using ..Substances: _coolant_metadata
+using ..Substances: _CoolantKey
 using ..HTC
 using ..HTC: _bergles_rohsenow_dT_ONB   # the ONB superheat, private to HTC
 using ..Friction
