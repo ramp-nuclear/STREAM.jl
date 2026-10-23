@@ -71,9 +71,8 @@ connections = [
 sys = mtkcompile(plant)
 foreach(println, unknowns(sys))
 
-flows = filter(u -> occursin("ṁ", string(u)), unknowns(sys))
-op = [[f => ṁ_design for f in flows]; sys.dtank.pinned => false]
-sol_ss = solve_steady(sys, op; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
+sol_ss = solve_steady(sys, [sys.dtank.pinned => false]; solver=DynamicSS(Rodas5P()),
+                      abstol=1e-10, reltol=1e-10)
 sol_ss.retcode
 
 (level=sol_ss[sys.dtank.L], inflow=sol_ss[sys.tank_line.inlet.ṁ],
