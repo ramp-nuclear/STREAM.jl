@@ -48,7 +48,7 @@ connections = [
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)
 
-sol = solve_steady(sys, [sys.ch.inlet.ṁ => 0.5])
+sol = solve_steady(sys)
 sol[sys.ch.inlet.ṁ], sol[sys.ch.T_out]    # about 0.6 kg/s, leaving at about 42 °C
 ```
 

@@ -166,12 +166,11 @@ foreach(println, unknowns(sys))
 #
 # ## Normal operation
 #
-# The decay tank's level is free in the steady solve, set in the operating point. Its flows
-# start at the design flow, and the solve integrates to where the plant settles:
+# The decay tank's level is free in the steady solve, set in the operating point, and the
+# solve integrates to where the plant settles:
 
-flows = filter(u -> occursin("ṁ", string(u)), unknowns(sys))
-op = [[f => ṁ_design for f in flows]; sys.dtank.pinned => false]
-sol_ss = solve_steady(sys, op; solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
+sol_ss = solve_steady(sys, [sys.dtank.pinned => false]; solver=DynamicSS(Rodas5P()),
+                      abstol=1e-10, reltol=1e-10)
 sol_ss.retcode
 
 # The decay tank found its own level, where the pump draws exactly what arrives from the

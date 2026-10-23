@@ -77,7 +77,7 @@ connections = [
 ]
 @named loop = assembly(connections, pump, hx, ch)
 sys = mtkcompile(loop)
-sol = solve_transient(sys, [sys.ch.inlet.ṁ => 0.6, sys.ch.T => fill(40.0, n)], 0.0:1.0:60.0)
+sol = solve_transient(sys, [sys.ch.T => fill(40.0, n)], 0.0:1.0:60.0)
 sol[sys.ch.T_out, end]
 ```
 

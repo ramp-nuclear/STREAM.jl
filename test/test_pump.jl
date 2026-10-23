@@ -60,13 +60,7 @@ end
     ]
     @named sys_fn = assembly(conns_fn, p_fn, hx_fn, res_fn)
     ssys_fn = mtkcompile(sys_fn)
-    sol_fn = solve_steady(
-        ssys_fn,
-        [
-            ssys_fn.res_fn.inlet.ṁ => 1.0,
-            ssys_fn.p_fn.dP_pump_fn => dP_call,
-        ],
-    )
+    sol_fn = solve_steady(ssys_fn, [ssys_fn.p_fn.dP_pump_fn => dP_call])
     @test sol_fn.retcode == ReturnCode.Success
     # Defining relation of callable mode: the head equals the callable's value (rtol=1e-8,
     # exact algebraic head). Confirms the callable, not a frozen constant, drove the solve.
@@ -145,9 +139,8 @@ end
     #
     # Solver choice: this loop has a time-varying head, so the steady solve needs the stiff
     # DynamicSS(Rodas5P) solver. The default steady solver goes unstable here.
-    sol_ss = solve_steady(ssys,
-        [ssys.ine.inlet.ṁ => ṁ_0, ssys.pump.dP_pump_fn => dP_hold];
-        solver=DynamicSS(Rodas5P()))
+    sol_ss = solve_steady(ssys, [ssys.pump.dP_pump_fn => dP_hold];
+                          solver=DynamicSS(Rodas5P()))
     @test sol_ss.retcode == ReturnCode.Success
     @test isapprox(sol_ss[ssys.ine.inlet.ṁ], ṁ_0; rtol=1e-3)   # relaxation endpoint, loose
 

@@ -213,7 +213,7 @@ end
         ssys = mtkcompile(sys)
         # The callable form's extra L_eff variable changes what MTK tears, which surfaces
         # the dummy derivative; seed it so both forms initialise the same way.
-        op = Pair{Any,Any}[ssys.L_comp.inlet.ṁ => ṁ0]
+        op = Pair{Any,Any}[]
         if any(contains("ṁˍt"), string.(unknowns(ssys)))
             push!(op, Differential(t)(ssys.L_comp.inlet.ṁ) => 0.0)
         end

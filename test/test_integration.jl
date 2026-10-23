@@ -244,15 +244,9 @@ end
     @named sys = assembly(conns, pump, L_el, R1, R2, hx)
     ssys = mtkcompile(sys)
     # Python solves the driven steady state, then shuts the pump (p=0) and coasts. Solve_steady
-    # with the pump on (the branch guesses seed the split m1/m2 = √(k2/k1)), then start the
-    # transient from the solved state with the pump head overridden to 0.
-    sol_ss = solve_steady(ssys,
-        [
-            ssys.L_el.inlet.ṁ => ṁ0,
-            ssys.R1.inlet.ṁ => ṁ0 / (1 + sqrt(k1 / k2)),
-            ssys.R2.inlet.ṁ => ṁ0 / (1 + sqrt(k2 / k1)),
-        ],
-    )
+    # with the pump on, then start the transient from the solved state with the pump head
+    # overridden to 0.
+    sol_ss = solve_steady(ssys)
     @test sol_ss.retcode == ReturnCode.Success
     t_arr = range(0.0, 100.0; length=6)   # includes 0, 20, 60, 100
     sol = solve_transient(ssys, sol_ss, t_arr; overrides=[ssys.pump.dP_pump => 0.0],
@@ -344,10 +338,7 @@ end
     ṁ = Float64[]
     for tt in 0.0:1.0:6.0
         m = 3.0 - tt
-        sol = solve_steady(
-            ssys,
-            [ssys.pump.ṁ0 => m, ssys.lpd.inlet.ṁ => m],
-        )
+        sol = solve_steady(ssys, [ssys.pump.ṁ0 => m])
         @test sol.retcode == ReturnCode.Success
         push!(ṁ, sol[ssys.lpd.inlet.ṁ])
     end
@@ -381,7 +372,6 @@ end
     @named sys = assembly(conns, pump, R, flapper, hx)
     ssys = mtkcompile(sys)
     op = [
-        ssys.R.inlet.ṁ => 1.0,
         ssys.pump.dP_pump_fn => dp_fn,
     ]   # the machine starts :CLOSED (flapper shut until the transition fires)
     @test machine.state === :CLOSED   # starts closed (Python: isinf(F.t_open))
@@ -486,15 +476,9 @@ end
     ]
     @named sys = assembly(conns, pump, ine, R, transistor, hx)
     ssys = mtkcompile(sys)
-    sr(a, b) = 1 + sqrt(a / b)
     # Python solves the driven steady state (transistor stiff, near-all flow through R), then
     # shuts the pump and coasts as the transistor collapses. Solve_steady on, then coast from it.
-    sol_ss = solve_steady(ssys, [
-            ssys.ine.inlet.ṁ => 1.0,
-            ssys.R.inlet.ṁ => 1.0 / sr(k1, k2),
-            ssys.transistor.inlet.ṁ => 1.0 / sr(k2, k1),
-        ssys.transistor.k_fn => kfn,
-    ])
+    sol_ss = solve_steady(ssys, [ssys.transistor.k_fn => kfn])
     @test sol_ss.retcode == ReturnCode.Success
     sol = solve_transient(ssys, sol_ss, range(0.0, t_final; length=302);
                           overrides=[ssys.pump.dP_pump => 0.0, ssys.transistor.k_fn => kfn],
@@ -606,7 +590,6 @@ end
     @named pump = Pump(; ṁ0=ṁ0)
     ssys = build_coastdown(pump)
     guess = [
-        ssys.cold.inlet.ṁ => ṁ0,
         ssys.cold.T => fill(T_cold, nz),
         ssys.hot.T => fill(T_hot, nz),
     ]
@@ -649,14 +632,9 @@ end
     # Quasi-static per-point steady (Python #16 is a nonlinear root-solve, not a transient). Each
     # solve is seeded from the previous converged full state, so it starts near-steady and converges
     # in a couple of Newton steps. The reversal emerges from the decaying head, not the seed.
-    #
-    # Seed BOTH channels forward (ṁ0/2): mtkcompile keeps one channel ṁ as the state and which
-    # one varies by Julia version, so seeding both lands the kept state in the forward basin either
-    # way (otherwise it sits at 0 and the laminar 64/Re friction divides by zero). SSRootfind is a
-    # direct root-find with no time step, so it cannot underflow dt at the stiff near-reversal point.
+    # SSRootfind is a direct root-find with no time step, so it cannot underflow dt at the
+    # stiff near-reversal point.
     carry = [
-        ssys2.hot.inlet.ṁ => ṁ0 / 2,
-        ssys2.cold.inlet.ṁ => ṁ0 / 2,
         Dt(ssys2.cold.inlet.ṁ) => 0.0,
         Dt(ssys2.hot.inlet.ṁ) => 0.0,
         ssys2.cold.T => fill(T_cold, nz),
@@ -729,8 +707,7 @@ end
     ]
     full = assembly(conns, osc, pump, bc; name=:sys4)
     ssys = mtkcompile(full)
-    ic = [ssys.osc.cac.inlet.ṁ => ṁ]
-    sol = solve_transient(ssys, ic, range(0.0, 200.0; length=50);
+    sol = solve_transient(ssys, range(0.0, 200.0; length=50);
                           initializealg=BrownFullBasicInit(), maxiters=1_000_000)
     @test sol.retcode == ReturnCode.Success
     Tc = sol[ssys.osc.cac.T, end]

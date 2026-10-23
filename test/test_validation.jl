@@ -137,8 +137,7 @@ end
     @named sys = assembly(conns, pump, hx, cac, wall)
     ssys = mtkcompile(sys)
 
-    op = [ssys.cac.inlet.ṁ => 0.5]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test all(isfinite, sol[ssys.cac.T])
         @test isfinite(sol[ssys.cac.inlet.ṁ])
@@ -231,9 +230,8 @@ end
     @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     ssys = mtkcompile(sys)
 
-    op = [ssys.cac_l.inlet.ṁ => +0.250, ssys.cac_r.inlet.ṁ => +0.250]
     rows = ParityRow[]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test all(isfinite, sol[ssys.hd.T])
 
@@ -426,11 +424,7 @@ end
     @named sys = assembly(conns, pump_l, hx_l, cac_l, pump_r, hx_r, cac_r, hd)
     ssys = mtkcompile(sys)
 
-    op = [
-        [ssys.hd.T[i, nx] => 95.0 for i in 1:nz]...,
-        ssys.cac_l.inlet.ṁ => +0.250,
-        ssys.cac_r.inlet.ṁ => +0.250,
-    ]
+    op = [ssys.hd.T[i, nx] => 95.0 for i in 1:nz]
     rows = ParityRow[]
     sol = solve_steady(ssys, op)
     @test sol.retcode == ReturnCode.Success
@@ -567,9 +561,8 @@ end
 
     cac_s = ssys.scc.cac_l
     fuel_s = ssys.scc.hd
-    op = [cac_s.inlet.ṁ => +0.250]
     rows = ParityRow[]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     @test all(isfinite, sol[fuel_s.T])
 
