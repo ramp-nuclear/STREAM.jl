@@ -86,8 +86,7 @@ end
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
     # Solve briefly to verify composition produces meaningful steady state
-    ic = [ssys.rods.cac.inlet.ṁ => 0.2]
-    sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
+    sol = solve_transient(ssys, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
 end
 
@@ -104,8 +103,7 @@ end
     full = assembly(conns, rods, pump, bc; name=:fullx4)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
-    ic = [ssys.rods.cac.inlet.ṁ => 0.2]
-    sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
+    sol = solve_transient(ssys, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
 end
 
@@ -122,8 +120,7 @@ end
     full = assembly(conns, rods, pump, bc; name=:fullx3)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
-    ic = [ssys.rods.cac.inlet.ṁ => 0.2]
-    sol = solve_transient(ssys, ic, range(0.0, 0.5, length=10))
+    sol = solve_transient(ssys, range(0.0, 0.5, length=10))
     @test sol.retcode == ReturnCode.Success
 end
 
@@ -159,11 +156,7 @@ end
     ]
     full = assembly(conns, pl, pump_l, bc_l, pump_r, bc_r; name=:dualcac)
     ssys = mtkcompile(full)
-    op = [
-        ssys.pl.ch_left.inlet.ṁ => 0.25,
-        ssys.pl.ch_right.inlet.ṁ => 0.25,
-    ]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     # Both fuel faces exchange heat with their own channel. thermal_left[i].Q is
     # heat INTO the fuel from ch_left; the powered plate is hotter than the coolant, so
@@ -216,8 +209,7 @@ function _build_osc_loop(side::Symbol, name_suffix)
     ]
     full = assembly(conns, osc, pump, bc; name=Symbol(:osc_full_, name_suffix))
     ssys = mtkcompile(full)
-    op = [getproperty(ssys, Symbol(:osc_, name_suffix)).cac.inlet.ṁ => 0.25]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
     return ssys, sol, getproperty(ssys, Symbol(:osc_, name_suffix)), nz, nx
 end
 
@@ -330,8 +322,7 @@ end
     ]
     full = assembly(conns, scc, pump, bc; name=:scc_full_s)
     ssys = mtkcompile(full)
-    op = [ssys.scc_s.cac.inlet.ṁ => 0.25]
-    sol = solve_steady(ssys, op)
+    sol = solve_steady(ssys)
     @test sol.retcode == ReturnCode.Success
     # Far face carries heat into the convective sink (one_sided would be adiabatic here).
     far_Q = sol[port(ssys.scc_s.fuel, :thermal_right, 1).Q]
@@ -364,8 +355,7 @@ end
     full = assembly(conns, p1, p2, pump, bc; name=:two_plates)
     ssys = mtkcompile(full)
     @test ssys isa ModelingToolkit.AbstractSystem
-    ic = [ssys.p1.cac.inlet.ṁ => 0.2]
-    sol = solve_transient(ssys, ic, range(0.0, 0.2, length=5))
+    sol = solve_transient(ssys, range(0.0, 0.2, length=5))
     @test sol.retcode == ReturnCode.Success
 end
 

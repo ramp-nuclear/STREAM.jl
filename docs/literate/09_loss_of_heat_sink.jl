@@ -118,13 +118,12 @@ nothing #hide
 # ## Normal operation
 #
 # In the steady state the pool's temperature is where the exchanger removes exactly the
-# core's power. The solve integrates to where the plant settles, starting from the design
-# flows. The pool takes a long time to settle, and its temperature drifts slowly near the end,
-# so the solve asks for tight tolerances to avoid stopping early.
+# core's power. The solve integrates to where the plant settles. The pool takes a long time
+# to settle, and its temperature drifts slowly near the end, so the solve asks for tight
+# tolerances to avoid stopping early.
 
-op = [sys.ch.inlet.ṁ => ṁ_primary / N, sys.flywheel.inlet.ṁ => ṁ_secondary]
 steady = (solver=DynamicSS(Rodas5P()), abstol=1e-10, reltol=1e-10)
-sol_ss = solve_steady(sys, op; steady...)
+sol_ss = solve_steady(sys; steady...)
 sol_ss.retcode
 
 # All of the core's power crosses the exchanger. `hx.Q` is the heat into the primary, so it is
@@ -164,7 +163,7 @@ T_pool_hand = T_tower + P_rated / (ε * C_min) - P_rated / C_p
 
 @named hx = HeatExchanger(; UA, arrangement=HTC.ParallelFlow())
 sys_parallel = build_plant(hx)
-sol_parallel = solve_steady(sys_parallel, op; steady...)
+sol_parallel = solve_steady(sys_parallel; steady...)
 @assert sol_parallel[sys_parallel.pool.T] > sol_ss[sys.pool.T]
 (counterflow=sol_ss[sys.pool.T], parallel=sol_parallel[sys_parallel.pool.T])
 
@@ -229,7 +228,7 @@ residual = -sol[sys.hx.Q][end] / P_rated
 ua = HTC.flow_scaled_UA(UA, ṁp_0, ṁs_0)
 @named hx = HeatExchanger(; UA=ua)
 sys_scaled = build_plant(hx)
-sol_ss_scaled = solve_steady(sys_scaled, op; steady...)
+sol_ss_scaled = solve_steady(sys_scaled; steady...)
 sol_scaled = solve_transient(sys_scaled, sol_ss_scaled, times;
                              overrides=[sys_scaled.spump.dP_pump => 0.0,
                                         sys_scaled.pool.pinned => false])

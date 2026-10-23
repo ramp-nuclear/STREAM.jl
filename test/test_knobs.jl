@@ -110,12 +110,8 @@ end
     # the gap is one shared knob across both channels and the plate
     @test count(p -> occursin("gap", string(p)), parameters(ssys)) == 1
 
-    baseop(gv) = [
-        gap => gv, ssys.cac_l.inlet.ṁ => +0.250, ssys.cac_r.inlet.ṁ => +0.250,
-    ]
-
-    s0 = solve_steady(ssys, baseop(0.00127))   # default gap
-    s1 = solve_steady(ssys, baseop(0.00090))   # narrower gap, no rebuild
+    s0 = solve_steady(ssys, [gap => 0.00127])   # default gap
+    s1 = solve_steady(ssys, [gap => 0.00090])   # narrower gap, no rebuild
     @test string(s0.retcode) == "Success"
     @test string(s1.retcode) == "Success"
 

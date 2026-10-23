@@ -44,9 +44,6 @@ function hx_loops(hx; dPp=2.0, dPs=4.0)
     return mtkcompile(sys)
 end
 
-solve_loops(ssys, op=Pair[]) = solve_steady(ssys, [ssys.rp.inlet.ṁ => 2.0,
-                                                   ssys.rs.inlet.ṁ => 4.0, op...])
-
 """
     hand_hx(arrangement, ṁp, ṁs; UA=HX_UA) -> (Q, Tp_out, Ts_out)
 
@@ -73,7 +70,7 @@ lmtd(ΔT1, ΔT2) = (ΔT1 - ΔT2) / log(ΔT1 / ΔT2)
         @testset "$(nameof(typeof(arr))): outlets match ε-NTU" begin
             @named hx = HeatExchanger(; UA=HX_UA, arrangement=arr)
             ssys = hx_loops(hx)
-            sol = solve_loops(ssys)
+            sol = solve_steady(ssys)
             @test SciMLBase.successful_retcode(sol)
 
             Q, Tp_out, Ts_out = hand_hx(arr, 2.0, 4.0)
@@ -99,7 +96,7 @@ lmtd(ΔT1, ΔT2) = (ΔT1 - ΔT2) / log(ΔT1 / ΔT2)
     @testset "no secondary flow, no heat removed" begin
         @named hx = HeatExchanger(; UA=HX_UA)
         ssys = hx_loops(hx; dPs=0.0)
-        sol = solve_steady(ssys, [ssys.rp.inlet.ṁ => 2.0, ssys.rs.inlet.ṁ => 0.0])
+        sol = solve_steady(ssys)
         @test SciMLBase.successful_retcode(sol)
         @test abs(sol[ssys.hx.Q]) < 1e-3
         @test sol[ssys.hx.primary.outlet.T] ≈ HX_T_HOT atol = 1e-6
@@ -108,7 +105,7 @@ lmtd(ΔT1, ΔT2) = (ΔT1 - ΔT2) / log(ΔT1 / ΔT2)
     @testset "reversed primary turns counterflow into parallel flow" begin
         @named hx = HeatExchanger(; UA=HX_UA, arrangement=HTC.Counterflow())
         ssys = hx_loops(hx; dPp=-2.0)
-        sol = solve_steady(ssys, [ssys.rp.inlet.ṁ => -2.0, ssys.rs.inlet.ṁ => 4.0])
+        sol = solve_steady(ssys)
         @test SciMLBase.successful_retcode(sol)
         @test sol[ssys.hx.primary.inlet.ṁ] ≈ -2.0
         @test sol[ssys.hx.primary.T_in] ≈ HX_T_HOT
@@ -121,20 +118,20 @@ lmtd(ΔT1, ΔT2) = (ΔT1 - ΔT2) / log(ΔT1 / ΔT2)
     @testset "UA is a parameter a solve can override" begin
         @named hx = HeatExchanger(; UA=HX_UA)
         ssys = hx_loops(hx)
-        sol = solve_loops(ssys, [ssys.hx.UA => 5.0e3])
+        sol = solve_steady(ssys, [ssys.hx.UA => 5.0e3])
         @test sol[ssys.hx.Q] ≈ first(hand_hx(HTC.Counterflow(), 2.0, 4.0; UA=5.0e3)) rtol = 1e-8
     end
 
     @testset "flow_scaled_UA is UA0 at the design flows" begin
         @named hx = HeatExchanger(; UA=HTC.flow_scaled_UA(HX_UA, 2.0, 4.0))
         ssys = hx_loops(hx)
-        sol = solve_loops(ssys)
+        sol = solve_steady(ssys)
         @test sol[ssys.hx.UA_eff] ≈ HX_UA rtol = 1e-10
         @test sol[ssys.hx.Q] ≈ first(hand_hx(HTC.Counterflow(), 2.0, 4.0)) rtol = 1e-8
 
         # Half the secondary flow lowers UA, and less heat crosses than at fixed UA.
         ssys = hx_loops(hx; dPs=2.0)
-        sol = solve_steady(ssys, [ssys.rp.inlet.ṁ => 2.0, ssys.rs.inlet.ṁ => 2.0])
+        sol = solve_steady(ssys)
         @test sol[ssys.hx.UA_eff] < HX_UA
         @test abs(sol[ssys.hx.Q]) < abs(first(hand_hx(HTC.Counterflow(), 2.0, 2.0)))
     end
@@ -148,7 +145,7 @@ end
         @named sys = assembly([inseries(p, hot, sink, r, p), p.inlet.p ~ 1.0e5],
                               p, r, hot, sink)
         ssys = mtkcompile(sys)
-        return ssys, solve_steady(ssys, [ssys.r.inlet.ṁ => 2.0])
+        return ssys, solve_steady(ssys)
     end
 
     @named sink = HeatExchanger(20.0; UA=1.0e4)

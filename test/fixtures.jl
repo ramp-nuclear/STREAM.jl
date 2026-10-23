@@ -80,7 +80,6 @@ function build_loop_pk(ctrl; n=7, nz=7, nx=2, T_inlet=20.0, P0=1.0, feedback=not
     ssys = mtkcompile(sys)
 
     ic = Pair{Any,Any}[
-        ssys.rods.cac.inlet.ṁ => 0.2,
         ssys.rods.cac.T => fill(T_inlet, n),
         ssys.rods.fuel.T => fill(T_inlet, nz, nx),
     ]
