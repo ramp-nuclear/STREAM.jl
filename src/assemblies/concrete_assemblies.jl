@@ -16,15 +16,16 @@ end
 """
     _check_side(channel, side)
 
-Throw an `ArgumentError` unless `side` is `:left` or `:right` and the channel has a face there.
+Check that `side` names a wall of a rectangular channel. Throw an `ArgumentError` unless
+`side` is `:left` or `:right` and the channel has a face there.
 """
 function _check_side(channel, side)
-    side in (:left, :right) ||
-        throw(ArgumentError("side must be :left or :right, got :$side"))
+    side in (:left, :right) || throw(ArgumentError(
+        "side must be :left or :right for a rectangular channel, got :$side"))
     faces = keys(duct(channel).heated)
     side in faces || throw(ArgumentError(
-        "$(nameof(channel)) has no :$side face; its faces are $(join(repr.(faces), ", "))"))
-    return nothing
+        "$(nameof(channel)) has no :$side face, which a rectangular channel should have; " *
+        "its faces are $(join(repr.(faces), ", "))"))
 end
 
 """
